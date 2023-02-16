@@ -105,7 +105,12 @@ sendresult:
 }
 
 int main(void) {
-	std::string token(getenv("TOKEN"));
+	const char *token_str = getenv("TOKEN");
+	if (!token_str) {
+		printf("TOKEN is not exported\n");
+		return 1;
+	}
+	std::string token(token_str);
 	printf("Token: %s\n", token.c_str());
 	
 	Bot bot(token);
