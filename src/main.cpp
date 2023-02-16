@@ -8,8 +8,6 @@
 
 #include <tgbot/tgbot.h>
 
-#define DEBUG
-
 using namespace TgBot;
 
 static std::vector<int64_t> recognized_chatids = {
@@ -29,11 +27,12 @@ static bool Authorized(const Message::Ptr &message) {
 #define AOUTNAME "./a.out"
 #define STDERRTOOUT "2>&1"
 #define BUFSIZE 1024
+#define EMPTY "<empty>"
 static void CCppCompileHandler(const Bot *bot, const Message::Ptr &message, const bool plusplus) {
 	FILE *fp;
 	std::string cmd, res;
 	char* buff;
-	bool fine = true;
+	bool fine;
 
 	if (message->replyToMessage == nullptr) {
 		bot->getApi().sendMessage(message->chat->id, "Reply to a code to compile",
@@ -53,11 +52,11 @@ static void CCppCompileHandler(const Bot *bot, const Message::Ptr &message, cons
 
 	if (plusplus) { cmd += "g++"; } else { cmd += "gcc"; }
 	cmd += " ";
-	cmd += FILENAME;
-	cmd += " ";
 	cmd += "-x";
 	cmd += " ";
 	if (plusplus) { cmd += "c++"; } else { cmd += "c"; }
+	cmd += " ";
+	cmd += FILENAME;
 	cmd += " ";
 	cmd += STDERRTOOUT;
 #ifdef DEBUG
@@ -71,10 +70,16 @@ static void CCppCompileHandler(const Bot *bot, const Message::Ptr &message, cons
 	}
 	buff = new char[BUFSIZE];
 	res += "Compile time:\n";
-	while(fgets(buff, BUFSIZE, fp))
+	// fine is implicit false here
+	while(fgets(buff, BUFSIZE, fp)) {
+		if (!fine) fine = true;
 		res += buff;
+	}
 	pclose(fp);
 	delete buff;
+	if (!fine) res += EMPTY;
+
+	res += "\n";
 
 	std::ifstream aout(AOUTNAME);
 	if (!aout.good()) goto sendresult;
@@ -84,8 +89,12 @@ static void CCppCompileHandler(const Bot *bot, const Message::Ptr &message, cons
 	fp = popen(cmd.c_str(), "r");
 	buff = new char[BUFSIZE];
 	res += "Run time:\n";
-	while(fgets(buff, BUFSIZE, fp))
+	fine = false;
+	while(fgets(buff, BUFSIZE, fp)) {
+		if (!fine) fine = true;
 		res += buff;
+	}
+	if (!fine) res += EMPTY;
 	pclose(fp);
 	delete buff;
 
@@ -129,7 +138,9 @@ int main(void) {
 
 		TgLongPoll longPoll(bot);
 		while (true) {
+#ifdef DEBUG
 			printf("Long poll started\n");
+#endif
 			longPoll.start();
 		}
 	} catch (std::exception& e) {
