@@ -50,7 +50,7 @@ static void CCppCompileHandler(const Bot *bot, const Message::Ptr &message, cons
 	file << message->replyToMessage->text;
 	file.close();
 
-	if (plusplus) { cmd += "g++"; } else { cmd += "gcc"; }
+	if (plusplus) { cmd += "c++"; } else { cmd += "cc"; }
 	cmd += " ";
 	cmd += "-x";
 	cmd += " ";
