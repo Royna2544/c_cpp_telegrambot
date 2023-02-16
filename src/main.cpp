@@ -76,7 +76,7 @@ static void CCppCompileHandler(const Bot *bot, const Message::Ptr &message, cons
 		res += buff;
 	}
 	pclose(fp);
-	delete buff;
+	delete[] buff;
 	if (!fine) res += EMPTY;
 
 	res += "\n";
@@ -96,7 +96,7 @@ static void CCppCompileHandler(const Bot *bot, const Message::Ptr &message, cons
 	}
 	if (!fine) res += EMPTY;
 	pclose(fp);
-	delete buff;
+	delete[] buff;
 
 sendresult:
 	bot->getApi().sendMessage(message->chat->id, res.c_str(), false, message->messageId);
