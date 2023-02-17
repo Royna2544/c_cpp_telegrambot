@@ -5,10 +5,18 @@
 #include <fstream>
 #include <string>
 #include <vector>
+#include <thread>
+#include <future>
+#include <chrono>
+#include <mutex>
+#include <atomic>
+#include <unordered_map>
 
 #include <tgbot/tgbot.h>
 
 using namespace TgBot;
+
+//#define DEBUG
 
 static std::vector<int64_t> recognized_chatids = {
 	-1001895513214, // Our spamgroup
@@ -122,15 +130,85 @@ int main(void) {
 		if (!Authorized(message)) return;
 		CCppCompileHandler(&bot, message, 0);
 	});
-	/*
 	bot.getEvents().onAnyMessage([&bot](Message::Ptr message) {
-		printf("User wrote %s\n", message->text.c_str());
-		if (StringTools::startsWith(message->text, "/start")) {
-			return;
+		static std::vector<Message::Ptr> buffer;
+		static std::mutex m;
+		static std::atomic_bool cb;
+		static bool falseth;
+
+		if (!falseth) {
+			std::thread([cb = &cb]() {
+				falseth = true;
+				while (true) {
+					if (!cb) break;
+					cb->store(false);
+					std::this_thread::sleep_for(std::chrono::seconds(5));
+				}
+			}).detach();
 		}
-		bot.getApi().sendMessage(message->chat->id, "Your message is: " + message->text);
+
+		if (!Authorized(message)) return;
+		{
+			std::lock_guard<std::mutex> _(m);
+			buffer.push_back(message);
+		}
+		if (!cb) {
+			cb.store(true);
+			std::thread([&]() {
+				struct simpleuser {
+					int64_t id;
+					std::string username;
+					int spamcnt;
+				};
+				bool spam = false;
+				std::vector<struct simpleuser> spamvec;
+				std::this_thread::sleep_for(std::chrono::seconds(3));
+                                std::lock_guard<std::mutex> _(m);
+				if (buffer.size() > 5) {
+					int64_t chatid = buffer.front()->chat->id;
+					for (const auto& msg : buffer) {
+						if (msg->chat->id != chatid) continue;
+						bool found = false;
+						struct simpleuser *ptr;
+						for (const auto& user : spamvec) {
+							found = user.id == msg->from->id;
+							if (found) {
+								ptr = const_cast<struct simpleuser *>(&user);
+								break;
+							}
+						}
+						if (found) {
+							ptr->spamcnt += 1;
+						} else {
+							spamvec.push_back({msg->from->id, msg->from->username, 0});
+						}
+					}
+					spam = spamvec.size() < 3;
+				}
+				if (spam) {
+					using pair_type = decltype(spamvec)::value_type;
+					auto pr = std::max_element(
+						std::begin(spamvec), std::end(spamvec), 
+						[] (const pair_type &p1, const pair_type &p2) {
+							return p1.spamcnt < p2.spamcnt;
+						}
+					);
+					bot.getApi().sendMessage(buffer.front()->chat->id, "Spam detected @" + pr->username);
+					try {
+						for (const auto &msg : buffer) {
+							if (msg->from->id != pr->id) continue;
+#ifdef DEBUG
+							// Can get 'Too many requests' here
+							bot.getApi().sendMessage(buffer.front()->chat->id, "Delete '" + msg->text + "'");
+#endif
+							bot.getApi().deleteMessage(msg->chat->id, msg->messageId);
+						}
+					} catch (std::exception&){ printf("Error deleting msg\n"); }
+				}
+				buffer.clear();
+			}).detach();
+		}
 	});
-	*/
 	signal(SIGINT, [](int s) {
 		printf("\n");
 		printf("Got SIGINT\n");
@@ -143,9 +221,6 @@ int main(void) {
 
 		TgLongPoll longPoll(bot);
 		while (true) {
-#ifdef DEBUG
-			printf("Long poll started\n");
-#endif
 			longPoll.start();
 		}
 	} catch (std::exception& e) {
