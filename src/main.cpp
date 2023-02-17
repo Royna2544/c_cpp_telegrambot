@@ -10,7 +10,7 @@
 #include <chrono>
 #include <mutex>
 #include <atomic>
-#include <unordered_map>
+#include <memory>
 
 #include <tgbot/tgbot.h>
 
@@ -39,7 +39,7 @@ static bool Authorized(const Message::Ptr &message) {
 static void CCppCompileHandler(const Bot *bot, const Message::Ptr &message, const bool plusplus) {
 	FILE *fp;
 	std::string cmd, res;
-	char* buff;
+	std::unique_ptr<char[]> buff;
 	bool fine;
 
 	if (message->replyToMessage == nullptr) {
@@ -76,15 +76,14 @@ static void CCppCompileHandler(const Bot *bot, const Message::Ptr &message, cons
 			       false, message->messageId);
 		return;
 	}
-	buff = new char[BUFSIZE];
+	buff = std::make_unique<char[]>(BUFSIZE);
 	res += "Compile time:\n";
 	// fine is implicit false here
-	while(fgets(buff, BUFSIZE, fp)) {
+	while (fgets(buff.get(), BUFSIZE, fp)) {
 		if (!fine) fine = true;
-		res += buff;
+		res += buff.get();
 	}
 	pclose(fp);
-	delete[] buff;
 	if (!fine) res += EMPTY;
 
 	res += "\n";
@@ -95,16 +94,15 @@ static void CCppCompileHandler(const Bot *bot, const Message::Ptr &message, cons
 	cmd += " ";
 	cmd += STDERRTOOUT;
 	fp = popen(cmd.c_str(), "r");
-	buff = new char[BUFSIZE];
 	res += "Run time:\n";
 	fine = false;
-	while(fgets(buff, BUFSIZE, fp)) {
+	buff = std::make_unique<char[]>(BUFSIZE);
+	while(fgets(buff.get(), BUFSIZE, fp)) {
 		if (!fine) fine = true;
-		res += buff;
+		res += buff.get();
 	}
 	if (!fine) res += EMPTY;
 	pclose(fp);
-	delete[] buff;
 
 sendresult:
 	bot->getApi().sendMessage(message->chat->id, res.c_str(), false, message->messageId);
@@ -149,7 +147,7 @@ int main(void) {
 
 		if (!Authorized(message)) return;
 		{
-			std::lock_guard<std::mutex> _(m);
+			const std::lock_guard<std::mutex> _(m);
 			buffer.push_back(message);
 		}
 		if (!cb) {
@@ -163,7 +161,7 @@ int main(void) {
 				bool spam = false;
 				std::vector<struct simpleuser> spamvec;
 				std::this_thread::sleep_for(std::chrono::seconds(3));
-                                std::lock_guard<std::mutex> _(m);
+				const std::lock_guard<std::mutex> _(m);
 				if (buffer.size() > 5) {
 					int64_t chatid = buffer.front()->chat->id;
 					for (const auto& msg : buffer) {
