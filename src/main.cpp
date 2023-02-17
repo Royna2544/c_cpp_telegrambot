@@ -128,6 +128,11 @@ int main(void) {
 		if (!Authorized(message)) return;
 		CCppCompileHandler(&bot, message, 0);
 	});
+	bot.getEvents().onCommand("alive", [&bot](Message::Ptr message) {
+		if (!Authorized(message)) return;
+		bot.getApi().sendMessage(message->chat->id, "I am alive...", false, message->messageId);
+	});
+
 	bot.getEvents().onAnyMessage([&bot](Message::Ptr message) {
 		static std::vector<Message::Ptr> buffer;
 		static std::mutex m;
