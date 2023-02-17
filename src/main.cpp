@@ -142,7 +142,7 @@ int main(void) {
 				while (true) {
 					if (!cb) break;
 					cb->store(false);
-					std::this_thread::sleep_for(std::chrono::seconds(5));
+					std::this_thread::sleep_for(std::chrono::seconds(4));
 				}
 			}).detach();
 		}
