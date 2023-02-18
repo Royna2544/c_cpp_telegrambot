@@ -36,6 +36,7 @@ static bool Authorized(const Message::Ptr &message) {
 #define STDERRTOOUT "2>&1"
 #define BUFSIZE 1024
 #define EMPTY "<empty>"
+#define SPACE " "
 static void CCppCompileHandler(const Bot *bot, const Message::Ptr &message, const bool plusplus) {
 	FILE *fp;
 	std::string cmd, res;
@@ -59,13 +60,13 @@ static void CCppCompileHandler(const Bot *bot, const Message::Ptr &message, cons
 	file.close();
 
 	if (plusplus) { cmd += "c++"; } else { cmd += "cc"; }
-	cmd += " ";
+	cmd += SPACE;
 	cmd += "-x";
-	cmd += " ";
+	cmd += SPACE;
 	if (plusplus) { cmd += "c++"; } else { cmd += "c"; }
-	cmd += " ";
+	cmd += SPACE;
 	cmd += FILENAME;
-	cmd += " ";
+	cmd += SPACE;
 	cmd += STDERRTOOUT;
 #ifdef DEBUG
 	printf("cmd: %s\n", cmd.c_str());
@@ -91,7 +92,7 @@ static void CCppCompileHandler(const Bot *bot, const Message::Ptr &message, cons
 	std::ifstream aout(AOUTNAME);
 	if (!aout.good()) goto sendresult;
 	cmd = AOUTNAME;
-	cmd += " ";
+	cmd += SPACE;
 	cmd += STDERRTOOUT;
 	fp = popen(cmd.c_str(), "r");
 	res += "Run time:\n";
