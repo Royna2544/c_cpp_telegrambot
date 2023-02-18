@@ -184,7 +184,7 @@ int main(void) {
 						if (found) {
 							ptr->spamcnt += 1;
 						} else {
-							spamvec.push_back({msg->from->id, msg->from->username, 0});
+							spamvec.push_back({msg->from->id, msg->from->username, 1});
 						}
 					}
 					spam = spamvec.size() < 3;
