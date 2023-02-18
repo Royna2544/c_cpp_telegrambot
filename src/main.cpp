@@ -1,9 +1,11 @@
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
+#include <cmath>
 #include <exception>
 #include <fstream>
 #include <string>
+#include <sstream>
 #include <vector>
 #include <thread>
 #include <future>
@@ -13,6 +15,8 @@
 #include <memory>
 
 #include <tgbot/tgbot.h>
+
+#include "Timer.h"
 
 using namespace TgBot;
 
@@ -25,7 +29,7 @@ static std::vector<int64_t> recognized_chatids = {
 static bool Authorized(const Message::Ptr &message) {
 	if (std::find(recognized_chatids.begin(), recognized_chatids.end(),
 			message->chat->id) == recognized_chatids.end()) {
-		printf("Unknown chat: %ld", message->chat->id);
+		printf("Unknown chat: %ld\n", message->chat->id);
 		return false;
 	}
 	return true;
@@ -110,7 +114,6 @@ sendresult:
 	std::remove(FILENAME);
 	std::remove(AOUTNAME);
 }
-
 int main(void) {
 	const char *token_str = getenv("TOKEN");
 	if (!token_str) {
@@ -121,6 +124,7 @@ int main(void) {
 	printf("Token: %s\n", token.c_str());
 	
 	Bot bot(token);
+	static Timer *tm_ptr;
 	bot.getEvents().onCommand("cpp", [&bot](Message::Ptr message) {
 		if (!Authorized(message)) return;
 		CCppCompileHandler(&bot, message, 1);
@@ -133,7 +137,114 @@ int main(void) {
 		if (!Authorized(message)) return;
 		bot.getApi().sendMessage(message->chat->id, "I am alive...", false, message->messageId);
 	});
-
+	bot.getEvents().onCommand("starttimer", [&bot](Message::Ptr message) {
+		enum InputState {
+			HOUR,
+			MINUTE,
+			SECOND,
+			NONE,
+		};
+		if (!Authorized(message)) return;
+		if (message->replyToMessage == nullptr) {
+			bot.getApi().sendMessage(message->chat->id, "Reply to a time, in hhmmss format",
+				false, message->messageId);
+			return;
+		}
+		const char *c_str = message->replyToMessage->text.c_str();
+		std::vector<int> numbercache;
+		enum InputState state;
+		struct timehms hms = { 0 };
+		for (int i = 0; i <= message->replyToMessage->text.size(); i++) {
+			int code = static_cast<int>(c_str[i]);
+			if (i == message->replyToMessage->text.size()) code = 32;
+			switch (code) {
+				case 32: {
+					if (numbercache.size() != 0) {
+						int result = 0, count = 1;
+						for (const auto i: numbercache) {
+							result += pow(10, numbercache.size() - count) * i;
+							count++;
+						}
+						switch (state) {
+							case InputState::HOUR: 
+								hms.h = result;
+								break;
+							case InputState::MINUTE:
+								hms.m = result;
+								break;
+							case InputState::SECOND:
+								hms.s = result;
+								break;
+							default:
+								break;
+						}
+#ifdef DEBUG
+						printf("result: %d\n", result);
+#endif
+						state = InputState::NONE;
+						numbercache.clear();
+					}
+					break;
+				}
+				case 48 ... 57: {
+					int intver = code - 48;
+#ifdef DEBUG
+					printf("%d\n", intver);
+#endif
+					numbercache.push_back(intver);
+					break;
+				}
+				case 104: {
+					state = InputState::HOUR;
+					break;
+				}
+				case 109: {
+					state = InputState::MINUTE;
+					break;
+                                }
+				case 115: {
+					state = InputState::SECOND;
+					break;
+				}
+			}
+		}
+#ifdef DEBUG
+		printf("Date h %d m %d s %d\n", hms.h, hms.m, hms.s);
+#endif
+		if (!hms.h && !hms.m && !hms.s) {
+			bot.getApi().sendMessage(message->chat->id, "I'm not a fool to time 0s",
+				false, message->messageId);
+		}
+		int msgid = bot.getApi().sendMessage(message->chat->id, "Timer starts")->messageId;
+		try {
+			bot.getApi().pinChatMessage(message->chat->id, msgid);
+		} catch (const std::exception&) {
+			printf("Cannot pin msg!\n");
+		}
+		tm_ptr = new Timer(hms.h, hms.m, hms.s);
+		tm_ptr->setCallback([=](void *priv, struct timehms ms){
+			Bot *bott = reinterpret_cast<decltype(bott)>(priv);
+			std::stringstream ss;
+			if (ms.h != 0)
+				ss << ms.h << "h ";
+			if (ms.m != 0)
+				ss << ms.m << "m ";
+			if (ms.s != 0)
+				ss << ms.s << "s ";
+			bott->getApi().editMessageText(ss.str(), message->chat->id, msgid);
+		}, 5, [=](void *priv){
+			Bot *bott = reinterpret_cast<decltype(bott)>(priv);
+			bott->getApi().editMessageText("Timer ended", message->chat->id, msgid);
+			std::this_thread::sleep_for(std::chrono::seconds(3));
+			bott->getApi().unpinChatMessage(message->chat->id, msgid);
+		}, &bot);
+		tm_ptr->start();
+        });
+	bot.getEvents().onCommand("stoptimer", [&bot](Message::Ptr message) {
+		if (tm_ptr) tm_ptr->cancel();
+		bot.getApi().sendMessage(message->chat->id, "Stopped successfully",
+			false, message->messageId);
+	});
 	bot.getEvents().onAnyMessage([&bot](Message::Ptr message) {
 		static std::vector<Message::Ptr> buffer;
 		static std::mutex m;
