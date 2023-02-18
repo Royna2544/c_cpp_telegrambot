@@ -36,6 +36,7 @@ void Timer::start(void) {
 		}
 		if (onEnd)
 			onEnd(priv);
+		stop = true;
 	}).detach();
 }
 void Timer::cancel(void) { stop = true; }

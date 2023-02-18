@@ -150,6 +150,11 @@ int main(void) {
 				false, message->messageId);
 			return;
 		}
+		if (tm_ptr && tm_ptr->isrunning()) {
+			bot.getApi().sendMessage(message->chat->id, "Timer is already running",
+				false, message->messageId);
+			return;
+		}
 		const char *c_str = message->replyToMessage->text.c_str();
 		std::vector<int> numbercache;
 		enum InputState state;
@@ -242,8 +247,8 @@ int main(void) {
         });
 	bot.getEvents().onCommand("stoptimer", [&bot](Message::Ptr message) {
 		if (tm_ptr) tm_ptr->cancel();
-		bot.getApi().sendMessage(message->chat->id, "Stopped successfully",
-			false, message->messageId);
+		bot.getApi().sendMessage(message->chat->id, tm_ptr ? "Stopped successfully" 
+			: "Timer is not running", false, message->messageId);
 	});
 	bot.getEvents().onAnyMessage([&bot](Message::Ptr message) {
 		static std::vector<Message::Ptr> buffer;

@@ -29,4 +29,7 @@ class Timer {
 	void setCallback(const time_callback_t onEvery, const unsigned int onsec, const callback_t onEnd, const void *priv);
 	void start(void);
 	void cancel(void);
+	bool isrunning(void) {
+		return !stop;
+	}
 };
