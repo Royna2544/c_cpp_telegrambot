@@ -242,7 +242,7 @@ int main(void) {
 				ss << ms.m << "m ";
 			if (ms.s != 0)
 				ss << ms.s << "s ";
-			if (!ss.str().empty())
+			if (!ss.str().empty() && ss.str() != message->text)
 				bott->getApi().editMessageText(ss.str(), message->chat->id, msgid);
 		}, TIMER_CONFIG_SEC, [=](void *priv){
 			Bot *bott = reinterpret_cast<decltype(bott)>(priv);
