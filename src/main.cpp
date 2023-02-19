@@ -257,6 +257,7 @@ int main(void) {
 		static std::atomic_bool cb;
 		static bool falseth;
 
+		if (std::time(0) - message->date > 10) return;
 		if (!falseth) {
 			std::thread([cb = &cb]() {
 				falseth = true;
