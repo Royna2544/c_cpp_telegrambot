@@ -264,7 +264,7 @@ int main(void) {
 				while (true) {
 					if (!cb) break;
 					cb->store(false);
-					std::this_thread::sleep_for(std::chrono::seconds(4));
+					std::this_thread::sleep_for(std::chrono::seconds(5));
 				}
 				falseth = false;
 			}).detach();
@@ -285,8 +285,9 @@ int main(void) {
 				};
 				bool spam = false;
 				std::vector<struct simpleuser> spamvec;
-				std::this_thread::sleep_for(std::chrono::seconds(3));
+				std::this_thread::sleep_for(std::chrono::seconds(5));
 				const std::lock_guard<std::mutex> _(m);
+				printf("Buffer size: %lu\n", buffer.size());
 				if (buffer.size() > 5) {
 					int64_t chatid = buffer.front()->chat->id;
 					for (const auto& msg : buffer) {
