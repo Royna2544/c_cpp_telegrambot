@@ -236,7 +236,8 @@ int main(void) {
 				ss << ms.m << "m ";
 			if (ms.s != 0)
 				ss << ms.s << "s ";
-			bott->getApi().editMessageText(ss.str(), message->chat->id, msgid);
+			if (!ss.str().empty())
+				bott->getApi().editMessageText(ss.str(), message->chat->id, msgid);
 		}, 5, [=](void *priv){
 			Bot *bott = reinterpret_cast<decltype(bott)>(priv);
 			bott->getApi().editMessageText("Timer ended", message->chat->id, msgid);
@@ -264,6 +265,7 @@ int main(void) {
 					cb->store(false);
 					std::this_thread::sleep_for(std::chrono::seconds(4));
 				}
+				falseth = false;
 			}).detach();
 		}
 
