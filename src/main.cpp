@@ -216,9 +216,15 @@ int main(void) {
 #ifdef DEBUG
 		printf("Date h %d m %d s %d\n", hms.h, hms.m, hms.s);
 #endif
+#define TIMER_CONFIG_SEC 4
 		if (!hms.h && !hms.m && !hms.s) {
 			bot.getApi().sendMessage(message->chat->id, "I'm not a fool to time 0s",
 				false, message->messageId);
+			return;
+		} else if (hms.toSeconds() < TIMER_CONFIG_SEC) {
+			bot.getApi().sendMessage(message->chat->id, "Provide longer time value",
+				false, message->messageId);
+			return;
 		}
 		int msgid = bot.getApi().sendMessage(message->chat->id, "Timer starts")->messageId;
 		try {
@@ -238,7 +244,7 @@ int main(void) {
 				ss << ms.s << "s ";
 			if (!ss.str().empty())
 				bott->getApi().editMessageText(ss.str(), message->chat->id, msgid);
-		}, 5, [=](void *priv){
+		}, TIMER_CONFIG_SEC, [=](void *priv){
 			Bot *bott = reinterpret_cast<decltype(bott)>(priv);
 			bott->getApi().editMessageText("Timer ended", message->chat->id, msgid);
 			std::this_thread::sleep_for(std::chrono::seconds(3));

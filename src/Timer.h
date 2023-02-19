@@ -9,6 +9,9 @@ struct timehms {
 	int h;
 	int m;
 	int s;
+	int toSeconds(void) {
+		return 60 * 60 * h + 60 * m + s;
+	}
 };
 
 using callback_t = std::function<void(void *)>;
