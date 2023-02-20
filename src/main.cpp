@@ -13,7 +13,9 @@
 #include <mutex>
 #include <atomic>
 #include <memory>
-
+#include <algorithm>
+#include <iostream>
+#include <random>
 #include <tgbot/tgbot.h>
 
 #include "Timer.h"
@@ -136,6 +138,27 @@ int main(void) {
 	bot.getEvents().onCommand("alive", [&bot](Message::Ptr message) {
 		if (!Authorized(message)) return;
 		bot.getApi().sendMessage(message->chat->id, "I am alive...", false, message->messageId);
+	});
+	bot.getEvents().onCommand("flash", [&bot](Message::Ptr message) {
+		if (!Authorized(message)) return;
+		static std::vector<std::string> reasons = {
+			"Alex is not sleeping",
+			"The system has been destoryed",
+		};
+
+		std::string msg = message->text;
+		std::replace(msg.begin(), msg.end(), ' ', '_');
+		std::stringstream ss;
+		ss << "Flashing '" << msg;
+		ss << "' failed!" << std::endl;
+		ss << "Reason: ";
+		srand(time(0));
+		ssize_t pos = rand() % reasons.size();
+		ss << reasons[pos];
+		bot.getApi().sendMessage(message->chat->id, ss.str());
+	});
+	bot.getEvents().onCommand("shutdown", [&bot](Message::Ptr message) {
+		if (message->from->id == 1185607882) exit(0);
 	});
 	bot.getEvents().onCommand("starttimer", [&bot](Message::Ptr message) {
 		enum InputState {
