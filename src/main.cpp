@@ -186,7 +186,7 @@ int main(void) {
 			int code = static_cast<int>(c_str[i]);
 			if (i == message->replyToMessage->text.size()) code = 32;
 			switch (code) {
-				case 32: {
+				case ' ': {
 					if (numbercache.size() != 0) {
 						int result = 0, count = 1;
 						for (const auto i: numbercache) {
@@ -214,7 +214,7 @@ int main(void) {
 					}
 					break;
 				}
-				case 48 ... 57: {
+				case '0' ... '9': {
 					int intver = code - 48;
 #ifdef DEBUG
 					printf("%d\n", intver);
@@ -222,15 +222,18 @@ int main(void) {
 					numbercache.push_back(intver);
 					break;
 				}
-				case 104: {
+				case 'H':
+				case 'h': {
 					state = InputState::HOUR;
 					break;
 				}
-				case 109: {
+				case 'M':
+				case 'm': {
 					state = InputState::MINUTE;
 					break;
                                 }
-				case 115: {
+				case 'S':
+				case 's': {
 					state = InputState::SECOND;
 					break;
 				}
