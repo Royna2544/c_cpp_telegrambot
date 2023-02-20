@@ -158,13 +158,18 @@ int main(void) {
 		};
 
 		std::string msg = message->text;
-		if (msg.find(" ") == std::string::npos) {
+		if (message->replyToMessage != nullptr) {
+			msg = message->replyToMessage->text;
+			goto parse;
+		}
+		if (msg.find(SPACE) == std::string::npos) {
 			bot.getApi().sendMessage(message->chat->id,
 						 "Send a file name", false,
 						 message->messageId);
 			return;
 		}
 		msg = msg.substr(msg.find(" ") + 1);
+	parse:
 		std::replace(msg.begin(), msg.end(), ' ', '_');
 		std::stringstream ss;
 		ss << "Flashing '" << msg;
@@ -176,7 +181,9 @@ int main(void) {
 		bot.getApi().sendMessage(message->chat->id, ss.str());
 	});
 	bot.getEvents().onCommand("shutdown", [&bot](Message::Ptr message) {
-		if (message->from->id == 1185607882 && std::time(0) - message->date < 5) exit(0);
+		if (message->from->id == 1185607882 &&
+		    std::time(0) - message->date < 5)
+			exit(0);
 	});
 	bot.getEvents().onCommand("starttimer", [&bot](Message::Ptr message) {
 		enum InputState {
