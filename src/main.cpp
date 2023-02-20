@@ -1,25 +1,27 @@
+#include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <cmath>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
-#include <cmath>
 #include <exception>
 #include <fstream>
-#include <string>
-#include <sstream>
-#include <vector>
-#include <thread>
 #include <future>
-#include <chrono>
-#include <mutex>
-#include <atomic>
-#include <memory>
-#include <algorithm>
 #include <iostream>
+#include <memory>
+#include <mutex>
 #include <random>
+#include <sstream>
+#include <string>
+#include <thread>
+#include <vector>
+
 #include <tgbot/tgbot.h>
 
 #include "Timer.h"
 
+// clang-format off
 using namespace TgBot;
 
 //#define DEBUG
