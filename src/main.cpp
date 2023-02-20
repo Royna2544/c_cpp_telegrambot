@@ -155,6 +155,8 @@ int main(void) {
 		static std::vector<std::string> reasons = {
 		    "Alex is not sleeping",
 		    "The system has been destoryed",
+		    "init: service 'recovery' got signal 6",
+		    "Rewrite the updater script with cpp and try again"
 		};
 
 		std::string msg = message->text;
