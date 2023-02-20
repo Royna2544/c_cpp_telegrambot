@@ -48,7 +48,8 @@ static bool Authorized(const Message::Ptr &message) {
 static void CCppCompileHandler(const Bot *bot, const Message::Ptr &message,
 			       const bool plusplus) {
 	FILE *fp;
-	std::string cmd, res;
+	std::string res;
+	std::stringstream cmd, cmd2;
 	std::unique_ptr<char[]> buff;
 	bool fine;
 
@@ -71,26 +72,21 @@ static void CCppCompileHandler(const Bot *bot, const Message::Ptr &message,
 	file.close();
 
 	if (plusplus) {
-		cmd += "c++";
+		cmd << "c++";
 	} else {
-		cmd += "cc";
+		cmd << "cc";
 	}
-	cmd += SPACE;
-	cmd += "-x";
-	cmd += SPACE;
+	cmd << SPACE << "-x" << SPACE;
 	if (plusplus) {
-		cmd += "c++";
+		cmd << "c++";
 	} else {
-		cmd += "c";
+		cmd << "c";
 	}
-	cmd += SPACE;
-	cmd += FILENAME;
-	cmd += SPACE;
-	cmd += STDERRTOOUT;
+	cmd << SPACE << FILENAME << SPACE << STDERRTOOUT;
 #ifdef DEBUG
-	printf("cmd: %s\n", cmd.c_str());
+	printf("cmd: %s\n", cmd.str().c_str());
 #endif
-	fp = popen(cmd.c_str(), "r");
+	fp = popen(cmd.str().c_str(), "r");
 	if (!fp) {
 		bot->getApi().sendMessage(message->chat->id,
 					  "Failed to popen()", false,
@@ -111,10 +107,9 @@ static void CCppCompileHandler(const Bot *bot, const Message::Ptr &message,
 
 	std::ifstream aout(AOUTNAME);
 	if (!aout.good()) goto sendresult;
-	cmd = AOUTNAME;
-	cmd += SPACE;
-	cmd += STDERRTOOUT;
-	fp = popen(cmd.c_str(), "r");
+	cmd.swap(cmd2);
+	cmd << AOUTNAME << SPACE << STDERRTOOUT;
+	fp = popen(cmd.str().c_str(), "r");
 	res += "Run time:\n";
 	fine = false;
 	buff = std::make_unique<char[]>(BUFSIZE);
