@@ -150,7 +150,7 @@ int main(void) {
 		std::replace(msg.begin(), msg.end(), ' ', '_');
 		std::stringstream ss;
 		ss << "Flashing '" << msg;
-		ss << "' failed!" << std::endl;
+		ss << ".zip' failed!" << std::endl;
 		ss << "Reason: ";
 		srand(time(0));
 		ssize_t pos = rand() % reasons.size();
