@@ -158,6 +158,12 @@ int main(void) {
 		};
 
 		std::string msg = message->text;
+		if (msg.find(" ") == std::string::npos) {
+			bot.getApi().sendMessage(message->chat->id,
+						 "Send a file name", false,
+						 message->messageId);
+		}
+		msg = msg.substr(msg.find(" ") + 1);
 		std::replace(msg.begin(), msg.end(), ' ', '_');
 		std::stringstream ss;
 		ss << "Flashing '" << msg;
