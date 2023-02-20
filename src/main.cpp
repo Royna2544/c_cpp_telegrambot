@@ -364,7 +364,7 @@ int main(void) {
 #ifdef DEBUG
 				printf("Buffer size: %lu\n", buffer.size());
 #endif
-				if (buffer.size() > 5) {
+				if (buffer.size() >= 4) {
 					int64_t chatid =
 					    buffer.front()->chat->id;
 					for (const auto &msg : buffer) {
