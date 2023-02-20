@@ -354,7 +354,9 @@ int main(void) {
 				std::this_thread::sleep_for(
 				    std::chrono::seconds(5));
 				const std::lock_guard<std::mutex> _(m);
+#ifdef DEBUG
 				printf("Buffer size: %lu\n", buffer.size());
+#endif
 				if (buffer.size() > 5) {
 					int64_t chatid =
 					    buffer.front()->chat->id;
