@@ -162,6 +162,7 @@ int main(void) {
 			bot.getApi().sendMessage(message->chat->id,
 						 "Send a file name", false,
 						 message->messageId);
+			return;
 		}
 		msg = msg.substr(msg.find(" ") + 1);
 		std::replace(msg.begin(), msg.end(), ' ', '_');
@@ -175,7 +176,7 @@ int main(void) {
 		bot.getApi().sendMessage(message->chat->id, ss.str());
 	});
 	bot.getEvents().onCommand("shutdown", [&bot](Message::Ptr message) {
-		if (message->from->id == 1185607882) exit(0);
+		if (message->from->id == 1185607882 && std::time(0) - message->date < 5) exit(0);
 	});
 	bot.getEvents().onCommand("starttimer", [&bot](Message::Ptr message) {
 		enum InputState {
