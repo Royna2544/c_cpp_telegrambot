@@ -17,6 +17,7 @@
 #include <thread>
 #include <vector>
 
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS
 #include <tgbot/tgbot.h>
 
 #include "Timer.h"
