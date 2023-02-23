@@ -321,6 +321,22 @@ int main(void) {
             tm_ptr ? "Stopped successfully" : "Timer is not running", false,
             message->messageId, FILLIN_SENDWOERROR);
     });
+    bot.getEvents().onCommand("randsticker", [&bot](Message::Ptr message) {
+        if (message->replyToMessage && message->replyToMessage->sticker) {
+            auto stickset = bot.getApi().getStickerSet(
+                message->replyToMessage->sticker->setName);
+            srand(time(0));
+            ssize_t pos = rand() % stickset->stickers.size();
+            bot.getApi().sendSticker(message->chat->id,
+                                     stickset->stickers[pos]->fileId,
+                                     message->messageId, nullptr, false, true);
+        } else {
+            bot.getApi().sendMessage(
+                message->chat->id, "Sticker not found in replied-to message",
+                false, message->messageId, FILLIN_SENDWOERROR);
+            return;
+        }
+    });
     bot.getEvents().onAnyMessage([&bot](Message::Ptr message) {
         static std::vector<Message::Ptr> buffer;
         static std::mutex m;
