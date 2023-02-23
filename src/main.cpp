@@ -121,6 +121,7 @@ static void CCppCompileHandler(const Bot *bot, const Message::Ptr &message,
 	pclose(fp);
 
 sendresult:
+	if (res.size() > 4095) res.resize(4095);
 	bot->getApi().sendMessage(message->chat->id, res.c_str(), false,
 				  message->messageId);
 	std::remove(FILENAME);
