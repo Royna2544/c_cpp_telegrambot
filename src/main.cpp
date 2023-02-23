@@ -45,6 +45,8 @@ static bool Authorized(const Message::Ptr &message) {
 #define BUFSIZE 1024
 #define EMPTY "<empty>"
 #define SPACE " "
+
+#define FILLIN_SENDWOERROR nullptr, "", false, std::vector<MessageEntity::Ptr>(), true
 static void CCppCompileHandler(const Bot *bot, const Message::Ptr &message,
 			       const bool plusplus) {
 	FILE *fp;
@@ -56,7 +58,7 @@ static void CCppCompileHandler(const Bot *bot, const Message::Ptr &message,
 	if (message->replyToMessage == nullptr) {
 		bot->getApi().sendMessage(message->chat->id,
 					  "Reply to a code to compile", false,
-					  message->messageId);
+					  message->messageId, FILLIN_SENDWOERROR);
 		return;
 	}
 
@@ -65,7 +67,7 @@ static void CCppCompileHandler(const Bot *bot, const Message::Ptr &message,
 	if (file.fail()) {
 		bot->getApi().sendMessage(message->chat->id,
 					  "Failed to open file to compile",
-					  false, message->messageId);
+					  false, message->messageId, FILLIN_SENDWOERROR);
 		return;
 	}
 	file << message->replyToMessage->text;
@@ -90,7 +92,7 @@ static void CCppCompileHandler(const Bot *bot, const Message::Ptr &message,
 	if (!fp) {
 		bot->getApi().sendMessage(message->chat->id,
 					  "Failed to popen()", false,
-					  message->messageId);
+					  message->messageId, FILLIN_SENDWOERROR);
 		return;
 	}
 	buff = std::make_unique<char[]>(BUFSIZE);
@@ -123,7 +125,7 @@ static void CCppCompileHandler(const Bot *bot, const Message::Ptr &message,
 sendresult:
 	if (res.size() > 4095) res.resize(4095);
 	bot->getApi().sendMessage(message->chat->id, res.c_str(), false,
-				  message->messageId);
+				  message->messageId, FILLIN_SENDWOERROR);
 	std::remove(FILENAME);
 	std::remove(AOUTNAME);
 }
@@ -149,7 +151,7 @@ int main(void) {
 	bot.getEvents().onCommand("alive", [&bot](Message::Ptr message) {
 		if (!Authorized(message)) return;
 		bot.getApi().sendMessage(message->chat->id, "I am alive...",
-					 false, message->messageId);
+					 false, message->messageId, FILLIN_SENDWOERROR);
 	});
 	bot.getEvents().onCommand("flash", [&bot](Message::Ptr message) {
 		if (!Authorized(message)) return;
@@ -168,7 +170,7 @@ int main(void) {
 		if (msg.find(SPACE) == std::string::npos) {
 			bot.getApi().sendMessage(message->chat->id,
 						 "Send a file name", false,
-						 message->messageId);
+						 message->messageId, FILLIN_SENDWOERROR);
 			return;
 		}
 		msg = msg.substr(msg.find(" ") + 1);
@@ -200,13 +202,13 @@ int main(void) {
 			bot.getApi().sendMessage(
 			    message->chat->id,
 			    "Reply to a time, in hhmmss format", false,
-			    message->messageId);
+			    message->messageId, FILLIN_SENDWOERROR);
 			return;
 		}
 		if (tm_ptr && tm_ptr->isrunning()) {
 			bot.getApi().sendMessage(message->chat->id,
 						 "Timer is already running",
-						 false, message->messageId);
+						 false, message->messageId, FILLIN_SENDWOERROR);
 			return;
 		}
 		const char *c_str = message->replyToMessage->text.c_str();
@@ -285,12 +287,12 @@ int main(void) {
 		if (!hms.h && !hms.m && !hms.s) {
 			bot.getApi().sendMessage(message->chat->id,
 						 "I'm not a fool to time 0s",
-						 false, message->messageId);
+						 false, message->messageId, FILLIN_SENDWOERROR);
 			return;
 		} else if (hms.toSeconds() < TIMER_CONFIG_SEC) {
 			bot.getApi().sendMessage(message->chat->id,
 						 "Provide longer time value",
-						 false, message->messageId);
+						 false, message->messageId, FILLIN_SENDWOERROR);
 			return;
 		}
 		int msgid = bot.getApi()
@@ -331,7 +333,7 @@ int main(void) {
 		bot.getApi().sendMessage(
 		    message->chat->id,
 		    tm_ptr ? "Stopped successfully" : "Timer is not running",
-		    false, message->messageId);
+		    false, message->messageId, FILLIN_SENDWOERROR);
 	});
 	bot.getEvents().onAnyMessage([&bot](Message::Ptr message) {
 		static std::vector<Message::Ptr> buffer;
