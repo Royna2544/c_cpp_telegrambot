@@ -331,8 +331,9 @@ int main(void) {
                                      stickset->stickers[pos]->fileId,
                                      message->messageId, nullptr, false, true);
             std::stringstream ss;
-            ss << "Sticker idx " << pos
-               << " from pack '" + stickset->name + "'";
+            std::string name = stickset->title;
+            std::replace(name.begin(), name.end(), '_', ' ');
+            ss << "Sticker idx " << pos << " from pack \"" + name + "\"";
             bot.getApi().sendMessage(message->chat->id, ss.str(), false,
                                      message->messageId, FILLIN_SENDWOERROR);
         } else {
