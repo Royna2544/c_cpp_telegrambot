@@ -330,6 +330,11 @@ int main(void) {
             bot.getApi().sendSticker(message->chat->id,
                                      stickset->stickers[pos]->fileId,
                                      message->messageId, nullptr, false, true);
+            std::stringstream ss;
+            ss << "Sticker idx " << pos
+               << " from pack '" + stickset->name + "'";
+            bot.getApi().sendMessage(message->chat->id, ss.str(), false,
+                                     message->messageId, FILLIN_SENDWOERROR);
         } else {
             bot.getApi().sendMessage(
                 message->chat->id, "Sticker not found in replied-to message",
