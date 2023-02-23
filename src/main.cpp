@@ -333,7 +333,7 @@ int main(void) {
             std::stringstream ss;
             std::string name = stickset->title;
             std::replace(name.begin(), name.end(), '_', ' ');
-            ss << "Sticker idx " << pos << " from pack \"" + name + "\"";
+            ss << "Sticker idx: " << pos << " emoji: " << stickset->stickers[pos]->emoji << " from pack \"" + name + "\"";
             bot.getApi().sendMessage(message->chat->id, ss.str(), false,
                                      message->messageId, FILLIN_SENDWOERROR);
         } else {
