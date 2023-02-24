@@ -139,7 +139,7 @@ static void PyRunHandler(const Bot *bot, const Message::Ptr &message) {
 
     if (message->replyToMessage == nullptr) {
         bot->getApi().sendMessage(message->chat->id,
-                                  "Reply to a code to compile", false,
+                                  "Reply to a code to run", false,
                                   message->messageId, FILLIN_SENDWOERROR);
         return;
     }
@@ -148,7 +148,7 @@ static void PyRunHandler(const Bot *bot, const Message::Ptr &message) {
     file.open(FILENAME);
     if (file.fail()) {
         bot->getApi().sendMessage(message->chat->id,
-                                  "Failed to open file to compile", false,
+                                  "Failed to open file to run", false,
                                   message->messageId, FILLIN_SENDWOERROR);
         return;
     }
@@ -172,7 +172,6 @@ static void PyRunHandler(const Bot *bot, const Message::Ptr &message) {
     pclose(fp);
     if (res.empty()) res = EMPTY;
 
-sendresult:
     if (res.size() > 4095) res.resize(4095);
     bot->getApi().sendMessage(message->chat->id, res.c_str(), false,
                               message->messageId, FILLIN_SENDWOERROR);
