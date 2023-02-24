@@ -323,7 +323,7 @@ int main(void) {
 #ifdef DEBUG
         printf("Date h %d m %d s %d\n", hms.h, hms.m, hms.s);
 #endif
-#define TIMER_CONFIG_SEC 4
+#define TIMER_CONFIG_SEC 5
         if (!hms.h && !hms.m && !hms.s) {
             bot.getApi().sendMessage(message->chat->id,
                                      "I'm not a fool to time 0s", false,
