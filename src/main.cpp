@@ -129,6 +129,55 @@ sendresult:
     std::remove(FILENAME);
     std::remove(AOUTNAME);
 }
+#undef FILENAME
+#define FILENAME "./out.py"
+static void PyRunHandler(const Bot *bot, const Message::Ptr &message) {
+    FILE *fp;
+    std::string res;
+    std::stringstream cmd;
+    std::unique_ptr<char[]> buff;
+
+    if (message->replyToMessage == nullptr) {
+        bot->getApi().sendMessage(message->chat->id,
+                                  "Reply to a code to compile", false,
+                                  message->messageId, FILLIN_SENDWOERROR);
+        return;
+    }
+
+    std::ofstream file;
+    file.open(FILENAME);
+    if (file.fail()) {
+        bot->getApi().sendMessage(message->chat->id,
+                                  "Failed to open file to compile", false,
+                                  message->messageId, FILLIN_SENDWOERROR);
+        return;
+    }
+    file << message->replyToMessage->text;
+    file.close();
+    cmd << "python3" << SPACE;
+    cmd << FILENAME << SPACE << STDERRTOOUT;
+#ifdef DEBUG
+    printf("cmd: %s\n", cmd.str().c_str());
+#endif
+    fp = popen(cmd.str().c_str(), "r");
+    if (!fp) {
+        bot->getApi().sendMessage(message->chat->id, "Failed to popen()", false,
+                                  message->messageId, FILLIN_SENDWOERROR);
+        return;
+    }
+    buff = std::make_unique<char[]>(BUFSIZE);
+    while (fgets(buff.get(), BUFSIZE, fp)) {
+        res += buff.get();
+    }
+    pclose(fp);
+    if (res.empty()) res = EMPTY;
+
+sendresult:
+    if (res.size() > 4095) res.resize(4095);
+    bot->getApi().sendMessage(message->chat->id, res.c_str(), false,
+                              message->messageId, FILLIN_SENDWOERROR);
+    std::remove(FILENAME);
+}
 int main(void) {
     const char *token_str = getenv("TOKEN");
     if (!token_str) {
@@ -142,11 +191,15 @@ int main(void) {
     static Timer *tm_ptr;
     bot.getEvents().onCommand("cpp", [&bot](Message::Ptr message) {
         if (!Authorized(message)) return;
-        CCppCompileHandler(&bot, message, 1);
+        CCppCompileHandler(&bot, message, true);
     });
     bot.getEvents().onCommand("c", [&bot](Message::Ptr message) {
         if (!Authorized(message)) return;
-        CCppCompileHandler(&bot, message, 0);
+        CCppCompileHandler(&bot, message, true);
+    });
+    bot.getEvents().onCommand("python", [&bot](Message::Ptr message) {
+        if (!Authorized(message)) return;
+        PyRunHandler(&bot, message);
     });
     bot.getEvents().onCommand("alive", [&bot](Message::Ptr message) {
         if (!Authorized(message)) return;
@@ -331,7 +384,9 @@ int main(void) {
                                      stickset->stickers[pos]->fileId,
                                      message->messageId, nullptr, false, true);
             std::stringstream ss;
-            ss << "Sticker idx: " << pos + 1 << " emoji: " << stickset->stickers[pos]->emoji << std::endl << "From pack \"" + stickset->title + "\"";
+            ss << "Sticker idx: " << pos + 1
+               << " emoji: " << stickset->stickers[pos]->emoji << std::endl
+               << "From pack \"" + stickset->title + "\"";
             bot.getApi().sendMessage(message->chat->id, ss.str(), false,
                                      message->messageId, FILLIN_SENDWOERROR);
         } else {
