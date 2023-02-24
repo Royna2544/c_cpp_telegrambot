@@ -28,6 +28,7 @@ using namespace TgBot;
 
 static std::vector<int64_t> recognized_chatids = {
     -1001895513214,  // Our spamgroup
+    1185607882, // GG
 };
 
 static bool Authorized(const Message::Ptr &message) {
