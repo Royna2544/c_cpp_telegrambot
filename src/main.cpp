@@ -401,6 +401,7 @@ int main(void) {
         }
     });
     bot.getEvents().onAnyMessage([&bot](Message::Ptr message) {
+#define DEBUG
         static std::vector<Message::Ptr> buffer;
         static std::mutex m;
         static std::atomic_bool cb;
@@ -412,7 +413,7 @@ int main(void) {
 		config.close();
 		return;
 	}
-        if (std::time(0) - message->date > 7) return;
+        if (std::time(0) - message->date > 10) return;
         if (!falseth) {
             std::thread([cb = &cb]() {
                 falseth = true;
