@@ -28,7 +28,7 @@ using namespace TgBot;
 
 static std::vector<int64_t> recognized_chatids = {
     -1001895513214,  // Our spamgroup
-    1185607882, // GG
+    1185607882,      // GG
 };
 
 static bool Authorized(const Message::Ptr &message) {
@@ -139,9 +139,9 @@ static void PyRunHandler(const Bot *bot, const Message::Ptr &message) {
     std::unique_ptr<char[]> buff;
 
     if (message->replyToMessage == nullptr) {
-        bot->getApi().sendMessage(message->chat->id,
-                                  "Reply to a code to run", false,
-                                  message->messageId, FILLIN_SENDWOERROR);
+        bot->getApi().sendMessage(message->chat->id, "Reply to a code to run",
+                                  false, message->messageId,
+                                  FILLIN_SENDWOERROR);
         return;
     }
 
@@ -202,7 +202,11 @@ int main(void) {
         PyRunHandler(&bot, message);
     });
     bot.getEvents().onCommand("alive", [&bot](Message::Ptr message) {
+        static int64_t lasttime = 0, time = 0;
         if (!Authorized(message)) return;
+        time = std::time(0);
+        if (lasttime != 0 && time - lasttime < 5) return;
+        lasttime = time;
         bot.getApi().sendMessage(message->chat->id, "I am alive...", false,
                                  message->messageId, FILLIN_SENDWOERROR);
     });
@@ -401,14 +405,14 @@ int main(void) {
         static std::mutex m;
         static std::atomic_bool cb;
         static bool falseth;
-	static std::ifstream config;
+        static std::ifstream config;
 
 	config.open(".spamdetectdisabled");
 	if (config.good()) {
 		config.close();
 		return;
 	}
-        if (std::time(0) - message->date > 10) return;
+        if (std::time(0) - message->date > 7) return;
         if (!falseth) {
             std::thread([cb = &cb]() {
                 falseth = true;
