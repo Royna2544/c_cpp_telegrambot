@@ -408,11 +408,11 @@ int main(void) {
         static bool falseth;
         static std::ifstream config;
 
-	config.open(".spamdetectdisabled");
-	if (config.good()) {
-		config.close();
-		return;
-	}
+        config.open(".spamdetectdisabled");
+        if (config.good()) {
+            config.close();
+            return;
+        }
         if (std::time(0) - message->date > 10) return;
         if (!falseth) {
             std::thread([cb = &cb]() {
@@ -475,17 +475,20 @@ int main(void) {
                         [](const pair_type &p1, const pair_type &p2) {
                             return p1.spamcnt < p2.spamcnt;
                         });
+                    std::string tag;
+                    if (!pr->username.empty()) tag = " @" + pr->username;
                     bot.getApi().sendMessage(buffer.front()->chat->id,
-                                             "Spam detected @" + pr->username);
+                                             "Spam detected" + tag);
                     try {
                         for (const auto &msg : buffer) {
                             if (msg->from->id != pr->id) continue;
 #ifdef DEBUG
                             // Can get 'Too many
                             // requests' here
-                            bot.getApi().sendMessage(
-                                buffer.front()->chat->id,
-                                "Delete '" + msg->text + "'");
+                            if (!msg->text.empty())
+                                bot.getApi().sendMessage(
+                                    buffer.front()->chat->id,
+                                    "Delete '" + msg->text + "'");
 #endif
                             bot.getApi().deleteMessage(msg->chat->id,
                                                        msg->messageId);
