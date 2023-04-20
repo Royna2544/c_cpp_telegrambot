@@ -29,6 +29,7 @@ using namespace TgBot;
 static std::vector<int64_t> recognized_chatids = {
     -1001895513214,  // Our spamgroup
     -1001819867532,  // Ashcafe
+    -1001889871586,  // A51
     1185607882,      // GG
 };
 
