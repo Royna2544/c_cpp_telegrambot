@@ -52,7 +52,7 @@ static bool Authorized(const Message::Ptr &message) {
 static void CCppCompileHandler(const Bot *bot, const Message::Ptr &message,
                                const bool plusplus) {
     FILE *fp;
-    std::string res;
+    std::string res, extraargs;
     std::stringstream cmd, cmd2;
     std::unique_ptr<char[]> buff;
     bool fine;
@@ -62,6 +62,10 @@ static void CCppCompileHandler(const Bot *bot, const Message::Ptr &message,
                                   "Reply to a code to compile", false,
                                   message->messageId, FILLIN_SENDWOERROR);
         return;
+    }
+    auto id = message->text.find_first_of(" ");
+    if (id != std::string::npos) {
+        extraargs = message->text.substr(id);
     }
 
     std::ofstream file;
@@ -87,6 +91,14 @@ static void CCppCompileHandler(const Bot *bot, const Message::Ptr &message,
         cmd << "c";
     }
     cmd << SPACE << FILENAME << SPACE << STDERRTOOUT;
+    if (!extraargs.empty()) {
+        extraargs.erase(extraargs.find_last_not_of(" \n\r\t") + 1);
+        extraargs.erase(0, extraargs.find_first_not_of(" \n\r\t"));
+        cmd << " " << extraargs;
+        res += "cmd: \"";
+        res += cmd.str();
+        res += "\"\n";
+    }
 #ifdef DEBUG
     printf("cmd: %s\n", cmd.str().c_str());
 #endif
@@ -401,7 +413,6 @@ int main(void) {
         }
     });
     bot.getEvents().onAnyMessage([&bot](Message::Ptr message) {
-#define DEBUG
         static std::vector<Message::Ptr> buffer;
         static std::mutex m;
         static std::atomic_bool cb;
