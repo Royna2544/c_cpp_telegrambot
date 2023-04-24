@@ -30,6 +30,7 @@ static std::vector<int64_t> recognized_chatids = {
     -1001895513214,  // Our spamgroup
     -1001819867532,  // Ashcafe
     -1001889871586,  // A51
+    -1001972305418,
     1185607882,      // GG
 };
 
@@ -209,7 +210,7 @@ int main(void) {
     });
     bot.getEvents().onCommand("c", [&bot](Message::Ptr message) {
         if (!Authorized(message)) return;
-        CCppCompileHandler(&bot, message, true);
+        CCppCompileHandler(&bot, message, false);
     });
     bot.getEvents().onCommand("python", [&bot](Message::Ptr message) {
         if (!Authorized(message)) return;
@@ -244,6 +245,10 @@ int main(void) {
         }
         msg = msg.substr(msg.find(" ") + 1);
     parse:
+        if (msg.empty()) {
+		bot.getApi().sendMessage(message->chat->id, "Reply to a text", false, message->messageId, FILLIN_SENDWOERROR);
+		return;
+	}
         std::replace(msg.begin(), msg.end(), ' ', '_');
         std::stringstream ss;
         ss << "Flashing '" << msg;
@@ -252,7 +257,7 @@ int main(void) {
         srand(time(0));
         ssize_t pos = rand() % reasons.size();
         ss << reasons[pos];
-        bot.getApi().sendMessage(message->chat->id, ss.str());
+        bot.getApi().sendMessage(message->chat->id, ss.str(), false, message->messageId, FILLIN_SENDWOERROR);
     });
     bot.getEvents().onCommand("shutdown", [&bot](Message::Ptr message) {
         if (message->from->id == 1185607882 && std::time(0) - message->date < 5)
@@ -284,7 +289,7 @@ int main(void) {
         struct timehms hms = {0};
         for (int i = 0; i <= message->replyToMessage->text.size(); i++) {
             int code = static_cast<int>(c_str[i]);
-            if (i == message->replyToMessage->text.size()) code = 32;
+            if (i == message->replyToMessage->text.size()) code = ' ';
             switch (code) {
                 case ' ': {
                     if (numbercache.size() != 0) {
@@ -343,7 +348,7 @@ int main(void) {
         printf("Date h %d m %d s %d\n", hms.h, hms.m, hms.s);
 #endif
 #define TIMER_CONFIG_SEC 5
-        if (!hms.h && !hms.m && !hms.s) {
+        if (!hms.toSeconds() == 0) {
             bot.getApi().sendMessage(message->chat->id,
                                      "I'm not a fool to time 0s", false,
                                      message->messageId, FILLIN_SENDWOERROR);
@@ -391,6 +396,12 @@ int main(void) {
             message->chat->id,
             tm_ptr ? "Stopped successfully" : "Timer is not running", false,
             message->messageId, FILLIN_SENDWOERROR);
+    });
+    bot.getEvents().onCommand("build", [&bot](Message::Ptr message) {
+        bot.getApi().sendMessage(
+            message->chat->id,
+            "Function not implemented, did think this is a build bot?", false, message->messageId,
+            FILLIN_SENDWOERROR);
     });
     bot.getEvents().onCommand("randsticker", [&bot](Message::Ptr message) {
         if (message->replyToMessage && message->replyToMessage->sticker) {
