@@ -58,7 +58,7 @@ static void CCppCompileHandler(const Bot *bot, const Message::Ptr &message,
     std::string res, extraargs;
     std::stringstream cmd, cmd2;
     std::unique_ptr<char[]> buff;
-    bool fine;
+    bool fine = true;
 
     if (message->replyToMessage == nullptr) {
         bot->getApi().sendMessage(message->chat->id,
@@ -113,7 +113,6 @@ static void CCppCompileHandler(const Bot *bot, const Message::Ptr &message,
     }
     buff = std::make_unique<char[]>(BUFSIZE);
     res += "Compile time:\n";
-    // fine is implicit false here
     while (fgets(buff.get(), BUFSIZE, fp)) {
         if (!fine) fine = true;
         res += buff.get();
