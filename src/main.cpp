@@ -31,6 +31,7 @@ static std::vector<int64_t> recognized_chatids = {
     -1001819867532,  // Ashcafe
     -1001889871586,  // A51
     -1001972305418,
+    -1001418774987,  // Alex A51 Fw
     1185607882,      // GG
 };
 
@@ -58,7 +59,7 @@ static void CCppCompileHandler(const Bot *bot, const Message::Ptr &message,
     std::string res, extraargs;
     std::stringstream cmd, cmd2;
     std::unique_ptr<char[]> buff;
-    bool fine = true;
+    bool fine = false;
 
     if (message->replyToMessage == nullptr) {
         bot->getApi().sendMessage(message->chat->id,
