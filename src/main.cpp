@@ -438,12 +438,18 @@ int main(void) {
         static std::atomic_bool cb;
         static bool falseth;
         static std::ifstream config;
+        static bool enabled = true, initdone = false;
 
-        config.open(".spamdetectdisabled");
-        if (config.good()) {
-            config.close();
-            return;
+        if (!initdone) {
+            config.open(".spamdetectdisabled");
+            if (config.good()) {
+                config.close();
+                initdone = true;
+                enabled = false;
+                return;
+            }
         }
+        if (initdone && !enabled) return;
         if (std::time(0) - message->date > 10) return;
         if (!falseth) {
             std::thread([cb = &cb]() {
