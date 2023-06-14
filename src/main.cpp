@@ -412,6 +412,15 @@ int main(void) {
     });
     bot.getEvents().onCommand("randsticker", [&bot](Message::Ptr message) {
         if (message->replyToMessage && message->replyToMessage->sticker) {
+            try {
+                bot.getApi().getStickerSet(
+                    message->replyToMessage->sticker->setName);
+            } catch (const std::exception &e) {
+                bot.getApi().sendMessage(message->chat->id, e.what(), false,
+                                         message->messageId,
+                                         FILLIN_SENDWOERROR);
+                return;
+            }
             auto stickset = bot.getApi().getStickerSet(
                 message->replyToMessage->sticker->setName);
             srand(time(0));
