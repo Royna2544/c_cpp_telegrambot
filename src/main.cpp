@@ -347,7 +347,7 @@ int main(void) {
         printf("Date h %d m %d s %d\n", hms.h, hms.m, hms.s);
 #endif
 #define TIMER_CONFIG_SEC 5
-        if (!hms.toSeconds() == 0) {
+        if (hms.toSeconds() == 0) {
             bot.getApi().sendMessage(message->chat->id,
                                      "I'm not a fool to time 0s", false,
                                      message->messageId, FILLIN_SENDWOERROR);
