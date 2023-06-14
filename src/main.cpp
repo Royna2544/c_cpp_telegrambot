@@ -246,9 +246,11 @@ int main(void) {
         msg = msg.substr(msg.find(" ") + 1);
     parse:
         if (msg.empty()) {
-		bot.getApi().sendMessage(message->chat->id, "Reply to a text", false, message->messageId, FILLIN_SENDWOERROR);
-		return;
-	}
+            bot.getApi().sendMessage(message->chat->id, "Reply to a text",
+                                     false, message->messageId,
+                                     FILLIN_SENDWOERROR);
+            return;
+        }
         std::replace(msg.begin(), msg.end(), ' ', '_');
         std::stringstream ss;
         ss << "Flashing '" << msg;
@@ -257,7 +259,8 @@ int main(void) {
         srand(time(0));
         ssize_t pos = rand() % reasons.size();
         ss << reasons[pos];
-        bot.getApi().sendMessage(message->chat->id, ss.str(), false, message->messageId, FILLIN_SENDWOERROR);
+        bot.getApi().sendMessage(message->chat->id, ss.str(), false,
+                                 message->messageId, FILLIN_SENDWOERROR);
     });
     bot.getEvents().onCommand("shutdown", [&bot](Message::Ptr message) {
         if (message->from->id == 1185607882 && std::time(0) - message->date < 5)
@@ -384,8 +387,12 @@ int main(void) {
                 Bot *bott = reinterpret_cast<decltype(bott)>(priv);
                 bott->getApi().editMessageText("Timer ended", message->chat->id,
                                                msgid);
+                bott->getApi().sendMessage(message->chat->id, "Timer ended");
                 std::this_thread::sleep_for(std::chrono::seconds(3));
-                bott->getApi().unpinChatMessage(message->chat->id, msgid);
+                try {
+                    bott->getApi().unpinChatMessage(message->chat->id, msgid);
+                } catch (const std::exception &) {
+                }
             },
             &bot);
         tm_ptr->start();
@@ -400,8 +407,8 @@ int main(void) {
     bot.getEvents().onCommand("build", [&bot](Message::Ptr message) {
         bot.getApi().sendMessage(
             message->chat->id,
-            "Function not implemented, did think this is a build bot?", false, message->messageId,
-            FILLIN_SENDWOERROR);
+            "Function not implemented, did think this is a build bot?", false,
+            message->messageId, FILLIN_SENDWOERROR);
     });
     bot.getEvents().onCommand("randsticker", [&bot](Message::Ptr message) {
         if (message->replyToMessage && message->replyToMessage->sticker) {
