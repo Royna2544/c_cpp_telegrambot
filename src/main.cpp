@@ -404,11 +404,20 @@ int main(void) {
             tm_ptr ? "Stopped successfully" : "Timer is not running", false,
             message->messageId, FILLIN_SENDWOERROR);
     });
-    bot.getEvents().onCommand("build", [&bot](Message::Ptr message) {
-        bot.getApi().sendMessage(
-            message->chat->id,
-            "Function not implemented, did think this is a build bot?", false,
-            message->messageId, FILLIN_SENDWOERROR);
+    bot.getEvents().onCommand("decho", [&bot](Message::Ptr message) {
+        if (!Authorized(message)) return;
+        bool invalid = false;
+        if (message->text.find_first_of(" ") == std::string::npos)
+            invalid = true;
+        try {
+            bot.getApi().deleteMessage(message->chat->id, message->messageId);
+            if (!invalid)
+                bot.getApi().sendMessage(
+                    message->chat->id,
+                    message->text.substr(message->text.find_first_of(" ") + 1));
+        } catch (const std::exception &) {
+            // bot is not adm. nothing it can do
+        }
     });
     bot.getEvents().onCommand("randsticker", [&bot](Message::Ptr message) {
         if (message->replyToMessage && message->replyToMessage->sticker) {
