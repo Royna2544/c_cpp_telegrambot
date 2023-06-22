@@ -414,7 +414,7 @@ int main(void) {
             if (!invalid)
                 bot.getApi().sendMessage(
                     message->chat->id,
-                    message->text.substr(message->text.find_first_of(" ") + 1));
+                    message->text.substr(message->text.find_first_of(" ") + 1), false, (message->replyToMessage) ? message->replyToMessage->messageId : 0, FILLIN_SENDWOERROR);
         } catch (const std::exception &) {
             // bot is not adm. nothing it can do
         }
