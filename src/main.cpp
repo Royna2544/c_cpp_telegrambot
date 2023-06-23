@@ -26,22 +26,8 @@ using namespace TgBot;
 
 // #define DEBUG
 
-static std::vector<int64_t> recognized_chatids = {
-    -1001895513214,  // Our spamgroup
-    -1001819867532,  // Ashcafe
-    -1001889871586,  // A51
-    -1001972305418,
-    -1001418774987,  // Alex A51 Fw
-    1185607882,      // GG
-};
-
 static bool Authorized(const Message::Ptr &message) {
-    if (std::find(recognized_chatids.begin(), recognized_chatids.end(),
-                  message->chat->id) == recognized_chatids.end()) {
-        printf("Unknown chat: %ld\n", message->chat->id);
-        return false;
-    }
-    return true;
+    return message->from->id == 1185607882;
 }
 
 #define FILENAME "./compile.cpp"
@@ -263,7 +249,7 @@ int main(void) {
                                  message->messageId, FILLIN_SENDWOERROR);
     });
     bot.getEvents().onCommand("shutdown", [&bot](Message::Ptr message) {
-        if (message->from->id == 1185607882 && std::time(0) - message->date < 5)
+        if (std::time(0) - message->date < 5)
             exit(0);
     });
     bot.getEvents().onCommand("starttimer", [&bot](Message::Ptr message) {
