@@ -385,6 +385,7 @@ int main(void) {
         tm_ptr->start();
     });
     bot.getEvents().onCommand("stoptimer", [&bot](Message::Ptr message) {
+        if (!Authorized(message)) return;
         bool ret = false;
         const char *text;
         if (tm_ptr)
