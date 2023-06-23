@@ -21,6 +21,7 @@
 #include <tgbot/tgbot.h>
 
 #include "Timer.h"
+#include "TimerImpl_privdata.h"
 
 using namespace TgBot;
 
@@ -189,7 +190,7 @@ int main(void) {
     printf("Token: %s\n", token.c_str());
 
     Bot bot(token);
-    static Timer *tm_ptr;
+    static Timer<TimerImpl_privdata> *tm_ptr;
     bot.getEvents().onCommand("cpp", [&bot](Message::Ptr message) {
         if (!Authorized(message)) return;
         CCppCompileHandler(&bot, message, true);
@@ -249,8 +250,7 @@ int main(void) {
                                  message->messageId, FILLIN_SENDWOERROR);
     });
     bot.getEvents().onCommand("shutdown", [&bot](Message::Ptr message) {
-        if (std::time(0) - message->date < 5)
-            exit(0);
+        if (std::time(0) - message->date < 5) exit(0);
     });
     bot.getEvents().onCommand("starttimer", [&bot](Message::Ptr message) {
         enum InputState {
@@ -351,44 +351,56 @@ int main(void) {
         int msgid = bot.getApi()
                         .sendMessage(message->chat->id, "Timer starts")
                         ->messageId;
+        bool couldpin = true;
         try {
             bot.getApi().pinChatMessage(message->chat->id, msgid);
         } catch (const std::exception &) {
             printf("Cannot pin msg!\n");
+            couldpin = false;
         }
-        tm_ptr = new Timer(hms.h, hms.m, hms.s);
+        tm_ptr = new Timer<TimerImpl_privdata>(hms.h, hms.m, hms.s);
         tm_ptr->setCallback(
-            [=](void *priv, struct timehms ms) {
-                Bot *bott = reinterpret_cast<decltype(bott)>(priv);
+            [=](const TimerImpl_privdata *priv, struct timehms ms) {
+                const Bot &bot = priv->bot;
                 std::stringstream ss;
                 if (ms.h != 0) ss << ms.h << "h ";
                 if (ms.m != 0) ss << ms.m << "m ";
                 if (ms.s != 0) ss << ms.s << "s ";
                 if (!ss.str().empty() && ss.str() != message->text)
-                    bott->getApi().editMessageText(ss.str(), message->chat->id,
-                                                   msgid);
+                    bot.getApi().editMessageText(ss.str(), message->chat->id,
+                                                 priv->messageid);
             },
             TIMER_CONFIG_SEC,
-            [=](void *priv) {
-                Bot *bott = reinterpret_cast<decltype(bott)>(priv);
-                bott->getApi().editMessageText("Timer ended", message->chat->id,
-                                               msgid);
-                bott->getApi().sendMessage(message->chat->id, "Timer ended");
+            [=](const TimerImpl_privdata *priv) {
+                const Bot &bot = priv->bot;
+                bot.getApi().editMessageText("Timer ended", message->chat->id,
+                                             priv->messageid);
+                bot.getApi().sendMessage(message->chat->id, "Timer ended");
                 std::this_thread::sleep_for(std::chrono::seconds(3));
-                try {
-                    bott->getApi().unpinChatMessage(message->chat->id, msgid);
-                } catch (const std::exception &) {
-                }
+                if (priv->botcanpin)
+                    bot.getApi().unpinChatMessage(message->chat->id,
+                                                  priv->messageid);
             },
-            &bot);
+            std::make_unique<TimerImpl_privdata>(
+                TimerImpl_privdata{msgid, bot, couldpin, message->chat->id}));
         tm_ptr->start();
     });
     bot.getEvents().onCommand("stoptimer", [&bot](Message::Ptr message) {
-        if (tm_ptr) tm_ptr->cancel();
-        bot.getApi().sendMessage(
-            message->chat->id,
-            tm_ptr ? "Stopped successfully" : "Timer is not running", false,
-            message->messageId, FILLIN_SENDWOERROR);
+        bool ret = false;
+        const char *text;
+        if (tm_ptr)
+            ret = tm_ptr->cancel([&](const TimerImpl_privdata *t) -> bool {
+                return t->chatid == message->chat->id;
+            });
+        if (tm_ptr) {
+            if (ret)
+                text = "Stopped successfully";
+            else
+                text = "Cancel the timer running on other group not allowed";
+        } else
+            text = "Timer is not running";
+        bot.getApi().sendMessage(message->chat->id, text, false,
+                                 message->messageId, FILLIN_SENDWOERROR);
     });
     bot.getEvents().onCommand("decho", [&bot](Message::Ptr message) {
         if (!Authorized(message)) return;
@@ -400,7 +412,12 @@ int main(void) {
             if (!invalid)
                 bot.getApi().sendMessage(
                     message->chat->id,
-                    message->text.substr(message->text.find_first_of(" ") + 1), false, (message->replyToMessage) ? message->replyToMessage->messageId : 0, FILLIN_SENDWOERROR);
+                    message->text.substr(message->text.find_first_of(" ") + 1),
+                    false,
+                    (message->replyToMessage)
+                        ? message->replyToMessage->messageId
+                        : 0,
+                    FILLIN_SENDWOERROR);
         } catch (const std::exception &) {
             // bot is not adm. nothing it can do
         }
@@ -444,13 +461,13 @@ int main(void) {
         static bool enabled = true, initdone = false;
 
         if (!initdone) {
-	    std::ifstream config;
+            std::ifstream config;
             config.open(".spamdetectdisabled");
             if (config.good()) {
                 config.close();
                 enabled = false;
             }
-	    initdone = true;
+            initdone = true;
         }
         if (initdone && !enabled) return;
         if (std::time(0) - message->date > 10) return;
