@@ -1,6 +1,5 @@
 #pragma once
 
-#include <atomic>
 #include <functional>
 #include <memory>
 #include <thread>
@@ -26,7 +25,7 @@ class Timer {
     std::unique_ptr<T> priv;
     time_callback_t<T> onEvery;
     callback_t<T> onEnd;
-    std::atomic_bool stop;
+    bool stop;
 
    public:
     Timer() = delete;
