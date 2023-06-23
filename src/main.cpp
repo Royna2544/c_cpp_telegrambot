@@ -2,12 +2,10 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
-#include <csignal>
 #include <cstdio>
 #include <cstdlib>
 #include <exception>
 #include <fstream>
-#include <future>
 #include <iostream>
 #include <memory>
 #include <mutex>
@@ -557,11 +555,6 @@ int main(void) {
                 buffer.clear();
             }).detach();
         }
-    });
-    signal(SIGINT, [](int s) {
-        printf("\n");
-        printf("Got SIGINT\n");
-        exit(0);
     });
 
     try {
