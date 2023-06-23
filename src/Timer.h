@@ -16,6 +16,8 @@ template <typename T>
 using callback_t = std::function<void(const T*)>;
 template <typename T>
 using time_callback_t = std::function<void(const T*, struct timehms)>;
+template <typename T>
+using cancel_validator_t = std::function<bool(const T*)>;
 
 template <typename T>
 class Timer {
@@ -33,6 +35,8 @@ class Timer {
     void setCallback(const time_callback_t<T> onEvery, const unsigned int onsec,
                      const callback_t<T> onEnd, const std::unique_ptr<T> priv);
     void start(void);
-    void cancel(void) { stop = true; }
+    void cancel(const cancel_validator_t<T> cancel) {
+        if (cancel && cancel(priv.get())) stop = true;
+    }
     bool isrunning(void) { return !stop; }
 };
