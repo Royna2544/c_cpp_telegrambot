@@ -35,8 +35,10 @@ class Timer {
     void setCallback(const time_callback_t<T> onEvery, const unsigned int onsec,
                      const callback_t<T> onEnd, const std::unique_ptr<T> priv);
     void start(void);
-    void cancel(const cancel_validator_t<T> cancel) {
-        if (cancel && cancel(priv.get())) stop = true;
+    bool cancel(const cancel_validator_t<T> cancel) {
+        bool shouldcancel = cancel && cancel(priv.get());
+        if (shouldcancel) stop = true;
+        return shouldcancel;
     }
     bool isrunning(void) { return !stop; }
 };
