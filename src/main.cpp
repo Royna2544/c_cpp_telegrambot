@@ -455,17 +455,16 @@ int main(void) {
         static std::mutex m;
         static std::atomic_bool cb;
         static bool falseth;
-        static std::ifstream config;
         static bool enabled = true, initdone = false;
 
         if (!initdone) {
+	    std::ifstream config;
             config.open(".spamdetectdisabled");
             if (config.good()) {
                 config.close();
-                initdone = true;
                 enabled = false;
-                return;
             }
+	    initdone = true;
         }
         if (initdone && !enabled) return;
         if (std::time(0) - message->date > 10) return;
