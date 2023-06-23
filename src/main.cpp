@@ -566,6 +566,10 @@ int main(void) {
             longPoll.start();
         }
     } catch (std::exception &e) {
+        // The reason why we exit program instead of continuing is that it will
+        // endlessly except if the above code triggered error to Telegram API.
+        // Therefore a useless idea to catch and continue. Better to bail out
+        // and find problem.
         printf("error: %s\n", e.what());
     }
 }
