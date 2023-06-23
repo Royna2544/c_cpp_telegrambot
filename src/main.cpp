@@ -213,9 +213,57 @@ int main(void) {
     bot.getEvents().onCommand("flash", [&bot](Message::Ptr message) {
         if (!Authorized(message)) return;
         static std::vector<std::string> reasons = {
-            "Alex is not sleeping", "The system has been destoryed",
+            "Alex is not sleeping",
+            "The system has been destoryed",
             "init: service 'recovery' got signal 6",
-            "Rewrite the updater script with cpp and try again"};
+            "Rewrite the updater script with cpp and try again",
+            "Installation failed: incorrect bootloader version.",
+            "Error: Insufficient storage space to install the custom ROM.",
+            "The custom ROM installation process was interrupted due to a "
+            "power failure.",
+            "Installation failed: The custom ROM file is not compatible with "
+            "your device.",
+            "Error: The custom ROM installation package is corrupt.",
+            "Failed to install the custom ROM: Security boot error.",
+            "Installation aborted: Device not rooted",
+            "The custom ROM installation failed due to a user error.",
+            "Error: Custom ROM is incompatible with the device's kernel.",
+            "Failed to install the custom ROM: Not enough space available in "
+            "system partition.",
+            "Installation failed: Incorrect MD5 checksum of custom ROM image.",
+            "Error: Your bootloader is unlocked. Please lock the bootloader "
+            "before installing custom ROMs.",
+            "Custom ROM installation failed: The device is not supported.",
+            "Installation failed: The custom ROM installation process was "
+            "cancelled by the user.",
+            "Error: Custom ROM file is encrypted or password protected.",
+            "Failed to install custom ROM: The device is in a boot loop.",
+            "Installation failed: The custom ROM requires a newer version of "
+            "TWRP Recovery.",
+            "Error: Custom ROM package signature verification failed.",
+            "The custom ROM installation process failed due to an unknown "
+            "error.",
+            "Installation failed: Custom ROM package is not compatible with "
+            "your device's screen resolution.",
+            "Error: Your device is incompatible with the custom ROM's build "
+            "fingerprint.",
+            "Installation failed: The custom ROM image is missing important "
+            "system files.",
+            "Failed to install the custom ROM: Verification failed.",
+            "Installation failed: Custom ROM file name does not match the "
+            "expected format.",
+            "Error: Custom ROM package is missing important system libraries "
+            "or binaries.",
+            "The custom ROM installation process was interrupted due to a "
+            "network error.",
+            "Installation failed: The device is running an unsupported "
+            "firmware version.",
+            "Failed to install the custom ROM: The device is not rooted "
+            "properly",
+            "Installation failed: The custom ROM file is incompatible with the "
+            "device's recovery image.",
+            "Error: The custom ROM was not installed because the device is "
+            "currently encrypted."};
 
         std::string msg = message->text;
         if (message->replyToMessage != nullptr) {
