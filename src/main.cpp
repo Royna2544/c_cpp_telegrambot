@@ -40,7 +40,7 @@ static bool Authorized(const Message::Ptr &message) {
 
 #define FILLIN_SENDWOERROR \
     nullptr, "", false, std::vector<MessageEntity::Ptr>(), true
-static void CCppCompileHandler(const Bot& bot, const Message::Ptr &message,
+static void CCppCompileHandler(const Bot &bot, const Message::Ptr &message,
                                const bool plusplus) {
     FILE *fp;
     std::string res, extraargs;
@@ -50,8 +50,8 @@ static void CCppCompileHandler(const Bot& bot, const Message::Ptr &message,
 
     if (message->replyToMessage == nullptr) {
         bot.getApi().sendMessage(message->chat->id,
-                                  "Reply to a code to compile", false,
-                                  message->messageId, FILLIN_SENDWOERROR);
+                                 "Reply to a code to compile", false,
+                                 message->messageId, FILLIN_SENDWOERROR);
         return;
     }
     auto id = message->text.find_first_of(" ");
@@ -63,8 +63,8 @@ static void CCppCompileHandler(const Bot& bot, const Message::Ptr &message,
     file.open(FILENAME);
     if (file.fail()) {
         bot.getApi().sendMessage(message->chat->id,
-                                  "Failed to open file to compile", false,
-                                  message->messageId, FILLIN_SENDWOERROR);
+                                 "Failed to open file to compile", false,
+                                 message->messageId, FILLIN_SENDWOERROR);
         return;
     }
     file << message->replyToMessage->text;
@@ -96,7 +96,7 @@ static void CCppCompileHandler(const Bot& bot, const Message::Ptr &message,
     fp = popen(cmd.str().c_str(), "r");
     if (!fp) {
         bot.getApi().sendMessage(message->chat->id, "Failed to popen()", false,
-                                  message->messageId, FILLIN_SENDWOERROR);
+                                 message->messageId, FILLIN_SENDWOERROR);
         return;
     }
     buff = std::make_unique<char[]>(BUFSIZE);
@@ -128,13 +128,13 @@ static void CCppCompileHandler(const Bot& bot, const Message::Ptr &message,
 sendresult:
     if (res.size() > 4095) res.resize(4095);
     bot.getApi().sendMessage(message->chat->id, res.c_str(), false,
-                              message->messageId, FILLIN_SENDWOERROR);
+                             message->messageId, FILLIN_SENDWOERROR);
     std::remove(FILENAME);
     std::remove(AOUTNAME);
 }
 #undef FILENAME
 #define FILENAME "./out.py"
-static void PyRunHandler(const Bot& bot, const Message::Ptr &message) {
+static void PyRunHandler(const Bot &bot, const Message::Ptr &message) {
     FILE *fp;
     std::string res;
     std::stringstream cmd;
@@ -142,8 +142,7 @@ static void PyRunHandler(const Bot& bot, const Message::Ptr &message) {
 
     if (message->replyToMessage == nullptr) {
         bot.getApi().sendMessage(message->chat->id, "Reply to a code to run",
-                                  false, message->messageId,
-                                  FILLIN_SENDWOERROR);
+                                 false, message->messageId, FILLIN_SENDWOERROR);
         return;
     }
 
@@ -151,8 +150,8 @@ static void PyRunHandler(const Bot& bot, const Message::Ptr &message) {
     file.open(FILENAME);
     if (file.fail()) {
         bot.getApi().sendMessage(message->chat->id,
-                                  "Failed to open file to run", false,
-                                  message->messageId, FILLIN_SENDWOERROR);
+                                 "Failed to open file to run", false,
+                                 message->messageId, FILLIN_SENDWOERROR);
         return;
     }
     file << message->replyToMessage->text;
@@ -165,7 +164,7 @@ static void PyRunHandler(const Bot& bot, const Message::Ptr &message) {
     fp = popen(cmd.str().c_str(), "r");
     if (!fp) {
         bot.getApi().sendMessage(message->chat->id, "Failed to popen()", false,
-                                  message->messageId, FILLIN_SENDWOERROR);
+                                 message->messageId, FILLIN_SENDWOERROR);
         return;
     }
     buff = std::make_unique<char[]>(BUFSIZE);
@@ -177,7 +176,7 @@ static void PyRunHandler(const Bot& bot, const Message::Ptr &message) {
 
     if (res.size() > 4095) res.resize(4095);
     bot.getApi().sendMessage(message->chat->id, res.c_str(), false,
-                              message->messageId, FILLIN_SENDWOERROR);
+                             message->messageId, FILLIN_SENDWOERROR);
     std::remove(FILENAME);
 }
 int main(void) {
@@ -190,7 +189,7 @@ int main(void) {
     printf("Token: %s\n", token.c_str());
 
     Bot bot(token);
-    static Timer<TimerImpl_privdata> *tm_ptr;
+    static std::shared_ptr<Timer<TimerImpl_privdata>> tm_ptr;
     bot.getEvents().onCommand("cpp", [&bot](Message::Ptr message) {
         if (!Authorized(message)) return;
         CCppCompileHandler(bot, message, true);
@@ -358,7 +357,8 @@ int main(void) {
             printf("Cannot pin msg!\n");
             couldpin = false;
         }
-        tm_ptr = new Timer<TimerImpl_privdata>(hms.h, hms.m, hms.s);
+        using TimerType = decltype(*tm_ptr);
+        tm_ptr = std::make_shared<TimerType>(TimerType(hms.h, hms.m, hms.s));
         tm_ptr->setCallback(
             [=](const TimerImpl_privdata *priv, struct timehms ms) {
                 const Bot &bot = priv->bot;
@@ -393,9 +393,9 @@ int main(void) {
                 return t->chatid == message->chat->id;
             });
         if (tm_ptr) {
-            if (ret)
+            if (ret) {
                 text = "Stopped successfully";
-            else
+            } else
                 text = "Cancel the timer running on other group not allowed";
         } else
             text = "Timer is not running";
