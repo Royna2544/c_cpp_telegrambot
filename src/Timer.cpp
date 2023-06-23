@@ -2,15 +2,18 @@
 
 #include <chrono>
 
-void Timer::setCallback(const time_callback_t onEvery, const unsigned int onsec,
-                        const callback_t onEnd, const void *priv) {
+template <typename T>
+void Timer<T>::setCallback(const time_callback_t<T> onEvery,
+                           const unsigned int onsec, const callback_t<T> onEnd,
+                           const std::unique_ptr<T> priv) {
     this->onEvery = onEvery;
     this->onsec = onsec;
     this->onEnd = onEnd;
-    this->priv = const_cast<void *>(priv);
+    this->priv = std::move(priv);
 }
 
-void Timer::start(void) {
+template <typename T>
+void Timer<T>::start(void) {
     if (s >= 60) s = 59;
     if (m >= 60) m = 59;
     stop = false;
@@ -38,4 +41,3 @@ void Timer::start(void) {
         stop = true;
     }).detach();
 }
-void Timer::cancel(void) { stop = true; }

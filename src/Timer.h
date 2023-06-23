@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <functional>
+#include <memory>
 #include <thread>
 
 struct timehms {
@@ -11,24 +12,27 @@ struct timehms {
     int toSeconds(void) { return 60 * 60 * h + 60 * m + s; }
 };
 
-using callback_t = std::function<void(void *)>;
-using time_callback_t = std::function<void(void *, struct timehms)>;
+template <typename T>
+using callback_t = std::function<void(const T*)>;
+template <typename T>
+using time_callback_t = std::function<void(const T*, struct timehms)>;
 
+template <typename T>
 class Timer {
     unsigned int h, m, s;
     unsigned int onsec;
-    void *priv;
-    time_callback_t onEvery;
-    callback_t onEnd;
+    std::unique_ptr<T> priv;
+    time_callback_t<T> onEvery;
+    callback_t<T> onEnd;
     std::atomic_bool stop;
 
    public:
     Timer() = delete;
     Timer(unsigned int h, unsigned int m, unsigned int s) : h(h), m(m), s(s){};
 
-    void setCallback(const time_callback_t onEvery, const unsigned int onsec,
-                     const callback_t onEnd, const void *priv);
+    void setCallback(const time_callback_t<T> onEvery, const unsigned int onsec,
+                     const callback_t<T> onEnd, const std::unique_ptr<T> priv);
     void start(void);
-    void cancel(void);
+    void cancel(void) { stop = true; }
     bool isrunning(void) { return !stop; }
 };
