@@ -26,7 +26,8 @@ void Timer<T>::start(void) {
                 while (s_ >= 0) {
                     std::this_thread::sleep_for(std::chrono::seconds(1));
                     if (stop) break;
-                    if (onEvery && s_ % onsec == 0) onEvery(priv, {h_, m_, s_});
+                    if (onEvery && s_ % onsec == 0)
+                        onEvery(priv.get(), {h_, m_, s_});
                     s_--;
                 }
                 if (stop) break;
@@ -37,7 +38,7 @@ void Timer<T>::start(void) {
             if (h_ != 0 && m_ == -1) m_ = 60;
             h_--;
         }
-        if (onEnd) onEnd(priv);
+        if (onEnd) onEnd(priv.get());
         stop = true;
     }).detach();
 }
