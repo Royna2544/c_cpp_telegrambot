@@ -42,3 +42,4 @@ class Timer {
     }
     bool isrunning(void) { return !stop; }
 };
+#include "Timer.cpp"

@@ -9,7 +9,7 @@ void Timer<T>::setCallback(const time_callback_t<T> onEvery,
     this->onEvery = onEvery;
     this->onsec = onsec;
     this->onEnd = onEnd;
-    this->priv = std::move(priv);
+    this->priv = std::make_unique<T>(*priv);
 }
 
 template <typename T>

@@ -3,8 +3,7 @@ project(tg_cpphost)
 
 add_subdirectory(lib)
 set(SRC_LIST
-    src/main.cpp
-    src/Timer.cpp)
+    src/main.cpp)
 
 add_executable(${PROJECT_NAME} ${SRC_LIST})
 
