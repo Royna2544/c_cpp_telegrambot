@@ -13,6 +13,7 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <type_traits>
 #include <vector>
 
 #define BOOST_BIND_GLOBAL_PLACEHOLDERS
@@ -355,7 +356,7 @@ int main(void) {
             printf("Cannot pin msg!\n");
             couldpin = false;
         }
-        using TimerType = decltype(*tm_ptr);
+        using TimerType = std::remove_reference_t<decltype(*tm_ptr)>;
         tm_ptr = std::make_shared<TimerType>(TimerType(hms.h, hms.m, hms.s));
         tm_ptr->setCallback(
             [=](const TimerImpl_privdata *priv, struct timehms ms) {
