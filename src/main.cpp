@@ -285,13 +285,17 @@ int main(void) {
             return;
         }
         std::replace(msg.begin(), msg.end(), ' ', '_');
-        std::stringstream ss;
+        std::stringstream ss, ss2;
         ss << "Flashing '" << msg;
         ss << ".zip' failed!" << std::endl;
         ss << "Reason: ";
         srand(time(0));
-        ssize_t pos = rand() % reasons.size();
-        ss << reasons[pos];
+        ssize_t pos = rand() % (reasons.size() + 1);
+        if (pos == reasons.size()) {
+            ss.swap(ss2);
+            ss << "Flashing '" << msg << ".zip' Success! Chance was 1/" << pos;
+        } else
+            ss << reasons[pos];
         bot.getApi().sendMessage(message->chat->id, ss.str(), false,
                                  message->messageId, FILLIN_SENDWOERROR);
     });
@@ -616,10 +620,10 @@ int main(void) {
             longPoll.start();
         }
     } catch (std::exception &e) {
-        // The reason why we exit program instead of continuing is that it will
-        // endlessly except if the above code triggered error to Telegram API.
-        // Therefore a useless idea to catch and continue. Better to bail out
-        // and find problem.
+        // The reason why we exit program instead of continuing is that it
+        // will endlessly except if the above code triggered error to
+        // Telegram API. Therefore a useless idea to catch and continue.
+        // Better to bail out and find problem.
         printf("error: %s\n", e.what());
     }
 }
