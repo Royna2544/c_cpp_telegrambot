@@ -211,7 +211,6 @@ int main(void) {
                                  message->messageId, FILLIN_SENDWOERROR);
     });
     bot.getEvents().onCommand("flash", [&bot](Message::Ptr message) {
-        if (!Authorized(message)) return;
         static std::vector<std::string> reasons = {
             "Alex is not sleeping",
             "The system has been destoryed",
@@ -300,7 +299,7 @@ int main(void) {
                                  message->messageId, FILLIN_SENDWOERROR);
     });
     bot.getEvents().onCommand("shutdown", [&bot](Message::Ptr message) {
-        if (std::time(0) - message->date < 5) exit(0);
+        if (Authorized(message) && std::time(0) - message->date < 5) exit(0);
     });
     bot.getEvents().onCommand("starttimer", [&bot](Message::Ptr message) {
         enum InputState {
@@ -455,7 +454,6 @@ int main(void) {
                                  message->messageId, FILLIN_SENDWOERROR);
     });
     bot.getEvents().onCommand("decho", [&bot](Message::Ptr message) {
-        if (!Authorized(message)) return;
         bool invalid = false;
         if (message->text.find_first_of(" ") == std::string::npos)
             invalid = true;
@@ -512,6 +510,8 @@ int main(void) {
         static bool falseth;
         static bool enabled = true, initdone = false;
 
+	if (Authorized(message)) return;
+
         if (!initdone) {
             std::ifstream config;
             config.open(".spamdetectdisabled");
@@ -534,8 +534,6 @@ int main(void) {
                 falseth = false;
             }).detach();
         }
-
-        if (!Authorized(message)) return;
         {
             const std::lock_guard<std::mutex> _(m);
             buffer.push_back(message);
