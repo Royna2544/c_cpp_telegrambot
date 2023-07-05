@@ -471,11 +471,10 @@ int main(void) {
         if (!Authorized(message)) return;
         bool ret = false;
         const char *text;
-        if (tm_ptr)
+        if (tm_ptr) {
             ret = tm_ptr->cancel([&](const TimerImpl_privdata *t) -> bool {
                 return t->chatid == message->chat->id;
             });
-        if (tm_ptr) {
             if (ret) {
                 text = "Stopped successfully";
             } else
