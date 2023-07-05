@@ -215,52 +215,64 @@ int main(void) {
             "The system has been destoryed",
             "init: service 'recovery' got signal 6",
             "Rewrite the updater script with cpp and try again",
-            "Installation failed: incorrect bootloader version.",
-            "Error: Insufficient storage space to install the custom ROM.",
-            "The custom ROM installation process was interrupted due to a "
+            "Incorrect bootloader version.",
+            "Insufficient storage space to install the custom ROM.",
+            "The installation process was interrupted due to a "
             "power failure.",
-            "Installation failed: The custom ROM file is not compatible with "
-            "your device.",
-            "Error: The custom ROM installation package is corrupt.",
-            "Failed to install the custom ROM: Security boot error.",
-            "Installation aborted: Device not rooted",
-            "The custom ROM installation failed due to a user error.",
-            "Error: Custom ROM is incompatible with the device's kernel.",
-            "Failed to install the custom ROM: Not enough space available in "
-            "system partition.",
-            "Installation failed: Incorrect MD5 checksum of custom ROM image.",
-            "Error: Your bootloader is unlocked. Please lock the bootloader "
-            "before installing custom ROMs.",
-            "Custom ROM installation failed: The device is not supported.",
-            "Installation failed: The custom ROM installation process was "
-            "cancelled by the user.",
-            "Error: Custom ROM file is encrypted or password protected.",
-            "Failed to install custom ROM: The device is in a boot loop.",
-            "Installation failed: The custom ROM requires a newer version of "
-            "TWRP Recovery.",
-            "Error: Custom ROM package signature verification failed.",
-            "The custom ROM installation process failed due to an unknown "
-            "error.",
-            "Installation failed: Custom ROM package is not compatible with "
-            "your device's screen resolution.",
-            "Error: Your device is incompatible with the custom ROM's build "
-            "fingerprint.",
-            "Installation failed: The custom ROM image is missing important "
-            "system files.",
-            "Failed to install the custom ROM: Verification failed.",
-            "Installation failed: Custom ROM file name does not match the "
-            "expected format.",
-            "Error: Custom ROM package is missing important system libraries "
-            "or binaries.",
-            "The custom ROM installation process was interrupted due to a "
+            "The file is not compatible with your device.",
+            "The installation package is corrupt.",
+            "Security boot error. UEFI boot failed.",
+            "Device not rooted",
+            "Installation failed due to a user error.",
+            "The zip is incompatible with the device's kernel.",
+            "Not enough space available in system partition.",
+            "Incorrect MD5 checksum.",
+            "Your bootloader is unlocked. Please lock the bootloader "
+            "before installing.",
+            "The device is not supported.",
+            "The installation process was cancelled by the user.",
+            "The file is encrypted or password protected.",
+            "Requires a newer version of TWRP Recovery.",
+            "Package signature verification failed.",
+            "The installation process failed due to an unknown error.",
+            "Not compatible with your device's screen resolution.",
+            "Your device is incompatible with the build date fingerprint.",
+            "The zip is missing important system files.",
+            "Verification failed. BSOD is not enabled.",
+            "File name does not match the expected format.",
+            "Package is missing important system libraries or binaries.",
+            "Installation process was interrupted due to a "
             "network error.",
-            "Installation failed: The device is running an unsupported "
-            "firmware version.",
-            "Failed to install the custom ROM: The device is not rooted "
-            "properly",
-            "Installation failed: The custom ROM file is incompatible with the "
-            "device's recovery image.",
-            "Error: The custom ROM was not installed because the device is "
+            "The device is running an unsupported firmware version.",
+            "The device is not rooted properly",
+            "The file is incompatible with the device's recovery image.",
+            "bootloop",
+            "error 7",
+            "zip corrupted",
+            "battery died",
+            "virus",
+            "not enough space",
+            "locked bootloader",
+            "knox 0x0",
+            "try again later",
+            "yumi protection",
+            "sdcard corrupted",
+            "verizon locked carrier",
+            "emmc died",
+            "nusantara recovery not supported",
+            "battery corruption",
+            "failed to mount system",
+            "failed to mount system_ext",
+            "failed to mount product",
+            "failed to mount vendor",
+            "failed to mount partitions",
+            "system is mounted as read-only",
+            "system_ext is mounted as read-only",
+            "product is mounted as read-only",
+            "vendor is mounted as read-only",
+            "beep bop... something wrong",
+            "your opinion rejected",
+            "Not installed because the device is "
             "currently encrypted."};
 
         std::string msg = message->text;
