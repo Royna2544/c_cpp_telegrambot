@@ -45,7 +45,6 @@ static void CCppCompileHandler(const Bot &bot, const Message::Ptr &message,
     std::string res, extraargs;
     std::stringstream cmd, cmd2;
     std::unique_ptr<char[]> buff;
-    bool fine = false;
 
     if (message->replyToMessage == nullptr) {
         bot.getApi().sendMessage(message->chat->id,
@@ -100,28 +99,28 @@ static void CCppCompileHandler(const Bot &bot, const Message::Ptr &message,
     }
     buff = std::make_unique<char[]>(BUFSIZE);
     res += "Compile time:\n";
-    while (fgets(buff.get(), BUFSIZE, fp)) {
-        if (!fine) fine = true;
+    if (fgets(buff.get(), BUFSIZE, fp)) {
         res += buff.get();
+    } else {
+        res += EMPTY;
     }
     pclose(fp);
-    if (!fine) res += EMPTY;
 
     res += "\n";
 
-    std::ifstream aout(AOUTNAME);
-    if (!aout.good()) goto sendresult;
+    {
+        std::ifstream aout(AOUTNAME);
+        if (!aout.good()) goto sendresult;
+    }
     cmd.swap(cmd2);
     cmd << AOUTNAME << SPACE << STDERRTOOUT;
     fp = popen(cmd.str().c_str(), "r");
     res += "Run time:\n";
-    fine = false;
     buff = std::make_unique<char[]>(BUFSIZE);
-    while (fgets(buff.get(), BUFSIZE, fp)) {
-        if (!fine) fine = true;
+    if (fgets(buff.get(), BUFSIZE, fp))
         res += buff.get();
-    }
-    if (!fine) res += EMPTY;
+    else
+        res += EMPTY;
     pclose(fp);
 
 sendresult:
@@ -167,11 +166,11 @@ static void PyRunHandler(const Bot &bot, const Message::Ptr &message) {
         return;
     }
     buff = std::make_unique<char[]>(BUFSIZE);
-    while (fgets(buff.get(), BUFSIZE, fp)) {
+    if (fgets(buff.get(), BUFSIZE, fp))
         res += buff.get();
-    }
+    else
+        res = EMPTY;
     pclose(fp);
-    if (res.empty()) res = EMPTY;
 
     if (res.size() > 4095) res.resize(4095);
     bot.getApi().sendMessage(message->chat->id, res.c_str(), false,
@@ -510,7 +509,7 @@ int main(void) {
         static bool falseth;
         static bool enabled = true, initdone = false;
 
-	if (Authorized(message)) return;
+        if (Authorized(message)) return;
 
         if (!initdone) {
             std::ifstream config;
