@@ -477,13 +477,15 @@ int main(void) {
         bool sticker = false;
         if (message->text.find_first_of(" ") == std::string::npos)
             invalid = true;
-        if (const auto msg = message->replyToMessage; msg->sticker) {
-            invalid = false;
+        if (const auto msg = message->replyToMessage; msg && msg->sticker)
             sticker = true;
-        }
         try {
             bot.getApi().deleteMessage(message->chat->id, message->messageId);
-            if (!invalid) {
+            if (sticker && invalid) {
+                bot.getApi().sendSticker(
+                    message->chat->id, message->replyToMessage->sticker->fileId,
+                    0, nullptr, false, true);
+            } else if (!invalid) {
                 // clang-format off
                 bot.getApi().sendMessage(
 			message->chat->id,
@@ -491,10 +493,6 @@ int main(void) {
                         (message->replyToMessage) ? message->replyToMessage->messageId : 0,
                         FILLIN_SENDWOERROR);
                 // clang-format on
-            } else if (sticker) {
-                bot.getApi().sendSticker(
-                    message->chat->id, message->replyToMessage->sticker->fileId,
-                    0, nullptr, false, true);
             }
         } catch (const std::exception &) {
             // bot is not adm. nothing it can do
