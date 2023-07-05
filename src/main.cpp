@@ -486,12 +486,14 @@ int main(void) {
                                  message->messageId, FILLIN_SENDWOERROR);
     });
     bot.getEvents().onCommand("decho", [&bot](Message::Ptr message) {
-        bool invalid = false, sticker = false, text = false;
+        bool invalid = false, sticker = false, text = false, animation = false;
         if (message->text.find_first_of(" ") == std::string::npos)
             invalid = true;
         if (const auto msg = message->replyToMessage; msg) {
             if (msg->sticker)
                 sticker = true;
+            else if (msg->animation)
+                animation = true;
             else if (!msg->text.empty())
                 text = true;
         }
@@ -501,6 +503,10 @@ int main(void) {
                 bot.getApi().sendSticker(
                     message->chat->id, message->replyToMessage->sticker->fileId,
                     0, nullptr, false, true);
+            } else if (animation && invalid) {
+                bot.getApi().sendAnimation(
+                    message->chat->id, message->replyToMessage->animation->fileId, 0, 0,
+                    0, "", "", 0, FILLIN_SENDWOERROR, false, 0, false);
             } else if (text && invalid) {
                 bot.getApi().sendMessage(
                     message->chat->id, message->replyToMessage->text, false,
@@ -556,7 +562,7 @@ int main(void) {
         static bool falseth;
         static bool enabled = true, initdone = false;
 
-	if (Authorized(message)) return;
+        if (Authorized(message)) return;
 
         if (!initdone) {
             std::ifstream config;
