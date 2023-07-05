@@ -304,7 +304,7 @@ int main(void) {
         std::stringstream ss, ss2;
         ss << "Flashing '" << msg;
         if (msg.find(".zip") == std::string::npos) ss << ".zip";
-        ss << "'failed!" << std::endl;
+        ss << "' failed successfully!" << std::endl;
         ss << "Reason: ";
         srand(time(0));
         ssize_t pos = rand() % (reasons.size() + 1);
