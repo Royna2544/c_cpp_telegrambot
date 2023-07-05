@@ -473,18 +473,25 @@ int main(void) {
                                  message->messageId, FILLIN_SENDWOERROR);
     });
     bot.getEvents().onCommand("decho", [&bot](Message::Ptr message) {
-        bool invalid = false;
-        bool sticker = false;
+        bool invalid = false, sticker = false, text = false;
         if (message->text.find_first_of(" ") == std::string::npos)
             invalid = true;
-        if (const auto msg = message->replyToMessage; msg && msg->sticker)
-            sticker = true;
+        if (const auto msg = message->replyToMessage; msg) {
+            if (msg->sticker)
+                sticker = true;
+            else if (!msg->text.empty())
+                text = true;
+        }
         try {
             bot.getApi().deleteMessage(message->chat->id, message->messageId);
             if (sticker && invalid) {
                 bot.getApi().sendSticker(
                     message->chat->id, message->replyToMessage->sticker->fileId,
                     0, nullptr, false, true);
+            } else if (text && invalid) {
+                bot.getApi().sendMessage(
+                    message->chat->id, message->replyToMessage->text, false,
+                    message->replyToMessage->messageId, FILLIN_SENDWOERROR);
             } else if (!invalid) {
                 // clang-format off
                 bot.getApi().sendMessage(
