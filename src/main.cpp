@@ -458,7 +458,7 @@ int main(void) {
             if (ret) {
                 text = "Stopped successfully";
             } else
-                text = "Cancel the timer running on other group not allowed";
+                text = "Timer is running on other group. Cancel it and try again.";
         } else
             text = "Timer is not running";
         bot.getApi().sendMessage(message->chat->id, text, false,
