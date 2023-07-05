@@ -156,7 +156,7 @@ static void GenericRunHandler(const Bot &bot, const Message::Ptr &message,
     file << message->replyToMessage->text;
     file.close();
     cmd << cmdPrefix << SPACE;
-    cmd << FILENAME << SPACE << STDERRTOOUT;
+    cmd << outfile << SPACE << STDERRTOOUT;
 #ifdef DEBUG
     printf("cmd: %s\n", cmd.str().c_str());
 #endif
