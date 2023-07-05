@@ -84,8 +84,7 @@ static void CCppCompileHandler(const Bot &bot, const Message::Ptr &message,
     }
     cmd << SPACE << FILENAME;
     if (!extraargs.empty()) {
-        extraargs.erase(extraargs.find_last_not_of(" \n\r\t") + 1);
-        extraargs.erase(0, extraargs.find_first_not_of(" \n\r\t"));
+        extraargs.erase(extraargs.find_first_of("\n\r\t"));
         cmd << SPACE << extraargs;
         res += "cmd: \"";
         res += cmd.str();
@@ -165,8 +164,7 @@ static void GenericRunHandler(const Bot &bot, const Message::Ptr &message,
     cmd << cmdPrefix << SPACE;
     cmd << outfile;
     if (!extargs.empty()) {
-        extargs.erase(extargs.find_last_not_of(" \n\r\t") + 1);
-        extargs.erase(0, extargs.find_first_not_of(" \n\r\t"));
+        extargs.erase(extargs.find_first_of("\n\r\t"));
         cmd << SPACE << extargs;
         res += "cmd: \"";
         res += cmd.str();
