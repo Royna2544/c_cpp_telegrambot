@@ -202,7 +202,6 @@ int main(void) {
     });
     bot.getEvents().onCommand("alive", [&bot](Message::Ptr message) {
         static int64_t lasttime = 0, time = 0;
-        if (!Authorized(message)) return;
         time = std::time(0);
         if (lasttime != 0 && time - lasttime < 5) return;
         lasttime = time;
