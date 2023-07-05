@@ -296,7 +296,8 @@ int main(void) {
         std::replace(msg.begin(), msg.end(), ' ', '_');
         std::stringstream ss, ss2;
         ss << "Flashing '" << msg;
-        ss << ".zip' failed!" << std::endl;
+        if (msg.find(".zip") == std::string::npos) ss << ".zip";
+        ss << "'failed!" << std::endl;
         ss << "Reason: ";
         srand(time(0));
         ssize_t pos = rand() % (reasons.size() + 1);
@@ -457,7 +458,8 @@ int main(void) {
             if (ret) {
                 text = "Stopped successfully";
             } else
-                text = "Timer is running on other group. Cancel it and try again.";
+                text =
+                    "Timer is running on other group. Cancel it and try again.";
         } else
             text = "Timer is not running";
         bot.getApi().sendMessage(message->chat->id, text, false,
