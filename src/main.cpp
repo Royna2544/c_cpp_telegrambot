@@ -81,15 +81,16 @@ static void CCppCompileHandler(const Bot &bot, const Message::Ptr &message,
     } else {
         cmd << "c";
     }
-    cmd << SPACE << FILENAME << SPACE << STDERRTOOUT;
+    cmd << SPACE << FILENAME;
     if (!extraargs.empty()) {
         extraargs.erase(extraargs.find_last_not_of(" \n\r\t") + 1);
         extraargs.erase(0, extraargs.find_first_not_of(" \n\r\t"));
-        cmd << " " << extraargs;
+        cmd << SPACE << extraargs;
         res += "cmd: \"";
         res += cmd.str();
         res += "\"\n";
     }
+    cmd << SPACE << STDERRTOOUT;
 #ifdef DEBUG
     printf("cmd: %s\n", cmd.str().c_str());
 #endif
@@ -135,7 +136,7 @@ sendresult:
 static void GenericRunHandler(const Bot &bot, const Message::Ptr &message,
                               const char *cmdPrefix, const char *outfile) {
     FILE *fp;
-    std::string res;
+    std::string res, extargs;
     std::stringstream cmd;
     std::unique_ptr<char[]> buff;
 
@@ -155,8 +156,22 @@ static void GenericRunHandler(const Bot &bot, const Message::Ptr &message,
     }
     file << message->replyToMessage->text;
     file.close();
+    auto idx = message->text.find_first_of(" ");
+    if (idx != std::string::npos) {
+        extargs = message->text.substr(idx);
+    }
+
     cmd << cmdPrefix << SPACE;
-    cmd << outfile << SPACE << STDERRTOOUT;
+    cmd << outfile;
+    if (!extargs.empty()) {
+        extargs.erase(extargs.find_last_not_of(" \n\r\t") + 1);
+        extargs.erase(0, extargs.find_first_not_of(" \n\r\t"));
+        cmd << SPACE << extargs;
+        res += "cmd: \"";
+        res += cmd.str();
+        res += "\"\n";
+    }
+    cmd << SPACE << STDERRTOOUT;
 #ifdef DEBUG
     printf("cmd: %s\n", cmd.str().c_str());
 #endif
