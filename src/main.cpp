@@ -1,3 +1,5 @@
+#include <unistd.h>
+
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -130,9 +132,8 @@ sendresult:
     std::remove(FILENAME);
     std::remove(AOUTNAME);
 }
-#undef FILENAME
-#define FILENAME "./out.py"
-static void PyRunHandler(const Bot &bot, const Message::Ptr &message) {
+static void GenericRunHandler(const Bot &bot, const Message::Ptr &message,
+                              const char *cmdPrefix, const char *outfile) {
     FILE *fp;
     std::string res;
     std::stringstream cmd;
@@ -145,7 +146,7 @@ static void PyRunHandler(const Bot &bot, const Message::Ptr &message) {
     }
 
     std::ofstream file;
-    file.open(FILENAME);
+    file.open(outfile);
     if (file.fail()) {
         bot.getApi().sendMessage(message->chat->id,
                                  "Failed to open file to run", false,
@@ -154,7 +155,7 @@ static void PyRunHandler(const Bot &bot, const Message::Ptr &message) {
     }
     file << message->replyToMessage->text;
     file.close();
-    cmd << "python3" << SPACE;
+    cmd << cmdPrefix << SPACE;
     cmd << FILENAME << SPACE << STDERRTOOUT;
 #ifdef DEBUG
     printf("cmd: %s\n", cmd.str().c_str());
@@ -175,7 +176,7 @@ static void PyRunHandler(const Bot &bot, const Message::Ptr &message) {
     if (res.size() > 4095) res.resize(4095);
     bot.getApi().sendMessage(message->chat->id, res.c_str(), false,
                              message->messageId, FILLIN_SENDWOERROR);
-    std::remove(FILENAME);
+    std::remove(outfile);
 }
 int main(void) {
     const char *token_str = getenv("TOKEN");
@@ -198,8 +199,14 @@ int main(void) {
     });
     bot.getEvents().onCommand("python", [&bot](Message::Ptr message) {
         if (!Authorized(message)) return;
-        PyRunHandler(bot, message);
+        GenericRunHandler(bot, message, "python3", "./out.py");
     });
+    if (access("/usr/bin/go", F_OK) == 0) {
+        bot.getEvents().onCommand("golang", [&bot](Message::Ptr message) {
+            if (!Authorized(message)) return;
+            GenericRunHandler(bot, message, "go run", "./out.go");
+        });
+    }
     bot.getEvents().onCommand("alive", [&bot](Message::Ptr message) {
         static int64_t lasttime = 0, time = 0;
         time = std::time(0);
