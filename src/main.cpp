@@ -75,7 +75,8 @@ static bool writeMessageToFile(const Bot &bot, const Message::Ptr &message,
 static void addExtArgs(std::stringstream &cmd, std::string &extraargs,
                        std::string &res) {
     if (!extraargs.empty()) {
-        extraargs.erase(extraargs.find_first_of("\n\r\t"));
+        auto idx = extraargs.find_first_of("\n\r\t");
+        if (idx != std::string::npos) extraargs.erase(idx);
         cmd << SPACE << extraargs;
         res += "cmd: \"";
         res += cmd.str();
