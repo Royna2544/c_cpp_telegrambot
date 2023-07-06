@@ -42,6 +42,8 @@ static inline bool Authorized(const Message::Ptr &message) {
 #define FILLIN_SENDWOERROR \
     nullptr, "", false, std::vector<MessageEntity::Ptr>(), true
 
+static char *kCompiler = nullptr, *kCxxCompiler = nullptr;
+
 static bool verifyMessage(const Bot &bot, const Message::Ptr &message) {
     if (message->replyToMessage == nullptr) {
         bot.getApi().sendMessage(message->chat->id,
@@ -124,9 +126,9 @@ static void CCppCompileHandler(const Bot &bot, const Message::Ptr &message,
     if (!ret) return;
 
     if (plusplus) {
-        cmd << "c++";
+        cmd << kCxxCompiler;
     } else {
-        cmd << "cc";
+        cmd << kCompiler;
     }
     cmd << SPACE << "-x" << SPACE;
     if (plusplus) {
@@ -177,6 +179,37 @@ static void GenericRunHandler(const Bot &bot, const Message::Ptr &message,
     runCommand(bot, message, cmd.str(), res);
     commonCleanup(bot, message, res, outfile);
 }
+
+#define ARRAY_SIZE(arr) sizeof(arr) / sizeof(arr[0])
+
+static void findCompiler(void) {
+    static const char *const compilers[][2] = {
+        {"clang", "clang++"},
+        {"gcc", "g++"},
+        {"cc", "c++"},
+    };
+    static char buffer[20];
+    for (int i = 0; i < ARRAY_SIZE(compilers); i++) {
+        auto checkfn = [i](const int idx) -> bool {
+            memset(buffer, 0, sizeof(buffer));
+            auto bytes = snprintf(buffer, sizeof(buffer), "/usr/bin/%s",
+                                  compilers[i][idx]);
+            if (bytes >= sizeof(buffer))
+                return false;
+            else
+                buffer[bytes] = '\0';
+            return access(buffer, R_OK | X_OK) == 0;
+        };
+        if (!kCompiler && checkfn(0)) {
+            kCompiler = strdup(buffer);
+        }
+        if (!kCxxCompiler && checkfn(1)) {
+            kCxxCompiler = strdup(buffer);
+        }
+        if (kCompiler && kCxxCompiler) break;
+    }
+}
+
 int main(void) {
     const char *token_str = getenv("TOKEN");
     if (!token_str) {
@@ -188,14 +221,20 @@ int main(void) {
 
     Bot bot(token);
     static std::shared_ptr<Timer<TimerImpl_privdata>> tm_ptr;
-    bot.getEvents().onCommand("cpp", [&bot](Message::Ptr message) {
-        if (!Authorized(message)) return;
-        CCppCompileHandler(bot, message, true);
-    });
-    bot.getEvents().onCommand("c", [&bot](Message::Ptr message) {
-        if (!Authorized(message)) return;
-        CCppCompileHandler(bot, message, false);
-    });
+    findCompiler();
+
+    if (kCxxCompiler) {
+        bot.getEvents().onCommand("cpp", [&bot](Message::Ptr message) {
+            if (!Authorized(message)) return;
+            CCppCompileHandler(bot, message, true);
+        });
+    }
+    if (kCompiler) {
+        bot.getEvents().onCommand("c", [&bot](Message::Ptr message) {
+            if (!Authorized(message)) return;
+            CCppCompileHandler(bot, message, false);
+        });
+    }
     bot.getEvents().onCommand("python", [&bot](Message::Ptr message) {
         if (!Authorized(message)) return;
         GenericRunHandler(bot, message, "python3", "./out.py");
