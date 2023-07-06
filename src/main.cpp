@@ -4,6 +4,7 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <csignal>
 #include <cstdio>
 #include <cstdlib>
 #include <exception>
@@ -695,6 +696,16 @@ int main(void) {
         }
     });
 
+    auto freeMemory = [](int s) {
+        if (kCompiler) free(kCompiler);
+        if (kCxxCompiler) free(kCxxCompiler);
+	printf("Exit with signal %d\n", s);
+	exit(0);
+    };
+
+    std::signal(SIGINT, freeMemory);
+    std::signal(SIGTERM, freeMemory);
+
     try {
         printf("Bot username: %s\n", bot.getApi().getMe()->username.c_str());
         bot.getApi().deleteWebhook();
@@ -710,4 +721,5 @@ int main(void) {
         // Better to bail out and find problem.
         printf("error: %s\n", e.what());
     }
+    freeMemory(0);
 }
