@@ -211,6 +211,14 @@ static void findCompiler(void) {
     }
 }
 
+#define CMD_UNSUPPORTED(cmd, reason)                                 \
+    bot.getEvents().onCommand(cmd, [&bot](Message::Ptr message) {    \
+        bot.getApi().sendMessage(                                    \
+            message->chat->id,                                       \
+            "cmd '" cmd "' is unsupported.\nReason: " reason, false, \
+            message->messageId, FILLIN_SENDWOERROR);                 \
+    });
+
 int main(void) {
     const char *token_str = getenv("TOKEN");
     if (!token_str) {
@@ -228,11 +236,15 @@ int main(void) {
         bot.getEvents().onCommand("cpp", [&bot](Message::Ptr message) {
             CCppCompileHandler(bot, message, true);
         });
+    } else {
+        CMD_UNSUPPORTED("cpp", "Host does not have a C++ compiler");
     }
     if (kCompiler) {
         bot.getEvents().onCommand("c", [&bot](Message::Ptr message) {
             CCppCompileHandler(bot, message, false);
         });
+    } else {
+        CMD_UNSUPPORTED("c", "Host does not have a C compiler");
     }
     bot.getEvents().onCommand("python", [&bot](Message::Ptr message) {
         GenericRunHandler(bot, message, "python3", "./out.py");
@@ -241,6 +253,8 @@ int main(void) {
         bot.getEvents().onCommand("golang", [&bot](Message::Ptr message) {
             GenericRunHandler(bot, message, "go run", "./out.go");
         });
+    } else {
+        CMD_UNSUPPORTED("golang", "Host does not have a Go compiler");
     }
     bot.getEvents().onCommand("alive", [&bot](Message::Ptr message) {
         static int64_t lasttime = 0, time = 0;
