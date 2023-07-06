@@ -45,6 +45,7 @@ static inline bool Authorized(const Message::Ptr &message) {
 static char *kCompiler = nullptr, *kCxxCompiler = nullptr;
 
 static bool verifyMessage(const Bot &bot, const Message::Ptr &message) {
+    if (!Authorized(message)) return false;
     if (message->replyToMessage == nullptr) {
         bot.getApi().sendMessage(message->chat->id,
                                  "Reply to a code to compile", false,
@@ -225,23 +226,19 @@ int main(void) {
 
     if (kCxxCompiler) {
         bot.getEvents().onCommand("cpp", [&bot](Message::Ptr message) {
-            if (!Authorized(message)) return;
             CCppCompileHandler(bot, message, true);
         });
     }
     if (kCompiler) {
         bot.getEvents().onCommand("c", [&bot](Message::Ptr message) {
-            if (!Authorized(message)) return;
             CCppCompileHandler(bot, message, false);
         });
     }
     bot.getEvents().onCommand("python", [&bot](Message::Ptr message) {
-        if (!Authorized(message)) return;
         GenericRunHandler(bot, message, "python3", "./out.py");
     });
     if (access("/usr/bin/go", F_OK) == 0) {
         bot.getEvents().onCommand("golang", [&bot](Message::Ptr message) {
-            if (!Authorized(message)) return;
             GenericRunHandler(bot, message, "go run", "./out.go");
         });
     }
