@@ -28,7 +28,7 @@ using namespace TgBot;
 
 // #define DEBUG
 
-static bool Authorized(const Message::Ptr &message) {
+static inline bool Authorized(const Message::Ptr &message) {
     return message->from->id == 1185607882;
 }
 
@@ -41,35 +41,86 @@ static bool Authorized(const Message::Ptr &message) {
 
 #define FILLIN_SENDWOERROR \
     nullptr, "", false, std::vector<MessageEntity::Ptr>(), true
-static void CCppCompileHandler(const Bot &bot, const Message::Ptr &message,
-                               const bool plusplus) {
-    FILE *fp;
-    std::string res, extraargs;
-    std::stringstream cmd, cmd2;
-    std::unique_ptr<char[]> buff;
-    bool fine = false;
 
+static bool verifyMessage(const Bot &bot, const Message::Ptr &message) {
     if (message->replyToMessage == nullptr) {
         bot.getApi().sendMessage(message->chat->id,
                                  "Reply to a code to compile", false,
                                  message->messageId, FILLIN_SENDWOERROR);
-        return;
+        return false;
     }
+    return true;
+}
+
+static void parseExtArgs(const Message::Ptr &message, std::string &extraargs) {
     auto id = message->text.find_first_of(" ");
     if (id != std::string::npos) {
         extraargs = message->text.substr(id);
     }
+}
 
-    std::ofstream file;
-    file.open(FILENAME);
+static bool writeMessageToFile(const Bot &bot, const Message::Ptr &message,
+                               const char *filename) {
+    std::ofstream file(filename);
     if (file.fail()) {
-        bot.getApi().sendMessage(message->chat->id,
-                                 "Failed to open file to compile", false,
-                                 message->messageId, FILLIN_SENDWOERROR);
-        return;
+        bot.getApi().sendMessage(message->chat->id, "Failed to open file",
+                                 false, message->messageId, FILLIN_SENDWOERROR);
+        return false;
     }
     file << message->replyToMessage->text;
     file.close();
+    return true;
+}
+
+static void addExtArgs(std::stringstream &cmd, std::string &extraargs,
+                       std::string &res) {
+    if (!extraargs.empty()) {
+        extraargs.erase(extraargs.find_first_of("\n\r\t"));
+        cmd << SPACE << extraargs;
+        res += "cmd: \"";
+        res += cmd.str();
+        res += "\"\n";
+    }
+    cmd << SPACE << STDERRTOOUT;
+}
+
+static void runCommand(const Bot &bot, const Message::Ptr &message,
+                       const std::string &cmd, std::string &res) {
+    bool fine = false;
+    auto buf = std::make_unique<char[]>(BUFSIZE);
+    auto fp = popen(cmd.c_str(), "r");
+    if (!fp) {
+        bot.getApi().sendMessage(message->chat->id, "Failed to popen()", false,
+                                 message->messageId, FILLIN_SENDWOERROR);
+        return;
+    }
+    while (fgets(buf.get(), BUFSIZE, fp)) {
+        if (!fine) fine = true;
+        res += buf.get();
+    }
+    pclose(fp);
+    if (!fine) res += EMPTY;
+}
+
+static void commonCleanup(const Bot &bot, const Message::Ptr &message,
+                          std::string &res, const char *filename) {
+    if (res.size() > 4095) res.resize(4095);
+    bot.getApi().sendMessage(message->chat->id, res.c_str(), false,
+                             message->messageId, FILLIN_SENDWOERROR);
+    std::remove(filename);
+}
+
+static void CCppCompileHandler(const Bot &bot, const Message::Ptr &message,
+                               const bool plusplus) {
+    std::string res, extraargs;
+    std::stringstream cmd, cmd2;
+    bool ret;
+
+    ret = verifyMessage(bot, message);
+    if (!ret) return;
+    parseExtArgs(message, extraargs);
+    ret = writeMessageToFile(bot, message, FILENAME);
+    if (!ret) return;
 
     if (plusplus) {
         cmd << "c++";
@@ -83,114 +134,47 @@ static void CCppCompileHandler(const Bot &bot, const Message::Ptr &message,
         cmd << "c";
     }
     cmd << SPACE << FILENAME;
-    if (!extraargs.empty()) {
-        extraargs.erase(extraargs.find_first_of("\n\r\t"));
-        cmd << SPACE << extraargs;
-        res += "cmd: \"";
-        res += cmd.str();
-        res += "\"\n";
-    }
-    cmd << SPACE << STDERRTOOUT;
+    addExtArgs(cmd, extraargs, res);
 #ifdef DEBUG
     printf("cmd: %s\n", cmd.str().c_str());
 #endif
-    fp = popen(cmd.str().c_str(), "r");
-    if (!fp) {
-        bot.getApi().sendMessage(message->chat->id, "Failed to popen()", false,
-                                 message->messageId, FILLIN_SENDWOERROR);
-        return;
-    }
-    buff = std::make_unique<char[]>(BUFSIZE);
     res += "Compile time:\n";
-    while (fgets(buff.get(), BUFSIZE, fp)) {
-        if (!fine) fine = true;
-        res += buff.get();
-    }
-    pclose(fp);
-    if (!fine) res += EMPTY;
-
+    runCommand(bot, message, cmd.str(), res);
     res += "\n";
 
     std::ifstream aout(AOUTNAME);
     if (!aout.good()) goto sendresult;
     cmd.swap(cmd2);
     cmd << AOUTNAME << SPACE << STDERRTOOUT;
-    fp = popen(cmd.str().c_str(), "r");
     res += "Run time:\n";
-    fine = false;
-    buff = std::make_unique<char[]>(BUFSIZE);
-    while (fgets(buff.get(), BUFSIZE, fp)) {
-        if (!fine) fine = true;
-        res += buff.get();
-    }
-    if (!fine) res += EMPTY;
-    pclose(fp);
+    runCommand(bot, message, cmd.str(), res);
 
 sendresult:
-    if (res.size() > 4095) res.resize(4095);
-    bot.getApi().sendMessage(message->chat->id, res.c_str(), false,
-                             message->messageId, FILLIN_SENDWOERROR);
-    std::remove(FILENAME);
+    commonCleanup(bot, message, res, FILENAME);
     std::remove(AOUTNAME);
 }
+
 static void GenericRunHandler(const Bot &bot, const Message::Ptr &message,
                               const char *cmdPrefix, const char *outfile) {
-    FILE *fp;
     std::string res, extargs;
     std::stringstream cmd;
-    std::unique_ptr<char[]> buff;
+    bool ret;
 
-    if (message->replyToMessage == nullptr) {
-        bot.getApi().sendMessage(message->chat->id, "Reply to a code to run",
-                                 false, message->messageId, FILLIN_SENDWOERROR);
-        return;
-    }
-
-    std::ofstream file;
-    file.open(outfile);
-    if (file.fail()) {
-        bot.getApi().sendMessage(message->chat->id,
-                                 "Failed to open file to run", false,
-                                 message->messageId, FILLIN_SENDWOERROR);
-        return;
-    }
-    file << message->replyToMessage->text;
-    file.close();
-    auto idx = message->text.find_first_of(" ");
-    if (idx != std::string::npos) {
-        extargs = message->text.substr(idx);
-    }
+    ret = verifyMessage(bot, message);
+    if (!ret) return;
+    parseExtArgs(message, extargs);
+    ret = writeMessageToFile(bot, message, outfile);
+    if (!ret) return;
 
     cmd << cmdPrefix << SPACE;
     cmd << outfile;
-    if (!extargs.empty()) {
-        extargs.erase(extargs.find_first_of("\n\r\t"));
-        cmd << SPACE << extargs;
-        res += "cmd: \"";
-        res += cmd.str();
-        res += "\"\n";
-    }
-    cmd << SPACE << STDERRTOOUT;
+    addExtArgs(cmd, extargs, res);
+
 #ifdef DEBUG
     printf("cmd: %s\n", cmd.str().c_str());
 #endif
-    fp = popen(cmd.str().c_str(), "r");
-    if (!fp) {
-        bot.getApi().sendMessage(message->chat->id, "Failed to popen()", false,
-                                 message->messageId, FILLIN_SENDWOERROR);
-        return;
-    }
-    buff = std::make_unique<char[]>(BUFSIZE);
-    while (fgets(buff.get(), BUFSIZE, fp)) {
-        res += buff.get();
-    }
-    pclose(fp);
-    if (res.empty()) res = EMPTY;
-
-    if (res.size() > 4095) res.resize(4095);
-    bot.getApi().sendMessage(message->chat->id, res.c_str(), false,
-                             message->messageId, FILLIN_SENDWOERROR);
-    std::remove(outfile);
+    runCommand(bot, message, cmd.str(), res);
+    commonCleanup(bot, message, res, outfile);
 }
 int main(void) {
     const char *token_str = getenv("TOKEN");
@@ -230,7 +214,7 @@ int main(void) {
                                  message->messageId, FILLIN_SENDWOERROR);
     });
     bot.getEvents().onCommand("flash", [&bot](Message::Ptr message) {
-        static std::vector<std::string> reasons = {
+        static const std::vector<std::string> reasons = {
             "Alex is not sleeping",
             "The system has been destoryed",
             "init: service 'recovery' got signal 6",
@@ -478,8 +462,7 @@ int main(void) {
             if (ret) {
                 text = "Stopped successfully";
             } else
-                text =
-                    "Timer is running on other group. Cancel it and try again.";
+                text = "Timer is running on other group.";
         } else
             text = "Timer is not running";
         bot.getApi().sendMessage(message->chat->id, text, false,
@@ -505,8 +488,9 @@ int main(void) {
                     0, nullptr, false, true);
             } else if (animation && invalid) {
                 bot.getApi().sendAnimation(
-                    message->chat->id, message->replyToMessage->animation->fileId, 0, 0,
-                    0, "", "", 0, FILLIN_SENDWOERROR, false, 0, false);
+                    message->chat->id,
+                    message->replyToMessage->animation->fileId, 0, 0, 0, "", "",
+                    0, FILLIN_SENDWOERROR, false, 0, false);
             } else if (text && invalid) {
                 bot.getApi().sendMessage(
                     message->chat->id, message->replyToMessage->text, false,
@@ -552,7 +536,6 @@ int main(void) {
             bot.getApi().sendMessage(
                 message->chat->id, "Sticker not found in replied-to message",
                 false, message->messageId, FILLIN_SENDWOERROR);
-            return;
         }
     });
     bot.getEvents().onAnyMessage([&bot](Message::Ptr message) {
@@ -580,7 +563,7 @@ int main(void) {
                 falseth = true;
                 while (true) {
                     if (!cb) break;
-                    cb->store(false);
+                    *cb = false;
                     std::this_thread::sleep_for(std::chrono::seconds(5));
                 }
                 falseth = false;
@@ -591,7 +574,7 @@ int main(void) {
             buffer.push_back(message);
         }
         if (!cb) {
-            cb.store(true);
+            cb = true;
             std::thread([&]() {
                 struct simpleuser {
                     int64_t id;
