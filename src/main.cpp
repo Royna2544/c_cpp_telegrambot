@@ -420,6 +420,12 @@ int main(void) {
                 continue;
             vec.push_back(line);
         }
+        if (vec.size() == 1) {
+            bot.getApi().sendMessage(message->chat->id,
+                                     "Give more than 1 choice", false,
+                                     message->messageId, FILLIN_SENDWOERROR);
+            return;
+        }
         std::shuffle(vec.begin(), vec.end(), gen);
         out << "Total " << vec.size() << " items" << std::endl;
         last = vec.back();
