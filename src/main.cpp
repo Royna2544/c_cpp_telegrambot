@@ -636,7 +636,6 @@ int main(void) {
         static std::mutex m;
         static std::atomic_bool cb;
         static bool falseth;
-        static bool enabled = true, initdone = false;
 
         if (Authorized(message)) return;
         // Do not track older msgs and consider it as spam.
