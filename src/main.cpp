@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <csignal>
@@ -414,19 +415,22 @@ int main(void) {
         }
         vec.reserve(numlines);
         while (std::getline(ss, line, '\n')) {
+            if (std::all_of(line.begin(), line.end(),
+                            [](char c) { return std::isspace(c); }))
+                continue;
             vec.push_back(line);
         }
         std::shuffle(vec.begin(), vec.end(), gen);
-	out << "Total " << vec.size() << std::endl;
-	last = vec.back();
-	vec.pop_back();
+        out << "Total " << vec.size() << " items" << std::endl;
+        last = vec.back();
+        vec.pop_back();
         int total = 0;
         for (const auto &cond : vec) {
             int thisper = genRandomNumber(100 - total);
             out << cond << " : " << thisper << "%" << std::endl;
             total += thisper;
         }
-	out << last << " : " << 100 - total << "%" << std::endl;
+        out << last << " : " << 100 - total << "%" << std::endl;
         bot.getApi().sendMessage(message->chat->id, out.str(), false,
                                  message->messageId, FILLIN_SENDWOERROR);
     });
