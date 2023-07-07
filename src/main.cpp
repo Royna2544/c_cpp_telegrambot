@@ -354,13 +354,13 @@ int main(void) {
             msg = message->replyToMessage->text;
             goto parse;
         }
-        if (msg.find(SPACE) == std::string::npos) {
+        if (!hasExtArgs(message)) {
             bot.getApi().sendMessage(message->chat->id, "Send a file name",
                                      false, message->messageId,
                                      FILLIN_SENDWOERROR);
             return;
         }
-        msg = msg.substr(msg.find(" ") + 1);
+        parseExtArgs(message, msg);
     parse:
         if (msg.empty()) {
             bot.getApi().sendMessage(message->chat->id, "Reply to a text",
