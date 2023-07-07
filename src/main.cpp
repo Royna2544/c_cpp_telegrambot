@@ -355,18 +355,17 @@ int main(void) {
             return;
         }
         std::replace(msg.begin(), msg.end(), ' ', '_');
-        std::stringstream ss, ss2;
+        std::stringstream ss;
         ss << "Flashing '" << msg;
         if (msg.find(".zip") == std::string::npos) ss << ".zip";
-        ss << "' failed successfully!" << std::endl;
-        ss << "Reason: ";
         srand(time(0));
         ssize_t pos = rand() % (reasons.size() + 1);
-        if (pos == reasons.size()) {
-            ss.swap(ss2);
-            ss << "Flashing '" << msg << ".zip' Success! Chance was 1/" << pos;
-        } else
-            ss << reasons[pos];
+        if (pos != reasons.size()) {
+            ss << "' failed successfully!" << std::endl;
+            ss << "Reason: " << reasons[pos];
+        } else {
+            ss << "' Success! Chance was 1/" << reasons.size();
+        }
         bot.getApi().sendMessage(message->chat->id, ss.str(), false,
                                  message->messageId, FILLIN_SENDWOERROR);
     });
@@ -575,7 +574,8 @@ int main(void) {
                 bot.getApi().sendMessage(
                     message->chat->id, msg, false,
                     (message->replyToMessage)
-                        ? message->replyToMessage->messageId : 0,
+                        ? message->replyToMessage->messageId
+                        : 0,
                     FILLIN_SENDWOERROR);
             }
         } catch (const std::exception &) {
