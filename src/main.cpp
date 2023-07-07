@@ -381,10 +381,20 @@ int main(void) {
             NONE,
         };
         if (!Authorized(message)) return;
-        if (message->replyToMessage == nullptr) {
-            bot.getApi().sendMessage(message->chat->id,
-                                     "Reply to a time, in hhmmss format", false,
-                                     message->messageId, FILLIN_SENDWOERROR);
+        bool found = false;
+        std::string msg;
+        if (hasExtArgs(message)) {
+            parseExtArgs(message, msg);
+            found = true;
+        }
+        if (message->replyToMessage != nullptr) {
+            msg = message->replyToMessage->text;
+            found = true;
+        }
+        if (!found) {
+            bot.getApi().sendMessage(
+                message->chat->id, "Send or reply to a time, in hhmmss format",
+                false, message->messageId, FILLIN_SENDWOERROR);
             return;
         }
         if (tm_ptr && tm_ptr->isrunning()) {
@@ -393,13 +403,13 @@ int main(void) {
                                      message->messageId, FILLIN_SENDWOERROR);
             return;
         }
-        const char *c_str = message->replyToMessage->text.c_str();
+        const char *c_str = msg.c_str();
         std::vector<int> numbercache;
         enum InputState state;
         struct timehms hms = {0};
-        for (int i = 0; i <= message->replyToMessage->text.size(); i++) {
+        for (int i = 0; i <= msg.size(); i++) {
             int code = static_cast<int>(c_str[i]);
-            if (i == message->replyToMessage->text.size()) code = ' ';
+            if (i == msg.size()) code = ' ';
             switch (code) {
                 case ' ': {
                     if (numbercache.size() != 0) {
@@ -451,6 +461,15 @@ int main(void) {
                 case 's': {
                     state = InputState::SECOND;
                     break;
+                }
+                default: {
+                    bot.getApi().sendMessage(
+                        message->chat->id,
+                        "Invalid value provided.\nShould contain only h, m, s, "
+                        "numbers, spaces. (ex. 1h 20m 7s)",
+                        false, message->messageId, FILLIN_SENDWOERROR);
+
+                    return;
                 }
             }
         }
