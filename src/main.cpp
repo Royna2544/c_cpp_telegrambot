@@ -598,8 +598,9 @@ int main(void) {
     });
     bot.getEvents().onCommand("randsticker", [&bot](Message::Ptr message) {
         if (message->replyToMessage && message->replyToMessage->sticker) {
+            StickerSet::Ptr stickset;
             try {
-                bot.getApi().getStickerSet(
+                stickset = bot.getApi().getStickerSet(
                     message->replyToMessage->sticker->setName);
             } catch (const std::exception &e) {
                 bot.getApi().sendMessage(message->chat->id, e.what(), false,
@@ -607,8 +608,6 @@ int main(void) {
                                          FILLIN_SENDWOERROR);
                 return;
             }
-            auto stickset = bot.getApi().getStickerSet(
-                message->replyToMessage->sticker->setName);
             srand(time(0));
             ssize_t pos = rand() % stickset->stickers.size();
             bot.getApi().sendSticker(message->chat->id,
@@ -634,7 +633,7 @@ int main(void) {
         static bool enabled = true, initdone = false;
 
         if (Authorized(message)) return;
-	// Do not track older msgs and consider it as spam.
+        // Do not track older msgs and consider it as spam.
         if (std::time(0) - message->date > 15) return;
         // We care GIF, sticker, text spams only
         if (!message->animation && message->text.empty() && !message->sticker)
