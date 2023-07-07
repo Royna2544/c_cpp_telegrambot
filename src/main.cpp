@@ -218,6 +218,7 @@ static void findCompiler(void) {
 }
 
 static int genRandomNumber(const int upper, const int lower = 0) {
+    if (upper == lower) return lower;
     std::random_device rd;
     std::mt19937 gen(rd());
 
@@ -389,6 +390,44 @@ int main(void) {
             ss << "' Success! Chance was 1/" << reasons.size();
         }
         bot.getApi().sendMessage(message->chat->id, ss.str(), false,
+                                 message->messageId, FILLIN_SENDWOERROR);
+    });
+    bot.getEvents().onCommand("possibility", [&bot](Message::Ptr message) {
+        if (!hasExtArgs(message)) {
+            bot.getApi().sendMessage(
+                message->chat->id,
+                "Send avaliable conditions sperated by newline", false,
+                message->messageId, FILLIN_SENDWOERROR);
+            return;
+        }
+        std::string text;
+        parseExtArgs(message, text);
+        std::stringstream ss(text), out;
+        std::string line, last;
+        std::vector<std::string> vec;
+        std::random_device rd;
+        std::mt19937 gen(rd());
+
+        int numlines = 1;
+        for (char c : message->text) {
+            if (c == '\n') numlines++;
+        }
+        vec.reserve(numlines);
+        while (std::getline(ss, line, '\n')) {
+            vec.push_back(line);
+        }
+        std::shuffle(vec.begin(), vec.end(), gen);
+	out << "Total " << vec.size() << std::endl;
+	last = vec.back();
+	vec.pop_back();
+        int total = 0;
+        for (const auto &cond : vec) {
+            int thisper = genRandomNumber(100 - total);
+            out << cond << " : " << thisper << "%" << std::endl;
+            total += thisper;
+        }
+	out << last << " : " << 100 - total << "%" << std::endl;
+        bot.getApi().sendMessage(message->chat->id, out.str(), false,
                                  message->messageId, FILLIN_SENDWOERROR);
     });
     bot.getEvents().onCommand("shutdown", [&bot](Message::Ptr message) {
