@@ -56,6 +56,10 @@ static bool verifyMessage(const Bot &bot, const Message::Ptr &message) {
     return true;
 }
 
+static inline bool hasExtArgs(const Message::Ptr &message) {
+    return message->text.find_first_of(" ") != std::string::npos;
+}
+
 static void parseExtArgs(const Message::Ptr &message, std::string &extraargs) {
     auto id = message->text.find_first_of(" ");
     if (id != std::string::npos) {
@@ -522,8 +526,7 @@ int main(void) {
     });
     bot.getEvents().onCommand("decho", [&bot](Message::Ptr message) {
         bool invalid = false, sticker = false, text = false, animation = false;
-        if (message->text.find_first_of(" ") == std::string::npos)
-            invalid = true;
+        if (!hasExtArgs(message)) invalid = true;
         if (const auto msg = message->replyToMessage; msg) {
             if (msg->sticker)
                 sticker = true;
@@ -548,13 +551,13 @@ int main(void) {
                     message->chat->id, message->replyToMessage->text, false,
                     message->replyToMessage->messageId, FILLIN_SENDWOERROR);
             } else if (!invalid) {
-                // clang-format off
+                std::string msg;
+                parseExtArgs(message, msg);
                 bot.getApi().sendMessage(
-			message->chat->id,
-                        message->text.substr(message->text.find_first_of(" ") + 1), false,
-                        (message->replyToMessage) ? message->replyToMessage->messageId : 0,
-                        FILLIN_SENDWOERROR);
-                // clang-format on
+                    message->chat->id, msg, false,
+                    (message->replyToMessage)
+                        ? message->replyToMessage->messageId : 0,
+                    FILLIN_SENDWOERROR);
             }
         } catch (const std::exception &) {
             // bot is not adm. nothing it can do
@@ -699,8 +702,8 @@ int main(void) {
     auto freeMemory = [](int s) {
         if (kCompiler) free(kCompiler);
         if (kCxxCompiler) free(kCxxCompiler);
-	printf("Exit with signal %d\n", s);
-	exit(0);
+        printf("Exit with signal %d\n", s);
+        exit(0);
     };
 
     std::signal(SIGINT, freeMemory);
