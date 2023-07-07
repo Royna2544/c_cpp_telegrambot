@@ -634,18 +634,12 @@ int main(void) {
         static bool enabled = true, initdone = false;
 
         if (Authorized(message)) return;
+	// Do not track older msgs and consider it as spam.
+        if (std::time(0) - message->date > 15) return;
+        // We care GIF, sticker, text spams only
+        if (!message->animation && message->text.empty() && !message->sticker)
+            return;
 
-        if (!initdone) {
-            std::ifstream config;
-            config.open(".spamdetectdisabled");
-            if (config.good()) {
-                config.close();
-                enabled = false;
-            }
-            initdone = true;
-        }
-        if (initdone && !enabled) return;
-        if (std::time(0) - message->date > 10) return;
         if (!falseth) {
             std::thread([cb = &cb]() {
                 falseth = true;
