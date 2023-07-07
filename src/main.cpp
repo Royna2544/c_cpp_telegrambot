@@ -30,7 +30,7 @@ using namespace TgBot;
 // #define DEBUG
 
 static inline bool Authorized(const Message::Ptr &message) {
-    return message->from->id == 1185607882;
+    return message->from ? message->from->id == 1185607882 : true;
 }
 
 #define FILENAME "./compile.cpp"
