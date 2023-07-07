@@ -216,6 +216,14 @@ static void findCompiler(void) {
     }
 }
 
+static int genRandomNumber(const int upper, const int lower = 0) {
+    std::random_device rd;
+    std::mt19937 gen(rd());
+
+    std::uniform_int_distribution<int> distribution(lower, upper);
+    return distribution(gen);
+}
+
 #define CMD_UNSUPPORTED(cmd, reason)                                 \
     bot.getEvents().onCommand(cmd, [&bot](Message::Ptr message) {    \
         bot.getApi().sendMessage(                                    \
@@ -372,8 +380,7 @@ int main(void) {
         std::stringstream ss;
         ss << "Flashing '" << msg;
         if (msg.find(".zip") == std::string::npos) ss << ".zip";
-        srand(time(0));
-        ssize_t pos = rand() % (reasons.size() + 1);
+        ssize_t pos = genRandomNumber(reasons.size());
         if (pos != reasons.size()) {
             ss << "' failed successfully!" << std::endl;
             ss << "Reason: " << reasons[pos];
@@ -608,8 +615,7 @@ int main(void) {
                                          FILLIN_SENDWOERROR);
                 return;
             }
-            srand(time(0));
-            ssize_t pos = rand() % stickset->stickers.size();
+            ssize_t pos = genRandomNumber(stickset->stickers.size() - 1);
             bot.getApi().sendSticker(message->chat->id,
                                      stickset->stickers[pos]->fileId,
                                      message->messageId, nullptr, false, true);
