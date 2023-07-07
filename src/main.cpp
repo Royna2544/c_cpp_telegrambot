@@ -116,7 +116,7 @@ static void commonCleanup(const Bot &bot, const Message::Ptr &message,
     if (res.size() > 4095) res.resize(4095);
     bot.getApi().sendMessage(message->chat->id, res.c_str(), false,
                              message->messageId, FILLIN_SENDWOERROR);
-    std::remove(filename);
+    if (filename) std::remove(filename);
 }
 
 static void CCppCompileHandler(const Bot &bot, const Message::Ptr &message,
@@ -261,6 +261,20 @@ int main(void) {
     } else {
         CMD_UNSUPPORTED("golang", "Host does not have a Go compiler");
     }
+    bot.getEvents().onCommand("bash", [&bot](Message::Ptr message) {
+        std::string res;
+        if (!Authorized(message)) return;
+        if (hasExtArgs(message)) {
+            std::string cmd;
+            parseExtArgs(message, cmd);
+            runCommand(bot, message, std::string() + cmd + SPACE STDERRTOOUT,
+                       res);
+        } else {
+            res = "Send a bash command to run";
+        }
+        commonCleanup(bot, message, res, nullptr);
+    });
+
     bot.getEvents().onCommand("alive", [&bot](Message::Ptr message) {
         static int64_t lasttime = 0, time = 0;
         time = std::time(0);
