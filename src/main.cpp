@@ -61,9 +61,10 @@ static inline bool hasExtArgs(const Message::Ptr &message) {
 }
 
 static void parseExtArgs(const Message::Ptr &message, std::string &extraargs) {
+    // Telegram ensures message does not have whitespaces beginning or ending.
     auto id = message->text.find_first_of(" ");
     if (id != std::string::npos) {
-        extraargs = message->text.substr(id);
+        extraargs = message->text.substr(id + 1);
     }
 }
 
