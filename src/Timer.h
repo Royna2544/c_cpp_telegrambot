@@ -39,6 +39,7 @@ class Timer {
         if (shouldcancel) stop = true;
         return shouldcancel;
     }
+    void cancel(void) { stop = true; }
     bool isrunning(void) { return !stop; }
 };
 

@@ -782,15 +782,17 @@ int main(void) {
         }
     });
 
-    auto freeMemory = [](int s) {
+    auto cleanupFunc = [](int s) {
         if (kCompiler) free(kCompiler);
         if (kCxxCompiler) free(kCxxCompiler);
-        printf("Exit with signal %d\n", s);
+        printf("Exiting with signal %d\n", s);
+        if (tm_ptr) tm_ptr->cancel();
+        std::this_thread::sleep_for(std::chrono::seconds(4));
         exit(0);
     };
 
-    std::signal(SIGINT, freeMemory);
-    std::signal(SIGTERM, freeMemory);
+    std::signal(SIGINT, cleanupFunc);
+    std::signal(SIGTERM, cleanupFunc);
 
     try {
         printf("Bot username: %s\n", bot.getApi().getMe()->username.c_str());
@@ -807,5 +809,5 @@ int main(void) {
         // Better to bail out and find problem.
         printf("error: %s\n", e.what());
     }
-    freeMemory(0);
+    cleanupFunc(0);
 }
