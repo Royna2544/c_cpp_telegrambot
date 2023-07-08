@@ -21,11 +21,11 @@ using cancel_validator_t = std::function<bool(T*)>;
 template <typename T>
 class Timer {
     unsigned int h, m, s;
-    unsigned int onsec;
+    unsigned int onsec = 0;
     std::unique_ptr<T> priv;
     time_callback_t<T> onEvery;
     callback_t<T> onEnd;
-    bool stop;
+    bool stop = false;
 
    public:
     Timer() = delete;
