@@ -292,8 +292,12 @@ int main(void) {
         time = std::time(0);
         if (lasttime != 0 && time - lasttime < 5) return;
         lasttime = time;
-        bot.getApi().sendMessage(message->chat->id, "I am alive...", false,
-                                 message->messageId, FILLIN_SENDWOERROR);
+        // Hardcoded bocchi the rock GIF
+        bot.getApi().sendAnimation(message->chat->id,
+                                   "CgACAgQAAx0CVJDJywAChOJkqVx5kGpydVpJGpqXp6E"
+                                   "khb3IzAACxAMAAqDqHVM3s6FG-iRuoC8E",
+                                   0, 0, 0, "", "", message->messageId,
+                                   FILLIN_SENDWOERROR, false, 0, false);
     });
     bot.getEvents().onCommand("flash", [&bot](const Message::Ptr &message) {
 #include "FlashData.h"
