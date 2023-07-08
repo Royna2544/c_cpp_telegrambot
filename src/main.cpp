@@ -555,9 +555,11 @@ int main(void) {
                                  message->messageId, FILLIN_SENDWOERROR);
     });
     bot.getEvents().onCommand("decho", [&bot](const Message::Ptr &message) {
-        bool invalid = false, sticker = false, text = false, animation = false;
-        if (!hasExtArgs(message)) invalid = true;
-        if (const auto msg = message->replyToMessage; msg) {
+        bool invalid = !hasExtArgs(message), sticker = false, text = false,
+             animation = false;
+        const auto msg = message->replyToMessage;
+
+        if (msg) {
             if (msg->sticker)
                 sticker = true;
             else if (msg->animation)
