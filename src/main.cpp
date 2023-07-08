@@ -227,12 +227,12 @@ static int genRandomNumber(const int upper, const int lower = 0) {
     return distribution(gen);
 }
 
-#define CMD_UNSUPPORTED(cmd, reason)                                 \
-    bot.getEvents().onCommand(cmd, [&bot](Message::Ptr message) {    \
-        bot.getApi().sendMessage(                                    \
-            message->chat->id,                                       \
-            "cmd '" cmd "' is unsupported.\nReason: " reason, false, \
-            message->messageId, FILLIN_SENDWOERROR);                 \
+#define CMD_UNSUPPORTED(cmd, reason)                                     \
+    bot.getEvents().onCommand(cmd, [&bot](const Message::Ptr &message) { \
+        bot.getApi().sendMessage(                                        \
+            message->chat->id,                                           \
+            "cmd '" cmd "' is unsupported.\nReason: " reason, false,     \
+            message->messageId, FILLIN_SENDWOERROR);                     \
     });
 
 int main(void) {
@@ -249,30 +249,31 @@ int main(void) {
     findCompiler();
 
     if (kCxxCompiler) {
-        bot.getEvents().onCommand("cpp", [&bot](Message::Ptr message) {
+        bot.getEvents().onCommand("cpp", [&bot](const Message::Ptr &message) {
             CCppCompileHandler(bot, message, true);
         });
     } else {
         CMD_UNSUPPORTED("cpp", "Host does not have a C++ compiler");
     }
     if (kCompiler) {
-        bot.getEvents().onCommand("c", [&bot](Message::Ptr message) {
+        bot.getEvents().onCommand("c", [&bot](const Message::Ptr &message) {
             CCppCompileHandler(bot, message, false);
         });
     } else {
         CMD_UNSUPPORTED("c", "Host does not have a C compiler");
     }
-    bot.getEvents().onCommand("python", [&bot](Message::Ptr message) {
+    bot.getEvents().onCommand("python", [&bot](const Message::Ptr &message) {
         GenericRunHandler(bot, message, "python3", "./out.py");
     });
     if (access("/usr/bin/go", F_OK) == 0) {
-        bot.getEvents().onCommand("golang", [&bot](Message::Ptr message) {
-            GenericRunHandler(bot, message, "go run", "./out.go");
-        });
+        bot.getEvents().onCommand(
+            "golang", [&bot](const Message::Ptr &message) {
+                GenericRunHandler(bot, message, "go run", "./out.go");
+            });
     } else {
         CMD_UNSUPPORTED("golang", "Host does not have a Go compiler");
     }
-    bot.getEvents().onCommand("bash", [&bot](Message::Ptr message) {
+    bot.getEvents().onCommand("bash", [&bot](const Message::Ptr &message) {
         std::string res;
         if (!Authorized(message)) return;
         if (hasExtArgs(message)) {
@@ -286,7 +287,7 @@ int main(void) {
         commonCleanup(bot, message, res, nullptr);
     });
 
-    bot.getEvents().onCommand("alive", [&bot](Message::Ptr message) {
+    bot.getEvents().onCommand("alive", [&bot](const Message::Ptr &message) {
         static int64_t lasttime = 0, time = 0;
         time = std::time(0);
         if (lasttime != 0 && time - lasttime < 5) return;
@@ -294,7 +295,7 @@ int main(void) {
         bot.getApi().sendMessage(message->chat->id, "I am alive...", false,
                                  message->messageId, FILLIN_SENDWOERROR);
     });
-    bot.getEvents().onCommand("flash", [&bot](Message::Ptr message) {
+    bot.getEvents().onCommand("flash", [&bot](const Message::Ptr &message) {
         static const std::vector<std::string> reasons = {
             "Alex is not sleeping",
             "The system has been destoryed",
@@ -393,57 +394,59 @@ int main(void) {
         bot.getApi().sendMessage(message->chat->id, ss.str(), false,
                                  message->messageId, FILLIN_SENDWOERROR);
     });
-    bot.getEvents().onCommand("possibility", [&bot](Message::Ptr message) {
-        if (!hasExtArgs(message)) {
-            bot.getApi().sendMessage(
-                message->chat->id,
-                "Send avaliable conditions sperated by newline", false,
-                message->messageId, FILLIN_SENDWOERROR);
-            return;
-        }
-        std::string text;
-        parseExtArgs(message, text);
-        std::stringstream ss(text), out;
-        std::string line, last;
-        std::vector<std::string> vec;
-        std::random_device rd;
-        std::mt19937 gen(rd());
+    bot.getEvents().onCommand(
+        "possibility", [&bot](const Message::Ptr &message) {
+            if (!hasExtArgs(message)) {
+                bot.getApi().sendMessage(
+                    message->chat->id,
+                    "Send avaliable conditions sperated by newline", false,
+                    message->messageId, FILLIN_SENDWOERROR);
+                return;
+            }
+            std::string text;
+            parseExtArgs(message, text);
+            std::stringstream ss(text), out;
+            std::string line, last;
+            std::vector<std::string> vec;
+            std::random_device rd;
+            std::mt19937 gen(rd());
 
-        int numlines = 1;
-        for (char c : message->text) {
-            if (c == '\n') numlines++;
-        }
-        vec.reserve(numlines);
-        while (std::getline(ss, line, '\n')) {
-            if (std::all_of(line.begin(), line.end(),
-                            [](char c) { return std::isspace(c); }))
-                continue;
-            vec.push_back(line);
-        }
-        if (vec.size() == 1) {
-            bot.getApi().sendMessage(message->chat->id,
-                                     "Give more than 1 choice", false,
+            int numlines = 1;
+            for (char c : message->text) {
+                if (c == '\n') numlines++;
+            }
+            vec.reserve(numlines);
+            while (std::getline(ss, line, '\n')) {
+                if (std::all_of(line.begin(), line.end(),
+                                [](char c) { return std::isspace(c); }))
+                    continue;
+                vec.push_back(line);
+            }
+            if (vec.size() == 1) {
+                bot.getApi().sendMessage(
+                    message->chat->id, "Give more than 1 choice", false,
+                    message->messageId, FILLIN_SENDWOERROR);
+                return;
+            }
+            std::shuffle(vec.begin(), vec.end(), gen);
+            out << "Total " << vec.size() << " items" << std::endl;
+            last = vec.back();
+            vec.pop_back();
+            int total = 0;
+            for (const auto &cond : vec) {
+                int thisper = genRandomNumber(100 - total);
+                out << cond << " : " << thisper << "%" << std::endl;
+                total += thisper;
+            }
+            out << last << " : " << 100 - total << "%" << std::endl;
+            bot.getApi().sendMessage(message->chat->id, out.str(), false,
                                      message->messageId, FILLIN_SENDWOERROR);
-            return;
-        }
-        std::shuffle(vec.begin(), vec.end(), gen);
-        out << "Total " << vec.size() << " items" << std::endl;
-        last = vec.back();
-        vec.pop_back();
-        int total = 0;
-        for (const auto &cond : vec) {
-            int thisper = genRandomNumber(100 - total);
-            out << cond << " : " << thisper << "%" << std::endl;
-            total += thisper;
-        }
-        out << last << " : " << 100 - total << "%" << std::endl;
-        bot.getApi().sendMessage(message->chat->id, out.str(), false,
-                                 message->messageId, FILLIN_SENDWOERROR);
-    });
-    bot.getEvents().onCommand("shutdown", [&bot](Message::Ptr message) {
+        });
+    bot.getEvents().onCommand("shutdown", [&bot](const Message::Ptr &message) {
         if (Authorized(message) && std::time(0) - message->date < 5) exit(0);
     });
-    bot.getEvents().onCommand("starttimer", [&bot](Message::Ptr message) {
+    bot.getEvents().onCommand("starttimer", [&bot](
+                                                const Message::Ptr &message) {
         enum InputState {
             HOUR,
             MINUTE,
@@ -597,7 +600,7 @@ int main(void) {
                 msgid, bot, couldpin, true, message->chat->id}));
         tm_ptr->start();
     });
-    bot.getEvents().onCommand("stoptimer", [&bot](Message::Ptr message) {
+    bot.getEvents().onCommand("stoptimer", [&bot](const Message::Ptr &message) {
         if (!Authorized(message)) return;
         bool ret = false;
         const char *text;
@@ -615,7 +618,7 @@ int main(void) {
         bot.getApi().sendMessage(message->chat->id, text, false,
                                  message->messageId, FILLIN_SENDWOERROR);
     });
-    bot.getEvents().onCommand("decho", [&bot](Message::Ptr message) {
+    bot.getEvents().onCommand("decho", [&bot](const Message::Ptr &message) {
         bool invalid = false, sticker = false, text = false, animation = false;
         if (!hasExtArgs(message)) invalid = true;
         if (const auto msg = message->replyToMessage; msg) {
@@ -655,7 +658,8 @@ int main(void) {
             // bot is not adm. nothing it can do
         }
     });
-    bot.getEvents().onCommand("randsticker", [&bot](Message::Ptr message) {
+    bot.getEvents().onCommand("randsticker", [&bot](
+                                                 const Message::Ptr &message) {
         if (message->replyToMessage && message->replyToMessage->sticker) {
             StickerSet::Ptr stickset;
             try {
@@ -683,7 +687,7 @@ int main(void) {
                 false, message->messageId, FILLIN_SENDWOERROR);
         }
     });
-    bot.getEvents().onAnyMessage([&bot](Message::Ptr message) {
+    bot.getEvents().onAnyMessage([&bot](const Message::Ptr &message) {
         static std::vector<Message::Ptr> buffer;
         static std::mutex m;
         static std::atomic_bool cb;
