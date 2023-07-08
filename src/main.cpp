@@ -58,12 +58,12 @@ static bool verifyMessage(const Bot &bot, const Message::Ptr &message) {
 }
 
 static inline bool hasExtArgs(const Message::Ptr &message) {
-    return message->text.find_first_of(" ") != std::string::npos;
+    return message->text.find_first_of(" \n") != std::string::npos;
 }
 
 static void parseExtArgs(const Message::Ptr &message, std::string &extraargs) {
     // Telegram ensures message does not have whitespaces beginning or ending.
-    auto id = message->text.find_first_of(" ");
+    auto id = message->text.find_first_of(" \n");
     if (id != std::string::npos) {
         extraargs = message->text.substr(id + 1);
     }
