@@ -4,8 +4,8 @@
 #include <tgbot/tgbot.h>
 
 struct TimerImpl_privdata {
-	int64_t messageid;
-	const TgBot::Bot& bot;
-	bool botcanpin;
-	int64_t chatid;
+    int64_t messageid;
+    const TgBot::Bot& bot;
+    bool botcanpin, sendendmsg;
+    int64_t chatid;
 };

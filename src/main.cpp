@@ -586,14 +586,15 @@ int main(void) {
                 const Bot &bot = priv->bot;
                 bot.getApi().editMessageText("Timer ended", message->chat->id,
                                              priv->messageid);
-                bot.getApi().sendMessage(message->chat->id, "Timer ended");
-                std::this_thread::sleep_for(std::chrono::seconds(3));
+                if (priv->sendendmsg)
+                    bot.getApi().sendMessage(message->chat->id, "Timer ended");
+                std::this_thread::sleep_for(std::chrono::seconds(1));
                 if (priv->botcanpin)
                     bot.getApi().unpinChatMessage(message->chat->id,
                                                   priv->messageid);
             },
-            std::make_unique<TimerImpl_privdata>(
-                TimerImpl_privdata{msgid, bot, couldpin, message->chat->id}));
+            std::make_unique<TimerImpl_privdata>(TimerImpl_privdata{
+                msgid, bot, couldpin, true, message->chat->id}));
         tm_ptr->start();
     });
     bot.getEvents().onCommand("stoptimer", [&bot](Message::Ptr message) {
@@ -601,7 +602,8 @@ int main(void) {
         bool ret = false;
         const char *text;
         if (tm_ptr) {
-            ret = tm_ptr->cancel([&](const TimerImpl_privdata *t) -> bool {
+            ret = tm_ptr->cancel([&](TimerImpl_privdata *t) -> bool {
+                t->sendendmsg = false;
                 return t->chatid == message->chat->id;
             });
             if (ret) {

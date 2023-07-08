@@ -16,7 +16,7 @@ using callback_t = std::function<void(const T*)>;
 template <typename T>
 using time_callback_t = std::function<void(const T*, struct timehms)>;
 template <typename T>
-using cancel_validator_t = std::function<bool(const T*)>;
+using cancel_validator_t = std::function<bool(T*)>;
 
 template <typename T>
 class Timer {
