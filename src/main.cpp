@@ -296,71 +296,7 @@ int main(void) {
                                  message->messageId, FILLIN_SENDWOERROR);
     });
     bot.getEvents().onCommand("flash", [&bot](const Message::Ptr &message) {
-        static const std::vector<std::string> reasons = {
-            "Alex is not sleeping",
-            "The system has been destoryed",
-            "init: service 'recovery' got signal 6",
-            "Rewrite the updater script with cpp and try again",
-            "Incorrect bootloader version.",
-            "Insufficient storage space to install the custom ROM.",
-            "The installation process was interrupted due to a "
-            "power failure.",
-            "The file is not compatible with your device.",
-            "The installation package is corrupt.",
-            "Security boot error. UEFI boot failed.",
-            "Device not rooted",
-            "Installation failed due to a user error.",
-            "The zip is incompatible with the device's kernel.",
-            "Not enough space available in system partition.",
-            "Incorrect MD5 checksum.",
-            "Your bootloader is unlocked. Please lock the bootloader "
-            "before installing.",
-            "The device is not supported.",
-            "The installation process was cancelled by the user.",
-            "The file is encrypted or password protected.",
-            "Requires a newer version of TWRP Recovery.",
-            "Package signature verification failed.",
-            "The installation process failed due to an unknown error.",
-            "Not compatible with your device's screen resolution.",
-            "Your device is incompatible with the build date fingerprint.",
-            "The zip is missing important system files.",
-            "Verification failed. BSOD is not enabled.",
-            "File name does not match the expected format.",
-            "Package is missing important system libraries or binaries.",
-            "Installation process was interrupted due to a "
-            "network error.",
-            "The device is running an unsupported firmware version.",
-            "The device is not rooted properly",
-            "The file is incompatible with the device's recovery image.",
-            "bootloop",
-            "error 7",
-            "zip corrupted",
-            "battery died",
-            "virus",
-            "not enough space",
-            "locked bootloader",
-            "knox 0x0",
-            "try again later",
-            "yumi protection",
-            "sdcard corrupted",
-            "verizon locked carrier",
-            "emmc died",
-            "nusantara recovery not supported",
-            "battery corruption",
-            "failed to mount system",
-            "failed to mount system_ext",
-            "failed to mount product",
-            "failed to mount vendor",
-            "failed to mount partitions",
-            "system is mounted as read-only",
-            "system_ext is mounted as read-only",
-            "product is mounted as read-only",
-            "vendor is mounted as read-only",
-            "beep bop... something wrong",
-            "your opinion rejected",
-            "Not installed because the device is "
-            "currently encrypted."};
-
+#include "FlashData.h"
         std::string msg = message->text;
         if (message->replyToMessage != nullptr) {
             msg = message->replyToMessage->text;
