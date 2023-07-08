@@ -10,5 +10,8 @@ set(CMAKE_CXX_CLANG_TIDY clang-tidy;
 	-checks=*,-llvmlibc*,-fuchsia*,-altera*,-hicpp*,abseil-*,-llvm-header-guard,-modernize-use-trailing-return-type,-modernize-redundent-void-arg)
 
 add_subdirectory(lib)
+set_target_properties(TgBot
+    PROPERTIES CXX_CLANG_TIDY ""
+)
 add_executable(${PROJECT_NAME} ${SRC_LIST})
 target_link_libraries(${PROJECT_NAME} TgBot)
