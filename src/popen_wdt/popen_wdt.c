@@ -38,7 +38,7 @@ FILE *popen_watchdog(const char *command, const int pipe_ret) {
 
     data = mmap(NULL, sizeof(*data), PROT_READ | PROT_WRITE,
                 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-    if (data == NULL) return NULL;
+    if (data == MAP_FAILED) return NULL;
 
     data->pipe_ret = pipe_ret;
 
