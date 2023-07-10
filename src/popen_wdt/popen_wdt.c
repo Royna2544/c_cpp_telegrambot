@@ -17,7 +17,7 @@ static void *watchdog(void *arg) {
     _Bool ret = 0;
     sleep(SLEEP_SECONDS);
     if (kill(data->pid, 0) == 0) {
-        killpg(data->pid, SIGKILL);
+        killpg(data->pid, SIGTERM);
 	ret = 1;
     }
     if (data->pipe_ret > 0)
