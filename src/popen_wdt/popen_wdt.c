@@ -17,7 +17,7 @@ static void *watchdog(void *arg) {
     _Bool ret = 0;
     sleep(SLEEP_SECONDS);
     if (kill(data->pid, 0) == 0) {
-        kill(data->pid, SIGKILL);
+        killpg(data->pid, SIGKILL);
 	ret = 1;
     }
     if (data->pipe_ret > 0)
@@ -63,6 +63,7 @@ FILE *popen_watchdog(const char *command, const int pipe_ret) {
         close(pipefd[0]);
         dup2(pipefd[1], STDOUT_FILENO);
         close(STDIN_FILENO);
+	setpgid(0, 0);
         execl("/bin/bash", "bash", "-c", command, (char *)NULL);
         _exit(127);  // If execl fails, exit
     } else {
