@@ -23,9 +23,15 @@
 #define BOOST_BIND_GLOBAL_PLACEHOLDERS
 #include <tgbot/tgbot.h>
 
-#include "Timer.h"
-#include "TimerImpl_privdata.h"
 #include "popen_wdt/popen_wdt.h"
+#include "timer/Timer.h"
+
+struct TimerImpl_privdata {
+    int32_t messageid;
+    const TgBot::Bot &bot;
+    bool botcanpin, sendendmsg;
+    int64_t chatid;
+};
 
 using namespace TgBot;
 
