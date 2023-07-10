@@ -41,9 +41,18 @@ using TgBot::TgLongPoll;
 
 // #define DEBUG
 
+static bool gAuthorized = true;
+
 static inline bool Authorized(const Message::Ptr &message) {
+    if (!gAuthorized) return false;
     return message->from ? message->from->id == 1185607882 : true;
 }
+static inline bool AuthorizedStub(void) { return gAuthorized; }
+
+#define ENFORCE_AUTHORIZED \
+    if (!Authorized(message)) return
+#define STUB_AUTHORIZED \
+    if (!AuthorizedStub()) return
 
 #define FILENAME "./compile.cpp"
 #define AOUTNAME "./a.out"
@@ -58,7 +67,7 @@ static inline bool Authorized(const Message::Ptr &message) {
 static char *kCompiler = nullptr, *kCxxCompiler = nullptr;
 
 static bool verifyMessage(const Bot &bot, const Message::Ptr &message) {
-    if (!Authorized(message)) return false;
+    ENFORCE_AUTHORIZED false;
     if (message->replyToMessage == nullptr) {
         bot.getApi().sendMessage(message->chat->id,
                                  "Reply to a code to compile", false,
@@ -299,7 +308,7 @@ int main(void) {
     }
     bot.getEvents().onCommand("bash", [&bot](const Message::Ptr &message) {
         std::string res;
-        if (!Authorized(message)) return;
+        ENFORCE_AUTHORIZED;
         if (hasExtArgs(message)) {
             std::string cmd;
             parseExtArgs(message, cmd);
@@ -312,6 +321,7 @@ int main(void) {
     });
 
     bot.getEvents().onCommand("alive", [&bot](const Message::Ptr &message) {
+        STUB_AUTHORIZED;
         static int64_t lasttime = 0, time = 0;
         time = std::time(0);
         if (lasttime != 0 && time - lasttime < 5) return;
@@ -324,6 +334,7 @@ int main(void) {
                                    FILLIN_SENDWOERROR, false, 0, false);
     });
     bot.getEvents().onCommand("flash", [&bot](const Message::Ptr &message) {
+        STUB_AUTHORIZED;
 #include "FlashData.h"
         std::string msg = message->text;
         if (message->replyToMessage != nullptr) {
@@ -360,6 +371,7 @@ int main(void) {
     });
     bot.getEvents().onCommand(
         "possibility", [&bot](const Message::Ptr &message) {
+            STUB_AUTHORIZED;
             if (!hasExtArgs(message)) {
                 bot.getApi().sendMessage(
                     message->chat->id,
@@ -406,9 +418,6 @@ int main(void) {
             bot.getApi().sendMessage(message->chat->id, out.str(), false,
                                      message->messageId, FILLIN_SENDWOERROR);
         });
-    bot.getEvents().onCommand("shutdown", [&bot](const Message::Ptr &message) {
-        if (Authorized(message) && std::time(0) - message->date < 5) exit(0);
-    });
     bot.getEvents().onCommand("starttimer", [&bot](
                                                 const Message::Ptr &message) {
         enum InputState {
@@ -417,7 +426,7 @@ int main(void) {
             SECOND,
             NONE,
         };
-        if (!Authorized(message)) return;
+        ENFORCE_AUTHORIZED;
         bool found = false;
         std::string msg;
         if (hasExtArgs(message)) {
@@ -565,7 +574,7 @@ int main(void) {
         tm_ptr->start();
     });
     bot.getEvents().onCommand("stoptimer", [&bot](const Message::Ptr &message) {
-        if (!Authorized(message)) return;
+        ENFORCE_AUTHORIZED;
         bool ret = false;
         const char *text;
         if (tm_ptr) {
@@ -583,6 +592,7 @@ int main(void) {
                                  message->messageId, FILLIN_SENDWOERROR);
     });
     bot.getEvents().onCommand("decho", [&bot](const Message::Ptr &message) {
+        STUB_AUTHORIZED;
         bool invalid = !hasExtArgs(message), sticker = false, text = false,
              animation = false;
         const auto msg = message->replyToMessage;
@@ -626,6 +636,7 @@ int main(void) {
     });
     bot.getEvents().onCommand("randsticker", [&bot](
                                                  const Message::Ptr &message) {
+        STUB_AUTHORIZED;
         if (message->replyToMessage && message->replyToMessage->sticker) {
             StickerSet::Ptr stickset;
             try {
@@ -765,7 +776,9 @@ int main(void) {
 
     std::signal(SIGINT, cleanupFunc);
     std::signal(SIGTERM, cleanupFunc);
+    int64_t lastcrash = 0;
 
+reinit:
     try {
         printf("Bot username: %s\n", bot.getApi().getMe()->username.c_str());
         bot.getApi().deleteWebhook();
@@ -775,11 +788,21 @@ int main(void) {
             longPoll.start();
         }
     } catch (std::exception &e) {
-        // The reason why we exit program instead of continuing is that it
-        // will endlessly except if the above code triggered error to
-        // Telegram API. Therefore a useless idea to catch and continue.
-        // Better to bail out and find problem.
         printf("error: %s\n", e.what());
+        printf("trying to recover\n");
+        bot.getApi().sendMessage(1185607882, e.what());
+        int64_t temptime = time(0);
+        if (temptime - lastcrash < 10 && lastcrash != 0) {
+            bot.getApi().sendMessage(1185607882, "Recover failed.");
+            return 1;
+        }
+        lastcrash = temptime;
+        gAuthorized = false;
+        std::thread([] {
+            std::this_thread::sleep_for(std::chrono::seconds(5));
+            gAuthorized = true;
+        }).detach();
+	goto reinit;
     }
     cleanupFunc(0);
 }
