@@ -4,7 +4,8 @@ project(tg_cpphost)
 option(ENABLE_TIDY "Enable clang-tidy checks" OFF)
 
 set(SRC_LIST
-    src/main.cpp)
+    src/main.cpp
+    src/popen_wdt/popen_wdt.c)
 
 if (ENABLE_TIDY)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

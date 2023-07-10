@@ -25,6 +25,7 @@
 
 #include "Timer.h"
 #include "TimerImpl_privdata.h"
+#include "popen_wdt/popen_wdt.h"
 
 using namespace TgBot;
 
@@ -99,7 +100,7 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
                        const std::string &cmd, std::string &res) {
     bool fine = false;
     auto buf = std::make_unique<char[]>(BUFSIZE);
-    auto fp = popen(cmd.c_str(), "r");
+    auto fp = popen_watchdog(cmd.c_str());
     if (!fp) {
         bot.getApi().sendMessage(message->chat->id, "Failed to popen()", false,
                                  message->messageId, FILLIN_SENDWOERROR);
