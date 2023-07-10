@@ -33,7 +33,11 @@ struct TimerImpl_privdata {
     int64_t chatid;
 };
 
-using namespace TgBot;
+using TgBot::Bot;
+using TgBot::Message;
+using TgBot::MessageEntity;
+using TgBot::StickerSet;
+using TgBot::TgLongPoll;
 
 // #define DEBUG
 
