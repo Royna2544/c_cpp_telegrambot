@@ -9,19 +9,24 @@
 
 struct watchdog_data {
     pid_t pid;
+    int pipe_ret;
 };
 
 static void *watchdog(void *arg) {
     struct watchdog_data *data = (struct watchdog_data *)arg;
+    _Bool ret = 0;
     sleep(SLEEP_SECONDS);
     if (kill(data->pid, 0) == 0) {
         kill(data->pid, SIGKILL);
+	ret = 1;
     }
+    if (data->pipe_ret > 0)
+	write(data->pipe_ret, &ret, 1);
     munmap(data, sizeof(*data));
     return NULL;
 }
 
-FILE *popen_watchdog(const char *command) {
+FILE *popen_watchdog(const char *command, const int pipe_ret) {
     FILE *fp;
     int pipefd[2];
     pid_t pid;
@@ -34,6 +39,8 @@ FILE *popen_watchdog(const char *command) {
     data = mmap(NULL, sizeof(*data), PROT_READ | PROT_WRITE,
                 MAP_SHARED | MAP_ANONYMOUS, -1, 0);
     if (data == NULL) return NULL;
+
+    data->pipe_ret = pipe_ret;
 
     pthread_t watchdog_thread;
     pthread_attr_t attr;

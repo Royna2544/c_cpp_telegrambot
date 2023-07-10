@@ -110,7 +110,11 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
                        const std::string &cmd, std::string &res) {
     bool fine = false;
     auto buf = std::make_unique<char[]>(BUFSIZE);
-    auto fp = popen_watchdog(cmd.c_str());
+    int pipefd[2] = {-1, -1};
+
+    pipe(pipefd);
+    auto fp = popen_watchdog(cmd.c_str(), pipefd[1]);
+
     if (!fp) {
         bot.getApi().sendMessage(message->chat->id, "Failed to popen()", false,
                                  message->messageId, FILLIN_SENDWOERROR);
@@ -120,8 +124,17 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
         if (!fine) fine = true;
         res += buf.get();
     }
+    if (!fine) res += EMPTY "\n";
+    if (pipefd[0] != -1) {
+        bool buf;
+        read(pipefd[0], &buf, 1);
+        if (buf) {
+            res += WDT_BITE_STR;
+        }
+        close(pipefd[0]);
+        close(pipefd[1]);
+    }
     pclose(fp);
-    if (!fine) res += EMPTY;
 }
 
 static void commonCleanup(const Bot &bot, const Message::Ptr &message,
