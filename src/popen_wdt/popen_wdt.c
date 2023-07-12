@@ -14,7 +14,7 @@ struct watchdog_data {
 
 static void *watchdog(void *arg) {
     struct watchdog_data *data = (struct watchdog_data *)arg;
-    _Bool ret = 0;
+    int ret = 0;
     sleep(SLEEP_SECONDS);
     if (kill(data->pid, 0) == 0) {
         killpg(data->pid, SIGTERM);
