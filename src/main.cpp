@@ -23,6 +23,9 @@
 #define BOOST_BIND_GLOBAL_PLACEHOLDERS
 #include <tgbot/tgbot.h>
 
+#ifdef USE_BLACKLIST
+#include "conf/conf.h"
+#endif
 #include "popen_wdt/popen_wdt.h"
 #include "timer/Timer.h"
 
@@ -43,16 +46,41 @@ using TgBot::TgLongPoll;
 
 static bool gAuthorized = true;
 
-static inline bool Authorized(const Message::Ptr &message, const bool nonuserallowed = false) {
-    if (!gAuthorized) return false;
-    return message->from ? message->from->id == 1185607882 : nonuserallowed;
+#ifdef USE_BLACKLIST
+static TgBotConfig config("tgbot.dat");
+#else
+static int64_t ownerid = 1185607882;
+#endif
+
+static inline bool AuthorizedId(const int64_t id, const bool permissive) {
+#ifdef USE_BLACKLIST
+    static struct config_data data;
+    config.loadFromFile(&data);
+    if (!permissive) {
+        return id == data.owner_id;
+    } else {
+        for (int i = 0; i < BLACKLIST_BUFFER; ++i) {
+            if (data.blacklist[i] == id) return false;
+        }
+        return true;
+    }
+#else
+    return permissive ? true : ownerid == id;
+#endif
 }
-static inline bool AuthorizedStub(void) { return gAuthorized; }
+
+static inline bool Authorized(const Message::Ptr &message,
+                              const bool nonuserallowed = false,
+                              const bool permissive = false) {
+    if (!gAuthorized) return false;
+    return message->from ? AuthorizedId(message->from->id, permissive)
+                         : nonuserallowed;
+}
 
 #define ENFORCE_AUTHORIZED \
     if (!Authorized(message)) return
-#define STUB_AUTHORIZED \
-    if (!AuthorizedStub()) return
+#define PERMISSIVE_AUTHORIZED \
+    if (!Authorized(message, true, true)) return
 
 #define FILENAME "./compile.cpp"
 #define AOUTNAME "./a.out"
@@ -299,13 +327,72 @@ int main(void) {
         GenericRunHandler(bot, message, "python3", "./out.py");
     });
     if (access("/usr/bin/go", F_OK) == 0) {
-        bot.getEvents().onCommand(
-            "golang", [&bot](const Message::Ptr &message) {
-                GenericRunHandler(bot, message, "go run", "./out.go");
-            });
+        bot.getEvents().onCommand("golang", [&bot](const Message::Ptr &message) {
+            GenericRunHandler(bot, message, "go run", "./out.go");
+        });
     } else {
         CMD_UNSUPPORTED("golang", "Host does not have a Go compiler");
     }
+#ifdef USE_BLACKLIST
+    bot.getEvents().onCommand("addblacklist", [&bot](const Message::Ptr &message) {
+        ENFORCE_AUTHORIZED;
+        struct config_data data;
+        if (message->replyToMessage && message->replyToMessage->from) {
+            config.loadFromFile(&data);
+            for (int i = 0; i < BLACKLIST_BUFFER; i++) {
+                if (data.blacklist[i] == message->replyToMessage->from->id) {
+                    bot.getApi().sendMessage(
+                        message->chat->id, "User already in blacklist", false,
+                        message->messageId, FILLIN_SENDWOERROR);
+                    return;
+                }
+                if (data.blacklist[i] == 0) {
+                    data.blacklist[i] = message->replyToMessage->from->id;
+                    bot.getApi().sendMessage(
+                        message->chat->id, "User added to blacklist", false,
+                        message->messageId, FILLIN_SENDWOERROR);
+                    config.storeToFile(data);
+                    return;
+                }
+            }
+            bot.getApi().sendMessage(message->chat->id, "Out of buffer", false,
+                                     message->messageId, FILLIN_SENDWOERROR);
+        } else {
+            bot.getApi().sendMessage(message->chat->id, "Reply to a user",
+                                     false, message->messageId,
+                                     FILLIN_SENDWOERROR);
+        }
+    });
+    bot.getEvents().onCommand("rmblacklist", [&bot](const Message::Ptr &message) {
+        ENFORCE_AUTHORIZED;
+        struct config_data data;
+        if (message->replyToMessage && message->replyToMessage->from) {
+            config.loadFromFile(&data);
+            int tmp[BLACKLIST_BUFFER] = {
+                0,
+            };
+            for (int i = 0; i < BLACKLIST_BUFFER; i++) {
+                if (data.blacklist[i] == message->replyToMessage->from->id) {
+                    bot.getApi().sendMessage(
+                        message->chat->id, "User removed from blacklist", false,
+                        message->messageId, FILLIN_SENDWOERROR);
+                    continue;
+                } else {
+                    tmp[i] = data.blacklist[i];
+                }
+            }
+            memcpy(data.blacklist, tmp, sizeof(tmp));
+	    config.storeToFile(data);
+        } else {
+            bot.getApi().sendMessage(message->chat->id, "Reply to a user",
+                                     false, message->messageId,
+                                     FILLIN_SENDWOERROR);
+        }
+    });
+#else
+    CMD_UNSUPPORTED("addblacklist", "USE_BLACKLIST flag not enabled");
+    CMD_UNSUPPORTED("rmblacklist", "USE_BLACKLIST flag not enabled");
+#endif
     bot.getEvents().onCommand("bash", [&bot](const Message::Ptr &message) {
         std::string res;
         ENFORCE_AUTHORIZED;
@@ -321,7 +408,7 @@ int main(void) {
     });
 
     bot.getEvents().onCommand("alive", [&bot](const Message::Ptr &message) {
-        STUB_AUTHORIZED;
+        PERMISSIVE_AUTHORIZED;
         static int64_t lasttime = 0, time = 0;
         time = std::time(0);
         if (lasttime != 0 && time - lasttime < 5) return;
@@ -334,7 +421,7 @@ int main(void) {
                                    FILLIN_SENDWOERROR, false, 0, false);
     });
     bot.getEvents().onCommand("flash", [&bot](const Message::Ptr &message) {
-        STUB_AUTHORIZED;
+        PERMISSIVE_AUTHORIZED;
 #include "FlashData.h"
         std::string msg = message->text;
         if (message->replyToMessage != nullptr) {
@@ -369,57 +456,55 @@ int main(void) {
         bot.getApi().sendMessage(message->chat->id, ss.str(), false,
                                  message->messageId, FILLIN_SENDWOERROR);
     });
-    bot.getEvents().onCommand(
-        "possibility", [&bot](const Message::Ptr &message) {
-            STUB_AUTHORIZED;
-            if (!hasExtArgs(message)) {
-                bot.getApi().sendMessage(
-                    message->chat->id,
-                    "Send avaliable conditions sperated by newline", false,
-                    message->messageId, FILLIN_SENDWOERROR);
-                return;
-            }
-            std::string text;
-            parseExtArgs(message, text);
-            std::stringstream ss(text), out;
-            std::string line, last;
-            std::vector<std::string> vec;
-            std::random_device rd;
-            std::mt19937 gen(rd());
+    bot.getEvents().onCommand("possibility", [&bot](const Message::Ptr &message) {
+        PERMISSIVE_AUTHORIZED;
+        if (!hasExtArgs(message)) {
+            bot.getApi().sendMessage(
+                message->chat->id,
+                "Send avaliable conditions sperated by newline", false,
+                message->messageId, FILLIN_SENDWOERROR);
+            return;
+        }
+        std::string text;
+        parseExtArgs(message, text);
+        std::stringstream ss(text), out;
+        std::string line, last;
+        std::vector<std::string> vec;
+        std::random_device rd;
+        std::mt19937 gen(rd());
 
-            int numlines = 1;
-            for (char c : message->text) {
-                if (c == '\n') numlines++;
-            }
-            vec.reserve(numlines);
-            while (std::getline(ss, line, '\n')) {
-                if (std::all_of(line.begin(), line.end(),
-                                [](char c) { return std::isspace(c); }))
-                    continue;
-                vec.push_back(line);
-            }
-            if (vec.size() == 1) {
-                bot.getApi().sendMessage(
-                    message->chat->id, "Give more than 1 choice", false,
-                    message->messageId, FILLIN_SENDWOERROR);
-                return;
-            }
-            std::shuffle(vec.begin(), vec.end(), gen);
-            out << "Total " << vec.size() << " items" << std::endl;
-            last = vec.back();
-            vec.pop_back();
-            int total = 0;
-            for (const auto &cond : vec) {
-                int thisper = genRandomNumber(100 - total);
-                out << cond << " : " << thisper << "%" << std::endl;
-                total += thisper;
-            }
-            out << last << " : " << 100 - total << "%" << std::endl;
-            bot.getApi().sendMessage(message->chat->id, out.str(), false,
-                                     message->messageId, FILLIN_SENDWOERROR);
-        });
-    bot.getEvents().onCommand("starttimer", [&bot](
-                                                const Message::Ptr &message) {
+        int numlines = 1;
+        for (char c : message->text) {
+            if (c == '\n') numlines++;
+        }
+        vec.reserve(numlines);
+        while (std::getline(ss, line, '\n')) {
+            if (std::all_of(line.begin(), line.end(),
+                            [](char c) { return std::isspace(c); }))
+                continue;
+            vec.push_back(line);
+        }
+        if (vec.size() == 1) {
+            bot.getApi().sendMessage(
+                message->chat->id, "Give more than 1 choice", false,
+                message->messageId, FILLIN_SENDWOERROR);
+            return;
+        }
+        std::shuffle(vec.begin(), vec.end(), gen);
+        out << "Total " << vec.size() << " items" << std::endl;
+        last = vec.back();
+        vec.pop_back();
+        int total = 0;
+        for (const auto &cond : vec) {
+            int thisper = genRandomNumber(100 - total);
+            out << cond << " : " << thisper << "%" << std::endl;
+            total += thisper;
+        }
+        out << last << " : " << 100 - total << "%" << std::endl;
+        bot.getApi().sendMessage(message->chat->id, out.str(), false,
+                                 message->messageId, FILLIN_SENDWOERROR);
+    });
+    bot.getEvents().onCommand("starttimer", [&bot](const Message::Ptr &message) {
         enum InputState {
             HOUR,
             MINUTE,
@@ -592,7 +677,7 @@ int main(void) {
                                  message->messageId, FILLIN_SENDWOERROR);
     });
     bot.getEvents().onCommand("decho", [&bot](const Message::Ptr &message) {
-        STUB_AUTHORIZED;
+        PERMISSIVE_AUTHORIZED;
         bool invalid = !hasExtArgs(message), sticker = false, text = false,
              animation = false;
         const auto msg = message->replyToMessage;
@@ -634,9 +719,8 @@ int main(void) {
             // bot is not adm. nothing it can do
         }
     });
-    bot.getEvents().onCommand("randsticker", [&bot](
-                                                 const Message::Ptr &message) {
-        STUB_AUTHORIZED;
+    bot.getEvents().onCommand("randsticker", [&bot](const Message::Ptr &message) {
+        PERMISSIVE_AUTHORIZED;
         if (message->replyToMessage && message->replyToMessage->sticker) {
             StickerSet::Ptr stickset;
             try {
@@ -790,10 +874,15 @@ reinit:
     } catch (std::exception &e) {
         printf("error: %s\n", e.what());
         printf("trying to recover\n");
-        bot.getApi().sendMessage(1185607882, e.what());
+#ifdef USE_BLACKLIST
+        static struct config_data data;
+        config.loadFromFile(&data);
+        int64_t ownerid = data.owner_id;
+#endif
+        bot.getApi().sendMessage(ownerid, e.what());
         int64_t temptime = time(0);
         if (temptime - lastcrash < 10 && lastcrash != 0) {
-            bot.getApi().sendMessage(1185607882, "Recover failed.");
+            bot.getApi().sendMessage(ownerid, "Recover failed.");
             return 1;
         }
         lastcrash = temptime;
@@ -802,7 +891,7 @@ reinit:
             std::this_thread::sleep_for(std::chrono::seconds(5));
             gAuthorized = true;
         }).detach();
-	goto reinit;
+        goto reinit;
     }
     cleanupFunc(0);
 }
