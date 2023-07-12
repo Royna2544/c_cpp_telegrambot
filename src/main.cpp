@@ -42,8 +42,6 @@ using TgBot::MessageEntity;
 using TgBot::StickerSet;
 using TgBot::TgLongPoll;
 
-// #define DEBUG
-
 static bool gAuthorized = true;
 
 #ifdef USE_BLACKLIST

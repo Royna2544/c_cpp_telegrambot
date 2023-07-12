@@ -3,6 +3,7 @@ project(tg_cpphost)
 
 option(ENABLE_TIDY "Enable clang-tidy checks" OFF)
 option(ENABLE_BLACKLIST "Enable blacklist by local db" OFF)
+option(DEBUG "Debugging extra printfs" OFF)
 
 set(SRC_LIST
     src/main.cpp
@@ -20,6 +21,10 @@ add_definitions(-DUSE_BLACKLIST)
 set(SRC_LIST
     src/conf/conf.cc
     ${SRC_LIST})
+endif()
+
+if (DEBUG)
+add_definitions(-DDEBUG)
 endif()
 
 add_subdirectory(lib)
