@@ -337,6 +337,13 @@ int main(void) {
         struct config_data data;
         if (message->replyToMessage && message->replyToMessage->from) {
             config.loadFromFile(&data);
+            if (data.owner_id == message->replyToMessage->from->id) {
+                bot.getApi().sendMessage(
+                    message->chat->id, "Why would I blacklist my owner?"
+		    " Looks like a pretty bad idea.", false,
+                    message->messageId, FILLIN_SENDWOERROR);
+                return;
+            }
             for (int i = 0; i < BLACKLIST_BUFFER; i++) {
                 if (data.blacklist[i] == message->replyToMessage->from->id) {
                     bot.getApi().sendMessage(
