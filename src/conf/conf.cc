@@ -21,7 +21,10 @@ TgBotConfig::TgBotConfig(const char* path) {
         if (flags & O_CREAT) ftruncate(fd, DATA_SIZE);
         mapdata = static_cast<decltype(mapdata)>(
             mmap(NULL, DATA_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
-        if (mapdata != MAP_FAILED) initdone = true;
+        if (mapdata != MAP_FAILED) {
+            initdone = true;
+        }
+	close(fd);
     }
 }
 
