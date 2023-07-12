@@ -1,5 +1,6 @@
 #include "popen_wdt.h"
 
+#include <fcntl.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
@@ -18,10 +19,15 @@ static void *watchdog(void *arg) {
     sleep(SLEEP_SECONDS);
     if (kill(data->pid, 0) == 0) {
         killpg(data->pid, SIGTERM);
-	ret = 1;
+        ret = 1;
+    }
+    if (!ret) {
+        // The caller may have exited in this case, we shouldn't hang again
+        int flags = fcntl(data->pipe_ret, F_GETFL);
+        fcntl(data->pipe_ret, F_SETFL, flags | O_NONBLOCK);
     }
     if (data->pipe_ret > 0)
-	write(data->pipe_ret, &ret, 1);
+        write(data->pipe_ret, &ret, 1);
     munmap(data, sizeof(*data));
     return NULL;
 }
@@ -63,7 +69,7 @@ FILE *popen_watchdog(const char *command, const int pipe_ret) {
         close(pipefd[0]);
         dup2(pipefd[1], STDOUT_FILENO);
         close(STDIN_FILENO);
-	setpgid(0, 0);
+        setpgid(0, 0);
         execl("/bin/bash", "bash", "-c", command, (char *)NULL);
         _exit(127);  // If execl fails, exit
     } else {
