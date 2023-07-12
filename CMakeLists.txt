@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10.2)
 project(tg_cpphost)
 
 option(ENABLE_TIDY "Enable clang-tidy checks" OFF)
-option(ENABLE_BLACKLIST "Enable blacklist by local db" OFF)
+option(ENABLE_BLACKLIST "Enable blacklist by local db" ON)
 option(DEBUG "Debugging extra printfs" OFF)
 
 set(SRC_LIST
