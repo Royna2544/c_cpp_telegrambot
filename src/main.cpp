@@ -43,9 +43,9 @@ using TgBot::TgLongPoll;
 
 static bool gAuthorized = true;
 
-static inline bool Authorized(const Message::Ptr &message) {
+static inline bool Authorized(const Message::Ptr &message, const bool nonuserallowed = false) {
     if (!gAuthorized) return false;
-    return message->from ? message->from->id == 1185607882 : true;
+    return message->from ? message->from->id == 1185607882 : nonuserallowed;
 }
 static inline bool AuthorizedStub(void) { return gAuthorized; }
 
@@ -670,7 +670,7 @@ int main(void) {
         static std::atomic_bool cb;
         static bool falseth;
 
-        if (Authorized(message)) return;
+        if (Authorized(message, true)) return;
         // Do not track older msgs and consider it as spam.
         if (std::time(0) - message->date > 15) return;
         // We care GIF, sticker, text spams only
