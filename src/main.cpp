@@ -427,6 +427,7 @@ int main(void) {
     });
     bot.getEvents().onCommand("flash", [&bot](const Message::Ptr &message) {
         PERMISSIVE_AUTHORIZED;
+	// static const std::vector<std::string> reasons; in "FlashData.h"
 #include "FlashData.h"
         std::string msg = message->text;
         if (message->replyToMessage != nullptr) {
