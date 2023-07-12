@@ -22,6 +22,7 @@ TgBotConfig::TgBotConfig(const char* path) {
         mapdata = static_cast<decltype(mapdata)>(
             mmap(NULL, DATA_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
         if (mapdata != MAP_FAILED) {
+            if (flags & O_CREAT) memset(mapdata, 0, DATA_SIZE);
             initdone = true;
         }
 	close(fd);
