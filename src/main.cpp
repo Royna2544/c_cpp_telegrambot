@@ -1,3 +1,4 @@
+#include <fcntl.h>
 #include <unistd.h>
 
 #include <algorithm>
@@ -162,6 +163,12 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
     if (!fine) res += EMPTY "\n";
     if (pipefd[0] != -1) {
         bool buf;
+        int flags;
+
+        // Disable blocking (wdt would be sleeping if we are exiting earlier)
+        flags = fcntl(pipefd[0], F_GETFL);
+        fcntl(pipefd[0], F_SETFL, flags | O_NONBLOCK);
+
         read(pipefd[0], &buf, 1);
         if (buf) {
             res += WDT_BITE_STR;
@@ -339,8 +346,10 @@ int main(void) {
             config.loadFromFile(&data);
             if (data.owner_id == message->replyToMessage->from->id) {
                 bot.getApi().sendMessage(
-                    message->chat->id, "Why would I blacklist my owner?"
-		    " Looks like a pretty bad idea.", false,
+                    message->chat->id,
+                    "Why would I blacklist my owner?"
+                    " Looks like a pretty bad idea.",
+                    false,
                     message->messageId, FILLIN_SENDWOERROR);
                 return;
             }
@@ -427,7 +436,7 @@ int main(void) {
     });
     bot.getEvents().onCommand("flash", [&bot](const Message::Ptr &message) {
         PERMISSIVE_AUTHORIZED;
-	// static const std::vector<std::string> reasons; in "FlashData.h"
+        // static const std::vector<std::string> reasons; in "FlashData.h"
 #include "FlashData.h"
         std::string msg = message->text;
         if (message->replyToMessage != nullptr) {
