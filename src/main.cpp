@@ -225,15 +225,16 @@ static void CCppCompileHandler(const Bot &bot, const Message::Ptr &message,
     res += "\n";
 
     std::ifstream aout(aoutname);
-    if (!aout.good()) goto sendresult;
-    cmd.swap(cmd2);
-    cmd << aoutname << SPACE << STDERRTOOUT;
-    res += "Run time:\n";
-    runCommand(bot, message, cmd.str(), res);
+    if (aout.good()) {
+        aout.close();
+        cmd.swap(cmd2);
+        cmd << aoutname << SPACE << STDERRTOOUT;
+        res += "Run time:\n";
+        runCommand(bot, message, cmd.str(), res);
+        std::remove(aoutname);
+    }
 
-sendresult:
     commonCleanup(bot, message, res, filename);
-    std::remove(aoutname);
 }
 
 static void GenericRunHandler(const Bot &bot, const Message::Ptr &message,
