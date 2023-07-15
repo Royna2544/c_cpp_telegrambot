@@ -48,7 +48,7 @@ static bool gAuthorized = true;
 #ifdef USE_BLACKLIST
 static TgBotConfig config("tgbot.dat");
 #else
-static int64_t ownerid = 1185607882;
+static const int64_t ownerid = 1185607882;
 #endif
 
 static inline void bot_sendReplyMessage(const Bot &bot, const Message::Ptr &message,
@@ -58,7 +58,7 @@ static inline void bot_sendReplyMessage(const Bot &bot, const Message::Ptr &mess
                              nullptr, "", false, std::vector<MessageEntity::Ptr>(), true);
 }
 
-static inline bool AuthorizedId(const int64_t id, const bool permissive) {
+static bool AuthorizedId(const int64_t id, const bool permissive) {
 #ifdef USE_BLACKLIST
     static struct config_data data;
     config.loadFromFile(&data);
