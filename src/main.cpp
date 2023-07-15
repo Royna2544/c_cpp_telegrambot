@@ -12,6 +12,7 @@
 #include <exception>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <random>
@@ -732,9 +733,8 @@ int main(void) {
     });
     bot.getEvents().onAnyMessage([&bot](const Message::Ptr &message) {
         static std::vector<Message::Ptr> buffer;
-        static std::mutex m;
-        static std::atomic_bool cb;
-        static bool falseth;
+        static std::mutex m;  // Protect buffer
+        static std::once_flag once;
 
         if (Authorized(message, true)) return;
         // Do not track older msgs and consider it as spam.
@@ -743,89 +743,82 @@ int main(void) {
         if (!message->animation && message->text.empty() && !message->sticker)
             return;
 
-        if (!falseth) {
-            std::thread([cb = &cb]() {
-                falseth = true;
+        std::call_once(once, [&] {
+            std::thread([&]() {
                 while (true) {
-                    if (!cb) break;
-                    *cb = false;
+                    auto t = std::thread([&]() {
+                        std::string tag;
+                        std::vector<Message::Ptr> buffer_priv;
+                        std::map<int64_t, int> spammap, chatidmap;
+                        int64_t chatid = -1;
+                        int maxvalue = 0;
+                        {
+                            const std::lock_guard<std::mutex> _(m);
+                            buffer_priv = buffer;
+                            buffer.clear();
+                        }
+#ifdef DEBUG
+                        printf("Buffer size: %lu\n", buffer_priv.size());
+#endif
+                        if (buffer_priv.size() <= 1) return;
+                        for (const auto &msg : buffer_priv) {
+                            chatidmap[msg->chat->id]++;
+                        }
+
+                        for (const auto &pair : chatidmap) {
+                            if (pair.second > maxvalue) {
+                                chatid = pair.first;
+                                maxvalue = pair.second;
+                            }
+                        }
+                        buffer_priv.erase(std::remove_if(buffer_priv.begin(), buffer_priv.end(),
+                                                         [&](const Message::Ptr &s) {
+                                                             return s->chat->id != chatid;
+                                                         }),
+                                          buffer_priv.end());
+
+                        for (const auto &msg : buffer_priv) {
+                            if (msg->from)
+                                spammap[msg->from->id]++;
+                        }
+                        using pair_type = decltype(spammap)::value_type;
+                        auto pr = std::max_element(
+                            std::begin(spammap), std::end(spammap),
+                            [](const pair_type &p1, const pair_type &p2) {
+                                return p1.second > p2.second;
+                            });
+                        // Reasonable value 5 from experiments
+                        if (pr->second <= 5) return;
+                        for (const auto &msg : buffer_priv) {
+                            if (msg->from && msg->from->id == pr->first)
+                                if (!msg->from->username.empty()) tag = " @" + msg->from->username;
+                        }
+#ifdef DEBUG
+                        bot.getApi().sendMessage(chatid,
+                                                 "User:" + tag + " Count: " + std::to_string(pr->second));
+#else
+                        // clang-format off
+                        bot.getApi().sendMessage(chatid, "Spam detected" + tag);
+                        try {
+                            for (const auto &msg : buffer_priv) {
+                                if (msg->from && msg->from->id == pr->first) {
+                                    bot.getApi().deleteMessage(msg->chat->id, msg->messageId);
+                                }
+                            }
+                        } catch (const std::exception &) {
+                            printf("Error deleting msg\n");
+                        }
+                        // clang-format on
+#endif
+                    });
+                    t.detach();
                     std::this_thread::sleep_for(std::chrono::seconds(5));
                 }
-                falseth = false;
             }).detach();
-        }
+        });
         {
             const std::lock_guard<std::mutex> _(m);
             buffer.push_back(message);
-        }
-        if (!cb) {
-            cb = true;
-            std::thread([&]() {
-                struct simpleuser {
-                    int64_t id;
-                    std::string username;
-                    int spamcnt;
-                };
-                bool spam = false;
-                std::vector<struct simpleuser> spamvec;
-                std::this_thread::sleep_for(std::chrono::seconds(5));
-                const std::lock_guard<std::mutex> _(m);
-#ifdef DEBUG
-                printf("Buffer size: %lu\n", buffer.size());
-#endif
-                if (buffer.size() >= 5) {
-                    int64_t chatid = buffer.front()->chat->id;
-                    for (const auto &msg : buffer) {
-                        if (msg->chat->id != chatid) continue;
-                        bool found = false;
-                        struct simpleuser *ptr;
-                        for (const auto &user : spamvec) {
-                            found = user.id == msg->from->id;
-                            if (found) {
-                                ptr = const_cast<struct simpleuser *>(&user);
-                                break;
-                            }
-                        }
-                        if (found) {
-                            ptr->spamcnt += 1;
-                        } else {
-                            spamvec.push_back(
-                                {msg->from->id, msg->from->username, 1});
-                        }
-                    }
-                    spam = spamvec.size() < 3;
-                }
-                if (spam) {
-                    using pair_type = decltype(spamvec)::value_type;
-                    auto pr = std::max_element(
-                        std::begin(spamvec), std::end(spamvec),
-                        [](const pair_type &p1, const pair_type &p2) {
-                            return p1.spamcnt < p2.spamcnt;
-                        });
-                    std::string tag;
-                    if (!pr->username.empty()) tag = " @" + pr->username;
-                    bot.getApi().sendMessage(buffer.front()->chat->id,
-                                             "Spam detected" + tag);
-                    try {
-                        for (const auto &msg : buffer) {
-                            if (msg->from->id != pr->id) continue;
-#ifdef DEBUG
-                            // Can get 'Too many
-                            // requests' here
-                            if (!msg->text.empty())
-                                bot.getApi().sendMessage(
-                                    buffer.front()->chat->id,
-                                    "Delete '" + msg->text + "'");
-#endif
-                            bot.getApi().deleteMessage(msg->chat->id,
-                                                       msg->messageId);
-                        }
-                    } catch (std::exception &) {
-                        printf("Error deleting msg\n");
-                    }
-                }
-                buffer.clear();
-            }).detach();
         }
     });
 
