@@ -185,7 +185,8 @@ static void commonCleanup(const Bot &bot, const Message::Ptr &message,
     if (filename) std::remove(filename);
 }
 
-static bool commonVerifyParseWrite(const Bot &bot, const Message::Ptr &message, std::string &extraargs, const char *filename) {
+static bool commonVerifyParseWrite(const Bot &bot, const Message::Ptr &message,
+                                   std::string &extraargs, const char *filename) {
     bool ret = verifyMessage(bot, message);
     if (ret) {
         parseExtArgs(message, extraargs);
