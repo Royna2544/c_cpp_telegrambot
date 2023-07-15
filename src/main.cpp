@@ -19,6 +19,7 @@
 #include <string>
 #include <thread>
 #include <type_traits>
+#include <unordered_map>
 #include <vector>
 
 #define BOOST_BIND_GLOBAL_PLACEHOLDERS
@@ -465,6 +466,7 @@ int main(void) {
         std::stringstream ss(text), out;
         std::string line, last;
         std::vector<std::string> vec;
+        std::unordered_map<std::string, int> map;
         std::random_device rd;
         std::mt19937 gen(rd());
 
@@ -473,6 +475,7 @@ int main(void) {
             if (c == '\n') numlines++;
         }
         vec.reserve(numlines);
+        map.reserve(numlines);
         while (std::getline(ss, line, '\n')) {
             if (std::all_of(line.begin(), line.end(),
                             [](char c) { return std::isspace(c); }))
@@ -490,10 +493,18 @@ int main(void) {
         int total = 0;
         for (const auto &cond : vec) {
             int thisper = genRandomNumber(100 - total);
-            out << cond << " : " << thisper << "%" << std::endl;
+            map[cond] = thisper;
             total += thisper;
         }
-        out << last << " : " << 100 - total << "%" << std::endl;
+        map[last] = 100 - total;
+        using map_t = std::pair<std::string, int>;
+        std::vector<map_t> elem(map.begin(), map.end());
+        std::sort(elem.begin(), elem.end(), [](const map_t &map1, const map_t &map2) {
+            return map1.second <= map2.second;
+        });
+        for (const map_t &m : elem) {
+            out << m.first << " : " << m.second << "%" << std::endl;
+        }
         bot_sendReplyMessage(bot, message, out.str());
     });
     bot.getEvents().onCommand("starttimer", [&bot](const Message::Ptr &message) {
