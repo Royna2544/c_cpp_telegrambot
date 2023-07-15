@@ -81,10 +81,10 @@ static inline bool Authorized(const Message::Ptr &message,
 #define PERMISSIVE_AUTHORIZED \
     if (!Authorized(message, true, true)) return
 
-#define STDERRTOOUT "2>&1"
-#define BUFSIZE 1024
-#define EMPTY "<empty>"
-#define SPACE " "
+constexpr const char *STDERRTOOUT = "2>&1";
+constexpr const int BUFSIZE = 1024;
+constexpr const char *EMPTY = "<empty>";
+constexpr char SPACE = ' ';
 
 #define FILLIN_SENDWOERROR \
     nullptr, "", false, std::vector<MessageEntity::Ptr>(), true
@@ -158,7 +158,7 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
         if (!fine) fine = true;
         res += buf.get();
     }
-    if (!fine) res += EMPTY "\n";
+    if (!fine) res += std::string() + EMPTY + "\n";
     if (pipefd[0] != -1) {
         bool buf = false;
         int flags;
@@ -414,8 +414,7 @@ int main(void) {
         if (hasExtArgs(message)) {
             std::string cmd;
             parseExtArgs(message, cmd);
-            runCommand(bot, message, std::string() + cmd + SPACE STDERRTOOUT,
-                       res);
+            runCommand(bot, message, cmd + SPACE + STDERRTOOUT, res);
         } else {
             res = "Send a bash command to run";
         }
