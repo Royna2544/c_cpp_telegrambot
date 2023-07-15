@@ -858,6 +858,7 @@ reinit:
         int64_t temptime = time(0);
         if (temptime - lastcrash < 10 && lastcrash != 0) {
             bot.getApi().sendMessage(ownerid, "Recover failed.");
+            cleanupFunc(0);
             return 1;
         }
         lastcrash = temptime;
