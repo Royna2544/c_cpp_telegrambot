@@ -54,7 +54,7 @@ static const int64_t ownerid = 1185607882;
 static inline void bot_sendReplyMessage(const Bot &bot, const Message::Ptr &message,
                                         const std::string &text, const int32_t replyToMsg = 0) {
     bot.getApi().sendMessage(message->chat->id, text,
-                             false, (replyToMsg == 0) ? message->messageId : replyToMsg,
+                             true, (replyToMsg == 0) ? message->messageId : replyToMsg,
                              nullptr, "", false, std::vector<MessageEntity::Ptr>(), true);
 }
 
