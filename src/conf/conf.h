@@ -7,12 +7,12 @@
 
 using UserId = int64_t;
 
-#define BLACKLIST_BUFFER 25
+#define BLACKLIST_BUFFER 5
 
 struct config_data {
     UserId owner_id;
     UserId blacklist[BLACKLIST_BUFFER];
-    // TODO: Maybe we need whitelist?
+    UserId whitelist[BLACKLIST_BUFFER];
 };
 
 struct TgBotConfig {
