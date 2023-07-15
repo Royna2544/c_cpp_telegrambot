@@ -51,6 +51,13 @@ static TgBotConfig config("tgbot.dat");
 static int64_t ownerid = 1185607882;
 #endif
 
+static inline void bot_sendReplyMessage(const Bot &bot, const Message::Ptr &message,
+                                        const std::string &text, const int32_t replyToMsg = 0) {
+    bot.getApi().sendMessage(message->chat->id, text,
+                             false, (replyToMsg == 0) ? message->messageId : replyToMsg,
+                             nullptr, "", false, std::vector<MessageEntity::Ptr>(), true);
+}
+
 static inline bool AuthorizedId(const int64_t id, const bool permissive) {
 #ifdef USE_BLACKLIST
     static struct config_data data;
@@ -94,9 +101,7 @@ static char *kCompiler = nullptr, *kCxxCompiler = nullptr;
 static bool verifyMessage(const Bot &bot, const Message::Ptr &message) {
     ENFORCE_AUTHORIZED false;
     if (message->replyToMessage == nullptr) {
-        bot.getApi().sendMessage(message->chat->id,
-                                 "Reply to a code to compile", false,
-                                 message->messageId, FILLIN_SENDWOERROR);
+        bot_sendReplyMessage(bot, message, "Reply to a code to compile");
         return false;
     }
     return true;
@@ -118,8 +123,7 @@ static bool writeMessageToFile(const Bot &bot, const Message::Ptr &message,
                                const char *filename) {
     std::ofstream file(filename);
     if (file.fail()) {
-        bot.getApi().sendMessage(message->chat->id, "Failed to open file",
-                                 false, message->messageId, FILLIN_SENDWOERROR);
+        bot_sendReplyMessage(bot, message, "Failed to open file");
         return false;
     }
     file << message->replyToMessage->text;
@@ -150,8 +154,7 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
     auto fp = popen_watchdog(cmd.c_str(), pipefd[1]);
 
     if (!fp) {
-        bot.getApi().sendMessage(message->chat->id, "Failed to popen()", false,
-                                 message->messageId, FILLIN_SENDWOERROR);
+        bot_sendReplyMessage(bot, message, "Failed to popen()");
         return;
     }
     while (fgets(buf.get(), BUFSIZE, fp)) {
@@ -180,8 +183,7 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
 static void commonCleanup(const Bot &bot, const Message::Ptr &message,
                           std::string &res, const char *filename) {
     if (res.size() > 4095) res.resize(4095);
-    bot.getApi().sendMessage(message->chat->id, res.c_str(), false,
-                             message->messageId, FILLIN_SENDWOERROR);
+    bot_sendReplyMessage(bot, message, res);
     if (filename) std::remove(filename);
 }
 
@@ -297,10 +299,9 @@ static int genRandomNumber(const int upper, const int lower = 0) {
 
 #define CMD_UNSUPPORTED(cmd, reason)                                     \
     bot.getEvents().onCommand(cmd, [&bot](const Message::Ptr &message) { \
-        bot.getApi().sendMessage(                                        \
-            message->chat->id,                                           \
-            "cmd '" cmd "' is unsupported.\nReason: " reason, false,     \
-            message->messageId, FILLIN_SENDWOERROR);                     \
+        bot_sendReplyMessage(                                            \
+            bot, message,                                                \
+            "cmd '" cmd "' is unsupported.\nReason: " reason);           \
     });
 
 int main(void) {
@@ -347,36 +348,25 @@ int main(void) {
         if (message->replyToMessage && message->replyToMessage->from) {
             config.loadFromFile(&data);
             if (data.owner_id == message->replyToMessage->from->id) {
-                bot.getApi().sendMessage(
-                    message->chat->id,
-                    "Why would I blacklist my owner?"
-                    " Looks like a pretty bad idea.",
-                    false,
-                    message->messageId, FILLIN_SENDWOERROR);
+                bot_sendReplyMessage(bot, message,
+                                     "Why would I blacklist my owner? Looks like a pretty bad idea.");
                 return;
             }
             for (int i = 0; i < BLACKLIST_BUFFER; i++) {
                 if (data.blacklist[i] == message->replyToMessage->from->id) {
-                    bot.getApi().sendMessage(
-                        message->chat->id, "User already in blacklist", false,
-                        message->messageId, FILLIN_SENDWOERROR);
+                    bot_sendReplyMessage(bot, message, "User already in blacklist");
                     return;
                 }
                 if (data.blacklist[i] == 0) {
                     data.blacklist[i] = message->replyToMessage->from->id;
-                    bot.getApi().sendMessage(
-                        message->chat->id, "User added to blacklist", false,
-                        message->messageId, FILLIN_SENDWOERROR);
+                    bot_sendReplyMessage(bot, message, "User added to blacklist");
                     config.storeToFile(data);
                     return;
                 }
             }
-            bot.getApi().sendMessage(message->chat->id, "Out of buffer", false,
-                                     message->messageId, FILLIN_SENDWOERROR);
+            bot_sendReplyMessage(bot, message, "Out of buffer");
         } else {
-            bot.getApi().sendMessage(message->chat->id, "Reply to a user",
-                                     false, message->messageId,
-                                     FILLIN_SENDWOERROR);
+            bot_sendReplyMessage(bot, message, "Reply to a user");
         }
     });
     bot.getEvents().onCommand("rmblacklist", [&bot](const Message::Ptr &message) {
@@ -389,9 +379,7 @@ int main(void) {
             };
             for (int i = 0; i < BLACKLIST_BUFFER; i++) {
                 if (data.blacklist[i] == message->replyToMessage->from->id) {
-                    bot.getApi().sendMessage(
-                        message->chat->id, "User removed from blacklist", false,
-                        message->messageId, FILLIN_SENDWOERROR);
+                    bot_sendReplyMessage(bot, message, "User removed from blacklist");
                     continue;
                 } else {
                     tmp[i] = data.blacklist[i];
@@ -400,9 +388,7 @@ int main(void) {
             memcpy(data.blacklist, tmp, sizeof(tmp));
             config.storeToFile(data);
         } else {
-            bot.getApi().sendMessage(message->chat->id, "Reply to a user",
-                                     false, message->messageId,
-                                     FILLIN_SENDWOERROR);
+            bot_sendReplyMessage(bot, message, "Reply to a user");
         }
     });
 #else
@@ -445,17 +431,13 @@ int main(void) {
             goto parse;
         }
         if (!hasExtArgs(message)) {
-            bot.getApi().sendMessage(message->chat->id, "Send a file name",
-                                     false, message->messageId,
-                                     FILLIN_SENDWOERROR);
+            bot_sendReplyMessage(bot, message, "Send a file name");
             return;
         }
         parseExtArgs(message, msg);
     parse:
         if (msg.empty()) {
-            bot.getApi().sendMessage(message->chat->id, "Reply to a text",
-                                     false, message->messageId,
-                                     FILLIN_SENDWOERROR);
+            bot_sendReplyMessage(bot, message, "Reply to a text");
             return;
         }
         std::replace(msg.begin(), msg.end(), ' ', '_');
@@ -469,16 +451,13 @@ int main(void) {
         } else {
             ss << "' Success! Chance was 1/" << reasons.size();
         }
-        bot.getApi().sendMessage(message->chat->id, ss.str(), false,
-                                 message->messageId, FILLIN_SENDWOERROR);
+        bot_sendReplyMessage(bot, message, ss.str());
     });
     bot.getEvents().onCommand("possibility", [&bot](const Message::Ptr &message) {
         PERMISSIVE_AUTHORIZED;
         if (!hasExtArgs(message)) {
-            bot.getApi().sendMessage(
-                message->chat->id,
-                "Send avaliable conditions sperated by newline", false,
-                message->messageId, FILLIN_SENDWOERROR);
+            bot_sendReplyMessage(bot, message,
+                                 "Send avaliable conditions sperated by newline");
             return;
         }
         std::string text;
@@ -501,9 +480,7 @@ int main(void) {
             vec.push_back(line);
         }
         if (vec.size() == 1) {
-            bot.getApi().sendMessage(
-                message->chat->id, "Give more than 1 choice", false,
-                message->messageId, FILLIN_SENDWOERROR);
+            bot_sendReplyMessage(bot, message, "Give more than 1 choice");
             return;
         }
         std::shuffle(vec.begin(), vec.end(), gen);
@@ -517,8 +494,7 @@ int main(void) {
             total += thisper;
         }
         out << last << " : " << 100 - total << "%" << std::endl;
-        bot.getApi().sendMessage(message->chat->id, out.str(), false,
-                                 message->messageId, FILLIN_SENDWOERROR);
+        bot_sendReplyMessage(bot, message, out.str());
     });
     bot.getEvents().onCommand("starttimer", [&bot](const Message::Ptr &message) {
         enum InputState {
@@ -539,15 +515,12 @@ int main(void) {
             found = true;
         }
         if (!found) {
-            bot.getApi().sendMessage(
-                message->chat->id, "Send or reply to a time, in hhmmss format",
-                false, message->messageId, FILLIN_SENDWOERROR);
+            bot_sendReplyMessage(bot, message, "Send or reply to a time, in hhmmss format");
             return;
         }
         if (tm_ptr && tm_ptr->isrunning()) {
-            bot.getApi().sendMessage(message->chat->id,
-                                     "Timer is already running", false,
-                                     message->messageId, FILLIN_SENDWOERROR);
+            bot_sendReplyMessage(bot, message,
+                                 "Timer is already running");
             return;
         }
         const char *c_str = msg.c_str();
@@ -610,11 +583,9 @@ int main(void) {
                     break;
                 }
                 default: {
-                    bot.getApi().sendMessage(
-                        message->chat->id,
-                        "Invalid value provided.\nShould contain only h, m, s, "
-                        "numbers, spaces. (ex. 1h 20m 7s)",
-                        false, message->messageId, FILLIN_SENDWOERROR);
+                    bot_sendReplyMessage(bot, message,
+                                         "Invalid value provided.\nShould contain only h, m, s, "
+                                         "numbers, spaces. (ex. 1h 20m 7s)");
 
                     return;
                 }
@@ -625,14 +596,10 @@ int main(void) {
 #endif
 #define TIMER_CONFIG_SEC 5
         if (hms.toSeconds() == 0) {
-            bot.getApi().sendMessage(message->chat->id,
-                                     "I'm not a fool to time 0s", false,
-                                     message->messageId, FILLIN_SENDWOERROR);
+            bot_sendReplyMessage(bot, message, "I'm not a fool to time 0s");
             return;
         } else if (hms.toSeconds() < TIMER_CONFIG_SEC) {
-            bot.getApi().sendMessage(message->chat->id,
-                                     "Provide longer time value", false,
-                                     message->messageId, FILLIN_SENDWOERROR);
+            bot_sendReplyMessage(bot, message, "Provide longer time value");
             return;
         }
         int msgid = bot.getApi()
@@ -689,8 +656,7 @@ int main(void) {
                 text = "Timer is running on other group.";
         } else
             text = "Timer is not running";
-        bot.getApi().sendMessage(message->chat->id, text, false,
-                                 message->messageId, FILLIN_SENDWOERROR);
+        bot_sendReplyMessage(bot, message, text);
     });
     bot.getEvents().onCommand("decho", [&bot](const Message::Ptr &message) {
         PERMISSIVE_AUTHORIZED;
@@ -718,18 +684,12 @@ int main(void) {
                     message->replyToMessage->animation->fileId, 0, 0, 0, "", "",
                     0, FILLIN_SENDWOERROR, false, 0, false);
             } else if (text && invalid) {
-                bot.getApi().sendMessage(
-                    message->chat->id, message->replyToMessage->text, false,
-                    message->replyToMessage->messageId, FILLIN_SENDWOERROR);
+                bot_sendReplyMessage(bot, message, message->replyToMessage->text,
+                                     message->replyToMessage->messageId);
             } else if (!invalid) {
                 std::string msg;
                 parseExtArgs(message, msg);
-                bot.getApi().sendMessage(
-                    message->chat->id, msg, false,
-                    (message->replyToMessage)
-                        ? message->replyToMessage->messageId
-                        : 0,
-                    FILLIN_SENDWOERROR);
+                bot_sendReplyMessage(bot, message, msg, (message->replyToMessage) ? message->replyToMessage->messageId : 0);
             }
         } catch (const std::exception &) {
             // bot is not adm. nothing it can do
@@ -743,9 +703,7 @@ int main(void) {
                 stickset = bot.getApi().getStickerSet(
                     message->replyToMessage->sticker->setName);
             } catch (const std::exception &e) {
-                bot.getApi().sendMessage(message->chat->id, e.what(), false,
-                                         message->messageId,
-                                         FILLIN_SENDWOERROR);
+                bot_sendReplyMessage(bot, message, e.what());
                 return;
             }
             ssize_t pos = genRandomNumber(stickset->stickers.size() - 1);
@@ -756,12 +714,9 @@ int main(void) {
             ss << "Sticker idx: " << pos + 1
                << " emoji: " << stickset->stickers[pos]->emoji << std::endl
                << "From pack \"" + stickset->title + "\"";
-            bot.getApi().sendMessage(message->chat->id, ss.str(), false,
-                                     message->messageId, FILLIN_SENDWOERROR);
+            bot_sendReplyMessage(bot, message, ss.str());
         } else {
-            bot.getApi().sendMessage(
-                message->chat->id, "Sticker not found in replied-to message",
-                false, message->messageId, FILLIN_SENDWOERROR);
+            bot_sendReplyMessage(bot, message, "Sticker not found in replied-to message");
         }
     });
     bot.getEvents().onAnyMessage([&bot](const Message::Ptr &message) {
