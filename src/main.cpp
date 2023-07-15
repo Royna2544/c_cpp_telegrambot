@@ -162,7 +162,7 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
     }
     if (!fine) res += EMPTY "\n";
     if (pipefd[0] != -1) {
-        bool buf;
+        bool buf = false;
         int flags;
 
         // Disable blocking (wdt would be sleeping if we are exiting earlier)
