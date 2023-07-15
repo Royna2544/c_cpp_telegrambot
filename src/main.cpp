@@ -428,14 +428,14 @@ int main(void) {
         std::string msg = message->text;
         if (message->replyToMessage != nullptr) {
             msg = message->replyToMessage->text;
-            goto parse;
+
+        } else {
+            if (!hasExtArgs(message)) {
+                bot_sendReplyMessage(bot, message, "Send a file name");
+                return;
+            }
+            parseExtArgs(message, msg);
         }
-        if (!hasExtArgs(message)) {
-            bot_sendReplyMessage(bot, message, "Send a file name");
-            return;
-        }
-        parseExtArgs(message, msg);
-    parse:
         if (msg.empty()) {
             bot_sendReplyMessage(bot, message, "Reply to a text");
             return;
