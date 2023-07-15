@@ -187,17 +187,22 @@ static void commonCleanup(const Bot &bot, const Message::Ptr &message,
     if (filename) std::remove(filename);
 }
 
+static bool commonVerifyParseWrite(const Bot &bot, const Message::Ptr &message, std::string &extraargs, const char *filename) {
+    bool ret = verifyMessage(bot, message);
+    if (ret) {
+        parseExtArgs(message, extraargs);
+        ret = writeMessageToFile(bot, message, filename);
+    }
+    return ret;
+}
+
 static void CCppCompileHandler(const Bot &bot, const Message::Ptr &message,
                                const bool plusplus) {
     std::string res, extraargs;
     std::stringstream cmd, cmd2;
     bool ret;
 
-    ret = verifyMessage(bot, message);
-    if (!ret) return;
-    parseExtArgs(message, extraargs);
-    ret = writeMessageToFile(bot, message, FILENAME);
-    if (!ret) return;
+    if (!commonVerifyParseWrite(bot, message, extraargs, FILENAME)) return;
 
     if (plusplus) {
         cmd << kCxxCompiler;
@@ -237,11 +242,7 @@ static void GenericRunHandler(const Bot &bot, const Message::Ptr &message,
     std::stringstream cmd;
     bool ret;
 
-    ret = verifyMessage(bot, message);
-    if (!ret) return;
-    parseExtArgs(message, extargs);
-    ret = writeMessageToFile(bot, message, outfile);
-    if (!ret) return;
+    if (!commonVerifyParseWrite(bot, message, extargs, outfile)) return;
 
     cmd << cmdPrefix << SPACE;
     cmd << outfile;
@@ -396,7 +397,7 @@ int main(void) {
                 }
             }
             memcpy(data.blacklist, tmp, sizeof(tmp));
-	    config.storeToFile(data);
+            config.storeToFile(data);
         } else {
             bot.getApi().sendMessage(message->chat->id, "Reply to a user",
                                      false, message->messageId,
