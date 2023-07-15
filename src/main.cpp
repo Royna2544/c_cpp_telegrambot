@@ -81,8 +81,6 @@ static inline bool Authorized(const Message::Ptr &message,
 #define PERMISSIVE_AUTHORIZED \
     if (!Authorized(message, true, true)) return
 
-#define FILENAME "./compile.cpp"
-#define AOUTNAME "./a.out"
 #define STDERRTOOUT "2>&1"
 #define BUFSIZE 1024
 #define EMPTY "<empty>"
@@ -200,22 +198,23 @@ static void CCppCompileHandler(const Bot &bot, const Message::Ptr &message,
                                const bool plusplus) {
     std::string res, extraargs;
     std::stringstream cmd, cmd2;
+    const char *filename, aoutname[] = "./a.out";
     bool ret;
 
-    if (!commonVerifyParseWrite(bot, message, extraargs, FILENAME)) return;
+    if (plusplus) {
+        filename = "./compile.cpp";
+    } else {
+        filename = "./compile.c";
+    }
+
+    if (!commonVerifyParseWrite(bot, message, extraargs, filename)) return;
 
     if (plusplus) {
         cmd << kCxxCompiler;
     } else {
         cmd << kCompiler;
     }
-    cmd << SPACE << "-x" << SPACE;
-    if (plusplus) {
-        cmd << "c++";
-    } else {
-        cmd << "c";
-    }
-    cmd << SPACE << FILENAME;
+    cmd << SPACE << filename;
     addExtArgs(cmd, extraargs, res);
 #ifdef DEBUG
     printf("cmd: %s\n", cmd.str().c_str());
@@ -224,16 +223,16 @@ static void CCppCompileHandler(const Bot &bot, const Message::Ptr &message,
     runCommand(bot, message, cmd.str(), res);
     res += "\n";
 
-    std::ifstream aout(AOUTNAME);
+    std::ifstream aout(aoutname);
     if (!aout.good()) goto sendresult;
     cmd.swap(cmd2);
-    cmd << AOUTNAME << SPACE << STDERRTOOUT;
+    cmd << aoutname << SPACE << STDERRTOOUT;
     res += "Run time:\n";
     runCommand(bot, message, cmd.str(), res);
 
 sendresult:
-    commonCleanup(bot, message, res, FILENAME);
-    std::remove(AOUTNAME);
+    commonCleanup(bot, message, res, filename);
+    std::remove(aoutname);
 }
 
 static void GenericRunHandler(const Bot &bot, const Message::Ptr &message,
