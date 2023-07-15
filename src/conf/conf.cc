@@ -2,6 +2,7 @@
 
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include <cerrno>
@@ -18,14 +19,18 @@ TgBotConfig::TgBotConfig(const char* path) {
         fd = open(path, flags, 0644);
     }
     if (fd > 0) {
-        if (flags & O_CREAT) ftruncate(fd, DATA_SIZE);
+        struct stat statbuf;
+
+        if ((flags & O_CREAT) || (fstat(fd, &statbuf) == 0 && statbuf.st_size != DATA_SIZE)) {
+            ftruncate(fd, DATA_SIZE);
+        }
         mapdata = static_cast<decltype(mapdata)>(
             mmap(NULL, DATA_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
         if (mapdata != MAP_FAILED) {
             if (flags & O_CREAT) memset(mapdata, 0, DATA_SIZE);
             initdone = true;
         }
-	close(fd);
+        close(fd);
     }
 }
 
