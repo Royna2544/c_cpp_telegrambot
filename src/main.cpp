@@ -858,7 +858,11 @@ reinit:
         config.loadFromFile(&data);
         int64_t ownerid = data.owner_id;
 #endif
-        bot.getApi().sendMessage(ownerid, e.what());
+        try {
+            bot.getApi().sendMessage(ownerid, e.what());
+        } catch (const TgBot::TgException &e) {
+            printf("%s\n", e.what());
+        }
         int64_t temptime = time(0);
         if (temptime - lastcrash < 10 && lastcrash != 0) {
             bot.getApi().sendMessage(ownerid, "Recover failed.");
