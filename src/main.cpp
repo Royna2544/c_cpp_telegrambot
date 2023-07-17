@@ -153,6 +153,7 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
     int pipefd[2] = {-1, -1};
 
     pipe(pipefd);
+    auto start = std::chrono::high_resolution_clock::now();
     auto fp = popen_watchdog(cmd.c_str(), pipefd[1]);
 
     if (!fp) {
@@ -168,9 +169,12 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
         bool buf = false;
         int flags;
 
-        // Disable blocking (wdt would be sleeping if we are exiting earlier)
-        flags = fcntl(pipefd[0], F_GETFL);
-        fcntl(pipefd[0], F_SETFL, flags | O_NONBLOCK);
+        auto end = std::chrono::high_resolution_clock::now();
+        if (std::chrono::duration_cast<std::chrono::seconds>(end - start).count() < SLEEP_SECONDS) {
+            // Disable blocking (wdt would be sleeping if we are exiting earlier)
+            flags = fcntl(pipefd[0], F_GETFL);
+            fcntl(pipefd[0], F_SETFL, flags | O_NONBLOCK);
+        }
 
         read(pipefd[0], &buf, 1);
         if (buf) {
