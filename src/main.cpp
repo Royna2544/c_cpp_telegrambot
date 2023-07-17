@@ -841,9 +841,11 @@ int main(void) {
     std::signal(SIGTERM, cleanupFunc);
     int64_t lastcrash = 0;
 
+#define PRETTYF(fmt, ...) printf("[%s:%d] " fmt "\n", __FILE__, __LINE__, ##__VA_ARGS__)
+
 reinit:
     try {
-        printf("Bot username: %s\n", bot.getApi().getMe()->username.c_str());
+        PRETTYF("Debug: Bot username: %s", bot.getApi().getMe()->username.c_str());
         bot.getApi().deleteWebhook();
 
         TgLongPoll longPoll(bot);
@@ -851,8 +853,8 @@ reinit:
             longPoll.start();
         }
     } catch (std::exception &e) {
-        printf("error: %s\n", e.what());
-        printf("trying to recover\n");
+        PRETTYF("Error: %s", e.what());
+        PRETTYF("Warning: Trying to recover");
 #ifdef USE_BLACKLIST
         static struct config_data data;
         config.loadFromFile(&data);
@@ -861,15 +863,19 @@ reinit:
         try {
             bot.getApi().sendMessage(ownerid, e.what());
         } catch (const TgBot::TgException &e) {
-            printf("%s\n", e.what());
+            PRETTYF("Critical Error: %s", e.what());
+            return EXIT_FAILURE;
         }
         int64_t temptime = time(0);
         if (temptime - lastcrash < 10 && lastcrash != 0) {
             bot.getApi().sendMessage(ownerid, "Recover failed.");
+            PRETTYF("Error: Recover failed");
             cleanupFunc(0);
             return 1;
         }
         lastcrash = temptime;
+        bot.getApi().sendMessage(ownerid, "Reinitializing.");
+        PRETTYF("Info: Re-init");
         gAuthorized = false;
         std::thread([] {
             std::this_thread::sleep_for(std::chrono::seconds(5));
