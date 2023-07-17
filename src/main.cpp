@@ -826,7 +826,7 @@ int main(void) {
         }
     });
 
-    auto cleanupFunc = [](int s) {
+    static auto cleanupFunc = [](int s) {
         if (kCompiler) free(kCompiler);
         if (kCxxCompiler) free(kCxxCompiler);
         printf("Exiting with signal %d\n", s);
@@ -836,9 +836,11 @@ int main(void) {
         }
         exit(0);
     };
+    auto cleanupVoidFunc = [] { cleanupFunc(0); };
 
     std::signal(SIGINT, cleanupFunc);
     std::signal(SIGTERM, cleanupFunc);
+    std::atexit(cleanupVoidFunc);
     int64_t lastcrash = 0;
 
 #define PRETTYF(fmt, ...) printf("[%s:%d] " fmt "\n", __FILE__, __LINE__, ##__VA_ARGS__)
@@ -870,7 +872,6 @@ reinit:
         if (temptime - lastcrash < 10 && lastcrash != 0) {
             bot.getApi().sendMessage(ownerid, "Recover failed.");
             PRETTYF("Error: Recover failed");
-            cleanupFunc(0);
             return 1;
         }
         lastcrash = temptime;
@@ -883,5 +884,4 @@ reinit:
         }).detach();
         goto reinit;
     }
-    cleanupFunc(0);
 }
