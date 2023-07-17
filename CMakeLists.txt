@@ -5,6 +5,18 @@ option(ENABLE_TIDY "Enable clang-tidy checks" OFF)
 option(ENABLE_BLACKLIST "Enable blacklist by local db" ON)
 option(DEBUG "Debugging extra printfs" OFF)
 
+execute_process(
+	COMMAND pwd
+	RESULT_VARIABLE RESULT_PWD
+	OUTPUT_VARIABLE OUTPUT_PWD
+	OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+if (RESULT_PWD EQUAL 0)
+	message(STATUS "PWD is ${OUTPUT_PWD}")
+	add_compile_options(-fmacro-prefix-map=${OUTPUT_PWD}=...)
+endif()
+
 set(SRC_LIST
     src/main.cpp
     src/popen_wdt/popen_wdt.c)
