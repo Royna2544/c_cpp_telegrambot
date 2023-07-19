@@ -1,7 +1,9 @@
 #!/bin/bash
 
-set -e
+. $(dirname $0)/common.sh
 
-rm -f CMakeCache.txt
-CFLAGS=-g CXXFLAGS=-g cmake .
-make -j$(nproc)
+export CC=gcc
+export CXX=g++
+export FLAGS=-g
+
+common_cmake

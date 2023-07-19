@@ -1,7 +1,9 @@
 #!/bin/bash
 
-set -e
+. $(dirname $0)/common.sh
 
-rm -f CMakeCache.txt
-CC=clang CXX=clang++ CFLAGS="-flto=full -O3" CXXFLAGS="-flto=full -O3" cmake .
-make -j$(nproc)
+export CC=clang
+export CXX=clang++
+export FLAGS="-flto=full -O3"
+
+common_cmake
