@@ -168,9 +168,9 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
     if (pipefd[0] != -1) {
         bool buf = false;
         int flags;
-	using std::chrono::duration_cast;
-	using std::chrono::seconds;
-	using std::chrono::milliseconds;
+        using std::chrono::duration_cast;
+        using std::chrono::milliseconds;
+        using std::chrono::seconds;
 
         auto end = std::chrono::high_resolution_clock::now();
         if (duration_cast<seconds>(end - start).count() < SLEEP_SECONDS) {
@@ -428,24 +428,26 @@ int main(void) {
         lasttime = time;
 #if defined(GIT_COMMITID) && defined(GIT_COMMITMSG)
 #ifdef GIT_ORIGIN_URL
-#define BUILD_URL_STR "Commit-Id: <a href=\"" GIT_ORIGIN_URL "/commit/" GIT_COMMITID "\">" GIT_COMMITID "</a>" \
-	"\nRepo URL: <a href=\"" GIT_ORIGIN_URL "\">Here</a>"
+#define BUILD_URL_STR "Commit-Id: <a href=\"" GIT_ORIGIN_URL "/commit/" GIT_COMMITID "\">" GIT_COMMITID \
+                      "</a>"                                                                            \
+                      "\nRepo URL: <a href=\"" GIT_ORIGIN_URL "\">Here</a>"
 #else
 #define BUILD_URL_STR "Commit-Id: " GIT_COMMITID
 #endif
-#define VERSION_STR "<b>ABOUT</b>:\n- Telegram bot for fun\n"\
-        "- Proudly backed by C/C++.\n- Supports in-chat compiler support (Owner only)\n" \
-	"- Awesome spam purge feature\n- Utilites support\n\n" \
-        "<b>BUILD INFO</b>: HEAD\nCommit-Msg: \"" GIT_COMMITMSG "\"\n" BUILD_URL_STR
+#define VERSION_STR                                                                  \
+    "<b>ABOUT</b>:\n- Telegram bot for fun\n"                                        \
+    "- Proudly backed by C/C++.\n- Supports in-chat compiler support (Owner only)\n" \
+    "- Awesome spam purge feature\n- Utilites support\n\n"                           \
+    "<b>BUILD INFO</b>: HEAD\nCommit-Msg: \"" GIT_COMMITMSG "\"\n" BUILD_URL_STR
 #else
 #define VERSION_STR ""
 #endif
         // Hardcoded Cum about it GIF
         bot.getApi().sendAnimation(message->chat->id,
                                    "CgACAgQAAx0CdY7-CgABARtpZLefgyKNpSLvyCJWcp8"
-				   "mt5KF_REAAgkDAAI2tFRQIk0uTVxfZnsvBA",
+                                   "mt5KF_REAAgkDAAI2tFRQIk0uTVxfZnsvBA",
                                    0, 0, 0, "", VERSION_STR, message->messageId,
-                                   nullptr, "html", false, 
+                                   nullptr, "html", false,
                                    std::vector<MessageEntity::Ptr>(), true);
     });
     bot.getEvents().onCommand("flash", [&bot](const Message::Ptr &message) {
@@ -855,7 +857,10 @@ int main(void) {
             tm_ptr->cancel();
             std::this_thread::sleep_for(std::chrono::seconds(4));
         }
-        if (s != 0) std::quick_exit(0); else std::exit(0);
+        if (s != 0)
+            std::quick_exit(0);
+        else
+            std::exit(0);
     };
     auto cleanupVoidFunc = [] { cleanupFunc(0); };
 
