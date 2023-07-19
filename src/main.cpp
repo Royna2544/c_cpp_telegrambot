@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <exception>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <map>
 #include <memory>
@@ -151,6 +152,8 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
     bool fine = false;
     auto buf = std::make_unique<char[]>(BUFSIZE);
     int pipefd[2] = {-1, -1};
+    const static int max_buf = 3 * (1 << 10);
+    bool adjusted = false;
 
     pipe(pipefd);
     auto start = std::chrono::high_resolution_clock::now();
@@ -160,11 +163,18 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
         bot_sendReplyMessage(bot, message, "Failed to popen()");
         return;
     }
+    res.reserve(max_buf);
     while (fgets(buf.get(), BUFSIZE, fp)) {
         if (!fine) fine = true;
         res += buf.get();
     }
-    if (!fine) res += std::string() + EMPTY + "\n";
+    if (!fine) res += EMPTY;
+    if (res.size() > max_buf) {
+        res.resize(max_buf);
+	adjusted = true;
+    }
+    res += "\n\n";
+    if (adjusted) res += "-> Truncated due to too much output\n";
     if (pipefd[0] != -1) {
         bool buf = false;
         int flags;
@@ -183,8 +193,10 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
         if (buf) {
             res += WDT_BITE_STR;
         } else {
+            std::stringstream stream;
             float millis = static_cast<float>(duration_cast<milliseconds>(end - start).count());
-            res += "-> It took " + std::to_string(millis * 0.001) + " seconds";
+            stream << std::fixed << std::setprecision(3) << millis * 0.001;
+            res += "-> It took " + stream.str() + " seconds";
         }
         close(pipefd[0]);
         close(pipefd[1]);
@@ -194,7 +206,6 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
 
 static void commonCleanup(const Bot &bot, const Message::Ptr &message,
                           std::string &res, const char *filename) {
-    if (res.size() > 4095) res.resize(4095);
     bot_sendReplyMessage(bot, message, res);
     if (filename) std::remove(filename);
 }
@@ -824,7 +835,7 @@ int main(void) {
                         bot.getApi().sendMessage(chatid,
                                                  "User:" + tag + " Count: " + std::to_string(pr->second));
 #else
-                        // clang-format off
+                                    // clang-format off
                         bot.getApi().sendMessage(chatid, "Spam detected" + tag);
                         try {
                             for (const auto &msg : buffer_priv) {
