@@ -168,9 +168,12 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
     if (pipefd[0] != -1) {
         bool buf = false;
         int flags;
+	using std::chrono::duration_cast;
+	using std::chrono::seconds;
+	using std::chrono::milliseconds;
 
         auto end = std::chrono::high_resolution_clock::now();
-        if (std::chrono::duration_cast<std::chrono::seconds>(end - start).count() < SLEEP_SECONDS) {
+        if (duration_cast<seconds>(end - start).count() < SLEEP_SECONDS) {
             // Disable blocking (wdt would be sleeping if we are exiting earlier)
             flags = fcntl(pipefd[0], F_GETFL);
             fcntl(pipefd[0], F_SETFL, flags | O_NONBLOCK);
@@ -179,6 +182,9 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
         read(pipefd[0], &buf, 1);
         if (buf) {
             res += WDT_BITE_STR;
+        } else {
+            float millis = static_cast<float>(duration_cast<milliseconds>(end - start).count());
+            res += "-> It took " + std::to_string(millis * 0.001) + " seconds";
         }
         close(pipefd[0]);
         close(pipefd[1]);
