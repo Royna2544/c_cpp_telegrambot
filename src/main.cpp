@@ -845,7 +845,7 @@ int main(void) {
             tm_ptr->cancel();
             std::this_thread::sleep_for(std::chrono::seconds(4));
         }
-        exit(0);
+        if (s != 0) std::quick_exit(0); else std::exit(0);
     };
     auto cleanupVoidFunc = [] { cleanupFunc(0); };
 
