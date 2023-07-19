@@ -841,7 +841,7 @@ int main(void) {
         if (kCompiler) free(kCompiler);
         if (kCxxCompiler) free(kCxxCompiler);
         printf("Exiting with signal %d\n", s);
-        if (tm_ptr) {
+        if (tm_ptr && tm_ptr->isrunning()) {
             tm_ptr->cancel();
             std::this_thread::sleep_for(std::chrono::seconds(4));
         }
