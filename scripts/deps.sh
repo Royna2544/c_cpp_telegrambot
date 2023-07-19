@@ -20,3 +20,5 @@ else
     lecho "Current user is not root, trying sudo"
     eval "sudo $APT_COMMAND" || lecho "Failed to get root"
 fi
+
+git submodule update --init
