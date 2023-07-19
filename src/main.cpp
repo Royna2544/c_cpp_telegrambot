@@ -427,7 +427,16 @@ int main(void) {
         if (lasttime != 0 && time - lasttime < 5) return;
         lasttime = time;
 #if defined(GIT_COMMITID) && defined(GIT_COMMITMSG)
-#define VERSION_STR "ABOUT:\nTelegram bot for fun proudly backed by C/C++.\n\nBUILD INFO:\nHEAD Commit-Id: " GIT_COMMITID "\n" "HEAD Commit-Msg: \"" GIT_COMMITMSG "\""
+#ifdef GIT_ORIGIN_URL
+#define BUILD_URL_STR "Commit-Id: <a href=\"" GIT_ORIGIN_URL "/commit/" GIT_COMMITID "\">" GIT_COMMITID "</a>" \
+	"\nRepo URL: <a href=\"" GIT_ORIGIN_URL "\">Here</a>"
+#else
+#define BUILD_URL_STR "Commit-Id: " GIT_COMMITID
+#endif
+#define VERSION_STR "<b>ABOUT</b>:\n- Telegram bot for fun\n"\
+        "- Proudly backed by C/C++.\n- Supports in-chat compiler support (Owner only)\n" \
+	"- Awesome spam purge feature\n- Utilites support\n\n" \
+        "<b>BUILD INFO</b>: HEAD\nCommit-Msg: \"" GIT_COMMITMSG "\"\n" BUILD_URL_STR
 #else
 #define VERSION_STR ""
 #endif
@@ -436,7 +445,8 @@ int main(void) {
                                    "CgACAgQAAx0CVJDJywAChOJkqVx5kGpydVpJGpqXp6E"
                                    "khb3IzAACxAMAAqDqHVM3s6FG-iRuoC8E",
                                    0, 0, 0, "", VERSION_STR, message->messageId,
-                                   FILLIN_SENDWOERROR, false, 0, false);
+                                   nullptr, "html", false, 
+                                   std::vector<MessageEntity::Ptr>(), true);
     });
     bot.getEvents().onCommand("flash", [&bot](const Message::Ptr &message) {
         PERMISSIVE_AUTHORIZED;

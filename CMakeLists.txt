@@ -26,6 +26,13 @@ execute_process(
         OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
+execute_process(
+        COMMAND git config --get remote.origin.url
+        RESULT_VARIABLE RESULT_GIT_ORIGIN_URL
+        OUTPUT_VARIABLE OUTPUT_GIT_ORIGIN_URL
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
 if (RESULT_PWD EQUAL 0)
 	message(STATUS "PWD is ${OUTPUT_PWD}")
 	add_compile_options(-fmacro-prefix-map=${OUTPUT_PWD}=...)
@@ -39,6 +46,11 @@ endif()
 if (RESULT_GIT_COMMITMSG EQUAL 0)
         message(STATUS "Commit msg available")
         add_definitions(-DGIT_COMMITMSG="${OUTPUT_GIT_COMMITMSG}")
+endif()
+
+if (RESULT_GIT_ORIGIN_URL EQUAL 0)
+        message(STATUS "origin url link available")
+	add_definitions(-DGIT_ORIGIN_URL="${OUTPUT_GIT_ORIGIN_URL}")
 endif()
 
 set(SRC_LIST
