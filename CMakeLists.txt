@@ -12,9 +12,33 @@ execute_process(
 	OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
+execute_process(
+        COMMAND git rev-parse HEAD
+        RESULT_VARIABLE RESULT_GIT_COMMITID
+        OUTPUT_VARIABLE OUTPUT_GIT_COMMITID
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+execute_process(
+        COMMAND bash -c "git log -1 --pretty=%B | head -n 1"
+        RESULT_VARIABLE RESULT_GIT_COMMITMSG
+        OUTPUT_VARIABLE OUTPUT_GIT_COMMITMSG
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
 if (RESULT_PWD EQUAL 0)
 	message(STATUS "PWD is ${OUTPUT_PWD}")
 	add_compile_options(-fmacro-prefix-map=${OUTPUT_PWD}=...)
+endif()
+
+if (RESULT_GIT_COMMITID EQUAL 0)
+        message(STATUS "Commit ID available")
+        add_definitions(-DGIT_COMMITID="${OUTPUT_GIT_COMMITID}")
+endif()
+
+if (RESULT_GIT_COMMITMSG EQUAL 0)
+        message(STATUS "Commit msg available")
+        add_definitions(-DGIT_COMMITMSG="${OUTPUT_GIT_COMMITMSG}")
 endif()
 
 set(SRC_LIST

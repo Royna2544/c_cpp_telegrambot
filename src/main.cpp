@@ -426,11 +426,16 @@ int main(void) {
         time = std::time(0);
         if (lasttime != 0 && time - lasttime < 5) return;
         lasttime = time;
+#if defined(GIT_COMMITID) && defined(GIT_COMMITMSG)
+#define VERSION_STR "HEAD Commit-Id: " GIT_COMMITID "\n" "HEAD Commit-Msg: \"" GIT_COMMITMSG "\""
+#else
+#define VERSION_STR ""
+#endif
         // Hardcoded bocchi the rock GIF
         bot.getApi().sendAnimation(message->chat->id,
                                    "CgACAgQAAx0CVJDJywAChOJkqVx5kGpydVpJGpqXp6E"
                                    "khb3IzAACxAMAAqDqHVM3s6FG-iRuoC8E",
-                                   0, 0, 0, "", "", message->messageId,
+                                   0, 0, 0, "", VERSION_STR, message->messageId,
                                    FILLIN_SENDWOERROR, false, 0, false);
     });
     bot.getEvents().onCommand("flash", [&bot](const Message::Ptr &message) {
