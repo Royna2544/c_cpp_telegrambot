@@ -101,11 +101,11 @@ static char *kCompiler = nullptr, *kCxxCompiler = nullptr;
 
 static bool verifyMessage(const Bot &bot, const Message::Ptr &message) {
     ENFORCE_AUTHORIZED false;
-    if (message->replyToMessage == nullptr) {
-        bot_sendReplyMessage(bot, message, "Reply to a code to compile");
-        return false;
+    if (message->replyToMessage && !message->replyToMessage->text.empty()) {
+        return true;
     }
-    return true;
+    bot_sendReplyMessage(bot, message, "Reply to a code to compile");
+    return false;
 }
 
 static inline bool hasExtArgs(const Message::Ptr &message) {
