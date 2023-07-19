@@ -1,6 +1,6 @@
 #!/bin/bash
 
-APT_COMMAND="apt install libcurl4-openssl-dev libssl-dev libboost-all-dev cmake clang"
+APT_COMMAND="apt update; apt install libcurl4-openssl-dev libssl-dev libboost-all-dev cmake clang"
 
 function lecho () {
     echo "$0: $1"
@@ -18,7 +18,7 @@ if [ $UID -eq 0 ]; then
     eval $APT_COMMAND
 else
     lecho "Current user is not root, trying sudo"
-    eval "sudo $APT_COMMAND" || lecho "Failed to get root"
+    eval "sudo -u root bash -c \"$APT_COMMAND\"" || lecho "Failed to get root"
 fi
 
 git submodule update --init
