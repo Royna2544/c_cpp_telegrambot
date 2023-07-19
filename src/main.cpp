@@ -91,7 +91,6 @@ static inline bool Authorized(const Message::Ptr &message,
 #define PERMISSIVE_AUTHORIZED \
     if (!Authorized(message, true, true)) return
 
-constexpr const int BUFSIZE = 1024;
 constexpr const char *EMPTY = "<empty>";
 constexpr char SPACE = ' ';
 
@@ -147,11 +146,10 @@ static void addExtArgs(std::stringstream &cmd, std::string &extraargs,
 
 static void runCommand(const Bot &bot, const Message::Ptr &message,
                        const std::string &cmd, std::string &res) {
-    bool fine = false;
-    auto buf = std::make_unique<char[]>(BUFSIZE);
+    bool fine = false, adjusted = false;
     int pipefd[2] = {-1, -1};
-    const static int max_buf = 3 * (1 << 10);
-    bool adjusted = false;
+    const static int max_buf = 3 * (1 << 10), BUFSIZE = 1024;
+    auto buf = std::make_unique<char[]>(BUFSIZE);
     std::string cmd_r, cmd_remapped;
     const char *cmd_cstr = nullptr;
 
