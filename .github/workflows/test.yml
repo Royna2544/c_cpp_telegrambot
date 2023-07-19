@@ -18,27 +18,22 @@ jobs:
 
       - name: Set up dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get -y install clang gcc libcurl4-openssl-dev libboost-all-dev cmake
-          git submodule init
-          git submodule update
+          ./scripts/deps.sh
 
-      - name: Build and test with clang
+      - name: Clang (Perf)
         env:
           CC: clang
           CXX: clang++
         run: |
           mkdir -p build
           cd build
-          cmake ..
-          make
+          ../scripts/perf.sh
 
-      - name: Build and test with gcc
+      - name: GCC (Debug)
         env:
           CC: gcc
           CXX: g++
         run: |
           mkdir -p build
           cd build
-          cmake ..
-          make
+          ../scripts/debug.sh
