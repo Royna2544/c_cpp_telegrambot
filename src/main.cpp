@@ -440,10 +440,10 @@ int main(void) {
 #else
 #define VERSION_STR ""
 #endif
-        // Hardcoded bocchi the rock GIF
+        // Hardcoded Cum about it GIF
         bot.getApi().sendAnimation(message->chat->id,
-                                   "CgACAgQAAx0CVJDJywAChOJkqVx5kGpydVpJGpqXp6E"
-                                   "khb3IzAACxAMAAqDqHVM3s6FG-iRuoC8E",
+                                   "CgACAgQAAx0CdY7-CgABARtpZLefgyKNpSLvyCJWcp8"
+				   "mt5KF_REAAgkDAAI2tFRQIk0uTVxfZnsvBA",
                                    0, 0, 0, "", VERSION_STR, message->messageId,
                                    nullptr, "html", false, 
                                    std::vector<MessageEntity::Ptr>(), true);
