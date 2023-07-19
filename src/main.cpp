@@ -181,12 +181,13 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
         if (!fine) fine = true;
         res += buf.get();
     }
-    if (!fine) res += std::string() + EMPTY + "\n";
+    if (!fine) res += std::string() + EMPTY + '\n';
     if (res.size() > max_buf) {
         res.resize(max_buf);
+        if (res.back() != '\n') res += '\n';
         adjusted = true;
     }
-    res += "\n";
+    res += '\n';
     if (adjusted) res += "-> Truncated due to too much output\n";
     if (pipefd[0] != -1) {
         bool buf = false;
