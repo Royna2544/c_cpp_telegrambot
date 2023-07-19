@@ -154,10 +154,22 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
     int pipefd[2] = {-1, -1};
     const static int max_buf = 3 * (1 << 10);
     bool adjusted = false;
+    std::string cmd_remapped;
+    const char* cmd_cstr = nullptr;
+
+    cmd_remapped.reserve(cmd.size());
+    cmd_cstr = cmd.c_str();
+    for (;*cmd_cstr != '\0';cmd_cstr++) {
+	    if (*cmd_cstr == '"') {
+		    cmd_remapped += '\"';
+	    } else {
+		    cmd_remapped += *cmd_cstr;
+	    }
+    }
 
     pipe(pipefd);
     auto start = std::chrono::high_resolution_clock::now();
-    auto fp = popen_watchdog(cmd.c_str(), pipefd[1]);
+    auto fp = popen_watchdog(cmd_remapped.c_str(), pipefd[1]);
 
     if (!fp) {
         bot_sendReplyMessage(bot, message, "Failed to popen()");
@@ -171,7 +183,7 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
     if (!fine) res += EMPTY;
     if (res.size() > max_buf) {
         res.resize(max_buf);
-	adjusted = true;
+        adjusted = true;
     }
     res += "\n\n";
     if (adjusted) res += "-> Truncated due to too much output\n";
