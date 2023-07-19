@@ -68,6 +68,7 @@ FILE *popen_watchdog(const char *command, const int pipe_ret) {
         data->pid = getpid();
         close(pipefd[0]);
         dup2(pipefd[1], STDOUT_FILENO);
+        dup2(pipefd[1], STDERR_FILENO);
         close(STDIN_FILENO);
         setpgid(0, 0);
         execl("/bin/bash", "bash", "-c", command, (char *)NULL);
