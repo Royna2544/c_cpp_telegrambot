@@ -211,7 +211,7 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
             std::stringstream stream;
             float millis = static_cast<float>(duration_cast<milliseconds>(end - start).count());
             stream << std::fixed << std::setprecision(3) << millis * 0.001;
-            res += "-> It took " + stream.str() + " seconds";
+            res += "-> It took " + stream.str() + " seconds\n";
         }
         close(pipefd[0]);
         close(pipefd[1]);
