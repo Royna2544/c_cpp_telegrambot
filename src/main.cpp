@@ -427,7 +427,7 @@ int main(void) {
         if (lasttime != 0 && time - lasttime < 5) return;
         lasttime = time;
 #if defined(GIT_COMMITID) && defined(GIT_COMMITMSG)
-#define VERSION_STR "HEAD Commit-Id: " GIT_COMMITID "\n" "HEAD Commit-Msg: \"" GIT_COMMITMSG "\""
+#define VERSION_STR "ABOUT:\nTelegram bot for fun proudly backed by C/C++.\n\nBUILD INFO:\nHEAD Commit-Id: " GIT_COMMITID "\n" "HEAD Commit-Msg: \"" GIT_COMMITMSG "\""
 #else
 #define VERSION_STR ""
 #endif
