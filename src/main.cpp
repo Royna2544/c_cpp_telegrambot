@@ -91,7 +91,6 @@ static inline bool Authorized(const Message::Ptr &message,
 #define PERMISSIVE_AUTHORIZED \
     if (!Authorized(message, true, true)) return
 
-constexpr const char *STDERRTOOUT = "2>&1";
 constexpr const int BUFSIZE = 1024;
 constexpr const char *EMPTY = "<empty>";
 constexpr char SPACE = ' ';
@@ -144,7 +143,6 @@ static void addExtArgs(std::stringstream &cmd, std::string &extraargs,
         res += cmd.str();
         res += "\"\n";
     }
-    cmd << SPACE << STDERRTOOUT;
 }
 
 static void runCommand(const Bot &bot, const Message::Ptr &message,
@@ -240,7 +238,7 @@ static bool commonVerifyParseWrite(const Bot &bot, const Message::Ptr &message,
 static void CCppCompileHandler(const Bot &bot, const Message::Ptr &message,
                                const bool plusplus) {
     std::string res, extraargs;
-    std::stringstream cmd, cmd2;
+    std::stringstream cmd;
     const char *filename, aoutname[] = "./a.out";
     bool ret;
 
@@ -269,10 +267,8 @@ static void CCppCompileHandler(const Bot &bot, const Message::Ptr &message,
     std::ifstream aout(aoutname);
     if (aout.good()) {
         aout.close();
-        cmd.swap(cmd2);
-        cmd << aoutname << SPACE << STDERRTOOUT;
         res += "Run time:\n";
-        runCommand(bot, message, cmd.str(), res);
+        runCommand(bot, message, aoutname, res);
         std::remove(aoutname);
     }
 
@@ -441,7 +437,7 @@ int main(void) {
         if (hasExtArgs(message)) {
             std::string cmd;
             parseExtArgs(message, cmd);
-            runCommand(bot, message, cmd + SPACE + STDERRTOOUT, res);
+            runCommand(bot, message, cmd, res);
         } else {
             res = "Send a bash command to run";
         }
