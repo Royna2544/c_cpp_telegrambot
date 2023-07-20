@@ -146,10 +146,10 @@ static void addExtArgs(std::stringstream &cmd, std::string &extraargs,
 
 static void runCommand(const Bot &bot, const Message::Ptr &message,
                        const std::string &cmd, std::string &res) {
-    bool fine = false, adjusted = false;
-    int pipefd[2] = {-1, -1};
-    const static int max_buf = 3 * (1 << 10), BUFSIZE = 1024;
-    auto buf = std::make_unique<char[]>(BUFSIZE);
+    bool hasmore = false;
+    int pipefd[2] = {-1, -1}, count = 0;
+    constexpr const static int read_buf = (1 << 8), max_buf = (read_buf << 2) * 3;
+    auto buf = std::make_unique<char[]>(read_buf);
     std::string cmd_r, cmd_remapped;
     const char *cmd_cstr = nullptr;
 
@@ -177,18 +177,21 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
         return;
     }
     res.reserve(max_buf);
-    while (fgets(buf.get(), BUFSIZE, fp)) {
-        if (!fine) fine = true;
-        res += buf.get();
+    while (fgets(buf.get(), read_buf, fp)) {
+        if (res.size() < max_buf) {
+            res += buf.get();
+        } else {
+            hasmore = true;
+            break;
+        }
+        count++;
     }
-    if (!fine) res += std::string() + EMPTY + '\n';
-    if (res.size() > max_buf) {
-        res.resize(max_buf);
-        if (res.back() != '\n') res += '\n';
-        adjusted = true;
-    }
+    if (count == 0)
+        res += std::string() + EMPTY + '\n';
+    else if (res.back() != '\n')
+        res += '\n';
     res += '\n';
-    if (adjusted) res += "-> Truncated due to too much output\n";
+    if (hasmore) res += "-> Truncated due to too much output\n";
     if (pipefd[0] != -1) {
         bool buf = false;
         int flags;
