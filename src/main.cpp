@@ -712,8 +712,9 @@ int main(void) {
         const char *text;
         if (tm_ptr) {
             ret = tm_ptr->cancel([&](TimerImpl_privdata *t) -> bool {
-                t->sendendmsg = false;
-                return t->chatid == message->chat->id;
+                bool allowed = t->chatid == message->chat->id;
+                if (allowed) t->sendendmsg = false;
+                return allowed;
             });
             if (ret) {
                 text = "Stopped successfully";
