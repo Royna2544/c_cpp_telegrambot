@@ -42,8 +42,9 @@ execute_process(
 )
 
 if (RESULT_PWD EQUAL 0)
-	message(STATUS "PWD is ${OUTPUT_PWD}")
-	add_compile_options(-fmacro-prefix-map=${OUTPUT_PWD}=...)
+        message(STATUS "PWD is ${OUTPUT_PWD}")
+        add_compile_options(-fmacro-prefix-map=${OUTPUT_PWD}=...)
+        add_definitions(-DPWD_STR="${OUTPUT_PWD}")
 endif()
 
 if (RESULT_GIT_COMMITID EQUAL 0)

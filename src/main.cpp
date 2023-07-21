@@ -145,6 +145,11 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
         }
         count++;
     }
+#ifdef PWD_STR
+    for (size_t pos = res.find(PWD_STR); pos != std::string::npos; pos = res.find(PWD_STR)) {
+        res.replace(pos, sizeof(PWD_STR), 1, '.');
+    }
+#endif
     if (count == 0)
         res += std::string() + EMPTY + '\n';
     else if (res.back() != '\n')
