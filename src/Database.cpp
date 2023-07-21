@@ -16,23 +16,24 @@ static void addToDBList(const DBOperationsBase *thisptr, const Bot &bot, const M
     struct config_data data;
     UserId *listdata = getter(&data);
     if (message->replyToMessage && message->replyToMessage->from) {
-        if (bot.getApi().getMe()->id == message->replyToMessage->from->id) return;
+        int64_t id = message->replyToMessage->from->id;
+        if (bot.getApi().getMe()->id == id) return;
         config.loadFromFile(&data);
-        if (data.owner_id == message->replyToMessage->from->id) {
+        if (data.owner_id == id) {
             bot_sendReplyMessage(bot, message, std::string() + "Cannot add owner in " + listname);
             return;
         }
-        if (isInDB(thisptr->other->getter(&data), message->replyToMessage->from->id)) {
+        if (isInDB(thisptr->other->getter(&data), id)) {
             bot_sendReplyMessage(bot, message, std::string() + "Remove user from " + thisptr->other->name + " first");
             return;
         }
         for (int i = 0; i < DATABASE_LIST_BUFSIZE; i++) {
-            if (listdata[i] == message->replyToMessage->from->id) {
+            if (listdata[i] == id) {
                 bot_sendReplyMessage(bot, message, std::string() + "User already in " + listname);
                 return;
             }
             if (listdata[i] == 0) {
-                listdata[i] = message->replyToMessage->from->id;
+                listdata[i] = id;
                 bot_sendReplyMessage(bot, message, std::string() + "User added to " + listname);
                 config.storeToFile(data);
                 return;
