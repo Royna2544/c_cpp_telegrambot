@@ -36,6 +36,7 @@ static void removeFromDBList(const Bot &bot, const Message::Ptr &message,
     struct config_data data;
     UserId *listdata = getter(&data);
     if (message->replyToMessage && message->replyToMessage->from) {
+        bool changed = false;
         config.loadFromFile(&data);
         int tmp[DATABASE_LIST_BUFSIZE] = {
             0,
@@ -43,13 +44,18 @@ static void removeFromDBList(const Bot &bot, const Message::Ptr &message,
         for (int i = 0; i < DATABASE_LIST_BUFSIZE; i++) {
             if (listdata[i] == message->replyToMessage->from->id) {
                 bot_sendReplyMessage(bot, message, std::string() + "User removed from " + listname);
+                changed = true;
                 continue;
             } else {
                 tmp[i] = listdata[i];
             }
         }
-        memcpy(listdata, tmp, sizeof(tmp));
-        config.storeToFile(data);
+        if (changed) {
+            memcpy(listdata, tmp, sizeof(tmp));
+            config.storeToFile(data);
+        } else {
+            bot_sendReplyMessage(bot, message, std::string() + "User not in " + listname);
+        }
     } else {
         bot_sendReplyMessage(bot, message, "Reply to a user");
     }
