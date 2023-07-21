@@ -5,6 +5,14 @@ option(ENABLE_TIDY "Enable clang-tidy checks" OFF)
 option(ENABLE_DATABASE "Enable local db support" ON)
 option(DEBUG "Debugging extra printfs" OFF)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+if(WIN32)
+	message(FATAL_ERROR "Windows not supported")
+endif()
+
 execute_process(
 	COMMAND pwd
 	RESULT_VARIABLE RESULT_PWD

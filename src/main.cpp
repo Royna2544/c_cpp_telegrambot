@@ -50,10 +50,6 @@ using TgBot::MessageEntity;
 using TgBot::StickerSet;
 using TgBot::TgLongPoll;
 
-#ifndef USE_DATABASE
-static const int64_t ownerid = 1185607882;
-#endif
-
 constexpr const char *EMPTY = "<empty>";
 constexpr char SPACE = ' ';
 
