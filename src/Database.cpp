@@ -75,23 +75,22 @@ static void removeFromDBList(const DBOperationsBase *thisptr, const Bot &bot,
     }
 }
 
-};  // namespace defaultimpl
+}  // namespace defaultimpl
 
 DBOperationsBase blacklist = {
     defaultimpl::addToDBList,
     defaultimpl::removeFromDBList,
-    [](struct config_data *data) -> UserId * { return &data->blacklist[0]; },
+    std::bind(&config_data::blacklist, std::placeholders::_1),
     "blacklist",
     &whitelist,
 };
 DBOperationsBase whitelist = {
     defaultimpl::addToDBList,
     defaultimpl::removeFromDBList,
-    [](struct config_data *data) -> UserId * { return &data->whitelist[0]; },
+    std::bind(&config_data::whitelist, std::placeholders::_1),
     "whitelist",
     &blacklist,
 };
-
 TgBotConfig config("tgbot.dat");
 
-};  // namespace database
+}  // namespace database
