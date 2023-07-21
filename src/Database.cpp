@@ -1,6 +1,5 @@
-#include "Database.h"
-
-#include "BotReplyMessage.h"
+#include <BotReplyMessage.h>
+#include <Database.h>
 
 namespace database {
 namespace defaultimpl {

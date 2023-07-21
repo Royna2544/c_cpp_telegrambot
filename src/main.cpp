@@ -29,12 +29,13 @@
 #include <tgbot/tgbot.h>
 
 #ifdef USE_DATABASE
-#include "Database.h"
+#include <Database.h>
 #endif
 
-#include "Authorization.h"
-#include "BotReplyMessage.h"
-#include "NamespaceImport.h"
+#include <Authorization.h>
+#include <BotReplyMessage.h>
+#include <NamespaceImport.h>
+
 #include "popen_wdt/popen_wdt.h"
 #include "timer/Timer.h"
 

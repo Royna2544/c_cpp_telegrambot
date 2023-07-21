@@ -1,6 +1,5 @@
-#include "Authorization.h"
-
-#include "Database.h"
+#include <Authorization.h>
+#include <Database.h>
 
 bool gAuthorized = true;
 

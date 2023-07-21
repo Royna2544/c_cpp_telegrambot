@@ -1,10 +1,10 @@
 #pragma once
 
+#include <conf/conf.h>
 #include <tgbot/Bot.h>
 #include <tgbot/types/Message.h>
 
 #include "NamespaceImport.h"
-#include "conf/conf.h"
 
 namespace database {
 

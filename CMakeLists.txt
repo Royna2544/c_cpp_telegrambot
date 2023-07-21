@@ -53,6 +53,9 @@ if (RESULT_GIT_ORIGIN_URL EQUAL 0)
 	add_definitions(-DGIT_ORIGIN_URL="${OUTPUT_GIT_ORIGIN_URL}")
 endif()
 
+include_directories(src/include)
+include_directories(src/)
+
 set(SRC_LIST
     src/main.cpp
     src/Authorization.cpp
