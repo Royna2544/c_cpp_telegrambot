@@ -16,6 +16,7 @@ static void addToDBList(const DBOperationsBase *thisptr, const Bot &bot, const M
     struct config_data data;
     UserId *listdata = getter(&data);
     if (message->replyToMessage && message->replyToMessage->from) {
+        if (bot.getApi().getMe()->id == message->replyToMessage->from->id) return;
         config.loadFromFile(&data);
         if (data.owner_id == message->replyToMessage->from->id) {
             bot_sendReplyMessage(bot, message, std::string() + "Cannot add owner in " + listname);
