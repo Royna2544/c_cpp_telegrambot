@@ -4,7 +4,14 @@
 namespace database {
 namespace defaultimpl {
 
-static void addToDBList(const Bot &bot, const Message::Ptr &message,
+static bool isInDB(const UserId *listdata, const UserId id) {
+    for (int i = 0; i < DATABASE_LIST_BUFSIZE; i++) {
+        if (listdata[i] == id) return true;
+    }
+    return false;
+}
+
+static void addToDBList(const DBOperationsBase *thisptr, const Bot &bot, const Message::Ptr &message,
                         const dblist_getter_t getter, const char *listname) {
     struct config_data data;
     UserId *listdata = getter(&data);
@@ -12,6 +19,10 @@ static void addToDBList(const Bot &bot, const Message::Ptr &message,
         config.loadFromFile(&data);
         if (data.owner_id == message->replyToMessage->from->id) {
             bot_sendReplyMessage(bot, message, std::string() + "Cannot add owner in " + listname);
+            return;
+        }
+        if (isInDB(thisptr->other->getter(&data), message->replyToMessage->from->id)) {
+            bot_sendReplyMessage(bot, message, std::string() + "Remove user from " + thisptr->other->name + " first");
             return;
         }
         for (int i = 0; i < DATABASE_LIST_BUFSIZE; i++) {
@@ -31,7 +42,8 @@ static void addToDBList(const Bot &bot, const Message::Ptr &message,
         bot_sendReplyMessage(bot, message, "Reply to a user");
     }
 }
-static void removeFromDBList(const Bot &bot, const Message::Ptr &message,
+static void removeFromDBList(const DBOperationsBase *thisptr, const Bot &bot,
+                             const Message::Ptr &message,
                              const dblist_getter_t getter, const char *listname) {
     struct config_data data;
     UserId *listdata = getter(&data);
@@ -68,12 +80,14 @@ DBOperationsBase blacklist = {
     defaultimpl::removeFromDBList,
     [](struct config_data *data) -> UserId * { return &data->blacklist[0]; },
     "blacklist",
+    &whitelist,
 };
 DBOperationsBase whitelist = {
     defaultimpl::addToDBList,
     defaultimpl::removeFromDBList,
     [](struct config_data *data) -> UserId * { return &data->whitelist[0]; },
     "whitelist",
+    &blacklist,
 };
 
 TgBotConfig config("tgbot.dat");
