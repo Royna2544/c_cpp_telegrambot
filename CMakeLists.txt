@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10.2)
 project(tg_cpphost)
 
 option(ENABLE_TIDY "Enable clang-tidy checks" OFF)
-option(ENABLE_BLACKLIST "Enable blacklist by local db" ON)
+option(ENABLE_DATABASE "Enable local db support" ON)
 option(DEBUG "Debugging extra printfs" OFF)
 
 execute_process(
@@ -64,9 +64,10 @@ set(CMAKE_CXX_CLANG_TIDY clang-tidy;
 	-checks=*,-llvmlibc*,-fuchsia*,-altera*,-hicpp*,abseil-*,-llvm-header-guard,-modernize-use-trailing-return-type,-modernize-redundent-void-arg)
 endif()
 
-if (ENABLE_BLACKLIST)
-add_definitions(-DUSE_BLACKLIST)
+if (ENABLE_DATABASE)
+add_definitions(-DUSE_DATABASE)
 set(SRC_LIST
+    src/Database.cpp
     src/conf/conf.cc
     ${SRC_LIST})
 endif()

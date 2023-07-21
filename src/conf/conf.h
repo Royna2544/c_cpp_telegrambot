@@ -7,12 +7,12 @@
 
 using UserId = int64_t;
 
-#define BLACKLIST_BUFFER 5
+#define DATABASE_LIST_BUFSIZE 5
 
 struct config_data {
     UserId owner_id;
-    UserId blacklist[BLACKLIST_BUFFER];
-    UserId whitelist[BLACKLIST_BUFFER];
+    UserId blacklist[DATABASE_LIST_BUFSIZE];
+    UserId whitelist[DATABASE_LIST_BUFSIZE];
 };
 
 struct TgBotConfig {

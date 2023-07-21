@@ -11,6 +11,7 @@
 #include <cstdlib>
 #include <exception>
 #include <fstream>
+#include <functional>
 #include <iomanip>
 #include <iostream>
 #include <map>
@@ -27,9 +28,11 @@
 #define BOOST_BIND_GLOBAL_PLACEHOLDERS
 #include <tgbot/tgbot.h>
 
-#ifdef USE_BLACKLIST
-#include "conf/conf.h"
+#ifdef USE_DATABASE
+#include "Database.h"
 #endif
+
+#include "BotReplyMessage.h"
 #include "popen_wdt/popen_wdt.h"
 #include "timer/Timer.h"
 
@@ -48,27 +51,21 @@ using TgBot::TgLongPoll;
 
 static bool gAuthorized = true;
 
-#ifdef USE_BLACKLIST
-static TgBotConfig config("tgbot.dat");
-#else
+#ifndef USE_DATABASE
 static const int64_t ownerid = 1185607882;
 #endif
 
-static inline void bot_sendReplyMessage(const Bot &bot, const Message::Ptr &message,
-                                        const std::string &text, const int32_t replyToMsg = 0) {
-    bot.getApi().sendMessage(message->chat->id, text,
-                             true, (replyToMsg == 0) ? message->messageId : replyToMsg,
-                             nullptr, "", false, std::vector<MessageEntity::Ptr>(), true);
-}
-
 static bool AuthorizedId(const int64_t id, const bool permissive) {
-#ifdef USE_BLACKLIST
+#ifdef USE_DATABASE
     static struct config_data data;
-    config.loadFromFile(&data);
+    database::config.loadFromFile(&data);
     if (!permissive) {
+        for (int i = 0; i < DATABASE_LIST_BUFSIZE; ++i) {
+            if (data.whitelist[i] == id) return true;
+        }
         return id == data.owner_id;
     } else {
-        for (int i = 0; i < BLACKLIST_BUFFER; ++i) {
+        for (int i = 0; i < DATABASE_LIST_BUFSIZE; ++i) {
             if (data.blacklist[i] == id) return false;
         }
         return true;
@@ -379,59 +376,30 @@ int main(void) {
     } else {
         CMD_UNSUPPORTED("golang", "Host does not have a Go compiler");
     }
-#ifdef USE_BLACKLIST
+#ifdef USE_DATABASE
     bot.getEvents().onCommand("addblacklist", [&bot](const Message::Ptr &message) {
         ENFORCE_AUTHORIZED;
-        struct config_data data;
-        if (message->replyToMessage && message->replyToMessage->from) {
-            config.loadFromFile(&data);
-            if (data.owner_id == message->replyToMessage->from->id) {
-                bot_sendReplyMessage(bot, message,
-                                     "Why would I blacklist my owner? Looks like a pretty bad idea.");
-                return;
-            }
-            for (int i = 0; i < BLACKLIST_BUFFER; i++) {
-                if (data.blacklist[i] == message->replyToMessage->from->id) {
-                    bot_sendReplyMessage(bot, message, "User already in blacklist");
-                    return;
-                }
-                if (data.blacklist[i] == 0) {
-                    data.blacklist[i] = message->replyToMessage->from->id;
-                    bot_sendReplyMessage(bot, message, "User added to blacklist");
-                    config.storeToFile(data);
-                    return;
-                }
-            }
-            bot_sendReplyMessage(bot, message, "Out of buffer");
-        } else {
-            bot_sendReplyMessage(bot, message, "Reply to a user");
-        }
+        database::blacklist.add(bot, message);
     });
     bot.getEvents().onCommand("rmblacklist", [&bot](const Message::Ptr &message) {
         ENFORCE_AUTHORIZED;
-        struct config_data data;
-        if (message->replyToMessage && message->replyToMessage->from) {
-            config.loadFromFile(&data);
-            int tmp[BLACKLIST_BUFFER] = {
-                0,
-            };
-            for (int i = 0; i < BLACKLIST_BUFFER; i++) {
-                if (data.blacklist[i] == message->replyToMessage->from->id) {
-                    bot_sendReplyMessage(bot, message, "User removed from blacklist");
-                    continue;
-                } else {
-                    tmp[i] = data.blacklist[i];
-                }
-            }
-            memcpy(data.blacklist, tmp, sizeof(tmp));
-            config.storeToFile(data);
-        } else {
-            bot_sendReplyMessage(bot, message, "Reply to a user");
-        }
+        database::blacklist.remove(bot, message);
+    });
+    bot.getEvents().onCommand("addwhitelist", [&bot](const Message::Ptr &message) {
+        ENFORCE_AUTHORIZED;
+        database::whitelist.add(bot, message);
+    });
+    bot.getEvents().onCommand("rmwhitelist", [&bot](const Message::Ptr &message) {
+        ENFORCE_AUTHORIZED;
+        database::whitelist.remove(bot, message);
     });
 #else
-    CMD_UNSUPPORTED("addblacklist", "USE_BLACKLIST flag not enabled");
-    CMD_UNSUPPORTED("rmblacklist", "USE_BLACKLIST flag not enabled");
+#define NOT_SUPPORTED_DB(name) CMD_UNSUPPORTED(name, "USE_DATABASE flag not enabled");
+    NOT_SUPPORTED_DB("addblacklist");
+    NOT_SUPPORTED_DB("rmblacklist");
+    NOT_SUPPORTED_DB("addwhitelist");
+    NOT_SUPPORTED_DB("rmwhitelist");
+#undef NOT_SUPPORTED_DB
 #endif
     bot.getEvents().onCommand("bash", [&bot](const Message::Ptr &message) {
         std::string res;
@@ -910,9 +878,9 @@ reinit:
     } catch (std::exception &e) {
         PRETTYF("Error: %s", e.what());
         PRETTYF("Warning: Trying to recover");
-#ifdef USE_BLACKLIST
+#ifdef USE_DATABASE
         static struct config_data data;
-        config.loadFromFile(&data);
+        database::config.loadFromFile(&data);
         int64_t ownerid = data.owner_id;
 #endif
         try {
