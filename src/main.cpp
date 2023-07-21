@@ -32,7 +32,9 @@
 #include "Database.h"
 #endif
 
+#include "Authorization.h"
 #include "BotReplyMessage.h"
+#include "NamespaceImport.h"
 #include "popen_wdt/popen_wdt.h"
 #include "timer/Timer.h"
 
@@ -43,50 +45,13 @@ struct TimerImpl_privdata {
     int64_t chatid;
 };
 
-using TgBot::Bot;
-using TgBot::Message;
 using TgBot::MessageEntity;
 using TgBot::StickerSet;
 using TgBot::TgLongPoll;
 
-static bool gAuthorized = true;
-
 #ifndef USE_DATABASE
 static const int64_t ownerid = 1185607882;
 #endif
-
-static bool AuthorizedId(const int64_t id, const bool permissive) {
-#ifdef USE_DATABASE
-    static struct config_data data;
-    database::config.loadFromFile(&data);
-    if (!permissive) {
-        for (int i = 0; i < DATABASE_LIST_BUFSIZE; ++i) {
-            if (data.whitelist[i] == id) return true;
-        }
-        return id == data.owner_id;
-    } else {
-        for (int i = 0; i < DATABASE_LIST_BUFSIZE; ++i) {
-            if (data.blacklist[i] == id) return false;
-        }
-        return true;
-    }
-#else
-    return permissive ? true : ownerid == id;
-#endif
-}
-
-static inline bool Authorized(const Message::Ptr &message,
-                              const bool nonuserallowed = false,
-                              const bool permissive = false) {
-    if (!gAuthorized) return false;
-    return message->from ? AuthorizedId(message->from->id, permissive)
-                         : nonuserallowed;
-}
-
-#define ENFORCE_AUTHORIZED \
-    if (!Authorized(message)) return
-#define PERMISSIVE_AUTHORIZED \
-    if (!Authorized(message, true, true)) return
 
 constexpr const char *EMPTY = "<empty>";
 constexpr char SPACE = ' ';

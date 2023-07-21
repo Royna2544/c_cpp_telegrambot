@@ -3,13 +3,13 @@
 #include <tgbot/Bot.h>
 #include <tgbot/types/Message.h>
 
+#include "NamespaceImport.h"
 #include "conf/conf.h"
 
 namespace database {
 
-using ::TgBot::Bot;
-using ::TgBot::Message;
-
+using ::Bot;
+using ::Message;
 using dblist_getter_t = std::function<UserId *(struct config_data *data)>;
 using internal_op_t = std::function<void(const Bot &bot, const Message::Ptr &message,
                                          const dblist_getter_t getter, const char *listname)>;

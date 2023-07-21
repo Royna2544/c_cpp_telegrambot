@@ -55,6 +55,7 @@ endif()
 
 set(SRC_LIST
     src/main.cpp
+    src/Authorization.cpp
     src/popen_wdt/popen_wdt.c)
 
 if (ENABLE_TIDY)
