@@ -89,6 +89,9 @@ if (DEBUG)
 add_definitions(-DDEBUG)
 endif()
 
+# TgBot lib + Boost warning
+add_definitions(-DBOOST_BIND_GLOBAL_PLACEHOLDERS)
+
 add_subdirectory(lib)
 set_target_properties(TgBot
     PROPERTIES CXX_CLANG_TIDY ""

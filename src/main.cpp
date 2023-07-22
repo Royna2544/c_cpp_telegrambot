@@ -1,4 +1,5 @@
 #include <fcntl.h>
+#include <tgbot/tgbot.h>
 #include <unistd.h>
 
 #include <algorithm>
@@ -24,9 +25,6 @@
 #include <type_traits>
 #include <unordered_map>
 #include <vector>
-
-#define BOOST_BIND_GLOBAL_PLACEHOLDERS
-#include <tgbot/tgbot.h>
 
 #ifdef USE_DATABASE
 #include <Database.h>
