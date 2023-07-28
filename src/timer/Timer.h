@@ -9,7 +9,7 @@ struct timehms {
     int h;
     int m;
     int s;
-    int toSeconds(void) { return 60 * 60 * h + 60 * m + s; }
+    int toSeconds(void) const noexcept { return 60 * 60 * h + 60 * m + s; }
 };
 
 template <typename T>
