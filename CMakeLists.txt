@@ -68,7 +68,8 @@ include_directories(src/)
 set(SRC_LIST
     src/main.cpp
     src/Authorization.cpp
-    src/popen_wdt/popen_wdt.c)
+    src/popen_wdt/popen_wdt.c
+    src/utils/libutils.cpp)
 
 if (ENABLE_TIDY)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

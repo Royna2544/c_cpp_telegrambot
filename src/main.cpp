@@ -36,6 +36,7 @@
 
 #include "popen_wdt/popen_wdt.h"
 #include "timer/Timer.h"
+#include "utils/libutils.h"
 
 struct TimerImpl_privdata {
     int32_t messageid;
@@ -258,45 +259,6 @@ static void GenericRunHandler(const Bot &bot, const Message::Ptr &message,
     commonCleanup(bot, message, res, outfile);
 }
 
-#define ARRAY_SIZE(arr) sizeof(arr) / sizeof(arr[0])
-
-static void findCompiler(void) {
-    static const char *const compilers[][2] = {
-        {"clang", "clang++"},
-        {"gcc", "g++"},
-        {"cc", "c++"},
-    };
-    static char buffer[20];
-    for (int i = 0; i < ARRAY_SIZE(compilers); i++) {
-        auto checkfn = [i](const int idx) -> bool {
-            memset(buffer, 0, sizeof(buffer));
-            auto bytes = snprintf(buffer, sizeof(buffer), "/usr/bin/%s",
-                                  compilers[i][idx]);
-            if (bytes >= sizeof(buffer))
-                return false;
-            else
-                buffer[bytes] = '\0';
-            return access(buffer, R_OK | X_OK) == 0;
-        };
-        if (!kCompiler && checkfn(0)) {
-            kCompiler = strdup(buffer);
-        }
-        if (!kCxxCompiler && checkfn(1)) {
-            kCxxCompiler = strdup(buffer);
-        }
-        if (kCompiler && kCxxCompiler) break;
-    }
-}
-
-static int genRandomNumber(const int upper, const int lower = 0) {
-    if (upper == lower) return lower;
-    std::random_device rd;
-    std::mt19937 gen(rd());
-
-    std::uniform_int_distribution<int> distribution(lower, upper);
-    return distribution(gen);
-}
-
 #define CMD_UNSUPPORTED(cmd, reason)                                     \
     bot.getEvents().onCommand(cmd, [&bot](const Message::Ptr &message) { \
         bot_sendReplyMessage(                                            \
@@ -315,7 +277,7 @@ int main(void) {
 
     Bot bot(token);
     static std::shared_ptr<Timer<TimerImpl_privdata>> tm_ptr;
-    findCompiler();
+    findCompiler(kCompiler, kCxxCompiler);
 
     if (kCxxCompiler) {
         bot.getEvents().onCommand("cpp", [&bot](const Message::Ptr &message) {
@@ -828,8 +790,6 @@ int main(void) {
     std::signal(SIGTERM, cleanupFunc);
     std::atexit(cleanupVoidFunc);
     int64_t lastcrash = 0;
-
-#define PRETTYF(fmt, ...) printf("[%s:%d] " fmt "\n", __FILE__, __LINE__, ##__VA_ARGS__)
 
 reinit:
     try {
