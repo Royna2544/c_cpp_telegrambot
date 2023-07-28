@@ -32,9 +32,9 @@
 
 #include <Authorization.h>
 #include <BotReplyMessage.h>
+#include <CompilerInTelegram.h>
 #include <NamespaceImport.h>
 
-#include "popen_wdt/popen_wdt.h"
 #include "timer/Timer.h"
 #include "utils/libutils.h"
 
@@ -49,212 +49,7 @@ using TgBot::MessageEntity;
 using TgBot::StickerSet;
 using TgBot::TgLongPoll;
 
-constexpr const char *EMPTY = "<empty>";
-constexpr char SPACE = ' ';
-
 static char *kCompiler = nullptr, *kCxxCompiler = nullptr;
-
-static bool verifyMessage(const Bot &bot, const Message::Ptr &message) {
-    ENFORCE_AUTHORIZED false;
-    if (message->replyToMessage && !message->replyToMessage->text.empty()) {
-        return true;
-    }
-    bot_sendReplyMessage(bot, message, "Reply to a code to compile");
-    return false;
-}
-
-static inline bool hasExtArgs(const Message::Ptr &message) {
-    return message->text.find_first_of(" \n") != std::string::npos;
-}
-
-static void parseExtArgs(const Message::Ptr &message, std::string &extraargs) {
-    // Telegram ensures message does not have whitespaces beginning or ending.
-    auto id = message->text.find_first_of(" \n");
-    if (id != std::string::npos) {
-        extraargs = message->text.substr(id + 1);
-    }
-}
-
-static bool writeMessageToFile(const Bot &bot, const Message::Ptr &message,
-                               const char *filename) {
-    std::ofstream file(filename);
-    if (file.fail()) {
-        bot_sendReplyMessage(bot, message, "Failed to open file");
-        return false;
-    }
-    file << message->replyToMessage->text;
-    file.close();
-    return true;
-}
-
-static void addExtArgs(std::stringstream &cmd, std::string &extraargs,
-                       std::string &res) {
-    if (!extraargs.empty()) {
-        auto idx = extraargs.find_first_of("\n\r\t");
-        if (idx != std::string::npos) extraargs.erase(idx);
-        cmd << SPACE << extraargs;
-        res += "cmd: \"";
-        res += cmd.str();
-        res += "\"\n";
-    }
-}
-
-static void runCommand(const Bot &bot, const Message::Ptr &message,
-                       const std::string &cmd, std::string &res) {
-    bool hasmore = false;
-    int pipefd[2] = {-1, -1}, count = 0;
-    constexpr const static int read_buf = (1 << 8), max_buf = (read_buf << 2) * 3;
-    auto buf = std::make_unique<char[]>(read_buf);
-    std::string cmd_r, cmd_remapped;
-    const char *cmd_cstr = nullptr;
-
-    if (cmd.find("\"") != std::string::npos) {
-        cmd_remapped.reserve(cmd.size());
-        cmd_cstr = cmd.c_str();
-        for (; *cmd_cstr != '\0'; cmd_cstr++) {
-            if (*cmd_cstr == '"') {
-                cmd_remapped += '\"';
-            } else {
-                cmd_remapped += *cmd_cstr;
-            }
-        }
-        cmd_r = cmd_remapped;
-    } else {
-        cmd_r = cmd;
-    }
-
-    pipe(pipefd);
-    auto start = std::chrono::high_resolution_clock::now();
-    auto fp = popen_watchdog(cmd_r.c_str(), pipefd[1]);
-
-    if (!fp) {
-        bot_sendReplyMessage(bot, message, "Failed to popen()");
-        return;
-    }
-    res.reserve(max_buf);
-    while (fgets(buf.get(), read_buf, fp)) {
-        if (res.size() < max_buf) {
-            res += buf.get();
-        } else {
-            hasmore = true;
-            break;
-        }
-        count++;
-    }
-#ifdef PWD_STR
-    for (size_t pos = res.find(PWD_STR); pos != std::string::npos; pos = res.find(PWD_STR)) {
-        res.replace(pos, sizeof(PWD_STR), 1, '.');
-    }
-#endif
-    if (count == 0)
-        res += std::string() + EMPTY + '\n';
-    else if (res.back() != '\n')
-        res += '\n';
-    res += '\n';
-    if (hasmore) res += "-> Truncated due to too much output\n";
-    if (pipefd[0] != -1) {
-        bool buf = false;
-        int flags;
-        using std::chrono::duration_cast;
-        using std::chrono::milliseconds;
-        using std::chrono::seconds;
-
-        auto end = std::chrono::high_resolution_clock::now();
-        if (duration_cast<seconds>(end - start).count() < SLEEP_SECONDS) {
-            // Disable blocking (wdt would be sleeping if we are exiting earlier)
-            flags = fcntl(pipefd[0], F_GETFL);
-            fcntl(pipefd[0], F_SETFL, flags | O_NONBLOCK);
-        }
-
-        read(pipefd[0], &buf, 1);
-        if (buf) {
-            res += WDT_BITE_STR;
-        } else {
-            std::stringstream stream;
-            float millis = static_cast<float>(duration_cast<milliseconds>(end - start).count());
-            stream << std::fixed << std::setprecision(3) << millis * 0.001;
-            res += "-> It took " + stream.str() + " seconds\n";
-        }
-        close(pipefd[0]);
-        close(pipefd[1]);
-    }
-    pclose(fp);
-}
-
-static void commonCleanup(const Bot &bot, const Message::Ptr &message,
-                          std::string &res, const char *filename) {
-    bot_sendReplyMessage(bot, message, res);
-    if (filename) std::remove(filename);
-}
-
-static bool commonVerifyParseWrite(const Bot &bot, const Message::Ptr &message,
-                                   std::string &extraargs, const char *filename) {
-    bool ret = verifyMessage(bot, message);
-    if (ret) {
-        parseExtArgs(message, extraargs);
-        ret = writeMessageToFile(bot, message, filename);
-    }
-    return ret;
-}
-
-static void CCppCompileHandler(const Bot &bot, const Message::Ptr &message,
-                               const bool plusplus) {
-    std::string res, extraargs;
-    std::stringstream cmd;
-    const char *filename, aoutname[] = "./a.out";
-    bool ret;
-
-    if (plusplus) {
-        filename = "./compile.cpp";
-    } else {
-        filename = "./compile.c";
-    }
-
-    if (!commonVerifyParseWrite(bot, message, extraargs, filename)) return;
-
-    if (plusplus) {
-        cmd << kCxxCompiler;
-    } else {
-        cmd << kCompiler;
-    }
-    cmd << SPACE << filename;
-    addExtArgs(cmd, extraargs, res);
-#ifdef DEBUG
-    printf("cmd: %s\n", cmd.str().c_str());
-#endif
-    res += "Compile time:\n";
-    runCommand(bot, message, cmd.str(), res);
-    res += "\n";
-
-    std::ifstream aout(aoutname);
-    if (aout.good()) {
-        aout.close();
-        res += "Run time:\n";
-        runCommand(bot, message, aoutname, res);
-        std::remove(aoutname);
-    }
-
-    commonCleanup(bot, message, res, filename);
-}
-
-static void GenericRunHandler(const Bot &bot, const Message::Ptr &message,
-                              const char *cmdPrefix, const char *outfile) {
-    std::string res, extargs;
-    std::stringstream cmd;
-    bool ret;
-
-    if (!commonVerifyParseWrite(bot, message, extargs, outfile)) return;
-
-    cmd << cmdPrefix << SPACE;
-    cmd << outfile;
-    addExtArgs(cmd, extargs, res);
-
-#ifdef DEBUG
-    printf("cmd: %s\n", cmd.str().c_str());
-#endif
-    runCommand(bot, message, cmd.str(), res);
-    commonCleanup(bot, message, res, outfile);
-}
 
 #define CMD_UNSUPPORTED(cmd, reason)                                     \
     bot.getEvents().onCommand(cmd, [&bot](const Message::Ptr &message) { \
@@ -274,28 +69,28 @@ int main(void) {
 
     Bot bot(token);
     static std::shared_ptr<Timer<TimerImpl_privdata>> tm_ptr;
-    findCompiler(kCompiler, kCxxCompiler);
+    findCompiler(&kCompiler, &kCxxCompiler);
 
     if (kCxxCompiler) {
         bot.getEvents().onCommand("cpp", [&bot](const Message::Ptr &message) {
-            CCppCompileHandler(bot, message, true);
+            CompileRunHandler<CCppCompileHandleData>({bot, message, kCxxCompiler, "compile.cpp"});
         });
     } else {
         CMD_UNSUPPORTED("cpp", "Host does not have a C++ compiler");
     }
     if (kCompiler) {
         bot.getEvents().onCommand("c", [&bot](const Message::Ptr &message) {
-            CCppCompileHandler(bot, message, false);
+            CompileRunHandler<CCppCompileHandleData>({bot, message, kCompiler, "compile.c"});
         });
     } else {
         CMD_UNSUPPORTED("c", "Host does not have a C compiler");
     }
     bot.getEvents().onCommand("python", [&bot](const Message::Ptr &message) {
-        GenericRunHandler(bot, message, "python3", "./out.py");
+        CompileRunHandler({bot, message, "python3", "./out.py"});
     });
-    if (access("/usr/bin/go", F_OK) == 0) {
+    if (access("/usr/bin/go", F_OK | X_OK) == 0) {
         bot.getEvents().onCommand("golang", [&bot](const Message::Ptr &message) {
-            GenericRunHandler(bot, message, "go run", "./out.go");
+            CompileRunHandler({bot, message, "go run", "./out.go"});
         });
     } else {
         CMD_UNSUPPORTED("golang", "Host does not have a Go compiler");
@@ -326,16 +121,7 @@ int main(void) {
 #undef NOT_SUPPORTED_DB
 #endif
     bot.getEvents().onCommand("bash", [&bot](const Message::Ptr &message) {
-        std::string res;
-        ENFORCE_AUTHORIZED;
-        if (hasExtArgs(message)) {
-            std::string cmd;
-            parseExtArgs(message, cmd);
-            runCommand(bot, message, cmd, res);
-        } else {
-            res = "Send a bash command to run";
-        }
-        commonCleanup(bot, message, res, nullptr);
+        CompileRunHandler(BashHandleData{bot, message});
     });
 
     bot.getEvents().onCommand("alive", [&bot](const Message::Ptr &message) {

@@ -69,7 +69,8 @@ set(SRC_LIST
     src/main.cpp
     src/Authorization.cpp
     src/popen_wdt/popen_wdt.c
-    src/utils/libutils.cpp)
+    src/utils/libutils.cpp
+    src/CompilerInTelegram.cpp)
 
 if (ENABLE_TIDY)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
