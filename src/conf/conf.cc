@@ -20,15 +20,16 @@ TgBotConfig::TgBotConfig(const char* path) {
     }
     if (fd > 0) {
         struct stat statbuf;
+	void* data;
 
         if ((flags & O_CREAT) || (fstat(fd, &statbuf) == 0 && statbuf.st_size != DATA_SIZE)) {
             ftruncate(fd, DATA_SIZE);
         }
-        mapdata = static_cast<decltype(mapdata)>(
-            mmap(NULL, DATA_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
-        if (mapdata == MAP_FAILED) {
+	data = mmap(NULL, DATA_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);;
+        if (data == MAP_FAILED) {
             throw std::runtime_error(std::string("Failed to mmap() ") + path + ": " + strerror(errno));
         }
+	mapdata = static_cast<decltype(mapdata)>(data);
         if (flags & O_CREAT) memset(mapdata, 0, DATA_SIZE);
         close(fd);
     }
