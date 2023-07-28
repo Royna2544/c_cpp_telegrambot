@@ -59,7 +59,6 @@ static void removeFromDBList(const DBOperationsBase *thisptr, const Bot &bot,
             if (listdata[i] == message->replyToMessage->from->id) {
                 bot_sendReplyMessage(bot, message, std::string() + "User removed from " + listname);
                 changed = true;
-                continue;
             } else {
                 tmp[i] = listdata[i];
             }
