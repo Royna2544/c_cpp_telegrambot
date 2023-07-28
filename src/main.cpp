@@ -52,9 +52,6 @@ using TgBot::TgLongPoll;
 constexpr const char *EMPTY = "<empty>";
 constexpr char SPACE = ' ';
 
-#define FILLIN_SENDWOERROR \
-    nullptr, "", false, std::vector<MessageEntity::Ptr>(), true
-
 static char *kCompiler = nullptr, *kCxxCompiler = nullptr;
 
 static bool verifyMessage(const Bot &bot, const Message::Ptr &message) {
@@ -368,8 +365,7 @@ int main(void) {
                                    "CgACAgQAAx0CdY7-CgABARtpZLefgyKNpSLvyCJWcp8"
                                    "mt5KF_REAAgkDAAI2tFRQIk0uTVxfZnsvBA",
                                    0, 0, 0, "", VERSION_STR, message->messageId,
-                                   nullptr, "html", false,
-                                   std::vector<MessageEntity::Ptr>(), true);
+                                   nullptr, "html");
     });
     bot.getEvents().onCommand("flash", [&bot](const Message::Ptr &message) {
         PERMISSIVE_AUTHORIZED;
@@ -637,13 +633,11 @@ int main(void) {
             bot.getApi().deleteMessage(message->chat->id, message->messageId);
             if (sticker && invalid) {
                 bot.getApi().sendSticker(
-                    message->chat->id, message->replyToMessage->sticker->fileId,
-                    0, nullptr, false, true);
+                    message->chat->id, message->replyToMessage->sticker->fileId);
             } else if (animation && invalid) {
                 bot.getApi().sendAnimation(
                     message->chat->id,
-                    message->replyToMessage->animation->fileId, 0, 0, 0, "", "",
-                    0, FILLIN_SENDWOERROR, false, 0, false);
+                    message->replyToMessage->animation->fileId);
             } else if (text && invalid) {
                 bot_sendReplyMessage(bot, message, message->replyToMessage->text,
                                      message->replyToMessage->messageId);
@@ -742,11 +736,6 @@ int main(void) {
                             if (msg->from && msg->from->id == pr->first)
                                 if (!msg->from->username.empty()) tag = " @" + msg->from->username;
                         }
-#ifdef DEBUG
-                        bot.getApi().sendMessage(chatid,
-                                                 "User:" + tag + " Count: " + std::to_string(pr->second));
-#else
-                                    // clang-format off
                         bot.getApi().sendMessage(chatid, "Spam detected" + tag);
                         try {
                             for (const auto &msg : buffer_priv) {
@@ -757,8 +746,6 @@ int main(void) {
                         } catch (const std::exception &) {
                             printf("Error deleting msg\n");
                         }
-                        // clang-format on
-#endif
                     });
                     t.detach();
                     std::this_thread::sleep_for(std::chrono::seconds(5));

@@ -12,6 +12,5 @@ using TgBot::MessageEntity;
 static inline void bot_sendReplyMessage(const Bot &bot, const Message::Ptr &message,
                                         const std::string &text, const int32_t replyToMsg = 0) {
     bot.getApi().sendMessage(message->chat->id, text,
-                             true, (replyToMsg == 0) ? message->messageId : replyToMsg,
-                             nullptr, "", false, std::vector<MessageEntity::Ptr>(), true);
+                             true, (replyToMsg == 0) ? message->messageId : replyToMsg);
 }
