@@ -40,7 +40,10 @@ void TgBotConfig::storeToFile(const struct config_data& data) noexcept {
 }
 
 void TgBotConfig::loadFromFile(struct config_data* data) noexcept {
-    memcpy(data, mapdata, DATA_SIZE);
+    if (data == nullptr)
+        data = mapdata;
+    else
+        memcpy(data, mapdata, DATA_SIZE);
 }
 
 TgBotConfig::~TgBotConfig(void) noexcept {
