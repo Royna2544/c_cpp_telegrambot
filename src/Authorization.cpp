@@ -24,6 +24,8 @@ static bool AuthorizedId(const int64_t id, const bool permissive) {
 }
 bool Authorized(const Message::Ptr &message, const bool nonuserallowed, const bool permissive) {
     if (!gAuthorized) return false;
+    if (std::time(0) - message->date > 60) return false;
+
     return message->from ? AuthorizedId(message->from->id, permissive)
                          : nonuserallowed;
 }
