@@ -17,11 +17,10 @@ struct config_data {
 
 struct TgBotConfig {
     TgBotConfig(const char* path);
-    ~TgBotConfig();
-    bool storeToFile(const struct config_data& data);
-    bool loadFromFile(struct config_data* data);
+    ~TgBotConfig() noexcept;
+    void storeToFile(const struct config_data& data) noexcept;
+    void loadFromFile(struct config_data* data) noexcept;
 
    private:
     struct config_data* mapdata;
-    bool initdone = false;
 };

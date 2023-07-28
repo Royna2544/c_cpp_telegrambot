@@ -26,28 +26,24 @@ TgBotConfig::TgBotConfig(const char* path) {
         }
         mapdata = static_cast<decltype(mapdata)>(
             mmap(NULL, DATA_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
-        if (mapdata != MAP_FAILED) {
-            if (flags & O_CREAT) memset(mapdata, 0, DATA_SIZE);
-            initdone = true;
+        if (mapdata == MAP_FAILED) {
+            throw std::runtime_error(std::string("Failed to mmap() ") + path + ": " + strerror(errno));
         }
+        if (flags & O_CREAT) memset(mapdata, 0, DATA_SIZE);
         close(fd);
     }
 }
 
-bool TgBotConfig::storeToFile(const struct config_data& data) {
-    if (!initdone) return false;
+void TgBotConfig::storeToFile(const struct config_data& data) noexcept {
     memcpy(mapdata, &data, sizeof(*mapdata));
     msync(mapdata, DATA_SIZE, MS_ASYNC);
-    return true;
 }
 
-bool TgBotConfig::loadFromFile(struct config_data* data) {
-    if (!initdone) return false;
+void TgBotConfig::loadFromFile(struct config_data* data) noexcept {
     memcpy(data, mapdata, DATA_SIZE);
-    return true;
 }
 
-TgBotConfig::~TgBotConfig(void) {
+TgBotConfig::~TgBotConfig(void) noexcept {
     msync(mapdata, DATA_SIZE, MS_SYNC);
     munmap(mapdata, DATA_SIZE);
 }
