@@ -435,7 +435,9 @@ int main(void) {
             } else if (!invalid) {
                 std::string msg;
                 parseExtArgs(message, msg);
-                bot_sendReplyMessage(bot, message, msg, (message->replyToMessage) ? message->replyToMessage->messageId : 0);
+                bot_sendReplyMessage(bot, message, msg,
+                                     (message->replyToMessage) ? message->replyToMessage->messageId : 0,
+                                     true);
             }
         } catch (const std::exception &) {
             // bot is not adm. nothing it can do
