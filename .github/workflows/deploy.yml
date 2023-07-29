@@ -1,0 +1,29 @@
+name: Run tg_cpphost
+
+on:
+  workflow_dispatch
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up dependencies
+        run: |
+          ./scripts/deps.sh
+
+      - name: Build
+        run: |
+          mkdir -p build
+          cd build
+          ../scripts/perf.sh
+
+      - name: Host
+        env:
+          TOKEN: ${{ secrets.BOT_TOKEN }}
+        run: |
+          cd build
+          ./tg_cpphost
