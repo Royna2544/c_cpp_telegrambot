@@ -21,9 +21,10 @@ std::optional<int> ProtoDatabase::findByUid(const RepeatedField<int64_t>* list,
     return std::nullopt;
 }
 
-bool ProtoDatabase::rejectUid(const Bot& bot, const int64_t id) {
+bool ProtoDatabase::rejectUid(const Bot& bot, const User::Ptr& user, const int64_t id) {
     if (bot.getApi().getMe()->id == id) return true;
     if (db->has_ownerid() && db->ownerid() == id) return true;
+    if (user->isBot) return true;
     return false;
 }
 
@@ -31,7 +32,7 @@ void ProtoDatabase::_addToDatabase(const Bot& bot, const Message::Ptr& message,
                                    RepeatedField<int64_t>* list, const std::string& name) {
     if (message->replyToMessage && message->replyToMessage->from) {
         int64_t id = message->replyToMessage->from->id;
-        if (rejectUid(bot, id)) return;
+        if (rejectUid(bot, message->replyToMessage->from, id)) return;
         if (findByUid(list, id)) {
             bot_sendReplyMessage(bot, message, appendListName("already in", id, name));
             return;
@@ -50,7 +51,7 @@ void ProtoDatabase::_removeFromDatabase(const Bot& bot, const Message::Ptr& mess
                                         RepeatedField<int64_t>* list, const std::string& name) {
     if (message->replyToMessage && message->replyToMessage->from) {
         int64_t id = message->replyToMessage->from->id;
-        if (rejectUid(bot, id)) return;
+        if (rejectUid(bot, message->replyToMessage->from, id)) return;
         auto idx = findByUid(list, id);
         if (idx.has_value()) {
             list->erase(list->begin() + *idx);

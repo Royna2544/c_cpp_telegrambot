@@ -14,6 +14,7 @@ namespace database {
 using ::Bot;
 using ::Message;
 using ::google::protobuf::RepeatedField;
+using ::TgBot::User;
 using ::tgbot::proto::Database;
 using ::tgbot::proto::PersonList;
 
@@ -22,7 +23,7 @@ class ProtoDatabase {
                         RepeatedField<int64_t>* list, const std::string& name);
     void _removeFromDatabase(const Bot& bot, const Message::Ptr& message,
                              RepeatedField<int64_t>* list, const std::string& name);
-    bool rejectUid(const Bot& bot, const int64_t id);
+    bool rejectUid(const Bot& bot, const User::Ptr& user, const int64_t id);
     std::optional<int> findByUid(const RepeatedField<int64_t>* list, const int64_t uid);
 
    public:
