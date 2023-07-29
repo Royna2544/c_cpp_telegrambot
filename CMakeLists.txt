@@ -80,11 +80,16 @@ set(CMAKE_CXX_CLANG_TIDY clang-tidy;
 endif()
 
 if (ENABLE_DATABASE)
-add_definitions(-DUSE_DATABASE)
-set(SRC_LIST
-    src/Database.cpp
-    src/conf/conf.cc
-    ${SRC_LIST})
+     add_definitions(-DUSE_DATABASE)
+     find_package(Protobuf REQUIRED)
+     include(cmake/ProtobufCpp.cmake)
+     my_protobuf_generate_cpp(proto/gen PROTO_SRCS PROTO_HDRS proto/TgBotDB.proto)
+     include_directories(proto/gen)
+     include_directories(${Protobuf_INCLUDE_DIRS})
+     set(SRC_LIST
+          src/Database.cpp
+          ${SRC_LIST}
+          ${PROTO_SRCS})
 endif()
 
 if (DEBUG)
@@ -100,3 +105,6 @@ set_target_properties(TgBot
 )
 add_executable(${PROJECT_NAME} ${SRC_LIST})
 target_link_libraries(${PROJECT_NAME} TgBot)
+if (ENABLE_DATABASE)
+	target_link_libraries(${PROJECT_NAME} protobuf)
+endif()

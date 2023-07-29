@@ -1,0 +1,13 @@
+syntax = "proto2";
+
+package tgbot.proto;
+
+message PersonList {
+  repeated int64 id = 1;
+}
+
+message Database {
+  optional int64 ownerId = 1;
+  optional PersonList whitelist = 2;
+  optional PersonList blacklist = 3;
+}

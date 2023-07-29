@@ -1,6 +1,6 @@
 #!/bin/bash
 
-APT_COMMAND="apt update; apt install libcurl4-openssl-dev libssl-dev libboost-all-dev cmake clang"
+APT_COMMAND="apt update; apt install libcurl4-openssl-dev libssl-dev libboost-all-dev cmake clang libprotobuf-dev protobuf-compiler"
 
 function lecho () {
     echo "$0: $1"

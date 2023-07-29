@@ -5,17 +5,12 @@ bool gAuthorized = true;
 
 static bool AuthorizedId(const int64_t id, const bool permissive) {
 #ifdef USE_DATABASE
-    static struct config_data data;
-    database::config.loadFromFile(&data);
+
     if (!permissive) {
-        for (int i = 0; i < DATABASE_LIST_BUFSIZE; ++i) {
-            if (data.whitelist[i] == id) return true;
-        }
-        return id == data.owner_id;
+        if (database::whitelist.exists(id)) return true;
+        return id == database::db.maybeGetOwnerId().value_or(-1);
     } else {
-        for (int i = 0; i < DATABASE_LIST_BUFSIZE; ++i) {
-            if (data.blacklist[i] == id) return false;
-        }
+        if (database::blacklist.exists(id)) return false;
         return true;
     }
 #else

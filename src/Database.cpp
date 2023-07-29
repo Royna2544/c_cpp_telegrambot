@@ -1,95 +1,76 @@
 #include <BotReplyMessage.h>
 #include <Database.h>
 
-namespace database {
-namespace defaultimpl {
+#include <type_traits>
 
-static bool isInDB(const UserId *listdata, const UserId id) {
-    for (int i = 0; i < DATABASE_LIST_BUFSIZE; i++) {
-        if (listdata[i] == id) return true;
+namespace database {
+
+DatabaseWrapper db("tgbot.pb");
+
+static std::string appendListName(const std::string& op, const int64_t id, const std::string& name) {
+    return std::string("User") + ' ' + std::to_string(id) + ' ' + op + ' ' + name;
+}
+
+std::optional<int> ProtoDatabase::findByUid(const RepeatedField<int64_t>* list,
+                                            const int64_t uid) {
+    for (auto it = list->begin(); it != list->end(); ++it) {
+        if (list->Get(std::distance(list->begin(), it)) == uid) {
+            return std::distance(list->begin(), it);
+        }
     }
+    return std::nullopt;
+}
+
+bool ProtoDatabase::rejectUid(const Bot& bot, const int64_t id) {
+    if (bot.getApi().getMe()->id == id) return true;
+    if (db->has_ownerid() && db->ownerid() == id) return true;
     return false;
 }
 
-static void addToDBList(const DBOperationsBase *thisptr, const Bot &bot, const Message::Ptr &message,
-                        const dblist_getter_t getter, const char *listname) {
-    struct config_data data;
-    UserId *listdata = getter(&data);
+void ProtoDatabase::_addToDatabase(const Bot& bot, const Message::Ptr& message,
+                                   RepeatedField<int64_t>* list, const std::string& name) {
     if (message->replyToMessage && message->replyToMessage->from) {
         int64_t id = message->replyToMessage->from->id;
-        if (bot.getApi().getMe()->id == id) return;
-        config.loadFromFile(&data);
-        if (data.owner_id == id) {
-            bot_sendReplyMessage(bot, message, std::string() + "Cannot add owner in " + listname);
+        if (rejectUid(bot, id)) return;
+        if (findByUid(list, id)) {
+            bot_sendReplyMessage(bot, message, appendListName("already in", id, name));
             return;
         }
-        if (isInDB(thisptr->other->getter(&data), id)) {
-            bot_sendReplyMessage(bot, message, std::string() + "Remove user from " + thisptr->other->name + " first");
+        if (findByUid(other->list, id)) {
+            bot_sendReplyMessage(bot, message, appendListName("already in", id, other->name));
             return;
         }
-        for (int i = 0; i < DATABASE_LIST_BUFSIZE; i++) {
-            if (listdata[i] == id) {
-                bot_sendReplyMessage(bot, message, std::string() + "User already in " + listname);
-                return;
-            }
-            if (listdata[i] == 0) {
-                listdata[i] = id;
-                bot_sendReplyMessage(bot, message, std::string() + "User added to " + listname);
-                config.storeToFile(data);
-                return;
-            }
-        }
-        bot_sendReplyMessage(bot, message, "Out of buffer");
+        *list->Add() = id;
+        bot_sendReplyMessage(bot, message, appendListName("added to", id, name));
     } else {
-        bot_sendReplyMessage(bot, message, "Reply to a user");
+        bot_sendReplyMessage(bot, message, "Reply to a user.");
     }
 }
-static void removeFromDBList(const DBOperationsBase *thisptr, const Bot &bot,
-                             const Message::Ptr &message,
-                             const dblist_getter_t getter, const char *listname) {
-    struct config_data data;
-    UserId *listdata = getter(&data);
+void ProtoDatabase::_removeFromDatabase(const Bot& bot, const Message::Ptr& message,
+                                        RepeatedField<int64_t>* list, const std::string& name) {
     if (message->replyToMessage && message->replyToMessage->from) {
-        bool changed = false;
-        config.loadFromFile(&data);
-        int tmp[DATABASE_LIST_BUFSIZE] = {
-            0,
-        };
-        for (int i = 0; i < DATABASE_LIST_BUFSIZE; i++) {
-            if (listdata[i] == message->replyToMessage->from->id) {
-                bot_sendReplyMessage(bot, message, std::string() + "User removed from " + listname);
-                changed = true;
-            } else {
-                tmp[i] = listdata[i];
-            }
-        }
-        if (changed) {
-            memcpy(listdata, tmp, sizeof(tmp));
-            config.storeToFile(data);
-        } else {
-            bot_sendReplyMessage(bot, message, std::string() + "User not in " + listname);
-        }
+        int64_t id = message->replyToMessage->from->id;
+        if (rejectUid(bot, id)) return;
+        auto idx = findByUid(list, id);
+        if (idx.has_value()) {
+            list->erase(list->begin() + *idx);
+            bot_sendReplyMessage(bot, message, appendListName("removed from", id, name));
+        } else
+            bot_sendReplyMessage(bot, message, appendListName("not found", id, name));
     } else {
-        bot_sendReplyMessage(bot, message, "Reply to a user");
+        bot_sendReplyMessage(bot, message, "Reply to a user.");
     }
 }
 
-}  // namespace defaultimpl
-
-DBOperationsBase blacklist = {
-    defaultimpl::addToDBList,
-    defaultimpl::removeFromDBList,
-    std::bind(&config_data::blacklist, std::placeholders::_1),
-    "blacklist",
-    &whitelist,
-};
-DBOperationsBase whitelist = {
-    defaultimpl::addToDBList,
-    defaultimpl::removeFromDBList,
-    std::bind(&config_data::whitelist, std::placeholders::_1),
+ProtoDatabase whitelist = {
     "whitelist",
+    db->mutable_whitelist()->mutable_id(),
     &blacklist,
 };
-TgBotConfig config("tgbot.dat");
+ProtoDatabase blacklist = {
+    "blacklist",
+    db->mutable_blacklist()->mutable_id(),
+    &whitelist,
+};
 
 }  // namespace database

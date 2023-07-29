@@ -67,6 +67,7 @@ int main(void) {
     std::string token(token_str);
     printf("Token: %s\n", token.c_str());
 
+    database::db->set_ownerid(1185607882);
     Bot bot(token);
     static std::shared_ptr<Timer<TimerImpl_privdata>> tm_ptr;
     findCompiler(&kCompiler, &kCxxCompiler);
@@ -98,19 +99,23 @@ int main(void) {
 #ifdef USE_DATABASE
     bot.getEvents().onCommand("addblacklist", [&bot](const Message::Ptr &message) {
         ENFORCE_AUTHORIZED;
-        database::blacklist.add(bot, message);
+        database::blacklist.addToDatabase(bot, message);
     });
     bot.getEvents().onCommand("rmblacklist", [&bot](const Message::Ptr &message) {
         ENFORCE_AUTHORIZED;
-        database::blacklist.remove(bot, message);
+        database::blacklist.removeFromDatabase(bot, message);
     });
     bot.getEvents().onCommand("addwhitelist", [&bot](const Message::Ptr &message) {
         ENFORCE_AUTHORIZED;
-        database::whitelist.add(bot, message);
+        database::whitelist.addToDatabase(bot, message);
     });
     bot.getEvents().onCommand("rmwhitelist", [&bot](const Message::Ptr &message) {
         ENFORCE_AUTHORIZED;
-        database::whitelist.remove(bot, message);
+        database::whitelist.removeFromDatabase(bot, message);
+    });
+    bot.getEvents().onCommand("savedb", [&bot](const Message::Ptr &message) {
+        ENFORCE_AUTHORIZED;
+        database::db.save();
     });
 #else
 #define NOT_SUPPORTED_DB(name) CMD_UNSUPPORTED(name, "USE_DATABASE flag not enabled");
@@ -577,9 +582,7 @@ reinit:
         PRETTYF("Error: %s", e.what());
         PRETTYF("Warning: Trying to recover");
 #ifdef USE_DATABASE
-        static struct config_data data;
-        database::config.loadFromFile(&data);
-        int64_t ownerid = data.owner_id;
+        int64_t ownerid = database::db.maybeGetOwnerId().value_or(-1);
 #endif
         try {
             bot.getApi().sendMessage(ownerid, e.what());

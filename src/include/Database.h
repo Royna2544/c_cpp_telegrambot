@@ -1,43 +1,79 @@
 #pragma once
 
-#include <conf/conf.h>
+#include <TgBotDB.pb.h>
 #include <tgbot/Bot.h>
 #include <tgbot/types/Message.h>
+
+#include <fstream>
+#include <optional>
 
 #include "NamespaceImport.h"
 
 namespace database {
 
-class DBOperationsBase;
-
 using ::Bot;
 using ::Message;
-using dblist_getter_t = std::function<UserId *(struct config_data *data)>;
-using internal_op_t = std::function<void(const DBOperationsBase *thisptr, const Bot &bot,
-                                         const Message::Ptr &message, const dblist_getter_t getter,
-                                         const char *listname)>;
+using ::google::protobuf::RepeatedField;
+using ::tgbot::proto::Database;
+using ::tgbot::proto::PersonList;
 
-class DBOperationsBase {
-    internal_op_t add_, remove_;
+class ProtoDatabase {
+    void _addToDatabase(const Bot& bot, const Message::Ptr& message,
+                        RepeatedField<int64_t>* list, const std::string& name);
+    void _removeFromDatabase(const Bot& bot, const Message::Ptr& message,
+                             RepeatedField<int64_t>* list, const std::string& name);
+    bool rejectUid(const Bot& bot, const int64_t id);
+    std::optional<int> findByUid(const RepeatedField<int64_t>* list, const int64_t uid);
 
    public:
-    const char *name;
-    dblist_getter_t getter;
-    const DBOperationsBase *other;
+    std::string name;
+    RepeatedField<int64_t>* list;
+    const ProtoDatabase* other;
 
-    void add(const Bot &bot, const Message::Ptr &message) {
-        add_(this, bot, message, getter, name);
+    void addToDatabase(const Bot& bot, const Message::Ptr& message) {
+        _addToDatabase(bot, message, list, name);
     }
-    void remove(const Bot &bot, const Message::Ptr &message) {
-        remove_(this, bot, message, getter, name);
+    void removeFromDatabase(const Bot& bot, const Message::Ptr& message) {
+        _removeFromDatabase(bot, message, list, name);
     }
-    DBOperationsBase(internal_op_t add, internal_op_t remove, dblist_getter_t getter_,
-                     const char *name_, const DBOperationsBase *other_)
-        : add_(add), remove_(remove), getter(getter_), name(name_), other(other_) {}
+    bool exists(const int64_t id) {
+        return findByUid(list, id).has_value();
+    }
 };
 
-extern DBOperationsBase blacklist;
-extern DBOperationsBase whitelist;
-extern TgBotConfig config;
+struct DatabaseWrapper {
+    DatabaseWrapper(const std::string fname) : fname(fname) {
+        std::fstream input(fname, std::ios::in | std::ios::binary);
+        if (input) {
+            protodb.ParseFromIstream(&input);
+        }
+    }
+    ~DatabaseWrapper() {
+        save();
+    }
+    void save(void) {
+        std::fstream output(fname, std::ios::out | std::ios::trunc | std::ios::binary);
+        if (output) {
+            protodb.SerializeToOstream(&output);
+        }
+    }
+    Database* operator->(void) {
+        return &protodb;
+    }
+    std::optional<int64_t> maybeGetOwnerId() {
+        if (protodb.has_ownerid())
+            return protodb.ownerid();
+        else
+            return std::nullopt;
+    }
+
+   private:
+    Database protodb;
+    std::string fname;
+};
+
+extern ProtoDatabase whitelist;
+extern ProtoDatabase blacklist;
+extern DatabaseWrapper db;
 
 };  // namespace database
