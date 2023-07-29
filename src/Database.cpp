@@ -57,7 +57,7 @@ void ProtoDatabase::_removeFromDatabase(const Bot& bot, const Message::Ptr& mess
             list->erase(list->begin() + *idx);
             bot_sendReplyMessage(bot, message, appendListName("removed from", id, name));
         } else
-            bot_sendReplyMessage(bot, message, appendListName("not found", id, name));
+            bot_sendReplyMessage(bot, message, appendListName("not found in", id, name));
     } else {
         bot_sendReplyMessage(bot, message, "Reply to a user.");
     }
