@@ -23,7 +23,7 @@ class ProtoDatabase {
                         RepeatedField<int64_t>* list, const std::string& name);
     void _removeFromDatabase(const Bot& bot, const Message::Ptr& message,
                              RepeatedField<int64_t>* list, const std::string& name);
-    bool rejectUid(const Bot& bot, const User::Ptr& user, const int64_t id);
+    bool rejectUid(const Bot& bot, const User::Ptr& user);
     std::optional<int> findByUid(const RepeatedField<int64_t>* list, const int64_t uid);
 
    public:
