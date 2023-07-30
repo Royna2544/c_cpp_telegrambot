@@ -14,25 +14,19 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3.5.3
 
       - name: Set up dependencies
         run: |
           ./scripts/deps.sh
 
       - name: Clang (Perf)
-        env:
-          CC: clang
-          CXX: clang++
         run: |
           mkdir -p build
           cd build
           ../scripts/perf.sh
 
       - name: GCC (Debug)
-        env:
-          CC: gcc
-          CXX: g++
         run: |
           mkdir -p build
           cd build
