@@ -126,9 +126,11 @@ int main(void) {
 #undef NOT_SUPPORTED_DB
 #endif
     bot.getEvents().onCommand("bash", [&bot](const Message::Ptr &message) {
-        CompileRunHandler(BashHandleData{bot, message});
+        CompileRunHandler(BashHandleData{bot, message, false});
     });
-
+    bot.getEvents().onCommand("unsafebash", [&bot](const Message::Ptr &message) {
+        CompileRunHandler(BashHandleData{bot, message, true});
+    });
     bot.getEvents().onCommand("alive", [&bot](const Message::Ptr &message) {
         PERMISSIVE_AUTHORIZED;
         static int64_t lasttime = 0, time = 0;

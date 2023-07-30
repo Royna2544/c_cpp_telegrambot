@@ -7,7 +7,9 @@ struct HandleData {
     const Message::Ptr &message;
 };
 
-struct BashHandleData : HandleData {};
+struct BashHandleData : HandleData {
+    bool allowhang;
+};
 
 struct CompileHandleData : HandleData {
     const char *cmdPrefix, *outfile;

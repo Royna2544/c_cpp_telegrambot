@@ -36,26 +36,28 @@ FILE *popen_watchdog(const char *command, const int pipe_ret) {
     FILE *fp;
     int pipefd[2];
     pid_t pid;
-    struct watchdog_data *data;
+    struct watchdog_data *data = NULL;
+    int watchdog_on = pipe_ret > 0;
 
     if (pipe(pipefd) == -1) {
         return NULL;
     }
 
-    data = mmap(NULL, sizeof(*data), PROT_READ | PROT_WRITE,
-                MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-    if (data == MAP_FAILED) return NULL;
+    if (watchdog_on) {
+        data = mmap(NULL, sizeof(*data), PROT_READ | PROT_WRITE,
+                    MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+        if (data == MAP_FAILED) return NULL;
 
-    data->pipe_ret = pipe_ret;
+        data->pipe_ret = pipe_ret;
 
-    pthread_t watchdog_thread;
-    pthread_attr_t attr;
+        pthread_t watchdog_thread;
+        pthread_attr_t attr;
 
-    pthread_attr_init(&attr);
-    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-    pthread_create(&watchdog_thread, &attr, &watchdog, data);
-    pthread_attr_destroy(&attr);
-
+        pthread_attr_init(&attr);
+        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+        pthread_create(&watchdog_thread, &attr, &watchdog, data);
+        pthread_attr_destroy(&attr);
+    }
     pid = fork();
     if (pid == -1) {
         close(pipefd[0]);
@@ -65,7 +67,8 @@ FILE *popen_watchdog(const char *command, const int pipe_ret) {
 
     if (pid == 0) {
         // Child process
-        data->pid = getpid();
+        if (watchdog_on)
+            data->pid = getpid();
         close(pipefd[0]);
         dup2(pipefd[1], STDOUT_FILENO);
         dup2(pipefd[1], STDERR_FILENO);
