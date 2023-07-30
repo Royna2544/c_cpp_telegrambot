@@ -93,7 +93,6 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
             res += buf.get();
         } else {
             hasmore = true;
-            break;
         }
         count++;
     }
