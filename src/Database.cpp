@@ -12,7 +12,7 @@ static std::string appendListName(const std::string& op, const int64_t id, const
 }
 
 std::optional<int> ProtoDatabase::findByUid(const RepeatedField<int64_t>* list,
-                                            const int64_t uid) {
+                                            const int64_t uid) const {
     for (auto it = list->begin(); it != list->end(); ++it) {
         if (list->Get(std::distance(list->begin(), it)) == uid) {
             return std::distance(list->begin(), it);
@@ -21,7 +21,7 @@ std::optional<int> ProtoDatabase::findByUid(const RepeatedField<int64_t>* list,
     return std::nullopt;
 }
 
-bool ProtoDatabase::rejectUid(const Bot& bot, const User::Ptr& user) {
+bool ProtoDatabase::rejectUid(const Bot& bot, const User::Ptr& user) const {
     if (bot.getApi().getMe()->id == user->id) return true;
     if (db->has_ownerid() && db->ownerid() == user->id) return true;
     if (user->isBot) return true;

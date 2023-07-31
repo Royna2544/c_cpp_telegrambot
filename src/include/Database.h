@@ -23,8 +23,8 @@ class ProtoDatabase {
                         RepeatedField<int64_t>* list, const std::string& name);
     void _removeFromDatabase(const Bot& bot, const Message::Ptr& message,
                              RepeatedField<int64_t>* list, const std::string& name);
-    bool rejectUid(const Bot& bot, const User::Ptr& user);
-    std::optional<int> findByUid(const RepeatedField<int64_t>* list, const int64_t uid);
+    bool rejectUid(const Bot& bot, const User::Ptr& user) const;
+    std::optional<int> findByUid(const RepeatedField<int64_t>* list, const int64_t uid) const;
 
    public:
     std::string name;
@@ -37,7 +37,7 @@ class ProtoDatabase {
     void removeFromDatabase(const Bot& bot, const Message::Ptr& message) {
         _removeFromDatabase(bot, message, list, name);
     }
-    bool exists(const int64_t id) {
+    bool exists(const int64_t id) const {
         return findByUid(list, id).has_value();
     }
 };
@@ -52,7 +52,7 @@ struct DatabaseWrapper {
     ~DatabaseWrapper() {
         save();
     }
-    void save(void) {
+    void save(void) const {
         std::fstream output(fname, std::ios::out | std::ios::trunc | std::ios::binary);
         if (output) {
             protodb.SerializeToOstream(&output);
@@ -61,7 +61,7 @@ struct DatabaseWrapper {
     Database* operator->(void) {
         return &protodb;
     }
-    std::optional<int64_t> maybeGetOwnerId() {
+    std::optional<int64_t> maybeGetOwnerId() const {
         if (protodb.has_ownerid())
             return protodb.ownerid();
         else
