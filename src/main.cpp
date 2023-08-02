@@ -60,12 +60,28 @@ static char *kCompiler = nullptr, *kCxxCompiler = nullptr;
 
 int main(void) {
     const char *token_str = getenv("TOKEN");
+    std::string token;
     if (!token_str) {
-        printf("TOKEN is not exported\n");
-        return 1;
-    }
-    std::string token(token_str);
-    printf("Token: %s\n", token.c_str());
+        PRETTYF("Warning: TOKEN is not exported, try config file");
+        const char *home_str = getenv("HOME");
+        if (!home_str) {
+            PRETTYF("Error: $HOME is not set");
+            return EXIT_FAILURE;
+        }
+        std::string confPath = std::string(home_str) + "/.tgbot_token", line;
+        std::ifstream ifs(confPath);
+        if (ifs.fail()) {
+            PRETTYF("Error: Opening %s failed", confPath.c_str());
+            return EXIT_FAILURE;
+        }
+        std::getline(ifs, line);
+        if (line.empty()) {
+            PRETTYF("Error: Conf file %s empty", confPath.c_str());
+            return EXIT_FAILURE;
+        }
+        token = line;
+    } else
+        token = token_str;
 
     database::db->set_ownerid(1185607882);
     Bot bot(token);
@@ -573,6 +589,7 @@ int main(void) {
     std::atexit(cleanupVoidFunc);
     int64_t lastcrash = 0;
 
+    PRETTYF("Debug: Token: %s", token.c_str());
 reinit:
     try {
         PRETTYF("Debug: Bot username: %s", bot.getApi().getMe()->username.c_str());
