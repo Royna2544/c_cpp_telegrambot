@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <string>
 
 void findCompiler(char** c, char** cxx);
 int genRandomNumber(const int num1, const int num2 = 0);
