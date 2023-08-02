@@ -33,7 +33,8 @@ FILE* popen_watchdog(const char* command, const POPEN_WDT_HANDLE pipe_ret) {
     HANDLE pipeHandles[2] = {NULL, NULL};
     HANDLE pid;
     struct watchdog_data* data = NULL;
-    int watchdog_on = pipe_ret != INVALID_HANDLE_VALUE;
+    int watchdog_on = pipe_ret != INVALID_HANDLE_VALUE, ret;
+    CHAR command_full[PATH_MAX];
 
     if (!InitPipeHandle(&pipeHandles)) {
         return NULL;
@@ -68,7 +69,15 @@ FILE* popen_watchdog(const char* command, const POPEN_WDT_HANDLE pipe_ret) {
     si.hStdError = pipeHandles[1];
 
     PROCESS_INFORMATION pi = {0};
-    BOOL success = CreateProcess(NULL, (LPSTR)command, NULL, NULL, TRUE, CREATE_NEW_PROCESS_GROUP, NULL, NULL, &si, &pi);
+    // TODO: Hardcoded powershell
+    ret = snprintf(command_full, sizeof(command_full), 
+        "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -c \"%s\"", command);
+    if (command_full[ret - 1] != '"') {
+        // Truncated
+        return NULL;
+    }
+    BOOL success = CreateProcess(NULL, (LPSTR)command_full, NULL, NULL, TRUE,
+        CREATE_NEW_PROCESS_GROUP, NULL, NULL, &si, &pi);
     if (!success) {
         CloseHandle(pipeHandles[0]);
         CloseHandle(pipeHandles[1]);
