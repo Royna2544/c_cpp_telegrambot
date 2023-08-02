@@ -1,3 +1,5 @@
+#include "popen_wdt.h"
+
 #include <fcntl.h>
 #include <pthread.h>
 #include <signal.h>
@@ -6,8 +8,6 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-#include "popen_wdt.h"
-
 struct watchdog_data {
     pid_t pid;
     int pipe_ret;
@@ -15,30 +15,21 @@ struct watchdog_data {
 
 static void *watchdog(void *arg) {
     struct watchdog_data *data = (struct watchdog_data *)arg;
-    int ret = 0;
     sleep(SLEEP_SECONDS);
     if (kill(data->pid, 0) == 0) {
         killpg(data->pid, SIGTERM);
-        ret = 1;
     }
-    if (!ret) {
-        // The caller may have exited in this case, we shouldn't hang again
-        unblockForHandle(data->pipe_ret);
-    }
-    if (data->pipe_ret > 0)
-        writeBoolToHandle(data->pipe_ret, ret);
     munmap(data, sizeof(*data));
     return NULL;
 }
 
-FILE *popen_watchdog(const char *command, const POPEN_WDT_HANDLE pipe_ret) {
+FILE *popen_watchdog(const char *command, const bool watchdog_on) {
     FILE *fp;
     int pipefd[2];
     pid_t pid;
     struct watchdog_data *data = NULL;
-    int watchdog_on = pipe_ret > 0;
 
-    if (!InitPipeHandle(&pipefd)) {
+    if (pipe(pipefd) == -1) {
         return NULL;
     }
 
@@ -83,32 +74,3 @@ FILE *popen_watchdog(const char *command, const POPEN_WDT_HANDLE pipe_ret) {
 
     return fp;
 }
-
-void unblockForHandle(const POPEN_WDT_HANDLE fd) {
-    if (fd < 0) return;
-    int flags = fcntl(fd, F_GETFL);
-    fcntl(fd, F_SETFL, flags | O_NONBLOCK);
-}
-
-bool InitPipeHandle(POPEN_WDT_HANDLE (*fd)[2]) {
-    if (!fd) return false;
-    (*fd)[0] = invalid_fd_value;
-    (*fd)[1] = invalid_fd_value;
-    return pipe(*fd) == 0;
-}
-
-void writeBoolToHandle(const POPEN_WDT_HANDLE fd, bool value) {
-    write(fd, &value, sizeof(value));
-}
-
-bool readBoolFromHandle(const POPEN_WDT_HANDLE fd) {
-    bool ret = false;
-    read(fd, &ret, sizeof(bool));
-    return ret;
-}
-
-void closeHandle(const POPEN_WDT_HANDLE fd) {
-    close(fd);
-}
-
-POPEN_WDT_HANDLE invalid_fd_value = -1;

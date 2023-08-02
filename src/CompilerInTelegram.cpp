@@ -58,7 +58,6 @@ static void addExtArgs(std::stringstream &cmd, std::string &extraargs,
 static void runCommand(const Bot &bot, const Message::Ptr &message,
                        const std::string &cmd, std::string &res, bool use_wdt = true) {
     bool hasmore = false, watchdog_bitten = false;
-    POPEN_WDT_HANDLE pipefd[2] = {invalid_fd_value, invalid_fd_value};
     int count = 0;
     constexpr const static int read_buf = (1 << 8), max_buf = (read_buf << 2) * 3;
     auto buf = std::make_unique<char[]>(read_buf);
@@ -84,11 +83,8 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
         cmd_r = cmd;
     }
 
-    if (use_wdt)
-        InitPipeHandle(&pipefd);
-
     auto start = high_resolution_clock::now();
-    auto fp = popen_watchdog(cmd_r.c_str(), pipefd[1]);
+    auto fp = popen_watchdog(cmd_r.c_str(), use_wdt);
 
     if (!fp) {
         bot_sendReplyMessage(bot, message, "Failed to popen()");
@@ -119,21 +115,13 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
     if (hasmore) res += "-> Truncated due to too much output\n";
     auto end = high_resolution_clock::now();
 
-    if (pipefd[0] != invalid_fd_value) {
-        int flags;
-        if (duration_cast<seconds>(end - start).count() < SLEEP_SECONDS) {
-            // Disable blocking (wdt would be sleeping if we are exiting earlier)
-            unblockForHandle(pipefd[0]);
-        }
-
-        watchdog_bitten = readBoolFromHandle(pipefd[0]);
-        if (watchdog_bitten) {
-            res += WDT_BITE_STR;
-        }
-        closeHandle(pipefd[0]);
-        closeHandle(pipefd[1]);
+    if (duration_cast<seconds>(end - start).count() < SLEEP_SECONDS) {
+        // Disable blocking (wdt would be sleeping if we are exiting earlier)
+        watchdog_bitten = true;
     }
-    if (!watchdog_bitten) {
+    if (watchdog_bitten) {
+         res += WDT_BITE_STR;
+    } else {
         std::stringstream stream;
         float millis = static_cast<float>(duration_cast<milliseconds>(end - start).count());
         stream << std::fixed << std::setprecision(3) << millis * 0.001;

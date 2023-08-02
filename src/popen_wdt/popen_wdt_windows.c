@@ -1,126 +1,89 @@
 #include <Windows.h>
 #include <io.h>
 #include <stdio.h>
+#include <pthread.h>
 
 #include "popen_wdt.h"
 
 struct watchdog_data {
     HANDLE process_handle;
     DWORD process_id;
-    HANDLE pipe_ret;
+    HANDLE pipefd[2];
 };
 
-static DWORD WINAPI watchdog(LPVOID arg) {
+static void* watchdog(void* arg) {
     struct watchdog_data* data = (struct watchdog_data*)arg;
-    DWORD ret = 0, ret_getexit = 0;
+    DWORD ret_getexit = 0;
     Sleep(SLEEP_SECONDS);
-    if (GetExitCodeProcess(data->process_handle, &ret_getexit) && ret_getexit == STILL_ACTIVE) {
-        GenerateConsoleCtrlEvent(CTRL_C_EVENT, data->process_id);
-        ret = 1;
+    if (GetExitCodeProcess(data->process_handle, &ret_getexit)) {
+        if (ret_getexit == STILL_ACTIVE) {
+            const HANDLE explorer = OpenProcess(PROCESS_TERMINATE, false, data->process_id);
+            TerminateProcess(explorer, 1);
+            CloseHandle(explorer);
+        }
     }
-    if (!ret) {
-        // The caller may have exited in this case, we shouldn't hang again
-        unblockForHandle(data->pipe_ret);
-    }
-    if (data->pipe_ret != INVALID_HANDLE_VALUE)
-        WriteFile(data->pipe_ret, &ret, sizeof(DWORD), NULL, NULL);
+    CloseHandle(data->pipefd[0]);
+    CloseHandle(data->pipefd[1]);
     UnmapViewOfFile(data);
     return 0;
 }
 
-FILE* popen_watchdog(const char* command, const POPEN_WDT_HANDLE pipe_ret) {
+FILE* popen_watchdog(const char* command, const bool wdt_on) {
     FILE* fp;
     HANDLE pipeHandles[2] = {NULL, NULL};
     HANDLE pid;
     struct watchdog_data* data = NULL;
-    int watchdog_on = pipe_ret != INVALID_HANDLE_VALUE, ret;
-    CHAR command_full[PATH_MAX];
+    CHAR *command_full, dummy[PATH_MAX];
+    int ret;
 
-    if (!InitPipeHandle(&pipeHandles)) {
+    if (!CreatePipe(&pipeHandles[0], &pipeHandles[1], NULL, 0)) {
         return NULL;
     }
 
-    if (watchdog_on) {
-        HANDLE hMapFile = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof(struct watchdog_data), NULL);
-        if (hMapFile == NULL)
-            return NULL;
-
-        data = (struct watchdog_data*)MapViewOfFile(hMapFile, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(struct watchdog_data));
-        if (data == NULL) {
-            CloseHandle(hMapFile);
-            return NULL;
-        }
-
-        data->pipe_ret = pipe_ret;
-
-        HANDLE watchdog_thread = CreateThread(NULL, 0, watchdog, data, 0, NULL);
-        if (watchdog_thread == NULL) {
-            CloseHandle(hMapFile);
-            return NULL;
-        }
-        CloseHandle(watchdog_thread);
+    HANDLE hMapFile = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, sizeof(struct watchdog_data), NULL);
+    if (hMapFile == NULL)
+        return NULL;
+    data = (struct watchdog_data*)MapViewOfFile(hMapFile, FILE_MAP_ALL_ACCESS, 0, 0,
+        sizeof(struct watchdog_data));
+    if (data == NULL) {
+        CloseHandle(hMapFile);
+        return NULL;
     }
 
     STARTUPINFO si = {0};
     si.cb = sizeof(STARTUPINFO);
     si.dwFlags = STARTF_USESTDHANDLES;
-    si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
     si.hStdOutput = pipeHandles[1];
     si.hStdError = pipeHandles[1];
 
     PROCESS_INFORMATION pi = {0};
     // TODO: Hardcoded powershell
-    ret = snprintf(command_full, sizeof(command_full), 
-        "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -c \"%s\"", command);
-    if (command_full[ret - 1] != '"') {
-        // Truncated
-        return NULL;
-    }
+    #define PowerShellFmt "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -c \"%s\""
+    ret = sprintf(dummy, PowerShellFmt, command);
+    command_full = (CHAR *)malloc(ret + 1);
+    snprintf(command_full, ret + 1, PowerShellFmt, command);
     BOOL success = CreateProcess(NULL, (LPSTR)command_full, NULL, NULL, TRUE,
-        CREATE_NEW_PROCESS_GROUP, NULL, NULL, &si, &pi);
+        CREATE_NEW_PROCESS_GROUP | DETACHED_PROCESS, NULL, NULL, &si, &pi);
     if (!success) {
         CloseHandle(pipeHandles[0]);
         CloseHandle(pipeHandles[1]);
         return NULL;
     }
+    free(command_full);
+    data->process_handle = pi.hProcess;
+    data->process_id = pi.dwProcessId;
+    data->pipefd[0] = pipeHandles[0];
+    data->pipefd[1] = pipeHandles[1];
 
-    if (watchdog_on) {
-        data->process_handle = pi.hProcess;
-        data->process_id = pi.dwProcessId;
-    }
+    pthread_t watchdog_thread;
+    pthread_attr_t attr;
 
-    CloseHandle(pipeHandles[1]);
-    CloseHandle(pi.hThread);
+    pthread_attr_init(&attr);
+    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+    pthread_create(&watchdog_thread, &attr, &watchdog, data);
+    pthread_attr_destroy(&attr);
+
     fp = _fdopen(_open_osfhandle((intptr_t)pipeHandles[0], 0), "r");
 
     return fp;
 }
-
-void unblockForHandle(const POPEN_WDT_HANDLE fd) {
-    DWORD mode;
-
-    if (fd == INVALID_HANDLE_VALUE) return;
-    GetNamedPipeHandleState(fd, &mode, NULL, NULL, NULL, NULL, 0);
-    SetNamedPipeHandleState(fd, &mode, NULL, NULL);
-}
-
-bool InitPipeHandle(POPEN_WDT_HANDLE (*fd)[2]) {
-    if (!fd) return false;
-    return CreatePipe(fd[0], fd[1], NULL, 0);
-}
-
-void writeBoolToHandle(const POPEN_WDT_HANDLE fd, bool value) {
-    WriteFile(fd, &value, sizeof(value), NULL, NULL);
-}
-
-bool readBoolFromHandle(const POPEN_WDT_HANDLE fd) {
-    bool ret = false;
-    ReadFile(fd, &ret, sizeof(ret), NULL, NULL);
-    return ret;
-}
-
-void closeHandle(const POPEN_WDT_HANDLE fd) {
-    CloseHandle(fd);
-}
-
-POPEN_WDT_HANDLE invalid_fd_value = INVALID_HANDLE_VALUE;
