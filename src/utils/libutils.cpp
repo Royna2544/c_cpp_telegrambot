@@ -1,10 +1,52 @@
-#include <unistd.h>
-
 #include <cstdlib>
 #include <cstring>
 #include <random>
+#include "libutils.h"
 
 #define ARRAY_SIZE(arr) sizeof(arr) / sizeof(arr[0])
+
+#ifdef __WIN32
+#include <windows.h>
+#include <shlwapi.h>
+bool canExecute(const std::string& path) {
+    auto filepath = path.c_str();
+    bool exists = PathFileExistsA(filepath);
+    if (!exists) {
+        return false;
+    }
+
+    bool isDirectory = PathIsDirectoryA(filepath);
+    if (isDirectory) {
+        return false;
+    }
+    return true;
+}
+#else
+#include <unistd.h>
+bool canExecute(const std::string& path) {
+    return access(path.c_str(), R_OK | X_OK) == 0;
+}
+#endif
+
+#ifdef __linux__
+#include <linux/limits.h> // I need PATH_MAX
+#endif
+
+std::vector<std::string> getPathEnv() {
+    size_t pos = 0;
+    std::vector<std::string> paths;
+    std::string path;
+    const char* path_c = getenv("PATH");
+    if (!path_c) {
+        return {};
+    }
+    path = path_c;
+    while ((pos = path.find(path_env_delimiter)) != std::string::npos) {
+        paths.emplace_back(path.substr(0, pos));
+        path.erase(0, pos + 1);
+    }
+    return paths;
+}
 
 void findCompiler(char** c, char** cxx) {
     static const char* const compilers[][2] = {
@@ -12,26 +54,29 @@ void findCompiler(char** c, char** cxx) {
         {"gcc", "g++"},
         {"cc", "c++"},
     };
-    static char buffer[20];
-    for (int i = 0; i < ARRAY_SIZE(compilers); i++) {
-        auto checkfn = [i](const int idx) -> bool {
-            memset(buffer, 0, sizeof(buffer));
-            auto bytes = snprintf(buffer, sizeof(buffer), "/usr/bin/%s",
-                                  compilers[i][idx]);
-            if (bytes >= sizeof(buffer))
-                return false;
-            else
-                buffer[bytes] = '\0';
-            return access(buffer, R_OK | X_OK) == 0;
-        };
-        if (!*c && checkfn(0)) {
-            *c = strdup(buffer);
+    static char buffer[PATH_MAX];
+    for (const auto& path : getPathEnv()) {
+        for (int i = 0; i < ARRAY_SIZE(compilers); i++) {
+            auto checkfn = [i](const std::string& pathsuffix, const int idx) -> bool {
+                memset(buffer, 0, sizeof(buffer));
+                auto bytes = snprintf(buffer, sizeof(buffer), "%s%c%s",
+                                    pathsuffix.c_str(), dir_delimiter, compilers[i][idx]);
+                if (bytes >= sizeof(buffer))
+                    return false;
+                else
+                    buffer[bytes] = '\0';
+                return canExecute(buffer);
+            };
+            if (!*c && checkfn(path, 0)) {
+                *c = strdup(buffer);
+            }
+            if (!*cxx && checkfn(path, 1)) {
+                *cxx = strdup(buffer);
+            }
+            if (*c && *cxx) return;
         }
-        if (!*cxx && checkfn(1)) {
-            *cxx = strdup(buffer);
-        }
-        if (*c && *cxx) break;
     }
+    
 }
 
 int genRandomNumber(const int num1, const int num2) {
