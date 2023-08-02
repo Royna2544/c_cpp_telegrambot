@@ -63,12 +63,12 @@ int main(void) {
     std::string token;
     if (!token_str) {
         PRETTYF("Warning: TOKEN is not exported, try config file");
-        const char *home_str = getenv("HOME");
-        if (!home_str) {
-            PRETTYF("Error: $HOME is not set");
+        std::string home;
+        if (!getHomePath(home)) {
+            PRETTYF("Error: Cannot find HOME");
             return EXIT_FAILURE;
         }
-        std::string confPath = std::string(home_str) + "/.tgbot_token", line;
+        std::string confPath = home + dir_delimiter + ".tgbot_token", line;
         std::ifstream ifs(confPath);
         if (ifs.fail()) {
             PRETTYF("Error: Opening %s failed", confPath.c_str());

@@ -8,6 +8,7 @@
 #ifdef __WIN32
 #include <windows.h>
 #include <shlwapi.h>
+#include <shlobj.h>
 bool canExecute(const std::string& path) {
     auto filepath = path.c_str();
     bool exists = PathFileExistsA(filepath);
@@ -21,8 +22,23 @@ bool canExecute(const std::string& path) {
     }
     return true;
 }
+bool getHomePath(std::string& buf) {
+    CHAR userDir[MAX_PATH];
+    bool ret = SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_PROFILE, NULL, 0, userDir));
+    if (ret) {
+        buf = userDir;
+    }
+    return ret;
+}
 #else
 #include <unistd.h>
+bool getHomePath(std::string& buf) {
+    auto buf_c = getenv("HOME");
+    if (buf_c) {
+        buf = buf_c;
+    }
+    return !!buf_c;
+}
 bool canExecute(const std::string& path) {
     return access(path.c_str(), R_OK | X_OK) == 0;
 }
