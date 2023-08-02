@@ -28,8 +28,9 @@ execute_process(
   OUTPUT_STRIP_TRAILING_WHITESPACE)
 
 message(STATUS "PWD is ${CMAKE_CURRENT_SOURCE_DIR}")
-add_compile_options(-fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=/)
+add_compile_options(-fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/=//src_root:)
 add_definitions(-DPWD_STR="${CMAKE_CURRENT_SOURCE_DIR}")
+add_definitions(-DPWD_REPLACE_STR="//src_root")
 
 if(RESULT_GIT_COMMITID EQUAL 0)
   message(STATUS "Commit ID available")

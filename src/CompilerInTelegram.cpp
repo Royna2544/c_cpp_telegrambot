@@ -103,9 +103,12 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
         }
         count++;
     }
-#ifdef PWD_STR
-    for (size_t pos = res.find(PWD_STR); pos != std::string::npos; pos = res.find(PWD_STR)) {
-        res.replace(pos, sizeof(PWD_STR), 1, '.');
+#if defined PWD_STR && defined PWD_REPLACE_STR
+    size_t start_pos = 0;
+    std::string pwd(PWD_STR), replace(PWD_REPLACE_STR);
+    while((start_pos = res.find(pwd, start_pos)) != std::string::npos) {
+        res.replace(start_pos, pwd.length(), replace);
+        start_pos += replace.length();
     }
 #endif
     if (count == 0)
