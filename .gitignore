@@ -16,3 +16,4 @@ tg_cpphost
 proto/gen
 # Visual studio code
 build/
+.vscode/
