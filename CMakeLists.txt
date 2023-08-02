@@ -9,10 +9,6 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-if(WIN32)
-  message(FATAL_ERROR "Windows not supported")
-endif()
-
 execute_process(
   COMMAND pwd
   RESULT_VARIABLE RESULT_PWD
@@ -54,7 +50,7 @@ if(RESULT_GIT_COMMITMSG EQUAL 0)
 endif()
 
 if(RESULT_GIT_ORIGIN_URL EQUAL 0)
-  message(STATUS "origin url link available")
+  message(STATUS "Origin url link available")
   add_definitions(-DGIT_ORIGIN_URL="${OUTPUT_GIT_ORIGIN_URL}")
 endif()
 
@@ -94,7 +90,11 @@ add_definitions(-DBOOST_BIND_GLOBAL_PLACEHOLDERS)
 add_subdirectory(lib)
 set_target_properties(TgBot PROPERTIES CXX_CLANG_TIDY "")
 add_executable(${PROJECT_NAME} ${SRC_LIST})
-target_link_libraries(${PROJECT_NAME} TgBot)
+set(LD_LIST TgBot)
 if(ENABLE_DATABASE)
-  target_link_libraries(${PROJECT_NAME} protobuf)
+  set(LD_LIST ${LD_LIST} protobuf)
 endif()
+if (WIN32)
+  set(LD_LIST ${LD_LIST} wsock32 shlwapi Ws2_32)
+endif()
+target_link_libraries(${PROJECT_NAME} ${LD_LIST})

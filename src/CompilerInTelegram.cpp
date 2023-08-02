@@ -58,7 +58,8 @@ static void addExtArgs(std::stringstream &cmd, std::string &extraargs,
 static void runCommand(const Bot &bot, const Message::Ptr &message,
                        const std::string &cmd, std::string &res, bool use_wdt = true) {
     bool hasmore = false, watchdog_bitten = false;
-    int pipefd[2] = {-1, -1}, count = 0;
+    POPEN_WDT_HANDLE pipefd[2];
+    int count = 0;
     constexpr const static int read_buf = (1 << 8), max_buf = (read_buf << 2) * 3;
     auto buf = std::make_unique<char[]>(read_buf);
     std::string cmd_r, cmd_remapped;
@@ -84,7 +85,8 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
     }
 
     if (use_wdt)
-        pipe(pipefd);
+        InitPipeHandle(&pipefd);
+
     auto start = high_resolution_clock::now();
     auto fp = popen_watchdog(cmd_r.c_str(), pipefd[1]);
 
@@ -114,20 +116,19 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
     if (hasmore) res += "-> Truncated due to too much output\n";
     auto end = high_resolution_clock::now();
 
-    if (pipefd[0] != -1) {
+    if (pipefd[0] != invalid_fd_value) {
         int flags;
         if (duration_cast<seconds>(end - start).count() < SLEEP_SECONDS) {
             // Disable blocking (wdt would be sleeping if we are exiting earlier)
-            flags = fcntl(pipefd[0], F_GETFL);
-            fcntl(pipefd[0], F_SETFL, flags | O_NONBLOCK);
+            unblockForHandle(pipefd[0]);
         }
 
-        read(pipefd[0], &watchdog_bitten, 1);
+        watchdog_bitten = readBoolFromHandle(pipefd[0]);
         if (watchdog_bitten) {
             res += WDT_BITE_STR;
         }
-        close(pipefd[0]);
-        close(pipefd[1]);
+        closeHandle(pipefd[0]);
+        closeHandle(pipefd[1]);
     }
     if (!watchdog_bitten) {
         std::stringstream stream;
