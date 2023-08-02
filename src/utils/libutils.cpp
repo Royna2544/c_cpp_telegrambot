@@ -77,18 +77,13 @@ void findCompiler(char** c, char** cxx) {
                 memset(buffer, 0, sizeof(buffer));
                 auto bytes = snprintf(buffer, sizeof(buffer), "%s%c%s",
                                     pathsuffix.c_str(), dir_delimiter, compilers[i][idx]);
-
-                if (bytes >= sizeof(buffer)) {
-                    return false;
-                } else {
-                    #ifdef __WIN32
-                        bytes += sizeof(".exe");
-                        if (bytes >= sizeof(buffer))
-                            return false;
-                        strcat(buffer, ".exe");
-                    #endif
-                    buffer[bytes] = '\0';
-                }
+                #ifdef __WIN32
+                    bytes += sizeof(".exe");
+                    if (bytes >= sizeof(buffer))
+                        return false;
+                    strcat(buffer, ".exe");
+                #endif
+                buffer[bytes] = '\0';
                 return canExecute(buffer);
             };
             if (!*c && checkfn(path, 0)) {
