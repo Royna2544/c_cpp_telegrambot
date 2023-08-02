@@ -553,7 +553,9 @@ int main(void) {
         }
     });
 
+    static bool exited = false;
     static auto cleanupFunc = [](int s) {
+        if (exited) return;
         if (kCompiler) free(kCompiler);
         if (kCxxCompiler) free(kCxxCompiler);
         printf("Exiting with signal %d\n", s);
@@ -561,10 +563,8 @@ int main(void) {
             tm_ptr->cancel();
             std::this_thread::sleep_for(std::chrono::seconds(4));
         }
-        if (s != 0)
-            std::quick_exit(0);
-        else
-            std::exit(0);
+        exited = true;
+        std::exit(0);
     };
     auto cleanupVoidFunc = [] { cleanupFunc(0); };
 
