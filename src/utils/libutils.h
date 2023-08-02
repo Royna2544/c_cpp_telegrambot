@@ -10,10 +10,10 @@ bool getHomePath(std::string& buf);
 
 #ifdef __WIN32
     static inline const char path_env_delimiter = ';';
-    static inline const char dir_delimiter = '/';
+    static inline const char dir_delimiter = '\\';
 #else
     static inline const char path_env_delimiter = ':';
-    static inline const char dir_delimiter = '\\';
+    static inline const char dir_delimiter = '/';
 #endif
 
 #define PRETTYF(fmt, ...) printf("[%s:%d] " fmt "\n", __FILE__, __LINE__, ##__VA_ARGS__)
