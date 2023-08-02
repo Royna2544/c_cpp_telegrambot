@@ -58,7 +58,7 @@ static void addExtArgs(std::stringstream &cmd, std::string &extraargs,
 static void runCommand(const Bot &bot, const Message::Ptr &message,
                        const std::string &cmd, std::string &res, bool use_wdt = true) {
     bool hasmore = false, watchdog_bitten = false;
-    POPEN_WDT_HANDLE pipefd[2];
+    POPEN_WDT_HANDLE pipefd[2] = {invalid_fd_value, invalid_fd_value};
     int count = 0;
     constexpr const static int read_buf = (1 << 8), max_buf = (read_buf << 2) * 3;
     auto buf = std::make_unique<char[]>(read_buf);

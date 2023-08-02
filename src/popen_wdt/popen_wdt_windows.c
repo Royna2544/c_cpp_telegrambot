@@ -106,8 +106,6 @@ void unblockForHandle(const POPEN_WDT_HANDLE fd) {
 
 bool InitPipeHandle(POPEN_WDT_HANDLE (*fd)[2]) {
     if (!fd) return false;
-    (*fd)[0] = invalid_fd_value;
-    (*fd)[1] = invalid_fd_value;
     return CreatePipe(fd[0], fd[1], NULL, 0);
 }
 
