@@ -10,12 +10,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 execute_process(
-  COMMAND pwd
-  RESULT_VARIABLE RESULT_PWD
-  OUTPUT_VARIABLE OUTPUT_PWD
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-
-execute_process(
   COMMAND git rev-parse HEAD
   RESULT_VARIABLE RESULT_GIT_COMMITID
   OUTPUT_VARIABLE OUTPUT_GIT_COMMITID
@@ -33,11 +27,9 @@ execute_process(
   OUTPUT_VARIABLE OUTPUT_GIT_ORIGIN_URL
   OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-if(RESULT_PWD EQUAL 0)
-  message(STATUS "PWD is ${OUTPUT_PWD}")
-  add_compile_options(-fmacro-prefix-map=${OUTPUT_PWD}=...)
-  add_definitions(-DPWD_STR="${OUTPUT_PWD}")
-endif()
+message(STATUS "PWD is ${CMAKE_CURRENT_SOURCE_DIR}")
+add_compile_options(-fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=/)
+add_definitions(-DPWD_STR="${CMAKE_CURRENT_SOURCE_DIR}")
 
 if(RESULT_GIT_COMMITID EQUAL 0)
   message(STATUS "Commit ID available")
