@@ -83,7 +83,7 @@ int main(void) {
     } else
         token = token_str;
 
-    database::db->set_ownerid(1185607882);
+    database::db->set_ownerid(ownerid);
     Bot bot(token);
     static std::shared_ptr<Timer<TimerImpl_privdata>> tm_ptr;
     findCompiler(&kCompiler, &kCxxCompiler);
