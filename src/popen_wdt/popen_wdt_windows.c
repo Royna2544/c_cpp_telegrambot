@@ -109,9 +109,8 @@ FILE* popen_watchdog(const char* command, const bool wdt_on) {
     si.hStdOutput = child_stdout_w;
     si.hStdError = child_stdout_w;
 
-// Create command line string
-// TODO: Hardcoded powershell
-#define PowerShellFmt "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe -c \"%s\""
+    // Create command line string
+    #define PowerShellFmt "powershell.exe -c \"%s\""
     ret = snprintf(dummy, sizeof(dummy), PowerShellFmt, command);
     command_full = (CHAR*)malloc(ret + 1);
     snprintf(command_full, ret + 1, PowerShellFmt, command);
