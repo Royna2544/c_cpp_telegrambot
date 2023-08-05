@@ -599,7 +599,7 @@ reinit:
         while (true) {
             longPoll.start();
         }
-    } catch (std::exception &e) {
+    } catch (const std::exception &e) {
         PRETTYF("Error: %s", e.what());
         PRETTYF("Warning: Trying to recover");
 #ifdef USE_DATABASE
@@ -607,7 +607,7 @@ reinit:
 #endif
         try {
             bot.getApi().sendMessage(ownerid, e.what());
-        } catch (const TgBot::TgException &e) {
+        } catch (const std::exception &e) {
             PRETTYF("Critical Error: %s", e.what());
             return EXIT_FAILURE;
         }
