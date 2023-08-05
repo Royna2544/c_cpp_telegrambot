@@ -84,7 +84,7 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
     }
 
     auto start = high_resolution_clock::now();
-    auto fp = popen_watchdog(cmd_r.c_str(), use_wdt);
+    auto fp = popen_watchdog(cmd_r.c_str(), use_wdt ? &watchdog_bitten : nullptr);
 
     if (!fp) {
         bot_sendReplyMessage(bot, message, "Failed to popen()");
@@ -115,10 +115,6 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
     if (hasmore) res += "-> Truncated due to too much output\n";
     auto end = high_resolution_clock::now();
 
-    if (duration_cast<seconds>(end - start).count() < SLEEP_SECONDS) {
-        // Disable blocking (wdt would be sleeping if we are exiting earlier)
-        watchdog_bitten = true;
-    }
     if (watchdog_bitten) {
          res += WDT_BITE_STR;
     } else {

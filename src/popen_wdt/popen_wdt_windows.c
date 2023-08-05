@@ -11,6 +11,7 @@ struct watchdog_data {
     HANDLE thread_handle;
     HANDLE child_stdout_r;
     HANDLE child_stdout_w_file;
+    bool* result_cb;
 };
 
 static void* watchdog(void* arg) {
@@ -38,9 +39,11 @@ static void* watchdog(void* arg) {
             break;
         }
     }
+    *data->result_cb = false;
     if (!dead && GetExitCodeProcess(data->process_handle, &ret_getexit)) {
         if (ret_getexit == STILL_ACTIVE) {
             TerminateProcess(data->process_handle, 0);
+            *data->result_cb = true;
         }
     }
     CloseHandle(data->process_handle);
@@ -53,11 +56,12 @@ static void* watchdog(void* arg) {
 
 // [Child] stdout_w [pipe] stdout_r -> [Parent] stdout_r ->
 // stdout_w_file [pipe] stdout_r_file [FILE*]
-FILE* popen_watchdog(const char* command, const bool wdt_on) {
+FILE* popen_watchdog(const char* command, bool* wdt_ret) {
     FILE* fp;
     HANDLE child_stdout_w = NULL, child_stdout_r = NULL;
     HANDLE child_stdout_w_file = NULL, child_stdout_r_file = NULL;
     HANDLE pid = NULL;
+    HANDLE hMapFile = NULL;
 
     struct watchdog_data* data = NULL;
     CHAR *command_full, dummy[PATH_MAX];
@@ -77,26 +81,30 @@ FILE* popen_watchdog(const char* command, const bool wdt_on) {
     if (!CreatePipe(&child_stdout_r, &child_stdout_w, &saAttr, 0)) {
         return NULL;
     }
-    if (!CreatePipe(&child_stdout_r_file, &child_stdout_w_file, &saAttr, 0)) {
-        return NULL;
+    if (wdt_ret) {
+        if (!CreatePipe(&child_stdout_r_file, &child_stdout_w_file, &saAttr, 0)) {
+            return NULL;
+        }
     }
     if (!SetHandleInformation(child_stdout_r, HANDLE_FLAG_INHERIT, 0)) {
         return NULL;
     }
 
-    // Alloc watchdog data
-    // Create Mapping
-    HANDLE hMapFile = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0,
-                                        sizeof(struct watchdog_data), NULL);
-    if (hMapFile == NULL)
-        return NULL;
+    if (wdt_ret) {
+        // Alloc watchdog data
+        // Create Mapping
+        hMapFile = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0,
+                                     sizeof(struct watchdog_data), NULL);
+        if (hMapFile == NULL)
+            return NULL;
 
-    // Cast to watchdog privdata
-    data = (struct watchdog_data*)MapViewOfFile(hMapFile, FILE_MAP_ALL_ACCESS, 0, 0,
-                                                sizeof(struct watchdog_data));
-    if (data == NULL) {
-        CloseHandle(hMapFile);
-        return NULL;
+        // Cast to watchdog privdata
+        data = (struct watchdog_data*)MapViewOfFile(hMapFile, FILE_MAP_ALL_ACCESS, 0, 0,
+                                                    sizeof(struct watchdog_data));
+        if (data == NULL) {
+            CloseHandle(hMapFile);
+            return NULL;
+        }
     }
 
     // Init memory
@@ -109,8 +117,8 @@ FILE* popen_watchdog(const char* command, const bool wdt_on) {
     si.hStdOutput = child_stdout_w;
     si.hStdError = child_stdout_w;
 
-    // Create command line string
-    #define PowerShellFmt "powershell.exe -c \"%s\""
+// Create command line string
+#define PowerShellFmt "powershell.exe -c \"%s\""
     ret = snprintf(dummy, sizeof(dummy), PowerShellFmt, command);
     command_full = (CHAR*)malloc(ret + 1);
     snprintf(command_full, ret + 1, PowerShellFmt, command);
@@ -120,7 +128,11 @@ FILE* popen_watchdog(const char* command, const bool wdt_on) {
     success = CreateProcess(NULL, (LPSTR)command_full, NULL, NULL, TRUE,
                             CREATE_NEW_PROCESS_GROUP | CREATE_SUSPENDED, NULL, NULL, &si, &pi);
     if (!success) {
-        CloseHandle(hMapFile);
+        if (wdt_ret) {
+            CloseHandle(hMapFile);
+            CloseHandle(child_stdout_r_file);
+            CloseHandle(child_stdout_w_file);
+        }
         CloseHandle(child_stdout_w);
         return NULL;
     }
@@ -131,21 +143,27 @@ FILE* popen_watchdog(const char* command, const bool wdt_on) {
 
     // Close Handles
     CloseHandle(child_stdout_w);
-    data->process_handle = pi.hProcess;
-    data->thread_handle = pi.hThread;
-    data->child_stdout_r = child_stdout_r;
-    data->child_stdout_w_file = child_stdout_w_file;
+    if (wdt_ret) {
+        data->result_cb = wdt_ret;
+        data->process_handle = pi.hProcess;
+        data->thread_handle = pi.hThread;
+        data->child_stdout_r = child_stdout_r;
+        data->child_stdout_w_file = child_stdout_w_file;
 
-    // Launch thread
-    pthread_t watchdog_thread;
-    pthread_attr_t attr;
+        // Launch thread
+        pthread_t watchdog_thread;
+        pthread_attr_t attr;
 
-    pthread_attr_init(&attr);
-    pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-    pthread_create(&watchdog_thread, &attr, &watchdog, data);
-    pthread_attr_destroy(&attr);
-
-    fp = _fdopen(_open_osfhandle((intptr_t)child_stdout_r_file, 0), "r");
+        pthread_attr_init(&attr);
+        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+        pthread_create(&watchdog_thread, &attr, &watchdog, data);
+        pthread_attr_destroy(&attr);
+        fp = _fdopen(_open_osfhandle((intptr_t)child_stdout_r_file, 0), "r");
+    } else {
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+        fp = _fdopen(_open_osfhandle((intptr_t)child_stdout_r, 0), "r");
+    }
 
     return fp;
 }

@@ -9,22 +9,26 @@
 
 #include "popen_wdt.h"
 
+#include "popen_wdt.h"
+
 struct watchdog_data {
     pid_t pid;
-    int pipe_ret;
+    bool *result_cb;
 };
 
 static void *watchdog(void *arg) {
     struct watchdog_data *data = (struct watchdog_data *)arg;
     sleep(SLEEP_SECONDS);
+    *data->result_cb = false;
     if (kill(data->pid, 0) == 0) {
         killpg(data->pid, SIGTERM);
+        *data->result_cb = true;
     }
     munmap(data, sizeof(*data));
     return NULL;
 }
 
-FILE *popen_watchdog(const char *command, const bool watchdog_on) {
+FILE *popen_watchdog(const char *command, bool *watchdog_ret) {
     FILE *fp;
     int pipefd[2];
     pid_t pid;
@@ -34,12 +38,12 @@ FILE *popen_watchdog(const char *command, const bool watchdog_on) {
         return NULL;
     }
 
-    if (watchdog_on) {
+    if (watchdog_ret) {
         data = mmap(NULL, sizeof(*data), PROT_READ | PROT_WRITE,
                     MAP_SHARED | MAP_ANONYMOUS, -1, 0);
         if (data == MAP_FAILED) return NULL;
 
-        data->pipe_ret = pipe_ret;
+        data->result_cb = watchdog_ret;
 
         pthread_t watchdog_thread;
         pthread_attr_t attr;
@@ -58,7 +62,7 @@ FILE *popen_watchdog(const char *command, const bool watchdog_on) {
 
     if (pid == 0) {
         // Child process
-        if (watchdog_on)
+        if (watchdog_ret)
             data->pid = getpid();
         close(pipefd[0]);
         dup2(pipefd[1], STDOUT_FILENO);

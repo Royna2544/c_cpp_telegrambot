@@ -13,7 +13,7 @@
 extern "C" {
 #endif
 
-FILE* popen_watchdog(const char* command, const bool enabled);
+FILE* popen_watchdog(const char* command, bool* ret);
 
 #ifdef __cplusplus
 }
