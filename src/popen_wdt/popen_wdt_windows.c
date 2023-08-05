@@ -115,6 +115,7 @@ FILE* popen_watchdog(const char* command, const bool wdt_on) {
     ret = snprintf(dummy, sizeof(dummy), PowerShellFmt, command);
     command_full = (CHAR*)malloc(ret + 1);
     snprintf(command_full, ret + 1, PowerShellFmt, command);
+    PRETTYF("Command: %s", command_full);
 
     // Create process
     success = CreateProcess(NULL, (LPSTR)command_full, NULL, NULL, TRUE,

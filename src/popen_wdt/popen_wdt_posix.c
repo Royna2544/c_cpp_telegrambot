@@ -1,5 +1,3 @@
-#include "popen_wdt.h"
-
 #include <fcntl.h>
 #include <pthread.h>
 #include <signal.h>
@@ -7,6 +5,9 @@
 #include <stdlib.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <utils/libutils.h>
+
+#include "popen_wdt.h"
 
 struct watchdog_data {
     pid_t pid;
@@ -64,6 +65,7 @@ FILE *popen_watchdog(const char *command, const bool watchdog_on) {
         dup2(pipefd[1], STDERR_FILENO);
         close(STDIN_FILENO);
         setpgid(0, 0);
+        PRETTYF("Command: %s", command);
         execl("/bin/bash", "bash", "-c", command, (char *)NULL);
         _exit(127);  // If execl fails, exit
     } else {
