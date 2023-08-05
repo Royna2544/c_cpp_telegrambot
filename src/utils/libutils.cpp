@@ -1,14 +1,15 @@
+#include "libutils.h"
+
 #include <cstdlib>
 #include <cstring>
 #include <random>
-#include "libutils.h"
 
 #define ARRAY_SIZE(arr) sizeof(arr) / sizeof(arr[0])
 
 #ifdef __WIN32
-#include <windows.h>
-#include <shlwapi.h>
 #include <shlobj.h>
+#include <shlwapi.h>
+#include <windows.h>
 bool canExecute(const std::string& path) {
     auto filepath = path.c_str();
     bool exists = PathFileExistsA(filepath);
@@ -45,7 +46,7 @@ bool canExecute(const std::string& path) {
 #endif
 
 #ifdef __linux__
-#include <linux/limits.h> // I need PATH_MAX
+#include <linux/limits.h>  // I need PATH_MAX
 #endif
 
 std::vector<std::string> getPathEnv() {
@@ -76,13 +77,13 @@ void findCompiler(char** c, char** cxx) {
             auto checkfn = [i](const std::string& pathsuffix, const int idx) -> bool {
                 memset(buffer, 0, sizeof(buffer));
                 auto bytes = snprintf(buffer, sizeof(buffer), "%s%c%s",
-                                    pathsuffix.c_str(), dir_delimiter, compilers[i][idx]);
-                #ifdef __WIN32
-                    bytes += sizeof(".exe");
-                    if (bytes >= sizeof(buffer))
-                        return false;
-                    strcat(buffer, ".exe");
-                #endif
+                                      pathsuffix.c_str(), dir_delimiter, compilers[i][idx]);
+#ifdef __WIN32
+                bytes += sizeof(".exe");
+                if (bytes >= sizeof(buffer))
+                    return false;
+                strcat(buffer, ".exe");
+#endif
                 buffer[bytes] = '\0';
                 return canExecute(buffer);
             };
@@ -95,7 +96,6 @@ void findCompiler(char** c, char** cxx) {
             if (*c && *cxx) return;
         }
     }
-    
 }
 
 int genRandomNumber(const int num1, const int num2) {
