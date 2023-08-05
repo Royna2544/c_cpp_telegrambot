@@ -5,10 +5,8 @@
 #include <stdlib.h>
 #include <sys/mman.h>
 #include <unistd.h>
+
 #include <utils/libutils.h>
-
-#include "popen_wdt.h"
-
 #include "popen_wdt.h"
 
 struct watchdog_data {
