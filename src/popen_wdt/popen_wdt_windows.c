@@ -162,6 +162,7 @@ FILE* popen_watchdog(const char* command, bool* wdt_ret) {
         fp = _fdopen(_open_osfhandle((intptr_t)child_stdout_r_file, 0), "r");
     } else {
         CloseHandle(pi.hProcess);
+        ResumeThread(pi.hThread);
         CloseHandle(pi.hThread);
         fp = _fdopen(_open_osfhandle((intptr_t)child_stdout_r, 0), "r");
     }
