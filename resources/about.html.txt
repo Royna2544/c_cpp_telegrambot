@@ -4,8 +4,10 @@
 - Supports in-chat compiler support (Owner only)
 - Spam purge feature
 - Supported on Windows, macOS, Linux
+
 <b>BUILD INFO</b>: HEAD
 Commit-Msg: %s
-Commit-Id: <a href="%s/commit/%s">%s</a>                                                                            \
+Commit-Id: <a href="%s/commit/%s">%s</a>
 Repo URL: <a href="%s">Here</a>
-<b>OS:Compiler:Date</b>: %s
+
+<b>OS/Compiler/Date</b>: %s
