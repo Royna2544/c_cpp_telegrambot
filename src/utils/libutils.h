@@ -10,6 +10,7 @@ void findCompiler(char** c, char** cxx);
 #ifndef __cplusplus
 int genRandomNumber(const int num1, const int num2);
 #else
+std::string getCompileVersion();
 int genRandomNumber(const int num1, const int num2 = 0);
 std::vector<std::string> getPathEnv();
 bool canExecute(const std::string& path);
