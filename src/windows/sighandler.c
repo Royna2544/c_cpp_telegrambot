@@ -20,5 +20,5 @@ static BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
 
 BOOL installHandler(void (*cleanupFn_)()) {
     cleanupFn = cleanupFn_;
-    SetConsoleCtrlHandler(CtrlHandler, TRUE);
+    return SetConsoleCtrlHandler(CtrlHandler, TRUE);
 }
