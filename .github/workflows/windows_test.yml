@@ -15,11 +15,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { icon: '⬛', sys: mingw32 }
-          - { icon: '🟦', sys: mingw64 }
-          - { icon: '🟨', sys: ucrt64  }
-          - { icon: '🟧', sys: clang64 }
-    name: 🚧${{ matrix.icon }} ${{ matrix.sys }}
+          - sys: mingw32
+          - sys: mingw64
+          - sys: ucrt64
+          - sys: clang64
+    name: 🚧 ${{ matrix.sys }}
     defaults:
       run:
         shell: msys2 {0}
