@@ -30,6 +30,7 @@ static inline const char dir_delimiter = '/';
 #endif
 #endif
 
+#ifndef TEMP_FAILURE_RETRY
 /* Used to retry syscalls that can return EINTR. */
 #define TEMP_FAILURE_RETRY(exp) ({         \
     __typeof__(exp) _rc;                   \
@@ -37,5 +38,6 @@ static inline const char dir_delimiter = '/';
         _rc = (exp);                       \
     } while (_rc == -1 && errno == EINTR); \
     _rc; })
+#endif
 
 #define PRETTYF(fmt, ...) printf("[%s:%d] " fmt "\n", __FILE__, __LINE__, ##__VA_ARGS__)

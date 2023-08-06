@@ -39,8 +39,7 @@ bool ReadFdToString(int fd, std::string* content) {
 bool ReadFileToString(const std::string& path, std::string* content) {
   content->clear();
 
-  int flags = O_RDONLY | O_BINARY;
-  int fd(TEMP_FAILURE_RETRY(open(path.c_str(), flags)));
+  int fd(TEMP_FAILURE_RETRY(open(path.c_str(), O_RDONLY)));
   if (fd == -1) {
     return false;
   }
