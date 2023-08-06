@@ -155,7 +155,11 @@ template <>
 void CompileRunHandler<CCppCompileHandleData>(const CCppCompileHandleData &data) {
     std::string res, extraargs;
     std::stringstream cmd;
+#ifdef __WIN32
+    const char aoutname[] = "./a.exe";
+#else
     const char aoutname[] = "./a.out";
+#endif
     bool ret;
 
     if (!commonVerifyParseWrite(data.bot, data.message, extraargs, data.outfile)) return;
