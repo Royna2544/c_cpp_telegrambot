@@ -61,6 +61,7 @@ FILE *popen_watchdog(const char *command, bool *watchdog_ret) {
         return NULL;
     }
 
+    PRETTYF("Command: %s", command);
     if (pid == 0) {
         // Child process
         if (watchdog_ret)
@@ -70,7 +71,6 @@ FILE *popen_watchdog(const char *command, bool *watchdog_ret) {
         dup2(pipefd[1], STDERR_FILENO);
         close(STDIN_FILENO);
         setpgid(0, 0);
-        PRETTYF("Command: %s", command);
         execl("/bin/bash", "bash", "-c", command, (char *)NULL);
         _exit(127);  // If execl fails, exit
     } else {
