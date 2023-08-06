@@ -7,6 +7,7 @@
 
 #include <chrono>
 #include <fstream>
+#include <mutex>
 #include <sstream>
 
 #include "popen_wdt/popen_wdt.h"
@@ -63,10 +64,18 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
     auto buf = std::make_unique<char[]>(read_buf);
     std::string cmd_r, cmd_remapped;
     const char *cmd_cstr = nullptr;
+
     using std::chrono::duration_cast;
     using std::chrono::high_resolution_clock;
     using std::chrono::milliseconds;
     using std::chrono::seconds;
+
+#ifdef LOCALE_EN_US
+    static std::once_flag once;
+    std::call_once(once, [] {
+        setlocale_enus_once();
+    });
+#endif
 
     if (cmd.find("\"") != std::string::npos) {
         cmd_remapped.reserve(cmd.size());
@@ -102,7 +111,7 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
 #if defined PWD_STR && defined PWD_REPLACE_STR
     size_t start_pos = 0;
     std::string pwd(PWD_STR), replace(PWD_REPLACE_STR);
-    while((start_pos = res.find(pwd, start_pos)) != std::string::npos) {
+    while ((start_pos = res.find(pwd, start_pos)) != std::string::npos) {
         res.replace(start_pos, pwd.length(), replace);
         start_pos += replace.length();
     }
@@ -116,7 +125,7 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
     auto end = high_resolution_clock::now();
 
     if (watchdog_bitten) {
-         res += WDT_BITE_STR;
+        res += WDT_BITE_STR;
     } else {
         std::stringstream stream;
         float millis = static_cast<float>(duration_cast<milliseconds>(end - start).count());

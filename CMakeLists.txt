@@ -4,6 +4,7 @@ project(tg_cpphost)
 option(ENABLE_TIDY "Enable clang-tidy checks" OFF)
 option(ENABLE_DATABASE "Enable local db support" ON)
 option(DEBUG "Debugging extra printfs" OFF)
+option(ENFORCE_EN_US "Enforce en-US locale for output" ON)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -75,6 +76,10 @@ endif()
 
 if(DEBUG)
   add_definitions(-DDEBUG)
+endif()
+
+if (ENFORCE_EN_US)
+  add_definitions(-DLOCALE_EN_US)
 endif()
 
 # TgBot lib + Boost warning

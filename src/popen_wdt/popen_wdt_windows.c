@@ -1,5 +1,6 @@
 #include <Windows.h>
 #include <io.h>
+#include <locale.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <utils/libutils.h>
@@ -53,7 +54,9 @@ static void* watchdog(void* arg) {
     UnmapViewOfFile(data);
     return 0;
 }
-
+void setlocale_enus_once(void) {
+    SetThreadUILanguage(/* en-US */ 0x0409);
+}
 // [Child] stdout_w [pipe] stdout_r -> [Parent] stdout_r ->
 // stdout_w_file [pipe] stdout_r_file [FILE*]
 FILE* popen_watchdog(const char* command, bool* wdt_ret) {

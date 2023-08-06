@@ -13,6 +13,7 @@
 extern "C" {
 #endif
 
+void setlocale_enus_once(void);
 FILE* popen_watchdog(const char* command, bool* ret);
 
 #ifdef __cplusplus

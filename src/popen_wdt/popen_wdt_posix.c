@@ -1,12 +1,13 @@
 #include <fcntl.h>
+#include <locale.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/mman.h>
 #include <unistd.h>
-
 #include <utils/libutils.h>
+
 #include "popen_wdt.h"
 
 struct watchdog_data {
@@ -25,7 +26,9 @@ static void *watchdog(void *arg) {
     munmap(data, sizeof(*data));
     return NULL;
 }
-
+void setlocale_enus_once(void) {
+    setlocale(LC_ALL, "en-US");
+}
 FILE *popen_watchdog(const char *command, bool *watchdog_ret) {
     FILE *fp;
     int pipefd[2];
