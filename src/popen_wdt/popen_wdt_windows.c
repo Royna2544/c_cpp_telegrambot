@@ -34,9 +34,7 @@ static void* watchdog(void* arg) {
         ZeroMemory(&buf, sizeof(buf));
         ReadFile(data->child_stdout_r, buf, sizeof(buf), &readbuf, NULL);
         WriteFile(data->child_stdout_w_file, buf, readbuf, NULL, NULL);
-        if (GetTickCount() - startTime > SLEEP_SECONDS * 1000) {
-            // Give time for exit
-            Sleep(1);
+        if (GetTickCount() - startTime >= SLEEP_SECONDS * 1000) {
             break;
         }
     }
