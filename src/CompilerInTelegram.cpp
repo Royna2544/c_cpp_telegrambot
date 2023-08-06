@@ -108,7 +108,7 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
         }
         count++;
     }
-#if defined PWD_STR && defined PWD_REPLACE_STR
+#if defined PWD_STR && defined PWD_REPLACE_STR && !defined __WIN32
     size_t start_pos = 0;
     std::string pwd(PWD_STR), replace(PWD_REPLACE_STR);
     while ((start_pos = res.find(pwd, start_pos)) != std::string::npos) {
