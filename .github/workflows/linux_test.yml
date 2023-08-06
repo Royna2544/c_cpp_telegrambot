@@ -1,4 +1,4 @@
-name: Build tg_cpphost
+name: Build tg_cpphost (Linux)
 
 on:
   push:

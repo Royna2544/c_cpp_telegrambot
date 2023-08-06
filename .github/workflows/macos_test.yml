@@ -1,0 +1,30 @@
+name: Build tg_cpphost (macOS)
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3.5.3
+
+      - name: Set up dependencies
+        run: |
+          brew install boost protobuf
+          git submodule update --init
+
+      - name: Compile with Apple Clang
+        env: 
+          LDFLAGS: "-L/usr/local/opt/protobuf/lib -L/usr/local/opt/abseil/lib -labsl_log_internal_message -labsl_log_internal_check_op"
+        run: |
+          mkdir -p build
+          cd build
+          ../scripts/perf.sh
