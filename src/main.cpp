@@ -30,6 +30,10 @@
 #include <Database.h>
 #endif
 
+#ifdef __WIN32
+#include <windows/sighandler.h>
+#endif
+
 #include <Authorization.h>
 #include <BotReplyMessage.h>
 #include <CompilerInTelegram.h>
@@ -582,11 +586,14 @@ int main(void) {
         exited = true;
         std::exit(0);
     };
-    auto cleanupVoidFunc = [] { cleanupFunc(0); };
+    static auto cleanupVoidFunc = [] { cleanupFunc(0); };
 
     std::signal(SIGINT, cleanupFunc);
     std::signal(SIGTERM, cleanupFunc);
     std::atexit(cleanupVoidFunc);
+#ifdef __WIN32
+    installHandler(cleanupVoidFunc);
+#endif
     int64_t lastcrash = 0;
 
     PRETTYF("Debug: Token: %s", token.c_str());

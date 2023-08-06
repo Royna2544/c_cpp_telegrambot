@@ -56,9 +56,12 @@ set(SRC_LIST src/main.cpp src/Authorization.cpp
 
 # System specific
 if (WIN32)
-set(SRC_LIST ${SRC_LIST} src/popen_wdt/popen_wdt_windows.c)
+set(SRC_LIST src/popen_wdt/popen_wdt_windows.c
+             src/windows/sighandler.c
+             ${SRC_LIST})
 else()
-set(SRC_LIST ${SRC_LIST} src/popen_wdt/popen_wdt_posix.c)
+set(SRC_LIST src/popen_wdt/popen_wdt_posix.c
+             ${SRC_LIST})
 endif()
 
 if(ENABLE_TIDY)
