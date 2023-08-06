@@ -153,31 +153,29 @@ int main(void) {
     });
     bot.getEvents().onCommand("alive", [&bot](const Message::Ptr &message) {
         PERMISSIVE_AUTHORIZED;
-        static int64_t lasttime = 0, time = 0;
-        time = std::time(0);
-        if (lasttime != 0 && time - lasttime < 5) return;
-        lasttime = time;
-#if defined(GIT_COMMITID) && defined(GIT_COMMITMSG)
-#ifdef GIT_ORIGIN_URL
-#define BUILD_URL_STR "Commit-Id: <a href=\"" GIT_ORIGIN_URL "/commit/" GIT_COMMITID "\">" GIT_COMMITID \
-                      "</a>"                                                                            \
-                      "\nRepo URL: <a href=\"" GIT_ORIGIN_URL "\">Here</a>"
-#else
-#define BUILD_URL_STR "Commit-Id: " GIT_COMMITID
-#endif
-#define VERSION_STR                                                                  \
-    "<b>ABOUT</b>:\n- Telegram bot for fun\n"                                        \
-    "- Proudly backed by C/C++.\n- Supports in-chat compiler support (Owner only)\n" \
-    "- Awesome spam purge feature\n- Utilites support\n\n"                           \
-    "<b>BUILD INFO</b>: HEAD\nCommit-Msg: \"" GIT_COMMITMSG "\"\n" BUILD_URL_STR
-#else
-#define VERSION_STR ""
+        std::string version_str;
+        char dummy[1024];
+        char *buf;
+        ssize_t len = 0;
+#if defined(GIT_COMMITID) && defined(GIT_COMMITMSG) && defined(GIT_ORIGIN_URL) && defined(PWD_STR)
+        std::string buffer;
+        ReadFileToString(PWD_STR "/resources/about.html.txt", &buffer);
+        len = snprintf(dummy, sizeof(dummy), buffer.c_str(), GIT_COMMITMSG,
+                       GIT_ORIGIN_URL, GIT_COMMITID, GIT_COMMITID, GIT_ORIGIN_URL,
+                       getCompileVersion().c_str());
+        buf = new char[len + 1];
+        memset(buf, 0, len + 1);
+        snprintf(buf, len, buffer.c_str(), GIT_COMMITMSG,
+                 GIT_ORIGIN_URL, GIT_COMMITID, GIT_COMMITID, GIT_ORIGIN_URL,
+                 getCompileVersion().c_str());
+        version_str = buf;
+        delete[] buf;
 #endif
         // Hardcoded Cum about it GIF
         bot.getApi().sendAnimation(message->chat->id,
                                    "CgACAgQAAx0CdY7-CgABARtpZLefgyKNpSLvyCJWcp8"
                                    "mt5KF_REAAgkDAAI2tFRQIk0uTVxfZnsvBA",
-                                   0, 0, 0, "", VERSION_STR, message->messageId,
+                                   0, 0, 0, "", version_str, message->messageId,
                                    nullptr, "html");
     });
     bot.getEvents().onCommand("flash", [&bot](const Message::Ptr &message) {
