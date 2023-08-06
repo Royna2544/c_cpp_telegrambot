@@ -1,20 +1,52 @@
 #include "libutils.h"
 
+#include <boost/config.hpp>
 #include <cstdlib>
 #include <cstring>
 #include <random>
-
-#include <boost/config.hpp>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
 
 #define ARRAY_SIZE(arr) sizeof(arr) / sizeof(arr[0])
 
-std::string getCompileVersion()
-{
-     char buffer[sizeof(BOOST_PLATFORM) + sizeof(BOOST_COMPILER) + sizeof(__DATE__)];
-     snprintf(buffer, sizeof(buffer), "%s:%s:%s", BOOST_PLATFORM, BOOST_COMPILER, __DATE__);
-     std::string compileinfo(buffer);
-     return compileinfo;
+std::string getCompileVersion() {
+    char buffer[sizeof(BOOST_PLATFORM) + sizeof(BOOST_COMPILER) + sizeof(__DATE__)];
+    snprintf(buffer, sizeof(buffer), "%s:%s:%s", BOOST_PLATFORM, BOOST_COMPILER, __DATE__);
+    std::string compileinfo(buffer);
+    return compileinfo;
 }
+
+// Code from //system/libbase/file.cpp @ a7c91d78369684a6d426983b6445ef931be5d68e
+bool ReadFdToString(int fd, std::string* content) {
+  content->clear();
+
+  // Although original we had small files in mind, this code gets used for
+  // very large files too, where the std::string growth heuristics might not
+  // be suitable. https://code.google.com/p/android/issues/detail?id=258500.
+  struct stat sb;
+  if (fstat(fd, &sb) != -1 && sb.st_size > 0) {
+    content->reserve(sb.st_size);
+  }
+
+  char buf[4096] __attribute__((__uninitialized__));
+  ssize_t n;
+  while ((n = TEMP_FAILURE_RETRY(read(fd, &buf[0], sizeof(buf)))) > 0) {
+    content->append(buf, n);
+  }
+  return (n == 0) ? true : false;
+}
+bool ReadFileToString(const std::string& path, std::string* content) {
+  content->clear();
+
+  int flags = O_RDONLY | O_BINARY;
+  int fd(TEMP_FAILURE_RETRY(open(path.c_str(), flags)));
+  if (fd == -1) {
+    return false;
+  }
+  return ReadFdToString(fd, content);
+}
+// End
 
 #ifdef __WIN32
 #include <shlobj.h>
