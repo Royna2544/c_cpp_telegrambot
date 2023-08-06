@@ -54,6 +54,7 @@ FILE *popen_watchdog(const char *command, bool *watchdog_ret) {
         pthread_create(&watchdog_thread, &attr, &watchdog, data);
         pthread_attr_destroy(&attr);
     }
+    PRETTYF("Command: %s", command);
     pid = fork();
     if (pid == -1) {
         close(pipefd[0]);
@@ -61,7 +62,6 @@ FILE *popen_watchdog(const char *command, bool *watchdog_ret) {
         return NULL;
     }
 
-    PRETTYF("Command: %s", command);
     if (pid == 0) {
         // Child process
         if (watchdog_ret)
