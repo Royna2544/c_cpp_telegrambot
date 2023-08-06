@@ -321,7 +321,7 @@ int main(void) {
                                 break;
                         }
 #ifdef DEBUG
-                        printf("result: %d\n", result);
+                        PRETTYF("result: %d", result);
 #endif
                         state = InputState::NONE;
                         numbercache.clear();
@@ -331,7 +331,7 @@ int main(void) {
                 case '0' ... '9': {
                     int intver = code - 48;
 #ifdef DEBUG
-                    printf("%d\n", intver);
+                    PRETTYF("%d", intver);
 #endif
                     numbercache.push_back(intver);
                     break;
@@ -361,7 +361,7 @@ int main(void) {
             }
         }
 #ifdef DEBUG
-        printf("Date h %d m %d s %d\n", hms.h, hms.m, hms.s);
+        PRETTYF("Date h %d m %d s %d", hms.h, hms.m, hms.s);
 #endif
 #define TIMER_CONFIG_SEC 5
         if (hms.toSeconds() == 0) {
@@ -378,7 +378,7 @@ int main(void) {
         try {
             bot.getApi().pinChatMessage(message->chat->id, msgid);
         } catch (const std::exception &) {
-            printf("Cannot pin msg!\n");
+            PRETTYF("Cannot pin msg!");
             couldpin = false;
         }
         using TimerType = std::remove_reference_t<decltype(*tm_ptr)>;
@@ -516,7 +516,7 @@ int main(void) {
                             buffer.clear();
                         }
 #ifdef DEBUG
-                        printf("Buffer size: %lu\n", buffer_priv.size());
+                        PRETTYF("Buffer size: %lu", buffer_priv.size());
 #endif
                         if (buffer_priv.size() <= 1) return;
                         for (const auto &msg : buffer_priv) {
@@ -559,7 +559,7 @@ int main(void) {
                                 }
                             }
                         } catch (const std::exception &) {
-                            printf("Error deleting msg\n");
+                            PRETTYF("Error deleting msg");
                         }
                     });
                     t.detach();
@@ -578,7 +578,7 @@ int main(void) {
         if (exited) return;
         if (kCompiler) free(kCompiler);
         if (kCxxCompiler) free(kCxxCompiler);
-        printf("Exiting with signal %d\n", s);
+        PRETTYF("Exiting with signal %d", s);
         if (tm_ptr && tm_ptr->isrunning()) {
             tm_ptr->cancel();
             std::this_thread::sleep_for(std::chrono::seconds(4));
