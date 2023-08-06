@@ -51,8 +51,15 @@ endif()
 include_directories(src/include)
 include_directories(src/)
 
-set(SRC_LIST src/main.cpp src/Authorization.cpp src/popen_wdt/popen_wdt.c
+set(SRC_LIST src/main.cpp src/Authorization.cpp
              src/utils/libutils.cpp src/CompilerInTelegram.cpp)
+
+# System specific
+if (WIN32)
+set(SRC_LIST ${SRC_LIST} src/popen_wdt/popen_wdt_windows.c)
+else()
+set(SRC_LIST ${SRC_LIST} src/popen_wdt/popen_wdt_posix.c)
+endif()
 
 if(ENABLE_TIDY)
   set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
