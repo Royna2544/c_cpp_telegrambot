@@ -7,9 +7,7 @@
 
 void findCompiler(char** c, char** cxx);
 
-#ifndef __cplusplus
-int genRandomNumber(const int num1, const int num2);
-#else
+#ifdef __cplusplus
 // libbase
 bool ReadFdToString(int fd, std::string* content);
 bool ReadFileToString(const std::string& path, std::string* content);
