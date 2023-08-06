@@ -143,6 +143,7 @@ FILE* popen_watchdog(const char* command, bool* wdt_ret) {
             CloseHandle(child_stdout_r_file);
             CloseHandle(child_stdout_w_file);
         }
+        CloseHandle(child_stdout_r);
         CloseHandle(child_stdout_w);
         return NULL;
     }
