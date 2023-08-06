@@ -15,36 +15,45 @@ struct watchdog_data {
     bool* result_cb;
 };
 
-static void* watchdog(void* arg) {
+static DWORD WINAPI doReadWriteProcess(LPVOID arg) {
+    DWORD readbuf, result;
     struct watchdog_data* data = (struct watchdog_data*)arg;
-    DWORD ret_getexit = 0;
-    DWORD startTime = GetTickCount();
-    bool dead = false;
+    static char buf[1024];
 
-    ResumeThread(data->thread_handle);
+    ZeroMemory(&buf, sizeof(buf));
     for (;;) {
-        DWORD readbuf;
-        static char buf[1024];
-        if (GetExitCodeProcess(data->process_handle, &ret_getexit)) {
-            if (ret_getexit != STILL_ACTIVE) {
-                dead = true;
-                break;
-            }
-        }
-        ZeroMemory(&buf, sizeof(buf));
         ReadFile(data->child_stdout_r, buf, sizeof(buf), &readbuf, NULL);
         WriteFile(data->child_stdout_w_file, buf, readbuf, NULL, NULL);
-        if (GetTickCount() - startTime >= SLEEP_SECONDS * 1000) {
-            break;
+    }
+    return 0;
+}
+
+static void* watchdog(void* arg) {
+    struct watchdog_data* data = (struct watchdog_data*)arg;
+    HANDLE rwProcessThread = NULL;
+    DWORD ret_getexit = 0;
+    DWORD startTime = GetTickCount();
+
+    ResumeThread(data->thread_handle);
+    rwProcessThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)doReadWriteProcess,
+                                   data, 0, NULL);
+    for (;;) {
+        if (GetExitCodeProcess(data->process_handle, &ret_getexit)) {
+            if (ret_getexit != STILL_ACTIVE) {
+                TerminateThread(rwProcessThread, 0);
+                *data->result_cb = false;
+                break;
+            } else {
+                if (GetTickCount() - startTime > SLEEP_SECONDS * 1000) {
+                    TerminateThread(rwProcessThread, 0);
+                    TerminateProcess(data->process_handle, 0);
+                    *data->result_cb = true;
+                    break;
+                }
+            }
         }
     }
-    *data->result_cb = false;
-    if (!dead && GetExitCodeProcess(data->process_handle, &ret_getexit)) {
-        if (ret_getexit == STILL_ACTIVE) {
-            TerminateProcess(data->process_handle, 0);
-            *data->result_cb = true;
-        }
-    }
+    CloseHandle(rwProcessThread);
     CloseHandle(data->process_handle);
     CloseHandle(data->thread_handle);
     CloseHandle(data->child_stdout_r);
