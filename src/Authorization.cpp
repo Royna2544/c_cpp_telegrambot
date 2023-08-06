@@ -1,11 +1,12 @@
 #include <Authorization.h>
+#ifdef USE_DATABASE
 #include <Database.h>
+#endif
 
 bool gAuthorized = true;
 
 static bool AuthorizedId(const int64_t id, const bool permissive) {
 #ifdef USE_DATABASE
-
     if (!permissive) {
         if (database::whitelist.exists(id)) return true;
         return id == database::db.maybeGetOwnerId().value_or(-1);
