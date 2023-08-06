@@ -180,8 +180,19 @@ int main(void) {
     });
     bot.getEvents().onCommand("flash", [&bot](const Message::Ptr &message) {
         PERMISSIVE_AUTHORIZED;
-        // static const std::vector<std::string> reasons; in "FlashData.h"
-#include "FlashData.h"
+        static std::vector<std::string> reasons;
+        static std::once_flag once;
+        std::call_once(once, [] {
+            std::string buf, line;
+            std::stringstream ss;
+
+            ReadFileToString(PWD_STR "/resources/flash.txt", &buf);
+            ss = std::stringstream(buf);
+            while (std::getline(ss, line)) {
+                if (!line.empty())
+                    reasons.emplace_back(line);
+            }
+        });
         std::string msg = message->text;
         if (message->replyToMessage != nullptr) {
             msg = message->replyToMessage->text;
