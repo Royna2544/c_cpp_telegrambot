@@ -2,12 +2,6 @@
 
 #include <windows.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
+_BEGIN_DECLS
 BOOL installHandler(void (*cleanup)());
-
-#ifdef __cplusplus
-}
-#endif
+_END_DECLS

@@ -94,6 +94,8 @@ endif()
 
 # TgBot lib + Boost warning
 add_definitions(-DBOOST_BIND_GLOBAL_PLACEHOLDERS)
+# C Compliance header
+add_compile_options(-include sysdep/cdefs.h)
 
 add_subdirectory(lib)
 set_target_properties(TgBot PROPERTIES CXX_CLANG_TIDY "")

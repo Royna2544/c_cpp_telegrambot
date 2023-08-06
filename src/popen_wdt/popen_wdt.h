@@ -9,13 +9,7 @@
 #define SLEEP_SECONDS 10
 #define WDT_BITE_STR "-> Intercept: This task was hanging more than " STR(SLEEP_SECONDS) "s"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
+_BEGIN_DECLS
 void setlocale_enus_once(void);
 FILE* popen_watchdog(const char* command, bool* ret);
-
-#ifdef __cplusplus
-}
-#endif
+_END_DECLS
