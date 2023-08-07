@@ -55,8 +55,8 @@ using TgBot::MessageEntity;
 using TgBot::StickerSet;
 using TgBot::TgLongPoll;
 // stdc++
-using std::placeholders::_1;
-using std::placeholders::_2;
+static inline auto pholder1 = std::placeholders::_1;
+static inline auto pholder2 = std::placeholders::_2;
 // Database.cpp
 using database::blacklist;
 using database::ProtoDatabase;
@@ -120,13 +120,13 @@ int main(void) {
     }
 #ifdef USE_DATABASE
     bot_AddCommandEnforced(gbot, "addblacklist",
-                           std::bind(&ProtoDatabase::addToDatabase, blacklist, _1, _2));
+                           std::bind(&ProtoDatabase::addToDatabase, blacklist, pholder1, pholder2));
     bot_AddCommandEnforced(gbot, "rmblacklist",
-                           std::bind(&ProtoDatabase::removeFromDatabase, blacklist, _1, _2));
+                           std::bind(&ProtoDatabase::removeFromDatabase, blacklist, pholder1, pholder2));
     bot_AddCommandEnforced(gbot, "addwhitelist",
-                           std::bind(&ProtoDatabase::addToDatabase, whitelist, _1, _2));
+                           std::bind(&ProtoDatabase::addToDatabase, whitelist, pholder1, pholder2));
     bot_AddCommandEnforced(gbot, "rmwhitelist",
-                           std::bind(&ProtoDatabase::removeFromDatabase, whitelist, _1, _2));
+                           std::bind(&ProtoDatabase::removeFromDatabase, whitelist, pholder1, pholder2));
     bot_AddCommandEnforced(gbot, "savedb", [](const Bot &, const Message::Ptr &) {
         database::db.save();
     });
