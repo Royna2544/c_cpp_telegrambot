@@ -164,6 +164,8 @@ bool runCommand(const std::string& command, std::string& result) {
         result += buffer;
         memset(buffer, 0, sizeof(buffer));
     }
+    if (result.back() == '\n')
+        result.pop_back();
     return true;
 }
 
@@ -174,7 +176,6 @@ std::string getSrcRoot() {
         if (!runCommand("git rev-parse --show-toplevel", dir)) {
             throw std::runtime_error("Command failed");
         }
-        dir.pop_back(); // Newline
     });
     return dir;
 }
