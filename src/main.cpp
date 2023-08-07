@@ -127,8 +127,9 @@ int main(void) {
                            std::bind(&ProtoDatabase::addToDatabase, whitelist, pholder1, pholder2));
     bot_AddCommandEnforced(gbot, "rmwhitelist",
                            std::bind(&ProtoDatabase::removeFromDatabase, whitelist, pholder1, pholder2));
-    bot_AddCommandEnforced(gbot, "savedb", [](const Bot &, const Message::Ptr &) {
+    bot_AddCommandEnforced(gbot, "savedb", [](const Bot &bot, const Message::Ptr &message) {
         database::db.save();
+        bot_sendReplyMessage(bot, message, "OK");
     });
 #else
     NOT_SUPPORTED_DB("addblacklist");
