@@ -7,7 +7,11 @@
 #include <boost/config.hpp>
 #include <cstdlib>
 #include <cstring>
+#include <mutex>
+#include <stdexcept>
 #include <random>
+
+#include "../popen_wdt/popen_wdt.h"
 
 #define ARRAY_SIZE(arr) sizeof(arr) / sizeof(arr[0])
 
@@ -150,4 +154,27 @@ int genRandomNumber(const int num1, const int num2) {
     }
     std::uniform_int_distribution<int> distribution(num1_l, num2_l);
     return distribution(gen);
+}
+
+bool runCommand(const std::string& command, std::string& result) {
+    auto fp = popen_watchdog(command.c_str(), nullptr);
+    static char buffer[512] = {0};
+    if (!fp) return false;
+    while (fgets(buffer, sizeof(buffer), fp)) {
+        result += buffer;
+        memset(buffer, 0, sizeof(buffer));
+    }
+    return true;
+}
+
+std::string getSrcRoot() {
+    static std::string dir;
+    static std::once_flag flag;
+    std::call_once(flag, [] {
+        if (!runCommand("git rev-parse --show-toplevel", dir)) {
+            throw std::runtime_error("Command failed");
+        }
+        dir.pop_back(); // Newline
+    });
+    return dir;
 }

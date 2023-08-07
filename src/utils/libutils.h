@@ -16,11 +16,7 @@ bool ReadFileToString(const std::string& path, std::string* content);
 std::string getCompileVersion();
 int genRandomNumber(const int num1, const int num2 = 0);
 
-// Path tools
-std::vector<std::string> getPathEnv();
-bool canExecute(const std::string& path);
-bool getHomePath(std::string& buf);
-
+// Path
 #ifdef __WIN32
 static inline const char path_env_delimiter = ';';
 static inline const char dir_delimiter = '\\';
@@ -28,6 +24,20 @@ static inline const char dir_delimiter = '\\';
 static inline const char path_env_delimiter = ':';
 static inline const char dir_delimiter = '/';
 #endif
+
+// Path tools
+std::vector<std::string> getPathEnv();
+bool canExecute(const std::string& path);
+bool getHomePath(std::string& buf);
+
+// Src path
+std::string getSrcRoot();
+static inline std::string getResourcePath(const std::string& filename) {
+    return getSrcRoot() + "/resources/"+ filename;
+}
+
+// Command
+bool runCommand(const std::string& command, std::string& res);
 #endif
 
 #ifndef TEMP_FAILURE_RETRY
