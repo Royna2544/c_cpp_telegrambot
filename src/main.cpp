@@ -37,9 +37,9 @@
 #include <Authorization.h>
 #include <BotReplyMessage.h>
 #include <CompilerInTelegram.h>
+#include <Timer.h>
 #include <NamespaceImport.h>
 
-#include "timer/Timer.h"
 #include "utils/libutils.h"
 
 struct TimerImpl_privdata {
