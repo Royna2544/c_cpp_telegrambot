@@ -16,7 +16,6 @@ static const char SPACE = ' ';
 static const char EMPTY[] = "(empty)";
 
 static bool verifyMessage(const Bot &bot, const Message::Ptr &message) {
-    ENFORCE_AUTHORIZED false;
     if (message->replyToMessage && !message->replyToMessage->text.empty()) {
         return true;
     }

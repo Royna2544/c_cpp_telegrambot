@@ -35,10 +35,11 @@
 #endif
 
 #include <Authorization.h>
+#include <BotAddCommand.h>
 #include <BotReplyMessage.h>
 #include <CompilerInTelegram.h>
-#include <Timer.h>
 #include <NamespaceImport.h>
+#include <Timer.h>
 
 #include "utils/libutils.h"
 
@@ -49,18 +50,19 @@ struct TimerImpl_privdata {
     int64_t chatid;
 };
 
+// tgbot
 using TgBot::MessageEntity;
 using TgBot::StickerSet;
 using TgBot::TgLongPoll;
+// stdc++
+using std::placeholders::_1;
+using std::placeholders::_2;
+// Database.cpp
+using database::blacklist;
+using database::ProtoDatabase;
+using database::whitelist;
 
 static char *kCompiler = nullptr, *kCxxCompiler = nullptr;
-
-#define CMD_UNSUPPORTED(cmd, reason)                                     \
-    bot.getEvents().onCommand(cmd, [&bot](const Message::Ptr &message) { \
-        bot_sendReplyMessage(                                            \
-            bot, message,                                                \
-            "cmd '" cmd "' is unsupported.\nReason: " reason);           \
-    });
 
 int main(void) {
     const char *token_str = getenv("TOKEN");
@@ -88,71 +90,59 @@ int main(void) {
         token = token_str;
 
     database::db->set_ownerid(ownerid);
-    Bot bot(token);
+    Bot gbot(token);
     static std::shared_ptr<Timer<TimerImpl_privdata>> tm_ptr;
     findCompiler(&kCompiler, &kCxxCompiler);
 
     if (kCxxCompiler) {
-        bot.getEvents().onCommand("cpp", [&bot](const Message::Ptr &message) {
+        bot_AddCommandEnforced(gbot, "cpp", [](const Bot &bot, const Message::Ptr &message) {
             CompileRunHandler<CCppCompileHandleData>({bot, message, kCxxCompiler, "compile.cpp"});
         });
     } else {
-        CMD_UNSUPPORTED("cpp", "Host does not have a C++ compiler");
+        NOT_SUPPORTED_COMPILER(gbot, "cpp");
     }
     if (kCompiler) {
-        bot.getEvents().onCommand("c", [&bot](const Message::Ptr &message) {
+        bot_AddCommandEnforced(gbot, "c", [](const Bot &bot, const Message::Ptr &message) {
             CompileRunHandler<CCppCompileHandleData>({bot, message, kCompiler, "compile.c"});
         });
     } else {
-        CMD_UNSUPPORTED("c", "Host does not have a C compiler");
+        NOT_SUPPORTED_COMPILER(gbot, "c");
     }
-    bot.getEvents().onCommand("python", [&bot](const Message::Ptr &message) {
+    bot_AddCommandEnforced(gbot, "python", [](const Bot &bot, const Message::Ptr &message) {
         CompileRunHandler({bot, message, "python3", "./out.py"});
     });
     if (access("/usr/bin/go", F_OK | X_OK) == 0) {
-        bot.getEvents().onCommand("golang", [&bot](const Message::Ptr &message) {
+        bot_AddCommandEnforced(gbot, "golang", [](const Bot &bot, const Message::Ptr &message) {
             CompileRunHandler({bot, message, "go run", "./out.go"});
         });
     } else {
-        CMD_UNSUPPORTED("golang", "Host does not have a Go compiler");
+        NOT_SUPPORTED_COMPILER(gbot, "golang");
     }
 #ifdef USE_DATABASE
-    bot.getEvents().onCommand("addblacklist", [&bot](const Message::Ptr &message) {
-        ENFORCE_AUTHORIZED;
-        database::blacklist.addToDatabase(bot, message);
-    });
-    bot.getEvents().onCommand("rmblacklist", [&bot](const Message::Ptr &message) {
-        ENFORCE_AUTHORIZED;
-        database::blacklist.removeFromDatabase(bot, message);
-    });
-    bot.getEvents().onCommand("addwhitelist", [&bot](const Message::Ptr &message) {
-        ENFORCE_AUTHORIZED;
-        database::whitelist.addToDatabase(bot, message);
-    });
-    bot.getEvents().onCommand("rmwhitelist", [&bot](const Message::Ptr &message) {
-        ENFORCE_AUTHORIZED;
-        database::whitelist.removeFromDatabase(bot, message);
-    });
-    bot.getEvents().onCommand("savedb", [&bot](const Message::Ptr &message) {
-        ENFORCE_AUTHORIZED;
+    bot_AddCommandEnforced(gbot, "addblacklist",
+                           std::bind(&ProtoDatabase::addToDatabase, blacklist, _1, _2));
+    bot_AddCommandEnforced(gbot, "rmblacklist",
+                           std::bind(&ProtoDatabase::removeFromDatabase, blacklist, _1, _2));
+    bot_AddCommandEnforced(gbot, "addwhitelist",
+                           std::bind(&ProtoDatabase::addToDatabase, whitelist, _1, _2));
+    bot_AddCommandEnforced(gbot, "rmwhitelist",
+                           std::bind(&ProtoDatabase::removeFromDatabase, whitelist, _1, _2));
+    bot_AddCommandEnforced(gbot, "savedb", [](const Bot &, const Message::Ptr &) {
         database::db.save();
     });
 #else
-#define NOT_SUPPORTED_DB(name) CMD_UNSUPPORTED(name, "USE_DATABASE flag not enabled");
     NOT_SUPPORTED_DB("addblacklist");
     NOT_SUPPORTED_DB("rmblacklist");
     NOT_SUPPORTED_DB("addwhitelist");
     NOT_SUPPORTED_DB("rmwhitelist");
-#undef NOT_SUPPORTED_DB
 #endif
-    bot.getEvents().onCommand("bash", [&bot](const Message::Ptr &message) {
+    bot_AddCommandEnforced(gbot, "bash", [](const Bot &bot, const Message::Ptr &message) {
         CompileRunHandler(BashHandleData{bot, message, false});
     });
-    bot.getEvents().onCommand("unsafebash", [&bot](const Message::Ptr &message) {
+    bot_AddCommandEnforced(gbot, "unsafebash", [](const Bot &bot, const Message::Ptr &message) {
         CompileRunHandler(BashHandleData{bot, message, true});
     });
-    bot.getEvents().onCommand("alive", [&bot](const Message::Ptr &message) {
-        PERMISSIVE_AUTHORIZED;
+    bot_AddCommandPermissive(gbot, "alive", [](const Bot &bot, const Message::Ptr &message) {
         static std::string version_str;
 #if defined(GIT_COMMITID) && defined(GIT_COMMITMSG) && defined(GIT_ORIGIN_URL) && defined(PWD_STR)
         static std::once_flag once;
@@ -181,8 +171,7 @@ int main(void) {
                                    0, 0, 0, "", version_str, message->messageId,
                                    nullptr, "html");
     });
-    bot.getEvents().onCommand("flash", [&bot](const Message::Ptr &message) {
-        PERMISSIVE_AUTHORIZED;
+    bot_AddCommandPermissive(gbot, "flash", [](const Bot &bot, const Message::Ptr &message) {
         static std::vector<std::string> reasons;
         static std::once_flag once;
         std::call_once(once, [] {
@@ -224,8 +213,7 @@ int main(void) {
         }
         bot_sendReplyMessage(bot, message, ss.str());
     });
-    bot.getEvents().onCommand("possibility", [&bot](const Message::Ptr &message) {
-        PERMISSIVE_AUTHORIZED;
+    bot_AddCommandPermissive(gbot, "possibility", [](const Bot &bot, const Message::Ptr &message) {
         if (!hasExtArgs(message)) {
             bot_sendReplyMessage(bot, message,
                                  "Send avaliable conditions sperated by newline");
@@ -277,14 +265,13 @@ int main(void) {
         }
         bot_sendReplyMessage(bot, message, out.str());
     });
-    bot.getEvents().onCommand("starttimer", [&bot](const Message::Ptr &message) {
+    bot_AddCommandEnforced(gbot, "starttimer", [](const Bot &bot, const Message::Ptr &message) {
         enum InputState {
             HOUR,
             MINUTE,
             SECOND,
             NONE,
         };
-        ENFORCE_AUTHORIZED;
         bool found = false;
         std::string msg;
         if (hasExtArgs(message)) {
@@ -422,8 +409,7 @@ int main(void) {
                 msgid, bot, couldpin, true, message->chat->id}));
         tm_ptr->start();
     });
-    bot.getEvents().onCommand("stoptimer", [&bot](const Message::Ptr &message) {
-        ENFORCE_AUTHORIZED;
+    bot_AddCommandEnforced(gbot, "stoptimer", [](const Bot &bot, const Message::Ptr &message) {
         bool ret = false;
         const char *text;
         if (tm_ptr) {
@@ -440,8 +426,7 @@ int main(void) {
             text = "Timer is not running";
         bot_sendReplyMessage(bot, message, text);
     });
-    bot.getEvents().onCommand("decho", [&bot](const Message::Ptr &message) {
-        PERMISSIVE_AUTHORIZED;
+    bot_AddCommandPermissive(gbot, "decho", [](const Bot &bot, const Message::Ptr &message) {
         bool invalid = !hasExtArgs(message), sticker = false, text = false,
              animation = false;
         const auto msg = message->replyToMessage;
@@ -477,8 +462,7 @@ int main(void) {
             // bot is not adm. nothing it can do
         }
     });
-    bot.getEvents().onCommand("randsticker", [&bot](const Message::Ptr &message) {
-        PERMISSIVE_AUTHORIZED;
+    bot_AddCommandPermissive(gbot, "randsticker", [](const Bot &bot, const Message::Ptr &message) {
         if (message->replyToMessage && message->replyToMessage->sticker) {
             StickerSet::Ptr stickset;
             try {
@@ -501,10 +485,11 @@ int main(void) {
             bot_sendReplyMessage(bot, message, "Sticker not found in replied-to message");
         }
     });
-    bot.getEvents().onAnyMessage([&bot](const Message::Ptr &message) {
+    gbot.getEvents().onAnyMessage([&gbot](const Message::Ptr &message) {
         static std::vector<Message::Ptr> buffer;
         static std::mutex m;  // Protect buffer
         static std::once_flag once;
+        const Bot &bot = gbot;
 
         if (Authorized(message, true)) return;
         // Do not track older msgs and consider it as spam.
@@ -611,10 +596,10 @@ int main(void) {
     PRETTYF("Debug: Token: %s", token.c_str());
 reinit:
     try {
-        PRETTYF("Debug: Bot username: %s", bot.getApi().getMe()->username.c_str());
-        bot.getApi().deleteWebhook();
+        PRETTYF("Debug: Bot username: %s", gbot.getApi().getMe()->username.c_str());
+        gbot.getApi().deleteWebhook();
 
-        TgLongPoll longPoll(bot);
+        TgLongPoll longPoll(gbot);
         while (true) {
             longPoll.start();
         }
@@ -625,19 +610,19 @@ reinit:
         int64_t ownerid = database::db.maybeGetOwnerId().value_or(-1);
 #endif
         try {
-            bot.getApi().sendMessage(ownerid, e.what());
+            gbot.getApi().sendMessage(ownerid, e.what());
         } catch (const std::exception &e) {
             PRETTYF("Critical Error: %s", e.what());
             return EXIT_FAILURE;
         }
         int64_t temptime = time(0);
         if (temptime - lastcrash < 10 && lastcrash != 0) {
-            bot.getApi().sendMessage(ownerid, "Recover failed.");
+            gbot.getApi().sendMessage(ownerid, "Recover failed.");
             PRETTYF("Error: Recover failed");
             return 1;
         }
         lastcrash = temptime;
-        bot.getApi().sendMessage(ownerid, "Reinitializing.");
+        gbot.getApi().sendMessage(ownerid, "Reinitializing.");
         PRETTYF("Info: Re-init");
         gAuthorized = false;
         std::thread([] {

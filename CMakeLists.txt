@@ -51,7 +51,8 @@ include_directories(src/include)
 include_directories(src/)
 
 set(SRC_LIST src/main.cpp src/Authorization.cpp
-             src/utils/libutils.cpp src/CompilerInTelegram.cpp)
+             src/utils/libutils.cpp src/CompilerInTelegram.cpp
+             src/BotAddCommand.cpp)
 
 # System specific
 if (WIN32)

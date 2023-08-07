@@ -3,7 +3,7 @@
 #include "NamespaceImport.h"
 
 struct HandleData {
-    Bot &bot;
+    const Bot &bot;
     const Message::Ptr &message;
 };
 
