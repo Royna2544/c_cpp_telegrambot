@@ -15,19 +15,18 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3.5.3
+        with:
+          fetch-depth: 0
 
       - name: Set up dependencies
         run: |
           ./scripts/deps.sh
 
-      - name: Clang (Perf)
+      - name: Compile with Ubuntu Clang
+        env:
+          CC: clang
+          CXX: clang++
         run: |
-          mkdir -p build
-          cd build
-          ../scripts/perf.sh
-
-      - name: GCC (Debug)
-        run: |
-          mkdir -p build
-          cd build
-          ../scripts/debug.sh
+          mkdir build
+          cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release .
+          cmake --build build

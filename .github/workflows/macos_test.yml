@@ -18,13 +18,13 @@ jobs:
 
       - name: Set up dependencies
         run: |
-          brew install boost protobuf
+          brew install boost protobuf ninja
           git submodule update --init
 
       - name: Compile with Apple Clang
         env: 
           LDFLAGS: "-L/usr/local/opt/protobuf/lib -L/usr/local/opt/abseil/lib -labsl_log_internal_message -labsl_log_internal_check_op"
         run: |
-          mkdir -p build
-          cd build
-          ../scripts/perf.sh
+          mkdir build
+          cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release .
+          cmake --build build

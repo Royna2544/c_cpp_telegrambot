@@ -17,9 +17,9 @@ jobs:
 
       - name: Build
         run: |
-          mkdir -p build
-          cd build
-          ../scripts/perf.sh
+          mkdir build
+          cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release .
+          cmake --build build
 
       - name: Host
         env:
