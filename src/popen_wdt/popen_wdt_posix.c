@@ -9,7 +9,6 @@
 #include <utils/libutils.h>
 
 #include "popen_wdt.h"
-
 struct watchdog_data {
     pid_t pid;
     bool *result_cb;
@@ -54,7 +53,6 @@ FILE *popen_watchdog(const char *command, bool *watchdog_ret) {
         pthread_create(&watchdog_thread, &attr, &watchdog, data);
         pthread_attr_destroy(&attr);
     }
-    PRETTYF("Command: %s", command);
     pid = fork();
     if (pid == -1) {
         close(pipefd[0]);
