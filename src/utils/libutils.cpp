@@ -113,9 +113,15 @@ std::vector<std::string> getPathEnv() {
 
 void findCompiler(char** c, char** cxx) {
     static const char* const compilers[][2] = {
+#ifndef __WIN32
         {"clang", "clang++"},
         {"gcc", "g++"},
         {"cc", "c++"},
+#else
+        {"clang.exe", "clang++.exe"},
+        {"gcc.exe", "g++.exe"},
+#endif
+
     };
     static char buffer[PATH_MAX];
     for (const auto& path : getPathEnv()) {
@@ -124,13 +130,8 @@ void findCompiler(char** c, char** cxx) {
                 memset(buffer, 0, sizeof(buffer));
                 auto bytes = snprintf(buffer, sizeof(buffer), "%s%c%s",
                                       pathsuffix.c_str(), dir_delimiter, compilers[i][idx]);
-#ifdef __WIN32
-                bytes += sizeof(".exe");
-                if (bytes >= sizeof(buffer))
-                    return false;
-                strcat(buffer, ".exe");
-#endif
-                buffer[bytes] = '\0';
+                if (bytes < sizeof(buffer))
+                    buffer[bytes] = '\0';
                 return canExecute(buffer);
             };
             if (!*c && checkfn(path, 0)) {
