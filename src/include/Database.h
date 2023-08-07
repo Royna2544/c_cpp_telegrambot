@@ -45,18 +45,16 @@ class ProtoDatabase {
 struct DatabaseWrapper {
     DatabaseWrapper(const std::string fname) : fname(fname) {
         std::fstream input(fname, std::ios::in | std::ios::binary);
-        if (input) {
-            protodb.ParseFromIstream(&input);
-        }
+        assert(input);
+        protodb.ParseFromIstream(&input);
     }
     ~DatabaseWrapper() {
         save();
     }
     void save(void) const {
         std::fstream output(fname, std::ios::out | std::ios::trunc | std::ios::binary);
-        if (output) {
-            protodb.SerializeToOstream(&output);
-        }
+        assert(output);
+        protodb.SerializeToOstream(&output);
     }
     Database* operator->(void) {
         return &protodb;

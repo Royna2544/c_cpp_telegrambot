@@ -1,11 +1,12 @@
 #include <BotReplyMessage.h>
 #include <Database.h>
+#include <utils/libutils.h>
 
 #include <type_traits>
 
 namespace database {
 
-DatabaseWrapper db("tgbot.pb");
+DatabaseWrapper db(getSrcRoot() + "/tgbot.pb");
 
 static std::string appendListName(const std::string& op, const int64_t id, const std::string& name) {
     return std::string("User") + ' ' + std::to_string(id) + ' ' + op + ' ' + name;
