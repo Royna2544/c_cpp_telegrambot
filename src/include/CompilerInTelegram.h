@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "NamespaceImport.h"
 
 struct HandleData {
@@ -12,7 +14,7 @@ struct BashHandleData : HandleData {
 };
 
 struct CompileHandleData : HandleData {
-    const char *cmdPrefix, *outfile;
+    std::string cmdPrefix, outfile;
 };
 
 struct CCppCompileHandleData : CompileHandleData {};

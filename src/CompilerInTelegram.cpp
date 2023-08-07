@@ -33,7 +33,7 @@ void parseExtArgs(const Message::Ptr &message, std::string &extraargs) {
 }
 
 static bool writeMessageToFile(const Bot &bot, const Message::Ptr &message,
-                               const char *filename) {
+                               const std::string &filename) {
     std::ofstream file(filename);
     if (file.fail()) {
         bot_sendReplyMessage(bot, message, "Failed to open file");
@@ -137,13 +137,13 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
 }
 
 static void commonCleanup(const Bot &bot, const Message::Ptr &message,
-                          std::string &res, const char *filename) {
+                          std::string &res, const std::string &filename = "") {
     bot_sendReplyMessage(bot, message, res);
-    if (filename) std::remove(filename);
+    if (!filename.empty()) std::remove(filename.c_str());
 }
 
 static bool commonVerifyParseWrite(const Bot &bot, const Message::Ptr &message,
-                                   std::string &extraargs, const char *filename) {
+                                   std::string &extraargs, const std::string &filename) {
     bool ret = verifyMessage(bot, message);
     if (ret) {
         parseExtArgs(message, extraargs);
@@ -209,5 +209,5 @@ void CompileRunHandler<BashHandleData>(const BashHandleData &data) {
     } else {
         res = "Send a bash command to run";
     }
-    commonCleanup(data.bot, data.message, res, nullptr);
+    commonCleanup(data.bot, data.message, res);
 }
