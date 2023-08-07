@@ -111,7 +111,7 @@ int main(void) {
     bot_AddCommandEnforced(gbot, "python", [](const Bot &bot, const Message::Ptr &message) {
         CompileRunHandler({bot, message, "python3", "./out.py"});
     });
-    if (access("/usr/bin/go", F_OK | X_OK) == 0) {
+    if (canExecute("go") || canExecute("go.exe")) {
         bot_AddCommandEnforced(gbot, "golang", [](const Bot &bot, const Message::Ptr &message) {
             CompileRunHandler({bot, message, "go run", "./out.go"});
         });
