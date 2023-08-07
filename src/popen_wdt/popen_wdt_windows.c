@@ -74,7 +74,7 @@ FILE* popen_watchdog(const char* command, bool* wdt_ret) {
     HANDLE hMapFile = NULL;
 
     struct watchdog_data* data = NULL;
-    CHAR *command_full, dummy[PATH_MAX];
+    CHAR buffer[PATH_MAX] = {0};
     int ret;
 
     BOOL success;
@@ -127,16 +127,22 @@ FILE* popen_watchdog(const char* command, bool* wdt_ret) {
     si.hStdOutput = child_stdout_w;
     si.hStdError = child_stdout_w;
 
-// Create command line string
-#define PowerShellFmt "powershell.exe -c \"%s\""
-    ret = snprintf(dummy, sizeof(dummy), PowerShellFmt, command);
-    command_full = (CHAR*)malloc(ret + 1);
-    snprintf(command_full, ret + 1, PowerShellFmt, command);
-
-    // Create process
-    success = CreateProcess(NULL, (LPSTR)command_full, NULL, NULL, TRUE,
+    // Try with default
+    success = CreateProcess(NULL, (LPSTR)command, NULL, NULL, TRUE,
                             CREATE_NEW_PROCESS_GROUP | CREATE_SUSPENDED, NULL, NULL, &si, &pi);
+
     if (!success) {
+        // Hmm? We failed? Try to append powershell -c
+        // Create command line string
+#define PowerShellFmt "powershell.exe -c \"%s\""
+        ret = snprintf(buffer, sizeof(buffer), PowerShellFmt, command);
+
+        // Create process again
+        success = CreateProcess(NULL, (LPSTR)buffer, NULL, NULL, TRUE,
+                                CREATE_NEW_PROCESS_GROUP | CREATE_SUSPENDED, NULL, NULL, &si, &pi);
+    }
+    if (!success) {
+        // Still no? abort.
         if (wdt_ret) {
             CloseHandle(hMapFile);
             CloseHandle(child_stdout_r_file);
@@ -148,9 +154,6 @@ FILE* popen_watchdog(const char* command, bool* wdt_ret) {
     }
 
     // Cleanup
-    // Free memory
-    free(command_full);
-
     // Close Handles
     CloseHandle(child_stdout_w);
     if (wdt_ret) {
