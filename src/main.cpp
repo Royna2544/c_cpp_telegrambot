@@ -62,8 +62,6 @@ using database::blacklist;
 using database::ProtoDatabase;
 using database::whitelist;
 
-static char *kCompiler = nullptr, *kCxxCompiler = nullptr;
-
 int main(void) {
     const char *token_str = getenv("TOKEN");
     std::string token;
@@ -92,28 +90,36 @@ int main(void) {
     database::db->set_ownerid(ownerid);
     Bot gbot(token);
     static std::shared_ptr<Timer<TimerImpl_privdata>> tm_ptr;
-    findCompiler(&kCompiler, &kCxxCompiler);
+    std::string CCompiler, CXXCompiler, GoCompiler, PythonInterpreter;
+    CCompiler = findCompiler(ProgrammingLangs::C);
+    CXXCompiler = findCompiler(ProgrammingLangs::CXX);
+    GoCompiler = findCompiler(ProgrammingLangs::GO);
+    PythonInterpreter = findCompiler(ProgrammingLangs::PYTHON);
 
-    if (kCxxCompiler) {
-        bot_AddCommandEnforced(gbot, "cpp", [](const Bot &bot, const Message::Ptr &message) {
-            CompileRunHandler<CCppCompileHandleData>({bot, message, kCxxCompiler, "compile.cpp"});
+    if (!CXXCompiler.empty()) {
+        bot_AddCommandEnforced(gbot, "cpp", [&](const Bot &bot, const Message::Ptr &message) {
+            CompileRunHandler<CCppCompileHandleData>({bot, message, CXXCompiler, "compile.cpp"});
         });
     } else {
         NOT_SUPPORTED_COMPILER(gbot, "cpp");
     }
-    if (kCompiler) {
-        bot_AddCommandEnforced(gbot, "c", [](const Bot &bot, const Message::Ptr &message) {
-            CompileRunHandler<CCppCompileHandleData>({bot, message, kCompiler, "compile.c"});
+    if (!CCompiler.empty()) {
+        bot_AddCommandEnforced(gbot, "c", [&](const Bot &bot, const Message::Ptr &message) {
+            CompileRunHandler<CCppCompileHandleData>({bot, message, CCompiler, "compile.c"});
         });
     } else {
         NOT_SUPPORTED_COMPILER(gbot, "c");
     }
-    bot_AddCommandEnforced(gbot, "python", [](const Bot &bot, const Message::Ptr &message) {
-        CompileRunHandler({bot, message, "python3", "./out.py"});
-    });
-    if (canExecute("go") || canExecute("go.exe")) {
-        bot_AddCommandEnforced(gbot, "golang", [](const Bot &bot, const Message::Ptr &message) {
-            CompileRunHandler({bot, message, "go run", "./out.go"});
+    if (!PythonInterpreter.empty()) {
+        bot_AddCommandEnforced(gbot, "python", [&](const Bot &bot, const Message::Ptr &message) {
+            CompileRunHandler({bot, message, PythonInterpreter, "./out.py"});
+        });
+    } else {
+        NOT_SUPPORTED_COMPILER(gbot, "python");
+    }
+    if (!GoCompiler.empty()) {
+        bot_AddCommandEnforced(gbot, "golang", [&](const Bot &bot, const Message::Ptr &message) {
+            CompileRunHandler({bot, message, GoCompiler + " run", "./out.go"});
         });
     } else {
         NOT_SUPPORTED_COMPILER(gbot, "golang");
@@ -576,8 +582,6 @@ int main(void) {
     static bool exited = false;
     static auto cleanupFunc = [](int s) {
         if (exited) return;
-        if (kCompiler) free(kCompiler);
-        if (kCxxCompiler) free(kCxxCompiler);
         PRETTYF("Exiting with signal %d", s);
         if (tm_ptr && tm_ptr->isrunning()) {
             tm_ptr->cancel();

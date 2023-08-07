@@ -7,9 +7,10 @@
 #include <boost/config.hpp>
 #include <cstdlib>
 #include <cstring>
+#include <map>
 #include <mutex>
-#include <stdexcept>
 #include <random>
+#include <stdexcept>
 
 #include "../popen_wdt/popen_wdt.h"
 
@@ -111,38 +112,37 @@ std::vector<std::string> getPathEnv() {
     return paths;
 }
 
-void findCompiler(char** c, char** cxx) {
-    static const char* const compilers[][2] = {
-#ifndef __WIN32
-        {"clang", "clang++"},
-        {"gcc", "g++"},
-        {"cc", "c++"},
-#else
-        {"clang.exe", "clang++.exe"},
-        {"gcc.exe", "g++.exe"},
-#endif
-
-    };
+std::string findCommandExe(const std::string& command) {
+    static const bool is_windows = IS_DEFINED(__WIN32);
     static char buffer[PATH_MAX];
+    std::string _command = command;
+    if (is_windows)
+        _command.append(".exe");
     for (const auto& path : getPathEnv()) {
-        for (int i = 0; i < ARRAY_SIZE(compilers); i++) {
-            auto checkfn = [i](const std::string& pathsuffix, const int idx) -> bool {
-                memset(buffer, 0, sizeof(buffer));
-                auto bytes = snprintf(buffer, sizeof(buffer), "%s%c%s",
-                                      pathsuffix.c_str(), dir_delimiter, compilers[i][idx]);
-                if (bytes < sizeof(buffer))
-                    buffer[bytes] = '\0';
-                return canExecute(buffer);
-            };
-            if (!*c && checkfn(path, 0)) {
-                *c = strdup(buffer);
-            }
-            if (!*cxx && checkfn(path, 1)) {
-                *cxx = strdup(buffer);
-            }
-            if (*c && *cxx) return;
-        }
+        if (path.empty()) continue;
+        memset(buffer, 0, sizeof(buffer));
+        auto bytes = snprintf(buffer, sizeof(buffer), "%s%c%s",
+                              path.c_str(), dir_delimiter, _command.c_str());
+        if (bytes < sizeof(buffer))
+            buffer[bytes] = '\0';
+        if (canExecute(buffer))
+            return std::string(buffer);
     }
+    return {};
+}
+
+std::string findCompiler(ProgrammingLangs lang) {
+    static std::map<ProgrammingLangs, std::vector<std::string>> compilers = {
+        {ProgrammingLangs::C, {"clang", "gcc", "cc"}},
+        {ProgrammingLangs::CXX, {"clang++", "g++", "c++"}},
+        {ProgrammingLangs::GO, {"go"}},
+        {ProgrammingLangs::PYTHON, {"python", "python3"}},
+    };
+    for (const auto& options : compilers[lang]) {
+        auto ret = findCommandExe(options);
+        if (!ret.empty()) return ret;
+    }
+    return {};
 }
 
 int genRandomNumber(const int num1, const int num2) {

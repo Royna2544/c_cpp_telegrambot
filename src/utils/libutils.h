@@ -3,11 +3,17 @@
 #ifdef __cplusplus
 #include <string>
 #include <vector>
-#endif
 
-void findCompiler(char** c, char** cxx);
+enum ProgrammingLangs {
+    C,
+    CXX,
+    GO,
+    PYTHON,
+};
 
-#ifdef __cplusplus
+std::string findCommandExe(const std::string& basename);
+std::string findCompiler(ProgrammingLangs lang);
+
 // libbase
 bool ReadFdToString(int fd, std::string* content);
 bool ReadFileToString(const std::string& path, std::string* content);
@@ -33,7 +39,7 @@ bool getHomePath(std::string& buf);
 // Src path
 std::string getSrcRoot();
 static inline std::string getResourcePath(const std::string& filename) {
-    return getSrcRoot() + "/resources/"+ filename;
+    return getSrcRoot() + "/resources/" + filename;
 }
 
 // Command
@@ -50,4 +56,6 @@ bool runCommand(const std::string& command, std::string& res);
     _rc; })
 #endif
 
+#include "config.h"
+#define IS_DEFINED IS_BUILTIN
 #define PRETTYF(fmt, ...) printf("[%s:%d] " fmt "\n", __FILE__, __LINE__, ##__VA_ARGS__)
