@@ -4,6 +4,7 @@
 #include <NamespaceImport.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <utils/libutils.h>
 
 #include <chrono>
 #include <fstream>
@@ -108,9 +109,9 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
         }
         count++;
     }
-#if defined PWD_STR && defined PWD_REPLACE_STR && !defined __WIN32
+#if defined PWD_REPLACE_STR && !defined __WIN32
     size_t start_pos = 0;
-    std::string pwd(PWD_STR), replace(PWD_REPLACE_STR);
+    std::string pwd(getSrcRoot()), replace(PWD_REPLACE_STR);
     while ((start_pos = res.find(pwd, start_pos)) != std::string::npos) {
         res.replace(start_pos, pwd.length(), replace);
         start_pos += replace.length();

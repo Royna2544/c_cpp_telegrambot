@@ -144,26 +144,28 @@ int main(void) {
     });
     bot_AddCommandPermissive(gbot, "alive", [](const Bot &bot, const Message::Ptr &message) {
         static std::string version_str;
-#if defined(GIT_COMMITID) && defined(GIT_COMMITMSG) && defined(GIT_ORIGIN_URL) && defined(PWD_STR)
         static std::once_flag once;
         std::call_once(once, [] {
-            char dummy[1024];
-            char *buf;
-            ssize_t len = 0;
+            char buf[1024] = {0};
+            std::string commitid, commitmsg, originurl;
             std::string buffer;
-            ReadFileToString(PWD_STR "/resources/about.html.txt", &buffer);
-            len = snprintf(dummy, sizeof(dummy), buffer.c_str(), GIT_COMMITMSG,
-                           GIT_ORIGIN_URL, GIT_COMMITID, GIT_COMMITID, GIT_ORIGIN_URL,
-                           getCompileVersion().c_str());
-            buf = new char[len + 1];
-            memset(buf, 0, len + 1);
-            snprintf(buf, len, buffer.c_str(), GIT_COMMITMSG,
-                     GIT_ORIGIN_URL, GIT_COMMITID, GIT_COMMITID, GIT_ORIGIN_URL,
-                     getCompileVersion().c_str());
+
+            static const std::map<std::string *, std::string> commands = {
+                {&commitid, "git rev-parse HEAD"},
+                {&commitmsg, "git log --pretty=%s -1"},
+                {&originurl, "git config --get remote.origin.url"},
+            };
+            for (const auto &cmd : commands) {
+                bool ret = runCommand(cmd.second, *cmd.first);
+                if (!ret) {
+                    *cmd.first = "(Command failed)";
+                }
+            }
+            ReadFileToString(getResourcePath("about.html.txt"), &buffer);
+            snprintf(buf, sizeof(buf), buffer.c_str(), commitmsg.c_str(), originurl.c_str(),
+                     commitid.c_str(), commitid.c_str(), originurl.c_str(), getCompileVersion().c_str());
             version_str = buf;
-            delete[] buf;
         });
-#endif
         // Hardcoded Cum about it GIF
         bot.getApi().sendAnimation(message->chat->id,
                                    "CgACAgQAAx0CdY7-CgABARtpZLefgyKNpSLvyCJWcp8"
@@ -178,7 +180,7 @@ int main(void) {
             std::string buf, line;
             std::stringstream ss;
 
-            ReadFileToString(PWD_STR "/resources/flash.txt", &buf);
+            ReadFileToString(getResourcePath("flash.txt"), &buf);
             ss = std::stringstream(buf);
             while (std::getline(ss, line)) {
                 if (!line.empty())

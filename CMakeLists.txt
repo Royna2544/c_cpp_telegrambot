@@ -9,43 +9,9 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-execute_process(
-  COMMAND git rev-parse HEAD
-  RESULT_VARIABLE RESULT_GIT_COMMITID
-  OUTPUT_VARIABLE OUTPUT_GIT_COMMITID
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-
-execute_process(
-  COMMAND bash -c "git log -1 --pretty=%B | head -n 1"
-  RESULT_VARIABLE RESULT_GIT_COMMITMSG
-  OUTPUT_VARIABLE OUTPUT_GIT_COMMITMSG
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-
-execute_process(
-  COMMAND git config --get remote.origin.url
-  RESULT_VARIABLE RESULT_GIT_ORIGIN_URL
-  OUTPUT_VARIABLE OUTPUT_GIT_ORIGIN_URL
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-
-message(STATUS "PWD is ${CMAKE_CURRENT_SOURCE_DIR}")
-add_compile_options(-fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/=//src_root:)
-add_definitions(-DPWD_STR="${CMAKE_CURRENT_SOURCE_DIR}")
-add_definitions(-DPWD_REPLACE_STR="//src_root")
-
-if(RESULT_GIT_COMMITID EQUAL 0)
-  message(STATUS "Commit ID available")
-  add_definitions(-DGIT_COMMITID="${OUTPUT_GIT_COMMITID}")
-endif()
-
-if(RESULT_GIT_COMMITMSG EQUAL 0)
-  message(STATUS "Commit msg available")
-  add_definitions(-DGIT_COMMITMSG="${OUTPUT_GIT_COMMITMSG}")
-endif()
-
-if(RESULT_GIT_ORIGIN_URL EQUAL 0)
-  message(STATUS "Origin url link available")
-  add_definitions(-DGIT_ORIGIN_URL="${OUTPUT_GIT_ORIGIN_URL}")
-endif()
+set(PWD_REPLACE //src_root:)
+add_definitions(-DPWD_REPLACE_STR="{PWD_REPLACE}")
+add_compile_options(-fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/=${PWD_REPLACE})
 
 include_directories(src/include)
 include_directories(src/)
