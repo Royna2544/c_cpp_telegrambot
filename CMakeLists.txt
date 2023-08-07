@@ -3,7 +3,6 @@ project(tg_cpphost)
 
 option(ENABLE_TIDY "Enable clang-tidy checks" OFF)
 option(ENABLE_DATABASE "Enable local db support" ON)
-option(DEBUG "Debugging extra printfs" OFF)
 option(ENFORCE_EN_US "Enforce en-US locale for output" ON)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -82,10 +81,6 @@ if(ENABLE_DATABASE)
   include_directories(${PROTO_HDRS_DIR})
   include_directories(${Protobuf_INCLUDE_DIRS})
   set(SRC_LIST src/Database.cpp ${SRC_LIST} ${PROTO_SRCS})
-endif()
-
-if(DEBUG)
-  add_definitions(-DDEBUG)
 endif()
 
 if (ENFORCE_EN_US)

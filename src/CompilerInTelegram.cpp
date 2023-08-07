@@ -166,9 +166,7 @@ void CompileRunHandler<CCppCompileHandleData>(const CCppCompileHandleData &data)
 
     cmd << data.cmdPrefix << SPACE << data.outfile;
     addExtArgs(cmd, extraargs, res);
-#ifdef DEBUG
-    printf("cmd: %s\n", cmd.str().c_str());
-#endif
+
     res += "Compile time:\n";
     runCommand(data.bot, data.message, cmd.str(), res);
     res += "\n";
@@ -195,9 +193,6 @@ void CompileRunHandler(const CompileHandleData &data) {
     cmd << data.cmdPrefix << SPACE << data.outfile;
     addExtArgs(cmd, extargs, res);
 
-#ifdef DEBUG
-    printf("cmd: %s\n", cmd.str().c_str());
-#endif
     runCommand(data.bot, data.message, cmd.str(), res);
     commonCleanup(data.bot, data.message, res, data.outfile);
 }

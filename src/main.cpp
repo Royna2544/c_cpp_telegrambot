@@ -332,7 +332,7 @@ int main(void) {
                             default:
                                 break;
                         }
-#ifdef DEBUG
+#ifndef NDEBUG
                         PRETTYF("result: %d", result);
 #endif
                         state = InputState::NONE;
@@ -342,7 +342,7 @@ int main(void) {
                 }
                 case '0' ... '9': {
                     int intver = code - 48;
-#ifdef DEBUG
+#ifndef NDEBUG
                     PRETTYF("%d", intver);
 #endif
                     numbercache.push_back(intver);
@@ -372,7 +372,7 @@ int main(void) {
                 }
             }
         }
-#ifdef DEBUG
+#ifndef NDEBUG
         PRETTYF("Date h %d m %d s %d", hms.h, hms.m, hms.s);
 #endif
 #define TIMER_CONFIG_SEC 5
@@ -527,7 +527,7 @@ int main(void) {
                             buffer_priv = buffer;
                             buffer.clear();
                         }
-#ifdef DEBUG
+#ifndef NDEBUG
                         PRETTYF("Buffer size: %lu", buffer_priv.size());
 #endif
                         if (buffer_priv.size() <= 1) return;
