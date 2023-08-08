@@ -23,10 +23,12 @@ set(SRC_LIST src/main.cpp src/Authorization.cpp
 # System specific
 if (WIN32)
 set(SRC_LIST src/popen_wdt/popen_wdt_windows.c
+             src/utils/libutils_windows.cpp
              src/windows/sighandler.c
              ${SRC_LIST})
 else()
 set(SRC_LIST src/popen_wdt/popen_wdt_posix.c
+             src/utils/libutils_posix.cpp
              ${SRC_LIST})
 endif()
 

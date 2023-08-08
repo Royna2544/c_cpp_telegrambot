@@ -33,6 +33,7 @@ static inline const char dir_delimiter = '/';
 
 // Path tools
 std::vector<std::string> getPathEnv();
+// below functions are implemented sperately by OS
 bool canExecute(const std::string& path);
 bool getHomePath(std::string& buf);
 

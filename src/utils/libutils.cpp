@@ -1,5 +1,4 @@
 #include "libutils.h"
-#include "../popen_wdt/popen_wdt.h"
 
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -13,16 +12,10 @@
 #include <random>
 #include <stdexcept>
 
+#include "../popen_wdt/popen_wdt.h"
+
 #ifdef __linux__
 #include <linux/limits.h>  // I need PATH_MAX
-#endif
-
-#ifdef __WIN32
-#include <shlobj.h>
-#include <shlwapi.h>
-#include <windows.h>
-#else
-#include <unistd.h>
 #endif
 
 #define ARRAY_SIZE(arr) sizeof(arr) / sizeof(arr[0])
@@ -63,41 +56,6 @@ bool ReadFileToString(const std::string& path, std::string* content) {
     return ReadFdToString(fd, content);
 }
 // End libbase
-
-#ifdef __WIN32
-bool canExecute(const std::string& path) {
-    auto filepath = path.c_str();
-    bool exists = PathFileExistsA(filepath);
-    if (!exists) {
-        return false;
-    }
-
-    bool isDirectory = PathIsDirectoryA(filepath);
-    if (isDirectory) {
-        return false;
-    }
-    return true;
-}
-bool getHomePath(std::string& buf) {
-    CHAR userDir[MAX_PATH];
-    bool ret = SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_PROFILE, NULL, 0, userDir));
-    if (ret) {
-        buf = userDir;
-    }
-    return ret;
-}
-#else
-bool getHomePath(std::string& buf) {
-    auto buf_c = getenv("HOME");
-    if (buf_c) {
-        buf = buf_c;
-    }
-    return !!buf_c;
-}
-bool canExecute(const std::string& path) {
-    return access(path.c_str(), R_OK | X_OK) == 0;
-}
-#endif
 
 std::vector<std::string> getPathEnv() {
     size_t pos = 0;
