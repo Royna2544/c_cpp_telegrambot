@@ -46,7 +46,7 @@ bool ReadFdToString(int fd, std::string* content) {
         content->reserve(sb.st_size);
     }
 
-    char buf[4096] __attribute__((__uninitialized__));
+    char buf[4096];
     ssize_t n;
     while ((n = TEMP_FAILURE_RETRY(read(fd, &buf[0], sizeof(buf)))) > 0) {
         content->append(buf, n);
