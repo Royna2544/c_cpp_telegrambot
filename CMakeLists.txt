@@ -10,7 +10,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(PWD_REPLACE //src_root:)
-add_definitions(-DPWD_REPLACE_STR="{PWD_REPLACE}")
+add_definitions(-DPWD_REPLACE_STR="${PWD_REPLACE}")
 add_compile_options(-fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/=${PWD_REPLACE})
 
 include_directories(src/include)
