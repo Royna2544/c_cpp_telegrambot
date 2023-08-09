@@ -9,9 +9,12 @@
 #include <chrono>
 #include <fstream>
 #include <mutex>
+#include <thread>
 #include <sstream>
 
 #include "popen_wdt/popen_wdt.h"
+
+using std::chrono_literals::operator""ms;
 
 static const char SPACE = ' ';
 static const char EMPTY[] = "(empty)";
@@ -108,6 +111,7 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
             hasmore = true;
         }
         count++;
+        std::this_thread::sleep_for(50ms);
     }
 #if defined PWD_REPLACE_STR && !defined __WIN32
     size_t start_pos = 0;
