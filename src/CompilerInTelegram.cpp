@@ -9,8 +9,8 @@
 #include <chrono>
 #include <fstream>
 #include <mutex>
-#include <thread>
 #include <sstream>
+#include <thread>
 
 #include "popen_wdt/popen_wdt.h"
 
@@ -82,8 +82,7 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
 
     if (cmd.find("\"") != std::string::npos) {
         cmd_remapped.reserve(cmd.size());
-        cmd_cstr = cmd.c_str();
-        for (; *cmd_cstr != '\0'; cmd_cstr++) {
+        for (cmd_cstr = cmd.c_str(); *cmd_cstr != '\0'; cmd_cstr++) {
             if (*cmd_cstr == '"') {
                 cmd_remapped += '\"';
             } else {
