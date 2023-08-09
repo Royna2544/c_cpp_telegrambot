@@ -52,6 +52,7 @@ static void* watchdog(void* arg) {
                 }
             }
         }
+        Sleep(100);
     }
     CloseHandle(rwProcessThread);
     CloseHandle(data->process_handle);
