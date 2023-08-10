@@ -91,7 +91,7 @@ int main(void) {
         token = token_str;
 
     database::db->set_ownerid(ownerid);
-    Bot gbot(token);
+    static Bot gbot(token);
     static std::shared_ptr<Timer<TimerImpl_privdata>> tm_ptr;
     std::string CCompiler, CXXCompiler, GoCompiler, PythonInterpreter;
     CCompiler = findCompiler(ProgrammingLangs::C);
@@ -497,7 +497,7 @@ int main(void) {
             bot_sendReplyMessage(bot, message, "Sticker not found in replied-to message");
         }
     });
-    gbot.getEvents().onAnyMessage([&gbot](const Message::Ptr &message) {
+    gbot.getEvents().onAnyMessage([](const Message::Ptr &message) {
         using UserId = int64_t;
         using ChatId = int64_t;
         using ChatHandle = std::map<UserId, std::vector<Message::Ptr>>;
