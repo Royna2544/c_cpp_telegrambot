@@ -572,24 +572,28 @@ int main(void) {
         std::call_once(once, [] {
             std::thread([] {
                 while (true) {
-                    for (auto &chat : buffer_sub) {
+                    {
                         const std::lock_guard<std::mutex> _(m);
-                        decltype(buffer)::const_iterator it = buffer.find(chat.first);
-                        if (it == buffer.end()) {
-                            buffer_sub.erase(buffer_sub.find(chat.first));
-                            return;
-                        }
+                        auto its = buffer_sub.begin();
+                        while (its != buffer_sub.end()) {
+                            decltype(buffer)::const_iterator it = buffer.find(its->first);
+                            if (it == buffer.end()) {
+                                its = buffer_sub.erase(its);
+                                continue;
+                            }
 #ifndef NDEBUG
-                        PRETTYF("Chat: %ld, Count: %d", chat.first, chat.second);
+                            PRETTYF("Chat: %ld, Count: %d", its->first, its->second);
 #endif
-                        if (chat.second >= 5) {
+                            if (its->second >= 5) {
 #ifndef NDEBUG
-                            PRETTYF("Launching spamdetect for %ld", chat.first);
+                                PRETTYF("Launching spamdetect for %ld", its->first);
 #endif
-                            spamDetectFunc(it);
+                                spamDetectFunc(it);
+                            }
+                            buffer.erase(it);
+                            its->second = 0;
+			    ++its;
                         }
-                        buffer.erase(it);
-                        chat.second = 0;
                     }
                     std::this_thread::sleep_for(5s);
                 }
