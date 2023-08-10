@@ -53,6 +53,7 @@ struct TimerImpl_privdata {
 };
 
 // tgbot
+using TgBot::ChatPermissions;
 using TgBot::MessageEntity;
 using TgBot::StickerSet;
 using TgBot::TgLongPoll;
@@ -501,20 +502,22 @@ int main(void) {
         using ChatId = int64_t;
         using ChatHandle = std::map<UserId, std::vector<Message::Ptr>>;
         using UserType = std::pair<ChatId, std::vector<Message::Ptr>>;
+        using SpamMapT = std::map<UserId, std::vector<Message::Ptr>>;
         static std::map<ChatId, ChatHandle> buffer;
         static std::map<ChatId, int> buffer_sub;
         static std::mutex m;  // Protect buffer, buffer_sub
         static auto spamDetectFunc = [](decltype(buffer)::const_iterator handle) {
-            std::map<UserId, size_t> MaxSameMsgMap, MaxMsgMap;
+            SpamMapT MaxSameMsgMap, MaxMsgMap;
             // By most msgs sent by that user
             for (const auto &perUser : handle->second) {
                 std::apply([&](const auto &first, const auto &second) {
-                    MaxMsgMap.emplace(first, second.size());
+                    MaxMsgMap.emplace(first, second);
 #ifndef NDEBUG
                     PRETTYF("Chat: %ld, User: %ld, msgcnt: %ld", handle->first,
                             first, second.size());
 #endif
-                }, perUser);
+                },
+                           perUser);
             }
 
             // By most common msgs
@@ -531,34 +534,48 @@ int main(void) {
                 for (const auto &obj : pair.second) {
                     byMsgContent.emplace(commonMsgdataFn(obj), obj);
                 }
-                std::unordered_map<std::string, size_t> commonMap;
+                std::unordered_map<std::string, std::vector<Message::Ptr>> commonMap;
                 for (const auto &cnt : byMsgContent) {
-                    ++commonMap[cnt.first];
+                    commonMap[cnt.first].emplace_back(cnt.second);
                 }
                 // Find the most common value
                 auto mostCommonIt = std::max_element(commonMap.begin(), commonMap.end(),
                                                      [](const auto &lhs, const auto &rhs) {
-                                                         return lhs.second < rhs.second;
+                                                         return lhs.second.size() < rhs.second.size();
                                                      });
                 MaxSameMsgMap.emplace(pair.first, mostCommonIt->second);
 #ifndef NDEBUG
                 PRETTYF("Chat: %ld, User: %ld, maxIt: %ld", handle->first,
-                        pair.first, mostCommonIt->second);
+                        pair.first, mostCommonIt->second.size());
 #endif
             }
-#ifdef NDEBUG
-            try {
-                for (const auto &msg : pr->second) {
-                    bot.getApi().deleteMessage(msg->chat->id, msg->messageId);
-                }
-                auto msg = pr->second.front();
+            static auto deleteAndMute = [&](const SpamMapT &map, const int threshold) {
                 // Initial set - all false set
                 auto perms = std::make_shared<ChatPermissions>();
-                bot.getApi().restrictChatMember(msg->chat->id, msg->from->id, perms, 5 * 60);
-            } catch (const std::exception &e) {
-                PRETTYF("Error deleting msg: %s", e.what());
-            }
+                for (const auto &mapmsg : map) {
+                    if (mapmsg.second.size() >= threshold) {
+#ifdef NDEBUG
+                        for (const auto &msg : mapmsg.second) {
+                            try {
+                                gbot.getApi().deleteMessage(handle->first, msg->messageId);
+                            } catch (const std::exception &ignored) {
+                            }
+                        }
+                        try {
+                            gbot.getApi().restrictChatMember(handle->first, mapmsg.first,
+                                                            perms, 5 * 60);
+                        } catch (const std::exception &e) {
+                            PRETTYF("Cannot mute user %ld in chat %ld: %s", mapmsg.first,
+                                    handle->first, e.what());
+                        }
+#else
+                        PRETTYF("Spam detected for user %ld", mapmsg.first);
 #endif
+                    }
+                }
+            };
+            deleteAndMute(MaxSameMsgMap, 3);
+            deleteAndMute(MaxMsgMap, 5);
         };
 
         if (Authorized(message, true)) return;
@@ -592,7 +609,7 @@ int main(void) {
                             }
                             buffer.erase(it);
                             its->second = 0;
-			    ++its;
+                            ++its;
                         }
                     }
                     std::this_thread::sleep_for(5s);
