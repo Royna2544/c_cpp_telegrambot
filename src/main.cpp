@@ -520,9 +520,9 @@ int main(void) {
             // By most common msgs
             static auto commonMsgdataFn = [](const Message::Ptr &m) {
                 if (m->sticker)
-                    return m->sticker->fileId;
+                    return m->sticker->fileUniqueId;
                 else if (m->animation)
-                    return m->animation->fileId;
+                    return m->animation->fileUniqueId;
                 else
                     return m->text;
             };
