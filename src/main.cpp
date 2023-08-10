@@ -43,6 +43,8 @@
 
 #include "utils/libutils.h"
 
+using std::chrono_literals::operator""s;
+
 struct TimerImpl_privdata {
     int32_t messageid;
     const TgBot::Bot &bot;
@@ -495,10 +497,69 @@ int main(void) {
         }
     });
     gbot.getEvents().onAnyMessage([&gbot](const Message::Ptr &message) {
-        static std::vector<Message::Ptr> buffer;
-        static std::mutex m;  // Protect buffer
-        static std::once_flag once;
-        const Bot &bot = gbot;
+        using UserId = int64_t;
+        using ChatId = int64_t;
+        using ChatHandle = std::map<UserId, std::vector<Message::Ptr>>;
+        using UserType = std::pair<ChatId, std::vector<Message::Ptr>>;
+        static std::map<ChatId, ChatHandle> buffer;
+        static std::map<ChatId, int> buffer_sub;
+        static std::mutex m;  // Protect buffer, buffer_sub
+        static auto spamDetectFunc = [](decltype(buffer)::const_iterator handle) {
+            std::map<UserId, size_t> MaxSameMsgMap, MaxMsgMap;
+            // By most msgs sent by that user
+            for (const auto &perUser : handle->second) {
+                std::apply([&](const auto &first, const auto &second) {
+                    MaxMsgMap.emplace(first, second.size());
+#ifndef NDEBUG
+                    PRETTYF("Chat: %ld, User: %ld, msgcnt: %ld", handle->first,
+                            first, second.size());
+#endif
+                }, perUser);
+            }
+
+            // By most common msgs
+            static auto commonMsgdataFn = [](const Message::Ptr &m) {
+                if (m->sticker)
+                    return m->sticker->fileId;
+                else if (m->animation)
+                    return m->animation->fileId;
+                else
+                    return m->text;
+            };
+            for (const auto &pair : handle->second) {
+                std::multimap<std::string, Message::Ptr> byMsgContent;
+                for (const auto &obj : pair.second) {
+                    byMsgContent.emplace(commonMsgdataFn(obj), obj);
+                }
+                std::unordered_map<std::string, size_t> commonMap;
+                for (const auto &cnt : byMsgContent) {
+                    ++commonMap[cnt.first];
+                }
+                // Find the most common value
+                auto mostCommonIt = std::max_element(commonMap.begin(), commonMap.end(),
+                                                     [](const auto &lhs, const auto &rhs) {
+                                                         return lhs.second < rhs.second;
+                                                     });
+                MaxSameMsgMap.emplace(pair.first, mostCommonIt->second);
+#ifndef NDEBUG
+                PRETTYF("Chat: %ld, User: %ld, maxIt: %ld", handle->first,
+                        pair.first, mostCommonIt->second);
+#endif
+            }
+#ifdef NDEBUG
+            try {
+                for (const auto &msg : pr->second) {
+                    bot.getApi().deleteMessage(msg->chat->id, msg->messageId);
+                }
+                auto msg = pr->second.front();
+                // Initial set - all false set
+                auto perms = std::make_shared<ChatPermissions>();
+                bot.getApi().restrictChatMember(msg->chat->id, msg->from->id, perms, 5 * 60);
+            } catch (const std::exception &e) {
+                PRETTYF("Error deleting msg: %s", e.what());
+            }
+#endif
+        };
 
         if (Authorized(message, true)) return;
         // Do not track older msgs and consider it as spam.
@@ -507,75 +568,37 @@ int main(void) {
         if (!message->animation && message->text.empty() && !message->sticker)
             return;
 
-        std::call_once(once, [&] {
-            std::thread([&]() {
+        static std::once_flag once;
+        std::call_once(once, [] {
+            std::thread([] {
                 while (true) {
-                    auto t = std::thread([&]() {
-                        std::string tag;
-                        std::vector<Message::Ptr> buffer_priv;
-                        std::map<int64_t, int> spammap, chatidmap;
-                        int64_t chatid = -1;
-                        int maxvalue = 0;
-                        {
-                            const std::lock_guard<std::mutex> _(m);
-                            buffer_priv = buffer;
-                            buffer.clear();
+                    for (auto &chat : buffer_sub) {
+                        const std::lock_guard<std::mutex> _(m);
+                        decltype(buffer)::const_iterator it = buffer.find(chat.first);
+                        if (it == buffer.end()) {
+                            buffer_sub.erase(buffer_sub.find(chat.first));
+                            return;
                         }
 #ifndef NDEBUG
-                        PRETTYF("Buffer size: %lu", buffer_priv.size());
+                        PRETTYF("Chat: %ld, Count: %d", chat.first, chat.second);
 #endif
-                        if (buffer_priv.size() <= 1) return;
-                        for (const auto &msg : buffer_priv) {
-                            chatidmap[msg->chat->id]++;
+                        if (chat.second >= 5) {
+#ifndef NDEBUG
+                            PRETTYF("Launching spamdetect for %ld", chat.first);
+#endif
+                            spamDetectFunc(it);
                         }
-
-                        for (const auto &pair : chatidmap) {
-                            if (pair.second > maxvalue) {
-                                chatid = pair.first;
-                                maxvalue = pair.second;
-                            }
-                        }
-                        buffer_priv.erase(std::remove_if(buffer_priv.begin(), buffer_priv.end(),
-                                                         [&](const Message::Ptr &s) {
-                                                             return s->chat->id != chatid;
-                                                         }),
-                                          buffer_priv.end());
-
-                        for (const auto &msg : buffer_priv) {
-                            if (msg->from)
-                                spammap[msg->from->id]++;
-                        }
-                        using pair_type = decltype(spammap)::value_type;
-                        auto pr = std::max_element(
-                            std::begin(spammap), std::end(spammap),
-                            [](const pair_type &p1, const pair_type &p2) {
-                                return p1.second > p2.second;
-                            });
-                        // Reasonable value 5 from experiments
-                        if (pr->second <= 5) return;
-                        for (const auto &msg : buffer_priv) {
-                            if (msg->from && msg->from->id == pr->first)
-                                if (!msg->from->username.empty()) tag = " @" + msg->from->username;
-                        }
-                        bot.getApi().sendMessage(chatid, "Spam detected" + tag);
-                        try {
-                            for (const auto &msg : buffer_priv) {
-                                if (msg->from && msg->from->id == pr->first) {
-                                    bot.getApi().deleteMessage(msg->chat->id, msg->messageId);
-                                }
-                            }
-                        } catch (const std::exception &) {
-                            PRETTYF("Error deleting msg");
-                        }
-                    });
-                    t.detach();
-                    std::this_thread::sleep_for(std::chrono::seconds(5));
+                        buffer.erase(it);
+                        chat.second = 0;
+                    }
+                    std::this_thread::sleep_for(5s);
                 }
             }).detach();
         });
         {
             const std::lock_guard<std::mutex> _(m);
-            buffer.push_back(message);
+            buffer[message->chat->id][message->from->id].emplace_back(message);
+            ++buffer_sub[message->chat->id];
         }
     });
 
