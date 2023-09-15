@@ -88,20 +88,19 @@ FILE* popen_watchdog(const char* command, bool* wdt_ret) {
     saAttr.bInheritHandle = TRUE;
     saAttr.lpSecurityDescriptor = NULL;
 
-    // Create pips, disable handle inherit
+    // Create pipes, disable handle inherit
     if (!CreatePipe(&child_stdout_r, &child_stdout_w, &saAttr, 0)) {
         return NULL;
-    }
-    if (wdt_ret) {
-        if (!CreatePipe(&child_stdout_r_file, &child_stdout_w_file, &saAttr, 0)) {
-            return NULL;
-        }
     }
     if (!SetHandleInformation(child_stdout_r, HANDLE_FLAG_INHERIT, 0)) {
         return NULL;
     }
 
     if (wdt_ret) {
+        // Create FILE* middleman pipe 
+        if (!CreatePipe(&child_stdout_r_file, &child_stdout_w_file, &saAttr, 0)) {
+            return NULL;
+        }
         // Alloc watchdog data
         // Create Mapping
         hMapFile = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0,
