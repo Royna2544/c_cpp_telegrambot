@@ -39,6 +39,7 @@ if(ENABLE_TIDY)
       -header-filter=.;
       -checks=*,-llvmlibc*,-fuchsia*,-altera*,-hicpp*,abseil-*,-llvm-header-guard,-modernize-use-trailing-return-type,-modernize-redundent-void-arg
   )
+  set_target_properties(TgBot PROPERTIES CXX_CLANG_TIDY "")
 endif()
 
 if(ENABLE_DATABASE)
@@ -62,7 +63,6 @@ add_definitions(-DBOOST_BIND_GLOBAL_PLACEHOLDERS)
 add_compile_options(-include sysdep/cdefs.h)
 
 add_subdirectory(lib)
-set_target_properties(TgBot PROPERTIES CXX_CLANG_TIDY "")
 add_executable(${PROJECT_NAME} ${SRC_LIST})
 set(LD_LIST TgBot)
 if(ENABLE_DATABASE)
