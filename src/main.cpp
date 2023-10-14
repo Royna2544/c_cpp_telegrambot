@@ -26,6 +26,8 @@
 #include <unordered_map>
 #include <vector>
 
+#include <boost/algorithm/string/replace.hpp>
+
 #ifdef USE_DATABASE
 #include <Database.h>
 #endif
@@ -153,12 +155,11 @@ int main(void) {
         CompileRunHandler(BashHandleData{bot, message, true});
     });
     bot_AddCommandPermissive(gbot, "alive", [](const Bot &bot, const Message::Ptr &message) {
-        static std::string version_str;
+        static std::string version;
         static std::once_flag once;
         std::call_once(once, [] {
             char buf[1024] = {0};
-            std::string commitid, commitmsg, originurl;
-            std::string buffer;
+            std::string commitid, commitmsg, originurl, compilerver;
 
             static const std::map<std::string *, std::string> commands = {
                 {&commitid, "git rev-parse HEAD"},
@@ -171,16 +172,19 @@ int main(void) {
                     *cmd.first = "(Command failed)";
                 }
             }
-            ReadFileToString(getResourcePath("about.html.txt"), &buffer);
-            snprintf(buf, sizeof(buf), buffer.c_str(), commitmsg.c_str(), originurl.c_str(),
-                     commitid.c_str(), commitid.c_str(), originurl.c_str(), getCompileVersion().c_str());
-            version_str = buf;
+            compilerver = getCompileVersion();
+            ReadFileToString(getResourcePath("about.html.txt"), &version);
+#define REPLACE_PLACEHOLDER(buf, name) boost::replace_all(buf, "_" #name "_", name)
+            REPLACE_PLACEHOLDER(version, commitid);
+            REPLACE_PLACEHOLDER(version, commitmsg);
+            REPLACE_PLACEHOLDER(version, originurl);
+            REPLACE_PLACEHOLDER(version, compilerver);
         });
         // Hardcoded Cum about it GIF
         bot.getApi().sendAnimation(message->chat->id,
                                    "CgACAgQAAx0CdY7-CgABARtpZLefgyKNpSLvyCJWcp8"
                                    "mt5KF_REAAgkDAAI2tFRQIk0uTVxfZnsvBA",
-                                   0, 0, 0, "", version_str, message->messageId,
+                                   0, 0, 0, "", version, message->messageId,
                                    nullptr, "html");
     });
     bot_AddCommandPermissive(gbot, "flash", [](const Bot &bot, const Message::Ptr &message) {
@@ -563,7 +567,7 @@ int main(void) {
                         }
                         try {
                             gbot.getApi().restrictChatMember(handle->first, mapmsg.first,
-                                                            perms, 5 * 60);
+                                                             perms, 5 * 60);
                         } catch (const std::exception &e) {
                             PRETTYF("Cannot mute user %ld in chat %ld: %s", mapmsg.first,
                                     handle->first, e.what());
