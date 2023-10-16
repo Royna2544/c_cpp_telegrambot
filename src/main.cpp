@@ -62,10 +62,13 @@ using TgBot::TgLongPoll;
 // stdc++
 static inline auto pholder1 = std::placeholders::_1;
 static inline auto pholder2 = std::placeholders::_2;
+
+#ifdef USE_DATABASE
 // Database.cpp
 using database::blacklist;
 using database::ProtoDatabase;
 using database::whitelist;
+#endif
 
 int main(void) {
     const char *token_str = getenv("TOKEN");
@@ -92,7 +95,9 @@ int main(void) {
     } else
         token = token_str;
 
+#ifdef USE_DATABASE
     database::db->set_ownerid(ownerid);
+#endif
     static Bot gbot(token);
     static std::shared_ptr<Timer<TimerImpl_privdata>> tm_ptr;
     std::string CCompiler, CXXCompiler, GoCompiler, PythonInterpreter;
@@ -143,10 +148,10 @@ int main(void) {
         bot_sendReplyMessage(bot, message, "OK");
     });
 #else
-    NOT_SUPPORTED_DB("addblacklist");
-    NOT_SUPPORTED_DB("rmblacklist");
-    NOT_SUPPORTED_DB("addwhitelist");
-    NOT_SUPPORTED_DB("rmwhitelist");
+    NOT_SUPPORTED_DB(gbot, "addblacklist");
+    NOT_SUPPORTED_DB(gbot, "rmblacklist");
+    NOT_SUPPORTED_DB(gbot, "addwhitelist");
+    NOT_SUPPORTED_DB(gbot, "rmwhitelist");
 #endif
     bot_AddCommandEnforced(gbot, "bash", [](const Bot &bot, const Message::Ptr &message) {
         CompileRunHandler(BashHandleData{bot, message, false});
