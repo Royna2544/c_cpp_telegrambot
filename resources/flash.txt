@@ -47,3 +47,27 @@ Battery corruption: Current percent: 2000%
 YOUR COMMAND BLOCKED
 YOUR COMMAND REJECTED
 FDE is enabled on bootloader
+Error 404: Error not found
+Busy playing gi comeback later
+Process [17] is too shy to continue working
+Was unable to bend to matrix
+CPP code evolved to reject human
+You need to start caring about me
+Ate too much ram on breakfast, none left
+Syntax error: the code is a goddamn mess
+Not feeling like C today
+Process [16] was too ugly it crashed the whole thing
+Error 12: read only filesystem
+Process [14] suicided due to heavy loading
+Compiler died trying to understand your code
+Don't try again
+C++ compile error: pointer is lost and can't find it's way home
+C error: found array higher than eiffel tower
+C error: caught an integer pretending to be a float number
+CPU error: im not safe today
+Unable to locate success
+No
+Yesn't
+i thought this was bash
+mad at YOURCODE
+Hardware fail: no ram detected... wait how am i talking then
