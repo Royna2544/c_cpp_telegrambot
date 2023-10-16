@@ -40,6 +40,7 @@
 #include <BotAddCommand.h>
 #include <BotReplyMessage.h>
 #include <CompilerInTelegram.h>
+#include <ExtArgs.h>
 #include <NamespaceImport.h>
 #include <Timer.h>
 

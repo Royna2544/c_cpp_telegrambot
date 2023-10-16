@@ -1,6 +1,7 @@
 #include <Authorization.h>
 #include <BotReplyMessage.h>
 #include <CompilerInTelegram.h>
+#include <ExtArgs.h>
 #include <NamespaceImport.h>
 #include <fcntl.h>
 #include <unistd.h>
