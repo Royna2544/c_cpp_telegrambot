@@ -12,6 +12,8 @@ _deps
 
 # Exe
 tg_cpphost
+libTgBotUtils.a
+dumpProtoDB
 # Protobuf generated
 proto/gen
 # Visual studio code

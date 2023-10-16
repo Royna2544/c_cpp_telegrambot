@@ -17,19 +17,22 @@ include_directories(src/include)
 include_directories(src/)
 
 set(SRC_LIST src/main.cpp src/Authorization.cpp
-             src/utils/libutils.cpp src/CompilerInTelegram.cpp
-             src/BotAddCommand.cpp)
+             src/CompilerInTelegram.cpp src/BotAddCommand.cpp)
+
+set(LIBUTILS_SRC_LIST src/utils/libutils.cpp)
 
 # System specific
 if (WIN32)
-set(SRC_LIST src/popen_wdt/popen_wdt_windows.c
+set(SRC_LIST src/windows/sighandler.c
+	     ${SRC_LIST})
+
+set(LIBUTILS_SRC_LIST src/popen_wdt/popen_wdt_windows.c
              src/utils/libutils_windows.cpp
-             src/windows/sighandler.c
-             ${SRC_LIST})
+     	     ${LIBUTILS_SRC_LIST})
 else()
-set(SRC_LIST src/popen_wdt/popen_wdt_posix.c
+set(LIBUTILS_SRC_LIST src/popen_wdt/popen_wdt_posix.c
              src/utils/libutils_posix.cpp
-             ${SRC_LIST})
+             ${LIBUTILS_SRC_LIST})
 endif()
 
 if(ENABLE_TIDY)
@@ -62,14 +65,32 @@ add_definitions(-DBOOST_BIND_GLOBAL_PLACEHOLDERS)
 # C Compliance header
 add_compile_options(-include sysdep/cdefs.h)
 
+# Utils library
+add_library(TgBotUtils STATIC ${LIBUTILS_SRC_LIST})
+# Windows needs this
+if (WIN32)
+target_link_libraries(TgBotUtils shlwapi)
+endif()
+
+# TgBot-Cpp library
 add_subdirectory(lib)
+# Build main tg_cpphost exe
 add_executable(${PROJECT_NAME} ${SRC_LIST})
-set(LD_LIST TgBot)
+
+set(LD_LIST TgBot TgBotUtils)
 if(ENABLE_DATABASE)
   set(LD_LIST ${LD_LIST} absl_log_internal_check_op absl_log_internal_message)
   set(LD_LIST ${LD_LIST} protobuf::libprotobuf)
 endif()
 if (WIN32)
-  set(LD_LIST ${LD_LIST} wsock32 shlwapi Ws2_32)
+  set(LD_LIST ${LD_LIST} wsock32 Ws2_32)
 endif()
 target_link_libraries(${PROJECT_NAME} ${LD_LIST})
+
+## Protobuf DB Dumper
+if (ENABLE_DATABASE)
+add_executable(dumpProtoDB proto/DumpProtoDB.cc
+			 src/Database.cpp
+		 	 ${PROTO_SRCS})
+target_link_libraries(dumpProtoDB ${LD_LIST})
+endif()
