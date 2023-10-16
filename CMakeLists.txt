@@ -53,7 +53,8 @@ if(ENABLE_DATABASE)
   get_filename_component(PROTO_HDRS_DIR ${PROTO_HDRS} DIRECTORY)
   include_directories(${PROTO_HDRS_DIR})
   include_directories(${Protobuf_INCLUDE_DIRS})
-  set(SRC_LIST src/Database.cpp ${SRC_LIST} ${PROTO_SRCS})
+  add_library(TgBotDB STATIC src/Database.cpp ${PROTO_SRCS})
+  target_link_libraries(TgBotDB TgBot TgBotUtils protobuf::libprotobuf)
 endif()
 
 if (ENFORCE_EN_US)
@@ -77,10 +78,12 @@ add_subdirectory(lib)
 # Build main tg_cpphost exe
 add_executable(${PROJECT_NAME} ${SRC_LIST})
 
+# Default LD-list
 set(LD_LIST TgBot TgBotUtils)
+
 if(ENABLE_DATABASE)
   set(LD_LIST ${LD_LIST} absl_log_internal_check_op absl_log_internal_message)
-  set(LD_LIST ${LD_LIST} protobuf::libprotobuf)
+  set(LD_LIST ${LD_LIST} TgBotDB)
 endif()
 if (WIN32)
   set(LD_LIST ${LD_LIST} wsock32 Ws2_32)
@@ -89,8 +92,6 @@ target_link_libraries(${PROJECT_NAME} ${LD_LIST})
 
 ## Protobuf DB Dumper
 if (ENABLE_DATABASE)
-add_executable(dumpProtoDB proto/DumpProtoDB.cc
-			 src/Database.cpp
-		 	 ${PROTO_SRCS})
+add_executable(dumpProtoDB proto/DumpProtoDB.cc)
 target_link_libraries(dumpProtoDB ${LD_LIST})
 endif()
