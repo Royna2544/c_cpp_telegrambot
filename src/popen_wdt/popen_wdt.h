@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 #include <stdio.h>
+#include <sysdep/cdefs.h>
 
 #define _STR(x) #x
 #define STR(x) _STR(x)

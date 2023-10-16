@@ -63,8 +63,6 @@ endif()
 
 # TgBot lib + Boost warning
 add_definitions(-DBOOST_BIND_GLOBAL_PLACEHOLDERS)
-# C Compliance header
-add_compile_options(-include sysdep/cdefs.h)
 
 # Utils library
 add_library(TgBotUtils STATIC ${LIBUTILS_SRC_LIST})
