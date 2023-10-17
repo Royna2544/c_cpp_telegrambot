@@ -1,9 +1,6 @@
-#include <fcntl.h>
 #include <tgbot/tgbot.h>
-#include <unistd.h>
 
 #include <algorithm>
-#include <atomic>
 #include <cctype>
 #include <chrono>
 #include <cmath>
@@ -12,8 +9,6 @@
 #include <exception>
 #include <fstream>
 #include <functional>
-#include <iomanip>
-#include <iostream>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -21,7 +16,6 @@
 #include <sstream>
 #include <string>
 #include <thread>
-#include <type_traits>
 #include <unordered_map>
 #include <vector>
 

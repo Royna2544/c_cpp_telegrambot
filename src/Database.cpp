@@ -2,8 +2,6 @@
 #include <Database.h>
 #include <utils/libutils.h>
 
-#include <type_traits>
-
 namespace database {
 
 DatabaseWrapper db(getSrcRoot() + "/tgbot.pb");
