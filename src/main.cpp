@@ -7,7 +7,6 @@
 #include <cctype>
 #include <chrono>
 #include <cmath>
-#include <csignal>
 #include <cstdio>
 #include <cstdlib>
 #include <exception>
@@ -33,10 +32,6 @@
 #include <Database.h>
 #endif
 
-#ifdef __WIN32
-#include <windows/sighandler.h>
-#endif
-
 #include <Authorization.h>
 #include <BotAddCommand.h>
 #include <BotReplyMessage.h>
@@ -45,6 +40,7 @@
 #include <NamespaceImport.h>
 #include <Timer.h>
 
+#include "exithandlers/handler.h"
 #include "utils/libutils.h"
 
 using std::chrono_literals::operator""s;
@@ -671,14 +667,7 @@ int main(void) {
         exited = true;
         std::exit(0);
     };
-    static auto cleanupVoidFunc = [] { cleanupFunc(0); };
-
-    std::signal(SIGINT, cleanupFunc);
-    std::signal(SIGTERM, cleanupFunc);
-    std::atexit(cleanupVoidFunc);
-#ifdef __WIN32
-    installHandler(cleanupVoidFunc);
-#endif
+    installExitHandler(cleanupFunc);
     int64_t lastcrash = 0;
 
     PRETTYF("Debug: Token: %s", token.c_str());

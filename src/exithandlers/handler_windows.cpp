@@ -1,6 +1,8 @@
+#include "handler.h"
+
 #include <windows.h>
 
-static void (*cleanupFn)() = NULL;
+static exit_handler_t fn;
 
 static BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
     switch (fdwCtrlType) {
@@ -9,16 +11,14 @@ static BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
         case CTRL_BREAK_EVENT:
         case CTRL_LOGOFF_EVENT:
         case CTRL_SHUTDOWN_EVENT:
-            if (cleanupFn)
-                cleanupFn();
-            return FALSE;
-
+            if (fn)
+                fn(0);
         default:
             return FALSE;
     }
 }
 
-BOOL installHandler(void (*cleanupFn_)()) {
-    cleanupFn = cleanupFn_;
-    return SetConsoleCtrlHandler(CtrlHandler, TRUE);
+void installExitHandler(exit_handler_t fn_) {
+    fn = fn_;
+    SetConsoleCtrlHandler(CtrlHandler, TRUE);
 }

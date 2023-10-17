@@ -23,13 +23,16 @@ set(LIBUTILS_SRC_LIST src/utils/libutils.cpp)
 
 # System specific
 if (WIN32)
-set(SRC_LIST src/windows/sighandler.c
+set(SRC_LIST src/exithandlers/handler_windows.cpp
 	     ${SRC_LIST})
 
 set(LIBUTILS_SRC_LIST src/popen_wdt/popen_wdt_windows.c
              src/utils/libutils_windows.cpp
      	     ${LIBUTILS_SRC_LIST})
 else()
+set(SRC_LIST src/exithandlers/handler_posix.cpp
+	     ${SRC_LIST})
+
 set(LIBUTILS_SRC_LIST src/popen_wdt/popen_wdt_posix.c
              src/utils/libutils_posix.cpp
              ${LIBUTILS_SRC_LIST})
