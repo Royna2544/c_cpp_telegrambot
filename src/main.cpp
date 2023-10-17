@@ -26,6 +26,7 @@
 #include <unordered_map>
 #include <vector>
 
+// Boost
 #include <boost/algorithm/string/replace.hpp>
 
 #ifdef USE_DATABASE
@@ -70,6 +71,21 @@ using database::blacklist;
 using database::ProtoDatabase;
 using database::whitelist;
 #endif
+
+union time {
+    std::time_t val;
+};
+
+std::ostream &operator<<(std::ostream &self, union time t) {
+    char timestr[std::size("yyyy-mm-ddThh:mm:ssZ")];
+    std::strftime(std::data(timestr), std::size(timestr),
+                  "%FT%TZ", std::gmtime(&t.val));
+    return self << timestr;
+}
+
+int operator-(union time thisone, union time otherone) {
+    return thisone.val - otherone.val;
+}
 
 int main(void) {
     const char *token_str = getenv("TOKEN");
@@ -287,8 +303,16 @@ int main(void) {
         }
         bot_sendReplyMessage(bot, message, out.str());
     });
-    bot_AddCommandPermissive(gbot, "delay", [](const Bot& bot, const Message::Ptr& message) {
-        bot_sendReplyMessage(bot, message, std::to_string(time(0) - message->date) + "s");
+    bot_AddCommandPermissive(gbot, "delay", [](const Bot &bot, const Message::Ptr &message) {
+        using std::chrono::seconds;
+        union time now {
+            .val = time(0)
+        }, msg{.val = message->date};
+        std::ostringstream ss;
+        ss << "Message sent at: " << msg << std::endl;
+        ss << "Bot processed message at: " << now << std::endl;
+        ss << "Diff: " << now - msg << 's';
+        bot_sendReplyMessage(bot, message, ss.str());
     });
     bot_AddCommandEnforced(gbot, "starttimer", [](const Bot &bot, const Message::Ptr &message) {
         enum InputState {
