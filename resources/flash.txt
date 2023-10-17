@@ -2,72 +2,74 @@ Alex is not sleeping
 The system has been destoryed
 init: service 'recovery' got signal 6
 Rewrite the updater script with c++ and try again
+Kernel version 4.x or 5.x or 6.x is too old, needed at least 7.x
 Incorrect bootloader version, need at least 9
-Insufficient storage space
-Power failure
-The file is not compatible with your device
+Insufficient storage space, Required: At least 1TB
+The file is not compatible with your QCOMDEVICE
 The installation package is corrupt
-Security boot error. UEFI boot failed
-Device not rooted
-Installation failed due to a user error
+Cannot find Apple M1 SoC to apply zip.
+Failed to look for /EFI/Microsoft/boot.efi
+Device not rooted, root it with SuperSU.
+Installation failed due to user skill failure
 The zip is incompatible with the device's kernel
-Not enough space available in system partition
-Incorrect MD5 checksum
-Your bootloader is unlocked. Please lock the bootloader before installing
-The device is not supported
-Cancelled by the user
-The file is encrypted
+Internal flash type incompatible. Required: NVMe
+Incorrect MD5/SHA1/SHA256/SHA512 checksum.
+Your bootloader is unlocked. Please lock the bootloader before installing custom package.
+The CPU is too slow, Required specs: At least above Intel Core i9-13980HX's specs.
+Cancelled by the recovery: AI rules your device now.
+Cannot flash this ROM, Permission denied.
+In function flash_package, line 72: Error 130: Owner died (EOWNERDEAD)
+The file is encrypted with ransomware.
 Requires a newer version of TWRP Recovery, 4.1.0
-Package signature verification failed.
+Package signature verification failed. ERR_CERT_INVALID.
 Failed due to an unknown error.
 Not compatible with your device's screen resolution. Need at least 8K
 This is a bomb not a zip
 The zip is missing important bsod files.
 Verification failed. BSOD is not enabled.
-File name does not match the expected format.
+File name does not match the expected format: Expected .exe file extension.
+Failed to lookup AndroidFW.kext
+Unkown target partition file system: ext4
 Package is missing important system binary, /system/bin/bomb.
 Network not avaliable, turn on Wi-Fi
 The device is running an unsupported firmware version: Android 4.4
-The device is not rooted properly
+The device is not jailbreaked properly
 The file is incompatible with the flasher
 Bootloop enabler not allowed
-Error 7
-Zip is corrupted
-Virus detected
-Locked bootloader
-Knox 0x0
+Unknown recovery ramdisk file system: rootfs, expected: APFS
+Error 73127381273129831209
+Virus detected. If you want to install a better virus, flash that zip again.
+Knox 0x0, maybe you want Knox 0xF?
 Try again in a few years
-Yumi protection
 UFS corrupted
-Verizon locked carrier
-EMMC died
+EMMC died. RIP!
 Your device is not powered by snapdragon
+Zip file size too small to unpack
+LPDDR9X RAM needed
 Exynos not supported
 Battery corruption: Current percent: 2000%
 YOUR COMMAND BLOCKED
 YOUR COMMAND REJECTED
 FDE is enabled on bootloader
 Error 404: Error not found
-Busy playing gi comeback later
-Process [17] is too shy to continue working
+Busy running gi comeback later
+Flashing process said it is too shy to continue working
 Was unable to bend to matrix
-CPP code evolved to reject human
+TWRP source code evolved to reject human
 You need to start caring about me
-Ate too much ram on breakfast, none left
-Syntax error: the code is a goddamn mess
-Not feeling like C today
-Process [16] was too ugly it crashed the whole thing
+Ate too much RAM on breakfast, none left
+Syntax error: the updater-script and flasher too is a goddamn mess
+Not feeling like flashing today, come back tomorrow
+Flasher's face is too ugly it crashed the whole flashing procedure
 Error 12: read only filesystem
-Process [14] suicided due to heavy loading
-Compiler died trying to understand your code
+Processor suicided due to heavy loading
+TWRP died trying to understand your zipfile
 Don't try again
-C++ compile error: pointer is lost and can't find it's way home
-C error: found array higher than eiffel tower
-C error: caught an integer pretending to be a float number
-CPU error: im not safe today
+CPU error: Im not available today, come back later.
 Unable to locate success
 No
 Yesn't
-i thought this was bash
-mad at YOURCODE
-Hardware fail: no ram detected... wait how am i talking then
+I thought this was bash
+Mad at YOURZIP
+Hardware fail: no RAM detected... Wait how am i talking then
+Failed to get WiFi HAL. Is service started? Are binder threads started and available?
