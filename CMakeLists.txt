@@ -9,7 +9,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-set(PWD_REPLACE //src_root:)
+set(PWD_REPLACE //${PROJECT_NAME}:)
 add_definitions(-DPWD_REPLACE_STR="${PWD_REPLACE}")
 add_compile_options(-fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/=${PWD_REPLACE})
 
