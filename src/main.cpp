@@ -287,6 +287,9 @@ int main(void) {
         }
         bot_sendReplyMessage(bot, message, out.str());
     });
+    bot_AddCommandPermissive(gbot, "delay", [](const Bot& bot, const Message::Ptr& message) {
+        bot_sendReplyMessage(bot, message, std::to_string(time(0) - message->date) + "s");
+    });
     bot_AddCommandEnforced(gbot, "starttimer", [](const Bot &bot, const Message::Ptr &message) {
         enum InputState {
             HOUR,
