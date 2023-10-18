@@ -294,15 +294,20 @@ int main(void) {
         bot_sendReplyMessage(bot, message, out.str());
     });
     bot_AddCommandPermissive(gbot, "delay", [](const Bot &bot, const Message::Ptr &message) {
-        using std::chrono::seconds;
+        using std::chrono::high_resolution_clock;
+        using std::chrono::duration;
+        int64_t sentMsg;
         union time now {
             .val = time(0)
         }, msg{.val = message->date};
         std::ostringstream ss;
-        ss << "Message sent at: " << msg << std::endl;
-        ss << "Bot processed message at: " << now << std::endl;
-        ss << "Diff: " << now - msg << 's';
-        bot_sendReplyMessage(bot, message, ss.str());
+        ss << "Request message sent at: " << msg << std::endl;
+        ss << "Received at: " << now << " Diff: " << now - msg << 's' << std::endl;
+        auto beforeSend = high_resolution_clock::now();
+        sentMsg = bot_sendReplyMessage(bot, message, ss.str())->messageId;
+        auto afterSend = high_resolution_clock::now();
+        ss << "Sending reply message took: " << duration<double, std::milli>(afterSend - beforeSend).count() << "ms" << std::endl;
+        bot.getApi().editMessageText(ss.str(), message->chat->id, sentMsg);
     });
     bot_AddCommandEnforced(gbot, "starttimer", [](const Bot &bot, const Message::Ptr &message) {
         enum InputState {
