@@ -150,10 +150,6 @@ int main(void) {
                            std::bind(&ProtoDatabase::addToDatabase, whitelist, pholder1, pholder2));
     bot_AddCommandEnforced(gbot, "rmwhitelist",
                            std::bind(&ProtoDatabase::removeFromDatabase, whitelist, pholder1, pholder2));
-    bot_AddCommandEnforced(gbot, "savedb", [](const Bot &bot, const Message::Ptr &message) {
-        database::db.save();
-        bot_sendReplyMessage(bot, message, "OK");
-    });
 #else
     NOT_SUPPORTED_DB(gbot, "addblacklist");
     NOT_SUPPORTED_DB(gbot, "rmblacklist");
@@ -663,6 +659,7 @@ int main(void) {
             tm_ptr->cancel();
             std::this_thread::sleep_for(std::chrono::seconds(4));
         }
+        database::db.save();
         exited = true;
         std::exit(0);
     };
