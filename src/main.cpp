@@ -581,7 +581,7 @@ int main(void) {
                 auto perms = std::make_shared<ChatPermissions>();
                 for (const auto &mapmsg : map) {
                     if (mapmsg.second.size() >= threshold) {
-#ifdef NDEBUG
+#if 0
                         for (const auto &msg : mapmsg.second) {
                             try {
                                 gbot.getApi().deleteMessage(handle->first, msg->messageId);
