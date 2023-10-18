@@ -160,10 +160,10 @@ int main(void) {
     NOT_SUPPORTED_DB(gbot, "addwhitelist");
     NOT_SUPPORTED_DB(gbot, "rmwhitelist");
 #endif
-    bot_AddCommandEnforced(gbot, "bash", [](const Bot &bot, const Message::Ptr &message) {
+    bot_AddCommandEnforced(gbot, "bash", [](const Bot &bot, const Message::Ptr message) {
         CompileRunHandler(BashHandleData{bot, message, false});
     });
-    bot_AddCommandEnforced(gbot, "unsafebash", [](const Bot &bot, const Message::Ptr &message) {
+    bot_AddCommandEnforced(gbot, "unsafebash", [](const Bot &bot, const Message::Ptr message) {
         CompileRunHandler(BashHandleData{bot, message, true});
     });
     bot_AddCommandPermissive(gbot, "alive", [](const Bot &bot, const Message::Ptr &message) {
