@@ -687,7 +687,7 @@ reinit:
             return EXIT_FAILURE;
         }
         int64_t temptime = time(0);
-        if (temptime - lastcrash < 10 && lastcrash != 0) {
+        if (temptime - lastcrash < 15 && lastcrash != 0) {
             gbot.getApi().sendMessage(ownerid, "Recover failed.");
             PRETTYF("Error: Recover failed");
             return 1;
