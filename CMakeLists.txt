@@ -16,27 +16,19 @@ add_compile_options(-fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/=${PWD_REPLAC
 include_directories(src/include)
 include_directories(src/)
 
-set(SRC_LIST src/main.cpp src/Authorization.cpp
-             src/CompilerInTelegram.cpp src/BotAddCommand.cpp)
-
-set(LIBUTILS_SRC_LIST src/utils/libutils.cpp)
-
-# System specific
 if (WIN32)
-set(SRC_LIST src/exithandlers/handler_windows.cpp
-	     ${SRC_LIST})
-
-set(LIBUTILS_SRC_LIST src/popen_wdt/popen_wdt_windows.c
-             src/utils/libutils_windows.cpp
-     	     ${LIBUTILS_SRC_LIST})
+  set(TARGET_VARIANT windows)
 else()
-set(SRC_LIST src/exithandlers/handler_posix.cpp
-	     ${SRC_LIST})
-
-set(LIBUTILS_SRC_LIST src/popen_wdt/popen_wdt_posix.c
-             src/utils/libutils_posix.cpp
-             ${LIBUTILS_SRC_LIST})
+  set(TARGET_VARIANT posix)
 endif()
+
+set(SRC_LIST src/main.cpp src/Authorization.cpp
+             src/CompilerInTelegram.cpp src/BotAddCommand.cpp
+             src/exithandlers/handler_${TARGET_VARIANT}.cpp)
+
+set(LIBUTILS_SRC_LIST src/utils/libutils.cpp
+             src/popen_wdt/popen_wdt_${TARGET_VARIANT}.c
+	     src/utils/libutils_${TARGET_VARIANT}.cpp)
 
 if(ENABLE_TIDY)
   set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -71,7 +63,7 @@ add_definitions(-DBOOST_BIND_GLOBAL_PLACEHOLDERS)
 add_library(TgBotUtils STATIC ${LIBUTILS_SRC_LIST})
 # Windows needs this
 if (WIN32)
-target_link_libraries(TgBotUtils shlwapi)
+  target_link_libraries(TgBotUtils shlwapi)
 endif()
 
 # TgBot-Cpp library
@@ -100,6 +92,6 @@ target_link_libraries(${PROJECT_NAME} ${LD_LIST})
 
 ## Protobuf DB Dumper
 if (ENABLE_DATABASE)
-add_executable(dumpProtoDB proto/DumpProtoDB.cc)
-target_link_libraries(dumpProtoDB ${LD_LIST})
+  add_executable(dumpProtoDB proto/DumpProtoDB.cc)
+  target_link_libraries(dumpProtoDB ${LD_LIST})
 endif()
