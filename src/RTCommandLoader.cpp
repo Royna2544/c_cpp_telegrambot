@@ -21,12 +21,12 @@ static std::vector<DynamicLibraryHolder> libs;
 void loadOneCommand(Bot& bot, const std::string& fname) {
     void* handle = dlopen(fname.c_str(), RTLD_NOW);
     if (!handle) {
-        PRETTYF("Warning; Failed to load: %s", dlerror() ?: "unknown");
+        LOG_W("Failed to load: %s", dlerror() ?: "unknown");
         return;
     }
     struct dynamicCommand* sym = (struct dynamicCommand*)dlsym(handle, DYN_COMMAND_SYM_STR);
     if (!sym) {
-        PRETTYF("Warning: Failed to lookup symbol '" DYN_COMMAND_SYM_STR "' in %s", fname.c_str());
+        LOG_W("Failed to lookup symbol '" DYN_COMMAND_SYM_STR "' in %s", fname.c_str());
         return;
     }
     libs.emplace_back(handle);
@@ -34,8 +34,8 @@ void loadOneCommand(Bot& bot, const std::string& fname) {
         bot_AddCommandEnforced(bot, sym->name, sym->fn);
     else
         bot_AddCommandPermissive(bot, sym->name, sym->fn);
-    PRETTYF("Info: Loaded RT command module from %s", fname.c_str());
-    PRETTYF("Info: Module dump: { enforced: %d, name: %s, fn: %p }", sym->enforced, sym->name, sym->fn);
+    LOG_I("Loaded RT command module from %s", fname.c_str());
+    LOG_I("Module dump: { enforced: %d, name: %s, fn: %p }", sym->enforced, sym->name, sym->fn);
 }
 
 void loadCommandsFromFile(Bot& bot, const std::string& filename) {

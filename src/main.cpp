@@ -84,21 +84,21 @@ int main(void) {
     const char *token_str = getenv("TOKEN");
     std::string token;
     if (!token_str) {
-        PRETTYF("Warning: TOKEN is not exported, try config file");
+        LOG_W("TOKEN is not exported, try config file");
         std::string home;
         if (!getHomePath(home)) {
-            PRETTYF("Error: Cannot find HOME");
+            LOG_E("Cannot find HOME");
             return EXIT_FAILURE;
         }
         std::string confPath = home + dir_delimiter + ".tgbot_token", line;
         std::ifstream ifs(confPath);
         if (ifs.fail()) {
-            PRETTYF("Error: Opening %s failed", confPath.c_str());
+            LOG_E("Opening %s failed", confPath.c_str());
             return EXIT_FAILURE;
         }
         std::getline(ifs, line);
         if (line.empty()) {
-            PRETTYF("Error: Conf file %s empty", confPath.c_str());
+            LOG_E("Conf file %s empty", confPath.c_str());
             return EXIT_FAILURE;
         }
         token = line;
@@ -362,9 +362,6 @@ int main(void) {
                             default:
                                 break;
                         }
-#ifndef NDEBUG
-                        PRETTYF("result: %d", result);
-#endif
                         state = InputState::NONE;
                         numbercache.clear();
                     }
@@ -372,9 +369,6 @@ int main(void) {
                 }
                 case '0' ... '9': {
                     int intver = code - 48;
-#ifndef NDEBUG
-                    PRETTYF("%d", intver);
-#endif
                     numbercache.push_back(intver);
                     break;
                 }
@@ -402,9 +396,6 @@ int main(void) {
                 }
             }
         }
-#ifndef NDEBUG
-        PRETTYF("Date h %d m %d s %d", hms.h, hms.m, hms.s);
-#endif
 #define TIMER_CONFIG_SEC 5
         if (hms.toSeconds() == 0) {
             bot_sendReplyMessage(bot, message, "I'm not a fool to time 0s");
@@ -420,7 +411,7 @@ int main(void) {
         try {
             bot.getApi().pinChatMessage(message->chat->id, msgid);
         } catch (const std::exception &) {
-            PRETTYF("Cannot pin msg!");
+            LOG_W("Cannot pin msg!");
             couldpin = false;
         }
         using TimerType = std::remove_reference_t<decltype(*tm_ptr)>;
@@ -543,10 +534,8 @@ int main(void) {
             for (const auto &perUser : handle->second) {
                 std::apply([&](const auto &first, const auto &second) {
                     MaxMsgMap.emplace(first, second);
-#ifndef NDEBUG
-                    PRETTYF("Chat: %ld, User: %ld, msgcnt: %ld", handle->first,
+                    LOG_D("Chat: %ld, User: %ld, msgcnt: %ld", handle->first,
                             first, second.size());
-#endif
                 },
                            perUser);
             }
@@ -575,10 +564,8 @@ int main(void) {
                                                          return lhs.second.size() < rhs.second.size();
                                                      });
                 MaxSameMsgMap.emplace(pair.first, mostCommonIt->second);
-#ifndef NDEBUG
-                PRETTYF("Chat: %ld, User: %ld, maxIt: %ld", handle->first,
+                LOG_D("Chat: %ld, User: %ld, maxIt: %ld", handle->first,
                         pair.first, mostCommonIt->second.size());
-#endif
             }
             static auto deleteAndMute = [&](const SpamMapT &map, const int threshold) {
                 // Initial set - all false set
@@ -596,11 +583,11 @@ int main(void) {
                             gbot.getApi().restrictChatMember(handle->first, mapmsg.first,
                                                              perms, 5 * 60);
                         } catch (const std::exception &e) {
-                            PRETTYF("Cannot mute user %ld in chat %ld: %s", mapmsg.first,
+                            LOG_W("Cannot mute user %ld in chat %ld: %s", mapmsg.first,
                                     handle->first, e.what());
                         }
 #else
-                        PRETTYF("Spam detected for user %ld", mapmsg.first);
+                        LOG_I("Spam detected for user %ld", mapmsg.first);
 #endif
                     }
                 }
@@ -629,13 +616,9 @@ int main(void) {
                                 its = buffer_sub.erase(its);
                                 continue;
                             }
-#ifndef NDEBUG
-                            PRETTYF("Chat: %ld, Count: %d", its->first, its->second);
-#endif
+                            LOG_D("Chat: %ld, Count: %d", its->first, its->second);
                             if (its->second >= 5) {
-#ifndef NDEBUG
-                                PRETTYF("Launching spamdetect for %ld", its->first);
-#endif
+                                LOG_D("Launching spamdetect for %ld", its->first);
                                 spamDetectFunc(it);
                             }
                             buffer.erase(it);
@@ -657,7 +640,7 @@ int main(void) {
     static bool exited = false;
     static auto cleanupFunc = [](int s) {
         if (exited) return;
-        PRETTYF("Exiting with signal %d", s);
+        LOG_I("Exiting with signal %d", s);
         if (tm_ptr && tm_ptr->isrunning()) {
             tm_ptr->cancel();
             std::this_thread::sleep_for(std::chrono::seconds(4));
@@ -672,10 +655,10 @@ int main(void) {
 #ifdef RTCOMMAND_LOADER
     loadCommandsFromFile(gbot, getSrcRoot() + "/modules.load");
 #endif
-    PRETTYF("Debug: Token: %s", token.c_str());
+    LOG_D("Token: %s", token.c_str());
 reinit:
     try {
-        PRETTYF("Debug: Bot username: %s", gbot.getApi().getMe()->username.c_str());
+        LOG_D("Bot username: %s", gbot.getApi().getMe()->username.c_str());
         gbot.getApi().deleteWebhook();
 
         TgLongPoll longPoll(gbot);
@@ -683,26 +666,26 @@ reinit:
             longPoll.start();
         }
     } catch (const std::exception &e) {
-        PRETTYF("Error: %s", e.what());
-        PRETTYF("Warning: Trying to recover");
+        LOG_E("%s", e.what());
+        LOG_W("Trying to recover");
 #ifdef USE_DATABASE
         int64_t ownerid = database::db.maybeGetOwnerId().value_or(-1);
 #endif
         try {
             gbot.getApi().sendMessage(ownerid, e.what());
         } catch (const std::exception &e) {
-            PRETTYF("Critical Error: %s", e.what());
+            LOG_F("%s", e.what());
             return EXIT_FAILURE;
         }
         int64_t temptime = time(0);
         if (temptime - lastcrash < 15 && lastcrash != 0) {
             gbot.getApi().sendMessage(ownerid, "Recover failed.");
-            PRETTYF("Error: Recover failed");
+            LOG_E("Recover failed");
             return 1;
         }
         lastcrash = temptime;
         gbot.getApi().sendMessage(ownerid, "Reinitializing.");
-        PRETTYF("Info: Re-init");
+        LOG_I("Re-init");
         gAuthorized = false;
         std::thread([] {
             std::this_thread::sleep_for(std::chrono::seconds(5));

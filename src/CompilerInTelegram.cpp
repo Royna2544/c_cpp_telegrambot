@@ -93,7 +93,7 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
         cmd_r = cmd;
     }
 
-    PRETTYF("Command: %s", cmd_r.c_str());
+    LOG_I("Command: %s", cmd_r.c_str());
     auto start = high_resolution_clock::now();
     auto fp = popen_watchdog(cmd_r.c_str(), use_wdt ? &watchdog_bitten : nullptr);
 

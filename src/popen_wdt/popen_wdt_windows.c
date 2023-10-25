@@ -134,7 +134,7 @@ FILE* popen_watchdog(const char* command, bool* wdt_ret) {
     if (!success) {
         // Hmm? We failed? Try to append powershell -c
         // Create command line string
-        PRETTYF("Retrying with PowerShell prefix: %s", command);
+        LOG_W("Retrying with PowerShell prefix: %s", command);
         ret = snprintf(buffer, sizeof(buffer), "powershell.exe -c \"%s\"", command);
 
         // Create process again
