@@ -33,6 +33,9 @@
 #include <ExtArgs.h>
 #include <NamespaceImport.h>
 #include <Timer.h>
+#ifdef RTCOMMAND_LOADER
+#include <RTCommandLoader.h>
+#endif
 
 #include "exithandlers/handler.h"
 #include "utils/libutils.h"
@@ -666,6 +669,9 @@ int main(void) {
     installExitHandler(cleanupFunc);
     int64_t lastcrash = 0;
 
+#ifdef RTCOMMAND_LOADER
+    loadCommandsFromFile(gbot, getSrcRoot() + "/modules.load");
+#endif
     PRETTYF("Debug: Token: %s", token.c_str());
 reinit:
     try {

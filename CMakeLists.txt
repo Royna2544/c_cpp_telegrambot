@@ -4,6 +4,9 @@ project(tg_cpphost)
 option(ENABLE_TIDY "Enable clang-tidy checks" OFF)
 option(ENABLE_DATABASE "Enable local db support" ON)
 option(ENFORCE_EN_US "Enforce en-US locale for output" ON)
+if (NOT WIN32)
+  option(ENABLE_RUNTIME_COMMAND "Enable runtime loader of commands" ON)
+endif()
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -56,6 +59,12 @@ if (ENFORCE_EN_US)
   add_definitions(-DLOCALE_EN_US)
 endif()
 
+if (ENABLE_RUNTIME_COMMAND)
+  add_definitions(-DRTCOMMAND_LOADER)
+  set(SRC_LIST src/RTCommandLoader.cpp
+	       ${SRC_LIST})
+endif()
+
 # TgBot lib + Boost warning
 add_definitions(-DBOOST_BIND_GLOBAL_PLACEHOLDERS)
 
@@ -68,6 +77,10 @@ endif()
 
 # TgBot-Cpp library
 add_subdirectory(lib)
+if (ENABLE_RUNTIME_COMMAND)
+  # Dynamic cmd loader
+  add_subdirectory(src/cmd_dynamic)
+endif()
 # Build main tg_cpphost exe
 add_executable(${PROJECT_NAME} ${SRC_LIST})
 
