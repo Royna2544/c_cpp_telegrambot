@@ -6,4 +6,6 @@ static void cmdTest(const Bot& bot, const Message::Ptr& message) {
     bot_sendReplyMessage(bot, message, "Hello world");
 }
 
-DECL_DYN_ENFORCED_COMMAND("test", cmdTest);
+static bool isSupported(void) { return false; }
+
+DECL_DYN_ENFORCED_COMMAND("test", cmdTest, isSupported);

@@ -30,6 +30,11 @@ void loadOneCommand(Bot& bot, const std::string& fname) {
 	dlclose(handle);
         return;
     }
+    if (!sym->isSupported()) {
+	LOG_I("Module %s declares it is not supported.", fname.c_str());
+	dlclose(handle);
+	return;
+    }
     libs.emplace_back(handle);
     if (sym->enforced)
         bot_AddCommandEnforced(bot, sym->name, sym->fn);
