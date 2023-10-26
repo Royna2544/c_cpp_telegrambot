@@ -105,9 +105,6 @@ int main(void) {
     } else
         token = token_str;
 
-#ifdef USE_DATABASE
-    database::db->set_ownerid(ownerid);
-#endif
     static Bot gBot(token);
     static std::shared_ptr<Timer<TimerImpl_privdata>> tm_ptr;
     std::string CCompiler, CXXCompiler, GoCompiler, PythonInterpreter;
