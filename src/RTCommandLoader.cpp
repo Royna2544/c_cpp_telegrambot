@@ -46,7 +46,7 @@ void loadOneCommand(Bot& bot, const std::string& fname) {
     else
         bot_AddCommandPermissive(bot, sym->name, fn);
     LOG_I("Loaded RT command module from %s", fname.c_str());
-    LOG_I("Module dump: { enforced: %d, name: %s, fn: %p }", sym->enforced, sym->name, sym->fn);
+    LOG_I("Module dump: { enforced: %d, name: %s, fn: %p }", sym->enforced, sym->name, *(long *)(char *)&sym->fn);
 }
 
 void loadCommandsFromFile(Bot& bot, const std::string& filename) {
