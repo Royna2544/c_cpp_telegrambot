@@ -27,6 +27,7 @@ void loadOneCommand(Bot& bot, const std::string& fname) {
     struct dynamicCommand* sym = (struct dynamicCommand*)dlsym(handle, DYN_COMMAND_SYM_STR);
     if (!sym) {
         LOG_W("Failed to lookup symbol '" DYN_COMMAND_SYM_STR "' in %s", fname.c_str());
+	dlclose(handle);
         return;
     }
     libs.emplace_back(handle);
