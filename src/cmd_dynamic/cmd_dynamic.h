@@ -8,7 +8,7 @@ struct dynamicCommand {
 
 #define DYN_COMMAND_SYM cmd
 #define DYN_COMMAND_SYM_STR "cmd"
-#define DECL_DYN_COMMAND(enf, name_, fn_)   \
+#define _DECL_DYN_COMMAND(enf, name_, fn_)   \
     extern "C" {                            \
     struct dynamicCommand DYN_COMMAND_SYM { \
         .enforced = enf,                    \
@@ -16,3 +16,6 @@ struct dynamicCommand {
         .fn = fn_,                          \
     };                                      \
     }
+
+#define DECL_DYN_ENFORCED_COMMAND(name, fn) _DECL_DYN_COMMAND(true, name, fn)
+#define DECL_DYN_PERMISSIVE_COMMAND(name, fn) _DECL_DYN_COMMAND(false, name, fn)
