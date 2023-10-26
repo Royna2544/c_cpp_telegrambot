@@ -1,9 +1,10 @@
 #include <NamespaceImport.h>
+#include <BotAddCommand.h>
 
 struct dynamicCommand {
     bool enforced;
     const char* name;
-    void (*fn)(const Bot& bot, const Message::Ptr& message);
+    command_callback_t fn;
     bool (*isSupported)();
 };
 
