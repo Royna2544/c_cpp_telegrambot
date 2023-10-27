@@ -21,9 +21,7 @@
 #define ARRAY_SIZE(arr) sizeof(arr) / sizeof(arr[0])
 
 std::string getCompileVersion() {
-    char buffer[sizeof(BOOST_PLATFORM " | " BOOST_COMPILER " | " __DATE__)];
-    snprintf(buffer, sizeof(buffer), "%s | %s | %s", BOOST_PLATFORM, BOOST_COMPILER, __DATE__);
-    std::string compileinfo(buffer);
+    std::string compileinfo(BOOST_PLATFORM " | " BOOST_COMPILER " | " __DATE__);
     return compileinfo;
 }
 
