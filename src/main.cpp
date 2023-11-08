@@ -20,12 +20,6 @@
 #include <vector>
 
 // Boost
-#include <boost/algorithm/string/replace.hpp>
-
-#ifdef USE_DATABASE
-#include <Database.h>
-#endif
-
 #include <Authorization.h>
 #include <BotAddCommand.h>
 #include <BotReplyMessage.h>
@@ -33,8 +27,17 @@
 #include <ExtArgs.h>
 #include <NamespaceImport.h>
 #include <Timer.h>
+
+#include <boost/algorithm/string/replace.hpp>
+
 #ifdef RTCOMMAND_LOADER
 #include <RTCommandLoader.h>
+#endif
+#ifdef USE_DATABASE
+#include <Database.h>
+#endif
+#ifdef SOCKET_CONNECTION
+#include <SocketConnectionHandler.h>
 #endif
 
 #include "exithandlers/handler.h"
@@ -532,7 +535,7 @@ int main(void) {
                 std::apply([&](const auto &first, const auto &second) {
                     MaxMsgMap.emplace(first, second);
                     LOG_D("Chat: %ld, User: %ld, msgcnt: %ld", handle->first,
-                            first, second.size());
+                          first, second.size());
                 },
                            perUser);
             }
@@ -562,7 +565,7 @@ int main(void) {
                                                      });
                 MaxSameMsgMap.emplace(pair.first, mostCommonIt->second);
                 LOG_D("Chat: %ld, User: %ld, maxIt: %ld", handle->first,
-                        pair.first, mostCommonIt->second.size());
+                      pair.first, mostCommonIt->second.size());
             }
             static auto deleteAndMute = [&](const SpamMapT &map, const int threshold) {
                 // Initial set - all false set
@@ -634,6 +637,17 @@ int main(void) {
         }
     });
 
+#ifdef SOCKET_CONNECTION
+    static std::thread th;
+    th = std::thread([] {
+        startListening([](struct TgBotConnection conn) {
+            socketConnectionHandler(gBot, conn);
+        });
+    });
+#endif
+#ifdef RTCOMMAND_LOADER
+    loadCommandsFromFile(gBot, getSrcRoot() + "/modules.load");
+#endif
     static bool exited = false;
     static auto cleanupFunc = [](int s) {
         if (exited) return;
@@ -643,15 +657,18 @@ int main(void) {
             std::this_thread::sleep_for(std::chrono::seconds(4));
         }
         database::db.save();
+#ifdef SOCKET_CONNECTION
+        if (th.joinable()) {
+            writeToSocket({CMD_EXIT, {.data_2 = 0}});
+            th.join();
+        }
+#endif
         exited = true;
         std::exit(0);
     };
     installExitHandler(cleanupFunc);
     int64_t lastcrash = 0;
 
-#ifdef RTCOMMAND_LOADER
-    loadCommandsFromFile(gBot, getSrcRoot() + "/modules.load");
-#endif
     LOG_D("Token: %s", token.c_str());
 reinit:
     try {

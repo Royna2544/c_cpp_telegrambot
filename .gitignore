@@ -12,9 +12,11 @@ _deps
 
 # Exe
 tg_cpphost
+dumpProtoDB
+tgbotsocket_cli
+# Lib
 libTgBotUtils.a
 libTgBotDB.a
-dumpProtoDB
 # Cmake generated
 modules.load
 # Protobuf generated

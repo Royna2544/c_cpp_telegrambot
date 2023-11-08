@@ -6,6 +6,7 @@ option(ENABLE_DATABASE "Enable local db support" ON)
 option(ENFORCE_EN_US "Enforce en-US locale for output" ON)
 if (NOT WIN32)
   option(ENABLE_RUNTIME_COMMAND "Enable runtime loader of commands" ON)
+  option(ENABLE_SOCKET_CONNECT "Enable doing various operations with bot" ON)
 endif()
 
 set(CMAKE_CXX_STANDARD 17)
@@ -63,6 +64,15 @@ if (ENABLE_RUNTIME_COMMAND)
   add_definitions(-DRTCOMMAND_LOADER)
   set(SRC_LIST src/RTCommandLoader.cpp
 	       ${SRC_LIST})
+endif()
+
+if (ENABLE_SOCKET_CONNECT)
+  add_definitions(-DSOCKET_CONNECTION)
+  set(SRC_LIST src/socket/SocketUtils.cpp
+	       src/SocketConnectionHandler.cpp
+	       ${SRC_LIST})
+  add_executable(tgbotsocket_cli src/socket/SocketUtils.cpp
+	                         src/socket/TgBotSocketClient.cpp)
 endif()
 
 # TgBot lib + Boost warning
