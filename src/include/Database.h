@@ -3,6 +3,7 @@
 #include <TgBotDB.pb.h>
 #include <tgbot/Bot.h>
 #include <tgbot/types/Message.h>
+#include <Types.h>
 
 #include <fstream>
 #include <optional>
@@ -20,15 +21,15 @@ using ::tgbot::proto::PersonList;
 
 class ProtoDatabase {
     void _addToDatabase(const Bot& bot, const Message::Ptr& message,
-                        RepeatedField<int64_t>* list, const std::string& name);
+                        RepeatedField<UserId>* list, const std::string& name);
     void _removeFromDatabase(const Bot& bot, const Message::Ptr& message,
-                             RepeatedField<int64_t>* list, const std::string& name);
+                             RepeatedField<UserId>* list, const std::string& name);
     bool rejectUid(const Bot& bot, const User::Ptr& user) const;
-    std::optional<int> findByUid(const RepeatedField<int64_t>* list, const int64_t uid) const;
+    std::optional<int> findByUid(const RepeatedField<UserId>* list, const UserId uid) const;
 
    public:
     std::string name;
-    RepeatedField<int64_t>* list;
+    RepeatedField<UserId>* list;
     const ProtoDatabase* other;
 
     void addToDatabase(const Bot& bot, const Message::Ptr& message) {
@@ -37,7 +38,7 @@ class ProtoDatabase {
     void removeFromDatabase(const Bot& bot, const Message::Ptr& message) {
         _removeFromDatabase(bot, message, list, name);
     }
-    bool exists(const int64_t id) const {
+    bool exists(const UserId id) const {
         return findByUid(list, id).has_value();
     }
 };

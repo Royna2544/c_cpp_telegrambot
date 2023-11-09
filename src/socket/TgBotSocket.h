@@ -1,5 +1,6 @@
 #include <functional>
 #include <string>
+#include <Types.h>
 
 #define SOCKET_PATH "/tmp/tgbot_sock"
 
@@ -11,7 +12,7 @@ enum TgBotCommand {
 
 namespace TgBotCommandData {
 struct WriteMsgToChatId {
-    int64_t to; // To, chatid in numbers
+    ChatId to; // destination chatid
     char msg[2048]; // Msg to send
 };
 }  // namespace TgBotCommandData

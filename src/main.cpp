@@ -27,6 +27,7 @@
 #include <SpamBlock.h>
 #include <NamespaceImport.h>
 #include <Timer.h>
+#include <Types.h>
 
 #include <boost/algorithm/string/replace.hpp>
 
@@ -44,10 +45,10 @@
 #include "utils/libutils.h"
 
 struct TimerImpl_privdata {
-    int32_t messageid;
+    MessageId messageid;
     const TgBot::Bot &bot;
     bool botcanpin, sendendmsg;
-    int64_t chatid;
+    UserId chatid;
 };
 
 // tgbot
@@ -292,7 +293,7 @@ int main(void) {
     bot_AddCommandPermissive(gBot, "delay", [](const Bot &bot, const Message::Ptr &message) {
         using std::chrono::high_resolution_clock;
         using std::chrono::duration;
-        int64_t sentMsg;
+        MessageId sentMsg;
         union time now {
             .val = time(0)
         }, msg{.val = message->date};
@@ -564,7 +565,7 @@ reinit:
         LOG_E("%s", e.what());
         LOG_W("Trying to recover");
 #ifdef USE_DATABASE
-        int64_t ownerid = database::db.maybeGetOwnerId().value_or(-1);
+        UserId ownerid = database::db.maybeGetOwnerId().value_or(-1);
 #endif
         try {
             gBot.getApi().sendMessage(ownerid, e.what());

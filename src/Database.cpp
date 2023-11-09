@@ -6,12 +6,12 @@ namespace database {
 
 DatabaseWrapper db(getSrcRoot() + "/tgbot.pb");
 
-static std::string appendListName(const std::string& op, const int64_t id, const std::string& name) {
+static std::string appendListName(const std::string& op, const UserId id, const std::string& name) {
     return std::string("User") + ' ' + std::to_string(id) + ' ' + op + ' ' + name;
 }
 
-std::optional<int> ProtoDatabase::findByUid(const RepeatedField<int64_t>* list,
-                                            const int64_t uid) const {
+std::optional<int> ProtoDatabase::findByUid(const RepeatedField<UserId>* list,
+                                            const UserId uid) const {
     for (auto it = list->begin(); it != list->end(); ++it) {
         if (list->Get(std::distance(list->begin(), it)) == uid) {
             return std::distance(list->begin(), it);
@@ -28,9 +28,9 @@ bool ProtoDatabase::rejectUid(const Bot& bot, const User::Ptr& user) const {
 }
 
 void ProtoDatabase::_addToDatabase(const Bot& bot, const Message::Ptr& message,
-                                   RepeatedField<int64_t>* list, const std::string& name) {
+                                   RepeatedField<UserId>* list, const std::string& name) {
     if (message->replyToMessage && message->replyToMessage->from) {
-        int64_t id = message->replyToMessage->from->id;
+        UserId id = message->replyToMessage->from->id;
         if (rejectUid(bot, message->replyToMessage->from)) return;
         if (findByUid(list, id)) {
             bot_sendReplyMessage(bot, message, appendListName("already in", id, name));
@@ -47,9 +47,9 @@ void ProtoDatabase::_addToDatabase(const Bot& bot, const Message::Ptr& message,
     }
 }
 void ProtoDatabase::_removeFromDatabase(const Bot& bot, const Message::Ptr& message,
-                                        RepeatedField<int64_t>* list, const std::string& name) {
+                                        RepeatedField<UserId>* list, const std::string& name) {
     if (message->replyToMessage && message->replyToMessage->from) {
-        int64_t id = message->replyToMessage->from->id;
+        UserId id = message->replyToMessage->from->id;
         if (rejectUid(bot, message->replyToMessage->from)) return;
         auto idx = findByUid(list, id);
         if (idx.has_value()) {
