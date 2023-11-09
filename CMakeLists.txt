@@ -28,7 +28,8 @@ endif()
 
 set(SRC_LIST src/main.cpp src/Authorization.cpp
              src/CompilerInTelegram.cpp src/BotAddCommand.cpp
-             src/exithandlers/handler_${TARGET_VARIANT}.cpp)
+             src/exithandlers/handler_${TARGET_VARIANT}.cpp
+             src/SpamBlocker.cpp)
 
 set(LIBUTILS_SRC_LIST src/utils/libutils.cpp
              src/popen_wdt/popen_wdt_${TARGET_VARIANT}.c
