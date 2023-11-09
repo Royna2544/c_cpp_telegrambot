@@ -1,23 +1,28 @@
 #include <Authorization.h>
 #include <NamespaceImport.h>
 #include <SpamBlock.h>
-#include "../utils/libutils.h"
 
-#include <map>
-#include <thread>
-#include <mutex>
 #include <chrono>
+#include <map>
+#include <mutex>
+#include <thread>
 #include <unordered_map>
 #include <utility>
+
+#include "../utils/libutils.h"
 
 using std::chrono_literals::operator""s;
 using TgBot::ChatPermissions;
 
-void spamBlocker(const Message::Ptr &message) {
+#ifdef SOCKET_CONNECTION
+CtrlSpamBlock gSpamBlockCfg = CTRL_LOGGING_ONLY_ON;
+#endif
+
+void spamBlocker(const Bot& bot, const Message::Ptr &message) {
     static std::map<ChatId, ChatHandle> buffer;
     static std::map<ChatId, int> buffer_sub;
     static std::mutex m;  // Protect buffer, buffer_sub
-    static auto spamDetectFunc = [](decltype(buffer)::const_iterator handle) {
+    static auto spamDetectFunc = [&](decltype(buffer)::const_iterator handle) {
         SpamMapT MaxSameMsgMap, MaxMsgMap;
         // By most msgs sent by that user
         for (const auto &perUser : handle->second) {
@@ -25,8 +30,7 @@ void spamBlocker(const Message::Ptr &message) {
                 MaxMsgMap.emplace(first, second);
                 LOG_D("Chat: %ld, User: %ld, msgcnt: %ld", handle->first,
                       first, second.size());
-            },
-                       perUser);
+            }, perUser);
         }
 
         // By most common msgs
@@ -56,35 +60,44 @@ void spamBlocker(const Message::Ptr &message) {
             LOG_D("Chat: %ld, User: %ld, maxIt: %ld", handle->first,
                   pair.first, mostCommonIt->second.size());
         }
-        static auto deleteAndMute = [&](const SpamMapT &map, const int threshold) {
+        static auto deleteAndMute = [&](const Bot& bot_, const SpamMapT &map, const int threshold) {
             // Initial set - all false set
             auto perms = std::make_shared<ChatPermissions>();
             for (const auto &mapmsg : map) {
                 if (mapmsg.second.size() >= threshold) {
-#if 0
+#ifdef SOCKET_CONNECTION
+                    if (gSpamBlockCfg == CTRL_ON) {
                         for (const auto &msg : mapmsg.second) {
                             try {
-                                gBot.getApi().deleteMessage(handle->first, msg->messageId);
+                                bot_.getApi().deleteMessage(handle->first, msg->messageId);
                             } catch (const std::exception &ignored) {
                             }
                         }
                         try {
-                            gBot.getApi().restrictChatMember(handle->first, mapmsg.first,
+                            bot_.getApi().restrictChatMember(handle->first, mapmsg.first,
                                                              perms, 5 * 60);
                         } catch (const std::exception &e) {
                             LOG_W("Cannot mute user %ld in chat %ld: %s", mapmsg.first,
-                                    handle->first, e.what());
+                                  handle->first, e.what());
                         }
 #else
-                    LOG_I("Spam detected for user %ld", mapmsg.first);
+                    if (false) {
 #endif
+                    } else {
+                        LOG_I("Spam detected for user %ld", mapmsg.first);
+                    }
                 }
             }
         };
-        deleteAndMute(MaxSameMsgMap, 3);
-        deleteAndMute(MaxMsgMap, 5);
+        deleteAndMute(bot, MaxSameMsgMap, 3);
+        deleteAndMute(bot, MaxMsgMap, 5);
     };
 
+#ifdef SOCKET_CONNECTION
+    // Global cfg
+    if (gSpamBlockCfg == CTRL_OFF) return;
+#endif
+    // I'm allowed always
     if (Authorized(message, true)) return;
     // Do not track older msgs and consider it as spam.
     if (std::time(0) - message->date > 15) return;

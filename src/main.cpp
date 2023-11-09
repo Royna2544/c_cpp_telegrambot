@@ -517,7 +517,7 @@ int main(void) {
             bot_sendReplyMessage(bot, message, "Sticker not found in replied-to message");
         }
     });
-    gBot.getEvents().onAnyMessage(spamBlocker);
+    gBot.getEvents().onAnyMessage([](const Message::Ptr& msg) { spamBlocker(gBot, msg); });
 
 #ifdef SOCKET_CONNECTION
     static std::thread th;
