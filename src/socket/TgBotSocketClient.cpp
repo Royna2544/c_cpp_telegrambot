@@ -87,7 +87,7 @@ int main(int argc, char** argv) {
                 goto error;
             }
             memset(data.msg, 0, sizeof(data.msg));
-            strncpy(data.msg, argv[1], strlen(argv[3]));
+            strncpy(data.msg, argv[1], sizeof(data.msg));
             data_g.data_1 = data;
             break;
         }
