@@ -20,7 +20,7 @@ struct WriteMsgToChatId {
     char msg[2048]; // Msg to send
 };
 
-using Exit = int;
+using Exit = void *;
 
 enum CtrlSpamBlock {
     CTRL_OFF, // Disabled

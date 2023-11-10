@@ -94,7 +94,7 @@ int main(int argc, char** argv) {
         case CMD_CTRL_SPAMBLOCK: {
             int tmp;
             if (stoi_or(argv[0], &tmp) && verifyWithinEnum(TgBotCommandData::CTRL_MAX, tmp)) {
-                data_g.data_2 = static_cast<decltype(data_g.data_2)>(tmp);
+                data_g.data_3 = static_cast<decltype(data_g.data_3)>(tmp);
             } else {
 		fprintf(stderr, "Failed to convert '%s' to ctrl enum value\n", argv[0]);
                 goto error;
