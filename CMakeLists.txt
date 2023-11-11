@@ -40,9 +40,8 @@ if(ENABLE_TIDY)
   set(CMAKE_CXX_CLANG_TIDY
       clang-tidy;
       -header-filter=.;
-      -checks=*,-llvmlibc*,-fuchsia*,-altera*,-hicpp*,abseil-*,-llvm-header-guard,-modernize-use-trailing-return-type,-modernize-redundent-void-arg
+      -checks=*,-llvm*,-fuchsia*,-altera*,-hicpp*,abseil-*,-modernize-use-trailing-return-type,-modernize-redundent-void-arg
   )
-  set_target_properties(TgBot PROPERTIES CXX_CLANG_TIDY "")
 endif()
 
 if(ENABLE_DATABASE)
@@ -96,6 +95,10 @@ if (ENABLE_RUNTIME_COMMAND)
 endif()
 # Build main tg_cpphost exe
 add_executable(${PROJECT_NAME} ${SRC_LIST})
+
+if (ENABLE_TIDY)
+  set_target_properties(TgBot PROPERTIES CXX_CLANG_TIDY "")
+endif()
 
 # Default LD-list
 set(LD_LIST TgBot TgBotUtils)

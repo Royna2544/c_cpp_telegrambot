@@ -1,6 +1,6 @@
-#include "handler.h"
-
 #include <windows.h>
+
+#include "handler.h"
 
 static exit_handler_t fn;
 

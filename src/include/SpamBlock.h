@@ -19,4 +19,4 @@ using ChatHandle = std::map<UserId, std::vector<Message::Ptr>>;
 using UserType = std::pair<ChatId, std::vector<Message::Ptr>>;
 using SpamMapT = std::map<UserId, std::vector<Message::Ptr>>;
 
-void spamBlocker(const Bot& bot, const Message::Ptr& msg);
+void spamBlocker(const Bot& bot, const Message::Ptr& message);

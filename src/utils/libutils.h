@@ -11,7 +11,7 @@ enum ProgrammingLangs {
     PYTHON,
 };
 
-std::string findCommandExe(const std::string& basename);
+std::string findCommandExe(const std::string& command);
 std::string findCompiler(ProgrammingLangs lang);
 
 // libbase

@@ -32,7 +32,7 @@ void loadOneCommand(Bot& bot, const std::string& fname) {
         LOG_W("Failed to load: %s", dlerror() ?: "unknown");
         return;
     }
-    struct dynamicCommand* sym = (struct dynamicCommand*)dlsym(handle, DYN_COMMAND_SYM_STR);
+    auto* sym = static_cast<struct dynamicCommand*>(dlsym(handle, DYN_COMMAND_SYM_STR));
     if (!sym) {
         LOG_W("Failed to lookup symbol '" DYN_COMMAND_SYM_STR "' in %s", fname.c_str());
         dlclose(handle);
@@ -59,7 +59,7 @@ void loadCommandsFromFile(Bot& bot, const std::string& filename) {
     ReadFileToString(filename, &data);
     std::stringstream ss(data);
     while (std::getline(ss, line)) {
-        static std::string kModulesDir = "modules/";
+        static const std::string kModulesDir = "modules/";
         loadOneCommand(bot, kModulesDir + line);
     }
 }

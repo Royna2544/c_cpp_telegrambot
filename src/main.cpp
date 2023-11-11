@@ -24,8 +24,8 @@
 #include <BotReplyMessage.h>
 #include <CompilerInTelegram.h>
 #include <ExtArgs.h>
-#include <SpamBlock.h>
 #include <NamespaceImport.h>
+#include <SpamBlock.h>
 #include <Timer.h>
 #include <Types.h>
 
@@ -46,18 +46,17 @@
 
 struct TimerImpl_privdata {
     MessageId messageid;
-    const TgBot::Bot &bot;
+    const Bot *bot;
     bool botcanpin, sendendmsg;
     UserId chatid;
 };
 
 // tgbot
-using TgBot::MessageEntity;
 using TgBot::StickerSet;
 using TgBot::TgLongPoll;
 // stdc++
-static inline auto pholder1 = std::placeholders::_1;
-static inline auto pholder2 = std::placeholders::_2;
+static inline const auto pholder1 = std::placeholders::_1;
+static inline const auto pholder2 = std::placeholders::_2;
 
 #ifdef USE_DATABASE
 // Database.cpp
@@ -85,13 +84,13 @@ int main(void) {
     const char *token_str = getenv("TOKEN");
     std::string token;
     if (!token_str) {
+        std::string home, line;
         LOG_W("TOKEN is not exported, try config file");
-        std::string home;
         if (!getHomePath(home)) {
             LOG_E("Cannot find HOME");
             return EXIT_FAILURE;
         }
-        std::string confPath = home + dir_delimiter + ".tgbot_token", line;
+        const std::string confPath = home + dir_delimiter + ".tgbot_token";
         std::ifstream ifs(confPath);
         if (ifs.fail()) {
             LOG_E("Opening %s failed", confPath.c_str());
@@ -176,7 +175,7 @@ int main(void) {
                 {&originurl, "git config --get remote.origin.url"},
             };
             for (const auto &cmd : commands) {
-                bool ret = runCommand(cmd.second, *cmd.first);
+                const bool ret = runCommand(cmd.second, *cmd.first);
                 if (!ret) {
                     *cmd.first = "(Command failed)";
                 }
@@ -229,7 +228,7 @@ int main(void) {
         std::stringstream ss;
         ss << "Flashing '" << msg;
         if (msg.find(".zip") == std::string::npos) ss << ".zip";
-        ssize_t pos = genRandomNumber(reasons.size());
+        const ssize_t pos = genRandomNumber(reasons.size());
         if (pos != reasons.size()) {
             ss << "' failed successfully!" << std::endl;
             ss << "Reason: " << reasons[pos];
@@ -254,7 +253,7 @@ int main(void) {
         std::mt19937 gen(rd());
 
         int numlines = 1;
-        for (char c : message->text) {
+        for (const char c : message->text) {
             if (c == '\n') numlines++;
         }
         vec.reserve(numlines);
@@ -275,7 +274,7 @@ int main(void) {
         vec.pop_back();
         int total = 0;
         for (const auto &cond : vec) {
-            int thisper = genRandomNumber(100 - total);
+            const int thisper = genRandomNumber(100 - total);
             map[cond] = thisper;
             total += thisper;
         }
@@ -295,7 +294,7 @@ int main(void) {
         using std::chrono::duration;
         MessageId sentMsg;
         union time now {
-            .val = time(0)
+            .val = time(nullptr)
         }, msg{.val = message->date};
         std::ostringstream ss;
         ss << "Request message sent at: " << msg << std::endl;
@@ -341,7 +340,7 @@ int main(void) {
             if (i == msg.size()) code = ' ';
             switch (code) {
                 case ' ': {
-                    if (numbercache.size() != 0) {
+                    if (!numbercache.empty()) {
                         int result = 0, count = 1;
                         for (const auto i : numbercache) {
                             result += pow(10, numbercache.size() - count) * i;
@@ -402,9 +401,9 @@ int main(void) {
             bot_sendReplyMessage(bot, message, "Provide longer time value");
             return;
         }
-        int msgid = bot.getApi()
-                        .sendMessage(message->chat->id, "Timer starts")
-                        ->messageId;
+        const int msgid = bot.getApi()
+                              .sendMessage(message->chat->id, "Timer starts")
+                              ->messageId;
         bool couldpin = true;
         try {
             bot.getApi().pinChatMessage(message->chat->id, msgid);
@@ -416,37 +415,39 @@ int main(void) {
         tm_ptr = std::make_shared<TimerType>(TimerType(hms.h, hms.m, hms.s));
         tm_ptr->setCallback(
             [=](const TimerImpl_privdata *priv, struct timehms ms) {
-                const Bot &bot = priv->bot;
+                const auto bot = priv->bot;
                 std::stringstream ss;
                 if (ms.h != 0) ss << ms.h << "h ";
                 if (ms.m != 0) ss << ms.m << "m ";
                 if (ms.s != 0) ss << ms.s << "s ";
-                if (!ss.str().empty() && ss.str() != message->text)
-                    bot.getApi().editMessageText(ss.str(), message->chat->id,
-                                                 priv->messageid);
+                if (!ss.str().empty() && ss.str() != message->text && bot)
+                    bot->getApi().editMessageText(ss.str(), message->chat->id,
+                                                  priv->messageid);
             },
             TIMER_CONFIG_SEC,
             [=](const TimerImpl_privdata *priv) {
-                const Bot &bot = priv->bot;
-                bot.getApi().editMessageText("Timer ended", message->chat->id,
-                                             priv->messageid);
-                if (priv->sendendmsg)
-                    bot.getApi().sendMessage(message->chat->id, "Timer ended");
-                std::this_thread::sleep_for(std::chrono::seconds(1));
-                if (priv->botcanpin)
-                    bot.getApi().unpinChatMessage(message->chat->id,
+                const auto bot = priv->bot;
+                if (bot) {
+                    bot->getApi().editMessageText("Timer ended", message->chat->id,
                                                   priv->messageid);
+                    if (priv->sendendmsg)
+                        bot->getApi().sendMessage(message->chat->id, "Timer ended");
+                    std::this_thread::sleep_for(std::chrono::seconds(1));
+                    if (priv->botcanpin)
+                        bot->getApi().unpinChatMessage(message->chat->id,
+                                                       priv->messageid);
+                }
             },
             std::make_unique<TimerImpl_privdata>(TimerImpl_privdata{
-                msgid, bot, couldpin, true, message->chat->id}));
+                msgid, &bot, couldpin, true, message->chat->id}));
         tm_ptr->start();
     });
     bot_AddCommandEnforced(gBot, "stoptimer", [](const Bot &bot, const Message::Ptr &message) {
         bool ret = false;
-        const char *text;
+        const char *text = nullptr;
         if (tm_ptr) {
             ret = tm_ptr->cancel([&](TimerImpl_privdata *t) -> bool {
-                bool allowed = t->chatid == message->chat->id;
+                const bool allowed = t->chatid == message->chat->id;
                 if (allowed) t->sendendmsg = false;
                 return allowed;
             });
@@ -504,7 +505,7 @@ int main(void) {
                 bot_sendReplyMessage(bot, message, e.what());
                 return;
             }
-            ssize_t pos = genRandomNumber(stickset->stickers.size() - 1);
+            const ssize_t pos = genRandomNumber(stickset->stickers.size() - 1);
             bot.getApi().sendSticker(message->chat->id,
                                      stickset->stickers[pos]->fileId,
                                      message->messageId, nullptr, false, true);
@@ -517,7 +518,7 @@ int main(void) {
             bot_sendReplyMessage(bot, message, "Sticker not found in replied-to message");
         }
     });
-    gBot.getEvents().onAnyMessage([](const Message::Ptr& msg) { spamBlocker(gBot, msg); });
+    gBot.getEvents().onAnyMessage([](const Message::Ptr &msg) { spamBlocker(gBot, msg); });
 
 #ifdef SOCKET_CONNECTION
     static std::thread th;
@@ -541,7 +542,7 @@ int main(void) {
         database::db.save();
 #ifdef SOCKET_CONNECTION
         if (th.joinable()) {
-            writeToSocket({CMD_EXIT, {.data_2 = 0}});
+            writeToSocket({CMD_EXIT, {.data_2 = nullptr}});
             th.join();
         }
 #endif
@@ -573,7 +574,7 @@ reinit:
             LOG_F("%s", e.what());
             return EXIT_FAILURE;
         }
-        int64_t temptime = time(0);
+        const int64_t temptime = time(nullptr);
         if (temptime - lastcrash < 15 && lastcrash != 0) {
             gBot.getApi().sendMessage(ownerid, "Recover failed.");
             LOG_E("Recover failed");

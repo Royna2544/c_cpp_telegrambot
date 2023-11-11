@@ -97,7 +97,7 @@ FILE* popen_watchdog(const char* command, bool* wdt_ret) {
     }
 
     if (wdt_ret) {
-        // Create FILE* middleman pipe 
+        // Create FILE* middleman pipe
         if (!CreatePipe(&child_stdout_r_file, &child_stdout_w_file, &saAttr, 0)) {
             return NULL;
         }

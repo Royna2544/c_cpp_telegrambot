@@ -16,9 +16,9 @@ enum TgBotCommand {
 };
 
 #define ENUM_STR(enum) { enum, #enum }
-extern std::unordered_map<TgBotCommand, std::string> kTgBotCommandStrMap;
+extern const std::unordered_map<TgBotCommand, std::string> kTgBotCommandStrMap;
 static inline std::string toStr(TgBotCommand cmd) {
-    return kTgBotCommandStrMap[cmd];
+    return kTgBotCommandStrMap.at(cmd);
 }
 
 namespace TgBotCommandData {
@@ -50,5 +50,5 @@ struct TgBotConnection {
 
 using listener_callback_t = std::function<void(struct TgBotConnection)>;
 
-void startListening(listener_callback_t cb);
-void writeToSocket(struct TgBotConnection cn);
+void startListening(const listener_callback_t& cb);
+void writeToSocket(const struct TgBotConnection& conn);

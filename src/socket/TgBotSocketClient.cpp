@@ -8,13 +8,13 @@
 #include "../include/RuntimeException.h"
 #include "TgBotSocket.h"
 
-static void usage(char* argv, bool success) {
+static void usage(const char* argv, bool success) {
     printf("Usage: %s [cmd enum value] [args...]\n\n", argv);
     printf("Available cmd enum values:\n");
     using sortedIt = std::pair<TgBotCommand, std::string>;
     auto sortedVec = std::vector<sortedIt>(kTgBotCommandStrMap.begin(), kTgBotCommandStrMap.end());
-    std::sort(sortedVec.begin(), sortedVec.end(), [](sortedIt v1, sortedIt v2) { 
-        return v1.second > v2.second; 
+    std::sort(sortedVec.begin(), sortedVec.end(), [](const sortedIt& v1, const sortedIt& v2) {
+        return v1.second > v2.second;
     });
     for (const auto& ent : sortedVec) {
         if (ent.first == CMD_EXIT || ent.first == CMD_MAX) continue;
@@ -40,9 +40,9 @@ static bool verifyArgsCount(TgBotCommand cmd, int argc) {
     return ret;
 }
 
-static bool stoi_or(std::string str, int32_t* intval) {
+static bool stoi_or(const std::string& str, int32_t* intval) {
     try {
-        *intval = std::stoi(str.c_str());
+        *intval = std::stoi(str);
     } catch (...) {
         fprintf(stderr, "Failed to parse '%s' to int\n", str.c_str());
         return false;
@@ -50,9 +50,9 @@ static bool stoi_or(std::string str, int32_t* intval) {
     return true;
 }
 
-static bool stol_or(std::string str, int64_t* intval) {
+static bool stol_or(const std::string& str, int64_t* intval) {
     try {
-        *intval = std::stol(str.c_str());
+        *intval = std::stol(str);
     } catch (...) {
         fprintf(stderr, "Failed to parse '%s' to long\n", str.c_str());
         return false;
@@ -78,9 +78,9 @@ bool parseOneEnum(C* res, C max, const char* str, const char* name) {
 }
 
 int main(int argc, char** argv) {
-    enum TgBotCommand cmd;
-    union TgBotCommandUnion data_g;
-    char* exe = argv[0];
+    enum TgBotCommand cmd = CMD_MAX;
+    union TgBotCommandUnion data_g {};
+    const char* exe = argv[0];
 
     if (argc == 1)
         usage(exe, true);
