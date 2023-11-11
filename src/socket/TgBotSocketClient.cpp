@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <vector>
 #include <sstream>
 
 #include "../include/RuntimeException.h"
