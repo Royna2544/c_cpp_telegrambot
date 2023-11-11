@@ -14,7 +14,7 @@ static inline void bot_AddCommandEnforcedCompiler(Bot& bot, const char* cmd, std
     if (!compiler.empty()) {
         bot_AddCommandEnforced(bot, cmd, cb);
     } else {
-        LOG_W("Unsupported cmd %s", cmd);
+        LOG_W("Unsupported cmd '%s' (compiler)", cmd);
     }
 }
 
@@ -22,6 +22,6 @@ static inline void bot_AddCommandEnforcedDatabase(Bot& bot, const char* cmd, com
     if (IS_DEFINED(USE_DATABASE)) {
         bot_AddCommandEnforced(bot, cmd, cb);
     } else {
-        LOG_W("Unsupported cmd %s", cmd);
+        LOG_W("Unsupported cmd '%s' (database)", cmd);
     }
 }
