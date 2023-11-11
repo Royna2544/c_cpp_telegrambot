@@ -15,10 +15,27 @@ enum TgBotCommand {
     CMD_MAX,
 };
 
-#define ENUM_STR(enum) { enum, #enum }
-extern const std::unordered_map<TgBotCommand, std::string> kTgBotCommandStrMap;
+#define ENUM_STR(enum) std::make_pair(enum, #enum)
+#define ARGUMENT_SIZE(enum, len) std::make_pair(enum, len)
+
+extern const std::array<std::pair<TgBotCommand, std::string>, CMD_MAX - 1> kTgBotCommandStrMap;
+extern const std::array<std::pair<TgBotCommand, int>, CMD_MAX - 1> kTgBotCommandArgsCount;
+
 static inline std::string toStr(TgBotCommand cmd) {
-    return kTgBotCommandStrMap.at(cmd);
+    for (const auto &elem : kTgBotCommandStrMap) {
+        if (elem.first == cmd) {
+            return elem.second;
+        }
+    }
+    return {};
+}
+static inline int toCount(TgBotCommand cmd) {
+    for (const auto &elem : kTgBotCommandArgsCount) {
+        if (elem.first == cmd) {
+            return elem.second;
+        }
+    }
+    return -1;
 }
 
 namespace TgBotCommandData {
