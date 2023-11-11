@@ -3,6 +3,8 @@
 #include <functional>
 #include <string>
 #include <unordered_map>
+#include <array>
+#include <utility>
 
 #include <Types.h>
 
