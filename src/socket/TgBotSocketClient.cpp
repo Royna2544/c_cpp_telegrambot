@@ -3,9 +3,9 @@
 #include <cstring>
 #include <map>
 #include <sstream>
-#include <stdexcept>
 
 #include "TgBotSocket.h"
+#include "../include/RuntimeException.h"
 
 static void usage(char* argv, bool success) {
     printf("Usage: %s [cmd enum value] [args...]\n", argv);
@@ -21,7 +21,7 @@ static std::map<TgBotCommand, int> kRequiredArgsCount = {
 static bool verifyArgsCount(TgBotCommand cmd, int argc) {
     auto it = kRequiredArgsCount.find(cmd);
     if (it == kRequiredArgsCount.end())
-        throw std::runtime_error("Cannot find cmd in argcount map!");
+        throw runtime_errorf("Cannot find cmd %s in argcount map!", toStr(cmd).c_str());
     bool ret = it->second == argc;
     if (!ret)
         fprintf(stderr, "Invalid argument count %d for cmd %s, %d required\n", argc,
@@ -111,7 +111,7 @@ int main(int argc, char** argv) {
         case CMD_MAX:
             goto error;
         default:
-            throw std::runtime_error("Unhandled command value!");
+            throw runtime_errorf("Unhandled command value: %d!", cmd);
     };
     writeToSocket({cmd, data_g});
     return EXIT_SUCCESS;
