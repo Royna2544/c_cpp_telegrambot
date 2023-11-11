@@ -12,7 +12,7 @@ void socketConnectionHandler(const Bot& bot, struct TgBotConnection conn) {
 	    gSpamBlockCfg = _data.data_3;
 	    break;
         default:
-            LOG_E("Unexpected cmd: %d", conn.cmd);
+            LOG_E("Unexpected cmd: %s", toStr(conn.cmd).c_str());
             break;
     };
 }

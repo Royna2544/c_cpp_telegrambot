@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <string>
+#include <unordered_map>
 
 #include <Types.h>
 
@@ -13,6 +14,12 @@ enum TgBotCommand {
     CMD_CTRL_SPAMBLOCK,
     CMD_MAX,
 };
+
+#define ENUM_STR(enum) { enum, #enum }
+extern std::unordered_map<TgBotCommand, std::string> kTgBotCommandStrMap;
+static inline std::string toStr(TgBotCommand cmd) {
+    return kTgBotCommandStrMap[cmd];
+}
 
 namespace TgBotCommandData {
 struct WriteMsgToChatId {

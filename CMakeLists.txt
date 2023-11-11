@@ -70,10 +70,12 @@ endif()
 if (ENABLE_SOCKET_CONNECT)
   add_definitions(-DSOCKET_CONNECTION)
   set(SRC_LIST src/socket/SocketUtils.cpp
-	       src/SocketConnectionHandler.cpp
+               src/socket/TgBotCommandStrMap.cpp
+               src/SocketConnectionHandler.cpp
 	       ${SRC_LIST})
   add_executable(tgbotsocket_cli src/socket/SocketUtils.cpp
-	                         src/socket/TgBotSocketClient.cpp)
+                                 src/socket/TgBotCommandStrMap.cpp
+                                 src/socket/TgBotSocketClient.cpp)
 endif()
 
 # TgBot lib + Boost warning

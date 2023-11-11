@@ -24,7 +24,8 @@ static bool verifyArgsCount(TgBotCommand cmd, int argc) {
         throw std::runtime_error("Cannot find cmd in argcount map!");
     bool ret = it->second == argc;
     if (!ret)
-        fprintf(stderr, "Invalid argument count %d for cmd %d, %d required\n", argc, cmd, it->second);
+        fprintf(stderr, "Invalid argument count %d for cmd %s, %d required\n", argc,
+                toStr(cmd).c_str(), it->second);
     return ret;
 }
 
