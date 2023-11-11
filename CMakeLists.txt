@@ -29,11 +29,11 @@ endif()
 set(SRC_LIST src/main.cpp src/Authorization.cpp
              src/CompilerInTelegram.cpp src/BotAddCommand.cpp
              src/exithandlers/handler_${TARGET_VARIANT}.cpp
-             src/SpamBlocker.cpp)
+             src/SpamBlocker.cpp src/TimerImpl.cpp)
 
 set(LIBUTILS_SRC_LIST src/utils/libutils.cpp
              src/popen_wdt/popen_wdt_${TARGET_VARIANT}.c
-	     src/utils/libutils_${TARGET_VARIANT}.cpp)
+             src/utils/libutils_${TARGET_VARIANT}.cpp)
 
 if(ENABLE_TIDY)
   set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

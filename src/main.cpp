@@ -1,9 +1,7 @@
 #include <tgbot/tgbot.h>
 
 #include <algorithm>
-#include <cctype>
 #include <chrono>
-#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <exception>
@@ -26,7 +24,7 @@
 #include <ExtArgs.h>
 #include <NamespaceImport.h>
 #include <SpamBlock.h>
-#include <Timer.h>
+#include <TimerImpl.h>
 #include <Types.h>
 
 #include <boost/algorithm/string/replace.hpp>
@@ -43,13 +41,6 @@
 
 #include "exithandlers/handler.h"
 #include "utils/libutils.h"
-
-struct TimerImpl_privdata {
-    MessageId messageid;
-    const Bot *bot;
-    bool botcanpin, sendendmsg;
-    UserId chatid;
-};
 
 // tgbot
 using TgBot::StickerSet;
@@ -106,7 +97,6 @@ int main(void) {
         token = token_str;
 
     static Bot gBot(token);
-    static std::shared_ptr<Timer<TimerImpl_privdata>> tm_ptr;
     std::string CCompiler, CXXCompiler, GoCompiler, PythonInterpreter;
     CCompiler = findCompiler(ProgrammingLangs::C);
     CXXCompiler = findCompiler(ProgrammingLangs::CXX);
@@ -305,160 +295,8 @@ int main(void) {
         ss << "Sending reply message took: " << duration<double, std::milli>(afterSend - beforeSend).count() << "ms" << std::endl;
         bot.getApi().editMessageText(ss.str(), message->chat->id, sentMsg);
     });
-    bot_AddCommandEnforced(gBot, "starttimer", [](const Bot &bot, const Message::Ptr &message) {
-        enum InputState {
-            HOUR,
-            MINUTE,
-            SECOND,
-            NONE,
-        };
-        bool found = false;
-        std::string msg;
-        if (hasExtArgs(message)) {
-            parseExtArgs(message, msg);
-            found = true;
-        }
-        if (message->replyToMessage != nullptr) {
-            msg = message->replyToMessage->text;
-            found = true;
-        }
-        if (!found) {
-            bot_sendReplyMessage(bot, message, "Send or reply to a time, in hhmmss format");
-            return;
-        }
-        if (tm_ptr && tm_ptr->isrunning()) {
-            bot_sendReplyMessage(bot, message,
-                                 "Timer is already running");
-            return;
-        }
-        const char *c_str = msg.c_str();
-        std::vector<int> numbercache;
-        enum InputState state;
-        struct timehms hms = {0};
-        for (int i = 0; i <= msg.size(); i++) {
-            int code = static_cast<int>(c_str[i]);
-            if (i == msg.size()) code = ' ';
-            switch (code) {
-                case ' ': {
-                    if (!numbercache.empty()) {
-                        int result = 0, count = 1;
-                        for (const auto i : numbercache) {
-                            result += pow(10, numbercache.size() - count) * i;
-                            count++;
-                        }
-                        switch (state) {
-                            case InputState::HOUR:
-                                hms.h = result;
-                                break;
-                            case InputState::MINUTE:
-                                hms.m = result;
-                                break;
-                            case InputState::SECOND:
-                                hms.s = result;
-                                break;
-                            default:
-                                break;
-                        }
-                        state = InputState::NONE;
-                        numbercache.clear();
-                    }
-                    break;
-                }
-                case '0' ... '9': {
-                    int intver = code - 48;
-                    numbercache.push_back(intver);
-                    break;
-                }
-                case 'H':
-                case 'h': {
-                    state = InputState::HOUR;
-                    break;
-                }
-                case 'M':
-                case 'm': {
-                    state = InputState::MINUTE;
-                    break;
-                }
-                case 'S':
-                case 's': {
-                    state = InputState::SECOND;
-                    break;
-                }
-                default: {
-                    bot_sendReplyMessage(bot, message,
-                                         "Invalid value provided.\nShould contain only h, m, s, "
-                                         "numbers, spaces. (ex. 1h 20m 7s)");
-
-                    return;
-                }
-            }
-        }
-#define TIMER_CONFIG_SEC 5
-        if (hms.toSeconds() == 0) {
-            bot_sendReplyMessage(bot, message, "I'm not a fool to time 0s");
-            return;
-        } else if (hms.toSeconds() < TIMER_CONFIG_SEC) {
-            bot_sendReplyMessage(bot, message, "Provide longer time value");
-            return;
-        }
-        const int msgid = bot.getApi()
-                              .sendMessage(message->chat->id, "Timer starts")
-                              ->messageId;
-        bool couldpin = true;
-        try {
-            bot.getApi().pinChatMessage(message->chat->id, msgid);
-        } catch (const std::exception &) {
-            LOG_W("Cannot pin msg!");
-            couldpin = false;
-        }
-        using TimerType = std::remove_reference_t<decltype(*tm_ptr)>;
-        tm_ptr = std::make_shared<TimerType>(TimerType(hms.h, hms.m, hms.s));
-        tm_ptr->setCallback(
-            [=](const TimerImpl_privdata *priv, struct timehms ms) {
-                const auto bot = priv->bot;
-                std::stringstream ss;
-                if (ms.h != 0) ss << ms.h << "h ";
-                if (ms.m != 0) ss << ms.m << "m ";
-                if (ms.s != 0) ss << ms.s << "s ";
-                if (!ss.str().empty() && ss.str() != message->text && bot)
-                    bot->getApi().editMessageText(ss.str(), message->chat->id,
-                                                  priv->messageid);
-            },
-            TIMER_CONFIG_SEC,
-            [=](const TimerImpl_privdata *priv) {
-                const auto bot = priv->bot;
-                if (bot) {
-                    bot->getApi().editMessageText("Timer ended", message->chat->id,
-                                                  priv->messageid);
-                    if (priv->sendendmsg)
-                        bot->getApi().sendMessage(message->chat->id, "Timer ended");
-                    std::this_thread::sleep_for(std::chrono::seconds(1));
-                    if (priv->botcanpin)
-                        bot->getApi().unpinChatMessage(message->chat->id,
-                                                       priv->messageid);
-                }
-            },
-            std::make_unique<TimerImpl_privdata>(TimerImpl_privdata{
-                msgid, &bot, couldpin, true, message->chat->id}));
-        tm_ptr->start();
-    });
-    bot_AddCommandEnforced(gBot, "stoptimer", [](const Bot &bot, const Message::Ptr &message) {
-        bool ret = false;
-        const char *text = nullptr;
-        if (tm_ptr) {
-            ret = tm_ptr->cancel([&](TimerImpl_privdata *t) -> bool {
-                const bool allowed = t->chatid == message->chat->id;
-                if (allowed) t->sendendmsg = false;
-                return allowed;
-            });
-            if (ret) {
-                text = "Stopped successfully";
-            } else
-                text = "Timer is running on other group.";
-        } else
-            text = "Timer is not running";
-        bot_sendReplyMessage(bot, message, text);
-    });
+    bot_AddCommandEnforced(gBot, "starttimer", startTimer);
+    bot_AddCommandEnforced(gBot, "stoptimer", stopTimer);
     bot_AddCommandPermissive(gBot, "decho", [](const Bot &bot, const Message::Ptr &message) {
         bool invalid = !hasExtArgs(message), sticker = false, text = false,
              animation = false;
@@ -535,10 +373,7 @@ int main(void) {
     static auto cleanupFunc = [](int s) {
         if (exited) return;
         LOG_I("Exiting with signal %d", s);
-        if (tm_ptr && tm_ptr->isrunning()) {
-            tm_ptr->cancel();
-            std::this_thread::sleep_for(std::chrono::seconds(4));
-        }
+        forceStopTimer();
         database::db.save();
 #ifdef SOCKET_CONNECTION
         if (th.joinable()) {

@@ -6,9 +6,7 @@
 #include <thread>
 
 struct timehms {
-    int h;
-    int m;
-    int s;
+    unsigned int h, m, s;
     int toSeconds(void) const noexcept { return 60 * 60 * h + 60 * m + s; }
 };
 
@@ -23,7 +21,7 @@ template <typename T>
 class Timer {
     unsigned int h, m, s;
     unsigned int onsec = 0;
-    std::unique_ptr<T> priv;
+    T priv;
     time_callback_t<T> onEvery;
     callback_t<T> onEnd;
     bool stop = false;
@@ -33,7 +31,7 @@ class Timer {
     Timer(unsigned int h, unsigned int m, unsigned int s) : h(h), m(m), s(s){};
 
     bool cancel(const cancel_validator_t<T> cancel) {
-        bool shouldcancel = cancel && cancel(priv.get());
+        bool shouldcancel = cancel && cancel(&priv);
         if (shouldcancel) stop = true;
         return shouldcancel;
     }
@@ -41,11 +39,11 @@ class Timer {
     bool isrunning(void) { return !stop; }
     void setCallback(const time_callback_t<T> onEvery,
                      const unsigned int onsec, const callback_t<T> onEnd,
-                     const std::unique_ptr<T> priv) {
+                     const T priv) {
         this->onEvery = onEvery;
         this->onsec = onsec;
         this->onEnd = onEnd;
-        this->priv = std::make_unique<T>(*priv);
+        this->priv = priv;
     }
 
     void start(void) {
@@ -54,7 +52,7 @@ class Timer {
         stop = false;
 
         std::thread([=]() {
-            int h_ = h, m_ = m, s_ = s;
+            unsigned int h_ = h, m_ = m, s_ = s;
 
             while (h_ >= 0) {
                 while (m_ >= 0) {
@@ -62,7 +60,7 @@ class Timer {
                         std::this_thread::sleep_for(std::chrono::seconds(1));
                         if (stop) break;
                         if (onEvery && s_ % onsec == 0)
-                            onEvery(priv.get(), {h_, m_, s_});
+                            onEvery(&priv, {h_, m_, s_});
                         s_--;
                     }
                     if (stop) break;
@@ -73,7 +71,7 @@ class Timer {
                 if (h_ != 0 && m_ == -1) m_ = 60;
                 h_--;
             }
-            if (onEnd) onEnd(priv.get());
+            if (onEnd) onEnd(&priv);
             stop = true;
         }).detach();
     }
