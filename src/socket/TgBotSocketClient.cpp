@@ -51,8 +51,21 @@ static bool stol_or(std::string str, int64_t* intval) {
 template <class C>
 bool verifyWithinEnum(C max, int val) { return val >= 0 && val < max; }
 
+template <class C>
+bool parseOneEnum(C* res, C max, const char* str, const char* name) {
+    int parsed = 0;
+    if (stoi_or(str, &parsed)) {
+        if (verifyWithinEnum(max, parsed)) {
+            *res = static_cast<C>(parsed);
+            return true;
+        } else {
+            fprintf(stderr, "Cannot convert %s to %s enum value\n", str, name);
+        }
+    }
+    return false;
+}
+
 int main(int argc, char** argv) {
-    int cmd_i;
     enum TgBotCommand cmd;
     union TgBotCommandUnion data_g;
     char* exe = argv[0];
@@ -64,12 +77,9 @@ int main(int argc, char** argv) {
     ++argv;
     --argc;
 
-    if (!stoi_or(*argv, &cmd_i)) {
-        fprintf(stderr, "Cannot parse cmd enum value from '%s'", argv[1]);
-        goto error;
-    }
-    if (!verifyWithinEnum(CMD_MAX, cmd_i) || cmd_i == CMD_EXIT) {
-        fprintf(stderr, "Invalid cmd enum value: %d\n", cmd_i);
+    if (!parseOneEnum(&cmd, CMD_MAX, *argv, "cmd")) goto error;
+    if (cmd == CMD_EXIT) {
+        fprintf(stderr, "CMD_EXIT is not supported\n");
         goto error;
     }
 
@@ -77,7 +87,6 @@ int main(int argc, char** argv) {
     ++argv;
     --argc;
 
-    cmd = static_cast<decltype(cmd)>(cmd_i);
     if (!verifyArgsCount(cmd, argc))
         goto error;
     switch (cmd) {
@@ -92,13 +101,9 @@ int main(int argc, char** argv) {
             break;
         }
         case CMD_CTRL_SPAMBLOCK: {
-            int tmp;
-            if (stoi_or(argv[0], &tmp) && verifyWithinEnum(TgBotCommandData::CTRL_MAX, tmp)) {
-                data_g.data_3 = static_cast<decltype(data_g.data_3)>(tmp);
-            } else {
-		fprintf(stderr, "Failed to convert '%s' to ctrl enum value\n", argv[0]);
+            if (!parseOneEnum(&data_g.data_3, TgBotCommandData::CTRL_MAX, argv[0], "spamblock")) {
                 goto error;
-	    }
+            }
             break;
         }
         case CMD_EXIT:
