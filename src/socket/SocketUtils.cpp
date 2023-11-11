@@ -68,10 +68,10 @@ void startListening(const listener_callback_t& cb) {
                 LOG_D("Received exit command");
                 break;
             }
-            LOG_D("Received buf with cmd %d, invoke callback!", conn.cmd);
+            LOG_D("Received buf with %s, invoke callback!", toStr(conn.cmd).c_str());
             cb(conn);
         } else {
-            LOG_E("read failed, %s", strerror(errno));
+            LOG_E("While reading from socket, %s", strerror(errno));
         }
         close(cfd);
     }
