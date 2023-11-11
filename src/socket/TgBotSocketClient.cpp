@@ -19,12 +19,12 @@ static std::map<TgBotCommand, int> kRequiredArgsCount = {
 };
 
 static bool verifyArgsCount(TgBotCommand cmd, int argc) {
-    if (kRequiredArgsCount.find(cmd) == kRequiredArgsCount.end())
+    auto it = kRequiredArgsCount.find(cmd);
+    if (it == kRequiredArgsCount.end())
         throw std::runtime_error("Cannot find cmd in argcount map!");
-    auto it = kRequiredArgsCount[cmd];
-    bool ret = it == argc;
+    bool ret = it->second == argc;
     if (!ret)
-        fprintf(stderr, "Invalid argument count %d for cmd %d, %d required\n", argc, cmd, it);
+        fprintf(stderr, "Invalid argument count %d for cmd %d, %d required\n", argc, cmd, it->second);
     return ret;
 }
 
