@@ -1,14 +1,25 @@
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <map>
 #include <sstream>
 
-#include "TgBotSocket.h"
 #include "../include/RuntimeException.h"
+#include "TgBotSocket.h"
 
 static void usage(char* argv, bool success) {
-    printf("Usage: %s [cmd enum value] [args...]\n", argv);
+    printf("Usage: %s [cmd enum value] [args...]\n\n", argv);
+    printf("Available cmd enum values:\n");
+    using sortedIt = std::pair<TgBotCommand, std::string>;
+    auto sortedVec = std::vector<sortedIt>(kTgBotCommandStrMap.begin(), kTgBotCommandStrMap.end());
+    std::sort(sortedVec.begin(), sortedVec.end(), [](sortedIt v1, sortedIt v2) { 
+        return v1.second > v2.second; 
+    });
+    for (const auto& ent : sortedVec) {
+        if (ent.first == CMD_EXIT || ent.first == CMD_MAX) continue;
+        printf("%s: %d\n", ent.second.c_str(), ent.first);
+    }
     exit(success);
     __builtin_unreachable();
 }
