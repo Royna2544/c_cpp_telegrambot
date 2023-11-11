@@ -20,7 +20,7 @@ static void usage(char* argv, bool success) {
         if (ent.first == CMD_EXIT || ent.first == CMD_MAX) continue;
         printf("%s: %d\n", ent.second.c_str(), ent.first);
     }
-    exit(success);
+    exit(!success);
     __builtin_unreachable();
 }
 
