@@ -24,3 +24,4 @@ proto/gen
 # Visual studio code
 build/
 .vscode/
+.cache/
