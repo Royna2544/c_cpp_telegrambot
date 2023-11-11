@@ -103,49 +103,28 @@ int main(void) {
     GoCompiler = findCompiler(ProgrammingLangs::GO);
     PythonInterpreter = findCompiler(ProgrammingLangs::PYTHON);
 
-    if (!CXXCompiler.empty()) {
-        bot_AddCommandEnforced(gBot, "cpp", [&](const Bot &bot, const Message::Ptr &message) {
-            CompileRunHandler<CCppCompileHandleData>({bot, message, CXXCompiler, "compile.cpp"});
-        });
-    } else {
-        NOT_SUPPORTED_COMPILER(gBot, "cpp");
-    }
-    if (!CCompiler.empty()) {
-        bot_AddCommandEnforced(gBot, "c", [&](const Bot &bot, const Message::Ptr &message) {
-            CompileRunHandler<CCppCompileHandleData>({bot, message, CCompiler, "compile.c"});
-        });
-    } else {
-        NOT_SUPPORTED_COMPILER(gBot, "c");
-    }
-    if (!PythonInterpreter.empty()) {
-        bot_AddCommandEnforced(gBot, "python", [&](const Bot &bot, const Message::Ptr &message) {
-            CompileRunHandler({bot, message, PythonInterpreter, "./out.py"});
-        });
-    } else {
-        NOT_SUPPORTED_COMPILER(gBot, "python");
-    }
-    if (!GoCompiler.empty()) {
-        bot_AddCommandEnforced(gBot, "golang", [&](const Bot &bot, const Message::Ptr &message) {
-            CompileRunHandler({bot, message, GoCompiler + " run", "./out.go"});
-        });
-    } else {
-        NOT_SUPPORTED_COMPILER(gBot, "golang");
-    }
-#ifdef USE_DATABASE
-    bot_AddCommandEnforced(gBot, "addblacklist",
-                           std::bind(&ProtoDatabase::addToDatabase, blacklist, pholder1, pholder2));
-    bot_AddCommandEnforced(gBot, "rmblacklist",
-                           std::bind(&ProtoDatabase::removeFromDatabase, blacklist, pholder1, pholder2));
-    bot_AddCommandEnforced(gBot, "addwhitelist",
-                           std::bind(&ProtoDatabase::addToDatabase, whitelist, pholder1, pholder2));
-    bot_AddCommandEnforced(gBot, "rmwhitelist",
-                           std::bind(&ProtoDatabase::removeFromDatabase, whitelist, pholder1, pholder2));
-#else
-    NOT_SUPPORTED_DB(gBot, "addblacklist");
-    NOT_SUPPORTED_DB(gBot, "rmblacklist");
-    NOT_SUPPORTED_DB(gBot, "addwhitelist");
-    NOT_SUPPORTED_DB(gBot, "rmwhitelist");
-#endif
+    bot_AddCommandEnforcedCompiler(gBot, "cpp", CXXCompiler, [&](const Bot &bot, const Message::Ptr &message) {
+        CompileRunHandler<CCppCompileHandleData>({bot, message, CXXCompiler, "compile.cpp"});
+    });
+    bot_AddCommandEnforcedCompiler(gBot, "c", CXXCompiler, [&](const Bot &bot, const Message::Ptr &message) {
+        CompileRunHandler<CCppCompileHandleData>({bot, message, CCompiler, "compile.c"});
+    });
+    bot_AddCommandEnforcedCompiler(gBot, "python", PythonInterpreter, [&](const Bot &bot, const Message::Ptr &message) {
+        CompileRunHandler({bot, message, PythonInterpreter, "./out.py"});
+    });
+    bot_AddCommandEnforcedCompiler(gBot, "golang", GoCompiler, [&](const Bot &bot, const Message::Ptr &message) {
+        CompileRunHandler({bot, message, GoCompiler + " run", "./out.go"});
+    });
+
+    bot_AddCommandEnforcedDatabase(gBot, "addblacklist",
+                                   std::bind(&ProtoDatabase::addToDatabase, blacklist, pholder1, pholder2));
+    bot_AddCommandEnforcedDatabase(gBot, "rmblacklist",
+                                   std::bind(&ProtoDatabase::removeFromDatabase, blacklist, pholder1, pholder2));
+    bot_AddCommandEnforcedDatabase(gBot, "addwhitelist",
+                                   std::bind(&ProtoDatabase::addToDatabase, whitelist, pholder1, pholder2));
+    bot_AddCommandEnforcedDatabase(gBot, "rmwhitelist",
+                                   std::bind(&ProtoDatabase::removeFromDatabase, whitelist, pholder1, pholder2));
+
     bot_AddCommandEnforced(gBot, "bash", [](const Bot &bot, const Message::Ptr message) {
         CompileRunHandler(BashHandleData{bot, message, false});
     });
