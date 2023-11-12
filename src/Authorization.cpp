@@ -7,7 +7,7 @@ bool gAuthorized = true;
 static bool AuthorizedId(const UserId id, const bool permissive) {
     if (!permissive) {
         if (database::whitelist.exists(id)) return true;
-        return id == database::db.maybeGetOwnerId().value_or(-1);
+        return id == database::db.maybeGetOwnerId();
     } else {
         return !database::blacklist.exists(id);
     }

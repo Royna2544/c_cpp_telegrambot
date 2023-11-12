@@ -23,7 +23,7 @@ std::optional<int> ProtoDatabase::findByUid(const RepeatedField<UserId>* list,
 
 bool ProtoDatabase::rejectUid(const Bot& bot, const User::Ptr& user) const {
     if (bot.getApi().getMe()->id == user->id) return true;
-    if (db->has_ownerid() && db->ownerid() == user->id) return true;
+    if (db.maybeGetOwnerId() == user->id) return true;
     if (user->isBot) return true;
     return false;
 }

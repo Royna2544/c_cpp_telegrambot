@@ -60,11 +60,11 @@ struct DatabaseWrapper {
     Database* operator->(void) {
         return &protodb;
     }
-    std::optional<int64_t> maybeGetOwnerId() const {
+    UserId maybeGetOwnerId() const {
         if (protodb.has_ownerid())
             return protodb.ownerid();
         else
-            return std::nullopt;
+            return -1;
     }
 
    private:

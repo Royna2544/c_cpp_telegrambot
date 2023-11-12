@@ -372,7 +372,7 @@ reinit:
     } catch (const std::exception &e) {
         LOG_E("%s", e.what());
         LOG_W("Trying to recover");
-        UserId ownerid = database::db.maybeGetOwnerId().value_or(-1);
+        UserId ownerid = database::db.maybeGetOwnerId();
         try {
             gBot.getApi().sendMessage(ownerid, e.what());
         } catch (const std::exception &e) {
