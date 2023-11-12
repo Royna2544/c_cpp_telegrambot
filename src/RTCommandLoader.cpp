@@ -8,6 +8,10 @@
 
 struct DynamicLibraryHolder {
     DynamicLibraryHolder(void* handle) : handle_(handle){};
+    DynamicLibraryHolder(DynamicLibraryHolder&& other) {
+        handle_ = other.handle_;
+        other.handle_ = nullptr;
+    }
     ~DynamicLibraryHolder() {
         if (handle_) {
             LOG_D("%s: handle was at %p", __func__, handle_);
