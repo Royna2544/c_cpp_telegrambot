@@ -149,6 +149,7 @@ void startTimer(const Bot &bot, const Message::Ptr &message) {
                     bot->getApi().unpinChatMessage(message->chat->id,
                                                    priv->messageid);
             }
+            tm_ptr = std::nullopt;
         },
         {msgid, &bot, couldpin, true, message->chat->id});
     tm_ptr->start();
