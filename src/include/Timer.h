@@ -6,7 +6,7 @@
 #include <thread>
 
 struct timehms {
-    unsigned int h, m, s;
+    int h, m, s;
     int toSeconds(void) const noexcept { return 60 * 60 * h + 60 * m + s; }
 };
 
@@ -19,7 +19,7 @@ using cancel_validator_t = std::function<bool(T*)>;
 
 template <typename T>
 class Timer {
-    unsigned int h, m, s;
+    int h, m, s;
     unsigned int onsec = 0;
     T priv;
     time_callback_t<T> onEvery;
@@ -28,7 +28,7 @@ class Timer {
 
    public:
     Timer() = delete;
-    Timer(unsigned int h, unsigned int m, unsigned int s) : h(h), m(m), s(s){};
+    Timer(int h, int m, int s) : h(h), m(m), s(s){};
 
     bool cancel(const cancel_validator_t<T> cancel) {
         bool shouldcancel = cancel && cancel(&priv);
@@ -52,7 +52,7 @@ class Timer {
         stop = false;
 
         std::thread([=]() {
-            unsigned int h_ = h, m_ = m, s_ = s;
+            int h_ = h, m_ = m, s_ = s;
 
             while (h_ >= 0) {
                 while (m_ >= 0) {
