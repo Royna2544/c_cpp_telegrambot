@@ -1,6 +1,17 @@
+#include <Authorization.h>
+#include <BotAddCommand.h>
+#include <BotReplyMessage.h>
+#include <CompilerInTelegram.h>
+#include <Database.h>
+#include <ExtArgs.h>
+#include <NamespaceImport.h>
+#include <SpamBlock.h>
+#include <TimerImpl.h>
+#include <Types.h>
 #include <tgbot/tgbot.h>
 
 #include <algorithm>
+#include <boost/algorithm/string/replace.hpp>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -16,24 +27,8 @@
 #include <unordered_map>
 #include <vector>
 
-// Boost
-#include <Authorization.h>
-#include <BotAddCommand.h>
-#include <BotReplyMessage.h>
-#include <CompilerInTelegram.h>
-#include <ExtArgs.h>
-#include <NamespaceImport.h>
-#include <SpamBlock.h>
-#include <TimerImpl.h>
-#include <Types.h>
-
-#include <boost/algorithm/string/replace.hpp>
-
 #ifdef RTCOMMAND_LOADER
 #include <RTCommandLoader.h>
-#endif
-#ifdef USE_DATABASE
-#include <Database.h>
 #endif
 #ifdef SOCKET_CONNECTION
 #include <SocketConnectionHandler.h>
@@ -49,12 +44,10 @@ using TgBot::TgLongPoll;
 static inline const auto pholder1 = std::placeholders::_1;
 static inline const auto pholder2 = std::placeholders::_2;
 
-#ifdef USE_DATABASE
 // Database.cpp
 using database::blacklist;
 using database::ProtoDatabase;
 using database::whitelist;
-#endif
 
 union time {
     std::time_t val;
@@ -116,14 +109,14 @@ int main(void) {
         CompileRunHandler({bot, message, GoCompiler + " run", "./out.go"});
     });
 
-    bot_AddCommandEnforcedDatabase(gBot, "addblacklist",
-                                   std::bind(&ProtoDatabase::addToDatabase, blacklist, pholder1, pholder2));
-    bot_AddCommandEnforcedDatabase(gBot, "rmblacklist",
-                                   std::bind(&ProtoDatabase::removeFromDatabase, blacklist, pholder1, pholder2));
-    bot_AddCommandEnforcedDatabase(gBot, "addwhitelist",
-                                   std::bind(&ProtoDatabase::addToDatabase, whitelist, pholder1, pholder2));
-    bot_AddCommandEnforcedDatabase(gBot, "rmwhitelist",
-                                   std::bind(&ProtoDatabase::removeFromDatabase, whitelist, pholder1, pholder2));
+    bot_AddCommandEnforced(gBot, "addblacklist",
+                           std::bind(&ProtoDatabase::addToDatabase, blacklist, pholder1, pholder2));
+    bot_AddCommandEnforced(gBot, "rmblacklist",
+                           std::bind(&ProtoDatabase::removeFromDatabase, blacklist, pholder1, pholder2));
+    bot_AddCommandEnforced(gBot, "addwhitelist",
+                           std::bind(&ProtoDatabase::addToDatabase, whitelist, pholder1, pholder2));
+    bot_AddCommandEnforced(gBot, "rmwhitelist",
+                           std::bind(&ProtoDatabase::removeFromDatabase, whitelist, pholder1, pholder2));
 
     bot_AddCommandEnforced(gBot, "bash", [](const Bot &bot, const Message::Ptr message) {
         CompileRunHandler(BashHandleData{bot, message, false});
@@ -379,9 +372,7 @@ reinit:
     } catch (const std::exception &e) {
         LOG_E("%s", e.what());
         LOG_W("Trying to recover");
-#ifdef USE_DATABASE
         UserId ownerid = database::db.maybeGetOwnerId().value_or(-1);
-#endif
         try {
             gBot.getApi().sendMessage(ownerid, e.what());
         } catch (const std::exception &e) {

@@ -9,5 +9,3 @@ extern bool gAuthorized;
 bool Authorized(const Message::Ptr &message,
                 const bool nonuserallowed = false,
                 const bool permissive = false);
-
-static inline const UserId ownerid = 1185607882;

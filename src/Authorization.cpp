@@ -1,22 +1,16 @@
 #include <Authorization.h>
-#include <Types.h>
-#ifdef USE_DATABASE
 #include <Database.h>
-#endif
+#include <Types.h>
 
 bool gAuthorized = true;
 
 static bool AuthorizedId(const UserId id, const bool permissive) {
-#ifdef USE_DATABASE
     if (!permissive) {
         if (database::whitelist.exists(id)) return true;
         return id == database::db.maybeGetOwnerId().value_or(-1);
     } else {
         return !database::blacklist.exists(id);
     }
-#else
-    return permissive ? true : ownerid == id;
-#endif
 }
 bool Authorized(const Message::Ptr &message, const bool nonuserallowed, const bool permissive) {
     if (!gAuthorized) return false;
