@@ -78,6 +78,7 @@ int main(int argc, char** argv) {
     enum TgBotCommand cmd = CMD_MAX;
     union TgBotCommandUnion data_g {};
     const char* exe = argv[0];
+    bool ret = false;
 
     if (argc == 1)
         usage(exe, true);
@@ -86,44 +87,43 @@ int main(int argc, char** argv) {
     ++argv;
     --argc;
 
-    if (!parseOneEnum(&cmd, CMD_MAX, *argv, "cmd")) goto error;
-    if (cmd == CMD_EXIT) {
-        fprintf(stderr, "CMD_EXIT is not supported\n");
-        goto error;
+    if (parseOneEnum(&cmd, CMD_MAX, *argv, "cmd")) {
+        if (cmd == CMD_EXIT) {
+            fprintf(stderr, "CMD_EXIT is not supported\n");
+        } else {
+            // Remove cmd (argv[1])
+            ++argv;
+            --argc;
+
+            if (verifyArgsCount(cmd, argc)) {
+                switch (cmd) {
+                    case CMD_WRITE_MSG_TO_CHAT_ID: {
+                        TgBotCommandData::WriteMsgToChatId data;
+                        if (!stol_or(argv[0], &data.to)) {
+                            break;
+                        }
+                        memset(data.msg, 0, sizeof(data.msg));
+                        strncpy(data.msg, argv[1], sizeof(data.msg));
+                        data_g.data_1 = data;
+                        ret = true;
+                        break;
+                    }
+                    case CMD_CTRL_SPAMBLOCK: {
+                        ret = parseOneEnum(&data_g.data_3, TgBotCommandData::CTRL_MAX,
+                                           argv[0], "spamblock");
+                        break;
+                    }
+                    case CMD_MAX:
+                        break;
+                    default:
+                        throw runtime_errorf("Unhandled command value: %d!", cmd);
+                };
+            }
+        }
     }
-
-    // Remove cmd (argv[1])
-    ++argv;
-    --argc;
-
-    if (!verifyArgsCount(cmd, argc))
-        goto error;
-    switch (cmd) {
-        case CMD_WRITE_MSG_TO_CHAT_ID: {
-            TgBotCommandData::WriteMsgToChatId data;
-            if (!stol_or(argv[0], &data.to)) {
-                goto error;
-            }
-            memset(data.msg, 0, sizeof(data.msg));
-            strncpy(data.msg, argv[1], sizeof(data.msg));
-            data_g.data_1 = data;
-            break;
-        }
-        case CMD_CTRL_SPAMBLOCK: {
-            if (!parseOneEnum(&data_g.data_3, TgBotCommandData::CTRL_MAX, argv[0], "spamblock")) {
-                goto error;
-            }
-            break;
-        }
-        case CMD_EXIT:
-        case CMD_MAX:
-            goto error;
-        default:
-            throw runtime_errorf("Unhandled command value: %d!", cmd);
-    };
-    writeToSocket({cmd, data_g});
-    return EXIT_SUCCESS;
-error:
-    usage(exe, false);
-    return EXIT_FAILURE;
+    if (ret)
+        writeToSocket({cmd, data_g});
+    else
+        usage(exe, false);
+    return !ret;
 }
