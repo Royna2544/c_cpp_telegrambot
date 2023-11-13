@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.10.2)
 project(tg_cpphost)
 
-option(ENABLE_TIDY "Enable clang-tidy checks" OFF)
 option(ENFORCE_EN_US "Enforce en-US locale for output" ON)
 if(NOT WIN32)
   option(ENABLE_RUNTIME_COMMAND "Enable runtime loader of commands" ON)
@@ -11,6 +10,7 @@ endif()
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(PWD_REPLACE //${PROJECT_NAME}:)
 add_definitions(-DPWD_REPLACE_STR="${PWD_REPLACE}")
@@ -25,7 +25,6 @@ if(WIN32)
 else()
   set(TARGET_VARIANT posix)
 endif()
-
 set(SRC_LIST
     src/main.cpp
     src/Authorization.cpp
@@ -38,15 +37,6 @@ set(SRC_LIST
 set(LIBUTILS_SRC_LIST
     src/utils/libutils.cpp src/popen_wdt/popen_wdt_${TARGET_VARIANT}.c
     src/utils/libutils_${TARGET_VARIANT}.cpp)
-
-if(ENABLE_TIDY)
-  set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-  set(CMAKE_CXX_CLANG_TIDY
-      clang-tidy;
-      -header-filter=.;
-      -checks=*,-llvm*,-fuchsia*,-altera*,-hicpp*,abseil-*,-modernize-use-trailing-return-type,-modernize-redundent-void-arg
-  )
-endif()
 
 # Database
 find_package(Protobuf REQUIRED)
@@ -95,10 +85,6 @@ if(ENABLE_RUNTIME_COMMAND)
 endif()
 # Build main tg_cpphost exe
 add_executable(${PROJECT_NAME} ${SRC_LIST})
-
-if(ENABLE_TIDY)
-  set_target_properties(TgBot PROPERTIES CXX_CLANG_TIDY "")
-endif()
 
 # Default LD-list
 set(LD_LIST TgBot TgBotUtils)
