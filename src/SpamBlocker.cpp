@@ -11,6 +11,17 @@
 
 #include "../utils/libutils.h"
 
+// TODO: Remove stub, Windows and macOS uses int64_t as ll
+// while Linux uses with l causing formatting error
+#if defined __APPLE__ || defined __WIN32
+#undef LOG_D
+#undef LOG_W
+#undef LOG_I
+#define LOG_D(...)
+#define LOG_W(...)
+#define LOG_I(...)
+#endif
+
 using std::chrono_literals::operator""s;
 using TgBot::ChatPermissions;
 
@@ -30,7 +41,7 @@ static std::string commonMsgdataFn(const Message::Ptr &m) {
 }
 
 static auto deleteAndMute(const Bot &bot_, buffer_iterator_t handle,
-                          const SpamMapT &map, const int threshold) {
+                          const SpamMapT &map, const size_t threshold) {
     // Initial set - all false set
     auto perms = std::make_shared<ChatPermissions>();
     for (const auto &mapmsg : map) {

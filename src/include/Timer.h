@@ -17,11 +17,11 @@ using time_callback_t = std::function<void(const T*, struct timehms)>;
 template <typename T>
 using cancel_validator_t = std::function<bool(T*)>;
 
-template <typename T>
+template <class T>
 class Timer {
     int h, m, s;
     unsigned int onsec = 0;
-    T priv;
+    T priv {};
     time_callback_t<T> onEvery;
     callback_t<T> onEnd;
     bool stop = false;

@@ -46,9 +46,9 @@ void startTimer(const Bot &bot, const Message::Ptr &message) {
     }
     const char *c_str = msg.c_str();
     std::vector<int> numbercache;
-    enum InputState state;
+    enum InputState state = InputState::NONE;
     struct timehms hms = {0};
-    for (int i = 0; i <= msg.size(); i++) {
+    for (size_t i = 0; i <= msg.size(); i++) {
         int code = static_cast<int>(c_str[i]);
         if (i == msg.size()) code = ' ';
         switch (code) {

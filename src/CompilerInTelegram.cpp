@@ -163,7 +163,6 @@ void CompileRunHandler<CCppCompileHandleData>(const CCppCompileHandleData &data)
 #else
     const char aoutname[] = "./a.out";
 #endif
-    bool ret;
 
     if (!commonVerifyParseWrite(data.bot, data.message, extraargs, data.outfile)) return;
 
@@ -189,7 +188,6 @@ template <>
 void CompileRunHandler(const CompileHandleData &data) {
     std::string res, extargs;
     std::stringstream cmd;
-    bool ret;
 
     if (!commonVerifyParseWrite(data.bot, data.message, extargs, data.outfile)) return;
 

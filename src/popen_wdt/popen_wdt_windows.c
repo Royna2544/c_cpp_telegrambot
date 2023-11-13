@@ -16,7 +16,7 @@ struct watchdog_data {
 };
 
 static DWORD WINAPI doReadWriteProcess(LPVOID arg) {
-    DWORD readbuf, result;
+    DWORD readbuf;
     struct watchdog_data* data = (struct watchdog_data*)arg;
     static char buf[1024];
 
@@ -71,12 +71,11 @@ FILE* popen_watchdog(const char* command, bool* wdt_ret) {
     FILE* fp;
     HANDLE child_stdout_w = NULL, child_stdout_r = NULL;
     HANDLE child_stdout_w_file = NULL, child_stdout_r_file = NULL;
-    HANDLE pid = NULL;
     HANDLE hMapFile = NULL;
+    int ret;
 
     struct watchdog_data* data = NULL;
     CHAR buffer[PATH_MAX] = {0};
-    int ret;
 
     BOOL success;
     SECURITY_ATTRIBUTES saAttr;
@@ -137,6 +136,8 @@ FILE* popen_watchdog(const char* command, bool* wdt_ret) {
         LOG_W("Retrying with PowerShell prefix: %s", command);
         ret = snprintf(buffer, sizeof(buffer), "powershell.exe -c \"%s\"", command);
 
+        if (ret == sizeof(buffer))
+            LOG_W("Command line buffer may have overflowed");
         // Create process again
         success = CreateProcess(NULL, (LPSTR)buffer, NULL, NULL, TRUE,
                                 CREATE_NEW_PROCESS_GROUP | CREATE_SUSPENDED, NULL, NULL, &si, &pi);

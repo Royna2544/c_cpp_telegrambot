@@ -97,16 +97,16 @@ int main(void) {
     PythonInterpreter = findCompiler(ProgrammingLangs::PYTHON);
 
     bot_AddCommandEnforcedCompiler(gBot, "cpp", CXXCompiler, [&](const Bot &bot, const Message::Ptr &message) {
-        CompileRunHandler<CCppCompileHandleData>({bot, message, CXXCompiler, "compile.cpp"});
+        CompileRunHandler(CCppCompileHandleData{{{bot, message}, CXXCompiler, "compile.cpp"}});
     });
     bot_AddCommandEnforcedCompiler(gBot, "c", CXXCompiler, [&](const Bot &bot, const Message::Ptr &message) {
-        CompileRunHandler<CCppCompileHandleData>({bot, message, CCompiler, "compile.c"});
+        CompileRunHandler(CCppCompileHandleData{{{bot, message}, CCompiler, "compile.c"}});
     });
     bot_AddCommandEnforcedCompiler(gBot, "python", PythonInterpreter, [&](const Bot &bot, const Message::Ptr &message) {
-        CompileRunHandler({bot, message, PythonInterpreter, "./out.py"});
+        CompileRunHandler({{bot, message}, PythonInterpreter, "./out.py"});
     });
     bot_AddCommandEnforcedCompiler(gBot, "golang", GoCompiler, [&](const Bot &bot, const Message::Ptr &message) {
-        CompileRunHandler({bot, message, GoCompiler + " run", "./out.go"});
+        CompileRunHandler({{bot, message}, GoCompiler + " run", "./out.go"});
     });
 
     bot_AddCommandEnforced(gBot, "addblacklist",
@@ -119,16 +119,15 @@ int main(void) {
                            std::bind(&ProtoDatabase::removeFromDatabase, whitelist, pholder1, pholder2));
 
     bot_AddCommandEnforced(gBot, "bash", [](const Bot &bot, const Message::Ptr message) {
-        CompileRunHandler(BashHandleData{bot, message, false});
+        CompileRunHandler(BashHandleData{{bot, message}, false});
     });
     bot_AddCommandEnforced(gBot, "unsafebash", [](const Bot &bot, const Message::Ptr message) {
-        CompileRunHandler(BashHandleData{bot, message, true});
+        CompileRunHandler(BashHandleData{{bot, message}, true});
     });
     bot_AddCommandPermissive(gBot, "alive", [](const Bot &bot, const Message::Ptr &message) {
         static std::string version;
         static std::once_flag once;
         std::call_once(once, [] {
-            char buf[1024] = {0};
             std::string commitid, commitmsg, originurl, compilerver;
 
             static const std::map<std::string *, std::string> commands = {
@@ -190,7 +189,7 @@ int main(void) {
         std::stringstream ss;
         ss << "Flashing '" << msg;
         if (msg.find(".zip") == std::string::npos) ss << ".zip";
-        const ssize_t pos = genRandomNumber(reasons.size());
+        const size_t pos = genRandomNumber(reasons.size());
         if (pos != reasons.size()) {
             ss << "' failed successfully!" << std::endl;
             ss << "Reason: " << reasons[pos];

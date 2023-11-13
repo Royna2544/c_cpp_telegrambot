@@ -80,7 +80,7 @@ std::string findCommandExe(const std::string& command) {
     for (const auto& path : getPathEnv()) {
         if (path.empty()) continue;
         memset(buffer, 0, sizeof(buffer));
-        auto bytes = snprintf(buffer, sizeof(buffer), "%s%c%s",
+        size_t bytes = snprintf(buffer, sizeof(buffer), "%s%c%s",
                               path.c_str(), dir_delimiter, _command.c_str());
         if (bytes < sizeof(buffer))
             buffer[bytes] = '\0';
