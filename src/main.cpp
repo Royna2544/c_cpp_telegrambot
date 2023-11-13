@@ -6,6 +6,7 @@
 #include <ExtArgs.h>
 #include <NamespaceImport.h>
 #include <SpamBlock.h>
+#include <PrintableTime.h>
 #include <TimerImpl.h>
 #include <Types.h>
 #include <tgbot/tgbot.h>
@@ -13,13 +14,9 @@
 #include <algorithm>
 #include <boost/algorithm/string/replace.hpp>
 #include <chrono>
-#include <cstdio>
-#include <cstdlib>
 #include <exception>
 #include <fstream>
-#include <functional>
 #include <map>
-#include <memory>
 #include <random>
 #include <sstream>
 #include <string>
@@ -48,21 +45,6 @@ static inline const auto pholder2 = std::placeholders::_2;
 using database::blacklist;
 using database::ProtoDatabase;
 using database::whitelist;
-
-union time {
-    std::time_t val;
-};
-
-std::ostream &operator<<(std::ostream &self, union time t) {
-    char timestr[std::size("yyyy-mm-ddThh:mm:ssZ")];
-    std::strftime(std::data(timestr), std::size(timestr),
-                  "%FT%TZ", std::gmtime(&t.val));
-    return self << timestr;
-}
-
-int operator-(union time thisone, union time otherone) {
-    return thisone.val - otherone.val;
-}
 
 int main(void) {
     const char *token_str = getenv("TOKEN");
