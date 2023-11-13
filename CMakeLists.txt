@@ -59,11 +59,11 @@ endif()
 
 if(ENABLE_SOCKET_CONNECT)
   add_definitions(-DSOCKET_CONNECTION)
-  set(SRC_LIST src/socket/SocketUtils.cpp src/socket/TgBotCommandStrMap.cpp
+  set(SRC_LIST src/socket/SocketUtils.cpp src/socket/TgBotCommandMap.cpp
                src/SocketConnectionHandler.cpp ${SRC_LIST})
   add_executable(
     tgbotsocket_cli
-    src/socket/SocketUtils.cpp src/socket/TgBotCommandStrMap.cpp
+    src/socket/SocketUtils.cpp src/socket/TgBotCommandMap.cpp
     src/socket/TgBotSocketClient.cpp)
 endif()
 
