@@ -16,7 +16,7 @@ static void usage(const char* argv, bool success) {
     printf("Available cmd enum values:\n");
     auto kSortedStrMap = kTgBotCommandStrMap;
     std::sort(kSortedStrMap.begin(), kSortedStrMap.end(), [](const sortedIt& v1, const sortedIt& v2) {
-        return v1.second > v2.second;
+        return v1.first < v2.first;
     });
     for (const auto& ent : kSortedStrMap) {
         if (ent.first == CMD_EXIT || ent.first == CMD_MAX) continue;
