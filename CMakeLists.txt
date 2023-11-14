@@ -31,6 +31,7 @@ set(SRC_LIST
     src/Authorization.cpp
     src/CompilerInTelegram.cpp
     src/BotAddCommand.cpp
+    src/exithandlers/handler.cpp
     src/exithandlers/handler_${TARGET_VARIANT}.cpp
     src/SpamBlocker.cpp
     src/TimerImpl.cpp)
