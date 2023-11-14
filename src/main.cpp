@@ -37,9 +37,6 @@
 // tgbot
 using TgBot::StickerSet;
 using TgBot::TgLongPoll;
-// stdc++
-static inline const auto pholder1 = std::placeholders::_1;
-static inline const auto pholder2 = std::placeholders::_2;
 
 // Database.cpp
 using database::blacklist;
