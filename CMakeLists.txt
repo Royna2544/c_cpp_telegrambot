@@ -36,10 +36,6 @@ set(SRC_LIST
     src/SpamBlocker.cpp
     src/TimerImpl.cpp)
 
-set(LIBUTILS_SRC_LIST
-    src/utils/libutils.cpp src/popen_wdt/popen_wdt_${TARGET_VARIANT}.c
-    src/utils/libutils_${TARGET_VARIANT}.cpp)
-
 # Database
 find_package(Protobuf REQUIRED)
 include(cmake/ProtobufCpp.cmake)
@@ -61,19 +57,22 @@ endif()
 
 if(ENABLE_SOCKET_CONNECT)
   add_definitions(-DSOCKET_CONNECTION)
-  set(SRC_LIST src/socket/SocketUtils.cpp src/socket/TgBotCommandMap.cpp
-               src/SocketConnectionHandler.cpp ${SRC_LIST})
-  add_executable(
-    tgbotsocket_cli
-    src/socket/SocketUtils.cpp src/socket/TgBotCommandMap.cpp
-    src/socket/TgBotSocketClient.cpp)
+  add_library(TgBotSocket STATIC src/socket/SocketUtils.cpp
+                                 src/socket/TgBotCommandMap.cpp)
+  set(SRC_LIST src/SocketConnectionHandler.cpp ${SRC_LIST})
+  add_executable(tgbotsocket_cli src/socket/TgBotSocketClient.cpp)
+  target_link_libraries(tgbotsocket_cli TgBotSocket)
 endif()
 
 # TgBot lib + Boost warning
 add_definitions(-DBOOST_BIND_GLOBAL_PLACEHOLDERS)
 
 # Utils library
-add_library(TgBotUtils STATIC ${LIBUTILS_SRC_LIST})
+add_library(
+  TgBotUtils STATIC
+  src/utils/libutils.cpp src/popen_wdt/popen_wdt_${TARGET_VARIANT}.c
+  src/utils/libutils_${TARGET_VARIANT}.cpp)
+
 # Windows needs this
 if(WIN32)
   target_link_libraries(TgBotUtils shlwapi)
@@ -89,8 +88,14 @@ endif()
 add_executable(${PROJECT_NAME} ${SRC_LIST})
 
 # Default LD-list
-set(LD_LIST TgBot TgBotUtils)
+set(LD_LIST TgBot TgBotUtils TgBotDB)
 
+# Socket
+if(ENABLE_SOCKET_CONNECT)
+  set(LD_LIST TgBotSocket ${LD_LIST})
+endif()
+
+# Protobuf dep
 foreach(ABSL_LIB absl_log_internal_check_op absl_log_internal_message)
   find_library(TMP_${ABSL_LIB} NAMES ${ABSL_LIB})
   if(NOT TMP_${ABSL_LIB})
@@ -99,10 +104,12 @@ foreach(ABSL_LIB absl_log_internal_check_op absl_log_internal_message)
   endif()
   set(LD_LIST ${LD_LIST} ${TMP_${ABSL_LIB}})
 endforeach()
-set(LD_LIST ${LD_LIST} TgBotDB)
+
+# Windows API
 if(WIN32)
   set(LD_LIST ${LD_LIST} wsock32 Ws2_32)
 endif()
+
 target_link_libraries(${PROJECT_NAME} ${LD_LIST})
 
 # Protobuf DB Dumper

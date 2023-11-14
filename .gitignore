@@ -17,6 +17,7 @@ tgbotsocket_cli
 # Lib
 libTgBotUtils.a
 libTgBotDB.a
+libTgBotSocket.a
 # Cmake generated
 modules.load
 # Protobuf generated
