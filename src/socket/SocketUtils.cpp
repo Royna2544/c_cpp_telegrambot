@@ -26,12 +26,7 @@ static int makeSocket(bool is_client) {
     strncpy(name.sun_path, SOCKET_PATH, sizeof(name.sun_path));
     name.sun_path[sizeof(name.sun_path) - 1] = '\0';
     const size_t size = SUN_LEN(&name);
-    decltype(&connect) fn = nullptr;
-    if (is_client) {
-        fn = connect;
-    } else {
-        fn = bind;
-    }
+    decltype(&connect) fn = is_client ? connect : bind;
     if (fn(sfd, reinterpret_cast<struct sockaddr*>(&name), size) != 0) {
         LOG_E("Failed to %s to socket", is_client ? "connect" : "bind");
         return ret;
