@@ -1,12 +1,12 @@
 #pragma once
 
+#include <Types.h>
+
+#include <array>
 #include <functional>
 #include <string>
 #include <unordered_map>
-#include <array>
 #include <utility>
-
-#include <Types.h>
 
 #define SOCKET_PATH "/tmp/tgbot_sock"
 
@@ -14,6 +14,7 @@ enum TgBotCommand {
     CMD_WRITE_MSG_TO_CHAT_ID,
     CMD_EXIT,
     CMD_CTRL_SPAMBLOCK,
+    CMD_OBSERVE_CHAT_ID,
     CMD_MAX,
 };
 
@@ -42,24 +43,32 @@ static inline int toCount(TgBotCommand cmd) {
 
 namespace TgBotCommandData {
 struct WriteMsgToChatId {
-    ChatId to; // destination chatid
-    char msg[2048]; // Msg to send
+    ChatId to;       // destination chatid
+    char msg[2048];  // Msg to send
 };
 
 using Exit = void *;
 
 enum CtrlSpamBlock {
-    CTRL_OFF, // Disabled
-    CTRL_LOGGING_ONLY_ON, // Logging only, not taking action
-    CTRL_ON, // Enabled
+    CTRL_OFF,              // Disabled
+    CTRL_LOGGING_ONLY_ON,  // Logging only, not taking action
+    CTRL_ON,               // Enabled
     CTRL_MAX,
 };
+
+struct ObserveChatId {
+    ChatId id;
+    bool observe;  // new state for given ChatId,
+                   // true/false - Start/Stop observing
+};
+
 }  // namespace TgBotCommandData
 
 union TgBotCommandUnion {
     TgBotCommandData::WriteMsgToChatId data_1;
-    TgBotCommandData::Exit data_2; // unused
-    TgBotCommandData::CtrlSpamBlock data_3;        
+    TgBotCommandData::Exit data_2;  // unused
+    TgBotCommandData::CtrlSpamBlock data_3;
+    TgBotCommandData::ObserveChatId data_4;
 };
 
 struct TgBotConnection {
@@ -69,5 +78,5 @@ struct TgBotConnection {
 
 using listener_callback_t = std::function<void(struct TgBotConnection)>;
 
-void startListening(const listener_callback_t& cb);
-void writeToSocket(const struct TgBotConnection& conn);
+void startListening(const listener_callback_t &cb);
+void writeToSocket(const struct TgBotConnection &conn);

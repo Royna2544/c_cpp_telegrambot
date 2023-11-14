@@ -57,6 +57,14 @@ static bool stol_or(const std::string& str, int64_t* intval) {
     return true;
 }
 
+static bool stob_or(const std::string& str, bool* val) {
+    int intvar = 0;
+    bool rc = stoi_or(str, &intvar);
+    if (rc)
+        *val = !!intvar;
+    return rc;
+}
+
 template <class C>
 bool verifyWithinEnum(C max, int val) { return val >= 0 && val < max; }
 
@@ -113,6 +121,11 @@ int main(int argc, char** argv) {
                                            argv[0], "spamblock");
                         break;
                     }
+                    case CMD_OBSERVE_CHAT_ID: {
+                        TgBotCommandData::ObserveChatId data;
+                        ret = stol_or(argv[0], &data.id) && stob_or(argv[1], &data.observe);
+                        data_g.data_4 = data;
+                    } break;
                     case CMD_MAX:
                         break;
                     default:

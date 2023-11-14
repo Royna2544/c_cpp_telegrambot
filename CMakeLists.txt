@@ -59,7 +59,7 @@ if(ENABLE_SOCKET_CONNECT)
   add_definitions(-DSOCKET_CONNECTION)
   add_library(TgBotSocket STATIC src/socket/SocketUtils.cpp
                                  src/socket/TgBotCommandMap.cpp)
-  set(SRC_LIST src/SocketConnectionHandler.cpp ${SRC_LIST})
+  set(SRC_LIST src/SocketConnectionHandler.cpp src/ChatObserver.cpp ${SRC_LIST})
   add_executable(tgbotsocket_cli src/socket/TgBotSocketClient.cpp)
   target_link_libraries(tgbotsocket_cli TgBotSocket)
 endif()

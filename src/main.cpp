@@ -28,6 +28,7 @@
 #include <RTCommandLoader.h>
 #endif
 #ifdef SOCKET_CONNECTION
+#include <ChatObserver.h>
 #include <SocketConnectionHandler.h>
 #endif
 
@@ -301,7 +302,13 @@ int main(void) {
             bot_sendReplyMessage(bot, message, "Sticker not found in replied-to message");
         }
     });
-    gBot.getEvents().onAnyMessage([](const Message::Ptr &msg) { spamBlocker(gBot, msg); });
+    gBot.getEvents().onAnyMessage([](const Message::Ptr &msg) {
+#ifdef SOCKET_CONNECTION
+        if (!gObservedChatIds.empty())
+            processObservers(msg);
+#endif
+        spamBlocker(gBot, msg);
+    });
 
 #ifdef SOCKET_CONNECTION
     static std::thread th;
