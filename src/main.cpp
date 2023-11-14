@@ -5,8 +5,8 @@
 #include <Database.h>
 #include <ExtArgs.h>
 #include <NamespaceImport.h>
-#include <SpamBlock.h>
 #include <PrintableTime.h>
+#include <SpamBlock.h>
 #include <TimerImpl.h>
 #include <Types.h>
 #include <tgbot/tgbot.h>
@@ -72,23 +72,18 @@ int main(void) {
         token = token_str;
 
     static Bot gBot(token);
-    std::string CCompiler, CXXCompiler, GoCompiler, PythonInterpreter;
-    CCompiler = findCompiler(ProgrammingLangs::C);
-    CXXCompiler = findCompiler(ProgrammingLangs::CXX);
-    GoCompiler = findCompiler(ProgrammingLangs::GO);
-    PythonInterpreter = findCompiler(ProgrammingLangs::PYTHON);
 
-    bot_AddCommandEnforcedCompiler(gBot, "cpp", CXXCompiler, [&](const Bot &bot, const Message::Ptr &message) {
-        CompileRunHandler(CCppCompileHandleData{{{bot, message}, CXXCompiler, "compile.cpp"}});
+    bot_AddCommandEnforcedCompiler(gBot, "c", ProgrammingLangs::C, [&](const Bot &bot, const Message::Ptr &message, std::string compiler) {
+        CompileRunHandler(CCppCompileHandleData{{{bot, message}, compiler, "compile.c"}});
     });
-    bot_AddCommandEnforcedCompiler(gBot, "c", CXXCompiler, [&](const Bot &bot, const Message::Ptr &message) {
-        CompileRunHandler(CCppCompileHandleData{{{bot, message}, CCompiler, "compile.c"}});
+    bot_AddCommandEnforcedCompiler(gBot, "cpp", ProgrammingLangs::CXX, [&](const Bot &bot, const Message::Ptr &message, std::string compiler) {
+        CompileRunHandler(CCppCompileHandleData{{{bot, message}, compiler, "compile.cpp"}});
     });
-    bot_AddCommandEnforcedCompiler(gBot, "python", PythonInterpreter, [&](const Bot &bot, const Message::Ptr &message) {
-        CompileRunHandler({{bot, message}, PythonInterpreter, "./out.py"});
+    bot_AddCommandEnforcedCompiler(gBot, "python", ProgrammingLangs::PYTHON, [&](const Bot &bot, const Message::Ptr &message, std::string compiler) {
+        CompileRunHandler({{bot, message}, compiler, "./out.py"});
     });
-    bot_AddCommandEnforcedCompiler(gBot, "golang", GoCompiler, [&](const Bot &bot, const Message::Ptr &message) {
-        CompileRunHandler({{bot, message}, GoCompiler + " run", "./out.go"});
+    bot_AddCommandEnforcedCompiler(gBot, "golang", ProgrammingLangs::GO, [&](const Bot &bot, const Message::Ptr &message, std::string compiler) {
+        CompileRunHandler({{bot, message}, compiler + " run", "./out.go"});
     });
 
     bot_AddCommandEnforced(gBot, "addblacklist",
