@@ -40,7 +40,7 @@ bool ReadFileToString(const std::string& path, std::string* content) {
         return false;
     }
 
-    ifs.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    ifs.exceptions(std::ifstream::badbit);
     try {
         ifs.open(path);
     } catch (const std::ifstream::failure& e) {
