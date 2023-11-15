@@ -12,8 +12,8 @@
 #define SOCKET_PATH "/tmp/tgbot_sock"
 
 enum TgBotCommand {
-    CMD_WRITE_MSG_TO_CHAT_ID,
     CMD_EXIT,
+    CMD_WRITE_MSG_TO_CHAT_ID,
     CMD_CTRL_SPAMBLOCK,
     CMD_OBSERVE_CHAT_ID,
     CMD_SEND_FILE_TO_CHAT_ID,
