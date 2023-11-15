@@ -5,6 +5,7 @@
 #include <utils/libutils.h>
 
 #include <fstream>
+#include "socket/TgBotSocket.h"
 #include "tgbot/types/InputFile.h"
 
 using TgBot::Api;
@@ -67,6 +68,11 @@ void socketConnectionHandler(const Bot& bot, struct TgBotConnection conn) {
                             return api.sendDocument(id, file);
                         };
                         break;
+                    case TYPE_DICE:
+                        static const std::vector<std::string> dices = {"🎲", "🎯", "🏀", "⚽", "🎳", "🎰"};
+                        // TODO: More clean code?
+                        bot.getApi().sendDice(_data.data_5.id, false, 0, nullptr, dices[genRandomNumber(0, dices.size() - 1)]);
+                        return;
                     default:
                         fn = [](const Api&, ChatId, const FileOrId_t) {
                             return nullptr;

@@ -30,6 +30,8 @@ void processObservers(const Message::Ptr& msg) {
                 msgtext = "File";
             else if (msg->video)
                 msgtext = "Video";
+            else if (msg->dice)
+                msgtext = "(Dice) " + msg->dice->emoji;
             else
                 msgtext = msg->text;
             std::string userfullname = from->firstName;

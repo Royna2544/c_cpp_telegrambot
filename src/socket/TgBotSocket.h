@@ -25,6 +25,7 @@ enum FileType {
     TYPE_VIDEO,
     TYPE_GIF,
     TYPE_DOCUMENT,
+    TYPE_DICE,
     TYPE_MAX
 };
 
