@@ -1,7 +1,7 @@
 #include <ChatObserver.h>
 #include <utils/libutils.h>
 
-#define CHATLOGF(msg, ...) printf("ChatLog: " msg "\n", ##__VA_ARGS__)
+#include <iostream>
 
 using TgBot::Chat;
 
@@ -17,17 +17,27 @@ void processObservers(const Message::Ptr& msg) {
             if (chat->type != Chat::Type::Supergroup) {
                 LOG_W("Removing chat '%s' from observer: Not a supergroup", chat->title.c_str());
                 gObservedChatIds.erase(it);
-		return;
+                return;
             }
             std::string msgtext;
             if (msg->sticker)
                 msgtext = "Sticker";
             else if (msg->animation)
                 msgtext = "GIF";
+            else if (!msg->photo.empty())
+                msgtext = "Photo";
+            else if (msg->document)
+                msgtext = "File";
+            else if (msg->video)
+                msgtext = "Video";
             else
                 msgtext = msg->text;
-            CHATLOGF("Chat '%s': %s: %s", chat->title.c_str(),
-                     from->username.c_str(), msgtext.c_str());
+            std::string userfullname = from->firstName;
+            if (!from->lastName.empty())
+                userfullname += ' ' + from->lastName;
+            std::cout << "Chat '" << chat->title << "': "
+                      << userfullname << " (@" << from->username
+                      << "): " << msgtext << std::endl;
         }
     }
 }
