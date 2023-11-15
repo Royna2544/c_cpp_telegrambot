@@ -24,7 +24,9 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
+
 #include "RuntimeException.h"
+#include "tgbot/TgException.h"
 
 #ifdef RTCOMMAND_LOADER
 #include <RTCommandLoader.h>
@@ -248,39 +250,26 @@ int main(void) {
     bot_AddCommandEnforced(gBot, "starttimer", startTimer);
     bot_AddCommandEnforced(gBot, "stoptimer", stopTimer);
     bot_AddCommandPermissive(gBot, "decho", [](const Bot &bot, const Message::Ptr &message) {
-        bool invalid = !hasExtArgs(message), sticker = false, text = false,
-             animation = false;
-        const auto msg = message->replyToMessage;
-
-        if (msg) {
-            if (msg->sticker)
-                sticker = true;
-            else if (msg->animation)
-                animation = true;
-            else if (!msg->text.empty())
-                text = true;
-        }
+        const auto replyMsg = message->replyToMessage;
         try {
             bot.getApi().deleteMessage(message->chat->id, message->messageId);
-            if (sticker && invalid) {
-                bot.getApi().sendSticker(
-                    message->chat->id, message->replyToMessage->sticker->fileId);
-            } else if (animation && invalid) {
-                bot.getApi().sendAnimation(
-                    message->chat->id,
-                    message->replyToMessage->animation->fileId);
-            } else if (text && invalid) {
-                bot_sendReplyMessage(bot, message, message->replyToMessage->text,
-                                     message->replyToMessage->messageId);
-            } else if (!invalid) {
-                std::string msg;
-                parseExtArgs(message, msg);
-                bot_sendReplyMessage(bot, message, msg,
-                                     (message->replyToMessage) ? message->replyToMessage->messageId : 0,
-                                     true);
+        } catch (const TgBot::TgException &) {
+            // bot is not admin. nothing it can do
+            return;
+        }
+        if (replyMsg) {
+            if (replyMsg->sticker) {
+                bot.getApi().sendSticker(message->chat->id, replyMsg->sticker->fileId);
+            } else if (replyMsg->animation) {
+                bot.getApi().sendAnimation(message->chat->id, replyMsg->animation->fileId);
+            } else if (!replyMsg->text.empty()) {
+                bot_sendReplyMessage(bot, message, replyMsg->text, replyMsg->messageId);
             }
-        } catch (const std::exception &) {
-            // bot is not adm. nothing it can do
+        } else if (hasExtArgs(message)) {
+            std::string msg;
+            parseExtArgs(message, msg);
+            bot_sendReplyMessage(bot, message, msg,
+                                 (replyMsg) ? replyMsg->messageId : 0, true);
         }
     });
     bot_AddCommandPermissive(gBot, "randsticker", [](const Bot &bot, const Message::Ptr &message) {
