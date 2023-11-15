@@ -1,9 +1,5 @@
 #include "libutils.h"
 
-#include <fcntl.h>
-#include <sys/stat.h>
-#include <unistd.h>
-
 #include <boost/config.hpp>
 #include <cstdlib>
 #include <cstring>
@@ -33,7 +29,7 @@ bool ReadFileToString(const std::string& path, std::string* content) {
     std::error_code ec;
     std::ifstream ifs;
     std::string str;
-    auto filesize = fs::file_size(path);
+    auto filesize = fs::file_size(path, ec);
 
     if (ec) {
         LOG_E("Failed to determine file size: '%s', %s", path.c_str(), ec.message().c_str());
