@@ -1,6 +1,7 @@
 #include "libutils.h"
 
 #include <boost/config.hpp>
+#include <climits>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
@@ -11,10 +12,6 @@
 #include <stdexcept>
 
 #include "../popen_wdt/popen_wdt.h"
-
-#ifdef __linux__
-#include <linux/limits.h>  // I need PATH_MAX
-#endif
 
 #define ARRAY_SIZE(arr) sizeof(arr) / sizeof(arr[0])
 
