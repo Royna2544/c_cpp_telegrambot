@@ -22,7 +22,7 @@
 namespace fs = std::filesystem;
 
 std::string getCompileVersion() {
-    std::string compileinfo(BOOST_PLATFORM " | " BOOST_COMPILER " | " __DATE__);
+    static std::string compileinfo(BOOST_PLATFORM " | " BOOST_COMPILER " | " __DATE__);
     return compileinfo;
 }
 
