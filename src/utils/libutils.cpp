@@ -103,15 +103,13 @@ std::string findCompiler(ProgrammingLangs lang) {
     return {};
 }
 
-int genRandomNumber(const int num1, const int num2) {
+int genRandomNumber(const int min, const int max) {
     std::random_device rd;
     std::mt19937 gen(rd());
-    int num1_l = num1, num2_l = num2;
-    if (num1 > num2) {
-        num1_l = num2;
-        num2_l = num1;
+    if (min >= max) {
+        throw runtime_errorf("min(%d) >= max(%d)", min, max);
     }
-    std::uniform_int_distribution<int> distribution(num1_l, num2_l);
+    std::uniform_int_distribution<int> distribution(min, max);
     return distribution(gen);
 }
 
