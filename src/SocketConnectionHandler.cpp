@@ -84,7 +84,7 @@ void socketConnectionHandler(const Bot& bot, struct TgBotConnection conn) {
             }
         } break;
         default:
-            LOG_E("Unexpected cmd: %s", toStr(conn.cmd).c_str());
+            LOG_E("Unhandled cmd: %s", toStr(conn.cmd).c_str());
             break;
     };
 }
