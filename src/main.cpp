@@ -24,6 +24,7 @@
 #include <thread>
 #include <unordered_map>
 #include <vector>
+#include "RuntimeException.h"
 
 #ifdef RTCOMMAND_LOADER
 #include <RTCommandLoader.h>
@@ -116,7 +117,7 @@ int main(void) {
             for (const auto &cmd : commands) {
                 const bool ret = runCommand(cmd.second, *cmd.first);
                 if (!ret) {
-                    *cmd.first = "(Command failed)";
+                    throw runtime_errorf("Command failed: %s", cmd.second.c_str());
                 }
             }
             compilerver = getCompileVersion();
