@@ -15,7 +15,6 @@ std::string findCommandExe(const std::string& command);
 std::string findCompiler(ProgrammingLangs lang);
 
 // libbase
-bool ReadFdToString(int fd, std::string* content);
 bool ReadFileToString(const std::string& path, std::string* content);
 
 // Compile version
@@ -45,16 +44,6 @@ static inline std::string getResourcePath(const std::string& filename) {
 
 // Command
 bool runCommand(const std::string& command, std::string& res);
-#endif
-
-#ifndef TEMP_FAILURE_RETRY
-/* Used to retry syscalls that can return EINTR. */
-#define TEMP_FAILURE_RETRY(exp) ({         \
-    __typeof__(exp) _rc;                   \
-    do {                                   \
-        _rc = (exp);                       \
-    } while (_rc == -1 && errno == EINTR); \
-    _rc; })
 #endif
 
 #include "config.h"

@@ -7,6 +7,8 @@
 #include <boost/config.hpp>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <map>
 #include <mutex>
 #include <random>
@@ -20,40 +22,39 @@
 
 #define ARRAY_SIZE(arr) sizeof(arr) / sizeof(arr[0])
 
+namespace fs = std::filesystem;
+
 std::string getCompileVersion() {
     std::string compileinfo(BOOST_PLATFORM " | " BOOST_COMPILER " | " __DATE__);
     return compileinfo;
 }
 
-// Code from //system/libbase/file.cpp @ a7c91d78369684a6d426983b6445ef931be5d68e
-bool ReadFdToString(int fd, std::string* content) {
-    content->clear();
-
-    // Although original we had small files in mind, this code gets used for
-    // very large files too, where the std::string growth heuristics might not
-    // be suitable. https://code.google.com/p/android/issues/detail?id=258500.
-    struct stat sb;
-    if (fstat(fd, &sb) != -1 && sb.st_size > 0) {
-        content->reserve(sb.st_size);
-    }
-
-    char buf[4096];
-    ssize_t n;
-    while ((n = TEMP_FAILURE_RETRY(read(fd, &buf[0], sizeof(buf)))) > 0) {
-        content->append(buf, n);
-    }
-    return (n == 0) ? true : false;
-}
 bool ReadFileToString(const std::string& path, std::string* content) {
-    content->clear();
+    std::error_code ec;
+    std::ifstream ifs;
+    std::string str;
+    auto filesize = fs::file_size(path);
 
-    int fd(TEMP_FAILURE_RETRY(open(path.c_str(), O_RDONLY)));
-    if (fd == -1) {
+    if (ec) {
+        LOG_E("Failed to determine file size: '%s', %s", path.c_str(), ec.message().c_str());
         return false;
     }
-    return ReadFdToString(fd, content);
+
+    ifs.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+    try {
+        ifs.open(path);
+    } catch (const std::ifstream::failure& e) {
+        LOG_E("Failed to open file: '%s', %s", path.c_str(), e.what());
+        return false;
+    }
+
+    content->clear();
+    content->reserve(filesize);
+    while (std::getline(ifs, str)) {
+        *content += str + '\n';
+    }
+    return true;
 }
-// End libbase
 
 std::vector<std::string> getPathEnv() {
     size_t pos = 0;
@@ -81,7 +82,7 @@ std::string findCommandExe(const std::string& command) {
         if (path.empty()) continue;
         memset(buffer, 0, sizeof(buffer));
         size_t bytes = snprintf(buffer, sizeof(buffer), "%s%c%s",
-                              path.c_str(), dir_delimiter, _command.c_str());
+                                path.c_str(), dir_delimiter, _command.c_str());
         if (bytes < sizeof(buffer))
             buffer[bytes] = '\0';
         if (canExecute(buffer))
