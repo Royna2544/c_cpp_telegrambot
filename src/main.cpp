@@ -4,6 +4,7 @@
 #include <CompilerInTelegram.h>
 #include <Database.h>
 #include <ExtArgs.h>
+#include <Logging.h>
 #include <NamespaceImport.h>
 #include <PrintableTime.h>
 #include <SpamBlock.h>

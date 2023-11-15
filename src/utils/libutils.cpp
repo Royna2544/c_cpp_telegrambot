@@ -1,5 +1,6 @@
 #include "libutils.h"
 
+#include <Logging.h>
 #include <RuntimeException.h>
 #include <rapidjson/document.h>
 #include <rapidjson/rapidjson.h>

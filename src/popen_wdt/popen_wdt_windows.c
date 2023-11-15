@@ -3,8 +3,8 @@
 #include <locale.h>
 #include <pthread.h>
 #include <stdio.h>
-#include <utils/libutils.h>
 
+#include <Logging.h>
 #include "popen_wdt.h"
 
 struct watchdog_data {

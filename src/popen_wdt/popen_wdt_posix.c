@@ -6,9 +6,10 @@
 #include <stdlib.h>
 #include <sys/mman.h>
 #include <unistd.h>
-#include <utils/libutils.h>
 
+#include <Logging.h>
 #include "popen_wdt.h"
+
 struct watchdog_data {
     pid_t pid;
     bool *result_cb;

@@ -1,11 +1,11 @@
 #pragma once
 
 #include <BotReplyMessage.h>
+#include <Logging.h>
 #include <NamespaceImport.h>
+#include <utils/libutils.h>
 
 #include <functional>
-
-#include "utils/libutils.h"
 
 using command_callback_t = std::function<void(const Bot&, const Message::Ptr&)>;
 

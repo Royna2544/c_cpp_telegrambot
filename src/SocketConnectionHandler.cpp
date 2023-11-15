@@ -1,4 +1,5 @@
 #include <ChatObserver.h>
+#include <Logging.h>
 #include <SocketConnectionHandler.h>
 #include <SpamBlock.h>
 #include <utils/libutils.h>

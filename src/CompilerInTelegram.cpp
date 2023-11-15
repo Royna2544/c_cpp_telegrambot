@@ -2,6 +2,7 @@
 #include <BotReplyMessage.h>
 #include <CompilerInTelegram.h>
 #include <ExtArgs.h>
+#include <Logging.h>
 #include <NamespaceImport.h>
 #include <utils/libutils.h>
 
