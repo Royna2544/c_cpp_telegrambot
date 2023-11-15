@@ -1,17 +1,12 @@
 #include "TgBotSocket.h"
 
-const ConstArray<TgBotCommand, std::string, CMD_MAX - 1> kTgBotCommandStrMap = {
+const auto kTgBotCommandStrMap = make_array<ConstArrayElem<TgBotCommand, std::string>, CMD_MAX - 1>(
     ENUM_STR(CMD_WRITE_MSG_TO_CHAT_ID),
     ENUM_STR(CMD_CTRL_SPAMBLOCK),
-    ENUM_STR(CMD_OBSERVE_CHAT_ID),
-};
+    ENUM_STR(CMD_OBSERVE_CHAT_ID));
 
-const ConstArray<TgBotCommand, int, CMD_MAX - 1> kTgBotCommandArgsCount = {
+const auto kTgBotCommandArgsCount = make_array<ConstArrayElem<TgBotCommand, int>, CMD_MAX - 1>(
     ARGUMENT_SIZE(CMD_WRITE_MSG_TO_CHAT_ID, 2),  // chatid, msg
     ARGUMENT_SIZE(CMD_CTRL_SPAMBLOCK, 1),        // policy
-    ARGUMENT_SIZE(CMD_OBSERVE_CHAT_ID, 2),       // chatid, policy
-};
-
-static_assert(kTgBotCommandStrMap.size() == kTgBotCommandArgsCount.size(), "Command map size is different");
-static_assert(kTgBotCommandStrMap.size() == CMD_MAX - 1, "Add all members in TgBotCommand enum");
-static_assert(kTgBotCommandArgsCount.size() == CMD_MAX - 1, "Add all members in TgBotCommand enum");
+    ARGUMENT_SIZE(CMD_OBSERVE_CHAT_ID, 2)        // chatid, policy
+);
