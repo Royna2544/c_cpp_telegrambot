@@ -17,6 +17,8 @@ using time_callback_t = std::function<void(const T*, struct timehms)>;
 template <typename T>
 using cancel_validator_t = std::function<bool(T*)>;
 
+using std::chrono_literals::operator""s;
+
 template <class T>
 class Timer {
     int h, m, s;
@@ -57,7 +59,7 @@ class Timer {
             while (h_ >= 0) {
                 while (m_ >= 0) {
                     while (s_ >= 0) {
-                        std::this_thread::sleep_for(std::chrono::seconds(1));
+                        std::this_thread::sleep_for(1s);
                         if (stop) break;
                         if (onEvery && s_ % onsec == 0)
                             onEvery(&priv, {h_, m_, s_});

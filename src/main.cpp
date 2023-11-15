@@ -44,6 +44,8 @@ using database::blacklist;
 using database::ProtoDatabase;
 using database::whitelist;
 
+using std::chrono_literals::operator""s;
+
 int main(void) {
     const char *token_str = getenv("TOKEN");
     std::string token;
@@ -370,7 +372,7 @@ reinit:
         LOG_I("Re-init");
         gAuthorized = false;
         std::thread([] {
-            std::this_thread::sleep_for(std::chrono::seconds(5));
+            std::this_thread::sleep_for(5s);
             gAuthorized = true;
         }).detach();
         goto reinit;

@@ -14,6 +14,9 @@
 #include "popen_wdt/popen_wdt.h"
 
 using std::chrono_literals::operator""ms;
+using std::chrono::duration_cast;
+using std::chrono::high_resolution_clock;
+using std::chrono::milliseconds;
 
 static const char SPACE = ' ';
 static const char EMPTY[] = "(empty)";
@@ -66,11 +69,6 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
     auto buf = std::make_unique<char[]>(read_buf);
     std::string cmd_r, cmd_remapped;
     const char *cmd_cstr = nullptr;
-
-    using std::chrono::duration_cast;
-    using std::chrono::high_resolution_clock;
-    using std::chrono::milliseconds;
-    using std::chrono::seconds;
 
 #ifdef LOCALE_EN_US
     static std::once_flag once;

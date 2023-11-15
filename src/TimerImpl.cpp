@@ -144,7 +144,7 @@ void startTimer(const Bot &bot, const Message::Ptr &message) {
                                               priv->messageid);
                 if (priv->sendendmsg)
                     bot->getApi().sendMessage(message->chat->id, "Timer ended");
-                std::this_thread::sleep_for(std::chrono::seconds(1));
+                std::this_thread::sleep_for(1s);
                 if (priv->botcanpin)
                     bot->getApi().unpinChatMessage(message->chat->id,
                                                    priv->messageid);
