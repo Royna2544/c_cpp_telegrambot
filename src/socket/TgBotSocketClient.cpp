@@ -104,7 +104,7 @@ int main(int argc, char** argv) {
             if (verifyArgsCount(cmd, argc)) {
                 switch (cmd) {
                     case CMD_WRITE_MSG_TO_CHAT_ID: {
-                        TgBotCommandData::WriteMsgToChatId data;
+                        TgBotCommandData::WriteMsgToChatId data {};
                         if (!stol_or(argv[0], &data.to)) {
                             break;
                         }
@@ -119,12 +119,12 @@ int main(int argc, char** argv) {
                         break;
                     }
                     case CMD_OBSERVE_CHAT_ID: {
-                        TgBotCommandData::ObserveChatId data;
+                        TgBotCommandData::ObserveChatId data {};
                         ret = stol_or(argv[0], &data.id) && stob_or(argv[1], &data.observe);
                         data_g.data_4 = data;
                     } break;
                     case CMD_SEND_FILE_TO_CHAT_ID: {
-                        TgBotCommandData::SendFileToChatId data;
+                        TgBotCommandData::SendFileToChatId data {};
                         ret = stol_or(argv[0], &data.id) && parseOneEnum(&data.type, TYPE_MAX,
                                                                          argv[1], "type");
                         copyToStrBuf(data.filepath, sizeof(data.filepath), argv[2]);
