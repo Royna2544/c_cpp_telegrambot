@@ -1,5 +1,9 @@
 #include "libutils.h"
 
+#include <RuntimeException.h>
+#include <rapidjson/document.h>
+#include <rapidjson/rapidjson.h>
+
 #include <boost/config.hpp>
 #include <climits>
 #include <cstdlib>
@@ -132,4 +136,33 @@ std::string getSrcRoot() {
         }
     });
     return dir;
+}
+
+std::string getMIMEString(const std::string& path) {
+    static std::once_flag once;
+    static rapidjson::Document doc;
+    std::string extension = fs::path(path).extension().string();
+
+    std::call_once(once, [] {
+        std::string buf;
+        ReadFileToString(getResourcePath("mimeData.json"), &buf);
+        doc.Parse(buf.c_str());
+        if (doc.HasParseError())
+            throw runtime_errorf("Failed to parse mimedata: %d", doc.GetParseError());
+    });
+    if (!extension.empty()) {
+        for (rapidjson::SizeType i = 0; i < doc.Size(); i++) {
+            const rapidjson::Value& oneJsonElement = doc[i];
+            const rapidjson::Value& availableTypes = oneJsonElement["types"].GetArray();
+            for (rapidjson::SizeType i = 0; i < availableTypes.Size(); i++) {
+                if (availableTypes[i].GetString() == extension) {
+                    auto mime = oneJsonElement["name"].GetString();
+                    LOG_D("Found MIME type: '%s'", mime);
+                    return mime;
+                }
+            }
+        }
+        LOG_W("Unknown file extension: '%s'", extension.c_str());
+    }
+    return "application/octet-stream";
 }

@@ -58,6 +58,11 @@ static bool stob_or(const std::string& str, bool* val) {
     return rc;
 }
 
+static void copyToStrBuf(char* dst, size_t size, char* src) {
+    memset(dst, 0, size);
+    strncpy(dst, src, size);
+}
+
 template <class C>
 bool verifyWithinEnum(C max, int val) { return val >= 0 && val < max; }
 
@@ -103,8 +108,7 @@ int main(int argc, char** argv) {
                         if (!stol_or(argv[0], &data.to)) {
                             break;
                         }
-                        memset(data.msg, 0, sizeof(data.msg));
-                        strncpy(data.msg, argv[1], sizeof(data.msg));
+                        copyToStrBuf(data.msg, sizeof(data.msg), argv[1]);
                         data_g.data_1 = data;
                         ret = true;
                         break;
@@ -118,6 +122,13 @@ int main(int argc, char** argv) {
                         TgBotCommandData::ObserveChatId data;
                         ret = stol_or(argv[0], &data.id) && stob_or(argv[1], &data.observe);
                         data_g.data_4 = data;
+                    } break;
+                    case CMD_SEND_FILE_TO_CHAT_ID: {
+                        TgBotCommandData::SendFileToChatId data;
+                        ret = stol_or(argv[0], &data.id) && parseOneEnum(&data.type, TYPE_MAX,
+                                                                         argv[1], "type");
+                        copyToStrBuf(data.filepath, sizeof(data.filepath), argv[2]);
+                        data_g.data_5 = data;
                     } break;
                     case CMD_MAX:
                         break;

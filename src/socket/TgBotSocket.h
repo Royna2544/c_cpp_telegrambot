@@ -3,6 +3,7 @@
 #include <Types.h>
 
 #include <array>
+#include <climits>
 #include <functional>
 #include <string>
 #include <unordered_map>
@@ -15,7 +16,16 @@ enum TgBotCommand {
     CMD_EXIT,
     CMD_CTRL_SPAMBLOCK,
     CMD_OBSERVE_CHAT_ID,
+    CMD_SEND_FILE_TO_CHAT_ID,
     CMD_MAX,
+};
+
+enum FileType {
+    TYPE_PHOTO,
+    TYPE_VIDEO,
+    TYPE_GIF,
+    TYPE_DOCUMENT,
+    TYPE_MAX
 };
 
 template <typename T, typename V>
@@ -48,6 +58,12 @@ struct ObserveChatId {
                    // true/false - Start/Stop observing
 };
 
+struct SendFileToChatId {
+    ChatId id;                // Destination ChatId
+    FileType type;            // File type for file
+    char filepath[PATH_MAX];  // Path to file
+};
+
 }  // namespace TgBotCommandData
 
 union TgBotCommandUnion {
@@ -55,6 +71,7 @@ union TgBotCommandUnion {
     TgBotCommandData::Exit data_2;  // unused
     TgBotCommandData::CtrlSpamBlock data_3;
     TgBotCommandData::ObserveChatId data_4;
+    TgBotCommandData::SendFileToChatId data_5;
 };
 
 struct TgBotConnection {

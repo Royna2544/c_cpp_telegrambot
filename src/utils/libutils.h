@@ -44,6 +44,9 @@ static inline std::string getResourcePath(const std::string& filename) {
 
 // Command
 bool runCommand(const std::string& command, std::string& res);
+
+// MIME
+std::string getMIMEString(const std::string& path);
 #endif
 
 #include "config.h"
@@ -56,7 +59,9 @@ bool runCommand(const std::string& command, std::string& res);
 #ifndef NDEBUG
 #define LOG_D(fmt, ...) _LOG(fmt, "Debug", ##__VA_ARGS__)
 #else
-#define LOG_D(fmt, ...) do {} while(0)
+#define LOG_D(fmt, ...) \
+    do {                \
+    } while (0)
 #endif
 
 #define _LOG(fmt, servere, ...) printf("[%s:%d] " servere ": " fmt "\n", __FILE__, __LINE__, ##__VA_ARGS__)
