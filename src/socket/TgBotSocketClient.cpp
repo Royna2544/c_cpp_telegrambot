@@ -19,7 +19,6 @@ static void usage(const char* argv, bool success) {
         return v1.first < v2.first;
     });
     for (const auto& ent : kSortedStrMap) {
-        if (ent.first == CMD_EXIT || ent.first == CMD_MAX) continue;
         printf("%s: value %d, Requires %d argument(s)\n", ent.second.c_str(),
                ent.first, toCount(ent.first));
     }
