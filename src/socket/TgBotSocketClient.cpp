@@ -2,6 +2,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <iostream>
 #include <map>
 #include <sstream>
 #include <vector>
@@ -10,18 +11,11 @@
 #include "TgBotSocket.h"
 
 static void usage(const char* argv, bool success) {
-    using sortedIt = decltype(kTgBotCommandStrMap)::value_type;
+    std::cout << "Usage: " << argv << " [cmd enum value] [args...]" << std::endl
+              << std::endl;
+    std::cout << "Available cmd enum values:" << std::endl;
+    std::cout << toHelpText();
 
-    printf("Usage: %s [cmd enum value] [args...]\n\n", argv);
-    printf("Available cmd enum values:\n");
-    auto kSortedStrMap = kTgBotCommandStrMap;
-    std::sort(kSortedStrMap.begin(), kSortedStrMap.end(), [](const sortedIt& v1, const sortedIt& v2) {
-        return v1.first < v2.first;
-    });
-    for (const auto& ent : kSortedStrMap) {
-        printf("%s: value %d, Requires %d argument(s)\n", ent.second.c_str(),
-               ent.first, toCount(ent.first));
-    }
     exit(!success);
     __builtin_unreachable();
 }

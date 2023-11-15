@@ -18,39 +18,14 @@ enum TgBotCommand {
     CMD_MAX,
 };
 
-#define ENUM_STR(enum) std::make_pair(enum, #enum)
-#define ARGUMENT_SIZE(enum, len) std::make_pair(enum, len)
-
 template <typename T, typename V>
 using ConstArrayElem = std::pair<T, V>;
 template <typename T, typename V, int size>
 using ConstArray = std::array<ConstArrayElem<T, V>, size>;
 
-template <typename T, int N, typename... V>
-std::array<T, sizeof...(V)> make_array(V &&...v) {
-    static_assert(sizeof...(V) == N, "Must match declared size");
-    return {{std::forward<V>(v)...}};
-}
-
-extern const ConstArray<TgBotCommand, std::string, CMD_MAX - 1> kTgBotCommandStrMap;
-extern const ConstArray<TgBotCommand, int, CMD_MAX - 1> kTgBotCommandArgsCount;
-
-static inline std::string toStr(TgBotCommand cmd) {
-    for (const auto &elem : kTgBotCommandStrMap) {
-        if (elem.first == cmd) {
-            return elem.second;
-        }
-    }
-    return {};
-}
-static inline int toCount(TgBotCommand cmd) {
-    for (const auto &elem : kTgBotCommandArgsCount) {
-        if (elem.first == cmd) {
-            return elem.second;
-        }
-    }
-    return -1;
-}
+std::string toStr(TgBotCommand cmd);
+int toCount(TgBotCommand cmd);
+std::string toHelpText(void);
 
 namespace TgBotCommandData {
 struct WriteMsgToChatId {
