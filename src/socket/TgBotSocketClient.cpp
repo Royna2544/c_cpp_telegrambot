@@ -30,21 +30,21 @@ static bool verifyArgsCount(TgBotCommand cmd, int argc) {
     return true;
 }
 
-static bool stoi_or(const std::string& str, int32_t* intval) {
+static bool stoi_or(const std::string& str, std::int32_t* intval) {
     try {
         *intval = std::stoi(str);
     } catch (...) {
-        fprintf(stderr, "Failed to parse '%s' to int\n", str.c_str());
+        fprintf(stderr, "Failed to parse '%s' to int32_t\n", str.c_str());
         return false;
     }
     return true;
 }
 
-static bool stol_or(const std::string& str, int64_t* intval) {
+static bool stol_or(const std::string& str, std::int64_t* intval) {
     try {
-        *intval = std::stol(str);
+        *intval = std::stoll(str);
     } catch (...) {
-        fprintf(stderr, "Failed to parse '%s' to long\n", str.c_str());
+        fprintf(stderr, "Failed to parse '%s' to int64_t\n", str.c_str());
         return false;
     }
     return true;

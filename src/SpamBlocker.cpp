@@ -3,6 +3,7 @@
 #include <SpamBlock.h>
 
 #include <chrono>
+#include <cinttypes>
 #include <map>
 #include <mutex>
 #include <thread>
@@ -11,16 +12,7 @@
 
 #include "../utils/libutils.h"
 
-// TODO: Remove stub, Windows and macOS uses int64_t as ll
-// while Linux uses with l causing formatting error
-#if defined __APPLE__ || defined __WIN32
-#undef LOG_D
-#undef LOG_W
-#undef LOG_I
-#define LOG_D(...)
-#define LOG_W(...)
-#define LOG_I(...)
-#endif
+#define LONGFMT "%" PRId64
 
 using std::chrono_literals::operator""s;
 using TgBot::ChatPermissions;
@@ -58,14 +50,15 @@ static auto deleteAndMute(const Bot &bot_, buffer_iterator_t handle,
                     bot_.getApi().restrictChatMember(handle->first, mapmsg.first,
                                                      perms, 5 * 60);
                 } catch (const std::exception &e) {
-                    LOG_W("Cannot mute user %ld in chat %ld: %s", mapmsg.first,
-                          handle->first, e.what());
+                    LOG_W("Cannot mute user " LONGFMT " in chat " LONGFMT
+                          ": %s",
+                          mapmsg.first, handle->first, e.what());
                 }
 #else
             if (false) {
 #endif
             } else {
-                LOG_I("Spam detected for user %ld", mapmsg.first);
+                LOG_I("Spam detected for user " LONGFMT, mapmsg.first);
             }
         }
     }
@@ -76,7 +69,7 @@ static auto spamDetectFunc(const Bot &bot, buffer_iterator_t handle) {
     for (const auto &perUser : handle->second) {
         std::apply([&](const auto &first, const auto &second) {
             MaxMsgMap.emplace(first, second);
-            LOG_D("Chat: %ld, User: %ld, msgcnt: %ld", handle->first,
+            LOG_D("Chat: " LONGFMT ", User: " LONGFMT ", msgcnt: " LONGFMT, handle->first,
                   first, second.size());
         },
                    perUser);
@@ -97,7 +90,7 @@ static auto spamDetectFunc(const Bot &bot, buffer_iterator_t handle) {
                                                  return lhs.second.size() < rhs.second.size();
                                              });
         MaxSameMsgMap.emplace(pair.first, mostCommonIt->second);
-        LOG_D("Chat: %ld, User: %ld, maxIt: %ld", handle->first,
+        LOG_D("Chat: " LONGFMT ", User: " LONGFMT ", maxIt: " LONGFMT, handle->first,
               pair.first, mostCommonIt->second.size());
     }
 
@@ -135,9 +128,9 @@ void spamBlocker(const Bot &bot, const Message::Ptr &message) {
                             its = buffer_sub.erase(its);
                             continue;
                         }
-                        LOG_D("Chat: %ld, Count: %d", its->first, its->second);
+                        LOG_D("Chat: " LONGFMT ", Count: %d", its->first, its->second);
                         if (its->second >= 5) {
-                            LOG_D("Launching spamdetect for %ld", its->first);
+                            LOG_D("Launching spamdetect for " LONGFMT, its->first);
                             spamDetectFunc(bot, it);
                         }
                         buffer.erase(it);
