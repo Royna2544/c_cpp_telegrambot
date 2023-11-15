@@ -362,8 +362,8 @@ reinit:
         const int64_t temptime = time(nullptr);
         if (temptime - lastcrash < 15 && lastcrash != 0) {
             gBot.getApi().sendMessage(ownerid, "Recover failed.");
-            LOG_E("Recover failed");
-            return 1;
+            LOG_F("Recover failed");
+            return EXIT_FAILURE;
         }
         lastcrash = temptime;
         gBot.getApi().sendMessage(ownerid, "Reinitializing.");
