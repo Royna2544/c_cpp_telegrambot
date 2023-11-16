@@ -18,7 +18,8 @@ bool ReadFileToString(const std::string& path, std::string* content);
 
 // Compile version
 std::string getCompileVersion();
-int genRandomNumber(const int min, const int max = 0);
+int genRandomNumber(const int min, const int max);
+int genRandomNumber(const int max);
 
 // Path
 #ifdef __WIN32

@@ -113,6 +113,10 @@ int genRandomNumber(const int min, const int max) {
     return distribution(gen);
 }
 
+int genRandomNumber(const int max) {
+    return genRandomNumber(0, max);
+}
+
 bool runCommand(const std::string& command, std::string& result) {
     auto fp = popen_watchdog(command.c_str(), nullptr);
     static char buffer[512] = {0};
