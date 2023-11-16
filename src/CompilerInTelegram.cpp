@@ -143,13 +143,19 @@ static void commonCleanup(const Bot &bot, const Message::Ptr &message,
     if (!filename.empty()) std::remove(filename.c_str());
 }
 
-static bool commonVerifyParseWrite(const Bot &bot, const Message::Ptr &message,
-                                   std::string &extraargs, const std::string &filename) {
-    bool ret = verifyMessage(bot, message);
-    if (ret) {
-        parseExtArgs(message, extraargs);
-        ret = writeMessageToFile(bot, message, filename);
+// Verify, Parse, Write
+static bool commonVPW(const CompileHandleData &data, std::string &extraargs) {
+    bool ret = false;
+    if (hasExtArgs(data.message)) {
+        parseExtArgs(data.message, extraargs);
+        if (extraargs == "--path") {
+            bot_sendReplyMessage(data.bot, data.message,
+                                 "Selected compiler: " + data.cmdPrefix);
+            return ret;  // Bail out
+        }
     }
+    ret = verifyMessage(data.bot, data.message) &&
+          writeMessageToFile(data.bot, data.message, data.outfile);
     return ret;
 }
 
@@ -163,7 +169,7 @@ void CompileRunHandler<CCppCompileHandleData>(const CCppCompileHandleData &data)
     const char aoutname[] = "./a.out";
 #endif
 
-    if (!commonVerifyParseWrite(data.bot, data.message, extraargs, data.outfile)) return;
+    if (!commonVPW(data, extraargs)) return;
 
     cmd << data.cmdPrefix << SPACE << data.outfile;
     addExtArgs(cmd, extraargs, res);
@@ -188,7 +194,7 @@ void CompileRunHandler(const CompileHandleData &data) {
     std::string res, extargs;
     std::stringstream cmd;
 
-    if (!commonVerifyParseWrite(data.bot, data.message, extargs, data.outfile)) return;
+    if (!commonVPW(data, extargs)) return;
 
     cmd << data.cmdPrefix << SPACE << data.outfile;
     addExtArgs(cmd, extargs, res);
@@ -199,7 +205,6 @@ void CompileRunHandler(const CompileHandleData &data) {
 
 template <>
 void CompileRunHandler<BashHandleData>(const BashHandleData &data) {
-    if (!Authorized(data.message)) return;
     std::string res;
     if (hasExtArgs(data.message)) {
         std::string cmd;
