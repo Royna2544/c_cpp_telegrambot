@@ -10,6 +10,16 @@ using TgBot::Bot;
 using TgBot::Message;
 using TgBot::MessageEntity;
 
+/**
+ * bot_sendReplyMessage - Send a reply message given a message
+ *
+ * @param bot Bot object
+ * @param message message object to reply to
+ * @param text text to reply with
+ * @param replyToMsg optionally another message id to reply to, defaults to message parameter's id
+ * @param noError Do not throw exceptions when sending a reply message fails, default false
+ * @return The replied message object, if sent.
+ */
 static inline Message::Ptr bot_sendReplyMessage(const Bot &bot, const Message::Ptr &message,
                                         const std::string &text, const MessageId replyToMsg = 0,
                                         const bool noError = false) {
