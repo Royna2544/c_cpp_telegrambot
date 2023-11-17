@@ -1,5 +1,4 @@
 #include <fcntl.h>
-#include <locale.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
@@ -26,9 +25,11 @@ static void *watchdog(void *arg) {
     munmap(data, sizeof(*data));
     return NULL;
 }
+
 void setlocale_enus_once(void) {
-    setlocale(LC_ALL, "en-US");
+    setenv("LC_ALL", "C", true);
 }
+
 FILE *popen_watchdog(const char *command, bool *watchdog_ret) {
     FILE *fp;
     int pipefd[2];
