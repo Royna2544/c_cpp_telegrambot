@@ -30,14 +30,6 @@ static bool verifyMessage(const Bot &bot, const Message::Ptr &message) {
     return false;
 }
 
-void parseExtArgs(const Message::Ptr &message, std::string &extraargs) {
-    // Telegram ensures message does not have whitespaces beginning or ending.
-    auto id = message->text.find_first_of(" \n");
-    if (id != std::string::npos) {
-        extraargs = message->text.substr(id + 1);
-    }
-}
-
 static bool writeMessageToFile(const Bot &bot, const Message::Ptr &message,
                                const std::string &filename) {
     std::ofstream file(filename);

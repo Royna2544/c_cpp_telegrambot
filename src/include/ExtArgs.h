@@ -1,7 +1,4 @@
 #include "NamespaceImport.h"
 
-static inline bool hasExtArgs(const Message::Ptr &message) {
-    return message->text.find_first_of(" \n") != std::string::npos;
-}
-
+bool hasExtArgs(const Message::Ptr &message);
 void parseExtArgs(const Message::Ptr &message, std::string &extraargs);
