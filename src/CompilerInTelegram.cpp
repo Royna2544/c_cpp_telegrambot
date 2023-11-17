@@ -163,30 +163,25 @@ template <>
 void CompileRunHandler<CCppCompileHandleData>(const CCppCompileHandleData &data) {
     std::string res, extraargs;
     std::stringstream cmd;
-#ifdef __WIN32
-    const char aoutname[] = "./a.exe";
-#else
-    const char aoutname[] = "./a.out";
-#endif
+    const char *aoutname = IS_DEFINED(__WIN32) ? "./a.exe" : "./a.out";
 
-    if (!commonVPW(data, extraargs)) return;
+    if (commonVPW(data, extraargs)) {
+        cmd << data.cmdPrefix << SPACE << data.outfile;
+        addExtArgs(cmd, extraargs, res);
 
-    cmd << data.cmdPrefix << SPACE << data.outfile;
-    addExtArgs(cmd, extraargs, res);
+        res += "Compile time:\n";
+        runCommand(data.bot, data.message, cmd.str(), res);
+        res += "\n";
 
-    res += "Compile time:\n";
-    runCommand(data.bot, data.message, cmd.str(), res);
-    res += "\n";
-
-    std::ifstream aout(aoutname);
-    if (aout.good()) {
-        aout.close();
-        res += "Run time:\n";
-        runCommand(data.bot, data.message, aoutname, res);
-        std::remove(aoutname);
+        std::ifstream aout(aoutname);
+        if (aout.good()) {
+            aout.close();
+            res += "Run time:\n";
+            runCommand(data.bot, data.message, aoutname, res);
+            std::remove(aoutname);
+        }
+        commonCleanup(data.bot, data.message, res, data.outfile);
     }
-
-    commonCleanup(data.bot, data.message, res, data.outfile);
 }
 
 template <>
@@ -194,13 +189,13 @@ void CompileRunHandler(const CompileHandleData &data) {
     std::string res, extargs;
     std::stringstream cmd;
 
-    if (!commonVPW(data, extargs)) return;
+    if (commonVPW(data, extargs)) {
+        cmd << data.cmdPrefix << SPACE << data.outfile;
+        addExtArgs(cmd, extargs, res);
 
-    cmd << data.cmdPrefix << SPACE << data.outfile;
-    addExtArgs(cmd, extargs, res);
-
-    runCommand(data.bot, data.message, cmd.str(), res);
-    commonCleanup(data.bot, data.message, res, data.outfile);
+        runCommand(data.bot, data.message, cmd.str(), res);
+        commonCleanup(data.bot, data.message, res, data.outfile);
+    }
 }
 
 template <>
