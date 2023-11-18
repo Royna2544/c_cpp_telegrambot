@@ -1,8 +1,8 @@
 #pragma once
 
+#include <Types.h>
 #include <tgbot/Bot.h>
 #include <tgbot/types/Message.h>
-#include <Types.h>
 
 #include <string>
 
@@ -21,9 +21,22 @@ using TgBot::MessageEntity;
  * @return The replied message object, if sent.
  */
 static inline Message::Ptr bot_sendReplyMessage(const Bot &bot, const Message::Ptr &message,
-                                        const std::string &text, const MessageId replyToMsg = 0,
-                                        const bool noError = false) {
+                                                const std::string &text, const MessageId replyToMsg = 0,
+                                                const bool noError = false) {
     return bot.getApi().sendMessage(message->chat->id, text,
-                             true, (replyToMsg == 0) ? message->messageId : replyToMsg,
-                             nullptr, "", false, std::vector<MessageEntity::Ptr>(), noError);
+                                    true, (replyToMsg == 0) ? message->messageId : replyToMsg,
+                                    nullptr, "", false, std::vector<MessageEntity::Ptr>(), noError);
+}
+
+/**
+ * bot_editMessage - Send a edit message request given a message
+ *
+ * @param bot Bot object
+ * @param message message object to reply to
+ * @param text text to edit
+ * @return The replied message object, if sent.
+ */
+static inline Message::Ptr bot_editMessage(const Bot &bot, const Message::Ptr &message,
+                                           const std::string &text) {
+    return bot.getApi().editMessageText(text, message->chat->id, message->messageId);
 }
