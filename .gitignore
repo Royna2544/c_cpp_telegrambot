@@ -20,6 +20,7 @@ libTgBotDB.a
 libTgBotSocket.a
 # Cmake generated
 modules.load
+modules
 # Protobuf generated
 proto/gen
 # Visual studio code
