@@ -281,6 +281,8 @@ int main(void) {
                 bot.getApi().sendSticker(message->chat->id, replyMsg->sticker->fileId);
             } else if (replyMsg->animation) {
                 bot.getApi().sendAnimation(message->chat->id, replyMsg->animation->fileId);
+            } else if (replyMsg->video) {
+                bot.getApi().sendVideo(message->chat->id, replyMsg->video->fileId);
             } else if (!replyMsg->text.empty()) {
                 bot_sendReplyMessage(bot, message, replyMsg->text, replyMsg->messageId);
             }
