@@ -1,4 +1,5 @@
 #include <sstream>
+#include <cassert>
 
 #include "TgBotSocket.h"
 
@@ -31,6 +32,8 @@ std::string toStr(TgBotCommand cmd) {
             return elem.second;
         }
     }
+    assert(0);
+    __builtin_unreachable();
     return {};
 }
 
@@ -40,7 +43,9 @@ int toCount(TgBotCommand cmd) {
             return elem.second;
         }
     }
-    return -1;
+    assert(0);
+    __builtin_unreachable();
+    return 0;
 }
 
 std::string toHelpText(void) {
