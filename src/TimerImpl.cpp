@@ -153,13 +153,9 @@ void startTimer(const Bot &bot, const Message::Ptr &message) {
     tm_ptr->setCallback(
         [=](const Timerpriv *priv, struct timehms ms) {
             const auto bot = priv->bot;
-            std::stringstream ss;
-            if (ms.h != 0) ss << ms.h << "h ";
-            if (ms.m != 0) ss << ms.m << "m ";
-            if (ms.s != 0) ss << ms.s << "s ";
-            if (!ss.str().empty() && ss.str() != message->text && bot)
-                bot->getApi().editMessageText(ss.str(), message->chat->id,
-                                              priv->messageid);
+            auto str = static_cast<std::string>(ms);
+            if (!str.empty() && str != message->text && bot)
+                bot->getApi().editMessageText(str, message->chat->id, priv->messageid);
         },
         TIMER_CONFIG_SEC,
         [=](const Timerpriv *priv) {
