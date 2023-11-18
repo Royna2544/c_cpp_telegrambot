@@ -100,7 +100,7 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
             hasmore = true;
         }
         count++;
-        std::this_thread::sleep_for(50ms);
+        std_sleep(50ms);
     }
 #if defined PWD_REPLACE_STR && !defined __WIN32
     size_t start_pos = 0;

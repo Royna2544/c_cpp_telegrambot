@@ -144,7 +144,7 @@ void startTimer(const Bot &bot, const Message::Ptr &message) {
                                               priv->messageid);
                 if (priv->sendendmsg)
                     bot->getApi().sendMessage(message->chat->id, "Timer ended");
-                std::this_thread::sleep_for(1s);
+                std_sleep(1s);
                 if (priv->botcanpin)
                     bot->getApi().unpinChatMessage(message->chat->id,
                                                    priv->messageid);
@@ -176,6 +176,6 @@ void stopTimer(const Bot &bot, const Message::Ptr &message) {
 void forceStopTimer(void) {
     if (tm_ptr) {
         tm_ptr->cancel();
-        std::this_thread::sleep_for(4s); // Time for cleanup. e.g. Unpinning
+        std_sleep(4s); // Time for cleanup. e.g. Unpinning
     }
 }

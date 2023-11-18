@@ -181,7 +181,7 @@ int main(void) {
             }
             ss << "Flashing '" << msg << "'..." << std::endl;
             sentmsg = bot_sendReplyMessage(bot, message, ss.str());
-            std::this_thread::sleep_for(std::chrono::seconds(genRandomNumber(5)));
+            std_sleep(std::chrono::seconds(genRandomNumber(5)));
             if (const size_t pos = genRandomNumber(reasons.size()); pos != reasons.size()) {
                 ss << "Failed successfully!" << std::endl;
                 ss << "Reason: " << reasons[pos];
@@ -382,7 +382,7 @@ reinit:
         LOG_I("Re-init");
         gAuthorized = false;
         std::thread([] {
-            std::this_thread::sleep_for(5s);
+            std_sleep(5s);
             gAuthorized = true;
         }).detach();
         goto reinit;

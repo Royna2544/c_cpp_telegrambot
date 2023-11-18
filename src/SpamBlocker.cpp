@@ -137,7 +137,7 @@ void spamBlocker(const Bot &bot, const Message::Ptr &message) {
                         ++its;
                     }
                 }
-                std::this_thread::sleep_for(10s);
+                std_sleep(10s);
             }
         }).detach();
         init = true;
