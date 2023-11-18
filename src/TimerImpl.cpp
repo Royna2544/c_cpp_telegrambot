@@ -196,6 +196,7 @@ void stopTimer(const Bot &bot, const Message::Ptr &message) {
 
 void forceStopTimer(void) {
     if (tm_ptr) {
+        LOG_I("Canceling timer and cleaning up...");
         tm_ptr->cancel();
         std_sleep(4s);  // Time for cleanup. e.g. Unpinning
     }
