@@ -142,6 +142,9 @@ int main(void) {
         static std::vector<std::string> reasons;
         static std::once_flag once;
         static const char kZipExtentionSuffix[] = ".zip";
+        std::string msg;
+        std::stringstream ss;
+        Message::Ptr sentmsg;
 
         std::call_once(once, [] {
             std::string buf, line;
@@ -154,10 +157,12 @@ int main(void) {
                     reasons.emplace_back(line);
             }
         });
-        std::string msg = message->text;
         if (message->replyToMessage != nullptr) {
             msg = message->replyToMessage->text;
-
+            if (msg.empty()) {
+                bot_sendReplyMessage(bot, message, "Reply to a text");
+                return;
+            }
         } else {
             if (!hasExtArgs(message)) {
                 bot_sendReplyMessage(bot, message, "Send a file name");
@@ -165,23 +170,21 @@ int main(void) {
             }
             parseExtArgs(message, msg);
         }
-        if (msg.empty()) {
-            bot_sendReplyMessage(bot, message, "Reply to a text");
-            return;
-        }
-        std::stringstream ss;
+
         std::replace(msg.begin(), msg.end(), ' ', '_');
         if (!StringTools::endsWith(msg, kZipExtentionSuffix)) {
             msg += kZipExtentionSuffix;
         }
         ss << "Flashing '" << msg << "'..." << std::endl;
+        sentmsg = bot_sendReplyMessage(bot, message, ss.str());
+        std::this_thread::sleep_for(std::chrono::seconds(genRandomNumber(5)));
         if (const size_t pos = genRandomNumber(reasons.size()); pos != reasons.size()) {
             ss << "Failed successfully!" << std::endl;
             ss << "Reason: " << reasons[pos];
         } else {
             ss << "Success! Chance was 1/" << reasons.size();
         }
-        bot_sendReplyMessage(bot, message, ss.str());
+        bot_editMessage(bot, sentmsg, ss.str());
     });
     bot_AddCommandPermissive(gBot, "possibility", [](const Bot &bot, const Message::Ptr &message) {
         if (!hasExtArgs(message)) {
@@ -238,18 +241,18 @@ int main(void) {
     bot_AddCommandPermissive(gBot, "delay", [](const Bot &bot, const Message::Ptr &message) {
         using std::chrono::high_resolution_clock;
         using std::chrono::duration;
-        MessageId sentMsg;
         union time now {
             .val = time(nullptr)
         }, msg{.val = message->date};
         std::ostringstream ss;
+
         ss << "Request message sent at: " << msg << std::endl;
         ss << "Received at: " << now << " Diff: " << now - msg << 's' << std::endl;
         auto beforeSend = high_resolution_clock::now();
-        sentMsg = bot_sendReplyMessage(bot, message, ss.str())->messageId;
+        auto sentMsg = bot_sendReplyMessage(bot, message, ss.str());
         auto afterSend = high_resolution_clock::now();
         ss << "Sending reply message took: " << duration<double, std::milli>(afterSend - beforeSend).count() << "ms" << std::endl;
-        bot.getApi().editMessageText(ss.str(), message->chat->id, sentMsg);
+        bot_editMessage(bot, sentMsg, ss.str());
     });
     bot_AddCommandEnforced(gBot, "starttimer", startTimer);
     bot_AddCommandEnforced(gBot, "stoptimer", stopTimer);
