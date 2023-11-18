@@ -19,6 +19,7 @@
 #include <fstream>
 #include <map>
 #include <random>
+#include <regex>
 #include <sstream>
 #include <string>
 #include <thread>
@@ -141,6 +142,7 @@ int main(void) {
     bot_AddCommandPermissive(gBot, "flash", [](const Bot &bot, const Message::Ptr &message) {
         static std::vector<std::string> reasons;
         static std::once_flag once;
+        static std::regex kFlashTextRegEX(R"(Flashing '\S+.zip'\.\.\.)");
         static const char kZipExtentionSuffix[] = ".zip";
         std::string msg;
         std::stringstream ss;
@@ -171,20 +173,24 @@ int main(void) {
             parseExtArgs(message, msg);
         }
 
-        std::replace(msg.begin(), msg.end(), ' ', '_');
-        if (!StringTools::endsWith(msg, kZipExtentionSuffix)) {
-            msg += kZipExtentionSuffix;
-        }
-        ss << "Flashing '" << msg << "'..." << std::endl;
-        sentmsg = bot_sendReplyMessage(bot, message, ss.str());
-        std::this_thread::sleep_for(std::chrono::seconds(genRandomNumber(5)));
-        if (const size_t pos = genRandomNumber(reasons.size()); pos != reasons.size()) {
-            ss << "Failed successfully!" << std::endl;
-            ss << "Reason: " << reasons[pos];
+        if (!std::regex_match(StringTools::split(msg, '\n').front(), kFlashTextRegEX)) {
+            std::replace(msg.begin(), msg.end(), ' ', '_');
+            if (!StringTools::endsWith(msg, kZipExtentionSuffix)) {
+                msg += kZipExtentionSuffix;
+            }
+            ss << "Flashing '" << msg << "'..." << std::endl;
+            sentmsg = bot_sendReplyMessage(bot, message, ss.str());
+            std::this_thread::sleep_for(std::chrono::seconds(genRandomNumber(5)));
+            if (const size_t pos = genRandomNumber(reasons.size()); pos != reasons.size()) {
+                ss << "Failed successfully!" << std::endl;
+                ss << "Reason: " << reasons[pos];
+            } else {
+                ss << "Success! Chance was 1/" << reasons.size();
+            }
+            bot_editMessage(bot, sentmsg, ss.str());
         } else {
-            ss << "Success! Chance was 1/" << reasons.size();
+            bot_sendReplyMessage(bot, message, "Do not try to recurse flash command, Else I'll nuke u");
         }
-        bot_editMessage(bot, sentmsg, ss.str());
     });
     bot_AddCommandPermissive(gBot, "possibility", [](const Bot &bot, const Message::Ptr &message) {
         if (!hasExtArgs(message)) {
