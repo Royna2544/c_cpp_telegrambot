@@ -257,7 +257,12 @@ int main(void) {
             // bot is not admin. nothing it can do
             return;
         }
-        if (replyMsg) {
+        if (hasExtArgs(message)) {
+            std::string msg;
+            parseExtArgs(message, msg);
+            bot_sendReplyMessage(bot, message, msg,
+                                 (replyMsg) ? replyMsg->messageId : 0, true);
+        } else if (replyMsg) {
             if (replyMsg->sticker) {
                 bot.getApi().sendSticker(message->chat->id, replyMsg->sticker->fileId);
             } else if (replyMsg->animation) {
@@ -265,11 +270,6 @@ int main(void) {
             } else if (!replyMsg->text.empty()) {
                 bot_sendReplyMessage(bot, message, replyMsg->text, replyMsg->messageId);
             }
-        } else if (hasExtArgs(message)) {
-            std::string msg;
-            parseExtArgs(message, msg);
-            bot_sendReplyMessage(bot, message, msg,
-                                 (replyMsg) ? replyMsg->messageId : 0, true);
         }
     });
     bot_AddCommandPermissive(gBot, "randsticker", [](const Bot &bot, const Message::Ptr &message) {
