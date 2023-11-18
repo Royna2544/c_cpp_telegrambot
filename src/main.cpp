@@ -283,6 +283,9 @@ int main(void) {
                 bot.getApi().sendAnimation(message->chat->id, replyMsg->animation->fileId);
             } else if (replyMsg->video) {
                 bot.getApi().sendVideo(message->chat->id, replyMsg->video->fileId);
+            } else if (!replyMsg->photo.empty()) {
+                bot.getApi().sendPhoto(message->chat->id, replyMsg->photo.front()->fileId,
+                                       "(Note: Sending all photos are not supported)");
             } else if (!replyMsg->text.empty()) {
                 bot_sendReplyMessage(bot, message, replyMsg->text, replyMsg->messageId);
             }
