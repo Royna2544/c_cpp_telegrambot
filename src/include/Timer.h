@@ -3,11 +3,17 @@
 #include <chrono>
 #include <functional>
 #include <memory>
+#include <sstream>
 #include <thread>
 
 struct timehms {
     int h, m, s;
     int toSeconds(void) const noexcept { return 60 * 60 * h + 60 * m + s; }
+    operator std::string() {
+        std::stringstream ss;
+        ss << h << "h " << m << "m " << s << 's';
+        return ss.str();
+    }
 };
 
 template <typename T>
@@ -23,7 +29,7 @@ template <class T>
 class Timer {
     int h, m, s;
     unsigned int onsec = 0;
-    T priv {};
+    T priv{};
     time_callback_t<T> onEvery;
     callback_t<T> onEnd;
     bool stop = false;

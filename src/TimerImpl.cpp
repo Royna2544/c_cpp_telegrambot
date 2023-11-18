@@ -106,6 +106,25 @@ void startTimer(const Bot &bot, const Message::Ptr &message) {
             }
         }
     }
+    // If h is not specified...
+    if (hms.h == 0) {
+        // And m is not set...
+        if (hms.m == 0 && hms.s != 0) {
+            // ... fill other fields based on s
+            // TODO De-hardcode 60 here
+            auto s = hms.s;
+            hms.h = s / 3600;
+            hms.m = s % 3600 / 60;
+            hms.s = s % 3600 % 60;
+        }
+        // And s is not set...
+        else if (hms.m != 0 && hms.s == 0) {
+            // TODO Hardcoded 60 again here
+            hms.h = hms.m / 60;
+            hms.m %= 60;
+        }
+    }
+
 #define TIMER_CONFIG_SEC 5
     if (hms.toSeconds() == 0) {
         bot_sendReplyMessage(bot, message, "I'm not a fool to time 0s");
@@ -113,9 +132,15 @@ void startTimer(const Bot &bot, const Message::Ptr &message) {
     } else if (hms.toSeconds() < TIMER_CONFIG_SEC) {
         bot_sendReplyMessage(bot, message, "Provide longer time value");
         return;
+    } else if (hms.h > 2) {
+        bot_sendReplyMessage(bot, message,
+                             "Time provided is too long, which is: " +
+                                 static_cast<std::string>(hms));
+        return;
     }
     const int msgid = bot.getApi()
-                          .sendMessage(message->chat->id, "Timer starts")
+                          .sendMessage(message->chat->id,
+                                       "Timer starting: " + static_cast<std::string>(hms))
                           ->messageId;
     bool couldpin = true;
     try {
@@ -176,6 +201,6 @@ void stopTimer(const Bot &bot, const Message::Ptr &message) {
 void forceStopTimer(void) {
     if (tm_ptr) {
         tm_ptr->cancel();
-        std_sleep(4s); // Time for cleanup. e.g. Unpinning
+        std_sleep(4s);  // Time for cleanup. e.g. Unpinning
     }
 }
