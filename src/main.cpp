@@ -27,6 +27,7 @@
 
 #include "RuntimeException.h"
 #include "tgbot/TgException.h"
+#include "tgbot/tools/StringTools.h"
 
 #ifdef RTCOMMAND_LOADER
 #include <RTCommandLoader.h>
@@ -140,6 +141,8 @@ int main(void) {
     bot_AddCommandPermissive(gBot, "flash", [](const Bot &bot, const Message::Ptr &message) {
         static std::vector<std::string> reasons;
         static std::once_flag once;
+        static const char kZipExtentionSuffix[] = ".zip";
+
         std::call_once(once, [] {
             std::string buf, line;
             std::stringstream ss;
@@ -166,16 +169,17 @@ int main(void) {
             bot_sendReplyMessage(bot, message, "Reply to a text");
             return;
         }
-        std::replace(msg.begin(), msg.end(), ' ', '_');
         std::stringstream ss;
-        ss << "Flashing '" << msg;
-        if (msg.find(".zip") == std::string::npos) ss << ".zip";
-        const size_t pos = genRandomNumber(reasons.size());
-        if (pos != reasons.size()) {
-            ss << "' failed successfully!" << std::endl;
+        std::replace(msg.begin(), msg.end(), ' ', '_');
+        if (!StringTools::endsWith(msg, kZipExtentionSuffix)) {
+            msg += kZipExtentionSuffix;
+        }
+        ss << "Flashing '" << msg << "'..." << std::endl;
+        if (const size_t pos = genRandomNumber(reasons.size()); pos != reasons.size()) {
+            ss << "Failed successfully!" << std::endl;
             ss << "Reason: " << reasons[pos];
         } else {
-            ss << "' Success! Chance was 1/" << reasons.size();
+            ss << "Success! Chance was 1/" << reasons.size();
         }
         bot_sendReplyMessage(bot, message, ss.str());
     });
