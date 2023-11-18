@@ -175,6 +175,7 @@ int main(void) {
 
         if (!std::regex_match(StringTools::split(msg, '\n').front(), kFlashTextRegEX)) {
             std::replace(msg.begin(), msg.end(), ' ', '_');
+            std::replace(msg.begin(), msg.end(), '\n', ' ');
             if (!StringTools::endsWith(msg, kZipExtentionSuffix)) {
                 msg += kZipExtentionSuffix;
             }
