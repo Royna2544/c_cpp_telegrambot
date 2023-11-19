@@ -59,13 +59,16 @@ std::vector<std::string> getPathEnv() {
     std::vector<std::string> paths;
     std::string path;
     const char* path_c = getenv("PATH");
-    if (!path_c) {
-        return {};
-    }
-    path = path_c;
-    while ((pos = path.find(path_env_delimiter)) != std::string::npos) {
-        paths.emplace_back(path.substr(0, pos));
-        path.erase(0, pos + 1);
+    if (path_c) {
+        path = path_c;
+        if (path.find(path_env_delimiter) == std::string::npos)
+            paths.emplace_back(path);
+        else {
+            while ((pos = path.find(path_env_delimiter)) != std::string::npos) {
+                paths.emplace_back(path.substr(0, pos));
+                path.erase(0, pos + 1);
+            }
+        }
     }
     return paths;
 }
