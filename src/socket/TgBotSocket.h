@@ -9,7 +9,11 @@
 #include <unordered_map>
 #include <utility>
 
+#ifndef __ANDROID__
 #define SOCKET_PATH "/tmp/tgbot_sock"
+#else
+#define SOCKET_PATH "/data/data/com.termux/files/usr/tmp/tgbot_sock"
+#endif
 
 enum TgBotCommand {
     CMD_EXIT,
