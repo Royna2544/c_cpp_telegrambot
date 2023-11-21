@@ -12,6 +12,7 @@
 #include <TimerImpl.h>
 #include <Types.h>
 #include <tgbot/tgbot.h>
+#include <utils/LinuxPort.h>
 
 #include <algorithm>
 #include <boost/algorithm/string/replace.hpp>
@@ -285,6 +286,8 @@ int main(void) {
             bot.getApi().deleteMessage(message->chat->id, message->messageId);
         } catch (const TgBot::TgException &) {
             // bot is not admin. nothing it can do
+            WARN_ONCE(1, "bot is not admin in chat " LONGFMT ", cannot use decho!",
+                      message->chat->id);
             return;
         }
         if (hasExtArgs(message)) {

@@ -47,6 +47,3 @@ bool runCommand(const std::string& command, std::string& res);
 
 // MIME
 std::string getMIMEString(const std::string& path);
-
-#include "config.h"
-#define IS_DEFINED IS_BUILTIN
