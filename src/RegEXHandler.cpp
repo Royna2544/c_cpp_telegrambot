@@ -15,10 +15,11 @@ struct RegEXContext {
 
 using std::regex_constants::format_sed;
 using std::regex_constants::format_first_only;
+using std::regex_constants::match_not_null;
 
 static std::string doRegex(const RegEXContext* ctx, const std::string& text) {
     std::string s = text;
-    auto flags = format_sed;
+    auto flags = format_sed | match_not_null;
     if (!ctx->global)
         flags |= format_first_only;
     return std::regex_replace(text, ctx->src, ctx->dest, flags);
