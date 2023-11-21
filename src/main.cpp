@@ -7,6 +7,7 @@
 #include <Logging.h>
 #include <NamespaceImport.h>
 #include <PrintableTime.h>
+#include <RegEXHandler.h>
 #include <SpamBlock.h>
 #include <TimerImpl.h>
 #include <Types.h>
@@ -330,6 +331,8 @@ int main(void) {
         if (!gObservedChatIds.empty())
             processObservers(msg);
 #endif
+        if (!msg->text.empty())
+            processRegEXCommand(gBot, msg);
         spamBlocker(gBot, msg);
     });
 

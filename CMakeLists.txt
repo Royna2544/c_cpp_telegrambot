@@ -35,6 +35,7 @@ set(SRC_LIST
     src/exithandlers/handler.cpp
     src/exithandlers/handler_${TARGET_VARIANT}.cpp
     src/SpamBlocker.cpp
+    src/RegEXHandler.cpp
     src/TimerImpl.cpp)
 
 # Database
