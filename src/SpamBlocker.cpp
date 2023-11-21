@@ -4,14 +4,11 @@
 #include <SpamBlock.h>
 
 #include <chrono>
-#include <cinttypes>
 #include <map>
 #include <mutex>
 #include <thread>
 #include <unordered_map>
 #include <utility>
-
-#define LONGFMT "%" PRId64
 
 using std::chrono_literals::operator""s;
 using TgBot::ChatPermissions;
