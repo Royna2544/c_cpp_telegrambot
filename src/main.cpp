@@ -173,10 +173,14 @@ int main(void) {
             }
             parseExtArgs(message, msg);
         }
-
+        for (const auto c : msg) {
+            if (c == '\n') {
+                bot_sendReplyMessage(bot, message, "Zip names shouldn't have newlines");
+                return;
+            }
+        }
         if (!std::regex_match(StringTools::split(msg, '\n').front(), kFlashTextRegEX)) {
             std::replace(msg.begin(), msg.end(), ' ', '_');
-            std::replace(msg.begin(), msg.end(), '\n', ' ');
             if (!StringTools::endsWith(msg, kZipExtentionSuffix)) {
                 msg += kZipExtentionSuffix;
             }
