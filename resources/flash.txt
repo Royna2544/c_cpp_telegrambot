@@ -73,3 +73,16 @@ I thought this was bash
 Mad at YOURZIP
 Hardware fail: no RAM detected... Wait how am i talking then
 Failed to get WiFi HAL. Is service started? Are binder threads started and available?
+Invalid user format
+Device or resource busy: Knox and TWRP having a thermonuclear war
+I don't want to.
+You don't meet the minimal requirements for flashing: A working brain
+MD5 checksum success! but still no kys
+Failed too much times, locking the bootloader...
+ZIP tried to format internal storage
+No reason
+Clean your hand first
+I am better than this
+You better stop
+Try again (it will fail)
+User must die
