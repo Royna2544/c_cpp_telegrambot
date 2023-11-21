@@ -25,7 +25,7 @@ static std::string doRegex(const RegEXContext* ctx, const std::string& text) {
 }
 
 void processRegEXCommand(const Bot& bot, const Message::Ptr& msg) {
-    static std::regex kSedCommandRegex(R"(s\/.+\/.+\/(g)?)");
+    static std::regex kSedCommandRegex(R"(s\/.+\/.+(\/g)?)");
     std::string& text = msg->text;
     if (std::regex_match(text, kSedCommandRegex)) {
         if (msg->replyToMessage && !msg->replyToMessage->text.empty()) {
