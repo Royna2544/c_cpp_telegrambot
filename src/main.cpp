@@ -194,6 +194,7 @@ int main(void) {
         }
     });
     bot_AddCommandPermissive(gBot, "possibility", [](const Bot &bot, const Message::Ptr &message) {
+        constexpr int PERCENT_MAX = 100;
         if (!hasExtArgs(message)) {
             bot_sendReplyMessage(bot, message,
                                  "Send avaliable conditions sperated by newline");
@@ -230,15 +231,25 @@ int main(void) {
         vec.pop_back();
         int total = 0;
         for (const auto &cond : vec) {
-            const int thisper = genRandomNumber(100 - total);
+            int thisper = 0;
+            if (total < PERCENT_MAX) {
+                thisper = genRandomNumber(PERCENT_MAX - total);
+                if (total + thisper >= PERCENT_MAX) {
+                    thisper = PERCENT_MAX - total;
+                }
+            }
             map[cond] = thisper;
             total += thisper;
         }
-        map[last] = 100 - total;
+        // Nonetheless of total being 100 or whatever
+        map[last] = PERCENT_MAX - total;
         using map_t = std::pair<std::string, int>;
         std::vector<map_t> elem(map.begin(), map.end());
         std::sort(elem.begin(), elem.end(), [](const map_t &map1, const map_t &map2) {
-            return map1.second <= map2.second;
+            if (map1.second != map2.second) {
+                return map1.second > map2.second;
+            }
+            return map1.first < map2.first;
         });
         for (const map_t &m : elem) {
             out << m.first << " : " << m.second << "%" << std::endl;
