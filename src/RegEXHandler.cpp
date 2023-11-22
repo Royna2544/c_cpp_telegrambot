@@ -29,7 +29,7 @@ static std::string doRegex(const RegEXContext* ctx, const std::string& text) {
 
 void processRegEXCommand(const Bot& bot, const Message::Ptr& msg) {
     // Matches sed command with subsitute command and g or i flags
-    static std::regex kSedCommandRegex(R"(s\/.+\/.+(\/(g|i|ig|gi))?)");
+    static std::regex kSedCommandRegex(R"(^s\/.+\/.+(\/(g|i|ig|gi))?$)");
     std::string& text = msg->text;
     if (std::regex_match(text, kSedCommandRegex)) {
         if (msg->replyToMessage && !msg->replyToMessage->text.empty()) {
