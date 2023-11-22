@@ -383,7 +383,7 @@ reinit:
             longPoll.start();
         }
     } catch (const std::exception &e) {
-        LOG_E("%s", e.what());
+        LOG_E("Exception: %s", e.what());
         LOG_W("Trying to recover");
         UserId ownerid = database::db.maybeGetOwnerId();
         try {
