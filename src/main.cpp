@@ -81,16 +81,16 @@ int main(void) {
 
     static Bot gBot(token);
 
-    bot_AddCommandEnforcedCompiler(gBot, "c", ProgrammingLangs::C, [&](const Bot &bot, const Message::Ptr &message, std::string compiler) {
+    bot_AddCommandEnforcedCompiler(gBot, "c", ProgrammingLangs::C, [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
         CompileRunHandler(CCppCompileHandleData{{{bot, message}, compiler, "out.c"}});
     });
-    bot_AddCommandEnforcedCompiler(gBot, "cpp", ProgrammingLangs::CXX, [&](const Bot &bot, const Message::Ptr &message, std::string compiler) {
+    bot_AddCommandEnforcedCompiler(gBot, "cpp", ProgrammingLangs::CXX, [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
         CompileRunHandler(CCppCompileHandleData{{{bot, message}, compiler, "out.cpp"}});
     });
-    bot_AddCommandEnforcedCompiler(gBot, "python", ProgrammingLangs::PYTHON, [&](const Bot &bot, const Message::Ptr &message, std::string compiler) {
+    bot_AddCommandEnforcedCompiler(gBot, "python", ProgrammingLangs::PYTHON, [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
         CompileRunHandler({{bot, message}, compiler, "out.py"});
     });
-    bot_AddCommandEnforcedCompiler(gBot, "golang", ProgrammingLangs::GO, [&](const Bot &bot, const Message::Ptr &message, std::string compiler) {
+    bot_AddCommandEnforcedCompiler(gBot, "golang", ProgrammingLangs::GO, [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
         CompileRunHandler({{bot, message}, compiler + " run", "out.go"});
     });
 
