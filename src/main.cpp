@@ -29,6 +29,7 @@
 #include <vector>
 
 #include "RuntimeException.h"
+#include "StringToolsExt.h"
 #include "tgbot/TgException.h"
 #include "tgbot/tools/StringTools.h"
 
@@ -222,8 +223,7 @@ int main(void) {
         vec.reserve(numlines);
         map.reserve(numlines);
         while (std::getline(ss, line, '\n')) {
-            if (std::all_of(line.begin(), line.end(),
-                            [](char c) { return std::isspace(c); }))
+            if (isEmptyOrBlank(line))
                 continue;
             vec.push_back(line);
         }
