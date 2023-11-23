@@ -74,7 +74,7 @@ void loadCommandsFromFile(Bot& bot, const std::string& filename) {
     ReadFileToString(filename, &data);
     std::stringstream ss(data);
     while (std::getline(ss, line)) {
-        static const std::string kModulesDir = "modules/";
+        static const std::string kModulesDir = "src/cmd_dynamic/";
         loadOneCommand(bot, kModulesDir + line);
     }
 }
