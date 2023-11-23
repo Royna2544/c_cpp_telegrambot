@@ -9,6 +9,9 @@
 using TgBot::Bot;
 using TgBot::Message;
 
+using std::chrono_literals::operator""s;
+using std::chrono_literals::operator""ms;
+
 template <typename _Rep, typename _Period>
 static inline void std_sleep(std::chrono::duration<_Rep, _Period> time) {
 	std::this_thread::sleep_for(time);

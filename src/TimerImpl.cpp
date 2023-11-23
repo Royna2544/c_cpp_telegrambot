@@ -2,6 +2,7 @@
 #include <ExtArgs.h>
 #include <Logging.h>
 #include <Timer.h>
+#include <NamespaceImport.h>
 
 #include <cmath>
 #include <optional>
@@ -21,8 +22,6 @@ enum InputState {
     SECOND,
     NONE,
 };
-
-using std::chrono_literals::operator""s;
 
 void startTimer(const Bot &bot, const Message::Ptr &message) {
     bool found = false;

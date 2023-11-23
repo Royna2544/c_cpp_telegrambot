@@ -10,7 +10,6 @@
 #include <unordered_map>
 #include <utility>
 
-using std::chrono_literals::operator""s;
 using TgBot::ChatPermissions;
 
 #ifdef SOCKET_CONNECTION

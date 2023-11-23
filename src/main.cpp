@@ -53,8 +53,6 @@ using database::blacklist;
 using database::ProtoDatabase;
 using database::whitelist;
 
-using std::chrono_literals::operator""s;
-
 int main(void) {
     const char *token_str = getenv("TOKEN");
     std::string token;
