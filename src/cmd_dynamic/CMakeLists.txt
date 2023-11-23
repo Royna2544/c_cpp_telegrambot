@@ -1,4 +1,7 @@
 set(DYNAMIC_CMDS_LIST DynTest)
+if (NOT WIN32)
+	set(DYNAMIC_CMDS_LIST InteractiveBash ${DYNAMIC_CMDS_LIST})
+endif()
 
 FILE(REMOVE ${CMAKE_SOURCE_DIR}/modules.load)
 foreach(lib ${DYNAMIC_CMDS_LIST})
