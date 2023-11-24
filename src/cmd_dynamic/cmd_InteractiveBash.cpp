@@ -3,21 +3,20 @@
 #include <Logging.h>
 #include <fcntl.h>
 #include <stdio.h>
-
-#include <csignal>
-#include <cstdlib>
-#include <regex>
-
-#include "NamespaceImport.h"
-#include "StringToolsExt.h"
-#include "cmd_dynamic.h"
-#include "popen_wdt/popen_wdt.h"
-
 #include <sys/mman.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <atomic>
+#include <csignal>
+#include <cstdlib>
+#include <regex>
+
 #include "../ExtArgs.cpp"
+#include "NamespaceImport.h"
+#include "StringToolsExt.h"
+#include "cmd_dynamic.h"
+#include "popen_wdt/popen_wdt.h"
 
 using pipe_t = int[2];
 
@@ -53,7 +52,7 @@ static bool SendCommand(const std::string& str) {
     TrimStr(str_local);
     LOG_I("Command: %s", str_local.c_str());
     // To stop the read() when the command exit
-    str_local += "; echo \" \"\n";
+    str_local += "; echo\n";
     rc = write(parent_writefd, str_local.c_str(), str_local.size() + /* null terminator */ 1);
     if (rc < 0) {
         PLOG_E("Write command to parent fd");
@@ -64,7 +63,7 @@ static bool SendCommand(const std::string& str) {
 
 // TODO This is broken (Will hang if its not interactive)
 static bool isChildInteractive() {
-    static const char OkStr[] = "OK\n ";
+    static const char OkStr[] = "OK\n";
     constexpr size_t OkStrLen = sizeof(OkStr);
     char buf[OkStrLen] = {0};
     int rc;
@@ -74,7 +73,7 @@ static bool isChildInteractive() {
     if (!rc) {
         return false;
     }
-    // Expecting "OK\n " (See above for extra space)
+    // Expecting "OK\n"
     return read(parent_readfd, &buf, OkStrLen) == OkStrLen && !strncmp(buf, OkStr, OkStrLen - 1);
 }
 
@@ -147,19 +146,27 @@ static void do_InteractiveBash(const Bot& bot, const Message::Ptr& message) {
     if (IsVaildPipe(tochild) && IsVaildPipe(toparent)) {
         // Is it exit command?
         if (matchesExit) {
-            bool exited = false;
             int status;
-
             LOG_I("Received exit command: '%s'", command.c_str());
-            // TODO Need to send SIGINT to child of childpid not itself
-            // However if kill SIGINT is not here, it wouldnt exit if command is hanging
-            kill(childpid, SIGINT);
+
+            // Write a msg as a fallback if for some reason exit doesnt get written
+            std::thread th([] {
+                std_sleep_s(SLEEP_SECONDS);
+                if (childpid > 0) {
+                    if (kill(childpid, 0) == 0) {
+                        LOG_W("Process %d misbehaving, using SIGTERM", childpid);
+                        killpg(childpid, SIGTERM);
+                    }
+                }
+            });
+            // No need to have it linked
+            th.detach();
+            // Try to type exit command
             SendCommand("exit 0");
-            wait(&status);
-            exited = WIFEXITED(status);
-            if (!exited && kill(childpid, 0) == 0) {
-                LOG_W("Process %d misbehaving, using SIGTERM", childpid);
-                killpg(childpid, SIGTERM);
+            // waitpid(4p) will hang if not exited, yes
+            waitpid(childpid, &status, 0);
+            if (WIFEXITED(status)) {
+                LOG_I("Process %d exited with code %d", childpid, WEXITSTATUS(status));
             }
             bot_sendReplyMessage(bot, message, "Closed bash subprocess.");
             close(parent_readfd);
@@ -173,31 +180,31 @@ static void do_InteractiveBash(const Bot& bot, const Message::Ptr& message) {
                 static const char kExitedByTimeout[] = WDT_BITE_STR;
                 char buf[512];
                 int rc;
+                bool once_flag = true;
                 std::string result;
-                auto sendFallback = std::make_shared<bool>(true);
+                auto sendFallback = std::make_shared<std::atomic_bool>(true);
 
-                // TODO These results will come in next
                 SendCommand(command);
 
                 // Write a msg as a fallback if read() hangs
                 std::thread th([sendFallback] {
-                    std_sleep(std::chrono::seconds(SLEEP_SECONDS));
-                    if (*sendFallback)
+                    std_sleep_s(SLEEP_SECONDS);
+                    if (sendFallback->load())
                         writeStr(child_stdout, kExitedByTimeout);
                 });
                 // When rc < 0, most likely it returned EWOUDLBLOCK/EAGAIN
                 do {
-                    memset(buf, 0, sizeof(buf));
                     rc = read(parent_readfd, buf, sizeof(buf));
                     if (rc > 0) {
-                        // Cuz of the shim of " \n", since it is a sperate process, may not be read
-                        // in the same buffer.
-                        // TODO: Make it in a common way somehow
-                        if (!strncmp(buf, " \n", sizeof(buf))) {
+                        std::string buf_str(buf, rc);
+                        // Cuz of the shim of "\n", since it is a sperate process,
+                        // may not be read in the same buffer. TODO Remove dirty way
+                        if (isEmptyOrBlank(buf_str) && once_flag) {
                             // TODO This is a hack
                             rc = sizeof(buf);
+                            once_flag = false;
                         } else {
-                            result.append(buf, rc);
+                            result.append(buf_str);
                         }
                     }
                     // Exit if read ret != buf size
@@ -206,7 +213,7 @@ static void do_InteractiveBash(const Bot& bot, const Message::Ptr& message) {
                 // Was it the fallback input?
                 if (strncmp(buf, kExitedByTimeout, sizeof(buf))) {
                     // No? then set to not write fallback and detach
-                    *sendFallback = false;
+                    sendFallback->store(false);
                     th.detach();
                 } else {
                     // Yes? Do join then
