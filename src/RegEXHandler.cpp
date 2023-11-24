@@ -16,9 +16,9 @@ using std::regex_constants::match_not_null;
 using std::regex_constants::syntax_option_type;
 
 // Matches sed command with subsitute command and g or i flags
-static std::regex kSedReplaceCommandRegex(R"(^s\/.+\/.+(\/(g|i|ig|gi))?$)");
+static const std::regex kSedReplaceCommandRegex(R"(^s\/.+\/.+(\/(g|i|ig|gi))?$)");
 // Matches sed command with delete command, with regex on deleting expression
-static std::regex kSedDeleteCommandRegex(R"(^\/.+\/d$)");
+static const std::regex kSedDeleteCommandRegex(R"(^\/.+\/d$)");
 
 template<typename T>
 class OptionalWrapper {
