@@ -186,7 +186,7 @@ int main(void) {
             }
             ss << "Flashing '" << msg << "'..." << std::endl;
             sentmsg = bot_sendReplyMessage(bot, message, ss.str());
-            std_sleep(std::chrono::seconds(genRandomNumber(5)));
+            std_sleep_s(genRandomNumber(5));
             if (const size_t pos = genRandomNumber(reasons.size()); pos != reasons.size()) {
                 ss << "Failed successfully!" << std::endl;
                 ss << "Reason: " << reasons[pos];
