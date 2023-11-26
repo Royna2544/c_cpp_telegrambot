@@ -11,6 +11,7 @@
 #include <SpamBlock.h>
 #include <TimerImpl.h>
 #include <Types.h>
+#include <random/RandomNumber.h>
 #include <tgbot/tgbot.h>
 #include <utils/LinuxPort.h>
 
