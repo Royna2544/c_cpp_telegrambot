@@ -43,7 +43,7 @@ static void InvaildatePipe(pipe_t fd) {
     }
 }
 
-#define writeStr(fd, str) write(fd, str, sizeof(str))
+#define writeStr(fd, str) (void)write(fd, str, sizeof(str))
 
 static bool SendCommand(const std::string& str) {
     int rc;
