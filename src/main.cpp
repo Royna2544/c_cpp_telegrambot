@@ -281,12 +281,18 @@ int main(void) {
     bot_AddCommandEnforced(gBot, "stoptimer", stopTimer);
     bot_AddCommandPermissive(gBot, "decho", [](const Bot &bot, const Message::Ptr &message) {
         const auto replyMsg = message->replyToMessage;
+        const auto chatId = message->chat->id;
+        static std::vector<ChatId> warned_ids;
+
         try {
-            bot.getApi().deleteMessage(message->chat->id, message->messageId);
+            bot.getApi().deleteMessage(chatId, message->messageId);
         } catch (const TgBot::TgException &) {
             // bot is not admin. nothing it can do
-            WARN_ONCE(1, "bot is not admin in chat " LONGFMT ", cannot use decho!",
-                      message->chat->id);
+            if (std::find(warned_ids.begin(), warned_ids.end(), chatId) == warned_ids.end()) {
+                LOG_W("bot is not admin in chat " LONGFMT ", cannot use decho!",
+                          message->chat->id);
+                warned_ids.emplace_back(message->chat->id);
+            }
             return;
         }
         if (hasExtArgs(message)) {
