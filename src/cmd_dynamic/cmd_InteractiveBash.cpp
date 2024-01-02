@@ -43,8 +43,6 @@ static void InvaildatePipe(pipe_t fd) {
     }
 }
 
-#define writeStr(fd, str) (void)write(fd, str, sizeof(str))
-
 static bool SendCommand(const std::string& str) {
     int rc;
     std::string str_local = str;
@@ -190,7 +188,7 @@ static void do_InteractiveBash(const Bot& bot, const Message::Ptr& message) {
                 std::thread th([sendFallback] {
                     std_sleep_s(SLEEP_SECONDS);
                     if (sendFallback->load())
-                        writeStr(child_stdout, kExitedByTimeout);
+                        (void)write(child_stdout, kExitedByTimeout, sizeof(kExitedByTimeout));
                 });
                 // When rc < 0, most likely it returned EWOUDLBLOCK/EAGAIN
                 do {
