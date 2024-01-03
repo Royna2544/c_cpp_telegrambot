@@ -5,6 +5,7 @@
 #include <cassert>
 #include <random>
 
+#include "KernelRandEngine.h"
 #include "RDRandEngine.h"
 
 template <class Generator>
@@ -50,12 +51,30 @@ static bool RNG_rdrand_supported(void) {
 }
 #endif
 
+#ifdef KERNELRAND_MAYBE_SUPPORTED
+static int RNG_kernrand_generate(const int min, const int max) {
+    kernel_rand_engine gen;
+    return genRandomNumberImpl(gen, min, max);
+}
+
+static bool RNG_kernrand_supported(void) {
+    return kernel_rand_engine::isSupported();
+}
+#endif
+
 struct RNGType RNGs[] = {
 #ifdef RDRAND_MAYBE_SUPPORTED
     {
         .supported = RNG_rdrand_supported,
         .generate = RNG_rdrand_generate,
         .name = "X86 RDRAND instr. HWRNG (Intel/AMD)",
+    },
+#endif
+#ifdef KERNELRAND_MAYBE_SUPPORTED
+    {
+        .supported = RNG_kernrand_supported,
+        .generate = RNG_kernrand_generate,
+        .name = "Linux/MacOS hwrng interface",
     },
 #endif
     {
