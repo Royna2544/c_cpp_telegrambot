@@ -3,7 +3,7 @@
 - Proudly backed by C/C++.
 - Supports in-chat compiler support (Owner only)
 - Spam purge feature
-- Supported on Windows, macOS, Linux
+- Supported on Windows, macOS, Linux, Android (termux)
 
 <b>BUILD INFO</b>: HEAD
 Commit-Msg: _commitmsg_
