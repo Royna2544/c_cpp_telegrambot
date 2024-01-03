@@ -169,7 +169,10 @@ static void do_InteractiveBash(const Bot& bot, const Message::Ptr& message) {
             if (WIFEXITED(status)) {
                 LOG_I("Process %d exited with code %d", childpid, WEXITSTATUS(status));
             }
-            bot_sendReplyMessage(bot, message, "Closed bash subprocess.");
+            {
+                const std::lock_guard<std::mutex> _(m);
+                bot_sendReplyMessage(bot, message, "Closed bash subprocess.");
+            }
             close(parent_readfd);
             close(parent_writefd);
             close(child_stdout);
