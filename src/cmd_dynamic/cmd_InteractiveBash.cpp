@@ -10,6 +10,7 @@
 #include <atomic>
 #include <csignal>
 #include <cstdlib>
+#include <mutex>
 #include <regex>
 
 #include "../ExtArgs.cpp"
@@ -79,6 +80,7 @@ static bool isChildInteractive() {
 static void do_InteractiveBash(const Bot& bot, const Message::Ptr& message) {
     static const std::regex kExitCommandRegex(R"(^exit( \d+)?$)");
     std::string command;
+    static std::mutex m;
     bool matchesExit = false;
 
     if (!hasExtArgs(message)) {
@@ -176,6 +178,13 @@ static void do_InteractiveBash(const Bot& bot, const Message::Ptr& message) {
         } else {
             // Second try, it should have been opened by now or else its a failure
             if (is_open) {
+                {
+                    std::unique_lock<std::mutex> lk{m, std::try_to_lock};
+                    if (!lk.owns_lock()) {
+                        bot_sendReplyMessage(bot, message, "Subprocess is still running, try using an exit command");
+                        return;
+                    }
+                }
                 std::thread sendResThread([&bot, message, command] {
                     static const char kExitedByTimeout[] = WDT_BITE_STR;
                     char buf[BASH_READ_BUF];
@@ -183,6 +192,7 @@ static void do_InteractiveBash(const Bot& bot, const Message::Ptr& message) {
                     bool once_flag = true;
                     std::string result;
                     auto sendFallback = std::make_shared<std::atomic_bool>(true);
+                    const std::lock_guard<std::mutex> _(m);
 
                     SendCommand(command);
 
