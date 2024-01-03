@@ -44,11 +44,12 @@ static void InvaildatePipe(pipe_t fd) {
     }
 }
 
-static bool SendCommand(std::string str) {
+static bool SendCommand(std::string str, bool internal = false) {
     int rc;
 
     TrimStr(str);
-    LOG_I("Command: %s", str.c_str());
+    if (!internal)
+        LOG_I("Child <= Command '%s'", str.c_str());
     // To stop the read() when the command exit
     str += "; echo\n";
     rc = write(parent_writefd, str.c_str(), str.size() + /* null terminator */ 1);
@@ -67,7 +68,7 @@ static bool isChildInteractive() {
     int rc;
 
     // Send a command to check connection to child bash process
-    rc = SendCommand("echo OK");
+    rc = SendCommand("echo OK", true);
     if (!rc) {
         return false;
     }
@@ -160,7 +161,7 @@ static void do_InteractiveBash(const Bot& bot, const Message::Ptr& message) {
             // No need to have it linked
             th.detach();
             // Try to type exit command
-            SendCommand("exit 0");
+            SendCommand("exit 0", true);
             // waitpid(4p) will hang if not exited, yes
             waitpid(childpid, &status, 0);
             if (WIFEXITED(status)) {
