@@ -125,7 +125,7 @@ static void do_InteractiveBash(const Bot& bot, const Message::Ptr& message) {
             close(parent_writefd);
             *piddata = getpid();
             setpgid(0, 0);
-            execl("/bin/bash", "bash", (char*)NULL);
+            execl(BASH_EXE_PATH, "bash", (char*)NULL);
             _exit(127);
         } else {
             close(child_stdin);
@@ -232,7 +232,7 @@ static void do_InteractiveBash(const Bot& bot, const Message::Ptr& message) {
 }
 
 static bool isSupported(void) {
-    return access("/bin/bash", R_OK | X_OK) == 0;
+    return access(BASH_EXE_PATH, R_OK | X_OK) == 0;
 }
 
 DECL_DYN_ENFORCED_COMMAND("ibash", do_InteractiveBash, isSupported);

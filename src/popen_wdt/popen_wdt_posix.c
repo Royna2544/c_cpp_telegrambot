@@ -71,11 +71,7 @@ FILE *popen_watchdog(const char *command, bool *watchdog_ret) {
         dup2(pipefd[1], STDERR_FILENO);
         close(STDIN_FILENO);
         setpgid(0, 0);
-#ifndef __ANDROID__
-        execl("/bin/bash", "bash", "-c", command, (char *)NULL);
-#else
-        execl("/data/data/com.termux/files/usr/bin/bash", "bash", "-c", command, NULL);
-#endif
+        execl(BASH_EXE_PATH, "bash", "-c", command, (char *)NULL);
         _exit(127);  // If execl fails, exit
     } else {
         // Parent process
