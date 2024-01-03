@@ -58,8 +58,7 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
                        const std::string &cmd, std::string &res, bool use_wdt = true) {
     bool hasmore = false, watchdog_bitten = false;
     int count = 0;
-    constexpr const static int read_buf = (1 << 8), max_buf = (read_buf << 2) * 3;
-    auto buf = std::make_unique<char[]>(read_buf);
+    char buf[BASH_READ_BUF] = {};
     std::string cmd_r, cmd_remapped;
     const char *cmd_cstr = nullptr;
 
@@ -92,10 +91,10 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
         bot_sendReplyMessage(bot, message, "Failed to popen()");
         return;
     }
-    res.reserve(max_buf);
-    while (fgets(buf.get(), read_buf, fp)) {
-        if (res.size() < max_buf) {
-            res += buf.get();
+    res.reserve(BASH_MAX_BUF);
+    while (fgets(buf, sizeof(buf), fp)) {
+        if (res.size() < BASH_MAX_BUF) {
+            res += buf;
         } else {
             hasmore = true;
         }

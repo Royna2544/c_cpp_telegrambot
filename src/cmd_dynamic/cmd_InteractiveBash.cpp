@@ -13,6 +13,7 @@
 #include <regex>
 
 #include "../ExtArgs.cpp"
+#include "CompilerInTelegram.h" // BASH_MAX_BUF, BASH_READ_BUF
 #include "NamespaceImport.h"
 #include "StringToolsExt.h"
 #include "cmd_dynamic.h"
@@ -176,8 +177,8 @@ static void do_InteractiveBash(const Bot& bot, const Message::Ptr& message) {
             // Second try, it should have been opened by now or else its a failure
             if (is_open) {
                 static const char kExitedByTimeout[] = WDT_BITE_STR;
-                char buf[512];
-                int rc;
+                char buf[BASH_READ_BUF];
+                int rc, count = 0;
                 bool once_flag = true;
                 std::string result;
                 auto sendFallback = std::make_shared<std::atomic_bool>(true);
@@ -201,8 +202,9 @@ static void do_InteractiveBash(const Bot& bot, const Message::Ptr& message) {
                             // TODO This is a hack
                             rc = sizeof(buf);
                             once_flag = false;
-                        } else {
+                        } else if (count < BASH_MAX_BUF) {
                             result.append(buf_str);
+                            count += rc;
                         }
                     }
                     // Exit if read ret != buf size
