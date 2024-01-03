@@ -44,15 +44,14 @@ static void InvaildatePipe(pipe_t fd) {
     }
 }
 
-static bool SendCommand(const std::string& str) {
+static bool SendCommand(std::string str) {
     int rc;
-    std::string str_local = str;
 
-    TrimStr(str_local);
-    LOG_I("Command: %s", str_local.c_str());
+    TrimStr(str);
+    LOG_I("Command: %s", str.c_str());
     // To stop the read() when the command exit
-    str_local += "; echo\n";
-    rc = write(parent_writefd, str_local.c_str(), str_local.size() + /* null terminator */ 1);
+    str += "; echo\n";
+    rc = write(parent_writefd, str.c_str(), str.size() + /* null terminator */ 1);
     if (rc < 0) {
         PLOG_E("Write command to parent fd");
         return false;
