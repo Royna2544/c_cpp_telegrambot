@@ -13,7 +13,7 @@
 #include <regex>
 
 #include "../ExtArgs.cpp"
-#include "CompilerInTelegram.h" // BASH_MAX_BUF, BASH_READ_BUF
+#include "CompilerInTelegram.h"  // BASH_MAX_BUF, BASH_READ_BUF
 #include "NamespaceImport.h"
 #include "StringToolsExt.h"
 #include "cmd_dynamic.h"
@@ -176,54 +176,57 @@ static void do_InteractiveBash(const Bot& bot, const Message::Ptr& message) {
         } else {
             // Second try, it should have been opened by now or else its a failure
             if (is_open) {
-                static const char kExitedByTimeout[] = WDT_BITE_STR;
-                char buf[BASH_READ_BUF];
-                int rc, count = 0;
-                bool once_flag = true;
-                std::string result;
-                auto sendFallback = std::make_shared<std::atomic_bool>(true);
+                std::thread sendResThread([&bot, message, command] {
+                    static const char kExitedByTimeout[] = WDT_BITE_STR;
+                    char buf[BASH_READ_BUF];
+                    int rc, count = 0;
+                    bool once_flag = true;
+                    std::string result;
+                    auto sendFallback = std::make_shared<std::atomic_bool>(true);
 
-                SendCommand(command);
+                    SendCommand(command);
 
-                // Write a msg as a fallback if read() hangs
-                std::thread th([sendFallback] {
-                    std_sleep_s(SLEEP_SECONDS);
-                    if (sendFallback->load())
-                        (void)write(child_stdout, kExitedByTimeout, sizeof(kExitedByTimeout));
-                });
-                // When rc < 0, most likely it returned EWOUDLBLOCK/EAGAIN
-                do {
-                    rc = read(parent_readfd, buf, sizeof(buf));
-                    if (rc > 0) {
-                        std::string buf_str(buf, rc);
-                        // Cuz of the shim of "\n", since it is a sperate process,
-                        // may not be read in the same buffer. TODO Remove dirty way
-                        if (isEmptyOrBlank(buf_str) && once_flag) {
-                            // TODO This is a hack
-                            rc = sizeof(buf);
-                            once_flag = false;
-                        } else if (count < BASH_MAX_BUF) {
-                            result.append(buf_str);
-                            count += rc;
+                    // Write a msg as a fallback if read() hangs
+                    std::thread th([sendFallback] {
+                        std_sleep_s(SLEEP_SECONDS);
+                        if (sendFallback->load())
+                            (void)write(child_stdout, kExitedByTimeout, sizeof(kExitedByTimeout));
+                    });
+                    // When rc < 0, most likely it returned EWOUDLBLOCK/EAGAIN
+                    do {
+                        rc = read(parent_readfd, buf, sizeof(buf));
+                        if (rc > 0) {
+                            std::string buf_str(buf, rc);
+                            // Cuz of the shim of "\n", since it is a sperate process,
+                            // may not be read in the same buffer. TODO Remove dirty way
+                            if (isEmptyOrBlank(buf_str) && once_flag) {
+                                // TODO This is a hack
+                                rc = sizeof(buf);
+                                once_flag = false;
+                            } else if (count < BASH_MAX_BUF) {
+                                result.append(buf_str);
+                                count += rc;
+                            }
                         }
+                        // Exit if read ret != buf size
+                    } while (rc > 0 && rc == sizeof(buf));
+
+                    // Was it the fallback input?
+                    if (strncmp(buf, kExitedByTimeout, sizeof(buf))) {
+                        // No? then set to not write fallback and detach
+                        sendFallback->store(false);
+                        th.detach();
+                    } else {
+                        // Yes? Do join then
+                        if (th.joinable())
+                            th.join();
                     }
-                    // Exit if read ret != buf size
-                } while (rc > 0 && rc == sizeof(buf));
 
-                // Was it the fallback input?
-                if (strncmp(buf, kExitedByTimeout, sizeof(buf))) {
-                    // No? then set to not write fallback and detach
-                    sendFallback->store(false);
-                    th.detach();
-                } else {
-                    // Yes? Do join then
-                    if (th.joinable())
-                        th.join();
-                }
-
-                if (isEmptyOrBlank(result))
-                    result = "(No output)";
-                bot_sendReplyMessage(bot, message, result);
+                    if (isEmptyOrBlank(result))
+                        result = "(No output)";
+                    bot_sendReplyMessage(bot, message, result, 0, true);
+                });
+		sendResThread.detach();
             } else {
                 bot_sendReplyMessage(bot, message, "Failed to open child process");
             }
