@@ -11,7 +11,7 @@
 #include <SpamBlock.h>
 #include <TimerImpl.h>
 #include <Types.h>
-#include <random/RandomNumber.h>
+#include <random/RandomNumberGenerator.h>
 #include <tgbot/tgbot.h>
 #include <utils/LinuxPort.h>
 
@@ -212,8 +212,6 @@ int main(void) {
         std::string line, last;
         std::vector<std::string> vec;
         std::unordered_map<std::string, int> map;
-        std::random_device rd;
-        std::mt19937 gen(rd());
 
         int numlines = 1;
         for (const char c : message->text) {
@@ -230,7 +228,7 @@ int main(void) {
             bot_sendReplyMessage(bot, message, "Give more than 1 choice");
             return;
         }
-        std::shuffle(vec.begin(), vec.end(), gen);
+        shuffleStringArray(vec);
         out << "Total " << vec.size() << " items" << std::endl;
         last = vec.back();
         vec.pop_back();

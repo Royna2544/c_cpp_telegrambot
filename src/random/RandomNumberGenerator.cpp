@@ -2,6 +2,7 @@
 #include <Logging.h>
 #include <RuntimeException.h>
 
+#include <algorithm>
 #include <cassert>
 #include <random>
 
@@ -9,7 +10,7 @@
 #include "RDRandEngine.h"
 
 template <class Generator>
-int genRandomNumberImpl(Generator& gen, const int min, const int max) {
+int genRandomNumberImpl(Generator gen, const int min, const int max) {
     if (min >= max) {
         throw runtime_errorf("min(%d) >= max(%d)", min, max);
     }
@@ -20,18 +21,28 @@ int genRandomNumberImpl(Generator& gen, const int min, const int max) {
 struct RNGType {
     bool (*supported)(void);
     int (*generate)(const int min, const int max);
+    // TODO: Make it accept generic types
+    void (*shuffle) (std::vector<std::string>& in);
     const char* name;
 };
 
-static int RNG_std_generate(const int min, const int max) {
+static std::mt19937 RNG_std_create_rng(void) {
     std::random_device rd;
     std::mt19937 gen(rd());
     WARN_ONCE(rd.entropy() == 0, "Pesudo RNG detected");
-    return genRandomNumberImpl(gen, min, max);
+    return gen;
+}
+
+static inline int RNG_std_generate(const int min, const int max) {
+    return genRandomNumberImpl(RNG_std_create_rng(), min, max);
 }
 
 static bool RNG_std_supported(void) {
     return true;
+}
+
+static void RNG_std_shuffle(std::vector<std::string>& in) {
+    std::shuffle(in.begin(), in.end(), RNG_std_create_rng());
 }
 
 #ifdef RDRAND_MAYBE_SUPPORTED
@@ -49,6 +60,10 @@ static bool RNG_rdrand_supported(void) {
     }
     return BIT_SET(ecx, 30);
 }
+
+static void RNG_rdrand_shuffle(std::vector<std::string>& in) {
+    std::shuffle(in.begin(), in.end(), rdrand_engine());
+}
 #endif
 
 #ifdef KERNELRAND_MAYBE_SUPPORTED
@@ -60,6 +75,10 @@ static int RNG_kernrand_generate(const int min, const int max) {
 static bool RNG_kernrand_supported(void) {
     return kernel_rand_engine::isSupported();
 }
+
+static void RNG_kernrand_shuffle(std::vector<std::string>& in) {
+    std::shuffle(in.begin(), in.end(), kernel_rand_engine());
+}
 #endif
 
 struct RNGType RNGs[] = {
@@ -67,6 +86,7 @@ struct RNGType RNGs[] = {
     {
         .supported = RNG_rdrand_supported,
         .generate = RNG_rdrand_generate,
+        .shuffle = RNG_rdrand_shuffle,
         .name = "X86 RDRAND instr. HWRNG (Intel/AMD)",
     },
 #endif
@@ -74,17 +94,19 @@ struct RNGType RNGs[] = {
     {
         .supported = RNG_kernrand_supported,
         .generate = RNG_kernrand_generate,
+        .shuffle = RNG_kernrand_shuffle,
         .name = "Linux/MacOS hwrng interface",
     },
 #endif
     {
         .supported = RNG_std_supported,
         .generate = RNG_std_generate,
+        .shuffle = RNG_std_shuffle,
         .name = "libstdc++ pesudo RNG",
     },
 };
 
-int genRandomNumber(const int min, const int max) {
+static RNGType* getRNG(void) {
     static RNGType* rng = nullptr;
 
     if (!rng) {
@@ -97,11 +119,20 @@ int genRandomNumber(const int min, const int max) {
             }
         }
         // We don't really need fallback, as libc++'s rng is always supported
+	// But this looks better
         assert(rng != nullptr);
     }
-    return rng->generate(min, max);
+    return rng;
+}
+
+int genRandomNumber(const int min, const int max) {
+    return getRNG()->generate(min, max);
 }
 
 int genRandomNumber(const int max) {
     return genRandomNumber(0, max);
+}
+
+void shuffleStringArray(std::vector<std::string>& in) {
+    getRNG()->shuffle(in);
 }

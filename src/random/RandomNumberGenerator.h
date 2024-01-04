@@ -1,5 +1,7 @@
 #pragma once
 
+#include <vector>
+
 /**
  * genRandomNumber - Generate random number given a range.
  * Conditionally uses platform-specific RNG.
@@ -19,3 +21,5 @@ int genRandomNumber(const int min, const int max);
  * @return Generated number
  */
 int genRandomNumber(const int max);
+
+void shuffleStringArray(std::vector<std::string>& in);

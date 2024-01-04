@@ -2,7 +2,7 @@
 #include <Logging.h>
 #include <SocketConnectionHandler.h>
 #include <SpamBlock.h>
-#include <random/RandomNumber.h>
+#include <random/RandomNumberGenerator.h>
 #include <utils/libutils.h>
 
 #include <fstream>

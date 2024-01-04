@@ -39,7 +39,7 @@ set(SRC_LIST
     src/ExtArgs.cpp
     src/exithandlers/handler.cpp
     src/exithandlers/handler_${TARGET_VARIANT}.cpp
-    src/random/RandomNumber.cpp
+    src/random/RandomNumberGenerator.cpp
     src/SpamBlocker.cpp
     src/RegEXHandler.cpp
     src/TimerImpl.cpp)
