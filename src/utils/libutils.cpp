@@ -2,6 +2,7 @@
 #include "LinuxPort.h"
 
 #include <Logging.h>
+#include <StringToolsExt.h>
 #include <RuntimeException.h>
 #include <rapidjson/document.h>
 #include <rapidjson/rapidjson.h>
@@ -74,21 +75,20 @@ std::vector<std::string> getPathEnv() {
     return paths;
 }
 
-std::string findCommandExe(const std::string& command) {
-    static const bool is_windows = IS_DEFINED(__WIN32);
+std::string findCommandExe(std::string command) {
     static char buffer[PATH_MAX];
-    std::string _command = command;
-    if (is_windows)
-        _command.append(".exe");
+    if (IS_DEFINED(__WIN32))
+        command.append(".exe");
     for (const auto& path : getPathEnv()) {
-        if (path.empty()) continue;
-        memset(buffer, 0, sizeof(buffer));
-        size_t bytes = snprintf(buffer, sizeof(buffer), "%s%c%s",
-                                path.c_str(), dir_delimiter, _command.c_str());
-        if (bytes < sizeof(buffer))
-            buffer[bytes] = '\0';
-        if (canExecute(buffer))
-            return std::string(buffer);
+        if (!isEmptyOrBlank(path)) {
+            memset(buffer, 0, sizeof(buffer));
+            size_t bytes = snprintf(buffer, sizeof(buffer), "%s%c%s",
+                    path.c_str(), dir_delimiter, command.c_str());
+            if (bytes < sizeof(buffer)) {
+                if (canExecute(buffer))
+                    return std::string(buffer);
+            }
+        }
     }
     return {};
 }
@@ -110,14 +110,16 @@ std::string findCompiler(ProgrammingLangs lang) {
 bool runCommand(const std::string& command, std::string& result) {
     auto fp = popen_watchdog(command.c_str(), nullptr);
     static char buffer[512] = {0};
-    if (!fp) return false;
-    while (fgets(buffer, sizeof(buffer), fp)) {
-        result += buffer;
-        memset(buffer, 0, sizeof(buffer));
+    if (fp) {
+        while (fgets(buffer, sizeof(buffer), fp)) {
+            result += buffer;
+            memset(buffer, 0, sizeof(buffer));
+        }
+        if (result.back() == '\n')
+            result.pop_back();
+        return true;
     }
-    if (result.back() == '\n')
-        result.pop_back();
-    return true;
+    return false;
 }
 
 std::string getSrcRoot() {
