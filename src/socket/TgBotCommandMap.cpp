@@ -1,5 +1,6 @@
-#include <sstream>
 #include <cassert>
+#include <mutex>
+#include <sstream>
 
 #include "TgBotSocket.h"
 
@@ -33,7 +34,6 @@ std::string toStr(TgBotCommand cmd) {
         }
     }
     assert(0);
-    __builtin_unreachable();
     return {};
 }
 
@@ -44,15 +44,25 @@ int toCount(TgBotCommand cmd) {
         }
     }
     assert(0);
-    __builtin_unreachable();
     return 0;
 }
 
 std::string toHelpText(void) {
-    std::stringstream help;
-    for (const auto &ent : kTgBotCommandStrMap) {
-        help << ent.second << ": value " << ent.first << ", Requires "
-             << toCount(ent.first) << " argument(s)" << std::endl;
-    }
-    return help.str();
+    static std::string helptext;
+    static std::once_flag once;
+
+    std::call_once(once, [] {
+        std::stringstream help;
+        for (const auto &ent : kTgBotCommandStrMap) {
+            int count = toCount(ent.first);
+
+            help << ent.second << ": value " << ent.first << ", Requires "
+                 << count << " argument";
+            if (count > 1)
+                help << "s";
+            help << std::endl;
+        }
+        helptext = help.str();
+    });
+    return helptext;
 }
