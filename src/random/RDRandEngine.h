@@ -20,7 +20,7 @@ class rdrand_engine {
     static constexpr result_type min() { return 0; }
     static constexpr result_type max() { return UINT32_MAX; }
 
-    result_type operator()() {
+    result_type operator()() const {
         result_type val;
         while (!_rdrand32_step(&val)) {
         }  // retry until success

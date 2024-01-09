@@ -21,7 +21,7 @@ struct kernel_rand_engine {
     static constexpr result_type min() { return 0; }
     static constexpr result_type max() { return UINT32_MAX; }
 
-    result_type operator()() {
+    result_type operator()() const {
         result_type val;
         read(fd, &val, sizeof(val));
         return val;

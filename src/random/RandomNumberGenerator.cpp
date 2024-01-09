@@ -24,6 +24,11 @@ return_type genRandomNumberImpl(Generator gen, const return_type min, const retu
     return distribution(gen);
 }
 
+template <class Engine, typename T>
+void ShuffleImpl(std::vector<T>& in, Engine e) {
+    std::shuffle(in.begin(), in.end(), e);
+}
+
 struct RNGType {
     std::function<bool(void)> supported;
     std::function<return_type(const return_type min, const return_type max)> generate;
@@ -48,7 +53,7 @@ static bool RNG_std_supported(void) {
 
 template <typename T>
 void RNG_std_shuffle(std::vector<T>& in) {
-    std::shuffle(in.begin(), in.end(), RNG_std_create_rng());
+    ShuffleImpl(in, RNG_std_create_rng());
 }
 
 #ifdef RDRAND_MAYBE_SUPPORTED
@@ -69,7 +74,7 @@ static bool RNG_rdrand_supported(void) {
 
 template <typename T>
 void RNG_rdrand_shuffle(std::vector<T>& in) {
-    std::shuffle(in.begin(), in.end(), rdrand_engine());
+    ShuffleImpl(in, rdrand_engine());
 }
 #endif
 
@@ -85,7 +90,7 @@ static bool RNG_kernrand_supported(void) {
 
 template <typename T>
 static void RNG_kernrand_shuffle(std::vector<T>& in) {
-    std::shuffle(in.begin(), in.end(), kernel_rand_engine());
+    ShuffleImpl(in, kernel_rand_engine());
 }
 #endif
 
