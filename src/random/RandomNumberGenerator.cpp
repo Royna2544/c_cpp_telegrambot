@@ -18,7 +18,7 @@ using return_type = random_return_type;
 template <class Generator>
 return_type genRandomNumberImpl(Generator gen, const return_type min, const return_type max) {
     if (min >= max) {
-        throw runtime_errorf("min(%d) >= max(%d)", min, max);
+        throw runtime_errorf("%s: Assert failed: min(%d) is bigger than max(%d)", __func__, min, max);
     }
     std::uniform_int_distribution<return_type> distribution(min, max);
     return distribution(gen);
@@ -103,14 +103,14 @@ struct RNGType RNGs[] = {
         .supported = RNG_kernrand_supported,
         .generate = RNG_kernrand_generate,
         .shuffle_string = RNG_kernrand_shuffle<std::string>,
-        .name = "Linux/MacOS hwrng interface",
+        .name = "Linux/MacOS HWRNG interface",
     },
 #endif
     {
         .supported = RNG_std_supported,
         .generate = RNG_std_generate,
         .shuffle_string = RNG_std_shuffle<std::string>,
-        .name = "libstdc++ pesudo RNG",
+        .name = "STD C++ pesudo RNG",
     },
 };
 
