@@ -1,6 +1,11 @@
 #pragma once
 
+#include <type_traits>
 #include <vector>
+
+// Retval type for random
+using random_return_type = long;
+static_assert(std::is_integral_v<random_return_type>);
 
 /**
  * genRandomNumber - Generate random number given a range.
@@ -11,7 +16,7 @@
  * @throws std::runtime_error if min >= max
  * @return Generated number
  */
-int genRandomNumber(const int min, const int max);
+random_return_type genRandomNumber(const random_return_type min, const random_return_type max);
 
 /**
  * Alias for genRandomNumber(int, int) with min parameter as 0
@@ -20,6 +25,13 @@ int genRandomNumber(const int min, const int max);
  * @throws std::runtime_error if min >= max
  * @return Generated number
  */
-int genRandomNumber(const int max);
+random_return_type genRandomNumber(const random_return_type max);
 
+/**
+ * shuffleStringArray - Shuffle a string vector
+ * Conditionally uses platform-specific RNG.
+ *
+ * @param in in vector
+ * @return void
+ */
 void shuffleStringArray(std::vector<std::string>& in);

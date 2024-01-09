@@ -4,25 +4,30 @@
 
 #include <algorithm>
 #include <cassert>
+#include <functional>
 #include <random>
 
+#include "RandomNumberGenerator.h"
 #include "KernelRandEngine.h"
 #include "RDRandEngine.h"
 
+template <typename T>
+using shuffle_handle_t = std::function<void(std::vector<T> &)>;
+using return_type = random_return_type;
+
 template <class Generator>
-int genRandomNumberImpl(Generator gen, const int min, const int max) {
+return_type genRandomNumberImpl(Generator gen, const return_type min, const return_type max) {
     if (min >= max) {
         throw runtime_errorf("min(%d) >= max(%d)", min, max);
     }
-    std::uniform_int_distribution<int> distribution(min, max);
+    std::uniform_int_distribution<return_type> distribution(min, max);
     return distribution(gen);
 }
 
 struct RNGType {
-    bool (*supported)(void);
-    int (*generate)(const int min, const int max);
-    // TODO: Make it accept generic types
-    void (*shuffle) (std::vector<std::string>& in);
+    std::function<bool(void)> supported;
+    std::function<return_type(const return_type min, const return_type max)> generate;
+    shuffle_handle_t<std::string> shuffle_string;
     const char* name;
 };
 
@@ -33,7 +38,7 @@ static std::mt19937 RNG_std_create_rng(void) {
     return gen;
 }
 
-static inline int RNG_std_generate(const int min, const int max) {
+static return_type RNG_std_generate(const return_type min, const return_type max) {
     return genRandomNumberImpl(RNG_std_create_rng(), min, max);
 }
 
@@ -41,12 +46,13 @@ static bool RNG_std_supported(void) {
     return true;
 }
 
-static void RNG_std_shuffle(std::vector<std::string>& in) {
+template <typename T>
+void RNG_std_shuffle(std::vector<T>& in) {
     std::shuffle(in.begin(), in.end(), RNG_std_create_rng());
 }
 
 #ifdef RDRAND_MAYBE_SUPPORTED
-static int RNG_rdrand_generate(const int min, const int max) {
+static int RNG_rdrand_generate(const return_type min, const return_type max) {
     rdrand_engine gen;
     return genRandomNumberImpl(gen, min, max);
 }
@@ -61,14 +67,15 @@ static bool RNG_rdrand_supported(void) {
     return BIT_SET(ecx, 30);
 }
 
-static void RNG_rdrand_shuffle(std::vector<std::string>& in) {
+template <typename T>
+void RNG_rdrand_shuffle(std::vector<T>& in) {
     std::shuffle(in.begin(), in.end(), rdrand_engine());
 }
 #endif
 
 #ifdef KERNELRAND_MAYBE_SUPPORTED
-static int RNG_kernrand_generate(const int min, const int max) {
-    kernel_rand_engine gen;
+static return_type RNG_kernrand_generate(const return_type min, const return_type max) {
+    static kernel_rand_engine gen;
     return genRandomNumberImpl(gen, min, max);
 }
 
@@ -76,7 +83,8 @@ static bool RNG_kernrand_supported(void) {
     return kernel_rand_engine::isSupported();
 }
 
-static void RNG_kernrand_shuffle(std::vector<std::string>& in) {
+template <typename T>
+static void RNG_kernrand_shuffle(std::vector<T>& in) {
     std::shuffle(in.begin(), in.end(), kernel_rand_engine());
 }
 #endif
@@ -86,7 +94,7 @@ struct RNGType RNGs[] = {
     {
         .supported = RNG_rdrand_supported,
         .generate = RNG_rdrand_generate,
-        .shuffle = RNG_rdrand_shuffle,
+        .shuffle_string = RNG_rdrand_shuffle<std::string>,
         .name = "X86 RDRAND instr. HWRNG (Intel/AMD)",
     },
 #endif
@@ -94,14 +102,14 @@ struct RNGType RNGs[] = {
     {
         .supported = RNG_kernrand_supported,
         .generate = RNG_kernrand_generate,
-        .shuffle = RNG_kernrand_shuffle,
+        .shuffle_string = RNG_kernrand_shuffle<std::string>,
         .name = "Linux/MacOS hwrng interface",
     },
 #endif
     {
         .supported = RNG_std_supported,
         .generate = RNG_std_generate,
-        .shuffle = RNG_std_shuffle,
+        .shuffle_string = RNG_std_shuffle<std::string>,
         .name = "libstdc++ pesudo RNG",
     },
 };
@@ -125,14 +133,14 @@ static RNGType* getRNG(void) {
     return rng;
 }
 
-int genRandomNumber(const int min, const int max) {
+return_type genRandomNumber(const return_type min, const return_type max) {
     return getRNG()->generate(min, max);
 }
 
-int genRandomNumber(const int max) {
+return_type genRandomNumber(const return_type max) {
     return genRandomNumber(0, max);
 }
 
 void shuffleStringArray(std::vector<std::string>& in) {
-    getRNG()->shuffle(in);
+    getRNG()->shuffle_string(in);
 }
