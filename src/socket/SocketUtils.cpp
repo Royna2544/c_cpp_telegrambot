@@ -8,17 +8,13 @@
 
 static int makeSocket(bool is_client) {
     int ret = -1;
-    if (!is_client && access(SOCKET_PATH, F_OK) == 0) {
-        if (unlink(SOCKET_PATH) != 0) {
-            LOG_E("Failed to remove existing socket file");
-            return ret;
-        }
+    if (!is_client) {
         LOG_D("Creating socket at " SOCKET_PATH);
     }
     struct sockaddr_un name {};
     const int sfd = socket(AF_LOCAL, SOCK_STREAM, 0);
     if (sfd < 0) {
-        LOG_E("Failed to create socket");
+        PLOG_E("Failed to create socket");
         return ret;
     }
 
@@ -28,7 +24,7 @@ static int makeSocket(bool is_client) {
     const size_t size = SUN_LEN(&name);
     decltype(&connect) fn = is_client ? connect : bind;
     if (fn(sfd, reinterpret_cast<struct sockaddr*>(&name), size) != 0) {
-        LOG_E("Failed to %s to socket", is_client ? "connect" : "bind");
+        PLOG_E("Failed to %s to socket", is_client ? "connect" : "bind");
         return ret;
     }
     ret = sfd;
@@ -39,7 +35,7 @@ void startListening(const listener_callback_t& cb) {
     const int sfd = makeSocket(false);
     if (sfd < 0) return;
     if (listen(sfd, 1) < 0) {
-        LOG_E("Failed to listen to socket");
+        PLOG_E("Failed to listen to socket");
         return;
     }
     LOG_I("Listening on " SOCKET_PATH);
@@ -66,7 +62,7 @@ void startListening(const listener_callback_t& cb) {
             LOG_D("Received buf with %s, invoke callback!", toStr(conn.cmd).c_str());
             cb(conn);
         } else {
-            LOG_E("While reading from socket, %s", strerror(errno));
+            PLOG_E("Failed to read from socket");
         }
         close(cfd);
     }
@@ -79,7 +75,7 @@ void writeToSocket(const struct TgBotConnection& conn) {
     if (sfd >= 0) {
         const int count = write(sfd, &conn, sizeof(conn));
         if (count < 0) {
-            LOG_W("While writing to socket, %s", strerror(errno));
+            PLOG_E("Failed to write to socket");
         }
         close(sfd);
     }
