@@ -132,11 +132,18 @@ int main(int argc, char** argv) {
                         copyToStrBuf(data.filepath, argv[2]);
                         data_g.data_5 = data;
                     } break;
+                    case CMD_OBSERVE_ALL_CHATS: {
+                        TgBotCommandData::ObserveAllChats data;
+                        ret = stob_or(argv[0], &data);
+                        data_g.data_6 = data;
+                    } break;
                     case CMD_MAX:
                         break;
                     default:
                         throw runtime_errorf("Unhandled command value: %d!", cmd);
                 };
+                if (!ret)
+                    fprintf(stderr, "Failed parsing arguments for %s\n", toStr(cmd).c_str());
             }
         }
     }

@@ -339,7 +339,7 @@ int main(void) {
     gBot.getEvents().onAnyMessage([](const Message::Ptr &msg) {
         if (!gAuthorized) return;
 #ifdef SOCKET_CONNECTION
-        if (!gObservedChatIds.empty())
+        if (!gObservedChatIds.empty() || gObserveAllChats)
             processObservers(msg);
 #endif
         if (!msg->text.empty())

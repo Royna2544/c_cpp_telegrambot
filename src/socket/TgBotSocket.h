@@ -21,6 +21,7 @@ enum TgBotCommand {
     CMD_CTRL_SPAMBLOCK,
     CMD_OBSERVE_CHAT_ID,
     CMD_SEND_FILE_TO_CHAT_ID,
+    CMD_OBSERVE_ALL_CHATS,
     CMD_MAX,
 };
 
@@ -69,6 +70,7 @@ struct SendFileToChatId {
     char filepath[PATH_MAX];  // Path to file
 };
 
+using ObserveAllChats = bool;
 }  // namespace TgBotCommandData
 
 union TgBotCommandUnion {
@@ -77,6 +79,7 @@ union TgBotCommandUnion {
     TgBotCommandData::CtrlSpamBlock data_3;
     TgBotCommandData::ObserveChatId data_4;
     TgBotCommandData::SendFileToChatId data_5;
+    TgBotCommandData::ObserveAllChats data_6;
 };
 
 struct TgBotConnection {

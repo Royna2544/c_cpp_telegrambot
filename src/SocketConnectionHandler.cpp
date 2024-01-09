@@ -6,6 +6,7 @@
 #include <utils/libutils.h>
 
 #include <fstream>
+
 #include "socket/TgBotSocket.h"
 #include "tgbot/types/InputFile.h"
 
@@ -28,6 +29,10 @@ void socketConnectionHandler(const Bot& bot, struct TgBotConnection conn) {
         case CMD_OBSERVE_CHAT_ID: {
             auto it = std::find(gObservedChatIds.begin(), gObservedChatIds.end(), _data.data_4.id);
             bool observe = _data.data_4.observe;
+            if (gObserveAllChats) {
+                LOG_W("CMD_OBSERVE_CHAT_ID disabled due to CMD_OBSERVE_ALL_CHATS");
+                break;
+            }
             if (it == gObservedChatIds.end()) {
                 if (observe) {
                     LOG_D("Adding chat to observer");
@@ -90,6 +95,9 @@ void socketConnectionHandler(const Bot& bot, struct TgBotConnection conn) {
             } catch (const TgBot::TgException& e) {
                 LOG_E("Exception at handler, %s", e.what());
             }
+        } break;
+        case CMD_OBSERVE_ALL_CHATS: {
+            gObserveAllChats = _data.data_6;
         } break;
         default:
             LOG_E("Unhandled cmd: %s", toStr(conn.cmd).c_str());

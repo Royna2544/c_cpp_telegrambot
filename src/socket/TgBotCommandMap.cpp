@@ -17,14 +17,16 @@ const auto kTgBotCommandStrMap = make_array<ConstArrayElem<TgBotCommand, std::st
     ENUM_STR(CMD_WRITE_MSG_TO_CHAT_ID),
     ENUM_STR(CMD_CTRL_SPAMBLOCK),
     ENUM_STR(CMD_OBSERVE_CHAT_ID),
-    ENUM_STR(CMD_SEND_FILE_TO_CHAT_ID)
+    ENUM_STR(CMD_SEND_FILE_TO_CHAT_ID),
+    ENUM_STR(CMD_OBSERVE_ALL_CHATS)
 );
 
 const auto kTgBotCommandArgsCount = make_array<ConstArrayElem<TgBotCommand, int>, CMD_MAX - 1>(
     ARGUMENT_SIZE(CMD_WRITE_MSG_TO_CHAT_ID, 2),  // chatid, msg
     ARGUMENT_SIZE(CMD_CTRL_SPAMBLOCK, 1),        // policy
     ARGUMENT_SIZE(CMD_OBSERVE_CHAT_ID, 2),       // chatid, policy
-    ARGUMENT_SIZE(CMD_SEND_FILE_TO_CHAT_ID, 3)   // chatid, type, filepath
+    ARGUMENT_SIZE(CMD_SEND_FILE_TO_CHAT_ID, 3),  // chatid, type, filepath
+    ARGUMENT_SIZE(CMD_OBSERVE_ALL_CHATS, 1)      // policy
 );
 
 std::string toStr(TgBotCommand cmd) {

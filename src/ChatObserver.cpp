@@ -4,8 +4,36 @@
 #include <iostream>
 
 using TgBot::Chat;
+using TgBot::User;
 
 std::vector<ChatId> gObservedChatIds;
+bool gObserveAllChats = false;
+
+static void printChatMsg(const Message::Ptr& msg, const User::Ptr& from) {
+    std::string msgtext;
+    if (msg->sticker)
+        msgtext = "Sticker";
+    else if (msg->animation)
+        msgtext = "GIF";
+    else if (!msg->photo.empty())
+        msgtext = "Photo";
+    else if (msg->document)
+        msgtext = "File";
+    else if (msg->video)
+        msgtext = "Video";
+    else if (msg->dice)
+        msgtext = "(Dice) " + msg->dice->emoji;
+    else
+        msgtext = msg->text;
+    std::string userfullname = from->firstName;
+    if (!from->lastName.empty())
+        userfullname += ' ' + from->lastName;
+    std::cout << "[ChatObserveLog] ";
+    if (!msg->chat->title.empty())
+        std::cout << "Chat '" << msg->chat->title << "': ";
+    std::cout << userfullname << " (@" << from->username
+              << "): " << msgtext << std::endl;
+}
 
 void processObservers(const Message::Ptr& msg) {
     auto chat = msg->chat;
@@ -19,27 +47,7 @@ void processObservers(const Message::Ptr& msg) {
                 gObservedChatIds.erase(it);
                 return;
             }
-            std::string msgtext;
-            if (msg->sticker)
-                msgtext = "Sticker";
-            else if (msg->animation)
-                msgtext = "GIF";
-            else if (!msg->photo.empty())
-                msgtext = "Photo";
-            else if (msg->document)
-                msgtext = "File";
-            else if (msg->video)
-                msgtext = "Video";
-            else if (msg->dice)
-                msgtext = "(Dice) " + msg->dice->emoji;
-            else
-                msgtext = msg->text;
-            std::string userfullname = from->firstName;
-            if (!from->lastName.empty())
-                userfullname += ' ' + from->lastName;
-            std::cout << "Chat '" << chat->title << "': "
-                      << userfullname << " (@" << from->username
-                      << "): " << msgtext << std::endl;
         }
+        printChatMsg(msg, from);
     }
 }
