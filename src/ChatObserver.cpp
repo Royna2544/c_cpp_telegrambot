@@ -11,6 +11,9 @@ bool gObserveAllChats = false;
 
 static void printChatMsg(const Message::Ptr& msg, const User::Ptr& from) {
     std::string msgtext;
+    std::string userfullname = from->firstName;
+    std::string chatname = msg->chat->title;
+
     if (msg->sticker)
         msgtext = "Sticker";
     else if (msg->animation)
@@ -25,13 +28,13 @@ static void printChatMsg(const Message::Ptr& msg, const User::Ptr& from) {
         msgtext = "(Dice) " + msg->dice->emoji;
     else
         msgtext = msg->text;
-    std::string userfullname = from->firstName;
     if (!from->lastName.empty())
         userfullname += ' ' + from->lastName;
-    std::cout << "[ChatObserveLog] ";
-    if (!msg->chat->title.empty())
-        std::cout << "Chat '" << msg->chat->title << "': ";
-    std::cout << userfullname << " (@" << from->username
+    if (chatname.empty())
+       chatname = "Bot PM";
+
+    std::cout << "[ChatObserveLog][" << chatname << "] "
+              << userfullname << " (@" << from->username
               << "): " << msgtext << std::endl;
 }
 
