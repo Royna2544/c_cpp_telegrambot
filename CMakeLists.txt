@@ -2,9 +2,9 @@ cmake_minimum_required(VERSION 3.10.2)
 project(tg_cpphost)
 
 option(ENFORCE_EN_US "Enforce en-US locale for output" ON)
+option(ENABLE_SOCKET_CONNECT "Enable doing various operations with bot" ON)
 if(NOT WIN32)
   option(ENABLE_RUNTIME_COMMAND "Enable runtime loader of commands" ON)
-  option(ENABLE_SOCKET_CONNECT "Enable doing various operations with bot" ON)
 endif()
 try_compile(IS_NOT_X86 ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/cmake/tests/testX86.c)
 if (NOT IS_NOT_X86)
@@ -65,11 +65,14 @@ endif()
 
 if(ENABLE_SOCKET_CONNECT)
   add_definitions(-DSOCKET_CONNECTION)
-  add_library(TgBotSocket STATIC src/socket/SocketUtils.cpp
+  add_library(TgBotSocket STATIC src/socket/SocketUtils_${TARGET_VARIANT}.cpp
                                  src/socket/TgBotCommandMap.cpp)
   set(SRC_LIST src/SocketConnectionHandler.cpp src/ChatObserver.cpp ${SRC_LIST})
   add_executable(tgbotsocket_cli src/socket/TgBotSocketClient.cpp)
   target_link_libraries(tgbotsocket_cli TgBotSocket)
+  if (WIN32)
+    target_link_libraries(tgbotsocket_cli Ws2_32)
+  endif()
 endif()
 
 # TgBot lib + Boost warning

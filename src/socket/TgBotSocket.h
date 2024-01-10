@@ -9,10 +9,12 @@
 #include <unordered_map>
 #include <utility>
 
-#ifndef __ANDROID__
-#define SOCKET_PATH "/tmp/tgbot_sock"
-#else
+#ifdef __ANDROID__
 #define SOCKET_PATH "/data/data/com.termux/files/usr/tmp/tgbot_sock"
+#elif defined __WIN32
+#define SOCKET_PATH "C:\\Temp\\tgbot.sock"
+#else
+#define SOCKET_PATH "/tmp/tgbot_sock"
 #endif
 
 enum TgBotCommand {
@@ -90,4 +92,4 @@ struct TgBotConnection {
 using listener_callback_t = std::function<void(struct TgBotConnection)>;
 
 void startListening(const listener_callback_t &cb);
-void writeToSocket(const struct TgBotConnection &conn);
+void writeToSocket(struct TgBotConnection conn);
