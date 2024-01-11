@@ -23,6 +23,7 @@ add_definitions(-DPWD_REPLACE_STR="${PWD_REPLACE}")
 add_compile_options(
   -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/=${PWD_REPLACE})
 
+include_directories(src/include/third-party)
 include_directories(src/include)
 include_directories(src/)
 
