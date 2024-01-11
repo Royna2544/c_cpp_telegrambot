@@ -87,8 +87,9 @@ target_include_directories(TgBotRes PRIVATE .)
 # Utils library
 add_library(
   TgBotUtils STATIC
-  src/utils/libutils.cpp src/popen_wdt/popen_wdt_${TARGET_VARIANT}.c
-  src/utils/libutils_${TARGET_VARIANT}.cpp)
+  src/popen_wdt/popen_wdt_${TARGET_VARIANT}.c
+  src/popen_wdt/popen_wdt_lib.cpp
+  src/fslib/FileSystemLib_${TARGET_VARIANT}.cpp)
 
 # Windows needs this
 if(WIN32)

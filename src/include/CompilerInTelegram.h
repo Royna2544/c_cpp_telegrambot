@@ -26,3 +26,19 @@ void CompileRunHandler(const T &data);
 // Read buffer size, max allowed buffer size
 constexpr const static inline auto BASH_READ_BUF = (1 << 8);
 constexpr const static inline auto BASH_MAX_BUF = (BASH_READ_BUF << 2) * 3;
+
+enum ProgrammingLangs {
+    C,
+    CXX,
+    GO,
+    PYTHON,
+};
+
+/**
+ * findCompiler - find compiler's absolute path
+ * 
+ * @param lang ProgrammingLangs enum value to query
+ * @param path Search result is stored, if found, else untouched
+ * @return Whether it have found the compiler path
+ */
+bool findCompiler(ProgrammingLangs lang, std::string& path);

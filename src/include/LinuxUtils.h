@@ -2,7 +2,8 @@
 
 #include <Logging.h>  // LOG_W
 
-#include "config.h"
+#include "third-party/linux/config.h"
+
 #define IS_DEFINED IS_BUILTIN
 
 #define unlikely(x) __builtin_expect(!!(x), 0)

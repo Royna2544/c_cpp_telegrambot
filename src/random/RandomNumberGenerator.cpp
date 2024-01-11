@@ -1,4 +1,4 @@
-#include <../utils/LinuxPort.h>
+#include <LinuxUtils.h>
 #include <Logging.h>
 #include <RuntimeException.h>
 
@@ -132,7 +132,7 @@ static RNGType* getRNG(void) {
             }
         }
         // We don't really need fallback, as libc++'s rng is always supported
-	// But this looks better
+        // But this looks better
         assert(rng != nullptr);
     }
     return rng;

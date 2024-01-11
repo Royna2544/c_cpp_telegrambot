@@ -1,6 +1,5 @@
 #include <BotAddCommand.h>
 #include <Logging.h>
-#include <utils/libutils.h>
 
 #include <dlfcn.h>
 #include <vector>
@@ -65,8 +64,7 @@ void loadOneCommand(Bot& bot, const std::string& fname) {
         fnptr = info.dli_saddr;
     }
     LOG_I("Loaded RT command module from %s", fname.c_str());
-    LOG_I("Module dump: { enforced: %d, name: %s, fn: %p }", sym->enforced, sym->name,
-          (void*)fnptr);
+    LOG_I("Module dump: { enforced: %d, name: %s, fn: %p }", sym->enforced, sym->name, fnptr);
 }
 
 void loadCommandsFromFile(Bot& bot, const std::string& filename) {

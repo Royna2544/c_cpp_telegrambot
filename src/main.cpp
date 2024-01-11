@@ -12,11 +12,14 @@
 #include <SpamBlock.h>
 #include <TimerImpl.h>
 #include <Types.h>
+#include <FileSystemLib.h>
+#include <popen_wdt/popen_wdt.h>
 #include <random/RandomNumberGenerator.h>
 #include <tgbot/tgbot.h>
 
 #include <algorithm>
 #include <boost/algorithm/string/replace.hpp>
+#include <boost/config.hpp>
 #include <chrono>
 #include <exception>
 #include <fstream>
@@ -43,7 +46,6 @@
 #endif
 
 #include "exithandlers/handler.h"
-#include "utils/libutils.h"
 
 // tgbot
 using TgBot::StickerSet;
@@ -127,7 +129,7 @@ int main(void) {
                     throw runtime_errorf("Command failed: %s", cmd.second.c_str());
                 }
             }
-            compilerver = getCompileVersion();
+            compilerver = std::string(BOOST_PLATFORM " | " BOOST_COMPILER " | " __DATE__);
             ASSIGN_INCTXT_DATA(AboutHtmlText, version);
 #define REPLACE_PLACEHOLDER(buf, name) boost::replace_all(buf, "_" #name "_", name)
             REPLACE_PLACEHOLDER(version, commitid);

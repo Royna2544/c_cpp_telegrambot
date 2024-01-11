@@ -1,14 +1,16 @@
 #include <Authorization.h>
 #include <BotReplyMessage.h>
 #include <CompilerInTelegram.h>
+#include <FileSystemLib.h>
 #include <ExtArgs.h>
+#include <LinuxUtils.h>
 #include <Logging.h>
 #include <NamespaceImport.h>
-#include <utils/libutils.h>
-#include <utils/LinuxPort.h>
+#include <StringToolsExt.h>
 
 #include <chrono>
 #include <fstream>
+#include <map>
 #include <mutex>
 #include <sstream>
 #include <thread>
@@ -200,4 +202,54 @@ void CompileRunHandler<BashHandleData>(const BashHandleData &data) {
         res = "Send a bash command to run";
     }
     commonCleanup(data.bot, data.message, res);
+}
+
+static std::string findCommandExe(std::string command) {
+    static char buffer[PATH_MAX];
+    size_t pos = 0;
+    std::vector<std::string> paths;
+    std::string path;
+    const char* path_c = getenv("PATH");
+    if (path_c) {
+        path = path_c;
+        if (path.find(path_env_delimiter) == std::string::npos)
+            paths.emplace_back(path);
+        else {
+            while ((pos = path.find(path_env_delimiter)) != std::string::npos) {
+                paths.emplace_back(path.substr(0, pos));
+                path.erase(0, pos + 1);
+            }
+        }
+        if (IS_DEFINED(__WIN32))
+            command.append(".exe");
+
+        for (const auto& path : paths) {
+            if (!isEmptyOrBlank(path)) {
+                memset(buffer, 0, sizeof(buffer));
+                size_t bytes = snprintf(buffer, sizeof(buffer), "%s%c%s",
+                        path.c_str(), dir_delimiter, command.c_str());
+                if (bytes < sizeof(buffer) && canExecute(buffer)) {
+                    return std::string(buffer);
+                }
+            }
+        }
+    }
+    return {};
+}
+
+bool findCompiler(ProgrammingLangs lang, std::string& path) {
+    static std::map<ProgrammingLangs, std::vector<std::string>> compilers = {
+        {ProgrammingLangs::C, {"clang", "gcc", "cc"}},
+        {ProgrammingLangs::CXX, {"clang++", "g++", "c++"}},
+        {ProgrammingLangs::GO, {"go"}},
+        {ProgrammingLangs::PYTHON, {"python", "python3"}},
+    };
+    for (const auto& options : compilers[lang]) {
+        auto ret = findCommandExe(options);
+        if (!ret.empty()) {
+            path = ret;
+            return true;
+        }
+    }
+    return false;
 }

@@ -2,16 +2,52 @@
 #include <Logging.h>
 #include <SocketConnectionHandler.h>
 #include <SpamBlock.h>
+#include <ResourceIncBin.h>
+#include <RuntimeException.h>
 #include <random/RandomNumberGenerator.h>
-#include <utils/libutils.h>
 
+#include <rapidjson/rapidjson.h>
+#include <rapidjson/document.h>
+
+#include <filesystem>
 #include <fstream>
+#include <mutex>
 
 #include "socket/TgBotSocket.h"
 #include "tgbot/types/InputFile.h"
 
 using TgBot::Api;
 using TgBot::InputFile;
+namespace fs = std::filesystem;
+
+static std::string getMIMEString(const std::string& path) {
+    static std::once_flag once;
+    static rapidjson::Document doc;
+    std::string extension = fs::path(path).extension().string();
+
+    std::call_once(once, [] {
+        std::string buf;
+        ASSIGN_INCTXT_DATA(MimeDataJson, buf);
+        doc.Parse(buf.c_str());
+        if (doc.HasParseError())
+            throw runtime_errorf("Failed to parse mimedata: %d", doc.GetParseError());
+    });
+    if (!extension.empty()) {
+        for (rapidjson::SizeType i = 0; i < doc.Size(); i++) {
+            const rapidjson::Value& oneJsonElement = doc[i];
+            const rapidjson::Value& availableTypes = oneJsonElement["types"].GetArray();
+            for (rapidjson::SizeType i = 0; i < availableTypes.Size(); i++) {
+                if (availableTypes[i].GetString() == extension) {
+                    auto mime = oneJsonElement["name"].GetString();
+                    LOG_D("Found MIME type: '%s'", mime);
+                    return mime;
+                }
+            }
+        }
+        LOG_W("Unknown file extension: '%s'", extension.c_str());
+    }
+    return "application/octet-stream";
+}
 
 void socketConnectionHandler(const Bot& bot, struct TgBotConnection conn) {
     auto _data = conn.data;
