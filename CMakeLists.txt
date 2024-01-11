@@ -32,6 +32,7 @@ if(WIN32)
 else()
   set(TARGET_VARIANT posix)
 endif()
+
 set(SRC_LIST
     src/main.cpp
     src/Authorization.cpp
@@ -79,6 +80,10 @@ endif()
 # TgBot lib + Boost warning
 add_definitions(-DBOOST_BIND_GLOBAL_PLACEHOLDERS)
 
+# Res library
+add_library(TgBotRes STATIC src/ResourceIncBin.cpp)
+target_include_directories(TgBotRes PRIVATE .)
+
 # Utils library
 add_library(
   TgBotUtils STATIC
@@ -89,6 +94,7 @@ add_library(
 if(WIN32)
   target_link_libraries(TgBotUtils shlwapi)
 endif()
+target_link_libraries(TgBotUtils TgBotRes)
 
 # TgBot-Cpp library
 add_subdirectory(lib)
@@ -100,7 +106,7 @@ endif()
 add_executable(${PROJECT_NAME} ${SRC_LIST})
 
 # Default LD-list
-set(LD_LIST TgBot TgBotUtils TgBotDB)
+set(LD_LIST TgBot TgBotDB TgBotUtils TgBotRes)
 
 # Socket
 if(ENABLE_SOCKET_CONNECT)

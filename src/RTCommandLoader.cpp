@@ -70,11 +70,12 @@ void loadOneCommand(Bot& bot, const std::string& fname) {
 }
 
 void loadCommandsFromFile(Bot& bot, const std::string& filename) {
-    std::string data, line;
-    ReadFileToString(filename, &data);
-    std::stringstream ss(data);
-    while (std::getline(ss, line)) {
-        static const std::string kModulesDir = "src/cmd_dynamic/";
-        loadOneCommand(bot, kModulesDir + line);
+    std::string line;
+    std::ifstream ifs(filename);
+    if (ifs) {
+        while (std::getline(ifs, line)) {
+            static const std::string kModulesDir = "src/cmd_dynamic/";
+            loadOneCommand(bot, kModulesDir + line);
+        }
     }
 }

@@ -13,9 +13,6 @@ enum ProgrammingLangs {
 std::string findCommandExe(std::string command);
 std::string findCompiler(ProgrammingLangs lang);
 
-// libbase
-bool ReadFileToString(const std::string& path, std::string* content);
-
 // Compile version
 std::string getCompileVersion();
 
@@ -36,9 +33,6 @@ bool getHomePath(std::string& buf);
 
 // Src path
 std::string getSrcRoot();
-static inline std::string getResourcePath(const std::string& filename) {
-    return getSrcRoot() + "/resources/" + filename;
-}
 
 // Command
 bool runCommand(const std::string& command, std::string& res);

@@ -3,6 +3,7 @@
 
 #include <Logging.h>
 #include <StringToolsExt.h>
+#include <ResourceIncBin.h>
 #include <RuntimeException.h>
 #include <rapidjson/document.h>
 #include <rapidjson/rapidjson.h>
@@ -27,33 +28,6 @@ namespace fs = std::filesystem;
 std::string getCompileVersion() {
     static std::string compileinfo(BOOST_PLATFORM " | " BOOST_COMPILER " | " __DATE__);
     return compileinfo;
-}
-
-bool ReadFileToString(const std::string& path, std::string* content) {
-    std::error_code ec;
-    std::ifstream ifs;
-    std::string str;
-    auto filesize = fs::file_size(path, ec);
-
-    if (ec) {
-        LOG_E("Failed to determine file size: '%s', %s", path.c_str(), ec.message().c_str());
-        return false;
-    }
-
-    ifs.exceptions(std::ifstream::badbit);
-    try {
-        ifs.open(path);
-    } catch (const std::ifstream::failure& e) {
-        LOG_E("Failed to open file: '%s', %s", path.c_str(), e.what());
-        return false;
-    }
-
-    content->clear();
-    content->reserve(filesize);
-    while (std::getline(ifs, str)) {
-        *content += str + '\n';
-    }
-    return true;
 }
 
 std::vector<std::string> getPathEnv() {
@@ -140,7 +114,7 @@ std::string getMIMEString(const std::string& path) {
 
     std::call_once(once, [] {
         std::string buf;
-        ReadFileToString(getResourcePath("mimeData.json"), &buf);
+        ASSIGN_INCTXT_DATA(MimeDataJson, buf);
         doc.Parse(buf.c_str());
         if (doc.HasParseError())
             throw runtime_errorf("Failed to parse mimedata: %d", doc.GetParseError());

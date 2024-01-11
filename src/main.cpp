@@ -8,12 +8,12 @@
 #include <NamespaceImport.h>
 #include <PrintableTime.h>
 #include <RegEXHandler.h>
+#include <ResourceIncBin.h>
 #include <SpamBlock.h>
 #include <TimerImpl.h>
 #include <Types.h>
 #include <random/RandomNumberGenerator.h>
 #include <tgbot/tgbot.h>
-#include <utils/LinuxPort.h>
 
 #include <algorithm>
 #include <boost/algorithm/string/replace.hpp>
@@ -112,6 +112,7 @@ int main(void) {
     bot_AddCommandPermissive(gBot, "alive", [](const Bot &bot, const Message::Ptr &message) {
         static std::string version;
         static std::once_flag once;
+
         std::call_once(once, [] {
             std::string commitid, commitmsg, originurl, compilerver;
 
@@ -127,7 +128,7 @@ int main(void) {
                 }
             }
             compilerver = getCompileVersion();
-            ReadFileToString(getResourcePath("about.html.txt"), &version);
+            ASSIGN_INCTXT_DATA(AboutHtmlText, version);
 #define REPLACE_PLACEHOLDER(buf, name) boost::replace_all(buf, "_" #name "_", name)
             REPLACE_PLACEHOLDER(version, commitid);
             REPLACE_PLACEHOLDER(version, commitmsg);
@@ -154,7 +155,7 @@ int main(void) {
             std::string buf, line;
             std::stringstream ss;
 
-            ReadFileToString(getResourcePath("flash.txt"), &buf);
+            ASSIGN_INCTXT_DATA(FlashTxt, buf);
             ss = std::stringstream(buf);
             while (std::getline(ss, line)) {
                 if (!line.empty())

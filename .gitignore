@@ -15,9 +15,10 @@ tg_cpphost
 dumpProtoDB
 tgbotsocket_cli
 # Lib
-libTgBotUtils.a
 libTgBotDB.a
+libTGBotRes.a
 libTgBotSocket.a
+libTgBotUtils.a
 # Cmake generated
 modules.load
 # Protobuf generated
