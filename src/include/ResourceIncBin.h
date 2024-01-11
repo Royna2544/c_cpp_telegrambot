@@ -1,3 +1,4 @@
+#define INCBIN_SILENCE_BITCODE_WARNING
 #include "third-party/incbin/incbin.h"
 
 #include <string>

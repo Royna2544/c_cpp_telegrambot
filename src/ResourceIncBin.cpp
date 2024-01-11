@@ -1,4 +1,4 @@
-#include <incbin/incbin.h>
+#include <ResourceIncBin.h>
 
 INCTXT(AboutHtmlText, "resources/about.html.txt");
 INCTXT(FlashTxt, "resources/flash.txt");
