@@ -1,11 +1,13 @@
 #include <ConfigManager.h>
-#include <Logging.h>
 #include <FileSystemLib.h>
+#include <Logging.h>
 
 #include <cstdlib>
 #include <fstream>
 #include <functional>
 #include <map>
+#include <mutex>
+#include <stdexcept>
 
 struct ConfigBackendBase {
     std::function<void *(void)> load;
@@ -46,7 +48,7 @@ static void *file_load(void) {
     }
     while (std::getline(ifs, line)) {
         std::string::size_type pos;
-	count++;
+        count++;
 
         if (pos = line.find('='); pos == std::string::npos) {
             LOG_E("Invalid line in config file: %zu", count);
@@ -75,31 +77,45 @@ static struct ConfigBackendBase backends[] = {
     {
         .load = env_load,
         .getVariable = env_getVariable,
-	.name = "Env",
+        .name = "Env",
     },
     {
         .load = file_load,
         .getVariable = file_getVariable,
-	.name = "File",
-    }
-};
+        .name = "File",
+    }};
 
 namespace ConfigManager {
 
-void load(void) {
-    for (size_t i = 0; i < sizeof(backends) / sizeof(ConfigBackendBase); ++i) {
-        backends[i].priv = backends[i].load();
+static bool load(void) {
+    static std::once_flag once;
+    try {
+        std::call_once(once, [] {
+            for (size_t i = 0; i < sizeof(backends) / sizeof(ConfigBackendBase); ++i) {
+                auto ptr = &backends[i];
+                if (!ptr->load || !ptr->getVariable) throw std::runtime_error("Not ready");
+                ptr->priv = ptr->load();
+            }
+        });
+    } catch (const std::runtime_error &) {
+        return false;
     }
+    return true;
 }
 
 bool getVariable(const std::string &name, std::string &outvalue) {
-    ConfigBackendBase* ptr;
-    for (size_t i = 0; i < sizeof(backends) / sizeof(ConfigBackendBase); ++i) {
-        ptr = &backends[i];
-        if (ptr->getVariable(ptr->priv, name, outvalue)) {
-           LOG_D("Used '%s' backend for fetching var '%s'", ptr->name, name.c_str());
-           return true;
-	}
+    ConfigBackendBase *ptr;
+
+    if (load()) {
+        for (size_t i = 0; i < sizeof(backends) / sizeof(ConfigBackendBase); ++i) {
+            ptr = &backends[i];
+            if (ptr->getVariable(ptr->priv, name, outvalue)) {
+                LOG_D("Used '%s' backend for fetching var '%s'", ptr->name, name.c_str());
+                return true;
+            }
+        }
+    } else {
+        LOG_E("Manager not ready: while loading '%s'", name.c_str());
     }
     return false;
 }

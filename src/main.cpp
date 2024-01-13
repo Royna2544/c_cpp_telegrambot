@@ -59,11 +59,11 @@ using database::whitelist;
 
 int main(void) {
     std::string token;
-    ConfigManager::load();
     if (!ConfigManager::getVariable("TOKEN", token)) {
 	 LOG_F("Failed to get TOKEN variable");
 	 return EXIT_FAILURE;
     }
+    database::db.load((getSrcRoot() + "/" + kDatabaseFile));
 
     static Bot gBot(token);
 

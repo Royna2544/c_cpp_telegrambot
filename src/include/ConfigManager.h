@@ -7,11 +7,6 @@
 namespace ConfigManager {
 
 /**
- * load - call-once initializer
- */
-void load(void);
-
-/**
  * getVariable - fetch variable name from manager
  *
  * @param name variable name

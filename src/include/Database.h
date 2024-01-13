@@ -1,14 +1,17 @@
 #pragma once
 
+#include <Logging.h>
 #include <TgBotDB.pb.h>
+#include <Types.h>
 #include <tgbot/Bot.h>
 #include <tgbot/types/Message.h>
-#include <Types.h>
 
 #include <fstream>
 #include <optional>
 
 #include "NamespaceImport.h"
+
+static inline const char kDatabaseFile[] = "tgbot.pb";
 
 namespace database {
 
@@ -44,32 +47,42 @@ class ProtoDatabase {
 };
 
 struct DatabaseWrapper {
-    DatabaseWrapper(const std::string fname) : fname(fname) {
-        std::fstream input(fname, std::ios::in | std::ios::binary);
-        assert(input);
-        protodb.ParseFromIstream(&input);
-    }
     ~DatabaseWrapper() {
         save();
     }
+    void load(const std::string& _fname) {
+        fname = _fname;
+        std::fstream input(fname, std::ios::in | std::ios::binary);
+        assert(input);
+        protodb.ParseFromIstream(&input);
+        loaded = true;
+    }
     void save(void) const {
-        std::fstream output(fname, std::ios::out | std::ios::trunc | std::ios::binary);
-        assert(output);
-        protodb.SerializeToOstream(&output);
+        if (warnNoLoaded()) {
+            std::fstream output(fname, std::ios::out | std::ios::trunc | std::ios::binary);
+            assert(output);
+            protodb.SerializeToOstream(&output);
+        }
     }
     Database* operator->(void) {
         return &protodb;
     }
     UserId maybeGetOwnerId() const {
-        if (protodb.has_ownerid())
+        if (warnNoLoaded() && protodb.has_ownerid())
             return protodb.ownerid();
         else
             return -1;
     }
 
    private:
+    bool warnNoLoaded(void) const {
+        if (!loaded)
+            LOG_W("Database not loaded");
+        return loaded;
+    }
     Database protodb;
     std::string fname;
+    bool loaded = false;
 };
 
 extern ProtoDatabase whitelist;

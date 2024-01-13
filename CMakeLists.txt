@@ -35,7 +35,6 @@ set(SRC_LIST
     src/main.cpp
     src/Authorization.cpp
     src/CompilerInTelegram.cpp
-    src/ConfigManager.cpp
     src/BotAddCommand.cpp
     src/ExtArgs.cpp
     src/signalhandler/SignalHandler_${TARGET_VARIANT}.cpp
@@ -86,6 +85,7 @@ target_include_directories(TgBotRes PRIVATE .)
 # Utils library
 add_library(
   TgBotUtils STATIC
+  src/ConfigManager.cpp
   src/popen_wdt/popen_wdt_${TARGET_VARIANT}.c
   src/popen_wdt/popen_wdt_lib.cpp
   src/fslib/FileSystemLib_${TARGET_VARIANT}.cpp)

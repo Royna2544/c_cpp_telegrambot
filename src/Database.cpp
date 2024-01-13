@@ -4,7 +4,7 @@
 
 namespace database {
 
-DatabaseWrapper db(getSrcRoot() + "/tgbot.pb");
+DatabaseWrapper db;
 
 static std::string appendListName(const std::string& op, const UserId id, const std::string& name) {
     return std::string("User") + ' ' + std::to_string(id) + ' ' + op + ' ' + name;
