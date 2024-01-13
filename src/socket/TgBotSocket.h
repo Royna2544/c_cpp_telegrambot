@@ -91,5 +91,5 @@ struct TgBotConnection {
 
 using listener_callback_t = std::function<void(struct TgBotConnection)>;
 
-void startListening(const listener_callback_t &cb);
+bool startListening(const listener_callback_t &cb);
 void writeToSocket(struct TgBotConnection conn);

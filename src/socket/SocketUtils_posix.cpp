@@ -35,12 +35,12 @@ static int makeSocket(bool is_client) {
     return ret;
 }
 
-void startListening(const listener_callback_t& cb) {
+bool startListening(const listener_callback_t& cb) {
     const int sfd = makeSocket(false);
     if (sfd >= 0) {
         if (listen(sfd, 1) < 0) {
             PLOG_E("Failed to listen to socket");
-            return;
+            return false;
         }
         LOG_I("Listening on " SOCKET_PATH);
         while (true) {
@@ -73,7 +73,9 @@ void startListening(const listener_callback_t& cb) {
         }
         close(sfd);
         unlink(SOCKET_PATH);
+        return true;
     }
+    return false;
 }
 
 void writeToSocket(struct TgBotConnection conn) {

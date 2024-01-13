@@ -352,8 +352,9 @@ int main(void) {
 
 #ifdef SOCKET_CONNECTION
     static std::thread th;
+    static bool socketSucceeded = true;
     th = std::thread([] {
-        startListening([](struct TgBotConnection conn) {
+        socketSucceeded = startListening([](struct TgBotConnection conn) {
             socketConnectionHandler(gBot, conn);
         });
     });
@@ -363,18 +364,20 @@ int main(void) {
 #endif
     static bool exited = false;
     static auto cleanupFunc = [](int s) {
-        if (exited) return;
-        LOG_I("Exiting with signal %d", s);
-        forceStopTimer();
-        database::db.save();
+        if (!exited) {
+            LOG_I("Exiting with signal %d", s);
+            forceStopTimer();
+            database::db.save();
 #ifdef SOCKET_CONNECTION
-        if (th.joinable()) {
-            writeToSocket({CMD_EXIT, {.data_2 = nullptr}});
-            th.join();
-        }
+            if (th.joinable()) {
+                if (socketSucceeded)
+                    writeToSocket({CMD_EXIT, {.data_2 = nullptr}});
+                th.join();
+            }
 #endif
-        exited = true;
-        std::exit(0);
+            exited = true;
+            std::exit(0);
+        }
     };
     installExitHandler(cleanupFunc);
     int64_t lastcrash = 0;

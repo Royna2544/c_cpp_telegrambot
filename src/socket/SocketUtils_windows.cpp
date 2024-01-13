@@ -47,12 +47,12 @@ static SOCKET makeSocket(bool is_client) {
     return fd;
 }
 
-void startListening(const listener_callback_t& cb) {
+bool startListening(const listener_callback_t& cb) {
     const SOCKET sfd = makeSocket(false);
     if (sfd != INVALID_SOCKET) {
         if (listen(sfd, SOMAXCONN) == SOCKET_ERROR) {
             WSALOG_E("Failed to listen to socket");
-            return;
+            return false;
         }
         LOG_I("Listening on " SOCKET_PATH);
         while (true) {
@@ -84,7 +84,9 @@ void startListening(const listener_callback_t& cb) {
             closesocket(cfd);
         }
         closesocket(sfd);
+        return true;
     }
+    return false;
 }
 
 void writeToSocket(struct TgBotConnection conn) {
