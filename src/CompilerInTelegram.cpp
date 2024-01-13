@@ -15,6 +15,7 @@
 #include <mutex>
 #include <sstream>
 #include <thread>
+#include <optional>
 
 #include "popen_wdt/popen_wdt.h"
 
@@ -58,12 +59,10 @@ static void addExtArgs(std::stringstream &cmd, std::string &extraargs,
 }
 
 static void runCommand(const Bot &bot, const Message::Ptr &message,
-                       const std::string &cmd, std::string &res, bool use_wdt = true) {
+                       std::string cmd, std::string &res, bool use_wdt = true) {
     bool hasmore = false, watchdog_bitten = false;
     int count = 0;
     char buf[BASH_READ_BUF] = {};
-    std::string cmd_r, cmd_remapped;
-    const char *cmd_cstr = nullptr;
 
 #ifdef LOCALE_EN_US
     static std::once_flag once;
@@ -71,24 +70,11 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
         setlocale_enus_once();
     });
 #endif
+    boost::replace_all(cmd, std::string(1, '"'), "\\\"");
 
-    if (cmd.find("\"") != std::string::npos) {
-        cmd_remapped.reserve(cmd.size());
-        for (cmd_cstr = cmd.c_str(); *cmd_cstr != '\0'; cmd_cstr++) {
-            if (*cmd_cstr == '"') {
-                cmd_remapped += '\"';
-            } else {
-                cmd_remapped += *cmd_cstr;
-            }
-        }
-        cmd_r = cmd_remapped;
-    } else {
-        cmd_r = cmd;
-    }
-
-    LOG_I("Command: %s", cmd_r.c_str());
+    LOG_I("Command: %s", cmd.c_str());
     auto start = high_resolution_clock::now();
-    auto fp = popen_watchdog(cmd_r.c_str(), use_wdt ? &watchdog_bitten : nullptr);
+    auto fp = popen_watchdog(cmd.c_str(), use_wdt ? &watchdog_bitten : nullptr);
 
     if (!fp) {
         bot_sendReplyMessage(bot, message, "Failed to popen()");
@@ -202,22 +188,12 @@ void CompileRunHandler<BashHandleData>(const BashHandleData &data) {
     commonCleanup(data.bot, data.message, res);
 }
 
-static std::string findCommandExe(std::string command) {
+static std::optional<std::string> findCommandExe(std::string command) {
     static char buffer[PATH_MAX];
-    size_t pos = 0;
-    std::vector<std::string> paths;
-    std::string path;
     const char* path_c = getenv("PATH");
+
     if (path_c) {
-        path = path_c;
-        if (path.find(path_env_delimiter) == std::string::npos)
-            paths.emplace_back(path);
-        else {
-            while ((pos = path.find(path_env_delimiter)) != std::string::npos) {
-                paths.emplace_back(path.substr(0, pos));
-                path.erase(0, pos + 1);
-            }
-        }
+        auto paths = StringTools::split(path_c, path_env_delimiter);
         if (IS_DEFINED(__WIN32))
             command.append(".exe");
 
@@ -227,7 +203,7 @@ static std::string findCommandExe(std::string command) {
                 size_t bytes = snprintf(buffer, sizeof(buffer), "%s%c%s",
                         path.c_str(), dir_delimiter, command.c_str());
                 if (bytes < sizeof(buffer) && canExecute(buffer)) {
-                    return std::string(buffer);
+                    return {std::string(buffer)};
                 }
             }
         }
@@ -244,8 +220,8 @@ bool findCompiler(ProgrammingLangs lang, std::string& path) {
     };
     for (const auto& options : compilers[lang]) {
         auto ret = findCommandExe(options);
-        if (!ret.empty()) {
-            path = ret;
+        if (ret) {
+            path = ret.value();
             return true;
         }
     }
