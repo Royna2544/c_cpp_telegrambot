@@ -133,4 +133,4 @@ target_link_libraries(${PROJECT_NAME} ${LD_LIST})
 
 # Protobuf DB Dumper
 add_executable(dumpProtoDB proto/DumpProtoDB.cc)
-target_link_libraries(dumpProtoDB ${LD_LIST})
+target_link_libraries(dumpProtoDB TgBotDB)
