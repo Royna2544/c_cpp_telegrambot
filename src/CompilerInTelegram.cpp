@@ -93,12 +93,10 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
         count++;
         std_sleep(50ms);
     }
-    std::string srcroot = std::filesystem::current_path(ec);
+    auto srcroot = std::filesystem::current_path(ec);
     if (!ec) {
-#ifdef __WIN32
-       boost::replace_all(srcroot, std::string(1, unix_dir_delimiter), std::string(1, dir_delimiter));
-#endif
-       boost::replace_all(res, srcroot, "");
+       srcroot.make_preferred();
+       boost::replace_all(res, srcroot.string(), "");
     }
     if (count == 0)
         res += std::string() + EMPTY + '\n';
@@ -155,12 +153,10 @@ void CompileRunHandler<CCppCompileHandleData>(const CCppCompileHandleData &data)
         runCommand(data.bot, data.message, cmd.str(), res);
         res += "\n";
 
-        std::ifstream aout(aoutname);
-        if (aout.good()) {
-            aout.close();
+        if (std::filesystem::exists(aoutname)) {
             res += "Run time:\n";
             runCommand(data.bot, data.message, aoutname, res);
-            std::remove(aoutname);
+            std::filesystem::remove(aoutname);
         }
         commonCleanup(data.bot, data.message, res, data.outfile);
     }
@@ -194,7 +190,6 @@ void CompileRunHandler<BashHandleData>(const BashHandleData &data) {
 }
 
 static std::optional<std::string> findCommandExe(std::string command) {
-    static char buffer[PATH_MAX];
     std::string path;
 
     if (ConfigManager::getVariable("PATH", path)) {
@@ -204,11 +199,10 @@ static std::optional<std::string> findCommandExe(std::string command) {
 
         for (const auto& path : paths) {
             if (!isEmptyOrBlank(path)) {
-                memset(buffer, 0, sizeof(buffer));
-                size_t bytes = snprintf(buffer, sizeof(buffer), "%s%c%s",
-                        path.c_str(), dir_delimiter, command.c_str());
-                if (bytes < sizeof(buffer) && canExecute(buffer)) {
-                    return {std::string(buffer)};
+                std::filesystem::path p(path);
+                p /= command;
+                if (canExecute(p.string())) {
+                    return {p.string()};
                 }
             }
         }
