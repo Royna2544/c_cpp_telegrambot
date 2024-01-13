@@ -11,9 +11,7 @@ CTestTestfile.cmake
 _deps
 
 # Exe
-tg_cpphost
-dumpProtoDB
-tgbotsocket_cli
+TgBot++*
 # Lib
 libTgBotDB.a
 libTGBotRes.a

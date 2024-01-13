@@ -21,4 +21,4 @@
     } while (0)
 #endif
 
-#define _LOG(fmt, servere, ...) printf("[%s:%d] " servere ": " fmt "\n", __FILE__, __LINE__, ##__VA_ARGS__)
+#define _LOG(fmt, servere, ...) printf("TgBot++: [%s:%d] " servere ": " fmt "\n", __FILE__, __LINE__, ##__VA_ARGS__)

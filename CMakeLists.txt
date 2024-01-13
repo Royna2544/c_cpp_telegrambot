@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10.2)
-project(tg_cpphost)
+project(TgBot++)
 
 option(ENFORCE_EN_US "Enforce en-US locale for output" ON)
 option(ENABLE_SOCKET_CONNECT "Enable doing various operations with bot" ON)
@@ -64,14 +64,15 @@ if(ENABLE_RUNTIME_COMMAND)
 endif()
 
 if(ENABLE_SOCKET_CONNECT)
+  set(SOCKET_CLI_NAME ${PROJECT_NAME}_SocketCli)
   add_definitions(-DSOCKET_CONNECTION)
   add_library(TgBotSocket STATIC src/socket/SocketUtils_${TARGET_VARIANT}.cpp
                                  src/socket/TgBotCommandMap.cpp)
   set(SRC_LIST src/SocketConnectionHandler.cpp src/ChatObserver.cpp ${SRC_LIST})
-  add_executable(tgbotsocket_cli src/socket/TgBotSocketClient.cpp)
-  target_link_libraries(tgbotsocket_cli TgBotSocket)
+  add_executable(${SOCKET_CLI_NAME} src/socket/TgBotSocketClient.cpp)
+  target_link_libraries(${SOCKET_CLI_NAME} TgBotSocket)
   if (WIN32)
-    target_link_libraries(tgbotsocket_cli Ws2_32)
+    target_link_libraries(${SOCKET_CLI_NAME} Ws2_32)
   endif()
 endif()
 
@@ -101,7 +102,7 @@ if(ENABLE_RUNTIME_COMMAND)
   # Dynamic cmd loader
   add_subdirectory(src/cmd_dynamic)
 endif()
-# Build main tg_cpphost exe
+# Build main TgBot++ exe
 add_executable(${PROJECT_NAME} ${SRC_LIST})
 
 # Default LD-list
@@ -130,5 +131,6 @@ endif()
 target_link_libraries(${PROJECT_NAME} ${LD_LIST})
 
 # Protobuf DB Dumper
-add_executable(dumpProtoDB proto/DumpProtoDB.cc)
-target_link_libraries(dumpProtoDB TgBotDB)
+set(DBDUMPER_NAME ${PROJECT_NAME}_dumpDB)
+add_executable(${DBDUMPER_NAME} proto/DumpProtoDB.cc)
+target_link_libraries(${DBDUMPER_NAME} TgBotDB)
