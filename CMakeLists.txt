@@ -50,10 +50,10 @@ set(SRC_LIST
 find_package(Protobuf REQUIRED)
 include(cmake/ProtobufCpp.cmake)
 my_protobuf_generate_cpp(proto/gen PROTO_SRCS PROTO_HDRS proto/TgBotDB.proto)
-get_filename_component(PROTO_HDRS_DIR ${PROTO_HDRS} DIRECTORY)
-include_directories(${PROTO_HDRS_DIR})
-include_directories(${Protobuf_INCLUDE_DIRS})
 add_library(TgBotDB STATIC src/Database.cpp ${PROTO_SRCS})
+get_filename_component(PROTO_HDRS_DIR ${PROTO_HDRS} DIRECTORY)
+target_include_directories(TgBotDB PUBLIC ${PROTO_HDRS_DIR})
+target_include_directories(TgBotDB PRIVATE ${Protobuf_INCLUDE_DIRS})
 target_link_libraries(TgBotDB TgBot TgBotUtils protobuf::libprotobuf)
 
 if(ENFORCE_EN_US)
