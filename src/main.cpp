@@ -352,7 +352,7 @@ int main(void) {
 
 #ifdef SOCKET_CONNECTION
     static std::thread th;
-    static bool socketSucceeded = true;
+    static std::atomic_bool socketSucceeded = true;
     th = std::thread([] {
         socketSucceeded = startListening([](struct TgBotConnection conn) {
             socketConnectionHandler(gBot, conn);
@@ -362,9 +362,9 @@ int main(void) {
 #ifdef RTCOMMAND_LOADER
     loadCommandsFromFile(gBot, getSrcRoot() + "/modules.load");
 #endif
-    static bool exited = false;
-    static auto cleanupFunc = [](int s) {
-        if (!exited) {
+    installExitHandler([](int s) {
+        static std::once_flag once;
+        std::call_once(once, [s] {
             LOG_I("Exiting with signal %d", s);
             forceStopTimer();
             database::db.save();
@@ -375,11 +375,9 @@ int main(void) {
                 th.join();
             }
 #endif
-            exited = true;
             std::exit(0);
-        }
-    };
-    installExitHandler(cleanupFunc);
+        });
+    });
     int64_t lastcrash = 0;
 
     LOG_D("Token: %s", token.c_str());
