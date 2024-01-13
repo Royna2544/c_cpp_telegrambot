@@ -37,8 +37,7 @@ set(SRC_LIST
     src/CompilerInTelegram.cpp
     src/BotAddCommand.cpp
     src/ExtArgs.cpp
-    src/exithandlers/handler.cpp
-    src/exithandlers/handler_${TARGET_VARIANT}.cpp
+    src/signalhandler/SignalHandler_${TARGET_VARIANT}.cpp
     src/random/RandomNumberGenerator.cpp
     src/SpamBlocker.cpp
     src/RegEXHandler.cpp

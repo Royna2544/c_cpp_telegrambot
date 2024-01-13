@@ -45,7 +45,7 @@
 #include <SocketConnectionHandler.h>
 #endif
 
-#include "exithandlers/handler.h"
+#include "signalhandler/SignalHandler.h"
 
 // tgbot
 using TgBot::StickerSet;
@@ -362,7 +362,7 @@ int main(void) {
 #ifdef RTCOMMAND_LOADER
     loadCommandsFromFile(gBot, getSrcRoot() + "/modules.load");
 #endif
-    installExitHandler([](int s) {
+    static auto cleanupFn = [](int s) {
         static std::once_flag once;
         std::call_once(once, [s] {
             LOG_I("Exiting with signal %d", s);
@@ -377,7 +377,8 @@ int main(void) {
 #endif
         });
         std::exit(0);
-    });
+    };
+    installSignalHandler(cleanupFn);
     int64_t lastcrash = 0;
 
     LOG_D("Token: %s", token.c_str());
@@ -398,13 +399,13 @@ reinit:
             gBot.getApi().sendMessage(ownerid, std::string() + "Exception occured: " + e.what());
         } catch (const std::exception &e) {
             LOG_F("%s", e.what());
-            return EXIT_FAILURE;
+            goto exit;
         }
         const int64_t temptime = time(nullptr);
         if (temptime - lastcrash < 15 && lastcrash != 0) {
             gBot.getApi().sendMessage(ownerid, "Recover failed.");
             LOG_F("Recover failed");
-            return EXIT_FAILURE;
+            goto exit;
         }
         lastcrash = temptime;
         gBot.getApi().sendMessage(ownerid, "Reinitializing.");
@@ -416,4 +417,7 @@ reinit:
         }).detach();
         goto reinit;
     }
+exit:
+    cleanupFn(-1);
+    return EXIT_FAILURE;
 }

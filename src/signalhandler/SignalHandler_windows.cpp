@@ -1,6 +1,8 @@
 #include <windows.h>
 
-#include "handler.h"
+#include "SignalHandler.h"
+
+static exit_handler_t exitHandler = nullptr;
 
 static BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
     switch (fdwCtrlType) {
@@ -9,12 +11,13 @@ static BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
         case CTRL_BREAK_EVENT:
         case CTRL_LOGOFF_EVENT:
         case CTRL_SHUTDOWN_EVENT:
-            exitHandlerVoid();
+            exitHandler(-1);
         default:
             return FALSE;
     }
 }
 
-void _installExitHandler(void) {
+void installSignalHandler(const exit_handler_t et) {
+    exitHandler = et;
     SetConsoleCtrlHandler(CtrlHandler, TRUE);
 }
