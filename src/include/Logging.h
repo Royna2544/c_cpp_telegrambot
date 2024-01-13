@@ -21,13 +21,13 @@
     } while (0)
 #endif
 
-#define ASSERT(cond, msg, ...)      \
+#define ASSERT(cond, msg, ...)          \
     do {                                \
-        if (!(cond)) {                     \
+        if (!(cond)) {                  \
             LOG_F(msg, ##__VA_ARGS__);  \
             assert(cond);               \
             __builtin_unreachable();    \
         }                               \
     } while(0)
 
-#define _LOG(fmt, servere, ...) printf("TgBot++: [%s:%d] " servere ": " fmt "\n", __FILE__, __LINE__, ##__VA_ARGS__)
+#define _LOG(fmt, servere, ...) printf("[%s:%d]: [" servere "] " fmt "\n",  __FILE__, __LINE__, ##__VA_ARGS__)
