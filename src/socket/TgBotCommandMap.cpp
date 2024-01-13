@@ -2,12 +2,20 @@
 #include <mutex>
 #include <sstream>
 
+#include <Logging.h>
 #include "TgBotSocket.h"
 
 template <typename T, int N, typename... V>
 std::array<T, sizeof...(V)> make_array(V &&...v) {
     static_assert(sizeof...(V) == N, "Must match declared size");
     return {{std::forward<V>(v)...}};
+}
+
+template <class Container, typename T>
+auto find(Container& c, T val) {
+    return std::find_if(c.begin(), c.end(), [=](const auto& e) {
+        return e.first == val;
+    });
 }
 
 #define ENUM_STR(enum) std::make_pair(enum, #enum)
@@ -30,23 +38,15 @@ const auto kTgBotCommandArgsCount = make_array<ConstArrayElem<TgBotCommand, int>
 );
 
 std::string toStr(TgBotCommand cmd) {
-    for (const auto &elem : kTgBotCommandStrMap) {
-        if (elem.first == cmd) {
-            return elem.second;
-        }
-    }
-    assert(0);
-    return {};
+    const auto it = find(kTgBotCommandStrMap, cmd);
+    ASSERT(it != kTgBotCommandStrMap.end(), "Couldn't find cmd %d in map", cmd);
+    return it->second;
 }
 
 int toCount(TgBotCommand cmd) {
-    for (const auto &elem : kTgBotCommandArgsCount) {
-        if (elem.first == cmd) {
-            return elem.second;
-        }
-    }
-    assert(0);
-    return 0;
+    const auto it = find(kTgBotCommandArgsCount, cmd);
+    ASSERT(it != kTgBotCommandArgsCount.end(), "Couldn't find cmd %d in map", cmd);
+    return it->second;
 }
 
 std::string toHelpText(void) {
