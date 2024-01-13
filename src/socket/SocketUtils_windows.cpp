@@ -1,14 +1,63 @@
 #include <winsock2.h>
 #include <afunix.h>
 
-#include <thread>
 #include <chrono>
+#include <string>
+#include <thread>
 
 #include <Logging.h>
 #include "TgBotSocket.h"
 
-#define WSALOG_E(fmt, ...) LOG_E(fmt ": ret %d", ##__VA_ARGS__, WSAGetLastError())
-#define WSALOG_W(fmt, ...) LOG_W(fmt ": ret %d", ##__VA_ARGS__, WSAGetLastError())
+#define WSALOG_E(fmt, ...) LOG_E(fmt ": %s", ##__VA_ARGS__, strWSAError(WSAGetLastError()))
+#define WSALOG_W(fmt, ...) LOG_W(fmt ": %s", ##__VA_ARGS__, strWSAError(WSAGetLastError()))
+
+static char *strWSAError(const int errcode) {
+    int ret = 0;
+    static char strerror_buf[64];
+
+#define MAP_WSA_TO_POSIX(val, posix) \
+    case WSA ##posix: val = posix; break;
+
+    switch (errcode) {
+        MAP_WSA_TO_POSIX(ret, EINTR);
+        MAP_WSA_TO_POSIX(ret, EACCES);
+        MAP_WSA_TO_POSIX(ret, EFAULT);
+        MAP_WSA_TO_POSIX(ret, EINVAL);
+        MAP_WSA_TO_POSIX(ret, EMFILE);
+        MAP_WSA_TO_POSIX(ret, EWOULDBLOCK);
+        MAP_WSA_TO_POSIX(ret, EINPROGRESS);
+        MAP_WSA_TO_POSIX(ret, EALREADY);
+        MAP_WSA_TO_POSIX(ret, ENOTSOCK);
+        MAP_WSA_TO_POSIX(ret, EDESTADDRREQ);
+        MAP_WSA_TO_POSIX(ret, EMSGSIZE);
+        MAP_WSA_TO_POSIX(ret, EPROTOTYPE);
+        MAP_WSA_TO_POSIX(ret, ENOPROTOOPT);
+        MAP_WSA_TO_POSIX(ret, EPROTONOSUPPORT);
+        MAP_WSA_TO_POSIX(ret, EOPNOTSUPP);
+        MAP_WSA_TO_POSIX(ret, EAFNOSUPPORT);
+        MAP_WSA_TO_POSIX(ret, EADDRINUSE);
+        MAP_WSA_TO_POSIX(ret, EADDRNOTAVAIL);
+        MAP_WSA_TO_POSIX(ret, ENETDOWN);
+        MAP_WSA_TO_POSIX(ret, ENETUNREACH);
+        MAP_WSA_TO_POSIX(ret, ENETRESET);
+        MAP_WSA_TO_POSIX(ret, ECONNABORTED);
+        MAP_WSA_TO_POSIX(ret, ECONNRESET);
+        MAP_WSA_TO_POSIX(ret, ENOBUFS);
+        MAP_WSA_TO_POSIX(ret, EISCONN);
+        MAP_WSA_TO_POSIX(ret, ENOTCONN);
+        MAP_WSA_TO_POSIX(ret, ETIMEDOUT);
+        MAP_WSA_TO_POSIX(ret, ECONNREFUSED);
+        MAP_WSA_TO_POSIX(ret, ELOOP);
+        MAP_WSA_TO_POSIX(ret, ENAMETOOLONG);
+        MAP_WSA_TO_POSIX(ret, EHOSTUNREACH);
+        MAP_WSA_TO_POSIX(ret, ENOTEMPTY);
+    default:
+        memset(strerror_buf, 0, sizeof(strerror_buf));
+        snprintf(strerror_buf, sizeof(strerror_buf), "code: %d", errcode);
+        return strerror_buf;
+    }
+    return strerror(ret);
+}
 
 static SOCKET makeSocket(bool is_client) {
     struct sockaddr_un name {};
