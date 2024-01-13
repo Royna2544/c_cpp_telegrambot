@@ -375,8 +375,8 @@ int main(void) {
                 th.join();
             }
 #endif
-            std::exit(0);
         });
+        std::exit(0);
     });
     int64_t lastcrash = 0;
 
