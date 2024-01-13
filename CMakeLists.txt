@@ -35,6 +35,7 @@ set(SRC_LIST
     src/main.cpp
     src/Authorization.cpp
     src/CompilerInTelegram.cpp
+    src/ConfigManager.cpp
     src/BotAddCommand.cpp
     src/ExtArgs.cpp
     src/signalhandler/SignalHandler_${TARGET_VARIANT}.cpp

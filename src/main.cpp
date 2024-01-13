@@ -2,6 +2,7 @@
 #include <BotAddCommand.h>
 #include <BotReplyMessage.h>
 #include <CompilerInTelegram.h>
+#include <ConfigManager.h>
 #include <Database.h>
 #include <ExtArgs.h>
 #include <Logging.h>
@@ -57,29 +58,12 @@ using database::ProtoDatabase;
 using database::whitelist;
 
 int main(void) {
-    const char *token_str = getenv("TOKEN");
     std::string token;
-    if (!token_str) {
-        std::string home, line;
-        LOG_W("TOKEN is not exported, try config file");
-        if (!getHomePath(home)) {
-            LOG_E("Cannot find HOME");
-            return EXIT_FAILURE;
-        }
-        const std::string confPath = home + dir_delimiter + ".tgbot_token";
-        std::ifstream ifs(confPath);
-        if (ifs.fail()) {
-            LOG_E("Opening %s failed", confPath.c_str());
-            return EXIT_FAILURE;
-        }
-        std::getline(ifs, line);
-        if (line.empty()) {
-            LOG_E("Conf file %s empty", confPath.c_str());
-            return EXIT_FAILURE;
-        }
-        token = line;
-    } else
-        token = token_str;
+    ConfigManager::load();
+    if (!ConfigManager::getVariable("TOKEN", token)) {
+	 LOG_F("Failed to get TOKEN variable");
+	 return EXIT_FAILURE;
+    }
 
     static Bot gBot(token);
 

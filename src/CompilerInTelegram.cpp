@@ -1,6 +1,7 @@
 #include <Authorization.h>
 #include <BotReplyMessage.h>
 #include <CompilerInTelegram.h>
+#include <ConfigManager.h>
 #include <FileSystemLib.h>
 #include <ExtArgs.h>
 #include <LinuxUtils.h>
@@ -190,10 +191,10 @@ void CompileRunHandler<BashHandleData>(const BashHandleData &data) {
 
 static std::optional<std::string> findCommandExe(std::string command) {
     static char buffer[PATH_MAX];
-    const char* path_c = getenv("PATH");
+    std::string path;
 
-    if (path_c) {
-        auto paths = StringTools::split(path_c, path_env_delimiter);
+    if (ConfigManager::getVariable("PATH", path)) {
+        auto paths = StringTools::split(path, path_env_delimiter);
         if (IS_DEFINED(__WIN32))
             command.append(".exe");
 
