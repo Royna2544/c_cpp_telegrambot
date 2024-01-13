@@ -12,6 +12,7 @@
 #include <boost/algorithm/string/replace.hpp>
 #include <chrono>
 #include <fstream>
+#include <filesystem>
 #include <map>
 #include <mutex>
 #include <sstream>
@@ -64,6 +65,7 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
     bool hasmore = false, watchdog_bitten = false;
     int count = 0;
     char buf[BASH_READ_BUF] = {};
+    std::error_code ec;
 
 #ifdef LOCALE_EN_US
     static std::once_flag once;
@@ -91,11 +93,13 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
         count++;
         std_sleep(50ms);
     }
-    std::string srcroot = getSrcRoot();
+    std::string srcroot = std::filesystem::current_path(ec);
+    if (!ec) {
 #ifdef __WIN32
-    boost::replace_all(srcroot, std::string(1, unix_dir_delimiter), std::string(1, dir_delimiter));
+       boost::replace_all(srcroot, std::string(1, unix_dir_delimiter), std::string(1, dir_delimiter));
 #endif
-    boost::replace_all(res, srcroot, "");
+       boost::replace_all(res, srcroot, "");
+    }
     if (count == 0)
         res += std::string() + EMPTY + '\n';
     else if (res.back() != '\n')
