@@ -7,6 +7,7 @@
 
 #include <Logging.h>
 #include "TgBotSocket.h"
+#include "SocketUtils_internal.h"
 
 #define WSALOG_E(fmt, ...) LOG_E(fmt ": %s", ##__VA_ARGS__, strWSAError(WSAGetLastError()))
 #define WSALOG_W(fmt, ...) LOG_W(fmt ": %s", ##__VA_ARGS__, strWSAError(WSAGetLastError()))
@@ -97,6 +98,7 @@ static SOCKET makeSocket(bool is_client) {
 }
 
 bool startListening(const listener_callback_t& cb) {
+    bool should_break = false;
     const SOCKET sfd = makeSocket(false);
     if (sfd != INVALID_SOCKET) {
         if (listen(sfd, SOMAXCONN) == SOCKET_ERROR) {
@@ -104,7 +106,7 @@ bool startListening(const listener_callback_t& cb) {
             return false;
         }
         LOG_I("Listening on " SOCKET_PATH);
-        while (true) {
+        while (!should_break) {
             struct sockaddr_un addr {};
             struct TgBotConnection conn {};
             int len = sizeof(addr);
@@ -114,25 +116,17 @@ bool startListening(const listener_callback_t& cb) {
 
             if (cfd == INVALID_SOCKET) {
                 WSALOG_W("Accept failed. retry");
-                std::this_thread::sleep_for(std::chrono::seconds(4));
+                std::this_thread::sleep_for(sleep_sec);
                 continue;
             } else {
                 LOG_I("Client connected");
             }
             const int count = recv(cfd, reinterpret_cast<char *>(&conn), sizeof(conn), 0);
-            if (count > 0) {
-                if (conn.cmd == CMD_EXIT) {
-                    LOG_D("Received exit command");
-                    break;
-                }
-                LOG_D("Received buf with %s, invoke callback!", toStr(conn.cmd).c_str());
-                cb(conn);
-            } else {
-                PLOG_E("Failed to read from socket");
-            }
+            should_break = handleIncomingBuf(count, conn, cb, strWSAError(WSAGetLastError()));
             closesocket(cfd);
         }
         closesocket(sfd);
+        WSACleanup();
         return true;
     }
     return false;

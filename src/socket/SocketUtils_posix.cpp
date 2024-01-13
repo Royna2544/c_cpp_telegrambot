@@ -8,6 +8,7 @@
 
 #include <Logging.h>
 #include "TgBotSocket.h"
+#include "SocketUtils_internal.h"
 
 static int makeSocket(bool is_client) {
     int ret = -1;
@@ -36,6 +37,7 @@ static int makeSocket(bool is_client) {
 }
 
 bool startListening(const listener_callback_t& cb) {
+    bool should_break = false;
     const int sfd = makeSocket(false);
     if (sfd >= 0) {
         if (listen(sfd, 1) < 0) {
@@ -43,7 +45,7 @@ bool startListening(const listener_callback_t& cb) {
             return false;
         }
         LOG_I("Listening on " SOCKET_PATH);
-        while (true) {
+        while (!should_break) {
             struct sockaddr_un addr {};
             struct TgBotConnection conn {};
             unsigned int len = sizeof(addr);
@@ -53,22 +55,13 @@ bool startListening(const listener_callback_t& cb) {
 
             if (cfd < 0) {
                 LOG_W("Accept failed, retrying");
-                std::this_thread::sleep_for(std::chrono::seconds(4));
+                std::this_thread::sleep_for(sleep_sec);
                 continue;
             } else {
                 LOG_I("Client connected");
             }
             const int count = read(cfd, &conn, sizeof(conn));
-            if (count > 0) {
-                if (conn.cmd == CMD_EXIT) {
-                    LOG_D("Received exit command");
-                    break;
-                }
-                LOG_D("Received buf with %s, invoke callback!", toStr(conn.cmd).c_str());
-                cb(conn);
-            } else {
-                PLOG_E("Failed to read from socket");
-            }
+            should_break = handleIncomingBuf(count, conn, cb, strerror(errno));
             close(cfd);
         }
         close(sfd);
