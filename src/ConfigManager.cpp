@@ -49,13 +49,13 @@ static void *file_load(void) {
 	count++;
 
         if (pos = line.find('='); pos == std::string::npos) {
-            LOG_E("Invalid line in config file: %ld", count);
+            LOG_E("Invalid line in config file: %zu", count);
             continue;
         }
         p.kConfigEntries.emplace(line.substr(0, pos), line.substr(pos + 1));
         LOG_D("%s is '%s'", line.substr(0, pos).c_str(), line.substr(pos + 1).c_str());
     }
-    LOG_I("Loaded %ld entries from %s", p.kConfigEntries.size(), confPath.c_str());
+    LOG_I("Loaded %zu entries from %s", p.kConfigEntries.size(), confPath.c_str());
     return &p;
 }
 
