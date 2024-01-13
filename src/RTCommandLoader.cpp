@@ -14,7 +14,7 @@ struct DynamicLibraryHolder {
     }
     ~DynamicLibraryHolder() {
         if (handle_) {
-            LOG_D("%s: handle was at %p", __func__, handle_);
+            LOG_D("Handle was at %p", handle_);
             dlclose(handle_);
             handle_ = nullptr;
         }
