@@ -8,6 +8,7 @@
 #include <NamespaceImport.h>
 #include <StringToolsExt.h>
 
+#include <boost/algorithm/string/replace.hpp>
 #include <chrono>
 #include <fstream>
 #include <map>
@@ -103,14 +104,11 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
         count++;
         std_sleep(50ms);
     }
-#if defined PWD_REPLACE_STR && !defined __WIN32
-    size_t start_pos = 0;
-    std::string pwd(getSrcRoot()), replace(PWD_REPLACE_STR);
-    while ((start_pos = res.find(pwd, start_pos)) != std::string::npos) {
-        res.replace(start_pos, pwd.length(), replace);
-        start_pos += replace.length();
-    }
+    std::string srcroot = getSrcRoot();
+#ifdef __WIN32
+    boost::replace_all(srcroot, std::string(1, unix_dir_delimiter), std::string(1, dir_delimiter));
 #endif
+    boost::replace_all(res, srcroot, "");
     if (count == 0)
         res += std::string() + EMPTY + '\n';
     else if (res.back() != '\n')
