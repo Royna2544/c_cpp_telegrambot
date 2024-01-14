@@ -88,6 +88,7 @@ add_library(
   src/ConfigManager.cpp
   src/popen_wdt/popen_wdt_${TARGET_VARIANT}.c
   src/popen_wdt/popen_wdt_lib.cpp
+  src/fslib/FileSystemLib.cpp
   src/fslib/FileSystemLib_${TARGET_VARIANT}.cpp)
 
 # Windows needs this
