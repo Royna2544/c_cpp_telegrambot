@@ -3,6 +3,7 @@
 #include <Logging.h>
 
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <functional>
 #include <map>
@@ -40,7 +41,7 @@ static void *file_load(void) {
         LOG_E("Cannot find HOME");
         return nullptr;
     }
-    const std::string confPath = home + dir_delimiter + ".tgbot_config";
+    const auto confPath = (std::filesystem::path(home) / ".tgbot_config").u8string();
     std::ifstream ifs(confPath);
     if (ifs.fail()) {
         LOG_E("Opening %s failed", confPath.c_str());
