@@ -96,7 +96,7 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
     auto srcroot = std::filesystem::current_path(ec);
     if (!ec) {
         srcroot.make_preferred();
-        boost::replace_all(res, srcroot.string(), "");
+        boost::replace_all(res, srcroot.string(), "/");
     }
     if (count == 0)
         res += std::string() + EMPTY + '\n';
