@@ -1,12 +1,13 @@
+#include <Logging.h>
+
 #include <cassert>
 #include <mutex>
 #include <sstream>
 
-#include <Logging.h>
 #include "TgBotSocket.h"
 
 template <typename T, int N, typename... V>
-std::array<T, sizeof...(V)> make_array(V &&...v) {
+std::array<T, sizeof...(V)> make_array(V&&... v) {
     static_assert(sizeof...(V) == N, "Must match declared size");
     return {{std::forward<V>(v)...}};
 }
@@ -26,8 +27,7 @@ const auto kTgBotCommandStrMap = make_array<ConstArrayElem<TgBotCommand, std::st
     ENUM_STR(CMD_CTRL_SPAMBLOCK),
     ENUM_STR(CMD_OBSERVE_CHAT_ID),
     ENUM_STR(CMD_SEND_FILE_TO_CHAT_ID),
-    ENUM_STR(CMD_OBSERVE_ALL_CHATS)
-);
+    ENUM_STR(CMD_OBSERVE_ALL_CHATS));
 
 const auto kTgBotCommandArgsCount = make_array<ConstArrayElem<TgBotCommand, int>, CMD_MAX - 1>(
     ARGUMENT_SIZE(CMD_WRITE_MSG_TO_CHAT_ID, 2),  // chatid, msg
@@ -55,7 +55,7 @@ std::string toHelpText(void) {
 
     std::call_once(once, [] {
         std::stringstream help;
-        for (const auto &ent : kTgBotCommandStrMap) {
+        for (const auto& ent : kTgBotCommandStrMap) {
             int count = toCount(ent.first);
 
             help << ent.second << ": value " << ent.first << ", Requires "

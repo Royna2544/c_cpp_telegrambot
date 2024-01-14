@@ -5,6 +5,7 @@
 #include <ConfigManager.h>
 #include <Database.h>
 #include <ExtArgs.h>
+#include <FileSystemLib.h>
 #include <Logging.h>
 #include <NamespaceImport.h>
 #include <PrintableTime.h>
@@ -13,7 +14,6 @@
 #include <SpamBlock.h>
 #include <TimerImpl.h>
 #include <Types.h>
-#include <FileSystemLib.h>
 #include <popen_wdt/popen_wdt.h>
 #include <random/RandomNumberGenerator.h>
 #include <tgbot/tgbot.h>
@@ -60,8 +60,8 @@ using database::whitelist;
 int main(void) {
     std::string token;
     if (!ConfigManager::getVariable("TOKEN", token)) {
-	 LOG_F("Failed to get TOKEN variable");
-	 return EXIT_FAILURE;
+        LOG_F("Failed to get TOKEN variable");
+        return EXIT_FAILURE;
     }
     database::db.load((getSrcRoot() + "/" + kDatabaseFile));
 
@@ -275,7 +275,7 @@ int main(void) {
             // bot is not admin. nothing it can do
             if (std::find(warned_ids.begin(), warned_ids.end(), chatId) == warned_ids.end()) {
                 LOG_W("bot is not admin in chat " LONGFMT ", cannot use decho!",
-                          message->chat->id);
+                      message->chat->id);
                 warned_ids.emplace_back(message->chat->id);
             }
             return;

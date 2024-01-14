@@ -1,7 +1,8 @@
 #pragma once
 
-#include "Types.h"
 #include <NamespaceImport.h>
+
+#include "Types.h"
 
 #ifdef SOCKET_CONNECTION
 #include <socket/TgBotSocket.h>

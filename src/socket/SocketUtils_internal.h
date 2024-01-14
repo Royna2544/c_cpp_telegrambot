@@ -4,11 +4,10 @@
 
 static constexpr inline auto sleep_sec = std::chrono::seconds(4);
 
-[[nodiscard]]
-static inline bool handleIncomingBuf(const size_t len, struct TgBotConnection& conn,
-                                     const listener_callback_t& cb, char *errbuf) {
+[[nodiscard]] static inline bool handleIncomingBuf(const size_t len, struct TgBotConnection& conn,
+                                                   const listener_callback_t& cb, char* errbuf) {
     if (len > 0) {
-         if (conn.cmd == CMD_EXIT) {
+        if (conn.cmd == CMD_EXIT) {
             LOG_D("Received exit command");
             return true;
         }

@@ -1,9 +1,9 @@
 #pragma once
 
-#include <vector>
-
 #include <NamespaceImport.h>
 #include <Types.h>
+
+#include <vector>
 
 // Global ChatId list to observe
 extern std::vector<ChatId> gObservedChatIds;

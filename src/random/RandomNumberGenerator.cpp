@@ -1,3 +1,5 @@
+#include "RandomNumberGenerator.h"
+
 #include <LinuxUtils.h>
 #include <Logging.h>
 #include <RuntimeException.h>
@@ -7,12 +9,11 @@
 #include <functional>
 #include <random>
 
-#include "RandomNumberGenerator.h"
 #include "KernelRandEngine.h"
 #include "RDRandEngine.h"
 
 template <typename T>
-using shuffle_handle_t = std::function<void(std::vector<T> &)>;
+using shuffle_handle_t = std::function<void(std::vector<T>&)>;
 using return_type = random_return_type;
 
 template <class Generator>

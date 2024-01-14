@@ -1,8 +1,8 @@
 #pragma once
 
+#include <Types.h>
 #include <tgbot/types/Message.h>
 
-#include <Types.h>
 #include "NamespaceImport.h"
 
 // A global 'authorized' bool object that controls all commands

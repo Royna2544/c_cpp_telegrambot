@@ -1,7 +1,7 @@
 #pragma once
 
-#include <ostream>
 #include <ctime>
+#include <ostream>
 
 union time {
     std::time_t val;

@@ -31,7 +31,7 @@ static void printChatMsg(const Message::Ptr& msg, const User::Ptr& from) {
     if (!from->lastName.empty())
         userfullname += ' ' + from->lastName;
     if (chatname.empty())
-       chatname = "Bot PM";
+        chatname = "Bot PM";
 
     std::cout << "[ChatObserveLog][" << chatname << "] "
               << userfullname << " (@" << from->username

@@ -1,13 +1,16 @@
+#include <Logging.h>
+
+// clang-format off
 #include <winsock2.h>
 #include <afunix.h>
+// clang-format on
 
 #include <chrono>
 #include <string>
 #include <thread>
 
-#include <Logging.h>
-#include "TgBotSocket.h"
 #include "SocketUtils_internal.h"
+#include "TgBotSocket.h"
 
 #define WSALOG_E(fmt, ...) LOG_E(fmt ": %s", ##__VA_ARGS__, strWSAError(WSAGetLastError()))
 #define WSALOG_W(fmt, ...) LOG_W(fmt ": %s", ##__VA_ARGS__, strWSAError(WSAGetLastError()))
@@ -17,7 +20,9 @@ static char *strWSAError(const int errcode) {
     static char strerror_buf[64];
 
 #define MAP_WSA_TO_POSIX(val, posix) \
-    case WSA ##posix: val = posix; break;
+    case WSA##posix:                 \
+        val = posix;                 \
+        break;
 
     switch (errcode) {
         MAP_WSA_TO_POSIX(ret, EINTR);
@@ -52,10 +57,10 @@ static char *strWSAError(const int errcode) {
         MAP_WSA_TO_POSIX(ret, ENAMETOOLONG);
         MAP_WSA_TO_POSIX(ret, EHOSTUNREACH);
         MAP_WSA_TO_POSIX(ret, ENOTEMPTY);
-    default:
-        memset(strerror_buf, 0, sizeof(strerror_buf));
-        snprintf(strerror_buf, sizeof(strerror_buf), "code: %d", errcode);
-        return strerror_buf;
+        default:
+            memset(strerror_buf, 0, sizeof(strerror_buf));
+            snprintf(strerror_buf, sizeof(strerror_buf), "code: %d", errcode);
+            return strerror_buf;
     }
     return strerror(ret);
 }
@@ -71,7 +76,7 @@ static SOCKET makeSocket(bool is_client) {
         std::remove(SOCKET_PATH);
     }
 
-    ret = WSAStartup(MAKEWORD(2,2), &data);
+    ret = WSAStartup(MAKEWORD(2, 2), &data);
     if (ret != 0) {
         LOG_E("WSAStartup failed");
         return INVALID_SOCKET;
@@ -86,9 +91,9 @@ static SOCKET makeSocket(bool is_client) {
     name.sun_family = AF_UNIX;
     strncpy(name.sun_path, SOCKET_PATH, sizeof(name.sun_path));
     name.sun_path[sizeof(name.sun_path) - 1] = '\0';
-    
+
     decltype(&connect) fn = is_client ? connect : bind;
-    if (fn(fd, reinterpret_cast<struct sockaddr*>(&name), sizeof(name)) != 0) {
+    if (fn(fd, reinterpret_cast<struct sockaddr *>(&name), sizeof(name)) != 0) {
         WSALOG_E("Failed to %s to socket", is_client ? "connect" : "bind");
         closesocket(fd);
         WSACleanup();
@@ -97,7 +102,7 @@ static SOCKET makeSocket(bool is_client) {
     return fd;
 }
 
-bool startListening(const listener_callback_t& cb) {
+bool startListening(const listener_callback_t &cb) {
     bool should_break = false;
     const SOCKET sfd = makeSocket(false);
     if (sfd != INVALID_SOCKET) {
@@ -112,7 +117,7 @@ bool startListening(const listener_callback_t& cb) {
             int len = sizeof(addr);
 
             LOG_D("Waiting for connection");
-            const SOCKET cfd = accept(sfd, (struct sockaddr*)&addr, &len);
+            const SOCKET cfd = accept(sfd, (struct sockaddr *)&addr, &len);
 
             if (cfd == INVALID_SOCKET) {
                 WSALOG_W("Accept failed. retry");

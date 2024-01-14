@@ -36,9 +36,9 @@ enum ProgrammingLangs {
 
 /**
  * findCompiler - find compiler's absolute path
- * 
+ *
  * @param lang ProgrammingLangs enum value to query
  * @param path Search result is stored, if found, else untouched
  * @return Whether it have found the compiler path
  */
-bool findCompiler(ProgrammingLangs lang, std::string& path);
+bool findCompiler(ProgrammingLangs lang, std::string &path);

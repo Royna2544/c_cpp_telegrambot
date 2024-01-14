@@ -1,13 +1,12 @@
 #include <ChatObserver.h>
 #include <Logging.h>
-#include <SocketConnectionHandler.h>
-#include <SpamBlock.h>
 #include <ResourceIncBin.h>
 #include <RuntimeException.h>
+#include <SocketConnectionHandler.h>
+#include <SpamBlock.h>
 #include <random/RandomNumberGenerator.h>
-
-#include <rapidjson/rapidjson.h>
 #include <rapidjson/document.h>
+#include <rapidjson/rapidjson.h>
 
 #include <filesystem>
 #include <fstream>

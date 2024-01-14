@@ -2,8 +2,8 @@
 #include <BotReplyMessage.h>
 #include <CompilerInTelegram.h>
 #include <ConfigManager.h>
-#include <FileSystemLib.h>
 #include <ExtArgs.h>
+#include <FileSystemLib.h>
 #include <LinuxUtils.h>
 #include <Logging.h>
 #include <NamespaceImport.h>
@@ -11,13 +11,13 @@
 
 #include <boost/algorithm/string/replace.hpp>
 #include <chrono>
-#include <fstream>
 #include <filesystem>
+#include <fstream>
 #include <map>
 #include <mutex>
+#include <optional>
 #include <sstream>
 #include <thread>
-#include <optional>
 
 #include "popen_wdt/popen_wdt.h"
 
@@ -95,8 +95,8 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
     }
     auto srcroot = std::filesystem::current_path(ec);
     if (!ec) {
-       srcroot.make_preferred();
-       boost::replace_all(res, srcroot.string(), "");
+        srcroot.make_preferred();
+        boost::replace_all(res, srcroot.string(), "");
     }
     if (count == 0)
         res += std::string() + EMPTY + '\n';
@@ -197,7 +197,7 @@ static std::optional<std::string> findCommandExe(std::string command) {
         if (IS_DEFINED(__WIN32))
             command.append(".exe");
 
-        for (const auto& path : paths) {
+        for (const auto &path : paths) {
             if (!isEmptyOrBlank(path)) {
                 std::filesystem::path p(path);
                 p /= command;
@@ -210,14 +210,14 @@ static std::optional<std::string> findCommandExe(std::string command) {
     return {};
 }
 
-bool findCompiler(ProgrammingLangs lang, std::string& path) {
+bool findCompiler(ProgrammingLangs lang, std::string &path) {
     static std::map<ProgrammingLangs, std::vector<std::string>> compilers = {
         {ProgrammingLangs::C, {"clang", "gcc", "cc"}},
         {ProgrammingLangs::CXX, {"clang++", "g++", "c++"}},
         {ProgrammingLangs::GO, {"go"}},
         {ProgrammingLangs::PYTHON, {"python", "python3"}},
     };
-    for (const auto& options : compilers[lang]) {
+    for (const auto &options : compilers[lang]) {
         auto ret = findCommandExe(options);
         if (ret) {
             path = ret.value();

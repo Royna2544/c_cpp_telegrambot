@@ -3,7 +3,7 @@
 
 #include <string>
 
-static inline std::string::size_type findBlankInMsg(const Message::Ptr& message) {
+static inline std::string::size_type findBlankInMsg(const Message::Ptr &message) {
     return message->text.find_first_of(" \n");
 }
 

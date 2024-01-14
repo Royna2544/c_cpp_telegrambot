@@ -1,10 +1,10 @@
+#include <Logging.h>
 #include <Windows.h>
 #include <io.h>
 #include <locale.h>
 #include <pthread.h>
 #include <stdio.h>
 
-#include <Logging.h>
 #include "popen_wdt.h"
 
 struct watchdog_data {

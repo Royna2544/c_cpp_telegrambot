@@ -1,7 +1,7 @@
 #define INCBIN_SILENCE_BITCODE_WARNING
-#include "third-party/incbin/incbin.h"
-
 #include <string>
+
+#include "third-party/incbin/incbin.h"
 
 INCTXT_EXTERN(AboutHtmlText);
 INCTXT_EXTERN(FlashTxt);

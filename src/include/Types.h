@@ -1,7 +1,7 @@
 #pragma once
 
-#include <cstdint>
 #include <cinttypes>
+#include <cstdint>
 
 // Helper for platform-independent 64bit int format
 #define LONGFMT "%" PRId64

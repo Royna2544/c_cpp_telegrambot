@@ -20,10 +20,11 @@ static const std::regex kSedReplaceCommandRegex(R"(^s\/.+\/.+(\/(g|i|ig|gi))?$)"
 // Matches sed command with delete command, with regex on deleting expression
 static const std::regex kSedDeleteCommandRegex(R"(^\/.+\/d$)");
 
-template<typename T>
+template <typename T>
 class OptionalWrapper {
     std::optional<T> val;
- public:
+
+   public:
     OptionalWrapper<T>(const std::optional<T> _val) : val(_val) {}
     OptionalWrapper<T>() : val(std::nullopt) {}
 
@@ -39,7 +40,7 @@ class OptionalWrapper {
     operator bool() const {
         return has_value();
     }
-    OptionalWrapper<T> operator |= (OptionalWrapper<T> &&other) {
+    OptionalWrapper<T> operator|=(OptionalWrapper<T>&& other) {
         if (this != &other) {
             if (other.has_value() && !has_value()) {
                 val = std::move(other.val);

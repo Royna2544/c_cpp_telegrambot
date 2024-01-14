@@ -1,3 +1,4 @@
+#include <Logging.h>
 #include <fcntl.h>
 #include <pthread.h>
 #include <signal.h>
@@ -6,7 +7,6 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-#include <Logging.h>
 #include "popen_wdt.h"
 
 struct watchdog_data {

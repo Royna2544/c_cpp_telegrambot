@@ -1,8 +1,8 @@
 #pragma once
 
+#include <cdefs.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <cdefs.h>
 
 #define _STR(x) #x
 #define STR(x) _STR(x)
@@ -25,14 +25,14 @@ void setlocale_enus_once(void);
 
 /**
  * popen_watchdog - popen(3) but with watchdog support
- * 
+ *
  * Same as popen, it opens subprocess with [command], but
  * the process is killed, and FILE * returns EOF when the exec time
  * expires [SLEEP_SECONDS]. Also closes stdin and pipes stdout, stderr
  * to FILE *
- * 
+ *
  * @param command Null-terminated string of command
- * @param ret Whether watchdog killed the process or not, 
+ * @param ret Whether watchdog killed the process or not,
  * passing nullptr will disable watchdog functionaility.
  * @return valid FILE * if succeeded, nullptr otherwise
  */
@@ -45,7 +45,7 @@ _END_DECLS
 
 /**
  * runCommand - Runs a command and store result into buffer
- * 
+ *
  * @param command - Command to exec
  * @param res - Out buffer storage
  * @return If executing process succeeded
@@ -54,7 +54,7 @@ bool runCommand(const std::string& command, std::string& res);
 
 /**
  * getSrcRoot - Fetch source root directory with git command
- * 
+ *
  * @return source root directory path
  */
 std::string getSrcRoot();

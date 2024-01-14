@@ -1,8 +1,8 @@
 #include <BotReplyMessage.h>
 #include <ExtArgs.h>
 #include <Logging.h>
-#include <Timer.h>
 #include <NamespaceImport.h>
+#include <Timer.h>
 
 #include <cmath>
 #include <optional>

@@ -1,9 +1,9 @@
+#include <ConfigManager.h>
 #include <string.h>
-#include <string>
+
 #include <mutex>
 #include <stdexcept>
-
-#include <ConfigManager.h>
+#include <string>
 
 #include "popen_wdt.h"
 

@@ -239,7 +239,7 @@ static void do_InteractiveBash(const Bot& bot, const Message::Ptr& message) {
                         result = "(No output)";
                     bot_sendReplyMessage(bot, message, result, 0, true);
                 });
-		sendResThread.detach();
+                sendResThread.detach();
             } else {
                 bot_sendReplyMessage(bot, message, "Failed to open child process");
             }
