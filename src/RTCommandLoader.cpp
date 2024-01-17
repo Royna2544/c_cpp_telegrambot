@@ -36,6 +36,7 @@ void loadOneCommand(Bot& bot, const std::string& fname) {
     command_callback_t fn;
     Dl_info info{};
     void* fnptr = nullptr;
+    bool isSupported = true;
 
     if (!handle) {
         LOG_W("Failed to load: %s", dlerror() ?: "unknown");
@@ -50,8 +51,8 @@ void loadOneCommand(Bot& bot, const std::string& fname) {
     libs.emplace_back(handle);
     fn = sym->fn;
     if (!sym->isSupported()) {
-        LOG_I("Module declares it is not supported.");
         fn = commandStub;
+        isSupported = false;
     }
     if (sym->enforced)
         bot_AddCommandEnforced(bot, sym->name, fn);
@@ -64,7 +65,7 @@ void loadOneCommand(Bot& bot, const std::string& fname) {
         fnptr = info.dli_saddr;
     }
     LOG_I("Loaded RT command module from %s", fname.c_str());
-    LOG_I("Module dump: { enforced: %d, name: %s, fn: %p }", sym->enforced, sym->name, fnptr);
+    LOG_I("Module dump: { enforced: %d, supported: %d, name: %s, fn: %p }", sym->enforced, isSupported, sym->name, fnptr);
 }
 
 void loadCommandsFromFile(Bot& bot, const std::string& filename) {
