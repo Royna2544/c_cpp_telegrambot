@@ -2,6 +2,7 @@
 #include <ExtArgs.h>
 #include <Logging.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <stdio.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
@@ -35,25 +36,23 @@ static const int& parent_readfd = toparent[0];
 static const int& parent_writefd = tochild[1];
 
 static bool IsVaildPipe(pipe_t fd) {
-    return fd && (fd[0] >= 0 && fd[1] >= 0);
+    return fd[0] >= 0 && fd[1] >= 0;
 }
 
 static void InvaildatePipe(pipe_t fd) {
-    if (fd) {
-        fd[0] = -1;
-        fd[1] = -1;
-    }
+    fd[0] = -1;
+    fd[1] = -1;
 }
 
 static bool SendCommand(std::string str, bool internal = false) {
     int rc;
 
     TrimStr(str);
-    if (!internal)
+    if (!internal) {
         LOG_I("Child <= Command '%s'", str.c_str());
-    // To stop the read() when the command exit
-    str += "; echo\n";
-    rc = write(parent_writefd, str.c_str(), str.size() + /* null terminator */ 1);
+    }
+    str += "\n";
+    rc = write(parent_writefd, str.c_str(), str.size());
     if (rc < 0) {
         PLOG_E("Write command to parent fd");
         return false;
@@ -61,20 +60,48 @@ static bool SendCommand(std::string str, bool internal = false) {
     return true;
 }
 
-// TODO This is broken (Will hang if its not interactive)
-static bool isChildInteractive() {
-    static const char OkStr[] = "OK\n";
-    constexpr size_t OkStrLen = sizeof(OkStr);
-    char buf[OkStrLen] = {0};
+static bool SendText(std::string str) {
     int rc;
 
-    // Send a command to check connection to child bash process
-    rc = SendCommand("echo OK", true);
-    if (!rc) {
+    TrimStr(str);
+    LOG_I("Child <= Text '%s'", str.c_str());
+    rc = write(parent_writefd, str.c_str(), str.size());
+    if (rc < 0) {
+        PLOG_E("Write txt to parent fd");
         return false;
     }
-    // Expecting "OK\n"
-    return read(parent_readfd, &buf, OkStrLen) == OkStrLen && !strncmp(buf, OkStr, OkStrLen - 1);
+    return true;
+}
+
+enum ChildDataDirection : short {
+    DATA_IN = POLLIN,
+    DATA_OUT = POLLOUT,
+};
+
+static bool HasData(ChildDataDirection direction, bool wait = false) {
+    int rc;
+    struct pollfd poll_fd = {
+        .events = direction,
+        .revents = 0,
+    };
+
+    switch (direction) {
+        case DATA_IN:
+            poll_fd.fd = parent_readfd;
+            break;
+        case DATA_OUT:
+            poll_fd.fd = parent_writefd;
+            break;
+    };
+    rc = poll(&poll_fd, 1, wait ? -1 : 100);
+    if (rc < 0) {
+        PLOG_E("Poll failed");
+    } else {
+        if (poll_fd.revents & direction) {
+            return true;
+        }
+    }
+    return false;
 }
 
 static void do_InteractiveBash(const Bot& bot, const Message::Ptr& message) {
@@ -100,7 +127,7 @@ static void do_InteractiveBash(const Bot& bot, const Message::Ptr& message) {
         pid_t* piddata = (pid_t*)mmap(NULL, sizeof(pid_t), PROT_READ | PROT_WRITE,
                                       MAP_SHARED | MAP_ANONYMOUS, -1, 0);
         if (piddata == MAP_FAILED) {
-            perror("mmap");
+            PLOG_E("mmap");
             return;
         }
 
@@ -112,11 +139,11 @@ static void do_InteractiveBash(const Bot& bot, const Message::Ptr& message) {
         rc = pipe(tochild) || pipe(toparent);
 
         if (rc) {
-            perror("pipe");
+            PLOG_E("pipe");
             return;
         }
         if ((pid = fork()) < 0) {
-            perror("fork");
+            PLOG_E("fork");
             return;
         }
         if (pid == 0) {
@@ -131,16 +158,19 @@ static void do_InteractiveBash(const Bot& bot, const Message::Ptr& message) {
             execl(BASH_EXE_PATH, "bash", (char*)NULL);
             _exit(127);
         } else {
+            int count = 0;
             close(child_stdin);
-            if (isChildInteractive()) {
-                is_open = true;
-                childpid = *piddata;
-                LOG_D("Open success, child pid: %d", childpid);
-                munmap(piddata, sizeof(pid_t));
-                bot_sendReplyMessage(bot, message, "Opened bash subprocess.");
-            } else {
-                LOG_W("Write failed, process not opened!");
-            }
+            // Ensure bash execl() is up
+            do {
+                LOG_W("Waiting for subprocess up... (%d)", count);
+                std_sleep_s(1);
+                count++;
+            } while (kill(-(*piddata), 0) != 0);
+            is_open = true;
+            childpid = *piddata;
+            LOG_D("Open success, child pid: %d", childpid);
+            munmap(piddata, sizeof(pid_t));
+            bot_sendReplyMessage(bot, message, "Opened bash subprocess.");
         }
     }
 
@@ -184,60 +214,64 @@ static void do_InteractiveBash(const Bot& bot, const Message::Ptr& message) {
                 {
                     std::unique_lock<std::mutex> lk{m, std::try_to_lock};
                     if (!lk.owns_lock()) {
-                        bot_sendReplyMessage(bot, message, "Subprocess is still running, try using an exit command");
+                        // TODO better verification
+                        if (message->replyToMessage && message->replyToMessage->from->id == bot.getApi().getMe()->id) {
+                            // TODO Extract actual command
+                            SendText(message->text);
+                            bot_sendReplyMessage(bot, message, "Sent the text to subprocess");
+                        } else {
+                            bot_sendReplyMessage(bot, message, "Subprocess is still running, try using an exit command");
+                        }
                         return;
                     }
                 }
                 std::thread sendResThread([&bot, message, command] {
-                    static const char kExitedByTimeout[] = WDT_BITE_STR;
+                    static const char kSubProcessClosed[] = "Subprocess closed due to inactivity";
                     char buf[BASH_READ_BUF];
-                    int rc, count = 0;
-                    bool once_flag = true;
-                    std::string result;
+                    std::string result = "Output:\n";
+                    bool resModified = false;
                     auto sendFallback = std::make_shared<std::atomic_bool>(true);
+                    Message::Ptr resultMessage;
                     const std::lock_guard<std::mutex> _(m);
 
                     SendCommand(command);
 
                     // Write a msg as a fallback if read() hangs
                     std::thread th([sendFallback] {
-                        std_sleep_s(SLEEP_SECONDS);
+                        std_sleep_s(300);  // 5 Mins
+                        // TODO This should be sent as sperate message
                         if (sendFallback->load())
-                            (void)write(child_stdout, kExitedByTimeout, sizeof(kExitedByTimeout));
+                            (void)write(child_stdout, kSubProcessClosed, sizeof(kSubProcessClosed));
                     });
-                    // When rc < 0, most likely it returned EWOUDLBLOCK/EAGAIN
+                    resultMessage = bot_sendReplyMessage(bot, message, result);
                     do {
-                        rc = read(parent_readfd, buf, sizeof(buf));
+                        int rc = read(parent_readfd, buf, sizeof(buf));
                         if (rc > 0) {
                             std::string buf_str(buf, rc);
-                            // Cuz of the shim of "\n", since it is a sperate process,
-                            // may not be read in the same buffer. TODO Remove dirty way
-                            if (isEmptyOrBlank(buf_str) && once_flag) {
-                                // TODO This is a hack
-                                rc = sizeof(buf);
-                                once_flag = false;
-                            } else if (count < BASH_MAX_BUF) {
+                            TrimStr(buf_str);
+                            if (!buf_str.empty()) {
+                                resModified = true;
                                 result.append(buf_str);
-                                count += rc;
+                                bot_editMessage(bot, resultMessage, result);
                             }
                         }
-                        // Exit if read ret != buf size
-                    } while (rc > 0 && rc == sizeof(buf));
-
+                        // Exit if child has nothing more to send to us, or it is reading stdin
+                    } while (HasData(DATA_IN) || !HasData(DATA_OUT));
                     // Was it the fallback input?
-                    if (strncmp(buf, kExitedByTimeout, sizeof(buf))) {
+                    if (strncmp(buf, kSubProcessClosed, sizeof(buf))) {
                         // No? then set to not write fallback and detach
                         sendFallback->store(false);
                         th.detach();
                     } else {
                         // Yes? Do join then
                         if (th.joinable())
-                            th.join();
+                            th.detach();
                     }
-
-                    if (isEmptyOrBlank(result))
+                    TrimStr(result);
+                    if (!resModified) {
                         result = "(No output)";
-                    bot_sendReplyMessage(bot, message, result, 0, true);
+                        bot_editMessage(bot, resultMessage, result);
+                    }
                 });
                 sendResThread.detach();
             } else {
