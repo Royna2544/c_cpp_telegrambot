@@ -190,9 +190,12 @@ void CompileRunHandler<BashHandleData>(const BashHandleData &data) {
 }
 
 static std::optional<std::string> findCommandExe(std::string command) {
-    std::string path;
+    static std::string path;
+    static std::once_flag once;
+    static bool valid;
 
-    if (ConfigManager::getVariable("PATH", path)) {
+    std::call_once(once, [] { valid = ConfigManager::getVariable("PATH", path); });
+    if (valid) {
         auto paths = StringTools::split(path, path_env_delimiter);
         if (IS_DEFINED(__WIN32))
             command.append(".exe");
