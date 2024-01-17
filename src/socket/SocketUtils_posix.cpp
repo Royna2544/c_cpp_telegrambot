@@ -4,6 +4,7 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+#include <cerrno>
 #include <chrono>
 #include <thread>
 
@@ -28,9 +29,18 @@ static int makeSocket(bool is_client) {
     const size_t size = SUN_LEN(&name);
     decltype(&connect) fn = is_client ? connect : bind;
     if (fn(sfd, reinterpret_cast<struct sockaddr*>(&name), size) != 0) {
-        PLOG_E("Failed to %s to socket", is_client ? "connect" : "bind");
-        close(sfd);
-        return ret;
+        do {
+            PLOG_E("Failed to %s to socket", is_client ? "connect" : "bind");
+            if (!is_client && errno == EADDRINUSE) {
+                std::remove(SOCKET_PATH);
+                if (fn(sfd, reinterpret_cast<struct sockaddr*>(&name), size) == 0) {
+                    LOG_I("Bind succeeded by removing socket file");
+                    break;
+                }
+            }
+            close(sfd);
+            return ret;
+        } while (false);
     }
     ret = sfd;
     return ret;
