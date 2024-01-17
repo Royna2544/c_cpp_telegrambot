@@ -14,7 +14,7 @@ _deps
 TgBot++*
 # Lib
 libTgBotDB.a
-libTGBotRes.a
+libTgBotRes.a
 libTgBotSocket.a
 libTgBotUtils.a
 # Cmake generated
