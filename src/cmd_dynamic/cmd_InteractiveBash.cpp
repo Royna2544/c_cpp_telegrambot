@@ -135,10 +135,14 @@ static void do_InteractiveBash(const Bot& bot, const Message::Ptr& message) {
         rc = pipe(tochild) || pipe(toparent);
 
         if (rc) {
+            munmap(piddata, sizeof(pid_t));
             PLOG_E("pipe");
             return;
         }
         if ((pid = fork()) < 0) {
+            munmap(piddata, sizeof(pid_t));
+            for (const auto i : {parent_readfd, parent_writefd, child_stdout, child_stdin})
+                close(i);
             PLOG_E("fork");
             return;
         }
