@@ -11,7 +11,7 @@ static constexpr inline auto sleep_sec = std::chrono::seconds(4);
             LOG_D("Received exit command");
             return true;
         }
-        LOG_D("Received buf with %s, invoke callback!", toStr(conn.cmd).c_str());
+        LOG_D("Received buf with %s, invoke callback!", TgBotCmd_toStr(conn.cmd).c_str());
         cb(conn);
     } else {
         LOG_E("Failed to read from socket: %s", errbuf);

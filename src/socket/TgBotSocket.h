@@ -41,9 +41,9 @@ using ConstArrayElem = std::pair<T, V>;
 template <typename T, typename V, int size>
 using ConstArray = std::array<ConstArrayElem<T, V>, size>;
 
-std::string toStr(TgBotCommand cmd);
-int toCount(TgBotCommand cmd);
-std::string toHelpText(void);
+std::string TgBotCmd_toStr(TgBotCommand cmd);
+int TgBotCmd_toCount(TgBotCommand cmd);
+std::string TgBotCmd_getHelpText(void);
 
 namespace TgBotCommandData {
 struct WriteMsgToChatId {

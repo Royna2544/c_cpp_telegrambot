@@ -37,26 +37,26 @@ const auto kTgBotCommandArgsCount = make_array<ConstArrayElem<TgBotCommand, int>
     ARGUMENT_SIZE(CMD_OBSERVE_ALL_CHATS, 1)      // policy
 );
 
-std::string toStr(TgBotCommand cmd) {
+std::string TgBotCmd_toStr(TgBotCommand cmd) {
     const auto it = find(kTgBotCommandStrMap, cmd);
     ASSERT(it != kTgBotCommandStrMap.end(), "Couldn't find cmd %d in map", cmd);
     return it->second;
 }
 
-int toCount(TgBotCommand cmd) {
+int TgBotCmd_toCount(TgBotCommand cmd) {
     const auto it = find(kTgBotCommandArgsCount, cmd);
     ASSERT(it != kTgBotCommandArgsCount.end(), "Couldn't find cmd %d in map", cmd);
     return it->second;
 }
 
-std::string toHelpText(void) {
+std::string TgBotCmd_getHelpText(void) {
     static std::string helptext;
     static std::once_flag once;
 
     std::call_once(once, [] {
         std::stringstream help;
         for (const auto& ent : kTgBotCommandStrMap) {
-            int count = toCount(ent.first);
+            int count = TgBotCmd_toCount(ent.first);
 
             help << ent.second << ": value " << ent.first << ", Requires "
                  << count << " argument";

@@ -135,7 +135,7 @@ void socketConnectionHandler(const Bot& bot, struct TgBotConnection conn) {
             gObserveAllChats = _data.data_6;
         } break;
         default:
-            LOG_E("Unhandled cmd: %s", toStr(conn.cmd).c_str());
+            LOG_E("Unhandled cmd: %s", TgBotCmd_toStr(conn.cmd).c_str());
             break;
     };
 }
