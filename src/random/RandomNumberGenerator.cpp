@@ -95,7 +95,7 @@ static void RNG_kernrand_shuffle(std::vector<T>& in) {
 }
 #endif
 
-struct RNGType RNGs[] = {
+const static struct RNGType RNGs[] = {
 #ifdef RDRAND_MAYBE_SUPPORTED
     {
         .supported = RNG_rdrand_supported,
@@ -120,12 +120,12 @@ struct RNGType RNGs[] = {
     },
 };
 
-static RNGType* getRNG(void) {
-    static RNGType* rng = nullptr;
+static const RNGType* getRNG(void) {
+    static const RNGType* rng = nullptr;
 
     if (!rng) {
         for (size_t i = 0; i < sizeof(RNGs) / sizeof(RNGType); ++i) {
-            auto thisrng = &RNGs[i];
+            const auto thisrng = &RNGs[i];
             if (thisrng->supported()) {
                 LOG_I("Using '%s' for random number generation", thisrng->name);
                 rng = thisrng;
