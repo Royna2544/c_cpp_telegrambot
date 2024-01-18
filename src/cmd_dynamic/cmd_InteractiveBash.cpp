@@ -44,33 +44,29 @@ static void InvaildatePipe(pipe_t fd) {
     fd[1] = -1;
 }
 
-static bool SendCommand(std::string str, bool internal = false) {
+static bool _SendSomething(std::string str) {
     int rc;
 
     TrimStr(str);
-    if (!internal) {
-        LOG_I("Child <= Command '%s'", str.c_str());
-    }
-    str += "\n";
+    str += '\n';
     rc = write(parent_writefd, str.c_str(), str.size());
     if (rc < 0) {
-        PLOG_E("Write command to parent fd");
+        PLOG_E("Writing text to parent fd");
         return false;
     }
     return true;
 }
 
-static bool SendText(std::string str) {
-    int rc;
-
-    TrimStr(str);
-    LOG_I("Child <= Text '%s'", str.c_str());
-    rc = write(parent_writefd, str.c_str(), str.size());
-    if (rc < 0) {
-        PLOG_E("Write txt to parent fd");
-        return false;
+static bool SendCommand(const std::string& str, bool internal = false) {
+    if (!internal) {
+        LOG_I("Child <= Command '%s'", str.c_str());
     }
-    return true;
+    return _SendSomething(str);
+}
+
+static bool SendText(const std::string& str) {
+    LOG_I("Child <= Text '%s'", str.c_str());
+    return _SendSomething(str);
 }
 
 enum ChildDataDirection : short {
