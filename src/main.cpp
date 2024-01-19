@@ -131,8 +131,7 @@ int main(void) {
         } catch (const TgBot::TgException& e) {
             // Fallback to HTML if no GIF
             LOG_E("Alive cmd: Error while sending GIF: %s", e.what());
-            bot.getApi().sendMessage(message->chat->id, version, false, 
-                0, nullptr, "html");
+            bot_sendReplyMessageHTML(bot, message, version);
         }
 
     });
