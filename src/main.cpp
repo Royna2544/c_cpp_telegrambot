@@ -134,7 +134,7 @@ int main(void) {
             bot.getApi().sendMessage(message->chat->id, version, false, 
                 0, nullptr, "html");
         }
-        
+
     });
     bot_AddCommandPermissive(gBot, "flash", [](const Bot &bot, const Message::Ptr &message) {
         static std::vector<std::string> reasons;
@@ -329,6 +329,28 @@ int main(void) {
             bot_sendReplyMessage(bot, message, ss.str());
         } else {
             bot_sendReplyMessage(bot, message, "Sticker not found in replied-to message");
+        }
+    });
+    bot_AddCommandPermissive(gBot, "fileid", [](const Bot &bot, const Message::Ptr &message) {
+        const auto replyMsg = message->replyToMessage;
+        std::string file, unifile;
+
+        if (replyMsg) {
+            if (replyMsg->sticker) {
+                file = replyMsg->sticker->fileId;
+                unifile = replyMsg->sticker->fileUniqueId;
+            } else if (replyMsg->animation) {
+                file = replyMsg->animation->fileId;
+                unifile = replyMsg->animation->fileUniqueId;
+            } else if (replyMsg->video) {
+                file = replyMsg->video->fileId;
+                unifile = replyMsg->video->fileUniqueId;
+            } else {
+                file = unifile = "Unknown";
+            }
+            bot_sendReplyMessageMarkDown(bot, message, "FileId: `" + file + "`\n" + "FileUniqueId: `" + unifile + '`');
+        } else {
+            bot_sendReplyMessage(bot, message, "Reply to a media");
         }
     });
     gBot.getEvents().onAnyMessage([](const Message::Ptr &msg) {
