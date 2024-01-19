@@ -121,12 +121,20 @@ int main(void) {
             REPLACE_PLACEHOLDER(version, originurl);
             REPLACE_PLACEHOLDER(version, compilerver);
         });
-        // Hardcoded Cum about it GIF
-        bot.getApi().sendAnimation(message->chat->id,
-                                   "CgACAgQAAx0CdY7-CgABARtpZLefgyKNpSLvyCJWcp8"
-                                   "mt5KF_REAAgkDAAI2tFRQIk0uTVxfZnsvBA",
-                                   0, 0, 0, "", version, message->messageId,
-                                   nullptr, "html");
+        try {
+            // Hardcoded Cum about it GIF
+            bot.getApi().sendAnimation(message->chat->id,
+                                    "CgACAgQAAx0CdY7-CgABARtpZLefgyKNpSLvyCJWcp8"
+                                    "mt5KF_REAAgkDAAI2tFRQIk0uTVxfZnsvBA",
+                                    0, 0, 0, "", version, message->messageId,
+                                    nullptr, "html");
+        } catch (const TgBot::TgException& e) {
+            // Fallback to HTML if no GIF
+            LOG_E("Alive cmd: Error while sending GIF: %s", e.what());
+            bot.getApi().sendMessage(message->chat->id, version, false, 
+                0, nullptr, "html");
+        }
+        
     });
     bot_AddCommandPermissive(gBot, "flash", [](const Bot &bot, const Message::Ptr &message) {
         static std::vector<std::string> reasons;
