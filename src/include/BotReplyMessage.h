@@ -22,10 +22,22 @@ using TgBot::MessageEntity;
  */
 static inline Message::Ptr bot_sendReplyMessage(const Bot &bot, const Message::Ptr &message,
                                                 const std::string &text, const MessageId replyToMsg = 0,
-                                                const bool noError = false) {
+                                                const bool noError = false, const std::string parsemode = "") {
     return bot.getApi().sendMessage(message->chat->id, text,
                                     true, (replyToMsg == 0) ? message->messageId : replyToMsg,
-                                    nullptr, "", false, std::vector<MessageEntity::Ptr>(), noError);
+                                    nullptr, parsemode, false, std::vector<MessageEntity::Ptr>(), noError);
+}
+
+static inline Message::Ptr bot_sendReplyMessageMarkDown(const Bot &bot, const Message::Ptr &message,
+                                                const std::string &text, const MessageId replyToMsg = 0,
+                                                const bool noError = false) {
+    return bot_sendReplyMessage(bot, message, text, replyToMsg, false, "markdown");
+}
+
+static inline Message::Ptr bot_sendReplyMessageHTML(const Bot &bot, const Message::Ptr &message,
+                                                const std::string &text, const MessageId replyToMsg = 0,
+                                                const bool noError = false) {
+    return bot_sendReplyMessage(bot, message, text, replyToMsg, false, "html");
 }
 
 /**
