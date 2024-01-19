@@ -48,10 +48,23 @@ find_package(Protobuf REQUIRED)
 include(cmake/ProtobufCpp.cmake)
 my_protobuf_generate_cpp(proto/gen PROTO_SRCS PROTO_HDRS proto/TgBotDB.proto)
 add_library(TgBotDB STATIC src/Database.cpp ${PROTO_SRCS})
+
 get_filename_component(PROTO_HDRS_DIR ${PROTO_HDRS} DIRECTORY)
 target_include_directories(TgBotDB PUBLIC ${PROTO_HDRS_DIR})
 target_include_directories(TgBotDB PRIVATE ${Protobuf_INCLUDE_DIRS})
-target_link_libraries(TgBotDB TgBot TgBotUtils protobuf::libprotobuf)
+
+# Protobuf dep - ABSL
+foreach(ABSL_LIB absl_log_internal_check_op absl_log_internal_message)
+  find_library(TMP_${ABSL_LIB} NAMES ${ABSL_LIB})
+  if(NOT TMP_${ABSL_LIB})
+    message(INFO " Library ${ABSL_LIB} not existent")
+    continue()
+  endif()
+  set(ABSL_LIBS ${ABSL_LIBS} ${TMP_${ABSL_LIB}})
+endforeach()
+
+target_link_libraries(TgBotDB TgBot TgBotUtils protobuf::libprotobuf ${ABSL_LIBS})
+
 
 if(ENFORCE_EN_US)
   add_definitions(-DLOCALE_EN_US)
@@ -111,18 +124,8 @@ set(LD_LIST TgBot TgBotDB TgBotUtils TgBotRes)
 
 # Socket
 if(ENABLE_SOCKET_CONNECT)
-  set(LD_LIST TgBotSocket ${LD_LIST})
+  set(LD_LIST ${LD_LIST} TgBotSocket)
 endif()
-
-# Protobuf dep
-foreach(ABSL_LIB absl_log_internal_check_op absl_log_internal_message)
-  find_library(TMP_${ABSL_LIB} NAMES ${ABSL_LIB})
-  if(NOT TMP_${ABSL_LIB})
-    message(INFO " Library ${ABSL_LIB} not existent")
-    continue()
-  endif()
-  set(LD_LIST ${LD_LIST} ${TMP_${ABSL_LIB}})
-endforeach()
 
 # Windows API
 if(WIN32)
