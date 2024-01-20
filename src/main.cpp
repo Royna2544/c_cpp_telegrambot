@@ -63,9 +63,10 @@ int main(void) {
         LOG_F("Failed to get TOKEN variable");
         return EXIT_FAILURE;
     }
-    database::db.load();
-
     static Bot gBot(token);
+
+    database::db.load();
+    auto ctx = std::make_shared<TimerCtx>();
 
     bot_AddCommandEnforcedCompiler(gBot, "c", ProgrammingLangs::C, [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
         CompileRunHandler(CCppCompileHandleData{{{bot, message}, compiler, "out.c"}});
@@ -269,8 +270,8 @@ int main(void) {
         ss << "Sending reply message took: " << duration<double, std::milli>(afterSend - beforeSend).count() << "ms" << std::endl;
         bot_editMessage(bot, sentMsg, ss.str());
     });
-    bot_AddCommandEnforced(gBot, "starttimer", startTimer);
-    bot_AddCommandEnforced(gBot, "stoptimer", stopTimer);
+    bot_AddCommandEnforced(gBot, "starttimer", std::bind(startTimer, pholder1, pholder2, ctx));
+    bot_AddCommandEnforced(gBot, "stoptimer", std::bind(stopTimer, pholder1, pholder2, ctx));
     bot_AddCommandPermissive(gBot, "decho", [](const Bot &bot, const Message::Ptr &message) {
         const auto replyMsg = message->replyToMessage;
         const auto chatId = message->chat->id;
@@ -358,8 +359,6 @@ int main(void) {
         if (!gObservedChatIds.empty() || gObserveAllChats)
             processObservers(msg);
 #endif
-        if (!msg->text.empty())
-            processRegEXCommand(gBot, msg);
         spamBlocker(gBot, msg);
     });
 
@@ -373,13 +372,13 @@ int main(void) {
     });
 #endif
 #ifdef RTCOMMAND_LOADER
-    loadCommandsFromFile(gBot, getSrcRoot() + "/modules.load");
+    loadCommandsFromFile(gBot, getSrcRoot() / "modules.load");
 #endif
     static auto cleanupFn = [](int s) {
         static std::once_flag once;
         std::call_once(once, [s] {
             LOG_I("Exiting with signal %d", s);
-            forceStopTimer();
+//          forceStopTimer(ctx);
             database::db.save();
 #ifdef SOCKET_CONNECTION
             if (th.joinable()) {

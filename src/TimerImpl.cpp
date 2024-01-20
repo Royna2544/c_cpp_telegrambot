@@ -2,30 +2,51 @@
 #include <ExtArgs.h>
 #include <Logging.h>
 #include <NamespaceImport.h>
-#include <Timer.h>
+#include <TimerImpl.h>
 
+#include <atomic>
+#include <chrono>
 #include <cmath>
-#include <optional>
+#include <sstream>
 
-struct Timerpriv {
-    MessageId messageid;
-    const Bot *bot;
-    bool botcanpin, sendendmsg;
-    UserId chatid;
-};
+template <class Dur>
+std::chrono::hours to_hours(Dur&& it) {
+    return std::chrono::duration_cast<std::chrono::hours>(it);
+}
 
-static std::optional<Timer<Timerpriv>> tm_ptr = std::nullopt;
+template <class Dur>
+std::chrono::minutes to_mins(Dur&& it) {
+    return std::chrono::duration_cast<std::chrono::minutes>(it);
+}
 
-enum InputState {
-    HOUR,
-    MINUTE,
-    SECOND,
-    NONE,
-};
+template <class Dur>
+std::chrono::seconds to_secs(Dur&& it) {
+    return std::chrono::duration_cast<std::chrono::seconds>(it);
+}
 
-void startTimer(const Bot &bot, const Message::Ptr &message) {
+template <class Dur>
+std::string to_string(const Dur out) {
+    const auto hms = std::chrono::hh_mm_ss(out);
+    std::stringstream ss;
+
+    ss << hms.hours().count() << "h " << hms.minutes().count() << "m " << hms.seconds().count() << "s";
+    return ss.str();
+}
+
+static constexpr int TIMER_CONFIG_SEC = 5;
+
+
+static bool parseTimerArguments(const Bot &bot, const Message::Ptr &message, 
+                                const std::shared_ptr<TimerCtx> ctx, std::chrono::seconds& out) {
     bool found = false;
-    std::string msg;
+        std::string msg;
+    enum {
+        HOUR,
+        MINUTE,
+        SECOND,
+        NONE,
+    } state = NONE;
+
     if (hasExtArgs(message)) {
         parseExtArgs(message, msg);
         found = true;
@@ -36,17 +57,14 @@ void startTimer(const Bot &bot, const Message::Ptr &message) {
     }
     if (!found) {
         bot_sendReplyMessage(bot, message, "Send or reply to a time, in hhmmss format");
-        return;
+        return false;
     }
-    if (tm_ptr && tm_ptr->isrunning()) {
-        bot_sendReplyMessage(bot, message,
-                             "Timer is already running");
-        return;
+    if (ctx && ctx->isactive) {
+        bot_sendReplyMessage(bot, message, "Timer is already running");
+        return false;
     }
     const char *c_str = msg.c_str();
     std::vector<int> numbercache;
-    enum InputState state = InputState::NONE;
-    struct timehms hms = {0};
     for (size_t i = 0; i <= msg.size(); i++) {
         int code = static_cast<int>(c_str[i]);
         if (i == msg.size()) code = ' ';
@@ -59,41 +77,41 @@ void startTimer(const Bot &bot, const Message::Ptr &message) {
                         count++;
                     }
                     switch (state) {
-                        case InputState::HOUR:
-                            hms.h = result;
+                        case HOUR:
+                            out += to_secs(std::chrono::hours(result));
                             break;
-                        case InputState::MINUTE:
-                            hms.m = result;
+                        case MINUTE:
+                            out += to_secs(std::chrono::minutes(result));
                             break;
-                        case InputState::SECOND:
-                            hms.s = result;
+                        case SECOND:
+                            out += to_secs(std::chrono::seconds(result));
                             break;
                         default:
                             break;
                     }
-                    state = InputState::NONE;
+                    state = NONE;
                     numbercache.clear();
                 }
                 break;
             }
             case '0' ... '9': {
-                int intver = code - 48;
+                int intver = code - '0';
                 numbercache.push_back(intver);
                 break;
             }
             case 'H':
             case 'h': {
-                state = InputState::HOUR;
+                state = HOUR;
                 break;
             }
             case 'M':
             case 'm': {
-                state = InputState::MINUTE;
+                state = MINUTE;
                 break;
             }
             case 'S':
             case 's': {
-                state = InputState::SECOND;
+                state = SECOND;
                 break;
             }
             default: {
@@ -101,102 +119,81 @@ void startTimer(const Bot &bot, const Message::Ptr &message) {
                                      "Invalid value provided.\nShould contain only h, m, s, "
                                      "numbers, spaces. (ex. 1h 20m 7s)");
 
-                return;
+                return false;
             }
         }
     }
-    // If h is not specified...
-    if (hms.h == 0) {
-        // And m is not set...
-        if (hms.m == 0 && hms.s != 0) {
-            // ... fill other fields based on s
-            // TODO De-hardcode 60 here
-            auto s = hms.s;
-            hms.h = s / 3600;
-            hms.m = s % 3600 / 60;
-            hms.s = s % 3600 % 60;
-        }
-        // And s is not set...
-        else if (hms.m != 0 && hms.s == 0) {
-            // TODO Hardcoded 60 again here
-            hms.h = hms.m / 60;
-            hms.m %= 60;
-        }
-    }
-
-#define TIMER_CONFIG_SEC 5
-    if (hms.toSeconds() == 0) {
+    if (out.count() == 0) {
         bot_sendReplyMessage(bot, message, "I'm not a fool to time 0s");
-        return;
-    } else if (hms.toSeconds() < TIMER_CONFIG_SEC) {
+        return false;
+    } else if (out.count() < TIMER_CONFIG_SEC) {
         bot_sendReplyMessage(bot, message, "Provide longer time value");
-        return;
-    } else if (hms.h > 2) {
+        return false;
+    } else if (to_hours(out).count() > 2) {
         bot_sendReplyMessage(bot, message,
-                             "Time provided is too long, which is: " +
-                                 static_cast<std::string>(hms));
-        return;
+                   "Time provided is too long, which is: " + to_string(out));
+        return false;
     }
-    const int msgid = bot.getApi()
-                          .sendMessage(message->chat->id,
-                                       "Timer starting: " + static_cast<std::string>(hms))
-                          ->messageId;
-    bool couldpin = true;
-    try {
-        bot.getApi().pinChatMessage(message->chat->id, msgid);
-    } catch (const std::exception &) {
-        LOG_W("Cannot pin msg!");
-        couldpin = false;
-    }
-    tm_ptr = std::optional<Timer<Timerpriv>>({hms.h, hms.m, hms.s});
-    tm_ptr->setCallback(
-        [=](const Timerpriv *priv, struct timehms ms) {
-            const auto bot = priv->bot;
-            auto str = static_cast<std::string>(ms);
-            if (!str.empty() && str != message->text && bot)
-                bot->getApi().editMessageText(str, message->chat->id, priv->messageid);
-        },
-        TIMER_CONFIG_SEC,
-        [=](const Timerpriv *priv) {
-            const auto bot = priv->bot;
-            if (bot) {
-                bot->getApi().editMessageText("Timer ended", message->chat->id,
-                                              priv->messageid);
-                if (priv->sendendmsg)
-                    bot->getApi().sendMessage(message->chat->id, "Timer ended");
-                std_sleep(1s);
-                if (priv->botcanpin)
-                    bot->getApi().unpinChatMessage(message->chat->id,
-                                                   priv->messageid);
-            }
-            tm_ptr = std::nullopt;
-        },
-        {msgid, &bot, couldpin, true, message->chat->id});
-    tm_ptr->start();
+    return true;
 }
 
-void stopTimer(const Bot &bot, const Message::Ptr &message) {
-    bool ret = false;
-    const char *text = nullptr;
-    if (tm_ptr) {
-        ret = tm_ptr->cancel([&](Timerpriv *t) -> bool {
-            const bool allowed = t->chatid == message->chat->id;
-            if (allowed) t->sendendmsg = false;
-            return allowed;
+void startTimer(const Bot &bot, const Message::Ptr message, std::shared_ptr<TimerCtx> ctx) {
+    std::chrono::seconds parsedTime(0);
+
+    if (parseTimerArguments(bot, message, ctx, parsedTime) && message->chat) {
+        ctx->message = bot.getApi().sendMessage(message->chat->id,
+                                    "Timer starting: " + to_string(parsedTime));
+        ctx->botcanpin = true;
+        try {
+            bot.getApi().pinChatMessage(message->chat->id, ctx->message->messageId);
+        } catch (const TgBot::TgException &) {
+            LOG_W("Cannot pin msg!");
+            ctx->botcanpin = false;
+        }
+        ctx->isactive = true;
+        ctx->kStop = false;
+        ctx->threadP = std::thread([&bot, parsedTime, ctx]() {
+            auto timer = parsedTime;
+            while (timer > 0s && !ctx->kStop) {
+                std_sleep_s(1);
+                if (timer.count() % TIMER_CONFIG_SEC == 0) {
+                    bot_editMessage(bot, ctx->message, to_string(timer));
+                }
+                timer -= 1s;
+            }
+            bot_editMessage(bot, ctx->message, "Timer ended");
+            if (ctx->sendendmsg)
+                bot.getApi().sendMessage(ctx->message->chat->id, "Timer ended");
+            std_sleep(1s);
+            if (ctx->botcanpin)
+                bot.getApi().unpinChatMessage(ctx->message->chat->id, ctx->message->messageId);
+            ctx->isactive = false;
         });
-        if (ret) {
+    }
+}
+
+void stopTimer(const Bot &bot, const Message::Ptr message, std::shared_ptr<TimerCtx> ctx) {
+    std::string text;
+    if (ctx && ctx->isactive) {
+        const bool allowed = ctx->message->chat->id == message->chat->id;
+        ctx->sendendmsg = !allowed;
+        if (allowed) {
+            ctx->kStop = true;
+            ctx->threadP.join();
             text = "Stopped successfully";
-        } else
+        } else {
             text = "Timer is running on other group.";
-    } else
+        }
+    } else {
         text = "Timer is not running";
+    }
     bot_sendReplyMessage(bot, message, text);
 }
 
-void forceStopTimer(void) {
-    if (tm_ptr) {
+void forceStopTimer(std::shared_ptr<TimerCtx> ctx) {
+    if (ctx && ctx->isactive) {
         LOG_I("Canceling timer and cleaning up...");
-        tm_ptr->cancel();
-        std_sleep(4s);  // Time for cleanup. e.g. Unpinning
+        ctx->kStop = true;
+        ctx->threadP.join();
     }
 }
