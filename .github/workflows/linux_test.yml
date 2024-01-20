@@ -18,6 +18,8 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: mjp41/workaround8649@c8550b715ccdc17f89c8d5c28d7a48eeff9c94a8
+
       - name: Set up dependencies
         run: |
           ./scripts/deps.sh
