@@ -150,12 +150,9 @@ int main(void) {
             std::stringstream ss;
 
             ASSIGN_INCTXT_DATA(FlashTxt, buf);
-            ss = std::stringstream(buf);
-            while (std::getline(ss, line)) {
-                if (!line.empty())
-                    reasons.emplace_back(line);
-            }
+            splitAndClean(buf, reasons);
         });
+
         if (message->replyToMessage != nullptr) {
             msg = message->replyToMessage->text;
             if (msg.empty()) {
@@ -169,30 +166,24 @@ int main(void) {
             }
             parseExtArgs(message, msg);
         }
-        for (const auto c : msg) {
-            if (c == '\n') {
-                bot_sendReplyMessage(bot, message, "Zip names shouldn't have newlines");
-                return;
-            }
+        if (msg.find('\n') != std::string::npos) {
+            bot_sendReplyMessage(bot, message, "Invalid input: Zip names shouldn't have newlines");
+            return;
         }
-        if (!std::regex_match(StringTools::split(msg, '\n').front(), kFlashTextRegEX)) {
-            std::replace(msg.begin(), msg.end(), ' ', '_');
-            if (!StringTools::endsWith(msg, kZipExtentionSuffix)) {
-                msg += kZipExtentionSuffix;
-            }
-            ss << "Flashing '" << msg << "'..." << std::endl;
-            sentmsg = bot_sendReplyMessage(bot, message, ss.str());
-            std_sleep_s(genRandomNumber(5));
-            if (const size_t pos = genRandomNumber(reasons.size()); pos != reasons.size()) {
-                ss << "Failed successfully!" << std::endl;
-                ss << "Reason: " << reasons[pos];
-            } else {
-                ss << "Success! Chance was 1/" << reasons.size();
-            }
-            bot_editMessage(bot, sentmsg, ss.str());
+        std::replace(msg.begin(), msg.end(), ' ', '_');
+        if (!StringTools::endsWith(msg, kZipExtentionSuffix)) {
+            msg += kZipExtentionSuffix;
+        }
+        ss << "Flashing '" << msg << "'..." << std::endl;
+        sentmsg = bot_sendReplyMessage(bot, message, ss.str());
+        std_sleep_s(genRandomNumber(5));
+        if (const size_t pos = genRandomNumber(reasons.size()); pos != reasons.size()) {
+            ss << "Failed successfully!" << std::endl;
+            ss << "Reason: " << reasons[pos];
         } else {
-            bot_sendReplyMessage(bot, message, "Do not try to recurse flash command, Else I'll nuke u");
+            ss << "Success! Chance was 1/" << reasons.size();
         }
+        bot_editMessage(bot, sentmsg, ss.str());
     });
     bot_AddCommandPermissive(gBot, "possibility", [](const Bot &bot, const Message::Ptr &message) {
         constexpr int PERCENT_MAX = 100;
@@ -204,21 +195,12 @@ int main(void) {
         std::string text;
         parseExtArgs(message, text);
         std::stringstream ss(text), out;
-        std::string line, last;
-        std::vector<std::string> vec;
+        std::string last;
         std::unordered_map<std::string, int> map;
+        std::vector<std::string> vec;
 
-        int numlines = 1;
-        for (const char c : message->text) {
-            if (c == '\n') numlines++;
-        }
-        vec.reserve(numlines);
-        map.reserve(numlines);
-        while (std::getline(ss, line, '\n')) {
-            if (isEmptyOrBlank(line))
-                continue;
-            vec.push_back(line);
-        }
+        splitAndClean(text, vec);
+        map.reserve(vec.size());
         if (vec.size() == 1) {
             bot_sendReplyMessage(bot, message, "Give more than 1 choice");
             return;
