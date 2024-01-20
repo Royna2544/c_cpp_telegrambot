@@ -41,7 +41,7 @@ static void *file_load(void) {
         LOG_E("Cannot find HOME");
         return nullptr;
     }
-    const auto confPath = (std::filesystem::path(home) / ".tgbot_config").u8string();
+    const auto confPath = (std::filesystem::path(home) / ".tgbot_config").string();
     std::ifstream ifs(confPath);
     if (ifs.fail()) {
         LOG_E("Opening %s failed", confPath.c_str());
