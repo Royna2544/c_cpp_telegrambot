@@ -58,7 +58,7 @@ struct DatabaseWrapper {
         loaded = true;
     }
     void save(void) const {
-        if (warnNoLoaded()) {
+        if (warnNoLoaded(__func__)) {
             std::fstream output(fname, std::ios::out | std::ios::trunc | std::ios::binary);
             assert(output);
             protodb.SerializeToOstream(&output);
@@ -68,16 +68,17 @@ struct DatabaseWrapper {
         return &protodb;
     }
     UserId maybeGetOwnerId() const {
-        if (warnNoLoaded() && protodb.has_ownerid())
+        if (warnNoLoaded(__func__) && protodb.has_ownerid())
             return protodb.ownerid();
         else
             return -1;
     }
 
    private:
-    bool warnNoLoaded(void) const {
-        if (!loaded)
-            LOG_W("Database not loaded");
+    bool warnNoLoaded(const char* func) const {
+        if (!loaded) {
+            LOG_W("Database not loaded! Called function: '%s'", func);
+        }
         return loaded;
     }
     Database protodb;
