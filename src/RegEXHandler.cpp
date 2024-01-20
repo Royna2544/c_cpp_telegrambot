@@ -25,8 +25,8 @@ class OptionalWrapper {
     std::optional<T> val;
 
    public:
-    OptionalWrapper<T>(const std::optional<T> _val) : val(_val) {}
-    OptionalWrapper<T>() : val(std::nullopt) {}
+    OptionalWrapper(const std::optional<T> _val) : val(_val) {}
+    OptionalWrapper() : val(std::nullopt) {}
 
     bool has_value() const {
         return val.has_value();
