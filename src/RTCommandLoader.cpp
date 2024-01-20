@@ -2,6 +2,7 @@
 #include <Logging.h>
 #include <dlfcn.h>
 
+#include <filesystem>
 #include <vector>
 
 #include "cmd_dynamic/cmd_dynamic.h"
@@ -30,7 +31,7 @@ static void commandStub(const Bot& bot, const Message::Ptr& message) {
     bot_sendReplyMessage(bot, message, "Unsupported command");
 }
 
-void loadOneCommand(Bot& bot, const std::string& fname) {
+void loadOneCommand(Bot& bot, const std::filesystem::path fname) {
     void* handle = dlopen(fname.c_str(), RTLD_NOW);
     struct dynamicCommand* sym = nullptr;
     command_callback_t fn;
@@ -68,9 +69,9 @@ void loadOneCommand(Bot& bot, const std::string& fname) {
     LOG_I("Module dump: { enforced: %d, supported: %d, name: %s, fn: %p }", sym->enforced, isSupported, sym->name, fnptr);
 }
 
-void loadCommandsFromFile(Bot& bot, const std::string& filename) {
+void loadCommandsFromFile(Bot& bot, const std::filesystem::path filename) {
     std::string line;
-    std::ifstream ifs(filename);
+    std::ifstream ifs(filename.string());
     if (ifs) {
         while (std::getline(ifs, line)) {
             static const std::string kModulesDir = "src/cmd_dynamic/";

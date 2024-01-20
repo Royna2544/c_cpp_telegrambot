@@ -63,7 +63,7 @@ int main(void) {
         LOG_F("Failed to get TOKEN variable");
         return EXIT_FAILURE;
     }
-    database::db.load((getSrcRoot() + "/" + kDatabaseFile));
+    database::db.load();
 
     static Bot gBot(token);
 

@@ -19,7 +19,7 @@ static void dumpList(const PersonList& list, const char* name) {
 }
 
 int main(void) {
-    db.load((getSrcRoot() + "/" + kDatabaseFile));
+    db.load();
 
     std::cout << "Owner ID: ";
     if (db->has_ownerid()) {

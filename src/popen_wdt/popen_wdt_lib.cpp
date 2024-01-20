@@ -3,7 +3,6 @@
 
 #include <mutex>
 #include <stdexcept>
-#include <string>
 
 #include "popen_wdt.h"
 
@@ -23,14 +22,17 @@ bool runCommand(const std::string& command, std::string& result) {
     return false;
 }
 
-std::string getSrcRoot() {
-    static std::string dir;
+std::filesystem::path getSrcRoot() {
+    static std::filesystem::path dir;
     static std::once_flag flag;
     std::call_once(flag, [] {
-        bool ret = ConfigManager::getVariable("SRC_ROOT", dir);
-        if (!ret && !runCommand("git rev-parse --show-toplevel", dir)) {
+        std::string dir_str;
+        bool ret = ConfigManager::getVariable("SRC_ROOT", dir_str);
+        if (!ret && !runCommand("git rev-parse --show-toplevel", dir_str)) {
             throw std::runtime_error("Command failed");
         }
+        dir = dir_str;
+        dir.make_preferred();
     });
     return dir;
 }

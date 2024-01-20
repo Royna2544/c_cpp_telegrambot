@@ -7,11 +7,17 @@
 #include <tgbot/types/Message.h>
 
 #include <fstream>
+#include <string>
 #include <optional>
 
 #include "NamespaceImport.h"
+#include "../popen_wdt/popen_wdt.h"
 
 static inline const char kDatabaseFile[] = "tgbot.pb";
+
+inline std::filesystem::path getDatabaseFile() {
+    return getSrcRoot() / std::string(kDatabaseFile);
+}
 
 namespace database {
 
@@ -50,8 +56,8 @@ struct DatabaseWrapper {
     ~DatabaseWrapper() {
         save();
     }
-    void load(const std::string& _fname) {
-        fname = _fname;
+    void load(void) {
+        fname = getDatabaseFile().string();
         std::fstream input(fname, std::ios::in | std::ios::binary);
         assert(input);
         protodb.ParseFromIstream(&input);

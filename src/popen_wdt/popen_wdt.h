@@ -42,6 +42,7 @@ _END_DECLS
 
 #ifdef __cplusplus
 #include <string>
+#include <filesystem>
 
 /**
  * runCommand - Runs a command and store result into buffer
@@ -57,6 +58,6 @@ bool runCommand(const std::string& command, std::string& res);
  *
  * @return source root directory path
  */
-std::string getSrcRoot();
+std::filesystem::path getSrcRoot();
 
 #endif
