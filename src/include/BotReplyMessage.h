@@ -31,19 +31,19 @@ static Message::Ptr _bot_sendReplyMessage(const Bot &bot, const Message::Ptr &me
 static inline Message::Ptr bot_sendReplyMessage(const Bot &bot, const Message::Ptr &message,
                                                 const std::string &text, const MessageId replyToMsg = 0,
                                                 const bool noError = false, const std::string parsemode = "") {
-    return _bot_sendReplyMessage(bot, message, text, replyToMsg, false, "");
+    return _bot_sendReplyMessage(bot, message, text, replyToMsg, noError, "");
 }
 
 static inline Message::Ptr bot_sendReplyMessageMarkDown(const Bot &bot, const Message::Ptr &message,
                                                 const std::string &text, const MessageId replyToMsg = 0,
                                                 const bool noError = false) {
-    return _bot_sendReplyMessage(bot, message, text, replyToMsg, false, "markdown");
+    return _bot_sendReplyMessage(bot, message, text, replyToMsg, noError, "markdown");
 }
 
 static inline Message::Ptr bot_sendReplyMessageHTML(const Bot &bot, const Message::Ptr &message,
                                                 const std::string &text, const MessageId replyToMsg = 0,
                                                 const bool noError = false) {
-    return _bot_sendReplyMessage(bot, message, text, replyToMsg, false, "html");
+    return _bot_sendReplyMessage(bot, message, text, replyToMsg, noError, "html");
 }
 
 /**
