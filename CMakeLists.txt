@@ -12,7 +12,7 @@ if (NOT IS_NOT_X86)
   add_compile_options(-mrdrnd)
 endif()
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -64,7 +64,6 @@ foreach(ABSL_LIB absl_log_internal_check_op absl_log_internal_message)
 endforeach()
 
 target_link_libraries(TgBotDB TgBot TgBotUtils protobuf::libprotobuf ${ABSL_LIBS})
-
 
 if(ENFORCE_EN_US)
   add_definitions(-DLOCALE_EN_US)
@@ -120,7 +119,7 @@ endif()
 add_executable(${PROJECT_NAME} ${SRC_LIST})
 
 # Default LD-list
-set(LD_LIST TgBot TgBotDB TgBotUtils TgBotRes)
+set(LD_LIST TgBot TgBotDB TgBotUtils TgBotRes ${ABSL_LIBS})
 
 # Socket
 if(ENABLE_SOCKET_CONNECT)
@@ -137,4 +136,4 @@ target_link_libraries(${PROJECT_NAME} ${LD_LIST})
 # Protobuf DB Dumper
 set(DBDUMPER_NAME ${PROJECT_NAME}_dumpDB)
 add_executable(${DBDUMPER_NAME} proto/DumpProtoDB.cc)
-target_link_libraries(${DBDUMPER_NAME} TgBotDB TgBotUtils)
+target_link_libraries(${DBDUMPER_NAME} TgBotDB TgBotUtils ${ABSL_LIBS})
