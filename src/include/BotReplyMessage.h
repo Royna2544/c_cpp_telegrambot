@@ -20,24 +20,30 @@ using TgBot::MessageEntity;
  * @param noError Do not throw exceptions when sending a reply message fails, default false
  * @return The replied message object, if sent.
  */
-static inline Message::Ptr bot_sendReplyMessage(const Bot &bot, const Message::Ptr &message,
-                                                const std::string &text, const MessageId replyToMsg = 0,
-                                                const bool noError = false, const std::string parsemode = "") {
+static Message::Ptr _bot_sendReplyMessage(const Bot &bot, const Message::Ptr &message,
+                                            const std::string &text, const MessageId replyToMsg = 0,
+                                            const bool noError = false, const std::string parsemode = "") {
     return bot.getApi().sendMessage(message->chat->id, text,
                                     true, (replyToMsg == 0) ? message->messageId : replyToMsg,
                                     nullptr, parsemode, false, std::vector<MessageEntity::Ptr>(), noError);
 }
 
+static inline Message::Ptr bot_sendReplyMessage(const Bot &bot, const Message::Ptr &message,
+                                                const std::string &text, const MessageId replyToMsg = 0,
+                                                const bool noError = false, const std::string parsemode = "") {
+    return _bot_sendReplyMessage(bot, message, text, replyToMsg, false, "");
+}
+
 static inline Message::Ptr bot_sendReplyMessageMarkDown(const Bot &bot, const Message::Ptr &message,
                                                 const std::string &text, const MessageId replyToMsg = 0,
                                                 const bool noError = false) {
-    return bot_sendReplyMessage(bot, message, text, replyToMsg, false, "markdown");
+    return _bot_sendReplyMessage(bot, message, text, replyToMsg, false, "markdown");
 }
 
 static inline Message::Ptr bot_sendReplyMessageHTML(const Bot &bot, const Message::Ptr &message,
                                                 const std::string &text, const MessageId replyToMsg = 0,
                                                 const bool noError = false) {
-    return bot_sendReplyMessage(bot, message, text, replyToMsg, false, "html");
+    return _bot_sendReplyMessage(bot, message, text, replyToMsg, false, "html");
 }
 
 /**
