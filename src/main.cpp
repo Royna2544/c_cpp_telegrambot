@@ -66,7 +66,7 @@ int main(void) {
     static Bot gBot(token);
 
     database::db.load();
-    auto ctx = std::make_shared<TimerCtx>();
+    static auto ctx = std::make_shared<TimerCtx>();
 
     bot_AddCommandEnforcedCompiler(gBot, "c", ProgrammingLangs::C, [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
         CompileRunHandler(CCppCompileHandleData{{{bot, message}, compiler, "out.c"}});
@@ -363,7 +363,7 @@ int main(void) {
         static std::once_flag once;
         std::call_once(once, [s] {
             LOG_I("Exiting with signal %d", s);
-//          forceStopTimer(ctx);
+            forceStopTimer(ctx);
             database::db.save();
 #ifdef SOCKET_CONNECTION
             if (th.joinable()) {
