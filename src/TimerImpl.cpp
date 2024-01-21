@@ -10,17 +10,17 @@
 #include <sstream>
 
 template <class Dur>
-std::chrono::hours to_hours(Dur&& it) {
+std::chrono::hours to_hours(Dur &&it) {
     return std::chrono::duration_cast<std::chrono::hours>(it);
 }
 
 template <class Dur>
-std::chrono::minutes to_mins(Dur&& it) {
+std::chrono::minutes to_mins(Dur &&it) {
     return std::chrono::duration_cast<std::chrono::minutes>(it);
 }
 
 template <class Dur>
-std::chrono::seconds to_secs(Dur&& it) {
+std::chrono::seconds to_secs(Dur &&it) {
     return std::chrono::duration_cast<std::chrono::seconds>(it);
 }
 
@@ -35,11 +35,10 @@ std::string to_string(const Dur out) {
 
 static constexpr int TIMER_CONFIG_SEC = 5;
 
-
-static bool parseTimerArguments(const Bot &bot, const Message::Ptr &message, 
-                                const std::shared_ptr<TimerCtx> ctx, std::chrono::seconds& out) {
+static bool parseTimerArguments(const Bot &bot, const Message::Ptr &message,
+                                const std::shared_ptr<TimerCtx> ctx, std::chrono::seconds &out) {
     bool found = false;
-        std::string msg;
+    std::string msg;
     enum {
         HOUR,
         MINUTE,
@@ -131,7 +130,7 @@ static bool parseTimerArguments(const Bot &bot, const Message::Ptr &message,
         return false;
     } else if (to_hours(out).count() > 2) {
         bot_sendReplyMessage(bot, message,
-                   "Time provided is too long, which is: " + to_string(out));
+                             "Time provided is too long, which is: " + to_string(out));
         return false;
     }
     return true;
@@ -142,7 +141,7 @@ void startTimer(const Bot &bot, const Message::Ptr message, std::shared_ptr<Time
 
     if (parseTimerArguments(bot, message, ctx, parsedTime) && message->chat) {
         ctx->message = bot.getApi().sendMessage(message->chat->id,
-                                    "Timer starting: " + to_string(parsedTime));
+                                                "Timer starting: " + to_string(parsedTime));
         ctx->botcanpin = true;
         try {
             bot.getApi().pinChatMessage(message->chat->id, ctx->message->messageId);
