@@ -60,10 +60,12 @@ foreach(ABSL_LIB absl_log_internal_check_op absl_log_internal_message)
     message(INFO " Library ${ABSL_LIB} not existent")
     continue()
   endif()
+  get_filename_component(TMP_${ABSL_LIB} ${TMP_${ABSL_LIB}} NAME_WE)
+  string(REPLACE lib "" TMP_${ABSL_LIB} ${TMP_${ABSL_LIB}})
   set(ABSL_LIBS ${ABSL_LIBS} ${TMP_${ABSL_LIB}})
 endforeach()
 
-target_link_libraries(TgBotDB TgBot TgBotUtils protobuf::libprotobuf ${ABSL_LIBS})
+target_link_libraries(TgBotDB TgBot TgBotUtils protobuf::libprotobuf protobuf ${ABSL_LIBS})
 
 if(ENFORCE_EN_US)
   add_definitions(-DLOCALE_EN_US)
