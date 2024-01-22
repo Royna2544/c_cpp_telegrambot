@@ -58,7 +58,7 @@ bool startListening(const listener_callback_t& cb) {
         while (!should_break) {
             struct sockaddr_un addr {};
             struct TgBotConnection conn {};
-            unsigned int len = sizeof(addr);
+            addrlen_t len = sizeof(addr);
 
             LOG_D("Waiting for connection");
             const int cfd = accept(sfd, (struct sockaddr*)&addr, &len);
