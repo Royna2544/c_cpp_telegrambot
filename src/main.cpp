@@ -124,10 +124,9 @@ int main(void) {
             REPLACE_PLACEHOLDER(version, compilerver);
         });
         try {
-            // Hardcoded Cum about it GIF
+            // Hardcoded kys GIF
             bot.getApi().sendAnimation(message->chat->id,
-                                    "CgACAgQAAx0CdY7-CgABARtpZLefgyKNpSLvyCJWcp8"
-                                    "mt5KF_REAAgkDAAI2tFRQIk0uTVxfZnsvBA",
+                                    "CgACAgIAAx0CdMESqgACCZRlrfMoq_b2DL21k6ohShQzzLEh6gACsw4AAuSZWUmmR3jSJA9WxzQE",
                                     0, 0, 0, "", version, message->messageId,
                                     nullptr, "html");
         } catch (const TgBot::TgException& e) {
