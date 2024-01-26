@@ -22,7 +22,8 @@ auto find(Container& c, T val) {
 #define ENUM_STR(enum) std::make_pair(enum, #enum)
 #define ARGUMENT_SIZE(enum, len) std::make_pair(enum, len)
 
-const auto kTgBotCommandStrMap = make_array<ConstArrayElem<TgBotCommand, std::string>, CMD_MAX - 1>(
+const auto kTgBotCommandStrMap = make_array<ConstArrayElem<TgBotCommand, std::string>, CMD_MAX>(
+    ENUM_STR(CMD_EXIT),
     ENUM_STR(CMD_WRITE_MSG_TO_CHAT_ID),
     ENUM_STR(CMD_CTRL_SPAMBLOCK),
     ENUM_STR(CMD_OBSERVE_CHAT_ID),

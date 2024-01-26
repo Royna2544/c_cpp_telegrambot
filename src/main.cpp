@@ -35,6 +35,7 @@
 
 #include "RuntimeException.h"
 #include "StringToolsExt.h"
+#include "socket/TgBotSocket.h"
 #include "tgbot/TgException.h"
 #include "tgbot/tools/StringTools.h"
 
@@ -349,12 +350,23 @@ int main(void) {
 
 #ifdef SOCKET_CONNECTION
     static std::thread th;
-    static std::atomic_bool socketSucceeded = true;
+    static std::atomic_bool socketValid = true;
+    static std::string exitToken;
+
     th = std::thread([] {
-        socketSucceeded = startListening([](struct TgBotConnection conn) {
+        socketValid = startListening([](struct TgBotConnection conn) {
             socketConnectionHandler(gBot, conn);
         });
     });
+    exitToken = StringTools::generateRandomString(sizeof(TgBotCommandUnion::data_2.token) - 1);
+    LOG_D("Generated token: %s", exitToken.c_str());
+    
+    TgBotCommandData::Exit e;
+    e.op = ExitOp::SET_TOKEN;
+    strncpy(e.token, exitToken.c_str(), sizeof(e.token) - 1);
+
+    std_sleep_s(3);
+    writeToSocket({CMD_EXIT, {.data_2 = e}});
 #endif
 #ifdef RTCOMMAND_LOADER
     loadCommandsFromFile(gBot, getSrcRoot() / "modules.load");
@@ -366,10 +378,23 @@ int main(void) {
             forceStopTimer(ctx);
             database::db.save();
 #ifdef SOCKET_CONNECTION
-            if (th.joinable()) {
-                if (socketSucceeded)
-                    writeToSocket({CMD_EXIT, {.data_2 = nullptr}});
-                th.join();
+            std::error_code ec;
+            if (!std::filesystem::exists(SOCKET_PATH, ec)) {
+                LOG_W("Socket file was deleted");
+                socketValid = false;
+            }
+            if (socketValid) {
+                if (th.joinable()) {
+                    TgBotCommandData::Exit e;
+                    e.op = ExitOp::DO_EXIT;
+                    strncpy(e.token, exitToken.c_str(), sizeof(e.token) - 1);
+                    writeToSocket({CMD_EXIT, {.data_2 = e}});
+                    th.join();
+                }
+            } else {
+                if (th.joinable()) {
+                    th.detach();
+                }
             }
 #endif
         });

@@ -36,6 +36,11 @@ enum FileType {
     TYPE_MAX
 };
 
+enum ExitOp {
+    SET_TOKEN,
+    DO_EXIT,
+};
+
 template <typename T, typename V>
 using ConstArrayElem = std::pair<T, V>;
 template <typename T, typename V, int size>
@@ -51,7 +56,10 @@ struct WriteMsgToChatId {
     char msg[2048];  // Msg to send
 };
 
-using Exit = void *;
+struct Exit {
+    ExitOp op;       // operation desired
+    char token[16];  // token data, used to verify exit op
+};
 
 enum CtrlSpamBlock {
     CTRL_OFF,              // Disabled
