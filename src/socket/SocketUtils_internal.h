@@ -8,7 +8,7 @@ static constexpr inline auto sleep_sec = std::chrono::seconds(4);
 [[nodiscard]] static inline bool handleIncomingBuf(const size_t len, struct TgBotConnection& conn,
                                                    const listener_callback_t& cb, char* errbuf) {
     if (len > 0) {        
-        LOG_D("Received buf with %s, invoke callback!", TgBotCmd_toStr(conn.cmd).c_str());
+        LOG_I("Received buf with %s, invoke callback!", TgBotCmd_toStr(conn.cmd).c_str());
 
         if (conn.cmd == CMD_EXIT) {
             static std::string exitToken;

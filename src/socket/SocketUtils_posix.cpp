@@ -68,7 +68,7 @@ bool startListening(const listener_callback_t& cb) {
                 std::this_thread::sleep_for(sleep_sec);
                 continue;
             } else {
-                LOG_I("Client connected");
+                LOG_D("Client connected");
             }
             const int count = read(cfd, &conn, sizeof(conn));
             should_break = handleIncomingBuf(count, conn, cb, strerror(errno));
