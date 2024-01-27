@@ -24,7 +24,7 @@
 #define ASSERT(cond, msg, ...)         \
     do {                               \
         if (!(cond)) {                 \
-            LOG_F(msg, ##__VA_ARGS__); \
+            LOG_F("Assertion failed: " msg, ##__VA_ARGS__); \
             assert(cond);              \
             __builtin_unreachable();   \
         }                              \
