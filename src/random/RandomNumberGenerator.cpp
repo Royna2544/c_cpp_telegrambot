@@ -18,9 +18,7 @@ using return_type = random_return_type;
 
 template <class Generator>
 return_type genRandomNumberImpl(Generator gen, const return_type min, const return_type max) {
-    if (min >= max) {
-        throw runtime_errorf("%s: Assert failed: min(%d) is bigger than max(%d)", __func__, min, max);
-    }
+    ASSERT(min < max, "min(%ld) is bigger than max(%ld)", min, max);
     std::uniform_int_distribution<return_type> distribution(min, max);
     return distribution(gen);
 }
