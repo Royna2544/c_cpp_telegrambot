@@ -149,3 +149,8 @@ void writeToSocket(struct TgBotConnection conn) {
         WSACleanup();
     }
 }
+
+
+void forceStopListening(void) {
+    // TODO: Unimplemented
+}

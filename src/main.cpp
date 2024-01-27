@@ -392,7 +392,8 @@ int main(void) {
                 }
             } else {
                 if (th.joinable()) {
-                    th.detach();
+                    forceStopListening();
+                    th.join();
                 }
             }
 #endif

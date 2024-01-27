@@ -101,3 +101,4 @@ using listener_callback_t = std::function<void(struct TgBotConnection)>;
 
 bool startListening(const listener_callback_t &cb);
 void writeToSocket(struct TgBotConnection conn);
+void forceStopListening(void);
