@@ -21,8 +21,6 @@
 #include "cmd_dynamic.h"
 #include "popen_wdt/popen_wdt.h"
 
-using pipe_t = int[2];
-
 // tochild { child stdin , parent write }
 // toparent { parent read, child stdout }
 static pipe_t tochild, toparent;
