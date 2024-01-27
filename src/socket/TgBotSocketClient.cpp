@@ -133,7 +133,7 @@ int main(int argc, char** argv) {
                         data_g.data_5 = data;
                     } break;
                     case CMD_OBSERVE_ALL_CHATS: {
-                        TgBotCommandData::ObserveAllChats data;
+                        TgBotCommandData::ObserveAllChats data = false;
                         ret = stob_or(argv[0], &data);
                         data_g.data_6 = data;
                     } break;

@@ -1,4 +1,5 @@
 #include <Logging.h>
+#include <poll.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/un.h>
