@@ -363,6 +363,7 @@ int main(void) {
     TgBotCommandData::Exit e;
     e.op = ExitOp::SET_TOKEN;
     strncpy(e.token, exitToken.c_str(), sizeof(e.token) - 1);
+    e.token[sizeof(e.token) - 1] = 0;
 
     std_sleep_s(3);
     writeToSocket({CMD_EXIT, {.data_2 = e}});
@@ -387,6 +388,7 @@ int main(void) {
                     TgBotCommandData::Exit e;
                     e.op = ExitOp::DO_EXIT;
                     strncpy(e.token, exitToken.c_str(), sizeof(e.token) - 1);
+                    e.token[sizeof(e.token) - 1] = 0;
                     writeToSocket({CMD_EXIT, {.data_2 = e}});
                     th.join();
                 }
