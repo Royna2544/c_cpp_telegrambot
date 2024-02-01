@@ -33,15 +33,6 @@ static const int& child_stdout = toparent[1];
 static const int& parent_readfd = toparent[0];
 static const int& parent_writefd = tochild[1];
 
-static bool IsVaildPipe(pipe_t fd) {
-    return fd[0] >= 0 && fd[1] >= 0;
-}
-
-static void InvaildatePipe(pipe_t fd) {
-    fd[0] = -1;
-    fd[1] = -1;
-}
-
 static bool _SendSomething(std::string str) {
     int rc;
 
@@ -172,7 +163,7 @@ static void do_InteractiveBash(const Bot& bot, const Message::Ptr& message) {
         }
     }
 
-    if (IsVaildPipe(tochild) && IsVaildPipe(toparent)) {
+    if (IsValidPipe(tochild) && IsValidPipe(toparent)) {
         // Is it exit command?
         if (matchesExit) {
             int status;
