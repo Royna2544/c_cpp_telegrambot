@@ -4,6 +4,8 @@
 
 #include <Logging.h>
 #include <RuntimeException.h>
+#include <Types.h>
+
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -29,19 +31,16 @@ struct kernel_rand_engine {
     kernel_rand_engine() {
         for (const auto& n : nodes) {
             fd = open(n.c_str(), O_RDONLY);
-            if (fd < 0) {
-                if (errno != ENOENT) {
-                    PLOG_E("Opening hwrng device '%s'", n.c_str());
-                }
+            if (!isValidFd(fd) && errno != ENOENT) {
+                PLOG_E("Opening hwrng device '%s'", n.c_str());
             } else
                 break;
         }
-        if (fd < 0)
+        if (!isValidFd(fd))
             throw std::runtime_error("Failed to open hwrng device file");
     }
     ~kernel_rand_engine() {
-        if (fd > 0)
-            close(fd);
+        closeFd(fd);
     }
 
     static bool isSupported(void) {
@@ -52,10 +51,8 @@ struct kernel_rand_engine {
             int ret;
             for (const auto& n : nodes) {
                 ret = access(n.c_str(), R_OK);
-                if (ret != 0) {
-                    if (errno != ENOENT) {
-                        PLOG_E("Accessing hwrng device '%s'", n.c_str());
-                    }
+                if (ret != 0 && errno != ENOENT) {
+                    PLOG_E("Accessing hwrng device '%s'", n.c_str());
                 } else {
                     kSupported = true;
                 }
@@ -76,6 +73,6 @@ struct kernel_rand_engine {
         "/whatever"
 #endif
     };
-    int fd = -1;
+    int fd = kInvalidFD;
 };
 #endif
