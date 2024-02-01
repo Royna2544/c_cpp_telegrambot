@@ -1,5 +1,6 @@
 #include <Logging.h>
-#include <poll.h>
+#include <Types.h>
+
 #include <netinet/in.h>
 #include <poll.h>
 #include <sys/socket.h>
@@ -20,7 +21,7 @@ int& notify_fd = kListenTerminate[1];
 using kListenData = char;
 
 static int makeSocket(bool is_client) {
-    int ret = -1;
+    int ret = kInvalidFD;
     if (!is_client) {
         LOG_D("Creating socket at " SOCKET_PATH);
     }
@@ -59,15 +60,17 @@ bool startListening(const listener_callback_t& cb) {
     int rc = 0;
     const int sfd = makeSocket(false);
 
-    if (sfd >= 0) {
+    if (isValidFd(sfd)) {
         if (listen(sfd, 1) < 0) {
             PLOG_E("Failed to listen to socket");
+            close(sfd);
             return false;
         }
         LOG_I("Listening on " SOCKET_PATH);
         rc = pipe(kListenTerminate);
         if (rc < 0) {
             PLOG_E("Pipe failed");
+            close(sfd);
             return false;
         }
         while (!should_break) {
@@ -103,8 +106,7 @@ bool startListening(const listener_callback_t& cb) {
             if (listen_fd_poll.revents & POLLIN) {
                 kListenData buf;
                 read(listen_fd, &buf, sizeof(kListenData));
-                close(listen_fd);
-                listen_fd = -1;
+                closeFd(listen_fd);
             } else if (!(socket_fd_poll.revents & POLLIN)) {
                 LOG_E("Unexpected state: sfd.revents: %d, listen_fd.revents: %d",
                       socket_fd_poll.revents, listen_fd_poll.revents);
@@ -123,6 +125,7 @@ bool startListening(const listener_callback_t& cb) {
             should_break = handleIncomingBuf(count, conn, cb, strerror(errno));
             close(cfd);
         }
+        closePipe(kListenTerminate);
         close(sfd);
         unlink(SOCKET_PATH);
         return true;
@@ -132,7 +135,7 @@ bool startListening(const listener_callback_t& cb) {
 
 void writeToSocket(struct TgBotConnection conn) {
     const int sfd = makeSocket(true);
-    if (sfd >= 0) {
+    if (isValidFd(sfd)) {
         const int count = write(sfd, &conn, sizeof(conn));
         if (count < 0) {
             PLOG_E("Failed to write to socket");
@@ -142,10 +145,9 @@ void writeToSocket(struct TgBotConnection conn) {
 }
 
 void forceStopListening(void) {
-    if (notify_fd > 0 && listen_fd > 0) {
+    if (isValidFd(notify_fd) && isValidFd(listen_fd)) {
         kListenData d = 0;
         write(notify_fd, &d, sizeof(kListenData));
-        close(notify_fd);
-        notify_fd = -1;
+        closeFd(notify_fd);
     }
 }
