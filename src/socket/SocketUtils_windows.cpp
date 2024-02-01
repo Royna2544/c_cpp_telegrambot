@@ -101,39 +101,41 @@ static SOCKET makeSocket(bool is_client) {
     return fd;
 }
 
-bool startListening(const listener_callback_t &cb) {
+void startListening(const listener_callback_t &cb, std::promise<bool> &createdPromise) {
     bool should_break = false;
     const SOCKET sfd = makeSocket(false);
     if (sfd != INVALID_SOCKET) {
-        if (listen(sfd, SOMAXCONN) == SOCKET_ERROR) {
-            WSALOG_E("Failed to listen to socket");
-            closesocket(sfd);
-            return false;
-        }
-        LOG_I("Listening on " SOCKET_PATH);
-        while (!should_break) {
-            struct sockaddr_un addr {};
-            struct TgBotConnection conn {};
-            int len = sizeof(addr);
-
-            LOG_D("Waiting for connection");
-            const SOCKET cfd = accept(sfd, (struct sockaddr *)&addr, &len);
-
-            if (cfd == INVALID_SOCKET) {
-                WSALOG_E("Accept failed.");
+        do {
+            if (listen(sfd, SOMAXCONN) == SOCKET_ERROR) {
+                WSALOG_E("Failed to listen to socket");
                 break;
-            } else {
-                LOG_D("Client connected");
             }
-            const int count = recv(cfd, reinterpret_cast<char *>(&conn), sizeof(conn), 0);
-            should_break = handleIncomingBuf(count, conn, cb, []{ return strWSAError(WSAGetLastError()); });
-            closesocket(cfd);
-        }
+            LOG_I("Listening on " SOCKET_PATH);
+            createdPromise.set_value(true);
+            while (!should_break) {
+                struct sockaddr_un addr {};
+                struct TgBotConnection conn {};
+                int len = sizeof(addr);
+
+                LOG_D("Waiting for connection");
+                const SOCKET cfd = accept(sfd, (struct sockaddr *)&addr, &len);
+
+                if (cfd == INVALID_SOCKET) {
+                    WSALOG_E("Accept failed.");
+                    break;
+                } else {
+                    LOG_D("Client connected");
+                }
+                const int count = recv(cfd, reinterpret_cast<char *>(&conn), sizeof(conn), 0);
+                should_break = handleIncomingBuf(count, conn, cb, [] { return strWSAError(WSAGetLastError()); });
+                closesocket(cfd);
+            }
+        } while (false);
         closesocket(sfd);
         WSACleanup();
-        return true;
+        return;
     }
-    return false;
+    createdPromise.set_value(false);
 }
 
 void writeToSocket(struct TgBotConnection conn) {
@@ -148,7 +150,6 @@ void writeToSocket(struct TgBotConnection conn) {
         WSACleanup();
     }
 }
-
 
 void forceStopListening(void) {
     // TODO: Unimplemented

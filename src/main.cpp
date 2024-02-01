@@ -348,24 +348,29 @@ int main(void) {
 
 #ifdef SOCKET_CONNECTION
     static std::thread th;
-    static std::atomic_bool socketValid = true;
+    static bool socketValid = false;
     static std::string exitToken;
+    static std::promise<bool> socketCreatedProm;
+    static std::future<bool> socketCreatedFut = socketCreatedProm.get_future();
 
     th = std::thread([] {
-        socketValid = startListening([](struct TgBotConnection conn) {
+        startListening([](struct TgBotConnection conn) {
             socketConnectionHandler(gBot, conn);
-        });
+        },
+                       socketCreatedProm);
     });
-    exitToken = StringTools::generateRandomString(sizeof(TgBotCommandUnion::data_2.token) - 1);
-    LOG_D("Generated token: %s", exitToken.c_str());
 
-    TgBotCommandData::Exit e;
-    e.op = ExitOp::SET_TOKEN;
-    strncpy(e.token, exitToken.c_str(), sizeof(e.token) - 1);
-    e.token[sizeof(e.token) - 1] = 0;
+    socketValid = socketCreatedFut.get();
+    if (socketValid) {
+        exitToken = StringTools::generateRandomString(sizeof(TgBotCommandUnion::data_2.token) - 1);
+        LOG_D("Generated token: %s", exitToken.c_str());
 
-    std_sleep_s(3);
-    writeToSocket({CMD_EXIT, {.data_2 = e}});
+        TgBotCommandData::Exit e;
+        e.op = ExitOp::SET_TOKEN;
+        strncpy(e.token, exitToken.c_str(), sizeof(e.token) - 1);
+        e.token[sizeof(e.token) - 1] = 0;
+        writeToSocket({CMD_EXIT, {.data_2 = e}});
+    }
 #endif
 #ifdef RTCOMMAND_LOADER
     loadCommandsFromFile(gBot, getSrcRoot() / "modules.load");

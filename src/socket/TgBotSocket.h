@@ -4,6 +4,7 @@
 
 #include <array>
 #include <climits>
+#include <future>
 #include <functional>
 #include <string>
 #include <unordered_map>
@@ -99,6 +100,6 @@ struct TgBotConnection {
 
 using listener_callback_t = std::function<void(struct TgBotConnection)>;
 
-bool startListening(const listener_callback_t &cb);
+void startListening(const listener_callback_t &cb, std::promise<bool> &createdProm);
 void writeToSocket(struct TgBotConnection conn);
 void forceStopListening(void);
