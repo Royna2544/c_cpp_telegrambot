@@ -1,5 +1,8 @@
 #pragma once
 
+#include <assert.h>
+#include <stdio.h>
+
 // Like the perror(2)
 #ifndef __WIN32
 #include <errno.h>
