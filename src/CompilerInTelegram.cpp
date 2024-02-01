@@ -17,6 +17,7 @@
 #include <mutex>
 #include <optional>
 #include <sstream>
+#include <random/RandomNumberGenerator.h>
 #include <thread>
 
 #include "popen_wdt/popen_wdt.h"
@@ -63,7 +64,7 @@ static void addExtArgs(std::stringstream &cmd, std::string &extraargs,
 static void runCommand(const Bot &bot, const Message::Ptr &message,
                        std::string cmd, std::string &res, bool use_wdt = true) {
     bool hasmore = false, watchdog_bitten = false;
-    int count = 0;
+    int count = 0, unique_id = 0;;
     char buf[BASH_READ_BUF] = {};
     std::error_code ec;
 
@@ -73,9 +74,12 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
         setlocale_enus_once();
     });
 #endif
+    unique_id = genRandomNumber(100);
     boost::replace_all(cmd, std::string(1, '"'), "\\\"");
 
-    LOG_I("Command: %s", cmd.c_str());
+#define ID_LOG_I(id, fmt, ...) LOG_I("[ID %d] " fmt, id, ##__VA_ARGS__)
+    ID_LOG_I(unique_id, "%s: +++", __func__);
+    ID_LOG_I(unique_id, "Command: %s", cmd.c_str());
     auto start = high_resolution_clock::now();
     auto fp = popen_watchdog(cmd.c_str(), use_wdt ? &watchdog_bitten : nullptr);
 
@@ -115,6 +119,8 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
         res += "-> It took " + stream.str() + " seconds\n";
     }
     pclose(fp);
+    ID_LOG_I(unique_id, "%s: ---", __func__);
+#undef ID_LOG_I
 }
 
 static void commonCleanup(const Bot &bot, const Message::Ptr &message,
