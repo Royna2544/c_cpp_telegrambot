@@ -365,10 +365,7 @@ int main(void) {
         exitToken = StringTools::generateRandomString(sizeof(TgBotCommandUnion::data_2.token) - 1);
         LOG_D("Generated token: %s", exitToken.c_str());
 
-        TgBotCommandData::Exit e;
-        e.op = ExitOp::SET_TOKEN;
-        strncpy(e.token, exitToken.c_str(), sizeof(e.token) - 1);
-        e.token[sizeof(e.token) - 1] = 0;
+        auto e = TgBotCommandData::Exit::create(ExitOp::SET_TOKEN, exitToken);
         writeToSocket({CMD_EXIT, {.data_2 = e}});
     }
 #endif
@@ -389,11 +386,7 @@ int main(void) {
             }
             if (socketValid) {
                 if (th.joinable()) {
-                    TgBotCommandData::Exit e;
-                    e.op = ExitOp::DO_EXIT;
-                    strncpy(e.token, exitToken.c_str(), sizeof(e.token) - 1);
-                    e.token[sizeof(e.token) - 1] = 0;
-                    writeToSocket({CMD_EXIT, {.data_2 = e}});
+                    writeToSocket({CMD_EXIT, {.data_2 = TgBotCommandData::Exit::create(ExitOp::DO_EXIT, exitToken)}});
                     th.join();
                 }
             } else {
