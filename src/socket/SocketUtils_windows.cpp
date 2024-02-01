@@ -13,7 +13,6 @@
 #include "TgBotSocket.h"
 
 #define WSALOG_E(fmt, ...) LOG_E(fmt ": %s", ##__VA_ARGS__, strWSAError(WSAGetLastError()))
-#define WSALOG_W(fmt, ...) LOG_W(fmt ": %s", ##__VA_ARGS__, strWSAError(WSAGetLastError()))
 
 static char *strWSAError(const int errcode) {
     int ret = 0;
@@ -108,6 +107,7 @@ bool startListening(const listener_callback_t &cb) {
     if (sfd != INVALID_SOCKET) {
         if (listen(sfd, SOMAXCONN) == SOCKET_ERROR) {
             WSALOG_E("Failed to listen to socket");
+            closesocket(sfd);
             return false;
         }
         LOG_I("Listening on " SOCKET_PATH);
@@ -120,9 +120,8 @@ bool startListening(const listener_callback_t &cb) {
             const SOCKET cfd = accept(sfd, (struct sockaddr *)&addr, &len);
 
             if (cfd == INVALID_SOCKET) {
-                WSALOG_W("Accept failed. retry");
-                std::this_thread::sleep_for(sleep_sec);
-                continue;
+                WSALOG_E("Accept failed.");
+                break;
             } else {
                 LOG_D("Client connected");
             }
