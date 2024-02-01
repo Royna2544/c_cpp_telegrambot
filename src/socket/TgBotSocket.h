@@ -1,9 +1,11 @@
 #pragma once
 
 #include <Types.h>
+#include "../include/Logging.h"
 
 #include <array>
 #include <climits>
+#include <cstring>
 #include <future>
 #include <functional>
 #include <string>
@@ -68,7 +70,7 @@ struct Exit {
         strncpy(e.token, buf.c_str(), bufLen);
         e.token[bufLen] = 0;
         if (buf.size() != bufLen)
-            LOG_W("buf str doesn't fit token fully: tokenlen %d vs buflen %ld", bufLen, buf.size());
+            LOG_W("buf str doesn't fit token fully: tokenlen %d vs buflen %zu", bufLen, buf.size());
         return e;
     }
 };
