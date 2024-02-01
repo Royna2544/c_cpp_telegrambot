@@ -126,7 +126,7 @@ bool startListening(const listener_callback_t &cb) {
                 LOG_D("Client connected");
             }
             const int count = recv(cfd, reinterpret_cast<char *>(&conn), sizeof(conn), 0);
-            should_break = handleIncomingBuf(count, conn, cb, strWSAError(WSAGetLastError()));
+            should_break = handleIncomingBuf(count, conn, cb, []{ return strWSAError(WSAGetLastError()); });
             closesocket(cfd);
         }
         closesocket(sfd);

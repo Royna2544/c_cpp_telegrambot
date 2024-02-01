@@ -122,7 +122,7 @@ bool startListening(const listener_callback_t& cb) {
                 LOG_D("Client connected");
             }
             const int count = read(cfd, &conn, sizeof(conn));
-            should_break = handleIncomingBuf(count, conn, cb, strerror(errno));
+            should_break = handleIncomingBuf(count, conn, cb, [] { return strerror(errno); });
             close(cfd);
         }
         closePipe(kListenTerminate);

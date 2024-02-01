@@ -1,4 +1,5 @@
 #include <chrono>
+#include <functional>
 #include <string>
 
 #include "TgBotSocket.h"
@@ -6,7 +7,7 @@
 static constexpr inline auto sleep_sec = std::chrono::seconds(4);
 
 [[nodiscard]] static inline bool handleIncomingBuf(const size_t len, struct TgBotConnection& conn,
-                                                   const listener_callback_t& cb, char* errbuf) {
+                                                   const listener_callback_t& cb, std::function<char*(void)> errMsgFn) {
     if (len > 0) {        
         LOG_I("Received buf with %s, invoke callback!", TgBotCmd_toStr(conn.cmd).c_str());
 
@@ -35,7 +36,7 @@ static constexpr inline auto sleep_sec = std::chrono::seconds(4);
         }
         cb(conn);
     } else {
-        LOG_E("Failed to read from socket: %s", errbuf);
+        LOG_E("Failed to read from socket: %s", errMsgFn());
     }
     return false;
 }
