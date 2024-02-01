@@ -1,10 +1,7 @@
-#include <chrono>
 #include <functional>
 #include <string>
 
 #include "TgBotSocket.h"
-
-static constexpr inline auto sleep_sec = std::chrono::seconds(4);
 
 [[nodiscard]] static inline bool handleIncomingBuf(const size_t len, struct TgBotConnection& conn,
                                                    const listener_callback_t& cb, std::function<char*(void)> errMsgFn) {
