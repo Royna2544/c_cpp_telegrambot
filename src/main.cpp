@@ -126,15 +126,14 @@ int main(void) {
         try {
             // Hardcoded kys GIF
             bot.getApi().sendAnimation(message->chat->id,
-                                    "CgACAgIAAx0CdMESqgACCZRlrfMoq_b2DL21k6ohShQzzLEh6gACsw4AAuSZWUmmR3jSJA9WxzQE",
-                                    0, 0, 0, "", version, message->messageId,
-                                    nullptr, "html");
-        } catch (const TgBot::TgException& e) {
+                                       "CgACAgIAAx0CdMESqgACCZRlrfMoq_b2DL21k6ohShQzzLEh6gACsw4AAuSZWUmmR3jSJA9WxzQE",
+                                       0, 0, 0, "", version, message->messageId,
+                                       nullptr, "html");
+        } catch (const TgBot::TgException &e) {
             // Fallback to HTML if no GIF
             LOG_E("Alive cmd: Error while sending GIF: %s", e.what());
             bot_sendReplyMessageHTML(bot, message, version);
         }
-
     });
     bot_AddCommandPermissive(gBot, "flash", [](const Bot &bot, const Message::Ptr &message) {
         static std::vector<std::string> reasons;
@@ -329,7 +328,7 @@ int main(void) {
                 unifile = replyMsg->video->fileUniqueId;
             } else if (replyMsg->photo.size() == 1) {
                 file = replyMsg->photo.front()->fileId;
-                unifile = replyMsg->photo.front()->fileUniqueId; 
+                unifile = replyMsg->photo.front()->fileUniqueId;
             } else {
                 file = unifile = "Unknown";
             }
@@ -359,7 +358,7 @@ int main(void) {
     });
     exitToken = StringTools::generateRandomString(sizeof(TgBotCommandUnion::data_2.token) - 1);
     LOG_D("Generated token: %s", exitToken.c_str());
-    
+
     TgBotCommandData::Exit e;
     e.op = ExitOp::SET_TOKEN;
     strncpy(e.token, exitToken.c_str(), sizeof(e.token) - 1);
