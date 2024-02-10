@@ -105,6 +105,7 @@ void startListening(const listener_callback_t& cb, std::promise<bool>& createdPr
                     kListenData buf;
                     read(listen_fd, &buf, sizeof(kListenData));
                     closeFd(listen_fd);
+                    break;
                 } else if (!(socket_fd_poll.revents & POLLIN)) {
                     LOG_E("Unexpected state: sfd.revents: %d, listen_fd.revents: %d",
                           socket_fd_poll.revents, listen_fd_poll.revents);
