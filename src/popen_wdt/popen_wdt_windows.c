@@ -63,7 +63,7 @@ static void* watchdog(void* arg) {
     return 0;
 }
 void setlocale_enus_once(void) {
-    SetThreadUILanguage(/* en-US */ 0x0409);
+    // TODO
 }
 // [Child] stdout_w [pipe] stdout_r -> [Parent] stdout_r ->
 // stdout_w_file [pipe] stdout_r_file [FILE*]
