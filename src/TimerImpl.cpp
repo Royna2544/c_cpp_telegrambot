@@ -163,7 +163,6 @@ void startTimer(const Bot &bot, const Message::Ptr message, std::shared_ptr<Time
             bot_editMessage(bot, ctx->message, "Timer ended");
             if (ctx->sendendmsg)
                 bot.getApi().sendMessage(ctx->message->chat->id, "Timer ended");
-            std_sleep(1s);
             if (ctx->botcanpin)
                 bot.getApi().unpinChatMessage(ctx->message->chat->id, ctx->message->messageId);
             ctx->isactive = false;
