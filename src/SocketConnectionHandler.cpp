@@ -1,3 +1,4 @@
+#include <BotReplyMessage.h>
 #include <ChatObserver.h>
 #include <Logging.h>
 #include <ResourceIncBin.h>
@@ -53,7 +54,7 @@ void socketConnectionHandler(const Bot& bot, struct TgBotConnection conn) {
     switch (conn.cmd) {
         case CMD_WRITE_MSG_TO_CHAT_ID:
             try {
-                bot.getApi().sendMessage(_data.data_1.to, _data.data_1.msg);
+                bot_sendMessage(bot, _data.data_1.to, _data.data_1.msg);
             } catch (const TgBot::TgException& e) {
                 LOG_E("Exception at handler, %s", e.what());
             }

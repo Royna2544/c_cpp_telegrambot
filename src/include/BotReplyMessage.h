@@ -21,8 +21,8 @@ using TgBot::MessageEntity;
  * @return The replied message object, if sent.
  */
 static Message::Ptr _bot_sendReplyMessage(const Bot &bot, const Message::Ptr &message,
-                                            const std::string &text, const MessageId replyToMsg = 0,
-                                            const bool noError = false, const std::string parsemode = "") {
+                                          const std::string &text, const MessageId replyToMsg = 0,
+                                          const bool noError = false, const std::string parsemode = "") {
     return bot.getApi().sendMessage(message->chat->id, text,
                                     true, (replyToMsg == 0) ? message->messageId : replyToMsg,
                                     nullptr, parsemode, false, std::vector<MessageEntity::Ptr>(), noError);
@@ -35,14 +35,14 @@ static inline Message::Ptr bot_sendReplyMessage(const Bot &bot, const Message::P
 }
 
 static inline Message::Ptr bot_sendReplyMessageMarkDown(const Bot &bot, const Message::Ptr &message,
-                                                const std::string &text, const MessageId replyToMsg = 0,
-                                                const bool noError = false) {
+                                                        const std::string &text, const MessageId replyToMsg = 0,
+                                                        const bool noError = false) {
     return _bot_sendReplyMessage(bot, message, text, replyToMsg, noError, "markdown");
 }
 
 static inline Message::Ptr bot_sendReplyMessageHTML(const Bot &bot, const Message::Ptr &message,
-                                                const std::string &text, const MessageId replyToMsg = 0,
-                                                const bool noError = false) {
+                                                    const std::string &text, const MessageId replyToMsg = 0,
+                                                    const bool noError = false) {
     return _bot_sendReplyMessage(bot, message, text, replyToMsg, noError, "html");
 }
 
@@ -57,4 +57,8 @@ static inline Message::Ptr bot_sendReplyMessageHTML(const Bot &bot, const Messag
 static inline Message::Ptr bot_editMessage(const Bot &bot, const Message::Ptr &message,
                                            const std::string &text) {
     return bot.getApi().editMessageText(text, message->chat->id, message->messageId);
+}
+
+static inline Message::Ptr bot_sendMessage(const Bot &bot, const ChatId chatid, const std::string &text) {
+    return bot.getApi().sendMessage(chatid, text);
 }

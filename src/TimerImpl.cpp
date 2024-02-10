@@ -140,7 +140,7 @@ void startTimer(const Bot &bot, const Message::Ptr message, std::shared_ptr<Time
     std::chrono::seconds parsedTime(0);
 
     if (parseTimerArguments(bot, message, ctx, parsedTime) && message->chat) {
-        ctx->message = bot.getApi().sendMessage(message->chat->id,
+        ctx->message = bot_sendMessage(bot, message->chat->id,
                                                 "Timer starting: " + to_string(parsedTime));
         ctx->botcanpin = true;
         try {
@@ -162,7 +162,7 @@ void startTimer(const Bot &bot, const Message::Ptr message, std::shared_ptr<Time
             }
             bot_editMessage(bot, ctx->message, "Timer ended");
             if (ctx->sendendmsg)
-                bot.getApi().sendMessage(ctx->message->chat->id, "Timer ended");
+                bot_sendMessage(bot, ctx->message->chat->id, "Timer ended");
             if (ctx->botcanpin)
                 bot.getApi().unpinChatMessage(ctx->message->chat->id, ctx->message->messageId);
             ctx->isactive = false;

@@ -417,19 +417,19 @@ reinit:
         LOG_W("Trying to recover");
         UserId ownerid = database::db.maybeGetOwnerId();
         try {
-            gBot.getApi().sendMessage(ownerid, std::string() + "Exception occured: " + e.what());
+            bot_sendMessage(gBot, ownerid, std::string("Exception occured: ") + e.what());
         } catch (const std::exception &e) {
             LOG_F("%s", e.what());
             goto exit;
         }
         const int64_t temptime = time(nullptr);
         if (temptime - lastcrash < 15 && lastcrash != 0) {
-            gBot.getApi().sendMessage(ownerid, "Recover failed.");
+            bot_sendMessage(gBot, ownerid, "Recover failed.");
             LOG_F("Recover failed");
             goto exit;
         }
         lastcrash = temptime;
-        gBot.getApi().sendMessage(ownerid, "Reinitializing.");
+        bot_sendMessage(gBot, ownerid, "Reinitializing.");
         LOG_I("Re-init");
         gAuthorized = false;
         std::thread([] {
