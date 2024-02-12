@@ -55,8 +55,14 @@ static void *file_load(void) {
             LOG_E("Invalid line in config file: %zu", count);
             continue;
         }
-        p.kConfigEntries.emplace(line.substr(0, pos), line.substr(pos + 1));
-        LOG_D("%s is '%s'", line.substr(0, pos).c_str(), line.substr(pos + 1).c_str());
+
+        std::string name = line.substr(0, pos), value = line.substr(pos + 1);
+        if (name.front() == '#') {
+            LOG_D("Skip '%s': is commented out", name.c_str());
+            continue;
+        }
+        p.kConfigEntries.emplace(name, value);
+        LOG_D("%s is '%s'", name.c_str(), value.c_str());
     }
     LOG_I("Loaded %zu entries from %s", p.kConfigEntries.size(), confPath.c_str());
     return &p;
