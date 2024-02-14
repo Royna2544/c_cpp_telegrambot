@@ -105,12 +105,13 @@ int main(void) {
             std::string commitid, commitmsg, originurl, compilerver;
 
             static const std::map<std::string *, std::string> commands = {
-                {&commitid, "git rev-parse HEAD"},
-                {&commitmsg, "git log --pretty=%s -1"},
-                {&originurl, "git config --get remote.origin.url"},
+                {&commitid, "rev-parse HEAD"},
+                {&commitmsg, "log --pretty=%s -1"},
+                {&originurl, "config --get remote.origin.url"},
             };
             for (const auto &cmd : commands) {
-                const bool ret = runCommand(cmd.second, *cmd.first);
+                const std::string gitPrefix = "git --git-dir=" + (getSrcRoot() / ".git").string() + ' ';
+                const bool ret = runCommand(gitPrefix + cmd.second, *cmd.first);
                 if (!ret) {
                     throw runtime_errorf("Command failed: %s", cmd.second.c_str());
                 }
