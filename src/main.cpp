@@ -236,6 +236,24 @@ int main(void) {
         }
         bot_sendReplyMessage(bot, message, out.str());
     });
+    bot_AddCommandPermissive(gBot, "decide", [](const Bot &bot, const Message::Ptr &message) {
+        if (hasExtArgs(message)) {
+            std::string obj, msgtxt;
+            Message::Ptr msg;
+
+            parseExtArgs(message, obj);
+            msgtxt = "Deciding whether should you '" + obj + "'...";
+            msg = bot_sendReplyMessage(bot, message, msgtxt);
+            std_sleep_s(genRandomNumber(10));
+            msgtxt += '\n';
+            if (genRandomNumber(100) % 2 == 1) {
+                msgtxt += "Yes";
+            } else {
+                msgtxt += "No";
+            }
+            bot_editMessage(bot, msg, msgtxt);
+        }
+    });
     bot_AddCommandPermissive(gBot, "delay", [](const Bot &bot, const Message::Ptr &message) {
         using std::chrono::high_resolution_clock;
         using std::chrono::duration;
