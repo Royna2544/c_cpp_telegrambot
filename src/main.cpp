@@ -237,19 +237,45 @@ int main(void) {
         bot_sendReplyMessage(bot, message, out.str());
     });
     bot_AddCommandPermissive(gBot, "decide", [](const Bot &bot, const Message::Ptr &message) {
+        constexpr int COUNT_MAX = 10;
+
         if (hasExtArgs(message)) {
             std::string obj, msgtxt;
             Message::Ptr msg;
+            int count = COUNT_MAX, yesno = 0;
 
             parseExtArgs(message, obj);
             msgtxt = "Deciding whether should you '" + obj + "'...";
             msg = bot_sendReplyMessage(bot, message, msgtxt);
-            std_sleep_s(genRandomNumber(10));
+            msgtxt += "\n\n";
+            do {
+                msgtxt += "Try " + std::to_string(COUNT_MAX - count + 1) + " : ";
+                if (genRandomNumber(100) % 2 == 1) {
+                    msgtxt += "Yes";
+                    ++yesno;
+                } else {
+                    msgtxt += "No";
+                    --yesno;
+                }
+                msgtxt += '\n';
+                count--;
+                bot_editMessage(bot, msg, msgtxt);
+                std_sleep_s(2);
+            } while (count > 0);
             msgtxt += '\n';
-            if (genRandomNumber(100) % 2 == 1) {
-                msgtxt += "Yes";
-            } else {
-                msgtxt += "No";
+            switch (yesno) {
+                case 1 ... COUNT_MAX: {
+                    msgtxt += "So, yes.";
+                    break;
+                }
+                case 0: {
+                    msgtxt += "So, idk.";
+                    break;
+                }
+                case -COUNT_MAX ... -1: {
+                    msgtxt += "So, no.";
+                    break;
+                }
             }
             bot_editMessage(bot, msg, msgtxt);
         }
