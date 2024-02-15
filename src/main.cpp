@@ -25,6 +25,7 @@
 #include <exception>
 #include <fstream>
 #include <map>
+#include <ostream>
 #include <random>
 #include <regex>
 #include <sstream>
@@ -198,13 +199,21 @@ int main(void) {
         std::string last;
         std::unordered_map<std::string, int> map;
         std::vector<std::string> vec;
+        std::set<std::string> set;
 
         splitAndClean(text, vec);
-        map.reserve(vec.size());
-        if (vec.size() == 1) {
+        set = {vec.begin(), vec.end()};
+        if (set.size() != vec.size()) {
+            out << "(Warning: Removed " << vec.size() - set.size() 
+                << " duplicates)" << std::endl << std::endl;
+            LOG_W("Contains duplicates!");
+        }
+        map.reserve(set.size());
+        if (set.size() == 1) {
             bot_sendReplyMessage(bot, message, "Give more than 1 choice");
             return;
         }
+        vec = {set.begin(), set.end()};
         shuffleStringArray(vec);
         out << "Total " << vec.size() << " items" << std::endl;
         last = vec.back();
