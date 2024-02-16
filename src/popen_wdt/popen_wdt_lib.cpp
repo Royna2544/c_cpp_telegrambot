@@ -4,19 +4,24 @@
 #include <mutex>
 #include <stdexcept>
 
+#include "../include/Logging.h"
 #include "popen_wdt.h"
 
 // TODO Move this somewhere else
 bool runCommand(const std::string& command, std::string& result) {
     auto fp = popen_watchdog(command.c_str(), nullptr);
     char buffer[512] = {0};
+
     if (fp) {
+        result.clear();
         while (fgets(buffer, sizeof(buffer), fp)) {
             result += buffer;
             memset(buffer, 0, sizeof(buffer));
         }
         if (result.back() == '\n')
             result.pop_back();
+        
+        LOG_V("Command: %s, result: '%s'", command.c_str(), result.c_str());
         return true;
     }
     return false;
