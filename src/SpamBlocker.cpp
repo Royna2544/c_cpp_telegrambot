@@ -3,20 +3,50 @@
 #include <NamespaceImport.h>
 #include <SpamBlock.h>
 
-#include <chrono>
 #include <map>
 #include <mutex>
 #include <thread>
 #include <unordered_map>
 #include <utility>
+#include "tgbot/TgException.h"
 
+using TgBot::Chat;
 using TgBot::ChatPermissions;
+using TgBot::User;
 
 #ifdef SOCKET_CONNECTION
 CtrlSpamBlock gSpamBlockCfg = CTRL_LOGGING_ONLY_ON;
 #endif
 
-using buffer_iterator_t = std::map<ChatId, ChatHandle>::const_iterator;
+using ChatHandle = std::map<TgBot::User::Ptr, std::vector<Message::Ptr>>;
+using UserType = std::pair<TgBot::Chat::Ptr, std::vector<Message::Ptr>>;
+using SpamMapT = std::map<TgBot::User::Ptr, std::vector<Message::Ptr>>;
+using buffer_iterator_t = std::map<TgBot::Chat::Ptr, ChatHandle>::const_iterator;
+
+std::string toUserName(const TgBot::User::Ptr bro) {
+    std::string username = bro->firstName;
+    if (!bro->lastName.empty())
+        username += ' ' + bro->lastName;
+    return '\'' + username + '\'';
+}
+
+std::string toChatName(const TgBot::Chat::Ptr ch) {
+    return '\'' + ch->title + '\'';
+}
+
+template <class Type>
+struct _FindIdIt {
+    template <class Container>
+    static auto find(Container& c, std::function<typename Type::Ptr(typename Container::const_reference)> fn,
+                   typename Type::Ptr t) {
+        return std::find_if(c.begin(), c.end(), [=](const auto& it) {
+            return fn(it)->id == t->id;
+        });
+    }
+};
+
+using findChatIt = _FindIdIt<Chat>;
+using findUserIt = _FindIdIt<User>;
 
 static std::string commonMsgdataFn(const Message::Ptr &m) {
     if (m->sticker)
@@ -27,47 +57,56 @@ static std::string commonMsgdataFn(const Message::Ptr &m) {
         return m->text;
 }
 
-static auto deleteAndMute(const Bot &bot_, buffer_iterator_t handle,
+static void deleteAndMute(const Bot &bot, buffer_iterator_t handle,
                           const SpamMapT &map, const size_t threshold) {
     // Initial set - all false set
     auto perms = std::make_shared<ChatPermissions>();
     for (const auto &mapmsg : map) {
-        if (mapmsg.second.size() >= threshold) {
 #ifdef SOCKET_CONNECTION
-            if (gSpamBlockCfg == CTRL_ON) {
-                for (const auto &msg : mapmsg.second) {
-                    try {
-                        bot_.getApi().deleteMessage(handle->first, msg->messageId);
-                    } catch (const std::exception &ignored) {
-                    }
-                }
-                try {
-                    bot_.getApi().restrictChatMember(handle->first, mapmsg.first,
-                                                     perms, 5 * 60);
-                } catch (const std::exception &e) {
-                    LOG_W("Cannot mute user " LONGFMT " in chat " LONGFMT
-                          ": %s",
-                          mapmsg.first, handle->first, e.what());
-                }
-#else
-            if (false) {
+        switch (gSpamBlockCfg) {
+            case TgBotCommandData::CTRL_ON: {
 #endif
-            } else {
-                LOG_I("Spam detected for user " LONGFMT, mapmsg.first);
+                if (mapmsg.second.size() >= threshold) {
+#ifdef SOCKET_CONNECTION
+                    if (gSpamBlockCfg == CTRL_ON) {
+#endif
+                        for (const auto &msg : mapmsg.second) {
+                            try {
+                                bot.getApi().deleteMessage(handle->first->id, msg->messageId);
+                            } catch (const TgBot::TgException &ignored) {
+                            }
+                        }
+                        try {
+                            bot.getApi().restrictChatMember(handle->first->id, mapmsg.first->id,
+                                                            perms, 5 * 60);
+                        } catch (const std::exception &e) {
+                            LOG_W("Cannot mute user %s in chat %s: %s", toUserName(mapmsg.first).c_str(), 
+                                toChatName(handle->first).c_str(), e.what());
+                        }
+                    }
+#ifdef SOCKET_CONNECTION
+                }
+                [[fallthrough]];
             }
-        }
+            case TgBotCommandData::CTRL_LOGGING_ONLY_ON:
+#endif
+                LOG_I("Spam detected for user %s", toUserName(mapmsg.first).c_str());
+#ifdef SOCKET_CONNECTION
+                break;
+            default:
+                break;
+        };
+#endif
     }
 }
-static auto spamDetectFunc(const Bot &bot, buffer_iterator_t handle) {
+
+static void spamDetectFunc(const Bot &bot, buffer_iterator_t handle) {
     SpamMapT MaxSameMsgMap, MaxMsgMap;
     // By most msgs sent by that user
     for (const auto &perUser : handle->second) {
         std::apply([&](const auto &first, const auto &second) {
             MaxMsgMap.emplace(first, second);
-            LOG_D("Chat: " LONGFMT ", User: " LONGFMT ", msgcnt: " LONGFMT, handle->first,
-                  first, second.size());
-        },
-                   perUser);
+        }, perUser);
     }
 
     for (const auto &pair : handle->second) {
@@ -85,8 +124,8 @@ static auto spamDetectFunc(const Bot &bot, buffer_iterator_t handle) {
                                                  return lhs.second.size() < rhs.second.size();
                                              });
         MaxSameMsgMap.emplace(pair.first, mostCommonIt->second);
-        LOG_D("Chat: " LONGFMT ", User: " LONGFMT ", maxIt: " LONGFMT, handle->first,
-              pair.first, mostCommonIt->second.size());
+        LOG_D("Chat: %s, User: %s, maxIt: %zu", toChatName(handle->first).c_str(),
+              toUserName(pair.first).c_str(), mostCommonIt->second.size());
     }
 
     deleteAndMute(bot, handle, MaxSameMsgMap, 3);
@@ -94,8 +133,8 @@ static auto spamDetectFunc(const Bot &bot, buffer_iterator_t handle) {
 }
 
 struct SpamBlockBuffer {
-    std::map<ChatId, ChatHandle> buffer;
-    std::map<ChatId, int> buffer_sub;
+    std::map<Chat::Ptr, ChatHandle> buffer;
+    std::map<Chat::Ptr, int> buffer_sub;
     std::mutex m;  // Protect buffer, buffer_sub
 };
 
@@ -105,21 +144,26 @@ static void spamBlockerFn(const Bot& bot, SpamBlockBuffer& buf) {
     while (true) {
         {
             const std::lock_guard<std::mutex> _(buf.m);
-            auto its = buffer_sub.begin();
-            while (its != buffer_sub.end()) {
-                const auto it = buffer.find(its->first);
-                if (it == buffer.end()) {
-                    its = buffer_sub.erase(its);
-                    continue;
+            if (buffer_sub.size() > 0) {
+                auto its = buffer_sub.begin();
+                const auto chatNameStr = toChatName(its->first);
+                const auto chatName = chatNameStr.c_str();
+                while (its != buffer_sub.end()) {
+                    const auto it = findChatIt::find(buffer, 
+                        [](const auto &it) { return it.first; }, its->first);
+                    if (it == buffer.end()) {
+                        its = buffer_sub.erase(its);
+                        continue;
+                    }
+                    LOG_V("Chat: %s, Count: %d", chatName, its->second);
+                    if (its->second >= 5) {
+                        LOG_D("Launching spamdetect for %s", chatName);
+                        spamDetectFunc(bot, it);
+                    }
+                    buffer.erase(it);
+                    its->second = 0;
+                    ++its;
                 }
-                LOG_D("Chat: " LONGFMT ", Count: %d", its->first, its->second);
-                if (its->second >= 5) {
-                    LOG_D("Launching spamdetect for " LONGFMT, its->first);
-                    spamDetectFunc(bot, it);
-                }
-                buffer.erase(it);
-                its->second = 0;
-                ++its;
             }
         }
         std_sleep_s(10);
@@ -148,7 +192,27 @@ void spamBlocker(const Bot &bot, const Message::Ptr &message) {
     }
     {
         const std::lock_guard<std::mutex> _(buf.m);
-        buf.buffer[message->chat->id][message->from->id].emplace_back(message);
-        ++buf.buffer_sub[message->chat->id];
+        auto bufferIt = findChatIt::find(buf.buffer, [](const auto& it) { return it.first; },
+                                          message->chat);
+        if (bufferIt != buf.buffer.end()) {
+            const auto bufferUserIt = findUserIt::find(bufferIt->second, [](const auto& it) { 
+                return it.first;
+            }, message->from);
+
+            if (bufferUserIt != bufferIt->second.end()) {
+                bufferUserIt->second.emplace_back(message);
+            } else {
+                bufferIt->second[message->from].emplace_back(message);
+            }
+        } else {
+            buf.buffer[message->chat][message->from].emplace_back(message);
+        }
+        const auto bufferSubIt = findChatIt::find(buf.buffer_sub,
+            [](const auto& it) { return it.first; },  message->chat);
+        if (bufferSubIt != buf.buffer_sub.end()) {
+            ++bufferSubIt->second;
+        } else {
+            ++buf.buffer_sub[message->chat];
+        }
     }
 }
