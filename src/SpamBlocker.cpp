@@ -93,10 +93,41 @@ static auto spamDetectFunc(const Bot &bot, buffer_iterator_t handle) {
     deleteAndMute(bot, handle, MaxMsgMap, 5);
 }
 
+struct SpamBlockBuffer {
+    std::map<ChatId, ChatHandle> buffer;
+    std::map<ChatId, int> buffer_sub;
+    std::mutex m;  // Protect buffer, buffer_sub
+};
+
+static void spamBlockerFn(const Bot& bot, SpamBlockBuffer& buf) {
+    auto& buffer = buf.buffer;
+    auto& buffer_sub = buf.buffer_sub;
+    while (true) {
+        {
+            const std::lock_guard<std::mutex> _(buf.m);
+            auto its = buffer_sub.begin();
+            while (its != buffer_sub.end()) {
+                const auto it = buffer.find(its->first);
+                if (it == buffer.end()) {
+                    its = buffer_sub.erase(its);
+                    continue;
+                }
+                LOG_D("Chat: " LONGFMT ", Count: %d", its->first, its->second);
+                if (its->second >= 5) {
+                    LOG_D("Launching spamdetect for " LONGFMT, its->first);
+                    spamDetectFunc(bot, it);
+                }
+                buffer.erase(it);
+                its->second = 0;
+                ++its;
+            }
+        }
+        std_sleep_s(10);
+    }
+}
+
 void spamBlocker(const Bot &bot, const Message::Ptr &message) {
-    static std::map<ChatId, ChatHandle> buffer;
-    static std::map<ChatId, int> buffer_sub;
-    static std::mutex m;  // Protect buffer, buffer_sub
+    static SpamBlockBuffer buf;
 
 #ifdef SOCKET_CONNECTION
     // Global cfg
@@ -112,35 +143,12 @@ void spamBlocker(const Bot &bot, const Message::Ptr &message) {
 
     static bool init = false;
     if (!init) {
-        std::thread([&] {
-            while (true) {
-                {
-                    const std::lock_guard<std::mutex> _(m);
-                    auto its = buffer_sub.begin();
-                    while (its != buffer_sub.end()) {
-                        const auto it = buffer.find(its->first);
-                        if (it == buffer.end()) {
-                            its = buffer_sub.erase(its);
-                            continue;
-                        }
-                        LOG_D("Chat: " LONGFMT ", Count: %d", its->first, its->second);
-                        if (its->second >= 5) {
-                            LOG_D("Launching spamdetect for " LONGFMT, its->first);
-                            spamDetectFunc(bot, it);
-                        }
-                        buffer.erase(it);
-                        its->second = 0;
-                        ++its;
-                    }
-                }
-                std_sleep(10s);
-            }
-        }).detach();
+        std::thread(&spamBlockerFn, std::cref(bot), std::ref(buf)).detach();
         init = true;
     }
     {
-        const std::lock_guard<std::mutex> _(m);
-        buffer[message->chat->id][message->from->id].emplace_back(message);
-        ++buffer_sub[message->chat->id];
+        const std::lock_guard<std::mutex> _(buf.m);
+        buf.buffer[message->chat->id][message->from->id].emplace_back(message);
+        ++buf.buffer_sub[message->chat->id];
     }
 }
