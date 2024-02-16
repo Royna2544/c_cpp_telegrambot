@@ -16,10 +16,11 @@
 #define LOG_E(fmt, ...) _LOG(fmt, "Error", ##__VA_ARGS__)
 #define LOG_W(fmt, ...) _LOG(fmt, "Warning", ##__VA_ARGS__)
 #define LOG_I(fmt, ...) _LOG(fmt, "Info", ##__VA_ARGS__)
-#ifndef NDEBUG
 #define LOG_D(fmt, ...) _LOG(fmt, "Debug", ##__VA_ARGS__)
+#ifndef NDEBUG
+#define LOG_V(fmt, ...) _LOG(fmt, "Verbose", ##__VA_ARGS__)
 #else
-#define LOG_D(fmt, ...) \
+#define LOG_V(fmt, ...) \
     do {                \
     } while (0)
 #endif
