@@ -305,8 +305,8 @@ int main(void) {
         ss << "Sending reply message took: " << duration<double, std::milli>(afterSend - beforeSend).count() << "ms" << std::endl;
         bot_editMessage(bot, sentMsg, ss.str());
     });
-    bot_AddCommandEnforced(gBot, "starttimer", std::bind(startTimer, pholder1, pholder2, ctx));
-    bot_AddCommandEnforced(gBot, "stoptimer", std::bind(stopTimer, pholder1, pholder2, ctx));
+    bot_AddCommandEnforced(gBot, "starttimer", std::bind(&TimerCtx::startTimer, ctx, pholder1, pholder2));
+    bot_AddCommandEnforced(gBot, "stoptimer", std::bind(&TimerCtx::stopTimer, ctx, pholder1, pholder2));
     bot_AddCommandPermissive(gBot, "decho", [](const Bot &bot, const Message::Ptr &message) {
         const auto replyMsg = message->replyToMessage;
         const auto chatId = message->chat->id;
@@ -430,7 +430,7 @@ int main(void) {
         static std::once_flag once;
         std::call_once(once, [s] {
             LOG_I("Exiting with signal %d", s);
-            forceStopTimer(ctx);
+            ctx->forceStopTimer();
             database::db.save();
 #ifdef SOCKET_CONNECTION
             std::error_code ec;
