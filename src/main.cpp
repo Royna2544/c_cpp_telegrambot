@@ -411,13 +411,13 @@ int main(void) {
         startListening([](struct TgBotConnection conn) {
             socketConnectionHandler(gBot, conn);
         },
-                       socketCreatedProm);
+        socketCreatedProm);
     });
 
     socketValid = socketCreatedFut.get();
     if (socketValid) {
         exitToken = StringTools::generateRandomString(sizeof(TgBotCommandUnion::data_2.token) - 1);
-        LOG_D("Generated token: %s", exitToken.c_str());
+        LOG_V("Generated exittoken: %s", exitToken.c_str());
 
         auto e = TgBotCommandData::Exit::create(ExitOp::SET_TOKEN, exitToken);
         writeToSocket({CMD_EXIT, {.data_2 = e}});

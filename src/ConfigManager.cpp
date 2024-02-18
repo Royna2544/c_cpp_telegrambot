@@ -58,11 +58,11 @@ static void *file_load(void) {
 
         std::string name = line.substr(0, pos), value = line.substr(pos + 1);
         if (name.front() == '#') {
-            LOG_D("Skip '%s': is commented out", name.c_str());
+            LOG_V("Skip '%s': is commented out", name.c_str());
             continue;
         }
         p.kConfigEntries.emplace(name, value);
-        LOG_D("%s is '%s'", name.c_str(), value.c_str());
+        LOG_V("%s is '%s'", name.c_str(), value.c_str());
     }
     LOG_I("Loaded %zu entries from %s", p.kConfigEntries.size(), confPath.c_str());
     return &p;
@@ -117,7 +117,7 @@ bool getVariable(const std::string &name, std::string &outvalue) {
         for (size_t i = 0; i < sizeof(backends) / sizeof(ConfigBackendBase); ++i) {
             ptr = &backends[i];
             if (ptr->getVariable(ptr->priv, name, outvalue)) {
-                LOG_D("Used '%s' backend for fetching var '%s'", ptr->name, name.c_str());
+                LOG_V("Used '%s' backend for fetching var '%s'", ptr->name, name.c_str());
                 return true;
             }
         }
