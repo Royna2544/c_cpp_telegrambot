@@ -10,15 +10,12 @@
 #include <utility>
 #include "tgbot/TgException.h"
 
-using TgBot::Chat;
 using TgBot::ChatPermissions;
-using TgBot::User;
 
 #ifdef SOCKET_CONNECTION
 CtrlSpamBlock gSpamBlockCfg = CTRL_LOGGING_ONLY_ON;
 #endif
 
-using ChatHandle = std::map<TgBot::User::Ptr, std::vector<Message::Ptr>>;
 using UserType = std::pair<TgBot::Chat::Ptr, std::vector<Message::Ptr>>;
 using SpamMapT = std::map<TgBot::User::Ptr, std::vector<Message::Ptr>>;
 using buffer_iterator_t = std::map<TgBot::Chat::Ptr, ChatHandle>::const_iterator;
@@ -132,18 +129,12 @@ static void spamDetectFunc(const Bot &bot, buffer_iterator_t handle) {
     deleteAndMute(bot, handle, MaxMsgMap, 5);
 }
 
-struct SpamBlockBuffer {
-    std::map<Chat::Ptr, ChatHandle> buffer;
-    std::map<Chat::Ptr, int> buffer_sub;
-    std::mutex m;  // Protect buffer, buffer_sub
-};
-
-static void spamBlockerFn(const Bot& bot, SpamBlockBuffer& buf) {
-    auto& buffer = buf.buffer;
-    auto& buffer_sub = buf.buffer_sub;
-    while (true) {
+static void spamBlockerFn(const Bot& bot, std::shared_ptr<SpamBlockBuffer> buf) {
+    auto& buffer = buf->buffer;
+    auto& buffer_sub = buf->buffer_sub;
+    while (buf->kRun) {
         {
-            const std::lock_guard<std::mutex> _(buf.m);
+            const std::lock_guard<std::mutex> _(buf->m);
             if (buffer_sub.size() > 0) {
                 auto its = buffer_sub.begin();
                 const auto chatNameStr = toChatName(its->first);
@@ -170,8 +161,8 @@ static void spamBlockerFn(const Bot& bot, SpamBlockBuffer& buf) {
     }
 }
 
-void spamBlocker(const Bot &bot, const Message::Ptr &message) {
-    static SpamBlockBuffer buf;
+void spamBlocker(const Bot &bot, const Message::Ptr &message, std::shared_ptr<SpamBlockBuffer> buf) {
+    static std::once_flag once;
 
 #ifdef SOCKET_CONNECTION
     // Global cfg
@@ -185,16 +176,17 @@ void spamBlocker(const Bot &bot, const Message::Ptr &message) {
     if (!message->animation && message->text.empty() && !message->sticker)
         return;
 
-    static bool init = false;
-    if (!init) {
-        std::thread(&spamBlockerFn, std::cref(bot), std::ref(buf)).detach();
-        init = true;
-    }
+    buf->kRun = true;
+    std::call_once(once, [buf, &bot] {
+        buf->kThreadP = std::thread(&spamBlockerFn, std::cref(bot), buf);
+    });
     {
-        const std::lock_guard<std::mutex> _(buf.m);
-        auto bufferIt = findChatIt::find(buf.buffer, [](const auto& it) { return it.first; },
+        const std::lock_guard<std::mutex> _(buf->m);
+        auto& buffer = buf->buffer;
+        auto& buffer_sub = buf->buffer_sub;
+        auto bufferIt = findChatIt::find(buffer, [](const auto& it) { return it.first; },
                                           message->chat);
-        if (bufferIt != buf.buffer.end()) {
+        if (bufferIt != buffer.end()) {
             const auto bufferUserIt = findUserIt::find(bufferIt->second, [](const auto& it) { 
                 return it.first;
             }, message->from);
@@ -205,14 +197,14 @@ void spamBlocker(const Bot &bot, const Message::Ptr &message) {
                 bufferIt->second[message->from].emplace_back(message);
             }
         } else {
-            buf.buffer[message->chat][message->from].emplace_back(message);
+            buffer[message->chat][message->from].emplace_back(message);
         }
-        const auto bufferSubIt = findChatIt::find(buf.buffer_sub,
+        const auto bufferSubIt = findChatIt::find(buffer_sub,
             [](const auto& it) { return it.first; },  message->chat);
-        if (bufferSubIt != buf.buffer_sub.end()) {
+        if (bufferSubIt != buffer_sub.end()) {
             ++bufferSubIt->second;
         } else {
-            ++buf.buffer_sub[message->chat];
+            ++buffer_sub[message->chat];
         }
     }
 }

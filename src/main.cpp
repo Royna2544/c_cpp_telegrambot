@@ -69,6 +69,7 @@ int main(void) {
 
     database::db.load();
     static auto ctx = std::make_shared<TimerCtx>();
+    static auto kSpamBlockCtx = std::make_shared<SpamBlockBuffer>();
 
     bot_AddCommandEnforcedCompiler(gBot, "c", ProgrammingLangs::C, [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
         CompileRunHandler(CCppCompileHandleData{{{bot, message}, compiler, "out.c"}});
@@ -397,7 +398,7 @@ int main(void) {
         if (!gObservedChatIds.empty() || gObserveAllChats)
             processObservers(msg);
 #endif
-        spamBlocker(gBot, msg);
+        spamBlocker(gBot, msg, kSpamBlockCtx);
     });
 
 #ifdef SOCKET_CONNECTION
@@ -431,6 +432,8 @@ int main(void) {
         std::call_once(once, [s] {
             LOG_I("Exiting with signal %d", s);
             ctx->forceStopTimer();
+            kSpamBlockCtx->kRun = false;
+            kSpamBlockCtx->kThreadP.join();
             database::db.save();
 #ifdef SOCKET_CONNECTION
             std::error_code ec;
