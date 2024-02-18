@@ -54,15 +54,29 @@ static std::string commonMsgdataFn(const Message::Ptr &m) {
         return m->text;
 }
 
+static bool isEntryOverThreshold(const SpamMapT::value_type& t, const size_t threshold) {
+    const size_t kEntryValue = t.second.size();
+    const bool isOverThreshold = kEntryValue >= threshold;
+    if (isOverThreshold)
+        LOG_D("Note: Value %zu is over threshold %zu", kEntryValue, threshold);
+    return isOverThreshold;
+}
+
+static void _logSpamDetectCommon(const SpamMapT::value_type& t, const char* name) {
+    LOG_I("Spam detected for user %s, filtered by %s", toUserName(t.first).c_str(), name);
+}
+
 static void _deleteAndMuteCommon(const Bot& bot, const buffer_iterator_t& handle, const SpamMapT::value_type& t,
-                                 const size_t threshold) {
+                                 const size_t threshold, const char* name) {
                                      // Initial set - all false set
     static auto perms = std::make_shared<ChatPermissions>();
-    if (t.second.size() >= threshold) {
+    if (isEntryOverThreshold(t, threshold)) {
+        _logSpamDetectCommon(t, name);
+    
         for (const auto &msg : t.second) {
             try {
                 bot.getApi().deleteMessage(handle->first->id, msg->messageId);
-            } catch (const TgBot::TgException &ignored) {
+            } catch (const TgBot::TgException &) {
             }
         }
         try {
@@ -75,10 +89,6 @@ static void _deleteAndMuteCommon(const Bot& bot, const buffer_iterator_t& handle
     }
 }
 
-static void _logSpamDetectCommon(const SpamMapT::value_type& t, const char* name) {
-    LOG_I("Spam detected for user %s, filtered by %s", toUserName(t.first).c_str(), name);
-}
-
 #ifdef SOCKET_CONNECTION
 static void deleteAndMute(const Bot &bot, buffer_iterator_t handle,
                           const SpamMapT &map, const size_t threshold, const char* name) {
@@ -87,11 +97,12 @@ static void deleteAndMute(const Bot &bot, buffer_iterator_t handle,
     for (const auto &mapmsg : map) {
         switch (gSpamBlockCfg) {
             case TgBotCommandData::CTRL_ON: {
-                _deleteAndMuteCommon(bot, handle, mapmsg, threshold);
-                [[fallthrough]];
+                _deleteAndMuteCommon(bot, handle, mapmsg, threshold, name);
+                break;
             }
             case TgBotCommandData::CTRL_LOGGING_ONLY_ON:
-                _logSpamDetectCommon(mapmsg, name);
+                if (isEntryOverThreshold(mapmsg, threshold))
+                    _logSpamDetectCommon(mapmsg, name);
                 break;
             default:
                 break;
@@ -102,7 +113,7 @@ static void deleteAndMute(const Bot &bot, buffer_iterator_t handle,
 static void deleteAndMute(const Bot &bot, buffer_iterator_t handle,
                           const SpamMapT &map, const size_t threshold, const char* name) {
     for (const auto &mapmsg : map) {
-        _deleteAndMuteCommon(bot, handle, mapmsg, threshold);
+        _deleteAndMuteCommon(bot, handle, mapmsg, threshold, name);
         _logSpamDetectCommon(mapmsg, name);
     }
 }
@@ -132,12 +143,10 @@ static void spamDetectFunc(const Bot &bot, buffer_iterator_t handle) {
                                                  return lhs.second.size() < rhs.second.size();
                                              });
         MaxSameMsgMap.emplace(pair.first, mostCommonIt->second);
-        LOG_D("Chat: %s, User: %s, Max common msgs: %zu", toChatName(handle->first).c_str(),
-              toUserName(pair.first).c_str(), mostCommonIt->second.size());
     }
 
-    deleteAndMute(bot, handle, MaxSameMsgMap, 3, "MaxSameMsgMap");
-    deleteAndMute(bot, handle, MaxMsgMap, 5, "MaxMsgMap");
+    deleteAndMute(bot, handle, MaxSameMsgMap, 3, "MaxSameMsg");
+    deleteAndMute(bot, handle, MaxMsgMap, 5, "MaxMsg");
 }
 
 static void spamBlockerFn(const Bot& bot, std::shared_ptr<SpamBlockBuffer> buf) {
