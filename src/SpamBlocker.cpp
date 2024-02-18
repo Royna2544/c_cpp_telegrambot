@@ -54,48 +54,59 @@ static std::string commonMsgdataFn(const Message::Ptr &m) {
         return m->text;
 }
 
+static void _deleteAndMuteCommon(const Bot& bot, const buffer_iterator_t& handle, const SpamMapT::value_type& t,
+                                 const size_t threshold) {
+                                     // Initial set - all false set
+    static auto perms = std::make_shared<ChatPermissions>();
+    if (t.second.size() >= threshold) {
+        for (const auto &msg : t.second) {
+            try {
+                bot.getApi().deleteMessage(handle->first->id, msg->messageId);
+            } catch (const TgBot::TgException &ignored) {
+            }
+        }
+        try {
+            bot.getApi().restrictChatMember(handle->first->id, t.first->id,
+                                            perms, 5 * 60);
+        } catch (const TgBot::TgException &e) {
+            LOG_W("Cannot mute user %s in chat %s: %s", toUserName(t.first).c_str(), 
+                    toChatName(handle->first).c_str(), e.what());
+        }
+    }
+}
+
+static void _logSpamDetectCommon(const SpamMapT::value_type& t, const char* name) {
+    LOG_I("Spam detected for user %s, filtered by %s", toUserName(t.first).c_str(), name);
+}
+
+#ifdef SOCKET_CONNECTION
 static void deleteAndMute(const Bot &bot, buffer_iterator_t handle,
                           const SpamMapT &map, const size_t threshold, const char* name) {
     // Initial set - all false set
     auto perms = std::make_shared<ChatPermissions>();
     for (const auto &mapmsg : map) {
-#ifdef SOCKET_CONNECTION
         switch (gSpamBlockCfg) {
             case TgBotCommandData::CTRL_ON: {
-#endif
-                if (mapmsg.second.size() >= threshold) {
-#ifdef SOCKET_CONNECTION
-                    if (gSpamBlockCfg == CTRL_ON) {
-#endif
-                        for (const auto &msg : mapmsg.second) {
-                            try {
-                                bot.getApi().deleteMessage(handle->first->id, msg->messageId);
-                            } catch (const TgBot::TgException &ignored) {
-                            }
-                        }
-                        try {
-                            bot.getApi().restrictChatMember(handle->first->id, mapmsg.first->id,
-                                                            perms, 5 * 60);
-                        } catch (const std::exception &e) {
-                            LOG_W("Cannot mute user %s in chat %s: %s", toUserName(mapmsg.first).c_str(), 
-                                toChatName(handle->first).c_str(), e.what());
-                        }
-                    }
-#ifdef SOCKET_CONNECTION
-                }
+                _deleteAndMuteCommon(bot, handle, mapmsg, threshold);
                 [[fallthrough]];
             }
             case TgBotCommandData::CTRL_LOGGING_ONLY_ON:
-#endif
-                LOG_I("Spam detected for user %s, filtered by %s", toUserName(mapmsg.first).c_str(), name);
-#ifdef SOCKET_CONNECTION
+                _logSpamDetectCommon(mapmsg, name);
                 break;
             default:
                 break;
         };
-#endif
     }
 }
+#else
+static void deleteAndMute(const Bot &bot, buffer_iterator_t handle,
+                          const SpamMapT &map, const size_t threshold, const char* name) {
+    for (const auto &mapmsg : map) {
+        _deleteAndMuteCommon(bot, handle, mapmsg, threshold);
+        _logSpamDetectCommon(mapmsg, name);
+    }
+}
+#endif
 
 static void spamDetectFunc(const Bot &bot, buffer_iterator_t handle) {
     SpamMapT MaxSameMsgMap, MaxMsgMap;
