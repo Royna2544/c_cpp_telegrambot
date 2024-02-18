@@ -55,7 +55,7 @@ static std::string commonMsgdataFn(const Message::Ptr &m) {
 }
 
 static void deleteAndMute(const Bot &bot, buffer_iterator_t handle,
-                          const SpamMapT &map, const size_t threshold) {
+                          const SpamMapT &map, const size_t threshold, const char* name) {
     // Initial set - all false set
     auto perms = std::make_shared<ChatPermissions>();
     for (const auto &mapmsg : map) {
@@ -87,7 +87,7 @@ static void deleteAndMute(const Bot &bot, buffer_iterator_t handle,
             }
             case TgBotCommandData::CTRL_LOGGING_ONLY_ON:
 #endif
-                LOG_I("Spam detected for user %s", toUserName(mapmsg.first).c_str());
+                LOG_I("Spam detected for user %s, filtered by %s", toUserName(mapmsg.first).c_str(), name);
 #ifdef SOCKET_CONNECTION
                 break;
             default:
@@ -121,12 +121,12 @@ static void spamDetectFunc(const Bot &bot, buffer_iterator_t handle) {
                                                  return lhs.second.size() < rhs.second.size();
                                              });
         MaxSameMsgMap.emplace(pair.first, mostCommonIt->second);
-        LOG_D("Chat: %s, User: %s, maxIt: %zu", toChatName(handle->first).c_str(),
+        LOG_D("Chat: %s, User: %s, Max common msgs: %zu", toChatName(handle->first).c_str(),
               toUserName(pair.first).c_str(), mostCommonIt->second.size());
     }
 
-    deleteAndMute(bot, handle, MaxSameMsgMap, 3);
-    deleteAndMute(bot, handle, MaxMsgMap, 5);
+    deleteAndMute(bot, handle, MaxSameMsgMap, 3, "MaxSameMsgMap");
+    deleteAndMute(bot, handle, MaxMsgMap, 5, "MaxMsgMap");
 }
 
 static void spamBlockerFn(const Bot& bot, std::shared_ptr<SpamBlockBuffer> buf) {
@@ -146,7 +146,7 @@ static void spamBlockerFn(const Bot& bot, std::shared_ptr<SpamBlockBuffer> buf) 
                         its = buffer_sub.erase(its);
                         continue;
                     }
-                    LOG_V("Chat: %s, Count: %d", chatName, its->second);
+                    LOG_V("Chat: %s, MsgCount: %d", chatName, its->second);
                     if (its->second >= 5) {
                         LOG_D("Launching spamdetect for %s", chatName);
                         spamDetectFunc(bot, it);
