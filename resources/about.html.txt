@@ -7,7 +7,7 @@
 
 <b>BUILD INFO</b>: HEAD
 Commit-Msg: _commitmsg_
-Commit-Id: <a href="_originurl_/commit/_commitid_">_commitid_</a>
+Commit-Id: _commitid_
 Repo URL: <a href="_originurl_">Here</a>
 
 <b>OS | Compiler | Date</b>: _compilerver_
