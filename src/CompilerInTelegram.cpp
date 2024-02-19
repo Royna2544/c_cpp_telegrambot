@@ -159,7 +159,7 @@ void CompileRunHandler<CCppCompileHandleData>(const CCppCompileHandleData &data)
         runCommand(data.bot, data.message, cmd.str(), res);
         res += "\n";
 
-        if (std::filesystem::exists(aoutname)) {
+        if (fileExists(aoutname)) {
             res += "Run time:\n";
             runCommand(data.bot, data.message, aoutname, res);
             std::filesystem::remove(aoutname);

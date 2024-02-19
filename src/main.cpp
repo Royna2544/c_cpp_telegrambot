@@ -23,6 +23,7 @@
 #include <boost/config.hpp>
 #include <chrono>
 #include <exception>
+#include <filesystem>
 #include <fstream>
 #include <map>
 #include <ostream>
@@ -439,8 +440,7 @@ int main(void) {
             kSpamBlockCtx->stop();
             database::db.save();
 #ifdef SOCKET_CONNECTION
-            std::error_code ec;
-            if (!std::filesystem::exists(SOCKET_PATH, ec)) {
+            if (!fileExists(SOCKET_PATH)) {
                 LOG_W("Socket file was deleted");
                 socketValid = false;
             }
