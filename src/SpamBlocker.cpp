@@ -194,8 +194,8 @@ void SpamBlockBuffer::spamBlocker(const Bot &bot, const Message::Ptr &message) {
     if (Authorized(message, true)) return;
     // Do not track older msgs and consider it as spam.
     if (std::time(0) - message->date > 15) return;
-    // We care GIF, sticker, text spams only
-    if (!message->animation && message->text.empty() && !message->sticker)
+    // We care GIF, sticker, text spams only, or if it isn't fowarded msg
+    if ((!message->animation && message->text.empty() && !message->sticker) || message->forwardFrom)
         return;
 
     useConditionVariable();
