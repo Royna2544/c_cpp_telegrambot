@@ -147,7 +147,12 @@ void writeToSocket(struct TgBotConnection conn) {
 void forceStopListening(void) {
     if (isValidFd(notify_fd) && isValidFd(listen_fd)) {
         kListenData d = 0;
-        write(notify_fd, &d, sizeof(kListenData));
+        int count;
+
+        count = write(notify_fd, &d, sizeof(kListenData));
+        if (count < 0) {
+            PLOG_E("Failed to write to notify pipe");
+        }
         closeFd(notify_fd);
     }
 }
