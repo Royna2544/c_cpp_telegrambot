@@ -8,6 +8,7 @@
 #include <chrono>
 #include <cmath>
 #include <sstream>
+#include "SingleThreadCtrl.h"
 
 template <class Dur>
 std::chrono::hours to_hours(Dur &&it) {
@@ -183,9 +184,9 @@ void TimerCtx::stopTimer(const Bot &bot, const Message::Ptr& message) {
     bot_sendReplyMessage(bot, message, text);
 }
 
-void TimerCtx::forceStopTimer() {
+void TimerCtx::stop() {
     if (isactive) {
         LOG_I("Canceling timer and cleaning up...");
-        stop();
+        SingleThreadCtrl::stop();
     }
 }

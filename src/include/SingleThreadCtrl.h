@@ -29,7 +29,7 @@ class SingleThreadCtrl {
             LOG_W("Function is already set in this instance");
         }
     }
-    void stop() {
+    virtual void stop() {
         std::call_once(once, [this]{
             kRun = false;
             if (threadP && threadP->joinable())
@@ -37,7 +37,7 @@ class SingleThreadCtrl {
         });
     }
 
-    ~SingleThreadCtrl() {
+    virtual ~SingleThreadCtrl() {
         stop();
     }
  protected:

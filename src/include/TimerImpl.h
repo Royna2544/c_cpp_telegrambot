@@ -10,10 +10,11 @@ struct TimerCtx : SingleThreadCtrl {
     static constexpr int TIMER_CONFIG_SEC = 5;
     TimerCtx(thread_function other) : SingleThreadCtrl(other) {}
     TimerCtx() : SingleThreadCtrl() {}
+    ~TimerCtx() override = default;
 
     void startTimer(const Bot &bot, const Message::Ptr& message);
     void stopTimer(const Bot &bot, const Message::Ptr& message);
-    void forceStopTimer(void);
+    void stop(void) override;
  private:
     void TimerThreadFn(const Bot &bot, Message::Ptr message, std::chrono::seconds s);
     bool parseTimerArguments(const Bot &bot, const Message::Ptr &message, std::chrono::seconds &out);

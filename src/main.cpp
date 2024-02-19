@@ -431,7 +431,7 @@ int main(void) {
         static std::once_flag once;
         std::call_once(once, [s] {
             LOG_I("Exiting with signal %d", s);
-            ctx->forceStopTimer();
+            ctx->stop();
             kSpamBlockCtx->stop();
             database::db.save();
 #ifdef SOCKET_CONNECTION
