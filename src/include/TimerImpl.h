@@ -8,7 +8,6 @@
 
 struct TimerCtx : SingleThreadCtrl {
     static constexpr int TIMER_CONFIG_SEC = 5;
-    TimerCtx(thread_function other) : SingleThreadCtrl(other) {}
     TimerCtx() : SingleThreadCtrl() {}
     ~TimerCtx() override = default;
 

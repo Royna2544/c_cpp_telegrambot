@@ -13,9 +13,6 @@ class SingleThreadCtrl {
  public:
     using thread_function = std::function<void(void)>;
 
-    SingleThreadCtrl(thread_function other) {
-        setThreadFunction(other);
-    }
     SingleThreadCtrl() = default;
 
     /*

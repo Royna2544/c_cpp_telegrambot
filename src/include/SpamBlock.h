@@ -23,7 +23,6 @@ using TgBot::User;
 using ChatHandle = std::map<User::Ptr, std::vector<Message::Ptr>>;
 
 struct SpamBlockBuffer : SingleThreadCtrl {
-    SpamBlockBuffer(thread_function other) : SingleThreadCtrl(other) {}
     SpamBlockBuffer() : SingleThreadCtrl() {}
     ~SpamBlockBuffer() override = default;
 
