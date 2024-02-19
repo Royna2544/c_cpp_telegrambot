@@ -33,7 +33,8 @@ struct file_priv {
 };
 
 static void *file_load(void) {
-    std::string home, line;
+    std::filesystem::path home;
+    std::string line;
     static file_priv p{};
     size_t count = 0;
 
@@ -41,7 +42,7 @@ static void *file_load(void) {
         LOG_E("Cannot find HOME");
         return nullptr;
     }
-    const auto confPath = (std::filesystem::path(home) / ".tgbot_config").string();
+    const auto confPath = (home / ".tgbot_config").string();
     std::ifstream ifs(confPath);
     if (ifs.fail()) {
         LOG_E("Opening %s failed", confPath.c_str());

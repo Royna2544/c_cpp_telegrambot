@@ -6,7 +6,7 @@
 namespace fs = std::filesystem;
 
 __attribute__((weak))
-bool fileExists(const std::string& filename) {
+bool fileExists(const std::filesystem::path& filename) {
     bool rc;
 
     std::error_code ec;
@@ -17,7 +17,7 @@ bool fileExists(const std::string& filename) {
     return rc;
 }
 
-bool canExecute(const std::string& filename)
+bool canExecute(const std::filesystem::path& filename)
 {
     std::error_code ec;
 
