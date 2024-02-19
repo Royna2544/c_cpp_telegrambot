@@ -4,6 +4,7 @@
 #include <SpamBlock.h>
 
 #include <atomic>
+#include <condition_variable>
 #include <map>
 #include <mutex>
 #include <thread>
@@ -176,7 +177,9 @@ void SpamBlockBuffer::spamBlockerFn(const Bot& bot) {
                 }
             }
         }
-        std_sleep_s(10);
+        std::unique_lock<std::mutex> lk(m);
+        // It just provides faster way out of the loop - Nothing more
+        cv.wait_for(lk, 10s);
     }
 }
 
@@ -195,6 +198,7 @@ void SpamBlockBuffer::spamBlocker(const Bot &bot, const Message::Ptr &message) {
     if (!message->animation && message->text.empty() && !message->sticker)
         return;
 
+    useConditionVariable();
     std::call_once(once, [this, &bot]{
         setThreadFunction(std::bind(&SpamBlockBuffer::spamBlockerFn, this, std::cref(bot)));
     });
