@@ -36,6 +36,7 @@
 #include <vector>
 
 #include "RuntimeException.h"
+#include "SingleThreadCtrl.h"
 #include "StringToolsExt.h"
 #include "socket/TgBotSocket.h"
 #include "tgbot/TgException.h"
@@ -410,13 +411,13 @@ int main(void) {
     });
 
 #ifdef SOCKET_CONNECTION
-    static std::thread th;
+    static SingleThreadCtrl th;
     static bool socketValid = false;
     static std::string exitToken;
     static std::promise<bool> socketCreatedProm;
     static std::future<bool> socketCreatedFut = socketCreatedProm.get_future();
 
-    th = std::thread([] {
+    th.setThreadFunction([] {
         startListening([](struct TgBotConnection conn) {
             socketConnectionHandler(gBot, conn);
         },
@@ -448,16 +449,11 @@ int main(void) {
                 socketValid = false;
             }
             if (socketValid) {
-                if (th.joinable()) {
-                    writeToSocket({CMD_EXIT, {.data_2 = TgBotCommandData::Exit::create(ExitOp::DO_EXIT, exitToken)}});
-                    th.join();
-                }
+                writeToSocket({CMD_EXIT, {.data_2 = TgBotCommandData::Exit::create(ExitOp::DO_EXIT, exitToken)}});
             } else {
-                if (th.joinable()) {
-                    forceStopListening();
-                    th.join();
-                }
+                forceStopListening();
             }
+            th.stop();
 #endif
         });
         std::exit(0);
