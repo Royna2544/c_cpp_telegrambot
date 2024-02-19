@@ -17,6 +17,6 @@ struct TimerCtx : SingleThreadCtrl {
  private:
     void TimerThreadFn(const Bot &bot, Message::Ptr message, std::chrono::seconds s);
     bool parseTimerArguments(const Bot &bot, const Message::Ptr &message, std::chrono::seconds &out);
-    bool botcanpin, sendendmsg, isactive;
+    bool botcanpin = true, sendendmsg = true, isactive = false;
     Message::Ptr message;
 };
