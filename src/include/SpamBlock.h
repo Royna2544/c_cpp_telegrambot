@@ -1,8 +1,8 @@
 #pragma once
 
-#include <NamespaceImport.h>
-
+#include "NamespaceImport.h"
 #include "Types.h"
+#include "SingleThreadCtrl.h"
 
 #ifdef SOCKET_CONNECTION
 #include <socket/TgBotSocket.h>
@@ -22,12 +22,15 @@ using TgBot::Chat;
 using TgBot::User;
 using ChatHandle = std::map<User::Ptr, std::vector<Message::Ptr>>;
 
-struct SpamBlockBuffer {
+struct SpamBlockBuffer : SingleThreadCtrl {
+    SpamBlockBuffer(thread_function other) : SingleThreadCtrl(other) {}
+    SpamBlockBuffer() : SingleThreadCtrl() {}
+
+    void spamBlockerFn(const Bot& bot);
+    void spamBlocker(const Bot &bot, const Message::Ptr &message);
+
+ private:
     std::map<Chat::Ptr, ChatHandle> buffer;
     std::map<Chat::Ptr, int> buffer_sub;
     std::mutex m;  // Protect buffer, buffer_sub
-    std::atomic_bool kRun;
-    std::thread kThreadP;
 };
-
-void spamBlocker(const Bot& bot, const Message::Ptr& message, std::shared_ptr<SpamBlockBuffer> buf);

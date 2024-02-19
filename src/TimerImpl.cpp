@@ -133,6 +133,23 @@ bool TimerCtx::parseTimerArguments(const Bot &bot, const Message::Ptr &message, 
     return true;
 }
 
+void TimerCtx::TimerThreadFn(const Bot &bot, Message::Ptr message, std::chrono::seconds timer) {
+    isactive = true;
+    while (timer > 0s && kRun) {
+        std_sleep_s(1);
+        if (timer.count() % TIMER_CONFIG_SEC == 0) {
+            bot_editMessage(bot, message, to_string(timer));
+        }
+        timer -= 1s;
+    }
+    bot_editMessage(bot, message, "Timer ended");
+    if (sendendmsg)
+        bot_sendMessage(bot, message->chat->id, "Timer ended");
+    if (botcanpin)
+        bot.getApi().unpinChatMessage(message->chat->id, message->messageId);
+    isactive = false;
+}
+
 void TimerCtx::startTimer(const Bot &bot, const Message::Ptr& msg) {
     std::chrono::seconds parsedTime(0);
 
@@ -145,24 +162,7 @@ void TimerCtx::startTimer(const Bot &bot, const Message::Ptr& msg) {
             LOG_W("Cannot pin msg!");
             botcanpin = false;
         }
-        isactive = true;
-        kStop = false;
-        threadP = std::thread([&bot, parsedTime, this]() {
-            auto timer = parsedTime;
-            while (timer > 0s && !kStop) {
-                std_sleep_s(1);
-                if (timer.count() % TIMER_CONFIG_SEC == 0) {
-                    bot_editMessage(bot, message, to_string(timer));
-                }
-                timer -= 1s;
-            }
-            bot_editMessage(bot, message, "Timer ended");
-            if (sendendmsg)
-                bot_sendMessage(bot, message->chat->id, "Timer ended");
-            if (botcanpin)
-                bot.getApi().unpinChatMessage(message->chat->id, message->messageId);
-            isactive = false;
-        });
+        setThreadFunction(std::bind(&TimerCtx::TimerThreadFn, this, std::cref(bot), message, parsedTime));
     }
 }
 
@@ -172,8 +172,7 @@ void TimerCtx::stopTimer(const Bot &bot, const Message::Ptr& message) {
         const bool allowed = message->chat->id == message->chat->id;
         sendendmsg = !allowed;
         if (allowed) {
-            kStop = true;
-            threadP.join();
+            stop();
             text = "Stopped successfully";
         } else {
             text = "Timer is running on other group.";
@@ -187,7 +186,6 @@ void TimerCtx::stopTimer(const Bot &bot, const Message::Ptr& message) {
 void TimerCtx::forceStopTimer() {
     if (isactive) {
         LOG_I("Canceling timer and cleaning up...");
-        kStop = true;
-        threadP.join();
+        stop();
     }
 }

@@ -398,7 +398,7 @@ int main(void) {
         if (!gObservedChatIds.empty() || gObserveAllChats)
             processObservers(msg);
 #endif
-        spamBlocker(gBot, msg, kSpamBlockCtx);
+        kSpamBlockCtx->spamBlocker(gBot, msg);
     });
 
 #ifdef SOCKET_CONNECTION
@@ -432,8 +432,7 @@ int main(void) {
         std::call_once(once, [s] {
             LOG_I("Exiting with signal %d", s);
             ctx->forceStopTimer();
-            kSpamBlockCtx->kRun = false;
-            kSpamBlockCtx->kThreadP.join();
+            kSpamBlockCtx->stop();
             database::db.save();
 #ifdef SOCKET_CONNECTION
             std::error_code ec;

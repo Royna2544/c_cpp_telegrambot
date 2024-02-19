@@ -3,6 +3,7 @@
 #include <NamespaceImport.h>
 #include <SpamBlock.h>
 
+#include <atomic>
 #include <map>
 #include <mutex>
 #include <thread>
@@ -149,12 +150,10 @@ static void spamDetectFunc(const Bot &bot, buffer_iterator_t handle) {
     deleteAndMute(bot, handle, MaxMsgMap, 5, "MaxMsg");
 }
 
-static void spamBlockerFn(const Bot& bot, std::shared_ptr<SpamBlockBuffer> buf) {
-    auto& buffer = buf->buffer;
-    auto& buffer_sub = buf->buffer_sub;
-    while (buf->kRun) {
+void SpamBlockBuffer::spamBlockerFn(const Bot& bot) {
+    while (kRun) {
         {
-            const std::lock_guard<std::mutex> _(buf->m);
+            const std::lock_guard<std::mutex> _(m);
             if (buffer_sub.size() > 0) {
                 auto its = buffer_sub.begin();
                 const auto chatNameStr = toChatName(its->first);
@@ -181,7 +180,7 @@ static void spamBlockerFn(const Bot& bot, std::shared_ptr<SpamBlockBuffer> buf) 
     }
 }
 
-void spamBlocker(const Bot &bot, const Message::Ptr &message, std::shared_ptr<SpamBlockBuffer> buf) {
+void SpamBlockBuffer::spamBlocker(const Bot &bot, const Message::Ptr &message) {
     static std::once_flag once;
 
 #ifdef SOCKET_CONNECTION
@@ -196,14 +195,12 @@ void spamBlocker(const Bot &bot, const Message::Ptr &message, std::shared_ptr<Sp
     if (!message->animation && message->text.empty() && !message->sticker)
         return;
 
-    buf->kRun = true;
-    std::call_once(once, [buf, &bot] {
-        buf->kThreadP = std::thread(&spamBlockerFn, std::cref(bot), buf);
+    std::call_once(once, [this, &bot]{
+        setThreadFunction(std::bind(&SpamBlockBuffer::spamBlockerFn, this, std::cref(bot)));
     });
+
     {
-        const std::lock_guard<std::mutex> _(buf->m);
-        auto& buffer = buf->buffer;
-        auto& buffer_sub = buf->buffer_sub;
+        const std::lock_guard<std::mutex> _(m);
         auto bufferIt = findChatIt::find(buffer, [](const auto& it) { return it.first; },
                                           message->chat);
         if (bufferIt != buffer.end()) {
