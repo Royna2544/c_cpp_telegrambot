@@ -11,3 +11,8 @@ bool getHomePath(std::string& buf) {
     }
     return ret;
 }
+
+bool fileExists(const std::string& path) {
+    auto filepath = path.c_str();
+    return PathFileExistsA(filepath) && !PathIsDirectoryA(filepath);
+}

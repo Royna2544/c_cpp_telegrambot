@@ -11,3 +11,4 @@ static inline const char path_env_delimiter = ':';
 // Implemented sperately by OS
 bool canExecute(const std::string& path);
 bool getHomePath(std::string& buf);
+bool fileExists(const std::string& filename);
