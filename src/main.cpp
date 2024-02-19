@@ -408,6 +408,7 @@ int main(void) {
             processObservers(msg);
 #endif
         kSpamBlockCtx->spamBlocker(gBot, msg);
+        processRegEXCommand(gBot, msg);
     });
 
 #ifdef SOCKET_CONNECTION
