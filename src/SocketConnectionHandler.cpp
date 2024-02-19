@@ -123,7 +123,9 @@ void socketConnectionHandler(const Bot& bot, struct TgBotConnection conn) {
                 }
                 // Try to send as local file first
                 try {
-                    fn(bot.getApi(), _data.data_5.id, InputFile::fromFile(file, getMIMEString(file)));
+                    auto iFile = InputFile::fromFile(file, getMIMEString(file));
+                    iFile->fileName = std::filesystem::path(file).filename().string();
+                    fn(bot.getApi(), _data.data_5.id, iFile);
                 } catch (std::ifstream::failure& e) {
                     LOG_I("Failed to send '%s' as local file, trying as Telegram file id", file);
                     fn(bot.getApi(), _data.data_5.id, std::string(file));
