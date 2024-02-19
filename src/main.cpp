@@ -260,7 +260,7 @@ int main(void) {
             msgtxt += "\n\n";
             do {
                 msgtxt += "Try " + std::to_string(COUNT_MAX - count + 1) + " : ";
-                if (genRandomNumber(100) % 2 == 1) {
+                if (genRandomNumber(10) % 2 == 1) {
                     msgtxt += "Yes";
                     ++yesno;
                 } else {
@@ -270,6 +270,10 @@ int main(void) {
                 msgtxt += '\n';
                 count--;
                 bot_editMessage(bot, msg, msgtxt);
+                if (abs(yesno) > count) {
+                    msgtxt += "Short circuited to the answer\n";
+                    break;
+                }
                 std_sleep_s(2);
             } while (count > 0);
             msgtxt += '\n';
