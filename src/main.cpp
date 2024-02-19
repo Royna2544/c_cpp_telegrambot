@@ -446,12 +446,10 @@ int main(void) {
                     th.join();
                 }
             } else {
-                #ifndef __WIN32
                 if (th.joinable()) {
                     forceStopListening();
                     th.join();
                 }
-                #endif
             }
 #endif
         });
