@@ -10,6 +10,7 @@
 #include <thread>
 #include <unordered_map>
 #include <utility>
+#include "BotReplyMessage.h"
 #include "tgbot/TgException.h"
 
 using TgBot::ChatPermissions;
@@ -75,12 +76,16 @@ static void _deleteAndMuteCommon(const Bot& bot, const buffer_iterator_t& handle
     if (isEntryOverThreshold(t, threshold)) {
         _logSpamDetectCommon(t, name);
     
+        bot_sendMessage(bot, handle->first->id, "Spam detected @" + t.first->username);
         for (const auto &msg : t.second) {
             try {
                 bot.getApi().deleteMessage(handle->first->id, msg->messageId);
             } catch (const TgBot::TgException &) {
             }
         }
+        
+        LOG_I("Try mute user %s in chat %s", toUserName(t.first).c_str(), 
+                toChatName(handle->first).c_str());
         try {
             bot.getApi().restrictChatMember(handle->first->id, t.first->id,
                                             perms, 5 * 60);
