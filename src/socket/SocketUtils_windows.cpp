@@ -2,16 +2,14 @@
 
 // clang-format off
 #include <winsock2.h>
+#include <winsock.h>
 #include <afunix.h>
 // clang-format on
-
-#include <chrono>
-#include <string>
-#include <thread>
 
 #include "SocketUtils_internal.h"
 #include "TgBotSocket.h"
 
+#define INTERNAL_SOCKET_PATH "C:\\Temp\\tgbot_internal.sock"
 #define WSALOG_E(fmt, ...) LOG_E(fmt ": %s", ##__VA_ARGS__, strWSAError(WSAGetLastError()))
 
 static char *strWSAError(const int errcode) {
@@ -64,15 +62,15 @@ static char *strWSAError(const int errcode) {
     return strerror(ret);
 }
 
-static SOCKET makeSocket(bool is_client) {
+static SOCKET makeSocket(const char *path, bool is_client) {
     struct sockaddr_un name {};
     WSADATA data;
     SOCKET fd;
     int ret;
 
     if (!is_client) {
-        LOG_D("Creating socket at " SOCKET_PATH);
-        std::remove(SOCKET_PATH);
+        LOG_D("Creating socket at %s", path);
+        std::remove(path);
     }
 
     ret = WSAStartup(MAKEWORD(2, 2), &data);
@@ -88,7 +86,7 @@ static SOCKET makeSocket(bool is_client) {
     }
 
     name.sun_family = AF_UNIX;
-    strncpy(name.sun_path, SOCKET_PATH, sizeof(name.sun_path));
+    strncpy(name.sun_path, path, sizeof(name.sun_path));
     name.sun_path[sizeof(name.sun_path) - 1] = '\0';
 
     decltype(&connect) fn = is_client ? connect : bind;
@@ -103,11 +101,21 @@ static SOCKET makeSocket(bool is_client) {
 
 void startListening(const listener_callback_t &cb, std::promise<bool> &createdPromise) {
     bool should_break = false;
-    const SOCKET sfd = makeSocket(false);
+    struct fd_set set;
+    const SOCKET sfd = makeSocket(SOCKET_PATH, false);
+
     if (sfd != INVALID_SOCKET) {
         do {
             if (listen(sfd, SOMAXCONN) == SOCKET_ERROR) {
                 WSALOG_E("Failed to listen to socket");
+                break;
+            }
+            const SOCKET isfd = makeSocket(INTERNAL_SOCKET_PATH, false);
+            if (isfd == INVALID_SOCKET)
+                break;
+
+            if (listen(isfd, 1) == SOCKET_ERROR) {
+                WSALOG_E("Failed to listen to internal socket");
                 break;
             }
             LOG_I("Listening on " SOCKET_PATH);
@@ -118,10 +126,29 @@ void startListening(const listener_callback_t &cb, std::promise<bool> &createdPr
                 int len = sizeof(addr);
 
                 LOG_D("Waiting for connection");
+                FD_ZERO(&set);
+                FD_SET(sfd, &set);
+                FD_SET(isfd, &set);
+                if (select(0, &set, NULL, NULL, NULL) == SOCKET_ERROR) {
+                    WSALOG_E("Select failed");
+                    break;
+                }
+                if (FD_ISSET(isfd, &set)) {
+                    char dummy;
+                    const SOCKET cfd = accept(isfd, (struct sockaddr *)&addr, &len);
+                    if (cfd == INVALID_SOCKET) {
+                        WSALOG_E("Accept failed.");
+                        break;
+                    }
+                    recv(cfd, &dummy, sizeof(dummy), 0);
+                    closesocket(cfd);
+                    LOG_D("Exiting");
+                    break;
+                }
+                ASSERT(FD_ISSET(sfd, &set), "select() returns unexpected output");
                 const SOCKET cfd = accept(sfd, (struct sockaddr *)&addr, &len);
-
                 if (cfd == INVALID_SOCKET) {
-                    WSALOG_E("Accept failed.");
+                    WSALOG_E("Accept failed");
                     break;
                 } else {
                     LOG_D("Client connected");
@@ -139,18 +166,24 @@ void startListening(const listener_callback_t &cb, std::promise<bool> &createdPr
 }
 
 void writeToSocket(struct TgBotConnection conn) {
-    const auto sfd = makeSocket(true);
+    const auto sfd = makeSocket(SOCKET_PATH, true);
     if (sfd != INVALID_SOCKET) {
         const int count = send(sfd, reinterpret_cast<char *>(&conn), sizeof(conn), 0);
         if (count < 0) {
             WSALOG_E("Failed to send to socket");
         }
-        shutdown(sfd, SD_BOTH);
         closesocket(sfd);
         WSACleanup();
     }
 }
 
 void forceStopListening(void) {
-    // TODO: Unimplemented
+    char dummy = 0;
+    const SOCKET isfd = makeSocket(INTERNAL_SOCKET_PATH, true);
+
+    if (isfd != INVALID_SOCKET) {
+        send(isfd, &dummy, sizeof(dummy), 0);
+    } else {
+        WSALOG_E("Failed to connect to internal socket");
+    }
 }
