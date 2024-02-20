@@ -11,12 +11,13 @@
 #include <unordered_map>
 #include <utility>
 #include "BotReplyMessage.h"
+#include "socket/TgBotSocket.h"
 #include "tgbot/TgException.h"
 
 using TgBot::ChatPermissions;
 
 #ifdef SOCKET_CONNECTION
-CtrlSpamBlock gSpamBlockCfg = CTRL_LOGGING_ONLY_ON;
+CtrlSpamBlock gSpamBlockCfg = CTRL_ON;
 #endif
 
 using UserType = std::pair<TgBot::Chat::Ptr, std::vector<Message::Ptr>>;
@@ -70,7 +71,7 @@ static void _logSpamDetectCommon(const SpamMapT::value_type& t, const char* name
 }
 
 static void _deleteAndMuteCommon(const Bot& bot, const buffer_iterator_t& handle, const SpamMapT::value_type& t,
-                                 const size_t threshold, const char* name) {
+                                 const size_t threshold, const char* name, const bool mute) {
                                      // Initial set - all false set
     static auto perms = std::make_shared<ChatPermissions>();
     if (isEntryOverThreshold(t, threshold)) {
@@ -84,14 +85,16 @@ static void _deleteAndMuteCommon(const Bot& bot, const buffer_iterator_t& handle
             }
         }
         
-        LOG_I("Try mute user %s in chat %s", toUserName(t.first).c_str(), 
-                toChatName(handle->first).c_str());
-        try {
-            bot.getApi().restrictChatMember(handle->first->id, t.first->id,
-                                            perms, 5 * 60);
-        } catch (const TgBot::TgException &e) {
-            LOG_W("Cannot mute user %s in chat %s: %s", toUserName(t.first).c_str(), 
-                    toChatName(handle->first).c_str(), e.what());
+        if (mute) {
+            LOG_I("Try mute user %s in chat %s", toUserName(t.first).c_str(), 
+                    toChatName(handle->first).c_str());
+            try {
+                bot.getApi().restrictChatMember(handle->first->id, t.first->id,
+                                                perms, 5 * 60);
+            } catch (const TgBot::TgException &e) {
+                LOG_W("Cannot mute user %s in chat %s: %s", toUserName(t.first).c_str(), 
+                        toChatName(handle->first).c_str(), e.what());
+            }
         }
     }
 }
@@ -101,13 +104,18 @@ static void deleteAndMute(const Bot &bot, buffer_iterator_t handle,
                           const SpamMapT &map, const size_t threshold, const char* name) {
     // Initial set - all false set
     auto perms = std::make_shared<ChatPermissions>();
+    bool enforce = false;
+
     for (const auto &mapmsg : map) {
         switch (gSpamBlockCfg) {
-            case TgBotCommandData::CTRL_ON: {
-                _deleteAndMuteCommon(bot, handle, mapmsg, threshold, name);
+            case CTRL_ENFORCE:
+                enforce = true;
+                [[fallthrough]];
+            case CTRL_ON: {
+                _deleteAndMuteCommon(bot, handle, mapmsg, threshold, name, enforce);
                 break;
             }
-            case TgBotCommandData::CTRL_LOGGING_ONLY_ON:
+            case CTRL_LOGGING_ONLY_ON:
                 if (isEntryOverThreshold(mapmsg, threshold))
                     _logSpamDetectCommon(mapmsg, name);
                 break;
@@ -120,7 +128,7 @@ static void deleteAndMute(const Bot &bot, buffer_iterator_t handle,
 static void deleteAndMute(const Bot &bot, buffer_iterator_t handle,
                           const SpamMapT &map, const size_t threshold, const char* name) {
     for (const auto &mapmsg : map) {
-        _deleteAndMuteCommon(bot, handle, mapmsg, threshold, name);
+        _deleteAndMuteCommon(bot, handle, mapmsg, threshold, name, false);
         _logSpamDetectCommon(mapmsg, name);
     }
 }

@@ -78,7 +78,8 @@ struct Exit {
 enum CtrlSpamBlock {
     CTRL_OFF,              // Disabled
     CTRL_LOGGING_ONLY_ON,  // Logging only, not taking action
-    CTRL_ON,               // Enabled
+    CTRL_ON,               // Enabled, does delete but doesn't mute
+    CTRL_ENFORCE,          // Enabled, deletes and mutes
     CTRL_MAX,
 };
 
