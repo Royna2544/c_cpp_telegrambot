@@ -8,8 +8,6 @@
 #include <errno.h>
 #include <string.h>
 #define PLOG_E(fmt, ...) LOG_E(fmt ": %s", ##__VA_ARGS__, strerror(errno))
-#else
-#define PLOG_E LOG_E
 #endif
 
 #define LOG_F(fmt, ...) _LOG(fmt, "FATAL", ##__VA_ARGS__)
