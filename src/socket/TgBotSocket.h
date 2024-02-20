@@ -56,7 +56,7 @@ std::string TgBotCmd_getHelpText(void);
 namespace TgBotCommandData {
 struct WriteMsgToChatId {
     ChatId to;       // destination chatid
-    char msg[2048];  // Msg to send
+    char msg[512];  // Msg to send
 };
 
 struct Exit {
