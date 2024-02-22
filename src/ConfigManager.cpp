@@ -9,6 +9,7 @@
 #include <map>
 #include <mutex>
 #include <stdexcept>
+#include "StringToolsExt.h"
 
 struct ConfigBackendBase {
     std::function<void *(void)> load;
@@ -52,16 +53,16 @@ static void *file_load(void) {
         std::string::size_type pos;
         count++;
 
+        TrimStr(line);
+        if (line.front() == '#') {
+            LOG_V("Skip '%s': is commented out", line.c_str());
+            continue;
+        }
         if (pos = line.find('='); pos == std::string::npos) {
             LOG_E("Invalid line in config file: %zu", count);
             continue;
         }
-
         std::string name = line.substr(0, pos), value = line.substr(pos + 1);
-        if (name.front() == '#') {
-            LOG_V("Skip '%s': is commented out", name.c_str());
-            continue;
-        }
         p.kConfigEntries.emplace(name, value);
         LOG_V("%s is '%s'", name.c_str(), value.c_str());
     }
