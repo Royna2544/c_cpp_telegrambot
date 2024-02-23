@@ -38,7 +38,7 @@ std::string toChatName(const TgBot::Chat::Ptr ch) {
 template <class Type>
 struct _FindIdIt {
     template <class Container>
-    static auto find(Container& c, std::function<typename Type::Ptr(typename Container::const_reference)> fn,
+    auto operator()(Container& c, std::function<typename Type::Ptr(typename Container::const_reference)> fn,
                    typename Type::Ptr t) {
         return std::find_if(c.begin(), c.end(), [=](const auto& it) {
             return fn(it)->id == t->id;
@@ -174,7 +174,7 @@ void SpamBlockBuffer::spamBlockerFn(const Bot& bot) {
                 const auto chatNameStr = toChatName(its->first);
                 const auto chatName = chatNameStr.c_str();
                 while (its != buffer_sub.end()) {
-                    const auto it = findChatIt::find(buffer, 
+                    const auto it = findChatIt()(buffer, 
                         [](const auto &it) { return it.first; }, its->first);
                     if (it == buffer.end()) {
                         its = buffer_sub.erase(its);
@@ -219,10 +219,10 @@ void SpamBlockBuffer::spamBlocker(const Bot &bot, const Message::Ptr &message) {
 
     {
         const std::lock_guard<std::mutex> _(m);
-        auto bufferIt = findChatIt::find(buffer, [](const auto& it) { return it.first; },
+        auto bufferIt = findChatIt()(buffer, [](const auto& it) { return it.first; },
                                           message->chat);
         if (bufferIt != buffer.end()) {
-            const auto bufferUserIt = findUserIt::find(bufferIt->second, [](const auto& it) { 
+            const auto bufferUserIt = findUserIt()(bufferIt->second, [](const auto& it) { 
                 return it.first;
             }, message->from);
 
@@ -234,7 +234,7 @@ void SpamBlockBuffer::spamBlocker(const Bot &bot, const Message::Ptr &message) {
         } else {
             buffer[message->chat][message->from].emplace_back(message);
         }
-        const auto bufferSubIt = findChatIt::find(buffer_sub,
+        const auto bufferSubIt = findChatIt()(buffer_sub,
             [](const auto& it) { return it.first; },  message->chat);
         if (bufferSubIt != buffer_sub.end()) {
             ++bufferSubIt->second;
