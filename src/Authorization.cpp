@@ -1,6 +1,7 @@
 #include <Authorization.h>
 #include <Database.h>
 #include <Types.h>
+#include <chrono>
 
 bool gAuthorized = true;
 
@@ -13,8 +14,7 @@ static bool AuthorizedId(const UserId id, const bool permissive) {
     }
 }
 bool Authorized(const Message::Ptr &message, const int flags) {
-    if (!gAuthorized) return false;
-    if (std::time(nullptr) - message->date > 60) return false;
+    if (!gAuthorized || !isMessageUnderTimeLimit(message)) return false;
 
     if (message->from) {
         return AuthorizedId(message->from->id, flags & AuthorizeFlags::PERMISSIVE);

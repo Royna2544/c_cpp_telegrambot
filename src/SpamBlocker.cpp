@@ -206,7 +206,7 @@ void SpamBlockBuffer::spamBlocker(const Bot &bot, const Message::Ptr &message) {
     // I'm allowed always
     if (Authorized(message, 0)) return;
     // Do not track older msgs and consider it as spam.
-    if (std::time(0) - message->date > 15) return;
+    if (!isMessageUnderTimeLimit(message)) return;
     // We care GIF, sticker, text spams only, or if it isn't fowarded msg
     if ((!message->animation && message->text.empty() && !message->sticker) || message->forwardFrom)
         return;

@@ -17,6 +17,8 @@ enum AuthorizeFlags : int {
     PERMISSIVE = 0x2,   // If set, allow only for normal users (nonetheless of this flag, it excludes blacklist)
 };
 
+constexpr std::chrono::seconds kMaxTimestampDelay = std::chrono::seconds(5);
+
 /**
  * Authorized - controls the command policy of the bot
  *
@@ -29,3 +31,9 @@ enum AuthorizeFlags : int {
  * @see Database.cpp
  */
 bool Authorized(const Message::Ptr &message, const int flags);
+
+inline bool isMessageUnderTimeLimit(const Message::Ptr& msg) {   
+    const auto MessageTp = std::chrono::system_clock::from_time_t(msg->date);
+    const auto CurrentTp = std::chrono::system_clock::now();
+    return (CurrentTp - MessageTp) <= kMaxTimestampDelay;
+}
