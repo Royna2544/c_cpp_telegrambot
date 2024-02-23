@@ -53,8 +53,8 @@ static void *file_load(void) {
         return nullptr;
     }
     desc.add_options()
-        ("TOKEN", po::value<std::string>(), "Bot Token")
-        ("SRC_ROOT", po::value<std::filesystem::path>(), "Root directory of source tree");
+        ("TOKEN", "Bot Token")
+        ("SRC_ROOT", "Root directory of source tree");
     po::store(po::parse_config_file(ifs, desc), p.mp);
     po::notify(p.mp);
     
