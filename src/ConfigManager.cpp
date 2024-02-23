@@ -18,8 +18,6 @@ struct ConfigBackendBase {
     void *priv;
 };
 
-static void *env_load(void) { return nullptr; }
-
 static bool env_getVariable(const void *, const std::string &name, std::string &outvalue) {
     char *buf = getenv(name.c_str());
     if (buf) {
@@ -84,7 +82,6 @@ static bool file_getVariable(const void *p, const std::string &name, std::string
 
 static struct ConfigBackendBase backends[] = {
     {
-        .load = env_load,
         .getVariable = env_getVariable,
         .name = "Env",
     },
@@ -102,8 +99,11 @@ static bool load(void) {
         std::call_once(once, [] {
             for (size_t i = 0; i < sizeof(backends) / sizeof(ConfigBackendBase); ++i) {
                 auto ptr = &backends[i];
-                if (!ptr->load || !ptr->getVariable) throw std::runtime_error("Not ready");
-                ptr->priv = ptr->load();
+                if (!ptr->getVariable) throw std::runtime_error("Not ready");
+                if (ptr->load)
+                    ptr->priv = ptr->load();
+                else
+                    ptr->priv = nullptr;
             }
         });
     } catch (const std::runtime_error &) {
