@@ -257,7 +257,7 @@ int main(void) {
             int count = COUNT_MAX, yesno = 0;
 
             parseExtArgs(message, obj);
-            msgtxt = "Deciding whether should you '" + obj + "'...";
+            msgtxt = "Deciding '" + obj + "'...";
             msg = bot_sendReplyMessage(bot, message, msgtxt);
             msgtxt += "\n\n";
             do {
