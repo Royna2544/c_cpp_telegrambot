@@ -460,45 +460,45 @@ int main(void) {
         std::exit(0);
     };
     installSignalHandler(cleanupFn);
-    int64_t lastcrash = 0;
 
     LOG_D("Token: %s", token.c_str());
-reinit:
-    try {
-        LOG_D("Bot username: %s", gBot.getApi().getMe()->username.c_str());
-        gBot.getApi().deleteWebhook();
-
-        TgLongPoll longPoll(gBot);
-        while (true) {
-            longPoll.start();
-        }
-    } catch (const std::exception &e) {
-        LOG_E("Exception: %s", e.what());
-        LOG_W("Trying to recover");
-        UserId ownerid = database::db.maybeGetOwnerId();
+    do {
+        auto CurrentTp = std::chrono::system_clock::now();
+        auto LastTp = std::chrono::system_clock::from_time_t(0);
         try {
-            bot_sendMessage(gBot, ownerid, std::string("Exception occured: ") + e.what());
+            LOG_D("Bot username: %s", gBot.getApi().getMe()->username.c_str());
+            gBot.getApi().deleteWebhook();
+
+            TgLongPoll longPoll(gBot);
+            while (true) {
+                longPoll.start();
+            }
         } catch (const std::exception &e) {
-            LOG_F("%s", e.what());
-            goto exit;
+            LOG_E("Exception: %s", e.what());
+            LOG_W("Trying to recover");
+            UserId ownerid = database::db.maybeGetOwnerId();
+            try {
+                bot_sendMessage(gBot, ownerid, std::string("Exception occured: ") + e.what());
+            } catch (const std::exception &e) {
+                LOG_F("%s", e.what());
+                break;
+            }
+            CurrentTp = std::chrono::system_clock::now();
+            if ((CurrentTp - LastTp).count() < 15) {
+                bot_sendMessage(gBot, ownerid, "Recover failed.");
+                LOG_F("Recover failed");
+                break;
+            }
+            LastTp = CurrentTp;
+            bot_sendMessage(gBot, ownerid, "Reinitializing.");
+            LOG_I("Re-init");
+            gAuthorized = false;
+            std::thread([] {
+                std_sleep_s(5);
+                gAuthorized = true;
+            }).detach();
         }
-        const int64_t temptime = time(nullptr);
-        if (temptime - lastcrash < 15 && lastcrash != 0) {
-            bot_sendMessage(gBot, ownerid, "Recover failed.");
-            LOG_F("Recover failed");
-            goto exit;
-        }
-        lastcrash = temptime;
-        bot_sendMessage(gBot, ownerid, "Reinitializing.");
-        LOG_I("Re-init");
-        gAuthorized = false;
-        std::thread([] {
-            std_sleep(5s);
-            gAuthorized = true;
-        }).detach();
-        goto reinit;
-    }
-exit:
+    } while (true);
     cleanupFn(-1);
     return EXIT_FAILURE;
 }
