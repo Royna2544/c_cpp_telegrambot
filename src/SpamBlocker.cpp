@@ -81,7 +81,8 @@ static void _deleteAndMuteCommon(const Bot& bot, const buffer_iterator_t& handle
         for (const auto &msg : t.second) {
             try {
                 bot.getApi().deleteMessage(handle->first->id, msg->messageId);
-            } catch (const TgBot::TgException &) {
+            } catch (const TgBot::TgException &e) {
+                LOG_V("Error deleting message: %s", e.what());
             }
         }
         
