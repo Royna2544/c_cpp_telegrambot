@@ -212,7 +212,7 @@ void SpamBlockBuffer::spamBlocker(const Bot &bot, const Message::Ptr &message) {
     if ((!message->animation && message->text.empty() && !message->sticker) || message->forwardFrom)
         return;
 
-    useConditionVariable();
+    using_cv = true;
     std::call_once(once, [this, &bot]{
         setThreadFunction(std::bind(&SpamBlockBuffer::spamBlockerFn, this, std::cref(bot)));
     });

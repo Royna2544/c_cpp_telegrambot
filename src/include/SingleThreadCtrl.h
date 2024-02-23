@@ -16,13 +16,6 @@ class SingleThreadCtrl {
     SingleThreadCtrl() = default;
 
     /*
-     * useConditionVariable - Enable and set up std::condition_variable usage
-     */
-    void useConditionVariable() {
-        using_cv = true;
-    }
-
-    /*
      * setFunction - Assign a thread function and starts the thread
      *
      * @param fn thread function with void(*)() signature
@@ -52,10 +45,10 @@ class SingleThreadCtrl {
  protected:
     std::atomic_bool kRun = true;
     std::condition_variable cv;
+    bool using_cv = false;
  private:
     std::optional<std::thread> threadP;
     std::once_flag once;
     // Used by std::cv
-    bool using_cv = false;
     std::mutex m;
 };
