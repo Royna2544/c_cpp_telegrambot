@@ -2,6 +2,10 @@
 #include <FileSystemLib.h>
 #include <Logging.h>
 
+#include <boost/program_options.hpp>
+#include <boost/program_options/options_description.hpp>
+#include <boost/program_options/parsers.hpp>
+#include <boost/program_options/variables_map.hpp>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -27,53 +31,42 @@ static bool env_getVariable(const void *, const std::string &name, std::string &
     return false;
 }
 
+namespace po = boost::program_options;
 struct file_priv {
-    std::map<std::string, std::string> kConfigEntries;
+    po::variables_map mp;    
 };
 
 static void *file_load(void) {
     std::filesystem::path home;
     std::string line;
+    po::options_description desc("TgBot++ Configs");
     static file_priv p{};
-    size_t count = 0;
-
+    
     if (!getHomePath(home)) {
         LOG_E("Cannot find HOME");
         return nullptr;
     }
-    const auto confPath = (home / ".tgbot_config").string();
+    const auto confPath = (home / ".tgbot_conf.ini").string();
     std::ifstream ifs(confPath);
     if (ifs.fail()) {
         LOG_E("Opening %s failed", confPath.c_str());
         return nullptr;
     }
-    while (std::getline(ifs, line)) {
-        std::string::size_type pos;
-        count++;
-
-        TrimStr(line);
-        if (line.front() == '#') {
-            LOG_V("Skip '%s': is commented out", line.c_str());
-            continue;
-        }
-        if (pos = line.find('='); pos == std::string::npos) {
-            LOG_E("Invalid line in config file: %zu", count);
-            continue;
-        }
-        std::string name = line.substr(0, pos), value = line.substr(pos + 1);
-        p.kConfigEntries.emplace(name, value);
-        LOG_V("%s is '%s'", name.c_str(), value.c_str());
-    }
-    LOG_I("Loaded %zu entries from %s", p.kConfigEntries.size(), confPath.c_str());
+    desc.add_options()
+        ("TOKEN", po::value<std::string>(), "Bot Token")
+        ("SRC_ROOT", po::value<std::filesystem::path>(), "Root directory of source tree");
+    po::store(po::parse_config_file(ifs, desc), p.mp);
+    po::notify(p.mp);
+    
+    LOG_I("Loaded %zu entries from %s", p.mp.size(), confPath.c_str());
     return &p;
 }
 
 static bool file_getVariable(const void *p, const std::string &name, std::string &outvalue) {
     auto priv = reinterpret_cast<const file_priv *>(p);
     if (priv) {
-        auto it = priv->kConfigEntries.find(name);
-        if (it != priv->kConfigEntries.end()) {
-            outvalue = it->second;
+        if (const auto it = priv->mp[name]; !it.empty()) {
+            outvalue = it.as<std::string>();
             return true;
         }
     }

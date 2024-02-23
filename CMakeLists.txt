@@ -24,7 +24,7 @@ include_directories(src/include)
 include_directories(src/)
 
 # Include boost by default
-find_package(Boost REQUIRED)
+find_package(Boost COMPONENTS program_options REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})
 
 if(WIN32)
@@ -111,7 +111,7 @@ add_library(
 if(WIN32)
   target_link_libraries(TgBotUtils shlwapi)
 endif()
-target_link_libraries(TgBotUtils TgBotRes)
+target_link_libraries(TgBotUtils TgBotRes ${Boost_LIBRARIES})
 
 # TgBot-Cpp library
 add_subdirectory(lib)
