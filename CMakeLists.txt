@@ -17,13 +17,15 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_compile_options(-Wall -Werror)
-
 add_compile_options(
   -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/=)
-
 include_directories(src/include/third-party)
 include_directories(src/include)
 include_directories(src/)
+
+# Include boost by default
+find_package(Boost REQUIRED)
+include_directories(${Boost_INCLUDE_DIR})
 
 if(WIN32)
   set(TARGET_VARIANT windows)
