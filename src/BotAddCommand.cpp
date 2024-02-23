@@ -7,7 +7,7 @@ static void NoCompilerCommandStub(const Bot& bot, const Message::Ptr& message) {
 
 void bot_AddCommandPermissive(Bot& bot, const char* cmd, command_callback_t cb) {
     auto authFn = [&, cb](const Message::Ptr message) {
-        if (!Authorized(message, true, true)) return;
+        if (!Authorized(message, AuthorizeFlags::PERMISSIVE | AuthorizeFlags::REQUIRE_USER)) return;
         cb(bot, message);
     };
     bot.getEvents().onCommand(cmd, authFn);
@@ -15,7 +15,7 @@ void bot_AddCommandPermissive(Bot& bot, const char* cmd, command_callback_t cb) 
 
 void bot_AddCommandEnforced(Bot& bot, const char* cmd, command_callback_t cb) {
     auto authFn = [&, cb](const Message::Ptr message) {
-        if (!Authorized(message)) return;
+        if (!Authorized(message, AuthorizeFlags::REQUIRE_USER)) return;
         cb(bot, message);
     };
     bot.getEvents().onCommand(cmd, authFn);
