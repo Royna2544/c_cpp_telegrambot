@@ -1,8 +1,8 @@
 #include <Database.h>
+#include <ConfigManager.h>
 
 #include <iostream>
 
-#include "../src/popen_wdt/popen_wdt.h"
 
 using database::db;
 using tgbot::proto::PersonList;
@@ -18,7 +18,8 @@ static void dumpList(const PersonList& list, const char* name) {
     }
 }
 
-int main(void) {
+int main(const int argc, const char **argv) {
+    copyCommandLine(argc, argv, nullptr, nullptr);
     db.load();
 
     std::cout << "Owner ID: ";

@@ -22,6 +22,7 @@
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/config.hpp>
 #include <chrono>
+#include <cstdlib>
 #include <exception>
 #include <filesystem>
 #include <fstream>
@@ -61,17 +62,22 @@ using database::blacklist;
 using database::ProtoDatabase;
 using database::whitelist;
 
-int main(void) {
-    std::string token;
+int main(const int argc, const char** argv) {
+    std::string token, v;
+
+    copyCommandLine(argc, argv, nullptr, nullptr);
+    if (ConfigManager::getVariable("help", v)) {
+        ConfigManager::printHelp();
+        return EXIT_SUCCESS;
+    }
     if (!ConfigManager::getVariable("TOKEN", token)) {
         LOG_F("Failed to get TOKEN variable");
         return EXIT_FAILURE;
     }
     static Bot gBot(token);
-
-    database::db.load();
     static auto ctx = std::make_shared<TimerCtx>();
     static auto kSpamBlockCtx = std::make_shared<SpamBlockBuffer>();
+    database::db.load();
 
     bot_AddCommandEnforcedCompiler(gBot, "c", ProgrammingLangs::C, [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
         CompileRunHandler(CCppCompileHandleData{{{bot, message}, compiler, "out.c"}});

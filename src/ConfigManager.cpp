@@ -3,10 +3,13 @@
 #include <Logging.h>
 
 #include <boost/program_options.hpp>
+#include <cstddef>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <iostream>
+#include <mutex>
 
 struct ConfigBackendBase {
     std::function<void *(void)> load;
@@ -29,15 +32,37 @@ static bool env_getVariable(const void *, const std::string &name, std::string &
 }
 
 namespace po = boost::program_options;
+
 struct file_priv {
     constexpr static const char kConfigOverrideVar[] = "OVERRIDE_CONF";
-    po::variables_map mp;    
+    static po::options_description getTgBotOptionsDesc() {
+        static po::options_description desc("TgBot++ Configs");
+        static std::once_flag once;
+        std::call_once(once, []{
+            desc.add_options()
+                ("TOKEN,t", po::value<std::string>(), "Bot Token")
+                ("SRC_ROOT,r", po::value<std::string>(), "Root directory of source tree")
+                ("PATH,p", po::value<std::string>(), "Environment variable PATH (to override)")
+                (file_priv::kConfigOverrideVar, po::value<std::vector<std::string>>()->multitoken(),
+                    "Config list to override from this source");
+        });
+        return desc;
+    }
+    po::variables_map mp;
+};
+
+struct cmdline_priv : file_priv {
+    static po::options_description getTgBotOptionsDesc() {
+        auto desc = file_priv::getTgBotOptionsDesc();
+        desc.add_options()
+            ("help,h", "Help message for this bot vars");
+        return desc;
+    }
 };
 
 static void *file_load(void) {
     std::filesystem::path home;
     std::string line;
-    po::options_description desc("TgBot++ Configs");
     static file_priv p{};
     
     if (!getHomePath(home)) {
@@ -50,20 +75,32 @@ static void *file_load(void) {
         LOG_E("Opening %s failed", confPath.c_str());
         return nullptr;
     }
-    desc.add_options()
-        ("TOKEN", "Bot Token")
-        ("SRC_ROOT", "Root directory of source tree")
-        ("PATH", "Enviroment variable PATH")
-        (file_priv::kConfigOverrideVar, po::value<std::vector<std::string>>()->multitoken(),
-            "Config list to override to file");
-    po::store(po::parse_config_file(ifs, desc), p.mp);
+    po::store(po::parse_config_file(ifs, file_priv::getTgBotOptionsDesc()), p.mp);
     po::notify(p.mp);
     
     LOG_I("Loaded %zu entries from %s", p.mp.size(), confPath.c_str());
     return &p;
 }
 
-static bool file_getVariable(const void *p, const std::string &name, std::string &outvalue) {
+static void *cmdline_load() {
+    static cmdline_priv p{};
+    int argc = 0;
+    const char **argv = nullptr;
+
+    copyCommandLine(0, nullptr, &argc, &argv);
+    if (!argv) {
+        LOG_W("Command line copy failed, probably it wasn't saved before");
+        return nullptr;
+    }
+
+    po::store(po::parse_command_line(argc, argv, cmdline_priv::getTgBotOptionsDesc()), p.mp);
+    po::notify(p.mp);
+    
+    LOG_I("Loaded %zu entries", p.mp.size());
+    return &p;
+}
+
+static bool boost_progopt_getVariable(const void *p, const std::string &name, std::string &outvalue) {
     auto priv = reinterpret_cast<const file_priv *>(p);
     if (priv && name != file_priv::kConfigOverrideVar) {
         if (const auto it = priv->mp[name]; !it.empty()) {
@@ -74,7 +111,7 @@ static bool file_getVariable(const void *p, const std::string &name, std::string
     return false;
 }
 
-static bool file_doOverride(const void *p, const std::string& name) {
+static bool boost_progopt_doOverride(const void *p, const std::string& name) {
     auto priv = reinterpret_cast<const file_priv *>(p);
     if (priv) {
         if (const auto it = priv->mp[file_priv::kConfigOverrideVar]; !it.empty()) {
@@ -85,6 +122,20 @@ static bool file_doOverride(const void *p, const std::string& name) {
     return false;
 }
 
+void copyCommandLine(const int argc, const char **argv, int *argc_out, const char ***argv_out) {
+    static int argc_internal = 0;
+    static const char **argv_internal = nullptr;
+
+    if (argv_internal == nullptr) {
+        argc_internal = argc;
+        argv_internal = argv;
+    }
+    if (argv_out != nullptr)
+        *argv_out = argv_internal;
+    if (argc_out != nullptr)
+        *argc_out = argc_internal;
+}
+
 static struct ConfigBackendBase backends[] = {
     {
         .getVariable = env_getVariable,
@@ -92,9 +143,15 @@ static struct ConfigBackendBase backends[] = {
     },
     {
         .load = file_load,
-        .getVariable = file_getVariable,
-        .doOverride = file_doOverride,
+        .getVariable = boost_progopt_getVariable,
+        .doOverride = boost_progopt_doOverride,
         .name = "File",
+    },
+    {
+        .load = cmdline_load,
+        .getVariable = boost_progopt_getVariable,
+        .doOverride = boost_progopt_doOverride,
+        .name = "Command line",
     }};
 
 namespace ConfigManager {
@@ -129,4 +186,9 @@ bool getVariable(const std::string &name, std::string &outvalue) {
 
     return false;
 }
+
+void printHelp() {
+    std::cout << cmdline_priv::getTgBotOptionsDesc() << std::endl;
+}
+
 }  // namespace ConfigManager
