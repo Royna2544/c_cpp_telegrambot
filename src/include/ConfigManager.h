@@ -3,7 +3,7 @@
 #include <string>
 
 // Abstract manager for config loader
-// Currently have two sources, env and file
+// Currently have three sources, env and file, cmdline
 namespace ConfigManager {
 
 /**
@@ -19,14 +19,18 @@ void printHelp();
 
 };  // namespace ConfigManager
 
+enum CommandLineOp {
+    INSERT,
+    GET
+};
+
 /**
  * copyCommandLine - function used to obtain command line
  *  argument datas to command line backend
  * Basically just a container for argc, argv
  *
- * @param argc [in] argc
- * @param argv [in] argv
- * @param out_argc [out] argc, may be null.
- * @param out_argv [out] argv, may be null.
+ * @param op Operation desired
+ * @param out_argc [inout] argc, may be null.
+ * @param out_argv [inout] argv, may be null.
  */
-void copyCommandLine(const int argc, const char **argv, int *argc_out, const char ***argv_out);
+void copyCommandLine(CommandLineOp op, int *argc, const char ***argv);

@@ -87,7 +87,7 @@ static void *cmdline_load() {
     int argc = 0;
     const char **argv = nullptr;
 
-    copyCommandLine(0, nullptr, &argc, &argv);
+    copyCommandLine(CommandLineOp::GET, &argc, &argv);
     if (!argv) {
         LOG_W("Command line copy failed, probably it wasn't saved before");
         return nullptr;
@@ -122,18 +122,20 @@ static bool boost_progopt_doOverride(const void *p, const std::string& name) {
     return false;
 }
 
-void copyCommandLine(const int argc, const char **argv, int *argc_out, const char ***argv_out) {
+void copyCommandLine(CommandLineOp op, int *argc, const char ***argv) {
     static int argc_internal = 0;
     static const char **argv_internal = nullptr;
 
-    if (argv_internal == nullptr) {
-        argc_internal = argc;
-        argv_internal = argv;
-    }
-    if (argv_out != nullptr)
-        *argv_out = argv_internal;
-    if (argc_out != nullptr)
-        *argc_out = argc_internal;
+    switch (op) {
+        case INSERT:
+            argc_internal = *argc;
+            argv_internal = *argv;
+            break;
+        case GET:
+            *argv = argv_internal;
+            *argc = argc_internal;
+            break;
+    };
 }
 
 static struct ConfigBackendBase backends[] = {

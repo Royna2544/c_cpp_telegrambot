@@ -62,10 +62,10 @@ using database::blacklist;
 using database::ProtoDatabase;
 using database::whitelist;
 
-int main(const int argc, const char** argv) {
+int main(int argc, const char** argv) {
     std::string token, v;
 
-    copyCommandLine(argc, argv, nullptr, nullptr);
+    copyCommandLine(CommandLineOp::INSERT, &argc, &argv);
     if (ConfigManager::getVariable("help", v)) {
         ConfigManager::printHelp();
         return EXIT_SUCCESS;

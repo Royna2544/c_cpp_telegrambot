@@ -18,8 +18,8 @@ static void dumpList(const PersonList& list, const char* name) {
     }
 }
 
-int main(const int argc, const char **argv) {
-    copyCommandLine(argc, argv, nullptr, nullptr);
+int main(int argc, const char **argv) {
+    copyCommandLine(CommandLineOp::INSERT, &argc, &argv);
     db.load();
 
     std::cout << "Owner ID: ";
