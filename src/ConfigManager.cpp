@@ -138,8 +138,10 @@ void copyCommandLine(const int argc, const char **argv, int *argc_out, const cha
 
 static struct ConfigBackendBase backends[] = {
     {
-        .getVariable = env_getVariable,
-        .name = "Env",
+        .load = cmdline_load,
+        .getVariable = boost_progopt_getVariable,
+        .doOverride = boost_progopt_doOverride,
+        .name = "Command line",
     },
     {
         .load = file_load,
@@ -148,11 +150,10 @@ static struct ConfigBackendBase backends[] = {
         .name = "File",
     },
     {
-        .load = cmdline_load,
-        .getVariable = boost_progopt_getVariable,
-        .doOverride = boost_progopt_doOverride,
-        .name = "Command line",
-    }};
+        .getVariable = env_getVariable,
+        .name = "Env",
+    },
+};
 
 namespace ConfigManager {
 
