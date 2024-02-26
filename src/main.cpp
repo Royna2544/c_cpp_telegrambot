@@ -25,12 +25,11 @@
 #include <cstdlib>
 #include <exception>
 #include <filesystem>
-#include <fstream>
 #include <map>
 #include <ostream>
-#include <random>
 #include <regex>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -61,6 +60,11 @@ using TgBot::TgLongPoll;
 using database::blacklist;
 using database::ProtoDatabase;
 using database::whitelist;
+
+template <class Dur>
+std::chrono::seconds to_secs(Dur &&it) {
+    return std::chrono::duration_cast<std::chrono::seconds>(it);
+}
 
 int main(int argc, const char** argv) {
     std::string token, v;
@@ -468,16 +472,16 @@ int main(int argc, const char** argv) {
     installSignalHandler(cleanupFn);
 
     LOG_D("Token: %s", token.c_str());
+    auto CurrentTp = std::chrono::system_clock::now();
+    auto LastTp = std::chrono::system_clock::from_time_t(0);
     do {
-        auto CurrentTp = std::chrono::system_clock::now();
-        auto LastTp = std::chrono::system_clock::from_time_t(0);
         try {
             LOG_D("Bot username: %s", gBot.getApi().getMe()->username.c_str());
             gBot.getApi().deleteWebhook();
 
             TgLongPoll longPoll(gBot);
             while (true) {
-                longPoll.start();
+                longPoll.start();    
             }
         } catch (const std::exception &e) {
             LOG_E("Exception: %s", e.what());
@@ -490,7 +494,8 @@ int main(int argc, const char** argv) {
                 break;
             }
             CurrentTp = std::chrono::system_clock::now();
-            if ((CurrentTp - LastTp).count() < 15) {
+            if (to_secs(CurrentTp - LastTp).count() < 30 && 
+                std::chrono::system_clock::to_time_t(LastTp) != 0) {
                 bot_sendMessage(gBot, ownerid, "Recover failed.");
                 LOG_F("Recover failed");
                 break;

@@ -17,7 +17,7 @@ enum AuthorizeFlags : int {
     PERMISSIVE = 0x2,   // If set, allow only for normal users (nonetheless of this flag, it excludes blacklist)
 };
 
-constexpr std::chrono::seconds kMaxTimestampDelay = std::chrono::seconds(5);
+constexpr std::chrono::seconds kMaxTimestampDelay = std::chrono::seconds(10);
 
 /**
  * Authorized - controls the command policy of the bot
