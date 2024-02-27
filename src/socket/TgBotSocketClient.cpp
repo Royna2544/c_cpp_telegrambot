@@ -1,13 +1,8 @@
-#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
-#include <map>
-#include <sstream>
-#include <vector>
 
-#include "../include/RuntimeException.h"
 #include "TgBotSocket.h"
 
 static void usage(const char* argv, bool success) {
@@ -140,7 +135,7 @@ int main(int argc, char** argv) {
                     case CMD_MAX:
                         break;
                     default:
-                        throw runtime_errorf("Unhandled command value: %d!", cmd);
+                        ASSERT(0, "Unhandled command value: %d!", cmd);
                 };
                 if (!ret)
                     fprintf(stderr, "Failed parsing arguments for %s\n", TgBotCmd_toStr(cmd).c_str());
