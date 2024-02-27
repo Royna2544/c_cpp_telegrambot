@@ -11,3 +11,5 @@ using exit_handler_t = void (*)(int);
  * @param fn exit_handler_t object, that is called on signal receive
  */
 void installSignalHandler(exit_handler_t fn);
+
+constexpr int invalidSignal = -1;

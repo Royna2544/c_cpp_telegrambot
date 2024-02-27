@@ -11,7 +11,7 @@ static BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
         case CTRL_BREAK_EVENT:
         case CTRL_LOGOFF_EVENT:
         case CTRL_SHUTDOWN_EVENT:
-            exitHandler(-1);
+            exitHandler(invalidSignal);
         default:
             return FALSE;
     }
