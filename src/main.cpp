@@ -92,14 +92,15 @@ int main(int argc, const char** argv) {
             bot_AddCommandPermissive(gBot, i.name.c_str(), i.fn);
     }
     gBot.getEvents().onAnyMessage([](const Message::Ptr &msg) {
+        static auto spamMgr =  gSThreadManager
+            .getController<SpamBlockManager>(SingleThreadCtrlManager::USAGE_SPAMBLOCK_THREAD);
+
         if (!gAuthorized) return;
 #ifdef SOCKET_CONNECTION
         if (!gObservedChatIds.empty() || gObserveAllChats)
             processObservers(msg);
 #endif
-        gSThreadManager
-            .getController<SpamBlockManager>(SingleThreadCtrlManager::USAGE_SPAMBLOCK_THREAD)
-            ->run(gBot, msg);
+        spamMgr->run(gBot, msg);
         processRegEXCommand(gBot, msg);
     });
 
