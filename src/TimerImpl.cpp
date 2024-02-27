@@ -183,7 +183,7 @@ void TimerCommandManager::stopTimer(const Bot &bot, const Message::Ptr& message)
     bot_sendReplyMessage(bot, message, text);
 }
 
-void TimerCommandManager::stop() {
+void TimerCommandManager::Timerstop() {
     if (isactive) {
         LOG_I("Canceling timer and cleaning up...");
         SingleThreadCtrl::stop();

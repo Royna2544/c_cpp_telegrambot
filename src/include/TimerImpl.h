@@ -13,7 +13,7 @@ struct TimerCommandManager : SingleThreadCtrl {
 
     void startTimer(const Bot &bot, const Message::Ptr& message);
     void stopTimer(const Bot &bot, const Message::Ptr& message);
-    void stop(void) override;
+    void Timerstop(void);
  private:
     void TimerThreadFn(const Bot &bot, Message::Ptr message, std::chrono::seconds s);
     bool parseTimerArguments(const Bot &bot, const Message::Ptr &message, std::chrono::seconds &out);

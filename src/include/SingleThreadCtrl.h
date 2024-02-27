@@ -12,6 +12,8 @@
 class SingleThreadCtrl {
  public:
     using thread_function = std::function<void(void)>;
+    using prestop_function = std::function<void(SingleThreadCtrl *)>;
+
 
     SingleThreadCtrl() = default;
 
@@ -27,8 +29,15 @@ class SingleThreadCtrl {
             LOG_W("Function is already set in this instance");
         }
     }
-    virtual void stop() {
+
+    void setPreStopFunction(prestop_function fn) {
+        preStop = fn;
+    }
+
+    void stop() {
         std::call_once(once, [this]{
+            if (preStop)
+                preStop(this);
             kRun = false;
             if (using_cv) {
                 std::unique_lock<std::mutex> _(m);
@@ -42,12 +51,14 @@ class SingleThreadCtrl {
     virtual ~SingleThreadCtrl() {
         stop();
     }
+
  protected:
     std::atomic_bool kRun = true;
     std::condition_variable cv;
     bool using_cv = false;
  private:
     std::optional<std::thread> threadP;
+    prestop_function preStop;
     std::once_flag once;
     // Used by std::cv
     std::mutex m;
