@@ -79,7 +79,7 @@ int main(int argc, const char** argv) {
         return EXIT_FAILURE;
     }
     static Bot gBot(token);
-    static auto ctx = std::make_shared<TimerCtx>();
+    static auto timerCmdManager = std::make_shared<TimerCommandManager>();
     static auto kSpamBlockCtx = std::make_shared<SpamBlockBuffer>();
     database::db.load();
 
@@ -325,8 +325,10 @@ int main(int argc, const char** argv) {
         ss << "Sending reply message took: " << duration<double, std::milli>(afterSend - beforeSend).count() << "ms" << std::endl;
         bot_editMessage(bot, sentMsg, ss.str());
     });
-    bot_AddCommandEnforced(gBot, "starttimer", std::bind(&TimerCtx::startTimer, ctx, pholder1, pholder2));
-    bot_AddCommandEnforced(gBot, "stoptimer", std::bind(&TimerCtx::stopTimer, ctx, pholder1, pholder2));
+    bot_AddCommandEnforced(gBot, "starttimer", 
+        std::bind(&TimerCommandManager::startTimer, timerCmdManager, pholder1, pholder2));
+    bot_AddCommandEnforced(gBot, "stoptimer", 
+        std::bind(&TimerCommandManager::stopTimer, timerCmdManager, pholder1, pholder2));
     bot_AddCommandPermissive(gBot, "decho", [](const Bot &bot, const Message::Ptr &message) {
         const auto replyMsg = message->replyToMessage;
         const auto chatId = message->chat->id;
@@ -451,7 +453,7 @@ int main(int argc, const char** argv) {
         static std::once_flag once;
         std::call_once(once, [s] {
             LOG_I("Exiting with signal %d", s);
-            ctx->stop();
+            timerCmdManager->stop();
             kSpamBlockCtx->stop();
             database::db.save();
 #ifdef SOCKET_CONNECTION

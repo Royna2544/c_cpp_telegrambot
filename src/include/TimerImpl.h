@@ -6,10 +6,10 @@
 
 #include <chrono>
 
-struct TimerCtx : SingleThreadCtrl {
+struct TimerCommandManager : SingleThreadCtrl {
     static constexpr int TIMER_CONFIG_SEC = 5;
-    TimerCtx() : SingleThreadCtrl() {}
-    ~TimerCtx() override = default;
+    TimerCommandManager() : SingleThreadCtrl() {}
+    ~TimerCommandManager() override = default;
 
     void startTimer(const Bot &bot, const Message::Ptr& message);
     void stopTimer(const Bot &bot, const Message::Ptr& message);

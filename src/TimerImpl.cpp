@@ -4,7 +4,6 @@
 #include <NamespaceImport.h>
 #include <TimerImpl.h>
 
-#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <sstream>
@@ -34,7 +33,7 @@ std::string to_string(const Dur out) {
     return ss.str();
 }
 
-bool TimerCtx::parseTimerArguments(const Bot &bot, const Message::Ptr &message, std::chrono::seconds &out) {
+bool TimerCommandManager::parseTimerArguments(const Bot &bot, const Message::Ptr &message, std::chrono::seconds &out) {
     bool found = false;
     std::string msg;
     enum {
@@ -134,7 +133,7 @@ bool TimerCtx::parseTimerArguments(const Bot &bot, const Message::Ptr &message, 
     return true;
 }
 
-void TimerCtx::TimerThreadFn(const Bot &bot, Message::Ptr message, std::chrono::seconds timer) {
+void TimerCommandManager::TimerThreadFn(const Bot &bot, Message::Ptr message, std::chrono::seconds timer) {
     isactive = true;
     while (timer > 0s && kRun) {
         std_sleep_s(1);
@@ -151,7 +150,7 @@ void TimerCtx::TimerThreadFn(const Bot &bot, Message::Ptr message, std::chrono::
     isactive = false;
 }
 
-void TimerCtx::startTimer(const Bot &bot, const Message::Ptr& msg) {
+void TimerCommandManager::startTimer(const Bot &bot, const Message::Ptr& msg) {
     std::chrono::seconds parsedTime(0);
 
     if (parseTimerArguments(bot, msg, parsedTime)) {
@@ -163,11 +162,11 @@ void TimerCtx::startTimer(const Bot &bot, const Message::Ptr& msg) {
             LOG_W("Cannot pin msg!");
             botcanpin = false;
         }
-        setThreadFunction(std::bind(&TimerCtx::TimerThreadFn, this, std::cref(bot), message, parsedTime));
+        setThreadFunction(std::bind(&TimerCommandManager::TimerThreadFn, this, std::cref(bot), message, parsedTime));
     }
 }
 
-void TimerCtx::stopTimer(const Bot &bot, const Message::Ptr& message) {
+void TimerCommandManager::stopTimer(const Bot &bot, const Message::Ptr& message) {
     std::string text;
     if (isactive) {
         const bool allowed = message->chat->id == message->chat->id;
@@ -184,7 +183,7 @@ void TimerCtx::stopTimer(const Bot &bot, const Message::Ptr& message) {
     bot_sendReplyMessage(bot, message, text);
 }
 
-void TimerCtx::stop() {
+void TimerCommandManager::stop() {
     if (isactive) {
         LOG_I("Canceling timer and cleaning up...");
         SingleThreadCtrl::stop();
