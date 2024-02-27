@@ -6,12 +6,10 @@
 #include <tgbot/Bot.h>
 #include <tgbot/types/Message.h>
 
-#include <fstream>
-#include <string>
 #include <optional>
 
 #include "NamespaceImport.h"
-#include "../popen_wdt/popen_wdt.h"
+#include "../popen_wdt/popen_wdt.hpp"
 
 static inline const char kDatabaseFile[] = "tgbot.pb";
 

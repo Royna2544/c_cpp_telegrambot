@@ -1,10 +1,11 @@
 #include <ConfigManager.h>
-#include <string.h>
+#include <Logging.h>
 
+#include <cstring>
 #include <mutex>
 #include <stdexcept>
 
-#include "../include/Logging.h"
+#include "popen_wdt.hpp"
 #include "popen_wdt.h"
 
 // TODO Move this somewhere else
