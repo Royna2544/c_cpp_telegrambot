@@ -1,46 +1,14 @@
 #include <Authorization.h>
 #include <BotAddCommand.h>
-#include <BotReplyMessage.h>
-#include <CompilerInTelegram.h>
 #include <ConfigManager.h>
 #include <Database.h>
-#include <ExtArgs.h>
 #include <FileSystemLib.h>
-#include <Logging.h>
-#include <NamespaceImport.h>
-#include <PrintableTime.h>
 #include <RegEXHandler.h>
-#include <ResourceIncBin.h>
 #include <SingleThreadCtrlManager.h>
 #include <SpamBlock.h>
-#include <TimerImpl.h>
-#include <Types.h>
-#include <popen_wdt/popen_wdt.h>
-#include <random/RandomNumberGenerator.h>
-#include <tgbot/tgbot.h>
 
-#include <algorithm>
-#include <boost/algorithm/string/replace.hpp>
-#include <boost/config.hpp>
-#include <chrono>
-#include <cstdlib>
-#include <exception>
-#include <filesystem>
-#include <map>
-#include <ostream>
-#include <regex>
-#include <sstream>
-#include <string>
-#include <thread>
-#include <unordered_map>
-#include <vector>
-
-#include "RuntimeException.h"
-#include "SingleThreadCtrl.h"
-#include "StringToolsExt.h"
-#include "socket/TgBotSocket.h"
-#include "tgbot/TgException.h"
-#include "tgbot/tools/StringTools.h"
+// Generated cmd list
+#include <cmds.gen.h>
 
 #ifdef RTCOMMAND_LOADER
 #include <RTCommandLoader.h>
@@ -50,16 +18,12 @@
 #include <SocketConnectionHandler.h>
 #endif
 
+#include <tgbot/tgbot.h>
+
 #include "signalhandler/SignalHandler.h"
 
 // tgbot
-using TgBot::StickerSet;
 using TgBot::TgLongPoll;
-
-// Database.cpp
-using database::blacklist;
-using database::ProtoDatabase;
-using database::whitelist;
 
 template <class Dur>
 std::chrono::seconds to_secs(Dur &&it) {
@@ -111,326 +75,12 @@ int main(int argc, const char** argv) {
         CompileRunHandler({{bot, message}, compiler + " run", "out.go"});
     });
 
-    bot_AddCommandEnforced(gBot, "addblacklist",
-                           std::bind(&ProtoDatabase::addToDatabase, blacklist, pholder1, pholder2));
-    bot_AddCommandEnforced(gBot, "rmblacklist",
-                           std::bind(&ProtoDatabase::removeFromDatabase, blacklist, pholder1, pholder2));
-    bot_AddCommandEnforced(gBot, "addwhitelist",
-                           std::bind(&ProtoDatabase::addToDatabase, whitelist, pholder1, pholder2));
-    bot_AddCommandEnforced(gBot, "rmwhitelist",
-                           std::bind(&ProtoDatabase::removeFromDatabase, whitelist, pholder1, pholder2));
-
-    bot_AddCommandEnforced(gBot, "bash", [](const Bot &bot, const Message::Ptr message) {
-        CompileRunHandler(BashHandleData{{bot, message}, false});
-    });
-    bot_AddCommandEnforced(gBot, "unsafebash", [](const Bot &bot, const Message::Ptr message) {
-        CompileRunHandler(BashHandleData{{bot, message}, true});
-    });
-    bot_AddCommandPermissive(gBot, "alive", [](const Bot &bot, const Message::Ptr &message) {
-        static std::string version;
-        static std::once_flag once;
-
-        std::call_once(once, [] {
-            std::string commitid, commitmsg, originurl, compilerver;
-
-            static const std::map<std::string *, std::string> commands = {
-                {&commitid, "rev-parse HEAD"},
-                {&commitmsg, "log --pretty=%s -1"},
-                {&originurl, "config --get remote.origin.url"},
-            };
-            for (const auto &cmd : commands) {
-                const std::string gitPrefix = "git --git-dir=" + (getSrcRoot() / ".git").string() + ' ';
-                const bool ret = runCommand(gitPrefix + cmd.second, *cmd.first);
-                if (!ret) {
-                    throw runtime_errorf("Command failed: %s", cmd.second.c_str());
-                }
-            }
-            compilerver = std::string(BOOST_PLATFORM " | " BOOST_COMPILER " | " __DATE__);
-            ASSIGN_INCTXT_DATA(AboutHtmlText, version);
-#define REPLACE_PLACEHOLDER(buf, name) boost::replace_all(buf, "_" #name "_", name)
-            REPLACE_PLACEHOLDER(version, commitid);
-            REPLACE_PLACEHOLDER(version, commitmsg);
-            REPLACE_PLACEHOLDER(version, originurl);
-            REPLACE_PLACEHOLDER(version, compilerver);
-        });
-        try {
-            // Hardcoded kys GIF
-            bot.getApi().sendAnimation(message->chat->id,
-                                       "CgACAgIAAx0CdMESqgACCZRlrfMoq_b2DL21k6ohShQzzLEh6gACsw4AAuSZWUmmR3jSJA9WxzQE",
-                                       0, 0, 0, "", version, message->messageId,
-                                       nullptr, "html");
-        } catch (const TgBot::TgException &e) {
-            // Fallback to HTML if no GIF
-            LOG_E("Alive cmd: Error while sending GIF: %s", e.what());
-            bot_sendReplyMessageHTML(bot, message, version);
-        }
-    });
-    bot_AddCommandPermissive(gBot, "flash", [](const Bot &bot, const Message::Ptr &message) {
-        static std::vector<std::string> reasons;
-        static std::once_flag once;
-        static std::regex kFlashTextRegEX(R"(Flashing '\S+.zip'\.\.\.)");
-        static const char kZipExtentionSuffix[] = ".zip";
-        std::string msg;
-        std::stringstream ss;
-        Message::Ptr sentmsg;
-
-        std::call_once(once, [] {
-            std::string buf, line;
-            std::stringstream ss;
-
-            ASSIGN_INCTXT_DATA(FlashTxt, buf);
-            splitAndClean(buf, reasons);
-        });
-
-        if (message->replyToMessage != nullptr) {
-            msg = message->replyToMessage->text;
-            if (msg.empty()) {
-                bot_sendReplyMessage(bot, message, "Reply to a text");
-                return;
-            }
-        } else {
-            if (!hasExtArgs(message)) {
-                bot_sendReplyMessage(bot, message, "Send a file name");
-                return;
-            }
-            parseExtArgs(message, msg);
-        }
-        if (msg.find('\n') != std::string::npos) {
-            bot_sendReplyMessage(bot, message, "Invalid input: Zip names shouldn't have newlines");
-            return;
-        }
-        std::replace(msg.begin(), msg.end(), ' ', '_');
-        if (!StringTools::endsWith(msg, kZipExtentionSuffix)) {
-            msg += kZipExtentionSuffix;
-        }
-        ss << "Flashing '" << msg << "'..." << std::endl;
-        sentmsg = bot_sendReplyMessage(bot, message, ss.str());
-        std_sleep_s(genRandomNumber(5));
-        if (const size_t pos = genRandomNumber(reasons.size()); pos != reasons.size()) {
-            ss << "Failed successfully!" << std::endl;
-            ss << "Reason: " << reasons[pos];
-        } else {
-            ss << "Success! Chance was 1/" << reasons.size();
-        }
-        bot_editMessage(bot, sentmsg, ss.str());
-    });
-    bot_AddCommandPermissive(gBot, "possibility", [](const Bot &bot, const Message::Ptr &message) {
-        constexpr int PERCENT_MAX = 100;
-        if (!hasExtArgs(message)) {
-            bot_sendReplyMessage(bot, message,
-                                 "Send avaliable conditions sperated by newline");
-            return;
-        }
-        std::string text;
-        parseExtArgs(message, text);
-        std::stringstream ss(text), out;
-        std::string last;
-        std::unordered_map<std::string, int> map;
-        std::vector<std::string> vec;
-        std::set<std::string> set;
-
-        splitAndClean(text, vec);
-        set = {vec.begin(), vec.end()};
-        if (set.size() != vec.size()) {
-            out << "(Warning: Removed " << vec.size() - set.size() 
-                << " duplicates)" << std::endl << std::endl;
-            LOG_W("Contains duplicates!");
-        }
-        map.reserve(set.size());
-        if (set.size() == 1) {
-            bot_sendReplyMessage(bot, message, "Give more than 1 choice");
-            return;
-        }
-        vec = {set.begin(), set.end()};
-        shuffleStringArray(vec);
-        out << "Total " << vec.size() << " items" << std::endl;
-        last = vec.back();
-        vec.pop_back();
-        int total = 0;
-        for (const auto &cond : vec) {
-            int thisper = 0;
-            if (total < PERCENT_MAX) {
-                thisper = genRandomNumber(PERCENT_MAX - total);
-                if (total + thisper >= PERCENT_MAX) {
-                    thisper = PERCENT_MAX - total;
-                }
-            }
-            map[cond] = thisper;
-            total += thisper;
-        }
-        // Nonetheless of total being 100 or whatever
-        map[last] = PERCENT_MAX - total;
-        using map_t = std::pair<std::string, int>;
-        std::vector<map_t> elem(map.begin(), map.end());
-        std::sort(elem.begin(), elem.end(), [](const map_t &map1, const map_t &map2) {
-            if (map1.second != map2.second) {
-                return map1.second > map2.second;
-            }
-            return map1.first < map2.first;
-        });
-        for (const map_t &m : elem) {
-            out << m.first << " : " << m.second << "%" << std::endl;
-        }
-        bot_sendReplyMessage(bot, message, out.str());
-    });
-    bot_AddCommandPermissive(gBot, "decide", [](const Bot &bot, const Message::Ptr &message) {
-        constexpr int COUNT_MAX = 10;
-
-        if (hasExtArgs(message)) {
-            std::string obj, msgtxt;
-            Message::Ptr msg;
-            int count = COUNT_MAX, yesno = 0;
-
-            parseExtArgs(message, obj);
-            msgtxt = "Deciding '" + obj + "'...";
-            msg = bot_sendReplyMessage(bot, message, msgtxt);
-            msgtxt += "\n\n";
-            do {
-                msgtxt += "Try " + std::to_string(COUNT_MAX - count + 1) + " : ";
-                if (genRandomNumber(10) % 2 == 1) {
-                    msgtxt += "Yes";
-                    ++yesno;
-                } else {
-                    msgtxt += "No";
-                    --yesno;
-                }
-                msgtxt += '\n';
-                count--;
-                bot_editMessage(bot, msg, msgtxt);
-                if (count != 0) {
-                    if (abs(yesno) > count) {
-                        msgtxt += "Short circuited to the answer\n";
-                        break;
-                    }
-                } else // count == 0
-                    break;
-                std_sleep_s(2);
-            } while (count > 0);
-            msgtxt += '\n';
-            switch (yesno) {
-                case 1 ... COUNT_MAX: {
-                    msgtxt += "So, yes.";
-                    break;
-                }
-                case 0: {
-                    msgtxt += "So, idk.";
-                    break;
-                }
-                case -COUNT_MAX ... -1: {
-                    msgtxt += "So, no.";
-                    break;
-                }
-            }
-            bot_editMessage(bot, msg, msgtxt);
-        }
-    });
-    bot_AddCommandPermissive(gBot, "delay", [](const Bot &bot, const Message::Ptr &message) {
-        using std::chrono::high_resolution_clock;
-        using std::chrono::duration;
-        union time now {
-            .val = time(nullptr)
-        }, msg{.val = message->date};
-        std::ostringstream ss;
-
-        ss << "Request message sent at: " << msg << std::endl;
-        ss << "Received at: " << now << " Diff: " << now - msg << 's' << std::endl;
-        auto beforeSend = high_resolution_clock::now();
-        auto sentMsg = bot_sendReplyMessage(bot, message, ss.str());
-        auto afterSend = high_resolution_clock::now();
-        ss << "Sending reply message took: " << duration<double, std::milli>(afterSend - beforeSend).count() << "ms" << std::endl;
-        bot_editMessage(bot, sentMsg, ss.str());
-    });
-    bot_AddCommandEnforced(gBot, "starttimer", 
-        std::bind(&TimerCommandManager::startTimer, 
-        gSThreadManager
-            .getController<TimerCommandManager>(SingleThreadCtrlManager::USAGE_TIMER_THREAD)
-            , pholder1, pholder2));
-    bot_AddCommandEnforced(gBot, "stoptimer", [](const Bot &bot, const Message::Ptr &message) {
-        gSThreadManager
-            .getController<TimerCommandManager>(SingleThreadCtrlManager::USAGE_TIMER_THREAD)
-            ->stopTimer(bot, message);
-        gSThreadManager.destroyController(SingleThreadCtrlManager::USAGE_TIMER_THREAD);
-    });
-    bot_AddCommandPermissive(gBot, "decho", [](const Bot &bot, const Message::Ptr &message) {
-        const auto replyMsg = message->replyToMessage;
-        const auto chatId = message->chat->id;
-
-        try {
-            bot.getApi().deleteMessage(chatId, message->messageId);
-        } catch (const TgBot::TgException &) {
-            // bot is not admin. nothing it can do
-            LOG_W("bot is not admin in chat '%s', cannot use decho!",
-                    message->chat->title.c_str());
-            return;
-        }
-        if (hasExtArgs(message)) {
-            std::string msg;
-            parseExtArgs(message, msg);
-            bot_sendReplyMessage(bot, message, msg,
-                                 (replyMsg) ? replyMsg->messageId : 0, true);
-        } else if (replyMsg) {
-            if (replyMsg->sticker) {
-                bot.getApi().sendSticker(message->chat->id, replyMsg->sticker->fileId);
-            } else if (replyMsg->animation) {
-                bot.getApi().sendAnimation(message->chat->id, replyMsg->animation->fileId);
-            } else if (replyMsg->video) {
-                bot.getApi().sendVideo(message->chat->id, replyMsg->video->fileId);
-            } else if (!replyMsg->photo.empty()) {
-                bot.getApi().sendPhoto(message->chat->id, replyMsg->photo.front()->fileId,
-                                       "(Note: Sending all photos are not supported)");
-            } else if (!replyMsg->text.empty()) {
-                bot_sendReplyMessage(bot, message, replyMsg->text, replyMsg->messageId);
-            }
-        }
-    });
-    bot_AddCommandPermissive(gBot, "randsticker", [](const Bot &bot, const Message::Ptr &message) {
-        if (message->replyToMessage && message->replyToMessage->sticker) {
-            StickerSet::Ptr stickset;
-            try {
-                stickset = bot.getApi().getStickerSet(
-                    message->replyToMessage->sticker->setName);
-            } catch (const std::exception &e) {
-                bot_sendReplyMessage(bot, message, e.what());
-                return;
-            }
-            const ssize_t pos = genRandomNumber(stickset->stickers.size() - 1);
-            bot.getApi().sendSticker(message->chat->id,
-                                     stickset->stickers[pos]->fileId,
-                                     message->messageId, nullptr, false, true);
-            std::stringstream ss;
-            ss << "Sticker idx: " << pos + 1
-               << " emoji: " << stickset->stickers[pos]->emoji << std::endl
-               << "From pack \"" + stickset->title + "\"";
-            bot_sendReplyMessage(bot, message, ss.str());
-        } else {
-            bot_sendReplyMessage(bot, message, "Sticker not found in replied-to message");
-        }
-    });
-    bot_AddCommandPermissive(gBot, "fileid", [](const Bot &bot, const Message::Ptr &message) {
-        const auto replyMsg = message->replyToMessage;
-        std::string file, unifile;
-
-        if (replyMsg) {
-            if (replyMsg->sticker) {
-                file = replyMsg->sticker->fileId;
-                unifile = replyMsg->sticker->fileUniqueId;
-            } else if (replyMsg->animation) {
-                file = replyMsg->animation->fileId;
-                unifile = replyMsg->animation->fileUniqueId;
-            } else if (replyMsg->video) {
-                file = replyMsg->video->fileId;
-                unifile = replyMsg->video->fileUniqueId;
-            } else if (replyMsg->photo.size() == 1) {
-                file = replyMsg->photo.front()->fileId;
-                unifile = replyMsg->photo.front()->fileUniqueId;
-            } else {
-                file = unifile = "Unknown";
-            }
-            bot_sendReplyMessageMarkDown(bot, message, "FileId: `" + file + "`\n" + "FileUniqueId: `" + unifile + '`');
-        } else {
-            bot_sendReplyMessage(bot, message, "Reply to a media");
-        }
-    });
+    for (const auto &i : gCmdModules) {
+        if (i.enforced)
+            bot_AddCommandEnforced(gBot, i.name.c_str(), i.fn);
+        else
+            bot_AddCommandPermissive(gBot, i.name.c_str(), i.fn);
+    }
     gBot.getEvents().onAnyMessage([](const Message::Ptr &msg) {
         if (!gAuthorized) return;
 #ifdef SOCKET_CONNECTION

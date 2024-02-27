@@ -46,6 +46,9 @@ set(SRC_LIST
     src/RegEXHandler.cpp
     src/TimerImpl.cpp)
 
+# All commands reside here now
+include(src/command_modules/CMakeLists.txt)
+
 # Database
 find_package(Protobuf REQUIRED)
 include(cmake/ProtobufCpp.cmake)
@@ -120,6 +123,7 @@ if(ENABLE_RUNTIME_COMMAND)
 endif()
 # Build main TgBot++ exe
 add_executable(${PROJECT_NAME} ${SRC_LIST})
+target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_BINARY_DIR})
 
 # Default LD-list
 set(LD_LIST TgBot TgBotDB TgBotUtils TgBotRes ${ABSL_LIBS})
