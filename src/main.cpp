@@ -169,7 +169,7 @@ int main(int argc, const char** argv) {
             gAuthorized = false;
             gSThreadManager.getController(SingleThreadCtrlManager::USAGE_ERROR_RECOVERY_THREAD)
                 ->setThreadFunction([] {
-                    std_sleep_s(5);
+                    std_sleep(kErrorRecoveryDelay);
                     gAuthorized = true;
                 }
             );

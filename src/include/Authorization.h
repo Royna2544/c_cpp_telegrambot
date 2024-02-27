@@ -18,6 +18,8 @@ enum AuthorizeFlags : int {
 };
 
 constexpr std::chrono::seconds kMaxTimestampDelay = std::chrono::seconds(10);
+constexpr std::chrono::seconds kErrorRecoveryDelay = std::chrono::seconds(3);
+static_assert(kMaxTimestampDelay > kErrorRecoveryDelay);
 
 /**
  * Authorized - controls the command policy of the bot
