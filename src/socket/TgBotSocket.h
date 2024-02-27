@@ -44,11 +44,6 @@ enum ExitOp {
     DO_EXIT,
 };
 
-template <typename T, typename V>
-using ConstArrayElem = std::pair<T, V>;
-template <typename T, typename V, int size>
-using ConstArray = std::array<ConstArrayElem<T, V>, size>;
-
 std::string TgBotCmd_toStr(TgBotCommand cmd);
 int TgBotCmd_toCount(TgBotCommand cmd);
 std::string TgBotCmd_getHelpText(void);

@@ -1,36 +1,24 @@
 #include <Logging.h>
+#include <EnumArrayHelpers.h>
 
-#include <cassert>
 #include <mutex>
 #include <sstream>
 
 #include "TgBotSocket.h"
 
-template <typename T, int N, typename... V>
-std::array<T, sizeof...(V)> make_array(V&&... v) {
-    static_assert(sizeof...(V) == N, "Must match declared size");
-    return {{std::forward<V>(v)...}};
-}
+#define ENUM_STR(enum) array_helpers::make_elem(enum, std::string(#enum))
+#define ARGUMENT_SIZE(enum, len) array_helpers::make_elem(enum, len)
 
-template <class Container, typename T>
-auto find(Container& c, T val) {
-    return std::find_if(c.begin(), c.end(), [=](const auto& e) {
-        return e.first == val;
-    });
-}
-
-#define ENUM_STR(enum) std::make_pair(enum, #enum)
-#define ARGUMENT_SIZE(enum, len) std::make_pair(enum, len)
-
-const auto kTgBotCommandStrMap = make_array<ConstArrayElem<TgBotCommand, std::string>, CMD_MAX>(
+const auto kTgBotCommandStrMap = array_helpers::make<CMD_MAX, TgBotCommand, std::string>(
     ENUM_STR(CMD_EXIT),
     ENUM_STR(CMD_WRITE_MSG_TO_CHAT_ID),
     ENUM_STR(CMD_CTRL_SPAMBLOCK),
     ENUM_STR(CMD_OBSERVE_CHAT_ID),
     ENUM_STR(CMD_SEND_FILE_TO_CHAT_ID),
-    ENUM_STR(CMD_OBSERVE_ALL_CHATS));
+    ENUM_STR(CMD_OBSERVE_ALL_CHATS)
+);
 
-const auto kTgBotCommandArgsCount = make_array<ConstArrayElem<TgBotCommand, int>, CMD_MAX - 1>(
+const auto kTgBotCommandArgsCount =  array_helpers::make<CMD_MAX - 1, TgBotCommand, int>(
     ARGUMENT_SIZE(CMD_WRITE_MSG_TO_CHAT_ID, 2),  // chatid, msg
     ARGUMENT_SIZE(CMD_CTRL_SPAMBLOCK, 1),        // policy
     ARGUMENT_SIZE(CMD_OBSERVE_CHAT_ID, 2),       // chatid, policy
@@ -39,13 +27,13 @@ const auto kTgBotCommandArgsCount = make_array<ConstArrayElem<TgBotCommand, int>
 );
 
 std::string TgBotCmd_toStr(TgBotCommand cmd) {
-    const auto it = find(kTgBotCommandStrMap, cmd);
+    const auto it = array_helpers::find(kTgBotCommandStrMap, cmd);
     ASSERT(it != kTgBotCommandStrMap.end(), "Couldn't find cmd %d in map", cmd);
     return it->second;
 }
 
 int TgBotCmd_toCount(TgBotCommand cmd) {
-    const auto it = find(kTgBotCommandArgsCount, cmd);
+    const auto it = array_helpers::find(kTgBotCommandArgsCount, cmd);
     ASSERT(it != kTgBotCommandArgsCount.end(), "Couldn't find cmd %d in map", cmd);
     return it->second;
 }
