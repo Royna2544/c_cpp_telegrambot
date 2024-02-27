@@ -1,4 +1,4 @@
-#include <SingleThreadCtrlManager.h>
+#include <SingleThreadCtrl.h>
 #include <TimerImpl.h>
 
 #include "CommandModule.h"

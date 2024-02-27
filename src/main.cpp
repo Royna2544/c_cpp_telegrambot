@@ -4,7 +4,7 @@
 #include <Database.h>
 #include <FileSystemLib.h>
 #include <RegEXHandler.h>
-#include <SingleThreadCtrlManager.h>
+#include <SingleThreadCtrl.h>
 #include <SpamBlock.h>
 
 // Generated cmd list
@@ -144,7 +144,7 @@ int main(int argc, const char** argv) {
 
             TgLongPoll longPoll(gBot);
             while (true) {
-                longPoll.start();    
+                longPoll.start();
             }
         } catch (const std::exception &e) {
             LOG_E("Exception: %s", e.what());
@@ -167,12 +167,14 @@ int main(int argc, const char** argv) {
             bot_sendMessage(gBot, ownerid, "Reinitializing.");
             LOG_I("Re-init");
             gAuthorized = false;
-            std::thread([] {
-                std_sleep_s(5);
-                gAuthorized = true;
-            }).detach();
+            gSThreadManager.getController(SingleThreadCtrlManager::USAGE_ERROR_RECOVERY_THREAD)
+                ->setThreadFunction([] {
+                    std_sleep_s(5);
+                    gAuthorized = true;
+                }
+            );
         }
     } while (true);
-    cleanupFn(-1);
+    cleanupFn(invalidSignal);
     return EXIT_FAILURE;
 }

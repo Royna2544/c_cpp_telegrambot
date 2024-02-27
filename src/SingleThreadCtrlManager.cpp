@@ -1,3 +1,3 @@
-#include <SingleThreadCtrlManager.h>
+#include <SingleThreadCtrl.h>
 
 SingleThreadCtrlManager gSThreadManager;
