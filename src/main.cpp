@@ -29,7 +29,6 @@
 #include <ostream>
 #include <regex>
 #include <sstream>
-#include <stdexcept>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -64,6 +63,23 @@ using database::whitelist;
 template <class Dur>
 std::chrono::seconds to_secs(Dur &&it) {
     return std::chrono::duration_cast<std::chrono::seconds>(it);
+}
+
+static void cleanupSocket(const std::string exitToken, SingleThreadCtrl *) {
+#ifdef SOCKET_CONNECTION
+    bool socketValid = true;
+    
+    if (!fileExists(SOCKET_PATH)) {
+        LOG_W("Socket file was deleted");
+        socketValid = false;
+    }
+    if (socketValid) {
+        writeToSocket({CMD_EXIT, {.data_2 = 
+            TgBotCommandData::Exit::create(ExitOp::DO_EXIT, exitToken)}});
+    } else {
+        forceStopListening();
+    }
+#endif
 }
 
 int main(int argc, const char** argv) {
@@ -440,6 +456,7 @@ int main(int argc, const char** argv) {
 
         auto e = TgBotCommandData::Exit::create(ExitOp::SET_TOKEN, exitToken);
         writeToSocket({CMD_EXIT, {.data_2 = e}});
+        socketConnectionManager.setPreStopFunction(std::bind(&cleanupSocket, std::cref(exitToken), pholder1));
     }
 #endif
 #ifdef RTCOMMAND_LOADER
@@ -451,19 +468,8 @@ int main(int argc, const char** argv) {
             LOG_I("Exiting with signal %d", s);
             timerCmdManager->stop();
             spamBlockManager->stop();
-            database::db.save();
-#ifdef SOCKET_CONNECTION
-            if (!fileExists(SOCKET_PATH)) {
-                LOG_W("Socket file was deleted");
-                socketValid = false;
-            }
-            if (socketValid) {
-                writeToSocket({CMD_EXIT, {.data_2 = TgBotCommandData::Exit::create(ExitOp::DO_EXIT, exitToken)}});
-            } else {
-                forceStopListening();
-            }
             socketConnectionManager.stop();
-#endif
+            database::db.save();
         });
         std::exit(0);
     };
