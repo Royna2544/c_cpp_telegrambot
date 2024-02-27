@@ -11,6 +11,7 @@
 #include <PrintableTime.h>
 #include <RegEXHandler.h>
 #include <ResourceIncBin.h>
+#include <SingleThreadCtrlManager.h>
 #include <SpamBlock.h>
 #include <TimerImpl.h>
 #include <Types.h>
@@ -95,8 +96,6 @@ int main(int argc, const char** argv) {
         return EXIT_FAILURE;
     }
     static Bot gBot(token);
-    static auto timerCmdManager = std::make_shared<TimerCommandManager>();
-    static auto spamBlockManager = std::make_shared<SpamBlockManager>();
     database::db.load();
 
     bot_AddCommandEnforcedCompiler(gBot, "c", ProgrammingLangs::C, [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
@@ -342,9 +341,16 @@ int main(int argc, const char** argv) {
         bot_editMessage(bot, sentMsg, ss.str());
     });
     bot_AddCommandEnforced(gBot, "starttimer", 
-        std::bind(&TimerCommandManager::startTimer, timerCmdManager, pholder1, pholder2));
-    bot_AddCommandEnforced(gBot, "stoptimer", 
-        std::bind(&TimerCommandManager::stopTimer, timerCmdManager, pholder1, pholder2));
+        std::bind(&TimerCommandManager::startTimer, 
+        gSThreadManager
+            .getController<TimerCommandManager>(SingleThreadCtrlManager::USAGE_TIMER_THREAD)
+            , pholder1, pholder2));
+    bot_AddCommandEnforced(gBot, "stoptimer", [](const Bot &bot, const Message::Ptr &message) {
+        gSThreadManager
+            .getController<TimerCommandManager>(SingleThreadCtrlManager::USAGE_TIMER_THREAD)
+            ->stopTimer(bot, message);
+        gSThreadManager.destroyController(SingleThreadCtrlManager::USAGE_TIMER_THREAD);
+    });
     bot_AddCommandPermissive(gBot, "decho", [](const Bot &bot, const Message::Ptr &message) {
         const auto replyMsg = message->replyToMessage;
         const auto chatId = message->chat->id;
@@ -431,32 +437,35 @@ int main(int argc, const char** argv) {
         if (!gObservedChatIds.empty() || gObserveAllChats)
             processObservers(msg);
 #endif
-        spamBlockManager->run(gBot, msg);
+        gSThreadManager
+            .getController<SpamBlockManager>(SingleThreadCtrlManager::USAGE_SPAMBLOCK_THREAD)
+            ->run(gBot, msg);
         processRegEXCommand(gBot, msg);
     });
 
 #ifdef SOCKET_CONNECTION
-    static SingleThreadCtrl socketConnectionManager;
-    static bool socketValid = false;
+    auto socketConnectionManager = gSThreadManager
+                                   .getController(SingleThreadCtrlManager::USAGE_SOCKET_THREAD);
     static std::string exitToken;
     static std::promise<bool> socketCreatedProm;
     static std::future<bool> socketCreatedFut = socketCreatedProm.get_future();
 
-    socketConnectionManager.setThreadFunction([] {
+    socketConnectionManager->setThreadFunction([] {
         startListening([](struct TgBotConnection conn) {
             socketConnectionHandler(gBot, conn);
         },
         socketCreatedProm);
     });
 
-    socketValid = socketCreatedFut.get();
-    if (socketValid) {
+    if (socketCreatedFut.get()) {
         exitToken = StringTools::generateRandomString(sizeof(TgBotCommandUnion::data_2.token) - 1);
         LOG_V("Generated exittoken: %s", exitToken.c_str());
 
         auto e = TgBotCommandData::Exit::create(ExitOp::SET_TOKEN, exitToken);
         writeToSocket({CMD_EXIT, {.data_2 = e}});
-        socketConnectionManager.setPreStopFunction(std::bind(&cleanupSocket, std::cref(exitToken), pholder1));
+        socketConnectionManager->setPreStopFunction(std::bind(&cleanupSocket, std::cref(exitToken), pholder1));
+    } else {
+        gSThreadManager.destroyController(SingleThreadCtrlManager::USAGE_SOCKET_THREAD);
     }
 #endif
 #ifdef RTCOMMAND_LOADER
@@ -466,9 +475,7 @@ int main(int argc, const char** argv) {
         static std::once_flag once;
         std::call_once(once, [s] {
             LOG_I("Exiting with signal %d", s);
-            timerCmdManager->stop();
-            spamBlockManager->stop();
-            socketConnectionManager.stop();
+            gSThreadManager.stopAll();
             database::db.save();
         });
         std::exit(0);

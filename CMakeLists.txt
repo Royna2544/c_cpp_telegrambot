@@ -41,6 +41,7 @@ set(SRC_LIST
     src/ExtArgs.cpp
     src/signalhandler/SignalHandler_${TARGET_VARIANT}.cpp
     src/random/RandomNumberGenerator.cpp
+    src/SingleThreadCtrlManager.cpp
     src/SpamBlocker.cpp
     src/RegEXHandler.cpp
     src/TimerImpl.cpp)
