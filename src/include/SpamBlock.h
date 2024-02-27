@@ -22,12 +22,12 @@ using TgBot::Chat;
 using TgBot::User;
 using ChatHandle = std::map<User::Ptr, std::vector<Message::Ptr>>;
 
-struct SpamBlockBuffer : SingleThreadCtrl {
-    SpamBlockBuffer() : SingleThreadCtrl() {}
-    ~SpamBlockBuffer() override = default;
+struct SpamBlockManager : SingleThreadCtrl {
+    SpamBlockManager() : SingleThreadCtrl() {}
+    ~SpamBlockManager() override = default;
 
-    void spamBlockerFn(const Bot& bot);
-    void spamBlocker(const Bot &bot, const Message::Ptr &message);
+    void spamBlockerThreadFn(const Bot& bot);
+    void run(const Bot &bot, const Message::Ptr &message);
 
  private:
     std::map<Chat::Ptr, ChatHandle> buffer;

@@ -1,18 +1,15 @@
 #include <Authorization.h>
+#include <BotReplyMessage.h>
 #include <Logging.h>
 #include <NamespaceImport.h>
 #include <SpamBlock.h>
+#include <socket/TgBotSocket.h>
 
-#include <atomic>
 #include <condition_variable>
 #include <map>
 #include <mutex>
-#include <thread>
 #include <unordered_map>
 #include <utility>
-#include "BotReplyMessage.h"
-#include "socket/TgBotSocket.h"
-#include "tgbot/TgException.h"
 
 using TgBot::ChatPermissions;
 
@@ -165,7 +162,7 @@ static void spamDetectFunc(const Bot &bot, buffer_iterator_t handle) {
     deleteAndMute(bot, handle, MaxMsgMap, 5, "MaxMsg");
 }
 
-void SpamBlockBuffer::spamBlockerFn(const Bot& bot) {
+void SpamBlockManager::spamBlockerThreadFn(const Bot& bot) {
     while (kRun) {
         {
             const std::lock_guard<std::mutex> _(m);
@@ -197,7 +194,7 @@ void SpamBlockBuffer::spamBlockerFn(const Bot& bot) {
     }
 }
 
-void SpamBlockBuffer::spamBlocker(const Bot &bot, const Message::Ptr &message) {
+void SpamBlockManager::run(const Bot &bot, const Message::Ptr &message) {
     static std::once_flag once;
 
 #ifdef SOCKET_CONNECTION
@@ -214,7 +211,7 @@ void SpamBlockBuffer::spamBlocker(const Bot &bot, const Message::Ptr &message) {
 
     using_cv = true;
     std::call_once(once, [this, &bot]{
-        setThreadFunction(std::bind(&SpamBlockBuffer::spamBlockerFn, this, std::cref(bot)));
+        setThreadFunction(std::bind(&SpamBlockManager::spamBlockerThreadFn, this, std::cref(bot)));
     });
 
     {

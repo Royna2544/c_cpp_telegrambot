@@ -80,7 +80,7 @@ int main(int argc, const char** argv) {
     }
     static Bot gBot(token);
     static auto timerCmdManager = std::make_shared<TimerCommandManager>();
-    static auto kSpamBlockCtx = std::make_shared<SpamBlockBuffer>();
+    static auto spamBlockManager = std::make_shared<SpamBlockManager>();
     database::db.load();
 
     bot_AddCommandEnforcedCompiler(gBot, "c", ProgrammingLangs::C, [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
@@ -419,7 +419,7 @@ int main(int argc, const char** argv) {
         if (!gObservedChatIds.empty() || gObserveAllChats)
             processObservers(msg);
 #endif
-        kSpamBlockCtx->spamBlocker(gBot, msg);
+        spamBlockManager->run(gBot, msg);
         processRegEXCommand(gBot, msg);
     });
 
@@ -454,7 +454,7 @@ int main(int argc, const char** argv) {
         std::call_once(once, [s] {
             LOG_I("Exiting with signal %d", s);
             timerCmdManager->stop();
-            kSpamBlockCtx->stop();
+            spamBlockManager->stop();
             database::db.save();
 #ifdef SOCKET_CONNECTION
             if (!fileExists(SOCKET_PATH)) {
