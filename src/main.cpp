@@ -30,6 +30,16 @@ std::chrono::seconds to_secs(Dur &&it) {
     return std::chrono::duration_cast<std::chrono::seconds>(it);
 }
 
+static void cleanupFn (int s) {
+    static std::once_flag once;
+    std::call_once(once, [s] {
+        LOG_I("Exiting with signal %d", s);
+        gSThreadManager.stopAll();
+        database::db.save();
+    });
+    std::exit(0);
+};
+
 static void cleanupSocket(const std::string exitToken, SingleThreadCtrl *) {
 #ifdef SOCKET_CONNECTION
     bool socketValid = true;
@@ -121,15 +131,6 @@ int main(int argc, const char** argv) {
 #ifdef RTCOMMAND_LOADER
     loadCommandsFromFile(gBot, getSrcRoot() / "modules.load");
 #endif
-    static auto cleanupFn = [](int s) {
-        static std::once_flag once;
-        std::call_once(once, [s] {
-            LOG_I("Exiting with signal %d", s);
-            gSThreadManager.stopAll();
-            database::db.save();
-        });
-        std::exit(0);
-    };
     installSignalHandler(cleanupFn);
 
     LOG_D("Token: %s", token.c_str());
