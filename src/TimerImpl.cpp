@@ -6,6 +6,7 @@
 
 #include <chrono>
 #include <cmath>
+#include <memory>
 #include <sstream>
 #include "SingleThreadCtrl.h"
 
@@ -162,7 +163,9 @@ void TimerCommandManager::startTimer(const Bot &bot, const Message::Ptr& msg) {
             LOG_W("Cannot pin msg!");
             botcanpin = false;
         }
-        setThreadFunction(std::bind(&TimerCommandManager::TimerThreadFn, this, std::cref(bot), message, parsedTime));
+        setThreadFunction(std::bind(&TimerCommandManager::TimerThreadFn, this,
+            std::cref(bot), message, parsedTime));
+        setPreStopFunction(std::bind(&TimerCommandManager::Timerstop, pholder1));
     }
 }
 
@@ -183,9 +186,8 @@ void TimerCommandManager::stopTimer(const Bot &bot, const Message::Ptr& message)
     bot_sendReplyMessage(bot, message, text);
 }
 
-void TimerCommandManager::Timerstop() {
-    if (isactive) {
+void TimerCommandManager::Timerstop(SingleThreadCtrl *thiz) {
+    if (static_cast<TimerCommandManager *>(thiz)->isactive) {
         LOG_I("Canceling timer and cleaning up...");
-        SingleThreadCtrl::stop();
     }
 }
