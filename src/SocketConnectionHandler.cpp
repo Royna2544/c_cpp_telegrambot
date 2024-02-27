@@ -2,7 +2,6 @@
 #include <ChatObserver.h>
 #include <Logging.h>
 #include <ResourceIncBin.h>
-#include <RuntimeException.h>
 #include <SocketConnectionHandler.h>
 #include <SpamBlock.h>
 #include <random/RandomNumberGenerator.h>
@@ -29,8 +28,8 @@ static std::string getMIMEString(const std::string& path) {
         std::string buf;
         ASSIGN_INCTXT_DATA(MimeDataJson, buf);
         doc.Parse(buf.c_str());
-        if (doc.HasParseError())
-            throw runtime_errorf("Failed to parse mimedata: %d", doc.GetParseError());
+        // This should be an assert, we know the data file at compile time
+        ASSERT(!doc.HasParseError(), "Failed to parse mimedata: %d", doc.GetParseError());
     });
     if (!extension.empty()) {
         for (rapidjson::SizeType i = 0; i < doc.Size(); i++) {
