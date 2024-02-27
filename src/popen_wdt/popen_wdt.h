@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cdefs.h>
 #include <stdbool.h>
 #include <stdio.h>
 
@@ -16,7 +15,9 @@
 #define BASH_EXE_PATH "/data/data/com.termux/files/usr/bin/bash"
 #endif
 
-_BEGIN_DECLS
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /**
  * setlocale_enus_once - Function called once to set the terminal output to locale en-US
@@ -38,9 +39,9 @@ void setlocale_enus_once(void);
  */
 FILE* popen_watchdog(const char* command, bool* ret);
 
-_END_DECLS
-
 #ifdef __cplusplus
+}
+
 #include <string>
 #include <filesystem>
 
