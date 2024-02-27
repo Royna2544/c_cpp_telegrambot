@@ -424,13 +424,13 @@ int main(int argc, const char** argv) {
     });
 
 #ifdef SOCKET_CONNECTION
-    static SingleThreadCtrl th;
+    static SingleThreadCtrl socketConnectionManager;
     static bool socketValid = false;
     static std::string exitToken;
     static std::promise<bool> socketCreatedProm;
     static std::future<bool> socketCreatedFut = socketCreatedProm.get_future();
 
-    th.setThreadFunction([] {
+    socketConnectionManager.setThreadFunction([] {
         startListening([](struct TgBotConnection conn) {
             socketConnectionHandler(gBot, conn);
         },
@@ -466,7 +466,7 @@ int main(int argc, const char** argv) {
             } else {
                 forceStopListening();
             }
-            th.stop();
+            socketConnectionManager.stop();
 #endif
         });
         std::exit(0);
