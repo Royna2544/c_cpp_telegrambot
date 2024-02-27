@@ -2,23 +2,23 @@
 #include <BotReplyMessage.h>
 #include <CompilerInTelegram.h>
 #include <ConfigManager.h>
+#include <EnumArrayHelpers.h>
 #include <ExtArgs.h>
 #include <FileSystemLib.h>
 #include <LinuxUtils.h>
 #include <Logging.h>
 #include <NamespaceImport.h>
 #include <StringToolsExt.h>
+#include <random/RandomNumberGenerator.h>
 
 #include <boost/algorithm/string/replace.hpp>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
-#include <map>
 #include <mutex>
 #include <optional>
 #include <sstream>
-#include <random/RandomNumberGenerator.h>
-#include <thread>
+#include <vector>
 
 #include "popen_wdt/popen_wdt.h"
 
@@ -219,14 +219,19 @@ static std::optional<std::string> findCommandExe(std::string command) {
     return {};
 }
 
+#define COMPILER(lang, ...)                     \
+    array_helpers::make_elem<ProgrammingLangs,  \
+    std::vector<std::string>>(lang, {__VA_ARGS__})
+
 bool findCompiler(ProgrammingLangs lang, std::string &path) {
-    static std::map<ProgrammingLangs, std::vector<std::string>> compilers = {
-        {ProgrammingLangs::C, {"clang", "gcc", "cc"}},
-        {ProgrammingLangs::CXX, {"clang++", "g++", "c++"}},
-        {ProgrammingLangs::GO, {"go"}},
-        {ProgrammingLangs::PYTHON, {"python", "python3"}},
-    };
-    for (const auto &options : compilers[lang]) {
+    static const auto compilers = array_helpers::make<ProgrammingLangs::MAX,
+        ProgrammingLangs, const std::vector<std::string>>(
+        COMPILER(ProgrammingLangs::C, "clang", "gcc", "cc"),
+        COMPILER(ProgrammingLangs::CXX, "clang++", "g++", "c++"),
+        COMPILER(ProgrammingLangs::GO, "go"),
+        COMPILER(ProgrammingLangs::PYTHON, "python", "python3")
+    );
+    for (const auto &options : array_helpers::find(compilers, lang)->second) {
         auto ret = findCommandExe(options);
         if (ret) {
             path = ret.value();

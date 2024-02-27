@@ -32,6 +32,7 @@ enum ProgrammingLangs {
     CXX,
     GO,
     PYTHON,
+    MAX,
 };
 
 /**
