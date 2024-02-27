@@ -3,7 +3,12 @@
 #include <StringToolsExt.h>
 #include <random/RandomNumberGenerator.h>
 
+#include <chrono>
+#include <thread>
+
 #include "CommandModule.h"
+
+using std::chrono_literals::operator""s;
 
 static void DecideCommandFn(const Bot &bot, const Message::Ptr message) {
     constexpr int COUNT_MAX = 10;
@@ -36,7 +41,7 @@ static void DecideCommandFn(const Bot &bot, const Message::Ptr message) {
                 }
             } else  // count == 0
                 break;
-            std_sleep_s(2);
+            std::this_thread::sleep_for(2s);
         } while (count > 0);
         msgtxt += '\n';
         switch (yesno) {

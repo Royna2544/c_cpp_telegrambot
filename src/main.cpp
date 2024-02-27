@@ -9,6 +9,7 @@
 
 // Generated cmd list
 #include <cmds.gen.h>
+#include <thread>
 
 #ifdef RTCOMMAND_LOADER
 #include <RTCommandLoader.h>
@@ -124,7 +125,8 @@ int main(int argc, const char** argv) {
 
         auto e = TgBotCommandData::Exit::create(ExitOp::SET_TOKEN, exitToken);
         writeToSocket({CMD_EXIT, {.data_2 = e}});
-        socketConnectionManager->setPreStopFunction(std::bind(&cleanupSocket, std::cref(exitToken), pholder1));
+        socketConnectionManager->setPreStopFunction(std::bind(&cleanupSocket,
+            std::cref(exitToken), std::placeholders::_1));
     } else {
         gSThreadManager.destroyController(SingleThreadCtrlManager::USAGE_SOCKET_THREAD);
     }
@@ -169,7 +171,7 @@ int main(int argc, const char** argv) {
             gAuthorized = false;
             gSThreadManager.getController(SingleThreadCtrlManager::USAGE_ERROR_RECOVERY_THREAD)
                 ->setThreadFunction([] {
-                    std_sleep(kErrorRecoveryDelay);
+                    std::this_thread::sleep_for(kErrorRecoveryDelay);
                     gAuthorized = true;
                 }
             );

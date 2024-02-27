@@ -8,15 +8,15 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include <atomic>
+#include <chrono>
 #include <csignal>
 #include <cstdlib>
 #include <mutex>
+#include <thread>
 #include <regex>
 
 #include "../ExtArgs.cpp"
 #include "CompilerInTelegram.h"  // BASH_MAX_BUF, BASH_READ_BUF
-#include "NamespaceImport.h"
 #include "StringToolsExt.h"
 #include "cmd_dynamic.h"
 #include "popen_wdt/popen_wdt.h"
@@ -26,6 +26,8 @@
 static pipe_t tochild, toparent;
 static pid_t childpid = 0;
 static bool is_open = false;
+
+using std::chrono_literals::operator""s;
 
 // Aliases
 static const int& child_stdin = tochild[0];
@@ -154,7 +156,7 @@ static void do_InteractiveBash(const Bot& bot, const Message::Ptr& message) {
             // Ensure bash execl() is up
             do {
                 LOG_W("Waiting for subprocess up... (%d)", count);
-                std_sleep_s(1);
+                std::this_thread::sleep_for(1s);
                 count++;
             } while (kill(-(*piddata), 0) != 0);
             is_open = true;
@@ -173,7 +175,7 @@ static void do_InteractiveBash(const Bot& bot, const Message::Ptr& message) {
 
             // Write a msg as a fallback if for some reason exit doesnt get written
             std::thread th([] {
-                std_sleep_s(SLEEP_SECONDS);
+                std::this_thread::sleep_for(std::chrono::seconds(SLEEP_SECONDS));
                 if (childpid > 0) {
                     if (kill(childpid, 0) == 0) {
                         LOG_W("Process %d misbehaving, using SIGTERM", childpid);
@@ -229,7 +231,7 @@ static void do_InteractiveBash(const Bot& bot, const Message::Ptr& message) {
 
                     // Write a msg as a fallback if read() hangs
                     std::thread th([sendFallback] {
-                        std_sleep_s(300);  // 5 Mins
+                        std::this_thread::sleep_for(300s);  // 5 Mins
                         // TODO This should be sent as sperate message
                         if (sendFallback->load())
                             (void)write(child_stdout, kSubProcessClosed, sizeof(kSubProcessClosed));

@@ -25,7 +25,7 @@ void bot_AddCommandEnforcedCompiler(Bot& bot, const char* cmd,
                                     ProgrammingLangs lang, command_callback_compiler_t cb) {
     std::string compiler;
     if (findCompiler(lang, compiler)) {
-        bot_AddCommandEnforced(bot, cmd, std::bind(cb, pholder1, pholder2, compiler));
+        bot_AddCommandEnforced(bot, cmd, std::bind(cb, std::placeholders::_1, std::placeholders::_2, compiler));
     } else {
         LOG_W("Unsupported cmd '%s' (compiler)", cmd);
         bot_AddCommandEnforced(bot, cmd, NoCompilerCommandStub);

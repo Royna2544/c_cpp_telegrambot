@@ -1,16 +1,15 @@
 #pragma once
 
-#include "NamespaceImport.h"
-#include "Types.h"
+#include <tgbot/types/Chat.h>
+#include <tgbot/types/User.h>
+
 #include "SingleThreadCtrl.h"
 
 #ifdef SOCKET_CONNECTION
 #include <socket/TgBotSocket.h>
 #endif
 
-#include <atomic>
 #include <map>
-#include <memory>
 #include <mutex>
 
 #ifdef SOCKET_CONNECTION

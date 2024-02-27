@@ -1,16 +1,14 @@
 #include <Authorization.h>
 #include <BotReplyMessage.h>
 #include <Logging.h>
-#include <NamespaceImport.h>
 #include <SpamBlock.h>
 #include <socket/TgBotSocket.h>
 
-#include <condition_variable>
 #include <map>
 #include <mutex>
-#include <unordered_map>
 #include <utility>
 
+using std::chrono_literals::operator""s;
 using TgBot::ChatPermissions;
 
 #ifdef SOCKET_CONNECTION

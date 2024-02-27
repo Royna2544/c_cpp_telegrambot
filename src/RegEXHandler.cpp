@@ -1,12 +1,10 @@
 #include <Logging.h>
-#include <NamespaceImport.h>
 
 #include <optional>
 #include <regex>
 #include <string>
 
 #include "BotReplyMessage.h"
-#include "tgbot/tools/StringTools.h"
 
 using std::regex_constants::ECMAScript;
 using std::regex_constants::format_first_only;

@@ -1,9 +1,11 @@
 #pragma once
 
-#include <NamespaceImport.h>
+#include <tgbot/types/Message.h>
 #include <Types.h>
 
 #include <vector>
+
+using TgBot::Message;
 
 // Global ChatId list to observe
 extern std::vector<ChatId> gObservedChatIds;

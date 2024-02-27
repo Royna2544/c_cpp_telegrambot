@@ -1,10 +1,12 @@
 #include <ChatObserver.h>
 #include <Logging.h>
 
+#include <algorithm>
 #include <iostream>
 
 using TgBot::Chat;
 using TgBot::User;
+using TgBot::Message;
 
 std::vector<ChatId> gObservedChatIds;
 bool gObserveAllChats = false;

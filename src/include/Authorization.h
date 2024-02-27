@@ -5,7 +5,8 @@
 #include <tgbot/types/Message.h>
 
 #include <Types.h>
-#include "NamespaceImport.h"
+
+using TgBot::Message;
 
 // A global 'authorized' bool object that controls all commands
 // that are sent to the bot

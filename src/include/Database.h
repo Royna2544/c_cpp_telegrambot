@@ -8,7 +8,6 @@
 
 #include <optional>
 
-#include "NamespaceImport.h"
 #include "../popen_wdt/popen_wdt.hpp"
 
 static inline const char kDatabaseFile[] = "tgbot.pb";
@@ -19,10 +18,10 @@ inline std::filesystem::path getDatabaseFile() {
 
 namespace database {
 
-using ::Bot;
-using ::Message;
+using TgBot::Bot;
+using TgBot::Message;
+using TgBot::User;
 using ::google::protobuf::RepeatedField;
-using ::TgBot::User;
 using ::tgbot::proto::Database;
 using ::tgbot::proto::PersonList;
 

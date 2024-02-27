@@ -1,7 +1,6 @@
 #pragma once
 
-#include <NamespaceImport.h>
-#include <string>
+#include <tgbot/Bot.h>
 #include <filesystem>
 
 void loadOneCommand(Bot& bot, const std::filesystem::path fname);

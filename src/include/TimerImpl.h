@@ -1,10 +1,14 @@
 #pragma once
 
-#include "NamespaceImport.h"
-#include "Types.h"
+#include <tgbot/Bot.h>
+#include <tgbot/types/Message.h>
+
 #include "SingleThreadCtrl.h"
 
 #include <chrono>
+
+using TgBot::Bot;
+using TgBot::Message;
 
 struct TimerCommandManager : SingleThreadCtrl {
     static constexpr int TIMER_CONFIG_SEC = 5;

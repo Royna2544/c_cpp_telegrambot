@@ -7,7 +7,6 @@
 #include <FileSystemLib.h>
 #include <LinuxUtils.h>
 #include <Logging.h>
-#include <NamespaceImport.h>
 #include <StringToolsExt.h>
 #include <random/RandomNumberGenerator.h>
 
@@ -18,10 +17,12 @@
 #include <mutex>
 #include <optional>
 #include <sstream>
+#include <thread>
 #include <vector>
 
 #include "popen_wdt/popen_wdt.h"
 
+using std::chrono_literals::operator""ms;
 using std::chrono::duration_cast;
 using std::chrono::high_resolution_clock;
 using std::chrono::milliseconds;
@@ -95,7 +96,7 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
             hasmore = true;
         }
         count++;
-        std_sleep(50ms);
+        std::this_thread::sleep_for(50ms);
     }
     auto srcroot = std::filesystem::current_path(ec);
     if (!ec) {

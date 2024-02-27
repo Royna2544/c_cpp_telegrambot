@@ -1,7 +1,6 @@
 #include <BotReplyMessage.h>
 #include <ExtArgs.h>
 #include <Logging.h>
-#include <NamespaceImport.h>
 #include <TimerImpl.h>
 
 #include <chrono>
@@ -9,6 +8,8 @@
 #include <memory>
 #include <sstream>
 #include "SingleThreadCtrl.h"
+
+using std::chrono_literals::operator""s;
 
 template <class Dur>
 std::chrono::hours to_hours(Dur &&it) {
@@ -137,7 +138,7 @@ bool TimerCommandManager::parseTimerArguments(const Bot &bot, const Message::Ptr
 void TimerCommandManager::TimerThreadFn(const Bot &bot, Message::Ptr message, std::chrono::seconds timer) {
     isactive = true;
     while (timer > 0s && kRun) {
-        std_sleep_s(1);
+        std::this_thread::sleep_for(1s);
         if (timer.count() % TIMER_CONFIG_SEC == 0) {
             bot_editMessage(bot, message, to_string(timer));
         }
@@ -165,7 +166,7 @@ void TimerCommandManager::startTimer(const Bot &bot, const Message::Ptr& msg) {
         }
         setThreadFunction(std::bind(&TimerCommandManager::TimerThreadFn, this,
             std::cref(bot), message, parsedTime));
-        setPreStopFunction(std::bind(&TimerCommandManager::Timerstop, pholder1));
+        setPreStopFunction(std::bind(&TimerCommandManager::Timerstop, std::placeholders::_1));
     }
 }
 

@@ -1,8 +1,8 @@
 #pragma once
 
 #include <string>
-
-#include "NamespaceImport.h"
+#include <tgbot/Bot.h>
+#include <tgbot/types/Message.h>
 
 struct HandleData {
     const Bot &bot;

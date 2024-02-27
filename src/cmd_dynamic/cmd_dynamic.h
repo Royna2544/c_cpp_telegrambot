@@ -1,5 +1,4 @@
 #include <BotAddCommand.h>
-#include <NamespaceImport.h>
 
 struct dynamicCommand {
     bool enforced;
