@@ -2,7 +2,6 @@
 
 #include <LinuxUtils.h>
 #include <Logging.h>
-#include <RuntimeException.h>
 
 #include <algorithm>
 #include <cassert>

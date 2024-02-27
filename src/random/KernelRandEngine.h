@@ -3,7 +3,6 @@
 #if defined __APPLE__ || defined __linux__
 
 #include <Logging.h>
-#include <RuntimeException.h>
 #include <Types.h>
 
 #include <fcntl.h>
@@ -36,8 +35,7 @@ struct kernel_rand_engine {
             } else
                 break;
         }
-        if (!isValidFd(fd))
-            throw std::runtime_error("Failed to open hwrng device file");
+        ASSERT(isValidFd(fd), "Failed to open hwrng device file");
     }
     ~kernel_rand_engine() {
         closeFd(fd);
