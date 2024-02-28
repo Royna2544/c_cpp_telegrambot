@@ -186,6 +186,7 @@ struct InteractiveBashContext {
             (SingleThreadCtrlManager::USAGE_IBASH_TIMEOUT_THREAD);
 
         do {
+            onNoOutputThread.reset();
             onNoOutputThread->setThreadFunction(std::bind(&TimeoutThread::start, onNoOutputThread, onNoOutputCallbackFn));
             ssize_t rc = read(parent_readfd, buf, sizeof(buf));
             onNoOutputThread->stop();

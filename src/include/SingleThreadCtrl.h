@@ -81,7 +81,7 @@ class SingleThreadCtrl {
     }
 
     void stop() {
-        std::call_once(once, [this]{
+        if (once) {
             if (preStop)
                 preStop(this);
             kRun = false;
@@ -90,9 +90,15 @@ class SingleThreadCtrl {
             }
             if (threadP && threadP->joinable())
                 threadP->join();
-        });
+            once = false;
+        };
     }
 
+    void reset() {
+        once = true;
+        threadP.reset();
+    }
+    
     virtual ~SingleThreadCtrl() {
         stop();
     }
@@ -121,7 +127,7 @@ class SingleThreadCtrl {
 
     std::optional<std::thread> threadP;
     prestop_function preStop;
-    std::once_flag once;
+    std::atomic_bool once = true;
 };
 
 inline void SingleThreadCtrlManager::stopAll() {
