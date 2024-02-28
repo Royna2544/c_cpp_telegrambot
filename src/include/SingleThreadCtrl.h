@@ -16,6 +16,15 @@ class SingleThreadCtrl;
 
 class SingleThreadCtrlManager {
  public:
+    constexpr static int GetControllerActionShift = 15;
+    using RequireFailHandlerFn = std::function<void()>;
+
+    enum GetControllerFlags {
+        FLAG_GETCTRL_REQUIRE_EXIST = 1 << 0,
+        FLAG_GETCTRL_REQUIRE_NONEXIST = 1 << 1,
+        FLAG_GETCTRL_REQUIRE_FAILACTION_ASSERT = 1 << GetControllerActionShift,
+        FLAG_GETCTRL_REQUIRE_FAILACTION_LOG = 1 << (GetControllerActionShift + 1)
+    };
     enum ThreadUsage {
         USAGE_SOCKET_THREAD,
         USAGE_TIMER_THREAD,
@@ -25,15 +34,37 @@ class SingleThreadCtrlManager {
         USAGE_IBASH_EXIT_TIMEOUT_THREAD,
         USAGE_IBASH_COMMAND_QUEUE_THREAD
     };
+
     template <class T = SingleThreadCtrl, std::enable_if_t<std::is_base_of_v<SingleThreadCtrl, T>, bool> = true>
-    std::shared_ptr<T> getController(const ThreadUsage usage) {
+    std::shared_ptr<T> getController(const ThreadUsage usage, int flags = 0) {
         std::shared_ptr<SingleThreadCtrl> ptr;
         auto it = kControllers.find(usage);
+        const bool requireNonExist = flags & FLAG_GETCTRL_REQUIRE_NONEXIST;
+        const bool requireExist = flags & FLAG_GETCTRL_REQUIRE_EXIST;
+        const static RequireFailHandlerFn failActionAssert = []() {
+            ASSERT(false, "Flags requested FAILACTION_ASSERT");
+        };
+        const static RequireFailHandlerFn failActionLog = []() {
+            LOG_E("Flags-assertion failed");
+        };
+        RequireFailHandlerFn thisHandlerFn;
+
+        if (requireExist && requireNonExist)
+            flags &= ~(FLAG_GETCTRL_REQUIRE_FAILACTION_ASSERT | FLAG_GETCTRL_REQUIRE_FAILACTION_LOG); 
+        if (flags & FLAG_GETCTRL_REQUIRE_FAILACTION_ASSERT)
+            thisHandlerFn = failActionAssert;
+        if (flags & FLAG_GETCTRL_REQUIRE_FAILACTION_LOG)
+            thisHandlerFn = failActionLog;
 
         if (it != kControllers.end()) {
+            if (requireNonExist && thisHandlerFn)
+                thisHandlerFn();
+
             LOG_V("Using old: Controller with usage %d", usage);
             ptr = it->second;
         } else {
+            if (requireExist && thisHandlerFn)
+                thisHandlerFn();
             LOG_V("New allocation: Controller with usage %d", usage);
             ptr = kControllers[usage] = std::make_shared<T>();
         }
