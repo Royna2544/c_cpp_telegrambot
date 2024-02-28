@@ -9,5 +9,6 @@
 Commit-Msg: _commitmsg_
 Commit-Id: _commitid_
 Repo URL: <a href="_originurl_">Here</a>
+Loaded Command Modules: _commandmodules_
 
 <b>OS | Compiler | Date</b>: _compilerver_

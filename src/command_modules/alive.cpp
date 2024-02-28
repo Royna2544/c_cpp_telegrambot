@@ -5,6 +5,7 @@
 #include <ResourceIncBin.h>
 #include <popen_wdt/popen_wdt.hpp>
 #include "CommandModule.h"
+#include <cmds.gen.h>
 
 #include <map>
 #include <mutex>
@@ -15,7 +16,7 @@ static void AliveCommandFn(const Bot &bot, const Message::Ptr message) {
     static std::once_flag once;
 
     std::call_once(once, [] {
-        std::string commitid, commitmsg, originurl, compilerver;
+        std::string commitid, commitmsg, originurl, compilerver, commandmodules;
 
         static const std::map<std::string *, std::string> commands = {
             {&commitid, "rev-parse HEAD"},
@@ -31,12 +32,18 @@ static void AliveCommandFn(const Bot &bot, const Message::Ptr message) {
             }
         }
         compilerver = std::string(BOOST_PLATFORM " | " BOOST_COMPILER " | " __DATE__);
+        commandmodules.reserve(8 * gCmdModules.size());
+        for (const auto &i : gCmdModules) {
+            commandmodules += i->name;
+            commandmodules += " ";
+        }
         ASSIGN_INCTXT_DATA(AboutHtmlText, version);
 #define REPLACE_PLACEHOLDER(buf, name) boost::replace_all(buf, "_" #name "_", name)
         REPLACE_PLACEHOLDER(version, commitid);
         REPLACE_PLACEHOLDER(version, commitmsg);
         REPLACE_PLACEHOLDER(version, originurl);
         REPLACE_PLACEHOLDER(version, compilerver);
+        REPLACE_PLACEHOLDER(version, commandmodules);
     });
     try {
         // Hardcoded kys GIF
@@ -51,7 +58,7 @@ static void AliveCommandFn(const Bot &bot, const Message::Ptr message) {
     }
 }
 
-struct CommandModule cmd_alive {
+const struct CommandModule cmd_alive {
     .enforced = false,
     .name = "alive",
     .fn = AliveCommandFn,
