@@ -1,4 +1,4 @@
-set(DYNAMIC_CMDS_LIST DynTest InteractiveBash)
+set(DYNAMIC_CMDS_LIST DynTest)
 
 FILE(REMOVE ${CMAKE_SOURCE_DIR}/modules.load)
 foreach(lib ${DYNAMIC_CMDS_LIST})

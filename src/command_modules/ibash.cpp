@@ -15,10 +15,10 @@
 #include <thread>
 #include <regex>
 
-#include "../ExtArgs.cpp"
+#include "ExtArgs.h"
 #include "CompilerInTelegram.h"  // BASH_MAX_BUF, BASH_READ_BUF
 #include "StringToolsExt.h"
-#include "cmd_dynamic.h"
+#include "command_modules/CommandModule.h"
 #include "popen_wdt/popen_wdt.h"
 
 // tochild { child stdin , parent write }
@@ -91,7 +91,7 @@ static bool HasData(ChildDataDirection direction, bool wait = false) {
     return false;
 }
 
-static void do_InteractiveBash(const Bot& bot, const Message::Ptr& message) {
+static void InteractiveBashCommandFn(const Bot& bot, const Message::Ptr& message) {
     static const std::regex kExitCommandRegex(R"(^exit( \d+)?$)");
     std::string command;
     static std::mutex m;
@@ -276,8 +276,8 @@ static void do_InteractiveBash(const Bot& bot, const Message::Ptr& message) {
     }
 }
 
-static bool isSupported(void) {
-    return access(BASH_EXE_PATH, R_OK | X_OK) == 0;
-}
-
-DECL_DYN_ENFORCED_COMMAND("ibash", do_InteractiveBash, isSupported);
+struct CommandModule cmd_ibash {
+    .enforced = false,
+    .name = "ibash",
+    .fn = InteractiveBashCommandFn,
+};

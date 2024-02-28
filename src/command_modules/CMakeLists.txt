@@ -2,6 +2,9 @@ set(CMDS_LIST addblacklist rmblacklist addwhitelist
 			  rmwhitelist bash unsafebash alive flash
 			  possibility decide delay decho randsticker
 			  fileid starttimer stoptimer)
+if (NOT WIN32)
+set(CMDS_LIST ${CMDS_LIST} ibash)
+endif()
 
 set(COMMANDS_CWD src/command_modules)
 set(COMMANDS_GEN_HEADER ${CMAKE_BINARY_DIR}/cmds.gen.h)
