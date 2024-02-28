@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "cmd_dynamic/cmd_dynamic.h"
+#include "command_modules/CommandModule.h"
 
 struct DynamicLibraryHolder {
     DynamicLibraryHolder(void* handle) : handle_(handle){};
@@ -32,33 +33,36 @@ static void commandStub(const Bot& bot, const Message::Ptr& message) {
 }
 
 void loadOneCommand(Bot& bot, const std::filesystem::path fname) {
-    void* handle = dlopen(fname.c_str(), RTLD_NOW);
-    struct dynamicCommand* sym = nullptr;
+    struct dynamicCommandModule* sym = nullptr;
+    struct CommandModule* mod = nullptr;
     command_callback_t fn;
     Dl_info info{};
-    void* fnptr = nullptr;
+    void *handle, *fnptr = nullptr;
     bool isSupported = true;
 
+    handle = dlopen(fname.c_str(), RTLD_NOW);
     if (!handle) {
         LOG_W("Failed to load: %s", dlerror() ?: "unknown");
         return;
     }
-    sym = static_cast<struct dynamicCommand*>(dlsym(handle, DYN_COMMAND_SYM_STR));
+    sym = static_cast<struct dynamicCommandModule*>(dlsym(handle, DYN_COMMAND_SYM_STR));
     if (!sym) {
         LOG_W("Failed to lookup symbol '" DYN_COMMAND_SYM_STR "' in %s", fname.c_str());
         dlclose(handle);
         return;
     }
     libs.emplace_back(handle);
-    fn = sym->fn;
+    mod = &sym->mod;
     if (!sym->isSupported()) {
         fn = commandStub;
         isSupported = false;
+    } else {
+        fn = mod->fn;
     }
-    if (sym->enforced)
-        bot_AddCommandEnforced(bot, sym->name, fn);
+    if (mod->enforced)
+        bot_AddCommandEnforced(bot, mod->name, fn);
     else
-        bot_AddCommandPermissive(bot, sym->name, fn);
+        bot_AddCommandPermissive(bot, mod->name, fn);
 
     if (dladdr(sym, &info) < 0) {
         LOG_W("dladdr failed for %s: %s", fname.c_str(), dlerror() ?: "unknown");
@@ -66,7 +70,7 @@ void loadOneCommand(Bot& bot, const std::filesystem::path fname) {
         fnptr = info.dli_saddr;
     }
     LOG_I("Loaded RT command module from %s", fname.c_str());
-    LOG_I("Module dump: { enforced: %d, supported: %d, name: %s, fn: %p }", sym->enforced, isSupported, sym->name, fnptr);
+    LOG_I("Module dump: { enforced: %d, supported: %d, name: %s, fn: %p }", mod->enforced, isSupported, mod->name, fnptr);
 }
 
 void loadCommandsFromFile(Bot& bot, const std::filesystem::path filename) {
