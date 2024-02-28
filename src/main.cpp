@@ -87,10 +87,10 @@ int main(int argc, const char** argv) {
     });
 
     for (const auto &i : gCmdModules) {
-        if (i.enforced)
-            bot_AddCommandEnforced(gBot, i.name.c_str(), i.fn);
+        if (i->enforced)
+            bot_AddCommandEnforced(gBot, i->name, i->fn);
         else
-            bot_AddCommandPermissive(gBot, i.name.c_str(), i.fn);
+            bot_AddCommandPermissive(gBot, i->name, i->fn);
     }
     gBot.getEvents().onAnyMessage([](const Message::Ptr &msg) {
         static auto spamMgr =  gSThreadManager
