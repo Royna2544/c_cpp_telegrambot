@@ -51,6 +51,7 @@ class SingleThreadCtrlManager {
     void stopAll();
     friend class SingleThreadCtrl;
  private:
+   void destroyControllerWithStop(const ThreadUsage usage);
    std::unordered_map<ThreadUsage, std::shared_ptr<SingleThreadCtrl>> kControllers;
 };
 
@@ -120,7 +121,7 @@ class SingleThreadCtrl {
                     return std::this_thread::get_id() == e.second->threadP->get_id();
                 });
             if (it != ctrls.end()) {
-                gSThreadManager.destroyController(it->first);
+                gSThreadManager.destroyControllerWithStop(it->first);
             }
         }
     }
@@ -129,6 +130,14 @@ class SingleThreadCtrl {
     prestop_function preStop;
     std::atomic_bool once = true;
 };
+
+inline void SingleThreadCtrlManager::destroyControllerWithStop(const ThreadUsage usage) {
+    
+    std::thread([this, usage]{
+        getController(usage)->stop();
+        destroyController(usage);
+    }).detach();
+}
 
 inline void SingleThreadCtrlManager::stopAll() {
     for (const auto &[i, j] : kControllers) {
