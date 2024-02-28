@@ -25,9 +25,9 @@ static std::string getMIMEString(const std::string& path) {
     std::string extension = fs::path(path).extension().string();
 
     std::call_once(once, [] {
-        std::string buf;
+        std::string_view buf;
         ASSIGN_INCTXT_DATA(MimeDataJson, buf);
-        doc.Parse(buf.c_str());
+        doc.Parse(buf.data());
         // This should be an assert, we know the data file at compile time
         ASSERT(!doc.HasParseError(), "Failed to parse mimedata: %d", doc.GetParseError());
     });

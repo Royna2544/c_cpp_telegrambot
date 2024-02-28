@@ -1,5 +1,5 @@
 #define INCBIN_SILENCE_BITCODE_WARNING
-#include <string>
+#include <string_view>
 
 #include "third-party/incbin/incbin.h"
 
@@ -18,4 +18,4 @@ INCTXT_EXTERN(MimeDataJson);
         INCBIN_STYLE_IDENT(SIZE))
 
 #define ASSIGN_INCTXT_DATA(name, stringval) \
-    stringval = std::string(_TO_INCBIN_SYM_DATA(name), _TO_INCBIN_SYM_SIZE(name))
+    stringval = std::string_view(_TO_INCBIN_SYM_DATA(name), _TO_INCBIN_SYM_SIZE(name))
