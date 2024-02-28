@@ -28,12 +28,15 @@ using std::chrono_literals::operator""s;
 
 struct TimeoutThread : SingleThreadCtrl {
     void start(const std::function<void(void)>& callback_fn) {
+        using_cv = true;
         std::unique_lock<std::mutex> lk(CV_m);
-        if (cv.wait_for(lk, std::chrono::seconds(SLEEP_SECONDS)) == std::cv_status::timeout) {
+        if (!cv.wait_for(lk, std::chrono::seconds(SLEEP_SECONDS),
+             [this] () -> bool { return !kRun; })) {
             callback_fn();
         }
     }
 };
+
 
 struct InteractiveBashContext {
     // tochild { child stdin , parent write }
@@ -49,6 +52,19 @@ struct InteractiveBashContext {
     constexpr static const char kOutputInitBuf[] = "Output:\n";
     constexpr static const char kSubProcessClosed[] = "Subprocess closed due to inactivity";
     constexpr static const char kNoOutputFallback[] = "\n";
+
+    struct ExitTimeoutThread : SingleThreadCtrl {
+        void start(InteractiveBashContext* instr) {
+            using_cv = true;
+            std::unique_lock<std::mutex> lk(CV_m);
+            if (cv.wait_for(lk, std::chrono::seconds(SLEEP_SECONDS)) == std::cv_status::timeout) {
+                if (instr->childpid > 0 && kill(instr->childpid, 0) == 0) {
+                    LOG_W("Process %d misbehaving, using SIGTERM", instr->childpid);
+                    killpg(instr->childpid, SIGTERM);
+                }
+            }
+        }
+    };
 
     static bool isExitCommand(const std::string& str) {
         static const std::regex kExitCommandRegex(R"(^exit( \d+)?$)");
@@ -121,17 +137,9 @@ struct InteractiveBashContext {
             int status;
 
             // Write a msg as a fallback if for some reason exit doesnt get written
-            std::thread th([this] {
-                std::this_thread::sleep_for(std::chrono::seconds(SLEEP_SECONDS));
-                if (childpid > 0) {
-                    if (kill(childpid, 0) == 0) {
-                        LOG_W("Process %d misbehaving, using SIGTERM", childpid);
-                        killpg(childpid, SIGTERM);
-                    }
-                }
-            });
-            // No need to have it linked
-            th.detach();
+            auto exitTimeout = gSThreadManager.getController<ExitTimeoutThread>
+                (SingleThreadCtrlManager::USAGE_IBASH_EXIT_TIMEOUT_THREAD);
+
             // Try to type exit command
             SendCommand("exit 0", true);
             // waitpid(4p) will hang if not exited, yes
@@ -139,6 +147,7 @@ struct InteractiveBashContext {
             if (WIFEXITED(status)) {
                 LOG_I("Process %d exited with code %d", childpid, WEXITSTATUS(status));
             }
+            exitTimeout->stop();
             {
                 const std::lock_guard<std::mutex> _(m);
                 onClosed();
@@ -184,16 +193,15 @@ struct InteractiveBashContext {
         };
         auto onNoOutputThread = gSThreadManager.getController<TimeoutThread>
             (SingleThreadCtrlManager::USAGE_IBASH_TIMEOUT_THREAD);
-
         do {
-            onNoOutputThread.reset();
+            onNoOutputThread->reset();
             onNoOutputThread->setThreadFunction(std::bind(&TimeoutThread::start, onNoOutputThread, onNoOutputCallbackFn));
             ssize_t rc = read(parent_readfd, buf, sizeof(buf));
             onNoOutputThread->stop();
             if (rc > 0) {
                 std::string buf_str(buf, rc);
                 TrimStr(buf_str);
-                if (!buf_str.empty()) {
+                if (!isEmptyOrBlank(buf_str)) {
                     resModified = true;
                     result.append(buf_str);
                     onNewResultBuffer(result);
@@ -201,7 +209,7 @@ struct InteractiveBashContext {
             } else 
                 break;
             // Exit if child has nothing more to send to us, or it is reading stdin
-        } while (HasData(DATA_IN) || !HasData(DATA_OUT));
+        } while (HasData(DATA_IN, false) || HasData(DATA_IN, false));
         gSThreadManager.destroyController(SingleThreadCtrlManager::USAGE_IBASH_TIMEOUT_THREAD);
         TrimStr(result);
         if (!resModified) {
@@ -244,7 +252,7 @@ struct InteractiveBashContext {
         return _SendSomething(str);
     }
 
-    bool HasData(ChildDataDirection direction, bool wait = false) const {
+    bool HasData(ChildDataDirection direction, bool wait) const {
         int rc;
         struct pollfd poll_fd = {
             .events = direction,
@@ -259,7 +267,7 @@ struct InteractiveBashContext {
                 poll_fd.fd = parent_writefd;
                 break;
         };
-        rc = poll(&poll_fd, 1, wait ? -1 : 100);
+        rc = poll(&poll_fd, 1, wait ? -1 : 1000);
         if (rc < 0) {
             PLOG_E("Poll failed");
         } else {
@@ -298,11 +306,17 @@ static void InteractiveBashCommandFn(const Bot& bot, const Message::Ptr& message
             do {
                 if (ctx.sendText(bot, message))
                     break;
-                auto resultMessage = bot_sendReplyMessage(bot, message, InteractiveBashContext::kOutputInitBuf);
+                auto resultMessage = 
+                    bot_sendReplyMessage(bot, message, InteractiveBashContext::kOutputInitBuf);
                 ctx.sendCommand(
                     command, 
-                    [&bot, resultMessage](const std::string& buf) { bot_editMessage(bot, resultMessage, buf); },
-                    [&bot, message] { bot_sendMessage(bot, message->from->id, InteractiveBashContext::kSubProcessClosed); }
+                    [&bot, &resultMessage](const std::string& buf) {
+                        if (resultMessage->text != buf)
+                            resultMessage = bot_editMessage(bot, resultMessage, buf);
+                    },
+                    [&bot, message] { 
+                        bot_sendMessage(bot, message->from->id, InteractiveBashContext::kSubProcessClosed);
+                    }
                 );
             } while (false);
         }

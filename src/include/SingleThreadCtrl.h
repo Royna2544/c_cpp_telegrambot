@@ -21,7 +21,8 @@ class SingleThreadCtrlManager {
         USAGE_TIMER_THREAD,
         USAGE_SPAMBLOCK_THREAD,
         USAGE_ERROR_RECOVERY_THREAD,
-        USAGE_IBASH_TIMEOUT_THREAD
+        USAGE_IBASH_TIMEOUT_THREAD,
+        USAGE_IBASH_EXIT_TIMEOUT_THREAD
     };
     template <class T = SingleThreadCtrl, std::enable_if_t<std::is_base_of_v<SingleThreadCtrl, T>, bool> = true>
     std::shared_ptr<T> getController(const ThreadUsage usage) {
@@ -87,6 +88,9 @@ class SingleThreadCtrl {
                 preStop(this);
             kRun = false;
             if (using_cv) {
+                {
+                    std::lock_guard<std::mutex> lk(CV_m);
+                }
                 cv.notify_one();
             }
             if (threadP && threadP->joinable())
