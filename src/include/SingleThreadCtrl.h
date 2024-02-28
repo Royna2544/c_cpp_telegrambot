@@ -85,7 +85,7 @@ class SingleThreadCtrl {
                 preStop(this);
             kRun = false;
             if (using_cv) {
-                std::unique_lock<std::mutex> _(m);
+                std::unique_lock<std::mutex> _(CV_m);
                 cv.notify_one();
             }
             if (threadP && threadP->joinable())
@@ -99,8 +99,10 @@ class SingleThreadCtrl {
 
  protected:
     std::atomic_bool kRun = true;
+    // Used by std::cv
     std::condition_variable cv;
     bool using_cv = false;
+    std::mutex CV_m;
  private:
     void _threadFn(thread_function fn) {
         fn();
@@ -120,8 +122,6 @@ class SingleThreadCtrl {
     std::optional<std::thread> threadP;
     prestop_function preStop;
     std::once_flag once;
-    // Used by std::cv
-    std::mutex m;
 };
 
 inline void SingleThreadCtrlManager::stopAll() {

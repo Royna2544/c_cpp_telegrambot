@@ -31,5 +31,5 @@ struct SpamBlockManager : SingleThreadCtrl {
  private:
     std::map<Chat::Ptr, ChatHandle> buffer;
     std::map<Chat::Ptr, int> buffer_sub;
-    std::mutex m;  // Protect buffer, buffer_sub
+    std::mutex buffer_m;  // Protect buffer, buffer_sub
 };

@@ -163,7 +163,7 @@ static void spamDetectFunc(const Bot &bot, buffer_iterator_t handle) {
 void SpamBlockManager::spamBlockerThreadFn(const Bot& bot) {
     while (kRun) {
         {
-            const std::lock_guard<std::mutex> _(m);
+            const std::lock_guard<std::mutex> _(buffer_m);
             if (buffer_sub.size() > 0) {
                 auto its = buffer_sub.begin();
                 const auto chatNameStr = toChatName(its->first);
@@ -186,7 +186,7 @@ void SpamBlockManager::spamBlockerThreadFn(const Bot& bot) {
                 }
             }
         }
-        std::unique_lock<std::mutex> lk(m);
+        std::unique_lock<std::mutex> lk(CV_m);
         // It just provides faster way out of the loop - Nothing more
         cv.wait_for(lk, 10s);
     }
@@ -213,7 +213,7 @@ void SpamBlockManager::run(const Bot &bot, const Message::Ptr &message) {
     });
 
     {
-        const std::lock_guard<std::mutex> _(m);
+        const std::lock_guard<std::mutex> _(buffer_m);
         auto bufferIt = findChatIt()(buffer, [](const auto& it) { return it.first; },
                                           message->chat);
         if (bufferIt != buffer.end()) {
