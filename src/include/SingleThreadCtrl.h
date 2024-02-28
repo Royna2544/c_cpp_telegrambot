@@ -85,7 +85,6 @@ class SingleThreadCtrl {
                 preStop(this);
             kRun = false;
             if (using_cv) {
-                std::unique_lock<std::mutex> _(CV_m);
                 cv.notify_one();
             }
             if (threadP && threadP->joinable())
