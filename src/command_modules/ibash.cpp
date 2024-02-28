@@ -12,169 +12,103 @@
 #include <csignal>
 #include <cstdlib>
 #include <mutex>
-#include <thread>
 #include <regex>
+#include <thread>
 
-#include "ExtArgs.h"
 #include "CompilerInTelegram.h"  // BASH_MAX_BUF, BASH_READ_BUF
+#include "ExtArgs.h"
 #include "StringToolsExt.h"
 #include "command_modules/CommandModule.h"
 #include "popen_wdt/popen_wdt.h"
 
-// tochild { child stdin , parent write }
-// toparent { parent read, child stdout }
-static pipe_t tochild, toparent;
-static pid_t childpid = 0;
-static bool is_open = false;
-
 using std::chrono_literals::operator""s;
 
-// Aliases
-static const int& child_stdin = tochild[0];
-static const int& child_stdout = toparent[1];
-static const int& parent_readfd = toparent[0];
-static const int& parent_writefd = tochild[1];
+struct InteractiveBashContext {
+    // tochild { child stdin , parent write }
+    // toparent { parent read, child stdout }
+    pipe_t tochild, toparent;
+    bool is_open = false;
 
-static bool _SendSomething(std::string str) {
-    int rc;
+    // Aliases
+    const int& child_stdin = tochild[0];
+    const int& child_stdout = toparent[1];
+    const int& parent_readfd = toparent[0];
+    const int& parent_writefd = tochild[1];
+    constexpr static const char kOutputInitBuf[] = "Output:\n";
+    constexpr static const char kSubProcessClosed[] = "Subprocess closed due to inactivity";
 
-    TrimStr(str);
-    str += '\n';
-    rc = write(parent_writefd, str.c_str(), str.size());
-    if (rc < 0) {
-        PLOG_E("Writing text to parent fd");
-        return false;
-    }
-    return true;
-}
-
-static bool SendCommand(const std::string& str, bool internal = false) {
-    if (!internal) {
-        LOG_I("Child <= Command '%s'", str.c_str());
-    }
-    return _SendSomething(str);
-}
-
-static bool SendText(const std::string& str) {
-    LOG_I("Child <= Text '%s'", str.c_str());
-    return _SendSomething(str);
-}
-
-enum ChildDataDirection : short {
-    DATA_IN = POLLIN,
-    DATA_OUT = POLLOUT,
-};
-
-static bool HasData(ChildDataDirection direction, bool wait = false) {
-    int rc;
-    struct pollfd poll_fd = {
-        .events = direction,
-        .revents = 0,
-    };
-
-    switch (direction) {
-        case DATA_IN:
-            poll_fd.fd = parent_readfd;
-            break;
-        case DATA_OUT:
-            poll_fd.fd = parent_writefd;
-            break;
-    };
-    rc = poll(&poll_fd, 1, wait ? -1 : 100);
-    if (rc < 0) {
-        PLOG_E("Poll failed");
-    } else {
-        if (poll_fd.revents & direction) {
-            return true;
-        }
-    }
-    return false;
-}
-
-static void InteractiveBashCommandFn(const Bot& bot, const Message::Ptr& message) {
-    static const std::regex kExitCommandRegex(R"(^exit( \d+)?$)");
-    std::string command;
-    static std::mutex m;
-    bool matchesExit = false;
-
-    if (!hasExtArgs(message)) {
-        bot_sendReplyMessage(bot, message, "Send a bash command along /ibash");
-        return;
-    } else {
-        parseExtArgs(message, command);
-        matchesExit = std::regex_match(command, kExitCommandRegex);
-        if (matchesExit && !is_open) {
-            bot_sendReplyMessage(bot, message, "Bash subprocess is not open yet");
-            return;
-        }
-    }
-    if (!is_open) {
-        pid_t pid;
-        int rc;
-        pid_t* piddata = (pid_t*)mmap(NULL, sizeof(pid_t), PROT_READ | PROT_WRITE,
-                                      MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-        if (piddata == MAP_FAILED) {
-            PLOG_E("mmap");
-            return;
-        }
-
-        *piddata = 0;
-        InvaildatePipe(tochild);
-        InvaildatePipe(toparent);
-
-        // (-1 || -1) is 1, (-1 || 0) is 1, (0 || 0) is 0
-        rc = pipe(tochild) || pipe(toparent);
-
-        if (rc) {
-            munmap(piddata, sizeof(pid_t));
-            closePipe(tochild);
-            closePipe(toparent);
-            PLOG_E("pipe");
-            return;
-        }
-        if ((pid = fork()) < 0) {
-            munmap(piddata, sizeof(pid_t));
-            closePipe(tochild);
-            closePipe(toparent);
-            PLOG_E("fork");
-            return;
-        }
-        if (pid == 0) {
-            // Child
-            dup2(child_stdout, STDOUT_FILENO);
-            dup2(child_stdout, STDERR_FILENO);
-            dup2(child_stdin, STDIN_FILENO);
-            close(parent_readfd);
-            close(parent_writefd);
-            *piddata = getpid();
-            setpgid(0, 0);
-            execl(BASH_EXE_PATH, "bash", (char*)NULL);
-            _exit(127);
-        } else {
-            int count = 0;
-            close(child_stdin);
-            // Ensure bash execl() is up
-            do {
-                LOG_W("Waiting for subprocess up... (%d)", count);
-                std::this_thread::sleep_for(1s);
-                count++;
-            } while (kill(-(*piddata), 0) != 0);
-            is_open = true;
-            childpid = *piddata;
-            LOG_D("Open success, child pid: %d", childpid);
-            munmap(piddata, sizeof(pid_t));
-            bot_sendReplyMessage(bot, message, "Opened bash subprocess.");
-        }
+    static bool isExitCommand(const std::string& str) {
+        static const std::regex kExitCommandRegex(R"(^exit( \d+)?$)");
+        return std::regex_match(str, kExitCommandRegex);
     }
 
-    if (IsValidPipe(tochild) && IsValidPipe(toparent)) {
-        // Is it exit command?
-        if (matchesExit) {
+    void open(void) {
+        if (!is_open) {
+            pid_t pid;
+            int rc;
+            pid_t* piddata;
+
+            piddata = (pid_t*)mmap(NULL, sizeof(pid_t), PROT_READ | PROT_WRITE,
+                                   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+            if (piddata == MAP_FAILED) {
+                PLOG_E("mmap");
+                return;
+            }
+
+            *piddata = 0;
+            InvaildatePipe(tochild);
+            InvaildatePipe(toparent);
+
+            // (-1 || -1) is 1, (-1 || 0) is 1, (0 || 0) is 0
+            rc = pipe(tochild) || pipe(toparent);
+
+            if (rc) {
+                munmap(piddata, sizeof(pid_t));
+                closePipe(tochild);
+                closePipe(toparent);
+                PLOG_E("pipe");
+                return;
+            }
+            if ((pid = fork()) < 0) {
+                munmap(piddata, sizeof(pid_t));
+                closePipe(tochild);
+                closePipe(toparent);
+                PLOG_E("fork");
+                return;
+            }
+            if (pid == 0) {
+                // Child
+                dup2(child_stdout, STDOUT_FILENO);
+                dup2(child_stdout, STDERR_FILENO);
+                dup2(child_stdin, STDIN_FILENO);
+                close(parent_readfd);
+                close(parent_writefd);
+                *piddata = getpid();
+                setpgid(0, 0);
+                execl(BASH_EXE_PATH, "bash", (char*)NULL);
+                _exit(127);
+            } else {
+                int count = 0;
+                close(child_stdin);
+                // Ensure bash execl() is up
+                do {
+                    LOG_W("Waiting for subprocess up... (%ds passed)", count);
+                    std::this_thread::sleep_for(1s);
+                    count++;
+                } while (kill(-(*piddata), 0) != 0);
+                is_open = true;
+                childpid = *piddata;
+                LOG_D("Open success, child pid: %d", childpid);
+                munmap(piddata, sizeof(pid_t));
+            }
+        }
+    }
+    void exit(const std::function<void(void)> onClosed, const std::function<void(void)> onNotOpen) {
+        if (is_open) {
             int status;
-            LOG_I("Received exit command: '%s'", command.c_str());
 
             // Write a msg as a fallback if for some reason exit doesnt get written
-            std::thread th([] {
+            std::thread th([this] {
                 std::this_thread::sleep_for(std::chrono::seconds(SLEEP_SECONDS));
                 if (childpid > 0) {
                     if (kill(childpid, 0) == 0) {
@@ -194,7 +128,7 @@ static void InteractiveBashCommandFn(const Bot& bot, const Message::Ptr& message
             }
             {
                 const std::lock_guard<std::mutex> _(m);
-                bot_sendReplyMessage(bot, message, "Closed bash subprocess.");
+                onClosed();
             }
             close(parent_readfd);
             close(parent_writefd);
@@ -202,77 +136,174 @@ static void InteractiveBashCommandFn(const Bot& bot, const Message::Ptr& message
             childpid = -1;
             is_open = false;
         } else {
-            // Second try, it should have been opened by now or else its a failure
-            if (is_open) {
-                {
-                    std::unique_lock<std::mutex> lk{m, std::try_to_lock};
-                    if (!lk.owns_lock()) {
-                        // TODO better verification
-                        if (message->replyToMessage && message->replyToMessage->from->id == bot.getApi().getMe()->id) {
-                            // TODO Extract actual command
-                            SendText(message->text);
-                            bot_sendReplyMessage(bot, message, "Sent the text to subprocess");
-                        } else {
-                            bot_sendReplyMessage(bot, message, "Subprocess is still running, try using an exit command");
-                        }
-                        return;
-                    }
+            onNotOpen();
+        }
+    }
+
+    bool sendText(const Bot& bot, const Message::Ptr& message) {
+        if (is_open) {
+            std::unique_lock<std::mutex> lk{m, std::try_to_lock};
+            if (!lk.owns_lock()) {
+                // TODO better verification
+                if (message->replyToMessage && message->replyToMessage->from->id == bot.getApi().getMe()->id) {
+                    // TODO Extract actual command
+                    SendText(message->text);
+                    bot_sendReplyMessage(bot, message, "Sent the text to subprocess");
+                } else {
+                    bot_sendReplyMessage(bot, message, "Subprocess is still running, try using an exit command");
                 }
-                std::thread sendResThread([&bot, message, command] {
-                    static const char kSubProcessClosed[] = "Subprocess closed due to inactivity";
-                    char buf[BASH_READ_BUF];
-                    std::string result = "Output:\n";
-                    bool resModified = false;
-                    auto sendFallback = std::make_shared<std::atomic_bool>(true);
-                    Message::Ptr resultMessage;
-                    const std::lock_guard<std::mutex> _(m);
-
-                    SendCommand(command);
-
-                    // Write a msg as a fallback if read() hangs
-                    std::thread th([sendFallback] {
-                        std::this_thread::sleep_for(300s);  // 5 Mins
-                        // TODO This should be sent as sperate message
-                        if (sendFallback->load())
-                            (void)write(child_stdout, kSubProcessClosed, sizeof(kSubProcessClosed));
-                    });
-                    resultMessage = bot_sendReplyMessage(bot, message, result);
-                    do {
-                        int rc = read(parent_readfd, buf, sizeof(buf));
-                        if (rc > 0) {
-                            std::string buf_str(buf, rc);
-                            TrimStr(buf_str);
-                            if (!buf_str.empty()) {
-                                resModified = true;
-                                result.append(buf_str);
-                                bot_editMessage(bot, resultMessage, result);
-                            }
-                        }
-                        // Exit if child has nothing more to send to us, or it is reading stdin
-                    } while (HasData(DATA_IN) || !HasData(DATA_OUT));
-                    // Was it the fallback input?
-                    if (strncmp(buf, kSubProcessClosed, sizeof(buf))) {
-                        // No? then set to not write fallback and detach
-                        sendFallback->store(false);
-                        th.detach();
-                    } else {
-                        // Yes? Do join then
-                        if (th.joinable())
-                            th.detach();
-                    }
-                    TrimStr(result);
-                    if (!resModified) {
-                        result = "(No output)";
-                        bot_editMessage(bot, resultMessage, result);
-                    }
-                });
-                sendResThread.detach();
-            } else {
-                bot_sendReplyMessage(bot, message, "Failed to open child process");
+                return true;  // Handled
             }
         }
+        return false;
+    }
+
+    void sendCommand(const std::string& command, std::function<void(const std::string&)> onNewResultBuffer,
+                     const std::function<void(void)> onTimeout) {
+        char buf[BASH_READ_BUF];
+        bool resModified = false;
+        std::string result = kOutputInitBuf;
+        auto sendFallback = std::make_shared<std::atomic_bool>(true);
+        const std::lock_guard<std::mutex> _(m);
+
+        SendCommand(command);
+
+        // Write a msg as a fallback if read() hangs
+        std::thread th([sendFallback, this, onTimeout] {
+            std::this_thread::sleep_for(300s);  // 5 Mins
+            // TODO This should be sent as sperate message
+            if (sendFallback->load()) {
+                onTimeout();
+                (void)write(child_stdout, kSubProcessClosed, sizeof(kSubProcessClosed));
+            }
+        });
+        do {
+            int rc = read(parent_readfd, buf, sizeof(buf));
+            if (rc > 0) {
+                std::string buf_str(buf, rc);
+                TrimStr(buf_str);
+                if (!buf_str.empty()) {
+                    resModified = true;
+                    result.append(buf_str);
+                    onNewResultBuffer(result);
+                }
+            }
+            // Exit if child has nothing more to send to us, or it is reading stdin
+        } while (HasData(DATA_IN) || !HasData(DATA_OUT));
+        // Was it the fallback input?
+        if (strncmp(buf, kSubProcessClosed, sizeof(buf))) {
+            // No? then set to not write fallback and detach
+            sendFallback->store(false);
+            th.detach();
+        } else {
+            // Yes? Do join then
+            if (th.joinable())
+                th.detach();
+        }
+        TrimStr(result);
+        if (!resModified) {
+            result = "(No output)";
+            onNewResultBuffer(result);
+        }
+    }
+
+   private:
+    std::mutex m;
+    pid_t childpid = 0;
+
+    enum ChildDataDirection : short {
+        DATA_IN = POLLIN,
+        DATA_OUT = POLLOUT,
+    };
+
+    bool _SendSomething(std::string str) const {
+        int rc;
+
+        TrimStr(str);
+        str += '\n';
+        rc = write(parent_writefd, str.c_str(), str.size());
+        if (rc < 0) {
+            PLOG_E("Writing text to parent fd");
+            return false;
+        }
+        return true;
+    }
+
+    bool SendCommand(const std::string& str, bool internal = false) const {
+        if (!internal) {
+            LOG_I("Child <= Command '%s'", str.c_str());
+        }
+        return _SendSomething(str);
+    }
+
+    bool SendText(const std::string& str) const {
+        LOG_I("Child <= Text '%s'", str.c_str());
+        return _SendSomething(str);
+    }
+
+    bool HasData(ChildDataDirection direction, bool wait = false) const {
+        int rc;
+        struct pollfd poll_fd = {
+            .events = direction,
+            .revents = 0,
+        };
+
+        switch (direction) {
+            case DATA_IN:
+                poll_fd.fd = parent_readfd;
+                break;
+            case DATA_OUT:
+                poll_fd.fd = parent_writefd;
+                break;
+        };
+        rc = poll(&poll_fd, 1, wait ? -1 : 100);
+        if (rc < 0) {
+            PLOG_E("Poll failed");
+        } else {
+            if (poll_fd.revents & direction) {
+                return true;
+            }
+        }
+        return false;
+    }
+};
+
+static void InteractiveBashCommandFn(const Bot& bot, const Message::Ptr& message) {
+    static InteractiveBashContext ctx;
+    std::string command;
+
+    if (!hasExtArgs(message)) {
+        bot_sendReplyMessage(bot, message, "Send a bash command along /ibash");
     } else {
-        LOG_E("Pipes are not vaild, this is a BUG");
+        parseExtArgs(message, command);
+        if (InteractiveBashContext::isExitCommand(command)) {
+            if (ctx.is_open)
+                LOG_I("Received exit command: '%s'", command.c_str());
+            ctx.exit(
+                [&bot, message]() { bot_sendReplyMessage(bot, message, "Closed bash subprocess."); },
+                [&bot, message]() { bot_sendReplyMessage(bot, message, "Bash subprocess is not open yet"); });
+        } else {
+            if (!ctx.is_open) {
+                ctx.open();
+                if (ctx.is_open)
+                    bot_sendReplyMessage(bot, message, "Opened bash subprocess.");
+                else
+                    bot_sendReplyMessage(bot, message, "Failed to open child process");
+            }
+            ASSERT(IsValidPipe(ctx.tochild) && IsValidPipe(ctx.toparent), "Opening pipes failed");
+
+            // Second try, it should have been opened by now or else its a failure
+            do {
+                if (ctx.sendText(bot, message))
+                    break;
+                auto resultMessage = bot_sendReplyMessage(bot, message, InteractiveBashContext::kOutputInitBuf);
+                ctx.sendCommand(
+                    command, 
+                    [&bot, resultMessage](const std::string& buf) { bot_editMessage(bot, resultMessage, buf); },
+                    [&bot, message] { bot_sendMessage(bot, message->from->id, InteractiveBashContext::kSubProcessClosed); }
+                );
+            } while (false);
+        }
     }
 }
 
