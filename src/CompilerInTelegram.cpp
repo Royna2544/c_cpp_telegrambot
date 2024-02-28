@@ -5,7 +5,6 @@
 #include <EnumArrayHelpers.h>
 #include <ExtArgs.h>
 #include <FileSystemLib.h>
-#include <LinuxUtils.h>
 #include <Logging.h>
 #include <StringToolsExt.h>
 #include <random/RandomNumberGenerator.h>
@@ -150,7 +149,11 @@ template <>
 void CompileRunHandler<CCppCompileHandleData>(const CCppCompileHandleData &data) {
     std::string res, extraargs;
     std::stringstream cmd;
-    const char *aoutname = IS_DEFINED(__WIN32) ? "./a.exe" : "./a.out";
+#ifdef __WIN32
+    const char aoutname[] = "./a.exe";
+#else
+    const char aoutname[] = "./a.out";
+#endif
 
     if (commonVPW(data, extraargs)) {
         cmd << data.cmdPrefix << SPACE << data.outfile;
@@ -204,9 +207,9 @@ static std::optional<std::string> findCommandExe(std::string command) {
     std::call_once(once, [] { valid = ConfigManager::getVariable("PATH", path); });
     if (valid) {
         auto paths = StringTools::split(path, path_env_delimiter);
-        if (IS_DEFINED(__WIN32))
-            command.append(".exe");
-
+#ifdef __WIN32
+        command.append(".exe");
+#endif
         for (const auto &path : paths) {
             if (!isEmptyOrBlank(path)) {
                 std::filesystem::path p(path);

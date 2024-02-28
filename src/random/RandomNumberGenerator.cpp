@@ -1,6 +1,5 @@
 #include "RandomNumberGenerator.h"
 
-#include <LinuxUtils.h>
 #include <Logging.h>
 
 #include <algorithm>
@@ -37,7 +36,6 @@ struct RNGType {
 static std::mt19937 RNG_std_create_rng(void) {
     std::random_device rd;
     std::mt19937 gen(rd());
-    WARN_ONCE(rd.entropy() == 0, "Pesudo RNG detected");
     return gen;
 }
 
