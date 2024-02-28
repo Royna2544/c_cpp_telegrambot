@@ -9,19 +9,31 @@
 #include <unistd.h>
 
 #include <chrono>
+#include <condition_variable>
 #include <csignal>
 #include <cstdlib>
+#include <functional>
 #include <mutex>
 #include <regex>
 #include <thread>
 
 #include "CompilerInTelegram.h"  // BASH_MAX_BUF, BASH_READ_BUF
 #include "ExtArgs.h"
+#include "SingleThreadCtrl.h"
 #include "StringToolsExt.h"
 #include "command_modules/CommandModule.h"
 #include "popen_wdt/popen_wdt.h"
 
 using std::chrono_literals::operator""s;
+
+struct TimeoutThread : SingleThreadCtrl {
+    void start(const std::function<void(void)>& callback_fn) {
+        std::unique_lock<std::mutex> lk(CV_m);
+        if (cv.wait_for(lk, std::chrono::seconds(SLEEP_SECONDS)) == std::cv_status::timeout) {
+            callback_fn();
+        }
+    }
+};
 
 struct InteractiveBashContext {
     // tochild { child stdin , parent write }
@@ -36,6 +48,7 @@ struct InteractiveBashContext {
     const int& parent_writefd = tochild[1];
     constexpr static const char kOutputInitBuf[] = "Output:\n";
     constexpr static const char kSubProcessClosed[] = "Subprocess closed due to inactivity";
+    constexpr static const char kNoOutputFallback[] = "\n";
 
     static bool isExitCommand(const std::string& str) {
         static const std::regex kExitCommandRegex(R"(^exit( \d+)?$)");
@@ -163,22 +176,19 @@ struct InteractiveBashContext {
         char buf[BASH_READ_BUF];
         bool resModified = false;
         std::string result = kOutputInitBuf;
-        auto sendFallback = std::make_shared<std::atomic_bool>(true);
         const std::lock_guard<std::mutex> _(m);
 
         SendCommand(command);
+        const auto onNoOutputCallbackFn = [onTimeout, this]() {
+            (void)write(child_stdout, kNoOutputFallback, sizeof(kNoOutputFallback));
+        };
+        auto onNoOutputThread = gSThreadManager.getController<TimeoutThread>
+            (SingleThreadCtrlManager::USAGE_IBASH_TIMEOUT_THREAD);
 
-        // Write a msg as a fallback if read() hangs
-        std::thread th([sendFallback, this, onTimeout] {
-            std::this_thread::sleep_for(300s);  // 5 Mins
-            // TODO This should be sent as sperate message
-            if (sendFallback->load()) {
-                onTimeout();
-                (void)write(child_stdout, kSubProcessClosed, sizeof(kSubProcessClosed));
-            }
-        });
         do {
-            int rc = read(parent_readfd, buf, sizeof(buf));
+            onNoOutputThread->setThreadFunction(std::bind(&TimeoutThread::start, onNoOutputThread, onNoOutputCallbackFn));
+            ssize_t rc = read(parent_readfd, buf, sizeof(buf));
+            onNoOutputThread->stop();
             if (rc > 0) {
                 std::string buf_str(buf, rc);
                 TrimStr(buf_str);
@@ -187,19 +197,11 @@ struct InteractiveBashContext {
                     result.append(buf_str);
                     onNewResultBuffer(result);
                 }
-            }
+            } else 
+                break;
             // Exit if child has nothing more to send to us, or it is reading stdin
         } while (HasData(DATA_IN) || !HasData(DATA_OUT));
-        // Was it the fallback input?
-        if (strncmp(buf, kSubProcessClosed, sizeof(buf))) {
-            // No? then set to not write fallback and detach
-            sendFallback->store(false);
-            th.detach();
-        } else {
-            // Yes? Do join then
-            if (th.joinable())
-                th.detach();
-        }
+        gSThreadManager.destroyController(SingleThreadCtrlManager::USAGE_IBASH_TIMEOUT_THREAD);
         TrimStr(result);
         if (!resModified) {
             result = "(No output)";
@@ -292,7 +294,6 @@ static void InteractiveBashCommandFn(const Bot& bot, const Message::Ptr& message
             }
             ASSERT(IsValidPipe(ctx.tochild) && IsValidPipe(ctx.toparent), "Opening pipes failed");
 
-            // Second try, it should have been opened by now or else its a failure
             do {
                 if (ctx.sendText(bot, message))
                     break;
@@ -308,7 +309,7 @@ static void InteractiveBashCommandFn(const Bot& bot, const Message::Ptr& message
 }
 
 struct CommandModule cmd_ibash {
-    .enforced = false,
+    .enforced = true,
     .name = "ibash",
     .fn = InteractiveBashCommandFn,
 };
