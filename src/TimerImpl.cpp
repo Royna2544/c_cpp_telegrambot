@@ -170,10 +170,16 @@ void TimerCommandManager::startTimer(const Bot &bot, const Message::Ptr& msg) {
     }
 }
 
-void TimerCommandManager::stopTimer(const Bot &bot, const Message::Ptr& message) {
+using TgBot::Chat;
+
+bool operator==(const Chat::Ptr thiz, const Chat::Ptr other) {
+    return thiz->id == other->id;
+}
+
+void TimerCommandManager::stopTimer(const Bot &bot, const Message::Ptr& msg) {
     std::string text;
     if (isactive) {
-        const bool allowed = message->chat->id == message->chat->id;
+        const bool allowed = message->chat == msg->chat;
         sendendmsg = !allowed;
         if (allowed) {
             stop();
