@@ -34,7 +34,6 @@ else()
 endif()
 
 set(SRC_LIST
-    src/main.cpp
     src/Authorization.cpp
     src/CompilerInTelegram.cpp
     src/BotAddCommand.cpp
@@ -108,7 +107,6 @@ add_library(
   src/popen_wdt/popen_wdt_lib.cpp
   src/fslib/FileSystemLib.cpp
   src/fslib/FileSystemLib_${TARGET_VARIANT}.cpp)
-
 # Windows needs this
 if(WIN32)
   target_link_libraries(TgBotUtils shlwapi)
@@ -121,24 +119,27 @@ if(ENABLE_RUNTIME_COMMAND)
   # Dynamic cmd loader
   add_subdirectory(src/cmd_dynamic)
 endif()
-# Build main TgBot++ exe
-add_executable(${PROJECT_NAME} ${SRC_LIST})
-target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_BINARY_DIR}/${COMMANDS_CWD})
 
+# Build libTgBot++
+add_library(${PROJECT_NAME} ${SRC_LIST})
+target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_BINARY_DIR}/${COMMANDS_CWD})
 # Default LD-list
 set(LD_LIST TgBot TgBotDB TgBotUtils TgBotRes ${ABSL_LIBS})
-
 # Socket
 if(ENABLE_SOCKET_CONNECT)
   set(LD_LIST ${LD_LIST} TgBotSocket)
 endif()
-
 # Windows API
 if(WIN32)
   set(LD_LIST ${LD_LIST} wsock32 Ws2_32)
 endif()
-
 target_link_libraries(${PROJECT_NAME} ${LD_LIST})
+
+# Main launcher
+set(PROJECT_MAIN_EXE ${PROJECT_NAME}_main)
+add_executable(${PROJECT_MAIN_EXE} src/main.cpp)
+target_link_libraries(${PROJECT_MAIN_EXE} ${PROJECT_NAME})
+target_include_directories(${PROJECT_MAIN_EXE} PRIVATE ${CMAKE_BINARY_DIR}/${COMMANDS_CWD})
 
 # Protobuf DB Dumper
 set(DBDUMPER_NAME ${PROJECT_NAME}_dumpDB)
