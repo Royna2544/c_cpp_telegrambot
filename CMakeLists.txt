@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10.2)
-project(TgBot++)
+project(TgBot++ LANGUAGES CXX C)
 
 option(ENFORCE_EN_US "Enforce en-US locale for output" ON)
 option(ENABLE_SOCKET_CONNECT "Enable doing various operations with bot" ON)
