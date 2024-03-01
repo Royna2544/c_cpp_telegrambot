@@ -138,7 +138,12 @@ struct InteractiveBashContext {
 
             // Write a msg as a fallback if for some reason exit doesnt get written
             auto exitTimeout = gSThreadManager.getController<ExitTimeoutThread>
-                (SingleThreadCtrlManager::USAGE_IBASH_EXIT_TIMEOUT_THREAD);
+                (SingleThreadCtrlManager::USAGE_IBASH_EXIT_TIMEOUT_THREAD,
+                    SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_NONEXIST |
+                    SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_NONEXIST_FAILACTION_IGNORE);
+
+            if (!exitTimeout)
+                return;
 
             // Try to type exit command
             SendCommand("exit 0", true);
@@ -192,7 +197,9 @@ struct InteractiveBashContext {
             (void)write(child_stdout, kNoOutputFallback, sizeof(kNoOutputFallback));
         };
         auto onNoOutputThread = gSThreadManager.getController<TimeoutThread>
-            (SingleThreadCtrlManager::USAGE_IBASH_TIMEOUT_THREAD);
+            (SingleThreadCtrlManager::USAGE_IBASH_TIMEOUT_THREAD, 
+                SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_NONEXIST |
+                SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_FAILACTION_ASSERT);
         do {
             onNoOutputThread->reset();
             onNoOutputThread->setThreadFunction(std::bind(&TimeoutThread::start, onNoOutputThread, onNoOutputCallbackFn));
