@@ -7,6 +7,7 @@
 #include <map>
 #include <mutex>
 #include <utility>
+#include "tgbot/types/Chat.h"
 
 using std::chrono_literals::operator""s;
 using TgBot::ChatPermissions;
@@ -30,19 +31,25 @@ std::string toChatName(const TgBot::Chat::Ptr ch) {
     return '\'' + ch->title + '\'';
 }
 
-template <class Type>
-struct _FindIdIt {
-    template <class Container>
-    auto operator()(Container& c, std::function<typename Type::Ptr(typename Container::const_reference)> fn,
-                   typename Type::Ptr t) {
-        return std::find_if(c.begin(), c.end(), [=](const auto& it) {
-            return fn(it)->id == t->id;
-        });
-    }
-};
+template <class Container, class Type>
+typename Container::iterator _findItImpl(Container& c, std::function<typename Type::Ptr
+    (typename Container::const_reference)> fn, typename Type::Ptr t) {
+    return std::find_if(c.begin(), c.end(), [=](const auto& it) {
+        return fn(it)->id == t->id;
+    });
+}
 
-using findChatIt = _FindIdIt<Chat>;
-using findUserIt = _FindIdIt<User>;
+template <class Container>
+typename Container::iterator findChatIt(Container& c, std::function<Chat::Ptr
+    (typename Container::const_reference)> fn, Chat::Ptr t) {
+    return _findItImpl<Container, Chat>(c, fn, t);
+}
+
+template <class Container>
+typename Container::iterator findUserIt(Container& c, std::function<User::Ptr
+    (typename Container::const_reference)> fn, User::Ptr t) {
+    return _findItImpl<Container, User>(c, fn, t);
+}
 
 static std::string commonMsgdataFn(const Message::Ptr &m) {
     if (m->sticker)
@@ -169,8 +176,8 @@ void SpamBlockManager::spamBlockerThreadFn(const Bot& bot) {
                 const auto chatNameStr = toChatName(its->first);
                 const auto chatName = chatNameStr.c_str();
                 while (its != buffer_sub.end()) {
-                    const auto it = findChatIt()(buffer, 
-                        [](const auto &it) { return it.first; }, its->first);
+                    const auto it = findChatIt(buffer, [](const auto &it) { return it.first; },
+                         its->first);
                     if (it == buffer.end()) {
                         its = buffer_sub.erase(its);
                         continue;
@@ -214,10 +221,10 @@ void SpamBlockManager::run(const Bot &bot, const Message::Ptr &message) {
 
     {
         const std::lock_guard<std::mutex> _(buffer_m);
-        auto bufferIt = findChatIt()(buffer, [](const auto& it) { return it.first; },
-                                          message->chat);
+        auto bufferIt = findChatIt(buffer, [](const auto& it) { return it.first; },
+                                    message->chat);
         if (bufferIt != buffer.end()) {
-            const auto bufferUserIt = findUserIt()(bufferIt->second, [](const auto& it) { 
+            const auto bufferUserIt = findUserIt(bufferIt->second, [](const auto& it) { 
                 return it.first;
             }, message->from);
 
@@ -229,7 +236,7 @@ void SpamBlockManager::run(const Bot &bot, const Message::Ptr &message) {
         } else {
             buffer[message->chat][message->from].emplace_back(message);
         }
-        const auto bufferSubIt = findChatIt()(buffer_sub,
+        const auto bufferSubIt = findChatIt(buffer_sub,
             [](const auto& it) { return it.first; },  message->chat);
         if (bufferSubIt != buffer_sub.end()) {
             ++bufferSubIt->second;
