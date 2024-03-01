@@ -46,7 +46,7 @@ set(SRC_LIST
     src/TimerImpl.cpp)
 
 # All commands reside here now
-include(src/command_modules/CMakeLists.txt)
+add_subdirectory(src/command_modules)
 
 # Database
 find_package(Protobuf REQUIRED)
@@ -122,9 +122,8 @@ endif()
 
 # Build libTgBot++
 add_library(${PROJECT_NAME} ${SRC_LIST})
-target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_BINARY_DIR}/${COMMANDS_CWD})
 # Default LD-list
-set(LD_LIST TgBot TgBotDB TgBotUtils TgBotRes ${ABSL_LIBS})
+set(LD_LIST TgBot TgBotUtils TgBotRes TgBotCommandModules ${ABSL_LIBS})
 # Socket
 if(ENABLE_SOCKET_CONNECT)
   set(LD_LIST ${LD_LIST} TgBotSocket)
