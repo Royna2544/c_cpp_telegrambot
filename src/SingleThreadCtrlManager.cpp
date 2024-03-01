@@ -1,5 +1,6 @@
 #include <SingleThreadCtrl.h>
 #include <future>
+#include <latch>
 
 void SingleThreadCtrlManager::destroyController(const ThreadUsage usage) {
     auto it = kControllers.find(usage);
@@ -28,11 +29,34 @@ void SingleThreadCtrlManager::destroyControllerWithStop(const ThreadUsage usage)
     }));
 }
 void SingleThreadCtrlManager::stopAll() {
-    for (const auto &[i, j] : kControllers) {
-        LOG_V("Shutdown: Controller with usage %d", i);
-        j->stop();
-    }
-    for (const auto& i : kShutdownFutures)
-        i.wait();
+    std::latch controllersShutdownLH(kControllers.size());
+    std::latch futureShutdownLH(kShutdownFutures.size());
+    std::vector<std::thread> threads;
+    using ControllerRef = decltype(kControllers)::const_reference;
+    using FutureRef = std::add_lvalue_reference_t<decltype(kShutdownFutures)::value_type>;
+
+    std::for_each(kControllers.begin(), kControllers.end(), 
+        [&controllersShutdownLH, &threads](ControllerRef e) {
+        LOG_V("Shutdown: Controller with usage %d", e.first);
+        threads.emplace_back([e = std::move(e), &controllersShutdownLH] {
+            e.second->stop();
+            controllersShutdownLH.count_down();
+        });
+    });
+    controllersShutdownLH.wait();
+    for (auto& i : threads)
+        i.join();
+    threads.clear();
+    
+    std::for_each(kShutdownFutures.begin(), kShutdownFutures.end(), 
+        [&futureShutdownLH, &threads](FutureRef e) {
+        threads.emplace_back([e = std::move(e), &futureShutdownLH]() {
+            e.wait();
+            futureShutdownLH.count_down();
+        });
+    });
+    futureShutdownLH.wait();
+    for (auto& i : threads)
+        i.join();
 }
 SingleThreadCtrlManager gSThreadManager;
