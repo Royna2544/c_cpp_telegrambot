@@ -97,8 +97,8 @@ endif()
 add_definitions(-DBOOST_BIND_GLOBAL_PLACEHOLDERS)
 
 # Res library
-add_library(TgBotRes STATIC src/ResourceIncBin.cpp)
-target_include_directories(TgBotRes PRIVATE .)
+configure_file(src/ResourceIncBin.cpp.in src/ResourceIncBin.cpp)
+add_library(TgBotRes STATIC ${CMAKE_BINARY_DIR}/src/ResourceIncBin.cpp)
 
 # Utils library
 add_library(
