@@ -1,64 +1,137 @@
 cmake_minimum_required(VERSION 3.10.2)
 project(TgBot++ LANGUAGES CXX C)
 
+################ EXE NAMES STEMMED FROM PROJECT_NAME ################
+set(SOCKET_CLI_NAME ${PROJECT_NAME}_SocketCli)
+set(DBDUMPER_NAME ${PROJECT_NAME}_dumpDB)
+set(PROJECT_MAINEXE_NAME ${PROJECT_NAME}_main)
+set(PROJECT_TEST_NAME ${PROJECT_NAME}_test)
+#####################################################################
+
+############################## OPTIONS ##############################
 option(ENFORCE_EN_US "Enforce en-US locale for output" ON)
-option(ENABLE_SOCKET_CONNECT "Enable doing various operations with bot" ON)
 if(NOT WIN32)
   option(ENABLE_RUNTIME_COMMAND "Enable runtime loader of commands" ON)
 endif()
-try_compile(IS_NOT_X86 ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/tests/testX86.c)
+#####################################################################
+
+################# Detecting x86/x86_64 Architecture #################
+try_compile(IS_NOT_X86 ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/tests/test_x86.c)
 if (NOT IS_NOT_X86)
   message(INFO " X86 target detected")
   add_compile_options(-mrdrnd)
 endif()
+#####################################################################
 
+######################### C++ Configuration #########################
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+#####################################################################
+
+####################### Global compiler flags #######################
 add_compile_options(-Wall -Werror -O3)
 add_compile_options(
   -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/=)
-include_directories(src/include/third-party)
+################### Check Windows's AF_UNIX support ###################
+################# Versions later than Win10 RS3 does #################
+if (WIN32)
+  try_compile(USE_UNIX_SOCKETS ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/tests/test_af_unix.c)
+  if (USE_UNIX_SOCKETS)
+    add_definitions(-DSOCKET_CONNECTION)
+  endif()
+else()
+  set(USE_UNIX_SOCKETS TRUE)
+  add_definitions(-DSOCKET_CONNECTION)
+endif()
+if (USE_UNIX_SOCKETS)
+  message(INFO " Socket connection enabled")
+endif()
+#####################################################################
+
+################ TgBot lib + Boost creates a warning ################
+add_definitions(-DBOOST_BIND_GLOBAL_PLACEHOLDERS)
+if(ENFORCE_EN_US)
+  add_definitions(-DLOCALE_EN_US)
+endif()
+#####################################################################
+
+######################## Include directories ########################
 include_directories(src/include)
 include_directories(src/)
+#####################################################################
 
-# Include boost by default
+#################### Include directories (boost) ####################
 find_package(Boost COMPONENTS program_options REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})
+#####################################################################
 
+############################# Platforms #############################
 if(WIN32)
   set(TARGET_VARIANT windows)
 else()
   set(TARGET_VARIANT posix)
 endif()
+#####################################################################
 
+############################ Source list ############################
 set(SRC_LIST
     src/Authorization.cpp
-    src/CompilerInTelegram.cpp
     src/BotAddCommand.cpp
+    src/CompilerInTelegram.cpp
     src/ExtArgs.cpp
     src/signalhandler/SignalHandler_${TARGET_VARIANT}.cpp
     src/random/RandomNumberGenerator.cpp
     src/SingleThreadCtrlManager.cpp
     src/SpamBlocker.cpp
     src/RegEXHandler.cpp
-    src/TimerImpl.cpp)
+    src/TimerImpl.cpp
+)
+#####################################################################
 
-# All commands reside here now
-add_subdirectory(src/command_modules)
+######### Commands modules (The commands handler of the bot) #########
+################ Commands module in a single file list ################
+set(CMD_MODULES_SINGLE_LIST alive flash possibility decide delay decho randsticker fileid)
+if (NOT WIN32)
+  set(CMD_MODULES_SINGLE_LIST ${CMD_MODULES_SINGLE_LIST} ibash)
+endif()
+######################## Commands sources list ########################
+set(CMD_MODULES_SOURCES_LIST database_impl bash_impl ${CMD_MODULES_SINGLE_LIST} timer_impl)
+######################## Commands modules list ########################
+set(CMD_MODULES_LIST addblacklist rmblacklist addwhitelist 
+      rmwhitelist bash unsafebash ${CMD_MODULES_SINGLE_LIST}
+      starttimer stoptimer)
+####################### Commands modules defines #######################
+set(COMMANDS_CWD src/command_modules)
+set(COMMANDS_GEN_HEADER ${CMAKE_BINARY_DIR}/${COMMANDS_CWD}/cmds.gen.h)
+############ Generate commands modules header in compile time ############
+FILE(REMOVE ${COMMANDS_GEN_HEADER})
+FILE(APPEND ${COMMANDS_GEN_HEADER} "#include <vector>\n")
+FILE(APPEND ${COMMANDS_GEN_HEADER} "#include <command_modules/CommandModule.h>\n\n")
+foreach(lib ${CMD_MODULES_LIST})
+  FILE(APPEND ${COMMANDS_GEN_HEADER} "extern const struct CommandModule cmd_${lib};\n")
+endforeach()
+foreach(lib ${CMD_MODULES_SOURCES_LIST})
+  set(SRC_LIST ${SRC_LIST} ${COMMANDS_CWD}/${lib}.cpp)
+endforeach()
+FILE(APPEND ${COMMANDS_GEN_HEADER} "inline const std::vector gCmdModules = {\n")
+foreach(lib ${CMD_MODULES_LIST})
+  FILE(APPEND ${COMMANDS_GEN_HEADER} "   &cmd_${lib},\n")
+endforeach()
+FILE(APPEND ${COMMANDS_GEN_HEADER} "};\n")
+#####################################################################
 
-# Database
+####################### Database (Protobuf) #######################
 find_package(Protobuf REQUIRED)
 include(cmake/ProtobufCpp.cmake)
 my_protobuf_generate_cpp(proto/gen PROTO_SRCS PROTO_HDRS proto/TgBotDB.proto)
 add_library(TgBotDB STATIC src/Database.cpp ${PROTO_SRCS})
-
+####################### TgBotDB lib includes #######################
 get_filename_component(PROTO_HDRS_DIR ${PROTO_HDRS} DIRECTORY)
 target_include_directories(TgBotDB PUBLIC ${PROTO_HDRS_DIR})
 target_include_directories(TgBotDB PRIVATE ${Protobuf_INCLUDE_DIRS})
-
-# Protobuf dep - ABSL
+########## TgBotDB ABSL libs (We need them on some platforms) ##########
 foreach(ABSL_LIB absl_log_internal_check_op absl_log_internal_message)
   find_library(TMP_${ABSL_LIB} NAMES ${ABSL_LIB})
   if(NOT TMP_${ABSL_LIB})
@@ -67,39 +140,42 @@ foreach(ABSL_LIB absl_log_internal_check_op absl_log_internal_message)
   endif()
   set(ABSL_LIBS ${ABSL_LIBS} ${ABSL_LIB})
 endforeach()
-
+####################### TgBotDB lib includes #######################
 target_link_libraries(TgBotDB TgBot TgBotUtils protobuf::libprotobuf protobuf ${ABSL_LIBS})
+#####################################################################
 
-if(ENFORCE_EN_US)
-  add_definitions(-DLOCALE_EN_US)
-endif()
-
+################## RTCL (Run Time Command Loader) ##################
 if(ENABLE_RUNTIME_COMMAND)
   add_definitions(-DRTCOMMAND_LOADER)
   set(SRC_LIST src/RTCommandLoader.cpp ${SRC_LIST})
+  # Dynamic cmd loader
+  add_subdirectory(src/cmd_dynamic)
 endif()
+#####################################################################
 
-if(ENABLE_SOCKET_CONNECT)
-  set(SOCKET_CLI_NAME ${PROJECT_NAME}_SocketCli)
-  add_definitions(-DSOCKET_CONNECTION)
-  add_library(TgBotSocket STATIC src/socket/SocketUtils_${TARGET_VARIANT}.cpp
-                                 src/socket/TgBotCommandMap.cpp)
-  set(SRC_LIST src/SocketConnectionHandler.cpp src/ChatObserver.cpp ${SRC_LIST})
+####################### TgBot Socket Library #######################
+if (USE_UNIX_SOCKETS)
+  set(SRC_LIST ${SRC_LIST}
+      src/ChatObserver.cpp
+      src/SocketConnectionHandler.cpp)
+  add_library(TgBotSocket STATIC 
+      src/socket/SocketUtils_${TARGET_VARIANT}.cpp
+      src/socket/TgBotCommandMap.cpp)
   add_executable(${SOCKET_CLI_NAME} src/socket/TgBotSocketClient.cpp)
+
   target_link_libraries(${SOCKET_CLI_NAME} TgBotSocket)
   if (WIN32)
     target_link_libraries(${SOCKET_CLI_NAME} Ws2_32)
   endif()
 endif()
+#####################################################################
 
-# TgBot lib + Boost warning
-add_definitions(-DBOOST_BIND_GLOBAL_PLACEHOLDERS)
-
-# Res library
+################## TgBot Resource (incbin) Library ##################
 configure_file(src/ResourceIncBin.cpp.in src/ResourceIncBin.cpp)
 add_library(TgBotRes STATIC ${CMAKE_BINARY_DIR}/src/ResourceIncBin.cpp)
+#####################################################################
 
-# Utils library
+################# TgBot Utilities (generic) Library #################
 add_library(
   TgBotUtils STATIC
   src/ConfigManager.cpp
@@ -107,45 +183,43 @@ add_library(
   src/popen_wdt/popen_wdt_lib.cpp
   src/fslib/FileSystemLib.cpp
   src/fslib/FileSystemLib_${TARGET_VARIANT}.cpp)
-# Windows needs this
+
+target_link_libraries(TgBotUtils TgBotRes ${Boost_LIBRARIES})
 if(WIN32)
   target_link_libraries(TgBotUtils shlwapi)
 endif()
-target_link_libraries(TgBotUtils TgBotRes ${Boost_LIBRARIES})
+#####################################################################
 
-# TgBot-Cpp library
+#################### TgBot cpp (the core) Library ###################
 add_subdirectory(lib)
-if(ENABLE_RUNTIME_COMMAND)
-  # Dynamic cmd loader
-  add_subdirectory(src/cmd_dynamic)
-endif()
+#####################################################################
 
-# Build libTgBot++
-add_library(${PROJECT_NAME} ${SRC_LIST})
-# Default LD-list
-set(LD_LIST TgBot TgBotUtils TgBotRes TgBotCommandModules ${ABSL_LIBS})
-# Socket
-if(ENABLE_SOCKET_CONNECT)
+################### The Bot's main functionaility ###################
+add_library(TgBotCommandModules STATIC ${SRC_LIST})
+target_include_directories(TgBotCommandModules PUBLIC ${CMAKE_BINARY_DIR}/${COMMANDS_CWD})
+######################## Libraries to link ########################
+set(LD_LIST TgBot TgBotDB TgBotUtils TgBotRes ${ABSL_LIBS})
+if (USE_UNIX_SOCKETS)
   set(LD_LIST ${LD_LIST} TgBotSocket)
 endif()
 # Windows API
 if(WIN32)
   set(LD_LIST ${LD_LIST} wsock32 Ws2_32)
 endif()
-target_link_libraries(${PROJECT_NAME} ${LD_LIST})
+target_link_libraries(TgBotCommandModules ${LD_LIST})
+#####################################################################
 
-# Main launcher
-set(PROJECT_MAIN_EXE ${PROJECT_NAME}_main)
-add_executable(${PROJECT_MAIN_EXE} src/main.cpp)
-target_link_libraries(${PROJECT_MAIN_EXE} ${PROJECT_NAME})
-target_include_directories(${PROJECT_MAIN_EXE} PRIVATE ${CMAKE_BINARY_DIR}/${COMMANDS_CWD})
+################# The Bot's main launcher (program) #################
+add_executable(${PROJECT_MAINEXE_NAME} src/main.cpp)
+target_link_libraries(${PROJECT_MAINEXE_NAME} TgBotCommandModules)
+#####################################################################
 
-# Protobuf DB Dumper
-set(DBDUMPER_NAME ${PROJECT_NAME}_dumpDB)
+################# Utility Programs (Dump Database) ##################
 add_executable(${DBDUMPER_NAME} proto/DumpProtoDB.cc)
 target_link_libraries(${DBDUMPER_NAME} TgBotDB TgBotUtils ${ABSL_LIBS})
+#####################################################################
 
-# Test begins
+############### Bot functions' Test Arena (googletest) ##############
 include(FetchContent)
 FetchContent_Declare(
         googletest
@@ -158,7 +232,8 @@ if(NOT googletest_POPULATED)
     add_subdirectory(${googletest_SOURCE_DIR} ${googletest_BINARY_DIR})
     include_directories(${gtest_SOURCE_DIR}/include ${gmock_SOURCE_DIR}/include)
 endif()
-set(PROJECT_TEST_NAME ${PROJECT_NAME}_test)
+###################### Creates the test target ######################
 add_executable(${PROJECT_TEST_NAME} tests/AuthorizationTest.cpp)
-target_link_libraries(${PROJECT_TEST_NAME} gtest gtest_main ${PROJECT_NAME})
+target_link_libraries(${PROJECT_TEST_NAME} gtest gtest_main TgBotCommandModules)
 add_test(NAME ${PROJECT_TEST_NAME} COMMAND ${PROJECT_TEST_NAME})
+#####################################################################

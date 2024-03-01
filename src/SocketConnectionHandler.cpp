@@ -5,8 +5,8 @@
 #include <SocketConnectionHandler.h>
 #include <SpamBlock.h>
 #include <random/RandomNumberGenerator.h>
-#include <rapidjson/document.h>
-#include <rapidjson/rapidjson.h>
+#include <third-party/rapidjson/document.h>
+#include <third-party/rapidjson/rapidjson.h>
 
 #include <filesystem>
 #include <fstream>

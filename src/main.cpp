@@ -6,11 +6,10 @@
 #include <RegEXHandler.h>
 #include <SingleThreadCtrl.h>
 #include <SpamBlock.h>
+#include "signalhandler/SignalHandler.h"
 
 // Generated cmd list
 #include <cmds.gen.h>
-#include <stdexcept>
-#include <thread>
 
 #ifdef RTCOMMAND_LOADER
 #include <RTCommandLoader.h>
@@ -22,7 +21,6 @@
 
 #include <tgbot/tgbot.h>
 
-#include "signalhandler/SignalHandler.h"
 
 // tgbot
 using TgBot::TgLongPoll;
@@ -42,8 +40,8 @@ static void cleanupFn (int s) {
     std::exit(0);
 };
 
-static void cleanupSocket(const std::string exitToken, SingleThreadCtrl *) {
 #ifdef SOCKET_CONNECTION
+static void cleanupSocket(const std::string exitToken, SingleThreadCtrl *) {
     bool socketValid = true;
     
     if (!fileExists(SOCKET_PATH)) {
@@ -56,8 +54,8 @@ static void cleanupSocket(const std::string exitToken, SingleThreadCtrl *) {
     } else {
         forceStopListening();
     }
-#endif
 }
+#endif
 
 int main(int argc, const char** argv) {
     std::string token, v;
