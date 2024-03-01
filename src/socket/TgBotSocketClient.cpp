@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <utility>
 
 #include "TgBotSocket.h"
 
@@ -12,7 +13,7 @@ static void usage(const char* argv, bool success) {
     std::cout << TgBotCmd_getHelpText();
 
     exit(!success);
-    __builtin_unreachable();
+    std::unreachable();
 }
 
 static bool verifyArgsCount(TgBotCommand cmd, int argc) {
