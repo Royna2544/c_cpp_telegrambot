@@ -21,10 +21,10 @@ void SingleThreadCtrlManager::checkRequireFlags(int flags) {
         LOG_E("Flags-assertion failed");
 }
 void SingleThreadCtrlManager::destroyControllerWithStop(const ThreadUsage usage) {
-    std::thread([this, usage] {
+    tp.Enqueue([this] (const ThreadUsage usage) {
         getController<SingleThreadCtrl>(usage)->stop();
         destroyController(usage);
-    }).detach();
+    }, usage);
 }
 void SingleThreadCtrlManager::stopAll() {
     for (const auto &[i, j] : kControllers) {
