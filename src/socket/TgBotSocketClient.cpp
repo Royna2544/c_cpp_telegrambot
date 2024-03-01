@@ -5,6 +5,7 @@
 
 #include "TgBotSocket.h"
 
+[[noreturn]]
 static void usage(const char* argv, bool success) {
     std::cout << "Usage: " << argv << " [cmd enum value] [args...]" << std::endl
               << std::endl;
@@ -12,7 +13,6 @@ static void usage(const char* argv, bool success) {
     std::cout << TgBotCmd_getHelpText();
 
     exit(!success);
-    __builtin_unreachable();
 }
 
 static bool verifyArgsCount(TgBotCommand cmd, int argc) {
