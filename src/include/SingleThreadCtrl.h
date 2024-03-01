@@ -12,7 +12,6 @@
 #include <unordered_map>
 
 #include "Logging.h"
-#include "ThreadPool.h"
 
 struct SingleThreadCtrl;
 
@@ -68,11 +67,10 @@ class SingleThreadCtrlManager {
     // Stop all controllers managed by this manager
     void stopAll();
     friend struct SingleThreadCtrl;
-    friend void cleanupFn (int s);
+
    private:
     static void checkRequireFlags(int flags);
     void destroyControllerWithStop(const ThreadUsage usage);
-    ThreadPool tp = ThreadPool(4);
     std::unordered_map<ThreadUsage, std::shared_ptr<SingleThreadCtrl>> kControllers;
 };
 
