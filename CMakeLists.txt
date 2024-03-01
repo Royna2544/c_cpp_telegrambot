@@ -123,7 +123,7 @@ if(ENABLE_RUNTIME_COMMAND)
 endif()
 # Build main TgBot++ exe
 add_executable(${PROJECT_NAME} ${SRC_LIST})
-target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_BINARY_DIR})
+target_include_directories(${PROJECT_NAME} PRIVATE ${CMAKE_BINARY_DIR}/${COMMANDS_CWD})
 
 # Default LD-list
 set(LD_LIST TgBot TgBotDB TgBotUtils TgBotRes ${ABSL_LIBS})

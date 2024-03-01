@@ -1,22 +1,25 @@
-set(CMDS_LIST addblacklist rmblacklist addwhitelist 
-			  rmwhitelist bash unsafebash alive flash
-			  possibility decide delay decho randsticker
-			  fileid starttimer stoptimer)
+set(CMDS_SRC_SINGLETON_LIST alive flash possibility decide delay decho randsticker fileid)
 if (NOT WIN32)
-set(CMDS_LIST ${CMDS_LIST} ibash)
+set(CMDS_SRC_SINGLETON_LIST ${CMDS_SRC_SINGLETON_LIST} ibash)
 endif()
+set(CMDS_SRC_LIST database_impl bash_impl ${CMDS_SRC_SINGLETON_LIST} timer_impl)
+set(CMDS_LIST addblacklist rmblacklist addwhitelist 
+			  rmwhitelist bash unsafebash ${CMDS_SRC_SINGLETON_LIST}
+			  starttimer stoptimer)
 
 set(COMMANDS_CWD src/command_modules)
-set(COMMANDS_GEN_HEADER ${CMAKE_BINARY_DIR}/cmds.gen.h)
+set(COMMANDS_GEN_HEADER ${CMAKE_BINARY_DIR}/${COMMANDS_CWD}/cmds.gen.h)
 FILE(REMOVE ${COMMANDS_GEN_HEADER})
 FILE(APPEND ${COMMANDS_GEN_HEADER} "#include <vector>\n")
 FILE(APPEND ${COMMANDS_GEN_HEADER} "#include <command_modules/CommandModule.h>\n\n")
 foreach(lib ${CMDS_LIST})
-	set(SRC_LIST ${SRC_LIST} ${COMMANDS_CWD}/${lib}.cpp)
 	FILE(APPEND ${COMMANDS_GEN_HEADER} "extern const struct CommandModule cmd_${lib};\n")
+endforeach()
+foreach(lib ${CMDS_SRC_LIST})
+	set(SRC_LIST ${SRC_LIST} ${COMMANDS_CWD}/${lib}.cpp)
 endforeach()
 FILE(APPEND ${COMMANDS_GEN_HEADER} "inline const std::vector gCmdModules = {\n")
 foreach(lib ${CMDS_LIST})
-	FILE(APPEND ${COMMANDS_GEN_HEADER} "&cmd_${lib},\n")
+	FILE(APPEND ${COMMANDS_GEN_HEADER} "   &cmd_${lib},\n")
 endforeach()
 FILE(APPEND ${COMMANDS_GEN_HEADER} "};\n")
