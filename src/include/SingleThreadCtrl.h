@@ -4,6 +4,7 @@
 #include <atomic>
 #include <condition_variable>
 #include <functional>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <thread>
@@ -12,19 +13,20 @@
 
 #include "Logging.h"
 
-class SingleThreadCtrl;
+struct SingleThreadCtrl;
 
 class SingleThreadCtrlManager {
- public:
+   public:
     constexpr static int GetControllerActionShift = 15;
-    using RequireFailHandlerFn = std::function<void()>;
 
     enum GetControllerFlags {
         FLAG_GETCTRL_REQUIRE_EXIST = 1 << 0,
         FLAG_GETCTRL_REQUIRE_NONEXIST = 1 << 1,
         FLAG_GETCTRL_REQUIRE_FAILACTION_ASSERT = 1 << GetControllerActionShift,
-        FLAG_GETCTRL_REQUIRE_FAILACTION_LOG = 1 << (GetControllerActionShift + 1)
+        FLAG_GETCTRL_REQUIRE_FAILACTION_LOG = 1 << (GetControllerActionShift + 1),
+        FLAG_GETCTRL_REQUIRE_NONEXIST_FAILACTION_IGNORE = 1 << (GetControllerActionShift + 2)
     };
+
     enum ThreadUsage {
         USAGE_SOCKET_THREAD,
         USAGE_TIMER_THREAD,
@@ -35,73 +37,51 @@ class SingleThreadCtrlManager {
         USAGE_IBASH_COMMAND_QUEUE_THREAD
     };
 
-    template <class T = SingleThreadCtrl, std::enable_if_t<std::is_base_of_v<SingleThreadCtrl, T>, bool> = true>
+    // Get a controller with usage and flags
+    template <class T = SingleThreadCtrl,
+              std::enable_if_t<std::is_base_of_v<SingleThreadCtrl, T>, bool> = true>
     std::shared_ptr<T> getController(const ThreadUsage usage, int flags = 0) {
         std::shared_ptr<SingleThreadCtrl> ptr;
         auto it = kControllers.find(usage);
-        const bool requireNonExist = flags & FLAG_GETCTRL_REQUIRE_NONEXIST;
-        const bool requireExist = flags & FLAG_GETCTRL_REQUIRE_EXIST;
-        const static RequireFailHandlerFn failActionAssert = []() {
-            ASSERT(false, "Flags requested FAILACTION_ASSERT");
-        };
-        const static RequireFailHandlerFn failActionLog = []() {
-            LOG_E("Flags-assertion failed");
-        };
-        RequireFailHandlerFn thisHandlerFn;
-
-        if (requireExist && requireNonExist)
-            flags &= ~(FLAG_GETCTRL_REQUIRE_FAILACTION_ASSERT | FLAG_GETCTRL_REQUIRE_FAILACTION_LOG); 
-        if (flags & FLAG_GETCTRL_REQUIRE_FAILACTION_ASSERT)
-            thisHandlerFn = failActionAssert;
-        if (flags & FLAG_GETCTRL_REQUIRE_FAILACTION_LOG)
-            thisHandlerFn = failActionLog;
 
         if (it != kControllers.end()) {
-            if (requireNonExist && thisHandlerFn)
-                thisHandlerFn();
-
+            if (flags & FLAG_GETCTRL_REQUIRE_NONEXIST) {
+                if (flags & FLAG_GETCTRL_REQUIRE_NONEXIST_FAILACTION_IGNORE) {
+                    LOG_V("Return null");
+                    return {};
+                }
+                checkRequireFlags(flags);
+            }
             LOG_V("Using old: Controller with usage %d", usage);
             ptr = it->second;
         } else {
-            if (requireExist && thisHandlerFn)
-                thisHandlerFn();
+            if (flags & FLAG_GETCTRL_REQUIRE_EXIST)
+                checkRequireFlags(flags);
             LOG_V("New allocation: Controller with usage %d", usage);
             ptr = kControllers[usage] = std::make_shared<T>();
         }
         return std::static_pointer_cast<T>(ptr);
     }
-    void destroyController(const ThreadUsage usage) {
-        auto it = kControllers.find(usage);
-
-        if (it != kControllers.end()) {
-            LOG_V("Deleting: Controller with usage %d", usage);
-            it->second.reset();
-            kControllers.erase(it);
-        } else {
-            LOG_W("Not allocated: Controller with usage %d", usage);
-        }
-    }
+    // Destroy a controller given usage
+    void destroyController(const ThreadUsage usage);
+    // Stop all controllers managed by this manager
     void stopAll();
-    friend class SingleThreadCtrl;
- private:
-   void destroyControllerWithStop(const ThreadUsage usage);
-   std::unordered_map<ThreadUsage, std::shared_ptr<SingleThreadCtrl>> kControllers;
+    friend struct SingleThreadCtrl;
+
+   private:
+    static void checkRequireFlags(int flags);
+    void destroyControllerWithStop(const ThreadUsage usage);
+    std::unordered_map<ThreadUsage, std::shared_ptr<SingleThreadCtrl>> kControllers;
 };
 
 extern SingleThreadCtrlManager gSThreadManager;
 
-class SingleThreadCtrl {
- public:
+struct SingleThreadCtrl {
+    SingleThreadCtrl() = default;
     using thread_function = std::function<void(void)>;
     using prestop_function = std::function<void(SingleThreadCtrl *)>;
 
-    SingleThreadCtrl() = default;
-
-    /*
-     * setFunction - Assign a thread function and starts the thread
-     *
-     * @param fn thread function with void(*)() signature
-     */
+    // Set thread function - implictly starts the thread as well
     void setThreadFunction(thread_function fn) {
         if (!threadP)
             threadP = std::thread(&SingleThreadCtrl::_threadFn, this, fn);
@@ -110,10 +90,12 @@ class SingleThreadCtrl {
         }
     }
 
+    // Set the function called before stopping the thread
     void setPreStopFunction(prestop_function fn) {
         preStop = fn;
     }
 
+    // Stop the underlying thread
     void stop() {
         if (once) {
             if (preStop)
@@ -131,31 +113,33 @@ class SingleThreadCtrl {
         };
     }
 
+    // Reset the counter, to make this instance reusable
     void reset() {
         once = true;
         threadP.reset();
     }
-    
+
     virtual ~SingleThreadCtrl() {
         stop();
     }
 
- protected:
+   protected:
     std::atomic_bool kRun = true;
     // Used by std::cv
     std::condition_variable cv;
     bool using_cv = false;
     std::mutex CV_m;
- private:
+
+   private:
     void _threadFn(thread_function fn) {
         fn();
         if (kRun) {
             const auto& ctrls = gSThreadManager.kControllers;
             LOG_I("A thread ended before stop command");
             auto it = std::find_if(ctrls.begin(), ctrls.end(),
-                [](std::remove_reference_t<decltype(ctrls)>::const_reference e) {
-                    return std::this_thread::get_id() == e.second->threadP->get_id();
-                });
+                                   [](std::remove_reference_t<decltype(ctrls)>::const_reference e) {
+                                       return std::this_thread::get_id() == e.second->threadP->get_id();
+                                   });
             if (it != ctrls.end()) {
                 gSThreadManager.destroyControllerWithStop(it->first);
             }
@@ -166,18 +150,3 @@ class SingleThreadCtrl {
     prestop_function preStop;
     std::atomic_bool once = true;
 };
-
-inline void SingleThreadCtrlManager::destroyControllerWithStop(const ThreadUsage usage) {
-    
-    std::thread([this, usage]{
-        getController(usage)->stop();
-        destroyController(usage);
-    }).detach();
-}
-
-inline void SingleThreadCtrlManager::stopAll() {
-    for (const auto &[i, j] : kControllers) {
-        LOG_V("Shutdown: Controller with usage %d", i);
-        j->stop();
-    }
-}
