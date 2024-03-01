@@ -3,6 +3,7 @@
 #include <Authorization.h>
 #include <Database.h>
 
+#include <cinttypes>
 #include <chrono>
 #include <memory>
 #include <mutex>
@@ -11,7 +12,7 @@ static database::DatabaseWrapper& loadDb() {
     static std::once_flag once;
     std::call_once(once, []{
         database::db.load();
-        LOG_I("DB loaded, Owner id %lld", database::db.maybeGetOwnerId());
+        LOG_I("DB loaded, Owner id %" PRId64, database::db.maybeGetOwnerId());
     });
     return database::db;
 }
