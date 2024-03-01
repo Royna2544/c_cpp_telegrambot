@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <atomic>
 #include <condition_variable>
+#include <future>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -10,6 +11,7 @@
 #include <thread>
 #include <type_traits>
 #include <unordered_map>
+#include <vector>
 
 #include "Logging.h"
 
@@ -72,6 +74,7 @@ class SingleThreadCtrlManager {
     static void checkRequireFlags(int flags);
     void destroyControllerWithStop(const ThreadUsage usage);
     std::unordered_map<ThreadUsage, std::shared_ptr<SingleThreadCtrl>> kControllers;
+    std::vector<std::future<void>> kShutdownFutures;
 };
 
 extern SingleThreadCtrlManager gSThreadManager;

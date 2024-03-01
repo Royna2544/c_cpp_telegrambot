@@ -1,4 +1,5 @@
 #include <SingleThreadCtrl.h>
+#include <future>
 
 void SingleThreadCtrlManager::destroyController(const ThreadUsage usage) {
     auto it = kControllers.find(usage);
@@ -21,15 +22,17 @@ void SingleThreadCtrlManager::checkRequireFlags(int flags) {
         LOG_E("Flags-assertion failed");
 }
 void SingleThreadCtrlManager::destroyControllerWithStop(const ThreadUsage usage) {
-    std::thread([this, usage] {
+    kShutdownFutures.emplace_back(std::async(std::launch::async, [this, usage] {
         getController<SingleThreadCtrl>(usage)->stop();
         destroyController(usage);
-    }).detach();
+    }));
 }
 void SingleThreadCtrlManager::stopAll() {
     for (const auto &[i, j] : kControllers) {
         LOG_V("Shutdown: Controller with usage %d", i);
         j->stop();
     }
+    for (const auto& i : kShutdownFutures)
+        i.wait();
 }
 SingleThreadCtrlManager gSThreadManager;
