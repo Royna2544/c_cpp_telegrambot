@@ -9,6 +9,7 @@
 
 // Generated cmd list
 #include <cmds.gen.h>
+#include <stdexcept>
 #include <thread>
 
 #ifdef RTCOMMAND_LOADER
@@ -169,12 +170,15 @@ int main(int argc, const char** argv) {
             bot_sendMessage(gBot, ownerid, "Reinitializing.");
             LOG_I("Re-init");
             gAuthorized = false;
-            gSThreadManager.getController(SingleThreadCtrlManager::USAGE_ERROR_RECOVERY_THREAD)
-                ->setThreadFunction([] {
+            auto cl = gSThreadManager.getController(SingleThreadCtrlManager::USAGE_ERROR_RECOVERY_THREAD,
+                SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_NONEXIST | 
+                    SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_NONEXIST_FAILACTION_IGNORE);
+            if (cl) {
+                cl->setThreadFunction([] {
                     std::this_thread::sleep_for(kErrorRecoveryDelay);
                     gAuthorized = true;
-                }
-            );
+                });
+            }
         }
     } while (true);
     cleanupFn(invalidSignal);
