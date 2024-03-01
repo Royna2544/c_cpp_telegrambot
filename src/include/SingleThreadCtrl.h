@@ -83,6 +83,7 @@ struct SingleThreadCtrl {
 
     // Set thread function - implictly starts the thread as well
     void setThreadFunction(thread_function fn) {
+        const std::lock_guard<std::mutex> _(ctrl_lk);
         if (!threadP)
             threadP = std::thread(&SingleThreadCtrl::_threadFn, this, fn);
         else {
@@ -92,11 +93,13 @@ struct SingleThreadCtrl {
 
     // Set the function called before stopping the thread
     void setPreStopFunction(prestop_function fn) {
+        const std::lock_guard<std::mutex> _(ctrl_lk);
         preStop = fn;
     }
 
     // Stop the underlying thread
     void stop() {
+        const std::lock_guard<std::mutex> _(ctrl_lk);
         if (once) {
             if (preStop)
                 preStop(this);
@@ -115,6 +118,7 @@ struct SingleThreadCtrl {
 
     // Reset the counter, to make this instance reusable
     void reset() {
+        const std::lock_guard<std::mutex> _(ctrl_lk);
         once = true;
         threadP.reset();
     }
@@ -122,6 +126,8 @@ struct SingleThreadCtrl {
     virtual ~SingleThreadCtrl() {
         stop();
     }
+
+    friend class SingleThreadCtrlManager;
 
    protected:
     std::atomic_bool kRun = true;
@@ -134,6 +140,7 @@ struct SingleThreadCtrl {
     void _threadFn(thread_function fn) {
         fn();
         if (kRun) {
+            const std::lock_guard<std::mutex> _(ctrl_lk);
             const auto& ctrls = gSThreadManager.kControllers;
             LOG_I("A thread ended before stop command");
             auto it = std::find_if(ctrls.begin(), ctrls.end(),
@@ -149,4 +156,5 @@ struct SingleThreadCtrl {
     std::optional<std::thread> threadP;
     prestop_function preStop;
     std::atomic_bool once = true;
+    std::mutex ctrl_lk; // To modify the controller, user must hold this lock
 };

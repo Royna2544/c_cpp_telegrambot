@@ -4,6 +4,9 @@ void SingleThreadCtrlManager::destroyController(const ThreadUsage usage) {
     auto it = kControllers.find(usage);
 
     if (it != kControllers.end()) {
+        {
+            const std::lock_guard<std::mutex> _(it->second->ctrl_lk);
+        }
         LOG_V("Deleting: Controller with usage %d", usage);
         it->second.reset();
         kControllers.erase(it);
