@@ -31,10 +31,7 @@ endif()
 #####################################################################
 
 ################# Detecting x86/x86_64 Architecture ################
-perform_test("IS_NOT_X86")
-try_compile(IS_NOT_X86 ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/tests/test_x86.c)
-perform_test_ret(IS_NOT_X86)
-if (NOT IS_NOT_X86)
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "i[3-6]86|x86_64|AMD64|amd64")
   add_compile_options(-mrdrnd)
 endif()
 #####################################################################
