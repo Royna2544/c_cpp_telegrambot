@@ -40,6 +40,11 @@ void loadOneCommand(Bot& bot, const std::filesystem::path _fname) {
     void *handle, *fnptr = nullptr;
     bool isSupported = true;
     std::string fname = _fname.string();
+#ifdef __WIN32
+    fname += ".dll";
+#else
+    fname += ".so";
+#endif
 
     handle = dlopen(fname.c_str(), RTLD_NOW);
     if (!handle) {
