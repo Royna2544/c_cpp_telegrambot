@@ -1,4 +1,4 @@
-name: Run tg_cpphost
+name: Run TgBot++
 
 on:
   workflow_dispatch

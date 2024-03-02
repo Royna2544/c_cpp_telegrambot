@@ -1,4 +1,4 @@
-name: Build tg_cpphost (Windows)
+name: Build TgBot++ (Windows)
 
 on:
   push:

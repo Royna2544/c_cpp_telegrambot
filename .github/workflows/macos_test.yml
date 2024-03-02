@@ -1,4 +1,4 @@
-name: Build tg_cpphost (macOS)
+name: Build TgBot++ (macOS)
 
 on:
   push:
