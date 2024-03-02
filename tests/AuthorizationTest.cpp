@@ -29,15 +29,14 @@ static void MakeMessageDateBefore(Message::Ptr& message) {
     message->date = std::chrono::system_clock::to_time_t(before);
 }
 
-static void MakeMessageOwner(Message::Ptr& message) {
-    static UserId ownerId = loadDb().maybeGetOwnerId();
-    auto userP = std::make_shared<TgBot::User>();
-    userP->id = ownerId;
-    message->from = userP;
-}
-
 static void MakeMessageNonOwner(Message::Ptr& message) {
     message->from = std::make_shared<TgBot::User>();
+}
+
+static void MakeMessageOwner(Message::Ptr& message) {
+    static UserId ownerId = loadDb().maybeGetOwnerId();
+    MakeMessageNonOwner(message);
+    message->from->id = ownerId;
 }
 
 TEST(AuthorizationTest, TimeNowOwnerEnforce) {
