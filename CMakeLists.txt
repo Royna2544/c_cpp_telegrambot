@@ -25,8 +25,13 @@ set(PROJECT_TEST_NAME ${PROJECT_NAME}_test)
 
 ############################## OPTIONS ##############################
 option(ENFORCE_EN_US "Enforce en-US locale for output" ON)
-if(NOT WIN32)
-  option(ENABLE_RUNTIME_COMMAND "Enable runtime loader of commands" ON)
+option(ENABLE_RUNTIME_COMMAND "Enable runtime loader of commands" ON)
+#####################################################################
+
+################# Detecting x86/x86_64 Architecture ################
+if (WIN32 AND ENABLE_RUNTIME_COMMAND)
+add_subdirectory(src/third-party/dlfcn-win32)
+set(CMAKE_DL_LIBS dl)
 endif()
 #####################################################################
 
@@ -159,8 +164,7 @@ target_link_libraries(TgBotDB TgBot TgBotUtils protobuf::libprotobuf protobuf ${
 ################## RTCL (Run Time Command Loader) ##################
 if(ENABLE_RUNTIME_COMMAND)
   add_definitions(-DRTCOMMAND_LOADER)
-  set(SRC_LIST src/RTCommandLoader.cpp ${SRC_LIST})
-  # Dynamic cmd loader
+  set(SRC_LIST ${SRC_LIST} src/RTCommandLoader.cpp)
   add_subdirectory(src/cmd_dynamic)
 endif()
 #####################################################################
@@ -210,14 +214,16 @@ add_subdirectory(lib)
 add_library(TgBotCommandModules STATIC ${SRC_LIST})
 target_include_directories(TgBotCommandModules PUBLIC ${CMAKE_BINARY_DIR}/${COMMANDS_CWD})
 ######################## Libraries to link ########################
+macro(add_lib_if var)
+  if(${var})
+    set(LD_LIST ${LD_LIST} ${ARGN})
+  endif()
+endmacro()
+
 set(LD_LIST TgBot TgBotDB TgBotUtils TgBotRes ${ABSL_LIBS})
-if (USE_UNIX_SOCKETS)
-  set(LD_LIST ${LD_LIST} TgBotSocket)
-endif()
-# Windows API
-if(WIN32)
-  set(LD_LIST ${LD_LIST} wsock32 Ws2_32)
-endif()
+add_lib_if(USE_UNIX_SOCKETS TgBotSocket)
+add_lib_if(WIN32 wsock32 Ws2_32)
+add_lib_if(ENABLE_RUNTIME_COMMAND ${CMAKE_DL_LIBS})
 target_link_libraries(TgBotCommandModules ${LD_LIST})
 #####################################################################
 

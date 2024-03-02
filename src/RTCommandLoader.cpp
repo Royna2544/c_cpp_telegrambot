@@ -32,13 +32,14 @@ static void commandStub(const Bot& bot, const Message::Ptr& message) {
     bot_sendReplyMessage(bot, message, "Unsupported command");
 }
 
-void loadOneCommand(Bot& bot, const std::filesystem::path fname) {
+void loadOneCommand(Bot& bot, const std::filesystem::path _fname) {
     struct dynamicCommandModule* sym = nullptr;
     struct CommandModule* mod = nullptr;
     command_callback_t fn;
     Dl_info info{};
     void *handle, *fnptr = nullptr;
     bool isSupported = true;
+    std::string fname = _fname.string();
 
     handle = dlopen(fname.c_str(), RTLD_NOW);
     if (!handle) {
