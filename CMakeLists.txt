@@ -1,10 +1,6 @@
 cmake_minimum_required(VERSION 3.10.2)
 project(TgBot++ LANGUAGES CXX C)
 
-if(POLICY CMP0079)
-    cmake_policy(SET CMP0079 NEW) # Allow target_link_libraries for other module than this file
-endif()
-
 ################ Define a CMake Test Style macro ################
 macro(perform_test msg)
   message(STATUS "Performing test ${msg}")
@@ -16,14 +12,6 @@ macro(perform_test_ret result)
     message(STATUS ${PERFORM_TEST_SUCCESS})
   else()
     message(STATUS ${PERFORM_TEST_FAIL})
-  endif()
-endmacro()
-#####################################################################
-
-#################### Define a link_libs_if macro ####################
-macro(add_lib_if var)
-  if(${var})
-    set(LD_LIST ${LD_LIST} ${ARGN})
   endif()
 endmacro()
 #####################################################################
@@ -220,14 +208,18 @@ endif()
 
 #################### TgBot cpp (the core) Library ###################
 add_subdirectory(lib)
-add_lib_if(WIN32 wsock32 Ws2_32)
-target_link_libraries(TgBot ${LD_LIST})
 #####################################################################
 
 ################### The Bot's main functionaility ###################
 add_library(TgBotCommandModules STATIC ${SRC_LIST})
 target_include_directories(TgBotCommandModules PUBLIC ${CMAKE_BINARY_DIR}/${COMMANDS_CWD})
 ######################## Libraries to link ########################
+macro(add_lib_if var)
+  if(${var})
+    set(LD_LIST ${LD_LIST} ${ARGN})
+  endif()
+endmacro()
+
 set(LD_LIST TgBot TgBotDB TgBotUtils TgBotRes ${ABSL_LIBS})
 add_lib_if(USE_UNIX_SOCKETS TgBotSocket)
 add_lib_if(WIN32 wsock32 Ws2_32)
