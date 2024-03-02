@@ -26,13 +26,8 @@ set(PROJECT_TEST_NAME ${PROJECT_NAME}_test)
 ############################## OPTIONS ##############################
 option(ENFORCE_EN_US "Enforce en-US locale for output" ON)
 option(ENABLE_RUNTIME_COMMAND "Enable runtime loader of commands" ON)
-#####################################################################
-
-################# Detecting x86/x86_64 Architecture ################
-if (WIN32 AND ENABLE_RUNTIME_COMMAND)
-add_subdirectory(src/third-party/dlfcn-win32)
-set(CMAKE_DL_LIBS dl)
-endif()
+#################### This must be explicitly set ###################
+set(BUILD_SHARED_LIBS OFF)
 #####################################################################
 
 ################# Detecting x86/x86_64 Architecture ################
@@ -166,6 +161,10 @@ if(ENABLE_RUNTIME_COMMAND)
   add_definitions(-DRTCOMMAND_LOADER)
   set(SRC_LIST ${SRC_LIST} src/RTCommandLoader.cpp)
   add_subdirectory(src/cmd_dynamic)
+  if (WIN32)
+    add_subdirectory(src/third-party/dlfcn-win32)
+    set(CMAKE_DL_LIBS dl)
+  endif()
 endif()
 #####################################################################
 
