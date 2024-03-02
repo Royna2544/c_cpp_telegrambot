@@ -28,3 +28,9 @@ jobs:
           mkdir build
           cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release .
           cmake --build build
+
+      - name: Run Tests
+        run: |
+            cd build
+            ./TgBot++_test
+  
