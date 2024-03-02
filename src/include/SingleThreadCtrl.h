@@ -126,6 +126,11 @@ struct SingleThreadCtrl {
         threadP.reset();
     }
 
+    void allowAutoDelete(const bool allow) {
+        const std::lock_guard<std::mutex> _(ctrl_lk);
+        kAutoDelete = allow;
+    }
+
     virtual ~SingleThreadCtrl() {
         stop();
     }
@@ -133,7 +138,7 @@ struct SingleThreadCtrl {
     friend class SingleThreadCtrlManager;
 
    protected:
-    std::atomic_bool kRun = true;
+    std::atomic_bool kRun = true, kAutoDelete = true;
     // Used by std::cv
     std::condition_variable cv;
     bool using_cv = false;
@@ -142,7 +147,7 @@ struct SingleThreadCtrl {
    private:
     void _threadFn(thread_function fn) {
         fn();
-        if (kRun) {
+        if (kRun && kAutoDelete) {
             const std::lock_guard<std::mutex> _(ctrl_lk);
             const auto& ctrls = gSThreadManager.kControllers;
             LOG_I("A thread ended before stop command");

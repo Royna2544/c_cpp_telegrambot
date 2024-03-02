@@ -116,6 +116,7 @@ int main(int argc, const char** argv) {
         },
         socketCreatedProm);
     });
+    socketConnectionManager->allowAutoDelete(false);
 
     if (socketCreatedFut.get()) {
         exitToken = StringTools::generateRandomString(sizeof(TgBotCommandUnion::data_2.token) - 1);
