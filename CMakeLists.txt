@@ -1,6 +1,21 @@
 cmake_minimum_required(VERSION 3.10.2)
 project(TgBot++ LANGUAGES CXX C)
 
+################ Define a CMake Test Style macro ################
+macro(perform_test msg)
+  message(STATUS "Performing test ${msg}")
+  set(PERFORM_TEST_SUCCESS "Performing test ${msg}: Success")
+  set(PERFORM_TEST_FAIL "Performing test ${msg}: Failed")
+endmacro()
+macro(perform_test_ret result)
+  if (${result})
+    message(STATUS ${PERFORM_TEST_SUCCESS})
+  else()
+    message(STATUS ${PERFORM_TEST_FAIL})
+  endif()
+endmacro()
+#####################################################################
+
 ################ EXE NAMES STEMMED FROM PROJECT_NAME ################
 set(SOCKET_CLI_NAME ${PROJECT_NAME}_SocketCli)
 set(DBDUMPER_NAME ${PROJECT_NAME}_dumpDB)
@@ -15,10 +30,11 @@ if(NOT WIN32)
 endif()
 #####################################################################
 
-################# Detecting x86/x86_64 Architecture #################
+################# Detecting x86/x86_64 Architecture ################
+perform_test("IS_NOT_X86")
 try_compile(IS_NOT_X86 ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/tests/test_x86.c)
+perform_test_ret(IS_NOT_X86)
 if (NOT IS_NOT_X86)
-  message(INFO " X86 target detected")
   add_compile_options(-mrdrnd)
 endif()
 #####################################################################
@@ -37,16 +53,14 @@ add_compile_options(
 ################### Check Windows's AF_UNIX support ###################
 ################# Versions later than Win10 RS3 does #################
 if (WIN32)
+  perform_test("USE_UNIX_SOCKETS")
   try_compile(USE_UNIX_SOCKETS ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/tests/test_af_unix.c)
-  if (USE_UNIX_SOCKETS)
-    add_definitions(-DSOCKET_CONNECTION)
-  endif()
+  perform_test_ret(USE_UNIX_SOCKETS)
 else()
   set(USE_UNIX_SOCKETS TRUE)
-  add_definitions(-DSOCKET_CONNECTION)
 endif()
 if (USE_UNIX_SOCKETS)
-  message(INFO " Socket connection enabled")
+  add_definitions(-DSOCKET_CONNECTION)
 endif()
 #####################################################################
 
@@ -133,9 +147,10 @@ target_include_directories(TgBotDB PUBLIC ${PROTO_HDRS_DIR})
 target_include_directories(TgBotDB PRIVATE ${Protobuf_INCLUDE_DIRS})
 ########## TgBotDB ABSL libs (We need them on some platforms) ##########
 foreach(ABSL_LIB absl_log_internal_check_op absl_log_internal_message)
+  perform_test("HAS_LIB_${ABSL_LIB}")
   find_library(TMP_${ABSL_LIB} NAMES ${ABSL_LIB})
+  perform_test_ret(TMP_${ABSL_LIB})
   if(NOT TMP_${ABSL_LIB})
-    message(INFO " Library ${ABSL_LIB} not existent")
     continue()
   endif()
   set(ABSL_LIBS ${ABSL_LIBS} ${ABSL_LIB})
