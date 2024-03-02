@@ -22,7 +22,7 @@ jobs:
 
       - name: Set up dependencies
         run: |
-          ./scripts/deps.sh
+          bash ./setup_dependencies_apt.sh
 
       - name: Compile with Ubuntu Clang
         env:
