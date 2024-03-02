@@ -21,7 +21,6 @@
 
 #include <tgbot/tgbot.h>
 
-
 // tgbot
 using TgBot::TgLongPoll;
 
@@ -107,11 +106,11 @@ int main(int argc, const char** argv) {
 #ifdef SOCKET_CONNECTION
     auto socketConnectionManager = gSThreadManager
                                    .getController(SingleThreadCtrlManager::USAGE_SOCKET_THREAD);
-    static std::string exitToken;
-    static std::promise<bool> socketCreatedProm;
-    static std::future<bool> socketCreatedFut = socketCreatedProm.get_future();
+    std::string exitToken;
+    std::promise<bool> socketCreatedProm;
+    auto socketCreatedFut = socketCreatedProm.get_future();
 
-    socketConnectionManager->setThreadFunction([] {
+    socketConnectionManager->setThreadFunction([&socketCreatedProm] {
         startListening([](struct TgBotConnection conn) {
             socketConnectionHandler(gBot, conn);
         },
@@ -120,7 +119,6 @@ int main(int argc, const char** argv) {
 
     if (socketCreatedFut.get()) {
         exitToken = StringTools::generateRandomString(sizeof(TgBotCommandUnion::data_2.token) - 1);
-        LOG_V("Generated exittoken: %s", exitToken.c_str());
 
         auto e = TgBotCommandData::Exit::create(ExitOp::SET_TOKEN, exitToken);
         writeToSocket({CMD_EXIT, {.data_2 = e}});
