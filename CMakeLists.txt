@@ -18,6 +18,7 @@ endmacro()
 
 ################ EXE NAMES STEMMED FROM PROJECT_NAME ################
 set(SOCKET_CLI_NAME ${PROJECT_NAME}_SocketCli)
+set(MEDIA_CLI_NAME ${PROJECT_NAME}_MediaCli)
 set(DBDUMPER_NAME ${PROJECT_NAME}_dumpDB)
 set(PROJECT_MAINEXE_NAME ${PROJECT_NAME}_main)
 set(PROJECT_TEST_NAME ${PROJECT_NAME}_test)
@@ -237,6 +238,14 @@ target_link_libraries(${PROJECT_MAINEXE_NAME} TgBotCommandModules)
 ################# Utility Programs (Dump Database) ##################
 add_executable(${DBDUMPER_NAME} proto/DumpProtoDB.cc)
 target_link_libraries(${DBDUMPER_NAME} TgBotDB TgBotUtils ${ABSL_LIBS})
+#####################################################################
+
+############### Utility Programs (Send Media to chat) ################
+add_executable(${MEDIA_CLI_NAME} proto/SendMediaToChat.cc)
+target_link_libraries(${MEDIA_CLI_NAME} TgBotDB TgBotSocket ${ABSL_LIBS})
+if (WIN32)
+  target_link_libraries(${MEDIA_CLI_NAME} Ws2_32)
+endif()
 #####################################################################
 
 ############### Bot functions' Test Arena (googletest) ##############
