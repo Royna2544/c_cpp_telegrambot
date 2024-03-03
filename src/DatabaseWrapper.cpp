@@ -1,6 +1,5 @@
 #include <Database.h>
 #include <SingleThreadCtrl.h>
-#include <thread>
 
 using database::DatabaseWrapper;
 
@@ -8,7 +7,7 @@ struct DatabaseSync : SingleThreadCtrl {
     void run() {
         using_cv = true;
         while (kRun) {
-            database::db.save();
+            database::DBWrapper.save();
             std::unique_lock<std::mutex> lk(CV_m);
             cv.wait_for(lk, std::chrono::seconds(10));
         }
@@ -52,3 +51,7 @@ bool DatabaseWrapper::warnNoLoaded(const char* func) const {
     }
     return loaded;
 }
+
+namespace database {
+DatabaseWrapper DBWrapper;
+} // namespace database

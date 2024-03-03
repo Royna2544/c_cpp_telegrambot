@@ -4,8 +4,6 @@
 
 namespace database {
 
-DatabaseWrapper db;
-
 static std::string appendListName(const std::string& op, const UserId id, const std::string& name) {
     return std::string("User") + ' ' + std::to_string(id) + ' ' + op + ' ' + name;
 }
@@ -23,7 +21,7 @@ std::optional<int> ProtoDatabase::findByUid(const RepeatedField<UserId>* list,
 
 bool ProtoDatabase::rejectUid(const Bot& bot, const User::Ptr& user) const {
     if (bot.getApi().getMe()->id == user->id) return true;
-    if (db.maybeGetOwnerId() == user->id) return true;
+    if (DBWrapper.maybeGetOwnerId() == user->id) return true;
     if (user->isBot) return true;
     return false;
 }
@@ -65,12 +63,12 @@ void ProtoDatabase::_removeFromDatabase(const Bot& bot, const Message::Ptr& mess
 
 ProtoDatabase whitelist = {
     "whitelist",
-    db.getMainDatabase()->mutable_whitelist()->mutable_id(),
+    DBWrapper.getMainDatabase()->mutable_whitelist()->mutable_id(),
     &blacklist,
 };
 ProtoDatabase blacklist = {
     "blacklist",
-    db.getMainDatabase()->mutable_blacklist()->mutable_id(),
+    DBWrapper.getMainDatabase()->mutable_blacklist()->mutable_id(),
     &whitelist,
 };
 

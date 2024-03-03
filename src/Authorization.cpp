@@ -13,7 +13,7 @@ bool Authorized(const Message::Ptr &message, const int flags) {
             return !database::blacklist.exists(id);
         } else {
             if (database::whitelist.exists(id)) return true;
-            return id == database::db.maybeGetOwnerId();
+            return id == database::DBWrapper.maybeGetOwnerId();
         }
     } else {
         return !(flags & AuthorizeFlags::REQUIRE_USER);

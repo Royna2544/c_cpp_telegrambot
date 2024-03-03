@@ -37,7 +37,7 @@ struct CommandModule cmd_rmwhitelist {
 };
 
 static void saveIdFn(const Bot& bot, const Message::Ptr& message) {
-    const auto nonMutableMediaDB = database::db.getMediaDatabase();
+    const auto nonMutableMediaDB = database::DBWrapper.getMediaDatabase();
 
     if (hasExtArgs(message)) {
         std::string names;
@@ -62,7 +62,7 @@ static void saveIdFn(const Bot& bot, const Message::Ptr& message) {
                 }
             }
             const auto namevec = StringTools::split(names, '/');
-            auto ent = database::db.getMediaDatabase()->add_entries();
+            auto ent = nonMutableMediaDB->add_entries();
             std::stringstream ss;
 
             ent->set_telegrammediaid(*fileId);

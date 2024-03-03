@@ -11,10 +11,10 @@
 static database::DatabaseWrapper& loadDb() {
     static std::once_flag once;
     std::call_once(once, []{
-        database::db.load();
-        LOG_I("DB loaded, Owner id %" PRId64, database::db.maybeGetOwnerId());
+        database::DBWrapper.load();
+        LOG_I("DB loaded, Owner id %" PRId64, database::DBWrapper.maybeGetOwnerId());
     });
-    return database::db;
+    return database::DBWrapper;
 }
 
 static void MakeMessageDateNow(Message::Ptr& message) {

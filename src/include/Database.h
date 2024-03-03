@@ -80,6 +80,6 @@ struct DatabaseWrapper {
 
 extern ProtoDatabase whitelist;
 extern ProtoDatabase blacklist;
-extern DatabaseWrapper db;
+extern DatabaseWrapper DBWrapper;
 
 };  // namespace database

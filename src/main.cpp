@@ -34,7 +34,7 @@ static void cleanupFn (int s) {
     std::call_once(once, [s] {
         LOG_I("Exiting with signal %d", s);
         gSThreadManager.stopAll();
-        database::db.save();
+        database::DBWrapper.save();
     });
     std::exit(0);
 };
@@ -69,7 +69,7 @@ int main(int argc, const char** argv) {
         return EXIT_FAILURE;
     }
     static Bot gBot(token);
-    database::db.load();
+    database::DBWrapper.load();
 
     bot_AddCommandEnforcedCompiler(gBot, "c", ProgrammingLangs::C, [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
         CompileRunHandler(CCppCompileHandleData{{{bot, message}, compiler, "out.c"}});
@@ -149,7 +149,7 @@ int main(int argc, const char** argv) {
         } catch (const std::exception &e) {
             LOG_E("Exception: %s", e.what());
             LOG_W("Trying to recover");
-            UserId ownerid = database::db.maybeGetOwnerId();
+            UserId ownerid = database::DBWrapper.maybeGetOwnerId();
             try {
                 bot_sendMessage(gBot, ownerid, std::string("Exception occured: ") + e.what());
             } catch (const std::exception &e) {

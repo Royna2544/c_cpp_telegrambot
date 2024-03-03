@@ -3,7 +3,7 @@
 
 #include <iostream>
 
-using database::db;
+using database::DBWrapper;
 using tgbot::proto::PersonList;
 
 static void dumpList(const PersonList& list, const char* name) {
@@ -19,8 +19,8 @@ static void dumpList(const PersonList& list, const char* name) {
 
 int main(int argc, const char **argv) {
     copyCommandLine(CommandLineOp::INSERT, &argc, &argv);
-    db.load();
-    const auto mainDB = db.getMainDatabase();
+    DBWrapper.load();
+    const auto mainDB = DBWrapper.getMainDatabase();
 
     std::cout << "Owner ID: ";
     if (mainDB->has_ownerid()) {
