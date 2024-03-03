@@ -6,18 +6,15 @@ message PersonList {
   repeated int64 id = 1;
 }
 
-message Database {
-  optional int64 ownerId = 1;
-  optional PersonList whitelist = 2;
-  optional PersonList blacklist = 3;
-}
-
 message MediaToName {
   optional string TelegramMediaUniqueId = 1;
   optional string TelegramMediaId = 2;
   repeated string Names = 3;
 }
 
-message MediaToNameDatabase {
-  repeated MediaToName entries = 1;
+message Database {
+  optional int64 ownerId = 1;
+  optional PersonList whitelist = 2;
+  optional PersonList blacklist = 3;
+  repeated MediaToName mediaToNames = 4;
 }

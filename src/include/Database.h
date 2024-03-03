@@ -25,7 +25,6 @@ using TgBot::Message;
 using TgBot::User;
 using ::google::protobuf::RepeatedField;
 using ::tgbot::proto::Database;
-using ::tgbot::proto::MediaToNameDatabase;
 using ::tgbot::proto::PersonList;
 
 class ProtoDatabase {
@@ -60,9 +59,6 @@ struct DatabaseWrapper {
     Database* getMainDatabase(void) {
         return &protodb;
     }
-    MediaToNameDatabase* getMediaDatabase(void) {
-        return &protomediadb;
-    }
 
     DatabaseWrapper() = default;
     ~DatabaseWrapper() {
@@ -72,7 +68,6 @@ struct DatabaseWrapper {
    private:
     bool warnNoLoaded(const char* func) const;
     Database protodb;
-    MediaToNameDatabase protomediadb;
     std::string fname;
     bool loaded = false;
     std::once_flag once;

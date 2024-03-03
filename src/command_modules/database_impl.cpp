@@ -37,7 +37,7 @@ struct CommandModule cmd_rmwhitelist {
 };
 
 static void saveIdFn(const Bot& bot, const Message::Ptr& message) {
-    const auto nonMutableMediaDB = database::DBWrapper.getMediaDatabase();
+    const auto mutableMediaDB = database::DBWrapper.getMainDatabase()->mutable_mediatonames();
 
     if (hasExtArgs(message)) {
         std::string names;
@@ -54,9 +54,9 @@ static void saveIdFn(const Bot& bot, const Message::Ptr& message) {
             }
         }
         if (fileId) {
-            if (nonMutableMediaDB->entries().size() > 0) {
-                for (int i = 0; i < nonMutableMediaDB->entries_size(); ++i) {
-                    const auto& it = nonMutableMediaDB->entries(i);
+            if (const auto mediaSize = mutableMediaDB->size(); mediaSize > 0) {
+                for (int i = 0; i < mediaSize; ++i) {
+                    const auto& it = mutableMediaDB->Get(i);
                     if (it.has_telegrammediauniqueid() && fileUniqueId == it.telegrammediauniqueid()) {
                         bot_sendReplyMessage(bot, message, "FileUniqueId already exists on MediaDatabase");
                         return;
@@ -64,7 +64,7 @@ static void saveIdFn(const Bot& bot, const Message::Ptr& message) {
                 }
             }
             const auto namevec = StringTools::split(names, '/');
-            auto ent = nonMutableMediaDB->add_entries();
+            auto ent = mutableMediaDB->Add();
             std::stringstream ss;
 
             ent->set_telegrammediaid(*fileId);

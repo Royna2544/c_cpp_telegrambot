@@ -21,7 +21,6 @@ void DatabaseWrapper::load() {
         if (!input)
             throw std::runtime_error("Failed to load database file");
         protodb.ParseFromIstream(&input);
-        protomediadb.ParseFromIstream(&input);
         auto syncMgr = gSThreadManager.getController<DatabaseSync>
             (SingleThreadCtrlManager::USAGE_DATABASE_SYNC_THREAD);
         syncMgr->run();
@@ -34,7 +33,6 @@ void DatabaseWrapper::save() const {
         std::fstream output(fname, std::ios::out | std::ios::trunc | std::ios::binary);
         assert(output);
         protodb.SerializeToOstream(&output);
-        protomediadb.SerializePartialToOstream(&output);
     }
 }
 
