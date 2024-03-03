@@ -13,8 +13,9 @@ message Database {
 }
 
 message MediaToName {
-  optional string TelegramMediaId = 1;
-  repeated string Names = 2;
+  optional string TelegramMediaUniqueId = 1;
+  optional string TelegramMediaId = 2;
+  repeated string Names = 3;
 }
 
 message MediaToNameDatabase {
