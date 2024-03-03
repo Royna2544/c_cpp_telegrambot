@@ -65,12 +65,12 @@ void ProtoDatabase::_removeFromDatabase(const Bot& bot, const Message::Ptr& mess
 
 ProtoDatabase whitelist = {
     "whitelist",
-    db->mutable_whitelist()->mutable_id(),
+    db.getMainDatabase()->mutable_whitelist()->mutable_id(),
     &blacklist,
 };
 ProtoDatabase blacklist = {
     "blacklist",
-    db->mutable_blacklist()->mutable_id(),
+    db.getMainDatabase()->mutable_blacklist()->mutable_id(),
     &whitelist,
 };
 

@@ -3,7 +3,6 @@
 
 #include <iostream>
 
-
 using database::db;
 using tgbot::proto::PersonList;
 
@@ -21,18 +20,19 @@ static void dumpList(const PersonList& list, const char* name) {
 int main(int argc, const char **argv) {
     copyCommandLine(CommandLineOp::INSERT, &argc, &argv);
     db.load();
+    const auto mainDB = db.getMainDatabase();
 
     std::cout << "Owner ID: ";
-    if (db->has_ownerid()) {
-        std::cout << db->ownerid();
+    if (mainDB->has_ownerid()) {
+        std::cout << mainDB->ownerid();
     } else {
         std::cout << "Not set";
     }
     std::cout << std::endl;
-    if (db->has_whitelist()) {
-        dumpList(db->whitelist(), "whitelist");
+    if (mainDB->has_whitelist()) {
+        dumpList(mainDB->whitelist(), "whitelist");
     }
-    if (db->has_blacklist()) {
-        dumpList(db->blacklist(), "blacklist");
+    if (mainDB->has_blacklist()) {
+        dumpList(mainDB->blacklist(), "blacklist");
     }
 }

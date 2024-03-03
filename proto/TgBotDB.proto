@@ -11,3 +11,12 @@ message Database {
   optional PersonList whitelist = 2;
   optional PersonList blacklist = 3;
 }
+
+message MediaToName {
+  optional string TelegramMediaId = 1;
+  repeated string Names = 2;
+}
+
+message MediaToNameDatabase {
+  repeated MediaToName entries = 1;
+}

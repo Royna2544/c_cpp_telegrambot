@@ -6,7 +6,9 @@
 #include <tgbot/Bot.h>
 #include <tgbot/types/Message.h>
 
+#include <mutex>
 #include <optional>
+#include <stdexcept>
 
 #include "../popen_wdt/popen_wdt.hpp"
 
@@ -23,6 +25,7 @@ using TgBot::Message;
 using TgBot::User;
 using ::google::protobuf::RepeatedField;
 using ::tgbot::proto::Database;
+using ::tgbot::proto::MediaToNameDatabase;
 using ::tgbot::proto::PersonList;
 
 class ProtoDatabase {
@@ -50,43 +53,29 @@ class ProtoDatabase {
 };
 
 struct DatabaseWrapper {
+    void load(void);
+    void save(void) const;
+    UserId maybeGetOwnerId() const;
+
+    Database* getMainDatabase(void) {
+        return &protodb;
+    }
+    MediaToNameDatabase* getMediaDatabase(void) {
+        return &protomediadb;
+    }
+
+    DatabaseWrapper() = default;
     ~DatabaseWrapper() {
         save();
     }
-    void load(void) {
-        fname = getDatabaseFile().string();
-        std::fstream input(fname, std::ios::in | std::ios::binary);
-        assert(input);
-        protodb.ParseFromIstream(&input);
-        loaded = true;
-    }
-    void save(void) const {
-        if (warnNoLoaded(__func__)) {
-            std::fstream output(fname, std::ios::out | std::ios::trunc | std::ios::binary);
-            assert(output);
-            protodb.SerializeToOstream(&output);
-        }
-    }
-    Database* operator->(void) {
-        return &protodb;
-    }
-    UserId maybeGetOwnerId() const {
-        if (warnNoLoaded(__func__) && protodb.has_ownerid())
-            return protodb.ownerid();
-        else
-            return -1;
-    }
 
    private:
-    bool warnNoLoaded(const char* func) const {
-        if (!loaded) {
-            LOG_W("Database not loaded! Called function: '%s'", func);
-        }
-        return loaded;
-    }
+    bool warnNoLoaded(const char* func) const;
     Database protodb;
+    MediaToNameDatabase protomediadb;
     std::string fname;
     bool loaded = false;
+    std::once_flag once;
 };
 
 extern ProtoDatabase whitelist;

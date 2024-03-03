@@ -36,7 +36,8 @@ class SingleThreadCtrlManager {
         USAGE_ERROR_RECOVERY_THREAD,
         USAGE_IBASH_TIMEOUT_THREAD,
         USAGE_IBASH_EXIT_TIMEOUT_THREAD,
-        USAGE_IBASH_COMMAND_QUEUE_THREAD
+        USAGE_IBASH_COMMAND_QUEUE_THREAD,
+        USAGE_DATABASE_SYNC_THREAD,
     };
 
     // Get a controller with usage and flags

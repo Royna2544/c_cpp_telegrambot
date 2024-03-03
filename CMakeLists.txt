@@ -94,7 +94,6 @@ set(SRC_LIST
     src/ExtArgs.cpp
     src/signalhandler/SignalHandler_${TARGET_VARIANT}.cpp
     src/random/RandomNumberGenerator.cpp
-    src/SingleThreadCtrlManager.cpp
     src/SpamBlocker.cpp
     src/RegEXHandler.cpp
     src/TimerImpl.cpp
@@ -112,7 +111,7 @@ set(CMD_MODULES_SOURCES_LIST database_impl bash_impl ${CMD_MODULES_SINGLE_LIST} 
 ######################## Commands modules list ########################
 set(CMD_MODULES_LIST addblacklist rmblacklist addwhitelist 
       rmwhitelist bash unsafebash ${CMD_MODULES_SINGLE_LIST}
-      starttimer stoptimer)
+      starttimer stoptimer saveid)
 ####################### Commands modules defines #######################
 set(COMMANDS_CWD src/command_modules)
 set(COMMANDS_GEN_HEADER ${CMAKE_BINARY_DIR}/${COMMANDS_CWD}/cmds.gen.h)
@@ -137,7 +136,9 @@ FILE(APPEND ${COMMANDS_GEN_HEADER} "};\n")
 find_package(Protobuf REQUIRED)
 include(cmake/ProtobufCpp.cmake)
 my_protobuf_generate_cpp(proto/gen PROTO_SRCS PROTO_HDRS proto/TgBotDB.proto)
-add_library(TgBotDB STATIC src/Database.cpp ${PROTO_SRCS})
+add_library(TgBotDB STATIC src/Database.cpp
+                           src/DatabaseWrapper.cpp
+                           ${PROTO_SRCS})
 ####################### TgBotDB lib includes #######################
 get_filename_component(PROTO_HDRS_DIR ${PROTO_HDRS} DIRECTORY)
 target_include_directories(TgBotDB PUBLIC ${PROTO_HDRS_DIR})
@@ -194,6 +195,7 @@ add_library(TgBotRes STATIC ${CMAKE_BINARY_DIR}/src/ResourceIncBin.cpp)
 add_library(
   TgBotUtils STATIC
   src/ConfigManager.cpp
+  src/SingleThreadCtrlManager.cpp
   src/popen_wdt/popen_wdt_${TARGET_VARIANT}.c
   src/popen_wdt/popen_wdt_lib.cpp
   src/fslib/FileSystemLib.cpp
