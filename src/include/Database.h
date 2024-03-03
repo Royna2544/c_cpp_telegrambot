@@ -52,7 +52,7 @@ class ProtoDatabase {
 };
 
 struct DatabaseWrapper {
-    void load(void);
+    void load(bool withSync = false);
     void save(void) const;
     UserId maybeGetOwnerId() const;
 

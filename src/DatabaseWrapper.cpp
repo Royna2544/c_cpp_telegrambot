@@ -14,16 +14,18 @@ struct DatabaseSync : SingleThreadCtrlRunnable {
     }
 };
 
-void DatabaseWrapper::load() {
-    std::call_once(once, [this] {
+void DatabaseWrapper::load(const bool runSync) {
+    std::call_once(once, [this, runSync] {
         fname = getDatabaseFile().string();
         std::fstream input(fname, std::ios::in | std::ios::binary);
         if (!input)
             throw std::runtime_error("Failed to load database file");
         protodb.ParseFromIstream(&input);
-        auto syncMgr = gSThreadManager.getController<DatabaseSync>
-            (SingleThreadCtrlManager::USAGE_DATABASE_SYNC_THREAD);
-        syncMgr->run();
+
+        if (runSync) {
+            gSThreadManager.getController<DatabaseSync>
+                (SingleThreadCtrlManager::USAGE_DATABASE_SYNC_THREAD)->run();
+        }
         loaded = true;
     });
 }
