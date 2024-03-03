@@ -85,8 +85,8 @@ struct SingleThreadCtrl {
     using thread_function = std::function<void(void)>;
     using prestop_function = std::function<void(SingleThreadCtrl *)>;
 
-    // Set thread function - implictly starts the thread as well
-    void setThreadFunction(thread_function fn);
+    // Set thread function and run - implictly starts the thread as well
+    void runWith(thread_function fn);
     // Set the function called before stopping the thread
     void setPreStopFunction(prestop_function fn);
     // Stop the underlying thread
@@ -117,4 +117,17 @@ struct SingleThreadCtrl {
     prestop_function preStop;
     std::atomic_bool once = true;
     std::mutex ctrl_lk; // To modify the controller, user must hold this lock
+};
+
+struct SingleThreadCtrlRunnable : SingleThreadCtrl {
+    virtual void runFunction() = 0;
+    void run() {
+        SingleThreadCtrl::runWith(std::bind(&SingleThreadCtrlRunnable::runFunction, this));
+    }
+    void runWith(thread_function fn) {
+        SingleThreadCtrl::runWith(fn);
+    }
+
+    using SingleThreadCtrl::SingleThreadCtrl;
+    virtual ~SingleThreadCtrlRunnable() {}
 };

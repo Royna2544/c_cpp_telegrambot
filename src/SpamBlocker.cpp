@@ -216,7 +216,7 @@ void SpamBlockManager::run(const Bot &bot, const Message::Ptr &message) {
 
     using_cv = true;
     std::call_once(once, [this, &bot]{
-        setThreadFunction(std::bind(&SpamBlockManager::spamBlockerThreadFn, this, std::cref(bot)));
+        runWith(std::bind(&SpamBlockManager::spamBlockerThreadFn, this, std::cref(bot)));
     });
 
     {

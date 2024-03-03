@@ -1,6 +1,6 @@
 #include <SingleThreadCtrl.h>
 
-void SingleThreadCtrl::setThreadFunction(thread_function fn) {
+void SingleThreadCtrl::runWith(thread_function fn) {
     const std::lock_guard<std::mutex> _(ctrl_lk);
     if (!threadP)
         threadP = std::thread(&SingleThreadCtrl::_threadFn, this, fn);

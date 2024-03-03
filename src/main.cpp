@@ -110,7 +110,7 @@ int main(int argc, const char** argv) {
     std::promise<bool> socketCreatedProm;
     auto socketCreatedFut = socketCreatedProm.get_future();
 
-    socketConnectionManager->setThreadFunction([&socketCreatedProm] {
+    socketConnectionManager->runWith([&socketCreatedProm] {
         startListening([](struct TgBotConnection conn) {
             socketConnectionHandler(gBot, conn);
         },
@@ -171,7 +171,7 @@ int main(int argc, const char** argv) {
                 SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_NONEXIST | 
                     SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_NONEXIST_FAILACTION_IGNORE);
             if (cl) {
-                cl->setThreadFunction([] {
+                cl->runWith([] {
                     std::this_thread::sleep_for(kErrorRecoveryDelay);
                     gAuthorized = true;
                 });

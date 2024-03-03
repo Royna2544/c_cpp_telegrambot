@@ -202,7 +202,7 @@ struct InteractiveBashContext {
                 SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_FAILACTION_ASSERT);
         do {
             onNoOutputThread->reset();
-            onNoOutputThread->setThreadFunction(std::bind(&TimeoutThread::start, onNoOutputThread, onNoOutputCallbackFn));
+            onNoOutputThread->runWith(std::bind(&TimeoutThread::start, onNoOutputThread, onNoOutputCallbackFn));
             ssize_t rc = read(parent_readfd, buf, sizeof(buf));
             onNoOutputThread->stop();
             if (rc > 0) {

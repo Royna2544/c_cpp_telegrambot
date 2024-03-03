@@ -164,7 +164,7 @@ void TimerCommandManager::startTimer(const Bot &bot, const Message::Ptr& msg) {
             LOG_W("Cannot pin msg!");
             botcanpin = false;
         }
-        setThreadFunction(std::bind(&TimerCommandManager::TimerThreadFn, this,
+        runWith(std::bind(&TimerCommandManager::TimerThreadFn, this,
             std::cref(bot), message, parsedTime));
         setPreStopFunction(std::bind(&TimerCommandManager::Timerstop, std::placeholders::_1));
     }
