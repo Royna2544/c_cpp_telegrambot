@@ -3,8 +3,8 @@
 
 using database::DatabaseWrapper;
 
-struct DatabaseSync : SingleThreadCtrl {
-    void run() {
+struct DatabaseSync : SingleThreadCtrlRunnable {
+    void runFunction() override {
         using_cv = true;
         while (kRun) {
             database::DBWrapper.save();
@@ -24,7 +24,7 @@ void DatabaseWrapper::load() {
         protomediadb.ParseFromIstream(&input);
         auto syncMgr = gSThreadManager.getController<DatabaseSync>
             (SingleThreadCtrlManager::USAGE_DATABASE_SYNC_THREAD);
-        syncMgr->runWith(std::bind(&DatabaseSync::run, syncMgr));
+        syncMgr->run();
         loaded = true;
     });
 }
