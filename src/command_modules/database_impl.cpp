@@ -53,7 +53,7 @@ static void saveIdFn(const Bot& bot, const Message::Ptr& message) {
         }
         if (fileId) {
             if (nonMutableMediaDB->entries().size() > 0) {
-                for (size_t i = 0; i < nonMutableMediaDB->entries_size(); ++i) {
+                for (int i = 0; i < nonMutableMediaDB->entries_size(); ++i) {
                     const auto& it = nonMutableMediaDB->entries(i);
                     if (it.has_telegrammediaid() && fileId == it.telegrammediaid()) {
                         bot_sendReplyMessage(bot, message, "FileId already exists on MediaDatabase");
