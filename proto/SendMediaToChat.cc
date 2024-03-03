@@ -37,7 +37,7 @@ int main(const int argc, const char** argv) {
         const auto mediaEntriesIt = mediaEntries.Get(i);
         if (const auto mediaEntriesNames = mediaEntriesIt.names(); mediaEntriesNames.size() > 0) {
             for (int j = 0; j < mediaEntriesNames.size(); ++j) {
-                if (mediaEntriesNames.Get(j) == argv[2]) {
+                if (!strcasecmp(mediaEntriesNames.Get(j).c_str(), argv[2])) {
                     it = mediaEntriesIt;
                     break;
                 }
