@@ -86,51 +86,16 @@ struct SingleThreadCtrl {
     using prestop_function = std::function<void(SingleThreadCtrl *)>;
 
     // Set thread function - implictly starts the thread as well
-    void setThreadFunction(thread_function fn) {
-        const std::lock_guard<std::mutex> _(ctrl_lk);
-        if (!threadP)
-            threadP = std::thread(&SingleThreadCtrl::_threadFn, this, fn);
-        else {
-            LOG_W("Function is already set in this instance");
-        }
-    }
-
+    void setThreadFunction(thread_function fn);
     // Set the function called before stopping the thread
-    void setPreStopFunction(prestop_function fn) {
-        const std::lock_guard<std::mutex> _(ctrl_lk);
-        preStop = fn;
-    }
-
+    void setPreStopFunction(prestop_function fn);
     // Stop the underlying thread
-    void stop() {
-        const std::lock_guard<std::mutex> _(ctrl_lk);
-        if (once) {
-            if (preStop)
-                preStop(this);
-            kRun = false;
-            if (using_cv) {
-                {
-                    std::lock_guard<std::mutex> lk(CV_m);
-                }
-                cv.notify_one();
-            }
-            if (threadP && threadP->joinable())
-                threadP->join();
-            once = false;
-        };
-    }
+    void stop();
 
     // Reset the counter, to make this instance reusable
-    void reset() {
-        const std::lock_guard<std::mutex> _(ctrl_lk);
-        once = true;
-        threadP.reset();
-    }
-
-    void allowAutoDelete(const bool allow) {
-        const std::lock_guard<std::mutex> _(ctrl_lk);
-        kAutoDelete = allow;
-    }
+    void reset();
+    // Allow auto-deletion of completed controller
+    void allowAutoDelete(const bool allow);
 
     virtual ~SingleThreadCtrl() {
         stop();
@@ -146,21 +111,7 @@ struct SingleThreadCtrl {
     std::mutex CV_m;
 
    private:
-    void _threadFn(thread_function fn) {
-        fn();
-        if (kRun && kAutoDelete) {
-            const std::lock_guard<std::mutex> _(ctrl_lk);
-            const auto& ctrls = gSThreadManager.kControllers;
-            LOG_I("A thread ended before stop command");
-            auto it = std::find_if(ctrls.begin(), ctrls.end(),
-                                   [](std::remove_reference_t<decltype(ctrls)>::const_reference e) {
-                                       return std::this_thread::get_id() == e.second->threadP->get_id();
-                                   });
-            if (it != ctrls.end()) {
-                gSThreadManager.destroyControllerWithStop(it->first);
-            }
-        }
-    }
+    void _threadFn(thread_function fn);
 
     std::optional<std::thread> threadP;
     prestop_function preStop;

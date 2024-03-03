@@ -195,6 +195,7 @@ add_library(TgBotRes STATIC ${CMAKE_BINARY_DIR}/src/ResourceIncBin.cpp)
 add_library(
   TgBotUtils STATIC
   src/ConfigManager.cpp
+  src/SingleThreadCtrl.cpp
   src/SingleThreadCtrlManager.cpp
   src/popen_wdt/popen_wdt_${TARGET_VARIANT}.c
   src/popen_wdt/popen_wdt_lib.cpp
