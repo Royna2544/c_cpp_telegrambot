@@ -249,18 +249,8 @@ endif()
 #####################################################################
 
 ############### Bot functions' Test Arena (googletest) ##############
-include(FetchContent)
-FetchContent_Declare(
-        googletest
-        GIT_REPOSITORY https://github.com/google/googletest.git
-        GIT_TAG        v1.14.0
-)
-FetchContent_GetProperties(googletest)
-if(NOT googletest_POPULATED)
-    FetchContent_Populate(googletest)
-    add_subdirectory(${googletest_SOURCE_DIR} ${googletest_BINARY_DIR})
-    include_directories(${gtest_SOURCE_DIR}/include ${gmock_SOURCE_DIR}/include)
-endif()
+add_subdirectory(src/third-party/googletest)
+include_directories(${gtest_SOURCE_DIR}/include ${gmock_SOURCE_DIR}/include)
 ###################### Creates the test target ######################
 add_executable(${PROJECT_TEST_NAME} tests/AuthorizationTest.cpp)
 target_link_libraries(${PROJECT_TEST_NAME} gtest gtest_main TgBotCommandModules)
