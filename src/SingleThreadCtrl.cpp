@@ -41,15 +41,16 @@ void SingleThreadCtrl::reset() {
 void SingleThreadCtrl::_threadFn(thread_function fn) {
     fn();
     if (kRun) {
-        const std::lock_guard<std::mutex> _(ctrl_lk);
-        const auto& ctrls = gSThreadManager.kControllers;
-        LOG_I("A thread ended before stop command, invoke deleter");
+        LOG_I("A thread ended before stop command");
+    }
+    if (!gSThreadManager.kIsUnderStopAll) {
+        auto& ctrls = gSThreadManager.kControllers;
         auto it = std::find_if(ctrls.begin(), ctrls.end(),
-                               [](std::remove_reference_t<decltype(ctrls)>::const_reference e) {
-                                   return std::this_thread::get_id() == e.second->threadP->get_id();
-                               });
+                    [](std::remove_reference_t<decltype(ctrls)>::const_reference e) {
+                        return std::this_thread::get_id() == e.second->threadP->get_id();
+                    });
         if (it != ctrls.end()) {
-            gSThreadManager.destroyControllerWithStop(it->first);
+            gSThreadManager.destroyController(it);
         }
     }
 }

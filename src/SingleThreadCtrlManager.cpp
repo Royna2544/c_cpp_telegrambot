@@ -2,31 +2,23 @@
 #include <future>
 #include <latch>
 
-void SingleThreadCtrlManager::destroyController(const ThreadUsage usage) {
-    auto it = kControllers.find(usage);
-
-    if (it != kControllers.end()) {
+void SingleThreadCtrlManager::destroyController(decltype(kControllers)::iterator it) {
+    ASSERT(it->second, "Controller with type %d is null, but deletion requested", it->first);
+    kShutdownFutures.emplace_back(std::async(std::launch::async, [this, it] {
+        it->second->stop();
+        LOG_V("Deleting: Controller with usage %d", it->first);
         {
             const std::lock_guard<std::mutex> _(it->second->ctrl_lk);
         }
-        LOG_V("Deleting: Controller with usage %d", usage);
         it->second.reset();
         kControllers.erase(it);
-    } else {
-        LOG_W("Not allocated: Controller with usage %d", usage);
-    }
+    }));
 }
 void SingleThreadCtrlManager::checkRequireFlags(int flags) {
     if (flags & FLAG_GETCTRL_REQUIRE_FAILACTION_ASSERT)
         ASSERT(false, "Flags requested FAILACTION_ASSERT");
     if (flags & FLAG_GETCTRL_REQUIRE_FAILACTION_LOG)
         LOG_E("Flags-assertion failed");
-}
-void SingleThreadCtrlManager::destroyControllerWithStop(const ThreadUsage usage) {
-    kShutdownFutures.emplace_back(std::async(std::launch::async, [this, usage] {
-        getController<SingleThreadCtrl>(usage)->stop();
-        destroyController(usage);
-    }));
 }
 void SingleThreadCtrlManager::stopAll() {
     std::latch controllersShutdownLH(kControllers.size());
@@ -35,6 +27,7 @@ void SingleThreadCtrlManager::stopAll() {
     using ControllerRef = decltype(kControllers)::const_reference;
     using FutureRef = std::add_lvalue_reference_t<decltype(kShutdownFutures)::value_type>;
 
+    kIsUnderStopAll = true;
     std::for_each(kControllers.begin(), kControllers.end(), 
         [&controllersShutdownLH, &threads](ControllerRef e) {
         LOG_V("Shutdown: Controller with usage %d", e.first);
@@ -58,5 +51,6 @@ void SingleThreadCtrlManager::stopAll() {
     futureShutdownLH.wait();
     for (auto& i : threads)
         i.join();
+    kIsUnderStopAll = false;
 }
 SingleThreadCtrlManager gSThreadManager;

@@ -124,8 +124,6 @@ int main(int argc, const char** argv) {
         writeToSocket({CMD_EXIT, {.data_2 = e}});
         socketConnectionManager->setPreStopFunction(std::bind(&cleanupSocket,
             std::cref(exitToken), std::placeholders::_1));
-    } else {
-        gSThreadManager.destroyController(SingleThreadCtrlManager::USAGE_SOCKET_THREAD);
     }
 #endif
 #ifdef RTCOMMAND_LOADER

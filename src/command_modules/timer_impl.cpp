@@ -13,7 +13,6 @@ static void TimerStopCommandFn(const Bot &bot, const Message::Ptr message) {
     gSThreadManager
         .getController<TimerCommandManager>(SingleThreadCtrlManager::USAGE_TIMER_THREAD)
         ->stopTimer(bot, message);
-    gSThreadManager.destroyController(SingleThreadCtrlManager::USAGE_TIMER_THREAD);
 }
 
 struct CommandModule cmd_starttimer {

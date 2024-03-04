@@ -217,7 +217,6 @@ struct InteractiveBashContext {
                 break;
             // Exit if child has nothing more to send to us, or it is reading stdin
         } while (HasData(DATA_IN, false) || HasData(DATA_IN, false));
-        gSThreadManager.destroyController(SingleThreadCtrlManager::USAGE_IBASH_TIMEOUT_THREAD);
         TrimStr(result);
         if (!resModified) {
             result = "(No output)";

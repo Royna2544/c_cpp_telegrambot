@@ -47,6 +47,10 @@ class SingleThreadCtrlManager {
         std::shared_ptr<SingleThreadCtrl> ptr;
         auto it = kControllers.find(usage);
 
+        if (kIsUnderStopAll) {
+            LOG_W("Under stopAll(), ignore");
+            return {};
+        }
         if (it != kControllers.end()) {
             if (flags & FLAG_GETCTRL_REQUIRE_NONEXIST) {
                 if (flags & FLAG_GETCTRL_REQUIRE_NONEXIST_FAILACTION_IGNORE) {
@@ -65,17 +69,17 @@ class SingleThreadCtrlManager {
         }
         return std::static_pointer_cast<T>(ptr);
     }
-    // Destroy a controller given usage
-    void destroyController(const ThreadUsage usage);
     // Stop all controllers managed by this manager
     void stopAll();
     friend struct SingleThreadCtrl;
 
    private:
+    std::atomic_bool kIsUnderStopAll = false;
     static void checkRequireFlags(int flags);
-    void destroyControllerWithStop(const ThreadUsage usage);
     std::unordered_map<ThreadUsage, std::shared_ptr<SingleThreadCtrl>> kControllers;
     std::vector<std::future<void>> kShutdownFutures;
+    // Destroy a controller given usage
+    void destroyController(decltype(kControllers)::iterator it);
 };
 
 extern SingleThreadCtrlManager gSThreadManager;
