@@ -6,16 +6,15 @@
 
 #include "TgBotSocket.h"
 
-#define ENUM_STR(enum) array_helpers::make_elem(enum, std::string(#enum))
 #define ARGUMENT_SIZE(enum, len) array_helpers::make_elem(enum, len)
 
-const auto kTgBotCommandStrMap = array_helpers::make<CMD_MAX, TgBotCommand, std::string>(
-    ENUM_STR(CMD_EXIT),
-    ENUM_STR(CMD_WRITE_MSG_TO_CHAT_ID),
-    ENUM_STR(CMD_CTRL_SPAMBLOCK),
-    ENUM_STR(CMD_OBSERVE_CHAT_ID),
-    ENUM_STR(CMD_SEND_FILE_TO_CHAT_ID),
-    ENUM_STR(CMD_OBSERVE_ALL_CHATS)
+constexpr auto kTgBotCommandStrMap = array_helpers::make<CMD_MAX, TgBotCommand, const char *>(
+    ENUM_AND_STR(CMD_EXIT),
+    ENUM_AND_STR(CMD_WRITE_MSG_TO_CHAT_ID),
+    ENUM_AND_STR(CMD_CTRL_SPAMBLOCK),
+    ENUM_AND_STR(CMD_OBSERVE_CHAT_ID),
+    ENUM_AND_STR(CMD_SEND_FILE_TO_CHAT_ID),
+    ENUM_AND_STR(CMD_OBSERVE_ALL_CHATS)
 );
 
 const auto kTgBotCommandArgsCount =  array_helpers::make<CMD_MAX - 1, TgBotCommand, int>(
