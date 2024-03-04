@@ -5,7 +5,7 @@ void SingleThreadCtrl::runWith(thread_function fn) {
     if (!threadP)
         threadP = std::thread(&SingleThreadCtrl::_threadFn, this, fn);
     else {
-        LOG_W("Function is already set in this instance");
+        LOG_W("Function is already set: %s controller", usageStr);
     }
 }
 
@@ -41,7 +41,7 @@ void SingleThreadCtrl::reset() {
 void SingleThreadCtrl::_threadFn(thread_function fn) {
     fn();
     if (kRun) {
-        LOG_I("A thread ended before stop command");
+        LOG_I("%s controller ended before stop command", usageStr);
     }
     if (!gSThreadManager.kIsUnderStopAll) {
         auto& ctrls = gSThreadManager.kControllers;

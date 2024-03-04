@@ -1,10 +1,9 @@
 #pragma once
 
-#include <algorithm>
 #include <atomic>
 #include <condition_variable>
-#include <future>
 #include <functional>
+#include <future>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -13,6 +12,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "EnumArrayHelpers.h"
 #include "Logging.h"
 
 struct SingleThreadCtrl;
@@ -38,37 +38,27 @@ class SingleThreadCtrlManager {
         USAGE_IBASH_EXIT_TIMEOUT_THREAD,
         USAGE_IBASH_COMMAND_QUEUE_THREAD,
         USAGE_DATABASE_SYNC_THREAD,
+        USAGE_MAX,
     };
+
+    constexpr static auto ThreadUsageToStrMap = array_helpers::make<USAGE_MAX, ThreadUsage, const char*>(
+        ENUM_AND_STR(USAGE_SOCKET_THREAD),
+        ENUM_AND_STR(USAGE_TIMER_THREAD),
+        ENUM_AND_STR(USAGE_SPAMBLOCK_THREAD),
+        ENUM_AND_STR(USAGE_ERROR_RECOVERY_THREAD),
+        ENUM_AND_STR(USAGE_IBASH_TIMEOUT_THREAD),
+        ENUM_AND_STR(USAGE_IBASH_EXIT_TIMEOUT_THREAD),
+        ENUM_AND_STR(USAGE_IBASH_COMMAND_QUEUE_THREAD),
+        ENUM_AND_STR(USAGE_DATABASE_SYNC_THREAD));
+
+    constexpr static const char* ThreadUsageToStr(const ThreadUsage u) {
+        return ThreadUsageToStrMap[u].second;
+    }
 
     // Get a controller with usage and flags
     template <class T = SingleThreadCtrl,
               std::enable_if_t<std::is_base_of_v<SingleThreadCtrl, T>, bool> = true>
-    std::shared_ptr<T> getController(const ThreadUsage usage, int flags = 0) {
-        std::shared_ptr<SingleThreadCtrl> ptr;
-        auto it = kControllers.find(usage);
-
-        if (kIsUnderStopAll) {
-            LOG_W("Under stopAll(), ignore");
-            return {};
-        }
-        if (it != kControllers.end()) {
-            if (flags & FLAG_GETCTRL_REQUIRE_NONEXIST) {
-                if (flags & FLAG_GETCTRL_REQUIRE_NONEXIST_FAILACTION_IGNORE) {
-                    LOG_V("Return null");
-                    return {};
-                }
-                checkRequireFlags(flags);
-            }
-            LOG_V("Using old: Controller with usage %d", usage);
-            ptr = it->second;
-        } else {
-            if (flags & FLAG_GETCTRL_REQUIRE_EXIST)
-                checkRequireFlags(flags);
-            LOG_V("New allocation: Controller with usage %d", usage);
-            ptr = kControllers[usage] = std::make_shared<T>();
-        }
-        return std::static_pointer_cast<T>(ptr);
-    }
+    std::shared_ptr<T> getController(const ThreadUsage usage, int flags = 0);
     // Stop all controllers managed by this manager
     void stopAll();
     friend struct SingleThreadCtrl;
@@ -87,7 +77,7 @@ extern SingleThreadCtrlManager gSThreadManager;
 struct SingleThreadCtrl {
     SingleThreadCtrl() = default;
     using thread_function = std::function<void(void)>;
-    using prestop_function = std::function<void(SingleThreadCtrl *)>;
+    using prestop_function = std::function<void(SingleThreadCtrl*)>;
 
     // Set thread function and run - implictly starts the thread as well
     void runWith(thread_function fn);
@@ -113,11 +103,12 @@ struct SingleThreadCtrl {
 
    private:
     void _threadFn(thread_function fn);
-
+    // It would'nt be a dangling one
+    const char* usageStr;
     std::optional<std::thread> threadP;
     prestop_function preStop;
     std::atomic_bool once = true;
-    std::mutex ctrl_lk; // To modify the controller, user must hold this lock
+    std::mutex ctrl_lk;  // To modify the controller, user must hold this lock
 };
 
 struct SingleThreadCtrlRunnable : SingleThreadCtrl {
@@ -129,3 +120,33 @@ struct SingleThreadCtrlRunnable : SingleThreadCtrl {
     using SingleThreadCtrl::SingleThreadCtrl;
     virtual ~SingleThreadCtrlRunnable() {}
 };
+
+template <class T, std::enable_if_t<std::is_base_of_v<SingleThreadCtrl, T>, bool>>
+std::shared_ptr<T> SingleThreadCtrlManager::getController(const ThreadUsage usage, int flags) {
+    std::shared_ptr<SingleThreadCtrl> ptr;
+    auto it = kControllers.find(usage);
+
+    if (kIsUnderStopAll) {
+        LOG_W("Under stopAll(), ignore");
+        return {};
+    }
+    if (it != kControllers.end()) {
+        if (flags & FLAG_GETCTRL_REQUIRE_NONEXIST) {
+            if (flags & FLAG_GETCTRL_REQUIRE_NONEXIST_FAILACTION_IGNORE) {
+                LOG_V("Return null");
+                return {};
+            }
+            checkRequireFlags(flags);
+        }
+        LOG_V("Using old: %s controller", SingleThreadCtrlManager::ThreadUsageToStr(usage));
+        ptr = it->second;
+    } else {
+        if (flags & FLAG_GETCTRL_REQUIRE_EXIST)
+            checkRequireFlags(flags);
+        LOG_V("New allocation: %s controller", SingleThreadCtrlManager::ThreadUsageToStr(usage));
+        auto newit = std::make_shared<T>();
+        std::static_pointer_cast<SingleThreadCtrl>(newit)->usageStr = ThreadUsageToStr(usage);
+        ptr = kControllers[usage] = newit; 
+    }
+    return std::static_pointer_cast<T>(ptr);
+}

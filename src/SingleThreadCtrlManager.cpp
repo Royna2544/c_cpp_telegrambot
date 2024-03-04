@@ -6,7 +6,7 @@ void SingleThreadCtrlManager::destroyController(decltype(kControllers)::iterator
     ASSERT(it->second, "Controller with type %d is null, but deletion requested", it->first);
     kShutdownFutures.emplace_back(std::async(std::launch::async, [this, it] {
         it->second->stop();
-        LOG_V("Deleting: Controller with usage %d", it->first);
+        LOG_V("Deleting: %s controller", SingleThreadCtrlManager::ThreadUsageToStr(it->first));
         {
             const std::lock_guard<std::mutex> _(it->second->ctrl_lk);
         }
@@ -30,7 +30,7 @@ void SingleThreadCtrlManager::stopAll() {
     kIsUnderStopAll = true;
     std::for_each(kControllers.begin(), kControllers.end(), 
         [&controllersShutdownLH, &threads](ControllerRef e) {
-        LOG_V("Shutdown: Controller with usage %d", e.first);
+        LOG_V("Shutdown: %s controller", e.second->usageStr);
         threads.emplace_back([e = std::move(e), &controllersShutdownLH] {
             e.second->stop();
             controllersShutdownLH.count_down();
