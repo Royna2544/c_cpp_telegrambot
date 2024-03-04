@@ -125,10 +125,7 @@ struct SingleThreadCtrlRunnable : SingleThreadCtrl {
     void run() {
         SingleThreadCtrl::runWith(std::bind(&SingleThreadCtrlRunnable::runFunction, this));
     }
-    void runWith(thread_function fn) {
-        SingleThreadCtrl::runWith(fn);
-    }
-
+    using SingleThreadCtrl::runWith;
     using SingleThreadCtrl::SingleThreadCtrl;
     virtual ~SingleThreadCtrlRunnable() {}
 };
