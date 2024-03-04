@@ -91,11 +91,8 @@ struct SingleThreadCtrl {
     void setPreStopFunction(prestop_function fn);
     // Stop the underlying thread
     void stop();
-
     // Reset the counter, to make this instance reusable
     void reset();
-    // Allow auto-deletion of completed controller
-    void allowAutoDelete(const bool allow);
 
     virtual ~SingleThreadCtrl() {
         stop();
@@ -104,7 +101,7 @@ struct SingleThreadCtrl {
     friend class SingleThreadCtrlManager;
 
    protected:
-    std::atomic_bool kRun = true, kAutoDelete = true;
+    std::atomic_bool kRun = true;
     // Used by std::cv
     std::condition_variable cv;
     bool using_cv = false;

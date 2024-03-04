@@ -38,14 +38,9 @@ void SingleThreadCtrl::reset() {
     threadP.reset();
 }
 
-void SingleThreadCtrl::allowAutoDelete(const bool allow) {
-    const std::lock_guard<std::mutex> _(ctrl_lk);
-    kAutoDelete = allow;
-}
-
 void SingleThreadCtrl::_threadFn(thread_function fn) {
     fn();
-    if (kRun && kAutoDelete) {
+    if (kRun) {
         const std::lock_guard<std::mutex> _(ctrl_lk);
         const auto& ctrls = gSThreadManager.kControllers;
         LOG_I("A thread ended before stop command, invoke deleter");
