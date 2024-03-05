@@ -1,7 +1,6 @@
 #include <SingleThreadCtrl.h>
 
 void SingleThreadCtrl::runWith(thread_function fn) {
-    const std::lock_guard<std::mutex> _(ctrl_lk);
     if (!threadP)
         threadP = std::thread(&SingleThreadCtrl::_threadFn, this, fn);
     else {
@@ -10,12 +9,10 @@ void SingleThreadCtrl::runWith(thread_function fn) {
 }
 
 void SingleThreadCtrl::setPreStopFunction(prestop_function fn) {
-    const std::lock_guard<std::mutex> _(ctrl_lk);
     preStop = fn;
 }
 
 void SingleThreadCtrl::stop() {
-    const std::lock_guard<std::mutex> _(ctrl_lk);
     if (once) {
         if (preStop)
             preStop(this);
@@ -33,7 +30,6 @@ void SingleThreadCtrl::stop() {
 }
 
 void SingleThreadCtrl::reset() {
-    const std::lock_guard<std::mutex> _(ctrl_lk);
     once = true;
     threadP.reset();
 }
@@ -50,7 +46,7 @@ void SingleThreadCtrl::_threadFn(thread_function fn) {
                         return std::this_thread::get_id() == e.second->threadP->get_id();
                     });
         if (it != ctrls.end()) {
-            gSThreadManager.destroyController(it);
+            gSThreadManager.destroyController(it->first);
         }
     }
 }

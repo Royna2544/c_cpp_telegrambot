@@ -84,7 +84,6 @@ class SingleThreadCtrlManager {
     std::unordered_map<ThreadUsage, controller_type> kControllers;
     std::vector<std::future<void>> kShutdownFutures;
     // Destroy a controller given usage
-    void destroyController(decltype(kControllers)::iterator it);
     void destroyController(ThreadUsage usage);
 };
 
@@ -124,16 +123,15 @@ struct SingleThreadCtrl {
     std::optional<std::thread> threadP;
     prestop_function preStop;
     std::atomic_bool once = true;
-    std::mutex ctrl_lk;  // To modify the controller, user must hold this lock
 };
 
 struct SingleThreadCtrlRunnable : SingleThreadCtrl {
+    using SingleThreadCtrl::runWith;
+    using SingleThreadCtrl::SingleThreadCtrl;
     virtual void runFunction() = 0;
     void run() {
         SingleThreadCtrl::runWith(std::bind(&SingleThreadCtrlRunnable::runFunction, this));
     }
-    using SingleThreadCtrl::runWith;
-    using SingleThreadCtrl::SingleThreadCtrl;
     virtual ~SingleThreadCtrlRunnable() {}
 };
 
@@ -150,14 +148,14 @@ std::shared_ptr<T> SingleThreadCtrlManager::getController(const ThreadUsage usag
         if (const auto maybeRet = checkRequireFlags(FLAG_GETCTRL_REQUIRE_NONEXIST, flags); maybeRet)
             ptr = maybeRet.value();
         else {
-            LOG_V("Using old: %s controller", SingleThreadCtrlManager::ThreadUsageToStr(usage));
+            LOG_V("Using old: %s controller", ThreadUsageToStr(usage));
             ptr = it->second;
         }
     } else {
         if (const auto maybeRet = checkRequireFlags(FLAG_GETCTRL_REQUIRE_EXIST, flags); maybeRet)
             ptr = maybeRet.value();
         else {
-            LOG_V("New allocation: %s controller", SingleThreadCtrlManager::ThreadUsageToStr(usage));
+            LOG_V("New allocation: %s controller", ThreadUsageToStr(usage));
             auto newit = std::make_shared<T>();
             std::static_pointer_cast<SingleThreadCtrl>(newit)->usageStr = ThreadUsageToStr(usage);
             ptr = kControllers[usage] = newit; 

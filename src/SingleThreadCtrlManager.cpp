@@ -5,30 +5,23 @@
 #include <mutex>
 #include <optional>
 
-void SingleThreadCtrlManager::destroyController(decltype(kControllers)::iterator it) {
-    static std::array<std::mutex, USAGE_MAX> kDestroyLocks;
+void SingleThreadCtrlManager::destroyController(const ThreadUsage thisUsage) {
+    static std::array<std::mutex, USAGE_MAX> kPerUsageLocks;
 
-    ASSERT(it->second, "Controller with type %d is null, but deletion requested", it->first);
-    kShutdownFutures.emplace_back(std::async(std::launch::async, [this, it] {
-        auto &ctrl_lk = it->second->ctrl_lk;
-
-        std::unique_lock<std::mutex> lk(kDestroyLocks[it->first], std::defer_lock);
-        it->second->stop();
-        std::lock(ctrl_lk, kDestroyLocks[it->first]);
-        LOG_V("Deleting: %s controller", SingleThreadCtrlManager::ThreadUsageToStr(it->first));
-        ctrl_lk.unlock();
-        it->second.reset();
-        kControllers.erase(it);
+    kShutdownFutures.emplace_back(std::async(std::launch::async, [this, thisUsage] {
+        std::unique_lock<std::mutex> lk(kPerUsageLocks[thisUsage]);
+        // Do a refind
+        auto it = kControllers.find(thisUsage);
+        if (it != kControllers.end() && it->second) {
+            LOG_V("Stopping: %s controller", ThreadUsageToStr(thisUsage));
+            it->second->stop();
+            LOG_V("Deleting: %s controller", ThreadUsageToStr(thisUsage));
+            it->second.reset();
+            kControllers.erase(it);
+        }
     }));
 }
-void SingleThreadCtrlManager::destroyController(ThreadUsage usage) {
-    auto it = kControllers.find(usage);
-    if (it != kControllers.end()) {
-        destroyController(it);
-    } else {
-        LOG_W("Couldn't find %s controller to delete", it->second->usageStr);
-    }
-}
+
 std::optional<SingleThreadCtrlManager::controller_type>
 SingleThreadCtrlManager::checkRequireFlags(GetControllerFlags opposite, int flags) {
     if (flags & opposite) {
