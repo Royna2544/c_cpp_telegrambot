@@ -215,7 +215,7 @@ add_subdirectory(lib)
 
 ################### The Bot's main functionaility ###################
 add_library(TgBotCommandModules STATIC ${SRC_LIST})
-target_include_directories(TgBotCommandModules PUBLIC ${CMAKE_BINARY_DIR}/${COMMANDS_CWD})
+target_include_directories(TgBotCommandModules PUBLIC ${COMMANDS_CWD})
 ######################## Libraries to link ########################
 macro(add_lib_if var)
   if(${var})
