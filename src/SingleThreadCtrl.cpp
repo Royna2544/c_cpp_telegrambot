@@ -1,4 +1,6 @@
 #include <SingleThreadCtrl.h>
+#include <mutex>
+#include <shared_mutex>
 
 void SingleThreadCtrl::runWith(thread_function fn) {
     if (!threadP)
@@ -36,7 +38,9 @@ void SingleThreadCtrl::_threadFn(thread_function fn) {
         LOG_I("%s controller ended before stop command", usageStr);
     }
     if (!gSThreadManager.kIsUnderStopAll) {
+        const std::shared_lock<std::shared_mutex> lk(gSThreadManager.mControllerLock);
         auto& ctrls = gSThreadManager.kControllers;
+
         auto it = std::find_if(ctrls.begin(), ctrls.end(),
                     [](std::remove_reference_t<decltype(ctrls)>::const_reference e) {
                         return std::this_thread::get_id() == e.second->threadP->get_id();

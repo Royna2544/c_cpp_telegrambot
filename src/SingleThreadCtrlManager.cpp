@@ -4,12 +4,14 @@
 #include <latch>
 #include <mutex>
 #include <optional>
+#include <shared_mutex>
 
 void SingleThreadCtrlManager::destroyController(const ThreadUsage thisUsage) {
     static std::array<std::mutex, USAGE_MAX> kPerUsageLocks;
 
     kShutdownFutures.emplace_back(std::async(std::launch::async, [this, thisUsage] {
         std::unique_lock<std::mutex> lk(kPerUsageLocks[thisUsage]);
+        std::lock_guard<std::shared_mutex> _(mControllerLock);
         // Do a refind
         auto it = kControllers.find(thisUsage);
         if (it != kControllers.end() && it->second) {
@@ -44,25 +46,29 @@ void SingleThreadCtrlManager::stopAll() {
 
     kIsUnderStopAll = true;
     std::for_each(kControllers.begin(), kControllers.end(),
-                  [&controllersShutdownLH, &threads](ControllerRef e) {
-                      LOG_V("Shutdown: %s controller", e.second->usageStr);
-                      threads.emplace_back([e = std::move(e), &controllersShutdownLH] {
-                          e.second->stop();
-                          controllersShutdownLH.count_down();
-                      });
-                  });
+        [&controllersShutdownLH, &threads, this](ControllerRef e) {
+            LOG_V("Shutdown: %s controller", e.second->usageStr);
+            threads.emplace_back([e = std::move(e), &controllersShutdownLH, this] {
+                const std::lock_guard<std::shared_mutex> _(mControllerLock);
+                e.second->stop();
+                controllersShutdownLH.count_down();
+            });
+        }
+    );
     controllersShutdownLH.wait();
     for (auto& i : threads)
         i.join();
     threads.clear();
 
     std::for_each(kShutdownFutures.begin(), kShutdownFutures.end(),
-                  [&futureShutdownLH, &threads](FutureRef e) {
-                      threads.emplace_back([e = std::move(e), &futureShutdownLH]() {
-                          e.wait();
-                          futureShutdownLH.count_down();
-                      });
-                  });
+        [&futureShutdownLH, &threads, this](FutureRef e) {
+            threads.emplace_back([e = std::move(e), &futureShutdownLH, this] {
+                const std::lock_guard<std::shared_mutex> _(mControllerLock);
+                e.wait();
+                futureShutdownLH.count_down();
+            });
+        }
+    );
     futureShutdownLH.wait();
     for (auto& i : threads)
         i.join();

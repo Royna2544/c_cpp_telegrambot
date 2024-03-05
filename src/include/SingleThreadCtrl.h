@@ -7,6 +7,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <shared_mutex>
 #include <thread>
 #include <type_traits>
 #include <unordered_map>
@@ -75,6 +76,7 @@ class SingleThreadCtrlManager {
    private:
     std::atomic_bool kIsUnderStopAll = false;
     static std::optional<controller_type> checkRequireFlags(GetControllerFlags opposite, int flags);
+    std::shared_mutex mControllerLock;
     std::unordered_map<ThreadUsage, controller_type> kControllers;
     std::vector<std::future<void>> kShutdownFutures;
     // Destroy a controller given usage
@@ -141,6 +143,7 @@ struct SingleThreadCtrlRunnable : SingleThreadCtrl {
 template <class T, std::enable_if_t<std::is_base_of_v<SingleThreadCtrl, T>, bool>>
 std::shared_ptr<T> SingleThreadCtrlManager::getController(const ThreadUsage usage, int flags) {
     controller_type ptr;
+    const std::lock_guard<std::shared_mutex> _(mControllerLock);
     auto it = kControllers.find(usage);
 
 #ifndef _SINGLETHREADCTRL_TEST
