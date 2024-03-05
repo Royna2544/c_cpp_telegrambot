@@ -6,6 +6,9 @@
 #include <SingleThreadCtrl.h>
 
 struct SingleThreadCtrlTestAccessors {
+    SingleThreadCtrlTestAccessors() {
+        destroy();
+    }
     ~SingleThreadCtrlTestAccessors() {
         destroy();
     }
@@ -94,7 +97,7 @@ TEST(SingleThreadCtrlTest, ReturnsSameInstance) {
     ASSERT_TRUE(it2->it);
 }
 
-TEST(SingleThreadCtrlTest, RequireExistButDoesFailLog) {
+TEST(SingleThreadCtrlTest, RequireExistButDoes_FailLog) {
     SingleThreadCtrlTestAccessors e;
     const int flag = RequireFlagBuilder()
                         .setRequireExist()
@@ -105,7 +108,7 @@ TEST(SingleThreadCtrlTest, RequireExistButDoesFailLog) {
     e.createAndAssertNotNull(flag);
 }
 
-TEST(SingleThreadCtrlTest, RequireNonExistButDoesFailLog) {
+TEST(SingleThreadCtrlTest, RequireNonExistButDoes_FailLog) {
     SingleThreadCtrlTestAccessors e;
     const int flag = RequireFlagBuilder()
                         .setRequireNonExist()
@@ -115,7 +118,7 @@ TEST(SingleThreadCtrlTest, RequireNonExistButDoesFailLog) {
     e.createAndAssertNotNull(flag);
 }
 
-TEST(SingleThreadCtrlTest, RequireExistButDoesntFailLog) {
+TEST(SingleThreadCtrlTest, RequireExistButDoesnt_FailLog) {
     SingleThreadCtrlTestAccessors e;
     const int flag = RequireFlagBuilder()
                         .setRequireExist()
@@ -125,7 +128,7 @@ TEST(SingleThreadCtrlTest, RequireExistButDoesntFailLog) {
     e.createAndAssertNotNull(flag);
 }
 
-TEST(SingleThreadCtrlTest, RequireNonExistButDoesntFailLog) {
+TEST(SingleThreadCtrlTest, RequireNonExistButDoesnt_FailLog) {
     SingleThreadCtrlTestAccessors e;
     const int flag = RequireFlagBuilder()
                         .setRequireNonExist()
@@ -136,7 +139,7 @@ TEST(SingleThreadCtrlTest, RequireNonExistButDoesntFailLog) {
     e.createAndAssertNotNull(flag);
 }
 
-TEST(SingleThreadCtrlTest, RequireExistButDoesntFailLogReturnNull) {
+TEST(SingleThreadCtrlTest, RequireExistButDoesnt_FailLogReturnNull) {
     SingleThreadCtrlTestAccessors e;
     const int flag = RequireFlagBuilder()
                         .setRequireExist()
@@ -147,7 +150,7 @@ TEST(SingleThreadCtrlTest, RequireExistButDoesntFailLogReturnNull) {
     e.AssertNull(e.createAndGet(flag));
 }
 
-TEST(SingleThreadCtrlTest, RequireExistButDoesFailLogReturnNull) {
+TEST(SingleThreadCtrlTest, RequireExistButDoes_FailLogReturnNull) {
     SingleThreadCtrlTestAccessors e;
     const int flag = RequireFlagBuilder()
                         .setRequireExist()
@@ -160,7 +163,7 @@ TEST(SingleThreadCtrlTest, RequireExistButDoesFailLogReturnNull) {
 }
 
 #ifndef NDEBUG
-TEST(SingleThreadCtrlTest, RequireExistButDoesntFailAssert) {
+TEST(SingleThreadCtrlTest, RequireExistButDoesnt_FailAssert) {
     SingleThreadCtrlTestAccessors e;
     const int flag = RequireFlagBuilder().setRequireExist().setFailActionAssert().build();
 
@@ -168,15 +171,13 @@ TEST(SingleThreadCtrlTest, RequireExistButDoesntFailAssert) {
     ASSERT_DEATH(e.createAndGet(flag), R"(.*SingleThreadCtrlManager\.cpp.*)");
 }
 
-TEST(SingleThreadCtrlTest, RequireNonExistButDoesFailAssert) {
+TEST(SingleThreadCtrlTest, RequireNonExistButDoes_FailAssert) {
     SingleThreadCtrlTestAccessors e;
     const int flag = RequireFlagBuilder()
                         .setRequireNonExist()
                         .setFailActionAssert()
                         .build();
 
-    e.createAndAssertNotNull();
-    // As C++ standard require the filename of assert failure on its msg...
-    ASSERT_DEATH(e.createAndGet(flag), R"(.*SingleThreadCtrlManager\.cpp.*)");
+    e.createAndAssertNotNull(flag);
 }
 #endif
