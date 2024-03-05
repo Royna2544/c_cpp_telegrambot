@@ -41,9 +41,7 @@ class SingleThreadCtrlManager {
         USAGE_IBASH_EXIT_TIMEOUT_THREAD,
         USAGE_IBASH_COMMAND_QUEUE_THREAD,
         USAGE_DATABASE_SYNC_THREAD,
-#ifdef _SINGLETHREADCTRL_TEST
         USAGE_TEST,
-#endif
         USAGE_MAX,
     };
 
@@ -55,12 +53,8 @@ class SingleThreadCtrlManager {
         ENUM_AND_STR(USAGE_IBASH_TIMEOUT_THREAD),
         ENUM_AND_STR(USAGE_IBASH_EXIT_TIMEOUT_THREAD),
         ENUM_AND_STR(USAGE_IBASH_COMMAND_QUEUE_THREAD),
-#ifdef _SINGLETHREADCTRL_TEST
         ENUM_AND_STR(USAGE_DATABASE_SYNC_THREAD),
         ENUM_AND_STR(USAGE_TEST)
-#else
-        ENUM_AND_STR(USAGE_DATABASE_SYNC_THREAD)
-#endif
     );
 
     constexpr static const char* ThreadUsageToStr(const ThreadUsage u) {
@@ -139,6 +133,10 @@ template <class T, std::enable_if_t<std::is_base_of_v<SingleThreadCtrl, T>, bool
 std::shared_ptr<T> SingleThreadCtrlManager::getController(const ThreadUsage usage, int flags) {
     controller_type ptr;
     auto it = kControllers.find(usage);
+
+#ifndef _SINGLETHREADCTRL_TEST
+    ASSERT(usage != USAGE_TEST, "USAGE_TEST used in main program");
+#endif
 
     if (kIsUnderStopAll) {
         LOG_W("Under stopAll(), ignore");
