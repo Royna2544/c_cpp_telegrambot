@@ -32,7 +32,7 @@ SingleThreadCtrlManager::checkRequireFlags(GetControllerFlags opposite, int flag
             LOG_E("Flags-assertion failed");
         if (flags & FLAG_GETCTRL_REQUIRE_FAILACTION_RETURN_NULL) {
             LOG_V("Return null (FLAG_GETCTRL_REQUIRE_FAILACTION_RETURN_NULL)");
-            return {{}};
+            return std::optional(controller_type());
         }
     }
     return std::nullopt;

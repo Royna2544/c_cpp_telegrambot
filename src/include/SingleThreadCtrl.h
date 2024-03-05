@@ -111,7 +111,8 @@ struct SingleThreadCtrl {
     std::atomic_bool kRun = true;
     void delayUnlessStop(const std::chrono::seconds secs) {
         std::unique_lock<std::timed_mutex> lk(timer_lock, std::defer_lock);
-        lk.try_lock_for(secs);
+        // Unused because of unique_lock dtor
+        bool ret [[maybe_unused]] = lk.try_lock_for(secs);
     }
     void delayUnlessStop(const int secs) {
         delayUnlessStop(std::chrono::seconds(secs));
