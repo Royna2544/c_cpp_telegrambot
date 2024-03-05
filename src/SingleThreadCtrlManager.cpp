@@ -1,4 +1,5 @@
 #include <SingleThreadCtrl.h>
+
 #include <future>
 #include <latch>
 
@@ -14,6 +15,14 @@ void SingleThreadCtrlManager::destroyController(decltype(kControllers)::iterator
         kControllers.erase(it);
     }));
 }
+void SingleThreadCtrlManager::destroyController(ThreadUsage usage) {
+    auto it = kControllers.find(usage);
+    if (it != kControllers.end()) {
+        destroyController(it);
+    } else {
+        LOG_W("Couldn't find %s controller to delete", it->second->usageStr);
+    }
+}
 void SingleThreadCtrlManager::checkRequireFlags(int flags) {
     if (flags & FLAG_GETCTRL_REQUIRE_FAILACTION_ASSERT)
         ASSERT(false, "Flags requested FAILACTION_ASSERT");
@@ -28,26 +37,26 @@ void SingleThreadCtrlManager::stopAll() {
     using FutureRef = std::add_lvalue_reference_t<decltype(kShutdownFutures)::value_type>;
 
     kIsUnderStopAll = true;
-    std::for_each(kControllers.begin(), kControllers.end(), 
-        [&controllersShutdownLH, &threads](ControllerRef e) {
-        LOG_V("Shutdown: %s controller", e.second->usageStr);
-        threads.emplace_back([e = std::move(e), &controllersShutdownLH] {
-            e.second->stop();
-            controllersShutdownLH.count_down();
-        });
-    });
+    std::for_each(kControllers.begin(), kControllers.end(),
+                  [&controllersShutdownLH, &threads](ControllerRef e) {
+                      LOG_V("Shutdown: %s controller", e.second->usageStr);
+                      threads.emplace_back([e = std::move(e), &controllersShutdownLH] {
+                          e.second->stop();
+                          controllersShutdownLH.count_down();
+                      });
+                  });
     controllersShutdownLH.wait();
     for (auto& i : threads)
         i.join();
     threads.clear();
-    
-    std::for_each(kShutdownFutures.begin(), kShutdownFutures.end(), 
-        [&futureShutdownLH, &threads](FutureRef e) {
-        threads.emplace_back([e = std::move(e), &futureShutdownLH]() {
-            e.wait();
-            futureShutdownLH.count_down();
-        });
-    });
+
+    std::for_each(kShutdownFutures.begin(), kShutdownFutures.end(),
+                  [&futureShutdownLH, &threads](FutureRef e) {
+                      threads.emplace_back([e = std::move(e), &futureShutdownLH]() {
+                          e.wait();
+                          futureShutdownLH.count_down();
+                      });
+                  });
     futureShutdownLH.wait();
     for (auto& i : threads)
         i.join();

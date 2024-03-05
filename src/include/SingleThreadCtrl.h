@@ -38,10 +38,13 @@ class SingleThreadCtrlManager {
         USAGE_IBASH_EXIT_TIMEOUT_THREAD,
         USAGE_IBASH_COMMAND_QUEUE_THREAD,
         USAGE_DATABASE_SYNC_THREAD,
+#ifdef _SINGLETHREADCTRL_TEST
+        USAGE_TEST,
+#endif
         USAGE_MAX,
     };
 
-    constexpr static auto ThreadUsageToStrMap = array_helpers::make<USAGE_MAX, ThreadUsage, const char*>(
+    constexpr static auto ThreadUsageToStrMap = array_helpers::make<USAGE_MAX, ThreadUsage, const char*> (
         ENUM_AND_STR(USAGE_SOCKET_THREAD),
         ENUM_AND_STR(USAGE_TIMER_THREAD),
         ENUM_AND_STR(USAGE_SPAMBLOCK_THREAD),
@@ -49,7 +52,13 @@ class SingleThreadCtrlManager {
         ENUM_AND_STR(USAGE_IBASH_TIMEOUT_THREAD),
         ENUM_AND_STR(USAGE_IBASH_EXIT_TIMEOUT_THREAD),
         ENUM_AND_STR(USAGE_IBASH_COMMAND_QUEUE_THREAD),
-        ENUM_AND_STR(USAGE_DATABASE_SYNC_THREAD));
+#ifdef _SINGLETHREADCTRL_TEST
+        ENUM_AND_STR(USAGE_DATABASE_SYNC_THREAD),
+        ENUM_AND_STR(USAGE_TEST)
+#else
+        ENUM_AND_STR(USAGE_DATABASE_SYNC_THREAD)
+#endif
+    );
 
     constexpr static const char* ThreadUsageToStr(const ThreadUsage u) {
         return ThreadUsageToStrMap[u].second;
@@ -62,6 +71,9 @@ class SingleThreadCtrlManager {
     // Stop all controllers managed by this manager
     void stopAll();
     friend struct SingleThreadCtrl;
+#ifdef _SINGLETHREADCTRL_TEST
+    friend struct SingleThreadCtrlTestAccessors;
+#endif
 
    private:
     std::atomic_bool kIsUnderStopAll = false;
@@ -70,6 +82,7 @@ class SingleThreadCtrlManager {
     std::vector<std::future<void>> kShutdownFutures;
     // Destroy a controller given usage
     void destroyController(decltype(kControllers)::iterator it);
+    void destroyController(ThreadUsage usage);
 };
 
 extern SingleThreadCtrlManager gSThreadManager;
@@ -133,7 +146,7 @@ std::shared_ptr<T> SingleThreadCtrlManager::getController(const ThreadUsage usag
     if (it != kControllers.end()) {
         if (flags & FLAG_GETCTRL_REQUIRE_NONEXIST) {
             if (flags & FLAG_GETCTRL_REQUIRE_NONEXIST_FAILACTION_IGNORE) {
-                LOG_V("Return null");
+                LOG_V("Return null (FLAG_GETCTRL_REQUIRE_NONEXIST_FAILACTION_IGNORE)");
                 return {};
             }
             checkRequireFlags(flags);
