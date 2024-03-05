@@ -194,7 +194,8 @@ struct InteractiveBashContext {
 
         SendCommand(command);
         const auto onNoOutputCallbackFn = [onTimeout, this]() {
-            (void)write(child_stdout, kNoOutputFallback, sizeof(kNoOutputFallback));
+            ssize_t dummy [[maybe_unused]];
+            dummy = write(child_stdout, kNoOutputFallback, sizeof(kNoOutputFallback));
         };
         auto onNoOutputThread = gSThreadManager.getController<TimeoutThread>
             (SingleThreadCtrlManager::USAGE_IBASH_TIMEOUT_THREAD, 

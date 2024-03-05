@@ -23,8 +23,12 @@ struct kernel_rand_engine {
     static constexpr result_type max() { return UINT32_MAX; }
 
     result_type operator()() const {
-        result_type val;
-        read(fd, &val, sizeof(val));
+        result_type val = 0;
+        ssize_t rc;
+
+        rc = read(fd, &val, sizeof(val));
+        if (rc < 0)
+            PLOG_E("Failed to read data from HWRNG device");
         return val;
     }
     kernel_rand_engine() {

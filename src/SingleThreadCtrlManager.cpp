@@ -2,16 +2,21 @@
 
 #include <future>
 #include <latch>
+#include <mutex>
 #include <optional>
 
 void SingleThreadCtrlManager::destroyController(decltype(kControllers)::iterator it) {
+    static std::array<std::mutex, USAGE_MAX> kDestroyLocks;
+
     ASSERT(it->second, "Controller with type %d is null, but deletion requested", it->first);
     kShutdownFutures.emplace_back(std::async(std::launch::async, [this, it] {
+        auto &ctrl_lk = it->second->ctrl_lk;
+
+        std::unique_lock<std::mutex> lk(kDestroyLocks[it->first], std::defer_lock);
         it->second->stop();
+        std::lock(ctrl_lk, kDestroyLocks[it->first]);
         LOG_V("Deleting: %s controller", SingleThreadCtrlManager::ThreadUsageToStr(it->first));
-        {
-            const std::lock_guard<std::mutex> _(it->second->ctrl_lk);
-        }
+        ctrl_lk.unlock();
         it->second.reset();
         kControllers.erase(it);
     }));

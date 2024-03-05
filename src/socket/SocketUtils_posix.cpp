@@ -103,7 +103,9 @@ void startListening(const listener_callback_t& cb, std::promise<bool>& createdPr
                 }
                 if (listen_fd_poll.revents & POLLIN) {
                     kListenData buf;
-                    (void)read(listen_fd, &buf, sizeof(kListenData));
+                    ssize_t rc = read(listen_fd, &buf, sizeof(kListenData));
+                    if (rc < 0)
+                        PLOG_E("Reading data from forcestop fd");
                     closeFd(listen_fd);
                     break;
                 } else if (!(socket_fd_poll.revents & POLLIN)) {
