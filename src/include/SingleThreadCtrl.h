@@ -20,14 +20,16 @@ struct SingleThreadCtrl;
 class SingleThreadCtrlManager {
    public:
     using controller_type = std::shared_ptr<SingleThreadCtrl>;
-    constexpr static int GetControllerActionShift = 15;
 
     enum GetControllerFlags {
-        FLAG_GETCTRL_REQUIRE_EXIST = 1 << 0,
-        FLAG_GETCTRL_REQUIRE_NONEXIST = 1 << 1,
-        FLAG_GETCTRL_REQUIRE_FAILACTION_ASSERT = 1 << GetControllerActionShift,
-        FLAG_GETCTRL_REQUIRE_FAILACTION_LOG = 1 << (GetControllerActionShift + 1),
-        FLAG_GETCTRL_REQUIRE_FAILACTION_RETURN_NULL = 1 << (GetControllerActionShift + 2)
+        __FLAG_GETCTRL_REQUIRE_BASE = 1,
+        FLAG_GETCTRL_REQUIRE_EXIST = __FLAG_GETCTRL_REQUIRE_BASE,
+        FLAG_GETCTRL_REQUIRE_NONEXIST = __FLAG_GETCTRL_REQUIRE_BASE << 1,
+
+        __FLAG_GETCTRL_REQUIRE_FAILACTION_BASE = 1 << 2,
+        FLAG_GETCTRL_REQUIRE_FAILACTION_ASSERT = __FLAG_GETCTRL_REQUIRE_FAILACTION_BASE,
+        FLAG_GETCTRL_REQUIRE_FAILACTION_LOG = __FLAG_GETCTRL_REQUIRE_FAILACTION_BASE << 1,
+        FLAG_GETCTRL_REQUIRE_FAILACTION_RETURN_NULL = __FLAG_GETCTRL_REQUIRE_FAILACTION_BASE << 2
     };
 
     enum ThreadUsage {
