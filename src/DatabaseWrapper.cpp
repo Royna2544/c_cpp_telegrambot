@@ -5,11 +5,9 @@ using database::DatabaseWrapper;
 
 struct DatabaseSync : SingleThreadCtrlRunnable {
     void runFunction() override {
-        using_cv = true;
         while (kRun) {
             database::DBWrapper.save();
-            std::unique_lock<std::mutex> lk(CV_m);
-            cv.wait_for(lk, std::chrono::seconds(10));
+            delayUnlessStop(10);
         }
     }
 };

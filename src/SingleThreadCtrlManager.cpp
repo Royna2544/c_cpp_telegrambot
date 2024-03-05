@@ -15,7 +15,6 @@ void SingleThreadCtrlManager::destroyController(const ThreadUsage thisUsage) {
         if (it != kControllers.end() && it->second) {
             LOG_V("Stopping: %s controller", ThreadUsageToStr(thisUsage));
             it->second->stop();
-            LOG_V("Deleting: %s controller", ThreadUsageToStr(thisUsage));
             it->second.reset();
             kControllers.erase(it);
         }
@@ -31,7 +30,7 @@ SingleThreadCtrlManager::checkRequireFlags(GetControllerFlags opposite, int flag
             LOG_E("Flags-assertion failed");
         if (flags & FLAG_GETCTRL_REQUIRE_FAILACTION_RETURN_NULL) {
             LOG_V("Return null (FLAG_GETCTRL_REQUIRE_FAILACTION_RETURN_NULL)");
-            return {};
+            return {{}};
         }
     }
     return std::nullopt;

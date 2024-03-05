@@ -193,9 +193,7 @@ void SpamBlockManager::spamBlockerThreadFn(const Bot& bot) {
                 }
             }
         }
-        std::unique_lock<std::mutex> lk(CV_m);
-        // It just provides faster way out of the loop - Nothing more
-        cv.wait_for(lk, 10s);
+        delayUnlessStop(10s);
     }
 }
 
@@ -214,7 +212,6 @@ void SpamBlockManager::run(const Bot &bot, const Message::Ptr &message) {
     if ((!message->animation && message->text.empty() && !message->sticker) || message->forwardFrom)
         return;
 
-    using_cv = true;
     std::call_once(once, [this, &bot]{
         runWith(std::bind(&SpamBlockManager::spamBlockerThreadFn, this, std::cref(bot)));
     });

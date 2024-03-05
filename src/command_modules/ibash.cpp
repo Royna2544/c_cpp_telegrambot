@@ -26,18 +26,6 @@
 
 using std::chrono_literals::operator""s;
 
-struct TimeoutThread : SingleThreadCtrl {
-    void start(const std::function<void(void)>& callback_fn) {
-        using_cv = true;
-        std::unique_lock<std::mutex> lk(CV_m);
-        if (!cv.wait_for(lk, std::chrono::seconds(SLEEP_SECONDS),
-             [this] () -> bool { return !kRun; })) {
-            callback_fn();
-        }
-    }
-};
-
-
 struct InteractiveBashContext {
     // tochild { child stdin , parent write }
     // toparent { parent read, child stdout }
@@ -54,14 +42,21 @@ struct InteractiveBashContext {
     constexpr static const char kNoOutputFallback[] = "\n";
 
     struct ExitTimeoutThread : SingleThreadCtrl {
-        void start(InteractiveBashContext* instr) {
-            using_cv = true;
-            std::unique_lock<std::mutex> lk(CV_m);
-            if (cv.wait_for(lk, std::chrono::seconds(SLEEP_SECONDS)) == std::cv_status::timeout) {
+        void start(const InteractiveBashContext* instr) {
+            if (delayUnlessStop(SLEEP_SECONDS); kRun) {
                 if (instr->childpid > 0 && kill(instr->childpid, 0) == 0) {
                     LOG_W("Process %d misbehaving, using SIGTERM", instr->childpid);
                     killpg(instr->childpid, SIGTERM);
                 }
+            }
+        }
+    };
+
+    struct TimeoutThread : SingleThreadCtrl {
+        void start(const InteractiveBashContext *instr) {
+            if (delayUnlessStop(SLEEP_SECONDS); kRun) {
+                ssize_t dummy [[maybe_unused]];
+                dummy = write(instr->child_stdout, kNoOutputFallback, sizeof(kNoOutputFallback));
             }
         }
     };
@@ -193,17 +188,13 @@ struct InteractiveBashContext {
         const std::lock_guard<std::mutex> _(m);
 
         SendCommand(command);
-        const auto onNoOutputCallbackFn = [onTimeout, this]() {
-            ssize_t dummy [[maybe_unused]];
-            dummy = write(child_stdout, kNoOutputFallback, sizeof(kNoOutputFallback));
-        };
         auto onNoOutputThread = gSThreadManager.getController<TimeoutThread>
             (SingleThreadCtrlManager::USAGE_IBASH_TIMEOUT_THREAD, 
                 SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_NONEXIST |
                 SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_FAILACTION_ASSERT);
         do {
             onNoOutputThread->reset();
-            onNoOutputThread->runWith(std::bind(&TimeoutThread::start, onNoOutputThread, onNoOutputCallbackFn));
+            onNoOutputThread->runWith(std::bind(&TimeoutThread::start, onNoOutputThread, this));
             ssize_t rc = read(parent_readfd, buf, sizeof(buf));
             onNoOutputThread->stop();
             if (rc > 0) {

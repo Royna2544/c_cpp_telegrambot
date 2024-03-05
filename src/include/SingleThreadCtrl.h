@@ -1,7 +1,7 @@
 #pragma once
 
 #include <atomic>
-#include <condition_variable>
+#include <chrono>
 #include <functional>
 #include <future>
 #include <memory>
@@ -84,7 +84,9 @@ class SingleThreadCtrlManager {
 extern SingleThreadCtrlManager gSThreadManager;
 
 struct SingleThreadCtrl {
-    SingleThreadCtrl() = default;
+    SingleThreadCtrl() {
+        _TimerLk = std::unique_lock<std::timed_mutex>(timer_lock);
+    };
     using thread_function = std::function<void(void)>;
     using prestop_function = std::function<void(SingleThreadCtrl*)>;
 
@@ -105,10 +107,13 @@ struct SingleThreadCtrl {
 
    protected:
     std::atomic_bool kRun = true;
-    // Used by std::cv
-    std::condition_variable cv;
-    bool using_cv = false;
-    std::mutex CV_m;
+    void delayUnlessStop(const std::chrono::seconds secs) {
+        std::unique_lock<std::timed_mutex> lk(timer_lock, std::defer_lock);
+        lk.try_lock_for(secs);
+    }
+    void delayUnlessStop(const int secs) {
+        delayUnlessStop(std::chrono::seconds(secs));
+    }
 
    private:
     void _threadFn(thread_function fn);
@@ -117,6 +122,10 @@ struct SingleThreadCtrl {
     std::optional<std::thread> threadP;
     prestop_function preStop;
     std::atomic_bool once = true;
+    // This works, via the main thread will lock the mutex first. Then later thread function
+    // would try to lock it, but as it is a timed mutex, it could 
+    std::timed_mutex timer_lock;
+    std::unique_lock<std::timed_mutex> _TimerLk;
 };
 
 struct SingleThreadCtrlRunnable : SingleThreadCtrl {

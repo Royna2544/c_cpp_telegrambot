@@ -17,12 +17,7 @@ void SingleThreadCtrl::stop() {
         if (preStop)
             preStop(this);
         kRun = false;
-        if (using_cv) {
-            {
-                std::lock_guard<std::mutex> lk(CV_m);
-            }
-            cv.notify_one();
-        }
+        _TimerLk.unlock();
         if (threadP && threadP->joinable())
             threadP->join();
         once = false;
@@ -32,6 +27,7 @@ void SingleThreadCtrl::stop() {
 void SingleThreadCtrl::reset() {
     once = true;
     threadP.reset();
+    _TimerLk.lock();
 }
 
 void SingleThreadCtrl::_threadFn(thread_function fn) {

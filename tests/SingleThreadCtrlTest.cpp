@@ -61,6 +61,8 @@ struct RequireFlagBuilder {
             rc |= SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_FAILACTION_LOG;
         if (fail_assert)
             rc |= SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_FAILACTION_ASSERT;
+        if (fail_null)
+            rc |= SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_FAILACTION_RETURN_NULL;
         if (require_exist)
             rc |= SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_EXIST;
         if (require_nonexist)
