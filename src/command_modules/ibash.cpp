@@ -140,7 +140,7 @@ struct InteractiveBashContext {
             auto exitTimeout = gSThreadManager.getController<ExitTimeoutThread>
                 (SingleThreadCtrlManager::USAGE_IBASH_EXIT_TIMEOUT_THREAD,
                     SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_NONEXIST |
-                    SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_NONEXIST_FAILACTION_IGNORE);
+                    SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_FAILACTION_RETURN_NULL);
 
             if (!exitTimeout)
                 return;

@@ -166,7 +166,7 @@ int main(int argc, const char** argv) {
             gAuthorized = false;
             auto cl = gSThreadManager.getController(SingleThreadCtrlManager::USAGE_ERROR_RECOVERY_THREAD,
                 SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_NONEXIST | 
-                    SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_NONEXIST_FAILACTION_IGNORE);
+                    SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_FAILACTION_RETURN_NULL);
             if (cl) {
                 cl->runWith([] {
                     std::this_thread::sleep_for(kErrorRecoveryDelay);

@@ -2,6 +2,7 @@
 
 #include <future>
 #include <latch>
+#include <optional>
 
 void SingleThreadCtrlManager::destroyController(decltype(kControllers)::iterator it) {
     ASSERT(it->second, "Controller with type %d is null, but deletion requested", it->first);
@@ -23,11 +24,19 @@ void SingleThreadCtrlManager::destroyController(ThreadUsage usage) {
         LOG_W("Couldn't find %s controller to delete", it->second->usageStr);
     }
 }
-void SingleThreadCtrlManager::checkRequireFlags(int flags) {
-    if (flags & FLAG_GETCTRL_REQUIRE_FAILACTION_ASSERT)
-        ASSERT(false, "Flags requested FAILACTION_ASSERT");
-    if (flags & FLAG_GETCTRL_REQUIRE_FAILACTION_LOG)
-        LOG_E("Flags-assertion failed");
+std::optional<SingleThreadCtrlManager::controller_type>
+SingleThreadCtrlManager::checkRequireFlags(GetControllerFlags opposite, int flags) {
+    if (flags & opposite) {
+        if (flags & FLAG_GETCTRL_REQUIRE_FAILACTION_ASSERT)
+            ASSERT(false, "Flags requested FAILACTION_ASSERT");
+        if (flags & FLAG_GETCTRL_REQUIRE_FAILACTION_LOG)
+            LOG_E("Flags-assertion failed");
+        if (flags & FLAG_GETCTRL_REQUIRE_FAILACTION_RETURN_NULL) {
+            LOG_V("Return null (FLAG_GETCTRL_REQUIRE_FAILACTION_RETURN_NULL)");
+            return {};
+        }
+    }
+    return std::nullopt;
 }
 void SingleThreadCtrlManager::stopAll() {
     std::latch controllersShutdownLH(kControllers.size());
