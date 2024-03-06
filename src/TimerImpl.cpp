@@ -2,29 +2,13 @@
 #include <ExtArgs.h>
 #include <Logging.h>
 #include <TimerImpl.h>
+#include <internal/_std_chrono_templates.h>
 
 #include <chrono>
 #include <cmath>
 #include <memory>
 #include <sstream>
 #include "SingleThreadCtrl.h"
-
-using std::chrono_literals::operator""s;
-
-template <class Dur>
-std::chrono::hours to_hours(Dur &&it) {
-    return std::chrono::duration_cast<std::chrono::hours>(it);
-}
-
-template <class Dur>
-std::chrono::minutes to_mins(Dur &&it) {
-    return std::chrono::duration_cast<std::chrono::minutes>(it);
-}
-
-template <class Dur>
-std::chrono::seconds to_secs(Dur &&it) {
-    return std::chrono::duration_cast<std::chrono::seconds>(it);
-}
 
 template <class Dur>
 std::string to_string(const Dur out) {
@@ -168,12 +152,6 @@ void TimerCommandManager::startTimer(const Bot &bot, const Message::Ptr& msg) {
             std::cref(bot), message, parsedTime));
         setPreStopFunction(std::bind(&TimerCommandManager::Timerstop, std::placeholders::_1));
     }
-}
-
-using TgBot::Chat;
-
-bool operator==(const Chat::Ptr thiz, const Chat::Ptr other) {
-    return thiz->id == other->id;
 }
 
 void TimerCommandManager::stopTimer(const Bot &bot, const Message::Ptr& msg) {
