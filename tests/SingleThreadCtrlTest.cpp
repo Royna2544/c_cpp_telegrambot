@@ -177,6 +177,7 @@ TEST(SingleThreadCtrlTest, RequireExistButDoesnt_FailAssert) {
     SingleThreadCtrlTestAccessors e;
     const int flag = RequireFlagBuilder().setRequireExist().setFailActionAssert().build();
 
+    GTEST_FLAG_SET(death_test_style, "threadsafe");
     // As C++ standard require the filename of assert failure on its msg...
     ASSERT_DEATH(e.createAndGet(flag), R"(.*SingleThreadCtrlManager\.cpp.*)");
 }
