@@ -26,4 +26,4 @@ jobs:
           TOKEN: ${{ secrets.BOT_TOKEN }}
         run: |
           cd build
-          ./tg_cpphost
+          ./TgBot++_main
