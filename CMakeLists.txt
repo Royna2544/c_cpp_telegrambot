@@ -212,7 +212,7 @@ add_library(
   src/fslib/FileSystemLib.cpp
   src/fslib/FileSystemLib_${TARGET_VARIANT}.cpp)
 
-target_link_libraries(TgBotUtils TgBotRes ${Boost_LIBRARIES})
+target_link_libraries(TgBotUtils ${Boost_LIBRARIES})
 target_link_lib_if_windows(TgBotUtils shlwapi)
 #####################################################################
 
