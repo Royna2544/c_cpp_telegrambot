@@ -91,15 +91,17 @@ int main(int argc, const char** argv) {
             bot_AddCommandPermissive(gBot, i->name, i->fn);
     }
     gBot.getEvents().onAnyMessage([](const Message::Ptr &msg) {
-        static auto spamMgr =  gSThreadManager
-            .getController<SpamBlockManager>(SingleThreadCtrlManager::USAGE_SPAMBLOCK_THREAD);
+        static auto spamMgr = gSThreadManager
+            .getController<SpamBlockManager>({
+                .usage = SingleThreadCtrlManager::USAGE_SPAMBLOCK_THREAD, 
+            }, std::ref(gBot));
 
         if (!gAuthorized) return;
 #ifdef SOCKET_CONNECTION
         if (!gObservedChatIds.empty() || gObserveAllChats)
             processObservers(msg);
 #endif
-        spamMgr->run(gBot, msg);
+        spamMgr->addMessage(msg);
         processRegEXCommand(gBot, msg);
     });
 
@@ -164,9 +166,12 @@ int main(int argc, const char** argv) {
             bot_sendMessage(gBot, ownerid, "Reinitializing.");
             LOG_I("Re-init");
             gAuthorized = false;
-            auto cl = gSThreadManager.getController(SingleThreadCtrlManager::USAGE_ERROR_RECOVERY_THREAD,
-                SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_NONEXIST | 
-                    SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_FAILACTION_RETURN_NULL);
+            static const SingleThreadCtrlManager::GetControllerRequest req {
+                .usage = SingleThreadCtrlManager::USAGE_ERROR_RECOVERY_THREAD,
+                .flags = SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_NONEXIST | 
+                    SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_FAILACTION_RETURN_NULL
+            };
+            auto cl = gSThreadManager.getController(req);
             if (cl) {
                 cl->runWith([] {
                     std::this_thread::sleep_for(kErrorRecoveryDelay);

@@ -7,6 +7,7 @@
 #include <map>
 #include <mutex>
 #include <utility>
+
 #include "tgbot/types/Chat.h"
 
 using std::chrono_literals::operator""s;
@@ -16,42 +17,35 @@ using TgBot::ChatPermissions;
 CtrlSpamBlock gSpamBlockCfg = CTRL_ON;
 #endif
 
-using UserType = std::pair<TgBot::Chat::Ptr, std::vector<Message::Ptr>>;
-using SpamMapT = std::map<TgBot::User::Ptr, std::vector<Message::Ptr>>;
-using buffer_iterator_t = std::map<TgBot::Chat::Ptr, ChatHandle>::const_iterator;
-
-std::string toUserName(const TgBot::User::Ptr bro) {
+std::string SpamBlockBase::toUserName(const User::Ptr bro) {
     std::string username = bro->firstName;
     if (!bro->lastName.empty())
         username += ' ' + bro->lastName;
     return '\'' + username + '\'';
 }
 
-std::string toChatName(const TgBot::Chat::Ptr ch) {
+std::string SpamBlockBase::toChatName(const Chat::Ptr ch) {
     return '\'' + ch->title + '\'';
 }
 
 template <class Container, class Type>
-typename Container::iterator _findItImpl(Container& c, std::function<typename Type::Ptr
-    (typename Container::const_reference)> fn, typename Type::Ptr t) {
-    return std::find_if(c.begin(), c.end(), [=](const auto& it) {
+typename Container::iterator _findItImpl(Container &c, std::function<typename Type::Ptr(typename Container::const_reference)> fn, typename Type::Ptr t) {
+    return std::find_if(c.begin(), c.end(), [=](const auto &it) {
         return fn(it)->id == t->id;
     });
 }
 
 template <class Container>
-typename Container::iterator findChatIt(Container& c, std::function<Chat::Ptr
-    (typename Container::const_reference)> fn, Chat::Ptr t) {
+typename Container::iterator findChatIt(Container &c, std::function<Chat::Ptr(typename Container::const_reference)> fn, Chat::Ptr t) {
     return _findItImpl<Container, Chat>(c, fn, t);
 }
 
 template <class Container>
-typename Container::iterator findUserIt(Container& c, std::function<User::Ptr
-    (typename Container::const_reference)> fn, User::Ptr t) {
+typename Container::iterator findUserIt(Container &c, std::function<User::Ptr(typename Container::const_reference)> fn, User::Ptr t) {
     return _findItImpl<Container, User>(c, fn, t);
 }
 
-static std::string commonMsgdataFn(const Message::Ptr &m) {
+std::string SpamBlockBase::commonMsgdataFn(const Message::Ptr &m) {
     if (m->sticker)
         return m->sticker->fileUniqueId;
     else if (m->animation)
@@ -60,7 +54,7 @@ static std::string commonMsgdataFn(const Message::Ptr &m) {
         return m->text;
 }
 
-static bool isEntryOverThreshold(const SpamMapT::value_type& t, const size_t threshold) {
+bool SpamBlockBase::isEntryOverThreshold(PerChatHandle::const_reference t, const size_t threshold) {
     const size_t kEntryValue = t.second.size();
     const bool isOverThreshold = kEntryValue >= threshold;
     if (isOverThreshold)
@@ -68,77 +62,19 @@ static bool isEntryOverThreshold(const SpamMapT::value_type& t, const size_t thr
     return isOverThreshold;
 }
 
-static void _logSpamDetectCommon(const SpamMapT::value_type& t, const char* name) {
+void SpamBlockBase::_logSpamDetectCommon(PerChatHandle::const_reference t, const char *name) {
     LOG_I("Spam detected for user %s, filtered by %s", toUserName(t.first).c_str(), name);
 }
 
-static void _deleteAndMuteCommon(const Bot& bot, const buffer_iterator_t& handle, const SpamMapT::value_type& t,
-                                 const size_t threshold, const char* name, const bool mute) {
-                                     // Initial set - all false set
-    static auto perms = std::make_shared<ChatPermissions>();
-    if (isEntryOverThreshold(t, threshold)) {
-        _logSpamDetectCommon(t, name);
-    
-        bot_sendMessage(bot, handle->first->id, "Spam detected @" + t.first->username);
-        for (const auto &msg : t.second) {
-            try {
-                bot.getApi().deleteMessage(handle->first->id, msg->messageId);
-            } catch (const TgBot::TgException &e) {
-                LOG_V("Error deleting message: %s", e.what());
-            }
-        }
-        
-        if (mute) {
-            LOG_I("Try mute user %s in chat %s", toUserName(t.first).c_str(), 
-                    toChatName(handle->first).c_str());
-            try {
-                bot.getApi().restrictChatMember(handle->first->id, t.first->id,
-                                                perms, 5 * 60);
-            } catch (const TgBot::TgException &e) {
-                LOG_W("Cannot mute user %s in chat %s: %s", toUserName(t.first).c_str(), 
-                        toChatName(handle->first).c_str(), e.what());
-            }
-        }
-    }
-}
-
-#ifdef SOCKET_CONNECTION
-static void deleteAndMute(const Bot &bot, buffer_iterator_t handle,
-                          const SpamMapT &map, const size_t threshold, const char* name) {
-    // Initial set - all false set
-    auto perms = std::make_shared<ChatPermissions>();
-    bool enforce = false;
-
+void SpamBlockBase::takeAction(OneChatIterator it, const PerChatHandle &map,
+                               const size_t threshold, const char *name) {
     for (const auto &mapmsg : map) {
-        switch (gSpamBlockCfg) {
-            case CTRL_ENFORCE:
-                enforce = true;
-                [[fallthrough]];
-            case CTRL_ON: {
-                _deleteAndMuteCommon(bot, handle, mapmsg, threshold, name, enforce);
-                break;
-            }
-            case CTRL_LOGGING_ONLY_ON:
-                if (isEntryOverThreshold(mapmsg, threshold))
-                    _logSpamDetectCommon(mapmsg, name);
-                break;
-            default:
-                break;
-        };
+        handleUserAndMessagePair(mapmsg, it, threshold, name);
     }
 }
-#else
-static void deleteAndMute(const Bot &bot, buffer_iterator_t handle,
-                          const SpamMapT &map, const size_t threshold, const char* name) {
-    for (const auto &mapmsg : map) {
-        _deleteAndMuteCommon(bot, handle, mapmsg, threshold, name, false);
-        _logSpamDetectCommon(mapmsg, name);
-    }
-}
-#endif
 
-static void spamDetectFunc(const Bot &bot, buffer_iterator_t handle) {
-    SpamMapT MaxSameMsgMap, MaxMsgMap;
+void SpamBlockBase::spamDetectFunc(OneChatIterator handle) {
+    PerChatHandle MaxSameMsgMap, MaxMsgMap;
     // By most msgs sent by that user
     for (const auto &perUser : handle->second) {
         std::apply([&](const auto &first, const auto &second) {
@@ -163,11 +99,11 @@ static void spamDetectFunc(const Bot &bot, buffer_iterator_t handle) {
         MaxSameMsgMap.emplace(pair.first, mostCommonIt->second);
     }
 
-    deleteAndMute(bot, handle, MaxSameMsgMap, 3, "MaxSameMsg");
-    deleteAndMute(bot, handle, MaxMsgMap, 5, "MaxMsg");
+    takeAction(handle, MaxSameMsgMap, 3, "MaxSameMsg");
+    takeAction(handle, MaxMsgMap, 5, "MaxMsg");
 }
 
-void SpamBlockManager::spamBlockerThreadFn(const Bot& bot) {
+void SpamBlockBase::runFunction(void) {
     while (kRun) {
         {
             const std::lock_guard<std::mutex> _(buffer_m);
@@ -176,8 +112,9 @@ void SpamBlockManager::spamBlockerThreadFn(const Bot& bot) {
                 const auto chatNameStr = toChatName(its->first);
                 const auto chatName = chatNameStr.c_str();
                 while (its != buffer_sub.end()) {
-                    const auto it = findChatIt(buffer, [](const auto &it) { return it.first; },
-                         its->first);
+                    const auto it = findChatIt(
+                        buffer, [](const auto &it) { return it.first; },
+                        its->first);
                     if (it == buffer.end()) {
                         its = buffer_sub.erase(its);
                         continue;
@@ -185,7 +122,7 @@ void SpamBlockManager::spamBlockerThreadFn(const Bot& bot) {
                     LOG_V("Chat: %s, MsgCount: %d", chatName, its->second);
                     if (its->second >= 5) {
                         LOG_D("Launching spamdetect for %s", chatName);
-                        spamDetectFunc(bot, it);
+                        spamDetectFunc(it);
                     }
                     buffer.erase(it);
                     its->second = 0;
@@ -197,7 +134,7 @@ void SpamBlockManager::spamBlockerThreadFn(const Bot& bot) {
     }
 }
 
-void SpamBlockManager::run(const Bot &bot, const Message::Ptr &message) {
+void SpamBlockBase::addMessage(const Message::Ptr &message) {
     static std::once_flag once;
 
 #ifdef SOCKET_CONNECTION
@@ -212,18 +149,21 @@ void SpamBlockManager::run(const Bot &bot, const Message::Ptr &message) {
     if ((!message->animation && message->text.empty() && !message->sticker) || message->forwardFrom)
         return;
 
-    std::call_once(once, [this, &bot]{
-        runWith(std::bind(&SpamBlockManager::spamBlockerThreadFn, this, std::cref(bot)));
+    std::call_once(once, [this] {
+        run();
     });
 
     {
         const std::lock_guard<std::mutex> _(buffer_m);
-        auto bufferIt = findChatIt(buffer, [](const auto& it) { return it.first; },
-                                    message->chat);
+        auto bufferIt = findChatIt(
+            buffer, [](const auto &it) { return it.first; },
+            message->chat);
         if (bufferIt != buffer.end()) {
-            const auto bufferUserIt = findUserIt(bufferIt->second, [](const auto& it) { 
-                return it.first;
-            }, message->from);
+            const auto bufferUserIt = findUserIt(
+                bufferIt->second, [](const auto &it) {
+                    return it.first;
+                },
+                message->from);
 
             if (bufferUserIt != bufferIt->second.end()) {
                 bufferUserIt->second.emplace_back(message);
@@ -233,12 +173,63 @@ void SpamBlockManager::run(const Bot &bot, const Message::Ptr &message) {
         } else {
             buffer[message->chat][message->from].emplace_back(message);
         }
-        const auto bufferSubIt = findChatIt(buffer_sub,
-            [](const auto& it) { return it.first; },  message->chat);
+        const auto bufferSubIt = findChatIt(
+            buffer_sub,
+            [](const auto &it) { return it.first; }, message->chat);
         if (bufferSubIt != buffer_sub.end()) {
             ++bufferSubIt->second;
         } else {
             ++buffer_sub[message->chat];
+        }
+    }
+}
+
+void SpamBlockManager::handleUserAndMessagePair(PerChatHandleConstRef e, OneChatIterator it,
+                                                const size_t threshold, const char *name) {
+    bool enforce = false;
+    switch (gSpamBlockCfg) {
+        case CTRL_ENFORCE:
+            enforce = true;
+            [[fallthrough]];
+        case CTRL_ON: {
+            _deleteAndMuteCommon(it, e, threshold, name, enforce);
+            break;
+        }
+        case CTRL_LOGGING_ONLY_ON:
+            if (isEntryOverThreshold(e, threshold))
+                _logSpamDetectCommon(e, name);
+            break;
+        default:
+            break;
+    };
+}
+
+void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle, PerChatHandle::const_reference t,
+                                            const size_t threshold, const char *name, const bool mute) {
+    // Initial set - all false set
+    static auto perms = std::make_shared<ChatPermissions>();
+    if (isEntryOverThreshold(t, threshold)) {
+        _logSpamDetectCommon(t, name);
+
+        bot_sendMessage(_bot, handle->first->id, "Spam detected @" + t.first->username);
+        for (const auto &msg : t.second) {
+            try {
+                _bot.getApi().deleteMessage(handle->first->id, msg->messageId);
+            } catch (const TgBot::TgException &e) {
+                LOG_V("Error deleting message: %s", e.what());
+            }
+        }
+
+        if (mute) {
+            LOG_I("Try mute user %s in chat %s", toUserName(t.first).c_str(),
+                  toChatName(handle->first).c_str());
+            try {
+                _bot.getApi().restrictChatMember(handle->first->id, t.first->id,
+                                                 perms, 5 * 60);
+            } catch (const TgBot::TgException &e) {
+                LOG_W("Cannot mute user %s in chat %s: %s", toUserName(t.first).c_str(),
+                      toChatName(handle->first).c_str(), e.what());
+            }
         }
     }
 }

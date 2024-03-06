@@ -11,6 +11,7 @@
 #include <thread>
 #include <type_traits>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "EnumArrayHelpers.h"
@@ -63,9 +64,20 @@ class SingleThreadCtrlManager {
     }
 
     // Get a controller with usage and flags
+    struct GetControllerRequest {
+        ThreadUsage usage;
+        int flags = 0;
+    };
+    template <class T = SingleThreadCtrl, typename... Args,
+              std::enable_if_t<std::is_base_of_v<SingleThreadCtrl, T>, bool> = true>
+    std::shared_ptr<T> getController(const GetControllerRequest req, Args... args);
+
     template <class T = SingleThreadCtrl,
               std::enable_if_t<std::is_base_of_v<SingleThreadCtrl, T>, bool> = true>
-    std::shared_ptr<T> getController(const ThreadUsage usage, int flags = 0);
+    std::shared_ptr<T> getController(const ThreadUsage usage) {
+        return getController<T>({.usage = usage});
+    }
+
     // Stop all controllers managed by this manager
     void stopAll();
     friend struct SingleThreadCtrl;
@@ -144,15 +156,16 @@ struct SingleThreadCtrlRunnable : SingleThreadCtrl {
     virtual ~SingleThreadCtrlRunnable() {}
 };
 
-template <class T, std::enable_if_t<std::is_base_of_v<SingleThreadCtrl, T>, bool>>
-std::shared_ptr<T> SingleThreadCtrlManager::getController(const ThreadUsage usage, int flags) {
+template <class T, typename... Args, std::enable_if_t<std::is_base_of_v<SingleThreadCtrl, T>, bool>>
+std::shared_ptr<T> SingleThreadCtrlManager::getController(const GetControllerRequest req, Args... args) {
     controller_type ptr;
-    const std::lock_guard<std::shared_mutex> _(mControllerLock);
-    auto it = kControllers.find(usage);
     bool sizeMismatch = false;
+    const char *usageStr = ThreadUsageToStr(req.usage);
+    const std::lock_guard<std::shared_mutex> _(mControllerLock);
+    auto it = kControllers.find(req.usage);
 
 #ifndef _SINGLETHREADCTRL_TEST
-    ASSERT(usage != USAGE_TEST, "USAGE_TEST used in main program");
+    ASSERT(req.usage != USAGE_TEST, "USAGE_TEST used in main program");
 #endif
 
     if (kIsUnderStopAll) {
@@ -165,26 +178,30 @@ std::shared_ptr<T> SingleThreadCtrlManager::getController(const ThreadUsage usag
               "Will try to stop existing and alloc new", it->second->sizeOfThis, sizeof(T));
     }
     if (it != kControllers.end() && it->second && !sizeMismatch) {
-        if (const auto maybeRet = checkRequireFlags(FLAG_GETCTRL_REQUIRE_NONEXIST, flags); maybeRet)
+        if (const auto maybeRet = checkRequireFlags(FLAG_GETCTRL_REQUIRE_NONEXIST, req.flags); maybeRet)
             ptr = maybeRet.value();
         else {
-            LOG_V("Using old: %s controller", ThreadUsageToStr(usage));
+            LOG_V("Using old: %s controller", usageStr);
             ptr = it->second;
         }
     } else {
-        if (const auto maybeRet = checkRequireFlags(FLAG_GETCTRL_REQUIRE_EXIST, flags);
+        if (const auto maybeRet = checkRequireFlags(FLAG_GETCTRL_REQUIRE_EXIST, req.flags);
                 maybeRet && !sizeMismatch)
             ptr = maybeRet.value();
         else {
+            std::shared_ptr<T> newit;
             if (sizeMismatch) {
                 _destroyControllerWithoutAsync(it->first);
             }
-            LOG_V("New allocation: %s controller", ThreadUsageToStr(usage));
-            auto newit = std::make_shared<T>();
+            LOG_V("New allocation: %s controller", usageStr);
+            if constexpr (sizeof...(args) != 0)
+                newit = std::make_shared<T>(std::forward<Args...>(args...));
+            else
+                newit = std::make_shared<T>();
             auto ctrlit = std::static_pointer_cast<SingleThreadCtrl>(newit);
-            ctrlit->usageStr = ThreadUsageToStr(usage);
+            ctrlit->usageStr = usageStr;
             ctrlit->sizeOfThis = sizeof(T);
-            ptr = kControllers[usage] = newit; 
+            ptr = kControllers[req.usage] = newit; 
         }
     }
     return std::static_pointer_cast<T>(ptr);

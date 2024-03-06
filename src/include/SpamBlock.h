@@ -21,19 +21,51 @@ extern CtrlSpamBlock gSpamBlockCfg;
 
 using TgBot::Bot;
 using TgBot::Chat;
-using TgBot::User;
 using TgBot::Message;
-using ChatHandle = std::map<User::Ptr, std::vector<Message::Ptr>>;
+using TgBot::User;
 
-struct SpamBlockManager : SingleThreadCtrl {
-    SpamBlockManager() : SingleThreadCtrl() {}
-    ~SpamBlockManager() override = default;
+struct SpamBlockBase : SingleThreadCtrlRunnable {
+    // User and array of message pointers sent by that user
+    using PerChatHandle = std::map<User::Ptr, std::vector<Message::Ptr>>;
+    // Iterator type of buffer object, which contains <chats <users <msgs>>> map
+    using OneChatIterator = std::map<Chat::Ptr, PerChatHandle>::const_iterator;
+    using PerChatHandleConstRef = PerChatHandle::const_reference;
+    using SingleThreadCtrlRunnable::SingleThreadCtrlRunnable;
 
-    void spamBlockerThreadFn(const Bot& bot);
-    void run(const Bot &bot, const Message::Ptr &message);
+    virtual ~SpamBlockBase() = default;
+    virtual void handleUserAndMessagePair(PerChatHandleConstRef e, OneChatIterator it,
+                                          const size_t threshold, const char *name){};
 
- private:
-    std::map<Chat::Ptr, ChatHandle> buffer;
+    void runFunction(void) override;
+    void addMessage(const Message::Ptr &message);
+
+    static std::string commonMsgdataFn(const Message::Ptr &m);
+    static std::string toChatName(const Chat::Ptr ch);
+    static std::string toUserName(const User::Ptr bro);
+   protected:
+    bool isEntryOverThreshold(PerChatHandleConstRef t, const size_t threshold);
+    void _logSpamDetectCommon(PerChatHandleConstRef t, const char* name);
+
+   private:
+    void spamDetectFunc(OneChatIterator handle);
+    void takeAction(OneChatIterator handle, const PerChatHandle &map,
+                    const size_t threshold, const char *name);
+    std::map<Chat::Ptr, PerChatHandle> buffer;
     std::map<Chat::Ptr, int> buffer_sub;
     std::mutex buffer_m;  // Protect buffer, buffer_sub
+};
+
+struct SpamBlockManager : SpamBlockBase {
+    SpamBlockManager(const Bot &bot) : SpamBlockBase(), _bot(bot) {}
+    ~SpamBlockManager() override = default;
+
+    using SpamBlockBase::run;
+    using SpamBlockBase::runFunction;
+    void handleUserAndMessagePair(PerChatHandleConstRef e, OneChatIterator it,
+                                  const size_t threshold, const char *name) override;
+
+   private:
+    void _deleteAndMuteCommon(const OneChatIterator& handle, PerChatHandleConstRef t,
+                              const size_t threshold, const char* name, const bool mute);
+    const Bot &_bot;
 };

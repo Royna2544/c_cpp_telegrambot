@@ -8,7 +8,11 @@
 struct SingleThreadCtrlTestAccessors {
     template <class C = SingleThreadCtrl>
     std::shared_ptr<C> createAndGet(int flags = 0) {
-        return gSThreadManager.getController<C>(SingleThreadCtrlManager::USAGE_TEST, flags);
+        static struct SingleThreadCtrlManager::GetControllerRequest req {
+            .usage = SingleThreadCtrlManager::USAGE_TEST
+        };
+        req.flags = flags;
+        return gSThreadManager.getController<C>(req);
     }
 
     void destroy() {

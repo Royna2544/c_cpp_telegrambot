@@ -129,13 +129,15 @@ struct InteractiveBashContext {
     }
     void exit(const std::function<void(void)> onClosed, const std::function<void(void)> onNotOpen) {
         if (is_open) {
+            static const SingleThreadCtrlManager::GetControllerRequest req {
+                .usage = SingleThreadCtrlManager::USAGE_IBASH_EXIT_TIMEOUT_THREAD,
+                .flags = SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_NONEXIST |
+                         SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_FAILACTION_RETURN_NULL
+            };
             int status;
 
             // Write a msg as a fallback if for some reason exit doesnt get written
-            auto exitTimeout = gSThreadManager.getController<ExitTimeoutThread>
-                (SingleThreadCtrlManager::USAGE_IBASH_EXIT_TIMEOUT_THREAD,
-                    SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_NONEXIST |
-                    SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_FAILACTION_RETURN_NULL);
+            auto exitTimeout = gSThreadManager.getController<ExitTimeoutThread>(req);
 
             if (!exitTimeout)
                 return;
@@ -186,12 +188,13 @@ struct InteractiveBashContext {
         bool resModified = false;
         std::string result = kOutputInitBuf;
         const std::lock_guard<std::mutex> _(m);
-
+        static const SingleThreadCtrlManager::GetControllerRequest req {
+            .usage = SingleThreadCtrlManager::USAGE_IBASH_TIMEOUT_THREAD,
+            .flags = SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_NONEXIST |
+                     SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_FAILACTION_ASSERT
+        };
         SendCommand(command);
-        auto onNoOutputThread = gSThreadManager.getController<TimeoutThread>
-            (SingleThreadCtrlManager::USAGE_IBASH_TIMEOUT_THREAD, 
-                SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_NONEXIST |
-                SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_FAILACTION_ASSERT);
+        auto onNoOutputThread = gSThreadManager.getController<TimeoutThread>(req);
         do {
             onNoOutputThread->reset();
             onNoOutputThread->runWith(std::bind(&TimeoutThread::start, onNoOutputThread, this));
