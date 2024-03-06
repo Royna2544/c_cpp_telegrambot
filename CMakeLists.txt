@@ -14,6 +14,17 @@ macro(perform_test_ret result)
     message(STATUS ${PERFORM_TEST_FAIL})
   endif()
 endmacro()
+########### Define a target_link_libraries helper macro ###########
+macro(add_lib_if var)
+  if(${var})
+    set(LD_LIST ${LD_LIST} ${ARGN})
+  endif()
+endmacro()
+macro(target_link_lib_if_windows target)
+  if (WIN32)
+    target_link_libraries(${target} ${ARGN})
+  endif()
+endmacro()
 #####################################################################
 
 ################ EXE NAMES STEMMED FROM PROJECT_NAME ################
@@ -181,9 +192,7 @@ if (USE_UNIX_SOCKETS)
   add_executable(${SOCKET_CLI_NAME} src/socket/TgBotSocketClient.cpp)
 
   target_link_libraries(${SOCKET_CLI_NAME} TgBotSocket)
-  if (WIN32)
-    target_link_libraries(${SOCKET_CLI_NAME} Ws2_32)
-  endif()
+  target_link_lib_if_windows(${SOCKET_CLI_NAME} Ws2_32)
 endif()
 #####################################################################
 
@@ -204,9 +213,7 @@ add_library(
   src/fslib/FileSystemLib_${TARGET_VARIANT}.cpp)
 
 target_link_libraries(TgBotUtils TgBotRes ${Boost_LIBRARIES})
-if(WIN32)
-  target_link_libraries(TgBotUtils shlwapi)
-endif()
+target_link_lib_if_windows(TgBotUtils shlwapi)
 #####################################################################
 
 #################### TgBot cpp (the core) Library ###################
@@ -217,12 +224,6 @@ add_subdirectory(lib)
 add_library(TgBotCommandModules STATIC ${SRC_LIST})
 target_include_directories(TgBotCommandModules PUBLIC ${COMMANDS_CWD})
 ######################## Libraries to link ########################
-macro(add_lib_if var)
-  if(${var})
-    set(LD_LIST ${LD_LIST} ${ARGN})
-  endif()
-endmacro()
-
 set(LD_LIST TgBot TgBotDB TgBotUtils TgBotRes ${ABSL_LIBS})
 add_lib_if(USE_UNIX_SOCKETS TgBotSocket)
 add_lib_if(WIN32 wsock32 Ws2_32)
@@ -244,9 +245,7 @@ target_link_libraries(${DBDUMPER_NAME} TgBotDB TgBotUtils ${ABSL_LIBS})
 if (USE_UNIX_SOCKETS)
   add_executable(${MEDIA_CLI_NAME} proto/SendMediaToChat.cc)
   target_link_libraries(${MEDIA_CLI_NAME} TgBotDB TgBotSocket ${ABSL_LIBS})
-  if (WIN32)
-    target_link_libraries(${MEDIA_CLI_NAME} Ws2_32)
-  endif()
+  target_link_lib_if_windows(${MEDIA_CLI_NAME} Ws2_32)
 endif()
 #####################################################################
 
