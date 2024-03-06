@@ -1,6 +1,8 @@
 #pragma once
 
+#include <tgbot/Bot.h>
 #include <tgbot/types/Chat.h>
+#include <tgbot/types/Message.h>
 #include <tgbot/types/User.h>
 
 #include "SingleThreadCtrl.h"
@@ -17,8 +19,10 @@ using namespace TgBotCommandData;
 extern CtrlSpamBlock gSpamBlockCfg;
 #endif
 
+using TgBot::Bot;
 using TgBot::Chat;
 using TgBot::User;
+using TgBot::Message;
 using ChatHandle = std::map<User::Ptr, std::vector<Message::Ptr>>;
 
 struct SpamBlockManager : SingleThreadCtrl {
