@@ -187,6 +187,7 @@ void SpamBlockBase::addMessage(const Message::Ptr &message) {
 void SpamBlockManager::handleUserAndMessagePair(PerChatHandleConstRef e, OneChatIterator it,
                                                 const size_t threshold, const char *name) {
     bool enforce = false;
+#ifdef SOCKET_CONNECTION
     switch (gSpamBlockCfg) {
         case CTRL_ENFORCE:
             enforce = true;
@@ -202,6 +203,9 @@ void SpamBlockManager::handleUserAndMessagePair(PerChatHandleConstRef e, OneChat
         default:
             break;
     };
+#else
+    _deleteAndMuteCommon(it, e, threshold, name, enforce);
+#endif
 }
 
 void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle, PerChatHandle::const_reference t,

@@ -241,10 +241,12 @@ target_link_libraries(${DBDUMPER_NAME} TgBotDB TgBotUtils ${ABSL_LIBS})
 #####################################################################
 
 ############### Utility Programs (Send Media to chat) ################
-add_executable(${MEDIA_CLI_NAME} proto/SendMediaToChat.cc)
-target_link_libraries(${MEDIA_CLI_NAME} TgBotDB TgBotSocket ${ABSL_LIBS})
-if (WIN32)
-  target_link_libraries(${MEDIA_CLI_NAME} Ws2_32)
+if (USE_UNIX_SOCKETS)
+  add_executable(${MEDIA_CLI_NAME} proto/SendMediaToChat.cc)
+  target_link_libraries(${MEDIA_CLI_NAME} TgBotDB TgBotSocket ${ABSL_LIBS})
+  if (WIN32)
+    target_link_libraries(${MEDIA_CLI_NAME} Ws2_32)
+  endif()
 endif()
 #####################################################################
 
