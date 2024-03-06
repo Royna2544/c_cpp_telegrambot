@@ -31,6 +31,9 @@ struct SpamBlockBase : SingleThreadCtrlRunnable {
     using OneChatIterator = std::map<Chat::Ptr, PerChatHandle>::const_iterator;
     using PerChatHandleConstRef = PerChatHandle::const_reference;
     using SingleThreadCtrlRunnable::SingleThreadCtrlRunnable;
+    constexpr static int sMaxSameMsgThreshold = 3;
+    constexpr static int sMaxMsgThreshold = 5;
+    constexpr static int sSpamDetectThreshold = 5;
 
     virtual ~SpamBlockBase() = default;
     virtual void handleUserAndMessagePair(PerChatHandleConstRef e, OneChatIterator it,
@@ -40,8 +43,6 @@ struct SpamBlockBase : SingleThreadCtrlRunnable {
     void addMessage(const Message::Ptr &message);
 
     static std::string commonMsgdataFn(const Message::Ptr &m);
-    static std::string toChatName(const Chat::Ptr ch);
-    static std::string toUserName(const User::Ptr bro);
    protected:
     bool isEntryOverThreshold(PerChatHandleConstRef t, const size_t threshold);
     void _logSpamDetectCommon(PerChatHandleConstRef t, const char* name);
@@ -65,6 +66,7 @@ struct SpamBlockManager : SpamBlockBase {
                                   const size_t threshold, const char *name) override;
 
    private:
+    constexpr static auto kMuteDuration = std::chrono::minutes(3);
     void _deleteAndMuteCommon(const OneChatIterator& handle, PerChatHandleConstRef t,
                               const size_t threshold, const char* name, const bool mute);
     const Bot &_bot;

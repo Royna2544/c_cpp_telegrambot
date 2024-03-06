@@ -3,7 +3,8 @@
 #include <Logging.h>
 #include <SpamBlock.h>
 #include <socket/TgBotSocket.h>
-
+#include <internal/_tgbot.h>
+#include <internal/_std_chrono_templates.h>
 #include <map>
 #include <mutex>
 #include <utility>
@@ -16,17 +17,6 @@ using TgBot::ChatPermissions;
 #ifdef SOCKET_CONNECTION
 CtrlSpamBlock gSpamBlockCfg = CTRL_ON;
 #endif
-
-std::string SpamBlockBase::toUserName(const User::Ptr bro) {
-    std::string username = bro->firstName;
-    if (!bro->lastName.empty())
-        username += ' ' + bro->lastName;
-    return '\'' + username + '\'';
-}
-
-std::string SpamBlockBase::toChatName(const Chat::Ptr ch) {
-    return '\'' + ch->title + '\'';
-}
 
 template <class Container, class Type>
 typename Container::iterator _findItImpl(Container &c, std::function<typename Type::Ptr(typename Container::const_reference)> fn, typename Type::Ptr t) {
@@ -63,7 +53,7 @@ bool SpamBlockBase::isEntryOverThreshold(PerChatHandle::const_reference t, const
 }
 
 void SpamBlockBase::_logSpamDetectCommon(PerChatHandle::const_reference t, const char *name) {
-    LOG_I("Spam detected for user %s, filtered by %s", toUserName(t.first).c_str(), name);
+    LOG_I("Spam detected for user %s, filtered by %s", UserPtr_toString(t.first).c_str(), name);
 }
 
 void SpamBlockBase::takeAction(OneChatIterator it, const PerChatHandle &map,
@@ -99,8 +89,8 @@ void SpamBlockBase::spamDetectFunc(OneChatIterator handle) {
         MaxSameMsgMap.emplace(pair.first, mostCommonIt->second);
     }
 
-    takeAction(handle, MaxSameMsgMap, 3, "MaxSameMsg");
-    takeAction(handle, MaxMsgMap, 5, "MaxMsg");
+    takeAction(handle, MaxSameMsgMap, sMaxSameMsgThreshold, "MaxSameMsg");
+    takeAction(handle, MaxMsgMap, sMaxMsgThreshold, "MaxMsg");
 }
 
 void SpamBlockBase::runFunction(void) {
@@ -109,7 +99,7 @@ void SpamBlockBase::runFunction(void) {
             const std::lock_guard<std::mutex> _(buffer_m);
             if (buffer_sub.size() > 0) {
                 auto its = buffer_sub.begin();
-                const auto chatNameStr = toChatName(its->first);
+                const auto chatNameStr = ChatPtr_toString(its->first);
                 const auto chatName = chatNameStr.c_str();
                 while (its != buffer_sub.end()) {
                     const auto it = findChatIt(
@@ -120,7 +110,7 @@ void SpamBlockBase::runFunction(void) {
                         continue;
                     }
                     LOG_V("Chat: %s, MsgCount: %d", chatName, its->second);
-                    if (its->second >= 5) {
+                    if (its->second >= sSpamDetectThreshold) {
                         LOG_D("Launching spamdetect for %s", chatName);
                         spamDetectFunc(it);
                     }
@@ -213,6 +203,11 @@ void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle, PerCh
     // Initial set - all false set
     static auto perms = std::make_shared<ChatPermissions>();
     if (isEntryOverThreshold(t, threshold)) {
+        const auto userstr = UserPtr_toString(t.first);
+        const auto chatstr = ChatPtr_toString(handle->first);
+        const char *userStr = userstr.c_str();
+        const char *chatStr = chatstr.c_str();
+
         _logSpamDetectCommon(t, name);
 
         bot_sendMessage(_bot, handle->first->id, "Spam detected @" + t.first->username);
@@ -225,14 +220,12 @@ void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle, PerCh
         }
 
         if (mute) {
-            LOG_I("Try mute user %s in chat %s", toUserName(t.first).c_str(),
-                  toChatName(handle->first).c_str());
+            LOG_I("Try mute user %s in chat %s", userStr, chatStr);
             try {
                 _bot.getApi().restrictChatMember(handle->first->id, t.first->id,
-                                                 perms, 5 * 60);
+                                                 perms, to_secs(kMuteDuration).count());
             } catch (const TgBot::TgException &e) {
-                LOG_W("Cannot mute user %s in chat %s: %s", toUserName(t.first).c_str(),
-                      toChatName(handle->first).c_str(), e.what());
+                LOG_W("Cannot mute user %s in chat %s: %s", userStr, chatStr, e.what());
             }
         }
     }
