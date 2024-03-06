@@ -72,8 +72,7 @@ class SingleThreadCtrlManager {
               std::enable_if_t<std::is_base_of_v<SingleThreadCtrl, T>, bool> = true>
     std::shared_ptr<T> getController(const GetControllerRequest req, Args... args);
 
-    template <class T = SingleThreadCtrl,
-              std::enable_if_t<std::is_base_of_v<SingleThreadCtrl, T>, bool> = true>
+    template <class T = SingleThreadCtrl>
     std::shared_ptr<T> getController(const ThreadUsage usage) {
         return getController<T>({.usage = usage});
     }
