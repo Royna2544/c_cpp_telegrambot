@@ -1,3 +1,4 @@
-- std::async consideration on socketConnectionHandler
+- std::async consideration on SpamBlockThread
 - Eject TgBot dep from TgBotDB
 - IBash TimeoutThread could use SingleThreadCtrlRunnable
+- Write tests for SpamBlocker
