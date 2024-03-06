@@ -10,16 +10,16 @@ static void usage(const char* argv, bool success) {
     std::cout << "Usage: " << argv << " [cmd enum value] [args...]" << std::endl
               << std::endl;
     std::cout << "Available cmd enum values:" << std::endl;
-    std::cout << TgBotCmd_getHelpText();
+    std::cout << TgBotCmd::getHelpText();
 
     exit(!success);
 }
 
 static bool verifyArgsCount(TgBotCommand cmd, int argc) {
-    int required = TgBotCmd_toCount(cmd);
+    int required = TgBotCmd::toCount(cmd);
     if (required != argc) {
         fprintf(stderr, "Invalid argument count %d for cmd %s, %d required\n", argc,
-                TgBotCmd_toStr(cmd).c_str(), required);
+                TgBotCmd::toStr(cmd).c_str(), required);
         return false;
     }
     return true;
@@ -138,7 +138,7 @@ int main(int argc, char** argv) {
                         ASSERT(0, "Unhandled command value: %d!", cmd);
                 };
                 if (!ret)
-                    fprintf(stderr, "Failed parsing arguments for %s\n", TgBotCmd_toStr(cmd).c_str());
+                    fprintf(stderr, "Failed parsing arguments for %s\n", TgBotCmd::toStr(cmd).c_str());
             }
         }
     }

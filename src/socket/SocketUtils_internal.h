@@ -6,7 +6,7 @@
 [[nodiscard]] static inline bool handleIncomingBuf(const size_t len, struct TgBotConnection& conn,
                                                    const listener_callback_t& cb, std::function<char*(void)> errMsgFn) {
     if (len > 0) {        
-        LOG_I("Received buf with %s, invoke callback!", TgBotCmd_toStr(conn.cmd).c_str());
+        LOG_I("Received buf with %s, invoke callback!", TgBotCmd::toStr(conn.cmd).c_str());
 
         if (conn.cmd == CMD_EXIT) {
             static std::string exitToken;

@@ -40,9 +40,11 @@ enum ExitOp {
     DO_EXIT,
 };
 
-std::string TgBotCmd_toStr(TgBotCommand cmd);
-int TgBotCmd_toCount(TgBotCommand cmd);
-std::string TgBotCmd_getHelpText(void);
+namespace TgBotCmd {
+    std::string toStr(TgBotCommand cmd);
+    int toCount(TgBotCommand cmd);
+    std::string getHelpText(void);
+} // namespace TgBotCmd
 
 namespace TgBotCommandData {
 struct WriteMsgToChatId {

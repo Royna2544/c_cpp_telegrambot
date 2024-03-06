@@ -25,19 +25,20 @@ const auto kTgBotCommandArgsCount =  array_helpers::make<CMD_MAX - 1, TgBotComma
     ARGUMENT_SIZE(CMD_OBSERVE_ALL_CHATS, 1)      // policy
 );
 
-std::string TgBotCmd_toStr(TgBotCommand cmd) {
+namespace TgBotCmd {
+std::string toStr(TgBotCommand cmd) {
     const auto it = array_helpers::find(kTgBotCommandStrMap, cmd);
     ASSERT(it != kTgBotCommandStrMap.end(), "Couldn't find cmd %d in map", cmd);
     return it->second;
 }
 
-int TgBotCmd_toCount(TgBotCommand cmd) {
+int toCount(TgBotCommand cmd) {
     const auto it = array_helpers::find(kTgBotCommandArgsCount, cmd);
     ASSERT(it != kTgBotCommandArgsCount.end(), "Couldn't find cmd %d in map", cmd);
     return it->second;
 }
 
-std::string TgBotCmd_getHelpText(void) {
+std::string getHelpText(void) {
     static std::string helptext;
     static std::once_flag once;
 
@@ -47,7 +48,7 @@ std::string TgBotCmd_getHelpText(void) {
             int count;
 
             if (ent.first == CMD_EXIT) continue;
-            count = TgBotCmd_toCount(ent.first);
+            count = TgBotCmd::toCount(ent.first);
 
             help << ent.second << ": value " << ent.first << ", Requires "
                  << count << " argument";
@@ -58,4 +59,5 @@ std::string TgBotCmd_getHelpText(void) {
         helptext = help.str();
     });
     return helptext;
+}
 }
