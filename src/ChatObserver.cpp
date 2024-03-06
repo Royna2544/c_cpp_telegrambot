@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <iostream>
+#include "internal/_tgbot.h"
 
 using TgBot::Chat;
 using TgBot::User;
@@ -13,7 +14,6 @@ bool gObserveAllChats = false;
 
 static void printChatMsg(const Message::Ptr& msg, const User::Ptr& from) {
     std::string msgtext;
-    std::string userfullname = from->firstName;
     std::string chatname = msg->chat->title;
 
     if (msg->sticker)
@@ -30,13 +30,11 @@ static void printChatMsg(const Message::Ptr& msg, const User::Ptr& from) {
         msgtext = "(Dice) " + msg->dice->emoji;
     else
         msgtext = msg->text;
-    if (!from->lastName.empty())
-        userfullname += ' ' + from->lastName;
     if (chatname.empty())
         chatname = "Bot PM";
 
     std::cout << "[ChatObserveLog][" << chatname << "] "
-              << userfullname << " (@" << from->username
+              << UserPtr_toString(from) << " (@" << from->username
               << "): " << msgtext << std::endl;
 }
 
