@@ -79,8 +79,10 @@ class SingleThreadCtrlManager {
     std::shared_mutex mControllerLock;
     std::unordered_map<ThreadUsage, controller_type> kControllers;
     std::vector<std::future<void>> kShutdownFutures;
+
     // Destroy a controller given usage
     void destroyController(ThreadUsage usage);
+    void _destroyControllerWithoutAsync(ThreadUsage usage);
 };
 
 extern SingleThreadCtrlManager gSThreadManager;
@@ -129,6 +131,7 @@ struct SingleThreadCtrl {
     // would try to lock it, but as it is a timed mutex, it could 
     std::timed_mutex timer_lock;
     std::unique_lock<std::timed_mutex> _TimerLk;
+    size_t sizeOfThis;
 };
 
 struct SingleThreadCtrlRunnable : SingleThreadCtrl {
@@ -146,6 +149,7 @@ std::shared_ptr<T> SingleThreadCtrlManager::getController(const ThreadUsage usag
     controller_type ptr;
     const std::lock_guard<std::shared_mutex> _(mControllerLock);
     auto it = kControllers.find(usage);
+    bool sizeMismatch = false;
 
 #ifndef _SINGLETHREADCTRL_TEST
     ASSERT(usage != USAGE_TEST, "USAGE_TEST used in main program");
@@ -155,7 +159,12 @@ std::shared_ptr<T> SingleThreadCtrlManager::getController(const ThreadUsage usag
         LOG_W("Under stopAll(), ignore");
         return {};
     }
-    if (it != kControllers.end()) {
+    if (sizeMismatch = it != kControllers.end() 
+        && it->second && it->second->sizeOfThis < sizeof(T); sizeMismatch) {
+        LOG_W("Size mismatch: Buffer has %zu, New class wants %zu. "
+              "Will try to stop existing and alloc new", it->second->sizeOfThis, sizeof(T));
+    }
+    if (it != kControllers.end() && it->second && !sizeMismatch) {
         if (const auto maybeRet = checkRequireFlags(FLAG_GETCTRL_REQUIRE_NONEXIST, flags); maybeRet)
             ptr = maybeRet.value();
         else {
@@ -163,12 +172,18 @@ std::shared_ptr<T> SingleThreadCtrlManager::getController(const ThreadUsage usag
             ptr = it->second;
         }
     } else {
-        if (const auto maybeRet = checkRequireFlags(FLAG_GETCTRL_REQUIRE_EXIST, flags); maybeRet)
+        if (const auto maybeRet = checkRequireFlags(FLAG_GETCTRL_REQUIRE_EXIST, flags);
+                maybeRet && !sizeMismatch)
             ptr = maybeRet.value();
         else {
+            if (sizeMismatch) {
+                _destroyControllerWithoutAsync(it->first);
+            }
             LOG_V("New allocation: %s controller", ThreadUsageToStr(usage));
             auto newit = std::make_shared<T>();
-            std::static_pointer_cast<SingleThreadCtrl>(newit)->usageStr = ThreadUsageToStr(usage);
+            auto ctrlit = std::static_pointer_cast<SingleThreadCtrl>(newit);
+            ctrlit->usageStr = ThreadUsageToStr(usage);
+            ctrlit->sizeOfThis = sizeof(T);
             ptr = kControllers[usage] = newit; 
         }
     }

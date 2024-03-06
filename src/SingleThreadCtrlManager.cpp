@@ -1,28 +1,34 @@
 #include <SingleThreadCtrl.h>
 
+#include <chrono>
 #include <future>
 #include <latch>
 #include <mutex>
 #include <optional>
 #include <shared_mutex>
+#include <thread>
 
-void SingleThreadCtrlManager::destroyController(const ThreadUsage thisUsage) {
+void SingleThreadCtrlManager::destroyController(const ThreadUsage usage) {
+    kShutdownFutures.emplace_back(std::async(std::launch::async, [this, usage] {
+        const std::lock_guard<std::shared_mutex> _(mControllerLock);
+        _destroyControllerWithoutAsync(usage);
+    }));
+}
+
+// Caller must hold exclusive mControllerLock
+void SingleThreadCtrlManager::_destroyControllerWithoutAsync(const ThreadUsage thisUsage) {
     static std::array<std::mutex, USAGE_MAX> kPerUsageLocks;
-
-    kShutdownFutures.emplace_back(std::async(std::launch::async, [this, thisUsage] {
-        std::unique_lock<std::mutex> lk(kPerUsageLocks[thisUsage]);
-        std::lock_guard<std::shared_mutex> _(mControllerLock);
+    const std::unique_lock<std::mutex> lk(kPerUsageLocks[thisUsage], std::try_to_lock);
+    if (lk.owns_lock()) {
         // Do a refind
         auto it = kControllers.find(thisUsage);
         if (it != kControllers.end() && it->second) {
             LOG_V("Stopping: %s controller", ThreadUsageToStr(thisUsage));
             it->second->stop();
             it->second.reset();
-            kControllers.erase(it);
         }
-    }));
+    }
 }
-
 std::optional<SingleThreadCtrlManager::controller_type>
 SingleThreadCtrlManager::checkRequireFlags(GetControllerFlags opposite, int flags) {
     if (flags & opposite) {

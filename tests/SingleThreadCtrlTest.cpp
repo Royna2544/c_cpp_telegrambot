@@ -6,12 +6,6 @@
 #include <SingleThreadCtrl.h>
 
 struct SingleThreadCtrlTestAccessors {
-    SingleThreadCtrlTestAccessors() {
-        destroy();
-    }
-    ~SingleThreadCtrlTestAccessors() {
-        destroy();
-    }
     template <class C = SingleThreadCtrl>
     std::shared_ptr<C> createAndGet(int flags = 0) {
         return gSThreadManager.getController<C>(SingleThreadCtrlManager::USAGE_TEST, flags);
@@ -89,12 +83,15 @@ TEST(SingleThreadCtrlTest, ReturnsSameInstance) {
     SingleThreadCtrlTestAccessors e;
     struct Variable : SingleThreadCtrl {
         bool it = false;
+        ~Variable() override = default;
     };
+    e.destroy();
     auto it = e.createAndGet<Variable>();
     e.AssertNonNull(it);
     it->it = true;
     auto it2 = e.createAndGet<Variable>();
     ASSERT_TRUE(it2->it);
+    e.destroy();
 }
 
 TEST(SingleThreadCtrlTest, RequireExistButDoes_FailLog) {
@@ -106,6 +103,7 @@ TEST(SingleThreadCtrlTest, RequireExistButDoes_FailLog) {
 
     e.createAndAssertNotNull();
     e.createAndAssertNotNull(flag);
+    e.destroy();
 }
 
 TEST(SingleThreadCtrlTest, RequireNonExistButDoes_FailLog) {
@@ -115,7 +113,9 @@ TEST(SingleThreadCtrlTest, RequireNonExistButDoes_FailLog) {
                         .setFailActionLog()
                         .build();
 
+    e.destroy();
     e.createAndAssertNotNull(flag);
+    e.destroy();
 }
 
 TEST(SingleThreadCtrlTest, RequireExistButDoesnt_FailLog) {
@@ -125,7 +125,9 @@ TEST(SingleThreadCtrlTest, RequireExistButDoesnt_FailLog) {
                         .setFailActionLog()
                         .build();
 
+    e.destroy();
     e.createAndAssertNotNull(flag);
+    e.destroy();
 }
 
 TEST(SingleThreadCtrlTest, RequireNonExistButDoesnt_FailLog) {
@@ -137,6 +139,7 @@ TEST(SingleThreadCtrlTest, RequireNonExistButDoesnt_FailLog) {
 
     e.createAndAssertNotNull();
     e.createAndAssertNotNull(flag);
+    e.destroy();
 }
 
 TEST(SingleThreadCtrlTest, RequireExistButDoesnt_FailLogReturnNull) {
@@ -147,7 +150,9 @@ TEST(SingleThreadCtrlTest, RequireExistButDoesnt_FailLogReturnNull) {
                         .setFailActionRetNull()
                         .build();
 
+    e.destroy();
     e.AssertNull(e.createAndGet(flag));
+    e.destroy();
 }
 
 TEST(SingleThreadCtrlTest, RequireExistButDoes_FailLogReturnNull) {
@@ -160,6 +165,7 @@ TEST(SingleThreadCtrlTest, RequireExistButDoes_FailLogReturnNull) {
 
     e.createAndAssertNotNull();
     e.createAndAssertNotNull(flag);
+    e.destroy();
 }
 
 #ifndef NDEBUG
