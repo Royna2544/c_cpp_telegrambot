@@ -6,6 +6,8 @@
 #include <RegEXHandler.h>
 #include <SingleThreadCtrl.h>
 #include <SpamBlock.h>
+#include <internal/_std_chrono_templates.h>
+
 #include "signalhandler/SignalHandler.h"
 
 // Generated cmd list
@@ -23,11 +25,6 @@
 
 // tgbot
 using TgBot::TgLongPoll;
-
-template <class Dur>
-std::chrono::seconds to_secs(Dur &&it) {
-    return std::chrono::duration_cast<std::chrono::seconds>(it);
-}
 
 static void cleanupFn (int s) {
     static std::once_flag once;
