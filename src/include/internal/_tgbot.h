@@ -18,5 +18,7 @@ inline std::string UserPtr_toString(const User::Ptr bro) {
 }
 
 inline std::string ChatPtr_toString(const Chat::Ptr ch) {
-    return '\'' + ch->title + '\'';
+    if (ch->type == TgBot::Chat::Type::Private)
+        return "Bot PM";
+    return ch->title;
 }

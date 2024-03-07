@@ -5,8 +5,6 @@
 #include <iostream>
 #include "internal/_tgbot.h"
 
-using TgBot::Chat;
-using TgBot::User;
 using TgBot::Message;
 
 std::vector<ChatId> gObservedChatIds;
@@ -14,7 +12,6 @@ bool gObserveAllChats = false;
 
 static void printChatMsg(const Message::Ptr& msg, const User::Ptr& from) {
     std::string msgtext;
-    std::string chatname = msg->chat->title;
 
     if (msg->sticker)
         msgtext = "Sticker";
@@ -30,10 +27,8 @@ static void printChatMsg(const Message::Ptr& msg, const User::Ptr& from) {
         msgtext = "(Dice) " + msg->dice->emoji;
     else
         msgtext = msg->text;
-    if (chatname.empty())
-        chatname = "Bot PM";
 
-    std::cout << "[ChatObserveLog][" << chatname << "] "
+    std::cout << "[ChatObserveLog][" << ChatPtr_toString(msg->chat) << "] "
               << UserPtr_toString(from) << " (@" << from->username
               << "): " << msgtext << std::endl;
 }
