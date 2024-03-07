@@ -138,6 +138,9 @@ void SpamBlockBase::addMessage(const Message::Ptr &message) {
     // We care GIF, sticker, text spams only, or if it isn't fowarded msg
     if ((!message->animation && message->text.empty() && !message->sticker) || message->forwardFrom)
         return;
+    // Bot's PM is not a concern
+    if (message->chat->type == TgBot::Chat::Type::Private)
+        return;
 
     std::call_once(once, [this] {
         run();
