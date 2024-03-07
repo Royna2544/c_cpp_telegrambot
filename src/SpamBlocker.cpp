@@ -1,5 +1,6 @@
 #include <Authorization.h>
 #include <BotReplyMessage.h>
+#include <CStringLifetime.h>
 #include <Logging.h>
 #include <SpamBlock.h>
 #include <socket/TgBotSocket.h>
@@ -99,8 +100,7 @@ void SpamBlockBase::runFunction(void) {
             const std::lock_guard<std::mutex> _(buffer_m);
             if (buffer_sub.size() > 0) {
                 auto its = buffer_sub.begin();
-                const auto chatNameStr = ChatPtr_toString(its->first);
-                const auto chatName = chatNameStr.c_str();
+                const CStringLifetime chatName = ChatPtr_toString(its->first);
                 while (its != buffer_sub.end()) {
                     const auto it = findChatIt(
                         buffer, [](const auto &it) { return it.first; },
@@ -109,9 +109,9 @@ void SpamBlockBase::runFunction(void) {
                         its = buffer_sub.erase(its);
                         continue;
                     }
-                    LOG_V("Chat: %s, MsgCount: %d", chatName, its->second);
+                    LOG_V("Chat: %s, MsgCount: %d", chatName.get(), its->second);
                     if (its->second >= sSpamDetectThreshold) {
-                        LOG_D("Launching spamdetect for %s", chatName);
+                        LOG_D("Launching spamdetect for %s", chatName.get());
                         spamDetectFunc(it);
                     }
                     buffer.erase(it);
@@ -203,10 +203,8 @@ void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle, PerCh
     // Initial set - all false set
     static auto perms = std::make_shared<ChatPermissions>();
     if (isEntryOverThreshold(t, threshold)) {
-        const auto userstr = UserPtr_toString(t.first);
-        const auto chatstr = ChatPtr_toString(handle->first);
-        const char *userStr = userstr.c_str();
-        const char *chatStr = chatstr.c_str();
+        const CStringLifetime userstr = UserPtr_toString(t.first);
+        const CStringLifetime chatstr = ChatPtr_toString(handle->first);
 
         _logSpamDetectCommon(t, name);
 
@@ -220,12 +218,12 @@ void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle, PerCh
         }
 
         if (mute) {
-            LOG_I("Try mute user %s in chat %s", userStr, chatStr);
+            LOG_I("Try mute user %s in chat %s", userstr.get(), chatstr.get());
             try {
                 _bot.getApi().restrictChatMember(handle->first->id, t.first->id,
                                                  perms, to_secs(kMuteDuration).count());
             } catch (const TgBot::TgException &e) {
-                LOG_W("Cannot mute user %s in chat %s: %s", userStr, chatStr, e.what());
+                LOG_W("Cannot mute user %s in chat %s: %s", userstr.get(), chatstr.get(), e.what());
             }
         }
     }
