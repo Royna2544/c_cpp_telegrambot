@@ -31,7 +31,7 @@ int main(const int argc, const char** argv) {
         LOG_E("Failed to convert '%s' to ChatId", argv[1]);
         _usage(EXIT_FAILURE);
     }
-    const auto mediaEntries = DBWrapper.getMainDatabase()->mediatonames();
+    const auto mediaEntries = DBWrapper.protodb.mediatonames();
     std::optional<tgbot::proto::MediaToName> it;
     for (int i = 0; i < mediaEntries.size(); ++i) {
         const auto mediaEntriesIt = mediaEntries.Get(i);

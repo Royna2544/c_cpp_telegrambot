@@ -1,6 +1,9 @@
 #include <Database.h>
 #include <SingleThreadCtrl.h>
 
+#include <filesystem>
+#include <memory>
+
 using database::DatabaseWrapper;
 
 struct DatabaseSync : SingleThreadCtrlRunnable {
@@ -12,20 +15,34 @@ struct DatabaseSync : SingleThreadCtrlRunnable {
     }
 };
 
-void DatabaseWrapper::load(const bool runSync) {
-    std::call_once(once, [this, runSync] {
-        fname = getDatabaseFile().string();
-        std::fstream input(fname, std::ios::in | std::ios::binary);
+void DatabaseWrapper::load(const std::filesystem::path& it) {
+    std::call_once(once, [this, it] {
+        fname = it;
+        std::fstream input(fname.string(), std::ios::in | std::ios::binary);
         if (!input)
             throw std::runtime_error("Failed to load database file");
         protodb.ParseFromIstream(&input);
-
-        if (runSync) {
-            gSThreadManager.getController<DatabaseSync>
-                (SingleThreadCtrlManager::USAGE_DATABASE_SYNC_THREAD)->run();
-        }
         loaded = true;
     });
+}
+
+void DatabaseWrapper::load() {
+    load(getSrcRoot() / std::string(kDatabaseFile));
+}
+
+void DatabaseWrapper::loadMain(const Bot& bot) {
+    load();
+    const SingleThreadCtrlManager::GetControllerRequest req{
+        .usage = SingleThreadCtrlManager::USAGE_DATABASE_SYNC_THREAD,
+        .flags = SingleThreadCtrlManager::GetControllerFlags::FLAG_GETCTRL_REQUIRE_NONEXIST |
+                 SingleThreadCtrlManager::GetControllerFlags::FLAG_GETCTRL_REQUIRE_FAILACTION_RETURN_NULL};
+    if (const auto it = gSThreadManager.getController<DatabaseSync>(req); it)
+        it->run();
+
+    whitelist = std::make_shared<ProtoDatabase>(bot, "whitelist", protodb.mutable_whitelist()->mutable_id());
+    blacklist = std::make_shared<ProtoDatabase>(bot, "blacklist", protodb.mutable_blacklist()->mutable_id());
+    whitelist->setOtherProtoDatabaseBase(blacklist);
+    blacklist->setOtherProtoDatabaseBase(whitelist);
 }
 
 void DatabaseWrapper::save() const {
@@ -52,4 +69,4 @@ bool DatabaseWrapper::warnNoLoaded(const char* func) const {
 
 namespace database {
 DatabaseWrapper DBWrapper;
-} // namespace database
+}  // namespace database

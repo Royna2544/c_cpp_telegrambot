@@ -66,7 +66,7 @@ int main(int argc, const char** argv) {
         return EXIT_FAILURE;
     }
     static Bot gBot(token);
-    database::DBWrapper.load(/*withSync=*/ true);
+    database::DBWrapper.loadMain(gBot);
 
     bot_AddCommandEnforcedCompiler(gBot, "c", ProgrammingLangs::C, [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
         CompileRunHandler(CCppCompileHandleData{{{bot, message}, compiler, "out.c"}});

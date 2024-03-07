@@ -10,9 +10,10 @@ bool Authorized(const Message::Ptr &message, const int flags) {
     if (message->from) {
         const UserId id = message->from->id;
         if (flags & AuthorizeFlags::PERMISSIVE) {
-            return !database::blacklist.exists(id);
+            return !database::DBWrapper.blacklist->exists(id);
         } else {
-            if (database::whitelist.exists(id)) return true;
+            if (database::DBWrapper.whitelist->exists(id))
+                return true;
             return id == database::DBWrapper.maybeGetOwnerId();
         }
     } else {

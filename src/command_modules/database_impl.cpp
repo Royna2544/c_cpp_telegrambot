@@ -1,43 +1,48 @@
-#include <functional>
-#include <optional>
-
 #include <BotReplyMessage.h>
 #include <Database.h>
 #include <ExtArgs.h>
 
+#include <optional>
+
 #include "CommandModule.h"
 #include "tgbot/tools/StringTools.h"
 
-using database::blacklist;
-using database::ProtoDatabase;
-using database::whitelist;
+using database::DBWrapper;
 
 struct CommandModule cmd_addblacklist {
     .enforced = true,
     .name = "addblacklist",
-    .fn = std::bind(&ProtoDatabase::addToDatabase, blacklist, std::placeholders::_1, std::placeholders::_2)
+    .fn = [](const Bot& bot, const Message::Ptr& message) {
+        DBWrapper.blacklist->addToDatabase(message);
+    }
 };
 
 struct CommandModule cmd_rmblacklist {
     .enforced = true,
     .name = "rmblacklist",
-    .fn = std::bind(&ProtoDatabase::removeFromDatabase, blacklist, std::placeholders::_1, std::placeholders::_2)
+    .fn = [](const Bot& bot, const Message::Ptr& message) {
+        DBWrapper.blacklist->removeFromDatabase(message);
+    }
 };
 
 struct CommandModule cmd_addwhitelist {
     .enforced = true,
     .name = "addwhitelist",
-    .fn = std::bind(&ProtoDatabase::addToDatabase, whitelist, std::placeholders::_1, std::placeholders::_2)
+    .fn = [](const Bot& bot, const Message::Ptr& message) {
+        DBWrapper.whitelist->addToDatabase(message);
+    }
 };
 
 struct CommandModule cmd_rmwhitelist {
     .enforced = true,
     .name = "rmwhitelist",
-    .fn = std::bind(&ProtoDatabase::removeFromDatabase, whitelist, std::placeholders::_1, std::placeholders::_2)
+    .fn = [](const Bot& bot, const Message::Ptr& message) {
+        DBWrapper.whitelist->removeFromDatabase(message);
+    }
 };
 
 static void saveIdFn(const Bot& bot, const Message::Ptr& message) {
-    const auto mutableMediaDB = database::DBWrapper.getMainDatabase()->mutable_mediatonames();
+    const auto mutableMediaDB = database::DBWrapper.protodb.mutable_mediatonames();
 
     if (hasExtArgs(message)) {
         std::string names;
@@ -71,7 +76,7 @@ static void saveIdFn(const Bot& bot, const Message::Ptr& message) {
             ent->set_telegrammediauniqueid(*fileUniqueId);
             ss << "Media " << *fileUniqueId << " (fileUniqueId) added" << std::endl;
             ss << "With names:" << std::endl;
-            for (const auto &names : namevec) {
+            for (const auto& names : namevec) {
                 *ent->add_names() = names;
                 ss << "- " << names << std::endl;
             }

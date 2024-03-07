@@ -24,15 +24,15 @@ static void dumpList(const PersonList& list, const char* name) {
 int main(int argc, const char **argv) {
     copyCommandLine(CommandLineOp::INSERT, &argc, &argv);
     DBWrapper.load();
-    const auto mainDB = DBWrapper.getMainDatabase();
-    const auto mediaDB = DBWrapper.getMainDatabase()->mediatonames();
+    const auto mainDB = DBWrapper.protodb;
+    const auto mediaDB = mainDB.mediatonames();
 
-    std::cout << "Dump of database file: " << getDatabaseFile() << std::endl;
+    std::cout << "Dump of database file: " << DBWrapper.getDatabasePath() << std::endl;
     std::cout << std::endl;
     BEGIN_CATEGORY("Generic");
     std::cout << "Owner ID: ";
-    if (mainDB->has_ownerid()) {
-        std::cout << mainDB->ownerid();
+    if (mainDB.has_ownerid()) {
+        std::cout << mainDB.ownerid();
     } else {
         std::cout << "Not set";
     }
@@ -40,11 +40,11 @@ int main(int argc, const char **argv) {
     END_CATEGORY;
 
     BEGIN_CATEGORY("Database");
-    if (mainDB->has_whitelist()) {
-        dumpList(mainDB->whitelist(), "whitelist");
+    if (mainDB.has_whitelist()) {
+        dumpList(mainDB.whitelist(), "whitelist");
     }
-    if (mainDB->has_blacklist()) {
-        dumpList(mainDB->blacklist(), "blacklist");
+    if (mainDB.has_blacklist()) {
+        dumpList(mainDB.blacklist(), "blacklist");
     }
     END_CATEGORY;
 
@@ -62,8 +62,9 @@ int main(int argc, const char **argv) {
                     std::cout << INDENT "Media Name " << j << ": " << it.names(j) << std::endl;
                 }
             }
-            std::cout << std::endl;
+            if (i != mediaDBSize - 1)
+                std::cout << std::endl;
         }
-//      END_CATEGORY;
+        END_CATEGORY;
     }
 }
