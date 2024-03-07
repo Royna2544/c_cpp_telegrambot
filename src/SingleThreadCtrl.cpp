@@ -18,7 +18,8 @@ void SingleThreadCtrl::stop() {
         if (preStop)
             preStop(this);
         kRun = false;
-        timer_mutex.lk.unlock();
+        if (timer_mutex.lk.owns_lock())
+            timer_mutex.lk.unlock();
         if (threadP && threadP->joinable())
             threadP->join();
         once = false;
@@ -36,5 +37,4 @@ void SingleThreadCtrl::_threadFn(thread_function fn) {
     if (kRun) {
         LOG_I("%s controller ended before stop command", mgr_priv.usage.str);
     }
-    mgr_priv.mgr->destroyController(mgr_priv.usage.val);
 }

@@ -201,6 +201,8 @@ std::shared_ptr<T> SingleThreadCtrlManager::getController(const GetControllerReq
             ctrlit->mgr_priv.usage.val = req.usage;
             ctrlit->mgr_priv.sizeOfThis = sizeof(T);
             ctrlit->mgr_priv.mgr = this;
+            ASSERT(ctrlit->timer_mutex.lk.owns_lock(), "%s controller unique_lock is"
+                "not holding mutex. Probably constructor is not called.", usageStr);
             ptr = kControllers[req.usage] = newit; 
         }
     }
