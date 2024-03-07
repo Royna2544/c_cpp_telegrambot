@@ -63,3 +63,9 @@ const struct CommandModule cmd_alive {
     .name = "alive",
     .fn = AliveCommandFn,
 };
+
+const struct CommandModule cmd_start {
+    .enforced = false,
+    .name = "start",
+    .fn = AliveCommandFn,
+};

@@ -18,6 +18,7 @@ extern const struct CommandModule cmd_fileid;
 extern const struct CommandModule cmd_starttimer;
 extern const struct CommandModule cmd_stoptimer;
 extern const struct CommandModule cmd_saveid;
+extern const struct CommandModule cmd_start;
 inline const std::vector gCmdModules = {
    &cmd_addblacklist,
    &cmd_rmblacklist,
@@ -36,4 +37,5 @@ inline const std::vector gCmdModules = {
    &cmd_starttimer,
    &cmd_stoptimer,
    &cmd_saveid,
+   &cmd_start,
 };

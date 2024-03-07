@@ -128,7 +128,7 @@ set(CMD_MODULES_SOURCES_LIST database_impl bash_impl ${CMD_MODULES_SINGLE_LIST} 
 ######################## Commands modules list ########################
 set(CMD_MODULES_LIST addblacklist rmblacklist addwhitelist 
       rmwhitelist bash unsafebash ${CMD_MODULES_SINGLE_LIST}
-      starttimer stoptimer saveid)
+      starttimer stoptimer saveid start)
 ####################### Commands modules defines #######################
 set(COMMANDS_CWD src/command_modules)
 set(COMMANDS_GEN_HEADER ${CMAKE_BINARY_DIR}/${COMMANDS_CWD}/cmds.gen.h)
@@ -142,6 +142,7 @@ endforeach()
 foreach(lib ${CMD_MODULES_SOURCES_LIST})
   set(SRC_LIST ${SRC_LIST} ${COMMANDS_CWD}/${lib}.cpp)
 endforeach()
+FILE(APPEND ${COMMANDS_GEN_HEADER} "\n")
 FILE(APPEND ${COMMANDS_GEN_HEADER} "inline const std::vector gCmdModules = {\n")
 foreach(lib ${CMD_MODULES_LIST})
   FILE(APPEND ${COMMANDS_GEN_HEADER} "   &cmd_${lib},\n")
