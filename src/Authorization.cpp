@@ -4,16 +4,20 @@
 
 bool gAuthorized = true;
 
+using database::DBWrapper;
+
 bool Authorized(const Message::Ptr &message, const int flags) {
     if (!gAuthorized || !isMessageUnderTimeLimit(message)) return false;
 
     if (message->from) {
         const UserId id = message->from->id;
         if (flags & AuthorizeFlags::PERMISSIVE) {
-            return !database::DBWrapper.blacklist->exists(id);
+            if (const auto blacklist = DBWrapper.blacklist; blacklist)
+                return !blacklist->exists(id);
+            return true;
         } else {
-            if (database::DBWrapper.whitelist->exists(id))
-                return true;
+            if (const auto whitelist = DBWrapper.whitelist; whitelist)
+                return whitelist->exists(id);
             return id == database::DBWrapper.maybeGetOwnerId();
         }
     } else {
