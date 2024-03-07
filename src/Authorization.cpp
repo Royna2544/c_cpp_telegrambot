@@ -16,9 +16,11 @@ bool Authorized(const Message::Ptr &message, const int flags) {
                 return !blacklist->exists(id);
             return true;
         } else {
+            bool ret = false;
             if (const auto whitelist = DBWrapper.whitelist; whitelist)
-                return whitelist->exists(id);
-            return id == database::DBWrapper.maybeGetOwnerId();
+                ret |= whitelist->exists(id);
+            ret |= id == database::DBWrapper.maybeGetOwnerId();
+            return ret;
         }
     } else {
         return !(flags & AuthorizeFlags::REQUIRE_USER);
