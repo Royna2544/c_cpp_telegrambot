@@ -66,6 +66,7 @@ class SingleThreadCtrlManager {
         ThreadUsage usage;
         int flags = 0;
     };
+
     template <class T = SingleThreadCtrl, typename... Args,
               std::enable_if_t<std::is_base_of_v<SingleThreadCtrl, T>, bool> = true>
     std::shared_ptr<T> getController(const GetControllerRequest req, Args... args);
@@ -77,19 +78,16 @@ class SingleThreadCtrlManager {
 
     // Stop all controllers managed by this manager, and shutdown this.
     void destroyManager();
+    // Destroy a controller given usage
+    void destroyController(ThreadUsage usage);
+
     friend struct SingleThreadCtrl;
-#ifdef _SINGLETHREADCTRL_TEST
-    friend struct SingleThreadCtrlTestAccessors;
-#endif
 
    private:
     std::atomic_bool kIsUnderStopAll = false;
     static std::optional<controller_type> checkRequireFlags(GetControllerFlags opposite, int flags);
     std::shared_mutex mControllerLock;
     std::unordered_map<ThreadUsage, controller_type> kControllers;
-
-    // Destroy a controller given usage
-    void destroyController(ThreadUsage usage);
 };
 
 extern SingleThreadCtrlManager gSThreadManager;
@@ -168,17 +166,14 @@ std::shared_ptr<T> SingleThreadCtrlManager::getController(const GetControllerReq
     const std::lock_guard<std::shared_mutex> _(mControllerLock);
     auto it = kControllers.find(req.usage);
 
-#ifndef _SINGLETHREADCTRL_TEST
-    ASSERT(req.usage != USAGE_TEST, "USAGE_TEST used in main program");
-#endif
-
     if (kIsUnderStopAll) {
         LOG_W("Under stopAll(), ignore");
         return {};
     }
     if (sizeMismatch = it != kControllers.end() && it->second->mgr_priv.sizeOfThis < sizeof(T); sizeMismatch) {
-        LOG_W("Size mismatch: Buffer has %zu, New class wants %zu. "
-              "Will try to stop existing and alloc new", it->second->mgr_priv.sizeOfThis, sizeof(T));
+        LOG_W("Size mismatch: Buffer has %zu, New class wants %zu. return null",
+              it->second->mgr_priv.sizeOfThis, sizeof(T));
+        return {};
     }
     if (it != kControllers.end() && it->second && !sizeMismatch) {
         if (const auto maybeRet = checkRequireFlags(FLAG_GETCTRL_REQUIRE_NONEXIST, req.flags); maybeRet)

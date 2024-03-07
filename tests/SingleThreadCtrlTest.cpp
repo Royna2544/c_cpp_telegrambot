@@ -1,35 +1,9 @@
 #include <gtest/gtest.h>
 
-#include <memory>
+#include "SingleThreadCtrl.h"
+#include "SingleThreadCtrlAccessors.h"
 
-#define _SINGLETHREADCTRL_TEST
-#include <SingleThreadCtrl.h>
-
-struct SingleThreadCtrlTestAccessors {
-    template <class C = SingleThreadCtrl>
-    std::shared_ptr<C> createAndGet(int flags = 0) {
-        static struct SingleThreadCtrlManager::GetControllerRequest req {
-            .usage = SingleThreadCtrlManager::USAGE_TEST
-        };
-        req.flags = flags;
-        return gSThreadManager.getController<C>(req);
-    }
-
-    void destroy() {
-        gSThreadManager.destroyController(SingleThreadCtrlManager::USAGE_TEST);
-    }
-
-    void createAndAssertNotNull(int flags = 0) {
-        AssertNonNull(createAndGet(flags));
-    }
-
-    static void AssertNonNull(const std::shared_ptr<SingleThreadCtrl>& p) {
-        ASSERT_NE(p.get(), nullptr);
-    }
-    static void AssertNull(const std::shared_ptr<SingleThreadCtrl>& p) {
-        ASSERT_EQ(p.get(), nullptr);
-    }
-};
+using Accessor = SingleThreadCtrlTestAccessors<SingleThreadCtrlManager::USAGE_TEST>;
 
 struct RequireFlagBuilder {
     RequireFlagBuilder& setFailActionLog() {
@@ -79,12 +53,12 @@ struct RequireFlagBuilder {
 };
 
 TEST(SingleThreadCtrlTest, ReturnsNonNull) {
-    SingleThreadCtrlTestAccessors e;
+    Accessor e;
     e.createAndAssertNotNull();
 }
 
 TEST(SingleThreadCtrlTest, ReturnsSameInstance) {
-    SingleThreadCtrlTestAccessors e;
+    Accessor e;
     struct Variable : SingleThreadCtrl {
         bool it = false;
         ~Variable() override = default;
@@ -99,7 +73,7 @@ TEST(SingleThreadCtrlTest, ReturnsSameInstance) {
 }
 
 TEST(SingleThreadCtrlTest, RequireExistButDoes_FailLog) {
-    SingleThreadCtrlTestAccessors e;
+    Accessor e;
     const int flag = RequireFlagBuilder()
                         .setRequireExist()
                         .setFailActionLog()
@@ -111,7 +85,7 @@ TEST(SingleThreadCtrlTest, RequireExistButDoes_FailLog) {
 }
 
 TEST(SingleThreadCtrlTest, RequireNonExistButDoes_FailLog) {
-    SingleThreadCtrlTestAccessors e;
+    Accessor e;
     const int flag = RequireFlagBuilder()
                         .setRequireNonExist()
                         .setFailActionLog()
@@ -123,7 +97,7 @@ TEST(SingleThreadCtrlTest, RequireNonExistButDoes_FailLog) {
 }
 
 TEST(SingleThreadCtrlTest, RequireExistButDoesnt_FailLog) {
-    SingleThreadCtrlTestAccessors e;
+    Accessor e;
     const int flag = RequireFlagBuilder()
                         .setRequireExist()
                         .setFailActionLog()
@@ -135,7 +109,7 @@ TEST(SingleThreadCtrlTest, RequireExistButDoesnt_FailLog) {
 }
 
 TEST(SingleThreadCtrlTest, RequireNonExistButDoesnt_FailLog) {
-    SingleThreadCtrlTestAccessors e;
+    Accessor e;
     const int flag = RequireFlagBuilder()
                         .setRequireNonExist()
                         .setFailActionLog()
@@ -147,7 +121,7 @@ TEST(SingleThreadCtrlTest, RequireNonExistButDoesnt_FailLog) {
 }
 
 TEST(SingleThreadCtrlTest, RequireExistButDoesnt_FailLogReturnNull) {
-    SingleThreadCtrlTestAccessors e;
+    Accessor e;
     const int flag = RequireFlagBuilder()
                         .setRequireExist()
                         .setFailActionLog()
@@ -160,7 +134,7 @@ TEST(SingleThreadCtrlTest, RequireExistButDoesnt_FailLogReturnNull) {
 }
 
 TEST(SingleThreadCtrlTest, RequireExistButDoes_FailLogReturnNull) {
-    SingleThreadCtrlTestAccessors e;
+    Accessor e;
     const int flag = RequireFlagBuilder()
                         .setRequireExist()
                         .setFailActionLog()
@@ -174,7 +148,7 @@ TEST(SingleThreadCtrlTest, RequireExistButDoes_FailLogReturnNull) {
 
 #ifndef NDEBUG
 TEST(SingleThreadCtrlTest, RequireExistButDoesnt_FailAssert) {
-    SingleThreadCtrlTestAccessors e;
+    Accessor e;
     const int flag = RequireFlagBuilder().setRequireExist().setFailActionAssert().build();
 
     GTEST_FLAG_SET(death_test_style, "threadsafe");
@@ -183,7 +157,7 @@ TEST(SingleThreadCtrlTest, RequireExistButDoesnt_FailAssert) {
 }
 
 TEST(SingleThreadCtrlTest, RequireNonExistButDoes_FailAssert) {
-    SingleThreadCtrlTestAccessors e;
+    Accessor e;
     const int flag = RequireFlagBuilder()
                         .setRequireNonExist()
                         .setFailActionAssert()
