@@ -1,12 +1,11 @@
 #include <SingleThreadCtrl.h>
 #include <mutex>
-#include <shared_mutex>
 
 void SingleThreadCtrl::runWith(thread_function fn) {
     if (!threadP)
         threadP = std::thread(&SingleThreadCtrl::_threadFn, this, fn);
     else {
-        LOG_W("Function is already set: %s controller", usageStr);
+        LOG_W("Function is already set: %s controller", mgr_priv.usage.str);
     }
 }
 
@@ -19,7 +18,7 @@ void SingleThreadCtrl::stop() {
         if (preStop)
             preStop(this);
         kRun = false;
-        _TimerLk.unlock();
+        timer_mutex.lk.unlock();
         if (threadP && threadP->joinable())
             threadP->join();
         once = false;
@@ -29,24 +28,13 @@ void SingleThreadCtrl::stop() {
 void SingleThreadCtrl::reset() {
     once = true;
     threadP.reset();
-    _TimerLk.lock();
+    timer_mutex.lk.lock();
 }
 
 void SingleThreadCtrl::_threadFn(thread_function fn) {
     fn();
     if (kRun) {
-        LOG_I("%s controller ended before stop command", usageStr);
+        LOG_I("%s controller ended before stop command", mgr_priv.usage.str);
     }
-    if (!gSThreadManager.kIsUnderStopAll) {
-        const std::shared_lock<std::shared_mutex> lk(gSThreadManager.mControllerLock);
-        auto& ctrls = gSThreadManager.kControllers;
-
-        auto it = std::find_if(ctrls.begin(), ctrls.end(),
-                    [](std::remove_reference_t<decltype(ctrls)>::const_reference e) {
-                        return std::this_thread::get_id() == e.second->threadP->get_id();
-                    });
-        if (it != ctrls.end()) {
-            gSThreadManager.destroyController(it->first);
-        }
-    }
+    mgr_priv.mgr->destroyController(mgr_priv.usage.val);
 }

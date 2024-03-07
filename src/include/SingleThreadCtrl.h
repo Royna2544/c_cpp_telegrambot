@@ -3,7 +3,6 @@
 #include <atomic>
 #include <chrono>
 #include <functional>
-#include <future>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -12,7 +11,6 @@
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
-#include <vector>
 
 #include "EnumArrayHelpers.h"
 #include "Logging.h"
@@ -77,8 +75,8 @@ class SingleThreadCtrlManager {
         return getController<T>({.usage = usage});
     }
 
-    // Stop all controllers managed by this manager
-    void stopAll();
+    // Stop all controllers managed by this manager, and shutdown this.
+    void destroyManager();
     friend struct SingleThreadCtrl;
 #ifdef _SINGLETHREADCTRL_TEST
     friend struct SingleThreadCtrlTestAccessors;
@@ -89,18 +87,16 @@ class SingleThreadCtrlManager {
     static std::optional<controller_type> checkRequireFlags(GetControllerFlags opposite, int flags);
     std::shared_mutex mControllerLock;
     std::unordered_map<ThreadUsage, controller_type> kControllers;
-    std::vector<std::future<void>> kShutdownFutures;
 
     // Destroy a controller given usage
     void destroyController(ThreadUsage usage);
-    void _destroyControllerWithoutAsync(ThreadUsage usage);
 };
 
 extern SingleThreadCtrlManager gSThreadManager;
 
 struct SingleThreadCtrl {
     SingleThreadCtrl() {
-        _TimerLk = std::unique_lock<std::timed_mutex>(timer_lock);
+        timer_mutex.lk = std::unique_lock<std::timed_mutex>(timer_mutex.m);
     };
     using thread_function = std::function<void(void)>;
     using prestop_function = std::function<void(SingleThreadCtrl*)>;
@@ -123,7 +119,7 @@ struct SingleThreadCtrl {
    protected:
     std::atomic_bool kRun = true;
     void delayUnlessStop(const std::chrono::seconds secs) {
-        std::unique_lock<std::timed_mutex> lk(timer_lock, std::defer_lock);
+        std::unique_lock<std::timed_mutex> lk(timer_mutex.m, std::defer_lock);
         // Unused because of unique_lock dtor
         bool ret [[maybe_unused]] = lk.try_lock_for(secs);
     }
@@ -133,16 +129,25 @@ struct SingleThreadCtrl {
 
    private:
     void _threadFn(thread_function fn);
-    // It would'nt be a dangling one
-    const char* usageStr;
     std::optional<std::thread> threadP;
     prestop_function preStop;
     std::atomic_bool once = true;
-    // This works, via the main thread will lock the mutex first. Then later thread function
-    // would try to lock it, but as it is a timed mutex, it could 
-    std::timed_mutex timer_lock;
-    std::unique_lock<std::timed_mutex> _TimerLk;
-    size_t sizeOfThis;
+
+    struct {
+        // This works, via the main thread will lock the mutex first. Then later thread function
+        // would try to lock it, but as it is a timed mutex, it could 
+        std::timed_mutex m;
+        std::unique_lock<std::timed_mutex> lk;
+    } timer_mutex;
+    struct {
+        size_t sizeOfThis;
+        SingleThreadCtrlManager *mgr;
+        struct {
+            // It would'nt be a dangling one
+            const char* str;
+            SingleThreadCtrlManager::ThreadUsage val;
+        } usage;
+    } mgr_priv;
 };
 
 struct SingleThreadCtrlRunnable : SingleThreadCtrl {
@@ -171,10 +176,9 @@ std::shared_ptr<T> SingleThreadCtrlManager::getController(const GetControllerReq
         LOG_W("Under stopAll(), ignore");
         return {};
     }
-    if (sizeMismatch = it != kControllers.end() 
-        && it->second && it->second->sizeOfThis < sizeof(T); sizeMismatch) {
+    if (sizeMismatch = it != kControllers.end() && it->second->mgr_priv.sizeOfThis < sizeof(T); sizeMismatch) {
         LOG_W("Size mismatch: Buffer has %zu, New class wants %zu. "
-              "Will try to stop existing and alloc new", it->second->sizeOfThis, sizeof(T));
+              "Will try to stop existing and alloc new", it->second->mgr_priv.sizeOfThis, sizeof(T));
     }
     if (it != kControllers.end() && it->second && !sizeMismatch) {
         if (const auto maybeRet = checkRequireFlags(FLAG_GETCTRL_REQUIRE_NONEXIST, req.flags); maybeRet)
@@ -190,7 +194,7 @@ std::shared_ptr<T> SingleThreadCtrlManager::getController(const GetControllerReq
         else {
             std::shared_ptr<T> newit;
             if (sizeMismatch) {
-                _destroyControllerWithoutAsync(it->first);
+                destroyController(it->first);
             }
             LOG_V("New allocation: %s controller", usageStr);
             if constexpr (sizeof...(args) != 0)
@@ -198,8 +202,10 @@ std::shared_ptr<T> SingleThreadCtrlManager::getController(const GetControllerReq
             else
                 newit = std::make_shared<T>();
             auto ctrlit = std::static_pointer_cast<SingleThreadCtrl>(newit);
-            ctrlit->usageStr = usageStr;
-            ctrlit->sizeOfThis = sizeof(T);
+            ctrlit->mgr_priv.usage.str = usageStr;
+            ctrlit->mgr_priv.usage.val = req.usage;
+            ctrlit->mgr_priv.sizeOfThis = sizeof(T);
+            ctrlit->mgr_priv.mgr = this;
             ptr = kControllers[req.usage] = newit; 
         }
     }

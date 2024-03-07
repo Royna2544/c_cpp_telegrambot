@@ -30,7 +30,7 @@ static void cleanupFn (int s) {
     static std::once_flag once;
     std::call_once(once, [s] {
         LOG_I("Exiting with signal %d", s);
-        gSThreadManager.stopAll();
+        gSThreadManager.destroyManager();
         database::DBWrapper.save();
     });
     std::exit(0);

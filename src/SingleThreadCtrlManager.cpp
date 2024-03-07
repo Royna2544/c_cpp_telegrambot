@@ -1,31 +1,21 @@
 #include <SingleThreadCtrl.h>
 
-#include <chrono>
-#include <future>
 #include <latch>
 #include <mutex>
 #include <optional>
-#include <shared_mutex>
+#include <vector>
 #include <thread>
 
 void SingleThreadCtrlManager::destroyController(const ThreadUsage usage) {
-    kShutdownFutures.emplace_back(std::async(std::launch::async, [this, usage] {
-        const std::lock_guard<std::shared_mutex> _(mControllerLock);
-        _destroyControllerWithoutAsync(usage);
-    }));
-}
-
-// Caller must hold exclusive mControllerLock
-void SingleThreadCtrlManager::_destroyControllerWithoutAsync(const ThreadUsage thisUsage) {
     static std::array<std::mutex, USAGE_MAX> kPerUsageLocks;
-    const std::unique_lock<std::mutex> lk(kPerUsageLocks[thisUsage], std::try_to_lock);
-    if (lk.owns_lock()) {
-        // Do a refind
-        auto it = kControllers.find(thisUsage);
+    const std::scoped_lock lk(kPerUsageLocks[usage], mControllerLock);
+    if (!kIsUnderStopAll) {
+        auto it = kControllers.find(usage);
         if (it != kControllers.end() && it->second) {
-            LOG_V("Stopping: %s controller", ThreadUsageToStr(thisUsage));
+            LOG_V("Stopping: %s controller", it->second->mgr_priv.usage.str);
             it->second->stop();
             it->second.reset();
+            kControllers.erase(it);
         }
     }
 }
@@ -43,20 +33,17 @@ SingleThreadCtrlManager::checkRequireFlags(GetControllerFlags opposite, int flag
     }
     return std::nullopt;
 }
-void SingleThreadCtrlManager::stopAll() {
+void SingleThreadCtrlManager::destroyManager() {
     std::latch controllersShutdownLH(kControllers.size());
-    std::latch futureShutdownLH(kShutdownFutures.size());
     std::vector<std::thread> threads;
     using ControllerRef = decltype(kControllers)::const_reference;
-    using FutureRef = std::add_lvalue_reference_t<decltype(kShutdownFutures)::value_type>;
 
     kIsUnderStopAll = true;
     std::for_each(kControllers.begin(), kControllers.end(),
         [&controllersShutdownLH, &threads, this](ControllerRef e) {
-            LOG_V("Shutdown: %s controller", e.second->usageStr);
+            LOG_V("Shutdown: %s controller", e.second->mgr_priv.usage.str);
             threads.emplace_back([e = std::move(e), &controllersShutdownLH, this] {
-                const std::lock_guard<std::shared_mutex> _(mControllerLock);
-                e.second->stop();
+                destroyController(e.first);
                 controllersShutdownLH.count_down();
             });
         }
@@ -64,20 +51,6 @@ void SingleThreadCtrlManager::stopAll() {
     controllersShutdownLH.wait();
     for (auto& i : threads)
         i.join();
-    threads.clear();
-
-    std::for_each(kShutdownFutures.begin(), kShutdownFutures.end(),
-        [&futureShutdownLH, &threads, this](FutureRef e) {
-            threads.emplace_back([e = std::move(e), &futureShutdownLH, this] {
-                const std::lock_guard<std::shared_mutex> _(mControllerLock);
-                e.wait();
-                futureShutdownLH.count_down();
-            });
-        }
-    );
-    futureShutdownLH.wait();
-    for (auto& i : threads)
-        i.join();
-    kIsUnderStopAll = false;
 }
+
 SingleThreadCtrlManager gSThreadManager;
