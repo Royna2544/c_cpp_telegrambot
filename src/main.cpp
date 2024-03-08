@@ -92,6 +92,7 @@ int main(int argc, const char** argv) {
             .getController<SpamBlockManager>({
                 .usage = SingleThreadCtrlManager::USAGE_SPAMBLOCK_THREAD, 
             }, std::ref(gBot));
+        static RegexHandler regexHandler(gBot);
 
         if (!gAuthorized) return;
 #ifdef SOCKET_CONNECTION
@@ -99,7 +100,7 @@ int main(int argc, const char** argv) {
             processObservers(msg);
 #endif
         spamMgr->addMessage(msg);
-        processRegEXCommand(gBot, msg);
+        regexHandler.processRegEXCommandMessage(msg);
     });
 
 #ifdef SOCKET_CONNECTION
