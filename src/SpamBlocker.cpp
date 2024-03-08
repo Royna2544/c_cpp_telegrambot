@@ -109,7 +109,6 @@ void SpamBlockBase::runFunction(void) {
                         its = buffer_sub.erase(its);
                         continue;
                     }
-                    LOG_V("Chat: %s, MsgCount: %d", chatName.get(), its->second);
                     if (its->second >= sSpamDetectThreshold) {
                         LOG_D("Launching spamdetect for %s", chatName.get());
                         spamDetectFunc(it);
