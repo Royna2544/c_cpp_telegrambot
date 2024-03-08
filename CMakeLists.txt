@@ -59,11 +59,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_compile_options(-Wall -Werror -O3)
 add_compile_options(
   -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/=)
-if (${CMAKE_BUILD_TYPE} STREQUAL Debug)
-# Enable UBSAN, ASAN on debug targets
-add_compile_options(-fsanitize=address,undefined -O0)
-add_link_options(-fsanitize=address,undefined)
-endif()
 ################### Check Windows's AF_UNIX support ###################
 ################# Versions later than Win10 RS3 does #################
 if (WIN32)
