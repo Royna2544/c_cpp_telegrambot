@@ -107,6 +107,24 @@ struct TgBotConnection {
 
 using listener_callback_t = std::function<void(struct TgBotConnection)>;
 
+/**
+ * @brief Starts the socket listener thread.
+ * 
+ * @param cb The function to be called when a new connection is received.
+ * @param createdProm A promise that will be fulfilled with true when the listener is successfully created, or false if it fails.
+ */
 void startListening(const listener_callback_t &cb, std::promise<bool> &createdProm);
+/**
+ * @brief Writes a TgBotConnection to the socket.
+ * 
+ * @param conn The TgBotConnection to write to the socket.
+ */
 void writeToSocket(struct TgBotConnection conn);
-void forceStopListening(void);
+/**
+ * @brief Stops the socket listener thread.
+ * 
+ * This function will cause the socket listener thread to exit immediately.
+ * It is intended to be used in cases where the program needs to terminate
+ * immediately, and the normal shutdown process is not sufficient.
+ */
+void forceStopListening(void);;
