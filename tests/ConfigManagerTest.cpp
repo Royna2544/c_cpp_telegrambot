@@ -1,16 +1,26 @@
 #include <gtest/gtest.h>
 #include <ConfigManager.h>
 
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 0
+#endif
+
 class ConfigManagerTest : public ::testing::Test {
  protected:
   void SetUp() override {
+#if _POSIX_C_SOURCE > 200112L || defined __APPLE__
     // Set up the mock environment variables
     setenv("VAR_NAME", "VAR_VALUE", 1);
+#endif
+#ifdef _WIN32
+    _putenv("VAR_NAME=VAR_VALUE");
+#endif
   }
 
   void TearDown() override {
-    // Remove the mock environment variables
+#if _POSIX_C_SOURCE > 200112L || defined __APPLE__
     unsetenv("VAR_NAME");
+#endif
   }
 };
 
