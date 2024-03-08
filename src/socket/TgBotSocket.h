@@ -1,12 +1,13 @@
 #pragma once
 
-#include <Types.h>
+#include "../include/Types.h"
 #include "../include/Logging.h"
 
 #include <cstring>
 #include <future>
 #include <functional>
 #include <string>
+#include <unistd.h>
 
 #ifdef __ANDROID__
 #define SOCKET_PATH "/data/data/com.termux/files/usr/tmp/tgbot_sock"
