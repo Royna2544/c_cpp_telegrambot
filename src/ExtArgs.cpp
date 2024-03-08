@@ -1,18 +1,21 @@
 #include <ExtArgs.h>
 
 #include <string>
+#include "StringToolsExt.h"
 
-static inline std::string::size_type findBlankInMsg(const Message::Ptr &message) {
-    return message->text.find_first_of(" \n");
+std::string::size_type firstBlank(const Message::Ptr &msg) {
+    return msg->text.find_first_of(" \n\r");
 }
 
 bool hasExtArgs(const Message::Ptr &message) {
-    return findBlankInMsg(message) != std::string::npos;
+    return firstBlank(message) != std::string::npos;
 }
 
 void parseExtArgs(const Message::Ptr &message, std::string &extraargs) {
     // Telegram ensures message does not have whitespaces beginning or ending.
-    if (auto it = findBlankInMsg(message); it != std::string::npos) {
-        extraargs = message->text.substr(it + 1);
+    if (hasExtArgs(message)) {
+        extraargs = message->text.substr(firstBlank(message));
+        while (isEmptyChar(extraargs.front()))
+            extraargs = extraargs.substr(1);
     }
 }

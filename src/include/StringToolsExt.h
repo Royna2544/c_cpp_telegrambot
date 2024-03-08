@@ -4,9 +4,12 @@
 #include <boost/algorithm/string/trim.hpp>
 #include <string>
 
+static inline bool isEmptyChar(const char c) {
+    return std::isspace(c) || c == 0;
+}
+
 static inline bool isEmptyOrBlank(const std::string& str) {
-    return str.empty() || std::all_of(str.begin(), str.end(),
-                                      [](char c) { return std::isspace(c) || c == 0; });
+    return str.empty() || std::all_of(str.begin(), str.end(), isEmptyChar);
 }
 
 static inline void TrimStr(std::string& str) {
