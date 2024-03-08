@@ -263,6 +263,7 @@ add_executable(${PROJECT_TEST_NAME}
   tests/AuthorizationTest.cpp
   tests/SingleThreadCtrlTest.cpp
   tests/SpamBlockerTest.cpp
+  tests/ExtArgsTest.cpp
 )
 target_link_libraries(${PROJECT_TEST_NAME} gtest gtest_main gmock TgBotCommandModules)
 add_test(NAME ${PROJECT_TEST_NAME} COMMAND ${PROJECT_TEST_NAME})
