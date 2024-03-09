@@ -1,3 +1,2 @@
 - IBash TimeoutThread could use SingleThreadCtrlRunnable
-- Attach bot's information to alive cmd
 - ConfigMananger::loadVariable should return std::optional instead

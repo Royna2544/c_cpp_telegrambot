@@ -5,6 +5,7 @@
 #include <ResourceIncBin.h>
 #include <popen_wdt/popen_wdt.hpp>
 #include "CommandModule.h"
+#include "internal/_tgbot.h"
 #include <cmds.gen.h>
 
 #include <map>
@@ -15,7 +16,7 @@ static void AliveCommandFn(const Bot &bot, const Message::Ptr message) {
     static std::string version;
     static std::once_flag once;
 
-    std::call_once(once, [] {
+    std::call_once(once, [&bot] {
         std::string commitid, commitmsg, originurl, compilerver, commandmodules;
 
         static const std::map<std::string *, std::string> commands = {
@@ -39,11 +40,14 @@ static void AliveCommandFn(const Bot &bot, const Message::Ptr message) {
         }
         ASSIGN_INCTXT_DATA(AboutHtmlText, version);
 #define REPLACE_PLACEHOLDER(buf, name) boost::replace_all(buf, "_" #name "_", name)
+#define REPLACE_PLACEHOLDER2(buf, name, val) boost::replace_all(buf, "_" #name "_", val)
         REPLACE_PLACEHOLDER(version, commitid);
         REPLACE_PLACEHOLDER(version, commitmsg);
         REPLACE_PLACEHOLDER(version, originurl);
         REPLACE_PLACEHOLDER(version, compilerver);
         REPLACE_PLACEHOLDER(version, commandmodules);
+        REPLACE_PLACEHOLDER2(version, botname, UserPtr_toString(bot.getApi().getMe()));
+        REPLACE_PLACEHOLDER2(version, botusername, bot.getApi().getMe()->username);
     });
     try {
         // Hardcoded kys GIF

@@ -1,3 +1,5 @@
+<b>My name</b> _botname_ (@_botusername_)
+
 <b>ABOUT</b>:
 - Telegram bot for fun
 - Proudly backed by C/C++.
