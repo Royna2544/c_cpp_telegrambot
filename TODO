@@ -1,2 +1,1 @@
 - IBash TimeoutThread could use SingleThreadCtrlRunnable
-- ConfigMananger::loadVariable should return std::optional instead

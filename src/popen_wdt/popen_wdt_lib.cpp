@@ -33,8 +33,9 @@ std::filesystem::path getSrcRoot() {
     static std::once_flag flag;
     std::call_once(flag, [] {
         std::string dir_str;
-        bool ret = ConfigManager::getVariable("SRC_ROOT", dir_str);
-        if (!ret && !runCommand("git rev-parse --show-toplevel", dir_str)) {
+        if (auto ret = ConfigManager::getVariable("SRC_ROOT"); ret.has_value()) {
+            dir_str = ret.value();
+        } else if (!runCommand("git rev-parse --show-toplevel", dir_str)) {
             throw std::runtime_error("Command failed");
         }
         dir = dir_str;

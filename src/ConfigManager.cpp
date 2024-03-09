@@ -10,6 +10,7 @@
 #include <functional>
 #include <iostream>
 #include <mutex>
+#include <optional>
 
 struct ConfigBackendBase {
     std::function<void *(void)> load;
@@ -159,9 +160,10 @@ static struct ConfigBackendBase backends[] = {
 
 namespace ConfigManager {
 
-bool getVariable(const std::string &name, std::string &outvalue) {
+std::optional<std::string> getVariable(const std::string &name) {
     ConfigBackendBase *ptr;
     int once_flag = 0;
+    std::string outvalue;
 
     do {
         for (size_t i = 0; i < sizeof(backends) / sizeof(ConfigBackendBase); ++i) {
@@ -175,19 +177,20 @@ bool getVariable(const std::string &name, std::string &outvalue) {
             if (once_flag == 0) {
                 if (ptr->doOverride && ptr->doOverride(ptr->priv.data, name)) {
                     LOG_V("Used '%s' backend for fetching var '%s' (forced)", ptr->name, name.c_str());
-                    return ptr->getVariable(ptr->priv.data, name, outvalue);
+                    ptr->getVariable(ptr->priv.data, name, outvalue);
+                    return {outvalue};
                 }
                 continue;
             }
             if (ptr->getVariable(ptr->priv.data, name, outvalue)) {
                 LOG_V("Used '%s' backend for fetching var '%s'", ptr->name, name.c_str());
-                return true;
+                return {outvalue};
             }
         }
         ++once_flag;
     } while (once_flag < 2);
 
-    return false;
+    return std::nullopt;
 }
 
 void printHelp() {

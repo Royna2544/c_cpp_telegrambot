@@ -204,7 +204,13 @@ static std::optional<std::string> findCommandExe(std::string command) {
     static std::once_flag once;
     static bool valid;
 
-    std::call_once(once, [] { valid = ConfigManager::getVariable("PATH", path); });
+    std::call_once(once, [] { 
+        auto it = ConfigManager::getVariable("PATH");
+        valid = it.has_value();
+        if (valid) {
+            path = it.value();
+        }
+    });
     if (valid) {
         auto paths = StringTools::split(path, path_env_delimiter);
 #ifdef __WIN32

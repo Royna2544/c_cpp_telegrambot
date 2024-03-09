@@ -27,9 +27,9 @@ class ConfigManagerTest : public ::testing::Test {
 };
 
 TEST_F(ConfigManagerTest, GetVariableEnv) {
-  std::string value;
-  EXPECT_TRUE(ConfigManager::getVariable("VAR_NAME", value));
-  EXPECT_EQ(value, "VAR_VALUE");
+  auto it = ConfigManager::getVariable("VAR_NAME");
+  EXPECT_TRUE(it.has_value());
+  EXPECT_EQ(it.value(), "VAR_VALUE");
 }
 
 TEST_F(ConfigManagerTest, CopyCommandLine) {

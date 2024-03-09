@@ -73,17 +73,19 @@ static void setupSocket(const Bot &gBot, SingleThreadCtrlManager::ThreadUsage tu
 #endif
 
 int main(int argc, const char **argv) {
-    std::string token, v;
+    std::string token;
 
     copyCommandLine(CommandLineOp::INSERT, &argc, &argv);
-    if (ConfigManager::getVariable("help", v)) {
+    if (ConfigManager::getVariable("help")) {
         ConfigManager::printHelp();
         return EXIT_SUCCESS;
     }
-    if (!ConfigManager::getVariable("TOKEN", token)) {
+    auto ret = ConfigManager::getVariable("TOKEN");
+    if (!ret) {
         LOG_F("Failed to get TOKEN variable");
         return EXIT_FAILURE;
     }
+    token = *ret;
     static Bot gBot(token);
     database::DBWrapper.loadMain(gBot);
 
