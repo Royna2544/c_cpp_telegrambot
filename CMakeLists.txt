@@ -261,6 +261,7 @@ add_executable(${PROJECT_TEST_NAME}
   tests/ExtArgsTest.cpp
   tests/ConfigManagerTest.cpp
   tests/RegexHandlerTest.cpp
+  tests/DatabaseLoader.cpp
 )
 target_link_libraries(${PROJECT_TEST_NAME} gtest gtest_main gmock TgBotCommandModules)
 add_test(NAME ${PROJECT_TEST_NAME} COMMAND ${PROJECT_TEST_NAME})

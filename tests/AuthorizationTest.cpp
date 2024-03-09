@@ -1,21 +1,10 @@
 #include <gtest/gtest.h>
 
 #include <Authorization.h>
-#include <Database.h>
+#include "DatabaseLoader.h"
 
-#include <cinttypes>
 #include <chrono>
 #include <memory>
-#include <mutex>
-
-static database::DatabaseWrapper& loadDb() {
-    static std::once_flag once;
-    std::call_once(once, []{
-        database::DBWrapper.load();
-        LOG_I("DB loaded, Owner id %" PRId64, database::DBWrapper.maybeGetOwnerId());
-    });
-    return database::DBWrapper;
-}
 
 static void MakeMessageDateNow(Message::Ptr& message) {
     const auto rn = std::chrono::system_clock::now();

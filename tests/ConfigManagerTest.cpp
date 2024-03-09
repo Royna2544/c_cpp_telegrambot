@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <ConfigManager.h>
+#include "DatabaseLoader.h"
 
 #ifndef _POSIX_C_SOURCE
 #define _POSIX_C_SOURCE 0
@@ -15,6 +16,7 @@ class ConfigManagerTest : public ::testing::Test {
 #ifdef _WIN32
     _putenv("VAR_NAME=VAR_VALUE");
 #endif
+    loadDb();
   }
 
   void TearDown() override {
