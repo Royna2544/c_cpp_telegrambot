@@ -34,6 +34,7 @@ class SingleThreadCtrlManager {
 
     enum ThreadUsage {
         USAGE_SOCKET_THREAD,
+        USAGE_SOCKET_EXTERNAL_THREAD,
         USAGE_TIMER_THREAD,
         USAGE_SPAMBLOCK_THREAD,
         USAGE_ERROR_RECOVERY_THREAD,
@@ -47,6 +48,7 @@ class SingleThreadCtrlManager {
 
     constexpr static auto ThreadUsageToStrMap = array_helpers::make<USAGE_MAX, ThreadUsage, const char*> (
         ENUM_AND_STR(USAGE_SOCKET_THREAD),
+        ENUM_AND_STR(USAGE_SOCKET_EXTERNAL_THREAD),
         ENUM_AND_STR(USAGE_TIMER_THREAD),
         ENUM_AND_STR(USAGE_SPAMBLOCK_THREAD),
         ENUM_AND_STR(USAGE_ERROR_RECOVERY_THREAD),

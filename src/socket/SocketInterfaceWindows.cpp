@@ -1,18 +1,13 @@
-#include <Logging.h>
+#include "SocketInterfaceWindows.h"
 
 // clang-format off
 #include <winsock2.h>
 #include <winsock.h>
 #include <afunix.h>
+#include "socket/TgBotSocket.h"
 // clang-format on
 
-#include "SocketUtils_internal.h"
-#include "TgBotSocket.h"
-
-#define INTERNAL_SOCKET_PATH "C:\\Temp\\tgbot_internal.sock"
-#define WSALOG_E(fmt, ...) LOG_E(fmt ": %s", ##__VA_ARGS__, strWSAError(WSAGetLastError()))
-
-static char *strWSAError(const int errcode) {
+char *SocketInterfaceWindows::strWSAError(const int errcode) {
     int ret = 0;
     static char strerror_buf[64];
 
@@ -62,59 +57,23 @@ static char *strWSAError(const int errcode) {
     return strerror(ret);
 }
 
-static SOCKET makeSocket(const char *path, bool is_client) {
-    struct sockaddr_un name {};
-    WSADATA data;
-    SOCKET fd;
-    int ret;
-
-    if (!is_client) {
-        LOG_D("Creating socket at %s", path);
-        std::remove(path);
-    }
-
-    ret = WSAStartup(MAKEWORD(2, 2), &data);
-    if (ret != 0) {
-        LOG_E("WSAStartup failed");
-        return INVALID_SOCKET;
-    }
-    fd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (fd == INVALID_SOCKET) {
-        WSALOG_E("Failed to create socket");
-        WSACleanup();
-        return INVALID_SOCKET;
-    }
-
-    name.sun_family = AF_UNIX;
-    strncpy(name.sun_path, path, sizeof(name.sun_path));
-    name.sun_path[sizeof(name.sun_path) - 1] = '\0';
-
-    decltype(&connect) fn = is_client ? connect : bind;
-    if (fn(fd, reinterpret_cast<struct sockaddr *>(&name), sizeof(name)) != 0) {
-        WSALOG_E("Failed to %s to socket", is_client ? "connect" : "bind");
-        closesocket(fd);
-        WSACleanup();
-        return INVALID_SOCKET;
-    }
-    return fd;
-}
-
-void startListening(const listener_callback_t &cb, std::promise<bool> &createdPromise) {
+void SocketInterfaceWindows::startListening(const listener_callback_t &cb, std::promise<bool> &createdPromise) {
     bool should_break = false;
     struct fd_set set;
-    const SOCKET sfd = makeSocket(SOCKET_PATH, false);
+    const socket_handle_t sfd = createServerSocket(SOCKET_PATH);
+    isRunning = true;
 
-    if (sfd != INVALID_SOCKET) {
+    if (isValidSocketHandle(sfd)) {
         do {
             if (listen(sfd, SOMAXCONN) == SOCKET_ERROR) {
                 WSALOG_E("Failed to listen to socket");
                 break;
             }
-            const SOCKET isfd = makeSocket(INTERNAL_SOCKET_PATH, false);
+            const socket_handle_t isfd = createServerSocket(INTERNAL_SOCKET_PATH);
             if (isfd == INVALID_SOCKET)
                 break;
 
-            if (listen(isfd, 1) == SOCKET_ERROR) {
+            if (listen(isfd, SOMAXCONN) == SOCKET_ERROR) {
                 WSALOG_E("Failed to listen to internal socket");
                 break;
             }
@@ -146,7 +105,7 @@ void startListening(const listener_callback_t &cb, std::promise<bool> &createdPr
                     break;
                 }
                 ASSERT(FD_ISSET(sfd, &set), "select() returns unexpected output");
-                const SOCKET cfd = accept(sfd, (struct sockaddr *)&addr, &len);
+                const socket_handle_t cfd = accept(sfd, (struct sockaddr *)&addr, &len);
                 if (cfd == INVALID_SOCKET) {
                     WSALOG_E("Accept failed");
                     break;
@@ -159,15 +118,18 @@ void startListening(const listener_callback_t &cb, std::promise<bool> &createdPr
             }
         } while (false);
         closesocket(sfd);
+        cleanupServerSocket();
         WSACleanup();
+        isRunning = false;
         return;
     }
     createdPromise.set_value(false);
+    isRunning = false;
 }
 
-void writeToSocket(struct TgBotConnection conn) {
-    const auto sfd = makeSocket(SOCKET_PATH, true);
-    if (sfd != INVALID_SOCKET) {
+void SocketInterfaceWindows::writeToSocket(struct TgBotConnection conn) {
+    const auto sfd = createClientSocket(SOCKET_PATH);
+    if (isValidSocketHandle(sfd)) {
         const int count = send(sfd, reinterpret_cast<char *>(&conn), sizeof(conn), 0);
         if (count < 0) {
             WSALOG_E("Failed to send to socket");
@@ -177,11 +139,11 @@ void writeToSocket(struct TgBotConnection conn) {
     }
 }
 
-void forceStopListening(void) {
+void SocketInterfaceWindows::forceStopListening(void) {
     char dummy = 0;
-    const SOCKET isfd = makeSocket(INTERNAL_SOCKET_PATH, true);
+    const SOCKET isfd = createClientSocket(INTERNAL_SOCKET_PATH);
 
-    if (isfd != INVALID_SOCKET) {
+    if (isValidSocketHandle(isfd)) {
         send(isfd, &dummy, sizeof(dummy), 0);
     } else {
         WSALOG_E("Failed to connect to internal socket");

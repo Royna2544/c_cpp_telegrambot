@@ -1,70 +1,22 @@
-#include <Logging.h>
-#include <Types.h>
 #include <netinet/in.h>
 #include <poll.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
 
-#include <cerrno>
-#include <chrono>
-#include <thread>
+#include "SocketInterfaceUnix.h"
 
-#include "SocketUtils_internal.h"
-#include "TgBotSocket.h"
-
-static pipe_t kListenTerminate;
-int& listen_fd = kListenTerminate[0];
-int& notify_fd = kListenTerminate[1];
-
-using kListenData = char;
-
-static int makeSocket(bool is_client) {
-    int ret = kInvalidFD;
-    if (!is_client) {
-        LOG_D("Creating socket at " SOCKET_PATH);
-    }
-    struct sockaddr_un name {};
-    const int sfd = socket(AF_LOCAL, SOCK_STREAM, 0);
-    if (sfd < 0) {
-        PLOG_E("Failed to create socket");
-        return ret;
-    }
-
-    name.sun_family = AF_LOCAL;
-    strncpy(name.sun_path, SOCKET_PATH, sizeof(name.sun_path));
-    name.sun_path[sizeof(name.sun_path) - 1] = '\0';
-    const size_t size = SUN_LEN(&name);
-    decltype(&connect) fn = is_client ? connect : bind;
-    if (fn(sfd, reinterpret_cast<struct sockaddr*>(&name), size) != 0) {
-        do {
-            PLOG_E("Failed to %s to socket", is_client ? "connect" : "bind");
-            if (!is_client && errno == EADDRINUSE) {
-                std::remove(SOCKET_PATH);
-                if (fn(sfd, reinterpret_cast<struct sockaddr*>(&name), size) == 0) {
-                    LOG_I("Bind succeeded by removing socket file");
-                    break;
-                }
-            }
-            close(sfd);
-            return ret;
-        } while (false);
-    }
-    ret = sfd;
-    return ret;
-}
-
-void startListening(const listener_callback_t& cb, std::promise<bool>& createdPromise) {
+void SocketInterfaceUnix::startListening(const listener_callback_t& cb, std::promise<bool>& createdPromise) {
+    isRunning = true;
     bool should_break = false;
     int rc = 0;
-    int sfd = makeSocket(false);
-    if (isValidFd(sfd)) {
+    socket_handle_t sfd = createServerSocket();
+    if (isValidSocketHandle(sfd)) {
         do {
             if (listen(sfd, 1) < 0) {
                 PLOG_E("Failed to listen to socket");
                 break;
             }
-            LOG_I("Listening on " SOCKET_PATH);
             rc = pipe(kListenTerminate);
             if (rc < 0) {
                 PLOG_E("Pipe failed");
@@ -114,9 +66,9 @@ void startListening(const listener_callback_t& cb, std::promise<bool>& createdPr
                     break;
                 }
 
-                const int cfd = accept(sfd, (struct sockaddr*)&addr, &len);
+                const socket_handle_t cfd = accept(sfd, (struct sockaddr*)&addr, &len);
 
-                if (cfd < 0) {
+                if (!isValidSocketHandle(cfd)) {
                     PLOG_E("Accept failed");
                     break;
                 } else {
@@ -129,15 +81,17 @@ void startListening(const listener_callback_t& cb, std::promise<bool>& createdPr
         } while (false);
         closePipe(kListenTerminate);
         close(sfd);
-        unlink(SOCKET_PATH);
+        cleanupServerSocket();
+        isRunning = false;
         return;
     }
     createdPromise.set_value(false);
+    isRunning = false;
 }
 
-void writeToSocket(struct TgBotConnection conn) {
-    const int sfd = makeSocket(true);
-    if (isValidFd(sfd)) {
+void SocketInterfaceUnix::writeToSocket(struct TgBotConnection conn) {
+    const socket_handle_t sfd = createClientSocket();
+    if (isValidSocketHandle(sfd)) {
         const int count = write(sfd, &conn, sizeof(conn));
         if (count < 0) {
             PLOG_E("Failed to write to socket");
@@ -146,9 +100,9 @@ void writeToSocket(struct TgBotConnection conn) {
     }
 }
 
-void forceStopListening(void) {
-    if (isValidFd(notify_fd) && isValidFd(listen_fd)) {
-        kListenData d = 0;
+void SocketInterfaceUnix::forceStopListening(void) {
+    if (isValidFd(notify_fd) && isValidSocketHandle(listen_fd)) {
+        kListenData d = {};
         int count;
 
         count = write(notify_fd, &d, sizeof(kListenData));

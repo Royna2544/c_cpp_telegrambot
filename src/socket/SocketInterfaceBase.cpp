@@ -1,20 +1,8 @@
-#include <functional>
-#include <string>
+#include "SocketInterfaceBase.h"
+#include <map>
 
-#include "TgBotSocket.h"
-
-/**
- * @brief This function is used to handle incoming data from the Telegram Bot API.
- * 
- * @param len The length of the incoming data.
- * @param conn The TgBotConnection object that contains information about the incoming data.
- * @param cb The listener_callback_t function that will be invoked when the incoming data is processed.
- * @param errMsgFn The function that returns an error message when there is an error reading from the socket.
- * 
- * @return true if the incoming data was handled successfully, false otherwise.
- */
-[[nodiscard]] static inline bool handleIncomingBuf(const size_t len, struct TgBotConnection& conn,
-    const listener_callback_t& cb, std::function<char*(void)> errMsgFn) {
+bool SocketInterfaceBase::handleIncomingBuf(const size_t len, struct TgBotConnection& conn,
+                                            const listener_callback_t& cb, std::function<char*(void)> errMsgFn) {
     if (len > 0) {
         LOG_I("Received buf with %s, invoke callback!", TgBotCmd::toStr(conn.cmd).c_str());
 
@@ -49,7 +37,7 @@
                     /**
                      * @brief If the incoming exit token matches the stored exit token, exit the program. Otherwise, log a warning message indicating that different exit tokens were received.
                      */
-                    if (exitToken!= exitToken_In) {
+                    if (exitToken != exitToken_In) {
                         LOG_W("Different exit tokens: My: '%s', input: '%s'. Ignoring!", exitToken.c_str(), exitToken_In.c_str());
                         return false;
                     }
@@ -64,10 +52,47 @@
     } else {
         /**
          * @brief Logs an error message indicating that there was an error reading from the socket.
-         * 
+         *
          * @param errMsg The error message returned by the error message function.
          */
         LOG_E("Failed to read from socket: %s", errMsgFn());
     }
     return false;
+}
+
+void SocketInterfaceBase::stopListening(const std::string& exitToken) {
+    if (canSocketBeClosed()) {
+        writeToSocket({CMD_EXIT, {.data_2 = 
+            TgBotCommandData::Exit::create(ExitOp::DO_EXIT, exitToken)}});
+    } else {
+        forceStopListening();
+    }
+}
+
+#if defined __linux__ || defined __APPLE__
+#include "SocketInterfaceUnix.h"
+#endif
+#ifdef __WIN32
+#include "SocketInterfaceWindows.h"
+#endif
+
+#define MAKE_INTF(usage, instance) {usage, instance}
+
+std::shared_ptr<SocketInterfaceBase> getSocketInterface(const SocketUsage u) {
+    static const std::map<SocketUsage, std::shared_ptr<SocketInterfaceBase>> socketBackends = {
+#if defined __linux__
+        MAKE_INTF(SocketUsage::SU_INTERNAL, std::make_shared<SocketInterfaceUnixLocal>()),
+        MAKE_INTF(SocketUsage::SU_EXTERNAL, std::make_shared<SocketInterfaceUnixIPv4Linux>())
+#elif defined __APPLE__
+        MAKE_INTF(SocketUsage::SU_INTERNAL, std::make_shared<SocketInterfaceUnixLocal>()),
+        MAKE_INTF(SocketUsage::SU_EXTERNAL, std::make_shared<SocketInterfaceUnixIPv4Darwin>())
+#elif defined __WIN32
+        MAKE_INTF(SocketUsage::SU_INTERNAL, std::make_shared<SocketInterfaceWindowsLocal>()),
+#endif
+    };
+    const auto it = socketBackends.find(u);
+    if (it == socketBackends.end()) {
+        return socketBackends.at(SocketUsage::SU_INTERNAL);
+    }
+    return it->second;
 }

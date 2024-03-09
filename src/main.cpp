@@ -9,6 +9,8 @@
 #include <internal/_std_chrono_templates.h>
 
 #include "signalhandler/SignalHandler.h"
+#include "socket/SocketInterfaceBase.h"
+#include "socket/TgBotSocket.h"
 
 // Generated cmd list
 #include <cmds.gen.h>
@@ -26,7 +28,7 @@
 // tgbot
 using TgBot::TgLongPoll;
 
-static void cleanupFn (int s) {
+static void cleanupFn(int s) {
     static std::once_flag once;
     std::call_once(once, [s] {
         LOG_I("Exiting with signal %d", s);
@@ -37,23 +39,40 @@ static void cleanupFn (int s) {
 };
 
 #ifdef SOCKET_CONNECTION
-static void cleanupSocket(const std::string exitToken, SingleThreadCtrl *) {
-    bool socketValid = true;
-    
-    if (!fileExists(SOCKET_PATH)) {
-        LOG_W("Socket file was deleted");
-        socketValid = false;
-    }
-    if (socketValid) {
-        writeToSocket({CMD_EXIT, {.data_2 = 
-            TgBotCommandData::Exit::create(ExitOp::DO_EXIT, exitToken)}});
-    } else {
-        forceStopListening();
+static void cleanupSocket(const std::string exitToken, SocketUsage usage, SingleThreadCtrl *) {
+    getSocketInterface(usage)->stopListening(exitToken);
+}
+
+static void setupSocket(const Bot &gBot, SingleThreadCtrlManager::ThreadUsage tusage,
+                        SocketUsage susage, TgBotCommandData::Exit e) {
+    auto socketConnectionManager = gSThreadManager.getController(tusage);
+    std::promise<bool> socketCreatedProm;
+    auto socketCreatedFut = socketCreatedProm.get_future();
+    auto intf = getSocketInterface(susage);
+
+    if (!intf->isRunning) {
+        socketConnectionManager->runWith([&socketCreatedProm, susage, &gBot] {
+            getSocketInterface(susage)->startListening([&gBot](struct TgBotConnection conn) {
+                socketConnectionHandler(gBot, conn);
+            },socketCreatedProm);
+        });
+
+        if (socketCreatedFut.get() && susage == SU_INTERNAL) {
+            intf->setDestinationAddress();
+            intf->writeToSocket({CMD_EXIT, {.data_2 = e}});
+            socketConnectionManager->setPreStopFunction(
+                std::bind(&cleanupSocket, e.token, susage, std::placeholders::_1));
+        }
+        if (susage == SU_EXTERNAL) {
+            socketConnectionManager->setPreStopFunction([intf](SingleThreadCtrl *) {
+                intf->forceStopListening();
+            });
+        }
     }
 }
 #endif
 
-int main(int argc, const char** argv) {
+int main(int argc, const char **argv) {
     std::string token, v;
 
     copyCommandLine(CommandLineOp::INSERT, &argc, &argv);
@@ -89,9 +108,8 @@ int main(int argc, const char** argv) {
     }
     gBot.getEvents().onAnyMessage([](const Message::Ptr &msg) {
         static auto spamMgr = gSThreadManager
-            .getController<SpamBlockManager>({
-                .usage = SingleThreadCtrlManager::USAGE_SPAMBLOCK_THREAD, 
-            }, std::ref(gBot));
+            .getController<SpamBlockManager>(
+                {SingleThreadCtrlManager::USAGE_SPAMBLOCK_THREAD}, std::ref(gBot));
         static RegexHandler regexHandler(gBot);
 
         if (!gAuthorized) return;
@@ -104,27 +122,12 @@ int main(int argc, const char** argv) {
     });
 
 #ifdef SOCKET_CONNECTION
-    auto socketConnectionManager = gSThreadManager
-                                   .getController(SingleThreadCtrlManager::USAGE_SOCKET_THREAD);
-    std::string exitToken;
-    std::promise<bool> socketCreatedProm;
-    auto socketCreatedFut = socketCreatedProm.get_future();
+    std::string exitToken = StringTools::generateRandomString(sizeof(TgBotCommandUnion::data_2.token) - 1);
+    auto e = TgBotCommandData::Exit::create(ExitOp::SET_TOKEN, exitToken);
 
-    socketConnectionManager->runWith([&socketCreatedProm] {
-        startListening([](struct TgBotConnection conn) {
-            socketConnectionHandler(gBot, conn);
-        },
-        socketCreatedProm);
-    });
+    setupSocket(gBot, SingleThreadCtrlManager::USAGE_SOCKET_THREAD, SU_INTERNAL, e);
+    setupSocket(gBot, SingleThreadCtrlManager::USAGE_SOCKET_EXTERNAL_THREAD, SU_EXTERNAL, e);
 
-    if (socketCreatedFut.get()) {
-        exitToken = StringTools::generateRandomString(sizeof(TgBotCommandUnion::data_2.token) - 1);
-
-        auto e = TgBotCommandData::Exit::create(ExitOp::SET_TOKEN, exitToken);
-        writeToSocket({CMD_EXIT, {.data_2 = e}});
-        socketConnectionManager->setPreStopFunction(std::bind(&cleanupSocket,
-            std::cref(exitToken), std::placeholders::_1));
-    }
 #endif
 #ifdef RTCOMMAND_LOADER
     loadCommandsFromFile(gBot, getSrcRoot() / "modules.load");
@@ -154,7 +157,7 @@ int main(int argc, const char** argv) {
                 break;
             }
             CurrentTp = std::chrono::system_clock::now();
-            if (to_secs(CurrentTp - LastTp).count() < 30 && 
+            if (to_secs(CurrentTp - LastTp).count() < 30 &&
                 std::chrono::system_clock::to_time_t(LastTp) != 0) {
                 bot_sendMessage(gBot, ownerid, "Recover failed.");
                 LOG_F("Recover failed");
@@ -164,11 +167,10 @@ int main(int argc, const char** argv) {
             bot_sendMessage(gBot, ownerid, "Reinitializing.");
             LOG_I("Re-init");
             gAuthorized = false;
-            static const SingleThreadCtrlManager::GetControllerRequest req {
+            static const SingleThreadCtrlManager::GetControllerRequest req{
                 .usage = SingleThreadCtrlManager::USAGE_ERROR_RECOVERY_THREAD,
-                .flags = SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_NONEXIST | 
-                    SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_FAILACTION_RETURN_NULL
-            };
+                .flags = SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_NONEXIST |
+                         SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_FAILACTION_RETURN_NULL};
             auto cl = gSThreadManager.getController(req);
             if (cl) {
                 cl->runWith([] {

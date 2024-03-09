@@ -187,12 +187,35 @@ if (USE_UNIX_SOCKETS)
   set(SRC_LIST ${SRC_LIST}
       src/ChatObserver.cpp
       src/SocketConnectionHandler.cpp)
-  add_library(TgBotSocket STATIC 
-      src/socket/SocketUtils_${TARGET_VARIANT}.cpp
+  if (UNIX)
+    set(SOCKET_SRC_LIST
+      src/socket/SocketInterfaceUnix.cpp
+      src/socket/impl/SocketInterfacePosixLocal.cpp
+      src/socket/impl/SocketInterfacePosixIPv4.cpp
+    )
+    if (APPLE)
+      set(SOCKET_SRC_LIST ${SOCKET_SRC_LIST}
+        src/socket/impl/SocketInterfacePosixIPv4Darwin.cpp
+      )
+    else()
+      set(SOCKET_SRC_LIST ${SOCKET_SRC_LIST}
+        src/socket/impl/SocketInterfacePosixIPv4Linux.cpp
+      )
+    endif()
+  elseif(WIN32)
+      set(SOCKET_SRC_LIST 
+        src/socket/SocketInterfaceWindows.cpp
+        src/socket/impl/SocketInterfaceWindowsLocal.cpp
+      )
+  endif()
+
+  add_library(TgBotSocket STATIC
+      ${SOCKET_SRC_LIST}
+      src/socket/SocketInterfaceBase.cpp
       src/socket/TgBotCommandMap.cpp)
   add_executable(${SOCKET_CLI_NAME} src/socket/TgBotSocketClient.cpp)
 
-  target_link_libraries(${SOCKET_CLI_NAME} TgBotSocket)
+  target_link_libraries(${SOCKET_CLI_NAME} TgBotSocket TgBotUtils)
   target_link_lib_if_windows(${SOCKET_CLI_NAME} Ws2_32)
 endif()
 #####################################################################

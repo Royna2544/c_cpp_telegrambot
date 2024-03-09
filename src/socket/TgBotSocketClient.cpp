@@ -2,8 +2,10 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
+#include <memory>
 
 #include "TgBotSocket.h"
+#include "socket/SocketInterfaceBase.h"
 
 [[noreturn]]
 static void usage(const char* argv, bool success) {
@@ -142,9 +144,11 @@ int main(int argc, char** argv) {
             }
         }
     }
-    if (ret)
-        writeToSocket({cmd, data_g});
-    else
+    if (ret) {
+        auto intf = getSocketInterface(SocketUsage::SU_EXTERNAL);
+        intf->setDestinationAddress(getenv("IP_ADDR") ?: "");
+        intf->writeToSocket({cmd, data_g});
+    } else
         usage(exe, false);
     return !ret;
 }
