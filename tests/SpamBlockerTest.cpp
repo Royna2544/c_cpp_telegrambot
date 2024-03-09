@@ -96,4 +96,5 @@ TEST(SpamBlockTest, GeneralSpamEntryOverThresholdOld) {
     std::this_thread::sleep_for(100ms);
     mgr->stop();
     Mock::VerifyAndClearExpectations(mgr.get());
+    Accessor::destroy();
 }
