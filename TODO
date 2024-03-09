@@ -1,4 +1,3 @@
-- std::async consideration on SpamBlockThread
-- Eject TgBot dep from TgBotDB
 - IBash TimeoutThread could use SingleThreadCtrlRunnable
-- Write tests for SpamBlocker
+- Attach bot's information to alive cmd
+- ConfigMananger::loadVariable should return std::optional instead
