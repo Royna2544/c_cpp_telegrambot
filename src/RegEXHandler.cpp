@@ -5,6 +5,7 @@
 #include <optional>
 #include <regex>
 #include <string>
+#include "StringToolsExt.h"
 
 using std::regex_constants::ECMAScript;
 using std::regex_constants::format_first_only;
@@ -83,14 +84,16 @@ OptionalWrapper<std::string> RegexHandlerBase::doRegexDeleteCommand(const Messag
         if (auto regex = constructRegex(args[1], regexCommand, ECMAScript);
             regex.has_value()) {
             std::stringstream kInStream(text), kOutStream;
-            std::string line;
+            std::string line, out;
             LOG_D("regexstr: '%s'", args[1].c_str());
             while (std::getline(kInStream, line)) {
                 if (!std::regex_search(line, regex.value(), format_sed | match_not_null)) {
                     kOutStream << line << std::endl;
                 }
             }
-            return {kOutStream.str()};
+            out = kOutStream.str();
+            TrimStr(out);
+            return {out};
         }
     }
     return {std::nullopt};

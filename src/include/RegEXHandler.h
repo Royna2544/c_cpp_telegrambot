@@ -56,6 +56,7 @@ struct RegexHandlerBase {
 
     void processRegEXCommand(const Message::Ptr& regexCommand, const std::string& text);
 
+    friend struct RegexHandlerTest;
    private:
     std::vector<std::string> matchRegexAndSplit(const std::string& text, const std::regex& regex);
     std::optional<std::regex> constructRegex(const std::string& regexstr, const Message::Ptr& message,
