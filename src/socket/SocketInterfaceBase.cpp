@@ -1,10 +1,16 @@
 #include "SocketInterfaceBase.h"
 #include <map>
 #include <vector>
+#include "socket/TgBotSocket.h"
 
 bool SocketInterfaceBase::handleIncomingBuf(const size_t len, struct TgBotConnection& conn,
                                             const listener_callback_t& cb, std::function<char*(void)> errMsgFn) {
     if (len > 0) {
+        if (conn.magic != MAGIC_VALUE) {
+            LOG_W("Invalid magic value, dropping buffer");
+            return false;
+        }
+
         LOG_I("Received buf with %s, invoke callback!", TgBotCmd::toStr(conn.cmd).c_str());
 
         if (conn.cmd == CMD_EXIT) {

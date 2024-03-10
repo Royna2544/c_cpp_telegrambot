@@ -98,7 +98,9 @@ union TgBotCommandUnion {
     TgBotCommandData::ObserveAllChats data_6;
 };
 
+constexpr int64_t MAGIC_VALUE = 0xDEADFACE;
 struct TgBotConnection {
     TgBotCommand cmd;
     union TgBotCommandUnion data;
+    int64_t magic = MAGIC_VALUE;
 };
