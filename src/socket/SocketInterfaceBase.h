@@ -107,6 +107,7 @@ struct SocketInterfaceBase {
     struct {
         option_t opt_destination_address;
     } options;
+    constexpr static int kTgBotHostPort = 50000;
 };
 
 enum SocketUsage {

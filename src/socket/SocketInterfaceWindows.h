@@ -40,7 +40,6 @@ struct SocketInterfaceWindowsIPv4 : SocketInterfaceWindows {
     socket_handle_t createServerSocket() override;
     bool isAvailable() override;
 
-    constexpr static int kTgBotHostPort = 50000;
   private:
     socket_handle_t makeSocket(bool is_client);
 };

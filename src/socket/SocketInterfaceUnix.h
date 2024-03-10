@@ -49,7 +49,6 @@ struct SocketInterfaceUnixIPv4 : SocketInterfaceUnix {
     bool isAvailable() override;
     virtual ~SocketInterfaceUnixIPv4() = default;
     
-    constexpr static int kTgBotHostPort = 50000;
   private:
     void foreach_ipv4_interfaces(const std::function<void(const char*, const char*)> callback);
 };
@@ -61,7 +60,6 @@ struct SocketInterfaceUnixIPv6 : SocketInterfaceUnix {
     bool isAvailable() override;
     virtual ~SocketInterfaceUnixIPv6() = default;
     
-    constexpr static int kTgBotHostPort = 50000;
   private:
     void foreach_ipv6_interfaces(const std::function<void(const char*, const char*)> callback);
 };
