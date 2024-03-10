@@ -1,6 +1,6 @@
 #include <windows.h>
 
-#include "SignalHandler.h"
+#include "libsighandler.h"
 
 static exit_handler_t exitHandler = nullptr;
 

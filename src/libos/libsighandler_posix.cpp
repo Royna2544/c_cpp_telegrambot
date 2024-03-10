@@ -1,6 +1,6 @@
 #include <csignal>
 
-#include "SignalHandler.h"
+#include "libsighandler.h"
 
 void installSignalHandler(const exit_handler_t et) {
     std::signal(SIGINT, et);

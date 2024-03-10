@@ -104,7 +104,7 @@ set(SRC_LIST
     src/BotAddCommand.cpp
     src/CompilerInTelegram.cpp
     src/ExtArgs.cpp
-    src/signalhandler/SignalHandler_${TARGET_VARIANT}.cpp
+    src/libos/libsighandler_${TARGET_VARIANT}.cpp
     src/random/RandomNumberGenerator.cpp
     src/SpamBlocker.cpp
     src/RegEXHandler.cpp
@@ -236,8 +236,8 @@ add_library(
   src/SingleThreadCtrlManager.cpp
   src/popen_wdt/popen_wdt_${TARGET_VARIANT}.c
   src/popen_wdt/popen_wdt_lib.cpp
-  src/fslib/FileSystemLib.cpp
-  src/fslib/FileSystemLib_${TARGET_VARIANT}.cpp)
+  src/libos/libfs.cpp
+  src/libos/libfs_${TARGET_VARIANT}.cpp)
 
 target_link_libraries(TgBotUtils ${Boost_LIBRARIES})
 target_link_lib_if_windows(TgBotUtils shlwapi)

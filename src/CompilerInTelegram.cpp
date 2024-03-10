@@ -4,7 +4,7 @@
 #include <ConfigManager.h>
 #include <EnumArrayHelpers.h>
 #include <ExtArgs.h>
-#include <FileSystemLib.h>
+#include <libos/libfs.h>
 #include <Logging.h>
 #include <StringToolsExt.h>
 #include <random/RandomNumberGenerator.h>

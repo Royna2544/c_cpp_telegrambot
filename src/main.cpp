@@ -2,15 +2,13 @@
 #include <BotAddCommand.h>
 #include <ConfigManager.h>
 #include <Database.h>
-#include <FileSystemLib.h>
 #include <RegEXHandler.h>
 #include <SingleThreadCtrl.h>
 #include <SpamBlock.h>
 #include <internal/_std_chrono_templates.h>
-
-#include "signalhandler/SignalHandler.h"
-#include "socket/SocketInterfaceBase.h"
-#include "socket/TgBotSocket.h"
+#include <libos/libfs.h>
+#include <libos/libsighandler.h>
+#include <socket/SocketInterfaceBase.h>
 
 // Generated cmd list
 #include <cmds.gen.h>

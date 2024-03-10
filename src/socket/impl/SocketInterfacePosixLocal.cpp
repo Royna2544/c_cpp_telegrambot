@@ -10,7 +10,7 @@
 #include <filesystem>
 
 #include "../SocketInterfaceUnix.h"
-#include <FileSystemLib.h>
+#include <libos/libfs.h>
 #include <Logging.h>
 #include <Types.h>
 
