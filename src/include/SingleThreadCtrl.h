@@ -29,7 +29,9 @@ class SingleThreadCtrlManager {
         __REQUIRE_FAILACTION_BASE = 1 << 2,
         REQUIRE_FAILACTION_ASSERT = __REQUIRE_FAILACTION_BASE,
         REQUIRE_FAILACTION_LOG = __REQUIRE_FAILACTION_BASE << 1,
-        REQUIRE_FAILACTION_RETURN_NULL = __REQUIRE_FAILACTION_BASE << 2
+        REQUIRE_FAILACTION_RETURN_NULL = __REQUIRE_FAILACTION_BASE << 2,
+
+        SIZEDIFF_ACTION_RECONSTRUCT = __REQUIRE_FAILACTION_BASE << 3,
     };
 
     enum ThreadUsage {
@@ -46,7 +48,7 @@ class SingleThreadCtrlManager {
         USAGE_MAX,
     };
 
-    constexpr static auto ThreadUsageToStrMap = array_helpers::make<USAGE_MAX, ThreadUsage, const char*> (
+    constexpr static auto ThreadUsageToStrMap = array_helpers::make<USAGE_MAX, ThreadUsage, const char*>(
         ENUM_AND_STR(USAGE_SOCKET_THREAD),
         ENUM_AND_STR(USAGE_SOCKET_EXTERNAL_THREAD),
         ENUM_AND_STR(USAGE_TIMER_THREAD),
@@ -56,8 +58,7 @@ class SingleThreadCtrlManager {
         ENUM_AND_STR(USAGE_IBASH_EXIT_TIMEOUT_THREAD),
         ENUM_AND_STR(USAGE_IBASH_COMMAND_QUEUE_THREAD),
         ENUM_AND_STR(USAGE_DATABASE_SYNC_THREAD),
-        ENUM_AND_STR(USAGE_TEST)
-    );
+        ENUM_AND_STR(USAGE_TEST));
 
     constexpr static const char* ThreadUsageToStr(const ThreadUsage u) {
         return ThreadUsageToStrMap[u].second;
@@ -135,13 +136,13 @@ struct SingleThreadCtrl {
 
     struct {
         // This works, via the main thread will lock the mutex first. Then later thread function
-        // would try to lock it, but as it is a timed mutex, it could 
+        // would try to lock it, but as it is a timed mutex, it could
         std::timed_mutex m;
         std::unique_lock<std::timed_mutex> lk;
     } timer_mutex;
     struct {
         size_t sizeOfThis;
-        SingleThreadCtrlManager *mgr;
+        SingleThreadCtrlManager* mgr;
         struct {
             // It would'nt be a dangling one
             const char* str;
@@ -164,18 +165,20 @@ template <class T, typename... Args, std::enable_if_t<std::is_base_of_v<SingleTh
 std::shared_ptr<T> SingleThreadCtrlManager::getController(const GetControllerRequest req, Args... args) {
     controller_type ptr;
     bool sizeMismatch = false;
-    const char *usageStr = ThreadUsageToStr(req.usage);
-    const std::lock_guard<std::shared_mutex> _(mControllerLock);
+    const char* usageStr = ThreadUsageToStr(req.usage);
+    std::unique_lock<std::shared_mutex> lk(mControllerLock);
     auto it = kControllers.find(req.usage);
 
     if (kIsUnderStopAll) {
         LOG_W("Under stopAll(), ignore");
         return {};
     }
-    if (sizeMismatch = it != kControllers.end() && it->second->mgr_priv.sizeOfThis < sizeof(T); sizeMismatch) {
-        LOG_W("Size mismatch: Buffer has %zu, New class wants %zu. return null",
+    if (sizeMismatch = it != kControllers.end() &&
+                       it->second->mgr_priv.sizeOfThis < sizeof(T); sizeMismatch) {
+        LOG_W("Size mismatch: Buffer has %zu, New class wants %zu",
               it->second->mgr_priv.sizeOfThis, sizeof(T));
-        return {};
+        if (!(req.flags & SIZEDIFF_ACTION_RECONSTRUCT))
+            return {};
     }
     if (it != kControllers.end() && it->second && !sizeMismatch) {
         if (const auto maybeRet = checkRequireFlags(REQUIRE_NONEXIST, req.flags); maybeRet)
@@ -185,13 +188,14 @@ std::shared_ptr<T> SingleThreadCtrlManager::getController(const GetControllerReq
             ptr = it->second;
         }
     } else {
-        if (const auto maybeRet = checkRequireFlags(REQUIRE_EXIST, req.flags);
-                maybeRet && !sizeMismatch)
+        if (const auto maybeRet = checkRequireFlags(REQUIRE_EXIST, req.flags); maybeRet && !sizeMismatch)
             ptr = maybeRet.value();
         else {
             std::shared_ptr<T> newit;
             if (sizeMismatch) {
+                lk.unlock();
                 destroyController(it->first);
+                lk.lock();
             }
             LOG_V("New allocation: %s controller", usageStr);
             if constexpr (sizeof...(args) != 0)
@@ -203,9 +207,11 @@ std::shared_ptr<T> SingleThreadCtrlManager::getController(const GetControllerReq
             ctrlit->mgr_priv.usage.val = req.usage;
             ctrlit->mgr_priv.sizeOfThis = sizeof(T);
             ctrlit->mgr_priv.mgr = this;
-            ASSERT(ctrlit->timer_mutex.lk.owns_lock(), "%s controller unique_lock is"
-                "not holding mutex. Probably constructor is not called.", usageStr);
-            ptr = kControllers[req.usage] = newit; 
+            ASSERT(ctrlit->timer_mutex.lk.owns_lock(),
+                   "%s controller unique_lock is"
+                   "not holding mutex. Probably constructor is not called.",
+                   usageStr);
+            ptr = kControllers[req.usage] = newit;
         }
     }
     return std::static_pointer_cast<T>(ptr);
