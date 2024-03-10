@@ -4,10 +4,7 @@
 #include "../include/Logging.h"
 
 #include <cstring>
-#include <future>
-#include <functional>
 #include <string>
-#include <climits>
 
 #ifdef __ANDROID__
 #define SOCKET_PATH "/data/data/com.termux/files/usr/tmp/tgbot_sock"
@@ -50,7 +47,7 @@ namespace TgBotCmd {
 namespace TgBotCommandData {
 struct WriteMsgToChatId {
     ChatId to;       // destination chatid
-    char msg[512];  // Msg to send
+    char msg[256];  // Msg to send
 };
 
 struct Exit {
@@ -86,7 +83,7 @@ struct ObserveChatId {
 struct SendFileToChatId {
     ChatId id;                // Destination ChatId
     FileType type;            // File type for file
-    char filepath[PATH_MAX];  // Path to file
+    char filepath[256];       // Path to file
 };
 
 using ObserveAllChats = bool;
