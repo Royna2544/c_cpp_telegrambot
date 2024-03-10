@@ -207,6 +207,7 @@ if (USE_UNIX_SOCKETS)
       set(SOCKET_SRC_LIST 
         src/socket/SocketInterfaceWindows.cpp
         src/socket/impl/SocketInterfaceWindowsLocal.cpp
+        src/socket/impl/SocketInterfaceWindowsIPv4.cpp
       )
   endif()
 

@@ -55,11 +55,25 @@ bool SocketInterfaceWindowsLocal::canSocketBeClosed() {
 
 SocketInterfaceWindows::socket_handle_t
 SocketInterfaceWindowsLocal::createClientSocket() {
+    setOptions(Options::DESTINATION_ADDRESS, SOCKET_PATH);
     return makeSocket(/*is_client=*/true);
 }
 
 SocketInterfaceWindows::socket_handle_t
 SocketInterfaceWindowsLocal::createServerSocket() {
+    setOptions(Options::DESTINATION_ADDRESS, SOCKET_PATH);
+    return makeSocket(/*is_client=*/false);
+}
+
+SocketInterfaceWindows::socket_handle_t
+SocketInterfaceWindowsLocal::createClientInternalSocket() {
+    setOptions(Options::DESTINATION_ADDRESS, INTERNAL_SOCKET_PATH);
+    return makeSocket(/*is_client=*/true);
+}
+
+SocketInterfaceWindows::socket_handle_t
+SocketInterfaceWindowsLocal::createServerInternalSocket() {
+    setOptions(Options::DESTINATION_ADDRESS, INTERNAL_SOCKET_PATH);
     return makeSocket(/*is_client=*/false);
 }
 

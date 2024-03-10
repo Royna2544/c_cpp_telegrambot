@@ -126,6 +126,7 @@ std::shared_ptr<SocketInterfaceBase> getSocketInterface(const SocketUsage u) {
         MAKE_INTF(SocketUsage::SU_EXTERNAL, std::make_shared<SocketInterfaceUnixIPv4>())
 #elif defined __WIN32
         MAKE_INTF(SocketUsage::SU_INTERNAL, std::make_shared<SocketInterfaceWindowsLocal>()),
+        MAKE_INTF(SocketUsage::SU_EXTERNAL, std::make_shared<SocketInterfaceWindowsIPv4>()),
 #endif
     };
     const auto it = socketBackends.find(u);
@@ -141,6 +142,7 @@ std::shared_ptr<SocketInterfaceBase> getSocketInterfaceForClient() {
         std::make_shared<SocketInterfaceUnixIPv6>(),
         std::make_shared<SocketInterfaceUnixLocal>(),
 #elif defined __WIN32
+        std::make_shared<SocketInterfaceWindowsIPv4>(),
         std::make_shared<SocketInterfaceWindowsLocal>(),
 #endif
     };

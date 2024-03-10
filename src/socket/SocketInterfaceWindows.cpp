@@ -61,7 +61,6 @@ void SocketInterfaceWindows::startListening(const listener_callback_t &cb, std::
     bool should_break = false;
     struct fd_set set;
 
-    setOptions(Options::DESTINATION_ADDRESS, SOCKET_PATH);
     const socket_handle_t sfd = createServerSocket();
     isRunning = true;
 
@@ -71,8 +70,7 @@ void SocketInterfaceWindows::startListening(const listener_callback_t &cb, std::
                 WSALOG_E("Failed to listen to socket");
                 break;
             }
-            setOptions(Options::DESTINATION_ADDRESS, INTERNAL_SOCKET_PATH);
-            const socket_handle_t isfd = createServerSocket();
+            const socket_handle_t isfd = createServerInternalSocket();
             if (isfd == INVALID_SOCKET)
                 break;
 
@@ -131,7 +129,6 @@ void SocketInterfaceWindows::startListening(const listener_callback_t &cb, std::
 }
 
 void SocketInterfaceWindows::writeToSocket(struct TgBotConnection conn) {
-    setOptions(Options::DESTINATION_ADDRESS, SOCKET_PATH);
     const socket_handle_t sfd = createClientSocket();
     if (isValidSocketHandle(sfd)) {
         const int count = send(sfd, reinterpret_cast<char *>(&conn), sizeof(conn), 0);
@@ -146,7 +143,7 @@ void SocketInterfaceWindows::writeToSocket(struct TgBotConnection conn) {
 void SocketInterfaceWindows::forceStopListening(void) {
     dummy_listen_buf_t dummy = 0;
     setOptions(Options::DESTINATION_ADDRESS, INTERNAL_SOCKET_PATH);
-    const SOCKET isfd = createClientSocket();
+    const SOCKET isfd = createClientInternalSocket();
 
     if (isValidSocketHandle(isfd)) {
         send(isfd, &dummy, sizeof(dummy), 0);
