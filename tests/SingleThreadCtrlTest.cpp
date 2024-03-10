@@ -30,6 +30,10 @@ struct RequireFlagBuilder {
         require_nonexist = true;
         return *this;
     }
+    RequireFlagBuilder& setSizediffReconstruct() {
+        sizediff_recst = true;
+        return *this;
+    }
     int build() {
         int rc = 0;
         if (fail_log)
@@ -42,6 +46,8 @@ struct RequireFlagBuilder {
             rc |= SingleThreadCtrlManager::REQUIRE_EXIST;
         if (require_nonexist)
             rc |= SingleThreadCtrlManager::REQUIRE_NONEXIST;
+        if (sizediff_recst)
+            rc |= SingleThreadCtrlManager::SIZEDIFF_ACTION_RECONSTRUCT;
         return rc;
     }
  private:
@@ -50,6 +56,7 @@ struct RequireFlagBuilder {
     bool fail_null = false;
     bool require_exist = false;
     bool require_nonexist = false;
+    bool sizediff_recst = false;
 };
 
 TEST(SingleThreadCtrlTest, ReturnsNonNull) {
@@ -143,6 +150,35 @@ TEST(SingleThreadCtrlTest, RequireExistButDoes_FailLogReturnNull) {
 
     e.createAndAssertNotNull();
     e.createAndAssertNotNull(flag);
+    e.destroy();
+}
+
+struct Amazing : SingleThreadCtrl {
+    char buf[2048];
+};
+
+TEST(SingleThreadCtrlTest, SizeDiffReconstructYes) {
+    Accessor e;
+
+    const int flag = RequireFlagBuilder()
+                        .setRequireExist()
+                        .setSizediffReconstruct()
+                        .build();
+
+    e.createAndAssertNotNull();
+    e.AssertNonNull(e.createAndGet<Amazing>(flag));
+    e.destroy();
+}
+
+TEST(SingleThreadCtrlTest, SizeDiffReconstructNo) {
+    Accessor e;
+
+    const int flag = RequireFlagBuilder()
+                        .setRequireExist()
+                        .build();
+
+    e.createAndAssertNotNull();
+    e.AssertNull(e.createAndGet<Amazing>(flag));
     e.destroy();
 }
 
