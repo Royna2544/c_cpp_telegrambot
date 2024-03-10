@@ -22,12 +22,12 @@ void SingleThreadCtrlManager::destroyController(const ThreadUsage usage) {
 std::optional<SingleThreadCtrlManager::controller_type>
 SingleThreadCtrlManager::checkRequireFlags(GetControllerFlags opposite, int flags) {
     if (flags & opposite) {
-        if (flags & FLAG_GETCTRL_REQUIRE_FAILACTION_ASSERT)
+        if (flags & REQUIRE_FAILACTION_ASSERT)
             ASSERT(false, "Flags requested FAILACTION_ASSERT");
-        if (flags & FLAG_GETCTRL_REQUIRE_FAILACTION_LOG)
+        if (flags & REQUIRE_FAILACTION_LOG)
             LOG_E("Flags-assertion failed");
-        if (flags & FLAG_GETCTRL_REQUIRE_FAILACTION_RETURN_NULL) {
-            LOG_V("Return null (FLAG_GETCTRL_REQUIRE_FAILACTION_RETURN_NULL)");
+        if (flags & REQUIRE_FAILACTION_RETURN_NULL) {
+            LOG_V("Return null (REQUIRE_FAILACTION_RETURN_NULL)");
             return std::optional(controller_type());
         }
     }

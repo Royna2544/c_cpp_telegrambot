@@ -33,15 +33,15 @@ struct RequireFlagBuilder {
     int build() {
         int rc = 0;
         if (fail_log)
-            rc |= SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_FAILACTION_LOG;
+            rc |= SingleThreadCtrlManager::REQUIRE_FAILACTION_LOG;
         if (fail_assert)
-            rc |= SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_FAILACTION_ASSERT;
+            rc |= SingleThreadCtrlManager::REQUIRE_FAILACTION_ASSERT;
         if (fail_null)
-            rc |= SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_FAILACTION_RETURN_NULL;
+            rc |= SingleThreadCtrlManager::REQUIRE_FAILACTION_RETURN_NULL;
         if (require_exist)
-            rc |= SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_EXIST;
+            rc |= SingleThreadCtrlManager::REQUIRE_EXIST;
         if (require_nonexist)
-            rc |= SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_NONEXIST;
+            rc |= SingleThreadCtrlManager::REQUIRE_NONEXIST;
         return rc;
     }
  private:

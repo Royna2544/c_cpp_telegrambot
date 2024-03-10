@@ -170,8 +170,8 @@ int main(int argc, const char **argv) {
             gAuthorized = false;
             static const SingleThreadCtrlManager::GetControllerRequest req{
                 .usage = SingleThreadCtrlManager::USAGE_ERROR_RECOVERY_THREAD,
-                .flags = SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_NONEXIST |
-                         SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_FAILACTION_RETURN_NULL};
+                .flags = SingleThreadCtrlManager::REQUIRE_NONEXIST |
+                         SingleThreadCtrlManager::REQUIRE_FAILACTION_RETURN_NULL};
             auto cl = gSThreadManager.getController(req);
             if (cl) {
                 cl->runWith([] {

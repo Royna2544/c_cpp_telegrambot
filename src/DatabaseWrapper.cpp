@@ -34,8 +34,8 @@ void DatabaseWrapper::loadMain(const Bot& bot) {
     load();
     const SingleThreadCtrlManager::GetControllerRequest req{
         .usage = SingleThreadCtrlManager::USAGE_DATABASE_SYNC_THREAD,
-        .flags = SingleThreadCtrlManager::GetControllerFlags::FLAG_GETCTRL_REQUIRE_NONEXIST |
-                 SingleThreadCtrlManager::GetControllerFlags::FLAG_GETCTRL_REQUIRE_FAILACTION_RETURN_NULL};
+        .flags = SingleThreadCtrlManager::GetControllerFlags::REQUIRE_NONEXIST |
+                 SingleThreadCtrlManager::GetControllerFlags::REQUIRE_FAILACTION_RETURN_NULL};
     if (const auto it = gSThreadManager.getController<DatabaseSync>(req); it)
         it->run();
 

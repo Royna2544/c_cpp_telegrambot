@@ -131,8 +131,8 @@ struct InteractiveBashContext {
         if (is_open) {
             static const SingleThreadCtrlManager::GetControllerRequest req {
                 .usage = SingleThreadCtrlManager::USAGE_IBASH_EXIT_TIMEOUT_THREAD,
-                .flags = SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_NONEXIST |
-                         SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_FAILACTION_RETURN_NULL
+                .flags = SingleThreadCtrlManager::REQUIRE_NONEXIST |
+                         SingleThreadCtrlManager::REQUIRE_FAILACTION_RETURN_NULL
             };
             int status;
 
@@ -190,8 +190,8 @@ struct InteractiveBashContext {
         const std::lock_guard<std::mutex> _(m);
         static const SingleThreadCtrlManager::GetControllerRequest req {
             .usage = SingleThreadCtrlManager::USAGE_IBASH_TIMEOUT_THREAD,
-            .flags = SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_NONEXIST |
-                     SingleThreadCtrlManager::FLAG_GETCTRL_REQUIRE_FAILACTION_ASSERT
+            .flags = SingleThreadCtrlManager::REQUIRE_NONEXIST |
+                     SingleThreadCtrlManager::REQUIRE_FAILACTION_ASSERT
         };
         SendCommand(command);
         auto onNoOutputThread = gSThreadManager.getController<TimeoutThread>(req);

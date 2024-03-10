@@ -22,14 +22,14 @@ class SingleThreadCtrlManager {
     using controller_type = std::shared_ptr<SingleThreadCtrl>;
 
     enum GetControllerFlags {
-        __FLAG_GETCTRL_REQUIRE_BASE = 1,
-        FLAG_GETCTRL_REQUIRE_EXIST = __FLAG_GETCTRL_REQUIRE_BASE,
-        FLAG_GETCTRL_REQUIRE_NONEXIST = __FLAG_GETCTRL_REQUIRE_BASE << 1,
+        __REQUIRE_BASE = 1,
+        REQUIRE_EXIST = __REQUIRE_BASE,
+        REQUIRE_NONEXIST = __REQUIRE_BASE << 1,
 
-        __FLAG_GETCTRL_REQUIRE_FAILACTION_BASE = 1 << 2,
-        FLAG_GETCTRL_REQUIRE_FAILACTION_ASSERT = __FLAG_GETCTRL_REQUIRE_FAILACTION_BASE,
-        FLAG_GETCTRL_REQUIRE_FAILACTION_LOG = __FLAG_GETCTRL_REQUIRE_FAILACTION_BASE << 1,
-        FLAG_GETCTRL_REQUIRE_FAILACTION_RETURN_NULL = __FLAG_GETCTRL_REQUIRE_FAILACTION_BASE << 2
+        __REQUIRE_FAILACTION_BASE = 1 << 2,
+        REQUIRE_FAILACTION_ASSERT = __REQUIRE_FAILACTION_BASE,
+        REQUIRE_FAILACTION_LOG = __REQUIRE_FAILACTION_BASE << 1,
+        REQUIRE_FAILACTION_RETURN_NULL = __REQUIRE_FAILACTION_BASE << 2
     };
 
     enum ThreadUsage {
@@ -178,14 +178,14 @@ std::shared_ptr<T> SingleThreadCtrlManager::getController(const GetControllerReq
         return {};
     }
     if (it != kControllers.end() && it->second && !sizeMismatch) {
-        if (const auto maybeRet = checkRequireFlags(FLAG_GETCTRL_REQUIRE_NONEXIST, req.flags); maybeRet)
+        if (const auto maybeRet = checkRequireFlags(REQUIRE_NONEXIST, req.flags); maybeRet)
             ptr = maybeRet.value();
         else {
             LOG_V("Using old: %s controller", usageStr);
             ptr = it->second;
         }
     } else {
-        if (const auto maybeRet = checkRequireFlags(FLAG_GETCTRL_REQUIRE_EXIST, req.flags);
+        if (const auto maybeRet = checkRequireFlags(REQUIRE_EXIST, req.flags);
                 maybeRet && !sizeMismatch)
             ptr = maybeRet.value();
         else {
