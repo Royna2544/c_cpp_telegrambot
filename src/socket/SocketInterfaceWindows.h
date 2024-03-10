@@ -43,3 +43,12 @@ struct SocketInterfaceWindowsIPv4 : SocketInterfaceWindows {
   private:
     socket_handle_t makeSocket(bool is_client);
 };
+
+struct SocketInterfaceWindowsIPv6 : SocketInterfaceWindows {
+    socket_handle_t createClientSocket() override;
+    socket_handle_t createServerSocket() override;
+    bool isAvailable() override;
+
+  private:
+    socket_handle_t makeSocket(bool is_client);
+};

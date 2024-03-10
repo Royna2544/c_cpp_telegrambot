@@ -143,6 +143,7 @@ std::shared_ptr<SocketInterfaceBase> getSocketInterfaceForClient() {
         std::make_shared<SocketInterfaceUnixLocal>(),
 #elif defined __WIN32
         std::make_shared<SocketInterfaceWindowsIPv4>(),
+        std::make_shared<SocketInterfaceWindowsIPv6>(),
         std::make_shared<SocketInterfaceWindowsLocal>(),
 #endif
     };

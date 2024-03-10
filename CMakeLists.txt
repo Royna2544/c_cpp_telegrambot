@@ -208,6 +208,7 @@ if (USE_UNIX_SOCKETS)
         src/socket/SocketInterfaceWindows.cpp
         src/socket/impl/SocketInterfaceWindowsLocal.cpp
         src/socket/impl/SocketInterfaceWindowsIPv4.cpp
+        src/socket/impl/SocketInterfaceWindowsIPv6.cpp
       )
   endif()
 
