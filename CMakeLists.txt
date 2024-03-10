@@ -192,14 +192,15 @@ if (USE_UNIX_SOCKETS)
       src/socket/SocketInterfaceUnix.cpp
       src/socket/impl/SocketInterfacePosixLocal.cpp
       src/socket/impl/SocketInterfacePosixIPv4.cpp
+      src/socket/impl/SocketInterfacePosixIPv6.cpp
     )
     if (APPLE)
       set(SOCKET_SRC_LIST ${SOCKET_SRC_LIST}
-        src/socket/impl/SocketInterfacePosixIPv4Darwin.cpp
+        src/socket/impl/SocketHelperDarwin.cpp
       )
     else()
       set(SOCKET_SRC_LIST ${SOCKET_SRC_LIST}
-        src/socket/impl/SocketInterfacePosixIPv4Linux.cpp
+        src/socket/impl/SocketHelperLinux.cpp
       )
     endif()
   elseif(WIN32)

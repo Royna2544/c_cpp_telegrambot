@@ -1,5 +1,4 @@
 - IBash TimeoutThread could use SingleThreadCtrlRunnable
 - Add buffer verification to TgBotSocket
 - SingleThreadCtrl getController deadlock fix and rename getctrl flags enum
-- Add IPv6 for Unix Socket interface
 - Add UNIX Socket interface for windows host

@@ -45,14 +45,19 @@ SocketInterfaceUnix::socket_handle_t SocketInterfaceUnixIPv4::createServerSocket
     foreach_ipv4_interfaces([](const char* iface, const char* addr) {
         LOG_D("ifname %s: addr %s", iface, addr);
     });
-    foreach_ipv4_interfaces([&iface_done, sfd, this](const char* iface, const char* addr) {
+    foreach_ipv4_interfaces([&iface_done, sfd](const char* iface, const char* addr) {
         if (!iface_done && strncmp("lo", iface, 2)) {
             LOG_D("Choosing ifname %s addr %s", iface, addr);
 
-            setSocketBindingToIface(sfd, iface);
+            SocketHelperUnix::setSocketBindingToIface(sfd, iface);
             iface_done = true;
         }
     });
+
+    if (!iface_done) {
+        LOG_E("Failed to find any valid interface to bind to (IPv4)");
+        return ret;
+    }
 
     name.sin_family = AF_INET;
     name.sin_port = htons(kTgBotHostPort);

@@ -38,12 +38,15 @@ struct SocketInterfaceUnixLocal : SocketInterfaceUnix {
     socket_handle_t makeSocket(bool client);
 };
 
+struct SocketHelperUnix {
+    static void setSocketBindingToIface(const SocketInterfaceUnix::socket_handle_t sock, const char* iface);
+};
+
 // Implements POSIX socket interface - AF_INET
 struct SocketInterfaceUnixIPv4 : SocketInterfaceUnix {
     socket_handle_t createClientSocket() override;
     socket_handle_t createServerSocket() override;
     bool isAvailable() override;
-    virtual void setSocketBindingToIface(const socket_handle_t sock, const char* iface) = 0;
     virtual ~SocketInterfaceUnixIPv4() = default;
     
     constexpr static int kTgBotHostPort = 50000;
@@ -51,11 +54,14 @@ struct SocketInterfaceUnixIPv4 : SocketInterfaceUnix {
     void foreach_ipv4_interfaces(const std::function<void(const char*, const char*)> callback);
 };
 
-struct SocketInterfaceUnixIPv4Linux : SocketInterfaceUnixIPv4 {
-    void setSocketBindingToIface(const socket_handle_t sock, const char* iface) override;
-    ~SocketInterfaceUnixIPv4Linux() override = default;
-};
-struct SocketInterfaceUnixIPv4Darwin : SocketInterfaceUnixIPv4 {
-    void setSocketBindingToIface(const socket_handle_t sock, const char* iface) override;
-    ~SocketInterfaceUnixIPv4Darwin() override = default;
+// Implements POSIX socket interface - AF_INET6
+struct SocketInterfaceUnixIPv6 : SocketInterfaceUnix {
+    socket_handle_t createClientSocket() override;
+    socket_handle_t createServerSocket() override;
+    bool isAvailable() override;
+    virtual ~SocketInterfaceUnixIPv6() = default;
+    
+    constexpr static int kTgBotHostPort = 50000;
+  private:
+    void foreach_ipv6_interfaces(const std::function<void(const char*, const char*)> callback);
 };

@@ -115,12 +115,9 @@ std::string SocketInterfaceBase::getOptions(Options opt) {
 
 std::shared_ptr<SocketInterfaceBase> getSocketInterface(const SocketUsage u) {
     static const std::map<SocketUsage, std::shared_ptr<SocketInterfaceBase>> socketBackends = {
-#if defined __linux__
+#if defined __linux__ || defined __APPLE__
         MAKE_INTF(SocketUsage::SU_INTERNAL, std::make_shared<SocketInterfaceUnixLocal>()),
-        MAKE_INTF(SocketUsage::SU_EXTERNAL, std::make_shared<SocketInterfaceUnixIPv4Linux>())
-#elif defined __APPLE__
-        MAKE_INTF(SocketUsage::SU_INTERNAL, std::make_shared<SocketInterfaceUnixLocal>()),
-        MAKE_INTF(SocketUsage::SU_EXTERNAL, std::make_shared<SocketInterfaceUnixIPv4Darwin>())
+        MAKE_INTF(SocketUsage::SU_EXTERNAL, std::make_shared<SocketInterfaceUnixIPv4>())
 #elif defined __WIN32
         MAKE_INTF(SocketUsage::SU_INTERNAL, std::make_shared<SocketInterfaceWindowsLocal>()),
 #endif
@@ -133,11 +130,9 @@ std::shared_ptr<SocketInterfaceBase> getSocketInterface(const SocketUsage u) {
 }
 std::shared_ptr<SocketInterfaceBase> getSocketInterfaceForClient() {
     static const std::vector<std::shared_ptr<SocketInterfaceBase>> socketBackends = {
-#if defined __linux__ 
-        std::make_shared<SocketInterfaceUnixIPv4Linux>(),
-        std::make_shared<SocketInterfaceUnixLocal>(),
-#elif defined __APPLE__ 
-        std::make_shared<SocketInterfaceUnixIPv4Darwin>(),
+#if defined __linux__ || defined __APPLE__
+        std::make_shared<SocketInterfaceUnixIPv4>(),
+        std::make_shared<SocketInterfaceUnixIPv6>(),
         std::make_shared<SocketInterfaceUnixLocal>(),
 #elif defined __WIN32
         std::make_shared<SocketInterfaceWindowsLocal>(),
