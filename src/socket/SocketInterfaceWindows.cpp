@@ -60,7 +60,9 @@ char *SocketInterfaceWindows::strWSAError(const int errcode) {
 void SocketInterfaceWindows::startListening(const listener_callback_t &cb, std::promise<bool> &createdPromise) {
     bool should_break = false;
     struct fd_set set;
-    const socket_handle_t sfd = createServerSocket(SOCKET_PATH);
+
+    setOptions(Options::DESTINATION_ADDRESS, SOCKET_PATH);
+    const socket_handle_t sfd = createServerSocket();
     isRunning = true;
 
     if (isValidSocketHandle(sfd)) {
@@ -69,7 +71,8 @@ void SocketInterfaceWindows::startListening(const listener_callback_t &cb, std::
                 WSALOG_E("Failed to listen to socket");
                 break;
             }
-            const socket_handle_t isfd = createServerSocket(INTERNAL_SOCKET_PATH);
+            setOptions(Options::DESTINATION_ADDRESS, INTERNAL_SOCKET_PATH);
+            const socket_handle_t isfd = createServerSocket();
             if (isfd == INVALID_SOCKET)
                 break;
 
@@ -93,7 +96,7 @@ void SocketInterfaceWindows::startListening(const listener_callback_t &cb, std::
                     break;
                 }
                 if (FD_ISSET(isfd, &set)) {
-                    char dummy;
+                    dummy_listen_buf_t dummy;
                     const SOCKET cfd = accept(isfd, (struct sockaddr *)&addr, &len);
                     if (cfd == INVALID_SOCKET) {
                         WSALOG_E("Accept failed.");
@@ -128,7 +131,8 @@ void SocketInterfaceWindows::startListening(const listener_callback_t &cb, std::
 }
 
 void SocketInterfaceWindows::writeToSocket(struct TgBotConnection conn) {
-    const auto sfd = createClientSocket(SOCKET_PATH);
+    setOptions(Options::DESTINATION_ADDRESS, SOCKET_PATH);
+    const socket_handle_t sfd = createClientSocket();
     if (isValidSocketHandle(sfd)) {
         const int count = send(sfd, reinterpret_cast<char *>(&conn), sizeof(conn), 0);
         if (count < 0) {
@@ -140,8 +144,9 @@ void SocketInterfaceWindows::writeToSocket(struct TgBotConnection conn) {
 }
 
 void SocketInterfaceWindows::forceStopListening(void) {
-    char dummy = 0;
-    const SOCKET isfd = createClientSocket(INTERNAL_SOCKET_PATH);
+    dummy_listen_buf_t dummy = 0;
+    setOptions(Options::DESTINATION_ADDRESS, INTERNAL_SOCKET_PATH);
+    const SOCKET isfd = createClientSocket();
 
     if (isValidSocketHandle(isfd)) {
         send(isfd, &dummy, sizeof(dummy), 0);

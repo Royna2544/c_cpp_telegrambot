@@ -58,7 +58,6 @@ static void setupSocket(const Bot &gBot, SingleThreadCtrlManager::ThreadUsage tu
         });
 
         if (socketCreatedFut.get() && susage == SU_INTERNAL) {
-            intf->setDestinationAddress();
             intf->writeToSocket({CMD_EXIT, {.data_2 = e}});
             socketConnectionManager->setPreStopFunction(
                 std::bind(&cleanupSocket, e.token, susage, std::placeholders::_1));

@@ -16,14 +16,12 @@ struct SocketInterfaceUnix : SocketInterfaceBase {
     };
     virtual socket_handle_t createClientSocket() = 0;
     virtual socket_handle_t createServerSocket() = 0;
-    virtual void cleanupServerSocket() {}
     void writeToSocket(struct TgBotConnection conn) override;
     void forceStopListening(void) override;
     void startListening(const listener_callback_t& cb, std::promise<bool>& createdPromise) override;
   
     virtual ~SocketInterfaceUnix() = default;
   protected:
-    using kListenData = char;
     pipe_t kListenTerminate;
     int& listen_fd = kListenTerminate[0];
     int& notify_fd = kListenTerminate[1];
@@ -44,21 +42,13 @@ struct SocketInterfaceUnixLocal : SocketInterfaceUnix {
 struct SocketInterfaceUnixIPv4 : SocketInterfaceUnix {
     socket_handle_t createClientSocket() override;
     socket_handle_t createServerSocket() override;
+    bool isAvailable() override;
     virtual void setSocketBindingToIface(const socket_handle_t sock, const char* iface) = 0;
-
     virtual ~SocketInterfaceUnixIPv4() = default;
     
-    void setDestinationAddress(const std::string addr) override {
-        if (!addr.empty())
-            inetaddr = addr;
-        else
-            inetaddr = kMyAddress.value();
-    }
     constexpr static int kTgBotHostPort = 50000;
   private:
     void foreach_ipv4_interfaces(const std::function<void(const char*, const char*)> callback);
-    std::optional<std::string> kMyAddress;
-    std::string inetaddr;
 };
 
 struct SocketInterfaceUnixIPv4Linux : SocketInterfaceUnixIPv4 {

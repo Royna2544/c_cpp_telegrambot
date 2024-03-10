@@ -54,8 +54,8 @@ void SocketInterfaceUnix::startListening(const listener_callback_t& cb, std::pro
                     LOG_W("Dropping incoming buffer: exiting");
                 }
                 if (listen_fd_poll.revents & POLLIN) {
-                    kListenData buf;
-                    ssize_t rc = read(listen_fd, &buf, sizeof(kListenData));
+                    dummy_listen_buf_t buf;
+                    ssize_t rc = read(listen_fd, &buf, sizeof(dummy_listen_buf_t));
                     if (rc < 0)
                         PLOG_E("Reading data from forcestop fd");
                     closeFd(listen_fd);
@@ -102,10 +102,10 @@ void SocketInterfaceUnix::writeToSocket(struct TgBotConnection conn) {
 
 void SocketInterfaceUnix::forceStopListening(void) {
     if (isValidFd(notify_fd) && isValidSocketHandle(listen_fd)) {
-        kListenData d = {};
+        dummy_listen_buf_t d = {};
         int count;
 
-        count = write(notify_fd, &d, sizeof(kListenData));
+        count = write(notify_fd, &d, sizeof(dummy_listen_buf_t));
         if (count < 0) {
             PLOG_E("Failed to write to notify pipe");
         }

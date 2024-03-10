@@ -48,7 +48,6 @@ SocketInterfaceUnix::socket_handle_t SocketInterfaceUnixIPv4::createServerSocket
     foreach_ipv4_interfaces([&iface_done, sfd, this](const char* iface, const char* addr) {
         if (!iface_done && strncmp("lo", iface, 2)) {
             LOG_D("Choosing ifname %s addr %s", iface, addr);
-            kMyAddress = addr;
 
             setSocketBindingToIface(sfd, iface);
             iface_done = true;
@@ -79,7 +78,7 @@ SocketInterfaceUnix::socket_handle_t SocketInterfaceUnixIPv4::createClientSocket
 
     name.sin_family = AF_INET;
     name.sin_port = htons(kTgBotHostPort);
-    inet_aton(inetaddr.c_str(), &name.sin_addr);
+    inet_aton(getOptions(Options::DESTINATION_ADDRESS).c_str(), &name.sin_addr);
     if (connect(sfd, reinterpret_cast<struct sockaddr*>(&name), sizeof(name)) != 0) {
         PLOG_E("Failed to connect to socket");
         close(sfd);
@@ -87,4 +86,14 @@ SocketInterfaceUnix::socket_handle_t SocketInterfaceUnixIPv4::createClientSocket
     }
     ret = sfd;
     return ret;
+}
+
+bool SocketInterfaceUnixIPv4::isAvailable() {
+    char *ipv4addr = getenv("IPV4_ADDRESS");
+    if (!ipv4addr) {
+        LOG_D("IPV4_ADDRESS is not set, isAvailable false");
+        return false;
+    }
+    setOptions(Options::DESTINATION_ADDRESS, ipv4addr, true);
+    return true;
 }

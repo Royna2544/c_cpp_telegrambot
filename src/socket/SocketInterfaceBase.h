@@ -1,12 +1,17 @@
 #pragma once
 
 #include <future>
+#include <optional>
 
 #include "TgBotSocket.h"
 
 using listener_callback_t = std::function<void(struct TgBotConnection)>;
 
 struct SocketInterfaceBase {
+    enum class Options {
+        DESTINATION_ADDRESS
+    };
+
     /**
      * @brief Writes a TgBotConnection to the socket.
      *
@@ -30,18 +35,56 @@ struct SocketInterfaceBase {
      * @param createdProm A promise that will be fulfilled with true when the listener is successfully created, or false if it fails.
      */
     virtual void startListening(const listener_callback_t& cb, std::promise<bool>& createdPromise) = 0;
-    
-    // TODO - IPV4 requires this, but not all does
-    virtual void setDestinationAddress(const std::string addr = "") {}
+
+    /**
+     * @brief Cleans up the server socket.
+     *
+     * This function is called when the server socket is no longer needed.
+     * It will close the socket and free any system resources associated with it.
+     */
+    virtual void cleanupServerSocket() {}
+
+    /**
+     * @brief Sets an option for the socket interface.
+     *
+     * @param opt The option to set.
+     * @param data The data to set the option to.
+     * @param persistent Whether or not the option should be persisted across restarts.
+     */
+    void setOptions(Options opt, const std::string data, bool persistent = false);
+
+    /**
+     * @brief Returns the value of an option for the socket interface.
+     *
+     * @param opt The option to retrieve the value of.
+     *
+     * @return The value of the option
+     * @throws std::bad_optional_access if the option does not exist.
+     */
+    std::string getOptions(Options opt);
+
+    /**
+     * @brief Indicates whether the socket interface is available.
+     *
+     * A socket interface is considered available if it can be used to listen for incoming connections.
+     * This function should be used to determine whether the socket interface is ready to be used.
+     * (Or its dependencies are available)
+     *
+     * @return true if the socket interface is available, false otherwise.
+     */
+    virtual bool isAvailable() { return true; }
 
     // Can this instance exit cleanly with CMD_EXIT?
     virtual bool canSocketBeClosed() { return true; }
-    
+
     virtual ~SocketInterfaceBase() = default;
 
     void stopListening(const std::string& exittoken);
 
     bool isRunning = false;
+
+    using dummy_listen_buf_t = char;
+
    protected:
     /**
      * @brief This function is used to handle incoming data from the Telegram Bot API.
@@ -55,12 +98,21 @@ struct SocketInterfaceBase {
      */
     [[nodiscard]] bool handleIncomingBuf(const size_t len, struct TgBotConnection& conn,
                                          const listener_callback_t& cb, std::function<char*(void)> errMsgFn);
+
+    struct OptionContainer {
+        std::string data;
+        bool persistent = false;
+    };
+    using option_t = std::optional<OptionContainer>;
+    struct {
+        option_t opt_destination_address;
+    } options;
 };
 
 enum SocketUsage {
-    SU_INTERNAL, // Inside bot scope only, like cmd_exit
-    SU_EXTERNAL, // Sent through clients, like socketcli, mediacli
-    SU_MAX,
+    SU_INTERNAL,  // Inside bot scope only, like cmd_exit
+    SU_EXTERNAL,  // Sent through clients, like socketcli, mediacli
 };
 
 std::shared_ptr<SocketInterfaceBase> getSocketInterface(const SocketUsage usage);
+std::shared_ptr<SocketInterfaceBase> getSocketInterfaceForClient();

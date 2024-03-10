@@ -10,9 +10,8 @@ struct SocketInterfaceWindows : SocketInterfaceBase {
     bool isValidSocketHandle(socket_handle_t handle)  {
         return handle != INVALID_SOCKET;
     };
-    virtual socket_handle_t createClientSocket(const char *path) = 0;
-    virtual socket_handle_t createServerSocket(const char *path) = 0;
-    virtual void cleanupServerSocket() {}
+    virtual socket_handle_t createClientSocket() = 0;
+    virtual socket_handle_t createServerSocket() = 0;
     void writeToSocket(struct TgBotConnection conn) override;
     void forceStopListening(void) override;
     void startListening(const listener_callback_t& cb, std::promise<bool>& createdPromise) override;
@@ -23,11 +22,11 @@ struct SocketInterfaceWindows : SocketInterfaceBase {
 };
 
 struct SocketInterfaceWindowsLocal : SocketInterfaceWindows {
-    socket_handle_t createClientSocket(const char *path) override;
-    socket_handle_t createServerSocket(const char *path) override;
+    socket_handle_t createClientSocket() override;
+    socket_handle_t createServerSocket() override;
     void cleanupServerSocket() override;
     bool canSocketBeClosed() override;
     
   private:
-    socket_handle_t makeSocket(const char *path, bool is_client);
+    socket_handle_t makeSocket(bool is_client);
 };

@@ -145,9 +145,7 @@ int main(int argc, char** argv) {
         }
     }
     if (ret) {
-        auto intf = getSocketInterface(SocketUsage::SU_EXTERNAL);
-        intf->setDestinationAddress(getenv("IP_ADDR") ?: "");
-        intf->writeToSocket({cmd, data_g});
+        getSocketInterfaceForClient()->writeToSocket({cmd, data_g});
     } else
         usage(exe, false);
     return !ret;

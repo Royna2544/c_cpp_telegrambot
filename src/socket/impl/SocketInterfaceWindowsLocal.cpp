@@ -5,19 +5,22 @@
 #include <winsock.h>
 #include <afunix.h>
 // clang-format on
+
+#include <CStringLifetime.h>
 #include <FileSystemLib.h>
 #include <filesystem>
 
 SocketInterfaceWindows::socket_handle_t
-SocketInterfaceWindowsLocal::makeSocket(const char *path, bool is_client) {
+SocketInterfaceWindowsLocal::makeSocket(bool is_client) {
     struct sockaddr_un name {};
+    CStringLifetime path = getOptions(Options::DESTINATION_ADDRESS);
     WSADATA data;
     SOCKET fd;
     int ret;
 
     if (!is_client) {
-        LOG_D("Creating socket at %s", path);
-        std::remove(path);
+        LOG_D("Creating socket at %s", path.get());
+        std::filesystem::remove(path.get());
     }
 
     ret = WSAStartup(MAKEWORD(2, 2), &data);
@@ -33,7 +36,7 @@ SocketInterfaceWindowsLocal::makeSocket(const char *path, bool is_client) {
     }
 
     name.sun_family = AF_UNIX;
-    strncpy(name.sun_path, path, sizeof(name.sun_path));
+    strncpy(name.sun_path, path.get(), sizeof(name.sun_path));
     name.sun_path[sizeof(name.sun_path) - 1] = '\0';
 
     decltype(&connect) fn = is_client ? connect : bind;
@@ -51,13 +54,13 @@ bool SocketInterfaceWindowsLocal::canSocketBeClosed() {
 }
 
 SocketInterfaceWindows::socket_handle_t
-SocketInterfaceWindowsLocal::createClientSocket(const char *path) {
-    return makeSocket(path, /*is_client=*/true);
+SocketInterfaceWindowsLocal::createClientSocket() {
+    return makeSocket(/*is_client=*/true);
 }
 
 SocketInterfaceWindows::socket_handle_t
-SocketInterfaceWindowsLocal::createServerSocket(const char *path) {
-    return makeSocket(path, /*is_client=*/false);
+SocketInterfaceWindowsLocal::createServerSocket() {
+    return makeSocket(/*is_client=*/false);
 }
 
 void SocketInterfaceWindowsLocal::cleanupServerSocket() {

@@ -55,7 +55,5 @@ int main(const int argc, const char** argv) {
     data.id = chatId;
     data.type = TYPE_DOCUMENT;
 
-    auto intf = getSocketInterface(SocketUsage::SU_EXTERNAL);
-    intf->setDestinationAddress(getenv("IP_ADDR") ?: "");
-    intf->writeToSocket({.cmd = CMD_SEND_FILE_TO_CHAT_ID, .data = {.data_5 = data}});
+    getSocketInterfaceForClient()->writeToSocket({.cmd = CMD_SEND_FILE_TO_CHAT_ID, .data = {.data_5 = data}});
 }

@@ -1,5 +1,6 @@
 #include "SocketInterfaceBase.h"
 #include <map>
+#include <vector>
 
 bool SocketInterfaceBase::handleIncomingBuf(const size_t len, struct TgBotConnection& conn,
                                             const listener_callback_t& cb, std::function<char*(void)> errMsgFn) {
@@ -69,6 +70,40 @@ void SocketInterfaceBase::stopListening(const std::string& exitToken) {
     }
 }
 
+void SocketInterfaceBase::setOptions(Options opt, const std::string data, bool persistent) {
+    option_t *optionVal = nullptr;
+    switch (opt) {
+        case Options::DESTINATION_ADDRESS:
+            optionVal = &options.opt_destination_address;
+            break;
+    }
+    if (optionVal != nullptr) {
+        OptionContainer c;
+        c.data = data;
+        c.persistent = persistent;
+        *optionVal = c;
+    }
+}
+
+std::string SocketInterfaceBase::getOptions(Options opt) {
+    std::string ret;
+    option_t *optionVal = nullptr;
+ 
+    switch (opt) {
+        case Options::DESTINATION_ADDRESS:
+            optionVal = &options.opt_destination_address;
+            break;
+    }
+    if (optionVal) {
+        option_t option = *optionVal;
+        ASSERT(option.has_value(), "Option value is not set, and trying to get, opt is %d", static_cast<int>(opt));
+        ret = option->data;
+        if (!option->persistent)
+            option.reset();
+    }
+    return ret;
+}
+
 #if defined __linux__ || defined __APPLE__
 #include "SocketInterfaceUnix.h"
 #endif
@@ -95,4 +130,23 @@ std::shared_ptr<SocketInterfaceBase> getSocketInterface(const SocketUsage u) {
         return socketBackends.at(SocketUsage::SU_INTERNAL);
     }
     return it->second;
+}
+std::shared_ptr<SocketInterfaceBase> getSocketInterfaceForClient() {
+    static const std::vector<std::shared_ptr<SocketInterfaceBase>> socketBackends = {
+#if defined __linux__ 
+        std::make_shared<SocketInterfaceUnixIPv4Linux>(),
+        std::make_shared<SocketInterfaceUnixLocal>(),
+#elif defined __APPLE__ 
+        std::make_shared<SocketInterfaceUnixIPv4Darwin>(),
+        std::make_shared<SocketInterfaceUnixLocal>(),
+#elif defined __WIN32
+        std::make_shared<SocketInterfaceWindowsLocal>(),
+#endif
+    };
+    for (const auto& socketBackend : socketBackends) { 
+        if (socketBackend->isAvailable()) {
+            return socketBackend;
+        }
+    }
+    return {};
 }
