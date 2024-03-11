@@ -12,6 +12,7 @@
 
 // Generated cmd list
 #include <cmds.gen.h>
+#include "CompilerInTelegram.h"
 
 #ifdef RTCOMMAND_LOADER
 #include <RTCommandLoader.h>
@@ -87,16 +88,16 @@ int main(int argc, const char **argv) {
     database::DBWrapper.loadMain(gBot);
 
     bot_AddCommandEnforcedCompiler(gBot, "c", ProgrammingLangs::C, [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
-        CompileRunHandler(CCppCompileHandleData{{{bot, message}, compiler, "out.c"}});
+        CCppCompileHandleData(bot, message, compiler, "out.c").run();
     });
     bot_AddCommandEnforcedCompiler(gBot, "cpp", ProgrammingLangs::CXX, [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
-        CompileRunHandler(CCppCompileHandleData{{{bot, message}, compiler, "out.cpp"}});
+        CCppCompileHandleData(bot, message, compiler, "out.cpp").run();
     });
     bot_AddCommandEnforcedCompiler(gBot, "python", ProgrammingLangs::PYTHON, [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
-        CompileRunHandler({{bot, message}, compiler, "out.py"});
+        CompileHandleData(bot, message, compiler, "out.py").run();
     });
     bot_AddCommandEnforcedCompiler(gBot, "golang", ProgrammingLangs::GO, [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
-        CompileRunHandler({{bot, message}, compiler + " run", "out.go"});
+        CompileHandleData(bot, message, compiler + " run", "out.go").run();
     });
 
     for (const auto &i : gCmdModules) {

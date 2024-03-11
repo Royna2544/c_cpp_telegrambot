@@ -2,10 +2,10 @@
 #include <CompilerInTelegram.h>
 
 static void BashCommandFn(const Bot &bot, const Message::Ptr message) {
-    CompileRunHandler(BashHandleData{{bot, message}, false});
+    BashHandleData(bot, message, false).run();
 }
 static void unsafeBashCommandFn(const Bot &bot, const Message::Ptr message) {
-    CompileRunHandler(BashHandleData{{bot, message}, true});
+    BashHandleData(bot, message, true).run();
 }
 
 struct CommandModule cmd_bash {

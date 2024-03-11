@@ -1,48 +1,66 @@
 #pragma once
 
-#include <string>
 #include <tgbot/Bot.h>
 #include <tgbot/types/Message.h>
 
+#include <string>
+#include <sstream>
+
+using TgBot::Bot;
+using TgBot::Message;
+
+struct CompileHandleData;
 struct HandleData {
-    const Bot &bot;
-    const Message::Ptr &message;
+    const Message::Ptr message;
+    enum class ErrorType {
+        MESSAGE_VERIFICATION_FAILED,
+        FILE_WRITE_FAILED,
+        POPEN_WDT_FAILED,
+    };
+    virtual void onFailed(const ErrorType e) = 0;
+    virtual void onResultReady(const std::string &text) = 0;
+    virtual void run() = 0;
+    explicit HandleData(const Message::Ptr _message) : message(_message) {}
+
+    bool verifyMessage();
+    bool writeMessageToFile(const std::string &filename);
+    void appendExtArgs(std::stringstream &cmd, std::string &extraargs, std::string &res);
+    void runCommand(std::string cmd, std::string &res, bool use_wdt = true);
+    void commonCleanup(const std::string &res, const std::string &filename = "");
+    constexpr static const char SPACE = ' ';
+    constexpr static const char EMPTY[] = "(empty)";
 };
 
-struct BashHandleData : HandleData {
+struct HandleDataImpl : HandleData {
+    explicit HandleDataImpl(const Bot &bot, const Message::Ptr _message) : HandleData(_message), _bot(bot) {}
+    void onFailed(const ErrorType e) override;
+    void onResultReady(const std::string &text) override;
+
+   protected:
+    const Bot &_bot;
+};
+
+struct BashHandleData : HandleDataImpl {
+    explicit BashHandleData(const Bot &bot, const Message::Ptr message,
+                            const bool _allowhang) : HandleDataImpl(bot, message), allowhang(_allowhang) {}
     bool allowhang;
+    void run() override;
 };
 
-struct CompileHandleData : HandleData {
+struct CompileHandleData : HandleDataImpl {
+    explicit CompileHandleData(const Bot &bot, const Message::Ptr message,
+                               const std::string& _cmdPrefix, const std::string& _outfile)
+                               : HandleDataImpl(bot, message), cmdPrefix(_cmdPrefix), outfile(_outfile) {}
     std::string cmdPrefix, outfile;
+    bool commonVPW(std::string &extraargs);
+    void onCompilerPathCommand(const std::string &text);
+    virtual void run() override;
 };
 
-struct CCppCompileHandleData : CompileHandleData {};
-
-/**
- * @brief This function is a template that can be specialized for different types of data.
- * 
- * @tparam T The type of data that the function should handle. By default, it is set to CompileHandleData, 
- * which is a struct that contains the necessary information for the Compile and Run handlers.
- * @tparam std::enable_if_t<std::is_base_of<HandleData, T>::value, bool> = true This is a SFINAE (Substitution Failure Is Not An Error)
- * check that ensures that T is a type that is derived from HandleData. This is necessary because the function needs to access
- * certain members of the data struct, such as bot and message.
- * 
- * @param data The data struct that contains the necessary information for the specific handler.
- * 
- * This function is a template because it can be specialized for different types of data. This allows the same function to be used
- * for multiple handlers, without having to write separate functions for each handler.
- * 
- * The function takes a const reference to the data struct, which allows the function to be called with a reference or a copy of the data struct.
- * This is useful because it allows the function to be called with either a reference to the data that is already available, or with a copy of the data
- * that can be modified without affecting the original data.
- * 
- * The function itself is a simple wrapper that calls the appropriate specialized function based on the type of data that is passed in.
- * This allows the template to be used without having to specify the type of data explicitly, which can be cumbersome and error-prone.
- */
-template <typename T = CompileHandleData,
-          std::enable_if_t<std::is_base_of<HandleData, T>::value, bool> = true>
-void CompileRunHandler(const T &data);
+struct CCppCompileHandleData : CompileHandleData {
+    using CompileHandleData::CompileHandleData;
+    void run() override;
+};
 
 // Read buffer size, max allowed buffer size
 constexpr const static inline auto BASH_READ_BUF = (1 << 8);

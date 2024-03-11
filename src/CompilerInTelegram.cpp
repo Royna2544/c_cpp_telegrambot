@@ -26,22 +26,18 @@ using std::chrono::duration_cast;
 using std::chrono::high_resolution_clock;
 using std::chrono::milliseconds;
 
-static const char SPACE = ' ';
-static const char EMPTY[] = "(empty)";
-
-static bool verifyMessage(const Bot &bot, const Message::Ptr &message) {
+bool HandleData::verifyMessage() {
     if (message->replyToMessage && !message->replyToMessage->text.empty()) {
         return true;
     }
-    bot_sendReplyMessage(bot, message, "Reply to a code to compile");
+    onFailed(ErrorType::MESSAGE_VERIFICATION_FAILED);
     return false;
 }
 
-static bool writeMessageToFile(const Bot &bot, const Message::Ptr &message,
-                               const std::string &filename) {
+bool HandleData::writeMessageToFile(const std::string &filename) {
     std::ofstream file(filename);
     if (file.fail()) {
-        bot_sendReplyMessage(bot, message, "Failed to open file");
+        onFailed(ErrorType::FILE_WRITE_FAILED);
         return false;
     }
     file << message->replyToMessage->text;
@@ -49,22 +45,20 @@ static bool writeMessageToFile(const Bot &bot, const Message::Ptr &message,
     return true;
 }
 
-static void addExtArgs(std::stringstream &cmd, std::string &extraargs,
-                       std::string &res) {
-    if (!extraargs.empty()) {
-        auto idx = extraargs.find_first_of("\n\r\t");
-        if (idx != std::string::npos) extraargs.erase(idx);
-        cmd << SPACE << extraargs;
-        res += "cmd: \"";
-        res += cmd.str();
-        res += "\"\n";
+void HandleData::appendExtArgs(std::stringstream &cmd, std::string &extraargs_in, std::string &result_out) {
+    if (!extraargs_in.empty()) {
+        auto idx = extraargs_in.find_first_of("\n\r\t");
+        if (idx != std::string::npos) extraargs_in.erase(idx);
+        cmd << SPACE << extraargs_in;
+        result_out += "cmd: \"";
+        result_out += cmd.str();
+        result_out += "\"\n";
     }
 }
 
-static void runCommand(const Bot &bot, const Message::Ptr &message,
-                       std::string cmd, std::string &res, bool use_wdt = true) {
+void HandleData::runCommand(std::string cmd, std::string &res, bool use_wdt) {
     bool hasmore = false, watchdog_bitten = false;
-    int count = 0, unique_id = 0;;
+    int count = 0, unique_id = 0;
     char buf[BASH_READ_BUF] = {};
     std::error_code ec;
 
@@ -74,6 +68,7 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
         setlocale_enus_once();
     });
 #endif
+
     unique_id = genRandomNumber(100);
     boost::replace_all(cmd, std::string(1, '"'), "\\\"");
 
@@ -84,7 +79,7 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
     auto fp = popen_watchdog(cmd.c_str(), use_wdt ? &watchdog_bitten : nullptr);
 
     if (!fp) {
-        bot_sendReplyMessage(bot, message, "Failed to popen()");
+        onFailed(ErrorType::POPEN_WDT_FAILED);
         return;
     }
     res.reserve(BASH_MAX_BUF);
@@ -123,30 +118,51 @@ static void runCommand(const Bot &bot, const Message::Ptr &message,
 #undef ID_LOG_I
 }
 
-static void commonCleanup(const Bot &bot, const Message::Ptr &message,
-                          std::string &res, const std::string &filename = "") {
-    bot_sendReplyMessage(bot, message, res);
-    if (!filename.empty()) std::remove(filename.c_str());
+void HandleData::commonCleanup(const std::string &res, const std::string &filename) {
+    onResultReady(res);
+    if (!filename.empty())
+        std::filesystem::remove(filename);
+}
+
+void HandleDataImpl::onFailed(const ErrorType e) {
+    std::string text;
+    switch (e) {
+        case HandleData::ErrorType::MESSAGE_VERIFICATION_FAILED:
+            text = "Message verification failed";
+            break;
+        case HandleData::ErrorType::FILE_WRITE_FAILED:
+            text = "Failed to write to file";
+            break;
+        case HandleData::ErrorType::POPEN_WDT_FAILED:
+            text = "Failed to run command";
+            break;
+    };
+    bot_sendReplyMessage(_bot, message, text);
+}
+
+void HandleDataImpl::onResultReady(const std::string &text) {
+    bot_sendReplyMessage(_bot, message, text);
+}
+
+void CompileHandleData::onCompilerPathCommand(const std::string& text) {
+    bot_sendReplyMessage(_bot, message, text);
 }
 
 // Verify, Parse, Write
-static bool commonVPW(const CompileHandleData &data, std::string &extraargs) {
+bool CompileHandleData::commonVPW(std::string &extraargs) {
     bool ret = false;
-    if (hasExtArgs(data.message)) {
-        parseExtArgs(data.message, extraargs);
+    if (hasExtArgs(message)) {
+        parseExtArgs(message, extraargs);
         if (extraargs == "--path") {
-            bot_sendReplyMessage(data.bot, data.message,
-                                 "Selected compiler: " + data.cmdPrefix);
+            onCompilerPathCommand("Selected compiler: " + cmdPrefix );
             return ret;  // Bail out
         }
     }
-    ret = verifyMessage(data.bot, data.message) &&
-          writeMessageToFile(data.bot, data.message, data.outfile);
+    ret = verifyMessage() && writeMessageToFile(outfile);
     return ret;
 }
 
-template <>
-void CompileRunHandler<CCppCompileHandleData>(const CCppCompileHandleData &data) {
+void CCppCompileHandleData::run() {
     std::string res, extraargs;
     std::stringstream cmd;
 #ifdef __WIN32
@@ -155,48 +171,46 @@ void CompileRunHandler<CCppCompileHandleData>(const CCppCompileHandleData &data)
     const char aoutname[] = "./a.out";
 #endif
 
-    if (commonVPW(data, extraargs)) {
-        cmd << data.cmdPrefix << SPACE << data.outfile;
-        addExtArgs(cmd, extraargs, res);
+    if (commonVPW(extraargs)) {
+        cmd << cmdPrefix << SPACE << outfile;
+        appendExtArgs(cmd, extraargs, res);
 
         res += "Compile time:\n";
-        runCommand(data.bot, data.message, cmd.str(), res);
+        runCommand(cmd.str(), res);
         res += "\n";
 
         if (fileExists(aoutname)) {
             res += "Run time:\n";
-            runCommand(data.bot, data.message, aoutname, res);
+            runCommand(aoutname, res);
             std::filesystem::remove(aoutname);
         }
-        commonCleanup(data.bot, data.message, res, data.outfile);
+        commonCleanup(res, outfile);
     }
 }
 
-template <>
-void CompileRunHandler(const CompileHandleData &data) {
+void CompileHandleData::run() {
     std::string res, extargs;
     std::stringstream cmd;
 
-    if (commonVPW(data, extargs)) {
-        cmd << data.cmdPrefix << SPACE << data.outfile;
-        addExtArgs(cmd, extargs, res);
+    if (commonVPW(extargs)) {
+        cmd << cmdPrefix << SPACE << outfile;
+        appendExtArgs(cmd, extargs, res);
 
-        runCommand(data.bot, data.message, cmd.str(), res);
-        commonCleanup(data.bot, data.message, res, data.outfile);
+        runCommand(cmd.str(), res);
+        commonCleanup(res, outfile);
     }
 }
 
-template <>
-void CompileRunHandler<BashHandleData>(const BashHandleData &data) {
+void BashHandleData::run() {
     std::string res;
-    if (hasExtArgs(data.message)) {
+    if (hasExtArgs(message)) {
         std::string cmd;
-        parseExtArgs(data.message, cmd);
-        runCommand(data.bot, data.message, cmd, res, !data.allowhang);
+        parseExtArgs(message, cmd);
+        runCommand(cmd, res, !allowhang);
     } else {
         res = "Send a bash command to run";
     }
-    commonCleanup(data.bot, data.message, res);
+    commonCleanup(res);
 }
 
 static std::optional<std::string> findCommandExe(std::string command) {
