@@ -1,10 +1,10 @@
 #pragma once
 
-#include "../include/Types.h"
-#include "../include/Logging.h"
-
 #include <cstring>
 #include <string>
+
+#include "../include/Logging.h"
+#include "../include/Types.h"
 
 #ifdef __ANDROID__
 #define SOCKET_PATH "/data/data/com.termux/files/usr/tmp/tgbot_sock"
@@ -39,14 +39,33 @@ enum ExitOp {
 };
 
 namespace TgBotCmd {
-    std::string toStr(TgBotCommand cmd);
-    int toCount(TgBotCommand cmd);
-    std::string getHelpText(void);
-} // namespace TgBotCmd
+/**
+ * @brief Convert TgBotCommand to string
+ *
+ * @param cmd TgBotCommand to convert
+ * @return std::string string representation of TgBotCommand enum
+ */
+std::string toStr(TgBotCommand cmd);
+
+/**
+ * @brief Get count of TgBotCommand
+ *
+ * @param cmd TgBotCommand to get arg count of
+ * @return required arg count of TgBotCommand
+ */
+int toCount(TgBotCommand cmd);
+
+/**
+ * @brief Get help text for TgBotCommand
+ *
+ * @return std::string help text for TgBotCommand
+ */
+std::string getHelpText(void);
+}  // namespace TgBotCmd
 
 namespace TgBotCommandData {
 struct WriteMsgToChatId {
-    ChatId to;       // destination chatid
+    ChatId to;      // destination chatid
     char msg[256];  // Msg to send
 };
 
@@ -55,7 +74,7 @@ struct Exit {
     char token[16];  // token data, used to verify exit op
     static Exit create(ExitOp op, const std::string& buf) {
         const int bufLen = sizeof(Exit::token) - 1;
-        Exit e {};
+        Exit e{};
 
         e.op = op;
         strncpy(e.token, buf.c_str(), bufLen);
@@ -81,9 +100,9 @@ struct ObserveChatId {
 };
 
 struct SendFileToChatId {
-    ChatId id;                // Destination ChatId
-    FileType type;            // File type for file
-    char filepath[256];       // Path to file
+    ChatId id;           // Destination ChatId
+    FileType type;       // File type for file
+    char filepath[256];  // Path to file
 };
 
 using ObserveAllChats = bool;
