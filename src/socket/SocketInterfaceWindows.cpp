@@ -62,7 +62,6 @@ void SocketInterfaceWindows::startListening(const listener_callback_t &cb, std::
     struct fd_set set;
 
     const socket_handle_t sfd = createServerSocket();
-    socket_handle_t isfd = INVALID_SOCKET;
     isRunning = true;
 
     if (isValidSocketHandle(sfd)) {
@@ -71,59 +70,39 @@ void SocketInterfaceWindows::startListening(const listener_callback_t &cb, std::
                 WSALOG_E("Failed to listen to socket");
                 break;
             }
-            isfd = createServerInternalSocket();
-            if (!isValidSocketHandle(isfd) && isImplementedSocketHandle(isfd))
-                break;
-
-            if (isImplementedSocketHandle(isfd)) {
-                if (listen(isfd, SOMAXCONN) == SOCKET_ERROR) {
-                    WSALOG_E("Failed to listen to internal socket");
-                    break;
-                }
-            }
             LOG_I("Listening on " SOCKET_PATH);
             createdPromise.set_value(true);
             while (!should_break) {
                 struct sockaddr_un addr {};
                 struct TgBotConnection conn {};
+                struct timeval tv = {10, 0};
                 int len = sizeof(addr);
 
-                LOG_D("Waiting for connection");
                 FD_ZERO(&set);
                 FD_SET(sfd, &set);
-                if (isImplementedSocketHandle(isfd))
-                    FD_SET(isfd, &set);
-                if (select(0, &set, NULL, NULL, NULL) == SOCKET_ERROR) {
+                if (select(0, &set, NULL, NULL, &tv) == SOCKET_ERROR) {
                     WSALOG_E("Select failed");
                     break;
                 }
-                if (isImplementedSocketHandle(isfd) && FD_ISSET(isfd, &set)) {
-                    dummy_listen_buf_t dummy;
-                    const SOCKET cfd = accept(isfd, (struct sockaddr *)&addr, &len);
+                if (FD_ISSET(sfd, &set)) {
+                    const socket_handle_t cfd = accept(sfd, (struct sockaddr *)&addr, &len);
                     if (cfd == INVALID_SOCKET) {
-                        WSALOG_E("Accept failed.");
+                        WSALOG_E("Accept failed");
+                        break;
+                    } else {
+                        LOG_D("Client connected");
+                    }
+                    const int count = recv(cfd, reinterpret_cast<char *>(&conn), sizeof(conn), 0);
+                    should_break = handleIncomingBuf(count, conn, cb, [] { return strWSAError(WSAGetLastError()); });
+                    closesocket(cfd);
+                } else {
+                    if (!kRun) {
+                        LOG_D("Exiting");
                         break;
                     }
-                    recv(cfd, &dummy, sizeof(dummy), 0);
-                    closesocket(cfd);
-                    LOG_D("Exiting");
-                    break;
                 }
-                ASSERT(FD_ISSET(sfd, &set), "select() returns unexpected output");
-                const socket_handle_t cfd = accept(sfd, (struct sockaddr *)&addr, &len);
-                if (cfd == INVALID_SOCKET) {
-                    WSALOG_E("Accept failed");
-                    break;
-                } else {
-                    LOG_D("Client connected");
-                }
-                const int count = recv(cfd, reinterpret_cast<char *>(&conn), sizeof(conn), 0);
-                should_break = handleIncomingBuf(count, conn, cb, [] { return strWSAError(WSAGetLastError()); });
-                closesocket(cfd);
             }
         } while (false);
-        if (isValidSocketHandle(isfd))
-            closesocket(isfd);
         closesocket(sfd);
         cleanupServerSocket();
         WSACleanup();
@@ -147,12 +126,5 @@ void SocketInterfaceWindows::writeToSocket(struct TgBotConnection conn) {
 }
 
 void SocketInterfaceWindows::forceStopListening(void) {
-    dummy_listen_buf_t dummy = 0;
-    const SOCKET isfd = createClientInternalSocket();
-
-    if (isValidSocketHandle(isfd)) {
-        send(isfd, &dummy, sizeof(dummy), 0);
-    } else if (!isImplementedSocketHandle(isfd)) {
-        WSALOG_E("Failed to connect to internal socket");
-    }
+    kRun = false;
 }

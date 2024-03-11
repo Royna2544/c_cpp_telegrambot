@@ -64,18 +64,6 @@ SocketInterfaceWindowsLocal::createServerSocket() {
     return makeSocket(/*is_client=*/false);
 }
 
-SocketInterfaceWindows::socket_handle_t
-SocketInterfaceWindowsLocal::createClientInternalSocket() {
-    setOptions(Options::DESTINATION_ADDRESS, INTERNAL_SOCKET_PATH);
-    return makeSocket(/*is_client=*/true);
-}
-
-SocketInterfaceWindows::socket_handle_t
-SocketInterfaceWindowsLocal::createServerInternalSocket() {
-    setOptions(Options::DESTINATION_ADDRESS, INTERNAL_SOCKET_PATH);
-    return makeSocket(/*is_client=*/false);
-}
-
 void SocketInterfaceWindowsLocal::cleanupServerSocket() {
     std::filesystem::remove(SOCKET_PATH);
 }
