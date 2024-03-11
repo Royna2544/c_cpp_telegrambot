@@ -56,15 +56,19 @@ static void setupSocket(const Bot &gBot, SingleThreadCtrlManager::ThreadUsage tu
             },socketCreatedProm);
         });
 
-        if (socketCreatedFut.get() && susage == SU_INTERNAL) {
-            intf->writeToSocket({CMD_EXIT, {.data_2 = e}});
-            socketConnectionManager->setPreStopFunction(
-                std::bind(&cleanupSocket, e.token, susage, std::placeholders::_1));
-        }
-        if (susage == SU_EXTERNAL) {
-            socketConnectionManager->setPreStopFunction([intf](SingleThreadCtrl *) {
-                intf->forceStopListening();
-            });
+        if (socketCreatedFut.get()) {
+            switch (susage) {
+                case SocketUsage::SU_INTERNAL:
+                    intf->writeToSocket({CMD_EXIT, {.data_2 = e}});
+                    socketConnectionManager->setPreStopFunction(
+                        std::bind(&cleanupSocket, e.token, susage, std::placeholders::_1));
+                    break;
+                case SocketUsage::SU_EXTERNAL:
+                    socketConnectionManager->setPreStopFunction([intf](SingleThreadCtrl *) {
+                        intf->forceStopListening();
+                    });
+                    break;
+            };
         }
     }
 }

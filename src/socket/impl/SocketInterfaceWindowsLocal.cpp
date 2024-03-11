@@ -49,7 +49,7 @@ SocketInterfaceWindowsLocal::makeSocket(bool is_client) {
 }
 
 bool SocketInterfaceWindowsLocal::canSocketBeClosed() {
-    return !fileExists(SOCKET_PATH);
+    return fileExists(SOCKET_PATH);
 }
 
 SocketInterfaceWindows::socket_handle_t

@@ -6,14 +6,18 @@
 
 struct SocketInterfaceWindows : SocketInterfaceBase {
     using socket_handle_t = SOCKET;
+    constexpr static SOCKET UNIMPLEMENTED_SOCKET = INVALID_SOCKET - 1;
 
+    bool isImplementedSocketHandle(socket_handle_t handle) {
+        return handle != UNIMPLEMENTED_SOCKET;
+    }
     bool isValidSocketHandle(socket_handle_t handle)  {
-        return handle != INVALID_SOCKET;
+        return handle != INVALID_SOCKET && isImplementedSocketHandle(handle);
     };
     virtual socket_handle_t createClientSocket() = 0;
     virtual socket_handle_t createServerSocket() = 0;
-    virtual socket_handle_t createServerInternalSocket() { return INVALID_SOCKET; }
-    virtual socket_handle_t createClientInternalSocket() { return INVALID_SOCKET; }
+    virtual socket_handle_t createServerInternalSocket() { return UNIMPLEMENTED_SOCKET; }
+    virtual socket_handle_t createClientInternalSocket() { return UNIMPLEMENTED_SOCKET; }
     void writeToSocket(struct TgBotConnection conn) override;
     void forceStopListening(void) override;
     void startListening(const listener_callback_t& cb, std::promise<bool>& createdPromise) override;

@@ -62,6 +62,7 @@ void SocketInterfaceWindows::startListening(const listener_callback_t &cb, std::
     struct fd_set set;
 
     const socket_handle_t sfd = createServerSocket();
+    socket_handle_t isfd = INVALID_SOCKET;
     isRunning = true;
 
     if (isValidSocketHandle(sfd)) {
@@ -70,13 +71,15 @@ void SocketInterfaceWindows::startListening(const listener_callback_t &cb, std::
                 WSALOG_E("Failed to listen to socket");
                 break;
             }
-            const socket_handle_t isfd = createServerInternalSocket();
-            if (isfd == INVALID_SOCKET)
+            isfd = createServerInternalSocket();
+            if (!isValidSocketHandle(isfd) && isImplementedSocketHandle(isfd))
                 break;
 
-            if (listen(isfd, SOMAXCONN) == SOCKET_ERROR) {
-                WSALOG_E("Failed to listen to internal socket");
-                break;
+            if (isImplementedSocketHandle(isfd)) {
+                if (listen(isfd, SOMAXCONN) == SOCKET_ERROR) {
+                    WSALOG_E("Failed to listen to internal socket");
+                    break;
+                }
             }
             LOG_I("Listening on " SOCKET_PATH);
             createdPromise.set_value(true);
@@ -88,12 +91,13 @@ void SocketInterfaceWindows::startListening(const listener_callback_t &cb, std::
                 LOG_D("Waiting for connection");
                 FD_ZERO(&set);
                 FD_SET(sfd, &set);
-                FD_SET(isfd, &set);
+                if (isImplementedSocketHandle(isfd))
+                    FD_SET(isfd, &set);
                 if (select(0, &set, NULL, NULL, NULL) == SOCKET_ERROR) {
                     WSALOG_E("Select failed");
                     break;
                 }
-                if (FD_ISSET(isfd, &set)) {
+                if (isImplementedSocketHandle(isfd) && FD_ISSET(isfd, &set)) {
                     dummy_listen_buf_t dummy;
                     const SOCKET cfd = accept(isfd, (struct sockaddr *)&addr, &len);
                     if (cfd == INVALID_SOCKET) {
@@ -118,6 +122,8 @@ void SocketInterfaceWindows::startListening(const listener_callback_t &cb, std::
                 closesocket(cfd);
             }
         } while (false);
+        if (isValidSocketHandle(isfd))
+            closesocket(isfd);
         closesocket(sfd);
         cleanupServerSocket();
         WSACleanup();
@@ -142,12 +148,11 @@ void SocketInterfaceWindows::writeToSocket(struct TgBotConnection conn) {
 
 void SocketInterfaceWindows::forceStopListening(void) {
     dummy_listen_buf_t dummy = 0;
-    setOptions(Options::DESTINATION_ADDRESS, INTERNAL_SOCKET_PATH);
     const SOCKET isfd = createClientInternalSocket();
 
     if (isValidSocketHandle(isfd)) {
         send(isfd, &dummy, sizeof(dummy), 0);
-    } else {
+    } else if (!isImplementedSocketHandle(isfd)) {
         WSALOG_E("Failed to connect to internal socket");
     }
 }
