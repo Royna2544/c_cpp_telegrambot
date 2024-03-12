@@ -14,9 +14,7 @@ struct SingleThreadCtrlTestAccessors {
         return gSThreadManager.getController<C>(req);
     }
 
-    static void destroy() {
-        gSThreadManager.destroyController(usage);
-    }
+    static void destroy() { gSThreadManager.destroyController(usage); }
 
     static void createAndAssertNotNull(int flags = 0) {
         AssertNonNull(createAndGet(flags));

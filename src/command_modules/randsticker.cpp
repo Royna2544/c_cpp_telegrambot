@@ -25,12 +25,11 @@ static void RandomStickerCommandFn(const Bot &bot, const Message::Ptr message) {
            << "From pack \"" + stickset->title + "\"";
         bot_sendReplyMessage(bot, message, ss.str());
     } else {
-        bot_sendReplyMessage(bot, message, "Sticker not found in replied-to message");
+        bot_sendReplyMessage(bot, message,
+                             "Sticker not found in replied-to message");
     }
 }
 
 struct CommandModule cmd_randsticker {
-    .enforced = false,
-    .name = "randsticker",
-    .fn = RandomStickerCommandFn,
+    .enforced = false, .name = "randsticker", .fn = RandomStickerCommandFn,
 };

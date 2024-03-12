@@ -26,9 +26,7 @@ static void *watchdog(void *arg) {
     return NULL;
 }
 
-void setlocale_enus_once(void) {
-    setenv("LC_ALL", "C", true);
-}
+void setlocale_enus_once(void) { setenv("LC_ALL", "C", true); }
 
 FILE *popen_watchdog(const char *command, bool *watchdog_ret) {
     FILE *fp;
@@ -64,8 +62,7 @@ FILE *popen_watchdog(const char *command, bool *watchdog_ret) {
 
     if (pid == 0) {
         // Child process
-        if (watchdog_ret)
-            data->pid = getpid();
+        if (watchdog_ret) data->pid = getpid();
         close(pipefd[0]);
         dup2(pipefd[1], STDOUT_FILENO);
         dup2(pipefd[1], STDERR_FILENO);

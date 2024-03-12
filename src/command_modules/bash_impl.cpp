@@ -1,5 +1,6 @@
-#include "CommandModule.h"
 #include <CompilerInTelegram.h>
+
+#include "CommandModule.h"
 
 static void BashCommandFn(const Bot &bot, const Message::Ptr message) {
     BashHandleData(bot, message, false).run();
@@ -9,13 +10,9 @@ static void unsafeBashCommandFn(const Bot &bot, const Message::Ptr message) {
 }
 
 struct CommandModule cmd_bash {
-    .enforced = true,
-    .name = "bash",
-    .fn = BashCommandFn,
+    .enforced = true, .name = "bash", .fn = BashCommandFn,
 };
 
 struct CommandModule cmd_unsafebash {
-    .enforced = true,
-    .name = "unsafebash",
-    .fn = unsafeBashCommandFn,
+    .enforced = true, .name = "unsafebash", .fn = unsafeBashCommandFn,
 };

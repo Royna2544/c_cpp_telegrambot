@@ -20,14 +20,14 @@ static void FileIdCommandFn(const Bot &bot, const Message::Ptr message) {
         } else {
             file = unifile = "Unknown";
         }
-        bot_sendReplyMessageMarkDown(bot, message, "FileId: `" + file + "`\n" + "FileUniqueId: `" + unifile + '`');
+        bot_sendReplyMessageMarkDown(
+            bot, message,
+            "FileId: `" + file + "`\n" + "FileUniqueId: `" + unifile + '`');
     } else {
         bot_sendReplyMessage(bot, message, "Reply to a media");
     }
 }
 
 struct CommandModule cmd_fileid {
-    .enforced = false,
-    .name = "fileid",
-    .fn = FileIdCommandFn,
+    .enforced = false, .name = "fileid", .fn = FileIdCommandFn,
 };

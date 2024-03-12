@@ -5,8 +5,8 @@
 #include <mutex>
 #include <stdexcept>
 
-#include "popen_wdt.hpp"
 #include "popen_wdt.h"
+#include "popen_wdt.hpp"
 
 // TODO Move this somewhere else
 bool runCommand(const std::string& command, std::string& result) {
@@ -19,9 +19,8 @@ bool runCommand(const std::string& command, std::string& result) {
             result += buffer;
             memset(buffer, 0, sizeof(buffer));
         }
-        if (result.back() == '\n')
-            result.pop_back();
-        
+        if (result.back() == '\n') result.pop_back();
+
         LOG_V("Command: %s, result: '%s'", command.c_str(), result.c_str());
         return true;
     }
@@ -33,7 +32,8 @@ std::filesystem::path getSrcRoot() {
     static std::once_flag flag;
     std::call_once(flag, [] {
         std::string dir_str;
-        if (auto ret = ConfigManager::getVariable("SRC_ROOT"); ret.has_value()) {
+        if (auto ret = ConfigManager::getVariable("SRC_ROOT");
+            ret.has_value()) {
             dir_str = ret.value();
         } else if (!runCommand("git rev-parse --show-toplevel", dir_str)) {
             throw std::runtime_error("Command failed");

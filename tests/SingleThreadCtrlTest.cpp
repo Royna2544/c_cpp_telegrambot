@@ -3,7 +3,8 @@
 #include "SingleThreadCtrl.h"
 #include "SingleThreadCtrlAccessors.h"
 
-using Accessor = SingleThreadCtrlTestAccessors<SingleThreadCtrlManager::USAGE_TEST>;
+using Accessor =
+    SingleThreadCtrlTestAccessors<SingleThreadCtrlManager::USAGE_TEST>;
 
 struct RequireFlagBuilder {
     RequireFlagBuilder& setFailActionLog() {
@@ -36,21 +37,19 @@ struct RequireFlagBuilder {
     }
     int build() {
         int rc = 0;
-        if (fail_log)
-            rc |= SingleThreadCtrlManager::REQUIRE_FAILACTION_LOG;
+        if (fail_log) rc |= SingleThreadCtrlManager::REQUIRE_FAILACTION_LOG;
         if (fail_assert)
             rc |= SingleThreadCtrlManager::REQUIRE_FAILACTION_ASSERT;
         if (fail_null)
             rc |= SingleThreadCtrlManager::REQUIRE_FAILACTION_RETURN_NULL;
-        if (require_exist)
-            rc |= SingleThreadCtrlManager::REQUIRE_EXIST;
-        if (require_nonexist)
-            rc |= SingleThreadCtrlManager::REQUIRE_NONEXIST;
+        if (require_exist) rc |= SingleThreadCtrlManager::REQUIRE_EXIST;
+        if (require_nonexist) rc |= SingleThreadCtrlManager::REQUIRE_NONEXIST;
         if (sizediff_recst)
             rc |= SingleThreadCtrlManager::SIZEDIFF_ACTION_RECONSTRUCT;
         return rc;
     }
- private:
+
+   private:
     bool fail_log = false;
     bool fail_assert = false;
     bool fail_null = false;
@@ -81,10 +80,8 @@ TEST(SingleThreadCtrlTest, ReturnsSameInstance) {
 
 TEST(SingleThreadCtrlTest, RequireExistButDoes_FailLog) {
     Accessor e;
-    const int flag = RequireFlagBuilder()
-                        .setRequireExist()
-                        .setFailActionLog()
-                        .build();
+    const int flag =
+        RequireFlagBuilder().setRequireExist().setFailActionLog().build();
 
     e.createAndAssertNotNull();
     e.createAndAssertNotNull(flag);
@@ -93,10 +90,8 @@ TEST(SingleThreadCtrlTest, RequireExistButDoes_FailLog) {
 
 TEST(SingleThreadCtrlTest, RequireNonExistButDoes_FailLog) {
     Accessor e;
-    const int flag = RequireFlagBuilder()
-                        .setRequireNonExist()
-                        .setFailActionLog()
-                        .build();
+    const int flag =
+        RequireFlagBuilder().setRequireNonExist().setFailActionLog().build();
 
     e.destroy();
     e.createAndAssertNotNull(flag);
@@ -105,10 +100,8 @@ TEST(SingleThreadCtrlTest, RequireNonExistButDoes_FailLog) {
 
 TEST(SingleThreadCtrlTest, RequireExistButDoesnt_FailLog) {
     Accessor e;
-    const int flag = RequireFlagBuilder()
-                        .setRequireExist()
-                        .setFailActionLog()
-                        .build();
+    const int flag =
+        RequireFlagBuilder().setRequireExist().setFailActionLog().build();
 
     e.destroy();
     e.createAndAssertNotNull(flag);
@@ -117,10 +110,8 @@ TEST(SingleThreadCtrlTest, RequireExistButDoesnt_FailLog) {
 
 TEST(SingleThreadCtrlTest, RequireNonExistButDoesnt_FailLog) {
     Accessor e;
-    const int flag = RequireFlagBuilder()
-                        .setRequireNonExist()
-                        .setFailActionLog()
-                        .build();
+    const int flag =
+        RequireFlagBuilder().setRequireNonExist().setFailActionLog().build();
 
     e.createAndAssertNotNull();
     e.createAndAssertNotNull(flag);
@@ -130,10 +121,10 @@ TEST(SingleThreadCtrlTest, RequireNonExistButDoesnt_FailLog) {
 TEST(SingleThreadCtrlTest, RequireExistButDoesnt_FailLogReturnNull) {
     Accessor e;
     const int flag = RequireFlagBuilder()
-                        .setRequireExist()
-                        .setFailActionLog()
-                        .setFailActionRetNull()
-                        .build();
+                         .setRequireExist()
+                         .setFailActionLog()
+                         .setFailActionRetNull()
+                         .build();
 
     e.destroy();
     e.AssertNull(e.createAndGet(flag));
@@ -143,10 +134,10 @@ TEST(SingleThreadCtrlTest, RequireExistButDoesnt_FailLogReturnNull) {
 TEST(SingleThreadCtrlTest, RequireExistButDoes_FailLogReturnNull) {
     Accessor e;
     const int flag = RequireFlagBuilder()
-                        .setRequireExist()
-                        .setFailActionLog()
-                        .setFailActionRetNull()
-                        .build();
+                         .setRequireExist()
+                         .setFailActionLog()
+                         .setFailActionRetNull()
+                         .build();
 
     e.createAndAssertNotNull();
     e.createAndAssertNotNull(flag);
@@ -160,10 +151,8 @@ struct Amazing : SingleThreadCtrl {
 TEST(SingleThreadCtrlTest, SizeDiffReconstructYes) {
     Accessor e;
 
-    const int flag = RequireFlagBuilder()
-                        .setRequireExist()
-                        .setSizediffReconstruct()
-                        .build();
+    const int flag =
+        RequireFlagBuilder().setRequireExist().setSizediffReconstruct().build();
 
     e.createAndAssertNotNull();
     e.AssertNonNull(e.createAndGet<Amazing>(flag));
@@ -173,9 +162,7 @@ TEST(SingleThreadCtrlTest, SizeDiffReconstructYes) {
 TEST(SingleThreadCtrlTest, SizeDiffReconstructNo) {
     Accessor e;
 
-    const int flag = RequireFlagBuilder()
-                        .setRequireExist()
-                        .build();
+    const int flag = RequireFlagBuilder().setRequireExist().build();
 
     e.createAndAssertNotNull();
     e.AssertNull(e.createAndGet<Amazing>(flag));
@@ -185,7 +172,8 @@ TEST(SingleThreadCtrlTest, SizeDiffReconstructNo) {
 #ifndef NDEBUG
 TEST(SingleThreadCtrlTest, RequireExistButDoesnt_FailAssert) {
     Accessor e;
-    const int flag = RequireFlagBuilder().setRequireExist().setFailActionAssert().build();
+    const int flag =
+        RequireFlagBuilder().setRequireExist().setFailActionAssert().build();
 
     GTEST_FLAG_SET(death_test_style, "threadsafe");
     // As C++ standard require the filename of assert failure on its msg...
@@ -194,10 +182,8 @@ TEST(SingleThreadCtrlTest, RequireExistButDoesnt_FailAssert) {
 
 TEST(SingleThreadCtrlTest, RequireNonExistButDoes_FailAssert) {
     Accessor e;
-    const int flag = RequireFlagBuilder()
-                        .setRequireNonExist()
-                        .setFailActionAssert()
-                        .build();
+    const int flag =
+        RequireFlagBuilder().setRequireNonExist().setFailActionAssert().build();
 
     e.createAndAssertNotNull(flag);
 }

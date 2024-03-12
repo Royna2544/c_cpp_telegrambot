@@ -15,7 +15,8 @@ using shuffle_handle_t = std::function<void(std::vector<T>&)>;
 using return_type = random_return_type;
 
 template <class Generator>
-return_type genRandomNumberImpl(Generator gen, const return_type min, const return_type max) {
+return_type genRandomNumberImpl(Generator gen, const return_type min,
+                                const return_type max) {
     ASSERT(min < max, "min(%ld) is bigger than max(%ld)", min, max);
     std::uniform_int_distribution<return_type> distribution(min, max);
     return distribution(gen);
@@ -28,7 +29,8 @@ void ShuffleImpl(std::vector<T>& in, Engine e) {
 
 struct RNGType {
     std::function<bool(void)> supported;
-    std::function<return_type(const return_type min, const return_type max)> generate;
+    std::function<return_type(const return_type min, const return_type max)>
+        generate;
     shuffle_handle_t<std::string> shuffle_string;
     const char* name;
 };
@@ -39,13 +41,12 @@ static std::mt19937 RNG_std_create_rng(void) {
     return gen;
 }
 
-static return_type RNG_std_generate(const return_type min, const return_type max) {
+static return_type RNG_std_generate(const return_type min,
+                                    const return_type max) {
     return genRandomNumberImpl(RNG_std_create_rng(), min, max);
 }
 
-static bool RNG_std_supported(void) {
-    return true;
-}
+static bool RNG_std_supported(void) { return true; }
 
 template <typename T>
 void RNG_std_shuffle(std::vector<T>& in) {
@@ -75,7 +76,8 @@ void RNG_rdrand_shuffle(std::vector<T>& in) {
 #endif
 
 #ifdef KERNELRAND_MAYBE_SUPPORTED
-static return_type RNG_kernrand_generate(const return_type min, const return_type max) {
+static return_type RNG_kernrand_generate(const return_type min,
+                                         const return_type max) {
     static kernel_rand_engine gen;
     return genRandomNumberImpl(gen, min, max);
 }

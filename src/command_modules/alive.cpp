@@ -1,16 +1,16 @@
-#include <boost/algorithm/string/replace.hpp>
-#include <boost/config.hpp>
-
 #include <Logging.h>
 #include <ResourceIncBin.h>
-#include <popen_wdt/popen_wdt.hpp>
-#include "CommandModule.h"
-#include "internal/_tgbot.h"
 #include <cmds.gen.h>
 
+#include <boost/algorithm/string/replace.hpp>
+#include <boost/config.hpp>
 #include <map>
 #include <mutex>
+#include <popen_wdt/popen_wdt.hpp>
 #include <string>
+
+#include "CommandModule.h"
+#include "internal/_tgbot.h"
 
 static void AliveCommandFn(const Bot &bot, const Message::Ptr message) {
     static std::string version;
@@ -25,36 +25,43 @@ static void AliveCommandFn(const Bot &bot, const Message::Ptr message) {
             {&originurl, "config --get remote.origin.url"},
         };
         for (const auto &cmd : commands) {
-            const std::string gitPrefix = "git --git-dir=" + (getSrcRoot() / ".git").string() + ' ';
+            const std::string gitPrefix =
+                "git --git-dir=" + (getSrcRoot() / ".git").string() + ' ';
             const bool ret = runCommand(gitPrefix + cmd.second, *cmd.first);
             if (!ret) {
                 LOG_E("Command failed: %s", cmd.second.c_str());
                 *cmd.first = "[Failed]";
             }
         }
-        compilerver = std::string(BOOST_PLATFORM " | " BOOST_COMPILER " | " __DATE__);
+        compilerver =
+            std::string(BOOST_PLATFORM " | " BOOST_COMPILER " | " __DATE__);
         commandmodules.reserve(8 * gCmdModules.size());
         for (const auto &i : gCmdModules) {
             commandmodules += i->name;
             commandmodules += " ";
         }
         ASSIGN_INCTXT_DATA(AboutHtmlText, version);
-#define REPLACE_PLACEHOLDER(buf, name) boost::replace_all(buf, "_" #name "_", name)
-#define REPLACE_PLACEHOLDER2(buf, name, val) boost::replace_all(buf, "_" #name "_", val)
+#define REPLACE_PLACEHOLDER(buf, name) \
+    boost::replace_all(buf, "_" #name "_", name)
+#define REPLACE_PLACEHOLDER2(buf, name, val) \
+    boost::replace_all(buf, "_" #name "_", val)
         REPLACE_PLACEHOLDER(version, commitid);
         REPLACE_PLACEHOLDER(version, commitmsg);
         REPLACE_PLACEHOLDER(version, originurl);
         REPLACE_PLACEHOLDER(version, compilerver);
         REPLACE_PLACEHOLDER(version, commandmodules);
-        REPLACE_PLACEHOLDER2(version, botname, UserPtr_toString(bot.getApi().getMe()));
-        REPLACE_PLACEHOLDER2(version, botusername, bot.getApi().getMe()->username);
+        REPLACE_PLACEHOLDER2(version, botname,
+                             UserPtr_toString(bot.getApi().getMe()));
+        REPLACE_PLACEHOLDER2(version, botusername,
+                             bot.getApi().getMe()->username);
     });
     try {
         // Hardcoded kys GIF
-        bot.getApi().sendAnimation(message->chat->id,
-                                   "CgACAgIAAx0CdMESqgACCZRlrfMoq_b2DL21k6ohShQzzLEh6gACsw4AAuSZWUmmR3jSJA9WxzQE",
-                                   0, 0, 0, "", version, message->messageId,
-                                   nullptr, "html");
+        bot.getApi().sendAnimation(
+            message->chat->id,
+            "CgACAgIAAx0CdMESqgACCZRlrfMoq_"
+            "b2DL21k6ohShQzzLEh6gACsw4AAuSZWUmmR3jSJA9WxzQE",
+            0, 0, 0, "", version, message->messageId, nullptr, "html");
     } catch (const TgBot::TgException &e) {
         // Fallback to HTML if no GIF
         LOG_E("Alive cmd: Error while sending GIF: %s", e.what());
@@ -63,13 +70,9 @@ static void AliveCommandFn(const Bot &bot, const Message::Ptr message) {
 }
 
 const struct CommandModule cmd_alive {
-    .enforced = false,
-    .name = "alive",
-    .fn = AliveCommandFn,
+    .enforced = false, .name = "alive", .fn = AliveCommandFn,
 };
 
 const struct CommandModule cmd_start {
-    .enforced = false,
-    .name = "start",
-    .fn = AliveCommandFn,
+    .enforced = false, .name = "start", .fn = AliveCommandFn,
 };

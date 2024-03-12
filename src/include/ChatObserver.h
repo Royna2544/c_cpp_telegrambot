@@ -1,7 +1,7 @@
 #pragma once
 
-#include <tgbot/types/Message.h>
 #include <Types.h>
+#include <tgbot/types/Message.h>
 
 #include <vector>
 

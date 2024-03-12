@@ -12,6 +12,7 @@
 
 // Generated cmd list
 #include <cmds.gen.h>
+
 #include "CompilerInTelegram.h"
 
 #ifdef RTCOMMAND_LOADER
@@ -38,11 +39,13 @@ static void cleanupFn(int s) {
 };
 
 #ifdef SOCKET_CONNECTION
-static void cleanupSocket(const std::string exitToken, SocketUsage usage, SingleThreadCtrl *) {
+static void cleanupSocket(const std::string exitToken, SocketUsage usage,
+                          SingleThreadCtrl *) {
     getSocketInterface(usage)->stopListening(exitToken);
 }
 
-static void setupSocket(const Bot &gBot, SingleThreadCtrlManager::ThreadUsage tusage,
+static void setupSocket(const Bot &gBot,
+                        SingleThreadCtrlManager::ThreadUsage tusage,
                         SocketUsage susage, TgBotCommandData::Exit e) {
     auto socketConnectionManager = gSThreadManager.getController(tusage);
     std::promise<bool> socketCreatedProm;
@@ -51,9 +54,11 @@ static void setupSocket(const Bot &gBot, SingleThreadCtrlManager::ThreadUsage tu
 
     if (!intf->isRunning) {
         socketConnectionManager->runWith([&socketCreatedProm, susage, &gBot] {
-            getSocketInterface(susage)->startListening([&gBot](struct TgBotConnection conn) {
-                socketConnectionHandler(gBot, conn);
-            },socketCreatedProm);
+            getSocketInterface(susage)->startListening(
+                [&gBot](struct TgBotConnection conn) {
+                    socketConnectionHandler(gBot, conn);
+                },
+                socketCreatedProm);
         });
 
         if (socketCreatedFut.get()) {
@@ -61,12 +66,14 @@ static void setupSocket(const Bot &gBot, SingleThreadCtrlManager::ThreadUsage tu
                 case SocketUsage::SU_INTERNAL:
                     intf->writeToSocket({CMD_EXIT, {.data_2 = e}});
                     socketConnectionManager->setPreStopFunction(
-                        std::bind(&cleanupSocket, e.token, susage, std::placeholders::_1));
+                        std::bind(&cleanupSocket, e.token, susage,
+                                  std::placeholders::_1));
                     break;
                 case SocketUsage::SU_EXTERNAL:
-                    socketConnectionManager->setPreStopFunction([intf](SingleThreadCtrl *) {
-                        intf->forceStopListening();
-                    });
+                    socketConnectionManager->setPreStopFunction(
+                        [intf](SingleThreadCtrl *) {
+                            intf->forceStopListening();
+                        });
                     break;
             };
         }
@@ -91,18 +98,26 @@ int main(int argc, const char **argv) {
     static Bot gBot(token);
     database::DBWrapper.loadMain(gBot);
 
-    bot_AddCommandEnforcedCompiler(gBot, "c", ProgrammingLangs::C, [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
-        CCppCompileHandleData(bot, message, compiler, "out.c").run();
-    });
-    bot_AddCommandEnforcedCompiler(gBot, "cpp", ProgrammingLangs::CXX, [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
-        CCppCompileHandleData(bot, message, compiler, "out.cpp").run();
-    });
-    bot_AddCommandEnforcedCompiler(gBot, "python", ProgrammingLangs::PYTHON, [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
-        CompileHandleData(bot, message, compiler, "out.py").run();
-    });
-    bot_AddCommandEnforcedCompiler(gBot, "golang", ProgrammingLangs::GO, [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
-        CompileHandleData(bot, message, compiler + " run", "out.go").run();
-    });
+    bot_AddCommandEnforcedCompiler(
+        gBot, "c", ProgrammingLangs::C,
+        [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
+            CCppCompileHandleData(bot, message, compiler, "out.c").run();
+        });
+    bot_AddCommandEnforcedCompiler(
+        gBot, "cpp", ProgrammingLangs::CXX,
+        [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
+            CCppCompileHandleData(bot, message, compiler, "out.cpp").run();
+        });
+    bot_AddCommandEnforcedCompiler(
+        gBot, "python", ProgrammingLangs::PYTHON,
+        [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
+            CompileHandleData(bot, message, compiler, "out.py").run();
+        });
+    bot_AddCommandEnforcedCompiler(
+        gBot, "golang", ProgrammingLangs::GO,
+        [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
+            CompileHandleData(bot, message, compiler + " run", "out.go").run();
+        });
 
     for (const auto &i : gCmdModules) {
         if (i->enforced)
@@ -111,9 +126,8 @@ int main(int argc, const char **argv) {
             bot_AddCommandPermissive(gBot, i->name, i->fn);
     }
     gBot.getEvents().onAnyMessage([](const Message::Ptr &msg) {
-        static auto spamMgr = gSThreadManager
-            .getController<SpamBlockManager>(
-                {SingleThreadCtrlManager::USAGE_SPAMBLOCK_THREAD}, std::ref(gBot));
+        static auto spamMgr = gSThreadManager.getController<SpamBlockManager>(
+            {SingleThreadCtrlManager::USAGE_SPAMBLOCK_THREAD}, std::ref(gBot));
         static RegexHandler regexHandler(gBot);
 
         if (!gAuthorized) return;
@@ -126,11 +140,14 @@ int main(int argc, const char **argv) {
     });
 
 #ifdef SOCKET_CONNECTION
-    std::string exitToken = StringTools::generateRandomString(sizeof(TgBotCommandUnion::data_2.token) - 1);
+    std::string exitToken = StringTools::generateRandomString(
+        sizeof(TgBotCommandUnion::data_2.token) - 1);
     auto e = TgBotCommandData::Exit::create(ExitOp::SET_TOKEN, exitToken);
 
-    setupSocket(gBot, SingleThreadCtrlManager::USAGE_SOCKET_THREAD, SU_INTERNAL, e);
-    setupSocket(gBot, SingleThreadCtrlManager::USAGE_SOCKET_EXTERNAL_THREAD, SU_EXTERNAL, e);
+    setupSocket(gBot, SingleThreadCtrlManager::USAGE_SOCKET_THREAD, SU_INTERNAL,
+                e);
+    setupSocket(gBot, SingleThreadCtrlManager::USAGE_SOCKET_EXTERNAL_THREAD,
+                SU_EXTERNAL, e);
 
 #endif
 #ifdef RTCOMMAND_LOADER
@@ -155,7 +172,8 @@ int main(int argc, const char **argv) {
             LOG_W("Trying to recover");
             UserId ownerid = database::DBWrapper.maybeGetOwnerId();
             try {
-                bot_sendMessage(gBot, ownerid, std::string("Exception occured: ") + e.what());
+                bot_sendMessage(gBot, ownerid,
+                                std::string("Exception occured: ") + e.what());
             } catch (const std::exception &e) {
                 LOG_F("%s", e.what());
                 break;
@@ -173,8 +191,9 @@ int main(int argc, const char **argv) {
             gAuthorized = false;
             static const SingleThreadCtrlManager::GetControllerRequest req{
                 .usage = SingleThreadCtrlManager::USAGE_ERROR_RECOVERY_THREAD,
-                .flags = SingleThreadCtrlManager::REQUIRE_NONEXIST |
-                         SingleThreadCtrlManager::REQUIRE_FAILACTION_RETURN_NULL};
+                .flags =
+                    SingleThreadCtrlManager::REQUIRE_NONEXIST |
+                    SingleThreadCtrlManager::REQUIRE_FAILACTION_RETURN_NULL};
             auto cl = gSThreadManager.getController(req);
             if (cl) {
                 cl->runWith([] {

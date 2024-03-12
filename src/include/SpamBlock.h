@@ -36,16 +36,19 @@ struct SpamBlockBase : SingleThreadCtrlRunnable {
     constexpr static int sSpamDetectThreshold = 5;
 
     virtual ~SpamBlockBase() = default;
-    virtual void handleUserAndMessagePair(PerChatHandleConstRef e, OneChatIterator it,
-                                          const size_t threshold, const char *name){};
+    virtual void handleUserAndMessagePair(PerChatHandleConstRef e,
+                                          OneChatIterator it,
+                                          const size_t threshold,
+                                          const char *name){};
 
     void runFunction(void) override;
     void addMessage(const Message::Ptr &message);
 
     static std::string commonMsgdataFn(const Message::Ptr &m);
+
    protected:
     bool isEntryOverThreshold(PerChatHandleConstRef t, const size_t threshold);
-    void _logSpamDetectCommon(PerChatHandleConstRef t, const char* name);
+    void _logSpamDetectCommon(PerChatHandleConstRef t, const char *name);
 
    private:
     void spamDetectFunc(OneChatIterator handle);
@@ -63,11 +66,13 @@ struct SpamBlockManager : SpamBlockBase {
     using SpamBlockBase::run;
     using SpamBlockBase::runFunction;
     void handleUserAndMessagePair(PerChatHandleConstRef e, OneChatIterator it,
-                                  const size_t threshold, const char *name) override;
+                                  const size_t threshold,
+                                  const char *name) override;
 
    private:
     constexpr static auto kMuteDuration = std::chrono::minutes(3);
-    void _deleteAndMuteCommon(const OneChatIterator& handle, PerChatHandleConstRef t,
-                              const size_t threshold, const char* name, const bool mute);
+    void _deleteAndMuteCommon(const OneChatIterator &handle,
+                              PerChatHandleConstRef t, const size_t threshold,
+                              const char *name, const bool mute);
     const Bot &_bot;
 };

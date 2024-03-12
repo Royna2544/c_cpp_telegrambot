@@ -3,9 +3,10 @@
 #include <CStringLifetime.h>
 #include <Logging.h>
 #include <SpamBlock.h>
-#include <socket/TgBotSocket.h>
-#include <internal/_tgbot.h>
 #include <internal/_std_chrono_templates.h>
+#include <internal/_tgbot.h>
+#include <socket/TgBotSocket.h>
+
 #include <map>
 #include <mutex>
 #include <utility>
@@ -20,19 +21,27 @@ CtrlSpamBlock gSpamBlockCfg = CTRL_ON;
 #endif
 
 template <class Container, class Type>
-typename Container::iterator _findItImpl(Container &c, std::function<typename Type::Ptr(typename Container::const_reference)> fn, typename Type::Ptr t) {
-    return std::find_if(c.begin(), c.end(), [=](const auto &it) {
-        return fn(it)->id == t->id;
-    });
+typename Container::iterator _findItImpl(
+    Container &c,
+    std::function<typename Type::Ptr(typename Container::const_reference)> fn,
+    typename Type::Ptr t) {
+    return std::find_if(c.begin(), c.end(),
+                        [=](const auto &it) { return fn(it)->id == t->id; });
 }
 
 template <class Container>
-typename Container::iterator findChatIt(Container &c, std::function<Chat::Ptr(typename Container::const_reference)> fn, Chat::Ptr t) {
+typename Container::iterator findChatIt(
+    Container &c,
+    std::function<Chat::Ptr(typename Container::const_reference)> fn,
+    Chat::Ptr t) {
     return _findItImpl<Container, Chat>(c, fn, t);
 }
 
 template <class Container>
-typename Container::iterator findUserIt(Container &c, std::function<User::Ptr(typename Container::const_reference)> fn, User::Ptr t) {
+typename Container::iterator findUserIt(
+    Container &c,
+    std::function<User::Ptr(typename Container::const_reference)> fn,
+    User::Ptr t) {
     return _findItImpl<Container, User>(c, fn, t);
 }
 
@@ -45,7 +54,8 @@ std::string SpamBlockBase::commonMsgdataFn(const Message::Ptr &m) {
         return m->text;
 }
 
-bool SpamBlockBase::isEntryOverThreshold(PerChatHandle::const_reference t, const size_t threshold) {
+bool SpamBlockBase::isEntryOverThreshold(PerChatHandle::const_reference t,
+                                         const size_t threshold) {
     const size_t kEntryValue = t.second.size();
     const bool isOverThreshold = kEntryValue >= threshold;
     if (isOverThreshold)
@@ -53,8 +63,10 @@ bool SpamBlockBase::isEntryOverThreshold(PerChatHandle::const_reference t, const
     return isOverThreshold;
 }
 
-void SpamBlockBase::_logSpamDetectCommon(PerChatHandle::const_reference t, const char *name) {
-    LOG_I("Spam detected for user %s, filtered by %s", UserPtr_toString(t.first).c_str(), name);
+void SpamBlockBase::_logSpamDetectCommon(PerChatHandle::const_reference t,
+                                         const char *name) {
+    LOG_I("Spam detected for user %s, filtered by %s",
+          UserPtr_toString(t.first).c_str(), name);
 }
 
 void SpamBlockBase::takeAction(OneChatIterator it, const PerChatHandle &map,
@@ -68,9 +80,11 @@ void SpamBlockBase::spamDetectFunc(OneChatIterator handle) {
     PerChatHandle MaxSameMsgMap, MaxMsgMap;
     // By most msgs sent by that user
     for (const auto &perUser : handle->second) {
-        std::apply([&](const auto &first, const auto &second) {
-            MaxMsgMap.emplace(first, second);
-        }, perUser);
+        std::apply(
+            [&](const auto &first, const auto &second) {
+                MaxMsgMap.emplace(first, second);
+            },
+            perUser);
     }
 
     for (const auto &pair : handle->second) {
@@ -83,10 +97,11 @@ void SpamBlockBase::spamDetectFunc(OneChatIterator handle) {
             commonMap[cnt.first].emplace_back(cnt.second);
         }
         // Find the most common value
-        auto mostCommonIt = std::max_element(commonMap.begin(), commonMap.end(),
-                                             [](const auto &lhs, const auto &rhs) {
-                                                 return lhs.second.size() < rhs.second.size();
-                                             });
+        auto mostCommonIt =
+            std::max_element(commonMap.begin(), commonMap.end(),
+                             [](const auto &lhs, const auto &rhs) {
+                                 return lhs.second.size() < rhs.second.size();
+                             });
         MaxSameMsgMap.emplace(pair.first, mostCommonIt->second);
     }
 
@@ -135,26 +150,21 @@ void SpamBlockBase::addMessage(const Message::Ptr &message) {
     // Do not track older msgs and consider it as spam.
     if (!isMessageUnderTimeLimit(message)) return;
     // We care GIF, sticker, text spams only, or if it isn't fowarded msg
-    if ((!message->animation && message->text.empty() && !message->sticker) || message->forwardFrom)
+    if ((!message->animation && message->text.empty() && !message->sticker) ||
+        message->forwardFrom)
         return;
     // Bot's PM is not a concern
-    if (message->chat->type == TgBot::Chat::Type::Private)
-        return;
+    if (message->chat->type == TgBot::Chat::Type::Private) return;
 
-    std::call_once(once, [this] {
-        run();
-    });
+    std::call_once(once, [this] { run(); });
 
     {
         const std::lock_guard<std::mutex> _(buffer_m);
         auto bufferIt = findChatIt(
-            buffer, [](const auto &it) { return it.first; },
-            message->chat);
+            buffer, [](const auto &it) { return it.first; }, message->chat);
         if (bufferIt != buffer.end()) {
             const auto bufferUserIt = findUserIt(
-                bufferIt->second, [](const auto &it) {
-                    return it.first;
-                },
+                bufferIt->second, [](const auto &it) { return it.first; },
                 message->from);
 
             if (bufferUserIt != bufferIt->second.end()) {
@@ -166,8 +176,7 @@ void SpamBlockBase::addMessage(const Message::Ptr &message) {
             buffer[message->chat][message->from].emplace_back(message);
         }
         const auto bufferSubIt = findChatIt(
-            buffer_sub,
-            [](const auto &it) { return it.first; }, message->chat);
+            buffer_sub, [](const auto &it) { return it.first; }, message->chat);
         if (bufferSubIt != buffer_sub.end()) {
             ++bufferSubIt->second;
         } else {
@@ -176,8 +185,10 @@ void SpamBlockBase::addMessage(const Message::Ptr &message) {
     }
 }
 
-void SpamBlockManager::handleUserAndMessagePair(PerChatHandleConstRef e, OneChatIterator it,
-                                                const size_t threshold, const char *name) {
+void SpamBlockManager::handleUserAndMessagePair(PerChatHandleConstRef e,
+                                                OneChatIterator it,
+                                                const size_t threshold,
+                                                const char *name) {
     bool enforce = false;
 #ifdef SOCKET_CONNECTION
     switch (gSpamBlockCfg) {
@@ -200,8 +211,10 @@ void SpamBlockManager::handleUserAndMessagePair(PerChatHandleConstRef e, OneChat
 #endif
 }
 
-void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle, PerChatHandle::const_reference t,
-                                            const size_t threshold, const char *name, const bool mute) {
+void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle,
+                                            PerChatHandle::const_reference t,
+                                            const size_t threshold,
+                                            const char *name, const bool mute) {
     // Initial set - all false set
     static auto perms = std::make_shared<ChatPermissions>();
     if (isEntryOverThreshold(t, threshold)) {
@@ -210,7 +223,8 @@ void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle, PerCh
 
         _logSpamDetectCommon(t, name);
 
-        bot_sendMessage(_bot, handle->first->id, "Spam detected @" + t.first->username);
+        bot_sendMessage(_bot, handle->first->id,
+                        "Spam detected @" + t.first->username);
         for (const auto &msg : t.second) {
             try {
                 _bot.getApi().deleteMessage(handle->first->id, msg->messageId);
@@ -222,10 +236,12 @@ void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle, PerCh
         if (mute) {
             LOG_I("Try mute user %s in chat %s", userstr.get(), chatstr.get());
             try {
-                _bot.getApi().restrictChatMember(handle->first->id, t.first->id,
-                                                 perms, to_secs(kMuteDuration).count());
+                _bot.getApi().restrictChatMember(
+                    handle->first->id, t.first->id, perms,
+                    to_secs(kMuteDuration).count());
             } catch (const TgBot::TgException &e) {
-                LOG_W("Cannot mute user %s in chat %s: %s", userstr.get(), chatstr.get(), e.what());
+                LOG_W("Cannot mute user %s in chat %s: %s", userstr.get(),
+                      chatstr.get(), e.what());
             }
         }
     }

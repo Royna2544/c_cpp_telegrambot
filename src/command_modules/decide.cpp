@@ -63,7 +63,5 @@ static void DecideCommandFn(const Bot &bot, const Message::Ptr message) {
 }
 
 struct CommandModule cmd_decide {
-    .enforced = false,
-    .name = "decide",
-    .fn = DecideCommandFn,
+    .enforced = false, .name = "decide", .fn = DecideCommandFn,
 };

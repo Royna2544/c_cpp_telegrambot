@@ -4,7 +4,6 @@
 
 #include <Logging.h>
 #include <Types.h>
-
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -27,8 +26,7 @@ struct kernel_rand_engine {
         ssize_t rc;
 
         rc = read(fd, &val, sizeof(val));
-        if (rc < 0)
-            PLOG_E("Failed to read data from HWRNG device");
+        if (rc < 0) PLOG_E("Failed to read data from HWRNG device");
         return val;
     }
     kernel_rand_engine() {
@@ -41,9 +39,7 @@ struct kernel_rand_engine {
         }
         ASSERT(isValidFd(fd), "Failed to open hwrng device file");
     }
-    ~kernel_rand_engine() {
-        closeFd(fd);
-    }
+    ~kernel_rand_engine() { closeFd(fd); }
 
     static bool isSupported(void) {
         static bool kSupported = false;
@@ -71,8 +67,7 @@ struct kernel_rand_engine {
         // Linux 4.17 or above
         "/dev/hwrng",
 #elif defined __APPLE__
-        "/dev/random",
-        "/whatever"
+        "/dev/random", "/whatever"
 #endif
     };
     int fd = kInvalidFD;

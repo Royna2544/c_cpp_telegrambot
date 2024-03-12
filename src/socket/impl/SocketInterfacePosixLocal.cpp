@@ -1,4 +1,7 @@
+#include <Logging.h>
+#include <Types.h>
 #include <arpa/inet.h>
+#include <libos/libfs.h>
 #include <net/if.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
@@ -10,11 +13,9 @@
 #include <filesystem>
 
 #include "../SocketInterfaceUnix.h"
-#include <libos/libfs.h>
-#include <Logging.h>
-#include <Types.h>
 
-SocketInterfaceUnix::socket_handle_t SocketInterfaceUnixLocal::makeSocket(bool client) {
+SocketInterfaceUnix::socket_handle_t SocketInterfaceUnixLocal::makeSocket(
+    bool client) {
     int ret = kInvalidFD;
     if (!client) {
         LOG_D("Creating socket at " SOCKET_PATH);
@@ -36,7 +37,8 @@ SocketInterfaceUnix::socket_handle_t SocketInterfaceUnixLocal::makeSocket(bool c
             PLOG_E("Failed to %s to socket", client ? "connect" : "bind");
             if (!client && errno == EADDRINUSE) {
                 std::remove(SOCKET_PATH);
-                if (fn(sfd, reinterpret_cast<struct sockaddr*>(&name), size) == 0) {
+                if (fn(sfd, reinterpret_cast<struct sockaddr*>(&name), size) ==
+                    0) {
                     LOG_I("Bind succeeded by removing socket file");
                     break;
                 }
@@ -49,12 +51,14 @@ SocketInterfaceUnix::socket_handle_t SocketInterfaceUnixLocal::makeSocket(bool c
     return ret;
 }
 
-SocketInterfaceUnix::socket_handle_t SocketInterfaceUnixLocal::createClientSocket() {
-    return makeSocket(/*client=*/ true);
+SocketInterfaceUnix::socket_handle_t
+SocketInterfaceUnixLocal::createClientSocket() {
+    return makeSocket(/*client=*/true);
 }
 
-SocketInterfaceUnix::socket_handle_t SocketInterfaceUnixLocal::createServerSocket() {
-    return makeSocket(/*client=*/ false);
+SocketInterfaceUnix::socket_handle_t
+SocketInterfaceUnixLocal::createServerSocket() {
+    return makeSocket(/*client=*/false);
 }
 void SocketInterfaceUnixLocal::cleanupServerSocket() {
     std::filesystem::remove(SOCKET_PATH);
@@ -62,7 +66,7 @@ void SocketInterfaceUnixLocal::cleanupServerSocket() {
 
 bool SocketInterfaceUnixLocal::canSocketBeClosed() {
     bool socketValid = true;
-    
+
     if (!fileExists(SOCKET_PATH)) {
         LOG_W("Socket file was deleted");
         socketValid = false;

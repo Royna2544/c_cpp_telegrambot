@@ -1,6 +1,6 @@
 #include <ConfigManager.h>
-#include <libos/libfs.h>
 #include <Logging.h>
+#include <libos/libfs.h>
 
 #include <boost/program_options.hpp>
 #include <cstdlib>
@@ -13,8 +13,10 @@
 
 struct ConfigBackendBase {
     std::function<void *(void)> load;
-    std::function<bool(const void *priv, const std::string &name, std::string &outvalue)> getVariable;
-    std::function<bool(const void *priv, const std::string& config)> doOverride;
+    std::function<bool(const void *priv, const std::string &name,
+                       std::string &outvalue)>
+        getVariable;
+    std::function<bool(const void *priv, const std::string &config)> doOverride;
     const char *name;
     struct {
         void *data = nullptr;
@@ -22,7 +24,8 @@ struct ConfigBackendBase {
     } priv;
 };
 
-static bool env_getVariable(const void *, const std::string &name, std::string &outvalue) {
+static bool env_getVariable(const void *, const std::string &name,
+                            std::string &outvalue) {
     char *buf = getenv(name.c_str());
     if (buf) {
         outvalue = buf;
@@ -38,13 +41,15 @@ struct file_priv {
     static po::options_description getTgBotOptionsDesc() {
         static po::options_description desc("TgBot++ Configs");
         static std::once_flag once;
-        std::call_once(once, []{
+        std::call_once(once, [] {
             desc.add_options()
+                // clang-format off
                 ("TOKEN,t", po::value<std::string>(), "Bot Token")
                 ("SRC_ROOT,r", po::value<std::string>(), "Root directory of source tree")
                 ("PATH,p", po::value<std::string>(), "Environment variable PATH (to override)")
                 (file_priv::kConfigOverrideVar, po::value<std::vector<std::string>>()->multitoken(),
                     "Config list to override from this source");
+                // clang-format on
         });
         return desc;
     }
@@ -54,8 +59,7 @@ struct file_priv {
 struct cmdline_priv : file_priv {
     static po::options_description getTgBotOptionsDesc() {
         auto desc = file_priv::getTgBotOptionsDesc();
-        desc.add_options()
-            ("help,h", "Help message for this bot vars");
+        desc.add_options()("help,h", "Help message for this bot vars");
         return desc;
     }
 };
@@ -64,7 +68,7 @@ static void *file_load(void) {
     std::filesystem::path home;
     std::string line;
     static file_priv p{};
-    
+
     if (!getHomePath(home)) {
         LOG_E("Cannot find HOME");
         return nullptr;
@@ -75,9 +79,10 @@ static void *file_load(void) {
         LOG_E("Opening %s failed", confPath.c_str());
         return nullptr;
     }
-    po::store(po::parse_config_file(ifs, file_priv::getTgBotOptionsDesc()), p.mp);
+    po::store(po::parse_config_file(ifs, file_priv::getTgBotOptionsDesc()),
+              p.mp);
     po::notify(p.mp);
-    
+
     LOG_I("Loaded %zu entries from %s", p.mp.size(), confPath.c_str());
     return &p;
 }
@@ -93,14 +98,17 @@ static void *cmdline_load() {
         return nullptr;
     }
 
-    po::store(po::parse_command_line(argc, argv, cmdline_priv::getTgBotOptionsDesc()), p.mp);
+    po::store(
+        po::parse_command_line(argc, argv, cmdline_priv::getTgBotOptionsDesc()),
+        p.mp);
     po::notify(p.mp);
-    
+
     LOG_I("Loaded %zu entries", p.mp.size());
     return &p;
 }
 
-static bool boost_progopt_getVariable(const void *p, const std::string &name, std::string &outvalue) {
+static bool boost_progopt_getVariable(const void *p, const std::string &name,
+                                      std::string &outvalue) {
     auto priv = reinterpret_cast<const file_priv *>(p);
     if (priv && name != file_priv::kConfigOverrideVar) {
         if (const auto it = priv->mp[name]; !it.empty()) {
@@ -111,10 +119,11 @@ static bool boost_progopt_getVariable(const void *p, const std::string &name, st
     return false;
 }
 
-static bool boost_progopt_doOverride(const void *p, const std::string& name) {
+static bool boost_progopt_doOverride(const void *p, const std::string &name) {
     auto priv = reinterpret_cast<const file_priv *>(p);
     if (priv) {
-        if (const auto it = priv->mp[file_priv::kConfigOverrideVar]; !it.empty()) {
+        if (const auto it = priv->mp[file_priv::kConfigOverrideVar];
+            !it.empty()) {
             const auto vec = it.as<std::vector<std::string>>();
             return std::find(vec.begin(), vec.end(), name) != vec.end();
         }
@@ -165,24 +174,26 @@ std::optional<std::string> getVariable(const std::string &name) {
     std::string outvalue;
 
     do {
-        for (size_t i = 0; i < sizeof(backends) / sizeof(ConfigBackendBase); ++i) {
+        for (size_t i = 0; i < sizeof(backends) / sizeof(ConfigBackendBase);
+             ++i) {
             ptr = &backends[i];
             if (!ptr->priv.initialized) {
-                if (ptr->load)
-                    ptr->priv.data = ptr->load();
+                if (ptr->load) ptr->priv.data = ptr->load();
                 ptr->priv.initialized = true;
             }
             ASSERT(ptr->getVariable, "Bad: getVariable not yet set");
             if (once_flag == 0) {
                 if (ptr->doOverride && ptr->doOverride(ptr->priv.data, name)) {
-                    LOG_V("Used '%s' backend for fetching var '%s' (forced)", ptr->name, name.c_str());
+                    LOG_V("Used '%s' backend for fetching var '%s' (forced)",
+                          ptr->name, name.c_str());
                     ptr->getVariable(ptr->priv.data, name, outvalue);
                     return {outvalue};
                 }
                 continue;
             }
             if (ptr->getVariable(ptr->priv.data, name, outvalue)) {
-                LOG_V("Used '%s' backend for fetching var '%s'", ptr->name, name.c_str());
+                LOG_V("Used '%s' backend for fetching var '%s'", ptr->name,
+                      name.c_str());
                 return {outvalue};
             }
         }

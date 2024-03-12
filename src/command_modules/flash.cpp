@@ -42,7 +42,8 @@ static void FlashCommandFn(const Bot &bot, const Message::Ptr message) {
         parseExtArgs(message, msg);
     }
     if (msg.find('\n') != std::string::npos) {
-        bot_sendReplyMessage(bot, message, "Invalid input: Zip names shouldn't have newlines");
+        bot_sendReplyMessage(
+            bot, message, "Invalid input: Zip names shouldn't have newlines");
         return;
     }
     std::replace(msg.begin(), msg.end(), ' ', '_');
@@ -52,7 +53,8 @@ static void FlashCommandFn(const Bot &bot, const Message::Ptr message) {
     ss << "Flashing '" << msg << "'..." << std::endl;
     sentmsg = bot_sendReplyMessage(bot, message, ss.str());
     std::this_thread::sleep_for(std::chrono::seconds(genRandomNumber(5)));
-    if (const size_t pos = genRandomNumber(reasons.size()); pos != reasons.size()) {
+    if (const size_t pos = genRandomNumber(reasons.size());
+        pos != reasons.size()) {
         ss << "Failed successfully!" << std::endl;
         ss << "Reason: " << reasons[pos];
     } else {
@@ -62,7 +64,5 @@ static void FlashCommandFn(const Bot &bot, const Message::Ptr message) {
 }
 
 struct CommandModule cmd_flash {
-    .enforced = false,
-    .name = "flash",
-    .fn = FlashCommandFn,
+    .enforced = false, .name = "flash", .fn = FlashCommandFn,
 };

@@ -29,12 +29,14 @@ static std::string getMIMEString(const std::string& path) {
         ASSIGN_INCTXT_DATA(MimeDataJson, buf);
         doc.Parse(buf.data());
         // This should be an assert, we know the data file at compile time
-        ASSERT(!doc.HasParseError(), "Failed to parse mimedata: %d", doc.GetParseError());
+        ASSERT(!doc.HasParseError(), "Failed to parse mimedata: %d",
+               doc.GetParseError());
     });
     if (!extension.empty()) {
         for (rapidjson::SizeType i = 0; i < doc.Size(); i++) {
             const rapidjson::Value& oneJsonElement = doc[i];
-            const rapidjson::Value& availableTypes = oneJsonElement["types"].GetArray();
+            const rapidjson::Value& availableTypes =
+                oneJsonElement["types"].GetArray();
             for (rapidjson::SizeType i = 0; i < availableTypes.Size(); i++) {
                 if (availableTypes[i].GetString() == extension) {
                     auto mime = oneJsonElement["name"].GetString();
@@ -62,10 +64,13 @@ void socketConnectionHandler(const Bot& bot, struct TgBotConnection conn) {
             gSpamBlockCfg = _data.data_3;
             break;
         case CMD_OBSERVE_CHAT_ID: {
-            auto it = std::find(gObservedChatIds.begin(), gObservedChatIds.end(), _data.data_4.id);
+            auto it = std::find(gObservedChatIds.begin(),
+                                gObservedChatIds.end(), _data.data_4.id);
             bool observe = _data.data_4.observe;
             if (gObserveAllChats) {
-                LOG_W("CMD_OBSERVE_CHAT_ID disabled due to CMD_OBSERVE_ALL_CHATS");
+                LOG_W(
+                    "CMD_OBSERVE_CHAT_ID disabled due to "
+                    "CMD_OBSERVE_ALL_CHATS");
                 break;
             }
             if (it == gObservedChatIds.end()) {
@@ -73,11 +78,15 @@ void socketConnectionHandler(const Bot& bot, struct TgBotConnection conn) {
                     LOG_D("Adding chat to observer");
                     gObservedChatIds.push_back(_data.data_4.id);
                 } else {
-                    LOG_W("Trying to quit observing chatid which wasn't being observed!");
+                    LOG_W(
+                        "Trying to quit observing chatid which wasn't being "
+                        "observed!");
                 }
             } else {
                 if (observe) {
-                    LOG_W("Trying to observe chatid which was already being observed!");
+                    LOG_W(
+                        "Trying to observe chatid which was already being "
+                        "observed!");
                 } else {
                     LOG_D("Removing chat from observer");
                     gObservedChatIds.erase(it);
@@ -91,28 +100,35 @@ void socketConnectionHandler(const Bot& bot, struct TgBotConnection conn) {
             try {
                 switch (_data.data_5.type) {
                     case TYPE_PHOTO:
-                        fn = [](const Api& api, ChatId id, const FileOrId_t file) {
+                        fn = [](const Api& api, ChatId id,
+                                const FileOrId_t file) {
                             return api.sendPhoto(id, file);
                         };
                         break;
                     case TYPE_VIDEO:
-                        fn = [](const Api& api, ChatId id, const FileOrId_t file) {
+                        fn = [](const Api& api, ChatId id,
+                                const FileOrId_t file) {
                             return api.sendVideo(id, file);
                         };
                         break;
                     case TYPE_GIF:
-                        fn = [](const Api& api, ChatId id, const FileOrId_t file) {
+                        fn = [](const Api& api, ChatId id,
+                                const FileOrId_t file) {
                             return api.sendAnimation(id, file);
                         };
                     case TYPE_DOCUMENT:
-                        fn = [](const Api& api, ChatId id, const FileOrId_t file) {
+                        fn = [](const Api& api, ChatId id,
+                                const FileOrId_t file) {
                             return api.sendDocument(id, file);
                         };
                         break;
                     case TYPE_DICE:
-                        static const std::vector<std::string> dices = {"🎲", "🎯", "🏀", "⚽", "🎳", "🎰"};
+                        static const std::vector<std::string> dices = {
+                            "🎲", "🎯", "🏀", "⚽", "🎳", "🎰"};
                         // TODO: More clean code?
-                        bot.getApi().sendDice(_data.data_5.id, false, 0, nullptr, dices[genRandomNumber(0, dices.size() - 1)]);
+                        bot.getApi().sendDice(
+                            _data.data_5.id, false, 0, nullptr,
+                            dices[genRandomNumber(0, dices.size() - 1)]);
                         return;
                     default:
                         fn = [](const Api&, ChatId, const FileOrId_t) {
@@ -122,9 +138,13 @@ void socketConnectionHandler(const Bot& bot, struct TgBotConnection conn) {
                 }
                 // Try to send as local file first
                 try {
-                    fn(bot.getApi(), _data.data_5.id, InputFile::fromFile(file, getMIMEString(file)));
+                    fn(bot.getApi(), _data.data_5.id,
+                       InputFile::fromFile(file, getMIMEString(file)));
                 } catch (std::ifstream::failure& e) {
-                    LOG_I("Failed to send '%s' as local file, trying as Telegram file id", file);
+                    LOG_I(
+                        "Failed to send '%s' as local file, trying as Telegram "
+                        "file id",
+                        file);
                     fn(bot.getApi(), _data.data_5.id, std::string(file));
                 }
             } catch (const TgBot::TgException& e) {

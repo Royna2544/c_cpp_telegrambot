@@ -1,8 +1,10 @@
-#include "../SocketInterfaceWindows.h"
 #include <winsock2.h>
 #include <ws2tcpip.h>
 
-SocketInterfaceWindowsIPv4::socket_handle_t SocketInterfaceWindowsIPv4::createServerSocket() {
+#include "../SocketInterfaceWindows.h"
+
+SocketInterfaceWindowsIPv4::socket_handle_t
+SocketInterfaceWindowsIPv4::createServerSocket() {
     struct sockaddr_in name {};
     socket_handle_t sfd;
     WSADATA data;
@@ -20,7 +22,8 @@ SocketInterfaceWindowsIPv4::socket_handle_t SocketInterfaceWindowsIPv4::createSe
     name.sin_family = AF_INET;
     name.sin_port = htons(kTgBotHostPort);
     name.sin_addr.s_addr = INADDR_ANY;
-    if (bind(sfd, reinterpret_cast<struct sockaddr*>(&name), sizeof(name)) != 0) {
+    if (bind(sfd, reinterpret_cast<struct sockaddr *>(&name), sizeof(name)) !=
+        0) {
         WSALOG_E("Failed to bind to socket");
         closesocket(sfd);
         WSACleanup();
@@ -29,7 +32,8 @@ SocketInterfaceWindowsIPv4::socket_handle_t SocketInterfaceWindowsIPv4::createSe
     return sfd;
 }
 
-SocketInterfaceWindowsIPv4::socket_handle_t SocketInterfaceWindowsIPv4::createClientSocket() {
+SocketInterfaceWindowsIPv4::socket_handle_t
+SocketInterfaceWindowsIPv4::createClientSocket() {
     struct sockaddr_in name {};
     socket_handle_t sfd;
     WSADATA data;
@@ -46,8 +50,10 @@ SocketInterfaceWindowsIPv4::socket_handle_t SocketInterfaceWindowsIPv4::createCl
 
     name.sin_family = AF_INET;
     name.sin_port = htons(kTgBotHostPort);
-    InetPton(AF_INET, getOptions(Options::DESTINATION_ADDRESS).c_str(), &name.sin_addr);
-    if (connect(sfd, reinterpret_cast<struct sockaddr*>(&name), sizeof(name)) != 0) {
+    InetPton(AF_INET, getOptions(Options::DESTINATION_ADDRESS).c_str(),
+             &name.sin_addr);
+    if (connect(sfd, reinterpret_cast<struct sockaddr *>(&name),
+                sizeof(name)) != 0) {
         WSALOG_E("Failed to connect to socket");
         closesocket(sfd);
         WSACleanup();

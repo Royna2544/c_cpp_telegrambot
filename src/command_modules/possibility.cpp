@@ -2,6 +2,7 @@
 #include <Logging.h>
 #include <StringToolsExt.h>
 #include <random/RandomNumberGenerator.h>
+
 #include <set>
 
 #include "CommandModule.h"
@@ -24,8 +25,8 @@ static void PossibilityCommandFn(const Bot &bot, const Message::Ptr message) {
     splitAndClean(text, vec);
     set = {vec.begin(), vec.end()};
     if (set.size() != vec.size()) {
-        out << "(Warning: Removed " << vec.size() - set.size()
-            << " duplicates)" << std::endl
+        out << "(Warning: Removed " << vec.size() - set.size() << " duplicates)"
+            << std::endl
             << std::endl;
         LOG_W("Contains duplicates!");
     }
@@ -55,12 +56,13 @@ static void PossibilityCommandFn(const Bot &bot, const Message::Ptr message) {
     map[last] = PERCENT_MAX - total;
     using map_t = std::pair<std::string, int>;
     std::vector<map_t> elem(map.begin(), map.end());
-    std::sort(elem.begin(), elem.end(), [](const map_t &map1, const map_t &map2) {
-        if (map1.second != map2.second) {
-            return map1.second > map2.second;
-        }
-        return map1.first < map2.first;
-    });
+    std::sort(elem.begin(), elem.end(),
+              [](const map_t &map1, const map_t &map2) {
+                  if (map1.second != map2.second) {
+                      return map1.second > map2.second;
+                  }
+                  return map1.first < map2.first;
+              });
     for (const map_t &m : elem) {
         out << m.first << " : " << m.second << "%" << std::endl;
     }
@@ -68,7 +70,5 @@ static void PossibilityCommandFn(const Bot &bot, const Message::Ptr message) {
 }
 
 struct CommandModule cmd_possibility {
-    .enforced = false,
-    .name = "possibility",
-    .fn = PossibilityCommandFn,
+    .enforced = false, .name = "possibility", .fn = PossibilityCommandFn,
 };

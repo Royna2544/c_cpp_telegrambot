@@ -25,25 +25,31 @@ using ::tgbot::proto::Database;
 using ::tgbot::proto::PersonList;
 
 class ProtoDatabaseBase {
-    void _addToDatabase(const Message::Ptr& message, RepeatedField<UserId>* list);
-    void _removeFromDatabase(const Message::Ptr& message, RepeatedField<UserId>* list);
-    std::optional<int> findByUid(const RepeatedField<UserId>* list, const UserId uid) const;
+    void _addToDatabase(const Message::Ptr& message,
+                        RepeatedField<UserId>* list);
+    void _removeFromDatabase(const Message::Ptr& message,
+                             RepeatedField<UserId>* list);
+    std::optional<int> findByUid(const RepeatedField<UserId>* list,
+                                 const UserId uid) const;
 
    public:
     const char* name;
+
    protected:
     RepeatedField<UserId>* list;
     std::weak_ptr<ProtoDatabaseBase> other;
 
    public:
-    explicit ProtoDatabaseBase(const char *_name, RepeatedField<UserId>* _list) : name(_name), list(_list) {}
+    explicit ProtoDatabaseBase(const char* _name, RepeatedField<UserId>* _list)
+        : name(_name), list(_list) {}
     virtual ~ProtoDatabaseBase() {}
 
     virtual bool rejectUid(const User::Ptr& user) const {
         if (user->isBot) return true;
         return false;
     }
-    virtual void onAlreadyExist(const Message::Ptr& message, const User::Ptr& who,
+    virtual void onAlreadyExist(const Message::Ptr& message,
+                                const User::Ptr& who,
                                 const ProtoDatabaseBase* which) const = 0;
     virtual void onAdded(const Message::Ptr& message, const User::Ptr& who,
                          const ProtoDatabaseBase* which) const = 0;
@@ -53,7 +59,8 @@ class ProtoDatabaseBase {
                            const ProtoDatabaseBase* which) const = 0;
     virtual void onUserNotFoundOnMessage(const Message::Ptr& message) const = 0;
 
-    void setOtherProtoDatabaseBase(const std::weak_ptr<ProtoDatabaseBase> _other) {
+    void setOtherProtoDatabaseBase(
+        const std::weak_ptr<ProtoDatabaseBase> _other) {
         other = _other;
     }
 
@@ -69,7 +76,8 @@ class ProtoDatabaseBase {
 };
 
 struct ProtoDatabase : ProtoDatabaseBase {
-    ProtoDatabase(const Bot& bot, const char *_name, RepeatedField<UserId>* _list) 
+    ProtoDatabase(const Bot& bot, const char* _name,
+                  RepeatedField<UserId>* _list)
         : ProtoDatabaseBase(_name, _list), _bot(bot) {}
     ~ProtoDatabase() override = default;
 
@@ -85,8 +93,9 @@ struct ProtoDatabase : ProtoDatabaseBase {
     bool rejectUid(const User::Ptr& user) const override;
 
    private:
-    static std::string appendListName(const std::string& op, const User::Ptr from,
-                                      const ProtoDatabaseBase *what);
+    static std::string appendListName(const std::string& op,
+                                      const User::Ptr from,
+                                      const ProtoDatabaseBase* what);
     const Bot& _bot;
 };
 
@@ -101,17 +110,13 @@ struct DatabaseWrapper {
     UserId maybeGetOwnerId() const;
 
     DatabaseWrapper() = default;
-    ~DatabaseWrapper() {
-        save();
-    }
+    ~DatabaseWrapper() { save(); }
 
     std::shared_ptr<ProtoDatabaseBase> whitelist;
     std::shared_ptr<ProtoDatabaseBase> blacklist;
     Database protodb;
 
-    std::filesystem::path& getDatabasePath() {
-        return fname;
-    }
+    std::filesystem::path& getDatabasePath() { return fname; }
 
    private:
     bool warnNoLoaded(const char* func) const;

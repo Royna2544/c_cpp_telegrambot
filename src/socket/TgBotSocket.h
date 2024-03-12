@@ -80,7 +80,8 @@ struct Exit {
         strncpy(e.token, buf.c_str(), bufLen);
         e.token[bufLen] = 0;
         if (buf.size() != bufLen)
-            LOG_W("buf str doesn't fit token fully: tokenlen %d vs buflen %zu", bufLen, buf.size());
+            LOG_W("buf str doesn't fit token fully: tokenlen %d vs buflen %zu",
+                  bufLen, buf.size());
         return e;
     }
 };
@@ -120,8 +121,9 @@ union TgBotCommandUnion {
 constexpr int64_t MAGIC_VALUE = 0xDEADFACE;
 struct TgBotConnection {
     TgBotConnection() = default;
-    TgBotConnection(TgBotCommand _cmd, union TgBotCommandUnion _data) : cmd(_cmd), data(_data) {}
-   
+    TgBotConnection(TgBotCommand _cmd, union TgBotCommandUnion _data)
+        : cmd(_cmd), data(_data) {}
+
     int64_t magic = MAGIC_VALUE;
     TgBotCommand cmd;
     union TgBotCommandUnion data;

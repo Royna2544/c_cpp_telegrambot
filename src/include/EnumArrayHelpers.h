@@ -2,7 +2,8 @@
 #include <array>
 #include <utility>
 
-#define ENUM_AND_STR(e) array_helpers::make_elem<decltype(e), const char *>(e, #e)
+#define ENUM_AND_STR(e) \
+    array_helpers::make_elem<decltype(e), const char*>(e, #e)
 
 namespace array_helpers {
 
@@ -15,9 +16,8 @@ using ConstArray = std::array<ConstArrayElem<T, V>, size>;
 
 template <class Container, typename T>
 auto find(Container& c, T val) {
-    return std::find_if(c.begin(), c.end(), [=](const auto& e) {
-        return e.first == val;
-    });
+    return std::find_if(c.begin(), c.end(),
+                        [=](const auto& e) { return e.first == val; });
 }
 
 // T, V : Map elements, N: count, E valargs
@@ -32,4 +32,4 @@ constexpr ArrayElem<T, V> make_elem(T&& t, V&& v) {
     return std::make_pair<T, V>(std::forward<T>(t), std::forward<V>(v));
 }
 
-}
+}  // namespace array_helpers

@@ -1,10 +1,10 @@
-#include <gtest/gtest.h>
-
 #include <Authorization.h>
-#include "DatabaseLoader.h"
+#include <gtest/gtest.h>
 
 #include <chrono>
 #include <memory>
+
+#include "DatabaseLoader.h"
 
 static void MakeMessageDateNow(Message::Ptr& message) {
     const auto rn = std::chrono::system_clock::now();
@@ -14,7 +14,8 @@ static void MakeMessageDateNow(Message::Ptr& message) {
 static void MakeMessageDateBefore(Message::Ptr& message) {
     using std::chrono_literals::operator""s;
 
-    const auto before = std::chrono::system_clock::now()- kMaxTimestampDelay - 1s;
+    const auto before =
+        std::chrono::system_clock::now() - kMaxTimestampDelay - 1s;
     message->date = std::chrono::system_clock::to_time_t(before);
 }
 
@@ -87,12 +88,14 @@ TEST(AuthorizationTest, TimeBeforeNonOwnerPermissive) {
 TEST(AuthorizationTest, UserRequiredNoUser) {
     auto dummyMsg = std::make_shared<Message>();
     MakeMessageDateNow(dummyMsg);
-    ASSERT_FALSE(Authorized(dummyMsg, AuthorizeFlags::REQUIRE_USER | AuthorizeFlags::PERMISSIVE));
+    ASSERT_FALSE(Authorized(
+        dummyMsg, AuthorizeFlags::REQUIRE_USER | AuthorizeFlags::PERMISSIVE));
 }
 
 TEST(AuthorizationTest, UserRequiredUser) {
     auto dummyMsg = std::make_shared<Message>();
     MakeMessageDateNow(dummyMsg);
     MakeMessageNonOwner(dummyMsg);
-    ASSERT_TRUE(Authorized(dummyMsg, AuthorizeFlags::REQUIRE_USER | AuthorizeFlags::PERMISSIVE));
+    ASSERT_TRUE(Authorized(
+        dummyMsg, AuthorizeFlags::REQUIRE_USER | AuthorizeFlags::PERMISSIVE));
 }

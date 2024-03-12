@@ -1,12 +1,13 @@
+#include "SocketInterfaceUnix.h"
+
 #include <netinet/in.h>
 #include <poll.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
 
-#include "SocketInterfaceUnix.h"
-
-void SocketInterfaceUnix::startListening(const listener_callback_t& cb, std::promise<bool>& createdPromise) {
+void SocketInterfaceUnix::startListening(const listener_callback_t& cb,
+                                         std::promise<bool>& createdPromise) {
     isRunning = true;
     bool should_break = false;
     int rc = 0;
@@ -27,18 +28,17 @@ void SocketInterfaceUnix::startListening(const listener_callback_t& cb, std::pro
                 struct sockaddr_un addr {};
                 struct TgBotConnection conn {};
                 socklen_t len = sizeof(addr);
-                struct pollfd fds[] = {
-                    {
-                        .fd = listen_fd,
-                        .events = POLLIN,
-                        .revents = 0,
-                    },
-                    {
-                        .fd = sfd,
-                        .events = POLLIN,
-                        .revents = 0,
+                struct pollfd fds[] = {{
+                                           .fd = listen_fd,
+                                           .events = POLLIN,
+                                           .revents = 0,
+                                       },
+                                       {
+                                           .fd = sfd,
+                                           .events = POLLIN,
+                                           .revents = 0,
 
-                    }};
+                                       }};
                 const pollfd& listen_fd_poll = fds[0];
                 const pollfd& socket_fd_poll = fds[1];
 
@@ -55,18 +55,21 @@ void SocketInterfaceUnix::startListening(const listener_callback_t& cb, std::pro
                 }
                 if (listen_fd_poll.revents & POLLIN) {
                     dummy_listen_buf_t buf;
-                    ssize_t rc = read(listen_fd, &buf, sizeof(dummy_listen_buf_t));
-                    if (rc < 0)
-                        PLOG_E("Reading data from forcestop fd");
+                    ssize_t rc =
+                        read(listen_fd, &buf, sizeof(dummy_listen_buf_t));
+                    if (rc < 0) PLOG_E("Reading data from forcestop fd");
                     closeFd(listen_fd);
                     break;
                 } else if (!(socket_fd_poll.revents & POLLIN)) {
-                    LOG_E("Unexpected state: sfd.revents: %d, listen_fd.revents: %d",
-                          socket_fd_poll.revents, listen_fd_poll.revents);
+                    LOG_E(
+                        "Unexpected state: sfd.revents: %d, listen_fd.revents: "
+                        "%d",
+                        socket_fd_poll.revents, listen_fd_poll.revents);
                     break;
                 }
 
-                const socket_handle_t cfd = accept(sfd, (struct sockaddr*)&addr, &len);
+                const socket_handle_t cfd =
+                    accept(sfd, (struct sockaddr*)&addr, &len);
 
                 if (!isValidSocketHandle(cfd)) {
                     PLOG_E("Accept failed");
@@ -75,7 +78,8 @@ void SocketInterfaceUnix::startListening(const listener_callback_t& cb, std::pro
                     LOG_D("Client connected");
                 }
                 const int count = read(cfd, &conn, sizeof(conn));
-                should_break = handleIncomingBuf(count, conn, cb, [] { return strerror(errno); });
+                should_break = handleIncomingBuf(
+                    count, conn, cb, [] { return strerror(errno); });
                 close(cfd);
             }
         } while (false);

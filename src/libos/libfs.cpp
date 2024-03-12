@@ -5,8 +5,7 @@
 
 namespace fs = std::filesystem;
 
-__attribute__((weak))
-bool fileExists(const std::filesystem::path& filename) {
+__attribute__((weak)) bool fileExists(const std::filesystem::path& filename) {
     bool rc;
 
     std::error_code ec;
@@ -17,8 +16,7 @@ bool fileExists(const std::filesystem::path& filename) {
     return rc;
 }
 
-bool canExecute(const std::filesystem::path& filename)
-{
+bool canExecute(const std::filesystem::path& filename) {
     std::error_code ec;
 
     if (fileExists(filename)) {
@@ -26,8 +24,8 @@ bool canExecute(const std::filesystem::path& filename)
         auto permissions = status.permissions();
 
         return (permissions & fs::perms::owner_exec) != fs::perms::none ||
-            (permissions & fs::perms::group_exec) != fs::perms::none ||
-            (permissions & fs::perms::others_exec) != fs::perms::none;
+               (permissions & fs::perms::group_exec) != fs::perms::none ||
+               (permissions & fs::perms::others_exec) != fs::perms::none;
     }
 
     return false;

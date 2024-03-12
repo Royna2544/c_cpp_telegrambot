@@ -7,8 +7,7 @@
 #include "TgBotSocket.h"
 #include "socket/SocketInterfaceBase.h"
 
-[[noreturn]]
-static void usage(const char* argv, bool success) {
+[[noreturn]] static void usage(const char* argv, bool success) {
     std::cout << "Usage: " << argv << " [cmd enum value] [args...]" << std::endl
               << std::endl;
     std::cout << "Available cmd enum values:" << std::endl;
@@ -20,8 +19,8 @@ static void usage(const char* argv, bool success) {
 static bool verifyArgsCount(TgBotCommand cmd, int argc) {
     int required = TgBotCmd::toCount(cmd);
     if (required != argc) {
-        fprintf(stderr, "Invalid argument count %d for cmd %s, %d required\n", argc,
-                TgBotCmd::toStr(cmd).c_str(), required);
+        fprintf(stderr, "Invalid argument count %d for cmd %s, %d required\n",
+                argc, TgBotCmd::toStr(cmd).c_str(), required);
         return false;
     }
     return true;
@@ -50,8 +49,7 @@ static bool stol_or(const std::string& str, std::int64_t* intval) {
 static bool stob_or(const std::string& str, bool* val) {
     int intvar = 0;
     bool rc = stoi_or(str, &intvar);
-    if (rc)
-        *val = !!intvar;
+    if (rc) *val = !!intvar;
     return rc;
 }
 
@@ -63,7 +61,9 @@ static void _copyToStrBuf(char dst[], size_t dst_size, char* src) {
 #define copyToStrBuf(dst, argv) _copyToStrBuf(dst, sizeof(dst), argv)
 
 template <class C>
-bool verifyWithinEnum(C max, int val) { return val >= 0 && val < max; }
+bool verifyWithinEnum(C max, int val) {
+    return val >= 0 && val < max;
+}
 
 template <class C>
 bool parseOneEnum(C* res, C max, const char* str, const char* name) {
@@ -85,8 +85,7 @@ int main(int argc, char** argv) {
     const char* exe = argv[0];
     bool ret = false;
 
-    if (argc == 1)
-        usage(exe, true);
+    if (argc == 1) usage(exe, true);
 
     // Remove exe (argv[0])
     ++argv;
@@ -113,19 +112,22 @@ int main(int argc, char** argv) {
                         break;
                     }
                     case CMD_CTRL_SPAMBLOCK: {
-                        ret = parseOneEnum(&data_g.data_3, TgBotCommandData::CTRL_MAX,
-                                           argv[0], "spamblock");
+                        ret = parseOneEnum(&data_g.data_3,
+                                           TgBotCommandData::CTRL_MAX, argv[0],
+                                           "spamblock");
                         break;
                     }
                     case CMD_OBSERVE_CHAT_ID: {
                         TgBotCommandData::ObserveChatId data{};
-                        ret = stol_or(argv[0], &data.id) && stob_or(argv[1], &data.observe);
+                        ret = stol_or(argv[0], &data.id) &&
+                              stob_or(argv[1], &data.observe);
                         data_g.data_4 = data;
                     } break;
                     case CMD_SEND_FILE_TO_CHAT_ID: {
                         TgBotCommandData::SendFileToChatId data{};
-                        ret = stol_or(argv[0], &data.id) && parseOneEnum(&data.type, TYPE_MAX,
-                                                                         argv[1], "type");
+                        ret =
+                            stol_or(argv[0], &data.id) &&
+                            parseOneEnum(&data.type, TYPE_MAX, argv[1], "type");
                         copyToStrBuf(data.filepath, argv[2]);
                         data_g.data_5 = data;
                     } break;
@@ -140,7 +142,8 @@ int main(int argc, char** argv) {
                         ASSERT(0, "Unhandled command value: %d!", cmd);
                 };
                 if (!ret)
-                    fprintf(stderr, "Failed parsing arguments for %s\n", TgBotCmd::toStr(cmd).c_str());
+                    fprintf(stderr, "Failed parsing arguments for %s\n",
+                            TgBotCmd::toStr(cmd).c_str());
             }
         }
     }

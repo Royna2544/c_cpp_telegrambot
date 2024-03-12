@@ -35,8 +35,8 @@ static void* watchdog(void* arg) {
     DWORD startTime = GetTickCount();
 
     ResumeThread(data->thread_handle);
-    rwProcessThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)doReadWriteProcess,
-                                   data, 0, NULL);
+    rwProcessThread = CreateThread(
+        NULL, 0, (LPTHREAD_START_ROUTINE)doReadWriteProcess, data, 0, NULL);
     for (;;) {
         if (GetExitCodeProcess(data->process_handle, &ret_getexit)) {
             if (ret_getexit != STILL_ACTIVE) {
@@ -97,19 +97,19 @@ FILE* popen_watchdog(const char* command, bool* wdt_ret) {
 
     if (wdt_ret) {
         // Create FILE* middleman pipe
-        if (!CreatePipe(&child_stdout_r_file, &child_stdout_w_file, &saAttr, 0)) {
+        if (!CreatePipe(&child_stdout_r_file, &child_stdout_w_file, &saAttr,
+                        0)) {
             return NULL;
         }
         // Alloc watchdog data
         // Create Mapping
-        hMapFile = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0,
-                                     sizeof(struct watchdog_data), NULL);
-        if (hMapFile == NULL)
-            return NULL;
+        hMapFile = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE,
+                                     0, sizeof(struct watchdog_data), NULL);
+        if (hMapFile == NULL) return NULL;
 
         // Cast to watchdog privdata
-        data = (struct watchdog_data*)MapViewOfFile(hMapFile, FILE_MAP_ALL_ACCESS, 0, 0,
-                                                    sizeof(struct watchdog_data));
+        data = (struct watchdog_data*)MapViewOfFile(
+            hMapFile, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(struct watchdog_data));
         if (data == NULL) {
             CloseHandle(hMapFile);
             return NULL;
@@ -128,19 +128,22 @@ FILE* popen_watchdog(const char* command, bool* wdt_ret) {
 
     // Try with default
     success = CreateProcess(NULL, (LPSTR)command, NULL, NULL, TRUE,
-                            CREATE_NEW_PROCESS_GROUP | CREATE_SUSPENDED, NULL, NULL, &si, &pi);
+                            CREATE_NEW_PROCESS_GROUP | CREATE_SUSPENDED, NULL,
+                            NULL, &si, &pi);
 
     if (!success) {
         // Hmm? We failed? Try to append powershell -c
         // Create command line string
         LOG_W("Retrying with PowerShell prefix: %s", command);
-        ret = snprintf(buffer, sizeof(buffer), "powershell.exe -c \"%s\"", command);
+        ret = snprintf(buffer, sizeof(buffer), "powershell.exe -c \"%s\"",
+                       command);
 
         if (ret == sizeof(buffer))
             LOG_W("Command line buffer may have overflowed");
         // Create process again
         success = CreateProcess(NULL, (LPSTR)buffer, NULL, NULL, TRUE,
-                                CREATE_NEW_PROCESS_GROUP | CREATE_SUSPENDED, NULL, NULL, &si, &pi);
+                                CREATE_NEW_PROCESS_GROUP | CREATE_SUSPENDED,
+                                NULL, NULL, &si, &pi);
     }
     if (!success) {
         // Still no? abort.

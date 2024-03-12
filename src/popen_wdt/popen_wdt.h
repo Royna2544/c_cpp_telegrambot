@@ -7,7 +7,8 @@
 #define STR(x) _STR(x)
 
 #define SLEEP_SECONDS 10
-#define WDT_BITE_STR "-> Intercept: This task was hanging more than " STR(SLEEP_SECONDS) "s"
+#define WDT_BITE_STR \
+    "-> Intercept: This task was hanging more than " STR(SLEEP_SECONDS) "s"
 
 #ifndef __ANDROID__
 #define BASH_EXE_PATH "/bin/bash"
@@ -20,7 +21,8 @@ extern "C" {
 #endif
 
 /**
- * setlocale_enus_once - Function called once to set the terminal output to locale en-US
+ * setlocale_enus_once - Function called once to set the terminal output to
+ * locale en-US
  */
 void setlocale_enus_once(void);
 

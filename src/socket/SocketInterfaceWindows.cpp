@@ -57,7 +57,8 @@ char *SocketInterfaceWindows::strWSAError(const int errcode) {
     return strerror(ret);
 }
 
-void SocketInterfaceWindows::startListening(const listener_callback_t &cb, std::promise<bool> &createdPromise) {
+void SocketInterfaceWindows::startListening(
+    const listener_callback_t &cb, std::promise<bool> &createdPromise) {
     bool should_break = false;
     struct fd_set set;
 
@@ -85,15 +86,19 @@ void SocketInterfaceWindows::startListening(const listener_callback_t &cb, std::
                     break;
                 }
                 if (FD_ISSET(sfd, &set)) {
-                    const socket_handle_t cfd = accept(sfd, (struct sockaddr *)&addr, &len);
+                    const socket_handle_t cfd =
+                        accept(sfd, (struct sockaddr *)&addr, &len);
                     if (cfd == INVALID_SOCKET) {
                         WSALOG_E("Accept failed");
                         break;
                     } else {
                         LOG_D("Client connected");
                     }
-                    const int count = recv(cfd, reinterpret_cast<char *>(&conn), sizeof(conn), 0);
-                    should_break = handleIncomingBuf(count, conn, cb, [] { return strWSAError(WSAGetLastError()); });
+                    const int count = recv(cfd, reinterpret_cast<char *>(&conn),
+                                           sizeof(conn), 0);
+                    should_break = handleIncomingBuf(count, conn, cb, [] {
+                        return strWSAError(WSAGetLastError());
+                    });
                     closesocket(cfd);
                 } else {
                     if (!kRun) {
@@ -116,7 +121,8 @@ void SocketInterfaceWindows::startListening(const listener_callback_t &cb, std::
 void SocketInterfaceWindows::writeToSocket(struct TgBotConnection conn) {
     const socket_handle_t sfd = createClientSocket();
     if (isValidSocketHandle(sfd)) {
-        const int count = send(sfd, reinterpret_cast<char *>(&conn), sizeof(conn), 0);
+        const int count =
+            send(sfd, reinterpret_cast<char *>(&conn), sizeof(conn), 0);
         if (count < 0) {
             WSALOG_E("Failed to send to socket");
         }
@@ -125,6 +131,4 @@ void SocketInterfaceWindows::writeToSocket(struct TgBotConnection conn) {
     }
 }
 
-void SocketInterfaceWindows::forceStopListening(void) {
-    kRun = false;
-}
+void SocketInterfaceWindows::forceStopListening(void) { kRun = false; }

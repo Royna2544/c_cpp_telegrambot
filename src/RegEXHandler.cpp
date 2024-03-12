@@ -5,6 +5,7 @@
 #include <optional>
 #include <regex>
 #include <string>
+
 #include "StringToolsExt.h"
 
 using std::regex_constants::ECMAScript;
@@ -14,19 +15,20 @@ using std::regex_constants::icase;
 using std::regex_constants::match_not_null;
 
 // Matches sed command with subsitute command and g or i flags
-static const std::regex kSedReplaceCommandRegex(R"(^s\/.+\/.+(\/(g|i|ig|gi))?$)");
+static const std::regex kSedReplaceCommandRegex(
+    R"(^s\/.+\/.+(\/(g|i|ig|gi))?$)");
 // Matches sed command with delete command, with regex on deleting expression
 static const std::regex kSedDeleteCommandRegex(R"(^\/.+\/d$)");
 
-std::vector<std::string> RegexHandlerBase::matchRegexAndSplit(const std::string& text, const std::regex& regex) {
-    if (std::regex_match(text, regex))
-        return StringTools::split(text, '/');
+std::vector<std::string> RegexHandlerBase::matchRegexAndSplit(
+    const std::string& text, const std::regex& regex) {
+    if (std::regex_match(text, regex)) return StringTools::split(text, '/');
     return {};
 }
 
-std::optional<std::regex> RegexHandlerBase::constructRegex(const std::string& regexstr,
-                                                           const Message::Ptr& message,
-                                                           const syntax_option_type flags) {
+std::optional<std::regex> RegexHandlerBase::constructRegex(
+    const std::string& regexstr, const Message::Ptr& message,
+    const syntax_option_type flags) {
     try {
         return std::regex(regexstr, flags);
     } catch (const std::regex_error& e) {
@@ -35,8 +37,8 @@ std::optional<std::regex> RegexHandlerBase::constructRegex(const std::string& re
     }
 }
 
-OptionalWrapper<std::string> RegexHandlerBase::doRegexReplaceCommand(const Message::Ptr& regexCommand,
-                                                                     const std::string& desttext) {
+OptionalWrapper<std::string> RegexHandlerBase::doRegexReplaceCommand(
+    const Message::Ptr& regexCommand, const std::string& desttext) {
     std::regex src;
     std::string dest;
     bool global = false;  // g flag in sed
@@ -50,23 +52,23 @@ OptionalWrapper<std::string> RegexHandlerBase::doRegexReplaceCommand(const Messa
     if (auto len = args.size(); len == 3 || len == 4) {
         if (len == 4) {
             const auto& opt = args[3];
-            // Due to the above regex match, it should be either none, i, g, ig, gi
+            // Due to the above regex match, it should be either none, i, g, ig,
+            // gi
             global = opt.find('g') != std::string::npos;
-            if (opt.find('i') != std::string::npos)
-                kRegexFlags |= icase;
+            if (opt.find('i') != std::string::npos) kRegexFlags |= icase;
         }
         if (auto regex = constructRegex(args[1], regexCommand, kRegexFlags);
             regex.has_value()) {
             src = regex.value();
             dest = args[2];
 
-            if (!global)
-                kRegexMatchFlags |= format_first_only;
+            if (!global) kRegexMatchFlags |= format_first_only;
 
-            LOG_D("src: '%s' dest: '%s' global: %d icase: %d", args[1].c_str(), args[2].c_str(),
-                  global, kRegexFlags & icase);
+            LOG_D("src: '%s' dest: '%s' global: %d icase: %d", args[1].c_str(),
+                  args[2].c_str(), global, kRegexFlags & icase);
             try {
-                return {std::regex_replace(desttext, src, dest, kRegexMatchFlags)};
+                return {
+                    std::regex_replace(desttext, src, dest, kRegexMatchFlags)};
             } catch (const std::regex_error& e) {
                 onRegexOperationFailed(regexCommand, e);
             }
@@ -76,8 +78,8 @@ OptionalWrapper<std::string> RegexHandlerBase::doRegexReplaceCommand(const Messa
     return {std::nullopt};
 }
 
-OptionalWrapper<std::string> RegexHandlerBase::doRegexDeleteCommand(const Message::Ptr& regexCommand,
-                                                                    const std::string& text) {
+OptionalWrapper<std::string> RegexHandlerBase::doRegexDeleteCommand(
+    const Message::Ptr& regexCommand, const std::string& text) {
     auto args = matchRegexAndSplit(regexCommand->text, kSedDeleteCommandRegex);
     // /aaaa/d
     if (args.size() == 3) {
@@ -87,7 +89,8 @@ OptionalWrapper<std::string> RegexHandlerBase::doRegexDeleteCommand(const Messag
             std::string line, out;
             LOG_D("regexstr: '%s'", args[1].c_str());
             while (std::getline(kInStream, line)) {
-                if (!std::regex_search(line, regex.value(), format_sed | match_not_null)) {
+                if (!std::regex_search(line, regex.value(),
+                                       format_sed | match_not_null)) {
                     kOutStream << line << std::endl;
                 }
             }
@@ -99,7 +102,8 @@ OptionalWrapper<std::string> RegexHandlerBase::doRegexDeleteCommand(const Messag
     return {std::nullopt};
 }
 
-void RegexHandlerBase::processRegEXCommand(const Message::Ptr& srcstr, const std::string& dststr) {
+void RegexHandlerBase::processRegEXCommand(const Message::Ptr& srcstr,
+                                           const std::string& dststr) {
     OptionalWrapper<std::string> ret;
     ret |= doRegexReplaceCommand(srcstr, dststr);
     ret |= doRegexDeleteCommand(srcstr, dststr);
@@ -108,18 +112,23 @@ void RegexHandlerBase::processRegEXCommand(const Message::Ptr& srcstr, const std
     }
 }
 
-void RegexHandler::onRegexCreationFailed(const Message::Ptr& message, const std::string& what,
+void RegexHandler::onRegexCreationFailed(const Message::Ptr& message,
+                                         const std::string& what,
                                          const std::regex_error& why) {
-    bot_sendReplyMessage(_bot, message,
-                         "Failed to parse regex (if it is) in '" + what + "': " + why.what());
+    bot_sendReplyMessage(
+        _bot, message,
+        "Failed to parse regex (if it is) in '" + what + "': " + why.what());
 }
-void RegexHandler::onRegexOperationFailed(const Message::Ptr& which, const std::regex_error& why) {
-    bot_sendReplyMessage(_bot, which,
-                         std::string() + "Exception while executing doRegex: " + why.what());
+void RegexHandler::onRegexOperationFailed(const Message::Ptr& which,
+                                          const std::regex_error& why) {
+    bot_sendReplyMessage(
+        _bot, which,
+        std::string() + "Exception while executing doRegex: " + why.what());
 }
-void RegexHandler::onRegexProcessed(const Message::Ptr& from, const std::string& processedData) {
+void RegexHandler::onRegexProcessed(const Message::Ptr& from,
+                                    const std::string& processedData) {
     bot_sendReplyMessage(_bot, from->replyToMessage, processedData);
-}    
+}
 void RegexHandler::processRegEXCommandMessage(const Message::Ptr& message) {
     if (message->replyToMessage && !message->replyToMessage->text.empty())
         processRegEXCommand(message, message->replyToMessage->text);

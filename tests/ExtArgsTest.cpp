@@ -18,7 +18,8 @@ static Message::Ptr createMessageWithText(const std::string_view& text) {
     return message_ptr;
 }
 
-static void createAndParseExtArgs(const std::string_view& text, std::string& out) {
+static void createAndParseExtArgs(const std::string_view& text,
+                                  std::string& out) {
     parseExtArgs(createMessageWithText(text), out);
 }
 
@@ -34,11 +35,9 @@ TEST(ExtArgsTest, ParseExtArgsNewLine) {
     EXPECT_EQ(extraargs, "extra_arg1 extra_arg2");
 }
 
-class ExtArgsTest : public testing::TestWithParam<std::string_view> {
-};
+class ExtArgsTest : public testing::TestWithParam<std::string_view> {};
 
-class ExtArgsTest2 : public testing::TestWithParam<std::string_view> {
-};
+class ExtArgsTest2 : public testing::TestWithParam<std::string_view> {};
 
 TEST_P(ExtArgsTest2, DoesntHaveExtArgs) {
     EXPECT_FALSE(hasExtArgs(createMessageWithText(GetParam())));
@@ -48,5 +47,7 @@ TEST_P(ExtArgsTest, HasExtArgs) {
     EXPECT_TRUE(hasExtArgs(createMessageWithText(GetParam())));
 }
 
-INSTANTIATE_TEST_SUITE_P(HasExtArgs, ExtArgsTest, testing::Values(kExtArgsSuit1, kExtArgsSuit2));
-INSTANTIATE_TEST_SUITE_P(DontHaveExtArgs, ExtArgsTest2, testing::Values(kExtArgsSuit3, kExtArgsSuit4));
+INSTANTIATE_TEST_SUITE_P(HasExtArgs, ExtArgsTest,
+                         testing::Values(kExtArgsSuit1, kExtArgsSuit2));
+INSTANTIATE_TEST_SUITE_P(DontHaveExtArgs, ExtArgsTest2,
+                         testing::Values(kExtArgsSuit3, kExtArgsSuit4));

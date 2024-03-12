@@ -1,4 +1,5 @@
 #include <SingleThreadCtrl.h>
+
 #include <mutex>
 
 void SingleThreadCtrl::runWith(thread_function fn) {
@@ -9,19 +10,14 @@ void SingleThreadCtrl::runWith(thread_function fn) {
     }
 }
 
-void SingleThreadCtrl::setPreStopFunction(prestop_function fn) {
-    preStop = fn;
-}
+void SingleThreadCtrl::setPreStopFunction(prestop_function fn) { preStop = fn; }
 
 void SingleThreadCtrl::stop() {
     if (once) {
-        if (preStop)
-            preStop(this);
+        if (preStop) preStop(this);
         kRun = false;
-        if (timer_mutex.lk.owns_lock())
-            timer_mutex.lk.unlock();
-        if (threadP && threadP->joinable())
-            threadP->join();
+        if (timer_mutex.lk.owns_lock()) timer_mutex.lk.unlock();
+        if (threadP && threadP->joinable()) threadP->join();
         once = false;
     };
 }

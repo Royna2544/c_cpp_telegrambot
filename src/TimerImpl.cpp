@@ -8,6 +8,7 @@
 #include <cmath>
 #include <memory>
 #include <sstream>
+
 #include "SingleThreadCtrl.h"
 
 template <class Dur>
@@ -15,11 +16,14 @@ std::string to_string(const Dur out) {
     const auto hms = std::chrono::hh_mm_ss(out);
     std::stringstream ss;
 
-    ss << hms.hours().count() << "h " << hms.minutes().count() << "m " << hms.seconds().count() << "s";
+    ss << hms.hours().count() << "h " << hms.minutes().count() << "m "
+       << hms.seconds().count() << "s";
     return ss.str();
 }
 
-bool TimerCommandManager::parseTimerArguments(const Bot &bot, const Message::Ptr &message, std::chrono::seconds &out) {
+bool TimerCommandManager::parseTimerArguments(const Bot &bot,
+                                              const Message::Ptr &message,
+                                              std::chrono::seconds &out) {
     bool found = false;
     std::string msg;
     enum {
@@ -38,7 +42,8 @@ bool TimerCommandManager::parseTimerArguments(const Bot &bot, const Message::Ptr
         found = true;
     }
     if (!found) {
-        bot_sendReplyMessage(bot, message, "Send or reply to a time, in hhmmss format");
+        bot_sendReplyMessage(bot, message,
+                             "Send or reply to a time, in hhmmss format");
         return false;
     }
     if (isactive) {
@@ -97,9 +102,10 @@ bool TimerCommandManager::parseTimerArguments(const Bot &bot, const Message::Ptr
                 break;
             }
             default: {
-                bot_sendReplyMessage(bot, message,
-                                     "Invalid value provided.\nShould contain only h, m, s, "
-                                     "numbers, spaces. (ex. 1h 20m 7s)");
+                bot_sendReplyMessage(
+                    bot, message,
+                    "Invalid value provided.\nShould contain only h, m, s, "
+                    "numbers, spaces. (ex. 1h 20m 7s)");
 
                 return false;
             }
@@ -112,14 +118,16 @@ bool TimerCommandManager::parseTimerArguments(const Bot &bot, const Message::Ptr
         bot_sendReplyMessage(bot, message, "Provide longer time value");
         return false;
     } else if (to_hours(out).count() > 2) {
-        bot_sendReplyMessage(bot, message,
-                             "Time provided is too long, which is: " + to_string(out));
+        bot_sendReplyMessage(
+            bot, message,
+            "Time provided is too long, which is: " + to_string(out));
         return false;
     }
     return true;
 }
 
-void TimerCommandManager::TimerThreadFn(const Bot &bot, Message::Ptr message, std::chrono::seconds timer) {
+void TimerCommandManager::TimerThreadFn(const Bot &bot, Message::Ptr message,
+                                        std::chrono::seconds timer) {
     isactive = true;
     while (timer > 0s && kRun) {
         std::this_thread::sleep_for(1s);
@@ -129,18 +137,18 @@ void TimerCommandManager::TimerThreadFn(const Bot &bot, Message::Ptr message, st
         timer -= 1s;
     }
     bot_editMessage(bot, message, "Timer ended");
-    if (sendendmsg)
-        bot_sendMessage(bot, message->chat->id, "Timer ended");
+    if (sendendmsg) bot_sendMessage(bot, message->chat->id, "Timer ended");
     if (botcanpin)
         bot.getApi().unpinChatMessage(message->chat->id, message->messageId);
     isactive = false;
 }
 
-void TimerCommandManager::startTimer(const Bot &bot, const Message::Ptr& msg) {
+void TimerCommandManager::startTimer(const Bot &bot, const Message::Ptr &msg) {
     std::chrono::seconds parsedTime(0);
 
     if (parseTimerArguments(bot, msg, parsedTime)) {
-        message = bot_sendMessage(bot, msg->chat->id, "Timer starting: " + to_string(parsedTime));
+        message = bot_sendMessage(bot, msg->chat->id,
+                                  "Timer starting: " + to_string(parsedTime));
         botcanpin = true;
         try {
             bot.getApi().pinChatMessage(message->chat->id, message->messageId);
@@ -149,12 +157,13 @@ void TimerCommandManager::startTimer(const Bot &bot, const Message::Ptr& msg) {
             botcanpin = false;
         }
         runWith(std::bind(&TimerCommandManager::TimerThreadFn, this,
-            std::cref(bot), message, parsedTime));
-        setPreStopFunction(std::bind(&TimerCommandManager::Timerstop, std::placeholders::_1));
+                          std::cref(bot), message, parsedTime));
+        setPreStopFunction(
+            std::bind(&TimerCommandManager::Timerstop, std::placeholders::_1));
     }
 }
 
-void TimerCommandManager::stopTimer(const Bot &bot, const Message::Ptr& msg) {
+void TimerCommandManager::stopTimer(const Bot &bot, const Message::Ptr &msg) {
     std::string text;
     if (isactive) {
         const bool allowed = message->chat == msg->chat;

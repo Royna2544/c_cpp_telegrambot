@@ -23,13 +23,15 @@
     } while (0)
 #endif
 
-#define ASSERT(cond, msg, ...)         \
-    do {                               \
-        if (!(cond)) {                 \
+#define ASSERT(cond, msg, ...)                              \
+    do {                                                    \
+        if (!(cond)) {                                      \
             LOG_F("Assertion failed: " msg, ##__VA_ARGS__); \
-            assert(cond);              \
-            __builtin_unreachable();   \
-        }                              \
+            assert(cond);                                   \
+            __builtin_unreachable();                        \
+        }                                                   \
     } while (0)
 
-#define _LOG(fmt, servere, ...) printf("[%s:%d] %s: [" servere "] " fmt "\n", __FILE__, __LINE__, __func__, ##__VA_ARGS__)
+#define _LOG(fmt, servere, ...)                                       \
+    printf("[%s:%d] %s: [" servere "] " fmt "\n", __FILE__, __LINE__, \
+           __func__, ##__VA_ARGS__)

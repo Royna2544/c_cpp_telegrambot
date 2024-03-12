@@ -48,17 +48,17 @@ class SingleThreadCtrlManager {
         USAGE_MAX,
     };
 
-    constexpr static auto ThreadUsageToStrMap = array_helpers::make<USAGE_MAX, ThreadUsage, const char*>(
-        ENUM_AND_STR(USAGE_SOCKET_THREAD),
-        ENUM_AND_STR(USAGE_SOCKET_EXTERNAL_THREAD),
-        ENUM_AND_STR(USAGE_TIMER_THREAD),
-        ENUM_AND_STR(USAGE_SPAMBLOCK_THREAD),
-        ENUM_AND_STR(USAGE_ERROR_RECOVERY_THREAD),
-        ENUM_AND_STR(USAGE_IBASH_TIMEOUT_THREAD),
-        ENUM_AND_STR(USAGE_IBASH_EXIT_TIMEOUT_THREAD),
-        ENUM_AND_STR(USAGE_IBASH_COMMAND_QUEUE_THREAD),
-        ENUM_AND_STR(USAGE_DATABASE_SYNC_THREAD),
-        ENUM_AND_STR(USAGE_TEST));
+    constexpr static auto ThreadUsageToStrMap =
+        array_helpers::make<USAGE_MAX, ThreadUsage, const char*>(
+            ENUM_AND_STR(USAGE_SOCKET_THREAD),
+            ENUM_AND_STR(USAGE_SOCKET_EXTERNAL_THREAD),
+            ENUM_AND_STR(USAGE_TIMER_THREAD),
+            ENUM_AND_STR(USAGE_SPAMBLOCK_THREAD),
+            ENUM_AND_STR(USAGE_ERROR_RECOVERY_THREAD),
+            ENUM_AND_STR(USAGE_IBASH_TIMEOUT_THREAD),
+            ENUM_AND_STR(USAGE_IBASH_EXIT_TIMEOUT_THREAD),
+            ENUM_AND_STR(USAGE_IBASH_COMMAND_QUEUE_THREAD),
+            ENUM_AND_STR(USAGE_DATABASE_SYNC_THREAD), ENUM_AND_STR(USAGE_TEST));
 
     constexpr static const char* ThreadUsageToStr(const ThreadUsage u) {
         return ThreadUsageToStrMap[u].second;
@@ -70,9 +70,11 @@ class SingleThreadCtrlManager {
         int flags = 0;
     };
 
-    template <class T = SingleThreadCtrl, typename... Args,
-              std::enable_if_t<std::is_base_of_v<SingleThreadCtrl, T>, bool> = true>
-    std::shared_ptr<T> getController(const GetControllerRequest req, Args... args);
+    template <
+        class T = SingleThreadCtrl, typename... Args,
+        std::enable_if_t<std::is_base_of_v<SingleThreadCtrl, T>, bool> = true>
+    std::shared_ptr<T> getController(const GetControllerRequest req,
+                                     Args... args);
 
     template <class T = SingleThreadCtrl>
     std::shared_ptr<T> getController(const ThreadUsage usage) {
@@ -88,7 +90,8 @@ class SingleThreadCtrlManager {
 
    private:
     std::atomic_bool kIsUnderStopAll = false;
-    static std::optional<controller_type> checkRequireFlags(GetControllerFlags opposite, int flags);
+    static std::optional<controller_type> checkRequireFlags(
+        GetControllerFlags opposite, int flags);
     std::shared_mutex mControllerLock;
     std::unordered_map<ThreadUsage, controller_type> kControllers;
 };
@@ -111,9 +114,7 @@ struct SingleThreadCtrl {
     // Reset the counter, to make this instance reusable
     void reset();
 
-    virtual ~SingleThreadCtrl() {
-        stop();
-    }
+    virtual ~SingleThreadCtrl() { stop(); }
 
     friend class SingleThreadCtrlManager;
 
@@ -135,8 +136,9 @@ struct SingleThreadCtrl {
     std::atomic_bool once = true;
 
     struct {
-        // This works, via the main thread will lock the mutex first. Then later thread function
-        // would try to lock it, but as it is a timed mutex, it could
+        // This works, via the main thread will lock the mutex first. Then later
+        // thread function would try to lock it, but as it is a timed mutex, it
+        // could
         std::timed_mutex m;
         std::unique_lock<std::timed_mutex> lk;
     } timer_mutex;
@@ -156,13 +158,16 @@ struct SingleThreadCtrlRunnable : SingleThreadCtrl {
     using SingleThreadCtrl::SingleThreadCtrl;
     virtual void runFunction() = 0;
     void run() {
-        SingleThreadCtrl::runWith(std::bind(&SingleThreadCtrlRunnable::runFunction, this));
+        SingleThreadCtrl::runWith(
+            std::bind(&SingleThreadCtrlRunnable::runFunction, this));
     }
     virtual ~SingleThreadCtrlRunnable() {}
 };
 
-template <class T, typename... Args, std::enable_if_t<std::is_base_of_v<SingleThreadCtrl, T>, bool>>
-std::shared_ptr<T> SingleThreadCtrlManager::getController(const GetControllerRequest req, Args... args) {
+template <class T, typename... Args,
+          std::enable_if_t<std::is_base_of_v<SingleThreadCtrl, T>, bool>>
+std::shared_ptr<T> SingleThreadCtrlManager::getController(
+    const GetControllerRequest req, Args... args) {
     controller_type ptr;
     bool sizeMismatch = false;
     const char* usageStr = ThreadUsageToStr(req.usage);
@@ -174,21 +179,24 @@ std::shared_ptr<T> SingleThreadCtrlManager::getController(const GetControllerReq
         return {};
     }
     if (sizeMismatch = it != kControllers.end() &&
-                       it->second->mgr_priv.sizeOfThis < sizeof(T); sizeMismatch) {
+                       it->second->mgr_priv.sizeOfThis < sizeof(T);
+        sizeMismatch) {
         LOG_W("Size mismatch: Buffer has %zu, New class wants %zu",
               it->second->mgr_priv.sizeOfThis, sizeof(T));
-        if (!(req.flags & SIZEDIFF_ACTION_RECONSTRUCT))
-            return {};
+        if (!(req.flags & SIZEDIFF_ACTION_RECONSTRUCT)) return {};
     }
     if (it != kControllers.end() && it->second && !sizeMismatch) {
-        if (const auto maybeRet = checkRequireFlags(REQUIRE_NONEXIST, req.flags); maybeRet)
+        if (const auto maybeRet =
+                checkRequireFlags(REQUIRE_NONEXIST, req.flags);
+            maybeRet)
             ptr = maybeRet.value();
         else {
             LOG_V("Using old: %s controller", usageStr);
             ptr = it->second;
         }
     } else {
-        if (const auto maybeRet = checkRequireFlags(REQUIRE_EXIST, req.flags); maybeRet && !sizeMismatch)
+        if (const auto maybeRet = checkRequireFlags(REQUIRE_EXIST, req.flags);
+            maybeRet && !sizeMismatch)
             ptr = maybeRet.value();
         else {
             std::shared_ptr<T> newit;

@@ -9,8 +9,8 @@
 #include <CStringLifetime.h>
 #include <libos/libfs.h>
 
-SocketInterfaceWindows::socket_handle_t
-SocketInterfaceWindowsLocal::makeSocket(bool is_client) {
+SocketInterfaceWindows::socket_handle_t SocketInterfaceWindowsLocal::makeSocket(
+    bool is_client) {
     struct sockaddr_un name {};
     CStringLifetime path = getOptions(Options::DESTINATION_ADDRESS);
     WSADATA data;

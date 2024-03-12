@@ -12,13 +12,11 @@ inline bool operator==(const Chat::Ptr thiz, const Chat::Ptr other) {
 
 inline std::string UserPtr_toString(const User::Ptr bro) {
     std::string username = bro->firstName;
-    if (!bro->lastName.empty())
-        username += ' ' + bro->lastName;
+    if (!bro->lastName.empty()) username += ' ' + bro->lastName;
     return '\'' + username + '\'';
 }
 
 inline std::string ChatPtr_toString(const Chat::Ptr ch) {
-    if (ch->type == TgBot::Chat::Type::Private)
-        return "Bot PM";
+    if (ch->type == TgBot::Chat::Type::Private) return "Bot PM";
     return ch->title;
 }

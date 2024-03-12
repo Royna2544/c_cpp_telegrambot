@@ -5,24 +5,22 @@
 
 static void TimerStartCommandFn(const Bot &bot, const Message::Ptr message) {
     gSThreadManager
-        .getController<TimerCommandManager>(SingleThreadCtrlManager::USAGE_TIMER_THREAD)
+        .getController<TimerCommandManager>(
+            SingleThreadCtrlManager::USAGE_TIMER_THREAD)
         ->startTimer(bot, message);
 }
 
 static void TimerStopCommandFn(const Bot &bot, const Message::Ptr message) {
     gSThreadManager
-        .getController<TimerCommandManager>(SingleThreadCtrlManager::USAGE_TIMER_THREAD)
+        .getController<TimerCommandManager>(
+            SingleThreadCtrlManager::USAGE_TIMER_THREAD)
         ->stopTimer(bot, message);
 }
 
 struct CommandModule cmd_starttimer {
-    .enforced = true,
-    .name = "starttimer",
-    .fn = TimerStartCommandFn,
+    .enforced = true, .name = "starttimer", .fn = TimerStartCommandFn,
 };
 
 struct CommandModule cmd_stoptimer {
-    .enforced = true,
-    .name = "stoptimer",
-    .fn = TimerStopCommandFn,
+    .enforced = true, .name = "stoptimer", .fn = TimerStopCommandFn,
 };

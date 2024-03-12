@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <iostream>
+
 #include "internal/_tgbot.h"
 
 using TgBot::Message;
@@ -41,7 +42,8 @@ void processObservers(const Message::Ptr& msg) {
                             chat->id);
         if (it != gObservedChatIds.end()) {
             if (chat->type != Chat::Type::Supergroup) {
-                LOG_W("Removing chat '%s' from observer: Not a supergroup", chat->title.c_str());
+                LOG_W("Removing chat '%s' from observer: Not a supergroup",
+                      chat->title.c_str());
                 gObservedChatIds.erase(it);
                 return;
             }

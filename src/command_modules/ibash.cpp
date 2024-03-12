@@ -38,14 +38,16 @@ struct InteractiveBashContext {
     const int& parent_readfd = toparent[0];
     const int& parent_writefd = tochild[1];
     constexpr static const char kOutputInitBuf[] = "Output:\n";
-    constexpr static const char kSubProcessClosed[] = "Subprocess closed due to inactivity";
+    constexpr static const char kSubProcessClosed[] =
+        "Subprocess closed due to inactivity";
     constexpr static const char kNoOutputFallback[] = "\n";
 
     struct ExitTimeoutThread : SingleThreadCtrl {
         void start(const InteractiveBashContext* instr) {
             if (delayUnlessStop(SLEEP_SECONDS); kRun) {
                 if (instr->childpid > 0 && kill(instr->childpid, 0) == 0) {
-                    LOG_W("Process %d misbehaving, using SIGTERM", instr->childpid);
+                    LOG_W("Process %d misbehaving, using SIGTERM",
+                          instr->childpid);
                     killpg(instr->childpid, SIGTERM);
                 }
             }
@@ -53,10 +55,11 @@ struct InteractiveBashContext {
     };
 
     struct TimeoutThread : SingleThreadCtrl {
-        void start(const InteractiveBashContext *instr) {
+        void start(const InteractiveBashContext* instr) {
             if (delayUnlessStop(SLEEP_SECONDS); kRun) {
                 ssize_t dummy [[maybe_unused]];
-                dummy = write(instr->child_stdout, kNoOutputFallback, sizeof(kNoOutputFallback));
+                dummy = write(instr->child_stdout, kNoOutputFallback,
+                              sizeof(kNoOutputFallback));
             }
         }
     };
@@ -127,27 +130,31 @@ struct InteractiveBashContext {
             }
         }
     }
-    void exit(const std::function<void(void)> onClosed, const std::function<void(void)> onNotOpen) {
+    void exit(const std::function<void(void)> onClosed,
+              const std::function<void(void)> onNotOpen) {
         if (is_open) {
-            static const SingleThreadCtrlManager::GetControllerRequest req {
-                .usage = SingleThreadCtrlManager::USAGE_IBASH_EXIT_TIMEOUT_THREAD,
-                .flags = SingleThreadCtrlManager::REQUIRE_NONEXIST |
-                         SingleThreadCtrlManager::REQUIRE_FAILACTION_RETURN_NULL
-            };
+            static const SingleThreadCtrlManager::GetControllerRequest req{
+                .usage =
+                    SingleThreadCtrlManager::USAGE_IBASH_EXIT_TIMEOUT_THREAD,
+                .flags =
+                    SingleThreadCtrlManager::REQUIRE_NONEXIST |
+                    SingleThreadCtrlManager::REQUIRE_FAILACTION_RETURN_NULL};
             int status;
 
-            // Write a msg as a fallback if for some reason exit doesnt get written
-            auto exitTimeout = gSThreadManager.getController<ExitTimeoutThread>(req);
+            // Write a msg as a fallback if for some reason exit doesnt get
+            // written
+            auto exitTimeout =
+                gSThreadManager.getController<ExitTimeoutThread>(req);
 
-            if (!exitTimeout)
-                return;
+            if (!exitTimeout) return;
 
             // Try to type exit command
             SendCommand("exit 0", true);
             // waitpid(4p) will hang if not exited, yes
             waitpid(childpid, &status, 0);
             if (WIFEXITED(status)) {
-                LOG_I("Process %d exited with code %d", childpid, WEXITSTATUS(status));
+                LOG_I("Process %d exited with code %d", childpid,
+                      WEXITSTATUS(status));
             }
             exitTimeout->stop();
             {
@@ -169,12 +176,17 @@ struct InteractiveBashContext {
             std::unique_lock<std::mutex> lk{m, std::try_to_lock};
             if (!lk.owns_lock()) {
                 // TODO better verification
-                if (message->replyToMessage && message->replyToMessage->from->id == bot.getApi().getMe()->id) {
+                if (message->replyToMessage &&
+                    message->replyToMessage->from->id ==
+                        bot.getApi().getMe()->id) {
                     // TODO Extract actual command
                     SendText(message->text);
-                    bot_sendReplyMessage(bot, message, "Sent the text to subprocess");
+                    bot_sendReplyMessage(bot, message,
+                                         "Sent the text to subprocess");
                 } else {
-                    bot_sendReplyMessage(bot, message, "Subprocess is still running, try using an exit command");
+                    bot_sendReplyMessage(bot, message,
+                                         "Subprocess is still running, try "
+                                         "using an exit command");
                 }
                 return true;  // Handled
             }
@@ -182,22 +194,24 @@ struct InteractiveBashContext {
         return false;
     }
 
-    void sendCommand(const std::string& command, std::function<void(const std::string&)> onNewResultBuffer,
+    void sendCommand(const std::string& command,
+                     std::function<void(const std::string&)> onNewResultBuffer,
                      const std::function<void(void)> onTimeout) {
         char buf[BASH_READ_BUF];
         bool resModified = false;
         std::string result = kOutputInitBuf;
         const std::lock_guard<std::mutex> _(m);
-        static const SingleThreadCtrlManager::GetControllerRequest req {
+        static const SingleThreadCtrlManager::GetControllerRequest req{
             .usage = SingleThreadCtrlManager::USAGE_IBASH_TIMEOUT_THREAD,
             .flags = SingleThreadCtrlManager::REQUIRE_NONEXIST |
-                     SingleThreadCtrlManager::REQUIRE_FAILACTION_ASSERT
-        };
+                     SingleThreadCtrlManager::REQUIRE_FAILACTION_ASSERT};
         SendCommand(command);
-        auto onNoOutputThread = gSThreadManager.getController<TimeoutThread>(req);
+        auto onNoOutputThread =
+            gSThreadManager.getController<TimeoutThread>(req);
         do {
             onNoOutputThread->reset();
-            onNoOutputThread->runWith(std::bind(&TimeoutThread::start, onNoOutputThread, this));
+            onNoOutputThread->runWith(
+                std::bind(&TimeoutThread::start, onNoOutputThread, this));
             ssize_t rc = read(parent_readfd, buf, sizeof(buf));
             onNoOutputThread->stop();
             if (rc > 0) {
@@ -208,9 +222,10 @@ struct InteractiveBashContext {
                     result.append(buf_str);
                     onNewResultBuffer(result);
                 }
-            } else 
+            } else
                 break;
-            // Exit if child has nothing more to send to us, or it is reading stdin
+            // Exit if child has nothing more to send to us, or it is reading
+            // stdin
         } while (HasData(DATA_IN, false) || HasData(DATA_IN, false));
         TrimStr(result);
         if (!resModified) {
@@ -280,7 +295,8 @@ struct InteractiveBashContext {
     }
 };
 
-static void InteractiveBashCommandFn(const Bot& bot, const Message::Ptr& message) {
+static void InteractiveBashCommandFn(const Bot& bot,
+                                     const Message::Ptr& message) {
     static InteractiveBashContext ctx;
     std::string command;
 
@@ -292,40 +308,48 @@ static void InteractiveBashCommandFn(const Bot& bot, const Message::Ptr& message
             if (ctx.is_open)
                 LOG_I("Received exit command: '%s'", command.c_str());
             ctx.exit(
-                [&bot, message]() { bot_sendReplyMessage(bot, message, "Closed bash subprocess."); },
-                [&bot, message]() { bot_sendReplyMessage(bot, message, "Bash subprocess is not open yet"); });
+                [&bot, message]() {
+                    bot_sendReplyMessage(bot, message,
+                                         "Closed bash subprocess.");
+                },
+                [&bot, message]() {
+                    bot_sendReplyMessage(bot, message,
+                                         "Bash subprocess is not open yet");
+                });
         } else {
             if (!ctx.is_open) {
                 ctx.open();
                 if (ctx.is_open)
-                    bot_sendReplyMessage(bot, message, "Opened bash subprocess.");
+                    bot_sendReplyMessage(bot, message,
+                                         "Opened bash subprocess.");
                 else
-                    bot_sendReplyMessage(bot, message, "Failed to open child process");
+                    bot_sendReplyMessage(bot, message,
+                                         "Failed to open child process");
             }
-            ASSERT(IsValidPipe(ctx.tochild) && IsValidPipe(ctx.toparent), "Opening pipes failed");
+            ASSERT(IsValidPipe(ctx.tochild) && IsValidPipe(ctx.toparent),
+                   "Opening pipes failed");
 
             do {
-                if (ctx.sendText(bot, message))
-                    break;
-                auto resultMessage = 
-                    bot_sendReplyMessage(bot, message, InteractiveBashContext::kOutputInitBuf);
+                if (ctx.sendText(bot, message)) break;
+                auto resultMessage = bot_sendReplyMessage(
+                    bot, message, InteractiveBashContext::kOutputInitBuf);
                 ctx.sendCommand(
-                    command, 
+                    command,
                     [&bot, &resultMessage](const std::string& buf) {
                         if (resultMessage->text != buf)
-                            resultMessage = bot_editMessage(bot, resultMessage, buf);
+                            resultMessage =
+                                bot_editMessage(bot, resultMessage, buf);
                     },
-                    [&bot, message] { 
-                        bot_sendMessage(bot, message->from->id, InteractiveBashContext::kSubProcessClosed);
-                    }
-                );
+                    [&bot, message] {
+                        bot_sendMessage(
+                            bot, message->from->id,
+                            InteractiveBashContext::kSubProcessClosed);
+                    });
             } while (false);
         }
     }
 }
 
 struct CommandModule cmd_ibash {
-    .enforced = true,
-    .name = "ibash",
-    .fn = InteractiveBashCommandFn,
+    .enforced = true, .name = "ibash", .fn = InteractiveBashCommandFn,
 };

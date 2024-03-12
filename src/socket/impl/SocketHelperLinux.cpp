@@ -2,7 +2,8 @@
 
 #include "../SocketInterfaceUnix.h"
 
-void SocketHelperUnix::setSocketBindingToIface(const SocketInterfaceUnix::socket_handle_t sfd, const char* iface) {
+void SocketHelperUnix::setSocketBindingToIface(
+    const SocketInterfaceUnix::socket_handle_t sfd, const char* iface) {
     struct ifreq intf {};
     int opt = 1;
 

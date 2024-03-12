@@ -3,8 +3,8 @@
 #include <tgbot/Bot.h>
 #include <tgbot/types/Message.h>
 
-#include <string>
 #include <sstream>
+#include <string>
 
 using TgBot::Bot;
 using TgBot::Message;
@@ -24,15 +24,18 @@ struct HandleData {
 
     bool verifyMessage();
     bool writeMessageToFile(const std::string &filename);
-    void appendExtArgs(std::stringstream &cmd, std::string &extraargs, std::string &res);
+    void appendExtArgs(std::stringstream &cmd, std::string &extraargs,
+                       std::string &res);
     void runCommand(std::string cmd, std::string &res, bool use_wdt = true);
-    void commonCleanup(const std::string &res, const std::string &filename = "");
+    void commonCleanup(const std::string &res,
+                       const std::string &filename = "");
     constexpr static const char SPACE = ' ';
     constexpr static const char EMPTY[] = "(empty)";
 };
 
 struct HandleDataImpl : HandleData {
-    explicit HandleDataImpl(const Bot &bot, const Message::Ptr _message) : HandleData(_message), _bot(bot) {}
+    explicit HandleDataImpl(const Bot &bot, const Message::Ptr _message)
+        : HandleData(_message), _bot(bot) {}
     void onFailed(const ErrorType e) override;
     void onResultReady(const std::string &text) override;
 
@@ -42,15 +45,19 @@ struct HandleDataImpl : HandleData {
 
 struct BashHandleData : HandleDataImpl {
     explicit BashHandleData(const Bot &bot, const Message::Ptr message,
-                            const bool _allowhang) : HandleDataImpl(bot, message), allowhang(_allowhang) {}
+                            const bool _allowhang)
+        : HandleDataImpl(bot, message), allowhang(_allowhang) {}
     bool allowhang;
     void run() override;
 };
 
 struct CompileHandleData : HandleDataImpl {
     explicit CompileHandleData(const Bot &bot, const Message::Ptr message,
-                               const std::string& _cmdPrefix, const std::string& _outfile)
-                               : HandleDataImpl(bot, message), cmdPrefix(_cmdPrefix), outfile(_outfile) {}
+                               const std::string &_cmdPrefix,
+                               const std::string &_outfile)
+        : HandleDataImpl(bot, message),
+          cmdPrefix(_cmdPrefix),
+          outfile(_outfile) {}
     std::string cmdPrefix, outfile;
     bool commonVPW(std::string &extraargs);
     void onCompilerPathCommand(const std::string &text);

@@ -1,8 +1,10 @@
-#include "../SocketInterfaceWindows.h"
 #include <winsock2.h>
 #include <ws2tcpip.h>
 
-SocketInterfaceWindows::socket_handle_t SocketInterfaceWindowsIPv6::createServerSocket() {
+#include "../SocketInterfaceWindows.h"
+
+SocketInterfaceWindows::socket_handle_t
+SocketInterfaceWindowsIPv6::createServerSocket() {
     struct sockaddr_in6 name {};
     socket_handle_t sfd;
     WSADATA data;
@@ -20,7 +22,8 @@ SocketInterfaceWindows::socket_handle_t SocketInterfaceWindowsIPv6::createServer
     name.sin6_family = AF_INET6;
     name.sin6_port = htons(kTgBotHostPort);
     name.sin6_addr = in6addr_any;
-    if (bind(sfd, reinterpret_cast<struct sockaddr*>(&name), sizeof(name)) != 0) {
+    if (bind(sfd, reinterpret_cast<struct sockaddr *>(&name), sizeof(name)) !=
+        0) {
         WSALOG_E("Failed to bind to socket");
         closesocket(sfd);
         WSACleanup();
@@ -29,7 +32,8 @@ SocketInterfaceWindows::socket_handle_t SocketInterfaceWindowsIPv6::createServer
     return sfd;
 }
 
-SocketInterfaceWindowsIPv6::socket_handle_t SocketInterfaceWindowsIPv6::createClientSocket() {
+SocketInterfaceWindowsIPv6::socket_handle_t
+SocketInterfaceWindowsIPv6::createClientSocket() {
     struct sockaddr_in name {};
     socket_handle_t sfd;
     WSADATA data;
@@ -46,8 +50,10 @@ SocketInterfaceWindowsIPv6::socket_handle_t SocketInterfaceWindowsIPv6::createCl
 
     name.sin_family = AF_INET6;
     name.sin_port = htons(kTgBotHostPort);
-    InetPton(AF_INET6, getOptions(Options::DESTINATION_ADDRESS).c_str(), &name.sin_addr);
-    if (connect(sfd, reinterpret_cast<struct sockaddr*>(&name), sizeof(name)) != 0) {
+    InetPton(AF_INET6, getOptions(Options::DESTINATION_ADDRESS).c_str(),
+             &name.sin_addr);
+    if (connect(sfd, reinterpret_cast<struct sockaddr *>(&name),
+                sizeof(name)) != 0) {
         WSALOG_E("Failed to connect to socket");
         closesocket(sfd);
         WSACleanup();

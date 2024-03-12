@@ -1,7 +1,7 @@
 #pragma once
 
-#include <string>
 #include <optional>
+#include <string>
 
 // Abstract manager for config loader
 // Currently have three sources, env and file, cmdline
@@ -14,16 +14,13 @@ namespace ConfigManager {
  * @param outvalue variable to store the env variable
  * @return whether the manager was able to fetch the variable
  */
-std::optional<std::string> getVariable(const std::string& name);
+std::optional<std::string> getVariable(const std::string &name);
 
 void printHelp();
 
 };  // namespace ConfigManager
 
-enum CommandLineOp {
-    INSERT,
-    GET
-};
+enum CommandLineOp { INSERT, GET };
 
 /**
  * copyCommandLine - function used to obtain command line

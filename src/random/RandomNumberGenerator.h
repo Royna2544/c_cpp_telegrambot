@@ -17,7 +17,8 @@ static_assert(std::is_integral_v<random_return_type>);
  * @throws std::runtime_error if min >= max
  * @return Generated number
  */
-random_return_type genRandomNumber(const random_return_type min, const random_return_type max);
+random_return_type genRandomNumber(const random_return_type min,
+                                   const random_return_type max);
 
 /**
  * Alias for genRandomNumber(int, int) with min parameter as 0

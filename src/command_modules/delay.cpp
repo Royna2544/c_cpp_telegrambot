@@ -1,8 +1,9 @@
+#include <BotReplyMessage.h>
+#include <internal/_std_chrono_templates.h>
+
 #include <chrono>
 #include <ctime>
 #include <ostream>
-#include <BotReplyMessage.h>
-#include <internal/_std_chrono_templates.h>
 
 #include "CommandModule.h"
 
@@ -10,7 +11,7 @@ union Time_t {
     time_t val;
 };
 
-std::ostream& operator<< (std::ostream& self, const Time_t tp) {
+std::ostream& operator<<(std::ostream& self, const Time_t tp) {
     self << std::put_time(std::gmtime(&tp.val), "%Y-%m-%dT%H:%M:%SZ (GMT)");
     return self;
 }
@@ -20,7 +21,7 @@ Time_t fromTP(std::chrono::time_point<T> it) {
     return {std::chrono::system_clock::to_time_t(it)};
 }
 
-static void DelayCommandFn(const Bot &bot, const Message::Ptr message) {
+static void DelayCommandFn(const Bot& bot, const Message::Ptr message) {
     using std::chrono::duration;
     using std::chrono::high_resolution_clock;
     using std::chrono::system_clock;
@@ -34,12 +35,12 @@ static void DelayCommandFn(const Bot &bot, const Message::Ptr message) {
     auto beforeSend = high_resolution_clock::now();
     auto sentMsg = bot_sendReplyMessage(bot, message, ss.str());
     auto afterSend = high_resolution_clock::now();
-    ss << "Sending reply message took: " << duration<double, std::milli>(afterSend - beforeSend).count() << "ms" << std::endl;
+    ss << "Sending reply message took: "
+       << duration<double, std::milli>(afterSend - beforeSend).count() << "ms"
+       << std::endl;
     bot_editMessage(bot, sentMsg, ss.str());
 }
 
 struct CommandModule cmd_delay {
-    .enforced = false,
-    .name = "delay",
-    .fn = DelayCommandFn,
+    .enforced = false, .name = "delay", .fn = DelayCommandFn,
 };

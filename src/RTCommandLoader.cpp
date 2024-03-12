@@ -51,9 +51,11 @@ void loadOneCommand(Bot& bot, const std::filesystem::path _fname) {
         LOG_W("Failed to load: %s", dlerror() ?: "unknown");
         return;
     }
-    sym = static_cast<struct dynamicCommandModule*>(dlsym(handle, DYN_COMMAND_SYM_STR));
+    sym = static_cast<struct dynamicCommandModule*>(
+        dlsym(handle, DYN_COMMAND_SYM_STR));
     if (!sym) {
-        LOG_W("Failed to lookup symbol '" DYN_COMMAND_SYM_STR "' in %s", fname.c_str());
+        LOG_W("Failed to lookup symbol '" DYN_COMMAND_SYM_STR "' in %s",
+              fname.c_str());
         dlclose(handle);
         return;
     }
@@ -71,12 +73,14 @@ void loadOneCommand(Bot& bot, const std::filesystem::path _fname) {
         bot_AddCommandPermissive(bot, mod->name, fn);
 
     if (dladdr(sym, &info) < 0) {
-        LOG_W("dladdr failed for %s: %s", fname.c_str(), dlerror() ?: "unknown");
+        LOG_W("dladdr failed for %s: %s", fname.c_str(),
+              dlerror() ?: "unknown");
     } else {
         fnptr = info.dli_saddr;
     }
     LOG_I("Loaded RT command module from %s", fname.c_str());
-    LOG_I("Module dump: { enforced: %d, supported: %d, name: %s, fn: %p }", mod->enforced, isSupported, mod->name, fnptr);
+    LOG_I("Module dump: { enforced: %d, supported: %d, name: %s, fn: %p }",
+          mod->enforced, isSupported, mod->name, fnptr);
 }
 
 void loadCommandsFromFile(Bot& bot, const std::filesystem::path filename) {

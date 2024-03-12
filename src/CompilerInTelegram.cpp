@@ -4,9 +4,9 @@
 #include <ConfigManager.h>
 #include <EnumArrayHelpers.h>
 #include <ExtArgs.h>
-#include <libos/libfs.h>
 #include <Logging.h>
 #include <StringToolsExt.h>
+#include <libos/libfs.h>
 #include <random/RandomNumberGenerator.h>
 
 #include <boost/algorithm/string/replace.hpp>
@@ -45,7 +45,9 @@ bool HandleData::writeMessageToFile(const std::string &filename) {
     return true;
 }
 
-void HandleData::appendExtArgs(std::stringstream &cmd, std::string &extraargs_in, std::string &result_out) {
+void HandleData::appendExtArgs(std::stringstream &cmd,
+                               std::string &extraargs_in,
+                               std::string &result_out) {
     if (!extraargs_in.empty()) {
         auto idx = extraargs_in.find_first_of("\n\r\t");
         if (idx != std::string::npos) extraargs_in.erase(idx);
@@ -64,9 +66,7 @@ void HandleData::runCommand(std::string cmd, std::string &res, bool use_wdt) {
 
 #ifdef LOCALE_EN_US
     static std::once_flag once;
-    std::call_once(once, [] {
-        setlocale_enus_once();
-    });
+    std::call_once(once, [] { setlocale_enus_once(); });
 #endif
 
     unique_id = genRandomNumber(100);
@@ -109,7 +109,8 @@ void HandleData::runCommand(std::string cmd, std::string &res, bool use_wdt) {
         res += WDT_BITE_STR;
     } else {
         std::stringstream stream;
-        float millis = static_cast<float>(duration_cast<milliseconds>(end - start).count());
+        float millis = static_cast<float>(
+            duration_cast<milliseconds>(end - start).count());
         stream << std::fixed << std::setprecision(3) << millis * 0.001;
         res += "-> It took " + stream.str() + " seconds\n";
     }
@@ -118,10 +119,10 @@ void HandleData::runCommand(std::string cmd, std::string &res, bool use_wdt) {
 #undef ID_LOG_I
 }
 
-void HandleData::commonCleanup(const std::string &res, const std::string &filename) {
+void HandleData::commonCleanup(const std::string &res,
+                               const std::string &filename) {
     onResultReady(res);
-    if (!filename.empty())
-        std::filesystem::remove(filename);
+    if (!filename.empty()) std::filesystem::remove(filename);
 }
 
 void HandleDataImpl::onFailed(const ErrorType e) {
@@ -144,7 +145,7 @@ void HandleDataImpl::onResultReady(const std::string &text) {
     bot_sendReplyMessage(_bot, message, text);
 }
 
-void CompileHandleData::onCompilerPathCommand(const std::string& text) {
+void CompileHandleData::onCompilerPathCommand(const std::string &text) {
     bot_sendReplyMessage(_bot, message, text);
 }
 
@@ -154,7 +155,7 @@ bool CompileHandleData::commonVPW(std::string &extraargs) {
     if (hasExtArgs(message)) {
         parseExtArgs(message, extraargs);
         if (extraargs == "--path") {
-            onCompilerPathCommand("Selected compiler: " + cmdPrefix );
+            onCompilerPathCommand("Selected compiler: " + cmdPrefix);
             return ret;  // Bail out
         }
     }
@@ -218,7 +219,7 @@ static std::optional<std::string> findCommandExe(std::string command) {
     static std::once_flag once;
     static bool valid;
 
-    std::call_once(once, [] { 
+    std::call_once(once, [] {
         auto it = ConfigManager::getVariable("PATH");
         valid = it.has_value();
         if (valid) {
@@ -243,18 +244,18 @@ static std::optional<std::string> findCommandExe(std::string command) {
     return {};
 }
 
-#define COMPILER(lang, ...)                     \
-    array_helpers::make_elem<ProgrammingLangs,  \
-    std::vector<std::string>>(lang, {__VA_ARGS__})
+#define COMPILER(lang, ...)                                               \
+    array_helpers::make_elem<ProgrammingLangs, std::vector<std::string>>( \
+        lang, {__VA_ARGS__})
 
 bool findCompiler(ProgrammingLangs lang, std::string &path) {
-    static const auto compilers = array_helpers::make<ProgrammingLangs::MAX,
-        ProgrammingLangs, const std::vector<std::string>>(
-        COMPILER(ProgrammingLangs::C, "clang", "gcc", "cc"),
-        COMPILER(ProgrammingLangs::CXX, "clang++", "g++", "c++"),
-        COMPILER(ProgrammingLangs::GO, "go"),
-        COMPILER(ProgrammingLangs::PYTHON, "python", "python3")
-    );
+    static const auto compilers =
+        array_helpers::make<ProgrammingLangs::MAX, ProgrammingLangs,
+                            const std::vector<std::string>>(
+            COMPILER(ProgrammingLangs::C, "clang", "gcc", "cc"),
+            COMPILER(ProgrammingLangs::CXX, "clang++", "g++", "c++"),
+            COMPILER(ProgrammingLangs::GO, "go"),
+            COMPILER(ProgrammingLangs::PYTHON, "python", "python3"));
     for (const auto &options : array_helpers::find(compilers, lang)->second) {
         auto ret = findCommandExe(options);
         if (ret) {
