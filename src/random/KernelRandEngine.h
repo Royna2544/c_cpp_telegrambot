@@ -3,15 +3,14 @@
 #if defined __APPLE__ || defined __linux__
 
 #include <Logging.h>
-#include <Types.h>
 #include <fcntl.h>
+#include <internal/_FileDescriptor_posix.h>
 #include <unistd.h>
 
 #include <array>
 #include <cerrno>
 #include <cstdint>
 #include <mutex>
-#include <stdexcept>
 
 #define KERNELRAND_MAYBE_SUPPORTED
 

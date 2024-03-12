@@ -1,11 +1,8 @@
 #pragma once
 
-#include <Types.h>
-
 #include <functional>
-#include <optional>
-#include <string>
 
+#include <internal/_FileDescriptor_posix.h>
 #include "SocketInterfaceBase.h"
 #include "TgBotSocket.h"
 

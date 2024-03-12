@@ -2,6 +2,7 @@
 #include <ExtArgs.h>
 #include <Logging.h>
 #include <fcntl.h>
+#include <internal/_FileDescriptor_posix.h>
 #include <poll.h>
 #include <stdio.h>
 #include <sys/mman.h>
@@ -9,7 +10,6 @@
 #include <unistd.h>
 
 #include <chrono>
-#include <condition_variable>
 #include <csignal>
 #include <cstdlib>
 #include <functional>
