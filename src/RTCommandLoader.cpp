@@ -5,8 +5,7 @@
 #include <filesystem>
 #include <vector>
 
-#include "cmd_dynamic/cmd_dynamic.h"
-#include "command_modules/CommandModule.h"
+#include "command_modules/runtime/cmd_dynamic.h"
 
 struct DynamicLibraryHolder {
     DynamicLibraryHolder(void* handle) : handle_(handle){};
@@ -67,10 +66,10 @@ void loadOneCommand(Bot& bot, const std::filesystem::path _fname) {
     } else {
         fn = mod->fn;
     }
-    if (mod->enforced)
-        bot_AddCommandEnforced(bot, mod->name, fn);
+    if (mod->isEnforced())
+        bot_AddCommandEnforced(bot, mod->command, fn);
     else
-        bot_AddCommandPermissive(bot, mod->name, fn);
+        bot_AddCommandPermissive(bot, mod->command, fn);
 
     if (dladdr(sym, &info) < 0) {
         LOG_W("dladdr failed for %s: %s", fname.c_str(),
@@ -80,7 +79,7 @@ void loadOneCommand(Bot& bot, const std::filesystem::path _fname) {
     }
     LOG_I("Loaded RT command module from %s", fname.c_str());
     LOG_I("Module dump: { enforced: %d, supported: %d, name: %s, fn: %p }",
-          mod->enforced, isSupported, mod->name, fnptr);
+          mod->isEnforced(), isSupported, mod->command.c_str(), fnptr);
 }
 
 void loadCommandsFromFile(Bot& bot, const std::filesystem::path filename) {
@@ -88,7 +87,7 @@ void loadCommandsFromFile(Bot& bot, const std::filesystem::path filename) {
     std::ifstream ifs(filename.string());
     if (ifs) {
         while (std::getline(ifs, line)) {
-            static const std::string kModulesDir = "src/cmd_dynamic/";
+            static const std::string kModulesDir = "src/command_modules/runtime/";
             loadOneCommand(bot, kModulesDir + line);
         }
     }

@@ -20,7 +20,7 @@ using command_callback_t = std::function<void(const Bot&, const Message::Ptr&)>;
  * @param cb callback invoked on messages with matching cmd
  * @see Authorization.h
  */
-void bot_AddCommandPermissive(Bot& bot, const char* cmd, command_callback_t cb);
+void bot_AddCommandPermissive(Bot& bot, const std::string& cmd, command_callback_t cb);
 
 /**
  * bot_AddCommandEnforced - Add a bot command (enforced command)
@@ -30,7 +30,7 @@ void bot_AddCommandPermissive(Bot& bot, const char* cmd, command_callback_t cb);
  * @param cb callback invoked on messages with matching cmd
  * @see Authorization.h
  */
-void bot_AddCommandEnforced(Bot& bot, const char* cmd, command_callback_t cb);
+void bot_AddCommandEnforced(Bot& bot, const std::string& cmd, command_callback_t cb);
 
 /**
  * command_callback_compiler_t - callback function for a compiler related

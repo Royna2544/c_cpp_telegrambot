@@ -119,7 +119,7 @@ set(SRC_LIST
 
 ######### Commands modules (The commands handler of the bot) #########
 ################ Commands module in a single file list ################
-set(CMD_MODULES_SINGLE_LIST alive flash possibility decide delay decho randsticker fileid)
+set(CMD_MODULES_SINGLE_LIST alive flash possibility decide delay decho randsticker fileid updatecommands)
 if (NOT WIN32)
   set(CMD_MODULES_SINGLE_LIST ${CMD_MODULES_SINGLE_LIST} ibash)
 endif()
@@ -127,7 +127,7 @@ endif()
 set(CMD_MODULES_SOURCES_LIST database_impl bash_impl ${CMD_MODULES_SINGLE_LIST} timer_impl)
 ######################## Commands modules list ########################
 set(CMD_MODULES_LIST addblacklist rmblacklist addwhitelist 
-      rmwhitelist bash unsafebash ${CMD_MODULES_SINGLE_LIST}
+      rmwhitelist bash ubash ${CMD_MODULES_SINGLE_LIST}
       starttimer stoptimer saveid start)
 ####################### Commands modules defines #######################
 set(COMMANDS_CWD src/command_modules)
@@ -137,7 +137,7 @@ FILE(REMOVE ${COMMANDS_GEN_HEADER})
 FILE(APPEND ${COMMANDS_GEN_HEADER} "#include <vector>\n")
 FILE(APPEND ${COMMANDS_GEN_HEADER} "#include <command_modules/CommandModule.h>\n\n")
 foreach(lib ${CMD_MODULES_LIST})
-  FILE(APPEND ${COMMANDS_GEN_HEADER} "extern const struct CommandModule cmd_${lib};\n")
+  FILE(APPEND ${COMMANDS_GEN_HEADER} "extern struct CommandModule cmd_${lib};\n")
 endforeach()
 foreach(lib ${CMD_MODULES_SOURCES_LIST})
   set(SRC_LIST ${SRC_LIST} ${COMMANDS_CWD}/${lib}.cpp)
@@ -179,7 +179,7 @@ target_link_libraries(TgBotDB TgBot TgBotUtils protobuf::libprotobuf protobuf ${
 if(ENABLE_RUNTIME_COMMAND)
   add_definitions(-DRTCOMMAND_LOADER)
   set(SRC_LIST ${SRC_LIST} src/RTCommandLoader.cpp)
-  add_subdirectory(src/cmd_dynamic)
+  add_subdirectory(src/command_modules/runtime)
   if (WIN32)
     add_subdirectory(src/third-party/dlfcn-win32)
     set(CMAKE_DL_LIBS dl)

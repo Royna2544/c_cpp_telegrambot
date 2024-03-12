@@ -9,10 +9,8 @@ static void unsafeBashCommandFn(const Bot &bot, const Message::Ptr message) {
     BashHandleData(bot, message, true).run();
 }
 
-struct CommandModule cmd_bash {
-    .enforced = true, .name = "bash", .fn = BashCommandFn,
-};
+struct CommandModule cmd_bash("bash", "Execute bash commands",
+                              CommandModule::Flags::Enforced, BashCommandFn);
 
-struct CommandModule cmd_unsafebash {
-    .enforced = true, .name = "unsafebash", .fn = unsafeBashCommandFn,
-};
+struct CommandModule cmd_ubash("ubash", "Execute bash commands (no timeout)",
+                              CommandModule::Flags::Enforced, unsafeBashCommandFn);

@@ -5,8 +5,7 @@ static void NoCompilerCommandStub(const Bot& bot, const Message::Ptr& message) {
     bot_sendReplyMessage(bot, message, "Not supported in current host");
 }
 
-void bot_AddCommandPermissive(Bot& bot, const char* cmd,
-                              command_callback_t cb) {
+void bot_AddCommandPermissive(Bot& bot, const std::string& cmd, command_callback_t cb) {
     auto authFn = [&, cb](const Message::Ptr message) {
         if (Authorized(message, AuthorizeFlags::PERMISSIVE |
                                     AuthorizeFlags::REQUIRE_USER))
@@ -15,7 +14,7 @@ void bot_AddCommandPermissive(Bot& bot, const char* cmd,
     bot.getEvents().onCommand(cmd, authFn);
 }
 
-void bot_AddCommandEnforced(Bot& bot, const char* cmd, command_callback_t cb) {
+void bot_AddCommandEnforced(Bot& bot, const std::string& cmd, command_callback_t cb) {
     auto authFn = [&, cb](const Message::Ptr message) {
         if (Authorized(message, AuthorizeFlags::REQUIRE_USER)) cb(bot, message);
     };

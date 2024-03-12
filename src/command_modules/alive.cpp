@@ -37,7 +37,7 @@ static void AliveCommandFn(const Bot &bot, const Message::Ptr message) {
             std::string(BOOST_PLATFORM " | " BOOST_COMPILER " | " __DATE__);
         commandmodules.reserve(8 * gCmdModules.size());
         for (const auto &i : gCmdModules) {
-            commandmodules += i->name;
+            commandmodules += i->command;
             commandmodules += " ";
         }
         ASSIGN_INCTXT_DATA(AboutHtmlText, version);
@@ -69,10 +69,10 @@ static void AliveCommandFn(const Bot &bot, const Message::Ptr message) {
     }
 }
 
-const struct CommandModule cmd_alive {
-    .enforced = false, .name = "alive", .fn = AliveCommandFn,
-};
+struct CommandModule cmd_alive(
+    "alive", "Test the bot if alive, also prints bot information",
+    CommandModule::Flags::None, AliveCommandFn);
 
-const struct CommandModule cmd_start {
-    .enforced = false, .name = "start", .fn = AliveCommandFn,
-};
+struct CommandModule cmd_start(
+    "start", "Alias for alive command",
+    CommandModule::Flags::HideDescription, AliveCommandFn);

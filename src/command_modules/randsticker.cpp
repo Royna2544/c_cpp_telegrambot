@@ -30,6 +30,6 @@ static void RandomStickerCommandFn(const Bot &bot, const Message::Ptr message) {
     }
 }
 
-struct CommandModule cmd_randsticker {
-    .enforced = false, .name = "randsticker", .fn = RandomStickerCommandFn,
-};
+struct CommandModule cmd_randsticker("randsticker",
+    "Get a random sticker from a replyed-to-msg-s-stickerpack",
+    CommandModule::Flags::None, RandomStickerCommandFn);

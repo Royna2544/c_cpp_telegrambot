@@ -9,33 +9,33 @@
 
 using database::DBWrapper;
 
-struct CommandModule cmd_addblacklist {
-    .enforced = true, .name = "addblacklist",
-    .fn = [](const Bot& bot, const Message::Ptr& message) {
+struct CommandModule cmd_addblacklist(
+    "addblacklist", "Add blacklisted user to the database",
+    CommandModule::Flags::Enforced | CommandModule::Flags::HideDescription,
+    [](const Bot& bot, const Message::Ptr& message) {
         DBWrapper.blacklist->addToDatabase(message);
-    }
-};
+    });
 
-struct CommandModule cmd_rmblacklist {
-    .enforced = true, .name = "rmblacklist",
-    .fn = [](const Bot& bot, const Message::Ptr& message) {
+struct CommandModule cmd_rmblacklist(
+    "rmblacklist", "Remove blacklisted user from the database",
+    CommandModule::Flags::Enforced | CommandModule::Flags::HideDescription,
+    [](const Bot& bot, const Message::Ptr& message) {
         DBWrapper.blacklist->removeFromDatabase(message);
-    }
-};
+    });
 
-struct CommandModule cmd_addwhitelist {
-    .enforced = true, .name = "addwhitelist",
-    .fn = [](const Bot& bot, const Message::Ptr& message) {
+struct CommandModule cmd_addwhitelist(
+    "addwhitelist", "Add whitelisted user to the database",
+    CommandModule::Flags::Enforced | CommandModule::Flags::HideDescription,
+    [](const Bot& bot, const Message::Ptr& message) {
         DBWrapper.whitelist->addToDatabase(message);
-    }
-};
+    });
 
-struct CommandModule cmd_rmwhitelist {
-    .enforced = true, .name = "rmwhitelist",
-    .fn = [](const Bot& bot, const Message::Ptr& message) {
+struct CommandModule cmd_rmwhitelist(
+    "rmblacklist", "Remove whitelisted user from the database",
+    CommandModule::Flags::Enforced | CommandModule::Flags::HideDescription,
+    [](const Bot& bot, const Message::Ptr& message) {
         DBWrapper.whitelist->removeFromDatabase(message);
-    }
-};
+    });
 
 static void saveIdFn(const Bot& bot, const Message::Ptr& message) {
     const auto mutableMediaDB =
@@ -90,6 +90,7 @@ static void saveIdFn(const Bot& bot, const Message::Ptr& message) {
     }
 }
 
-struct CommandModule cmd_saveid {
-    .enforced = true, .name = "saveid", .fn = saveIdFn,
-};
+// clang-format off
+struct CommandModule cmd_saveid("saveid",
+    "Save media to MediaDatabase for later use",
+    CommandModule::Flags::Enforced | CommandModule::Flags::HideDescription, saveIdFn);

@@ -69,6 +69,7 @@ static void PossibilityCommandFn(const Bot &bot, const Message::Ptr message) {
     bot_sendReplyMessage(bot, message, out.str());
 }
 
-struct CommandModule cmd_possibility {
-    .enforced = false, .name = "possibility", .fn = PossibilityCommandFn,
-};
+struct CommandModule cmd_possibility("possibility",
+                                     "Get possibility for given conditions",
+                                     CommandModule::Flags::None,
+                                     PossibilityCommandFn);

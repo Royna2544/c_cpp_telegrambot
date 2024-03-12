@@ -3,7 +3,6 @@
 #include <StringToolsExt.h>
 #include <random/RandomNumberGenerator.h>
 
-#include <chrono>
 #include <thread>
 
 #include "CommandModule.h"
@@ -62,6 +61,5 @@ static void DecideCommandFn(const Bot &bot, const Message::Ptr message) {
     }
 }
 
-struct CommandModule cmd_decide {
-    .enforced = false, .name = "decide", .fn = DecideCommandFn,
-};
+struct CommandModule cmd_decide("decide", "Decide a statement",
+                                CommandModule::Flags::None, DecideCommandFn);

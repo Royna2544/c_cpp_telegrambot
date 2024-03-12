@@ -14,6 +14,7 @@
 #include <cmds.gen.h>
 
 #include "CompilerInTelegram.h"
+#include "tgbot/types/ChatAdministratorRights.h"
 
 #ifdef RTCOMMAND_LOADER
 #include <RTCommandLoader.h>
@@ -120,10 +121,10 @@ int main(int argc, const char **argv) {
         });
 
     for (const auto &i : gCmdModules) {
-        if (i->enforced)
-            bot_AddCommandEnforced(gBot, i->name, i->fn);
+        if (i->isEnforced())
+            bot_AddCommandEnforced(gBot, i->command, i->fn);
         else
-            bot_AddCommandPermissive(gBot, i->name, i->fn);
+            bot_AddCommandPermissive(gBot, i->command, i->fn);
     }
     gBot.getEvents().onAnyMessage([](const Message::Ptr &msg) {
         static auto spamMgr = gSThreadManager.getController<SpamBlockManager>(
