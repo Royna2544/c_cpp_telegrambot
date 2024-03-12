@@ -107,7 +107,11 @@ endif()
 set(SRC_LIST
     src/Authorization.cpp
     src/BotAddCommand.cpp
-    src/CompilerInTelegram.cpp
+    src/compiler/Base.cpp
+    src/compiler/Bash.cpp
+    src/compiler/CCpp.cpp
+    src/compiler/Generic.cpp
+    src/compiler/Helper.cpp
     src/ExtArgs.cpp
     src/libos/libsighandler_${TARGET_VARIANT}.cpp
     src/random/RandomNumberGenerator.cpp

@@ -102,22 +102,26 @@ int main(int argc, const char **argv) {
     bot_AddCommandEnforcedCompiler(
         gBot, "c", ProgrammingLangs::C,
         [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
-            CCppCompileHandleData(bot, message, compiler, "out.c").run();
+            static CompilerInTgForCCppImpl cCompiler(bot, compiler, "foo.c");
+            cCompiler.run(message);
         });
     bot_AddCommandEnforcedCompiler(
         gBot, "cpp", ProgrammingLangs::CXX,
         [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
-            CCppCompileHandleData(bot, message, compiler, "out.cpp").run();
+            static CompilerInTgForCCppImpl cxxCompiler(bot, compiler, "foo.cpp");
+            cxxCompiler.run(message);
         });
     bot_AddCommandEnforcedCompiler(
         gBot, "python", ProgrammingLangs::PYTHON,
         [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
-            CompileHandleData(bot, message, compiler, "out.py").run();
+            static CompilerInTgForGenericImpl gPyCompiler(bot, compiler, "foo.py");
+            gPyCompiler.run(message);
         });
     bot_AddCommandEnforcedCompiler(
         gBot, "golang", ProgrammingLangs::GO,
         [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
-            CompileHandleData(bot, message, compiler + " run", "out.go").run();
+            static CompilerInTgForGenericImpl GoCompiler(bot, compiler, "foo.go");
+            GoCompiler.run(message);
         });
 
     for (const auto &i : gCmdModules) {

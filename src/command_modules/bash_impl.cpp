@@ -3,10 +3,12 @@
 #include "CommandModule.h"
 
 static void BashCommandFn(const Bot &bot, const Message::Ptr message) {
-    BashHandleData(bot, message, false).run();
+    static CompilerInTgForBashImpl bash(bot, true);
+    bash.run(message);
 }
 static void unsafeBashCommandFn(const Bot &bot, const Message::Ptr message) {
-    BashHandleData(bot, message, true).run();
+    static CompilerInTgForBashImpl ubash(bot, false);
+    ubash.run(message);
 }
 
 struct CommandModule cmd_bash("bash", "Execute bash commands",
