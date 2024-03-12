@@ -5,6 +5,7 @@
 
 #include <thread>
 
+#include "BotReplyMessage.h"
 #include "CommandModule.h"
 
 using std::chrono_literals::operator""s;
@@ -58,6 +59,8 @@ static void DecideCommandFn(const Bot &bot, const Message::Ptr message) {
             }
         }
         bot_editMessage(bot, msg, msgtxt);
+    } else {
+        bot_sendReplyMessage(bot, message, "What should I decide?");
     }
 }
 
