@@ -128,51 +128,15 @@ std::string SocketInterfaceBase::getOptions(Options opt) {
     return ret;
 }
 
-#if defined __linux__ || defined __APPLE__
-#include "SocketInterfaceUnix.h"
-#endif
-#ifdef __WIN32
-#include "SocketInterfaceWindows.h"
-#endif
-
-#define MAKE_INTF(usage, instance) \
-    { usage, instance }
-
 std::shared_ptr<SocketInterfaceBase> getSocketInterface(const SocketUsage u) {
-    static const std::map<SocketUsage, std::shared_ptr<SocketInterfaceBase>>
-        socketBackends = {
-#if defined __linux__ || defined __APPLE__
-            MAKE_INTF(SocketUsage::SU_INTERNAL,
-                      std::make_shared<SocketInterfaceUnixLocal>()),
-            MAKE_INTF(SocketUsage::SU_EXTERNAL,
-                      std::make_shared<SocketInterfaceUnixIPv4>())
-#elif defined __WIN32
-            MAKE_INTF(SocketUsage::SU_INTERNAL,
-                      std::make_shared<SocketInterfaceWindowsLocal>()),
-            MAKE_INTF(SocketUsage::SU_EXTERNAL,
-                      std::make_shared<SocketInterfaceWindowsIPv4>()),
-#endif
-        };
-    const auto it = socketBackends.find(u);
-    if (it == socketBackends.end()) {
-        return socketBackends.at(SocketUsage::SU_INTERNAL);
+    const auto it = socket_interfaces.find(u);
+    if (it == socket_interfaces.end()) {
+        return socket_interfaces.at(SocketUsage::SU_INTERNAL);
     }
     return it->second;
 }
 std::shared_ptr<SocketInterfaceBase> getSocketInterfaceForClient() {
-    static const std::vector<std::shared_ptr<SocketInterfaceBase>>
-        socketBackends = {
-#if defined __linux__ || defined __APPLE__
-            std::make_shared<SocketInterfaceUnixIPv4>(),
-            std::make_shared<SocketInterfaceUnixIPv6>(),
-            std::make_shared<SocketInterfaceUnixLocal>(),
-#elif defined __WIN32
-            std::make_shared<SocketInterfaceWindowsIPv4>(),
-            std::make_shared<SocketInterfaceWindowsIPv6>(),
-            std::make_shared<SocketInterfaceWindowsLocal>(),
-#endif
-        };
-    for (const auto& socketBackend : socketBackends) {
+    for (const auto& socketBackend : socket_interfaces_client) {
         if (socketBackend->isAvailable()) {
             return socketBackend;
         }

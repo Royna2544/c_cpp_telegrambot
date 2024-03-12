@@ -2,6 +2,8 @@
 
 #include <future>
 #include <optional>
+#include <map>
+#include <vector>
 
 #include "TgBotSocket.h"
 
@@ -129,3 +131,6 @@ enum SocketUsage {
 std::shared_ptr<SocketInterfaceBase> getSocketInterface(
     const SocketUsage usage);
 std::shared_ptr<SocketInterfaceBase> getSocketInterfaceForClient();
+
+extern std::map<SocketUsage, std::shared_ptr<SocketInterfaceBase>> socket_interfaces;
+extern std::vector<std::shared_ptr<SocketInterfaceBase>> socket_interfaces_client;

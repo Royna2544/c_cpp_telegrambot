@@ -132,3 +132,14 @@ void SocketInterfaceWindows::writeToSocket(struct TgBotConnection conn) {
 }
 
 void SocketInterfaceWindows::forceStopListening(void) { kRun = false; }
+
+std::map<SocketUsage, std::shared_ptr<SocketInterfaceBase>> socket_interfaces{
+    {SocketUsage::SU_INTERNAL, std::make_shared<SocketInterfaceWindowsLocal>()},
+    {SocketUsage::SU_EXTERNAL, std::make_shared<SocketInterfaceWindowsIPv4>()},
+};
+
+std::vector<std::shared_ptr<SocketInterfaceBase>> socket_interfaces_client{
+    std::make_shared<SocketInterfaceWindowsIPv4>(),
+    std::make_shared<SocketInterfaceWindowsIPv6>(),
+    std::make_shared<SocketInterfaceWindowsLocal>(),
+};

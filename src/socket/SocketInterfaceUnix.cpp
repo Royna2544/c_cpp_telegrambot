@@ -116,3 +116,14 @@ void SocketInterfaceUnix::forceStopListening(void) {
         closeFd(notify_fd);
     }
 }
+
+std::map<SocketUsage, std::shared_ptr<SocketInterfaceBase>> socket_interfaces{
+    {SocketUsage::SU_INTERNAL, std::make_shared<SocketInterfaceUnixLocal>()},
+    {SocketUsage::SU_EXTERNAL, std::make_shared<SocketInterfaceUnixIPv4>()},
+};
+
+std::vector<std::shared_ptr<SocketInterfaceBase>> socket_interfaces_client{
+    std::make_shared<SocketInterfaceUnixIPv4>(),
+    std::make_shared<SocketInterfaceUnixIPv6>(),
+    std::make_shared<SocketInterfaceUnixLocal>(),
+};
