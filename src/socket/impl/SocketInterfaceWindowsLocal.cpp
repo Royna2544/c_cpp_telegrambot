@@ -1,4 +1,5 @@
 #include "../SocketInterfaceWindows.h"
+#include "socket/SocketInterfaceBase.h"
 
 // clang-format off
 #include <winsock2.h>
@@ -48,10 +49,6 @@ SocketInterfaceWindows::socket_handle_t SocketInterfaceWindowsLocal::makeSocket(
     return fd;
 }
 
-bool SocketInterfaceWindowsLocal::canSocketBeClosed() {
-    return fileExists(SOCKET_PATH);
-}
-
 SocketInterfaceWindows::socket_handle_t
 SocketInterfaceWindowsLocal::createClientSocket() {
     setOptions(Options::DESTINATION_ADDRESS, SOCKET_PATH);
@@ -65,5 +62,9 @@ SocketInterfaceWindowsLocal::createServerSocket() {
 }
 
 void SocketInterfaceWindowsLocal::cleanupServerSocket() {
-    std::filesystem::remove(SOCKET_PATH);
+    SocketHelperCommon::cleanupServerSocketLocalSocket();
+}
+
+bool SocketInterfaceWindowsLocal::canSocketBeClosed() {
+    return SocketHelperCommon::canSocketBeClosedLocalSocket();
 }

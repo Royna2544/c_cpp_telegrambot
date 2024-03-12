@@ -220,6 +220,8 @@ if (USE_UNIX_SOCKETS)
         src/socket/impl/SocketInterfaceWindowsIPv6.cpp
       )
   endif()
+  set(SOCKET_SRC_LIST ${SOCKET_SRC_LIST}
+        src/socket/impl/SocketHelperCommon.cpp)
 
   add_library(TgBotSocket STATIC
       ${SOCKET_SRC_LIST}

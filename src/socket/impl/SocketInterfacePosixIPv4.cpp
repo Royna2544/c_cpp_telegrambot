@@ -100,11 +100,5 @@ SocketInterfaceUnixIPv4::createClientSocket() {
 }
 
 bool SocketInterfaceUnixIPv4::isAvailable() {
-    char* ipv4addr = getenv("IPV4_ADDRESS");
-    if (!ipv4addr) {
-        LOG_D("IPV4_ADDRESS is not set, isAvailable false");
-        return false;
-    }
-    setOptions(Options::DESTINATION_ADDRESS, ipv4addr, true);
-    return true;
+    return SocketHelperCommon::isAvailableIPv4(this);
 }

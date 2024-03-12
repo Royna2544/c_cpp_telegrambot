@@ -13,6 +13,7 @@
 #include <filesystem>
 
 #include "../SocketInterfaceUnix.h"
+#include "socket/SocketInterfaceBase.h"
 
 SocketInterfaceUnix::socket_handle_t SocketInterfaceUnixLocal::makeSocket(
     bool client) {
@@ -61,15 +62,9 @@ SocketInterfaceUnixLocal::createServerSocket() {
     return makeSocket(/*client=*/false);
 }
 void SocketInterfaceUnixLocal::cleanupServerSocket() {
-    std::filesystem::remove(SOCKET_PATH);
+    SocketHelperCommon::cleanupServerSocketLocalSocket();
 }
 
 bool SocketInterfaceUnixLocal::canSocketBeClosed() {
-    bool socketValid = true;
-
-    if (!fileExists(SOCKET_PATH)) {
-        LOG_W("Socket file was deleted");
-        socketValid = false;
-    }
-    return socketValid;
+    return SocketHelperCommon::canSocketBeClosedLocalSocket();
 }

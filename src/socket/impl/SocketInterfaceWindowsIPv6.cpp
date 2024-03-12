@@ -2,6 +2,7 @@
 #include <ws2tcpip.h>
 
 #include "../SocketInterfaceWindows.h"
+#include "socket/SocketInterfaceBase.h"
 
 SocketInterfaceWindows::socket_handle_t
 SocketInterfaceWindowsIPv6::createServerSocket() {
@@ -63,11 +64,5 @@ SocketInterfaceWindowsIPv6::createClientSocket() {
 }
 
 bool SocketInterfaceWindowsIPv6::isAvailable() {
-    char *IPv6addr = getenv("IPV6_ADDRESS");
-    if (!IPv6addr) {
-        LOG_D("IPv6_ADDRESS is not set, isAvailable false");
-        return false;
-    }
-    setOptions(Options::DESTINATION_ADDRESS, IPv6addr, true);
-    return true;
+    return SocketHelperCommon::isAvailableIPv6(this);
 }

@@ -15,6 +15,7 @@
 #include <Types.h>
 
 #include "../SocketInterfaceUnix.h"
+#include "socket/SocketInterfaceBase.h"
 
 void SocketInterfaceUnixIPv6::foreach_ipv6_interfaces(
     const std::function<void(const char*, const char*)> callback) {
@@ -104,11 +105,5 @@ SocketInterfaceUnixIPv6::createClientSocket() {
 }
 
 bool SocketInterfaceUnixIPv6::isAvailable() {
-    char* ipv6addr = getenv("IPV6_ADDRESS");
-    if (!ipv6addr) {
-        LOG_D("IPV6_ADDRESS is not set, isAvailable false");
-        return false;
-    }
-    setOptions(Options::DESTINATION_ADDRESS, ipv6addr, true);
-    return true;
+    return SocketHelperCommon::isAvailableIPv6(this);
 }

@@ -136,3 +136,14 @@ std::shared_ptr<SocketInterfaceBase> getSocketInterfaceForClient();
 
 extern std::map<SocketUsage, std::shared_ptr<SocketInterfaceBase>> socket_interfaces;
 extern std::vector<std::shared_ptr<SocketInterfaceBase>> socket_interfaces_client;
+
+struct SocketHelperCommon {
+    static bool isAvailableIPv4(SocketInterfaceBase *it);
+    static bool isAvailableIPv6(SocketInterfaceBase *it);
+    static bool canSocketBeClosedLocalSocket(void);
+    static void cleanupServerSocketLocalSocket(void);
+  private:
+    constexpr static const char kIPv4EnvVar[] = "IPV4_ADDRESS";
+    constexpr static const char kIPv6EnvVar[] = "IPV6_ADDRESS";
+    static bool _isAvailable(SocketInterfaceBase *it, const char *envVar);
+};
