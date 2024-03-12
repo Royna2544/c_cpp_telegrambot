@@ -94,12 +94,7 @@ void SocketInterfaceBase::stopListening(const std::string& exitToken) {
 
 void SocketInterfaceBase::setOptions(Options opt, const std::string data,
                                      bool persistent) {
-    option_t* optionVal = nullptr;
-    switch (opt) {
-        case Options::DESTINATION_ADDRESS:
-            optionVal = &options.opt_destination_address;
-            break;
-    }
+    option_t* optionVal = getOptionPtr(opt);
     if (optionVal != nullptr) {
         OptionContainer c;
         c.data = data;
@@ -110,13 +105,7 @@ void SocketInterfaceBase::setOptions(Options opt, const std::string data,
 
 std::string SocketInterfaceBase::getOptions(Options opt) {
     std::string ret;
-    option_t* optionVal = nullptr;
-
-    switch (opt) {
-        case Options::DESTINATION_ADDRESS:
-            optionVal = &options.opt_destination_address;
-            break;
-    }
+    option_t* optionVal = getOptionPtr(opt);
     if (optionVal) {
         option_t option = *optionVal;
         ASSERT(option.has_value(),
@@ -126,6 +115,16 @@ std::string SocketInterfaceBase::getOptions(Options opt) {
         if (!option->persistent) option.reset();
     }
     return ret;
+}
+
+SocketInterfaceBase::option_t* SocketInterfaceBase::getOptionPtr(Options p) {
+    option_t* optionVal = nullptr;
+    switch (p) {
+        case Options::DESTINATION_ADDRESS:
+            optionVal = &options.opt_destination_address;
+            break;
+    }
+    return optionVal;
 }
 
 std::shared_ptr<SocketInterfaceBase> getSocketInterface(const SocketUsage u) {

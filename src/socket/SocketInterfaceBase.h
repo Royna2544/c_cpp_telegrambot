@@ -121,6 +121,8 @@ struct SocketInterfaceBase {
         option_t opt_destination_address;
     } options;
     constexpr static int kTgBotHostPort = 50000;
+  private:
+    option_t *getOptionPtr(Options opt);
 };
 
 enum SocketUsage {
