@@ -9,8 +9,8 @@
 #include <filesystem>
 #include <mutex>
 #include <optional>
-#include <stdexcept>
 
+#include "BotClassBase.h"
 #include "../popen_wdt/popen_wdt.hpp"
 
 static inline const char kDatabaseFile[] = "tgbot.pb";
@@ -75,10 +75,10 @@ class ProtoDatabaseBase {
     }
 };
 
-struct ProtoDatabase : ProtoDatabaseBase {
+struct ProtoDatabase : ProtoDatabaseBase, BotClassBase {
     ProtoDatabase(const Bot& bot, const char* _name,
                   RepeatedField<UserId>* _list)
-        : ProtoDatabaseBase(_name, _list), _bot(bot) {}
+        : ProtoDatabaseBase(_name, _list), BotClassBase(bot) {}
     ~ProtoDatabase() override = default;
 
     void onAlreadyExist(const Message::Ptr& message, const User::Ptr& who,
@@ -96,7 +96,6 @@ struct ProtoDatabase : ProtoDatabaseBase {
     static std::string appendListName(const std::string& op,
                                       const User::Ptr from,
                                       const ProtoDatabaseBase* what);
-    const Bot& _bot;
 };
 
 struct DatabaseWrapper {

@@ -6,6 +6,7 @@
 #include <tgbot/types/User.h>
 
 #include "SingleThreadCtrl.h"
+#include "BotClassBase.h"
 
 #ifdef SOCKET_CONNECTION
 #include <socket/TgBotSocket.h>
@@ -59,8 +60,8 @@ struct SpamBlockBase : SingleThreadCtrlRunnable {
     std::mutex buffer_m;  // Protect buffer, buffer_sub
 };
 
-struct SpamBlockManager : SpamBlockBase {
-    SpamBlockManager(const Bot &bot) : SpamBlockBase(), _bot(bot) {}
+struct SpamBlockManager : SpamBlockBase, BotClassBase {
+    SpamBlockManager(const Bot &bot) : SpamBlockBase(), BotClassBase(bot) {}
     ~SpamBlockManager() override = default;
 
     using SpamBlockBase::run;
@@ -74,5 +75,4 @@ struct SpamBlockManager : SpamBlockBase {
     void _deleteAndMuteCommon(const OneChatIterator &handle,
                               PerChatHandleConstRef t, const size_t threshold,
                               const char *name, const bool mute);
-    const Bot &_bot;
 };
