@@ -71,7 +71,6 @@ void SocketInterfaceWindows::startListening(
                 WSALOG_E("Failed to listen to socket");
                 break;
             }
-            LOG_I("Listening on " SOCKET_PATH);
             createdPromise.set_value(true);
             while (!should_break) {
                 struct sockaddr_un addr {};

@@ -1,18 +1,16 @@
 #pragma once
 
 #include <cstring>
+#include <filesystem>
 #include <string>
 
 #include "../include/Logging.h"
 #include "../include/Types.h"
 
-#ifdef __ANDROID__
-#define SOCKET_PATH "/data/data/com.termux/files/usr/tmp/tgbot_sock"
-#elif defined __WIN32
-#define SOCKET_PATH "C:\\Temp\\tgbot.sock"
-#else
-#define SOCKET_PATH "/tmp/tgbot_sock"
-#endif
+inline std::filesystem::path getSocketPath() {
+    static auto spath = std::filesystem::temp_directory_path() / "tgbot.sock";
+    return spath;
+}
 
 enum TgBotCommand {
     CMD_EXIT,

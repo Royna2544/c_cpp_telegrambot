@@ -1,5 +1,6 @@
 #include "../SocketInterfaceWindows.h"
 #include "socket/SocketInterfaceBase.h"
+#include "socket/TgBotSocket.h"
 
 // clang-format off
 #include <winsock2.h>
@@ -20,7 +21,6 @@ SocketInterfaceWindows::socket_handle_t SocketInterfaceWindowsLocal::makeSocket(
 
     if (!is_client) {
         LOG_D("Creating socket at %s", path.get());
-        std::filesystem::remove(path.get());
     }
 
     ret = WSAStartup(MAKEWORD(2, 2), &data);
@@ -42,29 +42,38 @@ SocketInterfaceWindows::socket_handle_t SocketInterfaceWindowsLocal::makeSocket(
     decltype(&connect) fn = is_client ? connect : bind;
     if (fn(fd, reinterpret_cast<struct sockaddr *>(&name), sizeof(name)) != 0) {
         WSALOG_E("Failed to %s to socket", is_client ? "connect" : "bind");
-        closesocket(fd);
-        WSACleanup();
-        return INVALID_SOCKET;
+        do {
+            if (!is_client && WSAGetLastError() == WSAEADDRINUSE) {
+                cleanupServerSocket();
+                if (fn(fd, reinterpret_cast<struct sockaddr *>(&name), sizeof(name)) == 0) {
+                    LOG_I("Bind succeeded by removing socket file");
+                    break;
+                }
+            }
+            closesocket(fd);
+            WSACleanup();
+            return INVALID_SOCKET;
+        } while (false);
     }
     return fd;
 }
 
 SocketInterfaceWindows::socket_handle_t
 SocketInterfaceWindowsLocal::createClientSocket() {
-    setOptions(Options::DESTINATION_ADDRESS, SOCKET_PATH);
+    setOptions(Options::DESTINATION_ADDRESS, getSocketPath().string());
     return makeSocket(/*is_client=*/true);
 }
 
 SocketInterfaceWindows::socket_handle_t
 SocketInterfaceWindowsLocal::createServerSocket() {
-    setOptions(Options::DESTINATION_ADDRESS, SOCKET_PATH);
+    setOptions(Options::DESTINATION_ADDRESS, getSocketPath().string());
     return makeSocket(/*is_client=*/false);
 }
 
 void SocketInterfaceWindowsLocal::cleanupServerSocket() {
-    SocketHelperCommon::cleanupServerSocketLocalSocket();
+    SocketHelperCommon::cleanupServerSocketLocalSocket(this);
 }
 
 bool SocketInterfaceWindowsLocal::canSocketBeClosed() {
-    return SocketHelperCommon::canSocketBeClosedLocalSocket();
+    return SocketHelperCommon::canSocketBeClosedLocalSocket(this);
 }

@@ -1,4 +1,5 @@
 #include "../SocketInterfaceBase.h"
+#include "socket/TgBotSocket.h"
 #include <libos/libfs.h>
 
 bool SocketHelperCommon::_isAvailable(SocketInterfaceBase *it, const char *envVar) {
@@ -18,16 +19,16 @@ bool SocketHelperCommon::isAvailableIPv4(SocketInterfaceBase *it) {
 bool SocketHelperCommon::isAvailableIPv6(SocketInterfaceBase *it) {
     return _isAvailable(it, kIPv6EnvVar);
 }
-bool SocketHelperCommon::canSocketBeClosedLocalSocket() {
+bool SocketHelperCommon::canSocketBeClosedLocalSocket(SocketInterfaceBase *it) {
     bool socketValid = true;
 
-    if (!fileExists(SOCKET_PATH)) {
+    if (!fileExists(it->getOptions(SocketInterfaceBase::Options::DESTINATION_ADDRESS))) {
         LOG_W("Socket file was deleted");
         socketValid = false;
     }
     return socketValid;
 }
 
-void SocketHelperCommon::cleanupServerSocketLocalSocket() {
-    std::filesystem::remove(SOCKET_PATH);
+void SocketHelperCommon::cleanupServerSocketLocalSocket(SocketInterfaceBase *it) {
+    std::filesystem::remove(it->getOptions(SocketInterfaceBase::Options::DESTINATION_ADDRESS));
 }

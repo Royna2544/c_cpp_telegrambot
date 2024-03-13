@@ -140,8 +140,8 @@ extern std::vector<std::shared_ptr<SocketInterfaceBase>> socket_interfaces_clien
 struct SocketHelperCommon {
     static bool isAvailableIPv4(SocketInterfaceBase *it);
     static bool isAvailableIPv6(SocketInterfaceBase *it);
-    static bool canSocketBeClosedLocalSocket(void);
-    static void cleanupServerSocketLocalSocket(void);
+    static bool canSocketBeClosedLocalSocket(SocketInterfaceBase *it);
+    static void cleanupServerSocketLocalSocket(SocketInterfaceBase *it);
   private:
     constexpr static const char kIPv4EnvVar[] = "IPV4_ADDRESS";
     constexpr static const char kIPv6EnvVar[] = "IPV6_ADDRESS";

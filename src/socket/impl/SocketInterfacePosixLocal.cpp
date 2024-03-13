@@ -1,3 +1,4 @@
+#include <CStringLifetime.h>
 #include <Logging.h>
 #include <Types.h>
 #include <arpa/inet.h>
@@ -14,12 +15,15 @@
 
 #include "../SocketInterfaceUnix.h"
 #include "socket/SocketInterfaceBase.h"
+#include "socket/TgBotSocket.h"
 
 SocketInterfaceUnix::socket_handle_t SocketInterfaceUnixLocal::makeSocket(
     bool client) {
     int ret = kInvalidFD;
+    CStringLifetime path = getOptions(Options::DESTINATION_ADDRESS);
+
     if (!client) {
-        LOG_D("Creating socket at " SOCKET_PATH);
+        LOG_D("Creating socket at %s", path.get());
     }
     struct sockaddr_un name {};
     const int sfd = socket(AF_LOCAL, SOCK_STREAM, 0);
@@ -29,7 +33,7 @@ SocketInterfaceUnix::socket_handle_t SocketInterfaceUnixLocal::makeSocket(
     }
 
     name.sun_family = AF_LOCAL;
-    strncpy(name.sun_path, SOCKET_PATH, sizeof(name.sun_path));
+    strncpy(name.sun_path, path.get(), sizeof(name.sun_path));
     name.sun_path[sizeof(name.sun_path) - 1] = '\0';
     const size_t size = SUN_LEN(&name);
     decltype(&connect) fn = client ? connect : bind;
@@ -37,7 +41,7 @@ SocketInterfaceUnix::socket_handle_t SocketInterfaceUnixLocal::makeSocket(
         do {
             PLOG_E("Failed to %s to socket", client ? "connect" : "bind");
             if (!client && errno == EADDRINUSE) {
-                std::remove(SOCKET_PATH);
+                cleanupServerSocket();
                 if (fn(sfd, reinterpret_cast<struct sockaddr*>(&name), size) ==
                     0) {
                     LOG_I("Bind succeeded by removing socket file");
@@ -54,17 +58,19 @@ SocketInterfaceUnix::socket_handle_t SocketInterfaceUnixLocal::makeSocket(
 
 SocketInterfaceUnix::socket_handle_t
 SocketInterfaceUnixLocal::createClientSocket() {
+    setOptions(Options::DESTINATION_ADDRESS, getSocketPath().string());
     return makeSocket(/*client=*/true);
 }
 
 SocketInterfaceUnix::socket_handle_t
 SocketInterfaceUnixLocal::createServerSocket() {
+    setOptions(Options::DESTINATION_ADDRESS, getSocketPath().string());
     return makeSocket(/*client=*/false);
 }
 void SocketInterfaceUnixLocal::cleanupServerSocket() {
-    SocketHelperCommon::cleanupServerSocketLocalSocket();
+    SocketHelperCommon::cleanupServerSocketLocalSocket(this);
 }
 
 bool SocketInterfaceUnixLocal::canSocketBeClosed() {
-    return SocketHelperCommon::canSocketBeClosedLocalSocket();
+    return SocketHelperCommon::canSocketBeClosedLocalSocket(this);
 }
