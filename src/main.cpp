@@ -40,11 +40,6 @@ static void cleanupFn(int s) {
 };
 
 #ifdef SOCKET_CONNECTION
-static void cleanupSocket(const std::string exitToken, SocketUsage usage,
-                          SingleThreadCtrl *) {
-    getSocketInterface(usage)->stopListening(exitToken);
-}
-
 static void setupSocket(const Bot &gBot,
                         SingleThreadCtrlManager::ThreadUsage tusage,
                         SocketUsage susage, TgBotCommandData::Exit e) {
@@ -67,8 +62,9 @@ static void setupSocket(const Bot &gBot,
                 case SocketUsage::SU_INTERNAL:
                     intf->writeToSocket({CMD_EXIT, {.data_2 = e}});
                     socketConnectionManager->setPreStopFunction(
-                        std::bind(&cleanupSocket, e.token, susage,
-                                  std::placeholders::_1));
+                        [=](SingleThreadCtrl *) {
+                            getSocketInterface(susage)->stopListening(e.token);
+                        });
                     break;
                 case SocketUsage::SU_EXTERNAL:
                     socketConnectionManager->setPreStopFunction(
@@ -108,19 +104,22 @@ int main(int argc, const char **argv) {
     bot_AddCommandEnforcedCompiler(
         gBot, "cpp", ProgrammingLangs::CXX,
         [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
-            static CompilerInTgForCCppImpl cxxCompiler(bot, compiler, "foo.cpp");
+            static CompilerInTgForCCppImpl cxxCompiler(bot, compiler,
+                                                       "foo.cpp");
             cxxCompiler.run(message);
         });
     bot_AddCommandEnforcedCompiler(
         gBot, "python", ProgrammingLangs::PYTHON,
         [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
-            static CompilerInTgForGenericImpl gPyCompiler(bot, compiler, "foo.py");
+            static CompilerInTgForGenericImpl gPyCompiler(bot, compiler,
+                                                          "foo.py");
             gPyCompiler.run(message);
         });
     bot_AddCommandEnforcedCompiler(
         gBot, "golang", ProgrammingLangs::GO,
         [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
-            static CompilerInTgForGenericImpl GoCompiler(bot, compiler, "foo.go");
+            static CompilerInTgForGenericImpl GoCompiler(bot, compiler,
+                                                         "foo.go");
             GoCompiler.run(message);
         });
 
