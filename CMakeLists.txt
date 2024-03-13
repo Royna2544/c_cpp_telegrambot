@@ -156,7 +156,7 @@ FILE(APPEND ${COMMANDS_GEN_HEADER} "};\n")
 
 ####################### Database (Protobuf) #######################
 find_package(Protobuf REQUIRED)
-include(cmake/ProtobufCpp.cmake)
+include(proto/ProtobufCpp.cmake)
 my_protobuf_generate_cpp(proto/gen PROTO_SRCS PROTO_HDRS proto/TgBotDB.proto)
 add_library(TgBotDB STATIC src/Database.cpp
                            src/DatabaseWrapper.cpp
