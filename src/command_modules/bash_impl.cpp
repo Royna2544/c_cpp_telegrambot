@@ -3,11 +3,11 @@
 #include "CommandModule.h"
 
 static void BashCommandFn(const Bot &bot, const Message::Ptr message) {
-    static CompilerInTgForBashImpl bash(bot, true);
+    static CompilerInTgForBashImpl bash(bot, false);
     bash.run(message);
 }
 static void unsafeBashCommandFn(const Bot &bot, const Message::Ptr message) {
-    static CompilerInTgForBashImpl ubash(bot, false);
+    static CompilerInTgForBashImpl ubash(bot, true);
     ubash.run(message);
 }
 
