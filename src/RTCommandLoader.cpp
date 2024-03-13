@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <vector>
 
+#include "ConfigManager.h"
 #include "command_modules/runtime/cmd_dynamic.h"
 
 struct DynamicLibraryHolder {
@@ -86,9 +87,14 @@ void loadCommandsFromFile(Bot& bot, const std::filesystem::path filename) {
     std::string line;
     std::ifstream ifs(filename.string());
     if (ifs) {
+        int argc;
+        const char** argv;
+        copyCommandLine(CommandLineOp::GET, &argc, &argv);
+        auto modulesPath = std::filesystem::path(argv[0]).parent_path() /
+                           "src/command_modules/runtime/";
+        modulesPath.make_preferred();
         while (std::getline(ifs, line)) {
-            static const std::string kModulesDir = "src/command_modules/runtime/";
-            loadOneCommand(bot, kModulesDir + line);
+            loadOneCommand(bot, modulesPath / line);
         }
     }
 }
