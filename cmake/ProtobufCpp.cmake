@@ -39,12 +39,17 @@ function(MY_PROTOBUF_GENERATE_CPP PATH SRCS HDRS)
     list(APPEND ${SRCS} "${CMAKE_CURRENT_BINARY_DIR}/${PATH}/${FIL_WE}.pb.cc")
     list(APPEND ${HDRS} "${CMAKE_CURRENT_BINARY_DIR}/${PATH}/${FIL_WE}.pb.h")
 
+    set(PROTO_GEN_SRCS "${CMAKE_CURRENT_BINARY_DIR}/${PATH}/${FIL_WE}.pb.cc"
+                       "${CMAKE_CURRENT_BINARY_DIR}/${PATH}/${FIL_WE}.pb.h")
     execute_process(COMMAND ${CMAKE_COMMAND} -E make_directory
                             ${CMAKE_CURRENT_BINARY_DIR}/${PATH})
 
+    add_custom_target(protobuf_${FIL_WE}_ready
+      DEPENDS ${PROTO_GEN_SRCS}
+      COMMAND ${CMAKE_COMMAND} -E echo "Generated ${FIL_WE} Proto Srcs..."
+    )
     add_custom_command(
-      OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${PATH}/${FIL_WE}.pb.cc"
-             "${CMAKE_CURRENT_BINARY_DIR}/${PATH}/${FIL_WE}.pb.h"
+      OUTPUT ${PROTO_GEN_SRCS}
       COMMAND
         ${PROTOBUF_PROTOC_EXECUTABLE} ARGS --cpp_out
         ${CMAKE_CURRENT_BINARY_DIR}/${PATH} ${_protobuf_include_path} ${ABS_FIL}

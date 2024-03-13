@@ -176,6 +176,7 @@ foreach(ABSL_LIB absl_log_internal_check_op absl_log_internal_message)
   set(ABSL_LIBS ${ABSL_LIBS} ${ABSL_LIB})
 endforeach()
 ####################### TgBotDB lib includes #######################
+add_dependencies(TgBotDB protobuf_TgBotDB_ready)
 target_link_libraries(TgBotDB TgBot TgBotUtils protobuf::libprotobuf protobuf ${ABSL_LIBS})
 #####################################################################
 
