@@ -1,7 +1,6 @@
 #include <BotReplyMessage.h>
 #include <ChatObserver.h>
 #include <Logging.h>
-#include <ResourceIncBin.h>
 #include <SocketConnectionHandler.h>
 #include <SpamBlock.h>
 #include <random/RandomNumberGenerator.h>
@@ -12,6 +11,7 @@
 #include <fstream>
 #include <mutex>
 
+#include "ResourceManager.h"
 #include "socket/TgBotSocket.h"
 #include "tgbot/types/InputFile.h"
 
@@ -26,7 +26,7 @@ static std::string getMIMEString(const std::string& path) {
 
     std::call_once(once, [] {
         std::string_view buf;
-        ASSIGN_INCTXT_DATA(MimeDataJson, buf);
+        buf = gResourceManager.getResource("mimeData.json");
         doc.Parse(buf.data());
         // This should be an assert, we know the data file at compile time
         ASSERT(!doc.HasParseError(), "Failed to parse mimedata: %d",

@@ -1,6 +1,5 @@
 #include "../SocketInterfaceBase.h"
-#include "socket/TgBotSocket.h"
-#include <libos/libfs.h>
+#include <libos/libfs.hpp>
 
 bool SocketHelperCommon::_isAvailable(SocketInterfaceBase *it, const char *envVar) {
     char* addr = getenv(envVar);

@@ -1,6 +1,5 @@
 #include <ExtArgs.h>
 #include <Logging.h>
-#include <ResourceIncBin.h>
 #include <StringToolsExt.h>
 #include <random/RandomNumberGenerator.h>
 
@@ -10,6 +9,7 @@
 #include <thread>
 
 #include "CommandModule.h"
+#include "ResourceManager.h"
 
 static void FlashCommandFn(const Bot &bot, const Message::Ptr message) {
     static std::vector<std::string> reasons;
@@ -24,7 +24,7 @@ static void FlashCommandFn(const Bot &bot, const Message::Ptr message) {
         std::string buf, line;
         std::stringstream ss;
 
-        ASSIGN_INCTXT_DATA(FlashTxt, buf);
+        buf = gResourceManager.getResource("flash.txt");
         splitAndClean(buf, reasons);
     });
 

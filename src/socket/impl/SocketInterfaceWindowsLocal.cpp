@@ -9,7 +9,7 @@
 // clang-format on
 
 #include <CStringLifetime.h>
-#include <libos/libfs.h>
+#include <libos/libfs.hpp>
 
 SocketInterfaceWindows::socket_handle_t SocketInterfaceWindowsLocal::makeSocket(
     bool is_client) {

@@ -1,20 +1,9 @@
 #include <filesystem>
 #include <string>
-
+#include "libfs.hpp"
 #include "Logging.h"
 
 namespace fs = std::filesystem;
-
-__attribute__((weak)) bool fileExists(const std::filesystem::path& filename) {
-    bool rc;
-
-    std::error_code ec;
-    rc = fs::exists(filename, ec);
-    if (ec) {
-        LOG_W("FS::Exists failed: %s", ec.message().c_str());
-    }
-    return rc;
-}
 
 bool canExecute(const std::filesystem::path& filename) {
     std::error_code ec;

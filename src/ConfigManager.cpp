@@ -1,6 +1,6 @@
 #include <ConfigManager.h>
 #include <Logging.h>
-#include <libos/libfs.h>
+#include <libos/libfs.hpp>
 
 #include <boost/program_options.hpp>
 #include <cstdlib>

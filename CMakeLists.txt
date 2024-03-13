@@ -234,17 +234,13 @@ if (USE_UNIX_SOCKETS)
 endif()
 #####################################################################
 
-################## TgBot Resource (incbin) Library ##################
-configure_file(src/ResourceIncBin.cpp.in src/ResourceIncBin.cpp)
-add_library(TgBotRes STATIC ${CMAKE_BINARY_DIR}/src/ResourceIncBin.cpp)
-#####################################################################
-
 ################# TgBot Utilities (generic) Library #################
 add_library(
   TgBotUtils STATIC
   src/ConfigManager.cpp
   src/SingleThreadCtrl.cpp
   src/SingleThreadCtrlManager.cpp
+  src/ResourceManager.cpp
   src/popen_wdt/popen_wdt_${TARGET_VARIANT}.c
   src/popen_wdt/popen_wdt_lib.cpp
   src/libos/libfs.cpp
@@ -262,7 +258,7 @@ add_subdirectory(lib)
 add_library(TgBotCommandModules STATIC ${SRC_LIST})
 target_include_directories(TgBotCommandModules PUBLIC ${CMAKE_BINARY_DIR}/${COMMANDS_CWD})
 ######################## Libraries to link ########################
-set(LD_LIST TgBot TgBotDB TgBotUtils TgBotRes ${ABSL_LIBS})
+set(LD_LIST TgBot TgBotDB TgBotUtils ${ABSL_LIBS})
 add_lib_if(USE_UNIX_SOCKETS TgBotSocket)
 add_lib_if(WIN32 wsock32 Ws2_32)
 add_lib_if(ENABLE_RUNTIME_COMMAND ${CMAKE_DL_LIBS})
@@ -299,6 +295,7 @@ add_executable(${PROJECT_TEST_NAME}
   tests/ConfigManagerTest.cpp
   tests/RegexHandlerTest.cpp
   tests/DatabaseLoader.cpp
+  tests/ResourceManagerTest.cpp
 )
 target_link_libraries(${PROJECT_TEST_NAME} gtest gtest_main gmock TgBotCommandModules)
 add_test(NAME ${PROJECT_TEST_NAME} COMMAND ${PROJECT_TEST_NAME})

@@ -1,5 +1,5 @@
 #include <Logging.h>
-#include <ResourceIncBin.h>
+#include <ResourceManager.h>
 #include <cmds.gen.h>
 
 #include <boost/algorithm/string/replace.hpp>
@@ -11,6 +11,7 @@
 
 #include "CommandModule.h"
 #include "internal/_tgbot.h"
+
 
 static void AliveCommandFn(const Bot &bot, const Message::Ptr message) {
     static std::string version;
@@ -40,7 +41,7 @@ static void AliveCommandFn(const Bot &bot, const Message::Ptr message) {
             commandmodules += i->command;
             commandmodules += " ";
         }
-        ASSIGN_INCTXT_DATA(AboutHtmlText, version);
+        version = gResourceManager.getResource("about.html.txt");
 #define REPLACE_PLACEHOLDER(buf, name) \
     boost::replace_all(buf, "_" #name "_", name)
 #define REPLACE_PLACEHOLDER2(buf, name, val) \
@@ -73,6 +74,6 @@ struct CommandModule cmd_alive(
     "alive", "Test the bot if alive, also prints bot information",
     CommandModule::Flags::None, AliveCommandFn);
 
-struct CommandModule cmd_start(
-    "start", "Alias for alive command",
-    CommandModule::Flags::HideDescription, AliveCommandFn);
+struct CommandModule cmd_start("start", "Alias for alive command",
+                               CommandModule::Flags::HideDescription,
+                               AliveCommandFn);

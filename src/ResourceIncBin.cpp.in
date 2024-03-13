@@ -1,5 +1,0 @@
-#include <ResourceIncBin.h>
-
-INCTXT(AboutHtmlText, "@CMAKE_SOURCE_DIR@/resources/about.html.txt");
-INCTXT(FlashTxt, "@CMAKE_SOURCE_DIR@/resources/flash.txt");
-INCTXT(MimeDataJson, "@CMAKE_SOURCE_DIR@/resources/mimeData.json");

@@ -14,6 +14,7 @@
 #include <cmds.gen.h>
 
 #include "CompilerInTelegram.h"
+#include "ResourceManager.h"
 #include "tgbot/types/ChatAdministratorRights.h"
 
 #ifdef RTCOMMAND_LOADER
@@ -91,6 +92,7 @@ int main(int argc, const char **argv) {
         LOG_F("Failed to get TOKEN variable");
         return EXIT_FAILURE;
     }
+    gResourceManager.preloadResourceDirectory();
     token = *ret;
     static Bot gBot(token);
     database::DBWrapper.loadMain(gBot);

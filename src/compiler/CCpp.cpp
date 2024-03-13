@@ -1,6 +1,6 @@
 #include <CompilerInTelegram.h>
 #include <ExtArgs.h>
-#include <libos/libfs.h>
+#include <libos/libfs.hpp>
 
 void CompilerInTgForCCppImpl::onResultReady(const Message::Ptr& who,
                                             const std::string& text) {

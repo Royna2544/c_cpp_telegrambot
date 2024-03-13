@@ -4,6 +4,7 @@
 
 #define WSALOG_E(fmt, ...) \
     LOG_E(fmt ": %s", ##__VA_ARGS__, strWSAError(WSAGetLastError()))
+
 struct SocketInterfaceWindows : SocketInterfaceBase {
     using socket_handle_t = SOCKET;
     bool isValidSocketHandle(socket_handle_t handle) {

@@ -2,9 +2,9 @@
 #include <Windows.h>
 #include <io.h>
 #include <locale.h>
-#include <pthread.h>
 #include <stdio.h>
 
+#include <libos/libfs.h>
 #include "popen_wdt.h"
 
 struct watchdog_data {
@@ -28,15 +28,18 @@ static DWORD WINAPI doReadWriteProcess(LPVOID arg) {
     return 0;
 }
 
-static void* watchdog(void* arg) {
+static DWORD WINAPI watchdog(LPVOID arg) {
     struct watchdog_data* data = (struct watchdog_data*)arg;
     HANDLE rwProcessThread = NULL;
     DWORD ret_getexit = 0;
-    DWORD startTime = GetTickCount();
+    ULONGLONG startTime = GetTickCount64();
 
     ResumeThread(data->thread_handle);
     rwProcessThread = CreateThread(
         NULL, 0, (LPTHREAD_START_ROUTINE)doReadWriteProcess, data, 0, NULL);
+    if (rwProcessThread == NULL) {
+        return 0;
+    }
     for (;;) {
         if (GetExitCodeProcess(data->process_handle, &ret_getexit)) {
             if (ret_getexit != STILL_ACTIVE) {
@@ -44,7 +47,7 @@ static void* watchdog(void* arg) {
                 *data->result_cb = false;
                 break;
             } else {
-                if (GetTickCount() - startTime > SLEEP_SECONDS * 1000) {
+                if (GetTickCount64() - startTime > SLEEP_SECONDS * 1000) {
                     TerminateThread(rwProcessThread, 0);
                     TerminateProcess(data->process_handle, 0);
                     *data->result_cb = true;
@@ -68,7 +71,7 @@ void setlocale_enus_once(void) {
 // [Child] stdout_w [pipe] stdout_r -> [Parent] stdout_r ->
 // stdout_w_file [pipe] stdout_r_file [FILE*]
 FILE* popen_watchdog(const char* command, bool* wdt_ret) {
-    FILE* fp;
+    FILE* fp = NULL;
     HANDLE child_stdout_w = NULL, child_stdout_r = NULL;
     HANDLE child_stdout_w_file = NULL, child_stdout_r_file = NULL;
     HANDLE hMapFile = NULL;
@@ -167,15 +170,11 @@ FILE* popen_watchdog(const char* command, bool* wdt_ret) {
         data->child_stdout_r = child_stdout_r;
         data->child_stdout_w_file = child_stdout_w_file;
 
-        // Launch thread
-        pthread_t watchdog_thread;
-        pthread_attr_t attr;
-
-        pthread_attr_init(&attr);
-        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-        pthread_create(&watchdog_thread, &attr, &watchdog, data);
-        pthread_attr_destroy(&attr);
-        fp = _fdopen(_open_osfhandle((intptr_t)child_stdout_r_file, 0), "r");
+        HANDLE wdtThHdl = CreateThread(NULL, 0, watchdog, data, 0, NULL);
+        if (wdtThHdl != NULL) {
+            CloseHandle(wdtThHdl);
+            fp = _fdopen(_open_osfhandle((intptr_t)child_stdout_r_file, 0), "r");
+        }
     } else {
         CloseHandle(pi.hProcess);
         ResumeThread(pi.hThread);

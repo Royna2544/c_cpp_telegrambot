@@ -3,7 +3,7 @@
 #include <EnumArrayHelpers.h>
 #include <Logging.h>
 #include <StringToolsExt.h>
-#include <libos/libfs.h>
+#include <libos/libfs.hpp>
 #include <random/RandomNumberGenerator.h>
 
 #include <boost/algorithm/string/replace.hpp>

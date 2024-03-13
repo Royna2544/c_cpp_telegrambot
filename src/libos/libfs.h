@@ -1,14 +1,7 @@
 #pragma once
 
-#include <filesystem>
+#include <limits.h>
 
-#ifdef __WIN32
-static inline const char path_env_delimiter = ';';
-#else
-static inline const char path_env_delimiter = ':';
+#ifndef PATH_MAX
+#define PATH_MAX 250
 #endif
-
-// Implemented sperately by OS
-bool canExecute(const std::filesystem::path& path);
-bool getHomePath(std::filesystem::path& buf);
-bool fileExists(const std::filesystem::path& filename);

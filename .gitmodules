@@ -8,6 +8,3 @@
 	path = src/third-party/googletest
 	url = https://github.com/google/googletest.git
 	branch = refs/tags/v1.14.0
-[submodule "src/third-party/incbin"]
-	path = src/third-party/incbin
-	url = https://github.com/graphitemaster/incbin
