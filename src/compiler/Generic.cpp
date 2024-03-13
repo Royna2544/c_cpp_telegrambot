@@ -12,7 +12,18 @@ bool CompilerInTgForGeneric::verifyParseWrite(const Message::Ptr& message,
             return false;  // Bail out
         }
     }
-    return verifyAndWriteMessage(message, outfile);
+    if (message->replyToMessage && !message->replyToMessage->text.empty()) {
+        std::ofstream file(outfile);
+        if (file.fail()) {
+            onFailed(message, ErrorType::FILE_WRITE_FAILED);
+            return false;
+        }
+        file << message->replyToMessage->text;
+        file.close();
+        return true;
+    }
+    onFailed(message, ErrorType::MESSAGE_VERIFICATION_FAILED);
+    return false;
 }
 
 void CompilerInTgForGenericImpl::onResultReady(const Message::Ptr& message,

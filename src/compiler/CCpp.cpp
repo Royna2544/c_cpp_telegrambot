@@ -20,7 +20,7 @@ void CompilerInTgForCCpp::run(const Message::Ptr& message) {
     const char aoutname[] = "./a.out";
 #endif
 
-    if (verifyAndWriteMessage(message, outfile)) {
+    if (verifyParseWrite(message, outfile)) {
         cmd << cmdPrefix << SPACE << outfile;
         if (hasExtArgs(message)) {
             parseExtArgs(message, extraargs);

@@ -18,22 +18,6 @@ using std::chrono::duration_cast;
 using std::chrono::high_resolution_clock;
 using std::chrono::milliseconds;
 
-bool CompilerInTg::verifyAndWriteMessage(const Message::Ptr &message,
-                                         const std::string &filename) {
-    if (message->replyToMessage && !message->replyToMessage->text.empty()) {
-        std::ofstream file(filename);
-        if (file.fail()) {
-            onFailed(message, ErrorType::FILE_WRITE_FAILED);
-            return false;
-        }
-        file << message->replyToMessage->text;
-        file.close();
-        return true;
-    }
-    onFailed(message, ErrorType::MESSAGE_VERIFICATION_FAILED);
-    return false;
-}
-
 void CompilerInTg::appendExtArgs(std::stringstream &cmd,
                                  std::string extraargs_in,
                                  std::stringstream &result_out) {

@@ -48,19 +48,6 @@ struct CompilerInTg {
     virtual ~CompilerInTg() = default;
 
     /**
-     * @brief Verify the message sent by the user.
-     *
-     * This function verifies that the message sent by the user is valid. It
-     * ensures that the message's reply-to-message contains a text, and
-     * that it is not empty.
-     *
-     * @param message The message sent by the user.
-     * @return Whether the message is valid.
-     */
-    bool verifyAndWriteMessage(const Message::Ptr& message,
-                               const std::string& filename);
-
-    /**
      * @brief This function is used to append extra arguments to the command.
      *
      * @param cmd The command to which the extra arguments are to be appended.
