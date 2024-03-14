@@ -141,23 +141,31 @@ set(CMD_MODULES_LIST addblacklist rmblacklist addwhitelist
       starttimer stoptimer saveid start)
 ####################### Commands modules defines #######################
 set(COMMANDS_CWD src/command_modules)
-set(COMMANDS_GEN_HEADER ${CMAKE_BINARY_DIR}/${COMMANDS_CWD}/cmds.gen.h)
-############ Generate commands modules header in compile time ############
-FILE(REMOVE ${COMMANDS_GEN_HEADER})
-FILE(APPEND ${COMMANDS_GEN_HEADER} "#include <vector>\n")
-FILE(APPEND ${COMMANDS_GEN_HEADER} "#include <command_modules/CommandModule.h>\n\n")
+############ Generate commands modules list in compile time ############
+set(COMMANDS_GEN_FILE ${CMAKE_BINARY_DIR}/${COMMANDS_CWD}/cmds.gen.h)
+FILE(REMOVE ${COMMANDS_GEN_FILE})
+FILE(APPEND ${COMMANDS_GEN_FILE} "#pragma once\n\n")
+FILE(APPEND ${COMMANDS_GEN_FILE} "#include <vector>\n")
+FILE(APPEND ${COMMANDS_GEN_FILE} "#include <command_modules/CommandModule.h>\n\n")
+FILE(APPEND ${COMMANDS_GEN_FILE} "extern std::vector<CommandModule *> gCmdModules;\n")
+########## Generate commands modules list in compile time (cpp) ##########
+set(COMMANDS_GEN_FILE ${CMAKE_BINARY_DIR}/${COMMANDS_CWD}/cmds.gen.cpp)
+FILE(REMOVE ${COMMANDS_GEN_FILE})
+FILE(APPEND ${COMMANDS_GEN_FILE} "#include \"cmds.gen.h\"\n\n")
 foreach(lib ${CMD_MODULES_LIST})
-  FILE(APPEND ${COMMANDS_GEN_HEADER} "extern struct CommandModule cmd_${lib};\n")
+  FILE(APPEND ${COMMANDS_GEN_FILE} "extern struct CommandModule cmd_${lib};\n")
 endforeach()
 foreach(lib ${CMD_MODULES_SOURCES_LIST})
   set(SRC_LIST ${SRC_LIST} ${COMMANDS_CWD}/${lib}.cpp)
 endforeach()
-FILE(APPEND ${COMMANDS_GEN_HEADER} "\n")
-FILE(APPEND ${COMMANDS_GEN_HEADER} "inline const std::vector gCmdModules = {\n")
+FILE(APPEND ${COMMANDS_GEN_FILE} "\n")
+FILE(APPEND ${COMMANDS_GEN_FILE} "std::vector<CommandModule *> gCmdModules = {\n")
 foreach(lib ${CMD_MODULES_LIST})
-  FILE(APPEND ${COMMANDS_GEN_HEADER} "   &cmd_${lib},\n")
+  FILE(APPEND ${COMMANDS_GEN_FILE} "   &cmd_${lib},\n")
 endforeach()
-FILE(APPEND ${COMMANDS_GEN_HEADER} "};\n")
+FILE(APPEND ${COMMANDS_GEN_FILE} "};\n")
+#################### Include to TgBotCommandModules #################
+set(SRC_LIST ${SRC_LIST} ${COMMANDS_GEN_FILE})
 #####################################################################
 
 ####################### Database (Protobuf) #######################

@@ -7,6 +7,7 @@
 #include <string>
 
 #include "BotClassBase.h"
+#include "command_modules/CommandModule.h"
 
 using TgBot::Bot;
 using TgBot::Message;

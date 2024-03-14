@@ -95,18 +95,18 @@ int main(int argc, const char **argv) {
         LOG(LogLevel::FATAL, "Failed to get TOKEN variable");
         return EXIT_FAILURE;
     }
-    gResourceManager.preloadResourceDirectory();
     token = *ret;
     static Bot gBot(token);
     database::DBWrapper.loadMain(gBot);
-    
-    setupCompilerInTg(gBot);
+    gResourceManager.preloadResourceDirectory();
+
     for (const auto &i : gCmdModules) {
         if (i->isEnforced())
             bot_AddCommandEnforced(gBot, i->command, i->fn);
         else
             bot_AddCommandPermissive(gBot, i->command, i->fn);
     }
+    setupCompilerInTg(gBot);
     
     gBot.getEvents().onAnyMessage([](const Message::Ptr &msg) {
         static auto spamMgr = gSThreadManager.getController<SpamBlockManager>(
