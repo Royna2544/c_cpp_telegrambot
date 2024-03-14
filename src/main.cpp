@@ -101,13 +101,23 @@ int main(int argc, const char **argv) {
     gResourceManager.preloadResourceDirectory();
 
     for (const auto &i : gCmdModules) {
-        if (i->isEnforced())
-            bot_AddCommandEnforced(gBot, i->command, i->fn);
-        else
-            bot_AddCommandPermissive(gBot, i->command, i->fn);
+        if (i->fn) {
+            if (i->isEnforced())
+                bot_AddCommandEnforced(gBot, i->command, i->fn);
+            else
+                bot_AddCommandPermissive(gBot, i->command, i->fn);
+        } else if (i->mfn) {
+            if (i->isEnforced())
+                bot_AddCommandEnforcedMod(gBot, i->command, i->mfn);
+        } else {
+            LOG(LogLevel::FATAL,
+                "Invalid command module %s: No functions provided",
+                i->command.c_str());
+            return EXIT_FAILURE;
+        }
     }
     setupCompilerInTg(gBot);
-    
+
     gBot.getEvents().onAnyMessage([](const Message::Ptr &msg) {
         static auto spamMgr = gSThreadManager.getController<SpamBlockManager>(
             {SingleThreadCtrlManager::USAGE_SPAMBLOCK_THREAD}, std::ref(gBot));
@@ -134,7 +144,7 @@ int main(int argc, const char **argv) {
 
 #endif
 #ifdef RTCOMMAND_LOADER
-    loadCommandsFromFile(gBot, getSrcRoot() / "modules.load");
+    RTCommandLoader(gBot).loadCommandsFromFile(getSrcRoot() / "modules.load");
 #endif
     installSignalHandler(cleanupFn);
 
@@ -143,7 +153,8 @@ int main(int argc, const char **argv) {
     auto LastTp = std::chrono::system_clock::from_time_t(0);
     do {
         try {
-            LOG(LogLevel::DEBUG, "Bot username: %s", gBot.getApi().getMe()->username.c_str());
+            LOG(LogLevel::DEBUG, "Bot username: %s",
+                gBot.getApi().getMe()->username.c_str());
             gBot.getApi().deleteWebhook();
 
             TgLongPoll longPoll(gBot);

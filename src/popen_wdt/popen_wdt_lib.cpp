@@ -1,5 +1,6 @@
 #include <ConfigManager.h>
 #include <Logging.h>
+#include <libos/libfs.hpp>
 
 #include <cstring>
 #include <mutex>
@@ -21,7 +22,8 @@ bool runCommand(const std::string& command, std::string& result) {
         }
         if (result.back() == '\n') result.pop_back();
 
-        LOG(LogLevel::VERBOSE, "Command: %s, result: '%s'", command.c_str(), result.c_str());
+        LOG(LogLevel::VERBOSE, "Command: %s, result: '%s'", command.c_str(),
+            result.c_str());
         return true;
     }
     return false;
@@ -39,7 +41,7 @@ std::filesystem::path getSrcRoot() {
             throw std::runtime_error("Command failed");
         }
         dir = dir_str;
-        dir.make_preferred();
+        makeRelativeToCWD(dir);
     });
     return dir;
 }

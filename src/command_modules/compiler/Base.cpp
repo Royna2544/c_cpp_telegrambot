@@ -14,7 +14,6 @@
 
 #include "popen_wdt/popen_wdt.h"
 
-
 using std::chrono_literals::operator""ms;
 using std::chrono::duration_cast;
 using std::chrono::high_resolution_clock;

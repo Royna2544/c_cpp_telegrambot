@@ -7,9 +7,16 @@
 bool ResourceManager::preloadOneFile(std::filesystem::path path) {
     std::ifstream file(path);
     std::stringstream linebuf;
+    bool found = false;
 
     path.make_preferred();
-    if (path.is_absolute())
+    for (auto p = path.parent_path(); p!= path.root_path(); p = p.parent_path()) {
+        if (p.filename() == "resources") {
+            found = true;
+            break;
+        }
+    }
+    if (found)
         path = path.lexically_relative(getResourceRootdir());
 
     for (const auto& [elem, data] : kResources) {
@@ -48,6 +55,7 @@ const std::string& ResourceManager::getResource(std::filesystem::path path) {
 
 std::filesystem::path ResourceManager::getResourceRootdir() {
     static auto path = getSrcRoot() / "resources";
+    path.make_preferred();
     return path;
 }
 

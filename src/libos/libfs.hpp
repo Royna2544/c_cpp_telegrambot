@@ -37,3 +37,7 @@ bool canExecute(const std::filesystem::path& path);
  * @return true if the file exists, false otherwise
  */
 bool fileExists(const std::filesystem::path& filename);
+
+std::filesystem::path& appendDylibExtension(std::filesystem::path& path);
+std::filesystem::path& appendExeExtension(std::filesystem::path& path);
+std::filesystem::path& makeRelativeToCWD(std::filesystem::path& path);

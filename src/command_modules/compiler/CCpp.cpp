@@ -20,8 +20,8 @@ void CompilerInTgForCCpp::run(const Message::Ptr& message) {
     const char aoutname[] = "./a.out";
 #endif
 
-    if (verifyParseWrite(message, outfile)) {
-        cmd << cmdPrefix << SPACE << outfile;
+    if (verifyParseWrite(message, extraargs)) {
+        cmd << cmdPrefix << SPACE << extraargs << SPACE << outfile;
 
         resultbuf << "Compile time:" << std::endl;
         runCommand(message, cmd.str(), resultbuf);

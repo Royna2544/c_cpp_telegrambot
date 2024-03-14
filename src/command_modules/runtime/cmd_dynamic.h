@@ -1,5 +1,5 @@
 #include <BotAddCommand.h>
-#include <command_modules/CommandModule.h>
+#include "../CommandModule.h"
 
 struct dynamicCommandModule {
     CommandModule mod;

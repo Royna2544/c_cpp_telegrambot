@@ -3,7 +3,9 @@
 
 #include <filesystem>
 #include <memory>
+
 #include "Logging.h"
+
 
 using database::DatabaseWrapper;
 
@@ -60,13 +62,15 @@ void DatabaseWrapper::save() const {
 UserId DatabaseWrapper::maybeGetOwnerId() const {
     if (warnNoLoaded(__func__) && protodb.has_ownerid())
         return protodb.ownerid();
-    else
-        return -1;
+    LOG(LogLevel::WARNING,
+        "No owner id found in database, enforced commands will not work");
+    return -1;
 }
 
 bool DatabaseWrapper::warnNoLoaded(const char* func) const {
     if (!loaded) {
-        LOG(LogLevel::WARNING, "Database not loaded! Called function: '%s'", func);
+        LOG(LogLevel::WARNING, "Database not loaded! Called function: '%s'",
+            func);
     }
     return loaded;
 }
