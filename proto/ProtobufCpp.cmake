@@ -46,7 +46,7 @@ function(MY_PROTOBUF_GENERATE_CPP PATH SRCS HDRS)
 
     add_custom_target(protobuf_${FIL_WE}_ready
       DEPENDS ${PROTO_GEN_SRCS}
-      COMMAND ${CMAKE_COMMAND} -E echo "Generated ${FIL_WE} Proto Srcs..."
+      COMMENT "Generated ${FIL_WE} Proto Srcs..."
     )
     add_custom_command(
       OUTPUT ${PROTO_GEN_SRCS}
