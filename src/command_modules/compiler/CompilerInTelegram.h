@@ -160,3 +160,5 @@ enum class ProgrammingLangs {
  * @return Whether it have found the compiler path
  */
 bool findCompiler(ProgrammingLangs lang, std::string& path);
+
+void setupCompilerInTg(Bot& bot);

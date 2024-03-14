@@ -18,7 +18,7 @@
 #include <regex>
 #include <thread>
 
-#include "CompilerInTelegram.h"  // BASH_MAX_BUF, BASH_READ_BUF
+#include "compiler/CompilerInTelegram.h"  // BASH_MAX_BUF, BASH_READ_BUF
 #include "ExtArgs.h"
 #include "SingleThreadCtrl.h"
 #include "StringToolsExt.h"

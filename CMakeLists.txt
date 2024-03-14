@@ -112,11 +112,12 @@ endif()
 set(SRC_LIST
     src/Authorization.cpp
     src/BotAddCommand.cpp
-    src/compiler/Base.cpp
-    src/compiler/Bash.cpp
-    src/compiler/CCpp.cpp
-    src/compiler/Generic.cpp
-    src/compiler/Helper.cpp
+    src/command_modules/compiler/Base.cpp
+    src/command_modules/compiler/Bash.cpp
+    src/command_modules/compiler/CCpp.cpp
+    src/command_modules/compiler/Generic.cpp
+    src/command_modules/compiler/Helper.cpp
+    src/command_modules/compilers.cpp
     src/ExtArgs.cpp
     src/libos/libsighandler_${TARGET_VARIANT}.cpp
     src/random/RandomNumberGenerator.cpp

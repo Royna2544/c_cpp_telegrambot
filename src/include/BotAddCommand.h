@@ -1,7 +1,7 @@
 #pragma once
 
 #include <BotReplyMessage.h>
-#include <CompilerInTelegram.h>
+#include "command_modules/compiler/CompilerInTelegram.h"
 #include <Logging.h>
 
 #include <functional>
@@ -49,6 +49,6 @@ using command_callback_compiler_t = std::function<void(
  * @param cb callback invoked on messages with matching cmd
  * @see Authorization.h
  */
-void bot_AddCommandEnforcedCompiler(Bot& bot, const char* cmd,
+void bot_AddCommandEnforcedCompiler(Bot& bot, const std::string& cmd,
                                     ProgrammingLangs lang,
                                     command_callback_compiler_t cb);

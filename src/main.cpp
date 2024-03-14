@@ -13,9 +13,9 @@
 // Generated cmd list
 #include <cmds.gen.h>
 
-#include "CompilerInTelegram.h"
 #include "Logging.h"
 #include "ResourceManager.h"
+#include "command_modules/compiler/CompilerInTelegram.h"
 
 #ifdef RTCOMMAND_LOADER
 #include <RTCommandLoader.h>
@@ -99,41 +99,15 @@ int main(int argc, const char **argv) {
     token = *ret;
     static Bot gBot(token);
     database::DBWrapper.loadMain(gBot);
-
-    bot_AddCommandEnforcedCompiler(
-        gBot, "c", ProgrammingLangs::C,
-        [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
-            static CompilerInTgForCCppImpl cCompiler(bot, compiler, "foo.c");
-            cCompiler.run(message);
-        });
-    bot_AddCommandEnforcedCompiler(
-        gBot, "cpp", ProgrammingLangs::CXX,
-        [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
-            static CompilerInTgForCCppImpl cxxCompiler(bot, compiler,
-                                                       "foo.cpp");
-            cxxCompiler.run(message);
-        });
-    bot_AddCommandEnforcedCompiler(
-        gBot, "python", ProgrammingLangs::PYTHON,
-        [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
-            static CompilerInTgForGenericImpl gPyCompiler(bot, compiler,
-                                                          "foo.py");
-            gPyCompiler.run(message);
-        });
-    bot_AddCommandEnforcedCompiler(
-        gBot, "golang", ProgrammingLangs::GO,
-        [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
-            static CompilerInTgForGenericImpl GoCompiler(bot, compiler,
-                                                         "foo.go");
-            GoCompiler.run(message);
-        });
-
+    
+    setupCompilerInTg(gBot);
     for (const auto &i : gCmdModules) {
         if (i->isEnforced())
             bot_AddCommandEnforced(gBot, i->command, i->fn);
         else
             bot_AddCommandPermissive(gBot, i->command, i->fn);
     }
+    
     gBot.getEvents().onAnyMessage([](const Message::Ptr &msg) {
         static auto spamMgr = gSThreadManager.getController<SpamBlockManager>(
             {SingleThreadCtrlManager::USAGE_SPAMBLOCK_THREAD}, std::ref(gBot));
