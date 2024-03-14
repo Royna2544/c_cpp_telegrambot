@@ -1,4 +1,3 @@
-#include <Logging.h>
 #include <Windows.h>
 #include <io.h>
 #include <locale.h>
@@ -75,8 +74,6 @@ FILE* popen_watchdog(const char* command, bool* wdt_ret) {
     HANDLE child_stdout_w = NULL, child_stdout_r = NULL;
     HANDLE child_stdout_w_file = NULL, child_stdout_r_file = NULL;
     HANDLE hMapFile = NULL;
-    int ret;
-
     struct watchdog_data* data = NULL;
     CHAR buffer[PATH_MAX] = {0};
 
@@ -137,12 +134,10 @@ FILE* popen_watchdog(const char* command, bool* wdt_ret) {
     if (!success) {
         // Hmm? We failed? Try to append powershell -c
         // Create command line string
-        LOG_W("Retrying with PowerShell prefix: %s", command);
-        ret = snprintf(buffer, sizeof(buffer), "powershell.exe -c \"%s\"",
-                       command);
-
-        if (ret == sizeof(buffer))
-            LOG_W("Command line buffer may have overflowed");
+        //LOG_W("Retrying with PowerShell prefix: %s", command);
+        snprintf(buffer, sizeof(buffer), "powershell.exe -c \"%s\"",
+                    command);
+                       
         // Create process again
         success = CreateProcess(NULL, (LPSTR)buffer, NULL, NULL, TRUE,
                                 CREATE_NEW_PROCESS_GROUP | CREATE_SUSPENDED,

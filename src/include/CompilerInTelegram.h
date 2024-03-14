@@ -144,7 +144,7 @@ struct CompilerInTgHelper {
 constexpr const static inline auto BASH_READ_BUF = (1 << 8);
 constexpr const static inline auto BASH_MAX_BUF = (1 << 10) * 3;
 
-enum ProgrammingLangs {
+enum class ProgrammingLangs {
     C,
     CXX,
     GO,

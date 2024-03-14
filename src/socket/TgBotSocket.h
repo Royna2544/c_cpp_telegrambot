@@ -78,8 +78,9 @@ struct Exit {
         strncpy(e.token, buf.c_str(), bufLen);
         e.token[bufLen] = 0;
         if (buf.size() != bufLen)
-            LOG_W("buf str doesn't fit token fully: tokenlen %d vs buflen %zu",
-                  bufLen, buf.size());
+            LOG(LogLevel::WARNING,
+                "buf str doesn't fit token fully: tokenlen %d vs buflen %zu",
+                bufLen, buf.size());
         return e;
     }
 };

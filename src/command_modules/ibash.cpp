@@ -2,6 +2,7 @@
 #include <ExtArgs.h>
 #include <Logging.h>
 #include <fcntl.h>
+#include <internal/_logging_posix.h>
 #include <internal/_FileDescriptor_posix.h>
 #include <poll.h>
 #include <stdio.h>
@@ -46,7 +47,7 @@ struct InteractiveBashContext {
         void start(const InteractiveBashContext* instr) {
             if (delayUnlessStop(SLEEP_SECONDS); kRun) {
                 if (instr->childpid > 0 && kill(instr->childpid, 0) == 0) {
-                    LOG_W("Process %d misbehaving, using SIGTERM",
+                    LOG(LogLevel::WARNING, "Process %d misbehaving, using SIGTERM",
                           instr->childpid);
                     killpg(instr->childpid, SIGTERM);
                 }
@@ -119,13 +120,13 @@ struct InteractiveBashContext {
                 close(child_stdin);
                 // Ensure bash execl() is up
                 do {
-                    LOG_W("Waiting for subprocess up... (%ds passed)", count);
+                    LOG(LogLevel::WARNING, "Waiting for subprocess up... (%ds passed)", count);
                     std::this_thread::sleep_for(1s);
                     count++;
                 } while (kill(-(*piddata), 0) != 0);
                 is_open = true;
                 childpid = *piddata;
-                LOG_D("Open success, child pid: %d", childpid);
+                LOG(LogLevel::DEBUG, "Open success, child pid: %d", childpid);
                 munmap(piddata, sizeof(pid_t));
             }
         }
@@ -153,7 +154,7 @@ struct InteractiveBashContext {
             // waitpid(4p) will hang if not exited, yes
             waitpid(childpid, &status, 0);
             if (WIFEXITED(status)) {
-                LOG_I("Process %d exited with code %d", childpid,
+                LOG(LogLevel::INFO, "Process %d exited with code %d", childpid,
                       WEXITSTATUS(status));
             }
             exitTimeout->stop();
@@ -258,13 +259,13 @@ struct InteractiveBashContext {
 
     bool SendCommand(const std::string& str, bool internal = false) const {
         if (!internal) {
-            LOG_I("Child <= Command '%s'", str.c_str());
+            LOG(LogLevel::INFO, "Child <= Command '%s'", str.c_str());
         }
         return _SendSomething(str);
     }
 
     bool SendText(const std::string& str) const {
-        LOG_I("Child <= Text '%s'", str.c_str());
+        LOG(LogLevel::INFO, "Child <= Text '%s'", str.c_str());
         return _SendSomething(str);
     }
 
@@ -306,7 +307,7 @@ static void InteractiveBashCommandFn(const Bot& bot,
         parseExtArgs(message, command);
         if (InteractiveBashContext::isExitCommand(command)) {
             if (ctx.is_open)
-                LOG_I("Received exit command: '%s'", command.c_str());
+                LOG(LogLevel::INFO, "Received exit command: '%s'", command.c_str());
             ctx.exit(
                 [&bot, message]() {
                     bot_sendReplyMessage(bot, message,

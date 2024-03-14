@@ -1,37 +1,55 @@
 #pragma once
 
 #include <assert.h>
-#include <stdio.h>
 
-// Like the perror(2)
-#ifndef __WIN32
-#include <errno.h>
-#include <string.h>
-#define PLOG_E(fmt, ...) LOG_E(fmt ": %s", ##__VA_ARGS__, strerror(errno))
+#include <cstdio>
+#include <cstring>
+#include <source_location>
+
+#include "EnumArrayHelpers.h"
+
+#ifdef ERROR
+#undef ERROR
 #endif
 
-#define LOG_F(fmt, ...) _LOG(fmt, "FATAL", ##__VA_ARGS__)
-#define LOG_E(fmt, ...) _LOG(fmt, "Error", ##__VA_ARGS__)
-#define LOG_W(fmt, ...) _LOG(fmt, "Warning", ##__VA_ARGS__)
-#define LOG_I(fmt, ...) _LOG(fmt, "Info", ##__VA_ARGS__)
-#define LOG_D(fmt, ...) _LOG(fmt, "Debug", ##__VA_ARGS__)
-#ifndef NDEBUG
-#define LOG_V(fmt, ...) _LOG(fmt, "Verbose", ##__VA_ARGS__)
-#else
-#define LOG_V(fmt, ...) \
-    do {                \
-    } while (0)
-#endif
+enum class LogLevel { FATAL, ERROR, WARNING, INFO, DEBUG, VERBOSE, MAX };
 
-#define ASSERT(cond, msg, ...)                              \
-    do {                                                    \
-        if (!(cond)) {                                      \
-            LOG_F("Assertion failed: " msg, ##__VA_ARGS__); \
-            assert(cond);                                   \
-            __builtin_unreachable();                        \
-        }                                                   \
-    } while (0)
+static inline constexpr auto LogLevelStrMap =
+    array_helpers::make<static_cast<int>(LogLevel::MAX), LogLevel, const char*>(
+        ENUM_AND_STR(LogLevel::FATAL), ENUM_AND_STR(LogLevel::ERROR),
+        ENUM_AND_STR(LogLevel::WARNING), ENUM_AND_STR(LogLevel::INFO),
+        ENUM_AND_STR(LogLevel::DEBUG), ENUM_AND_STR(LogLevel::VERBOSE));
 
-#define _LOG(fmt, servere, ...)                                       \
-    printf("[%s:%d] %s: [" servere "] " fmt "\n", __FILE__, __LINE__, \
-           __func__, ##__VA_ARGS__)
+struct FormatWithLocation {
+    const char* value;
+    std::source_location loc;
+
+    FormatWithLocation(const char* s, const std::source_location& l =
+                                          std::source_location::current())
+        : value(s), loc(l) {}
+};
+
+template <typename... Args>
+void LOG(LogLevel servere, FormatWithLocation fwl, Args... args) {
+    const char* logmsg = nullptr;
+    const auto& loc = fwl.loc;
+    const auto& fmt = fwl.value;
+    if constexpr (sizeof...(args) == 0) {
+        logmsg = fmt;
+    } else {
+        static char logbuf[512];
+        memset(logbuf, 0, sizeof(logbuf));
+        snprintf(logbuf, sizeof(logbuf), fmt, args...);
+        logmsg = logbuf;
+    }
+    printf("[%s:%d] %s: %s\n", loc.file_name(), loc.line(),
+           array_helpers::find(LogLevelStrMap, servere)->second, logmsg);
+}
+
+template <typename T, typename... Args>
+void ASSERT(const T cond, const char* msg, Args... args) {
+    if (!cond) {
+        LOG(LogLevel::FATAL, "Assertion failed: %s", msg, args...);
+        assert(cond);
+    }
+}

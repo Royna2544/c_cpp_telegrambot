@@ -40,12 +40,13 @@ static std::string getMIMEString(const std::string& path) {
             for (rapidjson::SizeType i = 0; i < availableTypes.Size(); i++) {
                 if (availableTypes[i].GetString() == extension) {
                     auto mime = oneJsonElement["name"].GetString();
-                    LOG_D("Found MIME type: '%s'", mime);
+                    LOG(LogLevel::DEBUG, "Found MIME type: '%s'", mime);
                     return mime;
                 }
             }
         }
-        LOG_W("Unknown file extension: '%s'", extension.c_str());
+        LOG(LogLevel::WARNING, "Unknown file extension: '%s'",
+            extension.c_str());
     }
     return "application/octet-stream";
 }
@@ -57,7 +58,7 @@ void socketConnectionHandler(const Bot& bot, struct TgBotConnection conn) {
             try {
                 bot_sendMessage(bot, _data.data_1.to, _data.data_1.msg);
             } catch (const TgBot::TgException& e) {
-                LOG_E("Exception at handler, %s", e.what());
+                LOG(LogLevel::ERROR, "Exception at handler, %s", e.what());
             }
             break;
         case CMD_CTRL_SPAMBLOCK:
@@ -68,27 +69,27 @@ void socketConnectionHandler(const Bot& bot, struct TgBotConnection conn) {
                                 gObservedChatIds.end(), _data.data_4.id);
             bool observe = _data.data_4.observe;
             if (gObserveAllChats) {
-                LOG_W(
+                LOG(LogLevel::WARNING,
                     "CMD_OBSERVE_CHAT_ID disabled due to "
                     "CMD_OBSERVE_ALL_CHATS");
                 break;
             }
             if (it == gObservedChatIds.end()) {
                 if (observe) {
-                    LOG_D("Adding chat to observer");
+                    LOG(LogLevel::DEBUG, "Adding chat to observer");
                     gObservedChatIds.push_back(_data.data_4.id);
                 } else {
-                    LOG_W(
+                    LOG(LogLevel::WARNING,
                         "Trying to quit observing chatid which wasn't being "
                         "observed!");
                 }
             } else {
                 if (observe) {
-                    LOG_W(
+                    LOG(LogLevel::WARNING,
                         "Trying to observe chatid which was already being "
                         "observed!");
                 } else {
-                    LOG_D("Removing chat from observer");
+                    LOG(LogLevel::DEBUG, "Removing chat from observer");
                     gObservedChatIds.erase(it);
                 }
             }
@@ -141,21 +142,22 @@ void socketConnectionHandler(const Bot& bot, struct TgBotConnection conn) {
                     fn(bot.getApi(), _data.data_5.id,
                        InputFile::fromFile(file, getMIMEString(file)));
                 } catch (std::ifstream::failure& e) {
-                    LOG_I(
+                    LOG(LogLevel::INFO,
                         "Failed to send '%s' as local file, trying as Telegram "
                         "file id",
                         file);
                     fn(bot.getApi(), _data.data_5.id, std::string(file));
                 }
             } catch (const TgBot::TgException& e) {
-                LOG_E("Exception at handler, %s", e.what());
+                LOG(LogLevel::ERROR, "Exception at handler, %s", e.what());
             }
         } break;
         case CMD_OBSERVE_ALL_CHATS: {
             gObserveAllChats = _data.data_6;
         } break;
         default:
-            LOG_E("Unhandled cmd: %s", TgBotCmd::toStr(conn.cmd).c_str());
+            LOG(LogLevel::ERROR, "Unhandled cmd: %s",
+                TgBotCmd::toStr(conn.cmd).c_str());
             break;
     };
 }

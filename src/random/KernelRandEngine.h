@@ -4,6 +4,7 @@
 
 #include <Logging.h>
 #include <fcntl.h>
+#include <internal/_logging_posix.h>
 #include <internal/_FileDescriptor_posix.h>
 #include <unistd.h>
 
@@ -32,7 +33,7 @@ struct kernel_rand_engine {
         for (const auto& n : nodes) {
             fd = open(n.c_str(), O_RDONLY);
             if (!isValidFd(fd) && errno != ENOENT) {
-                PLOG_E("Opening hwrng device '%s'", n.c_str());
+                PLOG_E("Opening hwrng device failed");
             } else
                 break;
         }
@@ -49,7 +50,7 @@ struct kernel_rand_engine {
             for (const auto& n : nodes) {
                 ret = access(n.c_str(), R_OK);
                 if (ret != 0 && errno != ENOENT) {
-                    PLOG_E("Accessing hwrng device '%s'", n.c_str());
+                    PLOG_E("Accessing hwrng device failed");
                 } else {
                     kSupported = true;
                 }

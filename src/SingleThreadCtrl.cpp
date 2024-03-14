@@ -1,12 +1,13 @@
 #include <SingleThreadCtrl.h>
 
 #include <mutex>
+#include "Logging.h"
 
 void SingleThreadCtrl::runWith(thread_function fn) {
     if (!threadP)
         threadP = std::thread(&SingleThreadCtrl::_threadFn, this, fn);
     else {
-        LOG_W("Function is already set: %s controller", mgr_priv.usage.str);
+        LOG(LogLevel::WARNING, "Function is already set: %s controller", mgr_priv.usage.str);
     }
 }
 
@@ -31,6 +32,6 @@ void SingleThreadCtrl::reset() {
 void SingleThreadCtrl::_threadFn(thread_function fn) {
     fn();
     if (kRun) {
-        LOG_I("%s controller ended before stop command", mgr_priv.usage.str);
+        LOG(LogLevel::INFO, "%s controller ended before stop command", mgr_priv.usage.str);
     }
 }

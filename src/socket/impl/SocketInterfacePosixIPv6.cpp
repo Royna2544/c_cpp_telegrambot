@@ -47,14 +47,14 @@ SocketInterfaceUnixIPv6::createServerSocket() {
         return ret;
     }
 
-    LOG_D("Dump of active interfaces' addresses (IPv6)");
+    LOG(LogLevel::DEBUG, "Dump of active interfaces' addresses (IPv6)");
     foreach_ipv6_interfaces([](const char* iface, const char* addr) {
-        LOG_D("ifname %s: addr %s", iface, addr);
+        LOG(LogLevel::DEBUG, "ifname %s: addr %s", iface, addr);
     });
     foreach_ipv6_interfaces(
         [&iface_done, sfd](const char* iface, const char* addr) {
             if (!iface_done && strncmp("lo", iface, 2)) {
-                LOG_D("Choosing ifname %s addr %s", iface, addr);
+                LOG(LogLevel::DEBUG, "Choosing ifname %s addr %s", iface, addr);
 
                 SocketHelperUnix::setSocketBindingToIface(sfd, iface);
                 iface_done = true;
@@ -62,15 +62,14 @@ SocketInterfaceUnixIPv6::createServerSocket() {
         });
 
     if (!iface_done) {
-        LOG_E("Failed to find any valid interface to bind to (IPv6)");
+        LOG(LogLevel::ERROR, "Failed to find any valid interface to bind to (IPv6)");
         return ret;
     }
 
     name.sin6_family = AF_INET6;
     name.sin6_port = htons(kTgBotHostPort);
     name.sin6_addr = IN6ADDR_ANY_INIT;
-    if (bind(sfd, reinterpret_cast<struct sockaddr*>(&name), sizeof(name)) !=
-        0) {
+    if (bind(sfd, reinterpret_cast<struct sockaddr*>(&name), sizeof(name)) != 0) {
         PLOG_E("Failed to bind to socket");
         close(sfd);
         return ret;

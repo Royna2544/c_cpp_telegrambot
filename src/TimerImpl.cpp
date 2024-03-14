@@ -153,7 +153,7 @@ void TimerCommandManager::startTimer(const Bot &bot, const Message::Ptr &msg) {
         try {
             bot.getApi().pinChatMessage(message->chat->id, message->messageId);
         } catch (const TgBot::TgException &) {
-            LOG_W("Cannot pin msg!");
+            LOG(LogLevel::WARNING, "Cannot pin msg!");
             botcanpin = false;
         }
         runWith(std::bind(&TimerCommandManager::TimerThreadFn, this,
@@ -182,6 +182,6 @@ void TimerCommandManager::stopTimer(const Bot &bot, const Message::Ptr &msg) {
 
 void TimerCommandManager::Timerstop(SingleThreadCtrl *thiz) {
     if (static_cast<TimerCommandManager *>(thiz)->isactive) {
-        LOG_I("Canceling timer and cleaning up...");
+        LOG(LogLevel::INFO, "Canceling timer and cleaning up...");
     }
 }

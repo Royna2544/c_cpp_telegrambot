@@ -6,6 +6,8 @@
 #include <sys/un.h>
 #include <unistd.h>
 
+#include "Logging.h"
+
 void SocketInterfaceUnix::startListening(const listener_callback_t& cb,
                                          std::promise<bool>& createdPromise) {
     isRunning = true;
@@ -42,7 +44,7 @@ void SocketInterfaceUnix::startListening(const listener_callback_t& cb,
                 const pollfd& listen_fd_poll = fds[0];
                 const pollfd& socket_fd_poll = fds[1];
 
-                LOG_D("Waiting for incoming events");
+                LOG(LogLevel::DEBUG, "Waiting for incoming events");
 
                 rc = poll(fds, sizeof(fds) / sizeof(pollfd), -1);
                 if (rc < 0) {
@@ -51,7 +53,7 @@ void SocketInterfaceUnix::startListening(const listener_callback_t& cb,
                 }
 
                 if (rc == 2) {
-                    LOG_W("Dropping incoming buffer: exiting");
+                    LOG(LogLevel::WARNING, "Dropping incoming buffer: exiting");
                 }
                 if (listen_fd_poll.revents & POLLIN) {
                     dummy_listen_buf_t buf;
@@ -61,7 +63,7 @@ void SocketInterfaceUnix::startListening(const listener_callback_t& cb,
                     closeFd(listen_fd);
                     break;
                 } else if (!(socket_fd_poll.revents & POLLIN)) {
-                    LOG_E(
+                    LOG(LogLevel::ERROR,
                         "Unexpected state: sfd.revents: %d, listen_fd.revents: "
                         "%d",
                         socket_fd_poll.revents, listen_fd_poll.revents);
@@ -75,7 +77,7 @@ void SocketInterfaceUnix::startListening(const listener_callback_t& cb,
                     PLOG_E("Accept failed");
                     break;
                 } else {
-                    LOG_D("Client connected");
+                    LOG(LogLevel::DEBUG, "Client connected");
                 }
                 const int count = read(cfd, &conn, sizeof(conn));
                 should_break = handleIncomingBuf(

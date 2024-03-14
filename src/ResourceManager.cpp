@@ -14,25 +14,25 @@ bool ResourceManager::preloadOneFile(std::filesystem::path path) {
 
     for (const auto& [elem, data] : kResources) {
         if (elem.string() == path.string()) {
-            LOG_W("Resource %s already loaded", path.string().c_str());
+            LOG(LogLevel::WARNING, "Resource %s already loaded", path.string().c_str());
             return false;
         }
     }
-    LOG_V("Preloading %s", path.string().c_str());
+    LOG(LogLevel::VERBOSE, "Preloading %s", path.string().c_str());
     linebuf << file.rdbuf();
     kResources[path] = linebuf.str();
     return true;
 }
 
 void ResourceManager::preloadResourceDirectory() {
-    LOG_V("Preloading resource directory");
+    LOG(LogLevel::VERBOSE, "Preloading resource directory");
     std::filesystem::recursive_directory_iterator end;
     for (std::filesystem::recursive_directory_iterator it(getResourceRootdir()); it != end; ++it) {
         if (it->is_regular_file()) {
             preloadOneFile(*it);
         }
     }
-    LOG_V("Preloading resource directory done");
+    LOG(LogLevel::VERBOSE, "Preloading resource directory done");
 }
 
 const std::string& ResourceManager::getResource(std::filesystem::path path) {
@@ -42,7 +42,7 @@ const std::string& ResourceManager::getResource(std::filesystem::path path) {
             return data;
         }
     }
-    LOG_E("Resource not found: %s", path.string().c_str());
+    LOG(LogLevel::ERROR, "Resource not found: %s", path.string().c_str());
     return empty;
 }
 

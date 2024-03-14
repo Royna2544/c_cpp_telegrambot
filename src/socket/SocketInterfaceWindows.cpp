@@ -4,6 +4,7 @@
 #include <winsock2.h>
 #include <winsock.h>
 #include <afunix.h>
+#include "Logging.h"
 #include "socket/TgBotSocket.h"
 // clang-format on
 
@@ -91,7 +92,7 @@ void SocketInterfaceWindows::startListening(
                         WSALOG_E("Accept failed");
                         break;
                     } else {
-                        LOG_D("Client connected");
+                        LOG(LogLevel::DEBUG, "Client connected");
                     }
                     const int count = recv(cfd, reinterpret_cast<char *>(&conn),
                                            sizeof(conn), 0);
@@ -101,7 +102,7 @@ void SocketInterfaceWindows::startListening(
                     closesocket(cfd);
                 } else {
                     if (!kRun) {
-                        LOG_D("Exiting");
+                        LOG(LogLevel::DEBUG, "Exiting");
                         break;
                     }
                 }

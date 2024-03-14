@@ -1,6 +1,5 @@
 #include <ConfigManager.h>
 #include <Logging.h>
-#include <libos/libfs.hpp>
 
 #include <boost/program_options.hpp>
 #include <cstdlib>
@@ -8,6 +7,7 @@
 #include <fstream>
 #include <functional>
 #include <iostream>
+#include <libos/libfs.hpp>
 #include <mutex>
 #include <optional>
 
@@ -49,7 +49,7 @@ struct file_priv {
                 ("PATH,p", po::value<std::string>(), "Environment variable PATH (to override)")
                 (file_priv::kConfigOverrideVar, po::value<std::vector<std::string>>()->multitoken(),
                     "Config list to override from this source");
-                // clang-format on
+            // clang-format on
         });
         return desc;
     }
@@ -70,20 +70,21 @@ static void *file_load(void) {
     static file_priv p{};
 
     if (!getHomePath(home)) {
-        LOG_E("Cannot find HOME");
+        LOG(LogLevel::ERROR, "Cannot find HOME");
         return nullptr;
     }
     const auto confPath = (home / ".tgbot_conf.ini").string();
     std::ifstream ifs(confPath);
     if (ifs.fail()) {
-        LOG_E("Opening %s failed", confPath.c_str());
+        LOG(LogLevel::ERROR, "Opening %s failed", confPath.c_str());
         return nullptr;
     }
     po::store(po::parse_config_file(ifs, file_priv::getTgBotOptionsDesc()),
               p.mp);
     po::notify(p.mp);
 
-    LOG_I("Loaded %zu entries from %s", p.mp.size(), confPath.c_str());
+    LOG(LogLevel::INFO, "Loaded %zu entries from %s", p.mp.size(),
+        confPath.c_str());
     return &p;
 }
 
@@ -94,7 +95,8 @@ static void *cmdline_load() {
 
     copyCommandLine(CommandLineOp::GET, &argc, &argv);
     if (!argv) {
-        LOG_W("Command line copy failed, probably it wasn't saved before");
+        LOG(LogLevel::WARNING,
+            "Command line copy failed, probably it wasn't saved before");
         return nullptr;
     }
 
@@ -103,7 +105,7 @@ static void *cmdline_load() {
         p.mp);
     po::notify(p.mp);
 
-    LOG_I("Loaded %zu entries", p.mp.size());
+    LOG(LogLevel::INFO, "Loaded %zu entries", p.mp.size());
     return &p;
 }
 
@@ -184,16 +186,18 @@ std::optional<std::string> getVariable(const std::string &name) {
             ASSERT(ptr->getVariable, "Bad: getVariable not yet set");
             if (once_flag == 0) {
                 if (ptr->doOverride && ptr->doOverride(ptr->priv.data, name)) {
-                    LOG_V("Used '%s' backend for fetching var '%s' (forced)",
-                          ptr->name, name.c_str());
+                    LOG(LogLevel::VERBOSE,
+                        "Used '%s' backend for fetching var '%s' (forced)",
+                        ptr->name, name.c_str());
                     ptr->getVariable(ptr->priv.data, name, outvalue);
                     return {outvalue};
                 }
                 continue;
             }
             if (ptr->getVariable(ptr->priv.data, name, outvalue)) {
-                LOG_V("Used '%s' backend for fetching var '%s'", ptr->name,
-                      name.c_str());
+                LOG(LogLevel::VERBOSE,
+                    "Used '%s' backend for fetching var '%s'", ptr->name,
+                    name.c_str());
                 return {outvalue};
             }
         }

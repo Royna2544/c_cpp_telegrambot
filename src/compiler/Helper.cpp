@@ -28,6 +28,6 @@ void CompilerInTgHelper::onResultReady(const Bot &bot,
 void CompilerInTgHelper::onCompilerPathCommand(const Bot &bot,
                                                const Message::Ptr &message,
                                                const std::string &text) {
-    LOG_D("%s", text.c_str());
+    LOG(LogLevel::DEBUG, "%s", text.c_str());
     bot_sendReplyMessage(bot, message, text);
 }

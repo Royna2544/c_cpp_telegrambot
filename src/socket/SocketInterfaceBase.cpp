@@ -3,6 +3,7 @@
 #include <map>
 #include <vector>
 
+#include "Logging.h"
 #include "socket/TgBotSocket.h"
 
 bool SocketInterfaceBase::handleIncomingBuf(
@@ -10,12 +11,12 @@ bool SocketInterfaceBase::handleIncomingBuf(
     const listener_callback_t& cb, std::function<char*(void)> errMsgFn) {
     if (len > 0) {
         if (conn.magic != MAGIC_VALUE) {
-            LOG_W("Invalid magic value, dropping buffer");
+            LOG(LogLevel::WARNING, "Invalid magic value, dropping buffer");
             return false;
         }
 
-        LOG_I("Received buf with %s, invoke callback!",
-              TgBotCmd::toStr(conn.cmd).c_str());
+        LOG(LogLevel::INFO, "Received buf with %s, invoke callback!",
+            TgBotCmd::toStr(conn.cmd).c_str());
 
         if (conn.cmd == CMD_EXIT) {
             /**
@@ -44,7 +45,7 @@ bool SocketInterfaceBase::handleIncomingBuf(
                         tokenSet = true;
                         return false;
                     }
-                    LOG_W(
+                    LOG(LogLevel::WARNING,
                         "Token was already set, but SET_TOKEN request, abort.");
                     break;
                 case ExitOp::DO_EXIT:
@@ -54,7 +55,7 @@ bool SocketInterfaceBase::handleIncomingBuf(
                      * indicating that different exit tokens were received.
                      */
                     if (exitToken != exitToken_In) {
-                        LOG_W(
+                        LOG(LogLevel::WARNING,
                             "Different exit tokens: My: '%s', input: '%s'. "
                             "Ignoring!",
                             exitToken.c_str(), exitToken_In.c_str());
@@ -77,7 +78,7 @@ bool SocketInterfaceBase::handleIncomingBuf(
          * @param errMsg The error message returned by the error message
          * function.
          */
-        LOG_E("Failed to read from socket: %s", errMsgFn());
+        LOG(LogLevel::ERROR, "Failed to read from socket: %s", errMsgFn());
     }
     return false;
 }

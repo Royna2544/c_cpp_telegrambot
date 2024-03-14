@@ -2,6 +2,7 @@
 
 #include <functional>
 
+#include <internal/_logging_posix.h>
 #include <internal/_FileDescriptor_posix.h>
 #include "SocketInterfaceBase.h"
 #include "TgBotSocket.h"

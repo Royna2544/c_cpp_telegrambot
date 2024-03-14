@@ -1,9 +1,10 @@
 #include <winsock2.h>
 
+#include "Logging.h"
 #include "SocketInterfaceBase.h"
 
-#define WSALOG_E(fmt, ...) \
-    LOG_E(fmt ": %s", ##__VA_ARGS__, strWSAError(WSAGetLastError()))
+#define WSALOG_E(fmt) \
+    LOG(LogLevel::ERROR, fmt ": %s", strWSAError(WSAGetLastError()))
 
 struct SocketInterfaceWindows : SocketInterfaceBase {
     using socket_handle_t = SOCKET;

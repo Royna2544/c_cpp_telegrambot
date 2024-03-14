@@ -3,6 +3,7 @@
 
 #include <filesystem>
 #include <memory>
+#include "Logging.h"
 
 using database::DatabaseWrapper;
 
@@ -65,7 +66,7 @@ UserId DatabaseWrapper::maybeGetOwnerId() const {
 
 bool DatabaseWrapper::warnNoLoaded(const char* func) const {
     if (!loaded) {
-        LOG_W("Database not loaded! Called function: '%s'", func);
+        LOG(LogLevel::WARNING, "Database not loaded! Called function: '%s'", func);
     }
     return loaded;
 }

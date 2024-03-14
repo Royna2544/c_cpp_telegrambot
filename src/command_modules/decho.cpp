@@ -11,8 +11,9 @@ static void DeleteEchoCommandFn(const Bot &bot, const Message::Ptr message) {
         bot.getApi().deleteMessage(chatId, message->messageId);
     } catch (const TgBot::TgException &) {
         // bot is not admin. nothing it can do
-        LOG_W("bot is not admin in chat '%s', cannot use decho!",
-              message->chat->title.c_str());
+        LOG(LogLevel::WARNING,
+            "bot is not admin in chat '%s', cannot use decho!",
+            message->chat->title.c_str());
         return;
     }
     if (hasExtArgs(message)) {

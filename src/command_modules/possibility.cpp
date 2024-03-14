@@ -28,7 +28,7 @@ static void PossibilityCommandFn(const Bot &bot, const Message::Ptr message) {
         out << "(Warning: Removed " << vec.size() - set.size() << " duplicates)"
             << std::endl
             << std::endl;
-        LOG_W("Contains duplicates!");
+        LOG(LogLevel::WARNING, "Contains duplicates!");
     }
     map.reserve(set.size());
     if (set.size() == 1) {

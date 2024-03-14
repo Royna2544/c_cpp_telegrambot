@@ -63,7 +63,7 @@ static bool RNG_rdrand_supported(void) {
     unsigned int eax, ebx, ecx, edx;
 
     if (__get_cpuid(1, &eax, &ebx, &ecx, &edx) == 0) {
-        LOG_W("CPUID information is not available");
+        LOG(LogLevel::WARNING, "CPUID information is not available");
         return false;
     }
     return BIT_SET(ecx, 30);
@@ -124,7 +124,7 @@ static const RNGType* getRNG(void) {
         for (size_t i = 0; i < sizeof(RNGs) / sizeof(RNGType); ++i) {
             const auto thisrng = &RNGs[i];
             if (thisrng->supported()) {
-                LOG_I("Using '%s' for random number generation", thisrng->name);
+                LOG(LogLevel::INFO, "Using '%s' for random number generation", thisrng->name);
                 rng = thisrng;
                 break;
             }

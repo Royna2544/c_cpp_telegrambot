@@ -3,15 +3,17 @@
 #include <EnumArrayHelpers.h>
 #include <Logging.h>
 #include <StringToolsExt.h>
-#include <libos/libfs.hpp>
 #include <random/RandomNumberGenerator.h>
 
 #include <boost/algorithm/string/replace.hpp>
 #include <chrono>
+#include <cstdio>
+#include <libos/libfs.hpp>
 #include <mutex>
 #include <thread>
 
 #include "popen_wdt/popen_wdt.h"
+
 
 using std::chrono_literals::operator""ms;
 using std::chrono::duration_cast;
@@ -47,9 +49,8 @@ void CompilerInTg::runCommand(const Message::Ptr &message, std::string cmd,
     unique_id = genRandomNumber(100);
     boost::replace_all(cmd, std::string(1, '"'), "\\\"");
 
-#define ID_LOG_I(id, fmt, ...) LOG_I("[ID %d] " fmt, id, ##__VA_ARGS__)
-    ID_LOG_I(unique_id, "%s: +++", __func__);
-    ID_LOG_I(unique_id, "Command: %s", cmd.c_str());
+    LOG(LogLevel::INFO, "[ID %d] %s: +++", unique_id, __func__);
+    LOG(LogLevel::INFO, "[ID %d] Command: '%s'", unique_id, cmd.c_str());
     auto start = high_resolution_clock::now();
     auto fp = popen_watchdog(cmd.c_str(), use_wdt ? &watchdog_bitten : nullptr);
 
@@ -81,8 +82,7 @@ void CompilerInTg::runCommand(const Message::Ptr &message, std::string cmd,
             << millis * 0.001 << " seconds" << std::endl;
     }
     pclose(fp);
-    ID_LOG_I(unique_id, "%s: ---", __func__);
-#undef ID_LOG_I
+    LOG(LogLevel::INFO, "[ID %d] %s: ---", unique_id, __func__);
 }
 
 static std::optional<std::string> findCommandExe(std::string command) {
@@ -121,8 +121,8 @@ static std::optional<std::string> findCommandExe(std::string command) {
 
 bool findCompiler(ProgrammingLangs lang, std::string &path) {
     static const auto compilers =
-        array_helpers::make<ProgrammingLangs::MAX, ProgrammingLangs,
-                            const std::vector<std::string>>(
+        array_helpers::make<static_cast<int>(ProgrammingLangs::MAX),
+                            ProgrammingLangs, const std::vector<std::string>>(
             COMPILER(ProgrammingLangs::C, "clang", "gcc", "cc"),
             COMPILER(ProgrammingLangs::CXX, "clang++", "g++", "c++"),
             COMPILER(ProgrammingLangs::GO, "go"),

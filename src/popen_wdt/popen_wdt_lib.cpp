@@ -21,7 +21,7 @@ bool runCommand(const std::string& command, std::string& result) {
         }
         if (result.back() == '\n') result.pop_back();
 
-        LOG_V("Command: %s, result: '%s'", command.c_str(), result.c_str());
+        LOG(LogLevel::VERBOSE, "Command: %s, result: '%s'", command.c_str(), result.c_str());
         return true;
     }
     return false;

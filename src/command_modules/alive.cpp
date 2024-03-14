@@ -12,7 +12,6 @@
 #include "CommandModule.h"
 #include "internal/_tgbot.h"
 
-
 static void AliveCommandFn(const Bot &bot, const Message::Ptr message) {
     static std::string version;
     static std::once_flag once;
@@ -30,7 +29,7 @@ static void AliveCommandFn(const Bot &bot, const Message::Ptr message) {
                 "git --git-dir=" + (getSrcRoot() / ".git").string() + ' ';
             const bool ret = runCommand(gitPrefix + cmd.second, *cmd.first);
             if (!ret) {
-                LOG_E("Command failed: %s", cmd.second.c_str());
+                LOG(LogLevel::ERROR, "Command failed: %s", cmd.second.c_str());
                 *cmd.first = "[Failed]";
             }
         }
@@ -65,7 +64,8 @@ static void AliveCommandFn(const Bot &bot, const Message::Ptr message) {
             0, 0, 0, "", version, message->messageId, nullptr, "html");
     } catch (const TgBot::TgException &e) {
         // Fallback to HTML if no GIF
-        LOG_E("Alive cmd: Error while sending GIF: %s", e.what());
+        LOG(LogLevel::ERROR, "Alive cmd: Error while sending GIF: %s",
+            e.what());
         bot_sendReplyMessageHTML(bot, message, version);
     }
 }

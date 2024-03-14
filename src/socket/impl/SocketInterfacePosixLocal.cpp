@@ -23,7 +23,7 @@ SocketInterfaceUnix::socket_handle_t SocketInterfaceUnixLocal::makeSocket(
     CStringLifetime path = getOptions(Options::DESTINATION_ADDRESS);
 
     if (!client) {
-        LOG_D("Creating socket at %s", path.get());
+        LOG(LogLevel::DEBUG, "Creating socket at %s", path.get());
     }
     struct sockaddr_un name {};
     const int sfd = socket(AF_LOCAL, SOCK_STREAM, 0);
@@ -39,12 +39,16 @@ SocketInterfaceUnix::socket_handle_t SocketInterfaceUnixLocal::makeSocket(
     decltype(&connect) fn = client ? connect : bind;
     if (fn(sfd, reinterpret_cast<struct sockaddr*>(&name), size) != 0) {
         do {
-            PLOG_E("Failed to %s to socket", client ? "connect" : "bind");
+            if (client) {
+                PLOG_E("Failed to connect to socket");
+            } else {
+                PLOG_E("Failed to bind to socket");
+            }
             if (!client && errno == EADDRINUSE) {
                 cleanupServerSocket();
                 if (fn(sfd, reinterpret_cast<struct sockaddr*>(&name), size) ==
                     0) {
-                    LOG_I("Bind succeeded by removing socket file");
+                    LOG(LogLevel::INFO, "Bind succeeded by removing socket file");
                     break;
                 }
             }

@@ -175,14 +175,15 @@ std::shared_ptr<T> SingleThreadCtrlManager::getController(
     auto it = kControllers.find(req.usage);
 
     if (kIsUnderStopAll) {
-        LOG_W("Under stopAll(), ignore");
+        LOG(LogLevel::WARNING, "Under stopAll(), ignore");
         return {};
     }
     if (sizeMismatch = it != kControllers.end() &&
                        it->second->mgr_priv.sizeOfThis < sizeof(T);
         sizeMismatch) {
-        LOG_W("Size mismatch: Buffer has %zu, New class wants %zu",
-              it->second->mgr_priv.sizeOfThis, sizeof(T));
+        LOG(LogLevel::WARNING,
+            "Size mismatch: Buffer has %zu, New class wants %zu",
+            it->second->mgr_priv.sizeOfThis, sizeof(T));
         if (!(req.flags & SIZEDIFF_ACTION_RECONSTRUCT)) return {};
     }
     if (it != kControllers.end() && it->second && !sizeMismatch) {
@@ -191,7 +192,7 @@ std::shared_ptr<T> SingleThreadCtrlManager::getController(
             maybeRet)
             ptr = maybeRet.value();
         else {
-            LOG_V("Using old: %s controller", usageStr);
+            LOG(LogLevel::VERBOSE, "Using old: %s controller", usageStr);
             ptr = it->second;
         }
     } else {
@@ -205,7 +206,7 @@ std::shared_ptr<T> SingleThreadCtrlManager::getController(
                 destroyController(it->first);
                 lk.lock();
             }
-            LOG_V("New allocation: %s controller", usageStr);
+            LOG(LogLevel::VERBOSE, "New allocation: %s controller", usageStr);
             if constexpr (sizeof...(args) != 0)
                 newit = std::make_shared<T>(std::forward<Args...>(args...));
             else

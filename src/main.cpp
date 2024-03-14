@@ -14,8 +14,8 @@
 #include <cmds.gen.h>
 
 #include "CompilerInTelegram.h"
+#include "Logging.h"
 #include "ResourceManager.h"
-#include "tgbot/types/ChatAdministratorRights.h"
 
 #ifdef RTCOMMAND_LOADER
 #include <RTCommandLoader.h>
@@ -27,13 +27,16 @@
 
 #include <tgbot/tgbot.h>
 
+// wingdi.h
+#undef ERROR
+
 // tgbot
 using TgBot::TgLongPoll;
 
 static void cleanupFn(int s) {
     static std::once_flag once;
     std::call_once(once, [s] {
-        LOG_I("Exiting with signal %d", s);
+        LOG(LogLevel::INFO, "Exiting with signal %d", s);
         gSThreadManager.destroyManager();
         database::DBWrapper.save();
     });
@@ -89,7 +92,7 @@ int main(int argc, const char **argv) {
     }
     auto ret = ConfigManager::getVariable("TOKEN");
     if (!ret) {
-        LOG_F("Failed to get TOKEN variable");
+        LOG(LogLevel::FATAL, "Failed to get TOKEN variable");
         return EXIT_FAILURE;
     }
     gResourceManager.preloadResourceDirectory();
@@ -161,12 +164,12 @@ int main(int argc, const char **argv) {
 #endif
     installSignalHandler(cleanupFn);
 
-    LOG_D("Token: %s", token.c_str());
+    LOG(LogLevel::DEBUG, "Token: %s", token.c_str());
     auto CurrentTp = std::chrono::system_clock::now();
     auto LastTp = std::chrono::system_clock::from_time_t(0);
     do {
         try {
-            LOG_D("Bot username: %s", gBot.getApi().getMe()->username.c_str());
+            LOG(LogLevel::DEBUG, "Bot username: %s", gBot.getApi().getMe()->username.c_str());
             gBot.getApi().deleteWebhook();
 
             TgLongPoll longPoll(gBot);
@@ -174,26 +177,26 @@ int main(int argc, const char **argv) {
                 longPoll.start();
             }
         } catch (const std::exception &e) {
-            LOG_E("Exception: %s", e.what());
-            LOG_W("Trying to recover");
+            LOG(LogLevel::ERROR, "Exception: %s", e.what());
+            LOG(LogLevel::WARNING, "Trying to recover");
             UserId ownerid = database::DBWrapper.maybeGetOwnerId();
             try {
                 bot_sendMessage(gBot, ownerid,
                                 std::string("Exception occured: ") + e.what());
             } catch (const std::exception &e) {
-                LOG_F("%s", e.what());
+                LOG(LogLevel::FATAL, "%s", e.what());
                 break;
             }
             CurrentTp = std::chrono::system_clock::now();
             if (to_secs(CurrentTp - LastTp).count() < 30 &&
                 std::chrono::system_clock::to_time_t(LastTp) != 0) {
                 bot_sendMessage(gBot, ownerid, "Recover failed.");
-                LOG_F("Recover failed");
+                LOG(LogLevel::FATAL, "Recover failed");
                 break;
             }
             LastTp = CurrentTp;
             bot_sendMessage(gBot, ownerid, "Reinitializing.");
-            LOG_I("Re-init");
+            LOG(LogLevel::INFO, "Re-init");
             gAuthorized = false;
             static const SingleThreadCtrlManager::GetControllerRequest req{
                 .usage = SingleThreadCtrlManager::USAGE_ERROR_RECOVERY_THREAD,

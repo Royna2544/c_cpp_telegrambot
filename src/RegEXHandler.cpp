@@ -64,8 +64,8 @@ OptionalWrapper<std::string> RegexHandlerBase::doRegexReplaceCommand(
 
             if (!global) kRegexMatchFlags |= format_first_only;
 
-            LOG_D("src: '%s' dest: '%s' global: %d icase: %d", args[1].c_str(),
-                  args[2].c_str(), global, kRegexFlags & icase);
+            LOG(LogLevel::DEBUG, "src: '%s' dest: '%s' global: %d icase: %d",
+                args[1].c_str(), args[2].c_str(), global, kRegexFlags & icase);
             try {
                 return {
                     std::regex_replace(desttext, src, dest, kRegexMatchFlags)};
@@ -87,7 +87,7 @@ OptionalWrapper<std::string> RegexHandlerBase::doRegexDeleteCommand(
             regex.has_value()) {
             std::stringstream kInStream(text), kOutStream;
             std::string line, out;
-            LOG_D("regexstr: '%s'", args[1].c_str());
+            LOG(LogLevel::DEBUG, "regexstr: '%s'", args[1].c_str());
             while (std::getline(kInStream, line)) {
                 if (!std::regex_search(line, regex.value(),
                                        format_sed | match_not_null)) {

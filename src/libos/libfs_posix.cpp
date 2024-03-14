@@ -8,7 +8,7 @@ bool fileExists(const std::filesystem::path& filename) {
     std::error_code ec;
     rc = std::filesystem::exists(filename, ec);
     if (ec) {
-        LOG_W("FS::Exists failed: %s", ec.message().c_str());
+        LOG(LogLevel::WARNING, "FS::Exists failed: %s", ec.message().c_str());
     }
     return rc;
 }

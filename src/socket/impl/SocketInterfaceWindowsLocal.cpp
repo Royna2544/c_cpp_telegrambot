@@ -1,4 +1,5 @@
 #include "../SocketInterfaceWindows.h"
+#include "Logging.h"
 #include "socket/SocketInterfaceBase.h"
 #include "socket/TgBotSocket.h"
 
@@ -20,12 +21,12 @@ SocketInterfaceWindows::socket_handle_t SocketInterfaceWindowsLocal::makeSocket(
     int ret;
 
     if (!is_client) {
-        LOG_D("Creating socket at %s", path.get());
+        LOG(LogLevel::DEBUG, "Creating socket at %s", path.get());
     }
 
     ret = WSAStartup(MAKEWORD(2, 2), &data);
     if (ret != 0) {
-        LOG_E("WSAStartup failed");
+        LOG(LogLevel::ERROR, "WSAStartup failed");
         return INVALID_SOCKET;
     }
     fd = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -41,12 +42,15 @@ SocketInterfaceWindows::socket_handle_t SocketInterfaceWindowsLocal::makeSocket(
 
     decltype(&connect) fn = is_client ? connect : bind;
     if (fn(fd, reinterpret_cast<struct sockaddr *>(&name), sizeof(name)) != 0) {
-        WSALOG_E("Failed to %s to socket", is_client ? "connect" : "bind");
+        if (is_client)
+            WSALOG_E("Failed to connect to socket");
+        else
+            WSALOG_E("Failed to bind to socket");
         do {
             if (!is_client && WSAGetLastError() == WSAEADDRINUSE) {
                 cleanupServerSocket();
                 if (fn(fd, reinterpret_cast<struct sockaddr *>(&name), sizeof(name)) == 0) {
-                    LOG_I("Bind succeeded by removing socket file");
+                    LOG(LogLevel::INFO, "Bind succeeded by removing socket file");
                     break;
                 }
             }

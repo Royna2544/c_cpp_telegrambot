@@ -59,14 +59,15 @@ bool SpamBlockBase::isEntryOverThreshold(PerChatHandle::const_reference t,
     const size_t kEntryValue = t.second.size();
     const bool isOverThreshold = kEntryValue >= threshold;
     if (isOverThreshold)
-        LOG_D("Note: Value %zu is over threshold %zu", kEntryValue, threshold);
+        LOG(LogLevel::DEBUG, "Note: Value %zu is over threshold %zu",
+            kEntryValue, threshold);
     return isOverThreshold;
 }
 
 void SpamBlockBase::_logSpamDetectCommon(PerChatHandle::const_reference t,
                                          const char *name) {
-    LOG_I("Spam detected for user %s, filtered by %s",
-          UserPtr_toString(t.first).c_str(), name);
+    LOG(LogLevel::INFO, "Spam detected for user %s, filtered by %s",
+        UserPtr_toString(t.first).c_str(), name);
 }
 
 void SpamBlockBase::takeAction(OneChatIterator it, const PerChatHandle &map,
@@ -125,7 +126,8 @@ void SpamBlockBase::runFunction(void) {
                         continue;
                     }
                     if (its->second >= sSpamDetectThreshold) {
-                        LOG_D("Launching spamdetect for %s", chatName.get());
+                        LOG(LogLevel::DEBUG, "Launching spamdetect for %s",
+                            chatName.get());
                         spamDetectFunc(it);
                     }
                     buffer.erase(it);
@@ -229,19 +231,20 @@ void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle,
             try {
                 _bot.getApi().deleteMessage(handle->first->id, msg->messageId);
             } catch (const TgBot::TgException &e) {
-                LOG_V("Error deleting message: %s", e.what());
+                LOG(LogLevel::VERBOSE, "Error deleting message: %s", e.what());
             }
         }
 
         if (mute) {
-            LOG_I("Try mute user %s in chat %s", userstr.get(), chatstr.get());
+            LOG(LogLevel::INFO, "Try mute user %s in chat %s", userstr.get(),
+                chatstr.get());
             try {
                 _bot.getApi().restrictChatMember(
                     handle->first->id, t.first->id, perms,
                     to_secs(kMuteDuration).count());
             } catch (const TgBot::TgException &e) {
-                LOG_W("Cannot mute user %s in chat %s: %s", userstr.get(),
-                      chatstr.get(), e.what());
+                LOG(LogLevel::WARNING, "Cannot mute user %s in chat %s: %s",
+                    userstr.get(), chatstr.get(), e.what());
             }
         }
     }

@@ -1,5 +1,6 @@
 #include <Authorization.h>
 #include <BotAddCommand.h>
+#include "Logging.h"
 
 static void NoCompilerCommandStub(const Bot& bot, const Message::Ptr& message) {
     bot_sendReplyMessage(bot, message, "Not supported in current host");
@@ -30,7 +31,7 @@ void bot_AddCommandEnforcedCompiler(Bot& bot, const char* cmd,
                                std::bind(cb, std::placeholders::_1,
                                          std::placeholders::_2, compiler));
     } else {
-        LOG_W("Unsupported cmd '%s' (compiler)", cmd);
+        LOG(LogLevel::WARNING, "Unsupported cmd '%s' (compiler)", cmd);
         bot_AddCommandEnforced(bot, cmd, NoCompilerCommandStub);
     }
 }
