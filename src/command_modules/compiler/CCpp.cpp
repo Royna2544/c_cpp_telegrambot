@@ -22,17 +22,13 @@ void CompilerInTgForCCpp::run(const Message::Ptr& message) {
 
     if (verifyParseWrite(message, outfile)) {
         cmd << cmdPrefix << SPACE << outfile;
-        if (hasExtArgs(message)) {
-            parseExtArgs(message, extraargs);
-            appendExtArgs(cmd, extraargs, resultbuf);
-        }
 
         resultbuf << "Compile time:" << std::endl;
         runCommand(message, cmd.str(), resultbuf);
         resultbuf << std::endl;
 
         if (fileExists(aoutname)) {
-            resultbuf << "Run time:\n";
+            resultbuf << "Run time:" << std::endl;
             runCommand(message, aoutname, resultbuf);
             std::filesystem::remove(aoutname);
         }
