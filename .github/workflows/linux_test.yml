@@ -18,16 +18,17 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: mjp41/workaround8649@c8550b715ccdc17f89c8d5c28d7a48eeff9c94a8
-
       - name: Set up dependencies
         run: |
           bash ./setup_dependencies_apt.sh
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 18
 
       - name: Compile with Ubuntu Clang
         env:
-          CC: clang
-          CXX: clang++
+          CC: clang-18
+          CXX: clang++-18
         run: |
           mkdir build
           cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release .

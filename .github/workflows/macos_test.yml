@@ -18,11 +18,13 @@ jobs:
 
       - name: Set up dependencies
         run: |
-          brew install boost protobuf ninja
+          brew install boost protobuf ninja llvm
           git submodule update --init
 
       - name: Compile with Apple Clang
         env: 
+          CC: /usr/local/opt/llvm/bin/clang
+          CXX: /usr/local/opt/llvm/bin/clang++
           LDFLAGS: "-L/usr/local/opt/protobuf/lib -L/usr/local/opt/abseil/lib"
         run: |
           mkdir build
