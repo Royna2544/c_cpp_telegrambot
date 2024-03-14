@@ -7,10 +7,10 @@ void CompilerInTgHelper::onFailed(const Bot &bot, const Message::Ptr &message,
     std::string text;
     switch (e) {
         case CompilerInTg::ErrorType::MESSAGE_VERIFICATION_FAILED:
-            text = "Message verification failed";
+            text = "Reply to a message with code as text";
             break;
         case CompilerInTg::ErrorType::FILE_WRITE_FAILED:
-            text = "Failed to write to file";
+            text = "Failed to write output file";
             break;
         case CompilerInTg::ErrorType::POPEN_WDT_FAILED:
             text = "Failed to run command";
