@@ -95,6 +95,7 @@ void loadCommandsFromFile(Bot& bot, const std::filesystem::path filename) {
         auto modulesPath = std::filesystem::path(argv[0]).parent_path() /
                            "src/command_modules/runtime/";
         modulesPath.make_preferred();
+        modulesPath.lexically_relative(std::filesystem::current_path());
         while (std::getline(ifs, line)) {
             loadOneCommand(bot, modulesPath / line);
         }
