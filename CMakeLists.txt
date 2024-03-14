@@ -48,7 +48,7 @@ set(BUILD_SHARED_LIBS OFF)
 #####################################################################
 
 ################# Detecting x86/x86_64 Architecture ################
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "i[3-6]86|x86_64|AMD64|amd64")
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "i[3-6]86|x86_64|AMD64|amd64" AND NOT MSVC)
   add_compile_options(-mrdrnd)
 endif()
 #####################################################################
@@ -61,9 +61,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 #####################################################################
 
 ####################### Global compiler flags #######################
-add_compile_options(-Wall -Werror -O3)
-add_compile_options(
-  -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/=)
+if (NOT MSVC)
+  add_compile_options(-Wall -Werror -O3)
+  add_compile_options(
+    -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/=)
+endif()
 ################### Check Windows's AF_UNIX support ###################
 ################# Versions later than Win10 RS3 does #################
 if (WIN32)
