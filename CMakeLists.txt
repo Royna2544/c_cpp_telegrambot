@@ -65,6 +65,9 @@ if (NOT MSVC)
   add_compile_options(-Wall -Werror -O3)
   add_compile_options(
     -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/=)
+else()
+  # Windows 10
+  add_definitions(-D_WIN32_WINNT=0x0A00)
 endif()
 ################### Check Windows's AF_UNIX support ###################
 ################# Versions later than Win10 RS3 does #################
@@ -179,7 +182,7 @@ foreach(ABSL_LIB absl_log_internal_check_op absl_log_internal_message)
 endforeach()
 ####################### TgBotDB lib includes #######################
 add_dependencies(TgBotDB protobuf_TgBotDB_ready)
-target_link_libraries(TgBotDB TgBot TgBotUtils protobuf::libprotobuf protobuf ${ABSL_LIBS})
+target_link_libraries(TgBotDB TgBot TgBotUtils protobuf::libprotobuf ${ABSL_LIBS})
 #####################################################################
 
 ################## RTCL (Run Time Command Loader) ##################

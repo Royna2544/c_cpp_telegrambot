@@ -13,10 +13,7 @@ _deps
 # Exe
 TgBot++*
 # Lib
-libTgBotDB.a
-libTgBotRes.a
-libTgBotSocket.a
-libTgBotUtils.a
+libTgBot*.a
 # Cmake generated
 modules.load
 # Protobuf generated
@@ -25,3 +22,5 @@ proto/gen
 build/
 .vscode/
 .cache/
+.vs/
+CMakeSettings.json

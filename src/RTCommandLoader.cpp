@@ -38,6 +38,7 @@ void loadOneCommand(Bot& bot, const std::filesystem::path _fname) {
     command_callback_t fn;
     Dl_info info{};
     void *handle, *fnptr = nullptr;
+    const char* dlerrorBuf = nullptr;
     bool isSupported = true;
     std::string fname = _fname.string();
 #ifdef __WIN32
@@ -48,7 +49,8 @@ void loadOneCommand(Bot& bot, const std::filesystem::path _fname) {
 
     handle = dlopen(fname.c_str(), RTLD_NOW);
     if (!handle) {
-        LOG(LogLevel::WARNING, "Failed to load: %s", dlerror() ?: "unknown");
+        dlerrorBuf = dlerror();
+        LOG(LogLevel::WARNING, "Failed to load: %s", dlerrorBuf ? dlerrorBuf : "unknown");
         return;
     }
     sym = static_cast<struct dynamicCommandModule*>(
@@ -74,8 +76,8 @@ void loadOneCommand(Bot& bot, const std::filesystem::path _fname) {
         bot_AddCommandPermissive(bot, mod->command, fn);
 
     if (dladdr(sym, &info) < 0) {
-        LOG(LogLevel::WARNING, "dladdr failed for %s: %s", fname.c_str(),
-            dlerror() ?: "unknown");
+        dlerrorBuf = dlerror();
+        LOG(LogLevel::WARNING, "dladdr failed for %s: %s", fname.c_str(), dlerrorBuf ? dlerrorBuf : "unknown");
     } else {
         fnptr = info.dli_saddr;
     }

@@ -10,6 +10,9 @@
 #include "Logging.h"
 #include "socket/SocketInterfaceBase.h"
 
+#ifdef _MSC_VER
+#define strcasecmp _stricmp
+#endif
 
 using database::DBWrapper;
 

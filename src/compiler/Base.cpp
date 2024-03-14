@@ -81,7 +81,7 @@ void CompilerInTg::runCommand(const Message::Ptr &message, std::string cmd,
         res << "-> It took " << std::fixed << std::setprecision(3)
             << millis * 0.001 << " seconds" << std::endl;
     }
-    pclose(fp);
+    fclose(fp);
     LOG(LogLevel::INFO, "[ID %d] %s: ---", unique_id, __func__);
 }
 

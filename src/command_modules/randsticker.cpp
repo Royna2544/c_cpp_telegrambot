@@ -15,7 +15,7 @@ static void RandomStickerCommandFn(const Bot &bot, const Message::Ptr message) {
             bot_sendReplyMessage(bot, message, e.what());
             return;
         }
-        const ssize_t pos = genRandomNumber(stickset->stickers.size() - 1);
+        const size_t pos = genRandomNumber(stickset->stickers.size() - 1);
         bot.getApi().sendSticker(message->chat->id,
                                  stickset->stickers[pos]->fileId,
                                  message->messageId, nullptr, false, true);

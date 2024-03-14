@@ -99,9 +99,6 @@ class SingleThreadCtrlManager {
 extern SingleThreadCtrlManager gSThreadManager;
 
 struct SingleThreadCtrl {
-    SingleThreadCtrl() {
-        timer_mutex.lk = std::unique_lock<std::timed_mutex>(timer_mutex.m);
-    };
     using thread_function = std::function<void(void)>;
     using prestop_function = std::function<void(SingleThreadCtrl*)>;
 
@@ -114,7 +111,14 @@ struct SingleThreadCtrl {
     // Reset the counter, to make this instance reusable
     void reset();
 
-    virtual ~SingleThreadCtrl() { stop(); }
+    SingleThreadCtrl() {
+        timer_mutex.lk = std::unique_lock<std::timed_mutex>(timer_mutex.m);
+    };
+    virtual ~SingleThreadCtrl() {
+	if (timer_mutex.lk.owns_lock())
+            timer_mutex.lk.unlock();
+        stop();
+    }
 
     friend class SingleThreadCtrlManager;
 
