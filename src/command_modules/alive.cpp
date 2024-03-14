@@ -71,7 +71,7 @@ static void AliveCommandFn(const Bot &bot, const Message::Ptr message) {
 }
 
 struct CommandModule cmd_alive(
-    "alive", "Test the bot if alive, also prints bot information",
+    "alive", "Test the bot if alive",
     CommandModule::Flags::None, AliveCommandFn);
 
 struct CommandModule cmd_start("start", "Alias for alive command",

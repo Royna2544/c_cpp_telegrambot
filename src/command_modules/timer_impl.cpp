@@ -18,7 +18,7 @@ static void TimerStopCommandFn(const Bot &bot, const Message::Ptr message) {
 }
 
 struct CommandModule cmd_starttimer(
-    "starttimer", "Start timer of the bot, possibly pins timer message",
+    "starttimer", "Start timer of the bot",
     CommandModule::Flags::Enforced, TimerStartCommandFn);
 struct CommandModule cmd_stoptimer(
     "stoptimer", "Stop timer of the bot",

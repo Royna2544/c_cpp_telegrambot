@@ -351,6 +351,6 @@ static void InteractiveBashCommandFn(const Bot& bot,
     }
 }
 
-struct CommandModule cmd_ibash("ibash", "Interactive bash subprocess",
+struct CommandModule cmd_ibash("ibash", "Interactive bash",
                                CommandModule::Flags::Enforced,
                                InteractiveBashCommandFn);

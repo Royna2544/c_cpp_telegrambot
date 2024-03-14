@@ -42,5 +42,5 @@ static void DelayCommandFn(const Bot& bot, const Message::Ptr message) {
 }
 
 struct CommandModule cmd_delay("delay",
-                               "Ping the bot for network delay measurement",
+                               "Ping the bot for network delay",
                                CommandModule::Flags::None, DelayCommandFn);

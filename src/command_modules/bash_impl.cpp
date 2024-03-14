@@ -11,8 +11,8 @@ static void unsafeBashCommandFn(const Bot &bot, const Message::Ptr message) {
     ubash.run(message);
 }
 
-struct CommandModule cmd_bash("bash", "Execute bash commands",
+struct CommandModule cmd_bash("bash", "Run bash scripts",
                               CommandModule::Flags::Enforced, BashCommandFn);
 
-struct CommandModule cmd_ubash("ubash", "Execute bash commands (no timeout)",
+struct CommandModule cmd_ubash("ubash", "Run bash scripts notimeout",
                               CommandModule::Flags::Enforced, unsafeBashCommandFn);

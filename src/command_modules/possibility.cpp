@@ -70,6 +70,6 @@ static void PossibilityCommandFn(const Bot &bot, const Message::Ptr message) {
 }
 
 struct CommandModule cmd_possibility("possibility",
-                                     "Get possibility for given conditions",
+                                     "Get possibilities",
                                      CommandModule::Flags::None,
                                      PossibilityCommandFn);
