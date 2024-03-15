@@ -70,9 +70,8 @@ class SingleThreadCtrlManager {
         int flags = 0;
     };
 
-    template <
-        class T = SingleThreadCtrl, typename... Args,
-        std::enable_if_t<std::is_base_of_v<SingleThreadCtrl, T>, bool> = true>
+    template <class T = SingleThreadCtrl, typename... Args>
+        requires std::is_base_of_v<SingleThreadCtrl, T>
     std::shared_ptr<T> getController(const GetControllerRequest req,
                                      Args... args);
 
@@ -168,8 +167,8 @@ struct SingleThreadCtrlRunnable : SingleThreadCtrl {
     virtual ~SingleThreadCtrlRunnable() {}
 };
 
-template <class T, typename... Args,
-          std::enable_if_t<std::is_base_of_v<SingleThreadCtrl, T>, bool>>
+template <class T, typename... Args>
+requires std::is_base_of_v<SingleThreadCtrl, T>
 std::shared_ptr<T> SingleThreadCtrlManager::getController(
     const GetControllerRequest req, Args... args) {
     controller_type ptr;
