@@ -47,9 +47,11 @@ void LOG(LogLevel servere, FormatWithLocation fwl, Args... args) {
 }
 
 template <typename T, typename... Args>
-void ASSERT(const T cond, FormatWithLocation value, Args... args) {
+inline void ASSERT(const T cond, FormatWithLocation value, Args... args) {
     if (!cond) {
-        LOG(LogLevel::FATAL, FormatWithLocation("Assertion failed: %s"), value, args...);
+        LOG(LogLevel::FATAL,
+            FormatWithLocation("Assertion failed: %s", value.loc), value.value,
+            args...);
         assert(cond);
     }
 }
