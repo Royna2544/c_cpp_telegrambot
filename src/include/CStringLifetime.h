@@ -141,6 +141,9 @@ public:
         return _c_str;
     }
 
+    operator const char*() const {
+        return get();
+    }
 private:
     /**
      * @brief Update the C-style string with a new value
