@@ -1,5 +1,6 @@
 #pragma once
 
+#include <filesystem>
 #include <string>
 
 /**
@@ -15,7 +16,6 @@
  * 
  * @tparam TAllocator The allocator to use for the std::string object
  */
-template<typename TAllocator = std::allocator<char>>
 class CStringLifetime {
 public:
     /**
@@ -66,6 +66,8 @@ public:
     CStringLifetime(const CStringLifetime& other) : _str(other._str) {
         _c_str = _str.c_str();
     }
+
+    CStringLifetime(const std::filesystem::path path) : CStringLifetime(path.string()) {}
 
     /**
      * @brief Move constructor

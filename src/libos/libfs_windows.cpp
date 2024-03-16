@@ -2,6 +2,7 @@
 #include <shlwapi.h>
 
 #include <filesystem>
+#include <CStringLifetime.h>
 
 bool getHomePath(std::filesystem::path& buf) {
     CHAR userDir[MAX_PATH];
@@ -14,7 +15,6 @@ bool getHomePath(std::filesystem::path& buf) {
 }
 
 bool fileExists(const std::filesystem::path& path) {
-    auto pathstr = path.string();
-    auto filepath = pathstr.c_str();
+    CStringLifetime filepath(path);
     return PathFileExistsA(filepath) && !PathIsDirectoryA(filepath);
 }
