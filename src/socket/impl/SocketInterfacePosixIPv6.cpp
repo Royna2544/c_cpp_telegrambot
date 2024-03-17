@@ -65,6 +65,7 @@ SocketInterfaceUnixIPv6::createServerSocket() {
         LOG(LogLevel::ERROR, "Failed to find any valid interface to bind to (IPv6)");
         return ret;
     }
+    SocketHelperCommon::printExternalIPINet();
 
     name.sin6_family = AF_INET6;
     name.sin6_port = htons(kTgBotHostPort);

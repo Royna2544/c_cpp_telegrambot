@@ -15,6 +15,7 @@
 #include <Types.h>
 
 #include "../SocketInterfaceUnix.h"
+#include "socket/SocketInterfaceBase.h"
 
 void SocketInterfaceUnixIPv4::foreach_ipv4_interfaces(
     const std::function<void(const char*, const char*)> callback) {
@@ -56,11 +57,13 @@ SocketInterfaceUnixIPv4::createServerSocket() {
                 iface_done = true;
             }
         });
-
+    
+    
     if (!iface_done) {
         LOG(LogLevel::ERROR, "Failed to find any valid interface to bind to (IPv4)");
         return ret;
     }
+    SocketHelperCommon::printExternalIPINet();
 
     name.sin_family = AF_INET;
     name.sin_port = htons(kTgBotHostPort);

@@ -1,14 +1,17 @@
-#include "../SocketInterfaceBase.h"
-#include "Logging.h"
 #include <libos/libfs.hpp>
 
-bool SocketHelperCommon::_isAvailable(SocketInterfaceBase *it, const char *envVar) {
-    char* addr = getenv(envVar);
+#include "../SocketInterfaceBase.h"
+#include "Logging.h"
+
+bool SocketHelperCommon::_isAvailable(SocketInterfaceBase *it,
+                                      const char *envVar) {
+    char *addr = getenv(envVar);
     if (!addr) {
         LOG(LogLevel::DEBUG, "%s is not set, isAvailable false", envVar);
         return false;
     }
-    it->setOptions(SocketInterfaceBase::Options::DESTINATION_ADDRESS, addr, true);
+    it->setOptions(SocketInterfaceBase::Options::DESTINATION_ADDRESS, addr,
+                   true);
     return true;
 }
 
@@ -22,13 +25,61 @@ bool SocketHelperCommon::isAvailableIPv6(SocketInterfaceBase *it) {
 bool SocketHelperCommon::canSocketBeClosedLocalSocket(SocketInterfaceBase *it) {
     bool socketValid = true;
 
-    if (!fileExists(it->getOptions(SocketInterfaceBase::Options::DESTINATION_ADDRESS))) {
+    if (!fileExists(it->getOptions(
+            SocketInterfaceBase::Options::DESTINATION_ADDRESS))) {
         LOG(LogLevel::WARNING, "Socket file was deleted");
         socketValid = false;
     }
     return socketValid;
 }
 
-void SocketHelperCommon::cleanupServerSocketLocalSocket(SocketInterfaceBase *it) {
-    std::filesystem::remove(it->getOptions(SocketInterfaceBase::Options::DESTINATION_ADDRESS));
+void SocketHelperCommon::cleanupServerSocketLocalSocket(
+    SocketInterfaceBase *it) {
+    std::filesystem::remove(
+        it->getOptions(SocketInterfaceBase::Options::DESTINATION_ADDRESS));
 }
+
+#ifdef HAVE_CURL
+#include <curl/curl.h>
+#undef ERROR
+
+void SocketHelperCommon::printExternalIPINet() {
+    CURL *curl;
+    CURLcode res;
+
+    // Initialize libcurl
+    curl = curl_easy_init();
+    if (!curl) {
+        LOG(LogLevel::ERROR, "Error initializing libcurl");
+        return;
+    }
+
+    // Set the URL to ipinfo
+    curl_easy_setopt(curl, CURLOPT_URL, "ipinfo.io/ip");
+
+    // Set the callback function for handling the response
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, externalIPCallback);
+
+    // Perform the request
+    res = curl_easy_perform(curl);
+    if (res != CURLE_OK) {
+        LOG(LogLevel::ERROR, "curl_easy_perform() failed: %s",
+            curl_easy_strerror(res));
+    }
+
+    // Clean up
+    curl_easy_cleanup(curl);
+}
+
+size_t SocketHelperCommon::externalIPCallback(void *contents, size_t size,
+                                              size_t nmemb, void *userp) {
+    std::string s;
+    s.append((char *)contents, size * nmemb);
+    LOG(LogLevel::DEBUG, "External IP addr: %s", s.c_str());
+    return size * nmemb;
+}
+#else   // HAVE_CURL
+void SocketHelperCommon::getExternalIPINet() {
+    LOG(LogLevel::ERROR, "%s needs libcurl", __func__);
+}
+#endif  // HAVE_CURL

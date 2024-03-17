@@ -100,6 +100,14 @@ find_package(Boost COMPONENTS program_options REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})
 #####################################################################
 
+############################# Check curl #############################
+find_package(CURL 7.58.0)
+if (CURL_FOUND)
+    include_directories(${CURL_INCLUDE_DIRS})
+    add_definitions(-DHAVE_CURL)
+endif()
+#####################################################################
+
 ############################# Platforms #############################
 if(WIN32)
   set(TARGET_VARIANT windows)
@@ -247,6 +255,9 @@ if (USE_UNIX_SOCKETS)
 
   target_link_libraries(${SOCKET_CLI_NAME} TgBotSocket TgBotUtils)
   target_link_lib_if_windows(${SOCKET_CLI_NAME} Ws2_32)
+  if (CURL_FOUND)
+    target_link_libraries(TgBotSocket ${CURL_LIBRARIES})
+  endif()
 endif()
 #####################################################################
 

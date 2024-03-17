@@ -5,6 +5,7 @@
 #include <map>
 #include <vector>
 
+#include "Logging.h"
 #include "TgBotSocket.h"
 
 using listener_callback_t = std::function<void(struct TgBotConnection)>;
@@ -142,8 +143,11 @@ struct SocketHelperCommon {
     static bool isAvailableIPv6(SocketInterfaceBase *it);
     static bool canSocketBeClosedLocalSocket(SocketInterfaceBase *it);
     static void cleanupServerSocketLocalSocket(SocketInterfaceBase *it);
+    static void printExternalIPINet(void);
   private:
     constexpr static const char kIPv4EnvVar[] = "IPV4_ADDRESS";
     constexpr static const char kIPv6EnvVar[] = "IPV6_ADDRESS";
     static bool _isAvailable(SocketInterfaceBase *it, const char *envVar);
+    static size_t externalIPCallback(void *contents, size_t size, size_t nmemb, void *userp);
+
 };
