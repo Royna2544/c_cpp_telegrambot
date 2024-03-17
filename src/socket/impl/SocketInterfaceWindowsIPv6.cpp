@@ -4,8 +4,7 @@
 #include "../SocketInterfaceWindows.h"
 #include "socket/SocketInterfaceBase.h"
 
-SocketInterfaceWindows::socket_handle_t
-SocketInterfaceWindowsIPv6::createServerSocket() {
+socket_handle_t SocketInterfaceWindowsIPv6::createServerSocket() {
     struct sockaddr_in6 name {};
     socket_handle_t sfd;
     WSADATA data;
@@ -33,8 +32,7 @@ SocketInterfaceWindowsIPv6::createServerSocket() {
     return sfd;
 }
 
-SocketInterfaceWindowsIPv6::socket_handle_t
-SocketInterfaceWindowsIPv6::createClientSocket() {
+socket_handle_t SocketInterfaceWindowsIPv6::createClientSocket() {
     struct sockaddr_in name {};
     socket_handle_t sfd;
     WSADATA data;

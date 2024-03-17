@@ -12,7 +12,7 @@
 #include <CStringLifetime.h>
 #include <libos/libfs.hpp>
 
-SocketInterfaceWindows::socket_handle_t SocketInterfaceWindowsLocal::makeSocket(
+socket_handle_t SocketInterfaceWindowsLocal::makeSocket(
     bool is_client) {
     struct sockaddr_un name {};
     CStringLifetime path = getOptions(Options::DESTINATION_ADDRESS);
@@ -62,14 +62,12 @@ SocketInterfaceWindows::socket_handle_t SocketInterfaceWindowsLocal::makeSocket(
     return fd;
 }
 
-SocketInterfaceWindows::socket_handle_t
-SocketInterfaceWindowsLocal::createClientSocket() {
+socket_handle_t SocketInterfaceWindowsLocal::createClientSocket() {
     setOptions(Options::DESTINATION_ADDRESS, getSocketPath().string());
     return makeSocket(/*is_client=*/true);
 }
 
-SocketInterfaceWindows::socket_handle_t
-SocketInterfaceWindowsLocal::createServerSocket() {
+socket_handle_t SocketInterfaceWindowsLocal::createServerSocket() {
     setOptions(Options::DESTINATION_ADDRESS, getSocketPath().string());
     return makeSocket(/*is_client=*/false);
 }

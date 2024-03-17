@@ -6,8 +6,9 @@
 #define WSALOG_E(fmt) \
     LOG(LogLevel::ERROR, fmt ": %s", strWSAError(WSAGetLastError()))
 
+using socket_handle_t = SOCKET;
+
 struct SocketInterfaceWindows : SocketInterfaceBase {
-    using socket_handle_t = SOCKET;
     bool isValidSocketHandle(socket_handle_t handle) {
         return handle != INVALID_SOCKET;
     };

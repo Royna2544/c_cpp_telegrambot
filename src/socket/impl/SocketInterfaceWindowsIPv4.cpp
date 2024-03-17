@@ -3,8 +3,7 @@
 
 #include "../SocketInterfaceWindows.h"
 
-SocketInterfaceWindowsIPv4::socket_handle_t
-SocketInterfaceWindowsIPv4::createServerSocket() {
+socket_handle_t SocketInterfaceWindowsIPv4::createServerSocket() {
     struct sockaddr_in name {};
     socket_handle_t sfd;
     WSADATA data;
@@ -32,8 +31,7 @@ SocketInterfaceWindowsIPv4::createServerSocket() {
     return sfd;
 }
 
-SocketInterfaceWindowsIPv4::socket_handle_t
-SocketInterfaceWindowsIPv4::createClientSocket() {
+socket_handle_t SocketInterfaceWindowsIPv4::createClientSocket() {
     struct sockaddr_in name {};
     socket_handle_t sfd;
     WSADATA data;
