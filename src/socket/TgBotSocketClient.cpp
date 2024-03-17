@@ -136,6 +136,11 @@ int main(int argc, char** argv) {
                         ret = stob_or(argv[0], &data);
                         data_g.data_6 = data;
                     } break;
+                    case CMD_DELETE_CONTROLLER_BY_ID: {
+                        TgBotCommandData::DeleteControllerById data{};
+                        ret = stoi_or(argv[0], &data);
+                        data_g.data_7 = data;
+                    }
                     case CMD_MAX:
                         break;
                     default:

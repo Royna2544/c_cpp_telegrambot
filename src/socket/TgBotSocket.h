@@ -19,6 +19,7 @@ enum TgBotCommand {
     CMD_OBSERVE_CHAT_ID,
     CMD_SEND_FILE_TO_CHAT_ID,
     CMD_OBSERVE_ALL_CHATS,
+    CMD_DELETE_CONTROLLER_BY_ID,
     CMD_MAX,
 };
 
@@ -106,6 +107,9 @@ struct SendFileToChatId {
 };
 
 using ObserveAllChats = bool;
+
+using DeleteControllerById = int;
+
 }  // namespace TgBotCommandData
 
 union TgBotCommandUnion {
@@ -115,6 +119,7 @@ union TgBotCommandUnion {
     TgBotCommandData::ObserveChatId data_4;
     TgBotCommandData::SendFileToChatId data_5;
     TgBotCommandData::ObserveAllChats data_6;
+    TgBotCommandData::DeleteControllerById data_7;
 };
 
 constexpr int64_t MAGIC_VALUE = 0xDEADFACE;

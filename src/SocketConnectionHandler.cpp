@@ -12,6 +12,7 @@
 #include <mutex>
 
 #include "ResourceManager.h"
+#include "SingleThreadCtrl.h"
 #include "socket/TgBotSocket.h"
 #include "tgbot/types/InputFile.h"
 
@@ -125,8 +126,8 @@ void socketConnectionHandler(const Bot& bot, struct TgBotConnection conn) {
                         break;
                     case TYPE_DICE: {
                         static const std::vector<std::string> dices = {
-                                "🎲", "🎯", "🏀", "⚽", "🎳", "🎰"};
-                            // TODO: More clean code?
+                            "🎲", "🎯", "🏀", "⚽", "🎳", "🎰"};
+                        // TODO: More clean code?
                         bot.getApi().sendDice(
                             _data.data_5.id, false, 0, nullptr,
                             dices[genRandomNumber(0, dices.size() - 1)]);
@@ -156,6 +157,18 @@ void socketConnectionHandler(const Bot& bot, struct TgBotConnection conn) {
         case CMD_OBSERVE_ALL_CHATS: {
             gObserveAllChats = _data.data_6;
         } break;
+        case CMD_DELETE_CONTROLLER_BY_ID: {
+            int data = _data.data_7;
+            enum SingleThreadCtrlManager::ThreadUsage threadUsage;
+            if (data < 0 ||
+                data >= SingleThreadCtrlManager::USAGE_MAX) {
+                LOG(LogLevel::ERROR, "Invalid controller id: %d", data);
+                break;
+            }
+            threadUsage = static_cast<SingleThreadCtrlManager::ThreadUsage>(data);
+            gSThreadManager.destroyController(threadUsage);
+        }
+        break;
         default:
             LOG(LogLevel::ERROR, "Unhandled cmd: %s",
                 TgBotCmd::toStr(conn.cmd).c_str());
