@@ -18,6 +18,7 @@ struct SocketInterfaceWindows : SocketInterfaceBase {
     void forceStopListening(void) override;
     void startListening(const listener_callback_t& cb,
                         std::promise<bool>& createdPromise) override;
+    virtual void cleanupServerSocket() override;
 
     virtual ~SocketInterfaceWindows() = default;
 

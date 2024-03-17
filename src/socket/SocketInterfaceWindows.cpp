@@ -133,6 +133,10 @@ void SocketInterfaceWindows::writeToSocket(struct TgBotConnection conn) {
 
 void SocketInterfaceWindows::forceStopListening(void) { kRun = false; }
 
+void SocketInterfaceWindows::cleanupServerSocket() {
+    WSACleanup();
+}
+
 std::map<SocketUsage, std::shared_ptr<SocketInterfaceBase>> socket_interfaces{
     {SocketUsage::SU_INTERNAL, std::make_shared<SocketInterfaceWindowsLocal>()},
     {SocketUsage::SU_EXTERNAL, std::make_shared<SocketInterfaceWindowsIPv4>()},

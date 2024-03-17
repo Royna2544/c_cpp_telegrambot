@@ -73,6 +73,7 @@ socket_handle_t SocketInterfaceWindowsLocal::createServerSocket() {
 }
 
 void SocketInterfaceWindowsLocal::cleanupServerSocket() {
+    SocketInterfaceWindows::cleanupServerSocket();
     SocketHelperCommon::cleanupServerSocketLocalSocket(this);
 }
 
