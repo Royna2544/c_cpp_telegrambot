@@ -1,10 +1,11 @@
+#include <GitData.h>
 #include <Logging.h>
 #include <ResourceManager.h>
 #include <cmds.gen.h>
 
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/config.hpp>
-#include <map>
+#include <filesystem>
 #include <mutex>
 #include <popen_wdt/popen_wdt.hpp>
 #include <string>
@@ -17,39 +18,28 @@ static void AliveCommandFn(const Bot &bot, const Message::Ptr message) {
     static std::once_flag once;
 
     std::call_once(once, [&bot] {
-        std::string commitid, commitmsg, originurl, compilerver, commandmodules;
+        std::string commandmodules;
+        GitData data;
 
-        static const std::map<std::string *, std::string> commands = {
-            {&commitid, "rev-parse HEAD"},
-            {&commitmsg, "log --pretty=%s -1"},
-            {&originurl, "config --get remote.origin.url"},
-        };
-        for (const auto &cmd : commands) {
-            const std::string gitPrefix =
-                "git --git-dir=" + (getSrcRoot() / ".git").string() + ' ';
-            const bool ret = runCommand(gitPrefix + cmd.second, *cmd.first);
-            if (!ret) {
-                LOG(LogLevel::ERROR, "Command failed: %s", cmd.second.c_str());
-                *cmd.first = "[Failed]";
-            }
-        }
-        compilerver =
-            std::string(BOOST_PLATFORM " | " BOOST_COMPILER " | " __DATE__);
+        GitData::Fill(&data);
         commandmodules.reserve(8 * gCmdModules.size());
         for (const auto &i : gCmdModules) {
             commandmodules += i->command;
             commandmodules += " ";
         }
         version = gResourceManager.getResource("about.html.txt");
+
 #define REPLACE_PLACEHOLDER(buf, name) \
     boost::replace_all(buf, "_" #name "_", name)
 #define REPLACE_PLACEHOLDER2(buf, name, val) \
     boost::replace_all(buf, "_" #name "_", val)
-        REPLACE_PLACEHOLDER(version, commitid);
-        REPLACE_PLACEHOLDER(version, commitmsg);
-        REPLACE_PLACEHOLDER(version, originurl);
-        REPLACE_PLACEHOLDER(version, compilerver);
         REPLACE_PLACEHOLDER(version, commandmodules);
+        REPLACE_PLACEHOLDER2(version, compilerver,
+                             BOOST_PLATFORM " | " BOOST_COMPILER
+                                            " | " __DATE__);
+        REPLACE_PLACEHOLDER2(version, commitid, data.commitid);
+        REPLACE_PLACEHOLDER2(version, commitmsg, data.commitmsg);
+        REPLACE_PLACEHOLDER2(version, originurl, data.originurl);
         REPLACE_PLACEHOLDER2(version, botname,
                              UserPtr_toString(bot.getApi().getMe()));
         REPLACE_PLACEHOLDER2(version, botusername,
@@ -70,9 +60,8 @@ static void AliveCommandFn(const Bot &bot, const Message::Ptr message) {
     }
 }
 
-struct CommandModule cmd_alive(
-    "alive", "Test the bot if alive",
-    CommandModule::Flags::None, AliveCommandFn);
+struct CommandModule cmd_alive("alive", "Test the bot if alive",
+                               CommandModule::Flags::None, AliveCommandFn);
 
 struct CommandModule cmd_start("start", "Alias for alive command",
                                CommandModule::Flags::HideDescription,

@@ -12,12 +12,14 @@ _deps
 
 # Exe
 TgBot++*
-# Lib
 libTgBot*.a
-# Cmake generated
+libTgBot*.so
+
+# Generated
+src/command_modules/cmds.gen.*
 modules.load
-# Protobuf generated
 proto/gen
+
 # Visual studio code
 build/
 .vscode/

@@ -8,3 +8,6 @@
 	path = src/third-party/googletest
 	url = https://github.com/google/googletest.git
 	branch = refs/tags/v1.14.0
+[submodule "src/third-party/libgit2"]
+	path = src/third-party/libgit2
+	url = https://github.com/libgit2/libgit2

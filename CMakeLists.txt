@@ -44,7 +44,10 @@ set(PROJECT_TEST_NAME ${PROJECT_NAME}_test)
 option(ENFORCE_EN_US "Enforce en-US locale for output" ON)
 option(ENABLE_RUNTIME_COMMAND "Enable runtime loader of commands" ON)
 #################### This must be explicitly set ###################
-set(BUILD_SHARED_LIBS OFF)
+set(BUILD_SHARED_LIBS ON)
+set(BUILD_TESTS OFF)
+set(BUILD_CLI OFF)
+set(USE_HTTPS "OpenSSL")
 #####################################################################
 
 ################# Detecting x86/x86_64 Architecture ################
@@ -62,7 +65,6 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 ####################### Global compiler flags #######################
 if (NOT MSVC)
-  add_compile_options(-Wall -Werror -O3)
   add_compile_options(
     -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/=)
 else()
@@ -100,12 +102,14 @@ find_package(Boost COMPONENTS program_options REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})
 #####################################################################
 
-############################# Check curl #############################
+############################# Check lib #############################
 find_package(CURL 7.58.0)
 if (CURL_FOUND)
     include_directories(${CURL_INCLUDE_DIRS})
     add_definitions(-DHAVE_CURL)
 endif()
+find_package(OpenSSL REQUIRED)
+find_package(ZLIB REQUIRED)
 #####################################################################
 
 ############################# Platforms #############################
@@ -181,7 +185,7 @@ set(SRC_LIST ${SRC_LIST} ${COMMANDS_GEN_FILE})
 find_package(Protobuf REQUIRED)
 include(proto/ProtobufCpp.cmake)
 my_protobuf_generate_cpp(proto/gen PROTO_SRCS PROTO_HDRS proto/TgBotDB.proto)
-add_library(TgBotDB STATIC src/Database.cpp
+add_library(TgBotDB SHARED src/Database.cpp
                            src/DatabaseWrapper.cpp
                            ${PROTO_SRCS})
 ####################### TgBotDB lib includes #######################
@@ -248,7 +252,7 @@ if (USE_UNIX_SOCKETS)
   set(SOCKET_SRC_LIST ${SOCKET_SRC_LIST}
         src/socket/impl/SocketHelperCommon.cpp)
 
-  add_library(TgBotSocket STATIC
+  add_library(TgBotSocket SHARED
       ${SOCKET_SRC_LIST}
       src/socket/SocketInterfaceBase.cpp
       src/socket/TgBotCommandMap.cpp)
@@ -259,22 +263,35 @@ if (USE_UNIX_SOCKETS)
   if (CURL_FOUND)
     target_link_libraries(TgBotSocket ${CURL_LIBRARIES})
   endif()
+  target_link_libraries(TgBotSocket TgBotUtils)
 endif()
 #####################################################################
 
+################## libgit2 for accessing git in C code ##############
+add_subdirectory(src/third-party/libgit2)
+set(LIBGIT2_LIBS libgit2 util pcre http-parser xdiff ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES})
+if (WIN32)
+  set(LIBGIT2_LIBS ${LIBGIT2_LIBS} winhttp CRYPT32 Rpcrt4 Secur32 Ws2_32)
+elseif(APPLE)
+  set(LIBGIT2_LIBS ${LIBGIT2_LIBS} ntlmclient iconv)
+else()
+  set(LIBGIT2_LIBS ${LIBGIT2_LIBS} ntlmclient)
+endif()
+#####################################################################
 ################# TgBot Utilities (generic) Library #################
 add_library(
-  TgBotUtils STATIC
+  TgBotUtils SHARED
   src/ConfigManager.cpp
   src/SingleThreadCtrl.cpp
   src/SingleThreadCtrlManager.cpp
   src/ResourceManager.cpp
+  src/GitData.cpp
   src/popen_wdt/popen_wdt_${TARGET_VARIANT}.c
   src/popen_wdt/popen_wdt_lib.cpp
   src/libos/libfs.cpp
   src/libos/libfs_${TARGET_VARIANT}.cpp)
 
-target_link_libraries(TgBotUtils ${Boost_LIBRARIES})
+target_link_libraries(TgBotUtils ${Boost_LIBRARIES} ${LIBGIT2_LIBS})
 target_link_lib_if_windows(TgBotUtils shlwapi)
 #####################################################################
 
@@ -283,7 +300,7 @@ add_subdirectory(lib)
 #####################################################################
 
 ################### The Bot's main functionaility ###################
-add_library(TgBotCommandModules STATIC ${SRC_LIST})
+add_library(TgBotCommandModules SHARED ${SRC_LIST})
 target_include_directories(TgBotCommandModules PUBLIC ${CMAKE_BINARY_DIR}/${COMMANDS_CWD})
 ######################## Libraries to link ########################
 set(LD_LIST TgBot TgBotDB TgBotUtils ${ABSL_LIBS})
@@ -306,7 +323,7 @@ target_link_libraries(${DBDUMPER_NAME} TgBotDB TgBotUtils ${ABSL_LIBS})
 ############### Utility Programs (Send Media to chat) ################
 if (USE_UNIX_SOCKETS)
   add_executable(${MEDIA_CLI_NAME} proto/SendMediaToChat.cc)
-  target_link_libraries(${MEDIA_CLI_NAME} TgBotDB TgBotSocket ${ABSL_LIBS})
+  target_link_libraries(${MEDIA_CLI_NAME} TgBotDB TgBotSocket TgBotUtils ${ABSL_LIBS})
   target_link_lib_if_windows(${MEDIA_CLI_NAME} Ws2_32)
 endif()
 #####################################################################
