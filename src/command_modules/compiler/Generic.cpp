@@ -42,12 +42,6 @@ void CompilerInTgForGeneric::run(const Message::Ptr &message) {
 
     if (verifyParseWrite(message, outfile)) {
         cmd << cmdPrefix << SPACE << outfile;
-        
-        if (hasExtArgs(message)) {
-            parseExtArgs(message, extargs);
-            appendExtArgs(cmd, extargs, res);
-        }
-
         runCommand(message, cmd.str(), res);
         onResultReady(message, res.str());
         std::filesystem::remove(outfile);
