@@ -49,33 +49,34 @@ struct CompilerModule : CommandModule {
     }
 };
 
-static CompilerModule moduleC("c", ProgrammingLangs::C,
-                              [](const Bot &bot, const Message::Ptr &message,
-                                 std::string compiler) {
-                                  static CompilerInTgForCCppImpl cCompiler(
-                                      bot, compiler, "foo.c");
-                                  cCompiler.run(message);
-                              });
+static void CModuleCallback(const Bot &bot, const Message::Ptr &message,
+                            std::string compiler) {
+    static CompilerInTgForCCppImpl cCompiler(bot, compiler, "foo.c");
+    cCompiler.run(message);
+}
+static void CPPModuleCallback(const Bot &bot, const Message::Ptr &message,
+                              std::string compiler) {
+    static CompilerInTgForCCppImpl cppCompiler(bot, compiler, "foo.cpp");
+    cppCompiler.run(message);
+}
+static void PYModuleCallback(const Bot &bot, const Message::Ptr &message,
+                             std::string compiler) {
+    static CompilerInTgForGenericImpl pyCompiler(bot, compiler, "foo.py");
+    pyCompiler.run(message);
+}
+static void GOModuleCallback(const Bot &bot, const Message::Ptr &message,
+                             std::string compiler) {
+    static CompilerInTgForGenericImpl goCompiler(bot, compiler, "foo.go");
+    goCompiler.run(message);
+}
+
+static CompilerModule moduleC("c", ProgrammingLangs::C, CModuleCallback);
 static CompilerModule moduleCpp("cpp", ProgrammingLangs::CXX,
-                                [](const Bot &bot, const Message::Ptr &message,
-                                   std::string compiler) {
-                                    static CompilerInTgForCCppImpl cxxCompiler(
-                                        bot, compiler, "foo.cpp");
-                                    cxxCompiler.run(message);
-                                });
-static CompilerModule modulePython(
-    "python", ProgrammingLangs::PYTHON,
-    [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
-        static CompilerInTgForCCppImpl cxxCompiler(bot, compiler, "foo.py");
-        cxxCompiler.run(message);
-    });
-static CompilerModule moduleGolang(
-    "go", ProgrammingLangs::GO,
-    [](const Bot &bot, const Message::Ptr &message, std::string compiler) {
-        static CompilerInTgForCCppImpl cxxCompiler(bot, compiler + " run",
-                                                   "foo.go");
-        cxxCompiler.run(message);
-    });
+                                CPPModuleCallback);
+static CompilerModule modulePython("python", ProgrammingLangs::PYTHON,
+                                   PYModuleCallback);
+static CompilerModule moduleGolang("go", ProgrammingLangs::GO,
+                                   GOModuleCallback);
 
 void setupCompilerInTg(Bot &bot) {
     static std::vector<CompilerModule *> modules = {
