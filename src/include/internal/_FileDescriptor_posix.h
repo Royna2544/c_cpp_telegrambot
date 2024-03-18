@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <unistd.h>
 
 #include "Logging.h"
