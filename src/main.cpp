@@ -52,32 +52,28 @@ static void setupSocket(const Bot &gBot,
     auto socketCreatedFut = socketCreatedProm.get_future();
     auto intf = getSocketInterface(susage);
 
-    if (!intf->isRunning) {
-        socketConnectionManager->runWith([&socketCreatedProm, susage, &gBot] {
-            getSocketInterface(susage)->startListening(
-                [&gBot](struct TgBotConnection conn) {
-                    socketConnectionHandler(gBot, conn);
-                },
-                socketCreatedProm);
-        });
+    socketConnectionManager->runWith([&socketCreatedProm, susage, &gBot] {
+        getSocketInterface(susage)->startListening(
+            [&gBot](struct TgBotConnection conn) {
+                socketConnectionHandler(gBot, conn);
+            },
+            socketCreatedProm);
+    });
 
-        if (socketCreatedFut.get()) {
-            switch (susage) {
-                case SocketUsage::SU_INTERNAL:
-                    intf->writeToSocket({CMD_EXIT, {.data_2 = e}});
-                    socketConnectionManager->setPreStopFunction(
-                        [=](SingleThreadCtrl *) {
-                            getSocketInterface(susage)->stopListening(e.token);
-                        });
-                    break;
-                case SocketUsage::SU_EXTERNAL:
-                    socketConnectionManager->setPreStopFunction(
-                        [intf](SingleThreadCtrl *) {
-                            intf->forceStopListening();
-                        });
-                    break;
-            };
-        }
+    if (socketCreatedFut.get()) {
+        switch (susage) {
+            case SocketUsage::SU_INTERNAL:
+                intf->writeToSocket({CMD_EXIT, {.data_2 = e}});
+                socketConnectionManager->setPreStopFunction(
+                    [=](SingleThreadCtrl *) {
+                        getSocketInterface(susage)->stopListening(e.token);
+                    });
+                break;
+            case SocketUsage::SU_EXTERNAL:
+                socketConnectionManager->setPreStopFunction(
+                    [intf](SingleThreadCtrl *) { intf->forceStopListening(); });
+                break;
+        };
     }
 }
 #endif

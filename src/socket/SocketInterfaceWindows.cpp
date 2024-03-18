@@ -60,13 +60,12 @@ char *SocketInterfaceWindows::strWSAError(const int errcode) {
 
 void SocketInterfaceWindows::startListening(
     const listener_callback_t &cb, std::promise<bool> &createdPromise) {
-    bool should_break = false;
+    bool should_break = false, value_set = false;
     struct fd_set set;
     WSADATA data;
 
     if (WSAStartup(MAKEWORD(2, 2), &data) == 0) {
         const socket_handle_t sfd = createServerSocket();
-        isRunning = true;
         if (isValidSocketHandle(sfd)) {
             do {
                 if (listen(sfd, SOMAXCONN) == SOCKET_ERROR) {
@@ -74,6 +73,7 @@ void SocketInterfaceWindows::startListening(
                     break;
                 }
                 createdPromise.set_value(true);
+                value_set = true;
                 while (!should_break) {
                     struct sockaddr_un addr {};
                     struct TgBotConnection conn {};
@@ -112,13 +112,13 @@ void SocketInterfaceWindows::startListening(
             } while (false);
             closesocket(sfd);
             cleanupServerSocket();
-            isRunning = false;
         }
     } else {
         WSALOG_E("WSAStartup failed");
     }
     WSACleanup();
-    createdPromise.set_value(false);
+    if (!value_set)
+        createdPromise.set_value(false);
 }
 
 void SocketInterfaceWindows::writeToSocket(struct TgBotConnection conn) {

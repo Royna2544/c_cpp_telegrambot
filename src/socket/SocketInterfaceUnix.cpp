@@ -10,8 +10,7 @@
 
 void SocketInterfaceUnix::startListening(const listener_callback_t& cb,
                                          std::promise<bool>& createdPromise) {
-    isRunning = true;
-    bool should_break = false;
+    bool should_break = false, value_set = false;
     int rc = 0;
     socket_handle_t sfd = createServerSocket();
     if (isValidSocketHandle(sfd)) {
@@ -26,6 +25,7 @@ void SocketInterfaceUnix::startListening(const listener_callback_t& cb,
                 break;
             }
             createdPromise.set_value(true);
+            value_set = true;
             while (!should_break) {
                 struct sockaddr_un addr {};
                 struct TgBotConnection conn {};
@@ -88,11 +88,9 @@ void SocketInterfaceUnix::startListening(const listener_callback_t& cb,
         closePipe(kListenTerminate);
         close(sfd);
         cleanupServerSocket();
-        isRunning = false;
-        return;
     }
-    createdPromise.set_value(false);
-    isRunning = false;
+    if (!value_set)
+        createdPromise.set_value(false);
 }
 
 void SocketInterfaceUnix::writeToSocket(struct TgBotConnection conn) {

@@ -88,8 +88,6 @@ struct SocketInterfaceBase {
 
     void stopListening(const std::string& exittoken);
 
-    bool isRunning = false;
-
     using dummy_listen_buf_t = char;
 
    protected:
