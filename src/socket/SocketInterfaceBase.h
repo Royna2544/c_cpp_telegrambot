@@ -23,15 +23,6 @@ struct SocketInterfaceBase : SingleThreadCtrlRunnable<SocketInterfacePriv> {
     virtual void writeToSocket(struct TgBotConnection conn) = 0;
 
     /**
-     * @brief Stops the socket listener thread.
-     *
-     * This function will cause the socket listener thread to exit immediately.
-     * It is intended to be used in cases where the program needs to terminate
-     * immediately, and the normal shutdown process is not sufficient.
-     */
-    virtual void forceStopListening(void) = 0;
-
-    /**
      * @brief Starts the socket listener thread.
      *
      * @param listener_callback The function to be called when a new connection
@@ -41,15 +32,6 @@ struct SocketInterfaceBase : SingleThreadCtrlRunnable<SocketInterfacePriv> {
      */
     virtual void startListening(const listener_callback_t &listener_callback,
                                 const result_callback_t &result_callback) = 0;
-
-    /**
-     * @brief Cleans up the server socket.
-     *
-     * This function is called when the server socket is no longer needed.
-     * It will close the socket and free any system resources associated with
-     * it.
-     */
-    virtual void cleanupServerSocket() {}
 
     /**
      * @brief Sets an option for the socket interface.
@@ -84,13 +66,7 @@ struct SocketInterfaceBase : SingleThreadCtrlRunnable<SocketInterfacePriv> {
      */
     virtual bool isAvailable() = 0;
 
-    // Can this instance exit cleanly with CMD_EXIT?
-    virtual bool canSocketBeClosed() { return true; }
-
     virtual ~SocketInterfaceBase() = default;
-
-    // Setup exit verification via token
-    virtual void setupExitVerification();
 
     // Stop listening with exit token
     virtual void stopListening(const std::string &exittoken);
@@ -102,6 +78,30 @@ struct SocketInterfaceBase : SingleThreadCtrlRunnable<SocketInterfacePriv> {
     constexpr static int kTgBotHostPort = 50000;
 
    protected:
+    /**
+     * @brief Cleans up the server socket.
+     *
+     * This function is called when the server socket is no longer needed.
+     * It will close the socket and free any system resources associated with
+     * it.
+     */
+    virtual void cleanupServerSocket() {}
+
+    // Setup exit verification via token
+    virtual void setupExitVerification();
+
+    // Can this instance exit cleanly with CMD_EXIT?
+    virtual bool canSocketBeClosed() { return true; }
+
+    /**
+     * @brief Stops the socket listener thread.
+     *
+     * This function will cause the socket listener thread to exit immediately.
+     * It is intended to be used in cases where the program needs to terminate
+     * immediately, and the normal shutdown process is not sufficient.
+     */
+    virtual void forceStopListening(void) = 0;
+
     /**
      * @brief This function is used to handle incoming data from the Telegram
      * Bot API.
