@@ -114,8 +114,7 @@ struct SingleThreadCtrl {
         timer_mutex.lk = std::unique_lock<std::timed_mutex>(timer_mutex.m);
     };
     virtual ~SingleThreadCtrl() {
-	if (timer_mutex.lk.owns_lock())
-            timer_mutex.lk.unlock();
+        if (timer_mutex.lk.owns_lock()) timer_mutex.lk.unlock();
         stop();
     }
 
@@ -156,6 +155,10 @@ struct SingleThreadCtrl {
     } mgr_priv;
 };
 
+struct Empty {};
+
+template <typename T = Empty>
+    requires std::is_copy_constructible_v<T>
 struct SingleThreadCtrlRunnable : SingleThreadCtrl {
     using SingleThreadCtrl::runWith;
     using SingleThreadCtrl::SingleThreadCtrl;
@@ -164,11 +167,15 @@ struct SingleThreadCtrlRunnable : SingleThreadCtrl {
         SingleThreadCtrl::runWith(
             std::bind(&SingleThreadCtrlRunnable::runFunction, this));
     }
+    void setPriv(const std::shared_ptr<T> _priv) { priv = _priv; }
     virtual ~SingleThreadCtrlRunnable() {}
+
+   protected:
+    std::shared_ptr<T> priv;
 };
 
 template <class T, typename... Args>
-requires std::is_base_of_v<SingleThreadCtrl, T>
+    requires std::is_base_of_v<SingleThreadCtrl, T>
 std::shared_ptr<T> SingleThreadCtrlManager::getController(
     const GetControllerRequest req, Args... args) {
     controller_type ptr;

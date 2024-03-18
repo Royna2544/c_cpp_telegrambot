@@ -6,10 +6,9 @@
 
 #include "Logging.h"
 
-
 using database::DatabaseWrapper;
 
-struct DatabaseSync : SingleThreadCtrlRunnable {
+struct DatabaseSync : SingleThreadCtrlRunnable<> {
     void runFunction() override {
         while (kRun) {
             database::DBWrapper.save();

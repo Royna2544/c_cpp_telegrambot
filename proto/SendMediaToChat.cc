@@ -68,5 +68,5 @@ int main(const int argc, const char** argv) {
     struct TgBotConnection conn {};
     conn.cmd = CMD_SEND_FILE_TO_CHAT_ID;
     conn.data.data_5 = data;
-    getSocketInterfaceForClient()->writeToSocket(conn);
+    SocketInterfaceGetter::getForClient()->writeToSocket(conn);
 }

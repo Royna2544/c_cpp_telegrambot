@@ -18,7 +18,7 @@ struct SocketInterfaceUnix : SocketInterfaceBase {
     void writeToSocket(struct TgBotConnection conn) override;
     void forceStopListening(void) override;
     void startListening(const listener_callback_t& cb,
-                        std::promise<bool>& createdPromise) override;
+                        const result_callback_t& createdPromise) override;
 
     virtual ~SocketInterfaceUnix() = default;
 
@@ -51,6 +51,8 @@ struct SocketInterfaceUnixIPv4 : SocketInterfaceUnix {
     socket_handle_t createClientSocket() override;
     socket_handle_t createServerSocket() override;
     bool isAvailable() override;
+    void setupExitVerification() override {};
+    void stopListening(const std::string& e) override;
     virtual ~SocketInterfaceUnixIPv4() = default;
 
    private:
@@ -63,6 +65,8 @@ struct SocketInterfaceUnixIPv6 : SocketInterfaceUnix {
     socket_handle_t createClientSocket() override;
     socket_handle_t createServerSocket() override;
     bool isAvailable() override;
+    void setupExitVerification() override {};
+    void stopListening(const std::string& e) override;
     virtual ~SocketInterfaceUnixIPv6() = default;
 
    private:

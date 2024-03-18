@@ -1,9 +1,9 @@
 #include "SocketInterfaceBase.h"
 
-#include <map>
-#include <vector>
+#include <memory>
 
 #include "Logging.h"
+#include "SingleThreadCtrl.h"
 #include "socket/TgBotSocket.h"
 
 bool SocketInterfaceBase::handleIncomingBuf(
@@ -128,18 +128,16 @@ SocketInterfaceBase::option_t* SocketInterfaceBase::getOptionPtr(Options p) {
     return optionVal;
 }
 
-std::shared_ptr<SocketInterfaceBase> getSocketInterface(const SocketUsage u) {
-    const auto it = socket_interfaces.find(u);
-    if (it == socket_interfaces.end()) {
-        return socket_interfaces.at(SocketUsage::SU_INTERNAL);
-    }
-    return it->second;
+void SocketInterfaceBase::setupExitVerification() {
+    writeToSocket({CMD_EXIT, {.data_2 = priv->e}});
+    setPreStopFunction(
+        [this](SingleThreadCtrl*) { stopListening(priv->e.token); });
 }
-std::shared_ptr<SocketInterfaceBase> getSocketInterfaceForClient() {
-    for (const auto& socketBackend : socket_interfaces_client) {
-        if (socketBackend->isAvailable()) {
-            return socketBackend;
+
+void SocketInterfaceBase::runFunction() {
+    startListening(priv->listener_callback, [this](const bool p) {
+        if (p) {
+            setupExitVerification();
         }
-    }
-    return {};
+    });
 }

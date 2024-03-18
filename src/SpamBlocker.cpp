@@ -8,6 +8,7 @@
 #include <socket/TgBotSocket.h>
 
 #include <map>
+#include <memory>
 #include <mutex>
 #include <utility>
 
@@ -110,7 +111,7 @@ void SpamBlockBase::spamDetectFunc(OneChatIterator handle) {
     takeAction(handle, MaxMsgMap, sMaxMsgThreshold, "MaxMsg");
 }
 
-void SpamBlockBase::runFunction(void) {
+void SpamBlockBase::runFunction() {
     while (kRun) {
         {
             const std::lock_guard<std::mutex> _(buffer_m);

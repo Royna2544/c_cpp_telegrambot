@@ -13,6 +13,8 @@
 // Generated cmd list
 #include <cmds.gen.h>
 
+#include <memory>
+
 #include "Logging.h"
 #include "ResourceManager.h"
 #include "command_modules/compiler/CompilerInTelegram.h"
@@ -42,41 +44,6 @@ static void cleanupFn(int s) {
     });
     std::exit(0);
 };
-
-#ifdef SOCKET_CONNECTION
-static void setupSocket(const Bot &gBot,
-                        SingleThreadCtrlManager::ThreadUsage tusage,
-                        SocketUsage susage, TgBotCommandData::Exit e) {
-    auto socketConnectionManager = gSThreadManager.getController(tusage);
-    std::promise<bool> socketCreatedProm;
-    auto socketCreatedFut = socketCreatedProm.get_future();
-    auto intf = getSocketInterface(susage);
-
-    socketConnectionManager->runWith([&socketCreatedProm, susage, &gBot] {
-        getSocketInterface(susage)->startListening(
-            [&gBot](struct TgBotConnection conn) {
-                socketConnectionHandler(gBot, conn);
-            },
-            socketCreatedProm);
-    });
-
-    if (socketCreatedFut.get()) {
-        switch (susage) {
-            case SocketUsage::SU_INTERNAL:
-                intf->writeToSocket({CMD_EXIT, {.data_2 = e}});
-                socketConnectionManager->setPreStopFunction(
-                    [=](SingleThreadCtrl *) {
-                        getSocketInterface(susage)->stopListening(e.token);
-                    });
-                break;
-            case SocketUsage::SU_EXTERNAL:
-                socketConnectionManager->setPreStopFunction(
-                    [intf](SingleThreadCtrl *) { intf->forceStopListening(); });
-                break;
-        };
-    }
-}
-#endif
 
 int main(int argc, const char **argv) {
     std::string token;
@@ -132,12 +99,24 @@ int main(int argc, const char **argv) {
     std::string exitToken = StringTools::generateRandomString(
         sizeof(TgBotCommandUnion::data_2.token) - 1);
     auto e = TgBotCommandData::Exit::create(ExitOp::SET_TOKEN, exitToken);
+    auto p = std::make_shared<SocketInterfacePriv>();
+    auto inter = SocketInterfaceGetter::get(
+        SocketInterfaceGetter::typeForInternal,
+        SocketInterfaceGetter::SocketUsage::USAGE_INTERNAL);
 
-    setupSocket(gBot, SingleThreadCtrlManager::USAGE_SOCKET_THREAD, SU_INTERNAL,
-                e);
-    setupSocket(gBot, SingleThreadCtrlManager::USAGE_SOCKET_EXTERNAL_THREAD,
-                SU_EXTERNAL, e);
+    auto exter = SocketInterfaceGetter::get(
+        SocketInterfaceGetter::typeForExternal,
+        SocketInterfaceGetter::SocketUsage::USAGE_EXTERNAL);
 
+    p->listener_callback = [](struct TgBotConnection conn) {
+        socketConnectionHandler(gBot, conn);
+    };
+    p->e = std::move(e);
+
+    for (auto &intf : {inter, exter}) {
+        intf->setPriv(p);
+        intf->run();
+    }
 #endif
 #ifdef RTCOMMAND_LOADER
     RTCommandLoader(gBot).loadCommandsFromFile(getSrcRoot() / "modules.load");

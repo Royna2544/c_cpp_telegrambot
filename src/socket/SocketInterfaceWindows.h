@@ -18,8 +18,8 @@ struct SocketInterfaceWindows : SocketInterfaceBase {
     virtual socket_handle_t createServerSocket() = 0;
     void writeToSocket(struct TgBotConnection conn) override;
     void forceStopListening(void) override;
-    void startListening(const listener_callback_t& cb,
-                        std::promise<bool>& createdPromise) override;
+    void startListening(const listener_callback_t& listen_cb,
+                        const result_callback_t& result_cb) override;
 
     virtual ~SocketInterfaceWindows() = default;
 
@@ -41,6 +41,8 @@ struct SocketInterfaceWindowsLocal : SocketInterfaceWindows {
 struct SocketInterfaceWindowsIPv4 : SocketInterfaceWindows {
     socket_handle_t createClientSocket() override;
     socket_handle_t createServerSocket() override;
+    void setupExitVerification() override {};
+    void stopListening(const std::string& e) override;
     bool isAvailable() override;
 
    private:
@@ -50,6 +52,8 @@ struct SocketInterfaceWindowsIPv4 : SocketInterfaceWindows {
 struct SocketInterfaceWindowsIPv6 : SocketInterfaceWindows {
     socket_handle_t createClientSocket() override;
     socket_handle_t createServerSocket() override;
+    void setupExitVerification() override {};
+    void stopListening(const std::string& e) override;
     bool isAvailable() override;
 
    private:

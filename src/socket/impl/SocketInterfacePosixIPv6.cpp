@@ -107,3 +107,7 @@ SocketInterfaceUnixIPv6::createClientSocket() {
 bool SocketInterfaceUnixIPv6::isAvailable() {
     return SocketHelperCommon::isAvailableIPv6(this);
 }
+
+void SocketInterfaceUnixIPv6::stopListening(const std::string& e) {
+    forceStopListening();
+}

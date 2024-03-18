@@ -4,7 +4,10 @@
 #include <winsock2.h>
 #include <winsock.h>
 #include <afunix.h>
+#include <memory>
 #include "Logging.h"
+#include "SingleThreadCtrl.h"
+#include "socket/SocketInterfaceBase.h"
 #include "socket/TgBotSocket.h"
 // clang-format on
 
@@ -59,7 +62,7 @@ char *SocketInterfaceWindows::strWSAError(const int errcode) {
 }
 
 void SocketInterfaceWindows::startListening(
-    const listener_callback_t &cb, std::promise<bool> &createdPromise) {
+    const listener_callback_t &listen_cb, const result_callback_t &result_cb) {
     bool should_break = false, value_set = false;
     struct fd_set set;
     WSADATA data;
@@ -72,7 +75,7 @@ void SocketInterfaceWindows::startListening(
                     WSALOG_E("Failed to listen to socket");
                     break;
                 }
-                createdPromise.set_value(true);
+                result_cb(true);
                 value_set = true;
                 while (!should_break) {
                     struct sockaddr_un addr {};
@@ -98,7 +101,7 @@ void SocketInterfaceWindows::startListening(
                         const int count =
                             recv(cfd, reinterpret_cast<char *>(&conn),
                                  sizeof(conn), 0);
-                        should_break = handleIncomingBuf(count, conn, cb, [] {
+                        should_break = handleIncomingBuf(count, conn, listen_cb, [] {
                             return strWSAError(WSAGetLastError());
                         });
                         closesocket(cfd);
@@ -117,8 +120,7 @@ void SocketInterfaceWindows::startListening(
         WSALOG_E("WSAStartup failed");
     }
     WSACleanup();
-    if (!value_set)
-        createdPromise.set_value(false);
+    if (!value_set) result_cb(false);
 }
 
 void SocketInterfaceWindows::writeToSocket(struct TgBotConnection conn) {
@@ -135,13 +137,37 @@ void SocketInterfaceWindows::writeToSocket(struct TgBotConnection conn) {
 
 void SocketInterfaceWindows::forceStopListening(void) { kRun = false; }
 
-std::map<SocketUsage, std::shared_ptr<SocketInterfaceBase>> socket_interfaces{
-    {SocketUsage::SU_INTERNAL, std::make_shared<SocketInterfaceWindowsLocal>()},
-    {SocketUsage::SU_EXTERNAL, std::make_shared<SocketInterfaceWindowsIPv4>()},
-};
+std::shared_ptr<SocketInterfaceBase> SocketInterfaceGetter::getForClient() {
+    static const std::vector<std::shared_ptr<SocketInterfaceBase>>
+        socket_interfaces_client{
+            std::make_shared<SocketInterfaceWindowsIPv4>(),
+            std::make_shared<SocketInterfaceWindowsIPv6>(),
+            std::make_shared<SocketInterfaceWindowsLocal>(),
+        };
 
-std::vector<std::shared_ptr<SocketInterfaceBase>> socket_interfaces_client{
-    std::make_shared<SocketInterfaceWindowsIPv4>(),
-    std::make_shared<SocketInterfaceWindowsIPv6>(),
-    std::make_shared<SocketInterfaceWindowsLocal>(),
-};
+    for (const auto &e : socket_interfaces_client) {
+        if (e->isAvailable()) {
+            return e;
+        }
+    }
+    return nullptr;
+}
+
+std::shared_ptr<SocketInterfaceBase> SocketInterfaceGetter::get(
+    const SocketNetworkType type, const SocketUsage usage) {
+    const auto tusage =
+        static_cast<SingleThreadCtrlManager::ThreadUsage>(usage);
+    std::shared_ptr<SocketInterfaceBase> ptr;
+    switch (type) {
+        case SocketNetworkType::TYPE_IPV4:
+            ptr = gSThreadManager.getController<SocketInterfaceWindowsIPv4>(
+                tusage);
+        case SocketNetworkType::TYPE_IPV6:
+            ptr = gSThreadManager.getController<SocketInterfaceWindowsIPv6>(
+                tusage);
+        case SocketNetworkType::TYPE_LOCAL_UNIX:
+            ptr = gSThreadManager.getController<SocketInterfaceWindowsLocal>(
+                tusage);
+    };
+    return ptr;
+}

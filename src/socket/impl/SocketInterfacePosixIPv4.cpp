@@ -105,3 +105,7 @@ SocketInterfaceUnixIPv4::createClientSocket() {
 bool SocketInterfaceUnixIPv4::isAvailable() {
     return SocketHelperCommon::isAvailableIPv4(this);
 }
+
+void SocketInterfaceUnixIPv4::stopListening(const std::string& e) {
+    forceStopListening();
+}

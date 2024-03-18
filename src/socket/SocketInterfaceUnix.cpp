@@ -8,8 +8,8 @@
 
 #include "Logging.h"
 
-void SocketInterfaceUnix::startListening(const listener_callback_t& cb,
-                                         std::promise<bool>& createdPromise) {
+void SocketInterfaceUnix::startListening(const listener_callback_t& listen_cb,
+                                         const result_callback_t& result_cb) {
     bool should_break = false, value_set = false;
     int rc = 0;
     socket_handle_t sfd = createServerSocket();
@@ -24,7 +24,7 @@ void SocketInterfaceUnix::startListening(const listener_callback_t& cb,
                 PLOG_E("Pipe failed");
                 break;
             }
-            createdPromise.set_value(true);
+            result_cb(true);
             value_set = true;
             while (!should_break) {
                 struct sockaddr_un addr {};
@@ -81,7 +81,7 @@ void SocketInterfaceUnix::startListening(const listener_callback_t& cb,
                 }
                 const int count = read(cfd, &conn, sizeof(conn));
                 should_break = handleIncomingBuf(
-                    count, conn, cb, [] { return strerror(errno); });
+                    count, conn, listen_cb, [] { return strerror(errno); });
                 close(cfd);
             }
         } while (false);
@@ -89,8 +89,7 @@ void SocketInterfaceUnix::startListening(const listener_callback_t& cb,
         close(sfd);
         cleanupServerSocket();
     }
-    if (!value_set)
-        createdPromise.set_value(false);
+    if (!value_set) result_cb(false);
 }
 
 void SocketInterfaceUnix::writeToSocket(struct TgBotConnection conn) {
@@ -117,13 +116,37 @@ void SocketInterfaceUnix::forceStopListening(void) {
     }
 }
 
-std::map<SocketUsage, std::shared_ptr<SocketInterfaceBase>> socket_interfaces{
-    {SocketUsage::SU_INTERNAL, std::make_shared<SocketInterfaceUnixLocal>()},
-    {SocketUsage::SU_EXTERNAL, std::make_shared<SocketInterfaceUnixIPv4>()},
-};
+std::shared_ptr<SocketInterfaceBase> SocketInterfaceGetter::getForClient() {
+    static const std::vector<std::shared_ptr<SocketInterfaceBase>>
+        socket_interfaces_client{
+            std::make_shared<SocketInterfaceUnixIPv4>(),
+            std::make_shared<SocketInterfaceUnixIPv6>(),
+            std::make_shared<SocketInterfaceUnixLocal>(),
+        };
 
-std::vector<std::shared_ptr<SocketInterfaceBase>> socket_interfaces_client{
-    std::make_shared<SocketInterfaceUnixIPv4>(),
-    std::make_shared<SocketInterfaceUnixIPv6>(),
-    std::make_shared<SocketInterfaceUnixLocal>(),
-};
+    for (const auto& e : socket_interfaces_client) {
+        if (e->isAvailable()) {
+            return e;
+        }
+    }
+    return nullptr;
+}
+
+std::shared_ptr<SocketInterfaceBase> SocketInterfaceGetter::get(
+    const SocketNetworkType type, const SocketUsage usage) {
+    const auto tusage =
+        static_cast<SingleThreadCtrlManager::ThreadUsage>(usage);
+    std::shared_ptr<SocketInterfaceBase> ptr;
+    switch (type) {
+        case SocketNetworkType::TYPE_IPV4:
+            ptr =
+                gSThreadManager.getController<SocketInterfaceUnixIPv4>(tusage);
+        case SocketNetworkType::TYPE_IPV6:
+            ptr =
+                gSThreadManager.getController<SocketInterfaceUnixIPv6>(tusage);
+        case SocketNetworkType::TYPE_LOCAL_UNIX:
+            ptr =
+                gSThreadManager.getController<SocketInterfaceUnixLocal>(tusage);
+    };
+    return ptr;
+}

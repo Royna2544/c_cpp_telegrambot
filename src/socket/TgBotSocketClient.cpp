@@ -153,7 +153,7 @@ int main(int argc, char** argv) {
         }
     }
     if (ret) {
-        getSocketInterfaceForClient()->writeToSocket({cmd, data_g});
+        SocketInterfaceGetter::getForClient()->writeToSocket({cmd, data_g});
     } else
         usage(exe, false);
     return !ret;

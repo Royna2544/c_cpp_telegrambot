@@ -37,3 +37,7 @@ socket_handle_t SocketInterfaceWindowsIPv6::createClientSocket() {
 bool SocketInterfaceWindowsIPv6::isAvailable() {
     return SocketHelperCommon::isAvailableIPv6(this);
 }
+
+void SocketInterfaceWindowsIPv6::stopListening(const std::string& e) {
+    forceStopListening();
+}

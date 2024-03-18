@@ -4,6 +4,7 @@
 #include <tgbot/types/Chat.h>
 #include <tgbot/types/Message.h>
 #include <tgbot/types/User.h>
+#include <memory>
 
 #include "SingleThreadCtrl.h"
 #include "BotClassBase.h"
@@ -25,7 +26,7 @@ using TgBot::Chat;
 using TgBot::Message;
 using TgBot::User;
 
-struct SpamBlockBase : SingleThreadCtrlRunnable {
+struct SpamBlockBase : SingleThreadCtrlRunnable<> {
     // User and array of message pointers sent by that user
     using PerChatHandle = std::map<User::Ptr, std::vector<Message::Ptr>>;
     // Iterator type of buffer object, which contains <chats <users <msgs>>> map
@@ -42,7 +43,7 @@ struct SpamBlockBase : SingleThreadCtrlRunnable {
                                           const size_t threshold,
                                           const char *name){};
 
-    void runFunction(void) override;
+    void runFunction() override;
     void addMessage(const Message::Ptr &message);
 
     static std::string commonMsgdataFn(const Message::Ptr &m);

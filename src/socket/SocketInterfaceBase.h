@@ -1,16 +1,18 @@
 #pragma once
 
-#include <future>
+#include <memory>
 #include <optional>
-#include <map>
-#include <vector>
 
-#include "Logging.h"
+#include "../include/SingleThreadCtrl.h"
 #include "TgBotSocket.h"
 
 using listener_callback_t = std::function<void(struct TgBotConnection)>;
-
-struct SocketInterfaceBase {
+using result_callback_t = std::function<void(const bool)>;
+struct SocketInterfacePriv {
+    listener_callback_t listener_callback;
+    TgBotCommandData::Exit e;
+};
+struct SocketInterfaceBase : SingleThreadCtrlRunnable<SocketInterfacePriv> {
     enum class Options { DESTINATION_ADDRESS };
 
     /**
@@ -32,12 +34,13 @@ struct SocketInterfaceBase {
     /**
      * @brief Starts the socket listener thread.
      *
-     * @param cb The function to be called when a new connection is received.
-     * @param createdProm A promise that will be fulfilled with true when the
-     * listener is successfully created, or false if it fails.
+     * @param listener_callback The function to be called when a new connection
+     * is received.
+     * @param result_callback A function that will be called when the socket
+     * listener thread has started.
      */
-    virtual void startListening(const listener_callback_t& cb,
-                                std::promise<bool>& createdPromise) = 0;
+    virtual void startListening(const listener_callback_t &listener_callback,
+                                const result_callback_t &result_callback) = 0;
 
     /**
      * @brief Cleans up the server socket.
@@ -86,11 +89,18 @@ struct SocketInterfaceBase {
 
     virtual ~SocketInterfaceBase() = default;
 
-    void stopListening(const std::string& exittoken);
+    // Setup exit verification via token
+    virtual void setupExitVerification();
+
+    // Stop listening with exit token
+    virtual void stopListening(const std::string &exittoken);
+
+    void runFunction() override;
 
     using dummy_listen_buf_t = char;
 
     constexpr static int kTgBotHostPort = 50000;
+
    protected:
     /**
      * @brief This function is used to handle incoming data from the Telegram
@@ -108,9 +118,9 @@ struct SocketInterfaceBase {
      * otherwise.
      */
     [[nodiscard]] bool handleIncomingBuf(const size_t len,
-                                         struct TgBotConnection& conn,
-                                         const listener_callback_t& cb,
-                                         std::function<char*(void)> errMsgFn);
+                                         struct TgBotConnection &conn,
+                                         const listener_callback_t &cb,
+                                         std::function<char *(void)> errMsgFn);
 
     struct OptionContainer {
         std::string data;
@@ -120,22 +130,34 @@ struct SocketInterfaceBase {
     struct {
         option_t opt_destination_address;
     } options;
-  private:
+
+   private:
     option_t *getOptionPtr(Options opt);
 };
 
-enum SocketUsage {
-    SU_INTERNAL,  // Inside bot scope only, like cmd_exit
-    SU_EXTERNAL,  // Sent through clients, like socketcli, mediacli
+struct SocketInterfaceGetter {
+    enum class SocketNetworkType {
+        TYPE_LOCAL_UNIX,
+        TYPE_IPV4,
+        TYPE_IPV6,
+    };
+
+    enum class SocketUsage {
+        USAGE_INTERNAL =
+            SingleThreadCtrlManager::ThreadUsage::USAGE_SOCKET_THREAD,
+        USAGE_EXTERNAL =
+            SingleThreadCtrlManager::ThreadUsage::USAGE_SOCKET_EXTERNAL_THREAD,
+    };
+
+    static constexpr SocketNetworkType typeForInternal =
+        SocketNetworkType::TYPE_LOCAL_UNIX;
+    static constexpr SocketNetworkType typeForExternal =
+        SocketNetworkType::TYPE_IPV4;
+
+    static std::shared_ptr<SocketInterfaceBase> get(
+        const SocketNetworkType type, const SocketUsage usage);
+    static std::shared_ptr<SocketInterfaceBase> getForClient();
 };
-
-std::shared_ptr<SocketInterfaceBase> getSocketInterface(
-    const SocketUsage usage);
-std::shared_ptr<SocketInterfaceBase> getSocketInterfaceForClient();
-
-extern std::map<SocketUsage, std::shared_ptr<SocketInterfaceBase>> socket_interfaces;
-extern std::vector<std::shared_ptr<SocketInterfaceBase>> socket_interfaces_client;
-
 struct SocketHelperCommon {
     static bool isAvailableIPv4(SocketInterfaceBase *it);
     static bool isAvailableIPv6(SocketInterfaceBase *it);
@@ -143,9 +165,11 @@ struct SocketHelperCommon {
     static bool canSocketBeClosedLocalSocket(SocketInterfaceBase *it);
     static void cleanupServerSocketLocalSocket(SocketInterfaceBase *it);
     static void printExternalIPINet(void);
-  private:
+
+   private:
     constexpr static const char kIPv4EnvVar[] = "IPV4_ADDRESS";
     constexpr static const char kIPv6EnvVar[] = "IPV6_ADDRESS";
     static bool _isAvailable(SocketInterfaceBase *it, const char *envVar);
-    static size_t externalIPCallback(void *contents, size_t size, size_t nmemb, void *userp);
+    static size_t externalIPCallback(void *contents, size_t size, size_t nmemb,
+                                     void *userp);
 };

@@ -39,3 +39,7 @@ socket_handle_t SocketInterfaceWindowsIPv4::createClientSocket() {
 bool SocketInterfaceWindowsIPv4::isAvailable() {
     return SocketHelperCommon::isAvailableIPv4(this);
 }
+
+void SocketInterfaceWindowsIPv4::stopListening(const std::string& e) {
+    forceStopListening();
+}
