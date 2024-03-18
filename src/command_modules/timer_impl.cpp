@@ -4,10 +4,11 @@
 #include "CommandModule.h"
 
 static void TimerStartCommandFn(const Bot &bot, const Message::Ptr message) {
-    gSThreadManager
+    auto ctrl = gSThreadManager
         .getController<TimerCommandManager>(
-            SingleThreadCtrlManager::USAGE_TIMER_THREAD)
-        ->startTimer(bot, message);
+            SingleThreadCtrlManager::USAGE_TIMER_THREAD);
+    ctrl->reset();
+    ctrl->startTimer(bot, message);
 }
 
 static void TimerStopCommandFn(const Bot &bot, const Message::Ptr message) {

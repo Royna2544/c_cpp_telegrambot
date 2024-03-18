@@ -133,6 +133,7 @@ struct SingleThreadCtrl {
 
    private:
     void _threadFn(thread_function fn);
+    void joinThread();
     std::optional<std::thread> threadP;
     prestop_function preStop;
     std::atomic_bool once = true;
