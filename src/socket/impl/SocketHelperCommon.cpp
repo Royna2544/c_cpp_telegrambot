@@ -22,6 +22,12 @@ bool SocketHelperCommon::isAvailableIPv4(SocketInterfaceBase *it) {
 bool SocketHelperCommon::isAvailableIPv6(SocketInterfaceBase *it) {
     return _isAvailable(it, kIPv6EnvVar);
 }
+
+bool SocketHelperCommon::isAvailableLocalSocket() {
+    LOG(LogLevel::DEBUG, "Choosing local socket");
+    return true;
+}
+
 bool SocketHelperCommon::canSocketBeClosedLocalSocket(SocketInterfaceBase *it) {
     bool socketValid = true;
 

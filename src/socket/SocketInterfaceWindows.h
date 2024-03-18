@@ -34,6 +34,7 @@ struct SocketInterfaceWindowsLocal : SocketInterfaceWindows {
     socket_handle_t createServerSocket() override;
     void cleanupServerSocket() override;
     bool canSocketBeClosed() override;
+    bool isAvailable() override;
 
    private:
     socket_handle_t makeSocket(bool is_client);

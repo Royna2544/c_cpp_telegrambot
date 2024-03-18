@@ -34,6 +34,7 @@ struct SocketInterfaceUnixLocal : SocketInterfaceUnix {
     socket_handle_t createServerSocket() override;
     void cleanupServerSocket() override;
     bool canSocketBeClosed() override;
+    bool isAvailable() override;
     ~SocketInterfaceUnixLocal() override = default;
 
    private:

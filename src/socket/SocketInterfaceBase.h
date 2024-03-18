@@ -79,7 +79,7 @@ struct SocketInterfaceBase {
      *
      * @return true if the socket interface is available, false otherwise.
      */
-    virtual bool isAvailable() { return true; }
+    virtual bool isAvailable() = 0;
 
     // Can this instance exit cleanly with CMD_EXIT?
     virtual bool canSocketBeClosed() { return true; }
@@ -141,6 +141,7 @@ extern std::vector<std::shared_ptr<SocketInterfaceBase>> socket_interfaces_clien
 struct SocketHelperCommon {
     static bool isAvailableIPv4(SocketInterfaceBase *it);
     static bool isAvailableIPv6(SocketInterfaceBase *it);
+    static bool isAvailableLocalSocket(void);
     static bool canSocketBeClosedLocalSocket(SocketInterfaceBase *it);
     static void cleanupServerSocketLocalSocket(SocketInterfaceBase *it);
     static void printExternalIPINet(void);
@@ -149,5 +150,4 @@ struct SocketHelperCommon {
     constexpr static const char kIPv6EnvVar[] = "IPV6_ADDRESS";
     static bool _isAvailable(SocketInterfaceBase *it, const char *envVar);
     static size_t externalIPCallback(void *contents, size_t size, size_t nmemb, void *userp);
-
 };

@@ -78,3 +78,7 @@ void SocketInterfaceUnixLocal::cleanupServerSocket() {
 bool SocketInterfaceUnixLocal::canSocketBeClosed() {
     return SocketHelperCommon::canSocketBeClosedLocalSocket(this);
 }
+
+bool SocketInterfaceUnixLocal::isAvailable() {
+    return SocketHelperCommon::isAvailableLocalSocket();
+}

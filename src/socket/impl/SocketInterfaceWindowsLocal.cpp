@@ -80,3 +80,7 @@ void SocketInterfaceWindowsLocal::cleanupServerSocket() {
 bool SocketInterfaceWindowsLocal::canSocketBeClosed() {
     return SocketHelperCommon::canSocketBeClosedLocalSocket(this);
 }
+
+bool SocketInterfaceWindowsLocal::isAvailable() {
+    return SocketHelperCommon::isAvailableLocalSocket();
+}
