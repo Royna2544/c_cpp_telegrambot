@@ -62,60 +62,63 @@ void SocketInterfaceWindows::startListening(
     const listener_callback_t &cb, std::promise<bool> &createdPromise) {
     bool should_break = false;
     struct fd_set set;
+    WSADATA data;
 
-    const socket_handle_t sfd = createServerSocket();
-    isRunning = true;
-
-    if (isValidSocketHandle(sfd)) {
-        do {
-            if (listen(sfd, SOMAXCONN) == SOCKET_ERROR) {
-                WSALOG_E("Failed to listen to socket");
-                break;
-            }
-            createdPromise.set_value(true);
-            while (!should_break) {
-                struct sockaddr_un addr {};
-                struct TgBotConnection conn {};
-                struct timeval tv = {10, 0};
-                int len = sizeof(addr);
-
-                FD_ZERO(&set);
-                FD_SET(sfd, &set);
-                if (select(0, &set, NULL, NULL, &tv) == SOCKET_ERROR) {
-                    WSALOG_E("Select failed");
+    if (WSAStartup(MAKEWORD(2, 2), &data) == 0) {
+        const socket_handle_t sfd = createServerSocket();
+        isRunning = true;
+        if (isValidSocketHandle(sfd)) {
+            do {
+                if (listen(sfd, SOMAXCONN) == SOCKET_ERROR) {
+                    WSALOG_E("Failed to listen to socket");
                     break;
                 }
-                if (FD_ISSET(sfd, &set)) {
-                    const socket_handle_t cfd =
-                        accept(sfd, (struct sockaddr *)&addr, &len);
-                    if (cfd == INVALID_SOCKET) {
-                        WSALOG_E("Accept failed");
+                createdPromise.set_value(true);
+                while (!should_break) {
+                    struct sockaddr_un addr {};
+                    struct TgBotConnection conn {};
+                    struct timeval tv = {10, 0};
+                    int len = sizeof(addr);
+
+                    FD_ZERO(&set);
+                    FD_SET(sfd, &set);
+                    if (select(0, &set, NULL, NULL, &tv) == SOCKET_ERROR) {
+                        WSALOG_E("Select failed");
                         break;
-                    } else {
-                        LOG(LogLevel::DEBUG, "Client connected");
                     }
-                    const int count = recv(cfd, reinterpret_cast<char *>(&conn),
-                                           sizeof(conn), 0);
-                    should_break = handleIncomingBuf(count, conn, cb, [] {
-                        return strWSAError(WSAGetLastError());
-                    });
-                    closesocket(cfd);
-                } else {
-                    if (!kRun) {
-                        LOG(LogLevel::DEBUG, "Exiting");
-                        break;
+                    if (FD_ISSET(sfd, &set)) {
+                        const socket_handle_t cfd =
+                            accept(sfd, (struct sockaddr *)&addr, &len);
+                        if (cfd == INVALID_SOCKET) {
+                            WSALOG_E("Accept failed");
+                            break;
+                        } else {
+                            LOG(LogLevel::DEBUG, "Client connected");
+                        }
+                        const int count =
+                            recv(cfd, reinterpret_cast<char *>(&conn),
+                                 sizeof(conn), 0);
+                        should_break = handleIncomingBuf(count, conn, cb, [] {
+                            return strWSAError(WSAGetLastError());
+                        });
+                        closesocket(cfd);
+                    } else {
+                        if (!kRun) {
+                            LOG(LogLevel::DEBUG, "Exiting");
+                            break;
+                        }
                     }
                 }
-            }
-        } while (false);
-        closesocket(sfd);
-        cleanupServerSocket();
-        WSACleanup();
-        isRunning = false;
-        return;
+            } while (false);
+            closesocket(sfd);
+            cleanupServerSocket();
+            isRunning = false;
+        }
+    } else {
+        WSALOG_E("WSAStartup failed");
     }
+    WSACleanup();
     createdPromise.set_value(false);
-    isRunning = false;
 }
 
 void SocketInterfaceWindows::writeToSocket(struct TgBotConnection conn) {
@@ -127,15 +130,10 @@ void SocketInterfaceWindows::writeToSocket(struct TgBotConnection conn) {
             WSALOG_E("Failed to send to socket");
         }
         closesocket(sfd);
-        WSACleanup();
     }
 }
 
 void SocketInterfaceWindows::forceStopListening(void) { kRun = false; }
-
-void SocketInterfaceWindows::cleanupServerSocket() {
-    WSACleanup();
-}
 
 std::map<SocketUsage, std::shared_ptr<SocketInterfaceBase>> socket_interfaces{
     {SocketUsage::SU_INTERNAL, std::make_shared<SocketInterfaceWindowsLocal>()},

@@ -6,12 +6,7 @@
 socket_handle_t SocketInterfaceWindowsIPv4::createServerSocket() {
     struct sockaddr_in name {};
     socket_handle_t sfd;
-    WSADATA data;
 
-    if (WSAStartup(MAKEWORD(2, 2), &data) != 0) {
-        WSALOG_E("WSAStartup failed");
-        return INVALID_SOCKET;
-    }
     sfd = socket(AF_INET, SOCK_STREAM, 0);
     if (!isValidSocketHandle(sfd)) {
         WSALOG_E("Failed to create socket");
@@ -25,7 +20,6 @@ socket_handle_t SocketInterfaceWindowsIPv4::createServerSocket() {
         0) {
         WSALOG_E("Failed to bind to socket");
         closesocket(sfd);
-        WSACleanup();
         return INVALID_SOCKET;
     }
     return sfd;
@@ -34,12 +28,7 @@ socket_handle_t SocketInterfaceWindowsIPv4::createServerSocket() {
 socket_handle_t SocketInterfaceWindowsIPv4::createClientSocket() {
     struct sockaddr_in name {};
     socket_handle_t sfd;
-    WSADATA data;
 
-    if (WSAStartup(MAKEWORD(2, 2), &data) != 0) {
-        WSALOG_E("WSAStartup failed");
-        return INVALID_SOCKET;
-    }
     sfd = socket(AF_INET, SOCK_STREAM, 0);
     if (!isValidSocketHandle(sfd)) {
         WSALOG_E("Failed to create socket");
@@ -54,7 +43,6 @@ socket_handle_t SocketInterfaceWindowsIPv4::createClientSocket() {
                 sizeof(name)) != 0) {
         WSALOG_E("Failed to connect to socket");
         closesocket(sfd);
-        WSACleanup();
         return INVALID_SOCKET;
     }
     return sfd;

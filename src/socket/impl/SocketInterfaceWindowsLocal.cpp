@@ -16,23 +16,15 @@ socket_handle_t SocketInterfaceWindowsLocal::makeSocket(
     bool is_client) {
     struct sockaddr_un name {};
     CStringLifetime path = getOptions(Options::DESTINATION_ADDRESS);
-    WSADATA data;
     SOCKET fd;
-    int ret;
 
     if (!is_client) {
         LOG(LogLevel::DEBUG, "Creating socket at %s", path.get());
     }
 
-    ret = WSAStartup(MAKEWORD(2, 2), &data);
-    if (ret != 0) {
-        LOG(LogLevel::ERROR, "WSAStartup failed");
-        return INVALID_SOCKET;
-    }
     fd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (fd == INVALID_SOCKET) {
         WSALOG_E("Failed to create socket");
-        WSACleanup();
         return INVALID_SOCKET;
     }
 
@@ -55,7 +47,6 @@ socket_handle_t SocketInterfaceWindowsLocal::makeSocket(
                 }
             }
             closesocket(fd);
-            WSACleanup();
             return INVALID_SOCKET;
         } while (false);
     }
@@ -73,7 +64,6 @@ socket_handle_t SocketInterfaceWindowsLocal::createServerSocket() {
 }
 
 void SocketInterfaceWindowsLocal::cleanupServerSocket() {
-    SocketInterfaceWindows::cleanupServerSocket();
     SocketHelperCommon::cleanupServerSocketLocalSocket(this);
 }
 
