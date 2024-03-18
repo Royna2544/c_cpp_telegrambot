@@ -242,6 +242,7 @@ if (USE_UNIX_SOCKETS)
         src/socket/impl/SocketInterfaceWindowsLocal.cpp
         src/socket/impl/SocketInterfaceWindowsIPv4.cpp
         src/socket/impl/SocketInterfaceWindowsIPv6.cpp
+        src/socket/impl/SocketHelperWindows.cpp
       )
   endif()
   set(SOCKET_SRC_LIST ${SOCKET_SRC_LIST}

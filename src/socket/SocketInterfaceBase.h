@@ -90,6 +90,7 @@ struct SocketInterfaceBase {
 
     using dummy_listen_buf_t = char;
 
+    constexpr static int kTgBotHostPort = 50000;
    protected:
     /**
      * @brief This function is used to handle incoming data from the Telegram
@@ -119,7 +120,6 @@ struct SocketInterfaceBase {
     struct {
         option_t opt_destination_address;
     } options;
-    constexpr static int kTgBotHostPort = 50000;
   private:
     option_t *getOptionPtr(Options opt);
 };

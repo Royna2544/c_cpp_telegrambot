@@ -1,17 +1,19 @@
 #include <winsock2.h>
+#include <ws2tcpip.h>
 
-#include "Logging.h"
 #include "SocketInterfaceBase.h"
 
 #define WSALOG_E(fmt) \
-    LOG(LogLevel::ERROR, fmt ": %s", strWSAError(WSAGetLastError()))
+    LOG(LogLevel::ERROR, fmt ": %s", SocketInterfaceWindows::strWSAError(WSAGetLastError()))
 
 using socket_handle_t = SOCKET;
 
 struct SocketInterfaceWindows : SocketInterfaceBase {
-    bool isValidSocketHandle(socket_handle_t handle) {
+    static bool isValidSocketHandle(socket_handle_t handle) {
         return handle != INVALID_SOCKET;
     };
+    static char* strWSAError(const int errcode);
+
     virtual socket_handle_t createClientSocket() = 0;
     virtual socket_handle_t createServerSocket() = 0;
     void writeToSocket(struct TgBotConnection conn) override;
@@ -20,9 +22,6 @@ struct SocketInterfaceWindows : SocketInterfaceBase {
                         std::promise<bool>& createdPromise) override;
 
     virtual ~SocketInterfaceWindows() = default;
-
-   protected:
-    static char* strWSAError(const int errcode);
 
    private:
     std::atomic_bool kRun = true;
@@ -55,4 +54,9 @@ struct SocketInterfaceWindowsIPv6 : SocketInterfaceWindows {
 
    private:
     socket_handle_t makeSocket(bool is_client);
+};
+
+struct SocketHelperWindows {
+    static bool createInetSocketAddr(socket_handle_t *socket, struct sockaddr_in *addr);
+    static bool createInet6SocketAddr(socket_handle_t *socket, struct sockaddr_in6 *addr);
 };
