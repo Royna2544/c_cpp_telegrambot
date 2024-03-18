@@ -8,6 +8,7 @@
 #include <boost/algorithm/string/replace.hpp>
 #include <chrono>
 #include <cstdio>
+#include <filesystem>
 #include <libos/libfs.hpp>
 #include <mutex>
 #include <thread>
@@ -98,13 +99,12 @@ static std::optional<std::string> findCommandExe(std::string command) {
     });
     if (valid) {
         auto paths = StringTools::split(path, path_env_delimiter);
-#ifdef __WIN32
-        command.append(".exe");
-#endif
+        std::filesystem::path exePath(command);
+        appendExeExtension(exePath);
         for (const auto &path : paths) {
             if (!isEmptyOrBlank(path)) {
                 std::filesystem::path p(path);
-                p /= command;
+                p /= exePath;
                 if (canExecute(p.string())) {
                     return {p.string()};
                 }
