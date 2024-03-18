@@ -17,8 +17,7 @@
 #include "socket/SocketInterfaceBase.h"
 #include "socket/TgBotSocket.h"
 
-SocketInterfaceUnix::socket_handle_t SocketInterfaceUnixLocal::makeSocket(
-    bool client) {
+socket_handle_t SocketInterfaceUnixLocal::makeSocket(bool client) {
     int ret = kInvalidFD;
     CStringLifetime path = getOptions(Options::DESTINATION_ADDRESS);
 
@@ -48,7 +47,8 @@ SocketInterfaceUnix::socket_handle_t SocketInterfaceUnixLocal::makeSocket(
                 cleanupServerSocket();
                 if (fn(sfd, reinterpret_cast<struct sockaddr*>(&name), size) ==
                     0) {
-                    LOG(LogLevel::INFO, "Bind succeeded by removing socket file");
+                    LOG(LogLevel::INFO,
+                        "Bind succeeded by removing socket file");
                     break;
                 }
             }
@@ -60,14 +60,12 @@ SocketInterfaceUnix::socket_handle_t SocketInterfaceUnixLocal::makeSocket(
     return ret;
 }
 
-SocketInterfaceUnix::socket_handle_t
-SocketInterfaceUnixLocal::createClientSocket() {
+socket_handle_t SocketInterfaceUnixLocal::createClientSocket() {
     setOptions(Options::DESTINATION_ADDRESS, getSocketPath().string());
     return makeSocket(/*client=*/true);
 }
 
-SocketInterfaceUnix::socket_handle_t
-SocketInterfaceUnixLocal::createServerSocket() {
+socket_handle_t SocketInterfaceUnixLocal::createServerSocket() {
     setOptions(Options::DESTINATION_ADDRESS, getSocketPath().string());
     return makeSocket(/*client=*/false);
 }

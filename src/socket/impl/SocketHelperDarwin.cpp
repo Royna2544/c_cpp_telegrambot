@@ -5,8 +5,8 @@
 
 #include "../SocketInterfaceUnix.h"
 
-void SocketHelperUnix::setSocketBindingToIface(
-    const SocketInterfaceUnix::socket_handle_t sfd, const char* iface) {
+void SocketHelperUnix::setSocketBindingToIface(const socket_handle_t sfd,
+                                               const char* iface) {
     const int index = if_nametoindex(iface);
     int opt = 1;
 

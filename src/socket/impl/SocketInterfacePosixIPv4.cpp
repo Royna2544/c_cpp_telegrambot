@@ -32,8 +32,7 @@ void SocketInterfaceUnixIPv4::foreach_ipv4_interfaces(
     freeifaddrs(addrs);
 }
 
-SocketInterfaceUnix::socket_handle_t
-SocketInterfaceUnixIPv4::createServerSocket() {
+socket_handle_t SocketInterfaceUnixIPv4::createServerSocket() {
     socket_handle_t ret = kInvalidFD;
     bool iface_done = false;
     struct sockaddr_in name {};
@@ -78,8 +77,7 @@ SocketInterfaceUnixIPv4::createServerSocket() {
     return ret;
 }
 
-SocketInterfaceUnix::socket_handle_t
-SocketInterfaceUnixIPv4::createClientSocket() {
+socket_handle_t SocketInterfaceUnixIPv4::createClientSocket() {
     socket_handle_t ret = kInvalidFD;
     struct sockaddr_in name {};
     const socket_handle_t sfd = socket(AF_INET, SOCK_STREAM, 0);

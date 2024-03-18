@@ -1,15 +1,17 @@
 #pragma once
 
+#include <internal/_FileDescriptor_posix.h>
+#include <internal/_logging_posix.h>
+
 #include <functional>
 
-#include <internal/_logging_posix.h>
-#include <internal/_FileDescriptor_posix.h>
 #include "SocketInterfaceBase.h"
 #include "TgBotSocket.h"
 
-struct SocketInterfaceUnix : SocketInterfaceBase {
-    using socket_handle_t = int;
 
+using socket_handle_t = int;
+
+struct SocketInterfaceUnix : SocketInterfaceBase {
     bool isValidSocketHandle(socket_handle_t handle) {
         return isValidFd(handle);
     };
@@ -42,8 +44,8 @@ struct SocketInterfaceUnixLocal : SocketInterfaceUnix {
 };
 
 struct SocketHelperUnix {
-    static void setSocketBindingToIface(
-        const SocketInterfaceUnix::socket_handle_t sock, const char* iface);
+    static void setSocketBindingToIface(const socket_handle_t sock,
+                                        const char* iface);
 };
 
 // Implements POSIX socket interface - AF_INET
@@ -51,7 +53,7 @@ struct SocketInterfaceUnixIPv4 : SocketInterfaceUnix {
     socket_handle_t createClientSocket() override;
     socket_handle_t createServerSocket() override;
     bool isAvailable() override;
-    void setupExitVerification() override {};
+    void setupExitVerification() override{};
     void stopListening(const std::string& e) override;
     virtual ~SocketInterfaceUnixIPv4() = default;
 
@@ -65,7 +67,7 @@ struct SocketInterfaceUnixIPv6 : SocketInterfaceUnix {
     socket_handle_t createClientSocket() override;
     socket_handle_t createServerSocket() override;
     bool isAvailable() override;
-    void setupExitVerification() override {};
+    void setupExitVerification() override{};
     void stopListening(const std::string& e) override;
     virtual ~SocketInterfaceUnixIPv6() = default;
 

@@ -35,8 +35,7 @@ void SocketInterfaceUnixIPv6::foreach_ipv6_interfaces(
     freeifaddrs(addrs);
 }
 
-SocketInterfaceUnix::socket_handle_t
-SocketInterfaceUnixIPv6::createServerSocket() {
+socket_handle_t SocketInterfaceUnixIPv6::createServerSocket() {
     socket_handle_t ret = kInvalidFD;
     bool iface_done = false;
     struct sockaddr_in6 name {};
@@ -62,7 +61,8 @@ SocketInterfaceUnixIPv6::createServerSocket() {
         });
 
     if (!iface_done) {
-        LOG(LogLevel::ERROR, "Failed to find any valid interface to bind to (IPv6)");
+        LOG(LogLevel::ERROR,
+            "Failed to find any valid interface to bind to (IPv6)");
         return ret;
     }
     SocketHelperCommon::printExternalIPINet();
@@ -70,7 +70,8 @@ SocketInterfaceUnixIPv6::createServerSocket() {
     name.sin6_family = AF_INET6;
     name.sin6_port = htons(kTgBotHostPort);
     name.sin6_addr = IN6ADDR_ANY_INIT;
-    if (bind(sfd, reinterpret_cast<struct sockaddr*>(&name), sizeof(name)) != 0) {
+    if (bind(sfd, reinterpret_cast<struct sockaddr*>(&name), sizeof(name)) !=
+        0) {
         PLOG_E("Failed to bind to socket");
         close(sfd);
         return ret;
@@ -79,8 +80,7 @@ SocketInterfaceUnixIPv6::createServerSocket() {
     return ret;
 }
 
-SocketInterfaceUnix::socket_handle_t
-SocketInterfaceUnixIPv6::createClientSocket() {
+socket_handle_t SocketInterfaceUnixIPv6::createClientSocket() {
     socket_handle_t ret = kInvalidFD;
     struct sockaddr_in6 name {};
     const socket_handle_t sfd = socket(AF_INET6, SOCK_STREAM, 0);
