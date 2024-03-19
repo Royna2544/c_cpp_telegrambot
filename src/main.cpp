@@ -10,15 +10,9 @@
 #include <libos/libsighandler.h>
 #include <socket/SocketInterfaceBase.h>
 
-// Generated cmd list
-#include <cmds.gen.h>
-
-#include <memory>
-
 #include "Logging.h"
 #include "ResourceManager.h"
 #include "command_modules/CommandModule.h"
-#include "command_modules/compiler/CompilerInTelegram.h"
 
 #ifdef RTCOMMAND_LOADER
 #include <RTCommandLoader.h>

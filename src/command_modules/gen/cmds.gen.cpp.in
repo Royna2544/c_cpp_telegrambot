@@ -1,0 +1,7 @@
+#include <gen/cmds.gen.h>
+
+@COMMANDS_MODULES_DECL@
+
+std::vector<CommandModule *> gCmdModules = {
+   @COMMANDS_MODULES_PTR@
+};

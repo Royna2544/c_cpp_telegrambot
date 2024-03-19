@@ -1,6 +1,6 @@
 #include "CommandModule.h"
 #include "StringToolsExt.h"
-#include "cmds.gen.h"
+#include "gen/cmds.gen.h"
 #include "compiler/CompilerInTelegram.h"
 
 static void CModuleCallback(const Bot &bot, const Message::Ptr &message,

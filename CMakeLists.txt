@@ -157,31 +157,29 @@ set(CMD_MODULES_LIST addblacklist rmblacklist addwhitelist
       starttimer stoptimer saveid start)
 ####################### Commands modules defines #######################
 set(COMMANDS_CWD src/command_modules)
-############ Generate commands modules list in compile time ############
-set(COMMANDS_GEN_FILE ${CMAKE_BINARY_DIR}/${COMMANDS_CWD}/cmds.gen.h)
-FILE(REMOVE ${COMMANDS_GEN_FILE})
-FILE(APPEND ${COMMANDS_GEN_FILE} "#pragma once\n\n")
-FILE(APPEND ${COMMANDS_GEN_FILE} "#include <vector>\n")
-FILE(APPEND ${COMMANDS_GEN_FILE} "#include <command_modules/CommandModule.h>\n\n")
-FILE(APPEND ${COMMANDS_GEN_FILE} "extern std::vector<CommandModule *> gCmdModules;\n")
+set(COMMANDS_GEN_FILE ${COMMANDS_CWD}/gen/cmds.gen.cpp)
 ########## Generate commands modules list in compile time (cpp) ##########
-set(COMMANDS_GEN_FILE ${CMAKE_BINARY_DIR}/${COMMANDS_CWD}/cmds.gen.cpp)
-FILE(REMOVE ${COMMANDS_GEN_FILE})
-FILE(APPEND ${COMMANDS_GEN_FILE} "#include \"cmds.gen.h\"\n\n")
+macro(append_cmdlib lib)
+  string(APPEND COMMANDS_MODULES_DECL "extern CommandModule cmd_${lib};\n")
+  string(APPEND COMMANDS_MODULES_PTR "&cmd_${lib}")
+endmacro()
+
+list(GET CMD_MODULES_LIST 0 COMMANDS_MODULES_FIRST_ELEM)
+append_cmdlib(${COMMANDS_MODULES_FIRST_ELEM})
 foreach(lib ${CMD_MODULES_LIST})
-  FILE(APPEND ${COMMANDS_GEN_FILE} "extern struct CommandModule cmd_${lib};\n")
+  if (${lib} STREQUAL ${COMMANDS_MODULES_FIRST_ELEM})
+    continue()
+  endif()
+  string(APPEND COMMANDS_MODULES_PTR ",\n")
+  append_cmdlib(${lib})
 endforeach()
+########## Generate commands modules list in compile time (cpp) ##########
 foreach(lib ${CMD_MODULES_SOURCES_LIST})
   set(SRC_LIST ${SRC_LIST} ${COMMANDS_CWD}/${lib}.cpp)
 endforeach()
-FILE(APPEND ${COMMANDS_GEN_FILE} "\n")
-FILE(APPEND ${COMMANDS_GEN_FILE} "std::vector<CommandModule *> gCmdModules = {\n")
-foreach(lib ${CMD_MODULES_LIST})
-  FILE(APPEND ${COMMANDS_GEN_FILE} "   &cmd_${lib},\n")
-endforeach()
-FILE(APPEND ${COMMANDS_GEN_FILE} "};\n")
 #################### Include to TgBotCommandModules #################
-set(SRC_LIST ${SRC_LIST} ${COMMANDS_GEN_FILE})
+configure_file(${COMMANDS_GEN_FILE}.in ${CMAKE_BINARY_DIR}/${COMMANDS_GEN_FILE})
+set(SRC_LIST ${SRC_LIST} ${CMAKE_BINARY_DIR}/${COMMANDS_GEN_FILE})
 #####################################################################
 
 ####################### Database (Protobuf) #######################
@@ -304,7 +302,7 @@ add_subdirectory(lib)
 
 ################### The Bot's main functionaility ###################
 add_library(TgBotCommandModules SHARED ${SRC_LIST})
-target_include_directories(TgBotCommandModules PUBLIC ${CMAKE_BINARY_DIR}/${COMMANDS_CWD})
+target_include_directories(TgBotCommandModules PRIVATE ${COMMANDS_CWD})
 target_include_directories(TgBotCommandModules PRIVATE src/third-party/rapidjson/include)
 ######################## Libraries to link ########################
 set(LD_LIST TgBot TgBotDB TgBotUtils ${ABSL_LIBS})
