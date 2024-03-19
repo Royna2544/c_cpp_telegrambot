@@ -42,10 +42,10 @@ set(PROJECT_TEST_NAME ${PROJECT_NAME}_test)
 option(ENFORCE_EN_US "Enforce en-US locale for output" ON)
 option(ENABLE_RUNTIME_COMMAND "Enable runtime loader of commands" ON)
 #################### This must be explicitly set ###################
-set(BUILD_SHARED_LIBS ON)
-set(BUILD_TESTS OFF)
-set(BUILD_CLI OFF)
-set(USE_HTTPS "OpenSSL")
+set(BUILD_SHARED_LIBS ON CACHE BOOL "Build libs as shared libraries")
+set(BUILD_TESTS OFF CACHE BOOL "Build tests")
+set(BUILD_CLI OFF CACHE BOOL "[libgit2] Build client")
+set(USE_HTTPS "OpenSSL" CACHE STRING "[libgit2] Select HTTPS backend")
 #####################################################################
 
 ################# Detecting x86/x86_64 Architecture ################
