@@ -40,7 +40,7 @@ static void cleanupFn(int s) {
     std::exit(0);
 };
 
-int main(int argc, const char **argv) {
+int main(int argc, char *const *argv) {
     std::string token;
 
     copyCommandLine(CommandLineOp::INSERT, &argc, &argv);
@@ -60,7 +60,7 @@ int main(int argc, const char **argv) {
 
     CommandModule::loadCommandModules(gBot);
     CommandModule::updateBotCommands(gBot);
-    
+
     gBot.getEvents().onAnyMessage([](const Message::Ptr &msg) {
         static auto spamMgr = gSThreadManager.getController<SpamBlockManager>(
             {SingleThreadCtrlManager::USAGE_SPAMBLOCK_THREAD}, std::ref(gBot));
@@ -76,7 +76,8 @@ int main(int argc, const char **argv) {
     });
 
 #ifdef SOCKET_CONNECTION
-    std::string exitToken = StringTools::generateRandomString(TgBotCommandData::Exit::TokenLen);
+    std::string exitToken =
+        StringTools::generateRandomString(TgBotCommandData::Exit::TokenLen);
     auto e = TgBotCommandData::Exit::create(ExitOp::SET_TOKEN, exitToken);
     auto p = std::make_shared<SocketInterfacePriv>();
     auto inter = SocketInterfaceGetter::get(

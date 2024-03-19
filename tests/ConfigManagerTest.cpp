@@ -1,5 +1,6 @@
 #include <ConfigManager.h>
 #include <gtest/gtest.h>
+#include <cstring>
 
 #include "DatabaseLoader.h"
 
@@ -35,11 +36,14 @@ TEST_F(ConfigManagerTest, GetVariableEnv) {
 
 TEST_F(ConfigManagerTest, CopyCommandLine) {
     int in_argc = 2;
-    const char* ins_argv[] = {"ConfigManagerTest", "test"};
-    const char** ins_argv2 = ins_argv;
+    char buf[16], buf2[16];
+    strncpy(buf, "ConfigManagerTest", sizeof(buf));
+    strncpy(buf2, "test", sizeof(buf2));
+    char *const ins_argv[] = {buf, buf2};
+    char *const *ins_argv2 = ins_argv;
     copyCommandLine(CommandLineOp::INSERT, &in_argc, &ins_argv2);
 
-    const char** out_argv = nullptr;
+    char *const * out_argv = nullptr;
     int out_argc = 0;
     copyCommandLine(CommandLineOp::GET, &out_argc, &out_argv);
     EXPECT_EQ(out_argc, 2);

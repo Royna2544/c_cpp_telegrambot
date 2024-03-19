@@ -97,7 +97,7 @@ std::filesystem::path RTCommandLoader::getModulesInstallPath() {
     static std::filesystem::path modulesPath;
     std::call_once(once, [] {
         int argc;
-        const char** argv;
+        char *const * argv;
         copyCommandLine(CommandLineOp::GET, &argc, &argv);
         modulesPath = std::filesystem::path(argv[0]).parent_path() /
                       "src/command_modules/runtime/";

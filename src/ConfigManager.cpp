@@ -91,7 +91,7 @@ static void *file_load(void) {
 static void *cmdline_load() {
     static cmdline_priv p{};
     int argc = 0;
-    const char **argv = nullptr;
+    char *const *argv = nullptr;
 
     copyCommandLine(CommandLineOp::GET, &argc, &argv);
     if (!argv) {
@@ -133,9 +133,9 @@ static bool boost_progopt_doOverride(const void *p, const std::string &name) {
     return false;
 }
 
-void copyCommandLine(CommandLineOp op, int *argc, const char ***argv) {
+void copyCommandLine(CommandLineOp op, int *argc, char *const **argv) {
     static int argc_internal = 0;
-    static const char **argv_internal = nullptr;
+    static char *const *argv_internal = nullptr;
 
     switch (op) {
         case INSERT:

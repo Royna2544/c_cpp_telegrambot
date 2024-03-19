@@ -31,4 +31,4 @@ enum CommandLineOp { INSERT, GET };
  * @param out_argc [inout] argc, may be null.
  * @param out_argv [inout] argv, may be null.
  */
-void copyCommandLine(CommandLineOp op, int *argc, const char ***argv);
+void copyCommandLine(CommandLineOp op, int *argc, char *const **argv);

@@ -21,7 +21,7 @@ static void dumpList(const PersonList& list, const char* name) {
 #define END_CATEGORY std::cout << std::endl
 #define INDENT "   -> "
 
-int main(int argc, const char **argv) {
+int main(int argc, char *const *argv) {
     copyCommandLine(CommandLineOp::INSERT, &argc, &argv);
     DBWrapper.load();
     const auto mainDB = DBWrapper.protodb;
