@@ -108,6 +108,11 @@ if (CURL_FOUND)
 endif()
 find_package(OpenSSL REQUIRED)
 find_package(ZLIB REQUIRED)
+if (APPLE)
+    find_library(CORE_FOUNDATION CoreFoundation REQUIRED)
+    find_library(SECURITY Security REQUIRED)
+    set(MACOS_SSL_LIBS ${CORE_FOUNDATION} ${SECURITY})
+endif()
 #####################################################################
 
 ############################# Platforms #############################
@@ -271,7 +276,7 @@ set(LIBGIT2_LIBS libgit2 util pcre http-parser xdiff ${ZLIB_LIBRARIES} ${OPENSSL
 if (WIN32)
   set(LIBGIT2_LIBS ${LIBGIT2_LIBS} winhttp CRYPT32 Rpcrt4 Secur32 Ws2_32)
 elseif(APPLE)
-  set(LIBGIT2_LIBS ${LIBGIT2_LIBS} ntlmclient iconv)
+  set(LIBGIT2_LIBS ${LIBGIT2_LIBS} ntlmclient iconv ${MACOS_SSL_LIBS})
 else()
   set(LIBGIT2_LIBS ${LIBGIT2_LIBS} ntlmclient)
 endif()
