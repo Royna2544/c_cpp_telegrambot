@@ -300,6 +300,7 @@ add_subdirectory(lib)
 ################### The Bot's main functionaility ###################
 add_library(TgBotCommandModules SHARED ${SRC_LIST})
 target_include_directories(TgBotCommandModules PUBLIC ${CMAKE_BINARY_DIR}/${COMMANDS_CWD})
+target_include_directories(TgBotCommandModules PRIVATE src/third-party/rapidjson/include)
 ######################## Libraries to link ########################
 set(LD_LIST TgBot TgBotDB TgBotUtils ${ABSL_LIBS})
 add_lib_if(USE_UNIX_SOCKETS TgBotSocket)

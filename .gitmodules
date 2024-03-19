@@ -11,3 +11,6 @@
 [submodule "src/third-party/libgit2"]
 	path = src/third-party/libgit2
 	url = https://github.com/libgit2/libgit2
+[submodule "src/third-party/rapidjson"]
+	path = src/third-party/rapidjson
+	url = https://github.com/Tencent/rapidjson/
