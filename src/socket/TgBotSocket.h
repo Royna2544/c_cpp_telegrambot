@@ -71,7 +71,7 @@ struct WriteMsgToChatId {
 struct Exit {
     static constexpr int TokenLen = 15;
     ExitOp op;             // operation desired
-    char token[TokenLen];  // token data, used to verify exit op
+    char token[TokenLen + 1];  // token data, used to verify exit op
     static Exit create(ExitOp op, const std::string& buf) {
         Exit e{};
 
