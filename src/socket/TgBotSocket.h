@@ -69,19 +69,19 @@ struct WriteMsgToChatId {
 };
 
 struct Exit {
-    ExitOp op;       // operation desired
-    char token[16];  // token data, used to verify exit op
+    static constexpr int TokenLen = 15;
+    ExitOp op;             // operation desired
+    char token[TokenLen];  // token data, used to verify exit op
     static Exit create(ExitOp op, const std::string& buf) {
-        const int bufLen = sizeof(Exit::token) - 1;
         Exit e{};
 
         e.op = op;
-        strncpy(e.token, buf.c_str(), bufLen);
-        e.token[bufLen] = 0;
-        if (buf.size() != bufLen)
+        strncpy(e.token, buf.c_str(), TokenLen);
+        e.token[TokenLen] = 0;
+        if (buf.size() != TokenLen)
             LOG(LogLevel::WARNING,
                 "buf str doesn't fit token fully: tokenlen %d vs buflen %zu",
-                bufLen, buf.size());
+                TokenLen, buf.size());
         return e;
     }
 };

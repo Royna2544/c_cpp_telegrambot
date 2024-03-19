@@ -96,8 +96,7 @@ int main(int argc, const char **argv) {
     });
 
 #ifdef SOCKET_CONNECTION
-    std::string exitToken = StringTools::generateRandomString(
-        sizeof(TgBotCommandUnion::data_2.token) - 1);
+    std::string exitToken = StringTools::generateRandomString(TgBotCommandData::Exit::TokenLen);
     auto e = TgBotCommandData::Exit::create(ExitOp::SET_TOKEN, exitToken);
     auto p = std::make_shared<SocketInterfacePriv>();
     auto inter = SocketInterfaceGetter::get(
