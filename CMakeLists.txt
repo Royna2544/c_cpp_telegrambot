@@ -2,10 +2,8 @@ cmake_minimum_required(VERSION 3.13)
 project(TgBot++ LANGUAGES CXX C)
 
 ####################### Set CMake Policy #######################
-if(POLICY CMP0077)
-    cmake_policy(SET CMP0077 NEW) # option() command prefers to do nothing 
-                                  # when a normal variable of the given name already exists.
-endif()
+cmake_policy(SET CMP0077 NEW) # option() command prefers to do nothing
+                              # when a normal variable of the given name already exists.
 ################ Define a CMake Test Style macro ################
 macro(perform_test msg)
   message(STATUS "Performing test ${msg}")
