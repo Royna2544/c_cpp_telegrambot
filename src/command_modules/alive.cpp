@@ -1,7 +1,6 @@
 #include <GitData.h>
 #include <Logging.h>
 #include <ResourceManager.h>
-#include <cmds.gen.h>
 
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/config.hpp>
@@ -22,11 +21,7 @@ static void AliveCommandFn(const Bot &bot, const Message::Ptr message) {
         GitData data;
 
         GitData::Fill(&data);
-        commandmodules.reserve(8 * gCmdModules.size());
-        for (const auto &i : gCmdModules) {
-            commandmodules += i->command;
-            commandmodules += " ";
-        }
+        commandmodules = CommandModule::getLoadedModulesString();
         version = gResourceManager.getResource("about.html.txt");
 
 #define REPLACE_PLACEHOLDER(buf, name) \

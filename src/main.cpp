@@ -17,6 +17,7 @@
 
 #include "Logging.h"
 #include "ResourceManager.h"
+#include "command_modules/CommandModule.h"
 #include "command_modules/compiler/CompilerInTelegram.h"
 
 #ifdef RTCOMMAND_LOADER
@@ -63,24 +64,9 @@ int main(int argc, const char **argv) {
     database::DBWrapper.loadMain(gBot);
     gResourceManager.preloadResourceDirectory();
 
-    for (const auto &i : gCmdModules) {
-        if (i->fn) {
-            if (i->isEnforced())
-                bot_AddCommandEnforced(gBot, i->command, i->fn);
-            else
-                bot_AddCommandPermissive(gBot, i->command, i->fn);
-        } else if (i->mfn) {
-            if (i->isEnforced())
-                bot_AddCommandEnforcedMod(gBot, i->command, i->mfn);
-        } else {
-            LOG(LogLevel::FATAL,
-                "Invalid command module %s: No functions provided",
-                i->command.c_str());
-            return EXIT_FAILURE;
-        }
-    }
-    setupCompilerInTg(gBot);
-
+    CommandModule::loadCommandModules(gBot);
+    CommandModule::updateBotCommands(gBot);
+    
     gBot.getEvents().onAnyMessage([](const Message::Ptr &msg) {
         static auto spamMgr = gSThreadManager.getController<SpamBlockManager>(
             {SingleThreadCtrlManager::USAGE_SPAMBLOCK_THREAD}, std::ref(gBot));

@@ -132,7 +132,7 @@ set(SRC_LIST
     src/command_modules/compiler/CCpp.cpp
     src/command_modules/compiler/Generic.cpp
     src/command_modules/compiler/Helper.cpp
-    src/command_modules/compilers.cpp
+    src/command_modules/CommandModules.cpp
     src/ExtArgs.cpp
     src/libos/libsighandler_${TARGET_VARIANT}.cpp
     src/random/RandomNumberGenerator.cpp

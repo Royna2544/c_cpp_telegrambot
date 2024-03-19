@@ -3,6 +3,9 @@
 #include <BotAddCommand.h>
 #include <tgbot/types/BotCommand.h>
 
+#include <initializer_list>
+
+struct CompilerModule;
 struct CommandModule : TgBot::BotCommand {
     enum Flags { None = 0, Enforced = 1 << 0, HideDescription = 1 << 1 };
     command_callback_t fn;
@@ -26,4 +29,32 @@ struct CommandModule : TgBot::BotCommand {
     CommandModule(const CommandModule *other) { *this = *other; }
     constexpr bool isEnforced() const { return flags & Enforced; }
     bool isHideDescription() const { return flags & HideDescription; }
+    static std::string getLoadedModulesString();
+
+    /**
+     * Returns a string containing the names of all loaded modules, separated by
+     * spaces.
+     */
+    static std::vector<CommandModule *> getLoadedModules();
+
+    /**
+     * Adds a list of CompilerModules to the bot.
+     * @param bot The Bot instance to add the modules to.
+     * @param list The list of CompilerModules to add.
+     */
+    static void loadCompilerModule(
+        Bot &bot, std::initializer_list<CompilerModule *> list);
+
+    /**
+     * Adds default CommandModules to the bot.
+     * @param bot The Bot instance to add the modules to.
+     */
+    static void loadCommandModules(Bot &bot);
+
+    /**
+     * Updates the list of bot commands based on the currently loaded
+     * CommandModules.
+     * @param bot The Bot instance to update the commands for.
+     */
+    static void updateBotCommands(const Bot &bot);
 };
