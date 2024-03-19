@@ -1,7 +1,9 @@
 #include "CommandModule.h"
+#include "Logging.h"
 #include "StringToolsExt.h"
 #include "gen/cmds.gen.h"
 #include "compiler/CompilerInTelegram.h"
+#include <set>
 
 static void CModuleCallback(const Bot &bot, const Message::Ptr &message,
                             std::string compiler) {
@@ -61,7 +63,14 @@ void CommandModule::updateBotCommands(const Bot &bot) {
 }
 
 void CommandModule::loadCommandModules(Bot &bot) {
-    for (const auto &i : gCmdModules) {
+    std::set<std::string> commandsName;
+    for (const auto &i : getLoadedModules()) {
+        commandsName.insert(i->command);
+    }
+    if (commandsName.size() != getLoadedModules().size()) {
+        LOG(LogLevel::WARNING, "Module names have duplicates");
+    }
+    for (const auto &i : getLoadedModules()) {
         if (i->fn) {
             if (i->isEnforced())
                 bot_AddCommandEnforced(bot, i->command, i->fn);
