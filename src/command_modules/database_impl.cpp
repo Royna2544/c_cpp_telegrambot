@@ -31,7 +31,7 @@ struct CommandModule cmd_addwhitelist(
     });
 
 struct CommandModule cmd_rmwhitelist(
-    "rmblacklist", "Remove whitelisted user from the database",
+    "rmwhitelist", "Remove whitelisted user from the database",
     CommandModule::Flags::Enforced | CommandModule::Flags::HideDescription,
     [](const Bot& bot, const Message::Ptr& message) {
         DBWrapper.whitelist->removeFromDatabase(message);
