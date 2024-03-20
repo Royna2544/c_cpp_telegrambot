@@ -13,7 +13,7 @@ struct DatabaseSync : SingleThreadCtrlRunnable<> {
     void runFunction() override {
         while (kRun) {
             database::DBWrapper.save();
-            delayUnlessStop(10);
+            delayUnlessStop(100);
         }
     }
 };
