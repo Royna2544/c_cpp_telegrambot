@@ -101,6 +101,7 @@ std::filesystem::path RTCommandLoader::getModulesInstallPath() {
         copyCommandLine(CommandLineOp::GET, &argc, &argv);
         modulesPath = FS::getPathForType(FS::PathType::BUILD_ROOT) /
                       "src/command_modules/runtime/";
+        modulesPath.make_preferred();
     });
     return modulesPath;
 }
