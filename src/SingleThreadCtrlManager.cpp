@@ -1,14 +1,11 @@
 #include <SingleThreadCtrl.h>
 
-#include <latch>
 #include <mutex>
 #include <optional>
-#include <thread>
-#include <vector>
 
 #include "Logging.h"
 
-void SingleThreadCtrlManager::destroyController(const ThreadUsage usage) {
+void SingleThreadCtrlManager::destroyController(const ThreadUsage usage, bool deleteIt) {
     static std::array<std::mutex, USAGE_MAX> kPerUsageLocks;
     const std::scoped_lock lk(kPerUsageLocks[usage], mControllerLock);
     auto it = kControllers.find(usage);
@@ -17,9 +14,12 @@ void SingleThreadCtrlManager::destroyController(const ThreadUsage usage) {
             it->second->mgr_priv.usage.str);
         it->second->stop();
         it->second.reset();
-        kControllers.erase(it);
+        if (deleteIt)
+            kControllers.erase(it);
+        LOG(LogLevel::VERBOSE, "Stopped!");
     }
 }
+
 std::optional<SingleThreadCtrlManager::controller_type>
 SingleThreadCtrlManager::checkRequireFlags(GetControllerFlags opposite,
                                            int flags) {
@@ -37,23 +37,16 @@ SingleThreadCtrlManager::checkRequireFlags(GetControllerFlags opposite,
     return std::nullopt;
 }
 void SingleThreadCtrlManager::destroyManager() {
-    std::latch controllersShutdownLH(kControllers.size());
-    std::vector<std::thread> threads;
-    using ControllerRef = decltype(kControllers)::const_reference;
-
-    kIsUnderStopAll = true;
+    std::unique_lock<std::shared_mutex> lk(mControllerLock);
     std::for_each(kControllers.begin(), kControllers.end(),
-                  [&controllersShutdownLH, &threads, this](ControllerRef e) {
+                  [this, &lk](const auto& e) {
                       LOG(LogLevel::VERBOSE, "Shutdown: %s controller",
                           e.second->mgr_priv.usage.str);
-                      threads.emplace_back(
-                          [e = std::move(e), &controllersShutdownLH, this] {
-                              destroyController(e.first);
-                              controllersShutdownLH.count_down();
-                          });
+                      lk.unlock();
+                      destroyController(e.first, false);
+                      lk.lock();
+                      LOG(LogLevel::VERBOSE, "Shutdown done");
                   });
-    controllersShutdownLH.wait();
-    for (auto& i : threads) i.join();
 }
 
 SingleThreadCtrlManager gSThreadManager;

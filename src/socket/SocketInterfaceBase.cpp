@@ -130,14 +130,14 @@ SocketInterfaceBase::option_t* SocketInterfaceBase::getOptionPtr(Options p) {
 
 void SocketInterfaceBase::setupExitVerification() {
     writeToSocket({CMD_EXIT, {.data_2 = priv->e}});
-    setPreStopFunction(
-        [this](SingleThreadCtrl*) { stopListening(priv->e.token); });
 }
 
 void SocketInterfaceBase::runFunction() {
     startListening(priv->listener_callback, [this](const bool p) {
         if (p) {
             setupExitVerification();
+            setPreStopFunction(
+                [this](SingleThreadCtrl*) { stopListening(priv->e.token); });
         }
     });
 }

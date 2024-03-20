@@ -83,7 +83,7 @@ class SingleThreadCtrlManager {
     // Stop all controllers managed by this manager, and shutdown this.
     void destroyManager();
     // Destroy a controller given usage
-    void destroyController(ThreadUsage usage);
+    void destroyController(ThreadUsage usage, bool deleteIt = true);
 
     friend struct SingleThreadCtrl;
 
