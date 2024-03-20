@@ -1,5 +1,6 @@
 #include <BotReplyMessage.h>
 #include "CompilerInTelegram.h"
+#include "StringToolsExt.h"
 #include <Logging.h>
 
 void CompilerInTgHelper::onFailed(const Bot &bot, const Message::Ptr &message,
@@ -25,7 +26,9 @@ void CompilerInTgHelper::onFailed(const Bot &bot, const Message::Ptr &message,
 void CompilerInTgHelper::onResultReady(const Bot &bot,
                                        const Message::Ptr &message,
                                        const std::string &text) {
-    bot_sendReplyMessage(bot, message, text);
+    std::string text_ = text;
+    TrimStr(text_);
+    bot_sendReplyMessage(bot, message, text_);
 }
 
 void CompilerInTgHelper::onCompilerPathCommand(const Bot &bot,
