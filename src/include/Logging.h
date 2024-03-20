@@ -14,11 +14,14 @@
 
 enum class LogLevel { FATAL, ERROR, WARNING, INFO, DEBUG, VERBOSE, MAX };
 
+#define ENUM_AND_STR_LOGLEVEL(e) \
+    array_helpers::make_elem<LogLevel, const char*>(LogLevel::e, #e)
+
 static inline constexpr auto LogLevelStrMap =
     array_helpers::make<static_cast<int>(LogLevel::MAX), LogLevel, const char*>(
-        ENUM_AND_STR(LogLevel::FATAL), ENUM_AND_STR(LogLevel::ERROR),
-        ENUM_AND_STR(LogLevel::WARNING), ENUM_AND_STR(LogLevel::INFO),
-        ENUM_AND_STR(LogLevel::DEBUG), ENUM_AND_STR(LogLevel::VERBOSE));
+        ENUM_AND_STR_LOGLEVEL(FATAL), ENUM_AND_STR_LOGLEVEL(ERROR),
+        ENUM_AND_STR_LOGLEVEL(WARNING), ENUM_AND_STR_LOGLEVEL(INFO),
+        ENUM_AND_STR_LOGLEVEL(DEBUG), ENUM_AND_STR_LOGLEVEL(VERBOSE));
 
 struct FormatWithLocation {
     const char* value;
