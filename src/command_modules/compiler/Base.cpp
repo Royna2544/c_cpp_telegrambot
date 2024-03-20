@@ -98,14 +98,14 @@ static std::optional<std::string> findCommandExe(std::string command) {
         }
     });
     if (valid) {
-        auto paths = StringTools::split(path, path_env_delimiter);
+        auto paths = StringTools::split(path, FS::path_env_delimiter);
         std::filesystem::path exePath(command);
-        appendExeExtension(exePath);
+        FS::appendExeExtension(exePath);
         for (const auto &path : paths) {
             if (!isEmptyOrBlank(path)) {
                 std::filesystem::path p(path);
                 p /= exePath;
-                if (canExecute(p.string())) {
+                if (FS::canExecute(p.string())) {
                     return {p.string()};
                 }
             }

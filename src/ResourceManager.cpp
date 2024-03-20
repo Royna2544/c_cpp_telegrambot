@@ -3,6 +3,7 @@
 #include <popen_wdt/popen_wdt.hpp>
 #include <fstream>
 #include <sstream>
+#include <libos/libfs.hpp>
 
 bool ResourceManager::preloadOneFile(std::filesystem::path path) {
     std::ifstream file(path);
@@ -54,9 +55,8 @@ const std::string& ResourceManager::getResource(std::filesystem::path path) {
 }
 
 std::filesystem::path ResourceManager::getResourceRootdir() {
-    static auto path = getSrcRoot() / "resources";
-    path.make_preferred();
-    return path;
+    static auto path = FS::getPathForType(FS::PathType::RESOURCES);
+    return path.value();
 }
 
 const std::string ResourceManager::empty = "";

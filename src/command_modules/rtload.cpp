@@ -19,7 +19,7 @@ void RTLoadCommandFn(Bot& bot, const Message::Ptr message) {
     }
     auto p = RTCommandLoader::getModulesInstallPath() /
              ("libdlload_" + std::to_string(count));
-    appendDylibExtension(p);
+    FS::appendDylibExtension(p);
     compiler += " -o " + p.string() +
                 " libTgBotCommandModules.a lib/libTgBot.a -I{src}/src/include -I{src}/lib/include -I{src}/src"
                 " -include {src}/src/command_modules/runtime/cmd_dynamic.h -std=c++20 -shared";
@@ -27,7 +27,7 @@ void RTLoadCommandFn(Bot& bot, const Message::Ptr message) {
     CompilerInTgForCCppImpl impl(bot, compiler, "dltmp.cc");
     std::filesystem::remove(p);
     impl.run(message);
-    if (fileExists(p)) {
+    if (FS::exists(p)) {
         static auto loader = RTCommandLoader(bot);
         if (loader.loadOneCommand(p)) {
             bot_sendReplyMessage(bot, message, "Command loaded!");

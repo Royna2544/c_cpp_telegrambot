@@ -41,7 +41,7 @@ std::filesystem::path getSrcRoot() {
             throw std::runtime_error("Command failed");
         }
         dir = dir_str;
-        makeRelativeToCWD(dir);
+        FS::makeRelativeToCWD(dir);
     });
     return dir;
 }

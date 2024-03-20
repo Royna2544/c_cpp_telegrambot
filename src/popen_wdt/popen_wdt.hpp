@@ -8,6 +8,7 @@
  * @param res - Out buffer storage
  * @return If executing process succeeded
  */
+[[deprecated]]
 bool runCommand(const std::string& command, std::string& res);
 
 /**
@@ -15,4 +16,5 @@ bool runCommand(const std::string& command, std::string& res);
  *
  * @return source root directory path
  */
+[[deprecated("To be removed in the future. Use libfs::getSrcRoot() instead")]]
 std::filesystem::path getSrcRoot();

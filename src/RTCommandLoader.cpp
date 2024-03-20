@@ -32,7 +32,7 @@ bool RTCommandLoader::loadOneCommand(std::filesystem::path _fname) {
     void *handle, *fnptr = nullptr;
     const char* dlerrorBuf = nullptr;
     bool isSupported = true;
-    const std::string fname = appendDylibExtension(_fname).string();
+    const std::string fname = FS::appendDylibExtension(_fname).string();
 
     handle = dlopen(fname.c_str(), RTLD_NOW);
     if (!handle) {
@@ -99,10 +99,9 @@ std::filesystem::path RTCommandLoader::getModulesInstallPath() {
         int argc;
         char *const * argv;
         copyCommandLine(CommandLineOp::GET, &argc, &argv);
-        modulesPath = std::filesystem::path(argv[0]).parent_path() /
-                      "src/command_modules/runtime/";
-        modulesPath.make_preferred();
-        makeRelativeToCWD(modulesPath);
+        modulesPath =
+            FS::getPathForType(FS::PathType::BUILD_ROOT).value_or("") /
+            "src/command_modules/runtime/";
     });
     return modulesPath;
 }

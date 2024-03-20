@@ -27,7 +27,7 @@ void CompilerInTgForCCpp::run(const Message::Ptr& message) {
         runCommand(message, cmd.str(), resultbuf);
         resultbuf << std::endl;
 
-        if (fileExists(aoutname)) {
+        if (FS::exists(aoutname)) {
             resultbuf << "Run time:" << std::endl;
             runCommand(message, aoutname, resultbuf);
             std::filesystem::remove(aoutname);

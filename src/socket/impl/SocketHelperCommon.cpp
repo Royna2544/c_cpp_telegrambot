@@ -31,7 +31,7 @@ bool SocketHelperCommon::isAvailableLocalSocket() {
 bool SocketHelperCommon::canSocketBeClosedLocalSocket(SocketInterfaceBase *it) {
     bool socketValid = true;
 
-    if (!fileExists(it->getOptions(
+    if (!FS::exists(it->getOptions(
             SocketInterfaceBase::Options::DESTINATION_ADDRESS))) {
         LOG(LogLevel::WARNING, "Socket file was deleted");
         socketValid = false;

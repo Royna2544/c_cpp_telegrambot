@@ -3,8 +3,14 @@
 
 #include <filesystem>
 #include <CStringLifetime.h>
+#include "libfs.hpp"
 
-bool getHomePath(std::filesystem::path& buf) {
+bool FS::exists(const std::filesystem::path& path) {
+    CStringLifetime filepath(path);
+    return PathFileExistsA(filepath) && !PathIsDirectoryA(filepath);
+}
+
+bool FS::getHomePath(std::filesystem::path& buf) {
     CHAR userDir[MAX_PATH];
     bool ret =
         SUCCEEDED(SHGetFolderPathA(NULL, CSIDL_PROFILE, NULL, 0, userDir));
@@ -12,9 +18,4 @@ bool getHomePath(std::filesystem::path& buf) {
         buf = userDir;
     }
     return ret;
-}
-
-bool fileExists(const std::filesystem::path& path) {
-    CStringLifetime filepath(path);
-    return PathFileExistsA(filepath) && !PathIsDirectoryA(filepath);
 }
