@@ -6,7 +6,6 @@
 #include <boost/config.hpp>
 #include <filesystem>
 #include <mutex>
-#include <popen_wdt/popen_wdt.hpp>
 #include <string>
 
 #include "CommandModule.h"

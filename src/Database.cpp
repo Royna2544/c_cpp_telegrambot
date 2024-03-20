@@ -1,8 +1,6 @@
 #include <BotReplyMessage.h>
 #include <Database.h>
 
-#include <popen_wdt/popen_wdt.hpp>
-
 namespace database {
 
 std::optional<int> ProtoDatabaseBase::findByUid(

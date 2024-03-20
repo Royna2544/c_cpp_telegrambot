@@ -288,7 +288,6 @@ add_library(
   src/ResourceManager.cpp
   src/GitData.cpp
   src/popen_wdt/popen_wdt_${TARGET_VARIANT}.c
-  src/popen_wdt/popen_wdt_lib.cpp
   src/libos/libfs.cpp
   src/libos/libfs_${TARGET_VARIANT}.cpp)
 

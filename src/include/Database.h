@@ -11,7 +11,6 @@
 #include <optional>
 
 #include "BotClassBase.h"
-#include "../popen_wdt/popen_wdt.hpp"
 
 static inline const char kDatabaseFile[] = "tgbot.pb";
 

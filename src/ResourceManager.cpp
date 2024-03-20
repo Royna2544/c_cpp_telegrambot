@@ -1,6 +1,5 @@
 #include <Logging.h>
 #include <ResourceManager.h>
-#include <popen_wdt/popen_wdt.hpp>
 #include <fstream>
 #include <sstream>
 #include <libos/libfs.hpp>
@@ -56,7 +55,7 @@ const std::string& ResourceManager::getResource(std::filesystem::path path) {
 
 std::filesystem::path ResourceManager::getResourceRootdir() {
     static auto path = FS::getPathForType(FS::PathType::RESOURCES);
-    return path.value();
+    return path;
 }
 
 const std::string ResourceManager::empty = "";

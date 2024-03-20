@@ -3,7 +3,6 @@
 #include <boost/algorithm/string/replace.hpp>
 #include <filesystem>
 #include <libos/libfs.hpp>
-#include <popen_wdt/popen_wdt.hpp>
 #include <string>
 
 #include "CommandModule.h"
@@ -21,9 +20,12 @@ void RTLoadCommandFn(Bot& bot, const Message::Ptr message) {
              ("libdlload_" + std::to_string(count));
     FS::appendDylibExtension(p);
     compiler += " -o " + p.string() +
-                " libTgBotCommandModules.a lib/libTgBot.a -I{src}/src/include -I{src}/lib/include -I{src}/src"
-                " -include {src}/src/command_modules/runtime/cmd_dynamic.h -std=c++20 -shared";
-    boost::replace_all(compiler, "{src}", getSrcRoot().string());
+                " libTgBotCommandModules.a lib/libTgBot.a -I{src}/src/include "
+                "-I{src}/lib/include -I{src}/src"
+                " -include {src}/src/command_modules/runtime/cmd_dynamic.h "
+                "-std=c++20 -shared";
+    boost::replace_all(compiler, "{src}",
+                       FS::getPathForType(FS::PathType::GIT_ROOT).string());
     CompilerInTgForCCppImpl impl(bot, compiler, "dltmp.cc");
     std::filesystem::remove(p);
     impl.run(message);

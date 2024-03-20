@@ -22,9 +22,9 @@ struct FS {
      * Returns the path associated with the specified type.
      *
      * @param type The type of path to retrieve.
-     * @return The path, if it exists, or an empty optional.
+     * @return The path, if it exists, or an empty path.
      */
-    static std::optional<std::filesystem::path> getPathForType(PathType type);
+    static std::filesystem::path getPathForType(PathType type);
 
     /**
      * Returns whether the current user can execute the specified file.

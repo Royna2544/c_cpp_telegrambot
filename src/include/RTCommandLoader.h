@@ -42,6 +42,8 @@ struct RTCommandLoader {
      */
     static std::filesystem::path getModulesInstallPath();
 
+    static std::filesystem::path getModulesLoadConfPath();
+
    private:
     static void commandStub(const Bot& bot, const Message::Ptr& message);
     Bot& bot;

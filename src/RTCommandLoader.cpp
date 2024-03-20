@@ -97,15 +97,18 @@ std::filesystem::path RTCommandLoader::getModulesInstallPath() {
     static std::filesystem::path modulesPath;
     std::call_once(once, [] {
         int argc;
-        char *const * argv;
+        char* const* argv;
         copyCommandLine(CommandLineOp::GET, &argc, &argv);
-        modulesPath =
-            FS::getPathForType(FS::PathType::BUILD_ROOT).value_or("") /
-            "src/command_modules/runtime/";
+        modulesPath = FS::getPathForType(FS::PathType::BUILD_ROOT) /
+                      "src/command_modules/runtime/";
     });
     return modulesPath;
 }
 
 void RTCommandLoader::commandStub(const Bot& bot, const Message::Ptr& message) {
     bot_sendReplyMessage(bot, message, "Unsupported command");
+}
+
+std::filesystem::path RTCommandLoader::getModulesLoadConfPath() {
+    return FS::getPathForType(FS::PathType::GIT_ROOT) / "modules.load";
 }

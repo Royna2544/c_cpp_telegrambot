@@ -4,6 +4,7 @@
 
 #include "ConfigManager.h"
 #include "GitData.h"
+#include "Logging.h"
 
 namespace fs = std::filesystem;
 
@@ -53,7 +54,7 @@ std::filesystem::path& FS::makeRelativeToCWD(std::filesystem::path& path) {
     return path;
 }
 
-std::optional<std::filesystem::path> FS::getPathForType(PathType type) {
+std::filesystem::path FS::getPathForType(PathType type) {
     std::filesystem::path path;
     GitData data;
     bool ok = false;
@@ -69,11 +70,8 @@ std::optional<std::filesystem::path> FS::getPathForType(PathType type) {
             }
             break;
         case PathType::RESOURCES:
-            if (auto rootdir = getPathForType(PathType::GIT_ROOT);
-                rootdir.has_value()) {
-                path = rootdir.value() / "resources";
-                ok = true;
-            }
+            path = getPathForType(PathType::GIT_ROOT) / "resources";
+            ok = true;
             break;
         case PathType::BUILD_ROOT: {
             int argc = 0;
@@ -88,7 +86,8 @@ std::optional<std::filesystem::path> FS::getPathForType(PathType type) {
     if (ok) {
         path.make_preferred();
         makeRelativeToCWD(path);
-        return path;
+    } else {
+        LOG(LogLevel::ERROR, "Could not find path for type %d", type);
     }
-    return std::nullopt;
+    return path;
 }

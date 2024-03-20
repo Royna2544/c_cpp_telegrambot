@@ -99,7 +99,7 @@ int main(int argc, char *const *argv) {
     }
 #endif
 #ifdef RTCOMMAND_LOADER
-    RTCommandLoader(gBot).loadCommandsFromFile(getSrcRoot() / "modules.load");
+    RTCommandLoader(gBot).loadCommandsFromFile(RTCommandLoader::getModulesLoadConfPath());
 #endif
     installSignalHandler(cleanupFn);
 

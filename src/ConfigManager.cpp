@@ -69,12 +69,9 @@ static void *file_load(void) {
     std::string line;
     static file_priv p{};
 
-    if (const auto homeOp = FS::getPathForType(FS::PathType::HOME);
-        !homeOp.has_value()) {
-        LOG(LogLevel::ERROR, "Cannot find HOME");
+    home = FS::getPathForType(FS::PathType::HOME);
+    if (home.empty()) {
         return nullptr;
-    } else {
-        home = homeOp.value();
     }
     const auto confPath = (home / ".tgbot_conf.ini").string();
     std::ifstream ifs(confPath);

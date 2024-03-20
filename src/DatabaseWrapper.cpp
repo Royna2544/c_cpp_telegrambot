@@ -1,5 +1,6 @@
 #include <Database.h>
 #include <SingleThreadCtrl.h>
+#include <libos/libfs.hpp>
 
 #include <filesystem>
 #include <memory>
@@ -28,7 +29,7 @@ void DatabaseWrapper::load(const std::filesystem::path& it) {
 }
 
 void DatabaseWrapper::load() {
-    load(getSrcRoot() / std::string(kDatabaseFile));
+    load(FS::getPathForType(FS::PathType::GIT_ROOT) / std::string(kDatabaseFile));
 }
 
 void DatabaseWrapper::loadMain(const Bot& bot) {
