@@ -15,6 +15,9 @@ void CompilerInTgHelper::onFailed(const Bot &bot, const Message::Ptr &message,
         case CompilerInTg::ErrorType::POPEN_WDT_FAILED:
             text = "Failed to run command";
             break;
+        case CompilerInTg::ErrorType::START_COMPILER:
+            text = "Working on it...";
+            break;
     };
     bot_sendReplyMessage(bot, message, text);
 }

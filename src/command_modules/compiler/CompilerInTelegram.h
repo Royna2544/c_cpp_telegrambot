@@ -14,6 +14,8 @@ using TgBot::Message;
 
 struct CompilerInTg {
     enum class ErrorType {
+        // TODO
+        START_COMPILER,
         MESSAGE_VERIFICATION_FAILED,
         FILE_WRITE_FAILED,
         POPEN_WDT_FAILED,

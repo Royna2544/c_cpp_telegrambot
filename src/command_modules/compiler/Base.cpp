@@ -3,7 +3,6 @@
 #include <EnumArrayHelpers.h>
 #include <Logging.h>
 #include <StringToolsExt.h>
-#include <random/RandomNumberGenerator.h>
 
 #include <boost/algorithm/string/replace.hpp>
 #include <chrono>
@@ -46,11 +45,11 @@ void CompilerInTg::runCommand(const Message::Ptr &message, std::string cmd,
     std::call_once(once, [] { setlocale_enus_once(); });
 #endif
 
-    unique_id = genRandomNumber(100);
     boost::replace_all(cmd, std::string(1, '"'), "\\\"");
 
-    LOG(LogLevel::INFO, "[ID %d] %s: +++", unique_id, __func__);
-    LOG(LogLevel::INFO, "[ID %d] Command: '%s'", unique_id, cmd.c_str());
+    LOG(LogLevel::INFO, "%s: +++", __func__);
+    onFailed(message, ErrorType::START_COMPILER);
+    LOG(LogLevel::INFO, "Command: '%s'", cmd.c_str());
     auto start = high_resolution_clock::now();
     auto fp = popen_watchdog(cmd.c_str(), use_wdt ? &watchdog_bitten : nullptr);
 
@@ -82,7 +81,7 @@ void CompilerInTg::runCommand(const Message::Ptr &message, std::string cmd,
             << millis * 0.001 << " seconds" << std::endl;
     }
     fclose(fp);
-    LOG(LogLevel::INFO, "[ID %d] %s: ---", unique_id, __func__);
+    LOG(LogLevel::INFO, "%s: ---",  __func__);
 }
 
 static std::optional<std::string> findCommandExe(std::string command) {
