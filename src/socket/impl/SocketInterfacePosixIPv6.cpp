@@ -111,3 +111,9 @@ bool SocketInterfaceUnixIPv6::isAvailable() {
 void SocketInterfaceUnixIPv6::stopListening(const std::string& e) {
     forceStopListening();
 }
+
+void SocketInterfaceUnixIPv6::doGetRemoteAddr(socket_handle_t s) {
+    SocketHelperUnix::doGetRemoteAddrInet<
+        struct sockaddr_in6, AF_INET6, in6_addr, INET6_ADDRSTRLEN,
+        offsetof(struct sockaddr_in6, sin6_addr)>(s);
+}

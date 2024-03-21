@@ -74,3 +74,5 @@ bool SocketInterfaceWindowsLocal::canSocketBeClosed() {
 bool SocketInterfaceWindowsLocal::isAvailable() {
     return SocketHelperCommon::isAvailableLocalSocket();
 }
+
+void SocketInterfaceWindowsLocal::doGetRemoteAddr(socket_handle_t s) {}

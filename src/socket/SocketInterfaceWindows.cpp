@@ -96,7 +96,7 @@ void SocketInterfaceWindows::startListening(
                             WSALOG_E("Accept failed");
                             break;
                         } else {
-                            LOG(LogLevel::DEBUG, "Client connected");
+                            doGetRemoteAddr(cfd);
                         }
                         const int count =
                             recv(cfd, reinterpret_cast<char *>(&conn),

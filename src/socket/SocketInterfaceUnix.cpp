@@ -77,7 +77,7 @@ void SocketInterfaceUnix::startListening(const listener_callback_t& listen_cb,
                     PLOG_E("Accept failed");
                     break;
                 } else {
-                    LOG(LogLevel::DEBUG, "Client connected");
+                    doGetRemoteAddr(cfd);
                 }
                 const int count = read(cfd, &conn, sizeof(conn));
                 should_break = handleIncomingBuf(

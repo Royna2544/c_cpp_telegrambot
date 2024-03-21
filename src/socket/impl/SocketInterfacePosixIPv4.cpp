@@ -107,3 +107,9 @@ bool SocketInterfaceUnixIPv4::isAvailable() {
 void SocketInterfaceUnixIPv4::stopListening(const std::string& e) {
     forceStopListening();
 }
+
+void SocketInterfaceUnixIPv4::doGetRemoteAddr(socket_handle_t s) {
+    SocketHelperUnix::doGetRemoteAddrInet<
+        struct sockaddr_in, AF_INET, in_addr, INET_ADDRSTRLEN,
+        offsetof(struct sockaddr_in, sin_addr)>(s);
+}

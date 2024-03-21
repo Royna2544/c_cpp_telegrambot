@@ -80,3 +80,5 @@ bool SocketInterfaceUnixLocal::canSocketBeClosed() {
 bool SocketInterfaceUnixLocal::isAvailable() {
     return SocketHelperCommon::isAvailableLocalSocket();
 }
+
+void SocketInterfaceUnixLocal::doGetRemoteAddr(socket_handle_t s) {}

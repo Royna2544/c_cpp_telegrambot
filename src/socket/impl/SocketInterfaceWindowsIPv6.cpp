@@ -38,6 +38,12 @@ bool SocketInterfaceWindowsIPv6::isAvailable() {
     return SocketHelperCommon::isAvailableIPv6(this);
 }
 
-void SocketInterfaceWindowsIPv6::stopListening(const std::string& e) {
+void SocketInterfaceWindowsIPv6::stopListening(const std::string &e) {
     forceStopListening();
+}
+
+void SocketInterfaceWindowsIPv6::doGetRemoteAddr(socket_handle_t s) {
+    SocketHelperWindows::doGetRemoteAddrInet<
+        struct sockaddr_in6, AF_INET6, in6_addr, INET6_ADDRSTRLEN,
+        offsetof(struct sockaddr_in6, sin6_addr)>(s);
 }
