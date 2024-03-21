@@ -47,6 +47,11 @@ set(BUILD_TESTS OFF CACHE BOOL "Build tests" FORCE)
 set(BUILD_CLI OFF CACHE BOOL "[libgit2] Build client" FORCE)
 set(USE_HTTPS "OpenSSL" CACHE STRING "[libgit2] Select HTTPS backend" FORCE)
 #####################################################################
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin CACHE STRING 
+  "Output to store binaries (win32)" FORCE)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin CACHE STRING
+  "Output to store binaries (linux)" FORCE)
+#####################################################################
 
 ################# Detecting x86/x86_64 Architecture ################
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "i[3-6]86|x86_64|AMD64|amd64" AND NOT MSVC)
