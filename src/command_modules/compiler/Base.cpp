@@ -104,7 +104,7 @@ static std::optional<std::string> findCommandExe(std::string command) {
             if (!isEmptyOrBlank(path)) {
                 std::filesystem::path p(path);
                 p /= exePath;
-                if (FS::canExecute(p.string())) {
+                if (FS::canExecute(p)) {
                     return {p.string()};
                 }
             }
