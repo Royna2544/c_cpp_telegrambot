@@ -2,7 +2,7 @@
 #include <BotAddCommand.h>
 #include <ExtArgs.h>
 
-static bool check(Bot& bot, const Message::Ptr& message) {
+static bool check(Bot& bot, const Message::Ptr& message, int authflags) {
     static const std::string myName = bot.getApi().getMe()->username;
 
     std::string text = message->text;
@@ -18,9 +18,8 @@ static bool check(Bot& bot, const Message::Ptr& message) {
 void bot_AddCommandPermissive(Bot& bot, const std::string& cmd,
                               command_callback_t cb) {
     auto authFn = [&, cb](const Message::Ptr message) {
-        if (Authorized(message, AuthorizeFlags::PERMISSIVE |
-                                    AuthorizeFlags::REQUIRE_USER) &&
-            check(bot, message))
+        if (check(bot, message,
+                  AuthorizeFlags::PERMISSIVE | AuthorizeFlags::REQUIRE_USER))
             cb(bot, message);
     };
     bot.getEvents().onCommand(cmd, authFn);
@@ -29,17 +28,7 @@ void bot_AddCommandPermissive(Bot& bot, const std::string& cmd,
 void bot_AddCommandEnforced(Bot& bot, const std::string& cmd,
                             command_callback_t cb) {
     auto authFn = [&, cb](const Message::Ptr message) {
-        if (Authorized(message, AuthorizeFlags::REQUIRE_USER) &&
-            check(bot, message))
-            cb(bot, message);
-    };
-    bot.getEvents().onCommand(cmd, authFn);
-}
-
-void bot_AddCommandEnforcedMod(Bot& bot, const std::string& cmd,
-                               command_callback_modbot_t cb) {
-    auto authFn = [&, cb](const Message::Ptr message) {
-        if (Authorized(message, AuthorizeFlags::REQUIRE_USER)) cb(bot, message);
+        if (check(bot, message, AuthorizeFlags::REQUIRE_USER)) cb(bot, message);
     };
     bot.getEvents().onCommand(cmd, authFn);
 }

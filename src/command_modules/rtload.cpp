@@ -18,10 +18,9 @@ void RTLoadCommandFn(Bot& bot, const Message::Ptr message) {
     }
     auto p = RTCommandLoader::getModulesInstallPath() /
              ("libdlload_" + std::to_string(count));
-    auto libcmdmod = FS::getPathForType(FS::PathType::BUILD_ROOT) /
-               "libTgBotCommandModules";
-    auto libtg = FS::getPathForType(FS::PathType::BUILD_ROOT) /
-               "libTgBot";
+    auto libcmdmod =
+        FS::getPathForType(FS::PathType::BUILD_ROOT) / "libTgBotCommandModules";
+    auto libtg = FS::getPathForType(FS::PathType::BUILD_ROOT) / "libTgBot";
     FS::appendDylibExtension(p);
     compiler += " -o " + p.string() +
                 " {libcmdmod} {libtg} -I{src}/src/include "
@@ -51,4 +50,4 @@ void RTLoadCommandFn(Bot& bot, const Message::Ptr message) {
 struct CommandModule cmd_rtload("rtload", "Runtime load command",
                                 CommandModule::Flags::Enforced |
                                     CommandModule::Flags::HideDescription,
-                                {}, RTLoadCommandFn);
+                                RTLoadCommandFn);

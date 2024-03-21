@@ -9,8 +9,7 @@
  * command_callback_t - callback function for a generic command handler
  * Passes a Bot reference object and callback message pointer
  */
-using command_callback_t = std::function<void(const Bot&, const Message::Ptr&)>;
-using command_callback_modbot_t = std::function<void(Bot&, const Message::Ptr&)>;
+using command_callback_t = std::function<void(Bot&, const Message::Ptr&)>;
 
 /**
  * bot_AddCommandPermissive - Add a bot command (permissive command)
@@ -31,13 +30,3 @@ void bot_AddCommandPermissive(Bot& bot, const std::string& cmd, command_callback
  * @see Authorization.h
  */
 void bot_AddCommandEnforced(Bot& bot, const std::string& cmd, command_callback_t cb);
-
-/**
- * bot_AddCommandEnforcedMod - Add a bot command (enforced command) (overload)
- *
- * @param bot Bot object
- * @param cmd The command name in string
- * @param cb callback invoked on messages with matching cmd
- * @see Authorization.h
- */
-void bot_AddCommandEnforcedMod(Bot& bot, const std::string& cmd, command_callback_modbot_t cb);

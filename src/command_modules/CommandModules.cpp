@@ -76,9 +76,6 @@ void CommandModule::loadCommandModules(Bot &bot) {
                 bot_AddCommandEnforced(bot, i->command, i->fn);
             else
                 bot_AddCommandPermissive(bot, i->command, i->fn);
-        } else if (i->mfn) {
-            if (i->isEnforced())
-                bot_AddCommandEnforcedMod(bot, i->command, i->mfn);
         } else {
             LOG(LogLevel::ERROR,
                 "Invalid command module %s: No functions provided",
