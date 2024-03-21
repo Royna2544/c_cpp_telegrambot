@@ -1,2 +1,2 @@
 - IBash TimeoutThread could use SingleThreadCtrlRunnable
-- SingleThreadCtrl getController deadlock fix and rename getctrl flags enum
+- clang-* compilers add, preferred
