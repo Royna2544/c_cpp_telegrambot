@@ -3,7 +3,9 @@
 
 #include "BotReplyMessage.h"
 #include "CommandModule.h"
+#include "Database.h"
 #include "Logging.h"
+#include "SingleThreadCtrl.h"
 
 extern char **environ;
 static void restartCommandFn(const Bot &bot, const Message::Ptr message) {
@@ -29,6 +31,8 @@ static void restartCommandFn(const Bot &bot, const Message::Ptr message) {
     LOG(LogLevel::DEBUG, "Restarting bot with command line: %s, addenv %s",
         argv[0], restartBuf);
     bot_sendReplyMessage(bot, message, "Restarting bot instance...");
+    gSThreadManager.destroyManager();
+    database::DBWrapper.save();
     execve(argv[0], argv, myEnviron);
 }
 
