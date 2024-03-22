@@ -51,8 +51,13 @@ jobs:
       run: |
         git submodule update --init
 
-    - name: '🚧 Build tg_cpphost'
+    - name: '🚧 Build TgBot++'
       run: |
         mkdir build
         cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release .
         cmake --build build
+
+    - name: Run Tests
+      run: |
+        cd build
+        ./bin/TgBot++_test.exe

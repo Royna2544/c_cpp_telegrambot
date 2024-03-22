@@ -34,5 +34,5 @@ jobs:
       - name: Run Tests
         run: |
             cd build
-            ./TgBot++_test
+            ./bin/TgBot++_test
   
