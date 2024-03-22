@@ -5,6 +5,7 @@
 class ResourceManagerTest : public testing::Test {
    protected:
     void SetUp() override { gResourceManager.preloadResourceDirectory(); }
+    ResourceManager& gResourceManager = ResourceManager::getInstance();
 };
 
 TEST_F(ResourceManagerTest, PreloadOneFile) {

@@ -13,11 +13,12 @@
 #include <utility>
 
 #include "EnumArrayHelpers.h"
+#include "InstanceClassBase.hpp"
 #include "Logging.h"
 
 struct SingleThreadCtrl;
 
-class SingleThreadCtrlManager {
+class SingleThreadCtrlManager : public InstanceClassBase<SingleThreadCtrlManager> {
    public:
     using controller_type = std::shared_ptr<SingleThreadCtrl>;
 
@@ -85,6 +86,7 @@ class SingleThreadCtrlManager {
     // Destroy a controller given usage
     void destroyController(ThreadUsage usage, bool deleteIt = true);
 
+   private:
     friend struct SingleThreadCtrl;
 
    private:
@@ -94,8 +96,6 @@ class SingleThreadCtrlManager {
     std::shared_mutex mControllerLock;
     std::unordered_map<ThreadUsage, controller_type> kControllers;
 };
-
-extern SingleThreadCtrlManager gSThreadManager;
 
 struct SingleThreadCtrl {
     using thread_function = std::function<void(void)>;

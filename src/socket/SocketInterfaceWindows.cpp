@@ -162,16 +162,14 @@ std::shared_ptr<SocketInterfaceBase> SocketInterfaceGetter::get(
     const auto tusage =
         static_cast<SingleThreadCtrlManager::ThreadUsage>(usage);
     std::shared_ptr<SocketInterfaceBase> ptr;
+    auto &mgr = SingleThreadCtrlManager::getInstance();
     switch (type) {
         case SocketNetworkType::TYPE_IPV4:
-            ptr = gSThreadManager.getController<SocketInterfaceWindowsIPv4>(
-                tusage);
+            ptr = mgr.getController<SocketInterfaceWindowsIPv4>(tusage);
         case SocketNetworkType::TYPE_IPV6:
-            ptr = gSThreadManager.getController<SocketInterfaceWindowsIPv6>(
-                tusage);
+            ptr = mgr.getController<SocketInterfaceWindowsIPv6>(tusage);
         case SocketNetworkType::TYPE_LOCAL_UNIX:
-            ptr = gSThreadManager.getController<SocketInterfaceWindowsLocal>(
-                tusage);
+            ptr = mgr.getController<SocketInterfaceWindowsLocal>(tusage);
     };
     return ptr;
 }

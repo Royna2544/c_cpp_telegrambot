@@ -27,7 +27,7 @@ static std::string getMIMEString(const std::string& path) {
 
     std::call_once(once, [] {
         std::string_view buf;
-        buf = gResourceManager.getResource("mimeData.json");
+        buf = ResourceManager::getInstance().getResource("mimeData.json");
         doc.Parse(buf.data());
         // This should be an assert, we know the data file at compile time
         ASSERT(!doc.HasParseError(), "Failed to parse mimedata: %d",
@@ -166,7 +166,7 @@ void socketConnectionHandler(const Bot& bot, struct TgBotConnection conn) {
                 break;
             }
             threadUsage = static_cast<SingleThreadCtrlManager::ThreadUsage>(data);
-            gSThreadManager.destroyController(threadUsage);
+            SingleThreadCtrlManager::getInstance().destroyController(threadUsage);
         }
         break;
         default:

@@ -13,6 +13,6 @@ void defaultSignalHandler(int s) {
 
 void defaultCleanupFunction() {
     LOG(LogLevel::INFO, "Exiting");
-    gSThreadManager.destroyManager();
+    SingleThreadCtrlManager::getInstance().destroyManager();
     database::DBWrapper.save();
 }

@@ -46,14 +46,17 @@ int main(int argc, char *const *argv) {
     token = *ret;
     static Bot gBot(token);
     database::DBWrapper.loadMain(gBot);
-    gResourceManager.preloadResourceDirectory();
+    ResourceManager::getInstance().preloadResourceDirectory();
 
     CommandModule::loadCommandModules(gBot);
     CommandModule::updateBotCommands(gBot);
 
     gBot.getEvents().onAnyMessage([](const Message::Ptr &msg) {
-        static auto spamMgr = gSThreadManager.getController<SpamBlockManager>(
-            {SingleThreadCtrlManager::USAGE_SPAMBLOCK_THREAD}, std::ref(gBot));
+        static auto spamMgr =
+            SingleThreadCtrlManager::getInstance()
+                .getController<SpamBlockManager>(
+                    {SingleThreadCtrlManager::USAGE_SPAMBLOCK_THREAD},
+                    std::ref(gBot));
         static RegexHandler regexHandler(gBot);
 
         if (!gAuthorized) return;
@@ -89,7 +92,8 @@ int main(int argc, char *const *argv) {
     }
 #endif
 #ifdef RTCOMMAND_LOADER
-    RTCommandLoader(gBot).loadCommandsFromFile(RTCommandLoader::getModulesLoadConfPath());
+    RTCommandLoader(gBot).loadCommandsFromFile(
+        RTCommandLoader::getModulesLoadConfPath());
 #endif
     installSignalHandler();
 
@@ -133,7 +137,7 @@ int main(int argc, char *const *argv) {
                 .flags =
                     SingleThreadCtrlManager::REQUIRE_NONEXIST |
                     SingleThreadCtrlManager::REQUIRE_FAILACTION_RETURN_NULL};
-            auto cl = gSThreadManager.getController(req);
+            auto cl = SingleThreadCtrlManager::getInstance().getController(req);
             if (cl) {
                 cl->runWith([] {
                     std::this_thread::sleep_for(kErrorRecoveryDelay);

@@ -49,4 +49,3 @@ void SingleThreadCtrlManager::destroyManager() {
                   });
 }
 
-SingleThreadCtrlManager gSThreadManager;

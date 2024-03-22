@@ -24,7 +24,7 @@ static void FlashCommandFn(const Bot &bot, const Message::Ptr message) {
         std::string buf, line;
         std::stringstream ss;
 
-        buf = gResourceManager.getResource("flash.txt");
+        buf = ResourceManager::getInstance().getResource("flash.txt");
         splitAndClean(buf, reasons);
     });
 

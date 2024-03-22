@@ -2,10 +2,11 @@
 
 #include <map>
 #include <string>
-#include <string_view>
 #include <filesystem>
 
-struct ResourceManager {
+#include "InstanceClassBase.hpp"
+
+struct ResourceManager : public InstanceClassBase<ResourceManager> {
     bool preloadOneFile(std::filesystem::path p);
     void preloadResourceDirectory(void);
     const std::string& getResource(std::filesystem::path filename);
@@ -14,5 +15,3 @@ struct ResourceManager {
     std::map<std::filesystem::path, std::string> kResources;
     const static std::string empty;
 };
-
-extern ResourceManager gResourceManager;

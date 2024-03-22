@@ -33,13 +33,14 @@ void DatabaseWrapper::load() {
 }
 
 void DatabaseWrapper::loadMain(const Bot& bot) {
+    auto &mgr = SingleThreadCtrlManager::getInstance();
     load();
     const SingleThreadCtrlManager::GetControllerRequest req{
         .usage = SingleThreadCtrlManager::USAGE_DATABASE_SYNC_THREAD,
         .flags = SingleThreadCtrlManager::GetControllerFlags::REQUIRE_NONEXIST |
                  SingleThreadCtrlManager::GetControllerFlags::
                      REQUIRE_FAILACTION_RETURN_NULL};
-    if (const auto it = gSThreadManager.getController<DatabaseSync>(req); it)
+    if (const auto it = mgr.getController<DatabaseSync>(req); it)
         it->run();
 
     whitelist = std::make_shared<ProtoDatabase>(

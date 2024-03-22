@@ -21,7 +21,7 @@ static void AliveCommandFn(const Bot &bot, const Message::Ptr message) {
 
         GitData::Fill(&data);
         commandmodules = CommandModule::getLoadedModulesString();
-        version = gResourceManager.getResource("about.html.txt");
+        version = ResourceManager::getInstance().getResource("about.html.txt");
 
 #define REPLACE_PLACEHOLDER(buf, name) \
     boost::replace_all(buf, "_" #name "_", name)
