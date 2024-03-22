@@ -13,7 +13,7 @@ struct SocketInterfacePriv {
     TgBotCommandData::Exit e;
 };
 struct SocketInterfaceBase : SingleThreadCtrlRunnable<SocketInterfacePriv> {
-    enum class Options { DESTINATION_ADDRESS };
+    enum class Options { DESTINATION_ADDRESS, DESTINATION_PORT };
 
     /**
      * @brief Writes a TgBotConnection to the socket.
@@ -129,6 +129,7 @@ struct SocketInterfaceBase : SingleThreadCtrlRunnable<SocketInterfacePriv> {
     using option_t = std::optional<OptionContainer>;
     struct {
         option_t opt_destination_address;
+        option_t opt_destination_port;
     } options;
 
    private:
@@ -162,6 +163,7 @@ struct SocketHelperCommon {
     static bool isAvailableIPv4(SocketInterfaceBase *it);
     static bool isAvailableIPv6(SocketInterfaceBase *it);
     static bool isAvailableLocalSocket(void);
+    static int getPortNumInet(SocketInterfaceBase *it);
     static bool canSocketBeClosedLocalSocket(SocketInterfaceBase *it);
     static void cleanupServerSocketLocalSocket(SocketInterfaceBase *it);
     static void printExternalIPINet(void);
@@ -169,6 +171,7 @@ struct SocketHelperCommon {
    private:
     constexpr static const char kIPv4EnvVar[] = "IPV4_ADDRESS";
     constexpr static const char kIPv6EnvVar[] = "IPV6_ADDRESS";
+    constexpr static const char kPortEnvVar[] = "PORT_NUM";
     static bool _isAvailable(SocketInterfaceBase *it, const char *envVar);
     static size_t externalIPCallback(void *contents, size_t size, size_t nmemb,
                                      void *userp);

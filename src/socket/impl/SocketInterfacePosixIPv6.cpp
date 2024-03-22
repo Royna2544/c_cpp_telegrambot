@@ -91,7 +91,7 @@ socket_handle_t SocketInterfaceUnixIPv6::createClientSocket() {
     }
 
     name.sin6_family = AF_INET6;
-    name.sin6_port = htons(kTgBotHostPort);
+    name.sin6_port = htons(SocketHelperCommon::getPortNumInet(this));
     inet_pton(AF_INET6, getOptions(Options::DESTINATION_ADDRESS).c_str(),
               &name.sin6_addr);
     if (connect(sfd, reinterpret_cast<struct sockaddr*>(&name), sizeof(name)) !=

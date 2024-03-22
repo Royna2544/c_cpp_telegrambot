@@ -124,6 +124,9 @@ SocketInterfaceBase::option_t* SocketInterfaceBase::getOptionPtr(Options p) {
         case Options::DESTINATION_ADDRESS:
             optionVal = &options.opt_destination_address;
             break;
+        case Options::DESTINATION_PORT:
+            optionVal = &options.opt_destination_port;
+            break;
     }
     return optionVal;
 }

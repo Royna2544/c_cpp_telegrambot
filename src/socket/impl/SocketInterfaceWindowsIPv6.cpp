@@ -5,7 +5,8 @@ socket_handle_t SocketInterfaceWindowsIPv6::createServerSocket() {
     struct sockaddr_in6 name {};
     socket_handle_t sfd;
 
-    if (SocketHelperWindows::createInet6SocketAddr(&sfd, &name)) {
+    setOptions(Options::DESTINATION_PORT, std::to_string(kTgBotHostPort));
+    if (SocketHelperWindows::createInet6SocketAddr(&sfd, &name, this)) {
         name.sin6_addr = in6addr_any;
         if (bind(sfd, reinterpret_cast<struct sockaddr *>(&name),
                  sizeof(name)) != 0) {
@@ -21,7 +22,7 @@ socket_handle_t SocketInterfaceWindowsIPv6::createClientSocket() {
     struct sockaddr_in6 name {};
     socket_handle_t sfd;
 
-    if (SocketHelperWindows::createInet6SocketAddr(&sfd, &name)) {
+    if (SocketHelperWindows::createInet6SocketAddr(&sfd, &name, this)) {
         InetPton(AF_INET6, getOptions(Options::DESTINATION_ADDRESS).c_str(),
                  &name.sin6_addr);
         if (connect(sfd, reinterpret_cast<struct sockaddr *>(&name),

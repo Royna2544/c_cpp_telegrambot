@@ -88,7 +88,7 @@ socket_handle_t SocketInterfaceUnixIPv4::createClientSocket() {
     }
 
     name.sin_family = AF_INET;
-    name.sin_port = htons(kTgBotHostPort);
+    name.sin_port = htons(SocketHelperCommon::getPortNumInet(this));
     inet_aton(getOptions(Options::DESTINATION_ADDRESS).c_str(), &name.sin_addr);
     if (connect(sfd, reinterpret_cast<struct sockaddr*>(&name), sizeof(name)) !=
         0) {

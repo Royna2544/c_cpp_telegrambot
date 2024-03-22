@@ -2,6 +2,7 @@
 #include <ws2tcpip.h>
 
 #include <cstddef>
+#include <string>
 
 #include "../SocketInterfaceWindows.h"
 
@@ -9,7 +10,8 @@ socket_handle_t SocketInterfaceWindowsIPv4::createServerSocket() {
     struct sockaddr_in name {};
     socket_handle_t sfd;
 
-    if (SocketHelperWindows::createInetSocketAddr(&sfd, &name)) {
+    setOptions(Options::DESTINATION_PORT, std::to_string(kTgBotHostPort));
+    if (SocketHelperWindows::createInetSocketAddr(&sfd, &name, this)) {
         name.sin_addr.s_addr = INADDR_ANY;
         if (bind(sfd, reinterpret_cast<struct sockaddr *>(&name),
                  sizeof(name)) != 0) {
@@ -25,7 +27,7 @@ socket_handle_t SocketInterfaceWindowsIPv4::createClientSocket() {
     struct sockaddr_in name {};
     socket_handle_t sfd;
 
-    if (SocketHelperWindows::createInetSocketAddr(&sfd, &name)) {
+    if (SocketHelperWindows::createInetSocketAddr(&sfd, &name, this)) {
         InetPton(AF_INET, getOptions(Options::DESTINATION_ADDRESS).c_str(),
                  &name.sin_addr);
         if (connect(sfd, reinterpret_cast<struct sockaddr *>(&name),
