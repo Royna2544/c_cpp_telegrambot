@@ -101,9 +101,9 @@ void SocketInterfaceWindows::startListening(
                         const int count =
                             recv(cfd, reinterpret_cast<char *>(&conn),
                                  sizeof(conn), 0);
-                        should_break = handleIncomingBuf(count, conn, listen_cb, [] {
-                            return strWSAError(WSAGetLastError());
-                        });
+                        should_break = handleIncomingBuf(
+                            count, conn, listen_cb,
+                            [] { return strWSAError(WSAGetLastError()); });
                         closesocket(cfd);
                     } else {
                         if (!kRun) {
@@ -124,15 +124,19 @@ void SocketInterfaceWindows::startListening(
 }
 
 void SocketInterfaceWindows::writeToSocket(struct TgBotConnection conn) {
-    const socket_handle_t sfd = createClientSocket();
-    if (isValidSocketHandle(sfd)) {
-        const int count =
-            send(sfd, reinterpret_cast<char *>(&conn), sizeof(conn), 0);
-        if (count < 0) {
-            WSALOG_E("Failed to send to socket");
+    WSADATA data;
+    if (WSAStartup(MAKEWORD(2, 2), &data) == 0) {
+        const socket_handle_t sfd = createClientSocket();
+        if (isValidSocketHandle(sfd)) {
+            const int count =
+                send(sfd, reinterpret_cast<char *>(&conn), sizeof(conn), 0);
+            if (count < 0) {
+                WSALOG_E("Failed to send to socket");
+            }
+            closesocket(sfd);
         }
-        closesocket(sfd);
     }
+    WSACleanup();
 }
 
 void SocketInterfaceWindows::forceStopListening(void) { kRun = false; }
