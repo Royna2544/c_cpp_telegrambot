@@ -30,16 +30,6 @@
 // tgbot
 using TgBot::TgLongPoll;
 
-static void cleanupFn(int s) {
-    static std::once_flag once;
-    std::call_once(once, [s] {
-        LOG(LogLevel::INFO, "Exiting with signal %d", s);
-        gSThreadManager.destroyManager();
-        database::DBWrapper.save();
-    });
-    std::exit(0);
-};
-
 int main(int argc, char *const *argv) {
     std::string token;
 
@@ -101,7 +91,7 @@ int main(int argc, char *const *argv) {
 #ifdef RTCOMMAND_LOADER
     RTCommandLoader(gBot).loadCommandsFromFile(RTCommandLoader::getModulesLoadConfPath());
 #endif
-    installSignalHandler(cleanupFn);
+    installSignalHandler();
 
     LOG(LogLevel::DEBUG, "Token: %s", token.c_str());
     auto CurrentTp = std::chrono::system_clock::now();
@@ -152,6 +142,6 @@ int main(int argc, char *const *argv) {
             }
         }
     } while (true);
-    cleanupFn(invalidSignal);
+    defaultCleanupFunction();
     return EXIT_FAILURE;
 }

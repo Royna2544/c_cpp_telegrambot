@@ -3,9 +3,8 @@
 
 #include "BotReplyMessage.h"
 #include "CommandModule.h"
-#include "Database.h"
 #include "Logging.h"
-#include "SingleThreadCtrl.h"
+#include "libos/libsighandler.h"
 
 extern char **environ;
 static void restartCommandFn(const Bot &bot, const Message::Ptr message) {
@@ -15,6 +14,7 @@ static void restartCommandFn(const Bot &bot, const Message::Ptr message) {
     if (const auto var = getenv("RESTART"); var != nullptr) {
         LOG(LogLevel::DEBUG, "RESTART env var set to %s", var);
         unsetenv("RESTART");
+        installSignalHandler();
         if (std::stoi(var) == message->messageId) {
             LOG(LogLevel::DEBUG, "Restart success! From messageId %d", message->messageId);
             bot_sendReplyMessage(bot, message, "Restart success!");
@@ -31,8 +31,7 @@ static void restartCommandFn(const Bot &bot, const Message::Ptr message) {
     LOG(LogLevel::DEBUG, "Restarting bot with command line: %s, addenv %s",
         argv[0], restartBuf);
     bot_sendReplyMessage(bot, message, "Restarting bot instance...");
-    gSThreadManager.destroyManager();
-    database::DBWrapper.save();
+    defaultCleanupFunction();
     execve(argv[0], argv, myEnviron);
 }
 

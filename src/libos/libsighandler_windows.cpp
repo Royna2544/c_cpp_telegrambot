@@ -2,8 +2,6 @@
 
 #include "libsighandler.h"
 
-static exit_handler_t exitHandler = nullptr;
-
 static BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
     switch (fdwCtrlType) {
         case CTRL_C_EVENT:
@@ -11,13 +9,12 @@ static BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
         case CTRL_BREAK_EVENT:
         case CTRL_LOGOFF_EVENT:
         case CTRL_SHUTDOWN_EVENT:
-            exitHandler(invalidSignal);
+            defaultSignalHandler(invalidSignal);
         default:
             return FALSE;
     }
 }
 
-void installSignalHandler(const exit_handler_t et) {
-    exitHandler = et;
+void installSignalHandler() {
     SetConsoleCtrlHandler(CtrlHandler, TRUE);
 }

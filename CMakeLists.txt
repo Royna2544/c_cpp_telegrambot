@@ -139,6 +139,7 @@ set(SRC_LIST
     src/command_modules/compiler/Helper.cpp
     src/command_modules/CommandModules.cpp
     src/ExtArgs.cpp
+    src/libos/libsighandler_impl.cpp
     src/libos/libsighandler_${TARGET_VARIANT}.cpp
     src/random/RandomNumberGenerator.cpp
     src/SpamBlocker.cpp
