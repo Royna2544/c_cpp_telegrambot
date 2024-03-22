@@ -12,7 +12,7 @@ static bool check(Bot& bot, const Message::Ptr& message, int authflags) {
     auto v = StringTools::split(text, '@');
     if (v.size() == 2 && v[1] != myName) return false;
 
-    return true;
+    return Authorized(message, authflags);
 }
 
 void bot_AddCommandPermissive(Bot& bot, const std::string& cmd,
