@@ -55,12 +55,10 @@ void LOG(LogLevel servere, FormatWithLocation fwl, Args... args) {
            array_helpers::find(LogLevelStrMap, servere)->second, logmsg);
 }
 
-template <typename T, typename... Args>
-inline void ASSERT(const T cond, FormatWithLocation value, Args... args) {
-    if (!cond) {
-        LOG(LogLevel::FATAL,
-            FormatWithLocation("Assertion failed: %s", value.loc), value.value,
-            args...);
-        assert(cond);
-    }
-}
+#define ASSERT(cond, message, ...)                                             \
+    do {                                                                       \
+        if (!(cond)) {                                                         \
+            LOG(LogLevel::FATAL, "Assertion failed: " message, ##__VA_ARGS__); \
+            abort();                                                           \
+        }                                                                      \
+    } while (0)
