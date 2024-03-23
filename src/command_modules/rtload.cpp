@@ -37,7 +37,7 @@ void RTLoadCommandFn(Bot& bot, const Message::Ptr message) {
     std::filesystem::remove(p);
     impl.run(message);
     if (FS::exists(p)) {
-        static auto loader = RTCommandLoader(bot);
+        auto loader = RTCommandLoader::getInstance();
         if (loader.loadOneCommand(p)) {
             bot_sendReplyMessage(bot, message, "Command loaded!");
             count++;

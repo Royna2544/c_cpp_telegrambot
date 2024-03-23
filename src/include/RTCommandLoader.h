@@ -4,6 +4,7 @@
 
 #include <filesystem>
 #include <vector>
+#include "InstanceClassBase.hpp"
 
 using TgBot::Bot;
 using TgBot::Message;
@@ -18,8 +19,9 @@ struct DynamicLibraryHolder {
 };
 
 
-struct RTCommandLoader {
+struct RTCommandLoader : InstanceClassBase<RTCommandLoader> {
     RTCommandLoader(Bot& bot) : bot(bot) {}
+    RTCommandLoader() = delete;
 
     /**
      * @brief loads a single command from a file
