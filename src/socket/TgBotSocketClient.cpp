@@ -4,6 +4,7 @@
 #include <iostream>
 #include <memory>
 
+#include "Logging.h"
 #include "TgBotSocket.h"
 #include "socket/SocketInterfaceBase.h"
 
@@ -144,7 +145,7 @@ int main(int argc, char** argv) {
                     case CMD_MAX:
                         break;
                     default:
-                        ASSERT(0, "Unhandled command value: %d!", cmd);
+                        ASSERT_UNREACHABLE;
                 };
                 if (!ret)
                     fprintf(stderr, "Failed parsing arguments for %s\n",

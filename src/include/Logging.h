@@ -55,10 +55,23 @@ void LOG(LogLevel servere, FormatWithLocation fwl, Args... args) {
            array_helpers::find(LogLevelStrMap, servere)->second, logmsg);
 }
 
+#ifndef NDEBUG
+#define ABORT_FN(cond) assert(cond)
+#else
+#define ABORT_FN(cond) abort()
+#endif
+
 #define ASSERT(cond, message, ...)                                             \
     do {                                                                       \
         if (!(cond)) {                                                         \
             LOG(LogLevel::FATAL, "Assertion failed: " message, ##__VA_ARGS__); \
-            abort();                                                           \
+            ABORT_FN(cond);                                                    \
         }                                                                      \
     } while (0)
+
+#define ASSERT_UNREACHABLE                                         \
+    {                                                              \
+        bool is_unreachable = false;                               \
+        ASSERT(is_unreachable, "This path should be unreachable"); \
+    }
+    
