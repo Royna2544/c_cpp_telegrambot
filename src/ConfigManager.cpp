@@ -11,6 +11,8 @@
 #include <mutex>
 #include <optional>
 
+namespace po = boost::program_options;
+
 /**
  * @brief This struct represents a configuration backend.
  *
@@ -104,9 +106,8 @@ struct ConfigBackendEnv : public ConfigBackendBase {
     const char *getName() const override { return "Env"; }
 };
 
-namespace po = boost::program_options;
-struct ConfigBackendFile : public ConfigBackendBase {
-    struct file_priv {
+struct ConfigBackendBoostPOBase : public ConfigBackendBase {
+    struct boost_priv {
         constexpr static const char kConfigOverrideVar[] = "OVERRIDE_CONF";
         static po::options_description getTgBotOptionsDesc() {
             static po::options_description desc("TgBot++ Configs");
@@ -117,7 +118,7 @@ struct ConfigBackendFile : public ConfigBackendBase {
                 ("TOKEN,t", po::value<std::string>(), "Bot Token")
                 ("SRC_ROOT,r", po::value<std::string>(), "Root directory of source tree")
                 ("PATH,p", po::value<std::string>(), "Environment variable PATH (to override)")
-                (file_priv::kConfigOverrideVar, po::value<std::vector<std::string>>()->multitoken(),
+                (kConfigOverrideVar, po::value<std::vector<std::string>>()->multitoken(),
                     "Config list to override from this source");
                 // clang-format on
             });
@@ -128,8 +129,8 @@ struct ConfigBackendFile : public ConfigBackendBase {
 
     bool getVariable(const void *p, const std::string &name,
                      std::string &outvalue) override {
-        auto priv = reinterpret_cast<const file_priv *>(p);
-        if (priv && name != file_priv::kConfigOverrideVar) {
+        auto priv = reinterpret_cast<const boost_priv *>(p);
+        if (priv && name != boost_priv::kConfigOverrideVar) {
             if (const auto it = priv->mp[name]; !it.empty()) {
                 outvalue = it.as<std::string>();
                 return true;
@@ -139,9 +140,9 @@ struct ConfigBackendFile : public ConfigBackendBase {
     }
 
     bool doOverride(const void *p, const std::string &config) override {
-        auto priv = reinterpret_cast<const file_priv *>(p);
+        auto priv = reinterpret_cast<const boost_priv *>(p);
         if (priv) {
-            if (const auto it = priv->mp[file_priv::kConfigOverrideVar];
+            if (const auto it = priv->mp[boost_priv::kConfigOverrideVar];
                 !it.empty()) {
                 const auto vec = it.as<std::vector<std::string>>();
                 return std::find(vec.begin(), vec.end(), config) != vec.end();
@@ -149,11 +150,13 @@ struct ConfigBackendFile : public ConfigBackendBase {
         }
         return false;
     }
+};
 
-    virtual void *load() override {
+struct ConfigBackendFile : public ConfigBackendBoostPOBase {
+    void *load() override {
         std::filesystem::path home;
         std::string line;
-        static file_priv p{};
+        static boost_priv p{};
 
         home = FS::getPathForType(FS::PathType::HOME);
         if (home.empty()) {
@@ -165,7 +168,7 @@ struct ConfigBackendFile : public ConfigBackendBase {
             LOG(LogLevel::ERROR, "Opening %s failed", confPath.c_str());
             return nullptr;
         }
-        po::store(po::parse_config_file(ifs, file_priv::getTgBotOptionsDesc()),
+        po::store(po::parse_config_file(ifs, boost_priv::getTgBotOptionsDesc()),
                   p.mp);
         po::notify(p.mp);
 
@@ -176,14 +179,15 @@ struct ConfigBackendFile : public ConfigBackendBase {
     virtual const char *getName() const override { return "File"; }
 };
 
-struct ConfigBackendCmdline : public ConfigBackendFile {
-    struct cmdline_priv : ConfigBackendFile::file_priv {
+struct ConfigBackendCmdline : public ConfigBackendBoostPOBase {
+    struct cmdline_priv : ConfigBackendBoostPOBase::boost_priv {
         static po::options_description getTgBotOptionsDesc() {
-            auto desc = file_priv::getTgBotOptionsDesc();
+            auto desc = boost_priv::getTgBotOptionsDesc();
             desc.add_options()("help,h", "Help message for this bot vars");
             return desc;
         }
     };
+
     void *load() override {
         static cmdline_priv p{};
         int argc = 0;
@@ -201,7 +205,7 @@ struct ConfigBackendCmdline : public ConfigBackendFile {
                   p.mp);
         po::notify(p.mp);
 
-        LOG(LogLevel::INFO, "Loaded %zu entries", p.mp.size());
+        LOG(LogLevel::INFO, "Loaded %zu entries (cmdline)", p.mp.size());
         return &p;
     }
     const char *getName() const override { return "Cmdline"; }
