@@ -37,6 +37,12 @@ void LOG(LogLevel servere, FormatWithLocation fwl, Args... args) {
     const char* logmsg = nullptr;
     const auto& loc = fwl.loc;
     const auto& fmt = fwl.value;
+
+#ifdef NDEBUG
+    if (servere == LogLevel::VERBOSE) {
+        return;
+    }
+#endif
     if constexpr (sizeof...(args) == 0) {
         logmsg = fmt;
     } else {
