@@ -153,7 +153,7 @@ set(SRC_LIST
 set(CMD_MODULES_SINGLE_LIST alive flash possibility decide delay decho
                             randsticker fileid updatecommands rtload)
 if (NOT WIN32)
-  set(CMD_MODULES_SINGLE_LIST ${CMD_MODULES_SINGLE_LIST} restart)
+  set(CMD_MODULES_SINGLE_LIST ${CMD_MODULES_SINGLE_LIST} ibash restart)
 endif()
 ######################## Commands sources list ########################
 set(CMD_MODULES_SOURCES_LIST database_impl bash_impl ${CMD_MODULES_SINGLE_LIST} timer_impl)
