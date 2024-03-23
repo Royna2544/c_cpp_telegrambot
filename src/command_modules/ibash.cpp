@@ -2,8 +2,8 @@
 #include <ExtArgs.h>
 #include <Logging.h>
 #include <fcntl.h>
-#include <internal/_logging_posix.h>
 #include <internal/_FileDescriptor_posix.h>
+#include <internal/_logging_posix.h>
 #include <poll.h>
 #include <stdio.h>
 #include <sys/mman.h>
@@ -12,17 +12,18 @@
 
 #include <chrono>
 #include <csignal>
+#include <cstdint>
 #include <cstdlib>
 #include <functional>
 #include <mutex>
 #include <regex>
 #include <thread>
 
-#include "compiler/CompilerInTelegram.h"  // BASH_MAX_BUF, BASH_READ_BUF
 #include "ExtArgs.h"
 #include "SingleThreadCtrl.h"
 #include "StringToolsExt.h"
 #include "command_modules/CommandModule.h"
+#include "compiler/CompilerInTelegram.h"  // BASH_MAX_BUF, BASH_READ_BUF
 #include "popen_wdt/popen_wdt.h"
 
 using std::chrono_literals::operator""s;
@@ -32,6 +33,7 @@ struct InteractiveBashContext {
     // toparent { parent read, child stdout }
     pipe_t tochild, toparent;
     bool is_open = false;
+    SingleThreadCtrlManager& gSThreadManager;
 
     // Aliases
     const int& child_stdin = tochild[0];
@@ -43,12 +45,16 @@ struct InteractiveBashContext {
         "Subprocess closed due to inactivity";
     constexpr static const char kNoOutputFallback[] = "\n";
 
+    InteractiveBashContext()
+        : gSThreadManager(SingleThreadCtrlManager::getInstance()) {}
+
     struct ExitTimeoutThread : SingleThreadCtrl {
         void start(const InteractiveBashContext* instr) {
             if (delayUnlessStop(SLEEP_SECONDS); kRun) {
                 if (instr->childpid > 0 && kill(instr->childpid, 0) == 0) {
-                    LOG(LogLevel::WARNING, "Process %d misbehaving, using SIGTERM",
-                          instr->childpid);
+                    LOG(LogLevel::WARNING,
+                        "Process %d misbehaving, using SIGTERM",
+                        instr->childpid);
                     killpg(instr->childpid, SIGTERM);
                 }
             }
@@ -120,7 +126,8 @@ struct InteractiveBashContext {
                 close(child_stdin);
                 // Ensure bash execl() is up
                 do {
-                    LOG(LogLevel::WARNING, "Waiting for subprocess up... (%ds passed)", count);
+                    LOG(LogLevel::WARNING,
+                        "Waiting for subprocess up... (%ds passed)", count);
                     std::this_thread::sleep_for(1s);
                     count++;
                 } while (kill(-(*piddata), 0) != 0);
@@ -155,7 +162,7 @@ struct InteractiveBashContext {
             waitpid(childpid, &status, 0);
             if (WIFEXITED(status)) {
                 LOG(LogLevel::INFO, "Process %d exited with code %d", childpid,
-                      WEXITSTATUS(status));
+                    WEXITSTATUS(status));
             }
             exitTimeout->stop();
             {
@@ -307,7 +314,8 @@ static void InteractiveBashCommandFn(const Bot& bot,
         parseExtArgs(message, command);
         if (InteractiveBashContext::isExitCommand(command)) {
             if (ctx.is_open)
-                LOG(LogLevel::INFO, "Received exit command: '%s'", command.c_str());
+                LOG(LogLevel::INFO, "Received exit command: '%s'",
+                    command.c_str());
             ctx.exit(
                 [&bot, message]() {
                     bot_sendReplyMessage(bot, message,
