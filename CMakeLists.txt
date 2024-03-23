@@ -350,9 +350,5 @@ add_executable(${PROJECT_TEST_NAME}
   tests/ResourceManagerTest.cpp
 )
 target_link_libraries(${PROJECT_TEST_NAME} gtest gtest_main gmock TgBotCommandModules)
-###################### Creates the valgrind target ######################
-find_program(VALGRIND "valgrind")
-if(VALGRIND)
-  add_custom_target(valgrind COMMAND "${VALGRIND}" --tool=memcheck --leak-check=yes --show-reachable=yes --num-callers=20 --track-fds=yes $<TARGET_FILE:${PROJECT_MAINEXE_NAME}>)
-endif()
+add_test(NAME ${PROJECT_TEST_NAME} COMMAND ${PROJECT_TEST_NAME})
 #####################################################################
