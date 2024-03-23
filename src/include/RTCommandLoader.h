@@ -10,7 +10,7 @@ using TgBot::Bot;
 using TgBot::Message;
 
 struct DynamicLibraryHolder {
-    DynamicLibraryHolder(void* handle) : handle_(handle){};
+    explicit DynamicLibraryHolder(void* handle) : handle_(handle){};
     DynamicLibraryHolder(DynamicLibraryHolder&& other);
     ~DynamicLibraryHolder();
 
@@ -18,8 +18,7 @@ struct DynamicLibraryHolder {
     void* handle_;
 };
 
-
-struct RTCommandLoader : InstanceClassBase<RTCommandLoader> {
+struct RTCommandLoader : public InstanceClassBase<RTCommandLoader> {
     RTCommandLoader(Bot& bot) : bot(bot) {}
     RTCommandLoader() = delete;
 
@@ -49,5 +48,5 @@ struct RTCommandLoader : InstanceClassBase<RTCommandLoader> {
    private:
     static void commandStub(const Bot& bot, const Message::Ptr& message);
     Bot& bot;
-    std::vector<DynamicLibraryHolder> libs;
+    std::vector<std::shared_ptr<DynamicLibraryHolder>> libs;
 };

@@ -5,6 +5,7 @@
 
 #include <filesystem>
 #include <libos/libfs.hpp>
+#include <memory>
 #include <mutex>
 #include <vector>
 
@@ -50,7 +51,7 @@ bool RTCommandLoader::loadOneCommand(std::filesystem::path _fname) {
         dlclose(handle);
         return false;
     }
-    libs.emplace_back(handle);
+    libs.emplace_back(std::make_shared<DynamicLibraryHolder>(handle));
     mod = &sym->mod;
     if (!sym->isSupported()) {
         fn = commandStub;
