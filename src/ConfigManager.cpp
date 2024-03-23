@@ -225,10 +225,11 @@ void copyCommandLine(CommandLineOp op, int *argc, char *const **argv) {
 
 namespace ConfigManager {
 
-enum Passes {
-    FIND_OVERRIDE = 0,
-    ACTUAL_GET = 1,
-    DONE = 2,
+enum class Passes {
+    INIT,
+    FIND_OVERRIDE,
+    ACTUAL_GET,
+    DONE,
 };
 
 std::optional<std::string> getVariable(const std::string &name) {
@@ -237,8 +238,8 @@ std::optional<std::string> getVariable(const std::string &name) {
         std::make_shared<ConfigBackendEnv>(),
         std::make_shared<ConfigBackendFile>(),
     };
-    
-    Passes p = FIND_OVERRIDE;
+
+    Passes p = Passes::INIT;
     std::string outvalue;
 
     for (auto &bit : backends) {
@@ -248,38 +249,39 @@ std::optional<std::string> getVariable(const std::string &name) {
         }
     }
 
+    p = Passes::FIND_OVERRIDE;
     do {
-        for (auto &bit : backends) {
-            switch (p) {
-                case FIND_OVERRIDE:
-                    for (auto &bit : backends) {
-                        if (bit->doOverride(bit->priv.data, name)) {
-                            LOG(LogLevel::VERBOSE,
-                                "Used '%s' backend for fetching var '%s' "
-                                "(forced)",
-                                bit->getName(), name.c_str());
-                            bit->getVariable(bit->priv.data, name, outvalue);
-                            return {outvalue};
-                        }
+        switch (p) {
+            case Passes::FIND_OVERRIDE:
+                for (auto &bit : backends) {
+                    if (bit->doOverride(bit->priv.data, name)) {
+                        LOG(LogLevel::VERBOSE,
+                            "Used '%s' backend for fetching var '%s' "
+                            "(forced)",
+                            bit->getName(), name.c_str());
+                        bit->getVariable(bit->priv.data, name, outvalue);
+                        return {outvalue};
                     }
-                    p = ACTUAL_GET;
-                    break;
-                case ACTUAL_GET:
-                    for (auto &bit : backends) {
-                        if (bit->getVariable(bit->priv.data, name, outvalue)) {
-                            LOG(LogLevel::VERBOSE,
-                                "Used '%s' backend for fetching var '%s'",
-                                bit->getName(), name.c_str());
-                            return {outvalue};
-                        }
+                }
+                p = Passes::ACTUAL_GET;
+                break;
+            case Passes::ACTUAL_GET:
+                for (auto &bit : backends) {
+                    if (bit->getVariable(bit->priv.data, name, outvalue)) {
+                        LOG(LogLevel::VERBOSE,
+                            "Used '%s' backend for fetching var '%s'",
+                            bit->getName(), name.c_str());
+                        return {outvalue};
                     }
-                    p = DONE;
-                    break;
-                default:
-                    break;
-            }
+                }
+                p = Passes::DONE;
+                break;
+            default:
+                ASSERT_UNREACHABLE;
+                break;
         }
-    } while (p != DONE);
+
+    } while (p != Passes::DONE);
 
     return std::nullopt;
 }
