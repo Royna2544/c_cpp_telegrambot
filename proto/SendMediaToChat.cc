@@ -7,6 +7,7 @@
 #include <cstring>
 #include <string>
 
+#include "ConfigManager.h"
 #include "Logging.h"
 #include "socket/SocketInterfaceBase.h"
 
@@ -22,7 +23,7 @@ using database::DBWrapper;
     exit(exitCode);
 }
 
-int main(const int argc, const char** argv) {
+int main(int argc, char* const* argv) {
     ChatId chatId = 0;
     TgBotCommandData::SendFileToChatId data = {};
     const auto _usage = std::bind(usage, argv[0], std::placeholders::_1);

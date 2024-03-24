@@ -1,6 +1,4 @@
 #include <Database.h>
-#include <ConfigManager.h>
-
 #include <iostream>
 
 using database::DBWrapper;
@@ -22,7 +20,6 @@ static void dumpList(const PersonList& list, const char* name) {
 #define INDENT "   -> "
 
 int main(int argc, char *const *argv) {
-    copyCommandLine(CommandLineOp::INSERT, &argc, &argv);
     DBWrapper.load();
     const auto mainDB = DBWrapper.protodb;
     const auto mediaDB = mainDB.mediatonames();

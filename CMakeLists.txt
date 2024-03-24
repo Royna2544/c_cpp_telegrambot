@@ -81,7 +81,7 @@ endif()
 ################### Check Windows's AF_UNIX support ###################
 ################# Versions later than Win10 RS3 does #################
 if (WIN32)
-  perform_test("USE_UNIX_SOCKETS")
+  perform_test(USE_UNIX_SOCKETS)
   try_compile(USE_UNIX_SOCKETS ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/tests/test_af_unix.c)
   perform_test_ret(USE_UNIX_SOCKETS)
 else()
@@ -201,7 +201,7 @@ target_include_directories(TgBotDB PUBLIC ${PROTO_HDRS_DIR})
 target_include_directories(TgBotDB PRIVATE ${Protobuf_INCLUDE_DIRS})
 ########## TgBotDB ABSL libs (We need them on some platforms) ##########
 foreach(ABSL_LIB absl_log_internal_check_op absl_log_internal_message)
-  perform_test("HAS_LIB_${ABSL_LIB}")
+  perform_test(HAS_LIB_${ABSL_LIB})
   find_library(TMP_${ABSL_LIB} NAMES ${ABSL_LIB})
   perform_test_ret(TMP_${ABSL_LIB})
   if(NOT TMP_${ABSL_LIB})
@@ -273,7 +273,7 @@ if (USE_UNIX_SOCKETS)
   target_include_directories(TgBotSocket PRIVATE ${CURL_INCLUDE_DIRS})
   add_executable(${SOCKET_CLI_NAME} src/socket/TgBotSocketClient.cpp)
 
-  target_link_libraries(${SOCKET_CLI_NAME} TgBotSocket TgBotUtils)
+  target_link_libraries(${SOCKET_CLI_NAME} TgBotSocket)
   target_link_lib_if_windows(${SOCKET_CLI_NAME} Ws2_32)
   if (CURL_FOUND)
     target_link_libraries(TgBotSocket ${CURL_LIBRARIES})
@@ -332,13 +332,13 @@ target_link_libraries(${PROJECT_MAINEXE_NAME} TgBotCommandModules)
 
 ################# Utility Programs (Dump Database) ##################
 add_executable(${DBDUMPER_NAME} proto/DumpProtoDB.cc)
-target_link_libraries(${DBDUMPER_NAME} TgBotDB TgBotUtils ${ABSL_LIBS})
+target_link_libraries(${DBDUMPER_NAME} TgBotDB ${ABSL_LIBS})
 #####################################################################
 
 ############### Utility Programs (Send Media to chat) ################
 if (USE_UNIX_SOCKETS)
   add_executable(${MEDIA_CLI_NAME} proto/SendMediaToChat.cc)
-  target_link_libraries(${MEDIA_CLI_NAME} TgBotDB TgBotSocket TgBotUtils ${ABSL_LIBS})
+  target_link_libraries(${MEDIA_CLI_NAME} TgBotDB TgBotSocket ${ABSL_LIBS})
   target_link_lib_if_windows(${MEDIA_CLI_NAME} Ws2_32)
 endif()
 #####################################################################
