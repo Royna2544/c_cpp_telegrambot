@@ -17,10 +17,14 @@ macro(perform_test_ret result)
     message(STATUS ${PERFORM_TEST_FAIL})
   endif()
 endmacro()
+########### Define a macro to prevent set(VAR ${VAR} NewVar) ###########
+macro(extend_set var)
+  set(${var} ${${var}} ${ARGN})
+endmacro()
 ########### Define a target_link_libraries helper macro ###########
 macro(add_lib_if var)
   if(${var})
-    set(LD_LIST ${LD_LIST} ${ARGN})
+    extend_set(LD_LIST ${ARGN})
   endif()
 endmacro()
 macro(target_link_lib_if_windows target)
@@ -177,11 +181,11 @@ foreach(lib ${CMD_MODULES_LIST})
 endforeach()
 ########## Generate commands modules list in compile time (cpp) ##########
 foreach(lib ${CMD_MODULES_SOURCES_LIST})
-  set(SRC_LIST ${SRC_LIST} ${COMMANDS_CWD}/${lib}.cpp)
+  extend_set(SRC_LIST ${COMMANDS_CWD}/${lib}.cpp)
 endforeach()
 #################### Include to TgBotCommandModules #################
 configure_file(${COMMANDS_GEN_FILE}.in ${CMAKE_BINARY_DIR}/${COMMANDS_GEN_FILE})
-set(SRC_LIST ${SRC_LIST} ${CMAKE_BINARY_DIR}/${COMMANDS_GEN_FILE})
+extend_set(SRC_LIST ${CMAKE_BINARY_DIR}/${COMMANDS_GEN_FILE})
 #####################################################################
 
 ####################### Database (Protobuf) #######################
@@ -203,7 +207,7 @@ foreach(ABSL_LIB absl_log_internal_check_op absl_log_internal_message)
   if(NOT TMP_${ABSL_LIB})
     continue()
   endif()
-  set(ABSL_LIBS ${ABSL_LIBS} ${ABSL_LIB})
+  extend_set(ABSL_LIBS ${ABSL_LIB})
 endforeach()
 ####################### TgBotDB lib includes #######################
 add_dependencies(TgBotDB protobuf_TgBotDB_ready)
@@ -213,7 +217,7 @@ target_link_libraries(TgBotDB TgBot TgBotUtils protobuf::libprotobuf ${ABSL_LIBS
 ################## RTCL (Run Time Command Loader) ##################
 if(ENABLE_RUNTIME_COMMAND)
   add_definitions(-DRTCOMMAND_LOADER)
-  set(SRC_LIST ${SRC_LIST} src/RTCommandLoader.cpp)
+  extend_set(SRC_LIST src/RTCommandLoader.cpp)
   add_subdirectory(src/command_modules/runtime)
   if (WIN32)
     add_subdirectory(src/third-party/dlfcn-win32)
@@ -224,9 +228,9 @@ endif()
 
 ####################### TgBot Socket Library #######################
 if (USE_UNIX_SOCKETS)
-  set(SRC_LIST ${SRC_LIST}
-      src/ChatObserver.cpp
-      src/SocketConnectionHandler.cpp)
+  extend_set(SRC_LIST
+    src/ChatObserver.cpp
+    src/SocketConnectionHandler.cpp)
   if (UNIX)
     set(SOCKET_SRC_LIST
       src/socket/SocketInterfaceUnix.cpp
@@ -235,32 +239,32 @@ if (USE_UNIX_SOCKETS)
       src/socket/impl/SocketInterfacePosixIPv6.cpp
     )
     if (APPLE)
-      set(SOCKET_SRC_LIST ${SOCKET_SRC_LIST}
+      extend_set(SOCKET_SRC_LIST
         src/socket/impl/SocketHelperDarwin.cpp
       )
     else()
-      set(SOCKET_SRC_LIST ${SOCKET_SRC_LIST}
+      extend_set(SOCKET_SRC_LIST
         src/socket/impl/SocketHelperLinux.cpp
       )
     endif()
   elseif(WIN32)
-      set(SOCKET_SRC_LIST 
-        src/socket/SocketInterfaceWindows.cpp
-        src/socket/impl/SocketInterfaceWindowsLocal.cpp
-        src/socket/impl/SocketInterfaceWindowsIPv4.cpp
-        src/socket/impl/SocketInterfaceWindowsIPv6.cpp
-        src/socket/impl/SocketHelperWindows.cpp
-      )
+    extend_set(SOCKET_SRC_LIST 
+      src/socket/SocketInterfaceWindows.cpp
+      src/socket/impl/SocketInterfaceWindowsLocal.cpp
+      src/socket/impl/SocketInterfaceWindowsIPv4.cpp
+      src/socket/impl/SocketInterfaceWindowsIPv6.cpp
+      src/socket/impl/SocketHelperWindows.cpp
+    )
   endif()
-  set(SOCKET_SRC_LIST ${SOCKET_SRC_LIST}
-        src/socket/impl/SocketHelperCommon.cpp)
+  extend_set(SOCKET_SRC_LIST
+    src/socket/impl/SocketHelperCommon.cpp)
 
   if (CURL_FOUND)
-      set(SOCKET_SRC_LIST ${SOCKET_SRC_LIST}
-          src/socket/impl/SocketHelperCommonCurl.cpp)
+    extend_set(SOCKET_SRC_LIST
+      src/socket/impl/SocketHelperCommonCurl.cpp)
   else()
-      set(SOCKET_SRC_LIST ${SOCKET_SRC_LIST}
-          src/socket/impl/SocketHelperCommonNoCurl.cpp)
+    extend_set(SOCKET_SRC_LIST
+      src/socket/impl/SocketHelperCommonNoCurl.cpp)
   endif()
   add_library(TgBotSocket SHARED
       ${SOCKET_SRC_LIST}
@@ -282,11 +286,11 @@ endif()
 add_subdirectory(src/third-party/libgit2)
 set(LIBGIT2_LIBS libgit2 util pcre http-parser xdiff ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES})
 if (WIN32)
-  set(LIBGIT2_LIBS ${LIBGIT2_LIBS} winhttp CRYPT32 Rpcrt4 Secur32 Ws2_32)
+  extend_set(LIBGIT2_LIBS winhttp CRYPT32 Rpcrt4 Secur32 Ws2_32)
 elseif(APPLE)
-  set(LIBGIT2_LIBS ${LIBGIT2_LIBS} ntlmclient iconv ${MACOS_SSL_LIBS})
+  extend_set(LIBGIT2_LIBS ntlmclient iconv ${MACOS_SSL_LIBS})
 else()
-  set(LIBGIT2_LIBS ${LIBGIT2_LIBS} ntlmclient)
+  extend_set(LIBGIT2_LIBS ntlmclient)
 endif()
 #####################################################################
 ################# TgBot Utilities (generic) Library #################
