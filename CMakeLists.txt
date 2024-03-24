@@ -21,12 +21,12 @@ endmacro()
 macro(extend_set var)
   set(${var} ${${var}} ${ARGN})
 endmacro()
-########### Define a target_link_libraries helper macro ###########
-macro(add_lib_if var)
-  if(${var})
-    extend_set(LD_LIST ${ARGN})
+macro(extend_set_if var cond)
+  if(${cond})
+    extend_set(${var} ${ARGN})
   endif()
 endmacro()
+########### Define a target_link_libraries helper macro ###########
 macro(target_link_lib_if_windows target)
   if (WIN32)
     target_link_libraries(${target} ${ARGN})
@@ -267,9 +267,9 @@ if (USE_UNIX_SOCKETS)
       src/socket/impl/SocketHelperCommonNoCurl.cpp)
   endif()
   add_library(TgBotSocket SHARED
-      ${SOCKET_SRC_LIST}
-      src/socket/SocketInterfaceBase.cpp
-      src/socket/TgBotCommandMap.cpp)
+    ${SOCKET_SRC_LIST}
+    src/socket/SocketInterfaceBase.cpp
+    src/socket/TgBotCommandMap.cpp)
   target_include_directories(TgBotSocket PRIVATE ${CURL_INCLUDE_DIRS})
   add_executable(${SOCKET_CLI_NAME} src/socket/TgBotSocketClient.cpp)
 
@@ -319,9 +319,9 @@ target_include_directories(TgBotCommandModules PRIVATE ${COMMANDS_CWD})
 target_include_directories(TgBotCommandModules PRIVATE src/third-party/rapidjson/include)
 ######################## Libraries to link ########################
 set(LD_LIST TgBot TgBotDB TgBotUtils ${ABSL_LIBS})
-add_lib_if(USE_UNIX_SOCKETS TgBotSocket)
-add_lib_if(WIN32 wsock32 Ws2_32)
-add_lib_if(ENABLE_RUNTIME_COMMAND ${CMAKE_DL_LIBS})
+extend_set_if(LD_LIST USE_UNIX_SOCKETS TgBotSocket)
+extend_set_if(LD_LIST WIN32 wsock32 Ws2_32)
+extend_set_if(LD_LIST ENABLE_RUNTIME_COMMAND ${CMAKE_DL_LIBS})
 target_link_libraries(TgBotCommandModules ${LD_LIST})
 #####################################################################
 
