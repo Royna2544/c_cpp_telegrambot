@@ -106,11 +106,7 @@ include_directories(${Boost_INCLUDE_DIR})
 #####################################################################
 
 ############################# Check lib #############################
-find_package(CURL 7.58.0)
-if (CURL_FOUND)
-    include_directories(${CURL_INCLUDE_DIRS})
-    add_definitions(-DHAVE_CURL)
-endif()
+find_package(CURL)
 find_package(OpenSSL REQUIRED)
 find_package(ZLIB REQUIRED)
 if (APPLE)
@@ -259,10 +255,18 @@ if (USE_UNIX_SOCKETS)
   set(SOCKET_SRC_LIST ${SOCKET_SRC_LIST}
         src/socket/impl/SocketHelperCommon.cpp)
 
+  if (CURL_FOUND)
+      set(SOCKET_SRC_LIST ${SOCKET_SRC_LIST}
+          src/socket/impl/SocketHelperCommonCurl.cpp)
+  else()
+      set(SOCKET_SRC_LIST ${SOCKET_SRC_LIST}
+          src/socket/impl/SocketHelperCommonNoCurl.cpp)
+  endif()
   add_library(TgBotSocket SHARED
       ${SOCKET_SRC_LIST}
       src/socket/SocketInterfaceBase.cpp
       src/socket/TgBotCommandMap.cpp)
+  target_include_directories(TgBotSocket PRIVATE ${CURL_INCLUDE_DIRS})
   add_executable(${SOCKET_CLI_NAME} src/socket/TgBotSocketClient.cpp)
 
   target_link_libraries(${SOCKET_CLI_NAME} TgBotSocket TgBotUtils)
