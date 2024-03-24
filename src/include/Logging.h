@@ -46,8 +46,7 @@ void LOG(LogLevel servere, FormatWithLocation fwl, Args... args) {
     if constexpr (sizeof...(args) == 0) {
         logmsg = fmt;
     } else {
-        static char logbuf[512];
-        memset(logbuf, 0, sizeof(logbuf));
+        char logbuf[128] = {};
         snprintf(logbuf, sizeof(logbuf), fmt, args...);
         logmsg = logbuf;
     }
