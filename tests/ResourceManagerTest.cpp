@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <libos/libfs.hpp>
 #include "ResourceManager.h"
 
 class ResourceManagerTest : public testing::Test {
@@ -17,7 +18,7 @@ TEST_F(ResourceManagerTest, PreloadOneFile) {
 
 TEST_F(ResourceManagerTest, PreloadAgain) {
     bool rc = gResourceManager.preloadOneFile(
-        ResourceManager::getResourceRootdir() / "test/test.txt");
+        FS::getPathForType(FS::PathType::RESOURCES) / "test/test.txt");
     EXPECT_FALSE(rc);
     rc = gResourceManager.preloadOneFile("test/test.txt");
     EXPECT_FALSE(rc);

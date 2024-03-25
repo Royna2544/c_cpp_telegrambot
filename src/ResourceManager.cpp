@@ -17,7 +17,7 @@ bool ResourceManager::preloadOneFile(std::filesystem::path path) {
         }
     }
     if (found)
-        path = path.lexically_relative(getResourceRootdir());
+        path = path.lexically_relative(FS::getPathForType(FS::PathType::RESOURCES));
 
     for (const auto& [elem, data] : kResources) {
         if (elem.string() == path.string()) {
@@ -32,9 +32,11 @@ bool ResourceManager::preloadOneFile(std::filesystem::path path) {
 }
 
 void ResourceManager::preloadResourceDirectory() {
-    LOG(LogLevel::INFO, "Preloading resource directory");
     std::filesystem::recursive_directory_iterator end;
-    for (std::filesystem::recursive_directory_iterator it(getResourceRootdir()); it != end; ++it) {
+    auto rd = FS::getPathForType(FS::PathType::RESOURCES);
+    LOG(LogLevel::INFO, "Preloading resource directory");
+
+    for (std::filesystem::recursive_directory_iterator it(rd); it != end; ++it) {
         if (it->is_regular_file()) {
             preloadOneFile(*it);
         }
@@ -52,12 +54,3 @@ const std::string& ResourceManager::getResource(std::filesystem::path path) {
     LOG(LogLevel::ERROR, "Resource not found: %s", path.string().c_str());
     return empty;
 }
-
-std::filesystem::path ResourceManager::getResourceRootdir() {
-    static auto path = FS::getPathForType(FS::PathType::RESOURCES);
-    return path;
-}
-
-const std::string ResourceManager::empty = "";
-
-ResourceManager gResourceManager;
