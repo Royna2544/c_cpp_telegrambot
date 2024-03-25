@@ -34,7 +34,7 @@ bool ResourceManager::preloadOneFile(std::filesystem::path path) {
 void ResourceManager::preloadResourceDirectory() {
     std::filesystem::recursive_directory_iterator end;
     auto rd = FS::getPathForType(FS::PathType::RESOURCES);
-    LOG(LogLevel::INFO, "Preloading resource directory");
+    LOG(LogLevel::INFO, "Preloading resource directory: %s", rd.string().c_str());
 
     for (std::filesystem::recursive_directory_iterator it(rd); it != end; ++it) {
         if (it->is_regular_file()) {
