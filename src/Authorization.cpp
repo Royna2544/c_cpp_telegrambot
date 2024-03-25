@@ -4,9 +4,20 @@
 
 bool gAuthorized = true;
 
-using database::DBWrapper;
+namespace database {
+inline DatabaseWrapperImpl& getDB() {
+    try {
+        return DatabaseWrapperBotImplObj::getInstance();
+    } catch (const std::runtime_error& e) {
+        LOG(LogLevel::ERROR, "%s", e.what());
+        return DatabaseWrapperImplObj::getInstance();
+    }
+}
+};  // namespace database
 
-bool Authorized(const Message::Ptr &message, const int flags) {
+bool Authorized(const Message::Ptr& message, const int flags) {
+    static auto& DBWrapper = database::getDB();
+
     if (!gAuthorized || !isMessageUnderTimeLimit(message)) return false;
 
     if (message->from) {
@@ -19,7 +30,7 @@ bool Authorized(const Message::Ptr &message, const int flags) {
             bool ret = false;
             if (const auto whitelist = DBWrapper.whitelist; whitelist)
                 ret |= whitelist->exists(id);
-            ret |= id == database::DBWrapper.maybeGetOwnerId();
+            ret |= id == DBWrapper.maybeGetOwnerId();
             return ret;
         }
     } else {

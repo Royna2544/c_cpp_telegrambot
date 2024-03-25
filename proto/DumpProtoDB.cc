@@ -1,7 +1,6 @@
 #include <Database.h>
 #include <iostream>
 
-using database::DBWrapper;
 using tgbot::proto::PersonList;
 
 static void dumpList(const PersonList& list, const char* name) {
@@ -20,6 +19,7 @@ static void dumpList(const PersonList& list, const char* name) {
 #define INDENT "   -> "
 
 int main(int argc, char *const *argv) {
+    auto &DBWrapper = database::DatabaseWrapperImplObj::getInstance();
     DBWrapper.load();
     const auto mainDB = DBWrapper.protodb;
     const auto mediaDB = mainDB.mediatonames();

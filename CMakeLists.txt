@@ -144,6 +144,7 @@ set(SRC_LIST
     src/command_modules/compiler/Helper.cpp
     src/command_modules/CommandModules.cpp
     src/ExtArgs.cpp
+    src/DatabaseBotImpl.cpp
     src/libos/libsighandler_impl.cpp
     src/libos/libsighandler_${TARGET_VARIANT}.cpp
     src/random/RandomNumberGenerator.cpp
@@ -197,9 +198,11 @@ extend_set(SRC_LIST ${CMAKE_BINARY_DIR}/${COMMANDS_GEN_FILE})
 find_package(Protobuf REQUIRED)
 include(proto/ProtobufCpp.cmake)
 my_protobuf_generate_cpp(proto/gen PROTO_SRCS PROTO_HDRS proto/TgBotDB.proto)
-add_library(TgBotDB SHARED src/Database.cpp
-                           src/DatabaseWrapper.cpp
+add_library(TgBotDB SHARED src/database/Database.cpp
+                           src/database/DatabaseWrapper.cpp
                            ${PROTO_SRCS})
+add_library(TgBotDBImpl SHARED src/DatabaseWrapperImpl.cpp)
+
 ####################### TgBotDB lib includes #######################
 get_filename_component(PROTO_HDRS_DIR ${PROTO_HDRS} DIRECTORY)
 target_include_directories(TgBotDB PUBLIC ${PROTO_HDRS_DIR})
@@ -216,7 +219,8 @@ foreach(ABSL_LIB absl_log_internal_check_op absl_log_internal_message)
 endforeach()
 ####################### TgBotDB lib includes #######################
 add_dependencies(TgBotDB protobuf_TgBotDB_ready)
-target_link_libraries(TgBotDB TgBot TgBotUtils protobuf::libprotobuf ${ABSL_LIBS})
+target_link_libraries(TgBotDB TgBot protobuf::libprotobuf ${ABSL_LIBS})
+target_link_libraries(TgBotDBImpl TgBotDB TgBotUtils)
 #####################################################################
 
 ################## RTCL (Run Time Command Loader) ##################
@@ -325,7 +329,7 @@ add_library(TgBotCommandModules SHARED ${SRC_LIST})
 target_include_directories(TgBotCommandModules PRIVATE ${COMMANDS_CWD})
 target_include_directories(TgBotCommandModules PRIVATE src/third-party/rapidjson/include)
 ######################## Libraries to link ########################
-set(LD_LIST TgBot TgBotDB TgBotUtils ${ABSL_LIBS})
+set(LD_LIST TgBot TgBotDBImpl TgBotUtils ${ABSL_LIBS})
 extend_set_if(LD_LIST USE_UNIX_SOCKETS TgBotSocket)
 extend_set_if(LD_LIST WIN32 wsock32 Ws2_32)
 extend_set_if(LD_LIST ENABLE_RUNTIME_COMMAND ${CMAKE_DL_LIBS})
@@ -339,13 +343,13 @@ target_link_libraries(${PROJECT_MAINEXE_NAME} TgBotCommandModules)
 
 ################# Utility Programs (Dump Database) ##################
 add_executable(${DBDUMPER_NAME} proto/DumpProtoDB.cc)
-target_link_libraries(${DBDUMPER_NAME} TgBotDB ${ABSL_LIBS})
+target_link_libraries(${DBDUMPER_NAME} TgBotDBImpl ${ABSL_LIBS})
 #####################################################################
 
 ############### Utility Programs (Send Media to chat) ################
 if (USE_UNIX_SOCKETS)
   add_executable(${MEDIA_CLI_NAME} proto/SendMediaToChat.cc)
-  target_link_libraries(${MEDIA_CLI_NAME} TgBotDB TgBotSocket ${ABSL_LIBS})
+  target_link_libraries(${MEDIA_CLI_NAME} TgBotDBImpl TgBotSocket ${ABSL_LIBS})
   target_link_lib_if_windows(${MEDIA_CLI_NAME} Ws2_32)
 endif()
 #####################################################################

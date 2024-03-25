@@ -36,7 +36,7 @@ static void CloneCommandFn(const Bot& bot, const Message::Ptr message) {
             auto user = member->user;
             CStringLifetime userName = UserPtr_toString(user);
             std::stringstream ss;
-            ChatId ownerId = database::DBWrapper.maybeGetOwnerId();
+            ChatId ownerId = database::DatabaseWrapperBotImplObj::getInstance().maybeGetOwnerId();
 
             LOG(LogLevel::INFO, "Clone: Dest user: %s", userName.get());
             bot_sendReplyMessage(bot, message, "Cloning... (see PM)");

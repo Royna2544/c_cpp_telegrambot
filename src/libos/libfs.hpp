@@ -1,5 +1,6 @@
+#pragma once
+
 #include <filesystem>
-#include <optional>
 
 #include "libfs.h"
 

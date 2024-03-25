@@ -7,12 +7,15 @@
 #include <tgbot/types/Message.h>
 
 #include <filesystem>
+#include <libos/libfs.hpp>
 #include <mutex>
 #include <optional>
+#include <stdexcept>
 
 #include "BotClassBase.h"
 #include "InstanceClassBase.hpp"
-#include "initcalls/BotInitcall.hpp"
+#include "initcalls/Initcall.hpp"
+#include "internal/_class_helper_macros.h"
 
 static inline const char kDatabaseFile[] = "tgbot.pb";
 
@@ -99,11 +102,7 @@ struct ProtoDatabase : ProtoDatabaseBase, BotClassBase {
                                       const ProtoDatabaseBase* what);
 };
 
-struct DatabaseWrapper : BotInitCall, InstanceClassBase<DatabaseWrapper> {
-    // Load database (excludes blacklist/whitelist, syncthread)
-    void load();
-    // Load database (includes above)
-    void loadMain(Bot& bot);
+struct DatabaseWrapper {
     // Save the changes to database file again
     void save(void) const;
     // 'Maybe' would return owner id stored in database
@@ -117,22 +116,44 @@ struct DatabaseWrapper : BotInitCall, InstanceClassBase<DatabaseWrapper> {
     Database protodb;
 
     std::filesystem::path& getDatabasePath() { return fname; }
+    void load(const std::filesystem::path& file);
 
-    void doInitCall(Bot& bot) override {
-        loadMain(bot);
-    }
-    const char *getInitCallName() const override {
-        return "Load database, including white/black list";
-    }
    private:
     bool warnNoLoaded(const char* func) const;
-    void load(const std::filesystem::path& file);
     std::filesystem::path fname;
     bool loaded = false;
     std::once_flag once;
 };
 
-// TODO
-inline DatabaseWrapper& DBWrapper = DatabaseWrapper::getInstance();
+struct DatabaseWrapperImpl : public DatabaseWrapper {
+    // Load database
+    // This method excludes blacklist/whitelist, syncthread
+    virtual void load();
+};
+
+struct DatabaseWrapperBotImpl : public DatabaseWrapperImpl,
+                                InitCall,
+                                BotClassBase {
+    DatabaseWrapperBotImpl(const Bot& bot) : BotClassBase(bot) {}
+    NO_DEFAULT_CTOR(DatabaseWrapperBotImpl);
+
+    // Load database (includes blacklist/whitelist, syncthread)
+    void load() override;
+
+    void doInitCall() override { load(); }
+    const char* getInitCallName() const override {
+        return "Load database, including white/black list";
+    }
+};
+
+struct DatabaseWrapperImplObj : public DatabaseWrapperImpl,
+                                InstanceClassBase<DatabaseWrapperImplObj> {};
+
+struct DatabaseWrapperBotImplObj
+    : public DatabaseWrapperBotImpl,
+      InstanceClassBase<DatabaseWrapperBotImplObj> {
+    NO_DEFAULT_CTOR(DatabaseWrapperBotImplObj);
+    DatabaseWrapperBotImplObj(const Bot& bot) : DatabaseWrapperBotImpl(bot) {}
+};
 
 };  // namespace database

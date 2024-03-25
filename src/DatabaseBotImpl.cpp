@@ -1,66 +1,42 @@
 #include <BotReplyMessage.h>
 #include <Database.h>
+#include <SingleThreadCtrl.h>
+#include "InstanceClassBase.hpp"
+
+DECLARE_CLASS_INST(database::DatabaseWrapperBotImplObj);
 
 namespace database {
 
-std::optional<int> ProtoDatabaseBase::findByUid(
-    const RepeatedField<UserId>* list, const UserId uid) const {
-    for (auto it = list->begin(); it != list->end(); ++it) {
-        auto distance = std::distance(list->begin(), it);
-        if (list->Get(distance) == uid) {
-            return distance;
+struct DatabaseSync : SingleThreadCtrlRunnable<> {
+    void runFunction() override {
+        while (kRun) {
+            DatabaseWrapperBotImplObj::getInstance().save();
+            delayUnlessStop(100);
         }
     }
-    return std::nullopt;
-}
+};
 
-void ProtoDatabaseBase::_addToDatabase(const Message::Ptr& message,
-                                       RepeatedField<UserId>* list) {
-    if (message->replyToMessage && message->replyToMessage->from) {
-        const User::Ptr user = message->replyToMessage->from;
-        const UserId id = user->id;
-        do {
-            if (rejectUid(user)) break;
-            if (findByUid(list, id)) {
-                onAlreadyExist(message, user, this);
-                break;
-            }
-            if (!other.expired()) {
-                if (const auto it = other.lock(); findByUid(it->list, id)) {
-                    onAlreadyExist(message, user, it.get());
-                    break;
-                }
-            }
-            *list->Add() = id;
-            onAdded(message, user, this);
-        } while (false);
-    } else {
-        onUserNotFoundOnMessage(message);
-    }
-}
-void ProtoDatabaseBase::_removeFromDatabase(const Message::Ptr& message,
-                                            RepeatedField<UserId>* list) {
-    if (message->replyToMessage && message->replyToMessage->from) {
-        const User::Ptr user = message->replyToMessage->from;
-        const UserId id = user->id;
-        do {
-            if (rejectUid(user)) break;
+void DatabaseWrapperBotImpl::load() {
+    auto& mgr = SingleThreadCtrlManager::getInstance();
+    DatabaseWrapperImpl::load();
+    const SingleThreadCtrlManager::GetControllerRequest req{
+        .usage = SingleThreadCtrlManager::USAGE_DATABASE_SYNC_THREAD,
+        .flags = SingleThreadCtrlManager::GetControllerFlags::REQUIRE_NONEXIST |
+                 SingleThreadCtrlManager::GetControllerFlags::
+                     REQUIRE_FAILACTION_RETURN_NULL};
+    if (const auto it = mgr.getController<DatabaseSync>(req); it) it->run();
 
-            const auto idx = findByUid(list, id);
-            if (idx.has_value()) {
-                list->erase(list->begin() + *idx);
-                onRemoved(message, user, this);
-            } else
-                onNotFound(message, user, this);
-        } while (false);
-    } else {
-        onUserNotFoundOnMessage(message);
-    }
+    whitelist = std::make_shared<ProtoDatabase>(
+        _bot, "whitelist", protodb.mutable_whitelist()->mutable_id());
+    blacklist = std::make_shared<ProtoDatabase>(
+        _bot, "blacklist", protodb.mutable_blacklist()->mutable_id());
+    whitelist->setOtherProtoDatabaseBase(blacklist);
+    blacklist->setOtherProtoDatabaseBase(whitelist);
 }
 
 bool ProtoDatabase::rejectUid(const User::Ptr& user) const {
     if (_bot.getApi().getMe()->id == user->id) return true;
-    if (DBWrapper.maybeGetOwnerId() == user->id) return true;
+    if (DatabaseWrapperImplObj::getInstance().maybeGetOwnerId() == user->id) return true;
     if (user->isBot) return true;
     return false;
 }

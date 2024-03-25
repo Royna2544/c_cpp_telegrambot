@@ -58,6 +58,13 @@ void createAndDoInitCall(Bot& bot) {
 }
 
 template <typename T>
+    requires HasInstanceGetter<T> && (!HasBotInitCaller<T>) && HasBotCtor<T>
+void createAndDoInitCall(Bot& bot) {
+    T::initInstance(bot);
+    T::getInstance().initWrapper();
+}
+
+template <typename T>
     requires(!HasInstanceGetter<T>) && HasBotInitCaller<T> && HasBotCtor<T>
 void createAndDoInitCall(Bot& bot) {
     T t(bot);
@@ -98,7 +105,7 @@ int main(int argc, char* const* argv) {
     createAndDoInitCall<SpamBlockManager>(gBot);
     createAndDoInitCall<SocketInterfaceInit>(gBot);
     createAndDoInitCall<CommandModule>(gBot);
-    createAndDoInitCall<database::DatabaseWrapper>(gBot);
+    createAndDoInitCall<database::DatabaseWrapperBotImplObj>(gBot);
     createAndDoInitCall<ChatObserver>(gBot);
     createAndDoInitCall<ResourceManager>();
     // Must be last
@@ -122,7 +129,7 @@ int main(int argc, char* const* argv) {
         } catch (const std::exception& e) {
             LOG(LogLevel::ERROR, "Exception: %s", e.what());
             LOG(LogLevel::WARNING, "Trying to recover");
-            UserId ownerid = database::DBWrapper.maybeGetOwnerId();
+            UserId ownerid = database::DatabaseWrapperImplObj::getInstance().maybeGetOwnerId();
             try {
                 bot_sendMessage(gBot, ownerid,
                                 std::string("Exception occured: ") + e.what());

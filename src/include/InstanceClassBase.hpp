@@ -9,6 +9,9 @@
     template <>                  \
     std::shared_ptr<type> InstanceClassBase<type>::instance = {}
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wundefined-var-template"
+
 template <typename T>
 /**
  * @brief A base class for creating a single instance of a class
@@ -36,3 +39,5 @@ struct InstanceClassBase {
     }
     static std::shared_ptr<T> instance;
 };
+
+#pragma clang diagnostic pop

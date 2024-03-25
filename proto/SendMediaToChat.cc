@@ -14,8 +14,6 @@
 #define strcasecmp _stricmp
 #endif
 
-using database::DBWrapper;
-
 [[noreturn]] static void usage(const char* argv0, const int exitCode) {
     std::cerr << "Usage: " << argv0 << " <chatId> <name stored in DB>"
               << std::endl;
@@ -26,10 +24,9 @@ int main(int argc, char* const* argv) {
     ChatId chatId = 0;
     TgBotCommandData::SendFileToChatId data = {};
     const auto _usage = std::bind(usage, argv[0], std::placeholders::_1);
+    auto &DBWrapper = database::DatabaseWrapperImplObj::getInstance();
 
-    if (!strcmp(argv[1], "-h")) {
-        _usage(EXIT_FAILURE);
-    } else if (argc != 3) {
+    if (argc != 3) {
         _usage(EXIT_SUCCESS);
     }
     DBWrapper.load();

@@ -7,39 +7,41 @@
 #include "CommandModule.h"
 #include "tgbot/tools/StringTools.h"
 
-using database::DBWrapper;
+static database::DatabaseWrapperImplObj& getDatabaseWrapper() {
+    return database::DatabaseWrapperImplObj::getInstance();
+}
 
 struct CommandModule cmd_addblacklist(
     "addblacklist", "Add blacklisted user to the database",
     CommandModule::Flags::Enforced | CommandModule::Flags::HideDescription,
     [](const Bot& bot, const Message::Ptr& message) {
-        DBWrapper.blacklist->addToDatabase(message);
+        getDatabaseWrapper().blacklist->addToDatabase(message);
     });
 
 struct CommandModule cmd_rmblacklist(
     "rmblacklist", "Remove blacklisted user from the database",
     CommandModule::Flags::Enforced | CommandModule::Flags::HideDescription,
     [](const Bot& bot, const Message::Ptr& message) {
-        DBWrapper.blacklist->removeFromDatabase(message);
+        getDatabaseWrapper().blacklist->removeFromDatabase(message);
     });
 
 struct CommandModule cmd_addwhitelist(
     "addwhitelist", "Add whitelisted user to the database",
     CommandModule::Flags::Enforced | CommandModule::Flags::HideDescription,
     [](const Bot& bot, const Message::Ptr& message) {
-        DBWrapper.whitelist->addToDatabase(message);
+        getDatabaseWrapper().whitelist->addToDatabase(message);
     });
 
 struct CommandModule cmd_rmwhitelist(
     "rmwhitelist", "Remove whitelisted user from the database",
     CommandModule::Flags::Enforced | CommandModule::Flags::HideDescription,
     [](const Bot& bot, const Message::Ptr& message) {
-        DBWrapper.whitelist->removeFromDatabase(message);
+        getDatabaseWrapper().whitelist->removeFromDatabase(message);
     });
 
 static void saveIdFn(const Bot& bot, const Message::Ptr& message) {
     const auto mutableMediaDB =
-        database::DBWrapper.protodb.mutable_mediatonames();
+        getDatabaseWrapper().protodb.mutable_mediatonames();
 
     if (hasExtArgs(message)) {
         std::string names;

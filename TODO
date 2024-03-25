@@ -1,2 +1,3 @@
 - IBash TimeoutThread could use SingleThreadCtrlRunnable
 - clang-* compilers add, preferred
+- Maybe add a timer class to count time diff, and use it on initcalls

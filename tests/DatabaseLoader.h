@@ -2,4 +2,4 @@
 
 #include <Database.h>
 
-extern database::DatabaseWrapper& loadDb();
+extern database::DatabaseWrapperImpl& loadDb();
