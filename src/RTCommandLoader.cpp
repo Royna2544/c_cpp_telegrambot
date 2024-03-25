@@ -6,10 +6,8 @@
 #include <filesystem>
 #include <libos/libfs.hpp>
 #include <memory>
-#include <mutex>
 #include <vector>
 
-#include "ConfigManager.h"
 #include "command_modules/runtime/cmd_dynamic.h"
 
 DynamicLibraryHolder::DynamicLibraryHolder(DynamicLibraryHolder&& other) {
@@ -84,25 +82,13 @@ bool RTCommandLoader::loadCommandsFromFile(
     std::ifstream ifs(filename.string());
     if (ifs) {
         while (std::getline(ifs, line)) {
-            loadOneCommand(getModulesInstallPath() / line);
+            loadOneCommand(FS::getPathForType(FS::PathType::MODULES_INSTALLED) / line);
         }
     } else {
         LOG(LogLevel::WARNING, "Failed to open %s", filename.string().c_str());
         return false;
     }
     return true;
-}
-
-std::filesystem::path RTCommandLoader::getModulesInstallPath() {
-    static std::once_flag once;
-    static std::filesystem::path modulesPath;
-    std::call_once(once, [] {
-        int argc;
-        char* const* argv;
-        copyCommandLine(CommandLineOp::GET, &argc, &argv);
-        modulesPath = FS::getPathForType(FS::PathType::BUILD_ROOT);
-    });
-    return modulesPath;
 }
 
 void RTCommandLoader::commandStub(const Bot& bot, const Message::Ptr& message) {

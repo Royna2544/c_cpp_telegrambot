@@ -73,6 +73,7 @@ std::filesystem::path FS::getPathForType(PathType type) {
             path = getPathForType(PathType::GIT_ROOT) / "resources";
             ok = true;
             break;
+        case PathType::MODULES_INSTALLED:
         case PathType::BUILD_ROOT: {
             int argc = 0;
             char* const* argv = nullptr;

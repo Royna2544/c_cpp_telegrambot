@@ -16,7 +16,7 @@ void RTLoadCommandFn(Bot& bot, const Message::Ptr message) {
         bot_sendReplyMessage(bot, message, "No CXX compiler found!");
         return;
     }
-    auto p = RTCommandLoader::getModulesInstallPath() /
+    auto p = FS::getPathForType(FS::PathType::MODULES_INSTALLED) /
              ("libdlload_" + std::to_string(count));
     auto libcmdmod =
         FS::getPathForType(FS::PathType::BUILD_ROOT) / "libTgBotCommandModules";
@@ -37,8 +37,7 @@ void RTLoadCommandFn(Bot& bot, const Message::Ptr message) {
     std::filesystem::remove(p);
     impl.run(message);
     if (FS::exists(p)) {
-        auto loader = RTCommandLoader::getInstance();
-        if (loader.loadOneCommand(p)) {
+        if (RTCommandLoader::getInstance().loadOneCommand(p)) {
             bot_sendReplyMessage(bot, message, "Command loaded!");
             count++;
         } else {

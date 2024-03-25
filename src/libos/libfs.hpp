@@ -16,6 +16,7 @@ struct FS {
         GIT_ROOT,
         RESOURCES,
         BUILD_ROOT,
+        MODULES_INSTALLED,
     };
 
     /**

@@ -37,12 +37,10 @@ struct RTCommandLoader : public InstanceClassBase<RTCommandLoader> {
     bool loadCommandsFromFile(std::filesystem::path filename);
 
     /**
-     * @brief returns the path where modules are installed
+     * @brief returns the path where modules load conf is installed
      *
-     * @return std::filesystem::path the path where modules are installed
+     * @return std::filesystem::path the path where modules load conf is installed
      */
-    static std::filesystem::path getModulesInstallPath();
-
     static std::filesystem::path getModulesLoadConfPath();
 
    private:
