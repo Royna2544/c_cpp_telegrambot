@@ -156,7 +156,6 @@ struct ConfigBackendFile : public ConfigBackendBoostPOBase {
     void *load() override {
         std::filesystem::path home;
         std::string line;
-        static boost_priv p{};
 
         home = FS::getPathForType(FS::PathType::HOME);
         if (home.empty()) {
@@ -176,7 +175,9 @@ struct ConfigBackendFile : public ConfigBackendBoostPOBase {
             confPath.c_str());
         return &p;
     }
-    virtual const char *getName() const override { return "File"; }
+    const char *getName() const override { return "File"; }
+  private:
+    boost_priv p{};
 };
 
 struct ConfigBackendCmdline : public ConfigBackendBoostPOBase {
@@ -189,7 +190,6 @@ struct ConfigBackendCmdline : public ConfigBackendBoostPOBase {
     };
 
     void *load() override {
-        static cmdline_priv p{};
         int argc = 0;
         char *const *argv = nullptr;
 
@@ -209,6 +209,8 @@ struct ConfigBackendCmdline : public ConfigBackendBoostPOBase {
         return &p;
     }
     const char *getName() const override { return "Cmdline"; }
+  private:
+    cmdline_priv p{};
 };
 
 void copyCommandLine(CommandLineOp op, int *argc, char *const **argv) {
