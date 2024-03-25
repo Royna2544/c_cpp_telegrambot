@@ -32,8 +32,5 @@ struct InstanceClassBase {
         }
         return *instance;
     }
-    static std::shared_ptr<T> instance;
+    static inline std::shared_ptr<T> instance;
 };
-
-template <typename T>
-std::shared_ptr<T> InstanceClassBase<T>::instance;
