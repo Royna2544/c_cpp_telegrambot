@@ -86,7 +86,8 @@ std::filesystem::path FS::getPathForType(PathType type) {
     }
     if (ok) {
         path.make_preferred();
-        makeRelativeToCWD(path);
+        if (type != PathType::HOME)
+            makeRelativeToCWD(path);
     } else {
         LOG(LogLevel::ERROR, "Could not find path for type %d", type);
     }
