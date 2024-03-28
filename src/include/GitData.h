@@ -7,4 +7,5 @@ struct GitData {
     std::string commitid, commitmsg, originurl;
     std::filesystem::path gitSrcRoot;
     static bool Fill(GitData *gitData);
+    bool Fill(void);
 };

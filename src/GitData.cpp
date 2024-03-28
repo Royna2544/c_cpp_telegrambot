@@ -65,3 +65,7 @@ bool GitData::Fill(GitData *data) {
     git_libgit2_shutdown();
     return true;
 }
+
+bool GitData::Fill() {
+    return Fill(this);
+}
