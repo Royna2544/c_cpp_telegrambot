@@ -28,9 +28,9 @@ int main(int argc, char* const* argv) {
     TgBotCommandData::SendFileToChatId data = {};
     const auto _usage = std::bind(usage, argv[0], std::placeholders::_1);
 
-    if (argc != 3) {
+    if (!strcmp(argv[1], "-h")) {
         _usage(EXIT_FAILURE);
-    } else if (!strcmp(argv[1], "-h")) {
+    } else if (argc != 3) {
         _usage(EXIT_SUCCESS);
     }
     DBWrapper.load();
