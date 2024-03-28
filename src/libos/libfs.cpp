@@ -5,6 +5,7 @@
 #include "ConfigManager.h"
 #include "GitData.h"
 #include "Logging.h"
+#include "ResourceManager.h"
 
 namespace fs = std::filesystem;
 
@@ -70,7 +71,7 @@ std::filesystem::path FS::getPathForType(PathType type) {
             }
             break;
         case PathType::RESOURCES:
-            path = getPathForType(PathType::GIT_ROOT) / "resources";
+            path = getPathForType(PathType::GIT_ROOT) / ResourceManager::kResourceDirname;
             ok = true;
             break;
         case PathType::MODULES_INSTALLED:
