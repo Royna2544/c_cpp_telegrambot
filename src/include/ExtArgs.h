@@ -36,3 +36,6 @@ bool hasExtArgs(const Message::Ptr &message);
  * arguments, if any
  */
 void parseExtArgs(const Message::Ptr &message, std::string &extraargs);
+
+// Overload for parseExtArgs - returns std::string instead of out parameter
+std::string parseExtArgs(const Message::Ptr &message);

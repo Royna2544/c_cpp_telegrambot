@@ -3,6 +3,7 @@
 #include <string>
 
 #include "StringToolsExt.h"
+#include "tgbot/types/Message.h"
 
 std::string::size_type firstBlank(const Message::Ptr &msg) {
     return msg->text.find_first_of(" \n\r");
@@ -18,4 +19,10 @@ void parseExtArgs(const Message::Ptr &message, std::string &extraargs) {
         extraargs = message->text.substr(firstBlank(message));
         while (isEmptyChar(extraargs.front())) extraargs = extraargs.substr(1);
     }
+}
+
+std::string parseExtArgs(const Message::Ptr& message) {
+    std::string extraargs;
+    parseExtArgs(message, extraargs);
+    return extraargs;
 }
