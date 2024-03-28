@@ -70,6 +70,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 #####################################################################
 
+##################### Fill in readme with cmake #####################
+string(TIMESTAMP TODAY "%Y-%m-%d")
+configure_file(resources/about.html.in ${CMAKE_SOURCE_DIR}/resources/about.html)
+#####################################################################
+
 ####################### Global compiler flags #######################
 if (NOT MSVC)
   add_compile_options(
