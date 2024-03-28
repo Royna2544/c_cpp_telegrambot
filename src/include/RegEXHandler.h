@@ -8,6 +8,11 @@
 #include <string>
 #include <vector>
 
+#include "BotClassBase.h"
+#include "InstanceClassBase.hpp"
+#include "initcalls/BotInitcall.hpp"
+#include "OnAnyMessageRegister.hpp"
+
 using std::regex_constants::syntax_option_type;
 using TgBot::Bot;
 using TgBot::Message;
@@ -66,8 +71,9 @@ struct RegexHandlerBase {
         const Message::Ptr& regexCommand, const std::string& text);
 };
 
-struct RegexHandler : public RegexHandlerBase {
-    RegexHandler(const Bot& bot) : _bot(bot) {}
+struct RegexHandler : public RegexHandlerBase, BotClassBase, BotInitCall, InstanceClassBase<RegexHandler> {
+    explicit RegexHandler(const Bot& bot) : BotClassBase(bot) {}
+    RegexHandler() = delete;
     virtual ~RegexHandler() override = default;
 
     void onRegexCreationFailed(const Message::Ptr& which,
@@ -79,6 +85,13 @@ struct RegexHandler : public RegexHandlerBase {
                           const std::string& processedData) override;
     void processRegEXCommandMessage(const Message::Ptr& message);
 
-   private:
-    const Bot& _bot;
+    void doInitCall(Bot& bot) override {
+        OnAnyMessageRegisterer::getInstance().registerCallback(
+            [this](const Bot& bot, const Message::Ptr& message) {
+                processRegEXCommandMessage(message);
+            });
+    }
+    const char* getInitCallName() const override {
+        return "Add regexhandler anymessage callback";
+    }
 };

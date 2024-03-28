@@ -32,7 +32,7 @@ void DatabaseWrapper::load() {
     load(FS::getPathForType(FS::PathType::GIT_ROOT) / std::string(kDatabaseFile));
 }
 
-void DatabaseWrapper::loadMain(const Bot& bot) {
+void DatabaseWrapper::loadMain(Bot& bot) {
     auto &mgr = SingleThreadCtrlManager::getInstance();
     load();
     const SingleThreadCtrlManager::GetControllerRequest req{
@@ -75,7 +75,3 @@ bool DatabaseWrapper::warnNoLoaded(const char* func) const {
     }
     return loaded;
 }
-
-namespace database {
-DatabaseWrapper DBWrapper;
-}  // namespace database

@@ -3,10 +3,11 @@
 #include <BotAddCommand.h>
 #include <tgbot/types/BotCommand.h>
 
+#include <initcalls/BotInitcall.hpp>
 #include <initializer_list>
 
 struct CompilerModule;
-struct CommandModule : TgBot::BotCommand {
+struct CommandModule : TgBot::BotCommand, BotInitCall {
     enum Flags { None = 0, Enforced = 1 << 0, HideDescription = 1 << 1 };
     command_callback_t fn;
     int flags;
@@ -50,4 +51,12 @@ struct CommandModule : TgBot::BotCommand {
      * @param bot The Bot instance to update the commands for.
      */
     static void updateBotCommands(const Bot &bot);
+
+    void doInitCall(Bot &bot) override {
+        loadCommandModules(bot);
+        updateBotCommands(bot);
+    }
+    const char *getInitCallName() const override {
+        return "Load/update default modules";
+    }
 };

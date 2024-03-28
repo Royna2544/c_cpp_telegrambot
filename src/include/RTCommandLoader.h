@@ -4,7 +4,9 @@
 
 #include <filesystem>
 #include <vector>
+
 #include "InstanceClassBase.hpp"
+#include "initcalls/BotInitcall.hpp"
 
 using TgBot::Bot;
 using TgBot::Message;
@@ -18,7 +20,8 @@ struct DynamicLibraryHolder {
     void* handle_;
 };
 
-struct RTCommandLoader : public InstanceClassBase<RTCommandLoader> {
+struct RTCommandLoader : public InstanceClassBase<RTCommandLoader>,
+                         BotInitCall {
     RTCommandLoader(Bot& bot) : bot(bot) {}
     RTCommandLoader() = delete;
 
@@ -39,9 +42,17 @@ struct RTCommandLoader : public InstanceClassBase<RTCommandLoader> {
     /**
      * @brief returns the path where modules load conf is installed
      *
-     * @return std::filesystem::path the path where modules load conf is installed
+     * @return std::filesystem::path the path where modules load conf is
+     * installed
      */
     static std::filesystem::path getModulesLoadConfPath();
+
+    void doInitCall(Bot& bot) override {
+        loadCommandsFromFile(getModulesLoadConfPath());
+    }
+    const char * getInitCallName() const override {
+        return "Load commands from file";
+    }
 
    private:
     static void commandStub(const Bot& bot, const Message::Ptr& message);

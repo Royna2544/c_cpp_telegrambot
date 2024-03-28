@@ -11,6 +11,8 @@
 #include <optional>
 
 #include "BotClassBase.h"
+#include "InstanceClassBase.hpp"
+#include "initcalls/BotInitcall.hpp"
 
 static inline const char kDatabaseFile[] = "tgbot.pb";
 
@@ -97,11 +99,11 @@ struct ProtoDatabase : ProtoDatabaseBase, BotClassBase {
                                       const ProtoDatabaseBase* what);
 };
 
-struct DatabaseWrapper {
+struct DatabaseWrapper : BotInitCall, InstanceClassBase<DatabaseWrapper> {
     // Load database (excludes blacklist/whitelist, syncthread)
     void load();
     // Load database (includes above)
-    void loadMain(const Bot& bot);
+    void loadMain(Bot& bot);
     // Save the changes to database file again
     void save(void) const;
     // 'Maybe' would return owner id stored in database
@@ -116,6 +118,12 @@ struct DatabaseWrapper {
 
     std::filesystem::path& getDatabasePath() { return fname; }
 
+    void doInitCall(Bot& bot) override {
+        loadMain(bot);
+    }
+    const char *getInitCallName() const override {
+        return "Load database, including white/black list";
+    }
    private:
     bool warnNoLoaded(const char* func) const;
     void load(const std::filesystem::path& file);
@@ -124,6 +132,7 @@ struct DatabaseWrapper {
     std::once_flag once;
 };
 
-extern DatabaseWrapper DBWrapper;
+// TODO
+inline DatabaseWrapper& DBWrapper = DatabaseWrapper::getInstance();
 
 };  // namespace database

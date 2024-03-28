@@ -8,6 +8,8 @@
 
 #include "SingleThreadCtrl.h"
 #include "BotClassBase.h"
+#include "initcalls/BotInitcall.hpp"
+#include "OnAnyMessageRegister.hpp"
 
 #ifdef SOCKET_CONNECTION
 #include <socket/TgBotSocket.h>
@@ -61,7 +63,7 @@ struct SpamBlockBase : SingleThreadCtrlRunnable<> {
     std::mutex buffer_m;  // Protect buffer, buffer_sub
 };
 
-struct SpamBlockManager : SpamBlockBase, BotClassBase {
+struct SpamBlockManager : SpamBlockBase, BotClassBase, BotInitCall {
     SpamBlockManager(const Bot &bot) : SpamBlockBase(), BotClassBase(bot) {}
     ~SpamBlockManager() override = default;
 
@@ -70,6 +72,20 @@ struct SpamBlockManager : SpamBlockBase, BotClassBase {
     void handleUserAndMessagePair(PerChatHandleConstRef e, OneChatIterator it,
                                   const size_t threshold,
                                   const char *name) override;
+    void doInitCall(Bot& bot) override {
+        OnAnyMessageRegisterer::getInstance()
+            .registerCallback([](const Bot &bot, const Message::Ptr &message) {
+                static auto spamMgr =
+                    SingleThreadCtrlManager::getInstance()
+                        .getController<SpamBlockManager>(
+                            {SingleThreadCtrlManager::USAGE_SPAMBLOCK_THREAD},
+                            std::cref(bot));
+                spamMgr->addMessage(message);
+            });
+    }
+    const char *getInitCallName() const override {
+        return "Register spamblock anymsg callback and start thread";
+    }
 
    private:
     constexpr static auto kMuteDuration = std::chrono::minutes(3);

@@ -24,8 +24,6 @@ struct InstanceClassBase {
     static T& getInstance() {
         if (!instance) {
             if constexpr (std::is_default_constructible_v<T>) {
-                LOG(LogLevel::VERBOSE, "Create default instance: %s",
-                    __PRETTY_FUNCTION__);
                 initInstance();
             } else
                 throw std::runtime_error(

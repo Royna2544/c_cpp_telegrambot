@@ -10,18 +10,23 @@
 #include <libos/libsighandler.h>
 #include <socket/SocketInterfaceBase.h>
 
+#include <OnAnyMessageRegister.hpp>
+#include <type_traits>
+
 #include "Logging.h"
 #include "ResourceManager.h"
 #include "command_modules/CommandModule.h"
+#include "initcalls/BotInitcall.hpp"
 
 #ifdef RTCOMMAND_LOADER
 #include <RTCommandLoader.h>
 #endif
+
 #ifdef SOCKET_CONNECTION
 #include <ChatObserver.h>
-#include <SocketConnectionHandler.h>
-#endif
 
+#include <socket/bot/SocketInterfaceInit.hpp>
+#endif
 #include <tgbot/tgbot.h>
 
 // wingdi.h
@@ -30,7 +35,49 @@
 // tgbot
 using TgBot::TgLongPoll;
 
-int main(int argc, char *const *argv) {
+template <typename T>
+concept HasInstanceGetter = requires { T::getInstance(); };
+template <typename T>
+concept HasBotInitCaller = requires(T t, Bot& bot) { t.initWrapper(bot); };
+template <typename T>
+concept HasBotCtor = requires(Bot& bot) { T(bot); };
+template <typename T>
+concept DontNeedArguments = std::is_default_constructible_v<T>;
+
+template <typename T>
+    requires HasInstanceGetter<T> && HasBotInitCaller<T> && HasBotCtor<T>
+void createAndDoInitCall(Bot& bot) {
+    T::initInstance(bot);
+    T::getInstance().initWrapper(bot);
+}
+
+template <typename T>
+    requires HasInstanceGetter<T> && HasBotInitCaller<T> && (!HasBotCtor<T>)
+void createAndDoInitCall(Bot& bot) {
+    T::getInstance().initWrapper(bot);
+}
+
+template <typename T>
+    requires(!HasInstanceGetter<T>) && HasBotInitCaller<T> && HasBotCtor<T>
+void createAndDoInitCall(Bot& bot) {
+    T t(bot);
+    t.initWrapper(bot);
+}
+
+template <typename T>
+    requires(!HasInstanceGetter<T>) && HasBotInitCaller<T> && DontNeedArguments<T>
+void createAndDoInitCall(Bot& bot) {
+    T t;
+    t.initWrapper(bot);
+}
+
+template <typename T>
+    requires HasInstanceGetter<T> && (!HasBotInitCaller<T>) && DontNeedArguments<T>
+void createAndDoInitCall(void) {
+    T::getInstance().initWrapper();
+}
+
+int main(int argc, char* const* argv) {
     std::string token;
 
     copyCommandLine(CommandLineOp::INSERT, &argc, &argv);
@@ -43,59 +90,20 @@ int main(int argc, char *const *argv) {
         LOG(LogLevel::FATAL, "Failed to get TOKEN variable");
         return EXIT_FAILURE;
     }
-    token = *ret;
+    token = ret.value();
+
     static Bot gBot(token);
-    database::DBWrapper.loadMain(gBot);
-    ResourceManager::getInstance().preloadResourceDirectory();
+    createAndDoInitCall<RTCommandLoader>(gBot);
+    createAndDoInitCall<RegexHandler>(gBot);
+    createAndDoInitCall<SpamBlockManager>(gBot);
+    createAndDoInitCall<SocketInterfaceInit>(gBot);
+    createAndDoInitCall<CommandModule>(gBot);
+    createAndDoInitCall<database::DatabaseWrapper>(gBot);
+    createAndDoInitCall<ChatObserver>(gBot);
+    createAndDoInitCall<ResourceManager>();
+    // Must be last
+    createAndDoInitCall<OnAnyMessageRegisterer>(gBot);
 
-    CommandModule::loadCommandModules(gBot);
-    CommandModule::updateBotCommands(gBot);
-
-    gBot.getEvents().onAnyMessage([](const Message::Ptr &msg) {
-        static auto spamMgr =
-            SingleThreadCtrlManager::getInstance()
-                .getController<SpamBlockManager>(
-                    {SingleThreadCtrlManager::USAGE_SPAMBLOCK_THREAD},
-                    std::ref(gBot));
-        static RegexHandler regexHandler(gBot);
-
-        if (!gAuthorized) return;
-#ifdef SOCKET_CONNECTION
-        if (!gObservedChatIds.empty() || gObserveAllChats)
-            processObservers(msg);
-#endif
-        spamMgr->addMessage(msg);
-        regexHandler.processRegEXCommandMessage(msg);
-    });
-
-#ifdef SOCKET_CONNECTION
-    std::string exitToken =
-        StringTools::generateRandomString(TgBotCommandData::Exit::TokenLen);
-    auto e = TgBotCommandData::Exit::create(ExitOp::SET_TOKEN, exitToken);
-    auto p = std::make_shared<SocketInterfacePriv>();
-    auto inter = SocketInterfaceGetter::get(
-        SocketInterfaceGetter::typeForInternal,
-        SocketInterfaceGetter::SocketUsage::USAGE_INTERNAL);
-
-    auto exter = SocketInterfaceGetter::get(
-        SocketInterfaceGetter::typeForExternal,
-        SocketInterfaceGetter::SocketUsage::USAGE_EXTERNAL);
-
-    p->listener_callback = [](struct TgBotConnection conn) {
-        socketConnectionHandler(gBot, conn);
-    };
-    p->e = std::move(e);
-
-    for (auto &intf : {inter, exter}) {
-        intf->setPriv(p);
-        intf->run();
-    }
-#endif
-#ifdef RTCOMMAND_LOADER
-    RTCommandLoader::initInstance(gBot);
-    RTCommandLoader::getInstance().loadCommandsFromFile(
-        RTCommandLoader::getModulesLoadConfPath());
-#endif
     installSignalHandler();
 
     LOG(LogLevel::DEBUG, "Token: %s", token.c_str());
@@ -111,14 +119,14 @@ int main(int argc, char *const *argv) {
             while (true) {
                 longPoll.start();
             }
-        } catch (const std::exception &e) {
+        } catch (const std::exception& e) {
             LOG(LogLevel::ERROR, "Exception: %s", e.what());
             LOG(LogLevel::WARNING, "Trying to recover");
             UserId ownerid = database::DBWrapper.maybeGetOwnerId();
             try {
                 bot_sendMessage(gBot, ownerid,
                                 std::string("Exception occured: ") + e.what());
-            } catch (const std::exception &e) {
+            } catch (const std::exception& e) {
                 LOG(LogLevel::FATAL, "%s", e.what());
                 break;
             }

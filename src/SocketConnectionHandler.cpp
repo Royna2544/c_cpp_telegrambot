@@ -54,6 +54,8 @@ static std::string getMIMEString(const std::string& path) {
 
 void socketConnectionHandler(const Bot& bot, struct TgBotConnection conn) {
     auto _data = conn.data;
+    auto& obs = ChatObserver::getInstance();
+
     switch (conn.cmd) {
         case CMD_WRITE_MSG_TO_CHAT_ID:
             try {
@@ -66,19 +68,20 @@ void socketConnectionHandler(const Bot& bot, struct TgBotConnection conn) {
             gSpamBlockCfg = _data.data_3;
             break;
         case CMD_OBSERVE_CHAT_ID: {
-            auto it = std::find(gObservedChatIds.begin(),
-                                gObservedChatIds.end(), _data.data_4.id);
+            const std::lock_guard<std::mutex> _(obs.m);
+            auto it = std::find(obs.observedChatIds.begin(),
+                                obs.observedChatIds.end(), _data.data_4.id);
             bool observe = _data.data_4.observe;
-            if (gObserveAllChats) {
+            if (obs.observeAllChats) {
                 LOG(LogLevel::WARNING,
                     "CMD_OBSERVE_CHAT_ID disabled due to "
                     "CMD_OBSERVE_ALL_CHATS");
                 break;
             }
-            if (it == gObservedChatIds.end()) {
+            if (it == obs.observedChatIds.end()) {
                 if (observe) {
                     LOG(LogLevel::DEBUG, "Adding chat to observer");
-                    gObservedChatIds.push_back(_data.data_4.id);
+                    obs.observedChatIds.push_back(_data.data_4.id);
                 } else {
                     LOG(LogLevel::WARNING,
                         "Trying to quit observing chatid which wasn't being "
@@ -91,7 +94,7 @@ void socketConnectionHandler(const Bot& bot, struct TgBotConnection conn) {
                         "observed!");
                 } else {
                     LOG(LogLevel::DEBUG, "Removing chat from observer");
-                    gObservedChatIds.erase(it);
+                    obs.observedChatIds.erase(it);
                 }
             }
         } break;
@@ -155,20 +158,20 @@ void socketConnectionHandler(const Bot& bot, struct TgBotConnection conn) {
             }
         } break;
         case CMD_OBSERVE_ALL_CHATS: {
-            gObserveAllChats = _data.data_6;
+            obs.observeAllChats = _data.data_6;
         } break;
         case CMD_DELETE_CONTROLLER_BY_ID: {
             int data = _data.data_7;
             enum SingleThreadCtrlManager::ThreadUsage threadUsage;
-            if (data < 0 ||
-                data >= SingleThreadCtrlManager::USAGE_MAX) {
+            if (data < 0 || data >= SingleThreadCtrlManager::USAGE_MAX) {
                 LOG(LogLevel::ERROR, "Invalid controller id: %d", data);
                 break;
             }
-            threadUsage = static_cast<SingleThreadCtrlManager::ThreadUsage>(data);
-            SingleThreadCtrlManager::getInstance().destroyController(threadUsage);
-        }
-        break;
+            threadUsage =
+                static_cast<SingleThreadCtrlManager::ThreadUsage>(data);
+            SingleThreadCtrlManager::getInstance().destroyController(
+                threadUsage);
+        } break;
         default:
             LOG(LogLevel::ERROR, "Unhandled cmd: %s",
                 TgBotCmd::toStr(conn.cmd).c_str());

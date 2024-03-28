@@ -3,15 +3,13 @@
 
 #include <algorithm>
 #include <iostream>
+#include <mutex>
 
 #include "internal/_tgbot.h"
 
 using TgBot::Message;
 
-std::vector<ChatId> gObservedChatIds;
-bool gObserveAllChats = false;
-
-static void printChatMsg(const Message::Ptr& msg, const User::Ptr& from) {
+void ChatObserver::printChatMsg(const Message::Ptr& msg, const User::Ptr& from) {
     std::string msgtext;
 
     if (msg->sticker)
@@ -34,18 +32,19 @@ static void printChatMsg(const Message::Ptr& msg, const User::Ptr& from) {
               << "): " << msgtext << std::endl;
 }
 
-void processObservers(const Message::Ptr& msg) {
+void ChatObserver::process(const Message::Ptr& msg) {
     auto chat = msg->chat;
     auto from = msg->from;
     if (from && chat) {
-        auto it = std::find(gObservedChatIds.begin(), gObservedChatIds.end(),
+        std::lock_guard<std::mutex> _(m);
+        auto it = std::find(observedChatIds.begin(), observedChatIds.end(),
                             chat->id);
-        if (it != gObservedChatIds.end()) {
+        if (it != observedChatIds.end()) {
             if (chat->type != Chat::Type::Supergroup) {
                 LOG(LogLevel::WARNING,
                     "Removing chat '%s' from observer: Not a supergroup",
                     chat->title.c_str());
-                gObservedChatIds.erase(it);
+                observedChatIds.erase(it);
                 return;
             }
         }

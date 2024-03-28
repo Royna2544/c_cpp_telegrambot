@@ -242,6 +242,7 @@ if (USE_UNIX_SOCKETS)
       src/socket/impl/SocketInterfacePosixLocal.cpp
       src/socket/impl/SocketInterfacePosixIPv4.cpp
       src/socket/impl/SocketInterfacePosixIPv6.cpp
+      src/socket/getter/SocketInterfaceGetterUnix.cpp
     )
     if (APPLE)
       extend_set(SOCKET_SRC_LIST
@@ -259,6 +260,7 @@ if (USE_UNIX_SOCKETS)
       src/socket/impl/SocketInterfaceWindowsIPv4.cpp
       src/socket/impl/SocketInterfaceWindowsIPv6.cpp
       src/socket/impl/SocketHelperWindows.cpp
+      src/socket/getter/SocketInterfaceGetterWindows.cpp
     )
   endif()
   extend_set(SOCKET_SRC_LIST

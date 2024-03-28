@@ -7,9 +7,8 @@
 #include <cstring>
 #include <string>
 
-#include "ConfigManager.h"
 #include "Logging.h"
-#include "socket/SocketInterfaceBase.h"
+#include "socket/getter/SocketInterfaceGetter.hpp"
 
 #ifdef _MSC_VER
 #define strcasecmp _stricmp

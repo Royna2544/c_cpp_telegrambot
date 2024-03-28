@@ -2,11 +2,10 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
-#include <memory>
 
 #include "Logging.h"
 #include "TgBotSocket.h"
-#include "socket/SocketInterfaceBase.h"
+#include "socket/getter/SocketInterfaceGetter.hpp"
 
 [[noreturn]] static void usage(const char* argv, bool success) {
     std::cout << "Usage: " << argv << " [cmd enum value] [args...]" << std::endl

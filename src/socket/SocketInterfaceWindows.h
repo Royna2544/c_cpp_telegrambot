@@ -5,6 +5,7 @@
 
 #include "SocketInterfaceBase.h"
 
+#undef ERROR
 #define WSALOG_E(fmt)                \
     LOG(LogLevel::ERROR, fmt ": %s", \
         SocketInterfaceWindows::strWSAError(WSAGetLastError()))
