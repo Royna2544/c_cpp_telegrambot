@@ -1,6 +1,11 @@
 #include <Authorization.h>
 #include <BotAddCommand.h>
 #include <ExtArgs.h>
+#include "InstanceClassBase.hpp"
+#include "OnAnyMessageRegister.hpp"
+
+// TODO Move this somewhere else
+DECLARE_CLASS_INST(OnAnyMessageRegisterer);
 
 static bool check(Bot& bot, const Message::Ptr& message, int authflags) {
     static const std::string myName = bot.getApi().getMe()->username;

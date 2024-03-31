@@ -12,6 +12,7 @@
 #include <mutex>
 #include <utility>
 
+#include "InstanceClassBase.hpp"
 #include "tgbot/types/Chat.h"
 
 using std::chrono_literals::operator""s;
@@ -250,3 +251,5 @@ void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle,
         }
     }
 }
+
+DECLARE_CLASS_INST(SpamBlockManager);

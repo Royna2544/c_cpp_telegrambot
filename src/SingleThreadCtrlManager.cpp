@@ -3,6 +3,7 @@
 #include <mutex>
 #include <optional>
 
+#include "InstanceClassBase.hpp"
 #include "Logging.h"
 
 void SingleThreadCtrlManager::destroyController(const ThreadUsage usage, bool deleteIt) {
@@ -49,3 +50,4 @@ void SingleThreadCtrlManager::destroyManager() {
                   });
 }
 
+DECLARE_CLASS_INST(SingleThreadCtrlManager);

@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <memory>
 
+#include "InstanceClassBase.hpp"
 #include "Logging.h"
 
 using database::DatabaseWrapper;
@@ -17,6 +18,8 @@ struct DatabaseSync : SingleThreadCtrlRunnable<> {
         }
     }
 };
+
+DECLARE_CLASS_INST(DatabaseWrapper);
 
 void DatabaseWrapper::load(const std::filesystem::path& it) {
     std::call_once(once, [this, it] {

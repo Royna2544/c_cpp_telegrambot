@@ -5,7 +5,9 @@
 #include <type_traits>
 #include <utility>
 
-#include "Logging.h"
+#define DECLARE_CLASS_INST(type) \
+    template <>                  \
+    std::shared_ptr<type> InstanceClassBase<type>::instance = {}
 
 template <typename T>
 /**
@@ -32,5 +34,5 @@ struct InstanceClassBase {
         }
         return *instance;
     }
-    static inline std::shared_ptr<T> instance;
+    static std::shared_ptr<T> instance;
 };

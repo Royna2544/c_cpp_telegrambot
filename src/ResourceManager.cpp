@@ -6,6 +6,7 @@
 #include <mutex>
 #include <sstream>
 
+#include "InstanceClassBase.hpp"
 #include "StringToolsExt.h"
 
 bool ResourceManager::preloadOneFile(std::filesystem::path path) {
@@ -82,3 +83,5 @@ const std::string& ResourceManager::getResource(std::filesystem::path path) {
     LOG(LogLevel::ERROR, "Resource not found: %s", path.string().c_str());
     return empty;
 }
+
+DECLARE_CLASS_INST(ResourceManager);

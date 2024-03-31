@@ -5,6 +5,7 @@
 #include <iostream>
 #include <mutex>
 
+#include "InstanceClassBase.hpp"
 #include "internal/_tgbot.h"
 
 using TgBot::Message;
@@ -51,3 +52,5 @@ void ChatObserver::process(const Message::Ptr& msg) {
         printChatMsg(msg, from);
     }
 }
+
+DECLARE_CLASS_INST(ChatObserver);

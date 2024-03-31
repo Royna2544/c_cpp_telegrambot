@@ -6,6 +6,7 @@
 #include <regex>
 #include <string>
 
+#include "InstanceClassBase.hpp"
 #include "StringToolsExt.h"
 
 using std::regex_constants::ECMAScript;
@@ -133,3 +134,5 @@ void RegexHandler::processRegEXCommandMessage(const Message::Ptr& message) {
     if (message->replyToMessage && !message->replyToMessage->text.empty())
         processRegEXCommand(message, message->replyToMessage->text);
 }
+
+DECLARE_CLASS_INST(RegexHandler);

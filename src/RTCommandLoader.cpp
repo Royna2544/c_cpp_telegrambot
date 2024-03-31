@@ -8,6 +8,7 @@
 #include <memory>
 #include <vector>
 
+#include "InstanceClassBase.hpp"
 #include "command_modules/runtime/cmd_dynamic.h"
 
 DynamicLibraryHolder::DynamicLibraryHolder(DynamicLibraryHolder&& other) {
@@ -98,3 +99,5 @@ void RTCommandLoader::commandStub(const Bot& bot, const Message::Ptr& message) {
 std::filesystem::path RTCommandLoader::getModulesLoadConfPath() {
     return FS::getPathForType(FS::PathType::GIT_ROOT) / "modules.load";
 }
+
+DECLARE_CLASS_INST(RTCommandLoader);
