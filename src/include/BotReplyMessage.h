@@ -74,3 +74,10 @@ static inline Message::Ptr bot_sendMessage(const Bot &bot, const ChatId chatid,
                                            const std::string &text) {
     return bot.getApi().sendMessage(chatid, text);
 }
+
+static Message::Ptr bot_sendSticker(const Bot &bot, const Message::Ptr &message,
+                                    TgBot::Sticker::Ptr sticker,
+                                    const Message::Ptr& replyTo = nullptr) {
+    return bot.getApi().sendSticker(message->chat->id, sticker->fileId,
+                                    replyTo ? replyTo->messageId : 0);
+}

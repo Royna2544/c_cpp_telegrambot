@@ -1,6 +1,7 @@
 #include <ExtArgs.h>
 #include <random/RandomNumberGenerator.h>
 
+#include "BotReplyMessage.h"
 #include "CommandModule.h"
 
 using TgBot::StickerSet;
@@ -16,9 +17,7 @@ static void RandomStickerCommandFn(const Bot &bot, const Message::Ptr message) {
             return;
         }
         const size_t pos = genRandomNumber(stickset->stickers.size() - 1);
-        bot.getApi().sendSticker(message->chat->id,
-                                 stickset->stickers[pos]->fileId,
-                                 message->messageId, nullptr, false, true);
+        bot_sendSticker(bot, message, stickset->stickers[pos], message);
         std::stringstream ss;
         ss << "Sticker idx: " << pos + 1
            << " emoji: " << stickset->stickers[pos]->emoji << std::endl

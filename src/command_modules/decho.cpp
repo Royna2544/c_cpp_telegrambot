@@ -1,6 +1,7 @@
 #include <ExtArgs.h>
 #include <Logging.h>
 
+#include "BotReplyMessage.h"
 #include "CommandModule.h"
 
 static void DeleteEchoCommandFn(const Bot &bot, const Message::Ptr message) {
@@ -23,8 +24,7 @@ static void DeleteEchoCommandFn(const Bot &bot, const Message::Ptr message) {
                              (replyMsg) ? replyMsg->messageId : 0, true);
     } else if (replyMsg) {
         if (replyMsg->sticker) {
-            bot.getApi().sendSticker(message->chat->id,
-                                     replyMsg->sticker->fileId);
+            bot_sendSticker(bot, message, replyMsg->sticker);
         } else if (replyMsg->animation) {
             bot.getApi().sendAnimation(message->chat->id,
                                        replyMsg->animation->fileId);
