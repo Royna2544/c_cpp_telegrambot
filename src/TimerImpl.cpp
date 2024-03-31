@@ -3,6 +3,7 @@
 #include <Logging.h>
 #include <TimerImpl.h>
 #include <internal/_std_chrono_templates.h>
+#include <internal/_tgbot.h>
 
 #include <chrono>
 #include <cmath>
@@ -165,10 +166,10 @@ void TimerCommandManager::startTimer(const Bot &bot, const Message::Ptr &msg) {
             LOG(LogLevel::WARNING, "Cannot pin msg!");
             botcanpin = false;
         }
-        runWith(std::bind(&TimerCommandManager::TimerThreadFn, this,
-                          std::cref(bot), message, parsedTime));
         setPreStopFunction(
             std::bind(&TimerCommandManager::Timerstop, std::placeholders::_1));
+        runWith(std::bind(&TimerCommandManager::TimerThreadFn, this,
+                          std::cref(bot), message, parsedTime));
     }
 }
 

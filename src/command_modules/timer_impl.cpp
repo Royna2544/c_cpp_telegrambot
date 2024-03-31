@@ -10,7 +10,8 @@ static std::shared_ptr<TimerCommandManager> getTMM() {
 }
 static void TimerStartCommandFn(const Bot &bot, const Message::Ptr message) {
     auto ctrl = getTMM();
-    ctrl->reset();
+    if (!ctrl->isRunning())
+        ctrl->reset();
     ctrl->startTimer(bot, message);
 }
 

@@ -109,6 +109,8 @@ struct SingleThreadCtrl {
     void stop();
     // Reset the counter, to make this instance reusable
     void reset();
+    // Does this controller have a thread inside it?
+    bool isRunning() const;
 
     SingleThreadCtrl() {
         timer_mutex.lk = std::unique_lock<std::timed_mutex>(timer_mutex.m);
@@ -132,11 +134,17 @@ struct SingleThreadCtrl {
     }
 
    private:
+    enum class ControlState {
+        UNINITIALIZED,
+        STOPPED_PREMATURE,
+        STOPPED_BY_STOP_CMD,
+        RUNNING,
+    } state = ControlState::UNINITIALIZED;
+
     void _threadFn(thread_function fn);
-    void joinThread();
+    void logInvalidState(const char * state);
     std::optional<std::thread> threadP;
     prestop_function preStop;
-    std::atomic_bool once = true;
 
     struct {
         // This works, via the main thread will lock the mutex first. Then later
