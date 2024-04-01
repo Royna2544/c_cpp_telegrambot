@@ -137,6 +137,7 @@ endif()
 set(SRC_LIST
     src/Authorization.cpp
     src/BotAddCommand.cpp
+    src/BotMessageUtils.cpp
     src/command_modules/compiler/Base.cpp
     src/command_modules/compiler/Bash.cpp
     src/command_modules/compiler/CCpp.cpp

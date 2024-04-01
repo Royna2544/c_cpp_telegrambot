@@ -1,5 +1,6 @@
 #include <ExtArgs.h>
 
+#include <functional>
 #include <thread>
 
 #include "BotReplyMessage.h"
@@ -9,46 +10,46 @@
 constexpr int MAX_SPAM_COUNT = 10;
 constexpr auto kSpamDelayTime = std::chrono::milliseconds(700);
 
-/**
- * @brief Update the spam count, ensuring it does not exceed the maximum allowed
- * count.
- *
- * @param count The current spam count.
- */
-static void updateSpamCount(int& count) {
+static void for_count(int count, std::function<void(void)> callback) {
     if (count > MAX_SPAM_COUNT) {
         count = MAX_SPAM_COUNT;
     }
+    for (int i = 0; i < count; ++i) {
+        callback();
+        std::this_thread::sleep_for(kSpamDelayTime);
+    }
 }
 
+/**
+ * @brief A command module for spamming.
+ */
 static void SpamCommandFn(const Bot& bot, const Message::Ptr message) {
+    std::function<void(void)> fp;
+    int count = 0;
+
     if (message->replyToMessage) {
         if (hasExtArgs(message)) {
-            int count = stoi(parseExtArgs(message));
-            updateSpamCount(count);
+            count = stoi(parseExtArgs(message));
             if (message->replyToMessage->sticker) {
-                for (int _ = 0; _ < count; _++) {
-                    bot_sendSticker(bot, message,
+                fp = [&bot, message] {
+                    bot_sendSticker(bot, message->chat,
                                     message->replyToMessage->sticker);
-                    std::this_thread::sleep_for(kSpamDelayTime);
-                }
+                };
             } else if (message->replyToMessage->animation) {
-                for (int _ = 0; _ < count; _++) {
-                    bot.getApi().sendAnimation(
-                        message->chat->id,
-                        message->replyToMessage->animation->fileId);
-                    std::this_thread::sleep_for(kSpamDelayTime);
-                }
+                fp = [&bot, message] {
+                    bot_sendAnimation(bot, message->chat,
+                                      message->replyToMessage->animation);
+                };
             } else if (!message->replyToMessage->text.empty()) {
-                for (int _ = 0; _ < count; _++) {
+                fp = [&bot, message] {
                     bot.getApi().sendMessage(message->chat->id,
                                              message->replyToMessage->text);
-                    std::this_thread::sleep_for(kSpamDelayTime);
-                }
+                };
             } else {
-                bot_sendReplyMessage(
-                    bot, message,
-                    "Supports sticker/GIF/text for reply to messages, give count");
+                bot_sendReplyMessage(bot, message,
+                                     "Supports sticker/GIF/text for reply to "
+                                     "messages, give count");
+                return;
             }
         }
     } else if (hasExtArgs(message)) {
@@ -57,18 +58,20 @@ static void SpamCommandFn(const Bot& bot, const Message::Ptr message) {
         if (const auto v = StringTools::split(command, ' '); v.size() >= 2) {
             spamData.first = std::stoi(v[0]);
             spamData.second = command.substr(command.find_first_of(' ') + 1);
-            updateSpamCount(spamData.first);
-            for (int _ = 0; _ < spamData.first; _++) {
+            fp = [&bot, message, spamData] {
                 bot_sendMessage(bot, message->chat->id, spamData.second);
-                std::this_thread::sleep_for(std::chrono::milliseconds(500));
-            }
+            };
+            count = spamData.first;
         } else {
             bot_sendReplyMessage(bot, message, "Failed to parse spam config");
+            return;
         }
     } else {
         bot_sendReplyMessage(bot, message,
                              "Send a pair of spam count and message to spam");
+        return;
     }
+    for_count(count, fp);
 }
 
 struct CommandModule cmd_spam("spam", "Spam a given literal or media",

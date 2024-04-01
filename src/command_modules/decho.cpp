@@ -24,7 +24,7 @@ static void DeleteEchoCommandFn(const Bot &bot, const Message::Ptr message) {
                              (replyMsg) ? replyMsg->messageId : 0, true);
     } else if (replyMsg) {
         if (replyMsg->sticker) {
-            bot_sendSticker(bot, message, replyMsg->sticker);
+            bot_sendSticker(bot, message->chat, replyMsg->sticker);
         } else if (replyMsg->animation) {
             bot.getApi().sendAnimation(message->chat->id,
                                        replyMsg->animation->fileId);
