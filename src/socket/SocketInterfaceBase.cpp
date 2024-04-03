@@ -1,8 +1,5 @@
 #include "SocketInterfaceBase.h"
 
-#include <memory>
-
-#include "Logging.h"
 #include "SingleThreadCtrl.h"
 #include "socket/TgBotSocket.h"
 
@@ -11,12 +8,12 @@ bool SocketInterfaceBase::handleIncomingBuf(
     const listener_callback_t& cb, std::function<char*(void)> errMsgFn) {
     if (len > 0) {
         if (conn.magic != MAGIC_VALUE) {
-            LOG(LogLevel::WARNING, "Invalid magic value, dropping buffer");
+            LOG(WARNING) << "Invalid magic value, dropping buffer";
             return false;
         }
 
-        LOG(LogLevel::INFO, "Received buf with %s, invoke callback!",
-            TgBotCmd::toStr(conn.cmd).c_str());
+        LOG(INFO) << "Received buf with " << TgBotCmd::toStr(conn.cmd)
+                  << ", invoke callback!";
 
         if (conn.cmd == CMD_EXIT) {
             /**
@@ -45,8 +42,8 @@ bool SocketInterfaceBase::handleIncomingBuf(
                         tokenSet = true;
                         return false;
                     }
-                    LOG(LogLevel::WARNING,
-                        "Token was already set, but SET_TOKEN request, abort.");
+                    LOG(WARNING) << "Token was already set, but SET_TOKEN "
+                                    "request, abort.";
                     break;
                 case ExitOp::DO_EXIT:
                     /**
@@ -55,10 +52,9 @@ bool SocketInterfaceBase::handleIncomingBuf(
                      * indicating that different exit tokens were received.
                      */
                     if (exitToken != exitToken_In) {
-                        LOG(LogLevel::WARNING,
-                            "Different exit tokens: My: '%s', input: '%s'. "
-                            "Ignoring!",
-                            exitToken.c_str(), exitToken_In.c_str());
+                        LOG(WARNING)
+                            << "Different exit tokens: My: '" << exitToken
+                            << "', input: '" << exitToken_In << "'. Ignoring!";
                         return false;
                     }
                     break;
@@ -78,7 +74,7 @@ bool SocketInterfaceBase::handleIncomingBuf(
          * @param errMsg The error message returned by the error message
          * function.
          */
-        LOG(LogLevel::ERROR, "Failed to read from socket: %s", errMsgFn());
+        LOG(ERROR) << "Failed to read from socket: " << errMsgFn();
     }
     return false;
 }
@@ -109,9 +105,10 @@ std::string SocketInterfaceBase::getOptions(Options opt) {
     option_t* optionVal = getOptionPtr(opt);
     if (optionVal) {
         option_t option = *optionVal;
-        ASSERT(option.has_value(),
-               "Option value is not set, and trying to get, opt is %d",
-               static_cast<int>(opt));
+        if (!option.has_value()) {
+            LOG(FATAL) << "Option is not set, and trying to get it: option "
+                       << static_cast<int>(opt);
+        }
         ret = option->data;
         if (!option->persistent) option.reset();
     }

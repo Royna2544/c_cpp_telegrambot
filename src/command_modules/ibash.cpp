@@ -1,9 +1,7 @@
 #include <BotReplyMessage.h>
 #include <ExtArgs.h>
-#include <Logging.h>
 #include <fcntl.h>
 #include <internal/_FileDescriptor_posix.h>
-#include <internal/_logging_posix.h>
 #include <poll.h>
 #include <stdio.h>
 #include <sys/mman.h>
@@ -52,9 +50,8 @@ struct InteractiveBashContext {
         void start(const InteractiveBashContext* instr) {
             if (delayUnlessStop(SLEEP_SECONDS); kRun) {
                 if (instr->childpid > 0 && kill(instr->childpid, 0) == 0) {
-                    LOG(LogLevel::WARNING,
-                        "Process %d misbehaving, using SIGTERM",
-                        instr->childpid);
+                    LOG(WARNING) << "Process " << instr->childpid
+                                 << " misbehaving, using SIGTERM";
                     killpg(instr->childpid, SIGTERM);
                 }
             }
@@ -85,7 +82,7 @@ struct InteractiveBashContext {
             piddata = (pid_t*)mmap(NULL, sizeof(pid_t), PROT_READ | PROT_WRITE,
                                    MAP_SHARED | MAP_ANONYMOUS, -1, 0);
             if (piddata == MAP_FAILED) {
-                PLOG_E("mmap");
+                PLOG(ERROR) << "mmap";
                 return;
             }
 
@@ -100,14 +97,14 @@ struct InteractiveBashContext {
                 munmap(piddata, sizeof(pid_t));
                 closePipe(tochild);
                 closePipe(toparent);
-                PLOG_E("pipe");
+                PLOG(ERROR) << "pipe";
                 return;
             }
             if ((pid = fork()) < 0) {
                 munmap(piddata, sizeof(pid_t));
                 closePipe(tochild);
                 closePipe(toparent);
-                PLOG_E("fork");
+                PLOG(ERROR) << "fork";
                 return;
             }
             if (pid == 0) {
@@ -126,14 +123,14 @@ struct InteractiveBashContext {
                 close(child_stdin);
                 // Ensure bash execl() is up
                 do {
-                    LOG(LogLevel::WARNING,
-                        "Waiting for subprocess up... (%ds passed)", count);
+                    LOG(WARNING) << "Waiting for subprocess up... (" << count
+                                 << "s passed)";
                     std::this_thread::sleep_for(1s);
                     count++;
                 } while (kill(-(*piddata), 0) != 0);
                 is_open = true;
                 childpid = *piddata;
-                LOG(LogLevel::DEBUG, "Open success, child pid: %d", childpid);
+                LOG(INFO) << "Open success, child pid: " << childpid;
                 munmap(piddata, sizeof(pid_t));
             }
         }
@@ -161,8 +158,8 @@ struct InteractiveBashContext {
             // waitpid(4p) will hang if not exited, yes
             waitpid(childpid, &status, 0);
             if (WIFEXITED(status)) {
-                LOG(LogLevel::INFO, "Process %d exited with code %d", childpid,
-                    WEXITSTATUS(status));
+                LOG(INFO) << "Process " << childpid << " exited with code "
+                          << WEXITSTATUS(status);
             }
             exitTimeout->stop();
             {
@@ -258,7 +255,7 @@ struct InteractiveBashContext {
         str += '\n';
         rc = write(parent_writefd, str.c_str(), str.size());
         if (rc < 0) {
-            PLOG_E("Writing text to parent fd");
+            PLOG(ERROR) << "Writing text to parent fd";
             return false;
         }
         return true;
@@ -266,13 +263,13 @@ struct InteractiveBashContext {
 
     bool SendCommand(const std::string& str, bool internal = false) const {
         if (!internal) {
-            LOG(LogLevel::INFO, "Child <= Command '%s'", str.c_str());
+            LOG(INFO) << "Child <= Command '" << str << "'";
         }
         return _SendSomething(str);
     }
 
     bool SendText(const std::string& str) const {
-        LOG(LogLevel::INFO, "Child <= Text '%s'", str.c_str());
+        LOG(INFO) << "Child <= Text '" << str << "'";
         return _SendSomething(str);
     }
 
@@ -293,7 +290,7 @@ struct InteractiveBashContext {
         };
         rc = poll(&poll_fd, 1, wait ? -1 : 1000);
         if (rc < 0) {
-            PLOG_E("Poll failed");
+            PLOG(ERROR) << "Poll failed";
         } else {
             if (poll_fd.revents & direction) {
                 return true;
@@ -314,8 +311,7 @@ static void InteractiveBashCommandFn(const Bot& bot,
         parseExtArgs(message, command);
         if (InteractiveBashContext::isExitCommand(command)) {
             if (ctx.is_open)
-                LOG(LogLevel::INFO, "Received exit command: '%s'",
-                    command.c_str());
+                LOG(INFO) << "Received exit command: '" << command << "'";
             ctx.exit(
                 [&bot, message]() {
                     bot_sendReplyMessage(bot, message,
@@ -335,8 +331,9 @@ static void InteractiveBashCommandFn(const Bot& bot,
                     bot_sendReplyMessage(bot, message,
                                          "Failed to open child process");
             }
-            ASSERT(IsValidPipe(ctx.tochild) && IsValidPipe(ctx.toparent),
-                   "Opening pipes failed");
+            LOG_IF(FATAL,
+                   (IsValidPipe(ctx.tochild) && IsValidPipe(ctx.toparent)))
+                << "Opening pipes failed";
 
             do {
                 if (ctx.sendText(bot, message)) break;

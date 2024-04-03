@@ -2,9 +2,9 @@
 
 #if defined __APPLE__ || defined __linux__
 
-#include <Logging.h>
+#include <absl/log/check.h>
+#include <absl/log/log.h>
 #include <fcntl.h>
-#include <internal/_logging_posix.h>
 #include <internal/_FileDescriptor_posix.h>
 #include <unistd.h>
 
@@ -26,18 +26,19 @@ struct kernel_rand_engine {
         ssize_t rc;
 
         rc = read(fd, &val, sizeof(val));
-        if (rc < 0) PLOG_E("Failed to read data from HWRNG device");
+        if (rc < 0)
+            PLOG(ERROR) << "Failed to read data from HWRNG device: fd " << fd;
         return val;
     }
     kernel_rand_engine() {
         for (const auto& n : nodes) {
             fd = open(n.c_str(), O_RDONLY);
             if (!isValidFd(fd) && errno != ENOENT) {
-                PLOG_E("Opening hwrng device failed");
+                PLOG(ERROR) << "Opening hwrng device failed";
             } else
                 break;
         }
-        ASSERT(isValidFd(fd), "Failed to open hwrng device file");
+        CHECK(isValidFd(fd));
     }
     ~kernel_rand_engine() { closeFd(fd); }
 
@@ -50,7 +51,7 @@ struct kernel_rand_engine {
             for (const auto& n : nodes) {
                 ret = access(n.c_str(), R_OK);
                 if (ret != 0 && errno != ENOENT) {
-                    PLOG_E("Accessing hwrng device failed");
+                    PLOG(ERROR) << "Accessing hwrng device failed";
                 } else {
                     kSupported = true;
                 }
@@ -67,7 +68,7 @@ struct kernel_rand_engine {
         // Linux 4.17 or above
         "/dev/hwrng",
 #elif defined __APPLE__
-        "/dev/random", "/whatever"
+        "/dev/random", "/dev/urandom"
 #endif
     };
     int fd = kInvalidFD;

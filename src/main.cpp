@@ -3,20 +3,22 @@
 #include <ConfigManager.h>
 #include <Database.h>
 #include <RegEXHandler.h>
+#include <ResourceManager.h>
 #include <SingleThreadCtrl.h>
 #include <SpamBlock.h>
+#include <absl/log/initialize.h>
+#include <absl/log/log.h>
+#include <absl/log/internal/flags.h>
+#include <absl/flags/flag.h>
+#include <command_modules/CommandModule.h>
 #include <internal/_std_chrono_templates.h>
 #include <libos/libfs.h>
 #include <libos/libsighandler.h>
 #include <socket/SocketInterfaceBase.h>
 
 #include <OnAnyMessageRegister.hpp>
+#include <initcalls/BotInitcall.hpp>
 #include <type_traits>
-
-#include "Logging.h"
-#include "ResourceManager.h"
-#include "command_modules/CommandModule.h"
-#include "initcalls/BotInitcall.hpp"
 
 #ifdef RTCOMMAND_LOADER
 #include <RTCommandLoader.h>
@@ -72,14 +74,16 @@ void createAndDoInitCall(Bot& bot) {
 }
 
 template <typename T>
-    requires(!HasInstanceGetter<T>) && HasBotInitCaller<T> && DontNeedArguments<T>
+    requires(!HasInstanceGetter<T>) && HasBotInitCaller<T> &&
+            DontNeedArguments<T>
 void createAndDoInitCall(Bot& bot) {
     T t;
     t.initWrapper(bot);
 }
 
 template <typename T>
-    requires HasInstanceGetter<T> && (!HasBotInitCaller<T>) && DontNeedArguments<T>
+    requires HasInstanceGetter<T> &&
+             (!HasBotInitCaller<T>) && DontNeedArguments<T>
 void createAndDoInitCall(void) {
     T::getInstance().initWrapper();
 }
@@ -87,6 +91,8 @@ void createAndDoInitCall(void) {
 int main(int argc, char* const* argv) {
     std::string token;
 
+    absl::SetFlag(&FLAGS_stderrthreshold, 0);
+    absl::InitializeLog();
     copyCommandLine(CommandLineOp::INSERT, &argc, &argv);
     if (ConfigManager::getVariable("help")) {
         ConfigManager::printHelp();
@@ -94,7 +100,7 @@ int main(int argc, char* const* argv) {
     }
     auto ret = ConfigManager::getVariable("TOKEN");
     if (!ret) {
-        LOG(LogLevel::FATAL, "Failed to get TOKEN variable");
+        LOG(FATAL) << "Failed to get TOKEN variable";
         return EXIT_FAILURE;
     }
     token = ret.value();
@@ -113,40 +119,40 @@ int main(int argc, char* const* argv) {
 
     installSignalHandler();
 
-    LOG(LogLevel::DEBUG, "Token: %s", token.c_str());
+    DLOG(INFO) << "Token: " << token;
     auto CurrentTp = std::chrono::system_clock::now();
     auto LastTp = std::chrono::system_clock::from_time_t(0);
     do {
         try {
-            LOG(LogLevel::DEBUG, "Bot username: %s",
-                gBot.getApi().getMe()->username.c_str());
+            LOG(INFO) << "Bot username: " << gBot.getApi().getMe()->username;
             gBot.getApi().deleteWebhook();
 
             TgLongPoll longPoll(gBot);
             while (true) {
                 longPoll.start();
             }
-        } catch (const std::exception& e) {
-            LOG(LogLevel::ERROR, "Exception: %s", e.what());
-            LOG(LogLevel::WARNING, "Trying to recover");
-            UserId ownerid = database::DatabaseWrapperImplObj::getInstance().maybeGetOwnerId();
+        } catch (const TgBot::TgException& e) {
+            LOG(ERROR) << "TgBotAPI Exception: ", e.what();
+            LOG(WARNING) << "Trying to recover";
+            UserId ownerid = database::DatabaseWrapperImplObj::getInstance()
+                                 .maybeGetOwnerId();
             try {
                 bot_sendMessage(gBot, ownerid,
                                 std::string("Exception occured: ") + e.what());
-            } catch (const std::exception& e) {
-                LOG(LogLevel::FATAL, "%s", e.what());
+            } catch (const TgBot::TgException& e) {
+                LOG(FATAL) << e.what();
                 break;
             }
             CurrentTp = std::chrono::system_clock::now();
             if (to_secs(CurrentTp - LastTp).count() < 30 &&
                 std::chrono::system_clock::to_time_t(LastTp) != 0) {
                 bot_sendMessage(gBot, ownerid, "Recover failed.");
-                LOG(LogLevel::FATAL, "Recover failed");
+                LOG(FATAL) << "Recover failed";
                 break;
             }
             LastTp = CurrentTp;
             bot_sendMessage(gBot, ownerid, "Reinitializing.");
-            LOG(LogLevel::INFO, "Re-init");
+            LOG(INFO) << "Re-init";
             gAuthorized = false;
             static const SingleThreadCtrlManager::GetControllerRequest req{
                 .usage = SingleThreadCtrlManager::USAGE_ERROR_RECOVERY_THREAD,
@@ -160,6 +166,10 @@ int main(int argc, char* const* argv) {
                     gAuthorized = true;
                 });
             }
+        } catch (const std::exception& e) {
+            LOG(ERROR) << "Uncaught Exception: ", e.what();
+            LOG(ERROR) << "Throwing exception to the main thread";
+            throw;
         }
     } while (true);
     defaultCleanupFunction();

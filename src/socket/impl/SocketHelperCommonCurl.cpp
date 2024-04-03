@@ -1,5 +1,6 @@
 
 #include <curl/curl.h>
+
 #include "../SocketInterfaceBase.h"
 
 void SocketHelperCommon::printExternalIPINet() {
@@ -9,7 +10,7 @@ void SocketHelperCommon::printExternalIPINet() {
     // Initialize libcurl
     curl = curl_easy_init();
     if (!curl) {
-        LOG(LogLevel::ERROR, "Error initializing libcurl");
+        LOG(ERROR) << "Error initializing libcurl";
         return;
     }
 
@@ -22,8 +23,7 @@ void SocketHelperCommon::printExternalIPINet() {
     // Perform the request
     res = curl_easy_perform(curl);
     if (res != CURLE_OK) {
-        LOG(LogLevel::ERROR, "curl_easy_perform() failed: %s",
-            curl_easy_strerror(res));
+        LOG(ERROR) << "curl_easy_perform() failed: " << curl_easy_strerror(res);
     }
 
     // Clean up
@@ -34,6 +34,7 @@ size_t SocketHelperCommon::externalIPCallback(void *contents, size_t size,
                                               size_t nmemb, void *userp) {
     std::string s;
     s.append((char *)contents, size * nmemb);
-    LOG(LogLevel::DEBUG, "External IP addr: %s", s.c_str());
+
+    LOG(INFO) << "External IP addr: " << s;
     return size * nmemb;
 }

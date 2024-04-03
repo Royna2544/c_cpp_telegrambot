@@ -1,5 +1,5 @@
 #include <ChatObserver.h>
-#include <Logging.h>
+#include <absl/log/log.h>
 
 #include <algorithm>
 #include <iostream>
@@ -10,7 +10,8 @@
 
 using TgBot::Message;
 
-void ChatObserver::printChatMsg(const Message::Ptr& msg, const User::Ptr& from) {
+void ChatObserver::printChatMsg(const Message::Ptr& msg,
+                                const User::Ptr& from) {
     std::string msgtext;
 
     if (msg->sticker)
@@ -38,13 +39,12 @@ void ChatObserver::process(const Message::Ptr& msg) {
     auto from = msg->from;
     if (from && chat) {
         std::lock_guard<std::mutex> _(m);
-        auto it = std::find(observedChatIds.begin(), observedChatIds.end(),
-                            chat->id);
+        auto it =
+            std::find(observedChatIds.begin(), observedChatIds.end(), chat->id);
         if (it != observedChatIds.end()) {
             if (chat->type != Chat::Type::Supergroup) {
-                LOG(LogLevel::WARNING,
-                    "Removing chat '%s' from observer: Not a supergroup",
-                    chat->title.c_str());
+                LOG(WARNING) << "Removing chat '" << chat->title
+                             << "' from observer: Not a supergroup";
                 observedChatIds.erase(it);
                 return;
             }

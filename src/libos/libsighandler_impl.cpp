@@ -12,7 +12,7 @@ void defaultSignalHandler(int s) {
 };
 
 void defaultCleanupFunction() {
-    LOG(LogLevel::INFO, "Exiting");
+    LOG(INFO) << "Exiting";
     SingleThreadCtrlManager::getInstance().destroyManager();
     database::DatabaseWrapperImplObj::getInstance().save();
 }

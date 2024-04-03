@@ -2,7 +2,9 @@
 
 #include <tgbot/Bot.h>
 
-#include "Logging.h"
+#include <absl/log/log.h>
+#include <chrono>
+#include "internal/_std_chrono_templates.h"
 
 using TgBot::Bot;
 
@@ -22,8 +24,10 @@ struct BotInitCall {
     virtual const char* getInitCallName() const = 0;
 
     void initWrapper(Bot& bot) {
-        LOG(LogLevel::VERBOSE, "%s: +++", getInitCallName());
+        DLOG(INFO) << getInitCallName() << ": +++";
+        auto now = std::chrono::high_resolution_clock::now();
         doInitCall(bot);
-        LOG(LogLevel::VERBOSE, "%s: ---", getInitCallName());
+        auto elapsed = to_msecs(std::chrono::high_resolution_clock::now() - now);
+        DLOG(INFO) << getInitCallName() << ": --- (" << elapsed.count() << "ms)";
     }
 };

@@ -1,13 +1,12 @@
 #include <BotReplyMessage.h>
 #include <ExtArgs.h>
-#include <Logging.h>
 #include <TimerImpl.h>
+#include <absl/log/log.h>
 #include <internal/_std_chrono_templates.h>
 #include <internal/_tgbot.h>
 
 #include <chrono>
 #include <cmath>
-#include <memory>
 #include <sstream>
 
 #include "SingleThreadCtrl.h"
@@ -163,7 +162,7 @@ void TimerCommandManager::startTimer(const Bot &bot, const Message::Ptr &msg) {
         try {
             bot.getApi().pinChatMessage(message->chat->id, message->messageId);
         } catch (const TgBot::TgException &) {
-            LOG(LogLevel::WARNING, "Cannot pin msg!");
+            LOG(WARNING) <<  "Cannot pin msg!";
             botcanpin = false;
         }
         setPreStopFunction(
@@ -192,6 +191,6 @@ void TimerCommandManager::stopTimer(const Bot &bot, const Message::Ptr &msg) {
 
 void TimerCommandManager::Timerstop(SingleThreadCtrl *thiz) {
     if (static_cast<TimerCommandManager *>(thiz)->isactive) {
-        LOG(LogLevel::INFO, "Canceling timer and cleaning up...");
+        LOG(INFO) << "Canceling timer and cleaning up...";
     }
 }

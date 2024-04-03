@@ -1,8 +1,7 @@
 #include <CStringLifetime.h>
-#include <Logging.h>
 #include <Types.h>
+#include <absl/log/log.h>
 #include <arpa/inet.h>
-#include <libos/libfs.h>
 #include <net/if.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
@@ -12,6 +11,7 @@
 
 #include <cerrno>
 #include <filesystem>
+#include <libos/libfs.hpp>
 
 #include "../SocketInterfaceUnix.h"
 #include "socket/SocketInterfaceBase.h"
@@ -19,15 +19,16 @@
 
 socket_handle_t SocketInterfaceUnixLocal::makeSocket(bool client) {
     int ret = kInvalidFD;
+    struct sockaddr_un name {};
+    struct sockaddr* _name = reinterpret_cast<struct sockaddr*>(&name);
     CStringLifetime path = getOptions(Options::DESTINATION_ADDRESS);
 
     if (!client) {
-        LOG(LogLevel::DEBUG, "Creating socket at %s", path.get());
+        LOG(INFO) << "Creating socket at " << path.get();
     }
-    struct sockaddr_un name {};
     const int sfd = socket(AF_LOCAL, SOCK_STREAM, 0);
     if (sfd < 0) {
-        PLOG_E("Failed to create socket");
+        PLOG(ERROR) << "Failed to create socket";
         return ret;
     }
 
@@ -36,19 +37,17 @@ socket_handle_t SocketInterfaceUnixLocal::makeSocket(bool client) {
     name.sun_path[sizeof(name.sun_path) - 1] = '\0';
     const size_t size = SUN_LEN(&name);
     decltype(&connect) fn = client ? connect : bind;
-    if (fn(sfd, reinterpret_cast<struct sockaddr*>(&name), size) != 0) {
+    if (fn(sfd, _name, size) != 0) {
         do {
             if (client) {
-                PLOG_E("Failed to connect to socket");
+                PLOG(ERROR) << "Failed to connect to socket";
             } else {
-                PLOG_E("Failed to bind to socket");
+                PLOG(ERROR) << "Failed to bind to socket";
             }
             if (!client && errno == EADDRINUSE) {
                 cleanupServerSocket();
-                if (fn(sfd, reinterpret_cast<struct sockaddr*>(&name), size) ==
-                    0) {
-                    LOG(LogLevel::INFO,
-                        "Bind succeeded by removing socket file");
+                if (fn(sfd, _name, size) == 0) {
+                    LOG(INFO) << "Bind succeeded by removing socket file";
                     break;
                 }
             }

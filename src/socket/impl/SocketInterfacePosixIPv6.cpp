@@ -11,8 +11,8 @@
 #include <functional>
 
 // TgBot deps
-#include <Logging.h>
 #include <Types.h>
+#include <absl/log/log.h>
 
 #include "../SocketInterfaceUnix.h"
 #include "socket/SocketInterfaceBase.h"
@@ -39,21 +39,22 @@ socket_handle_t SocketInterfaceUnixIPv6::createServerSocket() {
     socket_handle_t ret = kInvalidFD;
     bool iface_done = false;
     struct sockaddr_in6 name {};
+    struct sockaddr* _name = reinterpret_cast<struct sockaddr*>(&name);
     const socket_handle_t sfd = socket(AF_INET6, SOCK_STREAM, 0);
 
     if (!isValidSocketHandle(sfd)) {
-        PLOG_E("Failed to create socket");
+        PLOG(ERROR) << "Failed to create socket";
         return ret;
     }
 
-    LOG(LogLevel::DEBUG, "Dump of active interfaces' addresses (IPv6)");
+    LOG(INFO) << "Dump of active interfaces' addresses (IPv6)";
     foreach_ipv6_interfaces([](const char* iface, const char* addr) {
-        LOG(LogLevel::DEBUG, "ifname %s: addr %s", iface, addr);
+        LOG(INFO) << "ifname " << iface << ": addr " << addr;
     });
     foreach_ipv6_interfaces(
         [&iface_done, sfd](const char* iface, const char* addr) {
             if (!iface_done && strncmp("lo", iface, 2)) {
-                LOG(LogLevel::DEBUG, "Choosing ifname %s addr %s", iface, addr);
+                LOG(INFO) << "Choosing ifname " << iface << ": addr " << addr;
 
                 SocketHelperUnix::setSocketBindingToIface(sfd, iface);
                 iface_done = true;
@@ -61,8 +62,7 @@ socket_handle_t SocketInterfaceUnixIPv6::createServerSocket() {
         });
 
     if (!iface_done) {
-        LOG(LogLevel::ERROR,
-            "Failed to find any valid interface to bind to (IPv6)");
+        LOG(ERROR) << "Failed to find any valid interface to bind to (IPv6)";
         return ret;
     }
     SocketHelperCommon::printExternalIPINet();
@@ -70,9 +70,8 @@ socket_handle_t SocketInterfaceUnixIPv6::createServerSocket() {
     name.sin6_family = AF_INET6;
     name.sin6_port = htons(kTgBotHostPort);
     name.sin6_addr = IN6ADDR_ANY_INIT;
-    if (bind(sfd, reinterpret_cast<struct sockaddr*>(&name), sizeof(name)) !=
-        0) {
-        PLOG_E("Failed to bind to socket");
+    if (bind(sfd, _name, sizeof(name)) != 0) {
+        PLOG(ERROR) << "Failed to bind to socket";
         close(sfd);
         return ret;
     }
@@ -83,10 +82,11 @@ socket_handle_t SocketInterfaceUnixIPv6::createServerSocket() {
 socket_handle_t SocketInterfaceUnixIPv6::createClientSocket() {
     socket_handle_t ret = kInvalidFD;
     struct sockaddr_in6 name {};
+    struct sockaddr* _name = reinterpret_cast<struct sockaddr*>(&name);
     const socket_handle_t sfd = socket(AF_INET6, SOCK_STREAM, 0);
 
     if (!isValidSocketHandle(sfd)) {
-        PLOG_E("Failed to create socket");
+        PLOG(ERROR) << "Failed to create socket";
         return ret;
     }
 
@@ -94,9 +94,8 @@ socket_handle_t SocketInterfaceUnixIPv6::createClientSocket() {
     name.sin6_port = htons(SocketHelperCommon::getPortNumInet(this));
     inet_pton(AF_INET6, getOptions(Options::DESTINATION_ADDRESS).c_str(),
               &name.sin6_addr);
-    if (connect(sfd, reinterpret_cast<struct sockaddr*>(&name), sizeof(name)) !=
-        0) {
-        PLOG_E("Failed to connect to socket");
+    if (connect(sfd, _name, sizeof(name)) != 0) {
+        PLOG(ERROR) << "Failed to connect to socket";
         close(sfd);
         return ret;
     }

@@ -4,8 +4,8 @@
 #include <filesystem>
 #include <string>
 
-#include "../include/Logging.h"
 #include "../include/Types.h"
+#include <absl/log/check.h>
 
 inline std::filesystem::path getSocketPath() {
     static auto spath = std::filesystem::temp_directory_path() / "tgbot.sock";
@@ -78,10 +78,7 @@ struct Exit {
         e.op = op;
         strncpy(e.token, buf.c_str(), TokenLen);
         e.token[TokenLen] = 0;
-        if (buf.size() != TokenLen)
-            LOG(LogLevel::WARNING,
-                "buf str doesn't fit token fully: tokenlen %d vs buflen %zu",
-                TokenLen, buf.size());
+        CHECK(buf.size() == TokenLen);
         return e;
     }
 };

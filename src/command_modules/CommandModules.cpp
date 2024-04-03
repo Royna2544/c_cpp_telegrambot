@@ -1,9 +1,9 @@
-#include "CommandModule.h"
-#include "Logging.h"
-#include "StringToolsExt.h"
-#include "gen/cmds.gen.h"
-#include "compiler/CompilerInTelegram.h"
 #include <set>
+
+#include "CommandModule.h"
+#include "StringToolsExt.h"
+#include "compiler/CompilerInTelegram.h"
+#include "gen/cmds.gen.h"
 
 static void CModuleCallback(const Bot &bot, const Message::Ptr &message,
                             std::string compiler) {
@@ -68,7 +68,7 @@ void CommandModule::loadCommandModules(Bot &bot) {
         commandsName.insert(i->command);
     }
     if (commandsName.size() != getLoadedModules().size()) {
-        LOG(LogLevel::WARNING, "Module names have duplicates");
+        LOG(WARNING) << "Module names have duplicates";
     }
     for (const auto &i : getLoadedModules()) {
         if (i->fn) {
@@ -77,9 +77,8 @@ void CommandModule::loadCommandModules(Bot &bot) {
             else
                 bot_AddCommandPermissive(bot, i->command, i->fn);
         } else {
-            LOG(LogLevel::ERROR,
-                "Invalid command module %s: No functions provided",
-                i->command.c_str());
+            LOG(ERROR) << "Invalid command module " << i->command
+                       << ": No functions provided";
         }
     }
     loadCompilerModule(bot,
@@ -109,7 +108,7 @@ void bot_AddCommandEnforcedCompiler(Bot &bot, const std::string &cmd,
                                std::bind(cb, std::placeholders::_1,
                                          std::placeholders::_2, compiler));
     } else {
-        LOG(LogLevel::WARNING, "Unsupported cmd '%s' (compiler)", cmd.c_str());
+        LOG(WARNING) << "Unsupported cmd '" << cmd << "' (compiler)";
         bot_AddCommandEnforced(bot, cmd, NoCompilerCommandStub);
     }
 }

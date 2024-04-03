@@ -1,12 +1,11 @@
 #include "DatabaseLoader.h"
 
+#include <absl/log/log.h>
 #include <gtest/gtest.h>
 
-#include <cinttypes>
 #include <mutex>
 
 #include "Database.h"
-#include "Logging.h"
 
 database::DatabaseWrapperImpl& loadDb() {
     static std::once_flag once;
@@ -15,8 +14,7 @@ database::DatabaseWrapperImpl& loadDb() {
         // DatabaseWrapper::load throws std::runtime_error if it fails to load
         // the database.
         ASSERT_NO_THROW(DBWrapper.load());
-        LOG(LogLevel::INFO, "DB loaded, Owner id %" PRId64,
-            DBWrapper.maybeGetOwnerId());
+        LOG(INFO) << "DB loaded, Owner id " << DBWrapper.maybeGetOwnerId();
     });
     return DBWrapper;
 }

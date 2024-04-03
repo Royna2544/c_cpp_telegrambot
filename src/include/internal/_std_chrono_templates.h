@@ -18,3 +18,8 @@ template <class Dur>
 std::chrono::seconds to_secs(Dur &&it) {
     return std::chrono::duration_cast<std::chrono::seconds>(it);
 }
+
+template <class Dur>
+std::chrono::milliseconds to_msecs(Dur &&it) {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(it);
+}

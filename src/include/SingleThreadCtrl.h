@@ -1,5 +1,8 @@
 #pragma once
 
+#include <absl/log/check.h>
+#include <absl/log/log.h>
+
 #include <atomic>
 #include <chrono>
 #include <functional>
@@ -14,11 +17,11 @@
 
 #include "EnumArrayHelpers.h"
 #include "InstanceClassBase.hpp"
-#include "Logging.h"
 
 struct SingleThreadCtrl;
 
-class SingleThreadCtrlManager : public InstanceClassBase<SingleThreadCtrlManager> {
+class SingleThreadCtrlManager
+    : public InstanceClassBase<SingleThreadCtrlManager> {
    public:
     using controller_type = std::shared_ptr<SingleThreadCtrl>;
 
@@ -142,7 +145,7 @@ struct SingleThreadCtrl {
     } state = ControlState::UNINITIALIZED;
 
     void _threadFn(thread_function fn);
-    void logInvalidState(const char * state);
+    void logInvalidState(const char* state);
     std::optional<std::thread> threadP;
     prestop_function preStop;
 
@@ -194,15 +197,15 @@ std::shared_ptr<T> SingleThreadCtrlManager::getController(
     auto it = kControllers.find(req.usage);
 
     if (kIsUnderStopAll) {
-        LOG(LogLevel::WARNING, "Under stopAll(), ignore");
+        LOG(WARNING) << "Under stopAll(), ignore";
         return {};
     }
     if (sizeMismatch = it != kControllers.end() &&
                        it->second->mgr_priv.sizeOfThis < sizeof(T);
         sizeMismatch) {
-        LOG(LogLevel::WARNING,
-            "Size mismatch: Buffer has %zu, New class wants %zu",
-            it->second->mgr_priv.sizeOfThis, sizeof(T));
+        LOG(WARNING) << "Size mismatch: Buffer has "
+                     << it->second->mgr_priv.sizeOfThis << ", New class wants "
+                     << sizeof(T);
         if (!(req.flags & SIZEDIFF_ACTION_RECONSTRUCT)) return {};
     }
     if (it != kControllers.end() && it->second && !sizeMismatch) {
@@ -211,7 +214,7 @@ std::shared_ptr<T> SingleThreadCtrlManager::getController(
             maybeRet)
             ptr = maybeRet.value();
         else {
-            LOG(LogLevel::VERBOSE, "Using old: %s controller", usageStr);
+            DLOG(INFO) << "Using old: " << usageStr << " controller";
             ptr = it->second;
         }
     } else {
@@ -225,7 +228,7 @@ std::shared_ptr<T> SingleThreadCtrlManager::getController(
                 destroyController(it->first);
                 lk.lock();
             }
-            LOG(LogLevel::VERBOSE, "New allocation: %s controller", usageStr);
+            DLOG(INFO) << "New allocation: " << usageStr << " controller";
             if constexpr (sizeof...(args) != 0)
                 newit = std::make_shared<T>(std::forward<Args...>(args...));
             else
@@ -235,10 +238,10 @@ std::shared_ptr<T> SingleThreadCtrlManager::getController(
             ctrlit->mgr_priv.usage.val = req.usage;
             ctrlit->mgr_priv.sizeOfThis = sizeof(T);
             ctrlit->mgr_priv.mgr = this;
-            ASSERT(ctrlit->timer_mutex.lk.owns_lock(),
-                   "%s controller unique_lock is"
-                   "not holding mutex. Probably constructor is not called.",
-                   usageStr);
+            LOG_IF(FATAL, !ctrlit->timer_mutex.lk.owns_lock())
+                << usageStr
+                << " controller unique_lock is not holding mutex. Probably "
+                   "constructor is not called.";
             ptr = kControllers[req.usage] = newit;
         }
     }

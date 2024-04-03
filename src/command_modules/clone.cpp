@@ -1,12 +1,12 @@
 #include <BotReplyMessage.h>
 #include <ExtArgs.h>
+#include <absl/log/log.h>
 
 #include <sstream>
 
 #include "CStringLifetime.h"
 #include "CommandModule.h"
 #include "Database.h"
-#include "Logging.h"
 #include "internal/_tgbot.h"
 
 static void CloneCommandFn(const Bot& bot, const Message::Ptr message) {
@@ -36,9 +36,10 @@ static void CloneCommandFn(const Bot& bot, const Message::Ptr message) {
             auto user = member->user;
             CStringLifetime userName = UserPtr_toString(user);
             std::stringstream ss;
-            ChatId ownerId = database::DatabaseWrapperBotImplObj::getInstance().maybeGetOwnerId();
+            ChatId ownerId = database::DatabaseWrapperBotImplObj::getInstance()
+                                 .maybeGetOwnerId();
 
-            LOG(LogLevel::INFO, "Clone: Dest user: %s", userName.get());
+            LOG(INFO) << "Clone: Dest user: " << userName.get();
             bot_sendReplyMessage(bot, message, "Cloning... (see PM)");
             auto pmfn = [&bot, &ss, ownerId]() {
                 std::stringstream newSs;

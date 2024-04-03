@@ -1,4 +1,4 @@
-#include <Logging.h>
+#include <absl/log/log.h>
 #include <ResourceManager.h>
 
 #include <fstream>
@@ -37,23 +37,21 @@ bool ResourceManager::preloadOneFile(std::filesystem::path path) {
                 ignoredResources.emplace_back(line);
             }
             ignoredResources.emplace_back(kResourceLoadIgnoreFile);
-            LOG(LogLevel::INFO, "Applied resource ignore configuration");
+            LOG(INFO) << "Applied resource ignore configuration";
         }
     });
     if (std::find(ignoredResources.begin(), ignoredResources.end(), path) !=
         ignoredResources.end()) {
-        LOG(LogLevel::DEBUG, "Ignoring resource path %s",
-            path.string().c_str());
+        DLOG(INFO) << "Ignoring resource path " << path;
         return false;
     }
     for (const auto& [elem, data] : kResources) {
         if (elem.string() == path.string()) {
-            LOG(LogLevel::WARNING, "Resource %s already loaded",
-                path.string().c_str());
+            LOG(WARNING) << "Resource " << path << " already loaded";
             return false;
         }
     }
-    LOG(LogLevel::VERBOSE, "Preloading %s", path.string().c_str());
+    DLOG(INFO) << "Preloading " << path;
     linebuf << file.rdbuf();
     kResources[path] = linebuf.str();
     return true;
@@ -62,15 +60,14 @@ bool ResourceManager::preloadOneFile(std::filesystem::path path) {
 void ResourceManager::preloadResourceDirectory() {
     std::filesystem::directory_iterator end;
     auto rd = FS::getPathForType(FS::PathType::RESOURCES);
-    LOG(LogLevel::INFO, "Preloading resource directory: %s",
-        rd.string().c_str());
+    LOG(INFO) << "Preloading resource directory: " << rd;
 
     for (std::filesystem::directory_iterator it(rd); it != end; ++it) {
         if (it->is_regular_file()) {
             preloadOneFile(*it);
         }
     }
-    LOG(LogLevel::INFO, "Preloading resource directory done");
+    LOG(INFO) << "Preloading resource directory done";
 }
 
 const std::string& ResourceManager::getResource(std::filesystem::path path) {
@@ -80,7 +77,7 @@ const std::string& ResourceManager::getResource(std::filesystem::path path) {
             return data;
         }
     }
-    LOG(LogLevel::ERROR, "Resource not found: %s", path.string().c_str());
+    LOG(ERROR) << "Resource not found: " << path;
     return empty;
 }
 

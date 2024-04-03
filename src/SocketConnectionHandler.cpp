@@ -1,6 +1,5 @@
 #include <BotReplyMessage.h>
 #include <ChatObserver.h>
-#include <Logging.h>
 #include <SocketConnectionHandler.h>
 #include <SpamBlock.h>
 #include <random/RandomNumberGenerator.h>
@@ -30,8 +29,8 @@ static std::string getMIMEString(const std::string& path) {
         buf = ResourceManager::getInstance().getResource("mimeData.json");
         doc.Parse(buf.data());
         // This should be an assert, we know the data file at compile time
-        ASSERT(!doc.HasParseError(), "Failed to parse mimedata: %d",
-               doc.GetParseError());
+        LOG_IF(FATAL, doc.HasParseError())
+            << "Failed to parse mimedata: " << doc.GetParseError();
     });
     if (!extension.empty()) {
         for (rapidjson::SizeType i = 0; i < doc.Size(); i++) {
@@ -41,13 +40,12 @@ static std::string getMIMEString(const std::string& path) {
             for (rapidjson::SizeType i = 0; i < availableTypes.Size(); i++) {
                 if (availableTypes[i].GetString() == extension) {
                     auto mime = oneJsonElement["name"].GetString();
-                    LOG(LogLevel::DEBUG, "Found MIME type: '%s'", mime);
+                    LOG(INFO) << "Found MIME type: '" << mime << "'";
                     return mime;
                 }
             }
         }
-        LOG(LogLevel::WARNING, "Unknown file extension: '%s'",
-            extension.c_str());
+        LOG(WARNING) << "Unknown file extension: '" << extension << "'";
     }
     return "application/octet-stream";
 }
@@ -61,7 +59,7 @@ void socketConnectionHandler(const Bot& bot, struct TgBotConnection conn) {
             try {
                 bot_sendMessage(bot, _data.data_1.to, _data.data_1.msg);
             } catch (const TgBot::TgException& e) {
-                LOG(LogLevel::ERROR, "Exception at handler, %s", e.what());
+                LOG(ERROR) << "Exception at handler " << e.what();
             }
             break;
         case CMD_CTRL_SPAMBLOCK:
@@ -73,27 +71,26 @@ void socketConnectionHandler(const Bot& bot, struct TgBotConnection conn) {
                                 obs.observedChatIds.end(), _data.data_4.id);
             bool observe = _data.data_4.observe;
             if (obs.observeAllChats) {
-                LOG(LogLevel::WARNING,
-                    "CMD_OBSERVE_CHAT_ID disabled due to "
-                    "CMD_OBSERVE_ALL_CHATS");
+                LOG(WARNING) << "CMD_OBSERVE_CHAT_ID disabled due to "
+                                "CMD_OBSERVE_ALL_CHATS";
                 break;
             }
             if (it == obs.observedChatIds.end()) {
                 if (observe) {
-                    LOG(LogLevel::DEBUG, "Adding chat to observer");
+                    LOG(INFO) << "Adding chat to observer";
                     obs.observedChatIds.push_back(_data.data_4.id);
                 } else {
-                    LOG(LogLevel::WARNING,
-                        "Trying to quit observing chatid which wasn't being "
-                        "observed!");
+                    LOG(WARNING)
+                        << "Trying to quit observing chatid which wasn't being "
+                           "observed!";
                 }
             } else {
                 if (observe) {
-                    LOG(LogLevel::WARNING,
-                        "Trying to observe chatid which was already being "
-                        "observed!");
+                    LOG(WARNING)
+                        << "Trying to observe chatid which was already being "
+                           "observed!";
                 } else {
-                    LOG(LogLevel::DEBUG, "Removing chat from observer");
+                    LOG(INFO) << "Removing chat from observer";
                     obs.observedChatIds.erase(it);
                 }
             }
@@ -147,14 +144,13 @@ void socketConnectionHandler(const Bot& bot, struct TgBotConnection conn) {
                     fn(bot.getApi(), _data.data_5.id,
                        InputFile::fromFile(file, getMIMEString(file)));
                 } catch (std::ifstream::failure& e) {
-                    LOG(LogLevel::INFO,
-                        "Failed to send '%s' as local file, trying as Telegram "
-                        "file id",
-                        file);
+                    LOG(INFO) << "Failed to send '" << file
+                              << "' as local file, trying as Telegram "
+                                 "file id";
                     fn(bot.getApi(), _data.data_5.id, std::string(file));
                 }
             } catch (const TgBot::TgException& e) {
-                LOG(LogLevel::ERROR, "Exception at handler, %s", e.what());
+                LOG(ERROR) << "Exception at handler, " << e.what();
             }
         } break;
         case CMD_OBSERVE_ALL_CHATS: {
@@ -164,7 +160,7 @@ void socketConnectionHandler(const Bot& bot, struct TgBotConnection conn) {
             int data = _data.data_7;
             enum SingleThreadCtrlManager::ThreadUsage threadUsage;
             if (data < 0 || data >= SingleThreadCtrlManager::USAGE_MAX) {
-                LOG(LogLevel::ERROR, "Invalid controller id: %d", data);
+                LOG(ERROR) << "Invalid controller id: " << data;
                 break;
             }
             threadUsage =
@@ -173,8 +169,7 @@ void socketConnectionHandler(const Bot& bot, struct TgBotConnection conn) {
                 threadUsage);
         } break;
         default:
-            LOG(LogLevel::ERROR, "Unhandled cmd: %s",
-                TgBotCmd::toStr(conn.cmd).c_str());
+            LOG(ERROR) << "Unhandled cmd: " << TgBotCmd::toStr(conn.cmd);
             break;
     };
 }

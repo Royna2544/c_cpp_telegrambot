@@ -1,5 +1,5 @@
 #include <EnumArrayHelpers.h>
-#include <Logging.h>
+#include <absl/log/log.h>
 
 #include <mutex>
 #include <sstream>
@@ -29,14 +29,13 @@ const auto kTgBotCommandArgsCount =
 namespace TgBotCmd {
 std::string toStr(TgBotCommand cmd) {
     const auto it = array_helpers::find(kTgBotCommandStrMap, cmd);
-    ASSERT(it != kTgBotCommandStrMap.end(), "Couldn't find cmd %d in map", cmd);
+    LOG_IF(FATAL, it == kTgBotCommandStrMap.end()) << "Couldn't find cmd " << cmd << " in map";
     return it->second;
 }
 
 int toCount(TgBotCommand cmd) {
     const auto it = array_helpers::find(kTgBotCommandArgsCount, cmd);
-    ASSERT(it != kTgBotCommandArgsCount.end(), "Couldn't find cmd %d in map",
-           cmd);
+    LOG_IF(FATAL, it == kTgBotCommandArgsCount.end()) << "Couldn't find cmd " << cmd << " in map";
     return it->second;
 }
 

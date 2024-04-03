@@ -1,7 +1,6 @@
 #pragma once
 
 #include <BotReplyMessage.h>
-#include <Logging.h>
 
 #include <functional>
 

@@ -1,8 +1,8 @@
 #pragma once
 
+#include <absl/log/log.h>
 #include <arpa/inet.h>
 #include <internal/_FileDescriptor_posix.h>
-#include <internal/_logging_posix.h>
 
 #include <functional>
 
@@ -49,7 +49,8 @@ struct SocketHelperUnix {
     static void setSocketBindingToIface(const socket_handle_t sock,
                                         const char* iface);
 
-    template <typename T, int family, typename addr_t, int addrbuf_len, int offset>
+    template <typename T, int family, typename addr_t, int addrbuf_len,
+              int offset>
         requires std::is_same_v<T, struct sockaddr_in> ||
                  std::is_same_v<T, struct sockaddr_in6>
     static void doGetRemoteAddrInet(socket_handle_t s) {
@@ -59,10 +60,10 @@ struct SocketHelperUnix {
         addr_t* addr_ptr =
             reinterpret_cast<addr_t*>(reinterpret_cast<char*>(&addr) + offset);
         if (getpeername(s, (struct sockaddr*)&addr, &len) != 0) {
-            PLOG_E("Get connected peer address failed");
+            PLOG(ERROR) << "Get connected peer address failed";
         } else {
             inet_ntop(family, addr_ptr, ipStr, addrbuf_len);
-            LOG(LogLevel::DEBUG, "Client connected, its addr: %s", ipStr);
+            LOG(INFO) << "Client connected, its addr: " << ipStr;
         }
     }
 };

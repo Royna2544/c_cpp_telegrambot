@@ -1,7 +1,5 @@
-#include <errno.h>
 #include <unistd.h>
-
-#include "Logging.h"
+#include <absl/log/log.h>
 
 using pipe_t = int[2];
 
@@ -14,7 +12,7 @@ static inline void closeFd(int& fd) {
 
     if (isValidFd(fd)) rc = close(fd);
 
-    ASSERT(rc == 0, "Failed to validate fd, fd %d, errno %d", fd, errno);
+    PLOG_IF(ERROR, rc != 0) << "Failed to close fd: " << fd;
     fd = kInvalidFD;
 }
 

@@ -1,5 +1,6 @@
 #include <Database.h>
 #include <iostream>
+#include <absl/log/initialize.h>
 
 using tgbot::proto::PersonList;
 

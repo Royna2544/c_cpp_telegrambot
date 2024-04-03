@@ -50,6 +50,7 @@ set(BUILD_SHARED_LIBS ON CACHE BOOL "Build libs as shared libraries" FORCE)
 set(BUILD_TESTS OFF CACHE BOOL "Build tests" FORCE)
 set(BUILD_CLI OFF CACHE BOOL "[libgit2] Build client" FORCE)
 set(USE_HTTPS "OpenSSL" CACHE STRING "[libgit2] Select HTTPS backend" FORCE)
+set(ABSL_BUILD_TEST_HELPERS OFF CACHE BOOL "[abseil] Build gtest helpers" FORCE)
 #####################################################################
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin CACHE STRING 
   "Output to store binaries (win32)" FORCE)
@@ -73,6 +74,12 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 ##################### Fill in readme with cmake #####################
 string(TIMESTAMP TODAY "%Y-%m-%d")
 configure_file(resources/about.html.in ${CMAKE_SOURCE_DIR}/resources/about.html)
+#####################################################################
+
+########################## ABSEIL log deps ##########################
+add_subdirectory(src/third-party/googletest)
+add_subdirectory(src/third-party/abseil-cpp)
+link_libraries(absl::log absl::log_initialize absl::log_flags absl::flags)
 #####################################################################
 
 ####################### Global compiler flags #######################
@@ -356,8 +363,6 @@ endif()
 #####################################################################
 
 ############### Bot functions' Test Arena (googletest) ##############
-add_subdirectory(src/third-party/googletest)
-include_directories(${gtest_SOURCE_DIR}/include ${gmock_SOURCE_DIR}/include)
 ###################### Creates the test target ######################
 add_executable(${PROJECT_TEST_NAME}
   tests/AuthorizationTest.cpp
@@ -369,6 +374,7 @@ add_executable(${PROJECT_TEST_NAME}
   tests/DatabaseLoader.cpp
   tests/ResourceManagerTest.cpp
 )
+target_include_directories(${PROJECT_TEST_NAME} PRIVATE ${gtest_INCLUDE_DIR} ${gmock_INCLUDE_DIR})
 target_link_libraries(${PROJECT_TEST_NAME} gtest gtest_main gmock TgBotCommandModules)
 add_test(NAME ${PROJECT_TEST_NAME} COMMAND ${PROJECT_TEST_NAME})
 #####################################################################

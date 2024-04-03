@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Logging.h"
+#include <absl/log/log.h>
 
 struct InitCall {
     /**
@@ -18,8 +18,8 @@ struct InitCall {
     virtual const char* getInitCallName() const = 0;
 
     void initWrapper() {
-        LOG(LogLevel::VERBOSE, "%s: +++", getInitCallName());
+        DLOG(INFO) << getInitCallName() << ": +++";
         doInitCall();
-        LOG(LogLevel::VERBOSE, "%s: ---", getInitCallName());
+        DLOG(INFO) << getInitCallName() << ": ---";
     }
 };

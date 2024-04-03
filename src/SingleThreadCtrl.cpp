@@ -2,15 +2,13 @@
 
 #include <mutex>
 
-#include "Logging.h"
-
 bool SingleThreadCtrl::isRunning() const {
     return state == ControlState::RUNNING;
 }
 
 void SingleThreadCtrl::logInvalidState(const char *func) {
-    LOG(LogLevel::ERROR, "Invalid state %d for %s: %s controller",
-        static_cast<int>(state), func, mgr_priv.usage.str);
+    LOG(ERROR) << "Invalid state " << static_cast<int>(state) << " for " << func
+               << ": " << mgr_priv.usage.str << " controller";
 }
 
 void SingleThreadCtrl::runWith(thread_function fn) {
@@ -24,8 +22,8 @@ void SingleThreadCtrl::runWith(thread_function fn) {
             state = ControlState::RUNNING;
             break;
         case ControlState::RUNNING:
-            LOG(LogLevel::WARNING, "Thread is already running: %s controller",
-                mgr_priv.usage.str);
+            LOG(WARNING) << "Thread is already running: " << mgr_priv.usage.str
+                         << " controller";
             break;
     };
 }
@@ -80,8 +78,7 @@ void SingleThreadCtrl::reset() {
 void SingleThreadCtrl::_threadFn(thread_function fn) {
     fn();
     if (kRun) {
-        LOG(LogLevel::INFO, "%s controller ended before stop command",
-            mgr_priv.usage.str);
+        LOG(INFO) << mgr_priv.usage.str << " controller ended before stop command";
         state = ControlState::STOPPED_PREMATURE;
         kRun = false;
     }

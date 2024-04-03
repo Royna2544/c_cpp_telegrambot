@@ -1,6 +1,8 @@
+#include <absl/log/log.h>
+
 #include <cstdlib>
 #include <filesystem>
-#include <Logging.h>
+
 #include "libfs.hpp"
 
 bool FS::exists(const std::filesystem::path& filename) {
@@ -9,7 +11,7 @@ bool FS::exists(const std::filesystem::path& filename) {
     std::error_code ec;
     rc = std::filesystem::exists(filename, ec);
     if (ec) {
-        LOG(LogLevel::WARNING, "FS::Exists failed: %s", ec.message().c_str());
+        PLOG(WARNING) << "FS::Exists failed: " << ec.message();
     }
     return rc;
 }

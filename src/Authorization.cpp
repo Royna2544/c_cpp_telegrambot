@@ -9,7 +9,7 @@ inline DatabaseWrapperImpl& getDB() {
     try {
         return DatabaseWrapperBotImplObj::getInstance();
     } catch (const std::runtime_error& e) {
-        LOG(LogLevel::ERROR, "%s", e.what());
+        LOG(ERROR) << e.what();
         return DatabaseWrapperImplObj::getInstance();
     }
 }

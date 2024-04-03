@@ -1,7 +1,7 @@
 #include <BotReplyMessage.h>
 #include "CompilerInTelegram.h"
 #include "StringToolsExt.h"
-#include <Logging.h>
+#include <absl/log/log.h>
 
 void CompilerInTgHelper::onFailed(const Bot &bot, const Message::Ptr &message,
                                   const CompilerInTg::ErrorType e) {
@@ -34,6 +34,6 @@ void CompilerInTgHelper::onResultReady(const Bot &bot,
 void CompilerInTgHelper::onCompilerPathCommand(const Bot &bot,
                                                const Message::Ptr &message,
                                                const std::string &text) {
-    LOG(LogLevel::DEBUG, "%s", text.c_str());
+    LOG(INFO) << text;
     bot_sendReplyMessage(bot, message, text);
 }

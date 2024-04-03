@@ -1,5 +1,5 @@
 #include <ExtArgs.h>
-#include <Logging.h>
+#include <absl/log/log.h>
 
 #include "BotReplyMessage.h"
 #include "CommandModule.h"
@@ -12,9 +12,8 @@ static void DeleteEchoCommandFn(const Bot &bot, const Message::Ptr message) {
         bot.getApi().deleteMessage(chatId, message->messageId);
     } catch (const TgBot::TgException &) {
         // bot is not admin. nothing it can do
-        LOG(LogLevel::WARNING,
-            "bot is not admin in chat '%s', cannot use decho!",
-            message->chat->title.c_str());
+        LOG(WARNING) << "bot is not admin in chat '" << message->chat->title
+                     << "', cannot use decho!";
         return;
     }
     if (hasExtArgs(message)) {
@@ -41,6 +40,5 @@ static void DeleteEchoCommandFn(const Bot &bot, const Message::Ptr message) {
     }
 }
 
-struct CommandModule cmd_decho("decho",
-                               "Delete and echo message",
+struct CommandModule cmd_decho("decho", "Delete and echo message",
                                CommandModule::Flags::None, DeleteEchoCommandFn);

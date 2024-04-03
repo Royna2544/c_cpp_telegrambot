@@ -4,20 +4,19 @@
 #include <optional>
 
 #include "InstanceClassBase.hpp"
-#include "Logging.h"
 
-void SingleThreadCtrlManager::destroyController(const ThreadUsage usage, bool deleteIt) {
+void SingleThreadCtrlManager::destroyController(const ThreadUsage usage,
+                                                bool deleteIt) {
     static std::array<std::mutex, USAGE_MAX> kPerUsageLocks;
     const std::scoped_lock lk(kPerUsageLocks[usage], mControllerLock);
     auto it = kControllers.find(usage);
     if (it != kControllers.end() && it->second) {
-        LOG(LogLevel::VERBOSE, "Stopping: %s controller",
-            it->second->mgr_priv.usage.str);
+        DLOG(INFO) << "Stopping: " << it->second->mgr_priv.usage.str
+                   << " controller";
         it->second->stop();
         it->second.reset();
-        if (deleteIt)
-            kControllers.erase(it);
-        LOG(LogLevel::VERBOSE, "Stopped!");
+        if (deleteIt) kControllers.erase(it);
+        DLOG(INFO) << "Stopped!";
     }
 }
 
@@ -26,12 +25,11 @@ SingleThreadCtrlManager::checkRequireFlags(GetControllerFlags opposite,
                                            int flags) {
     if (flags & opposite) {
         if (flags & REQUIRE_FAILACTION_ASSERT)
-            ASSERT(false, "Flags requested FAILACTION_ASSERT");
+            LOG(FATAL) << "Flags requested FAILACTION_ASSERT";
         if (flags & REQUIRE_FAILACTION_LOG)
-            LOG(LogLevel::ERROR, "Flags-assertion failed");
+            LOG(ERROR) << "Flags-assertion failed";
         if (flags & REQUIRE_FAILACTION_RETURN_NULL) {
-            LOG(LogLevel::VERBOSE,
-                "Return null (REQUIRE_FAILACTION_RETURN_NULL)");
+            DLOG(INFO) << "Return null (REQUIRE_FAILACTION_RETURN_NULL)";
             return std::optional(controller_type());
         }
     }
@@ -39,15 +37,12 @@ SingleThreadCtrlManager::checkRequireFlags(GetControllerFlags opposite,
 }
 void SingleThreadCtrlManager::destroyManager() {
     std::unique_lock<std::shared_mutex> lk(mControllerLock);
-    std::for_each(kControllers.begin(), kControllers.end(),
-                  [this, &lk](const auto& e) {
-                      LOG(LogLevel::VERBOSE, "Shutdown: %s controller",
-                          e.second->mgr_priv.usage.str);
-                      lk.unlock();
-                      destroyController(e.first, false);
-                      lk.lock();
-                      LOG(LogLevel::VERBOSE, "Shutdown done");
-                  });
+    std::for_each(
+        kControllers.begin(), kControllers.end(), [this, &lk](const auto& e) {
+            lk.unlock();
+            destroyController(e.first, false);
+            lk.lock();
+        });
 }
 
 DECLARE_CLASS_INST(SingleThreadCtrlManager);

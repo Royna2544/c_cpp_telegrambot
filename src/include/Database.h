@@ -1,6 +1,5 @@
 #pragma once
 
-#include <Logging.h>
 #include <TgBotDB.pb.h>
 #include <Types.h>
 #include <tgbot/Bot.h>
@@ -10,7 +9,6 @@
 #include <libos/libfs.hpp>
 #include <mutex>
 #include <optional>
-#include <stdexcept>
 
 #include "BotClassBase.h"
 #include "InstanceClassBase.hpp"

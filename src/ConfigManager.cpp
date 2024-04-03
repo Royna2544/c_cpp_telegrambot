@@ -1,5 +1,5 @@
 #include <ConfigManager.h>
-#include <Logging.h>
+#include <absl/log/log.h>
 
 #include <boost/program_options.hpp>
 #include <cstdlib>
@@ -164,19 +164,19 @@ struct ConfigBackendFile : public ConfigBackendBoostPOBase {
         const auto confPath = (home / ".tgbot_conf.ini").string();
         std::ifstream ifs(confPath);
         if (ifs.fail()) {
-            LOG(LogLevel::ERROR, "Opening %s failed", confPath.c_str());
+            LOG(ERROR) << "Opening " << confPath << " failed";
             return nullptr;
         }
         po::store(po::parse_config_file(ifs, boost_priv::getTgBotOptionsDesc()),
                   p.mp);
         po::notify(p.mp);
 
-        LOG(LogLevel::INFO, "Loaded %zu entries from %s", p.mp.size(),
-            confPath.c_str());
+        LOG(INFO) << "Loaded " << p.mp.size() << " entries from " << confPath;
         return &p;
     }
     const char *getName() const override { return "File"; }
-  private:
+
+   private:
     boost_priv p{};
 };
 
@@ -195,8 +195,8 @@ struct ConfigBackendCmdline : public ConfigBackendBoostPOBase {
 
         copyCommandLine(CommandLineOp::GET, &argc, &argv);
         if (!argv) {
-            LOG(LogLevel::WARNING,
-                "Command line copy failed, probably it wasn't saved before");
+            LOG(WARNING)
+                << "Command line copy failed, probably it wasn't saved before";
             return nullptr;
         }
 
@@ -205,11 +205,12 @@ struct ConfigBackendCmdline : public ConfigBackendBoostPOBase {
                   p.mp);
         po::notify(p.mp);
 
-        LOG(LogLevel::INFO, "Loaded %zu entries (cmdline)", p.mp.size());
+        LOG(INFO) << "Loaded " << p.mp.size() << " entries (cmdline)";
         return &p;
     }
     const char *getName() const override { return "Cmdline"; }
-  private:
+
+   private:
     cmdline_priv p{};
 };
 
@@ -261,10 +262,9 @@ std::optional<std::string> getVariable(const std::string &name) {
             case Passes::FIND_OVERRIDE:
                 for (auto &bit : backends) {
                     if (bit->doOverride(bit->priv.data, name)) {
-                        LOG(LogLevel::VERBOSE,
-                            "Used '%s' backend for fetching var '%s' "
-                            "(forced)",
-                            bit->getName(), name.c_str());
+                        DLOG(INFO) << "Used '" << bit->getName()
+                                   << "' backend for fetching var '" << name
+                                   << "' (forced)";
                         bit->getVariable(bit->priv.data, name, outvalue);
                         return {outvalue};
                     }
@@ -274,16 +274,15 @@ std::optional<std::string> getVariable(const std::string &name) {
             case Passes::ACTUAL_GET:
                 for (auto &bit : backends) {
                     if (bit->getVariable(bit->priv.data, name, outvalue)) {
-                        LOG(LogLevel::VERBOSE,
-                            "Used '%s' backend for fetching var '%s'",
-                            bit->getName(), name.c_str());
+                        DLOG(INFO) << "Used '" << bit->getName()
+                                   << "' backend for fetching var '" << name << "'";
                         return {outvalue};
                     }
                 }
                 p = Passes::DONE;
                 break;
             default:
-                ASSERT_UNREACHABLE;
+                LOG(FATAL) << "Should never reach here";
                 break;
         }
 

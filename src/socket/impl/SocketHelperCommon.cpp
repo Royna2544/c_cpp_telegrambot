@@ -1,8 +1,9 @@
+#include <absl/log/log.h>
+
 #include <libos/libfs.hpp>
 #include <string>
 
 #include "../SocketInterfaceBase.h"
-#include "Logging.h"
 
 bool SocketHelperCommon::_isAvailable(SocketInterfaceBase *it,
                                       const char *envVar) {
@@ -10,7 +11,7 @@ bool SocketHelperCommon::_isAvailable(SocketInterfaceBase *it,
     int portNum = SocketInterfaceBase::kTgBotHostPort;
 
     if (!addr) {
-        LOG(LogLevel::DEBUG, "%s is not set, isAvailable false", envVar);
+        LOG(INFO) << envVar << " is not set, isAvailable false";
         return false;
     }
     it->setOptions(SocketInterfaceBase::Options::DESTINATION_ADDRESS, addr,
@@ -18,11 +19,11 @@ bool SocketHelperCommon::_isAvailable(SocketInterfaceBase *it,
     if (const char *port = getenv(kPortEnvVar); port != nullptr) {
         try {
             portNum = std::stoi(port);
-            LOG(LogLevel::DEBUG, "%s is set", kPortEnvVar);
+            DLOG(INFO) << kPortEnvVar << " is set";
         } catch (...) {
-            LOG(LogLevel::ERROR, "Illegal value for %s: %s", kPortEnvVar, port);
+            LOG(ERROR) << "Illegal value for " << kPortEnvVar << ": " << port;
         }
-        LOG(LogLevel::DEBUG, "Chosen port: %d", portNum);
+        DLOG(INFO) << "Chosen port: " << portNum;
     }
     it->setOptions(SocketInterfaceBase::Options::DESTINATION_PORT,
                    std::to_string(portNum), true);
@@ -42,7 +43,7 @@ int SocketHelperCommon::getPortNumInet(SocketInterfaceBase *it) {
 }
 
 bool SocketHelperCommon::isAvailableLocalSocket() {
-    LOG(LogLevel::DEBUG, "Choosing local socket");
+    DLOG(INFO) << "Choosing local socket";
     return true;
 }
 
@@ -51,7 +52,7 @@ bool SocketHelperCommon::canSocketBeClosedLocalSocket(SocketInterfaceBase *it) {
 
     if (!FS::exists(it->getOptions(
             SocketInterfaceBase::Options::DESTINATION_ADDRESS))) {
-        LOG(LogLevel::WARNING, "Socket file was deleted");
+        LOG(WARNING) << "Socket file was deleted";
         socketValid = false;
     }
     return socketValid;

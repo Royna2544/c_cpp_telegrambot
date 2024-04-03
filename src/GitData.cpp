@@ -1,5 +1,5 @@
 #include <GitData.h>
-#include <Logging.h>
+#include <absl/log/log.h>
 #include <git2.h>
 
 bool GitData::Fill(GitData *data) {
@@ -9,6 +9,7 @@ bool GitData::Fill(GitData *data) {
     git_reference *head_ref = NULL;
     git_remote *origin = NULL;
     char head_sha[41] = {0};
+    bool rc = true;
 
     // Initial invalid ret
     int error = -1;
@@ -21,13 +22,17 @@ bool GitData::Fill(GitData *data) {
     if (error != 0) {
         for (; path.has_parent_path(); path = path.parent_path()) {
             if (path.root_path() == path) {
-                LOG(LogLevel::ERROR, "Error opening git repository");
+                LOG(ERROR) << "Error opening git repository";
                 return false;
             }
             error = git_repository_open(&repo, path.string().c_str());
             if (error == 0) {
                 break;
             }
+        }
+        if (error != 0) {
+            LOG(ERROR) << "Not a git repository (or any of the parent directories)";
+            return false;
         }
     }
     data->gitSrcRoot = path;
@@ -38,8 +43,7 @@ bool GitData::Fill(GitData *data) {
         error = git_commit_lookup(&head_commit, repo, head_oid);
         git_reference_free(head_ref);
     } else {
-        LOG(LogLevel::ERROR, "Error getting HEAD commit: %s",
-            giterr_last()->message);
+        LOG(ERROR) << "Error getting HEAD commit: " << giterr_last()->message;
         git_repository_free(repo);
         return false;
     }
@@ -55,17 +59,15 @@ bool GitData::Fill(GitData *data) {
         data->commitid = head_sha;
         git_remote_free(origin);
     } else {
-        LOG(LogLevel::ERROR, "Error getting origin URL: %s",
-            giterr_last()->message);
+        LOG(ERROR) << "Error getting origin URL: " << giterr_last()->message;
+        rc = false;
     }
 
     // Clean up
     git_commit_free(head_commit);
     git_repository_free(repo);
     git_libgit2_shutdown();
-    return true;
+    return rc;
 }
 
-bool GitData::Fill() {
-    return Fill(this);
-}
+bool GitData::Fill() { return Fill(this); }

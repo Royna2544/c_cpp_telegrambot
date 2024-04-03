@@ -1,7 +1,7 @@
 #include <GitData.h>
-#include <Logging.h>
 #include <ResourceManager.h>
 
+#include <absl/log/log.h>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/config.hpp>
 #include <filesystem>
@@ -47,8 +47,7 @@ static void AliveCommandFn(const Bot &bot, const Message::Ptr message) {
                                    "html");
     } catch (const TgBot::TgException &e) {
         // Fallback to HTML if no GIF
-        LOG(LogLevel::ERROR, "Alive cmd: Error while sending GIF: %s",
-            e.what());
+        LOG(ERROR) << "Alive cmd: Error while sending GIF: " << e.what();
         bot_sendReplyMessageHTML(bot, message, version);
     }
 }

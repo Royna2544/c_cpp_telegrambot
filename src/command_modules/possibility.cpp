@@ -1,5 +1,4 @@
 #include <ExtArgs.h>
-#include <Logging.h>
 #include <StringToolsExt.h>
 #include <random/RandomNumberGenerator.h>
 
@@ -28,7 +27,8 @@ static void PossibilityCommandFn(const Bot &bot, const Message::Ptr message) {
         out << "(Warning: Removed " << vec.size() - set.size() << " duplicates)"
             << std::endl
             << std::endl;
-        LOG(LogLevel::WARNING, "Contains duplicates!");
+        LOG(WARNING) << "Contains duplicates! removed"
+                     << vec.size() - set.size() << " duplicates";
     }
     map.reserve(set.size());
     if (set.size() == 1) {
@@ -69,7 +69,6 @@ static void PossibilityCommandFn(const Bot &bot, const Message::Ptr message) {
     bot_sendReplyMessage(bot, message, out.str());
 }
 
-struct CommandModule cmd_possibility("possibility",
-                                     "Get possibilities",
+struct CommandModule cmd_possibility("possibility", "Get possibilities",
                                      CommandModule::Flags::None,
                                      PossibilityCommandFn);

@@ -1,6 +1,6 @@
 #include "RandomNumberGenerator.h"
 
-#include <Logging.h>
+#include <absl/log/log.h>
 
 #include <algorithm>
 #include <cassert>
@@ -49,7 +49,8 @@ struct RNGBase {
      * in a container. The specific algorithm used for shuffling is dependent on
      * the RNG implementation.
      *
-     * @deprecated This function is a template, can't be overriden therefore a stub
+     * @deprecated This function is a template, can't be overriden therefore a
+     * stub
      * @tparam     T  The type of elements in the container.
      * @param[in,out]  it  The container to be shuffled.
      */
@@ -64,7 +65,7 @@ struct RNGBase {
      * the RNG implementation.
      */
     virtual void shuffle_string(std::vector<std::string>& it) const = 0;
-    
+
     /**
      * @brief      Returns the name of the RNG.
      *
@@ -107,9 +108,13 @@ struct RNGBase {
      */
     template <class Generator>
     random_return_type genRandomNumberImpl(Generator gen,
-                                           const random_return_type min,
-                                           const random_return_type max) const {
-        ASSERT(min < max, "min(%ld) is bigger than max(%ld)", min, max);
+                                           random_return_type min,
+                                           random_return_type max) const {
+        if (min < max) {
+            LOG(WARNING) << "min(" << min << ") is bigger than max(" << max
+                         << ")";
+            std::swap(min, max);
+        }
         std::uniform_int_distribution<return_type> distribution(min, max);
         return distribution(gen);
     }
@@ -134,7 +139,7 @@ struct StdCpp : RNGBase {
         ShuffleImpl(in, RNG_std_create_rng());
     }
 
-    void shuffle_string(std::vector<std::string> &it) const override {
+    void shuffle_string(std::vector<std::string>& it) const override {
         shuffle(it);
     }
 
@@ -152,7 +157,7 @@ struct RDRand : RNGBase {
         unsigned int eax, ebx, ecx, edx;
 
         if (__get_cpuid(1, &eax, &ebx, &ecx, &edx) == 0) {
-            LOG(LogLevel::WARNING, "CPUID information is not available");
+            LOG(WARNING) << "CPUID information is not available";
             return false;
         }
         return BIT_SET(ecx, 30);
@@ -163,7 +168,7 @@ struct RDRand : RNGBase {
         ShuffleImpl(in, rdrand_engine());
     }
 
-    void shuffle_string(std::vector<std::string> &it) const override {
+    void shuffle_string(std::vector<std::string>& it) const override {
         shuffle(it);
     }
 
@@ -189,7 +194,7 @@ struct KernelRand : RNGBase {
         ShuffleImpl(in, kernel_rand_engine());
     }
 
-    void shuffle_string(std::vector<std::string> &it) const override {
+    void shuffle_string(std::vector<std::string>& it) const override {
         shuffle(it);
     }
 
@@ -214,8 +219,8 @@ static std::shared_ptr<RNGBase> getRNG(void) {
     if (!rng) {
         for (const auto& thisrng : rngs) {
             if (thisrng->supported()) {
-                LOG(LogLevel::INFO, "Using '%s' for random number generation",
-                    thisrng->getName());
+                LOG(INFO) << "Using '" << thisrng->getName()
+                          << "' for random number generation";
                 rng = thisrng;
                 break;
             }

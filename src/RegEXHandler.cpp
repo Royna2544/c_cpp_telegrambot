@@ -1,7 +1,8 @@
 #include <BotReplyMessage.h>
-#include <Logging.h>
 #include <RegEXHandler.h>
+#include <absl/log/log.h>
 
+#include <ios>
 #include <optional>
 #include <regex>
 #include <string>
@@ -65,8 +66,9 @@ OptionalWrapper<std::string> RegexHandlerBase::doRegexReplaceCommand(
 
             if (!global) kRegexMatchFlags |= format_first_only;
 
-            LOG(LogLevel::DEBUG, "src: '%s' dest: '%s' global: %d icase: %d",
-                args[1].c_str(), args[2].c_str(), global, kRegexFlags & icase);
+            DLOG(INFO) << "src: '" << args[1] << "' dest: '" << args[2]
+                       << std::boolalpha << "' global: " << global
+                       << " icase: " << (kRegexFlags & icase);
             try {
                 return {
                     std::regex_replace(desttext, src, dest, kRegexMatchFlags)};
@@ -88,7 +90,7 @@ OptionalWrapper<std::string> RegexHandlerBase::doRegexDeleteCommand(
             regex.has_value()) {
             std::stringstream kInStream(text), kOutStream;
             std::string line, out;
-            LOG(LogLevel::DEBUG, "regexstr: '%s'", args[1].c_str());
+            DLOG(INFO) << "regexstr: '" << args[1] << "'";
             while (std::getline(kInStream, line)) {
                 if (!std::regex_search(line, regex.value(),
                                        format_sed | match_not_null)) {

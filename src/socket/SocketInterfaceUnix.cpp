@@ -1,12 +1,11 @@
 #include "SocketInterfaceUnix.h"
 
+#include <absl/log/log.h>
 #include <netinet/in.h>
 #include <poll.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
-
-#include "Logging.h"
 
 void SocketInterfaceUnix::startListening(const listener_callback_t& listen_cb,
                                          const result_callback_t& result_cb) {
@@ -16,12 +15,12 @@ void SocketInterfaceUnix::startListening(const listener_callback_t& listen_cb,
     if (isValidSocketHandle(sfd)) {
         do {
             if (listen(sfd, 1) < 0) {
-                PLOG_E("Failed to listen to socket");
+                PLOG(ERROR) << "Failed to listen to socket";
                 break;
             }
             rc = pipe(kListenTerminate);
             if (rc < 0) {
-                PLOG_E("Pipe failed");
+                PLOG(ERROR) << "Pipe failed";
                 break;
             }
             result_cb(true);
@@ -44,29 +43,29 @@ void SocketInterfaceUnix::startListening(const listener_callback_t& listen_cb,
                 const pollfd& listen_fd_poll = fds[0];
                 const pollfd& socket_fd_poll = fds[1];
 
-                LOG(LogLevel::DEBUG, "Waiting for incoming events");
+                DLOG(INFO) << "Waiting for incoming events";
 
                 rc = poll(fds, sizeof(fds) / sizeof(pollfd), -1);
                 if (rc < 0) {
-                    PLOG_E("Poll failed");
+                    PLOG(ERROR) << "Poll failed";
                     break;
                 }
 
                 if (rc == 2) {
-                    LOG(LogLevel::WARNING, "Dropping incoming buffer: exiting");
+                    LOG(WARNING) << "Dropping incoming buffer: exiting";
                 }
                 if (listen_fd_poll.revents & POLLIN) {
                     dummy_listen_buf_t buf;
                     ssize_t rc =
                         read(listen_fd, &buf, sizeof(dummy_listen_buf_t));
-                    if (rc < 0) PLOG_E("Reading data from forcestop fd");
+                    if (rc < 0) PLOG(ERROR) << "Reading data from forcestop fd";
                     closeFd(listen_fd);
                     break;
                 } else if (!(socket_fd_poll.revents & POLLIN)) {
-                    LOG(LogLevel::ERROR,
-                        "Unexpected state: sfd.revents: %d, listen_fd.revents: "
-                        "%d",
-                        socket_fd_poll.revents, listen_fd_poll.revents);
+                    LOG(ERROR)
+                        << "Unexpected state: sfd.revents: "
+                        << socket_fd_poll.revents
+                        << ", listen_fd.revents: " << listen_fd_poll.revents;
                     break;
                 }
 
@@ -74,7 +73,7 @@ void SocketInterfaceUnix::startListening(const listener_callback_t& listen_cb,
                     accept(sfd, (struct sockaddr*)&addr, &len);
 
                 if (!isValidSocketHandle(cfd)) {
-                    PLOG_E("Accept failed");
+                    PLOG(ERROR) << "Accept failed";
                     break;
                 } else {
                     doGetRemoteAddr(cfd);
@@ -97,7 +96,7 @@ void SocketInterfaceUnix::writeToSocket(struct TgBotConnection conn) {
     if (isValidSocketHandle(sfd)) {
         const int count = write(sfd, &conn, sizeof(conn));
         if (count < 0) {
-            PLOG_E("Failed to write to socket");
+            PLOG(ERROR) << "Failed to write to socket";
         }
         close(sfd);
     }
@@ -110,7 +109,7 @@ void SocketInterfaceUnix::forceStopListening(void) {
 
         count = write(notify_fd, &d, sizeof(dummy_listen_buf_t));
         if (count < 0) {
-            PLOG_E("Failed to write to notify pipe");
+            PLOG(ERROR) << "Failed to write to notify pipe";
         }
         closeFd(notify_fd);
     }

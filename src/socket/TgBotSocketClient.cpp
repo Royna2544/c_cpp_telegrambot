@@ -1,9 +1,10 @@
+#include <absl/log/initialize.h>
+
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
 
-#include "Logging.h"
 #include "TgBotSocket.h"
 #include "socket/getter/SocketInterfaceGetter.hpp"
 
@@ -86,6 +87,7 @@ int main(int argc, char** argv) {
     bool ret = false;
 
     if (argc == 1) usage(exe, true);
+    absl::InitializeLog();
 
     // Remove exe (argv[0])
     ++argv;
@@ -144,7 +146,7 @@ int main(int argc, char** argv) {
                     case CMD_MAX:
                         break;
                     default:
-                        ASSERT_UNREACHABLE;
+                        LOG(FATAL) << "Unhandled command: " << cmd;
                 };
                 if (!ret)
                     fprintf(stderr, "Failed parsing arguments for %s\n",

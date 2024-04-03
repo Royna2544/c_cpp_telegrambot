@@ -4,7 +4,7 @@
 
 #include <filesystem>
 
-#include "Logging.h"
+#include <absl/log/log.h>
 
 using database::DatabaseWrapper;
 
@@ -30,15 +30,14 @@ void DatabaseWrapper::save() const {
 UserId DatabaseWrapper::maybeGetOwnerId() const {
     if (warnNoLoaded(__func__) && protodb.has_ownerid())
         return protodb.ownerid();
-    LOG(LogLevel::WARNING,
-        "No owner id found in database, enforced commands will not work");
+    LOG(WARNING) << 
+        "No owner id found in database, enforced commands will not work";
     return -1;
 }
 
 bool DatabaseWrapper::warnNoLoaded(const char* func) const {
     if (!loaded) {
-        LOG(LogLevel::WARNING, "Database not loaded! Called function: '%s'",
-            func);
+        LOG(WARNING) << "Database not loaded! Called function: " << func;
     }
     return loaded;
 }

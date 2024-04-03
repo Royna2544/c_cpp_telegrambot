@@ -1,13 +1,13 @@
 #include <Database.h>
 #include <Types.h>
+#include <absl/log/initialize.h>
+#include <absl/log/log.h>
 #include <socket/TgBotSocket.h>
 
-#include <cinttypes>
 #include <cstdlib>
 #include <cstring>
 #include <string>
 
-#include "Logging.h"
 #include "socket/getter/SocketInterfaceGetter.hpp"
 
 #ifdef _MSC_VER
@@ -24,8 +24,9 @@ int main(int argc, char* const* argv) {
     ChatId chatId = 0;
     TgBotCommandData::SendFileToChatId data = {};
     const auto _usage = std::bind(usage, argv[0], std::placeholders::_1);
-    auto &DBWrapper = database::DatabaseWrapperImplObj::getInstance();
+    auto& DBWrapper = database::DatabaseWrapperImplObj::getInstance();
 
+    absl::InitializeLog();
     if (argc != 3) {
         _usage(EXIT_SUCCESS);
     }
@@ -33,7 +34,7 @@ int main(int argc, char* const* argv) {
     try {
         chatId = std::stoll(argv[1]);
     } catch (...) {
-        LOG(LogLevel::ERROR, "Failed to convert '%s' to ChatId", argv[1]);
+        LOG(ERROR) << "Failed to convert '" << argv[1] << "' to ChatId";
         _usage(EXIT_FAILURE);
     }
     const auto mediaEntries = DBWrapper.protodb.mediatonames();
@@ -51,11 +52,11 @@ int main(int argc, char* const* argv) {
         }
     }
     if (!it) {
-        LOG(LogLevel::ERROR, "Failed to find entry for name '%s'", argv[2]);
+        LOG(ERROR) << "Failed to find entry for name '" << argv[2] << "'";
         return EXIT_FAILURE;
     } else {
-        LOG(LogLevel::INFO, "Found, sending (fileid %s) to chat %" PRId64,
-            it->telegrammediaid().c_str(), chatId);
+        LOG(INFO) << "Found, sending (fileid " << it->telegrammediaid()
+                  << ") to chat " << chatId;
     }
     strncpy(data.filepath, it->telegrammediaid().c_str(),
             sizeof(data.filepath) - 1);

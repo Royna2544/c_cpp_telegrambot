@@ -1,10 +1,11 @@
 #include "libfs.hpp"
 
+#include <absl/log/log.h>
+
 #include <filesystem>
 
 #include "ConfigManager.h"
 #include "GitData.h"
-#include "Logging.h"
 #include "ResourceManager.h"
 
 namespace fs = std::filesystem;
@@ -71,7 +72,8 @@ std::filesystem::path FS::getPathForType(PathType type) {
             }
             break;
         case PathType::RESOURCES:
-            path = getPathForType(PathType::GIT_ROOT) / ResourceManager::kResourceDirname;
+            path = getPathForType(PathType::GIT_ROOT) /
+                   ResourceManager::kResourceDirname;
             ok = true;
             break;
         case PathType::MODULES_INSTALLED:
@@ -87,10 +89,9 @@ std::filesystem::path FS::getPathForType(PathType type) {
     }
     if (ok) {
         path.make_preferred();
-        if (type != PathType::HOME)
-            makeRelativeToCWD(path);
+        if (type != PathType::HOME) makeRelativeToCWD(path);
     } else {
-        LOG(LogLevel::ERROR, "Could not find path for type %d", type);
+        LOG(ERROR) << "Could not find path for type " << static_cast<int>(type);
     }
     return path;
 }
