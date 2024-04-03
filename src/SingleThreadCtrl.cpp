@@ -33,10 +33,8 @@ void SingleThreadCtrl::setPreStopFunction(prestop_function fn) {
         case ControlState::UNINITIALIZED:
         case ControlState::STOPPED_BY_STOP_CMD:
         case ControlState::STOPPED_PREMATURE:
+        case ControlState::RUNNING:
             preStop = fn;
-            break;
-        default:
-            logInvalidState(__func__);
             break;
     };
 }
