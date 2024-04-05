@@ -23,6 +23,6 @@ struct DurationPoint {
     }
 
    private:
-    std::chrono::time_point<std::chrono::system_clock> tp;
+    decltype(std::chrono::high_resolution_clock::now()) tp;
     bool m_isValid = false;
 };
