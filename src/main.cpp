@@ -105,7 +105,13 @@ int main(int argc, char* const* argv) {
     }
     token = ret.value();
 
+#ifdef HAVE_CURL
+    static TgBot::CurlHttpClient cli;
+    static Bot gBot(token, cli);
+#else
     static Bot gBot(token);
+#endif
+
     createAndDoInitCall<RTCommandLoader>(gBot);
     createAndDoInitCall<RegexHandler>(gBot);
     createAndDoInitCall<SpamBlockManager>(gBot);

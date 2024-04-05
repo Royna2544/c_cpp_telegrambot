@@ -132,6 +132,9 @@ include_directories(${Boost_INCLUDE_DIR})
 
 ############################# Check lib #############################
 find_package(CURL)
+if (${CURL_FOUND})
+  add_definitions(-DHAVE_CURL)
+endif()
 find_package(OpenSSL REQUIRED)
 find_package(ZLIB REQUIRED)
 if (APPLE)
