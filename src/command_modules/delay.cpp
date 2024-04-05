@@ -32,15 +32,12 @@ static void DelayCommandFn(const Bot& bot, const Message::Ptr message) {
     ss << "Request message sent at: " << Time_t{message->date} << std::endl;
     ss << "Received at: " << fromTP(now) << std::endl;
     ss << "Diff: " << to_secs(now - msg).count() << 's' << std::endl;
-    auto beforeSend = high_resolution_clock::now();
+    auto dp = DurationPoint();
     auto sentMsg = bot_sendReplyMessage(bot, message, ss.str());
-    auto afterSend = high_resolution_clock::now();
-    ss << "Sending reply message took: "
-       << duration<double, std::milli>(afterSend - beforeSend).count() << "ms"
-       << std::endl;
+    auto tp = dp.get();
+    ss << "Sending reply message took: " << tp.count() << "ms" << std::endl;
     bot_editMessage(bot, sentMsg, ss.str());
 }
 
-struct CommandModule cmd_delay("delay",
-                               "Ping the bot for network delay",
+struct CommandModule cmd_delay("delay", "Ping the bot for network delay",
                                CommandModule::Flags::None, DelayCommandFn);

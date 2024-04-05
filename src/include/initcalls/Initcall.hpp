@@ -1,8 +1,8 @@
 #pragma once
 
-#include <absl/log/log.h>
+#include "InitcallBase.hpp"
 
-struct InitCall {
+struct InitCall : InitcallBase {
     /**
      * @brief A virtual function that is called on init
      *
@@ -10,16 +10,9 @@ struct InitCall {
      */
     virtual void doInitCall(void) = 0;
 
-    /**
-     * @brief A virtual function that will return what is initcall doing
-     *
-     * @return The name of the initcall's work
-     */
-    virtual const char* getInitCallName() const = 0;
-
     void initWrapper() {
-        DLOG(INFO) << getInitCallName() << ": +++";
+        auto dp = onStart();
         doInitCall();
-        DLOG(INFO) << getInitCallName() << ": ---";
+        onEnd(dp);
     }
 };

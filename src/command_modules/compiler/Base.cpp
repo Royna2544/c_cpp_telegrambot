@@ -1,9 +1,9 @@
-#include "CompilerInTelegram.h"
 #include <ConfigManager.h>
 #include <EnumArrayHelpers.h>
 #include <StringToolsExt.h>
-
 #include <absl/log/log.h>
+
+#include <DurationPoint.hpp>
 #include <boost/algorithm/string/replace.hpp>
 #include <chrono>
 #include <cstdio>
@@ -12,6 +12,7 @@
 #include <mutex>
 #include <thread>
 
+#include "CompilerInTelegram.h"
 #include "popen_wdt/popen_wdt.h"
 
 using std::chrono_literals::operator""ms;
@@ -50,7 +51,7 @@ void CompilerInTg::runCommand(const Message::Ptr &message, std::string cmd,
     LOG(INFO) << __func__ << ": +++";
     onFailed(message, ErrorType::START_COMPILER);
     LOG(INFO) << "Command: '" << cmd << "'";
-    auto start = high_resolution_clock::now();
+    auto dp = DurationPoint();
     auto fp = popen_watchdog(cmd.c_str(), use_wdt ? &watchdog_bitten : nullptr);
 
     if (!fp) {
@@ -70,13 +71,11 @@ void CompilerInTg::runCommand(const Message::Ptr &message, std::string cmd,
     if (count == 0) res << EMPTY << std::endl;
     res << std::endl;
     if (hasmore) res << "-> Truncated due to too much output\n";
-    auto end = high_resolution_clock::now();
 
     if (watchdog_bitten) {
         res << WDT_BITE_STR;
     } else {
-        float millis = static_cast<float>(
-            duration_cast<milliseconds>(end - start).count());
+        float millis = static_cast<float>(dp.get().count());
         res << "-> It took " << std::fixed << std::setprecision(3)
             << millis * 0.001 << " seconds" << std::endl;
     }
