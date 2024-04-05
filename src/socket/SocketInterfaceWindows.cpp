@@ -1,15 +1,13 @@
-#include "SocketInterfaceWindows.h"
-
 // clang-format off
 #include <winsock2.h>
 #include <winsock.h>
 #include <afunix.h>
-#include <memory>
-#include "Logging.h"
-#include "SingleThreadCtrl.h"
+// clang-format on
+
+#include "SocketInterfaceWindows.h"
+
 #include "socket/SocketInterfaceBase.h"
 #include "socket/TgBotSocket.h"
-// clang-format on
 
 char *SocketInterfaceWindows::strWSAError(const int errcode) {
     int ret = 0;
@@ -107,7 +105,7 @@ void SocketInterfaceWindows::startListening(
                         closesocket(cfd);
                     } else {
                         if (!kRun) {
-                            LOG(LogLevel::DEBUG, "Exiting");
+                            DLOG(INFO) << "Exiting";
                             break;
                         }
                     }

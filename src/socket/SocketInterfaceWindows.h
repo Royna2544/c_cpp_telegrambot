@@ -2,13 +2,13 @@
 #include <winsock2.h>
 #include <ws2ipdef.h>
 #include <ws2tcpip.h>
+#include <absl/log/log.h>
 
 #include "SocketInterfaceBase.h"
 
-#undef ERROR
-#define WSALOG_E(fmt)                \
-    LOG(LogLevel::ERROR, fmt ": %s", \
-        SocketInterfaceWindows::strWSAError(WSAGetLastError()))
+#define WSALOG_E(msg)         \
+    LOG(ERROR) << msg ": " << \
+        SocketInterfaceWindows::strWSAError(WSAGetLastError())
 
 using socket_handle_t = SOCKET;
 
@@ -89,7 +89,7 @@ struct SocketHelperWindows {
             WSALOG_E("Get connected peer address failed");
         } else {
             inet_ntop(family, addr_ptr, ipStr, addrbuf_len);
-            LOG(LogLevel::DEBUG, "Client connected, its addr: %s", ipStr);
+            LOG(INFO) << "Client connected, its addr: " << ipStr;
         }
     }
 };

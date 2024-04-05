@@ -8,6 +8,13 @@
 
 using database::DatabaseWrapper;
 
+void database::DatabaseWrapperImpl::load() {
+    DatabaseWrapper::load(FS::getPathForType(FS::PathType::GIT_ROOT) /
+                          std::string(kDatabaseFile));
+}
+
+DECLARE_CLASS_INST(database::DatabaseWrapperImplObj);
+
 void DatabaseWrapper::load(const std::filesystem::path& it) {
     std::call_once(once, [this, it] {
         fname = it;

@@ -36,13 +36,17 @@ function(MY_PROTOBUF_GENERATE_CPP PATH SRCS HDRS)
     get_filename_component(ABS_FIL ${FIL} ABSOLUTE)
     get_filename_component(FIL_WE ${FIL} NAME_WE)
 
-    list(APPEND ${SRCS} "${CMAKE_CURRENT_BINARY_DIR}/${PATH}/${FIL_WE}.pb.cc")
-    list(APPEND ${HDRS} "${CMAKE_CURRENT_BINARY_DIR}/${PATH}/${FIL_WE}.pb.h")
+    set(PROTO_GENSRC_ROOT "${CMAKE_CURRENT_BINARY_DIR}/${PATH}")
+    set(PROTO_GENSRC_OUT "${CMAKE_CURRENT_BINARY_DIR}/${PATH}/proto")
+    set(PROTO_GEN_SRC "${FIL_WE}.pb.cc")
+    set(PROTO_GEN_HDR "${FIL_WE}.pb.h")
+    list(APPEND ${SRCS} "${PROTO_GENSRC_OUT}/${PROTO_GEN_SRC}")
+    list(APPEND ${HDRS} "${PROTO_GENSRC_OUT}/${PROTO_GEN_HDR}")
 
-    set(PROTO_GEN_SRCS "${CMAKE_CURRENT_BINARY_DIR}/${PATH}/${FIL_WE}.pb.cc"
-                       "${CMAKE_CURRENT_BINARY_DIR}/${PATH}/${FIL_WE}.pb.h")
+    set(PROTO_GEN_SRCS "${PROTO_GENSRC_ROOT}/${PROTO_GEN_SRC}"
+                       "${PROTO_GENSRC_ROOT}/${PROTO_GEN_HDR}")
     execute_process(COMMAND ${CMAKE_COMMAND} -E make_directory
-                            ${CMAKE_CURRENT_BINARY_DIR}/${PATH})
+                            ${PROTO_GENSRC_ROOT})
 
     add_custom_target(protobuf_${FIL_WE}_ready
       DEPENDS ${PROTO_GEN_SRCS}
@@ -51,9 +55,9 @@ function(MY_PROTOBUF_GENERATE_CPP PATH SRCS HDRS)
     add_custom_command(
       OUTPUT ${PROTO_GEN_SRCS}
       COMMAND
-        ${PROTOBUF_PROTOC_EXECUTABLE} ARGS --cpp_out
+        protoc ARGS --cpp_out
         ${CMAKE_CURRENT_BINARY_DIR}/${PATH} ${_protobuf_include_path} ${ABS_FIL}
-      DEPENDS ${ABS_FIL}
+      DEPENDS ${ABS_FIL} protoc
       COMMENT "Running C++ protocol buffer compiler on ${FIL}"
       VERBATIM)
   endforeach()

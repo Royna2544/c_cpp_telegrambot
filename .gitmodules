@@ -17,3 +17,6 @@
 [submodule "src/third-party/abseil-cpp"]
 	path = src/third-party/abseil-cpp
 	url = https://github.com/abseil/abseil-cpp
+[submodule "src/third-party/protobuf"]
+	path = src/third-party/protobuf
+	url = https://github.com/protocolbuffers/protobuf/

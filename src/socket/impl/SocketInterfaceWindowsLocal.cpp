@@ -1,5 +1,4 @@
 #include "../SocketInterfaceWindows.h"
-#include "Logging.h"
 #include "socket/SocketInterfaceBase.h"
 #include "socket/TgBotSocket.h"
 
@@ -19,7 +18,7 @@ socket_handle_t SocketInterfaceWindowsLocal::makeSocket(
     SOCKET fd;
 
     if (!is_client) {
-        LOG(LogLevel::DEBUG, "Creating socket at %s", path.get());
+        LOG(INFO) << "Creating socket at " << path.get();
     }
 
     fd = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -42,7 +41,7 @@ socket_handle_t SocketInterfaceWindowsLocal::makeSocket(
             if (!is_client && WSAGetLastError() == WSAEADDRINUSE) {
                 cleanupServerSocket();
                 if (fn(fd, reinterpret_cast<struct sockaddr *>(&name), sizeof(name)) == 0) {
-                    LOG(LogLevel::INFO, "Bind succeeded by removing socket file");
+                    LOG(INFO) << "Bind succeeded by removing socket file";
                     break;
                 }
             }

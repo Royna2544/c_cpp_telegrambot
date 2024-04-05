@@ -51,6 +51,11 @@ set(BUILD_TESTS OFF CACHE BOOL "Build tests" FORCE)
 set(BUILD_CLI OFF CACHE BOOL "[libgit2] Build client" FORCE)
 set(USE_HTTPS "OpenSSL" CACHE STRING "[libgit2] Select HTTPS backend" FORCE)
 set(ABSL_BUILD_TEST_HELPERS OFF CACHE BOOL "[abseil] Build gtest helpers" FORCE)
+set(protobuf_INSTALL OFF CACHE BOOL "[protobuf] Install protobuf libs" FORCE)
+set(protobuf_BUILD_TESTS OFF CACHE BOOL "[protobuf] Build tests" FORCE)
+set(protobuf_BUILD_LIBUPB OFF CACHE BOOL "[protobuf] Build libup8" FORCE)
+set(utf8_range_ENABLE_TESTS OFF CACHE BOOL "[protobuf][utf8_range] Build Tests" FORCE)
+set(utf8_range_ENABLE_INSTALL OFF CACHE BOOL "[protobuf][utf8_range] Install" FORCE)
 #####################################################################
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin CACHE STRING 
   "Output to store binaries (win32)" FORCE)
@@ -79,6 +84,7 @@ configure_file(resources/about.html.in ${CMAKE_SOURCE_DIR}/resources/about.html)
 ########################## ABSEIL log deps ##########################
 add_subdirectory(src/third-party/googletest)
 add_subdirectory(src/third-party/abseil-cpp)
+add_subdirectory(src/third-party/protobuf)
 if (WIN32)
 add_subdirectory(src/third-party/dlfcn-win32)
 endif()
@@ -206,31 +212,18 @@ extend_set(SRC_LIST ${CMAKE_BINARY_DIR}/${COMMANDS_GEN_FILE})
 #####################################################################
 
 ####################### Database (Protobuf) #######################
-find_package(Protobuf REQUIRED)
 include(proto/ProtobufCpp.cmake)
-my_protobuf_generate_cpp(proto/gen PROTO_SRCS PROTO_HDRS proto/TgBotDB.proto)
-add_library(TgBotDB SHARED src/database/Database.cpp
-                           src/database/DatabaseWrapper.cpp
-                           ${PROTO_SRCS})
-add_library(TgBotDBImpl SHARED src/DatabaseWrapperImpl.cpp)
-
+my_protobuf_generate_cpp(gen PROTO_SRCS PROTO_HDRS proto/TgBotDB.proto)
+add_library(TgBotDB SHARED src/database/Database.cpp ${PROTO_SRCS})
+add_library(TgBotDBImpl SHARED src/database/DatabaseWrapper.cpp)
 ####################### TgBotDB lib includes #######################
 get_filename_component(PROTO_HDRS_DIR ${PROTO_HDRS} DIRECTORY)
 target_include_directories(TgBotDB PUBLIC ${PROTO_HDRS_DIR})
+target_include_directories(TgBotDB PRIVATE ${PROTO_HDRS_DIR}/../)
 target_include_directories(TgBotDB PRIVATE ${Protobuf_INCLUDE_DIRS})
-########## TgBotDB ABSL libs (We need them on some platforms) ##########
-foreach(ABSL_LIB absl_log_internal_check_op absl_log_internal_message)
-  perform_test(HAS_LIB_${ABSL_LIB})
-  find_library(TMP_${ABSL_LIB} NAMES ${ABSL_LIB})
-  perform_test_ret(TMP_${ABSL_LIB})
-  if(NOT TMP_${ABSL_LIB})
-    continue()
-  endif()
-  extend_set(ABSL_LIBS ${ABSL_LIB})
-endforeach()
 ####################### TgBotDB lib includes #######################
 add_dependencies(TgBotDB protobuf_TgBotDB_ready)
-target_link_libraries(TgBotDB TgBot protobuf::libprotobuf ${ABSL_LIBS})
+target_link_libraries(TgBotDB TgBot protobuf::libprotobuf)
 target_link_libraries(TgBotDBImpl TgBotDB TgBotUtils)
 #####################################################################
 
@@ -339,7 +332,7 @@ add_library(TgBotCommandModules SHARED ${SRC_LIST})
 target_include_directories(TgBotCommandModules PRIVATE ${COMMANDS_CWD})
 target_include_directories(TgBotCommandModules PRIVATE src/third-party/rapidjson/include)
 ######################## Libraries to link ########################
-set(LD_LIST TgBot TgBotDBImpl TgBotUtils ${ABSL_LIBS})
+set(LD_LIST TgBot TgBotDBImpl TgBotUtils)
 extend_set_if(LD_LIST USE_UNIX_SOCKETS TgBotSocket)
 extend_set_if(LD_LIST WIN32 wsock32 Ws2_32)
 extend_set_if(LD_LIST ENABLE_RUNTIME_COMMAND ${CMAKE_DL_LIBS})
@@ -353,13 +346,13 @@ target_link_libraries(${PROJECT_MAINEXE_NAME} TgBotCommandModules)
 
 ################# Utility Programs (Dump Database) ##################
 add_executable(${DBDUMPER_NAME} proto/DumpProtoDB.cc)
-target_link_libraries(${DBDUMPER_NAME} TgBotDBImpl ${ABSL_LIBS})
+target_link_libraries(${DBDUMPER_NAME} TgBotDBImpl)
 #####################################################################
 
 ############### Utility Programs (Send Media to chat) ################
 if (USE_UNIX_SOCKETS)
   add_executable(${MEDIA_CLI_NAME} proto/SendMediaToChat.cc)
-  target_link_libraries(${MEDIA_CLI_NAME} TgBotDBImpl TgBotSocket ${ABSL_LIBS})
+  target_link_libraries(${MEDIA_CLI_NAME} TgBotDBImpl TgBotSocket)
   target_link_lib_if_windows(${MEDIA_CLI_NAME} Ws2_32)
 endif()
 #####################################################################
