@@ -118,6 +118,7 @@ struct ConfigBackendBoostPOBase : public ConfigBackendBase {
                 ("TOKEN,t", po::value<std::string>(), "Bot Token")
                 ("SRC_ROOT,r", po::value<std::string>(), "Root directory of source tree")
                 ("PATH,p", po::value<std::string>(), "Environment variable PATH (to override)")
+                ("LOG_FILE,f", po::value<std::string>(), "File path to log")
                 (kConfigOverrideVar, po::value<std::vector<std::string>>()->multitoken(),
                     "Config list to override from this source");
                 // clang-format on
