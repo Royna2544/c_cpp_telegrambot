@@ -90,9 +90,6 @@ class SingleThreadCtrlManager
     void destroyController(ThreadUsage usage, bool deleteIt = true);
 
    private:
-    friend struct SingleThreadCtrl;
-
-   private:
     std::atomic_bool kIsUnderStopAll = false;
     static std::optional<controller_type> checkRequireFlags(
         GetControllerFlags opposite, int flags);
@@ -158,7 +155,6 @@ struct SingleThreadCtrl {
     } timer_mutex;
     struct {
         size_t sizeOfThis;
-        SingleThreadCtrlManager* mgr;
         struct {
             // It would'nt be a dangling one
             const char* str;
@@ -237,7 +233,6 @@ std::shared_ptr<T> SingleThreadCtrlManager::getController(
             ctrlit->mgr_priv.usage.str = usageStr;
             ctrlit->mgr_priv.usage.val = req.usage;
             ctrlit->mgr_priv.sizeOfThis = sizeof(T);
-            ctrlit->mgr_priv.mgr = this;
             LOG_IF(FATAL, !ctrlit->timer_mutex.lk.owns_lock())
                 << usageStr
                 << " controller unique_lock is not holding mutex. Probably "
