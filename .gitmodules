@@ -1,5 +1,5 @@
 [submodule "lib"]
-	path = lib
+	path = src/third-party/tgbot-cpp
 	url = https://github.com/roynatech2544/tgbot-cpp.git
 [submodule "src/third-party/dlfcn-win32"]
 	path = src/third-party/dlfcn-win32

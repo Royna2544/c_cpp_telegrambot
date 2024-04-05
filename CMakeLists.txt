@@ -324,7 +324,7 @@ target_link_lib_if_windows(TgBotUtils shlwapi)
 #####################################################################
 
 #################### TgBot cpp (the core) Library ###################
-add_subdirectory(lib)
+add_subdirectory(src/third-party/tgbot-cpp)
 #####################################################################
 
 ################### The Bot's main functionaility ###################
