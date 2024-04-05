@@ -79,6 +79,9 @@ configure_file(resources/about.html.in ${CMAKE_SOURCE_DIR}/resources/about.html)
 ########################## ABSEIL log deps ##########################
 add_subdirectory(src/third-party/googletest)
 add_subdirectory(src/third-party/abseil-cpp)
+if (WIN32)
+add_subdirectory(src/third-party/dlfcn-win32)
+endif()
 link_libraries(absl::log absl::log_initialize absl::log_flags absl::flags)
 #####################################################################
 
@@ -237,7 +240,6 @@ if(ENABLE_RUNTIME_COMMAND)
   extend_set(SRC_LIST src/RTCommandLoader.cpp)
   add_subdirectory(src/command_modules/runtime)
   if (WIN32)
-    add_subdirectory(src/third-party/dlfcn-win32)
     set(CMAKE_DL_LIBS dl)
   endif()
 endif()
@@ -365,6 +367,7 @@ endif()
 ############### Bot functions' Test Arena (googletest) ##############
 ###################### Creates the test target ######################
 add_executable(${PROJECT_TEST_NAME}
+  tests/TestMain.cpp
   tests/AuthorizationTest.cpp
   tests/SingleThreadCtrlTest.cpp
   tests/SpamBlockerTest.cpp
@@ -375,6 +378,6 @@ add_executable(${PROJECT_TEST_NAME}
   tests/ResourceManagerTest.cpp
 )
 target_include_directories(${PROJECT_TEST_NAME} PRIVATE ${gtest_INCLUDE_DIR} ${gmock_INCLUDE_DIR})
-target_link_libraries(${PROJECT_TEST_NAME} gtest gtest_main gmock TgBotCommandModules)
+target_link_libraries(${PROJECT_TEST_NAME} gtest gmock TgBotCommandModules)
 add_test(NAME ${PROJECT_TEST_NAME} COMMAND ${PROJECT_TEST_NAME})
 #####################################################################
