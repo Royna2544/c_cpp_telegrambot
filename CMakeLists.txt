@@ -82,11 +82,11 @@ configure_file(resources/about.html.in ${CMAKE_SOURCE_DIR}/resources/about.html)
 #####################################################################
 
 ########################## ABSEIL log deps ##########################
-add_subdirectory(src/third-party/googletest)
-add_subdirectory(src/third-party/abseil-cpp)
-add_subdirectory(src/third-party/protobuf)
+add_subdirectory(src/third-party/googletest EXCLUDE_FROM_ALL)
+add_subdirectory(src/third-party/abseil-cpp EXCLUDE_FROM_ALL)
+add_subdirectory(src/third-party/protobuf EXCLUDE_FROM_ALL)
 if (WIN32)
-add_subdirectory(src/third-party/dlfcn-win32)
+add_subdirectory(src/third-party/dlfcn-win32 EXCLUDE_FROM_ALL)
 endif()
 link_libraries(absl::log absl::log_initialize absl::log_flags absl::flags)
 #####################################################################
@@ -300,7 +300,7 @@ endif()
 #####################################################################
 
 ################## libgit2 for accessing git in C code ##############
-add_subdirectory(src/third-party/libgit2)
+add_subdirectory(src/third-party/libgit2 EXCLUDE_FROM_ALL)
 set(LIBGIT2_LIBS libgit2 util pcre http-parser xdiff ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES})
 if (WIN32)
   extend_set(LIBGIT2_LIBS winhttp CRYPT32 Rpcrt4 Secur32 Ws2_32)
@@ -327,7 +327,7 @@ target_link_lib_if_windows(TgBotUtils shlwapi)
 #####################################################################
 
 #################### TgBot cpp (the core) Library ###################
-add_subdirectory(src/third-party/tgbot-cpp)
+add_subdirectory(src/third-party/tgbot-cpp EXCLUDE_FROM_ALL)
 #####################################################################
 
 ################### The Bot's main functionaility ###################
