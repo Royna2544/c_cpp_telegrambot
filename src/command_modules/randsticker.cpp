@@ -16,7 +16,7 @@ static void RandomStickerCommandFn(const Bot &bot, const Message::Ptr message) {
             bot_sendReplyMessage(bot, message, e.what());
             return;
         }
-        const size_t pos = genRandomNumber(stickset->stickers.size() - 1);
+        const random_return_type pos = genRandomNumber(stickset->stickers.size() - 1);
         bot_sendSticker(bot, message->chat, stickset->stickers[pos], message);
         std::stringstream ss;
         ss << "Sticker idx: " << pos + 1

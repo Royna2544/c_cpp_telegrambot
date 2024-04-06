@@ -110,10 +110,13 @@ struct RNGBase {
     random_return_type genRandomNumberImpl(Generator gen,
                                            random_return_type min,
                                            random_return_type max) const {
-        if (min < max) {
+        if (min > max) {
             LOG(WARNING) << "min(" << min << ") is bigger than max(" << max
                          << ")";
             std::swap(min, max);
+        } else if (min == max) {
+            LOG(WARNING) << "min == max == " << min;
+            return min;
         }
         std::uniform_int_distribution<return_type> distribution(min, max);
         return distribution(gen);

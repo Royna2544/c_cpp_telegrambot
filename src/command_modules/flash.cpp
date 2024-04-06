@@ -52,7 +52,7 @@ static void FlashCommandFn(const Bot &bot, const Message::Ptr message) {
     ss << "Flashing '" << msg << "'..." << std::endl;
     sentmsg = bot_sendReplyMessage(bot, message, ss.str());
     std::this_thread::sleep_for(std::chrono::seconds(genRandomNumber(5)));
-    if (const size_t pos = genRandomNumber(reasons.size());
+    if (const random_return_type pos = genRandomNumber(reasons.size());
         pos != reasons.size()) {
         ss << "Failed successfully!" << std::endl;
         ss << "Reason: " << reasons[pos];
