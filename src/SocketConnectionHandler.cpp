@@ -158,7 +158,7 @@ void socketConnectionHandler(const Bot& bot, struct TgBotConnection conn) {
         } break;
         case CMD_DELETE_CONTROLLER_BY_ID: {
             int data = _data.data_7;
-            enum SingleThreadCtrlManager::ThreadUsage threadUsage;
+            enum SingleThreadCtrlManager::ThreadUsage threadUsage {};
             if (data < 0 || data >= SingleThreadCtrlManager::USAGE_MAX) {
                 LOG(ERROR) << "Invalid controller id: " << data;
                 break;

@@ -10,7 +10,7 @@ using database::DatabaseWrapper;
 
 void database::DatabaseWrapperImpl::load() {
     DatabaseWrapper::load(FS::getPathForType(FS::PathType::GIT_ROOT) /
-                          std::string(kDatabaseFile));
+                          kDatabaseFile.data());
 }
 
 DECLARE_CLASS_INST(database::DatabaseWrapperImplObj);

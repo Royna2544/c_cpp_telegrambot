@@ -4,7 +4,7 @@
 #include "socket/TgBotSocket.h"
 
 bool SocketInterfaceBase::handleIncomingBuf(
-    const size_t len, struct TgBotConnection& conn,
+    const ssize_t len, struct TgBotConnection& conn,
     const listener_callback_t& cb, std::function<char*(void)> errMsgFn) {
     if (len > 0) {
         if (conn.magic != MAGIC_VALUE) {

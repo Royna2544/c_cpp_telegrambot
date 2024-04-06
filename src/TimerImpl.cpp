@@ -53,7 +53,7 @@ bool TimerCommandManager::parseTimerArguments(const Bot &bot,
     const char *c_str = msg.c_str();
     std::vector<int> numbercache;
     for (size_t i = 0; i <= msg.size(); i++) {
-        int code = static_cast<int>(c_str[i]);
+        int code = static_cast<int>(static_cast<unsigned char>(c_str[i]));
         if (i == msg.size()) code = ' ';
         switch (code) {
             case ' ': {

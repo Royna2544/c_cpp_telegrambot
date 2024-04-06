@@ -16,7 +16,7 @@ inline DatabaseWrapperImpl& getDB() {
 };  // namespace database
 
 bool Authorized(const Message::Ptr& message, const int flags) {
-    static auto& DBWrapper = database::getDB();
+    static const auto& DBWrapper = database::getDB();
 
     if (!gAuthorized || !isMessageUnderTimeLimit(message)) return false;
 

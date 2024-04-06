@@ -1,6 +1,7 @@
 #include <ConfigManager.h>
 #include <absl/log/log.h>
 #include <unistd.h>
+#include <memory>
 
 #include "BotReplyMessage.h"
 #include "CommandModule.h"
@@ -8,8 +9,10 @@
 
 extern char **environ;
 static void restartCommandFn(const Bot &bot, const Message::Ptr message) {
-    int argc, count = 1;
-    char *const *argv, **myEnviron, restartBuf[32] = {0};
+    std::array<char, 32> restartBuf = {0};
+    char **myEnviron;
+    int argc = 0, count = 1;
+    char *const *argv = nullptr;
 
     if (const auto var = getenv("RESTART"); var != nullptr) {
         LOG(INFO) << "RESTART env var set to " << var;
@@ -26,15 +29,16 @@ static void restartCommandFn(const Bot &bot, const Message::Ptr message) {
         ;
     myEnviron = new char *[count + 2];
     memcpy(myEnviron, environ, count * sizeof(char *));
-    snprintf(restartBuf, sizeof(restartBuf), "RESTART=%d", message->messageId);
-    myEnviron[count] = restartBuf;
+    snprintf(restartBuf.data(), restartBuf.size(), "RESTART=%d", message->messageId);
+    myEnviron[count] = restartBuf.data();
     myEnviron[count + 1] = 0;
     copyCommandLine(CommandLineOp::GET, &argc, &argv);
     LOG(INFO) << "Restarting bot with exe: " << argv[0] << ", addenv "
-              << restartBuf;
+              << restartBuf.data();
     bot_sendReplyMessage(bot, message, "Restarting bot instance...");
     defaultCleanupFunction();
     execve(argv[0], argv, myEnviron);
+    delete[] myEnviron;
 }
 
 struct CommandModule cmd_restart("restart", "Restarts the bot",

@@ -10,6 +10,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <string_view>
 
 namespace po = boost::program_options;
 
@@ -78,7 +79,7 @@ struct ConfigBackendBase {
      * This field stores the name of the backend, such as "Command line" or
      * "File". This field is used for logging purposes.
      */
-    virtual const char *getName() const = 0;
+    virtual const std::string_view getName() const = 0;
 
     /**
      * @brief This field stores the private data for the backend.
@@ -103,12 +104,12 @@ struct ConfigBackendEnv : public ConfigBackendBase {
         }
         return false;
     }
-    const char *getName() const override { return "Env"; }
+    const std::string_view getName() const override { return "Env"; }
 };
 
 struct ConfigBackendBoostPOBase : public ConfigBackendBase {
     struct boost_priv {
-        constexpr static const char kConfigOverrideVar[] = "OVERRIDE_CONF";
+        constexpr static std::string_view kConfigOverrideVar = "OVERRIDE_CONF";
         static po::options_description getTgBotOptionsDesc() {
             static po::options_description desc("TgBot++ Configs");
             static std::once_flag once;
@@ -119,7 +120,7 @@ struct ConfigBackendBoostPOBase : public ConfigBackendBase {
                 ("SRC_ROOT,r", po::value<std::string>(), "Root directory of source tree")
                 ("PATH,p", po::value<std::string>(), "Environment variable PATH (to override)")
                 ("LOG_FILE,f", po::value<std::string>(), "File path to log")
-                (kConfigOverrideVar, po::value<std::vector<std::string>>()->multitoken(),
+                (kConfigOverrideVar.data(), po::value<std::vector<std::string>>()->multitoken(),
                     "Config list to override from this source");
                 // clang-format on
             });
@@ -143,7 +144,7 @@ struct ConfigBackendBoostPOBase : public ConfigBackendBase {
     bool doOverride(const void *p, const std::string &config) override {
         auto priv = reinterpret_cast<const boost_priv *>(p);
         if (priv) {
-            if (const auto it = priv->mp[boost_priv::kConfigOverrideVar];
+            if (const auto it = priv->mp[boost_priv::kConfigOverrideVar.data()];
                 !it.empty()) {
                 const auto vec = it.as<std::vector<std::string>>();
                 return std::find(vec.begin(), vec.end(), config) != vec.end();
@@ -151,6 +152,7 @@ struct ConfigBackendBoostPOBase : public ConfigBackendBase {
         }
         return false;
     }
+    virtual ~ConfigBackendBoostPOBase() = default;
 };
 
 struct ConfigBackendFile : public ConfigBackendBoostPOBase {
@@ -175,8 +177,8 @@ struct ConfigBackendFile : public ConfigBackendBoostPOBase {
         LOG(INFO) << "Loaded " << p.mp.size() << " entries from " << confPath;
         return &p;
     }
-    const char *getName() const override { return "File"; }
-
+    const std::string_view getName() const override { return "File"; }
+    ~ConfigBackendFile() override = default;
    private:
     boost_priv p{};
 };
@@ -209,8 +211,8 @@ struct ConfigBackendCmdline : public ConfigBackendBoostPOBase {
         LOG(INFO) << "Loaded " << p.mp.size() << " entries (cmdline)";
         return &p;
     }
-    const char *getName() const override { return "Cmdline"; }
-
+    const std::string_view getName() const override { return "Cmdline"; }
+    ~ConfigBackendCmdline() override = default;
    private:
     cmdline_priv p{};
 };

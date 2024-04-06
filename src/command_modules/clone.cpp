@@ -10,7 +10,7 @@
 #include "internal/_tgbot.h"
 
 static void CloneCommandFn(const Bot& bot, const Message::Ptr message) {
-    UserId uid;
+    UserId uid = 0;
     ChatId cid = message->chat->id;
     bool ok = false;
     static TgBot::User::Ptr botUser = bot.getApi().getMe();
@@ -19,7 +19,7 @@ static void CloneCommandFn(const Bot& bot, const Message::Ptr message) {
         std::string extArgs;
         parseExtArgs(message, extArgs);
         try {
-            uid = std::stoull(extArgs);
+            uid = std::stol(extArgs);
             ok = true;
         } catch (...) {
             bot_sendReplyMessage(bot, message, "Invalid user id");

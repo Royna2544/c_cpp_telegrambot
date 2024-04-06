@@ -46,7 +46,7 @@ std::string getHelpText(void) {
     std::call_once(once, [] {
         std::stringstream help;
         for (const auto& ent : kTgBotCommandStrMap) {
-            int count;
+            int count = 0;
 
             if (ent.first == CMD_EXIT) continue;
             count = TgBotCmd::toCount(ent.first);

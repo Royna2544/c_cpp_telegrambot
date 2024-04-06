@@ -1,6 +1,9 @@
 #include <GitData.h>
 #include <absl/log/log.h>
 #include <git2.h>
+#include "git2/types.h"
+
+constexpr int SHA1_HASH_LEN = 40;
 
 bool GitData::Fill(GitData *data) {
     std::filesystem::path path = std::filesystem::current_path();
@@ -8,7 +11,7 @@ bool GitData::Fill(GitData *data) {
     git_commit *head_commit = NULL;
     git_reference *head_ref = NULL;
     git_remote *origin = NULL;
-    char head_sha[41] = {0};
+    std::array<char, SHA1_HASH_LEN + 1> head_sha = {0};
     bool rc = true;
 
     // Initial invalid ret
@@ -42,6 +45,11 @@ bool GitData::Fill(GitData *data) {
         const git_oid *head_oid = git_reference_target(head_ref);
         error = git_commit_lookup(&head_commit, repo, head_oid);
         git_reference_free(head_ref);
+        if (error != 0) {
+            LOG(ERROR) << "Error looking up head commit";
+            git_repository_free(repo);
+            return false;
+        }
     } else {
         LOG(ERROR) << "Error getting HEAD commit: " << giterr_last()->message;
         git_repository_free(repo);
@@ -49,14 +57,14 @@ bool GitData::Fill(GitData *data) {
     }
 
     // Get the SHA1 (OID) of the HEAD commit
-    git_oid_fmt(head_sha, git_commit_id(head_commit));
+    git_oid_fmt(head_sha.data(), git_commit_id(head_commit));
 
     // Get the origin URL
     error = git_remote_lookup(&origin, repo, "origin");
     if (error == 0) {
         data->originurl = git_remote_url(origin);
         data->commitmsg = git_commit_message(head_commit);
-        data->commitid = head_sha;
+        data->commitid = head_sha.data();
         git_remote_free(origin);
     } else {
         LOG(ERROR) << "Error getting origin URL: " << giterr_last()->message;

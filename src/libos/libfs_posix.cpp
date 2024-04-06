@@ -6,7 +6,7 @@
 #include "libfs.hpp"
 
 bool FS::exists(const std::filesystem::path& filename) {
-    bool rc;
+    bool rc = false;
 
     std::error_code ec;
     rc = std::filesystem::exists(filename, ec);

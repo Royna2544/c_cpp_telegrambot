@@ -8,6 +8,7 @@
 #include <chrono>
 #include <cstdio>
 #include <filesystem>
+#include <initializer_list>
 #include <libos/libfs.hpp>
 #include <mutex>
 #include <thread>
@@ -37,7 +38,7 @@ void CompilerInTg::runCommand(const Message::Ptr &message, std::string cmd,
                               std::stringstream &res, bool use_wdt) {
     bool hasmore = false, watchdog_bitten = false;
     int count = 0, unique_id = 0;
-    char buf[BASH_READ_BUF] = {};
+    std::array<char, BASH_READ_BUF> buf = {};
     size_t buf_len = 0;
     std::error_code ec;
 
@@ -58,10 +59,10 @@ void CompilerInTg::runCommand(const Message::Ptr &message, std::string cmd,
         onFailed(message, ErrorType::POPEN_WDT_FAILED);
         return;
     }
-    while (fgets(buf, sizeof(buf), fp)) {
+    while (fgets(buf.data(), buf.size(), fp)) {
         if (buf_len < BASH_MAX_BUF) {
-            res << buf;
-            buf_len += strlen(buf);
+            res << buf.data();
+            buf_len += strlen(buf.data());
         } else {
             hasmore = true;
         }
@@ -112,18 +113,20 @@ static std::optional<std::string> findCommandExe(std::string command) {
     return {};
 }
 
-#define COMPILER(lang, ...)                                               \
-    array_helpers::make_elem<ProgrammingLangs, std::vector<std::string>>( \
-        lang, {__VA_ARGS__})
+array_helpers::ArrayElem<ProgrammingLangs, std::vector<std::string>> COMPILER(
+    ProgrammingLangs &&lang, std::initializer_list<std::string> &&v) {
+    return array_helpers::make_elem<ProgrammingLangs, std::vector<std::string>>(
+        std::move(lang), std::move(v));
+}
 
 bool findCompiler(ProgrammingLangs lang, std::string &path) {
     static const auto compilers =
         array_helpers::make<static_cast<int>(ProgrammingLangs::MAX),
                             ProgrammingLangs, const std::vector<std::string>>(
-            COMPILER(ProgrammingLangs::C, "clang", "gcc", "cc"),
-            COMPILER(ProgrammingLangs::CXX, "clang++", "g++", "c++"),
-            COMPILER(ProgrammingLangs::GO, "go"),
-            COMPILER(ProgrammingLangs::PYTHON, "python", "python3"));
+            COMPILER(ProgrammingLangs::C, {"clang", "gcc", "cc"}),
+            COMPILER(ProgrammingLangs::CXX, {"clang++", "g++", "c++"}),
+            COMPILER(ProgrammingLangs::GO, {"go"}),
+            COMPILER(ProgrammingLangs::PYTHON, {"python", "python3"}));
     for (const auto &options : array_helpers::find(compilers, lang)->second) {
         auto ret = findCommandExe(options);
         if (ret) {

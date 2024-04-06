@@ -29,23 +29,22 @@ void SocketInterfaceUnix::startListening(const listener_callback_t& listen_cb,
                 struct sockaddr_un addr {};
                 struct TgBotConnection conn {};
                 socklen_t len = sizeof(addr);
-                struct pollfd fds[] = {{
-                                           .fd = listen_fd,
-                                           .events = POLLIN,
-                                           .revents = 0,
-                                       },
-                                       {
-                                           .fd = sfd,
-                                           .events = POLLIN,
-                                           .revents = 0,
-
-                                       }};
-                const pollfd& listen_fd_poll = fds[0];
-                const pollfd& socket_fd_poll = fds[1];
+                std::array<struct pollfd, 2> fds = {};
+                const struct pollfd listen_fd_poll = {
+                    .fd = listen_fd,
+                    .events = POLLIN,
+                    .revents = 0,
+                };
+                const struct pollfd socket_fd_poll = {
+                    .fd = sfd,
+                    .events = POLLIN,
+                    .revents = 0,
+                };
+                fds = {listen_fd_poll, socket_fd_poll};
 
                 DLOG(INFO) << "Waiting for incoming events";
 
-                rc = poll(fds, sizeof(fds) / sizeof(pollfd), -1);
+                rc = poll(fds.data(), fds.size(), -1);
                 if (rc < 0) {
                     PLOG(ERROR) << "Poll failed";
                     break;
@@ -55,7 +54,7 @@ void SocketInterfaceUnix::startListening(const listener_callback_t& listen_cb,
                     LOG(WARNING) << "Dropping incoming buffer: exiting";
                 }
                 if (listen_fd_poll.revents & POLLIN) {
-                    dummy_listen_buf_t buf;
+                    dummy_listen_buf_t buf = {};
                     ssize_t rc =
                         read(listen_fd, &buf, sizeof(dummy_listen_buf_t));
                     if (rc < 0) PLOG(ERROR) << "Reading data from forcestop fd";
@@ -69,8 +68,8 @@ void SocketInterfaceUnix::startListening(const listener_callback_t& listen_cb,
                     break;
                 }
 
-                const socket_handle_t cfd =
-                    accept(sfd, (struct sockaddr*)&addr, &len);
+                const socket_handle_t cfd = accept(
+                    sfd, reinterpret_cast<struct sockaddr*>(&addr), &len);
 
                 if (!isValidSocketHandle(cfd)) {
                     PLOG(ERROR) << "Accept failed";
@@ -78,7 +77,7 @@ void SocketInterfaceUnix::startListening(const listener_callback_t& listen_cb,
                 } else {
                     doGetRemoteAddr(cfd);
                 }
-                const int count = read(cfd, &conn, sizeof(conn));
+                const ssize_t count = read(cfd, &conn, sizeof(conn));
                 should_break = handleIncomingBuf(
                     count, conn, listen_cb, [] { return strerror(errno); });
                 close(cfd);
@@ -94,7 +93,7 @@ void SocketInterfaceUnix::startListening(const listener_callback_t& listen_cb,
 void SocketInterfaceUnix::writeToSocket(struct TgBotConnection conn) {
     const socket_handle_t sfd = createClientSocket();
     if (isValidSocketHandle(sfd)) {
-        const int count = write(sfd, &conn, sizeof(conn));
+        const ssize_t count = write(sfd, &conn, sizeof(conn));
         if (count < 0) {
             PLOG(ERROR) << "Failed to write to socket";
         }
@@ -105,7 +104,7 @@ void SocketInterfaceUnix::writeToSocket(struct TgBotConnection conn) {
 void SocketInterfaceUnix::forceStopListening(void) {
     if (isValidFd(notify_fd) && isValidSocketHandle(listen_fd)) {
         dummy_listen_buf_t d = {};
-        int count;
+        ssize_t count = 0;
 
         count = write(notify_fd, &d, sizeof(dummy_listen_buf_t));
         if (count < 0) {

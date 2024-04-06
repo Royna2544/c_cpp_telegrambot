@@ -15,7 +15,7 @@
 #include "initcalls/Initcall.hpp"
 #include "internal/_class_helper_macros.h"
 
-static inline const char kDatabaseFile[] = "tgbot.pb";
+constexpr std::string_view kDatabaseFile = "tgbot.pb";
 
 namespace database {
 

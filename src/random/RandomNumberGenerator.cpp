@@ -6,6 +6,7 @@
 #include <cassert>
 #include <memory>
 #include <random>
+#include <string_view>
 
 #include "KernelRandEngine.h"
 #include "RDRandEngine.h"
@@ -71,7 +72,7 @@ struct RNGBase {
      *
      * @return     A string containing the name of the RNG.
      */
-    virtual const char* getName() const = 0;
+    virtual const std::string_view getName() const = 0;
 
     /**
      * @brief      Shuffles the elements in a container using the specified
@@ -121,6 +122,7 @@ struct RNGBase {
         std::uniform_int_distribution<return_type> distribution(min, max);
         return distribution(gen);
     }
+    virtual ~RNGBase() = default;
 };
 
 struct StdCpp : RNGBase {
@@ -146,7 +148,8 @@ struct StdCpp : RNGBase {
         shuffle(it);
     }
 
-    const char* getName(void) const override { return "STD C++ pesudo RNG"; }
+    const std::string_view getName(void) const override { return "STD C++ pesudo RNG"; }
+    ~StdCpp() override = default;
 };
 
 #ifdef RDRAND_MAYBE_SUPPORTED
@@ -157,7 +160,7 @@ struct RDRand : RNGBase {
     }
 
     bool supported(void) const override {
-        unsigned int eax, ebx, ecx, edx;
+        unsigned int eax = 0, ebx = 0, ecx = 0, edx = 0;
 
         if (__get_cpuid(1, &eax, &ebx, &ecx, &edx) == 0) {
             LOG(WARNING) << "CPUID information is not available";
@@ -175,9 +178,10 @@ struct RDRand : RNGBase {
         shuffle(it);
     }
 
-    const char* getName() const override {
+    const std::string_view getName() const override {
         return "X86 RDRAND instr. HWRNG (Intel/AMD)";
     }
+    ~RDRand() override = default;
 };
 #endif
 
@@ -201,9 +205,10 @@ struct KernelRand : RNGBase {
         shuffle(it);
     }
 
-    const char* getName() const override {
+    const std::string_view getName() const override {
         return "Linux/MacOS HWRNG interface";
     }
+    ~KernelRand() override = default;
 };
 #endif
 

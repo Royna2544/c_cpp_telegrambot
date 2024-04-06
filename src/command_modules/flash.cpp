@@ -10,11 +10,13 @@
 #include "CommandModule.h"
 #include "ResourceManager.h"
 
+constexpr std::string_view kZipExtensionSuffix = ".zip";
+constexpr int FLASH_DELAY_MAX_SEC = 5;
+
 static void FlashCommandFn(const Bot &bot, const Message::Ptr message) {
     static std::vector<std::string> reasons;
     static std::once_flag once;
     static std::regex kFlashTextRegEX(R"(Flashing '\S+.zip'\.\.\.)");
-    static const char kZipExtentionSuffix[] = ".zip";
     std::string msg;
     std::stringstream ss;
     Message::Ptr sentmsg;
@@ -46,12 +48,12 @@ static void FlashCommandFn(const Bot &bot, const Message::Ptr message) {
         return;
     }
     std::replace(msg.begin(), msg.end(), ' ', '_');
-    if (!StringTools::endsWith(msg, kZipExtentionSuffix)) {
-        msg += kZipExtentionSuffix;
+    if (!StringTools::endsWith(msg, std::string(kZipExtensionSuffix))) {
+        msg += kZipExtensionSuffix;
     }
     ss << "Flashing '" << msg << "'..." << std::endl;
     sentmsg = bot_sendReplyMessage(bot, message, ss.str());
-    std::this_thread::sleep_for(std::chrono::seconds(genRandomNumber(5)));
+    std::this_thread::sleep_for(std::chrono::seconds(genRandomNumber(FLASH_DELAY_MAX_SEC)));
     if (const random_return_type pos = genRandomNumber(reasons.size());
         pos != reasons.size()) {
         ss << "Failed successfully!" << std::endl;

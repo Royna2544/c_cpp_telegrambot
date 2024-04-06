@@ -19,12 +19,12 @@
 
 void SocketInterfaceUnixIPv4::foreach_ipv4_interfaces(
     const std::function<void(const char*, const char*)> callback) {
-    struct ifaddrs *addrs, *tmp;
+    struct ifaddrs *addrs = nullptr, *tmp = nullptr;
     getifaddrs(&addrs);
     tmp = addrs;
     while (tmp) {
         if (tmp->ifa_addr && tmp->ifa_addr->sa_family == AF_INET) {
-            struct sockaddr_in* pAddr = (struct sockaddr_in*)tmp->ifa_addr;
+            struct sockaddr_in* pAddr = reinterpret_cast<struct sockaddr_in*>(tmp->ifa_addr);
             callback(tmp->ifa_name, inet_ntoa(pAddr->sin_addr));
         }
         tmp = tmp->ifa_next;
@@ -50,7 +50,7 @@ socket_handle_t SocketInterfaceUnixIPv4::createServerSocket() {
     });
     foreach_ipv4_interfaces(
         [&iface_done, sfd](const char* iface, const char* addr) {
-            if (!iface_done && strncmp("lo", iface, 2)) {
+            if (!iface_done && strncmp("lo", iface, 2) != 0) {
                 LOG(INFO) << "Choosing ifname " << iface << ": addr " << addr;
 
                 SocketHelperUnix::setSocketBindingToIface(sfd, iface);

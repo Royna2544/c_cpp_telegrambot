@@ -29,7 +29,7 @@ bool RTCommandLoader::loadOneCommand(std::filesystem::path _fname) {
     struct CommandModule* mod = nullptr;
     command_callback_t fn;
     Dl_info info{};
-    void *handle, *fnptr = nullptr;
+    void *handle = nullptr, *fnptr = nullptr;
     const char* dlerrorBuf = nullptr;
     bool isSupported = true;
     const std::string fname = FS::appendDylibExtension(_fname).string();

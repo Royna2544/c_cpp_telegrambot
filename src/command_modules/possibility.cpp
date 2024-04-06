@@ -42,7 +42,7 @@ static void PossibilityCommandFn(const Bot &bot, const Message::Ptr message) {
     vec.pop_back();
     int total = 0;
     for (const auto &cond : vec) {
-        int thisper = 0;
+        random_return_type thisper = 0;
         if (total < PERCENT_MAX) {
             thisper = genRandomNumber(PERCENT_MAX - total);
             if (total + thisper >= PERCENT_MAX) {

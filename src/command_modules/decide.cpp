@@ -12,6 +12,7 @@ using std::chrono_literals::operator""s;
 
 static void DecideCommandFn(const Bot &bot, const Message::Ptr message) {
     constexpr int COUNT_MAX = 10;
+    constexpr int RANDOM_RANGE_NUM = 10;
 
     if (hasExtArgs(message)) {
         std::string obj;
@@ -25,7 +26,7 @@ static void DecideCommandFn(const Bot &bot, const Message::Ptr message) {
         msgtxt << std::endl << std::endl;
         do {
             msgtxt << "Try " + std::to_string(COUNT_MAX - count + 1) + " : ";
-            if (genRandomNumber(10) % 2 == 1) {
+            if (genRandomNumber(RANDOM_RANGE_NUM) % 2 == 1) {
                 msgtxt << "Yes";
                 ++yesno;
             } else {

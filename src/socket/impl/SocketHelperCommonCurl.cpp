@@ -4,8 +4,8 @@
 #include "../SocketInterfaceBase.h"
 
 void SocketHelperCommon::printExternalIPINet() {
-    CURL *curl;
-    CURLcode res;
+    CURL *curl = nullptr;
+    CURLcode res = {};
 
     // Initialize libcurl
     curl = curl_easy_init();
@@ -31,9 +31,9 @@ void SocketHelperCommon::printExternalIPINet() {
 }
 
 size_t SocketHelperCommon::externalIPCallback(void *contents, size_t size,
-                                              size_t nmemb, void *userp) {
+                                              size_t nmemb, void */*userp*/) {
     std::string s;
-    s.append((char *)contents, size * nmemb);
+    s.append(static_cast<char *>(contents), size * nmemb);
 
     LOG(INFO) << "External IP addr: " << s;
     return size * nmemb;

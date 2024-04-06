@@ -19,16 +19,16 @@
 
 void SocketInterfaceUnixIPv6::foreach_ipv6_interfaces(
     const std::function<void(const char*, const char*)> callback) {
-    struct ifaddrs *addrs, *tmp;
+    struct ifaddrs *addrs = nullptr, *tmp = nullptr;
     getifaddrs(&addrs);
     tmp = addrs;
     while (tmp) {
         if (tmp->ifa_addr && tmp->ifa_addr->sa_family == AF_INET6) {
-            struct sockaddr_in6* pAddr = (struct sockaddr_in6*)tmp->ifa_addr;
-            char ipStr[INET6_ADDRSTRLEN];
+            struct sockaddr_in6* pAddr = reinterpret_cast<struct sockaddr_in6*>(tmp->ifa_addr);
+            std::array<char, INET6_ADDRSTRLEN> ipStr;
 
-            inet_ntop(AF_INET6, &(pAddr->sin6_addr), ipStr, INET6_ADDRSTRLEN);
-            callback(tmp->ifa_name, ipStr);
+            inet_ntop(AF_INET6, &(pAddr->sin6_addr), ipStr.data(), INET6_ADDRSTRLEN);
+            callback(tmp->ifa_name, ipStr.data());
         }
         tmp = tmp->ifa_next;
     }
@@ -53,7 +53,7 @@ socket_handle_t SocketInterfaceUnixIPv6::createServerSocket() {
     });
     foreach_ipv6_interfaces(
         [&iface_done, sfd](const char* iface, const char* addr) {
-            if (!iface_done && strncmp("lo", iface, 2)) {
+            if (!iface_done && strncmp("lo", iface, 2) != 0) {
                 LOG(INFO) << "Choosing ifname " << iface << ": addr " << addr;
 
                 SocketHelperUnix::setSocketBindingToIface(sfd, iface);

@@ -117,7 +117,7 @@ struct SocketInterfaceBase : SingleThreadCtrlRunnable<SocketInterfacePriv> {
      * @return true if the incoming data was handled successfully, false
      * otherwise.
      */
-    [[nodiscard]] bool handleIncomingBuf(const size_t len,
+    [[nodiscard]] bool handleIncomingBuf(const ssize_t len,
                                          struct TgBotConnection &conn,
                                          const listener_callback_t &cb,
                                          std::function<char *(void)> errMsgFn);

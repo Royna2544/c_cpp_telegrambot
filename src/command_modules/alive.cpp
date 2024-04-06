@@ -6,12 +6,12 @@
 #include <boost/config.hpp>
 #include <filesystem>
 #include <mutex>
-#include <string>
+#include <string_view>
 
 #include "CommandModule.h"
 #include "internal/_tgbot.h"
 
-constexpr char kysGif[] =
+constexpr std::string_view kysGif =
     "CgACAgIAAx0CdMESqgACCZRlrfMoq_"
     "b2DL21k6ohShQzzLEh6gACsw4AAuSZWUmmR3jSJA9WxzQE";
 
@@ -42,7 +42,7 @@ static void AliveCommandFn(const Bot &bot, const Message::Ptr message) {
     });
     try {
         // Hardcoded kys GIF
-        bot.getApi().sendAnimation(message->chat->id, kysGif, 0, 0, 0, "",
+        bot.getApi().sendAnimation(message->chat->id, kysGif.data(), 0, 0, 0, "",
                                    version, message->messageId, nullptr,
                                    "html");
     } catch (const TgBot::TgException &e) {
