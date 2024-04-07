@@ -3,7 +3,6 @@
 #include "CommandModule.h"
 #include "StringToolsExt.h"
 #include "compiler/CompilerInTelegram.h"
-#include "gen/cmds.gen.h"
 
 static void CModuleCallback(const Bot &bot, const Message::Ptr &message,
                             std::string compiler) {
@@ -34,10 +33,6 @@ static CompilerModule modulePython("python", ProgrammingLangs::PYTHON,
 static CompilerModule moduleGolang("go", ProgrammingLangs::GO,
                                    GOModuleCallback);
 
-std::vector<CommandModule *> CommandModule::getLoadedModules() {
-    return gCmdModules;
-}
-
 std::string CommandModule::getLoadedModulesString() {
     std::stringstream ss;
     std::string outbuf;
@@ -52,7 +47,7 @@ std::string CommandModule::getLoadedModulesString() {
 
 void CommandModule::updateBotCommands(const Bot &bot) {
     std::vector<BotCommand::Ptr> buffer;
-    for (const auto &cmd : gCmdModules) {
+    for (const auto &cmd : getLoadedModules()) {
         if (!cmd->isHideDescription()) {
             auto onecommand = std::make_shared<CommandModule>(cmd);
             if (cmd->isEnforced()) onecommand->description += " (Owner)";
@@ -118,6 +113,6 @@ void CommandModule::loadCompilerModule(
     for (auto &module : list) {
         bot_AddCommandEnforcedCompiler(bot, module->command, module->lang,
                                        module->cb);
-        gCmdModules.emplace_back(module);
+        getLoadedModules().emplace_back(module);
     }
 }

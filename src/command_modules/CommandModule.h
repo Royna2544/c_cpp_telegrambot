@@ -29,7 +29,7 @@ struct CommandModule : TgBot::BotCommand, BotInitCall {
      * Returns a string containing the names of all loaded modules, separated by
      * spaces.
      */
-    static std::vector<CommandModule *> getLoadedModules();
+    static std::vector<CommandModule *> &getLoadedModules();
 
     /**
      * Adds a list of CompilerModules to the bot.

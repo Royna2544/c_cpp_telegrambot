@@ -1,7 +1,11 @@
-#include <gen/cmds.gen.h>
+#include <vector>
+#include <command_modules/CommandModule.h>
 
 @COMMANDS_MODULES_DECL@
 
-std::vector<CommandModule *> gCmdModules = {
-   @COMMANDS_MODULES_PTR@
-};
+std::vector<CommandModule *> &CommandModule::getLoadedModules() {
+   static std::vector<CommandModule *> gCmdModules = {
+      @COMMANDS_MODULES_PTR@
+   };
+   return gCmdModules;
+}
