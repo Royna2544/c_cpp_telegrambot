@@ -201,6 +201,7 @@ int main(int argc, char* const* argv) {
         } catch (const std::exception& e) {
             LOG(ERROR) << "Uncaught Exception: ", e.what();
             LOG(ERROR) << "Throwing exception to the main thread";
+            defaultCleanupFunction();
             throw;
         }
     } while (true);
