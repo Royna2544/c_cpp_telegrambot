@@ -1,5 +1,4 @@
 #include <Authorization.h>
-#include <BotAddCommand.h>
 #include <ConfigManager.h>
 #include <Database.h>
 #include <RegEXHandler.h>
@@ -10,19 +9,17 @@
 #include <absl/log/initialize.h>
 #include <absl/log/internal/flags.h>
 #include <absl/log/log.h>
+#include <absl/log/log_sink.h>
+#include <absl/log/log_sink_registry.h>
+#include <absl/strings/str_split.h>
 #include <command_modules/CommandModule.h>
 #include <internal/_std_chrono_templates.h>
-#include <libos/libfs.h>
 #include <libos/libsighandler.h>
 #include <socket/SocketInterfaceBase.h>
 
 #include <OnAnyMessageRegister.hpp>
-#include <initcalls/BotInitcall.hpp>
-#include <type_traits>
 
-#include "absl/log/log_sink.h"
-#include "absl/log/log_sink_registry.h"
-#include "absl/strings/str_split.h"
+#include "DurationPoint.hpp"
 
 #ifdef RTCOMMAND_LOADER
 #include <RTCommandLoader.h>
@@ -34,9 +31,6 @@
 #include <socket/bot/SocketInterfaceInit.hpp>
 #endif
 #include <tgbot/tgbot.h>
-
-// wingdi.h
-#undef ERROR
 
 // tgbot
 using TgBot::TgLongPoll;
@@ -161,8 +155,7 @@ int main(int argc, char* const* argv) {
     installSignalHandler();
 
     DLOG(INFO) << "Token: " << token;
-    auto CurrentTp = std::chrono::system_clock::now();
-    auto LastTp = std::chrono::system_clock::from_time_t(0);
+    DurationPoint dp;
     do {
         try {
             LOG(INFO) << "Bot username: " << gBot.getApi().getMe()->username;
@@ -184,14 +177,12 @@ int main(int argc, char* const* argv) {
                 LOG(FATAL) << e.what();
                 break;
             }
-            CurrentTp = std::chrono::system_clock::now();
-            if (to_secs(CurrentTp - LastTp).count() < 30 &&
-                std::chrono::system_clock::to_time_t(LastTp) != 0) {
+            if (dp.get() < kErrorMaxDuration) {
                 bot_sendMessage(gBot, ownerid, "Recover failed.");
                 LOG(FATAL) << "Recover failed";
                 break;
             }
-            LastTp = CurrentTp;
+            dp.init();
             bot_sendMessage(gBot, ownerid, "Reinitializing.");
             LOG(INFO) << "Re-init";
             gAuthorized = false;

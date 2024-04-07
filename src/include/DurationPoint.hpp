@@ -18,7 +18,7 @@ struct DurationPoint {
             return to_msecs(std::chrono::high_resolution_clock::now() - tp);
         } else {
             LOG(ERROR) << "Timer didn't start yet";
-            return std::chrono::milliseconds(0);
+            return std::chrono::milliseconds::min();
         }
     }
 

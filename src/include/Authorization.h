@@ -21,6 +21,7 @@ enum AuthorizeFlags : int {
 
 constexpr std::chrono::seconds kMaxTimestampDelay = std::chrono::seconds(10);
 constexpr std::chrono::seconds kErrorRecoveryDelay = std::chrono::seconds(7);
+constexpr std::chrono::seconds kErrorMaxDuration = std::chrono::seconds(30);
 static_assert(kMaxTimestampDelay > kErrorRecoveryDelay);
 
 /**
