@@ -23,7 +23,7 @@ bool SocketHelperCommon::_isAvailable(SocketInterfaceBase *it,
         } catch (...) {
             LOG(ERROR) << "Illegal value for " << kPortEnvVar << ": " << port;
         }
-        DLOG(INFO) << "Chosen port: " << portNum;
+        LOG(INFO) << "Chosen port: " << portNum;
     }
     it->setOptions(SocketInterfaceBase::Options::DESTINATION_PORT,
                    std::to_string(portNum), true);

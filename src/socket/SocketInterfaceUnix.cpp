@@ -30,17 +30,18 @@ void SocketInterfaceUnix::startListening(const listener_callback_t& listen_cb,
                 struct TgBotConnection conn {};
                 socklen_t len = sizeof(addr);
                 std::array<struct pollfd, 2> fds = {};
-                const struct pollfd listen_fd_poll = {
+                fds[0] = {
                     .fd = listen_fd,
                     .events = POLLIN,
                     .revents = 0,
                 };
-                const struct pollfd socket_fd_poll = {
+                fds[1] = {
                     .fd = sfd,
                     .events = POLLIN,
                     .revents = 0,
                 };
-                fds = {listen_fd_poll, socket_fd_poll};
+                const struct pollfd& listen_fd_poll = fds[0];
+                const struct pollfd& socket_fd_poll = fds[1];
 
                 DLOG(INFO) << "Waiting for incoming events";
 
@@ -61,7 +62,7 @@ void SocketInterfaceUnix::startListening(const listener_callback_t& listen_cb,
                     closeFd(listen_fd);
                     break;
                 } else if (!(socket_fd_poll.revents & POLLIN)) {
-                    LOG(ERROR)
+                    PLOG(ERROR)
                         << "Unexpected state: sfd.revents: "
                         << socket_fd_poll.revents
                         << ", listen_fd.revents: " << listen_fd_poll.revents;

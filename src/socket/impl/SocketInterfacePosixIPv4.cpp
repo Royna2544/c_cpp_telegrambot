@@ -51,7 +51,7 @@ socket_handle_t SocketInterfaceUnixIPv4::createServerSocket() {
     foreach_ipv4_interfaces(
         [&iface_done, sfd](const char* iface, const char* addr) {
             if (!iface_done && strncmp("lo", iface, 2) != 0) {
-                LOG(INFO) << "Choosing ifname " << iface << ": addr " << addr;
+                LOG(INFO) << "Choosing ifname " << iface;
 
                 SocketHelperUnix::setSocketBindingToIface(sfd, iface);
                 iface_done = true;
