@@ -78,7 +78,7 @@ const std::string& ResourceManager::getResource(std::filesystem::path path) {
         }
     }
     LOG(ERROR) << "Resource not found: " << path;
-    return empty;
+    throw std::runtime_error(std::string("Resource not found: ") + path.string());
 }
 
 DECLARE_CLASS_INST(ResourceManager);

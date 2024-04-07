@@ -24,5 +24,4 @@ struct ResourceManager : public InstanceClassBase<ResourceManager>, InitCall {
     std::vector<std::string> ignoredResources;
     std::once_flag m_once;
     static constexpr char kResourceLoadIgnoreFile[] = ".loadignore";
-    const static inline std::string empty;
 };
