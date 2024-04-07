@@ -100,33 +100,32 @@ struct LogFileSink : absl::LogSink {
 };
 
 int main(int argc, char* const* argv) {
-    std::string token;
+    std::optional<std::string> token;
     std::optional<LogFileSink> log_sink;
 
     absl::InitializeLog();
     copyCommandLine(CommandLineOp::INSERT, &argc, &argv);
+    if (ConfigManager::getVariable("help")) {
+        ConfigManager::printHelp();
+        return EXIT_SUCCESS;
+    }
     if (const auto it = ConfigManager::getVariable("LOG_FILE"); it) {
         log_sink = LogFileSink();
         log_sink->init(*it);
         absl::AddLogSink(&log_sink.value());
         LOG(INFO) << "Register LogSink_file: " << it.value();
     }
-    if (ConfigManager::getVariable("help")) {
-        ConfigManager::printHelp();
-        return EXIT_SUCCESS;
-    }
-    auto ret = ConfigManager::getVariable("TOKEN");
-    if (!ret) {
+    token = ConfigManager::getVariable("TOKEN");
+    if (!token) {
         LOG(FATAL) << "Failed to get TOKEN variable";
         return EXIT_FAILURE;
     }
-    token = ret.value();
 
 #ifdef HAVE_CURL
     static TgBot::CurlHttpClient cli;
-    static Bot gBot(token, cli);
+    static Bot gBot(token.value(), cli);
 #else
-    static Bot gBot(token);
+    static Bot gBot(token.value());
 #endif
 
     createAndDoInitCall<RTCommandLoader>(gBot);
@@ -142,7 +141,7 @@ int main(int argc, char* const* argv) {
 
     installSignalHandler();
 
-    DLOG(INFO) << "Token: " << token;
+    DLOG(INFO) << "Token: " << token.value();
     DurationPoint dp;
     do {
         try {
