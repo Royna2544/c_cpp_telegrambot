@@ -11,6 +11,7 @@
 #include <optional>
 
 #include "BotClassBase.h"
+#include "CStringLifetime.h"
 #include "InstanceClassBase.hpp"
 #include "initcalls/Initcall.hpp"
 #include "internal/_class_helper_macros.h"
@@ -139,7 +140,7 @@ struct DatabaseWrapperBotImpl : public DatabaseWrapperImpl,
     void load() override;
 
     void doInitCall() override { load(); }
-    const char* getInitCallName() const override {
+    const CStringLifetime getInitCallName() const override {
         return "Load database, including white/black list";
     }
 };

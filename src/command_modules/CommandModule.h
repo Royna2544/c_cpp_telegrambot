@@ -56,7 +56,7 @@ struct CommandModule : TgBot::BotCommand, BotInitCall {
         loadCommandModules(bot);
         updateBotCommands(bot);
     }
-    const char *getInitCallName() const override {
+    const CStringLifetime getInitCallName() const override {
         return "Load/update default modules";
     }
 };

@@ -4,11 +4,14 @@
 #include <tgbot/types/Message.h>
 
 #include <functional>
+#include <string_view>
 #include <vector>
 
 #include "Authorization.h"
-#include "initcalls/BotInitcall.hpp"
+#include "CStringLifetime.h"
+#include "CompileTimeStringConcat.hpp"
 #include "InstanceClassBase.hpp"
+#include "initcalls/BotInitcall.hpp"
 
 using TgBot::Bot;
 using TgBot::Message;
@@ -28,8 +31,13 @@ struct OnAnyMessageRegisterer : InstanceClassBase<OnAnyMessageRegisterer>,
             }
         });
     }
-    const char* getInitCallName() const override {
+    const CStringLifetime getInitCallName() const override {
         return "Register onAnyMessage callbacks";
+    }
+
+    template <unsigned Len>
+    static consteval auto getInitCallNameForClient(const char (&str)[Len]) {
+        return StringConcat::cat("Register onAnyMessage callbacks: ", str);
     }
 
    private:

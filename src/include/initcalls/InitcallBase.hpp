@@ -2,6 +2,7 @@
 
 #include <absl/log/log.h>
 #include "../DurationPoint.hpp"
+#include "../CStringLifetime.h"
 
 struct InitcallBase {
     /**
@@ -9,14 +10,14 @@ struct InitcallBase {
      *
      * @return The name of the initcall's work
      */
-    virtual const char* getInitCallName() const = 0;
+    virtual const CStringLifetime getInitCallName() const = 0;
 
     DurationPoint onStart() {
-        DLOG(INFO) << getInitCallName() << ": +++";
+        DLOG(INFO) << getInitCallName().get() << ": +++";
         return DurationPoint();
     }
 
     void onEnd(DurationPoint& dp) {
-        DLOG(INFO) << getInitCallName() << ": --- (" << dp.get().count() << "ms)";
+        DLOG(INFO) << getInitCallName().get() << ": --- (" << dp.get().count() << "ms)";
     }
 };

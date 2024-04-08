@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <vector>
 
+#include "CStringLifetime.h"
 #include "InstanceClassBase.hpp"
 #include "initcalls/BotInitcall.hpp"
 
@@ -50,7 +51,7 @@ struct RTCommandLoader : public InstanceClassBase<RTCommandLoader>,
     void doInitCall(Bot& bot) override {
         loadCommandsFromFile(getModulesLoadConfPath());
     }
-    const char * getInitCallName() const override {
+    const CStringLifetime getInitCallName() const override {
         return "Load commands from file";
     }
 

@@ -6,6 +6,7 @@
 #include <tgbot/types/User.h>
 #include <memory>
 
+#include "CStringLifetime.h"
 #include "SingleThreadCtrl.h"
 #include "BotClassBase.h"
 #include "initcalls/BotInitcall.hpp"
@@ -83,8 +84,8 @@ struct SpamBlockManager : SpamBlockBase, BotClassBase, BotInitCall {
                 spamMgr->addMessage(message);
             });
     }
-    const char *getInitCallName() const override {
-        return "Register spamblock anymsg callback and start thread";
+    const CStringLifetime getInitCallName() const override {
+        return OnAnyMessageRegisterer::getInitCallNameForClient("SpamBlock");
     }
 
    private:

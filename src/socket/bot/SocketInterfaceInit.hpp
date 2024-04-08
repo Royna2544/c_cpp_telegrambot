@@ -3,6 +3,7 @@
 
 #include <socket/getter/SocketInterfaceGetter.hpp>
 
+#include "CStringLifetime.h"
 #include "initcalls/BotInitcall.hpp"
 
 struct SocketInterfaceInit : BotInitCall {
@@ -29,7 +30,7 @@ struct SocketInterfaceInit : BotInitCall {
             intf->run();
         }
     }
-    const char * getInitCallName() const override {
+    const CStringLifetime getInitCallName() const override {
         return "Create sockets and setup";
     }
 };

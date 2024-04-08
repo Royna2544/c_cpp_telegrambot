@@ -9,9 +9,10 @@
 #include <vector>
 
 #include "BotClassBase.h"
+#include "CStringLifetime.h"
 #include "InstanceClassBase.hpp"
-#include "initcalls/BotInitcall.hpp"
 #include "OnAnyMessageRegister.hpp"
+#include "initcalls/BotInitcall.hpp"
 
 using std::regex_constants::syntax_option_type;
 using TgBot::Bot;
@@ -71,7 +72,10 @@ struct RegexHandlerBase {
         const Message::Ptr& regexCommand, const std::string& text);
 };
 
-struct RegexHandler : public RegexHandlerBase, BotClassBase, BotInitCall, InstanceClassBase<RegexHandler> {
+struct RegexHandler : public RegexHandlerBase,
+                      BotClassBase,
+                      BotInitCall,
+                      InstanceClassBase<RegexHandler> {
     explicit RegexHandler(const Bot& bot) : BotClassBase(bot) {}
     RegexHandler() = delete;
     virtual ~RegexHandler() override = default;
@@ -91,7 +95,7 @@ struct RegexHandler : public RegexHandlerBase, BotClassBase, BotInitCall, Instan
                 processRegEXCommandMessage(message);
             });
     }
-    const char* getInitCallName() const override {
-        return "Add regexhandler anymessage callback";
+    const CStringLifetime getInitCallName() const override {
+        return OnAnyMessageRegisterer::getInitCallNameForClient("RegexHandler");
     }
 };

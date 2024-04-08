@@ -9,7 +9,7 @@ namespace StringConcat {
 template <unsigned N>
 struct String {
     char c[N];
-    operator std::string_view() const { return std::string_view(c, N - 1); }
+    constexpr operator std::string_view() const { return std::string_view(c, N - 1); }
     operator std::string() const { return std::string(c, N - 1); }
 };
 

@@ -5,6 +5,7 @@
 
 #include <vector>
 
+#include "CStringLifetime.h"
 #include "initcalls/BotInitcall.hpp"
 #include "InstanceClassBase.hpp"
 #include "OnAnyMessageRegister.hpp"
@@ -34,7 +35,7 @@ struct ChatObserver : BotInitCall, InstanceClassBase<ChatObserver> {
                     process(message);
             });
     }
-    const char* getInitCallName() const override {
-        return "Register ChatObserver AnyMessageHandler";
+    const CStringLifetime getInitCallName() const override {
+        return OnAnyMessageRegisterer::getInitCallNameForClient("ChatObserver");
     }
 };
