@@ -6,12 +6,16 @@
 #include <rapidjson/document.h>
 #include <rapidjson/rapidjson.h>
 
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <mutex>
+#include <optional>
 
+#include "Database.h"
 #include "ResourceManager.h"
 #include "SingleThreadCtrl.h"
+#include "internal/_std_chrono_templates.h"
 #include "socket/TgBotSocket.h"
 #include "tgbot/types/InputFile.h"
 
@@ -53,6 +57,7 @@ static std::string getMIMEString(const std::string& path) {
 void socketConnectionHandler(const Bot& bot, struct TgBotConnection conn) {
     auto _data = conn.data;
     auto& obs = ChatObserver::getInstance();
+    static std::optional<std::chrono::system_clock::time_point> startTp;
 
     switch (conn.cmd) {
         case CMD_WRITE_MSG_TO_CHAT_ID:
@@ -158,7 +163,7 @@ void socketConnectionHandler(const Bot& bot, struct TgBotConnection conn) {
         } break;
         case CMD_DELETE_CONTROLLER_BY_ID: {
             int data = _data.data_7;
-            enum SingleThreadCtrlManager::ThreadUsage threadUsage {};
+            enum SingleThreadCtrlManager::ThreadUsage threadUsage{};
             if (data < 0 || data >= SingleThreadCtrlManager::USAGE_MAX) {
                 LOG(ERROR) << "Invalid controller id: " << data;
                 break;
@@ -168,8 +173,31 @@ void socketConnectionHandler(const Bot& bot, struct TgBotConnection conn) {
             SingleThreadCtrlManager::getInstance().destroyController(
                 threadUsage);
         } break;
+        case CMD_SET_STARTTIME: {
+            startTp = std::chrono::system_clock::from_time_t(_data.data_8);
+            break;
+        }
+        case CMD_GET_UPTIME: {
+            auto now = std::chrono::system_clock::now();
+            if (startTp) {
+                const auto diff = now - *startTp;
+                const auto& dbwrapper =
+                    database::DatabaseWrapperBotImplObj::getInstance();
+                LOG(INFO) << "Uptime: " << to_string(diff);
+                bot_sendMessage(bot, dbwrapper.maybeGetOwnerId(),
+                                "Uptime is " + to_string(diff));
+            } else {
+                LOG(ERROR) << "StartTp is not set";
+            }
+            break;
+        }
         default:
-            LOG(ERROR) << "Unhandled cmd: " << TgBotCmd::toStr(conn.cmd);
+            if (TgBotCmd::isClientCommand(conn.cmd)) {
+                LOG(ERROR) << "Unhandled cmd: " << TgBotCmd::toStr(conn.cmd);
+            } else {
+                LOG(WARNING) << "cmd ignored (as internal): "
+                             << static_cast<int>(conn.cmd);
+            }
             break;
     };
 }

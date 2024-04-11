@@ -12,8 +12,10 @@ bool SocketInterfaceBase::handleIncomingBuf(
             return false;
         }
 
-        LOG(INFO) << "Received buf with " << TgBotCmd::toStr(conn.cmd)
-                  << ", invoke callback!";
+        if (TgBotCmd::isClientCommand(conn.cmd)) {
+            LOG(INFO) << "Received buf with " << TgBotCmd::toStr(conn.cmd)
+                      << ", invoke callback!";
+        }
 
         if (conn.cmd == CMD_EXIT) {
             /**

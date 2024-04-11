@@ -94,8 +94,8 @@ int main(int argc, char** argv) {
     --argc;
 
     if (parseOneEnum(&cmd, CMD_MAX, *argv, "cmd")) {
-        if (cmd == CMD_EXIT) {
-            fprintf(stderr, "CMD_EXIT is not supported\n");
+        if (TgBotCmd::isInternalCommand(cmd)) {
+            fprintf(stderr, "Internal commands not supported\n");
         } else {
             // Remove cmd (argv[1])
             ++argv;
@@ -143,10 +143,14 @@ int main(int argc, char** argv) {
                         ret = stoi_or(argv[0], &data);
                         data_g.data_7 = data;
                     }
+                    case CMD_GET_UPTIME: {
+                        // Data is unused in this case
+                        ret = true;
+                    }
                     case CMD_MAX:
                         break;
                     default:
-                        LOG(FATAL) << "Unhandled command: " << cmd;
+                        LOG(FATAL) << "Unhandled command: " << TgBotCmd::toStr(cmd);
                 };
                 if (!ret)
                     fprintf(stderr, "Failed parsing arguments for %s\n",

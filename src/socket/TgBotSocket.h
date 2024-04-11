@@ -13,13 +13,19 @@ inline std::filesystem::path getSocketPath() {
 }
 
 enum TgBotCommand {
-    CMD_EXIT,
     CMD_WRITE_MSG_TO_CHAT_ID,
     CMD_CTRL_SPAMBLOCK,
     CMD_OBSERVE_CHAT_ID,
     CMD_SEND_FILE_TO_CHAT_ID,
     CMD_OBSERVE_ALL_CHATS,
     CMD_DELETE_CONTROLLER_BY_ID,
+    CMD_GET_UPTIME,
+    CMD_CLIENT_MAX,
+
+    // Below are internal commands
+    CMD_SERVER_INTERNAL_START = 100,
+    CMD_EXIT = CMD_SERVER_INTERNAL_START,
+    CMD_SET_STARTTIME,
     CMD_MAX,
 };
 
@@ -53,6 +59,22 @@ std::string toStr(TgBotCommand cmd);
  * @return required arg count of TgBotCommand
  */
 int toCount(TgBotCommand cmd);
+
+/**
+ * @brief Check if given command is a client command
+ *
+ * @param cmd TgBotCommand to check
+ * @return true if given command is a client command, false otherwise
+ */
+bool isClientCommand(TgBotCommand cmd);
+
+/**
+ * @brief Check if given command is an internal command
+ *
+ * @param cmd TgBotCommand to check
+ * @return true if given command is an internal command, false otherwise
+ */
+bool isInternalCommand(TgBotCommand cmd);
 
 /**
  * @brief Get help text for TgBotCommand
@@ -107,6 +129,8 @@ using ObserveAllChats = bool;
 
 using DeleteControllerById = int;
 
+using SetStartTime = std::time_t;
+
 }  // namespace TgBotCommandData
 
 union TgBotCommandUnion {
@@ -117,6 +141,7 @@ union TgBotCommandUnion {
     TgBotCommandData::SendFileToChatId data_5;
     TgBotCommandData::ObserveAllChats data_6;
     TgBotCommandData::DeleteControllerById data_7;
+    TgBotCommandData::SetStartTime data_8;
 };
 
 constexpr int64_t MAGIC_VALUE = 0xDEADFACE;

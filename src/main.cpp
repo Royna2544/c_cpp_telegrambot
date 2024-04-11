@@ -18,8 +18,12 @@
 #include <socket/SocketInterfaceBase.h>
 
 #include <OnAnyMessageRegister.hpp>
+#include <chrono>
 
 #include "DurationPoint.hpp"
+#include "SocketConnectionHandler.h"
+#include "internal/_class_helper_macros.h"
+#include "socket/TgBotSocket.h"
 
 #ifdef RTCOMMAND_LOADER
 #include <RTCommandLoader.h>
@@ -152,6 +156,11 @@ int main(int argc, char* const* argv) {
     createAndDoInitCall<OnAnyMessageRegisterer>(gBot);
 
     installSignalHandler();
+
+    TgBotConnection conn(
+        CMD_SET_STARTTIME,
+        {.data_8 = std::chrono::system_clock::to_time_t(startTp)});
+    socketConnectionHandler(gBot, conn);
 
     DLOG(INFO) << "Token: " << token.value();
     DurationPoint dp;
