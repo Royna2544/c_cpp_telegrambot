@@ -5,10 +5,13 @@
 #include <ResourceManager.h>
 #include <SingleThreadCtrl.h>
 #include <SpamBlock.h>
+#include <absl/flags/flag.h>
 #include <absl/log/initialize.h>
+#include <absl/log/internal/flags.h>
 #include <absl/log/log.h>
 #include <absl/log/log_sink.h>
 #include <absl/log/log_sink_registry.h>
+#include <absl/strings/str_split.h>
 #include <command_modules/CommandModule.h>
 #include <internal/_std_chrono_templates.h>
 #include <libos/libsighandler.h>
@@ -85,7 +88,15 @@ void createAndDoInitCall(void) {
 
 struct LogFileSink : absl::LogSink {
     void Send(const absl::LogEntry& entry) override {
-        fputs(entry.text_message_with_prefix_and_newline_c_str(), fp_);
+        for (absl::string_view line : absl::StrSplit(
+                 entry.text_message_with_prefix(), absl::ByChar('\n'))) {
+            // Overprint severe entries for emphasis:
+            for (int i = static_cast<int>(absl::LogSeverity::kInfo);
+                 i <= static_cast<int>(entry.log_severity()); i++) {
+                absl::FPrintF(fp_, "%s\r", line);
+            }
+            fputc('\n', fp_);
+        }
     }
     void init(const std::string& filename) {
         fp_ = fopen(filename.c_str(), "w");
@@ -103,6 +114,7 @@ int main(int argc, char* const* argv) {
     std::optional<std::string> token;
     std::optional<LogFileSink> log_sink;
 
+    absl::SetFlag(&FLAGS_stderrthreshold, 0);
     absl::InitializeLog();
     copyCommandLine(CommandLineOp::INSERT, &argc, &argv);
     if (ConfigManager::getVariable("help")) {

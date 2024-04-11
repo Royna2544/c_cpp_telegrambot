@@ -88,7 +88,7 @@ add_subdirectory(src/third-party/protobuf EXCLUDE_FROM_ALL)
 if (WIN32)
 add_subdirectory(src/third-party/dlfcn-win32 EXCLUDE_FROM_ALL)
 endif()
-link_libraries(absl::log absl::log_initialize)
+link_libraries(absl::log absl::log_initialize absl::log_flags absl::flags)
 #####################################################################
 
 ####################### Global compiler flags #######################
