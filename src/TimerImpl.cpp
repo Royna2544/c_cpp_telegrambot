@@ -7,19 +7,8 @@
 
 #include <chrono>
 #include <cmath>
-#include <sstream>
 
 #include "SingleThreadCtrl.h"
-
-template <class Dur>
-std::string to_string(const Dur out) {
-    const auto hms = std::chrono::hh_mm_ss(out);
-    std::stringstream ss;
-
-    ss << hms.hours().count() << "h " << hms.minutes().count() << "m "
-       << hms.seconds().count() << "s";
-    return ss.str();
-}
 
 bool TimerCommandManager::parseTimerArguments(const Bot &bot,
                                               const Message::Ptr &message,
