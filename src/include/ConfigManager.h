@@ -20,7 +20,7 @@ void printHelp();
 
 };  // namespace ConfigManager
 
-enum CommandLineOp { INSERT, GET };
+enum class CommandLineOp { INSERT, GET };
 
 /**
  * copyCommandLine - function used to obtain command line

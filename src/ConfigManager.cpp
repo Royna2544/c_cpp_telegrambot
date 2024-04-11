@@ -222,11 +222,11 @@ void copyCommandLine(CommandLineOp op, int *argc, char *const **argv) {
     static char *const *argv_internal = nullptr;
 
     switch (op) {
-        case INSERT:
+        case CommandLineOp::INSERT:
             argc_internal = *argc;
             argv_internal = *argv;
             break;
-        case GET:
+        case CommandLineOp::GET:
             *argv = argv_internal;
             *argc = argc_internal;
             break;
