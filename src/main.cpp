@@ -117,6 +117,7 @@ struct LogFileSink : absl::LogSink {
 int main(int argc, char* const* argv) {
     std::optional<std::string> token;
     std::optional<LogFileSink> log_sink;
+    const auto startTp = std::chrono::system_clock::now();
 
     absl::SetFlag(&FLAGS_stderrthreshold, 0);
     absl::InitializeLog();
@@ -157,9 +158,9 @@ int main(int argc, char* const* argv) {
 
     installSignalHandler();
 
-    TgBotConnection conn(
-        CMD_SET_STARTTIME,
-        {.data_8 = std::chrono::system_clock::to_time_t(startTp)});
+    TgBotCommandUnion timeData{
+        .data_8 = std::chrono::system_clock::to_time_t(startTp)};
+    TgBotConnection conn(CMD_SET_STARTTIME, timeData);
     socketConnectionHandler(gBot, conn);
 
     DLOG(INFO) << "Token: " << token.value();
