@@ -1,5 +1,8 @@
 #include "TgBotSocketInterface.hpp"
 
+#include <SingleThreadCtrl.h>
+#include <absl/log/log.h>
+
 #include <new>
 #include <optional>
 
@@ -51,6 +54,8 @@ HandleState SocketInterfaceTgBot::handle_Packet(
 }
 
 void SocketInterfaceTgBot::runFunction() {
+    setPreStopFunction(
+        [this](SingleThreadCtrl*) { interface->forceStopListening(); });
     interface->startListening(
         [this](SocketInterfaceBase*, socket_handle_t cfd) {
             return onNewBuffer(_bot, cfd);

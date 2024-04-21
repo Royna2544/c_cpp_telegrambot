@@ -144,6 +144,15 @@ struct SocketInterfaceBase {
     SocketInterfaceBase() : helper(this) {}
     virtual ~SocketInterfaceBase() = default;
 
+    /**
+     * @brief Stops the socket listener thread.
+     *
+     * This function will cause the socket listener thread to exit immediately.
+     * It is intended to be used in cases where the program needs to terminate
+     * immediately, and the normal shutdown process is not sufficient.
+     */
+    virtual void forceStopListening(void) = 0;
+
    protected:
     /**
      * @brief Cleans up the server socket.
@@ -161,15 +170,6 @@ struct SocketInterfaceBase {
      * @return true if the server can accept connections.
      */
     virtual bool canSocketBeClosed() { return true; }
-
-    /**
-     * @brief Stops the socket listener thread.
-     *
-     * This function will cause the socket listener thread to exit immediately.
-     * It is intended to be used in cases where the program needs to terminate
-     * immediately, and the normal shutdown process is not sufficient.
-     */
-    virtual void forceStopListening(void) = 0;
 
     /**
      * @brief Returns the last error message associated with the socket
