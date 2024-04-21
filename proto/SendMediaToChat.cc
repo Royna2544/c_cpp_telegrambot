@@ -7,8 +7,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
-
-#include "socket/getter/SocketInterfaceGetter.hpp"
+#include "SocketData.hpp"
+#include "impl/InterfaceSelector.hpp"
 
 #ifdef _MSC_VER
 #define strcasecmp _stricmp
@@ -62,9 +62,7 @@ int main(int argc, char* const* argv) {
             sizeof(data.filepath) - 1);
     data.id = chatId;
     data.type = TYPE_DOCUMENT;
-
-    struct TgBotConnection conn {};
-    conn.cmd = CMD_SEND_FILE_TO_CHAT_ID;
-    conn.data.data_5 = data;
-    SocketInterfaceGetter::getForClient()->writeToSocket(conn);
+    
+    struct TgBotCommandPacket pkt(CMD_SEND_FILE_TO_CHAT_ID, data);
+    SocketInternalInterface().writeToSocket(pkt.toSocketData());
 }

@@ -99,9 +99,8 @@ void SocketInterfaceWindows::startListening(
                         const int count =
                             recv(cfd, reinterpret_cast<char *>(&conn),
                                  sizeof(conn), 0);
-                        should_break = handleIncomingBuf(
-                            count, conn, listen_cb,
-                            [] { return strWSAError(WSAGetLastError()); });
+                        should_break =
+                            handleIncomingBuf(count, conn, listen_cb);
                         closesocket(cfd);
                     } else {
                         if (!kRun) {
@@ -138,3 +137,7 @@ void SocketInterfaceWindows::writeToSocket(struct TgBotConnection conn) {
 }
 
 void SocketInterfaceWindows::forceStopListening(void) { kRun = false; }
+
+char *SocketInterfaceUnix::getLastErrorMessage() {
+    return strWSAError(WSAGetLastError());
+}

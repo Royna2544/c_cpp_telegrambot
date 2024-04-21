@@ -4,7 +4,7 @@
 #include <cstddef>
 #include <string>
 
-#include "../SocketInterfaceWindows.h"
+#include <impl/Windows.hpp>
 
 socket_handle_t SocketInterfaceWindowsIPv4::createServerSocket() {
     struct sockaddr_in name {};

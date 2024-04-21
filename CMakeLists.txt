@@ -243,51 +243,54 @@ endif()
 
 ####################### TgBot Socket Library #######################
 if (USE_UNIX_SOCKETS)
+  set(SOCKET_SRC_INTERFACE src/socket/interface)
   extend_set(SRC_LIST
     src/ChatObserver.cpp
-    src/SocketConnectionHandler.cpp)
+    ${SOCKET_SRC_INTERFACE}/impl/bot/SocketDataHandler.cpp
+    ${SOCKET_SRC_INTERFACE}/impl/bot/TgBotSocketInterface.cpp)
   if (UNIX)
     set(SOCKET_SRC_LIST
-      src/socket/SocketInterfaceUnix.cpp
-      src/socket/impl/SocketInterfacePosixLocal.cpp
-      src/socket/impl/SocketInterfacePosixIPv4.cpp
-      src/socket/impl/SocketInterfacePosixIPv6.cpp
-      src/socket/getter/SocketInterfaceGetterUnix.cpp
+      ${SOCKET_SRC_INTERFACE}/impl/SocketPosix.cpp
+      ${SOCKET_SRC_INTERFACE}/impl/local/SocketPosixLocal.cpp
+      ${SOCKET_SRC_INTERFACE}/impl/inet/SocketPosixIPv4.cpp
+      ${SOCKET_SRC_INTERFACE}/impl/inet/SocketPosixIPv6.cpp
+      src/socket/selector/SelectorPosixPoll.cpp
+      src/socket/selector/SelectorPosixSelect.cpp
     )
     if (APPLE)
       extend_set(SOCKET_SRC_LIST
-        src/socket/impl/SocketHelperDarwin.cpp
+        ${SOCKET_SRC_INTERFACE}/impl/helper/SocketHelperDarwin.cpp
       )
     else()
       extend_set(SOCKET_SRC_LIST
-        src/socket/impl/SocketHelperLinux.cpp
+        ${SOCKET_SRC_INTERFACE}/impl/helper/SocketHelperLinux.cpp
       )
     endif()
   elseif(WIN32)
     extend_set(SOCKET_SRC_LIST 
-      src/socket/SocketInterfaceWindows.cpp
-      src/socket/impl/SocketInterfaceWindowsLocal.cpp
-      src/socket/impl/SocketInterfaceWindowsIPv4.cpp
-      src/socket/impl/SocketInterfaceWindowsIPv6.cpp
-      src/socket/impl/SocketHelperWindows.cpp
-      src/socket/getter/SocketInterfaceGetterWindows.cpp
+      ${SOCKET_SRC_INTERFACE}/impl/SocketWindows.cpp
+      ${SOCKET_SRC_INTERFACE}/impl/local/SocketWindowsLocal.cpp
+      ${SOCKET_SRC_INTERFACE}/impl/inet/SocketWindowsIPv4.cpp
+      ${SOCKET_SRC_INTERFACE}/impl/inet/SocketWindowsIPv6.cpp
+      ${SOCKET_SRC_INTERFACE}/impl/helper/SocketHelperWindows.cpp
     )
   endif()
   extend_set(SOCKET_SRC_LIST
-    src/socket/impl/SocketHelperCommon.cpp)
+    ${SOCKET_SRC_INTERFACE}/impl/helper/SocketHelper.cpp)
 
   if (CURL_FOUND)
     extend_set(SOCKET_SRC_LIST
-      src/socket/impl/SocketHelperCommonCurl.cpp)
+      ${SOCKET_SRC_INTERFACE}/impl/helper/SocketHelperCurl.cpp)
   else()
     extend_set(SOCKET_SRC_LIST
-      src/socket/impl/SocketHelperCommonNoCurl.cpp)
+      ${SOCKET_SRC_INTERFACE}/impl/helper/SocketHelperNoCurl.cpp)
   endif()
   add_library(TgBotSocket SHARED
     ${SOCKET_SRC_LIST}
-    src/socket/SocketInterfaceBase.cpp
+    ${SOCKET_SRC_INTERFACE}/SocketBase.cpp
     src/socket/TgBotCommandMap.cpp)
   target_include_directories(TgBotSocket PRIVATE ${CURL_INCLUDE_DIRS})
+  target_include_directories(TgBotSocket PUBLIC src/socket/include ${SOCKET_SRC_INTERFACE})
   add_executable(${SOCKET_CLI_NAME} src/socket/TgBotSocketClient.cpp)
 
   target_link_libraries(${SOCKET_CLI_NAME} TgBotSocket)
@@ -316,6 +319,7 @@ add_library(
   src/ConfigManager.cpp
   src/SingleThreadCtrl.cpp
   src/SingleThreadCtrlManager.cpp
+  src/SharedMalloc.cpp
   src/ResourceManager.cpp
   src/GitData.cpp
   src/popen_wdt/popen_wdt_${TARGET_VARIANT}.c
@@ -372,6 +376,8 @@ add_executable(${PROJECT_TEST_NAME}
   tests/RegexHandlerTest.cpp
   tests/DatabaseLoader.cpp
   tests/ResourceManagerTest.cpp
+  tests/TryParseTest.cpp
+  tests/SharedMallocTest.cpp
 )
 target_include_directories(${PROJECT_TEST_NAME} PRIVATE ${gtest_INCLUDE_DIR} ${gmock_INCLUDE_DIR})
 target_link_libraries(${PROJECT_TEST_NAME} gtest gmock TgBotCommandModules)

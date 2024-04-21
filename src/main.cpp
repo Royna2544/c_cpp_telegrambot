@@ -15,15 +15,14 @@
 #include <command_modules/CommandModule.h>
 #include <internal/_std_chrono_templates.h>
 #include <libos/libsighandler.h>
-#include <socket/SocketInterfaceBase.h>
+#include <socket/interface/SocketBase.hpp>
 
 #include <OnAnyMessageRegister.hpp>
 #include <chrono>
 
 #include "DurationPoint.hpp"
-#include "SocketConnectionHandler.h"
-#include "internal/_class_helper_macros.h"
 #include "socket/TgBotSocket.h"
+#include <socket/interface/impl/bot/TgBotSocketInterface.hpp>
 
 #ifdef RTCOMMAND_LOADER
 #include <RTCommandLoader.h>
@@ -32,7 +31,6 @@
 #ifdef SOCKET_CONNECTION
 #include <ChatObserver.h>
 
-#include <socket/bot/SocketInterfaceInit.hpp>
 #endif
 #include <tgbot/tgbot.h>
 
@@ -148,7 +146,7 @@ int main(int argc, char* const* argv) {
     createAndDoInitCall<RTCommandLoader>(gBot);
     createAndDoInitCall<RegexHandler>(gBot);
     createAndDoInitCall<SpamBlockManager>(gBot);
-    createAndDoInitCall<SocketInterfaceInit>(gBot);
+    createAndDoInitCall<SocketInterfaceTgBot>(gBot);
     createAndDoInitCall<CommandModule>(gBot);
     createAndDoInitCall<database::DatabaseWrapperBotImplObj>(gBot);
     createAndDoInitCall<ChatObserver>(gBot);
@@ -158,10 +156,9 @@ int main(int argc, char* const* argv) {
 
     installSignalHandler();
 
-    TgBotCommandUnion timeData{
-        .data_8 = std::chrono::system_clock::to_time_t(startTp)};
-    TgBotConnection conn(CMD_SET_STARTTIME, timeData);
-    socketConnectionHandler(gBot, conn);
+    SetStartTime timeData = std::chrono::system_clock::to_time_t(startTp);
+    TgBotCommandPacket pkt(CMD_SET_STARTTIME, timeData);
+    socketConnectionHandler(gBot, pkt);
 
     DLOG(INFO) << "Token: " << token.value();
     DurationPoint dp;

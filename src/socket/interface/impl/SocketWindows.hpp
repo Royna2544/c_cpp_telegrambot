@@ -1,31 +1,27 @@
+#include <absl/log/log.h>
 #include <inaddr.h>
 #include <winsock2.h>
 #include <ws2ipdef.h>
 #include <ws2tcpip.h>
-#include <absl/log/log.h>
 
-#include "SocketInterfaceBase.h"
+#include "../SocketInterfaceBase.h"
+#include "../TgBotSocket.h"
 
-#define WSALOG_E(msg)         \
-    LOG(ERROR) << msg ": " << \
-        SocketInterfaceWindows::strWSAError(WSAGetLastError())
-
-using socket_handle_t = SOCKET;
+#define WSALOG_E(msg)      \
+    LOG(ERROR) << msg ": " \
+               << SocketInterfaceWindows::strWSAError(WSAGetLastError())
 
 struct SocketInterfaceWindows : SocketInterfaceBase {
-    static bool isValidSocketHandle(socket_handle_t handle) {
+    bool isValidSocketHandle(socket_handle_t handle) override {
         return handle != INVALID_SOCKET;
     };
     static char* strWSAError(const int errcode);
 
-    virtual socket_handle_t createClientSocket() = 0;
-    virtual socket_handle_t createServerSocket() = 0;
-    virtual void doGetRemoteAddr(socket_handle_t s) = 0;
-    void writeToSocket(struct TgBotConnection conn) override;
+    void writeToSocket(struct TgBotCommandPacket conn) override;
     void forceStopListening(void) override;
     void startListening(const listener_callback_t& listen_cb,
                         const result_callback_t& result_cb) override;
-
+    char* getLastErrorMessage() override;
     virtual ~SocketInterfaceWindows() = default;
 
    private:

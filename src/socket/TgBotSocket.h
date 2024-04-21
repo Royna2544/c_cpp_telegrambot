@@ -1,11 +1,16 @@
 #pragma once
 
+#include <absl/log/check.h>
+
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <memory>
 #include <string>
 
 #include "../include/Types.h"
-#include <absl/log/check.h>
+#include "SharedMalloc.hpp"
+#include "SocketData.hpp"
 
 inline std::filesystem::path getSocketPath() {
     static auto spath = std::filesystem::temp_directory_path() / "tgbot.sock";
@@ -90,20 +95,7 @@ struct WriteMsgToChatId {
     char msg[256];  // Msg to send
 };
 
-struct Exit {
-    static constexpr int TokenLen = 15;
-    ExitOp op;             // operation desired
-    char token[TokenLen + 1];  // token data, used to verify exit op
-    static Exit create(ExitOp op, const std::string& buf) {
-        Exit e{};
-
-        e.op = op;
-        strncpy(e.token, buf.c_str(), TokenLen);
-        e.token[TokenLen] = 0;
-        CHECK(buf.size() == TokenLen);
-        return e;
-    }
-};
+struct Exit {};
 
 enum CtrlSpamBlock {
     CTRL_OFF,              // Disabled
@@ -133,24 +125,54 @@ using SetStartTime = std::time_t;
 
 }  // namespace TgBotCommandData
 
-union TgBotCommandUnion {
-    TgBotCommandData::WriteMsgToChatId data_1;
-    TgBotCommandData::Exit data_2;  // unused
-    TgBotCommandData::CtrlSpamBlock data_3;
-    TgBotCommandData::ObserveChatId data_4;
-    TgBotCommandData::SendFileToChatId data_5;
-    TgBotCommandData::ObserveAllChats data_6;
-    TgBotCommandData::DeleteControllerById data_7;
-    TgBotCommandData::SetStartTime data_8;
+/**
+ * @brief Header for TgBotCommand Packets
+ *
+ * Header contains the magic value, command, and the size of the data
+ */
+struct TgBotCommandPacketHeader {
+    int64_t magic;                      ///< Magic value to identify the packet
+    TgBotCommand cmd;                   ///< Command to be executed
+    SocketData::length_type data_size;  ///< Size of the data in the packet
 };
 
-constexpr int64_t MAGIC_VALUE = 0xDEADFACE;
-struct TgBotConnection {
-    TgBotConnection() = default;
-    TgBotConnection(TgBotCommand _cmd, union TgBotCommandUnion _data)
-        : cmd(_cmd), data(_data) {}
+/**
+ * @brief Packet for sending commands to the server
+ *
+ * @code data_ptr is only vaild for this scope: This should not be sent, instead
+ * it must be memcpy'd
+ *
+ * This packet is used to send commands to the server.
+ * It contains a header, which contains the magic value, the command, and the
+ * size of the data. The data is then followed by the actual data.
+ */
+struct TgBotCommandPacket {
+    static constexpr int64_t MAGIC_VALUE = 0xDEADFACE;
+    static constexpr auto hdr_sz = sizeof(TgBotCommandPacketHeader);
+    TgBotCommandPacketHeader header{};
+    SharedMalloc data_ptr;
 
-    int64_t magic = MAGIC_VALUE;
-    TgBotCommand cmd;
-    union TgBotCommandUnion data;
+    explicit TgBotCommandPacket(SocketData::length_type length)
+        : data_ptr(length) {
+        header.magic = TgBotCommandPacket::MAGIC_VALUE;
+        header.data_size = length;
+    }
+
+    // Constructor that takes malloc
+    template <typename T>
+    explicit TgBotCommandPacket(TgBotCommand cmd, T data)
+        : data_ptr(sizeof(T)) {
+        header.cmd = cmd;
+        header.magic = MAGIC_VALUE;
+        header.data_size = sizeof(T);
+        memcpy(data_ptr.getData(), &data, header.data_size);
+    }
+    SocketData toSocketData() {
+        SocketData data(hdr_sz + header.data_size);
+        void* dataBuf = data.data->getData();
+        memcpy(dataBuf, &header, hdr_sz);
+        memcpy(static_cast<char*>(dataBuf) + hdr_sz, data_ptr.getData(),
+               header.data_size);
+        return data;
+    }
 };

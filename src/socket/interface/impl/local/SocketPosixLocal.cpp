@@ -1,26 +1,18 @@
 #include <CStringLifetime.h>
-#include <Types.h>
 #include <absl/log/log.h>
-#include <arpa/inet.h>
-#include <net/if.h>
-#include <netinet/in.h>
-#include <netinet/ip.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
 
 #include <cerrno>
-#include <filesystem>
-#include <libos/libfs.hpp>
 
-#include "../SocketInterfaceUnix.h"
-#include "socket/SocketInterfaceBase.h"
-#include "socket/TgBotSocket.h"
+#include <impl/SocketPosix.hpp>
+#include <socket/TgBotSocket.h>
 
 socket_handle_t SocketInterfaceUnixLocal::makeSocket(bool client) {
     int ret = kInvalidFD;
     struct sockaddr_un name {};
-    struct sockaddr* _name = reinterpret_cast<struct sockaddr*>(&name);
+    auto* _name = reinterpret_cast<struct sockaddr*>(&name);
     CStringLifetime path = getOptions(Options::DESTINATION_ADDRESS);
 
     if (!client) {
@@ -69,15 +61,15 @@ socket_handle_t SocketInterfaceUnixLocal::createServerSocket() {
     return makeSocket(/*client=*/false);
 }
 void SocketInterfaceUnixLocal::cleanupServerSocket() {
-    SocketHelperCommon::cleanupServerSocketLocalSocket(this);
+    helper.local.cleanupServerSocket();
 }
 
 bool SocketInterfaceUnixLocal::canSocketBeClosed() {
-    return SocketHelperCommon::canSocketBeClosedLocalSocket(this);
+    return helper.local.canSocketBeClosed();
 }
 
 bool SocketInterfaceUnixLocal::isAvailable() {
-    return SocketHelperCommon::isAvailableLocalSocket();
+    return helper.local.isAvailable();
 }
 
 void SocketInterfaceUnixLocal::doGetRemoteAddr(socket_handle_t s) {}

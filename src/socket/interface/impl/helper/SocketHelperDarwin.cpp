@@ -3,7 +3,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
-#include "../SocketInterfaceUnix.h"
+#include <impl/SocketPosix.hpp>
 
 void SocketHelperUnix::setSocketBindingToIface(const socket_handle_t sfd,
                                                const char* iface) {

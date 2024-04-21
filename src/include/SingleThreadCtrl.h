@@ -226,7 +226,7 @@ std::shared_ptr<T> SingleThreadCtrlManager::getController(
             }
             DLOG(INFO) << "New allocation: " << usageStr << " controller";
             if constexpr (sizeof...(args) != 0)
-                newit = std::make_shared<T>(std::forward<Args...>(args...));
+                newit = std::make_shared<T>(std::forward<Args>(args)...);
             else
                 newit = std::make_shared<T>();
             auto ctrlit = std::static_pointer_cast<SingleThreadCtrl>(newit);

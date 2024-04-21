@@ -1,15 +1,16 @@
 
 #include <curl/curl.h>
+#include <absl/log/log.h>
 
-#include "../SocketInterfaceBase.h"
+#include <SocketBase.hpp>
 
-void SocketHelperCommon::printExternalIPINet() {
+void SocketInterfaceBase::INetHelper::printExternalIP() {
     CURL *curl = nullptr;
     CURLcode res = {};
 
     // Initialize libcurl
     curl = curl_easy_init();
-    if (!curl) {
+    if (curl == nullptr) {
         LOG(ERROR) << "Error initializing libcurl";
         return;
     }
@@ -30,7 +31,7 @@ void SocketHelperCommon::printExternalIPINet() {
     curl_easy_cleanup(curl);
 }
 
-size_t SocketHelperCommon::externalIPCallback(void *contents, size_t size,
+size_t SocketInterfaceBase::INetHelper::externalIPCallback(void *contents, size_t size,
                                               size_t nmemb, void */*userp*/) {
     std::string s;
     s.append(static_cast<char *>(contents), size * nmemb);
