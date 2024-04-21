@@ -73,6 +73,9 @@ extern Message::Ptr bot_sendReplyMessageHTML(const Bot &bot,
  */
 extern Message::Ptr bot_editMessage(const Bot &bot, const Message::Ptr &message,
                                     const std::string &text);
+extern Message::Ptr bot_editMessage(const Bot &bot, const ChatId chatid,
+                                    const MessageId message,
+                                    const std::string &text);
 
 extern Message::Ptr bot_sendMessage(const Bot &bot, const ChatId chatid,
                                     const std::string &text);
@@ -103,15 +106,16 @@ static inline Message::Ptr bot_sendSticker(const Bot &bot,
     return bot_sendSticker(bot, chat->id, stick);
 }
 
-
 static inline Message::Ptr bot_sendAnimation(const Bot &bot,
                                              const Chat::Ptr &chat,
-                                             Animation::Ptr gif, const Message::Ptr& replyTo) {
+                                             Animation::Ptr gif,
+                                             const Message::Ptr &replyTo) {
     return bot_sendAnimation(bot, chat->id, gif, replyTo);
 }
 
 static inline Message::Ptr bot_sendSticker(const Bot &bot,
                                            const Chat::Ptr &chat,
-                                           Sticker::Ptr stick,  const Message::Ptr& replyTo) {
+                                           Sticker::Ptr stick,
+                                           const Message::Ptr &replyTo) {
     return bot_sendSticker(bot, chat->id, stick, replyTo);
 }

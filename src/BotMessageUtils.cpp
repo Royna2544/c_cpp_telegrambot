@@ -43,6 +43,11 @@ Message::Ptr bot_editMessage(const Bot &bot, const Message::Ptr &message,
                                         message->messageId);
 }
 
+Message::Ptr bot_editMessage(const Bot &bot, const ChatId chatid,
+                             const MessageId message, const std::string &text) {
+    return bot.getApi().editMessageText(text, chatid, message);
+}
+
 Message::Ptr bot_sendMessage(const Bot &bot, const ChatId chatid,
                              const std::string &text) {
     return bot.getApi().sendMessage(chatid, text);
