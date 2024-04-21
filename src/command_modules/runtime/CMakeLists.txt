@@ -1,4 +1,4 @@
-set(DYNAMIC_CMDS_LIST DynTest)
+set(DYNAMIC_CMDS_LIST DynTest DTState)
 
 FILE(REMOVE ${CMAKE_SOURCE_DIR}/modules.load)
 foreach(lib ${DYNAMIC_CMDS_LIST})
