@@ -10,9 +10,10 @@ static void cmd_DT(const Bot& bot, const Message::Ptr& message) {
     static bool ok = false;
     std::call_once(once, [&bot, message]() {
         auto msg =
-            bot_sendMessage(bot, message->from->id, "DT State: Available");
+            bot_sendMessage(bot, message->chat->id, "DT State: Available");
         msgid = msg->messageId;
         chatid = msg->chat->id;
+        bot.getApi().pinChatMessage(chatid, msgid);
         ok = true;
     });
     switch (ok) {
