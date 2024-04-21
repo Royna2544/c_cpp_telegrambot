@@ -94,7 +94,11 @@ link_libraries(absl::log absl::log_initialize absl::log_flags absl::flags)
 ####################### Global compiler flags #######################
 if (NOT MSVC)
   add_compile_options(
-    -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/=)
+    -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/=)  
+  if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_compile_options(-fsanitize=address,leak)
+    add_link_options(-fsanitize=address,leak)
+  endif()
 else()
   # Windows 10
   add_definitions(-D_WIN32_WINNT=0x0A00)
