@@ -1,7 +1,7 @@
 #include <BotReplyMessage.h>
+#include <mutex>
 
 #include "cmd_dynamic.h"
-#include "command_modules/CommandModule.h"
 
 static void cmd_DT(const Bot& bot, const Message::Ptr& message) {
     static std::once_flag once;

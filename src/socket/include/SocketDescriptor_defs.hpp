@@ -1,7 +1,7 @@
 #pragma once
 
 #ifdef __WIN32
-#include <windows.h>
+#include <winsock2.h>
 #undef interface
 #endif
 
