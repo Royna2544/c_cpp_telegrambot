@@ -2,6 +2,7 @@
 
 #ifdef __WIN32
 #include <windows.h>
+#undef interface
 #endif
 
 #ifdef __WIN32

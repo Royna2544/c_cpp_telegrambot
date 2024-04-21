@@ -1,15 +1,13 @@
 #include <absl/log/log.h>
 #include <inaddr.h>
+#include <socket/TgBotSocket.h>
 #include <winsock2.h>
 #include <ws2ipdef.h>
 #include <ws2tcpip.h>
 
-#include "../SocketInterfaceBase.h"
-#include "../TgBotSocket.h"
+#include <SocketBase.hpp>
 
-#define WSALOG_E(msg)      \
-    LOG(ERROR) << msg ": " \
-               << SocketInterfaceWindows::strWSAError(WSAGetLastError())
+extern void WSALOG_E(const char* msg);
 
 struct SocketInterfaceWindows : SocketInterfaceBase {
     bool isValidSocketHandle(socket_handle_t handle) override {
@@ -17,11 +15,12 @@ struct SocketInterfaceWindows : SocketInterfaceBase {
     };
     static char* strWSAError(const int errcode);
 
-    void writeToSocket(struct TgBotCommandPacket conn) override;
+    void writeToSocket(struct SocketData sdata) override;
     void forceStopListening(void) override;
-    void startListening(const listener_callback_t& listen_cb,
-                        const result_callback_t& result_cb) override;
+    void startListening(const listener_callback_t onNewData) override;
     char* getLastErrorMessage() override;
+    std::optional<SocketData> readFromSocket(
+        socket_handle_t handle, SocketData::length_type length) override;
     virtual ~SocketInterfaceWindows() = default;
 
    private:
@@ -43,8 +42,6 @@ struct SocketInterfaceWindowsLocal : SocketInterfaceWindows {
 struct SocketInterfaceWindowsIPv4 : SocketInterfaceWindows {
     socket_handle_t createClientSocket() override;
     socket_handle_t createServerSocket() override;
-    void setupExitVerification() override{};
-    void stopListening(const std::string& e) override;
     bool isAvailable() override;
     void doGetRemoteAddr(socket_handle_t s) override;
 
@@ -55,8 +52,6 @@ struct SocketInterfaceWindowsIPv4 : SocketInterfaceWindows {
 struct SocketInterfaceWindowsIPv6 : SocketInterfaceWindows {
     socket_handle_t createClientSocket() override;
     socket_handle_t createServerSocket() override;
-    void setupExitVerification() override{};
-    void stopListening(const std::string& e) override;
     bool isAvailable() override;
     void doGetRemoteAddr(socket_handle_t s) override;
 
@@ -67,10 +62,10 @@ struct SocketInterfaceWindowsIPv6 : SocketInterfaceWindows {
 struct SocketHelperWindows {
     static bool createInetSocketAddr(socket_handle_t* socket,
                                      struct sockaddr_in* addr,
-                                     SocketInterfaceBase* it);
+                                     SocketInterfaceWindows* it);
     static bool createInet6SocketAddr(socket_handle_t* socket,
                                       struct sockaddr_in6* addr,
-                                      SocketInterfaceBase* it);
+                                      SocketInterfaceWindows* it);
     template <typename T, int family, typename addr_t, int addrbuf_len,
               int offset>
         requires std::is_same_v<T, struct sockaddr_in> ||

@@ -3,11 +3,8 @@
 #include <winsock.h>
 #include <afunix.h>
 // clang-format on
-
-#include "SocketInterfaceWindows.h"
-
-#include "socket/SocketInterfaceBase.h"
-#include "socket/TgBotSocket.h"
+#include <impl/SocketWindows.hpp>
+#include <socket/selector/SelectorConfig.hpp>
 
 char *SocketInterfaceWindows::strWSAError(const int errcode) {
     int ret = 0;
@@ -60,10 +57,10 @@ char *SocketInterfaceWindows::strWSAError(const int errcode) {
 }
 
 void SocketInterfaceWindows::startListening(
-    const listener_callback_t &listen_cb, const result_callback_t &result_cb) {
+    const listener_callback_t onNewData) {
     bool should_break = false, value_set = false;
-    struct fd_set set;
     WSADATA data;
+    DefaultSelector selector;
 
     if (WSAStartup(MAKEWORD(2, 2), &data) == 0) {
         const socket_handle_t sfd = createServerSocket();
@@ -73,42 +70,36 @@ void SocketInterfaceWindows::startListening(
                     WSALOG_E("Failed to listen to socket");
                     break;
                 }
-                result_cb(true);
-                value_set = true;
-                while (!should_break) {
-                    struct sockaddr_un addr {};
-                    struct TgBotConnection conn {};
-                    struct timeval tv = {10, 0};
-                    int len = sizeof(addr);
+                if (!selector.init()) {
+                    break;
+                }
+                selector.add(sfd, [sfd, this, &should_break, onNewData] {
+                    struct sockaddr addr {};
+                    socklen_t len = sizeof(addr);
+                    const socket_handle_t cfd = accept(sfd, &addr, &len);
 
-                    FD_ZERO(&set);
-                    FD_SET(sfd, &set);
-                    if (select(0, &set, NULL, NULL, &tv) == SOCKET_ERROR) {
-                        WSALOG_E("Select failed");
-                        break;
-                    }
-                    if (FD_ISSET(sfd, &set)) {
-                        const socket_handle_t cfd =
-                            accept(sfd, (struct sockaddr *)&addr, &len);
-                        if (cfd == INVALID_SOCKET) {
-                            WSALOG_E("Accept failed");
-                            break;
-                        } else {
-                            doGetRemoteAddr(cfd);
-                        }
-                        const int count =
-                            recv(cfd, reinterpret_cast<char *>(&conn),
-                                 sizeof(conn), 0);
-                        should_break =
-                            handleIncomingBuf(count, conn, listen_cb);
-                        closesocket(cfd);
+                    if (!isValidSocketHandle(cfd)) {
+                        WSALOG_E("Accept failed");
                     } else {
-                        if (!kRun) {
-                            DLOG(INFO) << "Exiting";
+                        doGetRemoteAddr(cfd);
+                        should_break = onNewData(this, cfd);
+                        closesocket(cfd);
+                    }
+                });
+                while (!should_break && kRun) {
+                    switch (selector.poll()) {
+                        case Selector::SelectorPollResult::ERROR_TIMEOUT:
+                        case Selector::SelectorPollResult::ERROR_NOTHING_FOUND:
+                            LOG(WARNING) << "Timeout or nothing found happened";
                             break;
-                        }
+                        case Selector::SelectorPollResult::ERROR_GENERIC:
+                            should_break = true;
+                            break;
+                        case Selector::SelectorPollResult::OK:
+                            break;
                     }
                 }
+                selector.shutdown();
             } while (false);
             closesocket(sfd);
             cleanupServerSocket();
@@ -117,16 +108,16 @@ void SocketInterfaceWindows::startListening(
         WSALOG_E("WSAStartup failed");
     }
     WSACleanup();
-    if (!value_set) result_cb(false);
 }
 
-void SocketInterfaceWindows::writeToSocket(struct TgBotConnection conn) {
+void SocketInterfaceWindows::writeToSocket(struct SocketData sdata) {
     WSADATA data;
     if (WSAStartup(MAKEWORD(2, 2), &data) == 0) {
         const socket_handle_t sfd = createClientSocket();
         if (isValidSocketHandle(sfd)) {
             const int count =
-                send(sfd, reinterpret_cast<char *>(&conn), sizeof(conn), 0);
+                send(sfd, reinterpret_cast<char *>(sdata.data->getData()),
+                     sdata.len, 0);
             if (count < 0) {
                 WSALOG_E("Failed to send to socket");
             }
@@ -138,6 +129,25 @@ void SocketInterfaceWindows::writeToSocket(struct TgBotConnection conn) {
 
 void SocketInterfaceWindows::forceStopListening(void) { kRun = false; }
 
-char *SocketInterfaceUnix::getLastErrorMessage() {
+char *SocketInterfaceWindows::getLastErrorMessage() {
     return strWSAError(WSAGetLastError());
+}
+
+std::optional<SocketData> SocketInterfaceWindows::readFromSocket(
+    socket_handle_t handle, SocketData::length_type length) {
+    SocketData buf(length);
+    ssize_t count =
+        recv(handle, static_cast<char *>(buf.data->getData()), length, 0);
+    if (count < 0) {
+        PLOG(ERROR) << "Failed to read from socket";
+    } else {
+        buf.len = count;
+        return buf;
+    }
+    return std::nullopt;
+}
+
+void WSALOG_E(const char *msg) {
+    LOG(ERROR) << msg << ": "
+               << SocketInterfaceWindows::strWSAError(WSAGetLastError());
 }

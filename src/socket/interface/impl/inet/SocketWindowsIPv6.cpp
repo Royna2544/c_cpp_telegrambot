@@ -1,5 +1,4 @@
-#include "../SocketInterfaceWindows.h"
-#include "socket/SocketInterfaceBase.h"
+#include <impl/SocketWindows.hpp>
 
 socket_handle_t SocketInterfaceWindowsIPv6::createServerSocket() {
     struct sockaddr_in6 name {};
@@ -36,12 +35,9 @@ socket_handle_t SocketInterfaceWindowsIPv6::createClientSocket() {
 }
 
 bool SocketInterfaceWindowsIPv6::isAvailable() {
-    return SocketHelperCommon::isAvailableIPv6(this);
+    return helper.inet.isAvailableIPv6();
 }
 
-void SocketInterfaceWindowsIPv6::stopListening(const std::string &e) {
-    forceStopListening();
-}
 
 void SocketInterfaceWindowsIPv6::doGetRemoteAddr(socket_handle_t s) {
     SocketHelperWindows::doGetRemoteAddrInet<

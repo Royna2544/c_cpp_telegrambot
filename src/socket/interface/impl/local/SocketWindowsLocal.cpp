@@ -1,5 +1,4 @@
-#include "../SocketInterfaceWindows.h"
-#include "socket/SocketInterfaceBase.h"
+#include <impl/SocketWindows.hpp>
 #include "socket/TgBotSocket.h"
 
 // clang-format off
@@ -63,15 +62,15 @@ socket_handle_t SocketInterfaceWindowsLocal::createServerSocket() {
 }
 
 void SocketInterfaceWindowsLocal::cleanupServerSocket() {
-    SocketHelperCommon::cleanupServerSocketLocalSocket(this);
+    helper.local.cleanupServerSocket();
 }
 
 bool SocketInterfaceWindowsLocal::canSocketBeClosed() {
-    return SocketHelperCommon::canSocketBeClosedLocalSocket(this);
+    return helper.local.canSocketBeClosed();
 }
 
 bool SocketInterfaceWindowsLocal::isAvailable() {
-    return SocketHelperCommon::isAvailableLocalSocket();
+    return helper.local.isAvailable();
 }
 
 void SocketInterfaceWindowsLocal::doGetRemoteAddr(socket_handle_t s) {}

@@ -277,6 +277,7 @@ if (USE_UNIX_SOCKETS)
       ${SOCKET_SRC_INTERFACE}/impl/inet/SocketWindowsIPv4.cpp
       ${SOCKET_SRC_INTERFACE}/impl/inet/SocketWindowsIPv6.cpp
       ${SOCKET_SRC_INTERFACE}/impl/helper/SocketHelperWindows.cpp
+      src/socket/selector/SelectorWindowsSelect.cpp
     )
   endif()
   extend_set(SOCKET_SRC_LIST

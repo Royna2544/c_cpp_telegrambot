@@ -2,9 +2,8 @@
 #include <ws2tcpip.h>
 
 #include <cstddef>
+#include <impl/SocketWindows.hpp>
 #include <string>
-
-#include <impl/Windows.hpp>
 
 socket_handle_t SocketInterfaceWindowsIPv4::createServerSocket() {
     struct sockaddr_in name {};
@@ -41,11 +40,7 @@ socket_handle_t SocketInterfaceWindowsIPv4::createClientSocket() {
 }
 
 bool SocketInterfaceWindowsIPv4::isAvailable() {
-    return SocketHelperCommon::isAvailableIPv4(this);
-}
-
-void SocketInterfaceWindowsIPv4::stopListening(const std::string &e) {
-    forceStopListening();
+    return helper.inet.isAvailableIPv4();
 }
 
 void SocketInterfaceWindowsIPv4::doGetRemoteAddr(socket_handle_t s) {
