@@ -5,17 +5,16 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <SharedMalloc.hpp>
+#include <SocketData.hpp>
 #include <cstring>
-#include <socket/selector/SelectorConfig.hpp>
-
-#include "SharedMalloc.hpp"
-#include "SocketData.hpp"
+#include <socket/selector/SelectorPosix.hpp>
 
 void SocketInterfaceUnix::startListening(const listener_callback_t onNewData) {
     bool should_break = false;
     int rc = 0;
     socket_handle_t sfd = createServerSocket();
-    DefaultSelector selector;
+    PollSelector selector;
     if (isValidSocketHandle(sfd)) {
         do {
             if (listen(sfd, SOMAXCONN) < 0) {

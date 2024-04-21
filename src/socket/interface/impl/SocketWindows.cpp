@@ -4,7 +4,7 @@
 #include <afunix.h>
 // clang-format on
 #include <impl/SocketWindows.hpp>
-#include <socket/selector/SelectorConfig.hpp>
+#include <socket/selector/SelectorWindows.hpp>
 
 char *SocketInterfaceWindows::strWSAError(const int errcode) {
     int ret = 0;
@@ -60,7 +60,7 @@ void SocketInterfaceWindows::startListening(
     const listener_callback_t onNewData) {
     bool should_break = false, value_set = false;
     WSADATA data;
-    DefaultSelector selector;
+    SelectSelector selector;
 
     if (WSAStartup(MAKEWORD(2, 2), &data) == 0) {
         const socket_handle_t sfd = createServerSocket();
