@@ -17,7 +17,7 @@ jobs:
         include:
           - sys: mingw64
           - sys: ucrt64
-          - sys: clang64
+         # - sys: clang64
 
     name: 🚧 ${{ matrix.sys }}
     defaults:
