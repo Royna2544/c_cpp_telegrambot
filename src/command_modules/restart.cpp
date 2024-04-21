@@ -1,35 +1,39 @@
+#include <BotReplyMessage.h>
+#include <CommandModule.h>
 #include <ConfigManager.h>
 #include <absl/log/log.h>
+#include <libos/libsighandler.h>
 #include <unistd.h>
-#include <memory>
 
-#include "BotReplyMessage.h"
-#include "CommandModule.h"
-#include "libos/libsighandler.h"
+#include <TryParseStr.hpp>
+#include <memory>
 
 extern char **environ;
 static void restartCommandFn(const Bot &bot, const Message::Ptr message) {
     std::array<char, 32> restartBuf = {0};
-    char **myEnviron;
-    int argc = 0, count = 1;
+    char **myEnviron = nullptr;
+    int argc = 0;
+    int count = 1;
     char *const *argv = nullptr;
 
-    if (const auto var = getenv("RESTART"); var != nullptr) {
+    if (auto *const var = getenv("RESTART"); var != nullptr) {
+        MessageId id;
         LOG(INFO) << "RESTART env var set to " << var;
         unsetenv("RESTART");
         installSignalHandler();
-        if (std::stoi(var) == message->messageId) {
+
+        if (try_parse(var, &id) && id == message->messageId) {
             LOG(INFO) << "Restart success! From messageId "
                       << message->messageId;
             bot_sendReplyMessage(bot, message, "Restart success!");
             return;
         }
     }
-    for (; environ[count]; ++count)
-        ;
+    for (; environ[count]; ++count);
     myEnviron = new char *[count + 2];
     memcpy(myEnviron, environ, count * sizeof(char *));
-    snprintf(restartBuf.data(), restartBuf.size(), "RESTART=%d", message->messageId);
+    snprintf(restartBuf.data(), restartBuf.size(), "RESTART=%d",
+             message->messageId);
     myEnviron[count] = restartBuf.data();
     myEnviron[count + 1] = 0;
     copyCommandLine(CommandLineOp::GET, &argc, &argv);

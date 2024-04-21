@@ -1,16 +1,19 @@
+#include <BotReplyMessage.h>
 #include <ExtArgs.h>
+#include <tgbot/tools/StringTools.h>
 
+#include <TryParseStr.hpp>
 #include <functional>
 #include <thread>
 
-#include "BotReplyMessage.h"
 #include "CommandModule.h"
-#include "tgbot/tools/StringTools.h"
 
 constexpr int MAX_SPAM_COUNT = 10;
 constexpr auto kSpamDelayTime = std::chrono::milliseconds(700);
 
-static void for_count(int count, std::function<void(void)> callback) {
+namespace {
+
+void for_count(int count, std::function<void(void)> callback) {
     if (count > MAX_SPAM_COUNT) {
         count = MAX_SPAM_COUNT;
     }
@@ -19,6 +22,16 @@ static void for_count(int count, std::function<void(void)> callback) {
         std::this_thread::sleep_for(kSpamDelayTime);
     }
 }
+void try_parse_spamcnt(const std::string& data, int& count) {
+    if (count > MAX_SPAM_COUNT) {
+        count = MAX_SPAM_COUNT;
+    }
+    if (!try_parse(data, &count)) {
+        LOG(WARNING) << "Failed to parse " << data << " as int";
+        count = 1;
+    }
+}
+}  // namespace
 
 /**
  * @brief A command module for spamming.
@@ -29,7 +42,7 @@ static void SpamCommandFn(const Bot& bot, const Message::Ptr message) {
 
     if (message->replyToMessage) {
         if (hasExtArgs(message)) {
-            count = stoi(parseExtArgs(message));
+            try_parse_spamcnt(parseExtArgs(message), count);
             if (message->replyToMessage->sticker) {
                 fp = [&bot, message] {
                     bot_sendSticker(bot, message->chat,
@@ -56,7 +69,7 @@ static void SpamCommandFn(const Bot& bot, const Message::Ptr message) {
         std::string command = parseExtArgs(message);
         std::pair<int, std::string> spamData;
         if (const auto v = StringTools::split(command, ' '); v.size() >= 2) {
-            spamData.first = std::stoi(v[0]);
+            try_parse_spamcnt(v[0], spamData.first);
             spamData.second = command.substr(command.find_first_of(' ') + 1);
             fp = [&bot, message, spamData] {
                 bot_sendMessage(bot, message->chat->id, spamData.second);
