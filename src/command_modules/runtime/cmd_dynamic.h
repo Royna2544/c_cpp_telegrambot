@@ -3,7 +3,7 @@
 
 struct dynamicCommandModule {
     CommandModule mod;
-    bool (*isSupported)();
+    bool (*isSupported)() = nullptr;
 };
 
 #define DYN_COMMAND_SYM cmd

@@ -28,8 +28,7 @@ static void cmd_DT(const Bot& bot, const Message::Ptr& message) {
 
 extern "C" {
 struct dynamicCommandModule DYN_COMMAND_SYM {
-    .mod = CommandModule("newdtstate", "Update DT state",
-                         CommandModule::Flags::Enforced, cmd_DT),
-    .isSupported = nullptr,
+    .mod = CommandModule("dtstate", "Update DT state",
+                         CommandModule::Flags::Enforced, cmd_DT)
 };
 }
