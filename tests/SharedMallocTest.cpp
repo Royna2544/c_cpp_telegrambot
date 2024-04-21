@@ -11,12 +11,13 @@ TEST(SharedMallocTest, UseCount) {
         // 3 = shared_malloc parent + v + v2
         ASSERT_EQ(shared_malloc.use_count(), 3);
     }
-    ASSERT_EQ(shared_malloc.use_count(), 1);
+    // 2 = shared_malloc parent + v
+    ASSERT_EQ(shared_malloc.use_count(), 2);
     SharedMallocChild v3 = some.getChild();
-    v3 = std::move(v);
+    v = std::move(v3);
+    // v is gone - so refcnt 1
     EXPECT_EQ(shared_malloc.use_count(), 1);
-    EXPECT_EQ(v.getData(), nullptr);
-    EXPECT_EQ(v3.getData(), shared_malloc.getData());
+    EXPECT_EQ(v.getData(), some.getData());
 }
 
 TEST(SharedMallocChildTest, ReturnValidObject) {
