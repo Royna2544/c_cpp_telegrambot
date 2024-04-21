@@ -51,7 +51,7 @@ bool RTCommandLoader::loadOneCommand(std::filesystem::path _fname) {
     }
     libs.emplace_back(std::make_shared<DynamicLibraryHolder>(handle));
     mod = &sym->mod;
-    if (!sym->isSupported()) {
+    if (sym->isSupported && !sym->isSupported()) {
         fn = commandStub;
         isSupported = false;
     } else {
