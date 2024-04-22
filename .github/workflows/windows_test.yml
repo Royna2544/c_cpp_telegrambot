@@ -42,7 +42,6 @@ jobs:
           toolchain:p
           cmake:p
           ninja:p
-          protobuf:p
           boost:p
 
     - name: 'Setup submodule'
