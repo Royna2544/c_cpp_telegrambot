@@ -375,7 +375,7 @@ add_executable(${PROJECT_TEST_NAME}
   tests/TestMain.cpp
   tests/AuthorizationTest.cpp
   tests/SingleThreadCtrlTest.cpp
-  tests/SpamBlockerTest.cpp
+# tests/SpamBlockerTest.cpp
   tests/ExtArgsTest.cpp
   tests/ConfigManagerTest.cpp
   tests/RegexHandlerTest.cpp

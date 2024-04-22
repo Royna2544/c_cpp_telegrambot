@@ -1,3 +1,4 @@
 - IBash TimeoutThread could use SingleThreadCtrlRunnable
 - clang-* compilers add, preferred
 - Add calc cmd
+- Fix SpamBlockerTest
