@@ -1,4 +1,4 @@
-name: Build TgBot++ (Windows)
+name: Build TgBot++ (Windows MSYS2)
 
 on:
   push:
