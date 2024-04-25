@@ -1,83 +1,110 @@
 #include <Windows.h>
 #include <io.h>
-#include <locale.h>
-#include <stdio.h>
-
 #include <libos/libfs.h>
+#include <locale.h>
+#include <namedpipeapi.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include "popen_wdt.h"
 
-struct watchdog_data {
+struct popen_wdt_windows_priv {
     HANDLE process_handle;
     HANDLE thread_handle;
     HANDLE child_stdout_r;
     HANDLE child_stdout_w_file;
-    bool* result_cb;
+    HANDLE exit_event;
+    HANDLE rwProcessThread;
 };
 
+static HANDLE g_PrivMutex;
+
 static DWORD WINAPI doReadWriteProcess(LPVOID arg) {
-    DWORD readbuf;
-    struct watchdog_data* data = (struct watchdog_data*)arg;
+    popen_watchdog_data_t* data = (popen_watchdog_data_t*)arg;
+    struct popen_wdt_windows_priv* pdata = data->privdata;
+    DWORD readbuf = 0;
     static char buf[1024];
 
     ZeroMemory(&buf, sizeof(buf));
     for (;;) {
-        ReadFile(data->child_stdout_r, buf, sizeof(buf), &readbuf, NULL);
-        WriteFile(data->child_stdout_w_file, buf, readbuf, NULL, NULL);
+        WaitForSingleObject(g_PrivMutex, INFINITE);
+        if (WaitForSingleObject(pdata->exit_event, 0) == WAIT_OBJECT_0) {
+            break;
+        }
+        ReadFile(pdata->child_stdout_r, buf, sizeof(buf), &readbuf, NULL);
+        WriteFile(pdata->child_stdout_w_file, buf, readbuf, NULL, NULL);
+        ReleaseMutex(g_PrivMutex);
     }
+    ReleaseMutex(g_PrivMutex);
     return 0;
 }
 
 static DWORD WINAPI watchdog(LPVOID arg) {
-    struct watchdog_data* data = (struct watchdog_data*)arg;
-    HANDLE rwProcessThread = NULL;
+    popen_watchdog_data_t* data = (popen_watchdog_data_t*)arg;
+    struct popen_wdt_windows_priv* pdata = data->privdata;
     DWORD ret_getexit = 0;
+    DWORD exitEvent = 0;
     ULONGLONG startTime = GetTickCount64();
 
-    ResumeThread(data->thread_handle);
-    rwProcessThread = CreateThread(
-        NULL, 0, (LPTHREAD_START_ROUTINE)doReadWriteProcess, data, 0, NULL);
-    if (rwProcessThread == NULL) {
-        return 0;
+    WaitForSingleObject(g_PrivMutex, INFINITE);
+    ResumeThread(pdata->thread_handle);
+    pdata->exit_event = CreateEvent(NULL, TRUE, FALSE, NULL);
+    if (pdata->exit_event == NULL) {
+        goto fail_exitevent;
     }
-    for (;;) {
-        if (GetExitCodeProcess(data->process_handle, &ret_getexit)) {
+    pdata->rwProcessThread = CreateThread(
+        NULL, 0, (LPTHREAD_START_ROUTINE)doReadWriteProcess, data, 0, NULL);
+    if (pdata->rwProcessThread == NULL) {
+        goto fail_rwph;
+    }
+
+    while (WaitForSingleObject(pdata->exit_event, 0) != WAIT_OBJECT_0) {
+        if (GetExitCodeProcess(pdata->process_handle, &ret_getexit)) {
             if (ret_getexit != STILL_ACTIVE) {
-                TerminateThread(rwProcessThread, 0);
-                *data->result_cb = false;
+                SetEvent(pdata->exit_event);
+                WaitForSingleObject(pdata->rwProcessThread, INFINITE);
+                data->watchdog_activated = false;
                 break;
             } else {
-                if (GetTickCount64() - startTime > SLEEP_SECONDS * 1000) {
-                    TerminateThread(rwProcessThread, 0);
-                    TerminateProcess(data->process_handle, 0);
-                    *data->result_cb = true;
+                if (GetTickCount64() - startTime >
+                    (ULONGLONG)(SLEEP_SECONDS * 1000)) {
+                    SetEvent(pdata->exit_event);
+                    WaitForSingleObject(pdata->rwProcessThread, INFINITE);
+                    TerminateProcess(pdata->process_handle, 0);
+                    data->watchdog_activated = true;
                     break;
                 }
             }
         }
         Sleep(100);
     }
-    CloseHandle(rwProcessThread);
-    CloseHandle(data->process_handle);
-    CloseHandle(data->thread_handle);
-    CloseHandle(data->child_stdout_r);
-    CloseHandle(data->child_stdout_w_file);
-    UnmapViewOfFile(data);
+    CloseHandle(pdata->rwProcessThread);
+fail_rwph:
+    CloseHandle(pdata->exit_event);
+fail_exitevent:
+    CloseHandle(pdata->process_handle);
+    CloseHandle(pdata->thread_handle);
+    CloseHandle(pdata->child_stdout_r);
+    CloseHandle(pdata->child_stdout_w_file);
+    UnmapViewOfFile(pdata);
+    if (data->fp != NULL) {
+        fclose(data->fp);
+    }
+    free(data);
+    ReleaseMutex(g_PrivMutex);
     return 0;
 }
-void setlocale_enus_once(void) {
-    // TODO
-}
+
 // [Child] stdout_w [pipe] stdout_r -> [Parent] stdout_r ->
 // stdout_w_file [pipe] stdout_r_file [FILE*]
-FILE* popen_watchdog(const char* command, bool* wdt_ret) {
-    FILE* fp = NULL;
+bool popen_watchdog_start(popen_watchdog_data_t* wdt_data) {
     HANDLE child_stdout_w = NULL, child_stdout_r = NULL;
     HANDLE child_stdout_w_file = NULL, child_stdout_r_file = NULL;
     HANDLE hMapFile = NULL;
-    struct watchdog_data* data = NULL;
     CHAR buffer[PATH_MAX] = {0};
 
-    BOOL success;
+    BOOL success = 0;
     SECURITY_ATTRIBUTES saAttr;
     STARTUPINFO si;
     PROCESS_INFORMATION pi;
@@ -89,30 +116,46 @@ FILE* popen_watchdog(const char* command, bool* wdt_ret) {
 
     // Create pipes, disable handle inherit
     if (!CreatePipe(&child_stdout_r, &child_stdout_w, &saAttr, 0)) {
-        return NULL;
+        return false;
     }
     if (!SetHandleInformation(child_stdout_r, HANDLE_FLAG_INHERIT, 0)) {
-        return NULL;
+        CloseHandle(child_stdout_r);
+        CloseHandle(child_stdout_w);
+        return false;
     }
 
-    if (wdt_ret) {
+    if (wdt_data->watchdog_enabled) {
         // Create FILE* middleman pipe
         if (!CreatePipe(&child_stdout_r_file, &child_stdout_w_file, &saAttr,
                         0)) {
-            return NULL;
+            CloseHandle(child_stdout_r);
+            CloseHandle(child_stdout_w);
+            return false;
         }
         // Alloc watchdog data
         // Create Mapping
-        hMapFile = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE,
-                                     0, sizeof(struct watchdog_data), NULL);
-        if (hMapFile == NULL) return NULL;
+        hMapFile =
+            CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0,
+                              sizeof(struct popen_wdt_windows_priv), NULL);
+        if (hMapFile == NULL) {
+            CloseHandle(child_stdout_r);
+            CloseHandle(child_stdout_w);
+            CloseHandle(child_stdout_r_file);
+            CloseHandle(child_stdout_w_file);
+            return false;
+        }
 
         // Cast to watchdog privdata
-        data = (struct watchdog_data*)MapViewOfFile(
-            hMapFile, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(struct watchdog_data));
-        if (data == NULL) {
+        wdt_data->privdata = (struct popen_wdt_windows_priv*)MapViewOfFile(
+            hMapFile, FILE_MAP_ALL_ACCESS, 0, 0,
+            sizeof(struct popen_wdt_windows_priv));
+        if (wdt_data->privdata == NULL) {
             CloseHandle(hMapFile);
-            return NULL;
+            CloseHandle(child_stdout_r);
+            CloseHandle(child_stdout_w);
+            CloseHandle(child_stdout_r_file);
+            CloseHandle(child_stdout_w_file);
+            return false;
         }
     }
 
@@ -127,17 +170,16 @@ FILE* popen_watchdog(const char* command, bool* wdt_ret) {
     si.hStdError = child_stdout_w;
 
     // Try with default
-    success = CreateProcess(NULL, (LPSTR)command, NULL, NULL, TRUE,
+    success = CreateProcess(NULL, (LPSTR)wdt_data->command, NULL, NULL, TRUE,
                             CREATE_NEW_PROCESS_GROUP | CREATE_SUSPENDED, NULL,
                             NULL, &si, &pi);
 
     if (!success) {
         // Hmm? We failed? Try to append powershell -c
         // Create command line string
-        //LOG_W("Retrying with PowerShell prefix: %s", command);
         snprintf(buffer, sizeof(buffer), "powershell.exe -c \"%s\"",
-                    command);
-                       
+                 wdt_data->command);
+
         // Create process again
         success = CreateProcess(NULL, (LPSTR)buffer, NULL, NULL, TRUE,
                                 CREATE_NEW_PROCESS_GROUP | CREATE_SUSPENDED,
@@ -145,37 +187,59 @@ FILE* popen_watchdog(const char* command, bool* wdt_ret) {
     }
     if (!success) {
         // Still no? abort.
-        if (wdt_ret) {
+        if (wdt_data->watchdog_enabled) {
             CloseHandle(hMapFile);
             CloseHandle(child_stdout_r_file);
             CloseHandle(child_stdout_w_file);
         }
         CloseHandle(child_stdout_r);
         CloseHandle(child_stdout_w);
-        return NULL;
+        return false;
     }
 
     // Cleanup
     // Close Handles
     CloseHandle(child_stdout_w);
-    if (wdt_ret) {
-        data->result_cb = wdt_ret;
-        data->process_handle = pi.hProcess;
-        data->thread_handle = pi.hThread;
-        data->child_stdout_r = child_stdout_r;
-        data->child_stdout_w_file = child_stdout_w_file;
+    if (wdt_data->watchdog_enabled) {
+        struct popen_wdt_windows_priv pdata;
+        pdata.process_handle = pi.hProcess;
+        pdata.thread_handle = pi.hThread;
+        pdata.child_stdout_r = child_stdout_r;
+        pdata.child_stdout_w_file = child_stdout_w_file;
 
-        HANDLE wdtThHdl = CreateThread(NULL, 0, watchdog, data, 0, NULL);
+        memcpy(wdt_data->privdata, &pdata,
+               sizeof(struct popen_wdt_windows_priv));
+        HANDLE wdtThHdl = CreateThread(NULL, 0, watchdog, wdt_data, 0, NULL);
         if (wdtThHdl != NULL) {
             CloseHandle(wdtThHdl);
-            fp = _fdopen(_open_osfhandle((intptr_t)child_stdout_r_file, 0), "r");
+            wdt_data->fp =
+                _fdopen(_open_osfhandle((intptr_t)child_stdout_r_file, 0), "r");
         }
     } else {
         CloseHandle(pi.hProcess);
         ResumeThread(pi.hThread);
         CloseHandle(pi.hThread);
-        fp = _fdopen(_open_osfhandle((intptr_t)child_stdout_r, 0), "r");
+        wdt_data->fp =
+            _fdopen(_open_osfhandle((intptr_t)child_stdout_r, 0), "r");
     }
+    return true;
+}
 
-    return fp;
+void popen_watchdog_stop(popen_watchdog_data_t* data) {
+    const struct popen_wdt_windows_priv* pdata = data->privdata;
+    WaitForSingleObject(g_PrivMutex, INFINITE);
+    if (data->fp != NULL) {
+        fclose(data->fp);
+    }
+    if (data->watchdog_enabled) {
+        data->watchdog_activated = false;
+        CloseHandle(pdata->rwProcessThread);
+        CloseHandle(pdata->process_handle);
+        CloseHandle(pdata->thread_handle);
+        CloseHandle(pdata->child_stdout_w_file);
+        CloseHandle(pdata->exit_event);
+        UnmapViewOfFile(pdata);
+    }
+    free(data);
+    ReleaseMutex(g_PrivMutex);
 }

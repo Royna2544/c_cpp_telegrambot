@@ -43,7 +43,6 @@ set(PROJECT_TEST_NAME ${PROJECT_NAME}_test)
 #####################################################################
 
 ############################## OPTIONS ##############################
-option(ENFORCE_EN_US "Enforce en-US locale for output" ON)
 option(ENABLE_RUNTIME_COMMAND "Enable runtime loader of commands" ON)
 #################### This must be explicitly set ###################
 set(BUILD_SHARED_LIBS ON CACHE BOOL "Build libs as shared libraries" FORCE)
@@ -328,6 +327,7 @@ add_library(
   src/ResourceManager.cpp
   src/GitData.cpp
   src/popen_wdt/popen_wdt_${TARGET_VARIANT}.c
+  src/popen_wdt/popen_wdt.c
   src/libos/libfs.cpp
   src/libos/libfs_${TARGET_VARIANT}.cpp)
 

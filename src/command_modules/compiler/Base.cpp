@@ -11,6 +11,7 @@
 #include <initializer_list>
 #include <libos/libfs.hpp>
 #include <mutex>
+#include <ostream>
 #include <thread>
 
 #include "CompilerInTelegram.h"
@@ -36,52 +37,58 @@ void CompilerInTg::appendExtArgs(std::stringstream &cmd,
 
 void CompilerInTg::runCommand(const Message::Ptr &message, std::string cmd,
                               std::stringstream &res, bool use_wdt) {
-    bool hasmore = false, watchdog_bitten = false;
-    int count = 0, unique_id = 0;
+    bool hasmore = false;
+    int count = 0;
     std::array<char, BASH_READ_BUF> buf = {};
     size_t buf_len = 0;
-    std::error_code ec;
-
-#ifdef LOCALE_EN_US
-    static std::once_flag once;
-    std::call_once(once, [] { setlocale_enus_once(); });
-#endif
+    popen_watchdog_data_t *p_wdt_data = nullptr;
 
     boost::replace_all(cmd, std::string(1, '"'), "\\\"");
 
     LOG(INFO) << __func__ << ": +++";
     onFailed(message, ErrorType::START_COMPILER);
     LOG(INFO) << "Command: '" << cmd << "'";
+
     auto dp = DurationPoint();
-    auto fp = popen_watchdog(cmd.c_str(), use_wdt ? &watchdog_bitten : nullptr);
 
-    if (!fp) {
-        onFailed(message, ErrorType::POPEN_WDT_FAILED);
-        return;
-    }
-    while (fgets(buf.data(), buf.size(), fp)) {
-        if (buf_len < BASH_MAX_BUF) {
-            res << buf.data();
-            buf_len += strlen(buf.data());
-        } else {
-            hasmore = true;
+    if (popen_watchdog_init(&p_wdt_data)) {
+        p_wdt_data->command = cmd.c_str();
+        p_wdt_data->watchdog_enabled = use_wdt;
+        popen_watchdog_start(p_wdt_data);
+
+        if (p_wdt_data->fp == nullptr) {
+            onFailed(message, ErrorType::POPEN_WDT_FAILED);
+            return;
         }
-        count++;
-        std::this_thread::sleep_for(50ms);
-    }
-    if (count == 0) res << EMPTY << std::endl;
-    res << std::endl;
-    if (hasmore) res << "-> Truncated due to too much output\n";
+        while (fgets(buf.data(), buf.size(), p_wdt_data->fp) != nullptr) {
+            if (buf_len < BASH_MAX_BUF) {
+                res << buf.data();
+                buf_len += strlen(buf.data());
+            } else {
+                hasmore = true;
+            }
+            count++;
+            std::this_thread::sleep_for(50ms);
+        }
+        if (count == 0) {
+            res << EMPTY << std::endl;
+        }
+        res << std::endl;
+        if (hasmore) {
+            res << "-> Truncated due to too much output" << std::endl;
+        }
 
-    if (watchdog_bitten) {
-        res << WDT_BITE_STR;
-    } else {
-        float millis = static_cast<float>(dp.get().count());
-        res << "-> It took " << std::fixed << std::setprecision(3)
-            << millis * 0.001 << " seconds" << std::endl;
+        if (popen_watchdog_activated(p_wdt_data)) {
+            res << WDT_BITE_STR;
+        } else {
+            double millis = static_cast<double>(dp.get().count()) * 0.001;
+            res << "-> It took " << std::fixed << std::setprecision(3) << millis
+                << " seconds" << std::endl;
+            if (use_wdt)
+                popen_watchdog_stop(p_wdt_data);
+        }
+        LOG(INFO) << __func__ << ": ---";
     }
-    fclose(fp);
-    LOG(INFO) << __func__ << ": ---";
 }
 
 static std::optional<std::string> findCommandExe(std::string command) {

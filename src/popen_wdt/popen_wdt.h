@@ -20,26 +20,47 @@
 extern "C" {
 #endif
 
-/**
- * setlocale_enus_once - Function called once to set the terminal output to
- * locale en-US
- */
-void setlocale_enus_once(void);
+typedef struct {
+    FILE *fp;                /* file pointer to get out data */
+    const char *command;     /* command string */
+    bool watchdog_enabled;   /* Is watchdog enabled? [in] */
+    bool watchdog_activated; /* Result callback, stored true if watchdog did the
+                                work [out] */
+    void *privdata;          /* Private data pointer */
+} popen_watchdog_data_t;
 
 /**
- * popen_watchdog - popen(3) but with watchdog support
+ * @brief initializes the popen watchdog data structure
  *
- * Same as popen, it opens subprocess with [command], but
- * the process is killed, and FILE * returns EOF when the exec time
- * expires [SLEEP_SECONDS]. Also closes stdin and pipes stdout, stderr
- * to FILE *
- *
- * @param command Null-terminated string of command
- * @param ret Whether watchdog killed the process or not,
- * passing nullptr will disable watchdog functionaility.
- * @return valid FILE * if succeeded, nullptr otherwise
+ * @param data the data structure to initialize
+ * @return if the initialization succeeded
  */
-FILE* popen_watchdog(const char* command, bool* ret);
+[[nodiscard]] bool popen_watchdog_init(popen_watchdog_data_t **data);
+
+/**
+ * @brief starts the popen watchdog, which monitors the given command and kills
+ * it if it hangs
+ *
+ * @param data the data structure containing the command to monitor
+ * @return true if the watchdog was successfully started, false otherwise
+ */
+bool popen_watchdog_start(popen_watchdog_data_t *data);
+
+/**
+ * @brief stops the popen watchdog, which monitors the given command and kills
+ * it if it hangs
+ *
+ * @param data the data structure containing the command to monitor
+ */
+void popen_watchdog_stop(popen_watchdog_data_t *data);
+
+/**
+ * @brief Checks if the watchdog has been activated for the given popen data.
+ *
+ * @param data The data structure containing the popen information.
+ * @return true if the watchdog activated, false otherwise.
+ */
+bool popen_watchdog_activated(popen_watchdog_data_t *data);
 
 #ifdef __cplusplus
 }
