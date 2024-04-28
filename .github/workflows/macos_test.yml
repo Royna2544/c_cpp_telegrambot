@@ -23,9 +23,9 @@ jobs:
 
       - name: Compile with Apple Clang
         env: 
-          CC: /usr/local/opt/llvm/bin/clang
-          CXX: /usr/local/opt/llvm/bin/clang++
-          LDFLAGS: "-L/usr/local/opt/protobuf/lib -L/usr/local/opt/abseil/lib"
+          CC: /opt/homebrew/opt/llvm/bin/clang
+          CXX: /opt/homebrew/opt/llvm/bin/clang++
+          LDFLAGS: "-L/opt/homebrew/opt/protobuf/lib -L/opt/homebrew/opt/abseil/lib"
         run: |
           mkdir build
           cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release .
