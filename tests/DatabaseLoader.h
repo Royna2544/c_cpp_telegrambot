@@ -1,5 +1,5 @@
 #pragma once
 
-#include <Database.h>
+#include <DatabaseBot.hpp>
 
-extern database::DatabaseWrapperImpl& loadDb();
+extern DefaultDatabase& loadDb();

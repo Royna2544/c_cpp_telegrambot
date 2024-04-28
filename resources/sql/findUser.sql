@@ -1,0 +1,1 @@
+SELECT info FROM usermap WHERE userid=?

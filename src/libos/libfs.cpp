@@ -85,7 +85,12 @@ std::filesystem::path FS::getPathForType(PathType type) {
                 path = std::filesystem::path(argv[0]).parent_path();
                 ok = true;
             }
+            break;
         }
+        case PathType::RESOURCES_SQL:
+            path = getPathForType(PathType::RESOURCES) / "sql";
+            ok = true;
+            break;
     }
     if (ok) {
         path.make_preferred();

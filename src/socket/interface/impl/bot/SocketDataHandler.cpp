@@ -1,6 +1,5 @@
 #include <BotReplyMessage.h>
 #include <ChatObserver.h>
-#include <Database.h>
 #include <ResourceManager.h>
 #include <SingleThreadCtrl.h>
 #include <SocketConnectionHandler.h>
@@ -12,6 +11,7 @@
 #include <socket/TgBotSocket.h>
 #include <tgbot/types/InputFile.h>
 
+#include <DatabaseBot.hpp>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
@@ -42,7 +42,7 @@ static std::string getMIMEString(const std::string& path) {
                 oneJsonElement["types"].GetArray();
             for (rapidjson::SizeType i = 0; i < availableTypes.Size(); i++) {
                 if (availableTypes[i].GetString() == extension) {
-                    const auto *mime = oneJsonElement["name"].GetString();
+                    const auto* mime = oneJsonElement["name"].GetString();
                     LOG(INFO) << "Found MIME type: '" << mime << "'";
                     return mime;
                 }
@@ -61,7 +61,7 @@ void socketConnectionHandler(const Bot& bot, struct TgBotCommandPacket pkt) {
 
     switch (pkt.header.cmd) {
         case CMD_WRITE_MSG_TO_CHAT_ID: {
-            auto *data = reinterpret_cast<WriteMsgToChatId*>(ptr);
+            auto* data = reinterpret_cast<WriteMsgToChatId*>(ptr);
             try {
                 bot_sendMessage(bot, data->to, data->msg);
             } catch (const TgBot::TgException& e) {
@@ -74,7 +74,7 @@ void socketConnectionHandler(const Bot& bot, struct TgBotCommandPacket pkt) {
             break;
         case CMD_OBSERVE_CHAT_ID: {
             const std::lock_guard<std::mutex> _(obs.m);
-            auto *data = reinterpret_cast<ObserveChatId*>(ptr);
+            auto* data = reinterpret_cast<ObserveChatId*>(ptr);
             auto it = std::find(obs.observedChatIds.begin(),
                                 obs.observedChatIds.end(), data->id);
             bool observe = data->observe;
@@ -186,10 +186,9 @@ void socketConnectionHandler(const Bot& bot, struct TgBotCommandPacket pkt) {
             auto now = std::chrono::system_clock::now();
             if (startTp) {
                 const auto diff = now - *startTp;
-                const auto& dbwrapper =
-                    database::DatabaseWrapperBotImplObj::getInstance();
+                const auto& dbwrapper = DefaultBotDatabase::getInstance();
                 LOG(INFO) << "Uptime: " << to_string(diff);
-                bot_sendMessage(bot, dbwrapper.maybeGetOwnerId(),
+                bot_sendMessage(bot, dbwrapper.getOwnerUserId(),
                                 "Uptime is " + to_string(diff));
             } else {
                 LOG(ERROR) << "StartTp is not set";

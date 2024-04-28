@@ -91,7 +91,7 @@ void CompilerInTg::runCommand(const Message::Ptr &message, std::string cmd,
     }
 }
 
-static std::optional<std::string> findCommandExe(std::string command) {
+static std::optional<std::string> findCommandExe(const std::string& command) {
     static std::string path;
     static std::once_flag once;
     static bool valid;

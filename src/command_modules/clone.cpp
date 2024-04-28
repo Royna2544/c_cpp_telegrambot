@@ -1,13 +1,14 @@
 #include <BotReplyMessage.h>
+#include <CStringLifetime.h>
 #include <ExtArgs.h>
 #include <absl/log/log.h>
+#include <internal/_tgbot.h>
 
+#include <DatabaseBot.hpp>
+#include <TryParseStr.hpp>
 #include <sstream>
 
-#include "CStringLifetime.h"
 #include "CommandModule.h"
-#include "Database.h"
-#include "internal/_tgbot.h"
 
 static void CloneCommandFn(const Bot& bot, const Message::Ptr message) {
     UserId uid = 0;
@@ -16,13 +17,9 @@ static void CloneCommandFn(const Bot& bot, const Message::Ptr message) {
     static TgBot::User::Ptr botUser = bot.getApi().getMe();
 
     if (hasExtArgs(message)) {
-        std::string extArgs;
-        parseExtArgs(message, extArgs);
-        try {
-            uid = std::stol(extArgs);
-            ok = true;
-        } catch (...) {
+        if (!try_parse(parseExtArgs(message), &uid)) {
             bot_sendReplyMessage(bot, message, "Invalid user id");
+            return;
         }
     } else if (message->replyToMessage) {
         uid = message->replyToMessage->from->id;
@@ -36,8 +33,7 @@ static void CloneCommandFn(const Bot& bot, const Message::Ptr message) {
             auto user = member->user;
             CStringLifetime userName = UserPtr_toString(user);
             std::stringstream ss;
-            ChatId ownerId = database::DatabaseWrapperBotImplObj::getInstance()
-                                 .maybeGetOwnerId();
+            ChatId ownerId = DefaultBotDatabase::getInstance().getOwnerUserId();
 
             LOG(INFO) << "Clone: Dest user: " << userName.get();
             bot_sendReplyMessage(bot, message, "Cloning... (see PM)");

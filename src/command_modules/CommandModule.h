@@ -10,11 +10,11 @@ struct CompilerModule;
 struct CommandModule : TgBot::BotCommand, BotInitCall {
     enum Flags { None = 0, Enforced = 1 << 0, HideDescription = 1 << 1 };
     command_callback_t fn;
-    int flags;
+    int flags{};
 
     explicit CommandModule(const std::string &name,
                            const std::string &description, int flags,
-                           command_callback_t fn)
+                           command_callback_t fn) noexcept
         : fn(fn), flags(flags) {
         this->command = name;
         this->description = description;

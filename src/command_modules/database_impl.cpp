@@ -1,51 +1,106 @@
 #include <BotReplyMessage.h>
-#include <Database.h>
 #include <ExtArgs.h>
+#include <tgbot/tools/StringTools.h>
 
+#include <DatabaseBot.hpp>
+#include <database/DatabaseBase.hpp>
 #include <optional>
 
 #include "CommandModule.h"
-#include "tgbot/tools/StringTools.h"
 
-static database::DatabaseWrapperImplObj& getDatabaseWrapper() {
-    return database::DatabaseWrapperImplObj::getInstance();
+namespace {
+bool checkDatabaseCommand(const Bot& bot, const Message::Ptr& message) {
+    if (!(message->replyToMessage && message->replyToMessage->from)) {
+        bot_sendReplyMessage(bot, message, "Reply to a user's message");
+        return false;
+    }
+    return true;
+}
+}  // namespace
+
+template <DatabaseBase::ListType type>
+void handleAddUser(const Bot& bot, const Message::Ptr& message) {
+    auto& base = DefaultBotDatabase::getInstance();
+    if (!checkDatabaseCommand(bot, message)) {
+        return;
+    }
+    auto res = base.addUserToList(type, message->replyToMessage->from->id);
+    std::string text;
+    switch (res) {
+        case DatabaseBase::ListResult::OK:
+            text = "User added to list";
+            break;
+        case DatabaseBase::ListResult::ALREADY_IN_LIST:
+            text = "User is already in the list";
+            break;
+        case DatabaseBase::ListResult::ALREADY_IN_OTHER_LIST:
+            text = "User is already in another list";
+            break;
+        case DatabaseBase::ListResult::BACKEND_ERROR:
+            text = "Backend error";
+            break;
+        default:
+            LOG(ERROR) << "Unhandled result type " << static_cast<int>(res);
+            text = "Unknown error";
+    }
+    bot_sendReplyMessage(bot, message, text);
+}
+
+template <DatabaseBase::ListType type>
+void handleRemoveUser(const Bot& bot, const Message::Ptr& message) {
+    auto& base = DefaultBotDatabase::getInstance();
+    if (!checkDatabaseCommand(bot, message)) {
+        return;
+    }
+    auto res = base.removeUserFromList(type, message->replyToMessage->from->id);
+    std::string text;
+    switch (res) {
+        case DatabaseBase::ListResult::OK:
+            text = "User removed from list";
+            break;
+        case DatabaseBase::ListResult::NOT_IN_LIST:
+            text = "User is not in the list";
+            break;
+        case DatabaseBase::ListResult::ALREADY_IN_OTHER_LIST:
+            text = "User is already in another list";
+            break;
+        case DatabaseBase::ListResult::BACKEND_ERROR:
+            text = "Backend error";
+            break;
+        default:
+            LOG(ERROR) << "Unhandled result type " << static_cast<int>(res);
+            text = "Unknown error";
+    }
+    bot_sendReplyMessage(bot, message, text);
 }
 
 struct CommandModule cmd_addblacklist(
     "addblacklist", "Add blacklisted user to the database",
     CommandModule::Flags::Enforced | CommandModule::Flags::HideDescription,
     [](const Bot& bot, const Message::Ptr& message) {
-        getDatabaseWrapper().blacklist->addToDatabase(message);
+        handleAddUser<DatabaseBase::ListType::BLACKLIST>(bot, message);
     });
 
 struct CommandModule cmd_rmblacklist(
     "rmblacklist", "Remove blacklisted user from the database",
     CommandModule::Flags::Enforced | CommandModule::Flags::HideDescription,
-    [](const Bot& bot, const Message::Ptr& message) {
-        getDatabaseWrapper().blacklist->removeFromDatabase(message);
-    });
+    handleRemoveUser<DatabaseBase::ListType::BLACKLIST>);
 
 struct CommandModule cmd_addwhitelist(
     "addwhitelist", "Add whitelisted user to the database",
     CommandModule::Flags::Enforced | CommandModule::Flags::HideDescription,
-    [](const Bot& bot, const Message::Ptr& message) {
-        getDatabaseWrapper().whitelist->addToDatabase(message);
-    });
+    handleAddUser<DatabaseBase::ListType::WHITELIST>);
 
 struct CommandModule cmd_rmwhitelist(
     "rmwhitelist", "Remove whitelisted user from the database",
     CommandModule::Flags::Enforced | CommandModule::Flags::HideDescription,
-    [](const Bot& bot, const Message::Ptr& message) {
-        getDatabaseWrapper().whitelist->removeFromDatabase(message);
-    });
+    handleRemoveUser<DatabaseBase::ListType::WHITELIST>);
 
 static void saveIdFn(const Bot& bot, const Message::Ptr& message) {
-    const auto mutableMediaDB =
-        getDatabaseWrapper().protodb.mutable_mediatonames();
-
     if (hasExtArgs(message)) {
         std::string names;
-        std::optional<std::string> fileId, fileUniqueId;
+        std::optional<std::string> fileId;
+        std::optional<std::string> fileUniqueId;
         parseExtArgs(message, names);
 
         if (message->replyToMessage) {
@@ -57,33 +112,27 @@ static void saveIdFn(const Bot& bot, const Message::Ptr& message) {
                 fileUniqueId = it->fileUniqueId;
             }
         }
-        if (fileId) {
-            if (const auto mediaSize = mutableMediaDB->size(); mediaSize > 0) {
-                for (int i = 0; i < mediaSize; ++i) {
-                    const auto& it = mutableMediaDB->Get(i);
-                    if (it.has_telegrammediauniqueid() &&
-                        fileUniqueId == it.telegrammediauniqueid()) {
-                        bot_sendReplyMessage(
-                            bot, message,
-                            "FileUniqueId already exists on MediaDatabase");
-                        return;
-                    }
-                }
-            }
+        if (fileId && fileUniqueId) {
+            DatabaseBase::MediaInfo info{};
             const auto namevec = StringTools::split(names, '/');
-            auto ent = mutableMediaDB->Add();
-            std::stringstream ss;
+            auto const& backend = DefaultBotDatabase::getInstance();
+            info.mediaId = fileId.value();
+            info.mediaUniqueId = fileUniqueId.value();
 
-            ent->set_telegrammediaid(*fileId);
-            ent->set_telegrammediauniqueid(*fileUniqueId);
+            std::stringstream ss;
             ss << "Media " << *fileUniqueId << " (fileUniqueId) added"
                << std::endl;
             ss << "With names:" << std::endl;
             for (const auto& names : namevec) {
-                *ent->add_names() = names;
+                info.names = names;
                 ss << "- " << names << std::endl;
             }
-            bot_sendReplyMessage(bot, message, ss.str());
+            if (backend.addMediaInfo(info)) {
+                bot_sendReplyMessage(bot, message, ss.str());
+            } else {
+                bot_sendReplyMessage(bot, message,
+                                     "Media is already in database");
+            }
         } else {
             bot_sendReplyMessage(bot, message, "Reply to a GIF or sticker");
         }

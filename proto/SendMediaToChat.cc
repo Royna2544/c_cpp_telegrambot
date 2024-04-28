@@ -1,13 +1,14 @@
-#include <Database.h>
 #include <Types.h>
 #include <absl/log/initialize.h>
 #include <absl/log/log.h>
 #include <socket/TgBotSocket.h>
 
+#include <DatabaseBot.hpp>
 #include <cstdlib>
 #include <cstring>
+#include <iostream>
 #include <string>
-#include "SocketData.hpp"
+
 #include "impl/InterfaceSelector.hpp"
 
 #ifdef _MSC_VER
@@ -23,46 +24,34 @@
 int main(int argc, char* const* argv) {
     ChatId chatId = 0;
     TgBotCommandData::SendFileToChatId data = {};
-    const auto _usage = std::bind(usage, argv[0], std::placeholders::_1);
-    auto& DBWrapper = database::DatabaseWrapperImplObj::getInstance();
+    const auto _usage = [capture0 = argv[0]](auto&& PH1) {
+        usage(capture0, std::forward<decltype(PH1)>(PH1));
+    };
+    auto backend = DefaultDatabase();
 
     absl::InitializeLog();
     if (argc != 3) {
         _usage(EXIT_SUCCESS);
     }
-    DBWrapper.load();
+    backend.loadDatabaseFromFile(DefaultBotDatabase::getDatabaseDefaultPath());
     try {
         chatId = std::stoll(argv[1]);
     } catch (...) {
         LOG(ERROR) << "Failed to convert '" << argv[1] << "' to ChatId";
         _usage(EXIT_FAILURE);
     }
-    const auto mediaEntries = DBWrapper.protodb.mediatonames();
-    std::optional<tgbot::proto::MediaToName> it;
-    for (int i = 0; i < mediaEntries.size(); ++i) {
-        const auto mediaEntriesIt = mediaEntries.Get(i);
-        if (const auto mediaEntriesNames = mediaEntriesIt.names();
-            mediaEntriesNames.size() > 0) {
-            for (int j = 0; j < mediaEntriesNames.size(); ++j) {
-                if (!strcasecmp(mediaEntriesNames.Get(j).c_str(), argv[2])) {
-                    it = mediaEntriesIt;
-                    break;
-                }
-            }
-        }
-    }
-    if (!it) {
+    auto info = backend.queryMediaInfo(argv[2]);
+    if (!info.has_value()) {
         LOG(ERROR) << "Failed to find entry for name '" << argv[2] << "'";
         return EXIT_FAILURE;
     } else {
-        LOG(INFO) << "Found, sending (fileid " << it->telegrammediaid()
-                  << ") to chat " << chatId;
+        LOG(INFO) << "Found, sending (fileid " << info->mediaId << ") to chat "
+                  << chatId;
     }
-    strncpy(data.filepath, it->telegrammediaid().c_str(),
-            sizeof(data.filepath) - 1);
+    strncpy(data.filepath, info->mediaId.c_str(), sizeof(data.filepath) - 1);
     data.id = chatId;
     data.type = TYPE_DOCUMENT;
-    
+
     struct TgBotCommandPacket pkt(CMD_SEND_FILE_TO_CHAT_ID, data);
     SocketInternalInterface().writeToSocket(pkt.toSocketData());
 }

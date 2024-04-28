@@ -1,4 +1,4 @@
-#include <Database.h>
+#include <DatabaseBot.hpp>
 #include <SingleThreadCtrl.h>
 
 #include <mutex>
@@ -14,5 +14,5 @@ void defaultSignalHandler(int s) {
 void defaultCleanupFunction() {
     LOG(INFO) << "Exiting";
     SingleThreadCtrlManager::getInstance().destroyManager();
-    database::DatabaseWrapperImplObj::getInstance().save();
+    DefaultBotDatabase::getInstance().unloadDatabase();
 }

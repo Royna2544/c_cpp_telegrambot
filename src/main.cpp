@@ -1,6 +1,5 @@
 #include <Authorization.h>
 #include <ConfigManager.h>
-#include <Database.h>
 #include <RegEXHandler.h>
 #include <ResourceManager.h>
 #include <SingleThreadCtrl.h>
@@ -15,14 +14,19 @@
 #include <command_modules/CommandModule.h>
 #include <internal/_std_chrono_templates.h>
 #include <libos/libsighandler.h>
-#include <socket/interface/SocketBase.hpp>
 
+#include <DatabaseBot.hpp>
 #include <OnAnyMessageRegister.hpp>
 #include <chrono>
+#include <filesystem>
+#include <ios>
+#include <socket/interface/SocketBase.hpp>
+#include <socket/interface/impl/bot/TgBotSocketInterface.hpp>
 
 #include "DurationPoint.hpp"
+#include "InstanceClassBase.hpp"
+#include "database/DatabaseBase.hpp"
 #include "socket/TgBotSocket.h"
-#include <socket/interface/impl/bot/TgBotSocketInterface.hpp>
 
 #ifdef RTCOMMAND_LOADER
 #include <RTCommandLoader.h>
@@ -112,6 +116,8 @@ struct LogFileSink : absl::LogSink {
     FILE* fp_ = nullptr;
 };
 
+#include <database/SQLiteDatabase.hpp>
+
 int main(int argc, char* const* argv) {
     std::optional<std::string> token;
     std::optional<LogFileSink> log_sink;
@@ -124,6 +130,7 @@ int main(int argc, char* const* argv) {
         ConfigManager::printHelp();
         return EXIT_SUCCESS;
     }
+
     if (const auto it = ConfigManager::getVariable("LOG_FILE"); it) {
         log_sink = LogFileSink();
         log_sink->init(*it);
@@ -148,7 +155,7 @@ int main(int argc, char* const* argv) {
     createAndDoInitCall<SpamBlockManager>(gBot);
     createAndDoInitCall<SocketInterfaceTgBot>(gBot);
     createAndDoInitCall<CommandModule>(gBot);
-    createAndDoInitCall<database::DatabaseWrapperBotImplObj>(gBot);
+    createAndDoInitCall<DefaultBotDatabase>(gBot);
     createAndDoInitCall<ChatObserver>(gBot);
     createAndDoInitCall<ResourceManager>();
     // Must be last
@@ -174,8 +181,7 @@ int main(int argc, char* const* argv) {
         } catch (const TgBot::TgException& e) {
             LOG(ERROR) << "TgBotAPI Exception: ", e.what();
             LOG(WARNING) << "Trying to recover";
-            UserId ownerid = database::DatabaseWrapperImplObj::getInstance()
-                                 .maybeGetOwnerId();
+            UserId ownerid = DefaultBotDatabase::getInstance().getOwnerUserId();
             try {
                 bot_sendMessage(gBot, ownerid,
                                 std::string("Exception occured: ") + e.what());

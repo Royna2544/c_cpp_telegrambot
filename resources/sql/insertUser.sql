@@ -1,0 +1,1 @@
+INSERT INTO usermap VALUES (?, ?);

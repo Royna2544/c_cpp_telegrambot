@@ -19,3 +19,6 @@
 [submodule "src/third-party/protobuf"]
 	path = src/third-party/protobuf
 	url = https://github.com/roynatech2544/protobuf.git
+[submodule "src/third-party/libsqlite3"]
+	path = src/third-party/libsqlite3
+	url = git://git.build2.org/packaging/sqlite/sqlite.git
