@@ -1,7 +1,9 @@
 #include <BotReplyMessage.h>
 #include <mutex>
 
+#include "BotAddCommand.h"
 #include "cmd_dynamic.h"
+#include "command_modules/CommandModule.h"
 
 static void cmd_DT(const Bot& bot, const Message::Ptr& message) {
     static std::once_flag once;
@@ -28,8 +30,10 @@ static void cmd_DT(const Bot& bot, const Message::Ptr& message) {
 }
 
 extern "C" {
-struct dynamicCommandModule DYN_COMMAND_SYM {
-    .mod = CommandModule("dtstate", "Update DT state",
-                         CommandModule::Flags::Enforced, cmd_DT)
+void DYN_COMMAND_SYM (CommandModule &module) {
+    module.command = "dtstate";
+    module.description = "Toggle DT State";
+    module.fn = cmd_DT;
+    module.flags = CommandModule::Flags::Enforced;
 };
 }

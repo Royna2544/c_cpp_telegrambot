@@ -38,6 +38,10 @@ static void DelayCommandFn(const Bot& bot, const Message::Ptr message) {
     ss << "Sending reply message took: " << tp.count() << "ms" << std::endl;
     bot_editMessage(bot, sentMsg, ss.str());
 }
-
-struct CommandModule cmd_delay("delay", "Ping the bot for network delay",
-                               CommandModule::Flags::None, DelayCommandFn);
+   
+void loadcmd_delay(CommandModule& module) {
+    module.command = "delay";
+    module.description = "Ping the bot for network delay";
+    module.flags = CommandModule::Flags::None;
+    module.fn = DelayCommandFn;
+}

@@ -187,23 +187,24 @@ set(SRC_LIST
 ######### Commands modules (The commands handler of the bot) #########
 ################ Commands module in a single file list ################
 set(CMD_MODULES_SINGLE_LIST alive flash possibility decide delay decho
-                            randsticker fileid rtload clone spam)
+                            randsticker fileid clone spam)
 if (NOT WIN32)
   set(CMD_MODULES_SINGLE_LIST ${CMD_MODULES_SINGLE_LIST} ibash restart)
 endif()
+extend_set_if(ENABLE_RUNTIME_COMMAND CMD_MODULES_SINGLE_LIST rtload)
 ######################## Commands sources list ########################
-set(CMD_MODULES_SOURCES_LIST database_impl bash_impl ${CMD_MODULES_SINGLE_LIST} timer_impl)
+set(CMD_MODULES_SOURCES_LIST database_impl bash_impl ${CMD_MODULES_SINGLE_LIST} 
+      timer_impl)
 ######################## Commands modules list ########################
-set(CMD_MODULES_LIST addblacklist rmblacklist addwhitelist 
-      rmwhitelist bash ubash ${CMD_MODULES_SINGLE_LIST}
+set(CMD_MODULES_LIST database bash ubash ${CMD_MODULES_SINGLE_LIST}
       starttimer stoptimer saveid start)
 ####################### Commands modules defines #######################
 set(COMMANDS_CWD src/command_modules)
 set(COMMANDS_GEN_FILE ${COMMANDS_CWD}/gen/cmds.gen.cpp)
 ########## Generate commands modules list in compile time (cpp) ##########
 macro(append_cmdlib lib)
-  string(APPEND COMMANDS_MODULES_DECL "extern CommandModule cmd_${lib};\n")
-  string(APPEND COMMANDS_MODULES_PTR "&cmd_${lib}")
+  string(APPEND COMMANDS_MODULES_DECL "extern void loadcmd_${lib}(CommandModule &cmd);\n")
+  string(APPEND COMMANDS_MODULES_PTR "&loadcmd_${lib}")
 endmacro()
 
 list(GET CMD_MODULES_LIST 0 COMMANDS_MODULES_FIRST_ELEM)

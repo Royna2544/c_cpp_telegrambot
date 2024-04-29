@@ -163,22 +163,3 @@ enum class ProgrammingLangs {
  * @return Whether it have found the compiler path
  */
 bool findCompiler(ProgrammingLangs lang, std::string& path);
-
-/**
- * command_callback_compiler_t - callback function for a compiler related
- * command handler Passes a Bot reference object and callback message pointer,
- * and additionally compiler exe path as string
- */
-using command_callback_compiler_t = std::function<void(
-    const Bot &, const Message::Ptr &, const std::string &compiler)>;
-
-struct CompilerModule : CommandModule {
-    ProgrammingLangs lang;
-    command_callback_compiler_t cb;
-    explicit CompilerModule(std::string cmd, ProgrammingLangs lang,
-                            command_callback_compiler_t cb)
-        : lang(lang), cb(cb) {
-        flags = Enforced | HideDescription;
-        command = cmd;
-    }
-};

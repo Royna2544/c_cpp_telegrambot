@@ -45,6 +45,9 @@ static void restartCommandFn(const Bot &bot, const Message::Ptr message) {
     delete[] myEnviron;
 }
 
-struct CommandModule cmd_restart("restart", "Restarts the bot",
-                                 CommandModule::Flags::Enforced,
-                                 restartCommandFn);
+void loadcmd_restart(CommandModule& module) {
+    module.command = "restart";
+    module.description = "Restarts the bot";
+    module.flags = CommandModule::Flags::None;
+    module.fn = restartCommandFn;
+}

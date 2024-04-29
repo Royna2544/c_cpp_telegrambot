@@ -29,6 +29,9 @@ static void RandomStickerCommandFn(const Bot &bot, const Message::Ptr message) {
     }
 }
 
-struct CommandModule cmd_randsticker("randsticker",
-    "Random sticker from that pack",
-    CommandModule::Flags::None, RandomStickerCommandFn);
+void loadcmd_randsticker(CommandModule& module) {
+    module.command = "randsticker";
+    module.description = "Random sticker from that pack";
+    module.flags = CommandModule::Flags::None;
+    module.fn = RandomStickerCommandFn;
+}

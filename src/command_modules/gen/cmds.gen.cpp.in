@@ -3,9 +3,29 @@
 
 @COMMANDS_MODULES_DECL@
 
-std::vector<CommandModule *> &CommandModule::getLoadedModules() {
-   static std::vector<CommandModule *> gCmdModules = {
+void CommandModule::loadCommandModules(Bot &bot) {
+   std::vector<command_loader_function_t> cmdModuleFunctions = {
       @COMMANDS_MODULES_PTR@
    };
-   return gCmdModules;
+   for (const auto &fn : cmdModuleFunctions) {
+      CommandModule module;
+      try {
+         fn(module);
+      } catch (const std::exception &e) {
+         LOG(ERROR) << "Failed to load command module: " << module.command 
+            << ": " << e.what();
+         continue;
+      }
+      loadedModules.emplace_back(module);
+      if (module.fn) {
+         if (module.isEnforced()) {
+            bot_AddCommandEnforced(bot, module.command, module.fn);
+         } else {
+            bot_AddCommandPermissive(bot, module.command, module.fn);
+         }
+      } else {
+         LOG(ERROR) << "Invalid command module " << module.command
+                    << ": No functions provided";
+      }
+   }
 }

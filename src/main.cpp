@@ -150,7 +150,9 @@ int main(int argc, char* const* argv) {
     static Bot gBot(token.value());
 #endif
 
+#ifdef RTCOMMAND_LOADER
     createAndDoInitCall<RTCommandLoader>(gBot);
+#endif
     createAndDoInitCall<RegexHandler>(gBot);
     createAndDoInitCall<SpamBlockManager>(gBot);
     createAndDoInitCall<SocketInterfaceTgBot>(gBot);

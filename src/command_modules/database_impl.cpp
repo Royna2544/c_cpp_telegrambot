@@ -7,23 +7,11 @@
 #include <optional>
 
 #include "CommandModule.h"
-
-namespace {
-bool checkDatabaseCommand(const Bot& bot, const Message::Ptr& message) {
-    if (!(message->replyToMessage && message->replyToMessage->from)) {
-        bot_sendReplyMessage(bot, message, "Reply to a user's message");
-        return false;
-    }
-    return true;
-}
-}  // namespace
+#include "tgbot/types/Message.h"
 
 template <DatabaseBase::ListType type>
 void handleAddUser(const Bot& bot, const Message::Ptr& message) {
     auto& base = DefaultBotDatabase::getInstance();
-    if (!checkDatabaseCommand(bot, message)) {
-        return;
-    }
     auto res = base.addUserToList(type, message->replyToMessage->from->id);
     std::string text;
     switch (res) {
@@ -49,9 +37,6 @@ void handleAddUser(const Bot& bot, const Message::Ptr& message) {
 template <DatabaseBase::ListType type>
 void handleRemoveUser(const Bot& bot, const Message::Ptr& message) {
     auto& base = DefaultBotDatabase::getInstance();
-    if (!checkDatabaseCommand(bot, message)) {
-        return;
-    }
     auto res = base.removeUserFromList(type, message->replyToMessage->from->id);
     std::string text;
     switch (res) {
@@ -73,30 +58,57 @@ void handleRemoveUser(const Bot& bot, const Message::Ptr& message) {
     }
     bot_sendReplyMessage(bot, message, text);
 }
+namespace {
 
-struct CommandModule cmd_addblacklist(
-    "addblacklist", "Add blacklisted user to the database",
-    CommandModule::Flags::Enforced | CommandModule::Flags::HideDescription,
-    [](const Bot& bot, const Message::Ptr& message) {
-        handleAddUser<DatabaseBase::ListType::BLACKLIST>(bot, message);
-    });
+constexpr std::string_view whitelist = "whitelist";
+constexpr std::string_view blacklist = "blacklist";
+constexpr std::string_view add = "add";
+constexpr std::string_view remove = "remove";
 
-struct CommandModule cmd_rmblacklist(
-    "rmblacklist", "Remove blacklisted user from the database",
-    CommandModule::Flags::Enforced | CommandModule::Flags::HideDescription,
-    handleRemoveUser<DatabaseBase::ListType::BLACKLIST>);
+void handleDatabaseCmd(const Bot& bot, const Message::Ptr& message) {
+    if (!(message->replyToMessage && message->replyToMessage->from)) {
+        bot_sendReplyMessage(bot, message, "Reply to a user's message");
+    } else if (hasExtArgs(message)) {
+        const auto args = StringTools::split(parseExtArgs(message), ' ');
+        std::function<void(const Bot&, const Message::Ptr&)> handler;
+        std::string errorMessage;
 
-struct CommandModule cmd_addwhitelist(
-    "addwhitelist", "Add whitelisted user to the database",
-    CommandModule::Flags::Enforced | CommandModule::Flags::HideDescription,
-    handleAddUser<DatabaseBase::ListType::WHITELIST>);
+        if (args.size() != 2) {
+            errorMessage =
+                "Invalid arguments supplied. "
+                "Example: /database whitelist add";
+        } else {
+            if (args[0] == whitelist) {
+                if (args[1] == add) {
+                    handler = handleAddUser<DatabaseBase::ListType::WHITELIST>;
+                } else if (args[1] == remove) {
+                    handler =
+                        handleRemoveUser<DatabaseBase::ListType::WHITELIST>;
+                } else {
+                    errorMessage = "Invalid argument for [operation]";
+                }
+            } else if (args[0] == blacklist) {
+                if (args[1] == add) {
+                    handler = handleAddUser<DatabaseBase::ListType::BLACKLIST>;
+                } else if (args[1] == remove) {
+                    handler =
+                        handleRemoveUser<DatabaseBase::ListType::BLACKLIST>;
+                } else {
+                    errorMessage = "Invalid argument for [operation]";
+                }
+            } else {
+                errorMessage = "Invalid argument for [listtype]";
+            }
+        }
+        if (handler) {
+            handler(bot, message);
+        } else {
+            bot_sendReplyMessage(bot, message, errorMessage);
+        }
+    }
+};
 
-struct CommandModule cmd_rmwhitelist(
-    "rmwhitelist", "Remove whitelisted user from the database",
-    CommandModule::Flags::Enforced | CommandModule::Flags::HideDescription,
-    handleRemoveUser<DatabaseBase::ListType::WHITELIST>);
-
-static void saveIdFn(const Bot& bot, const Message::Ptr& message) {
+void handleSaveIdCmd(const Bot& bot, const Message::Ptr& message) {
     if (hasExtArgs(message)) {
         std::string names;
         std::optional<std::string> fileId;
@@ -141,7 +153,20 @@ static void saveIdFn(const Bot& bot, const Message::Ptr& message) {
     }
 }
 
-// clang-format off
-struct CommandModule cmd_saveid("saveid",
-    "Save media to MediaDatabase for later use",
-    CommandModule::Flags::Enforced | CommandModule::Flags::HideDescription, saveIdFn);
+}  // namespace
+
+void loadcmd_database(CommandModule& module) {
+    module.command = "database";
+    module.description = "Run database commands";
+    module.flags = CommandModule::Flags::Enforced;
+    module.fn = handleDatabaseCmd;
+}
+
+void loadcmd_saveid(CommandModule& module) {
+    module.command = "saveid";
+    module.description =
+        "Save database information about media for later retrieval";
+    module.flags =
+        CommandModule::Flags::Enforced | CommandModule::Flags::HideDescription;
+    module.fn = handleSaveIdCmd;
+}

@@ -10,9 +10,11 @@ static void cmdTest(const Bot& bot, const Message::Ptr& message) {
 static bool isSupported(void) { return false; }
 
 extern "C" {
-struct dynamicCommandModule DYN_COMMAND_SYM {
-    .mod = CommandModule("test", "Test Command", CommandModule::Flags::Enforced,
-                         cmdTest),
-    .isSupported = isSupported,
+void DYN_COMMAND_SYM (CommandModule &module) {
+    module.command = "test";
+    module.description = "Test module to test RTLoader";
+    module.fn = cmdTest;
+    module.flags = CommandModule::Flags::Enforced;
+    //throw unsupported_command_error("Test module");
 };
 }

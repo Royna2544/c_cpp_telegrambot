@@ -61,5 +61,10 @@ static void CloneCommandFn(const Bot& bot, const Message::Ptr message) {
         }
     }
 }
-struct CommandModule cmd_clone("clone", "Clones identity of a user",
-                               CommandModule::Flags::Enforced, CloneCommandFn);
+ 
+void loadcmd_clone(CommandModule &module) {
+    module.command = "clone";
+    module.description = "Clones identity of a user";
+    module.flags = CommandModule::Flags::Enforced;
+    module.fn = CloneCommandFn;
+}

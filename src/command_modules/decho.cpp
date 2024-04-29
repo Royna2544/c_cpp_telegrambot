@@ -40,5 +40,9 @@ static void DeleteEchoCommandFn(const Bot &bot, const Message::Ptr message) {
     }
 }
 
-struct CommandModule cmd_decho("decho", "Delete and echo message",
-                               CommandModule::Flags::None, DeleteEchoCommandFn);
+void loadcmd_decho(CommandModule& module) {
+    module.command = "decho";
+    module.description = "Delete and echo message";
+    module.flags = CommandModule::Flags::None;
+    module.fn = DeleteEchoCommandFn;
+}

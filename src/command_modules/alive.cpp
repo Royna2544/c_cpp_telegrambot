@@ -63,9 +63,16 @@ static void AliveCommandFn(const Bot& bot, const Message::Ptr message) {
     }
 }
 
-struct CommandModule cmd_alive("alive", "Test the bot if alive",
-                               CommandModule::Flags::None, AliveCommandFn);
+void loadcmd_alive(CommandModule &module) {
+    module.command = "alive";
+    module.description = "Test if a bot is alive";
+    module.flags = CommandModule::Flags::None;
+    module.fn = AliveCommandFn;
+}
 
-struct CommandModule cmd_start("start", "Alias for alive command",
-                               CommandModule::Flags::HideDescription,
-                               AliveCommandFn);
+void loadcmd_start(CommandModule &module) {
+    module.command = "start";
+    module.description = "Alias for alive command";
+    module.flags = CommandModule::Flags::HideDescription;
+    module.fn = AliveCommandFn;
+}

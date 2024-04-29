@@ -356,6 +356,9 @@ static void InteractiveBashCommandFn(const Bot& bot,
     }
 }
 
-struct CommandModule cmd_ibash("ibash", "Interactive bash",
-                               CommandModule::Flags::Enforced,
-                               InteractiveBashCommandFn);
+void loadcmd_ibash(CommandModule& module) {
+    module.command = "ibash";
+    module.description = "Interactive bash";
+    module.flags = CommandModule::Flags::Enforced;
+    module.fn = InteractiveBashCommandFn;
+}

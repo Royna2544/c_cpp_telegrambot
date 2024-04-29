@@ -64,5 +64,9 @@ static void FlashCommandFn(const Bot &bot, const Message::Ptr message) {
     bot_editMessage(bot, sentmsg, ss.str());
 }
 
-struct CommandModule cmd_flash("flash", "Flash and get a random result",
-                               CommandModule::Flags::None, FlashCommandFn);
+void loadcmd_flash(CommandModule& module) {
+    module.command = "flash";
+    module.description = "Flash and get a random result";
+    module.flags = CommandModule::Flags::None;
+    module.fn = FlashCommandFn;
+}

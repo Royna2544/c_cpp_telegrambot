@@ -87,5 +87,9 @@ static void SpamCommandFn(const Bot& bot, const Message::Ptr message) {
     for_count(count, fp);
 }
 
-struct CommandModule cmd_spam("spam", "Spam a given literal or media",
-                              CommandModule::Flags::Enforced, SpamCommandFn);
+void loadcmd_spam(CommandModule& module) {
+    module.command = "spam";
+    module.description = "Spam a given literal or media";
+    module.flags = CommandModule::Flags::Enforced;
+    module.fn = SpamCommandFn;
+}

@@ -46,7 +46,9 @@ void RTLoadCommandFn(Bot& bot, const Message::Ptr message) {
     }
 }
 
-struct CommandModule cmd_rtload("rtload", "Runtime load command",
-                                CommandModule::Flags::Enforced |
-                                    CommandModule::Flags::HideDescription,
-                                RTLoadCommandFn);
+void loadcmd_rtload(CommandModule& module) {
+    module.command = "rtload";
+    module.description = "Runtime load command";
+    module.flags = CommandModule::Flags::None;
+    module.fn = RTLoadCommandFn;
+}

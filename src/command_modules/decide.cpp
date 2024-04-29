@@ -18,7 +18,8 @@ static void DecideCommandFn(const Bot &bot, const Message::Ptr message) {
         std::string obj;
         std::stringstream msgtxt;
         Message::Ptr msg;
-        int count = COUNT_MAX, yesno = 0;
+        int count = COUNT_MAX;
+        int yesno = 0;
 
         parseExtArgs(message, obj);
         msgtxt << "Deciding '" + obj + "'...";
@@ -59,5 +60,9 @@ static void DecideCommandFn(const Bot &bot, const Message::Ptr message) {
     }
 }
 
-struct CommandModule cmd_decide("decide", "Decide a statement",
-                                CommandModule::Flags::None, DecideCommandFn);
+void loadcmd_decide(CommandModule& module) {
+    module.command = "decide";
+    module.description = "Decide a statement";
+    module.flags = CommandModule::Flags::None;
+    module.fn = DecideCommandFn;
+}

@@ -3,41 +3,18 @@
 #include <BotAddCommand.h>
 #include <tgbot/types/BotCommand.h>
 
+#include <functional>
 #include <initcalls/BotInitcall.hpp>
-#include <initializer_list>
 
-struct CompilerModule;
 struct CommandModule : TgBot::BotCommand, BotInitCall {
     enum Flags { None = 0, Enforced = 1 << 0, HideDescription = 1 << 1 };
     command_callback_t fn;
-    int flags{};
+    unsigned int flags{};
 
-    explicit CommandModule(const std::string &name,
-                           const std::string &description, int flags,
-                           command_callback_t fn) noexcept
-        : fn(fn), flags(flags) {
-        this->command = name;
-        this->description = description;
-    }
-    CommandModule() = default;
-    CommandModule(const CommandModule *other) { *this = *other; }
-    constexpr bool isEnforced() const { return flags & Enforced; }
-    bool isHideDescription() const { return flags & HideDescription; }
+    [[nodiscard]] constexpr bool isEnforced() const { return (flags & Enforced) != 0; }
+    [[nodiscard]] bool isHideDescription() const { return (flags & HideDescription) != 0; }
     static std::string getLoadedModulesString();
-
-    /**
-     * Returns a string containing the names of all loaded modules, separated by
-     * spaces.
-     */
-    static std::vector<CommandModule *> &getLoadedModules();
-
-    /**
-     * Adds a list of CompilerModules to the bot.
-     * @param bot The Bot instance to add the modules to.
-     * @param list The list of CompilerModules to add.
-     */
-    static void loadCompilerModule(
-        Bot &bot, std::initializer_list<CompilerModule *> list);
+    static inline std::vector<CommandModule> loadedModules;
 
     /**
      * Adds default CommandModules to the bot.
@@ -60,3 +37,4 @@ struct CommandModule : TgBot::BotCommand, BotInitCall {
         return "Load/update default modules";
     }
 };
+using command_loader_function_t = std::function<void(CommandModule &)>;

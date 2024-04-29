@@ -69,6 +69,9 @@ static void PossibilityCommandFn(const Bot &bot, const Message::Ptr message) {
     bot_sendReplyMessage(bot, message, out.str());
 }
 
-struct CommandModule cmd_possibility("possibility", "Get possibilities",
-                                     CommandModule::Flags::None,
-                                     PossibilityCommandFn);
+void loadcmd_possibility(CommandModule& module) {
+    module.command = "possibility";
+    module.description = "Get possibilities";
+    module.flags = CommandModule::Flags::None;
+    module.fn = PossibilityCommandFn;
+}

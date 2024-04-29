@@ -28,6 +28,9 @@ static void FileIdCommandFn(const Bot &bot, const Message::Ptr message) {
     }
 }
 
-struct CommandModule cmd_fileid("fileid",
-                                "Get fileId of a media",
-                                CommandModule::Flags::None, FileIdCommandFn);
+void loadcmd_fileid(CommandModule& module) {
+    module.command = "fileid";
+    module.description = "Get fileId of a media";
+    module.flags = CommandModule::Flags::None;
+    module.fn = FileIdCommandFn;
+}
