@@ -44,5 +44,5 @@ struct SQLiteDatabaseBot : public SQLiteDatabase,
     }
 };
 
-using DefaultBotDatabase = SQLiteDatabaseBot;
-using DefaultDatabase = SQLiteDatabase;
+using DefaultBotDatabase = ProtoDatabaseBot;
+using DefaultDatabase = ProtoDatabase;
