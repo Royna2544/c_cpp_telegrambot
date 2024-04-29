@@ -47,6 +47,7 @@ jobs:
     - name: 'Setup submodule'
       run: |
         git submodule update --init
+        cp src/third-party/libsqlite3/upstream/sqlite3.h src/third-party/libsqlite3/libsqlite3/libsqlite3/sqlite3.h
 
     - name: '🚧 Build TgBot++'
       run: |
