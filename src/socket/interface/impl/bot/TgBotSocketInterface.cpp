@@ -38,9 +38,6 @@ HandleState SocketInterfaceTgBot::handle_Packet(
                   << ", invoke callback!";
     }
 
-    if (pkt->header.cmd == CMD_EXIT) {
-        return HandleState::Fail;
-    }
     if (socketData->len != pkt->header.data_size) {
         LOG(WARNING) << "Invalid packet data size, dropping buffer";
         return HandleState::Ignore;

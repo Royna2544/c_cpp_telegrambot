@@ -29,8 +29,7 @@ enum TgBotCommand {
 
     // Below are internal commands
     CMD_SERVER_INTERNAL_START = 100,
-    CMD_EXIT = CMD_SERVER_INTERNAL_START,
-    CMD_SET_STARTTIME,
+    CMD_SET_STARTTIME = CMD_SERVER_INTERNAL_START,
     CMD_MAX,
 };
 
