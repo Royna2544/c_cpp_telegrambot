@@ -45,6 +45,7 @@ set(PROJECT_TEST_NAME ${PROJECT_NAME}_test)
 ############################## OPTIONS ##############################
 option(ENABLE_RUNTIME_COMMAND "Enable runtime loader of commands" ON)
 option(ENABLE_SANITIZERS "Enable sanitizers" OFF)
+option(ENABLE_RUST_SUPPORT "Enable rust support" OFF)
 #################### This must be explicitly set ###################
 set(BUILD_SHARED_LIBS ON CACHE BOOL "Build libs as shared libraries" FORCE)
 set(BUILD_TESTS OFF CACHE BOOL "Build tests" FORCE)
@@ -89,6 +90,12 @@ if (WIN32)
 add_subdirectory(src/third-party/dlfcn-win32 EXCLUDE_FROM_ALL)
 endif()
 link_libraries(absl::log absl::log_initialize absl::log_flags absl::flags)
+#####################################################################
+
+############################ RUST support ###########################
+if (ENABLE_RUST_SUPPORT)
+  add_subdirectory(src/third-party/corrosion)
+endif()
 #####################################################################
 
 ####################### Global compiler flags #######################

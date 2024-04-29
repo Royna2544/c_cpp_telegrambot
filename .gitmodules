@@ -22,3 +22,6 @@
 [submodule "src/third-party/libsqlite3"]
 	path = src/third-party/libsqlite3
 	url = git://git.build2.org/packaging/sqlite/sqlite.git
+[submodule "src/third-party/corrosion"]
+	path = src/third-party/corrosion
+	url = https://github.com/corrosion-rs/corrosion
