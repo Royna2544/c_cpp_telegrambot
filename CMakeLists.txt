@@ -44,6 +44,7 @@ set(PROJECT_TEST_NAME ${PROJECT_NAME}_test)
 
 ############################## OPTIONS ##############################
 option(ENABLE_RUNTIME_COMMAND "Enable runtime loader of commands" ON)
+option(ENABLE_SANITIZERS "Enable sanitizers" OFF)
 #################### This must be explicitly set ###################
 set(BUILD_SHARED_LIBS ON CACHE BOOL "Build libs as shared libraries" FORCE)
 set(BUILD_TESTS OFF CACHE BOOL "Build tests" FORCE)
@@ -94,7 +95,7 @@ link_libraries(absl::log absl::log_initialize absl::log_flags absl::flags)
 if (NOT MSVC)
   add_compile_options(
     -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/=)  
-  if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+  if (CMAKE_BUILD_TYPE STREQUAL "Debug" AND ENABLE_SANITIZERS)
     add_compile_options(-fsanitize=address,leak)
     add_link_options(-fsanitize=address,leak)
   endif()
