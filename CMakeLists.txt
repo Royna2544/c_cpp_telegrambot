@@ -187,7 +187,7 @@ set(SRC_LIST
 ######### Commands modules (The commands handler of the bot) #########
 ################ Commands module in a single file list ################
 set(CMD_MODULES_SINGLE_LIST alive flash possibility decide delay decho
-                            randsticker fileid updatecommands rtload clone spam)
+                            randsticker fileid rtload clone spam)
 if (NOT WIN32)
   set(CMD_MODULES_SINGLE_LIST ${CMD_MODULES_SINGLE_LIST} ibash restart)
 endif()
