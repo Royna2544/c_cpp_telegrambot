@@ -7,7 +7,7 @@
 - Spam purge feature
 - Rich set of utility commands
 - Regex command support
-- Runs on Windows (MSYS2), macOS, Linux, and Android (Termux)
+- Runs on Windows (MSYS2), macOS, Linux
 - Exports a network control interface with IPv4 and IPv6
 
 <b>BUILD INFO</b>:

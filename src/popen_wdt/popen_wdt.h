@@ -10,11 +10,7 @@
 #define WDT_BITE_STR \
     "-> Intercept: This task was hanging more than " STR(SLEEP_SECONDS) "s"
 
-#ifndef __ANDROID__
 #define BASH_EXE_PATH "/bin/bash"
-#else
-#define BASH_EXE_PATH "/data/data/com.termux/files/usr/bin/bash"
-#endif
 
 #ifdef __cplusplus
 extern "C" {
