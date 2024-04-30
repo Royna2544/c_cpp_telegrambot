@@ -7,15 +7,19 @@
 
 bool gAuthorized = true;
 
+[[gnu::weak]] DefaultDatabase& loadDb() {
+    static DefaultDatabase db;
+    return db;
+}
+
 DECLARE_CLASS_INST(DefaultBotDatabase);
 
 inline DefaultDatabase& getAuthorizationDB() {
     try {
         return DefaultBotDatabase::getInstance();
     } catch (const std::runtime_error& e) {
-        // For testing purposes...
-        static DefaultDatabase base;
-        return base;
+        // TODO Testing only
+        return loadDb();
     }
 }
 
@@ -49,8 +53,8 @@ bool Authorized(const Message::Ptr& message, const int flags) {
             return !isInList<DatabaseBase::ListType::BLACKLIST>(backend, id);
         } else {
             bool ret = isInList<DatabaseBase::ListType::WHITELIST>(backend, id);
-            ret |= id == backend.getOwnerUserId();
-            return ret;
+            bool ret2 = id == backend.getOwnerUserId();
+            return ret || ret2;
         }
     } else {
         return !(flags & AuthorizeFlags::REQUIRE_USER);
