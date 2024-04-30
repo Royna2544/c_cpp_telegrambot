@@ -193,11 +193,11 @@ if (NOT WIN32)
 endif()
 extend_set_if(ENABLE_RUNTIME_COMMAND CMD_MODULES_SINGLE_LIST rtload)
 ######################## Commands sources list ########################
-set(CMD_MODULES_SOURCES_LIST database_impl bash_impl ${CMD_MODULES_SINGLE_LIST} 
-      timer_impl)
+set(CMD_MODULES_SOURCES_LIST compilers_impl database_impl bash_impl timer_impl
+    ${CMD_MODULES_SINGLE_LIST})
 ######################## Commands modules list ########################
 set(CMD_MODULES_LIST database bash ubash ${CMD_MODULES_SINGLE_LIST}
-      starttimer stoptimer saveid start)
+      starttimer stoptimer saveid start c cpp go python)
 ####################### Commands modules defines #######################
 set(COMMANDS_CWD src/command_modules)
 set(COMMANDS_GEN_FILE ${COMMANDS_CWD}/gen/cmds.gen.cpp)

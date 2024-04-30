@@ -7,10 +7,6 @@ bool CompilerInTgForGeneric::verifyParseWrite(const Message::Ptr& message,
                                               std::string& extraargs) {
     if (hasExtArgs(message)) {
         parseExtArgs(message, extraargs);
-        if (extraargs == "--path") {
-            onResultReady(message, "Selected compiler: " + cmdPrefix);
-            return false;  // Bail out
-        }
     }
     if (message->replyToMessage && !message->replyToMessage->text.empty()) {
         std::ofstream file(outfile);

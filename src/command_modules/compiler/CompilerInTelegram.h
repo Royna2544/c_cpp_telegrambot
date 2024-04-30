@@ -86,10 +86,11 @@ struct CompilerInTgForBash : CompilerInTg {
 };
 
 struct CompilerInTgForGeneric : CompilerInTg {
-    explicit CompilerInTgForGeneric(const std::string& _cmdPrefix,
+    explicit CompilerInTgForGeneric(const std::filesystem::path& _cmdPrefix,
                                     const std::string& _outfile)
         : CompilerInTg(), cmdPrefix(_cmdPrefix), outfile(_outfile) {}
-    std::string cmdPrefix, outfile;
+    std::filesystem::path cmdPrefix;
+    std::string outfile;
     bool verifyParseWrite(const Message::Ptr& message, std::string& extraargs);
     virtual ~CompilerInTgForGeneric() = default;
     virtual void run(const Message::Ptr& message) override;
@@ -112,7 +113,7 @@ struct CompilerInTgForBashImpl : CompilerInTgForBash, BotClassBase {
 };
 
 struct CompilerInTgForGenericImpl : CompilerInTgForGeneric, BotClassBase {
-    CompilerInTgForGenericImpl(const Bot& bot, const std::string& cmdPrefix,
+    CompilerInTgForGenericImpl(const Bot& bot, const std::filesystem::path& cmdPrefix,
                                const std::string& outfile)
         : CompilerInTgForGeneric(cmdPrefix, outfile), BotClassBase(bot) {}
     ~CompilerInTgForGenericImpl() override = default;
@@ -123,7 +124,7 @@ struct CompilerInTgForGenericImpl : CompilerInTgForGeneric, BotClassBase {
 };
 
 struct CompilerInTgForCCppImpl : CompilerInTgForCCpp, BotClassBase {
-    CompilerInTgForCCppImpl(const Bot& bot, const std::string& cmdPrefix,
+    CompilerInTgForCCppImpl(const Bot& bot, const std::filesystem::path& cmdPrefix,
                             const std::string& outfile)
         : CompilerInTgForCCpp(cmdPrefix, outfile), BotClassBase(bot) {}
     ~CompilerInTgForCCppImpl() override = default;
@@ -162,4 +163,4 @@ enum class ProgrammingLangs {
  * @param path Search result is stored, if found, else untouched
  * @return Whether it have found the compiler path
  */
-bool findCompiler(ProgrammingLangs lang, std::string& path);
+bool findCompiler(ProgrammingLangs lang, std::filesystem::path& path);

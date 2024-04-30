@@ -6,13 +6,16 @@
 #include <functional>
 #include <initcalls/BotInitcall.hpp>
 
-struct CommandModule : TgBot::BotCommand, BotInitCall {
+struct CommandModule : TgBot::BotCommand {
     enum Flags { None = 0, Enforced = 1 << 0, HideDescription = 1 << 1 };
     command_callback_t fn;
     unsigned int flags{};
 
     [[nodiscard]] constexpr bool isEnforced() const { return (flags & Enforced) != 0; }
     [[nodiscard]] bool isHideDescription() const { return (flags & HideDescription) != 0; }
+};
+
+struct CommandModuleManager : BotInitCall {
     static std::string getLoadedModulesString();
     static inline std::vector<CommandModule> loadedModules;
 
@@ -37,4 +40,5 @@ struct CommandModule : TgBot::BotCommand, BotInitCall {
         return "Load/update default modules";
     }
 };
+
 using command_loader_function_t = std::function<void(CommandModule &)>;

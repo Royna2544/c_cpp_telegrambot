@@ -126,7 +126,7 @@ array_helpers::ArrayElem<ProgrammingLangs, std::vector<std::string>> COMPILER(
         std::move(lang), std::move(v));
 }
 
-bool findCompiler(ProgrammingLangs lang, std::string &path) {
+bool findCompiler(ProgrammingLangs lang, std::filesystem::path &path) {
     static const auto compilers =
         array_helpers::make<static_cast<int>(ProgrammingLangs::MAX),
                             ProgrammingLangs, const std::vector<std::string>>(

@@ -3,7 +3,7 @@
 
 @COMMANDS_MODULES_DECL@
 
-void CommandModule::loadCommandModules(Bot &bot) {
+void CommandModuleManager::loadCommandModules(Bot &bot) {
    std::vector<command_loader_function_t> cmdModuleFunctions = {
       @COMMANDS_MODULES_PTR@
    };

@@ -156,7 +156,7 @@ int main(int argc, char* const* argv) {
     createAndDoInitCall<RegexHandler>(gBot);
     createAndDoInitCall<SpamBlockManager>(gBot);
     createAndDoInitCall<SocketInterfaceTgBot>(gBot);
-    createAndDoInitCall<CommandModule>(gBot);
+    createAndDoInitCall<CommandModuleManager>(gBot);
     createAndDoInitCall<DefaultBotDatabase>(gBot);
     createAndDoInitCall<ChatObserver>(gBot);
     createAndDoInitCall<ResourceManager>();
