@@ -36,10 +36,9 @@ TEST_F(ConfigManagerTest, GetVariableEnv) {
 
 TEST_F(ConfigManagerTest, CopyCommandLine) {
     int in_argc = 2;
-    char buf[16], buf2[16];
-    strncpy(buf, "ConfigManagerTest", sizeof(buf));
-    strncpy(buf2, "test", sizeof(buf2));
-    char *const ins_argv[] = {buf, buf2};
+    std::string buf = "ConfigManagerTest";
+    std::string buf2 = "test";
+    char *const ins_argv[] = {buf.data(), buf2.data()};
     char *const *ins_argv2 = ins_argv;
     copyCommandLine(CommandLineOp::INSERT, &in_argc, &ins_argv2);
 
