@@ -4,5 +4,9 @@
 using namespace ConfigManager;
 
 void ConfigManager::setVariable(Configs config, const std::string &value) {
-    _putenv("TOKEN=VAR_VALUE");
+    std::string string;
+    string += ConfigManager::kConfigsMap.at(static_cast<int>(config)).second;
+    string += '=';
+    string += value;
+    _putenv(string.c_str());
 }
