@@ -17,8 +17,6 @@
 #include <chrono>
 #include <socket/interface/impl/bot/TgBotSocketInterface.hpp>
 
-#include "socket/TgBotSocket.h"
-
 #ifdef RTCOMMAND_LOADER
 #include <RTCommandLoader.h>
 #endif

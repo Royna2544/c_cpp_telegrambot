@@ -5,20 +5,17 @@
 #include <absl/log/log.h>
 #include <internal/_std_chrono_templates.h>
 #include <internal/_tgbot.h>
-#include <socket/TgBotSocket.h>
+#include <tgbot/types/Chat.h>
 
-#include <map>
+#include <InstanceClassBase.hpp>
 #include <memory>
 #include <mutex>
-#include <utility>
-
-#include "InstanceClassBase.hpp"
-#include "tgbot/types/Chat.h"
 
 using std::chrono_literals::operator""s;
 using TgBot::ChatPermissions;
 
 #ifdef SOCKET_CONNECTION
+#include <socket/TgBotSocket.h>
 CtrlSpamBlock gSpamBlockCfg = CTRL_ON;
 #endif
 
