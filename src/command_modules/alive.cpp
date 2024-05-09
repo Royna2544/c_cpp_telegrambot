@@ -42,7 +42,7 @@ static void AliveCommandFn(const Bot& bot, const Message::Ptr message) {
         std::string botusername = cat("botusername");
 
         GitData::Fill(&data);
-        version = ResourceManager::getInstance().getResource("about.html");
+        version = ResourceManager::getInstance()->getResource("about.html");
 
         boost::replace_all(version, modules,  CommandModuleManager::getLoadedModulesString());
         boost::replace_all(version, commitid, data.commitid);

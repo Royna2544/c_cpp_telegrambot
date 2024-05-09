@@ -6,7 +6,9 @@
 
 #include "DatabaseBase.hpp"
 
-using namespace tgbot::proto;
+using tgbot::proto::MediaToName;
+using tgbot::proto::PersonList;
+using tgbot::proto::Database;
 using google::protobuf::RepeatedField;
 using google::protobuf::RepeatedPtrField;
 

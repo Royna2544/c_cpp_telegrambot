@@ -1,5 +1,8 @@
 #include "SocketBase.hpp"
+
 #include <absl/log/log.h>
+
+#include <optional>
 
 void SocketInterfaceBase::setOptions(Options opt, const std::string data,
                                      bool persistent) {
@@ -18,11 +21,14 @@ std::string SocketInterfaceBase::getOptions(Options opt) {
     if (optionVal != nullptr) {
         option_t option = *optionVal;
         if (!option.has_value()) {
-            LOG(FATAL) << "Option is not set, and trying to get it: option "
-                       << static_cast<int>(opt);
+            LOG(WARNING) << "Option is not set, and trying to get it: option "
+                         << static_cast<int>(opt);
+            throw std::bad_optional_access();
         }
         ret = option->data;
-        if (!option->persistent) option.reset();
+        if (!option->persistent) {
+            option.reset();
+        }
     }
     return ret;
 }

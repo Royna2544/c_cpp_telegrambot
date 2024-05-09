@@ -28,6 +28,10 @@ static void MakeMessageOwner(Message::Ptr& message) {
     MakeMessageNonOwner(message);
     message->from->id = ownerId;
 }
+static bool Authorized(const Message::Ptr& message, unsigned flags) {
+    static auto authflags = AuthContext::getInstance();
+    return authflags->isAuthorized(message, flags);
+}
 
 TEST(AuthorizationTest, TimeNowOwnerEnforce) {
     auto dummyMsg = std::make_shared<Message>();
@@ -61,35 +65,35 @@ TEST(AuthorizationTest, TimeNowOwnerPermissive) {
     auto dummyMsg = std::make_shared<Message>();
     MakeMessageDateNow(dummyMsg);
     MakeMessageOwner(dummyMsg);
-    ASSERT_TRUE(Authorized(dummyMsg, AuthorizeFlags::PERMISSIVE));
+    ASSERT_TRUE(Authorized(dummyMsg, AuthContext::Flags::PERMISSIVE));
 }
 
 TEST(AuthorizationTest, TimeBeforeOwnerPermissive) {
     auto dummyMsg = std::make_shared<Message>();
     MakeMessageDateBefore(dummyMsg);
     MakeMessageOwner(dummyMsg);
-    ASSERT_FALSE(Authorized(dummyMsg, AuthorizeFlags::PERMISSIVE));
+    ASSERT_FALSE(Authorized(dummyMsg, AuthContext::Flags::PERMISSIVE));
 }
 
 TEST(AuthorizationTest, TimeNowNonOwnerPermissive) {
     auto dummyMsg = std::make_shared<Message>();
     MakeMessageDateNow(dummyMsg);
     MakeMessageNonOwner(dummyMsg);
-    ASSERT_TRUE(Authorized(dummyMsg, AuthorizeFlags::PERMISSIVE));
+    ASSERT_TRUE(Authorized(dummyMsg, AuthContext::Flags::PERMISSIVE));
 }
 
 TEST(AuthorizationTest, TimeBeforeNonOwnerPermissive) {
     auto dummyMsg = std::make_shared<Message>();
     MakeMessageDateBefore(dummyMsg);
     MakeMessageNonOwner(dummyMsg);
-    ASSERT_FALSE(Authorized(dummyMsg, AuthorizeFlags::PERMISSIVE));
+    ASSERT_FALSE(Authorized(dummyMsg, AuthContext::Flags::PERMISSIVE));
 }
 
 TEST(AuthorizationTest, UserRequiredNoUser) {
     auto dummyMsg = std::make_shared<Message>();
     MakeMessageDateNow(dummyMsg);
     ASSERT_FALSE(Authorized(
-        dummyMsg, AuthorizeFlags::REQUIRE_USER | AuthorizeFlags::PERMISSIVE));
+        dummyMsg, AuthContext::Flags::REQUIRE_USER | AuthContext::Flags::PERMISSIVE));
 }
 
 TEST(AuthorizationTest, UserRequiredUser) {
@@ -97,5 +101,5 @@ TEST(AuthorizationTest, UserRequiredUser) {
     MakeMessageDateNow(dummyMsg);
     MakeMessageNonOwner(dummyMsg);
     ASSERT_TRUE(Authorized(
-        dummyMsg, AuthorizeFlags::REQUIRE_USER | AuthorizeFlags::PERMISSIVE));
+        dummyMsg, AuthContext::Flags::REQUIRE_USER | AuthContext::Flags::PERMISSIVE));
 }

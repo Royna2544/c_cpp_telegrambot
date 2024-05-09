@@ -1,6 +1,7 @@
 #include <Authorization.h>
 #include <BotAddCommand.h>
 #include <ExtArgs.h>
+
 #include "InstanceClassBase.hpp"
 #include "OnAnyMessageRegister.hpp"
 
@@ -17,14 +18,15 @@ static bool check(Bot& bot, const Message::Ptr& message, int authflags) {
     auto v = StringTools::split(text, '@');
     if (v.size() == 2 && v[1] != myName) return false;
 
-    return Authorized(message, authflags);
+    return AuthContext::getInstance()->isAuthorized(message, authflags);
 }
 
 void bot_AddCommandPermissive(Bot& bot, const std::string& cmd,
                               command_callback_t cb) {
     auto authFn = [&, cb](const Message::Ptr message) {
         if (check(bot, message,
-                  AuthorizeFlags::PERMISSIVE | AuthorizeFlags::REQUIRE_USER))
+                  AuthContext::Flags::PERMISSIVE |
+                      AuthContext::Flags::REQUIRE_USER))
             cb(bot, message);
     };
     bot.getEvents().onCommand(cmd, authFn);
@@ -33,7 +35,8 @@ void bot_AddCommandPermissive(Bot& bot, const std::string& cmd,
 void bot_AddCommandEnforced(Bot& bot, const std::string& cmd,
                             command_callback_t cb) {
     auto authFn = [&, cb](const Message::Ptr message) {
-        if (check(bot, message, AuthorizeFlags::REQUIRE_USER)) cb(bot, message);
+        if (check(bot, message, AuthContext::Flags::REQUIRE_USER))
+            cb(bot, message);
     };
     bot.getEvents().onCommand(cmd, authFn);
 }

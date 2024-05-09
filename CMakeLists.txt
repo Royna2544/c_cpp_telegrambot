@@ -89,7 +89,7 @@ add_subdirectory(src/third-party/protobuf EXCLUDE_FROM_ALL)
 if (WIN32)
 add_subdirectory(src/third-party/dlfcn-win32 EXCLUDE_FROM_ALL)
 endif()
-link_libraries(absl::log absl::log_initialize absl::log_flags absl::flags)
+link_libraries(absl::log absl::log_initialize)
 #####################################################################
 
 ############################ RUST support ###########################
@@ -109,6 +109,9 @@ if (NOT MSVC)
 else()
   # Windows 10
   add_definitions(-D_WIN32_WINNT=0x0A00)
+endif()
+if (WIN32)
+  add_compile_definitions(-DWINDOWS_BUILD)
 endif()
 ################### Check Windows's AF_UNIX support ###################
 ################# Versions later than Win10 RS3 does #################
@@ -274,6 +277,7 @@ if (USE_UNIX_SOCKETS)
       ${SOCKET_SRC_INTERFACE}/impl/inet/SocketPosixIPv6.cpp
       src/socket/selector/SelectorPosixPoll.cpp
       src/socket/selector/SelectorPosixSelect.cpp
+      ${SOCKET_SRC_INTERFACE}/impl/bot/ClientBackendPosix.cpp
     )
     if (APPLE)
       extend_set(SOCKET_SRC_LIST
@@ -292,6 +296,7 @@ if (USE_UNIX_SOCKETS)
       ${SOCKET_SRC_INTERFACE}/impl/inet/SocketWindowsIPv6.cpp
       ${SOCKET_SRC_INTERFACE}/impl/helper/SocketHelperWindows.cpp
       src/socket/selector/SelectorWindowsSelect.cpp
+      ${SOCKET_SRC_INTERFACE}/impl/bot/ClientBackendWindows.cpp
     )
   endif()
   extend_set(SOCKET_SRC_LIST
@@ -336,6 +341,7 @@ endif()
 add_library(
   TgBotUtils SHARED
   src/ConfigManager.cpp
+  src/ConfigManager_${TARGET_VARIANT}.cpp
   src/SingleThreadCtrl.cpp
   src/SingleThreadCtrlManager.cpp
   src/SharedMalloc.cpp

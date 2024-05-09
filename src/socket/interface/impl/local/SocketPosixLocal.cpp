@@ -68,8 +68,8 @@ bool SocketInterfaceUnixLocal::canSocketBeClosed() {
     return helper.local.canSocketBeClosed();
 }
 
-bool SocketInterfaceUnixLocal::isAvailable() {
-    return helper.local.isAvailable();
+bool SocketInterfaceUnixLocal::isSupported() {
+    return helper.local.isSupported();
 }
 
 void SocketInterfaceUnixLocal::doGetRemoteAddr(socket_handle_t s) {}

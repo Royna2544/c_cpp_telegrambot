@@ -1,31 +1,25 @@
 #include <Authorization.h>
 #include <Types.h>
 
-#include "DatabaseBot.hpp"
-#include "InstanceClassBase.hpp"
-#include "database/DatabaseBase.hpp"
+#include <DatabaseBot.hpp>
+#include <InstanceClassBase.hpp>
+#include <database/DatabaseBase.hpp>
+#include <iomanip>
+#include <memory>
 
-bool gAuthorized = true;
+#include "absl/log/log.h"
 
-[[gnu::weak]] DefaultDatabase& loadDb() {
-    static DefaultDatabase db;
-    return db;
-}
+#ifdef AUTHORIZATION_DEBUG
+#include <mutex>
+#endif
 
 DECLARE_CLASS_INST(DefaultBotDatabase);
-
-inline DefaultDatabase& getAuthorizationDB() {
-    try {
-        return DefaultBotDatabase::getInstance();
-    } catch (const std::runtime_error& e) {
-        // TODO Testing only
-        return loadDb();
-    }
-}
+DECLARE_CLASS_INST(AuthContext);
 
 template <DatabaseBase::ListType type>
-bool isInList(const DefaultDatabase& database, const UserId user) {
-    switch (database.checkUserInList(type, user)) {
+bool isInList(const std::shared_ptr<DefaultDatabase> database,
+              const UserId user) {
+    switch (database->checkUserInList(type, user)) {
         case DatabaseBase::ListResult::OK:
             return true;
         case DatabaseBase::ListResult::BACKEND_ERROR:
@@ -40,23 +34,67 @@ bool isInList(const DefaultDatabase& database, const UserId user) {
     }
 }
 
-bool Authorized(const Message::Ptr& message, const int flags) {
-    static const auto& backend = getAuthorizationDB();
-
-    if (!gAuthorized || !isMessageUnderTimeLimit(message)) {
+bool AuthContext::isAuthorized(const Message::Ptr& message,
+                               const unsigned flags) const {
+#ifdef AUTHORIZATION_DEBUG
+    static std::mutex authStdoutLock;
+#endif
+    if (!authorized || !isMessageUnderTimeLimit(message)) {
+#ifdef AUTHORIZATION_DEBUG
+        const std::lock_guard<std::mutex> _(authStdoutLock);
+        DLOG(INFO) << "Not authorized: message text: "
+                   << std::quoted(message->text);
+        if (!authorized) {
+            DLOG(INFO) << "why?: Global authorization flag is off";
+        }
+        if (!isMessageUnderTimeLimit(message)) {
+            DLOG(INFO) << "why?: Message is too old";
+        }
+#endif
         return false;
     }
 
     if (message->from) {
         const UserId id = message->from->id;
-        if ((flags & AuthorizeFlags::PERMISSIVE) != 0) {
-            return !isInList<DatabaseBase::ListType::BLACKLIST>(backend, id);
+        if ((flags & Flags::PERMISSIVE) != 0) {
+            bool isInBlacklist = false;
+#ifdef AUTHORIZATION_DEBUG
+            const std::lock_guard<std::mutex> _(authStdoutLock);
+
+            DLOG(INFO) << "Checking if user id in blacklist";
+#endif
+            isInBlacklist =
+                isInList<DatabaseBase::ListType::BLACKLIST>(database, id);
+#ifdef AUTHORIZATION_DEBUG
+            DLOG(INFO) << "User id in blacklist: " << std::boolalpha
+                       << isInBlacklist;
+#endif
+            return !isInBlacklist;
         } else {
-            bool ret = isInList<DatabaseBase::ListType::WHITELIST>(backend, id);
-            bool ret2 = id == backend.getOwnerUserId();
+            bool ret =
+                isInList<DatabaseBase::ListType::WHITELIST>(database, id);
+            bool ret2 = id == database->getOwnerUserId();
+#ifdef AUTHORIZATION_DEBUG
+            const std::lock_guard<std::mutex> _(authStdoutLock);
+
+            DLOG(INFO) << "Checking if user id in whitelist: " << std::boolalpha
+                       << ret;
+            DLOG(INFO) << "User is owner of this bot: " << std::boolalpha
+                       << ret2;
+#endif
             return ret || ret2;
         }
     } else {
-        return !(flags & AuthorizeFlags::REQUIRE_USER);
+        bool ignore = (flags & Flags::REQUIRE_USER) == Flags::REQUIRE_USER;
+#ifdef AUTHORIZATION_DEBUG
+        DLOG(INFO) << "Should ignore the message: " << std::boolalpha << ignore;
+#endif
+        return !ignore;
     }
+}
+
+bool AuthContext::isMessageUnderTimeLimit(const Message::Ptr& msg) noexcept {
+    const auto MessageTp = std::chrono::system_clock::from_time_t(msg->date);
+    const auto CurrentTp = std::chrono::system_clock::now();
+    return (CurrentTp - MessageTp) <= kMaxTimestampDelay;
 }

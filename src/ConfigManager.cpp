@@ -2,6 +2,9 @@
 #include <absl/log/log.h>
 
 #include <boost/program_options.hpp>
+#include <boost/program_options/errors.hpp>
+#include <boost/program_options/options_description.hpp>
+#include <boost/program_options/value_semantic.hpp>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -10,9 +13,14 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <ostream>
 #include <string_view>
+#include <tuple>
+
+#include "CompileTimeStringConcat.hpp"
 
 namespace po = boost::program_options;
+using namespace ConfigManager;
 
 /**
  * @brief This struct represents a configuration backend.
@@ -107,6 +115,27 @@ struct ConfigBackendEnv : public ConfigBackendBase {
     const std::string_view getName() const override { return "Env"; }
 };
 
+template <typename T, Configs config>
+void AddOption(po::options_description &desc) {
+    constexpr int index = static_cast<int>(config);
+    constexpr auto confstr = StringConcat::cat(
+        kConfigsMap.at(index).second, StringConcat::String<2>(','),
+        StringConcat::String<2>(kConfigsAliasMap.at(index).second));
+
+    desc.add_options()(confstr.c, po::value<T>(),
+                       kConfigsDescMap.at(index).second.c);
+}
+
+template <Configs config>
+void AddOption(po::options_description &desc) {
+    constexpr int index = static_cast<int>(config);
+    constexpr auto confstr = StringConcat::cat(
+        kConfigsMap.at(index).second, StringConcat::String<2>(','),
+        StringConcat::String<2>(kConfigsAliasMap.at(index).second));
+
+    desc.add_options()(confstr.c, kConfigsDescMap.at(index).second.c);
+}
+
 struct ConfigBackendBoostPOBase : public ConfigBackendBase {
     struct boost_priv {
         constexpr static std::string_view kConfigOverrideVar = "OVERRIDE_CONF";
@@ -114,15 +143,15 @@ struct ConfigBackendBoostPOBase : public ConfigBackendBase {
             static po::options_description desc("TgBot++ Configs");
             static std::once_flag once;
             std::call_once(once, [] {
-                desc.add_options()
-                    // clang-format off
-                ("TOKEN,t", po::value<std::string>(), "Bot Token")
-                ("SRC_ROOT,r", po::value<std::string>(), "Root directory of source tree")
-                ("PATH,p", po::value<std::string>(), "Environment variable PATH (to override)")
-                ("LOG_FILE,f", po::value<std::string>(), "File path to log")
-                (kConfigOverrideVar.data(), po::value<std::vector<std::string>>()->multitoken(),
+                AddOption<std::string, Configs::TOKEN>(desc);
+                AddOption<std::string, Configs::SRC_ROOT>(desc);
+                AddOption<std::string, Configs::PATH>(desc);
+                AddOption<std::string, Configs::LOG_FILE>(desc);
+                AddOption<std::string, Configs::DATABASE_BACKEND>(desc);
+                desc.add_options()(
+                    kConfigOverrideVar.data(),
+                    po::value<std::vector<std::string>>()->multitoken(),
                     "Config list to override from this source");
-                // clang-format on
             });
             return desc;
         }
@@ -131,8 +160,8 @@ struct ConfigBackendBoostPOBase : public ConfigBackendBase {
 
     bool getVariable(const void *p, const std::string &name,
                      std::string &outvalue) override {
-        auto priv = reinterpret_cast<const boost_priv *>(p);
-        if (priv && name != boost_priv::kConfigOverrideVar) {
+        const auto *priv = reinterpret_cast<const boost_priv *>(p);
+        if ((priv != nullptr) && name != boost_priv::kConfigOverrideVar) {
             if (const auto it = priv->mp[name]; !it.empty()) {
                 outvalue = it.as<std::string>();
                 return true;
@@ -142,8 +171,8 @@ struct ConfigBackendBoostPOBase : public ConfigBackendBase {
     }
 
     bool doOverride(const void *p, const std::string &config) override {
-        auto priv = reinterpret_cast<const boost_priv *>(p);
-        if (priv) {
+        const auto *priv = reinterpret_cast<const boost_priv *>(p);
+        if (priv != nullptr) {
             if (const auto it = priv->mp[boost_priv::kConfigOverrideVar.data()];
                 !it.empty()) {
                 const auto vec = it.as<std::vector<std::string>>();
@@ -170,8 +199,14 @@ struct ConfigBackendFile : public ConfigBackendBoostPOBase {
             LOG(ERROR) << "Opening " << confPath << " failed";
             return nullptr;
         }
-        po::store(po::parse_config_file(ifs, boost_priv::getTgBotOptionsDesc()),
-                  p.mp);
+        try {
+            po::store(
+                po::parse_config_file(ifs, boost_priv::getTgBotOptionsDesc()),
+                p.mp);
+        } catch (const boost::program_options::error &e) {
+            LOG(ERROR) << "File backend failed to parse: " << e.what();
+            return nullptr;
+        }
         po::notify(p.mp);
 
         LOG(INFO) << "Loaded " << p.mp.size() << " entries from " << confPath;
@@ -179,6 +214,7 @@ struct ConfigBackendFile : public ConfigBackendBoostPOBase {
     }
     const std::string_view getName() const override { return "File"; }
     ~ConfigBackendFile() override = default;
+
    private:
     boost_priv p{};
 };
@@ -187,7 +223,8 @@ struct ConfigBackendCmdline : public ConfigBackendBoostPOBase {
     struct cmdline_priv : ConfigBackendBoostPOBase::boost_priv {
         static po::options_description getTgBotOptionsDesc() {
             auto desc = boost_priv::getTgBotOptionsDesc();
-            desc.add_options()("help,h", "Help message for this bot vars");
+
+            AddOption<Configs::HELP>(desc);
             return desc;
         }
     };
@@ -197,15 +234,20 @@ struct ConfigBackendCmdline : public ConfigBackendBoostPOBase {
         char *const *argv = nullptr;
 
         copyCommandLine(CommandLineOp::GET, &argc, &argv);
-        if (!argv) {
+        if (argv == nullptr) {
             LOG(WARNING)
                 << "Command line copy failed, probably it wasn't saved before";
             return nullptr;
         }
 
-        po::store(po::parse_command_line(argc, argv,
-                                         cmdline_priv::getTgBotOptionsDesc()),
-                  p.mp);
+        try {
+            po::store(po::parse_command_line(argc, argv,
+                                             boost_priv::getTgBotOptionsDesc()),
+                      p.mp);
+        } catch (const boost::program_options::error &e) {
+            LOG(ERROR) << "Cmdline backend failed to parse: " << e.what();
+            return nullptr;
+        }
         po::notify(p.mp);
 
         LOG(INFO) << "Loaded " << p.mp.size() << " entries (cmdline)";
@@ -213,6 +255,7 @@ struct ConfigBackendCmdline : public ConfigBackendBoostPOBase {
     }
     const std::string_view getName() const override { return "Cmdline"; }
     ~ConfigBackendCmdline() override = default;
+
    private:
     cmdline_priv p{};
 };
@@ -242,16 +285,17 @@ enum class Passes {
     DONE,
 };
 
-std::optional<std::string> getVariable(const std::string &name) {
+std::optional<std::string> getVariable(Configs config) {
     static std::vector<std::shared_ptr<ConfigBackendBase>> backends = {
         std::make_shared<ConfigBackendCmdline>(),
         std::make_shared<ConfigBackendEnv>(),
         std::make_shared<ConfigBackendFile>(),
     };
-
     Passes p = Passes::INIT;
     std::string outvalue;
-
+    std::string name = array_helpers::find(kConfigsMap, config)->second;
+    name.resize(strlen(name.c_str()));
+    
     for (auto &bit : backends) {
         if (!bit->priv.initialized) {
             bit->priv.data = bit->load();
@@ -277,8 +321,9 @@ std::optional<std::string> getVariable(const std::string &name) {
             case Passes::ACTUAL_GET:
                 for (auto &bit : backends) {
                     if (bit->getVariable(bit->priv.data, name, outvalue)) {
-                        DLOG(INFO) << "Used '" << bit->getName()
-                                   << "' backend for fetching var '" << name << "'";
+                        DLOG(INFO)
+                            << "Used '" << bit->getName()
+                            << "' backend for fetching var '" << name << "'";
                         return {outvalue};
                     }
                 }
@@ -294,9 +339,9 @@ std::optional<std::string> getVariable(const std::string &name) {
     return std::nullopt;
 }
 
-void printHelp() {
-    std::cout << ConfigBackendCmdline::cmdline_priv::getTgBotOptionsDesc()
-              << std::endl;
+void serializeHelpToOStream(std::ostream &out) {
+    out << ConfigBackendCmdline::cmdline_priv::getTgBotOptionsDesc()
+        << std::endl;
 }
 
 }  // namespace ConfigManager

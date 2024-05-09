@@ -32,7 +32,7 @@ struct SocketInterfaceWindowsLocal : SocketInterfaceWindows {
     socket_handle_t createServerSocket() override;
     void cleanupServerSocket() override;
     bool canSocketBeClosed() override;
-    bool isAvailable() override;
+    bool isSupported() override;
     void doGetRemoteAddr(socket_handle_t s) override;
 
    private:
@@ -42,7 +42,7 @@ struct SocketInterfaceWindowsLocal : SocketInterfaceWindows {
 struct SocketInterfaceWindowsIPv4 : SocketInterfaceWindows {
     socket_handle_t createClientSocket() override;
     socket_handle_t createServerSocket() override;
-    bool isAvailable() override;
+    bool isSupported() override;
     void doGetRemoteAddr(socket_handle_t s) override;
 
    private:
@@ -52,7 +52,7 @@ struct SocketInterfaceWindowsIPv4 : SocketInterfaceWindows {
 struct SocketInterfaceWindowsIPv6 : SocketInterfaceWindows {
     socket_handle_t createClientSocket() override;
     socket_handle_t createServerSocket() override;
-    bool isAvailable() override;
+    bool isSupported() override;
     void doGetRemoteAddr(socket_handle_t s) override;
 
    private:

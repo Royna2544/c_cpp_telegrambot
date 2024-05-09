@@ -1,5 +1,5 @@
-#include <absl/log/log.h>
 #include <ResourceManager.h>
+#include <absl/log/log.h>
 
 #include <fstream>
 #include <libos/libfs.hpp>
@@ -22,24 +22,11 @@ bool ResourceManager::preloadOneFile(std::filesystem::path path) {
             break;
         }
     }
-    if (found)
+    if (found) {
         path = path.lexically_relative(
             FS::getPathForType(FS::PathType::RESOURCES));
+    }
 
-    std::call_once(m_once, [this] {
-        std::ifstream ifs(FS::getPathForType(FS::PathType::RESOURCES) /
-                          kResourceLoadIgnoreFile);
-        if (ifs) {
-            std::string line;
-            while (std::getline(ifs, line)) {
-                TrimStr(line);
-                if (line.empty()) continue;
-                ignoredResources.emplace_back(line);
-            }
-            ignoredResources.emplace_back(kResourceLoadIgnoreFile);
-            LOG(INFO) << "Applied resource ignore configuration";
-        }
-    });
     if (std::find(ignoredResources.begin(), ignoredResources.end(), path) !=
         ignoredResources.end()) {
         DLOG(INFO) << "Ignoring resource path " << path;
@@ -60,8 +47,20 @@ bool ResourceManager::preloadOneFile(std::filesystem::path path) {
 void ResourceManager::preloadResourceDirectory() {
     std::filesystem::directory_iterator end;
     auto rd = FS::getPathForType(FS::PathType::RESOURCES);
-    LOG(INFO) << "Preloading resource directory: " << rd;
+    std::ifstream ifs(rd / kResourceLoadIgnoreFile);
+    if (ifs) {
+        std::string line;
+        while (std::getline(ifs, line)) {
+            TrimStr(line);
+            if (!line.empty()) {
+                ignoredResources.emplace_back(line);
+            }
+        }
+        ignoredResources.emplace_back(kResourceLoadIgnoreFile);
+        LOG(INFO) << "Applied resource ignore configuration";
+    }
 
+    LOG(INFO) << "Preloading resource directory: " << rd;
     for (std::filesystem::directory_iterator it(rd); it != end; ++it) {
         if (it->is_regular_file()) {
             preloadOneFile(*it);
@@ -78,7 +77,8 @@ const std::string& ResourceManager::getResource(std::filesystem::path path) {
         }
     }
     LOG(ERROR) << "Resource not found: " << path;
-    throw std::runtime_error(std::string("Resource not found: ") + path.string());
+    throw std::runtime_error(std::string("Resource not found: ") +
+                             path.string());
 }
 
 DECLARE_CLASS_INST(ResourceManager);

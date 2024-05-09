@@ -7,7 +7,7 @@
 // Implemented sperately by OS
 
 struct FS {
-#ifdef __WIN32
+#ifdef WINDOWS_BUILD
     constexpr static char path_env_delimiter = ';';
 #else
     constexpr static char path_env_delimiter = ':';

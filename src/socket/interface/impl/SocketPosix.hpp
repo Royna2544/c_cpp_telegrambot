@@ -35,7 +35,7 @@ struct SocketInterfaceUnixLocal : SocketInterfaceUnix {
     socket_handle_t createServerSocket() override;
     void cleanupServerSocket() override;
     bool canSocketBeClosed() override;
-    bool isAvailable() override;
+    bool isSupported() override;
     ~SocketInterfaceUnixLocal() override = default;
     void doGetRemoteAddr(socket_handle_t s) override;
 
@@ -124,7 +124,7 @@ using getremoteaddr_ipv6 =
 struct SocketInterfaceUnixIPv4 : SocketInterfaceUnix {
     socket_handle_t createClientSocket() override;
     socket_handle_t createServerSocket() override;
-    bool isAvailable() override;
+    bool isSupported() override;
     virtual ~SocketInterfaceUnixIPv4() = default;
     void doGetRemoteAddr(socket_handle_t s) override;
 };
@@ -133,7 +133,7 @@ struct SocketInterfaceUnixIPv4 : SocketInterfaceUnix {
 struct SocketInterfaceUnixIPv6 : SocketInterfaceUnix {
     socket_handle_t createClientSocket() override;
     socket_handle_t createServerSocket() override;
-    bool isAvailable() override;
+    bool isSupported() override;
     virtual ~SocketInterfaceUnixIPv6() = default;
     void doGetRemoteAddr(socket_handle_t s) override;
 };

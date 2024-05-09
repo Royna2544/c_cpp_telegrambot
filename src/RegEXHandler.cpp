@@ -137,4 +137,11 @@ void RegexHandler::processRegEXCommandMessage(const Message::Ptr& message) {
         processRegEXCommand(message, message->replyToMessage->text);
 }
 
+void RegexHandler::doInitCall() {
+    OnAnyMessageRegisterer::getInstance()->registerCallback(
+        [this](const Bot&  /*bot*/, const Message::Ptr& message) {
+            processRegEXCommandMessage(message);
+        });
+}
+
 DECLARE_CLASS_INST(RegexHandler);

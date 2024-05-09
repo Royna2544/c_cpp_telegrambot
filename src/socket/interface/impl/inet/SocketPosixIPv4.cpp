@@ -76,8 +76,8 @@ socket_handle_t SocketInterfaceUnixIPv4::createClientSocket() {
     return ret;
 }
 
-bool SocketInterfaceUnixIPv4::isAvailable() {
-    return helper.inet.isAvailableIPv4();
+bool SocketInterfaceUnixIPv4::isSupported() {
+    return helper.inet.isSupportedIPv4();
 }
 
 void SocketInterfaceUnixIPv4::doGetRemoteAddr(socket_handle_t s) {

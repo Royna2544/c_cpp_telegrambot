@@ -4,28 +4,19 @@
 #include <ResourceManager.h>
 #include <SingleThreadCtrl.h>
 #include <SpamBlock.h>
-#include <absl/flags/flag.h>
 #include <absl/log/initialize.h>
-#include <absl/log/internal/flags.h>
-#include <absl/log/log.h>
-#include <absl/log/log_sink.h>
 #include <absl/log/log_sink_registry.h>
-#include <absl/strings/str_split.h>
 #include <command_modules/CommandModule.h>
 #include <internal/_std_chrono_templates.h>
 #include <libos/libsighandler.h>
 
 #include <DatabaseBot.hpp>
+#include <DurationPoint.hpp>
+#include <LogSinks.hpp>
 #include <OnAnyMessageRegister.hpp>
 #include <chrono>
-#include <filesystem>
-#include <ios>
-#include <socket/interface/SocketBase.hpp>
 #include <socket/interface/impl/bot/TgBotSocketInterface.hpp>
 
-#include "DurationPoint.hpp"
-#include "InstanceClassBase.hpp"
-#include "database/DatabaseBase.hpp"
 #include "socket/TgBotSocket.h"
 
 #ifdef RTCOMMAND_LOADER
@@ -54,20 +45,20 @@ template <typename T>
     requires HasInstanceGetter<T> && HasBotInitCaller<T> && HasBotCtor<T>
 void createAndDoInitCall(Bot& bot) {
     T::initInstance(bot);
-    T::getInstance().initWrapper(bot);
+    T::getInstance()->initWrapper(bot);
 }
 
 template <typename T>
     requires HasInstanceGetter<T> && HasBotInitCaller<T> && (!HasBotCtor<T>)
 void createAndDoInitCall(Bot& bot) {
-    T::getInstance().initWrapper(bot);
+    T::getInstance()->initWrapper(bot);
 }
 
 template <typename T>
     requires HasInstanceGetter<T> && (!HasBotInitCaller<T>) && HasBotCtor<T>
 void createAndDoInitCall(Bot& bot) {
     T::initInstance(bot);
-    T::getInstance().initWrapper();
+    T::getInstance()->initWrapper();
 }
 
 template <typename T>
@@ -86,60 +77,44 @@ void createAndDoInitCall(Bot& bot) {
 }
 
 template <typename T>
-    requires HasInstanceGetter<T> &&
-             (!HasBotInitCaller<T>) && DontNeedArguments<T>
-void createAndDoInitCall(void) {
-    T::getInstance().initWrapper();
+    requires(!HasInstanceGetter<T>) && (!HasBotInitCaller<T>) && HasBotCtor<T>
+void createAndDoInitCall(Bot& bot) {
+    T t(bot);
+    t.initWrapper();
 }
 
-struct LogFileSink : absl::LogSink {
-    void Send(const absl::LogEntry& entry) override {
-        for (absl::string_view line : absl::StrSplit(
-                 entry.text_message_with_prefix(), absl::ByChar('\n'))) {
-            // Overprint severe entries for emphasis:
-            for (int i = static_cast<int>(absl::LogSeverity::kInfo);
-                 i <= static_cast<int>(entry.log_severity()); i++) {
-                absl::FPrintF(fp_, "%s\r", line);
-            }
-            fputc('\n', fp_);
-        }
-    }
-    void init(const std::string& filename) {
-        fp_ = fopen(filename.c_str(), "w");
-    }
-    LogFileSink() = default;
-    ~LogFileSink() override {
-        if (fp_) {
-            fclose(fp_);
-        }
-    }
-    FILE* fp_ = nullptr;
-};
-
-#include <database/SQLiteDatabase.hpp>
+template <typename T>
+    requires HasInstanceGetter<T> &&
+             (!HasBotInitCaller<T>) && DontNeedArguments<T>
+void createAndDoInitCall() {
+    T::getInstance()->initWrapper();
+}
 
 int main(int argc, char* const* argv) {
     std::optional<std::string> token;
     std::optional<LogFileSink> log_sink;
+    StdFileSink std_file_sink;
     const auto startTp = std::chrono::system_clock::now();
+    using namespace ConfigManager;
 
-    absl::SetFlag(&FLAGS_stderrthreshold, 0);
     absl::InitializeLog();
     copyCommandLine(CommandLineOp::INSERT, &argc, &argv);
-    if (ConfigManager::getVariable("help")) {
-        ConfigManager::printHelp();
+    if (ConfigManager::getVariable(ConfigManager::Configs::HELP)) {
+        ConfigManager::serializeHelpToOStream(std::cout);
         return EXIT_SUCCESS;
     }
+    absl::AddLogSink(&std_file_sink);
+    LOG(INFO) << "Registered LogSink_stdout";
 
-    if (const auto it = ConfigManager::getVariable("LOG_FILE"); it) {
+    if (const auto it = getVariable(Configs::LOG_FILE); it) {
         log_sink = LogFileSink();
         log_sink->init(*it);
         absl::AddLogSink(&log_sink.value());
         LOG(INFO) << "Register LogSink_file: " << it.value();
     }
-    token = ConfigManager::getVariable("TOKEN");
+    token = getVariable(Configs::TOKEN);
     if (!token) {
-        LOG(FATAL) << "Failed to get TOKEN variable";
+        LOG(ERROR) << "Failed to get TOKEN variable";
         return EXIT_FAILURE;
     }
 
@@ -157,9 +132,10 @@ int main(int argc, char* const* argv) {
     createAndDoInitCall<SpamBlockManager>(gBot);
     createAndDoInitCall<SocketInterfaceTgBot>(gBot);
     createAndDoInitCall<CommandModuleManager>(gBot);
-    createAndDoInitCall<DefaultBotDatabase>(gBot);
-    createAndDoInitCall<ChatObserver>(gBot);
+    createAndDoInitCall<DefaultBotDatabase>();
+    createAndDoInitCall<ChatObserver>();
     createAndDoInitCall<ResourceManager>();
+    AuthContext::initInstance(DefaultBotDatabase::getInstance());
     // Must be last
     createAndDoInitCall<OnAnyMessageRegisterer>(gBot);
 
@@ -183,7 +159,8 @@ int main(int argc, char* const* argv) {
         } catch (const TgBot::TgException& e) {
             LOG(ERROR) << "TgBotAPI Exception: ", e.what();
             LOG(WARNING) << "Trying to recover";
-            UserId ownerid = DefaultBotDatabase::getInstance().getOwnerUserId();
+            UserId ownerid =
+                DefaultBotDatabase::getInstance()->getOwnerUserId();
             try {
                 bot_sendMessage(gBot, ownerid,
                                 std::string("Exception occured: ") + e.what());
@@ -199,17 +176,18 @@ int main(int argc, char* const* argv) {
             dp.init();
             bot_sendMessage(gBot, ownerid, "Reinitializing.");
             LOG(INFO) << "Re-init";
-            gAuthorized = false;
+            AuthContext::getInstance()->isAuthorized() = false;
             static const SingleThreadCtrlManager::GetControllerRequest req{
                 .usage = SingleThreadCtrlManager::USAGE_ERROR_RECOVERY_THREAD,
                 .flags =
                     SingleThreadCtrlManager::REQUIRE_NONEXIST |
                     SingleThreadCtrlManager::REQUIRE_FAILACTION_RETURN_NULL};
-            auto cl = SingleThreadCtrlManager::getInstance().getController(req);
+            auto cl =
+                SingleThreadCtrlManager::getInstance()->getController(req);
             if (cl) {
                 cl->runWith([] {
                     std::this_thread::sleep_for(kErrorRecoveryDelay);
-                    gAuthorized = true;
+                    AuthContext::getInstance()->isAuthorized() = true;
                 });
             }
         } catch (const std::exception& e) {

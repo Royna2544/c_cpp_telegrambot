@@ -14,7 +14,7 @@ void CompilerInTgForCCppImpl::onFailed(const Message::Ptr& who,
 void CompilerInTgForCCpp::run(const Message::Ptr& message) {
     std::string extraargs;
     std::stringstream cmd, resultbuf;
-#ifdef __WIN32
+#ifdef WINDOWS_BUILD
     const char aoutname[] = "./a.exe";
 #else
     const char aoutname[] = "./a.out";

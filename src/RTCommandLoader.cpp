@@ -12,13 +12,14 @@
 #include "InstanceClassBase.hpp"
 #include "command_modules/runtime/cmd_dynamic.h"
 
-DynamicLibraryHolder::DynamicLibraryHolder(DynamicLibraryHolder&& other) {
-    handle_ = other.handle_;
+DynamicLibraryHolder::DynamicLibraryHolder(
+    DynamicLibraryHolder&& other) noexcept
+    : handle_(other.handle_) {
     other.handle_ = nullptr;
 }
 
 DynamicLibraryHolder::~DynamicLibraryHolder() {
-    if (handle_) {
+    if (handle_ != nullptr) {
         DLOG(INFO) << "Handle was at " << handle_;
         dlclose(handle_);
         handle_ = nullptr;
@@ -34,7 +35,7 @@ bool RTCommandLoader::loadOneCommand(std::filesystem::path _fname) {
     const std::string fname = FS::appendDylibExtension(_fname).string();
 
     handle = dlopen(fname.c_str(), RTLD_NOW);
-    if (!handle) {
+    if (handle == nullptr) {
         dlerrorBuf = dlerror();
         LOG(WARNING) << "Failed to load: "
                      << ((dlerrorBuf != nullptr) ? dlerrorBuf : "unknown");
@@ -52,12 +53,13 @@ bool RTCommandLoader::loadOneCommand(std::filesystem::path _fname) {
     try {
         functionSym(mod);
     } catch (const std::exception& e) {
-        LOG(WARNING) << "Failed to load command from " << fname << ": "
-                     << e.what();
-        dlclose(handle);
+        LOG(WARNING) << "Failed to load command from " << fname
+                     << ": Loader function threw an exception: "
+                     << std::quoted(e.what());
+        // TODO dlclose(handle);
         return false;
-    }    
-    libs.emplace_back(std::make_shared<DynamicLibraryHolder>(handle));
+    }
+    libs.emplace_back(handle);
     if (mod.isEnforced()) {
         bot_AddCommandEnforced(bot, mod.command, mod.fn);
     } else {
@@ -78,7 +80,7 @@ bool RTCommandLoader::loadOneCommand(std::filesystem::path _fname) {
 }
 
 bool RTCommandLoader::loadCommandsFromFile(
-    const std::filesystem::path filename) {
+    const std::filesystem::path& filename) {
     std::string line;
     std::ifstream ifs(filename.string());
     if (ifs) {

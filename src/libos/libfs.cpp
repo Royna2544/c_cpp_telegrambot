@@ -27,7 +27,7 @@ bool FS::canExecute(const std::filesystem::path& filename) {
 
 std::filesystem::path& FS::appendDylibExtension(std::filesystem::path& path) {
     if (!path.has_extension()) {
-#ifdef _WIN32
+#ifdef WINDOWS_BUILD
         path += ".dll";
 #else
         path += ".so";
@@ -38,7 +38,7 @@ std::filesystem::path& FS::appendDylibExtension(std::filesystem::path& path) {
 }
 
 std::filesystem::path& FS::appendExeExtension(std::filesystem::path& path) {
-#ifdef _WIN32
+#ifdef WINDOWS_BUILD
     if (!path.has_extension()) {
         path += ".exe";
     }

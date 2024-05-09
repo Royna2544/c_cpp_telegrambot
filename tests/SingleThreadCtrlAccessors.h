@@ -11,11 +11,11 @@ struct SingleThreadCtrlTestAccessors {
             .usage = usage
         };
         req.flags = flags;
-        return SingleThreadCtrlManager::getInstance().getController<C>(req);
+        return SingleThreadCtrlManager::getInstance()->getController<C>(req);
     }
 
     static void destroy() {
-        SingleThreadCtrlManager::getInstance().destroyController(usage);
+        SingleThreadCtrlManager::getInstance()->destroyController(usage);
     }
 
     static void createAndAssertNotNull(int flags = 0) {

@@ -47,11 +47,13 @@ struct kernel_rand_engine {
         static std::once_flag once;
 
         std::call_once(once, [] {
-            int ret;
+            int ret = 0;
             for (const auto& n : nodes) {
                 ret = access(n.c_str(), R_OK);
-                if (ret != 0 && errno != ENOENT) {
-                    PLOG(ERROR) << "Accessing hwrng device failed";
+                if (ret != 0) {
+                    if (errno != ENOENT) {
+                        PLOG(ERROR) << "Accessing hwrng device failed";
+                    }
                 } else {
                     kSupported = true;
                 }

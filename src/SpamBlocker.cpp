@@ -146,18 +146,24 @@ void SpamBlockBase::addMessage(const Message::Ptr &message) {
 
 #ifdef SOCKET_CONNECTION
     // Global cfg
-    if (gSpamBlockCfg == CTRL_OFF) return;
+    if (gSpamBlockCfg == CTRL_OFF) {
+        return;
+    }
 #endif
     // I'm allowed always
-    if (Authorized(message, 0)) return;
-    // Do not track older msgs and consider it as spam.
-    if (!isMessageUnderTimeLimit(message)) return;
+    if (AuthContext::getInstance()->isAuthorized(message, 0)) {
+        return;
+    }
+
     // We care GIF, sticker, text spams only, or if it isn't fowarded msg
     if ((!message->animation && message->text.empty() && !message->sticker) ||
-        message->forwardFrom)
+        message->forwardFrom) {
         return;
+    }
     // Bot's PM is not a concern
-    if (message->chat->type == TgBot::Chat::Type::Private) return;
+    if (message->chat->type == TgBot::Chat::Type::Private) {
+        return;
+    }
 
     std::call_once(once, [this] { run(); });
 
@@ -250,6 +256,18 @@ void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle,
             }
         }
     }
+}
+
+void SpamBlockManager::doInitCall() {
+    OnAnyMessageRegisterer::getInstance()->registerCallback(
+        [](const Bot &bot, const Message::Ptr &message) {
+            static auto spamMgr =
+                SingleThreadCtrlManager::getInstance()
+                    ->getController<SpamBlockManager>(
+                        {SingleThreadCtrlManager::USAGE_SPAMBLOCK_THREAD},
+                        std::cref(bot));
+            spamMgr->addMessage(message);
+        });
 }
 
 DECLARE_CLASS_INST(SpamBlockManager);

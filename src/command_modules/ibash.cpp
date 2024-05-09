@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <functional>
+#include <memory>
 #include <mutex>
 #include <regex>
 #include <thread>
@@ -31,7 +32,7 @@ struct InteractiveBashContext {
     // toparent { parent read, child stdout }
     pipe_t tochild, toparent;
     bool is_open = false;
-    SingleThreadCtrlManager& gSThreadManager;
+    std::shared_ptr<SingleThreadCtrlManager> gSThreadManager;
 
     // Aliases
     const int& child_stdin = tochild[0];
@@ -149,7 +150,7 @@ struct InteractiveBashContext {
             // Write a msg as a fallback if for some reason exit doesnt get
             // written
             auto exitTimeout =
-                gSThreadManager.getController<ExitTimeoutThread>(req);
+                gSThreadManager->getController<ExitTimeoutThread>(req);
 
             if (!exitTimeout) return;
 
@@ -212,7 +213,7 @@ struct InteractiveBashContext {
                      SingleThreadCtrlManager::REQUIRE_FAILACTION_ASSERT};
         SendCommand(command);
         auto onNoOutputThread =
-            gSThreadManager.getController<TimeoutThread>(req);
+            gSThreadManager->getController<TimeoutThread>(req);
         do {
             onNoOutputThread->reset();
             onNoOutputThread->runWith(

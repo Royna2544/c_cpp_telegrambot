@@ -101,7 +101,7 @@ struct SocketInterfaceBase {
      *
      * @return true if the socket interface is available, false otherwise.
      */
-    virtual bool isAvailable() = 0;
+    virtual bool isSupported() = 0;
 
     struct Helper {
         explicit Helper(SocketInterfaceBase *interface_)
@@ -110,8 +110,8 @@ struct SocketInterfaceBase {
         struct INetHelper {
             explicit INetHelper(SocketInterfaceBase *interface_)
                 : interface(interface_) {}
-            bool isAvailableIPv4(void);
-            bool isAvailableIPv6(void);
+            bool isSupportedIPv4(void);
+            bool isSupportedIPv6(void);
             int getPortNum();
             void printExternalIP(void);
             static size_t externalIPCallback(void *contents, size_t size,
@@ -121,14 +121,14 @@ struct SocketInterfaceBase {
             constexpr static const char kIPv4EnvVar[] = "IPV4_ADDRESS";
             constexpr static const char kIPv6EnvVar[] = "IPV6_ADDRESS";
             constexpr static const char kPortEnvVar[] = "PORT_NUM";
-            bool _isAvailable(const char *envVar);
+            bool _isSupported(const char *envVar);
             SocketInterfaceBase *interface;
         } inet;
 
         struct LocalHelper {
             explicit LocalHelper(SocketInterfaceBase *interface_)
                 : interface(interface_) {}
-            static bool isAvailable(void);
+            static bool isSupported(void);
             bool canSocketBeClosed();
             void cleanupServerSocket();
 

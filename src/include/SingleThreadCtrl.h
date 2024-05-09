@@ -116,8 +116,11 @@ struct SingleThreadCtrl {
         timer_mutex.lk = std::unique_lock<std::timed_mutex>(timer_mutex.m);
     };
     virtual ~SingleThreadCtrl() {
-        if (timer_mutex.lk.owns_lock()) timer_mutex.lk.unlock();
-        stop();
+        if (isRunning()) {
+            stop();
+        } else if (timer_mutex.lk.owns_lock()) {
+            timer_mutex.lk.unlock();
+        }
     }
 
     friend class SingleThreadCtrlManager;
@@ -160,13 +163,9 @@ struct SingleThreadCtrl {
             const char* str;
             SingleThreadCtrlManager::ThreadUsage val;
         } usage;
-    } mgr_priv;
+    } mgr_priv{};
 };
 
-struct Empty {};
-
-template <typename T = Empty>
-    requires std::is_copy_constructible_v<T>
 struct SingleThreadCtrlRunnable : SingleThreadCtrl {
     using SingleThreadCtrl::runWith;
     using SingleThreadCtrl::SingleThreadCtrl;
@@ -175,11 +174,7 @@ struct SingleThreadCtrlRunnable : SingleThreadCtrl {
         SingleThreadCtrl::runWith(
             std::bind(&SingleThreadCtrlRunnable::runFunction, this));
     }
-    void setPriv(const std::shared_ptr<T> _priv) { priv = _priv; }
-    virtual ~SingleThreadCtrlRunnable() {}
-
-   protected:
-    std::shared_ptr<T> priv;
+    virtual ~SingleThreadCtrlRunnable() = default;
 };
 
 template <class T, typename... Args>
@@ -202,7 +197,9 @@ std::shared_ptr<T> SingleThreadCtrlManager::getController(
         LOG(WARNING) << "Size mismatch: Buffer has "
                      << it->second->mgr_priv.sizeOfThis << ", New class wants "
                      << sizeof(T);
-        if (!(req.flags & SIZEDIFF_ACTION_RECONSTRUCT)) return {};
+        if (!(req.flags & SIZEDIFF_ACTION_RECONSTRUCT)) {
+            return {};
+        }
     }
     if (it != kControllers.end() && it->second && !sizeMismatch) {
         if (const auto maybeRet =

@@ -4,6 +4,8 @@
 
 #include <fstream>
 
+using namespace tgbot::proto;
+
 std::optional<int> ProtoDatabase::findByUid(const RepeatedField<UserId> list,
                                             const UserId uid) {
     for (auto it = list.begin(); it != list.end(); ++it) {

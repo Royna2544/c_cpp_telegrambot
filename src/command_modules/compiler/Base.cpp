@@ -84,36 +84,32 @@ void CompilerInTg::runCommand(const Message::Ptr &message, std::string cmd,
             double millis = static_cast<double>(dp.get().count()) * 0.001;
             res << "-> It took " << std::fixed << std::setprecision(3) << millis
                 << " seconds" << std::endl;
-            if (use_wdt)
-                popen_watchdog_stop(p_wdt_data);
+            if (use_wdt) popen_watchdog_stop(p_wdt_data);
         }
         LOG(INFO) << __func__ << ": ---";
     }
 }
 
-static std::optional<std::string> findCommandExe(const std::string& command) {
-    static std::string path;
+static std::optional<std::string> findCommandExe(const std::string &command) {
+    static std::vector<std::string> paths;
     static std::once_flag once;
-    static bool valid;
 
     std::call_once(once, [] {
-        auto it = ConfigManager::getVariable("PATH");
-        valid = it.has_value();
-        if (valid) {
-            path = it.value();
+        auto it = ConfigManager::getVariable(ConfigManager::Configs::PATH);
+        if (it.has_value()) {
+            paths = StringTools::split(it.value(), FS::path_env_delimiter);
+        } else {
+            throw std::runtime_error("PATH cannot be empty");
         }
     });
-    if (valid) {
-        auto paths = StringTools::split(path, FS::path_env_delimiter);
-        std::filesystem::path exePath(command);
-        FS::appendExeExtension(exePath);
-        for (const auto &path : paths) {
-            if (!isEmptyOrBlank(path)) {
-                std::filesystem::path p(path);
-                p /= exePath;
-                if (FS::canExecute(p)) {
-                    return {p.string()};
-                }
+    std::filesystem::path exePath(command);
+    FS::appendExeExtension(exePath);
+    for (const auto &path : paths) {
+        if (!isEmptyOrBlank(path)) {
+            std::filesystem::path p(path);
+            p /= exePath;
+            if (FS::canExecute(p)) {
+                return {p.string()};
             }
         }
     }

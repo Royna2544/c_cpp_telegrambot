@@ -53,4 +53,13 @@ void ChatObserver::process(const Message::Ptr& msg) {
     }
 }
 
+void ChatObserver::doInitCall() {
+    OnAnyMessageRegisterer::getInstance()->registerCallback(
+        [this](const Bot& /*bot*/, const Message::Ptr& message) {
+            if (!observedChatIds.empty() || observeAllChats) {
+                process(message);
+            }
+        });
+}
+
 DECLARE_CLASS_INST(ChatObserver);

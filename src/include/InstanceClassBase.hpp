@@ -24,18 +24,19 @@ struct InstanceClassBase {
     }
     /**
      * @brief Get the single instance of the class
-     * @return a reference to the instance
+     * @return a pointer to the instance
      */
-    static T& getInstance() {
+    static std::shared_ptr<T> getInstance() {
         if (!instance) {
             if constexpr (std::is_default_constructible_v<T>) {
                 initInstance();
-            } else
+            } else {
                 throw std::runtime_error(
                     "I need arguments for the instance, call #initInstance "
                     "first");
+            }
         }
-        return *instance;
+        return instance;
     }
     static std::shared_ptr<T> instance;
 };

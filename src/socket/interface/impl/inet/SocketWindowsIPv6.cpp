@@ -34,8 +34,8 @@ socket_handle_t SocketInterfaceWindowsIPv6::createClientSocket() {
     return sfd;
 }
 
-bool SocketInterfaceWindowsIPv6::isAvailable() {
-    return helper.inet.isAvailableIPv6();
+bool SocketInterfaceWindowsIPv6::isSupported() {
+    return helper.inet.isSupportedIPv6();
 }
 
 

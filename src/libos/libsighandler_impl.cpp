@@ -13,6 +13,6 @@ void defaultSignalHandler(int s) {
 
 void defaultCleanupFunction() {
     LOG(INFO) << "Exiting";
-    SingleThreadCtrlManager::getInstance().destroyManager();
-    DefaultBotDatabase::getInstance().unloadDatabase();
+    SingleThreadCtrlManager::getInstance()->destroyManager();
+    DefaultBotDatabase::getInstance()->unloadDatabase();
 }

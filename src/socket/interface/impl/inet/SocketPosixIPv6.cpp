@@ -78,8 +78,8 @@ socket_handle_t SocketInterfaceUnixIPv6::createClientSocket() {
     return ret;
 }
 
-bool SocketInterfaceUnixIPv6::isAvailable() {
-    return helper.inet.isAvailableIPv6();
+bool SocketInterfaceUnixIPv6::isSupported() {
+    return helper.inet.isSupportedIPv6();
 }
 
 void SocketInterfaceUnixIPv6::doGetRemoteAddr(socket_handle_t s) {    

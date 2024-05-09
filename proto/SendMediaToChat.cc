@@ -2,18 +2,13 @@
 #include <absl/log/initialize.h>
 #include <absl/log/log.h>
 #include <socket/TgBotSocket.h>
+#include <impl/bot/ClientBackend.hpp>
 
 #include <DatabaseBot.hpp>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
 #include <string>
-
-#include "impl/InterfaceSelector.hpp"
-
-#ifdef _MSC_VER
-#define strcasecmp _stricmp
-#endif
 
 [[noreturn]] static void usage(const char* argv0, const int exitCode) {
     std::cerr << "Usage: " << argv0 << " <chatId> <name stored in DB>"
@@ -53,5 +48,5 @@ int main(int argc, char* const* argv) {
     data.type = TYPE_DOCUMENT;
 
     struct TgBotCommandPacket pkt(CMD_SEND_FILE_TO_CHAT_ID, data);
-    SocketInternalInterface().writeToSocket(pkt.toSocketData());
+    getClientBackend()->writeToSocket(pkt.toSocketData());
 }

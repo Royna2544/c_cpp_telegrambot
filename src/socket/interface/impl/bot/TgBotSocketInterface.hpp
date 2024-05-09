@@ -5,11 +5,22 @@
 
 #include <SocketBase.hpp>
 #include <SocketData.hpp>
-#include <impl/InterfaceSelector.hpp>
 #include <initcalls/BotInitcall.hpp>
 #include <memory>
 
-struct SocketInterfaceTgBot : SingleThreadCtrlRunnable<>,
+#ifdef WINDOWS_BUILD
+#include "impl/SocketWindows.hpp"
+
+using SocketInternalInterface = SocketInterfaceWindowsLocal;
+using SocketExternalInterface = SocketInterfaceWindowsIPv4;
+#else // WINDOWS_BUILD
+#include "impl/SocketPosix.hpp"
+
+using SocketInternalInterface = SocketInterfaceUnixLocal;
+using SocketExternalInterface = SocketInterfaceUnixIPv4;
+#endif // WINDOWS_BUILD
+
+struct SocketInterfaceTgBot : SingleThreadCtrlRunnable,
                               BotInitCall,
                               BotClassBase {
     enum class HandleState {
@@ -19,15 +30,15 @@ struct SocketInterfaceTgBot : SingleThreadCtrlRunnable<>,
     };
 
     void doInitCall(Bot &bot) override {
-        auto &mgr = SingleThreadCtrlManager::getInstance();
+        auto mgr = SingleThreadCtrlManager::getInstance();
         struct SingleThreadCtrlManager::GetControllerRequest req {};
         req.usage = SingleThreadCtrlManager::USAGE_SOCKET_THREAD;
-        auto inter = mgr.getController<SocketInterfaceTgBot>(
+        auto inter = mgr->getController<SocketInterfaceTgBot>(
             req, std::ref(bot), std::make_shared<SocketInternalInterface>());
         req.usage = SingleThreadCtrlManager::USAGE_SOCKET_EXTERNAL_THREAD;
-        auto exter = mgr.getController<SocketInterfaceTgBot>(
+        auto exter = mgr->getController<SocketInterfaceTgBot>(
             req, std::ref(bot), std::make_shared<SocketExternalInterface>());
-        for (auto &intf : {inter, exter}) {
+        for (const auto &intf : {inter, exter}) {
             intf->run();
         }
     }

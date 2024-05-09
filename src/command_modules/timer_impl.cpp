@@ -5,7 +5,7 @@
 
 static std::shared_ptr<TimerCommandManager> getTMM() {
     return SingleThreadCtrlManager::getInstance()
-        .getController<TimerCommandManager>(
+        ->getController<TimerCommandManager>(
             SingleThreadCtrlManager::USAGE_TIMER_THREAD);
 }
 static void TimerStartCommandFn(const Bot &bot, const Message::Ptr message) {

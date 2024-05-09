@@ -9,12 +9,12 @@
 
 using Options = SocketInterfaceBase::Options;
 
-bool SocketInterfaceBase::INetHelper::_isAvailable(const char *envVar) {
+bool SocketInterfaceBase::INetHelper::_isSupported(const char *envVar) {
     char *addr = getenv(envVar);
     int portNum = SocketInterfaceBase::kTgBotHostPort;
 
     if (addr == nullptr) {
-        LOG(INFO) << envVar << " is not set, isAvailable false";
+        LOG(INFO) << envVar << " is not set, isSupported false";
         return false;
     }
     interface->setOptions(Options::DESTINATION_ADDRESS, addr, true);
@@ -29,12 +29,12 @@ bool SocketInterfaceBase::INetHelper::_isAvailable(const char *envVar) {
     return true;
 }
 
-bool SocketInterfaceBase::INetHelper::isAvailableIPv4() {
-    return _isAvailable(kIPv4EnvVar);
+bool SocketInterfaceBase::INetHelper::isSupportedIPv4() {
+    return _isSupported(kIPv4EnvVar);
 }
 
-bool SocketInterfaceBase::INetHelper::isAvailableIPv6() {
-    return _isAvailable(kIPv6EnvVar);
+bool SocketInterfaceBase::INetHelper::isSupportedIPv6() {
+    return _isSupported(kIPv6EnvVar);
 }
 
 int SocketInterfaceBase::INetHelper::getPortNum() {
@@ -46,7 +46,7 @@ int SocketInterfaceBase::INetHelper::getPortNum() {
     return SocketInterfaceBase::kTgBotHostPort;
 }
 
-bool SocketInterfaceBase::LocalHelper::isAvailable() {
+bool SocketInterfaceBase::LocalHelper::isSupported() {
     DLOG(INFO) << "Choosing local socket";
     return true;
 }

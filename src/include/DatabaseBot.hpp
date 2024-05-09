@@ -1,3 +1,5 @@
+#pragma once
+
 #include <database/ProtobufDatabase.hpp>
 #include <database/SQLiteDatabase.hpp>
 #include <libos/libfs.hpp>
@@ -8,10 +10,7 @@
 
 struct ProtoDatabaseBot : public ProtoDatabase,
                           InitCall,
-                          BotClassBase,
                           InstanceClassBase<ProtoDatabaseBot> {
-    explicit ProtoDatabaseBot(const TgBot::Bot& bot) : BotClassBase(bot) {}
-
     static std::filesystem::path getDatabaseDefaultPath() {
         return FS::getPathForType(FS::PathType::GIT_ROOT) / "tgbot.pb";
     }
@@ -25,10 +24,7 @@ struct ProtoDatabaseBot : public ProtoDatabase,
 
 struct SQLiteDatabaseBot : public SQLiteDatabase,
                         InitCall,
-                        BotClassBase,
                         InstanceClassBase<SQLiteDatabaseBot> {
-    explicit SQLiteDatabaseBot(const TgBot::Bot& bot) : BotClassBase(bot) {}
-
     static std::filesystem::path getDatabaseDefaultPath() {
         return FS::getPathForType(FS::PathType::GIT_ROOT) / "tgbot.db";
     }

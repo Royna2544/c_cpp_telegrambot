@@ -11,25 +11,19 @@
 class ConfigManagerTest : public ::testing::Test {
    protected:
     void SetUp() override {
-#if _POSIX_C_SOURCE > 200112L || defined __APPLE__
-        // Set up the mock environment variables
-        setenv("VAR_NAME", "VAR_VALUE", 1);
-#endif
-#ifdef _WIN32
-        _putenv("VAR_NAME=VAR_VALUE");
-#endif
+        ConfigManager::setVariable(ConfigManager::Configs::TOKEN, "VAR_VALUE");
         loadDb();
     }
 
     void TearDown() override {
 #if _POSIX_C_SOURCE > 200112L || defined __APPLE__
-        unsetenv("VAR_NAME");
+        unsetenv("TOKEN");
 #endif
     }
 };
 
 TEST_F(ConfigManagerTest, GetVariableEnv) {
-    auto it = ConfigManager::getVariable("VAR_NAME");
+    auto it = ConfigManager::getVariable(ConfigManager::Configs::TOKEN);
     EXPECT_TRUE(it.has_value());
     EXPECT_EQ(it.value(), "VAR_VALUE");
 }

@@ -69,8 +69,8 @@ bool SocketInterfaceWindowsLocal::canSocketBeClosed() {
     return helper.local.canSocketBeClosed();
 }
 
-bool SocketInterfaceWindowsLocal::isAvailable() {
-    return helper.local.isAvailable();
+bool SocketInterfaceWindowsLocal::isSupported() {
+    return helper.local.isSupported();
 }
 
 void SocketInterfaceWindowsLocal::doGetRemoteAddr(socket_handle_t s) {}

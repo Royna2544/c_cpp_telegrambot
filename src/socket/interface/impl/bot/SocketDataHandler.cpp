@@ -29,7 +29,7 @@ static std::string getMIMEString(const std::string& path) {
 
     std::call_once(once, [] {
         std::string_view buf;
-        buf = ResourceManager::getInstance().getResource("mimeData.json");
+        buf = ResourceManager::getInstance()->getResource("mimeData.json");
         doc.Parse(buf.data());
         // This should be an assert, we know the data file at compile time
         LOG_IF(FATAL, doc.HasParseError())
@@ -54,7 +54,7 @@ static std::string getMIMEString(const std::string& path) {
 }
 
 void socketConnectionHandler(const Bot& bot, struct TgBotCommandPacket pkt) {
-    auto& obs = ChatObserver::getInstance();
+    auto obs = ChatObserver::getInstance();
     static std::optional<std::chrono::system_clock::time_point> startTp;
     void* ptr = pkt.data_ptr.getData();
     using namespace TgBotCommandData;
@@ -73,20 +73,20 @@ void socketConnectionHandler(const Bot& bot, struct TgBotCommandPacket pkt) {
             gSpamBlockCfg = *reinterpret_cast<CtrlSpamBlock*>(ptr);
             break;
         case CMD_OBSERVE_CHAT_ID: {
-            const std::lock_guard<std::mutex> _(obs.m);
+            const std::lock_guard<std::mutex> _(obs->m);
             auto* data = reinterpret_cast<ObserveChatId*>(ptr);
-            auto it = std::find(obs.observedChatIds.begin(),
-                                obs.observedChatIds.end(), data->id);
+            auto it = std::find(obs->observedChatIds.begin(),
+                                obs->observedChatIds.end(), data->id);
             bool observe = data->observe;
-            if (obs.observeAllChats) {
+            if (obs->observeAllChats) {
                 LOG(WARNING) << "CMD_OBSERVE_CHAT_ID disabled due to "
                                 "CMD_OBSERVE_ALL_CHATS";
                 break;
             }
-            if (it == obs.observedChatIds.end()) {
+            if (it == obs->observedChatIds.end()) {
                 if (observe) {
                     LOG(INFO) << "Adding chat to observer";
-                    obs.observedChatIds.push_back(data->id);
+                    obs->observedChatIds.push_back(data->id);
                 } else {
                     LOG(WARNING) << "Trying to quit observing chatid "
                                  << "which wasn't being "
@@ -99,13 +99,13 @@ void socketConnectionHandler(const Bot& bot, struct TgBotCommandPacket pkt) {
                                     "observed!";
                 } else {
                     LOG(INFO) << "Removing chat from observer";
-                    obs.observedChatIds.erase(it);
+                    obs->observedChatIds.erase(it);
                 }
             }
         } break;
         case CMD_SEND_FILE_TO_CHAT_ID: {
-            auto data = reinterpret_cast<SendFileToChatId*>(ptr);
-            auto file = data->filepath;
+            auto *data = reinterpret_cast<SendFileToChatId*>(ptr);
+            auto *file = data->filepath;
             using FileOrId_t = boost::variant<InputFile::Ptr, std::string>;
             std::function<Message::Ptr(const Api&, ChatId, FileOrId_t)> fn;
             try {
@@ -163,7 +163,7 @@ void socketConnectionHandler(const Bot& bot, struct TgBotCommandPacket pkt) {
             }
         } break;
         case CMD_OBSERVE_ALL_CHATS: {
-            obs.observeAllChats = *reinterpret_cast<ObserveAllChats*>(ptr);
+            obs->observeAllChats = *reinterpret_cast<ObserveAllChats*>(ptr);
         } break;
         case CMD_DELETE_CONTROLLER_BY_ID: {
             int data = *reinterpret_cast<DeleteControllerById*>(ptr);
@@ -174,7 +174,7 @@ void socketConnectionHandler(const Bot& bot, struct TgBotCommandPacket pkt) {
             }
             threadUsage =
                 static_cast<SingleThreadCtrlManager::ThreadUsage>(data);
-            SingleThreadCtrlManager::getInstance().destroyController(
+            SingleThreadCtrlManager::getInstance()->destroyController(
                 threadUsage);
         } break;
         case CMD_SET_STARTTIME: {
@@ -188,7 +188,7 @@ void socketConnectionHandler(const Bot& bot, struct TgBotCommandPacket pkt) {
                 const auto diff = now - *startTp;
                 const auto& dbwrapper = DefaultBotDatabase::getInstance();
                 LOG(INFO) << "Uptime: " << to_string(diff);
-                bot_sendMessage(bot, dbwrapper.getOwnerUserId(),
+                bot_sendMessage(bot, dbwrapper->getOwnerUserId(),
                                 "Uptime is " + to_string(diff));
             } else {
                 LOG(ERROR) << "StartTp is not set";

@@ -15,6 +15,6 @@ void DYN_COMMAND_SYM (CommandModule &module) {
     module.description = "Test module to test RTLoader";
     module.fn = cmdTest;
     module.flags = CommandModule::Flags::Enforced;
-    //throw unsupported_command_error("Test module");
+    throw unsupported_command_error("Test module");
 };
 }

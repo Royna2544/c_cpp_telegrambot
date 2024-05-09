@@ -14,7 +14,7 @@ using TgBot::Message;
 
 struct DynamicLibraryHolder {
     explicit DynamicLibraryHolder(void* handle) : handle_(handle){};
-    DynamicLibraryHolder(DynamicLibraryHolder&& other);
+    DynamicLibraryHolder(DynamicLibraryHolder&& other) noexcept;
     ~DynamicLibraryHolder();
 
    private:
@@ -23,7 +23,7 @@ struct DynamicLibraryHolder {
 
 struct RTCommandLoader : public InstanceClassBase<RTCommandLoader>,
                          BotInitCall {
-    RTCommandLoader(Bot& bot) : bot(bot) {}
+    explicit RTCommandLoader(Bot& bot) : bot(bot) {}
     RTCommandLoader() = delete;
 
     /**
@@ -31,14 +31,14 @@ struct RTCommandLoader : public InstanceClassBase<RTCommandLoader>,
      * @param bot the bot instance
      * @param fname the file path of the command
      */
-    bool loadOneCommand(const std::filesystem::path fname);
+    bool loadOneCommand(std::filesystem::path fname);
 
     /**
      * @brief loads all commands from a file
      * @param bot the bot instance
      * @param filename the file path of the commands file
      */
-    bool loadCommandsFromFile(std::filesystem::path filename);
+    bool loadCommandsFromFile(const std::filesystem::path& filename);
 
     /**
      * @brief returns the path where modules load conf is installed
@@ -58,5 +58,5 @@ struct RTCommandLoader : public InstanceClassBase<RTCommandLoader>,
    private:
     static void commandStub(const Bot& bot, const Message::Ptr& message);
     Bot& bot;
-    std::vector<std::shared_ptr<DynamicLibraryHolder>> libs;
+    std::vector<DynamicLibraryHolder> libs;
 };

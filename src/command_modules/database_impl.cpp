@@ -11,8 +11,8 @@
 
 template <DatabaseBase::ListType type>
 void handleAddUser(const Bot& bot, const Message::Ptr& message) {
-    auto& base = DefaultBotDatabase::getInstance();
-    auto res = base.addUserToList(type, message->replyToMessage->from->id);
+    auto base = DefaultBotDatabase::getInstance();
+    auto res = base->addUserToList(type, message->replyToMessage->from->id);
     std::string text;
     switch (res) {
         case DatabaseBase::ListResult::OK:
@@ -36,8 +36,8 @@ void handleAddUser(const Bot& bot, const Message::Ptr& message) {
 
 template <DatabaseBase::ListType type>
 void handleRemoveUser(const Bot& bot, const Message::Ptr& message) {
-    auto& base = DefaultBotDatabase::getInstance();
-    auto res = base.removeUserFromList(type, message->replyToMessage->from->id);
+    auto base = DefaultBotDatabase::getInstance();
+    auto res = base->removeUserFromList(type, message->replyToMessage->from->id);
     std::string text;
     switch (res) {
         case DatabaseBase::ListResult::OK:
@@ -139,7 +139,7 @@ void handleSaveIdCmd(const Bot& bot, const Message::Ptr& message) {
                 info.names = names;
                 ss << "- " << names << std::endl;
             }
-            if (backend.addMediaInfo(info)) {
+            if (backend->addMediaInfo(info)) {
                 bot_sendReplyMessage(bot, message, ss.str());
             } else {
                 bot_sendReplyMessage(bot, message,

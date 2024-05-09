@@ -4,12 +4,11 @@
 #include <tgbot/types/Chat.h>
 #include <tgbot/types/Message.h>
 #include <tgbot/types/User.h>
-#include <memory>
 
 #include "CStringLifetime.h"
 #include "SingleThreadCtrl.h"
 #include "BotClassBase.h"
-#include "initcalls/BotInitcall.hpp"
+#include "initcalls/Initcall.hpp"
 #include "OnAnyMessageRegister.hpp"
 
 #ifdef SOCKET_CONNECTION
@@ -29,7 +28,7 @@ using TgBot::Chat;
 using TgBot::Message;
 using TgBot::User;
 
-struct SpamBlockBase : SingleThreadCtrlRunnable<> {
+struct SpamBlockBase : SingleThreadCtrlRunnable {
     // User and array of message pointers sent by that user
     using PerChatHandle = std::map<User::Ptr, std::vector<Message::Ptr>>;
     // Iterator type of buffer object, which contains <chats <users <msgs>>> map
@@ -64,7 +63,7 @@ struct SpamBlockBase : SingleThreadCtrlRunnable<> {
     std::mutex buffer_m;  // Protect buffer, buffer_sub
 };
 
-struct SpamBlockManager : SpamBlockBase, BotClassBase, BotInitCall {
+struct SpamBlockManager : SpamBlockBase, BotClassBase, InitCall {
     SpamBlockManager(const Bot &bot) : SpamBlockBase(), BotClassBase(bot) {}
     ~SpamBlockManager() override = default;
 
@@ -73,17 +72,7 @@ struct SpamBlockManager : SpamBlockBase, BotClassBase, BotInitCall {
     void handleUserAndMessagePair(PerChatHandleConstRef e, OneChatIterator it,
                                   const size_t threshold,
                                   const char *name) override;
-    void doInitCall(Bot& bot) override {
-        OnAnyMessageRegisterer::getInstance()
-            .registerCallback([](const Bot &bot, const Message::Ptr &message) {
-                static auto spamMgr =
-                    SingleThreadCtrlManager::getInstance()
-                        .getController<SpamBlockManager>(
-                            {SingleThreadCtrlManager::USAGE_SPAMBLOCK_THREAD},
-                            std::cref(bot));
-                spamMgr->addMessage(message);
-            });
-    }
+    void doInitCall() override;
     const CStringLifetime getInitCallName() const override {
         return OnAnyMessageRegisterer::getInitCallNameForClient("SpamBlock");
     }

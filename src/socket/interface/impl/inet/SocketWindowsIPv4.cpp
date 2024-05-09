@@ -39,8 +39,8 @@ socket_handle_t SocketInterfaceWindowsIPv4::createClientSocket() {
     return sfd;
 }
 
-bool SocketInterfaceWindowsIPv4::isAvailable() {
-    return helper.inet.isAvailableIPv4();
+bool SocketInterfaceWindowsIPv4::isSupported() {
+    return helper.inet.isSupportedIPv4();
 }
 
 void SocketInterfaceWindowsIPv4::doGetRemoteAddr(socket_handle_t s) {
