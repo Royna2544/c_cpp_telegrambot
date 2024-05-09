@@ -28,5 +28,9 @@ void CommandModuleManager::updateBotCommands(const Bot &bot) {
             buffer.emplace_back(onecommand);
         }
     }
-    bot.getApi().setMyCommands(buffer);
+    try {
+        bot.getApi().setMyCommands(buffer);
+    } catch (const TgBot::TgException &e) {
+        LOG(ERROR) << "Error: " << e.what() << std::endl;
+    }
 }
