@@ -155,7 +155,7 @@ int main(int argc, char* const* argv) {
                 longPoll.start();
             }
         } catch (const TgBot::TgException& e) {
-            LOG(ERROR) << "TgBotAPI Exception: ", e.what();
+            LOG(ERROR) << "TgBotAPI Exception: " << e.what();
             LOG(WARNING) << "Trying to recover";
             UserId ownerid =
                 DefaultBotDatabase::getInstance()->getOwnerUserId();
