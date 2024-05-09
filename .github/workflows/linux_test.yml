@@ -18,11 +18,29 @@ jobs:
           - cc: clang
             real_cc: clang-18
             real_cxx: clang++-18
+            flags: -DRTCOMMAND_LOADER=ON
+            str: (RTCL)
+
           - cc: gcc
             real_cc: gcc
             real_cxx: g++
+            flags: -DRTCOMMAND_LOADER=ON
+            str: (RTCL)
 
-    name: 🚧 ${{ matrix.cc }}
+          - cc: clang
+            real_cc: clang-18
+            real_cxx: clang++-18
+            flags: -DRTCOMMAND_LOADER=OFF
+            str: ''
+
+          - cc: gcc
+            real_cc: gcc
+            real_cxx: g++
+            flags: -DRTCOMMAND_LOADER=OFF
+            str: ''
+
+
+    name: 🚧 ${{ matrix.cc }} ${{ matrix.str }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3.5.3
@@ -34,7 +52,7 @@ jobs:
           bash ./setup_dependencies_apt.sh
 
       - name: Install latest clang
-        if: ${{ matrix.cc }} == clang
+        if: matrix.cc == 'clang'
         run: |
           bash ./setup_dependencies_apt.sh
           wget https://apt.llvm.org/llvm.sh
