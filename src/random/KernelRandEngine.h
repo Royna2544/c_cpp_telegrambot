@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <internal/_FileDescriptor_posix.h>
 #include <unistd.h>
+#include <iomanip>
 
 #include <InstanceClassBase.hpp>
 #include <array>
