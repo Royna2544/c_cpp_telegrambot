@@ -10,6 +10,7 @@
 #include <random>
 #include <string_view>
 
+#include "InstanceClassBase.hpp"
 #include "KernelRandEngine.h"
 #include "RDRandEngine.h"
 
@@ -196,16 +197,16 @@ struct RDRand : RNGBase {
 struct KernelRand : RNGBase {
     return_type generate(const return_type min,
                          const return_type max) const override {
-        return genRandomNumberImpl(kernel_rand_engine(), min, max);
+        return genRandomNumberImpl(*kernel_rand_engine::getInstance(), min, max);
     }
 
     bool isSupported(void) const override {
-        return kernel_rand_engine::isSupported();
+        return kernel_rand_engine::getInstance()->isSupported();
     }
 
     template <typename T>
     void shuffle(std::vector<T>& in) const {
-        ShuffleImpl(in, kernel_rand_engine());
+        ShuffleImpl(in, *kernel_rand_engine::getInstance());
     }
 
     void shuffle_string(std::vector<std::string>& it) const override {
@@ -263,3 +264,7 @@ return_type genRandomNumber(const return_type max) {
 void shuffleStringArray(std::vector<std::string>& in) {
     getRNG()->shuffle_string(in);
 }
+
+#ifdef KERNELRAND_MAYBE_SUPPORTED
+DECLARE_CLASS_INST(kernel_rand_engine);
+#endif
