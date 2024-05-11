@@ -34,24 +34,28 @@ SelectSelector::SelectorPollResult SelectSelector::poll() {
     struct timeval tv {
         .tv_sec = 5
     };
-    bool any = false;
 
     int ret = select(FD_SETSIZE, &set, nullptr, nullptr, &tv);
     if (ret < 0) {
         PLOG(ERROR) << "Select failed";
-        return SelectorPollResult::ERROR_GENERIC;
+        return SelectorPollResult::FAILED;
     }
     for (auto &e : data) {
         if (FD_ISSET(e.fd, &set)) {
             e.callback();
-            any = true;
         }
     }
-    if (!any) {
-        return SelectorPollResult::ERROR_NOTHING_FOUND;
-    } else {
-        return SelectorPollResult::OK;
-    }
+    // We have used the select: reinit them
+    reinit();
+    return SelectorPollResult::OK;
 }
 
 void SelectSelector::shutdown() {}
+
+bool SelectSelector::reinit() {
+    init();
+    for (auto &e : data) {
+        FD_SET(e.fd, &set);
+    }
+    return true;
+}

@@ -51,7 +51,13 @@ void SocketInterfaceUnix::startListening(const listener_callback_t onNewData) {
                 }
             });
             while (!should_break) {
-                selector.poll();
+                switch (selector.poll()) {
+                    case Selector::SelectorPollResult::FAILED:
+                        should_break = true;
+                        break;
+                    case Selector::SelectorPollResult::OK:
+                        break;
+                }
             }
             selector.shutdown();
         } while (false);

@@ -1,4 +1,5 @@
 #include <impl/SocketWindows.hpp>
+
 #include "socket/TgBotSocket.h"
 
 // clang-format off
@@ -8,11 +9,12 @@
 // clang-format on
 
 #include <CStringLifetime.h>
+
 #include <libos/libfs.hpp>
 
-socket_handle_t SocketInterfaceWindowsLocal::makeSocket(
-    bool is_client) {
+socket_handle_t SocketInterfaceWindowsLocal::makeSocket(bool is_client) {
     struct sockaddr_un name {};
+    auto *_name = reinterpret_cast<struct sockaddr *>(&name);
     CStringLifetime path = getOptions(Options::DESTINATION_ADDRESS);
     SOCKET fd;
 
@@ -31,17 +33,21 @@ socket_handle_t SocketInterfaceWindowsLocal::makeSocket(
     name.sun_path[sizeof(name.sun_path) - 1] = '\0';
 
     decltype(&connect) fn = is_client ? connect : bind;
-    if (fn(fd, reinterpret_cast<struct sockaddr *>(&name), sizeof(name)) != 0) {
-        if (is_client)
-            WSALOG_E("Failed to connect to socket");
-        else
-            WSALOG_E("Failed to bind to socket");
+    if (fn(fd, _name, sizeof(name)) != 0) {
+        int err = WSAGetLastError();
+        LOG(ERROR) << "Failed to " << (is_client ? "connect" : "bind")
+                   << " to socket: " << strWSAError(err);
         do {
-            if (!is_client && WSAGetLastError() == WSAEADDRINUSE) {
+            if (!is_client && err == WSAEADDRINUSE) {
                 cleanupServerSocket();
-                if (fn(fd, reinterpret_cast<struct sockaddr *>(&name), sizeof(name)) == 0) {
+                if (bind(fd, _name, sizeof(name)) == 0) {
                     LOG(INFO) << "Bind succeeded by removing socket file";
                     break;
+                } else {
+                    err = WSAGetLastError();
+                    LOG(ERROR)
+                        << "Failed to bind even after removing socket file: "
+                        << strWSAError(err);
                 }
             }
             closesocket(fd);

@@ -17,7 +17,7 @@ inline std::filesystem::path getSocketPath() {
     return spath;
 }
 
-enum TgBotCommand {
+enum TgBotCommand : std::int32_t {
     CMD_WRITE_MSG_TO_CHAT_ID,
     CMD_CTRL_SPAMBLOCK,
     CMD_OBSERVE_CHAT_ID,

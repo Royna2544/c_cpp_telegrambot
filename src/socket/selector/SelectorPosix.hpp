@@ -26,6 +26,7 @@ struct SelectSelector : Selector {
     bool remove(int fd) override;
     SelectorPollResult poll() override;
     void shutdown() override;
+    bool reinit() override;
 
    private:
     struct SelectFdData {

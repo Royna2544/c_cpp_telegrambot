@@ -1,11 +1,10 @@
 #include <absl/log/log.h>
 
+#include <SocketBase.hpp>
+#include <TryParseStr.hpp>
+#include <filesystem>
 #include <libos/libfs.hpp>
 #include <string>
-
-#include <SocketBase.hpp>
-
-#include <TryParseStr.hpp>
 
 using Options = SocketInterfaceBase::Options;
 
@@ -62,6 +61,8 @@ bool SocketInterfaceBase::LocalHelper::canSocketBeClosed() {
 }
 
 void SocketInterfaceBase::LocalHelper::cleanupServerSocket() {
-    std::filesystem::remove(
-        interface->getOptions(Options::DESTINATION_ADDRESS));
+    const auto path = std::filesystem::path(
+                          interface->getOptions(Options::DESTINATION_ADDRESS));
+    DLOG(INFO) << "Cleaning up server socket...";
+    FS::deleteFile(path);
 }

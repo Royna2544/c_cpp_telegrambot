@@ -143,5 +143,5 @@ int main(int argc, char** argv) {
         getClientBackend()->writeToSocket(pkt->toSocketData());
     } else
         usage(exe, false);
-    return !pkt.has_value();
+    return static_cast<int>(!pkt.has_value());
 }

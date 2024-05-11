@@ -1,12 +1,11 @@
 #pragma once
 
 #include <SharedMalloc.hpp>
-#include <cstdlib>
 #include <optional>
 #include <type_traits>
 
 struct SocketData {
-    using length_type = size_t;
+    using length_type = int64_t;
 
     std::optional<SharedMalloc> data;
     length_type len;

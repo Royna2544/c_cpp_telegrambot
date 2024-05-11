@@ -6,6 +6,7 @@ struct SelectSelector : Selector {
     bool remove(socket_handle_t fd) override;
     SelectorPollResult poll() override;
     void shutdown() override;
+    bool reinit() override;
 
    private:
     struct SelectFdData {

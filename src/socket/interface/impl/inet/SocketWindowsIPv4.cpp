@@ -19,6 +19,7 @@ socket_handle_t SocketInterfaceWindowsIPv4::createServerSocket() {
             return INVALID_SOCKET;
         }
     }
+    helper.inet.printExternalIP();
     return sfd;
 }
 

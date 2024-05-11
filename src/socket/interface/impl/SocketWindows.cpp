@@ -58,55 +58,55 @@ char *SocketInterfaceWindows::strWSAError(const int errcode) {
 
 void SocketInterfaceWindows::startListening(
     const listener_callback_t onNewData) {
-    bool should_break = false, value_set = false;
+    bool should_break = false;
     WSADATA data;
     SelectSelector selector;
+    socket_handle_t sfd = 0;
 
-    if (WSAStartup(MAKEWORD(2, 2), &data) == 0) {
-        const socket_handle_t sfd = createServerSocket();
-        if (isValidSocketHandle(sfd)) {
-            do {
-                if (listen(sfd, SOMAXCONN) == SOCKET_ERROR) {
-                    WSALOG_E("Failed to listen to socket");
-                    break;
-                }
-                if (!selector.init()) {
-                    break;
-                }
-                selector.add(sfd, [sfd, this, &should_break, onNewData] {
-                    struct sockaddr addr {};
-                    socklen_t len = sizeof(addr);
-                    const socket_handle_t cfd = accept(sfd, &addr, &len);
-
-                    if (!isValidSocketHandle(cfd)) {
-                        WSALOG_E("Accept failed");
-                    } else {
-                        doGetRemoteAddr(cfd);
-                        should_break = onNewData(this, cfd);
-                        closesocket(cfd);
-                    }
-                });
-                while (!should_break && kRun) {
-                    switch (selector.poll()) {
-                        case Selector::SelectorPollResult::ERROR_TIMEOUT:
-                        case Selector::SelectorPollResult::ERROR_NOTHING_FOUND:
-                            LOG(WARNING) << "Timeout or nothing found happened";
-                            break;
-                        case Selector::SelectorPollResult::ERROR_GENERIC:
-                            should_break = true;
-                            break;
-                        case Selector::SelectorPollResult::OK:
-                            break;
-                    }
-                }
-                selector.shutdown();
-            } while (false);
-            closesocket(sfd);
-            cleanupServerSocket();
-        }
-    } else {
+    if (WSAStartup(MAKEWORD(2, 2), &data) != 0) {
         WSALOG_E("WSAStartup failed");
     }
+
+    sfd = createServerSocket();
+    if (!isValidSocketHandle(sfd)) {
+        return;
+    }
+
+    do {
+        if (listen(sfd, SOMAXCONN) == SOCKET_ERROR) {
+            WSALOG_E("Failed to listen to socket");
+            break;
+        }
+        if (!selector.init()) {
+            break;
+        }
+        selector.add(sfd, [sfd, this, &should_break, onNewData] {
+            struct sockaddr addr {};
+            socklen_t len = sizeof(addr);
+            const socket_handle_t cfd = accept(sfd, &addr, &len);
+
+            if (!isValidSocketHandle(cfd)) {
+                WSALOG_E("Accept failed");
+            } else {
+                doGetRemoteAddr(cfd);
+                should_break = onNewData(this, cfd);
+                closesocket(cfd);
+            }
+        });
+        while (!should_break && kRun) {
+            switch (selector.poll()) {
+                case Selector::SelectorPollResult::FAILED:
+                    LOG(ERROR) << "Poll failed";
+                    should_break = true;
+                    break;
+                case Selector::SelectorPollResult::OK:
+                    break;
+            }
+        }
+        selector.shutdown();
+    } while (false);
+    closesocket(sfd);
+    cleanupServerSocket();
     WSACleanup();
 }
 
@@ -136,7 +136,7 @@ char *SocketInterfaceWindows::getLastErrorMessage() {
 std::optional<SocketData> SocketInterfaceWindows::readFromSocket(
     socket_handle_t handle, SocketData::length_type length) {
     SocketData buf(length);
-    ssize_t count =
+    int count =
         recv(handle, static_cast<char *>(buf.data->getData()), length, 0);
     if (count < 0) {
         PLOG(ERROR) << "Failed to read from socket";

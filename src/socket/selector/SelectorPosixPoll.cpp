@@ -1,17 +1,18 @@
-#include "SelectorPosix.hpp"
-
 #include <internal/_FileDescriptor_posix.h>
 #include <poll.h>
 #include <sys/poll.h>
 
 #include <memory>
 
+#include "SelectorPosix.hpp"
+
+
 bool PollSelector::init() { return true; }
 
 bool PollSelector::add(int fd, OnSelectedCallback callback) {
     struct pollfd pfd;
 
-    for (const auto & e : pollfds) {
+    for (const auto &e : pollfds) {
         if (e.poll_fd.fd == fd) {
             LOG(WARNING) << "poll fd " << e.poll_fd.fd << " is already added";
             return false;
@@ -26,7 +27,7 @@ bool PollSelector::add(int fd, OnSelectedCallback callback) {
 
 bool PollSelector::remove(int fd) {
     bool ret = false;
-    std::erase_if(pollfds, [fd, &ret](const PollFdData &e){
+    std::erase_if(pollfds, [fd, &ret](const PollFdData &e) {
         if (e.poll_fd.fd == fd) {
             ret = true;
             return true;
@@ -47,10 +48,7 @@ PollSelector::SelectorPollResult PollSelector::poll() {
     int rc = ::poll(pfds.get(), pollfds.size(), -1);
     if (rc < 0) {
         PLOG(ERROR) << "Poll failed";
-        return SelectorPollResult::ERROR_GENERIC;
-    }
-    if (rc == 0) {
-        return SelectorPollResult::ERROR_TIMEOUT;
+        return SelectorPollResult::FAILED;
     }
     for (int i = 0; i < pollfds.size(); ++i) {
         if (pfds[i].revents & POLLIN) {
@@ -59,12 +57,10 @@ PollSelector::SelectorPollResult PollSelector::poll() {
             any = true;
         }
     }
-    if (any) {
-        return SelectorPollResult::OK;
-    } else {
+    if (!any) {
         LOG(WARNING) << "None of the fd returned POILLIN";
-        return SelectorPollResult::ERROR_NOTHING_FOUND;
     }
+    return SelectorPollResult::OK;
 }
 
 void PollSelector::shutdown() {}
