@@ -240,7 +240,6 @@ add_library(TgBotDB SHARED
   src/database/ProtobufDatabase.cpp
   src/database/SQLiteDatabase.cpp
   ${PROTO_SRCS})
-#add_library(TgBotDBImpl SHARED src/database/DatabaseWrapper.cpp)
 ####################### TgBotDB lib includes #######################
 get_filename_component(PROTO_HDRS_DIR ${PROTO_HDRS} DIRECTORY)
 target_include_directories(TgBotDB PUBLIC ${PROTO_HDRS_DIR})
