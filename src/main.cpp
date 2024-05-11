@@ -15,7 +15,6 @@
 #include <LogSinks.hpp>
 #include <OnAnyMessageRegister.hpp>
 #include <chrono>
-#include <socket/interface/impl/bot/TgBotSocketInterface.hpp>
 
 #ifdef RTCOMMAND_LOADER
 #include <RTCommandLoader.h>
@@ -24,7 +23,10 @@
 #ifdef SOCKET_CONNECTION
 #include <ChatObserver.h>
 
+#include <socket/interface/impl/bot/TgBotSocketInterface.hpp>
+
 #endif
+
 #include <tgbot/tgbot.h>
 
 // tgbot
@@ -126,12 +128,14 @@ int main(int argc, char* const* argv) {
 #ifdef RTCOMMAND_LOADER
     createAndDoInitCall<RTCommandLoader>(gBot);
 #endif
+#ifdef SOCKET_CONNECTION
+    createAndDoInitCall<SocketInterfaceTgBot>(gBot);
+    createAndDoInitCall<ChatObserver>();
+#endif
     createAndDoInitCall<RegexHandler>(gBot);
     createAndDoInitCall<SpamBlockManager>(gBot);
-    createAndDoInitCall<SocketInterfaceTgBot>(gBot);
     createAndDoInitCall<CommandModuleManager>(gBot);
     createAndDoInitCall<DefaultBotDatabase>();
-    createAndDoInitCall<ChatObserver>();
     createAndDoInitCall<ResourceManager>();
     AuthContext::initInstance(DefaultBotDatabase::getInstance());
     // Must be last
@@ -139,10 +143,11 @@ int main(int argc, char* const* argv) {
 
     installSignalHandler();
 
+#ifdef SOCKET_CONNECTION
     SetStartTime timeData = std::chrono::system_clock::to_time_t(startTp);
     TgBotCommandPacket pkt(CMD_SET_STARTTIME, timeData);
     socketConnectionHandler(gBot, pkt);
-
+#endif
     DLOG(INFO) << "Token: " << token.value();
     DurationPoint dp;
     do {
