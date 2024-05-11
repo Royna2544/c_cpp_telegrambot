@@ -9,3 +9,13 @@ void ConfigManager::setVariable(Configs config, const std::string &value) {
     setenv(var.c_str(), value.c_str(), 1);
 #endif
 }
+
+bool ConfigManager::getEnv(const std::string &name, std::string &value) {
+    char *env = getenv(name.c_str());
+    if (env == nullptr) {
+        value.clear();
+        return false;
+    }
+    value = env;
+    return true;
+}

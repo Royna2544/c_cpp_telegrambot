@@ -21,6 +21,7 @@
 
 namespace po = boost::program_options;
 using namespace ConfigManager;
+using namespace StringConcat;
 
 /**
  * @brief This struct represents a configuration backend.
@@ -29,6 +30,10 @@ using namespace ConfigManager;
  * command line, a configuration file, or environment variables.
  */
 struct ConfigBackendBase {
+    constexpr static std::string_view kConfigOverrideVar =
+        array_helpers::find(ConfigManager::kConfigsMap, Configs::OVERRIDE_CONF)
+            ->second;
+
     /**
      * @brief This function loads the configuration data from the backend.
      *
@@ -105,12 +110,16 @@ struct ConfigBackendBase {
 struct ConfigBackendEnv : public ConfigBackendBase {
     bool getVariable(const void *priv, const std::string &name,
                      std::string &outvalue) override {
-        char *buf = getenv(name.c_str());
-        if (buf) {
-            outvalue = buf;
+        if (ConfigManager::getEnv(name.c_str(), outvalue)) {
             return true;
         }
         return false;
+    }
+    bool doOverride(const void *priv, const std::string &config) override {
+        std::string value;
+        std::string kConfigOverrideVariable(kConfigOverrideVar);
+        return getVariable(priv, kConfigOverrideVariable, value) &&
+               value == config;
     }
     const std::string_view getName() const override { return "Env"; }
 };
@@ -118,9 +127,9 @@ struct ConfigBackendEnv : public ConfigBackendBase {
 template <typename T, Configs config>
 void AddOption(po::options_description &desc) {
     constexpr int index = static_cast<int>(config);
-    constexpr auto confstr = StringConcat::cat(
-        kConfigsMap.at(index).second, StringConcat::String<2>(','),
-        StringConcat::String<2>(kConfigsAliasMap.at(index).second));
+    constexpr auto confstr =
+        cat(kConfigsMap.at(index).second, createString(','),
+            createString(kConfigsAliasMap.at(index).second));
 
     desc.add_options()(confstr.c, po::value<T>(),
                        kConfigsDescMap.at(index).second.c);
@@ -130,15 +139,14 @@ template <Configs config>
 void AddOption(po::options_description &desc) {
     constexpr int index = static_cast<int>(config);
     constexpr auto confstr = StringConcat::cat(
-        kConfigsMap.at(index).second, StringConcat::String<2>(','),
-        StringConcat::String<2>(kConfigsAliasMap.at(index).second));
+        kConfigsMap.at(index).second, createString(','),
+        createString(kConfigsAliasMap.at(index).second));
 
     desc.add_options()(confstr.c, kConfigsDescMap.at(index).second.c);
 }
 
 struct ConfigBackendBoostPOBase : public ConfigBackendBase {
     struct boost_priv {
-        constexpr static std::string_view kConfigOverrideVar = "OVERRIDE_CONF";
         static po::options_description getTgBotOptionsDesc() {
             static po::options_description desc("TgBot++ Configs");
             static std::once_flag once;
@@ -148,10 +156,7 @@ struct ConfigBackendBoostPOBase : public ConfigBackendBase {
                 AddOption<std::string, Configs::PATH>(desc);
                 AddOption<std::string, Configs::LOG_FILE>(desc);
                 AddOption<std::string, Configs::DATABASE_BACKEND>(desc);
-                desc.add_options()(
-                    kConfigOverrideVar.data(),
-                    po::value<std::vector<std::string>>()->multitoken(),
-                    "Config list to override from this source");
+                AddOption<std::string, Configs::OVERRIDE_CONF>(desc);
             });
             return desc;
         }
@@ -161,7 +166,7 @@ struct ConfigBackendBoostPOBase : public ConfigBackendBase {
     bool getVariable(const void *p, const std::string &name,
                      std::string &outvalue) override {
         const auto *priv = reinterpret_cast<const boost_priv *>(p);
-        if ((priv != nullptr) && name != boost_priv::kConfigOverrideVar) {
+        if ((priv != nullptr) && name != kConfigOverrideVar) {
             if (const auto it = priv->mp[name]; !it.empty()) {
                 outvalue = it.as<std::string>();
                 return true;
@@ -173,7 +178,7 @@ struct ConfigBackendBoostPOBase : public ConfigBackendBase {
     bool doOverride(const void *p, const std::string &config) override {
         const auto *priv = reinterpret_cast<const boost_priv *>(p);
         if (priv != nullptr) {
-            if (const auto it = priv->mp[boost_priv::kConfigOverrideVar.data()];
+            if (const auto it = priv->mp[kConfigOverrideVar.data()];
                 !it.empty()) {
                 const auto vec = it.as<std::vector<std::string>>();
                 return std::find(vec.begin(), vec.end(), config) != vec.end();
@@ -220,7 +225,7 @@ struct ConfigBackendFile : public ConfigBackendBoostPOBase {
 };
 
 struct ConfigBackendCmdline : public ConfigBackendBoostPOBase {
-    struct cmdline_priv : ConfigBackendBoostPOBase::boost_priv {
+    struct cmdline_priv : boost_priv {
         static po::options_description getTgBotOptionsDesc() {
             auto desc = boost_priv::getTgBotOptionsDesc();
 
@@ -242,7 +247,7 @@ struct ConfigBackendCmdline : public ConfigBackendBoostPOBase {
 
         try {
             po::store(po::parse_command_line(argc, argv,
-                                             boost_priv::getTgBotOptionsDesc()),
+                                             cmdline_priv::getTgBotOptionsDesc()),
                       p.mp);
         } catch (const boost::program_options::error &e) {
             LOG(ERROR) << "Cmdline backend failed to parse: " << e.what();
@@ -295,7 +300,7 @@ std::optional<std::string> getVariable(Configs config) {
     std::string outvalue;
     std::string name = array_helpers::find(kConfigsMap, config)->second;
     name.resize(strlen(name.c_str()));
-    
+
     for (auto &bit : backends) {
         if (!bit->priv.initialized) {
             bit->priv.data = bit->load();
