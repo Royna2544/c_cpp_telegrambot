@@ -23,3 +23,7 @@ bool FS::getHomePath(std::filesystem::path& buf) {
     }
     return !!buf_c;
 }
+
+bool FS::deleteFile(const std::filesystem::path &filename) {
+    return std::filesystem::remove(filename);
+}

@@ -19,3 +19,8 @@ bool FS::getHomePath(std::filesystem::path& buf) {
     }
     return ret;
 }
+
+bool FS::deleteFile(const std::filesystem::path &filename) {
+    CStringLifetime filepath(filename);
+    return DeleteFileA(filepath) != 0;
+}

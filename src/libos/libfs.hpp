@@ -46,9 +46,24 @@ struct FS {
      */
     static bool exists(const std::filesystem::path& filename);
 
-    static std::filesystem::path& appendDylibExtension(std::filesystem::path& path);
-    static std::filesystem::path& appendExeExtension(std::filesystem::path& path);
-    static std::filesystem::path& makeRelativeToCWD(std::filesystem::path& path);
+    /**
+     * Deletes the specified file.
+     *
+     * This function attempts to delete the file located at the given path.
+     * If the file does not exist or cannot be deleted for any reason, this
+     * function will return false.
+     *
+     * @param filename The path to the file to be deleted.
+     * @return true if the file was successfully deleted, false otherwise.
+     */
+    static bool deleteFile(const std::filesystem::path& filename);
+
+    static std::filesystem::path& appendDylibExtension(
+        std::filesystem::path& path);
+    static std::filesystem::path& appendExeExtension(
+        std::filesystem::path& path);
+    static std::filesystem::path& makeRelativeToCWD(
+        std::filesystem::path& path);
 
    private:
     /**
