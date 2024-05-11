@@ -17,7 +17,7 @@ template <typename T, typename V, int size>
 using ConstArray = std::array<ConstArrayElem<T, V>, size>;
 
 template <class Container, typename T>
-auto find(Container& c, T val) {
+constexpr auto find(Container& c, T val) {
     return std::find_if(c.begin(), c.end(),
                         [=](const auto& e) { return e.first == val; });
 }

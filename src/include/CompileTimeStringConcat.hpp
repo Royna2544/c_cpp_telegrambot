@@ -1,7 +1,8 @@
 #pragma once
 
-#include <string>
 #include <absl/log/log.h>
+
+#include <string>
 #include <string_view>
 
 namespace StringConcat {
@@ -11,6 +12,8 @@ template <unsigned N>
 struct String {
     char c[N] = {};
 
+    constexpr char operator[](unsigned i) const { return c[i]; }
+    
     template <unsigned M>
     constexpr operator String<M>() const {
         String<M> result{};
@@ -42,6 +45,7 @@ struct String {
         c[0] = l;
         c[1] = '\0';
     }
+
     [[nodiscard]] constexpr unsigned getSize() const { return N - 1; }
 
     constexpr operator std::string_view() const {
@@ -49,6 +53,15 @@ struct String {
     }
     operator std::string() const { return std::string(c, N - 1); }
 };
+
+template <unsigned N>
+constexpr auto createString(const char (&str)[N]) {
+    return String<N + 1>(str);
+}
+
+constexpr auto createString(const char (&str)) {
+    return String<2>(str);
+}
 
 template <unsigned... Len>
 consteval auto cat(const char (&... strings)[Len]) {
@@ -68,8 +81,8 @@ consteval auto cat(const char (&... strings)[Len]) {
 template <unsigned Len>
 consteval auto append(const String<Len>& srcBuf, char** dstBuf) {
     int j = 0;
-    char *dst = *dstBuf;
-    const char *src = srcBuf.c;
+    char* dst = *dstBuf;
+    const char* src = srcBuf.c;
 
     for (; *src != '\0' && j < srcBuf.getSize(); j++, src++, dst++) {
         *dst = *src;

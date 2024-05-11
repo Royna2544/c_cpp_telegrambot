@@ -17,35 +17,37 @@ enum class Configs {
     LOG_FILE,
     DATABASE_BACKEND,
     HELP,
+    OVERRIDE_CONF,
     MAX
 };
 
 using ConfigStr = StringConcat::String<20>;
 using DescStr = StringConcat::String<50>;
 
-#define CONFIG_AND_STR(e)                                    \
-    array_helpers::make_elem<Configs, ConfigStr>(Configs::e, \
-                                                 StringConcat::cat(#e))
+#define CONFIG_AND_STR(e)                         \
+    array_helpers::make_elem<Configs, ConfigStr>( \
+        Configs::e, StringConcat::createString(#e))
 
 #define CONFIGALIAS_AND_STR(e, alias) \
     array_helpers::make_elem<Configs, const char>(Configs::e, alias)
 
-#define DESC_AND_STR(e, desc)                              \
-    array_helpers::make_elem<Configs, DescStr>(Configs::e, \
-                                               StringConcat::cat(desc))
+#define DESC_AND_STR(e, desc)                   \
+    array_helpers::make_elem<Configs, DescStr>( \
+        Configs::e, StringConcat::createString(desc))
 
 constexpr auto kConfigsMap =
     array_helpers::make<static_cast<int>(Configs::MAX), Configs, ConfigStr>(
         CONFIG_AND_STR(TOKEN), CONFIG_AND_STR(SRC_ROOT), CONFIG_AND_STR(PATH),
         CONFIG_AND_STR(LOG_FILE), CONFIG_AND_STR(DATABASE_BACKEND),
-        CONFIG_AND_STR(HELP));
+        CONFIG_AND_STR(HELP), CONFIG_AND_STR(OVERRIDE_CONF));
 
 constexpr auto kConfigsAliasMap =
     array_helpers::make<static_cast<int>(Configs::MAX), Configs, const char>(
         CONFIGALIAS_AND_STR(TOKEN, 't'), CONFIGALIAS_AND_STR(SRC_ROOT, 'r'),
         CONFIGALIAS_AND_STR(PATH, 'p'), CONFIGALIAS_AND_STR(LOG_FILE, 'f'),
         CONFIGALIAS_AND_STR(DATABASE_BACKEND, 'd'),
-        CONFIGALIAS_AND_STR(HELP, 'h'));
+        CONFIGALIAS_AND_STR(HELP, 'h'),
+        CONFIGALIAS_AND_STR(OVERRIDE_CONF, 'c'));
 
 constexpr auto kConfigsDescMap =
     array_helpers::make<static_cast<int>(Configs::MAX), Configs, DescStr>(
@@ -54,7 +56,8 @@ constexpr auto kConfigsDescMap =
         DESC_AND_STR(PATH, "Environment variable PATH (to override)"),
         DESC_AND_STR(LOG_FILE, "File path to log"),
         DESC_AND_STR(DATABASE_BACKEND, "Database backend to use"),
-        DESC_AND_STR(HELP, "Print this help message"));
+        DESC_AND_STR(HELP, "Print this help message"),
+        DESC_AND_STR(OVERRIDE_CONF, "Override config file"));
 
 /**
  * getVariable - Function used to retrieve the value of a specific
@@ -73,6 +76,28 @@ std::optional<std::string> getVariable(Configs config);
  * @param value The new value to be set for the specified configuration.
  */
 void setVariable(Configs config, const std::string &value);
+
+/**
+ * getEnv - Function used to retrieve the value of an environment variable.
+ *
+ * @param name The name of the environment variable for which the value is to be
+ * retrieved.
+ * @param value [out] A reference to a string where the retrieved value will be
+ * stored.
+ * @return A boolean indicating whether the environment variable was found and
+ * its value was successfully retrieved. If the environment variable is not
+ * found, the function returns false and the value of 'value' remains unchanged.
+ *
+ * @note This function uses the standard library function std::getenv to
+ * retrieve the value of the environment variable. If the environment variable
+ * is not found, std::getenv returns a null pointer, which is converted to false
+ * in this function.
+ *
+ * @note The retrieved value is stored in the 'value' parameter as a string. If
+ * the environment variable is found but its value is empty, the 'value'
+ * parameter will be set to an empty string.
+ */
+bool getEnv(const std::string &name, std::string &value);
 
 /**
  * serializeHelpToOStream - Function used to serialize the help information to

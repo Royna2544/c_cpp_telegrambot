@@ -403,6 +403,7 @@ add_executable(${PROJECT_TEST_NAME}
   tests/ResourceManagerTest.cpp
   tests/TryParseTest.cpp
   tests/SharedMallocTest.cpp
+  tests/ConstexprStringCatTest.cpp
 )
 target_include_directories(${PROJECT_TEST_NAME} PRIVATE ${gtest_INCLUDE_DIR} ${gmock_INCLUDE_DIR})
 target_link_libraries(${PROJECT_TEST_NAME} gtest gmock TgBotCommandModules)
