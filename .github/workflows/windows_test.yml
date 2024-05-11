@@ -15,10 +15,10 @@ jobs:
       fail-fast: false
       matrix:
         sys: [mingw64, ucrt64] # clang64
-        text: ['', 'invalid']
+        text: ['', 'unsupported']
 
 
-    name: 🚧 ${{ matrix.sys }}
+    name: "🚧 ${{ matrix.sys }} (AF_UNIX ${{ matrix.text}})"
     defaults:
       run:
         shell: msys2 {0}
