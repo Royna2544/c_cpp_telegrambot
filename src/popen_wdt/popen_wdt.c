@@ -13,6 +13,9 @@ bool popen_watchdog_init(popen_watchdog_data_t **data) {
     return false;
 }
 
-bool popen_watchdog_activated(popen_watchdog_data_t *data) {
-    return data->watchdog_activated;
+bool popen_watchdog_activated(popen_watchdog_data_t **data) {
+    if (data != NULL && *data != NULL) {
+        return (*data)->watchdog_activated;
+    }
+    return false;
 }
