@@ -48,6 +48,6 @@ static void restartCommandFn(const Bot &bot, const Message::Ptr message) {
 void loadcmd_restart(CommandModule& module) {
     module.command = "restart";
     module.description = "Restarts the bot";
-    module.flags = CommandModule::Flags::None;
+    module.flags = CommandModule::Flags::Enforced;
     module.fn = restartCommandFn;
 }
