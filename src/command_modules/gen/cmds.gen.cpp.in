@@ -16,10 +16,10 @@ void CommandModuleManager::loadCommandModules(Bot &bot) {
             << ": " << e.what();
          continue;
       }
-      loadedModules.emplace_back(module);
       if (module.fn) {
          bot_AddCommand(bot, module.command, module.fn, module.isEnforced());
          module.isLoaded = true;
+         loadedModules.emplace_back(module);
       } else {
          LOG(ERROR) << "Invalid command module " << module.command
                     << ": No functions provided";
