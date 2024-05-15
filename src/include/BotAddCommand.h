@@ -11,21 +11,25 @@
 using command_callback_t = std::function<void(Bot&, const Message::Ptr&)>;
 
 /**
- * bot_AddCommandPermissive - Add a bot command (permissive command)
+ * @brief Adds a command to the bot.
  *
- * @param bot Bot object
- * @param cmd The command name in string
- * @param cb callback invoked on messages with matching cmd
- * @see Authorization.h
+ * This function adds a command to the bot with the specified name and callback function.
+ * The callback function is called when the bot receives a message containing the command.
+ *
+ * @param bot The bot reference object.
+ * @param cmd The name of the command.
+ * @param cb The callback function to be called when the command is received.
+ * @param enforced A boolean value indicating whether the command is enforced or not.
  */
-void bot_AddCommandPermissive(Bot& bot, const std::string& cmd, command_callback_t cb);
+void bot_AddCommand(Bot& bot, const std::string& cmd, command_callback_t cb, bool enforced);
+
 
 /**
- * bot_AddCommandEnforced - Add a bot command (enforced command)
+ * @brief Removes a command from the bot.
  *
- * @param bot Bot object
- * @param cmd The command name in string
- * @param cb callback invoked on messages with matching cmd
- * @see Authorization.h
+ * This function removes a command from the bot with the specified name.
+ *
+ * @param bot The bot reference object.
+ * @param cmd The name of the command to be removed.
  */
-void bot_AddCommandEnforced(Bot& bot, const std::string& cmd, command_callback_t cb);
+void bot_RemoveCommand(Bot& bot, const std::string& cmd);

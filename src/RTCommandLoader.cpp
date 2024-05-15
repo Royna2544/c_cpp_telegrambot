@@ -60,11 +60,7 @@ bool RTCommandLoader::loadOneCommand(std::filesystem::path _fname) {
         return false;
     }
     libs.emplace_back(handle);
-    if (mod.isEnforced()) {
-        bot_AddCommandEnforced(bot, mod.command, mod.fn);
-    } else {
-        bot_AddCommandPermissive(bot, mod.command, mod.fn);
-    }
+    bot_AddCommand(bot, mod.command, mod.fn, mod.isEnforced());
 
     if (dladdr(dlsym(handle, DYN_COMMAND_SYM_STR), &info) < 0) {
         dlerrorBuf = dlerror();

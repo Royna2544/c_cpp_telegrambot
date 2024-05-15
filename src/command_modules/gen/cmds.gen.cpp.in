@@ -18,11 +18,8 @@ void CommandModuleManager::loadCommandModules(Bot &bot) {
       }
       loadedModules.emplace_back(module);
       if (module.fn) {
-         if (module.isEnforced()) {
-            bot_AddCommandEnforced(bot, module.command, module.fn);
-         } else {
-            bot_AddCommandPermissive(bot, module.command, module.fn);
-         }
+         bot_AddCommand(bot, module.command, module.fn, module.isEnforced());
+         module.isLoaded = true;
       } else {
          LOG(ERROR) << "Invalid command module " << module.command
                     << ": No functions provided";

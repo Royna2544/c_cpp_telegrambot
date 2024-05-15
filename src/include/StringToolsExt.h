@@ -20,8 +20,8 @@ static inline void TrimStr(std::string& str) { boost::trim(str); }
 #include <vector>
 
 static inline void splitAndClean(const std::string& text,
-                                 std::vector<std::string>& out) {
-    auto v = StringTools::split(text, '\n');
+                                 std::vector<std::string>& out, char delimiter='\n') {
+    auto v = StringTools::split(text, delimiter);
     auto it = std::remove_if(v.begin(), v.end(), [](const std::string& s) {
         return isEmptyOrBlank(s);
     });
