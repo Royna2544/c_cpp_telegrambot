@@ -152,6 +152,11 @@ void SpamBlockBase::addMessage(const Message::Ptr &message) {
         return;
     }
 
+    // Ignore old messages
+    if (!AuthContext::isMessageUnderTimeLimit(message)) {
+        return;
+    }
+
     // We care GIF, sticker, text spams only, or if it isn't fowarded msg
     if ((!message->animation && message->text.empty() && !message->sticker) ||
         message->forwardFrom) {

@@ -38,10 +38,6 @@ class AuthContext : public InstanceClassBase<AuthContext> {
     explicit AuthContext(const std::shared_ptr<DefaultDatabase>& database) noexcept
         : database(database){};
 
-   private:
-    bool authorized = true;
-    std::shared_ptr<DefaultDatabase> database;
-
     /**
      * @brief Checks if the message is within the allowed time limit.
      *
@@ -56,6 +52,10 @@ class AuthContext : public InstanceClassBase<AuthContext> {
      * otherwise.
      */
     static bool isMessageUnderTimeLimit(const Message::Ptr& msg) noexcept;
+
+   private:
+    bool authorized = true;
+    std::shared_ptr<DefaultDatabase> database;
 };
 
 constexpr std::chrono::seconds kMaxTimestampDelay = std::chrono::seconds(10);
