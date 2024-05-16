@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <libos/libfs.hpp>
 #include <memory>
@@ -18,6 +19,11 @@
 namespace po = boost::program_options;
 using namespace ConfigManager;
 using namespace StringConcat;
+
+template <typename T>
+auto SingleQuoted(T t) {
+    return std::quoted(t, '\'');
+}
 
 template <typename T, Configs config>
 void AddOption(po::options_description &desc) {
@@ -46,7 +52,7 @@ struct ConfigBackendBase {
         array_helpers::find(ConfigManager::kConfigsMap, Configs::OVERRIDE_CONF)
             ->second;
 
-    virtual bool load() {}
+    virtual bool load() { return true; }
     virtual std::optional<std::string> getVariable(const std::string &name) = 0;
     virtual bool doOverride(const std::string & /*config*/) { return false; }
 
@@ -135,14 +141,14 @@ struct ConfigBackendFile : public ConfigBackendBoostPOBase {
             return false;
         }
         try {
-            po::store(po::parse_config_file(ifs, getTgBotOptionsDesc()), p.mp);
+            po::store(po::parse_config_file(ifs, getTgBotOptionsDesc()), mp);
         } catch (const boost::program_options::error &e) {
             LOG(ERROR) << "File backend failed to parse: " << e.what();
             return false;
         }
         po::notify(mp);
 
-        LOG(INFO) << "Loaded " << p.mp.size() << " entries from " << confPath;
+        LOG(INFO) << "Loaded " << mp.size() << " entries from " << confPath;
         return true;
     }
     [[nodiscard]] std::string_view getName() const override { return "File"; }
@@ -217,7 +223,7 @@ enum class Passes {
 
 namespace details {
 
-std::vector<std::unique_ptr<ConfigBackendBase>> getAvailableBackends() {
+std::vector<std::unique_ptr<ConfigBackendBase>>& getAvailableBackends() {
     static std::vector<std::unique_ptr<ConfigBackendBase>> backends;
     static std::once_flag status;
     std::call_once(status, [] {
@@ -253,9 +259,9 @@ std::optional<std::string> getVariable(Configs config) {
             case Passes::FIND_OVERRIDE:
                 for (const auto &bit : backends) {
                     if (bit->doOverride(name)) {
-                        DLOG(INFO) << "Used '" << bit->getName()
-                                   << "' backend for fetching var '" << name
-                                   << "' (forced)";
+                        DLOG(INFO) << "Used " << SingleQuoted(bit->getName())
+                                   << " backend for fetching var "
+                                   << SingleQuoted(name) << " (forced)";
                         return bit->getVariable(name);
                     }
                 }
@@ -265,9 +271,9 @@ std::optional<std::string> getVariable(Configs config) {
                 for (const auto &bit : backends) {
                     const auto &result = bit->getVariable(name);
                     if (result.has_value()) {
-                        DLOG(INFO)
-                            << "Used '" << bit->getName()
-                            << "' backend for fetching var '" << name << "'";
+                        DLOG(INFO) << "Used " << SingleQuoted(bit->getName())
+                                   << " backend for fetching var "
+                                   << SingleQuoted(name);
                         return result;
                     }
                 }
