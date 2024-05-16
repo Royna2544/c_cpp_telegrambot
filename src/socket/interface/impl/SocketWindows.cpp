@@ -6,6 +6,8 @@
 #include <impl/SocketWindows.hpp>
 #include <socket/selector/SelectorWindows.hpp>
 
+#include "SocketBase.hpp"
+
 char *SocketInterfaceWindows::strWSAError(const int errcode) {
     int ret = 0;
     static char strerror_buf[64];
@@ -57,39 +59,31 @@ char *SocketInterfaceWindows::strWSAError(const int errcode) {
 }
 
 void SocketInterfaceWindows::startListening(
-    const listener_callback_t onNewData) {
+    socket_handle_t handle, const listener_callback_t onNewData) {
     bool should_break = false;
     WSADATA data;
     SelectSelector selector;
-    socket_handle_t sfd = 0;
-
-    if (WSAStartup(MAKEWORD(2, 2), &data) != 0) {
-        WSALOG_E("WSAStartup failed");
-    }
-
-    sfd = createServerSocket();
-    if (!isValidSocketHandle(sfd)) {
-        return;
-    }
 
     do {
-        if (listen(sfd, SOMAXCONN) == SOCKET_ERROR) {
+        if (listen(handle, SOMAXCONN) == SOCKET_ERROR) {
             WSALOG_E("Failed to listen to socket");
             break;
         }
         if (!selector.init()) {
             break;
         }
-        selector.add(sfd, [sfd, this, &should_break, onNewData] {
+        selector.add(handle, [handle, this, &should_break, onNewData] {
             struct sockaddr addr {};
             socklen_t len = sizeof(addr);
-            const socket_handle_t cfd = accept(sfd, &addr, &len);
+            const socket_handle_t cfd = accept(handle, &addr, &len);
 
             if (!isValidSocketHandle(cfd)) {
                 WSALOG_E("Accept failed");
             } else {
                 doGetRemoteAddr(cfd);
-                should_break = onNewData(this, cfd);
+                SocketConnContext ctx(addr);
+                ctx.cfd = cfd;
+                should_break = onNewData(ctx);
                 closesocket(cfd);
             }
         });
@@ -105,26 +99,26 @@ void SocketInterfaceWindows::startListening(
         }
         selector.shutdown();
     } while (false);
-    closesocket(sfd);
+    closeSocketHandle(handle);
     cleanupServerSocket();
-    WSACleanup();
 }
 
-void SocketInterfaceWindows::writeToSocket(struct SocketData sdata) {
-    WSADATA data;
-    if (WSAStartup(MAKEWORD(2, 2), &data) == 0) {
-        const socket_handle_t sfd = createClientSocket();
-        if (isValidSocketHandle(sfd)) {
-            const int count =
-                send(sfd, reinterpret_cast<char *>(sdata.data->getData()),
-                     sdata.len, 0);
-            if (count < 0) {
-                WSALOG_E("Failed to send to socket");
-            }
-            closesocket(sfd);
+void SocketInterfaceWindows::writeToSocket(SocketConnContext context,
+                                           SocketData data) {
+    auto *socketData = static_cast<char *>(data.data->getData());
+    auto *addr = static_cast<sockaddr *>(context.addr.getData());
+    if (isValidSocketHandle(context.cfd)) {
+        const auto count = send(context.cfd, socketData, data.len, 0);
+        if (count < 0) {
+            WSALOG_E("Failed to send to socket");
+        }
+    } else {
+        const auto count =
+            sendto(context.cfd, socketData, data.len, 0, addr, context.len);
+        if (count < 0) {
+            WSALOG_E("Failed to sentto socket");
         }
     }
-    WSACleanup();
 }
 
 void SocketInterfaceWindows::forceStopListening(void) { kRun = false; }
@@ -134,17 +128,29 @@ char *SocketInterfaceWindows::getLastErrorMessage() {
 }
 
 std::optional<SocketData> SocketInterfaceWindows::readFromSocket(
-    socket_handle_t handle, SocketData::length_type length) {
+    SocketConnContext context, SocketData::length_type length) {
     SocketData buf(length);
-    int count =
-        recv(handle, static_cast<char *>(buf.data->getData()), length, 0);
+    auto *addr = static_cast<sockaddr *>(context.addr.getData());
+    auto *data = static_cast<char *>(buf.data->getData());
+
+    auto count = recvfrom(context.cfd, data, length, MSG_WAITALL,
+                          addr, &context.len);
     if (count < 0) {
-        PLOG(ERROR) << "Failed to read from socket";
+        WSALOG_E("Failed to read from socket");
     } else {
         buf.len = count;
         return buf;
     }
     return std::nullopt;
+}
+
+bool SocketInterfaceWindows::closeSocketHandle(socket_handle_t &handle) {
+    if (isValidSocketHandle(handle)) {
+        closesocket(handle);
+        handle = INVALID_SOCKET;
+        return true;
+    }
+    return false;
 }
 
 void WSALOG_E(const char *msg) {

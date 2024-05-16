@@ -4,22 +4,24 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <cstring>
 #include <functional>
 
 #include <absl/log/log.h>
 
 #include <impl/SocketPosix.hpp>
+#include "SocketBase.hpp"
 
-socket_handle_t SocketInterfaceUnixIPv6::createServerSocket() {
+std::optional<socket_handle_t> SocketInterfaceUnixIPv6::createServerSocket() {
     socket_handle_t ret = kInvalidFD;
     bool iface_done = false;
     struct sockaddr_in6 name {};
-    struct sockaddr* _name = reinterpret_cast<struct sockaddr*>(&name);
-    const socket_handle_t sfd = socket(AF_INET6, SOCK_STREAM, 0);
+    auto* _name = reinterpret_cast<struct sockaddr*>(&name);
+    socket_handle_t sfd = socket(AF_INET6, SOCK_STREAM, 0);
 
     if (!isValidSocketHandle(sfd)) {
         PLOG(ERROR) << "Failed to create socket";
-        return ret;
+        return std::nullopt;
     }
 
     LOG(INFO) << "Dump of active interfaces' addresses (IPv6)";
@@ -38,7 +40,7 @@ socket_handle_t SocketInterfaceUnixIPv6::createServerSocket() {
 
     if (!iface_done) {
         LOG(ERROR) << "Failed to find any valid interface to bind to (IPv6)";
-        return ret;
+        return std::nullopt;
     }
     helper.inet.printExternalIP();
 
@@ -47,35 +49,35 @@ socket_handle_t SocketInterfaceUnixIPv6::createServerSocket() {
     name.sin6_addr = IN6ADDR_ANY_INIT;
     if (bind(sfd, _name, sizeof(name)) != 0) {
         PLOG(ERROR) << "Failed to bind to socket";
-        close(sfd);
-        return ret;
+        closeSocketHandle(sfd);
+        return std::nullopt;
     }
     ret = sfd;
     return ret;
 }
 
-socket_handle_t SocketInterfaceUnixIPv6::createClientSocket() {
-    socket_handle_t ret = kInvalidFD;
+std::optional<SocketConnContext> SocketInterfaceUnixIPv6::createClientSocket() {
+    SocketConnContext ctx = SocketConnContext::create<sockaddr_in6>();
     struct sockaddr_in6 name {};
     auto* _name = reinterpret_cast<struct sockaddr*>(&name);
-    const socket_handle_t sfd = socket(AF_INET6, SOCK_STREAM, 0);
 
-    if (!isValidSocketHandle(sfd)) {
+    ctx.cfd = socket(AF_INET6, SOCK_STREAM, 0);
+    if (!isValidSocketHandle(ctx.cfd)) {
         PLOG(ERROR) << "Failed to create socket";
-        return ret;
+        return std::nullopt;
     }
 
     name.sin6_family = AF_INET6;
     name.sin6_port = htons(helper.inet.getPortNum());
     inet_pton(AF_INET6, getOptions(Options::DESTINATION_ADDRESS).c_str(),
               &name.sin6_addr);
-    if (connect(sfd, _name, sizeof(name)) != 0) {
+    if (connect(ctx.cfd, _name, sizeof(name)) != 0) {
         PLOG(ERROR) << "Failed to connect to socket";
-        close(sfd);
-        return ret;
+        closeSocketHandle(ctx.cfd);
+        return std::nullopt;
     }
-    ret = sfd;
-    return ret;
+    memcpy(ctx.addr.getData(), &name, sizeof(name));
+    return ctx;
 }
 
 bool SocketInterfaceUnixIPv6::isSupported() {

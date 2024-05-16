@@ -3,6 +3,9 @@
 #include <absl/log/log.h>
 
 #include <optional>
+#include <utility>
+
+#include "SocketDescriptor_defs.hpp"
 
 void SocketInterfaceBase::setOptions(Options opt, const std::string data,
                                      bool persistent) {
@@ -33,9 +36,9 @@ std::string SocketInterfaceBase::getOptions(Options opt) {
     return ret;
 }
 
-SocketInterfaceBase::option_t* SocketInterfaceBase::getOptionPtr(Options p) {
+SocketInterfaceBase::option_t* SocketInterfaceBase::getOptionPtr(Options opt) {
     option_t* optionVal = nullptr;
-    switch (p) {
+    switch (opt) {
         case Options::DESTINATION_ADDRESS:
             optionVal = &options.opt_destination_address;
             break;
@@ -44,4 +47,23 @@ SocketInterfaceBase::option_t* SocketInterfaceBase::getOptionPtr(Options p) {
             break;
     }
     return optionVal;
+}
+
+void SocketInterfaceBase::writeAsClientToSocket(SocketData data) {
+    const auto handle = createClientSocket();
+    if (handle.has_value()) {
+        writeToSocket(handle.value(), std::move(data));
+    }
+}
+
+void SocketInterfaceBase::startListeningAsServer(
+    const listener_callback_t onNewData) {
+    auto hdl = createServerSocket();
+    if (hdl) {
+        startListening(hdl.value(), onNewData);
+    }
+}
+
+bool SocketInterfaceBase::closeSocketHandle(SocketConnContext& context) {
+    return closeSocketHandle(context.cfd);
 }

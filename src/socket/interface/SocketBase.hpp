@@ -6,44 +6,120 @@
 #include <optional>
 #include <string>
 
+#include "SharedMalloc.hpp"
+
+struct SocketConnContext {
+    socket_handle_t cfd{};  // connection socket file descriptor
+    SharedMalloc addr;      // struct sockaddr_*'s address
+    socklen_t len;          // length of address
+
+    template <typename SocketAddr>
+    static SocketConnContext create() {
+        SocketAddr addr{};
+        SocketConnContext ctx(addr);
+        return ctx;
+    }
+    template <typename SocketAddr>
+    explicit SocketConnContext(SocketAddr Myaddr)
+        : len(sizeof(Myaddr)), addr(sizeof(Myaddr)) {
+        memcpy(addr.getData(), &Myaddr, sizeof(Myaddr));
+    }
+};
+
 // A base class for socket operations
 struct SocketInterfaceBase {
     enum class Options { DESTINATION_ADDRESS, DESTINATION_PORT };
 
-    using listener_callback_t =
-        std::function<bool(SocketInterfaceBase *intf, socket_handle_t cfd)>;
+    // addr is used as void pointer to maintain platform independence.
+    using listener_callback_t = std::function<bool(SocketConnContext ctx)>;
     using dummy_listen_buf_t = char;
 
     constexpr static int kTgBotHostPort = 50000;
 
+    void writeAsClientToSocket(SocketData data);
+    void startListeningAsServer(const listener_callback_t onNewData);
+    bool closeSocketHandle(SocketConnContext &context);
+
     /**
-     * @brief Writes a SocketData to the socket.
+     * @brief Writes data to the socket using the provided context.
      *
-     * @param data The SocketData to write to the socket.
+     * This function is a pure virtual function, meaning it must be implemented
+     * by any class that inherits from SocketInterfaceBase. It is used to send
+     * data over the network using the specified connection context.
+     *
+     * @param context The connection context containing the socket file
+     * descriptor, address, and length of the address of the destination.
+     * @param data The data to be written to the socket.
      */
-    virtual void writeToSocket(struct SocketData data) = 0;
+    virtual void writeToSocket(SocketConnContext context, SocketData data) = 0;
+
+    /**
+     * @brief Reads data from the socket using the provided context.
+     *
+     * This function is a pure virtual function, meaning it must be implemented
+     * by any class that inherits from SocketInterfaceBase. It is used to
+     * receive data from the network using the specified connection context.
+     *
+     * @param context The connection context containing the socket file
+     * descriptor, address, and length of the address of the source.
+     * @param length The maximum length of data to be read from the socket.
+     *
+     * @return An optional containing the received data if successful, or an
+     * empty optional if an error occurred or no data was available.
+     */
+    virtual std::optional<SocketData> readFromSocket(
+        SocketConnContext context, SocketData::length_type length) = 0;
+
+    /**
+     * @brief Closes the socket handle.
+     *
+     * This function is a pure virtual function, meaning it must be implemented
+     * by any class that inherits from SocketInterfaceBase. It is used to close
+     * the specified socket handle and release any system resources associated
+     * with it.
+     * Also, this function should invalidate the socket handle
+     *
+     * @param handle The socket handle to be closed.
+     *
+     * @return True if the socket handle was successfully closed, false
+     * otherwise. Note: The actual return value may vary depending on the
+     * specific implementation.
+     */
+    virtual bool closeSocketHandle(socket_handle_t &handle) = 0;
 
     /**
      * @brief Starts the socket listener thread.
      *
+     * @param handle The socket handle.
      * @param onNewBuffer The function to be called when a new connection
      * is received.
      */
-    virtual void startListening(listener_callback_t onNewBuffer) = 0;
+    virtual void startListening(socket_handle_t handle,
+                                listener_callback_t onNewBuffer) = 0;
 
     /**
      * @brief Creates a new client socket.
      *
-     * @return A new socket handle, or INVALID_SOCKET on error.
+     * This function is used to create a new client socket. The specific
+     * implementation of this function will depend on the underlying socket
+     * interface being used.
+     *
+     * @return A SocketConnContext object containing the connection socket
+     * file descriptor, address, and length of the address.
+     * Contains the socket handle of the server, server's address and length
      */
-    virtual socket_handle_t createClientSocket() = 0;
+    virtual std::optional<SocketConnContext> createClientSocket() = 0;
 
     /**
      * @brief Creates a new server socket.
      *
-     * @return A new socket handle, or INVALID_SOCKET on error.
+     * This function is used to create a new server socket. The specific
+     * implementation of this function will depend on the underlying socket
+     * interface being used.
+     *
+     * @return A socket handle representing the newly created server socket.
      */
-    virtual socket_handle_t createServerSocket() = 0;
+    virtual std::optional<socket_handle_t> createServerSocket() = 0;
 
     /**
      * @brief Retrieves the remote address of a connected socket.
@@ -59,16 +135,6 @@ struct SocketInterfaceBase {
      * @return True if the handle is valid, false otherwise.
      */
     virtual bool isValidSocketHandle(socket_handle_t handle) = 0;
-
-    /**
-     * @brief read data from socket handle, wrapper for os-specific read()
-     * function
-     *
-     * @param handle socket handle object passed from listener_callback function
-     * @param length length of data to read
-     */
-    virtual std::optional<SocketData> readFromSocket(socket_handle_t handle,
-                                      SocketData::length_type length) = 0;
 
     /**
      * @brief Sets an option for the socket interface.
@@ -118,10 +184,10 @@ struct SocketInterfaceBase {
                                              size_t nmemb, void *userp);
 
            private:
-            constexpr static const char kIPv4EnvVar[] = "IPV4_ADDRESS";
-            constexpr static const char kIPv6EnvVar[] = "IPV6_ADDRESS";
-            constexpr static const char kPortEnvVar[] = "PORT_NUM";
-            bool _isSupported(const char *envVar);
+            constexpr static std::string_view kIPv4EnvVar = "IPV4_ADDRESS";
+            constexpr static std::string_view kIPv6EnvVar = "IPV6_ADDRESS";
+            constexpr static std::string_view kPortEnvVar = "PORT_NUM";
+            bool _isSupported(const std::string_view envVar);
             SocketInterfaceBase *interface;
         } inet;
 
@@ -131,6 +197,7 @@ struct SocketInterfaceBase {
             static bool isSupported(void);
             bool canSocketBeClosed();
             void cleanupServerSocket();
+            void doGetRemoteAddr(socket_handle_t handle);
 
            private:
             SocketInterfaceBase *interface;

@@ -9,6 +9,7 @@
 #include <cstring>
 #include <iostream>
 #include <string>
+#include "SocketData.hpp"
 
 [[noreturn]] static void usage(const char* argv0, const int exitCode) {
     std::cerr << "Usage: " << argv0 << " <chatId> <name stored in DB>"
@@ -48,5 +49,5 @@ int main(int argc, char* const* argv) {
     data.type = TYPE_DOCUMENT;
 
     struct TgBotCommandPacket pkt(CMD_SEND_FILE_TO_CHAT_ID, data);
-    getClientBackend()->writeToSocket(pkt.toSocketData());
+    getClientBackend()->writeAsClientToSocket(pkt.toSocketData());
 }

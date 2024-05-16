@@ -5,7 +5,7 @@
 #include <type_traits>
 
 struct SocketData {
-    using length_type = int64_t;
+    using length_type = uint64_t;
 
     std::optional<SharedMalloc> data;
     length_type len;

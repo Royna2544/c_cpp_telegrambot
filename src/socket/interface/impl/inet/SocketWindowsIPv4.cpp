@@ -5,39 +5,43 @@
 #include <impl/SocketWindows.hpp>
 #include <string>
 
-socket_handle_t SocketInterfaceWindowsIPv4::createServerSocket() {
-    struct sockaddr_in name {};
-    socket_handle_t sfd;
+#include "SocketBase.hpp"
+
+std::optional<socket_handle_t> SocketInterfaceWindowsIPv4::createServerSocket() {
+    auto context = SocketConnContext::create<sockaddr_in>();
 
     setOptions(Options::DESTINATION_PORT, std::to_string(kTgBotHostPort));
-    if (SocketHelperWindows::createInetSocketAddr(&sfd, &name, this)) {
-        name.sin_addr.s_addr = INADDR_ANY;
-        if (bind(sfd, reinterpret_cast<struct sockaddr *>(&name),
-                 sizeof(name)) != 0) {
+    if (win_helper.createInetSocketAddr(context)) {
+        auto *name = static_cast<sockaddr_in *>(context.addr.getData());
+        auto *_name = static_cast<sockaddr *>(context.addr.getData());
+
+        name->sin_addr.s_addr = INADDR_ANY;
+        if (bind(context.cfd, _name, context.len) != 0) {
             WSALOG_E("Failed to bind to socket");
-            closesocket(sfd);
-            return INVALID_SOCKET;
+            closeSocketHandle(context.cfd);
+            return std::nullopt;
         }
     }
     helper.inet.printExternalIP();
-    return sfd;
+    return context.cfd;
 }
 
-socket_handle_t SocketInterfaceWindowsIPv4::createClientSocket() {
-    struct sockaddr_in name {};
-    socket_handle_t sfd;
+std::optional<SocketConnContext> SocketInterfaceWindowsIPv4::createClientSocket() {
+    auto context = SocketConnContext::create<sockaddr_in>();
 
-    if (SocketHelperWindows::createInetSocketAddr(&sfd, &name, this)) {
+    if (win_helper.createInetSocketAddr(context)) {
+        auto *name = static_cast<sockaddr_in *>(context.addr.getData());
+        auto *_name = static_cast<sockaddr *>(context.addr.getData());
+
         InetPton(AF_INET, getOptions(Options::DESTINATION_ADDRESS).c_str(),
-                 &name.sin_addr);
-        if (connect(sfd, reinterpret_cast<struct sockaddr *>(&name),
-                    sizeof(name)) != 0) {
+                 &name->sin_addr);
+        if (connect(context.cfd, _name, context.len) != 0) {
             WSALOG_E("Failed to connect to socket");
-            closesocket(sfd);
-            return INVALID_SOCKET;
+            closeSocketHandle(context.cfd);
+            return std::nullopt;
         }
     }
-    return sfd;
+    return context;
 }
 
 bool SocketInterfaceWindowsIPv4::isSupported() {
@@ -45,7 +49,7 @@ bool SocketInterfaceWindowsIPv4::isSupported() {
 }
 
 void SocketInterfaceWindowsIPv4::doGetRemoteAddr(socket_handle_t s) {
-    SocketHelperWindows::doGetRemoteAddrInet<
+    WinHelper::doGetRemoteAddrInet<
         struct sockaddr_in, AF_INET, in_addr, INET_ADDRSTRLEN,
         offsetof(struct sockaddr_in, sin_addr)>(s);
 }

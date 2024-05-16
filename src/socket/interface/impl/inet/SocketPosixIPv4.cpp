@@ -8,16 +8,19 @@
 #include <functional>
 #include <impl/SocketPosix.hpp>
 
-socket_handle_t SocketInterfaceUnixIPv4::createServerSocket() {
+#include "SharedMalloc.hpp"
+#include "SocketBase.hpp"
+
+std::optional<socket_handle_t> SocketInterfaceUnixIPv4::createServerSocket() {
     socket_handle_t ret = kInvalidFD;
     bool iface_done = false;
     struct sockaddr_in name {};
     auto* _name = reinterpret_cast<struct sockaddr*>(&name);
-    const socket_handle_t sfd = socket(AF_INET, SOCK_STREAM, 0);
+    socket_handle_t sfd = socket(AF_INET, SOCK_STREAM, 0);
 
     if (!isValidSocketHandle(sfd)) {
         PLOG(ERROR) << "Failed to create socket";
-        return ret;
+        return std::nullopt;
     }
 
     LOG(INFO) << "Dump of active interfaces' addresses (IPv4)";
@@ -46,34 +49,35 @@ socket_handle_t SocketInterfaceUnixIPv4::createServerSocket() {
     name.sin_addr.s_addr = INADDR_ANY;
     if (bind(sfd, _name, sizeof(name)) != 0) {
         PLOG(ERROR) << "Failed to bind to socket";
-        close(sfd);
-        return ret;
+        closeSocketHandle(sfd);
+        return std::nullopt;
     }
     ret = sfd;
     return ret;
 }
 
-socket_handle_t SocketInterfaceUnixIPv4::createClientSocket() {
-    socket_handle_t ret = kInvalidFD;
+std::optional<SocketConnContext> SocketInterfaceUnixIPv4::createClientSocket() {
+    SocketConnContext ctx = SocketConnContext::create<sockaddr_in>();
     struct sockaddr_in name {};
     auto* _name = reinterpret_cast<struct sockaddr*>(&name);
-    const socket_handle_t sfd = socket(AF_INET, SOCK_STREAM, 0);
 
-    if (!isValidSocketHandle(sfd)) {
+    ctx.cfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (!isValidSocketHandle(ctx.cfd)) {
         PLOG(ERROR) << "Failed to create socket";
-        return ret;
+        return std::nullopt;
     }
 
     name.sin_family = AF_INET;
     name.sin_port = htons(helper.inet.getPortNum());
-    inet_aton(getOptions(Options::DESTINATION_ADDRESS).c_str(), &name.sin_addr);
-    if (connect(sfd, _name, sizeof(name)) != 0) {
+    inet_pton(AF_INET, getOptions(Options::DESTINATION_ADDRESS).c_str(),
+              &name.sin_addr);
+    if (connect(ctx.cfd, _name, sizeof(name)) != 0) {
         PLOG(ERROR) << "Failed to connect to socket";
-        close(sfd);
-        return ret;
+        closeSocketHandle(ctx.cfd);
+        return std::nullopt;
     }
-    ret = sfd;
-    return ret;
+    memcpy(ctx.addr.getData(), &_name, sizeof(name));
+    return ctx;
 }
 
 bool SocketInterfaceUnixIPv4::isSupported() {

@@ -2,7 +2,6 @@
 #include <ChatObserver.h>
 #include <ResourceManager.h>
 #include <SingleThreadCtrl.h>
-#include <SocketConnectionHandler.h>
 #include <SpamBlock.h>
 #include <internal/_std_chrono_templates.h>
 #include <random/RandomNumberGenerator.h>
@@ -18,11 +17,17 @@
 #include <mutex>
 #include <optional>
 
+#include "SocketBase.hpp"
+#include "SocketDescriptor_defs.hpp"
+#include "TgBotSocketInterface.hpp"
+
 using TgBot::Api;
 using TgBot::InputFile;
 namespace fs = std::filesystem;
 
-static std::string getMIMEString(const std::string& path) {
+namespace {
+
+std::string getMIMEString(const std::string& path) {
     static std::once_flag once;
     static rapidjson::Document doc;
     std::string extension = fs::path(path).extension().string();
@@ -52,149 +57,171 @@ static std::string getMIMEString(const std::string& path) {
     }
     return "application/octet-stream";
 }
+}  // namespace
 
-void socketConnectionHandler(const Bot& bot, struct TgBotCommandPacket pkt) {
+void SocketInterfaceTgBot::handle_WriteMsgToChatId(const void* ptr) {
+    const auto* data = reinterpret_cast<const WriteMsgToChatId*>(ptr);
+    try {
+        bot_sendMessage(_bot, data->to, data->msg);
+    } catch (const TgBot::TgException& e) {
+        LOG(ERROR) << "Exception at handler " << e.what();
+    }
+}
+
+void SocketInterfaceTgBot::handle_CtrlSpamBlock(const void* ptr) {
+    const auto* data = reinterpret_cast<const CtrlSpamBlock*>(ptr);
+    gSpamBlockCfg = *data;
+}
+
+void SocketInterfaceTgBot::handle_ObserveChatId(const void* ptr) {
+    const auto* data = reinterpret_cast<const ObserveChatId*>(ptr);
     auto obs = ChatObserver::getInstance();
-    static std::optional<std::chrono::system_clock::time_point> startTp;
-    void* ptr = pkt.data_ptr.getData();
+    const std::lock_guard<std::mutex> _(obs->m);
+    auto it = std::find(obs->observedChatIds.begin(),
+                        obs->observedChatIds.end(), data->id);
+    bool observe = data->observe;
+    if (obs->observeAllChats) {
+        LOG(WARNING) << "CMD_OBSERVE_CHAT_ID disabled due to "
+                        "CMD_OBSERVE_ALL_CHATS";
+        return;
+    }
+    if (it == obs->observedChatIds.end()) {
+        if (observe) {
+            LOG(INFO) << "Adding chat to observer";
+            obs->observedChatIds.push_back(data->id);
+        } else {
+            LOG(WARNING) << "Trying to quit observing chatid "
+                         << "which wasn't being "
+                            "observed!";
+        }
+    } else {
+        if (observe) {
+            LOG(WARNING) << "Trying to observe chatid "
+                         << "which was already being "
+                            "observed!";
+        } else {
+            LOG(INFO) << "Removing chat from observer";
+            obs->observedChatIds.erase(it);
+        }
+    }
+}
+
+void SocketInterfaceTgBot::handle_SendFileToChatId(const void* ptr) {
+    const auto* data = reinterpret_cast<const SendFileToChatId*>(ptr);
+    const auto* file = data->filepath;
+    using FileOrId_t = boost::variant<InputFile::Ptr, std::string>;
+    std::function<Message::Ptr(const Api&, ChatId, FileOrId_t)> fn;
+    try {
+        switch (data->type) {
+            case TYPE_PHOTO:
+                fn = [](const Api& api, ChatId id, const FileOrId_t file) {
+                    return api.sendPhoto(id, file);
+                };
+                break;
+            case TYPE_VIDEO:
+                fn = [](const Api& api, ChatId id, const FileOrId_t file) {
+                    return api.sendVideo(id, file);
+                };
+                break;
+            case TYPE_GIF:
+                fn = [](const Api& api, ChatId id, const FileOrId_t file) {
+                    return api.sendAnimation(id, file);
+                };
+            case TYPE_DOCUMENT:
+                fn = [](const Api& api, ChatId id, const FileOrId_t file) {
+                    return api.sendDocument(id, file);
+                };
+                break;
+            case TYPE_DICE: {
+                static const std::vector<std::string> dices = {
+                    "🎲", "🎯", "🏀", "⚽", "🎳", "🎰"};
+                // TODO: More clean code?
+                _bot.getApi().sendDice(
+                    data->id, false, 0, nullptr,
+                    dices[genRandomNumber(0, dices.size() - 1)]);
+                return;
+            }
+            default:
+                fn = [](const Api&, ChatId, const FileOrId_t) {
+                    return nullptr;
+                };
+                break;
+        }
+        // Try to send as local file first
+        try {
+            fn(_bot.getApi(), data->id,
+               InputFile::fromFile(file, getMIMEString(file)));
+        } catch (std::ifstream::failure& e) {
+            LOG(INFO) << "Failed to send '" << file
+                      << "' as local file, trying as Telegram "
+                         "file id";
+            fn(_bot.getApi(), data->id, std::string(file));
+        }
+    } catch (const TgBot::TgException& e) {
+        LOG(ERROR) << "Exception at handler, " << e.what();
+    }
+}
+
+void SocketInterfaceTgBot::handle_ObserveAllChats(const void* ptr) {
+    auto obs = ChatObserver::getInstance();
+    const std::lock_guard<std::mutex> _(obs->m);
+    obs->observeAllChats = *reinterpret_cast<const ObserveAllChats*>(ptr);
+}
+
+void SocketInterfaceTgBot::handle_DeleteControllerById(const void* ptr) {
+    DeleteControllerById data =
+        *reinterpret_cast<const DeleteControllerById*>(ptr);
+    enum SingleThreadCtrlManager::ThreadUsage threadUsage{};
+    if (data < 0 || data >= SingleThreadCtrlManager::USAGE_MAX) {
+        LOG(ERROR) << "Invalid controller id: " << data;
+        return;
+    }
+    threadUsage = static_cast<SingleThreadCtrlManager::ThreadUsage>(data);
+    SingleThreadCtrlManager::getInstance()->destroyController(threadUsage);
+}
+
+void SocketInterfaceTgBot::handle_GetUptime(SocketConnContext ctx,
+                                            const void* /*ptr*/) {
+    auto now = std::chrono::system_clock::now();
+    const auto diff = now - startTp;
+    std::stringstream uptime;
+    std::string uptimeStr;
+
+    uptime << "Uptime: " << to_string(diff);
+    uptimeStr = uptime.str();
+    LOG(INFO) << "Sending text back: " << std::quoted(uptimeStr);
+    TgBotCommandPacket pkt(CMD_GET_UPTIME_CALLBACK, uptimeStr.c_str(),
+                           sizeof(GetUptimeCallback) - 1);
+    interface->writeToSocket(ctx, pkt.toSocketData());
+}
+
+void SocketInterfaceTgBot::handle_CommandPacket(SocketConnContext ctx,
+                                                TgBotCommandPacket pkt) {
+    const void* ptr = pkt.data_ptr.getData();
     using namespace TgBotCommandData;
 
     switch (pkt.header.cmd) {
-        case CMD_WRITE_MSG_TO_CHAT_ID: {
-            auto* data = reinterpret_cast<WriteMsgToChatId*>(ptr);
-            try {
-                bot_sendMessage(bot, data->to, data->msg);
-            } catch (const TgBot::TgException& e) {
-                LOG(ERROR) << "Exception at handler " << e.what();
-            }
+        case CMD_WRITE_MSG_TO_CHAT_ID:
+            handle_WriteMsgToChatId(ptr);
             break;
-        }
         case CMD_CTRL_SPAMBLOCK:
-            gSpamBlockCfg = *reinterpret_cast<CtrlSpamBlock*>(ptr);
+            handle_CtrlSpamBlock(ptr);
             break;
-        case CMD_OBSERVE_CHAT_ID: {
-            const std::lock_guard<std::mutex> _(obs->m);
-            auto* data = reinterpret_cast<ObserveChatId*>(ptr);
-            auto it = std::find(obs->observedChatIds.begin(),
-                                obs->observedChatIds.end(), data->id);
-            bool observe = data->observe;
-            if (obs->observeAllChats) {
-                LOG(WARNING) << "CMD_OBSERVE_CHAT_ID disabled due to "
-                                "CMD_OBSERVE_ALL_CHATS";
-                break;
-            }
-            if (it == obs->observedChatIds.end()) {
-                if (observe) {
-                    LOG(INFO) << "Adding chat to observer";
-                    obs->observedChatIds.push_back(data->id);
-                } else {
-                    LOG(WARNING) << "Trying to quit observing chatid "
-                                 << "which wasn't being "
-                                    "observed!";
-                }
-            } else {
-                if (observe) {
-                    LOG(WARNING) << "Trying to observe chatid "
-                                 << "which was already being "
-                                    "observed!";
-                } else {
-                    LOG(INFO) << "Removing chat from observer";
-                    obs->observedChatIds.erase(it);
-                }
-            }
-        } break;
-        case CMD_SEND_FILE_TO_CHAT_ID: {
-            auto *data = reinterpret_cast<SendFileToChatId*>(ptr);
-            auto *file = data->filepath;
-            using FileOrId_t = boost::variant<InputFile::Ptr, std::string>;
-            std::function<Message::Ptr(const Api&, ChatId, FileOrId_t)> fn;
-            try {
-                switch (data->type) {
-                    case TYPE_PHOTO:
-                        fn = [](const Api& api, ChatId id,
-                                const FileOrId_t file) {
-                            return api.sendPhoto(id, file);
-                        };
-                        break;
-                    case TYPE_VIDEO:
-                        fn = [](const Api& api, ChatId id,
-                                const FileOrId_t file) {
-                            return api.sendVideo(id, file);
-                        };
-                        break;
-                    case TYPE_GIF:
-                        fn = [](const Api& api, ChatId id,
-                                const FileOrId_t file) {
-                            return api.sendAnimation(id, file);
-                        };
-                    case TYPE_DOCUMENT:
-                        fn = [](const Api& api, ChatId id,
-                                const FileOrId_t file) {
-                            return api.sendDocument(id, file);
-                        };
-                        break;
-                    case TYPE_DICE: {
-                        static const std::vector<std::string> dices = {
-                            "🎲", "🎯", "🏀", "⚽", "🎳", "🎰"};
-                        // TODO: More clean code?
-                        bot.getApi().sendDice(
-                            data->id, false, 0, nullptr,
-                            dices[genRandomNumber(0, dices.size() - 1)]);
-                        return;
-                    }
-                    default:
-                        fn = [](const Api&, ChatId, const FileOrId_t) {
-                            return nullptr;
-                        };
-                        break;
-                }
-                // Try to send as local file first
-                try {
-                    fn(bot.getApi(), data->id,
-                       InputFile::fromFile(file, getMIMEString(file)));
-                } catch (std::ifstream::failure& e) {
-                    LOG(INFO) << "Failed to send '" << file
-                              << "' as local file, trying as Telegram "
-                                 "file id";
-                    fn(bot.getApi(), data->id, std::string(file));
-                }
-            } catch (const TgBot::TgException& e) {
-                LOG(ERROR) << "Exception at handler, " << e.what();
-            }
-        } break;
-        case CMD_OBSERVE_ALL_CHATS: {
-            obs->observeAllChats = *reinterpret_cast<ObserveAllChats*>(ptr);
-        } break;
-        case CMD_DELETE_CONTROLLER_BY_ID: {
-            int data = *reinterpret_cast<DeleteControllerById*>(ptr);
-            enum SingleThreadCtrlManager::ThreadUsage threadUsage{};
-            if (data < 0 || data >= SingleThreadCtrlManager::USAGE_MAX) {
-                LOG(ERROR) << "Invalid controller id: " << data;
-                break;
-            }
-            threadUsage =
-                static_cast<SingleThreadCtrlManager::ThreadUsage>(data);
-            SingleThreadCtrlManager::getInstance()->destroyController(
-                threadUsage);
-        } break;
-        case CMD_SET_STARTTIME: {
-            startTp = std::chrono::system_clock::from_time_t(
-                *reinterpret_cast<SetStartTime*>(ptr));
+        case CMD_OBSERVE_CHAT_ID:
+            handle_ObserveChatId(ptr);
             break;
-        }
-        case CMD_GET_UPTIME: {
-            auto now = std::chrono::system_clock::now();
-            if (startTp) {
-                const auto diff = now - *startTp;
-                const auto& dbwrapper = DefaultBotDatabase::getInstance();
-                LOG(INFO) << "Uptime: " << to_string(diff);
-                bot_sendMessage(bot, dbwrapper->getOwnerUserId(),
-                                "Uptime is " + to_string(diff));
-            } else {
-                LOG(ERROR) << "StartTp is not set";
-            }
+        case CMD_SEND_FILE_TO_CHAT_ID:
+            handle_SendFileToChatId(ptr);
             break;
-        }
+        case CMD_OBSERVE_ALL_CHATS:
+            handle_ObserveAllChats(ptr);
+            break;
+        case CMD_DELETE_CONTROLLER_BY_ID:
+            handle_DeleteControllerById(ptr);
+            break;
+        case CMD_GET_UPTIME:
+            handle_GetUptime(ctx, ptr);
+            break;
         default:
             if (TgBotCmd::isClientCommand(pkt.header.cmd)) {
                 LOG(ERROR) << "Unhandled cmd: "

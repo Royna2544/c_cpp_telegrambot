@@ -2,11 +2,12 @@
 
 #include <absl/log/check.h>
 
+#include <cstddef>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
-#include <memory>
 #include <string>
+#include <type_traits>
 
 #include "../include/Types.h"
 #include "SharedMalloc.hpp"
@@ -29,7 +30,7 @@ enum TgBotCommand : std::int32_t {
 
     // Below are internal commands
     CMD_SERVER_INTERNAL_START = 100,
-    CMD_SET_STARTTIME = CMD_SERVER_INTERNAL_START,
+    CMD_GET_UPTIME_CALLBACK = CMD_SERVER_INTERNAL_START,
     CMD_MAX,
 };
 
@@ -120,7 +121,7 @@ using ObserveAllChats = bool;
 
 using DeleteControllerById = int;
 
-using SetStartTime = std::time_t;
+using GetUptimeCallback = char[sizeof("Uptime: 99h 99m 99s")];
 
 }  // namespace TgBotCommandData
 
@@ -160,11 +161,21 @@ struct TgBotCommandPacket {
     // Constructor that takes malloc
     template <typename T>
     explicit TgBotCommandPacket(TgBotCommand cmd, T data)
-        : data_ptr(sizeof(T)) {
+        : TgBotCommandPacket(cmd, &data, sizeof(T)) {
+        static_assert(!std::is_pointer_v<T>,
+                      "This constructor should not be used with a pointer");
+    }
+
+    // Constructor that takes pointer, uses malloc but with size
+    template <typename T>
+    explicit TgBotCommandPacket(TgBotCommand cmd, T data, std::size_t size)
+        : data_ptr(size) {
+        static_assert(std::is_pointer_v<T>,
+                      "This constructor should not be used with non pointer");
         header.cmd = cmd;
         header.magic = MAGIC_VALUE;
-        header.data_size = sizeof(T);
-        memcpy(data_ptr.getData(), &data, header.data_size);
+        header.data_size = size;
+        memcpy(data_ptr.getData(), data, header.data_size);
     }
     SocketData toSocketData() {
         SocketData data(hdr_sz + header.data_size);

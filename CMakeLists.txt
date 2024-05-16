@@ -311,6 +311,7 @@ if (USE_UNIX_SOCKETS)
   add_library(TgBotSocket SHARED
     ${SOCKET_SRC_LIST}
     ${SOCKET_SRC_INTERFACE}/SocketBase.cpp
+    ${SOCKET_SRC_INTERFACE}/impl/bot/TgBotPacketParser.cpp
     src/socket/TgBotCommandMap.cpp)
   target_include_directories(TgBotSocket PRIVATE ${CURL_INCLUDE_DIRS})
   target_include_directories(TgBotSocket PUBLIC src/socket/include ${SOCKET_SRC_INTERFACE})

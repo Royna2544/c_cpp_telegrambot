@@ -1,18 +1,22 @@
 #include <absl/log/initialize.h>
 #include <absl/log/log.h>
+#include <absl/log/log_sink_registry.h>
 
 #include <LogSinks.hpp>
+#include <SocketData.hpp>
 #include <TryParseStr.hpp>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <impl/bot/ClientBackend.hpp>
+#include <impl/bot/TgBotPacketParser.hpp>
 #include <iostream>
 #include <optional>
 
-#include "SocketData.hpp"
+#include "SocketDescriptor_defs.hpp"
 #include "TgBotSocket.h"
-#include "absl/log/log_sink_registry.h"
+#include "interface/SocketBase.hpp"
+#include "interface/impl/bot/TgBotPacketParser.hpp"
 
 [[noreturn]] static void usage(const char* argv, bool success) {
     std::cout << "Usage: " << argv << " [cmd enum value] [args...]" << std::endl
@@ -38,7 +42,10 @@ static void _copyToStrBuf(char dst[], size_t dst_size, char* src) {
     strncpy(dst, src, dst_size - 1);
 }
 
-#define copyToStrBuf(dst, argv) _copyToStrBuf(dst, sizeof(dst), argv)
+template <unsigned N>
+void copyToStrBuf(char (&dst)[N], char* src) {
+    _copyToStrBuf(dst, sizeof(dst), src);
+}
 
 template <class C>
 bool parseOneEnum(C* res, C max, const char* str, const char* name) {
@@ -53,6 +60,28 @@ bool parseOneEnum(C* res, C max, const char* str, const char* name) {
     }
     return false;
 }
+
+struct ClientParser : TgBotSocketParser {
+    explicit ClientParser(SocketInterfaceBase* interface)
+        : TgBotSocketParser(interface) {}
+    void handle_CommandPacket(SocketConnContext context,
+                              TgBotCommandPacket pkt) override {
+        switch (pkt.header.cmd) {
+            case CMD_GET_UPTIME_CALLBACK: {
+                TgBotCommandData::GetUptimeCallback callbackData = {};
+                memcpy(callbackData, pkt.data_ptr.getData(),
+                       sizeof(callbackData));
+                printf("Server replied: %s\n", callbackData);
+                interface->closeSocketHandle(context);
+                break;
+            }
+            default:
+                LOG(ERROR) << "Unhandled callback of command: "
+                           << pkt.header.cmd;
+                break;
+        }
+    }
+};
 
 int main(int argc, char** argv) {
     enum TgBotCommand cmd = CMD_MAX;
@@ -139,9 +168,26 @@ int main(int argc, char** argv) {
             }
         }
     }
-    if (pkt) {
-        getClientBackend()->writeToSocket(pkt->toSocketData());
-    } else
+    auto* backend = getClientBackend();
+    auto handle = backend->createClientSocket();
+    if (!pkt) {
         usage(exe, false);
+    }
+
+    if (handle) {
+        backend->writeToSocket(handle.value(), pkt->toSocketData());
+        // Handle callbacks
+        switch (cmd) {
+            case CMD_GET_UPTIME: {
+                ClientParser parser(backend);
+                DLOG(INFO) << "Waiting for callback...";
+                parser.onNewBuffer(handle.value());
+                break;
+            }
+            default:
+                break;
+        }
+    }
+
     return static_cast<int>(!pkt.has_value());
 }

@@ -2,6 +2,7 @@
 
 #ifdef WINDOWS_BUILD
 #include <winsock2.h>
+#include <ws2tcpip.h>
 #undef interface
 #endif
 

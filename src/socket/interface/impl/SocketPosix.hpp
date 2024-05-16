@@ -13,12 +13,14 @@ struct SocketInterfaceUnix : SocketInterfaceBase {
         return isValidFd(handle);
     };
 
-    void writeToSocket(struct SocketData data) override;
+    void writeToSocket(SocketConnContext context, SocketData data) override;
     void forceStopListening(void) override;
-    void startListening(const listener_callback_t onNewData) override;
+    void startListening(socket_handle_t handle,
+                        const listener_callback_t onNewData) override;
+    bool closeSocketHandle(socket_handle_t& handle) override;
     char* getLastErrorMessage() override;
     std::optional<SocketData> readFromSocket(
-        socket_handle_t handle, SocketData::length_type length) override;
+        SocketConnContext context, SocketData::length_type length) override;
 
     SocketInterfaceUnix() = default;
     virtual ~SocketInterfaceUnix() = default;
@@ -31,8 +33,8 @@ struct SocketInterfaceUnix : SocketInterfaceBase {
 
 // Implements POSIX socket interface - AF_LOCAL
 struct SocketInterfaceUnixLocal : SocketInterfaceUnix {
-    socket_handle_t createClientSocket() override;
-    socket_handle_t createServerSocket() override;
+    std::optional<SocketConnContext> createClientSocket() override;
+    std::optional<socket_handle_t> createServerSocket() override;
     void cleanupServerSocket() override;
     bool canSocketBeClosed() override;
     bool isSupported() override;
@@ -40,7 +42,7 @@ struct SocketInterfaceUnixLocal : SocketInterfaceUnix {
     void doGetRemoteAddr(socket_handle_t s) override;
 
    private:
-    socket_handle_t makeSocket(bool client);
+    bool createLocalSocket(SocketConnContext* ctx);
 };
 
 template <typename NetworkAddr>
@@ -122,8 +124,8 @@ using getremoteaddr_ipv6 =
 
 // Implements POSIX socket interface - AF_INET
 struct SocketInterfaceUnixIPv4 : SocketInterfaceUnix {
-    socket_handle_t createClientSocket() override;
-    socket_handle_t createServerSocket() override;
+    std::optional<SocketConnContext> createClientSocket() override;
+    std::optional<socket_handle_t> createServerSocket() override;
     bool isSupported() override;
     virtual ~SocketInterfaceUnixIPv4() = default;
     void doGetRemoteAddr(socket_handle_t s) override;
@@ -131,8 +133,8 @@ struct SocketInterfaceUnixIPv4 : SocketInterfaceUnix {
 
 // Implements POSIX socket interface - AF_INET6
 struct SocketInterfaceUnixIPv6 : SocketInterfaceUnix {
-    socket_handle_t createClientSocket() override;
-    socket_handle_t createServerSocket() override;
+    std::optional<SocketConnContext> createClientSocket() override;
+    std::optional<socket_handle_t> createServerSocket() override;
     bool isSupported() override;
     virtual ~SocketInterfaceUnixIPv6() = default;
     void doGetRemoteAddr(socket_handle_t s) override;

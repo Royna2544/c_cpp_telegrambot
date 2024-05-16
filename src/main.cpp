@@ -143,11 +143,6 @@ int main(int argc, char* const* argv) {
 
     installSignalHandler();
 
-#ifdef SOCKET_CONNECTION
-    SetStartTime timeData = std::chrono::system_clock::to_time_t(startTp);
-    TgBotCommandPacket pkt(CMD_SET_STARTTIME, timeData);
-    socketConnectionHandler(gBot, pkt);
-#endif
     DLOG(INFO) << "Token: " << token.value();
     DurationPoint dp;
     do {
@@ -194,7 +189,7 @@ int main(int argc, char* const* argv) {
                 });
             }
         } catch (const std::exception& e) {
-            LOG(ERROR) << "Uncaught Exception: ", e.what();
+            LOG(ERROR) << "Uncaught Exception: " << e.what();
             LOG(ERROR) << "Throwing exception to the main thread";
             defaultCleanupFunction();
             throw;

@@ -5,11 +5,12 @@
 #include <filesystem>
 #include <libos/libfs.hpp>
 #include <string>
+#include "SocketDescriptor_defs.hpp"
 
 using Options = SocketInterfaceBase::Options;
 
-bool SocketInterfaceBase::INetHelper::_isSupported(const char *envVar) {
-    char *addr = getenv(envVar);
+bool SocketInterfaceBase::INetHelper::_isSupported(const std::string_view envVar) {
+    char *addr = getenv(envVar.data());
     int portNum = SocketInterfaceBase::kTgBotHostPort;
 
     if (addr == nullptr) {
@@ -17,7 +18,7 @@ bool SocketInterfaceBase::INetHelper::_isSupported(const char *envVar) {
         return false;
     }
     interface->setOptions(Options::DESTINATION_ADDRESS, addr, true);
-    if (const char *port = getenv(kPortEnvVar); port != nullptr) {
+    if (const char *port = getenv(kPortEnvVar.data()); port != nullptr) {
         if (!try_parse(port, &portNum)) {
             LOG(ERROR) << "Illegal value for " << kPortEnvVar << ": " << port;
         }
@@ -65,4 +66,8 @@ void SocketInterfaceBase::LocalHelper::cleanupServerSocket() {
                           interface->getOptions(Options::DESTINATION_ADDRESS));
     DLOG(INFO) << "Cleaning up server socket...";
     FS::deleteFile(path);
+}
+
+void SocketInterfaceBase::LocalHelper::doGetRemoteAddr(socket_handle_t socket) {
+    LOG(INFO) << "Client connected via local socket";
 }

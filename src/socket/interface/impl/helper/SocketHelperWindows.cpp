@@ -1,29 +1,29 @@
 #include <impl/SocketWindows.hpp>
 
-bool SocketHelperWindows::createInetSocketAddr(socket_handle_t *sfd,
-                                               struct sockaddr_in *addr,
-                                               SocketInterfaceWindows *it) {
-    *sfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (!it->isValidSocketHandle(*sfd)) {
+bool SocketInterfaceWindows::WinHelper::createInetSocketAddr(
+    SocketConnContext& context) {
+    context.cfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (!interface->isValidSocketHandle(context.cfd)) {
         WSALOG_E("Failed to create socket");
         return false;
     }
+    auto* addr = static_cast<sockaddr_in*>(context.addr.getData());
 
     addr->sin_family = AF_INET;
-    addr->sin_port = htons(it->helper.inet.getPortNum());
+    addr->sin_port = htons(interface->helper.inet.getPortNum());
     return true;
 }
 
-bool SocketHelperWindows::createInet6SocketAddr(socket_handle_t *sfd,
-                                                struct sockaddr_in6 *addr,
-                                                SocketInterfaceWindows *it) {
-    *sfd = socket(AF_INET6, SOCK_STREAM, 0);
-    if (!it->isValidSocketHandle(*sfd)) {
+bool SocketInterfaceWindows::WinHelper::createInet6SocketAddr(
+    SocketConnContext& context) {
+    context.cfd = socket(AF_INET6, SOCK_STREAM, 0);
+    if (!interface->isValidSocketHandle(context.cfd)) {
         WSALOG_E("Failed to create socket");
         return false;
     }
 
+    auto* addr = static_cast<sockaddr_in6*>(context.addr.getData());
     addr->sin6_family = AF_INET6;
-    addr->sin6_port = htons(it->helper.inet.getPortNum());
+    addr->sin6_port = htons(interface->helper.inet.getPortNum());
     return true;
 };

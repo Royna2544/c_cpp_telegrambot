@@ -1,85 +1,65 @@
 #include <BotClassBase.h>
 #include <SingleThreadCtrl.h>
-#include <SocketConnectionHandler.h>
 #include <socket/TgBotSocket.h>
 
 #include <SocketBase.hpp>
 #include <SocketData.hpp>
+#include <functional>
 #include <initcalls/BotInitcall.hpp>
+#include <map>
 #include <memory>
+#include <utility>
+
+#include "SocketDescriptor_defs.hpp"
+#include "TgBotPacketParser.hpp"
 
 #ifdef WINDOWS_BUILD
 #include "impl/SocketWindows.hpp"
 
 using SocketInternalInterface = SocketInterfaceWindowsLocal;
 using SocketExternalInterface = SocketInterfaceWindowsIPv4;
-#else // WINDOWS_BUILD
+#else  // WINDOWS_BUILD
 #include "impl/SocketPosix.hpp"
 
 using SocketInternalInterface = SocketInterfaceUnixLocal;
 using SocketExternalInterface = SocketInterfaceUnixIPv4;
-#endif // WINDOWS_BUILD
+#endif  // WINDOWS_BUILD
 
 struct SocketInterfaceTgBot : SingleThreadCtrlRunnable,
                               BotInitCall,
-                              BotClassBase {
-    enum class HandleState {
-        Ok,      // OK: Continue parsing
-        Ignore,  // Ignore: Parse was completed, skip to next buf
-        Fail     // Fail: Parse failed, exit loop
-    };
-
-    void doInitCall(Bot &bot) override {
-        auto mgr = SingleThreadCtrlManager::getInstance();
-        struct SingleThreadCtrlManager::GetControllerRequest req {};
-        req.usage = SingleThreadCtrlManager::USAGE_SOCKET_THREAD;
-        auto inter = mgr->getController<SocketInterfaceTgBot>(
-            req, std::ref(bot), std::make_shared<SocketInternalInterface>());
-        req.usage = SingleThreadCtrlManager::USAGE_SOCKET_EXTERNAL_THREAD;
-        auto exter = mgr->getController<SocketInterfaceTgBot>(
-            req, std::ref(bot), std::make_shared<SocketExternalInterface>());
-        for (const auto &intf : {inter, exter}) {
-            intf->run();
-        }
-    }
+                              BotClassBase,
+                              TgBotSocketParser {
+    void doInitCall(Bot& bot) override;
     const CStringLifetime getInitCallName() const override {
         return "Create sockets and setup";
     }
 
-    bool onNewBuffer(const Bot &bot, socket_handle_t cfd);
-
-    /**
-     * @brief Reads a packet header from the socket.
-     *
-     * @param socketData The SocketData object of data.
-     * @param pkt The TgBotCommandPacket to fill.
-     *
-     * @return HandleState object containing the state.
-     */
-    [[nodiscard]] static HandleState handle_PacketHeader(
-        std::optional<SocketData> &socketData,
-        std::optional<TgBotCommandPacket> &pkt);
-
-    /**
-     * @brief Reads a packet from the socket.
-     *
-     * @param socketData The SocketData object of data.
-     * @param pkt The TgBotCommandPacket to read the packet into.
-     *
-     * @return HandleState object containing the state.
-     */
-    [[nodiscard]] static HandleState handle_Packet(
-        std::optional<SocketData> &socketData,
-        std::optional<TgBotCommandPacket> &pkt);
+    void handle_CommandPacket(SocketConnContext ctx,
+                              TgBotCommandPacket pkt) override;
 
     void runFunction() override;
 
     explicit SocketInterfaceTgBot(
-        Bot &bot, std::shared_ptr<SocketInterfaceBase> _interface)
-        : interface(_interface), BotClassBase(bot) {}
-    // TODO Used by main.cpp
-    SocketInterfaceTgBot(Bot &bot) : BotClassBase(bot) {}
+        Bot& bot, std::shared_ptr<SocketInterfaceBase> _interface);
+
+    // TODO Used by main.cpp    
+    SocketInterfaceTgBot(Bot& bot) : BotClassBase(bot) {}
+
+    
+    void handle_SendFileToChatId(const void* ptr);
 
    private:
     std::shared_ptr<SocketInterfaceBase> interface = nullptr;
+    decltype(std::chrono::system_clock::now()) startTp =
+        std::chrono::system_clock::now();
+    using command_handler_fn_t = std::function<void(
+        socket_handle_t source, void* addr, socklen_t len, const void* data)>;
+
+    // Command handlers
+    void handle_WriteMsgToChatId(const void* ptr);
+    static void handle_CtrlSpamBlock(const void* ptr);
+    static void handle_ObserveChatId(const void* ptr);
+    static void handle_ObserveAllChats(const void* ptr);
+    static void handle_DeleteControllerById(const void* ptr);
+    void handle_GetUptime(SocketConnContext ctx, const void* ptr);
 };
