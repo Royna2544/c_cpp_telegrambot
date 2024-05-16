@@ -30,7 +30,7 @@ static void restartCommandFn(const Bot &bot, const Message::Ptr message) {
         }
     }
     for (; environ[count]; ++count);
-    myEnviron.reserve(count + 2);
+    myEnviron.resize(count + 2);
     memcpy(myEnviron.data(), environ, count * sizeof(char *));
     snprintf(restartBuf.data(), restartBuf.size(), "RESTART=%d",
              message->messageId);
