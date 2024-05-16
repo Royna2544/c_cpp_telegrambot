@@ -49,6 +49,7 @@ void CmdCommandFn(Bot& bot, const TgBot::Message::Ptr& message) {
                 return;
             }
             bot_RemoveCommand(bot, it->command);
+            it->isLoaded = false;
             bot_sendReplyMessage(bot, message, "Command unloaded");
         } else {
             bot_sendReplyMessage(bot, message, "Unknown action " + action);
