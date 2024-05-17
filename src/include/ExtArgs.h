@@ -22,6 +22,7 @@ std::string::size_type firstBlank(const Message::Ptr &msg);
  * @param message the Telegram message to check
  * @return whether the message contains extended arguments
  */
+ [[deprecated("to be replaced with MessageWrapper::hasExtraText")]]
 bool hasExtArgs(const Message::Ptr &message);
 
 /**
@@ -35,6 +36,7 @@ bool hasExtArgs(const Message::Ptr &message);
  * @param extraargs a reference to a string that will contain the extra
  * arguments, if any
  */
+[[deprecated("to be replaced with MessageWrapper::getExtraText")]]
 void parseExtArgs(const Message::Ptr &message, std::string &extraargs);
 
 // Overload for parseExtArgs - returns std::string instead of out parameter
