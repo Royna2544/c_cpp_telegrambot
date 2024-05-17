@@ -1,35 +1,41 @@
+#include <BotReplyMessage.h>
+#include <CommandModule.h>
 #include <ExtArgs.h>
 #include <random/RandomNumberGenerator.h>
 
-#include "BotReplyMessage.h"
-#include "CommandModule.h"
+#include <MessageWrapper.hpp>
 
 using TgBot::StickerSet;
 
-static void RandomStickerCommandFn(const Bot &bot, const Message::Ptr message) {
-    if (message->replyToMessage && message->replyToMessage->sticker) {
+static void RandomStickerCommandFn(const Bot &bot, const Message::Ptr& message) {
+    MessageWrapper msg(message);
+    if (!msg.switchToReplyToMessage(
+            bot, "Sticker not found in replied-to message")) {
+        return;
+    }
+
+    if (msg.hasSticker()) {
+        auto sticker = msg.getSticker();
+        random_return_type pos{};
         StickerSet::Ptr stickset;
+        std::stringstream ss;
         try {
-            stickset = bot.getApi().getStickerSet(
-                message->replyToMessage->sticker->setName);
+            stickset = bot.getApi().getStickerSet(sticker->setName);
         } catch (const std::exception &e) {
             bot_sendReplyMessage(bot, message, e.what());
             return;
         }
-        const random_return_type pos = genRandomNumber(stickset->stickers.size() - 1);
+        pos = genRandomNumber(stickset->stickers.size() - 1);
         bot_sendSticker(bot, message->chat, stickset->stickers[pos], message);
-        std::stringstream ss;
+
         ss << "Sticker idx: " << pos + 1
            << " emoji: " << stickset->stickers[pos]->emoji << std::endl
-           << "From pack \"" + stickset->title + "\"";
+           << "From pack " << std::quoted(stickset->title);
         bot_sendReplyMessage(bot, message, ss.str());
-    } else {
-        bot_sendReplyMessage(bot, message,
-                             "Sticker not found in replied-to message");
     }
 }
 
-void loadcmd_randsticker(CommandModule& module) {
+void loadcmd_randsticker(CommandModule &module) {
     module.command = "randsticker";
     module.description = "Random sticker from that pack";
     module.flags = CommandModule::Flags::None;
