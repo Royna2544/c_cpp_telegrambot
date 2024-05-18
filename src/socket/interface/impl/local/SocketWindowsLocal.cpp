@@ -40,7 +40,7 @@ std::optional<socket_handle_t> SocketInterfaceWindowsLocal::createServerSocket()
     if (bind(ret.cfd, _name, ret.len) != 0) {
         bool succeeded = false;
         LOG(ERROR) << "Failed to bind to socket: " << getLastErrorMessage();
-        if (errno == WSAEADDRINUSE) {
+        if (WSAGetLastError() == WSAEADDRINUSE) {
             cleanupServerSocket();
             if (bind(ret.cfd, _name, ret.len) == 0) {
                 LOG(INFO) << "Bind succeeded by removing socket file";
