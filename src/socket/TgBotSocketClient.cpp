@@ -30,8 +30,8 @@
 static bool verifyArgsCount(TgBotCommand cmd, int argc) {
     int required = TgBotCmd::toCount(cmd);
     if (required != argc) {
-        fprintf(stderr, "Invalid argument count %d for cmd %s, %d required\n",
-                argc, TgBotCmd::toStr(cmd).c_str(), required);
+        LOG(ERROR) << "Invalid argument count " << argc << " for cmd "
+                   << TgBotCmd::toStr(cmd) << ", " << required << " required";
         return false;
     }
     return true;
@@ -55,7 +55,8 @@ bool parseOneEnum(C* res, C max, const char* str, const char* name) {
             *res = static_cast<C>(parsed);
             return true;
         } else {
-            fprintf(stderr, "Cannot convert %s to %s enum value\n", str, name);
+            LOG(ERROR) << "Cannot convert " << str << " to " << name
+                       << " enum value";
         }
     }
     return false;
@@ -106,80 +107,113 @@ int main(int argc, char** argv) {
     ++argv;
     --argc;
 
-    if (parseOneEnum(&cmd, CMD_MAX, *argv, "cmd")) {
-        if (TgBotCmd::isInternalCommand(cmd)) {
-            fprintf(stderr, "Internal commands not supported\n");
-        } else {
-            // Remove cmd (argv[1])
-            ++argv;
-            --argc;
-
-            if (verifyArgsCount(cmd, argc)) {
-                switch (cmd) {
-                    case CMD_WRITE_MSG_TO_CHAT_ID: {
-                        TgBotCommandData::WriteMsgToChatId data{};
-                        if (!try_parse(argv[0], &data.to)) {
-                            break;
-                        }
-                        copyToStrBuf(data.msg, argv[1]);
-                        pkt = TgBotCommandPacket(cmd, data);
-                        break;
-                    }
-                    case CMD_CTRL_SPAMBLOCK: {
-                        TgBotCommandData::CtrlSpamBlock data;
-                        if (parseOneEnum(&data, TgBotCommandData::CTRL_MAX,
-                                         argv[0], "spamblock"))
-
-                            pkt = TgBotCommandPacket(cmd, data);
-                        break;
-                    }
-                    case CMD_OBSERVE_CHAT_ID: {
-                        TgBotCommandData::ObserveChatId data{};
-                        if (try_parse(argv[0], &data.id) &&
-                            try_parse(argv[1], &data.observe))
-                            pkt = TgBotCommandPacket(cmd, data);
-                    } break;
-                    case CMD_SEND_FILE_TO_CHAT_ID: {
-                        TgBotCommandData::SendFileToChatId data{};
-                        if (try_parse(argv[0], &data.id) &&
-                            parseOneEnum(&data.type, TYPE_MAX, argv[1],
-                                         "type")) {
-                            copyToStrBuf(data.filepath, argv[2]);
-                            pkt = TgBotCommandPacket(cmd, data);
-                        }
-                    } break;
-                    case CMD_OBSERVE_ALL_CHATS: {
-                        TgBotCommandData::ObserveAllChats data = false;
-                        if (try_parse(argv[0], &data)) {
-                            pkt = TgBotCommandPacket(cmd, data);
-                        }
-                    } break;
-                    case CMD_DELETE_CONTROLLER_BY_ID: {
-                        TgBotCommandData::DeleteControllerById data{};
-                        if (try_parse(argv[0], &data)) {
-                            pkt = TgBotCommandPacket(cmd, data);
-                        }
-                    }
-                    case CMD_GET_UPTIME: {
-                        // Data is unused in this case
-                        pkt = TgBotCommandPacket(cmd, 1);
-                        break;
-                    }
-                    default:
-                        LOG(FATAL)
-                            << "Unhandled command: " << TgBotCmd::toStr(cmd);
-                };
-                if (!pkt)
-                    fprintf(stderr, "Failed parsing arguments for %s\n",
-                            TgBotCmd::toStr(cmd).c_str());
-            }
-        }
-    }
-    auto* backend = getClientBackend();
-    auto handle = backend->createClientSocket();
-    if (!pkt) {
+    if (!parseOneEnum(&cmd, CMD_MAX, *argv, "cmd")) {
+        LOG(ERROR) << "Invalid cmd enum value";
         usage(exe, false);
     }
+
+    if (TgBotCmd::isInternalCommand(cmd)) {
+        LOG(ERROR) << "Internal commands not supported";
+        return EXIT_FAILURE;
+    }
+
+    // Remove cmd (argv[1])
+    ++argv;
+    --argc;
+
+    if (!verifyArgsCount(cmd, argc)) {
+        usage(exe, false);
+    }
+
+    switch (cmd) {
+        case CMD_WRITE_MSG_TO_CHAT_ID: {
+            TgBotCommandData::WriteMsgToChatId data{};
+            if (!try_parse(argv[0], &data.to)) {
+                break;
+            }
+            copyToStrBuf(data.msg, argv[1]);
+            pkt = TgBotCommandPacket(cmd, data);
+            break;
+        }
+        case CMD_CTRL_SPAMBLOCK: {
+            TgBotCommandData::CtrlSpamBlock data;
+            if (parseOneEnum(&data, TgBotCommandData::CTRL_MAX, argv[0],
+                             "spamblock"))
+
+                pkt = TgBotCommandPacket(cmd, data);
+            break;
+        }
+        case CMD_OBSERVE_CHAT_ID: {
+            TgBotCommandData::ObserveChatId data{};
+            if (try_parse(argv[0], &data.id) &&
+                try_parse(argv[1], &data.observe))
+                pkt = TgBotCommandPacket(cmd, data);
+        } break;
+        case CMD_SEND_FILE_TO_CHAT_ID: {
+            TgBotCommandData::SendFileToChatId data{};
+            if (try_parse(argv[0], &data.id) &&
+                parseOneEnum(&data.type, TYPE_MAX, argv[1], "type")) {
+                copyToStrBuf(data.filepath, argv[2]);
+                pkt = TgBotCommandPacket(cmd, data);
+            }
+        } break;
+        case CMD_OBSERVE_ALL_CHATS: {
+            TgBotCommandData::ObserveAllChats data = false;
+            if (try_parse(argv[0], &data)) {
+                pkt = TgBotCommandPacket(cmd, data);
+            }
+        } break;
+        case CMD_DELETE_CONTROLLER_BY_ID: {
+            TgBotCommandData::DeleteControllerById data{};
+            if (try_parse(argv[0], &data)) {
+                pkt = TgBotCommandPacket(cmd, data);
+            }
+        }
+        case CMD_GET_UPTIME: {
+            // Data is unused in this case
+            pkt = TgBotCommandPacket(cmd, 1);
+            break;
+        }
+        case CMD_SEND_FILE: {
+            size_t size = 0;
+            char* buf = nullptr;
+            FILE* fp = nullptr;
+            constexpr size_t datahdr_size = sizeof(TgBotCommandData::SendFile);
+
+            fp = fopen(argv[0], "rb");
+            if (fp != nullptr) {
+                fseek(fp, 0, SEEK_END);
+                size = ftell(fp);
+                fseek(fp, 0, SEEK_SET);
+                LOG(INFO) << "Sending file " << argv[0];
+                buf = static_cast<char*>(malloc(size + datahdr_size));
+                LOG(INFO) << "mem-alloc buffer of size " << size + datahdr_size << " bytes: OK";
+                // Copy data header to the beginning of the buffer.
+                if (buf != nullptr) {
+                    strncpy(buf, argv[1], datahdr_size);
+                    char* moved_buf = buf + datahdr_size;
+                    fread(moved_buf, 1, size, fp);
+                    pkt = TgBotCommandPacket(cmd, buf, size + datahdr_size);
+                    free(buf);
+                }
+                fclose(fp);
+            } else {
+                fprintf(stderr, "Failed to open file %s\n", argv[0]);
+            }
+            break;
+        }
+        default:
+            LOG(FATAL) << "Unhandled command: " << TgBotCmd::toStr(cmd);
+    };
+
+    if (!pkt) {
+        LOG(ERROR) << "Failed parsing arguments for "
+                   << TgBotCmd::toStr(cmd).c_str();
+        return EXIT_FAILURE;
+    }
+
+    auto* backend = getClientBackend();
+    auto handle = backend->createClientSocket();
 
     if (handle) {
         backend->writeToSocket(handle.value(), pkt->toSocketData());

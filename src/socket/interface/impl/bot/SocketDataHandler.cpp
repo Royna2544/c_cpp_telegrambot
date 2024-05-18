@@ -204,6 +204,33 @@ bool SocketInterfaceTgBot::handle_GetUptime(SocketConnContext ctx,
     return true;
 }
 
+bool SocketInterfaceTgBot::handle_SendFile(const void* ptr,
+                                           SocketData::length_type len) {
+    const auto* data = static_cast<const char*>(ptr);
+    SendFile destfilepath{};
+    FILE* file = nullptr;
+    size_t ret = 0;
+    size_t file_size = len - sizeof(SendFile);
+
+    LOG(INFO) << "This buffer has a size of " << len << " bytes";
+    LOG(INFO) << "Which is " << file_size << " bytes excluding the header";
+
+    strncpy(destfilepath, data, sizeof(SendFile));
+    if ((file = fopen(destfilepath, "wb")) == nullptr) {
+        LOG(ERROR) << "Failed to open file: " << destfilepath;
+        return false;
+    }
+    ret = fwrite(data + sizeof(SendFile), file_size, 1, file);
+    if (ret != 1) {
+        LOG(ERROR) << "Failed to write to file: " << destfilepath << " (Wrote "
+                   << ret << " bytes)";
+        fclose(file);
+        return false;
+    }
+    fclose(file);
+    return true;
+}
+
 void SocketInterfaceTgBot::handle_CommandPacket(SocketConnContext ctx,
                                                 TgBotCommandPacket pkt) {
     const void* ptr = pkt.data_ptr.getData();
@@ -232,6 +259,9 @@ void SocketInterfaceTgBot::handle_CommandPacket(SocketConnContext ctx,
         case CMD_GET_UPTIME:
             ret = handle_GetUptime(ctx, ptr);
             break;
+        case CMD_SEND_FILE:
+            ret = handle_SendFile(ptr, pkt.header.data_size);
+            break;
         default:
             if (TgBotCmd::isClientCommand(pkt.header.cmd)) {
                 LOG(ERROR) << "Unhandled cmd: "
@@ -253,6 +283,7 @@ void SocketInterfaceTgBot::handle_CommandPacket(SocketConnContext ctx,
         case CMD_SEND_FILE_TO_CHAT_ID:
         case CMD_OBSERVE_ALL_CHATS:
         case CMD_DELETE_CONTROLLER_BY_ID:
+        case CMD_SEND_FILE:
             TgBotCommandPacket ackpkt(CMD_GENERIC_ACK, &ret, 1);
             LOG(INFO) << "Sending ack: " << std::boolalpha << ret;
             interface->writeToSocket(ctx, ackpkt.toSocketData());

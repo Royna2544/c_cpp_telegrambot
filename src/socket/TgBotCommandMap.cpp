@@ -15,7 +15,8 @@ constexpr auto kTgBotCommandStrMap =
         ENUM_AND_STR(CMD_SEND_FILE_TO_CHAT_ID),
         ENUM_AND_STR(CMD_OBSERVE_ALL_CHATS),
         ENUM_AND_STR(CMD_DELETE_CONTROLLER_BY_ID),
-        ENUM_AND_STR(CMD_GET_UPTIME));
+        ENUM_AND_STR(CMD_GET_UPTIME),
+        ENUM_AND_STR(CMD_SEND_FILE));
 
 const auto kTgBotCommandArgsCount =
     array_helpers::make<CMD_CLIENT_MAX, TgBotCommand, int>(
@@ -25,7 +26,8 @@ const auto kTgBotCommandArgsCount =
         ARGUMENT_SIZE(CMD_SEND_FILE_TO_CHAT_ID, 3),  // chatid, type, filepath
         ARGUMENT_SIZE(CMD_OBSERVE_ALL_CHATS, 1),     // policy
         ARGUMENT_SIZE(CMD_DELETE_CONTROLLER_BY_ID, 1),  // id
-        ARGUMENT_SIZE(CMD_GET_UPTIME, 0));
+        ARGUMENT_SIZE(CMD_GET_UPTIME, 0),
+        ARGUMENT_SIZE(CMD_SEND_FILE, 2));               // source, dest filepath
 
 namespace TgBotCmd {
 std::string toStr(TgBotCommand cmd) {

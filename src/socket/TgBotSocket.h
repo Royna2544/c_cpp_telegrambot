@@ -13,6 +13,8 @@
 #include "SharedMalloc.hpp"
 #include "SocketData.hpp"
 
+constexpr int MAX_PATH_SIZE = 256;
+
 inline std::filesystem::path getSocketPath() {
     static auto spath = std::filesystem::temp_directory_path() / "tgbot.sock";
     return spath;
@@ -26,6 +28,7 @@ enum TgBotCommand : std::int32_t {
     CMD_OBSERVE_ALL_CHATS,
     CMD_DELETE_CONTROLLER_BY_ID,
     CMD_GET_UPTIME,
+    CMD_SEND_FILE,
     CMD_CLIENT_MAX,
 
     // Below are internal commands
@@ -108,7 +111,7 @@ struct ObserveChatId {
 struct SendFileToChatId {
     ChatId id;           // Destination ChatId
     FileType type;       // File type for file
-    char filepath[256];  // Path to file
+    char filepath[MAX_PATH_SIZE];  // Path to file
 };
 
 using ObserveAllChats = bool;
@@ -118,6 +121,8 @@ using DeleteControllerById = int;
 using GetUptimeCallback = char[sizeof("Uptime: 99h 99m 99s")];
 
 using GenericAck = bool;
+ 
+using SendFile = char[MAX_PATH_SIZE];  // Destination file name
 
 }  // namespace TgBotCommandData
 
