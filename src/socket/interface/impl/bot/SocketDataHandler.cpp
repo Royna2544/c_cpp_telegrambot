@@ -59,21 +59,24 @@ std::string getMIMEString(const std::string& path) {
 }
 }  // namespace
 
-void SocketInterfaceTgBot::handle_WriteMsgToChatId(const void* ptr) {
+bool SocketInterfaceTgBot::handle_WriteMsgToChatId(const void* ptr) {
     const auto* data = reinterpret_cast<const WriteMsgToChatId*>(ptr);
     try {
         bot_sendMessage(_bot, data->to, data->msg);
     } catch (const TgBot::TgException& e) {
-        LOG(ERROR) << "Exception at handler " << e.what();
+        LOG(ERROR) << "Exception at handler: " << e.what();
+        return false;
     }
+    return true;
 }
 
-void SocketInterfaceTgBot::handle_CtrlSpamBlock(const void* ptr) {
+bool SocketInterfaceTgBot::handle_CtrlSpamBlock(const void* ptr) {
     const auto* data = reinterpret_cast<const CtrlSpamBlock*>(ptr);
     gSpamBlockCfg = *data;
+    return true;
 }
 
-void SocketInterfaceTgBot::handle_ObserveChatId(const void* ptr) {
+bool SocketInterfaceTgBot::handle_ObserveChatId(const void* ptr) {
     const auto* data = reinterpret_cast<const ObserveChatId*>(ptr);
     auto obs = ChatObserver::getInstance();
     const std::lock_guard<std::mutex> _(obs->m);
@@ -83,7 +86,7 @@ void SocketInterfaceTgBot::handle_ObserveChatId(const void* ptr) {
     if (obs->observeAllChats) {
         LOG(WARNING) << "CMD_OBSERVE_CHAT_ID disabled due to "
                         "CMD_OBSERVE_ALL_CHATS";
-        return;
+        return false;
     }
     if (it == obs->observedChatIds.end()) {
         if (observe) {
@@ -104,9 +107,10 @@ void SocketInterfaceTgBot::handle_ObserveChatId(const void* ptr) {
             obs->observedChatIds.erase(it);
         }
     }
+    return true;
 }
 
-void SocketInterfaceTgBot::handle_SendFileToChatId(const void* ptr) {
+bool SocketInterfaceTgBot::handle_SendFileToChatId(const void* ptr) {
     const auto* data = reinterpret_cast<const SendFileToChatId*>(ptr);
     const auto* file = data->filepath;
     using FileOrId_t = boost::variant<InputFile::Ptr, std::string>;
@@ -139,7 +143,7 @@ void SocketInterfaceTgBot::handle_SendFileToChatId(const void* ptr) {
                 _bot.getApi().sendDice(
                     data->id, false, 0, nullptr,
                     dices[genRandomNumber(0, dices.size() - 1)]);
-                return;
+                return true;
             }
             default:
                 fn = [](const Api&, ChatId, const FileOrId_t) {
@@ -159,28 +163,32 @@ void SocketInterfaceTgBot::handle_SendFileToChatId(const void* ptr) {
         }
     } catch (const TgBot::TgException& e) {
         LOG(ERROR) << "Exception at handler, " << e.what();
+        return false;
     }
+    return true;
 }
 
-void SocketInterfaceTgBot::handle_ObserveAllChats(const void* ptr) {
+bool SocketInterfaceTgBot::handle_ObserveAllChats(const void* ptr) {
     auto obs = ChatObserver::getInstance();
     const std::lock_guard<std::mutex> _(obs->m);
     obs->observeAllChats = *reinterpret_cast<const ObserveAllChats*>(ptr);
+    return true;
 }
 
-void SocketInterfaceTgBot::handle_DeleteControllerById(const void* ptr) {
+bool SocketInterfaceTgBot::handle_DeleteControllerById(const void* ptr) {
     DeleteControllerById data =
         *reinterpret_cast<const DeleteControllerById*>(ptr);
     enum SingleThreadCtrlManager::ThreadUsage threadUsage{};
     if (data < 0 || data >= SingleThreadCtrlManager::USAGE_MAX) {
         LOG(ERROR) << "Invalid controller id: " << data;
-        return;
+        return false;
     }
     threadUsage = static_cast<SingleThreadCtrlManager::ThreadUsage>(data);
     SingleThreadCtrlManager::getInstance()->destroyController(threadUsage);
+    return true;
 }
 
-void SocketInterfaceTgBot::handle_GetUptime(SocketConnContext ctx,
+bool SocketInterfaceTgBot::handle_GetUptime(SocketConnContext ctx,
                                             const void* /*ptr*/) {
     auto now = std::chrono::system_clock::now();
     const auto diff = now - startTp;
@@ -193,34 +201,36 @@ void SocketInterfaceTgBot::handle_GetUptime(SocketConnContext ctx,
     TgBotCommandPacket pkt(CMD_GET_UPTIME_CALLBACK, uptimeStr.c_str(),
                            sizeof(GetUptimeCallback) - 1);
     interface->writeToSocket(ctx, pkt.toSocketData());
+    return true;
 }
 
 void SocketInterfaceTgBot::handle_CommandPacket(SocketConnContext ctx,
                                                 TgBotCommandPacket pkt) {
     const void* ptr = pkt.data_ptr.getData();
     using namespace TgBotCommandData;
+    bool ret = {};
 
     switch (pkt.header.cmd) {
         case CMD_WRITE_MSG_TO_CHAT_ID:
-            handle_WriteMsgToChatId(ptr);
+            ret = handle_WriteMsgToChatId(ptr);
             break;
         case CMD_CTRL_SPAMBLOCK:
-            handle_CtrlSpamBlock(ptr);
+            ret = handle_CtrlSpamBlock(ptr);
             break;
         case CMD_OBSERVE_CHAT_ID:
-            handle_ObserveChatId(ptr);
+            ret = handle_ObserveChatId(ptr);
             break;
         case CMD_SEND_FILE_TO_CHAT_ID:
-            handle_SendFileToChatId(ptr);
+            ret = handle_SendFileToChatId(ptr);
             break;
         case CMD_OBSERVE_ALL_CHATS:
-            handle_ObserveAllChats(ptr);
+            ret = handle_ObserveAllChats(ptr);
             break;
         case CMD_DELETE_CONTROLLER_BY_ID:
-            handle_DeleteControllerById(ptr);
+            ret = handle_DeleteControllerById(ptr);
             break;
         case CMD_GET_UPTIME:
-            handle_GetUptime(ctx, ptr);
+            ret = handle_GetUptime(ctx, ptr);
             break;
         default:
             if (TgBotCmd::isClientCommand(pkt.header.cmd)) {
@@ -230,6 +240,22 @@ void SocketInterfaceTgBot::handle_CommandPacket(SocketConnContext ctx,
                 LOG(WARNING) << "cmd ignored (as internal): "
                              << static_cast<int>(pkt.header.cmd);
             }
+            ret = false;
             break;
     };
+    switch (pkt.header.cmd) {
+        case CMD_GET_UPTIME:
+            // This has its own callback
+            break;
+        case CMD_WRITE_MSG_TO_CHAT_ID:
+        case CMD_CTRL_SPAMBLOCK:
+        case CMD_OBSERVE_CHAT_ID:
+        case CMD_SEND_FILE_TO_CHAT_ID:
+        case CMD_OBSERVE_ALL_CHATS:
+        case CMD_DELETE_CONTROLLER_BY_ID:
+            TgBotCommandPacket ackpkt(CMD_GENERIC_ACK, &ret, 1);
+            LOG(INFO) << "Sending ack: " << std::boolalpha << ret;
+            interface->writeToSocket(ctx, ackpkt.toSocketData());
+            break;
+    }
 }

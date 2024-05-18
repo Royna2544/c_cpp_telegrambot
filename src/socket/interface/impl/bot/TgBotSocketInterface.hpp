@@ -46,7 +46,7 @@ struct SocketInterfaceTgBot : SingleThreadCtrlRunnable,
     SocketInterfaceTgBot(Bot& bot) : BotClassBase(bot) {}
 
     
-    void handle_SendFileToChatId(const void* ptr);
+    bool handle_SendFileToChatId(const void* ptr);
 
    private:
     std::shared_ptr<SocketInterfaceBase> interface = nullptr;
@@ -56,10 +56,10 @@ struct SocketInterfaceTgBot : SingleThreadCtrlRunnable,
         socket_handle_t source, void* addr, socklen_t len, const void* data)>;
 
     // Command handlers
-    void handle_WriteMsgToChatId(const void* ptr);
-    static void handle_CtrlSpamBlock(const void* ptr);
-    static void handle_ObserveChatId(const void* ptr);
-    static void handle_ObserveAllChats(const void* ptr);
-    static void handle_DeleteControllerById(const void* ptr);
-    void handle_GetUptime(SocketConnContext ctx, const void* ptr);
+    bool handle_WriteMsgToChatId(const void* ptr);
+    static bool handle_CtrlSpamBlock(const void* ptr);
+    static bool handle_ObserveChatId(const void* ptr);
+    static bool handle_ObserveAllChats(const void* ptr);
+    static bool handle_DeleteControllerById(const void* ptr);
+    bool handle_GetUptime(SocketConnContext ctx, const void* ptr);
 };

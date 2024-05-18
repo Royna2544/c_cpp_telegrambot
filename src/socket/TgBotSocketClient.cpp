@@ -66,15 +66,22 @@ struct ClientParser : TgBotSocketParser {
         : TgBotSocketParser(interface) {}
     void handle_CommandPacket(SocketConnContext context,
                               TgBotCommandPacket pkt) override {
+        TgBotCommandData::GetUptimeCallback callbackData = {};
+        bool success{};
         switch (pkt.header.cmd) {
             case CMD_GET_UPTIME_CALLBACK: {
-                TgBotCommandData::GetUptimeCallback callbackData = {};
                 memcpy(callbackData, pkt.data_ptr.getData(),
                        sizeof(callbackData));
-                printf("Server replied: %s\n", callbackData);
+                LOG(INFO) << "Server replied: " << callbackData;
                 interface->closeSocketHandle(context);
                 break;
             }
+            case CMD_GENERIC_ACK:
+                memcpy(&success, pkt.data_ptr.getData(), sizeof(success));
+                LOG(INFO) << "Command ACK from server: " << std::boolalpha
+                          << success;
+                interface->closeSocketHandle(context);
+                break;
             default:
                 LOG(ERROR) << "Unhandled callback of command: "
                            << pkt.header.cmd;
@@ -176,17 +183,10 @@ int main(int argc, char** argv) {
 
     if (handle) {
         backend->writeToSocket(handle.value(), pkt->toSocketData());
+        LOG(INFO) << "Sent the command: Waiting for callback...";
         // Handle callbacks
-        switch (cmd) {
-            case CMD_GET_UPTIME: {
-                ClientParser parser(backend);
-                DLOG(INFO) << "Waiting for callback...";
-                parser.onNewBuffer(handle.value());
-                break;
-            }
-            default:
-                break;
-        }
+        ClientParser parser(backend);
+        parser.onNewBuffer(handle.value());
     }
 
     return static_cast<int>(!pkt.has_value());

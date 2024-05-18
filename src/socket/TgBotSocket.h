@@ -31,6 +31,7 @@ enum TgBotCommand : std::int32_t {
     // Below are internal commands
     CMD_SERVER_INTERNAL_START = 100,
     CMD_GET_UPTIME_CALLBACK = CMD_SERVER_INTERNAL_START,
+    CMD_GENERIC_ACK,
     CMD_MAX,
 };
 
@@ -41,11 +42,6 @@ enum FileType {
     TYPE_DOCUMENT,
     TYPE_DICE,
     TYPE_MAX
-};
-
-enum ExitOp {
-    SET_TOKEN,
-    DO_EXIT,
 };
 
 namespace TgBotCmd {
@@ -95,8 +91,6 @@ struct WriteMsgToChatId {
     char msg[256];  // Msg to send
 };
 
-struct Exit {};
-
 enum CtrlSpamBlock {
     CTRL_OFF,              // Disabled
     CTRL_LOGGING_ONLY_ON,  // Logging only, not taking action
@@ -122,6 +116,8 @@ using ObserveAllChats = bool;
 using DeleteControllerById = int;
 
 using GetUptimeCallback = char[sizeof("Uptime: 99h 99m 99s")];
+
+using GenericAck = bool;
 
 }  // namespace TgBotCommandData
 
