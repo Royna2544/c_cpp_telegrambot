@@ -10,13 +10,14 @@
 #include <cstring>
 #include <impl/bot/ClientBackend.hpp>
 #include <impl/bot/TgBotPacketParser.hpp>
+#include <impl/bot/TgBotSocketFileHelper.hpp>
 #include <iostream>
 #include <optional>
 
-#include "SocketDescriptor_defs.hpp"
 #include "TgBotSocket.h"
-#include "interface/SocketBase.hpp"
-#include "interface/impl/bot/TgBotPacketParser.hpp"
+#include "interface/impl/bot/TgBotSocketFileHelper.hpp"
+#include "socket/TgBotSocket.h"
+
 
 [[noreturn]] static void usage(const char* argv, bool success) {
     std::cout << "Usage: " << argv << " [cmd enum value] [args...]" << std::endl
@@ -74,20 +75,23 @@ struct ClientParser : TgBotSocketParser {
                 memcpy(callbackData, pkt.data_ptr.getData(),
                        sizeof(callbackData));
                 LOG(INFO) << "Server replied: " << callbackData;
-                interface->closeSocketHandle(context);
+                break;
+            }
+            case CMD_DOWNLOAD_FILE_CALLBACK: {
+                fileData_tofile(pkt.data_ptr.getData(), pkt.header.data_size);
                 break;
             }
             case CMD_GENERIC_ACK:
                 memcpy(&success, pkt.data_ptr.getData(), sizeof(success));
                 LOG(INFO) << "Command ACK from server: " << std::boolalpha
                           << success;
-                interface->closeSocketHandle(context);
                 break;
             default:
                 LOG(ERROR) << "Unhandled callback of command: "
                            << pkt.header.cmd;
                 break;
         }
+        interface->closeSocketHandle(context);
     }
 };
 
@@ -174,32 +178,15 @@ int main(int argc, char** argv) {
             pkt = TgBotCommandPacket(cmd, 1);
             break;
         }
-        case CMD_SEND_FILE: {
-            size_t size = 0;
-            char* buf = nullptr;
-            FILE* fp = nullptr;
-            constexpr size_t datahdr_size = sizeof(TgBotCommandData::SendFile);
-
-            fp = fopen(argv[0], "rb");
-            if (fp != nullptr) {
-                fseek(fp, 0, SEEK_END);
-                size = ftell(fp);
-                fseek(fp, 0, SEEK_SET);
-                LOG(INFO) << "Sending file " << argv[0];
-                buf = static_cast<char*>(malloc(size + datahdr_size));
-                LOG(INFO) << "mem-alloc buffer of size " << size + datahdr_size << " bytes: OK";
-                // Copy data header to the beginning of the buffer.
-                if (buf != nullptr) {
-                    strncpy(buf, argv[1], datahdr_size);
-                    char* moved_buf = buf + datahdr_size;
-                    fread(moved_buf, 1, size, fp);
-                    pkt = TgBotCommandPacket(cmd, buf, size + datahdr_size);
-                    free(buf);
-                }
-                fclose(fp);
-            } else {
-                fprintf(stderr, "Failed to open file %s\n", argv[0]);
-            }
+        case CMD_UPLOAD_FILE: {
+            pkt = fileData_fromFile(CMD_UPLOAD_FILE, argv[0], argv[1]);
+            break;
+        }
+        case CMD_DOWNLOAD_FILE: {
+            TgBotCommandData::DownloadFile data{};
+            copyToStrBuf(data.filepath, argv[0]);
+            copyToStrBuf(data.destfilename, argv[1]);
+            pkt = TgBotCommandPacket(cmd, &data, sizeof(data));
             break;
         }
         default:

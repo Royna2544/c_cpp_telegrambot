@@ -12,6 +12,7 @@
 #include "../include/Types.h"
 #include "SharedMalloc.hpp"
 #include "SocketData.hpp"
+#include "socket/TgBotSocket.h"
 
 constexpr int MAX_PATH_SIZE = 256;
 
@@ -28,13 +29,15 @@ enum TgBotCommand : std::int32_t {
     CMD_OBSERVE_ALL_CHATS,
     CMD_DELETE_CONTROLLER_BY_ID,
     CMD_GET_UPTIME,
-    CMD_SEND_FILE,
+    CMD_UPLOAD_FILE,
+    CMD_DOWNLOAD_FILE,
     CMD_CLIENT_MAX,
 
     // Below are internal commands
     CMD_SERVER_INTERNAL_START = 100,
     CMD_GET_UPTIME_CALLBACK = CMD_SERVER_INTERNAL_START,
     CMD_GENERIC_ACK,
+    CMD_DOWNLOAD_FILE_CALLBACK,
     CMD_MAX,
 };
 
@@ -122,7 +125,12 @@ using GetUptimeCallback = char[sizeof("Uptime: 99h 99m 99s")];
 
 using GenericAck = bool;
  
-using SendFile = char[MAX_PATH_SIZE];  // Destination file name
+using UploadFile = char[MAX_PATH_SIZE];  // Destination file name
+
+struct DownloadFile {
+    char filepath[MAX_PATH_SIZE];  // Path to file (in remote)
+    char destfilename[MAX_PATH_SIZE];  // Destination file name
+};
 
 }  // namespace TgBotCommandData
 

@@ -61,6 +61,7 @@ struct SocketInterfaceTgBot : SingleThreadCtrlRunnable,
     static bool handle_ObserveChatId(const void* ptr);
     static bool handle_ObserveAllChats(const void* ptr);
     static bool handle_DeleteControllerById(const void* ptr);
-    static bool handle_SendFile(const void *ptr, SocketData::length_type len);
+    static bool handle_UploadFile(const void *ptr, SocketData::length_type len);
     bool handle_GetUptime(SocketConnContext ctx, const void* ptr);
+    bool handle_DownloadFile(SocketConnContext ctx, const void* ptr);
 };

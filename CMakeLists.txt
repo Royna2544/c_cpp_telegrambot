@@ -267,7 +267,8 @@ if (USE_UNIX_SOCKETS)
   extend_set(SRC_LIST
     src/ChatObserver.cpp
     ${SOCKET_SRC_INTERFACE}/impl/bot/SocketDataHandler.cpp
-    ${SOCKET_SRC_INTERFACE}/impl/bot/TgBotSocketInterface.cpp)
+    ${SOCKET_SRC_INTERFACE}/impl/bot/TgBotSocketInterface.cpp
+    ${SOCKET_SRC_INTERFACE}/impl/bot/TgBotSocketFileHelper.cpp)
   if (UNIX)
     set(SOCKET_SRC_LIST
       ${SOCKET_SRC_INTERFACE}/impl/SocketPosix.cpp
@@ -315,7 +316,9 @@ if (USE_UNIX_SOCKETS)
     src/socket/TgBotCommandMap.cpp)
   target_include_directories(TgBotSocket PRIVATE ${CURL_INCLUDE_DIRS})
   target_include_directories(TgBotSocket PUBLIC src/socket/include ${SOCKET_SRC_INTERFACE})
-  add_executable(${SOCKET_CLI_NAME} src/socket/TgBotSocketClient.cpp)
+  add_executable(${SOCKET_CLI_NAME}
+    src/socket/TgBotSocketClient.cpp
+    ${SOCKET_SRC_INTERFACE}/impl/bot/TgBotSocketFileHelper.cpp)
 
   target_link_libraries(${SOCKET_CLI_NAME} TgBotSocket)
   target_link_lib_if_windows(${SOCKET_CLI_NAME} Ws2_32)

@@ -19,6 +19,7 @@
 
 #include "SocketBase.hpp"
 #include "SocketDescriptor_defs.hpp"
+#include "TgBotSocketFileHelper.hpp"
 #include "TgBotSocketInterface.hpp"
 
 using TgBot::Api;
@@ -204,30 +205,21 @@ bool SocketInterfaceTgBot::handle_GetUptime(SocketConnContext ctx,
     return true;
 }
 
-bool SocketInterfaceTgBot::handle_SendFile(const void* ptr,
-                                           SocketData::length_type len) {
-    const auto* data = static_cast<const char*>(ptr);
-    SendFile destfilepath{};
-    FILE* file = nullptr;
-    size_t ret = 0;
-    size_t file_size = len - sizeof(SendFile);
+bool SocketInterfaceTgBot::handle_UploadFile(const void* ptr,
+                                             SocketData::length_type len) {
+    return fileData_tofile(ptr, len);
+}
 
-    LOG(INFO) << "This buffer has a size of " << len << " bytes";
-    LOG(INFO) << "Which is " << file_size << " bytes excluding the header";
-
-    strncpy(destfilepath, data, sizeof(SendFile));
-    if ((file = fopen(destfilepath, "wb")) == nullptr) {
-        LOG(ERROR) << "Failed to open file: " << destfilepath;
+bool SocketInterfaceTgBot::handle_DownloadFile(SocketConnContext ctx,
+                                               const void* ptr) {
+    const auto* data = static_cast<const DownloadFile*>(ptr);
+    auto pkt = fileData_fromFile(CMD_DOWNLOAD_FILE_CALLBACK, data->filepath,
+                                 data->destfilename);
+    if (!pkt) {
+        LOG(ERROR) << "Failed to prepare download file packet";
         return false;
     }
-    ret = fwrite(data + sizeof(SendFile), file_size, 1, file);
-    if (ret != 1) {
-        LOG(ERROR) << "Failed to write to file: " << destfilepath << " (Wrote "
-                   << ret << " bytes)";
-        fclose(file);
-        return false;
-    }
-    fclose(file);
+    interface->writeToSocket(ctx, pkt->toSocketData());
     return true;
 }
 
@@ -259,8 +251,11 @@ void SocketInterfaceTgBot::handle_CommandPacket(SocketConnContext ctx,
         case CMD_GET_UPTIME:
             ret = handle_GetUptime(ctx, ptr);
             break;
-        case CMD_SEND_FILE:
-            ret = handle_SendFile(ptr, pkt.header.data_size);
+        case CMD_UPLOAD_FILE:
+            ret = handle_UploadFile(ptr, pkt.header.data_size);
+            break;
+        case CMD_DOWNLOAD_FILE:
+            ret = handle_DownloadFile(ctx, ptr);
             break;
         default:
             if (TgBotCmd::isClientCommand(pkt.header.cmd)) {
@@ -275,6 +270,7 @@ void SocketInterfaceTgBot::handle_CommandPacket(SocketConnContext ctx,
     };
     switch (pkt.header.cmd) {
         case CMD_GET_UPTIME:
+        case CMD_DOWNLOAD_FILE:
             // This has its own callback
             break;
         case CMD_WRITE_MSG_TO_CHAT_ID:
@@ -283,10 +279,15 @@ void SocketInterfaceTgBot::handle_CommandPacket(SocketConnContext ctx,
         case CMD_SEND_FILE_TO_CHAT_ID:
         case CMD_OBSERVE_ALL_CHATS:
         case CMD_DELETE_CONTROLLER_BY_ID:
-        case CMD_SEND_FILE:
+        case CMD_UPLOAD_FILE: {
             TgBotCommandPacket ackpkt(CMD_GENERIC_ACK, &ret, 1);
             LOG(INFO) << "Sending ack: " << std::boolalpha << ret;
             interface->writeToSocket(ctx, ackpkt.toSocketData());
+            break;
+        }
+        default:
+            LOG(ERROR) << "Unknown command: "
+                       << static_cast<int>(pkt.header.cmd);
             break;
     }
 }
