@@ -114,8 +114,8 @@ void SocketInterfaceWindows::writeToSocket(SocketConnContext context,
             WSALOG_E("Failed to send to socket");
         }
     } else {
-        const auto count =
-            sendto(context.cfd, socketData, data->size, 0, addr, context.len);
+        const auto count = sendto(context.cfd, socketData, data->size, 0, addr,
+                                  context.addr->size);
         if (count < 0) {
             WSALOG_E("Failed to sentto socket");
         }
@@ -133,9 +133,10 @@ std::optional<SharedMalloc> SocketInterfaceWindows::readFromSocket(
     SharedMalloc buf(length);
     auto *addr = static_cast<sockaddr *>(context.addr.get());
     auto *data = static_cast<char *>(buf.get());
+    socklen_t addrLen = context.addr->size;
 
     auto count =
-        recvfrom(context.cfd, data, length, MSG_WAITALL, addr, &context.len);
+        recvfrom(context.cfd, data, length, MSG_WAITALL, addr, &addrLen);
     if (count != length) {
         WSALOG_E("Failed to read from socket");
     } else {

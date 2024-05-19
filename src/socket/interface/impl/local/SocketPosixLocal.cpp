@@ -22,7 +22,6 @@ bool SocketInterfaceUnixLocal::createLocalSocket(SocketConnContext *ctx) {
     strncpy(addr->sun_path, getOptions(Options::DESTINATION_ADDRESS).c_str(),
             sizeof(addr->sun_path));
     addr->sun_path[sizeof(addr->sun_path) - 1] = '\0';
-    ctx->len = SUN_LEN(addr);
     return true;
 }
 
@@ -35,12 +34,12 @@ std::optional<socket_handle_t> SocketInterfaceUnixLocal::createServerSocket() {
     if (!createLocalSocket(&ret)) {
         return std::nullopt;
     }
-    if (bind(ret.cfd, _name, ret.len) != 0) {
+    if (bind(ret.cfd, _name, ret.addr->size) != 0) {
         bool succeeded = false;
         PLOG(ERROR) << "Failed to bind to socket";
         if (errno == EADDRINUSE) {
             cleanupServerSocket();
-            if (bind(ret.cfd, _name, ret.len) == 0) {
+            if (bind(ret.cfd, _name, ret.addr->size) == 0) {
                 LOG(INFO) << "Bind succeeded by removing socket file";
                 succeeded = true;
             }
@@ -61,7 +60,7 @@ std::optional<SocketConnContext> SocketInterfaceUnixLocal::createClientSocket() 
     if (!createLocalSocket(&ret)) {
         return std::nullopt;
     }
-    if (connect(ret.cfd, _name, ret.len) != 0) {
+    if (connect(ret.cfd, _name, ret.addr->size) != 0) {
         PLOG(ERROR) << "Failed to connect to socket";
         closeSocketHandle(ret.cfd);
     }

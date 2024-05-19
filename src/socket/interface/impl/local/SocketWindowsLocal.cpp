@@ -24,7 +24,6 @@ bool SocketInterfaceWindowsLocal::createLocalSocket(SocketConnContext *ctx) {
     strncpy(addr->sun_path, getOptions(Options::DESTINATION_ADDRESS).c_str(),
             sizeof(addr->sun_path));
     addr->sun_path[sizeof(addr->sun_path) - 1] = '\0';
-    ctx->len = sizeof(sockaddr_un);
     return true;
 }
 
@@ -37,12 +36,12 @@ std::optional<socket_handle_t> SocketInterfaceWindowsLocal::createServerSocket()
     if (!createLocalSocket(&ret)) {
         return std::nullopt;
     }
-    if (bind(ret.cfd, _name, ret.len) != 0) {
+    if (bind(ret.cfd, _name, ret.addr->size) != 0) {
         bool succeeded = false;
         LOG(ERROR) << "Failed to bind to socket: " << getLastErrorMessage();
         if (WSAGetLastError() == WSAEADDRINUSE) {
             cleanupServerSocket();
-            if (bind(ret.cfd, _name, ret.len) == 0) {
+            if (bind(ret.cfd, _name, ret.addr->size) == 0) {
                 LOG(INFO) << "Bind succeeded by removing socket file";
                 succeeded = true;
             }
@@ -63,7 +62,7 @@ std::optional<SocketConnContext> SocketInterfaceWindowsLocal::createClientSocket
     if (!createLocalSocket(&ret)) {
         return std::nullopt;
     }
-    if (connect(ret.cfd, _name, ret.len) != 0) {
+    if (connect(ret.cfd, _name, ret.addr->size) != 0) {
         LOG(ERROR) << "Failed to connect to socket: " << getLastErrorMessage();
         closeSocketHandle(ret.cfd);
     }

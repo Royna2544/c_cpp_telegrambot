@@ -99,7 +99,7 @@ void SocketInterfaceUnix::writeToSocket(SocketConnContext context,
         }
     } else {
         const auto count = sendto(context.cfd, socketData, data->size,
-                                  MSG_NOSIGNAL, addr, context.len);
+                                  MSG_NOSIGNAL, addr, context.addr->size);
         if (count < 0) {
             PLOG(ERROR) << "Failed to sentto socket";
         }
@@ -110,9 +110,10 @@ std::optional<SharedMalloc> SocketInterfaceUnix::readFromSocket(
     SocketConnContext handle, TgBotCommandPacketHeader::length_type length) {
     SharedMalloc buf(length);
     auto* addr = static_cast<sockaddr*>(handle.addr.get());
+    socklen_t addrlen = handle.addr->size;
 
     ssize_t count = recvfrom(handle.cfd, buf.get(), length,
-                             MSG_NOSIGNAL | MSG_WAITALL, addr, &handle.len);
+                             MSG_NOSIGNAL | MSG_WAITALL, addr, &addrlen);
     if (count != length) {
         PLOG(ERROR) << "Failed to read from socket";
     } else {

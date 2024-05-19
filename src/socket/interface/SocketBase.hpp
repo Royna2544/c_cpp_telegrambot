@@ -6,12 +6,11 @@
 #include <string>
 
 #include "SharedMalloc.hpp"
-#include "socket/TgBotSocket.h"
+#include <socket/TgBotSocket.h>
 
 struct SocketConnContext {
     socket_handle_t cfd{};  // connection socket file descriptor
     SharedMalloc addr;      // struct sockaddr_*'s address
-    socklen_t len;          // length of address
 
     template <typename SocketAddr>
     static SocketConnContext create() {
@@ -20,8 +19,7 @@ struct SocketConnContext {
         return ctx;
     }
     template <typename SocketAddr>
-    explicit SocketConnContext(SocketAddr Myaddr)
-        : len(sizeof(Myaddr)), addr(Myaddr) {}
+    explicit SocketConnContext(SocketAddr Myaddr) : addr(Myaddr) {}
 };
 
 // A base class for socket operations
@@ -49,7 +47,8 @@ struct SocketInterfaceBase {
      * descriptor, address, and length of the address of the destination.
      * @param data The data to be written to the socket.
      */
-    virtual void writeToSocket(SocketConnContext context, SharedMalloc data) = 0;
+    virtual void writeToSocket(SocketConnContext context,
+                               SharedMalloc data) = 0;
 
     /**
      * @brief Reads data from the socket using the provided context.
@@ -66,7 +65,8 @@ struct SocketInterfaceBase {
      * empty optional if an error occurred or no data was available.
      */
     virtual std::optional<SharedMalloc> readFromSocket(
-        SocketConnContext context, TgBotCommandPacketHeader::length_type length) = 0;
+        SocketConnContext context,
+        TgBotCommandPacketHeader::length_type length) = 0;
 
     /**
      * @brief Closes the socket handle.

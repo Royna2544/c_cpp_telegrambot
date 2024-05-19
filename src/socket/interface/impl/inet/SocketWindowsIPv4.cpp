@@ -16,7 +16,7 @@ std::optional<socket_handle_t> SocketInterfaceWindowsIPv4::createServerSocket() 
         auto *_name = static_cast<sockaddr *>(context.addr.get());
 
         name->sin_addr.s_addr = INADDR_ANY;
-        if (bind(context.cfd, _name, context.len) != 0) {
+        if (bind(context.cfd, _name, context.addr->size) != 0) {
             WSALOG_E("Failed to bind to socket");
             closeSocketHandle(context.cfd);
             return std::nullopt;
@@ -35,7 +35,7 @@ std::optional<SocketConnContext> SocketInterfaceWindowsIPv4::createClientSocket(
 
         InetPton(AF_INET, getOptions(Options::DESTINATION_ADDRESS).c_str(),
                  &name->sin_addr);
-        if (connect(context.cfd, _name, context.len) != 0) {
+        if (connect(context.cfd, _name, context.addr->size) != 0) {
             WSALOG_E("Failed to connect to socket");
             closeSocketHandle(context.cfd);
             return std::nullopt;
