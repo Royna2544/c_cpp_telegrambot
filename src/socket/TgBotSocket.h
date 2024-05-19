@@ -14,41 +14,14 @@
 #include "SocketData.hpp"
 #include "socket/TgBotSocket.h"
 
-constexpr int MAX_PATH_SIZE = 256;
-
 inline std::filesystem::path getSocketPath() {
     static auto spath = std::filesystem::temp_directory_path() / "tgbot.sock";
     return spath;
 }
 
-enum TgBotCommand : std::int32_t {
-    CMD_WRITE_MSG_TO_CHAT_ID,
-    CMD_CTRL_SPAMBLOCK,
-    CMD_OBSERVE_CHAT_ID,
-    CMD_SEND_FILE_TO_CHAT_ID,
-    CMD_OBSERVE_ALL_CHATS,
-    CMD_DELETE_CONTROLLER_BY_ID,
-    CMD_GET_UPTIME,
-    CMD_UPLOAD_FILE,
-    CMD_DOWNLOAD_FILE,
-    CMD_CLIENT_MAX,
-
-    // Below are internal commands
-    CMD_SERVER_INTERNAL_START = 100,
-    CMD_GET_UPTIME_CALLBACK = CMD_SERVER_INTERNAL_START,
-    CMD_GENERIC_ACK,
-    CMD_DOWNLOAD_FILE_CALLBACK,
-    CMD_MAX,
-};
-
-enum FileType {
-    TYPE_PHOTO,
-    TYPE_VIDEO,
-    TYPE_GIF,
-    TYPE_DOCUMENT,
-    TYPE_DICE,
-    TYPE_MAX
-};
+#define TGBOT_NAMESPACE_BEGIN namespace TgBotCommandData {
+#define TGBOT_NAMESPACE_END }
+#include "TgBotCommandExport.hpp"
 
 namespace TgBotCmd {
 /**
@@ -91,60 +64,6 @@ bool isInternalCommand(TgBotCommand cmd);
 std::string getHelpText(void);
 }  // namespace TgBotCmd
 
-namespace TgBotCommandData {
-struct WriteMsgToChatId {
-    ChatId to;      // destination chatid
-    char msg[256];  // Msg to send
-};
-
-enum CtrlSpamBlock {
-    CTRL_OFF,              // Disabled
-    CTRL_LOGGING_ONLY_ON,  // Logging only, not taking action
-    CTRL_ON,               // Enabled, does delete but doesn't mute
-    CTRL_ENFORCE,          // Enabled, deletes and mutes
-    CTRL_MAX,
-};
-
-struct ObserveChatId {
-    ChatId id;
-    bool observe;  // new state for given ChatId,
-                   // true/false - Start/Stop observing
-};
-
-struct SendFileToChatId {
-    ChatId id;           // Destination ChatId
-    FileType type;       // File type for file
-    char filepath[MAX_PATH_SIZE];  // Path to file
-};
-
-using ObserveAllChats = bool;
-
-using DeleteControllerById = int;
-
-using GetUptimeCallback = char[sizeof("Uptime: 99h 99m 99s")];
-
-using GenericAck = bool;
- 
-using UploadFile = char[MAX_PATH_SIZE];  // Destination file name
-
-struct DownloadFile {
-    char filepath[MAX_PATH_SIZE];  // Path to file (in remote)
-    char destfilename[MAX_PATH_SIZE];  // Destination file name
-};
-
-}  // namespace TgBotCommandData
-
-/**
- * @brief Header for TgBotCommand Packets
- *
- * Header contains the magic value, command, and the size of the data
- */
-struct TgBotCommandPacketHeader {
-    int64_t magic;                      ///< Magic value to identify the packet
-    TgBotCommand cmd;                   ///< Command to be executed
-    SocketData::length_type data_size;  ///< Size of the data in the packet
-};
-
 /**
  * @brief Packet for sending commands to the server
  *
@@ -156,14 +75,13 @@ struct TgBotCommandPacketHeader {
  * size of the data. The data is then followed by the actual data.
  */
 struct TgBotCommandPacket {
-    static constexpr int64_t MAGIC_VALUE = 0xDEADFACE;
     static constexpr auto hdr_sz = sizeof(TgBotCommandPacketHeader);
     TgBotCommandPacketHeader header{};
     SharedMalloc data_ptr;
 
     explicit TgBotCommandPacket(SocketData::length_type length)
         : data_ptr(length) {
-        header.magic = TgBotCommandPacket::MAGIC_VALUE;
+        header.magic = TgBotCommandPacketHeader::MAGIC_VALUE;
         header.data_size = length;
     }
 
@@ -182,7 +100,7 @@ struct TgBotCommandPacket {
         static_assert(std::is_pointer_v<T>,
                       "This constructor should not be used with non pointer");
         header.cmd = cmd;
-        header.magic = MAGIC_VALUE;
+        header.magic = TgBotCommandPacketHeader::MAGIC_VALUE;
         header.data_size = size;
         memcpy(data_ptr.getData(), data, header.data_size);
     }

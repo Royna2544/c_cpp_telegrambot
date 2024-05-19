@@ -46,7 +46,7 @@ int main(int argc, char* const* argv) {
     }
     strncpy(data.filepath, info->mediaId.c_str(), sizeof(data.filepath) - 1);
     data.id = chatId;
-    data.type = TYPE_DOCUMENT;
+    data.type = TgBotCommandData::TYPE_DOCUMENT;
 
     struct TgBotCommandPacket pkt(CMD_SEND_FILE_TO_CHAT_ID, data);
     getClientBackend()->writeAsClientToSocket(pkt.toSocketData());

@@ -15,7 +15,7 @@ HandleState TgBotSocketParser::handle_PacketHeader(
     memcpy(&pkt->header, socketData->data->getData(),
            TgBotCommandPacket::hdr_sz);
 
-    if (pkt->header.magic != TgBotCommandPacket::MAGIC_VALUE) {
+    if (pkt->header.magic != TgBotCommandPacketHeader::MAGIC_VALUE) {
         LOG(WARNING) << "Invalid magic value, dropping buffer";
         return HandleState::Ignore;
     }

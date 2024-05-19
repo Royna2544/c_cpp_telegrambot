@@ -156,7 +156,7 @@ int main(int argc, char** argv) {
         case CMD_SEND_FILE_TO_CHAT_ID: {
             TgBotCommandData::SendFileToChatId data{};
             if (try_parse(argv[0], &data.id) &&
-                parseOneEnum(&data.type, TYPE_MAX, argv[1], "type")) {
+                parseOneEnum(&data.type, TgBotCommandData::TYPE_MAX, argv[1], "type")) {
                 copyToStrBuf(data.filepath, argv[2]);
                 pkt = TgBotCommandPacket(cmd, data);
             }
