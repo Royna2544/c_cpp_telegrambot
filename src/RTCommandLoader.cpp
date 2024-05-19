@@ -32,6 +32,7 @@ bool RTCommandLoader::loadOneCommand(std::filesystem::path _fname) {
     void* handle = nullptr;
     void* fnptr = nullptr;
     const char* dlerrorBuf = nullptr;
+    bool exception = false;
     const std::string fname = FS::appendDylibExtension(_fname).string();
 
     handle = dlopen(fname.c_str(), RTLD_NOW);
@@ -56,7 +57,10 @@ bool RTCommandLoader::loadOneCommand(std::filesystem::path _fname) {
         LOG(WARNING) << "Failed to load command from " << fname
                      << ": Loader function threw an exception: "
                      << std::quoted(e.what());
-        // TODO dlclose(handle);
+        exception = true;
+    }
+    if (exception) {
+        dlclose(handle);
         return false;
     }
     libs.emplace_back(handle);
