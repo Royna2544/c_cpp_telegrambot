@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
-#include <absl/log/initialize.h>
+#include <AbslLogInit.hpp>
 
 int main(int argc, char **argv) {
     testing::InitGoogleTest(&argc, argv);
-    absl::InitializeLog();
+    TgBot_AbslLogInit();
     return RUN_ALL_TESTS();
 }

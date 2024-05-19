@@ -4,12 +4,13 @@
 #include <ResourceManager.h>
 #include <SingleThreadCtrl.h>
 #include <SpamBlock.h>
-#include <absl/log/initialize.h>
+#include <absl/log/log.h>
 #include <absl/log/log_sink_registry.h>
 #include <command_modules/CommandModule.h>
 #include <internal/_std_chrono_templates.h>
 #include <libos/libsighandler.h>
 
+#include <AbslLogInit.hpp>
 #include <DatabaseBot.hpp>
 #include <DurationPoint.hpp>
 #include <LogSinks.hpp>
@@ -22,9 +23,7 @@
 
 #ifdef SOCKET_CONNECTION
 #include <ChatObserver.h>
-
 #include <socket/interface/impl/bot/TgBotSocketInterface.hpp>
-
 #endif
 
 #include <tgbot/tgbot.h>
@@ -93,18 +92,16 @@ void createAndDoInitCall() {
 int main(int argc, char* const* argv) {
     std::optional<std::string> token;
     std::optional<LogFileSink> log_sink;
-    StdFileSink std_file_sink;
     const auto startTp = std::chrono::system_clock::now();
     using namespace ConfigManager;
 
-    absl::InitializeLog();
+    TgBot_AbslLogInit();
+    LOG(INFO) << "Registered LogSink_stdout";
     copyCommandLine(CommandLineOp::INSERT, &argc, &argv);
     if (ConfigManager::getVariable(ConfigManager::Configs::HELP)) {
         ConfigManager::serializeHelpToOStream(std::cout);
         return EXIT_SUCCESS;
     }
-    absl::AddLogSink(&std_file_sink);
-    LOG(INFO) << "Registered LogSink_stdout";
 
     if (const auto it = getVariable(Configs::LOG_FILE); it) {
         log_sink = LogFileSink();

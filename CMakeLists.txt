@@ -89,7 +89,13 @@ add_subdirectory(src/third-party/protobuf EXCLUDE_FROM_ALL)
 if (WIN32)
 add_subdirectory(src/third-party/dlfcn-win32 EXCLUDE_FROM_ALL)
 endif()
-link_libraries(absl::log absl::log_initialize)
+################## Add a common logging init lib ####################
+add_library(TgBotLogInit SHARED src/logging/AbslLogInit.cpp)
+target_include_directories(TgBotLogInit PUBLIC src/logging/)
+target_link_libraries(TgBotLogInit absl::log_initialize absl::log absl::log_sink
+  absl::log_sink_registry absl::str_format)
+#####################################################################
+link_libraries(absl::log)
 #####################################################################
 
 ############################ RUST support ###########################
@@ -316,16 +322,16 @@ if (USE_UNIX_SOCKETS)
     src/socket/TgBotCommandMap.cpp)
   target_include_directories(TgBotSocket PRIVATE ${CURL_INCLUDE_DIRS})
   target_include_directories(TgBotSocket PUBLIC src/socket/include ${SOCKET_SRC_INTERFACE})
-  add_executable(${SOCKET_CLI_NAME}
-    src/socket/TgBotSocketClient.cpp
-    ${SOCKET_SRC_INTERFACE}/impl/bot/TgBotSocketFileHelper.cpp)
-
-  target_link_libraries(${SOCKET_CLI_NAME} TgBotSocket)
-  target_link_lib_if_windows(${SOCKET_CLI_NAME} Ws2_32)
   if (CURL_FOUND)
     target_link_libraries(TgBotSocket ${CURL_LIBRARIES})
   endif()
   target_link_libraries(TgBotSocket TgBotUtils)
+  add_executable(${SOCKET_CLI_NAME}
+    src/socket/TgBotSocketClient.cpp
+    ${SOCKET_SRC_INTERFACE}/impl/bot/TgBotSocketFileHelper.cpp)
+
+  target_link_libraries(${SOCKET_CLI_NAME} TgBotSocket TgBotLogInit)
+  target_link_lib_if_windows(${SOCKET_CLI_NAME} Ws2_32)
 endif()
 #####################################################################
 
@@ -377,18 +383,19 @@ target_link_libraries(TgBotCommandModules ${LD_LIST})
 
 ################# The Bot's main launcher (program) #################
 add_executable(${PROJECT_MAINEXE_NAME} src/main.cpp)
-target_link_libraries(${PROJECT_MAINEXE_NAME} TgBotCommandModules)
+target_link_libraries(${PROJECT_MAINEXE_NAME} TgBotCommandModules TgBotLogInit
+  absl::log_sink absl::log_sink_registry)
 #####################################################################
 
 ################# Utility Programs (Dump Database) ##################
 add_executable(${DBDUMPER_NAME} proto/DumpProtoDB.cc)
-target_link_libraries(${DBDUMPER_NAME} TgBotDB)
+target_link_libraries(${DBDUMPER_NAME} TgBotDB TgBotLogInit)
 #####################################################################
 
 ############### Utility Programs (Send Media to chat) ################
 if (USE_UNIX_SOCKETS)
   add_executable(${MEDIA_CLI_NAME} proto/SendMediaToChat.cc)
-  target_link_libraries(${MEDIA_CLI_NAME} TgBotDB TgBotSocket)
+  target_link_libraries(${MEDIA_CLI_NAME} TgBotDB TgBotSocket TgBotLogInit)
   target_link_lib_if_windows(${MEDIA_CLI_NAME} Ws2_32)
 endif()
 #####################################################################
@@ -410,6 +417,6 @@ add_executable(${PROJECT_TEST_NAME}
   tests/ConstexprStringCatTest.cpp
 )
 target_include_directories(${PROJECT_TEST_NAME} PRIVATE ${gtest_INCLUDE_DIR} ${gmock_INCLUDE_DIR})
-target_link_libraries(${PROJECT_TEST_NAME} gtest gmock TgBotCommandModules)
+target_link_libraries(${PROJECT_TEST_NAME} gtest gmock TgBotCommandModules TgBotLogInit)
 add_test(NAME ${PROJECT_TEST_NAME} COMMAND ${PROJECT_TEST_NAME})
 #####################################################################

@@ -1,7 +1,7 @@
-#include <absl/log/initialize.h>
 #include <absl/log/log.h>
-#include <absl/log/log_sink_registry.h>
+#include <socket/TgBotSocket.h>
 
+#include <AbslLogInit.hpp>
 #include <LogSinks.hpp>
 #include <TryParseStr.hpp>
 #include <cstdio>
@@ -13,9 +13,6 @@
 #include <iostream>
 #include <optional>
 
-#include "TgBotSocket.h"
-#include "interface/impl/bot/TgBotSocketFileHelper.hpp"
-#include "socket/TgBotSocket.h"
 
 [[noreturn]] static void usage(const char* argv, bool success) {
     std::cout << "Usage: " << argv << " [cmd enum value] [args...]" << std::endl
@@ -97,13 +94,10 @@ int main(int argc, char** argv) {
     std::optional<TgBotCommandPacket> pkt;
     const char* exe = argv[0];
 
+    TgBot_AbslLogInit();
     if (argc == 1) {
         usage(exe, true);
     }
-    absl::InitializeLog();
-    StdFileSink sink;
-    absl::AddLogSink(&sink);
-
     // Remove exe (argv[0])
     ++argv;
     --argc;

@@ -1,8 +1,10 @@
 #include <DatabaseBot.hpp>
 #include <cstdlib>
 #include <iostream>
+#include <AbslLogInit.hpp>
 
 int main(const int argc, const char **argv) {
+    TgBot_AbslLogInit();
     auto DBWrapper = DefaultDatabase();
     if (argc != 2) {
         std::cerr << "Usage: " << argv[0] << " <databasefile>" << std::endl;

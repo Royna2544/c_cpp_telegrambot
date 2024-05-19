@@ -1,14 +1,14 @@
 #include <Types.h>
-#include <absl/log/initialize.h>
-#include <absl/log/log.h>
 #include <socket/TgBotSocket.h>
-#include <impl/bot/ClientBackend.hpp>
 
+#include <AbslLogInit.hpp>
 #include <DatabaseBot.hpp>
 #include <cstdlib>
 #include <cstring>
+#include <impl/bot/ClientBackend.hpp>
 #include <iostream>
 #include <string>
+
 
 [[noreturn]] static void usage(const char* argv0, const int exitCode) {
     std::cerr << "Usage: " << argv0 << " <chatId> <name stored in DB>"
@@ -24,7 +24,7 @@ int main(int argc, char* const* argv) {
     };
     auto backend = DefaultDatabase();
 
-    absl::InitializeLog();
+    TgBot_AbslLogInit();
     if (argc != 3) {
         _usage(EXIT_SUCCESS);
     }
