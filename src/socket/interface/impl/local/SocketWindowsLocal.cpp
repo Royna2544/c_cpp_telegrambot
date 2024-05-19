@@ -65,6 +65,7 @@ std::optional<SocketConnContext> SocketInterfaceWindowsLocal::createClientSocket
     if (connect(ret.cfd, _name, ret.addr->size) != 0) {
         LOG(ERROR) << "Failed to connect to socket: " << getLastErrorMessage();
         closeSocketHandle(ret.cfd);
+        return std::nullopt;
     }
     return ret;
 }
