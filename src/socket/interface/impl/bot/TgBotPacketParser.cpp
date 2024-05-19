@@ -10,7 +10,7 @@ using HandleState = TgBotSocketParser::HandleState;
 HandleState TgBotSocketParser::handle_PacketHeader(
     std::optional<SharedMalloc>& socketData,
     std::optional<TgBotCommandPacket>& pkt) {
-    if (socketData->size() < TgBotCommandPacket::hdr_sz) {
+    if (socketData.value()->size < TgBotCommandPacket::hdr_sz) {
         LOG(ERROR) << "Failed to read from socket";
         return HandleState::Fail;
     }
@@ -33,7 +33,7 @@ HandleState TgBotSocketParser::handle_Packet(
                   << ", invoke callback!";
     }
 
-    if (socketData->size() != pkt->header.data_size) {
+    if (socketData.value()->size != pkt->header.data_size) {
         LOG(WARNING) << "Invalid packet data size, dropping buffer";
         return HandleState::Ignore;
     }

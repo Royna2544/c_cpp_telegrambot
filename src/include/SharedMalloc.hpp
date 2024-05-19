@@ -60,7 +60,6 @@ struct SharedMalloc {
     SharedMallocChild getChild() noexcept;
     [[nodiscard]] void *get() noexcept { return getChild().get(); }
     [[nodiscard]] long use_count() const noexcept { return parent.use_count(); }
-    [[nodiscard]] size_t size() const noexcept { return parent->size; }
 
    private:
     std::shared_ptr<SharedMallocParent> parent;
