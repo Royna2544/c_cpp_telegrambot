@@ -3,7 +3,6 @@
 #include <absl/log/log_sink_registry.h>
 
 #include <LogSinks.hpp>
-#include <SocketData.hpp>
 #include <TryParseStr.hpp>
 #include <cstdio>
 #include <cstdlib>
@@ -17,7 +16,6 @@
 #include "TgBotSocket.h"
 #include "interface/impl/bot/TgBotSocketFileHelper.hpp"
 #include "socket/TgBotSocket.h"
-
 
 [[noreturn]] static void usage(const char* argv, bool success) {
     std::cout << "Usage: " << argv << " [cmd enum value] [args...]" << std::endl
@@ -72,17 +70,16 @@ struct ClientParser : TgBotSocketParser {
         bool success{};
         switch (pkt.header.cmd) {
             case CMD_GET_UPTIME_CALLBACK: {
-                memcpy(callbackData, pkt.data_ptr.getData(),
-                       sizeof(callbackData));
+                memcpy(callbackData, pkt.data.get(), sizeof(callbackData));
                 LOG(INFO) << "Server replied: " << callbackData;
                 break;
             }
             case CMD_DOWNLOAD_FILE_CALLBACK: {
-                fileData_tofile(pkt.data_ptr.getData(), pkt.header.data_size);
+                fileData_tofile(pkt.data.get(), pkt.header.data_size);
                 break;
             }
             case CMD_GENERIC_ACK:
-                memcpy(&success, pkt.data_ptr.getData(), sizeof(success));
+                memcpy(&success, pkt.data.get(), sizeof(success));
                 LOG(INFO) << "Command ACK from server: " << std::boolalpha
                           << success;
                 break;
@@ -156,7 +153,8 @@ int main(int argc, char** argv) {
         case CMD_SEND_FILE_TO_CHAT_ID: {
             TgBotCommandData::SendFileToChatId data{};
             if (try_parse(argv[0], &data.id) &&
-                parseOneEnum(&data.type, TgBotCommandData::TYPE_MAX, argv[1], "type")) {
+                parseOneEnum(&data.type, TgBotCommandData::TYPE_MAX, argv[1],
+                             "type")) {
                 copyToStrBuf(data.filepath, argv[2]);
                 pkt = TgBotCommandPacket(cmd, data);
             }

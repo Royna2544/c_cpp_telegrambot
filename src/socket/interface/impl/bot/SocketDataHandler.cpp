@@ -19,6 +19,7 @@
 
 #include "SocketBase.hpp"
 #include "SocketDescriptor_defs.hpp"
+#include "TgBotCommandExport.hpp"
 #include "TgBotSocketFileHelper.hpp"
 #include "TgBotSocketInterface.hpp"
 
@@ -205,8 +206,8 @@ bool SocketInterfaceTgBot::handle_GetUptime(SocketConnContext ctx,
     return true;
 }
 
-bool SocketInterfaceTgBot::handle_UploadFile(const void* ptr,
-                                             SocketData::length_type len) {
+bool SocketInterfaceTgBot::handle_UploadFile(
+    const void* ptr, TgBotCommandPacketHeader::length_type len) {
     return fileData_tofile(ptr, len);
 }
 
@@ -225,7 +226,7 @@ bool SocketInterfaceTgBot::handle_DownloadFile(SocketConnContext ctx,
 
 void SocketInterfaceTgBot::handle_CommandPacket(SocketConnContext ctx,
                                                 TgBotCommandPacket pkt) {
-    const void* ptr = pkt.data_ptr.getData();
+    const void* ptr = pkt.data.get();
     using namespace TgBotCommandData;
     bool ret = {};
 

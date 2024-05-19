@@ -17,18 +17,18 @@ TEST(SharedMallocTest, UseCount) {
     v = std::move(v3);
     // v is gone - so refcnt 1
     EXPECT_EQ(shared_malloc.use_count(), 1);
-    EXPECT_EQ(v.getData(), some.getData());
+    EXPECT_EQ(v.get(), some.get());
 }
 
 TEST(SharedMallocChildTest, ReturnValidObject) {
     SharedMalloc shared_malloc(10);
     auto child = shared_malloc.getChild();
-    EXPECT_NE(static_cast<void *>(child), nullptr);
+    EXPECT_NE(child.get(), nullptr);
 }
 
 TEST(SharedMallocChildTest, ReturnValidPointer) {
     SharedMalloc shared_malloc(10);
     auto child = shared_malloc.getChild();
-    void *ptr = static_cast<void *>(child);
+    void *ptr = child.get();
     EXPECT_NE(ptr, nullptr);
 }

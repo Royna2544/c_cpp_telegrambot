@@ -9,7 +9,6 @@
 #include <cstring>
 #include <iostream>
 #include <string>
-#include "SocketData.hpp"
 
 [[noreturn]] static void usage(const char* argv0, const int exitCode) {
     std::cerr << "Usage: " << argv0 << " <chatId> <name stored in DB>"

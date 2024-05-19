@@ -6,6 +6,8 @@
 
 #include <SocketBase.hpp>
 
+#include "SharedMalloc.hpp"
+
 extern void WSALOG_E(const char* msg);
 
 struct SocketInterfaceWindows : SocketInterfaceBase {
@@ -14,15 +16,16 @@ struct SocketInterfaceWindows : SocketInterfaceBase {
     };
     static char* strWSAError(const int errcode);
 
-    void writeToSocket(SocketConnContext context, SocketData data) override;
+    void writeToSocket(SocketConnContext context, SharedMalloc data) override;
     void forceStopListening(void) override;
     void startListening(socket_handle_t handle,
                         const listener_callback_t onNewData) override;
     bool closeSocketHandle(socket_handle_t& handle) override;
 
     char* getLastErrorMessage() override;
-    std::optional<SocketData> readFromSocket(
-        SocketConnContext context, SocketData::length_type length) override;
+    std::optional<SharedMalloc> readFromSocket(
+        SocketConnContext context,
+        TgBotCommandPacketHeader::length_type length) override;
 
     struct WinHelper {
         explicit WinHelper(SocketInterfaceWindows* interface)

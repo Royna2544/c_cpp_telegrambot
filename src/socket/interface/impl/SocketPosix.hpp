@@ -5,22 +5,25 @@
 #include <internal/_FileDescriptor_posix.h>
 
 #include <SocketBase.hpp>
-#include <SocketData.hpp>
 #include <functional>
+
+#include "SharedMalloc.hpp"
+#include "TgBotCommandExport.hpp"
 
 struct SocketInterfaceUnix : SocketInterfaceBase {
     bool isValidSocketHandle(socket_handle_t handle) override {
         return isValidFd(handle);
     };
 
-    void writeToSocket(SocketConnContext context, SocketData data) override;
+    void writeToSocket(SocketConnContext context, SharedMalloc data) override;
     void forceStopListening(void) override;
     void startListening(socket_handle_t handle,
                         const listener_callback_t onNewData) override;
     bool closeSocketHandle(socket_handle_t& handle) override;
     char* getLastErrorMessage() override;
-    std::optional<SocketData> readFromSocket(
-        SocketConnContext context, SocketData::length_type length) override;
+    std::optional<SharedMalloc> readFromSocket(
+        SocketConnContext context,
+        TgBotCommandPacketHeader::length_type length) override;
 
     SocketInterfaceUnix() = default;
     virtual ~SocketInterfaceUnix() = default;

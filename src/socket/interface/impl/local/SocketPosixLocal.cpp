@@ -17,7 +17,7 @@ bool SocketInterfaceUnixLocal::createLocalSocket(SocketConnContext *ctx) {
         PLOG(ERROR) << "Failed to create socket";
         return false;
     }
-    auto *addr = reinterpret_cast<struct sockaddr_un *>(ctx->addr.getData());
+    auto *addr = reinterpret_cast<struct sockaddr_un *>(ctx->addr.get());
     addr->sun_family = AF_LOCAL;
     strncpy(addr->sun_path, getOptions(Options::DESTINATION_ADDRESS).c_str(),
             sizeof(addr->sun_path));
@@ -28,7 +28,7 @@ bool SocketInterfaceUnixLocal::createLocalSocket(SocketConnContext *ctx) {
 
 std::optional<socket_handle_t> SocketInterfaceUnixLocal::createServerSocket() {
     SocketConnContext ret = SocketConnContext::create<sockaddr_un>();
-    const auto *_name = reinterpret_cast<struct sockaddr *>(ret.addr.getData());
+    const auto *_name = reinterpret_cast<struct sockaddr *>(ret.addr.get());
 
     setOptions(Options::DESTINATION_ADDRESS, getSocketPath().string());
     LOG(INFO) << "Creating socket at " << getSocketPath().string();
@@ -55,7 +55,7 @@ std::optional<socket_handle_t> SocketInterfaceUnixLocal::createServerSocket() {
 
 std::optional<SocketConnContext> SocketInterfaceUnixLocal::createClientSocket() {
     SocketConnContext ret = SocketConnContext::create<sockaddr_un>();
-    const auto *_name = reinterpret_cast<struct sockaddr *>(ret.addr.getData());
+    const auto *_name = reinterpret_cast<struct sockaddr *>(ret.addr.get());
 
     setOptions(Options::DESTINATION_ADDRESS, getSocketPath().string());
     if (!createLocalSocket(&ret)) {

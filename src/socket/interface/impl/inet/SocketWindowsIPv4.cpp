@@ -12,8 +12,8 @@ std::optional<socket_handle_t> SocketInterfaceWindowsIPv4::createServerSocket() 
 
     setOptions(Options::DESTINATION_PORT, std::to_string(kTgBotHostPort));
     if (win_helper.createInetSocketAddr(context)) {
-        auto *name = static_cast<sockaddr_in *>(context.addr.getData());
-        auto *_name = static_cast<sockaddr *>(context.addr.getData());
+        auto *name = static_cast<sockaddr_in *>(context.addr.get());
+        auto *_name = static_cast<sockaddr *>(context.addr.get());
 
         name->sin_addr.s_addr = INADDR_ANY;
         if (bind(context.cfd, _name, context.len) != 0) {
@@ -30,8 +30,8 @@ std::optional<SocketConnContext> SocketInterfaceWindowsIPv4::createClientSocket(
     auto context = SocketConnContext::create<sockaddr_in>();
 
     if (win_helper.createInetSocketAddr(context)) {
-        auto *name = static_cast<sockaddr_in *>(context.addr.getData());
-        auto *_name = static_cast<sockaddr *>(context.addr.getData());
+        auto *name = static_cast<sockaddr_in *>(context.addr.get());
+        auto *_name = static_cast<sockaddr *>(context.addr.get());
 
         InetPton(AF_INET, getOptions(Options::DESTINATION_ADDRESS).c_str(),
                  &name->sin_addr);

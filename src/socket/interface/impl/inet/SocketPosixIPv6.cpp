@@ -76,7 +76,7 @@ std::optional<SocketConnContext> SocketInterfaceUnixIPv6::createClientSocket() {
         closeSocketHandle(ctx.cfd);
         return std::nullopt;
     }
-    memcpy(ctx.addr.getData(), &name, sizeof(name));
+    memcpy(ctx.addr.get(), &name, sizeof(name));
     return ctx;
 }
 

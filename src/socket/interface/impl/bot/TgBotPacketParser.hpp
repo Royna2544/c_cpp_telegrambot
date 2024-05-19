@@ -5,7 +5,7 @@
 #include <SocketBase.hpp>
 #include <optional>
 
-#include "SocketDescriptor_defs.hpp"
+#include "SharedMalloc.hpp"
 
 struct TgBotSocketParser {
     enum class HandleState {
@@ -25,7 +25,7 @@ struct TgBotSocketParser {
      * @return HandleState object containing the state.
      */
     [[nodiscard]] static HandleState handle_PacketHeader(
-        std::optional<SocketData> &socketData,
+        std::optional<SharedMalloc> &socketData,
         std::optional<TgBotCommandPacket> &pkt);
 
     /**
@@ -37,7 +37,7 @@ struct TgBotSocketParser {
      * @return HandleState object containing the state.
      */
     [[nodiscard]] static HandleState handle_Packet(
-        std::optional<SocketData> &socketData,
+        std::optional<SharedMalloc> &socketData,
         std::optional<TgBotCommandPacket> &pkt);
 
     virtual void handle_CommandPacket(SocketConnContext ctx,

@@ -9,10 +9,7 @@
 #include <string>
 #include <type_traits>
 
-#include "../include/Types.h"
 #include "SharedMalloc.hpp"
-#include "SocketData.hpp"
-#include "socket/TgBotSocket.h"
 
 inline std::filesystem::path getSocketPath() {
     static auto spath = std::filesystem::temp_directory_path() / "tgbot.sock";
@@ -76,12 +73,13 @@ std::string getHelpText(void);
  */
 struct TgBotCommandPacket {
     static constexpr auto hdr_sz = sizeof(TgBotCommandPacketHeader);
-    TgBotCommandPacketHeader header{};
-    SharedMalloc data_ptr;
+    using header_type = TgBotCommandPacketHeader;
+    header_type header{};
+    SharedMalloc data;
 
-    explicit TgBotCommandPacket(SocketData::length_type length)
-        : data_ptr(length) {
-        header.magic = TgBotCommandPacketHeader::MAGIC_VALUE;
+    explicit TgBotCommandPacket(header_type::length_type length)
+        : data(length) {
+        header.magic = header_type::MAGIC_VALUE;
         header.data_size = length;
     }
 
@@ -95,21 +93,23 @@ struct TgBotCommandPacket {
 
     // Constructor that takes pointer, uses malloc but with size
     template <typename T>
-    explicit TgBotCommandPacket(TgBotCommand cmd, T data, std::size_t size)
-        : data_ptr(size) {
+    explicit TgBotCommandPacket(TgBotCommand cmd, T in_data, std::size_t size)
+        : data(size) {
         static_assert(std::is_pointer_v<T>,
                       "This constructor should not be used with non pointer");
         header.cmd = cmd;
-        header.magic = TgBotCommandPacketHeader::MAGIC_VALUE;
+        header.magic = header_type::MAGIC_VALUE;
         header.data_size = size;
-        memcpy(data_ptr.getData(), data, header.data_size);
+        memcpy(data.get(), in_data, header.data_size);
     }
-    SocketData toSocketData() {
-        SocketData data(hdr_sz + header.data_size);
-        void* dataBuf = data.data->getData();
+
+    // Converts to full SocketData object, including header
+    SharedMalloc toSocketData() {
+        SharedMalloc sockdata(hdr_sz + header.data_size);
+        void* dataBuf = sockdata.get();
         memcpy(dataBuf, &header, hdr_sz);
-        memcpy(static_cast<char*>(dataBuf) + hdr_sz, data_ptr.getData(),
+        memcpy(static_cast<char*>(dataBuf) + hdr_sz, data.get(),
                header.data_size);
-        return data;
+        return sockdata;
     }
 };

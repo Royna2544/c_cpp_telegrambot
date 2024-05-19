@@ -7,7 +7,7 @@ bool SocketInterfaceWindows::WinHelper::createInetSocketAddr(
         WSALOG_E("Failed to create socket");
         return false;
     }
-    auto* addr = static_cast<sockaddr_in*>(context.addr.getData());
+    auto* addr = static_cast<sockaddr_in*>(context.addr.get());
 
     addr->sin_family = AF_INET;
     addr->sin_port = htons(interface->helper.inet.getPortNum());
@@ -22,7 +22,7 @@ bool SocketInterfaceWindows::WinHelper::createInet6SocketAddr(
         return false;
     }
 
-    auto* addr = static_cast<sockaddr_in6*>(context.addr.getData());
+    auto* addr = static_cast<sockaddr_in6*>(context.addr.get());
     addr->sin6_family = AF_INET6;
     addr->sin6_port = htons(interface->helper.inet.getPortNum());
     return true;

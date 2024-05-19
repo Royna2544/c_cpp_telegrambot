@@ -5,12 +5,10 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#include <SharedMalloc.hpp>
-#include <SocketData.hpp>
 #include <cstring>
 #include <socket/selector/SelectorPosix.hpp>
-
-#include "SocketBase.hpp"
+#include "SharedMalloc.hpp"
+#include "TgBotCommandExport.hpp"
 
 void SocketInterfaceUnix::startListening(socket_handle_t handle,
                                          const listener_callback_t onNewData) {
@@ -90,17 +88,17 @@ void SocketInterfaceUnix::forceStopListening() {
 char* SocketInterfaceUnix::getLastErrorMessage() { return strerror(errno); }
 
 void SocketInterfaceUnix::writeToSocket(SocketConnContext context,
-                                        SocketData data) {
-    auto* socketData = static_cast<char*>(data.data->getData());
-    auto* addr = static_cast<sockaddr*>(context.addr.getData());
+                                        SharedMalloc data) {
+    auto* socketData = static_cast<char*>(data.get());
+    auto* addr = static_cast<sockaddr*>(context.addr.get());
     if (isValidSocketHandle(context.cfd)) {
         const auto count =
-            send(context.cfd, socketData, data.len, MSG_NOSIGNAL);
+            send(context.cfd, socketData, data->size, MSG_NOSIGNAL);
         if (count < 0) {
             PLOG(ERROR) << "Failed to send to socket";
         }
     } else {
-        const auto count = sendto(context.cfd, socketData, data.len,
+        const auto count = sendto(context.cfd, socketData, data->size,
                                   MSG_NOSIGNAL, addr, context.len);
         if (count < 0) {
             PLOG(ERROR) << "Failed to sentto socket";
@@ -108,17 +106,16 @@ void SocketInterfaceUnix::writeToSocket(SocketConnContext context,
     }
 }
 
-std::optional<SocketData> SocketInterfaceUnix::readFromSocket(
-    SocketConnContext handle, SocketData::length_type length) {
-    SocketData buf(length);
-    auto* addr = static_cast<sockaddr*>(handle.addr.getData());
+std::optional<SharedMalloc> SocketInterfaceUnix::readFromSocket(
+    SocketConnContext handle, TgBotCommandPacketHeader::length_type length) {
+    SharedMalloc buf(length);
+    auto* addr = static_cast<sockaddr*>(handle.addr.get());
 
-    ssize_t count = recvfrom(handle.cfd, buf.data->getData(), length,
+    ssize_t count = recvfrom(handle.cfd, buf.get(), length,
                              MSG_NOSIGNAL | MSG_WAITALL, addr, &handle.len);
-    if (count < 0) {
+    if (count != length) {
         PLOG(ERROR) << "Failed to read from socket";
     } else {
-        buf.len = count;
         return buf;
     }
     return std::nullopt;

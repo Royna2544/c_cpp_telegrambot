@@ -6,6 +6,7 @@
 #include <impl/SocketWindows.hpp>
 #include <socket/selector/SelectorWindows.hpp>
 
+#include "SharedMalloc.hpp"
 #include "SocketBase.hpp"
 
 char *SocketInterfaceWindows::strWSAError(const int errcode) {
@@ -104,17 +105,17 @@ void SocketInterfaceWindows::startListening(
 }
 
 void SocketInterfaceWindows::writeToSocket(SocketConnContext context,
-                                           SocketData data) {
-    auto *socketData = static_cast<char *>(data.data->getData());
-    auto *addr = static_cast<sockaddr *>(context.addr.getData());
+                                           SharedMalloc data) {
+    auto *socketData = static_cast<char *>(data.get());
+    auto *addr = static_cast<sockaddr *>(context.addr.get());
     if (isValidSocketHandle(context.cfd)) {
-        const auto count = send(context.cfd, socketData, data.len, 0);
+        const auto count = send(context.cfd, socketData, data->size, 0);
         if (count < 0) {
             WSALOG_E("Failed to send to socket");
         }
     } else {
         const auto count =
-            sendto(context.cfd, socketData, data.len, 0, addr, context.len);
+            sendto(context.cfd, socketData, data->size, 0, addr, context.len);
         if (count < 0) {
             WSALOG_E("Failed to sentto socket");
         }
@@ -127,18 +128,17 @@ char *SocketInterfaceWindows::getLastErrorMessage() {
     return strWSAError(WSAGetLastError());
 }
 
-std::optional<SocketData> SocketInterfaceWindows::readFromSocket(
-    SocketConnContext context, SocketData::length_type length) {
-    SocketData buf(length);
-    auto *addr = static_cast<sockaddr *>(context.addr.getData());
-    auto *data = static_cast<char *>(buf.data->getData());
+std::optional<SharedMalloc> SocketInterfaceWindows::readFromSocket(
+    SocketConnContext context, TgBotCommandPacketHeader::length_type length) {
+    SharedMalloc buf(length);
+    auto *addr = static_cast<sockaddr *>(context.addr.get());
+    auto *data = static_cast<char *>(buf.get());
 
-    auto count = recvfrom(context.cfd, data, length, MSG_WAITALL,
-                          addr, &context.len);
-    if (count < 0) {
+    auto count =
+        recvfrom(context.cfd, data, length, MSG_WAITALL, addr, &context.len);
+    if (count != length) {
         WSALOG_E("Failed to read from socket");
     } else {
-        buf.len = count;
         return buf;
     }
     return std::nullopt;

@@ -1,12 +1,12 @@
 #pragma once
 
-#include <SocketData.hpp>
 #include <SocketDescriptor_defs.hpp>
 #include <functional>
 #include <optional>
 #include <string>
 
 #include "SharedMalloc.hpp"
+#include "socket/TgBotSocket.h"
 
 struct SocketConnContext {
     socket_handle_t cfd{};  // connection socket file descriptor
@@ -21,9 +21,7 @@ struct SocketConnContext {
     }
     template <typename SocketAddr>
     explicit SocketConnContext(SocketAddr Myaddr)
-        : len(sizeof(Myaddr)), addr(sizeof(Myaddr)) {
-        memcpy(addr.getData(), &Myaddr, sizeof(Myaddr));
-    }
+        : len(sizeof(Myaddr)), addr(Myaddr) {}
 };
 
 // A base class for socket operations
@@ -36,7 +34,7 @@ struct SocketInterfaceBase {
 
     constexpr static int kTgBotHostPort = 50000;
 
-    void writeAsClientToSocket(SocketData data);
+    void writeAsClientToSocket(SharedMalloc data);
     void startListeningAsServer(const listener_callback_t onNewData);
     bool closeSocketHandle(SocketConnContext &context);
 
@@ -51,7 +49,7 @@ struct SocketInterfaceBase {
      * descriptor, address, and length of the address of the destination.
      * @param data The data to be written to the socket.
      */
-    virtual void writeToSocket(SocketConnContext context, SocketData data) = 0;
+    virtual void writeToSocket(SocketConnContext context, SharedMalloc data) = 0;
 
     /**
      * @brief Reads data from the socket using the provided context.
@@ -67,8 +65,8 @@ struct SocketInterfaceBase {
      * @return An optional containing the received data if successful, or an
      * empty optional if an error occurred or no data was available.
      */
-    virtual std::optional<SocketData> readFromSocket(
-        SocketConnContext context, SocketData::length_type length) = 0;
+    virtual std::optional<SharedMalloc> readFromSocket(
+        SocketConnContext context, TgBotCommandPacketHeader::length_type length) = 0;
 
     /**
      * @brief Closes the socket handle.

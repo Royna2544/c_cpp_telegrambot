@@ -5,6 +5,7 @@
 #include <optional>
 #include <utility>
 
+#include "SharedMalloc.hpp"
 #include "SocketDescriptor_defs.hpp"
 
 void SocketInterfaceBase::setOptions(Options opt, const std::string data,
@@ -49,7 +50,7 @@ SocketInterfaceBase::option_t* SocketInterfaceBase::getOptionPtr(Options opt) {
     return optionVal;
 }
 
-void SocketInterfaceBase::writeAsClientToSocket(SocketData data) {
+void SocketInterfaceBase::writeAsClientToSocket(SharedMalloc data) {
     const auto handle = createClientSocket();
     if (handle.has_value()) {
         writeToSocket(handle.value(), std::move(data));

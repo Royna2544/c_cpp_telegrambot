@@ -1,9 +1,10 @@
 #include <absl/log/log.h>
 
 #include <SharedMalloc.hpp>
+#include <memory>
 
 SharedMallocChild::SharedMallocChild(std::shared_ptr<SharedMallocParent> _parent)
-    : parent(std::move(_parent)), data(parent->data) {}
+    : parent(std::move(_parent)), m_data(parent->data.get()) {}
 
 SharedMallocChild SharedMalloc::getChild() noexcept {
     return SharedMallocChild(parent);
@@ -11,17 +12,11 @@ SharedMallocChild SharedMalloc::getChild() noexcept {
 
 void SharedMallocParent::alloc() {
     if (data == nullptr) {
-        data = malloc(size);
+        data.reset(malloc(size));
     } else {
-        data = realloc(data, size);
+        data.reset(realloc(data.release(), size));
     }
     if (data == nullptr) {
         throw std::bad_alloc();
-    } else {
-        memset(data, 0, size);
     }
-}
-
-void SharedMallocParent::set_size(size_t size) noexcept {
-    this->size = size;
 }
