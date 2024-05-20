@@ -105,11 +105,10 @@ struct TgBotCommandPacket {
 
     // Converts to full SocketData object, including header
     SharedMalloc toSocketData() {
-        SharedMalloc sockdata(hdr_sz + header.data_size);
-        void* dataBuf = sockdata.get();
-        memcpy(dataBuf, &header, hdr_sz);
-        memcpy(static_cast<char*>(dataBuf) + hdr_sz, data.get(),
-               header.data_size);
-        return sockdata;
+        data->size = hdr_sz + header.data_size;
+        data->alloc();
+        memmove(static_cast<char*>(data.get()) + hdr_sz, data.get(), header.data_size);
+        memcpy(data.get(), &header, hdr_sz);
+        return data;
     }
 };
