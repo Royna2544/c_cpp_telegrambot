@@ -7,21 +7,20 @@
 #include <random/RandomNumberGenerator.h>
 #include <rapidjson/document.h>
 #include <rapidjson/rapidjson.h>
-#include <socket/TgBotSocket.h>
 #include <tgbot/types/InputFile.h>
 
 #include <DatabaseBot.hpp>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <impl/bot/TgBotSocketFileHelper.hpp>
+#include <impl/bot/TgBotSocketInterface.hpp>
 #include <mutex>
 #include <optional>
+#include <variant>
 
-#include "SocketBase.hpp"
-#include "SocketDescriptor_defs.hpp"
-#include "TgBotCommandExport.hpp"
-#include "TgBotSocketFileHelper.hpp"
-#include "TgBotSocketInterface.hpp"
+// Come last
+#include <socket/TgBotSocket.h>
 
 using TgBot::Api;
 using TgBot::InputFile;
@@ -61,59 +60,55 @@ std::string getMIMEString(const std::string& path) {
 }
 }  // namespace
 
-bool SocketInterfaceTgBot::handle_WriteMsgToChatId(const void* ptr) {
-    const auto* data = reinterpret_cast<const WriteMsgToChatId*>(ptr);
+GenericAck SocketInterfaceTgBot::handle_WriteMsgToChatId(const void* ptr) {
+    const auto* data = static_cast<const WriteMsgToChatId*>(ptr);
     try {
         bot_sendMessage(_bot, data->to, data->msg);
     } catch (const TgBot::TgException& e) {
         LOG(ERROR) << "Exception at handler: " << e.what();
-        return false;
+        return GenericAck(AckType::ERROR_TGAPI_EXCEPTION, e.what());
     }
-    return true;
+    return GenericAck();
 }
 
-bool SocketInterfaceTgBot::handle_CtrlSpamBlock(const void* ptr) {
-    const auto* data = reinterpret_cast<const CtrlSpamBlock*>(ptr);
+GenericAck SocketInterfaceTgBot::handle_CtrlSpamBlock(const void* ptr) {
+    const auto* data = static_cast<const CtrlSpamBlock*>(ptr);
     gSpamBlockCfg = *data;
-    return true;
+    return GenericAck();
 }
 
-bool SocketInterfaceTgBot::handle_ObserveChatId(const void* ptr) {
-    const auto* data = reinterpret_cast<const ObserveChatId*>(ptr);
+GenericAck SocketInterfaceTgBot::handle_ObserveChatId(const void* ptr) {
+    const auto* data = static_cast<const ObserveChatId*>(ptr);
     auto obs = ChatObserver::getInstance();
     const std::lock_guard<std::mutex> _(obs->m);
-    auto it = std::find(obs->observedChatIds.begin(),
-                        obs->observedChatIds.end(), data->id);
+    auto it = std::ranges::find(obs->observedChatIds, data->id);
+
     bool observe = data->observe;
     if (obs->observeAllChats) {
-        LOG(WARNING) << "CMD_OBSERVE_CHAT_ID disabled due to "
-                        "CMD_OBSERVE_ALL_CHATS";
-        return false;
+        return GenericAck(AckType::ERROR_COMMAND_IGNORED,
+                          "CMD_OBSERVE_ALL_CHATS active");
     }
     if (it == obs->observedChatIds.end()) {
         if (observe) {
-            LOG(INFO) << "Adding chat to observer";
             obs->observedChatIds.push_back(data->id);
         } else {
-            LOG(WARNING) << "Trying to quit observing chatid "
-                         << "which wasn't being "
-                            "observed!";
+            return GenericAck(AckType::ERROR_COMMAND_IGNORED,
+                              "Target chat wasn't being observed");
         }
     } else {
         if (observe) {
-            LOG(WARNING) << "Trying to observe chatid "
-                         << "which was already being "
-                            "observed!";
+            return GenericAck(AckType::ERROR_COMMAND_IGNORED,
+                              "Target chat was already being observed");
         } else {
             LOG(INFO) << "Removing chat from observer";
             obs->observedChatIds.erase(it);
         }
     }
-    return true;
+    return GenericAck();
 }
 
-bool SocketInterfaceTgBot::handle_SendFileToChatId(const void* ptr) {
-    const auto* data = reinterpret_cast<const SendFileToChatId*>(ptr);
+GenericAck SocketInterfaceTgBot::handle_SendFileToChatId(const void* ptr) {
+    const auto* data = static_cast<const SendFileToChatId*>(ptr);
     const auto* file = data->filepath;
     using FileOrId_t = boost::variant<InputFile::Ptr, std::string>;
     std::function<Message::Ptr(const Api&, ChatId, FileOrId_t)> fn;
@@ -145,7 +140,7 @@ bool SocketInterfaceTgBot::handle_SendFileToChatId(const void* ptr) {
                 _bot.getApi().sendDice(
                     data->id, false, 0, nullptr,
                     dices[genRandomNumber(0, dices.size() - 1)]);
-                return true;
+                return GenericAck();
             }
             default:
                 fn = [](const Api&, ChatId, const FileOrId_t) {
@@ -165,28 +160,49 @@ bool SocketInterfaceTgBot::handle_SendFileToChatId(const void* ptr) {
         }
     } catch (const TgBot::TgException& e) {
         LOG(ERROR) << "Exception at handler, " << e.what();
-        return false;
+        return GenericAck(AckType::ERROR_TGAPI_EXCEPTION, e.what());
     }
-    return true;
+    return GenericAck();
 }
 
-bool SocketInterfaceTgBot::handle_ObserveAllChats(const void* ptr) {
+GenericAck SocketInterfaceTgBot::handle_ObserveAllChats(const void* ptr) {
     auto obs = ChatObserver::getInstance();
     const std::lock_guard<std::mutex> _(obs->m);
-    obs->observeAllChats = *reinterpret_cast<const ObserveAllChats*>(ptr);
-    return true;
+    obs->observeAllChats = *static_cast<const ObserveAllChats*>(ptr);
+    return GenericAck();
 }
 
-bool SocketInterfaceTgBot::handle_DeleteControllerById(const void* ptr) {
-    DeleteControllerById data =
-        *reinterpret_cast<const DeleteControllerById*>(ptr);
+GenericAck SocketInterfaceTgBot::handle_DeleteControllerById(const void* ptr) {
+    DeleteControllerById data = *static_cast<const DeleteControllerById*>(ptr);
     enum SingleThreadCtrlManager::ThreadUsage threadUsage{};
     if (data < 0 || data >= SingleThreadCtrlManager::USAGE_MAX) {
         LOG(ERROR) << "Invalid controller id: " << data;
-        return false;
+        return GenericAck(AckType::ERROR_INVALID_ARGUMENT,
+                          "Invalid controller id");
     }
     threadUsage = static_cast<SingleThreadCtrlManager::ThreadUsage>(data);
     SingleThreadCtrlManager::getInstance()->destroyController(threadUsage);
+    return GenericAck();
+}
+
+GenericAck SocketInterfaceTgBot::handle_UploadFile(
+    const void* ptr, TgBotCommandPacketHeader::length_type len) {
+    if (fileData_tofile(ptr, len)) {
+        return GenericAck();
+    }
+    return GenericAck(AckType::ERROR_RUNTIME_ERROR, "Failed to write file");
+}
+
+bool SocketInterfaceTgBot::handle_DownloadFile(SocketConnContext ctx,
+                                               const void* ptr) {
+    const auto* data = static_cast<const DownloadFile*>(ptr);
+    auto pkt = fileData_fromFile(CMD_DOWNLOAD_FILE_CALLBACK, data->filepath,
+                                 data->destfilename);
+    if (!pkt) {
+        LOG(ERROR) << "Failed to prepare download file packet";
+        return false;
+    }
+    interface->writeToSocket(ctx, pkt->toSocketData());
     return true;
 }
 
@@ -206,29 +222,11 @@ bool SocketInterfaceTgBot::handle_GetUptime(SocketConnContext ctx,
     return true;
 }
 
-bool SocketInterfaceTgBot::handle_UploadFile(
-    const void* ptr, TgBotCommandPacketHeader::length_type len) {
-    return fileData_tofile(ptr, len);
-}
-
-bool SocketInterfaceTgBot::handle_DownloadFile(SocketConnContext ctx,
-                                               const void* ptr) {
-    const auto* data = static_cast<const DownloadFile*>(ptr);
-    auto pkt = fileData_fromFile(CMD_DOWNLOAD_FILE_CALLBACK, data->filepath,
-                                 data->destfilename);
-    if (!pkt) {
-        LOG(ERROR) << "Failed to prepare download file packet";
-        return false;
-    }
-    interface->writeToSocket(ctx, pkt->toSocketData());
-    return true;
-}
-
 void SocketInterfaceTgBot::handle_CommandPacket(SocketConnContext ctx,
                                                 TgBotCommandPacket pkt) {
     const void* ptr = pkt.data.get();
     using namespace TgBotCommandData;
-    bool ret = {};
+    std::variant<GenericAck, bool> ret;
 
     switch (pkt.header.cmd) {
         case CMD_WRITE_MSG_TO_CHAT_ID:
@@ -266,14 +264,17 @@ void SocketInterfaceTgBot::handle_CommandPacket(SocketConnContext ctx,
                 LOG(WARNING) << "cmd ignored (as internal): "
                              << static_cast<int>(pkt.header.cmd);
             }
-            ret = false;
-            break;
+            return;
     };
     switch (pkt.header.cmd) {
         case CMD_GET_UPTIME:
-        case CMD_DOWNLOAD_FILE:
-            // This has its own callback
+        case CMD_DOWNLOAD_FILE: {
+            // This has its own callback, so we don't need to send ack.
+            bool result = std::get<bool>(ret);
+            DLOG_IF(INFO, (!result))
+                << "Command failed: " << TgBotCmd::toStr(pkt.header.cmd);
             break;
+        }
         case CMD_WRITE_MSG_TO_CHAT_ID:
         case CMD_CTRL_SPAMBLOCK:
         case CMD_OBSERVE_CHAT_ID:
@@ -281,8 +282,11 @@ void SocketInterfaceTgBot::handle_CommandPacket(SocketConnContext ctx,
         case CMD_OBSERVE_ALL_CHATS:
         case CMD_DELETE_CONTROLLER_BY_ID:
         case CMD_UPLOAD_FILE: {
-            TgBotCommandPacket ackpkt(CMD_GENERIC_ACK, &ret, 1);
-            LOG(INFO) << "Sending ack: " << std::boolalpha << ret;
+            GenericAck result = std::get<GenericAck>(ret);
+            TgBotCommandPacket ackpkt(CMD_GENERIC_ACK, &result,
+                                      sizeof(GenericAck));
+            LOG(INFO) << "Sending ack: " << std::boolalpha
+                      << (result.result == AckType::SUCCESS);
             interface->writeToSocket(ctx, ackpkt.toSocketData());
             break;
         }

@@ -8,7 +8,6 @@
 #include <functional>
 
 #include "SharedMalloc.hpp"
-#include "TgBotCommandExport.hpp"
 
 struct SocketInterfaceUnix : SocketInterfaceBase {
     bool isValidSocketHandle(socket_handle_t handle) override {

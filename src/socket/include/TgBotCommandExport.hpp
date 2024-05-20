@@ -2,6 +2,8 @@
 
 // A header export for the TgBot's socket connection
 
+#include <cstring>
+#include <string>
 #include "../../include/Types.h"
 
 #ifndef TGBOT_NAMESPACE_BEGIN
@@ -10,8 +12,10 @@
 #ifndef TGBOT_NAMESPACE_END
 #define TGBOT_NAMESPACE_END
 #endif
+#undef ERROR_INVALID_STATE
 
 constexpr int MAX_PATH_SIZE = 256;
+constexpr int MAX_MSG_SIZE = 256;
 
 enum TgBotCommand : std::int32_t {
     CMD_WRITE_MSG_TO_CHAT_ID,
@@ -54,7 +58,7 @@ enum CtrlSpamBlock {
 
 struct WriteMsgToChatId {
     ChatId to;      // destination chatid
-    char msg[256];  // Msg to send
+    char msg[MAX_MSG_SIZE];  // Msg to send
 };
 
 struct ObserveChatId {
@@ -75,13 +79,34 @@ using DeleteControllerById = int;
 
 using GetUptimeCallback = char[sizeof("Uptime: 99h 99m 99s")];
 
-using GenericAck = bool;
+enum class AckType {
+    SUCCESS,
+    ERROR_TGAPI_EXCEPTION,
+    ERROR_INVALID_ARGUMENT,
+    ERROR_COMMAND_IGNORED,
+    ERROR_RUNTIME_ERROR,
+};
+
+struct GenericAck {
+    AckType result;                   // result type
+    char error_msg[MAX_MSG_SIZE] {};  // Error message, only valid when result type is not SUCCESS
+
+    // Create a new instance of the Generic Ack, error.
+    explicit GenericAck(AckType result, const std::string& errorMsg) : result(result) {
+        std::strncpy(this->error_msg, errorMsg.c_str(), MAX_MSG_SIZE);
+        this->error_msg[MAX_MSG_SIZE - 1] = '\0';
+    }
+    // Create a new instance of the Generic Ack, success.
+    explicit GenericAck() : result(AckType::SUCCESS) {
+        std::strncpy(error_msg, "OK", MAX_MSG_SIZE);
+    }
+};
 
 using UploadFile = char[MAX_PATH_SIZE];  // Destination file name
 
 struct DownloadFile {
-    char filepath[MAX_PATH_SIZE];  // Path to file (in remote)
-    char destfilename[MAX_PATH_SIZE];  // Destination file name
+    char filepath[MAX_PATH_SIZE] {};  // Path to file (in remote)
+    char destfilename[MAX_PATH_SIZE] {};  // Destination file name
 };
 
 TGBOT_NAMESPACE_END

@@ -1,5 +1,4 @@
 #include <absl/log/log.h>
-#include <socket/TgBotSocket.h>
 
 #include <AbslLogInit.hpp>
 #include <LogSinks.hpp>
@@ -13,6 +12,10 @@
 #include <iostream>
 #include <optional>
 
+#include <SingleThreadCtrl.h>
+
+// Come last
+#include <socket/TgBotSocket.h>
 
 [[noreturn]] static void usage(const char* argv, bool success) {
     std::cout << "Usage: " << argv << " [cmd enum value] [args...]" << std::endl
@@ -63,8 +66,12 @@ struct ClientParser : TgBotSocketParser {
         : TgBotSocketParser(interface) {}
     void handle_CommandPacket(SocketConnContext context,
                               TgBotCommandPacket pkt) override {
+        using TgBotCommandData::AckType;
+        using TgBotCommandData::GenericAck;
         TgBotCommandData::GetUptimeCallback callbackData = {};
-        bool success{};
+        GenericAck result{};
+        std::string resultText;
+
         switch (pkt.header.cmd) {
             case CMD_GET_UPTIME_CALLBACK: {
                 memcpy(callbackData, pkt.data.get(), sizeof(callbackData));
@@ -76,9 +83,28 @@ struct ClientParser : TgBotSocketParser {
                 break;
             }
             case CMD_GENERIC_ACK:
-                memcpy(&success, pkt.data.get(), sizeof(success));
-                LOG(INFO) << "Command ACK from server: " << std::boolalpha
-                          << success;
+                memcpy(&result, pkt.data.get(), sizeof(GenericAck));
+                switch (result.result) {
+                    case AckType::SUCCESS:
+                        resultText = "Success";
+                        break;
+                    case AckType::ERROR_TGAPI_EXCEPTION:
+                        resultText = "Failed: Telegram Api exception";
+                        break;
+                    case AckType::ERROR_INVALID_ARGUMENT:
+                        resultText = "Failed: Invalid argument";
+                        break;
+                    case AckType::ERROR_COMMAND_IGNORED:
+                        resultText = "Failed: Command ignored";
+                        break;
+                    case AckType::ERROR_RUNTIME_ERROR:
+                        resultText = "Failed: Runtime error";
+                        break;
+                }
+                LOG(INFO) << "Response from server: " << resultText;
+                if (result.result != AckType::SUCCESS) {
+                    LOG(ERROR) << "Reason: " << result.error_msg;
+                }
                 break;
             default:
                 LOG(ERROR) << "Unhandled callback of command: "
@@ -160,8 +186,9 @@ int main(int argc, char** argv) {
             }
         } break;
         case CMD_DELETE_CONTROLLER_BY_ID: {
-            TgBotCommandData::DeleteControllerById data{};
-            if (try_parse(argv[0], &data)) {
+            SingleThreadCtrlManager::ThreadUsage data{};
+            if (parseOneEnum(&data, SingleThreadCtrlManager::USAGE_MAX, argv[0],
+                             "usage")) {
                 pkt = TgBotCommandPacket(cmd, data);
             }
         }

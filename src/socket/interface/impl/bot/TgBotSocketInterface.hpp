@@ -11,6 +11,8 @@
 
 #include "TgBotPacketParser.hpp"
 
+using TgBotCommandData::GenericAck;
+
 #ifdef WINDOWS_BUILD
 #include "impl/SocketWindows.hpp"
 
@@ -43,9 +45,6 @@ struct SocketInterfaceTgBot : SingleThreadCtrlRunnable,
     // TODO Used by main.cpp    
     SocketInterfaceTgBot(Bot& bot) : BotClassBase(bot) {}
 
-    
-    bool handle_SendFileToChatId(const void* ptr);
-
    private:
     std::shared_ptr<SocketInterfaceBase> interface = nullptr;
     decltype(std::chrono::system_clock::now()) startTp =
@@ -54,12 +53,15 @@ struct SocketInterfaceTgBot : SingleThreadCtrlRunnable,
         socket_handle_t source, void* addr, socklen_t len, const void* data)>;
 
     // Command handlers
-    bool handle_WriteMsgToChatId(const void* ptr);
-    static bool handle_CtrlSpamBlock(const void* ptr);
-    static bool handle_ObserveChatId(const void* ptr);
-    static bool handle_ObserveAllChats(const void* ptr);
-    static bool handle_DeleteControllerById(const void* ptr);
-    static bool handle_UploadFile(const void *ptr, TgBotCommandPacketHeader::length_type len);
+    GenericAck handle_WriteMsgToChatId(const void* ptr);
+    GenericAck handle_SendFileToChatId(const void* ptr);
+    static GenericAck handle_CtrlSpamBlock(const void* ptr);
+    static GenericAck handle_ObserveChatId(const void* ptr);
+    static GenericAck handle_ObserveAllChats(const void* ptr);
+    static GenericAck handle_DeleteControllerById(const void* ptr);
+    static GenericAck handle_UploadFile(const void *ptr, TgBotCommandPacketHeader::length_type len);
+
+    // These have their own ack handlers
     bool handle_GetUptime(SocketConnContext ctx, const void* ptr);
     bool handle_DownloadFile(SocketConnContext ctx, const void* ptr);
 };
