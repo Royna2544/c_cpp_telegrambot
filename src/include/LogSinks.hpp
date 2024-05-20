@@ -9,7 +9,7 @@ struct FileSinkBase : absl::LogSink {
     void Send(const absl::LogEntry& entry) override {
         for (absl::string_view line : absl::StrSplit(
                  entry.text_message_with_prefix(), absl::ByChar('\n'))) {
-            if (entry.log_severity() == absl::LogSeverity::kInfo) {
+            if (entry.log_severity() < absl::LogSeverity::kError) {
                 absl::FPrintF(fp_, "%s\r", line);
                 fputc('\n', fp_);
             }
