@@ -18,7 +18,6 @@ libTgBot*.so
 # Generated
 src/command_modules/cmds.gen.cpp
 modules.load
-proto/gen
 resources/about.html
 
 # Visual studio code

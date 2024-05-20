@@ -245,14 +245,11 @@ my_protobuf_generate_cpp(gen PROTO_SRCS PROTO_HDRS proto/TgBotDB.proto)
 add_library(TgBotDB SHARED 
   src/database/ProtobufDatabase.cpp
   src/database/SQLiteDatabase.cpp
-  ${PROTO_SRCS})
+  src/database/proto/TgBotDB.pb.cc)
 ####################### TgBotDB lib includes #######################
-get_filename_component(PROTO_HDRS_DIR ${PROTO_HDRS} DIRECTORY)
-target_include_directories(TgBotDB PUBLIC ${PROTO_HDRS_DIR})
-target_include_directories(TgBotDB PRIVATE ${PROTO_HDRS_DIR}/..)
+target_include_directories(TgBotDB PUBLIC src/database/proto/)
+target_include_directories(TgBotDB PRIVATE src/database/)
 target_include_directories(TgBotDB PRIVATE ${Protobuf_INCLUDE_DIRS})
-####################### TgBotDB lib includes #######################
-add_dependencies(TgBotDB protobuf_TgBotDB_ready)
 target_link_libraries(TgBotDB TgBot protobuf::libprotobuf SQLite3 TgBotUtils)
 #####################################################################
 
