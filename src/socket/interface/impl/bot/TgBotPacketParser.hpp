@@ -19,8 +19,8 @@ struct TgBotSocketParser {
     /**
      * @brief Reads a packet header from the socket.
      *
-     * @param socketData The SocketData object of data.
-     * @param pkt The TgBotCommandPacket to fill.
+     * @param socketData [in] The SharedMalloc object of incoming data.
+     * @param pkt [out] The TgBotCommandPacket to fill.
      *
      * @return HandleState object containing the state.
      */

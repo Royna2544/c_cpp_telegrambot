@@ -13,7 +13,7 @@ HandleState TgBotSocketParser::handle_PacketHeader(
     std::optional<TgBotCommandPacket>& pkt) {
     int64_t diff = 0;
 
-    if (socketData.value()->size < TgBotCommandPacket::hdr_sz) {
+    if (!socketData || socketData.value()->size != TgBotCommandPacket::hdr_sz) {
         LOG(ERROR) << "Failed to read from socket";
         return HandleState::Fail;
     }
