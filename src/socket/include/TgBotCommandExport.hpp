@@ -4,6 +4,7 @@
 
 #include <cstring>
 #include <string>
+
 #include "../../include/Types.h"
 
 #ifndef TGBOT_NAMESPACE_BEGIN
@@ -57,7 +58,7 @@ enum CtrlSpamBlock {
 };
 
 struct WriteMsgToChatId {
-    ChatId to;      // destination chatid
+    ChatId to;               // destination chatid
     char msg[MAX_MSG_SIZE];  // Msg to send
 };
 
@@ -68,8 +69,8 @@ struct ObserveChatId {
 };
 
 struct SendFileToChatId {
-    ChatId id;           // Destination ChatId
-    FileType type;       // File type for file
+    ChatId id;                     // Destination ChatId
+    FileType type;                 // File type for file
     char filepath[MAX_PATH_SIZE];  // Path to file
 };
 
@@ -88,11 +89,13 @@ enum class AckType {
 };
 
 struct GenericAck {
-    AckType result;                   // result type
-    char error_msg[MAX_MSG_SIZE] {};  // Error message, only valid when result type is not SUCCESS
+    AckType result;                  // result type
+    char error_msg[MAX_MSG_SIZE]{};  // Error message, only valid when result
+                                     // type is not SUCCESS
 
     // Create a new instance of the Generic Ack, error.
-    explicit GenericAck(AckType result, const std::string& errorMsg) : result(result) {
+    explicit GenericAck(AckType result, const std::string& errorMsg)
+        : result(result) {
         std::strncpy(this->error_msg, errorMsg.c_str(), MAX_MSG_SIZE);
         this->error_msg[MAX_MSG_SIZE - 1] = '\0';
     }
@@ -105,8 +108,8 @@ struct GenericAck {
 using UploadFile = char[MAX_PATH_SIZE];  // Destination file name
 
 struct DownloadFile {
-    char filepath[MAX_PATH_SIZE] {};  // Path to file (in remote)
-    char destfilename[MAX_PATH_SIZE] {};  // Destination file name
+    char filepath[MAX_PATH_SIZE]{};      // Path to file (in remote)
+    char destfilename[MAX_PATH_SIZE]{};  // Destination file name
 };
 
 TGBOT_NAMESPACE_END
@@ -118,9 +121,33 @@ TGBOT_NAMESPACE_END
  */
 struct TgBotCommandPacketHeader {
     using length_type = uint64_t;
-    constexpr static int64_t MAGIC_VALUE = 0xDEADFACE;  ///< Magic value to identify the packet
+    constexpr static int64_t MAGIC_VALUE_BASE = 0xDEADFACE;
+    // Version number, to be increased on breaking changes
+    constexpr static int DATA_VERSION = 1;
+    constexpr static int64_t MAGIC_VALUE = MAGIC_VALUE_BASE + DATA_VERSION;
 
-    int64_t magic = MAGIC_VALUE;  ///< Magic value to identify the packet
+    int64_t magic = MAGIC_VALUE;  ///< Magic value to verify the packet
     TgBotCommand cmd{};           ///< Command to be executed
     length_type data_size{};      ///< Size of the data in the packet
 };
+
+TGBOT_NAMESPACE_BEGIN
+
+// We make some asserts here to ensure that the size of the packet is expected
+#define ASSERT_SIZE(DataType, DataSize)           \
+    static_assert(sizeof(DataType) == (DataSize), \
+                  "Size of " #DataType " has changed")
+
+ASSERT_SIZE(WriteMsgToChatId, 264);
+ASSERT_SIZE(ObserveChatId, 16);
+ASSERT_SIZE(SendFileToChatId, 272);
+ASSERT_SIZE(ObserveAllChats, 1);
+ASSERT_SIZE(DeleteControllerById, 4);
+ASSERT_SIZE(GetUptimeCallback, 20);
+ASSERT_SIZE(GenericAck, 260);
+ASSERT_SIZE(UploadFile, 256);
+ASSERT_SIZE(DownloadFile, 512);
+ASSERT_SIZE(TgBotCommandPacketHeader, 24);
+#undef ASSERT_SIZE
+
+TGBOT_NAMESPACE_END

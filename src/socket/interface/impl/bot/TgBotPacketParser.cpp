@@ -4,12 +4,15 @@
 
 #include "SharedMalloc.hpp"
 #include "SocketBase.hpp"
+#include "TgBotCommandExport.hpp"
 
 using HandleState = TgBotSocketParser::HandleState;
 
 HandleState TgBotSocketParser::handle_PacketHeader(
     std::optional<SharedMalloc>& socketData,
     std::optional<TgBotCommandPacket>& pkt) {
+    int64_t diff = 0;
+
     if (socketData.value()->size < TgBotCommandPacket::hdr_sz) {
         LOG(ERROR) << "Failed to read from socket";
         return HandleState::Fail;
@@ -17,8 +20,14 @@ HandleState TgBotSocketParser::handle_PacketHeader(
     pkt = TgBotCommandPacket(TgBotCommandPacket::hdr_sz);
     memcpy(&pkt->header, socketData->get(), TgBotCommandPacket::hdr_sz);
 
-    if (pkt->header.magic != TgBotCommandPacketHeader::MAGIC_VALUE) {
+    diff = pkt->header.magic - TgBotCommandPacketHeader::MAGIC_VALUE_BASE;
+    if (diff != TgBotCommandPacketHeader::DATA_VERSION) {
         LOG(WARNING) << "Invalid magic value, dropping buffer";
+        if (diff > 0) {
+            LOG(INFO) << "This packet contains header data version " << diff
+                      << ", but we have version "
+                      << TgBotCommandPacketHeader::DATA_VERSION;
+        }
         return HandleState::Ignore;
     }
 
