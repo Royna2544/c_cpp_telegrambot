@@ -23,7 +23,7 @@ HandleState TgBotSocketParser::handle_PacketHeader(
     diff = pkt->header.magic - TgBotCommandPacketHeader::MAGIC_VALUE_BASE;
     if (diff != TgBotCommandPacketHeader::DATA_VERSION) {
         LOG(WARNING) << "Invalid magic value, dropping buffer";
-        if (diff > 0) {
+        if (diff >= 0) {
             LOG(INFO) << "This packet contains header data version " << diff
                       << ", but we have version "
                       << TgBotCommandPacketHeader::DATA_VERSION;
