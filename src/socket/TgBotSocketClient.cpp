@@ -11,6 +11,8 @@
 #include <impl/bot/TgBotSocketFileHelper.hpp>
 #include <iostream>
 #include <optional>
+#include "SharedMalloc.hpp"
+#include "TgBotCommandExport.hpp"
 
 #include <SingleThreadCtrl.h>
 
@@ -74,7 +76,7 @@ struct ClientParser : TgBotSocketParser {
 
         switch (pkt.header.cmd) {
             case CMD_GET_UPTIME_CALLBACK: {
-                memcpy(callbackData, pkt.data.get(), sizeof(callbackData));
+                pkt.data.assignTo(callbackData);
                 LOG(INFO) << "Server replied: " << callbackData;
                 break;
             }
@@ -83,7 +85,7 @@ struct ClientParser : TgBotSocketParser {
                 break;
             }
             case CMD_GENERIC_ACK:
-                memcpy(&result, pkt.data.get(), sizeof(GenericAck));
+                pkt.data.assignTo(result);
                 switch (result.result) {
                     case AckType::SUCCESS:
                         resultText = "Success";

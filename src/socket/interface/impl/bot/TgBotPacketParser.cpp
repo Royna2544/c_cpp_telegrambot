@@ -18,7 +18,7 @@ HandleState TgBotSocketParser::handle_PacketHeader(
         return HandleState::Fail;
     }
     pkt = TgBotCommandPacket(TgBotCommandPacket::hdr_sz);
-    memcpy(&pkt->header, socketData->get(), TgBotCommandPacket::hdr_sz);
+    socketData->assignTo(pkt->header);
 
     diff = pkt->header.magic - TgBotCommandPacketHeader::MAGIC_VALUE_BASE;
     if (diff != TgBotCommandPacketHeader::DATA_VERSION) {
@@ -48,7 +48,7 @@ HandleState TgBotSocketParser::handle_Packet(
     }
     pkt->data->size = TgBotCommandPacket::hdr_sz + pkt->header.data_size;
     pkt->data->alloc();
-    memcpy(pkt->data.get(), socketData->get(), pkt->header.data_size);
+    socketData->assignTo(pkt->data.get(), pkt->header.data_size);
 
     return HandleState::Ok;
 }

@@ -65,7 +65,6 @@ IPAddr* getIPAddr(AddrInfo* addr) {
 template <typename IPAddr, int family, int addr_str_len>
 void printToBuf(IPAddr* addr, std::array<char, addr_str_len>& buf) {
     inet_ntop(family, addr, buf.data(), addr_str_len);
-    memcpy(buf.data(), buf.data(), addr_str_len);
 }
 
 template <typename AddrInfo, typename IPAddr, int family, int addr_str_len,

@@ -59,7 +59,7 @@ std::optional<socket_handle_t> SocketInterfaceUnixIPv4::createServerSocket() {
 std::optional<SocketConnContext> SocketInterfaceUnixIPv4::createClientSocket() {
     SocketConnContext ctx = SocketConnContext::create<sockaddr_in>();
     struct sockaddr_in name {};
-    auto* _name = reinterpret_cast<struct sockaddr*>(&name);
+    const auto* _name = reinterpret_cast<struct sockaddr*>(&name);
 
     ctx.cfd = socket(AF_INET, SOCK_STREAM, 0);
     if (!isValidSocketHandle(ctx.cfd)) {
@@ -76,7 +76,7 @@ std::optional<SocketConnContext> SocketInterfaceUnixIPv4::createClientSocket() {
         closeSocketHandle(ctx.cfd);
         return std::nullopt;
     }
-    memcpy(ctx.addr.get(), &_name, sizeof(name));
+    ctx.addr.assignFrom(name);
     return ctx;
 }
 

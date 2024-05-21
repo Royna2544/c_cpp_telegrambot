@@ -6,7 +6,7 @@
 SharedMallocChild::SharedMallocChild(std::shared_ptr<SharedMallocParent> _parent)
     : parent(std::move(_parent)), m_data(parent->data.get()) {}
 
-SharedMallocChild SharedMalloc::getChild() noexcept {
+SharedMallocChild SharedMalloc::getChild() const noexcept {
     return SharedMallocChild(parent);
 }
 
