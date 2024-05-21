@@ -4,12 +4,12 @@
 #include <DatabaseBot.hpp>
 #include <InstanceClassBase.hpp>
 #include <database/DatabaseBase.hpp>
-#include <iomanip>
 #include <memory>
 
 #include "absl/log/log.h"
 
 #ifdef AUTHORIZATION_DEBUG
+#include <iomanip>
 #include <mutex>
 #endif
 
