@@ -108,7 +108,7 @@ int main(int argc, char* const* argv) {
     }
 
     if (const auto it = getVariable(Configs::LOG_FILE); it) {
-        log_sink = LogFileSink();
+        log_sink.emplace();
         log_sink->init(*it);
         absl::AddLogSink(&log_sink.value());
         LOG(INFO) << "Register LogSink_file: " << it.value();
