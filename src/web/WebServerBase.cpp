@@ -6,18 +6,28 @@
 #include <httplib.h>
 
 #include <TgBotWebpage.hpp>
+#include <iomanip>
 #include <libos/libfs.hpp>
+
+namespace {
+std::string getOrEmpty(const std::string &in) { return in.empty() ? in : "Empty"; }
+}  // namespace
 
 void TgBotWebServerBase::loggerFn(const httplib::Request &req,
                                   const httplib::Response &res) {
     static std::mutex logger_lock;
     std::lock_guard<std::mutex> lock(logger_lock);
-    LOG(INFO) << "=============== Inbound HTTP Request ====================";
-    LOG(INFO) << "HTTP request method: " << req.method;
-    LOG(INFO) << "From address " << req.remote_addr << ", port "
-              << req.remote_port;
-    LOG(INFO) << "Status: " << res.status;
-    LOG(INFO) << "=========================================================";
+    DLOG(INFO) << "=============== Inbound HTTP Request ====================";
+    DLOG(INFO) << "HTTP request method: " << req.method;
+    DLOG(INFO) << "Remote Info";
+    DLOG(INFO) << "Address: " << req.remote_addr << " Port: " << req.remote_port;
+    DLOG(INFO) << "Host: " << req.get_header_value("Host");
+    DLOG(INFO) << "User-Agent: " << req.get_header_value("User-Agent");
+    DLOG(INFO) << "Referer: " << getOrEmpty(req.get_header_value("Referer"));
+    DLOG(INFO) << "Accept: " << req.get_header_value("Accept");
+    DLOG(INFO) << "Requested filepath: " << std::quoted(req.path);
+    DLOG(INFO) << "Status: " << res.status;
+    DLOG(INFO) << "=========================================================";
 }
 
 void TgBotWebServerBase::startServer() {

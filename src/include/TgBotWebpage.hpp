@@ -11,7 +11,7 @@ class TgBotWebServerBase {
 
     explicit TgBotWebServerBase(int serverPort) : port(serverPort) {}
 
-    static void loggerFn(const httplib::Request &req, const httplib::Response &res)
+    static void loggerFn(const httplib::Request &req, const httplib::Response &res);
    private:
     int port;
     httplib::Server svr{};
