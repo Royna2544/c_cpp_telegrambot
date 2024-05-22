@@ -25,3 +25,6 @@
 [submodule "src/third-party/corrosion"]
 	path = src/third-party/corrosion
 	url = https://github.com/corrosion-rs/corrosion
+[submodule "src/third-party/cpp-httplib"]
+	path = src/third-party/cpp-httplib
+	url = https://github.com/yhirose/cpp-httplib

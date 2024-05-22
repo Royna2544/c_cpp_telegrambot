@@ -91,6 +91,10 @@ std::filesystem::path FS::getPathForType(PathType type) {
             path = getPathForType(PathType::RESOURCES) / "sql";
             ok = true;
             break;
+        case PathType::RESOURCES_WEBPAGE:
+            path = getPathForType(PathType::GIT_ROOT) / "www";
+            ok = true;
+            break;
     }
     if (ok) {
         path.make_preferred();

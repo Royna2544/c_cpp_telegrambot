@@ -264,6 +264,13 @@ if(ENABLE_RUNTIME_COMMAND)
 endif()
 #####################################################################
 
+########################## WebPage Server ##########################
+add_subdirectory(src/third-party/cpp-httplib)
+add_library(TgBotWeb SHARED src/web/WebServerBase.cpp)
+target_link_libraries(TgBotWeb httplib::httplib TgBotUtils)
+extend_set(SRC_LIST src/web/TgBotWebServer.cpp)
+####################################################################
+
 ####################### TgBot Socket Library #######################
 if (USE_UNIX_SOCKETS)
   set(SOCKET_SRC_INTERFACE src/socket/interface)
@@ -371,7 +378,7 @@ add_library(TgBotCommandModules SHARED ${SRC_LIST})
 target_include_directories(TgBotCommandModules PRIVATE ${COMMANDS_CWD})
 target_include_directories(TgBotCommandModules PRIVATE src/third-party/rapidjson/include)
 ######################## Libraries to link ########################
-set(LD_LIST TgBot TgBotDB TgBotUtils)
+set(LD_LIST TgBot TgBotDB TgBotUtils TgBotWeb)
 extend_set_if(LD_LIST USE_UNIX_SOCKETS TgBotSocket)
 extend_set_if(LD_LIST WIN32 wsock32 Ws2_32)
 extend_set_if(LD_LIST ENABLE_RUNTIME_COMMAND ${CMAKE_DL_LIBS})

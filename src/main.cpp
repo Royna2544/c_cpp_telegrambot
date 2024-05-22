@@ -15,7 +15,9 @@
 #include <DurationPoint.hpp>
 #include <LogSinks.hpp>
 #include <OnAnyMessageRegister.hpp>
+#include <TgBotWebpage.hpp>
 #include <chrono>
+
 
 #ifdef RTCOMMAND_LOADER
 #include <RTCommandLoader.h>
@@ -23,7 +25,9 @@
 
 #ifdef SOCKET_CONNECTION
 #include <ChatObserver.h>
+
 #include <socket/interface/impl/bot/TgBotSocketInterface.hpp>
+
 #endif
 
 #include <tgbot/tgbot.h>
@@ -134,6 +138,8 @@ int main(int argc, char* const* argv) {
     createAndDoInitCall<CommandModuleManager>(gBot);
     createAndDoInitCall<DefaultBotDatabase>();
     createAndDoInitCall<ResourceManager>();
+    TgBotWebServer server(8080);
+    server.initWrapper();
     AuthContext::initInstance(DefaultBotDatabase::getInstance());
     // Must be last
     createAndDoInitCall<OnAnyMessageRegisterer>(gBot);

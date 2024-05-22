@@ -49,6 +49,7 @@ class SingleThreadCtrlManager
         USAGE_IBASH_COMMAND_QUEUE_THREAD,
         USAGE_DATABASE_SYNC_THREAD,
         USAGE_TEST,
+        USAGE_WEBSERVER_THREAD,
         USAGE_MAX,
     };
 
@@ -62,7 +63,9 @@ class SingleThreadCtrlManager
             ENUM_AND_STR(USAGE_IBASH_TIMEOUT_THREAD),
             ENUM_AND_STR(USAGE_IBASH_EXIT_TIMEOUT_THREAD),
             ENUM_AND_STR(USAGE_IBASH_COMMAND_QUEUE_THREAD),
-            ENUM_AND_STR(USAGE_DATABASE_SYNC_THREAD), ENUM_AND_STR(USAGE_TEST));
+            ENUM_AND_STR(USAGE_DATABASE_SYNC_THREAD), 
+            ENUM_AND_STR(USAGE_TEST),
+            ENUM_AND_STR(USAGE_WEBSERVER_THREAD));
 
     constexpr static const char* ThreadUsageToStr(const ThreadUsage u) {
         return ThreadUsageToStrMap[u].second;

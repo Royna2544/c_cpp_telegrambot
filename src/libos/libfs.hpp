@@ -17,6 +17,7 @@ struct FS {
         GIT_ROOT,
         RESOURCES,
         RESOURCES_SQL,
+        RESOURCES_WEBPAGE,
         BUILD_ROOT,
         MODULES_INSTALLED,
     };
