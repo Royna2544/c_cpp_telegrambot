@@ -15,4 +15,5 @@ void defaultCleanupFunction() {
     LOG(INFO) << "Exiting";
     SingleThreadCtrlManager::getInstance()->destroyManager();
     DefaultBotDatabase::getInstance()->unloadDatabase();
+    LOG(INFO) << "TgBot process exiting, Goodbye!";
 }
