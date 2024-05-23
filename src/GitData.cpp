@@ -1,7 +1,11 @@
 #include <GitData.h>
 #include <absl/log/log.h>
 #include <git2.h>
+
+#include <mutex>
+
 #include "git2/types.h"
+
 
 constexpr int SHA1_HASH_LEN = 40;
 
@@ -34,7 +38,8 @@ bool GitData::Fill(GitData *data) {
             }
         }
         if (error != 0) {
-            LOG(ERROR) << "Not a git repository (or any of the parent directories)";
+            LOG(ERROR)
+                << "Not a git repository (or any of the parent directories)";
             return false;
         }
     }
@@ -75,6 +80,21 @@ bool GitData::Fill(GitData *data) {
     git_commit_free(head_commit);
     git_repository_free(repo);
     git_libgit2_shutdown();
+
+    if (rc) {
+        static std::once_flag once;
+        std::call_once(once, [&data]() {
+            const std::string oneline_msg =
+                data->commitmsg.substr(0, data->commitmsg.find_first_of('\n'));
+            DLOG(INFO) << "GitData::Fill returning:";
+            DLOG(INFO) << "- originurl: " << std::quoted(data->originurl);
+            DLOG(INFO) << "- commitmsg: " << std::quoted(oneline_msg);
+            DLOG(INFO) << "- commitid: " << std::quoted(data->commitid);
+            DLOG(INFO) << "- gitSrcRoot: "
+                       << std::quoted(data->gitSrcRoot.string());
+        });
+    }
+
     return rc;
 }
 
