@@ -35,7 +35,7 @@ void bot_AddCommand(Bot& bot, const std::string& cmd, command_callback_t cb,
         authflags |= AuthContext::Flags::PERMISSIVE;
     }
 
-    auto authFn = [&, cb = std::move(cb)](const Message::Ptr& message) {
+    auto authFn = [&, authflags, cb = std::move(cb)](const Message::Ptr& message) {
         static const std::string myName = bot.getApi().getMe()->username;
 
         std::string text = message->text;
