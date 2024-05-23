@@ -42,7 +42,7 @@ std::optional<socket_handle_t> SocketInterfaceUnixIPv4::createServerSocket() {
         LOG(ERROR) << "Failed to find any valid interface to bind to (IPv4)";
         return ret;
     }
-    helper.inet.printExternalIP();
+    helper.inet.getExternalIP();
 
     name.sin_family = AF_INET;
     name.sin_port = htons(kTgBotHostPort);

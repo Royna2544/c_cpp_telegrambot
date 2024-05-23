@@ -177,7 +177,7 @@ struct SocketInterfaceBase {
             bool isSupportedIPv4(void);
             bool isSupportedIPv6(void);
             int getPortNum();
-            void printExternalIP(void);
+            std::string getExternalIP(void);
             static size_t externalIPCallback(void *contents, size_t size,
                                              size_t nmemb, void *userp);
 

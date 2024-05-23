@@ -16,7 +16,7 @@ std::optional<socket_handle_t> SocketInterfaceWindowsIPv6::createServerSocket() 
             return std::nullopt;
         }
     }
-    helper.inet.printExternalIP();
+    helper.inet.getExternalIP();
     return context.cfd;
 }
 
