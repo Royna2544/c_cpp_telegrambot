@@ -7,12 +7,12 @@
 #include <fcntl.h>
 #include <internal/_FileDescriptor_posix.h>
 #include <unistd.h>
-#include <iomanip>
 
 #include <InstanceClassBase.hpp>
 #include <array>
 #include <cerrno>
 #include <cstdint>
+#include <iomanip>
 #include <mutex>
 
 #define KERNELRAND_MAYBE_SUPPORTED
@@ -33,6 +33,10 @@ struct kernel_rand_engine : InstanceClassBase<kernel_rand_engine> {
     }
     kernel_rand_engine() { isSupported(); }
     ~kernel_rand_engine() { closeFd(fd); }
+    kernel_rand_engine(kernel_rand_engine&& other) {
+        fd = other.fd;
+        other.fd = -1;
+    }
 
     bool isSupported(void) {
         static bool kSupported = false;
@@ -41,29 +45,21 @@ struct kernel_rand_engine : InstanceClassBase<kernel_rand_engine> {
         std::call_once(once, [this] {
             int ret = 0;
             for (const auto& n : nodes) {
-                ret = access(n.c_str(), R_OK);
-                if (ret != 0) {
-                    if (errno != ENOENT) {
-                        PLOG(ERROR) << "Accessing hwrng device failed";
-                    }
+                fd = open(n.c_str(), O_RDONLY);
+                if (!isValidFd(fd)) {
+                    PLOG(ERROR) << "Opening hwrng device failed";
                 } else {
-                    fd = open(n.c_str(), O_RDONLY);
-                    if (!isValidFd(fd)) {
-                        PLOG(ERROR) << "Opening hwrng device failed";
-                        kSupported = false;
+                    // Test read some bytes
+                    int data = 0;
+                    ret = read(fd, &data, sizeof(data));
+                    if (ret != sizeof(data)) {
+                        PLOG(ERROR) << "Reading from hwrng device failed";
+                        closeFd(fd);
                     } else {
-                        // Test read some bytes
-                        int data = 0;
-                        ret = read(fd, &data, sizeof(data));
-                        if (ret != sizeof(data)) {
-                            PLOG(ERROR) << "Reading from hwrng device failed";
-                            kSupported = false;
-                        } else {
-                            LOG(INFO)
-                                << "Device ready, Node: " << std::quoted(n)
-                                << " fd: " << fd;
-                            kSupported = true;
-                        }
+                        LOG(INFO) << "Device ready, Node: " << std::quoted(n)
+                                  << " fd: " << fd;
+                        kSupported = true;
+                        break;
                     }
                 }
             }

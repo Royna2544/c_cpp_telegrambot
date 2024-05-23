@@ -59,7 +59,7 @@ struct RNGBase {
      * @param[in,out]  it  The container to be shuffled.
      */
     template <typename T>
-    [[deprecated("This is a stub")]] void shuffle(std::vector<T>& it) const;
+    void shuffle(std::vector<T>& it) const;
 
     /**
      * @brief      Shuffles the elements in a string container.
@@ -91,8 +91,8 @@ struct RNGBase {
      * @param[in]  e  The random number engine to be used for shuffling.
      */
     template <class Engine, typename T>
-    void ShuffleImpl(std::vector<T>& in, Engine e) const {
-        std::shuffle(in.begin(), in.end(), e);
+    void ShuffleImpl(std::vector<T>& in, Engine* e) const {
+        std::shuffle(in.begin(), in.end(), *e);
     }
 
     /**
@@ -111,7 +111,7 @@ struct RNGBase {
      * @return     A random number in the specified range.
      */
     template <class Generator>
-    random_return_type genRandomNumberImpl(Generator gen,
+    random_return_type genRandomNumberImpl(Generator* gen,
                                            random_return_type min,
                                            random_return_type max) const {
         if (min > max) {
@@ -123,7 +123,7 @@ struct RNGBase {
             return min;
         }
         std::uniform_int_distribution<return_type> distribution(min, max);
-        return distribution(gen);
+        return distribution(*gen);
     }
     virtual ~RNGBase() = default;
 };
@@ -137,14 +137,16 @@ struct StdCpp : RNGBase {
 
     return_type generate(const return_type min,
                          const return_type max) const override {
-        return genRandomNumberImpl(RNG_std_create_rng(), min, max);
+        auto e = RNG_std_create_rng();
+        return genRandomNumberImpl(&e, min, max);
     }
 
     bool isSupported(void) const override { return true; }
 
     template <typename T>
     void shuffle(std::vector<T>& in) const {
-        ShuffleImpl(in, RNG_std_create_rng());
+        auto e = RNG_std_create_rng();
+        ShuffleImpl(in, &e);
     }
 
     void shuffle_string(std::vector<std::string>& it) const override {
@@ -161,7 +163,7 @@ struct StdCpp : RNGBase {
 struct RDRand : RNGBase {
     return_type generate(const return_type min,
                          const return_type max) const override {
-        return genRandomNumberImpl(rdrand_engine(), min, max);
+        return genRandomNumberImpl(&engine, min, max);
     }
 
     bool isSupported(void) const override {
@@ -179,7 +181,7 @@ struct RDRand : RNGBase {
 
     template <typename T>
     void shuffle(std::vector<T>& in) const {
-        ShuffleImpl(in, rdrand_engine());
+        ShuffleImpl(in, &engine);
     }
 
     void shuffle_string(std::vector<std::string>& it) const override {
@@ -190,6 +192,9 @@ struct RDRand : RNGBase {
         return "X86 RDRAND instr. HWRNG (Intel/AMD)";
     }
     ~RDRand() override = default;
+
+   private:
+    rdrand_engine engine;
 };
 #endif
 
@@ -197,7 +202,8 @@ struct RDRand : RNGBase {
 struct KernelRand : RNGBase {
     return_type generate(const return_type min,
                          const return_type max) const override {
-        return genRandomNumberImpl(*kernel_rand_engine::getInstance(), min, max);
+        return genRandomNumberImpl(kernel_rand_engine::getInstance().get(), min,
+                                   max);
     }
 
     bool isSupported(void) const override {
@@ -206,7 +212,7 @@ struct KernelRand : RNGBase {
 
     template <typename T>
     void shuffle(std::vector<T>& in) const {
-        ShuffleImpl(in, *kernel_rand_engine::getInstance());
+        ShuffleImpl(in, kernel_rand_engine::getInstance().get());
     }
 
     void shuffle_string(std::vector<std::string>& it) const override {
@@ -234,9 +240,8 @@ struct KernelRand : RNGBase {
 
 #define IMPL_LIST KERNELRAND_CLASS RDRAND_CLASS StdCpp
 
-struct RandomBackendChooser
-    : BackendChooser<RNGBase, IMPL_LIST> {
-     ~RandomBackendChooser() override = default;
+struct RandomBackendChooser : BackendChooser<RNGBase, IMPL_LIST> {
+    ~RandomBackendChooser() override = default;
 
     void onMatchFound(RNGBase& obj) override {
         LOG(INFO) << "Using " << std::quoted(obj.getName())
