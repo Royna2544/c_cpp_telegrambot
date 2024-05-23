@@ -29,6 +29,8 @@ std::filesystem::path& FS::appendDylibExtension(std::filesystem::path& path) {
     if (!path.has_extension()) {
 #ifdef WINDOWS_BUILD
         path += ".dll";
+#elif defined __APPLE__
+        path += ".dylib";
 #else
         path += ".so";
 #endif
