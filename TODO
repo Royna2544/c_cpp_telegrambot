@@ -2,3 +2,5 @@
 - clang-* compilers add, preferred
 - Add calc cmd
 - Fix SpamBlockerTest
+- Add CRC32 test on socket data
+- Add option for database backend selection
