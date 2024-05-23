@@ -31,43 +31,61 @@ void TgBotWebServerBase::loggerFn(const httplib::Request &req,
 }
 
 void TgBotWebServerBase::startServer() {
-    const static auto webPageResDir =
-        FS::getPathForType(FS::PathType::RESOURCES_WEBPAGE);
-    auto ret = svr.set_mount_point("/", webPageResDir.string());
+    auto ret = svr.set_mount_point("/", webServerRootPath.string());
     if (!ret) {
         LOG(ERROR) << "Failed to switch mount point";
         return;
     } else {
-        LOG(INFO) << "Web page mount point: " << webPageResDir.string()
-                  << " as /";
+        LOG(INFO) << "Web page mount point: " << webServerRootPath.string()
+                  << " as root directory";
     }
-    svr.Get("/hello", [](const httplib::Request &req, httplib::Response &res) {
-        res.set_content("Hello World!", "text/plain");
-    });
-    svr.Get("/shutdown", [this](const httplib::Request &req,
-                                const httplib::Response &res) { svr.stop(); });
-    svr.Get("/", [](const httplib::Request &req, httplib::Response &res) {
-        std::ifstream stream(webPageResDir / "about.html");
-        if (!stream.is_open()) {
-            LOG(ERROR) << "Failed to open web page index";
-            res.status = 500;
-            res.set_content("500 Internal Server Error", "text/plain");
-        } else {
-            std::string str((std::istreambuf_iterator<char>(stream)),
-                            std::istreambuf_iterator<char>());
-
-            res.set_content(str, "text/html");
-        }
-    });
+    svr.Get(Constants::kWebShutdownNode.data(),
+            [this](const httplib::Request &req, httplib::Response &res) {
+                callback.shutdown(req, res);
+            });
+    svr.Get(Constants::kWebRootNode.data(),
+            [this](const httplib::Request &req, httplib::Response &res) {
+                callback.showIndex(req, res);
+            });
     svr.set_logger(TgBotWebServerBase::loggerFn);
-    svr.listen("localhost", port);
+    svr.listen(Constants::kBindToIp.data(), port);
 }
 
-void TgBotWebServerBase::stopServer() {
-    httplib::Client cli("localhost", port);
+void TgBotWebServerBase::stopServer() const {
+    httplib::Client cli(Constants::kLocalHostname.data(), port);
 
-    auto res = cli.Get("/shutdown");
+    auto res = cli.Get(Constants::kWebShutdownNode.data());
     if (res && res->status == httplib::StatusCode::OK_200) {
         LOG(INFO) << "Server stopped";
+    } else {
+        LOG(ERROR) << "Failed to stop server: Code "
+                   << (res ? std::to_string(res->status) : "(res is null)");
+    }
+}
+
+TgBotWebServerBase::TgBotWebServerBase(int serverPort)
+    : port(serverPort), callback(this) {
+    webServerRootPath = FS::getPathForType(FS::PathType::RESOURCES_WEBPAGE);
+}
+
+void TgBotWebServerBase::Callbacks::shutdown(const httplib::Request &req,
+                                             httplib::Response &res) const {
+    server->svr.stop();
+    res.status = httplib::StatusCode::OK_200;
+    res.set_content("OK", "text/plain");
+}
+
+void TgBotWebServerBase::Callbacks::showIndex(const httplib::Request &req,
+                                              httplib::Response &res) const {
+    std::ifstream stream(server->webServerRootPath / "about.html");
+    if (!stream.is_open()) {
+        LOG(ERROR) << "Failed to open web page index";
+        res.status = httplib::StatusCode::InternalServerError_500;
+        res.set_content("500 Internal Server Error", "text/plain");
+    } else {
+        std::string str((std::istreambuf_iterator<char>(stream)),
+                        std::istreambuf_iterator<char>());
+
+        res.set_content(str, "text/html");
     }
 }
