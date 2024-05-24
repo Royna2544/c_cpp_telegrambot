@@ -2,6 +2,7 @@
 
 // A header export for the TgBot's socket connection
 
+#include <cstdint>
 #include <cstring>
 #include <string>
 
@@ -123,12 +124,15 @@ struct TgBotCommandPacketHeader {
     using length_type = uint64_t;
     constexpr static int64_t MAGIC_VALUE_BASE = 0xDEADFACE;
     // Version number, to be increased on breaking changes
-    constexpr static int DATA_VERSION = 1;
+    // 1: Initial version
+    // 2: Added crc32 checks to packet data
+    constexpr static int DATA_VERSION = 2;
     constexpr static int64_t MAGIC_VALUE = MAGIC_VALUE_BASE + DATA_VERSION;
 
     int64_t magic = MAGIC_VALUE;  ///< Magic value to verify the packet
     TgBotCommand cmd{};           ///< Command to be executed
     length_type data_size{};      ///< Size of the data in the packet
+    uint32_t checksum{};          ///< Checksum of the packet data
 };
 
 TGBOT_NAMESPACE_BEGIN
@@ -147,7 +151,7 @@ ASSERT_SIZE(GetUptimeCallback, 20);
 ASSERT_SIZE(GenericAck, 260);
 ASSERT_SIZE(UploadFile, 256);
 ASSERT_SIZE(DownloadFile, 512);
-ASSERT_SIZE(TgBotCommandPacketHeader, 24);
+ASSERT_SIZE(TgBotCommandPacketHeader, 32);
 #undef ASSERT_SIZE
 
 TGBOT_NAMESPACE_END

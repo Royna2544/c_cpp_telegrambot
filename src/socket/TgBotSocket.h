@@ -2,6 +2,7 @@
 
 #include <absl/log/check.h>
 
+#include <boost/crc.hpp>
 #include <cstddef>
 #include <cstdlib>
 #include <cstring>
@@ -95,12 +96,16 @@ struct TgBotCommandPacket {
     template <typename T>
     explicit TgBotCommandPacket(TgBotCommand cmd, T in_data, std::size_t size)
         : data(size) {
+        boost::crc_32_type crc;
+
         static_assert(std::is_pointer_v<T>,
                       "This constructor should not be used with non pointer");
         header.cmd = cmd;
         header.magic = header_type::MAGIC_VALUE;
         header.data_size = size;
         memcpy(data.get(), in_data, header.data_size);
+        crc.process_bytes(data.get(), header.data_size);
+        header.checksum = crc.checksum();
     }
 
     // Converts to full SocketData object, including header

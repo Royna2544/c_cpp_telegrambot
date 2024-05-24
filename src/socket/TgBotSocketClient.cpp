@@ -3,6 +3,7 @@
 #include <AbslLogInit.hpp>
 #include <LogSinks.hpp>
 #include <TryParseStr.hpp>
+#include <boost/crc.hpp>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -218,6 +219,10 @@ int main(int argc, char** argv) {
         LOG(ERROR) << "Failed parsing arguments for "
                    << TgBotCmd::toStr(cmd).c_str();
         return EXIT_FAILURE;
+    } else {
+        boost::crc_32_type crc;
+        crc.process_bytes(pkt->data.get(), pkt->header.data_size);
+        pkt->header.checksum = crc.checksum();
     }
 
     auto* backend = getClientBackend();

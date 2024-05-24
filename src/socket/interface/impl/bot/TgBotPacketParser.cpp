@@ -2,6 +2,8 @@
 
 #include <absl/log/log.h>
 
+#include <boost/crc.hpp>
+
 #include "SharedMalloc.hpp"
 #include "SocketBase.hpp"
 #include "TgBotCommandExport.hpp"
@@ -37,15 +39,29 @@ HandleState TgBotSocketParser::handle_PacketHeader(
 HandleState TgBotSocketParser::handle_Packet(
     std::optional<SharedMalloc>& socketData,
     std::optional<TgBotCommandPacket>& pkt) {
+    boost::crc_32_type crc;
+
     if (TgBotCmd::isClientCommand(pkt->header.cmd)) {
         LOG(INFO) << "Received buf with " << TgBotCmd::toStr(pkt->header.cmd)
                   << ", invoke callback!";
     }
 
-    if (socketData.value()->size != pkt->header.data_size) {
+    if (!socketData.has_value()) {
+        return HandleState::Ignore;
+    }
+
+    auto& socketDataVal = socketData.value();
+    if (socketDataVal->size != pkt->header.data_size) {
         LOG(WARNING) << "Invalid packet data size, dropping buffer";
         return HandleState::Ignore;
     }
+
+    crc.process_bytes(socketData->get(), pkt->header.data_size);
+    if (crc.checksum() != pkt->header.checksum) {
+        LOG(WARNING) << "Invalid packet checksum, dropping buffer";
+        return HandleState::Ignore;
+    }
+
     pkt->data->size = TgBotCommandPacket::hdr_sz + pkt->header.data_size;
     pkt->data->alloc();
     socketData->assignTo(pkt->data.get(), pkt->header.data_size);
