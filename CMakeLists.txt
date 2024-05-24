@@ -267,7 +267,7 @@ endif()
 ########################## WebPage Server ##########################
 add_subdirectory(src/third-party/cpp-httplib)
 add_library(TgBotWeb SHARED src/web/WebServerBase.cpp)
-target_link_libraries(TgBotWeb httplib::httplib TgBotUtils)
+target_link_libraries(TgBotWeb httplib::httplib)
 extend_set(SRC_LIST src/web/TgBotWebServer.cpp)
 ####################################################################
 

@@ -13,7 +13,7 @@ class TgBotWebServerBase {
     void startServer();
     void stopServer() const;
 
-    explicit TgBotWebServerBase(int serverPort);
+    explicit TgBotWebServerBase(int serverPort, std::filesystem::path serverPath);
 
     static void loggerFn(const httplib::Request &req,
                          const httplib::Response &res);
@@ -44,7 +44,7 @@ class TgBotWebServer : public SingleThreadCtrlRunnable,
                        InitCall,
                        TgBotWebServerBase {
    public:
-    explicit TgBotWebServer(int serverPort) : TgBotWebServerBase(serverPort) {}
+    explicit TgBotWebServer(int serverPort);
 
     using InitCall::initWrapper;
     void runFunction() override;

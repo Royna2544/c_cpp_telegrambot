@@ -8,9 +8,12 @@
 #include <TgBotWebpage.hpp>
 #include <iomanip>
 #include <libos/libfs.hpp>
+#include <utility>
 
 namespace {
-std::string getOrEmpty(const std::string &in) { return in.empty() ? in : "Empty"; }
+std::string getOrEmpty(const std::string &in) {
+    return in.empty() ? in : "Empty";
+}
 }  // namespace
 
 void TgBotWebServerBase::loggerFn(const httplib::Request &req,
@@ -20,7 +23,8 @@ void TgBotWebServerBase::loggerFn(const httplib::Request &req,
     DLOG(INFO) << "=============== Inbound HTTP Request ====================";
     DLOG(INFO) << "HTTP request method: " << req.method;
     DLOG(INFO) << "Remote Info";
-    DLOG(INFO) << "Address: " << req.remote_addr << " Port: " << req.remote_port;
+    DLOG(INFO) << "Address: " << req.remote_addr
+               << " Port: " << req.remote_port;
     DLOG(INFO) << "Host: " << req.get_header_value("Host");
     DLOG(INFO) << "User-Agent: " << req.get_header_value("User-Agent");
     DLOG(INFO) << "Referer: " << getOrEmpty(req.get_header_value("Referer"));
@@ -63,10 +67,11 @@ void TgBotWebServerBase::stopServer() const {
     }
 }
 
-TgBotWebServerBase::TgBotWebServerBase(int serverPort)
-    : port(serverPort), callback(this) {
-    webServerRootPath = FS::getPathForType(FS::PathType::RESOURCES_WEBPAGE);
-}
+TgBotWebServerBase::TgBotWebServerBase(int serverPort,
+                                       std::filesystem::path serverPath)
+    : port(serverPort),
+      callback(this),
+      webServerRootPath(std::move(serverPath)) {}
 
 void TgBotWebServerBase::Callbacks::shutdown(const httplib::Request &req,
                                              httplib::Response &res) const {
