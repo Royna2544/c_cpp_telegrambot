@@ -35,7 +35,8 @@ void TgBotWebServerBase::loggerFn(const httplib::Request &req,
 }
 
 void TgBotWebServerBase::startServer() {
-    auto ret = svr.set_mount_point("/", webServerRootPath.string());
+    auto ret = svr.set_mount_point(Constants::kWebRootNode.data(),
+                                   webServerRootPath.string());
     if (!ret) {
         LOG(ERROR) << "Failed to switch mount point";
         return;
@@ -43,29 +44,23 @@ void TgBotWebServerBase::startServer() {
         LOG(INFO) << "Web page mount point: " << webServerRootPath.string()
                   << " as root directory";
     }
-    svr.Get(Constants::kWebShutdownNode.data(),
-            [this](const httplib::Request &req, httplib::Response &res) {
-                callback.shutdown(req, res);
-            });
     svr.Get(Constants::kWebRootNode.data(),
+            [](const httplib::Request &req, httplib::Response &res) {
+                res.set_redirect(Constants::kAboutPage.data());
+            });
+    svr.Get(Constants::kAboutPage.data(),
             [this](const httplib::Request &req, httplib::Response &res) {
                 callback.showIndex(req, res);
             });
+    svr.Post(Constants::kAPIVotesNode.data(),
+             [this](const httplib::Request &req, httplib::Response &res) {
+                 callback.handleAPIVotes(req, res);
+             });
     svr.set_logger(TgBotWebServerBase::loggerFn);
     svr.listen(Constants::kBindToIp.data(), port);
 }
 
-void TgBotWebServerBase::stopServer() const {
-    httplib::Client cli(Constants::kLocalHostname.data(), port);
-
-    auto res = cli.Get(Constants::kWebShutdownNode.data());
-    if (res && res->status == httplib::StatusCode::OK_200) {
-        LOG(INFO) << "Server stopped";
-    } else {
-        LOG(ERROR) << "Failed to stop server: Code "
-                   << (res ? std::to_string(res->status) : "(res is null)");
-    }
-}
+void TgBotWebServerBase::stopServer() { svr.stop(); }
 
 TgBotWebServerBase::TgBotWebServerBase(int serverPort,
                                        std::filesystem::path serverPath)
@@ -73,15 +68,8 @@ TgBotWebServerBase::TgBotWebServerBase(int serverPort,
       callback(this),
       webServerRootPath(std::move(serverPath)) {}
 
-void TgBotWebServerBase::Callbacks::shutdown(const httplib::Request &req,
-                                             httplib::Response &res) const {
-    server->svr.stop();
-    res.status = httplib::StatusCode::OK_200;
-    res.set_content("OK", "text/plain");
-}
-
 void TgBotWebServerBase::Callbacks::showIndex(const httplib::Request &req,
-                                              httplib::Response &res) const {
+                                              httplib::Response &res) {
     std::ifstream stream(server->webServerRootPath / "about.html");
     if (!stream.is_open()) {
         LOG(ERROR) << "Failed to open web page index";
@@ -91,6 +79,18 @@ void TgBotWebServerBase::Callbacks::showIndex(const httplib::Request &req,
         std::string str((std::istreambuf_iterator<char>(stream)),
                         std::istreambuf_iterator<char>());
 
+        res.status = httplib::StatusCode::OK_200;
         res.set_content(str, "text/html");
+    }
+}
+
+void TgBotWebServerBase::Callbacks::handleAPIVotes(const httplib::Request &req,
+                                                   httplib::Response &res) {
+    if (req.has_param(Constants::kAPIVotesKey.data())) {
+        LOG(INFO) << "API Req vote: " << req.get_param_value(Constants::kAPIVotesKey.data());
+        res.status = httplib::StatusCode::OK_200;
+    } else {
+        LOG(ERROR) << "Invalid API request: Missing vote value";
+        res.status = httplib::StatusCode::BadRequest_400;
     }
 }

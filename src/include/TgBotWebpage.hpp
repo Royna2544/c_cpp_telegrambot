@@ -11,7 +11,7 @@
 class TgBotWebServerBase {
    public:
     void startServer();
-    void stopServer() const;
+    void stopServer();
 
     explicit TgBotWebServerBase(int serverPort, std::filesystem::path serverPath);
 
@@ -19,15 +19,17 @@ class TgBotWebServerBase {
                          const httplib::Response &res);
     struct Constants {
         static constexpr const std::string_view kWebRootNode = "/";
-        static constexpr const std::string_view kWebShutdownNode = "/shutdown";
+        static constexpr const std::string_view kAboutPage = "/about.html";
+        static constexpr const std::string_view kAPIVotesNode = "/api/votes";
+        static constexpr const std::string_view kAPIVotesKey = "votes";
         static constexpr const std::string_view kBindToIp = "0.0.0.0";
         static constexpr const std::string_view kLocalHostname = "localhost";
     };
     struct Callbacks {
         using type = std::function<void(const httplib::Request &req,
                                         const httplib::Response &res)>;
-        void shutdown(const httplib::Request &req, httplib::Response &res) const;
-        void showIndex(const httplib::Request &req, httplib::Response &res) const;
+        void showIndex(const httplib::Request &req, httplib::Response &res);
+        static void handleAPIVotes(const httplib::Request &req, httplib::Response &res);
         explicit Callbacks(TgBotWebServerBase *server) : server(server) {}
 
        private:
@@ -36,7 +38,7 @@ class TgBotWebServerBase {
 
    private:
     int port;
-    httplib::Server svr{};
+    httplib::Server svr {};
     std::filesystem::path webServerRootPath;
 };
 
