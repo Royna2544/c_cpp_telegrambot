@@ -1,0 +1,54 @@
+// Based on https://gist.github.com/gokulkrishh/242e68d1ee94ad05f488
+
+
+/* 
+  ##Device = Desktops
+  ##Screen = 1281px to higher resolution desktops
+*/
+$desktop: "(min-width: 1281px)";
+
+/* 
+    ##Device = Laptops, Desktops
+    ##Screen = B/w 1025px to 1280px
+*/
+$laptop: "(min-width: 1025px) and (max-width: 1280px)";
+
+/* 
+    ##Device = Tablets, Ipads (portrait)
+    ##Screen = B/w 768px to 1024px
+*/
+$tablet_portrait: "(min-width: 768px) and (max-width: 1024px)";
+
+/* 
+    ##Device = Tablets, Ipads (landscape)
+    ##Screen = B/w 768px to 1024px
+*/
+$tablet_landscape: "(min-width: 768px) and (max-width: 1024px) and (orientation: landscape)";
+
+/* 
+    ##Device = Low Resolution Tablets, Mobiles (Landscape)
+    ##Screen = B/w 481px to 767px
+*/
+$mobile_landscape: "(min-width: 481px) and (max-width: 767px)";
+
+/* 
+    ##Device = Most of the Smartphones Mobiles (Portrait)
+    ##Screen = B/w 320px to 479px
+  */
+
+$mobile_portrait: "(min-width: 320px) and (max-width: 480px)";
+
+$breakpoints: (
+    'desktop': $desktop,
+    'laptop': $laptop,
+    'tablet_portrait': $tablet_portrait,
+    'tablet_landscape': $tablet_landscape,
+    'mobile_landscape': $mobile_landscape,
+    'mobile_portrait': $mobile_portrait
+);
+
+@mixin on_mediaquery($breakpoint) {
+    @media #{map-get($breakpoints, $breakpoint)} {
+        @content;
+    }
+}

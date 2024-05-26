@@ -1,0 +1,9 @@
+@import '_common_config';
+
+$small_img_lengths: 30px;
+
+.small_img {
+    width: $small_img_lengths;
+    height: $small_img_lengths;
+    padding: $padding_small;
+}

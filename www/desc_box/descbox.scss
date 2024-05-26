@@ -1,0 +1,48 @@
+@import '../scss/_small_img';
+@import '../scss/_common_config';
+@import '../scss/_centered_flex';
+@import '../scss/_round_box';
+
+$descbox_height: 75px;
+$descbox_width: 150px;
+
+.descbox_container {
+    display: inline-block;
+    margin: 10px;
+    @include margin_tb($margin_small);
+}
+
+.descbox_box {
+    @extend .round_box;
+    @extend .centered_flex;
+    width: $descbox_width;
+    height: $descbox_height;
+    user-select: none;
+}
+
+.descbox_box h1 {
+    padding-left: $padding_small;
+}
+
+.descbox_title {
+    @extend .descbox_box;
+    z-index: 2;
+    background: $primary_color_1;
+    justify-content: center;
+    font-size: small;
+    font-weight: bold;
+    position: absolute;
+    cursor: pointer;
+}
+
+.descbox_content {
+    @extend .descbox_box;
+    z-index: 1;
+    background: $primary_color_2;
+    text-align: center;
+    position: relative;
+}
+
+.block-touch {
+    pointer-events: none;
+}

@@ -1,0 +1,81 @@
+@import 'scss/_common_config';
+@import 'scss/centered_flex';
+@import 'scss/strong_font';
+@import 'scss/round_box';
+@import 'scss/media_queries';
+@import 'scss/divider';
+
+$img_size: 150px;
+
+@mixin make_color_box($color) {
+    margin: $margin;
+    border: 10px solid $color;
+    display: inline-block;
+}
+
+.blue_box {
+    @include make_color_box($primary_color_1);
+}
+
+.green_box {
+    @include make_color_box($primary_color_2);
+}
+
+.highlighted_img {
+    width: $img_size;
+    height: $img_size;
+    margin: $padding;
+    padding: $margin;
+    border: $strong_border_size dotted $primary_color_4;
+
+    @include on_mediaquery('mobile_portrait') {
+        width: $img_size * 2 / 3;
+        height: $img_size * 2 / 3;
+    }
+}
+
+.container {
+    @extend .centered_flex;
+
+    @include on_mediaquery('mobile_portrait') {
+        flex-direction: column;
+    }
+}
+
+.container_desc_box {
+    @extend .container;
+    @extend .round_box;
+    @include shadow(2px, 2px, 24px);
+    width: $width_common;
+    flex-wrap: wrap;
+    justify-content: space-around
+}
+
+.container_inline {
+    @extend .container;
+    display: inline-flex;
+
+    @include on_mediaquery('mobile_portrait') {
+        flex-direction: row;
+    }
+}
+
+.container_vertical {
+    @extend .container;
+    flex-direction: column;
+}
+
+.container_end {
+    @extend .container;
+    justify-content: flex-end;
+}
+
+.text_block {
+    @extend .round_box;
+    @include shadow(10px, 10px, 24px);
+    padding: $padding_small;
+    width: $width_common;
+    @include on_mediaquery('mobile_portrait') {
+        font-size: small;
+    }
+}

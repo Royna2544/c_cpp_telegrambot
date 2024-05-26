@@ -1,0 +1,10 @@
+@import 'scss/common_config';
+
+.table_title {
+    background-color: $primary_color_1;
+    text-align: center;
+    border: $strong_border_size solid $primary_color_2;
+    font-size: large;
+    font-weight: bold;
+    @include padding_tb($padding_small);
+}

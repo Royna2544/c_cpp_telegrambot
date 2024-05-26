@@ -1,0 +1,8 @@
+@import 'scss/_common_config';
+
+.gotop_btn {
+    //display: none;
+    position: fixed;
+    bottom: $padding;
+    right: $padding;
+}

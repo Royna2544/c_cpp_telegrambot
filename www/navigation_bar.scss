@@ -1,0 +1,54 @@
+@import 'scss/_common_config';
+@import 'scss/_small_img';
+@import 'scss/_centered_flex';
+@import 'scss/_round_box';
+@import 'scss/_media_queries';
+
+.aside_navbar {
+    @extend .round_box;
+    position: absolute;
+    top: $padding + $small_img_lengths * 2;
+    left: $padding;
+    width: max-content;
+    background-color: white;
+    z-index: 99;
+    display: none;
+}
+
+.menu_img {
+    @extend .small_img;
+    position: absolute;
+    top: $padding;
+    left: $padding;
+    cursor: pointer;
+}
+
+.start_padded_text {
+    padding-left: $padding;
+}
+
+.title_text {
+    border-left: $strong_border_size solid $primary_color_2;
+    border-right: $strong_border_size solid $primary_color_2;
+    display: inline-block;
+    background-color: $primary_color_1;
+    margin-top: $margin;
+    margin-bottom: $margin * 2;
+    @include padding_lr($padding_small);
+    @include on_mediaquery('mobile_portrait') {
+        font-size: smaller;
+    }
+    @include on_mediaquery('mobile_landscape') {
+        font-size: small;
+    }
+}
+
+.nav_centered_flex {
+    @extend .centered_flex;
+    @include on_mediaquery('mobile_portrait') {
+        margin-left: $small_img_lengths + $padding_small * 2;
+    }
+    @include on_mediaquery('mobile_landscape') {
+        margin-left: $small_img_lengths + $padding_small * 2;
+    }
+}

@@ -1,0 +1,9 @@
+@import 'common_config';
+
+.centered_flex {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    @include padding_lr($padding_small);
+}

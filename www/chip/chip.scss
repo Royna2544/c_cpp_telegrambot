@@ -1,0 +1,39 @@
+@import '../scss/_small_img';
+@import '../scss/_common_config';
+@import '../scss/_centered_flex';
+@import '../scss/_round_box';
+
+$chip_width: 175px;
+$chip_height: 50px;
+
+.chip_container {
+    @extend .centered_flex;
+    @extend .round_box;
+    @include padding_lr($padding_small);
+    margin: $margin_small;
+    width: $chip_width;
+    height: $chip_height;
+    justify-content: left;
+    border: 2px solid black;
+    cursor: pointer;
+}
+
+.chip_container>img {
+    @extend .small_img;
+    margin-right: $margin_small;
+}
+
+.chip_container_active {
+    border-left: $strong_border_size solid black;
+    width: $chip_width - $strong_border_size;
+    pointer-events: none;
+}
+
+.chip_container_nolink {
+    pointer-events: none;
+}
+
+.chip_container:not(.chip_container_active):hover {
+    color: #0F52BA;
+    box-shadow: 0 0 20px lightblue;
+}

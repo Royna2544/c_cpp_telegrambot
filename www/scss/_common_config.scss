@@ -1,0 +1,49 @@
+$primary_color_1: #2DFDDB;
+$primary_color_2: #A0D9D1;
+$primary_color_3: #EDF6F9; 
+$primary_color_4: #B2E5E2;
+
+$shadow_color: rgba(66, 68, 90, 1);
+
+$margin: 20px;
+$padding: 20px;
+$margin_small: 10px;
+$padding_small: 10px;
+$width_common: 75%;
+$strong_border_size: 10px;
+
+@mixin shadow($hor, $ver, $blur) {
+    box-shadow: $hor $ver $blur 0px $shadow_color;
+    -webkit-box-shadow: $hor $ver $blur 0px $shadow_color;
+    -moz-box-shadow: $hor $ver $blur 0px $shadow_color;
+}
+
+@mixin colored_border() {
+    border: $strong_border_size solid $primary_color_1;
+}
+
+@mixin padding_lr($size) {
+    padding-left: $size;
+    padding-right: $size;
+}
+
+@mixin padding_tb($size) {
+    padding-top: $size;
+    padding-bottom: $size;
+}
+
+@mixin margin_lr($size) {
+    margin-left: $size;
+    margin-right: $size;
+}
+
+@mixin margin_tb($size) {
+    margin-top: $size;
+    margin-bottom: $size;
+}
+
+body {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 16px;
+    background-color: $primary_color_3;
+}
