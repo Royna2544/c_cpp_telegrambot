@@ -31,6 +31,6 @@ void CommandModuleManager::updateBotCommands(const Bot &bot) {
     try {
         bot.getApi().setMyCommands(buffer);
     } catch (const TgBot::TgException &e) {
-        LOG(ERROR) << "Error: " << e.what() << std::endl;
+        LOG(ERROR) << "Error updating bot command list: " << e.what() << std::endl;
     }
 }
