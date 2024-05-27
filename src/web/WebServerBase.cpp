@@ -10,6 +10,8 @@
 #include <libos/libfs.hpp>
 #include <utility>
 
+#include "third-party/rapidjson/include/rapidjson/document.h"
+
 namespace {
 std::string getOrEmpty(const std::string &in) {
     return in.empty() ? in : "Empty";
@@ -86,8 +88,26 @@ void TgBotWebServerBase::Callbacks::showIndex(const httplib::Request &req,
 
 void TgBotWebServerBase::Callbacks::handleAPIVotes(const httplib::Request &req,
                                                    httplib::Response &res) {
-    if (req.has_param(Constants::kAPIVotesKey.data())) {
-        LOG(INFO) << "API Req vote: " << req.get_param_value(Constants::kAPIVotesKey.data());
+    constexpr std::string_view kContentType = "Content-Type";
+    constexpr std::string_view kContentTypeJson = "application/json";
+    if (req.has_header(kContentType.data()) &&
+        req.get_header_value(kContentType.data()) == kContentTypeJson) {
+        rapidjson::Document document{};
+        std::string maybeVote;
+
+        document.Parse(req.body.c_str());
+        if (document.HasParseError()) {
+            LOG(ERROR) << "Failed to parse JSON";
+            res.status = httplib::StatusCode::BadRequest_400;
+            return;
+        }
+        maybeVote = document[Constants::kAPIVotesKey.data()].GetString();
+        if (maybeVote.empty()) {
+            LOG(ERROR) << "Invalid API request: Missing vote value";
+            res.status = httplib::StatusCode::BadRequest_400;
+            return;
+        }
+        LOG(INFO) << "API Req vote: " << maybeVote;
         res.status = httplib::StatusCode::OK_200;
     } else {
         LOG(ERROR) << "Invalid API request: Missing vote value";
