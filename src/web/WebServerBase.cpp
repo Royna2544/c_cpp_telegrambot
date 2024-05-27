@@ -12,6 +12,8 @@
 
 #include "third-party/rapidjson/include/rapidjson/document.h"
 
+constexpr bool WEBSERVER_INBOUND_VERBOSE = false;
+
 namespace {
 std::string getOrEmpty(const std::string &in) {
     return in.empty() ? in : "Empty";
@@ -24,13 +26,15 @@ void TgBotWebServerBase::loggerFn(const httplib::Request &req,
     std::lock_guard<std::mutex> lock(logger_lock);
     DLOG(INFO) << "=============== Inbound HTTP Request ====================";
     DLOG(INFO) << "HTTP request method: " << req.method;
-    DLOG(INFO) << "Remote Info";
-    DLOG(INFO) << "Address: " << req.remote_addr
-               << " Port: " << req.remote_port;
-    DLOG(INFO) << "Host: " << req.get_header_value("Host");
-    DLOG(INFO) << "User-Agent: " << req.get_header_value("User-Agent");
-    DLOG(INFO) << "Referer: " << getOrEmpty(req.get_header_value("Referer"));
-    DLOG(INFO) << "Accept: " << req.get_header_value("Accept");
+    DLOG(INFO) << "Remote Address: " << req.remote_addr;
+    if constexpr (WEBSERVER_INBOUND_VERBOSE) {
+        DLOG(INFO) << "Remote Port: " << req.remote_port;
+        DLOG(INFO) << "Host: " << req.get_header_value("Host");
+        DLOG(INFO) << "User-Agent: " << req.get_header_value("User-Agent");
+        DLOG(INFO) << "Referer: "
+                   << getOrEmpty(req.get_header_value("Referer"));
+        DLOG(INFO) << "Accept: " << req.get_header_value("Accept");
+    }
     DLOG(INFO) << "Requested filepath: " << std::quoted(req.path);
     DLOG(INFO) << "Status: " << res.status;
     DLOG(INFO) << "=========================================================";
