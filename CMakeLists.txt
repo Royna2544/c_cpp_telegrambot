@@ -240,17 +240,19 @@ target_include_directories(SQLite3 PUBLIC src/third-party/libsqlite3/libsqlite3/
 #####################################################################
 
 ####################### Database (Protobuf) #######################
-include(proto/ProtobufCpp.cmake)
-my_protobuf_generate_cpp(gen PROTO_SRCS PROTO_HDRS proto/TgBotDB.proto)
+include(src/database/proto/ProtobufCpp.cmake)
+my_protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS src/database/proto/TgBotDB.proto)
 add_library(TgBotDB SHARED 
   src/database/ProtobufDatabase.cpp
   src/database/SQLiteDatabase.cpp
-  src/database/proto/TgBotDB.pb.cc)
+  ${PROTO_SRCS})
+add_dependencies(TgBotDB protobuf_TgBotDB_ready)
 ####################### TgBotDB lib includes #######################
-target_include_directories(TgBotDB PUBLIC src/database/proto/)
-target_include_directories(TgBotDB PRIVATE src/database/)
+get_filename_component(PROTO_HDRS_DIR ${PROTO_HDRS} DIRECTORY)
+target_include_directories(TgBotDB PUBLIC ${PROTO_HDRS_DIR})
 target_include_directories(TgBotDB PRIVATE ${Protobuf_INCLUDE_DIRS})
-target_link_libraries(TgBotDB TgBot protobuf::libprotobuf SQLite3 TgBotUtils)
+# TODO: Eject tgbot dep here
+target_link_libraries(TgBotDB protobuf::libprotobuf SQLite3 TgBot TgBotUtils)
 #####################################################################
 
 ################## RTCL (Run Time Command Loader) ##################
@@ -392,13 +394,13 @@ target_link_libraries(${PROJECT_MAINEXE_NAME} TgBotCommandModules TgBotLogInit
 #####################################################################
 
 ################# Utility Programs (Dump Database) ##################
-add_executable(${DBDUMPER_NAME} proto/DumpProtoDB.cc)
+add_executable(${DBDUMPER_NAME} src/database/utils/DumpProtoDB.cc)
 target_link_libraries(${DBDUMPER_NAME} TgBotDB TgBotLogInit)
 #####################################################################
 
 ############### Utility Programs (Send Media to chat) ################
 if (USE_UNIX_SOCKETS)
-  add_executable(${MEDIA_CLI_NAME} proto/SendMediaToChat.cc)
+  add_executable(${MEDIA_CLI_NAME} src/database/utils/SendMediaToChat.cc)
   target_link_libraries(${MEDIA_CLI_NAME} TgBotDB TgBotSocket TgBotLogInit)
   target_link_lib_if_windows(${MEDIA_CLI_NAME} Ws2_32)
 endif()
