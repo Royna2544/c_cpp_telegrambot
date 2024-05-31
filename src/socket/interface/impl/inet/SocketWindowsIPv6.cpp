@@ -1,7 +1,10 @@
 #include <impl/SocketWindows.hpp>
+
 #include "SocketBase.hpp"
 
-std::optional<socket_handle_t> SocketInterfaceWindowsIPv6::createServerSocket() {
+
+std::optional<socket_handle_t>
+SocketInterfaceWindowsIPv6::createServerSocket() {
     auto context = SocketConnContext::create<sockaddr_in6>();
 
     setOptions(Options::DESTINATION_PORT, std::to_string(kTgBotHostPort));
@@ -11,7 +14,7 @@ std::optional<socket_handle_t> SocketInterfaceWindowsIPv6::createServerSocket() 
 
         name->sin6_addr = in6addr_any;
         if (bind(context.cfd, _name, context.addr->size) != 0) {
-            WSALOG_E("Failed to bind to socket");
+            LOG(ERROR) << "Failed to bind to socket: " << WSALastErrorStr();
             closeSocketHandle(context.cfd);
             return std::nullopt;
         }
@@ -20,7 +23,8 @@ std::optional<socket_handle_t> SocketInterfaceWindowsIPv6::createServerSocket() 
     return context.cfd;
 }
 
-std::optional<SocketConnContext> SocketInterfaceWindowsIPv6::createClientSocket() {
+std::optional<SocketConnContext>
+SocketInterfaceWindowsIPv6::createClientSocket() {
     auto context = SocketConnContext::create<sockaddr_in>();
 
     if (win_helper.createInet6SocketAddr(context)) {
@@ -30,7 +34,7 @@ std::optional<SocketConnContext> SocketInterfaceWindowsIPv6::createClientSocket(
         InetPton(AF_INET, getOptions(Options::DESTINATION_ADDRESS).c_str(),
                  &name->sin_addr);
         if (connect(context.cfd, _name, context.addr->size) != 0) {
-            WSALOG_E("Failed to connect to socket");
+            LOG(ERROR) << "Failed to connect to socket: " << WSALastErrorStr();
             closeSocketHandle(context.cfd);
             return std::nullopt;
         }
@@ -43,7 +47,7 @@ bool SocketInterfaceWindowsIPv6::isSupported() {
 }
 
 void SocketInterfaceWindowsIPv6::doGetRemoteAddr(socket_handle_t s) {
-    WinHelper::doGetRemoteAddrInet<
-        struct sockaddr_in6, AF_INET6, in6_addr, INET6_ADDRSTRLEN,
-        offsetof(struct sockaddr_in6, sin6_addr)>(s);
+    WinHelper::doGetRemoteAddrInet<struct sockaddr_in6, AF_INET6, in6_addr,
+                                   INET6_ADDRSTRLEN,
+                                   offsetof(struct sockaddr_in6, sin6_addr)>(s);
 }

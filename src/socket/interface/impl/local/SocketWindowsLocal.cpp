@@ -16,7 +16,7 @@
 bool SocketInterfaceWindowsLocal::createLocalSocket(SocketConnContext *ctx) {
     ctx->cfd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (ctx->cfd < 0) {
-        PLOG(ERROR) << "Failed to create socket";
+        LOG(ERROR) << "Failed to create socket: " << WSALastErrorStr();
         return false;
     }
     auto *addr = reinterpret_cast<struct sockaddr_un *>(ctx->addr.get());
@@ -38,7 +38,7 @@ std::optional<socket_handle_t> SocketInterfaceWindowsLocal::createServerSocket()
     }
     if (bind(ret.cfd, _name, ret.addr->size) != 0) {
         bool succeeded = false;
-        LOG(ERROR) << "Failed to bind to socket: " << getLastErrorMessage();
+        LOG(ERROR) << "Failed to bind to socket: " << WSALastErrorStr();
         if (WSAGetLastError() == WSAEADDRINUSE) {
             cleanupServerSocket();
             if (bind(ret.cfd, _name, ret.addr->size) == 0) {
@@ -63,7 +63,7 @@ std::optional<SocketConnContext> SocketInterfaceWindowsLocal::createClientSocket
         return std::nullopt;
     }
     if (connect(ret.cfd, _name, ret.addr->size) != 0) {
-        LOG(ERROR) << "Failed to connect to socket: " << getLastErrorMessage();
+        LOG(ERROR) << "Failed to connect to socket: " << WSALastErrorStr();
         closeSocketHandle(ret.cfd);
         return std::nullopt;
     }

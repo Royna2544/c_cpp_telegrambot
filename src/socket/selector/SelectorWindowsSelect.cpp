@@ -39,7 +39,7 @@ SelectSelector::SelectorPollResult SelectSelector::poll() {
 
     int ret = select(FD_SETSIZE, &set, nullptr, nullptr, &tv);
     if (ret == SOCKET_ERROR) {
-        WSALOG_E("Select failed");
+        LOG(ERROR) << "Select failed: " << WSAEStr();
         return SelectorPollResult::FAILED;
     }
     for (auto &e : data) {

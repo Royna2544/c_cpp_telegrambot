@@ -4,7 +4,7 @@ bool SocketInterfaceWindows::WinHelper::createInetSocketAddr(
     SocketConnContext& context) {
     context.cfd = socket(AF_INET, SOCK_STREAM, 0);
     if (!interface->isValidSocketHandle(context.cfd)) {
-        WSALOG_E("Failed to create socket");
+        LOG(ERROR) << "Failed to create socket: " << WSALastErrorStr();
         return false;
     }
     auto* addr = static_cast<sockaddr_in*>(context.addr.get());
@@ -18,7 +18,7 @@ bool SocketInterfaceWindows::WinHelper::createInet6SocketAddr(
     SocketConnContext& context) {
     context.cfd = socket(AF_INET6, SOCK_STREAM, 0);
     if (!interface->isValidSocketHandle(context.cfd)) {
-        WSALOG_E("Failed to create socket");
+        LOG(ERROR) << "Failed to create socket: " << WSALastErrorStr();
         return false;
     }
 

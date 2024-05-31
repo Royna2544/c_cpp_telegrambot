@@ -7,22 +7,20 @@
 #include <SocketBase.hpp>
 
 #include "SharedMalloc.hpp"
-
-extern void WSALOG_E(const char* msg);
+#include "SocketDescriptor_defs.hpp"
 
 struct SocketInterfaceWindows : SocketInterfaceBase {
     bool isValidSocketHandle(socket_handle_t handle) override {
         return handle != INVALID_SOCKET;
     };
-    static char* strWSAError(const int errcode);
+    static std::string WSALastErrorStr();
 
     void writeToSocket(SocketConnContext context, SharedMalloc data) override;
     void forceStopListening(void) override;
     void startListening(socket_handle_t handle,
                         const listener_callback_t onNewData) override;
     bool closeSocketHandle(socket_handle_t& handle) override;
-
-    char* getLastErrorMessage() override;
+    bool setSocketOptTimeout(socket_handle_t handle, int timeout) override;
     std::optional<SharedMalloc> readFromSocket(
         SocketConnContext context,
         TgBotCommandPacketHeader::length_type length) override;
@@ -43,7 +41,7 @@ struct SocketInterfaceWindows : SocketInterfaceBase {
             auto* addr_ptr = reinterpret_cast<addr_t*>(
                 reinterpret_cast<char*>(&addr) + offset);
             if (getpeername(s, (struct sockaddr*)&addr, &len) != 0) {
-                WSALOG_E("Get connected peer address failed");
+                LOG(ERROR) << "getpeername failed: " << WSALastErrorStr();
             } else {
                 inet_ntop(family, addr_ptr, ipStr.data(), addrbuf_len);
                 LOG(INFO) << "Client connected, its addr: " << ipStr.data();
@@ -59,7 +57,7 @@ struct SocketInterfaceWindows : SocketInterfaceBase {
     SocketInterfaceWindows() : win_helper(this) {
         WSADATA wsaData;
         if (WSAStartup(kWSAVersion, &wsaData) != 0) {
-            WSALOG_E("WSAStartup failed");
+            LOG(ERROR) << "WSAStartup failed: " << WSALastErrorStr();
             throw std::runtime_error("WSAStartup failed");
         }
     };
@@ -69,6 +67,8 @@ struct SocketInterfaceWindows : SocketInterfaceBase {
     std::atomic_bool kRun = true;
     WSAData data{};
 };
+
+static inline auto WSAEStr = SocketInterfaceWindows::WSALastErrorStr;
 
 struct SocketInterfaceWindowsLocal : SocketInterfaceWindows {
     std::optional<SocketConnContext> createClientSocket() override;

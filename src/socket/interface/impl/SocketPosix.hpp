@@ -19,7 +19,8 @@ struct SocketInterfaceUnix : SocketInterfaceBase {
     void startListening(socket_handle_t handle,
                         const listener_callback_t onNewData) override;
     bool closeSocketHandle(socket_handle_t& handle) override;
-    char* getLastErrorMessage() override;
+    bool setSocketOptTimeout(socket_handle_t handle, int timeout) override;
+
     std::optional<SharedMalloc> readFromSocket(
         SocketConnContext context,
         TgBotCommandPacketHeader::length_type length) override;

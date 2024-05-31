@@ -1,4 +1,5 @@
 // clang-format off
+#include <minwindef.h>
 #include <winsock2.h>
 #include <winsock.h>
 #include <afunix.h>
@@ -8,55 +9,18 @@
 
 #include "SharedMalloc.hpp"
 #include "SocketBase.hpp"
+#include "SocketDescriptor_defs.hpp"
 
-char *SocketInterfaceWindows::strWSAError(const int errcode) {
-    int ret = 0;
-    static char strerror_buf[64];
-
-#define MAP_WSA_TO_POSIX(val, posix) \
-    case WSA##posix:                 \
-        val = posix;                 \
-        break;
-
-    switch (errcode) {
-        MAP_WSA_TO_POSIX(ret, EINTR);
-        MAP_WSA_TO_POSIX(ret, EACCES);
-        MAP_WSA_TO_POSIX(ret, EFAULT);
-        MAP_WSA_TO_POSIX(ret, EINVAL);
-        MAP_WSA_TO_POSIX(ret, EMFILE);
-        MAP_WSA_TO_POSIX(ret, EWOULDBLOCK);
-        MAP_WSA_TO_POSIX(ret, EINPROGRESS);
-        MAP_WSA_TO_POSIX(ret, EALREADY);
-        MAP_WSA_TO_POSIX(ret, ENOTSOCK);
-        MAP_WSA_TO_POSIX(ret, EDESTADDRREQ);
-        MAP_WSA_TO_POSIX(ret, EMSGSIZE);
-        MAP_WSA_TO_POSIX(ret, EPROTOTYPE);
-        MAP_WSA_TO_POSIX(ret, ENOPROTOOPT);
-        MAP_WSA_TO_POSIX(ret, EPROTONOSUPPORT);
-        MAP_WSA_TO_POSIX(ret, EOPNOTSUPP);
-        MAP_WSA_TO_POSIX(ret, EAFNOSUPPORT);
-        MAP_WSA_TO_POSIX(ret, EADDRINUSE);
-        MAP_WSA_TO_POSIX(ret, EADDRNOTAVAIL);
-        MAP_WSA_TO_POSIX(ret, ENETDOWN);
-        MAP_WSA_TO_POSIX(ret, ENETUNREACH);
-        MAP_WSA_TO_POSIX(ret, ENETRESET);
-        MAP_WSA_TO_POSIX(ret, ECONNABORTED);
-        MAP_WSA_TO_POSIX(ret, ECONNRESET);
-        MAP_WSA_TO_POSIX(ret, ENOBUFS);
-        MAP_WSA_TO_POSIX(ret, EISCONN);
-        MAP_WSA_TO_POSIX(ret, ENOTCONN);
-        MAP_WSA_TO_POSIX(ret, ETIMEDOUT);
-        MAP_WSA_TO_POSIX(ret, ECONNREFUSED);
-        MAP_WSA_TO_POSIX(ret, ELOOP);
-        MAP_WSA_TO_POSIX(ret, ENAMETOOLONG);
-        MAP_WSA_TO_POSIX(ret, EHOSTUNREACH);
-        MAP_WSA_TO_POSIX(ret, ENOTEMPTY);
-        default:
-            memset(strerror_buf, 0, sizeof(strerror_buf));
-            snprintf(strerror_buf, sizeof(strerror_buf), "code: %d", errcode);
-            return strerror_buf;
-    }
-    return strerror(ret);
+std::string SocketInterfaceWindows::WSALastErrorStr() {
+    char *s = nullptr;
+    FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM |
+                      FORMAT_MESSAGE_IGNORE_INSERTS,
+                  nullptr, WSAGetLastError(),
+                  MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US), (LPSTR)&s, 0,
+                  nullptr);
+    std::string ret(s);
+    LocalFree(s);
+    return ret;
 }
 
 void SocketInterfaceWindows::startListening(
@@ -67,7 +31,7 @@ void SocketInterfaceWindows::startListening(
 
     do {
         if (listen(handle, SOMAXCONN) == SOCKET_ERROR) {
-            WSALOG_E("Failed to listen to socket");
+            LOG(ERROR) << "Failed to listen to socket: " << WSAEStr();
             break;
         }
         if (!selector.init()) {
@@ -79,7 +43,7 @@ void SocketInterfaceWindows::startListening(
             const socket_handle_t cfd = accept(handle, &addr, &len);
 
             if (!isValidSocketHandle(cfd)) {
-                WSALOG_E("Accept failed");
+                LOG(ERROR) << "Failed to accept: " << WSAEStr();
             } else {
                 doGetRemoteAddr(cfd);
                 SocketConnContext ctx(addr);
@@ -111,22 +75,18 @@ void SocketInterfaceWindows::writeToSocket(SocketConnContext context,
     if (isValidSocketHandle(context.cfd)) {
         const auto count = send(context.cfd, socketData, data->size, 0);
         if (count < 0) {
-            WSALOG_E("Failed to send to socket");
+            LOG(ERROR) << "Failed to send socket: " << WSAEStr();
         }
     } else {
         const auto count = sendto(context.cfd, socketData, data->size, 0, addr,
                                   context.addr->size);
         if (count < 0) {
-            WSALOG_E("Failed to sentto socket");
+            LOG(ERROR) << "Failed to sentto socket: " << WSAEStr();
         }
     }
 }
 
 void SocketInterfaceWindows::forceStopListening(void) { kRun = false; }
-
-char *SocketInterfaceWindows::getLastErrorMessage() {
-    return strWSAError(WSAGetLastError());
-}
 
 std::optional<SharedMalloc> SocketInterfaceWindows::readFromSocket(
     SocketConnContext context, TgBotCommandPacketHeader::length_type length) {
@@ -138,7 +98,7 @@ std::optional<SharedMalloc> SocketInterfaceWindows::readFromSocket(
     auto count =
         recvfrom(context.cfd, data, length, MSG_WAITALL, addr, &addrLen);
     if (count != length) {
-        WSALOG_E("Failed to read from socket");
+        LOG(ERROR) << "Failed to read from socket: " << WSAEStr();
     } else {
         return buf;
     }
@@ -154,7 +114,17 @@ bool SocketInterfaceWindows::closeSocketHandle(socket_handle_t &handle) {
     return false;
 }
 
-void WSALOG_E(const char *msg) {
-    LOG(ERROR) << msg << ": "
-               << SocketInterfaceWindows::strWSAError(WSAGetLastError());
+bool SocketInterfaceWindows::setSocketOptTimeout(socket_handle_t handle,
+                                                 int timeout) {
+    DWORD timeoutD = timeout;
+    int ret = 0;
+
+    ret |= setsockopt(handle, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeoutD,
+                      sizeof(timeoutD));
+    ret |= setsockopt(handle, SOL_SOCKET, SO_SNDTIMEO, (const char *)&timeoutD,
+                      sizeof(timeoutD));
+    if (ret) {
+        LOG(ERROR) << "Failed to set socket timeout: " << WSAEStr();
+    }
+    return !ret;
 }

@@ -7,7 +7,8 @@
 
 #include "SocketBase.hpp"
 
-std::optional<socket_handle_t> SocketInterfaceWindowsIPv4::createServerSocket() {
+std::optional<socket_handle_t>
+SocketInterfaceWindowsIPv4::createServerSocket() {
     auto context = SocketConnContext::create<sockaddr_in>();
 
     setOptions(Options::DESTINATION_PORT, std::to_string(kTgBotHostPort));
@@ -17,7 +18,7 @@ std::optional<socket_handle_t> SocketInterfaceWindowsIPv4::createServerSocket() 
 
         name->sin_addr.s_addr = INADDR_ANY;
         if (bind(context.cfd, _name, context.addr->size) != 0) {
-            WSALOG_E("Failed to bind to socket");
+            LOG(ERROR) << "Failed to bind to socket: " << WSALastErrorStr();
             closeSocketHandle(context.cfd);
             return std::nullopt;
         }
@@ -26,7 +27,8 @@ std::optional<socket_handle_t> SocketInterfaceWindowsIPv4::createServerSocket() 
     return context.cfd;
 }
 
-std::optional<SocketConnContext> SocketInterfaceWindowsIPv4::createClientSocket() {
+std::optional<SocketConnContext>
+SocketInterfaceWindowsIPv4::createClientSocket() {
     auto context = SocketConnContext::create<sockaddr_in>();
 
     if (win_helper.createInetSocketAddr(context)) {
@@ -36,7 +38,7 @@ std::optional<SocketConnContext> SocketInterfaceWindowsIPv4::createClientSocket(
         InetPton(AF_INET, getOptions(Options::DESTINATION_ADDRESS).c_str(),
                  &name->sin_addr);
         if (connect(context.cfd, _name, context.addr->size) != 0) {
-            WSALOG_E("Failed to connect to socket");
+            LOG(ERROR) << "Failed to connect to socket: " << WSALastErrorStr();
             closeSocketHandle(context.cfd);
             return std::nullopt;
         }
@@ -49,7 +51,7 @@ bool SocketInterfaceWindowsIPv4::isSupported() {
 }
 
 void SocketInterfaceWindowsIPv4::doGetRemoteAddr(socket_handle_t s) {
-    WinHelper::doGetRemoteAddrInet<
-        struct sockaddr_in, AF_INET, in_addr, INET_ADDRSTRLEN,
-        offsetof(struct sockaddr_in, sin_addr)>(s);
+    WinHelper::doGetRemoteAddrInet<struct sockaddr_in, AF_INET, in_addr,
+                                   INET_ADDRSTRLEN,
+                                   offsetof(struct sockaddr_in, sin_addr)>(s);
 }

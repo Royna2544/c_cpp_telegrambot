@@ -83,8 +83,6 @@ void SocketInterfaceUnix::forceStopListening() {
     }
 }
 
-char* SocketInterfaceUnix::getLastErrorMessage() { return strerror(errno); }
-
 void SocketInterfaceUnix::writeToSocket(SocketConnContext context,
                                         SharedMalloc data) {
     auto* socketData = static_cast<char*>(data.get());
@@ -127,4 +125,19 @@ bool SocketInterfaceUnix::closeSocketHandle(socket_handle_t& handle) {
         return true;
     }
     return false;
+}
+
+bool SocketInterfaceUnix::setSocketOptTimeout(socket_handle_t handle,
+                                              int timeout) {
+    struct timeval tv {
+        .tv_sec = timeout
+    };
+    int ret = 0;
+
+    ret |= setsockopt(handle, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    ret |= setsockopt(handle, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+    if (ret) {
+        PLOG(ERROR) << "Failed to set socket timeout";
+    }
+    return !ret;
 }

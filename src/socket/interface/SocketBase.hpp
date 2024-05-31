@@ -1,12 +1,14 @@
 #pragma once
 
+#include <socket/TgBotSocket.h>
+
 #include <SocketDescriptor_defs.hpp>
 #include <functional>
 #include <optional>
 #include <string>
 
 #include "SharedMalloc.hpp"
-#include <socket/TgBotSocket.h>
+
 
 struct SocketConnContext {
     socket_handle_t cfd{};  // connection socket file descriptor
@@ -84,6 +86,24 @@ struct SocketInterfaceBase {
      * specific implementation.
      */
     virtual bool closeSocketHandle(socket_handle_t &handle) = 0;
+
+    /**
+     * @brief Sets the timeout for socket operations.
+     *
+     * This function is a pure virtual function, meaning it must be implemented
+     * by any class that inherits from SocketInterfaceBase. It is used to set
+     * the timeout for socket operations, such as read and write, to prevent the
+     * program from hanging indefinitely in case of network issues.
+     *
+     * @param handle The socket handle.
+     * @param timeout The timeout value in seconds. A value of 0 means no
+     * timeout, and a negative value means to use the system default timeout.
+     *
+     * @return True if the timeout was successfully set, false otherwise. Note:
+     * The actual return value may vary depending on the specific
+     * implementation.
+     */
+    virtual bool setSocketOptTimeout(socket_handle_t handle, int timeout) = 0;
 
     /**
      * @brief Starts the socket listener thread.
@@ -235,14 +255,6 @@ struct SocketInterfaceBase {
      * @return true if the server can accept connections.
      */
     virtual bool canSocketBeClosed() { return true; }
-
-    /**
-     * @brief Returns the last error message associated with the socket
-     * interface.
-     *
-     * @return A pointer to the last error message.
-     */
-    virtual char *getLastErrorMessage() = 0;
 
    private:
     struct OptionContainer {
