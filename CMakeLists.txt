@@ -376,20 +376,20 @@ add_subdirectory(src/third-party/tgbot-cpp EXCLUDE_FROM_ALL)
 #####################################################################
 
 ################### The Bot's main functionaility ###################
-add_library(TgBotCommandModules SHARED ${SRC_LIST})
-target_include_directories(TgBotCommandModules PRIVATE ${COMMANDS_CWD})
-target_include_directories(TgBotCommandModules PRIVATE src/third-party/rapidjson/include)
+add_library(${PROJECT_NAME} SHARED ${SRC_LIST})
+target_include_directories(${PROJECT_NAME} PRIVATE ${COMMANDS_CWD})
+target_include_directories(${PROJECT_NAME} PRIVATE src/third-party/rapidjson/include)
 ######################## Libraries to link ########################
 set(LD_LIST TgBot TgBotDB TgBotUtils TgBotWeb)
 extend_set_if(LD_LIST USE_UNIX_SOCKETS TgBotSocket)
 extend_set_if(LD_LIST WIN32 wsock32 Ws2_32)
 extend_set_if(LD_LIST ENABLE_RUNTIME_COMMAND ${CMAKE_DL_LIBS})
-target_link_libraries(TgBotCommandModules ${LD_LIST})
+target_link_libraries(${PROJECT_NAME} ${LD_LIST})
 #####################################################################
 
 ################# The Bot's main launcher (program) #################
 add_executable(${PROJECT_MAINEXE_NAME} src/main.cpp)
-target_link_libraries(${PROJECT_MAINEXE_NAME} TgBotCommandModules TgBotLogInit
+target_link_libraries(${PROJECT_MAINEXE_NAME} ${PROJECT_NAME} TgBotLogInit
   absl::log_sink absl::log_sink_registry)
 #####################################################################
 
@@ -423,6 +423,6 @@ add_executable(${PROJECT_TEST_NAME}
   tests/ConstexprStringCatTest.cpp
 )
 target_include_directories(${PROJECT_TEST_NAME} PRIVATE ${gtest_INCLUDE_DIR} ${gmock_INCLUDE_DIR})
-target_link_libraries(${PROJECT_TEST_NAME} gtest gmock TgBotCommandModules TgBotLogInit)
+target_link_libraries(${PROJECT_TEST_NAME} gtest gmock ${PROJECT_NAME} TgBotLogInit)
 add_test(NAME ${PROJECT_TEST_NAME} COMMAND ${PROJECT_TEST_NAME})
 #####################################################################
