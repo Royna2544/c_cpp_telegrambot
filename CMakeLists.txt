@@ -329,7 +329,7 @@ if (USE_UNIX_SOCKETS)
   target_include_directories(TgBotSocket PRIVATE ${CURL_INCLUDE_DIRS})
   target_include_directories(TgBotSocket PUBLIC src/socket/include ${SOCKET_SRC_INTERFACE})
   if (CURL_FOUND)
-    target_link_libraries(TgBotSocket ${CURL_LIBRARIES})
+    target_link_libraries(TgBotSocket CURL::libcurl)
   endif()
   target_link_libraries(TgBotSocket TgBotUtils)
   add_executable(${SOCKET_CLI_NAME}

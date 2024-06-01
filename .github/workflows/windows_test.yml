@@ -42,6 +42,7 @@ jobs:
           cmake:p
           ninja:p
           boost:p
+          pcre:p
 
     - name: 'Setup submodule'
       run: |
