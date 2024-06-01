@@ -112,11 +112,10 @@ if (NOT MSVC)
     add_compile_options(-fsanitize=address,leak)
     add_link_options(-fsanitize=address,leak)
   endif()
-else()
-  # Windows 10
-  add_definitions(-D_WIN32_WINNT=0x0A00)
 endif()
 if (WIN32)
+  # Windows 10  
+  add_definitions(-D_WIN32_WINNT=0x0A00)
   add_compile_definitions(-DWINDOWS_BUILD)
 endif()
 ################### Check Windows's AF_UNIX support ###################
