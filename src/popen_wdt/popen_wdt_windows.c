@@ -270,3 +270,10 @@ bool popen_watchdog_read(popen_watchdog_data_t** data, char* buf, int size) {
                      bytesRead);
     return result;
 }
+
+bool popen_watchdog_activated(popen_watchdog_data_t **data) {
+    if (data != NULL && *data != NULL) {
+        return (*data)->watchdog_activated;
+    }
+    return false;
+}

@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <sys/poll.h>
 #include <unistd.h>
 
 #include "popen_wdt.h"
@@ -13,60 +14,59 @@
 struct popen_wdt_posix_priv {
     pthread_t wdt_thread;
     pid_t wdt_pid;
-    FILE *fp;
-    bool stopped;
-    _Atomic int refcount;
+    int pipefd_r;  // Subprocess' readfd, write end for the child
 };
 
-static void free_popen_wdt_data(popen_watchdog_data_t *data) {
-    struct popen_wdt_posix_priv *pdata = data->privdata;
+static pthread_mutex_t wdt_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-    printf("Note: %s\n", __func__);
-    if (pdata->refcount == 0) {
-        puts("Note: freeing popen_watchdog_data_t");
-        if (data->watchdog_activated) {
-            munmap(pdata, sizeof(struct popen_wdt_posix_priv));
-        } else {
-            free(pdata);
-        }
-        free(data);
-    }
+// Users should hold mutex
+static bool check_popen_wdt_data(popen_watchdog_data_t **data) {
+    return data && *data && (*data)->privdata;
 }
 
 static void *watchdog(void *arg) {
+    sleep(SLEEP_SECONDS);
+
+    pthread_mutex_lock(&wdt_mutex);
     popen_watchdog_data_t *data = (popen_watchdog_data_t *)arg;
     struct popen_wdt_posix_priv *pdata = data->privdata;
 
-    ++pdata->refcount;
-    sleep(SLEEP_SECONDS);
-    data->watchdog_activated = false;
     if (kill(pdata->wdt_pid, 0) == 0) {
         killpg(pdata->wdt_pid, SIGTERM);
         data->watchdog_activated = true;
     }
-    --pdata->refcount;
-    free_popen_wdt_data(data);
+    pthread_mutex_unlock(&wdt_mutex);
     return NULL;
 }
 
 bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
-    popen_watchdog_data_t *data = *data_in;
+    popen_watchdog_data_t *data = NULL;
     struct popen_wdt_posix_priv *pdata = NULL;
+    pthread_mutexattr_t mutexattr;
     int pipefd[2];
     pid_t pid = 0;
 
-    if (data == NULL) {
+    if (data_in == NULL || *data_in == NULL) {
         return false;
     }
+    data = *data_in;
 
     if (pipe(pipefd) == -1) {
         return false;
     }
 
+    pthread_mutexattr_init(&mutexattr);
+    pthread_mutexattr_setpshared(&mutexattr, PTHREAD_PROCESS_SHARED);
+    pthread_mutex_init(&wdt_mutex, &mutexattr);
+    pthread_mutexattr_destroy(&mutexattr);
+
     if (data->watchdog_enabled) {
         pdata = mmap(NULL, sizeof(struct popen_wdt_posix_priv),
                      PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
         if (pdata == MAP_FAILED) {
+            close(pipefd[0]);
+            close(pipefd[1]);
+            pthread_mutex_destroy(&wdt_mutex);
             return false;
         }
 
@@ -82,6 +82,9 @@ bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
     } else {
         pdata = malloc(sizeof(struct popen_wdt_posix_priv));
         if (pdata == NULL) {
+            close(pipefd[0]);
+            close(pipefd[1]);
+            pthread_mutex_destroy(&wdt_mutex);
             return false;
         }
         memset(pdata, 0, sizeof(struct popen_wdt_posix_priv));
@@ -91,12 +94,12 @@ bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
     if (pid == -1) {
         close(pipefd[0]);
         close(pipefd[1]);
+        pthread_mutex_destroy(&wdt_mutex);
         return NULL;
     }
 
-    setenv("LC_ALL", "C", true);
-
     if (pid == 0) {
+        setenv("LC_ALL", "C", true);
         // Child process
         if (data->watchdog_enabled) {
             pdata->wdt_pid = getpid();
@@ -110,60 +113,92 @@ bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
         _exit(127);  // If execl fails, exit
     } else {
         // Parent process
+        pdata->pipefd_r = pipefd[0];
         close(pipefd[1]);
-        pdata->fp = fdopen(pipefd[0], "r");
     }
     return true;
 }
 
 void popen_watchdog_stop(popen_watchdog_data_t **data_in) {
+    pthread_mutex_lock(&wdt_mutex);
+
+    if (!check_popen_wdt_data(data_in)) {
+        return;
+    }
     popen_watchdog_data_t *data = *data_in;
     struct popen_wdt_posix_priv *pdata = data->privdata;
-    pdata->refcount++;
-    pthread_cancel(pdata->wdt_thread);
-    pdata->stopped = true;
-    pdata->refcount--;
-    free_popen_wdt_data(data);
+
+    if (data->watchdog_enabled) {
+        pthread_cancel(pdata->wdt_thread);
+        pthread_join(pdata->wdt_thread, NULL);
+    }
+    pthread_mutex_unlock(&wdt_mutex);
 }
 
 void popen_watchdog_destroy(popen_watchdog_data_t **data_in) {
-    if (data_in == NULL) {
+    popen_watchdog_data_t *data = NULL;
+    struct popen_wdt_posix_priv *pdata = NULL;
+
+    pthread_mutex_lock(&wdt_mutex);
+    if (!check_popen_wdt_data(data_in)) {
+        pthread_mutex_unlock(&wdt_mutex);
         return;
     }
-    popen_watchdog_data_t *data = *data_in;
-    if (data->privdata == NULL) {
-        return;
-    }
-    struct popen_wdt_posix_priv *pdata = data->privdata;
-    pdata->refcount++;
+    data = *data_in;
+    pdata = data->privdata;
+    close(pdata->pipefd_r);
+    puts("Note: freeing popen_watchdog_data_t");
     if (data->watchdog_enabled) {
-        data->watchdog_activated = false;
+        munmap(pdata, sizeof(struct popen_wdt_posix_priv));
+    } else {
+        free(pdata);
     }
-    fclose(pdata->fp);
-    if (data->watchdog_enabled) {
-        if (!pdata->stopped) {
-            popen_watchdog_stop(data_in);
-        }
-    }
-    pdata->refcount--;
-    free_popen_wdt_data(data);
+    free(data);
+    data = NULL;
+    pthread_mutex_unlock(&wdt_mutex);
+    pthread_mutex_destroy(&wdt_mutex);
     *data_in = NULL;
 }
 
 bool popen_watchdog_read(popen_watchdog_data_t **data, char *buf, int size) {
-    if (data == NULL) {
-        return false;
+    bool ret = false;
+    const int one_sec = 1000;
+    struct pollfd fds;
+    popen_watchdog_data_t *data_ = NULL;
+    struct popen_wdt_posix_priv *pdata = NULL;
+
+    pthread_mutex_lock(&wdt_mutex);
+
+    if (!check_popen_wdt_data(data)) {
+        pthread_mutex_unlock(&wdt_mutex);
+        return ret;
     }
-    popen_watchdog_data_t *data_ = *data;
-    if (data_ == NULL) {
-        return false;
-    }
-    if (data_->privdata == NULL) {
-        return false;
-    }
-    struct popen_wdt_posix_priv *pdata = data_->privdata;
+    data_ = *data;
+    pdata = data_->privdata;
     if (data_->watchdog_activated) {
-        return false;
+        pthread_mutex_unlock(&wdt_mutex);
+        return ret;
     }
-    return fgets(buf, size, pdata->fp) != NULL;
+    fds.events = POLLIN;
+    fds.revents = 0;
+    fds.fd = pdata->pipefd_r;
+    if (poll(&fds, 1,
+             data_->watchdog_enabled ? SLEEP_SECONDS * one_sec : -1) > 0) {
+        ret = read(pdata->pipefd_r, buf, size) > 0;
+    }
+    pthread_mutex_unlock(&wdt_mutex);
+    return ret;
+}
+
+bool popen_watchdog_activated(popen_watchdog_data_t **data) {
+    bool ret = false;
+    pthread_mutex_lock(&wdt_mutex);
+
+    if (!check_popen_wdt_data(data)) {
+        pthread_mutex_unlock(&wdt_mutex);
+        return ret;
+    }
+    ret = (*data)->watchdog_activated;
+    pthread_mutex_unlock(&wdt_mutex);
+    return ret;
 }

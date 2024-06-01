@@ -54,7 +54,6 @@ void CompilerInTg::runCommand(const Message::Ptr &message, std::string cmd,
     if (popen_watchdog_init(&p_wdt_data)) {
         p_wdt_data->command = cmd.c_str();
         p_wdt_data->watchdog_enabled = use_wdt;
-        popen_watchdog_start(&p_wdt_data);
 
         if (!popen_watchdog_start(&p_wdt_data)) {
             onFailed(message, ErrorType::POPEN_WDT_FAILED);
