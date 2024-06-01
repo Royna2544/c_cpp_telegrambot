@@ -14,11 +14,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        sys: [ucrt64] # clang64, mingw64
-        text: ['', ' unsupported']
+        sys: [mingw64, ucrt64] # clang64
+        text: ['', 'unsupported']
 
 
-    name: "🚧 ${{ matrix.sys }} (AF_UNIX${{ matrix.text}})"
+    name: "🚧 ${{ matrix.sys }} (AF_UNIX ${{ matrix.text}})"
     defaults:
       run:
         shell: msys2 {0}
