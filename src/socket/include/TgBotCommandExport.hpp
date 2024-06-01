@@ -100,9 +100,10 @@ struct GenericAck {
         std::strncpy(this->error_msg, errorMsg.c_str(), MAX_MSG_SIZE);
         this->error_msg[MAX_MSG_SIZE - 1] = '\0';
     }
+    GenericAck() = default;
     // Create a new instance of the Generic Ack, success.
-    explicit GenericAck() : result(AckType::SUCCESS) {
-        std::strncpy(error_msg, "OK", MAX_MSG_SIZE);
+    static GenericAck ok() {
+        return GenericAck(AckType::SUCCESS, "OK");
     }
 };
 

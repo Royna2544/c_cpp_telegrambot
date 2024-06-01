@@ -68,13 +68,13 @@ GenericAck SocketInterfaceTgBot::handle_WriteMsgToChatId(const void* ptr) {
         LOG(ERROR) << "Exception at handler: " << e.what();
         return GenericAck(AckType::ERROR_TGAPI_EXCEPTION, e.what());
     }
-    return GenericAck();
+    return GenericAck::ok();
 }
 
 GenericAck SocketInterfaceTgBot::handle_CtrlSpamBlock(const void* ptr) {
     const auto* data = static_cast<const CtrlSpamBlock*>(ptr);
     gSpamBlockCfg = *data;
-    return GenericAck();
+    return GenericAck::ok();
 }
 
 GenericAck SocketInterfaceTgBot::handle_ObserveChatId(const void* ptr) {
@@ -104,7 +104,7 @@ GenericAck SocketInterfaceTgBot::handle_ObserveChatId(const void* ptr) {
             obs->observedChatIds.erase(it);
         }
     }
-    return GenericAck();
+    return GenericAck::ok();
 }
 
 GenericAck SocketInterfaceTgBot::handle_SendFileToChatId(const void* ptr) {
@@ -162,14 +162,14 @@ GenericAck SocketInterfaceTgBot::handle_SendFileToChatId(const void* ptr) {
         LOG(ERROR) << "Exception at handler, " << e.what();
         return GenericAck(AckType::ERROR_TGAPI_EXCEPTION, e.what());
     }
-    return GenericAck();
+    return GenericAck::ok();
 }
 
 GenericAck SocketInterfaceTgBot::handle_ObserveAllChats(const void* ptr) {
     auto obs = ChatObserver::getInstance();
     const std::lock_guard<std::mutex> _(obs->m);
     obs->observeAllChats = *static_cast<const ObserveAllChats*>(ptr);
-    return GenericAck();
+    return GenericAck::ok();
 }
 
 GenericAck SocketInterfaceTgBot::handle_DeleteControllerById(const void* ptr) {
@@ -182,13 +182,13 @@ GenericAck SocketInterfaceTgBot::handle_DeleteControllerById(const void* ptr) {
     }
     threadUsage = static_cast<SingleThreadCtrlManager::ThreadUsage>(data);
     SingleThreadCtrlManager::getInstance()->destroyController(threadUsage);
-    return GenericAck();
+    return GenericAck::ok();
 }
 
 GenericAck SocketInterfaceTgBot::handle_UploadFile(
     const void* ptr, TgBotCommandPacketHeader::length_type len) {
     if (fileData_tofile(ptr, len)) {
-        return GenericAck();
+        return GenericAck::ok();
     }
     return GenericAck(AckType::ERROR_RUNTIME_ERROR, "Failed to write file");
 }
