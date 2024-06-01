@@ -20,7 +20,6 @@ DynamicLibraryHolder::DynamicLibraryHolder(
 
 DynamicLibraryHolder::~DynamicLibraryHolder() {
     if (handle_ != nullptr) {
-        DLOG(INFO) << "Handle was at " << handle_;
         dlclose(handle_);
         handle_ = nullptr;
     }
