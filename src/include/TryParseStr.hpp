@@ -11,11 +11,11 @@
  * @param outval the output value to fill with the parsed value
  * @return true if the parsing was successful, false otherwise
  */
-template <typename T>
+template <typename String, typename StringStream, typename T>
     requires std::is_trivially_copyable_v<T>
-bool try_parse(const std::string& str, T* outval) {
-    std::stringstream ss(str);
-    std::string unused;
+bool _try_parse(const String& str, T* outval) {
+    StringStream ss(str);
+    String unused;
     T temp{};
 
     if (static_cast<bool>(ss >> temp)) {
@@ -29,4 +29,14 @@ bool try_parse(const std::string& str, T* outval) {
         return true;
     }
     return false;
+}
+
+template <typename T>
+bool try_parse(const std::string& str, T* outval) {
+    return _try_parse<std::string, std::stringstream>(str, outval);
+}
+
+template <typename T>
+bool try_parse(const std::wstring& str, T* outval) {
+    return _try_parse<std::wstring, std::wstringstream>(str, outval);
 }
