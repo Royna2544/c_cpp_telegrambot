@@ -130,7 +130,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="AbseilLogging.h" />
-    <ClInclude Include="framework.h" />
+    <ClInclude Include="BlockingOperation.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="TgBotSocketIntf.h" />
@@ -138,6 +138,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="About.cpp" />
+    <ClCompile Include="BlockingOperation.cpp" />
     <ClCompile Include="DestinationIP.cpp" />
     <ClCompile Include="nullguard.cpp" />
     <ClCompile Include="SendFileToChat.cpp" />

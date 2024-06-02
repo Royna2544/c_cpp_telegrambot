@@ -16,11 +16,14 @@
     <Filter Include="소스 파일\ui">
       <UniqueIdentifier>{0901d22e-1ed2-44b0-a92b-cc605fc2d51c}</UniqueIdentifier>
     </Filter>
+    <Filter Include="소스 파일\uihelper">
+      <UniqueIdentifier>{ccc6607c-2812-4874-8bf4-f86323486081}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="헤더 파일\ui">
+      <UniqueIdentifier>{1bdd91a0-64cc-406e-bc31-7392beb76c9d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="framework.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
     <ClInclude Include="targetver.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
@@ -35,6 +38,9 @@
     </ClInclude>
     <ClInclude Include="AbseilLogging.h">
       <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="BlockingOperation.h">
+      <Filter>헤더 파일\ui</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -59,11 +65,14 @@
     <ClCompile Include="Uptime.cpp">
       <Filter>소스 파일\ui</Filter>
     </ClCompile>
-    <ClCompile Include="StringLoader.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
     <ClCompile Include="DestinationIP.cpp">
       <Filter>소스 파일\ui</Filter>
+    </ClCompile>
+    <ClCompile Include="StringLoader.cpp">
+      <Filter>소스 파일\uihelper</Filter>
+    </ClCompile>
+    <ClCompile Include="BlockingOperation.cpp">
+      <Filter>소스 파일\uihelper</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

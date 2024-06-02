@@ -8,7 +8,6 @@
 
 #include "../../../src/socket/include/TgBotCommandExport.hpp"
 
-
 struct SocketConfig {
     std::string address;
     enum class Mode { USE_IPV4, USE_IPV6 } mode = Mode::USE_IPV4;

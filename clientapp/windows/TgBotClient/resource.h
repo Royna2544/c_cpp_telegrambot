@@ -23,6 +23,9 @@
 #define IDS_SUCCESS_FILESENT            111
 #define IDS_SUCCESS_MSGSENT             112
 #define IDS_IPADDR_EMPTY                113
+#define IDS_MEMALLOC_FAIL               114
+#define IDS_OPERATION_ACTIVE            115
+#define IDS_MEMALLOC_FAIL2              115
 #define IDR_MAINFRAME                   128
 #define IDD_UPTIME_DLG                  130
 #define IDR_MENU1                       131
