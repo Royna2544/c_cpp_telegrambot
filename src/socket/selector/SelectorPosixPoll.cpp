@@ -6,18 +6,18 @@
 
 #include "SelectorPosix.hpp"
 
-
 bool PollSelector::init() { return true; }
 
-bool PollSelector::add(int fd, OnSelectedCallback callback) {
-    struct pollfd pfd;
+bool PollSelector::add(socket_handle_t fd, OnSelectedCallback callback) {
+    struct pollfd pfd {};
 
-    for (const auto &e : pollfds) {
-        if (e.poll_fd.fd == fd) {
-            LOG(WARNING) << "poll fd " << e.poll_fd.fd << " is already added";
-            return false;
-        }
+    if (std::ranges::any_of(pollfds, [fd](const auto &data) {
+            return data.poll_fd.fd == fd;
+        })) {
+        LOG(WARNING) << "poll fd " << fd << " is already added";
+        return false;
     }
+
     pfd.fd = fd;
     pfd.events = POLLIN;
     pfd.revents = 0;
@@ -25,7 +25,7 @@ bool PollSelector::add(int fd, OnSelectedCallback callback) {
     return true;
 }
 
-bool PollSelector::remove(int fd) {
+bool PollSelector::remove(socket_handle_t fd) {
     bool ret = false;
     std::erase_if(pollfds, [fd, &ret](const PollFdData &e) {
         if (e.poll_fd.fd == fd) {

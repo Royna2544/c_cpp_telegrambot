@@ -8,7 +8,7 @@ bool SelectSelector::init() {
     return true;
 }
 
-bool SelectSelector::add(int fd, OnSelectedCallback callback) {
+bool SelectSelector::add(socket_handle_t fd, OnSelectedCallback callback) {
     if (FD_ISSET(fd, &set)) {
         LOG(WARNING) << "fd " << fd << " already set";
         return false;
@@ -18,7 +18,7 @@ bool SelectSelector::add(int fd, OnSelectedCallback callback) {
     return true;
 }
 
-bool SelectSelector::remove(int fd) {
+bool SelectSelector::remove(socket_handle_t fd) {
     bool ret = false;
     std::erase_if(data, [fd, &ret](const SelectFdData &e) {
         if (e.fd == fd) {
@@ -31,11 +31,7 @@ bool SelectSelector::remove(int fd) {
 }
 
 SelectSelector::SelectorPollResult SelectSelector::poll() {
-    struct timeval tv {
-        .tv_sec = 5
-    };
-
-    int ret = select(FD_SETSIZE, &set, nullptr, nullptr, &tv);
+    int ret = select(FD_SETSIZE, &set, nullptr, nullptr, nullptr);
     if (ret < 0) {
         PLOG(ERROR) << "Select failed";
         return SelectorPollResult::FAILED;

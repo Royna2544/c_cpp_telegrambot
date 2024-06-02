@@ -11,6 +11,8 @@ struct Selector {
         OK = 0,
         FAILED = -1,
     };
+    static constexpr int kTimeoutSecs = 5;
+
     using OnSelectedCallback = std::function<void(void)>;
 
     virtual ~Selector() = default;

@@ -297,6 +297,7 @@ if (USE_UNIX_SOCKETS)
     else()
       extend_set(SOCKET_SRC_LIST
         ${SOCKET_SRC_INTERFACE}/impl/helper/SocketHelperLinux.cpp
+        src/socket/selector/SelectorLinuxEPoll.cpp
       )
     endif()
   elseif(WIN32)
