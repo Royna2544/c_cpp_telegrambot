@@ -89,7 +89,7 @@ void SocketInterfaceWindows::writeToSocket(SocketConnContext context,
 void SocketInterfaceWindows::forceStopListening(void) { kRun = false; }
 
 std::optional<SharedMalloc> SocketInterfaceWindows::readFromSocket(
-    SocketConnContext context, TgBotCommandPacketHeader::length_type length) {
+    SocketConnContext context, TgBotSocket::PacketHeader::length_type length) {
     SharedMalloc buf(length);
     auto *addr = static_cast<sockaddr *>(context.addr.get());
     auto *data = static_cast<char *>(buf.get());

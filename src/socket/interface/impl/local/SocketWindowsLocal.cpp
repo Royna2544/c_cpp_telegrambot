@@ -31,8 +31,8 @@ std::optional<socket_handle_t> SocketInterfaceWindowsLocal::createServerSocket()
     SocketConnContext ret = SocketConnContext::create<sockaddr_un>();
     const auto *_name = reinterpret_cast<struct sockaddr *>(ret.addr.get());
 
-    setOptions(Options::DESTINATION_ADDRESS, getSocketPath().string());
-    LOG(INFO) << "Creating socket at " << getSocketPath().string();
+    setOptions(Options::DESTINATION_ADDRESS, LocalHelper::getSocketPath().string());
+    LOG(INFO) << "Creating socket at " << LocalHelper::getSocketPath().string();
     if (!createLocalSocket(&ret)) {
         return std::nullopt;
     }
@@ -58,7 +58,7 @@ std::optional<SocketConnContext> SocketInterfaceWindowsLocal::createClientSocket
     SocketConnContext ret = SocketConnContext::create<sockaddr_un>();
     const auto *_name = reinterpret_cast<struct sockaddr *>(ret.addr.get());
 
-    setOptions(Options::DESTINATION_ADDRESS, getSocketPath().string());
+    setOptions(Options::DESTINATION_ADDRESS, LocalHelper::getSocketPath().string());
     if (!createLocalSocket(&ret)) {
         return std::nullopt;
     }

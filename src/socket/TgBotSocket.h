@@ -6,61 +6,53 @@
 #include <cstddef>
 #include <cstdlib>
 #include <cstring>
-#include <filesystem>
 #include <string>
 #include <type_traits>
 
 #include "SharedMalloc.hpp"
-
-inline std::filesystem::path getSocketPath() {
-    static auto spath = std::filesystem::temp_directory_path() / "tgbot.sock";
-    return spath;
-}
-
-#define TGBOT_NAMESPACE_BEGIN namespace TgBotCommandData {
-#define TGBOT_NAMESPACE_END }
 #include "TgBotCommandExport.hpp"
 
-namespace TgBotCmd {
+namespace TgBotSocket {
+namespace CommandHelpers {
 /**
  * @brief Convert TgBotCommand to string
  *
- * @param cmd TgBotCommand to convert
- * @return std::string string representation of TgBotCommand enum
+ * @param cmd Command to convert
+ * @return std::string string representation of Command enum
  */
-std::string toStr(TgBotCommand cmd);
+std::string toStr(Command cmd);
 
 /**
- * @brief Get count of TgBotCommand
+ * @brief Get count of Command
  *
- * @param cmd TgBotCommand to get arg count of
- * @return required arg count of TgBotCommand
+ * @param cmd Command to get arg count of
+ * @return required arg count of Command
  */
-int toCount(TgBotCommand cmd);
+int toCount(Command cmd);
 
 /**
  * @brief Check if given command is a client command
  *
- * @param cmd TgBotCommand to check
+ * @param cmd Command to check
  * @return true if given command is a client command, false otherwise
  */
-bool isClientCommand(TgBotCommand cmd);
+bool isClientCommand(Command cmd);
 
 /**
  * @brief Check if given command is an internal command
  *
- * @param cmd TgBotCommand to check
+ * @param cmd Command to check
  * @return true if given command is an internal command, false otherwise
  */
-bool isInternalCommand(TgBotCommand cmd);
+bool isInternalCommand(Command cmd);
 
 /**
- * @brief Get help text for TgBotCommand
+ * @brief Get help text for Command
  *
- * @return std::string help text for TgBotCommand
+ * @return std::string help text for Command
  */
 std::string getHelpText(void);
-}  // namespace TgBotCmd
+}  // namespace CommandHelpers
 
 /**
  * @brief Packet for sending commands to the server
@@ -72,13 +64,13 @@ std::string getHelpText(void);
  * It contains a header, which contains the magic value, the command, and the
  * size of the data. The data is then followed by the actual data.
  */
-struct TgBotCommandPacket {
-    static constexpr auto hdr_sz = sizeof(TgBotCommandPacketHeader);
-    using header_type = TgBotCommandPacketHeader;
+struct Packet {
+    static constexpr auto hdr_sz = sizeof(PacketHeader);
+    using header_type = PacketHeader;
     header_type header{};
     SharedMalloc data;
 
-    explicit TgBotCommandPacket(header_type::length_type length)
+    explicit Packet(header_type::length_type length)
         : data(length) {
         header.magic = header_type::MAGIC_VALUE;
         header.data_size = length;
@@ -86,15 +78,15 @@ struct TgBotCommandPacket {
 
     // Constructor that takes malloc
     template <typename T>
-    explicit TgBotCommandPacket(TgBotCommand cmd, T data)
-        : TgBotCommandPacket(cmd, &data, sizeof(T)) {
+    explicit Packet(Command cmd, T data)
+        : Packet(cmd, &data, sizeof(T)) {
         static_assert(!std::is_pointer_v<T>,
                       "This constructor should not be used with a pointer");
     }
 
     // Constructor that takes pointer, uses malloc but with size
     template <typename T>
-    explicit TgBotCommandPacket(TgBotCommand cmd, T in_data, std::size_t size)
+    explicit Packet(Command cmd, T in_data, std::size_t size)
         : data(size) {
         boost::crc_32_type crc;
 
@@ -112,8 +104,10 @@ struct TgBotCommandPacket {
     SharedMalloc toSocketData() {
         data->size = hdr_sz + header.data_size;
         data->alloc();
-        memmove(static_cast<char*>(data.get()) + hdr_sz, data.get(), header.data_size);
+        memmove(static_cast<char*>(data.get()) + hdr_sz, data.get(),
+                header.data_size);
         memcpy(data.get(), &header, hdr_sz);
         return data;
     }
 };
+}  // namespace TgBotSocket

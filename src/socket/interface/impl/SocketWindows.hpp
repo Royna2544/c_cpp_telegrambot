@@ -23,7 +23,7 @@ struct SocketInterfaceWindows : SocketInterfaceBase {
     bool setSocketOptTimeout(socket_handle_t handle, int timeout) override;
     std::optional<SharedMalloc> readFromSocket(
         SocketConnContext context,
-        TgBotCommandPacketHeader::length_type length) override;
+        TgBotSocket::PacketHeader::length_type length) override;
 
     struct WinHelper {
         explicit WinHelper(SocketInterfaceWindows* interface)

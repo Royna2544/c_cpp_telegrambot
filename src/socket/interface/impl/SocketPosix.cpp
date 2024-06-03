@@ -103,7 +103,7 @@ void SocketInterfaceUnix::writeToSocket(SocketConnContext context,
 }
 
 std::optional<SharedMalloc> SocketInterfaceUnix::readFromSocket(
-    SocketConnContext handle, TgBotCommandPacketHeader::length_type length) {
+    SocketConnContext handle, buffer_len_t length) {
     SharedMalloc buf(length);
     auto* addr = static_cast<sockaddr*>(handle.addr.get());
     socklen_t addrlen = handle.addr->size;
@@ -139,5 +139,5 @@ bool SocketInterfaceUnix::setSocketOptTimeout(socket_handle_t handle,
     if (ret) {
         PLOG(ERROR) << "Failed to set socket timeout";
     }
-    return !ret;
+    return ret == 0;
 }

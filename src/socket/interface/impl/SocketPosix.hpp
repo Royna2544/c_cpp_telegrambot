@@ -21,9 +21,8 @@ struct SocketInterfaceUnix : SocketInterfaceBase {
     bool closeSocketHandle(socket_handle_t& handle) override;
     bool setSocketOptTimeout(socket_handle_t handle, int timeout) override;
 
-    std::optional<SharedMalloc> readFromSocket(
-        SocketConnContext context,
-        TgBotCommandPacketHeader::length_type length) override;
+    std::optional<SharedMalloc> readFromSocket(SocketConnContext context,
+                                               buffer_len_t length) override;
 
     SocketInterfaceUnix() = default;
     virtual ~SocketInterfaceUnix() = default;

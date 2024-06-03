@@ -3,12 +3,13 @@
 #include <socket/TgBotSocket.h>
 
 #include <SocketDescriptor_defs.hpp>
+#include <cstdint>
+#include <filesystem>
 #include <functional>
 #include <optional>
 #include <string>
 
 #include "SharedMalloc.hpp"
-
 
 struct SocketConnContext {
     socket_handle_t cfd{};  // connection socket file descriptor
@@ -31,6 +32,7 @@ struct SocketInterfaceBase {
     // addr is used as void pointer to maintain platform independence.
     using listener_callback_t = std::function<bool(SocketConnContext ctx)>;
     using dummy_listen_buf_t = char;
+    using buffer_len_t = uint64_t;
 
     constexpr static int kTgBotHostPort = 50000;
 
@@ -67,8 +69,7 @@ struct SocketInterfaceBase {
      * empty optional if an error occurred or no data was available.
      */
     virtual std::optional<SharedMalloc> readFromSocket(
-        SocketConnContext context,
-        TgBotCommandPacketHeader::length_type length) = 0;
+        SocketConnContext context, buffer_len_t length) = 0;
 
     /**
      * @brief Closes the socket handle.
@@ -216,6 +217,7 @@ struct SocketInterfaceBase {
             bool canSocketBeClosed();
             void cleanupServerSocket();
             void doGetRemoteAddr(socket_handle_t handle);
+            static std::filesystem::path getSocketPath();
 
            private:
             SocketInterfaceBase *interface;

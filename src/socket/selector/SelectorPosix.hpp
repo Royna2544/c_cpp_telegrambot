@@ -36,6 +36,7 @@ struct SelectSelector : Selector {
     std::vector<SelectFdData> data;
 };
 
+#ifdef __linux__
 struct EPollSelector : Selector {
     bool init() override;
     bool add(socket_handle_t fd, OnSelectedCallback callback) override;
@@ -53,3 +54,4 @@ struct EPollSelector : Selector {
     int epollfd;
     std::vector<EPollFdData> data;
 };
+#endif

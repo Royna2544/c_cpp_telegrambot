@@ -16,7 +16,7 @@ using TgBot::ChatPermissions;
 
 #ifdef SOCKET_CONNECTION
 #include <socket/TgBotSocket.h>
-CtrlSpamBlock gSpamBlockCfg = CTRL_ON;
+TgBotSocket::data::CtrlSpamBlock gSpamBlockCfg = CtrlSpamBlock::CTRL_ON;
 #endif
 
 template <class Container, class Type>
@@ -143,7 +143,7 @@ void SpamBlockBase::addMessage(const Message::Ptr &message) {
 
 #ifdef SOCKET_CONNECTION
     // Global cfg
-    if (gSpamBlockCfg == CTRL_OFF) {
+    if (gSpamBlockCfg == CtrlSpamBlock::CTRL_OFF) {
         return;
     }
 #endif
@@ -203,14 +203,14 @@ void SpamBlockManager::handleUserAndMessagePair(PerChatHandleConstRef e,
     bool enforce = false;
 #ifdef SOCKET_CONNECTION
     switch (gSpamBlockCfg) {
-        case CTRL_ENFORCE:
+        case CtrlSpamBlock::CTRL_ENFORCE:
             enforce = true;
             [[fallthrough]];
-        case CTRL_ON: {
+        case CtrlSpamBlock::CTRL_ON: {
             _deleteAndMuteCommon(it, e, threshold, name, enforce);
             break;
         }
-        case CTRL_LOGGING_ONLY_ON:
+        case CtrlSpamBlock::CTRL_LOGGING_ONLY_ON:
             if (isEntryOverThreshold(e, threshold))
                 _logSpamDetectCommon(e, name);
             break;

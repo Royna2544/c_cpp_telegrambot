@@ -8,6 +8,7 @@
 #include <impl/bot/ClientBackend.hpp>
 #include <iostream>
 #include <string>
+#include "TgBotCommandExport.hpp"
 
 
 [[noreturn]] static void usage(const char* argv0, const int exitCode) {
@@ -18,7 +19,7 @@
 
 int main(int argc, char* const* argv) {
     ChatId chatId = 0;
-    TgBotCommandData::SendFileToChatId data = {};
+    TgBotSocket::data::SendFileToChatId data = {};
     const auto _usage = [capture0 = argv[0]](auto&& PH1) {
         usage(capture0, std::forward<decltype(PH1)>(PH1));
     };
@@ -43,10 +44,10 @@ int main(int argc, char* const* argv) {
         LOG(INFO) << "Found, sending (fileid " << info->mediaId << ") to chat "
                   << chatId;
     }
-    strncpy(data.filepath, info->mediaId.c_str(), sizeof(data.filepath) - 1);
-    data.id = chatId;
-    data.type = TgBotCommandData::TYPE_DOCUMENT;
+    strncpy(data.filePath.data(), info->mediaId.c_str(), data.filePath.size());
+    data.chat = chatId;
+    data.fileType = TgBotSocket::data::FileType::TYPE_DOCUMENT;
 
-    struct TgBotCommandPacket pkt(CMD_SEND_FILE_TO_CHAT_ID, data);
+    struct TgBotSocket::Packet pkt(TgBotSocket::Command::CMD_SEND_FILE_TO_CHAT_ID, data);
     getClientBackend()->writeAsClientToSocket(pkt.toSocketData());
 }

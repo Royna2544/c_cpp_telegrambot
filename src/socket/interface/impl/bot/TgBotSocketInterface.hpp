@@ -11,7 +11,7 @@
 
 #include "TgBotPacketParser.hpp"
 
-using TgBotCommandData::GenericAck;
+using TgBotSocket::callback::GenericAck;
 
 #ifdef WINDOWS_BUILD
 #include "impl/SocketWindows.hpp"
@@ -35,14 +35,14 @@ struct SocketInterfaceTgBot : SingleThreadCtrlRunnable,
     }
 
     void handle_CommandPacket(SocketConnContext ctx,
-                              TgBotCommandPacket pkt) override;
+                              TgBotSocket::Packet pkt) override;
 
     void runFunction() override;
 
     explicit SocketInterfaceTgBot(
         Bot& bot, std::shared_ptr<SocketInterfaceBase> _interface);
 
-    // TODO Used by main.cpp    
+    // TODO Used by main.cpp
     SocketInterfaceTgBot(Bot& bot) : BotClassBase(bot) {}
 
    private:
@@ -59,7 +59,8 @@ struct SocketInterfaceTgBot : SingleThreadCtrlRunnable,
     static GenericAck handle_ObserveChatId(const void* ptr);
     static GenericAck handle_ObserveAllChats(const void* ptr);
     static GenericAck handle_DeleteControllerById(const void* ptr);
-    static GenericAck handle_UploadFile(const void *ptr, TgBotCommandPacketHeader::length_type len);
+    static GenericAck handle_UploadFile(
+        const void* ptr, TgBotSocket::PacketHeader::length_type len, bool dry);
 
     // These have their own ack handlers
     bool handle_GetUptime(SocketConnContext ctx, const void* ptr);

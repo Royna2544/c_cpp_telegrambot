@@ -4,52 +4,61 @@
 #include <mutex>
 #include <sstream>
 
+#include "TgBotCommandExport.hpp"
 #include "TgBotSocket.h"
 
-#define ARGUMENT_SIZE(enum, len) array_helpers::make_elem(enum, len)
+#define ARGUMENT_SIZE(enum, len) array_helpers::make_elem(Command::enum, len)
+
+#undef ENUM_AND_STR
+#define ENUM_AND_STR(e) \
+    array_helpers::make_elem<Command, const char*>(Command::e, #e)
+
+using namespace TgBotSocket;
+
+constexpr int MAX_LEN = static_cast<int>(Command::CMD_CLIENT_MAX);
 
 constexpr auto kTgBotCommandStrMap =
-    array_helpers::make<CMD_CLIENT_MAX, TgBotCommand, const char*>(
+    array_helpers::make<MAX_LEN, TgBotSocket::Command, const char*>(
         ENUM_AND_STR(CMD_WRITE_MSG_TO_CHAT_ID),
         ENUM_AND_STR(CMD_CTRL_SPAMBLOCK), ENUM_AND_STR(CMD_OBSERVE_CHAT_ID),
         ENUM_AND_STR(CMD_SEND_FILE_TO_CHAT_ID),
         ENUM_AND_STR(CMD_OBSERVE_ALL_CHATS),
-        ENUM_AND_STR(CMD_DELETE_CONTROLLER_BY_ID),
-        ENUM_AND_STR(CMD_GET_UPTIME),
-        ENUM_AND_STR(CMD_UPLOAD_FILE),
-        ENUM_AND_STR(CMD_DOWNLOAD_FILE));
+        ENUM_AND_STR(CMD_DELETE_CONTROLLER_BY_ID), ENUM_AND_STR(CMD_GET_UPTIME),
+        ENUM_AND_STR(CMD_UPLOAD_FILE), ENUM_AND_STR(CMD_DOWNLOAD_FILE),
+        ENUM_AND_STR(CMD_UPLOAD_FILE_DRY));
 
 const auto kTgBotCommandArgsCount =
-    array_helpers::make<CMD_CLIENT_MAX, TgBotCommand, int>(
+    array_helpers::make<MAX_LEN - 1, TgBotSocket::Command, int>(
         ARGUMENT_SIZE(CMD_WRITE_MSG_TO_CHAT_ID, 2),  // chatid, msg
         ARGUMENT_SIZE(CMD_CTRL_SPAMBLOCK, 1),        // policy
         ARGUMENT_SIZE(CMD_OBSERVE_CHAT_ID, 2),       // chatid, policy
         ARGUMENT_SIZE(CMD_SEND_FILE_TO_CHAT_ID, 3),  // chatid, type, filepath
         ARGUMENT_SIZE(CMD_OBSERVE_ALL_CHATS, 1),     // policy
-        ARGUMENT_SIZE(CMD_DELETE_CONTROLLER_BY_ID, 1),      // id
+        ARGUMENT_SIZE(CMD_DELETE_CONTROLLER_BY_ID, 1),  // id
         ARGUMENT_SIZE(CMD_GET_UPTIME, 0),
-        ARGUMENT_SIZE(CMD_UPLOAD_FILE, 2),                  // source, dest filepath
-        ARGUMENT_SIZE(CMD_DOWNLOAD_FILE, 2));               // source, dest filepath
+        ARGUMENT_SIZE(CMD_UPLOAD_FILE, 2),     // source, dest filepath
+        ARGUMENT_SIZE(CMD_DOWNLOAD_FILE, 2));  // source, dest filepath
 
-namespace TgBotCmd {
-std::string toStr(TgBotCommand cmd) {
-    const auto *const it = array_helpers::find(kTgBotCommandStrMap, cmd);
+namespace TgBotSocket::CommandHelpers {
+
+std::string toStr(Command cmd) {
+    const auto* const it = array_helpers::find(kTgBotCommandStrMap, cmd);
     LOG_IF(FATAL, it == kTgBotCommandStrMap.end())
-        << "Couldn't find cmd " << cmd << " in map";
+        << "Couldn't find cmd " << static_cast<int>(cmd) << " in map";
     return it->second;
 }
 
-int toCount(TgBotCommand cmd) {
+int toCount(Command cmd) {
     const auto* const it = array_helpers::find(kTgBotCommandArgsCount, cmd);
     LOG_IF(FATAL, it == kTgBotCommandArgsCount.end())
-        << "Couldn't find cmd " << cmd << " in map";
+        << "Couldn't find cmd " << static_cast<int>(cmd) << " in map";
     return it->second;
 }
 
-bool isClientCommand(TgBotCommand cmd) { return cmd < CMD_CLIENT_MAX; }
+bool isClientCommand(Command cmd) { return cmd < Command::CMD_CLIENT_MAX; }
 
-bool isInternalCommand(TgBotCommand cmd) {
-    return cmd >= CMD_SERVER_INTERNAL_START;
+bool isInternalCommand(Command cmd) {
+    return cmd >= Command::CMD_SERVER_INTERNAL_START;
 }
 
 std::string getHelpText() {
@@ -61,10 +70,10 @@ std::string getHelpText() {
         for (const auto& ent : kTgBotCommandStrMap) {
             int count = 0;
 
-            count = TgBotCmd::toCount(ent.first);
+            count = toCount(ent.first);
 
-            help << ent.second << ": value " << ent.first << ", Requires "
-                 << count << " argument";
+            help << ent.second << ": value " << static_cast<int>(ent.first)
+                 << ", Requires " << count << " argument";
             if (count > 1) {
                 help << "s";
             }
@@ -74,4 +83,5 @@ std::string getHelpText() {
     });
     return helptext;
 }
-}  // namespace TgBotCmd
+
+}  // namespace TgBotSocket::CommandHelpers

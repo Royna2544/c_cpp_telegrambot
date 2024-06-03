@@ -1,9 +1,11 @@
+#include <SingleThreadCtrl.h>
 #include <absl/log/log.h>
 
 #include <AbslLogInit.hpp>
 #include <LogSinks.hpp>
 #include <TryParseStr.hpp>
 #include <boost/crc.hpp>
+#include <cstddef>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -12,48 +14,49 @@
 #include <impl/bot/TgBotSocketFileHelper.hpp>
 #include <iostream>
 #include <optional>
+#include <string>
+
 #include "SharedMalloc.hpp"
 #include "TgBotCommandExport.hpp"
-
-#include <SingleThreadCtrl.h>
 
 // Come last
 #include <socket/TgBotSocket.h>
 
-[[noreturn]] static void usage(const char* argv, bool success) {
+using namespace TgBotSocket;
+
+namespace {
+
+[[noreturn]] void usage(const char* argv, bool success) {
     std::cout << "Usage: " << argv << " [cmd enum value] [args...]" << std::endl
               << std::endl;
     std::cout << "Available cmd enum values:" << std::endl;
-    std::cout << TgBotCmd::getHelpText();
+    std::cout << CommandHelpers::getHelpText();
 
-    exit(!success);
+    exit(static_cast<int>(!success));
 }
 
-static bool verifyArgsCount(TgBotCommand cmd, int argc) {
-    int required = TgBotCmd::toCount(cmd);
+bool verifyArgsCount(Command cmd, int argc) {
+    int required = CommandHelpers::toCount(cmd);
     if (required != argc) {
         LOG(ERROR) << "Invalid argument count " << argc << " for cmd "
-                   << TgBotCmd::toStr(cmd) << ", " << required << " required";
+                   << CommandHelpers::toStr(cmd) << ", " << required
+                   << " required";
         return false;
     }
     return true;
 }
 
-static void _copyToStrBuf(char dst[], size_t dst_size, char* src) {
-    memset(dst, 0, dst_size);
-    strncpy(dst, src, dst_size - 1);
-}
-
-template <unsigned N>
-void copyToStrBuf(char (&dst)[N], char* src) {
-    _copyToStrBuf(dst, sizeof(dst), src);
+template <size_t N>
+void copyToStrBuf(std::array<char, N>& dst, char* src) {
+    memset(dst.data(), 0, dst.size());
+    strncpy(dst.data(), src, dst.size() - 1);
 }
 
 template <class C>
 bool parseOneEnum(C* res, C max, const char* str, const char* name) {
-    int parsed = 0;
+    int parsed{};
     if (try_parse(str, &parsed)) {
-        if (max >= 0 && parsed < max) {
+        if (parsed >= 0 && parsed < static_cast<int>(max)) {
             *res = static_cast<C>(parsed);
             return true;
         } else {
@@ -64,54 +67,80 @@ bool parseOneEnum(C* res, C max, const char* str, const char* name) {
     return false;
 }
 
+std::string_view AckTypeToStr(callback::AckType type) {
+    using callback::AckType;
+    using callback::GenericAck;
+    switch (type) {
+        case AckType::SUCCESS:
+            return "Success";
+        case AckType::ERROR_TGAPI_EXCEPTION:
+            return "Failed: Telegram Api exception";
+        case AckType::ERROR_INVALID_ARGUMENT:
+            return "Failed: Invalid argument";
+        case AckType::ERROR_COMMAND_IGNORED:
+            return "Failed: Command ignored";
+        case AckType::ERROR_RUNTIME_ERROR:
+            return "Failed: Runtime error";
+    }
+    return "Unknown ack type";
+}
+
+}  // namespace
+
+// TODO: WTF is this
+FileDataHelper::DataFromFileParam p;
+
 struct ClientParser : TgBotSocketParser {
     explicit ClientParser(SocketInterfaceBase* interface)
         : TgBotSocketParser(interface) {}
-    void handle_CommandPacket(SocketConnContext context,
-                              TgBotCommandPacket pkt) override {
-        using TgBotCommandData::AckType;
-        using TgBotCommandData::GenericAck;
-        TgBotCommandData::GetUptimeCallback callbackData = {};
-        GenericAck result{};
+    void handle_CommandPacket(SocketConnContext context, Packet pkt) override {
+        using callback::AckType;
+        using callback::GenericAck;
+
+        callback::GetUptimeCallback callbackData = {};
+        callback::GenericAck result{};
         std::string resultText;
 
         switch (pkt.header.cmd) {
-            case CMD_GET_UPTIME_CALLBACK: {
+            case Command::CMD_GET_UPTIME_CALLBACK: {
                 pkt.data.assignTo(callbackData);
-                LOG(INFO) << "Server replied: " << callbackData;
+                LOG(INFO) << "Server replied: " << callbackData.uptime.data();
                 break;
             }
-            case CMD_DOWNLOAD_FILE_CALLBACK: {
-                fileData_tofile(pkt.data.get(), pkt.header.data_size);
+            case Command::CMD_DOWNLOAD_FILE_CALLBACK: {
+                FileDataHelper::DataToFile<FileDataHelper::DOWNLOAD_FILE>(
+                    pkt.data.get(), pkt.header.data_size);
                 break;
             }
-            case CMD_GENERIC_ACK:
+            case Command::CMD_UPLOAD_FILE_DRY_CALLBACK: {
                 pkt.data.assignTo(result);
-                switch (result.result) {
-                    case AckType::SUCCESS:
-                        resultText = "Success";
-                        break;
-                    case AckType::ERROR_TGAPI_EXCEPTION:
-                        resultText = "Failed: Telegram Api exception";
-                        break;
-                    case AckType::ERROR_INVALID_ARGUMENT:
-                        resultText = "Failed: Invalid argument";
-                        break;
-                    case AckType::ERROR_COMMAND_IGNORED:
-                        resultText = "Failed: Command ignored";
-                        break;
-                    case AckType::ERROR_RUNTIME_ERROR:
-                        resultText = "Failed: Runtime error";
-                        break;
-                }
-                LOG(INFO) << "Response from server: " << resultText;
+                LOG(INFO) << "Response from server: "
+                          << AckTypeToStr(result.result);
                 if (result.result != AckType::SUCCESS) {
-                    LOG(ERROR) << "Reason: " << result.error_msg;
+                    LOG(ERROR) << "Reason: " << result.error_msg.data();
+                } else {
+                    interface->closeSocketHandle(context);
+                    context = interface->createClientSocket().value();
+                    LOG(INFO) << "Recreated client socket";
+                    auto newPkt = FileDataHelper::DataFromFile<
+                        FileDataHelper::UPLOAD_FILE>(p);
+                    LOG(INFO) << "Sending the actual file content again...";
+                    interface->writeToSocket(context, newPkt->toSocketData());
+                    onNewBuffer(context);
+                }
+                break;
+            }
+            case Command::CMD_GENERIC_ACK:
+                pkt.data.assignTo(result);
+                LOG(INFO) << "Response from server: "
+                          << AckTypeToStr(result.result);
+                if (result.result != AckType::SUCCESS) {
+                    LOG(ERROR) << "Reason: " << result.error_msg.data();
                 }
                 break;
             default:
                 LOG(ERROR) << "Unhandled callback of command: "
-                           << pkt.header.cmd;
+                           << static_cast<int>(pkt.header.cmd);
                 break;
         }
         interface->closeSocketHandle(context);
@@ -119,8 +148,8 @@ struct ClientParser : TgBotSocketParser {
 };
 
 int main(int argc, char** argv) {
-    enum TgBotCommand cmd = CMD_MAX;
-    std::optional<TgBotCommandPacket> pkt;
+    enum Command cmd {};
+    std::optional<Packet> pkt;
     const char* exe = argv[0];
 
     TgBot_AbslLogInit();
@@ -131,12 +160,12 @@ int main(int argc, char** argv) {
     ++argv;
     --argc;
 
-    if (!parseOneEnum(&cmd, CMD_MAX, *argv, "cmd")) {
+    if (!parseOneEnum(&cmd, Command::CMD_MAX, *argv, "cmd")) {
         LOG(ERROR) << "Invalid cmd enum value";
         usage(exe, false);
     }
 
-    if (TgBotCmd::isInternalCommand(cmd)) {
+    if (CommandHelpers::isInternalCommand(cmd)) {
         LOG(ERROR) << "Internal commands not supported";
         return EXIT_FAILURE;
     }
@@ -150,74 +179,81 @@ int main(int argc, char** argv) {
     }
 
     switch (cmd) {
-        case CMD_WRITE_MSG_TO_CHAT_ID: {
-            TgBotCommandData::WriteMsgToChatId data{};
-            if (!try_parse(argv[0], &data.to)) {
+        case Command::CMD_WRITE_MSG_TO_CHAT_ID: {
+            data::WriteMsgToChatId data{};
+            if (!try_parse(argv[0], &data.chat)) {
                 break;
             }
-            copyToStrBuf(data.msg, argv[1]);
-            pkt = TgBotCommandPacket(cmd, data);
+            copyToStrBuf(data.message, argv[1]);
+            pkt = Packet(cmd, data);
             break;
         }
-        case CMD_CTRL_SPAMBLOCK: {
-            TgBotCommandData::CtrlSpamBlock data;
-            if (parseOneEnum(&data, TgBotCommandData::CTRL_MAX, argv[0],
+        case Command::CMD_CTRL_SPAMBLOCK: {
+            data::CtrlSpamBlock data;
+            if (parseOneEnum(&data, data::CtrlSpamBlock::CTRL_MAX, argv[0],
                              "spamblock"))
 
-                pkt = TgBotCommandPacket(cmd, data);
+                pkt = Packet(cmd, data);
             break;
         }
-        case CMD_OBSERVE_CHAT_ID: {
-            TgBotCommandData::ObserveChatId data{};
-            if (try_parse(argv[0], &data.id) &&
+        case Command::CMD_OBSERVE_CHAT_ID: {
+            data::ObserveChatId data{};
+            if (try_parse(argv[0], &data.chat) &&
                 try_parse(argv[1], &data.observe))
-                pkt = TgBotCommandPacket(cmd, data);
+                pkt = Packet(cmd, data);
         } break;
-        case CMD_SEND_FILE_TO_CHAT_ID: {
-            TgBotCommandData::SendFileToChatId data{};
-            if (try_parse(argv[0], &data.id) &&
-                parseOneEnum(&data.type, TgBotCommandData::TYPE_MAX, argv[1],
+        case Command::CMD_SEND_FILE_TO_CHAT_ID: {
+            data::SendFileToChatId data{};
+            if (try_parse(argv[0], &data.chat) &&
+                parseOneEnum(&data.fileType, data::FileType::TYPE_MAX, argv[1],
                              "type")) {
-                copyToStrBuf(data.filepath, argv[2]);
-                pkt = TgBotCommandPacket(cmd, data);
+                copyToStrBuf(data.filePath, argv[2]);
+                pkt = Packet(cmd, data);
             }
         } break;
-        case CMD_OBSERVE_ALL_CHATS: {
-            TgBotCommandData::ObserveAllChats data = false;
-            if (try_parse(argv[0], &data)) {
-                pkt = TgBotCommandPacket(cmd, data);
+        case Command::CMD_OBSERVE_ALL_CHATS: {
+            data::ObserveAllChats data{};
+            if (try_parse(argv[0], &data.observe)) {
+                pkt = Packet(cmd, data);
             }
         } break;
-        case CMD_DELETE_CONTROLLER_BY_ID: {
+        case Command::CMD_DELETE_CONTROLLER_BY_ID: {
             SingleThreadCtrlManager::ThreadUsage data{};
             if (parseOneEnum(&data, SingleThreadCtrlManager::USAGE_MAX, argv[0],
                              "usage")) {
-                pkt = TgBotCommandPacket(cmd, data);
+                pkt = Packet(cmd, data);
             }
         }
-        case CMD_GET_UPTIME: {
+        case Command::CMD_GET_UPTIME: {
             // Data is unused in this case
-            pkt = TgBotCommandPacket(cmd, 1);
+            pkt = Packet(cmd, 1);
             break;
         }
-        case CMD_UPLOAD_FILE: {
-            pkt = fileData_fromFile(CMD_UPLOAD_FILE, argv[0], argv[1]);
+        case Command::CMD_UPLOAD_FILE: {
+            FileDataHelper::DataFromFileParam params;
+            params.filepath = argv[0];
+            params.destfilepath = argv[1];
+            params.options.hash_ignore = false;  //= true;
+            params.options.overwrite = true;
+            pkt = FileDataHelper::DataFromFile<FileDataHelper::UPLOAD_FILE_DRY>(
+                params);
+            p = params;
             break;
         }
-        case CMD_DOWNLOAD_FILE: {
-            TgBotCommandData::DownloadFile data{};
+        case Command::CMD_DOWNLOAD_FILE: {
+            data::DownloadFile data{};
             copyToStrBuf(data.filepath, argv[0]);
             copyToStrBuf(data.destfilename, argv[1]);
-            pkt = TgBotCommandPacket(cmd, &data, sizeof(data));
+            pkt = Packet(cmd, &data, sizeof(data));
             break;
         }
         default:
-            LOG(FATAL) << "Unhandled command: " << TgBotCmd::toStr(cmd);
+            LOG(FATAL) << "Unhandled command: " << CommandHelpers::toStr(cmd);
     };
 
     if (!pkt) {
         LOG(ERROR) << "Failed parsing arguments for "
-                   << TgBotCmd::toStr(cmd).c_str();
+                   << CommandHelpers::toStr(cmd).c_str();
         return EXIT_FAILURE;
     } else {
         boost::crc_32_type crc;

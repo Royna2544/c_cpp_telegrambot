@@ -71,3 +71,8 @@ void SocketInterfaceBase::LocalHelper::cleanupServerSocket() {
 void SocketInterfaceBase::LocalHelper::doGetRemoteAddr(socket_handle_t socket) {
     LOG(INFO) << "Client connected via local socket";
 }
+
+std::filesystem::path SocketInterfaceBase::LocalHelper::getSocketPath() {
+    static auto spath = std::filesystem::temp_directory_path() / "tgbot.sock";
+    return spath;
+}

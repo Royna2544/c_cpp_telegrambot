@@ -12,23 +12,24 @@ using HandleState = TgBotSocketParser::HandleState;
 
 HandleState TgBotSocketParser::handle_PacketHeader(
     std::optional<SharedMalloc>& socketData,
-    std::optional<TgBotCommandPacket>& pkt) {
+    std::optional<TgBotSocket::Packet>& pkt) {
     int64_t diff = 0;
 
-    if (!socketData || socketData.value()->size != TgBotCommandPacket::hdr_sz) {
+    if (!socketData ||
+        socketData.value()->size != TgBotSocket::Packet::hdr_sz) {
         LOG(ERROR) << "Failed to read from socket";
         return HandleState::Fail;
     }
-    pkt = TgBotCommandPacket(TgBotCommandPacket::hdr_sz);
+    pkt = TgBotSocket::Packet(TgBotSocket::Packet::hdr_sz);
     socketData->assignTo(pkt->header);
 
-    diff = pkt->header.magic - TgBotCommandPacketHeader::MAGIC_VALUE_BASE;
-    if (diff != TgBotCommandPacketHeader::DATA_VERSION) {
+    diff = pkt->header.magic - TgBotSocket::PacketHeader::MAGIC_VALUE_BASE;
+    if (diff != TgBotSocket::PacketHeader::DATA_VERSION) {
         LOG(WARNING) << "Invalid magic value, dropping buffer";
         if (diff >= 0) {
             LOG(INFO) << "This packet contains header data version " << diff
                       << ", but we have version "
-                      << TgBotCommandPacketHeader::DATA_VERSION;
+                      << TgBotSocket::PacketHeader::DATA_VERSION;
         }
         return HandleState::Ignore;
     }
@@ -38,11 +39,11 @@ HandleState TgBotSocketParser::handle_PacketHeader(
 
 HandleState TgBotSocketParser::handle_Packet(
     std::optional<SharedMalloc>& socketData,
-    std::optional<TgBotCommandPacket>& pkt) {
+    std::optional<TgBotSocket::Packet>& pkt) {
     boost::crc_32_type crc;
 
-    if (TgBotCmd::isClientCommand(pkt->header.cmd)) {
-        LOG(INFO) << "Received buf with " << TgBotCmd::toStr(pkt->header.cmd)
+    if (TgBotSocket::CommandHelpers::isClientCommand(pkt->header.cmd)) {
+        LOG(INFO) << "Received buf with " << TgBotSocket::CommandHelpers::toStr(pkt->header.cmd)
                   << ", invoke callback!";
     }
 
@@ -62,7 +63,7 @@ HandleState TgBotSocketParser::handle_Packet(
         return HandleState::Ignore;
     }
 
-    pkt->data->size = TgBotCommandPacket::hdr_sz + pkt->header.data_size;
+    pkt->data->size = TgBotSocket::Packet::hdr_sz + pkt->header.data_size;
     pkt->data->alloc();
     socketData->assignTo(pkt->data.get(), pkt->header.data_size);
 
@@ -71,10 +72,10 @@ HandleState TgBotSocketParser::handle_Packet(
 
 bool TgBotSocketParser::onNewBuffer(SocketConnContext ctx) {
     std::optional<SharedMalloc> data;
-    std::optional<TgBotCommandPacket> pkt;
+    std::optional<TgBotSocket::Packet> pkt;
     bool ret = false;
 
-    data = interface->readFromSocket(ctx, sizeof(TgBotCommandPacketHeader));
+    data = interface->readFromSocket(ctx, sizeof(TgBotSocket::PacketHeader));
     switch (handle_PacketHeader(data, pkt)) {
         case HandleState::Ok: {
             data = interface->readFromSocket(ctx, pkt->header.data_size);

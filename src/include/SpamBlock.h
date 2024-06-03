@@ -19,7 +19,7 @@
 #include <mutex>
 
 #ifdef SOCKET_CONNECTION
-using namespace TgBotCommandData;
+using namespace TgBotSocket::data;
 extern CtrlSpamBlock gSpamBlockCfg;
 #endif
 

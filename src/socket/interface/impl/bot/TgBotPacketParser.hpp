@@ -26,7 +26,7 @@ struct TgBotSocketParser {
      */
     [[nodiscard]] static HandleState handle_PacketHeader(
         std::optional<SharedMalloc> &socketData,
-        std::optional<TgBotCommandPacket> &pkt);
+        std::optional<TgBotSocket::Packet> &pkt);
 
     /**
      * @brief Reads a packet from the socket.
@@ -38,10 +38,10 @@ struct TgBotSocketParser {
      */
     [[nodiscard]] static HandleState handle_Packet(
         std::optional<SharedMalloc> &socketData,
-        std::optional<TgBotCommandPacket> &pkt);
+        std::optional<TgBotSocket::Packet> &pkt);
 
     virtual void handle_CommandPacket(SocketConnContext ctx,
-                                      TgBotCommandPacket commandPacket) = 0;
+                                      TgBotSocket::Packet commandPacket) = 0;
 
     explicit TgBotSocketParser(SocketInterfaceBase *interface)
         : interface(interface) {}

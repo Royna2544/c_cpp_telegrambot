@@ -6,7 +6,6 @@
 #include <utility>
 
 #include "SharedMalloc.hpp"
-#include "SocketDescriptor_defs.hpp"
 
 void SocketInterfaceBase::setOptions(Options opt, const std::string data,
                                      bool persistent) {
