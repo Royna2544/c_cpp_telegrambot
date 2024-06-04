@@ -9,17 +9,18 @@
 #include <rapidjson/rapidjson.h>
 #include <tgbot/types/InputFile.h>
 
+#include <TgBotSocket_Export.hpp>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <impl/bot/TgBotSocketFileHelper.hpp>
 #include <impl/bot/TgBotSocketInterface.hpp>
 #include <mutex>
+#include <socket/TgBotCommandMap.hpp>
 #include <utility>
 #include <variant>
 
-#include <TgBotSocket_Export.hpp>
-#include <socket/TgBotCommandMap.hpp>
+#include "tgbot/TgException.h"
 
 using TgBot::Api;
 using TgBot::InputFile;
@@ -145,7 +146,11 @@ GenericAck SocketInterfaceTgBot::handle_SendFileToChatId(const void* ptr) {
                 return GenericAck();
             }
             default:
-                fn = [](const Api&, ChatId, const FileOrId_t&) {
+                fn = [data](const Api&, ChatId, const FileOrId_t&) {
+                    throw TgBot::TgException(
+                        "Invalid file type: " +
+                            std::to_string(static_cast<int>(data->fileType)),
+                        TgBot::TgException::ErrorCode::Undefined);
                     return nullptr;
                 };
                 break;
