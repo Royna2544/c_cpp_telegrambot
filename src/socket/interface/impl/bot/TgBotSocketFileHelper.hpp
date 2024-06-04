@@ -12,8 +12,7 @@
 #include <string>
 #include <system_error>
 
-#include "SocketBase.hpp"
-#include "TgBotSocket_Export.hpp"
+#include <TgBotSocket_Export.hpp>
 
 template <size_t size>
 inline void copyTo(std::array<char, size>& arr_in, const char* buf) {
@@ -21,7 +20,7 @@ inline void copyTo(std::array<char, size>& arr_in, const char* buf) {
 }
 
 namespace FileDataHelper {
-using len_t = SocketInterfaceBase::buffer_len_t;
+using len_t = uint64_t;
 using RAIIMalloc = std::unique_ptr<void, decltype(&free)>;
 
 enum Pass {
@@ -29,6 +28,7 @@ enum Pass {
     UPLOAD_FILE,
     DOWNLOAD_FILE,
 };
+
 struct DataFromFileParam {
     std::filesystem::path filepath;
     std::filesystem::path destfilepath;
@@ -60,22 +60,22 @@ bool DataToFile<DOWNLOAD_FILE>(const void* ptr, len_t len);
 
 template <Pass p>
 static std::optional<TgBotSocket::Packet> DataFromFile(
-    const DataFromFileParam&) = delete;
+    const DataFromFileParam& params) = delete;
 
 // Client ->
 template <>
 std::optional<TgBotSocket::Packet> DataFromFile<UPLOAD_FILE>(
-    const DataFromFileParam&);
+    const DataFromFileParam& params);
 
 // Client ->
 template <>
 std::optional<TgBotSocket::Packet> DataFromFile<UPLOAD_FILE_DRY>(
-    const DataFromFileParam&);
+    const DataFromFileParam& params);
 
 // Server ->
 template <>
 std::optional<TgBotSocket::Packet> DataFromFile<DOWNLOAD_FILE>(
-    const DataFromFileParam&);
+    const DataFromFileParam& params);
 };  // namespace FileDataHelper
 
 // Implementation starts
@@ -211,7 +211,7 @@ bool FileDataHelper::DataToFile<FileDataHelper::DOWNLOAD_FILE>(const void* ptr,
                                                                len_t len) {
     const auto* data = static_cast<const DownloadFile*>(ptr);
 
-    return writeFileCommon(data->filepath.data(), &data->buf[0],
+    return writeFileCommon(data->destfilename.data(), &data->buf[0],
                            len - sizeof(DownloadFile));
 }
 
@@ -294,7 +294,7 @@ FileDataHelper::DataFromFile<FileDataHelper::DOWNLOAD_FILE>(
     }
     // Create result packet buffer
     auto resultPointer = createMemory(result->size + sizeof(DownloadFile));
-    // The front bytes of the buffer is UploadFile, hence cast it
+    // The front bytes of the buffer is DownloadFile, hence cast it
     auto* downloadFile = static_cast<DownloadFile*>(resultPointer.get());
     // Copy destination file name info to the buffer
     copyTo(downloadFile->destfilename, params.destfilepath.string().c_str());

@@ -239,7 +239,7 @@ int main(int argc, char** argv) {
             data::DownloadFile data{};
             copyToStrBuf(data.filepath, argv[0]);
             copyToStrBuf(data.destfilename, argv[1]);
-            pkt = Packet(cmd, &data, sizeof(data));
+            pkt = Packet(cmd, data);
             break;
         }
         default:
