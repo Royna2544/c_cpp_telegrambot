@@ -1,6 +1,6 @@
 #pragma once
 
-#include <socket/TgBotSocket.h>
+#include <TgBotSocket_Export.hpp>
 
 #include <SocketBase.hpp>
 #include <optional>

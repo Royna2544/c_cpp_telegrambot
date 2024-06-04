@@ -1,15 +1,11 @@
-#include <CStringLifetime.h>
 #include <absl/log/log.h>
-#include <socket/TgBotSocket.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-#include <unistd.h>
 
 #include <cerrno>
 #include <impl/SocketPosix.hpp>
 
 #include "SocketBase.hpp"
-#include "SocketDescriptor_defs.hpp"
 
 bool SocketInterfaceUnixLocal::createLocalSocket(SocketConnContext *ctx) {
     ctx->cfd = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -29,7 +25,8 @@ std::optional<socket_handle_t> SocketInterfaceUnixLocal::createServerSocket() {
     SocketConnContext ret = SocketConnContext::create<sockaddr_un>();
     const auto *_name = reinterpret_cast<struct sockaddr *>(ret.addr.get());
 
-    setOptions(Options::DESTINATION_ADDRESS, LocalHelper::getSocketPath().string());
+    setOptions(Options::DESTINATION_ADDRESS,
+               LocalHelper::getSocketPath().string());
     LOG(INFO) << "Creating socket at " << LocalHelper::getSocketPath().string();
     if (!createLocalSocket(&ret)) {
         return std::nullopt;
@@ -52,11 +49,13 @@ std::optional<socket_handle_t> SocketInterfaceUnixLocal::createServerSocket() {
     return ret.cfd;
 }
 
-std::optional<SocketConnContext> SocketInterfaceUnixLocal::createClientSocket() {
+std::optional<SocketConnContext>
+SocketInterfaceUnixLocal::createClientSocket() {
     SocketConnContext ret = SocketConnContext::create<sockaddr_un>();
     const auto *_name = reinterpret_cast<struct sockaddr *>(ret.addr.get());
 
-    setOptions(Options::DESTINATION_ADDRESS, LocalHelper::getSocketPath().string());
+    setOptions(Options::DESTINATION_ADDRESS,
+               LocalHelper::getSocketPath().string());
     if (!createLocalSocket(&ret)) {
         return std::nullopt;
     }

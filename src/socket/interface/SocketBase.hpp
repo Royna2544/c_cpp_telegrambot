@@ -1,6 +1,6 @@
 #pragma once
 
-#include <socket/TgBotSocket.h>
+#include <TgBotSocket_Export.hpp>
 
 #include <SocketDescriptor_defs.hpp>
 #include <cstdint>
@@ -8,8 +8,6 @@
 #include <functional>
 #include <optional>
 #include <string>
-
-#include "SharedMalloc.hpp"
 
 struct SocketConnContext {
     socket_handle_t cfd{};  // connection socket file descriptor

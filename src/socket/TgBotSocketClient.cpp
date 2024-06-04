@@ -2,11 +2,9 @@
 #include <absl/log/log.h>
 
 #include <AbslLogInit.hpp>
-#include <LogSinks.hpp>
 #include <TryParseStr.hpp>
 #include <boost/crc.hpp>
 #include <cstddef>
-#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <impl/bot/ClientBackend.hpp>
@@ -16,11 +14,8 @@
 #include <optional>
 #include <string>
 
-#include "SharedMalloc.hpp"
-#include "TgBotCommandExport.hpp"
-
-// Come last
-#include <socket/TgBotSocket.h>
+#include <TgBotSocket_Export.hpp>
+#include "TgBotCommandMap.hpp"
 
 using namespace TgBotSocket;
 

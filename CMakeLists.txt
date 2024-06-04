@@ -357,7 +357,6 @@ add_library(
   src/ConfigManager_${TARGET_VARIANT}.cpp
   src/SingleThreadCtrl.cpp
   src/SingleThreadCtrlManager.cpp
-  src/SharedMalloc.cpp
   src/ResourceManager.cpp
   src/GitData.cpp
   src/popen_wdt/popen_wdt_${TARGET_VARIANT}.c

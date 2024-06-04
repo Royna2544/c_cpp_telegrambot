@@ -2,7 +2,6 @@
 
 #include <absl/log/log.h>
 #include <openssl/sha.h>
-#include <socket/TgBotSocket.h>
 
 #include <array>
 #include <cstdint>
@@ -14,7 +13,7 @@
 #include <system_error>
 
 #include "SocketBase.hpp"
-#include "TgBotCommandExport.hpp"
+#include "TgBotSocket_Export.hpp"
 
 template <size_t size>
 inline void copyTo(std::array<char, size>& arr_in, const char* buf) {

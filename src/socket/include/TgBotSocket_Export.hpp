@@ -3,12 +3,14 @@
 // A header export for the TgBot's socket connection
 
 #include <openssl/sha.h>
+#include <zlib.h>
 
 #include <array>
 #include <cstdint>
 #include <cstring>
 #include <string>
 
+#include "../../include/SharedMalloc.hpp"
 #include "../../include/Types.h"
 
 namespace TgBotSocket {
@@ -57,6 +59,59 @@ struct PacketHeader {
     Command cmd{};                ///< Command to be executed
     length_type data_size{};      ///< Size of the data in the packet
     uint32_t checksum{};          ///< Checksum of the packet data
+};
+
+/**
+ * @brief Packet for sending commands to the server
+ *
+ * @code data_ptr is only vaild for this scope: This should not be sent, instead
+ * it must be memcpy'd
+ *
+ * This packet is used to send commands to the server.
+ * It contains a header, which contains the magic value, the command, and the
+ * size of the data. The data is then followed by the actual data.
+ */
+struct Packet {
+    static constexpr auto hdr_sz = sizeof(PacketHeader);
+    using header_type = PacketHeader;
+    header_type header{};
+    SharedMalloc data;
+
+    explicit Packet(header_type::length_type length) : data(length) {
+        header.magic = header_type::MAGIC_VALUE;
+        header.data_size = length;
+    }
+
+    // Constructor that takes malloc
+    template <typename T>
+    explicit Packet(Command cmd, T data) : Packet(cmd, &data, sizeof(T)) {
+        static_assert(!std::is_pointer_v<T>,
+                      "This constructor should not be used with a pointer");
+    }
+
+    // Constructor that takes pointer, uses malloc but with size
+    template <typename T>
+    explicit Packet(Command cmd, T in_data, std::size_t size) : data(size) {
+        static_assert(std::is_pointer_v<T>,
+                      "This constructor should not be used with non pointer");
+        header.cmd = cmd;
+        header.magic = header_type::MAGIC_VALUE;
+        header.data_size = size;
+        memcpy(data.get(), in_data, header.data_size);
+        uLong crc = crc32(0L, Z_NULL, 0);  // Initial value
+        header.checksum =
+            crc32(crc, reinterpret_cast<Bytef*>(data.get()), header.data_size);
+    }
+
+    // Converts to full SocketData object, including header
+    SharedMalloc toSocketData() {
+        data->size = hdr_sz + header.data_size;
+        data->alloc();
+        memmove(static_cast<char*>(data.get()) + hdr_sz, data.get(),
+                header.data_size);
+        memcpy(data.get(), &header, hdr_sz);
+        return data;
+    }
 };
 
 namespace data {
@@ -178,11 +233,11 @@ ASSERT_SIZE(DeleteControllerById, 4);
 ASSERT_SIZE(UploadFile, 291);
 ASSERT_SIZE(DownloadFile, 512);
 ASSERT_SIZE(PacketHeader, 32);
-}
+}  // namespace TgBotSocket::data
 
 namespace TgBotSocket::callback {
 ASSERT_SIZE(GetUptimeCallback, 21);
 ASSERT_SIZE(GenericAck, 260);
-}
+}  // namespace TgBotSocket::callback
 
 #undef ASSERT_SIZE

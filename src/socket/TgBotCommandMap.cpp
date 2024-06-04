@@ -4,8 +4,7 @@
 #include <mutex>
 #include <sstream>
 
-#include "TgBotCommandExport.hpp"
-#include "TgBotSocket.h"
+#include <TgBotSocket_Export.hpp>
 
 #define ARGUMENT_SIZE(enum, len) array_helpers::make_elem(Command::enum, len)
 

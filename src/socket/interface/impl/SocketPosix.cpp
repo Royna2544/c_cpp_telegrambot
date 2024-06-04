@@ -1,7 +1,6 @@
 #include "SocketPosix.hpp"
 
 #include <absl/log/log.h>
-#include <socket/TgBotSocket.h>
 #include <sys/socket.h>
 #include <unistd.h>
 

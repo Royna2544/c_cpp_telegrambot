@@ -1,5 +1,5 @@
 #include <Types.h>
-#include <socket/TgBotSocket.h>
+#include <socket/include/TgBotSocket_Export.hpp>
 
 #include <AbslLogInit.hpp>
 #include <DatabaseBot.hpp>
@@ -7,9 +7,6 @@
 #include <cstring>
 #include <impl/bot/ClientBackend.hpp>
 #include <iostream>
-#include <string>
-#include "TgBotCommandExport.hpp"
-
 
 [[noreturn]] static void usage(const char* argv0, const int exitCode) {
     std::cerr << "Usage: " << argv0 << " <chatId> <name stored in DB>"

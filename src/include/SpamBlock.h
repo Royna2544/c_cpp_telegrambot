@@ -12,7 +12,7 @@
 #include "OnAnyMessageRegister.hpp"
 
 #ifdef SOCKET_CONNECTION
-#include <socket/TgBotSocket.h>
+#include <socket/include/TgBotSocket_Export.hpp>
 #endif
 
 #include <map>

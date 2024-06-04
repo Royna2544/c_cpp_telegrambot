@@ -1,8 +1,5 @@
 #include <impl/SocketWindows.hpp>
 
-#include "SocketBase.hpp"
-#include "socket/TgBotSocket.h"
-
 // clang-format off
 #include <winsock2.h>
 #include <winsock.h>

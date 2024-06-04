@@ -15,7 +15,6 @@ using std::chrono_literals::operator""s;
 using TgBot::ChatPermissions;
 
 #ifdef SOCKET_CONNECTION
-#include <socket/TgBotSocket.h>
 TgBotSocket::data::CtrlSpamBlock gSpamBlockCfg = CtrlSpamBlock::CTRL_ON;
 #endif
 

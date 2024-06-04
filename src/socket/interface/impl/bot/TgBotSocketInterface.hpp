@@ -1,6 +1,5 @@
 #include <BotClassBase.h>
 #include <SingleThreadCtrl.h>
-#include <socket/TgBotSocket.h>
 
 #include <SocketBase.hpp>
 #include <functional>

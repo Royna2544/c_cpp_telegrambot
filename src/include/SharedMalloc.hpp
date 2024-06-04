@@ -1,28 +1,13 @@
 #pragma once
 
+#include <absl/log/check.h>
+
 #include <cstddef>
 #include <cstdlib>
 #include <memory>
 #include <type_traits>
 
-#include <absl/log/check.h>
 #include "internal/_class_helper_macros.h"
-
-struct SharedMallocParent;
-
-struct SharedMallocChild {
-    template <typename T>
-    explicit operator const T *() const {
-        return static_cast<T *>(m_data);
-    }
-    [[nodiscard]] void *get() const { return m_data; }
-
-    explicit SharedMallocChild(std::shared_ptr<SharedMallocParent> parent);
-
-   private:
-    std::shared_ptr<SharedMallocParent> parent;
-    void *m_data{};
-};
 
 struct SharedMallocParent {
     explicit SharedMallocParent(size_t size)
@@ -37,10 +22,36 @@ struct SharedMallocParent {
     friend struct SharedMallocChild;
 
     // alloc allocates a new shared memory block of the specified size
-    void alloc();
+    void alloc() {
+        if (data == nullptr) {
+            data.reset(malloc(size));
+        } else {
+            data.reset(realloc(data.release(), size));
+        }
+        if (data == nullptr) {
+            throw std::bad_alloc();
+        }
+    }
+
     size_t size{};
+
    private:
     std::unique_ptr<void, decltype(&free)> data;
+};
+
+struct SharedMallocChild {
+    template <typename T>
+    explicit operator const T *() const {
+        return static_cast<T *>(m_data);
+    }
+    [[nodiscard]] void *get() const { return m_data; }
+
+    explicit SharedMallocChild(std::shared_ptr<SharedMallocParent> _parent)
+        : parent(std::move(_parent)), m_data(parent->data.get()) {}
+
+   private:
+    std::shared_ptr<SharedMallocParent> parent;
+    void *m_data{};
 };
 
 struct SharedMalloc {
@@ -48,7 +59,7 @@ struct SharedMalloc {
         parent = std::make_shared<SharedMallocParent>(size);
     }
     template <typename T>
-    requires (!std::is_pointer_v<T> && !std::is_integral_v<T>)
+        requires(!std::is_pointer_v<T> && !std::is_integral_v<T>)
     explicit SharedMalloc(T value) {
         parent = std::make_shared<SharedMallocParent>(sizeof(T));
         memcpy(get(), &value, sizeof(T));
@@ -57,7 +68,7 @@ struct SharedMalloc {
     NO_DEFAULT_CTOR(SharedMalloc);
     SharedMallocParent *operator->() { return parent.get(); }
     bool operator!=(std::nullptr_t value) { return parent.get() != value; }
-    
+
     template <typename T>
     explicit operator T() const {
         T value;
@@ -71,20 +82,23 @@ struct SharedMalloc {
     }
 
     template <typename T>
-    requires (!std::is_pointer_v<T>)
+        requires(!std::is_pointer_v<T>)
     void assignTo(T &ref) const {
         assignTo(&ref, sizeof(T));
     }
 
     template <typename T>
-    requires (!std::is_pointer_v<T>)
+        requires(!std::is_pointer_v<T>)
     void assignFrom(T &ref) {
-        CHECK(sizeof(T) == parent->size) << "Must have same size to assign from";
+        CHECK(sizeof(T) == parent->size)
+            << "Must have same size to assign from";
         memcpy(get(), &ref, sizeof(T));
     }
 
     // get returns a shared pointer to the shared memory block
-    [[nodiscard]] SharedMallocChild getChild() const noexcept;
+    [[nodiscard]] SharedMallocChild getChild() const noexcept {
+        return SharedMallocChild(parent);
+    }
     [[nodiscard]] void *get() const noexcept { return getChild().get(); }
     [[nodiscard]] long use_count() const noexcept { return parent.use_count(); }
 

@@ -9,21 +9,17 @@
 #include <rapidjson/rapidjson.h>
 #include <tgbot/types/InputFile.h>
 
-#include <DatabaseBot.hpp>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <impl/bot/TgBotSocketFileHelper.hpp>
 #include <impl/bot/TgBotSocketInterface.hpp>
 #include <mutex>
-#include <optional>
 #include <utility>
 #include <variant>
 
-#include "TgBotCommandExport.hpp"
-
-// Come last
-#include <socket/TgBotSocket.h>
+#include <TgBotSocket_Export.hpp>
+#include <socket/TgBotCommandMap.hpp>
 
 using TgBot::Api;
 using TgBot::InputFile;

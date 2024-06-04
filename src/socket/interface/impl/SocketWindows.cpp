@@ -7,7 +7,6 @@
 #include <impl/SocketWindows.hpp>
 #include <socket/selector/SelectorWindows.hpp>
 
-#include "SharedMalloc.hpp"
 #include "SocketBase.hpp"
 #include "SocketDescriptor_defs.hpp"
 
