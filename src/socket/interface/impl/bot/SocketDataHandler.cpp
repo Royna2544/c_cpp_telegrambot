@@ -150,6 +150,7 @@ GenericAck SocketInterfaceTgBot::handle_SendFileToChatId(const void* ptr) {
                 };
                 break;
         }
+        DLOG(INFO) << "Sending " << file << " to " << data->chat;
         // Try to send as local file first
         try {
             fn(_bot.getApi(), data->chat,
@@ -303,7 +304,7 @@ void SocketInterfaceTgBot::handle_CommandPacket(SocketConnContext ctx,
             GenericAck result = std::get<GenericAck>(ret);
             Packet ackpkt(Command::CMD_UPLOAD_FILE_DRY_CALLBACK, &result,
                           sizeof(GenericAck));
-            LOG(INFO) << "Sending ack: " << std::boolalpha
+            LOG(INFO) << "Sending CMD_UPLOAD_FILE_DRY ack: " << std::boolalpha
                       << (result.result == AckType::SUCCESS);
             interface->writeToSocket(ctx, ackpkt.toSocketData());
             break;
