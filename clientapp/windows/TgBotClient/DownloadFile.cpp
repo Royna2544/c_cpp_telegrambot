@@ -4,8 +4,8 @@
 #include <process.h>
 #include <tchar.h>
 
-#include <map>
 #include <array>
+#include <map>
 #include <optional>
 
 #include "../../../src/include/TryParseStr.hpp"
@@ -15,10 +15,9 @@
 
 namespace {
 
-struct SendFileInput {
-    ChatId chatid;
-    char filePath[MAX_PATH_SIZE];
-    FileType fileType;
+struct DownloadFileInput {
+    char srcFilePath[MAX_PATH_SIZE];
+    char destFilePath[MAX_PATH_SIZE];
     HWND dialog;
 };
 
@@ -41,7 +40,7 @@ std::optional<StringLoader::String> OpenFilePicker(HWND hwnd) {
     ofn.lpstrFileTitle = NULL;
     ofn.nMaxFileTitle = 0;
     ofn.lpstrInitialDir = NULL;
-    ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
+    ofn.Flags = 0;
 
     // Display the Open dialog box
     if (GetOpenFileName(&ofn) == TRUE) return ofn.lpstrFile;
@@ -49,64 +48,42 @@ std::optional<StringLoader::String> OpenFilePicker(HWND hwnd) {
 }
 
 unsigned __stdcall SendFileTask(void* param) {
-    const auto* in = (SendFileInput*)param;
+    const auto* in = (DownloadFileInput*)param;
     GenericAck* result = nullptr;
 
     result = allocMem<GenericAck>();
     if (result == nullptr) {
-        PostMessage(in->dialog, WM_SENDFILE_RESULT, 0, (LPARAM) nullptr);
+        PostMessage(in->dialog, WM_DLFILE_RESULT, 0, (LPARAM) nullptr);
         free(param);
         return 0;
     }
-    sendFileToChat(in->chatid, in->filePath, in->fileType, 
-        [result](const GenericAck* data) { 
-         *result = *data;
-    });
+    downloadFile(in->destFilePath, in->srcFilePath,
+                 [result](const GenericAck* ack) { *result = *ack; });
 
-    PostMessage(in->dialog, WM_SENDFILE_RESULT, 0, (LPARAM)result);
+    PostMessage(in->dialog, WM_DLFILE_RESULT, 0, (LPARAM)result);
     free(param);
     return 0;
 }
 
-void updateToType(std::map<FileType, HWND>& ref_in, FileType& type, FileType toUpdate) { 
-    if (type != toUpdate) {
-        SendMessage(ref_in[type], BM_SETCHECK, BST_UNCHECKED, 0);
-        SendMessage(ref_in[toUpdate], BM_SETCHECK, BST_CHECKED, 0);
-        type = toUpdate;
-    }
-}
 }  // namespace
 
-INT_PTR CALLBACK SendFileToChat(HWND hDlg, UINT message, WPARAM wParam,
-                                LPARAM lParam) {
-    static HWND hChatId;
+INT_PTR CALLBACK DownloadFileFn(HWND hDlg, UINT message, WPARAM wParam,
+                              LPARAM lParam) {
+    static HWND hRemoteFilepath;
     static HWND hFileText;
     static HWND hFileButton;
-    static HWND hFileAsDoc;
-    static HWND hFileAsPic;
     static BlockingOperation blk;
-    static FileType type;
-    static std::map<FileType, HWND> refs = {
-        {FileType::TYPE_DOCUMENT, hFileAsDoc},
-        {FileType::TYPE_PHOTO, hFileAsDoc}
-    };
 
     UNREFERENCED_PARAMETER(lParam);
 
     switch (message) {
         case WM_INITDIALOG:
-            hChatId = GetDlgItem(hDlg, IDC_CHATID);
+            hRemoteFilepath = GetDlgItem(hDlg, IDC_REMOTE_FILEPATH);
             hFileButton = GetDlgItem(hDlg, IDC_BROWSE);
             hFileText = GetDlgItem(hDlg, IDC_SEL_FILE);
-            hFileAsDoc = GetDlgItem(hDlg, IDC_ASFILE);
-            hFileAsPic = GetDlgItem(hDlg, IDC_ASPHOTO);
-
-            // Default type: Document
-            SendMessage(hFileAsDoc, BM_SETCHECK, BST_CHECKED, 0);
-            type = FileType::TYPE_DOCUMENT;
 
             // Focus to only one input section
-            SetFocus(hChatId);
+            SetFocus(hRemoteFilepath);
             return DIALOG_OK;
 
         case WM_COMMAND:
@@ -116,40 +93,29 @@ INT_PTR CALLBACK SendFileToChat(HWND hDlg, UINT message, WPARAM wParam,
 
             switch (LOWORD(wParam)) {
                 case IDSEND: {
-                    ChatId chatid = 0;
-                    std::array<TCHAR, 64 + 1> chatidbuf = {};
-                    std::array<char, MAX_PATH_SIZE> pathbuf = {};
-                    std::optional<StringLoader::String> errtext;
-                    bool fail = false;
+                    std::array<char, MAX_PATH_SIZE> srcbuf = {};
+                    std::array<char, MAX_PATH_SIZE> destbuf = {};
                     auto& loader = StringLoader::getInstance();
 
-                    GetDlgItemText(hDlg, IDC_CHATID, chatidbuf.data(),
-                                   chatidbuf.size() - 1);
-                    GetDlgItemTextA(hDlg, IDC_SEL_FILE, pathbuf.data(),
-                                    pathbuf.size());
+                    GetDlgItemTextA(hDlg, IDC_REMOTE_FILEPATH, srcbuf.data(),
+                                    srcbuf.size() - 1);
+                    GetDlgItemTextA(hDlg, IDC_SEL_FILE, destbuf.data(),
+                                   destbuf.size());
 
-                    if (Length(chatidbuf.data()) == 0) {
-                        errtext = loader.getString(IDS_CHATID_EMPTY);
-                    } else if (!try_parse(chatidbuf.data(), &chatid)) {
-                        errtext = loader.getString(IDS_CHATID_NOTINT);
-                    }
-                    if (!errtext.has_value()) {
-                        auto* in = allocMem<SendFileInput>();
+                    auto* in = allocMem<DownloadFileInput>();
 
-                        if (in) {
-                            blk.start();
-                            in->chatid = chatid;
-                            in->dialog = hDlg;
-                            strncpy(in->filePath, pathbuf.data(),
-                                    MAX_PATH_SIZE - 1);
-                            in->filePath[MAX_PATH_SIZE - 1] = 0;
-                            _beginthreadex(NULL, 0, SendFileTask, in, 0, NULL);
-                        } else {
-                            errtext = _T("Failed to allocate memory");
-                        }
-                    }
-                    if (errtext) {
-                        MessageBox(hDlg, errtext->c_str(),
+                    if (in) {
+                        blk.start();
+                        in->dialog = hDlg;
+                        strncpy(in->destFilePath, destbuf.data(),
+                                MAX_PATH_SIZE - 1);
+                        in->destFilePath[MAX_PATH_SIZE - 1] = 0;
+                        strncpy(in->srcFilePath, srcbuf.data(),
+                                MAX_PATH_SIZE - 1);
+                        in->srcFilePath[MAX_PATH_SIZE - 1] = 0;
+                        _beginthreadex(NULL, 0, SendFileTask, in, 0, NULL);
+                    } else {
+                        MessageBox(hDlg, _T("Failed to allocate memory"),
                                    loader.getString(IDS_FAILED).c_str(),
                                    ERROR_DIALOG);
                     }
@@ -164,12 +130,6 @@ INT_PTR CALLBACK SendFileToChat(HWND hDlg, UINT message, WPARAM wParam,
                 case IDCANCEL:
                     EndDialog(hDlg, LOWORD(wParam));
                     return DIALOG_OK;
-                case IDC_ASFILE:
-                    updateToType(refs, type, FileType::TYPE_DOCUMENT);
-                    break;
-                case IDC_ASPHOTO:
-                    updateToType(refs, type, FileType::TYPE_PHOTO);
-                    break;
                 default:
                     break;
             };
@@ -188,12 +148,10 @@ INT_PTR CALLBACK SendFileToChat(HWND hDlg, UINT message, WPARAM wParam,
                 errtext += loader.getString(IDS_CMD_FAILED_SVR_RSN);
                 errtext += charToWstring(res->error_msg.data());
                 MessageBox(hDlg, errtext.c_str(),
-                           loader.getString(IDS_FAILED).c_str(),
-                           ERROR_DIALOG);
+                           loader.getString(IDS_FAILED).c_str(), ERROR_DIALOG);
             } else {
                 MessageBox(hDlg, loader.getString(IDS_SUCCESS_FILESENT).c_str(),
-                           loader.getString(IDS_SUCCESS).c_str(),
-                           INFO_DIALOG);
+                           loader.getString(IDS_SUCCESS).c_str(), INFO_DIALOG);
             }
             blk.stop();
             free(reinterpret_cast<void*>(lParam));

@@ -33,8 +33,7 @@ unsigned __stdcall SendMsgTask(void* param) {
     sendMessageToChat(in->chatid, in->message, [result](const GenericAck* data) {
         result->success = data->result == AckType::SUCCESS;
         if (!result->success) {
-            strncpy(result->reason, data->error_msg,
-                    static_cast<size_t>(MAX_MSG_SIZE) - 1);
+            copyTo(result->reason, data->error_msg, MAX_MSG_SIZE);
         }
     });
 

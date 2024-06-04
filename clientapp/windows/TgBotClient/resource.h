@@ -25,12 +25,11 @@
 #define IDS_IPADDR_EMPTY                113
 #define IDS_MEMALLOC_FAIL               114
 #define IDS_OPERATION_ACTIVE            115
-#define IDS_MEMALLOC_FAIL2              115
 #define IDR_MAINFRAME                   128
 #define IDD_UPTIME_DLG                  130
-#define IDR_MENU1                       131
 #define IDR_MENU                        131
 #define IDD_DEST_DLG                    132
+#define IDD_RECVFILE_DLG                133
 #define IDC_LOAD                        1000
 #define IDC_CHATID                      1001
 #define IDC_MESSAGETXT                  1002
@@ -41,12 +40,16 @@
 #define IDC_INET_4                      1009
 #define IDC_INET_6                      1010
 #define IDC_IPADDR                      1011
+#define IDC_ASFILE                      1017
+#define IDC_ASPHOTO                     1018
+#define IDC_REMOTE_FILEPATH             1019
 #define ID_MENU_SENDFILE                32774
 #define ID_MENU_SENDMSG                 32775
 #define ID_MENU_UPTIME                  32777
 #define ID_HELP_WEBSITE                 32778
 #define IDM_WEBSITE                     32779
 #define ID_MENU_DESTIP                  32784
+#define ID_MENU_DOWNLOADFILE            32785
 #define IDC_STATIC                      -1
 
 // Next default values for new objects
@@ -55,8 +58,8 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NO_MFC                     1
 #define _APS_NEXT_RESOURCE_VALUE        133
-#define _APS_NEXT_COMMAND_VALUE         32785
-#define _APS_NEXT_CONTROL_VALUE         1012
+#define _APS_NEXT_COMMAND_VALUE         32786
+#define _APS_NEXT_CONTROL_VALUE         1020
 #define _APS_NEXT_SYMED_VALUE           110
 #endif
 #endif

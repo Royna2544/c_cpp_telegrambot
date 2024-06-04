@@ -74,6 +74,9 @@
     <ClCompile Include="BlockingOperation.cpp">
       <Filter>소스 파일\uihelper</Filter>
     </ClCompile>
+    <ClCompile Include="DownloadFile.cpp">
+      <Filter>소스 파일\ui</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="TgBotClient.rc">
