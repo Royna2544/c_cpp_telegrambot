@@ -107,6 +107,8 @@ INT_PTR CALLBACK SendFileToChat(HWND hDlg, UINT message, WPARAM wParam,
 
             // Focus to only one input section
             SetFocus(hChatId);
+
+            blk.init();
             return DIALOG_OK;
 
         case WM_COMMAND:
@@ -138,11 +140,13 @@ INT_PTR CALLBACK SendFileToChat(HWND hDlg, UINT message, WPARAM wParam,
 
                         if (in) {
                             blk.start();
+
                             in->chatid = chatid;
                             in->dialog = hDlg;
                             strncpy(in->filePath, pathbuf.data(),
                                     MAX_PATH_SIZE - 1);
                             in->filePath[MAX_PATH_SIZE - 1] = 0;
+                            in->fileType = type;
                             _beginthreadex(NULL, 0, SendFileTask, in, 0, NULL);
                         } else {
                             errtext = _T("Failed to allocate memory");

@@ -57,7 +57,11 @@ inline std::size_t Length(wchar_t* str) {
 
 template <typename T>
 T* allocMem() {
-    return static_cast<T*>(malloc(sizeof(T)));
+    T * mem = static_cast<T*>(malloc(sizeof(T)));
+    if (mem) {
+        ZeroMemory(mem, sizeof(T));
+    }
+    return mem;
 }
 
 inline std::wstring charToWstring(const char* charArray) {

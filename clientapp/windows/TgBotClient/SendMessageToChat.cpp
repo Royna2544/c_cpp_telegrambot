@@ -54,6 +54,7 @@ INT_PTR CALLBACK SendMsgToChat(HWND hDlg, UINT message, WPARAM wParam,
         case WM_INITDIALOG:
             hChatId = GetDlgItem(hDlg, IDC_CHATID);
             hMsgText = GetDlgItem(hDlg, IDC_MESSAGETXT);
+            blk.init();
             return DIALOG_OK;
 
         case WM_COMMAND:

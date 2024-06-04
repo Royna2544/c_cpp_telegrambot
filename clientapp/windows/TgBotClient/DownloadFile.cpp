@@ -84,6 +84,7 @@ INT_PTR CALLBACK DownloadFileFn(HWND hDlg, UINT message, WPARAM wParam,
 
             // Focus to only one input section
             SetFocus(hRemoteFilepath);
+            blk.init();
             return DIALOG_OK;
 
         case WM_COMMAND:
