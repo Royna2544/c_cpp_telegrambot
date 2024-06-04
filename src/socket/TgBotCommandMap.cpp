@@ -1,10 +1,10 @@
 #include <EnumArrayHelpers.h>
 #include <absl/log/log.h>
 
+#include <TgBotSocket_Export.hpp>
 #include <mutex>
 #include <sstream>
 
-#include <TgBotSocket_Export.hpp>
 
 #define ARGUMENT_SIZE(enum, len) array_helpers::make_elem(Command::enum, len)
 
@@ -23,11 +23,10 @@ constexpr auto kTgBotCommandStrMap =
         ENUM_AND_STR(CMD_SEND_FILE_TO_CHAT_ID),
         ENUM_AND_STR(CMD_OBSERVE_ALL_CHATS),
         ENUM_AND_STR(CMD_DELETE_CONTROLLER_BY_ID), ENUM_AND_STR(CMD_GET_UPTIME),
-        ENUM_AND_STR(CMD_UPLOAD_FILE), ENUM_AND_STR(CMD_DOWNLOAD_FILE),
-        ENUM_AND_STR(CMD_UPLOAD_FILE_DRY));
+        ENUM_AND_STR(CMD_UPLOAD_FILE), ENUM_AND_STR(CMD_DOWNLOAD_FILE));
 
 const auto kTgBotCommandArgsCount =
-    array_helpers::make<MAX_LEN - 1, TgBotSocket::Command, int>(
+    array_helpers::make<MAX_LEN, TgBotSocket::Command, int>(
         ARGUMENT_SIZE(CMD_WRITE_MSG_TO_CHAT_ID, 2),  // chatid, msg
         ARGUMENT_SIZE(CMD_CTRL_SPAMBLOCK, 1),        // policy
         ARGUMENT_SIZE(CMD_OBSERVE_CHAT_ID, 2),       // chatid, policy

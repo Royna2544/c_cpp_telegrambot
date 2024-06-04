@@ -26,7 +26,6 @@ enum class Command : std::int32_t {
     CMD_OBSERVE_ALL_CHATS,
     CMD_DELETE_CONTROLLER_BY_ID,
     CMD_GET_UPTIME,
-    CMD_UPLOAD_FILE_DRY,
     CMD_UPLOAD_FILE,
     CMD_DOWNLOAD_FILE,
     CMD_CLIENT_MAX,
@@ -35,6 +34,7 @@ enum class Command : std::int32_t {
     CMD_SERVER_INTERNAL_START = 100,
     CMD_GET_UPTIME_CALLBACK = CMD_SERVER_INTERNAL_START,
     CMD_GENERIC_ACK,
+    CMD_UPLOAD_FILE_DRY,
     CMD_UPLOAD_FILE_DRY_CALLBACK,
     CMD_DOWNLOAD_FILE_CALLBACK,
     CMD_MAX,
@@ -52,7 +52,8 @@ struct PacketHeader {
     // 1: Initial version
     // 2: Added crc32 checks to packet data
     // 3: Uploadfile has a sha256sum check, std::array conversions
-    constexpr static int DATA_VERSION = 3;
+    // 4: Move CMD_UPLOAD_FILE_DRY to internal namespace
+    constexpr static int DATA_VERSION = 4;
     constexpr static int64_t MAGIC_VALUE = MAGIC_VALUE_BASE + DATA_VERSION;
 
     int64_t magic = MAGIC_VALUE;  ///< Magic value to verify the packet
@@ -196,6 +197,7 @@ enum class AckType {
     ERROR_INVALID_ARGUMENT,
     ERROR_COMMAND_IGNORED,
     ERROR_RUNTIME_ERROR,
+    ERROR_CLIENT_ERROR,
 };
 
 struct GenericAck {
