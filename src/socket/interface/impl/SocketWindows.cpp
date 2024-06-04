@@ -1,8 +1,8 @@
 // clang-format off
-#include <minwindef.h>
 #include <winsock2.h>
 #include <winsock.h>
 #include <afunix.h>
+#include <windows.h>
 // clang-format on
 #include <impl/SocketWindows.hpp>
 #include <socket/selector/SelectorWindows.hpp>
