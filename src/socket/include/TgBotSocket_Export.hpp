@@ -13,7 +13,13 @@
 #include "../../include/SharedMalloc.hpp"
 #include "../../include/Types.h"
 
+#ifndef _MSC_VER
 #define TGSOCKET_ATTR_PACKED [[gnu::packed]]
+#else
+#pragma pack(push, 1)
+#define TGSOCKET_ATTR_PACKED
+#endif
+
 namespace TgBotSocket {
 
 constexpr int MAX_PATH_SIZE = 256;
@@ -246,3 +252,6 @@ ASSERT_SIZE(GenericAck, 260);
 }  // namespace TgBotSocket::callback
 
 #undef ASSERT_SIZE
+#ifdef _MSC_VER
+#pragma pack(pop)
+#endif
