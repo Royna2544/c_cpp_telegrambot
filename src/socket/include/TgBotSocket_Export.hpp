@@ -13,6 +13,7 @@
 #include "../../include/SharedMalloc.hpp"
 #include "../../include/Types.h"
 
+#define TGSOCKET_ATTR_PACKED [[gnu::packed]]
 namespace TgBotSocket {
 
 constexpr int MAX_PATH_SIZE = 256;
@@ -45,7 +46,8 @@ enum class Command : std::int32_t {
  *
  * Header contains the magic value, command, and the size of the data
  */
-struct PacketHeader {
+ 
+struct TGSOCKET_ATTR_PACKED PacketHeader {
     using length_type = uint64_t;
     constexpr static int64_t MAGIC_VALUE_BASE = 0xDEADFACE;
     // Version number, to be increased on breaking changes
@@ -53,7 +55,8 @@ struct PacketHeader {
     // 2: Added crc32 checks to packet data
     // 3: Uploadfile has a sha256sum check, std::array conversions
     // 4: Move CMD_UPLOAD_FILE_DRY to internal namespace
-    constexpr static int DATA_VERSION = 4;
+    // 5: Use the packed attribute for structs
+    constexpr static int DATA_VERSION = 5;
     constexpr static int64_t MAGIC_VALUE = MAGIC_VALUE_BASE + DATA_VERSION;
 
     int64_t magic = MAGIC_VALUE;  ///< Magic value to verify the packet
@@ -72,7 +75,7 @@ struct PacketHeader {
  * It contains a header, which contains the magic value, the command, and the
  * size of the data. The data is then followed by the actual data.
  */
-struct Packet {
+struct TGSOCKET_ATTR_PACKED Packet {
     static constexpr auto hdr_sz = sizeof(PacketHeader);
     using header_type = PacketHeader;
     header_type header{};
@@ -92,7 +95,7 @@ struct Packet {
 
     // Constructor that takes pointer, uses malloc but with size
     template <typename T>
-    explicit Packet(Command cmd, T in_data, std::size_t size) : data(size) {
+    explicit Packet(Command cmd, T in_data, header_type::length_type size) : data(size) {
         static_assert(std::is_pointer_v<T>,
                       "This constructor should not be used with non pointer");
         header.cmd = cmd;
@@ -134,33 +137,33 @@ enum class CtrlSpamBlock {
     CTRL_MAX,
 };
 
-struct WriteMsgToChatId {
+struct TGSOCKET_ATTR_PACKED WriteMsgToChatId {
     ChatId chat;                             // destination chatid
     std::array<char, MAX_MSG_SIZE> message;  // Msg to send
 };
 
-struct ObserveChatId {
+struct TGSOCKET_ATTR_PACKED ObserveChatId {
     ChatId chat;
     bool observe;  // new state for given ChatId,
                    // true/false - Start/Stop observing
 };
 
-struct SendFileToChatId {
+struct TGSOCKET_ATTR_PACKED SendFileToChatId {
     ChatId chat;                               // Destination ChatId
     FileType fileType;                         // File type for file
     std::array<char, MAX_PATH_SIZE> filePath;  // Path to file (local)
 };
 
-struct ObserveAllChats {
+struct TGSOCKET_ATTR_PACKED ObserveAllChats {
     bool observe;  // new state for all chats,
                    // true/false - Start/Stop observing
 };
 
-struct DeleteControllerById {
+struct TGSOCKET_ATTR_PACKED DeleteControllerById {
     int controller_id;
 };
 
-struct UploadFile {
+struct TGSOCKET_ATTR_PACKED UploadFile {
     std::array<char, MAX_PATH_SIZE> filepath{};  // Destination file name
     std::array<unsigned char, SHA256_DIGEST_LENGTH>
         sha256_hash{};  // SHA256 hash of the file
@@ -178,7 +181,7 @@ struct UploadFile {
     uint8_t buf[];  // Buffer
 };
 
-struct DownloadFile {
+struct TGSOCKET_ATTR_PACKED DownloadFile {
     std::array<char, MAX_PATH_SIZE> filepath{};      // Path to file (in remote)
     std::array<char, MAX_PATH_SIZE> destfilename{};  // Destination file name
     uint8_t buf[];                                   // Buffer
@@ -187,7 +190,7 @@ struct DownloadFile {
 
 namespace callback {
 
-struct GetUptimeCallback {
+struct TGSOCKET_ATTR_PACKED GetUptimeCallback {
     std::array<char, sizeof("Uptime: 999h 99m 99s")> uptime;
 };
 
@@ -200,7 +203,7 @@ enum class AckType {
     ERROR_CLIENT_ERROR,
 };
 
-struct GenericAck {
+struct TGSOCKET_ATTR_PACKED GenericAck {
     AckType result;  // result type
     // Error message, only valid when result type is not SUCCESS
     std::array<char, MAX_MSG_SIZE> error_msg{};
@@ -228,13 +231,13 @@ struct GenericAck {
 
 namespace TgBotSocket::data {
 ASSERT_SIZE(WriteMsgToChatId, 264);
-ASSERT_SIZE(ObserveChatId, 16);
-ASSERT_SIZE(SendFileToChatId, 272);
+ASSERT_SIZE(ObserveChatId, 9);
+ASSERT_SIZE(SendFileToChatId, 268);
 ASSERT_SIZE(ObserveAllChats, 1);
 ASSERT_SIZE(DeleteControllerById, 4);
 ASSERT_SIZE(UploadFile, 291);
 ASSERT_SIZE(DownloadFile, 512);
-ASSERT_SIZE(PacketHeader, 32);
+ASSERT_SIZE(PacketHeader, 24);
 }  // namespace TgBotSocket::data
 
 namespace TgBotSocket::callback {
