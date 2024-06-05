@@ -1,91 +1,91 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="소스 파일">
+    <Filter Include="Source File">
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
-    <Filter Include="헤더 파일">
+    <Filter Include="Header File">
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
     </Filter>
-    <Filter Include="리소스 파일">
+    <Filter Include="Resource File">
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="소스 파일\ui">
+    <Filter Include="Source File\ui">
       <UniqueIdentifier>{0901d22e-1ed2-44b0-a92b-cc605fc2d51c}</UniqueIdentifier>
     </Filter>
-    <Filter Include="소스 파일\uihelper">
+    <Filter Include="Source File\uihelper">
       <UniqueIdentifier>{ccc6607c-2812-4874-8bf4-f86323486081}</UniqueIdentifier>
     </Filter>
-    <Filter Include="헤더 파일\ui">
+    <Filter Include="Header File\ui">
       <UniqueIdentifier>{1bdd91a0-64cc-406e-bc31-7392beb76c9d}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="targetver.h">
-      <Filter>헤더 파일</Filter>
+      <Filter>Header File</Filter>
     </ClInclude>
     <ClInclude Include="TgBotSocketIntf.h">
-      <Filter>소스 파일</Filter>
+      <Filter>Source File</Filter>
     </ClInclude>
     <ClInclude Include="resource.h">
-      <Filter>헤더 파일</Filter>
+      <Filter>Header File</Filter>
     </ClInclude>
     <ClInclude Include="UIComponents.h">
-      <Filter>헤더 파일</Filter>
+      <Filter>Header File</Filter>
     </ClInclude>
     <ClInclude Include="AbseilLogging.h">
-      <Filter>헤더 파일</Filter>
+      <Filter>Header File</Filter>
     </ClInclude>
     <ClInclude Include="BlockingOperation.h">
-      <Filter>헤더 파일\ui</Filter>
+      <Filter>Header File\ui</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="TgBotClient.cpp">
-      <Filter>소스 파일</Filter>
+      <Filter>Source File</Filter>
     </ClCompile>
     <ClCompile Include="TgBotSocketIntf.cpp">
-      <Filter>소스 파일</Filter>
+      <Filter>Source File</Filter>
     </ClCompile>
     <ClCompile Include="nullguard.cpp">
-      <Filter>소스 파일</Filter>
+      <Filter>Source File</Filter>
     </ClCompile>
     <ClCompile Include="SendMessageToChat.cpp">
-      <Filter>소스 파일\ui</Filter>
+      <Filter>Source File\ui</Filter>
     </ClCompile>
     <ClCompile Include="About.cpp">
-      <Filter>소스 파일\ui</Filter>
+      <Filter>Source File\ui</Filter>
     </ClCompile>
     <ClCompile Include="SendFileToChat.cpp">
-      <Filter>소스 파일\ui</Filter>
+      <Filter>Source File\ui</Filter>
     </ClCompile>
     <ClCompile Include="Uptime.cpp">
-      <Filter>소스 파일\ui</Filter>
+      <Filter>Source File\ui</Filter>
     </ClCompile>
     <ClCompile Include="DestinationIP.cpp">
-      <Filter>소스 파일\ui</Filter>
+      <Filter>Source File\ui</Filter>
     </ClCompile>
     <ClCompile Include="StringLoader.cpp">
-      <Filter>소스 파일\uihelper</Filter>
+      <Filter>Source File\uihelper</Filter>
     </ClCompile>
     <ClCompile Include="BlockingOperation.cpp">
-      <Filter>소스 파일\uihelper</Filter>
+      <Filter>Source File\uihelper</Filter>
     </ClCompile>
     <ClCompile Include="DownloadFile.cpp">
-      <Filter>소스 파일\ui</Filter>
+      <Filter>Source File\ui</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="TgBotClient.rc">
-      <Filter>리소스 파일</Filter>
+      <Filter>Resource File</Filter>
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
     <Image Include="TgBotClient.ico">
-      <Filter>리소스 파일</Filter>
+      <Filter>Resource File</Filter>
     </Image>
   </ItemGroup>
 </Project>
