@@ -4,17 +4,15 @@
 #include <absl/log/log_sink.h>
 #include <absl/strings/str_format.h>
 #include <absl/strings/str_split.h>
+
 #include <mutex>
+
 
 struct FileSinkBase : absl::LogSink {
     void Send(const absl::LogEntry& entry) override {
-        for (absl::string_view line : absl::StrSplit(
-                 entry.text_message_with_prefix(), absl::ByChar('\n'))) {
-            const std::lock_guard<std::mutex> lock(m);
-            if (entry.log_severity() < absl::LogSeverity::kError) {
-                absl::FPrintF(fp_, "%s\r", line);
-                fputc('\n', fp_);
-            }
+        const std::lock_guard<std::mutex> lock(m);
+        if (entry.log_severity() < absl::LogSeverity::kError) {
+            fputs(entry.text_message_with_prefix_and_newline().data(), stdout);
         }
     }
     FileSinkBase() = default;
