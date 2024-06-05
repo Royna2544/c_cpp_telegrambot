@@ -24,7 +24,9 @@ struct WindowSinkBase : absl::LogSink {
 };
 
 inline void initLogging() {
-    static WindowSinkBase sink;
     absl::InitializeLog();
-    absl::AddLogSink(&sink);
+    if (IsDebuggerPresent()) {
+        static WindowSinkBase sink;
+        absl::AddLogSink(&sink);
+    }
 }
