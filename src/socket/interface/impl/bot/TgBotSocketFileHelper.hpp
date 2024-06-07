@@ -1,6 +1,6 @@
 #pragma once
 
-#include <absl/log/log.h>
+#include <absl/log/absl_log.h>
 #include <openssl/sha.h>
 
 #include <array>
@@ -96,18 +96,18 @@ bool FileDataHelper::writeFileCommon(const std::filesystem::path& filename,
     FILE* file = nullptr;
     bool ret = false;
 
-    LOG(INFO) << "Writing to file " << filename << "...";
-    LOG(INFO) << "Size is " << size;
+    ABSL_LOG(INFO) << "Writing to file " << filename << "...";
+    ABSL_LOG(INFO) << "Size is " << size;
     file = fopen(filename.string().c_str(), "wb");
     if (file == nullptr) {
-        LOG(ERROR) << "Failed to open file";
+        ABSL_LOG(ERROR) << "Failed to open file";
         return false;
     }
     writtenCnt = fwrite(startAddr, size, 1, file);
     if (writtenCnt != 1) {
-        LOG(ERROR) << "Failed to write to file";
+        ABSL_LOG(ERROR) << "Failed to write to file";
     } else {
-        LOG(INFO) << "Wrote " << size << " bytes to file " << filename;
+        ABSL_LOG(INFO) << "Wrote " << size << " bytes to file " << filename;
         ret = true;
     }
     fclose(file);
@@ -121,18 +121,18 @@ FileDataHelper::readFileFullyCommon(const std::filesystem::path& filename) {
     const auto file_size = std::filesystem::file_size(filename, errc);
 
     if (errc) {
-        LOG(ERROR) << "Failed to get file size: " << filename << ": "
+        ABSL_LOG(ERROR) << "Failed to get file size: " << filename << ": "
                    << errc.message();
         return std::nullopt;
     }
     file = fopen(filename.string().c_str(), "rb");
     if (file == nullptr) {
-        LOG(ERROR) << "Failed to fopen file: " << filename;
+        ABSL_LOG(ERROR) << "Failed to fopen file: " << filename;
         return std::nullopt;
     }
     auto dataP = createMemory(file_size);
     if (fread(dataP.get(), file_size, 1, file) != 1) {
-        LOG(ERROR) << "Failed to read from file";
+        ABSL_LOG(ERROR) << "Failed to read from file";
         fclose(file);
         return std::nullopt;
     }
@@ -156,12 +156,12 @@ bool FileDataHelper::DataToFile<FileDataHelper::UPLOAD_FILE_DRY>(
     std::error_code errc;
     bool exists = false;
 
-    LOG(INFO) << "Dry run: " << filename;
-    LOG(INFO) << "Do I care if the file exists already? " << std::boolalpha
+    ABSL_LOG(INFO) << "Dry run: " << filename;
+    ABSL_LOG(INFO) << "Do I care if the file exists already? " << std::boolalpha
               << !data->options.overwrite;
     exists = std::filesystem::exists(filename, errc);
     if (!data->options.overwrite && exists) {
-        LOG(WARNING) << "File already exists: " << filename;
+        ABSL_LOG(WARNING) << "File already exists: " << filename;
         return false;
     }
 
@@ -169,13 +169,13 @@ bool FileDataHelper::DataToFile<FileDataHelper::UPLOAD_FILE_DRY>(
         HashContainer hash{};
 
         if (errc) {
-            LOG(ERROR) << "Failed to get file size: " << filename << ": "
+            ABSL_LOG(ERROR) << "Failed to get file size: " << filename << ": "
                        << errc.message();
             return false;
         }
         const auto result = readFileFullyCommon(filename);
         if (!result) {
-            LOG(ERROR) << "Failed to read from file: " << filename;
+            ABSL_LOG(ERROR) << "Failed to read from file: " << filename;
             return false;
         }
 
@@ -183,15 +183,15 @@ bool FileDataHelper::DataToFile<FileDataHelper::UPLOAD_FILE_DRY>(
                result->size, hash.m_data.data());
         if (memcmp(hash.m_data.data(), data->sha256_hash.data(),
                    SHA256_DIGEST_LENGTH) == 0) {
-            LOG(WARNING) << "File hash matches, Should I ignore? "
+            ABSL_LOG(WARNING) << "File hash matches, Should I ignore? "
                          << std::boolalpha << data->options.hash_ignore;
             if (!data->options.hash_ignore) {
                 return false;
             }
         } else {
-            LOG(INFO) << "File hash does not match, good";
-            DLOG(INFO) << hash << " is not same as incoming "
-                       << HashContainer(data->sha256_hash);
+            ABSL_LOG(INFO) << "File hash does not match, good";
+            ABSL_DLOG(INFO) << hash << " is not same as incoming "
+                       << HashContainer{data->sha256_hash};
         }
     }
     return true;
@@ -223,7 +223,7 @@ FileDataHelper::DataFromFile<FileDataHelper::UPLOAD_FILE>(
     HashContainer hash{};
 
     if (!result) {
-        LOG(ERROR) << "Failed to read from file: " << params.filepath;
+        ABSL_LOG(ERROR) << "Failed to read from file: " << params.filepath;
         return std::nullopt;
     }
     // Create result packet buffer
@@ -257,7 +257,7 @@ FileDataHelper::DataFromFile<FileDataHelper::UPLOAD_FILE_DRY>(
     HashContainer hash{};
 
     if (!result) {
-        LOG(ERROR) << "Failed to read from file: " << params.filepath;
+        ABSL_LOG(ERROR) << "Failed to read from file: " << params.filepath;
         return std::nullopt;
     }
     // Create result packet buffer
@@ -289,7 +289,7 @@ FileDataHelper::DataFromFile<FileDataHelper::DOWNLOAD_FILE>(
     std::array<unsigned char, SHA256_DIGEST_LENGTH> hash{};
 
     if (!result) {
-        LOG(ERROR) << "Failed to read from file: " << params.filepath;
+        ABSL_LOG(ERROR) << "Failed to read from file: " << params.filepath;
         return std::nullopt;
     }
     // Create result packet buffer
