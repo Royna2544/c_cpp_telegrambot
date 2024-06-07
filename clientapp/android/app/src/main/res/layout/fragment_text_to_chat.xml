@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- First EditText with description -->
+    <TextView
+        android:id="@+id/showChatIdText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/destination_chat"
+        android:layout_marginTop="16dp"
+        android:layout_centerHorizontal="true" />
+
+    <EditText
+        android:id="@+id/chatIdText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/showChatIdText"
+        android:layout_marginTop="8dp"
+        android:layout_marginHorizontal="30dp"
+        android:inputType="numberSigned"
+        android:hint="@string/chat_id" />
+
+    <!-- Second EditText with description -->
+    <TextView
+        android:id="@+id/showMessageText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/message_text"
+        android:layout_below="@id/chatIdText"
+        android:layout_marginTop="16dp"
+        android:layout_centerHorizontal="true" />
+
+    <EditText
+        android:id="@+id/messageText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/showMessageText"
+        android:layout_marginTop="8dp"
+        android:layout_marginHorizontal="30dp"
+        android:hint="@string/text" />
+
+    <!-- Button -->
+    <Button
+        android:id="@+id/sendButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/messageText"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="16dp"
+        android:text="@string/send_message" />
+</RelativeLayout>

@@ -1,0 +1,19 @@
+<resources>
+    <string name="app_name">TgBot++ Client</string>
+    <string name="title_activity_main">MainActivity</string>
+    <string name="navigation_drawer_open">Open navigation drawer</string>
+    <string name="navigation_drawer_close">Close navigation drawer</string>
+    <string name="nav_header_title">Android Studio</string>
+    <string name="nav_header_subtitle">android.studio@android.com</string>
+    <string name="nav_header_desc">Navigation header</string>
+    <string name="action_settings">Settings</string>
+
+    <string name="menu_home">Home</string>
+    <string name="menu_send_text_to_chat">Send text to chat</string>
+    <string name="menu_get_uptime">Get uptime</string>
+    <string name="destination_chat">Destination Chat</string>
+    <string name="chat_id">Chat ID</string>
+    <string name="message_text">Message Text</string>
+    <string name="text">Text</string>
+    <string name="send_message">Send Message</string>
+</resources>

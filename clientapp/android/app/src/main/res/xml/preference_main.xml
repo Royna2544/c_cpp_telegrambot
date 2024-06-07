@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen
+    xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <PreferenceCategory
+        android:title="Network">
+        <EditTextPreference
+            android:title="IP Address"
+            android:key="ip_address"/>
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="Network type">
+        <CheckBoxPreference
+            android:title="IPv4"
+            android:key="ipv4"/>
+        <CheckBoxPreference
+            android:title="IPv6"
+            android:key="ipv6"/>
+    </PreferenceCategory>
+
+</androidx.preference.PreferenceScreen>

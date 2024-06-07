@@ -28,3 +28,6 @@
 [submodule "src/third-party/cpp-httplib"]
 	path = src/third-party/cpp-httplib
 	url = https://github.com/yhirose/cpp-httplib
+[submodule "clientapp/android/app/src/main/cpp/external/openssl"]
+	path = clientapp/android/app/src/main/cpp/external/openssl
+	url = https://github.com/openssl/openssl
