@@ -9,6 +9,10 @@
 
 #include "internal/_class_helper_macros.h"
 
+#ifndef __cpp_concepts
+#define requires(x)
+#endif
+
 struct SharedMallocParent {
     explicit SharedMallocParent(size_t size)
         : data(malloc(size), free), size(size) {
