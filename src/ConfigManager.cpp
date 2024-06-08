@@ -126,6 +126,9 @@ struct ConfigBackendBoostPOBase : public ConfigBackendBase {
 };
 
 struct ConfigBackendFile : public ConfigBackendBoostPOBase {
+    [[deprecated]]
+    static constexpr std::string_view kTgBotConfigFileOld = ".tgbot_conf.ini";
+    static constexpr std::string_view kTgBotConfigFile = "tgbotserver.ini";
     bool load() override {
         std::filesystem::path home;
         std::string line;
@@ -134,11 +137,21 @@ struct ConfigBackendFile : public ConfigBackendBoostPOBase {
         if (home.empty()) {
             return false;
         }
-        const auto confPath = (home / ".tgbot_conf.ini").string();
+        auto confPath = (home / kTgBotConfigFile.data()).string();
         std::ifstream ifs(confPath);
         if (ifs.fail()) {
             LOG(ERROR) << "Opening " << confPath << " failed";
-            return false;
+
+            confPath = (home / kTgBotConfigFileOld.data()).string();
+            ifs.open(confPath);
+            if (ifs.fail()) {
+                LOG(ERROR) << "Opening " << confPath << " failed";
+                return false;
+            } else {
+                LOG(WARNING) << "Using " << confPath << " instead, but"
+                             << " this path is deprecated, and will be removed "
+                                "in the future";
+            }
         }
         try {
             po::store(po::parse_config_file(ifs, getTgBotOptionsDesc()), mp);
@@ -223,7 +236,7 @@ enum class Passes {
 
 namespace details {
 
-std::vector<std::unique_ptr<ConfigBackendBase>>& getAvailableBackends() {
+std::vector<std::unique_ptr<ConfigBackendBase>> &getAvailableBackends() {
     static std::vector<std::unique_ptr<ConfigBackendBase>> backends;
     static std::once_flag status;
     std::call_once(status, [] {
