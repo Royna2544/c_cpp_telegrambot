@@ -45,6 +45,10 @@ void CompilerInTg::runCommand(const Message::Ptr &message, std::string cmd,
 
     boost::replace_all(cmd, std::string(1, '"'), "\\\"");
 
+#ifdef WINDOWS_BUILD
+    cmd = '.' + cmd;
+#endif
+
     LOG(INFO) << __func__ << ": +++";
     onFailed(message, ErrorType::START_COMPILER);
     LOG(INFO) << "Command: '" << cmd << "'";
@@ -84,7 +88,8 @@ void CompilerInTg::runCommand(const Message::Ptr &message, std::string cmd,
             double millis = static_cast<double>(dp.get().count()) * 0.001;
             res << "-> It took " << std::fixed << std::setprecision(3) << millis
                 << " seconds" << std::endl;
-            if (use_wdt) { popen_watchdog_stop(&p_wdt_data);
+            if (use_wdt) {
+                popen_watchdog_stop(&p_wdt_data);
             }
         }
         popen_watchdog_destroy(&p_wdt_data);
