@@ -81,7 +81,7 @@ struct TGSOCKET_ATTR_PACKED PacketHeader {
  * It contains a header, which contains the magic value, the command, and the
  * size of the data. The data is then followed by the actual data.
  */
-struct TGSOCKET_ATTR_PACKED Packet {
+struct Packet {
     static constexpr auto hdr_sz = sizeof(PacketHeader);
     using header_type = PacketHeader;
     header_type header{};
@@ -175,7 +175,7 @@ struct TGSOCKET_ATTR_PACKED UploadFile {
         sha256_hash{};  // SHA256 hash of the file
 
     // Returns AckType::ERROR_COMMAND_IGNORED on options failure
-    struct Options {
+    struct TGSOCKET_ATTR_PACKED Options {
         bool overwrite = false;  // Overwrite existing file if exists
         bool hash_ignore =
             false;  // Ignore hash, always upload file even if the same file
