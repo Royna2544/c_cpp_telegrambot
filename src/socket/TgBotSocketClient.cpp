@@ -2,6 +2,7 @@
 #include <absl/log/log.h>
 
 #include <AbslLogInit.hpp>
+#include <TgBotSocket_Export.hpp>
 #include <TryParseStr.hpp>
 #include <boost/crc.hpp>
 #include <cstddef>
@@ -14,8 +15,8 @@
 #include <optional>
 #include <string>
 
-#include <TgBotSocket_Export.hpp>
 #include "TgBotCommandMap.hpp"
+#include "Types.h"
 
 using namespace TgBotSocket;
 
@@ -176,9 +177,11 @@ int main(int argc, char** argv) {
     switch (cmd) {
         case Command::CMD_WRITE_MSG_TO_CHAT_ID: {
             data::WriteMsgToChatId data{};
-            if (!try_parse(argv[0], &data.chat)) {
+            ChatId id;
+            if (!try_parse(argv[0], &id)) {
                 break;
             }
+            data.chat = id;
             copyToStrBuf(data.message, argv[1]);
             pkt = Packet(cmd, data);
             break;
@@ -193,22 +196,33 @@ int main(int argc, char** argv) {
         }
         case Command::CMD_OBSERVE_CHAT_ID: {
             data::ObserveChatId data{};
-            if (try_parse(argv[0], &data.chat) &&
-                try_parse(argv[1], &data.observe))
+            bool observe;
+            ChatId id;
+            if (try_parse(argv[0], &id) && try_parse(argv[1], &observe)) {
+                data.chat = id;
+                data.observe = observe;
                 pkt = Packet(cmd, data);
-        } break;
+            }
+            break;
+        }
         case Command::CMD_SEND_FILE_TO_CHAT_ID: {
             data::SendFileToChatId data{};
-            if (try_parse(argv[0], &data.chat) &&
-                parseOneEnum(&data.fileType, data::FileType::TYPE_MAX, argv[1],
+            ChatId id;
+            data::FileType fileType;
+            if (try_parse(argv[0], &id) &&
+                parseOneEnum(&fileType, data::FileType::TYPE_MAX, argv[1],
                              "type")) {
+                data.chat = id;
+                data.fileType = fileType;
                 copyToStrBuf(data.filePath, argv[2]);
                 pkt = Packet(cmd, data);
             }
         } break;
         case Command::CMD_OBSERVE_ALL_CHATS: {
             data::ObserveAllChats data{};
-            if (try_parse(argv[0], &data.observe)) {
+            bool observe;
+            if (try_parse(argv[0], &observe)) {
+                data.observe = observe;
                 pkt = Packet(cmd, data);
             }
         } break;
