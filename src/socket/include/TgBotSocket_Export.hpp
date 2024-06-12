@@ -6,6 +6,7 @@
 #include <zlib.h>
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <string>

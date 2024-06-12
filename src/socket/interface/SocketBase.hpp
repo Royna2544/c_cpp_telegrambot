@@ -3,6 +3,7 @@
 #include <TgBotSocket_Export.hpp>
 
 #include <SocketDescriptor_defs.hpp>
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <functional>
@@ -30,7 +31,7 @@ struct SocketInterfaceBase {
     // addr is used as void pointer to maintain platform independence.
     using listener_callback_t = std::function<bool(SocketConnContext ctx)>;
     using dummy_listen_buf_t = char;
-    using buffer_len_t = uint64_t;
+    using buffer_len_t = TgBotSocket::PacketHeader::length_type;
 
     constexpr static int kTgBotHostPort = 50000;
 

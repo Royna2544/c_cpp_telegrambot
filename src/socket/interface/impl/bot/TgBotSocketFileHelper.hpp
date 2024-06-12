@@ -20,7 +20,7 @@ inline void copyTo(std::array<char, size>& arr_in, const char* buf) {
 }
 
 namespace FileDataHelper {
-using len_t = uint64_t;
+using len_t = TgBotSocket::PacketHeader::length_type;
 using RAIIMalloc = std::unique_ptr<void, decltype(&free)>;
 
 enum Pass {
