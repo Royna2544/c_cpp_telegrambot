@@ -63,7 +63,8 @@ struct TGSOCKET_ATTR_PACKED PacketHeader {
     // 3: Uploadfile has a sha256sum check, std::array conversions
     // 4: Move CMD_UPLOAD_FILE_DRY to internal namespace
     // 5: Use the packed attribute for structs
-    constexpr static int DATA_VERSION = 5;
+    // 6: Make CMD_UPLOAD_FILE_DRY_CALLBACK return sperate callback, and add srcpath to UploadFile
+    constexpr static int DATA_VERSION = 6;
     constexpr static int64_t MAGIC_VALUE = MAGIC_VALUE_BASE + DATA_VERSION;
 
     int64_t magic = MAGIC_VALUE;  ///< Magic value to verify the packet
@@ -125,6 +126,10 @@ struct Packet {
     }
 };
 
+using PathStringArray = std::array<char, MAX_PATH_SIZE>;
+using MessageStringArray = std::array<char, MAX_MSG_SIZE>;
+using SHA256StringArray = std::array<unsigned char, SHA256_DIGEST_LENGTH>;
+
 namespace data {
 
 enum class FileType {
@@ -146,7 +151,7 @@ enum class CtrlSpamBlock {
 
 struct TGSOCKET_ATTR_PACKED WriteMsgToChatId {
     ChatId chat;                             // destination chatid
-    std::array<char, MAX_MSG_SIZE> message;  // Msg to send
+    MessageStringArray message;  // Msg to send
 };
 
 struct TGSOCKET_ATTR_PACKED ObserveChatId {
@@ -158,7 +163,7 @@ struct TGSOCKET_ATTR_PACKED ObserveChatId {
 struct TGSOCKET_ATTR_PACKED SendFileToChatId {
     ChatId chat;                               // Destination ChatId
     FileType fileType;                         // File type for file
-    std::array<char, MAX_PATH_SIZE> filePath;  // Path to file (local)
+    PathStringArray filePath;  // Path to file (local)
 };
 
 struct TGSOCKET_ATTR_PACKED ObserveAllChats {
@@ -170,28 +175,35 @@ struct TGSOCKET_ATTR_PACKED DeleteControllerById {
     int controller_id;
 };
 
-struct TGSOCKET_ATTR_PACKED UploadFile {
-    std::array<char, MAX_PATH_SIZE> filepath{};  // Destination file name
-    std::array<unsigned char, SHA256_DIGEST_LENGTH>
-        sha256_hash{};  // SHA256 hash of the file
+struct TGSOCKET_ATTR_PACKED UploadFileDry {
+    PathStringArray destfilepath{};   // Destination file name 
+    PathStringArray srcfilepath{};    // Source file name (This is not used on the remote, used if dry=true)
+    SHA256StringArray sha256_hash{};  // SHA256 hash of the file
 
     // Returns AckType::ERROR_COMMAND_IGNORED on options failure
     struct TGSOCKET_ATTR_PACKED Options {
-        bool overwrite = false;  // Overwrite existing file if exists
-        bool hash_ignore =
-            false;  // Ignore hash, always upload file even if the same file
-                    // exists and the hash matches. Depends on overwrite flag
-                    // for actual overwriting
-        bool dry_run =
-            false;  // If true, just check the hashes and return result.
+        // Overwrite existing file if exists
+        bool overwrite = false;  
+
+        // Ignore hash, always upload file even if the same file
+        // exists and the hash matches. Depends on overwrite flag
+        // for actual overwriting
+        bool hash_ignore = false;
+
+        // If true, just check the hashes and return result.  
+        bool dry_run = false;
     } options;
+};
+
+struct TGSOCKET_ATTR_PACKED UploadFile : public UploadFileDry {
+    using Options = UploadFileDry::Options;
     uint8_t buf[];  // Buffer
 };
 
 struct TGSOCKET_ATTR_PACKED DownloadFile {
-    std::array<char, MAX_PATH_SIZE> filepath{};      // Path to file (in remote)
-    std::array<char, MAX_PATH_SIZE> destfilename{};  // Destination file name
-    uint8_t buf[];                                   // Buffer
+    PathStringArray filepath{};      // Path to file (in remote)
+    PathStringArray destfilename{};  // Destination file name
+    uint8_t buf[];                   // Buffer
 };
 }  // namespace data
 
@@ -213,7 +225,7 @@ enum class AckType {
 struct TGSOCKET_ATTR_PACKED GenericAck {
     AckType result;  // result type
     // Error message, only valid when result type is not SUCCESS
-    std::array<char, MAX_MSG_SIZE> error_msg{};
+    MessageStringArray error_msg{};
 
     // Create a new instance of the Generic Ack, error.
     explicit GenericAck(AckType result, const std::string& errorMsg)
@@ -225,6 +237,10 @@ struct TGSOCKET_ATTR_PACKED GenericAck {
 
     // Create a new instance of the Generic Ack, success.
     static GenericAck ok() { return GenericAck(AckType::SUCCESS, "OK"); }
+};
+
+struct TGSOCKET_ATTR_PACKED UploadFileDryCallback : public GenericAck {
+    data::UploadFileDry requestdata;
 };
 
 }  // namespace callback
@@ -242,7 +258,7 @@ ASSERT_SIZE(ObserveChatId, 9);
 ASSERT_SIZE(SendFileToChatId, 268);
 ASSERT_SIZE(ObserveAllChats, 1);
 ASSERT_SIZE(DeleteControllerById, 4);
-ASSERT_SIZE(UploadFile, 291);
+ASSERT_SIZE(UploadFile, 547);
 ASSERT_SIZE(DownloadFile, 512);
 ASSERT_SIZE(PacketHeader, 24);
 }  // namespace TgBotSocket::data
@@ -250,6 +266,7 @@ ASSERT_SIZE(PacketHeader, 24);
 namespace TgBotSocket::callback {
 ASSERT_SIZE(GetUptimeCallback, 21);
 ASSERT_SIZE(GenericAck, 260);
+ASSERT_SIZE(UploadFileDryCallback, 807);
 }  // namespace TgBotSocket::callback
 
 #undef ASSERT_SIZE

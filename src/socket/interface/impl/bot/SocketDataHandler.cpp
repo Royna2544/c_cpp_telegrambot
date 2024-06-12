@@ -196,25 +196,29 @@ GenericAck SocketInterfaceTgBot::handle_DeleteControllerById(const void* ptr) {
 }
 
 GenericAck SocketInterfaceTgBot::handle_UploadFile(
-    const void* ptr, TgBotSocket::PacketHeader::length_type len, bool dry) {
-    bool ret = false;
-
-    if (dry) {
-        ret = FileDataHelper::DataToFile<FileDataHelper::UPLOAD_FILE_DRY>(ptr,
-                                                                          len);
-        if (!ret) {
-            return GenericAck(AckType::ERROR_COMMAND_IGNORED,
-                              "Options verification failed");
-        }
-    } else {
-        ret = FileDataHelper::DataToFile<FileDataHelper::UPLOAD_FILE>(ptr, len);
-        if (!ret) {
-            return GenericAck(AckType::ERROR_RUNTIME_ERROR,
-                              "Failed to write file");
-        }
+    const void* ptr, TgBotSocket::PacketHeader::length_type len) {
+    if (!FileDataHelper::DataToFile<FileDataHelper::UPLOAD_FILE>(ptr, len)) {
+        return GenericAck(AckType::ERROR_RUNTIME_ERROR, "Failed to write file");
     }
-
     return GenericAck::ok();
+}
+
+UploadFileDryCallback SocketInterfaceTgBot::handle_UploadFileDry(
+    const void* ptr, TgBotSocket::PacketHeader::length_type len) {
+    bool ret = false;
+    const auto f = static_cast<const UploadFileDry *>(ptr);
+    UploadFileDryCallback callback;
+    callback.requestdata = *f;
+
+    ret = FileDataHelper::DataToFile<FileDataHelper::UPLOAD_FILE_DRY>(ptr, len);
+    if (!ret) {
+        copyTo(callback.error_msg, "Options verification failed");
+        callback.result = AckType::ERROR_COMMAND_IGNORED;
+    } else {
+        copyTo(callback.error_msg, "OK");
+        callback.result = AckType::SUCCESS;
+    }
+    return callback;
 }
 
 bool SocketInterfaceTgBot::handle_DownloadFile(SocketConnContext ctx,
@@ -252,7 +256,7 @@ bool SocketInterfaceTgBot::handle_GetUptime(SocketConnContext ctx,
 void SocketInterfaceTgBot::handle_CommandPacket(SocketConnContext ctx,
                                                 TgBotSocket::Packet pkt) {
     const void* ptr = pkt.data.get();
-    std::variant<GenericAck, bool> ret;
+    std::variant<GenericAck, UploadFileDryCallback, bool> ret;
 
     switch (pkt.header.cmd) {
         case Command::CMD_WRITE_MSG_TO_CHAT_ID:
@@ -277,10 +281,10 @@ void SocketInterfaceTgBot::handle_CommandPacket(SocketConnContext ctx,
             ret = handle_GetUptime(ctx, ptr);
             break;
         case Command::CMD_UPLOAD_FILE:
-            ret = handle_UploadFile(ptr, pkt.header.data_size, false);
+            ret = handle_UploadFile(ptr, pkt.header.data_size);
             break;
         case Command::CMD_UPLOAD_FILE_DRY:
-            ret = handle_UploadFile(ptr, pkt.header.data_size, true);
+            ret = handle_UploadFileDry(ptr, pkt.header.data_size);
             break;
         case Command::CMD_DOWNLOAD_FILE:
             ret = handle_DownloadFile(ctx, ptr);
@@ -305,10 +309,9 @@ void SocketInterfaceTgBot::handle_CommandPacket(SocketConnContext ctx,
             break;
         }
         case Command::CMD_UPLOAD_FILE_DRY: {
-            // Need a special cmd here
-            GenericAck result = std::get<GenericAck>(ret);
+            const auto result = std::get<UploadFileDryCallback>(ret);
             Packet ackpkt(Command::CMD_UPLOAD_FILE_DRY_CALLBACK, &result,
-                          sizeof(GenericAck));
+                          sizeof(UploadFileDryCallback));
             LOG(INFO) << "Sending CMD_UPLOAD_FILE_DRY ack: " << std::boolalpha
                       << (result.result == AckType::SUCCESS);
             interface->writeToSocket(ctx, ackpkt.toSocketData());

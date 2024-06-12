@@ -9,8 +9,10 @@
 #include <utility>
 
 #include "TgBotPacketParser.hpp"
+#include "TgBotSocket_Export.hpp"
 
 using TgBotSocket::callback::GenericAck;
+using TgBotSocket::callback::UploadFileDryCallback;
 
 #ifdef WINDOWS_BUILD
 #include "impl/SocketWindows.hpp"
@@ -59,7 +61,9 @@ struct SocketInterfaceTgBot : SingleThreadCtrlRunnable,
     static GenericAck handle_ObserveAllChats(const void* ptr);
     static GenericAck handle_DeleteControllerById(const void* ptr);
     static GenericAck handle_UploadFile(
-        const void* ptr, TgBotSocket::PacketHeader::length_type len, bool dry);
+        const void* ptr, TgBotSocket::PacketHeader::length_type len);
+    static UploadFileDryCallback handle_UploadFileDry(
+        const void* ptr, TgBotSocket::PacketHeader::length_type len);
 
     // These have their own ack handlers
     bool handle_GetUptime(SocketConnContext ctx, const void* ptr);

@@ -83,9 +83,6 @@ std::string_view AckTypeToStr(callback::AckType type) {
 
 }  // namespace
 
-// TODO: WTF is this
-FileDataHelper::DataFromFileParam p;
-
 struct ClientParser : TgBotSocketParser {
     explicit ClientParser(SocketInterfaceBase* interface)
         : TgBotSocketParser(interface) {}
@@ -93,12 +90,11 @@ struct ClientParser : TgBotSocketParser {
         using callback::AckType;
         using callback::GenericAck;
 
-        callback::GetUptimeCallback callbackData = {};
-        callback::GenericAck result{};
         std::string resultText;
 
         switch (pkt.header.cmd) {
             case Command::CMD_GET_UPTIME_CALLBACK: {
+                callback::GetUptimeCallback callbackData = {};
                 pkt.data.assignTo(callbackData);
                 LOG(INFO) << "Server replied: " << callbackData.uptime.data();
                 break;
@@ -109,31 +105,39 @@ struct ClientParser : TgBotSocketParser {
                 break;
             }
             case Command::CMD_UPLOAD_FILE_DRY_CALLBACK: {
-                pkt.data.assignTo(result);
+                callback::UploadFileDryCallback callbackData{};
+                pkt.data.assignTo(callbackData);
                 LOG(INFO) << "Response from server: "
-                          << AckTypeToStr(result.result);
-                if (result.result != AckType::SUCCESS) {
-                    LOG(ERROR) << "Reason: " << result.error_msg.data();
+                          << AckTypeToStr(callbackData.result);
+                if (callbackData.result != AckType::SUCCESS) {
+                    LOG(ERROR) << "Reason: " << callbackData.error_msg.data();
                 } else {
                     interface->closeSocketHandle(context);
                     context = interface->createClientSocket().value();
                     LOG(INFO) << "Recreated client socket";
+                    auto params_in = callbackData.requestdata;
+                    FileDataHelper::DataFromFileParam param;
+                    param.destfilepath = params_in.destfilepath.data();
+                    param.filepath = params_in.srcfilepath.data();
+                    param.options = params_in.options;
                     auto newPkt = FileDataHelper::DataFromFile<
-                        FileDataHelper::UPLOAD_FILE>(p);
+                        FileDataHelper::UPLOAD_FILE>(param);
                     LOG(INFO) << "Sending the actual file content again...";
                     interface->writeToSocket(context, newPkt->toSocketData());
                     onNewBuffer(context);
                 }
                 break;
             }
-            case Command::CMD_GENERIC_ACK:
-                pkt.data.assignTo(result);
+            case Command::CMD_GENERIC_ACK: {
+                callback::GenericAck callbackData{};
+                pkt.data.assignTo(callbackData);
                 LOG(INFO) << "Response from server: "
-                          << AckTypeToStr(result.result);
-                if (result.result != AckType::SUCCESS) {
-                    LOG(ERROR) << "Reason: " << result.error_msg.data();
+                          << AckTypeToStr(callbackData.result);
+                if (callbackData.result != AckType::SUCCESS) {
+                    LOG(ERROR) << "Reason: " << callbackData.error_msg.data();
                 }
                 break;
+            }
             default:
                 LOG(ERROR) << "Unhandled callback of command: "
                            << static_cast<int>(pkt.header.cmd);
@@ -246,7 +250,6 @@ int main(int argc, char** argv) {
             params.options.overwrite = true;
             pkt = FileDataHelper::DataFromFile<FileDataHelper::UPLOAD_FILE_DRY>(
                 params);
-            p = params;
             break;
         }
         case Command::CMD_DOWNLOAD_FILE: {

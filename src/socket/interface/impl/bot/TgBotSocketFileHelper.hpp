@@ -4,6 +4,7 @@
 #include <openssl/sha.h>
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <ios>
@@ -17,6 +18,10 @@
 template <size_t size>
 inline void copyTo(std::array<char, size>& arr_in, const char* buf) {
     strncpy(arr_in.data(), buf, size);
+}
+template <size_t size, size_t size2>
+inline void copyTo(std::array<char, size>& arr_in, std::array<char, size2> buf) {
+    copyTo(arr_in, buf.data());
 }
 
 namespace FileDataHelper {
@@ -81,6 +86,7 @@ std::optional<TgBotSocket::Packet> DataFromFile<DOWNLOAD_FILE>(
 // Implementation starts
 using TgBotSocket::data::DownloadFile;
 using TgBotSocket::data::UploadFile;
+using TgBotSocket::data::UploadFileDry;
 struct HashContainer {
     std::array<unsigned char, SHA256_DIGEST_LENGTH> m_data;
 };
@@ -151,8 +157,8 @@ inline std::ostream& operator<<(std::ostream& self, const HashContainer& data) {
 template <>
 bool FileDataHelper::DataToFile<FileDataHelper::UPLOAD_FILE_DRY>(
     const void* ptr, len_t len) {
-    const auto* data = static_cast<const UploadFile*>(ptr);
-    const char* filename = data->filepath.data();
+    const auto* data = static_cast<const UploadFileDry*>(ptr);
+    const char* filename = data->destfilepath.data();
     std::error_code errc;
     bool exists = false;
 
@@ -202,7 +208,7 @@ bool FileDataHelper::DataToFile<FileDataHelper::UPLOAD_FILE>(const void* ptr,
                                                              len_t len) {
     const auto* data = static_cast<const UploadFile*>(ptr);
 
-    return writeFileCommon(data->filepath.data(), &data->buf[0],
+    return writeFileCommon(data->destfilepath.data(), &data->buf[0],
                            len - sizeof(UploadFile));
 }
 
@@ -231,7 +237,7 @@ FileDataHelper::DataFromFile<FileDataHelper::UPLOAD_FILE>(
     // The front bytes of the buffer is UploadFile, hence cast it
     auto* uploadFile = static_cast<UploadFile*>(resultPointer.get());
     // Copy destination file name info to the buffer
-    copyTo(uploadFile->filepath, params.destfilepath.string().c_str());
+    copyTo(uploadFile->destfilepath, params.destfilepath.string().c_str());
     // Copy source file data to the buffer
     memcpy(&uploadFile->buf[0], result->data.get(), result->size);
     // Calculate SHA256 hash
@@ -261,11 +267,14 @@ FileDataHelper::DataFromFile<FileDataHelper::UPLOAD_FILE_DRY>(
         return std::nullopt;
     }
     // Create result packet buffer
-    auto resultPointer = createMemory(sizeof(UploadFile));
+    auto resultPointer = createMemory(sizeof(UploadFileDry));
     // The front bytes of the buffer is UploadFile, hence cast it
-    auto* uploadFile = static_cast<UploadFile*>(resultPointer.get());
+    auto* uploadFile = static_cast<UploadFileDry*>(resultPointer.get());
     // Copy destination file name info to the buffer
-    copyTo(uploadFile->filepath, params.destfilepath.string().c_str());
+    copyTo(uploadFile->destfilepath, params.destfilepath.string().c_str());
+    // Copy source file name to the buffer
+    copyTo(uploadFile->srcfilepath, params.filepath.string().c_str());
+
     // Calculate SHA256 hash
     SHA256(static_cast<unsigned char*>(result->data.get()), result->size,
            hash.m_data.data());
@@ -277,7 +286,7 @@ FileDataHelper::DataFromFile<FileDataHelper::UPLOAD_FILE_DRY>(
     uploadFile->options.dry_run = true;
 
     return TgBotSocket::Packet{TgBotSocket::Command::CMD_UPLOAD_FILE_DRY,
-                               resultPointer.get(), sizeof(UploadFile)};
+                               resultPointer.get(), sizeof(UploadFileDry)};
 }
 
 // Server ->
