@@ -7,6 +7,11 @@
         <EditTextPreference
             android:title="IP Address"
             android:key="ip_address"/>
+        <EditTextPreference
+            android:title="Port number"
+            android:key="port_number"
+            android:defaultValue="50000"
+            android:inputType="number"/>
     </PreferenceCategory>
 
     <PreferenceCategory

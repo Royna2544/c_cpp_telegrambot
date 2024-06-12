@@ -1,11 +1,8 @@
-package com.royna.tgbotclient.ui.text_to_chat
+package com.royna.tgbotclient.ui.commands.sendmsg
 
-import android.widget.Toast
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.liveData
-import androidx.lifecycle.viewModelScope
 import com.royna.tgbotclient.SocketCommandNative
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

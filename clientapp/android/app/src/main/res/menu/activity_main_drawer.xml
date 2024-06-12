@@ -6,15 +6,40 @@
     <group android:checkableBehavior="single">
         <item
             android:id="@+id/nav_home"
-            android:icon="@drawable/ic_menu_camera"
+            android:icon="@drawable/home"
             android:title="@string/menu_home" />
-        <item
-            android:id="@+id/nav_gallery"
-            android:icon="@drawable/ic_menu_gallery"
-            android:title="@string/menu_send_text_to_chat" />
-        <item
-            android:id="@+id/nav_slideshow"
-            android:icon="@drawable/ic_menu_slideshow"
-            android:title="@string/menu_get_uptime" />
+
+        <item android:title="@string/menu_commands">
+            <menu>
+                <group android:checkableBehavior="single">
+                    <item
+                        android:id="@+id/nav_send_msg"
+                        android:icon="@drawable/send"
+                        android:title="@string/menu_send_text_to_chat" />
+                    <item
+                        android:id="@+id/nav_uptime"
+                        android:icon="@drawable/schedule"
+                        android:title="@string/menu_get_uptime" />
+                    <item
+                        android:id="@+id/nav_upload"
+                        android:icon="@drawable/upload"
+                        android:title="@string/menu_upload_file" />
+                    <item
+                        android:id="@+id/nav_download"
+                        android:icon="@drawable/download"
+                        android:title="@string/menu_download_file" />
+                </group>
+            </menu>
+        </item>
+        <item android:title="@string/utilities">
+            <menu>
+                <group android:checkableBehavior="single">
+                    <item
+                        android:id="@+id/nav_chat_id"
+                        android:icon="@drawable/chat"
+                        android:title="@string/menu_chat_id_save" />
+                </group>
+            </menu>
+        </item>
     </group>
 </menu>

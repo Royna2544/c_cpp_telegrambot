@@ -13,10 +13,12 @@ import com.royna.tgbotclient.SocketCommandNative
 
 class TgClientSettings : PreferenceFragmentCompat() {
     private lateinit var mIPAddressEditText: EditTextPreference
+    private lateinit var mPortEditText: EditTextPreference
     private lateinit var mIPv4Switch: CheckBoxPreference
     private lateinit var mIPv6Switch: CheckBoxPreference
     private var mConfig = SocketCommandNative.DestinationType.IPv4
     private var mIPAddressStr = "127.0.0.1"
+    private var mPort = 0
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         addPreferencesFromResource(R.xml.preference_main)
@@ -24,19 +26,21 @@ class TgClientSettings : PreferenceFragmentCompat() {
         mIPv4Switch = findPreference("ipv4")!!
         mIPv6Switch = findPreference("ipv6")!!
         mIPAddressEditText = findPreference("ip_address")!!
+        mPortEditText = findPreference("port_number")!!
         PreferenceManager.getDefaultSharedPreferences(requireContext()).apply {
-
             val mIPAddressStr_in = getString(kIPAddressPref, mIPAddressStr)!!
             val mConfig_in = toInetConfig(getInt(kInetConfigPref, kInet4))
-            update(mConfig_in, mIPAddressStr_in)
+            val mPort_in = getInt(kPortPref, mPort)
+
+            update(UpdateInfo(mIPAddressStr_in, mConfig_in, mPort_in), true)
         }
 
         mIPv4Switch.setOnPreferenceClickListener {
-            update(SocketCommandNative.DestinationType.IPv4)
+            update(UpdateInfo(type = SocketCommandNative.DestinationType.IPv4))
             true
         }
         mIPv6Switch.setOnPreferenceClickListener {
-            update(SocketCommandNative.DestinationType.IPv6)
+            update(UpdateInfo(type = SocketCommandNative.DestinationType.IPv6))
             true
         }
         mIPAddressEditText.setOnPreferenceChangeListener { _, newValue ->
@@ -45,26 +49,39 @@ class TgClientSettings : PreferenceFragmentCompat() {
                 Toast.makeText(context, "Invalid IP address, not saved", Toast.LENGTH_SHORT).show()
                 return@setOnPreferenceChangeListener false
             }
-            update(mNewIPAddressStr)
+            update(UpdateInfo(ipaddr = mNewIPAddressStr))
+            true
+        }
+        mPortEditText.setOnPreferenceChangeListener { _, newValue ->
+            val mNewPortStr = newValue as String
+            if (mNewPortStr.toIntOrNull() == null) {
+                Toast.makeText(context, "Invalid port number, not saved", Toast.LENGTH_SHORT).show()
+                return@setOnPreferenceChangeListener false
+            }
+            update(UpdateInfo(port=mNewPortStr.toInt()))
             true
         }
     }
 
-    private fun update(mIPAddressStr_in: String) {
-        update(mConfig, mIPAddressStr_in)
-    }
+    data class UpdateInfo(var ipaddr: String? = null,
+                          var type: SocketCommandNative.DestinationType? = null,
+                          var port: Int? = null)
 
-    private fun update(mConfig_in: SocketCommandNative.DestinationType,
-                       mIPAddressStr_in: String = mIPAddressStr) {
+    private fun update(updateInfo: UpdateInfo, force: Boolean = false) {
         var mConfigChanged = false
         var mIPAddressStrChanged = false
-        if (mConfig_in != mConfig) {
+        var mPortChanged = false
+        if (updateInfo.type?.let { updateInfo.type != mConfig || force } == true) {
             mConfigChanged = true
-            mConfig = mConfig_in
+            mConfig = updateInfo.type!!
         }
-        if (mIPAddressStr_in != mIPAddressStr) {
+        if (updateInfo.ipaddr?.let { updateInfo.ipaddr != mIPAddressStr || force } == true) {
             mIPAddressStrChanged = true
-            mIPAddressStr = mIPAddressStr_in
+            mIPAddressStr = updateInfo.ipaddr!!
+        }
+        if (updateInfo.port?.let { updateInfo.port != mPort || force } == true) {
+            mPortChanged = true
+            mPort = updateInfo.port!!
         }
         if (mConfigChanged) {
             mIPv4Switch.isChecked = mConfig == SocketCommandNative.DestinationType.IPv4
@@ -73,6 +90,9 @@ class TgClientSettings : PreferenceFragmentCompat() {
         if (mIPAddressStrChanged) {
             mIPAddressEditText.text = mIPAddressStr
             mIPAddressEditText.summary = mIPAddressStr
+        }
+        if (mPortChanged) {
+            mPortEditText.summary = mPort.toString()
         }
         PreferenceManager.getDefaultSharedPreferences(requireContext()).apply {
             if (mIPAddressStrChanged) {
@@ -88,9 +108,12 @@ class TgClientSettings : PreferenceFragmentCompat() {
                     }
                 }
             }
+            if (mPortChanged) {
+                edit().putInt(kPortPref, mPort).apply()
+            }
         }
-        if (mConfigChanged or mIPAddressStrChanged) {
-            SocketCommandNative.changeDestinationInfo(mIPAddressStr, mConfig)
+        if (mConfigChanged or mIPAddressStrChanged or mPortChanged) {
+            SocketCommandNative.changeDestinationInfo(mIPAddressStr, mConfig, mPort)
         }
     }
     companion object {
@@ -98,6 +121,7 @@ class TgClientSettings : PreferenceFragmentCompat() {
         private val RegexIPv6 = Regex("\\b([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}\\b")
         private const val kIPAddressPref = "ip_address"
         private const val kInetConfigPref = "inet_version"
+        private const val kPortPref = "port_num"
         private const val kInet4 = 4
         private const val kInet6 = 6
         private const val kTag = "TgClientSettings"
@@ -121,7 +145,8 @@ class TgClientSettings : PreferenceFragmentCompat() {
                 val mIPAddressStr_in = getString(kIPAddressPref, "127.0.0.1")!!
                 val mConfig_in =
                     toInetConfig(getInt(kInetConfigPref, kInet4))
-                SocketCommandNative.changeDestinationInfo(mIPAddressStr_in, mConfig_in)
+                val mPort_in = getInt(kPortPref, 0)
+                SocketCommandNative.changeDestinationInfo(mIPAddressStr_in, mConfig_in, mPort_in)
             }
         }
     }

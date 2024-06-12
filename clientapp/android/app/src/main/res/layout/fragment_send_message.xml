@@ -9,7 +9,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/destination_chat"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="@dimen/padding_small"
         android:layout_centerHorizontal="true" />
 
     <EditText
@@ -17,8 +17,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_below="@id/showChatIdText"
-        android:layout_marginTop="8dp"
-        android:layout_marginHorizontal="30dp"
+        android:layout_marginTop="@dimen/padding_small"
+        android:layout_marginHorizontal="@dimen/padding_medium"
         android:inputType="numberSigned"
         android:hint="@string/chat_id" />
 
@@ -29,7 +29,7 @@
         android:layout_height="wrap_content"
         android:text="@string/message_text"
         android:layout_below="@id/chatIdText"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="@dimen/padding_small"
         android:layout_centerHorizontal="true" />
 
     <EditText
@@ -37,8 +37,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_below="@id/showMessageText"
-        android:layout_marginTop="8dp"
-        android:layout_marginHorizontal="30dp"
+        android:layout_marginHorizontal="@dimen/padding_medium"
+        android:layout_marginTop="@dimen/padding_small"
         android:hint="@string/text" />
 
     <!-- Button -->
@@ -48,6 +48,14 @@
         android:layout_height="wrap_content"
         android:layout_below="@id/messageText"
         android:layout_centerHorizontal="true"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="@dimen/padding_medium"
         android:text="@string/send_message" />
+
+    <include
+        layout="@layout/fragment_current_setting"
+        android:layout_alignParentBottom="true"
+        android:layout_margin="@dimen/padding_medium"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerHorizontal="true"/>
 </RelativeLayout>

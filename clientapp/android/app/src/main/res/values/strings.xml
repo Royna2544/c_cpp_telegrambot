@@ -3,7 +3,7 @@
     <string name="title_activity_main">MainActivity</string>
     <string name="navigation_drawer_open">Open navigation drawer</string>
     <string name="navigation_drawer_close">Close navigation drawer</string>
-    <string name="nav_header_title">Android Studio</string>
+    <string name="nav_header_title">TgBot++ Client</string>
     <string name="nav_header_subtitle">android.studio@android.com</string>
     <string name="nav_header_desc">Navigation header</string>
     <string name="action_settings">Settings</string>
@@ -16,4 +16,19 @@
     <string name="message_text">Message Text</string>
     <string name="text">Text</string>
     <string name="send_message">Send Message</string>
+    <string name="current_config">Current Configuration</string>
+    <string name="ip_address_fmt">IP Address: %s</string>
+    <string name="address_type_fmt">Address Type: %s</string>
+    <string name="port_fmt">Port: %d</string>
+    <string name="menu_commands">Commands</string>
+    <string name="menu_upload_file">Upload file</string>
+    <string name="menu_download_file">Download File</string>
+    <string name="menu_chat_id_save">Save chat id</string>
+    <string name="utilities">Utilities</string>
+    <string name="get">Get</string>
+    <string name="get_desc">Press the get button</string>
+    <string name="get_wip">Getting…</string>
+    <string name="select_file">Select File</string>
+    <string name="no_file_selected">No file selected</string>
+    <string name="upload_file">Upload File</string>
 </resources>

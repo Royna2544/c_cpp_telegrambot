@@ -1,4 +1,4 @@
-package com.royna.tgbotclient.ui.text_to_chat
+package com.royna.tgbotclient.ui.commands.sendmsg
 
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -9,11 +9,14 @@ import android.widget.Toast
 import androidx.core.widget.addTextChangedListener
 import androidx.core.widget.doOnTextChanged
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.commit
 import androidx.lifecycle.ViewModelProvider
-import com.royna.tgbotclient.databinding.FragmentTextToChatBinding
+import com.royna.tgbotclient.R
+import com.royna.tgbotclient.databinding.FragmentSendMessageBinding
+import com.royna.tgbotclient.ui.CurrentSettingFragment
 
 class TextToChatFragment : Fragment() {
-    private var _binding: FragmentTextToChatBinding? = null
+    private var _binding: FragmentSendMessageBinding? = null
 
     // This property is only valid between onCreateView and
     // onDestroyView.
@@ -27,7 +30,7 @@ class TextToChatFragment : Fragment() {
         val TextToChatViewModel =
             ViewModelProvider(this)[TextToChatViewModel::class.java]
 
-        _binding = FragmentTextToChatBinding.inflate(inflater, container, false)
+        _binding = FragmentSendMessageBinding.inflate(inflater, container, false)
         val root: View = binding.root
 
         val chatIdText: EditText = binding.chatIdText
@@ -68,6 +71,14 @@ class TextToChatFragment : Fragment() {
             Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
         }
         return root
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        childFragmentManager.commit {
+            replace(R.id.current_setting_container, CurrentSettingFragment())
+        }
     }
 
     override fun onDestroyView() {

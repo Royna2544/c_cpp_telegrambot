@@ -12,14 +12,20 @@
         tools:layout="@layout/fragment_home" />
 
     <fragment
-        android:id="@+id/nav_gallery"
-        android:name="com.royna.tgbotclient.ui.text_to_chat.TextToChatFragment"
+        android:id="@+id/nav_send_msg"
+        android:name="com.royna.tgbotclient.ui.commands.sendmsg.TextToChatFragment"
         android:label="@string/menu_send_text_to_chat"
-        tools:layout="@layout/fragment_text_to_chat" />
+        tools:layout="@layout/fragment_send_message" />
 
     <fragment
-        android:id="@+id/nav_slideshow"
-        android:name="com.royna.tgbotclient.ui.uptime.UptimeFragment"
+        android:id="@+id/nav_uptime"
+        android:name="com.royna.tgbotclient.ui.commands.uptime.UptimeFragment"
         android:label="@string/menu_get_uptime"
         tools:layout="@layout/fragment_uptime" />
+
+    <fragment
+        android:id="@+id/nav_upload"
+        android:name="com.royna.tgbotclient.ui.commands.uploadfile.UploadFileFragment"
+        android:label="@string/menu_upload_file"
+        tools:layout="@layout/fragment_upload_file" />
 </navigation>

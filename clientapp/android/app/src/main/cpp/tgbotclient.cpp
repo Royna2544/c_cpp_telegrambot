@@ -5,6 +5,7 @@
 #include <jni.h>
 #include <unistd.h>
 #include <zlib.h>
+#include <sys/poll.h>
 
 #include <cstring>
 #include <string>
@@ -26,7 +27,16 @@ using namespace TgBotSocket::callback;
 struct SocketConfig {
     std::string address;
     enum { USE_IPV4, USE_IPV6 } mode;
+    int port;
+
+    int timeout_s = 5;
 };
+
+#define SOCKNATIVE_JAVACLS "com/royna/tgbotclient/SocketCommandNative"
+#define SOCKNATIVE_CMDCB_JAVACLS SOCKNATIVE_JAVACLS "$ICommandCallback"
+#define SOCKNATIVE_DSTINFO_JAVACLS SOCKNATIVE_JAVACLS "$DestinationInfo"
+#define SOCKNATIVE_DSTTYPE_JAVACLS SOCKNATIVE_JAVACLS "$DestinationType"
+#define STRING_JAVACLS "java/lang/String"
 
 class TgBotSocketNative {
    public:
@@ -50,6 +60,7 @@ class TgBotSocketNative {
     void setSocketConfig(SocketConfig config_in) {
         config = std::move(config_in);
     }
+    SocketConfig getSocketConfig() { return config; }
 
     static std::shared_ptr<TgBotSocketNative> getInstance() {
         static auto instance =
@@ -59,7 +70,7 @@ class TgBotSocketNative {
 
     static void callSuccess(JNIEnv *env, jobject callbackObj,
                             jobject resultObj) {
-        jclass callbackClass = env->FindClass(kCallbackCls.data());
+        jclass callbackClass = env->FindClass(SOCKNATIVE_CMDCB_JAVACLS);
         jmethodID success = env->GetMethodID(callbackClass, "onSuccess",
                                              "(Ljava/lang/Object;)V");
         env->CallVoidMethod(callbackObj, success, resultObj);
@@ -68,19 +79,16 @@ class TgBotSocketNative {
 
     static void callFailed(JNIEnv *env, jobject callbackObj,
                            std::string message) {
-        jclass callbackClass = env->FindClass(kCallbackCls.data());
+        jclass callbackClass = env->FindClass(SOCKNATIVE_CMDCB_JAVACLS);
         jmethodID success =
-                env->GetMethodID(callbackClass, "onError", "(Ljava/lang/String;)V");
+            env->GetMethodID(callbackClass, "onError", "(L" STRING_JAVACLS ";)V");
         env->CallVoidMethod(callbackObj, success,
                             Convert<jstring>(env, message));
         ABSL_LOG(INFO) << "Called onFailed callback";
     }
 
    private:
-    constexpr static int kSocketPort = 50000;
     constexpr static int kRecvFlags = MSG_WAITALL | MSG_NOSIGNAL;
-    static constexpr std::string_view kCallbackCls =
-            "com/royna/tgbotclient/SocketCommandNative$ICommandCallback";
     SocketConfig config;
 
     TgBotSocketNative() = default;
@@ -102,7 +110,7 @@ class TgBotSocketNative {
         int ret{};
 
         ABSL_LOG(INFO) << "Prepare to send CommandContext";
-        sockfd = socket(af, SOCK_STREAM, 0);
+        sockfd = socket(af, SOCK_STREAM | SOCK_NONBLOCK, 0);
         if (sockfd < 0) {
             _callFailed(env, callbackObj, "Failed to create socket");
             return;
@@ -111,7 +119,7 @@ class TgBotSocketNative {
         auto sockFdCloser = std::unique_ptr<int, decltype(&closeFd)>(
             &sockfd, &TgBotSocketNative::closeFd);
         ABSL_LOG(INFO) << "Using IP: " << std::quoted(config.address, '\'')
-                       << ", Port: " << kSocketPort;
+                       << ", Port: " << config.port;
         setupSockAddress(&addr);
 
         // Calculate CRC32
@@ -121,9 +129,51 @@ class TgBotSocketNative {
         context.header.checksum = crc;
 
         if (connect(sockfd, reinterpret_cast<sockaddr *>(&addr), len) != 0) {
-            _callFailed(env, callbackObj, "Failed to connect to server");
+            if (errno != EINPROGRESS) {
+                _callFailed(env, callbackObj, "Failed to initiate connect()");
+                return;
+            }
+        }
+
+        // Wait for the nonblocking socket's event...
+        struct pollfd fds{};
+        fds.events = POLLOUT;
+        fds.fd = sockfd;
+        ret = poll(&fds, 1, config.timeout_s * 1000);
+        if (ret < 0) {
+            _callFailed(env, callbackObj, "Failed to poll()");
+            return;
+        } else if (!(fds.revents & POLLOUT)) {
+            _callFailed(env, callbackObj, "The server didn't respond");
             return;
         }
+
+        // Get if it failed...
+        int error = 0;
+        socklen_t error_len = sizeof(error);
+        ret = getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &error, &error_len);
+        if (ret < 0) {
+            _callFailed(env, callbackObj, "Failed to getsockopt()");
+            return;
+        }
+
+        // If failed to connect, abort
+        if (error != 0) {
+            callFailed(env, callbackObj, "Failed to connect to server");
+            return;
+        }
+
+        ret = fcntl(sockfd, F_GETFL);
+        if (ret < 0) {
+            _callFailed(env, callbackObj, "Failed to get socket fd flags");
+            return;
+        }
+        ret = fcntl(sockfd, F_SETFL, ret & ~O_NONBLOCK);
+        if (ret < 0) {
+            _callFailed(env, callbackObj, "Failed to set socket fd blocking");
+            return;
+        }
+
         ABSL_LOG(INFO) << "Connected to server";
         ret = send(sockfd, &context.header, sizeof(PacketHeader), MSG_NOSIGNAL);
         if (ret < 0) {
@@ -200,13 +250,13 @@ class TgBotSocketNative {
     [[maybe_unused]] void setupSockAddress(sockaddr_in *addr) const {
         addr->sin_family = AF_INET;
         inet_pton(AF_INET, config.address.c_str(), &addr->sin_addr);
-        addr->sin_port = htons(kSocketPort);
+        addr->sin_port = htons(config.port);
     }
     template <>
     [[maybe_unused]] void setupSockAddress(sockaddr_in6 *addr) const {
         addr->sin6_family = AF_INET6;
         inet_pton(AF_INET6, config.address.c_str(), &addr->sin6_addr);
-        addr->sin6_port = htons(kSocketPort);
+        addr->sin6_port = htons(config.port);
     }
 
     template <Command cmd>
@@ -242,7 +292,7 @@ void initLogging(JNIEnv *env, jobject thiz) {
 }
 
 jboolean changeDestinationInfo(JNIEnv *env, jobject thiz, jstring ipaddr,
-                               jint type) {
+                               jint type, jint port) {
     auto sockIntf = TgBotSocketNative::getInstance();
     std::string newAddress = Convert<std::string>(env, ipaddr);
     SocketConfig config{};
@@ -259,12 +309,37 @@ jboolean changeDestinationInfo(JNIEnv *env, jobject thiz, jstring ipaddr,
             return false;
     }
     config.address = newAddress;
+    config.port = port;
     ABSL_LOG(INFO) << "Switched to IP " << std::quoted(newAddress, '\'')
-                   << ", af: " << type;
+                   << ", af: " << type << ", port: " << port;
     sockIntf->setSocketConfig(config);
     return true;
 }
-
+jobject getCurrentDestinationInfo(JNIEnv *env, jobject thiz) {
+    auto cf = TgBotSocketNative::getInstance()->getSocketConfig();
+    jclass info = env->FindClass(SOCKNATIVE_DSTINFO_JAVACLS);
+    jmethodID ctor = env->GetMethodID(info, "<init>",
+                                      "(L" STRING_JAVACLS
+                                      ";L" SOCKNATIVE_DSTTYPE_JAVACLS ";I)V");
+    jclass destType = env->FindClass(SOCKNATIVE_DSTTYPE_JAVACLS);
+    jmethodID valueOf =
+        env->GetStaticMethodID(destType, "valueOf",
+                               "(L" STRING_JAVACLS ";)"
+                               "L" SOCKNATIVE_DSTTYPE_JAVACLS ";");
+    jobject destTypeVal;
+    switch (cf.mode) {
+        case SocketConfig::USE_IPV4:
+            destTypeVal = env->CallStaticObjectMethod(
+                destType, valueOf, Convert<jstring>(env, "IPv4"));
+            break;
+        case SocketConfig::USE_IPV6:
+            destTypeVal = env->CallStaticObjectMethod(
+                destType, valueOf, Convert<jstring>(env, "IPv6"));
+            break;
+    }
+    return env->NewObject(info, ctor, Convert<jstring>(env, cf.address),
+                          destTypeVal, cf.port);
+}
 void sendWriteMessageToChatId(JNIEnv *env, jobject thiz, jlong chat_id,
                               jstring text, jobject callback) {
     WriteMsgToChatId data;
@@ -299,7 +374,8 @@ void downloadFile(JNIEnv *env, jobject thiz, jstring remote_file_path,
                   jstring local_file_path, jobject callback) {
     DownloadFile req{};
     copyTo(req.filepath, Convert<std::string>(env, remote_file_path).c_str());
-    copyTo(req.destfilename, Convert<std::string>(env, local_file_path).c_str());
+    copyTo(req.destfilename,
+           Convert<std::string>(env, local_file_path).c_str());
     auto pkt = Packet(Command::CMD_DOWNLOAD_FILE, req);
     TgBotSocketNative::getInstance()->sendContext(pkt, env, callback);
 }
@@ -308,19 +384,17 @@ void downloadFile(JNIEnv *env, jobject thiz, jstring remote_file_path,
 JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *__unused reserved) {
     static const JNINativeMethod methods[] = {
         NATIVE_METHOD(initLogging, "()V"),
-        NATIVE_METHOD(changeDestinationInfo, "(Ljava/lang/String;I)Z"),
+        NATIVE_METHOD(changeDestinationInfo, "(L" STRING_JAVACLS ";II)Z"),
         NATIVE_METHOD(sendWriteMessageToChatId,
-                      "(JLjava/lang/String;Lcom/royna/tgbotclient/"
-                      "SocketCommandNative$ICommandCallback;)V"),
-        NATIVE_METHOD(
-            getUptime,
-            "(Lcom/royna/tgbotclient/SocketCommandNative$ICommandCallback;)V"),
-        NATIVE_METHOD(uploadFile,
-                      "(Ljava/lang/String;Ljava/lang/String;Lcom/royna/"
-                      "tgbotclient/SocketCommandNative$ICommandCallback;)V"),
-        NATIVE_METHOD(downloadFile,
-                      "(Ljava/lang/String;Ljava/lang/String;Lcom/royna/"
-                      "tgbotclient/SocketCommandNative$ICommandCallback;)V")};
-    return JNI_onLoadDef(vm, "com/royna/tgbotclient/SocketCommandNative",
-                         methods, NATIVE_METHOD_SZ(methods));
+                      "(JL" STRING_JAVACLS ";L" SOCKNATIVE_CMDCB_JAVACLS ";)V"),
+        NATIVE_METHOD(getUptime, "(L" SOCKNATIVE_CMDCB_JAVACLS ";)V"),
+        NATIVE_METHOD(uploadFile, "(L" STRING_JAVACLS ";L" STRING_JAVACLS
+                                  ";L" SOCKNATIVE_CMDCB_JAVACLS ";)V"),
+        NATIVE_METHOD(downloadFile, "(L" STRING_JAVACLS ";L" STRING_JAVACLS
+                                    ";L" SOCKNATIVE_CMDCB_JAVACLS ";)V"),
+        NATIVE_METHOD(getCurrentDestinationInfo,
+                      "()L" SOCKNATIVE_DSTINFO_JAVACLS ";")};
+
+    return JNI_onLoadDef(vm, SOCKNATIVE_JAVACLS, methods,
+                         NATIVE_METHOD_SZ(methods));
 }
