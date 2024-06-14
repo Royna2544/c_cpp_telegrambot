@@ -19,7 +19,6 @@
         android:layout_below="@id/showChatIdText"
         android:layout_marginTop="@dimen/padding_small"
         android:layout_marginHorizontal="@dimen/padding_medium"
-        android:inputType="numberSigned"
         android:hint="@string/chat_id" />
 
     <!-- Second EditText with description -->

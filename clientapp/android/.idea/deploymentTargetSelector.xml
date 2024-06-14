@@ -4,13 +4,17 @@
     <selectionStates>
       <SelectionState runConfigName="app">
         <option name="selectionMode" value="DROPDOWN" />
-        <DropdownSelection timestamp="2024-06-09T06:45:44.709948700Z">
+        <DropdownSelection timestamp="2024-06-13T12:50:47.877135Z">
           <Target type="DEFAULT_BOOT">
             <handle>
-              <DeviceId pluginId="PhysicalDevice" identifier="serial=R3CX307ZHXD" />
+              <DeviceId pluginId="PhysicalDevice" identifier="serial=RFCN5024TPB" />
             </handle>
           </Target>
         </DropdownSelection>
+        <DialogSelection />
+      </SelectionState>
+      <SelectionState runConfigName="SQLiteChatDatastoreTest">
+        <option name="selectionMode" value="DROPDOWN" />
         <DialogSelection />
       </SelectionState>
     </selectionStates>

@@ -4,9 +4,8 @@ import androidx.fragment.app.FragmentActivity
 import com.royna.tgbotclient.R
 import com.royna.tgbotclient.SocketCommandNative
 import com.royna.tgbotclient.SocketCommandNative.getUptime
-import com.royna.tgbotclient.ui.commands.SingleViewModelBase
+import com.royna.tgbotclient.ui.SingleViewModelBase
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext

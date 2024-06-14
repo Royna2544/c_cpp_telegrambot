@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:layout_centerHorizontal="true"
+    tools:context=".datastore.chat.ui.ChatDatastoreFragment">
+
+    <LinearLayout
+        android:id="@+id/datastore_edit_container"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerHorizontal="true">
+
+        <EditText
+            android:id="@+id/datastore_chat_edit"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:hint="@string/chat_id"
+            android:inputType="numberSigned"
+            android:layout_margin="@dimen/padding_small"/>
+
+        <EditText
+            android:id="@+id/datastore_name_edit"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:hint="@string/chat_name_to_save"
+            android:layout_margin="@dimen/padding_small"/>
+    </LinearLayout>
+
+    <LinearLayout
+        style="?android:attr/buttonBarStyle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/datastore_edit_container"
+        android:id="@+id/datastore_actions_container"
+        android:layout_centerHorizontal="true">
+
+        <Button
+            android:id="@+id/datastore_save_button"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_margin="@dimen/padding_small"
+            android:text="@string/save" />
+
+        <Button
+            android:id="@+id/datastore_clear_button"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_margin="@dimen/padding_small"
+            android:text="@string/clear_all"/>
+    </LinearLayout>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/datastore_actions_container"
+        android:id="@+id/datastore_chat_recycler_view"
+        android:layout_centerHorizontal="true">
+    </androidx.recyclerview.widget.RecyclerView>
+
+</RelativeLayout>

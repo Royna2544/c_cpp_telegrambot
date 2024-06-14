@@ -35,7 +35,7 @@
             <menu>
                 <group android:checkableBehavior="single">
                     <item
-                        android:id="@+id/nav_chat_id"
+                        android:id="@+id/nav_util_datastore_chat"
                         android:icon="@drawable/chat"
                         android:title="@string/menu_chat_id_save" />
                 </group>

@@ -6,13 +6,14 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.Toast
-import androidx.core.widget.addTextChangedListener
+import androidx.core.widget.doAfterTextChanged
 import androidx.core.widget.doOnTextChanged
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.commit
 import androidx.lifecycle.ViewModelProvider
 import com.royna.tgbotclient.R
 import com.royna.tgbotclient.databinding.FragmentSendMessageBinding
+import com.royna.tgbotclient.datastore.chat.SQLiteChatDatastore
 import com.royna.tgbotclient.ui.CurrentSettingFragment
 
 class TextToChatFragment : Fragment() {
@@ -27,7 +28,7 @@ class TextToChatFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        val TextToChatViewModel =
+        val textToChatViewModel =
             ViewModelProvider(this)[TextToChatViewModel::class.java]
 
         _binding = FragmentSendMessageBinding.inflate(inflater, container, false)
@@ -35,39 +36,78 @@ class TextToChatFragment : Fragment() {
 
         val chatIdText: EditText = binding.chatIdText
         val messageText: EditText = binding.messageText
-        TextToChatViewModel.chatId.observe(viewLifecycleOwner) {
-            val str = when (it) {
-                5185434015 -> "My brother"
-                else -> "Destination Chat Id: $it"
+
+        fun computeSendButtonState() {
+            val chatIdValue = textToChatViewModel.chatId.value
+            val messageTextValue = textToChatViewModel.messageText.value
+            binding.sendButton.isEnabled = chatIdValue.let {
+                (it != null) && (it != InvalidChatId)
+            }  && !messageTextValue.isNullOrBlank()
+        }
+
+        textToChatViewModel.chatId.observe(viewLifecycleOwner) {
+            binding.showChatIdText.text = if (mChatIdMap.containsValue(it)) {
+                getString(R.string.destination_chat_fmt, mChatIdMap.filterValues {
+                    v-> v == it
+                }.keys.first(), it)
+            } else if (it != InvalidChatId) {
+                getString(R.string.destination_chat_id_fmt, it)
+            } else {
+                getString(R.string.destination_chat)
             }
-            binding.showChatIdText.text = str
         }
-        TextToChatViewModel.messageText.observe(viewLifecycleOwner) {
-            binding.showMessageText.text = "Message: $it"
+        textToChatViewModel.messageText.observe(viewLifecycleOwner) {
+            computeSendButtonState()
+            binding.showMessageText.text = if (!it.isNullOrBlank())
+                getString(R.string.message_fmt, it) else getString(R.string.message_text)
         }
-        chatIdText.addTextChangedListener { editor ->
-            val id = runCatching {
+        chatIdText.doAfterTextChanged { editor ->
+            runCatching {
                 editor.toString().toLong()
-            }.getOrDefault(0)
-            TextToChatViewModel.setChatId(id)
+            }.onSuccess {
+                textToChatViewModel.setChatId(it)
+                computeSendButtonState()
+            }.onFailure {
+                // This is not a number, query it on DB
+                mChatIdMap[editor.toString()].let {
+                    if (it != null) {
+                        // Found
+                        textToChatViewModel.setChatId(it)
+                    } else {
+                        // Not found
+                        mChatIdMap.filterKeys { key ->
+                            key.lowercase() == editor.toString().lowercase()
+                        }.also { map ->
+                            assert(map.size == 1 || map.isEmpty())
+                            if (map.isEmpty()) {
+                                textToChatViewModel.setChatId(InvalidChatId)
+                            }
+                        }.forEach { entry ->
+                            textToChatViewModel.setChatId(entry.value)
+                        }
+                    }
+                    computeSendButtonState()
+                }
+            }
         }
-        messageText.doOnTextChanged { text, start, before, count ->
-            TextToChatViewModel.setMessageText(text.toString())
+        messageText.doOnTextChanged { text, _, _, _ ->
+            textToChatViewModel.setMessageText(text.toString())
         }
+        binding.sendButton.isEnabled = false
         binding.sendButton.setOnClickListener {
-            val text = TextToChatViewModel.messageText.value
+            val text = textToChatViewModel.messageText.value
             if (text.isNullOrBlank()) {
                 Toast.makeText(context, "Message is empty", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-            val chatId = TextToChatViewModel.chatId.value
+            val chatId = textToChatViewModel.chatId.value
             if (chatId == null) {
                 Toast.makeText(context, "Chat Id is empty", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-            TextToChatViewModel.send(chatId, text)
+            textToChatViewModel.send(chatId, text)
         }
-        TextToChatViewModel.sendResult.observe(viewLifecycleOwner) {
+        textToChatViewModel.sendResult.observe(viewLifecycleOwner) {
             Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
         }
         return root
@@ -76,6 +116,7 @@ class TextToChatFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        mChatIdMap = SQLiteChatDatastore(requireContext()).readAll()
         childFragmentManager.commit {
             replace(R.id.current_setting_container, CurrentSettingFragment())
         }
@@ -84,5 +125,10 @@ class TextToChatFragment : Fragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
+    }
+
+    private var mChatIdMap: Map<String, Long> = mapOf()
+    companion object {
+        private const val InvalidChatId = 0L
     }
 }

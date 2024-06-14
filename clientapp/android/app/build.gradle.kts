@@ -1,4 +1,4 @@
-import com.android.ide.common.gradle.RELEASE
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -47,6 +47,18 @@ android {
         viewBinding = true
         buildConfig = true
     }
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
+    packaging {
+        resources {
+            excludes += "META-INF/{AL2.0,LGPL2.1}"
+            excludes += "META-INF/LICENSE.md"
+            excludes += "META-INF/LICENSE-notice.md"
+        }
+    }
 }
 
 dependencies {
@@ -60,10 +72,11 @@ dependencies {
     implementation(libs.androidx.navigation.ui.ktx)
     implementation(libs.androidx.preference.ktx)
     implementation(libs.androidx.fragment.ktx)
-    implementation(libs.oshai.kotlin.logging.jvm)
-    runtimeOnly(libs.slf4j.simple)
+    implementation(libs.androidx.window)
 
     testImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.junit)
+
+    androidTestImplementation(libs.junit)
+    androidTestImplementation(libs.junit.jupiter)
     androidTestImplementation(libs.androidx.espresso.core)
 }

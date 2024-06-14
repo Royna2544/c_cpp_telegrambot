@@ -28,4 +28,10 @@
         android:name="com.royna.tgbotclient.ui.commands.uploadfile.UploadFileFragment"
         android:label="@string/menu_upload_file"
         tools:layout="@layout/fragment_upload_file" />
+
+    <fragment
+        android:id="@+id/nav_util_datastore_chat"
+        android:name="com.royna.tgbotclient.datastore.chat.ui.ChatDatastoreFragment"
+        android:label="@string/menu_chat_id_save"
+        tools:layout="@layout/fragment_datastore_chat" />
 </navigation>

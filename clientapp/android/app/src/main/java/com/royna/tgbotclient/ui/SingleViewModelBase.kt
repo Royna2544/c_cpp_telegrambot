@@ -1,4 +1,4 @@
-package com.royna.tgbotclient.ui.commands
+package com.royna.tgbotclient.ui
 
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.LiveData

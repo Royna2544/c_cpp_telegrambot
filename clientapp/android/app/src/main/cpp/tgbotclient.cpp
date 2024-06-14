@@ -62,6 +62,11 @@ class TgBotSocketNative {
     }
     SocketConfig getSocketConfig() { return config; }
 
+    void setUploadFileOptions(UploadFile::Options options_in) {
+        uploadOptions = std::move(options_in);
+    }
+    UploadFile::Options getUploadFileOptions() { return uploadOptions; }
+
     static std::shared_ptr<TgBotSocketNative> getInstance() {
         static auto instance =
             std::make_shared<TgBotSocketNative>(TgBotSocketNative());
@@ -73,6 +78,7 @@ class TgBotSocketNative {
         jclass callbackClass = env->FindClass(SOCKNATIVE_CMDCB_JAVACLS);
         jmethodID success = env->GetMethodID(callbackClass, "onSuccess",
                                              "(Ljava/lang/Object;)V");
+        ABSL_DLOG(INFO) << "Will execute: " << __func__;
         env->CallVoidMethod(callbackObj, success, resultObj);
         ABSL_LOG(INFO) << "Called onSuccess callback";
     }
@@ -80,16 +86,19 @@ class TgBotSocketNative {
     static void callFailed(JNIEnv *env, jobject callbackObj,
                            std::string message) {
         jclass callbackClass = env->FindClass(SOCKNATIVE_CMDCB_JAVACLS);
-        jmethodID success =
+        jmethodID failed =
             env->GetMethodID(callbackClass, "onError", "(L" STRING_JAVACLS ";)V");
-        env->CallVoidMethod(callbackObj, success,
-                            Convert<jstring>(env, message));
+
+        ABSL_DLOG(INFO) << "Will execute: " << __func__;
+        env->CallVoidMethod(callbackObj, failed, Convert<jstring>(env, message));
         ABSL_LOG(INFO) << "Called onFailed callback";
     }
 
    private:
     constexpr static int kRecvFlags = MSG_WAITALL | MSG_NOSIGNAL;
+    constexpr static int kSendFlags = MSG_NOSIGNAL;
     SocketConfig config;
+    UploadFile::Options uploadOptions;
 
     TgBotSocketNative() = default;
 
@@ -175,7 +184,7 @@ class TgBotSocketNative {
         }
 
         ABSL_LOG(INFO) << "Connected to server";
-        ret = send(sockfd, &context.header, sizeof(PacketHeader), MSG_NOSIGNAL);
+        ret = send(sockfd, &context.header, sizeof(PacketHeader), kSendFlags);
         if (ret < 0) {
             _callFailed(env, callbackObj, "Failed to send packet header");
             return;
@@ -185,7 +194,7 @@ class TgBotSocketNative {
                            << ret << " bytes";
         }
         ret = send(sockfd, context.data.get(), context.header.data_size,
-                   MSG_NOSIGNAL);
+                   kSendFlags);
         if (ret < 0) {
             _callFailed(env, callbackObj, "Failed to send packet data");
             return;
@@ -205,7 +214,7 @@ class TgBotSocketNative {
             _callFailed(env, callbackObj, "Bad magic value of callback header");
             return;
         }
-        SharedMalloc data(malloc(header.data_size));
+        SharedMalloc data(header.data_size);
         if (data.get() == nullptr) {
             errno = ENOMEM;
             _callFailed(env, callbackObj,
@@ -217,6 +226,7 @@ class TgBotSocketNative {
             _callFailed(env, callbackObj, "Failed to read callback data");
             return;
         }
+        ABSL_LOG(INFO) << "Command received: " << static_cast<int>(header.cmd);
         switch (header.cmd) {
             case Command::CMD_GET_UPTIME_CALLBACK:
                 handleSpecificData<Command::CMD_GET_UPTIME_CALLBACK>(
@@ -225,6 +235,10 @@ class TgBotSocketNative {
             case Command::CMD_DOWNLOAD_FILE_CALLBACK:
                 handleSpecificData<Command::CMD_DOWNLOAD_FILE_CALLBACK>(
                     env, callbackObj, data.get(), header.data_size);
+                break;
+            case Command::CMD_UPLOAD_FILE_DRY_CALLBACK:
+                handleSpecificData<Command::CMD_UPLOAD_FILE_DRY_CALLBACK>(
+                        env, callbackObj, data.get(), header.data_size);
                 break;
             default: {
                 GenericAck AckData{};
@@ -281,6 +295,26 @@ class TgBotSocketNative {
         PacketHeader::length_type len) const {
         const auto *uptime = static_cast<const char *>(data);
         callSuccess(env, callbackObj, Convert<jstring>(env, uptime));
+    }
+    template <>
+    void handleSpecificData<Command::CMD_UPLOAD_FILE_DRY_CALLBACK>(
+        JNIEnv *env, jobject callbackObj, const void *data,
+        PacketHeader::length_type len) const {
+        const auto *callback = static_cast<const UploadFileDryCallback *>(data);
+        if (callback->result == AckType::SUCCESS) {
+            FileDataHelper::DataFromFileParam param{};
+            param.filepath = callback->requestdata.srcfilepath.data();
+            param.destfilepath = callback->requestdata.destfilepath.data();
+            auto p = FileDataHelper::DataFromFile<FileDataHelper::Pass::UPLOAD_FILE>(param);
+            if (p) {
+                sendContext(p.value(), env, callbackObj);
+            } else {
+                ABSL_LOG(ERROR) << "Failed to prepare file";
+                callFailed(env, callbackObj, "Failed to prepare file");
+            }
+        } else {
+            callFailed(env, callbackObj, callback->error_msg.data());
+        }
     }
 };
 
@@ -356,11 +390,16 @@ void getUptime(JNIEnv *env, jobject thiz, jobject callback) {
 
 void uploadFile(JNIEnv *env, jobject thiz, jstring path, jstring dest_file_path,
                 jobject callback) {
-    FileDataHelper::DataFromFileParam params;
+    FileDataHelper::DataFromFileParam params{};
     params.filepath = Convert<std::string>(env, path);
     params.destfilepath = Convert<std::string>(env, dest_file_path);
+    params.options = TgBotSocketNative::getInstance()->getUploadFileOptions();
+
+    ABSL_LOG(INFO) << "===============" << __func__ << "===============";
+    ABSL_LOG(INFO) << std::boolalpha << "overwrite opt: " << params.options.overwrite;
+    ABSL_LOG(INFO) << std::boolalpha << "hash_ignore opt: " << params.options.hash_ignore;
     auto rc =
-        FileDataHelper::DataFromFile<FileDataHelper::Pass::UPLOAD_FILE>(params);
+        FileDataHelper::DataFromFile<FileDataHelper::Pass::UPLOAD_FILE_DRY>(params);
     if (rc) {
         TgBotSocketNative::getInstance()->sendContext(rc.value(), env,
                                                       callback);
@@ -379,6 +418,16 @@ void downloadFile(JNIEnv *env, jobject thiz, jstring remote_file_path,
     auto pkt = Packet(Command::CMD_DOWNLOAD_FILE, req);
     TgBotSocketNative::getInstance()->sendContext(pkt, env, callback);
 }
+
+void setUploadFileOptions(JNIEnv *env, jobject thiz, jboolean failIfExist, jboolean failIfChecksumMatch) {
+    TgBotSocketNative::getInstance()->setUploadFileOptions({
+        .overwrite = !failIfExist,
+        .hash_ignore = !failIfChecksumMatch,
+    });
+    ABSL_LOG(INFO) << "===============" << __func__ << "===============";
+    ABSL_LOG(INFO) << std::boolalpha << "overwrite opt: " << !failIfExist;
+    ABSL_LOG(INFO) << std::boolalpha << "hash_ignore opt: " << !failIfChecksumMatch;
+}
 }  // namespace
 
 JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *__unused reserved) {
@@ -393,7 +442,9 @@ JNIEXPORT jint JNI_OnLoad(JavaVM *vm, void *__unused reserved) {
         NATIVE_METHOD(downloadFile, "(L" STRING_JAVACLS ";L" STRING_JAVACLS
                                     ";L" SOCKNATIVE_CMDCB_JAVACLS ";)V"),
         NATIVE_METHOD(getCurrentDestinationInfo,
-                      "()L" SOCKNATIVE_DSTINFO_JAVACLS ";")};
+                      "()L" SOCKNATIVE_DSTINFO_JAVACLS ";"),
+        NATIVE_METHOD(setUploadFileOptions, "(ZZ)V")
+    };
 
     return JNI_onLoadDef(vm, SOCKNATIVE_JAVACLS, methods,
                          NATIVE_METHOD_SZ(methods));

@@ -1,20 +1,17 @@
 package com.royna.tgbotclient.ui.commands.uploadfile
 
+import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
 import android.os.Build
 import android.os.FileUtils
+import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
 import androidx.fragment.app.FragmentActivity
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.ViewModel
 import com.royna.tgbotclient.SocketCommandNative
-import com.royna.tgbotclient.ui.commands.SingleViewModelBase
+import com.royna.tgbotclient.ui.SingleViewModelBase
 import com.royna.tgbotclient.util.Logging
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -26,7 +23,7 @@ import java.io.OutputStream
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-class UploadFileViewModel : SingleViewModelBase<String, Unit>() {
+class UploadFileViewModel : SingleViewModelBase<Uri, Unit>() {
     private fun getFileExtension(context: Context, uri: Uri): String? {
         val fileType: String? = context.contentResolver.getType(uri)
         return MimeTypeMap.getSingleton().getExtensionFromMimeType(fileType)
@@ -41,17 +38,28 @@ class UploadFileViewModel : SingleViewModelBase<String, Unit>() {
         }
     }
 
+    fun queryName(resolver: ContentResolver, uri: Uri): String? {
+        val returnCursor =
+            resolver.query(uri, null, null, null, null) ?: return null
+        val nameIndex = returnCursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+        returnCursor.moveToFirst()
+        val name = returnCursor.getString(nameIndex)
+        returnCursor.close()
+        return name
+    }
+
     override suspend fun coroutineFunction(activity: FragmentActivity) = suspendCancellableCoroutine {
         cancellableContinuation ->
-        val contentUri = Uri.parse(liveData.value)
+        val contentUri = liveData.value!!
         val fileExtension = getFileExtension(activity, contentUri)
         val fileName = "temp_file" + if (fileExtension != null) ".$fileExtension" else ""
 
-        Logging.i { "Creating temporary file: $fileName" }
+        Logging.info("Creating temporary file: $fileName")
 
         // Creating Temp file
         val tempFile = File(activity.cacheDir, fileName)
         tempFile.createNewFile()
+        tempFile.deleteOnExit()
 
         try {
             val oStream = FileOutputStream(tempFile)
@@ -70,15 +78,18 @@ class UploadFileViewModel : SingleViewModelBase<String, Unit>() {
             cancellableContinuation.resumeWithException(e)
             return@suspendCancellableCoroutine
         }
-        SocketCommandNative.uploadFile(tempFile.absolutePath, fileName,
+
+        val name = queryName(activity.contentResolver,contentUri) ?: fileName
+        Logging.info("Uploading file as : $name")
+        SocketCommandNative.uploadFile(tempFile.absolutePath, name,
             object : SocketCommandNative.ICommandCallback {
             override fun onSuccess(result: Any?) {
-                Logging.i { "File uploaded successfully" }
+                Logging.info ("File uploaded successfully")
                 cancellableContinuation.resume(Unit)
             }
 
             override fun onError(error: String) {
-                Logging.e { "File upload failed: $error" }
+                Logging.error ("File upload failed: $error")
                 cancellableContinuation.resumeWithException(RuntimeException(error))
             }
         })
@@ -95,5 +106,4 @@ class UploadFileViewModel : SingleViewModelBase<String, Unit>() {
             }
         }
     }
-
 }

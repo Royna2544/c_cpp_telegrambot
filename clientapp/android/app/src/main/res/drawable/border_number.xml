@@ -1,13 +1,12 @@
-<!-- res/drawable/border.xml -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
     <solid android:color="#FFFFFF" /> <!-- Background color -->
     <stroke
         android:width="2dp"
         android:color="#000000" /> <!-- Border width and color -->
     <padding
-        android:left="30dp"
-        android:top="20dp"
-        android:right="30dp"
-        android:bottom="20dp" /> <!-- Padding inside the border -->
+        android:left="@dimen/border_number_w"
+        android:top="@dimen/border_number_h"
+        android:right="@dimen/border_number_w"
+        android:bottom="@dimen/border_number_h" /> <!-- Padding inside the border -->
     <corners android:radius="4dp" /> <!-- Corner radius -->
 </shape>

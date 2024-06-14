@@ -38,6 +38,38 @@
 
     </LinearLayout>
 
+    <RadioGroup
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/upload_buttons_container"
+        android:layout_centerInParent="true"
+        android:layout_marginHorizontal="@dimen/padding_medium">
+
+        <TextView
+            android:id="@+id/header"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/choose_upload_options" />
+
+        <RadioButton
+            android:id="@+id/upload_option_1"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/upload_option_1" />
+
+        <RadioButton
+            android:id="@+id/upload_option_2"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/upload_option_2" />
+
+        <RadioButton
+            android:id="@+id/upload_option_3"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/upload_option_3" />
+    </RadioGroup>
+
     <include
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"

@@ -8,4 +8,7 @@
     <dimen name="padding_small">10dp</dimen>
     <dimen name="padding_medium">20dp</dimen>
     <dimen name="padding_large">40dp</dimen>
+    <dimen name="main_pic_size">300dp</dimen>
+    <dimen name="border_number_w">10dp</dimen>
+    <dimen name="border_number_h">10dp</dimen>
 </resources>

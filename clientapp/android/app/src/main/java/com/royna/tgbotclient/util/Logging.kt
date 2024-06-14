@@ -1,41 +1,60 @@
 package com.royna.tgbotclient.util
 
+import android.util.Log
 import com.royna.tgbotclient.BuildConfig
-import io.github.oshai.kotlinlogging.KotlinLogging
 
 object Logging {
     private const val TAG = "TGBotCli::APP"
     private val DEBUG = BuildConfig.DEBUG
-    fun i(fn: logFunctionT) {
-        KotlinLogging.logger(getCaller()).info(fn)
+
+    fun info(message: String) {
+        Log.i(TAG, "[${getCaller()}] $message")
     }
 
-    fun e(fn: logFunctionT) {
-        KotlinLogging.logger(getCaller()).error(fn)
+    fun error(message: String) {
+        Log.e(TAG, "[${getCaller()}] $message")
+    }
+    fun error(message: String, t: Throwable) {
+        Log.e(TAG, "[${getCaller()}] $message", t)
     }
 
-    fun w(fn: logFunctionT) {
-        KotlinLogging.logger(getCaller()).warn(fn)
+    fun warn(message: String) {
+        Log.w(TAG, "[${getCaller()}] $message")
     }
 
-    fun d(fn: logFunctionT) {
+    fun debug(message: String) {
         if (DEBUG) {
-            KotlinLogging.logger(getCaller()).debug(fn)
+            Log.d(TAG, "[${getCaller()}] $message")
+        }
+    }
+
+    fun verbose(message: String) {
+        if (DEBUG) {
+            Log.v(TAG, "[${getCaller()}] $message")
         }
     }
 
     private fun getCaller(): String {
-        val element = Thread.currentThread().stackTrace[4]
-        var className = element.className.replace("$", "_")
-        while (className.endsWith("_")) {
-            className = className.substring(0, className.length - 1)
+        val myPackageName = BuildConfig.APPLICATION_ID.removeSuffix(".dev")
+        val element = Thread.currentThread().stackTrace.find {
+            it.className.contains(myPackageName) && !it.className
+                .contains(Logging.javaClass.simpleName)
         }
-        return String.format(
-            "%s %s",
-            className.substring(className.lastIndexOf(".") + 1),
-            element.methodName.substringBefore("-")
-        )
+        if (element == null) {
+            // Raise empty exception to log stack trace
+            Log.e(TAG, "getCaller: Failed to find caller", Exception())
+            return "Unknown"
+        }
+        var className = element.className.removePrefix("$myPackageName.")
+        val methodName = element.methodName
+        if (className.contains("$")) {
+            val classNameSplit = className.split("$")
+            // Actual class name
+            className = classNameSplit[0]
+            // Method of the class name
+            val memberFunctionName = classNameSplit[1]
+            className = "(anonymous class of $className::$memberFunctionName)"
+        }
+        return "Class '$className', Method '$methodName'"
     }
 }
-
-typealias logFunctionT = () -> Any?
