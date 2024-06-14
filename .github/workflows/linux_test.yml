@@ -43,7 +43,7 @@ jobs:
     name: 🚧 ${{ matrix.cc }} ${{ matrix.str }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3.5.3
+        uses: actions/checkout@v4.1.7
         with:
           fetch-depth: 0
 

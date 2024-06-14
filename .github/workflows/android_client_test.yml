@@ -27,7 +27,7 @@ jobs:
         java-version: ${{ env.JAVA_VERSION }}
 
     - name: Prepare Gradle Cache
-      uses: actions/cache@v2
+      uses: actions/cache@v4.0.2
       with:
         path: |
           ~/.gradle/caches
@@ -51,7 +51,7 @@ jobs:
         ./gradlew --no-daemon build
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4.3.3
       with:
         name: app-build
         path: |

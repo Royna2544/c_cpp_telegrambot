@@ -14,7 +14,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3.5.3
+        uses: actions/checkout@v4.1.7
 
         # https://github.com/Homebrew/homebrew-core/issues/169820#issuecomment-2080459578
       - name: Set up dependencies
