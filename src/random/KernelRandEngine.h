@@ -1,5 +1,6 @@
 #pragma once
 
+#include <ios>
 #if defined __APPLE__ || defined __linux__
 
 #include <absl/log/check.h>
@@ -47,7 +48,7 @@ struct kernel_rand_engine : InstanceClassBase<kernel_rand_engine> {
             for (const auto& n : nodes) {
                 fd = open(n.c_str(), O_RDONLY);
                 if (!isValidFd(fd)) {
-                    PLOG(ERROR) << "Opening hwrng device failed";
+                    PLOG(ERROR) << "Opening node " << std::quoted(n) << " failed";
                 } else {
                     // Test read some bytes
                     int data = 0;
@@ -63,6 +64,7 @@ struct kernel_rand_engine : InstanceClassBase<kernel_rand_engine> {
                     }
                 }
             }
+            LOG(INFO) << "isSupported: " << std::boolalpha << kSupported;
         });
         return kSupported;
     }
