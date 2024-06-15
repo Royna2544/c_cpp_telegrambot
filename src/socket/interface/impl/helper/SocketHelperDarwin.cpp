@@ -5,13 +5,14 @@
 
 #include <impl/SocketPosix.hpp>
 
-void SocketHelperUnix::setSocketBindingToIface(const socket_handle_t sfd,
-                                               const char* iface) {
-    const int index = if_nametoindex(iface);
+void SocketInterfaceUnix::bindToInterface(const socket_handle_t sock,
+                                          const std::string& iface) {
+    const int index = if_nametoindex(iface.c_str());
     int opt = 1;
 
     if (index != 0) {
-        setsockopt(sfd, IPPROTO_IP, IP_BOUND_IF, &index, sizeof(index));
+        setsockopt(sock, IPPROTO_IP, IP_BOUND_IF, &index, sizeof(index));
     }
-    setsockopt(sfd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt, sizeof(opt));
+    setsockopt(sock, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt,
+               sizeof(opt));
 }

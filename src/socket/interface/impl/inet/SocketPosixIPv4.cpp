@@ -3,13 +3,10 @@
 #include <ifaddrs.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
-#include <unistd.h>
 
-#include <functional>
 #include <impl/SocketPosix.hpp>
 
-#include "SharedMalloc.hpp"
-#include "SocketBase.hpp"
+#include "HelperPosix.hpp"
 
 std::optional<socket_handle_t> SocketInterfaceUnixIPv4::createServerSocket() {
     socket_handle_t ret = kInvalidFD;
@@ -24,16 +21,14 @@ std::optional<socket_handle_t> SocketInterfaceUnixIPv4::createServerSocket() {
     }
 
     LOG(INFO) << "Dump of active interfaces' addresses (IPv4)";
-    SocketHelperUnix::foreach_ipv4_interfaces::run(
-        [](const char* iface, const char* addr) {
-            LOG(INFO) << "ifname " << iface << ": addr " << addr;
-        });
-    SocketHelperUnix::foreach_ipv4_interfaces::run(
-        [&iface_done, sfd](const char* iface, const char* /*addr*/) {
-            if (!iface_done && strncmp("lo", iface, 2) != 0) {
-                LOG(INFO) << "Choosing ifname " << iface;
-
-                SocketHelperUnix::setSocketBindingToIface(sfd, iface);
+    forEachINetAddress<sockaddr_in, in_addr, AF_INET>([](const auto& data) {
+        LOG(INFO) << "ifname " << data.name << ": addr " << data.addr;
+    });
+    forEachINetAddress<sockaddr_in, in_addr, AF_INET>(
+        [&iface_done, sfd](const auto& data) {
+            if (!iface_done && kLocalInterface.data() != data.name) {
+                LOG(INFO) << "Choosing ifname " << data.name;
+                bindToInterface(sfd, data.name);
                 iface_done = true;
             }
         });
@@ -85,5 +80,5 @@ bool SocketInterfaceUnixIPv4::isSupported() {
 }
 
 void SocketInterfaceUnixIPv4::doGetRemoteAddr(socket_handle_t s) {
-    SocketHelperUnix::getremoteaddr_ipv4::run(s);
+    printRemoteAddress<sockaddr_in, in_addr, AF_INET>(s);
 }

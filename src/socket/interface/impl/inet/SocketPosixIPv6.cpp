@@ -1,3 +1,4 @@
+#include <absl/log/log.h>
 #include <arpa/inet.h>
 #include <ifaddrs.h>
 #include <netinet/in.h>
@@ -6,11 +7,9 @@
 
 #include <cstring>
 #include <functional>
-
-#include <absl/log/log.h>
-
 #include <impl/SocketPosix.hpp>
-#include "SocketBase.hpp"
+
+#include "HelperPosix.hpp"
 
 std::optional<socket_handle_t> SocketInterfaceUnixIPv6::createServerSocket() {
     socket_handle_t ret = kInvalidFD;
@@ -25,19 +24,17 @@ std::optional<socket_handle_t> SocketInterfaceUnixIPv6::createServerSocket() {
     }
 
     LOG(INFO) << "Dump of active interfaces' addresses (IPv6)";
-    SocketHelperUnix::foreach_ipv6_interfaces::run([](const char* iface, const char* addr) {
-        LOG(INFO) << "ifname " << iface << ": addr " << addr;
+    forEachINetAddress<sockaddr_in6, in6_addr, AF_INET6>([](const auto& data) {
+        LOG(INFO) << "ifname " << data.name << ": addr " << data.addr;
     });
-    SocketHelperUnix::foreach_ipv6_interfaces::run(
-        [&iface_done, sfd](const char* iface, const char* addr) {
-            if (!iface_done && strncmp("lo", iface, 2) != 0) {
-                LOG(INFO) << "Choosing ifname " << iface;
-
-                SocketHelperUnix::setSocketBindingToIface(sfd, iface);
+    forEachINetAddress<sockaddr_in6, in6_addr, AF_INET6>(
+        [&iface_done, sfd](const auto& data) {
+            if (!iface_done && kLocalInterface.data() != data.name) {
+                LOG(INFO) << "Choosing ifname " << data.name;
+                bindToInterface(sfd, data.name);
                 iface_done = true;
             }
         });
-
     if (!iface_done) {
         LOG(ERROR) << "Failed to find any valid interface to bind to (IPv6)";
         return std::nullopt;
@@ -84,6 +81,6 @@ bool SocketInterfaceUnixIPv6::isSupported() {
     return helper.inet.isSupportedIPv6();
 }
 
-void SocketInterfaceUnixIPv6::doGetRemoteAddr(socket_handle_t s) {    
-    SocketHelperUnix::getremoteaddr_ipv6::run(s);
+void SocketInterfaceUnixIPv6::doGetRemoteAddr(socket_handle_t s) {
+    printRemoteAddress<sockaddr_in6, in6_addr, AF_INET6>(s);
 }
