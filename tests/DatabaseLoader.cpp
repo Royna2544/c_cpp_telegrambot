@@ -6,17 +6,12 @@
 #include <memory>
 #include <mutex>
 
-#include "Authorization.h"
+#include "database/bot/TgBotDatabaseImpl.hpp"
 
-DefaultDatabase& loadDb() {
+std::shared_ptr<TgBotDatabaseImpl> loadDb() {
     static std::once_flag once;
-    static auto DBWrapper = std::make_shared<DefaultDatabase>();
     std::call_once(once, [] {
-        DBWrapper->loadDatabaseFromFile(
-            DefaultBotDatabase::getDatabaseDefaultPath());
-        LOG(INFO) << "Database loaded. Owner id is "
-                  << DBWrapper->getOwnerUserId();
-        AuthContext::initInstance(DBWrapper);
+        TgBotDatabaseImpl::getInstance()->loadDBFromConfig();
     });
-    return *DBWrapper;
+    return TgBotDatabaseImpl::getInstance();
 }

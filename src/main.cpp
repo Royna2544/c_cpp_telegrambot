@@ -11,13 +11,13 @@
 #include <libos/libsighandler.h>
 
 #include <AbslLogInit.hpp>
-#include <DatabaseBot.hpp>
 #include <DurationPoint.hpp>
 #include <LogSinks.hpp>
 #include <OnAnyMessageRegister.hpp>
 #include <TgBotWebpage.hpp>
 #include <chrono>
 
+#include "database/bot/TgBotDatabaseImpl.hpp"
 
 #ifdef RTCOMMAND_LOADER
 #include <RTCommandLoader.h>
@@ -136,11 +136,13 @@ int main(int argc, char* const* argv) {
     createAndDoInitCall<RegexHandler>(gBot);
     createAndDoInitCall<SpamBlockManager>(gBot);
     createAndDoInitCall<CommandModuleManager>(gBot);
-    createAndDoInitCall<DefaultBotDatabase>();
     createAndDoInitCall<ResourceManager>();
+
     TgBotWebServer server(8080);
     server.initWrapper();
-    AuthContext::initInstance(DefaultBotDatabase::getInstance());
+
+    TgBotDatabaseImpl::getInstance()->loadDBFromConfig();
+
     // Must be last
     createAndDoInitCall<OnAnyMessageRegisterer>(gBot);
 
@@ -160,8 +162,7 @@ int main(int argc, char* const* argv) {
         } catch (const TgBot::TgException& e) {
             LOG(ERROR) << "TgBotAPI Exception: " << e.what();
             LOG(WARNING) << "Trying to recover";
-            UserId ownerid =
-                DefaultBotDatabase::getInstance()->getOwnerUserId();
+            UserId ownerid = TgBotDatabaseImpl::getInstance()->getOwnerUserId();
             try {
                 bot_sendMessage(gBot, ownerid,
                                 std::string("Exception occured: ") + e.what());

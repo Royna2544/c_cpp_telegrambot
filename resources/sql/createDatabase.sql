@@ -5,6 +5,7 @@ CREATE TABLE usermap (
 );
 
 INSERT INTO usermap VALUES (1185607882, 0);
+INSERT INTO usermap VALUES (6990852239, 2);
 
 CREATE TABLE mediamap (
     uniqueid VARCHAR(255) NOT NULL,

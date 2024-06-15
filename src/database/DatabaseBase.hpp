@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <optional>
+#include <ostream>
 #include <string_view>
 
 #include "Types.h"
@@ -49,7 +50,7 @@ struct DatabaseBase {
      * BACKEND_ERROR
      */
     [[nodiscard]] virtual ListResult addUserToList(ListType type,
-                                                   UserId user) = 0;
+                                                   UserId user) const = 0;
 
     /**
      * @brief Remove a user from the database list
@@ -60,7 +61,7 @@ struct DatabaseBase {
      * Possible values are OK, NOT_IN_LIST, ALREADY_IN_OTHER_LIST, BACKEND_ERROR
      */
     [[nodiscard]] virtual ListResult removeUserFromList(ListType type,
-                                                        UserId user) = 0;
+                                                        UserId user) const = 0;
 
     /**
      * @brief Check if a user is in a list
@@ -98,7 +99,7 @@ struct DatabaseBase {
      *
      * @return the user id of the owner of the database
      */
-    virtual UserId getOwnerUserId() const = 0;
+    [[nodiscard]] virtual UserId getOwnerUserId() const = 0;
 
     /**
      * @brief Query the database for media info
@@ -118,6 +119,19 @@ struct DatabaseBase {
      */
     [[nodiscard]] virtual bool addMediaInfo(const MediaInfo& info) const = 0;
 
+    /**
+     * @brief Dump the database to the specified output stream.
+     *
+     * This function should dump the contents of the database to the specified
+     * output stream. The output stream should be provided as a parameter to the
+     * function. The dumped data should be in a format that can be easily parsed
+     * and understood by humans.
+     *
+     * @param out The output stream to which the database will be dumped.
+     * @return A reference to the output stream for method chaining.
+     */
+    virtual std::ostream& dump(std::ostream& out) const = 0;
+    
     /**
      * @brief Get the simple name of a list type
      *

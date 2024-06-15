@@ -1,12 +1,14 @@
 #include <Types.h>
-#include <socket/include/TgBotSocket_Export.hpp>
+#include <absl/log/log.h>
 
 #include <AbslLogInit.hpp>
-#include <DatabaseBot.hpp>
 #include <cstdlib>
 #include <cstring>
 #include <impl/bot/ClientBackend.hpp>
 #include <iostream>
+
+#include "TryParseStr.hpp"
+#include "database/bot/TgBotDatabaseImpl.hpp"
 
 [[noreturn]] static void usage(const char* argv0, const int exitCode) {
     std::cerr << "Usage: " << argv0 << " <chatId> <name stored in DB>"
@@ -20,20 +22,21 @@ int main(int argc, char* const* argv) {
     const auto _usage = [capture0 = argv[0]](auto&& PH1) {
         usage(capture0, std::forward<decltype(PH1)>(PH1));
     };
-    auto backend = DefaultDatabase();
+    auto backend = TgBotDatabaseImpl::getInstance();
 
     TgBot_AbslLogInit();
     if (argc != 3) {
         _usage(EXIT_SUCCESS);
     }
-    backend.loadDatabaseFromFile(DefaultBotDatabase::getDatabaseDefaultPath());
-    try {
-        chatId = std::stoll(argv[1]);
-    } catch (...) {
+    if (!backend->loadDBFromConfig()) {
+        LOG(ERROR) << "Failed to load DB from config";
+        return EXIT_FAILURE;
+    }
+    if (!try_parse(argv[1], &chatId)) {
         LOG(ERROR) << "Failed to convert '" << argv[1] << "' to ChatId";
         _usage(EXIT_FAILURE);
     }
-    auto info = backend.queryMediaInfo(argv[2]);
+    auto info = backend->queryMediaInfo(argv[2]);
     if (!info.has_value()) {
         LOG(ERROR) << "Failed to find entry for name '" << argv[2] << "'";
         return EXIT_FAILURE;
@@ -45,6 +48,7 @@ int main(int argc, char* const* argv) {
     data.chat = chatId;
     data.fileType = TgBotSocket::data::FileType::TYPE_DOCUMENT;
 
-    struct TgBotSocket::Packet pkt(TgBotSocket::Command::CMD_SEND_FILE_TO_CHAT_ID, data);
+    struct TgBotSocket::Packet pkt(
+        TgBotSocket::Command::CMD_SEND_FILE_TO_CHAT_ID, data);
     getClientBackend()->writeAsClientToSocket(pkt.toSocketData());
 }

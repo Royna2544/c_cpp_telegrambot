@@ -1,5 +1,5 @@
 #pragma once
 
-#include <DatabaseBot.hpp>
+#include "database/bot/TgBotDatabaseImpl.hpp"
 
-extern DefaultDatabase& loadDb();
+extern std::shared_ptr<TgBotDatabaseImpl> loadDb();

@@ -3,13 +3,14 @@
 #include <absl/log/log.h>
 
 #include <fstream>
+#include <iomanip>
 #include <libos/libfs.hpp>
 #include <string_view>
 
 #include "database/DatabaseBase.hpp"
 
 SQLiteDatabase::ListResult SQLiteDatabase::addUserToList(ListType type,
-                                                         UserId user) {
+                                                         UserId user) const {
     ListResult res{};
     sqlite3_stmt* stmt = nullptr;
 
@@ -22,8 +23,8 @@ SQLiteDatabase::ListResult SQLiteDatabase::addUserToList(ListType type,
                        << static_cast<int>(type) << " for user " << user;
             return res;
         case ListResult::OK:
-             res = ListResult::ALREADY_IN_LIST;
-             [[fallthrough]];
+            res = ListResult::ALREADY_IN_LIST;
+            [[fallthrough]];
         case ListResult::ALREADY_IN_OTHER_LIST:
         case ListResult::BACKEND_ERROR:
             return res;
@@ -42,8 +43,8 @@ SQLiteDatabase::ListResult SQLiteDatabase::addUserToList(ListType type,
     return ListResult::OK;
 }
 
-SQLiteDatabase::ListResult SQLiteDatabase::removeUserFromList(ListType type,
-                                                              UserId user) {
+SQLiteDatabase::ListResult SQLiteDatabase::removeUserFromList(
+    ListType type, UserId user) const {
     ListResult res{};
     sqlite3_stmt* stmt = nullptr;
 
@@ -324,12 +325,71 @@ SQLiteDatabase::InfoType SQLiteDatabase::toInfoType(ListType type) {
     }
 }
 
-std::ostream& operator<<(std::ostream& os, SQLiteDatabase sqDB) {
-    if (sqDB.db == nullptr) {
+std::ostream& SQLiteDatabase::dump(std::ostream& os) const {
+    sqlite3_stmt* stmt = nullptr;
+    int rc = 0;
+    std::stringstream ss;
+
+    if (db == nullptr) {
         os << "Database not loaded!";
         return os;
     }
-    os << "Implement me!" << std::endl;
+
+    ss << "====================== Dump of database ======================" << std::endl;
+
+    // Because of the race condition with logging, use stringstream and output
+    // later.
+    ss << "Owner Id: " << std::quoted(std::to_string(getOwnerUserId()))
+       << std::endl;
+
+    if (loadAndPrepareSTMT(&stmt, "dumpDatabase.sql")) {
+        rc = sqlite3_step(stmt);
+        while (rc == SQLITE_ROW) {
+            int type = 0;
+            ss << "UserId: " << sqlite3_column_int64(stmt, 0);
+            type = sqlite3_column_int(stmt, 1);
+            if (type > static_cast<int>(InfoType::WHITELIST) ||
+                type < static_cast<int>(InfoType::OWNER)) {
+                ss << " type: Invalid(" << type << ")" << std::endl;
+                continue;
+            }
+            auto info = static_cast<InfoType>(sqlite3_column_int(stmt, 1));
+            ss << " type: ";
+            switch (info) {
+                case InfoType::BLACKLIST:
+                    ss << "BLACKLIST";
+                    break;
+                case InfoType::WHITELIST:
+                    ss << "WHITELIST";
+                    break;
+                case InfoType::OWNER:
+                    ss << "OWNER";
+                    break;
+            };
+            ss << std::endl;
+            rc = sqlite3_step(stmt);
+        }
+        sqlite3_finalize(stmt);
+    } else {
+        ss << "!!! Failed to dump usermap database" << std::endl;
+    }
+    ss << std::endl;
+
+    if (loadAndPrepareSTMT(&stmt, "dumpDatabaseMedia.sql")) {
+        rc = sqlite3_step(stmt);
+        while (rc == SQLITE_ROW) {
+            ss << "MediaId: " << sqlite3_column_text(stmt, 0) << std::endl;
+            ss << "MediaUniqueId: " << sqlite3_column_text(stmt, 1)
+               << std::endl;
+            ss << "MediaName: " << sqlite3_column_text(stmt, 2) << std::endl;
+            rc = sqlite3_step(stmt);
+            ss << std::endl;
+        }
+        sqlite3_finalize(stmt);
+    } else {
+        ss << "!!!Failed to dump media database" << std::endl;
+    }
+    os << ss.str();
     return os;
 }
 

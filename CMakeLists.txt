@@ -186,6 +186,7 @@ set(SRC_LIST
     src/libos/libsighandler_impl.cpp
     src/libos/libsighandler_${TARGET_VARIANT}.cpp
     src/random/RandomNumberGenerator.cpp
+    src/database/bot/TgBotDatabaseImpl.cpp
     src/SpamBlocker.cpp
     src/RegEXHandler.cpp
     src/TimerImpl.cpp
@@ -250,8 +251,10 @@ add_dependencies(TgBotDB protobuf_TgBotDB_ready)
 get_filename_component(PROTO_HDRS_DIR ${PROTO_HDRS} DIRECTORY)
 target_include_directories(TgBotDB PUBLIC ${PROTO_HDRS_DIR})
 target_include_directories(TgBotDB PRIVATE ${Protobuf_INCLUDE_DIRS})
-# TODO: Eject tgbot dep here
-target_link_libraries(TgBotDB protobuf::libprotobuf SQLite3 TgBot TgBotUtils)
+target_link_libraries(TgBotDB protobuf::libprotobuf SQLite3 TgBotUtils)
+####################### TgBotDBImpl lib  #######################
+add_library(TgBotDBImpl SHARED src/database/bot/TgBotDatabaseImpl.cpp)
+target_link_libraries(TgBotDBImpl TgBotUtils TgBotDB)
 #####################################################################
 
 ################## RTCL (Run Time Command Loader) ##################
@@ -392,13 +395,13 @@ target_link_libraries(${PROJECT_MAINEXE_NAME} ${PROJECT_NAME} TgBotLogInit
 
 ################# Utility Programs (Dump Database) ##################
 add_executable(${DBDUMPER_NAME} src/database/utils/DumpProtoDB.cc)
-target_link_libraries(${DBDUMPER_NAME} TgBotDB TgBotLogInit)
+target_link_libraries(${DBDUMPER_NAME} TgBotDBImpl TgBotLogInit)
 #####################################################################
 
 ############### Utility Programs (Send Media to chat) ################
 if (USE_UNIX_SOCKETS)
   add_executable(${MEDIA_CLI_NAME} src/database/utils/SendMediaToChat.cc)
-  target_link_libraries(${MEDIA_CLI_NAME} TgBotDB TgBotSocket TgBotLogInit)
+  target_link_libraries(${MEDIA_CLI_NAME} TgBotDBImpl TgBotSocket TgBotLogInit)
   target_link_lib_if_windows(${MEDIA_CLI_NAME} Ws2_32)
 endif()
 #####################################################################

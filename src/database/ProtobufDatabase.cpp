@@ -18,7 +18,7 @@ std::optional<int> ProtoDatabase::findByUid(const RepeatedField<UserId> list,
 }
 
 ProtoDatabase::ListResult ProtoDatabase::addUserToList(ListType type,
-                                                       UserId user) {
+                                                       UserId user) const {
     auto const otherList = getOtherPersonList(type);
     if (findByUid(otherList.id(), user)) {
         return ListResult::ALREADY_IN_OTHER_LIST;
@@ -32,7 +32,7 @@ ProtoDatabase::ListResult ProtoDatabase::addUserToList(ListType type,
 }
 
 ProtoDatabase::ListResult ProtoDatabase::removeUserFromList(ListType type,
-                                                            UserId user) {
+                                                            UserId user) const {
     auto *const myList = getMutablePersonList(type);
     auto loc = findByUid(myList->id(), user);
     if (loc.has_value()) {
@@ -123,7 +123,7 @@ const PersonList &ProtoDatabase::getPersonList(
     }
 }
 
-PersonList *ProtoDatabase::getMutablePersonList(ListType type) {
+PersonList *ProtoDatabase::getMutablePersonList(ListType type) const {
     switch (type) {
         case DatabaseBase::ListType::WHITELIST:
             return db_info->protoDatabaseObject.mutable_whitelist();
@@ -179,14 +179,13 @@ bool ProtoDatabase::addMediaInfo(const MediaInfo &info) const {
     return true;
 }
 
-std::ostream &operator<<(std::ostream &os, ProtoDatabase protoDB) {
-    if (!protoDB.db_info.has_value()) {
+std::ostream &ProtoDatabase::dump(std::ostream &os) const {
+    if (!db_info.has_value()) {
         os << "Database not loaded!";
         return os;
     }
-    const auto &db = protoDB.db_info->protoDatabaseObject;
-    os << "Dump of database file: " << protoDB.db_info->protoFilePath
-       << std::endl;
+    const auto &db = db_info->protoDatabaseObject;
+    os << "Dump of database file: " << db_info->protoFilePath << std::endl;
     os << "Owner ID: ";
     if (db.has_ownerid()) {
         os << db.ownerid();
@@ -196,12 +195,12 @@ std::ostream &operator<<(std::ostream &os, ProtoDatabase protoDB) {
     os << std::endl;
 
     if (db.has_whitelist()) {
-        ProtoDatabase::dumpList(os, db.whitelist(), "whitelist");
+        dumpList(os, db.whitelist(), "whitelist");
     }
     if (db.has_blacklist()) {
-        ProtoDatabase::dumpList(os, db.blacklist(), "blacklist");
+        dumpList(os, db.blacklist(), "blacklist");
     }
-    const auto &mediaDB = protoDB.getMediaToName();
+    const auto &mediaDB = getMediaToName();
     if (const auto mediaDBSize = mediaDB->size(); mediaDBSize > 0) {
         for (int i = 0; i < mediaDBSize; ++i) {
             const auto it = mediaDB->Get(i);

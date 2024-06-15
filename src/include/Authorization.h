@@ -3,7 +3,6 @@
 #include <Types.h>
 #include <tgbot/types/Message.h>
 
-#include <DatabaseBot.hpp>
 #include <chrono>
 #include "InstanceClassBase.hpp"
 
@@ -35,9 +34,6 @@ class AuthContext : public InstanceClassBase<AuthContext> {
     [[nodiscard]] bool isAuthorized(const Message::Ptr& message,
                                     const unsigned flags) const;
 
-    explicit AuthContext(const std::shared_ptr<DefaultDatabase>& database) noexcept
-        : database(database){};
-
     /**
      * @brief Checks if the message is within the allowed time limit.
      *
@@ -55,7 +51,6 @@ class AuthContext : public InstanceClassBase<AuthContext> {
 
    private:
     bool authorized = true;
-    std::shared_ptr<DefaultDatabase> database;
 };
 
 constexpr std::chrono::seconds kMaxTimestampDelay = std::chrono::seconds(10);

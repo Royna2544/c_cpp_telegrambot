@@ -2,8 +2,7 @@
 #include <ExtArgs.h>
 #include <tgbot/tools/StringTools.h>
 
-#include <DatabaseBot.hpp>
-#include <database/DatabaseBase.hpp>
+#include <database/bot/TgBotDatabaseImpl.hpp>
 #include <optional>
 
 #include "CommandModule.h"
@@ -11,7 +10,7 @@
 
 template <DatabaseBase::ListType type>
 void handleAddUser(const Bot& bot, const Message::Ptr& message) {
-    auto base = DefaultBotDatabase::getInstance();
+    auto base = TgBotDatabaseImpl::getInstance();
     auto res = base->addUserToList(type, message->replyToMessage->from->id);
     std::string text;
     switch (res) {
@@ -36,8 +35,9 @@ void handleAddUser(const Bot& bot, const Message::Ptr& message) {
 
 template <DatabaseBase::ListType type>
 void handleRemoveUser(const Bot& bot, const Message::Ptr& message) {
-    auto base = DefaultBotDatabase::getInstance();
-    auto res = base->removeUserFromList(type, message->replyToMessage->from->id);
+    auto base = TgBotDatabaseImpl::getInstance();
+    auto res =
+        base->removeUserFromList(type, message->replyToMessage->from->id);
     std::string text;
     switch (res) {
         case DatabaseBase::ListResult::OK:
@@ -126,19 +126,15 @@ void handleSaveIdCmd(const Bot& bot, const Message::Ptr& message) {
         }
         if (fileId && fileUniqueId) {
             DatabaseBase::MediaInfo info{};
-            const auto namevec = StringTools::split(names, '/');
-            auto const& backend = DefaultBotDatabase::getInstance();
+            auto const& backend = TgBotDatabaseImpl::getInstance();
             info.mediaId = fileId.value();
             info.mediaUniqueId = fileUniqueId.value();
 
             std::stringstream ss;
             ss << "Media " << *fileUniqueId << " (fileUniqueId) added"
                << std::endl;
-            ss << "With names:" << std::endl;
-            for (const auto& names : namevec) {
-                info.names = names;
-                ss << "- " << names << std::endl;
-            }
+            ss << "With name:" << names << std::endl;
+            info.names = names;
             if (backend->addMediaInfo(info)) {
                 bot_sendReplyMessage(bot, message, ss.str());
             } else {

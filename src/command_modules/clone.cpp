@@ -3,8 +3,8 @@
 #include <ExtArgs.h>
 #include <absl/log/log.h>
 #include <internal/_tgbot.h>
+#include <database/bot/TgBotDatabaseImpl.hpp>
 
-#include <DatabaseBot.hpp>
 #include <TryParseStr.hpp>
 #include <sstream>
 
@@ -33,7 +33,7 @@ static void CloneCommandFn(const Bot& bot, const Message::Ptr message) {
             auto user = member->user;
             CStringLifetime userName = UserPtr_toString(user);
             std::stringstream ss;
-            ChatId ownerId = DefaultBotDatabase::getInstance()->getOwnerUserId();
+            ChatId ownerId = TgBotDatabaseImpl::getInstance()->getOwnerUserId();
 
             LOG(INFO) << "Clone: Dest user: " << userName.get();
             bot_sendReplyMessage(bot, message, "Cloning... (see PM)");

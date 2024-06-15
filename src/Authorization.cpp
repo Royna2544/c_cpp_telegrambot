@@ -1,24 +1,24 @@
 #include <Authorization.h>
 #include <Types.h>
 
-#include <DatabaseBot.hpp>
 #include <InstanceClassBase.hpp>
 #include <database/DatabaseBase.hpp>
-#include <memory>
 
 #include "absl/log/log.h"
+#include "database/bot/TgBotDatabaseImpl.hpp"
+
+// #define AUTHORIZATION_DEBUG
 
 #ifdef AUTHORIZATION_DEBUG
 #include <iomanip>
 #include <mutex>
 #endif
 
-DECLARE_CLASS_INST(DefaultBotDatabase);
 DECLARE_CLASS_INST(AuthContext);
 
 template <DatabaseBase::ListType type>
-bool isInList(const std::shared_ptr<DefaultDatabase> database,
-              const UserId user) {
+bool isInList(const UserId user) {
+    const auto database = TgBotDatabaseImpl::getInstance();
     switch (database->checkUserInList(type, user)) {
         case DatabaseBase::ListResult::OK:
             return true;
@@ -36,6 +36,7 @@ bool isInList(const std::shared_ptr<DefaultDatabase> database,
 
 bool AuthContext::isAuthorized(const Message::Ptr& message,
                                const unsigned flags) const {
+    const auto database = TgBotDatabaseImpl::getInstance();
 #ifdef AUTHORIZATION_DEBUG
     static std::mutex authStdoutLock;
 #endif
@@ -63,16 +64,14 @@ bool AuthContext::isAuthorized(const Message::Ptr& message,
 
             DLOG(INFO) << "Checking if user id in blacklist";
 #endif
-            isInBlacklist =
-                isInList<DatabaseBase::ListType::BLACKLIST>(database, id);
+            isInBlacklist = isInList<DatabaseBase::ListType::BLACKLIST>(id);
 #ifdef AUTHORIZATION_DEBUG
             DLOG(INFO) << "User id in blacklist: " << std::boolalpha
                        << isInBlacklist;
 #endif
             return !isInBlacklist;
         } else {
-            bool ret =
-                isInList<DatabaseBase::ListType::WHITELIST>(database, id);
+            bool ret = isInList<DatabaseBase::ListType::WHITELIST>(id);
             bool ret2 = id == database->getOwnerUserId();
 #ifdef AUTHORIZATION_DEBUG
             const std::lock_guard<std::mutex> _(authStdoutLock);

@@ -13,9 +13,10 @@ struct SQLiteDatabase : DatabaseBase {
         BLACKLIST = 1,
         WHITELIST = 2,
     };
-    [[nodiscard]] ListResult addUserToList(ListType type, UserId user) override;
+    [[nodiscard]] ListResult addUserToList(ListType type,
+                                           UserId user) const override;
     [[nodiscard]] ListResult removeUserFromList(ListType type,
-                                                UserId user) override;
+                                                UserId user) const override;
     [[nodiscard]] ListResult checkUserInList(ListType type,
                                              UserId user) const override;
     bool loadDatabaseFromFile(std::filesystem::path filepath) override;
@@ -24,7 +25,7 @@ struct SQLiteDatabase : DatabaseBase {
     void initDatabase() override;
     std::optional<MediaInfo> queryMediaInfo(std::string str) const override;
     bool addMediaInfo(const MediaInfo &info) const override;
-    friend std::ostream &operator<<(std::ostream &os, SQLiteDatabase sqDB);
+    std::ostream &dump(std::ostream &ofs) const override;
 
    private:
     bool loadAndExecuteSql(const std::string_view filename) const;
