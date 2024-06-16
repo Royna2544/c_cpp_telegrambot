@@ -5,6 +5,7 @@
 #include <libos/libfs.hpp>
 #include <mutex>
 #include <sstream>
+#include <system_error>
 
 #include "InstanceClassBase.hpp"
 #include "StringToolsExt.h"
@@ -27,7 +28,7 @@ bool ResourceManager::preloadOneFile(std::filesystem::path path) {
             FS::getPathForType(FS::PathType::RESOURCES));
     }
 
-    if (std::find(ignoredResources.begin(), ignoredResources.end(), path) !=
+    if (std::ranges::find(ignoredResources, path.string()) !=
         ignoredResources.end()) {
         DLOG(INFO) << "Ignoring resource path " << path;
         return false;
@@ -48,6 +49,8 @@ void ResourceManager::preloadResourceDirectory() {
     std::filesystem::directory_iterator end;
     auto rd = FS::getPathForType(FS::PathType::RESOURCES);
     std::ifstream ifs(rd / kResourceLoadIgnoreFile);
+    std::error_code ec;
+
     if (ifs) {
         std::string line;
         while (std::getline(ifs, line)) {
@@ -61,12 +64,16 @@ void ResourceManager::preloadResourceDirectory() {
     }
 
     LOG(INFO) << "Preloading resource directory: " << rd;
-    for (std::filesystem::directory_iterator it(rd); it != end; ++it) {
+    for (std::filesystem::directory_iterator it(rd, ec); it != end; ++it) {
         if (it->is_regular_file()) {
             preloadOneFile(*it);
         }
     }
-    LOG(INFO) << "Preloading resource directory done";
+    if (ec) {
+        LOG(ERROR) << "Failed to preload resource directory: " << ec.message();
+    } else {
+        LOG(INFO) << "Preloading resource directory done";
+    }
 }
 
 const std::string& ResourceManager::getResource(std::filesystem::path path) {
