@@ -244,13 +244,13 @@ std::vector<std::unique_ptr<ConfigBackendBase>> &getAvailableBackends() {
         if (cmdline->load()) {
             backends.emplace_back(std::move(cmdline));
         }
-        auto file = std::make_unique<ConfigBackendFile>();
-        if (file->load()) {
-            backends.emplace_back(std::move(file));
-        }
         auto env = std::make_unique<ConfigBackendEnv>();
         if (env->load()) {
             backends.emplace_back(std::move(env));
+        }
+        auto file = std::make_unique<ConfigBackendFile>();
+        if (file->load()) {
+            backends.emplace_back(std::move(file));
         }
         DLOG(INFO) << "Loaded " << backends.size() << " backends";
     });
