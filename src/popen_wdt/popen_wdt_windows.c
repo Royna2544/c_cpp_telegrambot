@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <synchapi.h>
+#include <winbase.h>
 #include <winnt.h>
 
 #include "popen_wdt.h"
@@ -66,7 +67,6 @@ static DWORD WINAPI watchdog(LPVOID arg) {
         }
         if (ret_getexit != STILL_ACTIVE) {
             POPEN_WDT_DBGLOG("Subprocess exited");
-            (*data)->watchdog_activated = false;
             break;
         } else if (GetTickCount64() > endTime) {
             POPEN_WDT_DBGLOG("Beginning watchdog trigger event");
@@ -152,7 +152,8 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
         wdt_data->privdata = malloc(sizeof(struct popen_wdt_windows_priv));
     }
 
-    // Init memory
+    // memset memory
+    ZeroMemory(wdt_data->privdata, sizeof(struct popen_wdt_windows_priv));
     ZeroMemory(&pi, sizeof(PROCESS_INFORMATION));
     ZeroMemory(&si, sizeof(STARTUPINFO));
 
@@ -162,6 +163,8 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
     si.hStdOutput = child_stdout_w;
     si.hStdError = child_stdout_w;
 
+    setlocale(LC_ALL, "C");
+    
     // Try with default
     success = CreateProcess(NULL, (LPSTR)wdt_data->command, NULL, NULL, TRUE,
                             CREATE_NEW_PROCESS_GROUP | CREATE_SUSPENDED, NULL,
@@ -216,11 +219,14 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
 }
 
 void popen_watchdog_stop(popen_watchdog_data_t** data_in) {
+    popen_watchdog_data_t* data = NULL;
+    struct popen_wdt_windows_priv* pdata = NULL;
+
     if (!check_data_privdata(data_in)) {
         return;
     }
-    popen_watchdog_data_t* data = *data_in;
-    const struct popen_wdt_windows_priv* pdata = data->privdata;
+    data = *data_in;
+    pdata = data->privdata;
     if (data->watchdog_enabled) {
         WaitForSingleObject(pdata->wdt_data.thread, INFINITE);
     }
@@ -259,19 +265,56 @@ bool popen_watchdog_read(popen_watchdog_data_t** data, char* buf, int size) {
     if (!check_data_privdata(data)) {
         return false;
     }
+
+    OVERLAPPED ol = {0};
     popen_watchdog_data_t* data_ = *data;
-    struct popen_wdt_windows_priv* pdata = (data_)->privdata;
+    struct popen_wdt_windows_priv* pdata = data_->privdata;
     DWORD bytesRead = 0;
     BOOL result = FALSE;
+    DWORD waitResult = 0;
+    const int one_sec = 1000;
+    BOOL readFileResult = FALSE;
 
+    if ((*data)->watchdog_activated) {
+        POPEN_WDT_DBGLOG("watchdog_activated: True, return");
+        return false;
+    }
+    ol.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+    if (ol.hEvent == NULL) {
+        POPEN_WDT_DBGLOG("CreateEvent failed");
+        return false;
+    }
     POPEN_WDT_DBGLOG("ReadFile is being called");
-    result = ReadFile(pdata->read_hdl, buf, size, &bytesRead, NULL);
-    POPEN_WDT_DBGLOG("Ret: %s, bytesRead: %lu", result ? "true" : "false",
-                     bytesRead);
-    return result;
+    result = ReadFile(pdata->read_hdl, buf, size, &bytesRead, &ol);
+    if (!result && GetLastError() != ERROR_IO_PENDING) {
+        POPEN_WDT_DBGLOG("ReadFile failed");
+        CloseHandle(ol.hEvent);
+        return false;
+    }
+    waitResult = WaitForSingleObject(
+        ol.hEvent, data_->watchdog_enabled ? SLEEP_SECONDS * one_sec : INFINITE);
+    switch (waitResult) {
+        case WAIT_OBJECT_0:
+            if (GetOverlappedResult(pdata->read_hdl, &ol, &bytesRead, FALSE)) {
+                buf[bytesRead] = '\0';  // Null-terminate the string
+                readFileResult = TRUE;
+            } else {
+                POPEN_WDT_DBGLOG("GetOverlappedResult failed.");
+            }
+            break;
+        case WAIT_FAILED:
+            POPEN_WDT_DBGLOG("Wait failed: %ld", GetLastError());
+            break;
+        default:
+            POPEN_WDT_DBGLOG("Unexpected result from WaitForSingleObject.");
+            break;
+    }
+    POPEN_WDT_DBGLOG("Ret: %s, bytesRead: %lu",
+                     readFileResult ? "true" : "false", bytesRead);
+    return readFileResult;
 }
 
-bool popen_watchdog_activated(popen_watchdog_data_t **data) {
+bool popen_watchdog_activated(popen_watchdog_data_t** data) {
     if (data != NULL && *data != NULL) {
         return (*data)->watchdog_activated;
     }
