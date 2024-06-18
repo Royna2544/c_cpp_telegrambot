@@ -24,7 +24,7 @@ jobs:
         git clone https://github.com/microsoft/vcpkg
         .\vcpkg\bootstrap-vcpkg.bat
         .\vcpkg\vcpkg integrate install
-        .\vcpkg\vcpkg install zlib abseil openssl boost
+        .\vcpkg\vcpkg install zlib abseil openssl boost-program-options
 
     - name: Build solution
       run: |
