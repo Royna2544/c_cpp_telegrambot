@@ -47,20 +47,20 @@ static void AliveCommandFn(const Bot& bot, const Message::Ptr message) {
         boost::replace_all(version, botusername,
                            bot.getApi().getMe()->username);
     });
-    try {
-        const auto info =
-            TgBotDatabaseImpl::getInstance()->queryMediaInfo("alive");
-        if (info) {
+    const auto info = TgBotDatabaseImpl::getInstance()->queryMediaInfo("alive");
+    bool sentAnimation = false;
+    if (info) {
+        try {
             bot.getApi().sendAnimation(message->chat->id, info->mediaId, 0, 0,
                                        0, "", version, message->messageId,
                                        nullptr, "html");
-        } else {
-            bot_sendReplyMessageHTML(bot, message, version);
+            sentAnimation = true;
+        } catch (const TgBot::TgException& e) {
+            // Fallback to HTML if no GIF
+            LOG(ERROR) << "Alive cmd: Error while sending GIF: " << e.what();
         }
-        // Hardcoded kys GIF
-    } catch (const TgBot::TgException& e) {
-        // Fallback to HTML if no GIF
-        LOG(ERROR) << "Alive cmd: Error while sending GIF: " << e.what();
+    }
+    if (!sentAnimation) {
         bot_sendReplyMessageHTML(bot, message, version);
     }
 }
