@@ -2,13 +2,13 @@
 #include <RegEXHandler.h>
 #include <absl/log/log.h>
 
+#include <boost/algorithm/string/trim.hpp>
 #include <ios>
 #include <optional>
 #include <regex>
 #include <string>
 
 #include "InstanceClassBase.hpp"
-#include "StringToolsExt.h"
 
 using std::regex_constants::ECMAScript;
 using std::regex_constants::format_first_only;
@@ -88,8 +88,10 @@ OptionalWrapper<std::string> RegexHandlerBase::doRegexDeleteCommand(
     if (args.size() == 3) {
         if (auto regex = constructRegex(args[1], regexCommand, ECMAScript);
             regex.has_value()) {
-            std::stringstream kInStream(text), kOutStream;
-            std::string line, out;
+            std::stringstream kInStream(text);
+            std::stringstream kOutStream;
+            std::string line;
+            std::string out;
             DLOG(INFO) << "regexstr: '" << args[1] << "'";
             while (std::getline(kInStream, line)) {
                 if (!std::regex_search(line, regex.value(),
@@ -98,7 +100,7 @@ OptionalWrapper<std::string> RegexHandlerBase::doRegexDeleteCommand(
                 }
             }
             out = kOutStream.str();
-            TrimStr(out);
+            boost::trim(out);
             return {out};
         }
     }

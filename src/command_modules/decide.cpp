@@ -1,33 +1,33 @@
 #include <ExtArgs.h>
-#include <StringToolsExt.h>
 #include <random/RandomNumberGenerator.h>
 
 #include <sstream>
 #include <thread>
+#include <MessageWrapper.hpp>
 
 #include "BotReplyMessage.h"
 #include "CommandModule.h"
 
 using std::chrono_literals::operator""s;
 
-static void DecideCommandFn(const Bot &bot, const Message::Ptr message) {
+static void DecideCommandFn(const Bot& bot, const Message::Ptr message) {
     constexpr int COUNT_MAX = 10;
     constexpr int RANDOM_RANGE_NUM = 10;
 
-    if (hasExtArgs(message)) {
-        std::string obj;
+    MessageWrapper wrapper(bot, message);
+    if (wrapper.hasExtraText()) {
+        std::string obj = wrapper.getExtraText();
         std::stringstream msgtxt;
         Message::Ptr msg;
         int count = COUNT_MAX;
         int yesno = 0;
 
-        parseExtArgs(message, obj);
         msgtxt << "Deciding '" + obj + "'...";
         msg = bot_sendReplyMessage(bot, message, msgtxt.str());
         msgtxt << std::endl << std::endl;
         do {
             msgtxt << "Try " + std::to_string(COUNT_MAX - count + 1) + " : ";
-            if (genRandomNumber(RANDOM_RANGE_NUM) % 2 == 1) {
+            if (RandomNumberGenerator::generate(RANDOM_RANGE_NUM) % 2 == 1) {
                 msgtxt << "Yes";
                 ++yesno;
             } else {
@@ -42,8 +42,10 @@ static void DecideCommandFn(const Bot &bot, const Message::Ptr message) {
                     msgtxt << "Short circuited to the answer\n";
                     break;
                 }
-            } else  // count == 0
+            } else {
+                // count == 0
                 break;
+            }
             std::this_thread::sleep_for(2s);
         } while (count > 0);
         msgtxt << std::endl;

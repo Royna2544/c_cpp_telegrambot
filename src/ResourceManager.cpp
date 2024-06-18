@@ -1,14 +1,13 @@
 #include <ResourceManager.h>
 #include <absl/log/log.h>
 
+#include <boost/algorithm/string/trim.hpp>
 #include <fstream>
 #include <libos/libfs.hpp>
-#include <mutex>
 #include <sstream>
 #include <system_error>
 
 #include "InstanceClassBase.hpp"
-#include "StringToolsExt.h"
 
 bool ResourceManager::preloadOneFile(std::filesystem::path path) {
     std::ifstream file(path);
@@ -54,7 +53,7 @@ void ResourceManager::preloadResourceDirectory() {
     if (ifs) {
         std::string line;
         while (std::getline(ifs, line)) {
-            TrimStr(line);
+            boost::trim(line);
             if (!line.empty()) {
                 ignoredResources.emplace_back(line);
             }

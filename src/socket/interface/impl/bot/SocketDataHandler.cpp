@@ -142,8 +142,8 @@ GenericAck SocketInterfaceTgBot::handle_SendFileToChatId(const void* ptr) {
                 // TODO: More clean code?
                 _bot.getApi().sendDice(
                     data->chat, false, 0, nullptr,
-                    dices[genRandomNumber(0, dices.size() - 1)]);
-                return GenericAck();
+                    dices[RandomNumberGenerator::generate(dices.size() - 1)]);
+                return GenericAck::ok();
             }
             default:
                 fn = [data](const Api&, ChatId, const FileOrId_t&) {
@@ -206,7 +206,7 @@ GenericAck SocketInterfaceTgBot::handle_UploadFile(
 UploadFileDryCallback SocketInterfaceTgBot::handle_UploadFileDry(
     const void* ptr, TgBotSocket::PacketHeader::length_type len) {
     bool ret = false;
-    const auto f = static_cast<const UploadFileDry *>(ptr);
+    const auto f = static_cast<const UploadFileDry*>(ptr);
     UploadFileDryCallback callback;
     callback.requestdata = *f;
 

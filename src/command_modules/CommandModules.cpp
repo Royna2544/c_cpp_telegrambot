@@ -1,9 +1,7 @@
 
-#include <functional>
+#include <boost/algorithm/string/trim.hpp>
 
-#include "BotAddCommand.h"
 #include "CommandModule.h"
-#include "StringToolsExt.h"
 
 std::string CommandModuleManager::getLoadedModulesString() {
     std::stringstream ss;
@@ -13,7 +11,7 @@ std::string CommandModuleManager::getLoadedModulesString() {
         ss << module.command << " ";
     }
     outbuf = ss.str();
-    TrimStr(outbuf);
+    boost::trim(outbuf);
     return outbuf;
 }
 
@@ -31,6 +29,7 @@ void CommandModuleManager::updateBotCommands(const Bot &bot) {
     try {
         bot.getApi().setMyCommands(buffer);
     } catch (const TgBot::TgException &e) {
-        LOG(ERROR) << "Error updating bot command list: " << e.what() << std::endl;
+        LOG(ERROR) << "Error updating bot command list: " << e.what()
+                   << std::endl;
     }
 }

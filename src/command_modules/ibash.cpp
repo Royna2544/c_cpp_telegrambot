@@ -8,6 +8,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <boost/algorithm/string/trim.hpp>
 #include <chrono>
 #include <csignal>
 #include <cstdint>
@@ -20,7 +21,7 @@
 
 #include "ExtArgs.h"
 #include "SingleThreadCtrl.h"
-#include "StringToolsExt.h"
+#include "StringToolsExt.hpp"
 #include "command_modules/CommandModule.h"
 #include "compiler/CompilerInTelegram.h"  // BASH_MAX_BUF, BASH_READ_BUF
 #include "popen_wdt/popen_wdt.h"
@@ -222,7 +223,7 @@ struct InteractiveBashContext {
             onNoOutputThread->stop();
             if (rc > 0) {
                 std::string buf_str(buf, rc);
-                TrimStr(buf_str);
+                boost::trim(buf_str);
                 if (!isEmptyOrBlank(buf_str)) {
                     resModified = true;
                     result.append(buf_str);
@@ -233,7 +234,7 @@ struct InteractiveBashContext {
             // Exit if child has nothing more to send to us, or it is reading
             // stdin
         } while (HasData(DATA_IN, false) || HasData(DATA_IN, false));
-        TrimStr(result);
+        boost::trim(result);
         if (!resModified) {
             result = "(No output)";
             onNewResultBuffer(result);
@@ -252,7 +253,7 @@ struct InteractiveBashContext {
     bool _SendSomething(std::string str) const {
         int rc;
 
-        TrimStr(str);
+        boost::trim(str);
         str += '\n';
         rc = write(parent_writefd, str.c_str(), str.size());
         if (rc < 0) {

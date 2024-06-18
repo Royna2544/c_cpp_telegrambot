@@ -8,7 +8,7 @@
 using TgBot::StickerSet;
 
 static void RandomStickerCommandFn(const Bot &bot, const Message::Ptr& message) {
-    MessageWrapper msg(message);
+    MessageWrapper msg(bot, message);
     if (!msg.switchToReplyToMessage(
             bot, "Sticker not found in replied-to message")) {
         return;
@@ -25,7 +25,7 @@ static void RandomStickerCommandFn(const Bot &bot, const Message::Ptr& message) 
             bot_sendReplyMessage(bot, message, e.what());
             return;
         }
-        pos = genRandomNumber(stickset->stickers.size() - 1);
+        pos = RandomNumberGenerator::generate(stickset->stickers.size() - 1);
         bot_sendSticker(bot, message->chat, stickset->stickers[pos], message);
 
         ss << "Sticker idx: " << pos + 1

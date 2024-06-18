@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "StringToolsExt.h"
+#include "StringToolsExt.hpp"
 #include "tgbot/types/Message.h"
 
 std::string::size_type firstBlank(const Message::Ptr &msg) {

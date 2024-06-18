@@ -258,17 +258,21 @@ static RNGBase* getRNG(void) {
     return rng;
 }
 
-return_type genRandomNumber(const return_type min, const return_type max) {
+namespace RandomNumberGenerator {
+
+return_type generate(const return_type min, const return_type max) {
     return getRNG()->generate(min, max);
 }
 
-return_type genRandomNumber(const return_type max) {
-    return genRandomNumber(0, max);
+return_type generate(const return_type max) {
+    return generate(0, max);
 }
 
-void shuffleStringArray(std::vector<std::string>& in) {
-    getRNG()->shuffle_string(in);
+void shuffleStringArray(std::vector<std::string>& inArray) {
+    getRNG()->shuffle_string(inArray);
 }
+
+}  // namespace RandomNumberGenerator
 
 #ifdef KERNELRAND_MAYBE_SUPPORTED
 DECLARE_CLASS_INST(kernel_rand_engine);
