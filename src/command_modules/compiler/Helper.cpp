@@ -1,7 +1,7 @@
 #include <BotReplyMessage.h>
 #include "CompilerInTelegram.h"
-#include "StringToolsExt.h"
 #include <absl/log/log.h>
+#include <boost/algorithm/string/trim.hpp>
 
 void CompilerInTgHelper::onFailed(const Bot &bot, const Message::Ptr &message,
                                   const CompilerInTg::ErrorType e) {
@@ -27,7 +27,7 @@ void CompilerInTgHelper::onResultReady(const Bot &bot,
                                        const Message::Ptr &message,
                                        const std::string &text) {
     std::string text_ = text;
-    TrimStr(text_);
+    boost::trim(text_);
     bot_sendReplyMessage(bot, message, text_);
 }
 

@@ -21,7 +21,7 @@ void CompilerInTgForCCpp::run(const Message::Ptr& message) {
 #endif
 
     if (verifyParseWrite(message, extraargs)) {
-        cmd << cmdPrefix << SPACE << extraargs << SPACE << outfile;
+        cmd << cmdPrefix.string() << SPACE << extraargs << SPACE << outfile;
 
         resultbuf << "Compile time:" << std::endl;
         runCommand(message, cmd.str(), resultbuf);

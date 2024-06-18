@@ -1,10 +1,10 @@
 #include <ConfigManager.h>
 #include <EnumArrayHelpers.h>
-#include <StringToolsExt.h>
 #include <absl/log/log.h>
 
 #include <DurationPoint.hpp>
 #include <boost/algorithm/string/replace.hpp>
+#include <boost/algorithm/string/trim.hpp>
 #include <chrono>
 #include <cstdio>
 #include <filesystem>
@@ -15,6 +15,7 @@
 #include <thread>
 
 #include "CompilerInTelegram.h"
+#include "StringToolsExt.hpp"
 #include "popen_wdt/popen_wdt.h"
 
 using std::chrono_literals::operator""ms;
@@ -26,7 +27,7 @@ void CompilerInTg::appendExtArgs(std::stringstream &cmd,
                                  std::string extraargs_in,
                                  std::stringstream &result_out) {
     if (!extraargs_in.empty()) {
-        TrimStr(extraargs_in);
+        boost::trim(extraargs_in);
         cmd << SPACE << extraargs_in;
         std::stringstream result;
         result_out << "cmd: ";
@@ -44,10 +45,6 @@ void CompilerInTg::runCommand(const Message::Ptr &message, std::string cmd,
     popen_watchdog_data_t *p_wdt_data = nullptr;
 
     boost::replace_all(cmd, std::string(1, '"'), "\\\"");
-
-#ifdef WINDOWS_BUILD
-    cmd = '.' + cmd;
-#endif
 
     LOG(INFO) << __func__ << ": +++";
     onFailed(message, ErrorType::START_COMPILER);

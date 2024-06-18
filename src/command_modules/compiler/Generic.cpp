@@ -37,7 +37,7 @@ void CompilerInTgForGeneric::run(const Message::Ptr &message) {
     std::stringstream cmd, res;
 
     if (verifyParseWrite(message, outfile)) {
-        cmd << cmdPrefix << SPACE << outfile;
+        cmd << cmdPrefix.string() << SPACE << outfile;
         runCommand(message, cmd.str(), res);
         onResultReady(message, res.str());
         std::filesystem::remove(outfile);
