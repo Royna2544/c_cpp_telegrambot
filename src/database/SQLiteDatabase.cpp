@@ -370,10 +370,10 @@ std::ostream& SQLiteDatabase::dump(std::ostream& os) const {
             rc = sqlite3_step(stmt);
         }
         sqlite3_finalize(stmt);
+	ss << std::endl;
     } else {
         ss << "!!! Failed to dump usermap database" << std::endl;
     }
-    ss << std::endl;
 
     if (loadAndPrepareSTMT(&stmt, "dumpDatabaseMedia.sql")) {
         rc = sqlite3_step(stmt);
@@ -387,7 +387,7 @@ std::ostream& SQLiteDatabase::dump(std::ostream& os) const {
         }
         sqlite3_finalize(stmt);
     } else {
-        ss << "!!!Failed to dump media database" << std::endl;
+        ss << "!!! Failed to dump media database" << std::endl;
     }
     os << ss.str();
     return os;
