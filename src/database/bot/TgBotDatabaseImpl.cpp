@@ -2,8 +2,10 @@
 
 #include <ConfigManager.h>
 
+#include <filesystem>
 #include <libos/libfs.hpp>
 #include <ostream>
+#include <system_error>
 
 #include "database/SQLiteDatabase.hpp"
 
@@ -11,6 +13,7 @@ bool TgBotDatabaseImpl::loadDBFromConfig() {
     const auto dbConf =
         ConfigManager::getVariable(ConfigManager::Configs::DATABASE_BACKEND);
     bool isCreated = false;
+    std::error_code ec;
 
     if (dbConf) {
         const std::string& config = dbConf.value();
@@ -39,7 +42,11 @@ bool TgBotDatabaseImpl::loadDBFromConfig() {
 
         std::filesystem::path parent;
         if (std::filesystem::path(filenameStr).is_relative()) {
-            parent = FS::getPathForType(FS::PathType::GIT_ROOT);
+            parent = std::filesystem::current_path(ec);
+            if (ec) {
+                LOG(ERROR) << "Failed to get current path: " << ec.message();
+                return false;
+            }
         }
         if (!FS::exists(parent / filenameStr)) {
             DLOG(INFO) << "isCreated: true, creating new database file";
