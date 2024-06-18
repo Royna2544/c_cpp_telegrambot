@@ -9,6 +9,7 @@
 - Regex command support
 - Runs on Windows (MSYS2), macOS, Linux
 - Exports a network control interface with IPv4 and IPv6
+- Client apps supported for Win32/Android
 
 <b>BUILD INFO</b>:
 - Host OS: @CMAKE_SYSTEM_NAME@
@@ -21,3 +22,5 @@
 - Repo URL: <a href="_originurl_">Here</a>
 - Commit-Id: _commitid_
 - Commit-Msg: <blockquote>_commitmsg_</blockquote>
+<b>Notes</b>:
+Finally, cum about it.
