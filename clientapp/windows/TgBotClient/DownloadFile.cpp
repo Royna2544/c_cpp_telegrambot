@@ -135,7 +135,7 @@ INT_PTR CALLBACK DownloadFileFn(HWND hDlg, UINT message, WPARAM wParam,
                     break;
             };
             break;
-        case WM_SENDFILE_RESULT: {
+        case WM_DLFILE_RESULT: {
             if (lParam == NULL) {
                 blk.stop();
                 return DIALOG_OK;
@@ -151,7 +151,7 @@ INT_PTR CALLBACK DownloadFileFn(HWND hDlg, UINT message, WPARAM wParam,
                 MessageBox(hDlg, errtext.c_str(),
                            loader.getString(IDS_FAILED).c_str(), ERROR_DIALOG);
             } else {
-                MessageBox(hDlg, loader.getString(IDS_SUCCESS_FILESENT).c_str(),
+                MessageBox(hDlg, loader.getString(IDS_SUCCESS_FILEDL).c_str(),
                            loader.getString(IDS_SUCCESS).c_str(), INFO_DIALOG);
             }
             blk.stop();
