@@ -24,21 +24,14 @@ jobs:
           - cc: gcc
             real_cc: gcc
             real_cxx: g++
-            flags: -DRTCOMMAND_LOADER=ON
-            str: (RTCL)
+            flags: -DENABLE_RUST_SUPPORT=ON
+            str: (Rust)
 
           - cc: clang
             real_cc: clang-18
             real_cxx: clang++-18
             flags: -DRTCOMMAND_LOADER=OFF
             str: ''
-
-          - cc: gcc
-            real_cc: gcc
-            real_cxx: g++
-            flags: -DRTCOMMAND_LOADER=OFF
-            str: ''
-
 
     name: 🚧 ${{ matrix.cc }} ${{ matrix.str }}
     steps:
