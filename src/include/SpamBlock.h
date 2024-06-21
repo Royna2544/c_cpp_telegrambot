@@ -5,11 +5,12 @@
 #include <tgbot/types/Message.h>
 #include <tgbot/types/User.h>
 
-#include "CStringLifetime.h"
-#include "SingleThreadCtrl.h"
 #include "BotClassBase.h"
-#include "initcalls/Initcall.hpp"
+#include "CStringLifetime.h"
+#include "InstanceClassBase.hpp"
+#include "ManagedThreads.hpp"
 #include "OnAnyMessageRegister.hpp"
+#include "initcalls/Initcall.hpp"
 
 #ifdef SOCKET_CONNECTION
 #include <socket/include/TgBotSocket_Export.hpp>
@@ -20,7 +21,6 @@
 
 #ifdef SOCKET_CONNECTION
 using namespace TgBotSocket::data;
-extern CtrlSpamBlock gSpamBlockCfg;
 #endif
 
 using TgBot::Bot;
@@ -28,28 +28,29 @@ using TgBot::Chat;
 using TgBot::Message;
 using TgBot::User;
 
-struct SpamBlockBase : SingleThreadCtrlRunnable {
+struct SpamBlockBase : ManagedThreadRunnable {
     // User and array of message pointers sent by that user
     using PerChatHandle = std::map<User::Ptr, std::vector<Message::Ptr>>;
     // Iterator type of buffer object, which contains <chats <users <msgs>>> map
     using OneChatIterator = std::map<Chat::Ptr, PerChatHandle>::const_iterator;
     using PerChatHandleConstRef = PerChatHandle::const_reference;
-    using SingleThreadCtrlRunnable::SingleThreadCtrlRunnable;
+    using ManagedThreadRunnable::ManagedThreadRunnable;
     constexpr static int sMaxSameMsgThreshold = 3;
     constexpr static int sMaxMsgThreshold = 5;
     constexpr static int sSpamDetectThreshold = 5;
 
-    virtual ~SpamBlockBase() = default;
+    ~SpamBlockBase() override = default;
     virtual void handleUserAndMessagePair(PerChatHandleConstRef e,
                                           OneChatIterator it,
                                           const size_t threshold,
-                                          const char *name){};
+                                          const char *name) {};
 
     void runFunction() override;
     void addMessage(const Message::Ptr &message);
 
     static std::string commonMsgdataFn(const Message::Ptr &m);
 
+    CtrlSpamBlock spamBlockConfig = CtrlSpamBlock::CTRL_ON;
    protected:
     bool isEntryOverThreshold(PerChatHandleConstRef t, const size_t threshold);
     void _logSpamDetectCommon(PerChatHandleConstRef t, const char *name);
@@ -63,7 +64,7 @@ struct SpamBlockBase : SingleThreadCtrlRunnable {
     std::mutex buffer_m;  // Protect buffer, buffer_sub
 };
 
-struct SpamBlockManager : SpamBlockBase, BotClassBase, InitCall {
+struct SpamBlockManager : SpamBlockBase, BotClassBase, InitCall, InstanceClassBase<SpamBlockManager> {
     SpamBlockManager(const Bot &bot) : SpamBlockBase(), BotClassBase(bot) {}
     ~SpamBlockManager() override = default;
 

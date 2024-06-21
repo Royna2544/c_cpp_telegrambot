@@ -359,8 +359,8 @@ add_library(
   TgBotUtils SHARED
   src/ConfigManager.cpp
   src/ConfigManager_${TARGET_VARIANT}.cpp
-  src/SingleThreadCtrl.cpp
-  src/SingleThreadCtrlManager.cpp
+  src/ManagedThread.cpp
+  src/ThreadManager.cpp
   src/ResourceManager.cpp
   src/GitData.cpp
   src/popen_wdt/popen_wdt_${TARGET_VARIANT}.c
@@ -412,8 +412,6 @@ endif()
 add_executable(${PROJECT_TEST_NAME}
   tests/TestMain.cpp
   tests/AuthorizationTest.cpp
-  tests/SingleThreadCtrlTest.cpp
-# tests/SpamBlockerTest.cpp
   tests/ExtArgsTest.cpp
   tests/ConfigManagerTest.cpp
   tests/RegexHandlerTest.cpp

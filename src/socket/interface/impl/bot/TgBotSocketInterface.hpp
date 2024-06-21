@@ -1,5 +1,5 @@
 #include <BotClassBase.h>
-#include <SingleThreadCtrl.h>
+#include <ManagedThreads.hpp>
 
 #include <SocketBase.hpp>
 #include <functional>
@@ -26,7 +26,7 @@ using SocketInternalInterface = SocketInterfaceUnixLocal;
 using SocketExternalInterface = SocketInterfaceUnixIPv4;
 #endif  // WINDOWS_BUILD
 
-struct SocketInterfaceTgBot : SingleThreadCtrlRunnable,
+struct SocketInterfaceTgBot : ManagedThreadRunnable,
                               BotInitCall,
                               BotClassBase,
                               TgBotSocketParser {
@@ -42,9 +42,6 @@ struct SocketInterfaceTgBot : SingleThreadCtrlRunnable,
 
     explicit SocketInterfaceTgBot(
         Bot& bot, std::shared_ptr<SocketInterfaceBase> _interface);
-
-    // TODO Used by main.cpp
-    SocketInterfaceTgBot(Bot& bot) : BotClassBase(bot) {}
 
    private:
     std::shared_ptr<SocketInterfaceBase> interface = nullptr;

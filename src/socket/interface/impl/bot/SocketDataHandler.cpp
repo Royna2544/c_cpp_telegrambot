@@ -1,7 +1,6 @@
 #include <BotReplyMessage.h>
 #include <ChatObserver.h>
 #include <ResourceManager.h>
-#include <SingleThreadCtrl.h>
 #include <SpamBlock.h>
 #include <internal/_std_chrono_templates.h>
 #include <random/RandomNumberGenerator.h>
@@ -9,6 +8,7 @@
 #include <rapidjson/rapidjson.h>
 #include <tgbot/types/InputFile.h>
 
+#include <ManagedThreads.hpp>
 #include <TgBotSocket_Export.hpp>
 #include <chrono>
 #include <filesystem>
@@ -76,7 +76,7 @@ GenericAck SocketInterfaceTgBot::handle_WriteMsgToChatId(const void* ptr) {
 
 GenericAck SocketInterfaceTgBot::handle_CtrlSpamBlock(const void* ptr) {
     const auto* data = static_cast<const CtrlSpamBlock*>(ptr);
-    gSpamBlockCfg = *data;
+    SpamBlockManager::getInstance()->spamBlockConfig = *data;
     return GenericAck::ok();
 }
 
@@ -182,16 +182,15 @@ GenericAck SocketInterfaceTgBot::handle_ObserveAllChats(const void* ptr) {
 
 GenericAck SocketInterfaceTgBot::handle_DeleteControllerById(const void* ptr) {
     DeleteControllerById data = *static_cast<const DeleteControllerById*>(ptr);
-    enum SingleThreadCtrlManager::ThreadUsage threadUsage{};
+    enum ThreadManager::Usage threadUsage{};
     if (data.controller_id < 0 ||
-        data.controller_id >= SingleThreadCtrlManager::USAGE_MAX) {
+        data.controller_id >= static_cast<int>(ThreadManager::Usage::MAX)) {
         LOG(ERROR) << "Invalid controller id: " << data.controller_id;
         return GenericAck(AckType::ERROR_INVALID_ARGUMENT,
                           "Invalid controller id");
     }
-    threadUsage =
-        static_cast<SingleThreadCtrlManager::ThreadUsage>(data.controller_id);
-    SingleThreadCtrlManager::getInstance()->destroyController(threadUsage);
+    threadUsage = static_cast<ThreadManager::Usage>(data.controller_id);
+    ThreadManager::getInstance()->destroyController(threadUsage);
     return GenericAck::ok();
 }
 

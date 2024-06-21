@@ -11,12 +11,10 @@
 #include <memory>
 #include <mutex>
 
+#include "ManagedThreads.hpp"
+
 using std::chrono_literals::operator""s;
 using TgBot::ChatPermissions;
-
-#ifdef SOCKET_CONNECTION
-TgBotSocket::data::CtrlSpamBlock gSpamBlockCfg = CtrlSpamBlock::CTRL_ON;
-#endif
 
 template <class Container, class Type>
 typename Container::iterator _findItImpl(
@@ -142,7 +140,7 @@ void SpamBlockBase::addMessage(const Message::Ptr &message) {
 
 #ifdef SOCKET_CONNECTION
     // Global cfg
-    if (gSpamBlockCfg == CtrlSpamBlock::CTRL_OFF) {
+    if (spamBlockConfig == CtrlSpamBlock::CTRL_OFF) {
         return;
     }
 #endif
@@ -201,7 +199,7 @@ void SpamBlockManager::handleUserAndMessagePair(PerChatHandleConstRef e,
                                                 const char *name) {
     bool enforce = false;
 #ifdef SOCKET_CONNECTION
-    switch (gSpamBlockCfg) {
+    switch (spamBlockConfig) {
         case CtrlSpamBlock::CTRL_ENFORCE:
             enforce = true;
             [[fallthrough]];
@@ -263,10 +261,9 @@ void SpamBlockManager::doInitCall() {
     OnAnyMessageRegisterer::getInstance()->registerCallback(
         [](const Bot &bot, const Message::Ptr &message) {
             static auto spamMgr =
-                SingleThreadCtrlManager::getInstance()
-                    ->getController<SpamBlockManager>(
-                        {SingleThreadCtrlManager::USAGE_SPAMBLOCK_THREAD},
-                        std::cref(bot));
+                ThreadManager::getInstance()
+                    ->createController<ThreadManager::Usage::SPAMBLOCK_THREAD,
+                                       SpamBlockManager>(std::cref(bot));
             spamMgr->addMessage(message);
         });
 }

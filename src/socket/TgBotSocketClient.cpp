@@ -1,7 +1,7 @@
-#include <SingleThreadCtrl.h>
 #include <absl/log/log.h>
 
 #include <AbslLogInit.hpp>
+#include <ManagedThreads.hpp>
 #include <TgBotSocket_Export.hpp>
 #include <TryParseStr.hpp>
 #include <boost/crc.hpp>
@@ -231,8 +231,8 @@ int main(int argc, char** argv) {
             }
         } break;
         case Command::CMD_DELETE_CONTROLLER_BY_ID: {
-            SingleThreadCtrlManager::ThreadUsage data{};
-            if (parseOneEnum(&data, SingleThreadCtrlManager::USAGE_MAX, argv[0],
+            ThreadManager::Usage data{};
+            if (parseOneEnum(&data, ThreadManager::Usage::MAX, argv[0],
                              "usage")) {
                 pkt = Packet(cmd, data);
             }

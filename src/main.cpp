@@ -2,7 +2,6 @@
 #include <ConfigManager.h>
 #include <RegEXHandler.h>
 #include <ResourceManager.h>
-#include <SingleThreadCtrl.h>
 #include <SpamBlock.h>
 #include <absl/log/log.h>
 #include <absl/log/log_sink_registry.h>
@@ -13,6 +12,7 @@
 #include <AbslLogInit.hpp>
 #include <DurationPoint.hpp>
 #include <LogSinks.hpp>
+#include <ManagedThreads.hpp>
 #include <OnAnyMessageRegister.hpp>
 #include <TgBotWebpage.hpp>
 #include <chrono>
@@ -130,7 +130,7 @@ int main(int argc, char* const* argv) {
     createAndDoInitCall<RTCommandLoader>(gBot);
 #endif
 #ifdef SOCKET_CONNECTION
-    createAndDoInitCall<SocketInterfaceTgBot>(gBot);
+    SocketInterfaceTgBot(gBot, nullptr).initWrapper(gBot);
     createAndDoInitCall<ChatObserver>();
 #endif
     createAndDoInitCall<RegexHandler>(gBot);
@@ -179,13 +179,13 @@ int main(int argc, char* const* argv) {
             bot_sendMessage(gBot, ownerid, "Reinitializing.");
             LOG(INFO) << "Re-init";
             AuthContext::getInstance()->isAuthorized() = false;
-            static const SingleThreadCtrlManager::GetControllerRequest req{
-                .usage = SingleThreadCtrlManager::USAGE_ERROR_RECOVERY_THREAD,
-                .flags =
-                    SingleThreadCtrlManager::REQUIRE_NONEXIST |
-                    SingleThreadCtrlManager::REQUIRE_FAILACTION_RETURN_NULL};
-            auto cl =
-                SingleThreadCtrlManager::getInstance()->getController(req);
+            const auto thrmgr = ThreadManager::getInstance();
+            auto cl = thrmgr->createController<
+                ThreadManager::Usage::ERROR_RECOVERY_THREAD>();
+            if (!cl) {
+                cl = thrmgr->getController<ThreadManager::Usage::ERROR_RECOVERY_THREAD>();
+                cl->reset();
+            }
             if (cl) {
                 cl->runWith([] {
                     std::this_thread::sleep_for(kErrorRecoveryDelay);

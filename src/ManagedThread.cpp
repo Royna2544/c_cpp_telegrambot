@@ -1,24 +1,21 @@
-#include <SingleThreadCtrl.h>
-
+#include <ManagedThreads.hpp>
 #include <mutex>
 
-bool SingleThreadCtrl::isRunning() const {
-    return state == ControlState::RUNNING;
-}
+bool ManagedThread::isRunning() const { return state == ControlState::RUNNING; }
 
-void SingleThreadCtrl::logInvalidState(const char *func) {
+void ManagedThread::logInvalidState(const char *func) {
     LOG(ERROR) << "Invalid state " << static_cast<int>(state) << " for " << func
                << ": " << mgr_priv.usage.str << " controller";
 }
 
-void SingleThreadCtrl::runWith(thread_function fn) {
+void ManagedThread::runWith(thread_function fn) {
     switch (state) {
         case ControlState::STOPPED_PREMATURE:
         case ControlState::STOPPED_BY_STOP_CMD:
             reset();
             [[fallthrough]];
         case ControlState::UNINITIALIZED:
-            threadP = std::thread(&SingleThreadCtrl::_threadFn, this, fn);
+            threadP = std::thread(&ManagedThread::_threadFn, this, fn);
             state = ControlState::RUNNING;
             break;
         case ControlState::RUNNING:
@@ -28,7 +25,7 @@ void SingleThreadCtrl::runWith(thread_function fn) {
     };
 }
 
-void SingleThreadCtrl::setPreStopFunction(prestop_function fn) {
+void ManagedThread::setPreStopFunction(prestop_function fn) {
     switch (state) {
         case ControlState::UNINITIALIZED:
         case ControlState::STOPPED_BY_STOP_CMD:
@@ -39,10 +36,12 @@ void SingleThreadCtrl::setPreStopFunction(prestop_function fn) {
     };
 }
 
-void SingleThreadCtrl::stop() {
+void ManagedThread::stop() {
     switch (state) {
         case ControlState::RUNNING:
-            if (preStop) preStop(this);
+            if (preStop) {
+                preStop(this);
+            }
             kRun = false;
             timer_mutex.lk.unlock();
             state = ControlState::STOPPED_BY_STOP_CMD;
@@ -56,7 +55,7 @@ void SingleThreadCtrl::stop() {
     }
 }
 
-void SingleThreadCtrl::reset() {
+void ManagedThread::reset() {
     switch (state) {
         case ControlState::RUNNING:
         case ControlState::STOPPED_PREMATURE:
@@ -73,10 +72,11 @@ void SingleThreadCtrl::reset() {
     }
 }
 
-void SingleThreadCtrl::_threadFn(thread_function fn) {
+void ManagedThread::_threadFn(thread_function fn) {
     fn();
     if (kRun) {
-        LOG(INFO) << mgr_priv.usage.str << " controller ended before stop command";
+        LOG(INFO) << mgr_priv.usage.str
+                  << " controller ended before stop command";
         state = ControlState::STOPPED_PREMATURE;
         kRun = false;
     }

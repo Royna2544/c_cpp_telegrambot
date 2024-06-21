@@ -1,4 +1,4 @@
-#include <SingleThreadCtrl.h>
+#include <ManagedThreads.hpp>
 
 #include <mutex>
 
@@ -12,6 +12,6 @@ void defaultSignalHandler(int s) {
 
 void defaultCleanupFunction() {
     LOG(INFO) << "Exiting";
-    SingleThreadCtrlManager::getInstance()->destroyManager();
+    ThreadManager::getInstance()->destroyManager();
     LOG(INFO) << "TgBot process exiting, Goodbye!";
 }

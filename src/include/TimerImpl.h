@@ -5,19 +5,19 @@
 
 #include <chrono>
 
-#include "SingleThreadCtrl.h"
+#include "ManagedThreads.hpp"
 
 using TgBot::Bot;
 using TgBot::Message;
 
-struct TimerCommandManager : SingleThreadCtrl {
+struct TimerCommandManager : ManagedThread {
     static constexpr int TIMER_CONFIG_SEC = 5;
-    TimerCommandManager() : SingleThreadCtrl() {}
+    TimerCommandManager() : ManagedThread() {}
     ~TimerCommandManager() override = default;
 
     void startTimer(const Bot &bot, const Message::Ptr &message);
     void stopTimer(const Bot &bot, const Message::Ptr &message);
-    static void Timerstop(SingleThreadCtrl *);
+    static void Timerstop(ManagedThread *);
 
    private:
     void TimerThreadFn(const Bot &bot, Message::Ptr message,

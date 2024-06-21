@@ -5,7 +5,7 @@
 #include <string_view>
 
 #include "CStringLifetime.h"
-#include "SingleThreadCtrl.h"
+#include "ManagedThreads.hpp"
 #include "initcalls/Initcall.hpp"
 
 class TgBotWebServerBase {
@@ -42,7 +42,7 @@ class TgBotWebServerBase {
     std::filesystem::path webServerRootPath;
 };
 
-class TgBotWebServer : public SingleThreadCtrlRunnable,
+class TgBotWebServer : public ManagedThreadRunnable,
                        InitCall,
                        TgBotWebServerBase {
    public:

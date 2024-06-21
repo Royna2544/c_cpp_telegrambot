@@ -1,6 +1,7 @@
 #include "TgBotSocketInterface.hpp"
 
-#include <SingleThreadCtrl.h>
+#include <ManagedThreads.hpp>
+#include <utility>
 
 #include "SocketBase.hpp"
 
@@ -13,22 +14,21 @@ SocketInterfaceTgBot::SocketInterfaceTgBot(
       TgBotSocketParser(_interface.get()) {}
 
 void SocketInterfaceTgBot::doInitCall(Bot& bot) {
-    auto mgr = SingleThreadCtrlManager::getInstance();
-    struct SingleThreadCtrlManager::GetControllerRequest req {};
-    req.usage = SingleThreadCtrlManager::USAGE_SOCKET_THREAD;
-    auto inter = mgr->getController<SocketInterfaceTgBot>(
-        req, std::ref(bot), std::make_shared<SocketInternalInterface>());
-    req.usage = SingleThreadCtrlManager::USAGE_SOCKET_EXTERNAL_THREAD;
-    auto exter = mgr->getController<SocketInterfaceTgBot>(
-        req, std::ref(bot), std::make_shared<SocketExternalInterface>());
+    auto mgr = ThreadManager::getInstance();
+    auto inter = mgr->createController<ThreadManager::Usage::SOCKET_THREAD,
+                                       SocketInterfaceTgBot>(
+        std::ref(bot), std::make_shared<SocketInternalInterface>());
+    auto exter =
+        mgr->createController<ThreadManager::Usage::SOCKET_EXTERNAL_THREAD,
+                              SocketInterfaceTgBot>(
+            std::ref(bot), std::make_shared<SocketExternalInterface>());
     for (const auto& intf : {inter, exter}) {
         intf->run();
     }
 }
 
 void SocketInterfaceTgBot::runFunction() {
-    setPreStopFunction(
-        [this](SingleThreadCtrl*) { interface->forceStopListening(); });
+    setPreStopFunction([this](auto*) { interface->forceStopListening(); });
     interface->startListeningAsServer(
-        [this](SocketConnContext ctx) { return onNewBuffer(ctx); });
+        [this](SocketConnContext ctx) { return onNewBuffer(std::move(ctx)); });
 }

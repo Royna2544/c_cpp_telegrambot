@@ -1,21 +1,34 @@
-#include <SingleThreadCtrl.h>
 #include <TimerImpl.h>
+
+#include <ManagedThreads.hpp>
 
 #include "CommandModule.h"
 
-static std::shared_ptr<TimerCommandManager> getTMM() {
-    return SingleThreadCtrlManager::getInstance()
-        ->getController<TimerCommandManager>(
-            SingleThreadCtrlManager::USAGE_TIMER_THREAD);
-}
 static void TimerStartCommandFn(const Bot &bot, const Message::Ptr message) {
-    auto ctrl = getTMM();
-    if (!ctrl->isRunning()) ctrl->reset();
-    ctrl->startTimer(bot, message);
+    const auto tm = ThreadManager::getInstance();
+    auto ctrl = tm->createController<ThreadManager::Usage::TIMER_THREAD,
+                                     TimerCommandManager>();
+    if (ctrl) {
+        ctrl->startTimer(bot, message);
+    } else {
+        ctrl = tm->getController<ThreadManager::Usage::TIMER_THREAD, TimerCommandManager>();
+        CHECK(ctrl) << "Timer should be gettable";
+        ctrl->startTimer(bot, message);
+    }
 }
 
 static void TimerStopCommandFn(const Bot &bot, const Message::Ptr message) {
-    getTMM()->stopTimer(bot, message);
+    const auto tm = ThreadManager::getInstance();
+    auto ctrl = tm->getController<ThreadManager::Usage::TIMER_THREAD,
+                                     TimerCommandManager>();
+    if (ctrl) {
+        ctrl->stopTimer(bot, message);
+    } else {
+        ctrl = tm->createController<ThreadManager::Usage::TIMER_THREAD, TimerCommandManager>();
+        CHECK(ctrl) << "Timer should be gettable";
+        ctrl->stopTimer(bot, message);
+        tm->destroyController(ThreadManager::Usage::TIMER_THREAD);
+    }
 }
 
 void loadcmd_starttimer(CommandModule &module) {

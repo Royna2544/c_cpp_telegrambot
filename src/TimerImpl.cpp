@@ -5,15 +5,15 @@
 #include <internal/_std_chrono_templates.h>
 #include <internal/_tgbot.h>
 
+#include <ManagedThreads.hpp>
 #include <chrono>
 #include <cmath>
-
-#include "SingleThreadCtrl.h"
 
 bool TimerCommandManager::parseTimerArguments(const Bot &bot,
                                               const Message::Ptr &message,
                                               std::chrono::seconds &out) {
     bool found = false;
+    bool result = false;
     std::string msg;
     enum {
         HOUR,
@@ -135,7 +135,8 @@ void TimerCommandManager::TimerThreadFn(const Bot &bot, Message::Ptr message,
         timer -= 1s;
     }
     bot_editMessage(bot, message, "Timer ended");
-    if (sendendmsg) bot_sendMessage(bot, message->chat->id, "Timer ended");
+    if (sendendmsg) { bot_sendMessage(bot, message->chat->id, "Timer ended");
+}
     if (botcanpin)
         bot.getApi().unpinChatMessage(message->chat->id, message->messageId);
     isactive = false;
@@ -151,13 +152,13 @@ void TimerCommandManager::startTimer(const Bot &bot, const Message::Ptr &msg) {
         try {
             bot.getApi().pinChatMessage(message->chat->id, message->messageId);
         } catch (const TgBot::TgException &) {
-            LOG(WARNING) <<  "Cannot pin msg!";
+            LOG(WARNING) << "Cannot pin msg!";
             botcanpin = false;
         }
-        setPreStopFunction(
-            std::bind(&TimerCommandManager::Timerstop, std::placeholders::_1));
-        runWith(std::bind(&TimerCommandManager::TimerThreadFn, this,
-                          std::cref(bot), message, parsedTime));
+        setPreStopFunction(TimerCommandManager::Timerstop);
+        runWith([this, capture0 = std::cref(bot), parsedTime] {
+            TimerThreadFn(capture0, message, parsedTime);
+        });
     }
 }
 
@@ -178,8 +179,8 @@ void TimerCommandManager::stopTimer(const Bot &bot, const Message::Ptr &msg) {
     bot_sendReplyMessage(bot, message, text);
 }
 
-void TimerCommandManager::Timerstop(SingleThreadCtrl *thiz) {
-    if (static_cast<TimerCommandManager *>(thiz)->isactive) {
+void TimerCommandManager::Timerstop(ManagedThread *thiz) {
+    if (dynamic_cast<TimerCommandManager *>(thiz)->isactive) {
         LOG(INFO) << "Canceling timer and cleaning up...";
     }
 }
