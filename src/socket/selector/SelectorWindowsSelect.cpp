@@ -35,7 +35,7 @@ bool SelectSelector::remove(socket_handle_t fd) {
 SelectSelector::SelectorPollResult SelectSelector::poll() {
     // TODO: Windows only uses timeout
     struct timeval tv {
-        .tv_sec = kTimeoutSecs
+        .tv_sec = timeoutSec
     };
 
     int ret = select(FD_SETSIZE, &set, nullptr, nullptr, &tv);

@@ -45,7 +45,7 @@ PollSelector::SelectorPollResult PollSelector::poll() {
     for (size_t i = 0; i < fds_len; ++i) {
         pfds[i] = pollfds[i].poll_fd;
     }
-    int rc = ::poll(pfds.get(), pollfds.size(), -1);
+    int rc = ::poll(pfds.get(), pollfds.size(), timeoutSec.value_or(-1));
     if (rc < 0) {
         PLOG(ERROR) << "Poll failed";
         return SelectorPollResult::FAILED;
@@ -59,6 +59,7 @@ PollSelector::SelectorPollResult PollSelector::poll() {
     }
     if (!any) {
         LOG(WARNING) << "None of the fd returned POILLIN";
+        return SelectorPollResult::TIMEOUT;
     }
     return SelectorPollResult::OK;
 }

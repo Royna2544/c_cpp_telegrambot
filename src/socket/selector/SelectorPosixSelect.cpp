@@ -31,7 +31,12 @@ bool SelectSelector::remove(socket_handle_t fd) {
 }
 
 SelectSelector::SelectorPollResult SelectSelector::poll() {
-    int ret = select(FD_SETSIZE, &set, nullptr, nullptr, nullptr);
+    struct timeval timeout {
+        .tv_sec = timeoutSec.value_or(0)
+    };
+    bool any = false;
+    int ret = select(FD_SETSIZE, &set, nullptr, nullptr,
+                     timeoutSec ? &timeout : nullptr);
     if (ret < 0) {
         PLOG(ERROR) << "Select failed";
         return SelectorPollResult::FAILED;
@@ -39,7 +44,12 @@ SelectSelector::SelectorPollResult SelectSelector::poll() {
     for (auto &e : data) {
         if (FD_ISSET(e.fd, &set)) {
             e.callback();
+            any = true;
         }
+    }
+    if (!any) {
+        LOG(WARNING) << "No events";
+        return SelectorPollResult::TIMEOUT;
     }
     // We have used the select: reinit them
     reinit();

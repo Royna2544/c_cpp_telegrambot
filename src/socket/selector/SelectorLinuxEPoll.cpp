@@ -51,17 +51,23 @@ bool EPollSelector::remove(socket_handle_t fd) {
 
 EPollSelector::SelectorPollResult EPollSelector::poll() {
     epoll_event result_event{};
-    int result = epoll_wait(epollfd, &result_event, 1, -1);
+    int result = epoll_wait(epollfd, &result_event, 1, timeoutSec.value_or(-1));
     if (result < 0) {
         PLOG(ERROR) << "epoll_wait failed";
         return SelectorPollResult::FAILED;
     } else if (result > 0) {
+        bool any = false;
         for (const auto &data : data) {
             if (data.fd == result_event.data.fd) {
                 data.callback();
+                any = true;
                 break;
             }
         }
+        if (!any) {
+            LOG(WARNING) << "Nothing reported";
+        }
+        return SelectorPollResult::TIMEOUT;
     }
     return SelectorPollResult::OK;
 }

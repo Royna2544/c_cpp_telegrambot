@@ -7,6 +7,7 @@ struct SelectSelector : Selector {
     SelectorPollResult poll() override;
     void shutdown() override;
     bool reinit() override;
+    bool isTimeoutAvailable() const override { return false; }
 
    private:
     struct SelectFdData {
