@@ -293,6 +293,7 @@ if (USE_UNIX_SOCKETS)
       ${SOCKET_SRC_INTERFACE}/impl/inet/SocketPosixIPv6.cpp
       src/socket/selector/SelectorPosixPoll.cpp
       src/socket/selector/SelectorPosixSelect.cpp
+      src/socket/selector/SelectorUnix.cpp
       ${SOCKET_SRC_INTERFACE}/impl/bot/ClientBackendPosix.cpp
     )
     if (APPLE)

@@ -2,6 +2,8 @@
 #include <sys/poll.h>
 #include <sys/select.h>
 
+#include <variant>
+
 #include "Selectors.hpp"
 
 struct PollSelector : Selector {
@@ -36,7 +38,6 @@ struct SelectSelector : Selector {
     std::vector<SelectFdData> data;
 };
 
-#ifdef __linux__
 struct EPollSelector : Selector {
     bool init() override;
     bool add(socket_handle_t fd, OnSelectedCallback callback) override;
@@ -54,4 +55,24 @@ struct EPollSelector : Selector {
     int epollfd;
     std::vector<EPollFdData> data;
 };
-#endif
+
+// Wrapper around selectors
+struct UnixSelector {
+    explicit UnixSelector();
+
+    bool init();
+    bool add(socket_handle_t fd, Selector::OnSelectedCallback callback);
+    bool remove(socket_handle_t fd);
+    Selector::SelectorPollResult poll();
+    void shutdown();
+    bool reinit();
+
+   private:
+    template <typename T>
+    constexpr static bool isKnownSelector() {
+        return std::is_same_v<T, PollSelector> ||
+               std::is_same_v<T, SelectSelector> ||
+               std::is_same_v<T, EPollSelector>;
+    }
+    std::variant<PollSelector, SelectSelector, EPollSelector> m_selector;
+};

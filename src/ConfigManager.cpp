@@ -97,6 +97,7 @@ struct ConfigBackendBoostPOBase : public ConfigBackendBase {
             AddOption<std::string, Configs::DATABASE_BACKEND>(desc);
             AddOption<std::string, Configs::OVERRIDE_CONF>(desc);
             AddOption<std::string, Configs::SOCKET_BACKEND>(desc);
+            AddOption<std::string, Configs::SELECTOR>(desc);
         });
         return desc;
     }

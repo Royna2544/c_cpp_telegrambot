@@ -11,11 +11,14 @@
 
 // Base interface for a fd selector, e.g. poll(2) or select(2).
 struct Selector {
-    enum class SelectorPollResult {
+    enum class PollResult {
         OK = 0,
         FAILED = -1,
         TIMEOUT = -2,
     };
+    // Shim for old code
+    using SelectorPollResult = PollResult;
+    
     static constexpr std::chrono::seconds kDefaultTimeoutSecs{5};
 
     using OnSelectedCallback = std::function<void(void)>;
