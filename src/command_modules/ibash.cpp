@@ -6,7 +6,6 @@
 #include <popen_wdt/popen_wdt.h>
 #include <semaphore.h>
 #include <sys/mman.h>
-#include <sys/poll.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -18,33 +17,28 @@
 #include <functional>
 #include <memory>
 #include <regex>
+#include <string>
 #include <string_view>
 #include <utility>
 
 #include "../../socket/selector/SelectorPosix.hpp"
 #include "BotClassBase.h"
-#include "tgbot/types/Message.h"
 
 using std::chrono_literals::operator""s;
 
 struct InteractiveBashContext : BotClassBase {
     // parentToChild { parent write, child stdin }
     // childToParent { parent read, child stdout }
-    pipe_t childToParent{}, parentToChild{};
+    Pipe childToParent{}, parentToChild{};
     bool is_open = false;
-    std::shared_ptr<ThreadManager> gSThreadManager;
+    std::shared_ptr<ThreadManager> ThrMgr;
 
-    // Aliases
-    const int& parent_readfd = childToParent[0];
-    const int& parent_writefd = parentToChild[0];
-    const int& child_stdin = parentToChild[1];
-    const int& child_stdout = childToParent[1];
     constexpr static std::string_view kOutputInitBuf = "Output:\n";
     constexpr static std::string_view kSubProcessClosed =
         "Subprocess closed due to inactivity";
 
     explicit InteractiveBashContext(const Bot& bot)
-        : BotClassBase(bot), gSThreadManager(ThreadManager::getInstance()) {}
+        : BotClassBase(bot), ThrMgr(ThreadManager::getInstance()) {}
 
     struct ExitTimeoutThread : ManagedThreadRunnable {
         void runFunction() override {
@@ -64,13 +58,12 @@ struct InteractiveBashContext : BotClassBase {
     struct UpdateOutputThread : ManagedThreadRunnable, BotClassBase {
         void runFunction() override {
             PollSelector selector;
-            std::array<char, BASH_MAX_BUF> buffer{};
-            ssize_t offset = 0;
 
             selector.init();
             selector.setTimeout(100s);
             selector.enableTimeout(true);
-            selector.add(readfd, [&buffer, &offset, this]() {
+            selector.add(readfd, [this]() {
+                std::lock_guard<std::mutex> lock(m_buffer);
                 auto len = read(readfd, buffer.data() + offset, BASH_READ_BUF);
                 if (len < 0) {
                     PLOG(ERROR) << "Failed to read from pipe";
@@ -100,6 +93,14 @@ struct InteractiveBashContext : BotClassBase {
                 };
             }
         }
+        void onNewCommand(const std::string& command) {
+            std::lock_guard<std::mutex> lock(m_buffer);
+            buffer.fill(0);
+
+            std::string header = ("Output of command: " + command + "\n");
+            strcpy(buffer.data(), header.c_str());
+            offset = header.size();
+        }
         explicit UpdateOutputThread(const Bot& bot, Message::Ptr message,
                                     int readfd)
             : BotClassBase(bot), readfd(readfd), message(std::move(message)) {}
@@ -107,6 +108,9 @@ struct InteractiveBashContext : BotClassBase {
        private:
         int readfd;
         Message::Ptr message;
+        std::mutex m_buffer; // Protect below 2
+        size_t offset = 0;
+        std::array<char, BASH_MAX_BUF> buffer{};
     };
 
     static bool isExitCommand(const std::string& str) {
@@ -151,19 +155,19 @@ struct InteractiveBashContext : BotClassBase {
         pid_t pid = 0;
         int ret = 0;
 
-        InvaildatePipe(parentToChild);
-        InvaildatePipe(childToParent);
+        childToParent.invalidate();
+        parentToChild.invalidate();
 
         for (const auto& pipes : {&parentToChild, &childToParent}) {
-            ret = pipe(*pipes);
-            if (ret != 0) {
+            bool ret = pipes->pipe();
+            if (!ret) {
                 PLOG(ERROR) << "pipe";
                 cleanupFunc();
                 return false;
             } else {
                 // These are variables on this class.
                 // and this cleanupstack will execute on this function scope
-                cleanupStack.emplace_back([pipes]() { closePipe(*pipes); });
+                cleanupStack.emplace_back([pipes]() { pipes->close(); });
             }
         }
         pid = fork();
@@ -174,19 +178,19 @@ struct InteractiveBashContext : BotClassBase {
         }
         if (pid == 0) {
             // Child
-            dup2(child_stdout, STDOUT_FILENO);
-            dup2(child_stdout, STDERR_FILENO);
-            dup2(child_stdin, STDIN_FILENO);
-            close(parent_readfd);
-            close(parent_writefd);
+            dup2(childToParent.writeEnd(), STDOUT_FILENO);
+            dup2(childToParent.writeEnd(), STDERR_FILENO);
+            dup2(parentToChild.readEnd(), STDIN_FILENO);
+            close(childToParent.readEnd());
+            close(parentToChild.writeEnd());
             privdata->child_pid = getpid();
             setpgid(0, 0);
             sem_post(&privdata->sem);
             execl(BASH_EXE_PATH, "bash", nullptr);
             _exit(127);
         } else {
-            close(child_stdin);
-            close(child_stdout);
+            close(childToParent.writeEnd());
+            close(parentToChild.readEnd());
             // Ensure bash execl() is up
             // to be able to read from it
             sem_wait(&privdata->sem);
@@ -194,12 +198,12 @@ struct InteractiveBashContext : BotClassBase {
             is_open = true;
             LOG(INFO) << "Open success, child pid: " << childpid;
         }
-        auto msg = bot_sendMessage(_bot, chat, "IBash");
-        gSThreadManager->getInstance()
+        auto msg = bot_sendMessage(_bot, chat, "IBash starts...");
+        ThrMgr->getInstance()
             ->createController<ThreadManager::Usage::IBASH_UPDATE_OUTPUT_THREAD,
                                UpdateOutputThread>(
 
-                std::cref(_bot), msg, parent_readfd)
+                std::cref(_bot), msg, childToParent.readEnd())
             ->run();
         return true;
     }
@@ -209,7 +213,7 @@ struct InteractiveBashContext : BotClassBase {
 
             // Write a msg as a fallback if for some reason exit doesnt get
             // written
-            auto exitTimeout = gSThreadManager->createController<
+            auto exitTimeout = ThrMgr->createController<
                 ThreadManager::Usage::IBASH_EXIT_TIMEOUT_THREAD,
                 ExitTimeoutThread>(this);
 
@@ -218,19 +222,26 @@ struct InteractiveBashContext : BotClassBase {
             }
 
             // Try to type exit command
-            SendCommand("exit 0", true);
+            sendCommandNoCheck("exit 0");
             // waitpid(4p) will hang if not exited, yes
             waitpid(childpid, &status, 0);
             if (WIFEXITED(status)) {
                 LOG(INFO) << "Process " << childpid << " exited with code "
                           << WEXITSTATUS(status);
             }
+            ThrMgr
+                ->getController<
+                    ThreadManager::Usage::IBASH_UPDATE_OUTPUT_THREAD,
+                    UpdateOutputThread>()
+                ->stop();
             exitTimeout->stop();
-            gSThreadManager->destroyController(ThreadManager::Usage::IBASH_EXIT_TIMEOUT_THREAD);
-            gSThreadManager->destroyController(ThreadManager::Usage::IBASH_UPDATE_OUTPUT_THREAD);
+            ThrMgr->destroyController(
+                ThreadManager::Usage::IBASH_EXIT_TIMEOUT_THREAD);
+            ThrMgr->destroyController(
+                ThreadManager::Usage::IBASH_UPDATE_OUTPUT_THREAD);
             bot_sendReplyMessage(_bot, message, "Closed");
-            close(parent_readfd);
-            close(parent_writefd);
+            close(childToParent.readEnd());
+            close(parentToChild.writeEnd());
             childpid = -1;
             is_open = false;
         } else {
@@ -243,24 +254,30 @@ struct InteractiveBashContext : BotClassBase {
     }
 
    private:
-    std::atomic_bool kIsProcessing;
     pid_t childpid = 0;
 
-    [[nodiscard]] bool SendCommand(std::string str, bool internal = false) const {
+    [[nodiscard]] bool SendCommand(std::string str,
+                                   bool internal = false) const {
         if (!internal) {
             LOG(INFO) << "Child <= Command '" << str << "'";
         }
         ssize_t rc = 0;
-        auto outputThread = gSThreadManager->getController<
+        auto outputThread = ThrMgr->getController<
             ThreadManager::Usage::IBASH_UPDATE_OUTPUT_THREAD,
             UpdateOutputThread>();
         if (!outputThread->isRunning()) {
             LOG(ERROR) << "Output thread is not running, timed out";
             return false;
         }
+        outputThread->onNewCommand(str);
+        return sendCommandNoCheck(str);
+    }
+
+    [[nodiscard]] bool sendCommandNoCheck(std::string str) const {
+        ssize_t rc = 0;
         boost::trim(str);
         str += '\n';
-        rc = write(parent_writefd, str.c_str(), str.size());
+        rc = write(parentToChild.writeEnd(), str.c_str(), str.size());
         if (rc < 0) {
             PLOG(ERROR) << "Writing text to parent fd";
             return false;
