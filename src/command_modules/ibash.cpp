@@ -1,73 +1,112 @@
 #include <BotReplyMessage.h>
 #include <ExtArgs.h>
-#include <fcntl.h>
+#include <command_modules/CommandModule.h>
+#include <compiler/CompilerInTelegram.h>  // BASH_MAX_BUF, BASH_READ_BUF
 #include <internal/_FileDescriptor_posix.h>
-#include <poll.h>
-#include <stdio.h>
+#include <popen_wdt/popen_wdt.h>
+#include <semaphore.h>
 #include <sys/mman.h>
+#include <sys/poll.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <ManagedThreads.hpp>
+#include <MessageWrapper.hpp>
 #include <boost/algorithm/string/trim.hpp>
-#include <chrono>
 #include <csignal>
-#include <cstdint>
 #include <cstdlib>
 #include <functional>
 #include <memory>
-#include <mutex>
 #include <regex>
-#include <thread>
+#include <string_view>
+#include <utility>
 
-#include "ExtArgs.h"
-#include "SingleThreadCtrl.h"
-#include "StringToolsExt.hpp"
-#include "command_modules/CommandModule.h"
-#include "compiler/CompilerInTelegram.h"  // BASH_MAX_BUF, BASH_READ_BUF
-#include "popen_wdt/popen_wdt.h"
+#include "../../socket/selector/SelectorPosix.hpp"
+#include "BotClassBase.h"
+#include "tgbot/types/Message.h"
 
 using std::chrono_literals::operator""s;
 
-struct InteractiveBashContext {
-    // tochild { child stdin , parent write }
-    // toparent { parent read, child stdout }
-    pipe_t tochild, toparent;
+struct InteractiveBashContext : BotClassBase {
+    // parentToChild { parent write, child stdin }
+    // childToParent { parent read, child stdout }
+    pipe_t childToParent{}, parentToChild{};
     bool is_open = false;
-    std::shared_ptr<SingleThreadCtrlManager> gSThreadManager;
+    std::shared_ptr<ThreadManager> gSThreadManager;
 
     // Aliases
-    const int& child_stdin = tochild[0];
-    const int& child_stdout = toparent[1];
-    const int& parent_readfd = toparent[0];
-    const int& parent_writefd = tochild[1];
-    constexpr static const char kOutputInitBuf[] = "Output:\n";
-    constexpr static const char kSubProcessClosed[] =
+    const int& parent_readfd = childToParent[0];
+    const int& parent_writefd = parentToChild[0];
+    const int& child_stdin = parentToChild[1];
+    const int& child_stdout = childToParent[1];
+    constexpr static std::string_view kOutputInitBuf = "Output:\n";
+    constexpr static std::string_view kSubProcessClosed =
         "Subprocess closed due to inactivity";
-    constexpr static const char kNoOutputFallback[] = "\n";
 
-    InteractiveBashContext()
-        : gSThreadManager(SingleThreadCtrlManager::getInstance()) {}
+    explicit InteractiveBashContext(const Bot& bot)
+        : BotClassBase(bot), gSThreadManager(ThreadManager::getInstance()) {}
 
-    struct ExitTimeoutThread : SingleThreadCtrl {
-        void start(const InteractiveBashContext* instr) {
+    struct ExitTimeoutThread : ManagedThreadRunnable {
+        void runFunction() override {
             if (delayUnlessStop(SLEEP_SECONDS); kRun) {
-                if (instr->childpid > 0 && kill(instr->childpid, 0) == 0) {
-                    LOG(WARNING) << "Process " << instr->childpid
+                if (context->childpid > 0 && kill(context->childpid, 0) == 0) {
+                    LOG(WARNING) << "Process " << context->childpid
                                  << " misbehaving, using SIGTERM";
-                    killpg(instr->childpid, SIGTERM);
+                    killpg(context->childpid, SIGTERM);
                 }
             }
         }
+        InteractiveBashContext* context;
+        explicit ExitTimeoutThread(InteractiveBashContext* context)
+            : context(context) {}
     };
 
-    struct TimeoutThread : SingleThreadCtrl {
-        void start(const InteractiveBashContext* instr) {
-            if (delayUnlessStop(SLEEP_SECONDS); kRun) {
-                ssize_t dummy [[maybe_unused]];
-                dummy = write(instr->child_stdout, kNoOutputFallback,
-                              sizeof(kNoOutputFallback));
+    struct UpdateOutputThread : ManagedThreadRunnable, BotClassBase {
+        void runFunction() override {
+            PollSelector selector;
+            std::array<char, BASH_MAX_BUF> buffer{};
+            ssize_t offset = 0;
+
+            selector.init();
+            selector.setTimeout(100s);
+            selector.enableTimeout(true);
+            selector.add(readfd, [&buffer, &offset, this]() {
+                auto len = read(readfd, buffer.data() + offset, BASH_READ_BUF);
+                if (len < 0) {
+                    PLOG(ERROR) << "Failed to read from pipe";
+                    kRun = false;
+                } else {
+                    offset += len;
+                    if (offset + BASH_READ_BUF > BASH_MAX_BUF) {
+                        LOG(INFO) << "Buffer overflow";
+                        kRun = false;
+                    }
+                }
+            });
+            while (kRun) {
+                switch (selector.poll()) {
+                    case Selector::SelectorPollResult::OK:
+                        bot_editMessage(_bot, message, buffer.data());
+                        selector.reinit();
+                        break;
+                    case Selector::SelectorPollResult::FAILED:
+                        LOG(ERROR) << "Failed to read from pipe";
+                        kRun = false;
+                        break;
+                    case Selector::SelectorPollResult::TIMEOUT:
+                        LOG(INFO) << "Timeout";
+                        kRun = false;
+                        break;
+                };
             }
         }
+        explicit UpdateOutputThread(const Bot& bot, Message::Ptr message,
+                                    int readfd)
+            : BotClassBase(bot), readfd(readfd), message(std::move(message)) {}
+
+       private:
+        int readfd;
+        Message::Ptr message;
     };
 
     static bool isExitCommand(const std::string& str) {
@@ -75,85 +114,108 @@ struct InteractiveBashContext {
         return std::regex_match(str, kExitCommandRegex);
     }
 
-    void open(void) {
-        if (!is_open) {
-            pid_t pid;
-            int rc;
-            pid_t* piddata;
+    struct IBashPriv {
+        sem_t sem{};
+        pid_t child_pid{};
+        IBashPriv() {
+            // Initialize semaphore for inter-process
+            // use, initial value 0
+            sem_init(&sem, 1, 0);
+        }
+        ~IBashPriv() { sem_destroy(&sem); }
+    };
 
-            piddata = (pid_t*)mmap(NULL, sizeof(pid_t), PROT_READ | PROT_WRITE,
-                                   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-            if (piddata == MAP_FAILED) {
-                PLOG(ERROR) << "mmap";
-                return;
-            }
+    static void unMap(IBashPriv* addr) { munmap(addr, sizeof(IBashPriv)); }
 
-            *piddata = 0;
-            InvaildatePipe(tochild);
-            InvaildatePipe(toparent);
+    bool open(const ChatId chat) {
+        std::vector<std::function<void(void)>> cleanupStack;
+        const auto cleanupFunc = [&cleanupStack]() {
+            std::ranges::for_each(cleanupStack,
+                                  [](const auto& func) { func(); });
+        };
 
-            // (-1 || -1) is 1, (-1 || 0) is 1, (0 || 0) is 0
-            rc = pipe(tochild) || pipe(toparent);
+        if (is_open) {
+            return false;
+        }
 
-            if (rc) {
-                munmap(piddata, sizeof(pid_t));
-                closePipe(tochild);
-                closePipe(toparent);
+        void* addr = mmap(nullptr, sizeof(IBashPriv), PROT_READ | PROT_WRITE,
+                          MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+        if (addr == MAP_FAILED) {
+            PLOG(ERROR) << "mmap";
+            return false;
+        }
+        new (addr) IBashPriv();
+        std::unique_ptr<IBashPriv, decltype(&unMap)> privdata(
+            static_cast<IBashPriv*>(addr), &unMap);
+
+        pid_t pid = 0;
+        int ret = 0;
+
+        InvaildatePipe(parentToChild);
+        InvaildatePipe(childToParent);
+
+        for (const auto& pipes : {&parentToChild, &childToParent}) {
+            ret = pipe(*pipes);
+            if (ret != 0) {
                 PLOG(ERROR) << "pipe";
-                return;
-            }
-            if ((pid = fork()) < 0) {
-                munmap(piddata, sizeof(pid_t));
-                closePipe(tochild);
-                closePipe(toparent);
-                PLOG(ERROR) << "fork";
-                return;
-            }
-            if (pid == 0) {
-                // Child
-                dup2(child_stdout, STDOUT_FILENO);
-                dup2(child_stdout, STDERR_FILENO);
-                dup2(child_stdin, STDIN_FILENO);
-                close(parent_readfd);
-                close(parent_writefd);
-                *piddata = getpid();
-                setpgid(0, 0);
-                execl(BASH_EXE_PATH, "bash", (char*)NULL);
-                _exit(127);
+                cleanupFunc();
+                return false;
             } else {
-                int count = 0;
-                close(child_stdin);
-                // Ensure bash execl() is up
-                do {
-                    LOG(WARNING) << "Waiting for subprocess up... (" << count
-                                 << "s passed)";
-                    std::this_thread::sleep_for(1s);
-                    count++;
-                } while (kill(-(*piddata), 0) != 0);
-                is_open = true;
-                childpid = *piddata;
-                LOG(INFO) << "Open success, child pid: " << childpid;
-                munmap(piddata, sizeof(pid_t));
+                // These are variables on this class.
+                // and this cleanupstack will execute on this function scope
+                cleanupStack.emplace_back([pipes]() { closePipe(*pipes); });
             }
         }
+        pid = fork();
+        if (pid < 0) {
+            PLOG(ERROR) << "fork";
+            cleanupFunc();
+            return false;
+        }
+        if (pid == 0) {
+            // Child
+            dup2(child_stdout, STDOUT_FILENO);
+            dup2(child_stdout, STDERR_FILENO);
+            dup2(child_stdin, STDIN_FILENO);
+            close(parent_readfd);
+            close(parent_writefd);
+            privdata->child_pid = getpid();
+            setpgid(0, 0);
+            sem_post(&privdata->sem);
+            execl(BASH_EXE_PATH, "bash", nullptr);
+            _exit(127);
+        } else {
+            close(child_stdin);
+            close(child_stdout);
+            // Ensure bash execl() is up
+            // to be able to read from it
+            sem_wait(&privdata->sem);
+            childpid = privdata->child_pid;
+            is_open = true;
+            LOG(INFO) << "Open success, child pid: " << childpid;
+        }
+        auto msg = bot_sendMessage(_bot, chat, "IBash");
+        gSThreadManager->getInstance()
+            ->createController<ThreadManager::Usage::IBASH_UPDATE_OUTPUT_THREAD,
+                               UpdateOutputThread>(
+
+                std::cref(_bot), msg, parent_readfd)
+            ->run();
+        return true;
     }
-    void exit(const std::function<void(void)> onClosed,
-              const std::function<void(void)> onNotOpen) {
+    void exit(const Message::Ptr& message) {
         if (is_open) {
-            static const SingleThreadCtrlManager::GetControllerRequest req{
-                .usage =
-                    SingleThreadCtrlManager::USAGE_IBASH_EXIT_TIMEOUT_THREAD,
-                .flags =
-                    SingleThreadCtrlManager::REQUIRE_NONEXIST |
-                    SingleThreadCtrlManager::REQUIRE_FAILACTION_RETURN_NULL};
-            int status;
+            int status = 0;
 
             // Write a msg as a fallback if for some reason exit doesnt get
             // written
-            auto exitTimeout =
-                gSThreadManager->getController<ExitTimeoutThread>(req);
+            auto exitTimeout = gSThreadManager->createController<
+                ThreadManager::Usage::IBASH_EXIT_TIMEOUT_THREAD,
+                ExitTimeoutThread>(this);
 
-            if (!exitTimeout) return;
+            if (!exitTimeout) {
+                return;
+            }
 
             // Try to type exit command
             SendCommand("exit 0", true);
@@ -164,95 +226,38 @@ struct InteractiveBashContext {
                           << WEXITSTATUS(status);
             }
             exitTimeout->stop();
-            {
-                const std::lock_guard<std::mutex> _(m);
-                onClosed();
-            }
+            gSThreadManager->destroyController(ThreadManager::Usage::IBASH_EXIT_TIMEOUT_THREAD);
+            gSThreadManager->destroyController(ThreadManager::Usage::IBASH_UPDATE_OUTPUT_THREAD);
+            bot_sendReplyMessage(_bot, message, "Closed");
             close(parent_readfd);
             close(parent_writefd);
-            close(child_stdout);
             childpid = -1;
             is_open = false;
         } else {
-            onNotOpen();
+            bot_sendReplyMessage(_bot, message, "Not open");
         }
     }
 
-    bool sendText(const Bot& bot, const Message::Ptr& message) {
-        if (is_open) {
-            std::unique_lock<std::mutex> lk{m, std::try_to_lock};
-            if (!lk.owns_lock()) {
-                // TODO better verification
-                if (message->replyToMessage &&
-                    message->replyToMessage->from->id ==
-                        bot.getApi().getMe()->id) {
-                    // TODO Extract actual command
-                    SendText(message->text);
-                    bot_sendReplyMessage(bot, message,
-                                         "Sent the text to subprocess");
-                } else {
-                    bot_sendReplyMessage(bot, message,
-                                         "Subprocess is still running, try "
-                                         "using an exit command");
-                }
-                return true;  // Handled
-            }
-        }
-        return false;
-    }
-
-    void sendCommand(const std::string& command,
-                     std::function<void(const std::string&)> onNewResultBuffer,
-                     const std::function<void(void)> onTimeout) {
-        char buf[BASH_READ_BUF];
-        bool resModified = false;
-        std::string result = kOutputInitBuf;
-        const std::lock_guard<std::mutex> _(m);
-        static const SingleThreadCtrlManager::GetControllerRequest req{
-            .usage = SingleThreadCtrlManager::USAGE_IBASH_TIMEOUT_THREAD,
-            .flags = SingleThreadCtrlManager::REQUIRE_NONEXIST |
-                     SingleThreadCtrlManager::REQUIRE_FAILACTION_ASSERT};
-        SendCommand(command);
-        auto onNoOutputThread =
-            gSThreadManager->getController<TimeoutThread>(req);
-        do {
-            onNoOutputThread->reset();
-            onNoOutputThread->runWith(
-                std::bind(&TimeoutThread::start, onNoOutputThread, this));
-            ssize_t rc = read(parent_readfd, buf, sizeof(buf));
-            onNoOutputThread->stop();
-            if (rc > 0) {
-                std::string buf_str(buf, rc);
-                boost::trim(buf_str);
-                if (!isEmptyOrBlank(buf_str)) {
-                    resModified = true;
-                    result.append(buf_str);
-                    onNewResultBuffer(result);
-                }
-            } else
-                break;
-            // Exit if child has nothing more to send to us, or it is reading
-            // stdin
-        } while (HasData(DATA_IN, false) || HasData(DATA_IN, false));
-        boost::trim(result);
-        if (!resModified) {
-            result = "(No output)";
-            onNewResultBuffer(result);
-        }
+    bool sendCommand(const std::string& command) {
+        return SendCommand(command);
     }
 
    private:
-    std::mutex m;
+    std::atomic_bool kIsProcessing;
     pid_t childpid = 0;
 
-    enum ChildDataDirection : short {
-        DATA_IN = POLLIN,
-        DATA_OUT = POLLOUT,
-    };
-
-    bool _SendSomething(std::string str) const {
-        int rc;
-
+    [[nodiscard]] bool SendCommand(std::string str, bool internal = false) const {
+        if (!internal) {
+            LOG(INFO) << "Child <= Command '" << str << "'";
+        }
+        ssize_t rc = 0;
+        auto outputThread = gSThreadManager->getController<
+            ThreadManager::Usage::IBASH_UPDATE_OUTPUT_THREAD,
+            UpdateOutputThread>();
+        if (!outputThread->isRunning()) {
+            LOG(ERROR) << "Output thread is not running, timed out";
+            return false;
+        }
         boost::trim(str);
         str += '\n';
         rc = write(parent_writefd, str.c_str(), str.size());
@@ -262,98 +267,41 @@ struct InteractiveBashContext {
         }
         return true;
     }
-
-    bool SendCommand(const std::string& str, bool internal = false) const {
-        if (!internal) {
-            LOG(INFO) << "Child <= Command '" << str << "'";
-        }
-        return _SendSomething(str);
-    }
-
-    bool SendText(const std::string& str) const {
-        LOG(INFO) << "Child <= Text '" << str << "'";
-        return _SendSomething(str);
-    }
-
-    bool HasData(ChildDataDirection direction, bool wait) const {
-        int rc;
-        struct pollfd poll_fd = {
-            .events = direction,
-            .revents = 0,
-        };
-
-        switch (direction) {
-            case DATA_IN:
-                poll_fd.fd = parent_readfd;
-                break;
-            case DATA_OUT:
-                poll_fd.fd = parent_writefd;
-                break;
-        };
-        rc = poll(&poll_fd, 1, wait ? -1 : 1000);
-        if (rc < 0) {
-            PLOG(ERROR) << "Poll failed";
-        } else {
-            if (poll_fd.revents & direction) {
-                return true;
-            }
-        }
-        return false;
-    }
 };
 
 static void InteractiveBashCommandFn(const Bot& bot,
                                      const Message::Ptr& message) {
-    static InteractiveBashContext ctx;
+    static InteractiveBashContext ctx(bot);
     std::string command;
+    MessageWrapper wrapper(bot, message);
 
-    if (!hasExtArgs(message)) {
-        bot_sendReplyMessage(bot, message, "Send a bash command along /ibash");
-    } else {
-        parseExtArgs(message, command);
-        if (InteractiveBashContext::isExitCommand(command)) {
-            if (ctx.is_open)
-                LOG(INFO) << "Received exit command: '" << command << "'";
-            ctx.exit(
-                [&bot, message]() {
-                    bot_sendReplyMessage(bot, message,
-                                         "Closed bash subprocess.");
-                },
-                [&bot, message]() {
-                    bot_sendReplyMessage(bot, message,
-                                         "Bash subprocess is not open yet");
-                });
-        } else {
-            if (!ctx.is_open) {
-                ctx.open();
-                if (ctx.is_open)
-                    bot_sendReplyMessage(bot, message,
-                                         "Opened bash subprocess.");
-                else
-                    bot_sendReplyMessage(bot, message,
-                                         "Failed to open child process");
+    if (!wrapper.hasExtraText()) {
+        if (!ctx.is_open) {
+            wrapper.sendMessageOnExit("Opening...");
+            if (ctx.open(message->chat->id)) {
+                wrapper.sendMessageOnExit("Opened bash subprocess.");
+            } else {
+                wrapper.sendMessageOnExit("Failed to open child process");
             }
-            LOG_IF(FATAL,
-                   (IsValidPipe(ctx.tochild) && IsValidPipe(ctx.toparent)))
-                << "Opening pipes failed";
-
-            do {
-                if (ctx.sendText(bot, message)) break;
-                auto resultMessage = bot_sendReplyMessage(
-                    bot, message, InteractiveBashContext::kOutputInitBuf);
-                ctx.sendCommand(
-                    command,
-                    [&bot, &resultMessage](const std::string& buf) {
-                        if (resultMessage->text != buf)
-                            resultMessage =
-                                bot_editMessage(bot, resultMessage, buf);
-                    },
-                    [&bot, message] {
-                        bot_sendMessage(
-                            bot, message->from->id,
-                            InteractiveBashContext::kSubProcessClosed);
-                    });
-            } while (false);
+        } else {
+            wrapper.sendMessageOnExit("Bash subprocess is already running");
+        }
+    } else {
+        wrapper.getExtraText(command);
+        if (InteractiveBashContext::isExitCommand(command)) {
+            if (ctx.is_open) {
+                LOG(INFO) << "Received exit command: '" << command << "'";
+            }
+            ctx.exit(message);
+        } else {
+            if (ctx.is_open) {
+                if (!ctx.sendCommand(command)) {
+                    wrapper.sendMessageOnExit("Failed to send command");
+                    ctx.exit(message);
+                }
+            } else {
+                wrapper.sendMessageOnExit("Bash subprocess is not open");
+            }
         }
     }
 }
