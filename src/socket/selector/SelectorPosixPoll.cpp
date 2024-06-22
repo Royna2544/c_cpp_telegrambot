@@ -58,13 +58,13 @@ PollSelector::SelectorPollResult PollSelector::poll() {
     
     for (int i = 0; i < pollfds.size(); ++i) {
         const auto revents = pfds[i].revents;
-        LOG(INFO) << "My fd: " << pollfds[i].poll_fd.fd;
+        DLOG(INFO) << "My fd: " << pollfds[i].poll_fd.fd;
         if (revents == 0) {
-            LOG(INFO) << "Nothing is set";
+            DLOG(INFO) << "Nothing is set";
             continue;
         }
         if (revents & POLLIN) {
-            LOG(INFO) << "POLLIN is set";
+            DLOG(INFO) << "POLLIN is set";
             pollfds[i].callback();
             any = true;
         }
