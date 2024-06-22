@@ -176,7 +176,7 @@ void TimerCommandManager::stopTimer(const Bot &bot, const Message::Ptr &msg) {
     } else {
         text = "Timer is not running";
     }
-    bot_sendReplyMessage(bot, message, text);
+    bot_sendReplyMessage(bot, msg, text);
 }
 
 void TimerCommandManager::Timerstop(ManagedThread *thiz) {
