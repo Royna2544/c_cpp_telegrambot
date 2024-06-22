@@ -32,11 +32,11 @@ bool SelectSelector::remove(socket_handle_t fd) {
 
 SelectSelector::SelectorPollResult SelectSelector::poll() {
     struct timeval timeout {
-        .tv_sec = timeoutSec.value_or(0)
+        .tv_sec = getSOrDefault()
     };
     bool any = false;
     int ret = select(FD_SETSIZE, &set, nullptr, nullptr,
-                     timeoutSec ? &timeout : nullptr);
+                     isTimeoutEnabled() ? &timeout : nullptr);
     if (ret < 0) {
         PLOG(ERROR) << "Select failed";
         return SelectorPollResult::FAILED;

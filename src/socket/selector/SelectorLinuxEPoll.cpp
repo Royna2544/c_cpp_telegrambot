@@ -51,7 +51,7 @@ bool EPollSelector::remove(socket_handle_t fd) {
 
 EPollSelector::SelectorPollResult EPollSelector::poll() {
     epoll_event result_event{};
-    int result = epoll_wait(epollfd, &result_event, 1, timeoutSec.value_or(-1));
+    int result = epoll_wait(epollfd, &result_event, 1, getSOrDefault());
     if (result < 0) {
         PLOG(ERROR) << "epoll_wait failed";
         return SelectorPollResult::FAILED;

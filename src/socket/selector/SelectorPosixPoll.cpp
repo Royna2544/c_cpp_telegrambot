@@ -45,18 +45,38 @@ PollSelector::SelectorPollResult PollSelector::poll() {
     for (size_t i = 0; i < fds_len; ++i) {
         pfds[i] = pollfds[i].poll_fd;
     }
-    int rc = ::poll(pfds.get(), pollfds.size(), timeoutSec.value_or(-1));
+    int rc = ::poll(pfds.get(), pollfds.size(), getMsOrDefault());
     if (rc < 0) {
         PLOG(ERROR) << "Poll failed";
         return SelectorPollResult::FAILED;
     }
+#define CHECK_AND_WARN(event, x)         \
+    if ((event) & (x)) {                     \
+        LOG(WARNING) << #x << " is set"; \
+    }
+#define NOTHING 0
+    
     for (int i = 0; i < pollfds.size(); ++i) {
-        if (pfds[i].revents & POLLIN) {
+        const auto revents = pfds[i].revents;
+        LOG(INFO) << "My fd: " << pollfds[i].poll_fd.fd;
+        if (revents == 0) {
+            LOG(INFO) << "Nothing is set";
+            continue;
+        }
+        if (revents & POLLIN) {
+            LOG(INFO) << "POLLIN is set";
             pollfds[i].callback();
-            pfds[i].revents = 0;
             any = true;
         }
+        CHECK_AND_WARN(revents, POLLPRI);
+        CHECK_AND_WARN(revents, POLLERR);
+        CHECK_AND_WARN(revents, POLLHUP);
+        CHECK_AND_WARN(revents, POLLNVAL);
+        CHECK_AND_WARN(revents, POLLOUT);
+        pfds[i].revents = 0;
     }
+    DLOG(INFO) << "Return value: " << rc
+               << ", Callbacks called: " << std::boolalpha << any;
     if (!any) {
         LOG(WARNING) << "None of the fd returned POILLIN";
         return SelectorPollResult::TIMEOUT;
