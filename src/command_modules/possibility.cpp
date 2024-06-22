@@ -36,6 +36,9 @@ static void PossibilityCommandFn(const Bot &bot, const Message::Ptr &message) {
     }
     // Put it in vector again and shuffle it.
     vec = {set.begin(), set.end()};
+    std::ranges::remove_if(vec, [](auto &&e) {
+        return isEmptyOrBlank(e);
+    });
     RandomNumberGenerator::shuffleArray(vec);
     // Start the output stream
     outStream << "Total " << vec.size() << " items" << std::endl;
