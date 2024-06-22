@@ -50,7 +50,9 @@ struct SpamBlockBase : ManagedThreadRunnable {
 
     static std::string commonMsgdataFn(const Message::Ptr &m);
 
+#ifdef SOCKET_CONNECTION
     CtrlSpamBlock spamBlockConfig = CtrlSpamBlock::CTRL_ON;
+#endif
    protected:
     bool isEntryOverThreshold(PerChatHandleConstRef t, const size_t threshold);
     void _logSpamDetectCommon(PerChatHandleConstRef t, const char *name);
