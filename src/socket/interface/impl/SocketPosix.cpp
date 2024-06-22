@@ -11,7 +11,7 @@ void SocketInterfaceUnix::startListening(socket_handle_t handle,
                                          const listener_callback_t onNewData) {
     bool should_break = false;
     int rc = 0;
-    PollSelector selector;
+    UnixSelector selector;
 
     if (!isValidSocketHandle(handle)) {
         return;
@@ -22,20 +22,20 @@ void SocketInterfaceUnix::startListening(socket_handle_t handle,
             PLOG(ERROR) << "Failed to listen to socket";
             break;
         }
-        if (pipe(kListenTerminate) != 0) {
+        if (!kListenTerminate.pipe()) {
             PLOG(ERROR) << "Failed to create pipe";
             break;
         }
         if (!selector.init()) {
             break;
         }
-        selector.add(listen_fd, [this, &should_break]() {
+        selector.add(kListenTerminate.readEnd(), [this, &should_break]() {
             dummy_listen_buf_t buf = {};
-            ssize_t rc = read(listen_fd, &buf, sizeof(dummy_listen_buf_t));
+            ssize_t rc = read(kListenTerminate.readEnd(), &buf, sizeof(dummy_listen_buf_t));
             if (rc < 0) {
                 PLOG(ERROR) << "Reading data from forcestop fd";
             }
-            closeFd(listen_fd);
+            close(kListenTerminate.readEnd());
             should_break = true;
         });
         selector.add(handle, [handle, this, &should_break, onNewData] {
@@ -59,20 +59,22 @@ void SocketInterfaceUnix::startListening(socket_handle_t handle,
                     should_break = true;
                     break;
                 case Selector::SelectorPollResult::OK:
+                case Selector::SelectorPollResult::TIMEOUT:
                     break;
             }
         }
         selector.shutdown();
     } while (false);
-    closePipe(kListenTerminate);
+    kListenTerminate.close();
     closeSocketHandle(handle);
     cleanupServerSocket();
 }
 
 void SocketInterfaceUnix::forceStopListening() {
-    if (isValidFd(notify_fd) && isValidSocketHandle(listen_fd)) {
+    if (kListenTerminate.isVaild()) {
         dummy_listen_buf_t d = {};
         ssize_t count = 0;
+        int notify_fd = kListenTerminate.writeEnd();
 
         count = write(notify_fd, &d, sizeof(dummy_listen_buf_t));
         if (count < 0) {

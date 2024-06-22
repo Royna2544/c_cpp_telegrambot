@@ -5,7 +5,6 @@
 #include <internal/_FileDescriptor_posix.h>
 
 #include <SocketBase.hpp>
-#include <functional>
 
 #include "SharedMalloc.hpp"
 
@@ -26,19 +25,9 @@ struct SocketInterfaceUnix : SocketInterfaceBase {
 
     SocketInterfaceUnix() = default;
     ~SocketInterfaceUnix() override = default;
-    SocketInterfaceUnix& operator=(const SocketInterfaceUnix& other) noexcept {
-        if (this == &other) {
-            return *this;
-        }
-        listen_fd = kListenTerminate[0];
-        notify_fd = kListenTerminate[1];
-        return *this;
-    }
 
    protected:
-    pipe_t kListenTerminate{};
-    int& listen_fd = kListenTerminate[0];
-    int& notify_fd = kListenTerminate[1];
+    Pipe kListenTerminate{};
     static void bindToInterface(const socket_handle_t sock,
                                 const std::string& iface);
 };
