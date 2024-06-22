@@ -79,5 +79,7 @@ void ManagedThread::_threadFn(thread_function fn) {
                   << " controller ended before stop command";
         state = ControlState::STOPPED_PREMATURE;
         kRun = false;
+    } else {
+        state = ControlState::STOPPED_BY_STOP_CMD;
     }
 }
