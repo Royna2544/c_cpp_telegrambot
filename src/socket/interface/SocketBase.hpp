@@ -175,18 +175,6 @@ struct SocketInterfaceBase {
      */
     std::string getOptions(Options opt);
 
-    /**
-     * @brief Indicates whether the socket interface is available.
-     *
-     * A socket interface is considered available if it can be used to listen
-     * for incoming connections. This function should be used to determine
-     * whether the socket interface is ready to be used. (Or its dependencies
-     * are available)
-     *
-     * @return true if the socket interface is available, false otherwise.
-     */
-    virtual bool isSupported() = 0;
-
     struct Helper {
         explicit Helper(SocketInterfaceBase *interface_)
             : inet(interface_), local(interface_) {}
@@ -194,25 +182,18 @@ struct SocketInterfaceBase {
         struct INetHelper {
             explicit INetHelper(SocketInterfaceBase *interface_)
                 : interface(interface_) {}
-            bool isSupportedIPv4(void);
-            bool isSupportedIPv6(void);
             int getPortNum();
             std::string getExternalIP(void);
             static size_t externalIPCallback(void *contents, size_t size,
                                              size_t nmemb, void *userp);
 
            private:
-            constexpr static std::string_view kIPv4EnvVar = "IPV4_ADDRESS";
-            constexpr static std::string_view kIPv6EnvVar = "IPV6_ADDRESS";
-            constexpr static std::string_view kPortEnvVar = "PORT_NUM";
-            bool _isSupported(const std::string_view envVar);
             SocketInterfaceBase *interface;
         } inet;
 
         struct LocalHelper {
             explicit LocalHelper(SocketInterfaceBase *interface_)
                 : interface(interface_) {}
-            static bool isSupported(void);
             bool canSocketBeClosed();
             void cleanupServerSocket();
             void doGetRemoteAddr(socket_handle_t handle);

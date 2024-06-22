@@ -9,34 +9,6 @@
 
 using Options = SocketInterfaceBase::Options;
 
-bool SocketInterfaceBase::INetHelper::_isSupported(const std::string_view envVar) {
-    char *addr = getenv(envVar.data());
-    int portNum = SocketInterfaceBase::kTgBotHostPort;
-
-    if (addr == nullptr) {
-        LOG(INFO) << envVar << " is not set, isSupported false";
-        return false;
-    }
-    interface->setOptions(Options::DESTINATION_ADDRESS, addr, true);
-    if (const char *port = getenv(kPortEnvVar.data()); port != nullptr) {
-        if (!try_parse(port, &portNum)) {
-            LOG(ERROR) << "Illegal value for " << kPortEnvVar << ": " << port;
-        }
-        LOG(INFO) << "Chosen port: " << portNum;
-    }
-    interface->setOptions(Options::DESTINATION_PORT, std::to_string(portNum),
-                          true);
-    return true;
-}
-
-bool SocketInterfaceBase::INetHelper::isSupportedIPv4() {
-    return _isSupported(kIPv4EnvVar);
-}
-
-bool SocketInterfaceBase::INetHelper::isSupportedIPv6() {
-    return _isSupported(kIPv6EnvVar);
-}
-
 int SocketInterfaceBase::INetHelper::getPortNum() {
     int ret = 0;
 
@@ -44,11 +16,6 @@ int SocketInterfaceBase::INetHelper::getPortNum() {
         return ret;
     }
     return SocketInterfaceBase::kTgBotHostPort;
-}
-
-bool SocketInterfaceBase::LocalHelper::isSupported() {
-    DLOG(INFO) << "Choosing local socket";
-    return true;
 }
 
 bool SocketInterfaceBase::LocalHelper::canSocketBeClosed() {

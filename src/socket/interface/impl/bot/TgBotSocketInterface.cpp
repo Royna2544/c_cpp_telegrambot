@@ -1,8 +1,10 @@
 #include "TgBotSocketInterface.hpp"
 
 #include <ManagedThreads.hpp>
+#include <memory>
 #include <utility>
 
+#include "../backends/ServerBackend.hpp"
 #include "SocketBase.hpp"
 
 using HandleState = SocketInterfaceTgBot::HandleState;
@@ -15,15 +17,23 @@ SocketInterfaceTgBot::SocketInterfaceTgBot(
 
 void SocketInterfaceTgBot::doInitCall(Bot& bot) {
     auto mgr = ThreadManager::getInstance();
-    auto inter = mgr->createController<ThreadManager::Usage::SOCKET_THREAD,
-                                       SocketInterfaceTgBot>(
-        std::ref(bot), std::make_shared<SocketInternalInterface>());
-    auto exter =
-        mgr->createController<ThreadManager::Usage::SOCKET_EXTERNAL_THREAD,
-                              SocketInterfaceTgBot>(
-            std::ref(bot), std::make_shared<SocketExternalInterface>());
-    for (const auto& intf : {inter, exter}) {
-        intf->run();
+    SocketServerWrapper wrapper;
+    std::vector<std::shared_ptr<SocketInterfaceTgBot>> threads;
+
+    if (wrapper.getInternalInterface()) {
+        threads.emplace_back(
+            mgr->createController<ThreadManager::Usage::SOCKET_THREAD,
+                                  SocketInterfaceTgBot>(
+                std::ref(bot), wrapper.getInternalInterface()));
+    }
+    if (wrapper.getExternalInterface()) {
+        threads.emplace_back(
+            mgr->createController<ThreadManager::Usage::SOCKET_EXTERNAL_THREAD,
+                                  SocketInterfaceTgBot>(
+                std::ref(bot), wrapper.getExternalInterface()));
+    }
+    for (auto &thr : threads) {
+        thr->run();
     }
 }
 

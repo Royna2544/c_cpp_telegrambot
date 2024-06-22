@@ -282,7 +282,9 @@ if (USE_UNIX_SOCKETS)
   extend_set(SRC_LIST
     src/ChatObserver.cpp
     ${SOCKET_SRC_INTERFACE}/impl/bot/SocketDataHandler.cpp
-    ${SOCKET_SRC_INTERFACE}/impl/bot/TgBotSocketInterface.cpp)
+    ${SOCKET_SRC_INTERFACE}/impl/bot/TgBotSocketInterface.cpp
+    ${SOCKET_SRC_INTERFACE}/impl/backends/ServerBackend.cpp
+    ${SOCKET_SRC_INTERFACE}/impl/backends/ServerBackend_${TARGET_VARIANT}.cpp)
   if (UNIX)
     set(SOCKET_SRC_LIST
       ${SOCKET_SRC_INTERFACE}/impl/SocketPosix.cpp

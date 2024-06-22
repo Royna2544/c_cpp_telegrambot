@@ -23,20 +23,20 @@ std::optional<socket_handle_t> SocketInterfaceUnixIPv6::createServerSocket() {
         return std::nullopt;
     }
 
-    LOG(INFO) << "Dump of active interfaces' addresses (IPv6)";
+    LOG(INFO) << "[IPv6] Dump of active interfaces' addresses";
     forEachINetAddress<sockaddr_in6, in6_addr, AF_INET6>([](const auto& data) {
-        LOG(INFO) << "ifname " << data.name << ": addr " << data.addr;
+        LOG(INFO) << "[IPv6] ifname " << data.name << ": addr " << data.addr;
     });
     forEachINetAddress<sockaddr_in6, in6_addr, AF_INET6>(
         [&iface_done, sfd](const auto& data) {
             if (!iface_done && kLocalInterface.data() != data.name) {
-                LOG(INFO) << "Choosing ifname " << data.name;
+                LOG(INFO) << "[IPv6] Choosing ifname " << data.name;
                 bindToInterface(sfd, data.name);
                 iface_done = true;
             }
         });
     if (!iface_done) {
-        LOG(ERROR) << "Failed to find any valid interface to bind to (IPv6)";
+        LOG(ERROR) << "[IPv6] Failed to find any valid interface to bind to";
         return std::nullopt;
     }
     helper.inet.getExternalIP();
@@ -75,10 +75,6 @@ std::optional<SocketConnContext> SocketInterfaceUnixIPv6::createClientSocket() {
     }
     ctx.addr.assignFrom(name);
     return ctx;
-}
-
-bool SocketInterfaceUnixIPv6::isSupported() {
-    return helper.inet.isSupportedIPv6();
 }
 
 void SocketInterfaceUnixIPv6::doGetRemoteAddr(socket_handle_t s) {

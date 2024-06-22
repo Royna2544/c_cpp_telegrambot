@@ -20,21 +20,21 @@ std::optional<socket_handle_t> SocketInterfaceUnixIPv4::createServerSocket() {
         return std::nullopt;
     }
 
-    LOG(INFO) << "Dump of active interfaces' addresses (IPv4)";
+    LOG(INFO) << "[IPv4] Dump of active interfaces' addresses";
     forEachINetAddress<sockaddr_in, in_addr, AF_INET>([](const auto& data) {
-        LOG(INFO) << "ifname " << data.name << ": addr " << data.addr;
+        LOG(INFO) << "[IPv4] ifname " << data.name << ": addr " << data.addr;
     });
     forEachINetAddress<sockaddr_in, in_addr, AF_INET>(
         [&iface_done, sfd](const auto& data) {
             if (!iface_done && kLocalInterface.data() != data.name) {
-                LOG(INFO) << "Choosing ifname " << data.name;
+                LOG(INFO) << "[IPv4] Choosing ifname " << data.name;
                 bindToInterface(sfd, data.name);
                 iface_done = true;
             }
         });
 
     if (!iface_done) {
-        LOG(ERROR) << "Failed to find any valid interface to bind to (IPv4)";
+        LOG(ERROR) << "[IPv4] Failed to find any valid interface to bind to";
         return ret;
     }
     helper.inet.getExternalIP();
@@ -73,10 +73,6 @@ std::optional<SocketConnContext> SocketInterfaceUnixIPv4::createClientSocket() {
     }
     ctx.addr.assignFrom(name);
     return ctx;
-}
-
-bool SocketInterfaceUnixIPv4::isSupported() {
-    return helper.inet.isSupportedIPv4();
 }
 
 void SocketInterfaceUnixIPv4::doGetRemoteAddr(socket_handle_t s) {

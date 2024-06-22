@@ -42,10 +42,6 @@ SocketInterfaceWindowsIPv6::createClientSocket() {
     return context;
 }
 
-bool SocketInterfaceWindowsIPv6::isSupported() {
-    return helper.inet.isSupportedIPv6();
-}
-
 void SocketInterfaceWindowsIPv6::doGetRemoteAddr(socket_handle_t s) {
     WinHelper::doGetRemoteAddrInet<struct sockaddr_in6, AF_INET6, in6_addr,
                                    INET6_ADDRSTRLEN,

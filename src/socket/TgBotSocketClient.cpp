@@ -84,8 +84,8 @@ std::string_view AckTypeToStr(callback::AckType type) {
 }  // namespace
 
 struct ClientParser : TgBotSocketParser {
-    explicit ClientParser(SocketInterfaceBase* interface)
-        : TgBotSocketParser(interface) {}
+    explicit ClientParser(SocketClientWrapper wrapper)
+        : TgBotSocketParser(wrapper.getRawInterface()), wrapper(wrapper) {}
     void handle_CommandPacket(SocketConnContext context, Packet pkt) override {
         using callback::AckType;
         using callback::GenericAck;
@@ -112,8 +112,13 @@ struct ClientParser : TgBotSocketParser {
                 if (callbackData.result != AckType::SUCCESS) {
                     LOG(ERROR) << "Reason: " << callbackData.error_msg.data();
                 } else {
-                    interface->closeSocketHandle(context);
-                    context = interface->createClientSocket().value();
+                    wrapper->closeSocketHandle(context);
+                    auto it = wrapper->createClientSocket();
+                    if (!it) {
+                        LOG(ERROR) << "Failed to recreate client socket";
+                        return;
+                    }
+                    context = it.value();
                     LOG(INFO) << "Recreated client socket";
                     auto params_in = callbackData.requestdata;
                     FileDataHelper::DataFromFileParam param;
@@ -123,7 +128,7 @@ struct ClientParser : TgBotSocketParser {
                     auto newPkt = FileDataHelper::DataFromFile<
                         FileDataHelper::UPLOAD_FILE>(param);
                     LOG(INFO) << "Sending the actual file content again...";
-                    interface->writeToSocket(context, newPkt->toSocketData());
+                    wrapper->writeToSocket(context, newPkt->toSocketData());
                     onNewBuffer(context);
                 }
                 break;
@@ -143,8 +148,9 @@ struct ClientParser : TgBotSocketParser {
                            << static_cast<int>(pkt.header.cmd);
                 break;
         }
-        interface->closeSocketHandle(context);
+        wrapper->closeSocketHandle(context);
     }
+    SocketClientWrapper wrapper;
 };
 
 int main(int argc, char** argv) {
@@ -273,7 +279,7 @@ int main(int argc, char** argv) {
         pkt->header.checksum = crc.checksum();
     }
 
-    auto* backend = getClientBackend();
+    auto backend = SocketClientWrapper();
     auto handle = backend->createClientSocket();
 
     if (handle) {

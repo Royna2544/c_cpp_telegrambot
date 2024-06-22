@@ -46,10 +46,6 @@ SocketInterfaceWindowsIPv4::createClientSocket() {
     return context;
 }
 
-bool SocketInterfaceWindowsIPv4::isSupported() {
-    return helper.inet.isSupportedIPv4();
-}
-
 void SocketInterfaceWindowsIPv4::doGetRemoteAddr(socket_handle_t s) {
     WinHelper::doGetRemoteAddrInet<struct sockaddr_in, AF_INET, in_addr,
                                    INET_ADDRSTRLEN,

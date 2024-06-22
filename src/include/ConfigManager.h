@@ -18,6 +18,7 @@ enum class Configs {
     DATABASE_BACKEND,
     HELP,
     OVERRIDE_CONF,
+    SOCKET_BACKEND,
     MAX
 };
 
@@ -39,15 +40,16 @@ constexpr auto kConfigsMap =
     array_helpers::make<static_cast<int>(Configs::MAX), Configs, ConfigStr>(
         CONFIG_AND_STR(TOKEN), CONFIG_AND_STR(SRC_ROOT), CONFIG_AND_STR(PATH),
         CONFIG_AND_STR(LOG_FILE), CONFIG_AND_STR(DATABASE_BACKEND),
-        CONFIG_AND_STR(HELP), CONFIG_AND_STR(OVERRIDE_CONF));
+        CONFIG_AND_STR(HELP), CONFIG_AND_STR(OVERRIDE_CONF),
+        CONFIG_AND_STR(SOCKET_BACKEND));
 
 constexpr auto kConfigsAliasMap =
     array_helpers::make<static_cast<int>(Configs::MAX), Configs, const char>(
         CONFIGALIAS_AND_STR(TOKEN, 't'), CONFIGALIAS_AND_STR(SRC_ROOT, 'r'),
         CONFIGALIAS_AND_STR(PATH, 'p'), CONFIGALIAS_AND_STR(LOG_FILE, 'f'),
         CONFIGALIAS_AND_STR(DATABASE_BACKEND, 'd'),
-        CONFIGALIAS_AND_STR(HELP, 'h'),
-        CONFIGALIAS_AND_STR(OVERRIDE_CONF, 'c'));
+        CONFIGALIAS_AND_STR(HELP, 'h'), CONFIGALIAS_AND_STR(OVERRIDE_CONF, 'c'),
+        CONFIGALIAS_AND_STR(SOCKET_BACKEND, 's'));
 
 constexpr auto kConfigsDescMap =
     array_helpers::make<static_cast<int>(Configs::MAX), Configs, DescStr>(
@@ -57,7 +59,8 @@ constexpr auto kConfigsDescMap =
         DESC_AND_STR(LOG_FILE, "File path to log"),
         DESC_AND_STR(DATABASE_BACKEND, "Database backend to use"),
         DESC_AND_STR(HELP, "Print this help message"),
-        DESC_AND_STR(OVERRIDE_CONF, "Override config file"));
+        DESC_AND_STR(OVERRIDE_CONF, "Override config file"),
+        DESC_AND_STR(SOCKET_BACKEND, "Socket backend to use"));
 
 /**
  * getVariable - Function used to retrieve the value of a specific

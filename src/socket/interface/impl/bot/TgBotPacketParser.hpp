@@ -45,8 +45,7 @@ struct TgBotSocketParser {
 
     explicit TgBotSocketParser(SocketInterfaceBase *interface)
         : interface(interface) {}
-    TgBotSocketParser() = default;
 
-   protected:
+   private:
     SocketInterfaceBase *interface;
 };

@@ -96,6 +96,7 @@ struct ConfigBackendBoostPOBase : public ConfigBackendBase {
             AddOption<std::string, Configs::LOG_FILE>(desc);
             AddOption<std::string, Configs::DATABASE_BACKEND>(desc);
             AddOption<std::string, Configs::OVERRIDE_CONF>(desc);
+            AddOption<std::string, Configs::SOCKET_BACKEND>(desc);
         });
         return desc;
     }
@@ -119,7 +120,7 @@ struct ConfigBackendBoostPOBase : public ConfigBackendBase {
     }
 
     ConfigBackendBoostPOBase() = default;
-    virtual ~ConfigBackendBoostPOBase() = default;
+    ~ConfigBackendBoostPOBase() override = default;
 
    protected:
     po::variables_map mp;
@@ -252,7 +253,7 @@ std::vector<std::unique_ptr<ConfigBackendBase>> &getAvailableBackends() {
         if (file->load()) {
             backends.emplace_back(std::move(file));
         }
-        DLOG(INFO) << "Loaded " << backends.size() << " backends";
+        DLOG(INFO) << "Loaded " << backends.size() << " config sources";
     });
     return backends;
 }
