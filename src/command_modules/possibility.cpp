@@ -21,7 +21,8 @@ static void PossibilityCommandFn(const Bot &bot, const Message::Ptr &message) {
     using map_t = std::pair<std::string, random_return_type>;
 
     if (!messageWrapper.hasExtraText()) {
-        messageWrapper.sendMessageOnExit("Send avaliable conditions sperated by newline");
+        messageWrapper.sendMessageOnExit(
+            "Send avaliable conditions sperated by newline");
         return;
     }
     text = messageWrapper.getExtraText();
@@ -36,9 +37,11 @@ static void PossibilityCommandFn(const Bot &bot, const Message::Ptr &message) {
     }
     // Put it in vector again and shuffle it.
     vec = {set.begin(), set.end()};
-    std::ranges::remove_if(vec, [](auto &&e) {
-        return isEmptyOrBlank(e);
+    auto [start, end] = std::ranges::remove_if(vec, [](auto &&e) {
+        return !isEmptyOrBlank(e);
     });
+    vec = {start, end};
+    // Shuffle the vector.
     RandomNumberGenerator::shuffleArray(vec);
     // Start the output stream
     outStream << "Total " << vec.size() << " items" << std::endl;
