@@ -1,5 +1,6 @@
 #include "ProtobufDatabase.hpp"
 
+#include <absl/log/check.h>
 #include <absl/log/log.h>
 
 #include <fstream>
@@ -121,6 +122,7 @@ const PersonList &ProtoDatabase::getPersonList(
         case DatabaseBase::ListType::BLACKLIST:
             return db_info->protoDatabaseObject.blacklist();
     }
+    CHECK(false) << "unreachable";
 }
 
 PersonList *ProtoDatabase::getMutablePersonList(ListType type) const {
@@ -130,6 +132,7 @@ PersonList *ProtoDatabase::getMutablePersonList(ListType type) const {
         case DatabaseBase::ListType::BLACKLIST:
             return db_info->protoDatabaseObject.mutable_blacklist();
     }
+    CHECK(false) << "unreachable";
 }
 
 const PersonList &ProtoDatabase::getOtherPersonList(
@@ -140,6 +143,7 @@ const PersonList &ProtoDatabase::getOtherPersonList(
         case DatabaseBase::ListType::BLACKLIST:
             return getPersonList(DatabaseBase::ListType::WHITELIST);
     }
+    CHECK(false) << "unreachable";
 }
 
 std::optional<ProtoDatabase::MediaInfo> ProtoDatabase::queryMediaInfo(
