@@ -5,7 +5,7 @@
 
 void CommandModuleManager::loadCommandModules(Bot &bot) {
    std::vector<command_loader_function_t> cmdModuleFunctions = {
-      @COMMANDS_MODULES_PTR@
+@COMMANDS_MODULES_PTR@
    };
    for (const auto &fn : cmdModuleFunctions) {
       CommandModule module;

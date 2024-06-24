@@ -1,0 +1,27 @@
+# Used by command_modules_helper.py
+# Syntax: commandname ([!win32]) ([infile <filename>])
+
+alive
+flash
+possibility
+decide
+delay
+decho
+randsticker
+fileid
+clone
+spam
+cmd
+ibash [!win32]
+restart [!win32]
+bash [infile bash_impl]
+ubash [infile bash_impl]
+starttimer [infile timer_impl]
+stoptimer [infile timer_impl]
+database [infile database_impl]
+saveid [infile database_impl]
+start [infile alive]
+c [infile compilers_impl]
+cpp [infile compilers_impl]
+go [infile compilers_impl]
+python [infile compilers_impl]

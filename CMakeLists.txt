@@ -135,9 +135,6 @@ endif()
 
 ################ TgBot lib + Boost creates a warning ################
 add_definitions(-DBOOST_BIND_GLOBAL_PLACEHOLDERS)
-if(ENFORCE_EN_US)
-  add_definitions(-DLOCALE_EN_US)
-endif()
 #####################################################################
 
 ######################## Include directories ########################
@@ -194,43 +191,39 @@ set(SRC_LIST
 )
 #####################################################################
 
-######### Commands modules (The commands handler of the bot) #########
-################ Commands module in a single file list ################
-set(CMD_MODULES_SINGLE_LIST alive flash possibility decide delay decho
-                            randsticker fileid clone spam cmd)
-if (NOT WIN32)
-  set(CMD_MODULES_SINGLE_LIST ${CMD_MODULES_SINGLE_LIST} ibash restart)
-endif()
-extend_set_if(ENABLE_RUNTIME_COMMAND CMD_MODULES_SINGLE_LIST rtload)
-######################## Commands sources list ########################
-set(CMD_MODULES_SOURCES_LIST compilers_impl database_impl bash_impl timer_impl
-    ${CMD_MODULES_SINGLE_LIST})
-######################## Commands modules list ########################
-set(CMD_MODULES_LIST database bash ubash ${CMD_MODULES_SINGLE_LIST}
-      starttimer stoptimer saveid start c cpp go python)
-####################### Commands modules defines #######################
-set(COMMANDS_CWD src/command_modules)
-set(COMMANDS_GEN_FILE ${COMMANDS_CWD}/gen/cmds.gen.cpp)
-########## Generate commands modules list in compile time (cpp) ##########
-macro(append_cmdlib lib)
-  string(APPEND COMMANDS_MODULES_DECL "extern void loadcmd_${lib}(CommandModule &cmd);\n")
-  string(APPEND COMMANDS_MODULES_PTR "&loadcmd_${lib}")
-endmacro()
-
-list(GET CMD_MODULES_LIST 0 COMMANDS_MODULES_FIRST_ELEM)
-append_cmdlib(${COMMANDS_MODULES_FIRST_ELEM})
-foreach(lib ${CMD_MODULES_LIST})
-  if (${lib} STREQUAL ${COMMANDS_MODULES_FIRST_ELEM})
-    continue()
-  endif()
-  string(APPEND COMMANDS_MODULES_PTR ",\n")
-  append_cmdlib(${lib})
-endforeach()
+########## Generate commands modules list in compile time (python) ##########
+find_package (Python3 COMPONENTS Interpreter REQUIRED)
+set(GENERATE_CMDMODULE_STRINGS ${CMAKE_SOURCE_DIR}/resources/scripts/command_modules_helper.py)
+execute_process(
+  COMMAND ${Python3_EXECUTABLE} ${GENERATE_CMDMODULE_STRINGS} get_cmd_filenames ${CMAKE_SOURCE_DIR}/resources/commands_list.txt 
+  OUTPUT_VARIABLE CMD_MODULES_SOURCES_LIST
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+  COMMAND_ERROR_IS_FATAL ANY
+)
+execute_process(
+  COMMAND ${Python3_EXECUTABLE} ${GENERATE_CMDMODULE_STRINGS} get_cmd_names ${CMAKE_SOURCE_DIR}/resources/commands_list.txt 
+  OUTPUT_VARIABLE CMD_MODULES_LIST
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+  COMMAND_ERROR_IS_FATAL ANY
+)
+execute_process(
+  COMMAND ${Python3_EXECUTABLE} ${GENERATE_CMDMODULE_STRINGS} gen_ptr ${CMD_MODULES_LIST} 
+  OUTPUT_VARIABLE COMMANDS_MODULES_PTR
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+  COMMAND_ERROR_IS_FATAL ANY
+)
+execute_process(
+  COMMAND ${Python3_EXECUTABLE} ${GENERATE_CMDMODULE_STRINGS} gen_decl ${CMD_MODULES_LIST} 
+  OUTPUT_VARIABLE COMMANDS_MODULES_DECL
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+  COMMAND_ERROR_IS_FATAL ANY
+)
 ########## Generate commands modules list in compile time (cpp) ##########
 foreach(lib ${CMD_MODULES_SOURCES_LIST})
-  extend_set(SRC_LIST ${COMMANDS_CWD}/${lib}.cpp)
+  extend_set(SRC_LIST src/command_modules/${lib}.cpp)
 endforeach()
-#################### Include to TgBotCommandModules #################
+#################### Include to TgBot++ #################
+set(COMMANDS_GEN_FILE src/command_modules/gen/cmds.gen.cpp)
 configure_file(${COMMANDS_GEN_FILE}.in ${CMAKE_BINARY_DIR}/${COMMANDS_GEN_FILE})
 extend_set(SRC_LIST ${CMAKE_BINARY_DIR}/${COMMANDS_GEN_FILE})
 #####################################################################
