@@ -2,22 +2,23 @@
 #include "CompilerInTelegram.h"
 #include <absl/log/log.h>
 #include <boost/algorithm/string/trim.hpp>
+#include <StringResManager.hpp>
 
 void CompilerInTgHelper::onFailed(const Bot &bot, const Message::Ptr &message,
                                   const CompilerInTg::ErrorType e) {
     std::string text;
     switch (e) {
         case CompilerInTg::ErrorType::MESSAGE_VERIFICATION_FAILED:
-            text = "Reply to a message with code as text";
+            text = GETSTR(REPLY_TO_A_CODE);
             break;
         case CompilerInTg::ErrorType::FILE_WRITE_FAILED:
-            text = "Failed to write output file";
+            text = GETSTR(FAILED_TO_WRITE_FILE);
             break;
         case CompilerInTg::ErrorType::POPEN_WDT_FAILED:
-            text = "Failed to run command";
+            text = GETSTR(FAILED_TO_RUN_COMMAND);
             break;
         case CompilerInTg::ErrorType::START_COMPILER:
-            text = "Working on it...";
+            text = GETSTR(WORKING);
             break;
     };
     bot_sendReplyMessage(bot, message, text);

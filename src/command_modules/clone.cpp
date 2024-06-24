@@ -3,7 +3,9 @@
 #include <ExtArgs.h>
 #include <absl/log/log.h>
 #include <internal/_tgbot.h>
+#include <MessageWrapper.hpp>
 #include <database/bot/TgBotDatabaseImpl.hpp>
+#include <StringResManager.hpp>
 
 #include <TryParseStr.hpp>
 #include <sstream>
@@ -15,17 +17,17 @@ static void CloneCommandFn(const Bot& bot, const Message::Ptr message) {
     ChatId cid = message->chat->id;
     bool ok = false;
     static TgBot::User::Ptr botUser = bot.getApi().getMe();
+    MessageWrapper wrapper(bot, message);
 
-    if (hasExtArgs(message)) {
-        if (!try_parse(parseExtArgs(message), &uid)) {
-            bot_sendReplyMessage(bot, message, "Invalid user id");
-            return;
+    if (wrapper.hasExtraText()) {
+        if (!try_parse(wrapper.getExtraText(), &uid)) {
+            wrapper.sendMessageOnExit(GETSTR(FAILED_TO_PARSE_INPUT));
         }
     } else if (message->replyToMessage) {
         uid = message->replyToMessage->from->id;
         ok = true;
     } else {
-        bot_sendReplyMessage(bot, message, "You must specify a user id");
+        wrapper.sendMessageOnExit(GETSTR(NEED_USER));
     }
     if (ok) {
         auto member = bot.getApi().getChatMember(cid, uid);
@@ -46,7 +48,7 @@ static void CloneCommandFn(const Bot& bot, const Message::Ptr message) {
             pmfn();
             ss << "/setname";
             pmfn();
-            ss << '@' << bot.getApi().getMe()->username;
+            ss << '@' << botUser->username;
             pmfn();
             ss << userName;
             pmfn();
@@ -54,7 +56,7 @@ static void CloneCommandFn(const Bot& bot, const Message::Ptr message) {
                 !phs.empty() && !phs.front().empty()) {
                 ss << "/setuserpic";
                 pmfn();
-                ss << '@' << bot.getApi().getMe()->username;
+                ss << '@' << botUser->username;
                 pmfn();
                 bot.getApi().sendPhoto(ownerId, phs[0][0]->fileId);
             }

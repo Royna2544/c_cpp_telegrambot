@@ -8,6 +8,7 @@
 #include "BotReplyMessage.h"
 #include "CommandModule.h"
 #include "StringToolsExt.hpp"
+#include <StringResManager.hpp>
 
 namespace {
 void handle_reload(Bot& bot, MessageWrapper& wrapper, std::string command) {
@@ -61,7 +62,7 @@ void CmdCommandFn(Bot& bot, const TgBot::Message::Ptr& message) {
         } else if (action == "unload") {
             handle_unload(bot, wrapper, command);
         } else {
-            wrapper.sendMessageOnExit("Unknown action " + action);
+            wrapper.sendMessageOnExit(GETSTR_IS(UNKNOWN_ACTION) + action);
         }
     }
 }

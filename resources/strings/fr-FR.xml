@@ -1,0 +1,48 @@
+
+<resources>
+    <string name="send_bash_command">Envoyer une commande bash à exécuter</string>
+    <string name="compile_time">Temps de compilation</string>
+    <string name="run_time">Temps d'exécution</string>
+    <string name="reply_to_a_code">Répondre à un message avec du code en texte</string>
+    <string name="working">En cours...</string>
+    <string name="owner">Propriétaire</string>
+    <string name="command">Commande</string>
+    <string name="truncated">Tronqué en raison d'une sortie trop volumineuse</string>
+    <string name="example">Exemple</string>
+    <string name="need_user">Vous devez spécifier un utilisateur</string>
+    <string name="unknown_action">Action inconnue</string>
+    <string name="cmd_not_loaded">Commande non chargée</string>
+    <string name="cmd_already_loaded">Commande déjà chargée</string>
+    <string name="cmd_not_found_to_load">Commande introuvable à charger</string>
+    <string name="cmd_not_found_to_unload">Commande introuvable à décharger</string>
+    <string name="not_supported_in_current_host">Non supporté dans l'hôte actuel</string>
+    <string name="reply_to_user_msg">Répondre à un message utilisateur</string>
+    <string name="reply_to_gif_or_sticker">Répondre à un GIF ou un sticker</string>
+    <string name="media_already_in_db">Média déjà dans la base de données</string>
+    <string name="send_a_name_to_save">Envoyer un nom à enregistrer</string>
+    
+<string name="user_added">Utilisateur ajouté à la liste</string>
+<string name="user_removed">Utilisateur retiré de la liste</string>
+<string name="user_already_in_list">L'utilisateur est déjà dans la liste</string>
+<string name="user_already_in_other_list">L'utilisateur est déjà dans une autre liste</string>
+<string name="user_not_in_list">L'utilisateur n'est pas dans la liste</string>
+
+<!-- Fails and errors -->
+<string name="failed_to_write_file">Échec de l'écriture du fichier</string>
+<string name="failed_to_run_command">Échec de l'exécution de la commande</string>
+<string name="failed_to_parse_input">Échec de l'analyse de l'entrée</string>
+<string name="error_path_cannot_be_empty">Le chemin ne peut pas être vide</string>
+<string name="error_updating_bot_commands">Erreur lors de la mise à jour de la liste des commandes du bot</string>
+<string name="error_sending_gif">Erreur lors de l'envoi du GIF</string>
+<string name="backend_error">Erreur du serveur</string>
+<string name="unknown_error">Erreur inconnue</string>
+<string name="invalid_args_passed">Arguments invalides passés</string>
+
+<!-- Command desc -->
+<string name="alive_cmd_desc">Tester si un bot est actif</string>
+<string name="start_cmd_desc">Alias pour la commande alive</string>
+<string name="bash_cmd_desc">Exécuter des commandes bash</string>
+<string name="ubash_cmd_desc">Exécuter des commandes bash sans limite de temps</string>
+<string name="database_cmd_desc">Exécuter des commandes de base de données</string>
+<string name="saveid_cmd_desc">Enregistrer un média tg sous un nom</string>
+</resources>

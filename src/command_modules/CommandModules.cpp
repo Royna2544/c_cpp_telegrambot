@@ -1,4 +1,5 @@
 
+#include <StringResManager.hpp>
 #include <boost/algorithm/string/trim.hpp>
 
 #include "CommandModule.h"
@@ -21,7 +22,7 @@ void CommandModuleManager::updateBotCommands(const Bot &bot) {
         if (!cmd.isHideDescription()) {
             auto onecommand = std::make_shared<CommandModule>(cmd);
             if (cmd.isEnforced()) {
-                onecommand->description += " (Owner)";
+                onecommand->description += " " + GETSTR_BRACE(OWNER);
             }
             buffer.emplace_back(onecommand);
         }
@@ -29,7 +30,7 @@ void CommandModuleManager::updateBotCommands(const Bot &bot) {
     try {
         bot.getApi().setMyCommands(buffer);
     } catch (const TgBot::TgException &e) {
-        LOG(ERROR) << "Error updating bot command list: " << e.what()
+        LOG(ERROR) << GETSTR_IS(ERROR_UPDATING_BOT_COMMANDS) << e.what()
                    << std::endl;
     }
 }

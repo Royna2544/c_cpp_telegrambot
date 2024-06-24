@@ -6,7 +6,7 @@
 #include <boost/config.hpp>
 #include <filesystem>
 #include <mutex>
-#include <string_view>
+#include <StringResManager.hpp>
 
 #include "BotReplyMessage.h"
 #include "CommandModule.h"
@@ -57,7 +57,7 @@ static void AliveCommandFn(const Bot& bot, const Message::Ptr message) {
             sentAnimation = true;
         } catch (const TgBot::TgException& e) {
             // Fallback to HTML if no GIF
-            LOG(ERROR) << "Alive cmd: Error while sending GIF: " << e.what();
+            LOG(ERROR) << GETSTR(ERROR_SENDING_GIF) << e.what();
         }
     }
     if (!sentAnimation) {
@@ -67,14 +67,14 @@ static void AliveCommandFn(const Bot& bot, const Message::Ptr message) {
 
 void loadcmd_alive(CommandModule& module) {
     module.command = "alive";
-    module.description = "Test if a bot is alive";
+    module.description =  GETSTR(ALIVE_CMD_DESC);
     module.flags = CommandModule::Flags::None;
     module.fn = AliveCommandFn;
 }
 
 void loadcmd_start(CommandModule& module) {
     module.command = "start";
-    module.description = "Alias for alive command";
+    module.description = GETSTR(START_CMD_DESC);
     module.flags = CommandModule::Flags::HideDescription;
     module.fn = AliveCommandFn;
 }

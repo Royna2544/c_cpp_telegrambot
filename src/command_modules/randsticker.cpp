@@ -9,8 +9,7 @@ using TgBot::StickerSet;
 
 static void RandomStickerCommandFn(const Bot &bot, const Message::Ptr& message) {
     MessageWrapper msg(bot, message);
-    if (!msg.switchToReplyToMessage(
-            bot, "Sticker not found in replied-to message")) {
+    if (!msg.switchToReplyToMessage("Sticker not found in replied-to message")) {
         return;
     }
 

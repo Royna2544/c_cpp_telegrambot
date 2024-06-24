@@ -159,6 +159,8 @@ if (APPLE)
     find_library(SECURITY Security REQUIRED)
     set(MACOS_SSL_LIBS ${CORE_FOUNDATION} ${SECURITY})
 endif()
+find_package(LibXml2 REQUIRED)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/<my_stuff> ${LIBXML2_INCLUDE_DIR})
 #####################################################################
 
 ############################# Platforms #############################
@@ -250,6 +252,21 @@ target_link_libraries(TgBotDB protobuf::libprotobuf SQLite3 TgBotUtils)
 add_library(TgBotDBImpl SHARED src/database/bot/TgBotDatabaseImpl.cpp)
 target_link_libraries(TgBotDBImpl TgBotUtils TgBotDB)
 #####################################################################
+
+####################### TgBotStringRes lib  #######################
+add_library(TgBotStringRes SHARED src/stringres/StringResManager.cpp)
+target_link_libraries(TgBotStringRes ${LIBXML2_LIBRARIES})
+target_include_directories(TgBotStringRes PUBLIC src/stringres)
+add_executable(StringResCompiler src/stringres/StringResCompiler.cpp)
+target_link_libraries(StringResCompiler TgBotStringRes TgBotLogInit)
+set(STRINGRES_XML ${CMAKE_SOURCE_DIR}/resources/strings/en-US.xml )
+add_custom_target(gen_stringres_header 
+  COMMAND ${CMAKE_BINARY_DIR}/bin/StringResCompiler ${STRINGRES_XML} 
+  ${CMAKE_SOURCE_DIR}/src/stringres/resources.gen.h
+  DEPENDS StringResCompiler
+  COMMENT "Generating string resource header"
+  SOURCES ${STRINGRES_XML})
+#################################################################
 
 ################## RTCL (Run Time Command Loader) ##################
 if(ENABLE_RUNTIME_COMMAND)
@@ -376,11 +393,12 @@ add_subdirectory(src/third-party/tgbot-cpp EXCLUDE_FROM_ALL)
 add_library(${PROJECT_NAME} SHARED ${SRC_LIST})
 target_include_directories(${PROJECT_NAME} PRIVATE src/third-party/rapidjson/include)
 ######################## Libraries to link ########################
-set(LD_LIST TgBot TgBotDB TgBotUtils TgBotWeb)
+set(LD_LIST TgBot TgBotDB TgBotUtils TgBotWeb TgBotStringRes)
 extend_set_if(LD_LIST USE_UNIX_SOCKETS TgBotSocket)
 extend_set_if(LD_LIST WIN32 wsock32 Ws2_32)
 extend_set_if(LD_LIST ENABLE_RUNTIME_COMMAND ${CMAKE_DL_LIBS})
 target_link_libraries(${PROJECT_NAME} ${LD_LIST})
+add_dependencies(${PROJECT_NAME} gen_stringres_header)
 #####################################################################
 
 ################# The Bot's main launcher (program) #################

@@ -21,12 +21,11 @@ struct MessageWrapper : BotClassBase {
     [[nodiscard]] bool hasReplyToMessage() const {
         return message->replyToMessage != nullptr;
     }
-    bool switchToReplyToMessage(const Bot& bot,
-                                const std::string& text) noexcept {
+    bool switchToReplyToMessage(const std::string& text) noexcept {
         if (switchToReplyToMessage()) {
             return true;
         } else {
-            bot_sendReplyMessage(bot, message, text);
+            bot_sendReplyMessage(_bot, message, text);
             return false;
         }
     }
@@ -39,6 +38,13 @@ struct MessageWrapper : BotClassBase {
         }
         return false;
     }
+    void switchToParent() noexcept {
+        if (parent) {
+            message = parent->message;
+            parent = parent->parent;
+        }
+    }
+    
     [[nodiscard]] bool hasExtraText() const noexcept {
         return firstBlank(message) != std::string::npos;
     }
@@ -64,8 +70,18 @@ struct MessageWrapper : BotClassBase {
         return !message->text.empty();
     }
     [[nodiscard]] std::string getText() const noexcept { return message->text; }
+
+    [[nodiscard]] bool hasUser() const noexcept {
+        return message->from != nullptr;
+    }
+    [[nodiscard]] TgBot::User::Ptr getUser() const noexcept {
+        return message->from;
+    }
     void sendMessageOnExit(std::string message) noexcept {
         onExitMessage = std::move(message);
+    }
+    void sendMessageOnExit() noexcept {
+        onExitMessage = std::nullopt;
     }
 
     explicit MessageWrapper(const Bot& bot, Message::Ptr message)
@@ -77,7 +93,7 @@ struct MessageWrapper : BotClassBase {
         } else {
             Rmessage = message;
         }
-        if (onExitMessage) {
+        if (onExitMessage && !onExitMessage->empty()) {
             bot_sendReplyMessage(_bot, Rmessage, *onExitMessage);
         }
     }

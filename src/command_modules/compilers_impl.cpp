@@ -1,4 +1,6 @@
+#include "StringToolsExt.hpp"
 #include "compiler/CompilerInTelegram.h"
+#include <StringResManager.hpp>
 
 using command_callback_compiler_t = std::function<void(
     const Bot &bot, const Message::Ptr &message, const std::filesystem::path &compiler)>;
@@ -25,7 +27,7 @@ void GOModuleCallback(const Bot &bot, const Message::Ptr &message,
     goCompiler.run(message);
 }
 void NoCompilerCommandStub(const Bot &bot, const Message::Ptr &message) {
-    bot_sendReplyMessage(bot, message, "Not supported in current host");
+    bot_sendReplyMessage(bot, message, GETSTR(NOT_SUPPORTED_IN_CURRENT_HOST));
 }
 void loadCompilerGeneric(CommandModule &module, ProgrammingLangs lang,
                          std::string_view name,
@@ -42,7 +44,7 @@ void loadCompilerGeneric(CommandModule &module, ProgrammingLangs lang,
         module.description += ", ";
         module.description += compiler.make_preferred().string();
     } else {
-        LOG(WARNING) << "Unsupported cmd '" << name << "' (compiler)";
+        LOG(WARNING) << "Unsupported cmd " << SingleQuoted(name) << " (compiler)";
         module.fn = NoCompilerCommandStub;
     }
 }

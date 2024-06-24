@@ -1,6 +1,7 @@
 #include "CompilerInTelegram.h"
 #include <ExtArgs.h>
 #include <libos/libfs.hpp>
+#include <StringResManager.hpp>
 
 void CompilerInTgForCCppImpl::onResultReady(const Message::Ptr& who,
                                             const std::string& text) {
@@ -23,12 +24,12 @@ void CompilerInTgForCCpp::run(const Message::Ptr& message) {
     if (verifyParseWrite(message, extraargs)) {
         cmd << cmdPrefix.string() << SPACE << extraargs << SPACE << outfile;
 
-        resultbuf << "Compile time:" << std::endl;
+        resultbuf << GETSTR_IS(COMPILE_TIME) << std::endl;
         runCommand(message, cmd.str(), resultbuf);
         resultbuf << std::endl;
 
         if (FS::exists(aoutname)) {
-            resultbuf << "Run time:" << std::endl;
+            resultbuf << GETSTR_IS(RUN_TIME) << std::endl;
             runCommand(message, aoutname, resultbuf);
             std::filesystem::remove(aoutname);
         }

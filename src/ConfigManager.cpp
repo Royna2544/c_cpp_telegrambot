@@ -1,11 +1,11 @@
 #include <ConfigManager.h>
 #include <absl/log/log.h>
 
+#include <StringToolsExt.hpp>
 #include <boost/program_options.hpp>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
-#include <iomanip>
 #include <iostream>
 #include <libos/libfs.hpp>
 #include <memory>
@@ -19,11 +19,6 @@
 namespace po = boost::program_options;
 using namespace ConfigManager;
 using namespace StringConcat;
-
-template <typename T>
-auto SingleQuoted(T t) {
-    return std::quoted(t, '\'');
-}
 
 template <typename T, Configs config>
 void AddOption(po::options_description &desc) {

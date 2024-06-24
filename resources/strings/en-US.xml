@@ -1,0 +1,47 @@
+<resources>
+    <string name="send_bash_command">Send a bash command to run</string>
+    <string name="compile_time">Compile time</string>
+    <string name="run_time">Run time</string>
+    <string name="reply_to_a_code">Reply to a message with code as text</string>
+    <string name="working">Working on it...</string>
+    <string name="owner">Owner</string>
+    <string name="command">Command</string>
+    <string name="truncated">Truncated due to too much output</string>
+    <string name="example">Example</string>
+    <string name="need_user">You must specify a user</string>
+    <string name="unknown_action">Unknown action</string>
+    <string name="cmd_not_loaded">Command not loaded</string>
+    <string name="cmd_already_loaded">Command already loaded</string>
+    <string name="cmd_not_found_to_load">Command not found to load</string>
+    <string name="cmd_not_found_to_unload">Command not found to unload</string>
+    <string name="not_supported_in_current_host">Not supported in current host</string>
+    <string name="reply_to_user_msg">Reply to a user's message</string>
+    <string name="reply_to_gif_or_sticker">Reply to a GIF or sticker</string>
+    <string name="media_already_in_db">Media already in database</string>
+    <string name="send_a_name_to_save">Send a name to save</string>
+
+    <string name="user_added">User added to the list</string>
+    <string name="user_removed">User removed from the list</string>
+    <string name="user_already_in_list">User is already in the list</string>
+    <string name="user_already_in_other_list">User is already in other list</string>
+    <string name="user_not_in_list">User is not in the list</string>
+
+    <!-- Fails and errors -->
+    <string name="failed_to_write_file">Failed to write file</string>
+    <string name="failed_to_run_command">Failed to run command</string>
+    <string name="failed_to_parse_input">Failed to parse input</string>
+    <string name="error_path_cannot_be_empty">PATH cannot be empty</string>
+    <string name="error_updating_bot_commands">Error updating bot commands list</string>
+    <string name="error_sending_gif">Error sending GIF</string>
+    <string name="backend_error">Backend error</string>
+    <string name="unknown_error">Unknown error</string>
+    <string name="invalid_args_passed">Invalid arguments passed</string>
+
+    <!-- Command desc -->
+    <string name="alive_cmd_desc">Test if a bot is alive</string>
+    <string name="start_cmd_desc">Alias for alive command</string>
+    <string name="bash_cmd_desc">Run bash commands</string>
+    <string name="ubash_cmd_desc">Run bash commands w/o timeout</string>
+    <string name="database_cmd_desc">Run database commands</string>
+    <string name="saveid_cmd_desc">Save a tg media as name</string>
+</resources>

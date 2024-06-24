@@ -14,10 +14,12 @@
 #include <LogSinks.hpp>
 #include <ManagedThreads.hpp>
 #include <OnAnyMessageRegister.hpp>
+#include <StringResManager.hpp>
 #include <TgBotWebpage.hpp>
 #include <chrono>
 
 #include "database/bot/TgBotDatabaseImpl.hpp"
+#include "libos/libfs.hpp"
 
 #ifdef RTCOMMAND_LOADER
 #include <RTCommandLoader.h>
@@ -126,6 +128,12 @@ int main(int argc, char* const* argv) {
     static Bot gBot(token.value());
 #endif
 
+    bool res = StringResManager::getInstance()->parseFromFile(
+        FS::getPathForType(FS::PathType::RESOURCES) / "strings/fr-FR.xml");
+    if (!res) {
+        LOG(ERROR) << "Failed to parse string res, abort";
+        return EXIT_FAILURE;
+    }
 #ifdef RTCOMMAND_LOADER
     createAndDoInitCall<RTCommandLoader>(gBot);
 #endif
@@ -183,7 +191,8 @@ int main(int argc, char* const* argv) {
             auto cl = thrmgr->createController<
                 ThreadManager::Usage::ERROR_RECOVERY_THREAD>();
             if (!cl) {
-                cl = thrmgr->getController<ThreadManager::Usage::ERROR_RECOVERY_THREAD>();
+                cl = thrmgr->getController<
+                    ThreadManager::Usage::ERROR_RECOVERY_THREAD>();
                 cl->reset();
             }
             if (cl) {

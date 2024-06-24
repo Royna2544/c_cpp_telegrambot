@@ -1,5 +1,5 @@
 #include "compiler/CompilerInTelegram.h"
-
+#include <StringResManager.hpp>
 #include "CommandModule.h"
 
 static void BashCommandFn(const Bot &bot, const Message::Ptr message) {
@@ -13,7 +13,7 @@ static void unsafeBashCommandFn(const Bot &bot, const Message::Ptr message) {
 
 void loadcmd_bash(CommandModule &module) {
     module.command = "bash";
-    module.description = "Run bash commands";
+    module.description = GETSTR(BASH_CMD_DESC);
     module.flags = CommandModule::Flags::Enforced;
     module.fn = BashCommandFn;
 }

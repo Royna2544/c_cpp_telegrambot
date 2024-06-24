@@ -1,5 +1,6 @@
 #include "CompilerInTelegram.h"
 #include <ExtArgs.h>
+#include <StringResManager.hpp>
 
 void CompilerInTgForBashImpl::onResultReady(const Message::Ptr& who,
                                             const std::string& text) {
@@ -18,7 +19,7 @@ void CompilerInTgForBash::run(const Message::Ptr &message) {
         parseExtArgs(message, cmd);
         runCommand(message, cmd, res, !allowhang);
     } else {
-        res << "Send a bash command to run";
+        res << GETSTR(SEND_BASH_COMMAND);
     }
     onResultReady(message, res.str());
 }

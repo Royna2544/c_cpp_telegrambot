@@ -3,6 +3,7 @@
 #include <absl/log/log.h>
 
 #include <DurationPoint.hpp>
+#include <StringResManager.hpp>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/algorithm/string/trim.hpp>
 #include <chrono>
@@ -48,7 +49,7 @@ void CompilerInTg::runCommand(const Message::Ptr &message, std::string cmd,
 
     LOG(INFO) << __func__ << ": +++";
     onFailed(message, ErrorType::START_COMPILER);
-    LOG(INFO) << "Command: '" << cmd << "'";
+    LOG(INFO) << GETSTR_IS(COMMAND) << SingleQuoted(cmd);
 
     auto dp = DurationPoint();
 
@@ -76,13 +77,16 @@ void CompilerInTg::runCommand(const Message::Ptr &message, std::string cmd,
         }
         res << std::endl;
         if (hasmore) {
-            res << "-> Truncated due to too much output" << std::endl;
+            res << "-> " << GETSTR(TRUNCATED) << std::endl;
         }
 
         if (popen_watchdog_activated(&p_wdt_data)) {
             res << WDT_BITE_STR;
         } else {
-            double millis = static_cast<double>(dp.get().count()) * 0.001;
+            double millis =
+                std::chrono::duration_cast<std::chrono::duration<double>>(
+                    dp.get())
+                    .count();
             res << "-> It took " << std::fixed << std::setprecision(3) << millis
                 << " seconds" << std::endl;
             if (use_wdt) {
@@ -103,7 +107,7 @@ static std::optional<std::string> findCommandExe(const std::string &command) {
         if (it.has_value()) {
             paths = StringTools::split(it.value(), FS::path_env_delimiter);
         } else {
-            throw std::runtime_error("PATH cannot be empty");
+            throw std::runtime_error(GETSTR(ERROR_PATH_CANNOT_BE_EMPTY));
         }
     });
     std::filesystem::path exePath(command);

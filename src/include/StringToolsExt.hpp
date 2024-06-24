@@ -1,7 +1,13 @@
 #pragma once
 
 #include <algorithm>
+#include <iomanip>
 #include <string>
+
+template <typename T>
+auto SingleQuoted(T t) {
+    return std::quoted(t, '\'');
+}
 
 inline bool isNewline(const char c) {
     return c == '\n' || c == '\r';
@@ -16,5 +22,7 @@ inline bool isEmptyChar(const char c) {
 }
 
 inline bool isEmptyOrBlank(const std::string& str) {
-    return str.empty() || std::ranges::all_of(str, isEmptyChar);
+    return str.empty() || std::ranges::all_of(str, [](const char c) {
+        return isEmptyChar(c) || isNewline(c);
+    });
 }

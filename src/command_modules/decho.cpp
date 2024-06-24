@@ -1,5 +1,6 @@
 #include <ExtArgs.h>
 #include <absl/log/log.h>
+#include <MessageWrapper.hpp>
 
 #include "BotReplyMessage.h"
 #include "CommandModule.h"
@@ -7,6 +8,7 @@
 static void DeleteEchoCommandFn(const Bot &bot, const Message::Ptr message) {
     const auto replyMsg = message->replyToMessage;
     const auto chatId = message->chat->id;
+    MessageWrapper wrapper(bot, message);
 
     try {
         bot.getApi().deleteMessage(chatId, message->messageId);
@@ -16,9 +18,8 @@ static void DeleteEchoCommandFn(const Bot &bot, const Message::Ptr message) {
                      << "', cannot use decho!";
         return;
     }
-    if (hasExtArgs(message)) {
-        std::string msg;
-        parseExtArgs(message, msg);
+    if (wrapper.hasExtraText()) {
+        std::string msg = wrapper.getExtraText();
         bot_sendReplyMessage(bot, message, msg,
                              (replyMsg) ? replyMsg->messageId : 0, true);
     } else if (replyMsg) {

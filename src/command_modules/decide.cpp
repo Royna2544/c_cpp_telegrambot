@@ -7,6 +7,7 @@
 
 #include "BotReplyMessage.h"
 #include "CommandModule.h"
+#include "StringToolsExt.hpp"
 
 using std::chrono_literals::operator""s;
 
@@ -22,7 +23,7 @@ static void DecideCommandFn(const Bot& bot, const Message::Ptr message) {
         int count = COUNT_MAX;
         int yesno = 0;
 
-        msgtxt << "Deciding '" + obj + "'...";
+        msgtxt << "Deciding " << SingleQuoted(obj) << "...";
         msg = bot_sendReplyMessage(bot, message, msgtxt.str());
         msgtxt << std::endl << std::endl;
         do {
@@ -39,7 +40,7 @@ static void DecideCommandFn(const Bot& bot, const Message::Ptr message) {
             bot_editMessage(bot, msg, msgtxt.str());
             if (count != 0) {
                 if (abs(yesno) > count) {
-                    msgtxt << "Short circuited to the answer\n";
+                    msgtxt << "Short circuited to the answer" << std::endl;
                     break;
                 }
             } else {
