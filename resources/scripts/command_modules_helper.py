@@ -42,6 +42,7 @@ def parse_command_list(file):
                                 case '!win32':
                                     if sys.platform in ['win32', 'cygwin', 'msys']:
                                         print('Ignore command: %s (Not Win32)' % command)
+                                        continue
                                 # TODO: Add more platforms
                         case 'infile':
                             if value not in filenames:
