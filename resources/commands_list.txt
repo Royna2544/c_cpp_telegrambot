@@ -1,5 +1,5 @@
 # Used by command_modules_helper.py
-# Syntax: commandname ([!win32]) ([infile <filename>])
+# Syntax: commandname ([target=(!)<platform>,infile=<filename>])
 
 alive
 flash
@@ -12,16 +12,16 @@ fileid
 clone
 spam
 cmd
-ibash [!win32]
-restart [!win32]
-bash [infile bash_impl]
-ubash [infile bash_impl]
-starttimer [infile timer_impl]
-stoptimer [infile timer_impl]
-database [infile database_impl]
-saveid [infile database_impl]
-start [infile alive]
-c [infile compilers_impl]
-cpp [infile compilers_impl]
-go [infile compilers_impl]
-python [infile compilers_impl]
+ibash [target=!win32]
+restart [target=!win32]
+bash [infile=bash_impl]
+ubash [infile=bash_impl]
+starttimer [infile=timer_impl]
+stoptimer [infile=timer_impl]
+database [infile=database_impl]
+saveid [infile=database_impl]
+start [infile=alive]
+c [infile=compilers_impl]
+cpp [infile=compilers_impl]
+go [infile=compilers_impl]
+python [infile=compilers_impl]

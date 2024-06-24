@@ -1,5 +1,5 @@
 #include <BotReplyMessage.h>
-#include <CommandModule.h>
+#include "CommandModule.h"
 #include <ExtArgs.h>
 #include <random/RandomNumberGenerator.h>
 

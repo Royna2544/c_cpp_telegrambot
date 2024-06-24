@@ -1,4 +1,5 @@
 import sys
+import re
 
 """
 Just a utility script to support dynamic list of commands compiled into.
@@ -10,46 +11,49 @@ if len(sys.argv) < 3:
 
 command = sys.argv[1]
 libs = sys.argv[2:]
+cmdlist_regex = re.compile(r'^([a-zA-Z]+)(?: \[([^\]]+)\])?$')
 
 def parse_command_list(file):
     filenames = []
     commands = []
     with open(file, 'r') as f:
         for line in f.readlines():
-            if line.startswith('#'):
+            if line.startswith('#') or line.strip() == '':
                 continue
-            if line.strip() == '':
+            regexOut = cmdlist_regex.match(line)
+            if not regexOut:
+                print('Invalid line "%s", doesn\'t match regex' % line, file=sys.stderr)
                 continue
-            if len(line.split('[')) > 2 or len(line.split(']')) > 2:
-                print('Invalid line "%s", Two options in one line:' % line, file=sys.stderr)
-                continue
-            command = line.split('[')[0].strip()
+            command = regexOut.group(1)
+            options = regexOut.group(2)
+            
             if command in commands:
                 print('Duplicate command: %s' % command, file=sys.stderr)
                 continue
+            
+            isInSperateFile = True
+            # Parse options
+            if options:
+                # Split the parameters by comma and process each key=value pair
+                for option, value in dict(param.split('=') for param in options.split(',')).items():
+                    match option:
+                        case 'target':
+                            match value:
+                                case '!win32':
+                                    if sys.platform in ['win32', 'cygwin', 'msys']:
+                                        print('Ignore command: %s (Not Win32)' % command)
+                                # TODO: Add more platforms
+                        case 'infile':
+                            if value not in filenames:
+                                filenames.append(value)
+                            isInSperateFile = False
+                            continue
+                        case _:
+                            print('Invalid option: %s' % option, file=sys.stderr)
+                            continue
+            if isInSperateFile:
+                filenames.append(command)
             commands.append(command)
-            if '[' and ']' in line:
-                opt = line.split('[')[1].split(']')[0].strip()
-                # Parse options
-                if opt.startswith('!'):
-                    # NOT platform declaration
-                    match line[1:]:
-                        case 'win32':
-                            if sys.platform in ['win32', 'cygwin', 'msys']:
-                                print('Ignore command: %s (Not Win32)' % command)
-                        # TODO: Add more platforms
-                elif opt.startswith('infile'):
-                    if opt.find(' ') == -1:
-                        print('Invalid option: %s' % opt, file=sys.stderr)
-                        continue
-                    str = opt.split(' ')[1]
-                    if str not in filenames:
-                        filenames.append(str)
-                    continue
-                else:
-                    print('Invalid option: %s' % opt, file=sys.stderr)
-                    continue
-            filenames.append(command)
     return filenames, commands
 
 if command == 'gen_decl':

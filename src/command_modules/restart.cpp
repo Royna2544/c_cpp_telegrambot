@@ -1,12 +1,12 @@
 #include <BotReplyMessage.h>
-#include <CommandModule.h>
 #include <ConfigManager.h>
 #include <absl/log/log.h>
 #include <libos/libsighandler.h>
 #include <unistd.h>
 
 #include <TryParseStr.hpp>
-#include <memory>
+
+#include "CommandModule.h"
 
 extern char **environ;
 static void restartCommandFn(const Bot &bot, const Message::Ptr message) {

@@ -374,7 +374,6 @@ add_subdirectory(src/third-party/tgbot-cpp EXCLUDE_FROM_ALL)
 
 ################### The Bot's main functionaility ###################
 add_library(${PROJECT_NAME} SHARED ${SRC_LIST})
-target_include_directories(${PROJECT_NAME} PRIVATE ${COMMANDS_CWD})
 target_include_directories(${PROJECT_NAME} PRIVATE src/third-party/rapidjson/include)
 ######################## Libraries to link ########################
 set(LD_LIST TgBot TgBotDB TgBotUtils TgBotWeb)

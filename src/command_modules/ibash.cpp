@@ -1,7 +1,6 @@
 #include <BotReplyMessage.h>
 #include <ExtArgs.h>
 #include <command_modules/CommandModule.h>
-#include <compiler/CompilerInTelegram.h>  // BASH_MAX_BUF, BASH_READ_BUF
 #include <internal/_FileDescriptor_posix.h>
 #include <popen_wdt/popen_wdt.h>
 #include <semaphore.h>
@@ -23,6 +22,7 @@
 
 #include "../../socket/selector/SelectorPosix.hpp"
 #include "BotClassBase.h"
+#include "compiler/CompilerInTelegram.h"  // BASH_MAX_BUF, BASH_READ_BUF
 
 using std::chrono_literals::operator""s;
 
@@ -108,7 +108,7 @@ struct InteractiveBashContext : BotClassBase {
        private:
         int readfd;
         Message::Ptr message;
-        std::mutex m_buffer; // Protect below 2
+        std::mutex m_buffer;  // Protect below 2
         size_t offset = 0;
         std::array<char, BASH_MAX_BUF> buffer{};
     };

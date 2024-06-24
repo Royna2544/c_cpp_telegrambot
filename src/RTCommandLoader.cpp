@@ -5,12 +5,11 @@
 
 #include <filesystem>
 #include <libos/libfs.hpp>
-#include <memory>
 #include <vector>
 
-#include "CommandModule.h"
 #include "InstanceClassBase.hpp"
 #include "command_modules/runtime/cmd_dynamic.h"
+#include "command_modules/CommandModule.h"
 
 DynamicLibraryHolder::DynamicLibraryHolder(
     DynamicLibraryHolder&& other) noexcept
