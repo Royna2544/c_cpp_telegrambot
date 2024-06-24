@@ -171,13 +171,11 @@ bool SQLiteDatabase::loadAndPrepareSTMT(sqlite3_stmt** stmt,
     if (!readSQLScriptFully(filename, sqlScriptData)) {
         return false;
     }
-    DLOG(INFO) << __func__ << ": Loading SQL script: " << filename;
     int rc = sqlite3_prepare_v2(db, sqlScriptData.c_str(), -1, stmt, nullptr);
     if (rc != SQLITE_OK) {
         onSQLFail(__func__, "PrepareV2");
         return false;
     }
-    DLOG(INFO) << __func__ << ": Prepare SQL script: OK";
     return true;
 }
 
