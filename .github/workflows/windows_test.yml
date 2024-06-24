@@ -15,10 +15,10 @@ jobs:
       fail-fast: false
       matrix:
         sys: [mingw64, ucrt64] # clang64
-        text: ['', 'unsupported']
+        text: ['', ' unsupported']
 
 
-    name: "🚧 ${{ matrix.sys }} (AF_UNIX ${{ matrix.text}})"
+    name: "🚧 ${{ matrix.sys }} (AF_UNIX${{matrix.text}})"
     defaults:
       run:
         shell: msys2 {0}
@@ -43,6 +43,7 @@ jobs:
           ninja:p
           boost:p
           pcre:p
+          libxml2:p
 
     - name: 'Setup submodule'
       run: |

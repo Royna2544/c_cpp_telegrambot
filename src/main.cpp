@@ -129,7 +129,8 @@ int main(int argc, char* const* argv) {
 #endif
 
     bool res = StringResManager::getInstance()->parseFromFile(
-        FS::getPathForType(FS::PathType::RESOURCES) / "strings/fr-FR.xml");
+        FS::getPathForType(FS::PathType::RESOURCES) / "strings/fr-FR.xml",
+        STRINGRES_MAX);
     if (!res) {
         LOG(ERROR) << "Failed to parse string res, abort";
         return EXIT_FAILURE;

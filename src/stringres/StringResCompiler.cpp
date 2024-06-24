@@ -22,7 +22,7 @@ int main(int argc, char** argv) {
     LOG(INFO) << "Input file: " << argv[1];
     LOG(INFO) << "Output file: " << argv[2];
 
-    if (!manager.parseFromFile(argv[1], true)) {
+    if (!manager.parseFromFile(argv[1])) {
         return EXIT_FAILURE;
     }
     std::ofstream ofs(argv[2]);

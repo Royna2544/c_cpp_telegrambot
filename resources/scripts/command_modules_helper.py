@@ -13,6 +13,9 @@ command = sys.argv[1]
 libs = sys.argv[2:]
 cmdlist_regex = re.compile(r'^([a-zA-Z]+)(?: \[([^\]]+)\])?$')
 
+def wprint(*args, **kwargs):
+    print(*args, **kwargs, file=sys.stderr)
+    
 def parse_command_list(file):
     filenames = []
     commands = []
@@ -22,13 +25,13 @@ def parse_command_list(file):
                 continue
             regexOut = cmdlist_regex.match(line)
             if not regexOut:
-                print('Invalid line "%s", doesn\'t match regex' % line, file=sys.stderr)
+                wprint('Invalid line "%s", doesn\'t match regex' % line)
                 continue
             command = regexOut.group(1)
             options = regexOut.group(2)
             
             if command in commands:
-                print('Duplicate command: %s' % command, file=sys.stderr)
+                wprint('Duplicate command: %s' % command)
                 continue
             
             isInSperateFile = True
@@ -41,7 +44,7 @@ def parse_command_list(file):
                             match value:
                                 case '!win32':
                                     if sys.platform in ['win32', 'cygwin', 'msys']:
-                                        print('Ignore command: %s (Not Win32)' % command)
+                                        wprint('Ignore command: %s (Not Win32)' % command)
                                         continue
                                 # TODO: Add more platforms
                         case 'infile':
@@ -50,7 +53,7 @@ def parse_command_list(file):
                             isInSperateFile = False
                             continue
                         case _:
-                            print('Invalid option: %s' % option, file=sys.stderr)
+                            wprint('Invalid option: %s' % option)
                             continue
             if isInSperateFile:
                 filenames.append(command)

@@ -309,6 +309,7 @@ if (USE_UNIX_SOCKETS)
     if (APPLE)
       extend_set(SOCKET_SRC_LIST
         ${SOCKET_SRC_INTERFACE}/impl/helper/SocketHelperDarwin.cpp
+        src/socket/selector/SelectorLinuxEPollStub.cpp
       )
     else()
       extend_set(SOCKET_SRC_LIST

@@ -10,7 +10,8 @@
 
 #include "InstanceClassBase.hpp"
 
-bool StringResManager::parseFromFile(const std::filesystem::path &path, bool for_parser) {
+bool StringResManager::parseFromFile(const std::filesystem::path &path,
+                                     int expected_size) {
     // Initialize the library and check potential ABI mismatches
     LIBXML_TEST_VERSION;
     CStringLifetime filename = path.string().c_str();
@@ -69,9 +70,9 @@ bool StringResManager::parseFromFile(const std::filesystem::path &path, bool for
     // Cleanup function for the XML library
     xmlCleanupParser();
 
-    if (!for_parser && m_strings.size() != STRINGRES_MAX) {
+    if (expected_size > 0 && m_strings.size() != expected_size) {
         LOG(ERROR) << "Number of strings(" << m_strings.size()
-                   << ") is not equal to STRINGRES_MAX(" << STRINGRES_MAX
+                   << ") is not equal to expected_size(" << expected_size
                    << ")";
         return false;
     }
