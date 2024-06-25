@@ -2,6 +2,7 @@
 
 #include <ManagedThreads.hpp>
 #include <memory>
+#include <string>
 #include <utility>
 
 #include "../backends/ServerBackend.hpp"
@@ -32,7 +33,10 @@ void SocketInterfaceTgBot::doInitCall(Bot& bot) {
                                   SocketInterfaceTgBot>(
                 std::ref(bot), wrapper.getExternalInterface()));
     }
-    for (auto &thr : threads) {
+    for (auto& thr : threads) {
+        thr->interface->setOptions(
+            SocketInterfaceBase::Options::DESTINATION_PORT,
+            std::to_string(SocketInterfaceBase::kTgBotHostPort));
         thr->run();
     }
 }

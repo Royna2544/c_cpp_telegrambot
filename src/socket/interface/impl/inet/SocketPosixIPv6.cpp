@@ -42,7 +42,7 @@ std::optional<socket_handle_t> SocketInterfaceUnixIPv6::createServerSocket() {
     helper.inet.getExternalIP();
 
     name.sin6_family = AF_INET6;
-    name.sin6_port = htons(kTgBotHostPort);
+    name.sin6_port = htons(helper.inet.getPortNum());
     name.sin6_addr = IN6ADDR_ANY_INIT;
     if (bind(sfd, _name, sizeof(name)) != 0) {
         PLOG(ERROR) << "Failed to bind to socket";

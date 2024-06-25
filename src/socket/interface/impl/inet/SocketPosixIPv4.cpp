@@ -40,7 +40,7 @@ std::optional<socket_handle_t> SocketInterfaceUnixIPv4::createServerSocket() {
     helper.inet.getExternalIP();
 
     name.sin_family = AF_INET;
-    name.sin_port = htons(kTgBotHostPort);
+    name.sin_port = htons(helper.inet.getPortNum());
     name.sin_addr.s_addr = INADDR_ANY;
     if (bind(sfd, _name, sizeof(name)) != 0) {
         PLOG(ERROR) << "Failed to bind to socket";

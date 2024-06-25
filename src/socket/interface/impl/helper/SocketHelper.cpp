@@ -5,17 +5,20 @@
 #include <filesystem>
 #include <libos/libfs.hpp>
 #include <string>
+
 #include "SocketDescriptor_defs.hpp"
 
 using Options = SocketInterfaceBase::Options;
 
 int SocketInterfaceBase::INetHelper::getPortNum() {
     int ret = 0;
+    std::string portStr = interface->getOptions(Options::DESTINATION_PORT);
 
-    if (try_parse(interface->getOptions(Options::DESTINATION_PORT), &ret)) {
+    if (try_parse(portStr, &ret)) {
         return ret;
     }
-    return SocketInterfaceBase::kTgBotHostPort;
+    LOG(ERROR) << "Could not parse port number for string: " << std::quoted(portStr);
+    return -1;
 }
 
 bool SocketInterfaceBase::LocalHelper::canSocketBeClosed() {
@@ -30,7 +33,7 @@ bool SocketInterfaceBase::LocalHelper::canSocketBeClosed() {
 
 void SocketInterfaceBase::LocalHelper::cleanupServerSocket() {
     const auto path = std::filesystem::path(
-                          interface->getOptions(Options::DESTINATION_ADDRESS));
+        interface->getOptions(Options::DESTINATION_ADDRESS));
     DLOG(INFO) << "Cleaning up server socket...";
     FS::deleteFile(path);
 }

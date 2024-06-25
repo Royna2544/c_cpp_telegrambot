@@ -11,7 +11,6 @@ std::optional<socket_handle_t>
 SocketInterfaceWindowsIPv4::createServerSocket() {
     auto context = SocketConnContext::create<sockaddr_in>();
 
-    setOptions(Options::DESTINATION_PORT, std::to_string(kTgBotHostPort));
     if (win_helper.createInetSocketAddr(context)) {
         auto *name = static_cast<sockaddr_in *>(context.addr.get());
         auto *_name = static_cast<sockaddr *>(context.addr.get());
