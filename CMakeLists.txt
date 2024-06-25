@@ -196,30 +196,19 @@ set(SRC_LIST
 ########## Generate commands modules list in compile time (python) ##########
 find_package (Python3 COMPONENTS Interpreter REQUIRED)
 set(GENERATE_CMDMODULE_STRINGS ${CMAKE_SOURCE_DIR}/resources/scripts/command_modules_helper.py)
-execute_process(
-  COMMAND ${Python3_EXECUTABLE} ${GENERATE_CMDMODULE_STRINGS} get_cmd_filenames ${CMAKE_SOURCE_DIR}/resources/commands_list.txt 
-  OUTPUT_VARIABLE CMD_MODULES_SOURCES_LIST
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-  COMMAND_ERROR_IS_FATAL ANY
-)
-execute_process(
-  COMMAND ${Python3_EXECUTABLE} ${GENERATE_CMDMODULE_STRINGS} get_cmd_names ${CMAKE_SOURCE_DIR}/resources/commands_list.txt 
-  OUTPUT_VARIABLE CMD_MODULES_LIST
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-  COMMAND_ERROR_IS_FATAL ANY
-)
-execute_process(
-  COMMAND ${Python3_EXECUTABLE} ${GENERATE_CMDMODULE_STRINGS} gen_ptr ${CMD_MODULES_LIST} 
-  OUTPUT_VARIABLE COMMANDS_MODULES_PTR
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-  COMMAND_ERROR_IS_FATAL ANY
-)
-execute_process(
-  COMMAND ${Python3_EXECUTABLE} ${GENERATE_CMDMODULE_STRINGS} gen_decl ${CMD_MODULES_LIST} 
-  OUTPUT_VARIABLE COMMANDS_MODULES_DECL
-  OUTPUT_STRIP_TRAILING_WHITESPACE
-  COMMAND_ERROR_IS_FATAL ANY
-)
+
+macro(get_str_and_assign _output_var)
+    execute_process(
+        COMMAND ${Python3_EXECUTABLE} ${GENERATE_CMDMODULE_STRINGS} ${ARGN}
+        OUTPUT_VARIABLE ${_output_var}
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        COMMAND_ERROR_IS_FATAL ANY
+    )
+endmacro()
+get_str_and_assign(CMD_MODULES_SOURCES_LIST get_cmd_filenames ${CMAKE_SOURCE_DIR}/resources/commands_list.txt)
+get_str_and_assign(CMD_MODULES_LIST get_cmd_names ${CMAKE_SOURCE_DIR}/resources/commands_list.txt)
+get_str_and_assign(COMMANDS_MODULES_PTR gen_ptr ${CMD_MODULES_LIST})
+get_str_and_assign(COMMANDS_MODULES_DECL gen_decl ${CMD_MODULES_LIST})
 ########## Generate commands modules list in compile time (cpp) ##########
 foreach(lib ${CMD_MODULES_SOURCES_LIST})
   extend_set(SRC_LIST src/command_modules/${lib}.cpp)
