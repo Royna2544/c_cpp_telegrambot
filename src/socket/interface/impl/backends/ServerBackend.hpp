@@ -3,8 +3,7 @@
 struct SocketServerWrapper {
     explicit SocketServerWrapper();
 
-    // TODO: Use this
-    enum class BackendType { Ipv4, Ipv6, Local };
+    enum class BackendType { Ipv4, Ipv6, Local, Unknown };
 
     [[nodiscard]] std::shared_ptr<SocketInterfaceBase> getInternalInterface()
         const {
@@ -14,10 +13,14 @@ struct SocketServerWrapper {
         const {
         return externalBackend;
     }
-    static std::shared_ptr<SocketInterfaceBase> getInterfaceForName(
-        const std::string &name);
 
    private:
     std::shared_ptr<SocketInterfaceBase> internalBackend;
     std::shared_ptr<SocketInterfaceBase> externalBackend;
+
+    static BackendType fromString(const std::string& str);
+    static std::shared_ptr<SocketInterfaceBase> getInterfaceForType(
+        BackendType type);
+    static std::shared_ptr<SocketInterfaceBase> getInterfaceForString(
+        const std::string& str);
 };

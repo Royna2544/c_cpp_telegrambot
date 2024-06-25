@@ -15,7 +15,7 @@ SocketServerWrapper::SocketServerWrapper() {
     auto indexOfSep = string.find(',');
     if (indexOfSep == std::string::npos) {
         LOG(INFO) << "Bootstrap interface: " << std::quoted(string);
-        internalBackend = getInterfaceForName(string);
+        internalBackend = getInterfaceForString(string);
     } else {
         auto first = string.substr(0, indexOfSep);
         auto second = string.substr(indexOfSep + 1);
@@ -26,7 +26,27 @@ SocketServerWrapper::SocketServerWrapper() {
             return;
         }
         LOG(INFO) << "Bootstrap i:" << first << " e:" << second << " interface";
-        internalBackend = getInterfaceForName(first);
-        externalBackend = getInterfaceForName(second);
+        internalBackend = getInterfaceForString(first);
+        externalBackend = getInterfaceForString(second);
     }
+}
+
+SocketServerWrapper::BackendType SocketServerWrapper::fromString(
+    const std::string& str) {
+    if (str == "ipv4") {
+        return BackendType::Ipv4;
+    }
+    if (str == "ipv6") {
+        return BackendType::Ipv6;
+    }
+    if (str == "local") {
+        return BackendType::Local;
+    }
+    LOG(ERROR) << "Unknown backend type: " << str;
+    return BackendType::Unknown;
+}
+
+std::shared_ptr<SocketInterfaceBase> SocketServerWrapper::getInterfaceForString(
+    const std::string& str) {
+    return getInterfaceForType(fromString(str));
 }
