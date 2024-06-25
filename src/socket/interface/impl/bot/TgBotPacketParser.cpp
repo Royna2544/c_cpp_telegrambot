@@ -64,7 +64,7 @@ HandleState TgBotSocketParser::handle_Packet(
         return HandleState::Ignore;
     }
 
-    pkt->data->size = TgBotSocket::Packet::hdr_sz + pkt->header.data_size;
+    pkt->data->size = pkt->header.data_size;
     pkt->data->alloc();
     socketData->assignTo(pkt->data.get(), pkt->header.data_size);
 
