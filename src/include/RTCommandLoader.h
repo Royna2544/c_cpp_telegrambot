@@ -7,7 +7,7 @@
 
 #include "CStringLifetime.h"
 #include "InstanceClassBase.hpp"
-#include "initcalls/BotInitcall.hpp"
+#include "initcalls/Initcall.hpp"
 
 using TgBot::Bot;
 using TgBot::Message;
@@ -21,8 +21,7 @@ struct DynamicLibraryHolder {
     void* handle_;
 };
 
-struct RTCommandLoader : public InstanceClassBase<RTCommandLoader>,
-                         BotInitCall {
+struct RTCommandLoader : public InstanceClassBase<RTCommandLoader>, InitCall {
     explicit RTCommandLoader(Bot& bot) : bot(bot) {}
     RTCommandLoader() = delete;
 
@@ -48,7 +47,7 @@ struct RTCommandLoader : public InstanceClassBase<RTCommandLoader>,
      */
     static std::filesystem::path getModulesLoadConfPath();
 
-    void doInitCall(Bot& bot) override {
+    void doInitCall() override {
         loadCommandsFromFile(getModulesLoadConfPath());
     }
     const CStringLifetime getInitCallName() const override {
