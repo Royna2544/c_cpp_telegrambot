@@ -24,11 +24,17 @@ bool SocketInterfaceWindowsLocal::createLocalSocket(SocketConnContext *ctx) {
     return true;
 }
 
-std::optional<socket_handle_t> SocketInterfaceWindowsLocal::createServerSocket() {
+std::optional<socket_handle_t>
+SocketInterfaceWindowsLocal::createServerSocket() {
     SocketConnContext ret = SocketConnContext::create<sockaddr_un>();
     const auto *_name = reinterpret_cast<struct sockaddr *>(ret.addr.get());
 
-    setOptions(Options::DESTINATION_ADDRESS, LocalHelper::getSocketPath().string());
+    try {
+        getOptions(Options::DESTINATION_ADDRESS);
+    } catch (const std::bad_optional_access &e) {
+        setOptions(Options::DESTINATION_ADDRESS,
+                   LocalHelper::getSocketPath().string());
+    }
     LOG(INFO) << "Creating socket at " << LocalHelper::getSocketPath().string();
     if (!createLocalSocket(&ret)) {
         return std::nullopt;
@@ -51,11 +57,17 @@ std::optional<socket_handle_t> SocketInterfaceWindowsLocal::createServerSocket()
     return ret.cfd;
 }
 
-std::optional<SocketConnContext> SocketInterfaceWindowsLocal::createClientSocket() {
+std::optional<SocketConnContext>
+SocketInterfaceWindowsLocal::createClientSocket() {
     SocketConnContext ret = SocketConnContext::create<sockaddr_un>();
     const auto *_name = reinterpret_cast<struct sockaddr *>(ret.addr.get());
-
-    setOptions(Options::DESTINATION_ADDRESS, LocalHelper::getSocketPath().string());
+    
+    try {
+        getOptions(Options::DESTINATION_ADDRESS);
+    } catch (const std::bad_optional_access &e) {
+        setOptions(Options::DESTINATION_ADDRESS,
+                   LocalHelper::getSocketPath().string());
+    }
     if (!createLocalSocket(&ret)) {
         return std::nullopt;
     }

@@ -4,6 +4,7 @@
 
 #include <cerrno>
 #include <impl/SocketPosix.hpp>
+#include <optional>
 
 #include "SocketBase.hpp"
 
@@ -25,8 +26,12 @@ std::optional<socket_handle_t> SocketInterfaceUnixLocal::createServerSocket() {
     SocketConnContext ret = SocketConnContext::create<sockaddr_un>();
     const auto *_name = reinterpret_cast<struct sockaddr *>(ret.addr.get());
 
-    setOptions(Options::DESTINATION_ADDRESS,
-               LocalHelper::getSocketPath().string());
+    try {
+        getOptions(Options::DESTINATION_ADDRESS);
+    } catch (const std::bad_optional_access &e) {
+        setOptions(Options::DESTINATION_ADDRESS,
+                   LocalHelper::getSocketPath().string());
+    }
     LOG(INFO) << "Creating socket at " << LocalHelper::getSocketPath().string();
     if (!createLocalSocket(&ret)) {
         return std::nullopt;
@@ -54,14 +59,19 @@ SocketInterfaceUnixLocal::createClientSocket() {
     SocketConnContext ret = SocketConnContext::create<sockaddr_un>();
     const auto *_name = reinterpret_cast<struct sockaddr *>(ret.addr.get());
 
-    setOptions(Options::DESTINATION_ADDRESS,
-               LocalHelper::getSocketPath().string());
+    try {
+        getOptions(Options::DESTINATION_ADDRESS);
+    } catch (const std::bad_optional_access &e) {
+        setOptions(Options::DESTINATION_ADDRESS,
+                   LocalHelper::getSocketPath().string());
+    }
     if (!createLocalSocket(&ret)) {
         return std::nullopt;
     }
     if (connect(ret.cfd, _name, ret.addr->size) != 0) {
         PLOG(ERROR) << "Failed to connect to socket";
         closeSocketHandle(ret.cfd);
+        return std::nullopt;
     }
     return ret;
 }
