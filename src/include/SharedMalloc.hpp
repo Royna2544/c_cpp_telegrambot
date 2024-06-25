@@ -82,7 +82,9 @@ struct SharedMalloc {
 
     template <typename T>
     void assignTo(T *ref, size_t size) const {
-        CHECK(size >= parent->size) << "Must have same or bigger size to assign to";
+        CHECK(size >= parent->size)
+            << ": Must have same or bigger size to assign to (" << size << " < "
+            << parent->size << ")";
         memcpy(ref, get(), size);
     }
 
