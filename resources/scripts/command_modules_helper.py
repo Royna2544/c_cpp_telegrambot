@@ -35,6 +35,7 @@ def parse_command_list(file):
                 continue
             
             isInSperateFile = True
+            ignoreCommand = False
             # Parse options
             if options:
                 # Split the parameters by comma and process each key=value pair
@@ -45,6 +46,7 @@ def parse_command_list(file):
                                 case '!win32':
                                     if sys.platform in ['win32', 'cygwin', 'msys']:
                                         wprint('Ignore command: %s (Not Win32)' % command)
+                                        ignoreCommand = True
                                         continue
                                 # TODO: Add more platforms
                         case 'infile':
@@ -55,6 +57,8 @@ def parse_command_list(file):
                         case _:
                             wprint('Invalid option: %s' % option)
                             continue
+            if ignoreCommand:
+                continue
             if isInSperateFile:
                 filenames.append(command)
             commands.append(command)
