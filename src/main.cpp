@@ -119,8 +119,13 @@ int main(int argc, char* const* argv) {
     static Bot gBot(token.value());
 #endif
 
+    auto locale = getVariable(ConfigManager::Configs::LOCALE);
+    if (!locale) {
+        LOG(WARNING) << "Using default locale: en-US";
+        locale = "en-US";
+    }
     bool res = StringResManager::getInstance()->parseFromFile(
-        FS::getPathForType(FS::PathType::RESOURCES) / "strings/fr-FR.xml",
+        FS::getPathForType(FS::PathType::RESOURCES) / "strings" / locale->append(".xml"),
         STRINGRES_MAX);
     if (!res) {
         LOG(ERROR) << "Failed to parse string res, abort";
