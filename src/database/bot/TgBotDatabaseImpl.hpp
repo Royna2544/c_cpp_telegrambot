@@ -5,8 +5,9 @@
 #include <variant>
 
 #include "InstanceClassBase.hpp"
+#include "initcalls/Initcall.hpp"
 
-struct TgBotDatabaseImpl : InstanceClassBase<TgBotDatabaseImpl> {
+struct TgBotDatabaseImpl : InstanceClassBase<TgBotDatabaseImpl>, InitCall {
     std::variant<ProtoDatabase, SQLiteDatabase> databaseBackend;
     bool loadDBFromConfig();
 
@@ -25,6 +26,13 @@ struct TgBotDatabaseImpl : InstanceClassBase<TgBotDatabaseImpl> {
         std::string str) const;
     [[nodiscard]] bool addMediaInfo(const DatabaseBase::MediaInfo& info) const;
     std::ostream &dump(std::ostream &ofs) const;
+
+    const CStringLifetime getInitCallName() const override {
+        return "Load database";
+    }
+    void doInitCall() override {
+        loadDBFromConfig();
+    }
 
    private:
     template <typename T>

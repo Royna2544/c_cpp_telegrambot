@@ -17,6 +17,7 @@
 #include <StringResManager.hpp>
 #include <TgBotWebpage.hpp>
 #include <chrono>
+#include <utility>
 
 #include "database/bot/TgBotDatabaseImpl.hpp"
 #include "libos/libfs.hpp"
@@ -29,7 +30,6 @@
 #include <ChatObserver.h>
 
 #include <socket/interface/impl/bot/TgBotSocketInterface.hpp>
-
 #endif
 
 #include <tgbot/tgbot.h>
@@ -42,57 +42,48 @@ concept HasInstanceGetter = requires { T::getInstance(); };
 template <typename T>
 concept HasBotInitCaller = requires(T t, Bot& bot) { t.initWrapper(bot); };
 template <typename T>
-concept HasBotCtor = requires(Bot& bot) { T(bot); };
-template <typename T>
-concept DontNeedArguments = std::is_default_constructible_v<T>;
+concept HasInitCaller = requires(T t) { t.initWrapper(); };
 
-template <typename T>
-    requires HasInstanceGetter<T> && HasBotInitCaller<T> && HasBotCtor<T>
-void createAndDoInitCall(Bot& bot) {
-    T::initInstance(bot);
+template <typename T, typename... Args>
+    requires HasInstanceGetter<T> && HasBotInitCaller<T>
+void createAndDoInitCall(Bot& bot, Args&&... args) {
+    if constexpr (sizeof...(args) != 0) {
+        T::initInstance(std::forward<Args>(args)...);
+    }
     T::getInstance()->initWrapper(bot);
 }
 
-template <typename T>
-    requires HasInstanceGetter<T> && HasBotInitCaller<T> && (!HasBotCtor<T>)
-void createAndDoInitCall(Bot& bot) {
-    T::getInstance()->initWrapper(bot);
-}
-
-template <typename T>
-    requires HasInstanceGetter<T> && (!HasBotInitCaller<T>) && HasBotCtor<T>
-void createAndDoInitCall(Bot& bot) {
-    T::initInstance(bot);
+template <typename T, typename... Args>
+    requires HasInstanceGetter<T> && HasInitCaller<T>
+void createAndDoInitCall(Args&&... args) {
+    if constexpr (sizeof...(args) != 0) {
+        T::initInstance(std::forward<Args>(args)...);
+    }
     T::getInstance()->initWrapper();
 }
 
-template <typename T>
-    requires(!HasInstanceGetter<T>) && HasBotInitCaller<T> && HasBotCtor<T>
-void createAndDoInitCall(Bot& bot) {
-    T t(bot);
-    t.initWrapper(bot);
+template <typename T, typename... Args>
+    requires(!HasInstanceGetter<T>) && HasBotInitCaller<T>
+void createAndDoInitCall(Bot& bot, Args&&... args) {
+    if constexpr (sizeof...(args) != 0) {
+        T t(std::forward<Args>(args)...);
+        t.initWrapper(bot);
+    } else {
+        T t;
+        t.initWrapper(bot);
+    }
 }
 
-template <typename T>
-    requires(!HasInstanceGetter<T>) && HasBotInitCaller<T> &&
-            DontNeedArguments<T>
-void createAndDoInitCall(Bot& bot) {
-    T t;
-    t.initWrapper(bot);
-}
-
-template <typename T>
-    requires(!HasInstanceGetter<T>) && (!HasBotInitCaller<T>) && HasBotCtor<T>
-void createAndDoInitCall(Bot& bot) {
-    T t(bot);
-    t.initWrapper();
-}
-
-template <typename T>
-    requires HasInstanceGetter<T> &&
-             (!HasBotInitCaller<T>) && DontNeedArguments<T>
-void createAndDoInitCall() {
-    T::getInstance()->initWrapper();
+template <typename T, typename... Args>
+    requires(!HasInstanceGetter<T>) && HasInitCaller<T>
+void createAndDoInitCall(Args&&... args) {
+    if constexpr (sizeof...(args) != 0) {
+        T t(std::forward<Args...>(args...));
+        t.initWrapper();
+    } else {
+        T t;
+        t.initWrapper();
+    }
 }
 
 int main(int argc, char* const* argv) {
@@ -139,19 +130,15 @@ int main(int argc, char* const* argv) {
     createAndDoInitCall<RTCommandLoader>(gBot);
 #endif
 #ifdef SOCKET_CONNECTION
-    SocketInterfaceTgBot(gBot, nullptr).initWrapper(gBot);
+    createAndDoInitCall<SocketInterfaceTgBot>(gBot, gBot, nullptr);
     createAndDoInitCall<ChatObserver>();
 #endif
     createAndDoInitCall<RegexHandler>(gBot);
     createAndDoInitCall<SpamBlockManager>(gBot);
     createAndDoInitCall<CommandModuleManager>(gBot);
     createAndDoInitCall<ResourceManager>();
-
-    TgBotWebServer server(8080);
-    server.initWrapper();
-
-    TgBotDatabaseImpl::getInstance()->loadDBFromConfig();
-
+    createAndDoInitCall<TgBotWebServer>(8080);
+    createAndDoInitCall<TgBotDatabaseImpl>();
     // Must be last
     createAndDoInitCall<OnAnyMessageRegisterer>(gBot);
 
