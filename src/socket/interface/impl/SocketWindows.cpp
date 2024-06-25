@@ -67,7 +67,7 @@ void SocketInterfaceWindows::startListening(
     cleanupServerSocket();
 }
 
-void SocketInterfaceWindows::writeToSocket(SocketConnContext context,
+bool SocketInterfaceWindows::writeToSocket(SocketConnContext context,
                                            SharedMalloc data) {
     auto *socketData = static_cast<char *>(data.get());
     auto *addr = static_cast<sockaddr *>(context.addr.get());
@@ -75,14 +75,17 @@ void SocketInterfaceWindows::writeToSocket(SocketConnContext context,
         const auto count = send(context.cfd, socketData, data->size, 0);
         if (count < 0) {
             LOG(ERROR) << "Failed to send socket: " << WSAEStr();
+            return false;
         }
     } else {
         const auto count = sendto(context.cfd, socketData, data->size, 0, addr,
                                   context.addr->size);
         if (count < 0) {
             LOG(ERROR) << "Failed to sentto socket: " << WSAEStr();
+            return false;
         }
     }
+    return true;
 }
 
 void SocketInterfaceWindows::forceStopListening(void) { kRun = false; }

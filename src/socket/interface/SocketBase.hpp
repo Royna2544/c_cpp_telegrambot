@@ -50,7 +50,7 @@ struct SocketInterfaceBase {
      * descriptor, address, and length of the address of the destination.
      * @param data The data to be written to the socket.
      */
-    virtual void writeToSocket(SocketConnContext context,
+    virtual bool writeToSocket(SocketConnContext context,
                                SharedMalloc data) = 0;
 
     /**

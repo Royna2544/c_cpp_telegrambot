@@ -84,7 +84,7 @@ void SocketInterfaceUnix::forceStopListening() {
     }
 }
 
-void SocketInterfaceUnix::writeToSocket(SocketConnContext context,
+bool SocketInterfaceUnix::writeToSocket(SocketConnContext context,
                                         SharedMalloc data) {
     auto* socketData = static_cast<char*>(data.get());
     auto* addr = static_cast<sockaddr*>(context.addr.get());
@@ -93,14 +93,17 @@ void SocketInterfaceUnix::writeToSocket(SocketConnContext context,
             send(context.cfd, socketData, data->size, MSG_NOSIGNAL);
         if (count < 0) {
             PLOG(ERROR) << "Failed to send to socket";
+            return false;
         }
     } else {
         const auto count = sendto(context.cfd, socketData, data->size,
                                   MSG_NOSIGNAL, addr, context.addr->size);
         if (count < 0) {
             PLOG(ERROR) << "Failed to sentto socket";
+            return false;
         }
     }
+    return true;
 }
 
 std::optional<SharedMalloc> SocketInterfaceUnix::readFromSocket(

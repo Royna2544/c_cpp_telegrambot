@@ -14,7 +14,7 @@ struct SocketInterfaceWindows : SocketInterfaceBase {
     };
     static std::string WSALastErrorStr();
 
-    void writeToSocket(SocketConnContext context, SharedMalloc data) override;
+    bool writeToSocket(SocketConnContext context, SharedMalloc data) override;
     void forceStopListening(void) override;
     void startListening(socket_handle_t handle,
                         const listener_callback_t onNewData) override;
