@@ -14,6 +14,7 @@ SocketServerWrapper::SocketServerWrapper() {
     auto& string = *value;
     auto indexOfSep = string.find(',');
     if (indexOfSep == std::string::npos) {
+        LOG(INFO) << "Bootstrap interface: " << std::quoted(string);
         internalBackend = getInterfaceForName(string);
     } else {
         auto first = string.substr(0, indexOfSep);
