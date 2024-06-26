@@ -106,8 +106,10 @@ int main(int argc, char* const* argv) {
     std::optional<std::string> token;
     std::optional<LogFileSink> log_sink;
     const auto startTp = std::chrono::system_clock::now();
+    DurationPoint startupDp;
     using namespace ConfigManager;
 
+    startupDp.init();
     TgBot_AbslLogInit();
     LOG(INFO) << "Registered LogSink_stdout";
     copyCommandLine(CommandLineOp::INSERT, &argc, &argv);
@@ -149,6 +151,10 @@ int main(int argc, char* const* argv) {
         return EXIT_FAILURE;
     }
 
+    // Install signal handlers
+    installSignalHandler();
+
+    // Initialize subsystems
     createAndDoInitCall<TgBotWebServer, ThreadManager::Usage::WEBSERVER_THREAD>(
         8080);
 #ifdef RTCOMMAND_LOADER
@@ -168,9 +174,24 @@ int main(int argc, char* const* argv) {
     // Must be last
     createAndDoInitCall<OnAnyMessageRegisterer>(gBot);
 
-    installSignalHandler();
+    // Bot starts
+    LOG(INFO) << "Subsystems initialized, bot started: " << argv[0];
+    LOG(INFO) << "Started in " << startupDp.get().count() << " milliseconds";
 
-    DLOG(INFO) << "Token: " << token.value();
+    gBot.getApi().setMyDescription("Royna's telegram bot, written in C++. Go on you can talk to him");
+    gBot.getApi().setMyShortDescription(
+        "One of @roynatech's C++ project bots. I'm currently hosted on "
+#if BOOST_OS_WINDOWS
+        "Windows"
+#elif BOOST_OS_LINUX
+        "Linux"
+#elif BOOST_OS_MACOS
+        "macOS"
+#else
+        "unknown platform"
+#endif
+    );
+    // Main loop
     DurationPoint dp;
     do {
         try {
