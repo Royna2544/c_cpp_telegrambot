@@ -202,8 +202,6 @@ struct SocketInterfaceBase {
     struct Option {
         // std::optional to hold the data
         std::optional<T> data;
-        // Flag to indicate whether the data should persist after retrieval
-        bool persistent = false;
 
         // Default constructor
         Option() = default;
@@ -212,16 +210,12 @@ struct SocketInterfaceBase {
         void set(T dataIn) { data = dataIn; }
 
         // Function to get the data and reset it if not persistent
-        T get() {
+        [[nodiscard]] T get() const {
             if (!operator bool()) {
                 LOG(WARNING) << "Trying to get data which is not set!";
             }
             // Throws std::bad_optional_access if not set
-            auto result = data.value();
-            if (!persistent) {
-                data.reset();
-            }
-            return result;
+            return data.value();
         }
 
         Option& operator=(const T& other) {
@@ -230,7 +224,7 @@ struct SocketInterfaceBase {
         }
 
         // Explicit conversion operator to check if data is present
-        explicit operator bool() { return data.has_value(); }
+        explicit operator bool() const { return data.has_value(); }
     };
     
     // A nested struct to hold optional parameters for the socket operations
