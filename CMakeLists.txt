@@ -83,6 +83,10 @@ string(TIMESTAMP TODAY "%Y-%m-%d")
 configure_file(resources/about.html.in ${CMAKE_SOURCE_DIR}/resources/about.html)
 #####################################################################
 
+#################### TgBot cpp (the core) Library ###################
+add_subdirectory(src/third-party/tgbot-cpp EXCLUDE_FROM_ALL)
+#####################################################################
+
 ########################## ABSEIL log deps ##########################
 add_subdirectory(src/third-party/googletest EXCLUDE_FROM_ALL)
 add_subdirectory(src/third-party/abseil-cpp EXCLUDE_FROM_ALL)
@@ -381,10 +385,6 @@ add_library(
 
 target_link_libraries(TgBotUtils ${Boost_LIBRARIES} ${LIBGIT2_LIBS})
 target_link_lib_if_windows(TgBotUtils shlwapi)
-#####################################################################
-
-#################### TgBot cpp (the core) Library ###################
-add_subdirectory(src/third-party/tgbot-cpp EXCLUDE_FROM_ALL)
 #####################################################################
 
 ################### The Bot's main functionaility ###################

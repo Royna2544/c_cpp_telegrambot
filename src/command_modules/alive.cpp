@@ -5,6 +5,7 @@
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/config.hpp>
 #include <filesystem>
+#include <memory>
 #include <mutex>
 #include <StringResManager.hpp>
 
@@ -13,6 +14,7 @@
 #include "CompileTimeStringConcat.hpp"
 #include "database/bot/TgBotDatabaseImpl.hpp"
 #include "internal/_tgbot.h"
+#include "tgbot/types/ReplyParameters.h"
 
 template <unsigned Len>
 consteval auto cat(const char (&strings)[Len]) {
@@ -50,9 +52,12 @@ static void AliveCommandFn(const Bot& bot, const Message::Ptr message) {
     const auto info = TgBotDatabaseImpl::getInstance()->queryMediaInfo("alive");
     bool sentAnimation = false;
     if (info) {
+        auto params = std::make_shared<TgBot::ReplyParameters>();
+        params->chatId = message->chat->id;
+        params->messageId = message->messageId;
         try {
             bot.getApi().sendAnimation(message->chat->id, info->mediaId, 0, 0,
-                                       0, "", version, message->messageId,
+                                       0, "", version, params,
                                        nullptr, "html");
             sentAnimation = true;
         } catch (const TgBot::TgException& e) {

@@ -1,16 +1,34 @@
 #include <BotReplyMessage.h>
 
-static Message::Ptr _bot_sendReplyMessage(const Bot &bot,
-                                          const Message::Ptr &message,
-                                          const std::string &text,
-                                          const MessageId replyToMsg = 0,
-                                          const bool noError = false,
-                                          const std::string parsemode = "") {
-    return bot.getApi().sendMessage(
-        message->chat->id, text, true,
-        (replyToMsg == 0) ? message->messageId : replyToMsg, nullptr, parsemode,
-        false, std::vector<MessageEntity::Ptr>(), noError);
+#include <memory>
+
+#include "tgbot/types/Message.h"
+#include "tgbot/types/ReplyParameters.h"
+
+namespace {
+Message::Ptr _bot_sendReplyMessage(const Bot &bot, const Message::Ptr &message,
+                                   const std::string &text,
+                                   const MessageId replyToMsg = 0,
+                                   const bool noError = false,
+                                   const std::string &parsemode = "") {
+    auto params = std::make_shared<TgBot::ReplyParameters>();
+    params->allowSendingWithoutReply = noError;
+    params->chatId = message->chat->id;
+    params->messageId = replyToMsg == 0 ? message->messageId : replyToMsg;
+
+    return bot.getApi().sendMessage(message->chat->id, text, nullptr, params,
+                                    nullptr, parsemode);
 }
+
+TgBot::ReplyParameters::Ptr createFromReplyMsg(
+    const TgBot::Message::Ptr &message) {
+    auto params = std::make_shared<TgBot::ReplyParameters>();
+    params->chatId = message->chat->id;
+    params->messageId = message->messageId;
+    return params;
+}
+
+}  // namespace
 
 Message::Ptr bot_sendReplyMessage(const Bot &bot, const Message::Ptr &message,
                                   const std::string &text,
@@ -57,7 +75,7 @@ Message::Ptr bot_sendSticker(const Bot &bot, const ChatId &chatid,
                              Sticker::Ptr sticker,
                              const Message::Ptr &replyTo) {
     return bot.getApi().sendSticker(chatid, sticker->fileId,
-                                    replyTo->messageId);
+                                    createFromReplyMsg(replyTo));
 }
 
 Message::Ptr bot_sendSticker(const Bot &bot, const ChatId &chat,
@@ -68,7 +86,8 @@ Message::Ptr bot_sendSticker(const Bot &bot, const ChatId &chat,
 Message::Ptr bot_sendAnimation(const Bot &bot, const ChatId &chat,
                                Animation::Ptr gif,
                                const Message::Ptr &replyTo) {
-    return bot.getApi().sendSticker(chat, gif->fileId, replyTo->messageId);
+    return bot.getApi().sendSticker(chat, gif->fileId,
+                                    createFromReplyMsg(replyTo));
 }
 
 Message::Ptr bot_sendAnimation(const Bot &bot, const ChatId &chat,
