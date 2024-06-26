@@ -40,6 +40,7 @@ set(MEDIA_CLI_NAME ${PROJECT_NAME}_MediaCli)
 set(DBDUMPER_NAME ${PROJECT_NAME}_dumpDB)
 set(PROJECT_MAINEXE_NAME ${PROJECT_NAME}_main)
 set(PROJECT_TEST_NAME ${PROJECT_NAME}_test)
+set(LOGCAT_NAME ${PROJECT_NAME}_logcat)
 #####################################################################
 
 ############################## OPTIONS ##############################
@@ -110,8 +111,8 @@ if (NOT MSVC)
   add_compile_options(
     -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/=)  
   if (CMAKE_BUILD_TYPE STREQUAL "Debug" AND ENABLE_SANITIZERS)
-    add_compile_options(-fsanitize=address,leak)
-    add_link_options(-fsanitize=address,leak)
+    add_compile_options(-fsanitize=address,leak -g -O0 -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=address,leak -g -O0 -fno-omit-frame-pointer)
   endif()
 endif()
 if (WIN32)
@@ -248,13 +249,14 @@ target_link_libraries(TgBotStringRes ${LIBXML2_LIBRARIES})
 target_include_directories(TgBotStringRes PUBLIC src/stringres)
 add_executable(StringResCompiler src/stringres/StringResCompiler.cpp)
 target_link_libraries(StringResCompiler TgBotStringRes TgBotLogInit)
-set(STRINGRES_XML ${CMAKE_SOURCE_DIR}/resources/strings/en-US.xml )
+set(STRINGRES_XML ${CMAKE_SOURCE_DIR}/resources/strings/en-US.xml)
+set(STRINGRES_GENHDR ${CMAKE_SOURCE_DIR}/src/stringres/resources.gen.h)
 add_custom_target(gen_stringres_header 
-  COMMAND ${CMAKE_BINARY_DIR}/bin/StringResCompiler ${STRINGRES_XML} 
-  ${CMAKE_SOURCE_DIR}/src/stringres/resources.gen.h
+  COMMAND ${CMAKE_BINARY_DIR}/bin/StringResCompiler ${STRINGRES_XML} ${STRINGRES_GENHDR}
   DEPENDS StringResCompiler
   COMMENT "Generating string resource header"
   SOURCES ${STRINGRES_XML})
+set_source_files_properties(${STRINGRES_GENHDR} PROPERTIES GENERATED TRUE)
 #################################################################
 
 ################## RTCL (Run Time Command Loader) ##################
@@ -275,11 +277,17 @@ target_link_libraries(TgBotWeb httplib::httplib)
 extend_set(SRC_LIST src/web/TgBotWebServer.cpp)
 ####################################################################
 
+########################## Logcat Client ##########################
+if (USE_UNIX_SOCKETS)
+  add_executable(${LOGCAT_NAME} src/logging/LoggingClient.cpp)
+  target_link_libraries(${LOGCAT_NAME} TgBotSocket TgBotLogInit)
+endif()
 ####################### TgBot Socket Library #######################
 if (USE_UNIX_SOCKETS)
   set(SOCKET_SRC_INTERFACE src/socket/interface)
   extend_set(SRC_LIST
     src/ChatObserver.cpp
+    src/logging/LoggingServer.cpp
     ${SOCKET_SRC_INTERFACE}/impl/bot/SocketDataHandler.cpp
     ${SOCKET_SRC_INTERFACE}/impl/bot/TgBotSocketInterface.cpp
     ${SOCKET_SRC_INTERFACE}/impl/backends/ServerBackend.cpp

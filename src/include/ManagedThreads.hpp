@@ -34,7 +34,7 @@ class ThreadManager
         IBASH_EXIT_TIMEOUT_THREAD,
         IBASH_UPDATE_OUTPUT_THREAD,
         DATABASE_SYNC_THREAD,
-        TEST,
+        LOGSERVER_THREAD,
         WEBSERVER_THREAD,
         MAX,
     };
@@ -51,7 +51,7 @@ class ThreadManager
             USAGE_AND_STR(IBASH_UPDATE_OUTPUT_THREAD),
             USAGE_AND_STR(DATABASE_SYNC_THREAD),
             USAGE_AND_STR(WEBSERVER_THREAD),
-            USAGE_AND_STR(TEST));
+            USAGE_AND_STR(LOGSERVER_THREAD));
 
     template <Usage u>
     constexpr static const char* ThreadUsageToStr() {
