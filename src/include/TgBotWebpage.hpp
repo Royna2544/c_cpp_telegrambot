@@ -38,7 +38,7 @@ class TgBotWebServerBase {
 
    private:
     int port;
-    httplib::Server svr {};
+    httplib::Server svr;
     std::filesystem::path webServerRootPath;
 };
 

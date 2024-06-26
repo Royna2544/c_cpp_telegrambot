@@ -10,11 +10,8 @@ const CStringLifetime TgBotWebServer::getInitCallName() const {
 }
 
 void TgBotWebServer::doInitCall() {
-    auto webThr = ThreadManager::getInstance()
-                      ->createController<ThreadManager::Usage::WEBSERVER_THREAD,
-                                         TgBotWebServer>(8080);
-    webThr->setPreStopFunction([webThr](auto *) { webThr->stopServer(); });
-    webThr->run();
+    setPreStopFunction([this](auto *) { stopServer(); });
+    run();
 }
 
 TgBotWebServer::TgBotWebServer(int serverPort)

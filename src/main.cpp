@@ -17,6 +17,7 @@
 #include <StringResManager.hpp>
 #include <TgBotWebpage.hpp>
 #include <chrono>
+#include <memory>
 #include <utility>
 
 #include "database/bot/TgBotDatabaseImpl.hpp"
@@ -30,6 +31,8 @@
 #include <ChatObserver.h>
 
 #include <socket/interface/impl/bot/TgBotSocketInterface.hpp>
+
+#include "logging/LoggingServer.hpp"
 #endif
 
 #include <tgbot/tgbot.h>
@@ -86,6 +89,19 @@ void createAndDoInitCall(Args&&... args) {
     }
 }
 
+template <typename T, ThreadManager::Usage usage, typename... Args>
+    requires(HasInitCaller<T>)
+void createAndDoInitCall(Args... args) {
+    const auto mgr = ThreadManager::getInstance();
+    std::shared_ptr<T> inst;
+    if constexpr (sizeof...(args) != 0) {
+        inst = mgr->createController<usage, T>(std::forward<Args...>(args...));
+    } else {
+        inst = mgr->createController<usage, T>();
+    }
+    inst->initWrapper();
+}
+
 int main(int argc, char* const* argv) {
     std::optional<std::string> token;
     std::optional<LogFileSink> log_sink;
@@ -125,12 +141,18 @@ int main(int argc, char* const* argv) {
         locale = "en-US";
     }
     bool res = StringResManager::getInstance()->parseFromFile(
-        FS::getPathForType(FS::PathType::RESOURCES) / "strings" / locale->append(".xml"),
+        FS::getPathForType(FS::PathType::RESOURCES) / "strings" /
+            locale->append(".xml"),
         STRINGRES_MAX);
     if (!res) {
         LOG(ERROR) << "Failed to parse string res, abort";
         return EXIT_FAILURE;
     }
+
+    createAndDoInitCall<TgBotWebServer, ThreadManager::Usage::WEBSERVER_THREAD>(
+        8080);
+    createAndDoInitCall<NetworkLogSink,
+                        ThreadManager::Usage::LOGSERVER_THREAD>();
 #ifdef RTCOMMAND_LOADER
     createAndDoInitCall<RTCommandLoader>(gBot);
 #endif
@@ -142,7 +164,6 @@ int main(int argc, char* const* argv) {
     createAndDoInitCall<SpamBlockManager>(gBot);
     createAndDoInitCall<CommandModuleManager>(gBot);
     createAndDoInitCall<ResourceManager>();
-    createAndDoInitCall<TgBotWebServer>(8080);
     createAndDoInitCall<TgBotDatabaseImpl>();
     // Must be last
     createAndDoInitCall<OnAnyMessageRegisterer>(gBot);
