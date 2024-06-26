@@ -16,7 +16,7 @@ std::optional<socket_handle_t> SocketInterfaceUnixIPv6::createServerSocket() {
     bool iface_done = false;
     struct sockaddr_in6 name {};
     auto* _name = reinterpret_cast<struct sockaddr*>(&name);
-    socket_handle_t sfd = socket(AF_INET6, SOCK_STREAM, 0);
+    socket_handle_t sfd = socket(AF_INET6, getSocketType(this), 0);
 
     if (!isValidSocketHandle(sfd)) {
         PLOG(ERROR) << "Failed to create socket";
@@ -58,7 +58,7 @@ std::optional<SocketConnContext> SocketInterfaceUnixIPv6::createClientSocket() {
     struct sockaddr_in6 name {};
     auto* _name = reinterpret_cast<struct sockaddr*>(&name);
 
-    ctx.cfd = socket(AF_INET6, SOCK_STREAM, 0);
+    ctx.cfd = socket(AF_INET6, getSocketType(this), 0);
     if (!isValidSocketHandle(ctx.cfd)) {
         PLOG(ERROR) << "Failed to create socket";
         return std::nullopt;

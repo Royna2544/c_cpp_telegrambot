@@ -7,13 +7,15 @@
 #include <impl/SocketPosix.hpp>
 
 #include "HelperPosix.hpp"
+#include "SocketBase.hpp"
 
 std::optional<socket_handle_t> SocketInterfaceUnixIPv4::createServerSocket() {
     socket_handle_t ret = kInvalidFD;
     bool iface_done = false;
     struct sockaddr_in name {};
     auto* _name = reinterpret_cast<struct sockaddr*>(&name);
-    socket_handle_t sfd = socket(AF_INET, SOCK_STREAM, 0);
+
+    socket_handle_t sfd = socket(AF_INET, getSocketType(this), 0);
 
     if (!isValidSocketHandle(sfd)) {
         PLOG(ERROR) << "Failed to create socket";
@@ -56,7 +58,7 @@ std::optional<SocketConnContext> SocketInterfaceUnixIPv4::createClientSocket() {
     struct sockaddr_in name {};
     const auto* _name = reinterpret_cast<struct sockaddr*>(&name);
 
-    ctx.cfd = socket(AF_INET, SOCK_STREAM, 0);
+    ctx.cfd = socket(AF_INET, getSocketType(this), 0);
     if (!isValidSocketHandle(ctx.cfd)) {
         PLOG(ERROR) << "Failed to create socket";
         return std::nullopt;

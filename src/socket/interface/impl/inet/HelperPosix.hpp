@@ -7,6 +7,7 @@
 #include <functional>
 #include <string_view>
 
+#include "SocketBase.hpp"
 #include "SocketDescriptor_defs.hpp"
 
 /**
@@ -35,7 +36,8 @@ consteval size_t getAddrStrLen() {
 }
 
 template <typename SockAddr, size_t N>
-const char* getAddrStr(const SockAddr& addr, std::array<char, N>& addrStr) = delete;
+const char* getAddrStr(const SockAddr& addr,
+                       std::array<char, N>& addrStr) = delete;
 
 template <size_t N>
 const char* getAddrStr(const sockaddr_in& addr, std::array<char, N>& addrStr) {
@@ -122,3 +124,11 @@ void forEachINetAddress(
 }
 
 constexpr std::string_view kLocalInterface = "lo";
+
+inline int getSocketType(const SocketInterfaceBase* base) {
+    if (static_cast<bool>(base->options.use_udp) &&
+        base->options.use_udp.get()) {
+        return SOCK_DGRAM;
+    }
+    return SOCK_STREAM;
+}

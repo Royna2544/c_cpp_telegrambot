@@ -7,9 +7,10 @@
 #include <optional>
 
 #include "SocketBase.hpp"
+#include "../inet/HelperPosix.hpp"
 
 bool SocketInterfaceUnixLocal::createLocalSocket(SocketConnContext *ctx) {
-    ctx->cfd = socket(AF_UNIX, SOCK_STREAM, 0);
+    ctx->cfd = socket(AF_UNIX, getSocketType(this), 0);
     if (ctx->cfd < 0) {
         PLOG(ERROR) << "Failed to create socket";
         return false;

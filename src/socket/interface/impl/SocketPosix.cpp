@@ -31,7 +31,8 @@ void SocketInterfaceUnix::startListening(socket_handle_t handle,
         }
         selector.add(kListenTerminate.readEnd(), [this, &should_break]() {
             dummy_listen_buf_t buf = {};
-            ssize_t rc = read(kListenTerminate.readEnd(), &buf, sizeof(dummy_listen_buf_t));
+            ssize_t rc = read(kListenTerminate.readEnd(), &buf,
+                              sizeof(dummy_listen_buf_t));
             if (rc < 0) {
                 PLOG(ERROR) << "Reading data from forcestop fd";
             }
@@ -86,20 +87,18 @@ bool SocketInterfaceUnix::writeToSocket(SocketConnContext context,
                                         SharedMalloc data) {
     auto* socketData = static_cast<char*>(data.get());
     auto* addr = static_cast<sockaddr*>(context.addr.get());
-    if (isValidSocketHandle(context.cfd)) {
-        const auto count =
-            send(context.cfd, socketData, data->size, MSG_NOSIGNAL);
-        if (count < 0) {
-            PLOG(ERROR) << "Failed to send to socket";
-            return false;
-        }
+    bool use_udp = static_cast<bool>(options.use_udp) && options.use_udp.get();
+    ssize_t count = 0;
+
+    if (use_udp) {
+        count = sendto(context.cfd, socketData, data->size, MSG_NOSIGNAL, addr,
+                       context.addr->size);
     } else {
-        const auto count = sendto(context.cfd, socketData, data->size,
-                                  MSG_NOSIGNAL, addr, context.addr->size);
-        if (count < 0) {
-            PLOG(ERROR) << "Failed to sentto socket";
-            return false;
-        }
+        count = send(context.cfd, socketData, data->size, MSG_NOSIGNAL);
+    }
+    if (count < 0) {
+        PLOG(ERROR) << "Failed to send to socket";
+        return false;
     }
     return true;
 }
@@ -109,9 +108,16 @@ std::optional<SharedMalloc> SocketInterfaceUnix::readFromSocket(
     SharedMalloc buf(length);
     auto* addr = static_cast<sockaddr*>(handle.addr.get());
     socklen_t addrlen = handle.addr->size;
+    bool use_udp = static_cast<bool>(options.use_udp) && options.use_udp.get();
+    ssize_t count = 0;
+    constexpr int kRecvFlags = MSG_NOSIGNAL | MSG_WAITALL;
 
-    ssize_t count = recvfrom(handle.cfd, buf.get(), length,
-                             MSG_NOSIGNAL | MSG_WAITALL, addr, &addrlen);
+    if (use_udp) {
+        count =
+            recvfrom(handle.cfd, buf.get(), length, kRecvFlags, addr, &addrlen);
+    } else {
+        count = recv(handle.cfd, buf.get(), length, kRecvFlags);
+    }
     if (count != length) {
         PLOG(ERROR) << "Failed to read from socket";
     } else {
