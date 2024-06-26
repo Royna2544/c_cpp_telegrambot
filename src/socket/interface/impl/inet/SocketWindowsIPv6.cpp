@@ -1,6 +1,6 @@
 #include <impl/SocketWindows.hpp>
 
-#include "SocketBase.hpp"
+#include "../helper/HelperWindows.hpp"
 
 std::optional<socket_handle_t>
 SocketInterfaceWindowsIPv6::createServerSocket() {
@@ -40,7 +40,5 @@ SocketInterfaceWindowsIPv6::createClientSocket() {
 }
 
 void SocketInterfaceWindowsIPv6::doGetRemoteAddr(socket_handle_t s) {
-    WinHelper::doGetRemoteAddrInet<struct sockaddr_in6, AF_INET6, in6_addr,
-                                   INET6_ADDRSTRLEN,
-                                   offsetof(struct sockaddr_in6, sin6_addr)>(s);
+    printRemoteAddress<sockaddr_in6, in6_addr, AF_INET6>(s);
 }

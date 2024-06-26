@@ -29,23 +29,6 @@ struct SocketInterfaceWindows : SocketInterfaceBase {
             : interface(interface) {}
         bool createInetSocketAddr(SocketConnContext& context);
         bool createInet6SocketAddr(SocketConnContext& context);
-        template <typename T, int family, typename addr_t, int addrbuf_len,
-                  int offset>
-            requires std::is_same_v<T, struct sockaddr_in> ||
-                     std::is_same_v<T, struct sockaddr_in6>
-        static void doGetRemoteAddrInet(socket_handle_t s) {
-            T addr;
-            std::array<char, addrbuf_len> ipStr = {};
-            socklen_t len = sizeof(T);
-            auto* addr_ptr = reinterpret_cast<addr_t*>(
-                reinterpret_cast<char*>(&addr) + offset);
-            if (getpeername(s, (struct sockaddr*)&addr, &len) != 0) {
-                LOG(ERROR) << "getpeername failed: " << WSALastErrorStr();
-            } else {
-                inet_ntop(family, addr_ptr, ipStr.data(), addrbuf_len);
-                LOG(INFO) << "Client connected, its addr: " << ipStr.data();
-            }
-        }
 
        private:
         SocketInterfaceWindows* interface;
@@ -67,7 +50,7 @@ struct SocketInterfaceWindows : SocketInterfaceBase {
     WSAData data{};
 };
 
-static inline auto WSAEStr = SocketInterfaceWindows::WSALastErrorStr;
+static inline const auto WSAEStr = SocketInterfaceWindows::WSALastErrorStr;
 
 struct SocketInterfaceWindowsLocal : SocketInterfaceWindows {
     std::optional<SocketConnContext> createClientSocket() override;

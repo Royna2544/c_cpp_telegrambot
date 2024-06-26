@@ -1,11 +1,8 @@
-#include <winsock2.h>
-#include <ws2tcpip.h>
-
 #include <cstddef>
 #include <impl/SocketWindows.hpp>
 #include <string>
 
-#include "SocketBase.hpp"
+#include "../helper/HelperWindows.hpp"
 
 std::optional<socket_handle_t>
 SocketInterfaceWindowsIPv4::createServerSocket() {
@@ -45,7 +42,5 @@ SocketInterfaceWindowsIPv4::createClientSocket() {
 }
 
 void SocketInterfaceWindowsIPv4::doGetRemoteAddr(socket_handle_t s) {
-    WinHelper::doGetRemoteAddrInet<struct sockaddr_in, AF_INET, in_addr,
-                                   INET_ADDRSTRLEN,
-                                   offsetof(struct sockaddr_in, sin_addr)>(s);
+    printRemoteAddress<sockaddr_in, in_addr, AF_INET>(s);
 }

@@ -4,11 +4,12 @@
 #include <afunix.h>
 #include <windows.h>
 // clang-format on
+#include <boost/algorithm/string/trim.hpp>
 #include <impl/SocketWindows.hpp>
 #include <socket/selector/SelectorWindows.hpp>
 
-#include "SocketBase.hpp"
 #include "SocketDescriptor_defs.hpp"
+#include "helper/HelperWindows.hpp"
 
 std::string SocketInterfaceWindows::WSALastErrorStr() {
     char *s = nullptr;
@@ -18,6 +19,7 @@ std::string SocketInterfaceWindows::WSALastErrorStr() {
                   MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US), (LPSTR)&s, 0,
                   nullptr);
     std::string ret(s);
+    boost::trim(ret);
     LocalFree(s);
     return ret;
 }
@@ -71,19 +73,17 @@ bool SocketInterfaceWindows::writeToSocket(SocketConnContext context,
                                            SharedMalloc data) {
     auto *socketData = static_cast<char *>(data.get());
     auto *addr = static_cast<sockaddr *>(context.addr.get());
-    if (isValidSocketHandle(context.cfd)) {
-        const auto count = send(context.cfd, socketData, data->size, 0);
-        if (count < 0) {
-            LOG(ERROR) << "Failed to send socket: " << WSAEStr();
-            return false;
-        }
+    int count = 0;
+    if (useUdp(this)) {
+        count = sendto(context.cfd, socketData, data->size, 0, addr,
+                       context.addr->size);
+
     } else {
-        const auto count = sendto(context.cfd, socketData, data->size, 0, addr,
-                                  context.addr->size);
-        if (count < 0) {
-            LOG(ERROR) << "Failed to sentto socket: " << WSAEStr();
-            return false;
-        }
+        count = send(context.cfd, socketData, data->size, 0);
+    }
+    if (count < 0) {
+        LOG(ERROR) << "Failed to sent to socket: " << WSAEStr();
+        return false;
     }
     return true;
 }
@@ -96,9 +96,13 @@ std::optional<SharedMalloc> SocketInterfaceWindows::readFromSocket(
     auto *addr = static_cast<sockaddr *>(context.addr.get());
     auto *data = static_cast<char *>(buf.get());
     socklen_t addrLen = context.addr->size;
+    int count = 0;
 
-    auto count =
-        recvfrom(context.cfd, data, length, MSG_WAITALL, addr, &addrLen);
+    if (useUdp(this)) {
+        count = recvfrom(context.cfd, data, length, 0, addr, &addrLen);
+    } else {
+        count = recv(context.cfd, data, length, 0);
+    }
     if (count != length) {
         LOG(ERROR) << "Failed to read from socket: " << WSAEStr();
     } else {

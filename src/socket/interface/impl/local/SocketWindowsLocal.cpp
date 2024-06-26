@@ -1,4 +1,5 @@
 #include <impl/SocketWindows.hpp>
+#include "../helper/HelperWindows.hpp"
 
 // clang-format off
 #include <winsock2.h>
@@ -11,7 +12,7 @@
 #include <libos/libfs.hpp>
 
 bool SocketInterfaceWindowsLocal::createLocalSocket(SocketConnContext *ctx) {
-    ctx->cfd = socket(AF_UNIX, SOCK_STREAM, 0);
+    ctx->cfd = socket(AF_UNIX, getSocketType(this), 0);
     if (ctx->cfd < 0) {
         LOG(ERROR) << "Failed to create socket: " << WSALastErrorStr();
         return false;

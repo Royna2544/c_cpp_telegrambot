@@ -1,8 +1,9 @@
 #include <impl/SocketWindows.hpp>
+#include "HelperWindows.hpp"
 
 bool SocketInterfaceWindows::WinHelper::createInetSocketAddr(
     SocketConnContext& context) {
-    context.cfd = socket(AF_INET, SOCK_STREAM, 0);
+    context.cfd = socket(AF_INET, getSocketType(interface), 0);
     if (!interface->isValidSocketHandle(context.cfd)) {
         LOG(ERROR) << "Failed to create socket: " << WSALastErrorStr();
         return false;
@@ -16,7 +17,7 @@ bool SocketInterfaceWindows::WinHelper::createInetSocketAddr(
 
 bool SocketInterfaceWindows::WinHelper::createInet6SocketAddr(
     SocketConnContext& context) {
-    context.cfd = socket(AF_INET6, SOCK_STREAM, 0);
+    context.cfd = socket(AF_INET6, getSocketType(interface), 0);
     if (!interface->isValidSocketHandle(context.cfd)) {
         LOG(ERROR) << "Failed to create socket: " << WSALastErrorStr();
         return false;
