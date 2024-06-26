@@ -15,6 +15,7 @@
 #include <optional>
 #include <string>
 
+#include "SocketBase.hpp"
 #include "TgBotCommandMap.hpp"
 #include "Types.h"
 
@@ -279,7 +280,9 @@ int main(int argc, char** argv) {
         pkt->header.checksum = crc.checksum();
     }
 
-    auto backend = SocketClientWrapper();
+    SocketClientWrapper backend;
+    backend.setLocalSocketPath(
+        SocketInterfaceBase::LocalHelper::getSocketPath());
     auto handle = backend->createClientSocket();
 
     if (handle) {

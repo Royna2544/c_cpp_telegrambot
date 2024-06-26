@@ -10,6 +10,7 @@
 
 #include "AbslLogInit.hpp"
 #include "LogcatData.hpp"
+#include "SocketBase.hpp"
 
 int main() {
     TgBot_AbslLogInit();
@@ -17,7 +18,8 @@ int main() {
     SocketClientWrapper wrapper;
     LogEntry entry{};
 
-    wrapper->options.address = getSocketPathForLogging().string();
+    wrapper->options.port = SocketInterfaceBase::kTgBotLogPort;
+    wrapper.setLocalSocketPath(getSocketPathForLogging());
     auto clientSocket = wrapper->createClientSocket();
     if (!clientSocket) {
         LOG(ERROR) << "Failed to create client socket";

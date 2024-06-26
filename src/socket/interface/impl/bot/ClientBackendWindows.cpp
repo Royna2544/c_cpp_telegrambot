@@ -21,8 +21,12 @@ SocketClientWrapper::SocketClientWrapper() {
         LOG(INFO) << "Chose IPv6 with address " << addressString;
     } else {
         backend = std::make_shared<SocketInterfaceWindowsLocal>();
-        addressString = SocketInterfaceBase::LocalHelper::getSocketPath().string();
-        LOG(INFO) << "Chose Unix Local socket";
+        if (localSocketPath) {
+            addressString = localSocketPath->string();
+            LOG(INFO) << "Chose Unix Local socket with path " << addressString;
+        } else {
+            LOG(INFO) << "Chose Unix Local socket";
+        }
     }
     if (needPortCfg) {
         std::string portStr;
@@ -37,5 +41,7 @@ SocketClientWrapper::SocketClientWrapper() {
         LOG(INFO) << "Using port " << port;
         backend->options.port = port;
     }
-    backend->options.address = addressString;
+    if (!addressString.empty()) {
+        backend->options.address = addressString;
+    }
 }

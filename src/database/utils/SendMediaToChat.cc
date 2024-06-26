@@ -50,5 +50,9 @@ int main(int argc, char* const* argv) {
 
     struct TgBotSocket::Packet pkt(
         TgBotSocket::Command::CMD_SEND_FILE_TO_CHAT_ID, data);
-    SocketClientWrapper()->writeAsClientToSocket(pkt.toSocketData());
+    SocketClientWrapper wrapper;
+
+    wrapper.setLocalSocketPath(
+        SocketInterfaceBase::LocalHelper::getSocketPath());
+    wrapper->writeAsClientToSocket(pkt.toSocketData());
 }

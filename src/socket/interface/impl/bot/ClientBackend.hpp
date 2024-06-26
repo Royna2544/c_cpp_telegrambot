@@ -1,6 +1,7 @@
 #pragma once
 
 #include <SocketBase.hpp>
+#include <filesystem>
 #include <memory>
 
 struct SocketClientWrapper {
@@ -9,6 +10,9 @@ struct SocketClientWrapper {
         return backend.get();
     }
     SocketInterfaceBase *operator->() const { return getRawInterface(); }
+    void setLocalSocketPath(const std::filesystem::path& path) {
+        localSocketPath = path;
+    }
 
    private:
     constexpr static std::string_view kIPv4EnvVar = "IPV4_ADDRESS";
@@ -16,4 +20,5 @@ struct SocketClientWrapper {
     constexpr static std::string_view kPortEnvVar = "PORT_NUM";
 
     std::shared_ptr<SocketInterfaceBase> backend;
+    std::optional<std::filesystem::path> localSocketPath;
 };

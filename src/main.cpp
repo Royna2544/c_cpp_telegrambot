@@ -151,12 +151,12 @@ int main(int argc, char* const* argv) {
 
     createAndDoInitCall<TgBotWebServer, ThreadManager::Usage::WEBSERVER_THREAD>(
         8080);
-    createAndDoInitCall<NetworkLogSink,
-                        ThreadManager::Usage::LOGSERVER_THREAD>();
 #ifdef RTCOMMAND_LOADER
     createAndDoInitCall<RTCommandLoader>(gBot);
 #endif
 #ifdef SOCKET_CONNECTION
+    createAndDoInitCall<NetworkLogSink,
+                        ThreadManager::Usage::LOGSERVER_THREAD>();
     createAndDoInitCall<SocketInterfaceTgBot>(gBot, gBot, nullptr);
     createAndDoInitCall<ChatObserver>();
 #endif
