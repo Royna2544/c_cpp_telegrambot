@@ -18,7 +18,7 @@ bool SocketInterfaceWindowsLocal::createLocalSocket(SocketConnContext *ctx) {
     }
     auto *addr = reinterpret_cast<struct sockaddr_un *>(ctx->addr.get());
     addr->sun_family = AF_UNIX;
-    strncpy(addr->sun_path, getOptions(Options::DESTINATION_ADDRESS).c_str(),
+    strncpy(addr->sun_path, options.address.get().c_str(),
             sizeof(addr->sun_path));
     addr->sun_path[sizeof(addr->sun_path) - 1] = '\0';
     return true;
@@ -29,12 +29,6 @@ SocketInterfaceWindowsLocal::createServerSocket() {
     SocketConnContext ret = SocketConnContext::create<sockaddr_un>();
     const auto *_name = reinterpret_cast<struct sockaddr *>(ret.addr.get());
 
-    try {
-        getOptions(Options::DESTINATION_ADDRESS);
-    } catch (const std::bad_optional_access &e) {
-        setOptions(Options::DESTINATION_ADDRESS,
-                   LocalHelper::getSocketPath().string());
-    }
     LOG(INFO) << "Creating socket at " << LocalHelper::getSocketPath().string();
     if (!createLocalSocket(&ret)) {
         return std::nullopt;
@@ -61,13 +55,7 @@ std::optional<SocketConnContext>
 SocketInterfaceWindowsLocal::createClientSocket() {
     SocketConnContext ret = SocketConnContext::create<sockaddr_un>();
     const auto *_name = reinterpret_cast<struct sockaddr *>(ret.addr.get());
-    
-    try {
-        getOptions(Options::DESTINATION_ADDRESS);
-    } catch (const std::bad_optional_access &e) {
-        setOptions(Options::DESTINATION_ADDRESS,
-                   LocalHelper::getSocketPath().string());
-    }
+
     if (!createLocalSocket(&ret)) {
         return std::nullopt;
     }

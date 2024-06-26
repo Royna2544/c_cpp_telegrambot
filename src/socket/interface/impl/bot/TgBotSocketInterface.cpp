@@ -34,9 +34,9 @@ void SocketInterfaceTgBot::doInitCall(Bot& bot) {
                 std::ref(bot), wrapper.getExternalInterface()));
     }
     for (auto& thr : threads) {
-        thr->interface->setOptions(
-            SocketInterfaceBase::Options::DESTINATION_PORT,
-            std::to_string(SocketInterfaceBase::kTgBotHostPort));
+        thr->interface->options.port = SocketInterfaceBase::kTgBotHostPort;
+        // TODO: This is only needed for AF_UNIX sockets
+        thr->interface->options.address = SocketInterfaceBase::LocalHelper::getSocketPath();
         thr->run();
     }
 }

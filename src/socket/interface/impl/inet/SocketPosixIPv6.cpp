@@ -66,8 +66,7 @@ std::optional<SocketConnContext> SocketInterfaceUnixIPv6::createClientSocket() {
 
     name.sin6_family = AF_INET6;
     name.sin6_port = htons(helper.inet.getPortNum());
-    inet_pton(AF_INET6, getOptions(Options::DESTINATION_ADDRESS).c_str(),
-              &name.sin6_addr);
+    inet_pton(AF_INET6, options.address.get().c_str(), &name.sin6_addr);
     if (connect(ctx.cfd, _name, sizeof(name)) != 0) {
         PLOG(ERROR) << "Failed to connect to socket";
         closeSocketHandle(ctx.cfd);

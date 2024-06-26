@@ -1,26 +1,41 @@
+#include <ConfigManager.h>
+
+#include <TryParseStr.hpp>
 #include <string>
 
 #include "ClientBackend.hpp"
-#include "ConfigManager.h"
 #include "impl/SocketWindows.hpp"
 
 SocketClientWrapper::SocketClientWrapper() {
-    std::string value;
-    std::string port;
-    if (ConfigManager::getEnv(kIPv4EnvVar.data(), value)) {
+    std::string addressString;
+    int port = 0;
+    bool needPortCfg = false;
+    bool foundPort = false;
+    if (ConfigManager::getEnv(kIPv4EnvVar.data(), addressString)) {
         backend = std::make_shared<SocketInterfaceWindowsIPv4>();
-        LOG(INFO) << "Chose IPv4 with address " << value;
-    } else if (ConfigManager::getEnv(kIPv6EnvVar.data(), value)) {
+        needPortCfg = true;
+        LOG(INFO) << "Chose IPv4 with address " << addressString;
+    } else if (ConfigManager::getEnv(kIPv6EnvVar.data(), addressString)) {
         backend = std::make_shared<SocketInterfaceWindowsIPv6>();
-        LOG(INFO) << "Chose IPv6 with address " << value;
+        needPortCfg = true;
+        LOG(INFO) << "Chose IPv6 with address " << addressString;
     } else {
         backend = std::make_shared<SocketInterfaceWindowsLocal>();
-        LOG(INFO) << "Chose Windows Local socket";
+        addressString = SocketInterfaceBase::LocalHelper::getSocketPath();
+        LOG(INFO) << "Chose Unix Local socket";
     }
-    if (!ConfigManager::getEnv(kPortEnvVar.data(), port)) {
-        port = std::to_string(SocketInterfaceBase::kTgBotHostPort);
+    if (needPortCfg) {
+        std::string portStr;
+        if (ConfigManager::getEnv(kPortEnvVar.data(), portStr)) {
+            if (try_parse(portStr, &port)) {
+                foundPort = true;
+            }
+        }
+        if (!foundPort) {
+            port = SocketInterfaceBase::kTgBotHostPort;
+        }
+        LOG(INFO) << "Using port " << port;
+        backend->options.port = port;
     }
-    LOG(INFO) << "Using port " << port;
-    backend->setOptions(SocketInterfaceBase::Options::DESTINATION_ADDRESS, value);
-    backend->setOptions(SocketInterfaceBase::Options::DESTINATION_PORT, port);
+    backend->options.address = addressString;
 }

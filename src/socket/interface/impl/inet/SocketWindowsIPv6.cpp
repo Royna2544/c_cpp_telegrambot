@@ -2,7 +2,6 @@
 
 #include "SocketBase.hpp"
 
-
 std::optional<socket_handle_t>
 SocketInterfaceWindowsIPv6::createServerSocket() {
     auto context = SocketConnContext::create<sockaddr_in6>();
@@ -30,8 +29,7 @@ SocketInterfaceWindowsIPv6::createClientSocket() {
         auto *name = static_cast<sockaddr_in *>(context.addr.get());
         auto *_name = static_cast<sockaddr *>(context.addr.get());
 
-        InetPton(AF_INET, getOptions(Options::DESTINATION_ADDRESS).c_str(),
-                 &name->sin_addr);
+        InetPton(AF_INET6, options.address.get().c_str(), &name->sin_addr);
         if (connect(context.cfd, _name, context.addr->size) != 0) {
             LOG(ERROR) << "Failed to connect to socket: " << WSALastErrorStr();
             closeSocketHandle(context.cfd);

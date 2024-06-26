@@ -64,8 +64,7 @@ std::optional<SocketConnContext> SocketInterfaceUnixIPv4::createClientSocket() {
 
     name.sin_family = AF_INET;
     name.sin_port = htons(helper.inet.getPortNum());
-    inet_pton(AF_INET, getOptions(Options::DESTINATION_ADDRESS).c_str(),
-              &name.sin_addr);
+    inet_pton(AF_INET, options.address.get().c_str(), &name.sin_addr);
     if (connect(ctx.cfd, _name, sizeof(name)) != 0) {
         PLOG(ERROR) << "Failed to connect to socket";
         closeSocketHandle(ctx.cfd);

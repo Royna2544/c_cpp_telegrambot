@@ -4,27 +4,24 @@
 #include <TryParseStr.hpp>
 #include <filesystem>
 #include <libos/libfs.hpp>
+#include <optional>
 #include <string>
 
 #include "SocketDescriptor_defs.hpp"
 
-using Options = SocketInterfaceBase::Options;
-
 int SocketInterfaceBase::INetHelper::getPortNum() {
-    int ret = 0;
-    std::string portStr = interface->getOptions(Options::DESTINATION_PORT);
-
-    if (try_parse(portStr, &ret)) {
-        return ret;
+    try {
+        return interface->options.port.get();
+    } catch (const std::bad_optional_access& e) {
+        LOG(ERROR) << "Could not get port number";
+        return -1;
     }
-    LOG(ERROR) << "Could not parse port number for string: " << std::quoted(portStr);
-    return -1;
 }
 
 bool SocketInterfaceBase::LocalHelper::canSocketBeClosed() {
     bool socketValid = true;
 
-    if (!FS::exists(interface->getOptions(Options::DESTINATION_ADDRESS))) {
+    if (!FS::exists(interface->options.address.get())) {
         LOG(WARNING) << "Socket file was deleted";
         socketValid = false;
     }
@@ -32,13 +29,12 @@ bool SocketInterfaceBase::LocalHelper::canSocketBeClosed() {
 }
 
 void SocketInterfaceBase::LocalHelper::cleanupServerSocket() {
-    const auto path = std::filesystem::path(
-        interface->getOptions(Options::DESTINATION_ADDRESS));
+    const auto path = std::filesystem::path(interface->options.address.get());
     DLOG(INFO) << "Cleaning up server socket...";
     FS::deleteFile(path);
 }
 
-void SocketInterfaceBase::LocalHelper::doGetRemoteAddr(socket_handle_t socket) {
+void SocketInterfaceBase::LocalHelper::doGetRemoteAddr(socket_handle_t  /*socket*/) {
     LOG(INFO) << "Client connected via local socket";
 }
 

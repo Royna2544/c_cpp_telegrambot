@@ -1,10 +1,9 @@
 #pragma once
 
-#include <TgBotSocket_Export.hpp>
-
 #include <SocketDescriptor_defs.hpp>
+#include <TgBotSocket_Export.hpp>
 #include <cstddef>
-#include <cstdint>
+#include <absl/log/log.h>
 #include <filesystem>
 #include <functional>
 #include <optional>
@@ -26,14 +25,13 @@ struct SocketConnContext {
 
 // A base class for socket operations
 struct SocketInterfaceBase {
-    enum class Options { DESTINATION_ADDRESS, DESTINATION_PORT };
-
     // addr is used as void pointer to maintain platform independence.
     using listener_callback_t = std::function<bool(SocketConnContext ctx)>;
     using dummy_listen_buf_t = char;
     using buffer_len_t = TgBotSocket::PacketHeader::length_type;
 
     constexpr static int kTgBotHostPort = 50000;
+    constexpr static int kTgBotLogPort = 50001;
 
     void writeAsClientToSocket(SharedMalloc data);
     void startListeningAsServer(const listener_callback_t onNewData);
@@ -154,27 +152,6 @@ struct SocketInterfaceBase {
      */
     virtual bool isValidSocketHandle(socket_handle_t handle) = 0;
 
-    /**
-     * @brief Sets an option for the socket interface.
-     *
-     * @param opt The option to set.
-     * @param data The data to set the option to.
-     * @param persistent Whether or not the option should be persisted across
-     * restarts.
-     */
-    void setOptions(Options opt, const std::string data,
-                    bool persistent = false);
-
-    /**
-     * @brief Returns the value of an option for the socket interface.
-     *
-     * @param opt The option to retrieve the value of.
-     *
-     * @return The value of the option
-     * @throws std::bad_optional_access if the option does not exist.
-     */
-    std::string getOptions(Options opt);
-
     struct Helper {
         explicit Helper(SocketInterfaceBase *interface_)
             : inet(interface_), local(interface_) {}
@@ -220,6 +197,53 @@ struct SocketInterfaceBase {
      */
     virtual void forceStopListening(void) = 0;
 
+    // A generic template struct to hold optional data and a persistent flag
+    template <typename T>
+    struct Option {
+        // std::optional to hold the data
+        std::optional<T> data;
+        // Flag to indicate whether the data should persist after retrieval
+        bool persistent = false;
+
+        // Default constructor
+        Option() = default;
+
+        // Function to set the data
+        void set(T dataIn) { data = dataIn; }
+
+        // Function to get the data and reset it if not persistent
+        T get() {
+            if (!operator bool()) {
+                LOG(WARNING) << "Trying to get data which is not set!";
+            }
+            // Throws std::bad_optional_access if not set
+            auto result = data.value();
+            if (!persistent) {
+                data.reset();
+            }
+            return result;
+        }
+
+        Option& operator=(const T& other) {
+            set(other);
+            return *this;
+        }
+
+        // Explicit conversion operator to check if data is present
+        explicit operator bool() { return data.has_value(); }
+    };
+    
+    // A nested struct to hold optional parameters for the socket operations
+    struct {
+        // Option to set the address for socket operations
+        Option<std::string> address;
+        // Option to set the port for socket operations
+        Option<int> port;
+        // Option to specify whether to use UDP for socket operations
+        Option<bool> use_udp;
+    } options;
+
+
    protected:
     /**
      * @brief Cleans up the server socket.
@@ -237,17 +261,4 @@ struct SocketInterfaceBase {
      * @return true if the server can accept connections.
      */
     virtual bool canSocketBeClosed() { return true; }
-
-   private:
-    struct OptionContainer {
-        std::string data;
-        bool persistent = false;
-    };
-    using option_t = std::optional<OptionContainer>;
-    struct {
-        option_t opt_destination_address;
-        option_t opt_destination_port;
-    } options;
-
-    option_t *getOptionPtr(Options opt);
 };
