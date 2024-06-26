@@ -76,6 +76,6 @@ bool SocketInterfaceWindowsLocal::canSocketBeClosed() {
     return helper.local.canSocketBeClosed();
 }
 
-void SocketInterfaceWindowsLocal::doGetRemoteAddr(socket_handle_t s) {
-    helper.local.doGetRemoteAddr(s);
+void SocketInterfaceWindowsLocal::printRemoteAddress(socket_handle_t s) {
+    helper.local.printRemoteAddress(s);
 }

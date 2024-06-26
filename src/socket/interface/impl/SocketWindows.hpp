@@ -57,7 +57,7 @@ struct SocketInterfaceWindowsLocal : SocketInterfaceWindows {
     std::optional<socket_handle_t> createServerSocket() override;
     void cleanupServerSocket() override;
     bool canSocketBeClosed() override;
-    void doGetRemoteAddr(socket_handle_t s) override;
+    void printRemoteAddress(socket_handle_t s) override;
 
    private:
     bool createLocalSocket(SocketConnContext* ctx);
@@ -66,7 +66,7 @@ struct SocketInterfaceWindowsLocal : SocketInterfaceWindows {
 struct SocketInterfaceWindowsIPv4 : SocketInterfaceWindows {
     std::optional<SocketConnContext> createClientSocket() override;
     std::optional<socket_handle_t> createServerSocket() override;
-    void doGetRemoteAddr(socket_handle_t s) override;
+    void printRemoteAddress(socket_handle_t s) override;
 
    private:
     socket_handle_t makeSocket(bool is_client);
@@ -75,7 +75,7 @@ struct SocketInterfaceWindowsIPv4 : SocketInterfaceWindows {
 struct SocketInterfaceWindowsIPv6 : SocketInterfaceWindows {
     std::optional<SocketConnContext> createClientSocket() override;
     std::optional<socket_handle_t> createServerSocket() override;
-    void doGetRemoteAddr(socket_handle_t s) override;
+    void printRemoteAddress(socket_handle_t s) override;
 
    private:
     socket_handle_t makeSocket(bool is_client);

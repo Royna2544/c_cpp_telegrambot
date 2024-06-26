@@ -76,6 +76,6 @@ std::optional<SocketConnContext> SocketInterfaceUnixIPv4::createClientSocket() {
     return ctx;
 }
 
-void SocketInterfaceUnixIPv4::doGetRemoteAddr(socket_handle_t s) {
-    printRemoteAddress<sockaddr_in, in_addr, AF_INET>(s);
+void SocketInterfaceUnixIPv4::printRemoteAddress(socket_handle_t s) {
+    printRemoteAddress_impl<sockaddr_in, in_addr, AF_INET>(s);
 }

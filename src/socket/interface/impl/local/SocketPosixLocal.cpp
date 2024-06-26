@@ -72,6 +72,6 @@ bool SocketInterfaceUnixLocal::canSocketBeClosed() {
     return helper.local.canSocketBeClosed();
 }
 
-void SocketInterfaceUnixLocal::doGetRemoteAddr(socket_handle_t s) {
-    helper.local.doGetRemoteAddr(s);
+void SocketInterfaceUnixLocal::printRemoteAddress(socket_handle_t s) {
+    helper.local.printRemoteAddress(s);
 }

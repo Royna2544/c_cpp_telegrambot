@@ -63,7 +63,7 @@ template <typename SockAddrT, /* e.g. sockaddr_in */
           typename AddrT,     /* e.g. addr_in */
           int af /* e.g. AF_INET */>
     requires(af == AF_INET || af == AF_INET6)
-void printRemoteAddress(socket_handle_t sock) {
+void printRemoteAddress_impl(socket_handle_t sock) {
     constexpr size_t addrStrLen = getAddrStrLen<af>();
     std::array<char, addrStrLen> addrStr{};
     SockAddrT addr;

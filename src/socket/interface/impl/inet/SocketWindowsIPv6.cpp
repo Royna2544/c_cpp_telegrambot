@@ -39,6 +39,6 @@ SocketInterfaceWindowsIPv6::createClientSocket() {
     return context;
 }
 
-void SocketInterfaceWindowsIPv6::doGetRemoteAddr(socket_handle_t s) {
-    printRemoteAddress<sockaddr_in6, in6_addr, AF_INET6>(s);
+void SocketInterfaceWindowsIPv6::printRemoteAddress(socket_handle_t s) {
+    printRemoteAddress_impl<sockaddr_in6, in6_addr, AF_INET6>(s);
 }

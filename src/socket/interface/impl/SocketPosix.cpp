@@ -46,9 +46,8 @@ void SocketInterfaceUnix::startListening(socket_handle_t handle,
             if (!isValidSocketHandle(cfd)) {
                 PLOG(ERROR) << "Accept failed";
             } else {
-                doGetRemoteAddr(cfd);
-                SocketConnContext ctx(addr);
-                ctx.cfd = cfd;
+                printRemoteAddress(cfd);
+                SocketConnContext ctx(cfd, addr);
                 should_break = onNewData(ctx);
                 closeSocketHandle(cfd);
             }

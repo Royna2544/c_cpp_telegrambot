@@ -1,9 +1,10 @@
 #pragma once
 
+#include <absl/log/log.h>
+
 #include <SocketDescriptor_defs.hpp>
 #include <TgBotSocket_Export.hpp>
 #include <cstddef>
-#include <absl/log/log.h>
 #include <filesystem>
 #include <functional>
 #include <optional>
@@ -21,6 +22,12 @@ struct SocketConnContext {
     }
     template <typename SocketAddr>
     explicit SocketConnContext(SocketAddr Myaddr) : addr(Myaddr) {}
+
+    template <typename SocketAddr>
+    explicit SocketConnContext(socket_handle_t sock, SocketAddr Myaddr)
+        : SocketConnContext(Myaddr) {
+        cfd = sock;
+    }
 };
 
 // A base class for socket operations
@@ -142,7 +149,7 @@ struct SocketInterfaceBase {
      *
      * @param handle The socket handle.
      */
-    virtual void doGetRemoteAddr(socket_handle_t handle) = 0;
+    virtual void printRemoteAddress(socket_handle_t handle) = 0;
 
     /**
      * @brief Checks if a socket handle is valid.
@@ -173,7 +180,7 @@ struct SocketInterfaceBase {
                 : interface(interface_) {}
             bool canSocketBeClosed();
             void cleanupServerSocket();
-            void doGetRemoteAddr(socket_handle_t handle);
+            static void printRemoteAddress(socket_handle_t handle);
             static std::filesystem::path getSocketPath();
 
            private:
@@ -218,7 +225,7 @@ struct SocketInterfaceBase {
             return data.value();
         }
 
-        Option& operator=(const T& other) {
+        Option &operator=(const T &other) {
             set(other);
             return *this;
         }
@@ -226,7 +233,7 @@ struct SocketInterfaceBase {
         // Explicit conversion operator to check if data is present
         explicit operator bool() const { return data.has_value(); }
     };
-    
+
     // A nested struct to hold optional parameters for the socket operations
     struct {
         // Option to set the address for socket operations
@@ -236,7 +243,6 @@ struct SocketInterfaceBase {
         // Option to specify whether to use UDP for socket operations
         Option<bool> use_udp;
     } options;
-
 
    protected:
     /**

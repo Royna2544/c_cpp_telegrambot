@@ -46,9 +46,8 @@ void SocketInterfaceWindows::startListening(
             if (!isValidSocketHandle(cfd)) {
                 LOG(ERROR) << "Failed to accept: " << WSAEStr();
             } else {
-                doGetRemoteAddr(cfd);
-                SocketConnContext ctx(addr);
-                ctx.cfd = cfd;
+                printRemoteAddress(cfd);
+                SocketConnContext ctx(cfd, addr);
                 should_break = onNewData(ctx);
                 closesocket(cfd);
             }

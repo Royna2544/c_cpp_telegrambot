@@ -38,7 +38,7 @@ struct SocketInterfaceUnixLocal : SocketInterfaceUnix {
     std::optional<socket_handle_t> createServerSocket() override;
     void cleanupServerSocket() override;
     bool canSocketBeClosed() override;
-    void doGetRemoteAddr(socket_handle_t s) override;
+    void printRemoteAddress(socket_handle_t s) override;
     SocketInterfaceUnixLocal() = default;
     ~SocketInterfaceUnixLocal() override = default;
 
@@ -51,7 +51,7 @@ struct SocketInterfaceUnixIPv4 : SocketInterfaceUnix {
     std::optional<SocketConnContext> createClientSocket() override;
     std::optional<socket_handle_t> createServerSocket() override;
     ~SocketInterfaceUnixIPv4() override = default;
-    void doGetRemoteAddr(socket_handle_t s) override;
+    void printRemoteAddress(socket_handle_t s) override;
 };
 
 // Implements POSIX socket interface - AF_INET6
@@ -59,5 +59,5 @@ struct SocketInterfaceUnixIPv6 : SocketInterfaceUnix {
     std::optional<SocketConnContext> createClientSocket() override;
     std::optional<socket_handle_t> createServerSocket() override;
     ~SocketInterfaceUnixIPv6() override = default;
-    void doGetRemoteAddr(socket_handle_t s) override;
+    void printRemoteAddress(socket_handle_t s) override;
 };

@@ -34,7 +34,7 @@ void SocketInterfaceBase::LocalHelper::cleanupServerSocket() {
     FS::deleteFile(path);
 }
 
-void SocketInterfaceBase::LocalHelper::doGetRemoteAddr(socket_handle_t  /*socket*/) {
+void SocketInterfaceBase::LocalHelper::printRemoteAddress(socket_handle_t  /*socket*/) {
     LOG(INFO) << "Client connected via local socket";
 }
 

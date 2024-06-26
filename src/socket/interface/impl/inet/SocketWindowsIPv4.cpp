@@ -41,6 +41,6 @@ SocketInterfaceWindowsIPv4::createClientSocket() {
     return context;
 }
 
-void SocketInterfaceWindowsIPv4::doGetRemoteAddr(socket_handle_t s) {
-    printRemoteAddress<sockaddr_in, in_addr, AF_INET>(s);
+void SocketInterfaceWindowsIPv4::printRemoteAddress(socket_handle_t s) {
+    printRemoteAddress_impl<sockaddr_in, in_addr, AF_INET>(s);
 }
