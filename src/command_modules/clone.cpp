@@ -37,6 +37,8 @@ static void CloneCommandFn(const Bot& bot, const Message::Ptr message) {
             std::stringstream ss;
             ChatId ownerId = TgBotDatabaseImpl::getInstance()->getOwnerUserId();
 
+            bot.getApi().setMyName(userName.get());
+
             LOG(INFO) << "Clone: Dest user: " << userName.get();
             bot_sendReplyMessage(bot, message, "Cloning... (see PM)");
             auto pmfn = [&bot, &ss, ownerId]() {

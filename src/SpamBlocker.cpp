@@ -8,10 +8,12 @@
 #include <tgbot/types/Chat.h>
 
 #include <InstanceClassBase.hpp>
+#include <algorithm>
 #include <memory>
 #include <mutex>
 
 #include "ManagedThreads.hpp"
+#include "Types.h"
 
 using std::chrono_literals::operator""s;
 using TgBot::ChatPermissions;
@@ -121,8 +123,8 @@ void SpamBlockBase::runFunction() {
                         continue;
                     }
                     if (its->second >= sSpamDetectThreshold) {
-                        LOG(INFO)
-                            << "Launching spamdetect for " << chatName.get();
+                        LOG(INFO) << "Launching spamdetect for chat "
+                                  << std::quoted(chatName.get());
                         spamDetectFunc(it);
                     }
                     buffer.erase(it);
@@ -233,14 +235,15 @@ void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle,
 
         bot_sendMessage(_bot, handle->first->id,
                         "Spam detected @" + t.first->username);
-        for (const auto &msg : t.second) {
-            try {
-                _bot.getApi().deleteMessage(handle->first->id, msg->messageId);
-            } catch (const TgBot::TgException &e) {
-                DLOG(INFO) << "Error deleting message: " << e.what();
-            }
+        std::vector<MessageId> message_ids;
+        std::ranges::for_each(t.second, [&message_ids](auto &&messageIn) {
+            message_ids.emplace_back(messageIn->messageId);
+        });
+        try {
+            _bot.getApi().deleteMessages(handle->first->id, message_ids);
+        } catch (const TgBot::TgException &e) {
+            DLOG(INFO) << "Error deleting message: " << e.what();
         }
-
         if (mute) {
             LOG(INFO) << "Try mute user " << userstr.get() << " in chat "
                       << chatstr.get();
