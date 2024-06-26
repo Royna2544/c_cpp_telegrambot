@@ -42,6 +42,7 @@ void NetworkLogSink::Send(const absl::LogEntry& entry) {
 void NetworkLogSink::doInitCall() {
     setPreStopFunction([this](auto*) {
         LOG(INFO) << "onServerShutdown";
+        enabled = false;
         onClientDisconnected.set_value();
     });
     run();

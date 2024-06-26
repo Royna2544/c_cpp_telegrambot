@@ -24,7 +24,7 @@ struct NetworkLogSink : absl::LogSink, InitCall, ManagedThreadRunnable {
     explicit NetworkLogSink();
 
     std::shared_ptr<SocketInterfaceBase> interface;
-    bool enabled = true;
+    std::atomic_bool enabled = true;
     std::promise<void> onClientDisconnected;
 
     std::mutex mContextMutex;  // Protects context
