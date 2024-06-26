@@ -35,7 +35,6 @@ void SocketInterfaceUnix::startListening(socket_handle_t handle,
             if (rc < 0) {
                 PLOG(ERROR) << "Reading data from forcestop fd";
             }
-            close(kListenTerminate.readEnd());
             should_break = true;
         });
         selector.add(handle, [handle, this, &should_break, onNewData] {
@@ -55,11 +54,11 @@ void SocketInterfaceUnix::startListening(socket_handle_t handle,
         });
         while (!should_break) {
             switch (selector.poll()) {
-                case Selector::SelectorPollResult::FAILED:
+                case Selector::PollResult::FAILED:
                     should_break = true;
                     break;
-                case Selector::SelectorPollResult::OK:
-                case Selector::SelectorPollResult::TIMEOUT:
+                case Selector::PollResult::OK:
+                case Selector::PollResult::TIMEOUT:
                     break;
             }
         }
@@ -80,7 +79,6 @@ void SocketInterfaceUnix::forceStopListening() {
         if (count < 0) {
             PLOG(ERROR) << "Failed to write to notify pipe";
         }
-        closeSocketHandle(notify_fd);
     }
 }
 
