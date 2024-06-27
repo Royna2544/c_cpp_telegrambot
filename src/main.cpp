@@ -23,6 +23,8 @@
 #include <memory>
 #include <utility>
 
+#include "tgbot/Bot.h"
+
 #ifdef RTCOMMAND_LOADER
 #include <RTCommandLoader.h>
 #endif
@@ -164,50 +166,26 @@ void TgBotApiExHandler(TgBot::Bot& bot, const TgBot::TgException& e) {
         });
     }
 }
-}  // namespace
 
-int main(int argc, char* const* argv) {
-    std::optional<std::string> token;
-    std::optional<LogFileSink> log_sink;
-    const auto startTp = std::chrono::system_clock::now();
-    DurationPoint startupDp;
+void initLogging() {
     using namespace ConfigManager;
+    static std::optional<LogFileSink> log_sink;
 
-    startupDp.init();
     TgBot_AbslLogInit();
     LOG(INFO) << "Registered LogSink_stdout";
-    copyCommandLine(CommandLineOp::INSERT, &argc, &argv);
-    if (ConfigManager::getVariable(ConfigManager::Configs::HELP)) {
-        ConfigManager::serializeHelpToOStream(std::cout);
-        return EXIT_SUCCESS;
-    }
-
     if (const auto it = getVariable(Configs::LOG_FILE); it) {
         log_sink.emplace();
         log_sink->init(*it);
         absl::AddLogSink(&log_sink.value());
         LOG(INFO) << "Register LogSink_file: " << it.value();
     }
-    token = getVariable(Configs::TOKEN);
-    if (!token) {
-        LOG(ERROR) << "Failed to get TOKEN variable";
-        return EXIT_FAILURE;
-    }
+}
 
-#ifdef HAVE_CURL
-    static TgBot::CurlHttpClient cli;
-    static Bot gBot(token.value(), cli);
-#else
-    static Bot gBot(token.value());
-#endif
-
-    // Install signal handlers
-    installSignalHandler();
-
-    // Initialize subsystems
+void createAndDoInitCallAll(TgBot::Bot& gBot) {
+    constexpr int kWebServerListenPort = 8080;
     createAndDoInitCall<StringResManager>();
     createAndDoInitCall<TgBotWebServer, ThreadManager::Usage::WEBSERVER_THREAD>(
-        8080);
+        kWebServerListenPort);
 #ifdef RTCOMMAND_LOADER
     createAndDoInitCall<RTCommandLoader>(gBot);
 #endif
@@ -224,9 +202,11 @@ int main(int argc, char* const* argv) {
     createAndDoInitCall<TgBotDatabaseImpl>();
     // Must be last
     createAndDoInitCall<OnAnyMessageRegisterer>(gBot);
+}
 
-    // Bot starts
-    LOG(INFO) << "Subsystems initialized, bot started: " << argv[0];
+void onBotInitialized(TgBot::Bot& gBot, DurationPoint& startupDp,
+                      const char* exe) {
+    LOG(INFO) << "Subsystems initialized, bot started: " << exe;
     LOG(INFO) << "Started in " << startupDp.get().count() << " milliseconds";
 
     gBot.getApi().setMyDescription(
@@ -243,6 +223,45 @@ int main(int argc, char* const* argv) {
         "unknown platform"
 #endif
     );
+}
+
+}  // namespace
+
+int main(int argc, char* const* argv) {
+    std::optional<std::string> token;
+    DurationPoint startupDp;
+    using namespace ConfigManager;
+
+    // Initialize logging
+    initLogging();
+
+    // Insert command line arguments
+    copyCommandLine(CommandLineOp::INSERT, &argc, &argv);
+
+    // Print help and return if help option is set
+    if (ConfigManager::getVariable(ConfigManager::Configs::HELP)) {
+        ConfigManager::serializeHelpToOStream(std::cout);
+        return EXIT_SUCCESS;
+    }
+
+    token = getVariable(Configs::TOKEN);
+    if (!token) {
+        LOG(ERROR) << "Failed to get TOKEN variable";
+        return EXIT_FAILURE;
+    }
+
+#ifdef HAVE_CURL
+    TgBot::CurlHttpClient cli;
+    Bot gBot(token.value(), cli);
+#else
+    Bot gBot(token.value());
+#endif
+
+    // Install signal handlers
+    installSignalHandler();
+
+    // Initialize subsystems
+    createAndDoInitCallAll(gBot);
 
 #ifndef WINDOWS_BUILD
     handleRestartCommand(gBot);
@@ -250,6 +269,9 @@ int main(int argc, char* const* argv) {
 
     while (true) {
         try {
+            // Bot starts
+            onBotInitialized(gBot, startupDp, argv[0]);
+
             LOG(INFO) << "Bot username: " << gBot.getApi().getMe()->username;
             gBot.getApi().deleteWebhook();
 
