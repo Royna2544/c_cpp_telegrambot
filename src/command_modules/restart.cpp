@@ -1,9 +1,9 @@
 #include <BotReplyMessage.h>
 #include <ConfigManager.h>
 #include <absl/log/log.h>
+#include <inttypes.h>
 #include <libos/libsighandler.h>
 #include <unistd.h>
-#include <inttypes.h>
 
 #include <TryParseStr.hpp>
 
@@ -17,6 +17,15 @@ static void restartCommandFn(const Bot &bot, const Message::Ptr message) {
     int count = 0;
     char *const *argv = nullptr;
     std::vector<char *> myEnviron;
+
+    if (std::string u; ConfigManager::getEnv("RESTART", u)) {
+        snprintf(restartBuf.data(), restartBuf.size(), "RESTART=%" PRId64 ":%d",
+                 message->chat->id, message->messageId);
+        if (u == restartBuf.data()) {
+            LOG(INFO) << "Ignoring restart command";
+            return;
+        }
+    }
 
     // Get the size of environment buffer
     for (; environ[count]; ++count);
