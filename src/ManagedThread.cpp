@@ -56,14 +56,19 @@ void ManagedThread::stop() {
 }
 
 void ManagedThread::reset() {
+    bool shouldRelock = false;
     switch (state) {
         case ControlState::RUNNING:
+            shouldRelock = true;
+            [[fallthrough]];
         case ControlState::STOPPED_PREMATURE:
             stop();
             [[fallthrough]];
         case ControlState::STOPPED_BY_STOP_CMD:
             kRun = true;
-            timer_mutex.lk.lock();
+            if (shouldRelock) {
+                timer_mutex.lk.lock();
+            }
             state = ControlState::UNINITIALIZED;
             break;
         default:
