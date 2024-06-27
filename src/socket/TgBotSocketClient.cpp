@@ -280,9 +280,7 @@ int main(int argc, char** argv) {
         pkt->header.checksum = crc.checksum();
     }
 
-    SocketClientWrapper backend;
-    backend.setLocalSocketPath(
-        SocketInterfaceBase::LocalHelper::getSocketPath());
+    SocketClientWrapper backend(SocketInterfaceBase::LocalHelper::getSocketPath());
     auto handle = backend->createClientSocket();
 
     if (handle) {

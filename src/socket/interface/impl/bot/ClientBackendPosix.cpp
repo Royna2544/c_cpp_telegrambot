@@ -7,7 +7,7 @@
 #include "TryParseStr.hpp"
 #include "impl/SocketPosix.hpp"
 
-SocketClientWrapper::SocketClientWrapper() {
+SocketClientWrapper::SocketClientWrapper(std::optional<std::filesystem::path> localSocketPath) {
     std::string addressString;
     int port = 0;
     bool needPortCfg = false;

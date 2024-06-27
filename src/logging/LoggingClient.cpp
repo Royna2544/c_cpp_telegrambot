@@ -15,11 +15,10 @@
 int main() {
     TgBot_AbslLogInit();
 
-    SocketClientWrapper wrapper;
+    SocketClientWrapper wrapper(getSocketPathForLogging());
     LogEntry entry{};
 
     wrapper->options.port = SocketInterfaceBase::kTgBotLogPort;
-    wrapper.setLocalSocketPath(getSocketPathForLogging());
     auto clientSocket = wrapper->createClientSocket();
     if (!clientSocket) {
         LOG(ERROR) << "Failed to create client socket";
