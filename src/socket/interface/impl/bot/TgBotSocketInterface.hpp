@@ -14,18 +14,6 @@
 using TgBotSocket::callback::GenericAck;
 using TgBotSocket::callback::UploadFileDryCallback;
 
-#ifdef WINDOWS_BUILD
-#include "impl/SocketWindows.hpp"
-
-using SocketInternalInterface = SocketInterfaceWindowsLocal;
-using SocketExternalInterface = SocketInterfaceWindowsIPv4;
-#else  // WINDOWS_BUILD
-#include "impl/SocketPosix.hpp"
-
-using SocketInternalInterface = SocketInterfaceUnixLocal;
-using SocketExternalInterface = SocketInterfaceUnixIPv4;
-#endif  // WINDOWS_BUILD
-
 struct SocketInterfaceTgBot : ManagedThreadRunnable,
                               BotInitCall,
                               BotClassBase,
