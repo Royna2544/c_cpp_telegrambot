@@ -1,5 +1,4 @@
 #include "CompilerInTelegram.h"
-#include <ExtArgs.h>
 #include <libos/libfs.hpp>
 #include <StringResManager.hpp>
 

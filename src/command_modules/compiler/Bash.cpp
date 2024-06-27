@@ -1,6 +1,6 @@
 #include "CompilerInTelegram.h"
-#include <ExtArgs.h>
 #include <StringResManager.hpp>
+#include <MessageWrapper.hpp>
 
 void CompilerInTgForBashImpl::onResultReady(const Message::Ptr& who,
                                             const std::string& text) {
@@ -13,11 +13,10 @@ void CompilerInTgForBashImpl::onFailed(const Message::Ptr& who,
 
 void CompilerInTgForBash::run(const Message::Ptr &message) {
     std::stringstream res;
-    std::string cmd;
+    MessageWrapperLimited wrapper(message);
 
-    if (hasExtArgs(message)) {
-        parseExtArgs(message, cmd);
-        runCommand(message, cmd, res, !allowhang);
+    if (wrapper.hasExtraText()) {
+        runCommand(message, wrapper.getExtraText(), res, !allowhang);
     } else {
         res << GETSTR(SEND_BASH_COMMAND);
     }

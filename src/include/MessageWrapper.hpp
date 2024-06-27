@@ -12,39 +12,31 @@
 using TgBot::Bot;
 
 // Simple wrapper for TgBot::Message::Ptr.
-// Provides easy access
-struct MessageWrapper : BotClassBase {
+// Provides easy access, without bot
+struct MessageWrapperLimited {
     TgBot::Message::Ptr message;
-    std::shared_ptr<MessageWrapper> parent;
+    std::shared_ptr<MessageWrapperLimited> parent;
 
     [[nodiscard]] ChatId getChatId() const { return message->chat->id; }
     [[nodiscard]] bool hasReplyToMessage() const {
         return message->replyToMessage != nullptr;
     }
-    bool switchToReplyToMessage(const std::string& text) noexcept {
-        if (switchToReplyToMessage()) {
-            return true;
-        } else {
-            bot_sendReplyMessage(_bot, message, text);
-            return false;
-        }
-    }
-    bool switchToReplyToMessage() noexcept {
+    virtual bool switchToReplyToMessage() noexcept {
         if (message->replyToMessage) {
-            parent = std::make_shared<MessageWrapper>(
-                MessageWrapper(_bot, message, parent));
+            parent = std::make_shared<MessageWrapperLimited>(
+                MessageWrapperLimited(message, parent));
             message = message->replyToMessage;
             return true;
         }
         return false;
     }
-    void switchToParent() noexcept {
+    virtual void switchToParent() noexcept {
         if (parent) {
             message = parent->message;
             parent = parent->parent;
         }
     }
-    
+
     [[nodiscard]] bool hasExtraText() const noexcept {
         return firstBlank(message) != std::string::npos;
     }
@@ -77,16 +69,55 @@ struct MessageWrapper : BotClassBase {
     [[nodiscard]] TgBot::User::Ptr getUser() const noexcept {
         return message->from;
     }
-    void sendMessageOnExit(std::string message) noexcept {
-        onExitMessage = std::move(message);
+    explicit MessageWrapperLimited(Message::Ptr message)
+        : message(std::move(message)) {}
+
+    virtual ~MessageWrapperLimited() = default;
+
+   private:
+    MessageWrapperLimited(Message::Ptr message,
+                          std::shared_ptr<MessageWrapperLimited> parent)
+        : MessageWrapperLimited(std::move(message)) {
+        this->parent = std::move(parent);
     }
-    void sendMessageOnExit() noexcept {
-        onExitMessage = std::nullopt;
+    [[nodiscard]] static std::string::size_type firstBlank(
+        const TgBot::Message::Ptr& msg) noexcept {
+        return msg->text.find_first_of(" \n\r");
+    }
+};
+
+// Simple wrapper for TgBot::Message::Ptr.
+// Provides easy access
+struct MessageWrapper : BotClassBase, MessageWrapperLimited {
+    std::shared_ptr<MessageWrapper> parent;
+
+    bool switchToReplyToMessage(const std::string& text) noexcept {
+        if (switchToReplyToMessage()) {
+            return true;
+        } else {
+            bot_sendReplyMessage(_bot, message, text);
+            return false;
+        }
+    }
+    bool switchToReplyToMessage() noexcept override {
+        if (message->replyToMessage) {
+            parent = std::make_shared<MessageWrapper>(
+                MessageWrapper(_bot, message, parent));
+            message = message->replyToMessage;
+            return true;
+        }
+        return false;
+    }
+    void switchToParent() noexcept override {
+        if (parent) {
+            message = parent->message;
+            parent = parent->parent;
+        }
     }
 
-    explicit MessageWrapper(const Bot& bot, Message::Ptr message)
-        : BotClassBase(bot), message(std::move(message)) {}
-    ~MessageWrapper() noexcept {
+    explicit MessageWrapper(const Bot& bot, TgBot::Message::Ptr message)
+        : BotClassBase(bot), MessageWrapperLimited(std::move(message)) {}
+    ~MessageWrapper() noexcept override {
         Message::Ptr Rmessage;
         if (parent) {
             Rmessage = parent->message;
@@ -97,18 +128,16 @@ struct MessageWrapper : BotClassBase {
             bot_sendReplyMessage(_bot, Rmessage, *onExitMessage);
         }
     }
+    void sendMessageOnExit(std::string message) noexcept {
+        onExitMessage = std::move(message);
+    }
+    void sendMessageOnExit() noexcept { onExitMessage = std::nullopt; }
 
    private:
-    using Message = TgBot::Message;
-
     MessageWrapper(const Bot& bot, Message::Ptr message,
                    std::shared_ptr<MessageWrapper> parent)
         : MessageWrapper(bot, std::move(message)) {
         this->parent = std::move(parent);
-    }
-    [[nodiscard]] static std::string::size_type firstBlank(
-        const TgBot::Message::Ptr& msg) noexcept {
-        return msg->text.find_first_of(" \n\r");
     }
     std::optional<std::string> onExitMessage;
 };

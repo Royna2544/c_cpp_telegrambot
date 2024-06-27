@@ -1,12 +1,13 @@
 #include "CompilerInTelegram.h"
-#include <ExtArgs.h>
+#include <MessageWrapper.hpp>
 #include <filesystem>
 
 // Verify, Parse, Write
 bool CompilerInTgForGeneric::verifyParseWrite(const Message::Ptr& message,
                                               std::string& extraargs) {
-    if (hasExtArgs(message)) {
-        parseExtArgs(message, extraargs);
+    MessageWrapperLimited wrapper(message);
+    if (wrapper.hasExtraText()) {
+        extraargs = wrapper.getExtraText();
     }
     if (message->replyToMessage && !message->replyToMessage->text.empty()) {
         std::ofstream file(outfile);

@@ -1,5 +1,4 @@
 #include <BotReplyMessage.h>
-#include <ExtArgs.h>
 #include <command_modules/CommandModule.h>
 #include <internal/_FileDescriptor_posix.h>
 #include <popen_wdt/popen_wdt.h>

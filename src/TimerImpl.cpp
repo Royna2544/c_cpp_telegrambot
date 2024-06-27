@@ -1,11 +1,11 @@
 #include <BotReplyMessage.h>
-#include <ExtArgs.h>
 #include <TimerImpl.h>
 #include <absl/log/log.h>
 #include <internal/_std_chrono_templates.h>
 #include <internal/_tgbot.h>
 
 #include <ManagedThreads.hpp>
+#include <MessageWrapper.hpp>
 #include <chrono>
 #include <cmath>
 
@@ -15,6 +15,7 @@ bool TimerCommandManager::parseTimerArguments(const Bot &bot,
     bool found = false;
     bool result = false;
     std::string msg;
+    MessageWrapper wrapper(bot, message);
     enum {
         HOUR,
         MINUTE,
@@ -22,28 +23,30 @@ bool TimerCommandManager::parseTimerArguments(const Bot &bot,
         NONE,
     } state = NONE;
 
-    if (hasExtArgs(message)) {
-        parseExtArgs(message, msg);
+    if (wrapper.hasExtraText()) {
+        msg = wrapper.getExtraText();
         found = true;
     }
-    if (message->replyToMessage != nullptr) {
-        msg = message->replyToMessage->text;
+    if (wrapper.hasExtraText()) {
+        wrapper.switchToReplyToMessage();
+        msg = wrapper.getText();
         found = true;
     }
     if (!found) {
-        bot_sendReplyMessage(bot, message,
-                             "Send or reply to a time, in hhmmss format");
+        wrapper.sendMessageOnExit("Send or reply to a time, in hhmmss format");
         return false;
     }
     if (isactive) {
-        bot_sendReplyMessage(bot, message, "Timer is already running");
+        wrapper.sendMessageOnExit("Timer is already running");
         return false;
     }
     const char *c_str = msg.c_str();
     std::vector<int> numbercache;
     for (size_t i = 0; i <= msg.size(); i++) {
         int code = static_cast<int>(static_cast<unsigned char>(c_str[i]));
-        if (i == msg.size()) code = ' ';
+        if (i == msg.size()) {
+            code = ' ';
+        }
         switch (code) {
             case ' ': {
                 if (!numbercache.empty()) {
@@ -100,25 +103,22 @@ bool TimerCommandManager::parseTimerArguments(const Bot &bot,
                 break;
             }
             default: {
-                bot_sendReplyMessage(
-                    bot, message,
+                wrapper.sendMessageOnExit(
                     "Invalid value provided.\nShould contain only h, m, s, "
                     "numbers, spaces. (ex. 1h 20m 7s)");
-
                 return false;
             }
         }
     }
     if (out.count() == 0) {
-        bot_sendReplyMessage(bot, message, "I'm not a fool to time 0s");
+        wrapper.sendMessageOnExit("I'm not a fool to time 0s");
         return false;
     } else if (out.count() < TIMER_CONFIG_SEC) {
-        bot_sendReplyMessage(bot, message, "Provide longer time value");
+        wrapper.sendMessageOnExit("Provide longer time value");
         return false;
     } else if (to_hours(out).count() > 2) {
-        bot_sendReplyMessage(
-            bot, message,
-            "Time provided is too long, which is: " + to_string(out));
+        wrapper.sendMessageOnExit("Time provided is too long, which is: " +
+                                  to_string(out));
         return false;
     }
     return true;
@@ -135,10 +135,12 @@ void TimerCommandManager::TimerThreadFn(const Bot &bot, Message::Ptr message,
         timer -= 1s;
     }
     bot_editMessage(bot, message, "Timer ended");
-    if (sendendmsg) { bot_sendMessage(bot, message->chat->id, "Timer ended");
-}
-    if (botcanpin)
+    if (sendendmsg) {
+        bot_sendMessage(bot, message->chat->id, "Timer ended");
+    }
+    if (botcanpin) {
         bot.getApi().unpinChatMessage(message->chat->id, message->messageId);
+    }
     isactive = false;
 }
 

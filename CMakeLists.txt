@@ -181,7 +181,6 @@ set(SRC_LIST
   src/Authorization.cpp
   src/BotAddCommand.cpp
   src/BotMessageUtils.cpp
-  src/ExtArgs.cpp
   src/ManagedThread.cpp
   src/RegEXHandler.cpp
   src/ResourceManager.cpp
@@ -429,7 +428,7 @@ endif()
 add_executable(${PROJECT_TEST_NAME}
   tests/TestMain.cpp
   tests/AuthorizationTest.cpp
-  tests/ExtArgsTest.cpp
+  tests/MessageWrapperTest.cpp
   tests/ConfigManagerTest.cpp
   tests/RegexHandlerTest.cpp
   tests/DatabaseLoader.cpp

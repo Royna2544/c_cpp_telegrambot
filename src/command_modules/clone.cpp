@@ -1,6 +1,5 @@
 #include <BotReplyMessage.h>
 #include <CStringLifetime.h>
-#include <ExtArgs.h>
 #include <absl/log/log.h>
 #include <internal/_tgbot.h>
 #include <MessageWrapper.hpp>

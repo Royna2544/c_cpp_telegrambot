@@ -1,5 +1,3 @@
-#include <ExtArgs.h>
-
 #include <MessageWrapper.hpp>
 #include <algorithm>
 #include <boost/algorithm/string/split.hpp>
