@@ -233,3 +233,15 @@ std::ostream &ProtoDatabase::dump(std::ostream &os) const {
     }
     return os;
 }
+
+void ProtoDatabase::setOwnerUserId(UserId userId) const {
+    if (!db_info.has_value()) {
+        LOG(WARNING) << "Database not loaded! Cannot set owner user id!";
+        return;
+    }
+    if (db_info->protoDatabaseObject.has_ownerid()) {
+        LOG(WARNING) << "Database already contains owner user id!";
+        return;
+    }
+    db_info->protoDatabaseObject.set_ownerid(userId);
+}

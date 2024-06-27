@@ -25,6 +25,7 @@ struct ProtoDatabase : DatabaseBase {
     UserId getOwnerUserId() const override;
     std::optional<MediaInfo> queryMediaInfo(std::string str) const override;
     bool addMediaInfo(const MediaInfo &info) const override;
+    void setOwnerUserId(UserId userId) const override;
     std::ostream &dump(std::ostream &ofs) const override;
 
    private:

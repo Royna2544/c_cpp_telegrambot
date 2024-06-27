@@ -1,5 +1,6 @@
 #include "SQLiteDatabase.hpp"
 
+#include <absl/log/check.h>
 #include <absl/log/log.h>
 
 #include <fstream>
@@ -7,9 +8,9 @@
 #include <libos/libfs.hpp>
 #include <string_view>
 
-#include "database/DatabaseBase.hpp"
+#include "Types.h"
 
-SQLiteDatabase::ListResult SQLiteDatabase::addUserToList(ListType type,
+SQLiteDatabase::ListResult SQLiteDatabase::addUserToList(InfoType type,
                                                          UserId user) const {
     ListResult res{};
     sqlite3_stmt* stmt = nullptr;
@@ -35,12 +36,17 @@ SQLiteDatabase::ListResult SQLiteDatabase::addUserToList(ListType type,
         return res;
     }
     sqlite3_bind_int64(stmt, 1, user);
-    sqlite3_bind_int(stmt, 2, static_cast<int>(toInfoType(type)));
+    sqlite3_bind_int(stmt, 2, static_cast<int>(type));
     if (sqlite3_step(stmt) != SQLITE_DONE) {
         onSQLFail(__func__, "Inserting user");
     }
     sqlite3_finalize(stmt);
     return ListResult::OK;
+}
+
+SQLiteDatabase::ListResult SQLiteDatabase::addUserToList(ListType type,
+                                                         UserId user) const {
+    return addUserToList(toInfoType(type), user);
 }
 
 SQLiteDatabase::ListResult SQLiteDatabase::removeUserFromList(
@@ -321,6 +327,7 @@ SQLiteDatabase::InfoType SQLiteDatabase::toInfoType(ListType type) {
         case ListType::WHITELIST:
             return InfoType::WHITELIST;
     }
+    CHECK(false) << "Unreachable";
 }
 
 std::ostream& SQLiteDatabase::dump(std::ostream& os) const {
@@ -333,7 +340,8 @@ std::ostream& SQLiteDatabase::dump(std::ostream& os) const {
         return os;
     }
 
-    ss << "====================== Dump of database ======================" << std::endl;
+    ss << "====================== Dump of database ======================"
+       << std::endl;
 
     // Because of the race condition with logging, use stringstream and output
     // later.
@@ -368,7 +376,7 @@ std::ostream& SQLiteDatabase::dump(std::ostream& os) const {
             rc = sqlite3_step(stmt);
         }
         sqlite3_finalize(stmt);
-	ss << std::endl;
+        ss << std::endl;
     } else {
         ss << "!!! Failed to dump usermap database" << std::endl;
     }
@@ -396,4 +404,22 @@ void SQLiteDatabase::onSQLFail(const std::string_view funcname,
     LOG(ERROR) << "!!! " << funcname
                << " failed: SQL error: " << sqlite3_errmsg(db) << " while "
                << std::quoted(what);
+}
+
+void SQLiteDatabase::setOwnerUserId(UserId userId) const {
+    switch (addUserToList(InfoType::OWNER, userId)) {
+        case DatabaseBase::ListResult::OK:
+            LOG(INFO) << "Owner set to " << userId;
+            break;
+        case DatabaseBase::ListResult::ALREADY_IN_OTHER_LIST:
+        case DatabaseBase::ListResult::BACKEND_ERROR:
+            LOG(ERROR) << "Failed to set owner to " << userId;
+            break;
+        case DatabaseBase::ListResult::ALREADY_IN_LIST:
+            DLOG(INFO) << "Owner already set to " << userId;
+            break;
+        case DatabaseBase::ListResult::NOT_IN_LIST:
+            // Not possible
+            break;
+    }
 }

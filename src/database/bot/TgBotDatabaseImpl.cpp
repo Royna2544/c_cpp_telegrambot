@@ -7,6 +7,7 @@
 #include <ostream>
 #include <system_error>
 
+#include "Types.h"
 #include "database/SQLiteDatabase.hpp"
 
 bool TgBotDatabaseImpl::loadDBFromConfig() {
@@ -200,6 +201,21 @@ std::ostream& TgBotDatabaseImpl::dump(std::ostream& ofs) const {
         },
         databaseBackend);
     return ofs;
+}
+
+void TgBotDatabaseImpl::setOwnerUserId(const UserId user) const {
+    if (!isLoaded()) {
+        LOG(ERROR) << __func__ << ": No-op due to missing database";
+        return;
+    }
+    std::visit(
+        [this, user](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (isKnownDatabase<T>()) {
+                arg.setOwnerUserId(user);
+            }
+        },
+        databaseBackend);
 }
 
 DECLARE_CLASS_INST(TgBotDatabaseImpl);

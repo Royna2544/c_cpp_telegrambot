@@ -102,6 +102,15 @@ struct DatabaseBase {
     [[nodiscard]] virtual UserId getOwnerUserId() const = 0;
 
     /**
+     * @brief Set the user id of the owner of the database
+     *
+     * @param userId the user id of the owner of the database
+     *
+     * This may be called once. Subsequent calls will be rejected
+     */
+    virtual void setOwnerUserId(UserId userId) const = 0;
+
+    /**
      * @brief Query the database for media info
      *
      * @param str the name or unique id of the media to query
@@ -131,7 +140,7 @@ struct DatabaseBase {
      * @return A reference to the output stream for method chaining.
      */
     virtual std::ostream& dump(std::ostream& out) const = 0;
-    
+
     /**
      * @brief Get the simple name of a list type
      *

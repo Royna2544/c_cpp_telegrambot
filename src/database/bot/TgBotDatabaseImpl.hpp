@@ -5,6 +5,7 @@
 #include <variant>
 
 #include "InstanceClassBase.hpp"
+#include "Types.h"
 #include "initcalls/Initcall.hpp"
 
 struct TgBotDatabaseImpl : InstanceClassBase<TgBotDatabaseImpl>, InitCall {
@@ -26,6 +27,7 @@ struct TgBotDatabaseImpl : InstanceClassBase<TgBotDatabaseImpl>, InitCall {
         std::string str) const;
     [[nodiscard]] bool addMediaInfo(const DatabaseBase::MediaInfo& info) const;
     std::ostream &dump(std::ostream &ofs) const;
+    void setOwnerUserId(UserId userid) const;
 
     const CStringLifetime getInitCallName() const override {
         return "Load database";

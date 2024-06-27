@@ -25,6 +25,7 @@ struct SQLiteDatabase : DatabaseBase {
     void initDatabase() override;
     std::optional<MediaInfo> queryMediaInfo(std::string str) const override;
     bool addMediaInfo(const MediaInfo &info) const override;
+    void setOwnerUserId(UserId userId) const override;
     std::ostream &dump(std::ostream &ofs) const override;
 
    private:
@@ -35,7 +36,7 @@ struct SQLiteDatabase : DatabaseBase {
                                    std::string &out_data);
     void onSQLFail(const std::string_view funcname,
                    const std::string_view what) const;
-
+    [[nodiscard]] ListResult addUserToList(InfoType type, UserId user) const;
     [[nodiscard]] ListResult checkUserInList(InfoType type, UserId user) const;
     static InfoType toInfoType(ListType type);
     sqlite3 *db = nullptr;
