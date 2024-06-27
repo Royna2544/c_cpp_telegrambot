@@ -1,6 +1,3 @@
-- IBash TimeoutThread could use SingleThreadCtrlRunnable
+- Python could generate loadcmd_* functions
 - clang-* compilers add, preferred
-- Add calc cmd
-- Fix SpamBlockerTest
-- Add CRC32 test on socket data
-- Add option for database backend selection
+- Make SQL use RDB again
