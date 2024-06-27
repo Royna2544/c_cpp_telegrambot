@@ -4,9 +4,7 @@
 #include <initcalls/Initcall.hpp>
 #include "StringResLoader.hpp"
 
-#if __has_include("resources.gen.h")
-#include "resources.gen.h"
-#endif
+#include <resources.gen.h>
 
 // Shorthand macro for getting a string
 #define GETSTR(x) StringResManager::getInstance()->getString(STRINGRES_##x)

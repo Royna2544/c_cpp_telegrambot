@@ -165,7 +165,6 @@ if (APPLE)
     set(MACOS_SSL_LIBS ${CORE_FOUNDATION} ${SECURITY})
 endif()
 find_package(LibXml2 REQUIRED)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/<my_stuff> ${LIBXML2_INCLUDE_DIR})
 #####################################################################
 
 ############################# Platforms #############################
@@ -256,11 +255,13 @@ add_library(TgBotStringRes SHARED src/stringres/StringResLoader.cpp)
 extend_set(SRC_LIST src/stringres/StringResManager.cpp)
 target_link_libraries(TgBotStringRes ${LIBXML2_LIBRARIES})
 target_include_directories(TgBotStringRes PUBLIC src/stringres)
+target_include_directories(TgBotStringRes PRIVATE ${LIBXML2_INCLUDE_DIR})
 add_executable(StringResCompiler src/stringres/StringResCompiler.cpp)
 target_link_libraries(StringResCompiler TgBotStringRes TgBotLogInit)
 
 set(STRINGRES_XML ${CMAKE_SOURCE_DIR}/resources/strings/en-US.xml)
-set(STRINGRES_GENHDR ${CMAKE_SOURCE_DIR}/src/stringres/resources.gen.h)
+set(STRINGRES_GENHDR_DIR ${CMAKE_BINARY_DIR}/src/stringres/)
+set(STRINGRES_GENHDR ${STRINGRES_GENHDR_DIR}/resources.gen.h)
 set(STRINGRES_COMPILER ${CMAKE_BINARY_DIR}/bin/StringResCompiler)
 add_custom_command(
   OUTPUT ${STRINGRES_GENHDR}
@@ -269,7 +270,7 @@ add_custom_command(
 )
 add_custom_target(gen_stringres_header
   COMMENT "Generating string resource header"
-  DEPENDS ${STRINGRES_XML})
+  DEPENDS ${STRINGRES_XML} ${STRINGRES_GENHDR})
 set_source_files_properties(${STRINGRES_GENHDR} PROPERTIES GENERATED TRUE)
 #################################################################
 
@@ -395,6 +396,7 @@ target_link_lib_if_windows(TgBotUtils shlwapi)
 ################### The Bot's main functionaility ###################
 add_library(${PROJECT_NAME} SHARED ${SRC_LIST})
 target_include_directories(${PROJECT_NAME} PRIVATE src/third-party/rapidjson/include)
+target_include_directories(${PROJECT_NAME} PUBLIC ${STRINGRES_GENHDR_DIR})
 ######################## Libraries to link ########################
 set(LD_LIST TgBot TgBotDB TgBotUtils TgBotWeb TgBotStringRes)
 extend_set_if(LD_LIST USE_UNIX_SOCKETS TgBotSocket)
