@@ -11,6 +11,12 @@
 #include "TgBotPacketParser.hpp"
 #include "TgBotSocket_Export.hpp"
 
+#ifdef WINDOWS_BUILD
+#include "impl/SocketWindows.hpp"
+#else  // WINDOWS_BUILD
+#include "impl/SocketPosix.hpp"
+#endif  // WINDOWS_BUILD
+
 using TgBotSocket::callback::GenericAck;
 using TgBotSocket::callback::UploadFileDryCallback;
 
