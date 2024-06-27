@@ -1,15 +1,17 @@
 #include <BotReplyMessage.h>
-#include <ExtArgs.h>
-#include <tgbot/tools/StringTools.h>
+#include <absl/log/check.h>
+#include <internal/_tgbot.h>
+#include <tgbot/tgbot.h>
 
 #include <MessageWrapper.hpp>
+#include <OnAnyMessageRegister.hpp>
 #include <StringResManager.hpp>
 #include <database/bot/TgBotDatabaseImpl.hpp>
+#include <memory>
 #include <optional>
 
 #include "CommandModule.h"
-#include "absl/log/check.h"
-#include "tgbot/types/Message.h"
+#include "random/RandomNumberGenerator.h"
 
 template <DatabaseBase::ListType type>
 void handleAddUser(const Bot& bot, const Message::Ptr& message) {
@@ -61,49 +63,77 @@ void handleRemoveUser(const Bot& bot, const Message::Ptr& message) {
     }
     bot_sendReplyMessage(bot, message, text);
 }
+
 namespace {
 
-constexpr std::string_view whitelist = "whitelist";
-constexpr std::string_view blacklist = "blacklist";
-constexpr std::string_view add = "add";
-constexpr std::string_view remove = "remove";
+using TgBot::KeyboardButton;
 
-void handleDatabaseCmd(const Bot& bot, const Message::Ptr& message) {
+std::vector<std::vector<KeyboardButton::Ptr>> genKeyboard(const int total,
+                                                          const int x) {
+    std::vector<std::vector<KeyboardButton::Ptr>> keyboard;
+    int yrow = total / x;
+    if (total % x != 0) {
+        yrow += 1;
+    }
+    keyboard.reserve(yrow);
+    for (int i = 0; i < yrow; i++) {
+        std::vector<KeyboardButton::Ptr> row;
+        row.reserve(x);
+        for (int j = 0; j < x; j++) {
+            row.emplace_back(std::make_shared<KeyboardButton>());
+        }
+        keyboard.push_back(row);
+    }
+    return keyboard;
+}
+
+constexpr std::string_view addtowhitelist = "Add to whitelist";
+constexpr std::string_view removefromwhitelist = "Remove from whitelist";
+constexpr std::string_view addtoblacklist = "Add to blacklist";
+constexpr std::string_view removefromblacklist = "Remove from blacklist";
+
+void handleDatabaseCmd(Bot& bot, const Message::Ptr& message) {
     MessageWrapper wrapper(bot, message);
+
+    auto reply = std::make_shared<TgBot::ReplyKeyboardMarkup>();
+    reply->keyboard = genKeyboard(4, 2);
+    reply->keyboard[0][0]->text = addtowhitelist;
+    reply->keyboard[0][1]->text = removefromwhitelist;
+    reply->keyboard[1][0]->text = addtoblacklist;
+    reply->keyboard[1][1]->text = removefromblacklist;
+    reply->oneTimeKeyboard = true;
+    reply->resizeKeyboard = true;
 
     if (!wrapper.switchToReplyToMessage(GETSTR(REPLY_TO_USER_MSG))) {
         return;
     }
 
-    if (wrapper.hasExtraText()) {
-        const auto args = StringTools::split(wrapper.getExtraText(), ' ');
-        std::function<void(const Bot&, const Message::Ptr&)> handler;
+    auto msg = bot.getApi().sendMessage(
+        message->chat->id,
+        "Choose what u want to do with " +
+            UserPtr_toString(message->replyToMessage->from),
+        nullptr, nullptr,
 
-        wrapper.sendMessageOnExit(GETSTR(INVALID_ARGS_PASSED) + ". " +
-                                  GETSTR_IS(EXAMPLE) +
-                                  "/database whitelist add");
-        if (args.size() == 2) {
-            if (args[0] == whitelist) {
-                if (args[1] == add) {
-                    handler = handleAddUser<DatabaseBase::ListType::WHITELIST>;
-                } else if (args[1] == remove) {
-                    handler =
-                        handleRemoveUser<DatabaseBase::ListType::WHITELIST>;
+        reply);
+        
+    const auto registerer = OnAnyMessageRegisterer::getInstance();
+    const random_return_type token = RandomNumberGenerator::generate(100);
+
+    registerer->registerCallback(
+        [msg, registerer, token](const Bot& bot, Message::Ptr m) {
+            if (m->replyToMessage->messageId == msg->messageId) {
+                if (m->text == addtowhitelist) {
+                    handleAddUser<DatabaseBase::ListType::WHITELIST>(bot, m);
+                } else if (m->text == removefromwhitelist) {
+                    handleRemoveUser<DatabaseBase::ListType::WHITELIST>(bot, m);
+                } else if (m->text == addtoblacklist) {
+                    handleAddUser<DatabaseBase::ListType::BLACKLIST>(bot, m);
+                } else if (m->text == removefromblacklist) {
+                    handleRemoveUser<DatabaseBase::ListType::BLACKLIST>(bot, m);
                 }
-            } else if (args[0] == blacklist) {
-                if (args[1] == add) {
-                    handler = handleAddUser<DatabaseBase::ListType::BLACKLIST>;
-                } else if (args[1] == remove) {
-                    handler =
-                        handleRemoveUser<DatabaseBase::ListType::BLACKLIST>;
-                }
+                registerer->unregisterCallback(token);
             }
-        }
-        if (handler) {
-            handler(bot, message);
-            wrapper.sendMessageOnExit();
-        }
-    }
+        }, token);
 };
 
 void handleSaveIdCmd(const Bot& bot, const Message::Ptr& message) {
