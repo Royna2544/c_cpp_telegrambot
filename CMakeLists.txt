@@ -4,38 +4,12 @@ project(TgBot++ LANGUAGES CXX C)
 ####################### Set CMake Policy #######################
 cmake_policy(SET CMP0077 NEW) # option() command prefers to do nothing
                               # when a normal variable of the given name already exists.
-################ Define a CMake Test Style macro ################
-macro(perform_test msg)
-  message(STATUS "Performing test ${msg}")
-  set(PERFORM_TEST_SUCCESS "Performing test ${msg}: Success")
-  set(PERFORM_TEST_FAIL "Performing test ${msg}: Failed")
-endmacro()
-macro(perform_test_ret result)
-  if (${result})
-    message(STATUS ${PERFORM_TEST_SUCCESS})
-  else()
-    message(STATUS ${PERFORM_TEST_FAIL})
-  endif()
-endmacro()
-########### Define a macro to prevent set(VAR ${VAR} NewVar) ###########
-macro(extend_set var)
-  set(${var} ${${var}} ${ARGN})
-endmacro()
-macro(extend_set_if var cond)
-  if(${cond})
-    extend_set(${var} ${ARGN})
-  endif()
-endmacro()
-########### Define a target_link_libraries helper macro ###########
-macro(target_link_lib_if_windows target)
-  if (WIN32)
-    target_link_libraries(${target} ${ARGN})
-  endif()
-endmacro()
-#####################################################################
+
+include(cmake/macros.cmake)
+include(cmake/variables.cmake)
+include(cmake/sanitizers.cmake)
 
 ################ EXE NAMES STEMMED FROM PROJECT_NAME ################
-set(SOCKET_CLI_NAME ${PROJECT_NAME}_SocketCli)
 set(MEDIA_CLI_NAME ${PROJECT_NAME}_MediaCli)
 set(DBDUMPER_NAME ${PROJECT_NAME}_dumpDB)
 set(PROJECT_MAINEXE_NAME ${PROJECT_NAME}_main)
@@ -45,37 +19,11 @@ set(LOGCAT_NAME ${PROJECT_NAME}_logcat)
 
 ############################## OPTIONS ##############################
 option(ENABLE_RUNTIME_COMMAND "Enable runtime loader of commands" ON)
-option(ENABLE_SANITIZERS "Enable sanitizers" OFF)
 option(ENABLE_RUST_SUPPORT "Enable rust support" OFF)
-#################### This must be explicitly set ###################
-set(BUILD_SHARED_LIBS ON CACHE BOOL "Build libs as shared libraries" FORCE)
-set(BUILD_TESTS OFF CACHE BOOL "Build tests" FORCE)
-set(BUILD_CLI OFF CACHE BOOL "[libgit2] Build client" FORCE)
-set(USE_HTTPS "OpenSSL" CACHE STRING "[libgit2] Select HTTPS backend" FORCE)
-set(ABSL_BUILD_TEST_HELPERS OFF CACHE BOOL "[abseil] Build gtest helpers" FORCE)
-set(protobuf_INSTALL OFF CACHE BOOL "[protobuf] Install protobuf libs" FORCE)
-set(protobuf_BUILD_TESTS OFF CACHE BOOL "[protobuf] Build tests" FORCE)
-set(protobuf_BUILD_LIBUPB OFF CACHE BOOL "[protobuf] Build libup8" FORCE)
-set(utf8_range_ENABLE_TESTS OFF CACHE BOOL "[protobuf][utf8_range] Build Tests" FORCE)
-set(utf8_range_ENABLE_INSTALL OFF CACHE BOOL "[protobuf][utf8_range] Install" FORCE)
-#####################################################################
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin CACHE STRING 
-  "Output to store binaries (win32)" FORCE)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin CACHE STRING
-  "Output to store binaries (linux)" FORCE)
-#####################################################################
-
 ################# Detecting x86/x86_64 Architecture ################
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "i[3-6]86|x86_64|AMD64|amd64" AND NOT MSVC)
   add_compile_options(-mrdrnd)
 endif()
-#####################################################################
-
-######################### C++ Configuration #########################
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 #####################################################################
 
 ##################### Fill in readme with cmake #####################
@@ -95,7 +43,7 @@ if (WIN32)
 add_subdirectory(src/third-party/dlfcn-win32 EXCLUDE_FROM_ALL)
 endif()
 ################## Add a common logging init lib ####################
-add_library(TgBotLogInit SHARED src/logging/AbslLogInit.cpp)
+add_library_san(TgBotLogInit SHARED src/logging/AbslLogInit.cpp)
 target_include_directories(TgBotLogInit PUBLIC src/logging/)
 target_link_libraries(TgBotLogInit absl::log_initialize absl::log absl::log_sink
   absl::log_sink_registry absl::str_format)
@@ -114,16 +62,14 @@ endif()
 if (NOT MSVC)
   add_compile_options(
     -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/=)  
-  if (CMAKE_BUILD_TYPE STREQUAL "Debug" AND ENABLE_SANITIZERS)
-    add_compile_options(-fsanitize=address,leak -g -O0 -fno-omit-frame-pointer)
-    add_link_options(-fsanitize=address,leak -g -O0 -fno-omit-frame-pointer)
-  endif()
 endif()
 if (WIN32)
   # Windows 10  
   add_definitions(-D_WIN32_WINNT=0x0A00)
   add_compile_definitions(-DWINDOWS_BUILD)
 endif()
+#####################################################################
+
 ################### Check Windows's AF_UNIX support ###################
 ################# Versions later than Win10 RS3 does #################
 if (WIN32)
@@ -164,7 +110,6 @@ if (APPLE)
     find_library(SECURITY Security REQUIRED)
     set(MACOS_SSL_LIBS ${CORE_FOUNDATION} ${SECURITY})
 endif()
-find_package(LibXml2 REQUIRED)
 #####################################################################
 
 ############################# Platforms #############################
@@ -226,52 +171,11 @@ set(COMMANDS_GEN_FILE src/command_modules/gen/cmds.gen.cpp)
 configure_file(${COMMANDS_GEN_FILE}.in ${CMAKE_BINARY_DIR}/${COMMANDS_GEN_FILE})
 extend_set(SRC_LIST ${CMAKE_BINARY_DIR}/${COMMANDS_GEN_FILE})
 #####################################################################
+include(cmake/database.cmake)
 
-######################## Define SQLite3 target ######################
-add_library(SQLite3 src/third-party/libsqlite3/libsqlite3/libsqlite3/sqlite3.c)
-target_include_directories(SQLite3 PUBLIC src/third-party/libsqlite3/libsqlite3/libsqlite3/)
-#####################################################################
-
-####################### Database (Protobuf) #######################
-include(src/database/proto/ProtobufCpp.cmake)
-my_protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS src/database/proto/TgBotDB.proto)
-add_library(TgBotDB SHARED 
-  src/database/ProtobufDatabase.cpp
-  src/database/SQLiteDatabase.cpp
-  ${PROTO_SRCS})
-add_dependencies(TgBotDB protobuf_TgBotDB_ready)
-####################### TgBotDB lib includes #######################
-get_filename_component(PROTO_HDRS_DIR ${PROTO_HDRS} DIRECTORY)
-target_include_directories(TgBotDB PUBLIC ${PROTO_HDRS_DIR})
-target_include_directories(TgBotDB PRIVATE ${Protobuf_INCLUDE_DIRS})
-target_link_libraries(TgBotDB protobuf::libprotobuf SQLite3 TgBotUtils)
-####################### TgBotDBImpl lib  #######################
-add_library(TgBotDBImpl SHARED src/database/bot/TgBotDatabaseImpl.cpp)
-target_link_libraries(TgBotDBImpl TgBotUtils TgBotDB)
-#####################################################################
-
-####################### TgBotStringRes lib  #######################
-add_library(TgBotStringRes SHARED src/stringres/StringResLoader.cpp)
+####################### TgBotStringRes lib  ######################
 extend_set(SRC_LIST src/stringres/StringResManager.cpp)
-target_link_libraries(TgBotStringRes ${LIBXML2_LIBRARIES})
-target_include_directories(TgBotStringRes PUBLIC src/stringres)
-target_include_directories(TgBotStringRes PRIVATE ${LIBXML2_INCLUDE_DIR})
-add_executable(StringResCompiler src/stringres/StringResCompiler.cpp)
-target_link_libraries(StringResCompiler TgBotStringRes TgBotLogInit)
-
-set(STRINGRES_XML ${CMAKE_SOURCE_DIR}/resources/strings/en-US.xml)
-set(STRINGRES_GENHDR_DIR ${CMAKE_BINARY_DIR}/src/stringres/)
-set(STRINGRES_GENHDR ${STRINGRES_GENHDR_DIR}/resources.gen.h)
-set(STRINGRES_COMPILER ${CMAKE_BINARY_DIR}/bin/StringResCompiler)
-add_custom_command(
-  OUTPUT ${STRINGRES_GENHDR}
-  DEPENDS ${STRINGRES_COMPILER} ${STRINGRES_XML}
-  COMMAND ${STRINGRES_COMPILER} ${STRINGRES_XML} ${STRINGRES_GENHDR}
-)
-add_custom_target(gen_stringres_header
-  COMMENT "Generating string resource header"
-  DEPENDS ${STRINGRES_XML} ${STRINGRES_GENHDR})
-set_source_files_properties(${STRINGRES_GENHDR} PROPERTIES GENERATED TRUE)
+include(cmake/tgbotstringres.cmake)
 #################################################################
 
 ################## RTCL (Run Time Command Loader) ##################
@@ -287,14 +191,14 @@ endif()
 
 ########################## WebPage Server ##########################
 add_subdirectory(src/third-party/cpp-httplib)
-add_library(TgBotWeb SHARED src/web/WebServerBase.cpp)
+add_library_san(TgBotWeb SHARED src/web/WebServerBase.cpp)
 target_link_libraries(TgBotWeb httplib::httplib)
 extend_set(SRC_LIST src/web/TgBotWebServer.cpp)
 ####################################################################
 
 ########################## Logcat Client ##########################
 if (USE_UNIX_SOCKETS)
-  add_executable(${LOGCAT_NAME} src/logging/LoggingClient.cpp)
+  add_executable_san(${LOGCAT_NAME} src/logging/LoggingClient.cpp)
   target_link_libraries(${LOGCAT_NAME} TgBotSocket TgBotLogInit)
 endif()
 ####################### TgBot Socket Library #######################
@@ -307,94 +211,16 @@ if (USE_UNIX_SOCKETS)
     ${SOCKET_SRC_INTERFACE}/impl/bot/TgBotSocketInterface.cpp
     ${SOCKET_SRC_INTERFACE}/impl/backends/ServerBackend.cpp
     ${SOCKET_SRC_INTERFACE}/impl/backends/ServerBackend_${TARGET_VARIANT}.cpp)
-  if (UNIX)
-    set(SOCKET_SRC_LIST
-      ${SOCKET_SRC_INTERFACE}/impl/SocketPosix.cpp
-      ${SOCKET_SRC_INTERFACE}/impl/local/SocketPosixLocal.cpp
-      ${SOCKET_SRC_INTERFACE}/impl/inet/SocketPosixIPv4.cpp
-      ${SOCKET_SRC_INTERFACE}/impl/inet/SocketPosixIPv6.cpp
-      src/socket/selector/SelectorPosixPoll.cpp
-      src/socket/selector/SelectorPosixSelect.cpp
-      src/socket/selector/SelectorUnix.cpp
-      ${SOCKET_SRC_INTERFACE}/impl/bot/ClientBackendPosix.cpp
-    )
-    if (APPLE)
-      extend_set(SOCKET_SRC_LIST
-        ${SOCKET_SRC_INTERFACE}/impl/helper/SocketHelperDarwin.cpp
-        src/socket/selector/SelectorLinuxEPollStub.cpp
-      )
-    else()
-      extend_set(SOCKET_SRC_LIST
-        ${SOCKET_SRC_INTERFACE}/impl/helper/SocketHelperLinux.cpp
-        src/socket/selector/SelectorLinuxEPoll.cpp
-      )
-    endif()
-  elseif(WIN32)
-    extend_set(SOCKET_SRC_LIST 
-      ${SOCKET_SRC_INTERFACE}/impl/SocketWindows.cpp
-      ${SOCKET_SRC_INTERFACE}/impl/local/SocketWindowsLocal.cpp
-      ${SOCKET_SRC_INTERFACE}/impl/inet/SocketWindowsIPv4.cpp
-      ${SOCKET_SRC_INTERFACE}/impl/inet/SocketWindowsIPv6.cpp
-      ${SOCKET_SRC_INTERFACE}/impl/helper/SocketHelperWindows.cpp
-      src/socket/selector/SelectorWindowsSelect.cpp
-      ${SOCKET_SRC_INTERFACE}/impl/bot/ClientBackendWindows.cpp
-    )
-  endif()
-  extend_set(SOCKET_SRC_LIST
-    ${SOCKET_SRC_INTERFACE}/impl/helper/SocketHelper.cpp)
-
-  if (CURL_FOUND)
-    extend_set(SOCKET_SRC_LIST
-      ${SOCKET_SRC_INTERFACE}/impl/helper/SocketHelperCurl.cpp)
-  else()
-    extend_set(SOCKET_SRC_LIST
-      ${SOCKET_SRC_INTERFACE}/impl/helper/SocketHelperNoCurl.cpp)
-  endif()
-  add_library(TgBotSocket SHARED
-    ${SOCKET_SRC_LIST}
-    ${SOCKET_SRC_INTERFACE}/SocketBase.cpp
-    ${SOCKET_SRC_INTERFACE}/impl/bot/TgBotPacketParser.cpp
-    src/socket/TgBotCommandMap.cpp)
-  target_include_directories(TgBotSocket PRIVATE ${CURL_INCLUDE_DIRS})
-  target_include_directories(TgBotSocket PUBLIC src/socket/include ${SOCKET_SRC_INTERFACE})
-  if (CURL_FOUND)
-    target_link_libraries(TgBotSocket CURL::libcurl)
-  endif()
-  target_link_libraries(TgBotSocket TgBotUtils)
-  add_executable(${SOCKET_CLI_NAME}
-    src/socket/TgBotSocketClient.cpp)
-
-  target_link_libraries(${SOCKET_CLI_NAME} TgBotSocket TgBotLogInit)
-  target_link_lib_if_windows(${SOCKET_CLI_NAME} Ws2_32)
+  include(cmake/tgbotsocket.cmake)
 endif()
 #####################################################################
 
-################## libgit2 for accessing git in C code ##############
-add_subdirectory(src/third-party/libgit2 EXCLUDE_FROM_ALL)
-set(LIBGIT2_LIBS libgit2 util pcre http-parser xdiff ${ZLIB_LIBRARIES} ${OPENSSL_LIBRARIES})
-if (WIN32)
-  extend_set(LIBGIT2_LIBS winhttp CRYPT32 Rpcrt4 Secur32 Ws2_32)
-elseif(APPLE)
-  extend_set(LIBGIT2_LIBS ntlmclient iconv ${MACOS_SSL_LIBS})
-else()
-  extend_set(LIBGIT2_LIBS ntlmclient)
-endif()
-#####################################################################
 ################# TgBot Utilities (generic) Library #################
-add_library(
-  TgBotUtils SHARED
-  src/ConfigManager.cpp
-  src/ConfigManager_${TARGET_VARIANT}.cpp
-  src/GitData.cpp
-  src/libos/libfs.cpp
-  src/libos/libfs_${TARGET_VARIANT}.cpp)
-
-target_link_libraries(TgBotUtils ${Boost_LIBRARIES} ${LIBGIT2_LIBS})
-target_link_lib_if_windows(TgBotUtils shlwapi)
+include(cmake/tgbotutils.cmake)
 #####################################################################
 
 ################### The Bot's main functionaility ###################
-add_library(${PROJECT_NAME} SHARED ${SRC_LIST})
+add_library_san(${PROJECT_NAME} SHARED ${SRC_LIST})
 target_include_directories(${PROJECT_NAME} PRIVATE src/third-party/rapidjson/include)
 target_include_directories(${PROJECT_NAME} PUBLIC ${STRINGRES_GENHDR_DIR})
 ######################## Libraries to link ########################
@@ -407,39 +233,22 @@ add_dependencies(${PROJECT_NAME} gen_stringres_header)
 #####################################################################
 
 ################# The Bot's main launcher (program) #################
-add_executable(${PROJECT_MAINEXE_NAME} src/main.cpp)
+add_executable_san(${PROJECT_MAINEXE_NAME} src/main.cpp)
 target_link_libraries(${PROJECT_MAINEXE_NAME} ${PROJECT_NAME} TgBotLogInit
   absl::log_sink absl::log_sink_registry)
 #####################################################################
 
 ################# Utility Programs (Dump Database) ##################
-add_executable(${DBDUMPER_NAME} src/database/utils/DumpProtoDB.cc)
+add_executable_san(${DBDUMPER_NAME} src/database/utils/DumpProtoDB.cc)
 target_link_libraries(${DBDUMPER_NAME} TgBotDBImpl TgBotLogInit)
 #####################################################################
 
 ############### Utility Programs (Send Media to chat) ################
 if (USE_UNIX_SOCKETS)
-  add_executable(${MEDIA_CLI_NAME} src/database/utils/SendMediaToChat.cc)
+  add_executable_san(${MEDIA_CLI_NAME} src/database/utils/SendMediaToChat.cc)
   target_link_libraries(${MEDIA_CLI_NAME} TgBotDBImpl TgBotSocket TgBotLogInit)
   target_link_lib_if_windows(${MEDIA_CLI_NAME} Ws2_32)
 endif()
 #####################################################################
 
-############### Bot functions' Test Arena (googletest) ##############
-###################### Creates the test target ######################
-add_executable(${PROJECT_TEST_NAME}
-  tests/TestMain.cpp
-  tests/AuthorizationTest.cpp
-  tests/MessageWrapperTest.cpp
-  tests/ConfigManagerTest.cpp
-  tests/RegexHandlerTest.cpp
-  tests/DatabaseLoader.cpp
-  tests/ResourceManagerTest.cpp
-  tests/TryParseTest.cpp
-  tests/SharedMallocTest.cpp
-  tests/ConstexprStringCatTest.cpp
-)
-target_include_directories(${PROJECT_TEST_NAME} PRIVATE ${gtest_INCLUDE_DIR} ${gmock_INCLUDE_DIR})
-target_link_libraries(${PROJECT_TEST_NAME} gtest gmock ${PROJECT_NAME} TgBotLogInit)
-add_test(NAME ${PROJECT_TEST_NAME} COMMAND ${PROJECT_TEST_NAME})
-#####################################################################
+include(cmake/tests.cmake)
