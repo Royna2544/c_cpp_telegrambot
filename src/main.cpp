@@ -267,11 +267,13 @@ int main(int argc, char* const* argv) {
     handleRestartCommand(gBot);
 #endif
 
+    try {
+        // Bot starts
+        onBotInitialized(gBot, startupDp, argv[0]);
+    } catch (...) {
+    }
     while (true) {
         try {
-            // Bot starts
-            onBotInitialized(gBot, startupDp, argv[0]);
-
             LOG(INFO) << "Bot username: " << gBot.getApi().getMe()->username;
             gBot.getApi().deleteWebhook();
 
