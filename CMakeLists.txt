@@ -254,13 +254,18 @@ target_link_libraries(TgBotStringRes ${LIBXML2_LIBRARIES})
 target_include_directories(TgBotStringRes PUBLIC src/stringres)
 add_executable(StringResCompiler src/stringres/StringResCompiler.cpp)
 target_link_libraries(StringResCompiler TgBotStringRes TgBotLogInit)
+
 set(STRINGRES_XML ${CMAKE_SOURCE_DIR}/resources/strings/en-US.xml)
 set(STRINGRES_GENHDR ${CMAKE_SOURCE_DIR}/src/stringres/resources.gen.h)
-add_custom_target(gen_stringres_header 
-  COMMAND ${CMAKE_BINARY_DIR}/bin/StringResCompiler ${STRINGRES_XML} ${STRINGRES_GENHDR}
-  DEPENDS StringResCompiler
+set(STRINGRES_COMPILER ${CMAKE_BINARY_DIR}/bin/StringResCompiler)
+add_custom_command(
+  OUTPUT ${STRINGRES_GENHDR}
+  DEPENDS ${STRINGRES_COMPILER} ${STRINGRES_XML}
+  COMMAND ${STRINGRES_COMPILER} ${STRINGRES_XML} ${STRINGRES_GENHDR}
+)
+add_custom_target(gen_stringres_header
   COMMENT "Generating string resource header"
-  SOURCES ${STRINGRES_XML})
+  DEPENDS ${STRINGRES_XML})
 set_source_files_properties(${STRINGRES_GENHDR} PROPERTIES GENERATED TRUE)
 #################################################################
 
