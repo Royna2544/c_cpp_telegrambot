@@ -7,10 +7,10 @@
 #include <cstdlib>
 #include <fstream>
 
-#include "StringResManager.hpp"
+#include "StringResLoader.hpp"
 
 int main(int argc, char** argv) {
-    StringResManager manager;
+    StringResLoader manager;
     TgBot_AbslLogInit();
 
     if (argc != 3) {

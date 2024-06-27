@@ -1,21 +1,19 @@
-#include <filesystem>
-#include <string>
-#include <vector>
-#include "InstanceClassBase.hpp"
+#include <CStringLifetime.h>
+
+#include <InstanceClassBase.hpp>
+#include <initcalls/Initcall.hpp>
+#include "StringResLoader.hpp"
 
 #if __has_include("resources.gen.h")
 #include "resources.gen.h"
 #endif
 
 // Shorthand macro for getting a string
-#define GETSTR(x) StringResManager::getInstance()->getString(STRINGRES_ ##x)
+#define GETSTR(x) StringResManager::getInstance()->getString(STRINGRES_##x)
 #define GETSTR_IS(x) (GETSTR(x) + ": ")
 #define GETSTR_BRACE(x) ("(" + GETSTR(x) + ")")
 
-struct StringResManager : InstanceClassBase<StringResManager> {
-    std::vector<std::pair<std::string, std::string>> m_strings;
-    
-    bool parseFromFile(const std::filesystem::path& path, int expected_size = 0);
-    // One of STRINGRES_* constants
-    [[nodiscard]] std::string getString(const int key) const;
+struct StringResManager : InstanceClassBase<StringResManager>, InitCall, StringResLoader {
+    void doInitCall() override;
+    const CStringLifetime getInitCallName() const override;
 };

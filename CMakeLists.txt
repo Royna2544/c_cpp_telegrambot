@@ -248,7 +248,8 @@ target_link_libraries(TgBotDBImpl TgBotUtils TgBotDB)
 #####################################################################
 
 ####################### TgBotStringRes lib  #######################
-add_library(TgBotStringRes SHARED src/stringres/StringResManager.cpp)
+add_library(TgBotStringRes SHARED src/stringres/StringResLoader.cpp)
+extend_set(SRC_LIST src/stringres/StringResManager.cpp)
 target_link_libraries(TgBotStringRes ${LIBXML2_LIBRARIES})
 target_include_directories(TgBotStringRes PUBLIC src/stringres)
 add_executable(StringResCompiler src/stringres/StringResCompiler.cpp)

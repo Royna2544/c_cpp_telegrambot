@@ -1,86 +1,25 @@
 #include "StringResManager.hpp"
 
-#include <CStringLifetime.h>
-#include <absl/log/log.h>
-#include <libxml/parser.h>
-#include <libxml/tree.h>
-
-#include <filesystem>
-#include <vector>
-
+#include <ConfigManager.h>
+#include <libos/libfs.hpp>
 #include "InstanceClassBase.hpp"
 
-bool StringResManager::parseFromFile(const std::filesystem::path &path,
-                                     int expected_size) {
-    // Initialize the library and check potential ABI mismatches
-    LIBXML_TEST_VERSION;
-    CStringLifetime filename = path.string().c_str();
-    xmlChar resourceKey[] = "resources";
-    xmlChar stringKey[] = "string";
-    xmlChar nameProp[] = "name";
-    // Parse the XML file
-    xmlDocPtr doc = xmlReadFile(filename, nullptr, 0);
-    if (doc == nullptr) {
-        LOG(ERROR) << "Could not parse file " << filename;
-        return false;
+void StringResManager::doInitCall() {
+    auto locale = getVariable(ConfigManager::Configs::LOCALE);
+    if (!locale) {
+        LOG(WARNING) << "Using default locale: en-US";
+        locale = "en-US";
     }
-
-    LOG(INFO) << "Parsing file: " << filename;
-
-    // Get the root element node
-    xmlNodePtr rootElement = xmlDocGetRootElement(doc);
-
-    // Ensure the root element is <resources>
-    if (xmlStrcmp(rootElement->name, resourceKey) != 0) {
-        LOG(ERROR) << "Root element is not <resources>";
-        xmlFreeDoc(doc);
-        return false;
+    bool res = parseFromFile(FS::getPathForType(FS::PathType::RESOURCES) /
+                                 "strings" / locale->append(".xml"),
+                             STRINGRES_MAX);
+    if (!res) {
+        LOG(ERROR) << "Failed to parse string res, abort";
     }
-
-    // Iterate through <string> elements
-    for (xmlNodePtr cur = rootElement->children; cur != nullptr;
-         cur = cur->next) {
-        if (cur->type == XML_ELEMENT_NODE &&
-            (xmlStrcmp(cur->name, stringKey) == 0)) {
-            xmlChar *nameAttr = xmlGetProp(cur, nameProp);
-            xmlChar *content = xmlNodeListGetString(doc, cur->children, 1);
-
-            if ((nameAttr != nullptr) && (content != nullptr)) {
-                m_strings.emplace_back(reinterpret_cast<char *>(nameAttr),
-                                       reinterpret_cast<char *>(content));
-            }
-
-            if (nameAttr != nullptr) {
-                xmlFree(nameAttr);
-            }
-            if (content != nullptr) {
-                xmlFree(content);
-            }
-        }
-    }
-
-    // Sort the strings by name
-    std::ranges::sort(m_strings, [](auto &&lfs, auto &&rfs) {
-        return lfs.first > rfs.first;
-    });
-
-    // Free the document
-    xmlFreeDoc(doc);
-
-    // Cleanup function for the XML library
-    xmlCleanupParser();
-
-    if (expected_size > 0 && m_strings.size() != expected_size) {
-        LOG(ERROR) << "Number of strings(" << m_strings.size()
-                   << ") is not equal to expected_size(" << expected_size
-                   << ")";
-        return false;
-    }
-    return true;
 }
 
-std::string StringResManager::getString(const int key) const {
-    return m_strings.at(key).second;
+const CStringLifetime StringResManager::getInitCallName() const {
+    return "Load language resource file";
 }
 
 DECLARE_CLASS_INST(StringResManager);

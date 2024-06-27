@@ -16,12 +16,12 @@
 #include <OnAnyMessageRegister.hpp>
 #include <StringResManager.hpp>
 #include <TgBotWebpage.hpp>
+#include <TryParseStr.hpp>
+#include <boost/algorithm/string/split.hpp>
 #include <chrono>
+#include <database/bot/TgBotDatabaseImpl.hpp>
 #include <memory>
 #include <utility>
-
-#include "database/bot/TgBotDatabaseImpl.hpp"
-#include "libos/libfs.hpp"
 
 #ifdef RTCOMMAND_LOADER
 #include <RTCommandLoader.h>
@@ -102,6 +102,70 @@ void createAndDoInitCall(Args... args) {
     inst->initWrapper();
 }
 
+namespace {
+void handleRestartCommand(Bot& bot) {
+    // If it was restarted, then send a message to the caller
+    std::string result;
+    std::vector<std::string> splitStrings(2);
+    if (ConfigManager::getEnv("RESTART", result)) {
+        MessageId msgId = 0;
+        ChatId chatId = 0;
+        LOG(INFO) << "RESTART env var set to " << result;
+
+        boost::split(splitStrings, result, [](char c) { return c == ':'; });
+
+        if (splitStrings.size() != 2) {
+            LOG(ERROR) << "Invalid RESTART env var format";
+        } else if (try_parse(splitStrings[0], &chatId) &&
+                   try_parse(splitStrings[1], &msgId)) {
+            LOG(INFO) << "Restart success!";
+            bot.getApi().sendMessage(
+                chatId, "Restart success!", nullptr,
+                std::make_shared<TgBot::ReplyParameters>(msgId, chatId, true));
+        } else {
+            LOG(ERROR) << "Could not parse back params!";
+        }
+    }
+}
+
+void TgBotApiExHandler(TgBot::Bot& bot, const TgBot::TgException& e) {
+    static std::optional<DurationPoint> exceptionDuration;
+
+    LOG(ERROR) << "TgBotAPI Exception: " << e.what();
+    LOG(WARNING) << "Trying to recover";
+    UserId ownerid = TgBotDatabaseImpl::getInstance()->getOwnerUserId();
+    try {
+        bot_sendMessage(bot, ownerid,
+                        std::string("Exception occured: ") + e.what());
+    } catch (const TgBot::TgException& e) {
+        LOG(FATAL) << e.what();
+    }
+    if (exceptionDuration && exceptionDuration->get() < kErrorMaxDuration) {
+        bot_sendMessage(bot, ownerid, "Recover failed.");
+        LOG(FATAL) << "Recover failed";
+    }
+    exceptionDuration.emplace();
+    exceptionDuration->init();
+    bot_sendMessage(bot, ownerid, "Reinitializing.");
+    LOG(INFO) << "Re-init";
+    AuthContext::getInstance()->isAuthorized() = false;
+    const auto thrmgr = ThreadManager::getInstance();
+    auto cl =
+        thrmgr->createController<ThreadManager::Usage::ERROR_RECOVERY_THREAD>();
+    if (!cl) {
+        cl = thrmgr
+                 ->getController<ThreadManager::Usage::ERROR_RECOVERY_THREAD>();
+        cl->reset();
+    }
+    if (cl) {
+        cl->runWith([] {
+            std::this_thread::sleep_for(kErrorRecoveryDelay);
+            AuthContext::getInstance()->isAuthorized() = true;
+        });
+    }
+}
+}  // namespace
+
 int main(int argc, char* const* argv) {
     std::optional<std::string> token;
     std::optional<LogFileSink> log_sink;
@@ -137,24 +201,11 @@ int main(int argc, char* const* argv) {
     static Bot gBot(token.value());
 #endif
 
-    auto locale = getVariable(ConfigManager::Configs::LOCALE);
-    if (!locale) {
-        LOG(WARNING) << "Using default locale: en-US";
-        locale = "en-US";
-    }
-    bool res = StringResManager::getInstance()->parseFromFile(
-        FS::getPathForType(FS::PathType::RESOURCES) / "strings" /
-            locale->append(".xml"),
-        STRINGRES_MAX);
-    if (!res) {
-        LOG(ERROR) << "Failed to parse string res, abort";
-        return EXIT_FAILURE;
-    }
-
     // Install signal handlers
     installSignalHandler();
 
     // Initialize subsystems
+    createAndDoInitCall<StringResManager>();
     createAndDoInitCall<TgBotWebServer, ThreadManager::Usage::WEBSERVER_THREAD>(
         8080);
 #ifdef RTCOMMAND_LOADER
@@ -178,9 +229,10 @@ int main(int argc, char* const* argv) {
     LOG(INFO) << "Subsystems initialized, bot started: " << argv[0];
     LOG(INFO) << "Started in " << startupDp.get().count() << " milliseconds";
 
-    gBot.getApi().setMyDescription("Royna's telegram bot, written in C++. Go on you can talk to him");
+    gBot.getApi().setMyDescription(
+        "Royna's telegram bot, written in C++. Go on you can talk to him");
     gBot.getApi().setMyShortDescription(
-        "One of @roynatech's C++ project bots. I'm currently hosted on "
+        "One of @roynatech's TgBot C++ project bots. I'm currently hosted on "
 #if BOOST_OS_WINDOWS
         "Windows"
 #elif BOOST_OS_LINUX
@@ -191,9 +243,12 @@ int main(int argc, char* const* argv) {
         "unknown platform"
 #endif
     );
-    // Main loop
-    DurationPoint dp;
-    do {
+
+#ifndef WINDOWS_BUILD
+    handleRestartCommand(gBot);
+#endif
+
+    while (true) {
         try {
             LOG(INFO) << "Bot username: " << gBot.getApi().getMe()->username;
             gBot.getApi().deleteWebhook();
@@ -203,46 +258,14 @@ int main(int argc, char* const* argv) {
                 longPoll.start();
             }
         } catch (const TgBot::TgException& e) {
-            LOG(ERROR) << "TgBotAPI Exception: " << e.what();
-            LOG(WARNING) << "Trying to recover";
-            UserId ownerid = TgBotDatabaseImpl::getInstance()->getOwnerUserId();
-            try {
-                bot_sendMessage(gBot, ownerid,
-                                std::string("Exception occured: ") + e.what());
-            } catch (const TgBot::TgException& e) {
-                LOG(FATAL) << e.what();
-                break;
-            }
-            if (dp.get() < kErrorMaxDuration) {
-                bot_sendMessage(gBot, ownerid, "Recover failed.");
-                LOG(FATAL) << "Recover failed";
-                break;
-            }
-            dp.init();
-            bot_sendMessage(gBot, ownerid, "Reinitializing.");
-            LOG(INFO) << "Re-init";
-            AuthContext::getInstance()->isAuthorized() = false;
-            const auto thrmgr = ThreadManager::getInstance();
-            auto cl = thrmgr->createController<
-                ThreadManager::Usage::ERROR_RECOVERY_THREAD>();
-            if (!cl) {
-                cl = thrmgr->getController<
-                    ThreadManager::Usage::ERROR_RECOVERY_THREAD>();
-                cl->reset();
-            }
-            if (cl) {
-                cl->runWith([] {
-                    std::this_thread::sleep_for(kErrorRecoveryDelay);
-                    AuthContext::getInstance()->isAuthorized() = true;
-                });
-            }
+            TgBotApiExHandler(gBot, e);
         } catch (const std::exception& e) {
             LOG(ERROR) << "Uncaught Exception: " << e.what();
             LOG(ERROR) << "Throwing exception to the main thread";
             defaultCleanupFunction();
             throw;
         }
-    } while (true);
+    }
     defaultCleanupFunction();
     return EXIT_FAILURE;
 }
