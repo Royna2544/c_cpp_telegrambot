@@ -178,23 +178,28 @@ endif()
 
 ############################ Source list ############################
 set(SRC_LIST
-    src/Authorization.cpp
-    src/BotAddCommand.cpp
-    src/BotMessageUtils.cpp
-    src/command_modules/compiler/Base.cpp
-    src/command_modules/compiler/Bash.cpp
-    src/command_modules/compiler/CCpp.cpp
-    src/command_modules/compiler/Generic.cpp
-    src/command_modules/compiler/Helper.cpp
-    src/command_modules/CommandModules.cpp
-    src/ExtArgs.cpp
-    src/libos/libsighandler_impl.cpp
-    src/libos/libsighandler_${TARGET_VARIANT}.cpp
-    src/random/RandomNumberGenerator.cpp
-    src/database/bot/TgBotDatabaseImpl.cpp
-    src/SpamBlocker.cpp
-    src/RegEXHandler.cpp
-    src/TimerImpl.cpp
+  src/Authorization.cpp
+  src/BotAddCommand.cpp
+  src/BotMessageUtils.cpp
+  src/ExtArgs.cpp
+  src/ManagedThread.cpp
+  src/RegEXHandler.cpp
+  src/ResourceManager.cpp
+  src/SpamBlocker.cpp
+  src/ThreadManager.cpp
+  src/TimerImpl.cpp
+  src/command_modules/CommandModules.cpp
+  src/command_modules/compiler/Base.cpp
+  src/command_modules/compiler/Bash.cpp
+  src/command_modules/compiler/CCpp.cpp
+  src/command_modules/compiler/Generic.cpp
+  src/command_modules/compiler/Helper.cpp
+  src/database/bot/TgBotDatabaseImpl.cpp
+  src/libos/libsighandler_impl.cpp
+  src/libos/libsighandler_${TARGET_VARIANT}.cpp
+  src/popen_wdt/popen_wdt.c
+  src/popen_wdt/popen_wdt_${TARGET_VARIANT}.c
+  src/random/RandomNumberGenerator.cpp
 )
 #####################################################################
 
@@ -380,12 +385,7 @@ add_library(
   TgBotUtils SHARED
   src/ConfigManager.cpp
   src/ConfigManager_${TARGET_VARIANT}.cpp
-  src/ManagedThread.cpp
-  src/ThreadManager.cpp
-  src/ResourceManager.cpp
   src/GitData.cpp
-  src/popen_wdt/popen_wdt_${TARGET_VARIANT}.c
-  src/popen_wdt/popen_wdt.c
   src/libos/libfs.cpp
   src/libos/libfs_${TARGET_VARIANT}.cpp)
 
