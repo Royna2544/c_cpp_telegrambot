@@ -123,7 +123,7 @@ void handleDatabaseCmd(Bot& bot, const Message::Ptr& message) {
 
     registerer->registerCallback(
         [msg, registerer, token](const Bot& bot, Message::Ptr m) {
-            if (m->replyToMessage->messageId == msg->messageId) {
+            if (m->replyToMessage && m->replyToMessage->messageId == msg->messageId) {
                 if (m->text == addtowhitelist) {
                     handleAddUser<DatabaseBase::ListType::WHITELIST>(bot, m);
                 } else if (m->text == removefromwhitelist) {
