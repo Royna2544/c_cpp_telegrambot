@@ -77,7 +77,7 @@ bool TgBotDatabaseImpl::loadDBFromConfig() {
     return loaded;
 }
 
-TgBotDatabaseImpl::~TgBotDatabaseImpl() {
+void TgBotDatabaseImpl::unloadDatabase() {
     if (loaded) {
         std::visit(
             [this](auto&& arg) {

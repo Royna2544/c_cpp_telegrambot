@@ -12,8 +12,6 @@ struct TgBotDatabaseImpl : InstanceClassBase<TgBotDatabaseImpl>, InitCall {
     std::variant<ProtoDatabase, SQLiteDatabase> databaseBackend;
     bool loadDBFromConfig();
 
-    ~TgBotDatabaseImpl();
-
     // Wrappers
     [[nodiscard]] bool isLoaded() const;
     [[nodiscard]] DatabaseBase::ListResult addUserToList(
@@ -28,6 +26,7 @@ struct TgBotDatabaseImpl : InstanceClassBase<TgBotDatabaseImpl>, InitCall {
     [[nodiscard]] bool addMediaInfo(const DatabaseBase::MediaInfo& info) const;
     std::ostream &dump(std::ostream &ofs) const;
     void setOwnerUserId(UserId userid) const;
+    void unloadDatabase();
 
     const CStringLifetime getInitCallName() const override {
         return "Load database";

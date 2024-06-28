@@ -1,5 +1,5 @@
 #include <ManagedThreads.hpp>
-
+#include <database/bot/TgBotDatabaseImpl.hpp>
 #include <mutex>
 
 #include "libsighandler.h"
@@ -13,5 +13,6 @@ void defaultSignalHandler(int s) {
 void defaultCleanupFunction() {
     LOG(INFO) << "Exiting";
     ThreadManager::getInstance()->destroyManager();
+    TgBotDatabaseImpl::getInstance()->unloadDatabase();
     LOG(INFO) << "TgBot process exiting, Goodbye!";
 }
