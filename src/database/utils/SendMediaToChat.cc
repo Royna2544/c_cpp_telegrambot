@@ -28,17 +28,18 @@ int main(int argc, char* const* argv) {
     if (argc != 3) {
         _usage(EXIT_SUCCESS);
     }
-    if (!backend->loadDBFromConfig()) {
-        LOG(ERROR) << "Failed to load DB from config";
-        return EXIT_FAILURE;
-    }
     if (!try_parse(argv[1], &chatId)) {
         LOG(ERROR) << "Failed to convert '" << argv[1] << "' to ChatId";
         _usage(EXIT_FAILURE);
     }
+    if (!backend->loadDBFromConfig()) {
+        LOG(ERROR) << "Failed to load DB from config";
+        return EXIT_FAILURE;
+    }
     auto info = backend->queryMediaInfo(argv[2]);
     if (!info.has_value()) {
         LOG(ERROR) << "Failed to find entry for name '" << argv[2] << "'";
+        backend->unloadDatabase();
         return EXIT_FAILURE;
     } else {
         LOG(INFO) << "Found, sending (fileid " << info->mediaId << ") to chat "
@@ -53,4 +54,5 @@ int main(int argc, char* const* argv) {
     SocketClientWrapper wrapper(
         SocketInterfaceBase::LocalHelper::getSocketPath());
     wrapper->writeAsClientToSocket(pkt.toSocketData());
+    backend->unloadDatabase();
 }
