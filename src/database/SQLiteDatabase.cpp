@@ -250,20 +250,15 @@ SQLiteDatabase::ListResult SQLiteDatabase::addUserToList(InfoType type,
         case ListResult::BACKEND_ERROR:
             return res;
     }
-
-    try {
-        auto helper = Helper::create(db, Helper::kInsertUserFile);
-        if (!helper->prepare()) {
-            return ListResult::BACKEND_ERROR;
-        }
-        helper->addArgument(user)
-            ->addArgument(static_cast<int>(type))
-            ->bindArguments();
-        if (helper->execute()) {
-            return ListResult::OK;
-        }
-    } catch (const std::runtime_error& e) {
-        LOG(ERROR) << "Error inserting user: " << e.what();
+    auto helper = Helper::create(db, Helper::kInsertUserFile);
+    if (!helper->prepare()) {
+        return ListResult::BACKEND_ERROR;
+    }
+    helper->addArgument(user)
+        ->addArgument(static_cast<int>(type))
+        ->bindArguments();
+    if (helper->execute()) {
+        return ListResult::OK;
     }
     return ListResult::BACKEND_ERROR;
 }
@@ -291,19 +286,15 @@ SQLiteDatabase::ListResult SQLiteDatabase::removeUserFromList(
             return res;
     }
 
-    try {
-        auto helper = Helper::create(db, Helper::kRemoveUserFile.data());
-        if (!helper->prepare()) {
-            return ListResult::BACKEND_ERROR;
-        }
-        helper->addArgument(user);
-        helper->addArgument(static_cast<int>(toInfoType(type)));
-        helper->bindArguments();
-        if (helper->execute()) {
-            return ListResult::OK;
-        }
-    } catch (const std::runtime_error& e) {
-        LOG(ERROR) << "Error removing user: " << e.what();
+    auto helper = Helper::create(db, Helper::kRemoveUserFile.data());
+    if (!helper->prepare()) {
+        return ListResult::BACKEND_ERROR;
+    }
+    helper->addArgument(user);
+    helper->addArgument(static_cast<int>(toInfoType(type)));
+    helper->bindArguments();
+    if (helper->execute()) {
+        return ListResult::OK;
     }
     return ListResult::BACKEND_ERROR;
 }
@@ -325,17 +316,12 @@ void SQLiteDatabase::initDatabase() {
     ListResult result = ListResult::BACKEND_ERROR;
     std::optional<Helper::Row> row;
 
-    try {
-        auto helper = Helper::create(db, Helper::kFindUserFile.data());
-        if (!helper->prepare()) {
-            return result;
-        }
-        helper->addArgument(user);
-        row = helper->execAndGetRow();
-    } catch (const std::runtime_error& e) {
-        LOG(ERROR) << "Error checking for user: " << e.what();
+    auto helper = Helper::create(db, Helper::kFindUserFile.data());
+    if (!helper->prepare()) {
         return result;
     }
+    helper->addArgument(user);
+    row = helper->execAndGetRow();
     if (row) {
         const auto info = static_cast<InfoType>(row->get<int>(0));
         const auto reqinfo = type;
