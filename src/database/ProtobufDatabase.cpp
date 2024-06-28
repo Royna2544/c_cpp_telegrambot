@@ -60,17 +60,20 @@ ProtoDatabase::ListResult ProtoDatabase::removeUserFromList(ListType type,
 }
 
 bool ProtoDatabase::loadDatabaseFromFile(std::filesystem::path filepath) {
+    GOOGLE_PROTOBUF_VERIFY_VERSION;
+
     if (db_info.has_value()) {
         return false;
     }
     std::fstream input(filepath.string(), std::ios::in | std::ios::binary);
-    if (!input.is_open()) {
-        return false;
-    }
     {
         Info info;
         info.protoFilePath = filepath;
         db_info.emplace(info);
+    }
+    if (!input.is_open()) {
+        LOG(INFO) << "Creating new";
+        return true;
     }
     return db_info->protoDatabaseObject.ParseFromIstream(&input);
 }
