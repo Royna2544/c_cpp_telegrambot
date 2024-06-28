@@ -179,7 +179,9 @@ bool ProtoDatabase::addMediaInfo(const MediaInfo &info) const {
     mediaEntry->set_telegrammediaid(info.mediaId);
     mediaEntry->set_telegrammediauniqueid(info.mediaUniqueId);
     auto *const mediaNames = mediaEntry->mutable_names();
-    *mediaNames->Add() = info.names;
+    for (const auto &name : info.names) {
+        *mediaNames->Add() = name;
+    }
     return true;
 }
 

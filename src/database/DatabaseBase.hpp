@@ -4,6 +4,7 @@
 #include <optional>
 #include <ostream>
 #include <string_view>
+#include <vector>
 
 #include "Types.h"
 
@@ -23,7 +24,7 @@ struct DatabaseBase {
     struct MediaInfo {
         std::string mediaId;
         std::string mediaUniqueId;
-        std::string names;
+        std::vector<std::string> names;
     };
 
     /**

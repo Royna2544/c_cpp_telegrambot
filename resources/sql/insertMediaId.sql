@@ -1,0 +1,1 @@
+INSERT INTO mediaids (mediauniqueid, mediaid) VALUES (?, ?)

@@ -7,7 +7,9 @@
 #include <iomanip>
 #include <libos/libfs.hpp>
 #include <string_view>
+#include <variant>
 
+#include "CStringLifetime.h"
 #include "Types.h"
 
 SQLiteDatabase::ListResult SQLiteDatabase::addUserToList(InfoType type,
@@ -208,7 +210,7 @@ std::optional<SQLiteDatabase::MediaInfo> SQLiteDatabase::queryMediaInfo(
     if (!loadAndPrepareSTMT(&stmt, "findMediaInfo.sql")) {
         return std::nullopt;
     }
-    sqlite3_bind_text(stmt, 1, str.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 1, str.c_str(), -1, SQLITE_STATIC);
     rc = sqlite3_step(stmt);
     if (rc == SQLITE_ROW) {
         const auto* mediaId =
@@ -232,71 +234,126 @@ std::optional<SQLiteDatabase::MediaInfo> SQLiteDatabase::queryMediaInfo(
 }
 
 bool SQLiteDatabase::addMediaInfo(const MediaInfo& info) const {
-    enum {
-        INSERT_MEDIA_NAME,
-        USE_EXISTING_MEDIA_NAME,
-    } update{};
+    struct UpdateInfo {
+        enum class Op {
+            INSERT,  // This name does not exist in namemap: I should insert it
+            USE_EXISTING,  // This name exists in namemap
+        } update{};
+        // id of namemap for USE_EXISTING, string data for INSERT
+        std::variant<int, std::string> data;
+    };
     sqlite3_stmt* stmt = nullptr;
     int count = 0;
-    int data_i = 0;
-    std::string data_s;
+    int mediaIdIndex = 0;
+    std::vector<UpdateInfo> updates(info.names.size());
 
-    if (queryMediaInfo(info.names).has_value()) {
+    if (info.names.size() == 0) {
+        LOG(ERROR) << "Zero-length names specified";
+        return false;  // No names to insert, so no need to run the query
+    }
+
+    // Determine stuff to insert, and the ones that already exist
+    for (const auto& name : info.names) {
+        int ret = 0;
+
         if (!loadAndPrepareSTMT(&stmt, "findMediaName.sql")) {
             return false;
         }
-        sqlite3_bind_text(stmt, 1, info.names.c_str(), -1, SQLITE_STATIC);
-        if (sqlite3_step(stmt) != SQLITE_ROW) {
+        sqlite3_bind_text(stmt, 1, name.c_str(), -1, SQLITE_STATIC);
+        ret = sqlite3_step(stmt);
+        if (ret == SQLITE_ROW) {
+            updates[count].update = UpdateInfo::Op::USE_EXISTING;
+            updates[count].data = sqlite3_column_int(stmt, 0);
+        } else if (ret == SQLITE_DONE) {
+            updates[count].update = UpdateInfo::Op::INSERT;
+            updates[count].data = name;
+        } else {
             onSQLFail(__func__, "Finding media name");
             sqlite3_finalize(stmt);
             return false;
         }
-        update = USE_EXISTING_MEDIA_NAME;
-        data_i = sqlite3_column_int(stmt, 0);
         sqlite3_finalize(stmt);
-    } else {
-        update = INSERT_MEDIA_NAME;
-        data_s = info.names;
-    }
-    if (!loadAndPrepareSTMT(&stmt, "findAllMediaNames.sql")) {
-        return false;
-    }
-    while (sqlite3_step(stmt) == SQLITE_ROW) {
         count++;
     }
-    LOG(INFO) << "Found " << count << " media names ";
-    sqlite3_finalize(stmt);
-    ++count;
-    switch (update) {
-        case INSERT_MEDIA_NAME: {
-            if (!loadAndPrepareSTMT(&stmt, "insertMediaName.sql")) {
-                return false;
-            }
-            sqlite3_bind_int(stmt, 1, count);
-            sqlite3_bind_text(stmt, 2, data_s.c_str(), -1, SQLITE_STATIC);
-            if (sqlite3_step(stmt) != SQLITE_DONE) {
-                onSQLFail(__func__, "Inserting mediatoname");
-                sqlite3_finalize(stmt);
-                return false;
-            }
-            sqlite3_finalize(stmt);
-            data_i = count;
-        } break;
 
-        case USE_EXISTING_MEDIA_NAME:
-            break;
+    // Insert the names into the database
+    for (auto& info : updates) {
+        switch (info.update) {
+            case UpdateInfo::Op::INSERT: {
+                CStringLifetime name = std::get<std::string>(info.data);
+
+                // Insert into database
+                if (!loadAndPrepareSTMT(&stmt, "insertMediaName.sql")) {
+                    return false;
+                }
+                sqlite3_bind_text(stmt, 1, name, -1, SQLITE_STATIC);
+                if (sqlite3_step(stmt) != SQLITE_DONE) {
+                    onSQLFail(__func__, "Inserting medianame");
+                    sqlite3_finalize(stmt);
+                    return false;
+                }
+                sqlite3_finalize(stmt);
+
+                // Get the index again
+                if (!loadAndPrepareSTMT(&stmt, "findMediaName.sql")) {
+                    return false;
+                }
+                sqlite3_bind_text(stmt, 1, name, -1, SQLITE_STATIC);
+                if (sqlite3_step(stmt) != SQLITE_ROW) {
+                    onSQLFail(__func__, "Getting index of inserted medianame");
+                    sqlite3_finalize(stmt);
+                    return false;
+                }
+                info.data = sqlite3_column_int(stmt, 0);
+                sqlite3_finalize(stmt);
+                break;
+            }
+
+            case UpdateInfo::Op::USE_EXISTING:
+                break;
+        }
     }
-    if (!loadAndPrepareSTMT(&stmt, "insertMediaInfo.sql")) {
+
+    // Insert the media info into the database
+    if (!loadAndPrepareSTMT(&stmt, "insertMediaId.sql")) {
         return false;
     }
-    sqlite3_bind_text(stmt, 1, info.mediaUniqueId.c_str(), -1,
-                      SQLITE_TRANSIENT);
-    sqlite3_bind_text(stmt, 2, info.mediaId.c_str(), -1, SQLITE_TRANSIENT);
-    sqlite3_bind_int(stmt, 3, data_i);
+    sqlite3_bind_text(stmt, 1, info.mediaUniqueId.c_str(), -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 2, info.mediaId.c_str(), -1, SQLITE_STATIC);
     if (sqlite3_step(stmt) != SQLITE_DONE) {
-        onSQLFail(__func__, "Inserting media info");
+        onSQLFail(__func__, "Inserting tg media id");
         sqlite3_finalize(stmt);
         return false;
+    }
+
+    // Get the inserted media index
+    if (!loadAndPrepareSTMT(&stmt, "findMediaId.sql")) {
+        return false;
+    }
+    sqlite3_bind_text(stmt, 1, info.mediaUniqueId.c_str(), -1, SQLITE_STATIC);
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        mediaIdIndex = sqlite3_column_int(stmt, 0);
+    } else {
+        onSQLFail(__func__, "Getting index of inserted tg media id");
+        sqlite3_finalize(stmt);
+        return false;
+    }
+    sqlite3_finalize(stmt);
+
+    // Insert the actual map into the database
+    for (const auto& info : updates) {
+        int data = std::get<int>(info.data);
+
+        if (!loadAndPrepareSTMT(&stmt, "insertMediaMap.sql")) {
+            return false;
+        }
+        sqlite3_bind_int(stmt, 1, mediaIdIndex);
+        sqlite3_bind_int(stmt, 2, data);
+        if (sqlite3_step(stmt) != SQLITE_DONE) {
+            onSQLFail(__func__, "Inserting media info");
+            sqlite3_finalize(stmt);
+            return false;
+        }
     }
     sqlite3_finalize(stmt);
     return true;

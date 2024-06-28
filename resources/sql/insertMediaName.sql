@@ -1,1 +1,1 @@
-INSERT INTO medianames VALUES (?, ?)
+INSERT INTO medianame (name) VALUES (?)

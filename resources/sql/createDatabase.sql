@@ -4,18 +4,23 @@ CREATE TABLE usermap (
     info INT NOT NULL
 );
 
-INSERT INTO usermap VALUES (1185607882, 0);
-INSERT INTO usermap VALUES (6990852239, 2);
-
-CREATE TABLE mediamap (
-    uniqueid VARCHAR(255) NOT NULL,
-    id VARCHAR(255) NOT NULL,
-    nameid INTEGER NOT NULL,
-    PRIMARY KEY (uniqueid)
+CREATE TABLE mediaids (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    mediauniqueid VARCHAR(20) NOT NULL,
+    mediaid VARCHAR(70) NOT NULL,
+    UNIQUE (mediauniqueid)
 );
 
-CREATE TABLE medianames (
-    id INTEGER NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    PRIMARY KEY (id)
+CREATE TABLE medianame (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name VARCHAR(100) NOT NULL,
+    UNIQUE (name)
+);
+
+CREATE TABLE mediamap (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    medianameid INTEGER NOT NULL,
+    mediaid INTEGER NOT NULL,
+    FOREIGN KEY (medianameid) REFERENCES medianame(id) ON DELETE CASCADE,
+    FOREIGN KEY (mediaid) REFERENCES mediaids(id) ON DELETE CASCADE
 );

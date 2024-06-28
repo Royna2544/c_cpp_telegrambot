@@ -1,0 +1,1 @@
+INSERT INTO mediamap (mediaid, medianameid) VALUES (?, ?)

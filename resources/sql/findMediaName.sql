@@ -1,1 +1,1 @@
-SELECT id FROM medianames WHERE name = ?
+SELECT id FROM medianame WHERE name = ?

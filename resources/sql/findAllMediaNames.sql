@@ -1,1 +1,1 @@
-SELECT id FROM medianames
+SELECT id FROM medianame

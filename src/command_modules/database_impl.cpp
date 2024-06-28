@@ -6,11 +6,13 @@
 #include <MessageWrapper.hpp>
 #include <OnAnyMessageRegister.hpp>
 #include <StringResManager.hpp>
+#include <boost/algorithm/string/split.hpp>
 #include <database/bot/TgBotDatabaseImpl.hpp>
 #include <memory>
 #include <optional>
 
 #include "CommandModule.h"
+#include "StringToolsExt.hpp"
 #include "random/RandomNumberGenerator.h"
 
 template <DatabaseBase::ListType type>
@@ -115,7 +117,7 @@ void handleDatabaseCmd(Bot& bot, const Message::Ptr& message) {
         nullptr, nullptr,
 
         reply);
-        
+
     const auto registerer = OnAnyMessageRegisterer::getInstance();
     const random_return_type token = RandomNumberGenerator::generate(100);
 
@@ -133,15 +135,17 @@ void handleDatabaseCmd(Bot& bot, const Message::Ptr& message) {
                 }
                 registerer->unregisterCallback(token);
             }
-        }, token);
+        },
+        token);
 };
 
 void handleSaveIdCmd(const Bot& bot, const Message::Ptr& message) {
     MessageWrapper wrapper(bot, message);
     if (wrapper.hasExtraText()) {
-        std::string names = wrapper.getExtraText();
         std::optional<std::string> fileId;
         std::optional<std::string> fileUniqueId;
+        std::vector<std::string> names;
+        boost::split(names, wrapper.getExtraText(), isEmptyChar);
 
         if (!wrapper.switchToReplyToMessage(GETSTR(REPLY_TO_GIF_OR_STICKER))) {
             return;
@@ -169,7 +173,11 @@ void handleSaveIdCmd(const Bot& bot, const Message::Ptr& message) {
         wrapper.switchToParent();
         if (backend->addMediaInfo(info)) {
             std::stringstream ss;
-            ss << "Media with name:" << names;
+            ss << "Media with names:" << std::endl;
+            for (const auto& name: names) {
+                ss << "- " << name << std::endl;
+            }
+            ss << "added";
             wrapper.sendMessageOnExit(ss.str());
         } else {
             wrapper.sendMessageOnExit(GETSTR(MEDIA_ALREADY_IN_DB));

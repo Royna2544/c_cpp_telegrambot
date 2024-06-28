@@ -1,4 +1,5 @@
-SELECT mediamap.id, mediamap.uniqueid
+SELECT mediaids.mediaid, mediaids.mediauniqueid
 FROM mediamap
-INNER JOIN medianames ON mediamap.nameid = medianames.id
-WHERE medianames.name = ?
+INNER JOIN medianame ON mediamap.medianameid = medianame.id
+INNER JOIN mediaids ON mediamap.mediaid = mediaids.id
+WHERE medianame.name = ?
