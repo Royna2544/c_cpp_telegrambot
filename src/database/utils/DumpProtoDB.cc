@@ -15,4 +15,5 @@ int main(const int argc, const char **argv) {
         return EXIT_FAILURE;
     }
     dbImpl->dump(std::cout);
+    dbImpl->unloadDatabase();
 }
