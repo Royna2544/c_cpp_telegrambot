@@ -15,6 +15,6 @@ static void setOwnerCommand(const Bot &bot, const Message::Ptr message) {
 void loadcmd_setowner(CommandModule& module) {
     module.command = "setowner";
     module.description = "Set owner of the bot, for once";
-    module.flags = CommandModule::Flags::Enforced | CommandModule::Flags::HideDescription;
+    module.flags = CommandModule::Flags::HideDescription;
     module.fn = setOwnerCommand;
 }
