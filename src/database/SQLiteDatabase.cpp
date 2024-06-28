@@ -3,19 +3,237 @@
 #include <absl/log/check.h>
 #include <absl/log/log.h>
 
+#include <cstdint>
 #include <fstream>
 #include <iomanip>
 #include <libos/libfs.hpp>
+#include <memory>
+#include <stdexcept>
+#include <string>
 #include <string_view>
+#include <type_traits>
 #include <variant>
 
-#include "CStringLifetime.h"
+#include "StringToolsExt.hpp"
 #include "Types.h"
+
+void SQLiteDatabase::Helper::logInvalidState(
+    const char* func, SQLiteDatabase::Helper::State state) {
+    std::string_view stateString;
+    switch (state) {
+        case State::NOTHING:
+            stateString = "NOTHING";
+            break;
+        case State::PREPARED:
+            stateString = "PREPARED";
+            break;
+        case State::EXECUTED_AS_SCRIPT:
+            stateString = "EXECUTED_AS_SCRIPT";
+            break;
+        case State::BOUND:
+            stateString = "BOUND";
+            break;
+        case State::EXECUTED:
+            stateString = "EXECUTED";
+            break;
+        case State::FAILED_TO_PREPARE:
+            stateString = "FAILED";
+            break;
+    }
+    LOG(ERROR) << "Invalid state for " << func << ": " << stateString;
+}
+
+SQLiteDatabase::Helper::Helper(sqlite3* db, const std::string_view& filename)
+    : db(db) {
+    static auto sqlResPath = FS::getPathForType(FS::PathType::RESOURCES_SQL);
+
+    std::ifstream sqlFile(sqlResPath / filename.data());
+    int ret = 0;
+
+    if (!sqlFile.is_open()) {
+        LOG(ERROR) << "Could not open SQL script file: " << filename;
+        throw std::runtime_error("Could not open SQL script file: " +
+                                 std::string(filename));
+    }
+    scriptContent = std::string((std::istreambuf_iterator<char>(sqlFile)),
+                                std::istreambuf_iterator<char>());
+}
+
+bool SQLiteDatabase::Helper::prepare() {
+    const char* pztail = nullptr;
+
+    switch (state) {
+        case State::NOTHING:
+            // Pass
+            break;
+        case State::PREPARED:
+            LOG(WARNING) << "Statement already prepared";
+            [[fallthrough]];
+        case State::EXECUTED_AS_SCRIPT:
+        case State::BOUND:
+        case State::EXECUTED:
+        case State::FAILED_TO_PREPARE:
+            logInvalidState(__func__, state);
+            return false;
+    };
+    auto ret =
+        sqlite3_prepare_v2(db, scriptContent.c_str(), -1, &stmt, &pztail);
+    if (ret != SQLITE_OK) {
+        LOG(ERROR) << "Failed to prepare statement: " << sqlite3_errmsg(db);
+        state = State::FAILED_TO_PREPARE;
+        return false;
+    }
+    state = State::PREPARED;
+    if (pztail != nullptr) {
+        scriptContentUnparsed = pztail;
+    }
+    return true;
+}
+
+bool SQLiteDatabase::Helper::executeAsScript() {
+    char* err_message = nullptr;
+
+    switch (state) {
+        case State::NOTHING:
+            // Pass
+            break;
+        case State::PREPARED:
+        case State::EXECUTED_AS_SCRIPT:
+        case State::BOUND:
+        case State::EXECUTED:
+        case State::FAILED_TO_PREPARE:
+            logInvalidState(__func__, state);
+            return false;
+    };
+
+    state = State::EXECUTED_AS_SCRIPT;
+    LOG(INFO) << "Executing SQL script...";
+    if (sqlite3_exec(db, scriptContent.c_str(), nullptr, nullptr,
+                     &err_message) != SQLITE_OK) {
+        LOG(ERROR) << "Failed to execute SQL script: " << err_message;
+        sqlite3_free(err_message);
+        return false;
+    } else {
+        DLOG(INFO) << "Executed SQL script successfully.";
+    }
+    return true;
+}
+
+SQLiteDatabase::Helper::Helper(sqlite3* db, std::string content)
+    : db(db), scriptContent(std::move(content)) {}
+
+SQLiteDatabase::Helper::~Helper() {
+    switch (state) {
+        case State::NOTHING:
+            // No cleanup needed
+            break;
+        case State::BOUND:
+        case State::EXECUTED:
+        case State::PREPARED:
+            if (stmt != nullptr) {
+                sqlite3_finalize(stmt);
+            }
+            break;
+        case State::EXECUTED_AS_SCRIPT:
+        case State::FAILED_TO_PREPARE:
+            break;
+    }
+}
+
+std::shared_ptr<SQLiteDatabase::Helper> SQLiteDatabase::Helper::addArgument(
+    SQLiteDatabase::Helper::ArgTypes value) {
+    switch (state) {
+        case State::PREPARED:
+            // Pass
+            arguments.emplace_back(value, arguments.size() + 1);
+            break;
+        case State::NOTHING:
+        case State::EXECUTED_AS_SCRIPT:
+        case State::BOUND:
+        case State::EXECUTED:
+        case State::FAILED_TO_PREPARE:
+            logInvalidState(__func__, state);
+            break;
+    };
+    return shared_from_this();
+}
+
+bool SQLiteDatabase::Helper::bindArguments() {
+    if (arguments.empty()) {
+        LOG(ERROR) << "No arguments provided for SQL statement";
+        return false;
+    }
+
+    switch (state) {
+        case State::PREPARED:
+            // Pass
+            break;
+        case State::NOTHING:
+        case State::EXECUTED_AS_SCRIPT:
+        case State::BOUND:
+        case State::EXECUTED:
+        case State::FAILED_TO_PREPARE:
+            logInvalidState(__func__, state);
+            return false;
+    };
+
+    for (const auto& argument : arguments) {
+        std::visit(
+            [this, &argument](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, std::string>) {
+                    sqlite3_bind_text(stmt, argument.index, arg.c_str(), -1,
+                                      SQLITE_STATIC);
+                } else if constexpr (std::is_same_v<T, int64_t>) {
+                    sqlite3_bind_int64(stmt, argument.index, arg);
+                } else if constexpr (std::is_same_v<T, int32_t>) {
+                    sqlite3_bind_int(stmt, argument.index, arg);
+                }
+            },
+            argument.parameter);
+    }
+    return true;
+}
+
+std::optional<SQLiteDatabase::Helper::Row>
+SQLiteDatabase::Helper::execAndGetRow() {
+    switch (sqlite3_step(stmt)) {
+        case SQLITE_ROW: {
+            Row row{shared_from_this(), stmt};
+            return row;
+        }
+        case SQLITE_DONE:
+            return std::nullopt;
+        default:
+            LOG(ERROR) << "Error fetching row: " << sqlite3_errmsg(db);
+            return std::nullopt;
+    }
+}
+
+bool SQLiteDatabase::Helper::execute() {
+    switch (sqlite3_step(stmt)) {
+        case SQLITE_DONE:
+        case SQLITE_ROW:
+            return true;
+        default:
+            LOG(ERROR) << "Error executing: " << sqlite3_errmsg(db);
+            return false;
+    }
+    return true;
+}
+
+std::shared_ptr<SQLiteDatabase::Helper>
+SQLiteDatabase::Helper::getNextStatement() {
+    if (isEmptyOrBlank(scriptContentUnparsed)) {
+        return nullptr;
+    }
+    return std::make_shared<SQLiteDatabase::Helper>(
+        Helper{db, scriptContentUnparsed});
+}
 
 SQLiteDatabase::ListResult SQLiteDatabase::addUserToList(InfoType type,
                                                          UserId user) const {
     ListResult res{};
-    sqlite3_stmt* stmt = nullptr;
 
     res = checkUserInList(type, user);
     switch (res) {
@@ -33,17 +251,21 @@ SQLiteDatabase::ListResult SQLiteDatabase::addUserToList(InfoType type,
             return res;
     }
 
-    if (!loadAndPrepareSTMT(&stmt, "insertUser.sql")) {
-        res = ListResult::BACKEND_ERROR;
-        return res;
+    try {
+        auto helper = Helper::create(db, Helper::kInsertUserFile);
+        if (!helper->prepare()) {
+            return ListResult::BACKEND_ERROR;
+        }
+        helper->addArgument(user)
+            ->addArgument(static_cast<int>(type))
+            ->bindArguments();
+        if (helper->execute()) {
+            return ListResult::OK;
+        }
+    } catch (const std::runtime_error& e) {
+        LOG(ERROR) << "Error inserting user: " << e.what();
     }
-    sqlite3_bind_int64(stmt, 1, user);
-    sqlite3_bind_int(stmt, 2, static_cast<int>(type));
-    if (sqlite3_step(stmt) != SQLITE_DONE) {
-        onSQLFail(__func__, "Inserting user");
-    }
-    sqlite3_finalize(stmt);
-    return ListResult::OK;
+    return ListResult::BACKEND_ERROR;
 }
 
 SQLiteDatabase::ListResult SQLiteDatabase::addUserToList(ListType type,
@@ -54,7 +276,6 @@ SQLiteDatabase::ListResult SQLiteDatabase::addUserToList(ListType type,
 SQLiteDatabase::ListResult SQLiteDatabase::removeUserFromList(
     ListType type, UserId user) const {
     ListResult res{};
-    sqlite3_stmt* stmt = nullptr;
 
     res = checkUserInList(type, user);
     switch (res) {
@@ -70,42 +291,28 @@ SQLiteDatabase::ListResult SQLiteDatabase::removeUserFromList(
             return res;
     }
 
-    if (!loadAndPrepareSTMT(&stmt, "removeUser.sql")) {
-        res = ListResult::BACKEND_ERROR;
-        return res;
+    try {
+        auto helper = Helper::create(db, Helper::kRemoveUserFile.data());
+        if (!helper->prepare()) {
+            return ListResult::BACKEND_ERROR;
+        }
+        helper->addArgument(user);
+        helper->addArgument(static_cast<int>(toInfoType(type)));
+        helper->bindArguments();
+        if (helper->execute()) {
+            return ListResult::OK;
+        }
+    } catch (const std::runtime_error& e) {
+        LOG(ERROR) << "Error removing user: " << e.what();
     }
-    sqlite3_bind_int64(stmt, 1, user);
-    sqlite3_bind_int(stmt, 2, static_cast<int>(toInfoType(type)));
-    if (sqlite3_step(stmt) != SQLITE_DONE) {
-        onSQLFail(__func__, "Removing user");
-    }
-    sqlite3_finalize(stmt);
-    return ListResult::OK;
+    return ListResult::BACKEND_ERROR;
 }
 
-void SQLiteDatabase::initDatabase() { loadAndExecuteSql("createDatabase.sql"); }
-
-bool SQLiteDatabase::loadAndExecuteSql(const std::string_view filename) const {
-    static auto sqlResPath = FS::getPathForType(FS::PathType::RESOURCES_SQL);
-
-    auto sqlResFilePath = sqlResPath / filename.data();
-    std::ifstream file(sqlResFilePath);
-    std::string buffer;
-    char* err_message = nullptr;
-
-    if (!readSQLScriptFully(filename, buffer)) {
-        return false;
+void SQLiteDatabase::initDatabase() {
+    auto helper = Helper::create(db, Helper::kCreateDatabaseFile.data());
+    if (!helper->executeAsScript()) {
+        throw std::runtime_error("Error initializing database");
     }
-    LOG(INFO) << "SQL file " << sqlResFilePath << " executing...";
-    if (sqlite3_exec(db, buffer.c_str(), nullptr, nullptr, &err_message) !=
-        SQLITE_OK) {
-        onSQLFail(__func__, "Executing SQL script");
-        sqlite3_free(err_message);
-        return false;
-    } else {
-        DLOG(INFO) << "Executed SQL script successfully.";
-    }
-    return true;
 }
 
 [[nodiscard]] DatabaseBase::ListResult SQLiteDatabase::checkUserInList(
@@ -116,31 +323,32 @@ bool SQLiteDatabase::loadAndExecuteSql(const std::string_view filename) const {
 [[nodiscard]] DatabaseBase::ListResult SQLiteDatabase::checkUserInList(
     InfoType type, UserId user) const {
     ListResult result = ListResult::BACKEND_ERROR;
-    sqlite3_stmt* stmt = nullptr;
-    int rc = 0;
+    std::optional<Helper::Row> row;
 
-    if (!loadAndPrepareSTMT(&stmt, "findUser.sql")) {
+    try {
+        auto helper = Helper::create(db, Helper::kFindUserFile.data());
+        if (!helper->prepare()) {
+            return result;
+        }
+        helper->addArgument(user);
+        row = helper->execAndGetRow();
+    } catch (const std::runtime_error& e) {
+        LOG(ERROR) << "Error checking for user: " << e.what();
         return result;
     }
-    sqlite3_bind_int64(stmt, 1, user);
-    rc = sqlite3_step(stmt);
-    if (rc == SQLITE_ROW) {
-        auto info = static_cast<InfoType>(sqlite3_column_int(stmt, 0));
-        auto reqinfo = type;
+    if (row) {
+        const auto info = static_cast<InfoType>(row->get<int>(0));
+        const auto reqinfo = type;
         if (info == reqinfo) {
             result = ListResult::OK;
         } else {
             // Not in this list, but other
             result = ListResult::ALREADY_IN_OTHER_LIST;
         }
-    } else if (rc != SQLITE_DONE) {
-        onSQLFail(__func__, "Check user in list");
-        result = ListResult::BACKEND_ERROR;
     } else {
         // Not in this list, just doesn't exist
         result = ListResult::NOT_IN_LIST;
     }
-    sqlite3_finalize(stmt);
     return result;
 }
 
@@ -172,64 +380,24 @@ bool SQLiteDatabase::unloadDatabase() {
     return false;
 }
 
-bool SQLiteDatabase::loadAndPrepareSTMT(sqlite3_stmt** stmt,
-                                        const std::string_view filename) const {
-    std::string sqlScriptData;
-
-    if (!readSQLScriptFully(filename, sqlScriptData)) {
-        return false;
-    }
-    int rc = sqlite3_prepare_v2(db, sqlScriptData.c_str(), -1, stmt, nullptr);
-    if (rc != SQLITE_OK) {
-        onSQLFail(__func__, "PrepareV2");
-        return false;
-    }
-    return true;
-}
-
-bool SQLiteDatabase::readSQLScriptFully(const std::string_view filename,
-                                        std::string& out_data) {
-    static auto sqlResPath = FS::getPathForType(FS::PathType::RESOURCES_SQL);
-    std::ifstream sqlFile(sqlResPath / filename.data());
-    if (!sqlFile.is_open()) {
-        LOG(ERROR) << "Could not open SQL script file: " << filename;
-        return false;
-    }
-    out_data = std::string((std::istreambuf_iterator<char>(sqlFile)),
-                           std::istreambuf_iterator<char>());
-    return true;
-}
-
 std::optional<SQLiteDatabase::MediaInfo> SQLiteDatabase::queryMediaInfo(
     std::string str) const {
-    sqlite3_stmt* stmt = nullptr;
-    ListResult ret{};
     MediaInfo info{};
-    int rc = 0;
 
-    if (!loadAndPrepareSTMT(&stmt, "findMediaInfo.sql")) {
+    auto helper = Helper::create(db, Helper::kFindMediaInfoFile);
+    if (!helper->prepare()) {
         return std::nullopt;
     }
-    sqlite3_bind_text(stmt, 1, str.c_str(), -1, SQLITE_STATIC);
-    rc = sqlite3_step(stmt);
-    if (rc == SQLITE_ROW) {
-        const auto* mediaId =
-            reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
-        const auto* mediaUniqueId =
-            reinterpret_cast<const char*>(sqlite3_column_text(stmt, 1));
-        if ((mediaId != nullptr) && (mediaUniqueId != nullptr)) {
-            info.mediaId = mediaId;
-            info.mediaUniqueId = mediaUniqueId;
-        } else {
-            rc = SQLITE_ERROR;
-        }
-    }
-    if (rc != SQLITE_ROW) {
-        onSQLFail(__func__, "Querying media ids");
-        sqlite3_finalize(stmt);
+    helper->addArgument(str)->bindArguments();
+    auto row = helper->execAndGetRow();
+
+    if (row) {
+        info.mediaId = row->get<std::string>(0);
+        info.mediaUniqueId = row->get<std::string>(1);
+    } else {
+        LOG(ERROR) << "Didn't find media info for name: " << str;
         return std::nullopt;
     }
-    sqlite3_finalize(stmt);
     return info;
 }
 
@@ -242,7 +410,6 @@ bool SQLiteDatabase::addMediaInfo(const MediaInfo& info) const {
         // id of namemap for USE_EXISTING, string data for INSERT
         std::variant<int, std::string> data;
     };
-    sqlite3_stmt* stmt = nullptr;
     int count = 0;
     int mediaIdIndex = 0;
     std::vector<UpdateInfo> updates(info.names.size());
@@ -254,25 +421,21 @@ bool SQLiteDatabase::addMediaInfo(const MediaInfo& info) const {
 
     // Determine stuff to insert, and the ones that already exist
     for (const auto& name : info.names) {
-        int ret = 0;
-
-        if (!loadAndPrepareSTMT(&stmt, "findMediaName.sql")) {
+        auto helper = Helper::create(db, Helper::kFindMediaNameFile);
+        if (!helper->prepare()) {
             return false;
         }
-        sqlite3_bind_text(stmt, 1, name.c_str(), -1, SQLITE_STATIC);
-        ret = sqlite3_step(stmt);
-        if (ret == SQLITE_ROW) {
+        helper->addArgument(name);
+        helper->bindArguments();
+
+        auto row = helper->execAndGetRow();
+        if (row) {
             updates[count].update = UpdateInfo::Op::USE_EXISTING;
-            updates[count].data = sqlite3_column_int(stmt, 0);
-        } else if (ret == SQLITE_DONE) {
+            updates[count].data = row->get<int>(0);
+        } else {
             updates[count].update = UpdateInfo::Op::INSERT;
             updates[count].data = name;
-        } else {
-            onSQLFail(__func__, "Finding media name");
-            sqlite3_finalize(stmt);
-            return false;
         }
-        sqlite3_finalize(stmt);
         count++;
     }
 
@@ -280,32 +443,33 @@ bool SQLiteDatabase::addMediaInfo(const MediaInfo& info) const {
     for (auto& info : updates) {
         switch (info.update) {
             case UpdateInfo::Op::INSERT: {
-                CStringLifetime name = std::get<std::string>(info.data);
+                const auto name = std::get<std::string>(info.data);
 
                 // Insert into database
-                if (!loadAndPrepareSTMT(&stmt, "insertMediaName.sql")) {
+                auto insertHelper =
+                    Helper::create(db, Helper::kInsertMediaNameFile);
+                if (!insertHelper->prepare()) {
                     return false;
                 }
-                sqlite3_bind_text(stmt, 1, name, -1, SQLITE_STATIC);
-                if (sqlite3_step(stmt) != SQLITE_DONE) {
-                    onSQLFail(__func__, "Inserting medianame");
-                    sqlite3_finalize(stmt);
+                insertHelper->addArgument(name);
+                insertHelper->bindArguments();
+                if (!insertHelper->execute()) {
                     return false;
                 }
-                sqlite3_finalize(stmt);
 
                 // Get the index again
-                if (!loadAndPrepareSTMT(&stmt, "findMediaName.sql")) {
+                auto findHelper =
+                    Helper::create(db, Helper::kFindMediaNameFile);
+                if (!findHelper->prepare()) {
                     return false;
                 }
-                sqlite3_bind_text(stmt, 1, name, -1, SQLITE_STATIC);
-                if (sqlite3_step(stmt) != SQLITE_ROW) {
-                    onSQLFail(__func__, "Getting index of inserted medianame");
-                    sqlite3_finalize(stmt);
+                findHelper->addArgument(name);
+                findHelper->bindArguments();
+                const auto row = findHelper->execAndGetRow();
+                if (!row) {
                     return false;
                 }
-                info.data = sqlite3_column_int(stmt, 0);
-                sqlite3_finalize(stmt);
+                info.data = row->get<int>(0);
                 break;
             }
 
@@ -315,66 +479,60 @@ bool SQLiteDatabase::addMediaInfo(const MediaInfo& info) const {
     }
 
     // Insert the media info into the database
-    if (!loadAndPrepareSTMT(&stmt, "insertMediaId.sql")) {
+    auto insertMediaHelper = Helper::create(db, Helper::kInsertMediaIdFile);
+
+    if (!insertMediaHelper->prepare()) {
         return false;
     }
-    sqlite3_bind_text(stmt, 1, info.mediaUniqueId.c_str(), -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 2, info.mediaId.c_str(), -1, SQLITE_STATIC);
-    if (sqlite3_step(stmt) != SQLITE_DONE) {
-        onSQLFail(__func__, "Inserting tg media id");
-        sqlite3_finalize(stmt);
+    insertMediaHelper->addArgument(info.mediaUniqueId)
+        ->addArgument(info.mediaId)
+        ->bindArguments();
+    if (!insertMediaHelper->execute()) {
         return false;
     }
 
     // Get the inserted media index
-    if (!loadAndPrepareSTMT(&stmt, "findMediaId.sql")) {
+    auto findMediaIdHelper = Helper::create(db, Helper::kFindMediaIdFile);
+    if (!findMediaIdHelper->prepare()) {
         return false;
     }
-    sqlite3_bind_text(stmt, 1, info.mediaUniqueId.c_str(), -1, SQLITE_STATIC);
-    if (sqlite3_step(stmt) == SQLITE_ROW) {
-        mediaIdIndex = sqlite3_column_int(stmt, 0);
-    } else {
-        onSQLFail(__func__, "Getting index of inserted tg media id");
-        sqlite3_finalize(stmt);
+    findMediaIdHelper->addArgument(info.mediaUniqueId)->bindArguments();
+    const auto row = findMediaIdHelper->execAndGetRow();
+    if (!row) {
         return false;
     }
-    sqlite3_finalize(stmt);
+    mediaIdIndex = row->get<int>(0);
 
     // Insert the actual map into the database
     for (const auto& info : updates) {
         int data = std::get<int>(info.data);
 
-        if (!loadAndPrepareSTMT(&stmt, "insertMediaMap.sql")) {
+        auto insertMediaMapHelper =
+            Helper::create(db, Helper::kInsertMediaMapFile);
+        if (!insertMediaMapHelper->prepare()) {
             return false;
         }
-        sqlite3_bind_int(stmt, 1, mediaIdIndex);
-        sqlite3_bind_int(stmt, 2, data);
-        if (sqlite3_step(stmt) != SQLITE_DONE) {
-            onSQLFail(__func__, "Inserting media info");
-            sqlite3_finalize(stmt);
+        insertMediaMapHelper->addArgument(mediaIdIndex);
+        insertMediaMapHelper->addArgument(data);
+        insertMediaMapHelper->bindArguments();
+
+        if (!insertMediaMapHelper->execute()) {
             return false;
         }
     }
-    sqlite3_finalize(stmt);
     return true;
 }
 
 UserId SQLiteDatabase::getOwnerUserId() const {
-    UserId id = kInvalidUserId;
-    sqlite3_stmt* stmt = nullptr;
-    int rc = 0;
-
-    if (!loadAndPrepareSTMT(&stmt, "findOwner.sql")) {
+    auto helper = Helper::create(db, Helper::kFindOwnerFile);
+    if (!helper->prepare()) {
         return kInvalidUserId;
     }
-    rc = sqlite3_step(stmt);
-    if (rc == SQLITE_ROW) {
-        id = sqlite3_column_int64(stmt, 0);
-    } else if (rc != SQLITE_DONE) {
-        onSQLFail(__func__, "Getting column to owner id");
+    const auto row = helper->execAndGetRow();
+    if (!row) {
+        return kInvalidUserId;
     }
-    sqlite3_finalize(stmt);
-    return id;
+    return row->get<UserId>(0);
 }
 
 SQLiteDatabase::InfoType SQLiteDatabase::toInfoType(ListType type) {
@@ -387,14 +545,12 @@ SQLiteDatabase::InfoType SQLiteDatabase::toInfoType(ListType type) {
     CHECK(false) << "Unreachable";
 }
 
-std::ostream& SQLiteDatabase::dump(std::ostream& os) const {
-    sqlite3_stmt* stmt = nullptr;
-    int rc = 0;
+std::ostream& SQLiteDatabase::dump(std::ostream& ofs) const {
     std::stringstream ss;
 
     if (db == nullptr) {
-        os << "Database not loaded!";
-        return os;
+        ofs << "Database not loaded!";
+        return ofs;
     }
 
     ss << "====================== Dump of database ======================"
@@ -405,18 +561,18 @@ std::ostream& SQLiteDatabase::dump(std::ostream& os) const {
     ss << "Owner Id: " << std::quoted(std::to_string(getOwnerUserId()))
        << std::endl;
 
-    if (loadAndPrepareSTMT(&stmt, "dumpDatabase.sql")) {
-        rc = sqlite3_step(stmt);
-        while (rc == SQLITE_ROW) {
-            int type = 0;
-            ss << "UserId: " << sqlite3_column_int64(stmt, 0);
-            type = sqlite3_column_int(stmt, 1);
-            if (type > static_cast<int>(InfoType::WHITELIST) ||
-                type < static_cast<int>(InfoType::OWNER)) {
+    auto helper = Helper::create(db, Helper::kDumpDatabaseFile);
+    if (helper->prepare()) {
+        std::optional<Helper::Row> row;
+        while ((row = helper->execAndGetRow())) {
+            ss << "UserId: " << row->get<UserId>(0);
+            int type = row->get<int>(1);
+            if (type < static_cast<int>(ListType::WHITELIST) ||
+                type > static_cast<int>(ListType::BLACKLIST)) {
                 ss << " type: Invalid(" << type << ")" << std::endl;
                 continue;
             }
-            auto info = static_cast<InfoType>(sqlite3_column_int(stmt, 1));
+            auto info = static_cast<InfoType>(type);
             ss << " type: ";
             switch (info) {
                 case InfoType::BLACKLIST:
@@ -430,37 +586,33 @@ std::ostream& SQLiteDatabase::dump(std::ostream& os) const {
                     break;
             };
             ss << std::endl;
-            rc = sqlite3_step(stmt);
         }
-        sqlite3_finalize(stmt);
-        ss << std::endl;
     } else {
         ss << "!!! Failed to dump usermap database" << std::endl;
     }
+    ss << std::endl;
 
-    if (loadAndPrepareSTMT(&stmt, "dumpDatabaseMedia.sql")) {
-        rc = sqlite3_step(stmt);
-        while (rc == SQLITE_ROW) {
-            ss << "MediaId: " << sqlite3_column_text(stmt, 0) << std::endl;
-            ss << "MediaUniqueId: " << sqlite3_column_text(stmt, 1)
-               << std::endl;
-            ss << "MediaName: " << sqlite3_column_text(stmt, 2) << std::endl;
-            rc = sqlite3_step(stmt);
+    // Dump media database
+    if (auto mhelper = helper->getNextStatement(); mhelper) {
+        std::optional<Helper::Row> row;
+        bool any = false;
+        while ((row = mhelper->execAndGetRow())) {
+            ss << "MediaId: " << row->get<std::string>(0) << std::endl;
+            ss << "MediaUniqueId: " << row->get<std::string>(1) << std::endl;
+            ss << "MediaName: " << row->get<std::string>(2) << std::endl;
             ss << std::endl;
+            any = true;
         }
-        sqlite3_finalize(stmt);
+        if (!any) {
+            ss << "!!! No media entries in the database" << std::endl;
+        }
     } else {
         ss << "!!! Failed to dump media database" << std::endl;
     }
-    os << ss.str();
-    return os;
-}
-
-void SQLiteDatabase::onSQLFail(const std::string_view funcname,
-                               const std::string_view what) const {
-    LOG(ERROR) << "!!! " << funcname
-               << " failed: SQL error: " << sqlite3_errmsg(db) << " while "
-               << std::quoted(what);
+    ss << "========================= End of dump ========================"
+       << std::endl;
+    ofs << ss.str();
+    return ofs;
 }
 
 void SQLiteDatabase::setOwnerUserId(UserId userId) const {
