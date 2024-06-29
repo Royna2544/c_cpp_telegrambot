@@ -4,6 +4,7 @@
 
 #include <filesystem>
 #include <libos/libfs.hpp>
+#include <optional>
 #include <ostream>
 #include <system_error>
 
@@ -140,10 +141,10 @@ DatabaseBase::ListResult TgBotDatabaseImpl::checkUserInList(
         databaseBackend);
 }
 
-UserId TgBotDatabaseImpl::getOwnerUserId() const {
+std::optional<UserId> TgBotDatabaseImpl::getOwnerUserId() const {
     if (!isLoaded()) {
         LOG(ERROR) << __func__ << ": No-op due to missing database";
-        return DatabaseBase::kInvalidUserId;
+        return std::nullopt;
     }
     return std::visit(
         [this](auto&& arg) {
@@ -213,6 +214,38 @@ void TgBotDatabaseImpl::setOwnerUserId(const UserId user) const {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (isKnownDatabase<T>()) {
                 arg.setOwnerUserId(user);
+            }
+        },
+        databaseBackend);
+}
+
+bool TgBotDatabaseImpl::addChatInfo(const ChatId chatid,
+                                    const std::string& name) const {
+    if (!isLoaded()) {
+        LOG(ERROR) << __func__ << ": No-op due to missing database";
+        return false;
+    }
+    return std::visit(
+        [this, chatid, name](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (isKnownDatabase<T>()) {
+                return arg.addChatInfo(chatid, name);
+            }
+        },
+        databaseBackend);
+}
+
+std::optional<ChatId> TgBotDatabaseImpl::getChatId(
+    const std::string& name) const {
+    if (!isLoaded()) {
+        LOG(ERROR) << __func__ << ": No-op due to missing database";
+        return std::nullopt;
+    }
+    return std::visit(
+        [this, name](auto&& arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (isKnownDatabase<T>()) {
+                return arg.getChatId(name);
             }
         },
         databaseBackend);

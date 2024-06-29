@@ -21,3 +21,9 @@ target_link_libraries(TgBotDB protobuf::libprotobuf SQLite3 TgBotUtils)
 add_library(TgBotDBImpl SHARED src/database/bot/TgBotDatabaseImpl.cpp)
 target_link_libraries(TgBotDBImpl TgBotUtils TgBotDB)
 #####################################################################
+
+################# Utility Programs (Database Ctl) ##################
+set(DBCTRL_NAME ${PROJECT_NAME}_DatabaseCtl)
+add_executable_san(${DBCTRL_NAME} src/database/utils/DatabaseCtrl.cc)
+target_link_libraries(${DBCTRL_NAME} TgBotDBImpl TgBotLogInit)
+#####################################################################

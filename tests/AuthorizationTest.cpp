@@ -24,7 +24,7 @@ static void MakeMessageNonOwner(Message::Ptr& message) {
 }
 
 static void MakeMessageOwner(Message::Ptr& message) {
-    static UserId ownerId = loadDb()->getOwnerUserId();
+    static UserId ownerId = loadDb()->getOwnerUserId().value_or(12345);
     MakeMessageNonOwner(message);
     message->from->id = ownerId;
 }

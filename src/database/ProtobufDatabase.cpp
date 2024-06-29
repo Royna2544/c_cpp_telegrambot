@@ -4,6 +4,7 @@
 #include <absl/log/log.h>
 
 #include <fstream>
+#include <optional>
 
 using namespace tgbot::proto;
 
@@ -94,14 +95,14 @@ bool ProtoDatabase::unloadDatabase() {
     return true;
 }
 
-UserId ProtoDatabase::getOwnerUserId() const {
+std::optional<UserId> ProtoDatabase::getOwnerUserId() const {
     if (!db_info.has_value()) {
         LOG(WARNING) << "Database not loaded! Cannot determine owner user id!";
-        return kInvalidUserId;
+        return std::nullopt;
     }
     if (!db_info->protoDatabaseObject.has_ownerid()) {
         LOG(WARNING) << "Database does not contain owner user id!";
-        return kInvalidUserId;
+        return std::nullopt;
     }
     return db_info->protoDatabaseObject.ownerid();
 }
@@ -236,6 +237,26 @@ std::ostream &ProtoDatabase::dump(std::ostream &os) const {
             }
         }
     }
+    const auto chatDB = db_info->protoDatabaseObject.chattonames();
+    if (const auto chatDBSize = chatDB.size(); chatDBSize > 0) {
+        for (int i = 0; i < chatDBSize; ++i) {
+            const auto it = chatDB.Get(i);
+            std::cout << "- Entry " << i << ":" << std::endl;
+            if (it.has_telegramchatid()) {
+                std::cout << "   -> "
+                             "Chat Id: "
+                          << it.telegramchatid() << std::endl;
+            }
+            if (it.has_name()) {
+                std::cout << "   -> "
+                             "Chat Name: "
+                          << it.name() << std::endl;
+            }
+            if (i != chatDBSize - 1) {
+                std::cout << std::endl;
+            }
+        }
+    }
     return os;
 }
 
@@ -249,4 +270,29 @@ void ProtoDatabase::setOwnerUserId(UserId userId) const {
         return;
     }
     db_info->protoDatabaseObject.set_ownerid(userId);
+}
+
+[[nodiscard]] bool ProtoDatabase::addChatInfo(const ChatId chatid,
+                                              const std::string &name) const {
+    auto *const chats = db_info->protoDatabaseObject.mutable_chattonames();
+    for (const auto &chat : *chats) {
+        if (chat.telegramchatid() == chatid) {
+            return false;
+        }
+    }
+    auto *const chat = chats->Add();
+    chat->set_telegramchatid(chatid);
+    chat->set_name(name);
+    return true;
+}
+
+[[nodiscard]] std::optional<ChatId> ProtoDatabase::getChatId(
+    const std::string &name) const {
+    const auto &obj = db_info->protoDatabaseObject;
+    for (const auto &chat : obj.chattonames()) {
+        if (strcasecmp(chat.name().c_str(), name.c_str()) == 0) {
+            return chat.telegramchatid();
+        }
+    }
+    return std::nullopt;
 }

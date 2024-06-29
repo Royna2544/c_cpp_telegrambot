@@ -11,7 +11,6 @@ include(cmake/sanitizers.cmake)
 
 ################ EXE NAMES STEMMED FROM PROJECT_NAME ################
 set(MEDIA_CLI_NAME ${PROJECT_NAME}_MediaCli)
-set(DBDUMPER_NAME ${PROJECT_NAME}_dumpDB)
 set(PROJECT_MAINEXE_NAME ${PROJECT_NAME}_main)
 set(PROJECT_TEST_NAME ${PROJECT_NAME}_test)
 set(LOGCAT_NAME ${PROJECT_NAME}_logcat)
@@ -236,11 +235,6 @@ add_dependencies(${PROJECT_NAME} gen_stringres_header)
 add_executable_san(${PROJECT_MAINEXE_NAME} src/main.cpp)
 target_link_libraries(${PROJECT_MAINEXE_NAME} ${PROJECT_NAME} TgBotLogInit
   absl::log_sink absl::log_sink_registry)
-#####################################################################
-
-################# Utility Programs (Dump Database) ##################
-add_executable_san(${DBDUMPER_NAME} src/database/utils/DumpProtoDB.cc)
-target_link_libraries(${DBDUMPER_NAME} TgBotDBImpl TgBotLogInit)
 #####################################################################
 
 ############### Utility Programs (Send Media to chat) ################

@@ -1,13 +1,19 @@
 #include "SQLiteDatabase.hpp"
 
+#include <absl/debugging/stacktrace.h>
+#include <absl/debugging/symbolize.h>
 #include <absl/log/check.h>
 #include <absl/log/log.h>
 
+#include <array>
 #include <cstdint>
 #include <fstream>
 #include <iomanip>
+#include <iostream>
 #include <libos/libfs.hpp>
 #include <memory>
+#include <optional>
+#include <source_location>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -17,8 +23,33 @@
 #include "StringToolsExt.hpp"
 #include "Types.h"
 
+namespace {
+
+void PrintStackTrace() {
+    constexpr int kMaxStackDepth = 8;
+    constexpr std::string_view kStopStackTrace = "TgBotDatabaseImpl";
+    std::array<void*, kMaxStackDepth> stack{};
+    std::cout << "Stack trace:" << std::endl;
+    int depth = absl::GetStackTrace(stack.data(), kMaxStackDepth, 0);
+
+    for (int i = 0; i < depth; ++i) {
+        // Symbolize the stack frame to get the function name and file/line.
+        std::array<char, 1024> symbol{};
+        if (absl::Symbolize(stack[i], symbol.data(), sizeof(symbol))) {
+            std::cout << i << ": " << symbol.data() << std::endl;
+        } else {
+            std::cout << i << ": " << stack[i] << std::endl;
+        }
+        if (std::string(symbol.data()).find(kStopStackTrace) !=
+            std::string::npos) {
+            break;
+        }
+    }
+}
+
+}  // namespace
 void SQLiteDatabase::Helper::logInvalidState(
-    const char* func, SQLiteDatabase::Helper::State state) {
+    const std::source_location& location, SQLiteDatabase::Helper::State state) {
     std::string_view stateString;
     switch (state) {
         case State::NOTHING:
@@ -39,8 +70,13 @@ void SQLiteDatabase::Helper::logInvalidState(
         case State::FAILED_TO_PREPARE:
             stateString = "FAILED";
             break;
+        case State::HAS_ARGUMENTS:
+            stateString = "HAS_ARGUMENTS";
+            break;
     }
-    LOG(ERROR) << "Invalid state for " << func << ": " << stateString;
+    LOG(ERROR) << "Invalid state for " << location.function_name() << ": "
+               << stateString;
+    PrintStackTrace();
 }
 
 SQLiteDatabase::Helper::Helper(sqlite3* db, const std::string_view& filename)
@@ -66,14 +102,8 @@ bool SQLiteDatabase::Helper::prepare() {
         case State::NOTHING:
             // Pass
             break;
-        case State::PREPARED:
-            LOG(WARNING) << "Statement already prepared";
-            [[fallthrough]];
-        case State::EXECUTED_AS_SCRIPT:
-        case State::BOUND:
-        case State::EXECUTED:
-        case State::FAILED_TO_PREPARE:
-            logInvalidState(__func__, state);
+        default:
+            logInvalidState(std::source_location::current(), state);
             return false;
     };
     auto ret =
@@ -97,12 +127,8 @@ bool SQLiteDatabase::Helper::executeAsScript() {
         case State::NOTHING:
             // Pass
             break;
-        case State::PREPARED:
-        case State::EXECUTED_AS_SCRIPT:
-        case State::BOUND:
-        case State::EXECUTED:
-        case State::FAILED_TO_PREPARE:
-            logInvalidState(__func__, state);
+        default:
+            logInvalidState(std::source_location::current(), state);
             return false;
     };
 
@@ -130,6 +156,7 @@ SQLiteDatabase::Helper::~Helper() {
         case State::BOUND:
         case State::EXECUTED:
         case State::PREPARED:
+        case State::HAS_ARGUMENTS:
             if (stmt != nullptr) {
                 sqlite3_finalize(stmt);
             }
@@ -143,37 +170,29 @@ SQLiteDatabase::Helper::~Helper() {
 std::shared_ptr<SQLiteDatabase::Helper> SQLiteDatabase::Helper::addArgument(
     SQLiteDatabase::Helper::ArgTypes value) {
     switch (state) {
+        case State::HAS_ARGUMENTS:
         case State::PREPARED:
             // Pass
             arguments.emplace_back(value, arguments.size() + 1);
             break;
-        case State::NOTHING:
-        case State::EXECUTED_AS_SCRIPT:
-        case State::BOUND:
-        case State::EXECUTED:
-        case State::FAILED_TO_PREPARE:
-            logInvalidState(__func__, state);
+        default:
+            logInvalidState(std::source_location::current(), state);
             break;
     };
+    state = State::HAS_ARGUMENTS;
     return shared_from_this();
 }
 
 bool SQLiteDatabase::Helper::bindArguments() {
-    if (arguments.empty()) {
-        LOG(ERROR) << "No arguments provided for SQL statement";
-        return false;
-    }
-
     switch (state) {
-        case State::PREPARED:
+        case State::HAS_ARGUMENTS:
             // Pass
             break;
-        case State::NOTHING:
-        case State::EXECUTED_AS_SCRIPT:
-        case State::BOUND:
-        case State::EXECUTED:
-        case State::FAILED_TO_PREPARE:
-            logInvalidState(__func__, state);
+        case State::PREPARED:
+            LOG(WARNING) << __func__ << " called without any arguments added?";
+            return false;
+        default:
+            logInvalidState(std::source_location::current(), state);
             return false;
     };
 
@@ -192,11 +211,36 @@ bool SQLiteDatabase::Helper::bindArguments() {
             },
             argument.parameter);
     }
+    state = State::BOUND;
     return true;
+}
+
+bool SQLiteDatabase::Helper::commonExecCheck(const std::source_location &location) {
+    switch (state) {
+        case State::BOUND:
+        case State::PREPARED:
+        case State::EXECUTED:
+            // Pass
+            return true;
+        case State::HAS_ARGUMENTS:
+            LOG(WARNING) << location.function_name()
+                         << " called with added arguments, but is not bound?";
+            PrintStackTrace();
+            bindArguments();
+            return true;
+        default:
+            logInvalidState(location, state);
+            return false;
+    }
 }
 
 std::optional<SQLiteDatabase::Helper::Row>
 SQLiteDatabase::Helper::execAndGetRow() {
+    if (!commonExecCheck(std::source_location::current())) {
+        return std::nullopt;
+    }
+
+    state = State::EXECUTED;
     switch (sqlite3_step(stmt)) {
         case SQLITE_ROW: {
             Row row{shared_from_this(), stmt};
@@ -211,6 +255,10 @@ SQLiteDatabase::Helper::execAndGetRow() {
 }
 
 bool SQLiteDatabase::Helper::execute() {
+    if (!commonExecCheck(std::source_location::current())) {
+        return false;
+    }
+
     switch (sqlite3_step(stmt)) {
         case SQLITE_DONE:
         case SQLITE_ROW:
@@ -219,11 +267,20 @@ bool SQLiteDatabase::Helper::execute() {
             LOG(ERROR) << "Error executing: " << sqlite3_errmsg(db);
             return false;
     }
+    state = State::EXECUTED;
     return true;
 }
 
 std::shared_ptr<SQLiteDatabase::Helper>
 SQLiteDatabase::Helper::getNextStatement() {
+    switch (state) {
+        case State::EXECUTED:
+            break;
+        default:
+            logInvalidState(std::source_location::current(), state);
+            return nullptr;
+    }
+
     if (isEmptyOrBlank(scriptContentUnparsed)) {
         return nullptr;
     }
@@ -320,7 +377,7 @@ void SQLiteDatabase::initDatabase() {
     if (!helper->prepare()) {
         return result;
     }
-    helper->addArgument(user);
+    helper->addArgument(user)->bindArguments();
     row = helper->execAndGetRow();
     if (row) {
         const auto info = static_cast<InfoType>(row->get<int>(0));
@@ -509,14 +566,14 @@ bool SQLiteDatabase::addMediaInfo(const MediaInfo& info) const {
     return true;
 }
 
-UserId SQLiteDatabase::getOwnerUserId() const {
+std::optional<UserId> SQLiteDatabase::getOwnerUserId() const {
     auto helper = Helper::create(db, Helper::kFindOwnerFile);
     if (!helper->prepare()) {
-        return kInvalidUserId;
+        return std::nullopt;
     }
     const auto row = helper->execAndGetRow();
     if (!row) {
-        return kInvalidUserId;
+        return std::nullopt;
     }
     return row->get<UserId>(0);
 }
@@ -544,7 +601,8 @@ std::ostream& SQLiteDatabase::dump(std::ostream& ofs) const {
 
     // Because of the race condition with logging, use stringstream and output
     // later.
-    ss << "Owner Id: " << std::quoted(std::to_string(getOwnerUserId()))
+    ss << "Owner Id: "
+       << std::quoted(std::to_string(getOwnerUserId().value_or(0)))
        << std::endl;
 
     auto helper = Helper::create(db, Helper::kDumpDatabaseFile);
@@ -579,10 +637,10 @@ std::ostream& SQLiteDatabase::dump(std::ostream& ofs) const {
     ss << std::endl;
 
     // Dump media database
-    if (auto mhelper = helper->getNextStatement(); mhelper) {
+    if (helper = helper->getNextStatement(); helper && helper->prepare()) {
         std::optional<Helper::Row> row;
         bool any = false;
-        while ((row = mhelper->execAndGetRow())) {
+        while ((row = helper->execAndGetRow())) {
             ss << "MediaId: " << row->get<std::string>(0) << std::endl;
             ss << "MediaUniqueId: " << row->get<std::string>(1) << std::endl;
             ss << "MediaName: " << row->get<std::string>(2) << std::endl;
@@ -595,6 +653,25 @@ std::ostream& SQLiteDatabase::dump(std::ostream& ofs) const {
     } else {
         ss << "!!! Failed to dump media database" << std::endl;
     }
+    ss << std::endl;
+
+    // Dump chatid database
+    if (helper = helper->getNextStatement(); helper && helper->prepare()) {
+        std::optional<Helper::Row> row;
+        bool any = false;
+        while ((row = helper->execAndGetRow())) {
+            ss << "ChatId: " << row->get<ChatId>(0) << std::endl;
+            ss << "ChatName: " << row->get<std::string>(1) << std::endl;
+            ss << std::endl;
+            any = true;
+        }
+        if (!any) {
+            ss << "!!! No chatid entries in the database" << std::endl;
+        }
+    } else {
+        ss << "!!! Failed to dump chatid database" << std::endl;
+    }
+
     ss << "========================= End of dump ========================"
        << std::endl;
     ofs << ss.str();
@@ -617,4 +694,29 @@ void SQLiteDatabase::setOwnerUserId(UserId userId) const {
             // Not possible
             break;
     }
+}
+
+bool SQLiteDatabase::addChatInfo(const ChatId chatid,
+                                 const std::string& name) const {
+    auto insertHelper = Helper::create(db, Helper::kInsertChatFile);
+    if (!insertHelper->prepare()) {
+        return false;
+    }
+    insertHelper->addArgument(chatid)->addArgument(name)->bindArguments();
+    return insertHelper->execute();
+}
+
+std::optional<ChatId> SQLiteDatabase::getChatId(const std::string& name) const {
+    auto helper = Helper::create(db, Helper::kFindChatIdFile);
+    if (!helper->prepare()) {
+        return std::nullopt;
+    }
+    helper->addArgument(name);
+    helper->bindArguments();
+
+    auto row = helper->execAndGetRow();
+    if (!row) {
+        return std::nullopt;
+    }
+    return row->get<ChatId>(0);
 }

@@ -1,0 +1,1 @@
+INSERT INTO chatmap (chatid, chatname) VALUES (?, ?)

@@ -22,11 +22,17 @@ struct ProtoDatabase : DatabaseBase {
                                              UserId user) const override;
     bool loadDatabaseFromFile(std::filesystem::path filepath) override;
     bool unloadDatabase() override;
-    UserId getOwnerUserId() const override;
-    std::optional<MediaInfo> queryMediaInfo(std::string str) const override;
-    bool addMediaInfo(const MediaInfo &info) const override;
+    [[nodiscard]] std::optional<UserId> getOwnerUserId() const override;
+    [[nodiscard]] std::optional<MediaInfo> queryMediaInfo(
+        std::string str) const override;
+    [[nodiscard]] bool addMediaInfo(const MediaInfo &info) const override;
     void setOwnerUserId(UserId userId) const override;
     std::ostream &dump(std::ostream &ofs) const override;
+
+    [[nodiscard]] bool addChatInfo(const ChatId chatid,
+                                   const std::string &name) const override;
+    [[nodiscard]] std::optional<ChatId> getChatId(
+        const std::string &name) const override;
 
    private:
     struct Info {

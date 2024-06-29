@@ -135,20 +135,26 @@ void TgBotApiExHandler(TgBot::Bot& bot, const TgBot::TgException& e) {
 
     LOG(ERROR) << "TgBotAPI Exception: " << e.what();
     LOG(WARNING) << "Trying to recover";
-    UserId ownerid = TgBotDatabaseImpl::getInstance()->getOwnerUserId();
-    try {
-        bot_sendMessage(bot, ownerid,
-                        std::string("Exception occured: ") + e.what());
-    } catch (const TgBot::TgException& e) {
-        LOG(FATAL) << e.what();
+    const auto ownerid = TgBotDatabaseImpl::getInstance()->getOwnerUserId();
+    if (ownerid) {
+        try {
+            bot_sendMessage(bot, ownerid.value(),
+                            std::string("Exception occured: ") + e.what());
+        } catch (const TgBot::TgException& e) {
+            LOG(FATAL) << e.what();
+        }
     }
     if (exceptionDuration && exceptionDuration->get() < kErrorMaxDuration) {
-        bot_sendMessage(bot, ownerid, "Recover failed.");
+        if (ownerid) {
+            bot_sendMessage(bot, ownerid.value(), "Recover failed.");
+        }
         LOG(FATAL) << "Recover failed";
     }
     exceptionDuration.emplace();
     exceptionDuration->init();
-    bot_sendMessage(bot, ownerid, "Reinitializing.");
+    if (ownerid) {
+        bot_sendMessage(bot, ownerid.value(), "Restarting...");
+    }
     LOG(INFO) << "Re-init";
     AuthContext::getInstance()->isAuthorized() = false;
     const auto thrmgr = ThreadManager::getInstance();

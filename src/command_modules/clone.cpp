@@ -34,7 +34,7 @@ static void CloneCommandFn(const Bot& bot, const Message::Ptr message) {
             auto user = member->user;
             CStringLifetime userName = UserPtr_toString(user);
             std::stringstream ss;
-            ChatId ownerId = TgBotDatabaseImpl::getInstance()->getOwnerUserId();
+            ChatId ownerId = *TgBotDatabaseImpl::getInstance()->getOwnerUserId();
 
             bot.getApi().setMyName(userName.get());
 

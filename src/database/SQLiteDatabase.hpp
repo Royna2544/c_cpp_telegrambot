@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <source_location>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -53,13 +54,17 @@ struct SQLiteDatabase : DatabaseBase {
                                              UserId user) const override;
     bool loadDatabaseFromFile(std::filesystem::path filepath) override;
     bool unloadDatabase() override;
-    [[nodiscard]] UserId getOwnerUserId() const override;
+    [[nodiscard]] std::optional<UserId> getOwnerUserId() const override;
     void initDatabase() override;
     [[nodiscard]] std::optional<MediaInfo> queryMediaInfo(
         std::string str) const override;
     [[nodiscard]] bool addMediaInfo(const MediaInfo &info) const override;
     void setOwnerUserId(UserId userId) const override;
     std::ostream &dump(std::ostream &ofs) const override;
+    [[nodiscard]] bool addChatInfo(const ChatId chatid,
+                                   const std::string &name) const override;
+    [[nodiscard]] std::optional<ChatId> getChatId(
+        const std::string &name) const override;
 
     /**
      * SQLiteDatabase::Helper is a helper class for executing SQL statements
@@ -69,7 +74,6 @@ struct SQLiteDatabase : DatabaseBase {
     class Helper : public std::enable_shared_from_this<Helper> {
        public:
         using ArgTypes = std::variant<int32_t, int64_t, std::string>;
-        using onRowCallback = std::function<bool(sqlite3_stmt *)>;
 
         static constexpr std::string_view kInsertUserFile = "insertUser.sql";
         static constexpr std::string_view kRemoveUserFile = "removeUser.sql";
@@ -92,6 +96,9 @@ struct SQLiteDatabase : DatabaseBase {
         static constexpr std::string_view kFindOwnerFile = "findOwner.sql";
         static constexpr std::string_view kDumpDatabaseFile =
             "dumpDatabase.sql";
+        static constexpr std::string_view kInsertChatFile = "insertChat.sql";
+        static constexpr std::string_view kFindChatIdFile = "findChatId.sql";
+
         struct Row {
             template <typename T>
             T get(const int index) const {
@@ -225,12 +232,39 @@ struct SQLiteDatabase : DatabaseBase {
             NOTHING,             // Only called ctor
             PREPARED,            // Called prepare() method
             EXECUTED_AS_SCRIPT,  // Called executeAsScript() method
+            HAS_ARGUMENTS,       // Called addArguments() method at least once
             BOUND,               // Called bindArguments() method
             EXECUTED,            // Called execute() or execAndGetRow() method
             FAILED_TO_PREPARE,   // Failed to prepare
         } state = State::NOTHING;
 
-        static void logInvalidState(const char *func, State state);
+        /**
+         * @brief Logs an error message for an invalid state of the
+         * SQLiteDatabase::Helper.
+         *
+         * This method logs an error message for an invalid state of the
+         * SQLiteDatabase::Helper. It is used to provide debugging information
+         * when the state of the Helper object is not as expected.
+         *
+         * @param location The source location where the invalid state was
+         * detected.
+         * @param state The invalid state of the SQLiteDatabase::Helper.
+         */
+        static void logInvalidState(const std::source_location &location,
+                                    State state);
+
+        /**
+         * @brief Checks if the SQL statement execution was successful.
+         *
+         * This method checks if the SQL statement execution was successful. It
+         * is used to provide debugging information when the SQL statement
+         * execution fails.
+         *
+         * @param location The source location where the SQL statement execution
+         * was attempted.
+         * @return True if the SQL statement could continue execution, false otherwise
+         */
+        bool commonExecCheck(const std::source_location &location);
 
         std::string scriptContent;
         std::string scriptContentUnparsed;

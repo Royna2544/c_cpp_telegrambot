@@ -28,11 +28,6 @@ struct DatabaseBase {
     };
 
     /**
-     * @brief A constant representing an invalid user id.
-     */
-    static constexpr UserId kInvalidUserId = -1;
-
-    /**
      * @brief Initialize the database.
      *
      * This function should initialize the database, creating any necessary
@@ -100,7 +95,7 @@ struct DatabaseBase {
      *
      * @return the user id of the owner of the database
      */
-    [[nodiscard]] virtual UserId getOwnerUserId() const = 0;
+    [[nodiscard]] virtual std::optional<UserId> getOwnerUserId() const = 0;
 
     /**
      * @brief Set the user id of the owner of the database
@@ -130,6 +125,34 @@ struct DatabaseBase {
     [[nodiscard]] virtual bool addMediaInfo(const MediaInfo& info) const = 0;
 
     /**
+     * @brief Add a chat info to the database
+     *
+     * This function adds a new chat info to the database. The chat info
+     * consists of a chat id and a name. If the chat info already exists in the
+     * database, the function should return false.
+     *
+     * @param chatid The unique identifier of the chat.
+     * @param name The name of the chat.
+     * @return true if the chat info was added successfully, false otherwise.
+     */
+    [[nodiscard]] virtual bool addChatInfo(const ChatId chatid,
+                                           const std::string& name) const = 0;
+
+    /**
+     * @brief Get the chat id associated with a given chat name
+     *
+     * This function retrieves the chat id associated with a given chat name
+     * from the database. If the chat name does not exist in the database, the
+     * function should return std::nullopt.
+     *
+     * @param name The name of the chat.
+     * @return The chat id associated with the given chat name. If the chat name
+     * does not exist, the function should return std::nullopt.
+     */
+    [[nodiscard]] virtual std::optional<ChatId> getChatId(
+        const std::string& name) const = 0;
+
+    /**
      * @brief Dump the database to the specified output stream.
      *
      * This function should dump the contents of the database to the specified
@@ -146,7 +169,7 @@ struct DatabaseBase {
      * @brief Get the simple name of a list type
      *
      * @param type type of the list
-     * @return const char* simple name of the list type
+     * @return std::string_view simple name of the list type
      */
     [[nodiscard]] static std::string_view getSimpleName(ListType type) {
         switch (type) {

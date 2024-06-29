@@ -4,7 +4,7 @@
 
 static void setOwnerCommand(const Bot &bot, const Message::Ptr message) {
     auto impl = TgBotDatabaseImpl::getInstance();
-    if (impl->getOwnerUserId() == DatabaseBase::kInvalidUserId) {
+    if (!impl->getOwnerUserId().has_value()) {
         impl->setOwnerUserId(message->from->id);
         bot_sendReplyMessage(bot, message, "Owner set");
     } else {

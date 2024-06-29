@@ -12,9 +12,15 @@ message MediaToName {
   repeated string Names = 3;
 }
 
+message ChatToName {
+  optional int64 TelegramChatId = 1;
+  optional string Name = 2;
+}
+
 message Database {
   optional int64 ownerId = 1;
   optional PersonList whitelist = 2;
   optional PersonList blacklist = 3;
   repeated MediaToName mediaToNames = 4;
+  repeated ChatToName chatToNames = 5;
 }

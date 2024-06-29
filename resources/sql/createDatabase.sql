@@ -24,3 +24,10 @@ CREATE TABLE mediamap (
     FOREIGN KEY (medianameid) REFERENCES medianame(id) ON DELETE CASCADE,
     FOREIGN KEY (mediaid) REFERENCES mediaids(id) ON DELETE CASCADE
 );
+
+CREATE TABLE chatmap (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    chatid BIGINT NOT NULL,
+    chatname VARCHAR(100) NOT NULL,
+    UNIQUE (chatid)
+)
