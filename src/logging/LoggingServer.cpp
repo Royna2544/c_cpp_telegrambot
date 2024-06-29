@@ -40,6 +40,10 @@ void NetworkLogSink::Send(const absl::LogEntry& entry) {
 }
 
 void NetworkLogSink::doInitCall() {
+    if (!interface) {
+        LOG(ERROR) << "Cannot export log socket, skipping initialization";
+        return;
+    }
     setPreStopFunction([this](auto*) {
         LOG(INFO) << "onServerShutdown";
         enabled = false;
@@ -83,6 +87,10 @@ const CStringLifetime NetworkLogSink::getInitCallName() const {
 NetworkLogSink::NetworkLogSink() {
     SocketServerWrapper wrapper;
     interface = wrapper.getInternalInterface();
-    interface->options.address.set(getSocketPathForLogging().string());
-    interface->options.port.set(SocketInterfaceBase::kTgBotLogPort);
+    if (interface) {
+        interface->options.address.set(getSocketPathForLogging().string());
+        interface->options.port.set(SocketInterfaceBase::kTgBotLogPort);
+    } else {
+        LOG(ERROR) << "Failed to find default socket interface";
+    }
 }
