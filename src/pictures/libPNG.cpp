@@ -19,7 +19,7 @@ bool PngImage::read(const std::filesystem::path& filename) {
     }
 
     LOG(INFO) << "Loading image " << filename;
-    
+
     fp = fopen(filename.string().c_str(), "rb");
     if (fp == nullptr) {
         LOG(ERROR) << "Can't open file " << filename << " for reading";
@@ -43,6 +43,7 @@ bool PngImage::read(const std::filesystem::path& filename) {
 
     if (setjmp(png_jmpbuf(png))) {
         LOG(ERROR) << "Error during reading image header";
+        png_destroy_read_struct(&png, &info, nullptr);
         return false;
     }
 
@@ -56,6 +57,7 @@ bool PngImage::read(const std::filesystem::path& filename) {
 
     if (setjmp(png_jmpbuf(png))) {
         LOG(ERROR) << "Error during updating image information";
+        png_destroy_read_struct(&png, &info, nullptr);
         return false;
     }
     if (bit_depth == 16) {
@@ -219,6 +221,7 @@ bool PngImage::write(const std::filesystem::path& filename) {
 
     if (setjmp(png_jmpbuf(png))) {
         LOG(ERROR) << "Error during init_io";
+        png_destroy_write_struct(&png, &info);
         return false;
     }
 
@@ -236,6 +239,7 @@ bool PngImage::write(const std::filesystem::path& filename) {
 
     if (setjmp(png_jmpbuf(png))) {
         LOG(ERROR) << "Error during writing bytes";
+        png_destroy_write_struct(&png, &info);
         return false;
     }
 
@@ -243,6 +247,7 @@ bool PngImage::write(const std::filesystem::path& filename) {
 
     if (setjmp(png_jmpbuf(png))) {
         LOG(ERROR) << "Error during end of write";
+        png_destroy_write_struct(&png, &info);
         return false;
     }
 
