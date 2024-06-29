@@ -3,6 +3,7 @@
 #include <absl/log/log.h>
 #include <webp/decode.h>
 #include <webp/encode.h>
+#include <webp/types.h>
 
 #include <cstdint>
 #include <memory>
@@ -39,7 +40,10 @@ bool WebPImage::read(const std::filesystem::path& filename) {
 
     width_ = width;
     height_ = height;
-    data_ = std::unique_ptr<uint8_t[]>(decoded_data);
+    const auto bufferSize = width * height * 4;
+    data_ = std::make_unique<uint8_t[]>(bufferSize);
+    memcpy(data_.get(), decoded_data, bufferSize);
+    WebPFree(decoded_data);
 
     return true;
 }
@@ -91,6 +95,7 @@ bool WebPImage::write(const std::filesystem::path& filename) {
 
     fwrite(output, 1, output_size, file);
     fclose(file);
+    WebPFree(output);
 
     LOG(INFO) << "New WebP image written to " << filename;
 
