@@ -138,6 +138,7 @@ enum class FileType {
     TYPE_GIF,
     TYPE_DOCUMENT,
     TYPE_DICE,
+    TYPE_STICKER,
     TYPE_MAX
 };
 

@@ -136,6 +136,11 @@ GenericAck SocketInterfaceTgBot::handle_SendFileToChatId(const void* ptr) {
                     return api.sendDocument(id, file);
                 };
                 break;
+            case FileType::TYPE_STICKER:
+                fn = [](const Api& api, ChatId id, const FileOrId_t& file) {
+                    return api.sendSticker(id, file);
+                };
+                break;
             case FileType::TYPE_DICE: {
                 static const std::vector<std::string> dices = {
                     "🎲", "🎯", "🏀", "⚽", "🎳", "🎰"};
