@@ -105,6 +105,7 @@ void handleDatabaseCmd(Bot& bot, const Message::Ptr& message) {
     reply->keyboard[1][1]->text = removefromblacklist;
     reply->oneTimeKeyboard = true;
     reply->resizeKeyboard = true;
+    reply->selective = true;
 
     if (!wrapper.switchToReplyToMessage(GETSTR(REPLY_TO_USER_MSG))) {
         return;
