@@ -8,7 +8,6 @@ cmake_policy(SET CMP0077 NEW) # option() command prefers to do nothing
 include(cmake/macros.cmake)
 include(cmake/variables.cmake)
 include(cmake/sanitizers.cmake)
-
 ################ EXE NAMES STEMMED FROM PROJECT_NAME ################
 set(MEDIA_CLI_NAME ${PROJECT_NAME}_MediaCli)
 set(PROJECT_MAINEXE_NAME ${PROJECT_NAME}_main)
@@ -50,6 +49,7 @@ target_link_libraries(TgBotLogInit absl::log_initialize absl::log absl::log_sink
 link_libraries(absl::log)
 #####################################################################
 
+include(cmake/tgbotpng.cmake)
 ############################ RUST support ###########################
 if (ENABLE_RUST_SUPPORT)
   add_subdirectory(src/third-party/corrosion)
@@ -223,7 +223,7 @@ add_library_san(${PROJECT_NAME} SHARED ${SRC_LIST})
 target_include_directories(${PROJECT_NAME} PRIVATE src/third-party/rapidjson/include)
 target_include_directories(${PROJECT_NAME} PUBLIC ${STRINGRES_GENHDR_DIR})
 ######################## Libraries to link ########################
-set(LD_LIST TgBot TgBotDB TgBotUtils TgBotWeb TgBotStringRes)
+set(LD_LIST TgBot TgBotDB TgBotUtils TgBotWeb TgBotStringRes TgBotPNG)
 extend_set_if(LD_LIST USE_UNIX_SOCKETS TgBotSocket)
 extend_set_if(LD_LIST WIN32 wsock32 Ws2_32)
 extend_set_if(LD_LIST ENABLE_RUNTIME_COMMAND ${CMAKE_DL_LIBS})

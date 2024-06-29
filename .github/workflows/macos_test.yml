@@ -19,7 +19,7 @@ jobs:
         # https://github.com/Homebrew/homebrew-core/issues/169820#issuecomment-2080459578
       - name: Set up dependencies
         run: |
-          brew install boost ninja llvm
+          brew install boost ninja llvm webp libpng
           git submodule update --init
           sed -i '' '/^#define _LIBCPP_HAS_NO_VENDOR_AVAILABILITY_ANNOTATIONS/d' "$(brew --prefix llvm)"/include/c++/v1/__config_site
 
@@ -27,7 +27,6 @@ jobs:
         env: 
           CC: /opt/homebrew/opt/llvm/bin/clang
           CXX: /opt/homebrew/opt/llvm/bin/clang++
-          LDFLAGS: "-L/opt/homebrew/opt/protobuf/lib -L/opt/homebrew/opt/abseil/lib"
         run: |
           mkdir build
           cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release .

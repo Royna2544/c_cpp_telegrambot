@@ -44,6 +44,8 @@ jobs:
           boost:p
           pcre:p
           libxml2:p
+          libpng:p
+          libwebp:p
 
     - name: 'Setup submodule'
       run: |

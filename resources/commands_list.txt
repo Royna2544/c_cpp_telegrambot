@@ -26,3 +26,4 @@ cpp [infile=compilers_impl]
 go [infile=compilers_impl]
 python [infile=compilers_impl]
 setowner
+rotatepic
