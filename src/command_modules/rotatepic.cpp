@@ -2,6 +2,8 @@
 #include <boost/algorithm/string/split.hpp>
 #include <cctype>
 #include <database/bot/TgBotDatabaseImpl.hpp>
+#include <filesystem>
+#include <libJPEG.hpp>
 #include <libPNG.hpp>
 #include <libWEBP.hpp>
 #include <string>
@@ -11,7 +13,6 @@
 #include "BotReplyMessage.h"
 #include "CommandModule.h"
 #include "TryParseStr.hpp"
-#include "tgbot/types/InputFile.h"
 
 struct ProcessImageParam {
     std::filesystem::path srcPath;
@@ -23,7 +24,7 @@ struct ProcessImageParam {
 namespace {
 
 template <int index>
-bool tryToProcess(std::variant<PngImage, WebPImage>& images,
+bool tryToProcess(std::variant<PngImage, WebPImage, JPEGImage>& images,
                   ProcessImageParam param) {
     auto& inst = std::get<index>(images);
     if (inst.read(param.srcPath)) {
@@ -52,7 +53,7 @@ bool tryToProcess(std::variant<PngImage, WebPImage>& images,
 }
 
 bool processPhotoFile(ProcessImageParam& param) {
-    std::variant<PngImage, WebPImage> images;
+    std::variant<PngImage, WebPImage, JPEGImage> images;
     LOG(INFO) << "Processing image " << param.srcPath << "...";
 
     // First try: PNG
@@ -64,12 +65,20 @@ bool processPhotoFile(ProcessImageParam& param) {
         return true;
     }
 
-    std::variant<PngImage, WebPImage> imagesTry2;
     // Second try: WebP
     LOG(INFO) << "Second try: WebP";
     images.emplace<WebPImage>();
     param.destPath = "output.webp";
     if (tryToProcess<1>(images, param)) {
+        LOG(INFO) << "Wrote image: " << param.destPath;
+        return true;
+    }
+
+    // Third try: JPEG
+    LOG(INFO) << "Third try: JPEG";
+    images.emplace<JPEGImage>();
+    param.destPath = "output.jpg";
+    if (tryToProcess<2>(images, param)) {
         LOG(INFO) << "Wrote image: " << param.destPath;
         return true;
     }
@@ -95,7 +104,8 @@ void rotateStickerCommand(const Bot& bot, const Message::Ptr message) {
     }
     boost::split(args, extText, isspace);
     if (args.size() < 1 || args.size() > 2) {
-        wrapper.sendMessageOnExit("Invalid arguments. Use /rotatepic <angle> [greyscale]");
+        wrapper.sendMessageOnExit(
+            "Invalid arguments. Use /rotatepic <angle> [greyscale]");
         return;
     }
     if (!try_parse(args[0], &rotation)) {
@@ -105,38 +115,48 @@ void rotateStickerCommand(const Bot& bot, const Message::Ptr message) {
     if (args.size() == 2) {
         greyscale = args[1] == "greyscale";
     }
-
+    std::optional<std::string> fileid;
     if (wrapper.hasSticker()) {
-        const auto sticker = wrapper.getSticker();
-        const auto file = bot.getApi().getFile(sticker->fileId);
-        constexpr std::string_view kDownloadFile = "tmp.png";
-        if (!file) {
-            wrapper.sendMessageOnExit("Failed to download sticker file.");
-            return;
-        }
-        // Download the sticker
-        std::string buffer = bot.getApi().downloadFile(file->filePath);
-        // Save the sticker to a temporary file
-        std::ofstream ofs(kDownloadFile.data());
-        ofs.write(buffer.data(), buffer.size());
-        ofs.close();
+        fileid = wrapper.getSticker()->fileId;
+    } else if (wrapper.hasPhoto()) {
+        fileid = wrapper.getPhoto().back()->fileId;
+    } else {
+        wrapper.sendMessageOnExit("Reply to a sticker or photo");
+        return;
+    }
 
-        // Process the image
-        ProcessImageParam params{};
-        params.srcPath = kDownloadFile.data();
-        params.greyscale = greyscale;
-        params.rotation = rotation;
+    const auto file = bot.getApi().getFile(fileid.value());
+    constexpr std::string_view kDownloadFile = "inpic.bin";
+    if (!file) {
+        wrapper.sendMessageOnExit("Failed to download sticker file.");
+        return;
+    }
+    // Download the sticker
+    std::string buffer = bot.getApi().downloadFile(file->filePath);
+    // Save the sticker to a temporary file
+    std::ofstream ofs(kDownloadFile.data());
+    ofs.write(buffer.data(), buffer.size());
+    ofs.close();
 
-        if (processPhotoFile(params)) {
-            bot.getApi().sendSticker(
-                wrapper.getChatId(),
-                TgBot::InputFile::fromFile(params.destPath.string(), "image/png"));
-        } else {
-            wrapper.sendMessageOnExit("Unknown image type, or processing failed");
+    // Process the image
+    ProcessImageParam params{};
+    params.srcPath = kDownloadFile.data();
+    params.greyscale = greyscale;
+    params.rotation = rotation;
+
+    if (processPhotoFile(params)) {
+        const auto infile =
+            TgBot::InputFile::fromFile(params.destPath.string(), "image/png");
+        if (wrapper.hasSticker()) {
+            bot.getApi().sendSticker(wrapper.getChatId(), infile);
+        } else if (wrapper.hasPhoto()) {
+            bot.getApi().sendPhoto(wrapper.getChatId(), infile);
         }
     } else {
-        wrapper.sendMessageOnExit("Reply to a sticker please.");
+        wrapper.sendMessageOnExit("Unknown image type, or processing failed");
     }
+    std::filesystem::remove(params.srcPath);  // Delete the temporary file
+    std::filesystem::remove(params.destPath);
 }
 }  // namespace
 

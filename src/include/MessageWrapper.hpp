@@ -69,6 +69,12 @@ struct MessageWrapperLimited {
     [[nodiscard]] TgBot::User::Ptr getUser() const noexcept {
         return message->from;
     }
+    [[nodiscard]] bool hasPhoto() const noexcept {
+        return !message->photo.empty();
+    }
+    [[nodiscard]] std::vector<TgBot::PhotoSize::Ptr> getPhoto() const noexcept {
+        return message->photo;
+    }
     explicit MessageWrapperLimited(Message::Ptr message)
         : message(std::move(message)) {}
 
