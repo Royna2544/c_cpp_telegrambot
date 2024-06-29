@@ -6,7 +6,6 @@ add_executable_san(${PROJECT_TEST_NAME}
   tests/MessageWrapperTest.cpp
   tests/ConfigManagerTest.cpp
   tests/RegexHandlerTest.cpp
-  tests/DatabaseLoader.cpp
   tests/ResourceManagerTest.cpp
   tests/TryParseTest.cpp
   tests/SharedMallocTest.cpp

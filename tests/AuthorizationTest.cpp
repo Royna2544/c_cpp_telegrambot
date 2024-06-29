@@ -4,7 +4,7 @@
 #include <chrono>
 #include <memory>
 
-#include "DatabaseLoader.h"
+#include "database/bot/TgBotDatabaseImpl.hpp"
 
 static void MakeMessageDateNow(Message::Ptr& message) {
     const auto rn = std::chrono::system_clock::now();
@@ -24,7 +24,7 @@ static void MakeMessageNonOwner(Message::Ptr& message) {
 }
 
 static void MakeMessageOwner(Message::Ptr& message) {
-    static UserId ownerId = loadDb()->getOwnerUserId().value_or(12345);
+    static UserId ownerId = TgBotDatabaseImpl::getInstance()->getOwnerUserId().value_or(12345);
     MakeMessageNonOwner(message);
     message->from->id = ownerId;
 }
