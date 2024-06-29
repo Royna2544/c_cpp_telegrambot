@@ -71,12 +71,7 @@ bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
         }
 
         pthread_t watchdog_thread = 0;
-        pthread_attr_t attr;
-
-        pthread_attr_init(&attr);
-        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
-        pthread_create(&watchdog_thread, &attr, &watchdog, data);
-        pthread_attr_destroy(&attr);
+        pthread_create(&watchdog_thread, NULL, &watchdog, data);
         pdata->wdt_thread = watchdog_thread;
         data->privdata = pdata;
     } else {
