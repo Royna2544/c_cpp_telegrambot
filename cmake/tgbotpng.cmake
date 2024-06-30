@@ -1,7 +1,7 @@
 include(cmake/FindWebP.cmake)
 find_package(PNG REQUIRED)
 find_package(JPEG REQUIRED)
-find_package(OpenCV REQUIRED)
+find_package(OpenCV REQUIRED core imgproc highgui)
 
 add_library_san(TgBotImgProc SHARED
     src/imagep/ImageProcOpenCV.cpp
