@@ -6,13 +6,10 @@ bool OpenCVImage::read(const std::filesystem::path& filename) {
         LOG(ERROR) << "Error reading image: " << filename;
         return false;
     }
-    LOG(INFO) << "Loading image: " << filename << ": Success";
     return true;
 }
 
 OpenCVImage::Result OpenCVImage::_rotate_image(int angle) {
-    LOG(INFO) << "Rotating image";
-
     // Make it clockwise
     angle = kAngleMax - angle;
 

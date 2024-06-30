@@ -8,24 +8,35 @@
 #include <filesystem>
 #include <vector>
 
+namespace {
+void absl_warn_fn(png_structp png_ptr, png_const_charp error_message) {
+    LOG(WARNING) << "libpng: " << error_message;
+    png_longjmp(png_ptr, 1);
+}
+
+void absl_error_fn(png_structp png_ptr, png_const_charp error_message) {
+    LOG(ERROR) << "libpng: " << error_message;
+    png_longjmp(png_ptr, 1);
+}
+}  // namespace
+
+constexpr int PNG_BYTES_TO_CHECK = 4;
 bool PngImage::read(const std::filesystem::path& filename) {
     FILE* fp = nullptr;
     png_structp png = nullptr;
     png_infop info = nullptr;
+    std::array<unsigned char, 4> header{};
 
     if (contains_data) {
         LOG(WARNING) << "Already contains data, ignore";
         return false;
     }
 
-    LOG(INFO) << "Loading image " << filename;
-
     fp = fopen(filename.string().c_str(), "rb");
     if (fp == nullptr) {
         LOG(ERROR) << "Can't open file " << filename << " for reading";
         return false;
     }
-
     const auto fileCloser = createFileCloser(fp);
 
     png = png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr,
@@ -40,6 +51,8 @@ bool PngImage::read(const std::filesystem::path& filename) {
         LOG(ERROR) << "png_create_info_struct failed";
         return false;
     }
+
+    png_set_error_fn(png, nullptr, absl_error_fn, absl_warn_fn);
 
     if (setjmp(png_jmpbuf(png))) {
         LOG(ERROR) << "Error during reading image header";
@@ -92,7 +105,6 @@ bool PngImage::read(const std::filesystem::path& filename) {
 
     png_destroy_read_struct(&png, &info, nullptr);
 
-    LOG(INFO) << "Read image: " << height << "x" << width;
     contains_data = true;
     return true;
 }
@@ -107,8 +119,8 @@ void PngImage::to_greyscale() {
         png_bytep row = row_data[y];
         for (int x = 0; x < width; x++) {
             png_bytep px = &(row[x * 4]);
-            uint8_t gray = static_cast<uint8_t>(0.299 * px[0] + 0.587 * px[1] +
-                                                0.114 * px[2]);
+            const auto gray = static_cast<uint8_t>(
+                0.299 * px[0] + 0.587 * px[1] + 0.114 * px[2]);
             px[0] = px[1] = px[2] = gray;
         }
     }
@@ -150,7 +162,6 @@ PngImage::Result PngImage::_rotate_image(int angle) {
         return Result::kErrorNoData;
     }
 
-    LOG(INFO) << "Rotating image by " << angle << " degrees";
     switch (angle) {
         case kAngle90:
             rotate_image_impl(height, width,
@@ -176,6 +187,9 @@ PngImage::Result PngImage::_rotate_image(int angle) {
                                   dst_y = src_width - 1 - x;
                               });
             break;
+        case kAngleMin:
+            // Noop
+            return Result::kSuccess;
         default:
             LOG(WARNING) << "libPNG cannot handle angle: " << angle;
             return Result::kErrorUnsupportedAngle;

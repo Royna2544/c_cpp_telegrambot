@@ -1,7 +1,9 @@
 #include <BotReplyMessage.h>
 
 #include <MessageWrapper.hpp>
+#include <StringToolsExt.hpp>
 #include <TryParseStr.hpp>
+#include <algorithm>
 #include <boost/algorithm/string/split.hpp>
 #include <cctype>
 #include <database/bot/TgBotDatabaseImpl.hpp>
@@ -28,6 +30,7 @@ template <int index>
 bool tryToProcess(ImageVariants& images, ProcessImageParam param) {
     auto& inst = std::get<index>(images);
     if (inst.read(param.srcPath)) {
+        LOG(INFO) << "Rotating image by " << param.rotation << " degrees";
         switch (inst.rotate_image(param.rotation)) {
             case PhotoBase::Result::kErrorInvalidArgument:
                 LOG(ERROR) << "Invalid rotation angle";
@@ -39,11 +42,14 @@ bool tryToProcess(ImageVariants& images, ProcessImageParam param) {
                 LOG(ERROR) << "No data available to rotate (internal error)";
                 return false;
             case PhotoBase::Result::kSuccess:
+                LOG(INFO) << "Successfully rotated image";
                 break;
         }
         if (param.greyscale) {
+            LOG(INFO) << "Converting image to greyscale";
             inst.to_greyscale();
         }
+        LOG(INFO) << "Writing image to " << param.destPath;
         return inst.write(param.destPath);
     }
     return false;
@@ -51,7 +57,6 @@ bool tryToProcess(ImageVariants& images, ProcessImageParam param) {
 
 bool processPhotoFile(ProcessImageParam& param) {
     ImageVariants images;
-    LOG(INFO) << "Processing image " << param.srcPath << "...";
 
     // First try: PNG
     LOG(INFO) << "First try: PNG";
@@ -106,17 +111,19 @@ void rotateStickerCommand(const Bot& bot, const Message::Ptr message) {
         return;
     }
 
-    if (!wrapper.switchToReplyToMessage("Reply to a sticker")) {
+    if (!wrapper.switchToReplyToMessage("Reply to a sticker or picture")) {
         return;
     }
     boost::split(args, extText, isspace);
+    std::ranges::remove_if(args, isEmptyOrBlank);
+
     if (args.size() < 1 || args.size() > 2) {
         wrapper.sendMessageOnExit(
             "Invalid arguments. Use /rotatepic <angle> [greyscale]");
         return;
     }
     if (!try_parse(args[0], &rotation)) {
-        wrapper.sendMessageOnExit("Invalid angle. Use one of 90/180/270");
+        wrapper.sendMessageOnExit("Invalid angle. (0-360 are allowed)");
         return;
     }
     if (args.size() == 2) {
@@ -124,11 +131,20 @@ void rotateStickerCommand(const Bot& bot, const Message::Ptr message) {
     }
     std::optional<std::string> fileid;
     if (wrapper.hasSticker()) {
-        fileid = wrapper.getSticker()->fileId;
+        const auto stick = wrapper.getSticker();
+        if (stick->isAnimated || stick->isVideo) {
+            wrapper.sendMessageOnExit(
+                "Cannot rotate animated or video sticker");
+        }
+        fileid = stick->fileId;
     } else if (wrapper.hasPhoto()) {
+        // Select the best quality photos available
         fileid = wrapper.getPhoto().back()->fileId;
     } else {
         wrapper.sendMessageOnExit("Reply to a sticker or photo");
+    }
+
+    if (!fileid) {
         return;
     }
 
@@ -145,6 +161,9 @@ void rotateStickerCommand(const Bot& bot, const Message::Ptr message) {
     ofs.write(buffer.data(), buffer.size());
     ofs.close();
 
+    // Round it under 360
+    rotation = rotation % PhotoBase::kAngleMax;
+
     // Process the image
     ProcessImageParam params{};
     params.srcPath = kDownloadFile.data();
@@ -160,7 +179,8 @@ void rotateStickerCommand(const Bot& bot, const Message::Ptr message) {
         if (wrapper.hasSticker()) {
             bot.getApi().sendSticker(wrapper.getChatId(), infile, replyParams);
         } else if (wrapper.hasPhoto()) {
-            bot.getApi().sendPhoto(wrapper.getChatId(), infile, "Rotated picture", replyParams);
+            bot.getApi().sendPhoto(wrapper.getChatId(), infile,
+                                   "Rotated picture", replyParams);
         }
     } else {
         wrapper.sendMessageOnExit("Unknown image type, or processing failed");

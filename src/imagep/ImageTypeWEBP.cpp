@@ -15,8 +15,6 @@ bool WebPImage::read(const std::filesystem::path& filename) {
     uint8_t* decoded_data = nullptr;
     FILE* file = nullptr;
 
-    LOG(INFO) << "Loading image: " << filename;
-
     // Open the file for reading in binary mode
     file = fopen(filename.string().c_str(), "rb");
     if (!file) {
@@ -55,8 +53,6 @@ WebPImage::Result WebPImage::_rotate_image(int angle) {
         return Result::kErrorNoData;
     }
 
-    DLOG(INFO) << "Rotating image";
-
     long rotated_width = 0;
     long rotated_height = 0;
     std::unique_ptr<uint8_t[]> rotated_data = nullptr;
@@ -71,6 +67,9 @@ WebPImage::Result WebPImage::_rotate_image(int angle) {
             rotated_width = width_;
             rotated_height = height_;
             break;
+        case kAngleMin:
+            // noop
+            return Result::kSuccess;
         default:
             LOG(WARNING) << "libWEBP cannot handle angle: " << angle;
             return Result::kErrorUnsupportedAngle;
@@ -114,7 +113,6 @@ void WebPImage::to_greyscale() {
         LOG(ERROR) << "No image data to convert to greyscale";
         return;
     }
-    LOG(INFO) << "Converting image to greyscale";
 
     for (int i = 0; i < width_ * height_; ++i) {
         // Convert each pixel to greyscale by averaging RGB values

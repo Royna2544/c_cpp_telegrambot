@@ -1,4 +1,5 @@
 // clang-format off
+#include <array>
 #include <csetjmp>
 #include <cstddef>
 #include <cstdio>
@@ -24,6 +25,13 @@ jpegimg_error_exit(j_common_ptr cinfo) {
     longjmp(myerr->setjmpbuf, 1);
 }
 
+METHODDEF(void)
+jpegimg_output_message(j_common_ptr cinfo) {
+    std::array<char, JMSG_LENGTH_MAX> buffer{};
+    (*cinfo->err->format_message)(cinfo, buffer.data());
+    LOG(ERROR) << "libjpeg: " << buffer.data();
+}
+
 bool JPEGImage::read(const std::filesystem::path& filename) {
     FILE* infile = fopen(filename.string().c_str(), "rb");
     if (infile == nullptr) {
@@ -32,13 +40,12 @@ bool JPEGImage::read(const std::filesystem::path& filename) {
     }
     const auto autoCloser = createFileCloser(infile);
 
-    LOG(INFO) << "Loading image " << filename;
-
     jpeg_decompress_struct cinfo{};
     jpegimg_error_mgr jerr{};
 
     cinfo.err = jpeg_std_error(&jerr.pub);
     jerr.pub.error_exit = jpegimg_error_exit;
+    jerr.pub.output_message = jpegimg_output_message;
 
     if (setjmp(jerr.setjmpbuf)) {
         LOG(ERROR) << "Error creating decompress struct";
@@ -92,6 +99,9 @@ JPEGImage::Result JPEGImage::_rotate_image(int angle) {
             new_width = width;
             new_height = height;
             break;
+        case kAngleMin:
+            // No-op
+            return Result::kSuccess;
         default:
             LOG(WARNING) << "libJPEG cannot handle angle: " << angle;
             return Result::kErrorUnsupportedAngle;
