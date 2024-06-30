@@ -1,15 +1,17 @@
 #include <libPHOTOBase.hpp>
 
+#include <opencv2/opencv.hpp>
+
 /**
- * @brief Derived class for photo manipulation using libjpeg.
+ * @brief Derived class for photo manipulation using OpenCV.
  *
  * This class provides implementation for photo manipulation operations using
- * libjpeg.
+ * OpenCV.
  */
-class JPEGImage : public PhotoBase {
+class OpenCVImage : public PhotoBase {
    public:
-    JPEGImage() = default;
-    ~JPEGImage() override = default;
+    OpenCVImage() = default;
+    ~OpenCVImage() override = default;
 
     bool read(const std::filesystem::path& filename) override;
     Result _rotate_image(int angle) override;
@@ -17,8 +19,5 @@ class JPEGImage : public PhotoBase {
     bool write(const std::filesystem::path& filename) override;
 
    private:
-    std::unique_ptr<unsigned char[]> image_data;
-    size_t width{};
-    size_t height{};
-    int num_channels{};
+    cv::Mat image;
 };

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <absl/log/log.h>
+
 #include <filesystem>
 
 /**
@@ -9,6 +11,19 @@
  * writing, and transforming images.
  */
 struct PhotoBase {
+    static constexpr int kAngleMin = 0;
+    static constexpr int kAngle90 = 90;
+    static constexpr int kAngle180 = 180;
+    static constexpr int kAngle270 = 270;
+    static constexpr int kAngleMax = 360;
+    
+    enum class Result {
+        kSuccess,
+        kErrorUnsupportedAngle,
+        kErrorInvalidArgument,
+        kErrorNoData,
+    };
+
     /**
      * @brief Reads an image from the specified file.
      *
@@ -18,19 +33,24 @@ struct PhotoBase {
     virtual bool read(const std::filesystem::path& filename) = 0;
 
     /**
-     * @brief Rotates the image 90 degrees clockwise.
+     * @brief Rotates the image by the specified angle.
+     *
+     * This function rotates the image by the given angle in degrees. The
+     * rotation is performed counter-clockwise.
+     *
+     * @param[in] angle The angle in degrees to rotate the image. The valid
+     * range is from 0 to 360.
+     *
+     * @note The function does not handle cases where the image is not valid or
+     *       cannot be rotated.
      */
-    virtual void rotate_image_90() = 0;
-
-    /**
-     * @brief Rotates the image 180 degrees.
-     */
-    virtual void rotate_image_180() = 0;
-
-    /**
-     * @brief Rotates the image 270 degrees clockwise.
-     */
-    virtual void rotate_image_270() = 0;
+    Result rotate_image(int angle) {
+        if (angle < kAngleMin || angle > kAngleMax) {
+            LOG(ERROR) << "Invalid rotation angle: " << angle;
+            return Result::kErrorInvalidArgument;
+        }
+        return _rotate_image(angle);
+    }
 
     /**
      * @brief Converts the image to grayscale.
@@ -49,4 +69,33 @@ struct PhotoBase {
      * @brief Destructor for the photo manipulation base class.
      */
     virtual ~PhotoBase() = default;
+
+    /**
+     * @brief Creates a unique_ptr that will automatically close the given FILE*
+     * when it goes out of scope.
+     *
+     * @param file The FILE* to be closed when the unique_ptr goes out of scope.
+     *
+     * @return A unique_ptr that will automatically close the given FILE* when
+     * it goes out of scope.
+     */
+    static auto createFileCloser(FILE* file) {
+        return std::unique_ptr<FILE, void (*)(FILE*)>(
+            file, [](FILE* f) { fclose(f); });
+    }
+
+   protected:
+    /**
+     * @brief Rotates the image by the specified angle.
+     *
+     * This function rotates the image by the given angle in degrees. The
+     * rotation is performed counter-clockwise.
+     *
+     * @param[in] angle The angle in degrees to rotate the image. The valid
+     * range is from 0 to 360.
+     *
+     * @note The function does not handle cases where the image is not valid or
+     *       cannot be rotated.
+     */
+    virtual Result _rotate_image(int angle) = 0;
 };

@@ -114,8 +114,8 @@ void PngImage::to_greyscale() {
     }
 }
 
-void PngImage::rotate_image(int new_width, int new_height,
-                            transform_fn_t transform) {
+void PngImage::rotate_image_impl(int new_width, int new_height,
+                                 transform_fn_t transform) {
     PngImage src = *this;
 
     width = new_width;
@@ -144,49 +144,44 @@ void PngImage::rotate_image(int new_width, int new_height,
     }
 }
 
-void PngImage::rotate_image_90() {
+PngImage::Result PngImage::_rotate_image(int angle) {
     if (!contains_data) {
         LOG(ERROR) << "No image data to rotate";
-        return;
+        return Result::kErrorNoData;
     }
 
-    LOG(INFO) << "Rotating image by 90 degrees";
-    rotate_image(height, width,
-                 [](int src_width, int src_height, int& dst_x, int& dst_y,
-                    int x, int y) {
-                     dst_x = src_height - 1 - y;
-                     dst_y = x;
-                 });
+    LOG(INFO) << "Rotating image by " << angle << " degrees";
+    switch (angle) {
+        case kAngle90:
+            rotate_image_impl(height, width,
+                              [](int src_width, int src_height, int& dst_x,
+                                 int& dst_y, int x, int y) {
+                                  dst_x = src_height - 1 - y;
+                                  dst_y = x;
+                              });
+            break;
+        case kAngle180:
+            rotate_image_impl(width, height,
+                              [](int src_width, int src_height, int& dst_x,
+                                 int& dst_y, int x, int y) {
+                                  dst_x = src_width - 1 - x;
+                                  dst_y = src_height - 1 - y;
+                              });
+            break;
+        case kAngle270:
+            rotate_image_impl(height, width,
+                              [](int src_width, int src_height, int& dst_x,
+                                 int& dst_y, int x, int y) {
+                                  dst_x = y;
+                                  dst_y = src_width - 1 - x;
+                              });
+            break;
+        default:
+            LOG(WARNING) << "libPNG cannot handle angle: " << angle;
+            return Result::kErrorUnsupportedAngle;
+    }
     LOG(INFO) << "New dimensions: " << width << "x" << height;
-}
-
-void PngImage::rotate_image_180() {
-    if (!contains_data) {
-        LOG(ERROR) << "No image data to rotate";
-        return;
-    }
-    LOG(INFO) << "Rotating image by 180 degrees";
-    rotate_image(width, height,
-                 [](int src_width, int src_height, int& dst_x, int& dst_y,
-                    int x, int y) {
-                     dst_x = src_width - 1 - x;
-                     dst_y = src_height - 1 - y;
-                 });
-}
-
-void PngImage::rotate_image_270() {
-    if (!contains_data) {
-        LOG(ERROR) << "No image data to rotate";
-        return;
-    }
-    LOG(INFO) << "Rotating image by 270 degrees";
-    rotate_image(height, width,
-                 [](int src_width, int src_height, int& dst_x, int& dst_y,
-                    int x, int y) {
-                     dst_x = y;
-                     dst_y = src_width - 1 - x;
-                 });
-    LOG(INFO) << "New dimensions: " << width << "x" << height;
+    return Result::kSuccess;
 }
 
 bool PngImage::write(const std::filesystem::path& filename) {

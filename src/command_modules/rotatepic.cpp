@@ -6,6 +6,8 @@
 #include <libJPEG.hpp>
 #include <libPNG.hpp>
 #include <libWEBP.hpp>
+#include <libOpenCV.hpp>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <variant>
@@ -13,6 +15,8 @@
 #include "BotReplyMessage.h"
 #include "CommandModule.h"
 #include "TryParseStr.hpp"
+#include "libPHOTOBase.hpp"
+#include "tgbot/types/ReplyParameters.h"
 
 struct ProcessImageParam {
     std::filesystem::path srcPath;
@@ -23,27 +27,24 @@ struct ProcessImageParam {
 
 namespace {
 
+using ImageVariants = std::variant<PngImage, WebPImage, JPEGImage, OpenCVImage>;
 template <int index>
-bool tryToProcess(std::variant<PngImage, WebPImage, JPEGImage>& images,
-                  ProcessImageParam param) {
+bool tryToProcess(ImageVariants& images, ProcessImageParam param) {
     auto& inst = std::get<index>(images);
     if (inst.read(param.srcPath)) {
-        switch (param.rotation) {
-            case 0:
+        switch (inst.rotate_image(param.rotation)) {
+            case PhotoBase::Result::kErrorInvalidArgument:
+                LOG(ERROR) << "Invalid rotation angle";
+                return false;
+            case PhotoBase::Result::kErrorUnsupportedAngle:
+                LOG(ERROR) << "Unsupported rotation angle";
+                return false;
+            case PhotoBase::Result::kErrorNoData:
+                LOG(ERROR) << "No data available to rotate (internal error)";
+                return false;
+            case PhotoBase::Result::kSuccess:
                 break;
-            case 90:
-                inst.rotate_image_90();
-                break;
-            case 180:
-                inst.rotate_image_180();
-                break;
-            case 270:
-                inst.rotate_image_270();
-                break;
-            default:
-                LOG(WARNING) << "Invalid rotation angle: " << param.rotation;
-                break;
-        };
+        }
         if (param.greyscale) {
             inst.to_greyscale();
         }
@@ -53,7 +54,7 @@ bool tryToProcess(std::variant<PngImage, WebPImage, JPEGImage>& images,
 }
 
 bool processPhotoFile(ProcessImageParam& param) {
-    std::variant<PngImage, WebPImage, JPEGImage> images;
+    ImageVariants images;
     LOG(INFO) << "Processing image " << param.srcPath << "...";
 
     // First try: PNG
@@ -83,6 +84,16 @@ bool processPhotoFile(ProcessImageParam& param) {
         return true;
     }
 
+    // Fourth try: OpenCV
+    LOG(INFO) << "Fourth try: OpenCV";
+    images.emplace<OpenCVImage>();
+    param.destPath = "output.png";
+    if (tryToProcess<3>(images, param)) {
+        LOG(INFO) << "Wrote image: " << param.destPath;
+        return true;
+    }
+
+    // Failed to process
     LOG(ERROR) << "Failed to process";
     return false;
 }
@@ -147,6 +158,9 @@ void rotateStickerCommand(const Bot& bot, const Message::Ptr message) {
     if (processPhotoFile(params)) {
         const auto infile =
             TgBot::InputFile::fromFile(params.destPath.string(), "image/png");
+        const auto replyParams = std::make_shared<TgBot::ReplyParameters>();
+        replyParams->messageId = message->messageId;
+        replyParams->chatId = message->chat->id;
         if (wrapper.hasSticker()) {
             bot.getApi().sendSticker(wrapper.getChatId(), infile);
         } else if (wrapper.hasPhoto()) {

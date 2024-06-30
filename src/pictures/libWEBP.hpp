@@ -3,17 +3,11 @@
 #include <libPHOTOBase.hpp>
 #include <memory>
 
-class WebPImage : PhotoBase {
+class WebPImage : public PhotoBase {
    public:
     WebPImage() = default;
     ~WebPImage() override = default;
 
-    enum class Degrees {
-        DEGREES_90,
-        DEGREES_180,
-        DEGREES_270
-    };
-    
     /**
      * @brief Reads an image from the specified file path.
      *
@@ -27,28 +21,17 @@ class WebPImage : PhotoBase {
     bool read(const std::filesystem::path& filename) override;
 
     /**
-     * @brief Rotates the image 90 degrees clockwise.
+     * @brief Rotates the image by the specified angle in degrees.
      *
-     * This function rotates the image 90 degrees clockwise. The internal data
-     * of the image is updated accordingly.
-     */
-    void rotate_image_90() override;
-
-    /**
-     * @brief Rotates the image 180 degrees.
+     * This method rotates the image by the specified angle in degrees. The
+     * internal data of the image is updated accordingly.
      *
-     * This function rotates the image 180 degrees. The internal data of the
-     * image is updated accordingly.
-     */
-    void rotate_image_180() override;
-
-    /**
-     * @brief Rotates the image 270 degrees clockwise.
+     * @param angle The angle in degrees by which the image should be rotated.
      *
-     * This function rotates the image 270 degrees clockwise. The internal data
-     * of the image is updated accordingly.
+     * @return A Result object indicating the success or failure of the
+     * operation.
      */
-    void rotate_image_270() override;
+    Result _rotate_image(int angle) override;
 
     /**
      * @brief Converts the image to grayscale.
@@ -74,6 +57,4 @@ class WebPImage : PhotoBase {
     long width_{};
     long height_{};
     std::unique_ptr<uint8_t[]> data_;
-
-    void rotateImage(Degrees degrees);
 };

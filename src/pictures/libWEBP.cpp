@@ -1,6 +1,7 @@
 #include "libWEBP.hpp"
 
 #include <absl/log/log.h>
+#include <absl/log/check.h>
 #include <webp/decode.h>
 #include <webp/encode.h>
 #include <webp/types.h>
@@ -13,7 +14,7 @@ bool WebPImage::read(const std::filesystem::path& filename) {
     int height = 0;
     uint8_t* decoded_data = nullptr;
     FILE* file = nullptr;
-    
+
     LOG(INFO) << "Loading image: " << filename;
 
     // Open the file for reading in binary mode
@@ -48,11 +49,65 @@ bool WebPImage::read(const std::filesystem::path& filename) {
     return true;
 }
 
-void WebPImage::rotate_image_90() { rotateImage(Degrees::DEGREES_90); }
+WebPImage::Result WebPImage::_rotate_image(int angle) {
+    if (data_ == nullptr) {
+        LOG(ERROR) << "No image data to rotate";
+        return Result::kErrorNoData;
+    }
 
-void WebPImage::rotate_image_180() { rotateImage(Degrees::DEGREES_180); }
+    DLOG(INFO) << "Rotating image";
 
-void WebPImage::rotate_image_270() { rotateImage(Degrees::DEGREES_270); }
+    long rotated_width = 0;
+    long rotated_height = 0;
+    std::unique_ptr<uint8_t[]> rotated_data = nullptr;
+
+    switch (angle) {
+        case kAngle90:
+        case kAngle270:
+            rotated_width = height_;
+            rotated_height = width_;
+            break;
+        case kAngle180:
+            rotated_width = width_;
+            rotated_height = height_;
+            break;
+        default:
+            LOG(WARNING) << "libWEBP cannot handle angle: " << angle;
+            return Result::kErrorUnsupportedAngle;
+    }
+
+    rotated_data =
+        std::make_unique<uint8_t[]>(rotated_width * rotated_height * 4);
+    
+    for (int y = 0; y < height_; ++y) {
+        for (int x = 0; x < width_; ++x) {
+            const auto source_index = (y * width_ + x) * 4;
+            long dest_index = 0;
+            
+            switch (angle) {
+                case kAngle90:
+                    dest_index = (x * rotated_width + (height_ - 1 - y)) * 4;
+                    break;
+                case kAngle180:
+                    dest_index = ((height_ - 1 - y) * width_ + (width_ - 1 - x)) * 4;
+                    break;
+                case kAngle270:
+                    dest_index = ((width_ - 1 - x) * rotated_width + y) * 4;
+                    break;
+                default:
+                    CHECK(false);
+            }
+            for (int k = 0; k < 4; ++k) {
+                rotated_data[dest_index + k] = data_[source_index + k];
+            }
+        }
+    }
+
+    data_ = std::move(rotated_data);
+    width_ = rotated_width;
+    height_ = rotated_height;
+    return Result::kSuccess;
+}
 
 void WebPImage::to_greyscale() {
     if (data_ == nullptr) {
@@ -86,7 +141,8 @@ bool WebPImage::write(const std::filesystem::path& filename) {
     uint8_t* output = nullptr;
     size_t output_size = 0;
 
-    output_size = WebPEncodeRGBA(data_.get(), width_, height_, stride, .5F, &output);
+    output_size =
+        WebPEncodeRGBA(data_.get(), width_, height_, stride, .5F, &output);
     if (output_size == 0) {
         LOG(ERROR) << "Failed to encode WebP image";
         fclose(file);
@@ -100,72 +156,4 @@ bool WebPImage::write(const std::filesystem::path& filename) {
     LOG(INFO) << "New WebP image written to " << filename;
 
     return true;
-}
-
-void WebPImage::rotateImage(Degrees degrees) {
-    if (data_ == nullptr) {
-        LOG(ERROR) << "No image data to rotate";
-        return;
-    }
-    DLOG(INFO) << "Rotating image";
-
-    long rotated_width = 0;
-    long rotated_height = 0;
-    std::unique_ptr<uint8_t[]> rotated_data = nullptr;
-
-    switch (degrees) {
-        case Degrees::DEGREES_90:
-            rotated_width = height_;
-            rotated_height = width_;
-            rotated_data =
-                std::make_unique<uint8_t[]>(rotated_width * rotated_height * 4);
-            for (int y = 0; y < height_; ++y) {
-                for (int x = 0; x < width_; ++x) {
-                    int source_index = (y * width_ + x) * 4;
-                    int dest_index = ((width_ - 1 - x) * rotated_width + y) * 4;
-                    for (int k = 0; k < 4; ++k) {
-                        rotated_data[dest_index + k] = data_[source_index + k];
-                    }
-                }
-            }
-            break;
-        case Degrees::DEGREES_180:
-            rotated_width = width_;
-            rotated_height = height_;
-            rotated_data =
-                std::make_unique<uint8_t[]>(rotated_width * rotated_height * 4);
-            for (int y = 0; y < height_; ++y) {
-                for (int x = 0; x < width_; ++x) {
-                    int source_index = (y * width_ + x) * 4;
-                    int dest_index =
-                        ((height_ - 1 - y) * width_ + (width_ - 1 - x)) * 4;
-                    for (int k = 0; k < 4; ++k) {
-                        rotated_data[dest_index + k] = data_[source_index + k];
-                    }
-                }
-            }
-            break;
-        case Degrees::DEGREES_270:
-            rotated_width = height_;
-            rotated_height = width_;
-            rotated_data =
-                std::make_unique<uint8_t[]>(rotated_width * rotated_height * 4);
-            for (int y = 0; y < height_; ++y) {
-                for (int x = 0; x < width_; ++x) {
-                    int source_index = (y * width_ + x) * 4;
-                    int dest_index =
-                        (x * rotated_width + (height_ - 1 - y)) * 4;
-                    for (int k = 0; k < 4; ++k) {
-                        rotated_data[dest_index + k] = data_[source_index + k];
-                    }
-                }
-            }
-            break;
-        default:
-            return;
-    }
-
-    data_ = std::move(rotated_data);
-    width_ = rotated_width;
-    height_ = rotated_height;
 }

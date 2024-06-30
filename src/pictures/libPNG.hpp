@@ -15,20 +15,7 @@ struct PngImage : PhotoBase {
     std::vector<png_bytep> row_data;
     std::vector<size_t> row_size;
     bool contains_data = false;
-    /**
-     * @brief Creates a unique_ptr that will automatically close the given FILE*
-     * when it goes out of scope.
-     *
-     * @param file The FILE* to be closed when the unique_ptr goes out of scope.
-     *
-     * @return A unique_ptr that will automatically close the given FILE* when
-     * it goes out of scope.
-     */
-    static auto createFileCloser(FILE* file) {
-        return std::unique_ptr<FILE, void (*)(FILE*)>(
-            file, [](FILE* f) { fclose(f); });
-    }
-
+    
     /**
      * @brief Reads a PNG image from the specified file path.
      *
@@ -39,20 +26,16 @@ struct PngImage : PhotoBase {
     bool read(const std::filesystem::path& filename) override;
 
     /**
-     * @brief Rotates the image 90 degrees clockwise.
+     * @brief Rotates the image with the specified new dimensions and
+     * transformation function.
+     *
+     * @param angle The angle of rotation.
+     *
+     * @return A Result object that indicates whether the rotation operation was
+     * successful.
      */
-    void rotate_image_90() override;
-
-    /**
-     * @brief Rotates the image 180 degrees.
-     */
-    void rotate_image_180() override;
-
-    /**
-     * @brief Rotates the image 270 degrees clockwise.
-     */
-    void rotate_image_270() override;
-
+    Result _rotate_image(int angle) override;
+    
     /**
      * @brief Converts the image to grayscale.
      */
@@ -80,5 +63,5 @@ struct PngImage : PhotoBase {
      * @param transform A function that takes the source coordinates and
      * transforms them to the destination coordinates.
      */
-    void rotate_image(int new_width, int new_height, transform_fn_t transform);
+    void rotate_image_impl(int new_width, int new_height, transform_fn_t transform);
 };

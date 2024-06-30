@@ -47,6 +47,7 @@ jobs:
           libpng:p
           libwebp:p
           libjpeg:p
+          opencv:p
 
     - name: 'Setup submodule'
       run: |
