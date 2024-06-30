@@ -1,4 +1,4 @@
-#include "libWEBP.hpp"
+#include "ImageTypeWEBP.hpp"
 
 #include <absl/log/log.h>
 #include <absl/log/check.h>

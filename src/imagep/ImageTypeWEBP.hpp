@@ -1,7 +1,10 @@
+#pragma once
+
 #include <cstdint>
 #include <filesystem>
-#include <libPHOTOBase.hpp>
 #include <memory>
+
+#include "ImagePBase.hpp"
 
 class WebPImage : public PhotoBase {
    public:

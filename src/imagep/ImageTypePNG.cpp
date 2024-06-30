@@ -1,4 +1,4 @@
-#include "libPNG.hpp"
+#include "ImageTypePNG.hpp"
 
 #include <absl/log/log.h>
 #include <png.h>

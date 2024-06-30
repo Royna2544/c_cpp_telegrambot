@@ -1,22 +1,18 @@
+#include <BotReplyMessage.h>
+
 #include <MessageWrapper.hpp>
+#include <TryParseStr.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <cctype>
 #include <database/bot/TgBotDatabaseImpl.hpp>
 #include <filesystem>
-#include <libJPEG.hpp>
-#include <libPNG.hpp>
-#include <libWEBP.hpp>
-#include <libOpenCV.hpp>
+#include <imagep/ImageProcessingAll.hpp>
 #include <memory>
 #include <string>
 #include <string_view>
 #include <variant>
 
-#include "BotReplyMessage.h"
 #include "CommandModule.h"
-#include "TryParseStr.hpp"
-#include "libPHOTOBase.hpp"
-#include "tgbot/types/ReplyParameters.h"
 
 struct ProcessImageParam {
     std::filesystem::path srcPath;
@@ -162,9 +158,9 @@ void rotateStickerCommand(const Bot& bot, const Message::Ptr message) {
         replyParams->messageId = message->messageId;
         replyParams->chatId = message->chat->id;
         if (wrapper.hasSticker()) {
-            bot.getApi().sendSticker(wrapper.getChatId(), infile);
+            bot.getApi().sendSticker(wrapper.getChatId(), infile, replyParams);
         } else if (wrapper.hasPhoto()) {
-            bot.getApi().sendPhoto(wrapper.getChatId(), infile);
+            bot.getApi().sendPhoto(wrapper.getChatId(), infile, "Rotated picture", replyParams);
         }
     } else {
         wrapper.sendMessageOnExit("Unknown image type, or processing failed");

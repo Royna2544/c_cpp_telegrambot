@@ -1,4 +1,4 @@
-#include "libOpenCV.hpp"
+#include "ImageProcOpenCV.hpp"
 
 bool OpenCVImage::read(const std::filesystem::path& filename) {
     image = cv::imread(filename.string(), cv::IMREAD_UNCHANGED);

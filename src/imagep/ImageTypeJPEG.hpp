@@ -1,4 +1,6 @@
-#include <libPHOTOBase.hpp>
+#pragma once
+
+#include "ImagePBase.hpp"
 
 /**
  * @brief Derived class for photo manipulation using libjpeg.

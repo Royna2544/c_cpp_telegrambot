@@ -1,4 +1,6 @@
-#include <libPHOTOBase.hpp>
+#pragma once
+
+#include "ImagePBase.hpp"
 
 #include <opencv2/opencv.hpp>
 

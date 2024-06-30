@@ -223,7 +223,7 @@ add_library_san(${PROJECT_NAME} SHARED ${SRC_LIST})
 target_include_directories(${PROJECT_NAME} PRIVATE src/third-party/rapidjson/include)
 target_include_directories(${PROJECT_NAME} PUBLIC ${STRINGRES_GENHDR_DIR})
 ######################## Libraries to link ########################
-set(LD_LIST TgBot TgBotDB TgBotUtils TgBotWeb TgBotStringRes TgBotPNG)
+set(LD_LIST TgBot TgBotDB TgBotUtils TgBotWeb TgBotStringRes TgBotImgProc)
 extend_set_if(LD_LIST USE_UNIX_SOCKETS TgBotSocket)
 extend_set_if(LD_LIST WIN32 wsock32 Ws2_32)
 extend_set_if(LD_LIST ENABLE_RUNTIME_COMMAND ${CMAKE_DL_LIBS})

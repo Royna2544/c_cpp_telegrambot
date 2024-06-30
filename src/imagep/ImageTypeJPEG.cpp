@@ -8,7 +8,7 @@
 #include <absl/log/log.h>
 
 #include <cstring>
-#include <libJPEG.hpp>
+#include "ImageTypeJPEG.hpp"
 #include <memory>
 
 struct jpegimg_error_mgr {

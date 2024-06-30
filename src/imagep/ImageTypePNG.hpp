@@ -1,10 +1,12 @@
-#include <absl/log/log.h>
+#pragma once
+
 #include <png.h>
 #include <pngconf.h>
 
 #include <filesystem>
-#include <libPHOTOBase.hpp>
 #include <vector>
+
+#include "ImagePBase.hpp"
 
 struct PngImage : PhotoBase {
     PngImage() = default;
@@ -15,7 +17,7 @@ struct PngImage : PhotoBase {
     std::vector<png_bytep> row_data;
     std::vector<size_t> row_size;
     bool contains_data = false;
-    
+
     /**
      * @brief Reads a PNG image from the specified file path.
      *
@@ -35,7 +37,7 @@ struct PngImage : PhotoBase {
      * successful.
      */
     Result _rotate_image(int angle) override;
-    
+
     /**
      * @brief Converts the image to grayscale.
      */
@@ -63,5 +65,6 @@ struct PngImage : PhotoBase {
      * @param transform A function that takes the source coordinates and
      * transforms them to the destination coordinates.
      */
-    void rotate_image_impl(int new_width, int new_height, transform_fn_t transform);
+    void rotate_image_impl(int new_width, int new_height,
+                           transform_fn_t transform);
 };
