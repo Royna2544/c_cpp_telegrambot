@@ -15,12 +15,13 @@ OpenCVImage::Result OpenCVImage::_rotate_image(int angle) {
 
     // Make it clockwise
     angle = kAngleMax - angle;
-    
+
     cv::Point2f center(image.cols / 2.0, image.rows / 2.0);
     cv::Mat rotation_matrix = cv::getRotationMatrix2D(center, angle, 1.0);
 
     // Calculate the bounding box of the rotated image
-    cv::Rect bbox = cv::RotatedRect(cv::Point2f(), image.size(), angle).boundingRect();
+    cv::Rect bbox =
+        cv::RotatedRect(cv::Point2f(), image.size(), angle).boundingRect();
 
     // Adjust the rotation matrix to take into account translation
     rotation_matrix.at<double>(0, 2) += bbox.width / 2.0 - center.x;
@@ -39,13 +40,14 @@ void OpenCVImage::to_greyscale() {
     } else if (image.channels() == 4) {
         cv::cvtColor(image, image, cv::COLOR_BGRA2GRAY);
     } else {
-        std::cerr << "Image does not have enough color channels to convert to grayscale." << std::endl;
+        LOG(INFO) << "Image does not have enough color channels to convert to "
+                     "grayscale.";
     }
 }
 
 bool OpenCVImage::write(const std::filesystem::path& filename) {
     if (!cv::imwrite(filename.string(), image)) {
-        std::cerr << "Error writing image: " << filename << std::endl;
+        LOG(INFO) << "Error writing image: " << filename;
         return false;
     }
     return true;

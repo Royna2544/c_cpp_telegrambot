@@ -58,7 +58,7 @@ bool processPhotoFile(ProcessImageParam& param) {
     images.emplace<PngImage>();
     param.destPath = "output.png";
     if (tryToProcess<0>(images, param)) {
-        LOG(INFO) << "Wrote image: " << param.destPath;
+        LOG(INFO) << "PNG liked it. Wrote image: " << param.destPath;
         return true;
     }
 
@@ -67,7 +67,7 @@ bool processPhotoFile(ProcessImageParam& param) {
     images.emplace<WebPImage>();
     param.destPath = "output.webp";
     if (tryToProcess<1>(images, param)) {
-        LOG(INFO) << "Wrote image: " << param.destPath;
+        LOG(INFO) << "WebP liked it. Wrote image: " << param.destPath;
         return true;
     }
 
@@ -76,7 +76,7 @@ bool processPhotoFile(ProcessImageParam& param) {
     images.emplace<JPEGImage>();
     param.destPath = "output.jpg";
     if (tryToProcess<2>(images, param)) {
-        LOG(INFO) << "Wrote image: " << param.destPath;
+        LOG(INFO) << "JPEG liked it. Wrote image: " << param.destPath;
         return true;
     }
 
@@ -85,12 +85,12 @@ bool processPhotoFile(ProcessImageParam& param) {
     images.emplace<OpenCVImage>();
     param.destPath = "output.png";
     if (tryToProcess<3>(images, param)) {
-        LOG(INFO) << "Wrote image: " << param.destPath;
+        LOG(INFO) << "OpenCV liked it. Wrote image: " << param.destPath;
         return true;
     }
 
     // Failed to process
-    LOG(ERROR) << "Failed to process";
+    LOG(ERROR) << "No one liked it. Failed to process";
     return false;
 }
 
