@@ -13,6 +13,9 @@ bool OpenCVImage::read(const std::filesystem::path& filename) {
 OpenCVImage::Result OpenCVImage::_rotate_image(int angle) {
     LOG(INFO) << "Rotating image";
 
+    // Make it clockwise
+    angle = kAngleMax - angle;
+    
     cv::Point2f center(image.cols / 2.0, image.rows / 2.0);
     cv::Mat rotation_matrix = cv::getRotationMatrix2D(center, angle, 1.0);
 
