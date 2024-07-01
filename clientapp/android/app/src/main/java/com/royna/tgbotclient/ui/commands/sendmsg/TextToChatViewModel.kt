@@ -3,15 +3,21 @@ package com.royna.tgbotclient.ui.commands.sendmsg
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.royna.tgbotclient.SocketCommandNative
+import com.royna.tgbotclient.datastore.IChatIDOperations
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import javax.inject.Inject
 
-class TextToChatViewModel : ViewModel() {
+@HiltViewModel
+class TextToChatViewModel @Inject constructor(private val operation: IChatIDOperations) : ViewModel() {
     // Private MutableLiveData
     private val _messageText = MutableLiveData<String>()
     private val _chatId = MutableLiveData<Long>()
@@ -65,5 +71,11 @@ class TextToChatViewModel : ViewModel() {
     override fun onCleared() {
         super.onCleared()
         gMainScope.cancel()
+    }
+
+    fun getAll() = viewModelScope.async {
+        withContext(Dispatchers.IO) {
+            operation.getAll()
+        }
     }
 }

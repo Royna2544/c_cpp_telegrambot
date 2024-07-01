@@ -4,10 +4,8 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.royna.tgbotclient.SocketCommandNative
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.cancel
 
 abstract class SingleViewModelBase<T, V> : ViewModel() {
     protected var _liveData = MutableLiveData<T>()
@@ -16,12 +14,7 @@ abstract class SingleViewModelBase<T, V> : ViewModel() {
         _liveData.value = inval
     }
 
-    protected val gMainScope = CoroutineScope(Dispatchers.Main)
+    protected val gMainScope = viewModelScope
     abstract suspend fun coroutineFunction(activity: FragmentActivity) : V
     abstract fun execute(activity: FragmentActivity, callback: SocketCommandNative.ICommandCallback)
-
-    override fun onCleared() {
-        super.onCleared()
-        gMainScope.cancel()
-    }
 }

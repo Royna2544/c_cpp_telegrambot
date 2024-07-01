@@ -21,7 +21,9 @@ import com.royna.tgbotclient.pm.IStoragePermission
 import com.royna.tgbotclient.pm.StoragePermissionPreR
 import com.royna.tgbotclient.pm.StoragePermissionR
 import com.royna.tgbotclient.ui.settings.SettingsActivity
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
     private lateinit var appBarConfiguration: AppBarConfiguration
     private lateinit var binding: ActivityMainBinding

@@ -1,8 +1,9 @@
-import java.util.Properties
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
+    alias(libs.plugins.androidx.room)
+    alias(libs.plugins.com.google.devtools.ksp)
+    alias(libs.plugins.com.google.dagger.hilt.android)
 }
 
 android {
@@ -59,6 +60,13 @@ android {
             excludes += "META-INF/LICENSE-notice.md"
         }
     }
+    room {
+        schemaDirectory("$projectDir/schemas")
+    }
+}
+
+ksp {
+    arg("room.generateKotlin", "true")
 }
 
 dependencies {
@@ -73,9 +81,14 @@ dependencies {
     implementation(libs.androidx.preference.ktx)
     implementation(libs.androidx.fragment.ktx)
     implementation(libs.androidx.window)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    implementation(libs.hilt)
+
+    ksp(libs.androidx.room.compiler)
+    ksp(libs.hilt.compiler)
 
     testImplementation(libs.junit)
-
     androidTestImplementation(libs.junit)
     androidTestImplementation(libs.junit.jupiter)
     androidTestImplementation(libs.androidx.espresso.core)

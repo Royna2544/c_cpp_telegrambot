@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:layout_centerHorizontal="true"
-    tools:context=".datastore.chat.ui.ChatDatastoreFragment">
+    tools:context=".ui.chatid.ChatDatastoreFragment">
 
     <LinearLayout
         android:id="@+id/datastore_edit_container"

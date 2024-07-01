@@ -1,4 +1,4 @@
-package com.royna.tgbotclient.datastore.chat.ui
+package com.royna.tgbotclient.ui.chatid
 
 import android.annotation.SuppressLint
 import android.view.LayoutInflater

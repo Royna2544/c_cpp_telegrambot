@@ -10,12 +10,17 @@ import androidx.core.widget.doAfterTextChanged
 import androidx.core.widget.doOnTextChanged
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.commit
-import androidx.lifecycle.ViewModelProvider
+import androidx.fragment.app.viewModels
 import com.royna.tgbotclient.R
 import com.royna.tgbotclient.databinding.FragmentSendMessageBinding
-import com.royna.tgbotclient.datastore.chat.SQLiteChatDatastore
+import com.royna.tgbotclient.datastore.ChatIDEntry
 import com.royna.tgbotclient.ui.CurrentSettingFragment
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
+@AndroidEntryPoint
 class TextToChatFragment : Fragment() {
     private var _binding: FragmentSendMessageBinding? = null
 
@@ -23,13 +28,13 @@ class TextToChatFragment : Fragment() {
     // onDestroyView.
     private val binding get() = _binding!!
 
+    private val textToChatViewModel : TextToChatViewModel by viewModels()
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-        val textToChatViewModel =
-            ViewModelProvider(this)[TextToChatViewModel::class.java]
 
         _binding = FragmentSendMessageBinding.inflate(inflater, container, false)
         val root: View = binding.root
@@ -46,10 +51,11 @@ class TextToChatFragment : Fragment() {
         }
 
         textToChatViewModel.chatId.observe(viewLifecycleOwner) {
-            binding.showChatIdText.text = if (mChatIdMap.containsValue(it)) {
-                getString(R.string.destination_chat_fmt, mChatIdMap.filterValues {
-                    v-> v == it
-                }.keys.first(), it)
+            val chatName = mChatIdMap.find { ent ->
+                ent.id == it
+            }?.name
+            binding.showChatIdText.text = if (chatName != null) {
+                getString(R.string.destination_chat_fmt, chatName, it)
             } else if (it != InvalidChatId) {
                 getString(R.string.destination_chat_id_fmt, it)
             } else {
@@ -69,22 +75,16 @@ class TextToChatFragment : Fragment() {
                 computeSendButtonState()
             }.onFailure {
                 // This is not a number, query it on DB
-                mChatIdMap[editor.toString()].let {
-                    if (it != null) {
+                mChatIdMap.filter {
+                    it.name.lowercase() == editor.toString().lowercase()
+                }.let { map ->
+                    if (map.isNotEmpty()) {
                         // Found
-                        textToChatViewModel.setChatId(it)
+                        assert(map.size == 1)
+                        textToChatViewModel.setChatId(map.first().id)
                     } else {
                         // Not found
-                        mChatIdMap.filterKeys { key ->
-                            key.lowercase() == editor.toString().lowercase()
-                        }.also { map ->
-                            assert(map.size == 1 || map.isEmpty())
-                            if (map.isEmpty()) {
-                                textToChatViewModel.setChatId(InvalidChatId)
-                            }
-                        }.forEach { entry ->
-                            textToChatViewModel.setChatId(entry.value)
-                        }
+                        textToChatViewModel.setChatId(InvalidChatId)
                     }
                     computeSendButtonState()
                 }
@@ -116,7 +116,9 @@ class TextToChatFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        mChatIdMap = SQLiteChatDatastore(requireContext()).readAll()
+        CoroutineScope(Dispatchers.IO).launch {
+            mChatIdMap = textToChatViewModel.getAll().await()
+        }
         childFragmentManager.commit {
             replace(R.id.current_setting_container, CurrentSettingFragment())
         }
@@ -127,7 +129,7 @@ class TextToChatFragment : Fragment() {
         _binding = null
     }
 
-    private var mChatIdMap: Map<String, Long> = mapOf()
+    private var mChatIdMap: List<ChatIDEntry> = listOf()
     companion object {
         private const val InvalidChatId = 0L
     }
