@@ -198,3 +198,11 @@ bool JPEGImage::write(const std::filesystem::path& filename) {
 
     return true;
 }
+
+#define _STR(x) #x
+#define STR(x) _STR(x)
+#define LIBJPEG_TURBO_VERSION_STR STR(LIBJPEG_TURBO_VERSION)
+
+std::string JPEGImage::version() const {
+    return "libjpeg version " LIBJPEG_TURBO_VERSION_STR;
+}

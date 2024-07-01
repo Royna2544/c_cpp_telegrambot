@@ -1,4 +1,5 @@
 #include "ImageProcOpenCV.hpp"
+#include <opencv2/core/utility.hpp>
 
 bool OpenCVImage::read(const std::filesystem::path& filename) {
     image = cv::imread(filename.string(), cv::IMREAD_UNCHANGED);
@@ -48,4 +49,8 @@ bool OpenCVImage::write(const std::filesystem::path& filename) {
         return false;
     }
     return true;
+}
+
+std::string OpenCVImage::version() const {
+    return "OpenCV version: " + cv::getVersionString();
 }

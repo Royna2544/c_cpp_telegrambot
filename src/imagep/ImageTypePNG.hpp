@@ -11,7 +11,7 @@
 #include "ImagePBase.hpp"
 
 struct PngImage : PhotoBase {
-    PngImage() = default;
+    PngImage() noexcept = default;
     ~PngImage() override = default;
 
     struct MiniSharedMalloc {
@@ -77,6 +77,8 @@ struct PngImage : PhotoBase {
      */
     bool write(const std::filesystem::path& filename) override;
 
+    std::string version() const override;
+    
    private:
     using transform_fn_t =
         std::function<void(png_uint_32 src_width, png_uint_32 src_height,

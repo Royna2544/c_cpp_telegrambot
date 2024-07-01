@@ -8,7 +8,7 @@
 
 class WebPImage : public PhotoBase {
    public:
-    WebPImage() = default;
+    WebPImage() noexcept = default;
     ~WebPImage() override = default;
 
     /**
@@ -55,6 +55,8 @@ class WebPImage : public PhotoBase {
      * @return True if the image is successfully written, false otherwise.
      */
     bool write(const std::filesystem::path& filename) override;
+
+    std::string version() const override;
 
    private:
     long width_{};

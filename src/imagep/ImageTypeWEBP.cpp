@@ -1,7 +1,7 @@
 #include "ImageTypeWEBP.hpp"
 
-#include <absl/log/log.h>
 #include <absl/log/check.h>
+#include <absl/log/log.h>
 #include <webp/decode.h>
 #include <webp/encode.h>
 #include <webp/types.h>
@@ -77,18 +77,19 @@ WebPImage::Result WebPImage::_rotate_image(int angle) {
 
     rotated_data =
         std::make_unique<uint8_t[]>(rotated_width * rotated_height * 4);
-    
+
     for (int y = 0; y < height_; ++y) {
         for (int x = 0; x < width_; ++x) {
             const auto source_index = (y * width_ + x) * 4;
             long dest_index = 0;
-            
+
             switch (angle) {
                 case kAngle90:
                     dest_index = (x * rotated_width + (height_ - 1 - y)) * 4;
                     break;
                 case kAngle180:
-                    dest_index = ((height_ - 1 - y) * width_ + (width_ - 1 - x)) * 4;
+                    dest_index =
+                        ((height_ - 1 - y) * width_ + (width_ - 1 - x)) * 4;
                     break;
                 case kAngle270:
                     dest_index = ((width_ - 1 - x) * rotated_width + y) * 4;
@@ -154,4 +155,16 @@ bool WebPImage::write(const std::filesystem::path& filename) {
     LOG(INFO) << "New WebP image written to " << filename;
 
     return true;
+}
+
+std::string WebPImage::version() const {
+    constexpr int kVersionBits = 8;
+    constexpr int kVersionMask = 0xff;
+    int version = WebPGetDecoderVersion();
+    int major = (version >> kVersionBits >> kVersionBits) & kVersionMask;
+    int minor = (version >> kVersionBits) & kVersionMask;
+    int revision = version & kVersionMask;
+
+    return ("libwebp version: " + std::to_string(major) + "." +
+            std::to_string(minor) + "." + std::to_string(revision));
 }

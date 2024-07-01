@@ -84,6 +84,8 @@ struct PhotoBase {
             file, [](FILE* f) { fclose(f); });
     }
 
+    [[nodiscard]] virtual std::string version() const = 0;
+
    protected:
     /**
      * @brief Rotates the image by the specified angle.

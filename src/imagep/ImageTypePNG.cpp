@@ -6,6 +6,7 @@
 
 #include <cstddef>
 #include <filesystem>
+#include <string>
 
 namespace {
 void absl_warn_fn(png_structp png_ptr, png_const_charp error_message) {
@@ -257,4 +258,8 @@ bool PngImage::write(const std::filesystem::path& filename) {
 
     contains_data = false;
     return true;
+}
+
+std::string PngImage::version() const {
+    return PNG_LIBPNG_VER_STRING;
 }

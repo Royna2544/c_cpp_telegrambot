@@ -10,13 +10,14 @@
  */
 class JPEGImage : public PhotoBase {
    public:
-    JPEGImage() = default;
+    JPEGImage() noexcept = default;
     ~JPEGImage() override = default;
 
     bool read(const std::filesystem::path& filename) override;
     Result _rotate_image(int angle) override;
     void to_greyscale() override;
     bool write(const std::filesystem::path& filename) override;
+    std::string version() const override;
 
    private:
     std::unique_ptr<unsigned char[]> image_data;

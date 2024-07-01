@@ -8,7 +8,7 @@
 #include <cctype>
 #include <database/bot/TgBotDatabaseImpl.hpp>
 #include <filesystem>
-#include <imagep/ImageProcessingAll.hpp>
+#include <imagep/ImageProcAll.hpp>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -24,15 +24,11 @@ struct ProcessImageParam {
 };
 
 namespace {
-
-using ImageVariants = std::variant<PngImage, WebPImage, JPEGImage, OpenCVImage>;
-template <int index>
-bool tryToProcess(ImageVariants& images, ProcessImageParam param) {
-    auto& inst = std::get<index>(images);
-    if (inst.read(param.srcPath)) {
+bool processPhotoFile(ProcessImageParam& param) {
+    ImageProcessingAll procAll(param.srcPath);
+    if (procAll.read()) {
         LOG(INFO) << "Successfully read image";
-        LOG(INFO) << "Rotating image by " << param.rotation << " degrees";
-        switch (inst.rotate_image(param.rotation)) {
+        switch (procAll.rotate(param.rotation)) {
             case PhotoBase::Result::kErrorInvalidArgument:
                 LOG(ERROR) << "Invalid rotation angle";
                 return false;
@@ -47,60 +43,15 @@ bool tryToProcess(ImageVariants& images, ProcessImageParam param) {
                 break;
         }
         if (param.greyscale) {
-            LOG(INFO) << "Converting image to greyscale";
-            inst.to_greyscale();
+            procAll.to_greyscale();
         }
-        LOG(INFO) << "Writing image to " << param.destPath;
-        return inst.write(param.destPath);
-    } else {
-        LOG(ERROR) << "Counld't read or parse image";
+        return procAll.write(param.destPath);
     }
     return false;
 }
 
-bool processPhotoFile(ProcessImageParam& param) {
-    ImageVariants images;
-
-    // First try: PNG
-    LOG(INFO) << "First try: PNG";
-    images.emplace<PngImage>();
-    param.destPath = "output.png";
-    if (tryToProcess<0>(images, param)) {
-        LOG(INFO) << "PNG liked it. Wrote image: " << param.destPath;
-        return true;
-    }
-
-    // Second try: WebP
-    LOG(INFO) << "Second try: WebP";
-    images.emplace<WebPImage>();
-    param.destPath = "output.webp";
-    if (tryToProcess<1>(images, param)) {
-        LOG(INFO) << "WebP liked it. Wrote image: " << param.destPath;
-        return true;
-    }
-
-    // Third try: JPEG
-    LOG(INFO) << "Third try: JPEG";
-    images.emplace<JPEGImage>();
-    param.destPath = "output.jpg";
-    if (tryToProcess<2>(images, param)) {
-        LOG(INFO) << "JPEG liked it. Wrote image: " << param.destPath;
-        return true;
-    }
-
-    // Fourth try: OpenCV
-    LOG(INFO) << "Fourth try: OpenCV";
-    images.emplace<OpenCVImage>();
-    param.destPath = "output.png";
-    if (tryToProcess<3>(images, param)) {
-        LOG(INFO) << "OpenCV liked it. Wrote image: " << param.destPath;
-        return true;
-    }
-
-    // Failed to process
-    LOG(ERROR) << "No one liked it. Failed to process";
-    return false;
-}
+constexpr std::string_view kDownloadFile = "inpic.bin";
+constexpr std::string_view kOutputFile = "outpic.png";
 
 void rotateStickerCommand(const Bot& bot, const Message::Ptr message) {
     MessageWrapper wrapper(bot, message);
@@ -152,7 +103,6 @@ void rotateStickerCommand(const Bot& bot, const Message::Ptr message) {
     }
 
     const auto file = bot.getApi().getFile(fileid.value());
-    constexpr std::string_view kDownloadFile = "inpic.bin";
     if (!file) {
         wrapper.sendMessageOnExit("Failed to download sticker file.");
         return;
@@ -172,6 +122,7 @@ void rotateStickerCommand(const Bot& bot, const Message::Ptr message) {
     params.srcPath = kDownloadFile.data();
     params.greyscale = greyscale;
     params.rotation = rotation;
+    params.destPath = kOutputFile.data();
 
     if (processPhotoFile(params)) {
         const auto infile =

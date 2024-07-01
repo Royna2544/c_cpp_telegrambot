@@ -19,7 +19,7 @@ jobs:
         # https://github.com/Homebrew/homebrew-core/issues/169820#issuecomment-2080459578
       - name: Set up dependencies
         run: |
-          brew install boost ninja llvm webp libpng libjpeg opencv
+          brew install boost ninja llvm webp libpng
           git submodule update --init
           sed -i '' '/^#define _LIBCPP_HAS_NO_VENDOR_AVAILABILITY_ANNOTATIONS/d' "$(brew --prefix llvm)"/include/c++/v1/__config_site
 
