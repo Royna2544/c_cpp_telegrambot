@@ -30,6 +30,7 @@ template <int index>
 bool tryToProcess(ImageVariants& images, ProcessImageParam param) {
     auto& inst = std::get<index>(images);
     if (inst.read(param.srcPath)) {
+        LOG(INFO) << "Successfully read image";
         LOG(INFO) << "Rotating image by " << param.rotation << " degrees";
         switch (inst.rotate_image(param.rotation)) {
             case PhotoBase::Result::kErrorInvalidArgument:
@@ -51,6 +52,8 @@ bool tryToProcess(ImageVariants& images, ProcessImageParam param) {
         }
         LOG(INFO) << "Writing image to " << param.destPath;
         return inst.write(param.destPath);
+    } else {
+        LOG(ERROR) << "Counld't read or parse image";
     }
     return false;
 }
