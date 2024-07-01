@@ -3,7 +3,9 @@
 #include <png.h>
 #include <pngconf.h>
 
+#include <cstddef>
 #include <filesystem>
+#include <memory>
 #include <vector>
 
 #include "ImagePBase.hpp"
@@ -12,10 +14,33 @@ struct PngImage : PhotoBase {
     PngImage() = default;
     ~PngImage() override = default;
 
+    struct MiniSharedMalloc {
+        MiniSharedMalloc(std::size_t size) : data(malloc(size)) {}
+        MiniSharedMalloc() = default;
+        ~MiniSharedMalloc() {
+            if (data)  // Only free if data is not nullptr.
+                free(data);
+        }
+        void* data = nullptr;
+    };
+
+    struct PngRefMem {
+        void add(std::size_t size) {
+            auto m = std::make_shared<MiniSharedMalloc>(size);
+            mallocs.emplace_back(m);
+            row_data.emplace_back(static_cast<png_bytep>(m->data));
+        }
+        void resize(std::size_t size) { row_data.resize(size); }
+        [[nodiscard]] png_bytepp data() { return row_data.data(); }
+        png_bytep& operator[](std::size_t size) { return row_data[size]; }
+
+       private:
+        std::vector<std::shared_ptr<MiniSharedMalloc>> mallocs;
+        std::vector<png_bytep> row_data;
+    } refmem;
+
     png_uint_32 width{}, height{};
     png_byte color_type{}, bit_depth{};
-    std::vector<png_bytep> row_data;
-    std::vector<size_t> row_size;
     bool contains_data = false;
 
     /**
@@ -53,8 +78,9 @@ struct PngImage : PhotoBase {
     bool write(const std::filesystem::path& filename) override;
 
    private:
-    using transform_fn_t = std::function<void(
-        int src_width, int src_height, int& dst_x, int& dst_y, int x, int y)>;
+    using transform_fn_t =
+        std::function<void(png_uint_32 src_width, png_uint_32 src_height,
+                           ptrdiff_t& dst_x, ptrdiff_t& dst_y, int x, int y)>;
 
     /**
      * @brief Rotates the image with the specified new dimensions and

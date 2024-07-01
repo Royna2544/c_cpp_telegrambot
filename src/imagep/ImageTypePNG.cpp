@@ -6,7 +6,6 @@
 
 #include <cstddef>
 #include <filesystem>
-#include <vector>
 
 namespace {
 void absl_warn_fn(png_structp png_ptr, png_const_charp error_message) {
@@ -20,12 +19,10 @@ void absl_error_fn(png_structp png_ptr, png_const_charp error_message) {
 }
 }  // namespace
 
-constexpr int PNG_BYTES_TO_CHECK = 4;
 bool PngImage::read(const std::filesystem::path& filename) {
     FILE* fp = nullptr;
     png_structp png = nullptr;
     png_infop info = nullptr;
-    std::array<unsigned char, 4> header{};
 
     if (contains_data) {
         LOG(WARNING) << "Already contains data, ignore";
@@ -93,15 +90,11 @@ bool PngImage::read(const std::filesystem::path& filename) {
     }
     png_read_update_info(png, info);
 
-    row_data.resize(height);
-    row_size.resize(height);
     for (int y = 0; y < height; y++) {
-        const size_t byteSz = png_get_rowbytes(png, info);
-        row_data[y] = static_cast<png_bytep>(malloc(byteSz));
-        row_size[y] = byteSz;
+        refmem.add(png_get_rowbytes(png, info));
     }
 
-    png_read_image(png, row_data.data());
+    png_read_image(png, refmem.data());
 
     png_destroy_read_struct(&png, &info, nullptr);
 
@@ -116,7 +109,7 @@ void PngImage::to_greyscale() {
     }
     LOG(INFO) << "Converting image to greyscale";
     for (int y = 0; y < height; y++) {
-        png_bytep row = row_data[y];
+        png_bytep row = refmem[y];
         for (int x = 0; x < width; x++) {
             png_bytep px = &(row[x * 4]);
             const auto gray = static_cast<uint8_t>(
@@ -134,25 +127,20 @@ void PngImage::rotate_image_impl(int new_width, int new_height,
     height = new_height;
     color_type = src.color_type;
     bit_depth = src.bit_depth;
-    row_data.resize(height);
-    row_size.resize(height);
 
     for (int y = 0; y < height; y++) {
-        row_data[y] = (png_byte*)malloc(static_cast<size_t>(width) * 4);
+        refmem.add(static_cast<size_t>(width) * 4);
     }
 
-    for (int y = 0; y < src.height; y++) {
-        for (int x = 0; x < src.width; x++) {
-            int dst_x, dst_y;
+    for (ptrdiff_t y = 0; y < src.height; y++) {
+        for (ptrdiff_t x = 0; x < src.width; x++) {
+            ptrdiff_t dst_x = 0;
+            ptrdiff_t dst_y = 0;
             transform(src.width, src.height, dst_x, dst_y, x, y);
-            png_bytep src_pixel = &src.row_data[y][x * 4];
-            png_bytep dst_pixel = &row_data[dst_y][dst_x * 4];
+            png_bytep src_pixel = &src.refmem[y][x * 4];
+            png_bytep dst_pixel = &refmem[dst_y][dst_x * 4];
             memcpy(dst_pixel, src_pixel, 4);
         }
-    }
-
-    for (auto* const row : src.row_data) {
-        free(row);
     }
 }
 
@@ -164,28 +152,31 @@ PngImage::Result PngImage::_rotate_image(int angle) {
 
     switch (angle) {
         case kAngle90:
-            rotate_image_impl(height, width,
-                              [](int src_width, int src_height, int& dst_x,
-                                 int& dst_y, int x, int y) {
-                                  dst_x = src_height - 1 - y;
-                                  dst_y = x;
-                              });
+            rotate_image_impl(
+                height, width,
+                [](png_uint_32 src_width, png_uint_32 src_height,
+                   ptrdiff_t& dst_x, ptrdiff_t& dst_y, int x, int y) {
+                    dst_x = src_height - 1 - y;
+                    dst_y = x;
+                });
             break;
         case kAngle180:
-            rotate_image_impl(width, height,
-                              [](int src_width, int src_height, int& dst_x,
-                                 int& dst_y, int x, int y) {
-                                  dst_x = src_width - 1 - x;
-                                  dst_y = src_height - 1 - y;
-                              });
+            rotate_image_impl(
+                width, height,
+                [](png_uint_32 src_width, png_uint_32 src_height,
+                   ptrdiff_t& dst_x, ptrdiff_t& dst_y, int x, int y) {
+                    dst_x = src_width - 1 - x;
+                    dst_y = src_height - 1 - y;
+                });
             break;
         case kAngle270:
-            rotate_image_impl(height, width,
-                              [](int src_width, int src_height, int& dst_x,
-                                 int& dst_y, int x, int y) {
-                                  dst_x = y;
-                                  dst_y = src_width - 1 - x;
-                              });
+            rotate_image_impl(
+                height, width,
+                [](png_uint_32 src_width, png_uint_32 src_height,
+                   ptrdiff_t& dst_x, ptrdiff_t& dst_y, int x, int y) {
+                    dst_x = y;
+                    dst_y = src_width - 1 - x;
+                });
             break;
         case kAngleMin:
             // Noop
@@ -252,7 +243,7 @@ bool PngImage::write(const std::filesystem::path& filename) {
         return false;
     }
 
-    png_write_image(png, row_data.data());
+    png_write_image(png, refmem.data());
 
     if (setjmp(png_jmpbuf(png))) {
         LOG(ERROR) << "Error during end of write";
@@ -261,12 +252,6 @@ bool PngImage::write(const std::filesystem::path& filename) {
     }
 
     png_write_end(png, nullptr);
-
-    for (int y = 0; y < height; y++) {
-        free(row_data[y]);
-
-        // TODO: memory leak if it errors above
-    }
 
     png_destroy_write_struct(&png, &info);
 
