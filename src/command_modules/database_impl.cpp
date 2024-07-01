@@ -146,7 +146,7 @@ void handleSaveIdCmd(const Bot& bot, const Message::Ptr& message) {
         std::optional<std::string> fileId;
         std::optional<std::string> fileUniqueId;
         std::vector<std::string> names;
-        boost::split(names, wrapper.getExtraText(), isEmptyChar);
+        splitWithSpaces(wrapper.getExtraText(), names);
 
         if (!wrapper.switchToReplyToMessage(GETSTR(REPLY_TO_GIF_OR_STICKER))) {
             return;

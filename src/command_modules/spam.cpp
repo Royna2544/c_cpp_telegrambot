@@ -73,7 +73,7 @@ static void SpamCommandFn(const Bot& bot, const Message::Ptr& message) {
     } else if (wrapper.hasExtraText()) {
         std::vector<std::string> commands;
         std::pair<int, std::string> spamData;
-        boost::split(commands, wrapper.getExtraText(), isEmptyChar);
+        splitWithSpaces(wrapper.getExtraText(), commands);
         if (commands.size() == 2) {
             try_parse_spamcnt(commands[0], spamData.first);
             spamData.second = commands[1];
