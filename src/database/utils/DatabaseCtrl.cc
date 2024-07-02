@@ -106,22 +106,24 @@ int main(int argc, char* const* argv) {
     copyCommandLine(CommandLineOp::INSERT, &argc, &argv);
 
     std::vector<std::string> args;
-    for (int i = 1; i < argc; ++i) {
+    for (int i = 0; i < argc; ++i) {
         args.emplace_back(argv[i]);
     }
     CommandData data = {args, nullptr};
+
+    if (args.size() < 2) {
+        executeCommand<Commands::Help>(data);
+        return EXIT_SUCCESS;
+    }
 
     auto dbImpl = TgBotDatabaseImpl::getInstance();
     if (!dbImpl->loadDBFromConfig()) {
         LOG(ERROR) << "Failed to load database";
         return EXIT_FAILURE;
     }
-    if (args.size() < 2) {
-        executeCommand<Commands::Help>(data);
-        return EXIT_SUCCESS;
-    }
-    const std::string command = args[0];
-    args.erase(args.begin(), args.begin() + 1);
+    const std::string command = args[1];
+    // Erase exe, command name
+    args.erase(args.begin(), args.begin() + 2);
     data = {args, dbImpl};
 
     DLOG(INFO) << "Executing command: " << command;
