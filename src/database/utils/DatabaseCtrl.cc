@@ -115,14 +115,14 @@ int main(int argc, char* const* argv) {
         executeCommand<Commands::Help>(data);
         return EXIT_SUCCESS;
     }
-    
+
     auto dbImpl = TgBotDatabaseImpl::getInstance();
     if (!dbImpl->loadDBFromConfig()) {
         LOG(ERROR) << "Failed to load database";
         return EXIT_FAILURE;
     }
-    const std::string command = args[0];
     args.erase(args.begin(), args.begin() + 1);
+    const std::string command = args[0];
     data = {args, dbImpl};
 
     DLOG(INFO) << "Executing command: " << command;
