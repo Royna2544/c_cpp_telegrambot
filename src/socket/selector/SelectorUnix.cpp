@@ -10,31 +10,30 @@ UnixSelector::UnixSelector() {
     auto string = ConfigManager::getVariable(ConfigManager::Configs::SELECTOR);
     bool found = false;
 
-    if (!string) {
-        string = "<not set>";
-    }
-    if (string == "poll") {
-        m_selector = PollSelector();
-        found = true;
-    } else if (string == "epoll") {
+    if (string) {
+        if (string == "poll") {
+            m_selector = PollSelector();
+            found = true;
+        } else if (string == "epoll") {
 #ifdef __linux__
-        m_selector = EPollSelector();
-        found = true;
+            m_selector = EPollSelector();
+            found = true;
 #else
-        LOG(ERROR) << "epoll is not supported on this platform";
+            LOG(ERROR) << "epoll is not supported on this platform";
 #endif
-    } else if (string == "select") {
-        m_selector = SelectSelector();
-        found = true;
-    } else {
-        LOG(ERROR) << "Unknown selector: " << std::quoted(*string);
+        } else if (string == "select") {
+            m_selector = SelectSelector();
+            found = true;
+        } else {
+            LOG(ERROR) << "Unknown selector: " << std::quoted(*string);
+        }
     }
     if (!found) {
-        LOG(INFO) << "Config invalid, using default selector: poll";
+        LOG(INFO) << "Config invalid or not set, using default selector: poll";
         m_selector = PollSelector();
         string = "poll";
     }
-    LOG(INFO) << "Using selector: " << string.value();
+    DLOG(INFO) << "Using selector: " << string.value();
 }
 
 bool UnixSelector::init() {
