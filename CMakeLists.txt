@@ -143,6 +143,10 @@ set(SRC_LIST
   src/popen_wdt/popen_wdt_${TARGET_VARIANT}.c
   src/random/RandomNumberGenerator.cpp
 )
+# Library for ibash
+if (UNIX)
+  extend_set(SRC_LIST src/portable_sem.c)
+endif()
 #####################################################################
 
 ########## Generate commands modules list in compile time (python) ##########

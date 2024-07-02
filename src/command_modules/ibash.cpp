@@ -2,7 +2,7 @@
 #include <command_modules/CommandModule.h>
 #include <internal/_FileDescriptor_posix.h>
 #include <popen_wdt/popen_wdt.h>
-#include <semaphore.h>
+#include <portable_sem.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -61,20 +61,24 @@ struct InteractiveBashContext : BotClassBase {
             selector.init();
             selector.setTimeout(100s);
             selector.enableTimeout(true);
-            selector.add(readfd, [this]() {
-                std::lock_guard<std::mutex> lock(m_buffer);
-                auto len = read(readfd, buffer.data() + offset, BASH_READ_BUF);
-                if (len < 0) {
-                    PLOG(ERROR) << "Failed to read from pipe";
-                    kRun = false;
-                } else {
-                    offset += len;
-                    if (offset + BASH_READ_BUF > BASH_MAX_BUF) {
-                        LOG(INFO) << "Buffer overflow";
+            selector.add(
+                readfd,
+                [this]() {
+                    std::lock_guard<std::mutex> lock(m_buffer);
+                    auto len =
+                        read(readfd, buffer.data() + offset, BASH_READ_BUF);
+                    if (len < 0) {
+                        PLOG(ERROR) << "Failed to read from pipe";
                         kRun = false;
+                    } else {
+                        offset += len;
+                        if (offset + BASH_READ_BUF > BASH_MAX_BUF) {
+                            LOG(INFO) << "Buffer overflow";
+                            kRun = false;
+                        }
                     }
-                }
-            }, Selector::Mode::READ);
+                },
+                Selector::Mode::READ);
             while (kRun) {
                 switch (selector.poll()) {
                     case Selector::SelectorPollResult::OK:
@@ -118,14 +122,14 @@ struct InteractiveBashContext : BotClassBase {
     }
 
     struct IBashPriv {
-        sem_t sem{};
+        rk_sema sem{};
         pid_t child_pid{};
         IBashPriv() {
             // Initialize semaphore for inter-process
             // use, initial value 0
-            sem_init(&sem, 1, 0);
+            rk_sema_init(&sem, 0);
         }
-        ~IBashPriv() { sem_destroy(&sem); }
+        ~IBashPriv() { rk_sema_destroy(&sem); }
     };
 
     static void unMap(IBashPriv* addr) { munmap(addr, sizeof(IBashPriv)); }
@@ -184,7 +188,7 @@ struct InteractiveBashContext : BotClassBase {
             close(parentToChild.writeEnd());
             privdata->child_pid = getpid();
             setpgid(0, 0);
-            sem_post(&privdata->sem);
+            rk_sema_post(&privdata->sem);
             execl(BASH_EXE_PATH, "bash", nullptr);
             _exit(127);
         } else {
@@ -192,7 +196,7 @@ struct InteractiveBashContext : BotClassBase {
             close(parentToChild.readEnd());
             // Ensure bash execl() is up
             // to be able to read from it
-            sem_wait(&privdata->sem);
+            rk_sema_wait(&privdata->sem);
             childpid = privdata->child_pid;
             is_open = true;
             LOG(INFO) << "Open success, child pid: " << childpid;
