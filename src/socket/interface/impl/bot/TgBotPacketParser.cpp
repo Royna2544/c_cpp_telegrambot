@@ -18,7 +18,7 @@ HandleState TgBotSocketParser::handle_PacketHeader(
     if (!socketData ||
         socketData.value()->size != TgBotSocket::Packet::hdr_sz) {
         LOG(ERROR) << "Failed to read from socket";
-        return HandleState::Fail;
+        return HandleState::Ignore;
     }
     pkt = TgBotSocket::Packet(TgBotSocket::Packet::hdr_sz);
     socketData->assignTo(pkt->header);
