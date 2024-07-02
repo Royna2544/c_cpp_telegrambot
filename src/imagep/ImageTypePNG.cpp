@@ -8,15 +8,21 @@
 #include <filesystem>
 #include <string>
 
+#if (PNG_LIBPNG_VER < 10500)
+#define png_longjmp_fn(png, val) longjmp(png->jmpbuf, val);
+#else
+#define png_longjmp_fn(png, val) png_longjmp(png, val);
+#endif
+
 namespace {
 void absl_warn_fn(png_structp png_ptr, png_const_charp error_message) {
     LOG(WARNING) << "libpng: " << error_message;
-    png_longjmp(png_ptr, 1);
+    png_longjmp_fn(png_ptr, 1);
 }
 
 void absl_error_fn(png_structp png_ptr, png_const_charp error_message) {
     LOG(ERROR) << "libpng: " << error_message;
-    png_longjmp(png_ptr, 1);
+    png_longjmp_fn(png_ptr, 1);
 }
 }  // namespace
 
@@ -260,6 +266,4 @@ bool PngImage::write(const std::filesystem::path& filename) {
     return true;
 }
 
-std::string PngImage::version() const {
-    return PNG_LIBPNG_VER_STRING;
-}
+std::string PngImage::version() const { return PNG_LIBPNG_VER_STRING; }
