@@ -8,7 +8,8 @@
 
 struct PollSelector : Selector {
     bool init() override;
-    bool add(socket_handle_t fd, OnSelectedCallback callback) override;
+    bool add(socket_handle_t fd, OnSelectedCallback callback,
+             Mode mode) override;
     bool remove(socket_handle_t fd) override;
     SelectorPollResult poll() override;
     void shutdown() override;
@@ -23,7 +24,8 @@ struct PollSelector : Selector {
 
 struct SelectSelector : Selector {
     bool init() override;
-    bool add(socket_handle_t fd, OnSelectedCallback callback) override;
+    bool add(socket_handle_t fd, OnSelectedCallback callback,
+             Mode mode) override;
     bool remove(socket_handle_t fd) override;
     SelectorPollResult poll() override;
     void shutdown() override;
@@ -31,16 +33,19 @@ struct SelectSelector : Selector {
 
    private:
     struct SelectFdData {
-        int fd;
+        socket_handle_t fd;
         OnSelectedCallback callback;
+        Mode mode;
     };
-    fd_set set;
+    fd_set read_set;
+    fd_set write_set;
     std::vector<SelectFdData> data;
 };
 
 struct EPollSelector : Selector {
     bool init() override;
-    bool add(socket_handle_t fd, OnSelectedCallback callback) override;
+    bool add(socket_handle_t fd, OnSelectedCallback callback,
+             Mode mode) override;
     bool remove(socket_handle_t fd) override;
     SelectorPollResult poll() override;
     void shutdown() override;
@@ -61,11 +66,26 @@ struct UnixSelector {
     explicit UnixSelector();
 
     bool init();
-    bool add(socket_handle_t fd, Selector::OnSelectedCallback callback);
+    bool add(socket_handle_t fd, Selector::OnSelectedCallback callback,
+             Selector::Mode flags);
     bool remove(socket_handle_t fd);
     Selector::SelectorPollResult poll();
     void shutdown();
     bool reinit();
+    void enableTimeout(bool enabled);
+
+    // Set the timeout for the selector.
+    template <typename Rep, typename Period>
+    void setTimeout(const std::chrono::duration<Rep, Period> timeout) {
+        return std::visit(
+            [timeout](auto &&arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (isKnownSelector<T>()) {
+                    return arg.setTimeout(timeout);
+                }
+            },
+            m_selector);
+    }
 
    private:
     template <typename T>

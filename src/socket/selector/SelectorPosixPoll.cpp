@@ -8,7 +8,8 @@
 
 bool PollSelector::init() { return true; }
 
-bool PollSelector::add(socket_handle_t fd, OnSelectedCallback callback) {
+bool PollSelector::add(socket_handle_t fd, OnSelectedCallback callback,
+                       Mode mode) {
     struct pollfd pfd {};
 
     if (std::ranges::any_of(pollfds, [fd](const auto &data) {
@@ -19,7 +20,23 @@ bool PollSelector::add(socket_handle_t fd, OnSelectedCallback callback) {
     }
 
     pfd.fd = fd;
-    pfd.events = POLLIN;
+    switch (mode) {
+        case Mode::READ:
+            pfd.events = POLLIN;
+            break;
+        case Mode::WRITE:
+            pfd.events = POLLOUT;
+            break;
+        case Mode::READ_WRITE:
+            pfd.events = POLLIN | POLLOUT;
+            break;
+        case Mode::EXCEPT:
+            pfd.events = POLLPRI;
+            break;
+        default:
+            LOG(ERROR) << "Invalid mode for socket " << fd;
+            return false;
+    }
     pfd.revents = 0;
     pollfds.push_back({pfd, callback});
     return true;
@@ -50,12 +67,17 @@ PollSelector::SelectorPollResult PollSelector::poll() {
         PLOG(ERROR) << "Poll failed";
         return SelectorPollResult::FAILED;
     }
+#define CHECK_AND_INFO(event, index, x) \
+    if ((event) & (x)) {                \
+        LOG(INFO) << #x << " is set";   \
+        pollfds[index].callback();      \
+        any = true;                     \
+    }
 #define CHECK_AND_WARN(event, x)         \
-    if ((event) & (x)) {                     \
+    if ((event) & (x)) {                 \
         LOG(WARNING) << #x << " is set"; \
     }
-#define NOTHING 0
-    
+
     for (int i = 0; i < pollfds.size(); ++i) {
         const auto revents = pfds[i].revents;
         DLOG(INFO) << "My fd: " << pollfds[i].poll_fd.fd;
@@ -63,22 +85,18 @@ PollSelector::SelectorPollResult PollSelector::poll() {
             DLOG(INFO) << "Nothing is set";
             continue;
         }
-        if (revents & POLLIN) {
-            DLOG(INFO) << "POLLIN is set";
-            pollfds[i].callback();
-            any = true;
-        }
+        CHECK_AND_INFO(revents, i, POLLIN);
+        CHECK_AND_INFO(revents, i, POLLOUT);
         CHECK_AND_WARN(revents, POLLPRI);
         CHECK_AND_WARN(revents, POLLERR);
         CHECK_AND_WARN(revents, POLLHUP);
         CHECK_AND_WARN(revents, POLLNVAL);
-        CHECK_AND_WARN(revents, POLLOUT);
         pfds[i].revents = 0;
     }
     DLOG(INFO) << "Return value: " << rc
                << ", Callbacks called: " << std::boolalpha << any;
     if (!any) {
-        LOG(WARNING) << "None of the fd returned POILLIN";
+        LOG(WARNING) << "None of the fd returned events";
         return SelectorPollResult::TIMEOUT;
     }
     return SelectorPollResult::OK;

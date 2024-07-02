@@ -4,8 +4,8 @@
 
 bool EPollSelector::init() { return false; }
 
-bool EPollSelector::add(socket_handle_t /*fd*/,
-                        OnSelectedCallback /*callback*/) {
+bool EPollSelector::add(socket_handle_t /*fd*/, OnSelectedCallback /*callback*/,
+                        Mode /*mode*/) {
     return false;
 }
 

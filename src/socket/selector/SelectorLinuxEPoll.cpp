@@ -8,7 +8,7 @@
 
 bool EPollSelector::init() { return (isValidFd(epollfd = epoll_create(MAX_EPOLLFDS))); }
 
-bool EPollSelector::add(socket_handle_t fd, OnSelectedCallback callback) {
+bool EPollSelector::add(socket_handle_t fd, OnSelectedCallback callback, Mode mode) {
     struct epoll_event event {};
 
     if (data.size() > MAX_EPOLLFDS) {
@@ -23,7 +23,24 @@ bool EPollSelector::add(socket_handle_t fd, OnSelectedCallback callback) {
     }
 
     event.data.fd = fd;
-    event.events = EPOLLIN;
+    
+    switch (mode) {
+        case Mode::READ:
+            event.events = EPOLLIN;
+            break;
+        case Mode::WRITE:
+            event.events = EPOLLOUT;
+            break;
+        case Mode::READ_WRITE:
+            event.events = EPOLLIN | EPOLLOUT;
+            break;
+        case Mode::EXCEPT:
+            event.events = EPOLLPRI | EPOLLRDHUP;
+            break;
+        default:
+            LOG(ERROR) << "Invalid mode for socket " << fd;
+            return false;
+    }
     if (epoll_ctl(epollfd, EPOLL_CTL_ADD, fd, &event) < 0) {
         PLOG(ERROR) << "epoll_ctl failed";
         return false;

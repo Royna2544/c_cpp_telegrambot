@@ -5,6 +5,7 @@
 #include <variant>
 
 #include "SelectorPosix.hpp"
+#include "socket/selector/Selectors.hpp"
 
 UnixSelector::UnixSelector() {
     auto string = ConfigManager::getVariable(ConfigManager::Configs::SELECTOR);
@@ -48,12 +49,13 @@ bool UnixSelector::init() {
 }
 
 bool UnixSelector::add(socket_handle_t fd,
-                       Selector::OnSelectedCallback callback) {
+                       Selector::OnSelectedCallback callback,
+                       Selector::Mode mode) {
     return std::visit(
-        [fd, callback](auto &&arg) {
+        [fd, callback, mode](auto &&arg) {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (isKnownSelector<T>()) {
-                return arg.add(fd, callback);
+                return arg.add(fd, callback, mode);
             }
         },
         m_selector);
@@ -98,6 +100,17 @@ bool UnixSelector::reinit() {
             using T = std::decay_t<decltype(arg)>;
             if constexpr (isKnownSelector<T>()) {
                 return arg.reinit();
+            }
+        },
+        m_selector);
+}
+
+void UnixSelector::enableTimeout(bool enabled) {
+    return std::visit(
+        [enabled](auto &&arg) {
+            using T = std::decay_t<decltype(arg)>;
+            if constexpr (isKnownSelector<T>()) {
+                return arg.enableTimeout(enabled);
             }
         },
         m_selector);

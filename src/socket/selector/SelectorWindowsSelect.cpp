@@ -6,17 +6,31 @@
 #include "SelectorWindows.hpp"
 
 bool SelectSelector::init() {
-    FD_ZERO(&set);
+    FD_ZERO(&read_set);
+    FD_ZERO(&write_set);
     return true;
 }
 
-bool SelectSelector::add(socket_handle_t fd, OnSelectedCallback callback) {
-    if (FD_ISSET(fd, &set)) {
+bool SelectSelector::add(socket_handle_t fd, OnSelectedCallback callback,
+                         Mode mode) {
+    fd_set *set = nullptr;
+    fd_set *other_set = nullptr;
+    switch (mode) {
+        case Mode::READ:
+            set = &read_set;
+            other_set = &write_set;
+            break;
+        case Mode::WRITE:
+            set = &write_set;
+            other_set = &read_set;
+            break;
+    }
+    if (FD_ISSET(fd, set) || FD_ISSET(fd, other_set)) {
         LOG(WARNING) << "fd " << fd << " already set";
         return false;
     }
-    FD_SET(fd, &set);
-    data.push_back({fd, callback});
+    FD_SET(fd, set);
+    data.emplace_back(fd, callback, mode);
     return true;
 }
 
@@ -38,13 +52,13 @@ SelectSelector::SelectorPollResult SelectSelector::poll() {
         .tv_sec = getSOrDefault()
     };
 
-    int ret = select(FD_SETSIZE, &set, nullptr, nullptr, &tv);
+    int ret = select(FD_SETSIZE, &read_set, &write_set, nullptr, &tv);
     if (ret == SOCKET_ERROR) {
         LOG(ERROR) << "Select failed: " << WSAEStr();
         return SelectorPollResult::FAILED;
     }
     for (auto &e : data) {
-        if (FD_ISSET(e.fd, &set)) {
+        if (FD_ISSET(e.fd, &read_set) || FD_ISSET(e.fd, &write_set)) {
             e.callback();
         }
     }
@@ -58,7 +72,14 @@ void SelectSelector::shutdown() {}
 bool SelectSelector::reinit() {
     init();
     for (auto &e : data) {
-        FD_SET(e.fd, &set);
+        switch (e.mode) {
+            case Mode::READ:
+                FD_SET(e.fd, &read_set);
+                break;
+            case Mode::WRITE:
+                FD_SET(e.fd, &write_set);
+                break;
+        }
     }
     return true;
 }
