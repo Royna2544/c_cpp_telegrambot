@@ -7,6 +7,7 @@
 #include <SocketBase.hpp>
 
 #include "SharedMalloc.hpp"
+#include "SocketDescriptor_defs.hpp"
 
 struct SocketInterfaceUnix : SocketInterfaceBase {
     bool isValidSocketHandle(socket_handle_t handle) override {
@@ -23,8 +24,26 @@ struct SocketInterfaceUnix : SocketInterfaceBase {
     std::optional<SharedMalloc> readFromSocket(SocketConnContext context,
                                                buffer_len_t length) override;
 
-    SocketInterfaceUnix() = default;
+    SocketInterfaceUnix() : posixHelper(this) {}
     ~SocketInterfaceUnix() override = default;
+
+    struct PosixHelper {
+        // SOCK_DGRAM or SOCK_STREAM?
+        int getSocketType();
+        // Connection timeout for clients are enabled?
+        bool connectionTimeoutEnabled();
+
+        // Handle connection timeout. Specific works before connect() in client
+        static void handleConnectTimeoutPre(socket_handle_t socket);
+        // Handle connection timeout. Specific works after connect() in client
+        bool handleConnectTimeoutPost(socket_handle_t socket);
+
+        explicit PosixHelper(SocketInterfaceUnix* _interface)
+            : interface(_interface) {}
+
+       private:
+        SocketInterfaceUnix* interface;
+    } posixHelper;
 
    protected:
     Pipe kListenTerminate{};

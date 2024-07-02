@@ -281,6 +281,8 @@ int main(int argc, char** argv) {
     }
 
     SocketClientWrapper backend(SocketInterfaceBase::LocalHelper::getSocketPath());
+    backend->options.use_connect_timeout.set(true);
+    backend->options.connect_timeout.set(3s);
     auto handle = backend->createClientSocket();
 
     if (handle) {

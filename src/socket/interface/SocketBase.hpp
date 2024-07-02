@@ -4,11 +4,14 @@
 
 #include <SocketDescriptor_defs.hpp>
 #include <TgBotSocket_Export.hpp>
+#include <chrono>
 #include <cstddef>
 #include <filesystem>
 #include <functional>
 #include <optional>
 #include <string>
+
+using std::chrono_literals::operator""s;
 
 struct SocketConnContext {
     socket_handle_t cfd{};  // connection socket file descriptor
@@ -213,6 +216,9 @@ struct SocketInterfaceBase {
         // Default constructor
         Option() = default;
 
+        // Option with default value
+        explicit Option(T defaultValue) : data(defaultValue) {}
+
         // Function to set the data
         void set(T dataIn) { data = dataIn; }
 
@@ -242,6 +248,11 @@ struct SocketInterfaceBase {
         Option<int> port;
         // Option to specify whether to use UDP for socket operations
         Option<bool> use_udp;
+        // Option to specify whether to use connection timeouts for client
+        Option<bool> use_connect_timeout;
+        // Option to specify the timeout for socket operations
+        // Used if use_connect_timeout is true
+        Option<std::chrono::seconds> connect_timeout{10s};
     } options;
 
    protected:

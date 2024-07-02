@@ -1,10 +1,12 @@
 #include <absl/log/log.h>
+#include <fcntl.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 
 #include <array>
 #include <cstddef>
 #include <functional>
+#include <socket/selector/SelectorPosix.hpp>
 #include <string_view>
 
 #include "SocketBase.hpp"
@@ -125,10 +127,19 @@ void forEachINetAddress(
 
 constexpr std::string_view kLocalInterface = "lo";
 
-inline int getSocketType(const SocketInterfaceBase* base) {
-    if (static_cast<bool>(base->options.use_udp) &&
-        base->options.use_udp.get()) {
-        return SOCK_DGRAM;
+template <int flag, bool add>
+void setSocketFlags(socket_handle_t handle) {
+    int flags = fcntl(handle, F_GETFL, 0);
+    if (flags == -1) {
+        PLOG(ERROR) << "fcntl(F_GETFL) failed";
+        return;
     }
-    return SOCK_STREAM;
+    if constexpr (add) {
+        flags |= flag;
+    } else {
+        flags &= ~flag;
+    }
+    if (fcntl(handle, F_SETFL, flags) == -1) {
+        PLOG(ERROR) << "fcntl(F_SETFL) failed";
+    }
 }

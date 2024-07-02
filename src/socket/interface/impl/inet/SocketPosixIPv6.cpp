@@ -9,14 +9,14 @@
 #include <functional>
 #include <impl/SocketPosix.hpp>
 
-#include "HelperPosix.hpp"
+#include "../helper/HelperPosix.hpp"
 
 std::optional<socket_handle_t> SocketInterfaceUnixIPv6::createServerSocket() {
     socket_handle_t ret = kInvalidFD;
     bool iface_done = false;
     struct sockaddr_in6 name {};
     auto* _name = reinterpret_cast<struct sockaddr*>(&name);
-    socket_handle_t sfd = socket(AF_INET6, getSocketType(this), 0);
+    socket_handle_t sfd = socket(AF_INET6, posixHelper.getSocketType(), 0);
 
     if (!isValidSocketHandle(sfd)) {
         PLOG(ERROR) << "Failed to create socket";
@@ -58,7 +58,7 @@ std::optional<SocketConnContext> SocketInterfaceUnixIPv6::createClientSocket() {
     struct sockaddr_in6 name {};
     auto* _name = reinterpret_cast<struct sockaddr*>(&name);
 
-    ctx.cfd = socket(AF_INET6, getSocketType(this), 0);
+    ctx.cfd = socket(AF_INET6, posixHelper.getSocketType(), 0);
     if (!isValidSocketHandle(ctx.cfd)) {
         PLOG(ERROR) << "Failed to create socket";
         return std::nullopt;
@@ -67,8 +67,17 @@ std::optional<SocketConnContext> SocketInterfaceUnixIPv6::createClientSocket() {
     name.sin6_family = AF_INET6;
     name.sin6_port = htons(helper.inet.getPortNum());
     inet_pton(AF_INET6, options.address.get().c_str(), &name.sin6_addr);
+
+    if (posixHelper.connectionTimeoutEnabled()) {
+        posixHelper.handleConnectTimeoutPre(ctx.cfd);
+    }
+
     if (connect(ctx.cfd, _name, sizeof(name)) != 0) {
         PLOG(ERROR) << "Failed to connect to socket";
+        closeSocketHandle(ctx.cfd);
+        return std::nullopt;
+    }
+    if (posixHelper.connectionTimeoutEnabled() && !posixHelper.handleConnectTimeoutPost(ctx.cfd)) {
         closeSocketHandle(ctx.cfd);
         return std::nullopt;
     }

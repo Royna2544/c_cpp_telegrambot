@@ -6,7 +6,7 @@
 
 #include <impl/SocketPosix.hpp>
 
-#include "HelperPosix.hpp"
+#include "../helper/HelperPosix.hpp"
 #include "SocketBase.hpp"
 
 std::optional<socket_handle_t> SocketInterfaceUnixIPv4::createServerSocket() {
@@ -15,7 +15,7 @@ std::optional<socket_handle_t> SocketInterfaceUnixIPv4::createServerSocket() {
     struct sockaddr_in name {};
     auto* _name = reinterpret_cast<struct sockaddr*>(&name);
 
-    socket_handle_t sfd = socket(AF_INET, getSocketType(this), 0);
+    socket_handle_t sfd = socket(AF_INET, posixHelper.getSocketType(), 0);
 
     if (!isValidSocketHandle(sfd)) {
         PLOG(ERROR) << "Failed to create socket";
@@ -58,7 +58,7 @@ std::optional<SocketConnContext> SocketInterfaceUnixIPv4::createClientSocket() {
     struct sockaddr_in name {};
     const auto* _name = reinterpret_cast<struct sockaddr*>(&name);
 
-    ctx.cfd = socket(AF_INET, getSocketType(this), 0);
+    ctx.cfd = socket(AF_INET, posixHelper.getSocketType(), 0);
     if (!isValidSocketHandle(ctx.cfd)) {
         PLOG(ERROR) << "Failed to create socket";
         return std::nullopt;
@@ -67,8 +67,18 @@ std::optional<SocketConnContext> SocketInterfaceUnixIPv4::createClientSocket() {
     name.sin_family = AF_INET;
     name.sin_port = htons(helper.inet.getPortNum());
     inet_pton(AF_INET, options.address.get().c_str(), &name.sin_addr);
-    if (connect(ctx.cfd, _name, sizeof(name)) != 0) {
+
+    if (posixHelper.connectionTimeoutEnabled()) {
+        posixHelper.handleConnectTimeoutPre(ctx.cfd);
+    }
+
+    // Blocking sockets wont return EINPROGRESS anyway...
+    if (connect(ctx.cfd, _name, sizeof(name)) != 0 && errno != EINPROGRESS) {
         PLOG(ERROR) << "Failed to connect to socket";
+        closeSocketHandle(ctx.cfd);
+        return std::nullopt;
+    }
+    if (posixHelper.connectionTimeoutEnabled() && !posixHelper.handleConnectTimeoutPost(ctx.cfd)) {
         closeSocketHandle(ctx.cfd);
         return std::nullopt;
     }

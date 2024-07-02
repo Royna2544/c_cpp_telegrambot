@@ -74,7 +74,7 @@ struct InteractiveBashContext : BotClassBase {
                         kRun = false;
                     }
                 }
-            });
+            }, Selector::Mode::READ);
             while (kRun) {
                 switch (selector.poll()) {
                     case Selector::SelectorPollResult::OK:

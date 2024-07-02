@@ -8,6 +8,7 @@ if (UNIX)
     ${SOCKET_SRC_INTERFACE}/impl/local/SocketPosixLocal.cpp
     ${SOCKET_SRC_INTERFACE}/impl/inet/SocketPosixIPv4.cpp
     ${SOCKET_SRC_INTERFACE}/impl/inet/SocketPosixIPv6.cpp
+    ${SOCKET_SRC_INTERFACE}/impl/helper/SocketHelperPosix.cpp
     src/socket/selector/SelectorPosixPoll.cpp
     src/socket/selector/SelectorPosixSelect.cpp
     src/socket/selector/SelectorUnix.cpp

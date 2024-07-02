@@ -6,6 +6,7 @@
 
 #include <cstring>
 #include <socket/selector/SelectorPosix.hpp>
+#include "socket/selector/Selectors.hpp"
 
 void SocketInterfaceUnix::startListening(socket_handle_t handle,
                                          const listener_callback_t onNewData) {
@@ -37,7 +38,7 @@ void SocketInterfaceUnix::startListening(socket_handle_t handle,
                 PLOG(ERROR) << "Reading data from forcestop fd";
             }
             should_break = true;
-        });
+        }, Selector::Mode::READ);
         selector.add(handle, [handle, this, &should_break, onNewData] {
             struct sockaddr addr {};
             socklen_t len = sizeof(addr);
@@ -51,7 +52,7 @@ void SocketInterfaceUnix::startListening(socket_handle_t handle,
                 should_break = onNewData(ctx);
                 closeSocketHandle(cfd);
             }
-        });
+        }, Selector::Mode::READ);
         while (!should_break) {
             switch (selector.poll()) {
                 case Selector::PollResult::FAILED:

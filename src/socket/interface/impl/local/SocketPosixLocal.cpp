@@ -7,10 +7,10 @@
 #include <optional>
 
 #include "SocketBase.hpp"
-#include "../inet/HelperPosix.hpp"
+#include "../helper/HelperPosix.hpp"
 
 bool SocketInterfaceUnixLocal::createLocalSocket(SocketConnContext *ctx) {
-    ctx->cfd = socket(AF_UNIX, getSocketType(this), 0);
+    ctx->cfd = socket(AF_UNIX, posixHelper.getSocketType(), 0);
     if (ctx->cfd < 0) {
         PLOG(ERROR) << "Failed to create socket";
         return false;
@@ -26,7 +26,7 @@ std::optional<socket_handle_t> SocketInterfaceUnixLocal::createServerSocket() {
     SocketConnContext ret = SocketConnContext::create<sockaddr_un>();
     const auto *_name = reinterpret_cast<struct sockaddr *>(ret.addr.get());
 
-    LOG(INFO) << "Creating socket at " << LocalHelper::getSocketPath().string();
+    LOG(INFO) << "Creating socket at " << options.address.get();
     if (!createLocalSocket(&ret)) {
         return std::nullopt;
     }

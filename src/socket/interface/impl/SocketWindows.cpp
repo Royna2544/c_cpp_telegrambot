@@ -10,6 +10,7 @@
 
 #include "SocketDescriptor_defs.hpp"
 #include "helper/HelperWindows.hpp"
+#include "socket/selector/Selectors.hpp"
 
 std::string SocketInterfaceWindows::WSALastErrorStr() {
     char *s = nullptr;
@@ -51,7 +52,7 @@ void SocketInterfaceWindows::startListening(
                 should_break = onNewData(ctx);
                 closesocket(cfd);
             }
-        });
+        }, Selector::Mode::READ);
         while (!should_break && kRun) {
             switch (selector.poll()) {
                 case Selector::SelectorPollResult::FAILED:
