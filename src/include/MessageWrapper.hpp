@@ -1,3 +1,5 @@
+#pragma once
+
 #include <tgbot/Bot.h>
 #include <tgbot/types/Message.h>
 #include <tgbot/types/Sticker.h>
@@ -75,6 +77,9 @@ struct MessageWrapperLimited {
     [[nodiscard]] std::vector<TgBot::PhotoSize::Ptr> getPhoto() const noexcept {
         return message->photo;
     }
+    [[nodiscard]] Message::Ptr getMessage() const noexcept {
+        return message;
+    }
     explicit MessageWrapperLimited(Message::Ptr message)
         : message(std::move(message)) {}
 
@@ -119,6 +124,11 @@ struct MessageWrapper : BotClassBase, MessageWrapperLimited {
             message = parent->message;
             parent = parent->parent;
         }
+    }
+    
+    // TODO: remove this
+    [[nodiscard]] const Bot& getBot() const noexcept {
+        return _bot;
     }
 
     explicit MessageWrapper(const Bot& bot, TgBot::Message::Ptr message)

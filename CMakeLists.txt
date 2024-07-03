@@ -222,6 +222,12 @@ endif()
 include(cmake/tgbotutils.cmake)
 #####################################################################
 
+################# Android ROM builder with C++/Python #################
+if (UNIX)
+  include(src/android_builder/builder.cmake)
+endif()
+#####################################################################
+
 ################### The Bot's main functionaility ###################
 add_library_san(${PROJECT_NAME} SHARED ${SRC_LIST})
 target_include_directories(${PROJECT_NAME} PRIVATE src/third-party/rapidjson/include)

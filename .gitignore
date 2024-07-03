@@ -19,6 +19,7 @@ libTgBot*.so
 src/command_modules/cmds.gen.cpp
 modules.load
 resources/about.html
+__pycache__
 
 # Visual studio code
 build/

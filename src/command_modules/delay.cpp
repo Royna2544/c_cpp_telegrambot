@@ -7,20 +7,6 @@
 
 #include "CommandModule.h"
 
-union Time_t {
-    time_t val;
-};
-
-std::ostream& operator<<(std::ostream& self, const Time_t tp) {
-    self << std::put_time(std::gmtime(&tp.val), "%Y-%m-%dT%H:%M:%SZ (GMT)");
-    return self;
-}
-
-template <class T>
-Time_t fromTP(std::chrono::time_point<T> it) {
-    return {std::chrono::system_clock::to_time_t(it)};
-}
-
 static void DelayCommandFn(const Bot& bot, const Message::Ptr message) {
     using std::chrono::duration;
     using std::chrono::high_resolution_clock;
