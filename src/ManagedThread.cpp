@@ -1,5 +1,6 @@
 #include <ManagedThreads.hpp>
 #include <mutex>
+#include <utility>
 
 bool ManagedThread::isRunning() const { return state == ControlState::RUNNING; }
 
@@ -30,8 +31,8 @@ void ManagedThread::setPreStopFunction(prestop_function fn) {
         case ControlState::UNINITIALIZED:
         case ControlState::STOPPED_BY_STOP_CMD:
         case ControlState::STOPPED_PREMATURE:
-        case ControlState::RUNNING:
-            preStop = fn;
+        case ControlState::RUNNING:           
+            preStop = std::move(fn);
             break;
     };
 }
