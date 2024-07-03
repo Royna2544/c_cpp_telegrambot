@@ -5,7 +5,6 @@
 #include <variant>
 
 #include "SelectorPosix.hpp"
-#include "socket/selector/Selectors.hpp"
 
 UnixSelector::UnixSelector() {
     auto string = ConfigManager::getVariable(ConfigManager::Configs::SELECTOR);

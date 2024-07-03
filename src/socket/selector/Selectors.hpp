@@ -2,12 +2,11 @@
 
 #include <absl/log/log.h>
 
-#include <SocketDescriptor_defs.hpp>
-#include <bitset>
 #include <chrono>
 #include <functional>
 #include <optional>
 
+#include <SocketDescriptor_defs.hpp>
 #include "internal/_std_chrono_templates.h"
 
 // Base interface for a fd selector, e.g. poll(2) or select(2).
@@ -18,17 +17,16 @@ struct Selector {
         TIMEOUT = -2,
     };
     enum class Mode {
-        READ,               // When reading would not block
-        WRITE,              // When writing would not block
-        READ_WRITE,         // When either reading or writing would not block
-        EXCEPT,             // When exception happens
+        READ,        // When reading would not block
+        WRITE,       // When writing would not block
+        READ_WRITE,  // When either reading or writing would not block
+        EXCEPT,      // When exception happens
     };
 
     // Shim for old code
     using SelectorPollResult = PollResult;
     using OnSelectedCallback = std::function<void(void)>;
     static constexpr std::chrono::seconds kDefaultTimeoutSecs{5};
-
 
     virtual ~Selector() = default;
 
@@ -40,7 +38,8 @@ struct Selector {
 
     // Add a file descriptor to the selector, with a callback. return false on
     // failure.
-    virtual bool add(socket_handle_t fd, OnSelectedCallback callback, Mode mode) = 0;
+    virtual bool add(socket_handle_t fd, OnSelectedCallback callback,
+                     Mode mode) = 0;
 
     // Remove a file descriptor from the selector, return false on failure.
     virtual bool remove(socket_handle_t fd) = 0;
@@ -69,7 +68,7 @@ struct Selector {
             timeoutMillisec = std::nullopt;
         }
     }
-    
+
     // Check if timeout is enabled.
     [[nodiscard]] bool isTimeoutEnabled() const {
         return timeoutMillisec.has_value();

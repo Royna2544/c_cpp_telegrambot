@@ -54,6 +54,8 @@ bool PollSelector::remove(socket_handle_t fd) {
     return ret;
 }
 
+constexpr bool kPollDebug = false;
+
 PollSelector::SelectorPollResult PollSelector::poll() {
     const size_t fds_len = pollfds.size();
     bool any = false;
@@ -67,11 +69,11 @@ PollSelector::SelectorPollResult PollSelector::poll() {
         PLOG(ERROR) << "Poll failed";
         return SelectorPollResult::FAILED;
     }
-#define CHECK_AND_INFO(event, index, x) \
-    if ((event) & (x)) {                \
-        LOG(INFO) << #x << " is set";   \
-        pollfds[index].callback();      \
-        any = true;                     \
+#define CHECK_AND_INFO(event, index, x)               \
+    if ((event) & (x)) {                              \
+        if (kPollDebug) LOG(INFO) << #x << " is set"; \
+        pollfds[index].callback();                    \
+        any = true;                                   \
     }
 #define CHECK_AND_WARN(event, x)         \
     if ((event) & (x)) {                 \
@@ -80,9 +82,14 @@ PollSelector::SelectorPollResult PollSelector::poll() {
 
     for (int i = 0; i < pollfds.size(); ++i) {
         const auto revents = pfds[i].revents;
-        DLOG(INFO) << "My fd: " << pollfds[i].poll_fd.fd;
+        if (kPollDebug) {
+            DLOG(INFO) << "My fd: " << pollfds[i].poll_fd.fd;
+        }
+
         if (revents == 0) {
-            DLOG(INFO) << "Nothing is set";
+            if (kPollDebug) {
+                LOG(INFO) << "No events are set";
+            }
             continue;
         }
         CHECK_AND_INFO(revents, i, POLLIN);
@@ -93,8 +100,11 @@ PollSelector::SelectorPollResult PollSelector::poll() {
         CHECK_AND_WARN(revents, POLLNVAL);
         pfds[i].revents = 0;
     }
-    DLOG(INFO) << "Return value: " << rc
-               << ", Callbacks called: " << std::boolalpha << any;
+    if (kPollDebug) {
+        DLOG(INFO) << "Return value: " << rc
+                   << ", Callbacks called: " << std::boolalpha << any;
+    }
+
     if (!any) {
         LOG(WARNING) << "None of the fd returned events";
         return SelectorPollResult::TIMEOUT;
