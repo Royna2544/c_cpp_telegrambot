@@ -124,20 +124,22 @@ static std::optional<std::string> findCommandExe(const std::string &command) {
     return {};
 }
 
-array_helpers::ArrayElem<ProgrammingLangs, std::vector<std::string>> COMPILER(
-    ProgrammingLangs &&lang, std::initializer_list<std::string> &&v) {
-    return array_helpers::make_elem<ProgrammingLangs, std::vector<std::string>>(
+array_helpers::ArrayElem<ProLangs, std::vector<std::string>> COMPILER(
+    ProLangs &&lang, std::initializer_list<std::string> &&v) {
+    return array_helpers::make_elem<ProLangs, std::vector<std::string>>(
         std::move(lang), std::move(v));
 }
 
-bool findCompiler(ProgrammingLangs lang, std::filesystem::path &path) {
+bool findCompiler(ProLangs lang, std::filesystem::path &path) {
     static const auto compilers =
-        array_helpers::make<static_cast<int>(ProgrammingLangs::MAX),
-                            ProgrammingLangs, const std::vector<std::string>>(
-            COMPILER(ProgrammingLangs::C, {"clang", "gcc", "cc"}),
-            COMPILER(ProgrammingLangs::CXX, {"clang++", "g++", "c++"}),
-            COMPILER(ProgrammingLangs::GO, {"go"}),
-            COMPILER(ProgrammingLangs::PYTHON, {"python", "python3"}));
+        array_helpers::make<static_cast<int>(ProLangs::MAX), ProLangs,
+                            const std::vector<std::string>>(
+            COMPILER(ProLangs::C, {"clang-19", "clang-18", "clang-17", "clang",
+                                   "gcc", "cc"}),
+            COMPILER(ProLangs::CXX, {"clang++-19", "clang++-18", "clang++-17",
+                                     "clang++", "g++", "c++"}),
+            COMPILER(ProLangs::GO, {"go"}),
+            COMPILER(ProLangs::PYTHON, {"python", "python3"}));
     for (const auto &options : array_helpers::find(compilers, lang)->second) {
         auto ret = findCommandExe(options);
         if (ret) {

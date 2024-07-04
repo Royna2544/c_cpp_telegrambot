@@ -29,7 +29,7 @@ void GOModuleCallback(const Bot &bot, const Message::Ptr &message,
 void NoCompilerCommandStub(const Bot &bot, const Message::Ptr &message) {
     bot_sendReplyMessage(bot, message, GETSTR(NOT_SUPPORTED_IN_CURRENT_HOST));
 }
-void loadCompilerGeneric(CommandModule &module, ProgrammingLangs lang,
+void loadCompilerGeneric(CommandModule &module, ProLangs lang,
                          std::string_view name,
                          const command_callback_compiler_t &callback) {
     std::filesystem::path compiler;
@@ -52,16 +52,16 @@ void loadCompilerGeneric(CommandModule &module, ProgrammingLangs lang,
 }  // namespace
 
 void loadcmd_c(CommandModule &module) {
-    loadCompilerGeneric(module, ProgrammingLangs::C, "c", CModuleCallback);
+    loadCompilerGeneric(module, ProLangs::C, "c", CModuleCallback);
 }
 void loadcmd_cpp(CommandModule &module) {
-    loadCompilerGeneric(module, ProgrammingLangs::CXX, "cpp",
+    loadCompilerGeneric(module, ProLangs::CXX, "cpp",
                         CPPModuleCallback);
 }
 void loadcmd_python(CommandModule &module) {
-    loadCompilerGeneric(module, ProgrammingLangs::PYTHON, "python",
+    loadCompilerGeneric(module, ProLangs::PYTHON, "python",
                         PYModuleCallback);
 }
 void loadcmd_go(CommandModule &module) {
-    loadCompilerGeneric(module, ProgrammingLangs::GO, "go", GOModuleCallback);
+    loadCompilerGeneric(module, ProLangs::GO, "go", GOModuleCallback);
 }

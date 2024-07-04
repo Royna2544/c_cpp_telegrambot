@@ -148,7 +148,7 @@ struct CompilerInTgHelper {
 constexpr const static inline auto BASH_READ_BUF = (1 << 8);
 constexpr const static inline auto BASH_MAX_BUF = (1 << 10) * 3;
 
-enum class ProgrammingLangs {
+enum class ProLangs {
     C,
     CXX,
     GO,
@@ -163,4 +163,4 @@ enum class ProgrammingLangs {
  * @param path Search result is stored, if found, else untouched
  * @return Whether it have found the compiler path
  */
-bool findCompiler(ProgrammingLangs lang, std::filesystem::path& path);
+bool findCompiler(ProLangs lang, std::filesystem::path& path);
