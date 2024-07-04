@@ -15,6 +15,7 @@ set(STRINGRES_COMPILER ${CMAKE_BINARY_DIR}/bin/StringResCompiler)
 add_custom_command(
   OUTPUT ${STRINGRES_GENHDR}
   DEPENDS ${STRINGRES_COMPILER} ${STRINGRES_XML}
+  COMMAND cmake -E make_directory ${STRINGRES_GENHDR_DIR}
   COMMAND ${STRINGRES_COMPILER} ${STRINGRES_XML} ${STRINGRES_GENHDR}
 )
 add_custom_target(gen_stringres_header
