@@ -1,13 +1,14 @@
 #include "ForkAndRun.hpp"
 
 #include <absl/log/log.h>
+#include <dlfcn.h>
 #include <internal/_FileDescriptor_posix.h>
 #include <sys/wait.h>
 
+#include <csignal>
 #include <cstdlib>
 #include <cstring>
 #include <thread>
-#include <dlfcn.h>
 
 bool ForkAndRun::execute() {
     Pipe stdout_pipe{};
@@ -32,7 +33,7 @@ bool ForkAndRun::execute() {
         Pipe program_termination_pipe{};
         bool breakIt = false;
         int status = 0;
-        
+
         childProcessId = pid;
         close(stdout_pipe.writeEnd());
         close(stderr_pipe.writeEnd());
@@ -109,7 +110,8 @@ void ForkAndRun::cancel() {
     int status = 0;
     waitpid(childProcessId, &status, 0);
     if (WIFSIGNALED(status)) {
-        LOG(INFO) << "Subprocess terminated by signal: " << strsignal(WTERMSIG(status));
+        LOG(INFO) << "Subprocess terminated by signal: "
+                  << strsignal(WTERMSIG(status));
     } else {
         LOG(WARNING) << "Unexpected status: " << status;
     }
