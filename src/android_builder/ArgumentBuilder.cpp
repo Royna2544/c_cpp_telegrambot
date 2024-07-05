@@ -28,11 +28,12 @@ PyObject* ArgumentBuilder::build() {
         PyErr_Print();
         return nullptr;
     }
+    DLOG(INFO) << "Building arguments: size=" << argument_count;
     arguments_ref.reserve(argument_count);
     for (Py_ssize_t i = 0; i < argument_count; ++i) {
         PyObject* value = nullptr;
         std::visit(
-            [&value, &arguments_ref](auto&& arg) {
+            [&value, &arguments_ref, i](auto&& arg) {
                 using T = std::decay_t<decltype(arg)>;
                 if constexpr (std::is_same_v<T, long>) {
                     value = PyLong_FromLong(arg);
@@ -41,6 +42,7 @@ PyObject* ArgumentBuilder::build() {
                     value = PyUnicode_FromString(arg.c_str());
                     arguments_ref.emplace_back(value);
                 }
+                DLOG(INFO) << "Arguments[" << i << "]: " << arg;
             },
             arguments[i]);
         if (value == nullptr) {

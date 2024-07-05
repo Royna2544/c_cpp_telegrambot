@@ -1,10 +1,38 @@
 #pragma once
 
 // Helper class to fork and run a subprocess with stdout/err
-#include <array>
-#include <iostream>
+#include <unistd.h>
 
+#include <array>
+#include <boost/algorithm/string/trim.hpp>
+#include <iostream>
+#include <string_view>
+
+#include "absl/log/log_entry.h"
+#include "absl/log/log_sink.h"
 #include "socket/selector/SelectorPosix.hpp"
+
+struct FDLogSink : public absl::LogSink {
+    void Send(const absl::LogEntry& logSink) override {
+        const auto message = logSink.text_message_with_prefix_and_newline();
+        constexpr std::string_view prefix = "SubProcess: ";
+        if (isWritable && logSink.log_severity() <= absl::LogSeverity::kWarning) {
+            write(stdout_fd, prefix.data(), prefix.size());
+            write(stdout_fd, message.data(), message.size());
+        }
+    }
+    explicit FDLogSink() : stdout_fd(::dup(STDOUT_FILENO)) {
+        if (stdout_fd < 0) {
+            PLOG(ERROR) << "Failed to duplicate stdout";
+            isWritable = false;
+        }
+    }
+    ~FDLogSink() override { ::close(stdout_fd); }
+
+   private:
+    int stdout_fd;
+    bool isWritable = true;
+};
 
 class ForkAndRun {
    public:
@@ -24,9 +52,7 @@ class ForkAndRun {
      *
      * @param buffer The buffer containing the new stdout data.
      */
-    virtual void onNewStdoutBuffer(BufferType& buffer) {
-        std::cout << buffer.data() << std::endl;
-    }
+    virtual void onNewStdoutBuffer(BufferType& buffer) {}
 
     /**
      * @brief Callback function for handling new stderr data.
@@ -38,7 +64,8 @@ class ForkAndRun {
      * @param buffer The buffer containing the new stderr data.
      */
     virtual void onNewStderrBuffer(BufferType& buffer) {
-        std::cerr << buffer.data() << std::endl;
+        std::string lines = buffer.data();
+        std::cerr << boost::trim_copy(lines) << std::endl;
     }
 
     /**
@@ -57,7 +84,9 @@ class ForkAndRun {
      *
      * @param signal The signal that caused the subprocess to exit.
      */
-    virtual void onSignal(int signal) {}
+    virtual void onSignal(int signal) {
+        onExit(signal);
+    }
 
     /**
      * @brief The function to be run in the subprocess.

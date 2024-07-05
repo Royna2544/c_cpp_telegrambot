@@ -36,9 +36,11 @@ class PythonClass : public std::enable_shared_from_this<PythonClass> {
     explicit PythonClass() = default;
 
    public:
+    using Ptr = std::shared_ptr<PythonClass>;
     static std::shared_ptr<PythonClass> get() {
         static PyInitHolder holder;
-        return std::make_shared<PythonClass>(PythonClass());
+        static auto instance = std::make_shared<PythonClass>(PythonClass());
+        return instance;
     }
 
     class ModuleHandle;
@@ -56,6 +58,7 @@ class PythonClass : public std::enable_shared_from_this<PythonClass> {
 
        public:
         friend class ModuleHandle;
+        using Ptr = std::shared_ptr<FunctionHandle>;
         std::string name;  // Logging purposes
         ~FunctionHandle() { Py_XDECREF(function); }
         FunctionHandle(FunctionHandle&& other) noexcept
@@ -65,7 +68,29 @@ class PythonClass : public std::enable_shared_from_this<PythonClass> {
             other.function = nullptr;
         }
 
-        // Manage the arg parameter lifetime yourself
+        /**
+         * Calls the specified Python function with the given arguments.
+         *
+         * @param args The arguments to be passed to the Python function.
+         * @param out A pointer to the variable where the result will be stored.
+         *            If the function returns a value, it will be converted to
+         * the specified type and stored in out. If the function does not return
+         * a value, out can be nullptr.
+         *
+         * @return true If the function call is successful and no error occurs.
+         *         false If an error occurs during the function call.
+         *
+         * @note The caller is responsible for managing the lifetime of the args
+         * parameter.
+         *
+         * @note If an error occurs during the function call, the error message
+         * will be printed to the standard error stream. The caller can retrieve
+         * the error message using PyErr_Print() or PyErr_Fetch().
+         *
+         * @see https://docs.python.org/3/c-api/object.html#c.Py_DECREF
+         * @see https://docs.python.org/3/c-api/exceptions.html#c.PyErr_Print
+         * @see https://docs.python.org/3/c-api/exceptions.html#c.PyErr_Fetch
+         */
         template <typename T>
         bool call(PyObject* args, T* out) {
             LOG(INFO) << "Calling Python function: module "
@@ -80,6 +105,8 @@ class PythonClass : public std::enable_shared_from_this<PythonClass> {
                 LOG(ERROR) << "Failed to call function";
                 return false;
             }
+            // If the function returned a value, convert it to the specified
+            // type and store it in out.
             if constexpr (!std::is_void_v<T>) {
                 T resultC = details::convert<T>(result);
                 if (PyErr_Occurred()) {
@@ -88,6 +115,7 @@ class PythonClass : public std::enable_shared_from_this<PythonClass> {
                     *out = resultC;
                 }
             }
+            DLOG(INFO) << "Call succeeded";
             // Decrement the reference count of the result
             Py_DECREF(result);
             return true;

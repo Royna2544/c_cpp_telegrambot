@@ -1,28 +1,30 @@
 #include <BotClassBase.h>
+#include <BotReplyMessage.h>
 #include <absl/log/log.h>
-#include <math.h>
-#include <sys/sysinfo.h>
 
 #include <ArgumentBuilder.hpp>
 #include <ConfigParsers.hpp>
 #include <ForkAndRun.hpp>
-#include <RepoUtils.hpp>
 #include <boost/algorithm/string/trim.hpp>
 #include <chrono>
+#include <cmath>
 #include <iomanip>
 #include <memory>
 #include <mutex>
 #include <ostream>
-#include <thread>
-#include <utility>
 
-#include "BotReplyMessage.h"
 #include "PerBuildData.hpp"
 #include "PythonClass.hpp"
 #include "internal/_std_chrono_templates.h"
+#include "object.h"
 
 struct ROMBuildTask : ForkAndRun, BotClassBase {
     ~ROMBuildTask() override = default;
+
+    void logErrorAndSave(const std::string& message) const {
+        LOG(ERROR) << "Error during ROM build: " << message;
+        data.result->msg.append(message + "\n");
+    }
 
     /**
      * @brief Runs the function that performs the repository synchronization.
@@ -35,17 +37,15 @@ struct ROMBuildTask : ForkAndRun, BotClassBase {
      * otherwise.
      */
     bool runFunction() override {
-        auto py = PythonClass::get();
-
-        py->addLookupDirectory(data.scriptDirectory);
-        auto repomod = py->importModule("build_rom_utils");
+        data.result->value = PerBuildData::Result::ERROR_FATAL;
+        auto repomod = _py->importModule("build_rom_utils");
         if (!repomod) {
-            LOG(ERROR) << "Failed to import build_rom_utils module";
+            logErrorAndSave("Failed to import build_rom_utils module");
             return false;
         }
         auto build_rom = repomod->lookupFunction("build_rom");
         if (!build_rom) {
-            LOG(ERROR) << "Failed to find build_rom function";
+            logErrorAndSave("Failed to find build_rom function");
             return false;
         }
         ArgumentBuilder builder(4);
@@ -63,28 +63,39 @@ struct ROMBuildTask : ForkAndRun, BotClassBase {
         }
         builder.add_argument(data.rConfig.target);
         builder.add_argument(guessJobCount());
-        bool result = false;
-        if (!build_rom->call<bool>(builder.build(), &result)) {
-            LOG(ERROR) << "Failed to call build ROM";
+        auto* arg = builder.build();
+        if (arg == nullptr) {
+            logErrorAndSave("Failed to build arguments");
+            return false;
         }
+        bool result = false;
+        if (!build_rom->call<bool>(arg, &result)) {
+            logErrorAndSave("Failed to call build ROM");
+            return false;
+        }
+        Py_DECREF(arg);
         if (result) {
             LOG(INFO) << "ROM build succeeded";
+            data.result->value = PerBuildData::Result::SUCCESS;
         } else {
             LOG(ERROR) << "ROM build failed";
         }
-        *data.result = result;
         return result;
     }
 
     int guessJobCount() {
         static std::once_flag once;
         static int jobCount = 6;
+        static constexpr int Multiplier = 1024;
         std::call_once(once, [this] {
             double total_memory = NAN;
             if (!_get_total_mem->call<double>(nullptr, &total_memory)) {
                 return;
             }
-            jobCount = static_cast<int>(sqrt(total_memory / 1024) * 4);
+            total_memory /= Multiplier;  // Convert to GB
+            LOG(INFO) << "Total memory: " << total_memory << "GB";
+            jobCount = static_cast<int>(sqrt(total_memory) * 2);
+            LOG(INFO) << "Using job count: " << jobCount;
         });
         return jobCount;
     }
@@ -108,40 +119,30 @@ struct ROMBuildTask : ForkAndRun, BotClassBase {
             buildInfoBuffer << "Time spent: " << to_string(now - startTime)
                             << std::endl;
             buildInfoBuffer << "Last updated on: " << fromTP(now) << std::endl;
-            buildInfoBuffer << "Target device: " << data.bConfig.device;
+            buildInfoBuffer << "Target device: " << data.bConfig.device << std::endl;
             buildInfoBuffer << "Job count: " << guessJobCount();
             if (_get_used_mem->call(nullptr, &memUsage)) {
                 buildInfoBuffer << ", memory usage: " << memUsage << "%";
+            } else {
+                buildInfoBuffer << ", memory usage: unavailable";
             }
+            buildInfoBuffer << std::endl;
+            buildInfoBuffer << "Variant: ";
             switch (data.bConfig.variant) {
                 case BuildConfig::Variant::kUser:
-                    buildInfoBuffer << ", variant: user";
+                    buildInfoBuffer << "user";
                     break;
                 case BuildConfig::Variant::kUserDebug:
-                    buildInfoBuffer << ", variant: userdebug";
+                    buildInfoBuffer << "userdebug";
                     break;
                 case BuildConfig::Variant::kEng:
-                    buildInfoBuffer << ", variant: eng";
+                    buildInfoBuffer << "eng";
                     break;
             }
             buildInfoBuffer << std::endl << std::endl;
             bot_editMessage(_bot, message,
                             buildInfoBuffer.str() + buffer.data());
         }
-    }
-
-    /**
-     * @brief Handles new standard error data.
-     *
-     * This function is called when new standard error data is available. It
-     * overrides the base class's onNewStderrBuffer() method to provide custom
-     * behavior.
-     *
-     * @param buffer The buffer containing the new standard error data.
-     */
-    void onNewStderrBuffer(ForkAndRun::BufferType& buffer) override {
-        std::string lines = buffer.data();
-        LOG(ERROR) << "onNewStderr: " << boost::trim_copy(lines);
     }
 
     /**
@@ -156,7 +157,6 @@ struct ROMBuildTask : ForkAndRun, BotClassBase {
         std::stringstream exitInfoBuffer;
         exitInfoBuffer << "Exit code: " << exitCode;
         bot_editMessage(_bot, message, exitInfoBuffer.str());
-        *data.result = exitCode == 0;
         LOG(INFO) << "Process exited with code: " << exitCode;
     }
 
@@ -175,8 +175,13 @@ struct ROMBuildTask : ForkAndRun, BotClassBase {
         LOG(WARNING) << "Process received signal: " << signalCode;
     }
 
+    [[noreturn]] static void errorAndThrow(const std::string& message) {
+        LOG(ERROR) << message;
+        throw std::runtime_error(message);
+    }
+
     /**
-     * @brief Constructs a RepoSyncF object with the provided data.
+     * @brief Constructs a ROMBuildTask object with the provided data.
      *
      * This constructor initializes a RepoSyncF object with the given data.
      *
@@ -191,31 +196,29 @@ struct ROMBuildTask : ForkAndRun, BotClassBase {
         clock = std::chrono::system_clock::now();
         startTime = std::chrono::system_clock::now();
 
-        auto c = PythonClass::get();
-        c->addLookupDirectory(data.scriptDirectory);
-        auto repomod = c->importModule("system_info");
+        _py = PythonClass::get();
+        _py->addLookupDirectory(data.scriptDirectory);
+        auto repomod = _py->importModule("system_info");
 
         if (!repomod) {
-            LOG(ERROR) << "Failed to import system_info module";
-            return;
+            errorAndThrow("Failed to import system_info module");
         }
         _get_total_mem = repomod->lookupFunction("get_memory_total");
         if (!_get_total_mem) {
-            LOG(ERROR) << "Failed to find get_memory_total function";
-            return;
+            errorAndThrow("Failed to find get_memory_total function");
         }
         _get_used_mem = repomod->lookupFunction("get_memory_usage");
         if (!_get_used_mem) {
-            LOG(ERROR) << "Failed to find get_memory_usage function";
-            return;
+            errorAndThrow("Failed to find get_memory_usage function");
         }
     }
 
    private:
     PerBuildData data;
     TgBot::Message::Ptr message;
-    std::shared_ptr<PythonClass::FunctionHandle> _get_total_mem;
-    std::shared_ptr<PythonClass::FunctionHandle> _get_used_mem;
+    PythonClass::Ptr _py;
+    PythonClass::FunctionHandle::Ptr _get_total_mem;
+    PythonClass::FunctionHandle::Ptr _get_used_mem;
     decltype(std::chrono::system_clock::now()) clock;
     decltype(std::chrono::system_clock::now()) startTime;
 };

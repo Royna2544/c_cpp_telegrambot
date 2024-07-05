@@ -2,6 +2,7 @@
 #include <unistd.h>
 
 #include <array>
+#include <cerrno>
 
 using pipe_t = std::array<int, 2>;
 
@@ -12,17 +13,22 @@ inline bool isValidFd(int fd) { return fd != kInvalidFD; }
 inline void closeFd(int& fd) {
     int rc = 0;
 
-    if (isValidFd(fd)) rc = close(fd);
+    if (isValidFd(fd)) {
+        rc = close(fd);
+    }
 
-    PLOG_IF(ERROR, rc != 0) << "Failed to close fd: " << fd;
+    PLOG_IF(ERROR, (rc != 0 && errno != EBADF))
+        << "Failed to close fd: " << fd;
     fd = kInvalidFD;
 }
 
 /**
  * @brief A class representing a pipe with two file descriptors.
  *
- * This class represents a pipe with two file descriptors, one for reading and one for writing.
- * It provides methods to check if the pipe is valid, invalidate the pipe, close the pipe, and get the read and write file descriptors.
+ * This class represents a pipe with two file descriptors, one for reading and
+ * one for writing. It provides methods to check if the pipe is valid,
+ * invalidate the pipe, close the pipe, and get the read and write file
+ * descriptors.
  */
 struct Pipe {
     /**
@@ -38,7 +44,8 @@ struct Pipe {
     /**
      * @brief Checks if the pipe is valid.
      *
-     * This method checks if the pipe is valid by verifying if both file descriptors are valid.
+     * This method checks if the pipe is valid by verifying if both file
+     * descriptors are valid.
      *
      * @return True if the pipe is valid, false otherwise.
      */
@@ -49,7 +56,8 @@ struct Pipe {
     /**
      * @brief Invalidates the pipe.
      *
-     * This method invalidates the pipe by setting both file descriptors to an invalid value.
+     * This method invalidates the pipe by setting both file descriptors to an
+     * invalid value.
      */
     void invalidate() {
         underlying[0] = kInvalidFD;
@@ -59,7 +67,8 @@ struct Pipe {
     /**
      * @brief Closes the pipe.
      *
-     * This method closes the pipe by calling the closeFd method on both file descriptors.
+     * This method closes the pipe by calling the closeFd method on both file
+     * descriptors.
      */
     void close() {
         closeFd(underlying[0]);
@@ -69,7 +78,8 @@ struct Pipe {
     /**
      * @brief Creates a pipe.
      *
-     * This method creates a pipe by calling the pipe system call and stores the file descriptors in the underlying array.
+     * This method creates a pipe by calling the pipe system call and stores the
+     * file descriptors in the underlying array.
      *
      * @return True if the pipe is successfully created, false otherwise.
      */
@@ -79,7 +89,7 @@ struct Pipe {
         return rc == 0;
     }
 
-    int operator[] (EndPoint ep) const {
+    int operator[](EndPoint ep) const {
         return underlying[static_cast<size_t>(ep)];
     }
 

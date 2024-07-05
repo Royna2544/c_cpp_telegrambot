@@ -1,34 +1,54 @@
 #include "ForkAndRun.hpp"
 
+#include <Python.h>
 #include <absl/log/log.h>
+#include <absl/log/log_sink_registry.h>
 #include <dlfcn.h>
 #include <internal/_FileDescriptor_posix.h>
 #include <sys/wait.h>
 
 #include <csignal>
 #include <cstdlib>
-#include <cstring>
+#include <string>
 #include <thread>
 
 bool ForkAndRun::execute() {
     Pipe stdout_pipe{};
     Pipe stderr_pipe{};
+    Pipe python_pipe{};
 
-    if (!stderr_pipe.pipe() || !stdout_pipe.pipe()) {
+    if (!stderr_pipe.pipe() || !stdout_pipe.pipe() || !python_pipe.pipe()) {
+        stderr_pipe.close();
+        stdout_pipe.close();
+        python_pipe.close();
         PLOG(ERROR) << "Failed to create pipes";
         return false;
     }
     pid_t pid = fork();
     if (pid == 0) {
+        FDLogSink sink;
+
+        absl::AddLogSink(&sink);
         dup2(stdout_pipe.writeEnd(), STDOUT_FILENO);
         dup2(stderr_pipe.writeEnd(), STDERR_FILENO);
         close(stdout_pipe.readEnd());
         close(stderr_pipe.readEnd());
-        if (runFunction()) {
-            _exit(EXIT_SUCCESS);
-        } else {
-            _exit(EXIT_FAILURE);
-        }
+        close(python_pipe.readEnd());
+
+        PyObject* os = PyImport_ImportModule("os");
+        PyObject* os_environ = PyObject_GetAttrString(os, "environ");
+        PyObject* value = PyUnicode_FromString(
+            std::to_string(python_pipe.writeEnd()).c_str());
+        PyMapping_SetItemString(os_environ, "PYTHON_LOG_FD", value);
+
+        // Clean up
+        Py_DECREF(value);
+        Py_DECREF(os_environ);
+        Py_DECREF(os);
+
+        int ret = runFunction() ? EXIT_SUCCESS : EXIT_FAILURE;
+        absl::RemoveLogSink(&sink);
+        _exit(ret);
     } else if (pid > 0) {
         Pipe program_termination_pipe{};
         bool breakIt = false;
@@ -37,6 +57,7 @@ bool ForkAndRun::execute() {
         childProcessId = pid;
         close(stdout_pipe.writeEnd());
         close(stderr_pipe.writeEnd());
+        close(python_pipe.writeEnd());
         program_termination_pipe.pipe();
 
         selector.add(
@@ -60,6 +81,18 @@ bool ForkAndRun::execute() {
                 if (bytes_read >= 0) {
                     onNewStderrBuffer(buf);
                     buf.fill(0);
+                }
+            },
+            Selector::Mode::READ);
+        selector.add(
+            python_pipe.readEnd(),
+            [&python_pipe] {
+                BufferType buf{};
+                ssize_t bytes_read =
+                    read(python_pipe.readEnd(), buf.data(), buf.size() - 1);
+                if (bytes_read >= 0) {
+                    printf("Python output: ");
+                    fputs(buf.data(), stdout);
                 }
             },
             Selector::Mode::READ);
@@ -93,6 +126,9 @@ bool ForkAndRun::execute() {
         pollThread.join();
 
         // Cleanup
+        selector.remove(stdout_pipe.readEnd());
+        selector.remove(stderr_pipe.readEnd());
+        selector.remove(program_termination_pipe.readEnd());
         program_termination_pipe.close();
         stderr_pipe.close();
         stdout_pipe.close();

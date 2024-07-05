@@ -14,6 +14,7 @@
 #include "PythonClass.hpp"
 #include "cmd_dynamic.h"
 #include "command_modules/CommandModule.h"
+#include "tasks/PerBuildData.hpp"
 
 namespace {
 
@@ -78,54 +79,75 @@ bool parseConfigAndGetTarget(PerBuildData* data, MessageWrapper& wrapper,
 }
 
 bool repoSync(PerBuildData data, MessageWrapper& wrapper) {
-    bool promise{};
-    data.result = &promise;
+    PerBuildData::ResultData result{};
+    data.result = &result;
     RepoSyncTask repoSync(data);
-    if (!repoSync.execute()) {
-        LOG(ERROR) << "Failed to exec";
-        wrapper.sendMessageOnExit("Sync failed: Internal error");
-    } else {
-        if (!promise) {
-            LOG(ERROR) << "Repo sync failed";
-            wrapper.sendMessageOnExit("Repo sync failed");
-        } else {
+    
+    do {
+        bool execRes = repoSync.execute();
+        if (!execRes) {
+            LOG(ERROR) << "Failed to exec";
+            wrapper.sendMessageOnExit(
+                "Repo sync failed: Couldn't start process");
+            return false;
+        }
+    } while (result.value == PerBuildData::Result::ERROR_NONFATAL);
+
+    switch (result.value) {
+        case PerBuildData::Result::SUCCESS:
             wrapper.sendMessageOnExit("Repo sync completed successfully");
             return true;
-        }
+        case PerBuildData::Result::ERROR_FATAL:
+            LOG(ERROR) << "Repo sync failed";
+            wrapper.sendMessageOnExit("Repo sync failed\n:" + result.msg);
+            break;
+        default:
+            break;
     }
     return false;
 }
 
 bool build(PerBuildData data, MessageWrapper& wrapper) {
-    bool promise{};
     static const std::filesystem::path kErrorLogFile = "out/error.log";
     std::error_code ec;
     const auto api = wrapper.getBot().getApi();
+    PerBuildData::ResultData result{};
 
-    data.result = &promise;
+    data.result = &result;
     auto msg = api.sendMessage(wrapper.getChatId(), "Starting build...");
     wrapper.switchToReplyToMessage();
+
     ROMBuildTask romBuild(wrapper.getBot(), msg, data);
-    if (!romBuild.execute()) {
-        LOG(ERROR) << "Failed to exec";
-        wrapper.sendMessageOnExit("Build failed: Couldn't start build process");
-        return false;
-    }
-    if (!promise) {
-        LOG(ERROR) << "Failed to build ROM";
-        wrapper.sendMessageOnExit("Build failed");
-        if (std::filesystem::file_size(kErrorLogFile, ec) != 0U) {
-            api.sendDocument(
-                wrapper.getMessage()->chat->id,
-                TgBot::InputFile::fromFile(kErrorLogFile, "text/plain"));
-        } else {
-            api.sendMessage(wrapper.getMessage()->chat->id,
-                            "Could not send " + kErrorLogFile.string() + ": " +
-                                ec.message());
+
+    do {
+        bool execRes = romBuild.execute();
+        if (!execRes) {
+            LOG(ERROR) << "Failed to exec";
+            wrapper.sendMessageOnExit(
+                "Build failed: Couldn't start build process");
+            return false;
         }
-    } else {
-        wrapper.sendMessageOnExit("Build completed successfully");
-        return true;
+    } while (result.value == PerBuildData::Result::ERROR_NONFATAL);
+
+    switch (result.value) {
+        case PerBuildData::Result::ERROR_FATAL:
+            LOG(ERROR) << "Failed to build ROM";
+            wrapper.sendMessageOnExit("Build failed:\n" + result.msg);
+            if (std::filesystem::file_size(kErrorLogFile, ec) != 0U) {
+                api.sendDocument(
+                    wrapper.getMessage()->chat->id,
+                    TgBot::InputFile::fromFile(kErrorLogFile, "text/plain"));
+            } else {
+                api.sendMessage(wrapper.getMessage()->chat->id,
+                                "Could not send " + kErrorLogFile.string() +
+                                    ": " + ec.message());
+            }
+            break;
+        case PerBuildData::Result::SUCCESS:
+            wrapper.sendMessageOnExit("Build completed successfully");
+            return true;
+        case PerBuildData::Result::ERROR_NONFATAL:
+            break;
     }
     return false;
 }
@@ -164,25 +186,28 @@ static void romBuildCommand(const Bot& bot, const Message::Ptr message) {
         wrapper.sendMessageOnExit("Failed to create build directory");
         return;
     }
-
     std::filesystem::current_path(kBuildDirectory, ec);
+    
     // Sync the repository
     if (!repoSync(PBData, wrapper)) {
         returnToCwd();
         return;
     }
+    
     // Build the ROM
     if (!build(PBData, wrapper)) {
         returnToCwd();
         return;
     }
-    
+
+#if 0
     bot_sendMessage(bot, wrapper.getChatId(), "Will upload");
 
     bool uploadResult = false;
     PBData.result = &uploadResult;
     UploadFileTask uploadTask(wrapper, PBData);
     uploadTask.execute();
+#endif
     returnToCwd();
 }
 

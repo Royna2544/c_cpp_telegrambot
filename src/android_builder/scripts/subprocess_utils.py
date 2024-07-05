@@ -1,8 +1,11 @@
 import subprocess
 import sys
+import print
 
 testing = False
 testingRet = True
+
+print = print.print_fd
 
 def run_command(command: str) -> bool:
     print("Running command: %s" % command)

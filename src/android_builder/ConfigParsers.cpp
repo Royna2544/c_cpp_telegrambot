@@ -2,7 +2,7 @@
 
 #include <absl/log/log.h>
 
-constexpr bool parserDebug = false;
+constexpr bool parserDebug = true;
 
 // Name RomName LocalManifestUrl LocalManifestBranch device variant
 template <>
@@ -44,14 +44,17 @@ std::vector<BuildConfig> parse(std::ifstream data) {
             LOG(INFO) << "LocalManifestBranch: "
                       << config.local_manifest.branch;
             LOG(INFO) << "Device: " << config.device;
-            LOG(INFO) << "Variant: "
-                      << (config.variant == BuildConfig::Variant::kUser
-                              ? "User"
-                              : (config.variant ==
-                                         BuildConfig::Variant::kUserDebug
-                                     ? "UserDebug"
-                                     : "Eng"));
-            LOG(INFO) << "---------------------------";
+            switch (config.variant) {
+                case BuildConfig::Variant::kUser:
+                    LOG(INFO) << "Variant: User";
+                    break;
+                case BuildConfig::Variant::kUserDebug:
+                    LOG(INFO) << "Variant: UserDebug";
+                    break;
+                case BuildConfig::Variant::kEng:
+                    LOG(INFO) << "Variant: Eng";
+                    break;
+            }
             LOG(INFO) << "---------------------------";
         }
         configs.emplace_back(config);
@@ -72,6 +75,13 @@ std::vector<RomConfig> parse(std::ifstream data) {
         splitWithSpaces(line, items);
         if (items.size() != RomConfig::elem_size) {
             LOG(WARNING) << "Skipping invalid line: " << line;
+            if (parserDebug) {
+                LOG(INFO) << "Invalid rom config size: " << items.size();
+                int count = 0;
+                for (const auto& item : items) {
+                    LOG(INFO) << '[' << count << "]=" << item;
+                }
+            }
             continue;
         }
         rom.name = items[RomConfig::indexOf_name];

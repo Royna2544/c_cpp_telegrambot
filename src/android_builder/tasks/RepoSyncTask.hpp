@@ -3,6 +3,69 @@
 #include <RepoUtils.hpp>
 #include "PerBuildData.hpp"
 
+class NewStdErrBufferHook {
+    std::stringstream logMessage;
+
+   protected:
+    bool hadProblems = false;
+    bool hadFatalProblems = false;
+    
+    void errorAndLog(const std::string& message) {
+        LOG(ERROR) << message;
+        logMessage << message << std::endl;
+    }
+
+   public:
+    /**
+     * @brief Virtual method to process each line of stderr buffer.
+     *
+     * This method is intended to be overridden by subclasses to handle specific
+     * processing logic for stderr lines.
+     *
+     * @param line A single line of text from the stderr buffer.
+     * @return A boolean value indicating whether the hook processed the line.
+     *
+     * @note This method is called for each line of stderr output during the
+     * execution of the task.
+     *
+     * @note Subclasses should override this method to implement their own
+     * processing logic.
+     */
+    virtual bool process(const std::string& line) = 0;
+
+    [[nodiscard]] std::string getLogMessage() const noexcept {
+        return logMessage.str();
+    }
+    [[nodiscard]] bool hasProblems() const noexcept {
+        return hadProblems;
+    }
+    [[nodiscard]] bool hasFatalProblems() const noexcept {
+        return hadProblems && hadFatalProblems;
+    }
+    virtual ~NewStdErrBufferHook() = default;
+};
+
+class RepoSyncLocalHook : public NewStdErrBufferHook {
+    static constexpr std::string_view kUpdatingFiles = "Updating files:";
+    static constexpr std::string_view kChangesWouldBeLost =
+        "error: Your local changes to the following files would be overwritten "
+        "by checkout:";
+    static constexpr std::string_view kRepoCheckoutFailStart = "Failing repos:";
+    static constexpr std::string_view kRepoCheckoutFailEnd =
+        "Try re-running with \"-j1 --fail-fast\" to exit at the first error.";
+
+    bool hasCheckoutIssues = false;
+   public:
+    bool process(const std::string& line) override;
+    ~RepoSyncLocalHook() override = default;
+};
+
+class RepoSyncNetworkHook : public NewStdErrBufferHook {
+   public:
+    bool process(const std::string& line) override;
+    ~RepoSyncNetworkHook() override = default;
+};
+
 struct RepoSyncTask : ForkAndRun {
     constexpr static std::string_view kLocalManifestPath =
         ".repo/local_manifests";
@@ -18,18 +81,7 @@ struct RepoSyncTask : ForkAndRun {
      * otherwise.
      */
     bool runFunction() override;
-
-    /**
-     * @brief Handles new standard output data.
-     *
-     * This function is called when new standard output data is available. It
-     * overrides the base class's onNewStdoutBuffer() method to provide custom
-     * behavior.
-     *
-     * @param buffer The buffer containing the new standard output data.
-     */
-    void onNewStdoutBuffer(ForkAndRun::BufferType& buffer) override;
-
+    
     /**
      * @brief Handles new standard error data.
      *
@@ -74,4 +126,8 @@ struct RepoSyncTask : ForkAndRun {
    private:
     PerBuildData data;
     std::atomic_bool networkSyncError = false;
+    std::atomic_bool localSyncError = false;
+    
+    RepoSyncLocalHook localHook;
+    RepoSyncNetworkHook networkHook;
 };

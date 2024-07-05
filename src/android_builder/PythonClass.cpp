@@ -2,23 +2,35 @@
 
 #include <absl/log/log.h>
 
+#include <limits>
 #include <memory>
-#include <optional>
 
 namespace details {
 
 template <>
 bool convert<bool>(PyObject* value) {
+    if (!PyBool_Check(value)) {
+        LOG(ERROR) << "Invalid boolean value: expected boolean object";
+        return std::numeric_limits<bool>::min();
+    }
     return PyObject_IsTrue(value) == 1;
 }
 
 template <>
 long convert<long>(PyObject* value) {
+    if (!PyLong_Check(value)) {
+        LOG(ERROR) << "Invalid integer value: expected integer object";
+        return std::numeric_limits<long>::min();
+    }
     return PyLong_AsLong(value);
 }
 
 template <>
 double convert<double>(PyObject* value) {
+    if (!PyFloat_Check(value)) {
+        LOG(ERROR) << "Invalid float value: expected float object";
+        return std::numeric_limits<double>::quiet_NaN();
+    }
     return PyFloat_AsDouble(value);
 }
 
