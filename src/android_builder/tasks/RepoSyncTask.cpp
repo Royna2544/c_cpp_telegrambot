@@ -1,5 +1,6 @@
 #include "RepoSyncTask.hpp"
 
+#include <filesystem>
 #include <iostream>
 #include <regex>
 #include <string>
@@ -99,12 +100,18 @@ class RepoSyncLocalHook : public NewStdErrBufferHook {
         }
 
         if (hasCheckoutIssues) {
+            std::error_code ec;
             if (line.find(kRepoCheckoutFailEnd) != std::string::npos) {
                 // Clear the flag
                 hasCheckoutIssues = false;
                 return Action::kErrorLocalIssue;
             }
             LOG(INFO) << "Repo sync failed directory: " << line;
+            std::filesystem::remove_all(line, ec);
+            if (ec) {
+                LOG(ERROR) << "Failed to remove directory: " << line
+                           << ", error: " << ec.message();
+            }
             return Action::kErrorLocalIssue;
         }
         return Action::kPass;
