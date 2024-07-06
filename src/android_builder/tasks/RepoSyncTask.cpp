@@ -1,13 +1,113 @@
 #include "RepoSyncTask.hpp"
 
+#include <git2.h>
+
 #include <filesystem>
+#include <functional>
 #include <iostream>
 #include <regex>
 #include <stdexcept>
 #include <string>
 #include <thread>
 
+#include "CStringLifetime.h"
 #include "tasks/PerBuildData.hpp"
+
+namespace {
+
+struct RAIIGit {
+    std::vector<std::function<void(void)>> cleanups;
+    void addCleanup(std::function<void(void)> cleanupFn) {
+        cleanups.emplace_back(cleanupFn);
+    }
+    RAIIGit() { git_libgit2_init(); }
+    ~RAIIGit() {
+        for (auto& cleanup : cleanups) {
+            cleanup();
+        }
+        git_libgit2_shutdown();
+    }
+};
+
+// Determine if the repository contains same url as the data, and try to match
+// it
+bool tryToMakeItMine(const PerBuildData& data) {
+    RAIIGit raii;
+    const auto git_error_last_str = [] { return git_error_last()->message; };
+    int ret = 0;
+
+    git_repository* repo = nullptr;
+    git_reference* head_ref = nullptr;
+    const char* current_branch = nullptr;
+    git_object* treeish = nullptr;
+    git_remote* remote = nullptr;
+    const char* remote_url = nullptr;
+
+    ret = git_repository_open(&repo, RepoSyncTask::kLocalManifestPath.data());
+    if (ret != 0) {
+        LOG(ERROR) << "Failed to open repository";
+        return false;
+    }
+    raii.addCleanup([repo] { git_repository_free(repo); });
+
+    ret = git_remote_lookup(&remote, repo, "origin");
+    if (ret != 0) {
+        LOG(ERROR) << "Failed to lookup remote origin";
+        return false;
+    }
+    raii.addCleanup([remote] { git_remote_free(remote); });
+
+    remote_url = git_remote_url(remote);
+    if (remote_url == nullptr) {
+        LOG(ERROR) << "Remote origin URL is null";
+        return false;
+    }
+    LOG(INFO) << "Remote origin URL: " << remote_url;
+
+    if (remote_url != data.bConfig.local_manifest.url) {
+        LOG(INFO) << "Repository URL doesn't match, ignoring";
+        return false;
+    }
+
+    ret = git_repository_head(&head_ref, repo);
+    if (ret != 0) {
+        LOG(ERROR) << "Failed to get HEAD reference";
+        return false;
+    }
+    raii.addCleanup([head_ref] { git_reference_free(head_ref); });
+
+    current_branch = git_reference_shorthand(head_ref);
+    LOG(INFO) << "Current branch: " << current_branch;
+    CStringLifetime branch_name = data.bConfig.local_manifest.branch;
+
+    if (data.bConfig.local_manifest.branch != current_branch) {
+        LOG(INFO) << "Switching to branch: "
+                  << data.bConfig.local_manifest.branch;
+
+        ret = git_revparse_single(&treeish, repo, branch_name);
+        if (ret != 0) {
+            LOG(ERROR) << "Failed to find the branch";
+            return false;
+        }
+        raii.addCleanup([treeish] { git_object_free(treeish); });
+
+        ret = git_checkout_tree(repo, treeish, nullptr);
+        if (ret != 0) {
+            LOG(ERROR) << "Failed to checkout tree";
+            return false;
+        }
+        ret = git_repository_set_head(
+            repo, ("refs/heads/" + std::string(branch_name)).c_str());
+        if (ret != 0) {
+            LOG(ERROR) << "Failed to set HEAD";
+            return false;
+        }
+    } else {
+        LOG(INFO) << "Already on the desired branch";
+    }
+    return true;
+}
+}  // namespace
 
 bool RepoSyncLocalHook::process(const std::string& line) {
     if (line.find(kUpdatingFiles) != std::string::npos) {
@@ -69,7 +169,14 @@ bool RepoSyncTask::runFunction() {
             utils.git_clone(data.bConfig.local_manifest,
                             kLocalManifestPath.data());
         } else {
-            LOG(INFO) << "Local manifest exists, skipping";
+            LOG(INFO) << "Local manifest exists already...";
+            if (tryToMakeItMine(data)) {
+                LOG(INFO) << "Repo is up-to-date.";
+            } else {
+                LOG(ERROR)
+                    << "Repo sync not possible: local manifest is not mine";
+                return false;
+            }
         }
         try {
             utils.repo_sync(std::thread::hardware_concurrency());
@@ -112,6 +219,9 @@ void RepoSyncTask::onExit(int exitCode) {
     } else if (networkHook.hasProblems()) {
         data.result->setMessage(networkHook.getLogMessage());
         data.result->value = PerBuildData::Result::ERROR_NONFATAL;
+    } else if (exitCode != 0) {
+        data.result->value = PerBuildData::Result::ERROR_FATAL;
+        data.result->setMessage("Repo sync failed");
     } else {
         data.result->value = PerBuildData::Result::SUCCESS;
         data.result->setMessage("Repo sync successful");
