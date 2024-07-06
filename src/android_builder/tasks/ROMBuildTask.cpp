@@ -109,8 +109,9 @@ void ROMBuildTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
         buildInfoBuffer << "Time spent: " << to_string(now - startTime)
                         << std::endl;
         buildInfoBuffer << "Last updated on: " << fromTP(now) << std::endl;
-        buildInfoBuffer << "Target device: " << data.bConfig.device
-                        << std::endl;
+        buildInfoBuffer << "Target ROM: " << data.rConfig.name
+                        << " branch: " << data.rConfig.branch;
+        buildInfoBuffer << "Target device: " << data.bConfig.device << std::endl;
         buildInfoBuffer << "Job count: " << guessJobCount();
         if (_get_used_mem->call(nullptr, &memUsage)) {
             buildInfoBuffer << ", memory usage: " << memUsage << "%";
