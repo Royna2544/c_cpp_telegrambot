@@ -39,7 +39,7 @@ class PythonClass : public std::enable_shared_from_this<PythonClass> {
         PyInitHolder() { Py_Initialize(); }
         ~PyInitHolder() { Py_Finalize(); }
     };
-    explicit PythonClass() : mainPyThreadState(PyThreadState_Get()) {}
+    explicit PythonClass() = default;
 
    public:
     using Ptr = std::shared_ptr<PythonClass>;
@@ -171,6 +171,4 @@ class PythonClass : public std::enable_shared_from_this<PythonClass> {
      */
     bool addLookupDirectory(const std::filesystem::path& directory);
     std::shared_ptr<ModuleHandle> importModule(const std::string& name);
-    
-    PyThreadState *mainPyThreadState {};
 };

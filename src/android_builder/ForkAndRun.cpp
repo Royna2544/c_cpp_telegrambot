@@ -22,7 +22,6 @@ bool ForkAndRun::execute() {
     Pipe stdout_pipe{};
     Pipe stderr_pipe{};
     Pipe python_pipe{};
-    auto* mainTS = PythonClass::get()->mainPyThreadState;
 
     if (!stderr_pipe.pipe() || !stdout_pipe.pipe() || !python_pipe.pipe()) {
         stderr_pipe.close();
@@ -32,13 +31,10 @@ bool ForkAndRun::execute() {
         return false;
     }
 
-    PyEval_SaveThread();
+    auto* mainTS = PyEval_SaveThread();
     pid_t pid = fork();
     if (pid == 0) {
         FDLogSink sink;
-        auto* ts = PyThreadState_New(mainTS->interp);
-        PyEval_AcquireThread(ts);
-
         absl::AddLogSink(&sink);
         dup2(stdout_pipe.writeEnd(), STDOUT_FILENO);
         dup2(stderr_pipe.writeEnd(), STDERR_FILENO);
@@ -46,26 +42,30 @@ bool ForkAndRun::execute() {
         close(stderr_pipe.readEnd());
         close(python_pipe.readEnd());
 
-        PyObject* os = PyImport_ImportModule("os");
-        PyObject* os_environ = PyObject_GetAttrString(os, "environ");
-        PyObject* value = PyUnicode_FromString(
-            std::to_string(python_pipe.writeEnd()).c_str());
-        PyMapping_SetItemString(os_environ, "PYTHON_LOG_FD", value);
-
-        // Clean up
-        Py_DECREF(value);
-        Py_DECREF(os_environ);
-        Py_DECREF(os);
-
         // Clear handlers
         signal(SIGINT, [](int) {});
         signal(SIGTERM, [](int) {});
 
-        int ret = runFunction() ? EXIT_SUCCESS : EXIT_FAILURE;
+        // Append PYTHON LOG FD
+        PyEval_RestoreThread(mainTS);
+        {
+            GILStateManagement _gil;
+            PyObject* os = PyImport_ImportModule("os");
+            PyObject* os_environ = PyObject_GetAttrString(os, "environ");
+            PyObject* value = PyUnicode_FromString(
+                std::to_string(python_pipe.writeEnd()).c_str());
+            PyMapping_SetItemString(os_environ, "PYTHON_LOG_FD", value);
+
+            // Clean up
+            Py_DECREF(value);
+            Py_DECREF(os_environ);
+            Py_DECREF(os);
+        }
+
+        int ret = 0;
+        ret = runFunction() ? EXIT_SUCCESS : EXIT_FAILURE;
+        PyEval_SaveThread();
         absl::RemoveLogSink(&sink);
-        PyThreadState_Clear(ts);
-        PyThreadState_Swap(nullptr);  // Ensure the current thread state is NULL
-        PyThreadState_Delete(ts);
         _exit(ret);
     } else if (pid > 0) {
         Pipe program_termination_pipe{};
