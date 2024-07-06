@@ -1,5 +1,23 @@
 import os
 
+def get_logfd() -> int:
+    """
+    This function retrieves the file descriptor for logging.
+
+    Returns:
+    int: The file descriptor for logging.
+
+    Raises:
+    OSError: If the environment variable 'PYTHON_LOG_FD' is not set or cannot be converted to an integer.
+    """
+    try:
+        logfd = int(os.environ['PYTHON_LOG_FD'])
+        return logfd
+    except KeyError:
+        raise OSError("Environment variable 'PYTHON_LOG_FD' not set")
+    except ValueError:
+        raise OSError("Invalid value for environment variable 'PYTHON_LOG_FD'")
+
 def custom_print(*args, **kwargs):
     """
     This function prints the provided arguments to a file descriptor specified by the environment variable 'PYTHON_LOG_FD'.
@@ -16,7 +34,7 @@ def custom_print(*args, **kwargs):
     Raises:
     OSError: If the file descriptor is invalid or not open for writing.
     """
-    logfd = int(os.environ['PYTHON_LOG_FD'])
+    logfd = get_logfd()
 
     # Get kwargs or set default values
     sep = kwargs.get('sep', ' ')

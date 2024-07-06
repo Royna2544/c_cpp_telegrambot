@@ -1,4 +1,5 @@
 import subprocess_utils
+import subprocess
 import os
 import custom_print
 
@@ -20,13 +21,23 @@ def find_vendor_str() -> str:
 
 def build_rom(device: str, variant: str, target: str, jobs: int) -> bool:
     vendor = find_vendor_str()
+    success = False
+    
     if vendor is None:
         print('Couldn\'t find vendor')
         return False
     
-    command_list = [
-        '. build/envsetup.sh',
-        f'lunch {vendor}_{device}-{variant}',
-        f'm {target} -j{jobs}'
-    ]
-    return subprocess_utils.run_command(' && '.join(command_list))
+    shell_process = subprocess.Popen(['bash'], stdin=subprocess.PIPE, text=True)
+    print('Writing . build/envsetup.sh')
+    shell_process.stdin.write('. build/envsetup.sh\n')
+    print(f'Writing lunch {vendor}_{device}-{variant}')
+    shell_process.stdin.write(f'lunch {vendor}_{device}-{variant}\n')
+    print(f'Writing m {target} -j{jobs}')
+    shell_process.stdin.write(f'm {target} -j{jobs}\n')
+    shell_process.stdin.flush()
+    shell_process.stdin.close()
+    print('Now waiting...')
+    shell_process.wait()
+    success = shell_process.returncode == 0
+
+    return success
