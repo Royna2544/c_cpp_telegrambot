@@ -50,8 +50,8 @@ bool ForkAndRun::execute() {
         Py_DECREF(os);
 
         // Clear handlers
-        signal(SIGINT, [](int){});
-        signal(SIGTERM, [](int){});
+        signal(SIGINT, [](int) {});
+        signal(SIGTERM, [](int) {});
 
         int ret = runFunction() ? EXIT_SUCCESS : EXIT_FAILURE;
         absl::RemoveLogSink(&sink);
@@ -63,8 +63,7 @@ bool ForkAndRun::execute() {
         random_return_type token = RandomNumberGenerator::generate(100);
         auto tregi = OnTerminateRegistrar::getInstance();
 
-        tregi->registerCallback(
-            [this](int sig) { cancel(); }, token);
+        tregi->registerCallback([this](int sig) { cancel(); }, token);
 
         childProcessId = pid;
         close(stdout_pipe.writeEnd());
@@ -98,7 +97,7 @@ bool ForkAndRun::execute() {
             Selector::Mode::READ);
         selector.add(
             python_pipe.readEnd(),
-            [&python_pipe] {
+            [python_pipe] {
                 BufferType buf{};
                 ssize_t bytes_read =
                     read(python_pipe.readEnd(), buf.data(), buf.size() - 1);
