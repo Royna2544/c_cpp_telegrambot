@@ -151,7 +151,6 @@
     <ClCompile Include="BlockingOperation.cpp" />
     <ClCompile Include="DestinationIP.cpp" />
     <ClCompile Include="DownloadFile.cpp" />
-    <ClCompile Include="nullguard.cpp" />
     <ClCompile Include="SendFileToChat.cpp" />
     <ClCompile Include="SendMessageToChat.cpp" />
     <ClCompile Include="TgBotClient.cpp" />

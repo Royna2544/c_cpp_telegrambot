@@ -50,9 +50,6 @@
     <ClCompile Include="TgBotSocketIntf.cpp">
       <Filter>Source File</Filter>
     </ClCompile>
-    <ClCompile Include="nullguard.cpp">
-      <Filter>Source File</Filter>
-    </ClCompile>
     <ClCompile Include="SendMessageToChat.cpp">
       <Filter>Source File\ui</Filter>
     </ClCompile>
