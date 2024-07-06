@@ -2,7 +2,7 @@ import subprocess
 import sys
 import custom_print
 
-testing = True
+testing = False
 testingRet = True
 
 print = custom_print.custom_print

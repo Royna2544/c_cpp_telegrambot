@@ -2,7 +2,7 @@
 
 #include <absl/log/log.h>
 
-constexpr bool parserDebug = true;
+constexpr bool parserDebug = false;
 
 // Name RomName LocalManifestUrl LocalManifestBranch device variant
 template <>
