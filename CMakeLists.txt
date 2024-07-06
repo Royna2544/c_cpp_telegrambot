@@ -137,8 +137,6 @@ set(SRC_LIST
   src/command_modules/compiler/Generic.cpp
   src/command_modules/compiler/Helper.cpp
   src/database/bot/TgBotDatabaseImpl.cpp
-  src/libos/libsighandler_impl.cpp
-  src/libos/libsighandler_${TARGET_VARIANT}.cpp
   src/popen_wdt/popen_wdt.c
   src/popen_wdt/popen_wdt_${TARGET_VARIANT}.c
   src/random/RandomNumberGenerator.cpp

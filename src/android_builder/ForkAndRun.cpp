@@ -9,8 +9,11 @@
 
 #include <csignal>
 #include <cstdlib>
+#include <libos/OnTerminateRegistrar.hpp>
 #include <string>
 #include <thread>
+
+#include "random/RandomNumberGenerator.h"
 
 bool ForkAndRun::execute() {
     Pipe stdout_pipe{};
@@ -46,6 +49,10 @@ bool ForkAndRun::execute() {
         Py_DECREF(os_environ);
         Py_DECREF(os);
 
+        // Clear handlers
+        signal(SIGINT, [](int){});
+        signal(SIGTERM, [](int){});
+
         int ret = runFunction() ? EXIT_SUCCESS : EXIT_FAILURE;
         absl::RemoveLogSink(&sink);
         _exit(ret);
@@ -53,6 +60,11 @@ bool ForkAndRun::execute() {
         Pipe program_termination_pipe{};
         bool breakIt = false;
         int status = 0;
+        random_return_type token = RandomNumberGenerator::generate(100);
+        auto tregi = OnTerminateRegistrar::getInstance();
+
+        tregi->registerCallback(
+            [this](int sig) { cancel(); }, token);
 
         childProcessId = pid;
         close(stdout_pipe.writeEnd());
@@ -132,6 +144,8 @@ bool ForkAndRun::execute() {
         program_termination_pipe.close();
         stderr_pipe.close();
         stdout_pipe.close();
+        python_pipe.close();
+        tregi->unregisterCallback(token);
     } else {
         PLOG(ERROR) << "Unable to fork";
     }

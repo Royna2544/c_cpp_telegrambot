@@ -8,6 +8,8 @@ add_library_san(
   src/ConfigManager.cpp
   src/ConfigManager_${TARGET_VARIANT}.cpp
   src/GitData.cpp
+  src/libos/libsighandler_impl.cpp
+  src/libos/libsighandler_${TARGET_VARIANT}.cpp
   src/libos/libfs.cpp
   src/libos/libfs_${TARGET_VARIANT}.cpp)
 

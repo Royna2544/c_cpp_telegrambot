@@ -2,6 +2,8 @@
 
 using exit_handler_t = void (*)(int);
 
+constexpr int invalidSignal = -1;
+
 /**
  * installSignalHandler - install the default signal handler
  * Signal handler is the function that is called after signal event
@@ -17,6 +19,4 @@ void installSignalHandler();
  * @param sig signal number
  */
 extern void defaultSignalHandler(int sig);
-extern void defaultCleanupFunction();
-
-constexpr int invalidSignal = -1;
+extern void defaultCleanupFunction(int bySignal = invalidSignal);

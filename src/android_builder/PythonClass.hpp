@@ -27,6 +27,12 @@ std::vector<int> convert<std::vector<int>>(PyObject* value);
 
 }  // namespace details
 
+struct GILStateManagement {
+    GILStateManagement() : gstate(PyGILState_Ensure()) {}
+    ~GILStateManagement() { PyGILState_Release(gstate); }
+    PyGILState_STATE gstate;
+};
+
 class PythonClass : public std::enable_shared_from_this<PythonClass> {
     // Declare a class to hold Py_init functions
     struct PyInitHolder {
@@ -93,6 +99,7 @@ class PythonClass : public std::enable_shared_from_this<PythonClass> {
          */
         template <typename T>
         bool call(PyObject* args, T* out) {
+            GILStateManagement _;
             LOG(INFO) << "Calling Python function: module "
                       << moduleHandle->name << " function: " << name;
 

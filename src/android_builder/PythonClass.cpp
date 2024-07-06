@@ -67,6 +67,8 @@ std::vector<long> convert<std::vector<long>>(PyObject* value) {
 }  // namespace details
 
 bool PythonClass::addLookupDirectory(const std::filesystem::path& directory) {
+    GILStateManagement _;
+
     // Get the sys.path list from Python interpreter
     PyObject* sysPath = PySys_GetObject("path");
 
@@ -87,6 +89,8 @@ bool PythonClass::addLookupDirectory(const std::filesystem::path& directory) {
 
 std::shared_ptr<PythonClass::ModuleHandle> PythonClass::importModule(
     const std::string& name) {
+    GILStateManagement _;
+
     // Import the specified module
     PyObject* module = PyImport_ImportModule(name.c_str());
 
@@ -102,6 +106,8 @@ std::shared_ptr<PythonClass::ModuleHandle> PythonClass::importModule(
 
 std::shared_ptr<PythonClass::FunctionHandle>
 PythonClass::ModuleHandle::lookupFunction(const std::string& name) {
+    GILStateManagement _;
+    
     // Get the specified function from the current module
     PyObject* function = PyObject_GetAttrString(module, name.c_str());
 

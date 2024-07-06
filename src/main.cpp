@@ -189,6 +189,7 @@ void initLogging() {
 
 void createAndDoInitCallAll(TgBot::Bot& gBot) {
     constexpr int kWebServerListenPort = 8080;
+
     createAndDoInitCall<StringResManager>();
     createAndDoInitCall<TgBotWebServer, ThreadManager::Usage::WEBSERVER_THREAD>(
         kWebServerListenPort);
@@ -208,6 +209,10 @@ void createAndDoInitCallAll(TgBot::Bot& gBot) {
     createAndDoInitCall<TgBotDatabaseImpl>();
     // Must be last
     createAndDoInitCall<OnAnyMessageRegisterer>(gBot);
+    // Must be last
+    OnTerminateRegistrar::getInstance()->registerCallback([](int sig) {
+        ThreadManager::getInstance()->destroyManager();
+    });
 }
 
 void onBotInitialized(TgBot::Bot& gBot, DurationPoint& startupDp,

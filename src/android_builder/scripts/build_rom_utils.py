@@ -1,8 +1,8 @@
 import subprocess_utils
 import os
-import print
+import custom_print
 
-print = print.print_fd
+print = custom_print.custom_print
 
 def find_vendor_str() -> str:
     vendor_path = 'vendor/'

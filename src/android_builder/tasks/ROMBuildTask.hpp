@@ -8,8 +8,6 @@
 #include <boost/algorithm/string/trim.hpp>
 #include <chrono>
 #include <cmath>
-#include <iomanip>
-#include <memory>
 #include <mutex>
 #include <ostream>
 

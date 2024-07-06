@@ -2,6 +2,7 @@
 
 #include <database/ProtobufDatabase.hpp>
 #include <database/SQLiteDatabase.hpp>
+#include <libos/OnTerminateRegistrar.hpp>
 #include <variant>
 
 #include "InstanceClassBase.hpp"
@@ -24,7 +25,7 @@ struct TgBotDatabaseImpl : InstanceClassBase<TgBotDatabaseImpl>, InitCall {
     [[nodiscard]] std::optional<UserId> getOwnerUserId() const;
     [[nodiscard]] std::optional<DatabaseBase::MediaInfo> queryMediaInfo(
         std::string str) const;
-    [[nodiscard]] bool addMediaInfo(const DatabaseBase::MediaInfo& info) const;
+    [[nodiscard]] bool addMediaInfo(const DatabaseBase::MediaInfo &info) const;
     std::ostream &dump(std::ostream &ofs) const;
     void setOwnerUserId(UserId userid) const;
     [[nodiscard]] bool addChatInfo(const ChatId chatid,
@@ -37,6 +38,8 @@ struct TgBotDatabaseImpl : InstanceClassBase<TgBotDatabaseImpl>, InitCall {
     }
     void doInitCall() override {
         loadDBFromConfig();
+        OnTerminateRegistrar::getInstance()->registerCallback(
+            [this](int) { unloadDatabase(); });
     }
 
    private:
