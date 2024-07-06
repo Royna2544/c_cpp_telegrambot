@@ -15,12 +15,14 @@
 #include <optional>
 #include <thread>
 
+#include "PythonClass.hpp"
 #include "random/RandomNumberGenerator.h"
 
 bool ForkAndRun::execute() {
     Pipe stdout_pipe{};
     Pipe stderr_pipe{};
     Pipe python_pipe{};
+    auto* mainTS = PythonClass::get()->mainPyThreadState;
 
     if (!stderr_pipe.pipe() || !stdout_pipe.pipe() || !python_pipe.pipe()) {
         stderr_pipe.close();
@@ -29,9 +31,13 @@ bool ForkAndRun::execute() {
         PLOG(ERROR) << "Failed to create pipes";
         return false;
     }
+
+    PyEval_SaveThread();
     pid_t pid = fork();
     if (pid == 0) {
         FDLogSink sink;
+        auto* ts = PyThreadState_New(mainTS->interp);
+        PyEval_AcquireThread(ts);
 
         absl::AddLogSink(&sink);
         dup2(stdout_pipe.writeEnd(), STDOUT_FILENO);
@@ -57,6 +63,9 @@ bool ForkAndRun::execute() {
 
         int ret = runFunction() ? EXIT_SUCCESS : EXIT_FAILURE;
         absl::RemoveLogSink(&sink);
+        PyThreadState_Clear(ts);
+        PyThreadState_Swap(nullptr);  // Ensure the current thread state is NULL
+        PyThreadState_Delete(ts);
         _exit(ret);
     } else if (pid > 0) {
         Pipe program_termination_pipe{};
@@ -134,6 +143,8 @@ bool ForkAndRun::execute() {
             LOG(WARNING) << "Unknown program termination: " << status;
             onExit(0);
         }
+
+        PyEval_RestoreThread(mainTS);
         // Notify the polling thread that program has ended.
         write(program_termination_pipe.writeEnd(), &status, sizeof(status));
         pollThread.join();
