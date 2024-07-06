@@ -221,7 +221,7 @@ include(cmake/tgbotutils.cmake)
 #####################################################################
 
 ################# Android ROM builder with C++/Python #################
-if (UNIX)
+if (UNIX AND NOT APPLE)
   include(src/android_builder/builder.cmake)
 endif()
 #####################################################################

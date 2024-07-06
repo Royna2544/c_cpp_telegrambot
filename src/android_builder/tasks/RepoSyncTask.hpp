@@ -42,6 +42,11 @@ class NewStdErrBufferHook {
     [[nodiscard]] bool hasFatalProblems() const noexcept {
         return hadProblems && hadFatalProblems;
     }
+    void clearProblems() noexcept {
+        hadProblems = false;
+        hadFatalProblems = false;
+        logMessage.str("");
+    }
     virtual ~NewStdErrBufferHook() = default;
 };
 
@@ -125,8 +130,6 @@ struct RepoSyncTask : ForkAndRun {
 
    private:
     PerBuildData data;
-    std::atomic_bool networkSyncError = false;
-    std::atomic_bool localSyncError = false;
     
     RepoSyncLocalHook localHook;
     RepoSyncNetworkHook networkHook;

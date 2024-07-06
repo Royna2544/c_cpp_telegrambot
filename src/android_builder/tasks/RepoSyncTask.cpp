@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <iostream>
 #include <regex>
+#include <stdexcept>
 #include <string>
 #include <thread>
 
@@ -70,11 +71,10 @@ bool RepoSyncTask::runFunction() {
         } else {
             LOG(INFO) << "Local manifest exists, skipping";
         }
-        utils.repo_sync(std::thread::hardware_concurrency());
-        // If network sync error occurs, the flag is immediately set but this
-        // repo sync will end later, so it's enough to make it atomic bool.
-        if (networkSyncError) {
-            // Let's hope no one is building in dual core cpu.
+        try {
+            utils.repo_sync(std::thread::hardware_concurrency());
+        } catch (const std::runtime_error& e) {
+            // Try with lower job count
             utils.repo_sync(std::thread::hardware_concurrency() / 4);
         }
     } catch (const std::exception& e) {
@@ -105,17 +105,19 @@ void RepoSyncTask::onNewStderrBuffer(ForkAndRun::BufferType& buffer) {
 void RepoSyncTask::onExit(int exitCode) {
     LOG(INFO) << "Repo sync exited with code: " << exitCode;
     if (localHook.hasProblems()) {
-        data.result->msg = localHook.getLogMessage();
+        data.result->setMessage(localHook.getLogMessage());
         data.result->value = localHook.hasFatalProblems()
                                  ? PerBuildData::Result::ERROR_FATAL
                                  : PerBuildData::Result::ERROR_NONFATAL;
     } else if (networkHook.hasProblems()) {
-        data.result->msg = networkHook.getLogMessage();
+        data.result->setMessage(networkHook.getLogMessage());
         data.result->value = PerBuildData::Result::ERROR_NONFATAL;
     } else {
         data.result->value = PerBuildData::Result::SUCCESS;
-        data.result->msg = "Repo sync successful";
+        data.result->setMessage("Repo sync successful");
     }
+    localHook.clearProblems();
+    networkHook.clearProblems();
 }
 
 void RepoSyncTask::onSignal(int signalCode) {

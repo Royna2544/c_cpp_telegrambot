@@ -1,6 +1,7 @@
 #pragma once
 
 // Helper class to fork and run a subprocess with stdout/err
+#include <sys/types.h>
 #include <unistd.h>
 
 #include <array>
@@ -16,7 +17,8 @@ struct FDLogSink : public absl::LogSink {
     void Send(const absl::LogEntry& logSink) override {
         const auto message = logSink.text_message_with_prefix_and_newline();
         constexpr std::string_view prefix = "SubProcess: ";
-        if (isWritable && logSink.log_severity() <= absl::LogSeverity::kWarning) {
+        if (isWritable &&
+            logSink.log_severity() <= absl::LogSeverity::kWarning) {
             write(stdout_fd, prefix.data(), prefix.size());
             write(stdout_fd, message.data(), message.size());
         }
@@ -84,9 +86,7 @@ class ForkAndRun {
      *
      * @param signal The signal that caused the subprocess to exit.
      */
-    virtual void onSignal(int signal) {
-        onExit(signal);
-    }
+    virtual void onSignal(int signal) { onExit(signal); }
 
     /**
      * @brief The function to be run in the subprocess.
@@ -116,6 +116,57 @@ class ForkAndRun {
      * subprocess should be stopped.
      */
     void cancel();
+
+    struct Shmem {
+        std::string path;
+        off_t size;
+        void* memory;
+        bool isAllocated;
+    };
+
+    /**
+     * @brief Allocates shared memory for the subprocess.
+     *
+     * This method allocates shared memory for the subprocess using the
+     * specified path and size. It returns a pointer to the allocated memory.
+     *
+     * @param path The path to the shared memory segment.
+     * @param size The size of the shared memory segment in bytes.
+     *
+     * @return A Shmem object containing the allocated shared memory segment,
+     * or std::nullopt if the allocation failed.
+     */
+    static std::optional<Shmem> allocShmem(const std::string_view& path,
+                                           off_t size);
+
+    /**
+     * @brief Frees the shared memory allocated for the subprocess.
+     *
+     * This method frees the shared memory that was allocated for the subprocess
+     * using the `allocShmem` method. It takes a pointer to the allocated memory
+     * as an argument and frees the memory associated with it.
+     *
+     * @param shmem The Shmem object containing the allocated shared memory
+     * segment.
+     */
+    static void freeShmem(Shmem& shmem);
+
+    /**
+     * @brief Connects to a shared memory segment.
+     *
+     * This method connects to a shared memory segment specified by the given
+     * path. It returns a pointer to the allocated shared memory segment.
+     *
+     * @param path The path to the shared memory segment.
+     * @param size The size of the shared memory segment.
+     *
+     * @return A Shmem object containing the connected shared memory segment,
+     * or std::nullopt if the connection failed.
+     */
+    static std::optional<Shmem> connectShmem(const std::string_view& path,
+                                             const off_t size);
+
+    static void disconnectShmem(Shmem& shmem);
 
    private:
     UnixSelector selector;

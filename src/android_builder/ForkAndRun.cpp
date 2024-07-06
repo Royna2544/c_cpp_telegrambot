@@ -3,14 +3,16 @@
 #include <Python.h>
 #include <absl/log/log.h>
 #include <absl/log/log_sink_registry.h>
-#include <dlfcn.h>
+#include <fcntl.h>
 #include <internal/_FileDescriptor_posix.h>
+#include <sys/mman.h>
+#include <sys/types.h>
 #include <sys/wait.h>
 
 #include <csignal>
 #include <cstdlib>
 #include <libos/OnTerminateRegistrar.hpp>
-#include <string>
+#include <optional>
 #include <thread>
 
 #include "random/RandomNumberGenerator.h"
@@ -140,6 +142,7 @@ bool ForkAndRun::execute() {
         selector.remove(stdout_pipe.readEnd());
         selector.remove(stderr_pipe.readEnd());
         selector.remove(program_termination_pipe.readEnd());
+        selector.remove(python_pipe.readEnd());
         program_termination_pipe.close();
         stderr_pipe.close();
         stdout_pipe.close();
@@ -165,4 +168,64 @@ void ForkAndRun::cancel() {
         LOG(WARNING) << "Unexpected status: " << status;
     }
     childProcessId = -1;
+}
+
+std::optional<ForkAndRun::Shmem> ForkAndRun::allocShmem(
+    const std::string_view& path, off_t size) {
+    void* ptr = nullptr;
+    int fd = shm_open(path.data(), O_CREAT | O_RDWR, 0666);
+    if (fd == -1) {
+        PLOG(ERROR) << "shm_open failed";
+        return std::nullopt;
+    }
+    const auto fdCloser = createFdAutoCloser(&fd);
+    if (ftruncate(fd, size) == -1) {
+        PLOG(ERROR) << "ftruncate failed";
+        return std::nullopt;
+    }
+    ptr = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (ptr == MAP_FAILED) {
+        PLOG(ERROR) << "mmap failed";
+        return std::nullopt;
+    }
+    close(fd);
+    DLOG(INFO) << "Shmem created with path: " << path.data()
+               << " size: " << size << " bytes";
+    return Shmem{path.data(), size, ptr, true};
+}
+
+void ForkAndRun::freeShmem(Shmem& shmem) {
+    if (munmap(shmem.memory, shmem.size) == -1) {
+        PLOG(ERROR) << "munmap failed";
+    }
+    if (shm_unlink(shmem.path.c_str()) == -1) {
+        PLOG(ERROR) << "shm_unlink failed";
+    }
+    DLOG(INFO) << "Shmem freed";
+    shmem.isAllocated = false;
+}
+
+std::optional<ForkAndRun::Shmem> ForkAndRun::connectShmem(
+    const std::string_view& path, const off_t size) {
+    int fd = shm_open(path.data(), O_RDWR, 0);
+    if (fd == -1) {
+        PLOG(ERROR) << "shm_open failed";
+        return std::nullopt;
+    }
+    const auto fdCloser = createFdAutoCloser(&fd);
+    void* ptr = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (ptr == MAP_FAILED) {
+        PLOG(ERROR) << "mmap failed";
+        return std::nullopt;
+    }
+    DLOG(INFO) << "Shmem connected with path: " << path.data();
+    return Shmem{path.data(), size, ptr, true};
+}
+
+void ForkAndRun::disconnectShmem(Shmem& shmem) {
+    if (munmap(shmem.memory, shmem.size) == -1) {
+        PLOG(ERROR) << "munmap failed";
+    }
+    DLOG(INFO) << "Shmem disconnected";
+    shmem.isAllocated = false;
 }
