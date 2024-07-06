@@ -2,3 +2,4 @@
 EvoxTablet Evox https://github.com/Roynas-Android-Playground/local_manifests/ tb128fu-Evolution-X-udc tb128fu user
 EvoxA30 Evox https://github.com/Roynas-Android-Playground/local_manifests/ Exynos7885-fourteen a30 user
 crDroidS4 crDroid https://github.com/Roynas-Android-Playground/local_manifests/ ks01lteskt-crDroid-11.0 ks01ltexx user
+EvoxA90 Evox https://github.com/Roynas-Android-Playground/local_manifests/ r3q-Evolution-X-udc r3q user
