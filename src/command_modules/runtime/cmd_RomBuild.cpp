@@ -153,6 +153,19 @@ bool build(PerBuildData data, const Bot& bot, const Message::Ptr& message) {
     }
     return false;
 }
+
+void upload(PerBuildData data, const Bot& bot, const Message::Ptr& message) {
+    PerBuildData::ResultData uploadResult;
+    auto uploadmsg = bot_sendMessage(bot, message->chat->id, "Will upload");
+
+    data.result = &uploadResult;
+    UploadFileTask uploadTask(data);
+    if (!uploadTask.execute()) {
+        bot_editMessage(bot, uploadmsg, "Could'nt initialize upload");
+    } else {
+        bot_editMessage(bot, uploadmsg, uploadResult.getMessage());
+    }
+}
 }  // namespace
 
 static void romBuildCommand(const Bot& bot, const Message::Ptr message) {
@@ -188,26 +201,12 @@ static void romBuildCommand(const Bot& bot, const Message::Ptr message) {
     }
     std::filesystem::current_path(kBuildDirectory, ec);
 
-    // Sync the repository
-    if (!repoSync(PBData, bot, message)) {
-        returnToCwd();
-        return;
+    if (repoSync(PBData, bot, message)) {
+        // Build the ROM
+        if (build(PBData, bot, message)) {
+            upload(PBData, bot, message);
+        }
     }
-
-    // Build the ROM
-    if (!build(PBData, bot, message)) {
-        returnToCwd();
-        return;
-    }
-
-#if 0
-    bot_sendMessage(bot, wrapper.getChatId(), "Will upload");
-
-    bool uploadResult = false;
-    PBData.result = &uploadResult;
-    UploadFileTask uploadTask(wrapper, PBData);
-    uploadTask.execute();
-#endif
     returnToCwd();
 }
 

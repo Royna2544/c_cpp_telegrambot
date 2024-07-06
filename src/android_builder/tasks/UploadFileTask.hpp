@@ -46,7 +46,7 @@ struct UploadFileTask : ForkAndRun {
             return false;
         }
         LOG(INFO) << resultString;
-        wrapper.sendMessageOnExit(resultString);
+        data.result->setMessage(resultString);
         return true;
     }
 
@@ -58,16 +58,15 @@ struct UploadFileTask : ForkAndRun {
      * @param exitCode The exit code of the subprocess.
      */
     void onExit(int exitCode) override {
-        const auto& bot = wrapper.getBot();
         switch (exitCode) {
             case EXIT_SUCCESS:
-                bot_sendMessage(bot, wrapper.getChatId(),
-                                "Upload completed successfully");
-
+                data.result->value = PerBuildData::Result::SUCCESS;
                 break;
             case EXIT_FAILURE:
+                data.result->value = PerBuildData::Result::ERROR_FATAL;
+                break;
             default:
-                bot_sendMessage(bot, wrapper.getChatId(), "Upload failed");
+                break;
         }
     }
 
@@ -79,11 +78,8 @@ struct UploadFileTask : ForkAndRun {
      * @param data The data object containing the necessary configuration and
      * paths.
      */
-    explicit UploadFileTask(MessageWrapper& wrapper, PerBuildData data)
-        : wrapper(wrapper), data(std::move(data)) {}
+    explicit UploadFileTask(PerBuildData data) : data(std::move(data)) {}
 
    private:
-    MessageWrapper&
-        wrapper;  // NOLINT(cppcoreguidelines-avoid-const-or-ref-data-members)
     PerBuildData data;
 };

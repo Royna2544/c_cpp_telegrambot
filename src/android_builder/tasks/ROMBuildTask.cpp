@@ -67,8 +67,8 @@ bool ROMBuildTask::runFunction() {
                 std::istreambuf_iterator<char>());
             if (errorLogContent.find("FAILED:") != std::string::npos) {
                 // Ninja error
-                resultdata->setMessage(errorLogContent.substr(
-                    errorLogContent.find_first_of('\n')));
+                resultdata->setMessage(errorLogContent.substr(0,
+                    errorLogContent.find_first_of("Command:")));
             } else {
                 // Probably makefile?
                 resultdata->setMessage(errorLogContent);
@@ -110,7 +110,7 @@ void ROMBuildTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
                         << std::endl;
         buildInfoBuffer << "Last updated on: " << fromTP(now) << std::endl;
         buildInfoBuffer << "Target ROM: " << data.rConfig.name
-                        << " branch: " << data.rConfig.branch;
+                        << ", branch: " << data.rConfig.branch << std::endl;
         buildInfoBuffer << "Target device: " << data.bConfig.device << std::endl;
         buildInfoBuffer << "Job count: " << guessJobCount();
         if (_get_used_mem->call(nullptr, &memUsage)) {
