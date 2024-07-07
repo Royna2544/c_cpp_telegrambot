@@ -8,7 +8,9 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <unistd.h>
 
+#include <boost/algorithm/string/trim.hpp>
 #include <csignal>
 #include <cstdlib>
 #include <libos/OnTerminateRegistrar.hpp>
@@ -45,6 +47,9 @@ bool ForkAndRun::execute() {
         // Clear handlers
         signal(SIGINT, [](int) {});
         signal(SIGTERM, [](int) {});
+
+        // Set the process group to the current process ID
+        setpgrp();
 
         // Append PYTHON LOG FD
         PyEval_RestoreThread(mainTS);
@@ -113,7 +118,8 @@ bool ForkAndRun::execute() {
                 ssize_t bytes_read =
                     read(python_pipe.readEnd(), buf.data(), buf.size() - 1);
                 if (bytes_read >= 0) {
-                    onNewStdoutBuffer(buf);
+                    std::cout << "Python output: "
+                              << boost::trim_copy(std::string(buf.data())) << std::endl;
                     buf.fill(0);
                 }
             },
@@ -167,7 +173,7 @@ bool ForkAndRun::execute() {
 
 void ForkAndRun::cancel() {
     if (childProcessId > 0) {
-        kill(childProcessId, SIGINT);
+        killpg(childProcessId, SIGINT);
     }
     // Wait for the child process to terminate.
     int status = 0;
