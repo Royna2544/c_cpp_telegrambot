@@ -1,6 +1,7 @@
 #include <ConfigParsers.hpp>
 #include <ForkAndRun.hpp>
 #include <RepoUtils.hpp>
+
 #include "PerBuildData.hpp"
 
 class NewStdErrBufferHook {
@@ -9,7 +10,7 @@ class NewStdErrBufferHook {
    protected:
     bool hadProblems = false;
     bool hadFatalProblems = false;
-    
+
     void errorAndLog(const std::string& message) {
         LOG(ERROR) << message;
         logMessage << message << std::endl;
@@ -36,9 +37,7 @@ class NewStdErrBufferHook {
     [[nodiscard]] std::string getLogMessage() const noexcept {
         return logMessage.str();
     }
-    [[nodiscard]] bool hasProblems() const noexcept {
-        return hadProblems;
-    }
+    [[nodiscard]] bool hasProblems() const noexcept { return hadProblems; }
     [[nodiscard]] bool hasFatalProblems() const noexcept {
         return hadProblems && hadFatalProblems;
     }
@@ -60,6 +59,8 @@ class RepoSyncLocalHook : public NewStdErrBufferHook {
         "Try re-running with \"-j1 --fail-fast\" to exit at the first error.";
 
     bool hasCheckoutIssues = false;
+    bool hasRemoveIssues = false;
+
    public:
     bool process(const std::string& line) override;
     ~RepoSyncLocalHook() override = default;
@@ -86,7 +87,7 @@ struct RepoSyncTask : ForkAndRun {
      * otherwise.
      */
     bool runFunction() override;
-    
+
     /**
      * @brief Handles new standard error data.
      *
@@ -98,6 +99,10 @@ struct RepoSyncTask : ForkAndRun {
      */
     void onNewStderrBuffer(ForkAndRun::BufferType& buffer) override;
 
+    void onNewStdoutBuffer(ForkAndRun::BufferType& buffer) override {
+        onNewStderrBuffer(buffer);
+    }
+    
     /**
      * @brief Handles the process exit event.
      *
@@ -130,7 +135,7 @@ struct RepoSyncTask : ForkAndRun {
 
    private:
     PerBuildData data;
-    
+
     RepoSyncLocalHook localHook;
     RepoSyncNetworkHook networkHook;
 };
