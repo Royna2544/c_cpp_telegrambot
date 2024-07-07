@@ -35,31 +35,37 @@ bool tryToMakeItMine(const PerBuildData& data) {
     RAIIGit raii;
     const auto git_error_last_str = [] { return git_error_last()->message; };
     int ret = 0;
+    constexpr std::string_view kRemoteRepoName = "origin";
 
     git_repository* repo = nullptr;
     git_reference* head_ref = nullptr;
+    git_reference* target_ref = nullptr;
+    git_reference* target_remote_ref = nullptr;
     const char* current_branch = nullptr;
+    const char* remote_url = nullptr;
     git_object* treeish = nullptr;
     git_remote* remote = nullptr;
-    const char* remote_url = nullptr;
+    git_commit* commit = nullptr;
+    git_checkout_options checkout_opts = GIT_CHECKOUT_OPTIONS_INIT;
 
     ret = git_repository_open(&repo, RepoSyncTask::kLocalManifestPath.data());
     if (ret != 0) {
-        LOG(ERROR) << "Failed to open repository";
+        LOG(ERROR) << "Failed to open repository: " << git_error_last_str();
         return false;
     }
     raii.addCleanup([repo] { git_repository_free(repo); });
 
-    ret = git_remote_lookup(&remote, repo, "origin");
+    ret = git_remote_lookup(&remote, repo, kRemoteRepoName.data());
     if (ret != 0) {
-        LOG(ERROR) << "Failed to lookup remote origin";
+        LOG(ERROR) << "Failed to lookup remote origin: "
+                   << git_error_last_str();
         return false;
     }
     raii.addCleanup([remote] { git_remote_free(remote); });
 
     remote_url = git_remote_url(remote);
     if (remote_url == nullptr) {
-        LOG(ERROR) << "Remote origin URL is null";
+        LOG(ERROR) << "Remote origin URL is null: " << git_error_last_str();
         return false;
     }
     LOG(INFO) << "Remote origin URL: " << remote_url;
@@ -71,7 +77,7 @@ bool tryToMakeItMine(const PerBuildData& data) {
 
     ret = git_repository_head(&head_ref, repo);
     if (ret != 0) {
-        LOG(ERROR) << "Failed to get HEAD reference";
+        LOG(ERROR) << "Failed to get HEAD reference: " << git_error_last_str();
         return false;
     }
     raii.addCleanup([head_ref] { git_reference_free(head_ref); });
@@ -80,26 +86,99 @@ bool tryToMakeItMine(const PerBuildData& data) {
     LOG(INFO) << "Current branch: " << current_branch;
     CStringLifetime branch_name = data.bConfig.local_manifest.branch;
 
+    // Check if the branch is the one we're interested in
     if (data.bConfig.local_manifest.branch != current_branch) {
-        LOG(INFO) << "Switching to branch: "
-                  << data.bConfig.local_manifest.branch;
+        LOG(INFO) << "Switching to branch: " << branch_name.get();
+        struct {
+            // refs/heads/*branch*
+            std::string local;
+            std::string remote;
+        } target_ref_name;
+        target_ref_name.local += "refs/heads/";
+        target_ref_name.local += branch_name.get();
+        target_ref_name.remote += "refs/remotes/";
+        target_ref_name.remote += kRemoteRepoName.data();
+        target_ref_name.remote += "/";
+        target_ref_name.remote += branch_name.get();
 
-        ret = git_revparse_single(&treeish, repo, branch_name);
+        // Try to find the branch ref in the repository
+        ret = git_reference_lookup(&target_ref, repo,
+                                   target_ref_name.local.c_str());
         if (ret != 0) {
-            LOG(ERROR) << "Failed to find the branch";
-            return false;
-        }
-        raii.addCleanup([treeish] { git_object_free(treeish); });
+            LOG(ERROR) << "Failed to find the branch ref: "
+                       << git_error_last_str();
 
-        ret = git_checkout_tree(repo, treeish, nullptr);
-        if (ret != 0) {
-            LOG(ERROR) << "Failed to checkout tree";
-            return false;
+            // Maybe remote has it?
+            ret = git_remote_fetch(remote, nullptr, nullptr, nullptr);
+            if (ret != 0) {
+                LOG(ERROR) << "Failed to fetch remote: "
+                           << git_error_last_str();
+                return false;
+            }
+
+            // Now try to find the branch in the remote
+            ret = git_reference_lookup(&target_remote_ref, repo,
+                                       target_ref_name.remote.c_str());
+            if (ret != 0) {
+                LOG(ERROR) << "Failed to find the branch "
+                              "in the remote: "
+                           << git_error_last_str();
+                return false;
+            }
+            raii.addCleanup(
+                [target_remote_ref] { git_reference_free(target_remote_ref); });
+
+            // Get the commit of the target branch ref
+            ret = git_commit_lookup(&commit, repo,
+                                    git_reference_target(target_remote_ref));
+            if (ret != 0) {
+                LOG(ERROR) << "Failed to find the commit: "
+                           << git_error_last_str();
+                return false;
+            }
+            raii.addCleanup([commit] { git_commit_free(commit); });
+
+            // Create the local branch ref pointing to the commit
+            ret = git_branch_create(&target_ref, repo, branch_name.get(),
+                                    commit, 0);
+            if (ret != 0) {
+                LOG(ERROR) << "Failed to create branch: "
+                           << git_error_last_str();
+                return false;
+            }
+            raii.addCleanup([target_ref] { git_reference_free(target_ref); });
+
+            // Checkout the local branch
+            ret = git_checkout_head(repo, &checkout_opts);
+            if (ret != 0) {
+                LOG(ERROR) << "Failed to checkout head: "
+                           << git_error_last_str();
+                return false;
+            }
+
+            LOG(INFO) << "Success on checking out remote branch";
+        } else {
+            raii.addCleanup([target_ref] { git_reference_free(target_ref); });
+
+            // Get the object of the target branch ref
+            ret = git_reference_peel(&treeish, target_ref, GIT_OBJECT_TREE);
+            if (ret != 0) {
+                LOG(ERROR) << "Failed to find the branch: "
+                           << git_error_last_str();
+                return false;
+            }
+            raii.addCleanup([treeish] { git_object_free(treeish); });
+
+            ret = git_checkout_tree(repo, treeish, nullptr);
+            if (ret != 0) {
+                LOG(ERROR) << "Failed to checkout tree: "
+                           << git_error_last_str();
+                return false;
+            }
         }
-        ret = git_repository_set_head(
-            repo, ("refs/heads/" + std::string(branch_name)).c_str());
+        ret = git_repository_set_head(repo, target_ref_name.local.c_str());
         if (ret != 0) {
-            LOG(ERROR) << "Failed to set HEAD";
+            LOG(ERROR) << "Failed to set HEAD: " << git_error_last_str();
             return false;
         }
     } else {

@@ -38,10 +38,11 @@ def upload_to_gofile(device_name, file_prefix) -> str:
         print(f"SSL certificate verification failed: {e}")
         dir_path = os.path.dirname(os.path.realpath(__file__))
         out, err = subprocess_utils.run_command_with_output(f'bash {dir_path}/upload_file.bash {file_to_upload}')
-        return f"""
-    STDOUT: {out}
-    STDERR: {err}
-    """
+        if out is None:
+            with open('upload_err.txt', 'w') as f:
+                f.write(err)
+            return f"An error occurred while uploading the file. See upload_err.txt for details."
+        return out
 
     # Check the response from GoFile
     if response.status_code == 200:

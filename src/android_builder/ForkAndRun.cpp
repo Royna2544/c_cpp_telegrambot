@@ -108,13 +108,13 @@ bool ForkAndRun::execute() {
             Selector::Mode::READ);
         selector.add(
             python_pipe.readEnd(),
-            [python_pipe] {
+            [python_pipe, this] {
                 BufferType buf{};
                 ssize_t bytes_read =
                     read(python_pipe.readEnd(), buf.data(), buf.size() - 1);
                 if (bytes_read >= 0) {
-                    printf("Python output: ");
-                    fputs(buf.data(), stdout);
+                    onNewStdoutBuffer(buf);
+                    buf.fill(0);
                 }
             },
             Selector::Mode::READ);

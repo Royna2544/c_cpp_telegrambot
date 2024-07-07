@@ -164,6 +164,11 @@ void upload(PerBuildData data, const Bot& bot, const Message::Ptr& message) {
         bot_editMessage(bot, uploadmsg, "Could'nt initialize upload");
     } else {
         bot_editMessage(bot, uploadmsg, uploadResult.getMessage());
+        if (uploadResult.value == PerBuildData::Result::ERROR_FATAL) {
+            bot.getApi().sendDocument(
+                message->chat->id,
+                TgBot::InputFile::fromFile("upload_err.txt", "text/plain"));
+        }
     }
 }
 }  // namespace

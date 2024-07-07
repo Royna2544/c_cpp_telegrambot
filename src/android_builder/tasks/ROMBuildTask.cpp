@@ -4,6 +4,7 @@
 
 #include <ArgumentBuilder.hpp>
 #include <mutex>
+#include <regex>
 
 bool ROMBuildTask::runFunction() {
     auto dataShmem =
@@ -62,15 +63,19 @@ bool ROMBuildTask::runFunction() {
         LOG(ERROR) << "ROM build failed";
         std::ifstream errorLog(kErrorLogFile.data());
         if (errorLog.is_open()) {
+            static std::regex ansi_escape_code_pattern(
+                R"(\x1B\[[0-9;]*[A-Za-z])");
+
             std::string errorLogContent(
                 (std::istreambuf_iterator<char>(errorLog)),
                 std::istreambuf_iterator<char>());
-            if (errorLogContent.find("FAILED:") != std::string::npos) {
+            const auto commandIdx = errorLogContent.find("Command:");
+            if (commandIdx != std::string::npos) {
                 // Ninja error
-                resultdata->setMessage(errorLogContent.substr(0,
-                    errorLogContent.find_first_of("Command:")));
+                resultdata->setMessage(errorLogContent.substr(0, commandIdx));
             } else {
                 // Probably makefile?
+                std::regex_replace(errorLogContent, ansi_escape_code_pattern, "");
                 resultdata->setMessage(errorLogContent);
             }
         } else {
@@ -93,7 +98,7 @@ int ROMBuildTask::guessJobCount() {
         }
         total_memory /= Multiplier;  // Convert to GB
         LOG(INFO) << "Total memory: " << total_memory << "GB";
-        jobCount = static_cast<int>(sqrt(total_memory) * 2);
+        jobCount = static_cast<int>(sqrt(total_memory));
         LOG(INFO) << "Using job count: " << jobCount;
     });
     return jobCount;
@@ -111,7 +116,8 @@ void ROMBuildTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
         buildInfoBuffer << "Last updated on: " << fromTP(now) << std::endl;
         buildInfoBuffer << "Target ROM: " << data.rConfig.name
                         << ", branch: " << data.rConfig.branch << std::endl;
-        buildInfoBuffer << "Target device: " << data.bConfig.device << std::endl;
+        buildInfoBuffer << "Target device: " << data.bConfig.device
+                        << std::endl;
         buildInfoBuffer << "Job count: " << guessJobCount();
         if (_get_used_mem->call(nullptr, &memUsage)) {
             buildInfoBuffer << ", memory usage: " << memUsage << "%";
