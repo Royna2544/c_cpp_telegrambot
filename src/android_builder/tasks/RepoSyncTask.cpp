@@ -304,11 +304,10 @@ bool RepoSyncTask::runFunction() {
                 return false;
             }
         }
-        try {
-            utils.repo_sync(std::thread::hardware_concurrency());
-        } catch (const std::runtime_error& e) {
-            // Try with lower job count
+        if (networkHook.hasProblems()) {
             utils.repo_sync(std::thread::hardware_concurrency() / 4);
+        } else {
+            utils.repo_sync(std::thread::hardware_concurrency());
         }
     } catch (const std::exception& e) {
         LOG(ERROR) << "Error occurred during repo sync: " << e.what();
@@ -352,8 +351,7 @@ void RepoSyncTask::onExit(int exitCode) {
         data.result->value = PerBuildData::Result::SUCCESS;
         data.result->setMessage("Repo sync successful");
     }
-    localHook.clearProblems();
-    networkHook.clearProblems();
+    localHook.clearProblems(); // Per-sync only, retrying won't help
 }
 
 void RepoSyncTask::onSignal(int signalCode) {

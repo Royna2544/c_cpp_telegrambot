@@ -39,7 +39,7 @@ def build_rom(device: str, variant: str, target: str, jobs: int) -> bool:
     shell_process.stdin.flush()
     print('Waiting for lunch command result...')
     while True:
-        line = process.stdout.readline()
+        line = shell_process.stdout.readline()
         if line.startswith("exit code:"):
             # Extract the exit code from the line
             exit_code = int(line.strip().split()[-1])
