@@ -135,7 +135,7 @@ struct RepoSyncTask : ForkAndRun {
 
    private:
     PerBuildData data;
-
     RepoSyncLocalHook localHook;
     RepoSyncNetworkHook networkHook;
+    bool runWithReducedJobs = false;
 };
