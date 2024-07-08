@@ -152,7 +152,6 @@ struct MatchesData {
         const char* current_branch = nullptr;
         const char* remote_url = nullptr;
         git_remote* remote = nullptr;
-        git_config* config = nullptr;
         RAIIGit raii;
         diffopts.flags = GIT_CHECKOUT_NOTIFY_CONFLICT;
         checkout_opts.checkout_strategy = GIT_CHECKOUT_SAFE;
@@ -164,24 +163,6 @@ struct MatchesData {
                        << git_error_last_str();
             git_config_free(config);
             return false;
-        }
-        // This config may not exist... probably?
-        if (ret == 0) {
-            int val = 0;
-            ret =
-                git_config_get_bool(&val, config, "extensions.preciousobjects");
-            if (ret == 0) {
-                LOG(INFO) << "Removing extensions.preciousobjects...";
-                ret = git_config_delete_entry(config,
-                                              "extensions.preciousobjects");
-                if (ret != 0) {
-                    LOG(ERROR)
-                        << "Failed to delete extensions.preciousobjects: "
-                        << git_error_last_str();
-                }
-            }
-            // Manual, to save the file to disk
-            git_config_free(config);
         }
         ret = git_repository_open(&repo, gitDirectory.c_str());
 
@@ -402,6 +383,26 @@ struct MatchesData {
         const char* branchName = nullptr;
         const char* upstreamName = nullptr;
         RAIIGit raii;
+        git_config* config = nullptr;
+
+        // This config may not exist... probably?
+        if (ret == 0) {
+            int val = 0;
+            ret =
+                git_config_get_bool(&val, config, "extensions.preciousobjects");
+            if (ret == 0) {
+                LOG(INFO) << "Removing extensions.preciousobjects...";
+                ret = git_config_delete_entry(config,
+                                              "extensions.preciousobjects");
+                if (ret != 0) {
+                    LOG(ERROR)
+                        << "Failed to delete extensions.preciousobjects: "
+                        << git_error_last_str();
+                }
+            }
+            // Manual, to save the file to disk
+            git_config_free(config);
+        }
 
         ret = git_repository_open(&repo, gitDirectory.c_str());
         if (ret != 0) {
@@ -441,7 +442,8 @@ struct MatchesData {
             std::string upstream_branch = upstreamName;
             constexpr auto originPrefix = StringConcat::cat("origin", "/");
             if (upstream_branch.starts_with(originPrefix)) {
-                upstream_branch.erase(0, originPrefix.getSize());  // Remove "remote/"
+                upstream_branch.erase(
+                    0, originPrefix.getSize());  // Remove "remote/"
             }
             if (desiredBranch == upstream_branch) {
                 LOG(INFO) << "Desired branch name matches upstream name";
