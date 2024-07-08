@@ -11,6 +11,11 @@
 #include <system_error>
 #include <thread>
 
+#include "CompileTimeStringConcat.hpp"
+#include "git2/branch.h"
+#include "git2/remote.h"
+#include "git2/repository.h"
+#include "git2/types.h"
 #include "tasks/PerBuildData.hpp"
 
 namespace {
@@ -82,67 +87,6 @@ struct MatchesData {
         fn_t onNoMatchCallback;
     };
 
-    // Determine if the repository contains same url as the data, and try to
-    // match it
-    bool _verify(Callbacks&& callbacks) const {
-        int ret = 0;
-        RAIIGit raii;
-
-        git_repository* repo = nullptr;
-        git_reference* head_ref = nullptr;
-        const char* current_branch = nullptr;
-        const char* remote_url = nullptr;
-        git_remote* remote = nullptr;
-
-        ret = git_repository_open(&repo, gitDirectory.c_str());
-        if (ret != 0) {
-            LOG(ERROR) << "Failed to open repository: " << git_error_last_str();
-            return false;
-        }
-        raii.add_repo_cleanup(repo);
-
-        ret = git_remote_lookup(&remote, repo, kRemoteRepoName.data());
-        if (ret != 0) {
-            LOG(ERROR) << "Failed to lookup remote origin: "
-                       << git_error_last_str();
-            return false;
-        }
-        raii.add_remote_cleanup(remote);
-
-        remote_url = git_remote_url(remote);
-        if (remote_url == nullptr) {
-            LOG(ERROR) << "Remote origin URL is null: " << git_error_last_str();
-            return false;
-        }
-        LOG(INFO) << "Remote origin URL: " << remote_url;
-
-        if (remote_url != desiredUrl) {
-            LOG(INFO) << "Repository URL doesn't match...";
-            return false;
-        }
-
-        ret = git_repository_head(&head_ref, repo);
-        if (ret != 0) {
-            LOG(ERROR) << "Failed to get HEAD reference: "
-                       << git_error_last_str();
-            return false;
-        }
-        raii.add_ref_cleanup(head_ref);
-
-        current_branch = git_reference_shorthand(head_ref);
-
-        Callbacks::Data data{repo, remote, head_ref, std::move(raii)};
-        // Check if the branch is the one we're interested in
-        if (desiredBranch == current_branch) {
-            LOG(INFO) << "Already on the desired branch";
-            return callbacks.onMatchedCallback(std::move(data));
-        } else {
-            LOG(INFO) << "Expected branch: " << desiredBranch
-                      << ", current branch: " << current_branch;
-            return callbacks.onNoMatchCallback(std::move(data));
-        }
-    }
-
     static bool hasDiff(git_diff* diff) {
         return git_diff_num_deltas(diff) != 0;
     }
@@ -191,7 +135,8 @@ struct MatchesData {
         }
     }
 
-    bool checkoutCallbackFn(Callbacks::Data&& data) const {
+   public:
+    [[nodiscard]] bool matchesAndCheckout() const {
         int ret = 0;
         git_reference* target_ref = nullptr;
         git_reference* target_remote_ref = nullptr;
@@ -202,9 +147,89 @@ struct MatchesData {
         git_tree* target_tree = nullptr;
         git_diff_options diffopts = GIT_DIFF_OPTIONS_INIT;
         git_diff* diff = nullptr;
+        git_repository* repo = nullptr;
+        git_reference* head_ref = nullptr;
+        const char* current_branch = nullptr;
+        const char* remote_url = nullptr;
+        git_remote* remote = nullptr;
+        git_config* config = nullptr;
+        RAIIGit raii;
         diffopts.flags = GIT_CHECKOUT_NOTIFY_CONFLICT;
         checkout_opts.checkout_strategy = GIT_CHECKOUT_SAFE;
 
+        ret =
+            git_config_open_ondisk(&config, (gitDirectory / "config").c_str());
+        if (ret != 0) {
+            LOG(ERROR) << "Failed to open config file: "
+                       << git_error_last_str();
+            git_config_free(config);
+            return false;
+        }
+        // This config may not exist... probably?
+        if (ret == 0) {
+            int val = 0;
+            ret =
+                git_config_get_bool(&val, config, "extensions.preciousobjects");
+            if (ret == 0) {
+                LOG(INFO) << "Removing extensions.preciousobjects...";
+                ret = git_config_delete_entry(config,
+                                              "extensions.preciousobjects");
+                if (ret != 0) {
+                    LOG(ERROR)
+                        << "Failed to delete extensions.preciousobjects: "
+                        << git_error_last_str();
+                }
+            }
+            // Manual, to save the file to disk
+            git_config_free(config);
+        }
+        ret = git_repository_open(&repo, gitDirectory.c_str());
+
+        if (ret != 0) {
+            LOG(ERROR) << "Failed to open repository: " << git_error_last_str();
+            return false;
+        }
+        raii.add_repo_cleanup(repo);
+
+        ret = git_remote_lookup(&remote, repo, kRemoteRepoName.data());
+        if (ret != 0) {
+            LOG(ERROR) << "Failed to lookup remote origin: "
+                       << git_error_last_str();
+            return false;
+        }
+        raii.add_remote_cleanup(remote);
+
+        remote_url = git_remote_url(remote);
+        if (remote_url == nullptr) {
+            LOG(ERROR) << "Remote origin URL is null: " << git_error_last_str();
+            return false;
+        }
+        LOG(INFO) << "Remote origin URL: " << remote_url;
+
+        if (remote_url != desiredUrl) {
+            LOG(INFO) << "Repository URL doesn't match...";
+            return false;
+        }
+
+        ret = git_repository_head(&head_ref, repo);
+        if (ret != 0) {
+            LOG(ERROR) << "Failed to get HEAD reference: "
+                       << git_error_last_str();
+            return false;
+        }
+        raii.add_ref_cleanup(head_ref);
+
+        current_branch = git_reference_shorthand(head_ref);
+
+        Callbacks::Data data{repo, remote, head_ref, std::move(raii)};
+        // Check if the branch is the one we're interested in
+        if (desiredBranch == current_branch) {
+            LOG(INFO) << "Already on the desired branch";
+            return true;
+        } else {
+            LOG(INFO) << "Expected branch: " << desiredBranch
+                      << ", current branch: " << current_branch;
+        }
         LOG(INFO) << "Switching to branch: " << desiredBranch;
         struct {
             // refs/heads/*branch*
@@ -369,22 +394,64 @@ struct MatchesData {
         return true;
     }
 
-   public:
     [[nodiscard]] bool matches() {
-        return _verify({
-            .onMatchedCallback = [](auto&&) { return true; },
-            .onNoMatchCallback = [](auto&&) { return false; },
-        });
-    }
-    [[nodiscard]] bool matchesAndCheckout() {
-        return _verify({
-            .onMatchedCallback = [](auto&&) { return true; },
-            .onNoMatchCallback =
-                [this](auto&& data) {
-                    return checkoutCallbackFn(
-                        std::forward<decltype(data)>(data));
-                },
-        });
+        git_repository* repo = nullptr;
+        int ret = 0;
+        git_reference* head_ref = nullptr;
+        git_reference* remote_tracking_ref = nullptr;
+        const char* branchName = nullptr;
+        const char* upstreamName = nullptr;
+        RAIIGit raii;
+
+        ret = git_repository_open(&repo, gitDirectory.c_str());
+        if (ret != 0) {
+            LOG(ERROR) << "Failed to open repository: " << git_error_last_str();
+            return false;
+        }
+        raii.add_repo_cleanup(repo);
+        ret = git_repository_head(&head_ref, repo);
+        if (ret != 0) {
+            LOG(ERROR) << "Failed to get head reference: "
+                       << git_error_last_str();
+            return false;
+        }
+        raii.add_ref_cleanup(head_ref);
+        ret = git_branch_name(&branchName, head_ref);
+        if (ret != 0) {
+            LOG(ERROR) << "Failed to get branch name: " << git_error_last_str();
+            return false;
+        }
+        ret = git_branch_upstream(&remote_tracking_ref, head_ref);
+        if (ret == GIT_ENOTFOUND) {
+            LOG(WARNING) << "Tracking remote is not configured???";
+            return false;
+        } else if (ret < 0) {
+            LOG(ERROR) << "Failed to get upstream reference: "
+                       << git_error_last_str();
+            return false;
+        } else {
+            raii.add_ref_cleanup(remote_tracking_ref);
+            ret = git_branch_name(&upstreamName, remote_tracking_ref);
+            if (ret != 0) {
+                LOG(ERROR) << "Failed to get upstream branch name: "
+                           << git_error_last_str();
+                return false;
+            }
+            // Exclude remote/ prefix
+            std::string upstream_branch = upstreamName;
+            constexpr auto originPrefix = StringConcat::cat("origin", "/");
+            if (upstream_branch.starts_with(originPrefix)) {
+                upstream_branch.erase(0, originPrefix.getSize());  // Remove "remote/"
+            }
+            if (desiredBranch == upstream_branch) {
+                LOG(INFO) << "Desired branch name matches upstream name";
+                return true;
+            } else {
+                LOG(INFO) << "Local branch does not match remote, got "
+                          << upstreamName;
+                return false;
+            }
+        }
     }
 };
 }  // namespace
@@ -484,7 +551,7 @@ bool RepoSyncTask::runFunction() {
     try {
         RepoUtils utils(data.scriptDirectory);
         MatchesData mmdata{
-            .gitDirectory = ".repo/manifests.git",
+            .gitDirectory = ".repo/manifests",
             .desiredBranch = data.rConfig.branch,
             .desiredUrl = data.rConfig.url,
         };

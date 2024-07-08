@@ -34,17 +34,11 @@ struct GILStateManagement {
 };
 
 class PythonClass : public std::enable_shared_from_this<PythonClass> {
-    // Declare a class to hold Py_init functions
-    struct PyInitHolder {
-        PyInitHolder() { Py_Initialize(); }
-        ~PyInitHolder() { Py_Finalize(); }
-    };
     explicit PythonClass() = default;
 
    public:
     using Ptr = std::shared_ptr<PythonClass>;
     static std::shared_ptr<PythonClass> get() {
-        static PyInitHolder holder;
         static auto instance = std::make_shared<PythonClass>(PythonClass());
         return instance;
     }

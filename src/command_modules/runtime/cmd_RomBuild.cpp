@@ -15,8 +15,6 @@
 #include "cmd_dynamic.h"
 #include "command_modules/CommandModule.h"
 #include "tasks/PerBuildData.hpp"
-#include "tgbot/Bot.h"
-#include "tgbot/types/Message.h"
 
 namespace {
 
@@ -185,7 +183,10 @@ static void romBuildCommand(const Bot& bot, const Message::Ptr message) {
         if (_ec) {
             LOG(ERROR) << "Failed to restore cwd: " << _ec.message();
         }
+        Py_Finalize();
     };
+
+    Py_Initialize();
 
     if (!wrapper.hasExtraText()) {
         wrapper.sendMessageOnExit("Please provide a target string");
