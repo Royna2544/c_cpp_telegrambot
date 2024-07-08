@@ -2,12 +2,8 @@
 
 #include <MessageWrapper.hpp>
 #include <cstdlib>
-#include <iostream>
-#include <utility>
 
-#include "ArgumentBuilder.hpp"
 #include "ForkAndRun.hpp"
-#include "PythonClass.hpp"
 #include "tasks/PerBuildData.hpp"
 
 struct UploadFileTask : ForkAndRun {
@@ -23,32 +19,7 @@ struct UploadFileTask : ForkAndRun {
      * @return True if the synchronization process is successful, false
      * otherwise.
      */
-    bool runFunction() override {
-        auto py = PythonClass::get();
-        py->addLookupDirectory(data.scriptDirectory);
-        auto mod = py->importModule("upload_file");
-        if (!mod) {
-            LOG(ERROR) << "Could not import module upload_file";
-            return false;
-        }
-        // Device name, PrefixStr
-        auto func = mod->lookupFunction("upload_to_gofile");
-        if (!func) {
-            LOG(ERROR) << "Could not find function upload_to_gofile";
-            return false;
-        }
-        ArgumentBuilder builder(2);
-        builder.add_argument(data.bConfig.device);
-        builder.add_argument(data.rConfig.prefixOfOutput);
-        std::string resultString;
-        if (!func->call(builder.build(), &resultString)) {
-            LOG(ERROR) << "Error calling function upload_to_gofile";
-            return false;
-        }
-        LOG(INFO) << resultString;
-        data.result->setMessage(resultString);
-        return true;
-    }
+    bool runFunction() override;
 
     /**
      * @brief Callback function for handling the exit of the subprocess.
@@ -57,18 +28,7 @@ struct UploadFileTask : ForkAndRun {
      *
      * @param exitCode The exit code of the subprocess.
      */
-    void onExit(int exitCode) override {
-        switch (exitCode) {
-            case EXIT_SUCCESS:
-                data.result->value = PerBuildData::Result::SUCCESS;
-                break;
-            case EXIT_FAILURE:
-                data.result->value = PerBuildData::Result::ERROR_FATAL;
-                break;
-            default:
-                break;
-        }
-    }
+    void onExit(int exitCode) override;
 
     /**
      * @brief Constructs a UploadFileTask object with the provided data.
@@ -78,7 +38,7 @@ struct UploadFileTask : ForkAndRun {
      * @param data The data object containing the necessary configuration and
      * paths.
      */
-    explicit UploadFileTask(PerBuildData data) : data(std::move(data)) {}
+    explicit UploadFileTask(PerBuildData data);
 
    private:
     PerBuildData data;

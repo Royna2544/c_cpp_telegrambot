@@ -16,7 +16,9 @@ file(REMOVE ${CMAKE_SOURCE_DIR}/modules.load)
 # Iterate over DYNAMIC_CMDS_LIST to add libraries
 foreach(lib ${DYNAMIC_CMDS_LIST})
 	if (lib STREQUAL "RomBuild" AND UNIX AND NOT APPLE)
-    	add_library(cmd_${lib} SHARED cmd_${lib}.cpp ../../android_builder/tasks/ROMBuildTask.cpp)
+    	add_library(cmd_${lib} SHARED cmd_${lib}.cpp
+            tasks/ROMBuildTask.cpp
+            tasks/UploadFileTask.cpp)
 	else()
     	add_library(cmd_${lib} SHARED cmd_${lib}.cpp)
 	endif()
