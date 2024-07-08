@@ -156,14 +156,6 @@ struct MatchesData {
         diffopts.flags = GIT_CHECKOUT_NOTIFY_CONFLICT;
         checkout_opts.checkout_strategy = GIT_CHECKOUT_SAFE;
 
-        ret =
-            git_config_open_ondisk(&config, (gitDirectory / "config").c_str());
-        if (ret != 0) {
-            LOG(ERROR) << "Failed to open config file: "
-                       << git_error_last_str();
-            git_config_free(config);
-            return false;
-        }
         ret = git_repository_open(&repo, gitDirectory.c_str());
 
         if (ret != 0) {
