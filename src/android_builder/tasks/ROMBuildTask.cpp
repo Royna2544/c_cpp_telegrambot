@@ -138,12 +138,12 @@ void ROMBuildTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
                 break;
         }
         buildInfoBuffer << std::endl << std::endl;
-        bot_editMessage(_bot, message, buildInfoBuffer.str() + buffer.data());
+        buildInfoBuffer << buffer.data();
+        bot_editMessage(_bot, message, buildInfoBuffer.str());
     }
 }
 
 void ROMBuildTask::onExit(int exitCode) {
-    // switch (exitCode) { case EXIT_SUCCESS: };
     LOG(INFO) << "Process exited with code: " << exitCode;
     std::memcpy(data.result, smem.memory, sizeof(PerBuildData::ResultData));
 }
