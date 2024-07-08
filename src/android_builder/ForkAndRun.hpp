@@ -17,8 +17,7 @@ struct FDLogSink : public absl::LogSink {
     void Send(const absl::LogEntry& logSink) override {
         const auto message = logSink.text_message_with_prefix_and_newline();
         constexpr std::string_view prefix = "SubProcess: ";
-        if (isWritable &&
-            logSink.log_severity() <= absl::LogSeverity::kWarning) {
+        if (isWritable) {
             write(stdout_fd, prefix.data(), prefix.size());
             write(stdout_fd, message.data(), message.size());
         }
