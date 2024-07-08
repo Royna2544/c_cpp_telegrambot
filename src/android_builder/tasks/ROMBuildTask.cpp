@@ -69,13 +69,13 @@ bool ROMBuildTask::runFunction() {
             std::string errorLogContent(
                 (std::istreambuf_iterator<char>(errorLog)),
                 std::istreambuf_iterator<char>());
+            std::regex_replace(errorLogContent, ansi_escape_code_pattern, "");
             const auto commandIdx = errorLogContent.find("Command:");
             if (commandIdx != std::string::npos) {
                 // Ninja error
                 resultdata->setMessage(errorLogContent.substr(0, commandIdx));
             } else {
                 // Probably makefile?
-                std::regex_replace(errorLogContent, ansi_escape_code_pattern, "");
                 resultdata->setMessage(errorLogContent);
             }
         } else {
