@@ -7,7 +7,7 @@
 #include <absl/log/log_sink_registry.h>
 #include <command_modules/CommandModule.h>
 #include <internal/_std_chrono_templates.h>
-#include <libos/libsighandler.h>
+#include <libos/libsighandler.hpp>
 
 #include <AbslLogInit.hpp>
 #include <DurationPoint.hpp>
@@ -23,6 +23,7 @@
 #include <memory>
 #include <utility>
 
+#include "TgBotWrapper.hpp"
 #include "tgbot/Bot.h"
 
 #ifdef RTCOMMAND_LOADER
@@ -210,7 +211,7 @@ void createAndDoInitCallAll(TgBot::Bot& gBot) {
     // Must be last
     createAndDoInitCall<OnAnyMessageRegisterer>(gBot);
     // Must be last
-    OnTerminateRegistrar::getInstance()->registerCallback([](int sig) {
+    OnTerminateRegistrar::getInstance()->registerCallback([]() {
         ThreadManager::getInstance()->destroyManager();
     });
 }
@@ -261,15 +262,11 @@ int main(int argc, char* const* argv) {
         return EXIT_FAILURE;
     }
 
-#ifdef HAVE_CURL
-    TgBot::CurlHttpClient cli;
-    Bot gBot(token.value(), cli);
-#else
-    Bot gBot(token.value());
-#endif
+    TgBotWrapper::initInstance(token.value());
 
+    auto& gBot = TgBotWrapper::getInstance()->getBot();
     // Install signal handlers
-    installSignalHandler();
+    SignalHandler::install();
 
     // Initialize subsystems
     createAndDoInitCallAll(gBot);
@@ -283,24 +280,22 @@ int main(int argc, char* const* argv) {
         onBotInitialized(gBot, startupDp, argv[0]);
     } catch (...) {
     }
-    while (true) {
+    while (!SignalHandler::isSignaled()) {
         try {
             LOG(INFO) << "Bot username: " << gBot.getApi().getMe()->username;
             gBot.getApi().deleteWebhook();
 
             TgLongPoll longPoll(gBot);
-            while (true) {
+            while (!SignalHandler::isSignaled()) {
                 longPoll.start();
             }
         } catch (const TgBot::TgException& e) {
             TgBotApiExHandler(gBot, e);
         } catch (const std::exception& e) {
             LOG(ERROR) << "Uncaught Exception: " << e.what();
-            LOG(ERROR) << "Throwing exception to the main thread";
-            defaultCleanupFunction();
-            throw;
+            break;
         }
     }
-    defaultCleanupFunction();
-    return EXIT_FAILURE;
+    OnTerminateRegistrar::getInstance()->callCallbacks();
+    return EXIT_SUCCESS;
 }
