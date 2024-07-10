@@ -130,6 +130,7 @@ set(SRC_LIST
   src/SpamBlocker.cpp
   src/ThreadManager.cpp
   src/TimerImpl.cpp
+  src/TgBotWrapper.cpp
   src/command_modules/CommandModules.cpp
   src/command_modules/compiler/Base.cpp
   src/command_modules/compiler/Bash.cpp

@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cmath>
 #include <sstream>
+#include "TgBotWrapper.hpp"
 
 TimerThread::Result TimerThread::parse(const std::string &timeString) {
     std::chrono::seconds parsedTimeLocal;
@@ -102,3 +103,6 @@ TimerThread::Result TimerThread::stop() {
     ManagedThreadRunnable::stop();
     return Result::SUCCESS;
 }
+
+// Really TODO: Remove
+DECLARE_CLASS_INST(TgBotWrapper);
