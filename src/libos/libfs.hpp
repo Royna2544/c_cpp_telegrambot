@@ -2,8 +2,6 @@
 
 #include <filesystem>
 
-#include "libfs.h"
-
 // Implemented sperately by OS
 
 struct FS {
