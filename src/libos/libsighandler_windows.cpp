@@ -1,6 +1,6 @@
 #include <windows.h>
 
-#include "libsighandler.h"
+#include "libsighandler.hpp"
 
 static BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
     switch (fdwCtrlType) {
@@ -9,12 +9,16 @@ static BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
         case CTRL_BREAK_EVENT:
         case CTRL_LOGOFF_EVENT:
         case CTRL_SHUTDOWN_EVENT:
-            defaultSignalHandler(invalidSignal);
+            SignalHandler::handleSignal();
         default:
             return FALSE;
     }
 }
 
-void installSignalHandler() {
+void SignalHandler::install() {
     SetConsoleCtrlHandler(CtrlHandler, TRUE);
+}
+
+void SignalHandler::uninstall() {
+    SetConsoleCtrlHandler(CtrlHandler, FALSE);
 }

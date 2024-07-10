@@ -4,7 +4,7 @@
 #include "InstanceClassBase.hpp"
 
 struct OnTerminateRegistrar : InstanceClassBase<OnTerminateRegistrar> {
-    using callback_type = std::function<void(int sig)>;
+    using callback_type = std::function<void()>;
 
     /**
      * @brief Registers a callback function to be called when the process
@@ -47,15 +47,13 @@ struct OnTerminateRegistrar : InstanceClassBase<OnTerminateRegistrar> {
 
     /**
      * @brief Calls all registered callback functions with the given signal.
-     *
-     * @param sig The signal to be sent to all registered callback functions.
      */
-    void callCallbacks(int sig) {
+    void callCallbacks() {
         for (const auto& callback : callbacks) {
-            callback(sig);
+            callback();
         }
         for (const auto& pair : callbacksWithToken) {
-            pair.second(sig);
+            pair.second();
         }
     }
 

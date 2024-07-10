@@ -2,7 +2,7 @@
 #include <ConfigManager.h>
 #include <absl/log/log.h>
 #include <inttypes.h>
-#include <libos/libsighandler.h>
+#include <libos/libsighandler.hpp>
 #include <unistd.h>
 
 #include <TryParseStr.hpp>
@@ -43,7 +43,6 @@ static void restartCommandFn(const Bot &bot, const Message::Ptr message) {
     LOG(INFO) << "Restarting bot with exe: " << argv[0] << ", addenv "
               << restartBuf.data();
     bot_sendReplyMessage(bot, message, "Restarting bot instance...");
-    defaultCleanupFunction();
     // Call exeve
     execve(argv[0], argv, myEnviron.data());
 }

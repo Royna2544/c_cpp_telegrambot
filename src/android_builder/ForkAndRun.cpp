@@ -18,6 +18,7 @@
 #include <thread>
 
 #include "PythonClass.hpp"
+#include "libos/libsighandler.hpp"
 #include "random/RandomNumberGenerator.h"
 
 bool ForkAndRun::execute() {
@@ -45,8 +46,7 @@ bool ForkAndRun::execute() {
         close(python_pipe.readEnd());
 
         // Clear handlers
-        signal(SIGINT, [](int) {});
-        signal(SIGTERM, [](int) {});
+        SignalHandler::uninstall();
 
         // Set the process group to the current process ID
         setpgrp();
@@ -79,7 +79,7 @@ bool ForkAndRun::execute() {
         random_return_type token = RandomNumberGenerator::generate(100);
         auto tregi = OnTerminateRegistrar::getInstance();
 
-        tregi->registerCallback([this](int sig) { cancel(); }, token);
+        tregi->registerCallback([this]() { cancel(); }, token);
 
         childProcessId = pid;
         close(stdout_pipe.writeEnd());

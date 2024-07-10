@@ -39,7 +39,7 @@ struct TgBotDatabaseImpl : InstanceClassBase<TgBotDatabaseImpl>, InitCall {
     void doInitCall() override {
         loadDBFromConfig();
         OnTerminateRegistrar::getInstance()->registerCallback(
-            [this](int) { unloadDatabase(); });
+            [this]() { unloadDatabase(); });
     }
 
    private:
