@@ -25,15 +25,19 @@ bool FS::canExecute(const std::filesystem::path& filename) {
     return false;
 }
 
+std::string FS::getDylibExtension() {
+#ifdef WINDOWS_BUILD
+    return ".dll";
+#elif defined __APPLE__
+    return ".dylib";
+#else
+    return ".so";
+#endif
+}
+
 std::filesystem::path& FS::appendDylibExtension(std::filesystem::path& path) {
     if (!path.has_extension()) {
-#ifdef WINDOWS_BUILD
-        path += ".dll";
-#elif defined __APPLE__
-        path += ".dylib";
-#else
-        path += ".so";
-#endif
+        path += getDylibExtension();
     }
 
     return path;

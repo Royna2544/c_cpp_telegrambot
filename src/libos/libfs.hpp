@@ -63,6 +63,7 @@ struct FS {
         std::filesystem::path& path);
     static std::filesystem::path& makeRelativeToCWD(
         std::filesystem::path& path);
+    static std::string getDylibExtension();
 
    private:
     /**
