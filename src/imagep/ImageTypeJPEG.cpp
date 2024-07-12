@@ -11,6 +11,7 @@
 #include <cstring>
 #include "ImageTypeJPEG.hpp"
 #include <memory>
+#include "absl/status/status.h"
 
 struct jpegimg_error_mgr {
     jpeg_error_mgr pub;
@@ -84,7 +85,7 @@ bool JPEGImage::read(const std::filesystem::path& filename) {
     return true;
 }
 
-JPEGImage::Result JPEGImage::_rotate_image(int angle) {
+absl::Status JPEGImage::_rotate_image(int angle) {
     size_t new_width = 0;
     size_t new_height = 0;
     std::unique_ptr<unsigned char[]> new_image_data = nullptr;
@@ -101,10 +102,10 @@ JPEGImage::Result JPEGImage::_rotate_image(int angle) {
             break;
         case kAngleMin:
             // No-op
-            return Result::kSuccess;
+            return absl::OkStatus();
         default:
             LOG(WARNING) << "libJPEG cannot handle angle: " << angle;
-            return Result::kErrorUnsupportedAngle;
+            return absl::UnimplementedError("Unsupported angle");
     }
 
     new_image_data = std::make_unique<unsigned char[]>(new_width * new_height *
@@ -142,7 +143,7 @@ JPEGImage::Result JPEGImage::_rotate_image(int angle) {
     image_data = std::move(new_image_data);
     width = new_width;
     height = new_height;
-    return Result::kSuccess;
+    return absl::OkStatus();
 }
 
 void JPEGImage::to_greyscale() {

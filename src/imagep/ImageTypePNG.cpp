@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <filesystem>
 #include <string>
+#include "absl/status/status.h"
 
 #if (PNG_LIBPNG_VER < 10500)
 #define png_longjmp_fn(png, val) longjmp(png->jmpbuf, val);
@@ -151,10 +152,10 @@ void PngImage::rotate_image_impl(int new_width, int new_height,
     }
 }
 
-PngImage::Result PngImage::_rotate_image(int angle) {
+absl::Status PngImage::_rotate_image(int angle) {
     if (!contains_data) {
         LOG(ERROR) << "No image data to rotate";
-        return Result::kErrorNoData;
+        return absl::UnavailableError("No image data to rotate");
     }
 
     switch (angle) {
@@ -187,13 +188,13 @@ PngImage::Result PngImage::_rotate_image(int angle) {
             break;
         case kAngleMin:
             // Noop
-            return Result::kSuccess;
+            return absl::OkStatus();
         default:
             LOG(WARNING) << "libPNG cannot handle angle: " << angle;
-            return Result::kErrorUnsupportedAngle;
+            return absl::UnimplementedError("Cannot handle angle");
     }
     LOG(INFO) << "New dimensions: " << width << "x" << height;
-    return Result::kSuccess;
+    return absl::OkStatus();
 }
 
 bool PngImage::write(const std::filesystem::path& filename) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <absl/log/log.h>
+#include <absl/status/status.h>
 
 #include <filesystem>
 
@@ -16,13 +17,6 @@ struct PhotoBase {
     static constexpr int kAngle180 = 180;
     static constexpr int kAngle270 = 270;
     static constexpr int kAngleMax = 360;
-    
-    enum class Result {
-        kSuccess,
-        kErrorUnsupportedAngle,
-        kErrorInvalidArgument,
-        kErrorNoData,
-    };
 
     /**
      * @brief Reads an image from the specified file.
@@ -44,10 +38,10 @@ struct PhotoBase {
      * @note The function does not handle cases where the image is not valid or
      *       cannot be rotated.
      */
-    Result rotate_image(int angle) {
+    absl::Status rotate_image(int angle) {
         if (angle < kAngleMin || angle > kAngleMax) {
             LOG(ERROR) << "Invalid rotation angle: " << angle;
-            return Result::kErrorInvalidArgument;
+            return absl::InvalidArgumentError("Invalid rotation angle");
         }
         return _rotate_image(angle);
     }
@@ -99,5 +93,5 @@ struct PhotoBase {
      * @note The function does not handle cases where the image is not valid or
      *       cannot be rotated.
      */
-    virtual Result _rotate_image(int angle) = 0;
+    virtual absl::Status _rotate_image(int angle) = 0;
 };

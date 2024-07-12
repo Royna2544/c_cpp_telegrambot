@@ -14,11 +14,11 @@
 #ifdef HAVE_LIBWEBP
 #include "ImageTypeWEBP.hpp"
 #endif
-#include "imagep/ImagePBase.hpp"
+#include "ImagePBase.hpp"
 
 struct ImageProcessingAll {
     bool read();
-    PhotoBase::Result rotate(int angle);
+    absl::Status rotate(int angle);
     void to_greyscale();
     bool write(const std::filesystem::path& filename);
 

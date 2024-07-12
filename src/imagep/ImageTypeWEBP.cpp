@@ -8,6 +8,7 @@
 
 #include <cstdint>
 #include <memory>
+#include "absl/status/status.h"
 
 bool WebPImage::read(const std::filesystem::path& filename) {
     int width = 0;
@@ -47,10 +48,10 @@ bool WebPImage::read(const std::filesystem::path& filename) {
     return true;
 }
 
-WebPImage::Result WebPImage::_rotate_image(int angle) {
+absl::Status WebPImage::_rotate_image(int angle) {
     if (data_ == nullptr) {
         LOG(ERROR) << "No image data to rotate";
-        return Result::kErrorNoData;
+        return absl::NotFoundError("No image data to rotate");
     }
 
     long rotated_width = 0;
@@ -69,10 +70,10 @@ WebPImage::Result WebPImage::_rotate_image(int angle) {
             break;
         case kAngleMin:
             // noop
-            return Result::kSuccess;
+            return absl::OkStatus();
         default:
             LOG(WARNING) << "libWEBP cannot handle angle: " << angle;
-            return Result::kErrorUnsupportedAngle;
+            return absl::UnimplementedError("Cannot handle angle");
     }
 
     rotated_data =
@@ -106,7 +107,7 @@ WebPImage::Result WebPImage::_rotate_image(int angle) {
     data_ = std::move(rotated_data);
     width_ = rotated_width;
     height_ = rotated_height;
-    return Result::kSuccess;
+    return absl::OkStatus();
 }
 
 void WebPImage::to_greyscale() {

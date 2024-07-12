@@ -16,7 +16,7 @@ class OpenCVImage : public PhotoBase {
     ~OpenCVImage() override = default;
 
     bool read(const std::filesystem::path& filename) override;
-    Result _rotate_image(int angle) override;
+    absl::Status _rotate_image(int angle) override;
     void to_greyscale() override;
     bool write(const std::filesystem::path& filename) override;
     std::string version() const override;

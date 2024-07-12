@@ -2,8 +2,6 @@
 
 #include <filesystem>
 
-#include "imagep/ImagePBase.hpp"
-
 ImageProcessingAll::ImageProcessingAll(std::filesystem::path filename)
     : _filename(std::move(filename)) {
 #ifdef HAVE_OPENCV
@@ -35,10 +33,10 @@ bool ImageProcessingAll::read() {
     return false;
 }
 
-PhotoBase::Result ImageProcessingAll::rotate(int angle) {
+absl::Status ImageProcessingAll::rotate(int angle) {
     if (!_impl) {
         LOG(ERROR) << "No backend selected for rotation";
-        return PhotoBase::Result::kErrorNoData;
+        return absl::UnavailableError("No backend available");
     }
     DLOG(INFO) << "Calling impl->rotate with angle: " << angle;
     return _impl->rotate_image(angle);

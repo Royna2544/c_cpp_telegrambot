@@ -61,7 +61,7 @@ struct PngImage : PhotoBase {
      * @return A Result object that indicates whether the rotation operation was
      * successful.
      */
-    Result _rotate_image(int angle) override;
+    absl::Status _rotate_image(int angle) override;
 
     /**
      * @brief Converts the image to grayscale.

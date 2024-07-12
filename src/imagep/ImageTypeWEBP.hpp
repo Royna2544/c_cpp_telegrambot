@@ -34,7 +34,7 @@ class WebPImage : public PhotoBase {
      * @return A Result object indicating the success or failure of the
      * operation.
      */
-    Result _rotate_image(int angle) override;
+    absl::Status _rotate_image(int angle) override;
 
     /**
      * @brief Converts the image to grayscale.

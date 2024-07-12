@@ -1,5 +1,6 @@
 #include "ImageProcOpenCV.hpp"
 #include <opencv2/core/utility.hpp>
+#include "absl/status/status.h"
 
 bool OpenCVImage::read(const std::filesystem::path& filename) {
     image = cv::imread(filename.string(), cv::IMREAD_UNCHANGED);
@@ -10,7 +11,7 @@ bool OpenCVImage::read(const std::filesystem::path& filename) {
     return true;
 }
 
-OpenCVImage::Result OpenCVImage::_rotate_image(int angle) {
+absl::Status OpenCVImage::_rotate_image(int angle) {
     // Make it clockwise
     angle = kAngleMax - angle;
 
@@ -29,7 +30,7 @@ OpenCVImage::Result OpenCVImage::_rotate_image(int angle) {
     cv::warpAffine(image, rotated_image, rotation_matrix, bbox.size());
 
     image = rotated_image;
-    return Result::kSuccess;
+    return absl::OkStatus();
 }
 
 void OpenCVImage::to_greyscale() {
