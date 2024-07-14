@@ -1,6 +1,4 @@
-#include <BotClassBase.h>
 #include <ManagedThreads.hpp>
-
 #include <SocketBase.hpp>
 #include <functional>
 #include <initcalls/BotInitcall.hpp>
@@ -17,13 +15,14 @@
 #include "impl/SocketPosix.hpp"
 #endif  // WINDOWS_BUILD
 
+#include <TgBotPPImplExports.h>
+
 using TgBotSocket::callback::GenericAck;
 using TgBotSocket::callback::UploadFileDryCallback;
 
-struct SocketInterfaceTgBot : ManagedThreadRunnable,
-                              BotInitCall,
-                              BotClassBase,
-                              TgBotSocketParser {
+struct TgBotPPImpl_API SocketInterfaceTgBot : ManagedThreadRunnable,
+                                              BotInitCall,
+                                              TgBotSocketParser {
     void doInitCall(Bot& bot) override;
     const CStringLifetime getInitCallName() const override {
         return "Create sockets and setup";
@@ -35,7 +34,7 @@ struct SocketInterfaceTgBot : ManagedThreadRunnable,
     void runFunction() override;
 
     explicit SocketInterfaceTgBot(
-        Bot& bot, std::shared_ptr<SocketInterfaceBase> _interface);
+        std::shared_ptr<SocketInterfaceBase> _interface);
 
    private:
     std::shared_ptr<SocketInterfaceBase> interface = nullptr;

@@ -1,14 +1,16 @@
 #pragma once
 
+#include <TgBotPPImplExports.h>
 #include <Types.h>
 #include <tgbot/types/Message.h>
 
 #include <chrono>
+
 #include "InstanceClassBase.hpp"
 
 using TgBot::Message;
 
-class AuthContext : public InstanceClassBase<AuthContext> {
+class TgBotPPImpl_API AuthContext : public InstanceClassBase<AuthContext> {
    public:
     enum Flags : unsigned int {
         REQUIRE_USER = 0x1,  // If set, don't allow non-users

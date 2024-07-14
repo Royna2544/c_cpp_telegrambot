@@ -3,16 +3,18 @@ include(cmake/libgit2.cmake)
 #####################################################################
 
 ################# TgBot Utilities (generic) Library #################
-add_library_san(
-  TgBotUtils SHARED
-  src/ConfigManager.cpp
-  src/ConfigManager_${TARGET_VARIANT}.cpp
-  src/GitData.cpp
-  src/libos/libsighandler_impl.cpp
-  src/libos/libsighandler_${TARGET_VARIANT}.cpp
-  src/libos/libfs.cpp
-  src/libos/libfs_${TARGET_VARIANT}.cpp)
-
-target_link_libraries(TgBotUtils ${Boost_LIBRARIES} ${LIBGIT2_LIBS})
-target_link_lib_if_windows(TgBotUtils shlwapi)
+add_my_library(
+  NAME Utils
+  SRCS
+    src/ConfigManager.cpp
+    src/ConfigManager_${TARGET_VARIANT}.cpp
+    src/GitData.cpp
+    src/libos/libfs.cpp
+    src/libos/libfs_${TARGET_VARIANT}.cpp
+    src/libos/libsighandler_impl.cpp
+    src/libos/libsighandler_${TARGET_VARIANT}.cpp
+    src/ResourceManager.cpp
+  LIBS ${Boost_LIBRARIES} ${LIBGIT2_LIBS}
+  LIBS_WIN32 shlwapi
+)
 #####################################################################

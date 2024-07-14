@@ -18,7 +18,7 @@ class RepoUtils {
     void repo_init(const CloneOptions& options);
     void repo_sync(const long job_count);
     static void git_clone(const CloneOptions& options, const std::filesystem::path& directory);
-    explicit RepoUtils(std::filesystem::path& scriptDirectory);
+    explicit RepoUtils();
     ~RepoUtils();
 
    private:

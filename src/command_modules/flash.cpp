@@ -1,6 +1,6 @@
-#include <random/RandomNumberGenerator.h>
+#include <RandomNumberGenerator.hpp>
 
-#include <MessageWrapper.hpp>
+#include <TgBotWrapper.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <chrono>
@@ -9,24 +9,23 @@
 #include <regex>
 #include <thread>
 
-#include "CommandModule.h"
 #include "ResourceManager.h"
 #include "StringToolsExt.hpp"
 
 constexpr std::string_view kZipExtensionSuffix = ".zip";
 constexpr int FLASH_DELAY_MAX_SEC = 5;
 
-static void FlashCommandFn(const Bot& bot, const Message::Ptr& message) {
+static void FlashCommandFn(const TgBotWrapper* botWrapper, const Message::Ptr& message) {
     static std::vector<std::string> reasons;
     static std::once_flag once;
     static std::regex kFlashTextRegEX(R"(Flashing '\S+.zip'\.\.\.)");
     std::optional<std::string> msg;
     std::stringstream ss;
     Message::Ptr sentmsg;
-    MessageWrapper wrapper(bot, message);
+    MessageWrapper wrapper(message);
     const auto sleep_secs =
         RandomNumberGenerator::generate(FLASH_DELAY_MAX_SEC);
-    random_return_type pos;
+    random_return_type pos = 0;
 
     std::call_once(once, [] {
         std::string buf;
@@ -64,7 +63,7 @@ static void FlashCommandFn(const Bot& bot, const Message::Ptr& message) {
         msg.value() += kZipExtensionSuffix;
     }
     ss << "Flashing " << std::quoted(msg.value()) << "..." << std::endl;
-    sentmsg = bot_sendReplyMessage(bot, message, ss.str());
+    sentmsg = botWrapper->sendReplyMessage(message, ss.str());
 
     std::this_thread::sleep_for(std::chrono::seconds(sleep_secs));
     if (pos != reasons.size()) {
@@ -73,12 +72,13 @@ static void FlashCommandFn(const Bot& bot, const Message::Ptr& message) {
     } else {
         ss << "Success! Chance was 1/" << reasons.size();
     }
-    bot_editMessage(bot, sentmsg, ss.str());
+    botWrapper->editMessage(sentmsg, ss.str());
 }
 
-void loadcmd_flash(CommandModule& module) {
+DYN_COMMAND_FN(n, module) {
     module.command = "flash";
     module.description = "Flash and get a random result";
     module.flags = CommandModule::Flags::None;
     module.fn = FlashCommandFn;
+    return true;
 }

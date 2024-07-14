@@ -10,10 +10,8 @@
     <string name="example">Example</string>
     <string name="need_user">You must specify a user</string>
     <string name="unknown_action">Unknown action</string>
-    <string name="cmd_not_loaded">Command not loaded</string>
-    <string name="cmd_already_loaded">Command already loaded</string>
-    <string name="cmd_not_found_to_load">Command not found to load</string>
-    <string name="cmd_not_found_to_unload">Command not found to unload</string>
+    <string name="operation_successful">Operation Sucessful</string>
+    <string name="operation_failure">Operation failed</string>
     <string name="not_supported_in_current_host">Not supported in current host</string>
     <string name="reply_to_user_msg">Reply to a user's message</string>
     <string name="reply_to_gif_or_sticker">Reply to a GIF or sticker</string>

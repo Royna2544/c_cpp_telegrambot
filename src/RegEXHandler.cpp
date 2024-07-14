@@ -1,13 +1,11 @@
-#include <BotReplyMessage.h>
-#include <RegEXHandler.h>
 #include <absl/log/log.h>
 
+#include <RegEXHandler.hpp>
 #include <boost/algorithm/string/trim.hpp>
 #include <ios>
 #include <optional>
 #include <regex>
 #include <string>
-
 #include "InstanceClassBase.hpp"
 
 using std::regex_constants::ECMAScript;
@@ -24,7 +22,9 @@ static const std::regex kSedDeleteCommandRegex(R"(^\/.+\/d$)");
 
 std::vector<std::string> RegexHandlerBase::matchRegexAndSplit(
     const std::string& text, const std::regex& regex) {
-    if (std::regex_match(text, regex)) return StringTools::split(text, '/');
+    if (std::regex_match(text, regex)) {
+        return StringTools::split(text, '/');
+    }
     return {};
 }
 
@@ -115,35 +115,6 @@ void RegexHandlerBase::processRegEXCommand(const Message::Ptr& srcstr,
     if (ret) {
         onRegexProcessed(srcstr, *ret);
     }
-}
-
-void RegexHandler::onRegexCreationFailed(const Message::Ptr& message,
-                                         const std::string& what,
-                                         const std::regex_error& why) {
-    bot_sendReplyMessage(
-        _bot, message,
-        "Failed to parse regex (if it is) in '" + what + "': " + why.what());
-}
-void RegexHandler::onRegexOperationFailed(const Message::Ptr& which,
-                                          const std::regex_error& why) {
-    bot_sendReplyMessage(
-        _bot, which,
-        std::string() + "Exception while executing doRegex: " + why.what());
-}
-void RegexHandler::onRegexProcessed(const Message::Ptr& from,
-                                    const std::string& processedData) {
-    bot_sendReplyMessage(_bot, from->replyToMessage, processedData);
-}
-void RegexHandler::processRegEXCommandMessage(const Message::Ptr& message) {
-    if (message->replyToMessage && !message->replyToMessage->text.empty())
-        processRegEXCommand(message, message->replyToMessage->text);
-}
-
-void RegexHandler::doInitCall() {
-    OnAnyMessageRegisterer::getInstance()->registerCallback(
-        [this](const Bot&  /*bot*/, const Message::Ptr& message) {
-            processRegEXCommandMessage(message);
-        });
 }
 
 DECLARE_CLASS_INST(RegexHandler);

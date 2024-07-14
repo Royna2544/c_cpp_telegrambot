@@ -1,4 +1,4 @@
-#include "RandomNumberGenerator.h"
+#include "RandomNumberGenerator.hpp"
 
 #include <absl/log/log.h>
 
@@ -10,7 +10,6 @@
 #include <random>
 #include <string_view>
 
-#include "InstanceClassBase.hpp"
 #include "KernelRandEngine.h"
 #include "RDRandEngine.h"
 

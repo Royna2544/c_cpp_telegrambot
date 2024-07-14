@@ -7,7 +7,6 @@
 
 #include <mutex>
 
-
 struct FileSinkBase : absl::LogSink {
     void Send(const absl::LogEntry& entry) override {
         const std::lock_guard<std::mutex> lock(m);

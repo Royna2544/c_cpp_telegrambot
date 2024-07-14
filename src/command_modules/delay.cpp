@@ -1,13 +1,12 @@
-#include <BotReplyMessage.h>
 #include <internal/_std_chrono_templates.h>
 
 #include <chrono>
 #include <ctime>
 #include <ostream>
+#include "DurationPoint.hpp"
+#include <TgBotWrapper.hpp>
 
-#include "CommandModule.h"
-
-static void DelayCommandFn(const Bot& bot, const Message::Ptr message) {
+static void DelayCommandFn(const TgBotWrapper* wrapper, const MessagePtr message) {
     using std::chrono::duration;
     using std::chrono::high_resolution_clock;
     using std::chrono::system_clock;
@@ -19,15 +18,17 @@ static void DelayCommandFn(const Bot& bot, const Message::Ptr message) {
     ss << "Received at: " << fromTP(now) << std::endl;
     ss << "Diff: " << to_secs(now - msg).count() << 's' << std::endl;
     auto dp = DurationPoint();
-    auto sentMsg = bot_sendReplyMessage(bot, message, ss.str());
+    auto sentMsg = wrapper->sendReplyMessage(message, ss.str());
     auto tp = dp.get();
     ss << "Sending reply message took: " << tp.count() << "ms" << std::endl;
-    bot_editMessage(bot, sentMsg, ss.str());
+    // Update the sent message with the delay information
+    wrapper->editMessage(sentMsg, ss.str());
 }
    
-void loadcmd_delay(CommandModule& module) {
+DYN_COMMAND_FN(name, module) {
     module.command = "delay";
     module.description = "Ping the bot for network delay";
     module.flags = CommandModule::Flags::None;
     module.fn = DelayCommandFn;
+    return true;
 }

@@ -7,8 +7,6 @@
 #include <sstream>
 #include <system_error>
 
-#include "InstanceClassBase.hpp"
-
 bool ResourceManager::preloadOneFile(std::filesystem::path path) {
     std::ifstream file(path);
     std::stringstream linebuf;

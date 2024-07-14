@@ -1,4 +1,3 @@
-#include <BotAddCommand.h>
 #include <RTCommandLoader.h>
 #include <absl/log/log.h>
 #include <dlfcn.h>
@@ -8,8 +7,7 @@
 #include <vector>
 
 #include "InstanceClassBase.hpp"
-#include "command_modules/runtime/cmd_dynamic.h"
-#include "command_modules/CommandModule.h"
+#include "TgBotWrapper.hpp"
 
 DynamicLibraryHolder::DynamicLibraryHolder(
     DynamicLibraryHolder&& other) noexcept
@@ -24,41 +22,46 @@ DynamicLibraryHolder::~DynamicLibraryHolder() {
     }
 }
 
-bool RTCommandLoader::loadOneCommand(std::filesystem::path _fname) {
-    command_loader_function_t functionSym;
+// Sym contains const char *cmdname, CommandModule& out, return if success
+bool RTCommandLoader::loadOneCommand(std::filesystem::path fname) {
     Dl_info info{};
     void* handle = nullptr;
     void* fnptr = nullptr;
     const char* dlerrorBuf = nullptr;
-    const std::string fname = FS::appendDylibExtension(_fname).string();
+    bool (*sym)(const char*, CommandModule&) = nullptr;
+    CommandModule module;
+    std::array<char, 20> cmdName{};
 
-    handle = dlopen(fname.c_str(), RTLD_NOW);
+    handle = dlopen(fname.string().c_str(), RTLD_NOW);
     if (handle == nullptr) {
         dlerrorBuf = dlerror();
         LOG(WARNING) << "Failed to load: "
                      << ((dlerrorBuf != nullptr) ? dlerrorBuf : "unknown");
         return false;
     }
-    functionSym = reinterpret_cast<void (*)(CommandModule&)>(
-        dlsym(handle, DYN_COMMAND_SYM_STR));
-    if (!functionSym) {
+    sym = reinterpret_cast<decltype(sym)>(dlsym(handle, DYN_COMMAND_SYM_STR));
+    if (sym == nullptr) {
         LOG(WARNING) << "Failed to lookup symbol '" DYN_COMMAND_SYM_STR "' in "
                      << fname;
         dlclose(handle);
         return false;
     }
-    CommandModule mod;
-    try {
-        functionSym(mod);
-    } catch (const std::exception& e) {
-        LOG(WARNING) << "Failed to load command from " << fname
-                     << ": Loader function threw an exception: "
-                     << std::quoted(e.what());
-        // TODO dlclose(handle);
+    libs.emplace_back(handle);
+
+    if (sscanf(fname.filename().replace_extension().string().c_str(),
+               "libcmd_%s", cmdName.data()) != 1) {
+        LOG(WARNING) << "scanf failed for " << fname;
+        dlclose(handle);
         return false;
     }
-    libs.emplace_back(handle);
-    bot_AddCommand(bot, mod.command, mod.fn, mod.isEnforced());
+
+    if (!sym(cmdName.data(), module)) {
+        LOG(WARNING) << "Failed to load command module from " << fname;
+        dlclose(handle);
+        return false;
+    }
+
+    TgBotWrapper::getInstance()->addCommand(module);
 
     if (dladdr(dlsym(handle, DYN_COMMAND_SYM_STR), &info) < 0) {
         dlerrorBuf = dlerror();
@@ -67,34 +70,23 @@ bool RTCommandLoader::loadOneCommand(std::filesystem::path _fname) {
     } else {
         fnptr = info.dli_saddr;
     }
-    LOG(INFO) << "Loaded RT command module from " << fname;
-    LOG(INFO) << "Module dump: { enforced: " << mod.isEnforced()
-              << ", name: " << mod.command << ", fn: " << fnptr << " }";
+    //    DLOG(INFO) << "Loaded RT command module from " << fname;
+    //    DLOG(INFO) << "Module dump: { enforced: " << module.isEnforced()
+    //               << ", name: " << module.command << ", fn: " << fnptr << "
+    //               }";
     return true;
 }
 
-bool RTCommandLoader::loadCommandsFromFile(
-    const std::filesystem::path& filename) {
-    std::string line;
-    std::ifstream ifs(filename.string());
-    if (ifs) {
-        while (std::getline(ifs, line)) {
-            loadOneCommand(FS::getPathForType(FS::PathType::MODULES_INSTALLED) /
-                           line);
+void RTCommandLoader::doInitCall() {
+    for (auto i = std::filesystem::directory_iterator(
+             FS::getPathForType(FS::PathType::BUILD_ROOT));
+         i != std::filesystem::directory_iterator(); ++i) {
+        if (i->path().extension() == FS::kDylibExtension &&
+            i->path().filename().string().starts_with("libcmd_")) {
+            LOG(INFO) << "Loading " << i->path().filename() << "...";
+            loadOneCommand(i->path());
         }
-    } else {
-        LOG(WARNING) << "Failed to open " << filename.string();
-        return false;
     }
-    return true;
-}
-
-void RTCommandLoader::commandStub(const Bot& bot, const Message::Ptr& message) {
-    bot_sendReplyMessage(bot, message, "Unsupported command");
-}
-
-std::filesystem::path RTCommandLoader::getModulesLoadConfPath() {
-    return FS::getPathForType(FS::PathType::GIT_ROOT) / "modules.load";
 }
 
 DECLARE_CLASS_INST(RTCommandLoader);

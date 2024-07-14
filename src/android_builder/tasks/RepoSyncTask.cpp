@@ -376,7 +376,15 @@ struct MatchesData {
         const char* upstreamName = nullptr;
         RAIIGit raii;
         git_config* config = nullptr;
-
+        
+        ret =
+            git_config_open_ondisk(&config, (gitDirectory / "config").c_str());
+        if (ret != 0) {
+            LOG(ERROR) << "Failed to open config file: "
+                       << git_error_last_str();
+            git_config_free(config);
+            return false;
+        }
         // This config may not exist... probably?
         if (ret == 0) {
             int val = 0;
@@ -543,7 +551,7 @@ bool RepoSyncTask::runFunction() {
     }
 
     try {
-        RepoUtils utils(data.scriptDirectory);
+        RepoUtils utils;
         MatchesData mmdata{
             .gitDirectory = ".repo/manifests",
             .desiredBranch = data.rConfig.branch,

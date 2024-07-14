@@ -1,5 +1,6 @@
 #pragma once
 
+#include <TgBotPPImplExports.h>
 #include <absl/log/check.h>
 #include <absl/log/log.h>
 
@@ -18,10 +19,10 @@
 #include "EnumArrayHelpers.h"
 #include "InstanceClassBase.hpp"
 
+
 struct ManagedThread;
 
-class ThreadManager
-    : public InstanceClassBase<ThreadManager> {
+class TgBotPPImpl_API ThreadManager : public InstanceClassBase<ThreadManager> {
    public:
     using controller_type = std::shared_ptr<ManagedThread>;
 
@@ -39,19 +40,17 @@ class ThreadManager
         MAX,
     };
 
-    #define USAGE_AND_STR(x) array_helpers::make_elem<Usage, const char *>(Usage::x, #x)
+#define USAGE_AND_STR(x) \
+    array_helpers::make_elem<Usage, const char*>(Usage::x, #x)
     constexpr static auto ThreadUsageToStrMap =
         array_helpers::make<static_cast<int>(Usage::MAX), Usage, const char*>(
-            USAGE_AND_STR(SOCKET_THREAD),
-            USAGE_AND_STR(SOCKET_EXTERNAL_THREAD),
-            USAGE_AND_STR(TIMER_THREAD),
-            USAGE_AND_STR(SPAMBLOCK_THREAD),
+            USAGE_AND_STR(SOCKET_THREAD), USAGE_AND_STR(SOCKET_EXTERNAL_THREAD),
+            USAGE_AND_STR(TIMER_THREAD), USAGE_AND_STR(SPAMBLOCK_THREAD),
             USAGE_AND_STR(ERROR_RECOVERY_THREAD),
             USAGE_AND_STR(IBASH_EXIT_TIMEOUT_THREAD),
             USAGE_AND_STR(IBASH_UPDATE_OUTPUT_THREAD),
             USAGE_AND_STR(DATABASE_SYNC_THREAD),
-            USAGE_AND_STR(WEBSERVER_THREAD),
-            USAGE_AND_STR(LOGSERVER_THREAD));
+            USAGE_AND_STR(WEBSERVER_THREAD), USAGE_AND_STR(LOGSERVER_THREAD));
 
     template <Usage u>
     constexpr static const char* ThreadUsageToStr() {
@@ -76,9 +75,9 @@ class ThreadManager
     std::unordered_map<Usage, controller_type> kControllers;
 };
 
-struct ManagedThread {
+struct TgBotPPImpl_API ManagedThread {
     using thread_function = std::function<void(void)>;
-    using prestop_function = std::function<void(ManagedThread *)>;
+    using prestop_function = std::function<void(ManagedThread*)>;
 
     // Set thread function and run - implictly starts the thread as well
     void runWith(thread_function fn);
@@ -145,9 +144,9 @@ struct ManagedThread {
     } mgr_priv{};
 };
 
-struct ManagedThreadRunnable : ManagedThread {
-    using ManagedThread::runWith;
+struct TgBotPPImpl_API ManagedThreadRunnable : ManagedThread {
     using ManagedThread::ManagedThread;
+    using ManagedThread::runWith;
     virtual void runFunction() = 0;
     void run() {
         ManagedThread::runWith([this] { runFunction(); });

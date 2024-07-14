@@ -2,7 +2,13 @@
 
 #include <atomic>
 
-class SignalHandler {
+#ifdef WINDOWS_BUILD
+#include <Windows.h>
+#endif
+
+#include <TgBotUtilsExports.h>
+
+class TgBotUtils_API SignalHandler {
    public:
     /**
      * @brief Installs the signal handler.
@@ -51,6 +57,9 @@ class SignalHandler {
      */
     static bool isSignaled() { return kUnderSignal.load(); }
 
+#ifdef WINDOWS_BUILD
+   friend BOOL WINAPI CtrlHandler(DWORD fdwCtrlType);
+#endif
    private:
     static std::atomic_bool kUnderSignal;
     static void signalHandler(int /*signum*/) { signalHandler(); }

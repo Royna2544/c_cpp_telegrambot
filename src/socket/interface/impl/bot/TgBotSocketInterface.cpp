@@ -10,10 +10,8 @@
 
 using HandleState = SocketInterfaceTgBot::HandleState;
 
-SocketInterfaceTgBot::SocketInterfaceTgBot(
-    Bot& bot, std::shared_ptr<SocketInterfaceBase> _interface)
+SocketInterfaceTgBot::SocketInterfaceTgBot(std::shared_ptr<SocketInterfaceBase> _interface)
     : interface(std::move(_interface)),
-      BotClassBase(bot),
       TgBotSocketParser(_interface.get()) {}
 
 void SocketInterfaceTgBot::doInitCall(Bot& bot) {
@@ -25,13 +23,13 @@ void SocketInterfaceTgBot::doInitCall(Bot& bot) {
         threads.emplace_back(
             mgr->createController<ThreadManager::Usage::SOCKET_THREAD,
                                   SocketInterfaceTgBot>(
-                std::ref(bot), wrapper.getInternalInterface()));
+                 wrapper.getInternalInterface()));
     }
     if (wrapper.getExternalInterface()) {
         threads.emplace_back(
             mgr->createController<ThreadManager::Usage::SOCKET_EXTERNAL_THREAD,
                                   SocketInterfaceTgBot>(
-                std::ref(bot), wrapper.getExternalInterface()));
+                wrapper.getExternalInterface()));
     }
     for (auto& thr : threads) {
         thr->interface->options.port = SocketInterfaceBase::kTgBotHostPort;

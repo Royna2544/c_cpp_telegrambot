@@ -25,19 +25,9 @@ bool FS::canExecute(const std::filesystem::path& filename) {
     return false;
 }
 
-std::string FS::getDylibExtension() {
-#ifdef WINDOWS_BUILD
-    return ".dll";
-#elif defined __APPLE__
-    return ".dylib";
-#else
-    return ".so";
-#endif
-}
-
 std::filesystem::path& FS::appendDylibExtension(std::filesystem::path& path) {
     if (!path.has_extension()) {
-        path += getDylibExtension();
+        path += kDylibExtension;
     }
 
     return path;
@@ -78,8 +68,8 @@ std::filesystem::path FS::getPathForType(PathType type) {
             }
             break;
         case PathType::RESOURCES:
-            path = getPathForType(PathType::GIT_ROOT) /
-                   ResourceManager::kResourceDirname;
+            path = getPathForType(PathType::GIT_ROOT) / "resources";
+                   //ResourceManager::kResourceDirname;
             ok = true;
             break;
         case PathType::MODULES_INSTALLED:

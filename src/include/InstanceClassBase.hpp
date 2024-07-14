@@ -1,13 +1,16 @@
 #pragma once
 
+#include <TgBotPPImplExports.h>
+
 #include <memory>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
 
-#define DECLARE_CLASS_INST(type) \
-    template <>                  \
-    std::shared_ptr<type> InstanceClassBase<type>::instance = {}
+#define DECLARE_CLASS_INST(type)                    \
+    template <>                                     \
+    std::shared_ptr<type> TGBOTPP_HELPER_DLL_EXPORT \
+        InstanceClassBase<type>::instance = {}
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wundefined-var-template"

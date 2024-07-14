@@ -1,10 +1,12 @@
 #pragma once
 
+#include <TgBotUtilsExports.h>
+
 #include <filesystem>
 
 // Implemented sperately by OS
 
-struct FS {
+struct TgBotUtils_API FS {
 #ifdef WINDOWS_BUILD
     constexpr static char path_env_delimiter = ';';
 #else
@@ -63,7 +65,15 @@ struct FS {
         std::filesystem::path& path);
     static std::filesystem::path& makeRelativeToCWD(
         std::filesystem::path& path);
-    static std::string getDylibExtension();
+
+    static constexpr std::string_view kDylibExtension =
+#ifdef WINDOWS_BUILD
+        ".dll";
+#elif defined __APPLE__
+        ".dylib";
+#else
+        ".so";
+#endif
 
    private:
     /**

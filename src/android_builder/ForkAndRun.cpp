@@ -19,7 +19,7 @@
 
 #include "PythonClass.hpp"
 #include "libos/libsighandler.hpp"
-#include "random/RandomNumberGenerator.h"
+#include "RandomNumberGenerator.hpp"
 
 bool ForkAndRun::execute() {
     Pipe stdout_pipe{};

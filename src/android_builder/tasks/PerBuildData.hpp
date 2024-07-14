@@ -8,7 +8,6 @@ struct PerBuildData {
     enum class Result { SUCCESS, ERROR_NONFATAL, ERROR_FATAL };
     BuildConfig bConfig;
     RomConfig rConfig;
-    std::filesystem::path scriptDirectory;
     struct ResultData {
         static constexpr int MSG_SIZE = 250;
         Result value{};

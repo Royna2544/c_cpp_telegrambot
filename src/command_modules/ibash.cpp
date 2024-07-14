@@ -1,14 +1,12 @@
-#include <BotReplyMessage.h>
-#include <command_modules/CommandModule.h>
 #include <internal/_FileDescriptor_posix.h>
-#include <popen_wdt/popen_wdt.h>
+#include <popen_wdt.h>
 #include <portable_sem.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
 #include <ManagedThreads.hpp>
-#include <MessageWrapper.hpp>
+#include <TgBotWrapper.hpp>
 #include <boost/algorithm/string/trim.hpp>
 #include <csignal>
 #include <cstdlib>
@@ -20,12 +18,11 @@
 #include <utility>
 
 #include "../../socket/selector/SelectorPosix.hpp"
-#include "BotClassBase.h"
-#include "compiler/CompilerInTelegram.h"  // BASH_MAX_BUF, BASH_READ_BUF
+#include "compiler/CompilerInTelegram.hpp"  // BASH_MAX_BUF, BASH_READ_BUF
 
 using std::chrono_literals::operator""s;
 
-struct InteractiveBashContext : BotClassBase {
+struct InteractiveBashContext {
     // parentToChild { parent write, child stdin }
     // childToParent { parent read, child stdout }
     Pipe childToParent{}, parentToChild{};
@@ -36,8 +33,7 @@ struct InteractiveBashContext : BotClassBase {
     constexpr static std::string_view kSubProcessClosed =
         "Subprocess closed due to inactivity";
 
-    explicit InteractiveBashContext(const Bot& bot)
-        : BotClassBase(bot), ThrMgr(ThreadManager::getInstance()) {}
+    explicit InteractiveBashContext() : ThrMgr(ThreadManager::getInstance()) {}
 
     struct ExitTimeoutThread : ManagedThreadRunnable {
         void runFunction() override {
@@ -54,7 +50,7 @@ struct InteractiveBashContext : BotClassBase {
             : context(context) {}
     };
 
-    struct UpdateOutputThread : ManagedThreadRunnable, BotClassBase {
+    struct UpdateOutputThread : ManagedThreadRunnable {
         void runFunction() override {
             PollSelector selector;
 
@@ -82,7 +78,8 @@ struct InteractiveBashContext : BotClassBase {
             while (kRun) {
                 switch (selector.poll()) {
                     case Selector::SelectorPollResult::OK:
-                        bot_editMessage(_bot, message, buffer.data());
+                        TgBotWrapper::getInstance()->editMessage(message,
+                                                                 buffer.data());
                         selector.reinit();
                         break;
                     case Selector::SelectorPollResult::FAILED:
@@ -104,9 +101,8 @@ struct InteractiveBashContext : BotClassBase {
             strcpy(buffer.data(), header.c_str());
             offset = header.size();
         }
-        explicit UpdateOutputThread(const Bot& bot, Message::Ptr message,
-                                    int readfd)
-            : BotClassBase(bot), readfd(readfd), message(std::move(message)) {}
+        explicit UpdateOutputThread(Message::Ptr message, int readfd)
+            : readfd(readfd), message(std::move(message)) {}
 
        private:
         int readfd;
@@ -201,15 +197,17 @@ struct InteractiveBashContext : BotClassBase {
             is_open = true;
             LOG(INFO) << "Open success, child pid: " << childpid;
         }
-        auto msg = bot_sendMessage(_bot, chat, "IBash starts...");
+        auto msg = wrapper->sendMessage(chat, "IBash starts...");
         ThrMgr->getInstance()
             ->createController<ThreadManager::Usage::IBASH_UPDATE_OUTPUT_THREAD,
                                UpdateOutputThread>(
 
-                std::cref(_bot), msg, childToParent.readEnd())
+                msg, childToParent.readEnd())
             ->run();
         return true;
     }
+    std::shared_ptr<TgBotWrapper> wrapper = TgBotWrapper::getInstance();
+
     void exit(const Message::Ptr& message) {
         if (is_open) {
             int status = 0;
@@ -242,13 +240,13 @@ struct InteractiveBashContext : BotClassBase {
                 ThreadManager::Usage::IBASH_EXIT_TIMEOUT_THREAD);
             ThrMgr->destroyController(
                 ThreadManager::Usage::IBASH_UPDATE_OUTPUT_THREAD);
-            bot_sendReplyMessage(_bot, message, "Closed");
+            wrapper->sendReplyMessage(message, "Closed");
             close(childToParent.readEnd());
             close(parentToChild.writeEnd());
             childpid = -1;
             is_open = false;
         } else {
-            bot_sendReplyMessage(_bot, message, "Not open");
+            wrapper->sendReplyMessage(message, "Not open");
         }
     }
 
@@ -289,11 +287,10 @@ struct InteractiveBashContext : BotClassBase {
     }
 };
 
-static void InteractiveBashCommandFn(const Bot& bot,
-                                     const Message::Ptr& message) {
-    static InteractiveBashContext ctx(bot);
+static void InteractiveBashCommandFn(const TgBotWrapper*, MessagePtr message) {
+    static InteractiveBashContext ctx;
     std::string command;
-    MessageWrapper wrapper(bot, message);
+    MessageWrapper wrapper(message);
 
     if (!wrapper.hasExtraText()) {
         if (!ctx.is_open) {
@@ -326,9 +323,10 @@ static void InteractiveBashCommandFn(const Bot& bot,
     }
 }
 
-void loadcmd_ibash(CommandModule& module) {
+DYN_COMMAND_FN(n, module) {
     module.command = "ibash";
     module.description = "Interactive bash";
     module.flags = CommandModule::Flags::Enforced;
     module.fn = InteractiveBashCommandFn;
+    return true;
 }

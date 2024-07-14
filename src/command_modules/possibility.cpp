@@ -1,15 +1,14 @@
-#include <random/RandomNumberGenerator.h>
+#include <RandomNumberGenerator.hpp>
 
-#include <MessageWrapper.hpp>
+#include <TgBotWrapper.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <set>
 
-#include "CommandModule.h"
 #include "StringToolsExt.hpp"
 
-static void PossibilityCommandFn(const Bot &bot, const Message::Ptr &message) {
+static void PossibilityCommandFn(const TgBotWrapper* botWrapper, MessagePtr message) {
     constexpr int PERCENT_MAX = 100;
-    MessageWrapper messageWrapper(bot, message);
+    MessageWrapper messageWrapper(message);
     std::string text;
     std::string lastItem;
     std::stringstream outStream;
@@ -36,9 +35,8 @@ static void PossibilityCommandFn(const Bot &bot, const Message::Ptr &message) {
     }
     // Put it in vector again and shuffle it.
     vec = {set.begin(), set.end()};
-    auto [start, end] = std::ranges::remove_if(vec, [](auto &&e) {
-        return !isEmptyOrBlank(e);
-    });
+    auto [start, end] = std::ranges::remove_if(
+        vec, [](auto &&e) { return !isEmptyOrBlank(e); });
     vec = {start, end};
     // Shuffle the vector.
     RandomNumberGenerator::shuffleArray(vec);
@@ -74,12 +72,13 @@ static void PossibilityCommandFn(const Bot &bot, const Message::Ptr &message) {
     for (const map_t &m : elem) {
         outStream << m.first << " : " << m.second << "%" << std::endl;
     }
-    bot_sendReplyMessage(bot, message, outStream.str());
+    botWrapper->sendReplyMessage(message, outStream.str());
 }
 
-void loadcmd_possibility(CommandModule &module) {
+DYN_COMMAND_FN(n, module) {
     module.command = "possibility";
     module.description = "Get possibilities";
     module.flags = CommandModule::Flags::None;
     module.fn = PossibilityCommandFn;
+    return true;
 }

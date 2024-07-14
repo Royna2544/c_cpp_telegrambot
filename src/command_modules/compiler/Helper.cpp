@@ -1,10 +1,12 @@
-#include <BotReplyMessage.h>
-#include "CompilerInTelegram.h"
 #include <absl/log/log.h>
-#include <boost/algorithm/string/trim.hpp>
-#include <StringResManager.hpp>
 
-void CompilerInTgHelper::onFailed(const Bot &bot, const Message::Ptr &message,
+#include <StringResManager.hpp>
+#include <TgBotWrapper.hpp>
+#include <boost/algorithm/string/trim.hpp>
+
+#include "CompilerInTelegram.hpp"
+
+void CompilerInTgHelper::onFailed(const Message::Ptr &message,
                                   const CompilerInTg::ErrorType e) {
     std::string text;
     switch (e) {
@@ -21,20 +23,18 @@ void CompilerInTgHelper::onFailed(const Bot &bot, const Message::Ptr &message,
             text = GETSTR(WORKING);
             break;
     };
-    bot_sendReplyMessage(bot, message, text);
+    TgBotWrapper::getInstance()->sendReplyMessage(message, text);
 }
 
-void CompilerInTgHelper::onResultReady(const Bot &bot,
-                                       const Message::Ptr &message,
+void CompilerInTgHelper::onResultReady(const Message::Ptr &message,
                                        const std::string &text) {
     std::string text_ = text;
     boost::trim(text_);
-    bot_sendReplyMessage(bot, message, text_);
+    TgBotWrapper::getInstance()->sendReplyMessage(message, text_);
 }
 
-void CompilerInTgHelper::onCompilerPathCommand(const Bot &bot,
-                                               const Message::Ptr &message,
+void CompilerInTgHelper::onCompilerPathCommand(const Message::Ptr &message,
                                                const std::string &text) {
     LOG(INFO) << text;
-    bot_sendReplyMessage(bot, message, text);
+    TgBotWrapper::getInstance()->sendReplyMessage(message, text);
 }

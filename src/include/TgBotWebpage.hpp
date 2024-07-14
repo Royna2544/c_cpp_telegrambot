@@ -1,4 +1,12 @@
+// CLimits provides _WIN32_WINNT, do not move
 #include <httplib.h>
+
+#include <climits>
+
+//
+
+#include <TgBotPPImplExports.h>
+#include <TgBotWebExports.h>
 
 #include <filesystem>
 #include <functional>
@@ -8,12 +16,14 @@
 #include "ManagedThreads.hpp"
 #include "initcalls/Initcall.hpp"
 
-class TgBotWebServerBase {
+
+class TgBotWeb_API TgBotWebServerBase {
    public:
     void startServer();
     void stopServer();
 
-    explicit TgBotWebServerBase(int serverPort, std::filesystem::path serverPath);
+    explicit TgBotWebServerBase(int serverPort,
+                                std::filesystem::path serverPath);
 
     static void loggerFn(const httplib::Request &req,
                          const httplib::Response &res);
@@ -29,7 +39,8 @@ class TgBotWebServerBase {
         using type = std::function<void(const httplib::Request &req,
                                         const httplib::Response &res)>;
         void showIndex(const httplib::Request &req, httplib::Response &res);
-        static void handleAPIVotes(const httplib::Request &req, httplib::Response &res);
+        static void handleAPIVotes(const httplib::Request &req,
+                                   httplib::Response &res);
         explicit Callbacks(TgBotWebServerBase *server) : server(server) {}
 
        private:
@@ -42,9 +53,9 @@ class TgBotWebServerBase {
     std::filesystem::path webServerRootPath;
 };
 
-class TgBotWebServer : public ManagedThreadRunnable,
-                       InitCall,
-                       TgBotWebServerBase {
+class TgBotPPImpl_API TgBotWebServer : public ManagedThreadRunnable,
+                                       InitCall,
+                                       TgBotWebServerBase {
    public:
     explicit TgBotWebServer(int serverPort);
 

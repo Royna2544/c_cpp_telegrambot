@@ -1,26 +1,32 @@
-#include "compiler/CompilerInTelegram.h"
 #include <StringResManager.hpp>
-#include "CommandModule.h"
 
-static void BashCommandFn(const Bot &bot, const Message::Ptr message) {
-    static CompilerInTgForBashImpl bash(bot, false);
+#include "TgBotWrapper.hpp"
+#include "compiler/CompilerInTelegram.hpp"
+
+static void BashCommandFn(const TgBotWrapper* wrapper, MessagePtr message) {
+    static CompilerInTgForBashImpl bash(false);
     bash.run(message);
 }
-static void unsafeBashCommandFn(const Bot &bot, const Message::Ptr message) {
-    static CompilerInTgForBashImpl ubash(bot, true);
+static void unsafeBashCommandFn(const TgBotWrapper* wrapper,
+                                MessagePtr message) {
+    static CompilerInTgForBashImpl ubash(true);
     ubash.run(message);
 }
 
-void loadcmd_bash(CommandModule &module) {
-    module.command = "bash";
-    module.description = GETSTR(BASH_CMD_DESC);
+DYN_COMMAND_FN(name, module) {
+    if (name == nullptr) {
+        return false;
+    }
+    std::string commandName = name;
+    module.command = commandName;
+    module.isLoaded = true;
     module.flags = CommandModule::Flags::Enforced;
-    module.fn = BashCommandFn;
-}
-
-void loadcmd_ubash(CommandModule &module) {
-    module.command = "ubash";
-    module.description = "Run bash commands notimeout";
-    module.flags = CommandModule::Flags::Enforced;
-    module.fn = unsafeBashCommandFn;
+    if (commandName == "bash") {
+        module.description = GETSTR(BASH_CMD_DESC);
+        module.fn = BashCommandFn;
+    } else if (commandName == "ubash") {
+        module.description = GETSTR(UBASH_CMD_DESC);
+        module.fn = unsafeBashCommandFn;
+    }
+    return true;
 }

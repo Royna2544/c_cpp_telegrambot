@@ -17,7 +17,6 @@ libTgBot*.so
 
 # Generated
 src/command_modules/cmds.gen.cpp
-modules.load
 resources/about.html
 __pycache__
 

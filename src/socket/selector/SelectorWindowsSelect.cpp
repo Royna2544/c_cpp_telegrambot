@@ -1,8 +1,6 @@
 #include <absl/log/log.h>
 #include <winsock2.h>
 
-#include <socket/interface/impl/SocketWindows.hpp>
-
 #include "SelectorWindows.hpp"
 
 bool SelectSelector::init() {
@@ -23,6 +21,9 @@ bool SelectSelector::add(socket_handle_t fd, OnSelectedCallback callback,
         case Mode::WRITE:
             set = &write_set;
             other_set = &read_set;
+            break;
+        case Selector::Mode::READ_WRITE:
+        case Selector::Mode::EXCEPT:
             break;
     }
     if (FD_ISSET(fd, set) || FD_ISSET(fd, other_set)) {
@@ -54,7 +55,7 @@ SelectSelector::SelectorPollResult SelectSelector::poll() {
 
     int ret = select(FD_SETSIZE, &read_set, &write_set, nullptr, &tv);
     if (ret == SOCKET_ERROR) {
-        LOG(ERROR) << "Select failed: " << WSAEStr();
+        LOG(ERROR) << "Select failed: " << WSAGetLastError();
         return SelectorPollResult::FAILED;
     }
     for (auto &e : data) {

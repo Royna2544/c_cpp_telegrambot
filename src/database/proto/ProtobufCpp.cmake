@@ -42,7 +42,7 @@ function(MY_PROTOBUF_GENERATE_CPP SRCS HDRS)
     add_custom_command(
       OUTPUT ${PROTO_GEN_SRCS}
       COMMAND
-        ${CMAKE_COMMAND} -E chdir ${CMAKE_SOURCE_DIR}/${PATH_DIR} ${PROTOC_EXE} --cpp_out
+        ${CMAKE_COMMAND} -E chdir ${CMAKE_CURRENT_SOURCE_DIR}/${PATH_DIR} ${PROTOC_EXE} --cpp_out
         ${CMAKE_CURRENT_BINARY_DIR}/${PATH_DIR} ${_protobuf_include_path} ${PATH_FILE}
       DEPENDS ${ABS_FIL} ${PROTOC_EXE}
       COMMENT "Running C++ protocol buffer compiler on ${FIL}"

@@ -1,13 +1,12 @@
-#include <BotClassBase.h>
-
 #include <ForkAndRun.hpp>
 #include <chrono>
 #include <string_view>
+#include <TgBotWrapper.hpp>
 
 #include "PerBuildData.hpp"
 #include "PythonClass.hpp"
 
-struct ROMBuildTask : ForkAndRun, BotClassBase {
+struct ROMBuildTask : ForkAndRun {
     static constexpr std::string_view kShmemROMBuild = "shmem_rombuild";
     static constexpr std::string_view kErrorLogFile = "out/error.log";
     
@@ -54,13 +53,14 @@ struct ROMBuildTask : ForkAndRun, BotClassBase {
      * @param data The data object containing the necessary configuration and
      * paths.
      */
-    explicit ROMBuildTask(const TgBot::Bot& bot, TgBot::Message::Ptr message,
+    explicit ROMBuildTask(const TgBotWrapper *wrapper, TgBot::Message::Ptr message,
                           PerBuildData data);
     ~ROMBuildTask() override;
 
    private:
     PerBuildData data;
     TgBot::Message::Ptr message;
+    const TgBotWrapper *botWrapper;
     PythonClass::Ptr _py;
     PythonClass::FunctionHandle::Ptr _get_total_mem;
     PythonClass::FunctionHandle::Ptr _get_used_mem;

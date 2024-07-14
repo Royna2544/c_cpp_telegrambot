@@ -1,20 +1,14 @@
-#include <BotReplyMessage.h>
-
-#include <MessageWrapper.hpp>
 #include <StringToolsExt.hpp>
+#include <TgBotWrapper.hpp>
 #include <TryParseStr.hpp>
 #include <algorithm>
 #include <boost/algorithm/string/split.hpp>
 #include <cctype>
-#include <database/bot/TgBotDatabaseImpl.hpp>
 #include <filesystem>
 #include <imagep/ImageProcAll.hpp>
 #include <memory>
 #include <string>
 #include <string_view>
-#include <variant>
-
-#include "CommandModule.h"
 
 struct ProcessImageParam {
     std::filesystem::path srcPath;
@@ -28,19 +22,10 @@ bool processPhotoFile(ProcessImageParam& param) {
     ImageProcessingAll procAll(param.srcPath);
     if (procAll.read()) {
         LOG(INFO) << "Successfully read image";
-        switch (procAll.rotate(param.rotation)) {
-            case PhotoBase::Result::kErrorInvalidArgument:
-                LOG(ERROR) << "Invalid rotation angle";
-                return false;
-            case PhotoBase::Result::kErrorUnsupportedAngle:
-                LOG(ERROR) << "Unsupported rotation angle";
-                return false;
-            case PhotoBase::Result::kErrorNoData:
-                LOG(ERROR) << "No data available to rotate (internal error)";
-                return false;
-            case PhotoBase::Result::kSuccess:
-                LOG(INFO) << "Successfully rotated image";
-                break;
+        const auto res = procAll.rotate(param.rotation);
+        if (!res.ok()) {
+            LOG(ERROR) << "Failed to rotate image: " << res;
+            return false;
         }
         if (param.greyscale) {
             procAll.to_greyscale();
@@ -53,8 +38,9 @@ bool processPhotoFile(ProcessImageParam& param) {
 constexpr std::string_view kDownloadFile = "inpic.bin";
 constexpr std::string_view kOutputFile = "outpic.png";
 
-void rotateStickerCommand(const Bot& bot, const Message::Ptr message) {
-    MessageWrapper wrapper(bot, message);
+void rotateStickerCommand(const TgBotWrapper* tgWrapper,
+                          MessagePtr message) {
+    MessageWrapper wrapper(message);
     std::string extText = wrapper.getExtraText();
     std::vector<std::string> args;
     int rotation = 0;
@@ -102,13 +88,13 @@ void rotateStickerCommand(const Bot& bot, const Message::Ptr message) {
         return;
     }
 
-    const auto file = bot.getApi().getFile(fileid.value());
+    const auto file = tgWrapper->getApi().getFile(fileid.value());
     if (!file) {
         wrapper.sendMessageOnExit("Failed to download sticker file.");
         return;
     }
     // Download the sticker
-    std::string buffer = bot.getApi().downloadFile(file->filePath);
+    std::string buffer = tgWrapper->getApi().downloadFile(file->filePath);
     // Save the sticker to a temporary file
     std::ofstream ofs(kDownloadFile.data());
     ofs.write(buffer.data(), buffer.size());
@@ -131,10 +117,11 @@ void rotateStickerCommand(const Bot& bot, const Message::Ptr message) {
         replyParams->messageId = message->messageId;
         replyParams->chatId = message->chat->id;
         if (wrapper.hasSticker()) {
-            bot.getApi().sendSticker(wrapper.getChatId(), infile, replyParams);
+            tgWrapper->getApi().sendSticker(wrapper.getChatId(), infile,
+                                            replyParams);
         } else if (wrapper.hasPhoto()) {
-            bot.getApi().sendPhoto(wrapper.getChatId(), infile,
-                                   "Rotated picture", replyParams);
+            tgWrapper->getApi().sendPhoto(wrapper.getChatId(), infile,
+                                          "Rotated picture", replyParams);
         }
     } else {
         wrapper.sendMessageOnExit("Unknown image type, or processing failed");
@@ -144,9 +131,10 @@ void rotateStickerCommand(const Bot& bot, const Message::Ptr message) {
 }
 }  // namespace
 
-void loadcmd_rotatepic(CommandModule& module) {
+DYN_COMMAND_FN(n, module) {
     module.command = "rotatepic";
     module.description = "Rotate a sticker";
     module.flags = CommandModule::Flags::None;
     module.fn = rotateStickerCommand;
+    return true;
 }

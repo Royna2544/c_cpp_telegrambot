@@ -1,15 +1,18 @@
 #pragma once
 
+#include <TgBotDBImplExports.h>
+#include <Types.h>
+
+#include <InstanceClassBase.hpp>
 #include <database/ProtobufDatabase.hpp>
 #include <database/SQLiteDatabase.hpp>
+#include <initcalls/Initcall.hpp>
 #include <libos/OnTerminateRegistrar.hpp>
 #include <variant>
 
-#include "InstanceClassBase.hpp"
-#include "Types.h"
-#include "initcalls/Initcall.hpp"
-
-struct TgBotDatabaseImpl : InstanceClassBase<TgBotDatabaseImpl>, InitCall {
+struct TgBotDBImpl_API TgBotDatabaseImpl : InstanceClassBase<TgBotDatabaseImpl>,
+                                           InitCall {
+    virtual ~TgBotDatabaseImpl() = default;
     std::variant<ProtoDatabase, SQLiteDatabase> databaseBackend;
     bool loadDBFromConfig();
     void unloadDatabase();

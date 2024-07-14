@@ -1,14 +1,11 @@
-#include <BotReplyMessage.h>
 #include <ChatObserver.h>
 #include <ResourceManager.h>
-#include <SpamBlock.h>
 #include <internal/_std_chrono_templates.h>
-#include <random/RandomNumberGenerator.h>
 #include <rapidjson/document.h>
 #include <rapidjson/rapidjson.h>
-#include <tgbot/types/InputFile.h>
 
 #include <ManagedThreads.hpp>
+#include <SpamBlock.hpp>
 #include <TgBotSocket_Export.hpp>
 #include <chrono>
 #include <filesystem>
@@ -17,10 +14,10 @@
 #include <impl/bot/TgBotSocketInterface.hpp>
 #include <mutex>
 #include <socket/TgBotCommandMap.hpp>
-#include <utility>
 #include <variant>
 
-#include "tgbot/TgException.h"
+#include "TgBotWrapper.hpp"
+#include <RandomNumberGenerator.hpp>
 
 using TgBot::Api;
 using TgBot::InputFile;
@@ -66,7 +63,7 @@ std::string getMIMEString(const std::string& path) {
 GenericAck SocketInterfaceTgBot::handle_WriteMsgToChatId(const void* ptr) {
     const auto* data = static_cast<const WriteMsgToChatId*>(ptr);
     try {
-        bot_sendMessage(_bot, data->chat, data->message.data());
+        TgBotWrapper::getInstance()->sendMessage(data->chat, data->message.data());
     } catch (const TgBot::TgException& e) {
         LOG(ERROR) << "Exception at handler: " << e.what();
         return GenericAck(AckType::ERROR_TGAPI_EXCEPTION, e.what());
@@ -115,6 +112,7 @@ GenericAck SocketInterfaceTgBot::handle_SendFileToChatId(const void* ptr) {
     const auto* file = data->filePath.data();
     using FileOrId_t = boost::variant<InputFile::Ptr, std::string>;
     std::function<Message::Ptr(const Api&, ChatId, const FileOrId_t&)> fn;
+    const auto& api = TgBotWrapper::getInstance()->getApi();
     try {
         switch (data->fileType) {
             case FileType::TYPE_PHOTO:
@@ -145,7 +143,7 @@ GenericAck SocketInterfaceTgBot::handle_SendFileToChatId(const void* ptr) {
                 static const std::vector<std::string> dices = {
                     "🎲", "🎯", "🏀", "⚽", "🎳", "🎰"};
                 // TODO: More clean code?
-                _bot.getApi().sendDice(
+                api.sendDice(
                     data->chat, false, 0, nullptr,
                     dices[RandomNumberGenerator::generate(dices.size() - 1)]);
                 return GenericAck::ok();
@@ -163,13 +161,13 @@ GenericAck SocketInterfaceTgBot::handle_SendFileToChatId(const void* ptr) {
         DLOG(INFO) << "Sending " << file << " to " << data->chat;
         // Try to send as local file first
         try {
-            fn(_bot.getApi(), data->chat,
+            fn(api, data->chat,
                InputFile::fromFile(file, getMIMEString(file)));
         } catch (std::ifstream::failure& e) {
             LOG(INFO) << "Failed to send '" << file
                       << "' as local file, trying as Telegram "
                          "file id";
-            fn(_bot.getApi(), data->chat, std::string(file));
+            fn(api, data->chat, std::string(file));
         }
     } catch (const TgBot::TgException& e) {
         LOG(ERROR) << "Exception at handler, " << e.what();

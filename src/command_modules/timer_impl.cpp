@@ -1,10 +1,10 @@
+#include <internal/_std_chrono_templates.h>
+
 #include <ManagedThreads.hpp>
-#include <TimerImpl.hpp>
 #include <memory>
 
-#include "BotReplyMessage.h"
-#include "CommandModule.h"
 #include "TgBotWrapper.hpp"
+#include "support/timer/TimerImpl.hpp"
 
 struct TimerImplThread : TimerThread {
     void onTimerStart() override {
@@ -25,7 +25,8 @@ struct TimerImplThread : TimerThread {
     ChatId chatid;
 };
 
-static void TimerStartCommandFn(const Bot &bot, const Message::Ptr message) {
+static void TimerStartCommandFn(const TgBotWrapper *bot,
+                                const Message::Ptr message) {
     const auto tm = ThreadManager::getInstance();
     auto ctrl = tm->createController<ThreadManager::Usage::TIMER_THREAD,
 
@@ -75,11 +76,12 @@ static void TimerStartCommandFn(const Bot &bot, const Message::Ptr message) {
         tm->destroyController(ThreadManager::Usage::TIMER_THREAD);
     }
     if (!result.empty()) {
-        bot_sendReplyMessage(bot, message, result);
+        bot->sendReplyMessage(message, result);
     }
 }
 
-static void TimerStopCommandFn(const Bot &bot, const Message::Ptr& message) {
+static void TimerStopCommandFn(const TgBotWrapper *bot,
+                               const Message::Ptr &message) {
     const auto tm = ThreadManager::getInstance();
     auto ctrl = tm->getController<ThreadManager::Usage::TIMER_THREAD,
                                   TimerImplThread>();
@@ -87,20 +89,22 @@ static void TimerStopCommandFn(const Bot &bot, const Message::Ptr& message) {
         ctrl->stop();
         tm->destroyController(ThreadManager::Usage::TIMER_THREAD);
     } else {
-        bot_sendReplyMessage(bot, message, "Timer not started");
+        bot->sendReplyMessage(message, "Timer not started");
     }
 }
 
-void loadcmd_starttimer(CommandModule &module) {
-    module.command = "starttimer";
-    module.description = "Start timer of the bot";
+DYN_COMMAND_FN(name, module) {
+    if (strcmp(name, "starttimer") == 0) {
+        module.command = "starttimer";
+        module.description = "Start timer of the bot";
+        module.fn = TimerStartCommandFn;
+    } else if (strcmp(name, "stoptimer") == 0) {
+        module.command = "stoptimer";
+        module.description = "Stop timer of the bot";
+        module.fn = TimerStopCommandFn;
+    } else {
+        return false;
+    }
     module.flags = CommandModule::Flags::Enforced;
-    module.fn = TimerStartCommandFn;
-}
-
-void loadcmd_stoptimer(CommandModule &module) {
-    module.command = "stoptimer";
-    module.description = "Stop timer of the bot";
-    module.flags = CommandModule::Flags::Enforced;
-    module.fn = TimerStopCommandFn;
+    return true;
 }

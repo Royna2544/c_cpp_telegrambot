@@ -1,5 +1,6 @@
 #pragma once
 
+#include <TgBotPPImplExports.h>
 #include <Types.h>
 #include <tgbot/types/Message.h>
 
@@ -7,13 +8,14 @@
 
 #include "CStringLifetime.h"
 #include "InstanceClassBase.hpp"
-#include "OnAnyMessageRegister.hpp"
+#include "TgBotWrapper.hpp"
 #include "initcalls/Initcall.hpp"
 
 using TgBot::Message;
 using TgBot::User;
 
-struct ChatObserver : InitCall, InstanceClassBase<ChatObserver> {
+struct TgBotPPImpl_API ChatObserver : InitCall,
+                                      InstanceClassBase<ChatObserver> {
     // Global ChatId list to observe
     std::vector<ChatId> observedChatIds;
     bool observeAllChats;
@@ -30,6 +32,6 @@ struct ChatObserver : InitCall, InstanceClassBase<ChatObserver> {
 
     void doInitCall() override;
     const CStringLifetime getInitCallName() const override {
-        return OnAnyMessageRegisterer::getInitCallNameForClient("ChatObserver");
+        return TgBotWrapper::getInitCallNameForClient("ChatObserver");
     }
 };

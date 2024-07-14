@@ -9,7 +9,6 @@
 #include <system_error>
 
 #include "Types.h"
-#include "database/SQLiteDatabase.hpp"
 
 bool TgBotDatabaseImpl::loadDBFromConfig() {
     const auto dbConf =

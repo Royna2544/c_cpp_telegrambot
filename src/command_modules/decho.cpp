@@ -1,16 +1,14 @@
 #include <absl/log/log.h>
-#include <MessageWrapper.hpp>
 
-#include "BotReplyMessage.h"
-#include "CommandModule.h"
+#include <TgBotWrapper.hpp>
 
-static void DeleteEchoCommandFn(const Bot &bot, const Message::Ptr message) {
+static void DeleteEchoCommandFn(const TgBotWrapper *tgBotWrapper,
+                                const Message::Ptr message) {
     const auto replyMsg = message->replyToMessage;
-    const auto chatId = message->chat->id;
-    MessageWrapper wrapper(bot, message);
+    MessageWrapper wrapper(message);
 
     try {
-        bot.getApi().deleteMessage(chatId, message->messageId);
+        tgBotWrapper->deleteMessage(message);
     } catch (const TgBot::TgException &) {
         // bot is not admin. nothing it can do
         LOG(WARNING) << "bot is not admin in chat '" << message->chat->title
@@ -19,30 +17,27 @@ static void DeleteEchoCommandFn(const Bot &bot, const Message::Ptr message) {
     }
     if (wrapper.hasExtraText()) {
         std::string msg = wrapper.getExtraText();
-        bot_sendReplyMessage(bot, message, msg,
-                             (replyMsg) ? replyMsg->messageId : 0, true);
+        if (wrapper.hasReplyToMessage()) {
+            wrapper.switchToReplyToMessage();
+            tgBotWrapper->sendReplyMessage(wrapper.getMessage(), msg);
+        } else {
+            tgBotWrapper->sendMessage(message, msg);
+        }
     } else if (replyMsg) {
         if (replyMsg->sticker) {
-            bot_sendSticker(bot, message->chat, replyMsg->sticker);
+            tgBotWrapper->sendSticker(message, MediaIds(replyMsg->sticker));
         } else if (replyMsg->animation) {
-            bot.getApi().sendAnimation(message->chat->id,
-                                       replyMsg->animation->fileId);
-        } else if (replyMsg->video) {
-            bot.getApi().sendVideo(message->chat->id, replyMsg->video->fileId);
-        } else if (!replyMsg->photo.empty()) {
-            bot.getApi().sendPhoto(
-                message->chat->id, replyMsg->photo.front()->fileId,
-                "(Note: Sending all photos are not supported)");
+            tgBotWrapper->sendAnimation(message, MediaIds(replyMsg->animation));
         } else if (!replyMsg->text.empty()) {
-            bot_sendReplyMessage(bot, message, replyMsg->text,
-                                 replyMsg->messageId);
+            tgBotWrapper->sendMessage(message, replyMsg->text);
         }
     }
 }
 
-void loadcmd_decho(CommandModule& module) {
+DYN_COMMAND_FN(/*name*/, module) {
     module.command = "decho";
     module.description = "Delete and echo message";
     module.flags = CommandModule::Flags::None;
     module.fn = DeleteEchoCommandFn;
+    return true;
 }

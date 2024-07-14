@@ -1,32 +1,29 @@
 #include <GitData.h>
 #include <ResourceManager.h>
 #include <absl/log/log.h>
+#include <absl/strings/str_replace.h>
+#include <internal/_tgbot.h>
 
+#include <CompileTimeStringConcat.hpp>
+#include <StringResManager.hpp>
+#include <TgBotWrapper.hpp>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/config.hpp>
+#include <database/bot/TgBotDatabaseImpl.hpp>
 #include <filesystem>
-#include <memory>
 #include <mutex>
-#include <StringResManager.hpp>
-
-#include "BotReplyMessage.h"
-#include "CommandModule.h"
-#include "CompileTimeStringConcat.hpp"
-#include "database/bot/TgBotDatabaseImpl.hpp"
-#include "internal/_tgbot.h"
-#include "tgbot/types/ReplyParameters.h"
 
 template <unsigned Len>
 consteval auto cat(const char (&strings)[Len]) {
     return StringConcat::cat("_", strings, "_");
 }
 
-static void AliveCommandFn(const Bot& bot, const Message::Ptr message) {
+static void AliveCommandFn(const TgBotWrapper* wrapper, MessagePtr message) {
     static std::string version;
     static std::once_flag once;
 
-    std::call_once(once, [&bot] {
-        std::string commandmodules;
+    std::call_once(once, [wrapper] {
+        std::string _version;
         GitData data;
 
         const std::string modules = cat("commandmodules");
@@ -37,28 +34,23 @@ static void AliveCommandFn(const Bot& bot, const Message::Ptr message) {
         const std::string botusername = cat("botusername");
 
         GitData::Fill(&data);
-        version = ResourceManager::getInstance()->getResource("about.html");
+        _version = ResourceManager::getInstance()->getResource("about.html");
 
-        boost::replace_all(version, modules,
-                           CommandModuleManager::getLoadedModulesString());
-        boost::replace_all(version, commitid, data.commitid);
-        boost::replace_all(version, commitmsg, data.commitmsg);
-        boost::replace_all(version, originurl, data.originurl);
-        boost::replace_all(version, botname,
-                           UserPtr_toString(bot.getApi().getMe()));
-        boost::replace_all(version, botusername,
-                           bot.getApi().getMe()->username);
+        // Replace placeholders in the version string with actual values.
+        version = absl::StrReplaceAll(
+            _version, {{modules, wrapper->getCommandModulesStr()},
+                       {commitid, data.commitid},
+                       {commitmsg, data.commitmsg},
+                       {originurl, data.originurl},
+                       {botname, UserPtr_toString(wrapper->getBotUser())},
+                       {botusername, wrapper->getBotUser()->username}});
     });
     const auto info = TgBotDatabaseImpl::getInstance()->queryMediaInfo("alive");
     bool sentAnimation = false;
     if (info) {
-        auto params = std::make_shared<TgBot::ReplyParameters>();
-        params->chatId = message->chat->id;
-        params->messageId = message->messageId;
         try {
-            bot.getApi().sendAnimation(message->chat->id, info->mediaId, 0, 0,
-                                       0, "", version, params,
-                                       nullptr, "html");
+            wrapper->sendReplyAnimation(
+                message, MediaIds{info->mediaId, info->mediaUniqueId});
             sentAnimation = true;
         } catch (const TgBot::TgException& e) {
             // Fallback to HTML if no GIF
@@ -66,20 +58,24 @@ static void AliveCommandFn(const Bot& bot, const Message::Ptr message) {
         }
     }
     if (!sentAnimation) {
-        bot_sendReplyMessageHTML(bot, message, version);
+        wrapper->sendReplyMessage<TgBotWrapper::ParseMode::HTML>(message,
+                                                                 version);
     }
 }
 
-void loadcmd_alive(CommandModule& module) {
-    module.command = "alive";
-    module.description =  GETSTR(ALIVE_CMD_DESC);
+DYN_COMMAND_FN(name, module) {
+    if (name == nullptr) {
+        return false;
+    }
+    std::string commandName = name;
+    if (commandName != "alive" && commandName != "start") {
+        return false;
+    }
     module.flags = CommandModule::Flags::None;
+    module.command = commandName;
+    module.description = GETSTR(ALIVE_CMD_DESC);
     module.fn = AliveCommandFn;
+    module.isLoaded = true;
+    return true;
 }
 
-void loadcmd_start(CommandModule& module) {
-    module.command = "start";
-    module.description = GETSTR(START_CMD_DESC);
-    module.flags = CommandModule::Flags::HideDescription;
-    module.fn = AliveCommandFn;
-}

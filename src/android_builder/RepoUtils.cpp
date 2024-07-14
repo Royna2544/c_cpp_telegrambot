@@ -5,10 +5,8 @@
 
 #include "ArgumentBuilder.hpp"
 
-RepoUtils::RepoUtils(std::filesystem::path& scriptDirectory) {
+RepoUtils::RepoUtils() {
     auto py = PythonClass::get();
-
-    py->addLookupDirectory(scriptDirectory);
 
     auto repomod = py->importModule("repo_utils");
     if (!repomod) {

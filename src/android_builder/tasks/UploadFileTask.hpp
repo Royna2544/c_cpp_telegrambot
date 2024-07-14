@@ -1,6 +1,6 @@
 #include <absl/log/log.h>
 
-#include <MessageWrapper.hpp>
+#include <TgBotWrapper.hpp>
 #include <cstdlib>
 
 #include "ForkAndRun.hpp"

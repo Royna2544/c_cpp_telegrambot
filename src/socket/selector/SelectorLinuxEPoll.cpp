@@ -4,7 +4,6 @@
 #include <algorithm>
 
 #include "SelectorPosix.hpp"
-#include "SocketDescriptor_defs.hpp"
 
 bool EPollSelector::init() { return (isValidFd(epollfd = epoll_create(MAX_EPOLLFDS))); }
 

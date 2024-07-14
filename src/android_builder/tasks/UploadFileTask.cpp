@@ -4,7 +4,6 @@
 
 bool UploadFileTask::runFunction() {
     auto py = PythonClass::get();
-    py->addLookupDirectory(data.scriptDirectory);
     auto mod = py->importModule("upload_file");
     if (!mod) {
         LOG(ERROR) << "Could not import module upload_file";

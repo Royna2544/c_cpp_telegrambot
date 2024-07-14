@@ -6,6 +6,7 @@
 #include <mutex>
 
 #include "InstanceClassBase.hpp"
+#include "TgBotWrapper.hpp"
 #include "internal/_tgbot.h"
 
 using TgBot::Message;
@@ -54,8 +55,8 @@ void ChatObserver::process(const Message::Ptr& msg) {
 }
 
 void ChatObserver::doInitCall() {
-    OnAnyMessageRegisterer::getInstance()->registerCallback(
-        [this](const Bot& /*bot*/, const Message::Ptr& message) {
+    TgBotWrapper::getInstance()->registerCallback(
+        [this](const TgBotWrapper*, const Message::Ptr& message) {
             if (!observedChatIds.empty() || observeAllChats) {
                 process(message);
             }

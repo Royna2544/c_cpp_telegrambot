@@ -1,14 +1,14 @@
-#include "CompilerInTelegram.h"
+#include "CompilerInTelegram.hpp"
 #include <StringResManager.hpp>
-#include <MessageWrapper.hpp>
+#include <TgBotWrapper.hpp>
 
 void CompilerInTgForBashImpl::onResultReady(const Message::Ptr& who,
                                             const std::string& text) {
-    CompilerInTgHelper::onResultReady(_bot, who, text);
+    CompilerInTgHelper::onResultReady(who, text);
 }
 void CompilerInTgForBashImpl::onFailed(const Message::Ptr& who,
                                        const ErrorType e) {
-    CompilerInTgHelper::onFailed(_bot, who, e);
+    CompilerInTgHelper::onFailed(who, e);
 }
 
 void CompilerInTgForBash::run(const Message::Ptr &message) {

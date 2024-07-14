@@ -1,4 +1,3 @@
-#include "InstanceClassBase.hpp"
 #include "OnTerminateRegistrar.hpp"
 #include "libsighandler.hpp"
 #include <absl/log/log.h>

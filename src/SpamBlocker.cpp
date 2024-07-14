@@ -1,18 +1,18 @@
 #include <Authorization.h>
-#include <BotReplyMessage.h>
 #include <CStringLifetime.h>
-#include <SpamBlock.h>
 #include <absl/log/log.h>
 #include <internal/_std_chrono_templates.h>
 #include <internal/_tgbot.h>
 #include <tgbot/types/Chat.h>
 
 #include <InstanceClassBase.hpp>
+#include <SpamBlock.hpp>
 #include <algorithm>
 #include <memory>
 #include <mutex>
 
 #include "ManagedThreads.hpp"
+#include "TgBotWrapper.hpp"
 #include "Types.h"
 
 using std::chrono_literals::operator""s;
@@ -225,6 +225,7 @@ void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle,
                                             PerChatHandle::const_reference t,
                                             const size_t threshold,
                                             const char *name, const bool mute) {
+    const auto wrapper = TgBotWrapper::getInstance();
     // Initial set - all false set
     static auto perms = std::make_shared<ChatPermissions>();
     if (isEntryOverThreshold(t, threshold)) {
@@ -233,14 +234,14 @@ void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle,
 
         _logSpamDetectCommon(t, name);
 
-        bot_sendMessage(_bot, handle->first->id,
-                        "Spam detected @" + t.first->username);
+        wrapper->sendMessage(handle->first->id,
+                             "Spam detected @" + t.first->username);
         std::vector<MessageId> message_ids;
         std::ranges::for_each(t.second, [&message_ids](auto &&messageIn) {
             message_ids.emplace_back(messageIn->messageId);
         });
         try {
-            _bot.getApi().deleteMessages(handle->first->id, message_ids);
+            //_bot.getApi().deleteMessages(handle->first->id, message_ids);
         } catch (const TgBot::TgException &e) {
             DLOG(INFO) << "Error deleting message: " << e.what();
         }
@@ -248,9 +249,9 @@ void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle,
             LOG(INFO) << "Try mute user " << userstr.get() << " in chat "
                       << chatstr.get();
             try {
-                _bot.getApi().restrictChatMember(
-                    handle->first->id, t.first->id, perms,
-                    to_secs(kMuteDuration).count());
+              //  _bot.getApi().restrictChatMember(
+                //    handle->first->id, t.first->id, perms,
+                  //  to_secs(kMuteDuration).count());
             } catch (const TgBot::TgException &e) {
                 LOG(WARNING)
                     << "Cannot mute user " << userstr.get() << " in chat "
@@ -261,12 +262,12 @@ void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle,
 }
 
 void SpamBlockManager::doInitCall() {
-    OnAnyMessageRegisterer::getInstance()->registerCallback(
-        [](const Bot &bot, const Message::Ptr &message) {
+    TgBotWrapper::getInstance()->registerCallback(
+        [](const TgBotWrapper*, const Message::Ptr &message) {
             static auto spamMgr =
                 ThreadManager::getInstance()
                     ->createController<ThreadManager::Usage::SPAMBLOCK_THREAD,
-                                       SpamBlockManager>(std::cref(bot));
+                                       SpamBlockManager>();
             spamMgr->addMessage(message);
         });
 }

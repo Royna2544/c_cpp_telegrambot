@@ -1,5 +1,7 @@
 #pragma once
 
+#include <TgBotUtilsExports.h>
+
 #include <optional>
 #include <string>
 
@@ -53,8 +55,7 @@ constexpr auto kConfigsAliasMap =
         CONFIGALIAS_AND_STR(DATABASE_BACKEND, 'd'),
         CONFIGALIAS_AND_STR(HELP, 'h'), CONFIGALIAS_AND_STR(OVERRIDE_CONF, 'c'),
         CONFIGALIAS_AND_STR(SOCKET_BACKEND, 's'),
-        CONFIGALIAS_AND_STR(SELECTOR, 'u'),
-        CONFIGALIAS_AND_STR(LOCALE, 'l'));
+        CONFIGALIAS_AND_STR(SELECTOR, 'u'), CONFIGALIAS_AND_STR(LOCALE, 'l'));
 
 constexpr auto kConfigsDescMap =
     array_helpers::make<static_cast<int>(Configs::MAX), Configs, DescStr>(
@@ -77,7 +78,7 @@ constexpr auto kConfigsDescMap =
  * @return A std::optional containing the value of the specified configuration,
  * or std::nullopt if the configuration is not found.
  */
-std::optional<std::string> getVariable(Configs config);
+TgBotUtils_API std::optional<std::string> getVariable(Configs config);
 
 /**
  * setVariable - Function used to set the value of a specific configuration.
@@ -85,7 +86,7 @@ std::optional<std::string> getVariable(Configs config);
  * @param config The configuration for which the value is to be set.
  * @param value The new value to be set for the specified configuration.
  */
-void setVariable(Configs config, const std::string &value);
+TgBotUtils_API void setVariable(Configs config, const std::string &value);
 
 /**
  * getEnv - Function used to retrieve the value of an environment variable.
@@ -107,7 +108,7 @@ void setVariable(Configs config, const std::string &value);
  * the environment variable is found but its value is empty, the 'value'
  * parameter will be set to an empty string.
  */
-bool getEnv(const std::string &name, std::string &value);
+TgBotUtils_API bool getEnv(const std::string &name, std::string &value);
 
 /**
  * serializeHelpToOStream - Function used to serialize the help information to
@@ -116,7 +117,7 @@ bool getEnv(const std::string &name, std::string &value);
  * @param out The output stream to which the help information will be
  * serialized.
  */
-void serializeHelpToOStream(std::ostream &out);
+TgBotUtils_API void serializeHelpToOStream(std::ostream &out);
 
 };  // namespace ConfigManager
 
@@ -131,4 +132,5 @@ enum class CommandLineOp { INSERT, GET };
  * @param out_argc [inout] argc, may be null.
  * @param out_argv [inout] argv, may be null.
  */
-void copyCommandLine(CommandLineOp op, int *argc, char *const **argv);
+TgBotUtils_API void copyCommandLine(CommandLineOp op, int *argc,
+                                    char *const **argv);

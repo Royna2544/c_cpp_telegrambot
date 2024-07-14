@@ -15,9 +15,9 @@
 #include <ostream>
 #include <thread>
 
-#include "CompilerInTelegram.h"
+#include "CompilerInTelegram.hpp"
 #include "StringToolsExt.hpp"
-#include "popen_wdt/popen_wdt.h"
+#include "popen_wdt.h"
 
 using std::chrono_literals::operator""ms;
 using std::chrono::duration_cast;

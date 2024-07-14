@@ -1,5 +1,6 @@
 #pragma once
 
+#include <TgBotPPImplExports.h>
 #include <tgbot/Bot.h>
 
 #include <filesystem>
@@ -12,7 +13,7 @@
 using TgBot::Bot;
 using TgBot::Message;
 
-struct DynamicLibraryHolder {
+struct TgBotPPImpl_API DynamicLibraryHolder {
     explicit DynamicLibraryHolder(void* handle) : handle_(handle){};
     DynamicLibraryHolder(DynamicLibraryHolder&& other) noexcept;
     ~DynamicLibraryHolder();
@@ -21,9 +22,11 @@ struct DynamicLibraryHolder {
     void* handle_;
 };
 
-struct RTCommandLoader : public InstanceClassBase<RTCommandLoader>, InitCall {
-    explicit RTCommandLoader(Bot& bot) : bot(bot) {}
-    RTCommandLoader() = delete;
+struct TgBotPPImpl_API RTCommandLoader
+    : public InstanceClassBase<RTCommandLoader>,
+      InitCall {
+    virtual ~RTCommandLoader() = default;
+    RTCommandLoader() = default;
 
     /**
      * @brief loads a single command from a file
@@ -32,30 +35,11 @@ struct RTCommandLoader : public InstanceClassBase<RTCommandLoader>, InitCall {
      */
     bool loadOneCommand(std::filesystem::path fname);
 
-    /**
-     * @brief loads all commands from a file
-     * @param bot the bot instance
-     * @param filename the file path of the commands file
-     */
-    bool loadCommandsFromFile(const std::filesystem::path& filename);
-
-    /**
-     * @brief returns the path where modules load conf is installed
-     *
-     * @return std::filesystem::path the path where modules load conf is
-     * installed
-     */
-    static std::filesystem::path getModulesLoadConfPath();
-
-    void doInitCall() override {
-        loadCommandsFromFile(getModulesLoadConfPath());
-    }
+    void doInitCall() override;
     const CStringLifetime getInitCallName() const override {
-        return "Load commands from file";
+        return "Load commands from shared libraries";
     }
 
    private:
-    static void commandStub(const Bot& bot, const Message::Ptr& message);
-    Bot& bot;
     std::vector<DynamicLibraryHolder> libs;
 };

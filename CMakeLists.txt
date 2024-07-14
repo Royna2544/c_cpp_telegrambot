@@ -9,19 +9,11 @@ include(cmake/macros.cmake)
 include(cmake/variables.cmake)
 include(cmake/sanitizers.cmake)
 ################ EXE NAMES STEMMED FROM PROJECT_NAME ################
-set(MEDIA_CLI_NAME ${PROJECT_NAME}_MediaCli)
 set(PROJECT_MAINEXE_NAME ${PROJECT_NAME}_main)
-set(PROJECT_TEST_NAME ${PROJECT_NAME}_test)
-set(LOGCAT_NAME ${PROJECT_NAME}_logcat)
 #####################################################################
 
 ############################## OPTIONS ##############################
-option(ENABLE_RUNTIME_COMMAND "Enable runtime loader of commands" ON)
 option(ENABLE_RUST_SUPPORT "Enable rust support" OFF)
-################# Detecting x86/x86_64 Architecture ################
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "i[3-6]86|x86_64|AMD64|amd64" AND NOT MSVC)
-  add_compile_options(-mrdrnd)
-endif()
 #####################################################################
 
 ##################### Fill in readme with cmake #####################
@@ -29,27 +21,37 @@ string(TIMESTAMP TODAY "%Y-%m-%d")
 configure_file(resources/about.html.in ${CMAKE_SOURCE_DIR}/resources/about.html)
 #####################################################################
 
-#################### TgBot cpp (the core) Library ###################
-add_subdirectory(src/third-party/tgbot-cpp EXCLUDE_FROM_ALL)
-#####################################################################
-
-########################## ABSEIL log deps ##########################
-add_subdirectory(src/third-party/googletest EXCLUDE_FROM_ALL)
-add_subdirectory(src/third-party/abseil-cpp EXCLUDE_FROM_ALL)
-add_subdirectory(src/third-party/protobuf EXCLUDE_FROM_ALL)
-if (WIN32)
-add_subdirectory(src/third-party/dlfcn-win32 EXCLUDE_FROM_ALL)
-endif()
 ################## Add a common logging init lib ####################
-add_library_san(TgBotLogInit SHARED src/logging/AbslLogInit.cpp)
-target_include_directories(TgBotLogInit PUBLIC src/logging/)
-target_link_libraries(TgBotLogInit absl::log_initialize absl::log absl::log_sink
-  absl::log_sink_registry absl::str_format)
-#####################################################################
-link_libraries(absl::log)
-#####################################################################
+function(add_my_library)
+  cmake_parse_arguments(TGBOT_LIBRARY
+    "NO_LIBSUFFIX" # Options
+    "NAME" # One-value keywords
+    "SRCS;LIBS;PUBLIC_INC;PRIVATE_INC;DEPENDS;DEFS;LIBS_WIN32" # Multiple-value keywords
+    ${ARGN}
+  )
+  if (NOT TGBOT_LIBRARY_SRCS OR NOT TGBOT_LIBRARY_NAME)
+    message(FATAL_ERROR "Must specify src or name")
+  endif()
+  if (NOT TGBOT_LIBRARY_NO_LIBSUFFIX)
+    set(TGBOT_LIBRARY_NAME TgBot${TGBOT_LIBRARY_NAME})
+  endif()
+  add_library(${TGBOT_LIBRARY_NAME} SHARED ${TGBOT_LIBRARY_SRCS})
+  add_sanitizers(${TGBOT_LIBRARY_NAME})
+  set(EXPORTCONF_DIR ${CMAKE_BINARY_DIR}/exportConfig/)
+  configure_file(${CMAKE_SOURCE_DIR}/src/include/LibraryExports.h.inc
+    ${EXPORTCONF_DIR}${TGBOT_LIBRARY_NAME}Exports.h)
+  target_include_directories(${TGBOT_LIBRARY_NAME} PUBLIC ${TGBOT_LIBRARY_PUBLIC_INC} ${EXPORTCONF_DIR})
+  target_include_directories(${TGBOT_LIBRARY_NAME} PRIVATE ${TGBOT_LIBRARY_PRIVATE_INC})
+  target_link_libraries(${TGBOT_LIBRARY_NAME} absl::log ${TGBOT_LIBRARY_LIBS})
+  if (WIN32)
+    target_link_libraries(${TGBOT_LIBRARY_NAME} ${TGBOT_LIBRARY_LIBS_WIN32})
+  endif()
+  target_compile_definitions(${TGBOT_LIBRARY_NAME} PRIVATE ${TGBOT_LIBRARY_DEFS})
+  if (TGBOT_LIBRARY_DEPENDS)
+    add_dependencies(${TGBOT_LIBRARY_NAME} ${TGBOT_LIBRARY_DEPENDS})
+  endif()
+endfunction(add_my_library)
 
-include(cmake/tgbotpng.cmake)
 ############################ RUST support ###########################
 if (ENABLE_RUST_SUPPORT)
   add_subdirectory(src/third-party/corrosion)
@@ -63,8 +65,6 @@ if (NOT MSVC)
     -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/=)  
 endif()
 if (WIN32)
-  # Windows 10  
-  add_definitions(-D_WIN32_WINNT=0x0A00)
   add_compile_definitions(-DWINDOWS_BUILD)
 endif()
 #####################################################################
@@ -92,11 +92,6 @@ include_directories(src/include)
 include_directories(src/)
 #####################################################################
 
-#################### Include directories (boost) ####################
-find_package(Boost COMPONENTS program_options REQUIRED)
-include_directories(${Boost_INCLUDE_DIR})
-#####################################################################
-
 ############################# Check lib #############################
 find_package(CURL)
 if (${CURL_FOUND})
@@ -109,6 +104,8 @@ if (APPLE)
     find_library(SECURITY Security REQUIRED)
     set(MACOS_SSL_LIBS ${CORE_FOUNDATION} ${SECURITY})
 endif()
+find_package(Boost COMPONENTS program_options REQUIRED)
+include_directories(${Boost_INCLUDE_DIR})
 #####################################################################
 
 ############################# Platforms #############################
@@ -122,87 +119,54 @@ endif()
 ############################ Source list ############################
 set(SRC_LIST
   src/Authorization.cpp
-  src/BotAddCommand.cpp
-  src/BotMessageUtils.cpp
   src/ManagedThread.cpp
   src/RegEXHandler.cpp
-  src/ResourceManager.cpp
   src/SpamBlocker.cpp
   src/ThreadManager.cpp
-  src/TimerImpl.cpp
   src/TgBotWrapper.cpp
-  src/command_modules/CommandModules.cpp
-  src/command_modules/compiler/Base.cpp
-  src/command_modules/compiler/Bash.cpp
-  src/command_modules/compiler/CCpp.cpp
-  src/command_modules/compiler/Generic.cpp
-  src/command_modules/compiler/Helper.cpp
-  src/database/bot/TgBotDatabaseImpl.cpp
-  src/popen_wdt/popen_wdt.c
-  src/popen_wdt/popen_wdt_${TARGET_VARIANT}.c
-  src/random/RandomNumberGenerator.cpp
+  src/RTCommandLoader.cpp
+  src/stringres/StringResManager.cpp
 )
-# Library for ibash
-if (UNIX)
-  extend_set(SRC_LIST src/portable_sem.c)
+#####################################################################
+
+######################## Define SQLite3 target ######################
+add_my_library(
+  NAME SQLite3
+  SRCS src/third-party/libsqlite3/libsqlite3/libsqlite3/sqlite3.c
+  PUBLIC_INC src/third-party/libsqlite3/libsqlite3/libsqlite3/
+  NO_LIBSUFFIX
+)
+add_subdirectory(src/database)
+add_subdirectory(src/random)
+add_subdirectory(src/command_modules)
+add_subdirectory(src/imagep)
+add_subdirectory(src/stringres)
+add_subdirectory(src/logging)
+add_subdirectory(src/third-party/cpp-httplib)
+add_subdirectory(src/third-party/tgbot-cpp EXCLUDE_FROM_ALL)
+add_subdirectory(src/third-party/googletest EXCLUDE_FROM_ALL)
+add_subdirectory(src/third-party/abseil-cpp EXCLUDE_FROM_ALL)
+add_subdirectory(src/third-party/protobuf EXCLUDE_FROM_ALL)
+if (WIN32)
+  add_subdirectory(src/third-party/dlfcn-win32 EXCLUDE_FROM_ALL)
+  set(CMAKE_DL_LIBS dl)
 endif()
-#####################################################################
-
-########## Generate commands modules list in compile time (python) ##########
-find_package (Python3 COMPONENTS Interpreter REQUIRED)
-set(GENERATE_CMDMODULE_STRINGS ${CMAKE_SOURCE_DIR}/resources/scripts/command_modules_helper.py)
-
-macro(get_str_and_assign _output_var)
-    execute_process(
-        COMMAND ${Python3_EXECUTABLE} ${GENERATE_CMDMODULE_STRINGS} ${ARGN}
-        OUTPUT_VARIABLE ${_output_var}
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-        COMMAND_ERROR_IS_FATAL ANY
-    )
-endmacro()
-get_str_and_assign(CMD_MODULES_SOURCES_LIST get_cmd_filenames ${CMAKE_SOURCE_DIR}/resources/commands_list.txt)
-get_str_and_assign(CMD_MODULES_LIST get_cmd_names ${CMAKE_SOURCE_DIR}/resources/commands_list.txt)
-get_str_and_assign(COMMANDS_MODULES_PTR gen_ptr ${CMD_MODULES_LIST})
-get_str_and_assign(COMMANDS_MODULES_DECL gen_decl ${CMD_MODULES_LIST})
-########## Generate commands modules list in compile time (cpp) ##########
-foreach(lib ${CMD_MODULES_SOURCES_LIST})
-  extend_set(SRC_LIST src/command_modules/${lib}.cpp)
-endforeach()
-#################### Include to TgBot++ #################
-set(COMMANDS_GEN_FILE src/command_modules/gen/cmds.gen.cpp)
-configure_file(${COMMANDS_GEN_FILE}.in ${CMAKE_BINARY_DIR}/${COMMANDS_GEN_FILE})
-extend_set(SRC_LIST ${CMAKE_BINARY_DIR}/${COMMANDS_GEN_FILE})
-#####################################################################
-include(cmake/database.cmake)
-
-####################### TgBotStringRes lib  ######################
-extend_set(SRC_LIST src/stringres/StringResManager.cpp)
-include(cmake/tgbotstringres.cmake)
+add_subdirectory(tests)
+################# Android ROM builder with C++/Python #################
+if (UNIX AND NOT APPLE)
+  add_subdirectory(src/android_builder)
+endif()
 #################################################################
 
-################## RTCL (Run Time Command Loader) ##################
-if(ENABLE_RUNTIME_COMMAND)
-  add_definitions(-DRTCOMMAND_LOADER)
-  extend_set(SRC_LIST src/RTCommandLoader.cpp)
-  add_subdirectory(src/command_modules/runtime)
-  if (WIN32)
-    set(CMAKE_DL_LIBS dl)
-  endif()
-endif()
-#####################################################################
-
 ########################## WebPage Server ##########################
-add_subdirectory(src/third-party/cpp-httplib)
-add_library_san(TgBotWeb SHARED src/web/WebServerBase.cpp)
-target_link_libraries(TgBotWeb httplib::httplib)
+add_my_library(
+  NAME Web 
+  SRCS src/web/WebServerBase.cpp
+  LIBS httplib::httplib
+)
 extend_set(SRC_LIST src/web/TgBotWebServer.cpp)
 ####################################################################
 
-########################## Logcat Client ##########################
-if (USE_UNIX_SOCKETS)
-  add_executable_san(${LOGCAT_NAME} src/logging/LoggingClient.cpp)
-  target_link_libraries(${LOGCAT_NAME} TgBotSocket TgBotLogInit)
-endif()
 ####################### TgBot Socket Library #######################
 if (USE_UNIX_SOCKETS)
   set(SOCKET_SRC_INTERFACE src/socket/interface)
@@ -213,7 +177,7 @@ if (USE_UNIX_SOCKETS)
     ${SOCKET_SRC_INTERFACE}/impl/bot/TgBotSocketInterface.cpp
     ${SOCKET_SRC_INTERFACE}/impl/backends/ServerBackend.cpp
     ${SOCKET_SRC_INTERFACE}/impl/backends/ServerBackend_${TARGET_VARIANT}.cpp)
-  include(cmake/tgbotsocket.cmake)
+  add_subdirectory(src/socket)
 endif()
 #####################################################################
 
@@ -221,37 +185,20 @@ endif()
 include(cmake/tgbotutils.cmake)
 #####################################################################
 
-################# Android ROM builder with C++/Python #################
-if (UNIX AND NOT APPLE)
-  include(src/android_builder/builder.cmake)
-endif()
-#####################################################################
-
 ################### The Bot's main functionaility ###################
-add_library_san(${PROJECT_NAME} SHARED ${SRC_LIST})
-target_include_directories(${PROJECT_NAME} PRIVATE src/third-party/rapidjson/include)
-target_include_directories(${PROJECT_NAME} PUBLIC ${STRINGRES_GENHDR_DIR})
-######################## Libraries to link ########################
-set(LD_LIST TgBot TgBotDB TgBotUtils TgBotWeb TgBotStringRes TgBotImgProc)
-extend_set_if(LD_LIST USE_UNIX_SOCKETS TgBotSocket)
-extend_set_if(LD_LIST WIN32 wsock32 Ws2_32)
-extend_set_if(LD_LIST ENABLE_RUNTIME_COMMAND ${CMAKE_DL_LIBS})
-target_link_libraries(${PROJECT_NAME} ${LD_LIST})
-add_dependencies(${PROJECT_NAME} gen_stringres_header)
+set(LD_LIST TgBot TgBotDBImpl TgBotUtils TgBotWeb TgBotStringRes ${CMAKE_DL_LIBS})
+extend_set_if(LD_LIST USE_UNIX_SOCKETS TgBotSocket TgBotRandom)
+add_my_library(
+  NAME PPImpl
+  SRCS ${SRC_LIST}
+  PRIVATE_INC src/third-party/rapidjson/include
+  LIBS ${LD_LIST}
+  DEPENDS gen_stringres_header
+)
 #####################################################################
 
 ################# The Bot's main launcher (program) #################
 add_executable_san(${PROJECT_MAINEXE_NAME} src/main.cpp)
-target_link_libraries(${PROJECT_MAINEXE_NAME} ${PROJECT_NAME} TgBotLogInit
-  absl::log_sink absl::log_sink_registry)
+target_link_libraries(${PROJECT_MAINEXE_NAME} TgBotPPImpl TgBotLogInit)
 #####################################################################
 
-############### Utility Programs (Send Media to chat) ################
-if (USE_UNIX_SOCKETS)
-  add_executable_san(${MEDIA_CLI_NAME} src/database/utils/SendMediaToChat.cc)
-  target_link_libraries(${MEDIA_CLI_NAME} TgBotDBImpl TgBotSocket TgBotLogInit)
-  target_link_lib_if_windows(${MEDIA_CLI_NAME} Ws2_32)
-endif()
-#####################################################################
-
-include(cmake/tests.cmake)

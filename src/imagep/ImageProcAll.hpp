@@ -16,7 +16,9 @@
 #endif
 #include "ImagePBase.hpp"
 
-struct ImageProcessingAll {
+#include <TgBotImgProcExports.h>
+
+struct TgBotImgProc_API ImageProcessingAll {
     bool read();
     absl::Status rotate(int angle);
     void to_greyscale();

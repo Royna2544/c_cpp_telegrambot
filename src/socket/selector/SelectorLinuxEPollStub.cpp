@@ -1,6 +1,5 @@
 
 #include "SelectorPosix.hpp"
-#include "SocketDescriptor_defs.hpp"
 
 bool EPollSelector::init() { return false; }
 

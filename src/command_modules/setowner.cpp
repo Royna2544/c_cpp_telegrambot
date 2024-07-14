@@ -1,20 +1,20 @@
 #include <database/bot/TgBotDatabaseImpl.hpp>
-#include "BotReplyMessage.h"
-#include "CommandModule.h"
+#include <TgBotWrapper.hpp>
 
-static void setOwnerCommand(const Bot &bot, const Message::Ptr message) {
+static void setOwnerCommand(const TgBotWrapper *tgWrapper, MessagePtr message) {
     auto impl = TgBotDatabaseImpl::getInstance();
     if (!impl->getOwnerUserId().has_value()) {
         impl->setOwnerUserId(message->from->id);
-        bot_sendReplyMessage(bot, message, "Owner set");
+        tgWrapper->sendReplyMessage(message, "Owner set");
     } else {
         LOG(WARNING) << "Your word rejected";
     }
 }
 
-void loadcmd_setowner(CommandModule& module) {
+DYN_COMMAND_FN(n, module) {
     module.command = "setowner";
     module.description = "Set owner of the bot, for once";
     module.flags = CommandModule::Flags::HideDescription;
     module.fn = setOwnerCommand;
+    return true;
 }

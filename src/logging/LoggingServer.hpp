@@ -1,6 +1,7 @@
 #pragma once
 
 #include <CStringLifetime.h>
+#include <TgBotPPImplExports.h>
 #include <absl/log/log_entry.h>
 #include <absl/log/log_sink.h>
 
@@ -12,7 +13,9 @@
 
 #include "SocketBase.hpp"
 
-struct NetworkLogSink : absl::LogSink, InitCall, ManagedThreadRunnable {
+struct TgBotPPImpl_API NetworkLogSink : absl::LogSink,
+                                        InitCall,
+                                        ManagedThreadRunnable {
     void Send(const absl::LogEntry& entry) override;
 
     void doInitCall() override;
@@ -30,4 +33,3 @@ struct NetworkLogSink : absl::LogSink, InitCall, ManagedThreadRunnable {
     std::mutex mContextMutex;  // Protects context
     SocketConnContext* context = nullptr;
 };
-

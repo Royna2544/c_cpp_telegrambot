@@ -8,8 +8,6 @@
 #include <filesystem>
 #include <vector>
 
-#include "InstanceClassBase.hpp"
-
 bool StringResLoader::parseFromFile(const std::filesystem::path &path,
                                      int expected_size) {
     // Initialize the library and check potential ABI mismatches

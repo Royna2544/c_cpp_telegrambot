@@ -1,10 +1,10 @@
 #include "ROMBuildTask.hpp"
 
-#include <BotReplyMessage.h>
-
 #include <ArgumentBuilder.hpp>
 #include <mutex>
 #include <regex>
+
+#include "TgBotWrapper.hpp"
 
 bool ROMBuildTask::runFunction() {
     auto dataShmem =
@@ -139,7 +139,7 @@ void ROMBuildTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
         }
         buildInfoBuffer << std::endl << std::endl;
         buildInfoBuffer << buffer.data();
-        bot_editMessage(_bot, message, buildInfoBuffer.str());
+        botWrapper->editMessage(message, buildInfoBuffer.str());
     }
 }
 
@@ -153,14 +153,13 @@ void ROMBuildTask::onExit(int exitCode) {
     throw std::runtime_error(message);
 }
 
-ROMBuildTask::ROMBuildTask(const TgBot::Bot& bot, TgBot::Message::Ptr message,
-                           PerBuildData data)
-    : BotClassBase(bot), data(std::move(data)), message(std::move(message)) {
+ROMBuildTask::ROMBuildTask(const TgBotWrapper* wrapper,
+                           TgBot::Message::Ptr message, PerBuildData data)
+    : botWrapper(wrapper), data(std::move(data)), message(std::move(message)) {
     clock = std::chrono::system_clock::now();
     startTime = std::chrono::system_clock::now();
 
     _py = PythonClass::get();
-    _py->addLookupDirectory(data.scriptDirectory);
     auto repomod = _py->importModule("system_info");
 
     // Lookup python functions

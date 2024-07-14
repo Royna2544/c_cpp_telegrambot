@@ -1,20 +1,19 @@
-#include <random/RandomNumberGenerator.h>
+#include <RandomNumberGenerator.hpp>
 
+#include <TgBotWrapper.hpp>
 #include <sstream>
 #include <thread>
-#include <MessageWrapper.hpp>
 
-#include "BotReplyMessage.h"
-#include "CommandModule.h"
 #include "StringToolsExt.hpp"
 
 using std::chrono_literals::operator""s;
 
-static void DecideCommandFn(const Bot& bot, const Message::Ptr message) {
+static void DecideCommandFn(const TgBotWrapper* wrapperBot,
+                            const Message::Ptr message) {
     constexpr int COUNT_MAX = 10;
     constexpr int RANDOM_RANGE_NUM = 10;
 
-    MessageWrapper wrapper(bot, message);
+    MessageWrapper wrapper(message);
     if (wrapper.hasExtraText()) {
         std::string obj = wrapper.getExtraText();
         std::stringstream msgtxt;
@@ -23,7 +22,7 @@ static void DecideCommandFn(const Bot& bot, const Message::Ptr message) {
         int yesno = 0;
 
         msgtxt << "Deciding " << SingleQuoted(obj) << "...";
-        msg = bot_sendReplyMessage(bot, message, msgtxt.str());
+        msg = wrapperBot->sendReplyMessage(message, msgtxt.str());
         msgtxt << std::endl << std::endl;
         do {
             msgtxt << "Try " + std::to_string(COUNT_MAX - count + 1) + " : ";
@@ -36,7 +35,7 @@ static void DecideCommandFn(const Bot& bot, const Message::Ptr message) {
             }
             msgtxt << std::endl;
             count--;
-            bot_editMessage(bot, msg, msgtxt.str());
+            wrapperBot->editMessage(msg, msgtxt.str());
             if (count != 0) {
                 if (abs(yesno) > count) {
                     msgtxt << "Short circuited to the answer" << std::endl;
@@ -56,15 +55,16 @@ static void DecideCommandFn(const Bot& bot, const Message::Ptr message) {
         } else {
             msgtxt << "So, no.";
         }
-        bot_editMessage(bot, msg, msgtxt.str());
+        wrapperBot->editMessage(msg, msgtxt.str());
     } else {
-        bot_sendReplyMessage(bot, message, "What should I decide?");
+        wrapperBot->sendReplyMessage(message, "Usage: /decide <object>");
     }
 }
 
-void loadcmd_decide(CommandModule& module) {
+DYN_COMMAND_FN(/*name*/, module) {
     module.command = "decide";
     module.description = "Decide a statement";
     module.flags = CommandModule::Flags::None;
     module.fn = DecideCommandFn;
+    return true;
 }

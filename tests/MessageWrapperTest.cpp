@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include <tgbot/tgbot.h>
-#include <MessageWrapper.hpp>
+#include <TgBotWrapper.hpp>
 
 using namespace TgBot;
 

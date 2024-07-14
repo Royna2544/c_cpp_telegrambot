@@ -1,6 +1,7 @@
-#include "CommandModule.h"
+#include "TgBotWrapper.hpp"
 
-static void FileIdCommandFn(const Bot &bot, const Message::Ptr message) {
+static void FileIdCommandFn(const TgBotWrapper* wrapper,
+                            const Message::Ptr message) {
     const auto replyMsg = message->replyToMessage;
     std::string file, unifile;
 
@@ -20,17 +21,19 @@ static void FileIdCommandFn(const Bot &bot, const Message::Ptr message) {
         } else {
             file = unifile = "Unknown";
         }
-        bot_sendReplyMessageMarkDown(
-            bot, message,
+        wrapper->sendReplyMessage<TgBotWrapper::ParseMode::Markdown>(
+            message,
             "FileId: `" + file + "`\n" + "FileUniqueId: `" + unifile + '`');
     } else {
-        bot_sendReplyMessage(bot, message, "Reply to a media");
+        wrapper->sendReplyMessage(
+            message, "Reply to a media");
     }
 }
 
-void loadcmd_fileid(CommandModule& module) {
+DYN_COMMAND_FN(n, module) {
     module.command = "fileid";
     module.description = "Get fileId of a media";
     module.flags = CommandModule::Flags::None;
     module.fn = FileIdCommandFn;
+    return true;
 }

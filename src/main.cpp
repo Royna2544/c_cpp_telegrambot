@@ -1,27 +1,26 @@
 #include <Authorization.h>
 #include <ConfigManager.h>
-#include <RegEXHandler.h>
 #include <ResourceManager.h>
-#include <SpamBlock.h>
 #include <absl/log/log.h>
 #include <absl/log/log_sink_registry.h>
-#include <command_modules/CommandModule.h>
 #include <internal/_std_chrono_templates.h>
-#include <libos/libsighandler.hpp>
 
 #include <AbslLogInit.hpp>
 #include <DurationPoint.hpp>
 #include <LogSinks.hpp>
 #include <ManagedThreads.hpp>
-#include <OnAnyMessageRegister.hpp>
+#include <RegEXHandler.hpp>
+#include <SpamBlock.hpp>
 #include <StringResManager.hpp>
 #include <TgBotWebpage.hpp>
 #include <TryParseStr.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <chrono>
 #include <database/bot/TgBotDatabaseImpl.hpp>
+#include <libos/libsighandler.hpp>
 #include <memory>
 #include <utility>
+#include <RTCommandLoader.h>
 
 #include "TgBotWrapper.hpp"
 #include "tgbot/Bot.h"
@@ -133,28 +132,29 @@ void handleRestartCommand(Bot& bot) {
 
 void TgBotApiExHandler(TgBot::Bot& bot, const TgBot::TgException& e) {
     static std::optional<DurationPoint> exceptionDuration;
+    auto wrapper = TgBotWrapper::getInstance();
 
     LOG(ERROR) << "TgBotAPI Exception: " << e.what();
     LOG(WARNING) << "Trying to recover";
     const auto ownerid = TgBotDatabaseImpl::getInstance()->getOwnerUserId();
     if (ownerid) {
         try {
-            bot_sendMessage(bot, ownerid.value(),
-                            std::string("Exception occured: ") + e.what());
+            wrapper->sendMessage(
+                ownerid.value(), std::string("Exception occured: ") + e.what());
         } catch (const TgBot::TgException& e) {
             LOG(FATAL) << e.what();
         }
     }
     if (exceptionDuration && exceptionDuration->get() < kErrorMaxDuration) {
         if (ownerid) {
-            bot_sendMessage(bot, ownerid.value(), "Recover failed.");
+            wrapper->sendMessage(ownerid.value(), "Recovery failed");
         }
         LOG(FATAL) << "Recover failed";
     }
     exceptionDuration.emplace();
     exceptionDuration->init();
     if (ownerid) {
-        bot_sendMessage(bot, ownerid.value(), "Restarting...");
+        wrapper->sendMessage(ownerid.value(), "Restarting...");
     }
     LOG(INFO) << "Re-init";
     AuthContext::getInstance()->isAuthorized() = false;
@@ -194,26 +194,23 @@ void createAndDoInitCallAll(TgBot::Bot& gBot) {
     createAndDoInitCall<StringResManager>();
     createAndDoInitCall<TgBotWebServer, ThreadManager::Usage::WEBSERVER_THREAD>(
         kWebServerListenPort);
-#ifdef RTCOMMAND_LOADER
-    createAndDoInitCall<RTCommandLoader>(gBot);
-#endif
+    createAndDoInitCall<RTCommandLoader>();
+    TgBotWrapper::getInstance()->setBotCommands();
+
 #ifdef SOCKET_CONNECTION
     createAndDoInitCall<NetworkLogSink,
                         ThreadManager::Usage::LOGSERVER_THREAD>();
-    createAndDoInitCall<SocketInterfaceTgBot>(gBot, gBot, nullptr);
+    createAndDoInitCall<SocketInterfaceTgBot>(gBot,  nullptr);
     createAndDoInitCall<ChatObserver>();
 #endif
-    createAndDoInitCall<RegexHandler>(gBot);
-    createAndDoInitCall<SpamBlockManager>(gBot);
-    createAndDoInitCall<CommandModuleManager>(gBot);
+    //createAndDoInitCall<RegexHandler>();
+    createAndDoInitCall<SpamBlockManager>();
     createAndDoInitCall<ResourceManager>();
     createAndDoInitCall<TgBotDatabaseImpl>();
+    TgBotWrapper::getInstance()->registerOnAnyMsgCallback();
     // Must be last
-    createAndDoInitCall<OnAnyMessageRegisterer>(gBot);
-    // Must be last
-    OnTerminateRegistrar::getInstance()->registerCallback([]() {
-        ThreadManager::getInstance()->destroyManager();
-    });
+    OnTerminateRegistrar::getInstance()->registerCallback(
+        []() { ThreadManager::getInstance()->destroyManager(); });
 }
 
 void onBotInitialized(TgBot::Bot& gBot, DurationPoint& startupDp,

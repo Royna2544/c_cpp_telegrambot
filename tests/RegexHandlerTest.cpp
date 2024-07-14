@@ -1,4 +1,4 @@
-#include <RegEXHandler.h>
+#include <RegEXHandler.hpp>
 #include <gtest/gtest.h>
 
 struct RegexHandlerTest : RegexHandlerBase {

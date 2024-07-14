@@ -3,7 +3,9 @@
 
 #include "InstanceClassBase.hpp"
 
-struct OnTerminateRegistrar : InstanceClassBase<OnTerminateRegistrar> {
+#include <TgBotUtilsExports.h>
+
+struct TgBotUtils_API OnTerminateRegistrar : InstanceClassBase<OnTerminateRegistrar> {
     using callback_type = std::function<void()>;
 
     /**

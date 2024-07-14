@@ -1,18 +1,18 @@
-#include <BotReplyMessage.h>
+
 #include <ConfigManager.h>
 #include <absl/log/log.h>
-#include <inttypes.h>
-#include <libos/libsighandler.hpp>
 #include <unistd.h>
 
+#include <TgBotWrapper.hpp>
 #include <TryParseStr.hpp>
-
-#include "CommandModule.h"
+#include <cinttypes>
+#include <libos/libsighandler.hpp>
 
 extern char **environ;
 
-static void restartCommandFn(const Bot &bot, const Message::Ptr message) {
-    std::array<char, 32> restartBuf = {0};
+static void restartCommandFn(const TgBotWrapper *tgBotWrapper,
+                             MessagePtr message) {
+    std::array<char, sizeof("RESTART=999999999999")> restartBuf = {0};
     int argc = 0;
     int count = 0;
     char *const *argv = nullptr;
@@ -42,14 +42,15 @@ static void restartCommandFn(const Bot &bot, const Message::Ptr message) {
     copyCommandLine(CommandLineOp::GET, &argc, &argv);
     LOG(INFO) << "Restarting bot with exe: " << argv[0] << ", addenv "
               << restartBuf.data();
-    bot_sendReplyMessage(bot, message, "Restarting bot instance...");
+    tgBotWrapper->sendReplyMessage(message, "Restarting bot instance...");
     // Call exeve
     execve(argv[0], argv, myEnviron.data());
 }
 
-void loadcmd_restart(CommandModule &module) {
+DYN_COMMAND_FN(n, module) {
     module.command = "restart";
     module.description = "Restarts the bot";
     module.flags = CommandModule::Flags::Enforced;
     module.fn = restartCommandFn;
+    return true;
 }

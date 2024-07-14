@@ -32,11 +32,16 @@ if (${OpenCV_FOUND})
     message(STATUS "libTgBotImgProc: OpenCV Present")
 endif()
 
-add_library_san(TgBotImgProc SHARED
-    ${TGBOTPNG_SOURCES}
-    ImageProcAll.cpp)
-    
-target_compile_definitions(TgBotImgProc PRIVATE ${TGBOTPNG_FLAGS})
-target_include_directories(TgBotImgProc PRIVATE 
-    ${PNG_INCLUDE_DIR} ${WebP_INCLUDE_DIRS} ${JPEG_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS})
-target_link_libraries(TgBotImgProc ${TGBOTPNG_LIBS} absl::status)
+add_my_library(
+    NAME ImgProc
+    SRCS 
+        ${TGBOTPNG_SOURCES}
+        ImageProcAll.cpp
+    PRIVATE_INC
+        ${PNG_INCLUDE_DIR}
+        ${WebP_INCLUDE_DIRS}
+        ${JPEG_INCLUDE_DIRS}
+        ${OpenCV_INCLUDE_DIRS}
+    LIBS ${TGBOTPNG_LIBS} absl::status
+    DEFS ${TGBOTPNG_FLAGS}
+)

@@ -1,50 +1,12 @@
-#include <MessageWrapper.hpp>
-#include <algorithm>
+#include <StringResManager.hpp>
+#include <TgBotWrapper.hpp>
 #include <boost/algorithm/string/split.hpp>
 
-#include "BotAddCommand.h"
-#include "BotReplyMessage.h"
-#include "CommandModule.h"
 #include "StringToolsExt.hpp"
-#include <StringResManager.hpp>
 
-namespace {
-void handle_reload(Bot& bot, MessageWrapper& wrapper, std::string command) {
-    auto it = std::ranges::find_if(
-        CommandModuleManager::loadedModules,
-        [&command](const CommandModule& e) { return e.command == command; });
-    if (it == CommandModuleManager::loadedModules.end()) {
-        wrapper.sendMessageOnExit("Command not found to reload");
-        return;
-    }
-    if (it->isLoaded) {
-        wrapper.sendMessageOnExit("Command already loaded");
-        return;
-    }
-    bot_AddCommand(bot, it->command, it->fn, it->isEnforced());
-    wrapper.sendMessageOnExit("Command reloaded");
-}
-
-void handle_unload(Bot& bot, MessageWrapper& wrapper, std::string command) {
-    auto it = std::ranges::find_if(
-        CommandModuleManager::loadedModules,
-        [&command](const CommandModule& e) { return e.command == command; });
-    if (it == CommandModuleManager::loadedModules.end()) {
-        wrapper.sendMessageOnExit("Command not found to unload");
-        return;
-    }
-    if (!it->isLoaded) {
-        wrapper.sendMessageOnExit("Command not loaded");
-        return;
-    }
-    bot_RemoveCommand(bot, it->command);
-    it->isLoaded = false;
-    wrapper.sendMessageOnExit("Command unloaded");
-}
-}  // namespace
-
-void CmdCommandFn(Bot& bot, const TgBot::Message::Ptr& message) {
-    MessageWrapper wrapper(bot, message);
+void CmdCommandFn(TgBotWrapper* botWrapper,
+                  const TgBot::Message::Ptr& message) {
+    MessageWrapper wrapper(message);
     if (wrapper.hasExtraText()) {
         std::vector<std::string> args;
 
@@ -55,19 +17,28 @@ void CmdCommandFn(Bot& bot, const TgBot::Message::Ptr& message) {
         }
         const auto& command = args[0];
         const auto& action = args[1];
+        bool ret = false;
         if (action == "reload") {
-            handle_reload(bot, wrapper, command);
+            ret = botWrapper->reloadCommand(command);
         } else if (action == "unload") {
-            handle_unload(bot, wrapper, command);
+            ret = botWrapper->unloadCommand(command);
         } else {
             wrapper.sendMessageOnExit(GETSTR_IS(UNKNOWN_ACTION) + action);
+            return;
+        }
+        if (ret) {
+            wrapper.sendMessageOnExit(GETSTR_IS(OPERATION_SUCCESSFUL) +
+                                      command);
+        } else {
+            wrapper.sendMessageOnExit(GETSTR_IS(OPERATION_FAILURE) + command);
         }
     }
 }
 
-void loadcmd_cmd(CommandModule& module) {
+DYN_COMMAND_FN(/*name*/, module) {
     module.command = "cmd";
     module.description = "unload/reload a command";
     module.flags = CommandModule::Flags::Enforced;
     module.fn = CmdCommandFn;
+    return true;
 }
