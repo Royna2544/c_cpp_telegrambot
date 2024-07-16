@@ -6,7 +6,7 @@
 
 #include "StringToolsExt.hpp"
 
-static void PossibilityCommandFn(const TgBotWrapper* botWrapper, MessagePtr message) {
+DECLARE_COMMAND_HANDLER(possibility, botWrapper, message){
     constexpr int PERCENT_MAX = 100;
     MessageWrapper messageWrapper(message);
     std::string text;
@@ -79,6 +79,6 @@ DYN_COMMAND_FN(n, module) {
     module.command = "possibility";
     module.description = "Get possibilities";
     module.flags = CommandModule::Flags::None;
-    module.fn = PossibilityCommandFn;
+    module.fn = COMMAND_HANDLER_NAME(possibility);
     return true;
 }

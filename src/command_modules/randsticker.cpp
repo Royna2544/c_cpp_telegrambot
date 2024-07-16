@@ -3,8 +3,7 @@
 
 using TgBot::StickerSet;
 
-static void RandomStickerCommandFn(const TgBotWrapper* wrapper,
-                                   const Message::Ptr& message) {
+DECLARE_COMMAND_HANDLER(randsticker, wrapper, message) {
     MessageWrapper msg(message);
     if (!msg.switchToReplyToMessage(
             "Sticker not found in replied-to message")) {
@@ -17,7 +16,7 @@ static void RandomStickerCommandFn(const TgBotWrapper* wrapper,
         StickerSet::Ptr stickset;
         std::stringstream ss;
         try {
-            stickset = wrapper->getApi().getStickerSet(sticker->setName);
+            stickset = wrapper->getStickerSet(sticker->setName);
         } catch (const std::exception& e) {
             wrapper->sendReplyMessage(message, e.what());
             return;
@@ -36,6 +35,6 @@ DYN_COMMAND_FN(n, module) {
     module.command = "randsticker";
     module.description = "Random sticker from that pack";
     module.flags = CommandModule::Flags::None;
-    module.fn = RandomStickerCommandFn;
+    module.fn = COMMAND_HANDLER_NAME(randsticker);
     return true;
 }

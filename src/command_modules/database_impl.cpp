@@ -8,11 +8,11 @@
 #include <memory>
 #include <optional>
 
-#include "StringToolsExt.hpp"
 #include "RandomNumberGenerator.hpp"
+#include "StringToolsExt.hpp"
 
 template <DatabaseBase::ListType type>
-void handleAddUser(TgBotWrapper* wrapper, const Message::Ptr& message,
+void handleAddUser(TgBotApi* wrapper, const Message::Ptr& message,
                    const UserId user) {
     auto base = TgBotDatabaseImpl::getInstance();
     auto res = base->addUserToList(type, user);
@@ -38,7 +38,7 @@ void handleAddUser(TgBotWrapper* wrapper, const Message::Ptr& message,
 }
 
 template <DatabaseBase::ListType type>
-void handleRemoveUser(TgBotWrapper* wrapper, const Message::Ptr& message,
+void handleRemoveUser(TgBotApi* wrapper, const Message::Ptr& message,
                       const UserId user) {
     auto base = TgBotDatabaseImpl::getInstance();
     auto res = base->removeUserFromList(type, user);
@@ -91,7 +91,7 @@ constexpr std::string_view removefromwhitelist = "Remove from whitelist";
 constexpr std::string_view addtoblacklist = "Add to blacklist";
 constexpr std::string_view removefromblacklist = "Remove from blacklist";
 
-void handleDatabaseCmd(TgBotWrapper* wrapper, const Message::Ptr& message) {
+DECLARE_COMMAND_HANDLER(database, wrapper, message) {
     MessageWrapper msgWrapper(message);
 
     auto reply = std::make_shared<TgBot::ReplyKeyboardMarkup>();
@@ -119,7 +119,7 @@ void handleDatabaseCmd(TgBotWrapper* wrapper, const Message::Ptr& message) {
     const random_return_type token = RandomNumberGenerator::generate(100);
 
     wrapper->registerCallback(
-        [msg, token, userId](TgBotWrapper* wrapper, Message::Ptr m) {
+        [msg, token, userId](TgBotApi* wrapper, MessagePtr m) {
             if (m->replyToMessage &&
                 m->replyToMessage->messageId == msg->messageId) {
                 if (m->text == addtowhitelist) {
@@ -141,7 +141,7 @@ void handleDatabaseCmd(TgBotWrapper* wrapper, const Message::Ptr& message) {
         token);
 };
 
-void handleSaveIdCmd(TgBotWrapper* wrapper, const Message::Ptr& message) {
+DECLARE_COMMAND_HANDLER(saveid,, message) {
     MessageWrapper msgWrapper(message);
     if (msgWrapper.hasExtraText()) {
         std::optional<std::string> fileId;
@@ -197,13 +197,13 @@ DYN_COMMAND_FN(name, module) {
         module.command = "database";
         module.description = GETSTR(DATABASE_CMD_DESC);
         module.flags = CommandModule::Flags::Enforced;
-        module.fn = handleDatabaseCmd;
+        module.fn = COMMAND_HANDLER_NAME(database);
     } else if (std::string(name) == "saveid") {
         module.command = "saveid";
         module.description = GETSTR(SAVEID_CMD_DESC);
         module.flags = CommandModule::Flags::Enforced |
                        CommandModule::Flags::HideDescription;
-        module.fn = handleSaveIdCmd;
+        module.fn = COMMAND_HANDLER_NAME(saveid);
     } else {
         return false;  // Command not found.
     }

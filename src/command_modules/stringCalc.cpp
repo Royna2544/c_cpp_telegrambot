@@ -6,7 +6,7 @@ extern "C" {
     void calculate_string_free(const char *expr);
 }
 
-static void cmd_stringcalc(const TgBotWrapper*, const Message::Ptr& message) {
+DECLARE_COMMAND_HANDLER(calc,, message) {
     MessageWrapper wrapper(message);
     if (wrapper.hasExtraText()) {
         CStringLifetime expr = wrapper.getExtraText();
@@ -19,7 +19,7 @@ static void cmd_stringcalc(const TgBotWrapper*, const Message::Ptr& message) {
 DYN_COMMAND_FN(n, module) {
     module.command = "calc";
     module.description = "Calculate a string";
-    module.fn = cmd_stringcalc;
+    module.fn = COMMAND_HANDLER_NAME(calc);
     module.flags = CommandModule::Flags::None;
     return true;
 }

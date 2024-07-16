@@ -14,7 +14,7 @@
 
 namespace {
 
-void sendSystemInfo(const TgBotWrapper* wrapper, MessagePtr message) {
+void sendSystemInfo(const TgBotApi* wrapper, MessagePtr message) {
     auto py = PythonClass::get();
     auto mod = py->importModule("system_info");
     if (!mod) {
@@ -73,7 +73,7 @@ bool parseConfigAndGetTarget(PerBuildData* data, MessageWrapper& wrapper,
     return true;
 }
 
-bool repoSync(PerBuildData data, const TgBotWrapper* wrapper,
+bool repoSync(PerBuildData data, const TgBotApi* wrapper,
               const Message::Ptr& message) {
     PerBuildData::ResultData result{};
     data.result = &result;
@@ -106,7 +106,7 @@ bool repoSync(PerBuildData data, const TgBotWrapper* wrapper,
 
 namespace fs = std::filesystem;
 
-bool build(PerBuildData data, const TgBotWrapper* wrapper,
+bool build(PerBuildData data, const TgBotApi* wrapper,
            const Message::Ptr& message) {
     std::error_code ec;
     PerBuildData::ResultData result{};
@@ -134,7 +134,7 @@ bool build(PerBuildData data, const TgBotWrapper* wrapper,
                 if (ec) {
                     break;
                 }
-                wrapper->getApi().sendDocument(
+                wrapper->sendDocument(
                     message->chat->id,
                     TgBot::InputFile::fromFile(
                         ROMBuildTask::kErrorLogFile.data(), "text/plain"));
@@ -149,7 +149,7 @@ bool build(PerBuildData data, const TgBotWrapper* wrapper,
     return false;
 }
 
-void upload(PerBuildData data, const TgBotWrapper* wrapper,
+void upload(PerBuildData data, const TgBotApi* wrapper,
             const Message::Ptr& message) {
     PerBuildData::ResultData uploadResult;
     auto uploadmsg = wrapper->sendMessage(message, "Will upload");
@@ -161,7 +161,7 @@ void upload(PerBuildData data, const TgBotWrapper* wrapper,
     } else {
         wrapper->editMessage(uploadmsg, uploadResult.getMessage());
         if (uploadResult.value == PerBuildData::Result::ERROR_FATAL) {
-            wrapper->getApi().sendDocument(
+            wrapper->sendDocument(
                 message->chat->id,
                 TgBot::InputFile::fromFile("upload_err.txt", "text/plain"));
         }
@@ -169,9 +169,9 @@ void upload(PerBuildData data, const TgBotWrapper* wrapper,
 }
 }  // namespace
 
-static void romBuildCommand(const TgBotWrapper* tgWrapper, MessagePtr message) {
+DECLARE_COMMAND_HANDLER(rombuild, tgWrapper, message) {
     PerBuildData PBData;
-    MessageWrapper wrapper( message);
+    MessageWrapper wrapper(message);
     std::error_code ec;
     constexpr static std::string_view kBuildDirectory = "rom_build/";
     const auto cwd = std::filesystem::current_path();
@@ -218,6 +218,6 @@ DYN_COMMAND_FN(n, module) {
     module.command = "rombuild";
     module.description = "Build a ROM, I'm lazy";
     module.flags = CommandModule::Flags::Enforced;
-    module.fn = romBuildCommand;
+    module.fn = COMMAND_HANDLER_NAME(rombuild);
     return true;
 }

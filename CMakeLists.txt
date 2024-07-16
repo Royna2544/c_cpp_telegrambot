@@ -186,8 +186,8 @@ include(cmake/tgbotutils.cmake)
 #####################################################################
 
 ################### The Bot's main functionaility ###################
-set(LD_LIST TgBot TgBotDBImpl TgBotUtils TgBotWeb TgBotStringRes ${CMAKE_DL_LIBS})
-extend_set_if(LD_LIST USE_UNIX_SOCKETS TgBotSocket TgBotRandom)
+set(LD_LIST TgBot TgBotDBImpl TgBotUtils TgBotWeb TgBotStringRes TgBotRandom ${CMAKE_DL_LIBS})
+extend_set_if(LD_LIST USE_UNIX_SOCKETS TgBotSocket)
 add_my_library(
   NAME PPImpl
   SRCS ${SRC_LIST}

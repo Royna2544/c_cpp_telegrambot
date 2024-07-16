@@ -25,8 +25,7 @@ struct TimerImplThread : TimerThread {
     ChatId chatid;
 };
 
-static void TimerStartCommandFn(const TgBotWrapper *bot,
-                                const Message::Ptr message) {
+DECLARE_COMMAND_HANDLER(starttimer, bot, message) {
     const auto tm = ThreadManager::getInstance();
     auto ctrl = tm->createController<ThreadManager::Usage::TIMER_THREAD,
 
@@ -80,8 +79,7 @@ static void TimerStartCommandFn(const TgBotWrapper *bot,
     }
 }
 
-static void TimerStopCommandFn(const TgBotWrapper *bot,
-                               const Message::Ptr &message) {
+DECLARE_COMMAND_HANDLER(stoptimer, bot, message) {
     const auto tm = ThreadManager::getInstance();
     auto ctrl = tm->getController<ThreadManager::Usage::TIMER_THREAD,
                                   TimerImplThread>();
@@ -97,11 +95,11 @@ DYN_COMMAND_FN(name, module) {
     if (strcmp(name, "starttimer") == 0) {
         module.command = "starttimer";
         module.description = "Start timer of the bot";
-        module.fn = TimerStartCommandFn;
+        module.fn = COMMAND_HANDLER_NAME(starttimer);
     } else if (strcmp(name, "stoptimer") == 0) {
         module.command = "stoptimer";
         module.description = "Stop timer of the bot";
-        module.fn = TimerStopCommandFn;
+        module.fn = COMMAND_HANDLER_NAME(stoptimer);
     } else {
         return false;
     }

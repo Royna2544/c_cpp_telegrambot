@@ -1,12 +1,13 @@
 #include <internal/_std_chrono_templates.h>
 
+#include <TgBotWrapper.hpp>
 #include <chrono>
 #include <ctime>
 #include <ostream>
-#include "DurationPoint.hpp"
-#include <TgBotWrapper.hpp>
 
-static void DelayCommandFn(const TgBotWrapper* wrapper, const MessagePtr message) {
+#include "DurationPoint.hpp"
+
+DECLARE_COMMAND_HANDLER(delay, wrapper, message) {
     using std::chrono::duration;
     using std::chrono::high_resolution_clock;
     using std::chrono::system_clock;
@@ -24,11 +25,11 @@ static void DelayCommandFn(const TgBotWrapper* wrapper, const MessagePtr message
     // Update the sent message with the delay information
     wrapper->editMessage(sentMsg, ss.str());
 }
-   
-DYN_COMMAND_FN(name, module) {
+
+DYN_COMMAND_FN(/*name*/, module) {
     module.command = "delay";
     module.description = "Ping the bot for network delay";
     module.flags = CommandModule::Flags::None;
-    module.fn = DelayCommandFn;
+    module.fn = COMMAND_HANDLER_NAME(delay);
     return true;
 }

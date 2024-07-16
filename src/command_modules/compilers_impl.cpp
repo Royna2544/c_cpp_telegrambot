@@ -28,17 +28,17 @@ void GOModuleCallback(MessagePtr message,
     static CompilerInTgForGenericImpl goCompiler(compiler, "foo.go");
     goCompiler.run(message);
 }
-void NoCompilerCommandStub(TgBotWrapper *wrapper, MessagePtr message) {
+void NoCompilerCommandStub(TgBotApi *wrapper, MessagePtr message) {
     wrapper->sendReplyMessage(message, GETSTR(NOT_SUPPORTED_IN_CURRENT_HOST));
 }
+
 void loadCompilerGeneric(CommandModule &module, ProLangs lang,
                          std::string_view name,
                          const command_callback_compiler_t &callback) {
     std::filesystem::path compiler;
     module.description = std::string(name) + " command";
     if (findCompiler(lang, compiler)) {
-        module.fn = [compiler, callback](TgBotWrapper *,
-                                         const Message::Ptr &message) {
+        module.fn = [compiler, callback](auto *, MessagePtr message) {
             callback(message, compiler);
         };
         module.description += ", ";
@@ -64,14 +64,16 @@ DYN_COMMAND_FN(name, module) {
         loadCompilerGeneric(module, ProLangs::C, commandName, CModuleCallback);
 
     } else if (commandName == "cpp") {
-        loadCompilerGeneric(module, ProLangs::CXX, commandName, CPPModuleCallback);
+        loadCompilerGeneric(module, ProLangs::CXX, commandName,
+                            CPPModuleCallback);
 
     } else if (commandName == "py") {
         loadCompilerGeneric(module, ProLangs::PYTHON, commandName,
                             PYModuleCallback);
 
     } else if (commandName == "go") {
-        loadCompilerGeneric(module, ProLangs::GO, commandName, GOModuleCallback);
+        loadCompilerGeneric(module, ProLangs::GO, commandName,
+                            GOModuleCallback);
     }
     return true;
 }

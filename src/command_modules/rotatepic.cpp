@@ -38,8 +38,7 @@ bool processPhotoFile(ProcessImageParam& param) {
 constexpr std::string_view kDownloadFile = "inpic.bin";
 constexpr std::string_view kOutputFile = "outpic.png";
 
-void rotateStickerCommand(const TgBotWrapper* tgWrapper,
-                          MessagePtr message) {
+DECLARE_COMMAND_HANDLER(rotatepic, tgWrapper, message) {
     MessageWrapper wrapper(message);
     std::string extText = wrapper.getExtraText();
     std::vector<std::string> args;
@@ -88,17 +87,11 @@ void rotateStickerCommand(const TgBotWrapper* tgWrapper,
         return;
     }
 
-    const auto file = tgWrapper->getApi().getFile(fileid.value());
-    if (!file) {
+    // Download the sticker file
+    if (!tgWrapper->downloadFile(kDownloadFile.data(), fileid.value())) {
         wrapper.sendMessageOnExit("Failed to download sticker file.");
         return;
     }
-    // Download the sticker
-    std::string buffer = tgWrapper->getApi().downloadFile(file->filePath);
-    // Save the sticker to a temporary file
-    std::ofstream ofs(kDownloadFile.data());
-    ofs.write(buffer.data(), buffer.size());
-    ofs.close();
 
     // Round it under 360
     rotation = rotation % PhotoBase::kAngleMax;
@@ -117,11 +110,9 @@ void rotateStickerCommand(const TgBotWrapper* tgWrapper,
         replyParams->messageId = message->messageId;
         replyParams->chatId = message->chat->id;
         if (wrapper.hasSticker()) {
-            tgWrapper->getApi().sendSticker(wrapper.getChatId(), infile,
-                                            replyParams);
+            tgWrapper->sendReplySticker(message, infile);
         } else if (wrapper.hasPhoto()) {
-            tgWrapper->getApi().sendPhoto(wrapper.getChatId(), infile,
-                                          "Rotated picture", replyParams);
+            tgWrapper->sendReplyPhoto(message, infile, "Rotated picture");
         }
     } else {
         wrapper.sendMessageOnExit("Unknown image type, or processing failed");
@@ -135,6 +126,6 @@ DYN_COMMAND_FN(n, module) {
     module.command = "rotatepic";
     module.description = "Rotate a sticker";
     module.flags = CommandModule::Flags::None;
-    module.fn = rotateStickerCommand;
+    module.fn = COMMAND_HANDLER_NAME(rotatepic);
     return true;
 }

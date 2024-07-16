@@ -10,8 +10,7 @@
 
 extern char **environ;
 
-static void restartCommandFn(const TgBotWrapper *tgBotWrapper,
-                             MessagePtr message) {
+DECLARE_COMMAND_HANDLER(restart, tgBotWrapper, message) {
     std::array<char, sizeof("RESTART=999999999999")> restartBuf = {0};
     int argc = 0;
     int count = 0;
@@ -51,6 +50,6 @@ DYN_COMMAND_FN(n, module) {
     module.command = "restart";
     module.description = "Restarts the bot";
     module.flags = CommandModule::Flags::Enforced;
-    module.fn = restartCommandFn;
+    module.fn = COMMAND_HANDLER_NAME(restart);
     return true;
 }

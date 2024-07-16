@@ -190,7 +190,7 @@ void createAndDoInitCallAll() {
         kWebServerListenPort);
     createAndDoInitCall<RTCommandLoader>();
     LOG(INFO) << "Updating commands list based on loaded commands...";
-    LOG_IF(ERROR, TgBotWrapper::getInstance()->setBotCommands())
+    LOG_IF(ERROR, !TgBotWrapper::getInstance()->setBotCommands())
         << "Couldn't update commands list";
     LOG(INFO) << "...done";
 
@@ -215,9 +215,8 @@ void onBotInitialized(const std::shared_ptr<TgBotWrapper>& wrapper,
     LOG(INFO) << "Subsystems initialized, bot started: " << exe;
     LOG(INFO) << "Started in " << startupDp.get().count() << " milliseconds";
 
-    wrapper->getApi().setMyDescription(
-        "Royna's telegram bot, written in C++. Go on you can talk to him");
-    wrapper->getApi().setMyShortDescription(
+    wrapper->setDescriptions(
+        "Royna's telegram bot, written in C++. Go on you can talk to him",
         "One of @roynatech's TgBot C++ project bots. I'm currently hosted on "
 #if BOOST_OS_WINDOWS
         "Windows"
@@ -256,6 +255,7 @@ int main(int argc, char* const* argv) {
         return EXIT_FAILURE;
     }
 
+    // Initialize TgBotWrapper instance with provided token
     TgBotWrapper::initInstance(token.value());
     auto wrapperInst = TgBotWrapper::getInstance();
 
@@ -276,7 +276,8 @@ int main(int argc, char* const* argv) {
     }
     while (!SignalHandler::isSignaled()) {
         try {
-            LOG(INFO) << "Bot username: " << wrapperInst->getBotUser()->username;
+            LOG(INFO) << "Bot username: "
+                      << wrapperInst->getBotUser()->username;
             wrapperInst->startPoll();
         } catch (const TgBot::TgException& e) {
             TgBotApiExHandler(e);

@@ -5,6 +5,7 @@
 #include <rapidjson/rapidjson.h>
 
 #include <ManagedThreads.hpp>
+#include <RandomNumberGenerator.hpp>
 #include <SpamBlock.hpp>
 #include <TgBotSocket_Export.hpp>
 #include <chrono>
@@ -14,10 +15,10 @@
 #include <impl/bot/TgBotSocketInterface.hpp>
 #include <mutex>
 #include <socket/TgBotCommandMap.hpp>
+#include <type_traits>
 #include <variant>
 
 #include "TgBotWrapper.hpp"
-#include <RandomNumberGenerator.hpp>
 
 using TgBot::Api;
 using TgBot::InputFile;
@@ -63,7 +64,8 @@ std::string getMIMEString(const std::string& path) {
 GenericAck SocketInterfaceTgBot::handle_WriteMsgToChatId(const void* ptr) {
     const auto* data = static_cast<const WriteMsgToChatId*>(ptr);
     try {
-        TgBotWrapper::getInstance()->sendMessage(data->chat, data->message.data());
+        TgBotWrapper::getInstance()->sendMessage(data->chat,
+                                                 data->message.data());
     } catch (const TgBot::TgException& e) {
         LOG(ERROR) << "Exception at handler: " << e.what();
         return GenericAck(AckType::ERROR_TGAPI_EXCEPTION, e.what());
@@ -110,46 +112,50 @@ GenericAck SocketInterfaceTgBot::handle_ObserveChatId(const void* ptr) {
 GenericAck SocketInterfaceTgBot::handle_SendFileToChatId(const void* ptr) {
     const auto* data = static_cast<const SendFileToChatId*>(ptr);
     const auto* file = data->filePath.data();
-    using FileOrId_t = boost::variant<InputFile::Ptr, std::string>;
-    std::function<Message::Ptr(const Api&, ChatId, const FileOrId_t&)> fn;
-    const auto& api = TgBotWrapper::getInstance()->getApi();
+    const auto instance = TgBotWrapper::getInstance();
+    using WrapperT =
+        std::add_const_t<std::add_lvalue_reference_t<decltype(instance)>>;
+    std::function<Message::Ptr(WrapperT, ChatId,
+                               const TgBotWrapper::FileOrMedia&)>
+        fn;
     try {
         switch (data->fileType) {
             case FileType::TYPE_PHOTO:
-                fn = [](const Api& api, ChatId id, const FileOrId_t& file) {
-                    return api.sendPhoto(id, file);
+                fn = [](WrapperT api, ChatId id,
+                        const TgBotWrapper::FileOrMedia& file) {
+                    return api->sendPhoto(id, file);
                 };
                 break;
             case FileType::TYPE_VIDEO:
-                fn = [](const Api& api, ChatId id, const FileOrId_t& file) {
-                    return api.sendVideo(id, file);
+                fn = [](WrapperT api, ChatId id,
+                        const TgBotWrapper::FileOrMedia& file) {
+                    return api->sendVideo(id, file);
                 };
                 break;
             case FileType::TYPE_GIF:
-                fn = [](const Api& api, ChatId id, const FileOrId_t& file) {
-                    return api.sendAnimation(id, file);
+                fn = [](WrapperT api, ChatId id,
+                        const TgBotWrapper::FileOrMedia& file) {
+                    return api->sendAnimation(id, file);
                 };
             case FileType::TYPE_DOCUMENT:
-                fn = [](const Api& api, ChatId id, const FileOrId_t& file) {
-                    return api.sendDocument(id, file);
+                fn = [](WrapperT api, ChatId id,
+                        const TgBotWrapper::FileOrMedia& file) {
+                    return api->sendDocument(id, file);
                 };
                 break;
             case FileType::TYPE_STICKER:
-                fn = [](const Api& api, ChatId id, const FileOrId_t& file) {
-                    return api.sendSticker(id, file);
+                fn = [](WrapperT api, ChatId id,
+                        const TgBotWrapper::FileOrMedia& file) {
+                    return api->sendSticker(id, file);
                 };
                 break;
             case FileType::TYPE_DICE: {
-                static const std::vector<std::string> dices = {
-                    "🎲", "🎯", "🏀", "⚽", "🎳", "🎰"};
-                // TODO: More clean code?
-                api.sendDice(
-                    data->chat, false, 0, nullptr,
-                    dices[RandomNumberGenerator::generate(dices.size() - 1)]);
+                instance->sendDice(data->chat);
                 return GenericAck::ok();
             }
             default:
-                fn = [data](const Api&, ChatId, const FileOrId_t&) {
+                fn = [data](WrapperT, ChatId,
+                            const TgBotWrapper::FileOrMedia&) {
                     throw TgBot::TgException(
                         "Invalid file type: " +
                             std::to_string(static_cast<int>(data->fileType)),
@@ -161,13 +167,14 @@ GenericAck SocketInterfaceTgBot::handle_SendFileToChatId(const void* ptr) {
         DLOG(INFO) << "Sending " << file << " to " << data->chat;
         // Try to send as local file first
         try {
-            fn(api, data->chat,
-               InputFile::fromFile(file, getMIMEString(file)));
+            fn(instance, data->chat, InputFile::fromFile(file, getMIMEString(file)));
         } catch (std::ifstream::failure& e) {
             LOG(INFO) << "Failed to send '" << file
                       << "' as local file, trying as Telegram "
                          "file id";
-            fn(api, data->chat, std::string(file));
+            MediaIds ids{};
+            ids.id = file;
+            fn(instance, data->chat, ids);
         }
     } catch (const TgBot::TgException& e) {
         LOG(ERROR) << "Exception at handler, " << e.what();

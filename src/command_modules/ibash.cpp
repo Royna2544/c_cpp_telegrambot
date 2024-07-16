@@ -287,7 +287,7 @@ struct InteractiveBashContext {
     }
 };
 
-static void InteractiveBashCommandFn(const TgBotWrapper*, MessagePtr message) {
+DECLARE_COMMAND_HANDLER(ibash,, message) {
     static InteractiveBashContext ctx;
     std::string command;
     MessageWrapper wrapper(message);
@@ -327,6 +327,6 @@ DYN_COMMAND_FN(n, module) {
     module.command = "ibash";
     module.description = "Interactive bash";
     module.flags = CommandModule::Flags::Enforced;
-    module.fn = InteractiveBashCommandFn;
+    module.fn = COMMAND_HANDLER_NAME(ibash);
     return true;
 }

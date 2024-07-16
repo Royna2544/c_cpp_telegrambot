@@ -37,10 +37,10 @@ void try_parse_spamcnt(const std::string& data, int& count) {
 /**
  * @brief A command module for spamming.
  */
-static void SpamCommandFn(const TgBotWrapper * bot, const Message::Ptr& message) {
+DECLARE_COMMAND_HANDLER(spam, bot, message) {
     std::function<void(void)> fp;
     int count = 0;
-    MessageWrapper wrapper( message);
+    MessageWrapper wrapper(message);
     bool spamable = false;
 
     if (wrapper.hasReplyToMessage()) {
@@ -56,7 +56,8 @@ static void SpamCommandFn(const TgBotWrapper * bot, const Message::Ptr& message)
                 };
             } else if (wrapper.hasAnimation()) {
                 fp = [bot, message, chatid, &wrapper] {
-                    bot->sendAnimation(chatid, MediaIds(wrapper.getAnimation()));
+                    bot->sendAnimation(chatid,
+                                       MediaIds(wrapper.getAnimation()));
                 };
             } else if (wrapper.hasText()) {
                 fp = [bot, message, chatid, &wrapper] {
@@ -97,6 +98,6 @@ DYN_COMMAND_FN(n, module) {
     module.command = "spam";
     module.description = "Spam a given literal or media";
     module.flags = CommandModule::Flags::Enforced;
-    module.fn = SpamCommandFn;
+    module.fn = COMMAND_HANDLER_NAME(spam);
     return true;
 }

@@ -15,7 +15,7 @@
 constexpr std::string_view kZipExtensionSuffix = ".zip";
 constexpr int FLASH_DELAY_MAX_SEC = 5;
 
-static void FlashCommandFn(const TgBotWrapper* botWrapper, const Message::Ptr& message) {
+DECLARE_COMMAND_HANDLER(flash, botWrapper, message) {
     static std::vector<std::string> reasons;
     static std::once_flag once;
     static std::regex kFlashTextRegEX(R"(Flashing '\S+.zip'\.\.\.)");
@@ -79,6 +79,6 @@ DYN_COMMAND_FN(n, module) {
     module.command = "flash";
     module.description = "Flash and get a random result";
     module.flags = CommandModule::Flags::None;
-    module.fn = FlashCommandFn;
+    module.fn = COMMAND_HANDLER_NAME(flash);
     return true;
 }

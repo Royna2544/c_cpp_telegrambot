@@ -18,7 +18,7 @@ consteval auto cat(const char (&strings)[Len]) {
     return StringConcat::cat("_", strings, "_");
 }
 
-static void AliveCommandFn(const TgBotWrapper* wrapper, MessagePtr message) {
+static DECLARE_COMMAND_HANDLER(alive, wrapper, message) {
     static std::string version;
     static std::once_flag once;
 
@@ -74,7 +74,7 @@ DYN_COMMAND_FN(name, module) {
     module.flags = CommandModule::Flags::None;
     module.command = commandName;
     module.description = GETSTR(ALIVE_CMD_DESC);
-    module.fn = AliveCommandFn;
+    module.fn = COMMAND_HANDLER_NAME(alive);
     module.isLoaded = true;
     return true;
 }

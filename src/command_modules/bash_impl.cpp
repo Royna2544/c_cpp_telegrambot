@@ -3,12 +3,11 @@
 #include "TgBotWrapper.hpp"
 #include "compiler/CompilerInTelegram.hpp"
 
-static void BashCommandFn(const TgBotWrapper* wrapper, MessagePtr message) {
+static DECLARE_COMMAND_HANDLER(bash,, message) {
     static CompilerInTgForBashImpl bash(false);
     bash.run(message);
 }
-static void unsafeBashCommandFn(const TgBotWrapper* wrapper,
-                                MessagePtr message) {
+static DECLARE_COMMAND_HANDLER(ubash,, message) {
     static CompilerInTgForBashImpl ubash(true);
     ubash.run(message);
 }
@@ -23,10 +22,10 @@ DYN_COMMAND_FN(name, module) {
     module.flags = CommandModule::Flags::Enforced;
     if (commandName == "bash") {
         module.description = GETSTR(BASH_CMD_DESC);
-        module.fn = BashCommandFn;
+        module.fn = COMMAND_HANDLER_NAME(bash);
     } else if (commandName == "ubash") {
         module.description = GETSTR(UBASH_CMD_DESC);
-        module.fn = unsafeBashCommandFn;
+        module.fn = COMMAND_HANDLER_NAME(ubash);
     }
     return true;
 }

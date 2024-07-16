@@ -1,9 +1,9 @@
 #include "TgBotWrapper.hpp"
 
-static void FileIdCommandFn(const TgBotWrapper* wrapper,
-                            const Message::Ptr message) {
+DECLARE_COMMAND_HANDLER(fileid, wrapper, message) {
     const auto replyMsg = message->replyToMessage;
-    std::string file, unifile;
+    std::string file;
+    std::string unifile;
 
     if (replyMsg) {
         if (replyMsg->sticker) {
@@ -25,15 +25,14 @@ static void FileIdCommandFn(const TgBotWrapper* wrapper,
             message,
             "FileId: `" + file + "`\n" + "FileUniqueId: `" + unifile + '`');
     } else {
-        wrapper->sendReplyMessage(
-            message, "Reply to a media");
+        wrapper->sendReplyMessage(message, "Reply to a media");
     }
 }
 
-DYN_COMMAND_FN(n, module) {
+DYN_COMMAND_FN(name, module) {
     module.command = "fileid";
     module.description = "Get fileId of a media";
     module.flags = CommandModule::Flags::None;
-    module.fn = FileIdCommandFn;
+    module.fn = COMMAND_HANDLER_NAME(fileid);
     return true;
 }

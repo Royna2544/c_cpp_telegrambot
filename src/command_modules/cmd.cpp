@@ -4,8 +4,7 @@
 
 #include "StringToolsExt.hpp"
 
-void CmdCommandFn(TgBotWrapper* botWrapper,
-                  const TgBot::Message::Ptr& message) {
+DECLARE_COMMAND_HANDLER(cmd, botWrapper, message) {
     MessageWrapper wrapper(message);
     if (wrapper.hasExtraText()) {
         std::vector<std::string> args;
@@ -39,6 +38,6 @@ DYN_COMMAND_FN(/*name*/, module) {
     module.command = "cmd";
     module.description = "unload/reload a command";
     module.flags = CommandModule::Flags::Enforced;
-    module.fn = CmdCommandFn;
+    module.fn = COMMAND_HANDLER_NAME(cmd);
     return true;
 }

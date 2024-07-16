@@ -2,8 +2,7 @@
 
 #include <TgBotWrapper.hpp>
 
-static void DeleteEchoCommandFn(const TgBotWrapper *tgBotWrapper,
-                                const Message::Ptr message) {
+static DECLARE_COMMAND_HANDLER(decho, tgBotWrapper, message) {
     const auto replyMsg = message->replyToMessage;
     MessageWrapper wrapper(message);
 
@@ -38,6 +37,6 @@ DYN_COMMAND_FN(/*name*/, module) {
     module.command = "decho";
     module.description = "Delete and echo message";
     module.flags = CommandModule::Flags::None;
-    module.fn = DeleteEchoCommandFn;
+    module.fn = COMMAND_HANDLER_NAME(decho);
     return true;
 }

@@ -8,8 +8,7 @@
 
 using std::chrono_literals::operator""s;
 
-static void DecideCommandFn(const TgBotWrapper* wrapperBot,
-                            const Message::Ptr message) {
+DECLARE_COMMAND_HANDLER(decide, wrapperBot, message) {
     constexpr int COUNT_MAX = 10;
     constexpr int RANDOM_RANGE_NUM = 10;
 
@@ -65,6 +64,6 @@ DYN_COMMAND_FN(/*name*/, module) {
     module.command = "decide";
     module.description = "Decide a statement";
     module.flags = CommandModule::Flags::None;
-    module.fn = DecideCommandFn;
+    module.fn = COMMAND_HANDLER_NAME(decide);
     return true;
 }

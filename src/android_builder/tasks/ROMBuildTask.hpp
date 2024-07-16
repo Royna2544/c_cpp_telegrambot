@@ -53,14 +53,14 @@ struct ROMBuildTask : ForkAndRun {
      * @param data The data object containing the necessary configuration and
      * paths.
      */
-    explicit ROMBuildTask(const TgBotWrapper *wrapper, TgBot::Message::Ptr message,
+    explicit ROMBuildTask(const TgBotApi *wrapper, TgBot::Message::Ptr message,
                           PerBuildData data);
     ~ROMBuildTask() override;
 
    private:
     PerBuildData data;
     TgBot::Message::Ptr message;
-    const TgBotWrapper *botWrapper;
+    const TgBotApi *botWrapper;
     PythonClass::Ptr _py;
     PythonClass::FunctionHandle::Ptr _get_total_mem;
     PythonClass::FunctionHandle::Ptr _get_used_mem;

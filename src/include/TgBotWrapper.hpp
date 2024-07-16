@@ -5,6 +5,7 @@
 #include <tgbot/tgbot.h>
 
 #include <boost/algorithm/string/trim.hpp>
+#include <filesystem>
 #include <map>
 #include <memory>
 #include <optional>
@@ -12,7 +13,11 @@
 
 #include "CompileTimeStringConcat.hpp"
 #include "InstanceClassBase.hpp"
+#include "RandomNumberGenerator.hpp"
 #include "Types.h"
+#include "tgbot/types/InputFile.h"
+#include "tgbot/types/Message.h"
+#include "tgbot/types/StickerSet.h"
 
 using TgBot::Api;
 using TgBot::Bot;
@@ -20,29 +25,31 @@ using TgBot::BotCommand;
 using TgBot::Chat;
 using TgBot::EventBroadcaster;
 using TgBot::GenericReply;
+using TgBot::InputFile;
 using TgBot::Message;
 using TgBot::ReplyParameters;
-using TgBot::User;
 using TgBot::TgLongPoll;
+using TgBot::User;
+using TgBot::StickerSet;
 
 struct MessageWrapper;
 struct MessageWrapperLimited;
 
 using MessagePtr = const Message::Ptr&;
 
-class TgBotWrapper;
-struct CommandModule;
+// API part wrapper (base)
+struct TgBotApi;
 
 #define DYN_COMMAND_SYM_STR "loadcmd"
 #define DYN_COMMAND_SYM loadcmd
 #define DYN_COMMAND_FN(n, m) \
     extern "C" bool DYN_COMMAND_SYM(const char* n, CommandModule& m)
+#define COMMAND_HANDLER_NAME(cmd) handle_command_##cmd
+#define DECLARE_COMMAND_HANDLER(cmd, w, m) \
+    void COMMAND_HANDLER_NAME(cmd)(TgBotApi * w, MessagePtr m)
 
-using TgBot::Message;
-using command_callback_t =
-    std::function<void(TgBotWrapper* wrapper, MessagePtr)>;
-using onanymsg_callback_type =
-    std::function<void(TgBotWrapper*, const Message::Ptr&)>;
+using onanymsg_callback_type = std::function<void(TgBotApi*, MessagePtr)>;
+using command_callback_t = std::function<void(TgBotApi* wrapper, MessagePtr)>;
 
 struct CommandModule : TgBot::BotCommand {
     enum Flags { None = 0, Enforced = 1 << 0, HideDescription = 1 << 1 };
@@ -150,19 +157,100 @@ struct TgBotPPImpl_API MediaIds {
     [[nodiscard]] bool empty() const { return id.empty() && uniqueid.empty(); }
 };
 
-// A class to effectively wrap TgBot::Api to stable interface
-// This class owns the Bot instance, and users of this code cannot directly
-// access it.
-class TgBotPPImpl_API TgBotWrapper : public InstanceClassBase<TgBotWrapper> {
+// Helper to remove duplicate overloads for ChatId and MessageTypes
+struct ChatIds {
+    ChatIds(ChatId id) : _id(id) {} // NOLINT(hicpp-explicit-conversions)
+    ChatIds(MessagePtr message) : _id(message->chat->id) {} // NOLINT(hicpp-explicit-conversions)
+    operator ChatId() const { return _id; } // NOLINT(hicpp-explicit-conversions)
+    ChatId _id;
+};
+
+// Base interface for operations involving TgBot...
+struct TgBotApi {
    public:
-    // Constructor requires a bot token to create a Bot instance.
-    explicit TgBotWrapper(const std::string& token) : _bot(token){};
+    TgBotApi() = default;
+    virtual ~TgBotApi() = default;
+    using FileOrString = boost::variant<InputFile::Ptr, std::string>;
+    using FileOrMedia = boost::variant<InputFile::Ptr, MediaIds>;
 
-    // Add commands/Remove commands
-    void addCommand(const CommandModule& module, bool isReload = false);
-    // Remove a command from being handled
-    void removeCommand(const std::string& cmd);
+   protected:
+    // Methods to be implemented
 
+    // Send a message to the chat
+    virtual Message::Ptr sendMessage_impl(
+        ChatId chatId, const std::string& text,
+        ReplyParameters::Ptr replyParameters = nullptr,
+        GenericReply::Ptr replyMarkup = nullptr,
+        const std::string& parseMode = "") const = 0;
+
+    // Send a GIF to the chat
+    virtual Message::Ptr sendAnimation_impl(
+        ChatId chatId, FileOrString animation, const std::string& caption,
+        ReplyParameters::Ptr replyParameters = nullptr,
+        GenericReply::Ptr replyMarkup = nullptr,
+        const std::string& parseMode = "") const = 0;
+
+    // Send a sticker to the chat
+    virtual Message::Ptr sendSticker_impl(
+        ChatId chatId, FileOrString sticker,
+        ReplyParameters::Ptr replyParameters = nullptr) const = 0;
+
+    // Edit a sent message
+    virtual Message::Ptr editMessage_impl(const Message::Ptr& message,
+                                          const std::string& newText) const = 0;
+
+    // Delete a sent message
+    virtual void deleteMessage_impl(const Message::Ptr& message) const = 0;
+
+    // Delete a range of messages
+    virtual void deleteMessages_impl(
+        ChatId chatId, const std::vector<MessageId>& messageIds) const = 0;
+
+    // Mute a chat member
+    virtual void restrictChatMember_impl(
+        ChatId chatId, UserId userId, TgBot::ChatPermissions::Ptr permissions,
+        std::uint32_t untilDate) const = 0;
+
+    // Send a file to the chat
+    virtual Message::Ptr sendDocument_impl(
+        ChatId chatId, FileOrString document, const std::string& caption,
+        ReplyParameters::Ptr replyParameters = nullptr,
+        GenericReply::Ptr replyMarkup = nullptr,
+        const std::string& parseMode = "") const = 0;
+
+    // Send a photo to the chat
+    virtual Message::Ptr sendPhoto_impl(
+        ChatId chatId, FileOrString photo, const std::string& caption,
+        ReplyParameters::Ptr replyParameters = nullptr,
+        GenericReply::Ptr replyMarkup = nullptr,
+        const std::string& parseMode = "") const = 0;
+
+    // Send a video to the chat
+    virtual Message::Ptr sendVideo_impl(
+        ChatId chatId, FileOrString photo, const std::string& caption,
+        ReplyParameters::Ptr replyParameters = nullptr,
+        GenericReply::Ptr replyMarkup = nullptr,
+        const std::string& parseMode = "") const = 0;
+
+    virtual Message::Ptr sendDice_impl(const ChatId chatId) const = 0;
+
+    virtual StickerSet::Ptr getStickerSet_impl(const std::string& setName) const = 0;
+
+    virtual bool downloadFile_impl(const std::filesystem::path& destfilename,
+                                   const std::string& fileid) const = 0;
+
+    virtual User::Ptr getBotUser_impl() const = 0;
+
+    static FileOrString ToFileOrString(const FileOrMedia& media) {
+        if (media.which() == 0) {
+            return boost::get<InputFile::Ptr>(media);
+        } else {
+            return boost::get<MediaIds>(media).id;
+        }
+    }
+
+   public:
+    // Convience wrappers over real API
     enum class ParseMode {
         Markdown,
         HTML,
@@ -181,8 +269,6 @@ class TgBotPPImpl_API TgBotWrapper : public InstanceClassBase<TgBotWrapper> {
         }
         return "Unknown";
     }
-
-    // Call TgBot::Api methods through this wrapper.
 
     /**
      * @brief Sends a reply message to the specified message.
@@ -210,29 +296,10 @@ class TgBotPPImpl_API TgBotWrapper : public InstanceClassBase<TgBotWrapper> {
         const ChatId chatId, const MessageId messageId,
         const std::string& message,
         const GenericReply::Ptr& replyMarkup = nullptr) const {
-        return getApi().sendMessage(
-            chatId, message, nullptr,
+        return sendMessage_impl(
+            chatId, message,
             std::make_shared<ReplyParameters>(chatId, messageId), replyMarkup,
             parseModeToStr<mode>());
-    }
-
-    /**
-     * @brief Sends a message to the specified chat reference message's chat.
-     *
-     * This function uses the TgBot::Api::sendMessage method to send a message
-     * to the chat where the specified `chatReferenceMessage` was sent. The
-     * function takes the chat reference message's chat ID and the text content
-     * of the message to be sent.
-     *
-     * @param chatReferenceMessage The message that serves as a reference for
-     * the chat where the new message will be sent.
-     * @param message The text content of the message to be sent.
-     *
-     * @return A shared pointer to the sent message.
-     */
-    Message::Ptr sendMessage(const Message::Ptr& chatReferenceMessage,
-                             const std::string& message) const {
-        return sendMessage(chatReferenceMessage->chat->id, message);
     }
 
     /**
@@ -247,26 +314,19 @@ class TgBotPPImpl_API TgBotWrapper : public InstanceClassBase<TgBotWrapper> {
      *
      * @return A shared pointer to the sent message.
      */
-    Message::Ptr sendMessage(const ChatId& chatId,
+    Message::Ptr sendMessage(const ChatIds& chatId,
                              const std::string& message) const {
-        return getApi().sendMessage(chatId, message);
+        return sendMessage_impl(chatId, message);
     }
 
     template <ParseMode mode = ParseMode::None>
     Message::Ptr sendReplyAnimation(const Message::Ptr& replyToMessage,
-                                    const MediaIds& mediaId,
+                                    const FileOrMedia& mediaId,
                                     const std::string& caption = "") const {
-        return getApi().sendAnimation(
-            replyToMessage->chat->id, mediaId.id, 0, 0, 0, "", caption,
-            createReplyParametersForReply(replyToMessage), nullptr,
-            parseModeToStr<mode>());
-    }
-
-    Message::Ptr sendReplySticker(const Message::Ptr& replyToMessage,
-                                  const MediaIds& mediaId) const {
-        return getApi().sendSticker(
-            replyToMessage->chat->id, mediaId.id,
-            createReplyParametersForReply(replyToMessage));
+        return sendAnimation_impl(replyToMessage->chat->id,
+                                  ToFileOrString(mediaId), caption,
+                                  createReplyParametersForReply(replyToMessage),
+                                  nullptr, parseModeToStr<mode>());
     }
 
     /**
@@ -286,51 +346,17 @@ class TgBotPPImpl_API TgBotWrapper : public InstanceClassBase<TgBotWrapper> {
      * @return A shared pointer to the sent animation message.
      */
     template <ParseMode mode = ParseMode::None>
-    Message::Ptr sendAnimation(const Message::Ptr& replyToMessage,
-                               const MediaIds& mediaId,
+    Message::Ptr sendAnimation(const ChatIds& chatid, const FileOrMedia& mediaId,
                                const std::string& caption = "") const {
-        return sendAnimation<mode>(replyToMessage->chat->id, mediaId, caption);
+        return sendAnimation_impl(chatid, ToFileOrString(mediaId), caption,
+                                  nullptr, nullptr, parseModeToStr<mode>());
     }
 
-    /**
-     * @brief Sends an animation message to the specified chat.
-     *
-     * This function uses the TgBot::Api::sendAnimation method to send an
-     * animation message to the chat specified by the given `chatId`. The
-     * function takes the chat ID and the media ID of the animation to be sent.
-     *
-     * @param chatId The ID of the chat to which the animation message will be
-     * sent.
-     * @param mediaId The ID of the animation to be sent.
-     * @param caption An optional caption for the animation message.
-     *
-     * @return A shared pointer to the sent animation message.
-     */
-    template <ParseMode mode = ParseMode::None>
-    Message::Ptr sendAnimation(const ChatId& chatId, const MediaIds& mediaId,
-                               const std::string& caption = "") const {
-        return getApi().sendAnimation(chatId, mediaId.id, 0, 0, 0, "", caption,
-                                      nullptr, nullptr, parseModeToStr<mode>());
-    }
-
-    /**
-     * @brief Sends a sticker message to the specified chat reference message's
-     * chat.
-     *
-     * This function uses the TgBot::Api::sendSticker method to send a sticker
-     * message to the chat where the specified `chatReferenceMessage` was sent.
-     * The function takes the chat reference message's chat ID and the media ID
-     * of the sticker to be sent.
-     *
-     * @param chatReferenceMessage The message that serves as a reference for
-     * the chat where the new sticker message will be sent.
-     * @param mediaId The ID of the sticker to be sent.
-     *
-     * @return A shared pointer to the sent sticker message.
-     */
-    Message::Ptr sendSticker(const Message::Ptr& chatReferenceMessage,
-                             const MediaIds& mediaId) const {
-        return sendSticker(chatReferenceMessage->chat->id, mediaId);
+    Message::Ptr sendReplySticker(const Message::Ptr& replyToMessage,
+                                  const FileOrMedia& sticker) const {
+        return sendSticker_impl(replyToMessage->chat->id,
+                                ToFileOrString(sticker),
+                                createReplyParametersForReply(replyToMessage));
     }
 
     /**
@@ -346,56 +372,266 @@ class TgBotPPImpl_API TgBotWrapper : public InstanceClassBase<TgBotWrapper> {
      *
      * @return A shared pointer to the sent sticker message.
      */
-    Message::Ptr sendSticker(const ChatId chatId,
-                             const MediaIds& mediaId) const {
-        return getApi().sendSticker(chatId, mediaId.id);
+    Message::Ptr sendSticker(const ChatIds& chatId,
+                             const FileOrMedia& mediaId) const {
+        return sendSticker_impl(chatId, ToFileOrString(mediaId));
     }
-    /**
-     * @brief Edits the text of a message.
-     *
-     * This function edits the text of a message that was previously sent by the
-     * bot. The function takes the message object, the new text content, and the
-     * chat ID of the message. It returns a shared pointer to the edited
-     * message.
-     *
-     * @param message The message object whose text is to be edited.
-     * @param newText The new text content for the message.
-     * @param chatId The ID of the chat where the message was sent.
-     *
-     * @return A shared pointer to the edited message.
-     */
-    Message::Ptr editMessage(const Message::Ptr& message,
-                             const std::string& newText) const {
+
+    inline Message::Ptr editMessage(const Message::Ptr& message,
+                                    const std::string& newText) const {
+        return editMessage_impl(message, newText);
+    }
+
+    inline void deleteMessage(const Message::Ptr& message) const {
+        deleteMessage_impl(message);
+    }
+
+    inline void deleteMessages(ChatId chatid,
+                               const std::vector<MessageId>& messages) const {
+        deleteMessages_impl(chatid, messages);
+    }
+
+    inline void muteChatMember(ChatId chatId, UserId userId,
+                               TgBot::ChatPermissions::Ptr permissions,
+                               std::uint32_t untilDate) const {
+        restrictChatMember_impl(chatId, userId, std::move(permissions),
+                                untilDate);
+    }
+
+    template <ParseMode mode = ParseMode::None>
+    Message::Ptr sendDocument(ChatIds chatId, FileOrMedia document,
+                              const std::string& caption = "",
+                              ReplyParameters::Ptr replyParameters = nullptr,
+                              GenericReply::Ptr replyMarkup = nullptr) const {
+        return sendDocument_impl(chatId, ToFileOrString(document), caption,
+                                 std::move(replyParameters),
+                                 std::move(replyMarkup),
+                                 parseModeToStr<mode>());
+    }
+
+    template <ParseMode mode = ParseMode::None>
+    Message::Ptr sendPhoto(ChatIds chatId, const FileOrMedia& photo,
+                           const std::string& caption = "",
+                           ReplyParameters::Ptr replyParameters = nullptr,
+                           GenericReply::Ptr replyMarkup = nullptr) const {
+        return sendPhoto_impl(chatId, ToFileOrString(photo), caption,
+                              std::move(replyParameters),
+                              std::move(replyMarkup), parseModeToStr<mode>());
+    }
+
+    template <ParseMode mode = ParseMode::None>
+    Message::Ptr sendVideo(ChatIds chatId, const FileOrMedia& video,
+                           const std::string& caption = "",
+                           ReplyParameters::Ptr replyParameters = nullptr,
+                           GenericReply::Ptr replyMarkup = nullptr) const {
+        return sendVideo_impl(chatId, ToFileOrString(video), caption,
+                              std::move(replyParameters),
+                              std::move(replyMarkup), parseModeToStr<mode>());
+    }
+
+    template <ParseMode mode = ParseMode::None>
+    Message::Ptr sendReplyPhoto(const Message::Ptr& replyToMessage,
+                                const FileOrMedia& photo,
+                                const std::string& caption = "") const {
+        return sendPhoto<mode>(replyToMessage->chat->id, photo, caption);
+    }
+
+    inline bool downloadFile(const std::filesystem::path& path,
+                             const std::string& fileid) const {
+        return downloadFile_impl(path, fileid);
+    }
+
+    inline User::Ptr getBotUser() const { return getBotUser_impl(); }
+
+    inline Message::Ptr sendDice(const ChatId chat) const {
+        return sendDice_impl(chat);
+    }
+
+    inline StickerSet::Ptr getStickerSet(const std::string& setName) const {
+        return getStickerSet_impl(setName);
+    }
+
+    // TODO: Any better way than this?
+    virtual std::string getCommandModulesStr() const { return {}; }
+
+    virtual bool unloadCommand(const std::string& command) {
+        return false;  // Dummy implementation
+    }
+    virtual bool reloadCommand(const std::string& command) {
+        return false;  // Dummy implementation
+    }
+
+    virtual void registerCallback(const onanymsg_callback_type& callback,
+                                  const size_t token) {
+        // Dummy implementation
+    }
+    virtual bool unregisterCallback(const size_t token) {
+        return false;  // Dummy implementation
+    }
+
+   protected:
+    static ReplyParameters::Ptr createReplyParametersForReply(
+        const Message::Ptr& message) {
+        auto ptr = std::make_shared<ReplyParameters>();
+        ptr->messageId = message->messageId;
+        ptr->chatId = message->chat->id;
+        return ptr;
+    }
+};
+
+// A class to effectively wrap TgBot::Api to stable interface
+// This class owns the Bot instance, and users of this code cannot directly
+// access it.
+class TgBotPPImpl_API TgBotWrapper : public InstanceClassBase<TgBotWrapper>,
+                                     public TgBotApi {
+   public:
+    // Constructor requires a bot token to create a Bot instance.
+    explicit TgBotWrapper(const std::string& token) : _bot(token){};
+
+   private:
+    Message::Ptr sendMessage_impl(ChatId chatId, const std::string& text,
+                                  ReplyParameters::Ptr replyParameters,
+                                  GenericReply::Ptr replyMarkup,
+                                  const std::string& parseMode) const override {
+        return getApi().sendMessage(chatId, text, nullptr, replyParameters,
+                                    replyMarkup, parseMode);
+    }
+
+    Message::Ptr sendAnimation_impl(
+        ChatId chatId, boost::variant<InputFile::Ptr, std::string> animation,
+        const std::string& caption,
+        ReplyParameters::Ptr replyParameters = nullptr,
+        GenericReply::Ptr replyMarkup = nullptr,
+        const std::string& parseMode = "") const override {
+        return getApi().sendAnimation(chatId, animation, 0, 0, 0, "", caption,
+                                      replyParameters, replyMarkup, parseMode);
+    }
+
+    Message::Ptr sendSticker_impl(
+        ChatId chatId, boost::variant<InputFile::Ptr, std::string> sticker,
+        ReplyParameters::Ptr replyParameters) const override {
+        return getApi().sendSticker(chatId, sticker, replyParameters);
+    }
+
+    Message::Ptr editMessage_impl(const Message::Ptr& message,
+                                  const std::string& newText) const override {
         return getApi().editMessageText(newText, message->chat->id,
                                         message->messageId);
     }
 
-    void deleteMessage(const Message::Ptr& message) const {
+    // Delete a sent message
+    void deleteMessage_impl(const Message::Ptr& message) const override {
         getApi().deleteMessage(message->chat->id, message->messageId);
+    }
+
+    // Delete a range of messages
+    void deleteMessages_impl(
+        ChatId chatId,
+        const std::vector<MessageId>& messageIds) const override {
+        getApi().deleteMessages(chatId, messageIds);
+    }
+
+    // Mute a chat member
+    void restrictChatMember_impl(ChatId chatId, UserId userId,
+                                 TgBot::ChatPermissions::Ptr permissions,
+                                 std::uint32_t untilDate) const override {
+        getApi().restrictChatMember(chatId, userId, permissions, untilDate);
+    }
+
+    // Send a file to the chat
+    Message::Ptr sendDocument_impl(
+        ChatId chatId, FileOrString document, const std::string& caption,
+        ReplyParameters::Ptr replyParameters = nullptr,
+        GenericReply::Ptr replyMarkup = nullptr,
+        const std::string& parseMode = "") const override {
+        return getApi().sendDocument(chatId, std::move(document), "", caption,
+                                     replyParameters, replyMarkup, parseMode);
+    }
+
+    // Send a photo to the chat
+    Message::Ptr sendPhoto_impl(
+        ChatId chatId, FileOrString photo, const std::string& caption,
+        ReplyParameters::Ptr replyParameters = nullptr,
+        GenericReply::Ptr replyMarkup = nullptr,
+        const std::string& parseMode = "") const override {
+        return getApi().sendPhoto(chatId, photo, caption, replyParameters,
+                                  replyMarkup, parseMode);
+    }
+
+    // Send a video to the chat
+    Message::Ptr sendVideo_impl(
+        ChatId chatId, FileOrString video, const std::string& caption,
+        ReplyParameters::Ptr replyParameters = nullptr,
+        GenericReply::Ptr replyMarkup = nullptr,
+        const std::string& parseMode = "") const override {
+        return getApi().sendVideo(chatId, video, false, 0, 0, 0, "", caption,
+                                  replyParameters, replyMarkup, parseMode);
+    }
+
+    Message::Ptr sendDice_impl(ChatId chatId) const override {
+        static const std::vector<std::string> dices = {"🎲", "🎯", "🏀",
+                                                       "⚽", "🎳", "🎰"};
+
+        return getApi().sendDice(
+            chatId, false, nullptr, nullptr,
+            dices[RandomNumberGenerator::generate(dices.size() - 1)]);
+    }
+
+    StickerSet::Ptr getStickerSet_impl(const std::string& setName) const override {
+        return getApi().getStickerSet(setName);
+    }
+    
+    bool downloadFile_impl(const std::filesystem::path& destfilename,
+                           const std::string& fileid) const override {
+        const auto file = getApi().getFile(fileid);
+        if (!file) {
+            LOG(INFO) << "File " << fileid << " not found in Telegram servers.";
+            return false;
+        }
+        // Download the file
+        std::string buffer = getApi().downloadFile(file->filePath);
+        // Save the file to a file on disk
+        std::fstream ofs(destfilename, std::ios::binary | std::ios::out);
+        if (!ofs.is_open()) {
+            LOG(ERROR) << "Failed to open file for writing: " << destfilename;
+            return false;
+        }
+        ofs.write(buffer.data(), buffer.size());
+        ofs.close();
+        return true;
     }
 
     /**
      * @brief Retrieves the bot's user object.
      *
-     * This function retrieves the user object associated with the bot. The user
-     * object contains information about the bot's account, such as its
+     * This function retrieves the user object associated with the bot. The
+     * user object contains information about the bot's account, such as its
      * username, first name, and last name.
      *
      * @return A shared pointer to the bot's user object.
      */
-    [[nodiscard]] User::Ptr getBotUser() const { return getApi().getMe(); }
+    User::Ptr getBotUser_impl() const override { return getApi().getMe(); }
+
+   public:
+    // Add commands/Remove commands
+    void addCommand(const CommandModule& module, bool isReload = false);
+    // Remove a command from being handled
+    void removeCommand(const std::string& cmd);
+
+    void setDescriptions(const std::string& description,
+                         const std::string& shortDescription) {
+        getApi().setMyDescription(description);
+        getApi().setMyShortDescription(shortDescription);
+    }
 
     [[nodiscard]] bool setBotCommands() const;
 
-    [[nodiscard]] std::string getCommandModulesStr() const;
+    [[nodiscard]] std::string getCommandModulesStr() const override;
 
     void startPoll();
 
-    // TODO: Private it
-    [[nodiscard]] const Api& getApi() const { return _bot.getApi(); }
-
-    bool unloadCommand(const std::string& command);
-    bool reloadCommand(const std::string& command);
+    bool unloadCommand(const std::string& command) override;
+    bool reloadCommand(const std::string& command) override;
     bool isLoadedCommand(const std::string& command);
     bool isKnownCommand(const std::string& command);
     void commandHandler(const command_callback_t& module_callback,
@@ -424,7 +660,7 @@ class TgBotPPImpl_API TgBotWrapper : public InstanceClassBase<TgBotWrapper> {
      * @param token A unique identifier for the callback.
      */
     void registerCallback(const onanymsg_callback_type& callback,
-                          const size_t token) {
+                          const size_t token) override {
         callbacksWithToken[token] = callback;
     }
 
@@ -437,7 +673,7 @@ class TgBotPPImpl_API TgBotWrapper : public InstanceClassBase<TgBotWrapper> {
      * @return True if the callback with the specified token was found and
      * successfully unregistered, false otherwise.
      */
-    bool unregisterCallback(const size_t token) {
+    bool unregisterCallback(const size_t token) override {
         auto it = callbacksWithToken.find(token);
         if (it == callbacksWithToken.end()) {
             return false;
@@ -458,18 +694,11 @@ class TgBotPPImpl_API TgBotWrapper : public InstanceClassBase<TgBotWrapper> {
     }
 
    private:
-    static ReplyParameters::Ptr createReplyParametersForReply(
-        const Message::Ptr& message) {
-        auto ptr = std::make_shared<ReplyParameters>();
-        ptr->messageId = message->messageId;
-        ptr->chatId = message->chat->id;
-        return ptr;
-    }
     [[nodiscard]] EventBroadcaster& getEvents() { return _bot.getEvents(); }
+    [[nodiscard]] const Api& getApi() const { return _bot.getApi(); }
 
     std::vector<CommandModule> _modules;
     Bot _bot;
-
     std::vector<onanymsg_callback_type> callbacks;
     std::map<size_t, onanymsg_callback_type> callbacksWithToken;
     decltype(_modules)::iterator findModulePosition(const std::string& command);
