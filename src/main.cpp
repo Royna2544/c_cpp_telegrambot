@@ -256,8 +256,7 @@ int main(int argc, char* const* argv) {
     }
 
     // Initialize TgBotWrapper instance with provided token
-    TgBotWrapper::initInstance(token.value());
-    auto wrapperInst = TgBotWrapper::getInstance();
+    auto wrapperInst = TgBotWrapper::initInstance(token.value());
 
     // Install signal handlers
     SignalHandler::install();

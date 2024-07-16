@@ -22,9 +22,11 @@ template <typename T>
  */
 struct InstanceClassBase {
     template <typename... Args>
-    static void initInstance(Args&&... args) {
+    static std::shared_ptr<T> initInstance(Args&&... args) {
         instance = std::make_shared<T>(std::forward<Args>(args)...);
+        return instance;
     }
+    
     /**
      * @brief Get the single instance of the class
      * @return a pointer to the instance
