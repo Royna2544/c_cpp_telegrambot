@@ -1,5 +1,7 @@
 #include <StringResManager.hpp>
 #include <TgBotWrapper.hpp>
+#include <libos/libsighandler.hpp>
+
 #include "InstanceClassBase.hpp"
 
 void TgBotWrapper::commandHandler(const command_callback_t& module_callback,
@@ -39,15 +41,6 @@ void TgBotWrapper::addCommand(const CommandModule& module, bool isReload) {
 
 void TgBotWrapper::removeCommand(const std::string& cmd) {
     getEvents().onCommand(cmd, {});
-}
-
-MessageWrapper TgBotWrapper::getMessageWrapper(const Message::Ptr& msg) {
-    return MessageWrapper(msg);
-}
-
-MessageWrapperLimited TgBotWrapper::getMessageWrapperLimited(
-    const Message::Ptr& msg) {
-    return MessageWrapperLimited(msg);
 }
 
 bool TgBotWrapper::setBotCommands() const {
@@ -121,11 +114,20 @@ bool TgBotWrapper::isKnownCommand(const std::string& command) {
     return findModulePosition(command) != _modules.end();
 }
 
-decltype(TgBotWrapper::_modules)::iterator
-TgBotWrapper::findModulePosition(const std::string& command) {
-    return std::ranges::find_if(
-        _modules,
-        [&command](const CommandModule& e) { return e.command == command; });
+decltype(TgBotWrapper::_modules)::iterator TgBotWrapper::findModulePosition(
+    const std::string& command) {
+    return std::ranges::find_if(_modules, [&command](const CommandModule& e) {
+        return e.command == command;
+    });
+}
+
+void TgBotWrapper::startPoll() {
+    _bot.getApi().deleteWebhook();
+
+    TgLongPoll longPoll(_bot);
+    while (!SignalHandler::isSignaled()) {
+        longPoll.start();
+    }
 }
 
 DECLARE_CLASS_INST(TgBotWrapper);

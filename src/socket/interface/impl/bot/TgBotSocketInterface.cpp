@@ -14,7 +14,7 @@ SocketInterfaceTgBot::SocketInterfaceTgBot(std::shared_ptr<SocketInterfaceBase> 
     : interface(std::move(_interface)),
       TgBotSocketParser(_interface.get()) {}
 
-void SocketInterfaceTgBot::doInitCall(Bot& bot) {
+void SocketInterfaceTgBot::doInitCall() {
     auto mgr = ThreadManager::getInstance();
     SocketServerWrapper wrapper;
     std::vector<std::shared_ptr<SocketInterfaceTgBot>> threads;

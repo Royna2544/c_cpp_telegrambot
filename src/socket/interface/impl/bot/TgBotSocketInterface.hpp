@@ -1,7 +1,7 @@
 #include <ManagedThreads.hpp>
 #include <SocketBase.hpp>
 #include <functional>
-#include <initcalls/BotInitcall.hpp>
+#include <initcalls/Initcall.hpp>
 #include <map>
 #include <memory>
 #include <utility>
@@ -21,9 +21,9 @@ using TgBotSocket::callback::GenericAck;
 using TgBotSocket::callback::UploadFileDryCallback;
 
 struct TgBotPPImpl_API SocketInterfaceTgBot : ManagedThreadRunnable,
-                                              BotInitCall,
+                                              InitCall,
                                               TgBotSocketParser {
-    void doInitCall(Bot& bot) override;
+    void doInitCall() override;
     const CStringLifetime getInitCallName() const override {
         return "Create sockets and setup";
     }

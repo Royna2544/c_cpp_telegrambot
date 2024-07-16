@@ -23,6 +23,7 @@ using TgBot::GenericReply;
 using TgBot::Message;
 using TgBot::ReplyParameters;
 using TgBot::User;
+using TgBot::TgLongPoll;
 
 struct MessageWrapper;
 struct MessageWrapperLimited;
@@ -162,11 +163,6 @@ class TgBotPPImpl_API TgBotWrapper : public InstanceClassBase<TgBotWrapper> {
     // Remove a command from being handled
     void removeCommand(const std::string& cmd);
 
-    // Obtain MessageWrapper object
-    static MessageWrapper getMessageWrapper(const Message::Ptr& msg);
-    static MessageWrapperLimited getMessageWrapperLimited(
-        const Message::Ptr& msg);
-
     enum class ParseMode {
         Markdown,
         HTML,
@@ -204,9 +200,19 @@ class TgBotPPImpl_API TgBotWrapper : public InstanceClassBase<TgBotWrapper> {
     Message::Ptr sendReplyMessage(
         const Message::Ptr& replyToMessage, const std::string& message,
         const GenericReply::Ptr& replyMarkup = nullptr) const {
+        return sendReplyMessage<mode>(replyToMessage->chat->id,
+                                      replyToMessage->messageId, message,
+                                      replyMarkup);
+    }
+
+    template <ParseMode mode = ParseMode::None>
+    Message::Ptr sendReplyMessage(
+        const ChatId chatId, const MessageId messageId,
+        const std::string& message,
+        const GenericReply::Ptr& replyMarkup = nullptr) const {
         return getApi().sendMessage(
-            replyToMessage->chat->id, message, nullptr,
-            createReplyParametersForReply(replyToMessage), replyMarkup,
+            chatId, message, nullptr,
+            std::make_shared<ReplyParameters>(chatId, messageId), replyMarkup,
             parseModeToStr<mode>());
     }
 
@@ -377,14 +383,13 @@ class TgBotPPImpl_API TgBotWrapper : public InstanceClassBase<TgBotWrapper> {
      *
      * @return A shared pointer to the bot's user object.
      */
-    [[nodiscard]] User::Ptr getBotUser() const { return _bot.getApi().getMe(); }
+    [[nodiscard]] User::Ptr getBotUser() const { return getApi().getMe(); }
 
     [[nodiscard]] bool setBotCommands() const;
 
     [[nodiscard]] std::string getCommandModulesStr() const;
 
-    // TODO: Remove
-    Bot& getBot() { return _bot; }
+    void startPoll();
 
     // TODO: Private it
     [[nodiscard]] const Api& getApi() const { return _bot.getApi(); }

@@ -241,7 +241,7 @@ void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle,
             message_ids.emplace_back(messageIn->messageId);
         });
         try {
-            //_bot.getApi().deleteMessages(handle->first->id, message_ids);
+            wrapper->getApi().deleteMessages(handle->first->id, message_ids);
         } catch (const TgBot::TgException &e) {
             DLOG(INFO) << "Error deleting message: " << e.what();
         }
@@ -249,9 +249,9 @@ void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle,
             LOG(INFO) << "Try mute user " << userstr.get() << " in chat "
                       << chatstr.get();
             try {
-              //  _bot.getApi().restrictChatMember(
-                //    handle->first->id, t.first->id, perms,
-                  //  to_secs(kMuteDuration).count());
+                wrapper->getApi().restrictChatMember(
+                    handle->first->id, t.first->id, perms,
+                    to_secs(kMuteDuration).count());
             } catch (const TgBot::TgException &e) {
                 LOG(WARNING)
                     << "Cannot mute user " << userstr.get() << " in chat "
@@ -263,7 +263,7 @@ void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle,
 
 void SpamBlockManager::doInitCall() {
     TgBotWrapper::getInstance()->registerCallback(
-        [](const TgBotWrapper*, const Message::Ptr &message) {
+        [](const TgBotWrapper *, const Message::Ptr &message) {
             static auto spamMgr =
                 ThreadManager::getInstance()
                     ->createController<ThreadManager::Usage::SPAMBLOCK_THREAD,

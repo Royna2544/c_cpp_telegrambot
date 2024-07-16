@@ -1,5 +1,6 @@
 #include <Authorization.h>
 #include <ConfigManager.h>
+#include <RTCommandLoader.h>
 #include <ResourceManager.h>
 #include <absl/log/log.h>
 #include <absl/log/log_sink_registry.h>
@@ -20,14 +21,9 @@
 #include <libos/libsighandler.hpp>
 #include <memory>
 #include <utility>
-#include <RTCommandLoader.h>
 
 #include "TgBotWrapper.hpp"
 #include "tgbot/Bot.h"
-
-#ifdef RTCOMMAND_LOADER
-#include <RTCommandLoader.h>
-#endif
 
 #ifdef SOCKET_CONNECTION
 #include <ChatObserver.h>
@@ -105,7 +101,7 @@ void createAndDoInitCall(Args... args) {
 }
 
 namespace {
-void handleRestartCommand(Bot& bot) {
+void handleRestartCommand(const std::shared_ptr<TgBotWrapper>& wrapper) {
     // If it was restarted, then send a message to the caller
     std::string result;
     std::vector<std::string> splitStrings(2);
@@ -121,16 +117,14 @@ void handleRestartCommand(Bot& bot) {
         } else if (try_parse(splitStrings[0], &chatId) &&
                    try_parse(splitStrings[1], &msgId)) {
             LOG(INFO) << "Restart success!";
-            bot.getApi().sendMessage(
-                chatId, "Restart success!", nullptr,
-                std::make_shared<TgBot::ReplyParameters>(msgId, chatId, true));
+            wrapper->sendReplyMessage(chatId, msgId, "Restart success!");
         } else {
             LOG(ERROR) << "Could not parse back params!";
         }
     }
 }
 
-void TgBotApiExHandler(TgBot::Bot& bot, const TgBot::TgException& e) {
+void TgBotApiExHandler(const TgBot::TgException& e) {
     static std::optional<DurationPoint> exceptionDuration;
     auto wrapper = TgBotWrapper::getInstance();
 
@@ -139,8 +133,8 @@ void TgBotApiExHandler(TgBot::Bot& bot, const TgBot::TgException& e) {
     const auto ownerid = TgBotDatabaseImpl::getInstance()->getOwnerUserId();
     if (ownerid) {
         try {
-            wrapper->sendMessage(
-                ownerid.value(), std::string("Exception occured: ") + e.what());
+            wrapper->sendMessage(ownerid.value(),
+                                 std::string("Exception occured: ") + e.what());
         } catch (const TgBot::TgException& e) {
             LOG(FATAL) << e.what();
         }
@@ -188,22 +182,25 @@ void initLogging() {
     }
 }
 
-void createAndDoInitCallAll(TgBot::Bot& gBot) {
+void createAndDoInitCallAll() {
     constexpr int kWebServerListenPort = 8080;
 
     createAndDoInitCall<StringResManager>();
     createAndDoInitCall<TgBotWebServer, ThreadManager::Usage::WEBSERVER_THREAD>(
         kWebServerListenPort);
     createAndDoInitCall<RTCommandLoader>();
-    TgBotWrapper::getInstance()->setBotCommands();
+    LOG(INFO) << "Updating commands list based on loaded commands...";
+    LOG_IF(ERROR, TgBotWrapper::getInstance()->setBotCommands())
+        << "Couldn't update commands list";
+    LOG(INFO) << "...done";
 
 #ifdef SOCKET_CONNECTION
     createAndDoInitCall<NetworkLogSink,
                         ThreadManager::Usage::LOGSERVER_THREAD>();
-    createAndDoInitCall<SocketInterfaceTgBot>(gBot,  nullptr);
+    createAndDoInitCall<SocketInterfaceTgBot>(nullptr);
     createAndDoInitCall<ChatObserver>();
 #endif
-    //createAndDoInitCall<RegexHandler>();
+    // createAndDoInitCall<RegexHandler>();
     createAndDoInitCall<SpamBlockManager>();
     createAndDoInitCall<ResourceManager>();
     createAndDoInitCall<TgBotDatabaseImpl>();
@@ -213,14 +210,14 @@ void createAndDoInitCallAll(TgBot::Bot& gBot) {
         []() { ThreadManager::getInstance()->destroyManager(); });
 }
 
-void onBotInitialized(TgBot::Bot& gBot, DurationPoint& startupDp,
-                      const char* exe) {
+void onBotInitialized(const std::shared_ptr<TgBotWrapper>& wrapper,
+                      DurationPoint& startupDp, const char* exe) {
     LOG(INFO) << "Subsystems initialized, bot started: " << exe;
     LOG(INFO) << "Started in " << startupDp.get().count() << " milliseconds";
 
-    gBot.getApi().setMyDescription(
+    wrapper->getApi().setMyDescription(
         "Royna's telegram bot, written in C++. Go on you can talk to him");
-    gBot.getApi().setMyShortDescription(
+    wrapper->getApi().setMyShortDescription(
         "One of @roynatech's TgBot C++ project bots. I'm currently hosted on "
 #if BOOST_OS_WINDOWS
         "Windows"
@@ -260,34 +257,29 @@ int main(int argc, char* const* argv) {
     }
 
     TgBotWrapper::initInstance(token.value());
+    auto wrapperInst = TgBotWrapper::getInstance();
 
-    auto& gBot = TgBotWrapper::getInstance()->getBot();
     // Install signal handlers
     SignalHandler::install();
 
     // Initialize subsystems
-    createAndDoInitCallAll(gBot);
+    createAndDoInitCallAll();
 
 #ifndef WINDOWS_BUILD
-    handleRestartCommand(gBot);
+    handleRestartCommand(wrapperInst);
 #endif
 
     try {
         // Bot starts
-        onBotInitialized(gBot, startupDp, argv[0]);
+        onBotInitialized(wrapperInst, startupDp, argv[0]);
     } catch (...) {
     }
     while (!SignalHandler::isSignaled()) {
         try {
-            LOG(INFO) << "Bot username: " << gBot.getApi().getMe()->username;
-            gBot.getApi().deleteWebhook();
-
-            TgLongPoll longPoll(gBot);
-            while (!SignalHandler::isSignaled()) {
-                longPoll.start();
-            }
+            LOG(INFO) << "Bot username: " << wrapperInst->getBotUser()->username;
+            wrapperInst->startPoll();
         } catch (const TgBot::TgException& e) {
-            TgBotApiExHandler(gBot, e);
+            TgBotApiExHandler(e);
         } catch (const std::exception& e) {
             LOG(ERROR) << "Uncaught Exception: " << e.what();
             break;
