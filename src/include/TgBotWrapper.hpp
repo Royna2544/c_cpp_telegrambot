@@ -26,9 +26,9 @@ using TgBot::GenericReply;
 using TgBot::InputFile;
 using TgBot::Message;
 using TgBot::ReplyParameters;
+using TgBot::StickerSet;
 using TgBot::TgLongPoll;
 using TgBot::User;
-using TgBot::StickerSet;
 
 struct MessageWrapper;
 struct MessageWrapperLimited;
@@ -157,9 +157,12 @@ struct TgBotPPImpl_API MediaIds {
 
 // Helper to remove duplicate overloads for ChatId and MessageTypes
 struct ChatIds {
-    ChatIds(ChatId id) : _id(id) {} // NOLINT(hicpp-explicit-conversions)
-    ChatIds(MessagePtr message) : _id(message->chat->id) {} // NOLINT(hicpp-explicit-conversions)
-    operator ChatId() const { return _id; } // NOLINT(hicpp-explicit-conversions)
+    ChatIds(ChatId id) : _id(id) {}  // NOLINT(hicpp-explicit-conversions)
+    ChatIds(MessagePtr message)
+        : _id(message->chat->id) {}  // NOLINT(hicpp-explicit-conversions)
+    operator ChatId() const {
+        return _id;
+    }  // NOLINT(hicpp-explicit-conversions)
     ChatId _id;
 };
 
@@ -232,7 +235,8 @@ struct TgBotApi {
 
     virtual Message::Ptr sendDice_impl(const ChatId chatId) const = 0;
 
-    virtual StickerSet::Ptr getStickerSet_impl(const std::string& setName) const = 0;
+    virtual StickerSet::Ptr getStickerSet_impl(
+        const std::string& setName) const = 0;
 
     virtual bool downloadFile_impl(const std::filesystem::path& destfilename,
                                    const std::string& fileid) const = 0;
@@ -296,7 +300,7 @@ struct TgBotApi {
         const GenericReply::Ptr& replyMarkup = nullptr) const {
         return sendMessage_impl(
             chatId, message,
-            std::make_shared<ReplyParameters>(chatId, messageId), replyMarkup,
+            std::make_shared<ReplyParameters>(messageId, chatId), replyMarkup,
             parseModeToStr<mode>());
     }
 
@@ -344,7 +348,8 @@ struct TgBotApi {
      * @return A shared pointer to the sent animation message.
      */
     template <ParseMode mode = ParseMode::None>
-    Message::Ptr sendAnimation(const ChatIds& chatid, const FileOrMedia& mediaId,
+    Message::Ptr sendAnimation(const ChatIds& chatid,
+                               const FileOrMedia& mediaId,
                                const std::string& caption = "") const {
         return sendAnimation_impl(chatid, ToFileOrString(mediaId), caption,
                                   nullptr, nullptr, parseModeToStr<mode>());
@@ -575,10 +580,11 @@ class TgBotPPImpl_API TgBotWrapper : public InstanceClassBase<TgBotWrapper>,
             dices[RandomNumberGenerator::generate(dices.size() - 1)]);
     }
 
-    StickerSet::Ptr getStickerSet_impl(const std::string& setName) const override {
+    StickerSet::Ptr getStickerSet_impl(
+        const std::string& setName) const override {
         return getApi().getStickerSet(setName);
     }
-    
+
     bool downloadFile_impl(const std::filesystem::path& destfilename,
                            const std::string& fileid) const override {
         const auto file = getApi().getFile(fileid);
