@@ -64,6 +64,5 @@ jobs:
         env: 
           DATABASE_BACKEND: sqlite:new.db
         run: |
-            cd build
-            ./bin/TgBot++_DatabaseCtl set_owner_id 12345
-            ./bin/TgBot++_test
+            ./build/bin/TgBot++_DatabaseCtl set_owner_id 12345
+            ./build/bin/TgBot++_test
