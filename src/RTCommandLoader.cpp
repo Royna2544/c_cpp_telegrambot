@@ -57,6 +57,7 @@ bool RTCommandLoader::loadOneCommand(std::filesystem::path fname) {
 
     if (!sym(cmdName.data(), module)) {
         LOG(WARNING) << "Failed to load command module from " << fname;
+        module.fn = nullptr; // Prevent double free from function ptr dtor...
         dlclose(handle);
         return false;
     }
