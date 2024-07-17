@@ -22,7 +22,8 @@ enum class Commands {
 
 // Structure to hold command data for easier manipulation and handling
 struct CommandData {
-    std::vector<std::string> args; // Array of command arguments after (exe, command)
+    std::vector<std::string>
+        args;  // Array of command arguments after (exe, command)
     std::shared_ptr<TgBotDatabaseImpl> impl;  // Instance of TgBotDatabaseImpl
 };
 
@@ -79,7 +80,6 @@ void executeCommand<Commands::AddChat>(const CommandData& data) {
     }
 }
 
-
 template <>
 void executeCommand<Commands::SetOwnerId>(const CommandData& data) {
     if (data.impl->getOwnerUserId()) {
@@ -114,7 +114,8 @@ int main(int argc, char** argv) {
     }
 
     auto dbImpl = TgBotDatabaseImpl::getInstance();
-    if (!dbImpl->loadDBFromConfig()) {
+    dbImpl->initWrapper();
+    if (!dbImpl->isLoaded()) {
         LOG(ERROR) << "Failed to load database";
         return EXIT_FAILURE;
     }

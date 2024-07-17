@@ -13,59 +13,6 @@
 
 #include "Types.h"
 
-bool TgBotDatabaseImpl::loadDBFromConfig() {
-    const auto dbConf =
-        ConfigManager::getVariable(ConfigManager::Configs::DATABASE_BACKEND);
-    std::error_code ec;
-
-    if (dbConf) {
-        const std::string& config = dbConf.value();
-        DLOG(INFO) << "Database configuration string: "
-                   << std::quoted(dbConf.value());
-        const auto speratorIdx = config.find(':');
-
-        if (speratorIdx == std::string::npos) {
-            LOG(ERROR) << "Invalid database configuration";
-            return false;
-        }
-        // Expected format: <backend>:filename relative to git root
-        const auto backendStr = config.substr(0, speratorIdx);
-        const auto filenameStr = config.substr(speratorIdx + 1);
-        DLOG(INFO) << "Database backend: " << backendStr;
-        DLOG(INFO) << "Database filename: " << filenameStr;
-
-        if (backendStr == "sqlite") {
-            setImpl(std::make_unique<SQLiteDatabase>());
-        } else if (backendStr == "protobuf") {
-            setImpl(std::make_unique<ProtoDatabase>());
-        } else {
-            LOG(ERROR) << "Invalid database backend: " << backendStr;
-            return false;
-        }
-
-        std::filesystem::path parent;
-        if (std::filesystem::path(filenameStr).is_relative()) {
-            parent = std::filesystem::current_path(ec);
-            if (ec) {
-                LOG(ERROR) << "Failed to get current path: " << ec.message();
-                return false;
-            }
-        }
-        loaded = loadDatabaseFromFile(parent / filenameStr);
-        if (!loaded) {
-            LOG(ERROR) << "Failed to load database from file";
-        } else {
-            DLOG(INFO) << "Database loaded";
-        }
-    }
-    if (!loaded) {
-        LOG(ERROR) << "Failed to load database, the bot will not be able to "
-                      "save changes.";
-    }
-    return loaded;
-}
-
-
 bool TgBotDatabaseImpl::setImpl(std::unique_ptr<DatabaseBase> impl) {
     if (_databaseImplRaw != nullptr) {
         LOG(WARNING) << "Implemention is already set.";
@@ -88,19 +35,25 @@ bool TgBotDatabaseImpl::setImpl(DatabaseBase* impl) {
 
 bool TgBotDatabaseImpl::loadDatabaseFromFile(std::filesystem::path filepath) {
     bool isCreated = false;  // i.e. Did it exist before?
+
+    if (loaded) {
+        LOG(WARNING) << "Database is already loaded";
+        return false;
+    }
     if (!FS::exists(filepath)) {
         DLOG(INFO) << "isCreated: true, creating new database file";
         isCreated = true;
     }
-    bool _loaded = _databaseImplRaw->loadDatabaseFromFile(filepath);
-    if (isCreated && _loaded) {
+    loaded = _databaseImplRaw->loadDatabaseFromFile(filepath);
+    if (isCreated && loaded) {
         _databaseImplRaw->initDatabase();
     }
-    return _loaded;
+    return loaded;
 }
 
 bool TgBotDatabaseImpl::unloadDatabase() {
     if (loaded) {
+        loaded = false;
         return _databaseImplRaw->unloadDatabase();
     } else {
         LOG(WARNING) << "No database to unload.";
@@ -197,4 +150,58 @@ std::optional<ChatId> TgBotDatabaseImpl::getChatId(
     return _databaseImplRaw->getChatId(name);
 }
 
+void TgBotDatabaseImpl::doInitCall() {
+    const auto dbConf =
+        ConfigManager::getVariable(ConfigManager::Configs::DATABASE_BACKEND);
+    std::error_code ec;
+
+    if (dbConf) {
+        const std::string& config = dbConf.value();
+        DLOG(INFO) << "Database configuration string: "
+                   << std::quoted(dbConf.value());
+        const auto speratorIdx = config.find(':');
+
+        if (speratorIdx == std::string::npos) {
+            LOG(ERROR) << "Invalid database configuration";
+            return;
+        }
+        // Expected format: <backend>:filename relative to git root (Could be
+        // absolute)
+        const auto backendStr = config.substr(0, speratorIdx);
+        const auto filenameStr = config.substr(speratorIdx + 1);
+        DLOG(INFO) << "Database backend: " << backendStr;
+        DLOG(INFO) << "Database filename: " << filenameStr;
+
+        if (backendStr == "sqlite") {
+            setImpl(std::make_unique<SQLiteDatabase>());
+        } else if (backendStr == "protobuf") {
+            setImpl(std::make_unique<ProtoDatabase>());
+        } else {
+            LOG(ERROR) << "Invalid database backend: " << backendStr;
+            return;
+        }
+
+        std::filesystem::path parent;
+        if (std::filesystem::path(filenameStr).is_relative()) {
+            parent = std::filesystem::current_path(ec);
+            if (ec) {
+                LOG(ERROR) << "Failed to get current path: " << ec.message();
+                return;
+            }
+        }
+        loaded = loadDatabaseFromFile(parent / filenameStr);
+        if (!loaded) {
+            LOG(ERROR) << "Failed to load database from file";
+        } else {
+            DLOG(INFO) << "Database loaded";
+        }
+    }
+    if (!loaded) {
+        LOG(ERROR) << "Failed to load database, the bot will not be able to "
+                      "save changes.";
+    } else {
+        OnTerminateRegistrar::getInstance()->registerCallback(
+            [this]() { unloadDatabase(); });
+    }
+}
 DECLARE_CLASS_INST(TgBotDatabaseImpl);

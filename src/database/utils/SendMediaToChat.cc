@@ -28,7 +28,8 @@ int main(int argc, char* const* argv) {
         _usage(EXIT_SUCCESS);
     }
     auto backend = TgBotDatabaseImpl::getInstance();
-    if (!backend->loadDBFromConfig()) {
+    backend->initWrapper();
+    if (!backend->isLoaded()) {
         LOG(ERROR) << "Failed to load DB from config";
         return EXIT_FAILURE;
     }

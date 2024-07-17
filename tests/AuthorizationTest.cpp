@@ -44,7 +44,8 @@ class AuthorizationTest : public ::testing::Test {
 
 TEST_F(AuthorizationTest, loadDatabase) {
     const auto dbImpl = TgBotDatabaseImpl::getInstance();
-    ASSERT_TRUE(dbImpl->loadDBFromConfig());
+    dbImpl->initWrapper();
+    ASSERT_TRUE(dbImpl->isLoaded());
 }
 
 TEST_F(AuthorizationTest, TimeNowOwnerEnforce) {

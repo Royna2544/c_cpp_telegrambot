@@ -210,7 +210,7 @@ TEST_F(CommandModulesTest, loadDatabase) {
 
     EXPECT_CALL(database, loadDatabaseFromFile(_)).WillOnce(Return(true));
     ASSERT_TRUE(dbinst->setImpl(&database));
-    ASSERT_TRUE(dbinst->loadDBFromConfig());
+    ASSERT_TRUE(dbinst->loadDatabaseFromFile({}));
 }
 
 TEST_F(CommandModulesTest, TestCommandAlive) {
@@ -228,8 +228,8 @@ TEST_F(CommandModulesTest, TestCommandAlive) {
             rhs->chatId == TEST_CHAT_ID && rhs->messageId == TEST_MESSAGE_ID;
         if (!cond) {
             LOG(INFO) << "ChatID: " << rhs->chatId << " != " << TEST_CHAT_ID;
-            LOG(INFO) << "MessageID: " << rhs->messageId << " != "
-                      << TEST_MESSAGE_ID;
+            LOG(INFO) << "MessageID: " << rhs->messageId
+                      << " != " << TEST_MESSAGE_ID;
         }
         return cond;
     };

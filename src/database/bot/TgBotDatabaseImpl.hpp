@@ -15,12 +15,6 @@ struct TgBotDBImpl_API TgBotDatabaseImpl : InstanceClassBase<TgBotDatabaseImpl>,
                                            DatabaseBase {
     ~TgBotDatabaseImpl() override = default;
     
-    // Load the database from the configuration file
-    bool loadDBFromConfig();
-    // Takes a std::unique_ptr containing the implementation
-    bool setImpl(std::unique_ptr<DatabaseBase> impl);
-    // Overload for setImpl, assuming the caller maintains lifetime of DatabaseImpl pointer
-    bool setImpl(DatabaseBase *impl);
     // Unload the database
     bool unloadDatabase() override;
 
@@ -44,20 +38,20 @@ struct TgBotDBImpl_API TgBotDatabaseImpl : InstanceClassBase<TgBotDatabaseImpl>,
     [[nodiscard]] std::optional<ChatId> getChatId(
         const std::string &name) const override;
 
-   private:
+    // Overload for setImpl, assuming the caller maintains lifetime of DatabaseImpl pointer
+    bool setImpl(DatabaseBase *impl);
+    // Load database from file
     bool loadDatabaseFromFile(std::filesystem::path filepath) override;
-
-   public:
+    
     const CStringLifetime getInitCallName() const override {
         return "Load database";
     }
-    void doInitCall() override {
-        loadDBFromConfig();
-        OnTerminateRegistrar::getInstance()->registerCallback(
-            [this]() { unloadDatabase(); });
-    }
+    void doInitCall() override;
 
    private:
+    // Takes a std::unique_ptr containing the implementation
+    bool setImpl(std::unique_ptr<DatabaseBase> impl);
+
     std::unique_ptr<DatabaseBase> _databaseImpl;
     DatabaseBase *_databaseImplRaw;
     bool loaded = false;
