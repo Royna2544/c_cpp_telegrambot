@@ -2,8 +2,11 @@
 
 #include <ConfigManager.h>
 
+#include <database/ProtobufDatabase.hpp>
+#include <database/SQLiteDatabase.hpp>
 #include <filesystem>
 #include <libos/libfs.hpp>
+#include <memory>
 #include <optional>
 #include <ostream>
 #include <system_error>
@@ -13,7 +16,6 @@
 bool TgBotDatabaseImpl::loadDBFromConfig() {
     const auto dbConf =
         ConfigManager::getVariable(ConfigManager::Configs::DATABASE_BACKEND);
-    bool isCreated = false;
     std::error_code ec;
 
     if (dbConf) {
@@ -33,9 +35,9 @@ bool TgBotDatabaseImpl::loadDBFromConfig() {
         DLOG(INFO) << "Database filename: " << filenameStr;
 
         if (backendStr == "sqlite") {
-            databaseBackend = SQLiteDatabase();
+            setImpl(std::make_unique<SQLiteDatabase>());
         } else if (backendStr == "protobuf") {
-            databaseBackend = ProtoDatabase();
+            setImpl(std::make_unique<ProtoDatabase>());
         } else {
             LOG(ERROR) << "Invalid database backend: " << backendStr;
             return false;
@@ -49,21 +51,7 @@ bool TgBotDatabaseImpl::loadDBFromConfig() {
                 return false;
             }
         }
-        if (!FS::exists(parent / filenameStr)) {
-            DLOG(INFO) << "isCreated: true, creating new database file";
-            isCreated = true;
-        }
-        std::visit(
-            [filenameStr, this, isCreated, parent](auto&& arg) {
-                using T = std::decay_t<decltype(arg)>;
-                if constexpr (isKnownDatabase<T>()) {
-                    loaded = arg.loadDatabaseFromFile(parent / filenameStr);
-                    if (isCreated && loaded) {
-                        arg.initDatabase();
-                    }
-                }
-            },
-            databaseBackend);
+        loaded = loadDatabaseFromFile(parent / filenameStr);
         if (!loaded) {
             LOG(ERROR) << "Failed to load database from file";
         } else {
@@ -77,17 +65,33 @@ bool TgBotDatabaseImpl::loadDBFromConfig() {
     return loaded;
 }
 
-void TgBotDatabaseImpl::unloadDatabase() {
-    if (loaded) {
-        std::visit(
-            [this](auto&& arg) {
-                using T = std::decay_t<decltype(arg)>;
-                if constexpr (isKnownDatabase<T>()) {
-                    arg.unloadDatabase();
-                }
-            },
-            databaseBackend);
+bool TgBotDatabaseImpl::loadDatabaseFromFile(std::filesystem::path filepath) {
+    bool isCreated = false; // i.e. Did it exist before?
+    if (!FS::exists(filepath)) {
+        DLOG(INFO) << "isCreated: true, creating new database file";
+        isCreated = true;
     }
+    bool _loaded = _databaseImpl->loadDatabaseFromFile(filepath);
+    if (isCreated && _loaded) {
+        _databaseImpl->initDatabase();
+    }
+    return _loaded;
+}
+
+bool TgBotDatabaseImpl::setImpl(std::unique_ptr<DatabaseBase> impl) {
+    if (_databaseImpl != nullptr) {
+        LOG(WARNING) << "Implemention is already set.";
+        return false;
+    }
+    _databaseImpl = std::move(impl);
+    return true;
+}
+
+bool TgBotDatabaseImpl::unloadDatabase() {
+    if (loaded) {
+        _databaseImpl->unloadDatabase();
+    }
+    return false;
 }
 
 bool TgBotDatabaseImpl::isLoaded() const { return loaded; }
@@ -98,14 +102,7 @@ DatabaseBase::ListResult TgBotDatabaseImpl::addUserToList(
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return DatabaseBase::ListResult::BACKEND_ERROR;
     }
-    return std::visit(
-        [this, type, user](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (isKnownDatabase<T>()) {
-                return arg.addUserToList(type, user);
-            }
-        },
-        databaseBackend);
+    return _databaseImpl->addUserToList(type, user);
 }
 
 DatabaseBase::ListResult TgBotDatabaseImpl::removeUserFromList(
@@ -114,14 +111,7 @@ DatabaseBase::ListResult TgBotDatabaseImpl::removeUserFromList(
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return DatabaseBase::ListResult::BACKEND_ERROR;
     }
-    return std::visit(
-        [this, type, user](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (isKnownDatabase<T>()) {
-                return arg.removeUserFromList(type, user);
-            }
-        },
-        databaseBackend);
+    return _databaseImpl->removeUserFromList(type, user);
 }
 
 DatabaseBase::ListResult TgBotDatabaseImpl::checkUserInList(
@@ -130,14 +120,7 @@ DatabaseBase::ListResult TgBotDatabaseImpl::checkUserInList(
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return DatabaseBase::ListResult::BACKEND_ERROR;
     }
-    return std::visit(
-        [this, type, user](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (isKnownDatabase<T>()) {
-                return arg.checkUserInList(type, user);
-            }
-        },
-        databaseBackend);
+    return _databaseImpl->checkUserInList(type, user);
 }
 
 std::optional<UserId> TgBotDatabaseImpl::getOwnerUserId() const {
@@ -145,14 +128,7 @@ std::optional<UserId> TgBotDatabaseImpl::getOwnerUserId() const {
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return std::nullopt;
     }
-    return std::visit(
-        [this](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (isKnownDatabase<T>()) {
-                return arg.getOwnerUserId();
-            }
-        },
-        databaseBackend);
+    return _databaseImpl->getOwnerUserId();
 }
 
 std::optional<DatabaseBase::MediaInfo> TgBotDatabaseImpl::queryMediaInfo(
@@ -161,14 +137,7 @@ std::optional<DatabaseBase::MediaInfo> TgBotDatabaseImpl::queryMediaInfo(
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return std::nullopt;
     }
-    return std::visit(
-        [this, str](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (isKnownDatabase<T>()) {
-                return arg.queryMediaInfo(str);
-            }
-        },
-        databaseBackend);
+    return _databaseImpl->queryMediaInfo(str);
 }
 
 bool TgBotDatabaseImpl::addMediaInfo(
@@ -177,14 +146,7 @@ bool TgBotDatabaseImpl::addMediaInfo(
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return false;
     }
-    return std::visit(
-        [this, info](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (isKnownDatabase<T>()) {
-                return arg.addMediaInfo(info);
-            }
-        },
-        databaseBackend);
+    return _databaseImpl->addMediaInfo(info);
 }
 
 std::ostream& TgBotDatabaseImpl::dump(std::ostream& ofs) const {
@@ -192,15 +154,7 @@ std::ostream& TgBotDatabaseImpl::dump(std::ostream& ofs) const {
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return ofs;
     }
-    std::visit(
-        [this, &ofs](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (isKnownDatabase<T>()) {
-                arg.dump(ofs);
-            }
-        },
-        databaseBackend);
-    return ofs;
+    return _databaseImpl->dump(ofs);
 }
 
 void TgBotDatabaseImpl::setOwnerUserId(const UserId user) const {
@@ -208,14 +162,7 @@ void TgBotDatabaseImpl::setOwnerUserId(const UserId user) const {
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return;
     }
-    std::visit(
-        [this, user](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (isKnownDatabase<T>()) {
-                arg.setOwnerUserId(user);
-            }
-        },
-        databaseBackend);
+    _databaseImpl->setOwnerUserId(user);
 }
 
 bool TgBotDatabaseImpl::addChatInfo(const ChatId chatid,
@@ -224,14 +171,7 @@ bool TgBotDatabaseImpl::addChatInfo(const ChatId chatid,
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return false;
     }
-    return std::visit(
-        [this, chatid, name](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (isKnownDatabase<T>()) {
-                return arg.addChatInfo(chatid, name);
-            }
-        },
-        databaseBackend);
+    return _databaseImpl->addChatInfo(chatid, name);
 }
 
 std::optional<ChatId> TgBotDatabaseImpl::getChatId(
@@ -240,14 +180,7 @@ std::optional<ChatId> TgBotDatabaseImpl::getChatId(
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return std::nullopt;
     }
-    return std::visit(
-        [this, name](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (isKnownDatabase<T>()) {
-                return arg.getChatId(name);
-            }
-        },
-        databaseBackend);
+    return _databaseImpl->getChatId(name);
 }
 
 DECLARE_CLASS_INST(TgBotDatabaseImpl);

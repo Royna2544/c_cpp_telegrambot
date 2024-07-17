@@ -4,38 +4,44 @@
 #include <Types.h>
 
 #include <InstanceClassBase.hpp>
-#include <database/ProtobufDatabase.hpp>
-#include <database/SQLiteDatabase.hpp>
 #include <initcalls/Initcall.hpp>
 #include <libos/OnTerminateRegistrar.hpp>
-#include <variant>
+#include <memory>
+
+#include "database/DatabaseBase.hpp"
 
 struct TgBotDBImpl_API TgBotDatabaseImpl : InstanceClassBase<TgBotDatabaseImpl>,
-                                           InitCall {
-    virtual ~TgBotDatabaseImpl() = default;
-    std::variant<ProtoDatabase, SQLiteDatabase> databaseBackend;
+                                           InitCall,
+                                           DatabaseBase {
+    ~TgBotDatabaseImpl() override = default;
     bool loadDBFromConfig();
-    void unloadDatabase();
+    bool setImpl(std::unique_ptr<DatabaseBase> impl);
+    bool unloadDatabase() override;
 
     // Wrappers
     [[nodiscard]] bool isLoaded() const;
     [[nodiscard]] DatabaseBase::ListResult addUserToList(
-        DatabaseBase::ListType type, UserId user) const;
+        DatabaseBase::ListType type, UserId user) const override;
     [[nodiscard]] DatabaseBase::ListResult removeUserFromList(
-        DatabaseBase::ListType type, UserId user) const;
+        DatabaseBase::ListType type, UserId user) const override;
     [[nodiscard]] DatabaseBase::ListResult checkUserInList(
-        DatabaseBase::ListType type, UserId user) const;
-    [[nodiscard]] std::optional<UserId> getOwnerUserId() const;
+        DatabaseBase::ListType type, UserId user) const override;
+    [[nodiscard]] std::optional<UserId> getOwnerUserId() const override;
     [[nodiscard]] std::optional<DatabaseBase::MediaInfo> queryMediaInfo(
-        std::string str) const;
-    [[nodiscard]] bool addMediaInfo(const DatabaseBase::MediaInfo &info) const;
-    std::ostream &dump(std::ostream &ofs) const;
-    void setOwnerUserId(UserId userid) const;
+        std::string str) const override;
+    [[nodiscard]] bool addMediaInfo(
+        const DatabaseBase::MediaInfo &info) const override;
+    std::ostream &dump(std::ostream &ofs) const override;
+    void setOwnerUserId(UserId userid) const override;
     [[nodiscard]] bool addChatInfo(const ChatId chatid,
-                                   const std::string &name) const;
+                                   const std::string &name) const override;
     [[nodiscard]] std::optional<ChatId> getChatId(
-        const std::string &name) const;
+        const std::string &name) const override;
 
+   private:
+    bool loadDatabaseFromFile(std::filesystem::path filepath) override;
+
+   public:
     const CStringLifetime getInitCallName() const override {
         return "Load database";
     }
@@ -46,10 +52,6 @@ struct TgBotDBImpl_API TgBotDatabaseImpl : InstanceClassBase<TgBotDatabaseImpl>,
     }
 
    private:
-    template <typename T>
-    constexpr static bool isKnownDatabase() {
-        return std::is_same_v<T, ProtoDatabase> ||
-               std::is_same_v<T, SQLiteDatabase>;
-    }
+    std::unique_ptr<DatabaseBase> _databaseImpl;
     bool loaded = false;
 };
