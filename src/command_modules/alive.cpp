@@ -50,7 +50,7 @@ static DECLARE_COMMAND_HANDLER(alive, wrapper, message) {
     if (info) {
         try {
             wrapper->sendReplyAnimation(
-                message, MediaIds{info->mediaId, info->mediaUniqueId});
+                message, MediaIds{info->mediaId, info->mediaUniqueId}, version);
             sentAnimation = true;
         } catch (const TgBot::TgException& e) {
             // Fallback to HTML if no GIF
