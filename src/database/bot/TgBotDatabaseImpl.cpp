@@ -65,31 +65,45 @@ bool TgBotDatabaseImpl::loadDBFromConfig() {
     return loaded;
 }
 
-bool TgBotDatabaseImpl::loadDatabaseFromFile(std::filesystem::path filepath) {
-    bool isCreated = false; // i.e. Did it exist before?
-    if (!FS::exists(filepath)) {
-        DLOG(INFO) << "isCreated: true, creating new database file";
-        isCreated = true;
-    }
-    bool _loaded = _databaseImpl->loadDatabaseFromFile(filepath);
-    if (isCreated && _loaded) {
-        _databaseImpl->initDatabase();
-    }
-    return _loaded;
-}
 
 bool TgBotDatabaseImpl::setImpl(std::unique_ptr<DatabaseBase> impl) {
-    if (_databaseImpl != nullptr) {
+    if (_databaseImplRaw != nullptr) {
         LOG(WARNING) << "Implemention is already set.";
         return false;
     }
     _databaseImpl = std::move(impl);
+    _databaseImplRaw = _databaseImpl.get();
     return true;
+}
+
+bool TgBotDatabaseImpl::setImpl(DatabaseBase* impl) {
+    if (_databaseImplRaw != nullptr) {
+        LOG(WARNING) << "Implemention is already set.";
+        return false;
+    }
+    _databaseImpl = nullptr;
+    _databaseImplRaw = impl;
+    return true;
+}
+
+bool TgBotDatabaseImpl::loadDatabaseFromFile(std::filesystem::path filepath) {
+    bool isCreated = false;  // i.e. Did it exist before?
+    if (!FS::exists(filepath)) {
+        DLOG(INFO) << "isCreated: true, creating new database file";
+        isCreated = true;
+    }
+    bool _loaded = _databaseImplRaw->loadDatabaseFromFile(filepath);
+    if (isCreated && _loaded) {
+        _databaseImplRaw->initDatabase();
+    }
+    return _loaded;
 }
 
 bool TgBotDatabaseImpl::unloadDatabase() {
     if (loaded) {
-        _databaseImpl->unloadDatabase();
+        return _databaseImplRaw->unloadDatabase();
+    } else {
+        LOG(WARNING) << "No database to unload.";
     }
     return false;
 }
@@ -102,7 +116,7 @@ DatabaseBase::ListResult TgBotDatabaseImpl::addUserToList(
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return DatabaseBase::ListResult::BACKEND_ERROR;
     }
-    return _databaseImpl->addUserToList(type, user);
+    return _databaseImplRaw->addUserToList(type, user);
 }
 
 DatabaseBase::ListResult TgBotDatabaseImpl::removeUserFromList(
@@ -111,7 +125,7 @@ DatabaseBase::ListResult TgBotDatabaseImpl::removeUserFromList(
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return DatabaseBase::ListResult::BACKEND_ERROR;
     }
-    return _databaseImpl->removeUserFromList(type, user);
+    return _databaseImplRaw->removeUserFromList(type, user);
 }
 
 DatabaseBase::ListResult TgBotDatabaseImpl::checkUserInList(
@@ -120,7 +134,7 @@ DatabaseBase::ListResult TgBotDatabaseImpl::checkUserInList(
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return DatabaseBase::ListResult::BACKEND_ERROR;
     }
-    return _databaseImpl->checkUserInList(type, user);
+    return _databaseImplRaw->checkUserInList(type, user);
 }
 
 std::optional<UserId> TgBotDatabaseImpl::getOwnerUserId() const {
@@ -128,7 +142,7 @@ std::optional<UserId> TgBotDatabaseImpl::getOwnerUserId() const {
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return std::nullopt;
     }
-    return _databaseImpl->getOwnerUserId();
+    return _databaseImplRaw->getOwnerUserId();
 }
 
 std::optional<DatabaseBase::MediaInfo> TgBotDatabaseImpl::queryMediaInfo(
@@ -137,7 +151,7 @@ std::optional<DatabaseBase::MediaInfo> TgBotDatabaseImpl::queryMediaInfo(
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return std::nullopt;
     }
-    return _databaseImpl->queryMediaInfo(str);
+    return _databaseImplRaw->queryMediaInfo(str);
 }
 
 bool TgBotDatabaseImpl::addMediaInfo(
@@ -146,7 +160,7 @@ bool TgBotDatabaseImpl::addMediaInfo(
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return false;
     }
-    return _databaseImpl->addMediaInfo(info);
+    return _databaseImplRaw->addMediaInfo(info);
 }
 
 std::ostream& TgBotDatabaseImpl::dump(std::ostream& ofs) const {
@@ -154,7 +168,7 @@ std::ostream& TgBotDatabaseImpl::dump(std::ostream& ofs) const {
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return ofs;
     }
-    return _databaseImpl->dump(ofs);
+    return _databaseImplRaw->dump(ofs);
 }
 
 void TgBotDatabaseImpl::setOwnerUserId(const UserId user) const {
@@ -162,7 +176,7 @@ void TgBotDatabaseImpl::setOwnerUserId(const UserId user) const {
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return;
     }
-    _databaseImpl->setOwnerUserId(user);
+    _databaseImplRaw->setOwnerUserId(user);
 }
 
 bool TgBotDatabaseImpl::addChatInfo(const ChatId chatid,
@@ -171,7 +185,7 @@ bool TgBotDatabaseImpl::addChatInfo(const ChatId chatid,
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return false;
     }
-    return _databaseImpl->addChatInfo(chatid, name);
+    return _databaseImplRaw->addChatInfo(chatid, name);
 }
 
 std::optional<ChatId> TgBotDatabaseImpl::getChatId(
@@ -180,7 +194,7 @@ std::optional<ChatId> TgBotDatabaseImpl::getChatId(
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return std::nullopt;
     }
-    return _databaseImpl->getChatId(name);
+    return _databaseImplRaw->getChatId(name);
 }
 
 DECLARE_CLASS_INST(TgBotDatabaseImpl);
