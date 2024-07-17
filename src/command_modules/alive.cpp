@@ -26,12 +26,12 @@ static DECLARE_COMMAND_HANDLER(alive, wrapper, message) {
         std::string _version;
         GitData data;
 
-        const std::string modules = cat("commandmodules");
-        const std::string commitid = cat("commitid");
-        const std::string commitmsg = cat("commitmsg");
-        const std::string originurl = cat("originurl");
-        const std::string botname = cat("botname");
-        const std::string botusername = cat("botusername");
+        const auto modules = cat("commandmodules");
+        const auto commitid = cat("commitid");
+        const auto commitmsg = cat("commitmsg");
+        const auto originurl = cat("originurl");
+        const auto botname = cat("botname");
+        const auto botusername = cat("botusername");
 
         GitData::Fill(&data);
         _version = ResourceManager::getInstance()->getResource("about.html");
@@ -49,12 +49,12 @@ static DECLARE_COMMAND_HANDLER(alive, wrapper, message) {
     bool sentAnimation = false;
     if (info) {
         try {
-            wrapper->sendReplyAnimation(
+            wrapper->sendReplyAnimation<TgBotWrapper::ParseMode::HTML>(
                 message, MediaIds{info->mediaId, info->mediaUniqueId}, version);
             sentAnimation = true;
         } catch (const TgBot::TgException& e) {
             // Fallback to HTML if no GIF
-            LOG(ERROR) << GETSTR(ERROR_SENDING_GIF) << e.what();
+            LOG(ERROR) << GETSTR_IS(ERROR_SENDING_GIF) << e.what();
         }
     }
     if (!sentAnimation) {
@@ -78,4 +78,3 @@ DYN_COMMAND_FN(name, module) {
     module.isLoaded = true;
     return true;
 }
-
