@@ -15,14 +15,12 @@
 #include "InstanceClassBase.hpp"
 #include "RandomNumberGenerator.hpp"
 #include "Types.h"
-#include "tgbot/types/InputFile.h"
-#include "tgbot/types/Message.h"
-#include "tgbot/types/StickerSet.h"
 
 using TgBot::Api;
 using TgBot::Bot;
 using TgBot::BotCommand;
 using TgBot::Chat;
+using TgBot::ChatPermissions;
 using TgBot::EventBroadcaster;
 using TgBot::GenericReply;
 using TgBot::InputFile;
