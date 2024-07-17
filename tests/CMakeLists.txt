@@ -8,9 +8,10 @@ add_executable_san(${PROJECT_TEST_NAME}
   ConfigManagerTest.cpp
   RegexHandlerTest.cpp
   ResourceManagerTest.cpp
+  PythonClassTest.cpp
   TryParseTest.cpp
   SharedMallocTest.cpp
   ConstexprStringCatTest.cpp
 )
 target_include_directories(${PROJECT_TEST_NAME} PRIVATE ${gtest_INCLUDE_DIR} ${gmock_INCLUDE_DIR})
-target_link_libraries(${PROJECT_TEST_NAME} gtest gmock TgBotPPImpl TgBotLogInit)
+target_link_libraries(${PROJECT_TEST_NAME} gtest gmock TgBotPPImpl TgBotLogInit TgBotPython)

@@ -181,10 +181,10 @@ DECLARE_COMMAND_HANDLER(rombuild, tgWrapper, message) {
         if (_ec) {
             LOG(ERROR) << "Failed to restore cwd: " << _ec.message();
         }
-        Py_Finalize();
+        PythonClass::deinit();
     };
 
-    Py_Initialize();
+    PythonClass::init();
 
     if (!wrapper.hasExtraText()) {
         wrapper.sendMessageOnExit("Please provide a target string");

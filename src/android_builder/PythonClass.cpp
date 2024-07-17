@@ -84,6 +84,7 @@ bool PythonClass::addLookupDirectory(const std::filesystem::path& directory) {
 
     // Decrement the reference count of the directory string
     Py_DECREF(dirStr);
+    
     return true;
 }
 

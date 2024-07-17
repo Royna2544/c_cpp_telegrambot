@@ -25,6 +25,12 @@ std::string convert<std::string>(PyObject* value);
 template <>
 std::vector<int> convert<std::vector<int>>(PyObject* value);
 
+inline void ensurePythonInitialized() {
+    if (Py_IsInitialized() == 0) {
+        throw std::runtime_error("Python not initialized");
+    }
+}
+
 }  // namespace details
 
 struct GILStateManagement {
@@ -38,7 +44,20 @@ class PythonClass : public std::enable_shared_from_this<PythonClass> {
 
    public:
     using Ptr = std::shared_ptr<PythonClass>;
+
+    // Doesnt make sense to use this on ctor/dtor because we cannot do
+    // bool isInitialized flag, as we cannot
+    static void init() {
+        Py_InitializeEx(1);
+        if (Py_IsInitialized() == 0) {
+            throw std::runtime_error("Failed to initialize Python");
+        }
+    }
+    static void deinit() { Py_FinalizeEx(); }
+
     static std::shared_ptr<PythonClass> get() {
+        details::ensurePythonInitialized();
+
         static auto instance = std::make_shared<PythonClass>(PythonClass());
         return instance;
     }
@@ -93,6 +112,7 @@ class PythonClass : public std::enable_shared_from_this<PythonClass> {
          */
         template <typename T>
         bool call(PyObject* args, T* out) {
+            // Acquire the GIL to ensure thread safety
             GILStateManagement _;
             LOG(INFO) << "Calling Python function: module "
                       << moduleHandle->name << " function: " << name;
