@@ -23,10 +23,13 @@ template <typename T>
 struct InstanceClassBase {
     template <typename... Args>
     static std::shared_ptr<T> initInstance(Args&&... args) {
+        if (instance) {
+            throw std::runtime_error("An instance of the class already exists");
+        }
         instance = std::make_shared<T>(std::forward<Args>(args)...);
         return instance;
     }
-    
+
     /**
      * @brief Get the single instance of the class
      * @return a pointer to the instance
