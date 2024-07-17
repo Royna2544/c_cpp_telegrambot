@@ -7,7 +7,7 @@
 #include <memory>
 #include <vector>
 
-#include "ConfigManager.h"
+#include "CommandLine.hpp"
 #include "TryParseStr.hpp"
 
 enum class Commands {
@@ -101,14 +101,11 @@ void executeCommand<Commands::SetOwnerId>(const CommandData& data) {
 
 }  // namespace
 
-int main(int argc, char* const* argv) {
+int main(int argc, char** argv) {
     TgBot_AbslLogInit();
-    copyCommandLine(CommandLineOp::INSERT, &argc, &argv);
+    auto inst = CommandLine::initInstance(argc, argv);
 
-    std::vector<std::string> args;
-    for (int i = 0; i < argc; ++i) {
-        args.emplace_back(argv[i]);
-    }
+    std::vector<std::string> args = inst->getArguments();
     CommandData data = {args, nullptr};
 
     if (args.size() < 2) {

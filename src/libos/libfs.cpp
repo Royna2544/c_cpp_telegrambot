@@ -2,11 +2,10 @@
 
 #include <absl/log/log.h>
 
+#include <CommandLine.hpp>
 #include <filesystem>
 
-#include "ConfigManager.h"
 #include "GitData.h"
-#include "ResourceManager.h"
 
 namespace fs = std::filesystem;
 
@@ -69,18 +68,14 @@ std::filesystem::path FS::getPathForType(PathType type) {
             break;
         case PathType::RESOURCES:
             path = getPathForType(PathType::GIT_ROOT) / "resources";
-                   //ResourceManager::kResourceDirname;
+            // ResourceManager::kResourceDirname;
             ok = true;
             break;
         case PathType::MODULES_INSTALLED:
         case PathType::BUILD_ROOT: {
-            int argc = 0;
-            char* const* argv = nullptr;
-            copyCommandLine(CommandLineOp::GET, &argc, &argv);
-            if (argv != nullptr) {
-                path = std::filesystem::path(argv[0]).parent_path();
-                ok = true;
-            }
+            path = std::filesystem::path((*CommandLine::getInstance())[0])
+                       .parent_path();
+            ok = true;
             break;
         }
         case PathType::RESOURCES_SQL:

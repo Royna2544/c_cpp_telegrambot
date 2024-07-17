@@ -21,7 +21,9 @@
 #include <libos/libsighandler.hpp>
 #include <memory>
 #include <utility>
+#include <CommandLine.hpp>
 
+#include "InstanceClassBase.hpp"
 #include "TgBotWrapper.hpp"
 #include "tgbot/Bot.h"
 
@@ -232,16 +234,16 @@ void onBotInitialized(const std::shared_ptr<TgBotWrapper>& wrapper,
 
 }  // namespace
 
-int main(int argc, char* const* argv) {
+int main(int argc, char** argv) {
     std::optional<std::string> token;
     DurationPoint startupDp;
     using namespace ConfigManager;
 
+    // Insert command line arguments
+    CommandLine::initInstance(argc, argv);
+    
     // Initialize logging
     initLogging();
-
-    // Insert command line arguments
-    copyCommandLine(CommandLineOp::INSERT, &argc, &argv);
 
     // Print help and return if help option is set
     if (ConfigManager::getVariable(ConfigManager::Configs::HELP)) {

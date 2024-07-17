@@ -1,6 +1,7 @@
 #include <ConfigManager.h>
 #include <absl/log/log.h>
 
+#include <CommandLine.hpp>
 #include <StringToolsExt.hpp>
 #include <boost/program_options.hpp>
 #include <cstdlib>
@@ -177,10 +178,12 @@ struct ConfigBackendCmdline : public ConfigBackendBoostPOBase {
     }
 
     bool load() override {
-        int argc = 0;
-        char *const *argv = nullptr;
+        const auto cmdInst = CommandLine::getInstance()->getArguments();
+        const auto argc = static_cast<int>(cmdInst.size());
+        auto argv = std::make_unique<const char *[]>(argc);
+        std::transform(cmdInst.begin(), cmdInst.end(), argv.get(),
+                       [](const std::string &arg) { return arg.c_str(); });
 
-        copyCommandLine(CommandLineOp::GET, &argc, &argv);
         if (argv == nullptr) {
             LOG(WARNING)
                 << "Command line copy failed, probably it wasn't saved before";
@@ -188,7 +191,7 @@ struct ConfigBackendCmdline : public ConfigBackendBoostPOBase {
         }
 
         try {
-            po::store(po::parse_command_line(argc, argv, getTgBotOptionsDesc()),
+            po::store(po::parse_command_line(argc, argv.get(), getTgBotOptionsDesc()),
                       mp);
         } catch (const boost::program_options::error &e) {
             LOG(ERROR) << "Cmdline backend failed to parse: " << e.what();
@@ -206,22 +209,6 @@ struct ConfigBackendCmdline : public ConfigBackendBoostPOBase {
     ConfigBackendCmdline() = default;
     ~ConfigBackendCmdline() override = default;
 };
-
-void copyCommandLine(CommandLineOp op, int *argc, char *const **argv) {
-    static int argc_internal = 0;
-    static char *const *argv_internal = nullptr;
-
-    switch (op) {
-        case CommandLineOp::INSERT:
-            argc_internal = *argc;
-            argv_internal = *argv;
-            break;
-        case CommandLineOp::GET:
-            *argv = argv_internal;
-            *argc = argc_internal;
-            break;
-    };
-}
 
 namespace ConfigManager {
 

@@ -141,6 +141,7 @@ command_module(
 command_module(
     NAME restart
     SRCS restart.cpp
+    LIBS TgBotCommandLine
     PLATFORM "Unix"
 )
 

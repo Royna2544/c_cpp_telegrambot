@@ -136,6 +136,11 @@ add_my_library(
   PUBLIC_INC src/third-party/libsqlite3/libsqlite3/libsqlite3/
   NO_LIBSUFFIX
 )
+add_my_library(
+  NAME CommandLine
+  SRCS src/CommandLine.cpp
+)
+
 add_subdirectory(src/android_builder)
 add_subdirectory(src/database)
 add_subdirectory(src/random)

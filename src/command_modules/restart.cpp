@@ -3,6 +3,7 @@
 #include <absl/log/log.h>
 #include <unistd.h>
 
+#include <CommandLine.hpp>
 #include <TgBotWrapper.hpp>
 #include <TryParseStr.hpp>
 #include <cinttypes>
@@ -38,12 +39,12 @@ DECLARE_COMMAND_HANDLER(restart, tgBotWrapper, message) {
     myEnviron[count] = restartBuf.data();
     myEnviron[count + 1] = nullptr;
     // Copy the command line used to launch the bot
-    copyCommandLine(CommandLineOp::GET, &argc, &argv);
-    LOG(INFO) << "Restarting bot with exe: " << argv[0] << ", addenv "
+    const auto exe = (*CommandLine::getInstance())[0];
+    LOG(INFO) << "Restarting bot with exe: " << exe << ", addenv "
               << restartBuf.data();
     tgBotWrapper->sendReplyMessage(message, "Restarting bot instance...");
     // Call exeve
-    execve(argv[0], argv, myEnviron.data());
+    execve(exe.c_str(), argv, myEnviron.data());
 }
 
 DYN_COMMAND_FN(n, module) {

@@ -14,7 +14,7 @@ add_my_library(
     src/libos/libsighandler_impl.cpp
     src/libos/libsighandler_${TARGET_VARIANT}.cpp
     src/ResourceManager.cpp
-  LIBS ${Boost_LIBRARIES} ${LIBGIT2_LIBS}
+  LIBS ${Boost_LIBRARIES} ${LIBGIT2_LIBS} TgBotCommandLine
   LIBS_WIN32 shlwapi
 )
 #####################################################################

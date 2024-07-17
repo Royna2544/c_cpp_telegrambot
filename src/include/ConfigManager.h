@@ -121,16 +121,3 @@ TgBotUtils_API void serializeHelpToOStream(std::ostream &out);
 
 };  // namespace ConfigManager
 
-enum class CommandLineOp { INSERT, GET };
-
-/**
- * copyCommandLine - function used to obtain command line
- *  argument datas to command line backend
- * Basically just a container for argc, argv
- *
- * @param op Operation desired
- * @param out_argc [inout] argc, may be null.
- * @param out_argv [inout] argv, may be null.
- */
-TgBotUtils_API void copyCommandLine(CommandLineOp op, int *argc,
-                                    char *const **argv);

@@ -1,6 +1,7 @@
 #include <absl/log/log.h>
 
 #include <AbslLogInit.hpp>
+#include <CommandLine.hpp>
 #include <ManagedThreads.hpp>
 #include <TgBotSocket_Export.hpp>
 #include <TryParseStr.hpp>
@@ -160,6 +161,7 @@ int main(int argc, char** argv) {
     const char* exe = argv[0];
 
     TgBot_AbslLogInit();
+    CommandLine::initInstance(argc, argv);
     if (argc == 1) {
         usage(exe, true);
     }
@@ -280,7 +282,8 @@ int main(int argc, char** argv) {
         pkt->header.checksum = crc.checksum();
     }
 
-    SocketClientWrapper backend(SocketInterfaceBase::LocalHelper::getSocketPath());
+    SocketClientWrapper backend(
+        SocketInterfaceBase::LocalHelper::getSocketPath());
     backend->options.use_connect_timeout.set(true);
     backend->options.connect_timeout.set(3s);
     auto handle = backend->createClientSocket();
