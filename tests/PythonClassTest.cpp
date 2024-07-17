@@ -1,4 +1,3 @@
-#include <Python.h>
 #include <absl/log/log.h>
 #include <gtest/gtest.h>
 

@@ -12,6 +12,8 @@ add_my_library(
         .
 )
 
+################# Android ROM builder with C++/Python #################
+if (UNIX AND NOT APPLE)
 add_my_library(
     NAME AndroidBuilder-cpp
     SRCS 
@@ -29,3 +31,4 @@ add_my_library(
         .
     NO_LIBSUFFIX
 )
+endif()

@@ -136,6 +136,7 @@ add_my_library(
   PUBLIC_INC src/third-party/libsqlite3/libsqlite3/libsqlite3/
   NO_LIBSUFFIX
 )
+add_subdirectory(src/android_builder)
 add_subdirectory(src/database)
 add_subdirectory(src/random)
 add_subdirectory(src/command_modules)
@@ -152,10 +153,6 @@ if (WIN32)
   set(CMAKE_DL_LIBS dl)
 endif()
 add_subdirectory(tests)
-################# Android ROM builder with C++/Python #################
-if (UNIX AND NOT APPLE)
-  add_subdirectory(src/android_builder)
-endif()
 #################################################################
 
 ########################## WebPage Server ##########################

@@ -73,7 +73,7 @@ bool PythonClass::addLookupDirectory(const std::filesystem::path& directory) {
     PyObject* sysPath = PySys_GetObject("path");
 
     // Convert the directory path to a Python string
-    PyObject* dirStr = PyUnicode_DecodeFSDefault(directory.c_str());
+    PyObject* dirStr = PyUnicode_DecodeFSDefault(directory.string().c_str());
 
     // Append the directory string to sys.path
     if (PyList_Append(sysPath, dirStr) != 0) {
