@@ -46,6 +46,10 @@ struct InstanceClassBase {
         }
         return instance;
     }
+
+    static void destroyInstance() {
+        instance.reset();
+    }
     static std::shared_ptr<T> instance;
 };
 
