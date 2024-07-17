@@ -8,15 +8,9 @@
 
 class AuthorizationTest : public ::testing::Test {
    protected:
-    static void SetUpTestSuite() {
-        const auto dbImpl = TgBotDatabaseImpl::getInstance();
-        ASSERT_TRUE(dbImpl->loadDBFromConfig());
-    }
+    static void SetUpTestSuite() {}
 
-    static void TearDownTestSuite() {
-        const auto dbImpl = TgBotDatabaseImpl::getInstance();
-        ASSERT_TRUE(dbImpl->unloadDatabase());
-    }
+    static void TearDownTestSuite() { TgBotDatabaseImpl::destroyInstance(); }
 
    public:
     static void MakeMessageDateNow(Message::Ptr& message) {
@@ -47,6 +41,11 @@ class AuthorizationTest : public ::testing::Test {
         return authflags->isAuthorized(message, flags);
     }
 };
+
+TEST_F(AuthorizationTest, loadDatabase) {
+    const auto dbImpl = TgBotDatabaseImpl::getInstance();
+    ASSERT_TRUE(dbImpl->loadDBFromConfig());
+}
 
 TEST_F(AuthorizationTest, TimeNowOwnerEnforce) {
     auto dummyMsg = std::make_shared<Message>();
@@ -117,4 +116,9 @@ TEST_F(AuthorizationTest, UserRequiredUser) {
     MakeMessageNonOwner(dummyMsg);
     ASSERT_TRUE(Authorized(dummyMsg, AuthContext::Flags::REQUIRE_USER |
                                          AuthContext::Flags::PERMISSIVE));
+}
+
+TEST_F(AuthorizationTest, unloadDatabase) {
+    const auto dbImpl = TgBotDatabaseImpl::getInstance();
+    ASSERT_TRUE(dbImpl->unloadDatabase());
 }
