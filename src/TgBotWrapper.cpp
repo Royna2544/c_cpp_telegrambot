@@ -20,7 +20,7 @@ void TgBotWrapper::commandHandler(const command_callback_t& module_callback,
     }
 
     if (AuthContext::getInstance()->isAuthorized(message, authflags)) {
-        module_callback(this, message);
+        module_callback(shared_from_this(), message);
     }
 }
 

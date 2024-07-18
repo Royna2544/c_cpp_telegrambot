@@ -56,7 +56,7 @@ void ChatObserver::process(const Message::Ptr& msg) {
 
 void ChatObserver::doInitCall() {
     TgBotWrapper::getInstance()->registerCallback(
-        [this](const auto*, const Message::Ptr& message) {
+        [this](const auto, const Message::Ptr& message) {
             if (!observedChatIds.empty() || observeAllChats) {
                 process(message);
             }

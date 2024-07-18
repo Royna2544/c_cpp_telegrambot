@@ -1,42 +1,49 @@
+#include "Helper.hpp"
+
+#include <absl/log/check.h>
 #include <absl/log/log.h>
 
 #include <StringResManager.hpp>
 #include <TgBotWrapper.hpp>
 #include <boost/algorithm/string/trim.hpp>
+#include <thread>
+#include <utility>
 
-#include "CompilerInTelegram.hpp"
+CompilerInTgBotInterface::CompilerInTgBotInterface(
+    std::shared_ptr<TgBotApi> api, Message::Ptr requestedMessage)
+    : botApi(std::move(api)), requestedMessage(std::move(requestedMessage)) {}
 
-void CompilerInTgHelper::onFailed(TgBotApi *botApi, const Message::Ptr &message,
-                                  const CompilerInTg::ErrorType e) {
-    std::string text;
-    switch (e) {
-        case CompilerInTg::ErrorType::MESSAGE_VERIFICATION_FAILED:
-            text = GETSTR(REPLY_TO_A_CODE);
-            break;
-        case CompilerInTg::ErrorType::FILE_WRITE_FAILED:
-            text = GETSTR(FAILED_TO_WRITE_FILE);
-            break;
-        case CompilerInTg::ErrorType::POPEN_WDT_FAILED:
-            text = GETSTR(FAILED_TO_RUN_COMMAND);
-            break;
-        case CompilerInTg::ErrorType::START_COMPILER:
-            text = GETSTR(WORKING);
-            break;
-    };
-    botApi->sendReplyMessage(message, text);
+void CompilerInTgBotInterface::onExecutionStarted(
+    const std::string_view& command) {
+    timePoint.init();
+    sentMessage = botApi->sendReplyMessage(
+        requestedMessage, GETSTR(WORKING) + command.data());
 }
 
-void CompilerInTgHelper::onResultReady(TgBotApi *botApi,
-                                       const Message::Ptr &message,
-                                       const std::string &text) {
-    std::string text_ = text;
-    boost::trim(text_);
-    botApi->sendReplyMessage(message, text_);
+void CompilerInTgBotInterface::onExecutionFinished(
+    const std::string_view& command) {
+    const auto timePassed = timePoint.get();
+    std::stringstream ss;
+    ss << GETSTR(WORKING) + command.data() << std::endl;
+    ss << "Done. Execution took " << timePassed.count() << " milliseconds";
+    botApi->editMessage(sentMessage, ss.str());
 }
 
-void CompilerInTgHelper::onCompilerPathCommand(TgBotApi *botApi,
-                                               const Message::Ptr &message,
-                                               const std::string &text) {
-    LOG(INFO) << text;
-    botApi->sendReplyMessage(message, text);
+void CompilerInTgBotInterface::onErrorStatus(absl::Status status) {
+    std::stringstream ss;
+    ss << "Error executing: " << status;
+    if (sentMessage) {
+        botApi->editMessage(sentMessage, ss.str());
+    } else {
+        botApi->sendReplyMessage(requestedMessage, ss.str());
+    }
+}
+
+void CompilerInTgBotInterface::onResultReady(const std::string& text) {
+    botApi->sendMessage(requestedMessage, text);
+}
+
+void CompilerInTgBotInterface::onWdtTimeout() {
+    botApi->editMessage(sentMessage, "WDT TIMEOUT");
+    std::this_thread::sleep_for(1s);
 }

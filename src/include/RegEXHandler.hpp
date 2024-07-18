@@ -1,19 +1,17 @@
 #pragma once
 
 #include <TgBotPPImplExports.h>
-#include <tgbot/Bot.h>
-#include <tgbot/types/Message.h>
-
+#include <absl/status/status.h>
+#include <memory>
 #include <optional>
 #include <regex>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "CStringLifetime.h"
-#include "InstanceClassBase.hpp"
 #include "TgBotWrapper.hpp"
 #include "initcalls/Initcall.hpp"
-
 
 using std::regex_constants::syntax_option_type;
 using TgBot::Bot;
@@ -42,51 +40,56 @@ class OptionalWrapper {
 };
 
 struct TgBotPPImpl_API RegexHandlerBase {
-    RegexHandlerBase() = default;
+    struct Interface {
+        virtual ~Interface() = default;
+        // Called when regex processing is complete. Error or success
+        virtual void onError(const absl::Status& status) = 0;
+        virtual void onSuccess(const std::string& result) = 0;
+    };
+
+    explicit RegexHandlerBase(std::shared_ptr<Interface> interface) : _interface(std::move(interface)) {}
     virtual ~RegexHandlerBase() = default;
 
-    virtual void onRegexCreationFailed(const Message::Ptr& which,
-                                       const std::string& what,
-                                       const std::regex_error& why) {
-        onRegexOperationFailed(which, why);
-    }
-    virtual void onRegexOperationFailed(const Message::Ptr& which,
-                                        const std::regex_error& why) {}
-    virtual void onRegexProcessed(const Message::Ptr& from,
-                                  const std::string& processedData) {}
+    // Available functions
+    enum class Command {
+        RegexReplace,
+        RegexDelete,
+    };
 
-    void processRegEXCommand(const Message::Ptr& regexCommand,
-                             const std::string& text);
+    // Context for making this class reusable against changed params
+    struct Context {
+        std::string regexCommand;  // e.g. s/s\d+/ssss/g
+        std::string text;
+    };
 
-    friend struct RegexHandlerTest;
+    // Process regex pattern in the given context.
+    // If regex processing fails, it calls onComplete with appropriate status.
+    // If regex processing succeeds, it calls onComplete with a success status.
+    void process();
+
+    void setContext(Context&& context) { _context = std::move(context); }
 
    private:
-    std::vector<std::string> matchRegexAndSplit(const std::string& text,
-                                                const std::regex& regex);
-    std::optional<std::regex> constructRegex(const std::string& regexstr,
-                                             const Message::Ptr& message,
+    std::optional<Context> _context;
+
+    // Tries to match a regex syntax, (if it is sed delete command or replace
+    // command), and returns a vector of substrings sperated by '/'
+    std::vector<std::string> tryParseCommand(const std::regex& regexMatcher);
+
+    // Tries to construct regex given pattern and flags
+    std::optional<std::regex> constructRegex(const std::string& pattern,
                                              const syntax_option_type flags);
 
-    OptionalWrapper<std::string> doRegexReplaceCommand(
-        const Message::Ptr& regexCommand, const std::string& text);
-    OptionalWrapper<std::string> doRegexDeleteCommand(
-        const Message::Ptr& regexCommand, const std::string& text);
+   protected:
+    // TODO: For testing purposes
+    std::shared_ptr<Interface> _interface;
+    OptionalWrapper<std::string> doRegexReplaceCommand();
+    OptionalWrapper<std::string> doRegexDeleteCommand();
 };
 
-struct TgBotPPImpl_API RegexHandler : public RegexHandlerBase,
-                                      InitCall,
-                                      InstanceClassBase<RegexHandler> {
-    RegexHandler() = delete;
-    ~RegexHandler() override = default;
-
-    void onRegexCreationFailed(const Message::Ptr& which,
-                               const std::string& what,
-                               const std::regex_error& why) override;
-    void onRegexOperationFailed(const Message::Ptr& which,
-                                const std::regex_error& why) override;
-    void onRegexProcessed(const Message::Ptr& from,
-                          const std::string& processedData) override;
-    void processRegEXCommandMessage(const Message::Ptr& message);
+struct TgBotPPImpl_API RegexHandler : public InitCall {
+    RegexHandler() = default;
+    ~RegexHandler() = default;
 
     void doInitCall() override;
     const CStringLifetime getInitCallName() const override {

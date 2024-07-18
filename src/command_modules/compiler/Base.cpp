@@ -5,40 +5,27 @@
 #include <DurationPoint.hpp>
 #include <StringResManager.hpp>
 #include <boost/algorithm/string/replace.hpp>
-#include <boost/algorithm/string/trim.hpp>
 #include <chrono>
 #include <cstdio>
-#include <filesystem>
-#include <initializer_list>
 #include <libos/libfs.hpp>
-#include <mutex>
+#include <memory>
 #include <ostream>
 #include <thread>
+#include <utility>
 
 #include "CompilerInTelegram.hpp"
 #include "StringToolsExt.hpp"
+#include "absl/status/status.h"
 #include "popen_wdt.h"
 
 using std::chrono_literals::operator""ms;
-using std::chrono::duration_cast;
 using std::chrono::high_resolution_clock;
 using std::chrono::milliseconds;
 
-void CompilerInTg::appendExtArgs(std::stringstream &cmd,
-                                 std::string extraargs_in,
-                                 std::stringstream &result_out) {
-    if (!extraargs_in.empty()) {
-        boost::trim(extraargs_in);
-        cmd << SPACE << extraargs_in;
-        std::stringstream result;
-        result_out << "cmd: ";
-        result_out << std::quoted(cmd.str());
-        result_out << std::endl;
-    }
-}
+CompilerInTg::CompilerInTg(std::shared_ptr<Interface> interface) : _interface(std::move(interface)) {}
 
-void CompilerInTg::runCommand(const Message::Ptr &message, std::string cmd,
-                              std::stringstream &res, bool use_wdt) {
+void CompilerInTg::runCommand(std::string cmd, std::stringstream &res,
+                              bool use_wdt) {
     bool hasmore = false;
     int count = 0;
     std::array<char, BASH_READ_BUF> buf = {};
@@ -48,104 +35,48 @@ void CompilerInTg::runCommand(const Message::Ptr &message, std::string cmd,
     boost::replace_all(cmd, std::string(1, '"'), "\\\"");
 
     LOG(INFO) << __func__ << ": +++";
-    onFailed(message, ErrorType::START_COMPILER);
+    _interface->onExecutionStarted(cmd);
     LOG(INFO) << GETSTR_IS(COMMAND) << SingleQuoted(cmd);
 
-    auto dp = DurationPoint();
+    if (!popen_watchdog_init(&p_wdt_data)) {
+        LOG(ERROR) << "popen_watchdog_init failed";
+        _interface->onErrorStatus(
+            absl::InternalError("popen_watchdog_init failed"));
+        return;
+    }
+    p_wdt_data->command = cmd.c_str();
+    p_wdt_data->watchdog_enabled = use_wdt;
 
-    if (popen_watchdog_init(&p_wdt_data)) {
-        p_wdt_data->command = cmd.c_str();
-        p_wdt_data->watchdog_enabled = use_wdt;
-
-        if (!popen_watchdog_start(&p_wdt_data)) {
-            onFailed(message, ErrorType::POPEN_WDT_FAILED);
-            return;
-        }
-        while (popen_watchdog_read(&p_wdt_data, buf.data(), buf.size() - 1)) {
-            if (buf_len < BASH_MAX_BUF) {
-                res << buf.data();
-                buf_len += strlen(buf.data());
-            } else {
-                hasmore = true;
-            }
-            buf.fill(0);
-            count++;
-            std::this_thread::sleep_for(50ms);
-        }
-        if (count == 0) {
-            res << EMPTY << std::endl;
-        }
-        res << std::endl;
-        if (hasmore) {
-            res << "-> " << GETSTR(TRUNCATED) << std::endl;
-        }
-
-        if (popen_watchdog_activated(&p_wdt_data)) {
-            res << WDT_BITE_STR;
-        } else {
-            double millis =
-                std::chrono::duration_cast<std::chrono::duration<double>>(
-                    dp.get())
-                    .count();
-            res << "-> It took " << std::fixed << std::setprecision(3) << millis
-                << " seconds" << std::endl;
-            if (use_wdt) {
-                popen_watchdog_stop(&p_wdt_data);
-            }
-        }
+    if (!popen_watchdog_start(&p_wdt_data)) {
+        LOG(ERROR) << "popen_watchdog_start failed";
         popen_watchdog_destroy(&p_wdt_data);
-        LOG(INFO) << __func__ << ": ---";
+        _interface->onErrorStatus(
+            absl::InternalError("popen_watchdog_start failed"));
+        return;
     }
-}
-
-static std::optional<std::string> findCommandExe(const std::string &command) {
-    static std::vector<std::string> paths;
-    static std::once_flag once;
-
-    std::call_once(once, [] {
-        auto it = ConfigManager::getVariable(ConfigManager::Configs::PATH);
-        if (it.has_value()) {
-            paths = StringTools::split(it.value(), FS::path_env_delimiter);
+    while (popen_watchdog_read(&p_wdt_data, buf.data(), buf.size() - 1)) {
+        if (buf_len < BASH_MAX_BUF) {
+            res << buf.data();
+            buf_len += strlen(buf.data());
         } else {
-            throw std::runtime_error(GETSTR(ERROR_PATH_CANNOT_BE_EMPTY));
+            hasmore = true;
         }
-    });
-    std::filesystem::path exePath(command);
-    FS::appendExeExtension(exePath);
-    for (const auto &path : paths) {
-        if (!isEmptyOrBlank(path)) {
-            std::filesystem::path p(path);
-            p /= exePath;
-            if (FS::canExecute(p)) {
-                return {p.string()};
-            }
+        buf.fill(0);
+        count++;
+        std::this_thread::sleep_for(50ms);
+    }
+    if (count == 0) {
+        res << "[EMPTY]";
+    }
+    res << std::endl;
+    if (popen_watchdog_activated(&p_wdt_data)) {
+        _interface->onWdtTimeout();
+    } else {
+        if (use_wdt) {
+            popen_watchdog_stop(&p_wdt_data);
         }
     }
-    return {};
-}
-
-array_helpers::ArrayElem<ProLangs, std::vector<std::string>> COMPILER(
-    ProLangs &&lang, std::initializer_list<std::string> &&v) {
-    return array_helpers::make_elem<ProLangs, std::vector<std::string>>(
-        std::move(lang), std::move(v));
-}
-
-bool findCompiler(ProLangs lang, std::filesystem::path &path) {
-    static const auto compilers =
-        array_helpers::make<static_cast<int>(ProLangs::MAX), ProLangs,
-                            const std::vector<std::string>>(
-            COMPILER(ProLangs::C, {"clang-19", "clang-18", "clang-17", "clang",
-                                   "gcc", "cc"}),
-            COMPILER(ProLangs::CXX, {"clang++-19", "clang++-18", "clang++-17",
-                                     "clang++", "g++", "c++"}),
-            COMPILER(ProLangs::GO, {"go"}),
-            COMPILER(ProLangs::PYTHON, {"python", "python3"}));
-    for (const auto &options : array_helpers::find(compilers, lang)->second) {
-        auto ret = findCommandExe(options);
-        if (ret) {
-            path = ret.value();
-            return true;
-        }
-    }
-    return false;
+    popen_watchdog_destroy(&p_wdt_data);
+    _interface->onExecutionFinished(cmd);
+    LOG(INFO) << __func__ << ": ---";
 }

@@ -5,7 +5,7 @@
 #include "StringToolsExt.hpp"
 
 DECLARE_COMMAND_HANDLER(cmd, botWrapper, message) {
-    MessageWrapper wrapper(message);
+    MessageWrapper wrapper(botWrapper, message);
     if (wrapper.hasExtraText()) {
         std::vector<std::string> args;
 

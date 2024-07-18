@@ -2,15 +2,25 @@
 
 #include "TgBotWrapper.hpp"
 #include "compiler/CompilerInTelegram.hpp"
+#include "compiler/Helper.hpp"
 
-static DECLARE_COMMAND_HANDLER(bash, wrapper, message) {
-    static CompilerInTgForBashImpl bash(wrapper, false);
+namespace {
+
+DECLARE_COMMAND_HANDLER(bash, wrapper, message) {
+    const auto helper =
+        std::make_shared<CompilerInTgBotInterface>(wrapper, message);
+    CompilerInTgForBash bash(helper);
     bash.run(message);
 }
-static DECLARE_COMMAND_HANDLER(ubash, wrapper, message) {
-    static CompilerInTgForBashImpl ubash(wrapper, true);
+DECLARE_COMMAND_HANDLER(ubash, wrapper, message) {
+    const auto helper =
+        std::make_shared<CompilerInTgBotInterface>(wrapper, message);
+    CompilerInTgForBash ubash(helper);
+    ubash.allowHang(true);
     ubash.run(message);
 }
+
+}  // namespace
 
 DYN_COMMAND_FN(name, module) {
     if (name == nullptr) {

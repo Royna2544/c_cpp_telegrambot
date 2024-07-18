@@ -8,7 +8,7 @@
 
 DECLARE_COMMAND_HANDLER(possibility, botWrapper, message){
     constexpr int PERCENT_MAX = 100;
-    MessageWrapper messageWrapper(message);
+    MessageWrapper messageWrapper(botWrapper, message);
     std::string text;
     std::string lastItem;
     std::stringstream outStream;

@@ -225,7 +225,7 @@ void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle,
                                             PerChatHandle::const_reference t,
                                             const size_t threshold,
                                             const char *name, const bool mute) {
-    const auto wrapper = TgBotWrapper::getInstance();
+    const auto wrapper = _api;
     // Initial set - all false set
     static auto perms = std::make_shared<ChatPermissions>();
     if (isEntryOverThreshold(t, threshold)) {
@@ -261,14 +261,13 @@ void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle,
 }
 
 void SpamBlockManager::doInitCall() {
-    TgBotWrapper::getInstance()->registerCallback(
-        [](const auto *, const Message::Ptr &message) {
-            static auto spamMgr =
-                ThreadManager::getInstance()
-                    ->createController<ThreadManager::Usage::SPAMBLOCK_THREAD,
-                                       SpamBlockManager>();
-            spamMgr->addMessage(message);
-        });
+    _api->registerCallback([this](const auto, const Message::Ptr &message) {
+        static auto spamMgr =
+            ThreadManager::getInstance()
+                ->createController<ThreadManager::Usage::SPAMBLOCK_THREAD,
+                                   SpamBlockManager>(_api);
+        spamMgr->addMessage(message);
+    });
 }
 
 DECLARE_CLASS_INST(SpamBlockManager);

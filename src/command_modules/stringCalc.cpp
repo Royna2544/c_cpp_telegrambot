@@ -6,8 +6,8 @@ extern "C" {
     void calculate_string_free(const char *expr);
 }
 
-DECLARE_COMMAND_HANDLER(calc,, message) {
-    MessageWrapper wrapper(message);
+DECLARE_COMMAND_HANDLER(calc, bot, message) {
+    MessageWrapper wrapper(bot, message);
     if (wrapper.hasExtraText()) {
         CStringLifetime expr = wrapper.getExtraText();
         const char *result = calculate_string(expr);

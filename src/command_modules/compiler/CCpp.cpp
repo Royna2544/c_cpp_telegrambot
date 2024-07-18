@@ -3,37 +3,28 @@
 
 #include "CompilerInTelegram.hpp"
 
-void CompilerInTgForCCppImpl::onResultReady(const Message::Ptr& who,
-                                            const std::string& text) {
-    CompilerInTgHelper::onResultReady(botApi, who, text);
-}
-void CompilerInTgForCCppImpl::onFailed(const Message::Ptr& who,
-                                       const ErrorType e) {
-    CompilerInTgHelper::onFailed(botApi, who, e);
-}
-
 void CompilerInTgForCCpp::run(const Message::Ptr& message) {
     std::string extraargs;
     std::stringstream cmd, resultbuf;
 #ifdef WINDOWS_BUILD
-    const char aoutname[] = "./a.exe";
+    constexpr std::string_view aoutname = "./a.exe";
 #else
-    const char aoutname[] = "./a.out";
+    constexpr std::string_view aoutname = "./a.out";
 #endif
 
     if (verifyParseWrite(message, extraargs)) {
-        cmd << cmdPrefix.string() << SPACE << extraargs << SPACE << outfile;
+        cmd << params.exe.string() << SPACE << extraargs << SPACE << params.outfile.string();
 
         resultbuf << GETSTR_IS(COMPILE_TIME) << std::endl;
-        runCommand(message, cmd.str(), resultbuf);
+        runCommand(cmd.str(), resultbuf);
         resultbuf << std::endl;
 
         if (FS::exists(aoutname)) {
             resultbuf << GETSTR_IS(RUN_TIME) << std::endl;
-            runCommand(message, aoutname, resultbuf);
+            runCommand(aoutname.data(), resultbuf);
             std::filesystem::remove(aoutname);
         }
-        onResultReady(message, resultbuf.str());
-        std::filesystem::remove(outfile);
+        std::filesystem::remove(params.outfile);
+        _interface->onResultReady(resultbuf.str());
     }
 }

@@ -30,7 +30,7 @@ DECLARE_COMMAND_HANDLER(starttimer, bot, message) {
     auto ctrl = tm->createController<ThreadManager::Usage::TIMER_THREAD,
 
                                      TimerImplThread>(message->chat->id);
-    MessageWrapper wrapper(message);
+    MessageWrapper wrapper(bot, message);
     bool ok = false;
     std::string result;
     if (wrapper.hasExtraText()) {

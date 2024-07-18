@@ -1,7 +1,8 @@
 #include <ForkAndRun.hpp>
-#include <chrono>
-#include <string_view>
 #include <TgBotWrapper.hpp>
+#include <chrono>
+#include <memory>
+#include <string_view>
 
 #include "PerBuildData.hpp"
 #include "PythonClass.hpp"
@@ -9,7 +10,7 @@
 struct ROMBuildTask : ForkAndRun {
     static constexpr std::string_view kShmemROMBuild = "shmem_rombuild";
     static constexpr std::string_view kErrorLogFile = "out/error.log";
-    
+
     /**
      * @brief Runs the function that performs the repository synchronization.
      *
@@ -53,14 +54,14 @@ struct ROMBuildTask : ForkAndRun {
      * @param data The data object containing the necessary configuration and
      * paths.
      */
-    explicit ROMBuildTask(const TgBotApi *wrapper, TgBot::Message::Ptr message,
+    explicit ROMBuildTask(ApiPtr wrapper, TgBot::Message::Ptr message,
                           PerBuildData data);
     ~ROMBuildTask() override;
 
    private:
     PerBuildData data;
     TgBot::Message::Ptr message;
-    const TgBotApi *botWrapper;
+    std::shared_ptr<TgBotApi> botWrapper;
     PythonClass::Ptr _py;
     PythonClass::FunctionHandle::Ptr _get_total_mem;
     PythonClass::FunctionHandle::Ptr _get_used_mem;

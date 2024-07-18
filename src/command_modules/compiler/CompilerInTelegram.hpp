@@ -1,9 +1,11 @@
 #pragma once
 
+#include <absl/status/status.h>
 #include <tgbot/Bot.h>
 #include <tgbot/types/Message.h>
 
 #include <filesystem>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -14,85 +16,65 @@ using TgBot::Bot;
 using TgBot::Message;
 
 struct CompilerInTg {
-    enum class ErrorType {
-        // TODO
-        START_COMPILER,
-        MESSAGE_VERIFICATION_FAILED,
-        FILE_WRITE_FAILED,
-        POPEN_WDT_FAILED,
+    // Interface for handling events from this class
+    struct Interface {
+        virtual ~Interface() = default;
+        virtual void onExecutionStarted(const std::string_view& command) = 0;
+        virtual void onExecutionFinished(const std::string_view& command) = 0;
+        virtual void onErrorStatus(absl::Status status) = 0;
+        virtual void onResultReady(const std::string& text) = 0;
+        virtual void onWdtTimeout() = 0;
     };
-
-    /**
-     * @brief This function is called when the compile framework fails to handle
-     * a request.
-     *
-     * @param who The message who sent the request.
-     * @param e The reason for the failure.
-     */
-    virtual void onFailed(const Message::Ptr& who, const ErrorType e) = 0;
-
-    /**
-     * @brief This function is called when the compile framework finishes
-     * compiling the code.
-     *
-     * @param who The message which sent the request.
-     * @param text The output of the compilation.
-     */
-    virtual void onResultReady(const Message::Ptr& who,
-                               const std::string& text) = 0;
 
     /**
      * @brief This functions proivides a common interface for the command
      * implementations.
-     *
-     * @param message The message who sent the request.
      */
-    virtual void run(const Message::Ptr& message) = 0;
+    virtual void run(MessagePtr message) = 0;
 
-    CompilerInTg() = default;
+    explicit CompilerInTg(std::shared_ptr<Interface> interface);
     virtual ~CompilerInTg() = default;
-
-    /**
-     * @brief This function is used to append extra arguments to the command.
-     *
-     * @param cmd The command to which the extra arguments are to be appended.
-     * @param extraargs The extra arguments to be appended to the command.
-     * @param res The result of the command buffer after appending the extra
-     * arguments.
-     */
-    void appendExtArgs(std::stringstream& cmd, std::string extraargs,
-                       std::stringstream& res);
 
     /**
      * @brief This function is used to execute a command and return the output.
      *
-     * @param message The message that triggered the command.
      * @param cmd The command to be executed.
      * @param res The output of the command.
      * @param use_wdt Whether to use the watchdog to time out the command.
      * If set to false, the function will not time out the command.
      */
-    void runCommand(const Message::Ptr& message, std::string cmd,
-                    std::stringstream& res, bool use_wdt = true);
+    void runCommand(std::string cmd, std::stringstream& res,
+                    bool use_wdt = true);
 
     constexpr static const char SPACE = ' ';
     constexpr static const char EMPTY[] = "(empty)";
+
+   protected:
+    std::shared_ptr<Interface> _interface;
 };
 
 struct CompilerInTgForBash : CompilerInTg {
-    explicit CompilerInTgForBash(const bool _allowhang)
-        : allowhang(_allowhang) {}
-    bool allowhang;
+    using CompilerInTg::CompilerInTg;
+    void allowHang(bool _allowhang) { allowhang = _allowhang; }
     ~CompilerInTgForBash() override = default;
     void run(const Message::Ptr& message) override;
+
+   private:
+    bool allowhang;
 };
 
 struct CompilerInTgForGeneric : CompilerInTg {
-    explicit CompilerInTgForGeneric(std::filesystem::path _cmdPrefix,
-                                    std::string _outfile)
-        : cmdPrefix(std::move(_cmdPrefix)), outfile(std::move(_outfile)) {}
-    std::filesystem::path cmdPrefix;
-    std::string outfile;
+    struct Params {
+        // e.g. /usr/bin/clang (Before the filename)
+        std::filesystem::path exe;
+        // e.g. /tmp/output.c (Where to write the code to compile/interpret)
+        std::filesystem::path outfile;
+    };
+    explicit CompilerInTgForGeneric(std::shared_ptr<Interface> interface,
+                                    Params params)
+        : CompilerInTg(std::move(interface)), params(std::move(params)) {}
+
+    Params params;
     bool verifyParseWrite(const Message::Ptr& message, std::string& extraargs);
     ~CompilerInTgForGeneric() override = default;
     void run(const Message::Ptr& message) override;
@@ -100,74 +82,11 @@ struct CompilerInTgForGeneric : CompilerInTg {
 
 struct CompilerInTgForCCpp : CompilerInTgForGeneric {
     using CompilerInTgForGeneric::CompilerInTgForGeneric;
+    using CompilerInTgForGeneric::Params;
     ~CompilerInTgForCCpp() override = default;
     void run(const Message::Ptr& message) override;
-};
-
-struct CompilerInTgForBashImpl : CompilerInTgForBash {
-    explicit CompilerInTgForBashImpl(TgBotApi* botApi, const bool allowhang)
-        : CompilerInTgForBash(allowhang), botApi(botApi) {}
-    ~CompilerInTgForBashImpl() override = default;
-
-    void onResultReady(const Message::Ptr& who,
-                       const std::string& text) override;
-    void onFailed(const Message::Ptr& who, const ErrorType e) override;
-    TgBotApi* botApi;
-};
-
-struct CompilerInTgForGenericImpl : CompilerInTgForGeneric {
-    CompilerInTgForGenericImpl(TgBotApi* botApi,
-                               const std::filesystem::path& cmdPrefix,
-                               const std::string& outfile)
-        : CompilerInTgForGeneric(cmdPrefix, outfile), botApi(botApi) {}
-    ~CompilerInTgForGenericImpl() override = default;
-
-    void onResultReady(const Message::Ptr& who,
-                       const std::string& text) override;
-    void onFailed(const Message::Ptr& who, const ErrorType e) override;
-    TgBotApi* botApi;
-};
-
-struct CompilerInTgForCCppImpl : CompilerInTgForCCpp {
-    CompilerInTgForCCppImpl(TgBotApi* botApi,
-                            const std::filesystem::path& cmdPrefix,
-                            const std::string& outfile)
-        : CompilerInTgForCCpp(cmdPrefix, outfile), botApi(botApi) {}
-    ~CompilerInTgForCCppImpl() override = default;
-
-    void onResultReady(const Message::Ptr& who,
-                       const std::string& text) override;
-    void onFailed(const Message::Ptr& who, const ErrorType e) override;
-    TgBotApi* botApi;
-};
-
-struct CompilerInTgHelper {
-    static void onFailed(TgBotApi* botApi, const Message::Ptr& message,
-                         const CompilerInTg::ErrorType e);
-    static void onResultReady(TgBotApi* botApi, const Message::Ptr& message,
-                              const std::string& text);
-    static void onCompilerPathCommand(TgBotApi* botApi,
-                                      const Message::Ptr& message,
-                                      const std::string& text);
 };
 
 // Read buffer size, max allowed buffer size
 constexpr const static inline auto BASH_READ_BUF = (1 << 8);
 constexpr const static inline auto BASH_MAX_BUF = (1 << 10) * 3;
-
-enum class ProLangs {
-    C,
-    CXX,
-    GO,
-    PYTHON,
-    MAX,
-};
-
-/**
- * findCompiler - find compiler's absolute path
- *
- * @param lang ProgrammingLangs enum value to query
- * @param path Search result is stored, if found, else untouched
- * @return Whether it have found the compiler path
- */
-bool findCompiler(ProLangs lang, std::filesystem::path& path);

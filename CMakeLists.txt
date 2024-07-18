@@ -121,6 +121,7 @@ set(SRC_LIST
   src/Authorization.cpp
   src/ManagedThread.cpp
   src/RegEXHandler.cpp
+  src/RegEXHandlerImpl.cpp
   src/SpamBlocker.cpp
   src/ThreadManager.cpp
   src/TgBotWrapper.cpp

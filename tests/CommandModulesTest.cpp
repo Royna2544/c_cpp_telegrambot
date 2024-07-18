@@ -2,19 +2,22 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <StringResManager.hpp>
 #include <TgBotWrapper.hpp>
+#include <filesystem>
 #include <libos/libfs.hpp>
 #include <memory>
 #include <optional>
 
 #include "Types.h"
 #include "database/bot/TgBotDatabaseImpl.hpp"
+#include "gmock/gmock.h"
 
 using testing::_;
 using testing::IsNull;
 using testing::Return;
+using testing::StartsWith;
 using testing::Truly;
-using testing::TypedEq;
 
 class MockDatabase : public DatabaseBase {
    public:
@@ -137,7 +140,7 @@ class CommandModulesTest : public ::testing::Test {
         CommandModule module;
 
         // Shorthand
-        void execute(TgBotApi* api, MessagePtr msg) const {
+        void execute(ApiPtr api, MessagePtr msg) const {
             module.fn(api, msg);
         }
     };
@@ -187,6 +190,28 @@ class CommandModulesTest : public ::testing::Test {
         dlclose(module.handle);
     }
 
+    static Message::Ptr createDefaultMessage() {
+        auto message = std::make_shared<Message>();
+        message->chat = std::make_shared<Chat>();
+        message->chat->id = TEST_CHAT_ID;
+        message->from = std::make_shared<User>();
+        message->from->id = TEST_USER_ID;
+        message->from->username = TEST_USERNAME;
+        message->from->firstName = TEST_NICKNAME;
+        message->messageId = TEST_MESSAGE_ID;
+        return message;
+    }
+    static bool isSameAsExpected(ReplyParameters::Ptr rhs) {
+        const bool cond =
+            rhs->chatId == TEST_CHAT_ID && rhs->messageId == TEST_MESSAGE_ID;
+        if (!cond) {
+            LOG(INFO) << "ChatID: " << rhs->chatId << " != " << TEST_CHAT_ID;
+            LOG(INFO) << "MessageID: " << rhs->messageId
+                      << " != " << TEST_MESSAGE_ID;
+        }
+        return cond;
+    };
+
     // Testing data
     static constexpr ChatId TEST_CHAT_ID = 123123;
     static constexpr UserId TEST_USER_ID = 456456;
@@ -200,7 +225,7 @@ class CommandModulesTest : public ::testing::Test {
     const DatabaseBase::MediaInfo TEST_MEDIAINFO{TEST_MEDIA_ID,
                                                  TEST_MEDIA_UNIQUEID};
 
-    MockTgBotApi botApi;
+    std::shared_ptr<MockTgBotApi> botApi = std::make_shared<MockTgBotApi>();
     MockDatabase database;
     std::filesystem::path modulePath;
 };
@@ -217,46 +242,88 @@ TEST_F(CommandModulesTest, TestCommandAlive) {
     auto module = loadModule("alive");
     ASSERT_TRUE(module.has_value());
 
-    auto message = std::make_shared<Message>();
-    message->chat = std::make_shared<Chat>();
-    message->chat->id = TEST_CHAT_ID;
+    auto message = createDefaultMessage();
     message->text = "/alive";
-    message->messageId = TEST_MESSAGE_ID;
     auto botUser = std::make_shared<User>();
-    const auto isSameAsExpected = [](ReplyParameters::Ptr rhs) {
-        const bool cond =
-            rhs->chatId == TEST_CHAT_ID && rhs->messageId == TEST_MESSAGE_ID;
-        if (!cond) {
-            LOG(INFO) << "ChatID: " << rhs->chatId << " != " << TEST_CHAT_ID;
-            LOG(INFO) << "MessageID: " << rhs->messageId
-                      << " != " << TEST_MESSAGE_ID;
-        }
-        return cond;
-    };
 
     // Would call two times for username, nickname
-    EXPECT_CALL(botApi, getBotUser_impl())
+    EXPECT_CALL(*botApi, getBotUser_impl())
         .Times(2)
         .WillRepeatedly(Return(botUser));
 
     // First, if alive medianame existed
     EXPECT_CALL(database, queryMediaInfo(ALIVE_FILE_ID))
         .WillOnce(Return(TEST_MEDIAINFO));
+
     // Expected to pass the fileid and parsemode as HTML
-    EXPECT_CALL(botApi,
+    EXPECT_CALL(*botApi,
                 sendAnimation_impl(TEST_CHAT_ID, {TEST_MEDIA_ID}, _,
                                    Truly(isSameAsExpected), IsNull(), "HTML"))
         .WillOnce(Return(nullptr));
-    module->execute(&botApi, message);
+    module->execute(botApi, message);
 
     // Second, if alive medianame not existed
     EXPECT_CALL(database, queryMediaInfo(ALIVE_FILE_ID))
         .WillOnce(Return(std::nullopt));
-    EXPECT_CALL(botApi,
+    EXPECT_CALL(*botApi,
                 sendMessage_impl(TEST_CHAT_ID, _, Truly(isSameAsExpected),
                                  IsNull(), "HTML"))
         .WillOnce(Return(nullptr));
-    module->execute(&botApi, message);
+    module->execute(botApi, message);
+
+    // Done, unload the module
+    unloadModule(std::move(module.value()));
+}
+
+// ChatId chatId, const std::string& text,
+// ReplyParameters::Ptr replyParameters,
+// GenericReply::Ptr replyMarkup, const std::string& parseMode
+TEST_F(CommandModulesTest, TestCommandBash) {
+    auto module = loadModule("bash");
+    ASSERT_TRUE(module.has_value());
+
+    auto message = createDefaultMessage();
+    message->text = "/bash pwd";
+
+    // First, "Working on it..."
+    EXPECT_CALL(*botApi, sendMessage_impl(TEST_CHAT_ID, GETSTR(WORKING), _,
+                                         IsNull(), ""));
+
+    // Second, Command result of pwd command
+    EXPECT_CALL(
+        *botApi,
+        sendMessage_impl(TEST_CHAT_ID,
+                         StartsWith(std::filesystem::current_path().string()),
+                         _, IsNull(), ""));
+
+    module->execute(botApi, message);
+
+    // Done, unload the module
+    unloadModule(std::move(module.value()));
+}
+
+// ChatId chatId, const std::string& text,
+// ReplyParameters::Ptr replyParameters,
+// GenericReply::Ptr replyMarkup, const std::string& parseMode
+TEST_F(CommandModulesTest, TestCommandCmd) {
+    auto module = loadModule("cmd");
+    ASSERT_TRUE(module.has_value());
+
+    auto message = createDefaultMessage();
+    message->text = "/cmd pwd";
+
+    // First, "Working on it..."
+    EXPECT_CALL(*botApi, sendMessage_impl(TEST_CHAT_ID, GETSTR(WORKING), _,
+                                         IsNull(), ""));
+
+    // Second, Command result of pwd command
+    EXPECT_CALL(
+        *botApi,
+        sendMessage_impl(TEST_CHAT_ID,
+                         StartsWith(std::filesystem::current_path().string()),
+                         _, IsNull(), ""));
+
+    module->execute(botApi, message);
 
     // Done, unload the module
     unloadModule(std::move(module.value()));

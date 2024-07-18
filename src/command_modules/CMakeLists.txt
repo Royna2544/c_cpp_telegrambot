@@ -1,7 +1,7 @@
 function(command_module)
     cmake_parse_arguments(TGBOT_CMDMODULE
         "RUST" # Options
-        "NAME;PLATFORM" # One-value keywords
+        "NAME;PLATFORM;PACKAGE" # One-value keywords
         "SRCS;LIBS" # Multiple-value keywords
         ${ARGN}
     )
@@ -26,6 +26,12 @@ function(command_module)
             endif()
         else()
             message(WARNING "Unknown platform: ${TGBOT_CMDMODULE_PLATFORM}")
+        endif()
+    endif()
+    if (TGBOT_CMDMODULE_PACKAGE)
+        find_package (${TGBOT_CMDMODULE_PACKAGE})
+        if (NOT ${TGBOT_CMDMODULE_PACKAGE}_FOUND)
+            message(WARNING "Package not found, disable command ${TGBOT_CMDMODULE_NAME}")
         endif()
     endif()
     set(TGBOT_CMDMODULE_LIBNAME cmd_${TGBOT_CMDMODULE_NAME})
@@ -55,13 +61,7 @@ function(multi_command_module)
 endfunction()
 
 add_subdirectory(support)
-add_library(TgBotCompiler SHARED 
-    compiler/Base.cpp
-    compiler/Bash.cpp
-    compiler/CCpp.cpp
-    compiler/Generic.cpp
-    compiler/Helper.cpp)
-target_link_libraries(TgBotCompiler TgBotUtils TgBotStringRes TgBotPPImpl TgBot_popen_wdt)
+add_subdirectory(compiler)
 
 multi_command_module(
     PROVIDES alive start
@@ -76,9 +76,16 @@ multi_command_module(
 )
 
 multi_command_module(
-    PROVIDES c cpp go py
+    PROVIDES c cpp
     SRCS compilers_impl.cpp
     LIBS TgBotCompiler
+)
+
+command_module(
+    NAME py
+    SRCS compilers_impl.cpp
+    LIBS TgBotCompiler
+    PACKAGE Python3
 )
 
 command_module(

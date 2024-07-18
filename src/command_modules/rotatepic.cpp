@@ -39,7 +39,7 @@ constexpr std::string_view kDownloadFile = "inpic.bin";
 constexpr std::string_view kOutputFile = "outpic.png";
 
 DECLARE_COMMAND_HANDLER(rotatepic, tgWrapper, message) {
-    MessageWrapper wrapper(message);
+    MessageWrapper wrapper(tgWrapper, message);
     std::string extText = wrapper.getExtraText();
     std::vector<std::string> args;
     int rotation = 0;

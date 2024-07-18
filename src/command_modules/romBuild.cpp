@@ -14,7 +14,7 @@
 
 namespace {
 
-void sendSystemInfo(const TgBotApi* wrapper, MessagePtr message) {
+void sendSystemInfo(ApiPtr wrapper, MessagePtr message) {
     auto py = PythonClass::get();
     auto mod = py->importModule("system_info");
     if (!mod) {
@@ -73,8 +73,7 @@ bool parseConfigAndGetTarget(PerBuildData* data, MessageWrapper& wrapper,
     return true;
 }
 
-bool repoSync(PerBuildData data, const TgBotApi* wrapper,
-              const Message::Ptr& message) {
+bool repoSync(PerBuildData data, ApiPtr wrapper, MessagePtr message) {
     PerBuildData::ResultData result{};
     data.result = &result;
     RepoSyncTask repoSync(data);
@@ -106,8 +105,7 @@ bool repoSync(PerBuildData data, const TgBotApi* wrapper,
 
 namespace fs = std::filesystem;
 
-bool build(PerBuildData data, const TgBotApi* wrapper,
-           const Message::Ptr& message) {
+bool build(PerBuildData data, ApiPtr wrapper, MessagePtr message) {
     std::error_code ec;
     PerBuildData::ResultData result{};
 
@@ -149,8 +147,7 @@ bool build(PerBuildData data, const TgBotApi* wrapper,
     return false;
 }
 
-void upload(PerBuildData data, const TgBotApi* wrapper,
-            const Message::Ptr& message) {
+void upload(PerBuildData data, ApiPtr wrapper, MessagePtr message) {
     PerBuildData::ResultData uploadResult;
     auto uploadmsg = wrapper->sendMessage(message, "Will upload");
 
@@ -171,7 +168,7 @@ void upload(PerBuildData data, const TgBotApi* wrapper,
 
 DECLARE_COMMAND_HANDLER(rombuild, tgWrapper, message) {
     PerBuildData PBData;
-    MessageWrapper wrapper(message);
+    MessageWrapper wrapper(tgWrapper, message);
     std::error_code ec;
     constexpr static std::string_view kBuildDirectory = "rom_build/";
     const auto cwd = std::filesystem::current_path();

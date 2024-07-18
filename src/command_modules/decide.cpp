@@ -12,7 +12,7 @@ DECLARE_COMMAND_HANDLER(decide, wrapperBot, message) {
     constexpr int COUNT_MAX = 10;
     constexpr int RANDOM_RANGE_NUM = 10;
 
-    MessageWrapper wrapper(message);
+    MessageWrapper wrapper(wrapperBot, message);
     if (wrapper.hasExtraText()) {
         std::string obj = wrapper.getExtraText();
         std::stringstream msgtxt;

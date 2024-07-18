@@ -287,10 +287,10 @@ struct InteractiveBashContext {
     }
 };
 
-DECLARE_COMMAND_HANDLER(ibash,, message) {
+DECLARE_COMMAND_HANDLER(ibash, bot, message) {
     static InteractiveBashContext ctx;
     std::string command;
-    MessageWrapper wrapper(message);
+    MessageWrapper wrapper(bot, message);
 
     if (!wrapper.hasExtraText()) {
         if (!ctx.is_open) {

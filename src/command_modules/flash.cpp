@@ -22,7 +22,7 @@ DECLARE_COMMAND_HANDLER(flash, botWrapper, message) {
     std::optional<std::string> msg;
     std::stringstream ss;
     Message::Ptr sentmsg;
-    MessageWrapper wrapper(message);
+    MessageWrapper wrapper(botWrapper, message);
     const auto sleep_secs =
         RandomNumberGenerator::generate(FLASH_DELAY_MAX_SEC);
     random_return_type pos = 0;

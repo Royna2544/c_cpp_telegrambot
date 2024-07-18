@@ -7,6 +7,7 @@
 #include <internal/_std_chrono_templates.h>
 
 #include <AbslLogInit.hpp>
+#include <CommandLine.hpp>
 #include <DurationPoint.hpp>
 #include <LogSinks.hpp>
 #include <ManagedThreads.hpp>
@@ -21,7 +22,6 @@
 #include <libos/libsighandler.hpp>
 #include <memory>
 #include <utility>
-#include <CommandLine.hpp>
 
 #include "InstanceClassBase.hpp"
 #include "TgBotWrapper.hpp"
@@ -187,13 +187,13 @@ void initLogging() {
 void createAndDoInitCallAll() {
     constexpr int kWebServerListenPort = 8080;
 
+    const auto bot = TgBotWrapper::getInstance();
     createAndDoInitCall<StringResManager>();
     createAndDoInitCall<TgBotWebServer, ThreadManager::Usage::WEBSERVER_THREAD>(
         kWebServerListenPort);
     createAndDoInitCall<RTCommandLoader>();
     LOG(INFO) << "Updating commands list based on loaded commands...";
-    LOG_IF(ERROR, !TgBotWrapper::getInstance()->setBotCommands())
-        << "Couldn't update commands list";
+    LOG_IF(ERROR, !bot->setBotCommands()) << "Couldn't update commands list";
     LOG(INFO) << "...done";
 
 #ifdef SOCKET_CONNECTION
@@ -202,11 +202,11 @@ void createAndDoInitCallAll() {
     createAndDoInitCall<SocketInterfaceTgBot>(nullptr);
     createAndDoInitCall<ChatObserver>();
 #endif
-    // createAndDoInitCall<RegexHandler>();
-    createAndDoInitCall<SpamBlockManager>();
+    createAndDoInitCall<RegexHandler>();
+    createAndDoInitCall<SpamBlockManager>(bot);
     createAndDoInitCall<ResourceManager>();
     createAndDoInitCall<TgBotDatabaseImpl>();
-    TgBotWrapper::getInstance()->registerOnAnyMsgCallback();
+    bot->registerOnAnyMsgCallback();
     // Must be last
     OnTerminateRegistrar::getInstance()->registerCallback(
         []() { ThreadManager::getInstance()->destroyManager(); });
@@ -241,7 +241,7 @@ int main(int argc, char** argv) {
 
     // Insert command line arguments
     CommandLine::initInstance(argc, argv);
-    
+
     // Initialize logging
     initLogging();
 

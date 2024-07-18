@@ -4,7 +4,7 @@
 
 static DECLARE_COMMAND_HANDLER(decho, tgBotWrapper, message) {
     const auto replyMsg = message->replyToMessage;
-    MessageWrapper wrapper(message);
+    MessageWrapper wrapper(tgBotWrapper,message);
 
     try {
         tgBotWrapper->deleteMessage(message);

@@ -2,6 +2,7 @@
 #include <filesystem>
 
 #include "CompilerInTelegram.hpp"
+#include "absl/status/status.h"
 
 // Verify, Parse, Write
 bool CompilerInTgForGeneric::verifyParseWrite(const Message::Ptr& message,
@@ -10,38 +11,36 @@ bool CompilerInTgForGeneric::verifyParseWrite(const Message::Ptr& message,
     if (wrapper.hasExtraText()) {
         extraargs = wrapper.getExtraText();
     }
-    if (message->replyToMessage && !message->replyToMessage->text.empty()) {
-        std::ofstream file(outfile);
-        if (file.fail()) {
-            onFailed(message, ErrorType::FILE_WRITE_FAILED);
-            return false;
-        }
-        file << message->replyToMessage->text;
-        file.close();
-        return true;
+    if (!wrapper.hasReplyToMessage()) {
+        _interface->onErrorStatus(
+            absl::InvalidArgumentError("Need a replied-to message"));
+        return false;
     }
-    onFailed(message, ErrorType::MESSAGE_VERIFICATION_FAILED);
-    return false;
-}
-
-void CompilerInTgForGenericImpl::onResultReady(const Message::Ptr& message,
-                                               const std::string& text) {
-    CompilerInTgHelper::onResultReady(botApi, message, text);
-}
-
-void CompilerInTgForGenericImpl::onFailed(const Message::Ptr& who,
-                                          const ErrorType e) {
-    CompilerInTgHelper::onFailed(botApi, who, e);
+    wrapper.switchToReplyToMessage();
+    if (wrapper.getText().empty()) {
+        _interface->onErrorStatus(
+            absl::InvalidArgumentError("Reply must contain a non-empty text"));
+        return false;
+    }
+    std::ofstream file(params.outfile);
+    if (file.fail()) {
+        _interface->onErrorStatus(
+            absl::InternalError("Unable to write out file"));
+        return false;
+    }
+    file << wrapper.getText();
+    file.close();
+    return true;
 }
 
 void CompilerInTgForGeneric::run(const Message::Ptr& message) {
     std::string extargs;
     std::stringstream cmd, res;
 
-    if (verifyParseWrite(message, outfile)) {
-        cmd << cmdPrefix.string() << SPACE << outfile;
-        runCommand(message, cmd.str(), res);
-        onResultReady(message, res.str());
-        std::filesystem::remove(outfile);
+    if (verifyParseWrite(message, extargs)) {
+        cmd << params.exe.string() << SPACE << extargs;
+        runCommand(cmd.str(), res);
+        _interface->onResultReady(res.str());
+        std::filesystem::remove(params.outfile);
     }
 }

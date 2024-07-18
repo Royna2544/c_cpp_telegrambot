@@ -1,56 +1,41 @@
+#include <CompilerPaths.hpp>
 #include <StringResManager.hpp>
+#include <memory>
 
-#include "StringToolsExt.hpp"
 #include "TgBotWrapper.hpp"
+#include "compiler/Helper.hpp"
 #include "compiler/CompilerInTelegram.hpp"
 
-using command_callback_compiler_t = std::function<void(
-    TgBotApi *, MessagePtr, const std::filesystem::path &compiler)>;
-namespace {
+DECLARE_COMMAND_HANDLER(c, bot, message) {
+    CompilerInTgForCCpp::Params params;
+    const auto intf = std::make_shared<CompilerInTgBotInterface>(bot, message);
+    params.exe = kCCompiler;
+    params.outfile = "out.c";
 
-void CModuleCallback(TgBotApi *wrapper, MessagePtr message,
-                     const std::filesystem::path &compiler) {
-    static CompilerInTgForCCppImpl cCompiler(wrapper, compiler, "foo.c");
-    cCompiler.run(message);
-}
-void CPPModuleCallback(TgBotApi *wrapper, MessagePtr message,
-                       const std::filesystem::path &compiler) {
-    static CompilerInTgForCCppImpl cppCompiler(wrapper, compiler, "foo.cpp");
-    cppCompiler.run(message);
-}
-void PYModuleCallback(TgBotApi *wrapper, MessagePtr message,
-                      const std::filesystem::path &compiler) {
-    static CompilerInTgForGenericImpl pyCompiler(wrapper, compiler, "foo.py");
-    pyCompiler.run(message);
-}
-void GOModuleCallback(TgBotApi *wrapper, MessagePtr message,
-                      const std::filesystem::path &compiler) {
-    static CompilerInTgForGenericImpl goCompiler(wrapper, compiler, "foo.go");
-    goCompiler.run(message);
-}
-void NoCompilerCommandStub(TgBotApi *wrapper, MessagePtr message) {
-    wrapper->sendReplyMessage(message, GETSTR(NOT_SUPPORTED_IN_CURRENT_HOST));
+    CompilerInTgForCCpp c(intf, params);
+    c.run(message);
 }
 
-void loadCompilerGeneric(CommandModule &module, ProLangs lang,
-                         std::string_view name,
-                         const command_callback_compiler_t &callback) {
-    std::filesystem::path compiler;
-    module.description = std::string(name) + " command";
-    if (findCompiler(lang, compiler)) {
-        module.fn = [compiler, callback](TgBotApi *tgApi, MessagePtr message) {
-            callback(tgApi, message, compiler);
-        };
-        module.description += ", ";
-        module.description += compiler.make_preferred().string();
-    } else {
-        LOG(WARNING) << "Unsupported cmd " << SingleQuoted(name)
-                     << " (compiler)";
-        module.fn = NoCompilerCommandStub;
-    }
+DECLARE_COMMAND_HANDLER(cpp, bot, message) {
+    CompilerInTgForCCpp::Params params;
+    const auto intf = std::make_shared<CompilerInTgBotInterface>(bot, message);
+    params.exe = kCXXCompiler;
+    params.outfile = "out.cpp";
+
+    CompilerInTgForCCpp cpp(intf, params);
+    cpp.run(message);
 }
 
-}  // namespace
+
+DECLARE_COMMAND_HANDLER(py, bot, message) {
+    CompilerInTgForGeneric::Params params;
+    const auto intf = std::make_shared<CompilerInTgBotInterface>(bot, message);
+    params.exe = kPythonInterpreter;
+    params.outfile = "out.py";
+
+    CompilerInTgForGeneric py(intf, params);
+    py.run(message);
+}
 
 DYN_COMMAND_FN(name, module) {
     if (name == nullptr) {
@@ -61,19 +46,13 @@ DYN_COMMAND_FN(name, module) {
     module.isLoaded = true;
     module.flags = CommandModule::Flags::Enforced;
     if (commandName == "c") {
-        loadCompilerGeneric(module, ProLangs::C, commandName, CModuleCallback);
-
+        module.fn = COMMAND_HANDLER_NAME(c);
     } else if (commandName == "cpp") {
-        loadCompilerGeneric(module, ProLangs::CXX, commandName,
-                            CPPModuleCallback);
-
+        module.fn = COMMAND_HANDLER_NAME(cpp);
     } else if (commandName == "py") {
-        loadCompilerGeneric(module, ProLangs::PYTHON, commandName,
-                            PYModuleCallback);
-
-    } else if (commandName == "go") {
-        loadCompilerGeneric(module, ProLangs::GO, commandName,
-                            GOModuleCallback);
+        module.fn = COMMAND_HANDLER_NAME(py);
+    } else {
+        return false;
     }
     return true;
 }

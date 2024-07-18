@@ -32,11 +32,11 @@ using TgBot::User;
 
 struct MessageWrapper;
 struct MessageWrapperLimited;
-
-using MessagePtr = const Message::Ptr&;
-
 // API part wrapper (base)
 struct TgBotApi;
+
+using MessagePtr = const Message::Ptr&;
+using ApiPtr = const std::shared_ptr<TgBotApi>&;
 
 #define DYN_COMMAND_SYM_STR "loadcmd"
 #define DYN_COMMAND_SYM loadcmd
@@ -44,10 +44,10 @@ struct TgBotApi;
     extern "C" bool DYN_COMMAND_SYM(const char* n, CommandModule& m)
 #define COMMAND_HANDLER_NAME(cmd) handle_command_##cmd
 #define DECLARE_COMMAND_HANDLER(cmd, w, m) \
-    void COMMAND_HANDLER_NAME(cmd)(TgBotApi * w, MessagePtr m)
+    void COMMAND_HANDLER_NAME(cmd)(ApiPtr w, MessagePtr m)
 
-using onanymsg_callback_type = std::function<void(TgBotApi*, MessagePtr)>;
-using command_callback_t = std::function<void(TgBotApi* wrapper, MessagePtr)>;
+using onanymsg_callback_type = std::function<void(ApiPtr, MessagePtr)>;
+using command_callback_t = std::function<void(ApiPtr wrapper, MessagePtr)>;
 
 struct CommandModule : TgBot::BotCommand {
     enum Flags { None = 0, Enforced = 1 << 0, HideDescription = 1 << 1 };
@@ -464,6 +464,9 @@ struct TgBotApi {
         return false;  // Dummy implementation
     }
 
+    virtual void registerCallback(const onanymsg_callback_type& callback) {
+        // Dummy implementation
+    }
     virtual void registerCallback(const onanymsg_callback_type& callback,
                                   const size_t token) {
         // Dummy implementation
@@ -485,8 +488,10 @@ struct TgBotApi {
 // A class to effectively wrap TgBot::Api to stable interface
 // This class owns the Bot instance, and users of this code cannot directly
 // access it.
-class TgBotPPImpl_API TgBotWrapper : public InstanceClassBase<TgBotWrapper>,
-                                     public TgBotApi {
+class TgBotPPImpl_API TgBotWrapper
+    : public InstanceClassBase<TgBotWrapper>,
+      public TgBotApi,
+      public std::enable_shared_from_this<TgBotWrapper> {
    public:
     // Constructor requires a bot token to create a Bot instance.
     explicit TgBotWrapper(const std::string& token) : _bot(token){};
@@ -652,7 +657,7 @@ class TgBotPPImpl_API TgBotWrapper : public InstanceClassBase<TgBotWrapper>,
      *
      * @param callback The function to be called when any message is received.
      */
-    void registerCallback(const onanymsg_callback_type& callback) {
+    void registerCallback(const onanymsg_callback_type& callback) override {
         callbacks.emplace_back(callback);
     }
 
@@ -689,10 +694,10 @@ class TgBotPPImpl_API TgBotWrapper : public InstanceClassBase<TgBotWrapper>,
     void registerOnAnyMsgCallback() {
         getEvents().onAnyMessage([this](const Message::Ptr& message) {
             for (auto& callback : callbacks) {
-                callback(this, message);
+                callback(shared_from_this(), message);
             }
             for (auto& [token, callback] : callbacksWithToken) {
-                callback(this, message);
+                callback(shared_from_this(), message);
             }
         });
     }
@@ -794,7 +799,7 @@ struct MessageWrapperLimited {
 // Provides easy access
 struct MessageWrapper : MessageWrapperLimited {
     std::shared_ptr<MessageWrapper> parent;
-    std::shared_ptr<TgBotWrapper> botWrapper;  // To access bot APIs
+    std::shared_ptr<TgBotApi> botWrapper;  // To access bot APIs
 
     bool switchToReplyToMessage(const std::string& text) noexcept {
         if (switchToReplyToMessage()) {
@@ -807,7 +812,7 @@ struct MessageWrapper : MessageWrapperLimited {
     bool switchToReplyToMessage() noexcept override {
         if (message->replyToMessage) {
             parent = std::make_shared<MessageWrapper>(
-                MessageWrapper(message, parent));
+                MessageWrapper(botWrapper, message, parent));
             message = message->replyToMessage;
             return true;
         }
@@ -820,9 +825,9 @@ struct MessageWrapper : MessageWrapperLimited {
         }
     }
 
-    explicit MessageWrapper(Message::Ptr message)
+    explicit MessageWrapper(std::shared_ptr<TgBotApi> api, Message::Ptr message)
         : MessageWrapperLimited(std::move(message)),
-          botWrapper(TgBotWrapper::getInstance()) {}
+          botWrapper(std::move(api)) {}
     ~MessageWrapper() noexcept override {
         Message::Ptr Rmessage;
         if (parent) {
@@ -840,10 +845,10 @@ struct MessageWrapper : MessageWrapperLimited {
     void sendMessageOnExit() noexcept { onExitMessage = std::nullopt; }
 
    private:
-    MessageWrapper(Message::Ptr message, std::shared_ptr<MessageWrapper> parent)
-        : MessageWrapper(std::move(message)) {
+    MessageWrapper(std::shared_ptr<TgBotApi> api, Message::Ptr message,
+                   std::shared_ptr<MessageWrapper> parent)
+        : MessageWrapper(std::move(api), std::move(message)) {
         this->parent = std::move(parent);
-        botWrapper = TgBotWrapper::getInstance();
     }
     std::optional<std::string> onExitMessage;
 };

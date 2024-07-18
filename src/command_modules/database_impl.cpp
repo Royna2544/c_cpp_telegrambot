@@ -12,7 +12,7 @@
 #include "StringToolsExt.hpp"
 
 template <DatabaseBase::ListType type>
-void handleAddUser(TgBotApi* wrapper, const Message::Ptr& message,
+void handleAddUser(ApiPtr wrapper, const Message::Ptr& message,
                    const UserId user) {
     auto base = TgBotDatabaseImpl::getInstance();
     auto res = base->addUserToList(type, user);
@@ -38,7 +38,7 @@ void handleAddUser(TgBotApi* wrapper, const Message::Ptr& message,
 }
 
 template <DatabaseBase::ListType type>
-void handleRemoveUser(TgBotApi* wrapper, const Message::Ptr& message,
+void handleRemoveUser(ApiPtr wrapper, const Message::Ptr& message,
                       const UserId user) {
     auto base = TgBotDatabaseImpl::getInstance();
     auto res = base->removeUserFromList(type, user);
@@ -92,7 +92,7 @@ constexpr std::string_view addtoblacklist = "Add to blacklist";
 constexpr std::string_view removefromblacklist = "Remove from blacklist";
 
 DECLARE_COMMAND_HANDLER(database, wrapper, message) {
-    MessageWrapper msgWrapper(message);
+    MessageWrapper msgWrapper(wrapper, message);
 
     auto reply = std::make_shared<TgBot::ReplyKeyboardMarkup>();
     reply->keyboard = genKeyboard(4, 2);
@@ -119,7 +119,7 @@ DECLARE_COMMAND_HANDLER(database, wrapper, message) {
     const random_return_type token = RandomNumberGenerator::generate(100);
 
     wrapper->registerCallback(
-        [msg, token, userId](TgBotApi* wrapper, MessagePtr m) {
+        [msg, token, userId](ApiPtr wrapper, MessagePtr m) {
             if (m->replyToMessage &&
                 m->replyToMessage->messageId == msg->messageId) {
                 if (m->text == addtowhitelist) {
@@ -141,8 +141,8 @@ DECLARE_COMMAND_HANDLER(database, wrapper, message) {
         token);
 };
 
-DECLARE_COMMAND_HANDLER(saveid,, message) {
-    MessageWrapper msgWrapper(message);
+DECLARE_COMMAND_HANDLER(saveid, bot, message) {
+    MessageWrapper msgWrapper(bot, message);
     if (msgWrapper.hasExtraText()) {
         std::optional<std::string> fileId;
         std::optional<std::string> fileUniqueId;

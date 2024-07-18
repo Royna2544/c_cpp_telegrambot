@@ -40,7 +40,7 @@ void try_parse_spamcnt(const std::string& data, int& count) {
 DECLARE_COMMAND_HANDLER(spam, bot, message) {
     std::function<void(void)> fp;
     int count = 0;
-    MessageWrapper wrapper(message);
+    MessageWrapper wrapper(bot, message);
     bool spamable = false;
 
     if (wrapper.hasReplyToMessage()) {

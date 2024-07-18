@@ -153,7 +153,7 @@ void ROMBuildTask::onExit(int exitCode) {
     throw std::runtime_error(message);
 }
 
-ROMBuildTask::ROMBuildTask(const TgBotApi* wrapper,
+ROMBuildTask::ROMBuildTask(ApiPtr wrapper,
                            TgBot::Message::Ptr message, PerBuildData data)
     : botWrapper(wrapper), data(std::move(data)), message(std::move(message)) {
     clock = std::chrono::system_clock::now();

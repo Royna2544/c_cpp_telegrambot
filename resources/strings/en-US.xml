@@ -3,7 +3,8 @@
     <string name="compile_time">Compile time</string>
     <string name="run_time">Run time</string>
     <string name="reply_to_a_code">Reply to a message with code as text</string>
-    <string name="working">Working on it...</string>
+    <string name="working">Working on it...
+Command is: </string>
     <string name="owner">Owner</string>
     <string name="command">Command</string>
     <string name="truncated">Truncated due to too much output</string>

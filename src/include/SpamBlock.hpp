@@ -5,6 +5,7 @@
 #include <tgbot/types/Chat.h>
 #include <tgbot/types/Message.h>
 #include <tgbot/types/User.h>
+#include <memory>
 
 #include "CStringLifetime.h"
 #include "InstanceClassBase.hpp"
@@ -70,6 +71,7 @@ struct TgBotPPImpl_API SpamBlockBase : ManagedThreadRunnable {
 struct TgBotPPImpl_API SpamBlockManager : SpamBlockBase,
                                           InitCall,
                                           InstanceClassBase<SpamBlockManager> {
+    explicit SpamBlockManager(ApiPtr api) : _api(api) {};
     ~SpamBlockManager() override = default;
 
     using SpamBlockBase::run;
@@ -87,4 +89,5 @@ struct TgBotPPImpl_API SpamBlockManager : SpamBlockBase,
     void _deleteAndMuteCommon(const OneChatIterator &handle,
                               PerChatHandleConstRef t, const size_t threshold,
                               const char *name, const bool mute);
+    std::shared_ptr<TgBotApi> _api;
 };

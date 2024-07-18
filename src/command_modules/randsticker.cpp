@@ -4,7 +4,7 @@
 using TgBot::StickerSet;
 
 DECLARE_COMMAND_HANDLER(randsticker, wrapper, message) {
-    MessageWrapper msg(message);
+    MessageWrapper msg(wrapper, message);
     if (!msg.switchToReplyToMessage(
             "Sticker not found in replied-to message")) {
         return;

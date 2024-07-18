@@ -1,4 +1,5 @@
 #include <absl/log/log.h>
+#include <absl/status/status.h>
 
 #include <RegEXHandler.hpp>
 #include <boost/algorithm/string/trim.hpp>
@@ -6,7 +7,6 @@
 #include <optional>
 #include <regex>
 #include <string>
-#include "InstanceClassBase.hpp"
 
 using std::regex_constants::ECMAScript;
 using std::regex_constants::format_first_only;
@@ -20,33 +20,31 @@ static const std::regex kSedReplaceCommandRegex(
 // Matches sed command with delete command, with regex on deleting expression
 static const std::regex kSedDeleteCommandRegex(R"(^\/.+\/d$)");
 
-std::vector<std::string> RegexHandlerBase::matchRegexAndSplit(
-    const std::string& text, const std::regex& regex) {
-    if (std::regex_match(text, regex)) {
-        return StringTools::split(text, '/');
+std::vector<std::string> RegexHandlerBase::tryParseCommand(
+    const std::regex& regexMatcher) {
+    if (std::regex_match(_context->regexCommand, regexMatcher)) {
+        return StringTools::split(_context->regexCommand, '/');
     }
     return {};
 }
 
 std::optional<std::regex> RegexHandlerBase::constructRegex(
-    const std::string& regexstr, const Message::Ptr& message,
-    const syntax_option_type flags) {
+    const std::string& pattern, const syntax_option_type flags) {
     try {
-        return std::regex(regexstr, flags);
+        return std::regex(pattern, flags);
     } catch (const std::regex_error& e) {
-        onRegexCreationFailed(message, regexstr, e);
+        _interface->onError(absl::InvalidArgumentError(e.what()));
         return std::nullopt;
     }
 }
 
-OptionalWrapper<std::string> RegexHandlerBase::doRegexReplaceCommand(
-    const Message::Ptr& regexCommand, const std::string& desttext) {
+OptionalWrapper<std::string> RegexHandlerBase::doRegexReplaceCommand() {
     std::regex src;
     std::string dest;
     bool global = false;  // g flag in sed
     auto kRegexFlags = ECMAScript;
     auto kRegexMatchFlags = format_sed | match_not_null;
-    auto args = matchRegexAndSplit(regexCommand->text, kSedReplaceCommandRegex);
+    auto args = tryParseCommand(kSedReplaceCommandRegex);
 
     // s/aaaa/bbbb/g (split to 4 strings)
     // s/aaaa/bbbb   (split to 3 strings)
@@ -57,23 +55,27 @@ OptionalWrapper<std::string> RegexHandlerBase::doRegexReplaceCommand(
             // Due to the above regex match, it should be either none, i, g, ig,
             // gi
             global = opt.find('g') != std::string::npos;
-            if (opt.find('i') != std::string::npos) kRegexFlags |= icase;
+            if (opt.find('i') != std::string::npos) {
+                kRegexFlags |= icase;
+            }
         }
-        if (auto regex = constructRegex(args[1], regexCommand, kRegexFlags);
+        if (auto regex = constructRegex(args[1], kRegexFlags);
             regex.has_value()) {
             src = regex.value();
             dest = args[2];
 
-            if (!global) kRegexMatchFlags |= format_first_only;
+            if (!global) {
+                kRegexMatchFlags |= format_first_only;
+            }
 
             DLOG(INFO) << "src: '" << args[1] << "' dest: '" << args[2]
                        << std::boolalpha << "' global: " << global
                        << " icase: " << (kRegexFlags & icase);
             try {
-                return {
-                    std::regex_replace(desttext, src, dest, kRegexMatchFlags)};
+                return {std::regex_replace(_context->text, src, dest,
+                                           kRegexMatchFlags)};
             } catch (const std::regex_error& e) {
-                onRegexOperationFailed(regexCommand, e);
+                _interface->onError(absl::InvalidArgumentError(e.what()));
             }
         }
     }
@@ -81,14 +83,13 @@ OptionalWrapper<std::string> RegexHandlerBase::doRegexReplaceCommand(
     return {std::nullopt};
 }
 
-OptionalWrapper<std::string> RegexHandlerBase::doRegexDeleteCommand(
-    const Message::Ptr& regexCommand, const std::string& text) {
-    auto args = matchRegexAndSplit(regexCommand->text, kSedDeleteCommandRegex);
+OptionalWrapper<std::string> RegexHandlerBase::doRegexDeleteCommand() {
+    auto args = tryParseCommand(kSedDeleteCommandRegex);
     // /aaaa/d
     if (args.size() == 3) {
-        if (auto regex = constructRegex(args[1], regexCommand, ECMAScript);
+        if (auto regex = constructRegex(args[1], ECMAScript);
             regex.has_value()) {
-            std::stringstream kInStream(text);
+            std::stringstream kInStream(_context->text);
             std::stringstream kOutStream;
             std::string line;
             std::string out;
@@ -107,14 +108,19 @@ OptionalWrapper<std::string> RegexHandlerBase::doRegexDeleteCommand(
     return {std::nullopt};
 }
 
-void RegexHandlerBase::processRegEXCommand(const Message::Ptr& srcstr,
-                                           const std::string& dststr) {
+void RegexHandlerBase::process() {
     OptionalWrapper<std::string> ret;
-    ret |= doRegexReplaceCommand(srcstr, dststr);
-    ret |= doRegexDeleteCommand(srcstr, dststr);
-    if (ret) {
-        onRegexProcessed(srcstr, *ret);
+
+    if (!_context.has_value()) {
+        _interface->onError(absl::InvalidArgumentError("No context provided"));
+        return;
     }
+    ret |= doRegexReplaceCommand();
+    ret |= doRegexDeleteCommand();
+    if (ret) {
+        _interface->onSuccess(*ret);
+    }
+    _context.reset();
 }
 
 DECLARE_CLASS_INST(RegexHandler);
