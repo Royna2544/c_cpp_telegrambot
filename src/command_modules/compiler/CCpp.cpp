@@ -1,14 +1,15 @@
-#include "CompilerInTelegram.hpp"
-#include <libos/libfs.hpp>
 #include <StringResManager.hpp>
+#include <libos/libfs.hpp>
+
+#include "CompilerInTelegram.hpp"
 
 void CompilerInTgForCCppImpl::onResultReady(const Message::Ptr& who,
                                             const std::string& text) {
-    CompilerInTgHelper::onResultReady( who, text);
+    CompilerInTgHelper::onResultReady(botApi, who, text);
 }
 void CompilerInTgForCCppImpl::onFailed(const Message::Ptr& who,
                                        const ErrorType e) {
-    CompilerInTgHelper::onFailed(who, e);
+    CompilerInTgHelper::onFailed(botApi, who, e);
 }
 
 void CompilerInTgForCCpp::run(const Message::Ptr& message) {

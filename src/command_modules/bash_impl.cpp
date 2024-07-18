@@ -3,12 +3,12 @@
 #include "TgBotWrapper.hpp"
 #include "compiler/CompilerInTelegram.hpp"
 
-static DECLARE_COMMAND_HANDLER(bash,, message) {
-    static CompilerInTgForBashImpl bash(false);
+static DECLARE_COMMAND_HANDLER(bash, wrapper, message) {
+    static CompilerInTgForBashImpl bash(wrapper, false);
     bash.run(message);
 }
-static DECLARE_COMMAND_HANDLER(ubash,, message) {
-    static CompilerInTgForBashImpl ubash(true);
+static DECLARE_COMMAND_HANDLER(ubash, wrapper, message) {
+    static CompilerInTgForBashImpl ubash(wrapper, true);
     ubash.run(message);
 }
 

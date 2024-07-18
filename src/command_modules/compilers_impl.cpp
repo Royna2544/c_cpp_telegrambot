@@ -4,28 +4,28 @@
 #include "TgBotWrapper.hpp"
 #include "compiler/CompilerInTelegram.hpp"
 
-using command_callback_compiler_t =
-    std::function<void(MessagePtr, const std::filesystem::path &compiler)>;
+using command_callback_compiler_t = std::function<void(
+    TgBotApi *, MessagePtr, const std::filesystem::path &compiler)>;
 namespace {
 
-void CModuleCallback(MessagePtr message,
+void CModuleCallback(TgBotApi *wrapper, MessagePtr message,
                      const std::filesystem::path &compiler) {
-    static CompilerInTgForCCppImpl cCompiler(compiler, "foo.c");
+    static CompilerInTgForCCppImpl cCompiler(wrapper, compiler, "foo.c");
     cCompiler.run(message);
 }
-void CPPModuleCallback(MessagePtr message,
+void CPPModuleCallback(TgBotApi *wrapper, MessagePtr message,
                        const std::filesystem::path &compiler) {
-    static CompilerInTgForCCppImpl cppCompiler(compiler, "foo.cpp");
+    static CompilerInTgForCCppImpl cppCompiler(wrapper, compiler, "foo.cpp");
     cppCompiler.run(message);
 }
-void PYModuleCallback(MessagePtr message,
+void PYModuleCallback(TgBotApi *wrapper, MessagePtr message,
                       const std::filesystem::path &compiler) {
-    static CompilerInTgForGenericImpl pyCompiler(compiler, "foo.py");
+    static CompilerInTgForGenericImpl pyCompiler(wrapper, compiler, "foo.py");
     pyCompiler.run(message);
 }
-void GOModuleCallback(MessagePtr message,
+void GOModuleCallback(TgBotApi *wrapper, MessagePtr message,
                       const std::filesystem::path &compiler) {
-    static CompilerInTgForGenericImpl goCompiler(compiler, "foo.go");
+    static CompilerInTgForGenericImpl goCompiler(wrapper, compiler, "foo.go");
     goCompiler.run(message);
 }
 void NoCompilerCommandStub(TgBotApi *wrapper, MessagePtr message) {
@@ -38,8 +38,8 @@ void loadCompilerGeneric(CommandModule &module, ProLangs lang,
     std::filesystem::path compiler;
     module.description = std::string(name) + " command";
     if (findCompiler(lang, compiler)) {
-        module.fn = [compiler, callback](auto *, MessagePtr message) {
-            callback(message, compiler);
+        module.fn = [compiler, callback](TgBotApi *tgApi, MessagePtr message) {
+            callback(tgApi, message, compiler);
         };
         module.description += ", ";
         module.description += compiler.make_preferred().string();

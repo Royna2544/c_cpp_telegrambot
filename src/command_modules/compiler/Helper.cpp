@@ -6,7 +6,7 @@
 
 #include "CompilerInTelegram.hpp"
 
-void CompilerInTgHelper::onFailed(const Message::Ptr &message,
+void CompilerInTgHelper::onFailed(TgBotApi *botApi, const Message::Ptr &message,
                                   const CompilerInTg::ErrorType e) {
     std::string text;
     switch (e) {
@@ -23,18 +23,20 @@ void CompilerInTgHelper::onFailed(const Message::Ptr &message,
             text = GETSTR(WORKING);
             break;
     };
-    TgBotWrapper::getInstance()->sendReplyMessage(message, text);
+    botApi->sendReplyMessage(message, text);
 }
 
-void CompilerInTgHelper::onResultReady(const Message::Ptr &message,
+void CompilerInTgHelper::onResultReady(TgBotApi *botApi,
+                                       const Message::Ptr &message,
                                        const std::string &text) {
     std::string text_ = text;
     boost::trim(text_);
-    TgBotWrapper::getInstance()->sendReplyMessage(message, text_);
+    botApi->sendReplyMessage(message, text_);
 }
 
-void CompilerInTgHelper::onCompilerPathCommand(const Message::Ptr &message,
+void CompilerInTgHelper::onCompilerPathCommand(TgBotApi *botApi,
+                                               const Message::Ptr &message,
                                                const std::string &text) {
     LOG(INFO) << text;
-    TgBotWrapper::getInstance()->sendReplyMessage(message, text);
+    botApi->sendReplyMessage(message, text);
 }

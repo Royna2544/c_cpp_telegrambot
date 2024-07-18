@@ -8,6 +8,8 @@
 #include <string>
 #include <utility>
 
+#include "TgBotWrapper.hpp"
+
 using TgBot::Bot;
 using TgBot::Message;
 
@@ -103,43 +105,49 @@ struct CompilerInTgForCCpp : CompilerInTgForGeneric {
 };
 
 struct CompilerInTgForBashImpl : CompilerInTgForBash {
-    explicit CompilerInTgForBashImpl(const bool allowhang)
-        : CompilerInTgForBash(allowhang) {}
+    explicit CompilerInTgForBashImpl(TgBotApi* botApi, const bool allowhang)
+        : CompilerInTgForBash(allowhang), botApi(botApi) {}
     ~CompilerInTgForBashImpl() override = default;
 
     void onResultReady(const Message::Ptr& who,
                        const std::string& text) override;
     void onFailed(const Message::Ptr& who, const ErrorType e) override;
+    TgBotApi* botApi;
 };
 
 struct CompilerInTgForGenericImpl : CompilerInTgForGeneric {
-    CompilerInTgForGenericImpl(const std::filesystem::path& cmdPrefix,
+    CompilerInTgForGenericImpl(TgBotApi* botApi,
+                               const std::filesystem::path& cmdPrefix,
                                const std::string& outfile)
-        : CompilerInTgForGeneric(cmdPrefix, outfile) {}
+        : CompilerInTgForGeneric(cmdPrefix, outfile), botApi(botApi) {}
     ~CompilerInTgForGenericImpl() override = default;
 
     void onResultReady(const Message::Ptr& who,
                        const std::string& text) override;
     void onFailed(const Message::Ptr& who, const ErrorType e) override;
+    TgBotApi* botApi;
 };
 
 struct CompilerInTgForCCppImpl : CompilerInTgForCCpp {
-    CompilerInTgForCCppImpl(const std::filesystem::path& cmdPrefix,
+    CompilerInTgForCCppImpl(TgBotApi* botApi,
+                            const std::filesystem::path& cmdPrefix,
                             const std::string& outfile)
-        : CompilerInTgForCCpp(cmdPrefix, outfile) {}
+        : CompilerInTgForCCpp(cmdPrefix, outfile), botApi(botApi) {}
     ~CompilerInTgForCCppImpl() override = default;
 
     void onResultReady(const Message::Ptr& who,
                        const std::string& text) override;
     void onFailed(const Message::Ptr& who, const ErrorType e) override;
+    TgBotApi* botApi;
 };
 
 struct CompilerInTgHelper {
-    static void onFailed(const Message::Ptr& message,
+    static void onFailed(TgBotApi* botApi, const Message::Ptr& message,
                          const CompilerInTg::ErrorType e);
-    static void onResultReady(const Message::Ptr& message,
+    static void onResultReady(TgBotApi* botApi, const Message::Ptr& message,
                               const std::string& text);
-    static void onCompilerPathCommand(const Message::Ptr& message,
+    static void onCompilerPathCommand(TgBotApi* botApi,
+                                      const Message::Ptr& message,
                                       const std::string& text);
 };
 

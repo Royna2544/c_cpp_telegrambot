@@ -1,6 +1,7 @@
-#include "CompilerInTelegram.hpp"
 #include <TgBotWrapper.hpp>
 #include <filesystem>
+
+#include "CompilerInTelegram.hpp"
 
 // Verify, Parse, Write
 bool CompilerInTgForGeneric::verifyParseWrite(const Message::Ptr& message,
@@ -25,15 +26,15 @@ bool CompilerInTgForGeneric::verifyParseWrite(const Message::Ptr& message,
 
 void CompilerInTgForGenericImpl::onResultReady(const Message::Ptr& message,
                                                const std::string& text) {
-    CompilerInTgHelper::onResultReady(message, text);
+    CompilerInTgHelper::onResultReady(botApi, message, text);
 }
 
 void CompilerInTgForGenericImpl::onFailed(const Message::Ptr& who,
                                           const ErrorType e) {
-    CompilerInTgHelper::onFailed(who, e);
+    CompilerInTgHelper::onFailed(botApi, who, e);
 }
 
-void CompilerInTgForGeneric::run(const Message::Ptr &message) {
+void CompilerInTgForGeneric::run(const Message::Ptr& message) {
     std::string extargs;
     std::stringstream cmd, res;
 
