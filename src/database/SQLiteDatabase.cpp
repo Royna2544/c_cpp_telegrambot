@@ -1,11 +1,9 @@
 #include "SQLiteDatabase.hpp"
 
-#include <absl/debugging/stacktrace.h>
-#include <absl/debugging/symbolize.h>
 #include <absl/log/check.h>
 #include <absl/log/log.h>
 
-#include <array>
+#include <StacktracePrint.hpp>
 #include <cstdint>
 #include <fstream>
 #include <iomanip>
@@ -24,30 +22,12 @@
 #include "Types.h"
 
 namespace {
-
-void PrintStackTrace() {
-    constexpr int kMaxStackDepth = 8;
-    constexpr std::string_view kStopStackTrace = "TgBotDatabaseImpl";
-    std::array<void*, kMaxStackDepth> stack{};
-    std::cout << "Stack trace:" << std::endl;
-    int depth = absl::GetStackTrace(stack.data(), kMaxStackDepth, 0);
-
-    for (int i = 0; i < depth; ++i) {
-        // Symbolize the stack frame to get the function name and file/line.
-        std::array<char, 1024> symbol{};
-        if (absl::Symbolize(stack[i], symbol.data(), sizeof(symbol))) {
-            std::cout << i << ": " << symbol.data() << std::endl;
-        } else {
-            std::cout << i << ": " << stack[i] << std::endl;
-        }
-        if (std::string(symbol.data()).find(kStopStackTrace) !=
-            std::string::npos) {
-            break;
-        }
-    }
+bool backtracePrint(const std::string_view& entry) {
+    LOG(ERROR) << entry;
+    return std::string(entry).find("SQLiteDatabase") != std::string::npos;
 }
-
 }  // namespace
+
 void SQLiteDatabase::Helper::logInvalidState(
     const std::source_location& location, SQLiteDatabase::Helper::State state) {
     std::string_view stateString;
@@ -76,7 +56,7 @@ void SQLiteDatabase::Helper::logInvalidState(
     }
     LOG(ERROR) << "Invalid state for " << location.function_name() << ": "
                << stateString;
-    PrintStackTrace();
+    PrintStackTrace(backtracePrint);
 }
 
 SQLiteDatabase::Helper::Helper(sqlite3* db, const std::string_view& filename)
@@ -215,7 +195,8 @@ bool SQLiteDatabase::Helper::bindArguments() {
     return true;
 }
 
-bool SQLiteDatabase::Helper::commonExecCheck(const std::source_location &location) {
+bool SQLiteDatabase::Helper::commonExecCheck(
+    const std::source_location& location) {
     switch (state) {
         case State::BOUND:
         case State::PREPARED:
@@ -225,7 +206,7 @@ bool SQLiteDatabase::Helper::commonExecCheck(const std::source_location &locatio
         case State::HAS_ARGUMENTS:
             LOG(WARNING) << location.function_name()
                          << " called with added arguments, but is not bound?";
-            PrintStackTrace();
+            PrintStackTrace(backtracePrint);
             bindArguments();
             return true;
         default:

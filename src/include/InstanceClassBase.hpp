@@ -1,9 +1,12 @@
 #pragma once
 
 #include <TgBotPPImplExports.h>
+#include <absl/log/log.h>
 
+#include <StacktracePrint.hpp>
 #include <memory>
 #include <stdexcept>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -39,6 +42,12 @@ struct InstanceClassBase {
             if constexpr (std::is_default_constructible_v<T>) {
                 initInstance();
             } else {
+                LOG(ERROR) << "Default constructor is not available for "
+                           << typeid(T).name();
+                PrintStackTrace([](const std::string_view& entry) {
+                    LOG(ERROR) << entry;
+                    return true;
+                });
                 throw std::runtime_error(
                     "I need arguments for the instance, call #initInstance "
                     "first");
@@ -47,9 +56,7 @@ struct InstanceClassBase {
         return instance;
     }
 
-    static void destroyInstance() {
-        instance.reset();
-    }
+    static void destroyInstance() { instance.reset(); }
     static std::shared_ptr<T> instance;
 };
 
