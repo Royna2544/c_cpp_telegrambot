@@ -104,6 +104,3 @@ TimerThread::Result TimerThread::stop() {
     ManagedThreadRunnable::stop();
     return Result::SUCCESS;
 }
-
-// Really TODO: Remove
-DECLARE_CLASS_INST(TgBotWrapper);
