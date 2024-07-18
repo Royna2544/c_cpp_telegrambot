@@ -35,10 +35,12 @@ bool CompilerInTgForGeneric::verifyParseWrite(const Message::Ptr& message,
 
 void CompilerInTgForGeneric::run(const Message::Ptr& message) {
     std::string extargs;
-    std::stringstream cmd, res;
+    std::stringstream cmd;
+    std::stringstream res;
 
     if (verifyParseWrite(message, extargs)) {
-        cmd << params.exe.string() << SPACE << extargs;
+        cmd << params.exe.string() << SPACE << extargs << SPACE
+            << params.outfile.string();
         runCommand(cmd.str(), res);
         _interface->onResultReady(res.str());
         std::filesystem::remove(params.outfile);
