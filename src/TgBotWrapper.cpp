@@ -1,5 +1,7 @@
 #include <StringResManager.hpp>
 #include <TgBotWrapper.hpp>
+#include <algorithm>
+#include <libos/OnTerminateRegistrar.hpp>
 #include <libos/libsighandler.hpp>
 
 #include "InstanceClassBase.hpp"
@@ -29,11 +31,10 @@ void TgBotWrapper::addCommand(const CommandModule& module, bool isReload) {
     if (!module.isEnforced()) {
         authflags |= AuthContext::Flags::PERMISSIVE;
     }
-    getEvents().onCommand(
-        module.command,
-        [this, authflags, callback = module.fn](const Message::Ptr& message) {
-            commandHandler(callback, authflags, message);
-        });
+    getEvents().onCommand(module.command, [this, authflags, &module](
+                                              const Message::Ptr& message) {
+        commandHandler(module.fn, authflags, message);
+    });
     if (!isReload) {
         _modules.emplace_back(module);
     }
@@ -123,6 +124,15 @@ decltype(TgBotWrapper::_modules)::iterator TgBotWrapper::findModulePosition(
 
 void TgBotWrapper::startPoll() {
     _bot.getApi().deleteWebhook();
+
+    OnTerminateRegistrar::getInstance()->registerCallback([this]() {
+        std::ranges::for_each(_modules, [this](auto& elem) {
+            // Clear function pointers, as RTCommandLoader manages it, and
+            // dlclose invalidates them
+            elem.fn = nullptr;
+            unloadCommand(elem.command);
+        });
+    });
 
     TgLongPoll longPoll(_bot);
     while (!SignalHandler::isSignaled()) {

@@ -46,7 +46,6 @@ bool RTCommandLoader::loadOneCommand(std::filesystem::path fname) {
         dlclose(handle);
         return false;
     }
-    libs.emplace_back(handle);
 
     if (sscanf(fname.filename().replace_extension().string().c_str(),
                "libcmd_%s", cmdName.data()) != 1) {
@@ -61,7 +60,9 @@ bool RTCommandLoader::loadOneCommand(std::filesystem::path fname) {
         dlclose(handle);
         return false;
     }
+    module.isLoaded = true;
 
+    libs.emplace_back(handle);
     TgBotWrapper::getInstance()->addCommand(module);
 
     if (dladdr(dlsym(handle, DYN_COMMAND_SYM_STR), &info) < 0) {
