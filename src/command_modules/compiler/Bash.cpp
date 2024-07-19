@@ -2,6 +2,7 @@
 #include <TgBotWrapper.hpp>
 
 #include "CompilerInTelegram.hpp"
+#include "absl/status/status.h"
 
 void CompilerInTgForBash::run(const Message::Ptr& message) {
     std::stringstream res;
@@ -9,8 +10,9 @@ void CompilerInTgForBash::run(const Message::Ptr& message) {
 
     if (wrapper.hasExtraText()) {
         runCommand(wrapper.getExtraText(), res, !allowhang);
+        _interface->onResultReady(res.str());
     } else {
-        res << GETSTR(SEND_BASH_COMMAND);
+        _interface->onErrorStatus(
+            absl::InvalidArgumentError(GETSTR(SEND_BASH_COMMAND)));
     }
-    _interface->onResultReady(res.str());
 }
