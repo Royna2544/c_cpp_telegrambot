@@ -12,6 +12,7 @@ add_my_library(
         TgBot
         TgBotRandom
         TgBot_popen_wdt
+        absl::status
     PUBLIC_INC
         ${CMAKE_CURRENT_BINARY_DIR}
 )
