@@ -88,11 +88,16 @@ struct SharedMalloc {
     }
 
     template <typename T>
-    void assignTo(T *ref, size_t size) const {
-        CHECK(size <= parent->getSize())
+    void assignTo(T *ref, size_t size, size_t offset) const {
+        CHECK(size + offset <= parent->getSize())
             << ": Requested size is bigger than what's stored in memory ("
-            << size << " > " << parent->getSize() << ")";
-        memcpy(ref, get(), size);
+            << size + offset << " > " << parent->getSize() << ")";
+        memcpy(ref, static_cast<char *>(get()) + offset, size);
+    }
+
+    template <typename T>
+    void assignTo(T *ref, size_t size) const {
+        assignTo(ref, size, 0);
     }
 
     template <typename T>
