@@ -31,6 +31,12 @@ struct SocketConnContext {
         : SocketConnContext(Myaddr) {
         cfd = sock;
     }
+    bool operator!=(const SocketConnContext &other) const noexcept {
+        return !(*this == other);
+    }
+    bool operator==(const SocketConnContext &other) const noexcept {
+        return cfd == other.cfd && addr == other.addr;
+    }
 };
 
 // A base class for socket operations

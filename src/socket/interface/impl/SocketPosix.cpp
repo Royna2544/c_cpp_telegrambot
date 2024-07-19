@@ -91,10 +91,10 @@ bool SocketInterfaceUnix::writeToSocket(SocketConnContext context,
     ssize_t count = 0;
 
     if (use_udp) {
-        count = sendto(context.cfd, socketData, data->size, MSG_NOSIGNAL, addr,
-                       context.addr->size);
+        count = sendto(context.cfd, socketData, data->getSize(), MSG_NOSIGNAL, addr,
+                       context.addr->getSize());
     } else {
-        count = send(context.cfd, socketData, data->size, MSG_NOSIGNAL);
+        count = send(context.cfd, socketData, data->getSize(), MSG_NOSIGNAL);
     }
     if (count < 0) {
         PLOG(ERROR) << "Failed to send to socket";
@@ -107,7 +107,7 @@ std::optional<SharedMalloc> SocketInterfaceUnix::readFromSocket(
     SocketConnContext handle, buffer_len_t length) {
     SharedMalloc buf(length);
     auto* addr = static_cast<sockaddr*>(handle.addr.get());
-    socklen_t addrlen = handle.addr->size;
+    socklen_t addrlen = handle.addr->getSize();
     bool use_udp = static_cast<bool>(options.use_udp) && options.use_udp.get();
     ssize_t count = 0;
     constexpr int kRecvFlags = MSG_NOSIGNAL | MSG_WAITALL;

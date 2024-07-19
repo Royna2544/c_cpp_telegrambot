@@ -109,7 +109,7 @@ struct Packet {
         header.cmd = cmd;
         header.magic = header_type::MAGIC_VALUE;
         header.data_size = size;
-        memcpy(data.get(), in_data, header.data_size);
+        data.assignFrom(in_data, header.data_size);
         uLong crc = crc32(0L, Z_NULL, 0);  // Initial value
         header.checksum =
             crc32(crc, reinterpret_cast<Bytef*>(data.get()), header.data_size);
@@ -117,8 +117,7 @@ struct Packet {
 
     // Converts to full SocketData object, including header
     SharedMalloc toSocketData() {
-        data->size = hdr_sz + header.data_size;
-        data->alloc();
+        data->realloc(hdr_sz + header.data_size);
         memmove(static_cast<char*>(data.get()) + hdr_sz, data.get(),
                 header.data_size);
         memcpy(data.get(), &header, hdr_sz);

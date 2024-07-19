@@ -30,12 +30,12 @@ std::optional<socket_handle_t> SocketInterfaceUnixLocal::createServerSocket() {
     if (!createLocalSocket(&ret)) {
         return std::nullopt;
     }
-    if (bind(ret.cfd, _name, ret.addr->size) != 0) {
+    if (bind(ret.cfd, _name, ret.addr->getSize()) != 0) {
         bool succeeded = false;
         PLOG(ERROR) << "Failed to bind to socket";
         if (errno == EADDRINUSE) {
             cleanupServerSocket();
-            if (bind(ret.cfd, _name, ret.addr->size) == 0) {
+            if (bind(ret.cfd, _name, ret.addr->getSize()) == 0) {
                 LOG(INFO) << "Bind succeeded by removing socket file";
                 succeeded = true;
             }
@@ -56,7 +56,7 @@ SocketInterfaceUnixLocal::createClientSocket() {
     if (!createLocalSocket(&ret)) {
         return std::nullopt;
     }
-    if (connect(ret.cfd, _name, ret.addr->size) != 0) {
+    if (connect(ret.cfd, _name, ret.addr->getSize()) != 0) {
         PLOG(ERROR) << "Failed to connect to socket";
         closeSocketHandle(ret.cfd);
         return std::nullopt;

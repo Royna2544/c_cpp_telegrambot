@@ -75,11 +75,11 @@ bool SocketInterfaceWindows::writeToSocket(SocketConnContext context,
     auto *addr = static_cast<sockaddr *>(context.addr.get());
     int count = 0;
     if (useUdp(this)) {
-        count = sendto(context.cfd, socketData, data->size, 0, addr,
-                       context.addr->size);
+        count = sendto(context.cfd, socketData, data->getSize(), 0, addr,
+                       context.addr->getSize());
 
     } else {
-        count = send(context.cfd, socketData, data->size, 0);
+        count = send(context.cfd, socketData, data->getSize(), 0);
     }
     if (count < 0) {
         LOG(ERROR) << "Failed to sent to socket: " << WSAEStr();
@@ -95,7 +95,7 @@ std::optional<SharedMalloc> SocketInterfaceWindows::readFromSocket(
     SharedMalloc buf(length);
     auto *addr = static_cast<sockaddr *>(context.addr.get());
     auto *data = static_cast<char *>(buf.get());
-    socklen_t addrLen = context.addr->size;
+    socklen_t addrLen = context.addr->getSize();
     int count = 0;
 
     if (useUdp(this)) {
