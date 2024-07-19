@@ -11,6 +11,7 @@
     "-> Intercept: This task was hanging more than " STR(SLEEP_SECONDS) "s"
 
 #define BASH_EXE_PATH "/bin/bash"
+#define POPEN_WDT_DEBUG
 
 #ifdef __cplusplus
 extern "C" {

@@ -13,7 +13,6 @@
 
 #include "popen_wdt.h"
 
-#define POPEN_WDT_DEBUG
 #ifdef POPEN_WDT_DEBUG
 #define POPEN_WDT_DBGLOG(fmt, ...)                                        \
     do {                                                                  \
