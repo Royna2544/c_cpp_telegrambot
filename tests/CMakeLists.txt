@@ -13,6 +13,7 @@ add_executable_san(${PROJECT_TEST_NAME}
   SharedMallocTest.cpp
   ConstexprStringCatTest.cpp
   CommandModulesTest.cpp
+  SocketDataHandlerTest.cpp
 )
 target_include_directories(${PROJECT_TEST_NAME} PRIVATE ${gtest_INCLUDE_DIR} ${gmock_INCLUDE_DIR})
 target_link_libraries(${PROJECT_TEST_NAME} gtest gmock TgBotPPImpl TgBotLogInit TgBotPython)

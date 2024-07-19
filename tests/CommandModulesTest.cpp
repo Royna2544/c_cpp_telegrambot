@@ -1,9 +1,13 @@
+#include <command_modules/support/popen_wdt/popen_wdt.h>
 #include <dlfcn.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <internal/_std_chrono_templates.h>
 
+#include <DurationPoint.hpp>
 #include <StringResManager.hpp>
 #include <TgBotWrapper.hpp>
+#include <chrono>
 #include <filesystem>
 #include <libos/libfs.hpp>
 #include <memory>
@@ -12,10 +16,14 @@
 #include "Types.h"
 #include "database/bot/TgBotDatabaseImpl.hpp"
 #include "gmock/gmock.h"
+#include "tgbot/types/Message.h"
 
 using testing::_;
+using testing::DoAll;
 using testing::IsNull;
+using testing::Mock;
 using testing::Return;
+using testing::SaveArg;
 using testing::StartsWith;
 using testing::Truly;
 
@@ -122,6 +130,10 @@ class MockTgBotApi : public TgBotApi {
                 (const, override));
 
     MOCK_METHOD(User::Ptr, getBotUser_impl, (), (const, override));
+
+    // Non-TgBotApi methods
+    MOCK_METHOD(bool, reloadCommand, (const std::string& cmd), (override));
+    MOCK_METHOD(bool, unloadCommand, (const std::string& cmd), (override));
 };
 
 class CommandModulesTest : public ::testing::Test {
@@ -140,9 +152,7 @@ class CommandModulesTest : public ::testing::Test {
         CommandModule module;
 
         // Shorthand
-        void execute(ApiPtr api, MessagePtr msg) const {
-            module.fn(api, msg);
-        }
+        void execute(ApiPtr api, MessagePtr msg) const { module.fn(api, msg); }
     };
 
     std::optional<ModuleHandle> loadModule(const std::string& name) const {
@@ -201,16 +211,38 @@ class CommandModulesTest : public ::testing::Test {
         message->messageId = TEST_MESSAGE_ID;
         return message;
     }
-    static bool isSameAsExpected(ReplyParameters::Ptr rhs) {
-        const bool cond =
-            rhs->chatId == TEST_CHAT_ID && rhs->messageId == TEST_MESSAGE_ID;
-        if (!cond) {
+    static bool isReplyToThisMsg(ReplyParameters::Ptr rhs) {
+        const bool cond = rhs && rhs->chatId == TEST_CHAT_ID &&
+                          rhs->messageId == TEST_MESSAGE_ID;
+        if (rhs && !cond) {
             LOG(INFO) << "ChatID: " << rhs->chatId << " != " << TEST_CHAT_ID;
             LOG(INFO) << "MessageID: " << rhs->messageId
                       << " != " << TEST_MESSAGE_ID;
+        } else if (!rhs) {
+            LOG(INFO) << "ReplyParameters is nullptr";
         }
         return cond;
     };
+
+    template <bool reply = false, typename Matcher>
+    Message::Ptr expectedToSendMessageWith(Matcher&& textMatcher) {
+        const auto sentMessage = std::make_shared<Message>();
+        if constexpr (reply) {
+            EXPECT_CALL(*botApi,
+                        sendMessage_impl(TEST_CHAT_ID, textMatcher,
+                                         Truly(isReplyToThisMsg), IsNull(), ""))
+                .WillOnce(Return(sentMessage));
+        } else {
+            EXPECT_CALL(*botApi, sendMessage_impl(TEST_CHAT_ID, textMatcher,
+                                                  IsNull(), IsNull(), ""))
+                .WillOnce(Return(sentMessage));
+        }
+        return sentMessage;
+    }
+
+#define expectedToEditMessageWith(out, matcher)        \
+    EXPECT_CALL(*botApi, editMessage_impl(_, matcher)) \
+        .WillOnce(DoAll(SaveArg<0>(out), Return(*(out))));
 
     // Testing data
     static constexpr ChatId TEST_CHAT_ID = 123123;
@@ -258,7 +290,7 @@ TEST_F(CommandModulesTest, TestCommandAlive) {
     // Expected to pass the fileid and parsemode as HTML
     EXPECT_CALL(*botApi,
                 sendAnimation_impl(TEST_CHAT_ID, {TEST_MEDIA_ID}, _,
-                                   Truly(isSameAsExpected), IsNull(), "HTML"))
+                                   Truly(isReplyToThisMsg), IsNull(), "HTML"))
         .WillOnce(Return(nullptr));
     module->execute(botApi, message);
 
@@ -266,38 +298,130 @@ TEST_F(CommandModulesTest, TestCommandAlive) {
     EXPECT_CALL(database, queryMediaInfo(ALIVE_FILE_ID))
         .WillOnce(Return(std::nullopt));
     EXPECT_CALL(*botApi,
-                sendMessage_impl(TEST_CHAT_ID, _, Truly(isSameAsExpected),
+                sendMessage_impl(TEST_CHAT_ID, _, Truly(isReplyToThisMsg),
                                  IsNull(), "HTML"))
         .WillOnce(Return(nullptr));
     module->execute(botApi, message);
+
+    Mock::VerifyAndClearExpectations(botApi.get());
 
     // Done, unload the module
     unloadModule(std::move(module.value()));
 }
 
-// ChatId chatId, const std::string& text,
-// ReplyParameters::Ptr replyParameters,
-// GenericReply::Ptr replyMarkup, const std::string& parseMode
 TEST_F(CommandModulesTest, TestCommandBash) {
     auto module = loadModule("bash");
     ASSERT_TRUE(module.has_value());
 
     auto message = createDefaultMessage();
     message->text = "/bash pwd";
+    Message::Ptr recvedMessage;
 
-    // First, "Working on it..."
-    EXPECT_CALL(*botApi, sendMessage_impl(TEST_CHAT_ID, GETSTR(WORKING), _,
-                                         IsNull(), ""));
+    // First, "Working on it...\nCommand is: pwd"
+    auto sentMsg = expectedToSendMessageWith<true>(GETSTR(WORKING) + "pwd");
+
+    // Edit, to add the exec done.
+    expectedToEditMessageWith(&recvedMessage, StartsWith(GETSTR(WORKING)));
 
     // Second, Command result of pwd command
-    EXPECT_CALL(
-        *botApi,
-        sendMessage_impl(TEST_CHAT_ID,
-                         StartsWith(std::filesystem::current_path().string()),
-                         _, IsNull(), ""));
+    expectedToSendMessageWith(
+        StartsWith(std::filesystem::current_path().string()));
+    module->execute(botApi, message);
+    EXPECT_EQ(sentMsg.get(), recvedMessage.get());
 
+    // Test without any command following
+    message->text = "/bash";
+    expectedToSendMessageWith<true>(StartsWith("Error"));
     module->execute(botApi, message);
 
+    Mock::VerifyAndClearExpectations(botApi.get());
+
+    // Test the watchdog timeout
+    LOG(INFO) << "Testing watchdog timeout";
+
+    // "Working on it...\nCommand is: sleep 15"
+    sentMsg = expectedToSendMessageWith<true>(GETSTR(WORKING) + "sleep 20");
+    // Sends total time
+    expectedToEditMessageWith(&recvedMessage, StartsWith(GETSTR(WORKING)));
+    // Sends watchdog timeout
+    expectedToEditMessageWith(&recvedMessage, "WDT TIMEOUT");
+    // After 15 seconds, sends nothing
+    expectedToSendMessageWith(testing::IsEmpty());
+
+    DurationPoint dp;
+    message->text = "/bash sleep 20";
+    module->execute(botApi, message);
+    EXPECT_EQ(sentMsg.get(), recvedMessage.get());
+
+    const auto tookTime = dp.get();
+
+    // Shouldn't take more than a second to SLEEP_SECONDS
+    if (tookTime > std::chrono::seconds(SLEEP_SECONDS) + 2s) {
+        FAIL() << "Watchdog wasn't triggered: Took " << tookTime.count()
+               << " milliseconds";
+    } else {
+        LOG(INFO) << "Took " << tookTime.count() << " milliseconds, pass";
+    }
+
+    Mock::VerifyAndClearExpectations(botApi.get());
+    // Done, unload the module
+    unloadModule(std::move(module.value()));
+}
+
+TEST_F(CommandModulesTest, TestCommandUBash) {
+    auto module = loadModule("ubash");
+    ASSERT_TRUE(module.has_value());
+
+    auto message = createDefaultMessage();
+    message->text = "/ubash pwd";
+    Message::Ptr recvedMessage;
+
+    // First, "Working on it...\nCommand is: pwd"
+    auto sentMsg = expectedToSendMessageWith<true>(GETSTR(WORKING) + "pwd");
+
+    // Edit, to add the exec done.
+    expectedToEditMessageWith(&recvedMessage, StartsWith(GETSTR(WORKING)));
+
+    // Second, Command result of pwd command
+    expectedToSendMessageWith(
+        StartsWith(std::filesystem::current_path().string()));
+    module->execute(botApi, message);
+    EXPECT_EQ(sentMsg.get(), recvedMessage.get());
+
+    // Test without any command following
+    message->text = "/ubash";
+    expectedToSendMessageWith<true>(StartsWith("Error"));
+    module->execute(botApi, message);
+
+    Mock::VerifyAndClearExpectations(botApi.get());
+
+    // Test the watchdog timeout
+    LOG(INFO) << "Testing watchdog timeout";
+
+    // "Working on it...\nCommand is: sleep 15"
+    sentMsg = expectedToSendMessageWith<true>(GETSTR(WORKING) + "sleep 20");
+    // Sends total time
+    expectedToEditMessageWith(&recvedMessage, StartsWith(GETSTR(WORKING)));
+
+    // After 15 seconds, sends nothing
+    expectedToSendMessageWith(testing::IsEmpty());
+
+    DurationPoint dp;
+    message->text = "/ubash sleep 20";
+    module->execute(botApi, message);
+    EXPECT_EQ(sentMsg.get(), recvedMessage.get());
+
+    const auto tookTime = dp.get();
+
+    // Shouldn't get timeout kill, compare to more than a second to SLEEP_SECONDS
+    if (tookTime < std::chrono::seconds(SLEEP_SECONDS) + 2s) {
+        FAIL() << "Watchdog was triggered: Took " << tookTime.count()
+               << " milliseconds";
+    } else {
+        LOG(INFO) << "Took " << tookTime.count() << " milliseconds, pass";
+    }
+
+    Mock::VerifyAndClearExpectations(botApi.get());
     // Done, unload the module
     unloadModule(std::move(module.value()));
 }
@@ -308,22 +432,41 @@ TEST_F(CommandModulesTest, TestCommandBash) {
 TEST_F(CommandModulesTest, TestCommandCmd) {
     auto module = loadModule("cmd");
     ASSERT_TRUE(module.has_value());
+    const std::string testCmd = "testingcmd";
 
     auto message = createDefaultMessage();
     message->text = "/cmd pwd";
 
-    // First, "Working on it..."
-    EXPECT_CALL(*botApi, sendMessage_impl(TEST_CHAT_ID, GETSTR(WORKING), _,
-                                         IsNull(), ""));
-
-    // Second, Command result of pwd command
-    EXPECT_CALL(
-        *botApi,
-        sendMessage_impl(TEST_CHAT_ID,
-                         StartsWith(std::filesystem::current_path().string()),
-                         _, IsNull(), ""));
-
+    // Invalid arguments passed, so...
+    expectedToSendMessageWith<true>(_);
     module->execute(botApi, message);
+    Mock::VerifyAndClearExpectations(botApi.get());
+
+    // Test with valid arguments passed
+    // Step 1: load command - fail
+    message->text = "/cmd testingcmd reload";
+    EXPECT_CALL(*botApi, reloadCommand(testCmd)).WillOnce(Return(false));
+    expectedToSendMessageWith<true>(GETSTR_IS(OPERATION_FAILURE) + testCmd);
+    module->execute(botApi, message);
+
+    // Step 2: load command - success
+    EXPECT_CALL(*botApi, reloadCommand(testCmd)).WillOnce(Return(true));
+    expectedToSendMessageWith<true>(GETSTR_IS(OPERATION_SUCCESSFUL) + testCmd);
+    module->execute(botApi, message);
+
+    // Step 3: unload command - failure
+    message->text = "/cmd testingcmd unload";
+    EXPECT_CALL(*botApi, unloadCommand(testCmd)).WillOnce(Return(false));
+    expectedToSendMessageWith<true>(GETSTR_IS(OPERATION_FAILURE) + testCmd);
+    module->execute(botApi, message);
+
+    // Step 4: unload command - success
+    EXPECT_CALL(*botApi, unloadCommand(testCmd)).WillOnce(Return(true));
+    expectedToSendMessageWith<true>(GETSTR_IS(OPERATION_SUCCESSFUL) + testCmd);
+    module->execute(botApi, message);
+
+    // Clear
+    Mock::VerifyAndClearExpectations(botApi.get());
 
     // Done, unload the module
     unloadModule(std::move(module.value()));

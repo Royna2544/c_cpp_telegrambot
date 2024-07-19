@@ -56,17 +56,17 @@ TEST_F(RegexHandlerTest,
 
     // OnSuccess shouldn't be called
     EXPECT_CALL(*getMock(), onSuccess(_)).Times(0);
-    // We expect only failure
-    EXPECT_CALL(*getMock(), onError(_)).Times(1);
+    // Neither onError should be called
+    EXPECT_CALL(*getMock(), onError(_)).Times(0);
     const auto actualOutput = doRegexReplaceCommand();
 
     ASSERT_FALSE(actualOutput.has_value());
 
     // Now let's try the public API
-    // We expect onSuccess not to be called
+    // We do not expect onSuccess not to be called
     EXPECT_CALL(*getMock(), onSuccess(_)).Times(0);
-    // Weexpect onFailure to be called
-    EXPECT_CALL(*getMock(), onError(_)).Times(1);
+    // Neither we expect onError would be called (As it will be noop)
+    EXPECT_CALL(*getMock(), onError(_)).Times(0);
     // Call main method
     process();
 }
@@ -77,11 +77,24 @@ TEST_F(RegexHandlerTest,
     const std::string kTextToMatch = "aaaaa\nbbbbb\nccccc\nddddd";
     const std::string kExpectedOutput = "bbbbb\nccccc\nddddd";
 
+    // OnSuccess isn't called when accessing directly...
+    EXPECT_CALL(*getMock(), onSuccess(_)).Times(0);
+    // Neither do we expect failure (Regex itself isn't wrong)
+    EXPECT_CALL(*getMock(), onError(_)).Times(0);
+
     setContext({.regexCommand = kRegexCommand, .text = kTextToMatch});
     const auto actualOutput = doRegexDeleteCommand();
 
     ASSERT_TRUE(actualOutput.has_value());
     EXPECT_EQ(kExpectedOutput, actualOutput.value());
+
+    // Now let's try the public API
+    // We expect onSuccess to be called with the expected output
+    EXPECT_CALL(*getMock(), onSuccess(kExpectedOutput)).Times(1);
+    // We don't expect onFailure to be called
+    EXPECT_CALL(*getMock(), onError(_)).Times(0);
+    // Call main method
+    process();
 }
 
 TEST_F(RegexHandlerTest,
@@ -90,6 +103,11 @@ TEST_F(RegexHandlerTest,
     const std::string kTextToMatch = "aaaaa\nbbbbb\nccccc\nddddd";
 
     setContext({.regexCommand = kRegexCommand, .text = kTextToMatch});
+    // In this case, regex itself is invalid - it would call onError...
+    EXPECT_CALL(*getMock(), onError(_)).Times(1);
+    // OnSuccess shouldn't be called
+    EXPECT_CALL(*getMock(), onSuccess(_)).Times(0);
+
     const auto actualOutput = doRegexDeleteCommand();
 
     ASSERT_FALSE(actualOutput.has_value());
