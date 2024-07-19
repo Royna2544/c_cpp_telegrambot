@@ -22,7 +22,8 @@ using std::chrono_literals::operator""ms;
 using std::chrono::high_resolution_clock;
 using std::chrono::milliseconds;
 
-CompilerInTg::CompilerInTg(std::shared_ptr<Interface> interface) : _interface(std::move(interface)) {}
+CompilerInTg::CompilerInTg(std::shared_ptr<Interface> interface)
+    : _interface(std::move(interface)) {}
 
 void CompilerInTg::runCommand(std::string cmd, std::stringstream &res,
                               bool use_wdt) {
@@ -65,14 +66,10 @@ void CompilerInTg::runCommand(std::string cmd, std::stringstream &res,
         count++;
         std::this_thread::sleep_for(50ms);
     }
-    if (count == 0) {
-        res << "[EMPTY]";
-    }
-    res << std::endl;
-    if (popen_watchdog_activated(&p_wdt_data)) {
-        _interface->onWdtTimeout();
-    } else {
-        if (use_wdt) {
+    if (use_wdt) {
+        if (popen_watchdog_activated(&p_wdt_data)) {
+            _interface->onWdtTimeout();
+        } else {
             popen_watchdog_stop(&p_wdt_data);
         }
     }
