@@ -56,7 +56,7 @@ bool RTCommandLoader::loadOneCommand(std::filesystem::path fname) {
 
     if (!sym(cmdName.data(), module)) {
         LOG(WARNING) << "Failed to load command module from " << fname;
-        module.fn = nullptr; // Prevent double free from function ptr dtor...
+        module.fn = nullptr;  // Prevent double free from function ptr dtor...
         dlclose(handle);
         return false;
     }
@@ -80,14 +80,20 @@ bool RTCommandLoader::loadOneCommand(std::filesystem::path fname) {
 }
 
 void RTCommandLoader::doInitCall() {
+    bool any = false;
     for (auto i = std::filesystem::directory_iterator(
-             FS::getPathForType(FS::PathType::BUILD_ROOT));
+             FS::getPathForType(FS::PathType::MODULES_INSTALLED));
          i != std::filesystem::directory_iterator(); ++i) {
         if (i->path().extension() == FS::kDylibExtension &&
             i->path().filename().string().starts_with("libcmd_")) {
             LOG(INFO) << "Loading " << i->path().filename() << "...";
             loadOneCommand(i->path());
+            any = true;
         }
+    }
+    if (!any) {
+        LOG(WARNING) << "No RT command modules found in "
+                     << FS::getPathForType(FS::PathType::MODULES_INSTALLED);
     }
 }
 
