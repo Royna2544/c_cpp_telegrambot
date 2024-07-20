@@ -46,18 +46,18 @@ std::string convert<std::string>(PyObject* value) {
 }
 
 template <>
-std::vector<long> convert<std::vector<long>>(PyObject* value) {
-    std::vector<long> result;
+std::vector<std::string> convert<std::vector<std::string>>(PyObject* value) {
+    std::vector<std::string> result;
     if (PyList_Check(value)) {
         Py_ssize_t size = PyList_Size(value);
         for (Py_ssize_t i = 0; i < size; ++i) {
             PyObject* item = PyList_GetItem(value, i);
-            if (PyLong_Check(item)) {
-                result.push_back(details::convert<long>(item));
+            const auto string = details::convert<std::string>(item);
+            if (!string.empty()) {
+                result.emplace_back(string);
             } else {
-                LOG(ERROR) << "Invalid list item: expected integer";
+                LOG(ERROR) << "Invalid list item: expected string";
             }
-            Py_DECREF(item);
         }
     } else {
         LOG(ERROR) << "Invalid input: expected list";
@@ -84,7 +84,7 @@ bool PythonClass::addLookupDirectory(const std::filesystem::path& directory) {
 
     // Decrement the reference count of the directory string
     Py_DECREF(dirStr);
-    
+
     return true;
 }
 
@@ -108,7 +108,7 @@ std::shared_ptr<PythonClass::ModuleHandle> PythonClass::importModule(
 std::shared_ptr<PythonClass::FunctionHandle>
 PythonClass::ModuleHandle::lookupFunction(const std::string& name) {
     GILStateManagement _;
-    
+
     // Get the specified function from the current module
     PyObject* function = PyObject_GetAttrString(module, name.c_str());
 
@@ -126,6 +126,6 @@ PythonClass::ModuleHandle::lookupFunction(const std::string& name) {
         return nullptr;
     }
 
-    FunctionHandle temp { shared_from_this(), function, name };
+    FunctionHandle temp{shared_from_this(), function, name};
     return std::make_shared<FunctionHandle>(std::move(temp));
 }

@@ -23,7 +23,7 @@ double convert<double>(PyObject* value);
 template <>
 std::string convert<std::string>(PyObject* value);
 template <>
-std::vector<int> convert<std::vector<int>>(PyObject* value);
+std::vector<std::string> convert<std::vector<std::string>>(PyObject* value);
 
 inline void ensurePythonInitialized() {
     if (Py_IsInitialized() == 0) {

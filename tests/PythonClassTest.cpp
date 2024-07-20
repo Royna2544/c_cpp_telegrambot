@@ -24,6 +24,17 @@ class PythonClassTest : public ::testing::Test {
     PythonClass::Ptr pythonClass;
 };
 
+TEST_F(PythonClassTest, OsListDir) {
+    std::vector<std::string> fileList;
+    auto os = pythonClass->importModule("os");
+    ASSERT_NE(os, nullptr);
+    auto listdir = os->lookupFunction("listdir");
+    ASSERT_NE(listdir, nullptr);
+    ASSERT_TRUE(listdir->call(nullptr, &fileList));
+    ASSERT_NE(fileList.size(), 0);
+    LOG(INFO) << "listdir size: " << fileList.size();
+}
+
 TEST_F(PythonClassTest, AddLookupDirectory) {
     std::filesystem::path testDir = std::filesystem::current_path();
     ASSERT_TRUE(pythonClass->addLookupDirectory(testDir));
