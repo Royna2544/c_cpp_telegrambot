@@ -12,3 +12,9 @@ add_my_executable(
   SRCS TgBotSocketClient.cpp
   LIBS TgBotSocket
 )
+
+include(TestBigEndian)
+test_big_endian(RET)
+if (${RET} EQUAL 1)
+  message(FATAL_ERROR "Cannot support big-endian systems")
+endif()
