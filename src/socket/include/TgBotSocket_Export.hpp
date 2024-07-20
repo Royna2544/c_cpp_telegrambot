@@ -6,7 +6,6 @@
 #include <zlib.h>
 
 #include <array>
-#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -14,17 +13,11 @@
 #include "../../include/SharedMalloc.hpp"
 #include "../../include/Types.h"
 
-#ifndef _MSC_VER
-#define TGSOCKET_ATTR_PACKED [[gnu::packed]]
-#else
-#pragma pack(push, 1)
-#define TGSOCKET_ATTR_PACKED
-#endif
-
 namespace TgBotSocket {
 
 constexpr int MAX_PATH_SIZE = 256;
 constexpr int MAX_MSG_SIZE = 256;
+constexpr int ALIGNMENT = 8;
 
 enum class Command : std::int32_t {
     CMD_WRITE_MSG_TO_CHAT_ID,
@@ -54,7 +47,7 @@ enum class Command : std::int32_t {
  * Header contains the magic value, command, and the size of the data
  */
  
-struct TGSOCKET_ATTR_PACKED PacketHeader {
+struct alignas(ALIGNMENT) PacketHeader {
     using length_type = uint64_t;
     constexpr static int64_t MAGIC_VALUE_BASE = 0xDEADFACE;
     // Version number, to be increased on breaking changes
@@ -64,7 +57,8 @@ struct TGSOCKET_ATTR_PACKED PacketHeader {
     // 4: Move CMD_UPLOAD_FILE_DRY to internal namespace
     // 5: Use the packed attribute for structs
     // 6: Make CMD_UPLOAD_FILE_DRY_CALLBACK return sperate callback, and add srcpath to UploadFile
-    constexpr static int DATA_VERSION = 6;
+    // 7: Remove packed attribute, align all as 8 bytes
+    constexpr static int DATA_VERSION = 7;
     constexpr static int64_t MAGIC_VALUE = MAGIC_VALUE_BASE + DATA_VERSION;
 
     int64_t magic = MAGIC_VALUE;  ///< Magic value to verify the packet
@@ -83,7 +77,7 @@ struct TGSOCKET_ATTR_PACKED PacketHeader {
  * It contains a header, which contains the magic value, the command, and the
  * size of the data. The data is then followed by the actual data.
  */
-struct Packet {
+struct alignas(ALIGNMENT) Packet {
     static constexpr auto hdr_sz = sizeof(PacketHeader);
     using header_type = PacketHeader;
     header_type header{};
@@ -149,39 +143,39 @@ enum class CtrlSpamBlock {
     CTRL_MAX,
 };
 
-struct TGSOCKET_ATTR_PACKED WriteMsgToChatId {
+struct alignas(ALIGNMENT)  WriteMsgToChatId {
     ChatId chat;                             // destination chatid
     MessageStringArray message;  // Msg to send
 };
 
-struct TGSOCKET_ATTR_PACKED ObserveChatId {
+struct alignas(ALIGNMENT) ObserveChatId {
     ChatId chat;
     bool observe;  // new state for given ChatId,
                    // true/false - Start/Stop observing
 };
 
-struct TGSOCKET_ATTR_PACKED SendFileToChatId {
+struct alignas(ALIGNMENT) SendFileToChatId {
     ChatId chat;                               // Destination ChatId
     FileType fileType;                         // File type for file
     PathStringArray filePath;  // Path to file (local)
 };
 
-struct TGSOCKET_ATTR_PACKED ObserveAllChats {
+struct alignas(ALIGNMENT) ObserveAllChats {
     bool observe;  // new state for all chats,
                    // true/false - Start/Stop observing
 };
 
-struct TGSOCKET_ATTR_PACKED DeleteControllerById {
+struct alignas(ALIGNMENT) DeleteControllerById {
     int controller_id;
 };
 
-struct TGSOCKET_ATTR_PACKED UploadFileDry {
+struct alignas(ALIGNMENT) UploadFileDry {
     PathStringArray destfilepath{};   // Destination file name 
     PathStringArray srcfilepath{};    // Source file name (This is not used on the remote, used if dry=true)
     SHA256StringArray sha256_hash{};  // SHA256 hash of the file
 
     // Returns AckType::ERROR_COMMAND_IGNORED on options failure
-    struct TGSOCKET_ATTR_PACKED Options {
+    struct Options {
         // Overwrite existing file if exists
         bool overwrite = false;  
 
@@ -195,12 +189,12 @@ struct TGSOCKET_ATTR_PACKED UploadFileDry {
     } options;
 };
 
-struct TGSOCKET_ATTR_PACKED UploadFile : public UploadFileDry {
+struct alignas(ALIGNMENT) UploadFile : public UploadFileDry {
     using Options = UploadFileDry::Options;
     uint8_t buf[];  // Buffer
 };
 
-struct TGSOCKET_ATTR_PACKED DownloadFile {
+struct alignas(ALIGNMENT) DownloadFile {
     PathStringArray filepath{};      // Path to file (in remote)
     PathStringArray destfilename{};  // Destination file name
     uint8_t buf[];                   // Buffer
@@ -209,7 +203,7 @@ struct TGSOCKET_ATTR_PACKED DownloadFile {
 
 namespace callback {
 
-struct TGSOCKET_ATTR_PACKED GetUptimeCallback {
+struct alignas(ALIGNMENT) GetUptimeCallback {
     std::array<char, sizeof("Uptime: 999h 99m 99s")> uptime;
 };
 
@@ -222,7 +216,7 @@ enum class AckType {
     ERROR_CLIENT_ERROR,
 };
 
-struct TGSOCKET_ATTR_PACKED GenericAck {
+struct alignas(ALIGNMENT) GenericAck {
     AckType result;  // result type
     // Error message, only valid when result type is not SUCCESS
     MessageStringArray error_msg{};
@@ -239,7 +233,7 @@ struct TGSOCKET_ATTR_PACKED GenericAck {
     static GenericAck ok() { return GenericAck(AckType::SUCCESS, "OK"); }
 };
 
-struct TGSOCKET_ATTR_PACKED UploadFileDryCallback : public GenericAck {
+struct alignas(ALIGNMENT) UploadFileDryCallback : public GenericAck {
     data::UploadFileDry requestdata;
 };
 
@@ -254,22 +248,17 @@ struct TGSOCKET_ATTR_PACKED UploadFileDryCallback : public GenericAck {
 
 namespace TgBotSocket::data {
 ASSERT_SIZE(WriteMsgToChatId, 264);
-ASSERT_SIZE(ObserveChatId, 9);
-ASSERT_SIZE(SendFileToChatId, 268);
-ASSERT_SIZE(ObserveAllChats, 1);
-ASSERT_SIZE(DeleteControllerById, 4);
-ASSERT_SIZE(UploadFile, 547);
+ASSERT_SIZE(ObserveChatId, 16);
+ASSERT_SIZE(SendFileToChatId, 272);
+ASSERT_SIZE(ObserveAllChats, 8);
+ASSERT_SIZE(DeleteControllerById, 8);
+ASSERT_SIZE(UploadFile, 552);
 ASSERT_SIZE(DownloadFile, 512);
-ASSERT_SIZE(PacketHeader, 24);
+ASSERT_SIZE(PacketHeader, 32);
 }  // namespace TgBotSocket::data
 
 namespace TgBotSocket::callback {
-ASSERT_SIZE(GetUptimeCallback, 21);
-ASSERT_SIZE(GenericAck, 260);
-ASSERT_SIZE(UploadFileDryCallback, 807);
+ASSERT_SIZE(GetUptimeCallback, 24);
+ASSERT_SIZE(GenericAck, 264);
+ASSERT_SIZE(UploadFileDryCallback, 816);
 }  // namespace TgBotSocket::callback
-
-#undef ASSERT_SIZE
-#ifdef _MSC_VER
-#pragma pack(pop)
-#endif
