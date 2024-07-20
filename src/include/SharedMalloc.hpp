@@ -130,8 +130,18 @@ struct SharedMalloc {
     [[nodiscard]] long use_count() const noexcept { return parent.use_count(); }
 
     bool operator==(const SharedMalloc &other) const noexcept {
+        // Check for self-comparison
+        if (this == &other) {
+            return true;
+        }
+        // Check if both shared memory blocks have same size
         if (parent->getSize() != other.parent->getSize()) {
             return false;
+        }
+        // Check if either shared memory blocks are nullptr.
+        // If so, then we don't need to pass it to memcmp
+        if (get() == nullptr || other.get() == nullptr) {
+            return get() == other.get();
         }
         return memcmp(get(), other.get(), parent->getSize()) == 0;
     }
