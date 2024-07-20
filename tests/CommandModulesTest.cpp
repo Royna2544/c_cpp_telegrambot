@@ -258,9 +258,10 @@ class CommandModulesTest : public ::testing::Test {
                                                  TEST_MEDIA_UNIQUEID};
 
     std::shared_ptr<MockTgBotApi> botApi = std::make_shared<MockTgBotApi>();
-    MockDatabase database;
+    static MockDatabase database;
     std::filesystem::path modulePath;
 };
+MockDatabase CommandModulesTest::database;
 
 TEST_F(CommandModulesTest, loadDatabase) {
     auto dbinst = TgBotDatabaseImpl::getInstance();
