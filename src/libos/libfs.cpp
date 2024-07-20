@@ -64,6 +64,10 @@ std::filesystem::path FS::getPathForType(PathType type) {
             if (GitData::Fill(&data)) {
                 path = data.gitSrcRoot;
                 ok = true;
+            } else {
+                // If we cannot determine, use build_root/../
+                path = getPathForType(PathType::BUILD_ROOT).parent_path();
+                ok = true;
             }
             break;
         case PathType::RESOURCES:
@@ -72,6 +76,12 @@ std::filesystem::path FS::getPathForType(PathType type) {
             ok = true;
             break;
         case PathType::MODULES_INSTALLED:
+            if (!GitData::Fill(&data)) {
+                path = getPathForType(PathType::BUILD_ROOT).parent_path() / "lib" / "commands";
+                ok = true;
+                break;
+            }
+            [[fallthrough]];
         case PathType::BUILD_ROOT: {
             path = std::filesystem::path((*CommandLine::getInstance())[0])
                        .parent_path();

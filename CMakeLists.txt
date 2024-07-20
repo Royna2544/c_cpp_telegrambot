@@ -8,6 +8,12 @@ cmake_policy(SET CMP0077 NEW) # option() command prefers to do nothing
 include(cmake/macros.cmake)
 include(cmake/variables.cmake)
 include(cmake/sanitizers.cmake)
+# Set RPATH for Unix-like systems
+if(UNIX)
+    set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+    set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
+    set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
+endif()
 ################ EXE NAMES STEMMED FROM PROJECT_NAME ################
 set(PROJECT_MAINEXE_NAME ${PROJECT_NAME}_main)
 #####################################################################
@@ -40,6 +46,7 @@ function(add_my_library)
   else()
     add_library(${TGBOT_LIBRARY_NAME} SHARED ${TGBOT_LIBRARY_SRCS})
   endif()
+  install(TARGETS ${TGBOT_LIBRARY_NAME} DESTINATION lib)
   set_target_properties(${TGBOT_LIBRARY_NAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)
   add_sanitizers(${TGBOT_LIBRARY_NAME})
   set(EXPORTCONF_DIR ${CMAKE_BINARY_DIR}/exportConfig/)
@@ -56,6 +63,28 @@ function(add_my_library)
     add_dependencies(${TGBOT_LIBRARY_NAME} ${TGBOT_LIBRARY_DEPENDS})
   endif()
 endfunction(add_my_library)
+
+function(add_my_executable)
+  cmake_parse_arguments(TGBOT_EXE
+    "NO_PREFIX" # Options
+    "NAME" # One-value keywords
+    "SRCS;LIBS;LIBS_WIN32" # Multiple-value keywords
+    ${ARGN}
+  )
+  if (NOT TGBOT_EXE_SRCS OR NOT TGBOT_EXE_NAME)
+    message(FATAL_ERROR "Must specify src or name")
+  endif()
+  if (NOT TGBOT_EXE_NO_PREFIX)
+    set(TGBOT_EXE_NAME ${PROJECT_NAME}_${TGBOT_EXE_NAME})
+  endif()
+  add_executable(${TGBOT_EXE_NAME} ${TGBOT_EXE_SRCS})
+  install(TARGETS ${TGBOT_EXE_NAME} DESTINATION bin)
+  add_sanitizers(${TGBOT_EXE_NAME})
+  target_link_libraries(${TGBOT_EXE_NAME} absl::log TgBotLogInit ${TGBOT_EXE_LIBS})
+  if (WIN32)
+    target_link_libraries(${TGBOT_EXE_NAME} ${TGBOT_EXE_LIBS_WIN32})
+  endif()
+endfunction(add_my_executable)
 
 ############################ RUST support ###########################
 if (ENABLE_RUST_SUPPORT)
@@ -163,12 +192,12 @@ add_subdirectory(src/imagep)
 add_subdirectory(src/stringres)
 add_subdirectory(src/logging)
 add_subdirectory(src/third-party/cpp-httplib)
-add_subdirectory(src/third-party/tgbot-cpp EXCLUDE_FROM_ALL)
-add_subdirectory(src/third-party/googletest EXCLUDE_FROM_ALL)
-add_subdirectory(src/third-party/abseil-cpp EXCLUDE_FROM_ALL)
-add_subdirectory(src/third-party/protobuf EXCLUDE_FROM_ALL)
+add_subdirectory(src/third-party/tgbot-cpp)
+add_subdirectory(src/third-party/googletest)
+add_subdirectory(src/third-party/abseil-cpp)
+add_subdirectory(src/third-party/protobuf)
 if (WIN32)
-  add_subdirectory(src/third-party/dlfcn-win32 EXCLUDE_FROM_ALL)
+  add_subdirectory(src/third-party/dlfcn-win32)
   set(CMAKE_DL_LIBS dl)
 endif()
 add_subdirectory(tests)
@@ -214,7 +243,12 @@ add_my_library(
 #####################################################################
 
 ################# The Bot's main launcher (program) #################
-add_executable_san(${PROJECT_MAINEXE_NAME} src/main.cpp)
-target_link_libraries(${PROJECT_MAINEXE_NAME} TgBotPPImpl TgBotLogInit)
+add_my_executable(
+  NAME main
+  SRCS src/main.cpp
+  LIBS TgBotPPImpl TgBotLogInit
+)
 #####################################################################
 
+install(DIRECTORY resources/ DESTINATION resources FILES_MATCHING  PATTERN "*"
+  PATTERN "*.in" EXCLUDE)

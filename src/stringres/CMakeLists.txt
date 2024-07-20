@@ -17,8 +17,12 @@ add_my_library(
   DEPENDS gen_stringres_header
 )
 
-add_executable_san(StringResCompiler StringResCompiler.cpp)
-target_link_libraries(StringResCompiler TgBotStringRes TgBotLogInit)
+add_my_executable(
+  NAME StringResCompiler
+  SRCS StringResCompiler.cpp
+  LIBS TgBotStringRes
+  NO_PREFIX
+)
 
 set(STRINGRES_XML ${CMAKE_SOURCE_DIR}/resources/strings/en-US.xml)
 set(STRINGRES_GENHDR_DIR ${CMAKE_CURRENT_BINARY_DIR})

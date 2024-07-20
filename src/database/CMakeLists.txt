@@ -27,16 +27,21 @@ add_my_library(
 )
 
 ################# Utility Programs (Database Ctl) ##################
-set(DBCTRL_NAME ${PROJECT_NAME}_DatabaseCtl)
-add_executable_san(${DBCTRL_NAME} utils/DatabaseCtrl.cc)
-target_link_libraries(${DBCTRL_NAME} TgBotDBImpl TgBotLogInit)
+add_my_executable(
+  NAME DatabaseCtl
+  SRCS utils/DatabaseCtrl.cc
+  LIBS TgBotDBImpl
+)
 #####################################################################
 
 ############### Utility Programs (Send Media to chat) ################
 if (USE_UNIX_SOCKETS)
-  set(MEDIA_CLI_NAME ${PROJECT_NAME}_MediaCli)
-  add_executable_san(${MEDIA_CLI_NAME} utils/SendMediaToChat.cc)
-  target_link_libraries(${MEDIA_CLI_NAME} TgBotDBImpl TgBotSocket TgBotLogInit)
-  target_link_lib_if_windows(${MEDIA_CLI_NAME} Ws2_32)
+  add_my_executable(
+    NAME MediaCli
+    SRCS utils/SendMediaToChat.cc
+    LIBS 
+      TgBotDBImpl
+      TgBotSocket
+  )
 endif()
 #####################################################################
