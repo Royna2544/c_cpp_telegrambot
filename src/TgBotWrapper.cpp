@@ -31,7 +31,7 @@ void TgBotWrapper::addCommand(const CommandModule& module, bool isReload) {
     if (!module.isEnforced()) {
         authflags |= AuthContext::Flags::PERMISSIVE;
     }
-    getEvents().onCommand(module.command, [this, authflags, &module](
+    getEvents().onCommand(module.command, [this, authflags, module](
                                               const Message::Ptr& message) {
         commandHandler(module.fn, authflags, message);
     });
