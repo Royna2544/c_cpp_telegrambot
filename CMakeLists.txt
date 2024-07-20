@@ -24,7 +24,7 @@ configure_file(resources/about.html.in ${CMAKE_SOURCE_DIR}/resources/about.html)
 ################## Add a common logging init lib ####################
 function(add_my_library)
   cmake_parse_arguments(TGBOT_LIBRARY
-    "NO_LIBSUFFIX" # Options
+    "NO_LIBPREFIX;STATIC" # Options
     "NAME" # One-value keywords
     "SRCS;LIBS;PUBLIC_INC;PRIVATE_INC;DEPENDS;DEFS;LIBS_WIN32" # Multiple-value keywords
     ${ARGN}
@@ -32,10 +32,15 @@ function(add_my_library)
   if (NOT TGBOT_LIBRARY_SRCS OR NOT TGBOT_LIBRARY_NAME)
     message(FATAL_ERROR "Must specify src or name")
   endif()
-  if (NOT TGBOT_LIBRARY_NO_LIBSUFFIX)
+  if (NOT TGBOT_LIBRARY_NO_LIBPREFIX)
     set(TGBOT_LIBRARY_NAME TgBot${TGBOT_LIBRARY_NAME})
   endif()
-  add_library(${TGBOT_LIBRARY_NAME} SHARED ${TGBOT_LIBRARY_SRCS})
+  if (TGBOT_LIBRARY_STATIC)
+    add_library(${TGBOT_LIBRARY_NAME} STATIC ${TGBOT_LIBRARY_SRCS})
+  else()
+    add_library(${TGBOT_LIBRARY_NAME} SHARED ${TGBOT_LIBRARY_SRCS})
+  endif()
+  set_target_properties(${TGBOT_LIBRARY_NAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)
   add_sanitizers(${TGBOT_LIBRARY_NAME})
   set(EXPORTCONF_DIR ${CMAKE_BINARY_DIR}/exportConfig/)
   configure_file(${CMAKE_SOURCE_DIR}/src/include/LibraryExports.h.inc
@@ -118,15 +123,10 @@ endif()
 
 ############################ Source list ############################
 set(SRC_LIST
-  src/Authorization.cpp
-  src/ManagedThread.cpp
   src/RegEXHandler.cpp
   src/RegEXHandlerImpl.cpp
   src/SpamBlocker.cpp
-  src/ThreadManager.cpp
-  src/TgBotWrapper.cpp
   src/RTCommandLoader.cpp
-  src/stringres/StringResManager.cpp
 )
 #####################################################################
 
@@ -135,11 +135,24 @@ add_my_library(
   NAME SQLite3
   SRCS src/third-party/libsqlite3/libsqlite3/libsqlite3/sqlite3.c
   PUBLIC_INC src/third-party/libsqlite3/libsqlite3/libsqlite3/
-  NO_LIBSUFFIX
+  NO_LIBPREFIX
 )
 add_my_library(
   NAME CommandLine
   SRCS src/CommandLine.cpp
+)
+add_my_library(
+  NAME PPImpl_shared_deps
+  SRCS 
+    src/Authorization.cpp
+    src/ManagedThread.cpp
+    src/ThreadManager.cpp
+    src/TgBotWrapper.cpp
+  LIBS
+    TgBot
+    TgBotStringResManager
+    TgBotRandom
+    TgBotDBImpl
 )
 
 add_subdirectory(src/android_builder)
@@ -189,14 +202,14 @@ include(cmake/tgbotutils.cmake)
 #####################################################################
 
 ################### The Bot's main functionaility ###################
-set(LD_LIST TgBot TgBotDBImpl TgBotUtils TgBotWeb TgBotStringRes TgBotRandom ${CMAKE_DL_LIBS})
+set(LD_LIST TgBot TgBotUtils TgBotWeb
+            TgBotStringResManager TgBotPPImpl_shared_deps ${CMAKE_DL_LIBS})
 extend_set_if(LD_LIST USE_UNIX_SOCKETS TgBotSocket)
 add_my_library(
   NAME PPImpl
   SRCS ${SRC_LIST}
   PRIVATE_INC src/third-party/rapidjson/include
   LIBS ${LD_LIST}
-  DEPENDS gen_stringres_header
 )
 #####################################################################
 

@@ -8,7 +8,7 @@ add_my_library(
         Helper.cpp
     LIBS
         TgBotUtils
-        TgBotStringRes
+        TgBotStringResManager
         TgBot
         TgBotRandom
         TgBot_popen_wdt

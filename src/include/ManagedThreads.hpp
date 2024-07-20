@@ -1,6 +1,6 @@
 #pragma once
 
-#include <TgBotPPImplExports.h>
+#include <TgBotPPImpl_shared_depsExports.h>
 #include <absl/log/check.h>
 #include <absl/log/log.h>
 
@@ -19,10 +19,10 @@
 #include "EnumArrayHelpers.h"
 #include "InstanceClassBase.hpp"
 
-
 struct ManagedThread;
 
-class TgBotPPImpl_API ThreadManager : public InstanceClassBase<ThreadManager> {
+class TgBotPPImpl_shared_deps_API ThreadManager
+    : public InstanceClassBase<ThreadManager> {
    public:
     using controller_type = std::shared_ptr<ManagedThread>;
 
@@ -75,7 +75,7 @@ class TgBotPPImpl_API ThreadManager : public InstanceClassBase<ThreadManager> {
     std::unordered_map<Usage, controller_type> kControllers;
 };
 
-struct TgBotPPImpl_API ManagedThread {
+struct TgBotPPImpl_shared_deps_API ManagedThread {
     using thread_function = std::function<void(void)>;
     using prestop_function = std::function<void(ManagedThread*)>;
 
@@ -144,7 +144,7 @@ struct TgBotPPImpl_API ManagedThread {
     } mgr_priv{};
 };
 
-struct TgBotPPImpl_API ManagedThreadRunnable : ManagedThread {
+struct TgBotPPImpl_shared_deps_API ManagedThreadRunnable : ManagedThread {
     using ManagedThread::ManagedThread;
     using ManagedThread::runWith;
     virtual void runFunction() = 0;

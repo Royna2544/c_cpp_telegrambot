@@ -1,5 +1,5 @@
 #include <CStringLifetime.h>
-#include <TgBotStringResExports.h>
+#include <TgBotStringResManagerExports.h>
 #include <resources.gen.h>
 
 #include <InstanceClassBase.hpp>
@@ -13,7 +13,7 @@
 #define GETSTR_BRACE(x) ("(" + GETSTR(x) + ")")
 
 // Implementation of StringResManager
-struct TgBotStringRes_API StringResManager
+struct TgBotStringResManager_API StringResManager
     : InstanceClassBase<StringResManager>,
       InitCall,
       StringResLoader {

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <TgBotPPImplExports.h>
+#include <TgBotPPImpl_shared_depsExports.h>
 #include <Types.h>
 #include <tgbot/types/Message.h>
 
@@ -10,7 +10,8 @@
 
 using TgBot::Message;
 
-class TgBotPPImpl_API AuthContext : public InstanceClassBase<AuthContext> {
+class TgBotPPImpl_shared_deps_API AuthContext
+    : public InstanceClassBase<AuthContext> {
    public:
     enum Flags : unsigned int {
         REQUIRE_USER = 0x1,  // If set, don't allow non-users

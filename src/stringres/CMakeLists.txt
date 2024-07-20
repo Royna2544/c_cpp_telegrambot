@@ -7,7 +7,16 @@ add_my_library(
   LIBS ${LIBXML2_LIBRARIES}
   PUBLIC_INC .
   PRIVATE_INC ${LIBXML2_INCLUDE_DIR}
+  STATIC
 )
+
+add_my_library(
+  NAME StringResManager
+  SRCS StringResManager.cpp
+  LIBS TgBotStringRes TgBotUtils
+  DEPENDS gen_stringres_header
+)
+
 add_executable_san(StringResCompiler StringResCompiler.cpp)
 target_link_libraries(StringResCompiler TgBotStringRes TgBotLogInit)
 
@@ -26,4 +35,4 @@ add_custom_target(gen_stringres_header
   COMMENT "Generating string resource header"
   DEPENDS ${STRINGRES_XML} ${STRINGRES_GENHDR})
 set_source_files_properties(${STRINGRES_GENHDR} PROPERTIES GENERATED TRUE)
-target_include_directories(TgBotStringRes PUBLIC ${STRINGRES_GENHDR_DIR})
+target_include_directories(TgBotStringResManager PUBLIC ${STRINGRES_GENHDR_DIR})

@@ -1,10 +1,18 @@
-add_library(TgBot_popen_wdt STATIC
-    popen_wdt/popen_wdt_${TARGET_VARIANT}.c
-    popen_wdt/popen_wdt.c
+add_my_library(
+    NAME _popen_wdt
+    SRCS
+        popen_wdt/popen_wdt_${TARGET_VARIANT}.c
+        popen_wdt/popen_wdt.c
+    PUBLIC_INC
+        popen_wdt
+    STATIC
 )
-target_include_directories(TgBot_popen_wdt PUBLIC popen_wdt)
 
-add_library(TgBot_portable_semaphore STATIC 
-    portable_sem/portable_sem.c
+add_my_library(
+    NAME _portable_semaphore
+    SRCS
+        portable_sem/portable_sem.c
+    PUBLIC_INC
+        portable_sem
+    STATIC
 )
-target_include_directories(TgBot_portable_semaphore PUBLIC portable_sem)

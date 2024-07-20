@@ -29,6 +29,6 @@ add_my_library(
         ${LIBGIT2_LIBS}
     PUBLIC_INC
         .
-    NO_LIBSUFFIX
+    NO_LIBPREFIX
 )
 endif()

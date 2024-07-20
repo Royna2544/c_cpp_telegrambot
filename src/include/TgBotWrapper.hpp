@@ -1,7 +1,7 @@
 #pragma once
 
 #include <Authorization.h>
-#include <TgBotPPImplExports.h>
+#include <TgBotPPImpl_shared_depsExports.h>
 #include <tgbot/tgbot.h>
 
 #include <boost/algorithm/string/trim.hpp>
@@ -77,7 +77,7 @@ struct CommandModule : TgBot::BotCommand {
  * such as animations, photos, and videos. It provides methods to compare media
  * IDs, check for emptiness, and construct instances from different media types.
  */
-struct TgBotPPImpl_API MediaIds {
+struct MediaIds {
     std::string id;        //!< The Telegram media ID.
     std::string uniqueid;  //!< The Telegram media unique ID.
 
@@ -488,7 +488,7 @@ struct TgBotApi {
 // A class to effectively wrap TgBot::Api to stable interface
 // This class owns the Bot instance, and users of this code cannot directly
 // access it.
-class TgBotPPImpl_API TgBotWrapper
+class TgBotPPImpl_shared_deps_API TgBotWrapper
     : public InstanceClassBase<TgBotWrapper>,
       public TgBotApi,
       public std::enable_shared_from_this<TgBotWrapper> {

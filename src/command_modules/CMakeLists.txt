@@ -36,7 +36,8 @@ function(command_module)
     endif()
     set(TGBOT_CMDMODULE_LIBNAME cmd_${TGBOT_CMDMODULE_NAME})
     add_library(${TGBOT_CMDMODULE_LIBNAME} ${TGBOT_CMDMODULE_SRCS})
-    target_link_libraries(${TGBOT_CMDMODULE_LIBNAME} ${TGBOT_CMDMODULE_LIBS} TgBotPPImpl absl::log TgBotStringRes)
+    target_link_libraries(${TGBOT_CMDMODULE_LIBNAME} ${TGBOT_CMDMODULE_LIBS}
+                          TgBotPPImpl_shared_deps absl::log TgBotStringResManager)
 endfunction()
 
 function(multi_command_module)
