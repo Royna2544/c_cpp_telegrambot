@@ -28,6 +28,7 @@ struct popen_wdt_posix_priv {
     pthread_t wdt_thread;
     pid_t wdt_pid;
     int pipefd_r;  // Subprocess' readfd, write end for the child
+    bool running;
 };
 
 static pthread_mutex_t wdt_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -53,6 +54,7 @@ static void *watchdog(void *arg) {
         POPEN_WDT_DBGLOG("Watchdog activated");
     }
     POPEN_WDT_DBGLOG("--");
+    pdata->running = false;
     return NULL;
 }
 
@@ -114,6 +116,7 @@ bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
         if (data->watchdog_enabled) {
             pdata->wdt_pid = getpid();
         }
+        pdata->running = true;
         setpgrp();
         close(pipefd[0]);
         close(STDIN_FILENO);
@@ -141,13 +144,19 @@ void popen_watchdog_stop(popen_watchdog_data_t **data_in) {
     popen_watchdog_data_t *data = *data_in;
     struct popen_wdt_posix_priv *pdata = data->privdata;
 
+    if (!pdata->running) {
+        pthread_mutex_unlock(&wdt_mutex);
+        return;
+    }
     if (data->watchdog_enabled) {
+        POPEN_WDT_DBGLOG("Stopping watchdog");
         pthread_cancel(pdata->wdt_thread);
         pthread_mutex_unlock(&wdt_mutex);
         pthread_join(pdata->wdt_thread, NULL);
     } else {
         pthread_mutex_unlock(&wdt_mutex);
     }
+    pdata->running = false;
 }
 
 void popen_watchdog_destroy(popen_watchdog_data_t **data_in) {
