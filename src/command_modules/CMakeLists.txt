@@ -39,6 +39,7 @@ function(command_module)
     target_link_libraries(${TGBOT_CMDMODULE_LIBNAME} ${TGBOT_CMDMODULE_LIBS}
                           TgBotPPImpl_shared_deps absl::log TgBotStringResManager)
     install(TARGETS ${TGBOT_CMDMODULE_LIBNAME} DESTINATION lib/commands)
+    add_sanitizers(${TGBOT_CMDMODULE_LIBNAME})
 endfunction()
 
 function(multi_command_module)

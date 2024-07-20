@@ -1,6 +1,6 @@
-set(SANITIZE_ADDRESS OFF)  # Enable ASanitizer
+set(SANITIZE_ADDRESS ON)  # Enable ASanitizer
 set(SANITIZE_THREAD OFF)  # Disable TSanitizer
-set(SANITIZE_UNDEFINED OFF)  # Enable UBSan
+set(SANITIZE_UNDEFINED ON)  # Enable UBSan
 
 # MSYS2 is special - They don't have any sanitizers
 if (WIN32)
@@ -25,16 +25,3 @@ macro(add_sanitizers target)
     endif()
 endmacro()
 
-# Convenience function
-macro(add_executable_san target)
-    add_executable(${target} ${ARGN})
-
-    add_sanitizers(${target})
-endmacro()
-
-# Convenience function
-macro(add_library_san target)
-    add_library(${target} ${ARGN})
-
-    add_sanitizers(${target})
-endmacro()
