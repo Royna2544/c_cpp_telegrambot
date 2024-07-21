@@ -1,5 +1,11 @@
 ############### Bot functions' Test Arena (googletest) ##############
 ###################### Creates the test target ######################
+if (USE_UNIX_SOCKETS)
+  set(SOCKET_TEST_FILE SocketDataHandlerTest.cpp)
+else()
+  set(SOCKET_TEST_FILE)
+endif()
+
 add_my_executable(
   NAME test
   SRCS
@@ -14,7 +20,7 @@ add_my_executable(
     SharedMallocTest.cpp
     ConstexprStringCatTest.cpp
     CommandModulesTest.cpp
-    SocketDataHandlerTest.cpp
+    ${SOCKET_TEST_FILE}
   LIBS
     gtest
     gmock
