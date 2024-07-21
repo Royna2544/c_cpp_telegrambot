@@ -10,7 +10,7 @@ add_my_library(
 add_my_executable(
   NAME SocketCli
   SRCS TgBotSocketClient.cpp
-  LIBS TgBotSocket
+  LIBS TgBotSocket OpenSSL::Crypto
 )
 
 include(TestBigEndian)

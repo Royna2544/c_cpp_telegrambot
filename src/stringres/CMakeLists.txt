@@ -7,7 +7,6 @@ add_my_library(
   LIBS ${LIBXML2_LIBRARIES}
   PUBLIC_INC .
   PRIVATE_INC ${LIBXML2_INCLUDE_DIR}
-  STATIC
 )
 
 add_my_library(

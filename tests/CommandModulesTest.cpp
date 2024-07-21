@@ -269,6 +269,7 @@ TEST_F(CommandModulesTest, loadDatabase) {
     EXPECT_CALL(database, loadDatabaseFromFile(_)).WillOnce(Return(true));
     ASSERT_TRUE(dbinst->setImpl(&database));
     ASSERT_TRUE(dbinst->loadDatabaseFromFile({}));
+    Mock::VerifyAndClearExpectations(&database);
 }
 
 TEST_F(CommandModulesTest, TestCommandAlive) {

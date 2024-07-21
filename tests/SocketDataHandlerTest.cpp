@@ -68,4 +68,5 @@ TEST_F(SocketDataHandlerTest, TestCmdGetUptime) {
     EXPECT_EQ(recv_header.data_size, sizeof(cbt));
     packetData.assignTo(&callbackData, sizeof(cbt), TgBotSocket::Packet::hdr_sz);
     EXPECT_STREQ(callbackData.uptime.data(), "Uptime: 0h 0m 0s");
+    testing::Mock::VerifyAndClearExpectations(&_mockImpl);
 }

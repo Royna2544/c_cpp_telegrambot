@@ -2,8 +2,12 @@
 
 #include <ConfigManager.h>
 
+#ifdef HAVE_PROTOBUF
 #include <database/ProtobufDatabase.hpp>
+#endif
+#ifdef HAVE_SQLITE
 #include <database/SQLiteDatabase.hpp>
+#endif
 #include <filesystem>
 #include <libos/libfs.hpp>
 #include <memory>
@@ -173,12 +177,22 @@ void TgBotDatabaseImpl::doInitCall() {
         DLOG(INFO) << "Database filename: " << filenameStr;
 
         if (backendStr == "sqlite") {
+#ifdef HAVE_SQLITE
             setImpl(std::make_unique<SQLiteDatabase>());
+#else
+            LOG(ERROR) << "SQLite support is not available in this build";
+            goto fail;
+#endif
         } else if (backendStr == "protobuf") {
+#ifdef HAVE_PROTOBUF
             setImpl(std::make_unique<ProtoDatabase>());
+#else
+            LOG(ERROR) << "Proto support is not available in this build";
+            goto fail;
+#endif
         } else {
             LOG(ERROR) << "Invalid database backend: " << backendStr;
-            return;
+            goto fail;
         }
 
         std::filesystem::path parent;
@@ -196,6 +210,7 @@ void TgBotDatabaseImpl::doInitCall() {
             DLOG(INFO) << "Database loaded";
         }
     }
+fail:
     if (!loaded) {
         LOG(ERROR) << "Failed to load database, the bot will not be able to "
                       "save changes.";

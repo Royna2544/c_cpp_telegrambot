@@ -5,9 +5,11 @@ project(TgBot++ LANGUAGES CXX C)
 cmake_policy(SET CMP0077 NEW) # option() command prefers to do nothing
                               # when a normal variable of the given name already exists.
 
-include(cmake/macros.cmake)
-include(cmake/variables.cmake)
-include(cmake/sanitizers.cmake)
+include(CMake/macros.cmake)
+include(CMake/variables.cmake)
+include(CMake/sanitizers.cmake)
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake")
+
 # Set RPATH for Unix-like systems
 if(UNIX)
     set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
@@ -131,14 +133,11 @@ find_package(CURL)
 if (${CURL_FOUND})
   add_definitions(-DHAVE_CURL)
 endif()
+find_package(libgit2 REQUIRED)
+find_package(Boost COMPONENTS program_options REQUIRED)
+find_package(absl REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(ZLIB REQUIRED)
-if (APPLE)
-    find_library(CORE_FOUNDATION CoreFoundation REQUIRED)
-    find_library(SECURITY Security REQUIRED)
-    set(MACOS_SSL_LIBS ${CORE_FOUNDATION} ${SECURITY})
-endif()
-find_package(Boost COMPONENTS program_options REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})
 #####################################################################
 
@@ -156,16 +155,11 @@ set(SRC_LIST
   src/RegEXHandlerImpl.cpp
   src/SpamBlocker.cpp
   src/RTCommandLoader.cpp
+  src/web/TgBotWebServer.cpp
 )
 #####################################################################
 
 ######################## Define SQLite3 target ######################
-add_my_library(
-  NAME SQLite3
-  SRCS src/third-party/libsqlite3/libsqlite3/libsqlite3/sqlite3.c
-  PUBLIC_INC src/third-party/libsqlite3/libsqlite3/libsqlite3/
-  NO_LIBPREFIX
-)
 add_my_library(
   NAME CommandLine
   SRCS src/CommandLine.cpp
@@ -191,26 +185,15 @@ add_subdirectory(src/command_modules)
 add_subdirectory(src/imagep)
 add_subdirectory(src/stringres)
 add_subdirectory(src/logging)
+add_subdirectory(src/web)
 add_subdirectory(src/third-party/cpp-httplib)
 add_subdirectory(src/third-party/tgbot-cpp)
-add_subdirectory(src/third-party/googletest)
-add_subdirectory(src/third-party/abseil-cpp)
-add_subdirectory(src/third-party/protobuf)
 if (WIN32)
   add_subdirectory(src/third-party/dlfcn-win32)
   set(CMAKE_DL_LIBS dl)
 endif()
 add_subdirectory(tests)
 #################################################################
-
-########################## WebPage Server ##########################
-add_my_library(
-  NAME Web 
-  SRCS src/web/WebServerBase.cpp
-  LIBS httplib::httplib
-)
-extend_set(SRC_LIST src/web/TgBotWebServer.cpp)
-####################################################################
 
 ####################### TgBot Socket Library #######################
 if (USE_UNIX_SOCKETS)
@@ -227,11 +210,11 @@ endif()
 #####################################################################
 
 ################# TgBot Utilities (generic) Library #################
-include(cmake/tgbotutils.cmake)
+include(CMake/tgbotutils.cmake)
 #####################################################################
 
 ################### The Bot's main functionaility ###################
-set(LD_LIST TgBot TgBotUtils TgBotWeb
+set(LD_LIST TgBot TgBotUtils TgBotWeb absl::status
             TgBotStringResManager TgBotPPImpl_shared_deps ${CMAKE_DL_LIBS})
 extend_set_if(LD_LIST USE_UNIX_SOCKETS TgBotSocket)
 add_my_library(

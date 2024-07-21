@@ -4,24 +4,9 @@
 [submodule "src/third-party/dlfcn-win32"]
 	path = src/third-party/dlfcn-win32
 	url = https://github.com/dlfcn-win32/dlfcn-win32.git
-[submodule "src/third-party/googletest"]
-	path = src/third-party/googletest
-	url = https://github.com/google/googletest.git
-[submodule "src/third-party/libgit2"]
-	path = src/third-party/libgit2
-	url = https://github.com/libgit2/libgit2.git
 [submodule "src/third-party/rapidjson"]
 	path = src/third-party/rapidjson
 	url = https://github.com/Tencent/rapidjson.git
-[submodule "src/third-party/abseil-cpp"]
-	path = src/third-party/abseil-cpp
-	url = https://github.com/abseil/abseil-cpp.git
-[submodule "src/third-party/protobuf"]
-	path = src/third-party/protobuf
-	url = https://github.com/protocolbuffers/protobuf.git
-[submodule "src/third-party/libsqlite3"]
-	path = src/third-party/libsqlite3
-	url = git://git.build2.org/packaging/sqlite/sqlite.git
 [submodule "src/third-party/corrosion"]
 	path = src/third-party/corrosion
 	url = https://github.com/corrosion-rs/corrosion

@@ -1,4 +1,5 @@
 # TgBotSocket library
+
 if (UNIX)
   set(SOCKET_SRC_LIST
     impl/SocketPosix.cpp
@@ -32,9 +33,11 @@ extend_set(SOCKET_SRC_LIST
   impl/helper/SocketHelper.cpp
   impl/bot/TgBotPacketParser.cpp)
 
+set(CURL_LIBS)
 if (CURL_FOUND)
   extend_set(SOCKET_SRC_LIST
     impl/helper/SocketHelperCurl.cpp)
+  set(CURL_LIBS ${CURL_LIBRARIES})
 else()
   extend_set(SOCKET_SRC_LIST
     impl/helper/SocketHelperNoCurl.cpp)
@@ -45,6 +48,6 @@ add_my_library(
   SRCS ${SOCKET_SRC_LIST}
   PRIVATE_INC ${CURL_INCLUDE_DIRS}
   PUBLIC_INC . ../include
-  LIBS TgBotUtils TgBotSocketSelectors TgBotSocketCommandMap CURL::libcurl
+  LIBS TgBotUtils TgBotSocketSelectors TgBotSocketCommandMap ${CURL_LIBS}  ZLIB::ZLIB
   LIBS_WIN32 wsock32 Ws2_32
 )

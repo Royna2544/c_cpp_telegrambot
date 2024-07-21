@@ -17,7 +17,7 @@
 #include <string_view>
 #include <utility>
 
-#include "../../socket/selector/SelectorPosix.hpp"
+#include <SelectorPosix.hpp>
 #include "compiler/CompilerInTelegram.hpp"  // BASH_MAX_BUF, BASH_READ_BUF
 
 using std::chrono_literals::operator""s;

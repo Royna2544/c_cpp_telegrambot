@@ -1,29 +1,48 @@
+find_package(SQLite3)
+find_package(Protobuf)
 
+if (NOT ${SQLite3_FOUND} AND NOT ${Protobuf_FOUND})
+  message(FATAL_ERROR "Failed to find suitable backend, abort")
+endif()
 ####################### Database (Protobuf) #######################
-include(proto/ProtobufCpp.cmake)
-my_protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS proto/TgBotDB.proto)
-####################### TgBotDB lib includes #######################
-get_filename_component(PROTO_HDRS_DIR ${PROTO_HDRS} DIRECTORY)
+set(DATABASE_LIBS)
+set(DATABASE_DEFS)
+if (${Protobuf_FOUND})
+  protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS proto/TgBotDB.proto)
+  get_filename_component(PROTO_HDRS_DIR ${PROTO_HDRS} DIRECTORY)
+  list(APPEND PROTO_SRCS ProtobufDatabase.cpp)
+  list(APPEND DATABASE_LIBS ${Protobuf_LIBRARIES})
+  list(APPEND DATABASE_DEFS -DHAVE_PROTOBUF)
+else()
+  set(PROTO_SRCS)
+  set(PROTO_HDRS_DIR)
+endif()
+
+if (${SQLite3_FOUND})
+  set(SQLITE_SRCS SQLiteDatabase.cpp)
+  list(APPEND DATABASE_LIBS ${SQLite3_LIBRARIES})
+  list(APPEND DATABASE_DEFS -DHAVE_SQLITE)
+endif()
+
 add_my_library(
   NAME DB 
   SRCS
-    ProtobufDatabase.cpp
-    SQLiteDatabase.cpp
+    ${SQLITE_SRCS}
     ${PROTO_SRCS}
-  DEPENDS
-    protobuf_TgBotDB_ready
   PUBLIC_INC 
     ${PROTO_HDRS_DIR}
   PRIVATE_INC
     ${Protobuf_INCLUDE_DIRS}
   LIBS
-    protobuf::libprotobuf SQLite3 TgBotUtils
+    ${DATABASE_LIBS} TgBotUtils
 )
 
 add_my_library(
   NAME DBImpl
   SRCS bot/TgBotDatabaseImpl.cpp
   LIBS TgBotUtils TgBotDB
+  DEFS
+    ${DATABASE_DEFS}
 )
 
 ################# Utility Programs (Database Ctl) ##################
@@ -42,6 +61,7 @@ if (USE_UNIX_SOCKETS)
     LIBS 
       TgBotDBImpl
       TgBotSocket
+      OpenSSL::Crypto
   )
 endif()
 #####################################################################

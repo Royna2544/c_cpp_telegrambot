@@ -1,4 +1,9 @@
-find_package(Python COMPONENTS Development REQUIRED)
+find_package(Python COMPONENTS Development)
+
+if (NOT ${Python_FOUND})
+    message(STATUS "Python dev package not found, disable AndroidBuilder-cpp")
+    return()
+endif()
 
 add_my_library(
     NAME Python
