@@ -220,7 +220,7 @@ struct SQLiteDatabase : DatabaseBase {
          */
         struct Argument {
             ArgTypes parameter;
-            int index;
+            std::vector<ArgTypes>::size_type index;
         };
 
         /**
