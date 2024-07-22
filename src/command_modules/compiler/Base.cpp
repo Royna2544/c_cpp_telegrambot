@@ -69,8 +69,6 @@ void CompilerInTg::runCommand(std::string cmd, std::stringstream &res,
     if (use_wdt) {
         if (popen_watchdog_activated(&p_wdt_data)) {
             _interface->onWdtTimeout();
-        } else {
-            popen_watchdog_stop(&p_wdt_data);
         }
     }
     popen_watchdog_destroy(&p_wdt_data);
