@@ -63,8 +63,10 @@ struct alignas(ALIGNMENT) PacketHeader {
 
     int64_t magic = MAGIC_VALUE;  ///< Magic value to verify the packet
     Command cmd{};                ///< Command to be executed
+    [[maybe_unused]] uint32_t padding1;            ///< Padding to align `data_size` to 8 bytes
     length_type data_size{};      ///< Size of the data in the packet
     uint32_t checksum{};          ///< Checksum of the packet data
+    [[maybe_unused]] uint32_t padding2;            ///< Padding to ensure struct size is a multiple of 8 bytes
 };
 
 /**

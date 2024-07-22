@@ -16,3 +16,6 @@
 [submodule "clientapp/android/app/src/main/cpp/external/openssl"]
 	path = clientapp/android/app/src/main/cpp/external/openssl
 	url = https://github.com/openssl/openssl
+[submodule "clientapp/android/app/src/main/cpp/abseil-cpp"]
+	path = clientapp/android/app/src/main/cpp/external/abseil-cpp
+	url = https://github.com/abseil/abseil-cpp/

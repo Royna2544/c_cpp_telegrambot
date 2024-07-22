@@ -48,11 +48,12 @@ jobs:
           libwebp:p
           libjpeg:p
           opencv:p
+          libgit2:p
+          gtest:p
 
     - name: 'Setup submodule'
       run: |
         git submodule update --init
-        cp src/third-party/libsqlite3/upstream/sqlite3.h src/third-party/libsqlite3/libsqlite3/libsqlite3/sqlite3.h
 
     - name: 'Break build of test_af_unix.c'
       if: matrix.text != ''

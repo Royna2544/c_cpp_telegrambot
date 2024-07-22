@@ -107,14 +107,16 @@ endif()
 
 ################### Check Windows's AF_UNIX support ###################
 ################# Versions later than Win10 RS3 does #################
-if (WIN32)
+if (WIN32 AND NOT _USE_UNIX_SOCKETS)
   perform_test(USE_UNIX_SOCKETS)
   try_compile(USE_UNIX_SOCKETS ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/tests/test_af_unix.c)
   perform_test_ret(USE_UNIX_SOCKETS)
+  set(_USE_UNIX_SOCKETS ${USE_UNIX_SOCKETS} CACHE BOOL "Use UNIX sockets (WinSock)")
 else()
-  set(USE_UNIX_SOCKETS TRUE)
+  set(_USE_UNIX_SOCKETS TRUE CACHE BOOL "Use UNIX sockets")
 endif()
-if (USE_UNIX_SOCKETS)
+set(USE_UNIX_SOCKETS ${USE_UNIX_SOCKETS})
+if (${USE_UNIX_SOCKETS})
   add_definitions(-DSOCKET_CONNECTION)
 endif()
 #####################################################################
