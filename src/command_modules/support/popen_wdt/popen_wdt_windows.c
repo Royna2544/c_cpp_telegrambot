@@ -1,4 +1,5 @@
 #include <Windows.h>
+#include <handleapi.h>
 #include <locale.h>
 #include <memoryapi.h>
 #include <minwinbase.h>
@@ -22,6 +23,7 @@
 #else
 #define POPEN_WDT_DBGLOG(fmt, ...)
 #endif
+#define POPEN_WDT_PIPE "\\\\.\\pipe\\popen_wdt"
 
 struct popen_wdt_windows_priv {
     struct {
@@ -113,16 +115,6 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
     saAttr.bInheritHandle = TRUE;
     saAttr.lpSecurityDescriptor = NULL;
 
-    // Create pipes, disable handle inherit
-    if (!CreatePipe(&child_stdout_r, &child_stdout_w, &saAttr, 0)) {
-        return false;
-    }
-    if (!SetHandleInformation(child_stdout_r, HANDLE_FLAG_INHERIT, 0)) {
-        CloseHandle(child_stdout_r);
-        CloseHandle(child_stdout_w);
-        return false;
-    }
-
     if (wdt_data->watchdog_enabled) {
         // Alloc watchdog data
         // Create Mapping
@@ -158,28 +150,48 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
     // Setup processinfo
     si.cb = sizeof(STARTUPINFO);
     si.dwFlags |= STARTF_USESTDHANDLES;
-    si.hStdOutput = child_stdout_w;
-    si.hStdError = child_stdout_w;
+    child_stdout_w = si.hStdError = si.hStdOutput = CreateNamedPipeA(
+        POPEN_WDT_PIPE, PIPE_ACCESS_OUTBOUND | FILE_FLAG_OVERLAPPED,
+        PIPE_TYPE_BYTE | PIPE_WAIT, 1, 0, 0, 0, &saAttr);
+    if (child_stdout_w == INVALID_HANDLE_VALUE) {
+        printf("CreateNamedPipe failed with error %lu\n", GetLastError());
+        if (wdt_data->watchdog_enabled) {
+            UnmapViewOfFile(wdt_data->privdata);
+            CloseHandle(hMapFile);
+        }
+        return false;
+    }
+    child_stdout_r = CreateFileA(POPEN_WDT_PIPE, GENERIC_READ, 0, NULL,
+                                 OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
+    if (child_stdout_r == INVALID_HANDLE_VALUE) {
+        printf("CreateFile failed with error %lu\n", GetLastError());
+        if (wdt_data->watchdog_enabled) {
+            UnmapViewOfFile(wdt_data->privdata);
+            CloseHandle(hMapFile);
+        }
+        CloseHandle(child_stdout_w);
+        return false;
+    }
 
     setlocale(LC_ALL, "C");
-    
+
     // Try with default
-    success = CreateProcess(NULL, (LPSTR)wdt_data->command, NULL, NULL, TRUE,
-                            CREATE_NEW_PROCESS_GROUP | CREATE_SUSPENDED, NULL,
-                            NULL, &si, &pi);
+    success = CreateProcessA(NULL, (LPSTR)wdt_data->command, NULL, NULL, TRUE,
+                             CREATE_NEW_PROCESS_GROUP | CREATE_SUSPENDED, NULL,
+                             NULL, &si, &pi);
     POPEN_WDT_DBGLOG("Command is: %s", wdt_data->command);
 
     if (!success) {
         // Hmm? We failed? Try to append powershell -c
         // Create command line string
-        snprintf(buffer, sizeof(buffer), "powershell.exe -c \"%s\"",
-                 wdt_data->command);
+        (void)snprintf(buffer, sizeof(buffer), "powershell.exe -c \"%s\"",
+                       wdt_data->command);
         POPEN_WDT_DBGLOG("New command is: %s", buffer);
 
         // Create process again
-        success = CreateProcess(NULL, (LPSTR)buffer, NULL, NULL, TRUE,
-                                CREATE_NEW_PROCESS_GROUP | CREATE_SUSPENDED,
-                                NULL, NULL, &si, &pi);
+        success = CreateProcessA(NULL, buffer, NULL, NULL, TRUE,
+                                 CREATE_NEW_PROCESS_GROUP | CREATE_SUSPENDED,
+                                 NULL, NULL, &si, &pi);
     }
     if (!success) {
         // Still no? abort.
@@ -209,10 +221,12 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
         }
     } else {
         ResumeThread(pi.hThread);
-        CloseHandle(pi.hProcess);
+        // Pass the process handle only
+        pdata.wdt_data.sub_Process = pi.hProcess;
         CloseHandle(pi.hThread);
     }
-    memcpy(wdt_data->privdata, &pdata, sizeof(struct popen_wdt_windows_priv));
+    CopyMemory(wdt_data->privdata, &pdata,
+               sizeof(struct popen_wdt_windows_priv));
     return true;
 }
 
@@ -249,6 +263,7 @@ void popen_watchdog_destroy(popen_watchdog_data_t** data) {
         (*data)->privdata = NULL;
     } else {
         POPEN_WDT_DBGLOG("HANDLEs of pdata are being closed");
+        CloseHandle(pdata->wdt_data.sub_Process);
         free(pdata);
         (*data)->privdata = NULL;
     }
@@ -277,7 +292,7 @@ bool popen_watchdog_read(popen_watchdog_data_t** data, char* buf, int size) {
         POPEN_WDT_DBGLOG("watchdog_activated: True, return");
         return false;
     }
-    ol.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+    ol.hEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
     if (ol.hEvent == NULL) {
         POPEN_WDT_DBGLOG("CreateEvent failed");
         return false;
@@ -289,8 +304,10 @@ bool popen_watchdog_read(popen_watchdog_data_t** data, char* buf, int size) {
         CloseHandle(ol.hEvent);
         return false;
     }
-    waitResult = WaitForSingleObject(
-        ol.hEvent, data_->watchdog_enabled ? SLEEP_SECONDS * one_sec : INFINITE);
+    HANDLE handles[] = {ol.hEvent, pdata->wdt_data.sub_Process};
+    waitResult = WaitForMultipleObjects(
+        sizeof(handles) / sizeof(HANDLE), handles, FALSE,
+        data_->watchdog_enabled ? SLEEP_SECONDS * one_sec : INFINITE);
     switch (waitResult) {
         case WAIT_OBJECT_0:
             if (GetOverlappedResult(pdata->read_hdl, &ol, &bytesRead, FALSE)) {
@@ -304,7 +321,8 @@ bool popen_watchdog_read(popen_watchdog_data_t** data, char* buf, int size) {
             POPEN_WDT_DBGLOG("Wait failed: %ld", GetLastError());
             break;
         default:
-            POPEN_WDT_DBGLOG("Unexpected result from WaitForSingleObject.");
+            POPEN_WDT_DBGLOG("Unexpected result from WaitForSingleObject: %ld",
+                             waitResult);
             break;
     }
     POPEN_WDT_DBGLOG("Ret: %s, bytesRead: %lu",
@@ -313,7 +331,11 @@ bool popen_watchdog_read(popen_watchdog_data_t** data, char* buf, int size) {
 }
 
 bool popen_watchdog_activated(popen_watchdog_data_t** data) {
+    popen_watchdog_stop(data);
+
     if (data != NULL && *data != NULL) {
+        POPEN_WDT_DBGLOG("IsWatchdogActivated: %d",
+                         (*data)->watchdog_activated);
         return (*data)->watchdog_activated;
     }
     return false;
