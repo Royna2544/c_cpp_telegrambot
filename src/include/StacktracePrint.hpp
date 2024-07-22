@@ -23,9 +23,9 @@ inline void PrintStackTrace(const stacktrace_foreach_function &function) {
         std::array<char, 1024> symbol{};
         kLineEntry << "#" <<  i << " ";
         if (absl::Symbolize(stack[i], symbol.data(), sizeof(symbol))) {
-            kLineEntry << symbol.data() << std::endl;
+            kLineEntry << symbol.data();
         } else {
-            kLineEntry << stack[i] << std::endl;
+            kLineEntry << stack[i];
         }
         if (function(kLineEntry.str())) {
             break;
