@@ -30,7 +30,7 @@ SocketInterfaceWindowsLocal::createServerSocket() {
     SocketConnContext ret = SocketConnContext::create<sockaddr_un>();
     const auto *_name = reinterpret_cast<struct sockaddr *>(ret.addr.get());
 
-    LOG(INFO) << "Creating socket at " << LocalHelper::getSocketPath().string();
+    LOG(INFO) << "Creating socket at " << options.address.get();
     if (!createLocalSocket(&ret)) {
         return std::nullopt;
     }
