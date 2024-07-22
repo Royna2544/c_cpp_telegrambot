@@ -7,6 +7,7 @@
 #include <DurationPoint.hpp>
 #include <StringResManager.hpp>
 #include <TgBotWrapper.hpp>
+#include <cctype>
 #include <chrono>
 #include <filesystem>
 #include <libos/libfs.hpp>
@@ -253,7 +254,7 @@ class CommandModulesTest : public ::testing::Test {
         if (ret.size() > 2 && ret[1] == ':') {
             char driveLetter = ret[0];
             ret[0] = '/';
-            ret[1] = driveLetter;
+            ret[1] = tolower(driveLetter);
         }
         if (ec) {
             LOG(ERROR) << "Couldn't get current path";
