@@ -143,9 +143,14 @@ class CommandModulesTest : public ::testing::Test {
 
     void SetUp() override {
         modulePath = FS::getPathForType(FS::PathType::MODULES_INSTALLED);
+        auto dbinst = TgBotDatabaseImpl::getInstance();
+
+        EXPECT_CALL(database, loadDatabaseFromFile(_)).WillOnce(Return(true));
+        ASSERT_TRUE(dbinst->setImpl(&database));
+        ASSERT_TRUE(dbinst->loadDatabaseFromFile({}));
     }
 
-    void TearDown() override {}
+    void TearDown() override { TgBotDatabaseImpl::destroyInstance(); }
 
     struct ModuleHandle {
         void* handle;
@@ -239,6 +244,17 @@ class CommandModulesTest : public ::testing::Test {
         }
         return sentMessage;
     }
+    static std::string current_path() {
+        std::error_code ec;
+        const auto ret =
+            std::filesystem::current_path(ec).generic_string().replace(0, 2,
+                                                                       "/c");
+        if (ec) {
+            LOG(ERROR) << "Couldn't get current path";
+            return {};
+        }
+        return ret;
+    }
 
 #define expectedToEditMessageWith(out, matcher)        \
     EXPECT_CALL(*botApi, editMessage_impl(_, matcher)) \
@@ -258,19 +274,9 @@ class CommandModulesTest : public ::testing::Test {
                                                  TEST_MEDIA_UNIQUEID};
 
     std::shared_ptr<MockTgBotApi> botApi = std::make_shared<MockTgBotApi>();
-    static MockDatabase database;
+    MockDatabase database;
     std::filesystem::path modulePath;
 };
-MockDatabase CommandModulesTest::database;
-
-TEST_F(CommandModulesTest, loadDatabase) {
-    auto dbinst = TgBotDatabaseImpl::getInstance();
-
-    EXPECT_CALL(database, loadDatabaseFromFile(_)).WillOnce(Return(true));
-    ASSERT_TRUE(dbinst->setImpl(&database));
-    ASSERT_TRUE(dbinst->loadDatabaseFromFile({}));
-    Mock::VerifyAndClearExpectations(&database);
-}
 
 TEST_F(CommandModulesTest, TestCommandAlive) {
     auto module = loadModule("alive");
@@ -326,8 +332,7 @@ TEST_F(CommandModulesTest, TestCommandBash) {
     expectedToEditMessageWith(&recvedMessage, StartsWith(GETSTR(WORKING)));
 
     // Second, Command result of pwd command
-    expectedToSendMessageWith(
-        StartsWith(std::filesystem::current_path().string()));
+    expectedToSendMessageWith(StartsWith(current_path()));
     module->execute(botApi, message);
     EXPECT_EQ(sentMsg.get(), recvedMessage.get());
 
@@ -385,8 +390,7 @@ TEST_F(CommandModulesTest, TestCommandUBash) {
     expectedToEditMessageWith(&recvedMessage, StartsWith(GETSTR(WORKING)));
 
     // Second, Command result of pwd command
-    expectedToSendMessageWith(
-        StartsWith(std::filesystem::current_path().string()));
+    expectedToSendMessageWith(StartsWith(current_path()));
     module->execute(botApi, message);
     EXPECT_EQ(sentMsg.get(), recvedMessage.get());
 
@@ -415,7 +419,8 @@ TEST_F(CommandModulesTest, TestCommandUBash) {
 
     const auto tookTime = dp.get();
 
-    // Shouldn't get timeout kill, compare to more than a second to SLEEP_SECONDS
+    // Shouldn't get timeout kill, compare to more than a second to
+    // SLEEP_SECONDS
     if (tookTime < std::chrono::seconds(SLEEP_SECONDS) + 2s) {
         FAIL() << "Watchdog was triggered: Took " << tookTime.count()
                << " milliseconds";
