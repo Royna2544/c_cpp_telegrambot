@@ -592,8 +592,8 @@ std::ostream& SQLiteDatabase::dump(std::ostream& ofs) const {
         while ((row = helper->execAndGetRow())) {
             ss << "UserId: " << row->get<UserId>(0);
             int type = row->get<int>(1);
-            if (type < static_cast<int>(ListType::WHITELIST) ||
-                type > static_cast<int>(ListType::BLACKLIST)) {
+            if (type <= static_cast<int>(InfoType::MIN) ||
+                type >= static_cast<int>(InfoType::MAX)) {
                 ss << " type: Invalid(" << type << ")" << std::endl;
                 continue;
             }

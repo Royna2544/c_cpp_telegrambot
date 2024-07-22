@@ -42,9 +42,11 @@ template <>
 
 struct SQLiteDatabase : DatabaseBase {
     enum class InfoType {
+        MIN = -1,
         OWNER = 0,
         BLACKLIST = 1,
         WHITELIST = 2,
+        MAX = 3
     };
     [[nodiscard]] ListResult addUserToList(ListType type,
                                            UserId user) const override;
