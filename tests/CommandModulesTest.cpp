@@ -248,9 +248,13 @@ class CommandModulesTest : public ::testing::Test {
     static std::string current_path() {
         std::error_code ec;
         auto ret = std::filesystem::current_path(ec).generic_string();
-#ifdef WINDOWS_BUILD
-        ret = ret.replace(0, 2, "/c");
-#endif
+
+        // Check if we have drive letter (e.g. C:)
+        if (ret.size() > 2 && ret[1] == ':') {
+            char driveLetter = ret[0];
+            ret[0] = '/';
+            ret[1] = driveLetter;
+        }
         if (ec) {
             LOG(ERROR) << "Couldn't get current path";
             return {};
