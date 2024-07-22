@@ -13,6 +13,7 @@
 #include <memory>
 #include <optional>
 
+#include "ResourceManager.h"
 #include "Types.h"
 #include "database/bot/TgBotDatabaseImpl.hpp"
 #include "gmock/gmock.h"
@@ -246,9 +247,10 @@ class CommandModulesTest : public ::testing::Test {
     }
     static std::string current_path() {
         std::error_code ec;
-        const auto ret =
-            std::filesystem::current_path(ec).generic_string().replace(0, 2,
-                                                                       "/c");
+        auto ret = std::filesystem::current_path(ec).generic_string();
+#ifdef WINDOWS_BUILD
+        ret = ret.replace(0, 2, "/c");
+#endif
         if (ec) {
             LOG(ERROR) << "Couldn't get current path";
             return {};
@@ -282,6 +284,8 @@ TEST_F(CommandModulesTest, TestCommandAlive) {
     auto module = loadModule("alive");
     ASSERT_TRUE(module.has_value());
 
+    ResourceManager::getInstance()->initWrapper();
+
     auto message = createDefaultMessage();
     message->text = "/alive";
     auto botUser = std::make_shared<User>();
@@ -312,7 +316,8 @@ TEST_F(CommandModulesTest, TestCommandAlive) {
     module->execute(botApi, message);
 
     Mock::VerifyAndClearExpectations(botApi.get());
-
+    // Goodbye resmanager
+    ResourceManager::destroyInstance();
     // Done, unload the module
     unloadModule(std::move(module.value()));
 }
