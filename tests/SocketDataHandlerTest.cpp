@@ -37,18 +37,19 @@ class SocketInterfaceImplMock : public SocketInterfaceBase {
     MOCK_METHOD(void, printRemoteAddress, (socket_handle_t handle), (override));
 };
 
-auto inst = std::make_shared<SocketInterfaceImplMock>();
 class SocketDataHandlerTest : public ::testing::Test {
     static constexpr int kSocket = 1000;
 
    public:
     SocketDataHandlerTest()
-        : mockInterface(inst), fakeConn(kSocket, NULL), _mockImpl(inst) {}
+        : _mockImpl(std::make_shared<SocketInterfaceImplMock>()),
+          mockInterface(_mockImpl),
+          fakeConn(kSocket, NULL) {}
 
+    std::shared_ptr<SocketInterfaceImplMock> _mockImpl;
     SocketInterfaceTgBot mockInterface;
     // Dummy, not under a real connection
     SocketConnContext fakeConn;
-    std::shared_ptr<SocketInterfaceImplMock> _mockImpl;
 };
 
 TEST_F(SocketDataHandlerTest, TestCmdGetUptime) {
@@ -66,7 +67,8 @@ TEST_F(SocketDataHandlerTest, TestCmdGetUptime) {
     EXPECT_NO_FATAL_FAILURE(packetData.assignTo(recv_header));
     EXPECT_EQ(recv_header.cmd, TgBotSocket::Command::CMD_GET_UPTIME_CALLBACK);
     EXPECT_EQ(recv_header.data_size, sizeof(cbt));
-    packetData.assignTo(&callbackData, sizeof(cbt), TgBotSocket::Packet::hdr_sz);
+    packetData.assignTo(&callbackData, sizeof(cbt),
+                        TgBotSocket::Packet::hdr_sz);
     EXPECT_STREQ(callbackData.uptime.data(), "Uptime: 0h 0m 0s");
     testing::Mock::VerifyAndClearExpectations(&_mockImpl);
 }
