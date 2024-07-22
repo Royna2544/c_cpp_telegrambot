@@ -45,7 +45,7 @@ jobs:
           git checkout 20240116.2
           mkdir build
           cd build
-          cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DBUILD_TESTING=ON -DABSL_BUILD_TESTING=ON -DABSL_USE_EXTERNAL_GOOGLETEST=ON -DABSL_FIND_GOOGLETEST=ON ..
+          cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DBUILD_TESTING=ON -DABSL_BUILD_TESTING=ON -DABSL_USE_GOOGLETEST_HEAD=ON ..
           sudo cmake --build . --target install
           cd ..
 
