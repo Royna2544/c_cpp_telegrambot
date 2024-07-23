@@ -39,7 +39,6 @@ bool ForkAndRun::execute() {
         return false;
     }
 
-    PyOS_BeforeFork();
     auto* mainTS = PyEval_SaveThread();
     pid_t pid = fork();
     if (pid == 0) {
@@ -63,10 +62,7 @@ bool ForkAndRun::execute() {
 
         // Set the process group to the current process ID
         setpgrp();
-
-        // Call PyOS_AfterFork
-        PyOS_AfterFork_Child();
-
+    
         // Append PYTHON LOG FD
         PyEval_RestoreThread(mainTS);
         {
@@ -94,7 +90,6 @@ bool ForkAndRun::execute() {
         random_return_type token = RandomNumberGenerator::generate(100);
         auto tregi = OnTerminateRegistrar::getInstance();
 
-        PyOS_AfterFork_Parent();
         tregi->registerCallback([this]() { cancel(); }, token);
 
         childProcessId = pid;
