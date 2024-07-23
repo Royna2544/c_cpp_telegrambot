@@ -21,11 +21,8 @@
 #include <database/bot/TgBotDatabaseImpl.hpp>
 #include <libos/libsighandler.hpp>
 #include <memory>
+#include <ml/ChatDataCollector.hpp>
 #include <utility>
-
-#include "InstanceClassBase.hpp"
-#include "TgBotWrapper.hpp"
-#include "tgbot/Bot.h"
 
 #ifdef SOCKET_CONNECTION
 #include <ChatObserver.h>
@@ -265,6 +262,9 @@ int main(int argc, char** argv) {
 
     // Initialize subsystems
     createAndDoInitCallAll();
+
+    ChatDataCollector collector;
+    collector.initWrapper();
 
 #ifndef WINDOWS_BUILD
     handleRestartCommand(wrapperInst);
