@@ -46,35 +46,38 @@ class ChatDataCollector : public InitCall {
                           msgType};
                 chatData.emplace_back(data);
             });
-        OnTerminateRegistrar::getInstance()->registerCallback([this]() {
-            bool existed = false;
-            constexpr const char *kChatDataFile = "chat_data.csv";
+        OnTerminateRegistrar::getInstance()->registerCallback(
+            [this]() {
+                bool existed = false;
+                constexpr const char* kChatDataFile = "chat_data.csv";
 
-            if (chatData.empty()) {
-                LOG(INFO) << "No chat data collected, skipping chat data writing";
-                return;
-            }
-            // Write chat data to chat_data.csv
-            if (std::filesystem::exists(kChatDataFile)) {
-                // Then skip writing header
-                existed = true;
-            }
-            std::ofstream chatDataFile;
-            if (existed) {
-                chatDataFile.open(kChatDataFile, std::ios::app);
-            } else {
-                chatDataFile.open(kChatDataFile);
-            }
-            if (!existed) {
-                chatDataFile << "chat_id,user_id,timestamp,message_type\n";
-            }
-            for (const auto& data : chatData) {
-                chatDataFile << data.chatId << "," << data.userId << ","
-                             << data.timestamp << ","
-                             << static_cast<int>(data.msgType) << "\n";
-            }
-            LOG(INFO) << "Chat data collected and saved to chat_data.csv: " << chatData.size() << " entries";
-        });
+                if (chatData.empty()) {
+                    LOG(INFO)
+                        << "No chat data collected, skipping chat data writing";
+                    return;
+                }
+                // Write chat data to chat_data.csv
+                if (std::filesystem::exists(kChatDataFile)) {
+                    // Then skip writing header
+                    existed = true;
+                }
+                std::ofstream chatDataFile;
+                if (existed) {
+                    chatDataFile.open(kChatDataFile, std::ios::app);
+                } else {
+                    chatDataFile.open(kChatDataFile);
+                }
+                if (!existed) {
+                    chatDataFile << "chat_id,user_id,timestamp,message_type\n";
+                }
+                for (const auto& data : chatData) {
+                    chatDataFile << data.chatId << "," << data.userId << ","
+                                 << data.timestamp << ","
+                                 << static_cast<int>(data.msgType) << "\n";
+                }
+                LOG(INFO) << "Chat data collected and saved to chat_data.csv: "
+                          << chatData.size() << " entries";
+            });
     }
 
     const CStringLifetime getInitCallName() const override {
