@@ -187,8 +187,16 @@ DECLARE_COMMAND_HANDLER(rombuild, tgWrapper, message) {
         wrapper.sendMessageOnExit("Please provide a target string");
         return;
     }
+
+    std::vector<std::string> options;
+    std::istringstream iss(wrapper.getExtraText());
+    std::string option;
+    while (std::getline(iss, option, ' ')) {
+        options.emplace_back(std::move(option));
+    }
+
     // Parse the config files and get the target build config and rom config
-    if (!parseConfigAndGetTarget(&PBData, wrapper, wrapper.getExtraText())) {
+    if (!parseConfigAndGetTarget(&PBData, wrapper, options[0])) {
         return;
     }
     // Send system information about the system
@@ -201,8 +209,10 @@ DECLARE_COMMAND_HANDLER(rombuild, tgWrapper, message) {
         return;
     }
     std::filesystem::current_path(kBuildDirectory, ec);
+    const bool shouldRepoSync =
+        std::ranges::find(options, "noreposync") == options.end();
 
-    if (repoSync(PBData, tgWrapper, message)) {
+    if (!shouldRepoSync || repoSync(PBData, tgWrapper, message)) {
         // Build the ROM
         if (build(PBData, tgWrapper, message)) {
             upload(PBData, tgWrapper, message);
