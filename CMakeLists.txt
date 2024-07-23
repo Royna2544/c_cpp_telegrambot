@@ -135,10 +135,20 @@ if (${CURL_FOUND})
 endif()
 find_package(libgit2 REQUIRED)
 find_package(Boost COMPONENTS program_options REQUIRED)
-find_package(absl REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(ZLIB REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})
+
+# If we couldn't find protobuf...
+if (NOT Protobuf_FOUND)
+  # Then we can just include source-abseil
+  message(STATUS "Using abseil-cpp as submodule")
+  set(ABSL_PROPAGATE_CXX_STD ON)
+  add_subdirectory(src/third-party/abseil-cpp)
+else()
+  # If there was, then we can cause collision with the system abseil
+  find_package(absl REQUIRED)
+endif()
 #####################################################################
 
 ############################# Platforms #############################

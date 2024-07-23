@@ -30,7 +30,7 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
     tgbotclient.cpp)
 
 set(ABSL_PROPAGATE_CXX_STD ON)
-add_subdirectory(external/abseil-cpp)
+add_subdirectory(../../../../../../src/third-party/abseil-cpp abseil-cpp)
 
 add_library(crypto_openssl SHARED IMPORTED)
 set_target_properties(crypto_openssl PROPERTIES IMPORTED_LOCATION ${CMAKE_SOURCE_DIR}/../jniLibs/${ANDROID_ABI}/libcrypto.so)
