@@ -27,17 +27,16 @@ def build_rom(device: str, variant: str, target: str, jobs: int) -> bool:
         return False
     
     shell_process = subprocess.Popen(['bash'], stdin=subprocess.PIPE, text=True)
-    print('Writing . build/envsetup.sh')
-    shell_process.stdin.write('. build/envsetup.sh\n')
-    shell_process.stdin.flush()
-    if os.getenv('USE_CCACHE') is not None:
-        print('ccache is useless, unset USE_CCACHE')
-        os.unsetenv('USE_CCACHE')
-    print(f'Writing lunch {vendor}_{device}-{variant}')
-    shell_process.stdin.write(f'lunch {vendor}_{device}-{variant}\n')
-    print(f'Writing m {target} -j{jobs}')
-    shell_process.stdin.write(f'm {target} -j{jobs}\n')
-    shell_process.stdin.flush()
+    
+    def write(s: str):
+        print('Writing %s' % s)
+        shell_process.stdin.write(s + '\n')
+        shell_process.stdin.flush()
+        
+    write('. build/envsetup.sh')
+    write('unset USE_CCACHE')
+    write(f'lunch {vendor}_{device}-{variant}')
+    write(f'm {target} -j{jobs}')
     shell_process.stdin.close()
     print('Now waiting...')
     shell_process.wait()
