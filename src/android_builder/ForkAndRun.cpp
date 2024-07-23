@@ -18,8 +18,13 @@
 #include <thread>
 
 #include "PythonClass.hpp"
-#include "libos/libsighandler.hpp"
 #include "RandomNumberGenerator.hpp"
+#include "libos/libsighandler.hpp"
+
+void sigchld_handler(int) {
+    while (waitpid(-1, nullptr, WNOHANG) > 0) {
+    }
+}
 
 bool ForkAndRun::execute() {
     Pipe stdout_pipe{};
@@ -49,12 +54,19 @@ bool ForkAndRun::execute() {
         // Clear handlers
         SignalHandler::uninstall();
 
+        // Handle sigchld
+        struct sigaction sa {};
+        sa.sa_handler = sigchld_handler;
+        sigemptyset(&sa.sa_mask);
+        sa.sa_flags = SA_RESTART;
+        sigaction(SIGCHLD, &sa, nullptr);
+
         // Set the process group to the current process ID
         setpgrp();
 
         // Call PyOS_AfterFork
         PyOS_AfterFork_Child();
-    
+
         // Append PYTHON LOG FD
         PyEval_RestoreThread(mainTS);
         {
@@ -73,7 +85,6 @@ bool ForkAndRun::execute() {
 
         int ret = 0;
         ret = runFunction() ? EXIT_SUCCESS : EXIT_FAILURE;
-        PyEval_SaveThread();
         absl::RemoveLogSink(&sink);
         _exit(ret);
     } else if (pid > 0) {
@@ -124,7 +135,8 @@ bool ForkAndRun::execute() {
                     read(python_pipe.readEnd(), buf.data(), buf.size() - 1);
                 if (bytes_read >= 0) {
                     std::cout << "Python output: "
-                              << boost::trim_copy(std::string(buf.data())) << std::endl;
+                              << boost::trim_copy(std::string(buf.data()))
+                              << std::endl;
                     buf.fill(0);
                 }
             },
@@ -159,6 +171,7 @@ bool ForkAndRun::execute() {
         // Notify the polling thread that program has ended.
         write(program_termination_pipe.writeEnd(), &status, sizeof(status));
         pollThread.join();
+        childProcessId = -1;
 
         // Cleanup
         selector.remove(stdout_pipe.readEnd());
@@ -177,12 +190,21 @@ bool ForkAndRun::execute() {
 }
 
 void ForkAndRun::cancel() {
-    if (childProcessId > 0) {
-        killpg(childProcessId, SIGINT);
+    if (childProcessId < 0) {
+        PLOG(WARNING) << "Attempting to cancel non-existing child";
+        return;
     }
+
+    killpg(childProcessId, SIGTERM);
+
     // Wait for the child process to terminate.
     int status = 0;
-    waitpid(childProcessId, &status, 0);
+    // The canceler should not be blocked by the signal handler.
+    pid_t pid = waitpid(childProcessId, &status, WNOHANG);
+    if (pid == 0) {
+        PLOG(WARNING) << "Child still running after timeout";
+        return;
+    }
     if (WIFSIGNALED(status)) {
         LOG(INFO) << "Subprocess terminated by signal: "
                   << strsignal(WTERMSIG(status));
