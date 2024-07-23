@@ -210,7 +210,6 @@ std::optional<ForkAndRun::Shmem> ForkAndRun::allocShmem(
         PLOG(ERROR) << "mmap failed";
         return std::nullopt;
     }
-    close(fd);
     DLOG(INFO) << "Shmem created with path: " << path.data()
                << " size: " << size << " bytes";
     return Shmem{path.data(), size, ptr, true};
