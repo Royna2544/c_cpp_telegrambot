@@ -743,6 +743,9 @@ struct MessageWrapperLimited {
         return firstBlank(message) != std::string::npos;
     }
     [[nodiscard]] std::string getExtraText() const noexcept {
+        if (!hasExtraText()) {
+            return {};
+        }
         return message->text.substr(firstBlank(message) + 1);
     }
     void getExtraText(std::string& extraText) const noexcept {
