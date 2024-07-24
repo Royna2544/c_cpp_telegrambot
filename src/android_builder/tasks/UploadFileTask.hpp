@@ -7,7 +7,7 @@
 #include "tasks/PerBuildData.hpp"
 
 struct UploadFileTask : ForkAndRun {
-    ~UploadFileTask() override = default;
+    static constexpr std::string_view kShmemUpload = "shmem_upload";
 
     /**
      * @brief Runs the function that performs the repository synchronization.
@@ -40,6 +40,8 @@ struct UploadFileTask : ForkAndRun {
      */
     explicit UploadFileTask(PerBuildData data);
 
+    ~UploadFileTask() override;
    private:
     PerBuildData data;
+    Shmem smem;
 };
