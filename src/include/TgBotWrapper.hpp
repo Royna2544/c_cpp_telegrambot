@@ -10,11 +10,13 @@
 #include <memory>
 #include <optional>
 #include <utility>
+#include <variant>
 
 #include "CompileTimeStringConcat.hpp"
 #include "InstanceClassBase.hpp"
 #include "RandomNumberGenerator.hpp"
 #include "Types.h"
+#include "tgbot/types/GenericReply.h"
 
 using TgBot::Api;
 using TgBot::Bot;
@@ -173,6 +175,7 @@ struct TgBotApi {
     virtual ~TgBotApi() = default;
     using FileOrString = boost::variant<InputFile::Ptr, std::string>;
     using FileOrMedia = boost::variant<InputFile::Ptr, MediaIds>;
+    using StringOrMessage = std::variant<std::string, Message::Ptr>;
 
    protected:
     // Methods to be implemented
@@ -199,6 +202,18 @@ struct TgBotApi {
     // Edit a sent message
     virtual Message::Ptr editMessage_impl(const Message::Ptr& message,
                                           const std::string& newText) const = 0;
+
+    virtual Message::Ptr editMessageMarkup_impl(
+        const StringOrMessage& message,
+        const GenericReply::Ptr& markup) const = 0;
+
+    virtual MessageId copyMessage_impl(
+        ChatId fromChatId, MessageId messageId,
+        ReplyParameters::Ptr replyParameters = nullptr) const = 0;
+
+    virtual bool answerCallbackQuery_impl(const std::string& callbackQueryId,
+                                          const std::string& text = "",
+                                          bool showAlert = false) const = 0;
 
     // Delete a sent message
     virtual void deleteMessage_impl(const Message::Ptr& message) const = 0;
@@ -385,6 +400,25 @@ struct TgBotApi {
         return editMessage_impl(message, newText);
     }
 
+    inline Message::Ptr editMessageMarkup(
+        const StringOrMessage& message,
+        const GenericReply::Ptr& replyMarkup) const {
+        return editMessageMarkup_impl(message, replyMarkup);
+    }
+
+    inline MessageId copyMessage(
+        ChatId fromChatId, MessageId messageId,
+        ReplyParameters::Ptr replyParameters = nullptr) const {
+        return copyMessage_impl(fromChatId, messageId,
+                                std::move(replyParameters));
+    }
+
+    inline bool answerCallbackQuery(const std::string& callbackQueryId,
+                                    const std::string& text = "",
+                                    bool showAlert = false) const {
+        return answerCallbackQuery_impl(callbackQueryId, text, showAlert);
+    }
+
     inline void deleteMessage(const Message::Ptr& message) const {
         deleteMessage_impl(message);
     }
@@ -475,6 +509,11 @@ struct TgBotApi {
         return false;  // Dummy implementation
     }
 
+    virtual void onCallbackQuery(
+        const TgBot::EventBroadcaster::CallbackQueryListener& listener) {
+        // Dummy implementation
+    }
+
    protected:
     static ReplyParameters::Ptr createReplyParametersForReply(
         const Message::Ptr& message) {
@@ -527,6 +566,41 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
                                         message->messageId);
     }
 
+    Message::Ptr editMessageMarkup_impl(
+        const StringOrMessage& message,
+        const GenericReply::Ptr& markup) const override {
+        return std::visit(
+            [=, this](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, Message::Ptr>) {
+                    return getApi().editMessageReplyMarkup(
+                        arg->chat->id, arg->messageId, "", markup);
+                } else if constexpr (std::is_same_v<T, std::string>) {
+                    return getApi().editMessageReplyMarkup(0, 0, arg, markup);
+                }
+                return Message::Ptr();
+            },
+            message);
+    }
+
+    // Copy a message
+    MessageId copyMessage_impl(
+        ChatId fromChatId, MessageId messageId,
+        ReplyParameters::Ptr replyParameters = nullptr) const {
+        const auto ret =
+            getApi().copyMessage(fromChatId, fromChatId, messageId, "", "", {},
+                                 false, replyParameters);
+        if (ret) {
+            return ret->messageId;
+        }
+        return 0;
+    }
+
+    bool answerCallbackQuery_impl(const std::string& callbackQueryId,
+                                  const std::string& text = "",
+                                  bool showAlert = false) const override {
+        return getApi().answerCallbackQuery(callbackQueryId, text, showAlert);
+    }
     // Delete a sent message
     void deleteMessage_impl(const Message::Ptr& message) const override {
         getApi().deleteMessage(message->chat->id, message->messageId);
@@ -700,6 +774,11 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
                 callback(shared_from_this(), message);
             }
         });
+    }
+
+    void onCallbackQuery(const TgBot::EventBroadcaster::CallbackQueryListener&
+                             listener) override {
+        getEvents().onCallbackQuery(listener);
     }
 
    private:
