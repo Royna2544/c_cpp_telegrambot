@@ -7,5 +7,5 @@ def repo_init(url: str, branch: str) -> bool:
         
 def repo_sync(jobs: int) -> bool:
     return subprocess_utils.run_command(
-        f'repo sync -c -j{jobs} --force-sync --no-clone-bundle --no-tags'
+        f'repo sync -c -j{jobs} --force-sync --no-clone-bundle --no-tags --force-remove-dirty'
     )

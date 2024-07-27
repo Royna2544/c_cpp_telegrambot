@@ -1,8 +1,11 @@
 #include <ConfigParsers.hpp>
 #include <TgBotWrapper.hpp>
 #include <filesystem>
-#include <fstream>
+#include <future>
+#include <initializer_list>
 #include <libos/libfs.hpp>
+#include <memory>
+#include <optional>
 #include <string>
 #include <system_error>
 #include <tasks/ROMBuildTask.hpp>
@@ -10,67 +13,33 @@
 #include <tasks/UploadFileTask.hpp>
 
 #include "PythonClass.hpp"
-#include "tasks/PerBuildData.hpp"
+#include "absl/log/check.h"
+#include "absl/strings/match.h"
+#include "absl/strings/str_split.h"
+#include "absl/strings/strip.h"
+#include "tgbot/types/InlineKeyboardButton.h"
+#include "tgbot/types/InlineKeyboardMarkup.h"
 
 namespace {
 
-void sendSystemInfo(ApiPtr wrapper, MessagePtr message) {
+std::string getSystemInfo() {
     auto py = PythonClass::get();
     auto mod = py->importModule("system_info");
     if (!mod) {
         LOG(ERROR) << "Failed to import system_info module";
-        return;
+        return "";
     }
     auto fn = mod->lookupFunction("get_system_summary");
     if (!fn) {
         LOG(ERROR) << "Failed to find get_system_summary function";
-        return;
+        return "";
     }
     std::string summary;
     if (!fn->call(nullptr, &summary)) {
         LOG(ERROR) << "Failed to call get_system_summary function";
-        return;
+        return "";
     }
-    wrapper->sendMessage(message, summary);
-}
-
-bool parseConfigAndGetTarget(PerBuildData* data, MessageWrapper& wrapper,
-                             const std::string& targetName) {
-    static auto buildRoot = FS::getPathForType(FS::PathType::GIT_ROOT) / "src" /
-                            "android_builder" / "configs";
-
-    const auto romsConfig =
-        parse<RomConfig>(std::ifstream(buildRoot / "rom_config.txt"));
-    const auto buildConfig =
-        parse<BuildConfig>(std::ifstream(buildRoot / "build_config.txt"));
-
-    LOG(INFO) << "Parsed rom config count: " << romsConfig.size();
-    LOG(INFO) << "Target: " << targetName;
-
-    // Lookup corresponding buildconfig for the target string
-    const auto build = std::ranges::find_if(
-        buildConfig,
-        [&targetName](const auto& r) { return r.name == targetName; });
-    if (build == buildConfig.end()) {
-        LOG(ERROR) << "No build config found for target: " << targetName;
-        wrapper.sendMessageOnExit("No build config found for target");
-        return false;
-    }
-
-    // Lookup corresponding rom config for the target config
-    const auto rom = std::ranges::find_if(romsConfig, [&build](const auto& r) {
-        return r.name == build->romName;
-    });
-    if (rom == romsConfig.end()) {
-        LOG(ERROR) << "No rom config found for build config: "
-                   << build->romName;
-        wrapper.sendMessageOnExit("No rom config found for build config");
-        return false;
-    }
-    data->rConfig = *rom;
-    data->bConfig = *build;
-    PythonClass::get()->addLookupDirectory(buildRoot.parent_path() / "scripts");
-    return true;
+    return summary;
 }
 
 bool repoSync(PerBuildData data, ApiPtr wrapper, MessagePtr message) {
@@ -166,10 +135,29 @@ void upload(PerBuildData data, ApiPtr wrapper, MessagePtr message) {
 }
 }  // namespace
 
+template <int Y>
+TgBot::InlineKeyboardMarkup::Ptr buildKeyboard(
+    std::initializer_list<std::pair<std::string, std::string>> list) {
+    std::vector<std::vector<TgBot::InlineKeyboardButton::Ptr>> keyboardButtons(
+        1);
+    int x = 0;
+    for (const auto& [text, callbackData] : list) {
+        auto button = std::make_shared<TgBot::InlineKeyboardButton>();
+        button->text = text;
+        button->callbackData = callbackData;
+        keyboardButtons.back().emplace_back(button);
+        ++x;
+        if (keyboardButtons.back().size() == Y && x != list.size()) {
+            keyboardButtons.emplace_back();
+        }
+    }
+    const auto keyboard = std::make_shared<TgBot::InlineKeyboardMarkup>();
+    keyboard->inlineKeyboard = keyboardButtons;
+    return keyboard;
+}
+
 DECLARE_COMMAND_HANDLER(rombuild, tgWrapper, message) {
-    PerBuildData PBData;
     MessageWrapper wrapper(tgWrapper, message);
-    std::error_code ec;
     constexpr static std::string_view kBuildDirectory = "rom_build/";
     const auto cwd = std::filesystem::current_path();
     const auto returnToCwd = [cwd]() {
@@ -183,42 +171,183 @@ DECLARE_COMMAND_HANDLER(rombuild, tgWrapper, message) {
 
     PythonClass::init();
 
-    if (!wrapper.hasExtraText()) {
-        wrapper.sendMessageOnExit("Please provide a target string");
-        return;
-    }
+    static auto buildRoot =
+        FS::getPathForType(FS::PathType::GIT_ROOT) / "src" / "android_builder";
 
-    std::vector<std::string> options;
-    std::istringstream iss(wrapper.getExtraText());
-    std::string option;
-    while (std::getline(iss, option, ' ')) {
-        options.emplace_back(std::move(option));
-    }
+    PythonClass::get()->addLookupDirectory(buildRoot / "scripts");
 
-    // Parse the config files and get the target build config and rom config
-    if (!parseConfigAndGetTarget(&PBData, wrapper, options[0])) {
-        return;
-    }
-    // Send system information about the system
-    sendSystemInfo(tgWrapper, message);
+    auto keyboard = std::make_shared<TgBot::InlineKeyboardMarkup>();
+    keyboard = buildKeyboard<2>({{"Build ROM", "build"},
+                                 {"Send system info", "send_system_info"},
+                                 {"Settings", "settings"},
+                                 {"Close", "close"}});
 
-    std::filesystem::create_directory(kBuildDirectory, ec);
-    if (ec && ec != std::make_error_code(std::errc::file_exists)) {
-        LOG(ERROR) << "Failed to create build directory: " << ec.message();
-        wrapper.sendMessageOnExit("Failed to create build directory");
-        return;
-    }
-    std::filesystem::current_path(kBuildDirectory, ec);
-    const bool shouldRepoSync =
-        std::ranges::find(options, "noreposync") == options.end();
+    auto m =
+        tgWrapper->sendReplyMessage(message, "Will build ROM...", keyboard);
 
-    if (!shouldRepoSync || repoSync(PBData, tgWrapper, message)) {
-        // Build the ROM
-        if (build(PBData, tgWrapper, message)) {
-            upload(PBData, tgWrapper, message);
+    ConfigParser parser(buildRoot / "configs" / "builder_config.xml");
+
+    tgWrapper->onCallbackQuery([=](const TgBot::CallbackQuery::Ptr& query) {
+        struct QueryData {
+            bool do_repo_sync = true;
+            PerBuildData per_build;
+            MessageId messageId;
+            std::vector<ConfigParser::ROMEntry> roms;
+        };
+
+        static std::optional<QueryData> queryData;
+
+        if (queryData && queryData->messageId != m->messageId) {
+            return;
         }
-    }
-    returnToCwd();
+        if (!queryData) {
+            queryData.emplace();
+            queryData->messageId = m->messageId;
+        }
+
+        if (query->data == "back") {
+            tgWrapper->editMessage(m, "Will build ROM...");
+            tgWrapper->editMessageMarkup(m, keyboard);
+            queryData->per_build.device.clear();
+            queryData->per_build.localManifest.reset();
+        } else if (query->data == "build") {
+            tgWrapper->editMessage(m, "Select device...");
+            auto deviceKeyboard =
+                std::make_shared<TgBot::InlineKeyboardMarkup>();
+            deviceKeyboard->inlineKeyboard.resize(1);
+            const int width = sqrt(parser.getDevices().size());
+            int x = 0;
+            for (const auto& device : parser.getDevices()) {
+                auto button = std::make_shared<TgBot::InlineKeyboardButton>();
+                button->text = device.device;
+                button->callbackData = "device_" + device.device;
+                deviceKeyboard->inlineKeyboard.back().emplace_back(button);
+                ++x;
+                if (deviceKeyboard->inlineKeyboard.back().size() == width &&
+                    x != parser.getDevices().size()) {
+                    deviceKeyboard->inlineKeyboard.emplace_back();
+                }
+            }
+            deviceKeyboard->inlineKeyboard.push_back(
+                {std::make_shared<TgBot::InlineKeyboardButton>("Back", "",
+                                                               "back")});
+            tgWrapper->editMessageMarkup(m, deviceKeyboard);
+        } else if (query->data == "settings") {
+            auto settingKeyboard = buildKeyboard<2>(
+                {{"Run repo sync", "repo_sync"}, {"Back", "back"}});
+            tgWrapper->editMessage(m, "Settings...");
+            tgWrapper->editMessageMarkup(m, settingKeyboard);
+        } else if (query->data == "send_system_info") {
+            static std::string info = getSystemInfo();
+            auto backKeyboard = buildKeyboard<2>({{"Back", "back"}});
+            tgWrapper->editMessage(m, info);
+            tgWrapper->editMessageMarkup(m, backKeyboard);
+        } else if (query->data == "repo_sync") {
+            queryData->do_repo_sync = !queryData->do_repo_sync;
+            tgWrapper->answerCallbackQuery(
+                query->id, std::string() + "Repo sync enabled: " +
+                               (queryData->do_repo_sync ? "Yes" : "No"));
+        } else if (query->data == "close") {
+            tgWrapper->editMessage(m, "Closed");
+            tgWrapper->editMessageMarkup(m, nullptr);
+            queryData.reset();
+        } else if (absl::StartsWith(query->data, "device_")) {
+            std::string_view device = query->data;
+            absl::ConsumePrefix(&device, "device_");
+            auto it = parser.getDevices();
+            queryData->roms = std::ranges::find_if(it, [&](const auto& d) {
+                                  return d.device == std::string(device);
+                              })->getROMs();
+            queryData->per_build.device = device;
+            auto deviceKeyboard =
+                std::make_shared<TgBot::InlineKeyboardMarkup>();
+            for (const auto& device : queryData->roms) {
+                auto button = std::make_shared<TgBot::InlineKeyboardButton>();
+                button->text = device.romName + " Android " +
+                               std::to_string(device.androidVersion);
+                button->callbackData = "rom_" + device.romName + "_" +
+                                       std::to_string(device.androidVersion);
+                deviceKeyboard->inlineKeyboard.emplace_back();
+                deviceKeyboard->inlineKeyboard.back().emplace_back(button);
+            }
+            deviceKeyboard->inlineKeyboard.push_back(
+                {std::make_shared<TgBot::InlineKeyboardButton>("Back", "",
+                                                               "back")});
+            tgWrapper->editMessage(m, "Select ROM...");
+            tgWrapper->editMessageMarkup(m, deviceKeyboard);
+        } else if (absl::StartsWith(query->data, "rom_")) {
+            std::string_view rom = query->data;
+            absl::ConsumePrefix(&rom, "rom_");
+            std::vector<std::string> c = absl::StrSplit(rom, '_');
+            CHECK(c.size() == 2);
+            auto romName = c[0];
+            // Basically an assert
+            int androidVersion = std::stoi(c[1]);
+            auto it = std::ranges::find_if(
+                queryData->roms, [=](ConfigParser::ROMEntry it) {
+                    return it.androidVersion == androidVersion &&
+                           it.romName == romName;
+                });
+            queryData->per_build.localManifest = it->getLocalManifest();
+
+            auto variantKeyboard =
+                buildKeyboard<2>({{"User build", "type_user"},
+                                  {"Userdebug build", "type_userdebug"},
+                                  {"Eng build", "type_eng"}});
+            tgWrapper->editMessage(m, "Select build variant...");
+            tgWrapper->editMessageMarkup(m, variantKeyboard);
+        } else if (absl::StartsWith(query->data, "type_")) {
+            std::string_view type = query->data;
+            absl::ConsumePrefix(&type, "type_");
+            if (type == "user") {
+                queryData->per_build.variant = PerBuildData::Variant::kUser;
+            } else if (type == "userdebug") {
+                queryData->per_build.variant =
+                    PerBuildData::Variant::kUserDebug;
+            } else if (type == "eng") {
+                queryData->per_build.variant = PerBuildData::Variant::kEng;
+            }
+            std::stringstream confirm;
+
+            confirm << "Build variant: " << type << "\n";
+            confirm << "Device: " << queryData->per_build.device << "\n";
+            confirm << "Rom: "
+                    << queryData->per_build.localManifest->rom->romInfo->name
+                    << "\n";
+            confirm << "Android version: "
+                    << queryData->per_build.localManifest->rom->androidVersion
+                    << "\n";
+
+            auto keyboardConfirm =
+                buildKeyboard<2>({{"Confirm", "confirm"}, {"Back", "back"}});
+            tgWrapper->editMessage(m, confirm.str());
+            tgWrapper->editMessageMarkup(m, keyboardConfirm);
+        } else if (query->data == "confirm") {
+            tgWrapper->editMessage(m, "Building...");
+            std::error_code ec;
+            std::filesystem::create_directory(kBuildDirectory, ec);
+            if (ec && ec != std::make_error_code(std::errc::file_exists)) {
+                LOG(ERROR) << "Failed to create build directory: "
+                           << ec.message();
+                tgWrapper->sendMessage(m, "Failed to create build directory");
+                returnToCwd();
+                return;
+            }
+            std::filesystem::current_path(kBuildDirectory, ec);
+            if (queryData->do_repo_sync) {
+                if (!repoSync(queryData->per_build, tgWrapper, m)) {
+                    tgWrapper->editMessage(m, "Failed to sync repo");
+                    returnToCwd();
+                    return;
+                }
+            }
+            if (build(queryData->per_build, tgWrapper, m)) {
+                upload(queryData->per_build, tgWrapper, m);
+            }
+            tgWrapper->editMessage(m, "Build complete");
+            returnToCwd();
+        }
+    });
 }
 
 DYN_COMMAND_FN(n, module) {

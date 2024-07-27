@@ -4,6 +4,7 @@
 #include <mutex>
 #include <regex>
 
+#include "ConfigParsers.hpp"
 #include "TgBotWrapper.hpp"
 
 bool ROMBuildTask::runFunction() {
@@ -29,19 +30,19 @@ bool ROMBuildTask::runFunction() {
         return false;
     }
     ArgumentBuilder builder(4);
-    builder.add_argument(data.bConfig.device);
-    switch (data.bConfig.variant) {
-        case BuildConfig::Variant::kUser:
+    builder.add_argument(data.device);
+    switch (data.variant) {
+        case PerBuildData::Variant::kUser:
             builder.add_argument("user");
             break;
-        case BuildConfig::Variant::kUserDebug:
+        case PerBuildData::Variant::kUserDebug:
             builder.add_argument("userdebug");
             break;
-        case BuildConfig::Variant::kEng:
+        case PerBuildData::Variant::kEng:
             builder.add_argument("eng");
             break;
     }
-    builder.add_argument(data.rConfig.target);
+    builder.add_argument(data.localManifest->rom->romInfo->target);
     builder.add_argument(guessJobCount());
     auto* arg = builder.build();
     if (arg == nullptr) {
@@ -114,9 +115,9 @@ void ROMBuildTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
         buildInfoBuffer << "Time spent: " << to_string(now - startTime)
                         << std::endl;
         buildInfoBuffer << "Last updated on: " << fromTP(now) << std::endl;
-        buildInfoBuffer << "Target ROM: " << data.rConfig.name
-                        << ", branch: " << data.rConfig.branch << std::endl;
-        buildInfoBuffer << "Target device: " << data.bConfig.device
+        buildInfoBuffer << "Target ROM: " << data.localManifest->rom->romInfo->name
+                        << ", branch: " << data.localManifest->rom->branch << std::endl;
+        buildInfoBuffer << "Target device: " << data.device
                         << std::endl;
         buildInfoBuffer << "Job count: " << guessJobCount();
         if (_get_used_mem->call(nullptr, &memUsage)) {
@@ -126,14 +127,14 @@ void ROMBuildTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
         }
         buildInfoBuffer << std::endl;
         buildInfoBuffer << "Variant: ";
-        switch (data.bConfig.variant) {
-            case BuildConfig::Variant::kUser:
+        switch (data.variant) {
+            case PerBuildData::Variant::kUser:
                 buildInfoBuffer << "user";
                 break;
-            case BuildConfig::Variant::kUserDebug:
+            case PerBuildData::Variant::kUserDebug:
                 buildInfoBuffer << "userdebug";
                 break;
-            case BuildConfig::Variant::kEng:
+            case PerBuildData::Variant::kEng:
                 buildInfoBuffer << "eng";
                 break;
         }

@@ -2,9 +2,9 @@
 
 #include <TgBotWrapper.hpp>
 #include <cstdlib>
+#include <ConfigParsers.hpp>
 
 #include "ForkAndRun.hpp"
-#include "tasks/PerBuildData.hpp"
 
 struct UploadFileTask : ForkAndRun {
     static constexpr std::string_view kShmemUpload = "shmem_upload";

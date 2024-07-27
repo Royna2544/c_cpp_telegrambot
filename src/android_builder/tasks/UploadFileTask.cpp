@@ -27,8 +27,8 @@ bool UploadFileTask::runFunction() {
         return false;
     }
     ArgumentBuilder builder(2);
-    builder.add_argument(data.bConfig.device);
-    builder.add_argument(data.rConfig.prefixOfOutput);
+    builder.add_argument(data.device);
+    builder.add_argument(data.localManifest->rom->prefixOfOutput);
     std::string resultString;
     if (!func->call(builder.build(), &resultString)) {
         LOG(ERROR) << "Error calling function upload_to_gofile";

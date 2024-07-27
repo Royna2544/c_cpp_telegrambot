@@ -4,6 +4,7 @@ if (NOT ${Python_FOUND})
     message(STATUS "Python dev package not found, disable AndroidBuilder-cpp")
     return()
 endif()
+find_package(LibXml2 REQUIRED)
 
 add_my_library(
     NAME Python
@@ -31,6 +32,7 @@ add_my_library(
         TgBotRandom
         TgBotSocketSelectors
         TgBotPython
+        LibXml2::LibXml2
         ${LIBGIT2_LIBS}
     PUBLIC_INC
         .

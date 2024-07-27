@@ -1,3 +1,0 @@
-# Name RepoUrl RepoBranch TargetName OutZipPrefix
-Evox https://github.com/Evolution-XYZ/manifest udc evolution EvolutionX
-crDroid https://github.com/crdroidandroid/android/ 11.0 bacon crDroidAndroid

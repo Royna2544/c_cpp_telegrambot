@@ -3,6 +3,7 @@
 #include <git2.h>
 
 #include <algorithm>
+#include <boost/algorithm/string/split.hpp>
 #include <filesystem>
 #include <functional>
 #include <ios>
@@ -12,11 +13,6 @@
 #include <thread>
 
 #include "CompileTimeStringConcat.hpp"
-#include "git2/branch.h"
-#include "git2/remote.h"
-#include "git2/repository.h"
-#include "git2/types.h"
-#include "tasks/PerBuildData.hpp"
 
 namespace {
 
@@ -376,7 +372,7 @@ struct MatchesData {
         const char* upstreamName = nullptr;
         RAIIGit raii;
         git_config* config = nullptr;
-        
+
         ret =
             git_config_open_ondisk(&config, (gitDirectory / "config").c_str());
         if (ret != 0) {
@@ -554,24 +550,21 @@ bool RepoSyncTask::runFunction() {
         RepoUtils utils;
         MatchesData mmdata{
             .gitDirectory = ".repo/manifests",
-            .desiredBranch = data.rConfig.branch,
-            .desiredUrl = data.rConfig.url,
+            .desiredBranch = data.localManifest->rom->branch,
+            .desiredUrl = data.localManifest->rom->romInfo->url,
         };
         if (!repoDirExists || !mmdata.matches()) {
-            utils.repo_init({
-                .url = data.rConfig.url,
-                .branch = data.rConfig.branch,
-            });
+            utils.repo_init(data.localManifest->repo_info);
         }
         if (!std::filesystem::exists(kLocalManifestPath)) {
-            utils.git_clone(data.bConfig.local_manifest,
+            utils.git_clone(data.localManifest->repo_info,
                             kLocalManifestPath.data());
         } else {
             LOG(INFO) << "Local manifest exists already...";
             MatchesData mdata{
                 .gitDirectory = RepoSyncTask::kLocalManifestPath.data(),
-                .desiredBranch = data.bConfig.local_manifest.branch,
-                .desiredUrl = data.bConfig.local_manifest.url,
+                .desiredBranch = data.localManifest->repo_info.branch,
+                .desiredUrl = data.localManifest->repo_info.url,
             };
             if (mdata.matchesAndCheckout()) {
                 LOG(INFO) << "Repo is up-to-date.";

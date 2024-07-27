@@ -27,7 +27,7 @@ RepoUtils::~RepoUtils() {
     LOG(INFO) << "RepoUtils shut down";
 }
 
-void RepoUtils::repo_init(const CloneOptions& options) {
+void RepoUtils::repo_init(const RepoInfo& options) {
     ArgumentBuilder builder(2);
     PyObject* args = nullptr;
     bool ret = false;
@@ -68,7 +68,7 @@ void RepoUtils::errorAndThrow(const std::string& message) {
     throw std::runtime_error(message);
 }
 
-void RepoUtils::git_clone(const CloneOptions& options,
+void RepoUtils::git_clone(const RepoInfo& options,
                           const std::filesystem::path& directory) {
     git_repository* repo = nullptr;
     git_clone_options gitoptions = GIT_CLONE_OPTIONS_INIT;

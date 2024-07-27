@@ -2,8 +2,6 @@
 #include <ForkAndRun.hpp>
 #include <RepoUtils.hpp>
 
-#include "PerBuildData.hpp"
-
 class NewStdErrBufferHook {
     std::stringstream logMessage;
 
