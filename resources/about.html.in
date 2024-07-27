@@ -1,5 +1,6 @@
 <b>My name</b> _botname_ (@_botusername_)
 
+<blockquote>
 <b>ABOUT</b>:
 - Telegram bot for fun
 - Proudly backed by C/C++
@@ -10,17 +11,23 @@
 - Runs on Windows (MSYS2), macOS, Linux
 - Exports a network control interface with IPv4 and IPv6
 - Client apps supported for Win32/Android
+</blockquote>
 
+<blockquote>
 <b>BUILD INFO</b>:
 - Host OS: @CMAKE_SYSTEM_NAME@
 - C Compiler: @CMAKE_C_COMPILER@ v@CMAKE_C_COMPILER_VERSION@
 - CXX Compiler: @CMAKE_CXX_COMPILER@ v@CMAKE_CXX_COMPILER_VERSION@
 - Date: @TODAY@
 - Loaded Command Modules: _commandmodules_
+</blockquote>
 
+<blockquote>
 <b>GIT INFO</b>:
 - Repo URL: <a href="_originurl_">Here</a>
 - Commit-Id: _commitid_
-- Commit-Msg: <blockquote>_commitmsg_</blockquote>
+- Commit-Msg: _commitmsg_
+</blockquote>
+
 <b>Notes</b>:
 Finally, cum about it.
