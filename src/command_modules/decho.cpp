@@ -22,14 +22,8 @@ static DECLARE_COMMAND_HANDLER(decho, tgBotWrapper, message) {
         } else {
             tgBotWrapper->sendMessage(message, msg);
         }
-    } else if (replyMsg) {
-        if (replyMsg->sticker) {
-            tgBotWrapper->sendSticker(message, MediaIds(replyMsg->sticker));
-        } else if (replyMsg->animation) {
-            tgBotWrapper->sendAnimation(message, MediaIds(replyMsg->animation));
-        } else if (!replyMsg->text.empty()) {
-            tgBotWrapper->sendMessage(message, replyMsg->text);
-        }
+    } else if (replyMsg) { 
+        tgBotWrapper->copyMessage(message->chat->id, replyMsg->messageId);
     }
 }
 
