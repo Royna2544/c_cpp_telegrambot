@@ -8,6 +8,7 @@
 
 #include "InstanceClassBase.hpp"
 #include "TgBotWrapper.hpp"
+#include "absl/strings/strip.h"
 
 DynamicLibraryHolder::DynamicLibraryHolder(
     DynamicLibraryHolder&& other) noexcept
@@ -30,7 +31,13 @@ bool RTCommandLoader::loadOneCommand(std::filesystem::path fname) {
     const char* dlerrorBuf = nullptr;
     bool (*sym)(const char*, CommandModule&) = nullptr;
     CommandModule module;
-    std::array<char, 20> cmdName{};
+    const std::string cmdNameStr = fname.filename().replace_extension().string();
+    std::string_view cmdNameView(cmdNameStr);
+    
+    if (!absl::ConsumePrefix(&cmdNameView, "libcmd_")) {
+        LOG(WARNING) << "Failed to extract command name from " << fname;
+        return false;
+    }
 
     handle = dlopen(fname.string().c_str(), RTLD_NOW);
     if (handle == nullptr) {
@@ -47,14 +54,7 @@ bool RTCommandLoader::loadOneCommand(std::filesystem::path fname) {
         return false;
     }
 
-    if (sscanf(fname.filename().replace_extension().string().c_str(),
-               "libcmd_%s", cmdName.data()) != 1) {
-        LOG(WARNING) << "scanf failed for " << fname;
-        dlclose(handle);
-        return false;
-    }
-
-    if (!sym(cmdName.data(), module)) {
+    if (!sym(cmdNameView.data(), module)) {
         LOG(WARNING) << "Failed to load command module from " << fname;
         module.fn = nullptr;  // Prevent double free from function ptr dtor...
         dlclose(handle);
@@ -72,10 +72,9 @@ bool RTCommandLoader::loadOneCommand(std::filesystem::path fname) {
     } else {
         fnptr = info.dli_saddr;
     }
-    //    DLOG(INFO) << "Loaded RT command module from " << fname;
-    //    DLOG(INFO) << "Module dump: { enforced: " << module.isEnforced()
-    //               << ", name: " << module.command << ", fn: " << fnptr << "
-    //               }";
+    DLOG(INFO) << "Loaded RT command module from " << fname;
+    DLOG(INFO) << "Module dump: { enforced: " << module.isEnforced()
+               << ", name: " << module.command << ", fn: " << fnptr << "}";
     return true;
 }
 
