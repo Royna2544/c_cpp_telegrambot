@@ -2,6 +2,7 @@
 #include <absl/log/log.h>
 
 #include <AbslLogInit.hpp>
+#include <CommandLine.hpp>
 #include <cstdlib>
 #include <cstring>
 #include <impl/bot/ClientBackend.hpp>
@@ -16,13 +17,14 @@
     exit(exitCode);
 }
 
-int main(int argc, char* const* argv) {
+int main(int argc, char** argv) {
     ChatId chatId = 0;
     TgBotSocket::data::SendFileToChatId data = {};
     const auto _usage = [capture0 = argv[0]](auto&& PH1) {
         usage(capture0, std::forward<decltype(PH1)>(PH1));
     };
     TgBot_AbslLogInit();
+    CommandLine::initInstance(argc, argv);
 
     if (argc != 3) {
         _usage(EXIT_SUCCESS);
