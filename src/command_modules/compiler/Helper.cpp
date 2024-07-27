@@ -16,34 +16,37 @@ CompilerInTgBotInterface::CompilerInTgBotInterface(
 void CompilerInTgBotInterface::onExecutionStarted(
     const std::string_view& command) {
     timePoint.init();
-    sentMessage = botApi->sendReplyMessage(
-        requestedMessage, GETSTR(WORKING) + command.data());
+    output << GETSTR(WORKING) + command.data() << std::endl;
+    sentMessage = botApi->sendReplyMessage(requestedMessage, output.str());
 }
 
 void CompilerInTgBotInterface::onExecutionFinished(
     const std::string_view& command) {
     const auto timePassed = timePoint.get();
-    std::stringstream ss;
-    ss << GETSTR(WORKING) + command.data() << std::endl;
-    ss << "Done. Execution took " << timePassed.count() << " milliseconds";
-    botApi->editMessage(sentMessage, ss.str());
+    output << "Done. Execution took " << timePassed.count() << " milliseconds";
+    botApi->editMessage(sentMessage, output.str());
 }
 
 void CompilerInTgBotInterface::onErrorStatus(absl::Status status) {
-    std::stringstream ss;
-    ss << "Error executing: " << status;
+    output << "Error executing: " << status;
     if (sentMessage) {
-        botApi->editMessage(sentMessage, ss.str());
+        botApi->editMessage(sentMessage, output.str());
     } else {
-        botApi->sendReplyMessage(requestedMessage, ss.str());
+        botApi->sendReplyMessage(requestedMessage, output.str());
     }
 }
 
 void CompilerInTgBotInterface::onResultReady(const std::string& text) {
-    botApi->sendMessage(requestedMessage, text);
+    if (!text.empty()) {
+        botApi->sendMessage(requestedMessage, text);
+    } else {
+        output << "Output is empty" << std::endl;
+        botApi->editMessage(sentMessage, output.str());
+    }
 }
 
 void CompilerInTgBotInterface::onWdtTimeout() {
-    botApi->editMessage(sentMessage, "WDT TIMEOUT");
+    output << "WDT TIMEOUT" << std::endl;
+    botApi->editMessage(sentMessage, output.str());
     std::this_thread::sleep_for(1s);
 }

@@ -21,4 +21,5 @@ class CompilerInTgBotInterface : public CompilerInTg::Interface {
     Message::Ptr requestedMessage;
     Message::Ptr sentMessage;
     DurationPoint timePoint;
+    std::stringstream output;
 };
