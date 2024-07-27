@@ -136,6 +136,7 @@ DECLARE_COMMAND_HANDLER(database, wrapper, message) {
                         wrapper, m, userId);
                 }
                 wrapper->unregisterCallback(token);
+                wrapper->editMessageMarkup(msg, nullptr);
             }
         },
         token);
