@@ -361,15 +361,22 @@ bool ConfigParser::Parser::parseROMManifest() {
 
 bool ConfigParser::Parser::parseDevices() {
     return findChildNodes(rootNode, "targets", [this](xmlNode *curNode) {
-        auto device = std::make_shared<Device>();
-        StringElement deviceElem(&device->marketName, "device");
+        std::vector<std::string> marketName;
+        std::vector<std::string> codeName;
+        StringArrayElement deviceElem(&marketName, "device");
         deviceElem.attrs.emplace_back(
-            StringElement(&device->codename, "codename"));
+            StringArrayElement(&codeName, "codename"));
 
         if (!parseChildElements(curNode, deviceElem)) {
             return false;
         }
-        data.devices.emplace_back(device);
+
+        for (int x = 0; x < marketName.size(); ++x) {
+            auto device = std::make_shared<Device>();
+            device->codename = codeName[x];
+            device->marketName = marketName[x];
+            data.devices.emplace_back(device);
+        }
         return true;
     });
 }
@@ -397,22 +404,25 @@ bool ConfigParser::Parser::parseLocalManifestBranch() {
         locMan->repo_info.url = data.url;
         locMan->name = data.name;
 
+        const auto findOrInsert = [this, &locMan](const std::string &codename) {
+            auto ptr =
+                std::ranges::find_if(data.devices, [&](const auto &device) {
+                    return device->codename == codename;
+                });
+            if (ptr != data.devices.end()) {
+                locMan->devices.emplace_back(*ptr);
+            } else {
+                locMan->devices.emplace_back(
+                    std::make_shared<Device>(codename, ""));
+            }
+        };
+
         if (!codename.empty()) {
             for (const auto &codenameElem : codename) {
-                auto ptr =
-                    std::ranges::find_if(data.devices, [&](const auto &device) {
-                        return device->codename == codenameElem;
-                    });
-                if (ptr != data.devices.end()) {
-                    locMan->devices.emplace_back(*ptr);
-                    break;
-                } else {
-                    locMan->devices.emplace_back(
-                        std::make_shared<Device>(codenameElem, ""));
-                }
+                findOrInsert(codenameElem);
             }
         } else if (deviceElem) {
-            locMan->devices.emplace_back(std::make_shared<Device>(device, ""));
+            findOrInsert(device);
         }
 
         // If it's '*', we append all known roms here
@@ -446,6 +456,7 @@ std::vector<ConfigParser::LocalManifest::Ptr> ConfigParser::Parser::parse() {
     if (!parseROMManifest()) {
         return {};
     }
+    LOG_IF(WARNING, !parseDevices()) << "Parse devices failed";
 
     if (findChildNodes(rootNode, "local_manifests", [this](xmlNode *root) {
             StringElement localManifestName(&data.name, "name");

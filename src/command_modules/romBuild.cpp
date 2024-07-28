@@ -214,19 +214,12 @@ DECLARE_COMMAND_HANDLER(rombuild, tgWrapper, message) {
             tgWrapper->editMessage(m, "Select device...");
             auto deviceKeyboard =
                 std::make_shared<TgBot::InlineKeyboardMarkup>();
-            deviceKeyboard->inlineKeyboard.resize(1);
-            const int width = sqrt(parser.getDevices().size());
-            int x = 0;
             for (const auto& device : parser.getDevices()) {
                 auto button = std::make_shared<TgBot::InlineKeyboardButton>();
-                button->text = device.device;
-                button->callbackData = "device_" + device.device;
+                button->text = device.device->toString();
+                button->callbackData = "device_" + device.device->codename;
+                deviceKeyboard->inlineKeyboard.emplace_back();
                 deviceKeyboard->inlineKeyboard.back().emplace_back(button);
-                ++x;
-                if (deviceKeyboard->inlineKeyboard.back().size() == width &&
-                    x != parser.getDevices().size()) {
-                    deviceKeyboard->inlineKeyboard.emplace_back();
-                }
             }
             deviceKeyboard->inlineKeyboard.push_back(
                 {std::make_shared<TgBot::InlineKeyboardButton>("Back", "",
@@ -255,9 +248,10 @@ DECLARE_COMMAND_HANDLER(rombuild, tgWrapper, message) {
             std::string_view device = query->data;
             absl::ConsumePrefix(&device, "device_");
             auto it = parser.getDevices();
-            queryData->roms = std::ranges::find_if(it, [&](const auto& d) {
-                                  return d.device == std::string(device);
-                              })->getROMs();
+            queryData->roms =
+                std::ranges::find_if(it, [&](const auto& d) {
+                    return d.device->codename == std::string(device);
+                })->getROMs();
             queryData->per_build.device = device;
             auto deviceKeyboard =
                 std::make_shared<TgBot::InlineKeyboardMarkup>();
