@@ -31,6 +31,12 @@ bool _try_parse(const String& str, T* outval) {
     return false;
 }
 
+template <typename String, typename StringStream>
+bool _try_parse(const String& str, String* outval) {
+    *outval = str;
+    return true;
+}
+
 template <typename T>
 bool try_parse(const std::string& str, T* outval) {
     return _try_parse<std::string, std::stringstream>(str, outval);
