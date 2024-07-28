@@ -12,6 +12,7 @@
 #include <map>
 #include <memory>
 #include <source_location>
+#include <stdexcept>
 #include <type_traits>
 #include <unordered_set>
 #include <vector>
@@ -19,7 +20,7 @@
 #include "CStringLifetime.h"
 #include "TryParseStr.hpp"
 
-constexpr bool parserDebug = false;
+constexpr bool parserDebug = true;
 
 namespace shim {
 bool xmlStrEq(const xmlChar *a, const char *b) {
@@ -328,11 +329,8 @@ bool parseChildElements(xmlNode *parentNode, Elements &...elements) {
            testCompletion(elements...);
 }
 
-std::vector<ConfigParser::LocalManifest::Ptr> ConfigParser::Parser::parse()
-    const {
-    std::vector<ROMBranch::Ptr> branches;
-    std::vector<LocalManifest::Ptr> manifests;
-    findChildNodes(rootNode, "rom", [this, &branches](xmlNode *curNode) {
+bool ConfigParser::Parser::parseROMManifest() {
+    return findChildNodes(rootNode, "rom", [this](xmlNode *curNode) {
         auto rom = std::make_shared<ROMInfo>();
         std::vector<int> version;
         std::vector<std::string> branch;
@@ -347,6 +345,7 @@ std::vector<ConfigParser::LocalManifest::Ptr> ConfigParser::Parser::parse()
 
         if (!parseChildElements(curNode, romName, romLink, romTarget,
                                 romOutzipPrefix, android_and_branch)) {
+            LOG(ERROR) << "Failed to parse rom manifest";
             return false;
         }
         std::transform(version.begin(), version.end(), branch.begin(),
@@ -354,85 +353,119 @@ std::vector<ConfigParser::LocalManifest::Ptr> ConfigParser::Parser::parse()
                        std::make_pair<int const &, std::string const &>);
 
         for (const auto &[k, v] : branchesMap) {
-            branches.emplace_back(
+            data.rombranches.emplace_back(
                 std::make_shared<ROMBranch>(v, k, std::string(), rom));
         }
         return true;
     });
-    if (branches.empty()) {
-        LOG(ERROR) << "Failed to parse rom config";
+}
+
+bool ConfigParser::Parser::parseDevices() {
+    return findChildNodes(rootNode, "targets", [this](xmlNode *curNode) {
+        auto device = std::make_shared<Device>();
+        StringElement deviceElem(&device->marketName, "device");
+        deviceElem.attrs.emplace_back(
+            StringElement(&device->codename, "codename"));
+
+        if (!parseChildElements(curNode, deviceElem)) {
+            return false;
+        }
+        data.devices.emplace_back(device);
+        return true;
+    });
+}
+
+bool ConfigParser::Parser::parseLocalManifestBranch() {
+    return findChildNodes(data.node, "branch", [&, this](xmlNode *curNode) {
+        auto locMan = std::make_shared<LocalManifest>();
+        std::string targetrom;
+        int androidVersion = 0;
+        std::string device;
+        std::vector<std::string> codename;
+
+        ParentElement parent(nullptr, "devices");
+        StringElement deviceElem(&device, "device");
+        StringElement targetRomElem(&targetrom, "target_rom");
+        IntElement androidVersionElem(&androidVersion, "android_version");
+
+        parent.childs.emplace_back(StringArrayElement(&codename, "codename"));
+
+        deviceElem.required = false;
+        if (!parseChildElements(curNode, deviceElem, parent, targetRomElem,
+                                androidVersionElem)) {
+            return false;
+        }
+        locMan->repo_info.url = data.url;
+        locMan->name = data.name;
+
+        if (!codename.empty()) {
+            for (const auto &codenameElem : codename) {
+                auto ptr =
+                    std::ranges::find_if(data.devices, [&](const auto &device) {
+                        return device->codename == codenameElem;
+                    });
+                if (ptr != data.devices.end()) {
+                    locMan->devices.emplace_back(*ptr);
+                    break;
+                } else {
+                    locMan->devices.emplace_back(
+                        std::make_shared<Device>(codenameElem, ""));
+                }
+            }
+        } else if (deviceElem) {
+            locMan->devices.emplace_back(std::make_shared<Device>(device, ""));
+        }
+
+        // If it's '*', we append all known roms here
+        if (targetrom == "*") {
+            for (const auto &rom : data.rombranches) {
+                locMan->rom = rom;
+                data.localManifests.emplace_back(locMan);
+            }
+        } else {
+            // Lookup the ROM by android version and rom name
+            for (const auto &rom : data.rombranches) {
+                if (rom->androidVersion == androidVersion &&
+                    rom->romInfo->name == targetrom) {
+                    locMan->rom = rom;
+                    break;
+                }
+            }
+            if (!locMan->rom) {
+                LOG(WARNING)
+                    << "No rom found for android version " << androidVersion
+                    << " and rom name " << targetrom << ", abort";
+                return false;
+            }
+            data.localManifests.emplace_back(locMan);
+        }
+        return true;
+    });
+}
+
+std::vector<ConfigParser::LocalManifest::Ptr> ConfigParser::Parser::parse() {
+    if (!parseROMManifest()) {
         return {};
     }
 
-    findChildNodes(rootNode, "local_manifests", [&, this](xmlNode *root) {
-        std::string name;
-        std::string url;
-        std::vector<LocalManifest::Ptr> localManifests;
-        StringElement localManifestName(&name, "name");
-        StringElement localManifestLink(&url, "url");
+    if (findChildNodes(rootNode, "local_manifests", [this](xmlNode *root) {
 
-        bool ret =
-            parseChildElements(root, localManifestName, localManifestLink);
-        if (!ret) {
-            return false;
-        }
+            StringElement localManifestName(&data.name, "name");
+            StringElement localManifestLink(&data.url, "url");
 
-        findChildNodes(root, "branch", [&, this](xmlNode *curNode) {
-            auto locMan = std::make_shared<LocalManifest>();
-            std::string targetrom;
-            int androidVersion = 0;
-            std::string device;
-
-            ParentElement parent(nullptr, "devices");
-            StringElement deviceElem(&device, "device");
-            StringElement targetRomElem(&targetrom, "target_rom");
-            IntElement androidVersionElem(&androidVersion, "android_version");
-
-            parent.childs.emplace_back(
-                StringArrayElement(&locMan->devices, "codename"));
-
-            deviceElem.required = false;
-            if (!parseChildElements(curNode, deviceElem, parent,
-                                    targetRomElem, androidVersionElem)) {
+            if (!parseChildElements(root, localManifestName,
+                                    localManifestLink)) {
                 return false;
             }
-            locMan->repo_info.url = url;
-            locMan->name = name;
-            if (deviceElem) {
-                locMan->devices.emplace_back(device);
-            }
 
-            // If it's '*', we append all known roms here
-            if (targetrom == "*") {
-                for (const auto &rom : branches) {
-                    locMan->rom = rom;
-                    localManifests.emplace_back(locMan);
-                }
-            } else {
-                // Lookup the ROM by android version and rom name
-                for (const auto &rom : branches) {
-                    if (rom->androidVersion == androidVersion &&
-                        rom->romInfo->name == targetrom) {
-                        locMan->rom = rom;
-                        break;
-                    }
-                }
-                if (!locMan->rom) {
-                    LOG(WARNING)
-                        << "No rom found for android version " << androidVersion
-                        << " and rom name " << targetrom << ", abort";
-                    return false;
-                }
-
-                localManifests.emplace_back(locMan);
-            }
+            data.node = root;
+            parseLocalManifestBranch();
             return true;
-        });
-        manifests = localManifests;
-        return true;
-    });
+        })) {
+        return data.localManifests;
+    }
 
-    return manifests;
+    return {};
 }
 
 ConfigParser::Parser::Parser(const std::filesystem::path &xmlFilePath)
@@ -458,7 +491,7 @@ ConfigParser::ConfigParser(const std::filesystem::path &xmlFilePath) {
 }
 
 std::vector<ConfigParser::DeviceEntry> ConfigParser::getDevices() const {
-    std::unordered_set<std::string> uniqueDevices;
+    std::unordered_set<Device::Ptr> uniqueDevices;
 
     // Collect unique devices
     for (const auto &manifest : parsedManifests) {
@@ -482,7 +515,8 @@ std::vector<ConfigParser::ROMEntry> ConfigParser::DeviceEntry::getROMs() const {
 
     // Collect relevant ROMs
     for (const auto &manifest : parser->parsedManifests) {
-        if (std::find(manifest->devices.begin(), manifest->devices.end(), device) != manifest->devices.end()) {
+        if (std::find(manifest->devices.begin(), manifest->devices.end(),
+                      device) != manifest->devices.end()) {
             relevantROMs.insert(manifest->rom);
         }
     }

@@ -26,9 +26,12 @@ Structure:
 
 <builderconfig>
     <targets>
-        <device>
-            
-        </device>
+        <device codename="a10">Galaxy A10</device>
+        <device codename="a20">Galaxy A20</device>
+        <device codename="a20e">Galaxy A20e</device>
+        <device codename="a30">Galaxy A30</device>
+        <device codename="a40">Galaxy A40</device>
+        <device codename="r3q">Galaxy A90 5G</device>
     </targets>
     <rom>
         <name>Evolution-X</name>

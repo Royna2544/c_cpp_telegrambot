@@ -4,6 +4,7 @@
 #include <libxml/tree.h>
 
 #include <string>
+#include <utility>
 
 #include "RepoUtils.hpp"
 
@@ -27,13 +28,34 @@ class ConfigParser {
         ROMInfo::Ptr romInfo;        // associated ROMInfo
     };
 
+    struct Device {
+        using Ptr = std::shared_ptr<Device>;
+
+        std::string codename;    // codename of the device (e.g. raven)
+        std::string marketName;  // market name of the device (e.g. Pixel 5 Pro)
+
+        Device() = default;
+        Device(std::string codename, std::string marketName)
+            : codename(std::move(codename)),
+              marketName(std::move(marketName)) {}
+
+        // Returns a string representation of the device
+        // e.g. Pixel 5 Pro (raven)
+        [[nodiscard]] std::string toString() const {
+            if (marketName.empty()) {
+                return codename;
+            }
+            return marketName + " (" + codename + ")";
+        }
+    };
+
     struct LocalManifest {
         using Ptr = std::shared_ptr<LocalManifest>;
 
         std::string name;                  // name of the manifest
         ROMBranch::Ptr rom;                // associated ROM and its branch
         RepoUtils::RepoInfo repo_info;     // local manifest information
-        std::vector<std::string> devices;  // codename of the device
+        std::vector<Device::Ptr> devices;  // codename of the device
     };
 
     explicit ConfigParser(const std::filesystem::path &xmlFilePath);
@@ -43,11 +65,11 @@ class ConfigParser {
         int androidVersion;          // android version of the ROM
         const ConfigParser *parser;  // pointer to the ConfigParser instance
 
-        LocalManifest::Ptr getLocalManifest() const;
+        [[nodiscard]] LocalManifest::Ptr getLocalManifest() const;
     };
 
     struct DeviceEntry {
-        std::string device;          // device codename
+        Device::Ptr device;          // device codename
         const ConfigParser *parser;  // pointer to the ConfigParser instance
 
         [[nodiscard]] std::vector<ROMEntry> getROMs() const;
@@ -61,10 +83,23 @@ class ConfigParser {
         xmlNode *rootNode;
         xmlDoc *doc;
 
+        struct {
+            xmlNode *node;
+            std::string url;
+            std::string name;
+            std::vector<ROMBranch::Ptr> rombranches;
+            std::vector<Device::Ptr> devices;
+            std::vector<LocalManifest::Ptr> localManifests;
+        } data;
+
+        bool parseROMManifest();
+        bool parseDevices();
+        bool parseLocalManifestBranch();
+
        public:
         explicit Parser(const std::filesystem::path &xmlFilePath);
         ~Parser();
-        [[nodiscard]] std::vector<LocalManifest::Ptr> parse() const;
+        [[nodiscard]] std::vector<LocalManifest::Ptr> parse();
     };
 };
 
