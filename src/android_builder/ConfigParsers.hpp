@@ -47,6 +47,10 @@ class ConfigParser {
             }
             return marketName + " (" + codename + ")";
         }
+
+        bool operator==(const Device &other) const {
+            return codename == other.codename;
+        }
     };
 
     struct LocalManifest {

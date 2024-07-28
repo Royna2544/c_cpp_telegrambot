@@ -493,7 +493,7 @@ std::vector<ConfigParser::DeviceEntry> ConfigParser::getDevices() const {
     for (const auto &manifest : parsedManifests) {
         for (const auto &device : manifest->devices) {
             if (std::ranges::find_if(devices, [&device](auto &&d) {
-                    return d.device == device;
+                    return *d.device == *device;
                 }) == devices.end()) {
                 devices.emplace_back(device, this);
             }
@@ -510,10 +510,10 @@ std::vector<ConfigParser::ROMEntry> ConfigParser::DeviceEntry::getROMs() const {
     std::ranges::for_each(
         parser->parsedManifests,
         [this, &romsInfo](const LocalManifest::Ptr &manifest) {
-            bool x = std::ranges::find_if(
-                         manifest->devices, [this](const Device::Ptr &device) {
-                             return device->codename == this->device->codename;
-                         }) != manifest->devices.end();
+            bool x = std::ranges::find_if(manifest->devices,
+                                          [this](const Device::Ptr &device) {
+                                              return *device == *this->device;
+                                          }) != manifest->devices.end();
             if (x) {
                 romsInfo.emplace_back(manifest->rom);
             }
