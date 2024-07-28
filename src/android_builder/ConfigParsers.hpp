@@ -65,12 +65,6 @@ class ConfigParser {
         explicit Parser(const std::filesystem::path &xmlFilePath);
         ~Parser();
         [[nodiscard]] std::vector<LocalManifest::Ptr> parse() const;
-
-        // Declare a member that represents ANY ROM match
-        [[nodiscard]] static auto anyROMObject() {
-            static auto obj = std::make_shared<ROMBranch>();
-            return obj;
-        }
     };
 };
 
