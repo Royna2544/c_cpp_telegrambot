@@ -1,7 +1,6 @@
 #include <ConfigParsers.hpp>
 #include <TgBotWrapper.hpp>
 #include <filesystem>
-#include <future>
 #include <initializer_list>
 #include <libos/libfs.hpp>
 #include <memory>
@@ -17,8 +16,6 @@
 #include "absl/strings/match.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/strip.h"
-#include "tgbot/types/InlineKeyboardButton.h"
-#include "tgbot/types/InlineKeyboardMarkup.h"
 
 namespace {
 
@@ -242,7 +239,6 @@ DECLARE_COMMAND_HANDLER(rombuild, tgWrapper, message) {
                                (queryData->do_repo_sync ? "Yes" : "No"));
         } else if (query->data == "close") {
             tgWrapper->editMessage(m, "Closed");
-            tgWrapper->editMessageMarkup(m, nullptr);
             queryData.reset();
         } else if (absl::StartsWith(query->data, "device_")) {
             std::string_view device = query->data;
