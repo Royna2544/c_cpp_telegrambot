@@ -14,7 +14,6 @@
 #include <source_location>
 #include <stdexcept>
 #include <type_traits>
-#include <unordered_set>
 #include <vector>
 
 #include "CStringLifetime.h"
@@ -449,7 +448,6 @@ std::vector<ConfigParser::LocalManifest::Ptr> ConfigParser::Parser::parse() {
     }
 
     if (findChildNodes(rootNode, "local_manifests", [this](xmlNode *root) {
-
             StringElement localManifestName(&data.name, "name");
             StringElement localManifestLink(&data.url, "url");
 
@@ -491,43 +489,52 @@ ConfigParser::ConfigParser(const std::filesystem::path &xmlFilePath) {
 }
 
 std::vector<ConfigParser::DeviceEntry> ConfigParser::getDevices() const {
-    std::unordered_set<Device::Ptr> uniqueDevices;
-
-    // Collect unique devices
+    std::vector<DeviceEntry> devices;
     for (const auto &manifest : parsedManifests) {
         for (const auto &device : manifest->devices) {
-            uniqueDevices.insert(device);
+            if (std::ranges::find_if(devices, [&device](auto &&d) {
+                    return d.device == device;
+                }) == devices.end()) {
+                devices.emplace_back(device, this);
+            }
         }
     }
-
-    // Transform to vector of DeviceEntry
-    std::vector<DeviceEntry> devices;
-    devices.reserve(uniqueDevices.size());
-    for (const auto &device : uniqueDevices) {
-        devices.emplace_back(device, this);
-    }
-
     return devices;
 }
 
 std::vector<ConfigParser::ROMEntry> ConfigParser::DeviceEntry::getROMs() const {
-    std::unordered_set<ROMBranch::Ptr> relevantROMs;
-
-    // Collect relevant ROMs
-    for (const auto &manifest : parser->parsedManifests) {
-        if (std::find(manifest->devices.begin(), manifest->devices.end(),
-                      device) != manifest->devices.end()) {
-            relevantROMs.insert(manifest->rom);
-        }
-    }
-
-    // Transform to vector of ROMEntry
     std::vector<ROMEntry> roms;
-    roms.reserve(relevantROMs.size());
-    for (const auto &rom : relevantROMs) {
-        roms.emplace_back(rom->romInfo->name, rom->androidVersion, parser);
-    }
+    std::vector<ROMBranch::Ptr> romsInfo;
 
+    // Sort out relevants
+    std::ranges::for_each(
+        parser->parsedManifests,
+        [this, &romsInfo](const LocalManifest::Ptr &manifest) {
+            bool x = std::ranges::find_if(
+                         manifest->devices, [this](const Device::Ptr &device) {
+                             return device->codename == this->device->codename;
+                         }) != manifest->devices.end();
+            if (x) {
+                romsInfo.emplace_back(manifest->rom);
+            }
+        });
+
+    // Sort out ROMInfo::Ptr only
+    std::ranges::transform(
+        parser->parsedManifests, std::back_inserter(romsInfo),
+        [](const LocalManifest::Ptr &manifest) { return manifest->rom; });
+    // Remove duplicates
+    const auto dels = std::ranges::unique(romsInfo);
+    romsInfo.erase(dels.begin(), dels.end());
+
+    // Map them to names
+    std::ranges::transform(romsInfo, std::back_inserter(roms),
+                           [this](const ROMBranch::Ptr &branch) {
+                               return ROMEntry(branch->romInfo->name,
+                                               branch->androidVersion, parser);
+                           });
+
+    // Done.
     return roms;
 }
 
