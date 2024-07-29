@@ -14,6 +14,7 @@
 #include <source_location>
 #include <stdexcept>
 #include <type_traits>
+#include <variant>
 #include <vector>
 
 #include "CStringLifetime.h"
