@@ -1,4 +1,4 @@
-#include <RandomNumberGenerator.hpp>
+#include <Random.hpp>
 #include <TgBotWrapper.hpp>
 
 using TgBot::StickerSet;
@@ -12,7 +12,7 @@ DECLARE_COMMAND_HANDLER(randsticker, wrapper, message) {
 
     if (msg.hasSticker()) {
         auto sticker = msg.getSticker();
-        random_return_type pos{};
+        Random::ret_type pos{};
         StickerSet::Ptr stickset;
         std::stringstream ss;
         try {
@@ -21,7 +21,7 @@ DECLARE_COMMAND_HANDLER(randsticker, wrapper, message) {
             wrapper->sendReplyMessage(message, e.what());
             return;
         }
-        pos = RandomNumberGenerator::generate(stickset->stickers.size() - 1);
+        pos = Random::getInstance()->generate(stickset->stickers.size() - 1);
         wrapper->sendSticker(message, MediaIds(stickset->stickers[pos]));
 
         ss << "Sticker idx: " << pos + 1

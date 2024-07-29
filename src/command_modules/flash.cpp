@@ -1,5 +1,4 @@
-#include <RandomNumberGenerator.hpp>
-
+#include <Random.hpp>
 #include <TgBotWrapper.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/split.hpp>
@@ -24,8 +23,8 @@ DECLARE_COMMAND_HANDLER(flash, botWrapper, message) {
     Message::Ptr sentmsg;
     MessageWrapper wrapper(botWrapper, message);
     const auto sleep_secs =
-        RandomNumberGenerator::generate(FLASH_DELAY_MAX_SEC);
-    random_return_type pos = 0;
+        Random::getInstance()->generate(FLASH_DELAY_MAX_SEC);
+    Random::ret_type pos = 0;
 
     std::call_once(once, [] {
         std::string buf;
@@ -33,7 +32,7 @@ DECLARE_COMMAND_HANDLER(flash, botWrapper, message) {
         boost::split(reasons, buf, isNewline);
     });
 
-    pos = RandomNumberGenerator::generate(reasons.size());
+    pos = Random::getInstance()->generate(reasons.size());
 
     if (wrapper.hasReplyToMessage()) {
         wrapper.switchToReplyToMessage();
@@ -55,7 +54,8 @@ DECLARE_COMMAND_HANDLER(flash, botWrapper, message) {
     }
 
     if (msg->find('\n') != std::string::npos) {
-        wrapper.sendMessageOnExit("Invalid input: Zip names shouldn't have newlines");
+        wrapper.sendMessageOnExit(
+            "Invalid input: Zip names shouldn't have newlines");
         return;
     }
     std::replace(msg->begin(), msg->end(), ' ', '_');

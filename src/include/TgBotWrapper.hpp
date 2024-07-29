@@ -14,7 +14,7 @@
 
 #include "CompileTimeStringConcat.hpp"
 #include "InstanceClassBase.hpp"
-#include "RandomNumberGenerator.hpp"
+#include "Random.hpp"
 #include "Types.h"
 #include "tgbot/types/GenericReply.h"
 
@@ -656,7 +656,7 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
 
         return getApi().sendDice(
             chatId, false, nullptr, nullptr,
-            dices[RandomNumberGenerator::generate(dices.size() - 1)]);
+            dices[Random::getInstance()->generate(dices.size() - 1)]);
     }
 
     StickerSet::Ptr getStickerSet_impl(

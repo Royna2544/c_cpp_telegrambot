@@ -8,7 +8,7 @@
 #include <memory>
 #include <optional>
 
-#include "RandomNumberGenerator.hpp"
+#include "Random.hpp"
 #include "StringToolsExt.hpp"
 
 template <DatabaseBase::ListType type>
@@ -116,7 +116,7 @@ DECLARE_COMMAND_HANDLER(database, wrapper, message) {
                                       UserPtr_toString(msgWrapper.getUser()),
                                   reply);
 
-    const random_return_type token = RandomNumberGenerator::generate(100);
+    const auto token = Random::getInstance()->generate(100);
 
     wrapper->registerCallback(
         [msg, token, userId](ApiPtr wrapper, MessagePtr m) {

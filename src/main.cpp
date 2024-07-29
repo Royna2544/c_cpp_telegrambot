@@ -17,12 +17,14 @@
 #include <TgBotWebpage.hpp>
 #include <TryParseStr.hpp>
 #include <boost/algorithm/string/split.hpp>
+#include <boost/system/system_error.hpp>
 #include <chrono>
 #include <database/bot/TgBotDatabaseImpl.hpp>
 #include <libos/libsighandler.hpp>
 #include <memory>
 #include <ml/ChatDataCollector.hpp>
 #include <utility>
+#include "Random.hpp"
 
 #ifdef SOCKET_CONNECTION
 #include <ChatObserver.h>
@@ -189,8 +191,14 @@ void createAndDoInitCallAll() {
     createAndDoInitCall<TgBotWebServer, ThreadManager::Usage::WEBSERVER_THREAD>(
         kWebServerListenPort);
     createAndDoInitCall<RTCommandLoader>();
+    createAndDoInitCall<Random>(nullptr);
     LOG(INFO) << "Updating commands list based on loaded commands...";
-    LOG_IF(ERROR, !bot->setBotCommands()) << "Couldn't update commands list";
+    try {
+        LOG_IF(ERROR, !bot->setBotCommands())
+            << "Couldn't update commands list";
+    } catch (const boost::system::system_error& e) {
+        LOG(ERROR) << "Error updating commands list: " << e.what();
+    }
     LOG(INFO) << "...done";
 
 #ifdef SOCKET_CONNECTION

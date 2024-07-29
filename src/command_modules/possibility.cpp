@@ -1,4 +1,4 @@
-#include <RandomNumberGenerator.hpp>
+#include <Random.hpp>
 
 #include <TgBotWrapper.hpp>
 #include <boost/algorithm/string/split.hpp>
@@ -12,11 +12,11 @@ DECLARE_COMMAND_HANDLER(possibility, botWrapper, message){
     std::string text;
     std::string lastItem;
     std::stringstream outStream;
-    std::unordered_map<std::string, random_return_type> kItemAndPercentMap;
+    std::unordered_map<std::string, Random::ret_type> kItemAndPercentMap;
     std::vector<std::string> vec;
     std::set<std::string> set;
-    random_return_type total = 0;
-    using map_t = std::pair<std::string, random_return_type>;
+    Random::ret_type total = 0;
+    using map_t = std::pair<std::string, Random::ret_type>;
 
     if (!messageWrapper.hasExtraText()) {
         messageWrapper.sendMessageOnExit(
@@ -39,7 +39,7 @@ DECLARE_COMMAND_HANDLER(possibility, botWrapper, message){
         vec, [](auto &&e) { return !isEmptyOrBlank(e); });
     vec = {start, end};
     // Shuffle the vector.
-    RandomNumberGenerator::shuffleArray(vec);
+    Random::getInstance()->shuffleArray(vec);
     // Start the output stream
     outStream << "Total " << vec.size() << " items" << std::endl;
     // Get the last item and remove it from the vector.
@@ -47,9 +47,9 @@ DECLARE_COMMAND_HANDLER(possibility, botWrapper, message){
     vec.pop_back();
     // Generate all random numbers
     for (const auto &cond : vec) {
-        random_return_type thisper = 0;
+        Random::ret_type thisper = 0;
         if (total < PERCENT_MAX) {
-            thisper = RandomNumberGenerator::generate(PERCENT_MAX - total);
+            thisper = Random::getInstance()->generate(PERCENT_MAX - total);
             if (total + thisper >= PERCENT_MAX) {
                 thisper = PERCENT_MAX - total;
             }

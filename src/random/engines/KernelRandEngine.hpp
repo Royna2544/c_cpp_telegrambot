@@ -9,7 +9,6 @@
 #include <internal/_FileDescriptor_posix.h>
 #include <unistd.h>
 
-#include <InstanceClassBase.hpp>
 #include <array>
 #include <cerrno>
 #include <cstdint>
@@ -18,7 +17,7 @@
 
 #define KERNELRAND_MAYBE_SUPPORTED
 
-struct kernel_rand_engine : InstanceClassBase<kernel_rand_engine> {
+struct kernel_rand_engine {
     using result_type = uint32_t;
 
     static constexpr result_type min() { return 0; }

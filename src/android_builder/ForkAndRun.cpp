@@ -17,9 +17,9 @@
 #include <optional>
 #include <thread>
 
-#include "PythonClass.hpp"
-#include "RandomNumberGenerator.hpp"
-#include "libos/libsighandler.hpp"
+#include <PythonClass.hpp>
+#include <Random.hpp>
+#include <libos/libsighandler.hpp>
 
 void sigchld_handler(int) {
     while (waitpid(-1, nullptr, WNOHANG) > 0) {
@@ -87,7 +87,7 @@ bool ForkAndRun::execute() {
         Pipe program_termination_pipe{};
         bool breakIt = false;
         int status = 0;
-        random_return_type token = RandomNumberGenerator::generate(100);
+        auto token = Random::getInstance()->generate(100);
         auto tregi = OnTerminateRegistrar::getInstance();
 
         tregi->registerCallback([this]() { cancel(); }, token);

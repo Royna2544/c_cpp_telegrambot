@@ -1,6 +1,6 @@
 add_my_library(
   NAME Random
-  SRCS RandomNumberGenerator.cpp
+  SRCS Random.cpp
   PUBLIC_INC .
 )
 ################# Detecting x86/x86_64 Architecture ################

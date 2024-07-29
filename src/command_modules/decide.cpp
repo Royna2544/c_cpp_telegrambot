@@ -1,4 +1,4 @@
-#include <RandomNumberGenerator.hpp>
+#include <Random.hpp>
 
 #include <TgBotWrapper.hpp>
 #include <sstream>
@@ -25,7 +25,7 @@ DECLARE_COMMAND_HANDLER(decide, wrapperBot, message) {
         msgtxt << std::endl << std::endl;
         do {
             msgtxt << "Try " + std::to_string(COUNT_MAX - count + 1) + " : ";
-            if (RandomNumberGenerator::generate(RANDOM_RANGE_NUM) % 2 == 1) {
+            if (Random::getInstance()->generate(RANDOM_RANGE_NUM) % 2 == 1) {
                 msgtxt << "Yes";
                 ++yesno;
             } else {
