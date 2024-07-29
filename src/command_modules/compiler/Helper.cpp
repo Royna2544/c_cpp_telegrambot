@@ -23,7 +23,8 @@ void CompilerInTgBotInterface::onExecutionStarted(
 void CompilerInTgBotInterface::onExecutionFinished(
     const std::string_view& command) {
     const auto timePassed = timePoint.get();
-    output << "Done. Execution took " << timePassed.count() << " milliseconds";
+    output << "Done. Execution took " << timePassed.count() << " milliseconds"
+           << std::endl;
     botApi->editMessage(sentMessage, output.str());
 }
 
