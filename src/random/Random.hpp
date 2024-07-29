@@ -55,7 +55,7 @@ class TgBotRandom_API Random : public InstanceClassBase<Random>,
          * elements in a container. The specific algorithm used for shuffling is
          * dependent on the RNG implementation.
          */
-        virtual void shuffle_string(std::vector<std::string>& it) const = 0;
+        virtual void shuffle(std::vector<std::string>& it) const = 0;
 
         /**
          * @brief      Returns the name of the RNG.

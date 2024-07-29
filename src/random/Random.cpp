@@ -32,7 +32,7 @@ struct StdCpp : Random::ImplBase {
         ShuffleImpl(in, &e);
     }
 
-    void shuffle_string(std::vector<std::string>& it) const override {
+    void shuffle(std::vector<std::string>& it) const override {
         shuffle(it);
     }
 
@@ -67,7 +67,7 @@ struct RDRand : Random::ImplBase {
         ShuffleImpl(in, &engine);
     }
 
-    void shuffle_string(std::vector<std::string>& it) const override {
+    void shuffle(std::vector<std::string>& it) const override {
         shuffle(it);
     }
 
@@ -97,7 +97,7 @@ struct KernelRand : Random::ImplBase {
         ShuffleImpl(in, &engine);
     }
 
-    void shuffle_string(std::vector<std::string>& it) const override {
+    void shuffle(std::vector<std::string>& it) const override {
         shuffle(it);
     }
 
@@ -138,7 +138,7 @@ void Random::doInitCall() {
 }
 
 void Random::shuffleArray(std::vector<std::string>& array) {
-    impl_->shuffle_string(array);
+    impl_->shuffle(array);
 }
 
 Random::ret_type Random::generate(const ret_type max) {
