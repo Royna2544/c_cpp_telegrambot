@@ -8,6 +8,7 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+#include "pythonrun.h"
 
 namespace details {
 
@@ -48,12 +49,19 @@ class PythonClass : public std::enable_shared_from_this<PythonClass> {
     // Doesnt make sense to use this on ctor/dtor because we cannot do
     // bool isInitialized flag, as we cannot
     static void init() {
-        Py_InitializeEx(1);
+        Py_Initialize();
         if (Py_IsInitialized() == 0) {
             throw std::runtime_error("Failed to initialize Python");
         }
     }
-    static void deinit() { Py_FinalizeEx(); }
+    static void deinit() { Py_Finalize(); }
+
+    static void Py_maybePrintError() {
+        if (PyErr_Occurred() != nullptr) {
+            PyErr_Print();
+            PyErr_Clear();
+        }
+    }
 
     static std::shared_ptr<PythonClass> get() {
         details::ensurePythonInitialized();
@@ -122,7 +130,7 @@ class PythonClass : public std::enable_shared_from_this<PythonClass> {
 
             // If an error occurs...
             if (result == nullptr) {
-                PyErr_Print();
+                Py_maybePrintError();
                 LOG(ERROR) << "Failed to call function";
                 return false;
             }
@@ -131,7 +139,7 @@ class PythonClass : public std::enable_shared_from_this<PythonClass> {
             if constexpr (!std::is_void_v<T>) {
                 T resultC = details::convert<T>(result);
                 if (PyErr_Occurred()) {
-                    PyErr_Print();
+                    Py_maybePrintError();
                 } else {
                     *out = resultC;
                 }

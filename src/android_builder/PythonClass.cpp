@@ -5,6 +5,8 @@
 #include <limits>
 #include <memory>
 
+#include "pyerrors.h"
+
 namespace details {
 
 template <>
@@ -97,7 +99,7 @@ std::shared_ptr<PythonClass::ModuleHandle> PythonClass::importModule(
 
     // If the module is not found, throw a runtime_error
     if (module == nullptr) {
-        PyErr_Print();
+        Py_maybePrintError();
         LOG(ERROR) << "Module not found: " << name;
         return nullptr;
     }
@@ -114,7 +116,7 @@ PythonClass::ModuleHandle::lookupFunction(const std::string& name) {
 
     // If the function is not found, throw a runtime_error
     if (function == nullptr) {
-        PyErr_Print();
+        Py_maybePrintError();
         LOG(ERROR) << "Function not found: " << name;
         return nullptr;
     }

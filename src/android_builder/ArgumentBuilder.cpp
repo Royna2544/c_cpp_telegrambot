@@ -2,6 +2,7 @@
 
 #include <absl/log/check.h>
 #include <absl/log/log.h>
+#include "PythonClass.hpp"
 
 ArgumentBuilder::ArgumentBuilder(Py_ssize_t argument_count)
     : argument_count(argument_count) {
@@ -25,7 +26,7 @@ PyObject* ArgumentBuilder::build() {
 
     if (result == nullptr) {
         LOG(ERROR) << "Failed to create tuple";
-        PyErr_Print();
+        PythonClass::Py_maybePrintError();
         return nullptr;
     }
     DLOG(INFO) << "Building arguments: size=" << argument_count;
@@ -48,7 +49,7 @@ PyObject* ArgumentBuilder::build() {
         if (value == nullptr) {
             LOG(ERROR) << "Failed to convert argument to Python object";
             Py_DECREF(result);
-            PyErr_Print();
+            PythonClass::Py_maybePrintError();
             for (const auto& obj : arguments_ref) {
                 Py_XDECREF(obj);
             }
