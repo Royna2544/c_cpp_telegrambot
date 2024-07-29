@@ -64,6 +64,10 @@ class TgBotRandom_API Random : public InstanceClassBase<Random>,
          */
         virtual std::string_view getName() const = 0;
 
+        virtual ~ImplBase() = default;
+
+       protected:
+       
         /**
          * @brief      Shuffles the elements in a container using the specified
          * random number engine.
@@ -82,9 +86,6 @@ class TgBotRandom_API Random : public InstanceClassBase<Random>,
             std::shuffle(in.begin(), in.end(), *e);
         }
 
-        virtual ~ImplBase() = default;
-
-       protected:
         /**
          * @brief      Generates a random number in the specified range using
          * the specified random number generator.
