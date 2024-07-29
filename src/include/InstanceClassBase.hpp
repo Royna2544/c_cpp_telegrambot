@@ -29,7 +29,7 @@ struct InstanceClassBase {
         if (instance) {
             throw std::runtime_error("An instance of the class already exists");
         }
-        instance = std::make_shared<T>(std::forward<Args>(args)...);
+        instance = std::make_shared<T>(std::move(args)...);
         return instance;
     }
 

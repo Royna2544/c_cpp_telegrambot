@@ -26,7 +26,11 @@ add_my_executable(
     TryParseTest.cpp
     SharedMallocTest.cpp
     ConstexprStringCatTest.cpp
-    CommandModulesTest.cpp
+    commands/CommandModulesTest.cpp
+    commands/AliveCmdTest.cpp
+    commands/BashCmdTest.cpp
+    commands/CmdCmdTest.cpp
+    commands/DatabaseCmdTest.cpp
     ${SOCKET_TEST_FILE}
   LIBS
     GTest::gtest

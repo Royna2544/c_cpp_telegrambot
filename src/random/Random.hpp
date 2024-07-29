@@ -159,6 +159,10 @@ class TgBotRandom_API Random : public InstanceClassBase<Random>,
         return "Choose random number generator impl";
     }
 
+    [[nodiscard]] ImplBase* getImpl() const {
+        return impl_.get();
+    }
+
    private:
     std::unique_ptr<ImplBase> impl_;
 };
