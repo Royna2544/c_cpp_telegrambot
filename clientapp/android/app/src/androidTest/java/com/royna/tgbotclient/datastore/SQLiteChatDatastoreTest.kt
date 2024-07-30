@@ -1,61 +1,90 @@
 package com.royna.tgbotclient.datastore
-
-import android.content.Context
-import androidx.test.core.app.ApplicationProvider
-import com.royna.tgbotclient.datastore.chat.SQLiteChatDatastore
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import dagger.hilt.android.testing.HiltAndroidRule
+import dagger.hilt.android.testing.HiltAndroidTest
+import dagger.hilt.android.testing.UninstallModules
 import org.junit.After
+import org.junit.Assert
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.runner.RunWith
+import javax.inject.Inject
 
-class SQLiteChatDatastoreTest {
-    lateinit var mContext: Context
-    lateinit var mChatDatastore: SQLiteChatDatastore
+@RunWith(AndroidJUnit4::class)
+@UninstallModules(ChatIDModule::class)
+@HiltAndroidTest
+class ChatIDOperationsTest {
+
+    @get:Rule
+    var hiltRule = HiltAndroidRule(this)
+
+    @Inject
+    lateinit var database: ChatIDDatabase
+
+    @Inject
+    lateinit var dao: IChatIDOperations
 
     @Before
-    fun setUp() {
-        mContext = ApplicationProvider.getApplicationContext()
-        mChatDatastore = SQLiteChatDatastore(mContext)
+    fun setup() {
+        hiltRule.inject()
     }
 
     @After
     fun tearDown() {
-        mChatDatastore.close()
-        mContext.getDatabasePath(SQLiteChatDatastore.DATABASE_NAME).delete()
+        database.close()
     }
 
     @Test
-    fun delete() {
-        assertTrue(mChatDatastore.write(kChatName, kChatId))
-        assertTrue(mChatDatastore.delete(kChatName))
-        assertFalse(mChatDatastore.delete(kChatName))
+    fun testAddAndRetrieveChatIDEntry() {
+        val entry = ChatIDEntry(kChatId,kChatName)
+        dao.add(entry)
+
+        val entries = dao.getAll()
+        Assert.assertEquals(1, entries.size)
+        Assert.assertEquals(kChatName, entries[0].name)
+        Assert.assertEquals(kChatId, entries[0].id)
     }
 
     @Test
-    fun readwrite() {
-        assertTrue(mChatDatastore.write(kChatName, kChatId))
-        assertEquals(mChatDatastore.read(kChatName), kChatId)
+    fun testRemoveChatIDEntry() {
+        val entry = ChatIDEntry(kChatId,kChatName)
+        dao.add(entry)
+        dao.remove(entry)
 
-        // Fail because of unique constraint
-        assertFalse(mChatDatastore.write(kChatName, kOtherChatId))
-
-        assertEquals(mChatDatastore.read(kChatName), kChatId)
+        val entries = dao.getAll()
+        Assert.assertTrue(entries.isEmpty())
     }
 
     @Test
-    fun invalidRead() {
-        assertEquals(mChatDatastore.read(kOtherChatName), null)
+    fun testGetChatIDByName() {
+        val entry = ChatIDEntry(kChatId,kChatName)
+        dao.add(entry)
+
+        val chatID = dao.getChatID(kChatName)
+        Assert.assertEquals(kChatId, chatID)
     }
 
     @Test
-    fun readAll() {
-        assertTrue(mChatDatastore.write(kChatName, kChatId))
-        assertTrue(mChatDatastore.write(kOtherChatName, kOtherChatId))
-        assertEquals(mChatDatastore.readAll(), mapOf(kChatName to kChatId,
-            kOtherChatName to kOtherChatId))
+    fun testGetChatNameByID() {
+        val entry = ChatIDEntry(kChatId,kChatName)
+        dao.add(entry)
+
+        val chatName = dao.getChatName(kChatId)
+        Assert.assertEquals(kChatName, chatName)
     }
+
+    @Test
+    fun testClearAll() {
+        val entry1 = ChatIDEntry(kChatId,kChatName)
+        val entry2 = ChatIDEntry(kOtherChatId, kOtherChatName)
+        dao.add(entry1, entry2)
+
+        dao.clearAll()
+        val entries = dao.getAll()
+        Assert.assertTrue(entries.isEmpty())
+    }
+
     companion object {
         private const val kChatName = "Blex"
         private const val kOtherChatName = "Clex"
