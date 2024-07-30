@@ -38,7 +38,7 @@ bool PollSelector::add(socket_handle_t fd, OnSelectedCallback callback,
             return false;
     }
     pfd.revents = 0;
-    pollfds.push_back({pfd, callback});
+    pollfds.emplace_back(pfd, callback);
     return true;
 }
 

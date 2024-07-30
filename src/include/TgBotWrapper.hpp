@@ -313,10 +313,11 @@ struct TgBotApi {
         const ChatId chatId, const MessageId messageId,
         const std::string& message,
         const GenericReply::Ptr& replyMarkup = nullptr) const {
-        return sendMessage_impl(
-            chatId, message,
-            std::make_shared<ReplyParameters>(messageId, chatId), replyMarkup,
-            parseModeToStr<mode>());
+        auto params = std::make_shared<ReplyParameters>();
+        params->messageId = messageId;
+        params->chatId = chatId;
+        return sendMessage_impl(chatId, message, params, replyMarkup,
+                                parseModeToStr<mode>());
     }
 
     /**
@@ -586,7 +587,7 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
     // Copy a message
     MessageId copyMessage_impl(
         ChatId fromChatId, MessageId messageId,
-        ReplyParameters::Ptr replyParameters = nullptr) const {
+        ReplyParameters::Ptr replyParameters = nullptr) const override {
         const auto ret =
             getApi().copyMessage(fromChatId, fromChatId, messageId, "", "", {},
                                  false, replyParameters);

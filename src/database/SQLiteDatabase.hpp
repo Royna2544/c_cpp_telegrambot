@@ -221,6 +221,10 @@ struct SQLiteDatabase : DatabaseBase {
         struct Argument {
             ArgTypes parameter;
             std::vector<ArgTypes>::size_type index;
+
+            explicit Argument(ArgTypes param,
+                              std::vector<ArgTypes>::size_type index)
+                : parameter(std::move(param)), index(index) {}
         };
 
         /**
@@ -264,7 +268,8 @@ struct SQLiteDatabase : DatabaseBase {
          *
          * @param location The source location where the SQL statement execution
          * was attempted.
-         * @return True if the SQL statement could continue execution, false otherwise
+         * @return True if the SQL statement could continue execution, false
+         * otherwise
          */
         bool commonExecCheck(const std::source_location &location);
 

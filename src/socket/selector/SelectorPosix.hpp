@@ -2,6 +2,7 @@
 #include <sys/poll.h>
 #include <sys/select.h>
 
+#include <utility>
 #include <variant>
 
 #include "Selectors.hpp"
@@ -18,6 +19,9 @@ struct PollSelector : Selector {
     struct PollFdData {
         struct pollfd poll_fd;
         OnSelectedCallback callback;
+
+        explicit PollFdData(pollfd poll_fd, OnSelectedCallback callback)
+            : poll_fd(poll_fd), callback(std::move(callback)) {}
     };
     std::vector<PollFdData> pollfds;
 };
@@ -36,6 +40,10 @@ struct SelectSelector : Selector {
         socket_handle_t fd;
         OnSelectedCallback callback;
         Mode mode;
+
+        explicit SelectFdData(socket_handle_t fd, OnSelectedCallback callback,
+                              Mode mode)
+            : fd(fd), callback(std::move(callback)), mode(mode) {}
     };
     fd_set read_set;
     fd_set write_set;
