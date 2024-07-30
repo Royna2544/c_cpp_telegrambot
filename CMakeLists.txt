@@ -22,6 +22,7 @@ set(PROJECT_MAINEXE_NAME ${PROJECT_NAME}_main)
 
 ############################## OPTIONS ##############################
 option(ENABLE_RUST_SUPPORT "Enable rust support" OFF)
+option(DISABLE_SANITIZERS "Disable all sanitizers (ASan, TSan, etc)" OFF)
 #####################################################################
 
 ##################### Fill in readme with cmake #####################

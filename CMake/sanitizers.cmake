@@ -8,7 +8,15 @@ if (WIN32)
     set(SANITIZE_UNDEFINED OFF)
 endif()
 
-macro(add_sanitizers target)
+if (DISABLE_SANITIZERS)
+    message(STATUS "Sanitizers disabled by option")
+endif()
+
+# Define a macro to add sanitizers to a target.
+function(add_sanitizers target)
+    if (DISABLE_SANITIZERS)
+        return()
+    endif()
     if (SANITIZE_ADDRESS)
         target_compile_options(${target} PRIVATE -fsanitize=address)
         target_link_options(${target} PRIVATE -fsanitize=address)
@@ -23,5 +31,5 @@ macro(add_sanitizers target)
         target_compile_options(${target} PRIVATE -fsanitize=undefined)
         target_link_options(${target} PRIVATE -fsanitize=undefined)
     endif()
-endmacro()
+endfunction()
 
