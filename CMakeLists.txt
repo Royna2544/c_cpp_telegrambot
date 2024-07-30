@@ -137,6 +137,7 @@ find_package(libgit2 REQUIRED)
 find_package(Boost COMPONENTS program_options REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(ZLIB REQUIRED)
+find_package(Protobuf)
 include_directories(${Boost_INCLUDE_DIR})
 
 # If we couldn't find protobuf...
