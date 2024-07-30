@@ -28,14 +28,14 @@ jobs:
             str: ''
           
           - cc: Clang
-            real_cc: clang
-            real_cxx: clang++
+            real_cc: clang-18
+            real_cxx: clang++-18
             flags: -DENABLE_RUST_SUPPORT=ON
             str: (Rust)
 
           - cc: Clang
-            real_cc: clang
-            real_cxx: clang++
+            real_cc: clang-18
+            real_cxx: clang++-18
             flags: ''
             str: ''
 
@@ -51,7 +51,7 @@ jobs:
           bash ./resources/scripts/setup_dependencies_apt.sh
       
       - name: Install latest clang
-        if: matrix.cc == 'clang'
+        if: matrix.cc == 'Clang'
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
