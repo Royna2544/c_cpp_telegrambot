@@ -31,6 +31,71 @@ class MockRandom : public Random::ImplBase {
 
 struct DatabaseCommandTest : public CommandTestBase {
     DatabaseCommandTest() : CommandTestBase("database") {}
+
+    template <DatabaseBase::ListType type, DatabaseBase::ListResult result,
+              int X, int Y>
+    void test_adduser() {
+        defaultProvidedMessage->replyToMessage = createDefaultMessage();
+
+        defaultProvidedMessage->replyToMessage->from =
+            createDefaultUser(14);  // NOLINT
+        EXPECT_CALL(database,
+                    addUserToList(
+                        type, defaultProvidedMessage->replyToMessage->from->id))
+            .WillOnce(Return(result));
+        test_impl<X, Y>(GETSTR(USER_ADDED));
+    }
+
+    template <DatabaseBase::ListType type, DatabaseBase::ListResult result,
+              int X, int Y>
+    void test_removeuser() {
+        defaultProvidedMessage->replyToMessage = createDefaultMessage();
+        defaultProvidedMessage->replyToMessage->from =
+            createDefaultUser(324);  // NOLINT
+
+        EXPECT_CALL(database,
+                    removeUserFromList(
+                        type, defaultProvidedMessage->replyToMessage->from->id))
+            .WillOnce(Return(result));
+        test_impl<X, Y>(GETSTR(USER_REMOVED));
+    }
+
+    template <int X, int Y, typename Matcher>
+    void test_impl(Matcher&& matcher) {
+        Random::initInstance(std::make_unique<MockRandom>());
+
+        GenericReply::Ptr reply;
+        TgBot::GenericReply::Ptr keyboard;
+        constexpr size_t token = 1231;
+        const auto sentMessage = createDefaultMessage();
+        const auto recievedMessage = createDefaultMessage();
+        willSendReplyMessageTo(matcher, recievedMessage);
+        recievedMessage->replyToMessage = sentMessage;
+        EXPECT_CALL(*botApi,
+                    sendMessage_impl(TEST_CHAT_ID, _,
+                                     createMessageReplyMatcher(), _, ""))
+            .WillOnce(DoAll(WithArg<3>(verifyKeyboard), SaveArg<3>(&keyboard),
+                            Return(sentMessage)));
+        EXPECT_CALL(*botApi, registerCallback(_, _))
+            .WillOnce(DoAll(
+                Invoke([&]() {
+                    recievedMessage->text =
+                        std::dynamic_pointer_cast<TgBot::ReplyKeyboardMarkup>(
+                            keyboard)
+                            ->keyboard[X][Y]
+                            ->text;
+                }),
+                InvokeArgument<0>(botApi, recievedMessage), Return()));
+        EXPECT_CALL(*static_cast<MockRandom*>(Random::getInstance()->getImpl()),
+                    generate(_, _))
+            .WillOnce(Return(token));
+        EXPECT_CALL(*botApi, unregisterCallback(token)).WillOnce(Return(true));
+        EXPECT_CALL(*botApi,
+                    editMessageMarkup_impl(
+                        MockTgBotApi::StringOrMessage(sentMessage), IsNull()));
+        execute();
+        Random::destroyInstance();
+    }
 };
 
 TEST_F(DatabaseCommandTest, WithoutUser) {
@@ -40,42 +105,21 @@ TEST_F(DatabaseCommandTest, WithoutUser) {
 }
 
 TEST_F(DatabaseCommandTest, WithUserAddToWhiteList) {
-    Random::initInstance(std::make_unique<MockRandom>());
-    defaultProvidedMessage->replyToMessage = createDefaultMessage();
+    test_adduser<DatabaseBase::ListType::WHITELIST,
+                 DatabaseBase::ListResult::OK, 0, 0>();
+}
 
-    defaultProvidedMessage->replyToMessage->from =
-        createDefaultUser(14);  // NOLINT
+TEST_F(DatabaseCommandTest, WithUserRemoveFromWhiteList) {
+    test_removeuser<DatabaseBase::ListType::WHITELIST,
+                    DatabaseBase::ListResult::OK, 0, 1>();
+}
 
-    EXPECT_CALL(database,
-                addUserToList(DatabaseBase::ListType::WHITELIST,
-                              defaultProvidedMessage->replyToMessage->from->id))
-        .WillOnce(Return(DatabaseBase::ListResult::OK));
+TEST_F(DatabaseCommandTest, WithUserAddToBlackList) {
+    test_adduser<DatabaseBase::ListType::BLACKLIST,
+                 DatabaseBase::ListResult::OK, 1, 0>();
+}
 
-    GenericReply::Ptr reply;
-    TgBot::GenericReply::Ptr keyboard;
-    constexpr size_t token = 1231;
-    const auto sentMessage = createDefaultMessage();
-    const auto recievedMessage = createDefaultMessage();
-    willSendReplyMessageTo(GETSTR(USER_ADDED), recievedMessage);
-    recievedMessage->replyToMessage = sentMessage;
-    EXPECT_CALL(*botApi, sendMessage_impl(TEST_CHAT_ID, _,
-                                          createMessageReplyMatcher(), _, ""))
-        .WillOnce(DoAll(WithArg<3>(verifyKeyboard), SaveArg<3>(&keyboard),
-                        Return(sentMessage)));
-    EXPECT_CALL(*botApi, registerCallback(_, _))
-        .WillOnce(
-            DoAll(Invoke([&]() {
-                      recievedMessage->text =
-                          std::dynamic_pointer_cast<TgBot::ReplyKeyboardMarkup>(
-                              keyboard)
-                              ->keyboard[0][0]
-                              ->text;
-                  }),
-                  InvokeArgument<0>(botApi, recievedMessage), Return()));
-    EXPECT_CALL(*static_cast<MockRandom*>(Random::getInstance()->getImpl()),
-                generate(_, _))
-        .WillOnce(Return(token));
-    EXPECT_CALL(*botApi, unregisterCallback(token)).WillOnce(Return(true));
-    execute();
-    Random::destroyInstance();
+TEST_F(DatabaseCommandTest, WithUserRemoveFromBlackList) {
+    test_removeuser<DatabaseBase::ListType::BLACKLIST,
+                    DatabaseBase::ListResult::OK, 1, 1>();
 }
