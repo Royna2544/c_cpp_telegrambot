@@ -70,7 +70,9 @@ absl::Status RestartFmt::handleMessage(ApiPtr api) {
 
             api->sendReplyMessage(v->first, v->second, "Restart success!");
             unsetenv(RestartFmt::ENV_VAR_NAME);
+            return absl::OkStatus();
         }
     }
-    return absl::OkStatus();
+    // Could get here when the environment variable is not set
+    return absl::UnavailableError("Environment variable not set");
 }

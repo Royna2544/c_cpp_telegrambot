@@ -19,8 +19,11 @@ DECLARE_COMMAND_HANDLER(restart, tgBotWrapper, message) {
     int count = 0;
     std::vector<char *> myEnviron;
 
-    if (auto status = RestartFmt::handleMessage(tgBotWrapper); !status.ok()) {
-        LOG(ERROR) << "Failed to handle restart message: " << status;
+    const auto status = RestartFmt::handleMessage(tgBotWrapper);
+    LOG_IF(ERROR, status.code() == absl::StatusCode::kInvalidArgument)
+        << "Failed to handle restart message: " << status;
+    if (status.ok()) {
+        return;
     }
 
     // Get the size of environment buffer
