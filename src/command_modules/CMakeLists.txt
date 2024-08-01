@@ -151,7 +151,7 @@ command_module(
 command_module(
     NAME restart
     SRCS restart.cpp
-    LIBS TgBotCommandLine
+    LIBS TgBotCommandLine TgBot_restartfmt_parser
     PLATFORM "Unix"
 )
 

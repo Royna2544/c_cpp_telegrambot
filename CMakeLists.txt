@@ -241,7 +241,7 @@ add_my_library(
 add_my_executable(
   NAME main
   SRCS src/main.cpp
-  LIBS TgBotPPImpl TgBotLogInit
+  LIBS TgBotPPImpl TgBotLogInit TgBot_restartfmt_parser
 )
 #####################################################################
 

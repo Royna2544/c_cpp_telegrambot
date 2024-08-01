@@ -7,24 +7,20 @@
 #include <TgBotWrapper.hpp>
 #include <TryParseStr.hpp>
 #include <cinttypes>
+#include <cstdlib>
 #include <libos/libsighandler.hpp>
+#include <restartfmt_parser.hpp>
 
 extern char **environ;
 
 DECLARE_COMMAND_HANDLER(restart, tgBotWrapper, message) {
     // typical chatid:int32_max
-    std::array<char, sizeof("RESTART=-00000000000:2147483647")> restartBuf = {0};
-    int argc = 0;
+    std::array<char, RestartFmt::MAX_KNOWN_LENGTH> restartBuf = {0};
     int count = 0;
     std::vector<char *> myEnviron;
 
-    if (std::string u; ConfigManager::getEnv("RESTART", u)) {
-        snprintf(restartBuf.data(), restartBuf.size(), "RESTART=%" PRId64 ":%d",
-                 message->chat->id, message->messageId);
-        if (u == restartBuf.data()) {
-            LOG(INFO) << "Ignoring restart command";
-            return;
-        }
+    if (auto status = RestartFmt::handleMessage(tgBotWrapper); !status.ok()) {
+        LOG(ERROR) << "Failed to handle restart message: " << status;
     }
 
     // Get the size of environment buffer
@@ -33,9 +29,13 @@ DECLARE_COMMAND_HANDLER(restart, tgBotWrapper, message) {
     myEnviron.resize(count + 2);
     // Copy the environment buffer to the new buffer
     memcpy(myEnviron.data(), environ, count * sizeof(char *));
-    // Add the restart command env to the environment buffer
-    snprintf(restartBuf.data(), restartBuf.size(), "RESTART=%" PRId64 ":%d",
-             message->chat->id, message->messageId);
+
+    // Set the restart command env to the environment buffer
+    const auto restartEnv =
+        RestartFmt::toString({message->chat->id, message->messageId}, true);
+    strncpy(restartBuf.data(), restartEnv.c_str(), restartEnv.size());
+
+    // Append the restart env to the environment buffer
     myEnviron[count] = restartBuf.data();
     myEnviron[count + 1] = nullptr;
 

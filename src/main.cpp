@@ -23,7 +23,9 @@
 #include <libos/libsighandler.hpp>
 #include <memory>
 #include <ml/ChatDataCollector.hpp>
+#include <restartfmt_parser.hpp>
 #include <utility>
+
 #include "Random.hpp"
 
 #ifdef SOCKET_CONNECTION
@@ -102,29 +104,6 @@ void createAndDoInitCall(Args... args) {
 }
 
 namespace {
-void handleRestartCommand(const std::shared_ptr<TgBotWrapper>& wrapper) {
-    // If it was restarted, then send a message to the caller
-    std::string result;
-    std::vector<std::string> splitStrings(2);
-    if (ConfigManager::getEnv("RESTART", result)) {
-        MessageId msgId = 0;
-        ChatId chatId = 0;
-        LOG(INFO) << "RESTART env var set to " << result;
-
-        boost::split(splitStrings, result, [](char c) { return c == ':'; });
-
-        if (splitStrings.size() != 2) {
-            LOG(ERROR) << "Invalid RESTART env var format";
-        } else if (try_parse(splitStrings[0], &chatId) &&
-                   try_parse(splitStrings[1], &msgId)) {
-            LOG(INFO) << "Restart success!";
-            wrapper->sendReplyMessage(chatId, msgId, "Restart success!");
-        } else {
-            LOG(ERROR) << "Could not parse back params!";
-        }
-    }
-}
-
 void TgBotApiExHandler(const TgBot::TgException& e) {
     static std::optional<DurationPoint> exceptionDuration;
     auto wrapper = TgBotWrapper::getInstance();
@@ -273,10 +252,8 @@ int main(int argc, char** argv) {
 
     ChatDataCollector collector;
     collector.initWrapper();
-
-#ifndef WINDOWS_BUILD
-    handleRestartCommand(wrapperInst);
-#endif
+    
+    LOG_IF(ERROR, !RestartFmt::handleMessage(wrapperInst).ok()) << "Failed to handle restart message";
 
     try {
         // Bot starts
