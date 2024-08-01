@@ -12,10 +12,10 @@
 extern char **environ;
 
 DECLARE_COMMAND_HANDLER(restart, tgBotWrapper, message) {
-    std::array<char, sizeof("RESTART=999999999999")> restartBuf = {0};
+    // typical chatid:int32_max
+    std::array<char, sizeof("RESTART=-00000000000:2147483647")> restartBuf = {0};
     int argc = 0;
     int count = 0;
-    char *const *argv = nullptr;
     std::vector<char *> myEnviron;
 
     if (std::string u; ConfigManager::getEnv("RESTART", u)) {
@@ -28,7 +28,7 @@ DECLARE_COMMAND_HANDLER(restart, tgBotWrapper, message) {
     }
 
     // Get the size of environment buffer
-    for (; environ[count]; ++count);
+    for (; environ[count] != nullptr; ++count);
     // Get ready to insert 1 more to the environment buffer
     myEnviron.resize(count + 2);
     // Copy the environment buffer to the new buffer
@@ -38,13 +38,18 @@ DECLARE_COMMAND_HANDLER(restart, tgBotWrapper, message) {
              message->chat->id, message->messageId);
     myEnviron[count] = restartBuf.data();
     myEnviron[count + 1] = nullptr;
+
     // Copy the command line used to launch the bot
-    const auto exe = (*CommandLine::getInstance())[0];
+    auto *const argv = CommandLine::getInstance()->getArgv();
+    auto *const exe = argv[0];
+
+    // Log the restart command and the arguments to be used to restart the bot
     LOG(INFO) << "Restarting bot with exe: " << exe << ", addenv "
               << restartBuf.data();
     tgBotWrapper->sendReplyMessage(message, "Restarting bot instance...");
+
     // Call exeve
-    execve(exe.c_str(), argv, myEnviron.data());
+    execve(exe, argv, myEnviron.data());
 }
 
 DYN_COMMAND_FN(n, module) {
