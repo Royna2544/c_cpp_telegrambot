@@ -17,6 +17,7 @@ add_my_library(
     STATIC
 )
 
+if (UNIX)
 add_my_library(
     NAME _restartfmt_parser
     SRCS
@@ -27,3 +28,4 @@ add_my_library(
         absl::strings absl::status TgBotPPImpl_shared_deps
     STATIC
 )
+endif()
