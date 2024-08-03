@@ -554,7 +554,8 @@ bool RepoSyncTask::runFunction() {
             .desiredUrl = data.localManifest->rom->romInfo->url,
         };
         if (!repoDirExists || !mmdata.matches()) {
-            utils.repo_init(data.localManifest->repo_info);
+            utils.repo_init({data.localManifest->rom->romInfo->url,
+                             data.localManifest->rom->branch});
         }
         if (!std::filesystem::exists(kLocalManifestPath)) {
             utils.git_clone(data.localManifest->repo_info,

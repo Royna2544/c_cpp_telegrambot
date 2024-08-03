@@ -38,7 +38,7 @@ void RepoUtils::repo_init(const RepoInfo& options) {
     if (args == nullptr) {
         errorAndThrow("Failed to prepare arguments");
     }
-    repoinit_function->call<bool>(args, &ret);
+    ret = repoinit_function->call<bool>(args, &ret);
     Py_DECREF(args);
     if (!ret) {
         errorAndThrow("Failed to initialize repository");
