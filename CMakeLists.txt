@@ -71,7 +71,7 @@ function(add_my_executable)
   cmake_parse_arguments(TGBOT_EXE
     "NO_PREFIX" # Options
     "NAME" # One-value keywords
-    "SRCS;LIBS;LIBS_WIN32" # Multiple-value keywords
+    "SRCS;LIBS;LIBS_WIN32;LIBS_UNIX" # Multiple-value keywords
     ${ARGN}
   )
   if (NOT TGBOT_EXE_SRCS OR NOT TGBOT_EXE_NAME)
@@ -86,6 +86,9 @@ function(add_my_executable)
   target_link_libraries(${TGBOT_EXE_NAME} absl::log TgBotLogInit ${TGBOT_EXE_LIBS})
   if (WIN32)
     target_link_libraries(${TGBOT_EXE_NAME} ${TGBOT_EXE_LIBS_WIN32})
+  endif()
+  if (UNIX)
+    target_link_libraries(${TGBOT_EXE_NAME} ${TGBOT_EXE_LIBS_UNIX})
   endif()
 endfunction(add_my_executable)
 
@@ -241,7 +244,8 @@ add_my_library(
 add_my_executable(
   NAME main
   SRCS src/main.cpp
-  LIBS TgBotPPImpl TgBotLogInit TgBot_restartfmt_parser
+  LIBS TgBotPPImpl TgBotLogInit
+  LIBS_UNIX TgBot_restartfmt_parser
 )
 #####################################################################
 

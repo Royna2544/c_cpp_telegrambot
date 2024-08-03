@@ -23,10 +23,13 @@
 #include <libos/libsighandler.hpp>
 #include <memory>
 #include <ml/ChatDataCollector.hpp>
-#include <restartfmt_parser.hpp>
 #include <utility>
 
 #include "Random.hpp"
+
+#ifndef WINDOWS_BUILD
+#include <restartfmt_parser.hpp>
+#endif
 
 #ifdef SOCKET_CONNECTION
 #include <ChatObserver.h>
@@ -252,8 +255,10 @@ int main(int argc, char** argv) {
 
     ChatDataCollector collector;
     collector.initWrapper();
-    
-    LOG_IF(ERROR, !RestartFmt::handleMessage(wrapperInst).ok()) << "Failed to handle restart message";
+
+#ifndef WINDOWS_BUILD
+    LOG_IF(WARNING, !RestartFmt::handleMessage(wrapperInst).ok()) << "Failed to handle restart message";
+#endif
 
     try {
         // Bot starts
