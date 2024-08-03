@@ -386,23 +386,26 @@ bool ConfigParser::Parser::parseLocalManifestBranch() {
     return findChildNodes(data.node, "branch", [&, this](xmlNode *curNode) {
         auto locMan = std::make_shared<LocalManifest>();
         std::string targetrom;
-        int androidVersion = 0;
         std::string device;
+        std::string repoBranch;
         std::vector<std::string> codename;
+        int androidVersion = 0;
 
         ParentElement parent(nullptr, "devices");
         StringElement deviceElem(&device, "device");
         StringElement targetRomElem(&targetrom, "target_rom");
+        StringElement repoBranchElem(&repoBranch, "name");
         IntElement androidVersionElem(&androidVersion, "android_version");
 
         parent.childs.emplace_back(StringArrayElement(&codename, "codename"));
 
         deviceElem.required = false;
-        if (!parseChildElements(curNode, deviceElem, parent, targetRomElem,
+        if (!parseChildElements(curNode, deviceElem, parent, targetRomElem, repoBranchElem,
                                 androidVersionElem)) {
             return false;
         }
         locMan->repo_info.url = data.url;
+        locMan->repo_info.branch = repoBranch;
         locMan->name = data.name;
 
         const auto findOrInsert = [this, &locMan](const std::string &codename) {

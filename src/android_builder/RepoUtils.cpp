@@ -38,7 +38,7 @@ void RepoUtils::repo_init(const RepoInfo& options) {
     if (args == nullptr) {
         errorAndThrow("Failed to prepare arguments");
     }
-    repoinit_function->call<bool>(args, &ret);
+    ret = repoinit_function->call<bool>(args, &ret);
     Py_DECREF(args);
     if (!ret) {
         errorAndThrow("Failed to initialize repository");
@@ -54,7 +54,7 @@ void RepoUtils::repo_sync(const long job_count) {
     if (arg == nullptr) {
         errorAndThrow("Failed to prepare arguments");
     }
-    reposync_function->call<bool>(arg, &ret);
+    ret = reposync_function->call<bool>(arg, &ret);
     Py_DECREF(arg);
     if (!ret) {
         errorAndThrow("Failed to sync repository");
