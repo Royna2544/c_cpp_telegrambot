@@ -77,7 +77,8 @@ class MockTgBotApi : public TgBotApi {
                 (const, override));
 
     MOCK_METHOD(Message::Ptr, editMessage_impl,
-                (const Message::Ptr& message, const std::string& newText),
+                (const Message::Ptr& message, const std::string& newText,
+                 const TgBot::InlineKeyboardMarkup::Ptr& markup),
                 (const, override));
 
     MOCK_METHOD(Message::Ptr, editMessageMarkup_impl,
@@ -121,6 +122,18 @@ class MockTgBotApi : public TgBotApi {
 
     MOCK_METHOD(StickerSet::Ptr, getStickerSet_impl,
                 (const std::string& setName), (const, override));
+
+    MOCK_METHOD(bool, createNewStickerSet_impl,
+                (std::int64_t userId, const std::string& name,
+                 const std::string& title,
+                 const std::vector<InputSticker::Ptr>& stickers,
+                 Sticker::Type stickerType),
+                (const, override));
+
+    MOCK_METHOD(File::Ptr, uploadStickerFile_impl,
+                (std::int64_t userId, InputFile::Ptr sticker,
+                 const std::string& stickerFormat),
+                (const, override));
 
     MOCK_METHOD(bool, downloadFile_impl,
                 (const std::filesystem::path& destfilename,
@@ -292,7 +305,7 @@ class CommandTestBase : public CommandModulesTest {
         const SentMessage& willEdit(T&& matcher,
                                     const st& location = st::current()) const {
             testRun("Edit message expectation", location);
-            EXPECT_CALL(*botApi, editMessage_impl(_, matcher))
+            EXPECT_CALL(*botApi, editMessage_impl(_, matcher, IsNull()))
                 .WillOnce(DoAll(
                     WithArg<0>([=, addr = message.get()](auto&& message_in) {
                         EXPECT_EQ(message_in.get(), addr);

@@ -16,7 +16,6 @@
 #include "InstanceClassBase.hpp"
 #include "Random.hpp"
 #include "Types.h"
-#include "tgbot/types/GenericReply.h"
 
 using TgBot::Api;
 using TgBot::Bot;
@@ -24,10 +23,13 @@ using TgBot::BotCommand;
 using TgBot::Chat;
 using TgBot::ChatPermissions;
 using TgBot::EventBroadcaster;
+using TgBot::File;
 using TgBot::GenericReply;
 using TgBot::InputFile;
+using TgBot::InputSticker;
 using TgBot::Message;
 using TgBot::ReplyParameters;
+using TgBot::Sticker;
 using TgBot::StickerSet;
 using TgBot::TgLongPoll;
 using TgBot::User;
@@ -199,10 +201,22 @@ struct TgBotApi {
         ChatId chatId, FileOrString sticker,
         ReplyParameters::Ptr replyParameters = nullptr) const = 0;
 
-    // Edit a sent message
-    virtual Message::Ptr editMessage_impl(const Message::Ptr& message,
-                                          const std::string& newText) const = 0;
+    // Create a new sticker set
+    virtual bool createNewStickerSet_impl(
+        std::int64_t userId, const std::string& name, const std::string& title,
+        const std::vector<InputSticker::Ptr>& stickers,
+        Sticker::Type stickerType) const = 0;
 
+    virtual File::Ptr uploadStickerFile_impl(
+        std::int64_t userId, InputFile::Ptr sticker,
+        const std::string& stickerFormat) const = 0;
+
+    // Edit a sent message
+    virtual Message::Ptr editMessage_impl(
+        const Message::Ptr& message, const std::string& newText,
+        const TgBot::InlineKeyboardMarkup::Ptr& markup) const = 0;
+
+    // Prefer editMessage_impl for editing text and keyboard
     virtual Message::Ptr editMessageMarkup_impl(
         const StringOrMessage& message,
         const GenericReply::Ptr& markup) const = 0;
@@ -332,9 +346,11 @@ struct TgBotApi {
      *
      * @return A shared pointer to the sent message.
      */
-    Message::Ptr sendMessage(const ChatIds& chatId,
-                             const std::string& message) const {
-        return sendMessage_impl(chatId, message);
+    template <ParseMode mode = ParseMode::None>
+    Message::Ptr sendMessage(const ChatIds& chatId, const std::string& message,
+                             const GenericReply::Ptr& markup = nullptr) const {
+        return sendMessage_impl(chatId, message, nullptr, markup,
+                                parseModeToStr<mode>());
     }
 
     template <ParseMode mode = ParseMode::None>
@@ -396,9 +412,10 @@ struct TgBotApi {
         return sendSticker_impl(chatId, ToFileOrString(mediaId));
     }
 
-    inline Message::Ptr editMessage(const Message::Ptr& message,
-                                    const std::string& newText) const {
-        return editMessage_impl(message, newText);
+    inline Message::Ptr editMessage(
+        const Message::Ptr& message, const std::string& newText,
+        const TgBot::InlineKeyboardMarkup::Ptr& markup = nullptr) const {
+        return editMessage_impl(message, newText, markup);
     }
 
     inline Message::Ptr editMessageMarkup(
@@ -489,6 +506,21 @@ struct TgBotApi {
         return getStickerSet_impl(setName);
     }
 
+    inline bool createNewStickerSet(
+        std::int64_t userId, const std::string& name, const std::string& title,
+        const std::vector<InputSticker::Ptr>& stickers,
+        Sticker::Type stickerType) const {
+        return createNewStickerSet_impl(userId, name, title, stickers,
+                                        stickerType);
+    }
+
+    inline File::Ptr uploadStickerFile(std::int64_t userId,
+                                       InputFile::Ptr sticker,
+                                       const std::string& stickerFormat) const {
+        return uploadStickerFile_impl(userId, std::move(sticker),
+                                      stickerFormat);
+    }
+
     // TODO: Any better way than this?
     virtual std::string getCommandModulesStr() const { return {}; }
 
@@ -561,10 +593,12 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
         return getApi().sendSticker(chatId, sticker, replyParameters);
     }
 
-    Message::Ptr editMessage_impl(const Message::Ptr& message,
-                                  const std::string& newText) const override {
+    Message::Ptr editMessage_impl(
+        const Message::Ptr& message, const std::string& newText,
+        const TgBot::InlineKeyboardMarkup::Ptr& markup) const override {
         return getApi().editMessageText(newText, message->chat->id,
-                                        message->messageId);
+                                        message->messageId, "", "", nullptr,
+                                        markup);
     }
 
     Message::Ptr editMessageMarkup_impl(
@@ -663,6 +697,20 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
     StickerSet::Ptr getStickerSet_impl(
         const std::string& setName) const override {
         return getApi().getStickerSet(setName);
+    }
+
+    bool createNewStickerSet_impl(
+        std::int64_t userId, const std::string& name, const std::string& title,
+        const std::vector<InputSticker::Ptr>& stickers,
+        Sticker::Type stickerType) const override {
+        return getApi().createNewStickerSet(userId, name, title, stickers,
+                                            stickerType);
+    }
+
+    File::Ptr uploadStickerFile_impl(
+        std::int64_t userId, InputFile::Ptr sticker,
+        const std::string& stickerFormat) const override {
+        return getApi().uploadStickerFile(userId, sticker, stickerFormat);
     }
 
     bool downloadFile_impl(const std::filesystem::path& destfilename,
