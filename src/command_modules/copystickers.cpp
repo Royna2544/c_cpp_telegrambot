@@ -1,6 +1,7 @@
 
 #include <TgBotWrapper.hpp>
 #include <algorithm>
+#include <concepts>
 #include <filesystem>
 #include <imagep/ImageProcAll.hpp>
 #include <libos/libfs.hpp>
@@ -17,6 +18,7 @@ struct StickerData {
     std::filesystem::path filePath;
     std::string fileUniqueId;
     std::string fileId;
+    std::string emoji;
     int index;
     size_t maxIndex;
 
@@ -26,8 +28,22 @@ struct StickerData {
     }
 };
 
+template <typename T>
+    requires std::equality_comparable<T>
+T min(T x, T y) {
+    return (x > y) ? y : x;
+}
+
+std::string ratio_to_percentage(double ratio) {
+    std::stringstream ss;
+    ss << std::fixed << std::setprecision(2) << ratio * 100 << "%";
+    return ss.str();
+}
+
 // Too many stickers in req to create a sticker set at once doesn't work
-constexpr int GOOD_KNOWN_MAX_STICKER_CREATE_REQUESTS = 60;
+constexpr int GOOD_MAX_STICKERS_SIZE = 40;
+// To not spam editMessage request
+constexpr int RATELIMIT_DELIMITER_FOR_CONVERT_UPDATE = 5;
 
 DECLARE_COMMAND_HANDLER(copystickers, api, message) {
     MessageWrapper wrapper(api, message);
@@ -56,10 +72,10 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
         return;
     }
 
-    LOG(INFO) << "Copy stickers from set " << set->title << ". Started";
+    LOG(INFO) << "Copy stickers from set " << std::quoted(set->title) << ". Started";
 
     const auto sentMessage =
-        api->sendMessage(message, "Starting conversion...");
+        api->sendReplyMessage(message, "Starting conversion...");
 
     // Make a list of file IDs of all stickers in the set
     std::vector<StickerData> stickerData;
@@ -69,24 +85,25 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
         [&counter, set](const auto& sticker) {
             return StickerData{
                 "stickers"_fs / (sticker->fileUniqueId + ".webp"),
-                sticker->fileUniqueId, sticker->fileId, counter++,
-                set->stickers.size()};
+                sticker->fileUniqueId, sticker->fileId, sticker->emoji, counter++,
+                min<size_t>(set->stickers.size(), GOOD_MAX_STICKERS_SIZE)};
         });
-    
-    if (stickerData.size() > GOOD_KNOWN_MAX_STICKER_CREATE_REQUESTS) {
+
+    if (stickerData.size() > GOOD_MAX_STICKERS_SIZE) {
         // Limit the number of requests to avoid hitting the API rate limit
-        LOG(INFO) << "Limiting stickers size to" << GOOD_KNOWN_MAX_STICKER_CREATE_REQUESTS;
-        stickerData.resize(GOOD_KNOWN_MAX_STICKER_CREATE_REQUESTS);
+        LOG(INFO) << "Limiting stickers size to: " << GOOD_MAX_STICKERS_SIZE;
+        stickerData.resize(GOOD_MAX_STICKERS_SIZE);
     }
 
     // Download all stickers from the set
-    LOG(INFO) << "Now downloading " << set->stickers.size() << " stickers";
-    int count = 0;
+    LOG(INFO) << "Now downloading " << stickerData.size() << " stickers";
+    size_t count = 0;
     for (const auto& sticker : stickerData) {
-        if (count % 10 == 0) {
-            api->editMessage(sentMessage,
-                             "Converting stickers... " + std::to_string(count) +
-                                 "/" + std::to_string(stickerData.size()));
+        if (count % RATELIMIT_DELIMITER_FOR_CONVERT_UPDATE == 0) {
+            const auto percent =
+                ratio_to_percentage(static_cast<double>(count) /
+                                    static_cast<double>(stickerData.size()));
+            api->editMessage(sentMessage, "Converting stickers... " + percent);
         }
         sticker.printProgress("Downloading");
         if (!api->downloadFile(sticker.filePath, sticker.fileId)) {
@@ -118,11 +135,12 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
         auto inputSticker = std::make_shared<InputSticker>();
         inputSticker->sticker = file->fileId;
         inputSticker->format = "static";
-        inputSticker->emojiList.emplace_back("😠");
+        inputSticker->emojiList.emplace_back(sticker.emoji);
         stickerToSend.emplace_back(inputSticker);
         std::filesystem::remove(sticker.filePath);
         ++count;
     }
+    
     // Create a new sticker set with the same name and title as the original
     // set, but with all stickers replaced with the converted ones and with a
     // custom emoji
@@ -154,7 +172,6 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
         DLOG(ERROR) << "Failed to create new sticker set: " << e.what();
         api->editMessage(sentMessage,
                          "Failed to create new sticker set: "s + e.what());
-
     }
 }
 
