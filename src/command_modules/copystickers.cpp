@@ -46,7 +46,7 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
     }
     int counter = 0;
     if (std::ranges::any_of(set->stickers, [](const auto& sticker) {
-            return sticker->type != Sticker::Type::Regular;
+            return sticker->isAnimated || sticker->isVideo;
         })) {
         LOG(WARNING) << "Sticker set contains animated stickers";
         wrapper.sendMessageOnExit("Animated stickers are not supported");
