@@ -54,6 +54,10 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
     }
 
     LOG(INFO) << "Copy stickers from set " << set->title << ". Started";
+
+    const auto sentMessage =
+        api->sendMessage(message, "Starting conversion...");
+
     // Make a list of file IDs of all stickers in the set
     std::vector<StickerData> stickerData;
     std::vector<InputSticker::Ptr> stickerToSend;
@@ -68,7 +72,13 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
 
     // Download all stickers from the set
     LOG(INFO) << "Now downloading " << set->stickers.size() << " stickers";
+    int count = 0;
     for (const auto& sticker : stickerData) {
+        if (count % 10 == 0) {
+            api->editMessage(sentMessage,
+                             "Converting stickers... " + std::to_string(count) +
+                                 "/" + std::to_string(stickerData.size()));
+        }
         sticker.printProgress("Downloading");
         if (!api->downloadFile(sticker.filePath, sticker.fileId)) {
             wrapper.sendMessageOnExit("Failed to download sticker file");
@@ -102,6 +112,7 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
         inputSticker->emojiList.emplace_back("😠");
         stickerToSend.emplace_back(inputSticker);
         std::filesystem::remove(sticker.filePath);
+        ++count;
     }
     // Create a new sticker set with the same name and title as the original
     // set, but with all stickers replaced with the converted ones and with a
@@ -118,6 +129,8 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
         }
         setName += "_by_" + api->getBotUser()->username;
     }
+
+    api->editMessage(sentMessage, "Creating new sticker set...");
     LOG(INFO) << "Now creating new sticker set, name: " << std::quoted(setName)
               << ", title: " << std::quoted(title)
               << " size: " << stickerToSend.size();
@@ -125,14 +138,15 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
         api->createNewStickerSet(wrapper.getUser()->id, setName, title,
                                  stickerToSend, Sticker::Type::Regular);
         LOG(INFO) << "Created: https://t.me/addstickers/" + setName;
+        api->editMessage(
+            sentMessage,
+            "Sticker pack created: https://t.me/addstickers/" + setName);
     } catch (const TgBot::TgException& e) {
         DLOG(ERROR) << "Failed to create new sticker set: " << e.what();
-        wrapper.sendMessageOnExit("Failed to create new sticker set: "s +
-                                  e.what());
-        return;
-    }
+        api->editMessage(sentMessage,
+                         "Failed to create new sticker set: "s + e.what());
 
-    wrapper.sendMessageOnExit("Sticker pack creation completed successfully");
+    }
 }
 
 DYN_COMMAND_FN(/*name*/, module) {
