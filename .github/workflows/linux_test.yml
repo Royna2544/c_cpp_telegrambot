@@ -23,7 +23,7 @@ jobs:
 
           - cc: GCC
             real_cc: gcc
-            real_cxx: gcc
+            real_cxx: g++
             flags: ''
             str: ''
           
@@ -63,7 +63,7 @@ jobs:
           CXX: ${{ matrix.real_cxx }}
         run: |
           mkdir build
-          cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release -DDISABLE_SANITIZERS=ON .
+          cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release -DDISABLE_SANITIZERS=ON ${{ matrix.flags }} .
           cmake --build build -j4
 
       - name: Run Tests
