@@ -3,6 +3,7 @@
 #include <TgBotUtilsExports.h>
 
 #include <filesystem>
+#include <system_error>
 
 // Implemented sperately by OS
 
@@ -89,3 +90,15 @@ struct TgBotUtils_API FS {
      */
     static bool getHomePath(std::filesystem::path& buf);
 };
+
+// Create a directory at the specified path, but allows EEXIST
+inline std::error_code createDirectory(const std::filesystem::path& path) {
+    std::error_code ec;
+    if (std::filesystem::create_directory(path, ec)) {
+        return {};
+    }
+    if (ec == std::errc::file_exists) {
+        ec.clear();
+    }
+    return ec;
+}
