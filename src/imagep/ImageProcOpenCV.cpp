@@ -1,5 +1,7 @@
 #include "ImageProcOpenCV.hpp"
+
 #include <opencv2/core/utility.hpp>
+
 #include "absl/status/status.h"
 
 bool OpenCVImage::read(const std::filesystem::path& filename) {
@@ -15,7 +17,7 @@ absl::Status OpenCVImage::_rotate_image(int angle) {
     // Make it clockwise
     angle = kAngleMax - angle;
 
-    cv::Point2f center(image.cols / 2.0, image.rows / 2.0);
+    cv::Point2d center(image.cols / 2.0, image.rows / 2.0);
     cv::Mat rotation_matrix = cv::getRotationMatrix2D(center, angle, 1.0);
 
     // Calculate the bounding box of the rotated image
@@ -35,9 +37,31 @@ absl::Status OpenCVImage::_rotate_image(int angle) {
 
 void OpenCVImage::to_greyscale() {
     if (image.channels() == 3) {
-        cv::cvtColor(image, image, cv::COLOR_BGR2GRAY);
+        // Convert a BGR image to grayscale
+        cv::Mat gray_image;
+        cv::cvtColor(image, gray_image, cv::COLOR_BGR2GRAY);
+        gray_image.copyTo(image);  // Update the image with the grayscale data
     } else if (image.channels() == 4) {
-        cv::cvtColor(image, image, cv::COLOR_BGRA2GRAY);
+        // Convert a BGRA image to grayscale while preserving the alpha channel
+        cv::Mat gray_image;
+        cv::Mat alpha_channel;
+        std::vector<cv::Mat> channels(4);
+
+        // Split the channels
+        cv::split(image, channels);
+        cv::cvtColor(image, gray_image, cv::COLOR_BGRA2GRAY);
+
+        // Extract the alpha channel
+        alpha_channel = channels[3];
+
+        // Merge grayscale and alpha channel back into one image
+        cv::Mat gray_alpha_image;
+        std::vector<cv::Mat> gray_alpha_channels = {gray_image, gray_image,
+                                                    gray_image, alpha_channel};
+        cv::merge(gray_alpha_channels, gray_alpha_image);
+
+        gray_alpha_image.copyTo(image);  // Update the image with the grayscale
+                                         // data and preserved alpha channel
     } else {
         LOG(INFO) << "Image does not have enough color channels to convert to "
                      "grayscale.";
