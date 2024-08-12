@@ -53,6 +53,7 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
         return;
     }
 
+    LOG(INFO) << "Copy stickers from set " << set->title << ". Started";
     // Make a list of file IDs of all stickers in the set
     std::vector<StickerData> stickerData;
     std::vector<InputSticker::Ptr> stickerToSend;
@@ -66,7 +67,7 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
         });
 
     // Download all stickers from the set
-    DLOG(INFO) << "Now downloading " << set->stickers.size() << " stickers";
+    LOG(INFO) << "Now downloading " << set->stickers.size() << " stickers";
     for (const auto& sticker : stickerData) {
         sticker.printProgress("Downloading");
         if (!api->downloadFile(sticker.filePath, sticker.fileId)) {
@@ -87,7 +88,9 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
         sticker.printProgress("Uploading");
         const auto file = api->uploadStickerFile(
             wrapper.getUser()->id,
-            InputFile::fromFile(sticker.filePath, "image/webp"), "static");
+            InputFile::fromFile(sticker.filePath.generic_string(),
+                                "image/webp"),
+            "static");
         if (!file) {
             wrapper.sendMessageOnExit("Failed to upload sticker file");
             return;
@@ -110,13 +113,14 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
         std::smatch match;
         if (std::regex_search(setName, match, regex)) {
             // Trim the author out
-            setName = setName.substr(0, match.position()) + match.suffix().str();
+            setName =
+                setName.substr(0, match.position()) + match.suffix().str();
         }
         setName += "_by_" + api->getBotUser()->username;
     }
-    DLOG(INFO) << "Now creating new sticker set, name: " << std::quoted(setName)
-               << ", title: " << std::quoted(title)
-               << " size: " << stickerToSend.size();
+    LOG(INFO) << "Now creating new sticker set, name: " << std::quoted(setName)
+              << ", title: " << std::quoted(title)
+              << " size: " << stickerToSend.size();
     try {
         api->createNewStickerSet(wrapper.getUser()->id, setName, title,
                                  stickerToSend, Sticker::Type::Regular);
