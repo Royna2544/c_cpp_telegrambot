@@ -26,6 +26,9 @@ struct StickerData {
         DLOG(INFO) << operation << ": " << filePath << " [" << index << "/"
                    << maxIndex << "]";
     }
+    static bool compare(const StickerData& a, const StickerData& b) {
+        return a.fileUniqueId == b.fileUniqueId;
+    }
 };
 
 template <typename T>
@@ -72,7 +75,8 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
         return;
     }
 
-    LOG(INFO) << "Copy stickers from set " << std::quoted(set->title) << ". Started";
+    LOG(INFO) << "Copy stickers from set " << std::quoted(set->title)
+              << ". Started";
 
     const auto sentMessage =
         api->sendReplyMessage(message, "Starting conversion...");
@@ -85,15 +89,18 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
         [&counter, set](const auto& sticker) {
             return StickerData{
                 "stickers"_fs / (sticker->fileUniqueId + ".webp"),
-                sticker->fileUniqueId, sticker->fileId, sticker->emoji, counter++,
+                sticker->fileUniqueId,
+                sticker->fileId,
+                sticker->emoji,
+                counter++,
                 min<size_t>(set->stickers.size(), GOOD_MAX_STICKERS_SIZE)};
         });
 
-    if (stickerData.size() > GOOD_MAX_STICKERS_SIZE) {
-        // Limit the number of requests to avoid hitting the API rate limit
-        LOG(INFO) << "Limiting stickers size to: " << GOOD_MAX_STICKERS_SIZE;
-        stickerData.resize(GOOD_MAX_STICKERS_SIZE);
-    }
+    // Remove duplicates by unique file IDs
+    std::sort(stickerData.begin(), stickerData.end(), StickerData::compare);
+    stickerData.erase(
+        std::ranges::unique(stickerData, StickerData::compare).begin(),
+        stickerData.end());
 
     // Download all stickers from the set
     LOG(INFO) << "Now downloading " << stickerData.size() << " stickers";
@@ -140,10 +147,10 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
         std::filesystem::remove(sticker.filePath);
         ++count;
     }
-    
-    // Create a new sticker set with the same name and title as the original
-    // set, but with all stickers replaced with the converted ones and with a
-    // custom emoji
+
+    // Create a new sticker set with the same name and title as the
+    // original set, but with all stickers replaced with the converted
+    // ones and with a custom emoji
     std::string setName = "grey_" + set->name;
     const std::string title = "Greyed-out " + set->title;
     {
