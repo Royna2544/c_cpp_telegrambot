@@ -26,6 +26,9 @@ struct StickerData {
     }
 };
 
+// Too many stickers in req to create a sticker set at once doesn't work
+constexpr int GOOD_KNOWN_MAX_STICKER_CREATE_REQUESTS = 60;
+
 DECLARE_COMMAND_HANDLER(copystickers, api, message) {
     MessageWrapper wrapper(api, message);
     if (!wrapper.switchToReplyToMessage("Reply to a sticker")) {
@@ -69,6 +72,12 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
                 sticker->fileUniqueId, sticker->fileId, counter++,
                 set->stickers.size()};
         });
+    
+    if (stickerData.size() > GOOD_KNOWN_MAX_STICKER_CREATE_REQUESTS) {
+        // Limit the number of requests to avoid hitting the API rate limit
+        LOG(INFO) << "Limiting stickers size to" << GOOD_KNOWN_MAX_STICKER_CREATE_REQUESTS;
+        stickerData.resize(GOOD_KNOWN_MAX_STICKER_CREATE_REQUESTS);
+    }
 
     // Download all stickers from the set
     LOG(INFO) << "Now downloading " << set->stickers.size() << " stickers";
