@@ -103,12 +103,12 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
     // Create a new sticker set with the same name and title as the original
     // set, but with all stickers replaced with the converted ones and with a
     // custom emoji
-    std::string setName = "copy_of_" + set->name;
-    const std::string title = "Copy of " + set->title;
+    std::string setName = "grey_" + set->name;
+    const std::string title = "Greyed-out " + set->title;
     {
         const static std::regex regex(R"(_by_\w+$)");
         std::smatch match;
-        if (std::regex_search(set->title, match, regex)) {
+        if (std::regex_search(setName, match, regex)) {
             // Trim the author out
             setName = setName.substr(0, match.position()) + match.suffix().str();
         }
