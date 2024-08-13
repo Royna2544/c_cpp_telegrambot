@@ -6,6 +6,8 @@
 
 // Wrapper launcher to create a daemon process from the bot
 int main(const int argc, char** argv) {
+    static const char *kLogFile = "bot.log";
+    
     if (argc < 2) {
         puts("A wrapper launcher to create a daemon process.");
         puts("No bot executable provided.");
@@ -25,6 +27,9 @@ int main(const int argc, char** argv) {
     }
 
     // Child process continues
+    printf("Daemon process created with PID: %d\n", getpid());
+    printf("Redirecting stdout and stderr to %s\n", kLogFile);
+    printf("Executable is: %s, argument count: %d\n", argv[1], argc - 1);
 
     // Create a new session
     if (setsid() < 0) {
@@ -58,11 +63,11 @@ int main(const int argc, char** argv) {
         perror("freopen stdin failed");
         return EXIT_FAILURE;
     }
-    if (!freopen("bot.log", "a+", stdout)) {
+    if (!freopen(kLogFile, "a+", stdout)) {
         perror("freopen stdout failed");
         return EXIT_FAILURE;
     }
-    if (!freopen("bot.log", "a+", stderr)) {
+    if (!freopen(kLogFile, "a+", stderr)) {
         perror("freopen stderr failed");
         return EXIT_FAILURE;
     }
