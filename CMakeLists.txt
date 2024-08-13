@@ -247,6 +247,13 @@ add_my_executable(
   LIBS TgBotPPImpl TgBotLogInit
   LIBS_UNIX TgBot_restartfmt_parser
 )
+
+if (UNIX)
+add_my_executable(
+  NAME maind
+  SRCS src/mainDaemon.c
+)
+endif()
 #####################################################################
 
 install(DIRECTORY resources/ DESTINATION resources FILES_MATCHING  PATTERN "*"
