@@ -160,6 +160,7 @@ command_module(
     SRCS romBuild.cpp
         androidbuilder_tasks/ROMBuildTask.cpp
         androidbuilder_tasks/UploadFileTask.cpp
+        androidbuilder_tasks/RepoSyncTask.cpp
     LIBS AndroidBuilder-cpp
     PLATFORM "Linux"
 )

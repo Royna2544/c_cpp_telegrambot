@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <boost/algorithm/string/split.hpp>
+#include <chrono>
 #include <filesystem>
 #include <functional>
 #include <ios>
@@ -11,6 +12,7 @@
 #include <string>
 #include <system_error>
 #include <thread>
+#include <utility>
 
 #include "CompileTimeStringConcat.hpp"
 
@@ -546,16 +548,16 @@ bool RepoSyncTask::runFunction() {
                    << repoDirExists;
     }
 
+    const auto& rom = getValue(data.localManifest->rom);
     try {
         RepoUtils utils;
         MatchesData mmdata{
             .gitDirectory = ".repo/manifests",
-            .desiredBranch = data.localManifest->rom->branch,
-            .desiredUrl = data.localManifest->rom->romInfo->url,
+            .desiredBranch = rom->branch,
+            .desiredUrl = rom->romInfo->url,
         };
         if (!repoDirExists || !mmdata.matches()) {
-            utils.repo_init({data.localManifest->rom->romInfo->url,
-                             data.localManifest->rom->branch});
+            utils.repo_init({rom->romInfo->url, rom->branch});
         }
         if (!std::filesystem::exists(kLocalManifestPath)) {
             utils.git_clone(data.localManifest->repo_info,
@@ -592,7 +594,12 @@ bool RepoSyncTask::runFunction() {
 void RepoSyncTask::onNewStderrBuffer(ForkAndRun::BufferType& buffer) {
     std::vector<std::string> lines;
 
+    // Split the buffer into lines
     boost::split(lines, buffer.data(), [](const char c) { return c == '\n'; });
+    if (std::chrono::system_clock::now() - clock > 10s) {
+        clock = std::chrono::system_clock::now();
+        wrapper->editMessage(message, "Sync in progress...:\n" + lines[0]);
+    }
     for (const auto& line : lines) {
         if (line.empty()) {
             continue;
@@ -603,28 +610,28 @@ void RepoSyncTask::onNewStderrBuffer(ForkAndRun::BufferType& buffer) {
         if (networkHook.process(line)) {
             continue;
         }
-        // std::cerr << "Repo sync stderr: " << line << std::endl;
     }
 }
 
 void RepoSyncTask::onExit(int exitCode) {
     LOG(INFO) << "Repo sync exited with code: " << exitCode;
+    auto* result = data.result;
     if (localHook.hasProblems()) {
-        data.result->setMessage(localHook.getLogMessage());
-        data.result->value = localHook.hasFatalProblems()
-                                 ? PerBuildData::Result::ERROR_FATAL
-                                 : PerBuildData::Result::ERROR_NONFATAL;
+        result->setMessage(localHook.getLogMessage());
+        result->value = localHook.hasFatalProblems()
+                            ? PerBuildData::Result::ERROR_FATAL
+                            : PerBuildData::Result::ERROR_NONFATAL;
     } else if (networkHook.hasProblems()) {
-        data.result->setMessage(networkHook.getLogMessage());
-        data.result->value = PerBuildData::Result::ERROR_NONFATAL;
+        result->setMessage(networkHook.getLogMessage());
+        result->value = PerBuildData::Result::ERROR_NONFATAL;
         // Will be picked up by next loop
         runWithReducedJobs = true;
     } else if (exitCode != 0) {
-        data.result->value = PerBuildData::Result::ERROR_FATAL;
-        data.result->setMessage("Repo sync failed");
+        result->value = PerBuildData::Result::ERROR_FATAL;
+        result->setMessage("Repo sync failed");
     } else {
-        data.result->value = PerBuildData::Result::SUCCESS;
-        data.result->setMessage("Repo sync successful");
+        result->value = PerBuildData::Result::SUCCESS;
+        result->setMessage("Repo sync successful");
     }
     localHook.clearProblems();  // Per-sync only, retrying won't help
 }
@@ -633,4 +640,6 @@ void RepoSyncTask::onSignal(int signalCode) {
     LOG(INFO) << "Repo sync received signal: " << strsignal(signalCode);
 }
 
-RepoSyncTask::RepoSyncTask(PerBuildData data) : data(std::move(data)) {}
+RepoSyncTask::RepoSyncTask(ApiPtr wrapper, Message::Ptr message,
+                           PerBuildData data)
+    : data(std::move(data)), wrapper(wrapper), message(std::move(message)) {}

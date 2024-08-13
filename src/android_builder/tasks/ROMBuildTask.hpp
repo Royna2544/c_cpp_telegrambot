@@ -1,9 +1,9 @@
+#include <ConfigParsers.hpp>
 #include <ForkAndRun.hpp>
 #include <TgBotWrapper.hpp>
 #include <chrono>
 #include <memory>
 #include <string_view>
-#include <ConfigParsers.hpp>
 
 #include "PythonClass.hpp"
 
@@ -24,6 +24,7 @@ struct ROMBuildTask : ForkAndRun {
     bool runFunction() override;
 
     int guessJobCount();
+
     /**
      * @brief Handles new standard output data.
      *
@@ -34,6 +35,7 @@ struct ROMBuildTask : ForkAndRun {
      * @param buffer The buffer containing the new standard output data.
      */
     void onNewStdoutBuffer(ForkAndRun::BufferType& buffer) override;
+
     /**
      * @brief Handles the process exit event.
      *
@@ -47,14 +49,13 @@ struct ROMBuildTask : ForkAndRun {
     [[noreturn]] static void errorAndThrow(const std::string& message);
 
     /**
-     * @brief Constructs a ROMBuildTask object with the provided data.
+     * Creates a new ROMBuildTask object.
      *
-     * This constructor initializes a RepoSyncF object with the given data.
-     *
-     * @param data The data object containing the necessary configuration and
-     * paths.
+     * @param wrapper A pointer to the Telegram Bot API wrapper.
+     * @param message The Telegram message associated with the build task.
+     * @param data Per-build configuration and path data.
      */
-    explicit ROMBuildTask(ApiPtr wrapper, TgBot::Message::Ptr message,
+    explicit ROMBuildTask(ApiPtr wrapper, Message::Ptr message,
                           PerBuildData data);
     ~ROMBuildTask() override;
 

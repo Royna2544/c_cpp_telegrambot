@@ -42,7 +42,7 @@ bool ROMBuildTask::runFunction() {
             builder.add_argument("eng");
             break;
     }
-    builder.add_argument(data.localManifest->rom->romInfo->target);
+    builder.add_argument(getValue(data.localManifest->rom)->romInfo->target);
     builder.add_argument(guessJobCount());
     auto* arg = builder.build();
     if (arg == nullptr) {
@@ -108,6 +108,7 @@ int ROMBuildTask::guessJobCount() {
 void ROMBuildTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
     std::stringstream buildInfoBuffer;
     const auto now = std::chrono::system_clock::now();
+    const auto& rom = getValue(data.localManifest->rom);
     double memUsage = NAN;
     if (clock + std::chrono::minutes(1) < now) {
         clock = now;
@@ -115,10 +116,9 @@ void ROMBuildTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
         buildInfoBuffer << "Time spent: " << to_string(now - startTime)
                         << std::endl;
         buildInfoBuffer << "Last updated on: " << fromTP(now) << std::endl;
-        buildInfoBuffer << "Target ROM: " << data.localManifest->rom->romInfo->name
-                        << ", branch: " << data.localManifest->rom->branch << std::endl;
-        buildInfoBuffer << "Target device: " << data.device
-                        << std::endl;
+        buildInfoBuffer << "Target ROM: " << rom->romInfo->name
+                        << ", branch: " << rom->branch << std::endl;
+        buildInfoBuffer << "Target device: " << data.device << std::endl;
         buildInfoBuffer << "Job count: " << guessJobCount();
         if (_get_used_mem->call(nullptr, &memUsage)) {
             buildInfoBuffer << ", memory usage: " << memUsage << "%";
@@ -154,8 +154,8 @@ void ROMBuildTask::onExit(int exitCode) {
     throw std::runtime_error(message);
 }
 
-ROMBuildTask::ROMBuildTask(ApiPtr wrapper,
-                           TgBot::Message::Ptr message, PerBuildData data)
+ROMBuildTask::ROMBuildTask(ApiPtr wrapper, TgBot::Message::Ptr message,
+                           PerBuildData data)
     : botWrapper(wrapper), data(std::move(data)), message(std::move(message)) {
     clock = std::chrono::system_clock::now();
     startTime = std::chrono::system_clock::now();

@@ -62,7 +62,9 @@ bool ForkAndRun::execute() {
 
         // Set the process group to the current process ID
         setpgrp();
-    
+
+        python = PythonClass::get();
+        
         // Append PYTHON LOG FD
         PyEval_RestoreThread(mainTS);
         {
@@ -82,6 +84,7 @@ bool ForkAndRun::execute() {
         int ret = 0;
         ret = runFunction() ? EXIT_SUCCESS : EXIT_FAILURE;
         absl::RemoveLogSink(&sink);
+        python.reset();
         _exit(ret);
     } else if (pid > 0) {
         Pipe program_termination_pipe{};
@@ -186,7 +189,7 @@ bool ForkAndRun::execute() {
 
 void ForkAndRun::cancel() {
     if (childProcessId < 0) {
-        PLOG(WARNING) << "Attempting to cancel non-existing child";
+        LOG(WARNING) << "Attempting to cancel non-existing child";
         return;
     }
 

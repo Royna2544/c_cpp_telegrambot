@@ -1,0 +1,104 @@
+{
+    "targets": [
+        {
+            "codename": "a10",
+            "name": "Galaxy A10"
+        },
+        {
+            "codename": "a20",
+            "name": "Galaxy A20"
+        },
+        {
+            "codename": "a20e",
+            "name": "Galaxy A20e"
+        },
+        {
+            "codename": "a30",
+            "name": "Galaxy A30"
+        },
+        {
+            "codename": "a40",
+            "name": "Galaxy A40"
+        },
+        {
+            "codename": "r3q",
+            "name": "Galaxy A90 5G"
+        }
+    ],
+    "roms": [
+        {
+            "name": "Evolution-X",
+            "link": "https://github.com/Evolution-XYZ/manifest",
+            "target": "evolution",
+            "outzip_prefix": "EvolutionX",
+            "branches": [
+                {
+                    "android_version": 14,
+                    "branch": "udc"
+                }
+            ]
+        },
+        {
+            "name": "LineageOS",
+            "link": "https://github.com/LineageOS/android",
+            "target": "bacon",
+            "outzip_prefix": "lineage",
+            "branches": [
+                {
+                    "android_version": 14,
+                    "branch": "lineage-21.0"
+                },
+                {
+                    "android_version": 13,
+                    "branch": "lineage-20.0"
+                }
+            ]
+        }
+    ],
+    "local_manifests": [
+        {
+            "name": "Royna's Playground",
+            "url": "https://github.com/Roynas-Android-Playground/local_manifests/",
+            "branches": [
+                {
+                    "name": "Exynos7885-fourteen",
+                    "target_rom": "*",
+                    "android_version": 14,
+                    "devices": [
+                        "a10",
+                        "a20",
+                        "a20e",
+                        "a30",
+                        "a30s",
+                        "a40"
+                    ]
+                },
+                {
+                    "name": "Exynos7885-thirteen",
+                    "target_rom": "*",
+                    "android_version": 13,
+                    "devices": [
+                        "a10",
+                        "a20",
+                        "a20e",
+                        "a30",
+                        "a30s",
+                        "a40"
+                    ]
+                },
+                {
+                    "name": "r3q-Evolution-X-udc",
+                    "target_rom": "Evolution-X",
+                    "android_version": 14,
+                    "device": "r3q"
+                },
+                {
+                    "name": "tb128fu-Evolution-X-udc",
+                    "target_rom": "Evolution-X",
+                    "android_version": 14,
+                    "device": "tb128fu"
+                }
+            ]
+        }
+    ]
+}

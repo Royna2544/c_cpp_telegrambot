@@ -73,7 +73,7 @@ void RepoUtils::git_clone(const RepoInfo& options,
     git_repository* repo = nullptr;
     git_clone_options gitoptions = GIT_CLONE_OPTIONS_INIT;
 
-    LOG(INFO) << "Cloning repository, url: " << options.url;
+    LOG(INFO) << "Cloning repository, url: " << options.url << ", branch: " << options.branch;
     gitoptions.checkout_branch = options.branch.c_str();
     int ret =
         ::git_clone(&repo, options.url.c_str(), directory.c_str(), &gitoptions);

@@ -2,9 +2,12 @@
 
 #include <ArgumentBuilder.hpp>
 
+#include "ConfigParsers.hpp"
+
 bool UploadFileTask::runFunction() {
     const auto py = PythonClass::get();
-    auto dataShmem = connectShmem(kShmemUpload, sizeof(PerBuildData::ResultData));
+    auto dataShmem =
+        connectShmem(kShmemUpload, sizeof(PerBuildData::ResultData));
     if (!dataShmem) {
         LOG(ERROR) << "Could not allocate shared memory";
         return false;
@@ -28,7 +31,8 @@ bool UploadFileTask::runFunction() {
     }
     ArgumentBuilder builder(2);
     builder.add_argument(data.device);
-    builder.add_argument(data.localManifest->rom->prefixOfOutput);
+    builder.add_argument(getValue(data.localManifest->rom)
+            ->romInfo->prefixOfOutput);
     std::string resultString;
     if (!func->call(builder.build(), &resultString)) {
         LOG(ERROR) << "Error calling function upload_to_gofile";

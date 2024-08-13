@@ -9,6 +9,7 @@
 #include <iostream>
 #include <string_view>
 
+#include "PythonClass.hpp"
 #include "absl/log/log_entry.h"
 #include "absl/log/log_sink.h"
 #include "socket/selector/SelectorPosix.hpp"
@@ -166,6 +167,9 @@ class ForkAndRun {
                                              const off_t size);
 
     static void disconnectShmem(Shmem& shmem);
+
+   protected:
+    std::shared_ptr<PythonClass> python;
 
    private:
     UnixSelector selector;

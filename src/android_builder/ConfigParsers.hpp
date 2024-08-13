@@ -1,8 +1,9 @@
 #pragma once
 
 #include <absl/log/log.h>
-#include <libxml/tree.h>
+#include <json/json.h>
 
+#include <set>
 #include <string>
 #include <utility>
 
@@ -22,10 +23,19 @@ class ConfigParser {
     struct ROMBranch {
         using Ptr = std::shared_ptr<ROMBranch>;
 
-        std::string branch;          // branch of the repo
-        int androidVersion;          // android version of the branch
-        std::string prefixOfOutput;  // prefix of output zip file
-        ROMInfo::Ptr romInfo;        // associated ROMInfo
+        std::string branch;  // branch of the repo
+        int androidVersion;  // android version of the branch
+
+        ROMInfo::Ptr romInfo;  // associated ROMInfo
+
+        // Returns a string representation of the ROM branch
+        [[nodiscard]] std::string toString() const {
+            if (!romInfo) {
+                return {};
+            }
+            return romInfo->name + " (Android " +
+                   std::to_string(androidVersion) + ")";
+        }
     };
 
     struct Device {
@@ -38,6 +48,7 @@ class ConfigParser {
         Device(std::string codename, std::string marketName)
             : codename(std::move(codename)),
               marketName(std::move(marketName)) {}
+        explicit Device(std::string codename) : codename(std::move(codename)) {}
 
         // Returns a string representation of the device
         // e.g. Pixel 5 Pro (raven)
@@ -55,62 +66,91 @@ class ConfigParser {
 
     struct LocalManifest {
         using Ptr = std::shared_ptr<LocalManifest>;
+        template <typename match>
+        using StringArrayOr =
+            std::variant<std::vector<std::string>, std::vector<match>>;
 
-        std::string name;                  // name of the manifest
-        ROMBranch::Ptr rom;                // associated ROM and its branch
-        RepoUtils::RepoInfo repo_info;     // local manifest information
-        std::vector<Device::Ptr> devices;  // codename of the device
+        struct ROMLookup {
+            int androidVersion;  // android version of the ROM
+            std::string name;    // name of the ROM
+        };
+
+        std::string name;  // name of the manifest
+        // associated ROM and its branch
+        std::variant<ROMLookup, ROMBranch::Ptr> rom;
+        RepoUtils::RepoInfo repo_info;  // local manifest information
+        // First type is used before merge, second type is used after merge
+        StringArrayOr<Device::Ptr> devices;
     };
 
-    explicit ConfigParser(const std::filesystem::path &xmlFilePath);
+    explicit ConfigParser(const std::filesystem::path &jsonFileDir);
 
-    struct ROMEntry {
-        std::string romName;         // name of the ROM
-        int androidVersion;          // android version of the ROM
-        const ConfigParser *parser;  // pointer to the ConfigParser instance
+    // Get available devices from config
+    [[nodiscard]] std::set<Device::Ptr> getDevices() const;
+    // Get available ROM branches for a given device
+    [[nodiscard]] std::set<ROMBranch::Ptr> getROMBranches(
+        const Device::Ptr &device) const;
+    // Get a local manifest for a given ROM branch and device
+    [[nodiscard]] LocalManifest::Ptr getLocalManifest(
+        const ROMBranch::Ptr &romBranch, const Device::Ptr &device) const;
 
-        [[nodiscard]] LocalManifest::Ptr getLocalManifest() const;
-    };
+    /**
+     * @brief Finds a device by its codename in the configuration.
+     *
+     * This function iterates through the available devices and checks if the
+     * codename matches the given parameter. If a match is found, a shared
+     * pointer to the device is returned. If no match is found, a nullptr is
+     * returned.
+     *
+     * @param codename The codename of the device to search for.
+     * @return A shared pointer to the device if found, or nullptr if not found.
+     */
+    [[nodiscard]] Device::Ptr getDevice(const std::string_view &codename) const;
 
-    struct DeviceEntry {
-        Device::Ptr device;          // device codename
-        const ConfigParser *parser;  // pointer to the ConfigParser instance
-
-        [[nodiscard]] std::vector<ROMEntry> getROMs() const;
-    };
-    [[nodiscard]] std::vector<DeviceEntry> getDevices() const;
+    /**
+     * @brief Finds a ROM branch by its branch name in the configuration.
+     *
+     * This function iterates through the available ROM branches and checks if
+     * the branch name matches the given parameter. If a match is found, a
+     * shared pointer to the ROM branch is returned. If no match is found, a
+     * nullptr is returned.
+     *
+     * @param romName The string representitive of the ROM name to search for
+     * @param androidVersion The android version of the ROM branch to search for
+     * @return A shared pointer to the ROM branch if found, or nullptr if not
+     * found.
+     */
+    [[nodiscard]] ROMBranch::Ptr getROMBranches(const std::string &romName,
+                                                const int androidVersion) const;
 
    private:
     std::vector<LocalManifest::Ptr> parsedManifests;
 
     class Parser {
-        xmlNode *rootNode;
-        xmlDoc *doc;
+        Json::Value root;
 
-        struct {
-            xmlNode *node;
-            std::string url;
-            std::string name;
-            std::vector<ROMBranch::Ptr> rombranches;
-            std::vector<Device::Ptr> devices;
-            std::vector<LocalManifest::Ptr> localManifests;
-        } data;
+        // Parse 'roms' section
+        std::vector<ROMBranch::Ptr> parseROMManifest();
+        // Parse 'targets' section
+        std::vector<Device::Ptr> parseDevices();
+        // Parse 'local_manifests' section
+        std::vector<LocalManifest::Ptr> parseLocalManifestBranch();
+        // Merge parsed data to create a linked list of LocalManifests
+        bool merge();
 
-        bool parseROMManifest();
-        bool parseDevices();
-        bool parseLocalManifestBranch();
+        std::vector<LocalManifest::Ptr> mergedManifests;
 
        public:
-        explicit Parser(const std::filesystem::path &xmlFilePath);
-        ~Parser();
+        explicit Parser(const std::filesystem::path &jsonFileDir);
         [[nodiscard]] std::vector<LocalManifest::Ptr> parse();
     };
 };
 
 struct PerBuildData {
-    std::string device;  // device codename
-    ConfigParser::LocalManifest::Ptr
-        localManifest;  // associated local manifest
+    // device codename
+    std::string device;
+    // associated local manifest
+    ConfigParser::LocalManifest::Ptr localManifest;
     enum class Variant {
         kUser,
         kUserDebug,
@@ -118,6 +158,14 @@ struct PerBuildData {
     } variant;  // Target build variant
 
     enum class Result { SUCCESS, ERROR_NONFATAL, ERROR_FATAL };
+
+    void reset() {
+        device.clear();
+        localManifest.reset();
+        variant = Variant::kUser;
+        result = nullptr;
+    }
+
     struct ResultData {
         static constexpr int MSG_SIZE = 250;
         Result value{};
@@ -133,3 +181,11 @@ struct PerBuildData {
         }
     } *result;
 };
+
+// Helpers for std variant codebloat, as we have real data on index 1
+static constexpr int VALUE_INDEX = 1;
+
+template <typename Variant>
+[[nodiscard]] auto getValue(Variant &&variant) {
+    return std::get<VALUE_INDEX>(std::forward<Variant>(variant));
+}
