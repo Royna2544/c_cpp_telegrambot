@@ -96,6 +96,7 @@ class ROMBuildQueryHandler
     bool do_repo_sync = true;
     PerBuildData per_build;
     Message::Ptr sentMessage;
+    Message::Ptr userMessage;
     std::shared_ptr<TgBotApi> api;
     using KeyboardType = TgBot::InlineKeyboardMarkup::Ptr;
 
@@ -184,9 +185,10 @@ class ROMBuildQueryHandler
     // Handle type selection button
     void handle_type(const Query& query);
 
-#define DECLARE_BUTTON_HANDLER(name, key) \
-    ButtonHandler{name, #key,             \
-                  [this](const Query& query) { handle_##key(query); }}
+#define DECLARE_BUTTON_HANDLER(name, key)                               \
+    ButtonHandler {                                                     \
+        name, #key, [this](const Query& query) { handle_##key(query); } \
+    }
 #define DECLARE_BUTTON_HANDLER_WITHPREFIX(name, key, prefix)             \
     ButtonHandler {                                                      \
         name, #key, [this](const Query& query) { handle_##key(query); }, \
@@ -355,8 +357,7 @@ class Build : public TaskWrapperBase<ROMBuildTask> {
                 }
             } break;
             case PerBuildData::Result::SUCCESS:
-                api->editMessage(sentMessage, "Build completed successfully",
-                                 backKeyboard);
+                api->editMessage(sentMessage, "Build completed successfully");
                 break;
             case PerBuildData::Result::ERROR_NONFATAL:
             case PerBuildData::Result::NONE:
@@ -468,7 +469,8 @@ ROMBuildQueryHandler::ROMBuildQueryHandler(std::shared_ptr<TgBotApi> api,
                                            MessagePtr userMessage)
     : api(std::move(api)),
       parser(FS::getPathForType(FS::PathType::GIT_ROOT) / "src" /
-             "android_builder" / "configs") {
+             "android_builder" / "configs"),
+      userMessage(userMessage) {
     settingsKeyboard = createKeyboardWith<Buttons::repo_sync, Buttons::back>();
     mainKeyboard =
         createKeyboardWith<Buttons::build_rom, Buttons::send_system_info,
@@ -542,18 +544,18 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
         return;
     }
     if (do_repo_sync) {
-        RepoSync repoSync(shared_from_this(), per_build, api, sentMessage);
+        RepoSync repoSync(shared_from_this(), per_build, api, userMessage);
         if (!repoSync.execute()) {
             LOG(INFO) << "RepoSync::execute fails...";
             return;
         }
     }
-    Build build(shared_from_this(), per_build, api, sentMessage);
+    Build build(shared_from_this(), per_build, api, userMessage);
     if (!build.execute()) {
         LOG(INFO) << "Build::execute fails...";
         return;
     }
-    Upload upload(shared_from_this(), per_build, api, sentMessage);
+    Upload upload(shared_from_this(), per_build, api, userMessage);
     if (!upload.execute()) {
         LOG(INFO) << "Upload::execute fails...";
         return;
