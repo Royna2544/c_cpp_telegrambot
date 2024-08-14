@@ -150,6 +150,9 @@ class MockTgBotApi : public TgBotApi {
                  bool showAlert),
                 (const override));
 
+    MOCK_METHOD(bool, pinMessage_impl, (MessagePtr message), (const override));
+    MOCK_METHOD(bool, unpinMessage_impl, (MessagePtr message), (const override));
+
     // Non-TgBotApi methods
     MOCK_METHOD(bool, reloadCommand, (const std::string& cmd), (override));
     MOCK_METHOD(bool, unloadCommand, (const std::string& cmd), (override));

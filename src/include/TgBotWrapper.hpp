@@ -272,6 +272,9 @@ struct TgBotApi {
 
     virtual User::Ptr getBotUser_impl() const = 0;
 
+    virtual bool pinMessage_impl(MessagePtr message) const = 0;
+    virtual bool unpinMessage_impl(MessagePtr message) const = 0;
+
     static FileOrString ToFileOrString(const FileOrMedia& media) {
         if (media.which() == 0) {
             return boost::get<InputFile::Ptr>(media);
@@ -521,6 +524,13 @@ struct TgBotApi {
                                       stickerFormat);
     }
 
+    inline bool pinMessage(MessagePtr message) {
+        return pinMessage_impl(message);
+    }
+    virtual bool unpinMessage(MessagePtr message) {
+        return unpinMessage_impl(message);
+    }
+
     // TODO: Any better way than this?
     virtual std::string getCommandModulesStr() const { return {}; }
 
@@ -743,6 +753,13 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
      * @return A shared pointer to the bot's user object.
      */
     User::Ptr getBotUser_impl() const override { return getApi().getMe(); }
+
+    bool pinMessage_impl(MessagePtr message) const override {
+        return getApi().pinChatMessage(message->chat->id, message->messageId);
+    }
+    bool unpinMessage_impl(MessagePtr message) const override {
+        return getApi().unpinChatMessage(message->chat->id, message->messageId);
+    }
 
    public:
     // Add commands/Remove commands
