@@ -29,7 +29,7 @@ def build_rom(device: str, variant: str, target: str, jobs: int) -> bool:
     shell_process = subprocess.Popen(['bash'], stdin=subprocess.PIPE, text=True)
     
     def write(s: str):
-        print('Writing %s' % s)
+        print('Writing \'%s\'' % s)
         shell_process.stdin.write(s + '\n')
         shell_process.stdin.flush()
         

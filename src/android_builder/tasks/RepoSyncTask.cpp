@@ -362,6 +362,7 @@ struct MatchesData {
             LOG(ERROR) << "Failed to set HEAD: " << git_error_last_str();
             return false;
         }
+        LOG(INFO) << "Switched to branch: " << desiredBranch;
         return true;
     }
 
@@ -397,6 +398,9 @@ struct MatchesData {
                         << "Failed to delete extensions.preciousobjects: "
                         << git_error_last_str();
                 }
+            } else {
+                LOG(WARNING) << "Failed to get extensions.preciousobjects: "
+                           << git_error_last_str();
             }
             // Manual, to save the file to disk
             git_config_free(config);

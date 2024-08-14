@@ -6,6 +6,7 @@
 #include <set>
 #include <string>
 #include <utility>
+#include <variant>
 
 #include "RepoUtils.hpp"
 
@@ -157,7 +158,7 @@ struct PerBuildData {
         kEng
     } variant;  // Target build variant
 
-    enum class Result { SUCCESS, ERROR_NONFATAL, ERROR_FATAL };
+    enum class Result { SUCCESS, ERROR_NONFATAL, ERROR_FATAL, NONE };
 
     void reset() {
         device.clear();
@@ -168,7 +169,7 @@ struct PerBuildData {
 
     struct ResultData {
         static constexpr int MSG_SIZE = 250;
-        Result value{};
+        Result value = Result::NONE;
         std::array<char, MSG_SIZE> msg{};
         void setMessage(const std::string &message) {
             LOG_IF(WARNING, message.size() > msg.size())

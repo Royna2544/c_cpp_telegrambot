@@ -51,6 +51,10 @@
                 {
                     "android_version": 13,
                     "branch": "lineage-20.0"
+                },
+                {
+                    "android_version": 11,
+                    "branch": "lineage-18.1"
                 }
             ]
         }
@@ -97,6 +101,12 @@
                     "target_rom": "Evolution-X",
                     "android_version": 14,
                     "device": "tb128fu"
+                },
+                {
+                    "name": "baffinvektt-LineageOS-lineage-18.1",
+                    "target_rom": "LineageOS",
+                    "android_version": 11,
+                    "device": "baffinvektt"
                 }
             ]
         }

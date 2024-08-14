@@ -1,11 +1,10 @@
 find_package(Python COMPONENTS Development)
+find_package(jsoncpp)
 
 if (NOT ${Python_FOUND})
     message(STATUS "Python dev package not found, disable AndroidBuilder-cpp")
     return()
 endif()
-find_package(jsoncpp REQUIRED)
-
 add_my_library(
     NAME Python
     SRCS
@@ -17,6 +16,11 @@ add_my_library(
         ${Python_INCLUDE_DIRS}
         .
 )
+
+if (NOT ${jsoncpp_FOUND})
+    message(STATUS "libjsoncpp not found, disable AndroidBuilder-cpp")
+    return()
+endif()
 
 ################# Android ROM builder with C++/Python #################
 if (UNIX AND NOT APPLE)
