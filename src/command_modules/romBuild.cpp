@@ -218,12 +218,12 @@ class ROMBuildQueryHandler
         DECLARE_BUTTON_HANDLER("Show system info", send_system_info),
         DECLARE_BUTTON_HANDLER("Build ROM", build),
         DECLARE_BUTTON_HANDLER("Confirm", confirm),
+        DECLARE_BUTTON_HANDLER("Do upload", upload),
+        DECLARE_BUTTON_HANDLER("Pin the build message", pin_message),
         DECLARE_BUTTON_HANDLER_WITHPREFIX("Select device", device, "device_"),
         DECLARE_BUTTON_HANDLER_WITHPREFIX("Select ROM", rom, "rom_"),
         DECLARE_BUTTON_HANDLER_WITHPREFIX("Select build variant", type,
                                           "type_"),
-        DECLARE_BUTTON_HANDLER("Do upload", upload),
-        DECLARE_BUTTON_HANDLER("Pin the build message", pin_message),
     };
 
     enum class Buttons {
@@ -666,7 +666,7 @@ void ROMBuildQueryHandler::onCallbackQuery(
     if (sentMessage == nullptr) {
         return;
     }
-    if (query->message->from->id != userMessage->from->id) {
+    if (query->from->id != userMessage->from->id) {
         api->answerCallbackQuery(
             query->id,
             "Sorry son, you are not allowed to touch this keyboard.");
