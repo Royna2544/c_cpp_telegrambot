@@ -48,15 +48,17 @@ int main(const int argc, char** argv) {
         exit(EXIT_SUCCESS);  // Parent exits
     }
 
-    // Set file creation mask to 0
-    umask(0);
-
     // Skip changing working directory to root directory
 
     // Close all open file descriptors
     close(STDIN_FILENO);
     close(STDOUT_FILENO);
     close(STDERR_FILENO);
+
+    if (access(kLogFile, F_OK) == 0) {
+        puts("Removing old log file");
+        unlink(kLogFile);  // Remove old log file
+    }
 
     // Redirect file descriptors to /dev/null and bot.log
     if (!freopen("/dev/null", "r", stdin)) {
