@@ -23,6 +23,14 @@
         {
             "codename": "r3q",
             "name": "Galaxy A90 5G"
+        },
+        {
+            "codename": "tb128fu",
+            "name": "Lenovo XiaoXin Pad 2022"
+        },
+        {
+            "codename": "a30s",
+            "name": "Galaxy A30s"
         }
     ],
     "roms": [
