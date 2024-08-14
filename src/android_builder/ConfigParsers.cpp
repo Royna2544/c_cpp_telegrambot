@@ -320,9 +320,19 @@ bool ConfigParser::Parser::merge() {
                 LOG(WARNING)
                     << "Device info not found for codename: " << codename
                     << ", create dummy";
+                if (std::ranges::any_of(deviceList,
+                                        [codename](const Device::Ptr& device) {
+                                            return device->codename == codename;
+                                        })) {
+                    LOG(WARNING) << "Already exists, skip adding device.";
+                }
                 deviceList.emplace_back(std::make_shared<Device>(codename));
             }
         }
+        std::ranges::sort(deviceList,
+                          [](const Device::Ptr& a, const Device::Ptr& b) {
+                              return a->codename < b->codename;
+                          });
         localManifest->devices = deviceList;
 
         // Find corresponding ROM branch
