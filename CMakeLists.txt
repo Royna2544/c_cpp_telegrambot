@@ -251,7 +251,7 @@ add_my_executable(
 if (UNIX)
 add_my_executable(
   NAME maind
-  SRCS src/mainDaemon.c
+  SRCS src/mainDaemon.cpp
 )
 endif()
 #####################################################################
