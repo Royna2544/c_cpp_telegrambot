@@ -67,8 +67,8 @@
             ]
         },
         {
-            "name": "RisingDroidOSS",
-            "link": "https://github.com/RisingDroidOSS/android",
+            "name": "RisingDroid",
+            "link": "https://github.com/RisingTechOSS/android",
             "target": "bacon",
             "outzip_prefix": "RisingOS",
             "branches": [
