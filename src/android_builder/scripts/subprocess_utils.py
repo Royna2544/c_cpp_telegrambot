@@ -29,8 +29,7 @@ def run_command_with_output(command: str):
         return output, error
     
     except subprocess.CalledProcessError as e:
-        errstr = f"Command '{command}' failed with exception {str(e)}\n"
-        print(errstr)
+        print(str(e))
         return None, str(e)
     
     except Exception as e:
