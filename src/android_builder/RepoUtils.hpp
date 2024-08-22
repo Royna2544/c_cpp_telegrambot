@@ -22,7 +22,6 @@ class RepoUtils {
     ~RepoUtils();
 
    private:
-    [[noreturn]] static void errorAndThrow(const std::string& message);
     std::shared_ptr<PythonClass::FunctionHandle> reposync_function;
     std::shared_ptr<PythonClass::FunctionHandle> repoinit_function;
 };
