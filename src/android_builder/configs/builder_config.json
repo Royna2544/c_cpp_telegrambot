@@ -65,6 +65,18 @@
                     "branch": "lineage-18.1"
                 }
             ]
+        },
+        {
+            "name": "RisingDroidOSS",
+            "link": "https://github.com/RisingDroidOSS/android",
+            "target": "bacon",
+            "outzip_prefix": "RisingOS",
+            "branches": [
+                {
+                    "android_version": 14,
+                    "branch": "fourteen"
+                }
+            ]
         }
     ],
     "local_manifests": [
