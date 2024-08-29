@@ -199,9 +199,10 @@ class ROMBuildQueryHandler
     // Handle type selection button
     void handle_type(const Query& query);
 
-#define DECLARE_BUTTON_HANDLER(name, key) \
-    ButtonHandler{name, #key,             \
-                  [this](const Query& query) { handle_##key(query); }}
+#define DECLARE_BUTTON_HANDLER(name, key)                               \
+    ButtonHandler {                                                     \
+        name, #key, [this](const Query& query) { handle_##key(query); } \
+    }
 #define DECLARE_BUTTON_HANDLER_WITHPREFIX(name, key, prefix)             \
     ButtonHandler {                                                      \
         name, #key, [this](const Query& query) { handle_##key(query); }, \
@@ -276,11 +277,10 @@ class TaskWrapperBase {
           api(api),
           userMessage(message) {
         this->data.result = &result;
-        backKeyboard = std::make_shared<TgBot::InlineKeyboardMarkup>();
-        auto v = std::vector<TgBot::InlineKeyboardButton::Ptr>();
-        v.emplace_back(
-            std::make_shared<TgBot::InlineKeyboardButton>("Back", "", "back"));
-        backKeyboard->inlineKeyboard.push_back(v);
+        backKeyboard =
+            KeyboardBuilder()
+                .addKeyboard({{"Back", "back"}, {"Retry", "confirm"}})
+                .get();
     }
 
     /**
@@ -453,7 +453,7 @@ class CwdRestorer {
             return;
         }
 
-        LOG(INFO) << "Changing cwd to: " << newCwd.string();
+        DLOG(INFO) << "Changing cwd to: " << newCwd.string();
         std::filesystem::current_path(newCwd, ec);
         if (!ec) {
             // Successfully changed cwd
@@ -474,6 +474,7 @@ class CwdRestorer {
     }
 
     ~CwdRestorer() {
+        DLOG(INFO) << "Restoring cwd to: " << cwd;
         std::filesystem::current_path(cwd, ec);
         if (ec) {
             LOG(ERROR) << "Error while restoring cwd: " << ec.message();
