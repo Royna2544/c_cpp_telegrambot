@@ -41,16 +41,19 @@ DYN_COMMAND_FN(name, module) {
     if (name == nullptr) {
         return false;
     }
-    std::string commandName = name;
+    const std::string commandName = name;
     module.command = commandName;
     module.isLoaded = true;
     module.flags = CommandModule::Flags::Enforced;
     if (commandName == "c") {
         module.fn = COMMAND_HANDLER_NAME(c);
+        module.description = "Run C source code in-chat";
     } else if (commandName == "cpp") {
         module.fn = COMMAND_HANDLER_NAME(cpp);
+        module.description = "Run C++ source code in-chat";
     } else if (commandName == "py") {
         module.fn = COMMAND_HANDLER_NAME(py);
+        module.description = "Run Python script in-chat";
     } else {
         return false;
     }
