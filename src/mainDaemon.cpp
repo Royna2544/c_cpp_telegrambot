@@ -31,6 +31,11 @@ int main(const int argc, char** argv) {
     printf("Redirecting stdout and stderr to %s\n", kLogFile);
     printf("Executable is: %s, argument count: %d\n", argv[1], argc - 1);
 
+    if (access(argv[1], R_OK | X_OK) != 0) {
+        fprintf(stderr, "Error: Bot executable not found or not executable.\n");
+        return EXIT_FAILURE;
+    }
+    
     // Create a new session
     if (setsid() < 0) {
         perror("setsid failed");
