@@ -60,20 +60,20 @@ class MockTgBotApi : public TgBotApi {
    public:
     MOCK_METHOD(Message::Ptr, sendMessage_impl,
                 (ChatId chatId, const std::string& text,
-                 ReplyParameters::Ptr replyParameters,
+                 ReplyParametersExt::Ptr replyParameters,
                  GenericReply::Ptr replyMarkup, const std::string& parseMode),
                 (const, override));
 
     MOCK_METHOD(Message::Ptr, sendAnimation_impl,
                 (ChatId chatId, FileOrString animation,
                  const std::string& caption,
-                 ReplyParameters::Ptr replyParameters,
+                 ReplyParametersExt::Ptr replyParameters,
                  GenericReply::Ptr replyMarkup, const std::string& parseMode),
                 (const, override));
 
     MOCK_METHOD(Message::Ptr, sendSticker_impl,
                 (ChatId chatId, FileOrString sticker,
-                 ReplyParameters::Ptr replyParameters),
+                 ReplyParametersExt::Ptr replyParameters),
                 (const, override));
 
     MOCK_METHOD(Message::Ptr, editMessage_impl,
@@ -101,19 +101,19 @@ class MockTgBotApi : public TgBotApi {
     MOCK_METHOD(Message::Ptr, sendDocument_impl,
                 (ChatId chatId, FileOrString document,
                  const std::string& caption,
-                 ReplyParameters::Ptr replyParameters,
+                 ReplyParametersExt::Ptr replyParameters,
                  GenericReply::Ptr replyMarkup, const std::string& parseMode),
                 (const, override));
 
     MOCK_METHOD(Message::Ptr, sendPhoto_impl,
                 (ChatId chatId, FileOrString photo, const std::string& caption,
-                 ReplyParameters::Ptr replyParameters,
+                 ReplyParametersExt::Ptr replyParameters,
                  GenericReply::Ptr replyMarkup, const std::string& parseMode),
                 (const, override));
 
     MOCK_METHOD(Message::Ptr, sendVideo_impl,
                 (ChatId chatId, FileOrString photo, const std::string& caption,
-                 ReplyParameters::Ptr replyParameters,
+                 ReplyParametersExt::Ptr replyParameters,
                  GenericReply::Ptr replyMarkup, const std::string& parseMode),
                 (const, override));
 
@@ -143,7 +143,7 @@ class MockTgBotApi : public TgBotApi {
     MOCK_METHOD(User::Ptr, getBotUser_impl, (), (const, override));
 
     MOCK_METHOD(MessageId, copyMessage_impl,
-                (ChatId chat, MessageId message, ReplyParameters::Ptr reply),
+                (ChatId chat, MessageId message, ReplyParametersExt::Ptr reply),
                 (const, override));
     MOCK_METHOD(bool, answerCallbackQuery_impl,
                 (const std::string& callbackQueryId, const std::string& text,
@@ -151,7 +151,8 @@ class MockTgBotApi : public TgBotApi {
                 (const override));
 
     MOCK_METHOD(bool, pinMessage_impl, (MessagePtr message), (const override));
-    MOCK_METHOD(bool, unpinMessage_impl, (MessagePtr message), (const override));
+    MOCK_METHOD(bool, unpinMessage_impl, (MessagePtr message),
+                (const override));
 
     // Non-TgBotApi methods
     MOCK_METHOD(bool, reloadCommand, (const std::string& cmd), (override));
@@ -239,7 +240,8 @@ class CommandModulesTest : public ::testing::Test {
      * @return True if the reply parameters refer to the specified message,
      *         false otherwise.
      */
-    static bool isReplyToThisMsg(ReplyParameters::Ptr rhs, MessagePtr message);
+    static bool isReplyToThisMsg(ReplyParametersExt::Ptr rhs,
+                                 MessagePtr message);
 
     /**
      * @brief Get the current working directory path.
@@ -319,7 +321,7 @@ class CommandTestBase : public CommandModulesTest {
     };
 
     auto createMessageReplyMatcher(MessagePtr message = nullptr) {
-        return Truly([=, this](ReplyParameters::Ptr m) {
+        return Truly([=, this](ReplyParametersExt::Ptr m) {
             return isReplyToThisMsg(std::move(m),
                                     message ?: defaultProvidedMessage);
         });

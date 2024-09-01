@@ -8,7 +8,15 @@
 
 class RestartFmt {
    public:
-    using data_type = std::pair<ChatId, MessageId>;
+    using MessageThreadId = int;
+
+    struct Type {
+        ChatId first;
+        MessageId second;
+        MessageThreadId third;
+    };
+    using data_type = Type;
+
     // function to parse the given string and populate chat_id and message_id
     static std::optional<data_type> fromString(const std::string& string, bool withPrefix = false);
 

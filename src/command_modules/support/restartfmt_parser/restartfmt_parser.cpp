@@ -14,22 +14,24 @@ std::optional<RestartFmt::data_type> RestartFmt::fromString(
     std::string_view view = string;
     ChatId parsedChatId = 0;
     MessageId parsedMessageId = 0;
+    int parsedMessageThreadId = 0;
 
-    if (!absl::ConsumePrefix(&view, "RESTART=") && withPrefix) {
+    if (withPrefix && !absl::ConsumePrefix(&view, "RESTART=")) {
         LOG(ERROR) << "Invalid format for RESTART=" << string
                    << " (Doesn't have the expected prefix)";
         return std::nullopt;
     }
     std::vector<std::string> parts =
         absl::StrSplit(view, ":", absl::SkipEmpty());
-    if (parts.size() != 2) {
+    if (parts.size() != 3) {
         LOG(ERROR) << "Invalid format for RESTART=" << string
-                   << " (Expected two parts)";
+                   << " (Expected three parts)";
         return std::nullopt;
     }
     if (try_parse(parts[0], &parsedChatId) &&
-        try_parse(parts[1], &parsedMessageId)) {
-        return std::make_pair(parsedChatId, parsedMessageId);
+        try_parse(parts[1], &parsedMessageId) &&
+        try_parse(parts[2], &parsedMessageThreadId)) {
+        return Type{parsedChatId, parsedMessageId, parsedMessageThreadId};
     } else {
         LOG(ERROR) << "Invalid format for RESTART=" << string
                    << " (Failed to parse chat_id and message_id)";
@@ -48,7 +50,8 @@ std::optional<RestartFmt::data_type> RestartFmt::fromEnvVar() {
 
 std::string RestartFmt::toString(const data_type& data, bool withPrefix) {
     std::string dataString = absl::StrCat(std::to_string(data.first), ":",
-                                          std::to_string(data.second));
+                                          std::to_string(data.second), ":",
+                                          std::to_string(data.third));
 
     if (withPrefix) {
         return absl::StrCat("RESTART=", dataString);
@@ -68,7 +71,7 @@ absl::Status RestartFmt::handleMessage(ApiPtr api) {
         } else {
             LOG(INFO) << "Restart successful";
 
-            api->sendReplyMessage(v->first, v->second, "Restart success!");
+            api->sendReplyMessage(v->first, v->second, v->third, "Restart success!");
             unsetenv(RestartFmt::ENV_VAR_NAME);
             return absl::OkStatus();
         }

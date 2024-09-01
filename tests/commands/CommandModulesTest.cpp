@@ -90,7 +90,7 @@ User::Ptr CommandModulesTest::createDefaultUser(off_t id_offset) {
     return user;
 }
 
-bool CommandModulesTest::isReplyToThisMsg(ReplyParameters::Ptr rhs,
+bool CommandModulesTest::isReplyToThisMsg(ReplyParametersExt::Ptr rhs,
                                           MessagePtr message) {
     if (!rhs) {
         LOG(INFO) << "ReplyParameters is nullptr";

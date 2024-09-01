@@ -4,6 +4,7 @@
 #include <TgBotPPImpl_shared_depsExports.h>
 #include <tgbot/tgbot.h>
 
+#include <ReplyParametersExt.hpp>
 #include <boost/algorithm/string/trim.hpp>
 #include <filesystem>
 #include <map>
@@ -28,7 +29,6 @@ using TgBot::GenericReply;
 using TgBot::InputFile;
 using TgBot::InputSticker;
 using TgBot::Message;
-using TgBot::ReplyParameters;
 using TgBot::Sticker;
 using TgBot::StickerSet;
 using TgBot::TgLongPoll;
@@ -185,21 +185,21 @@ struct TgBotApi {
     // Send a message to the chat
     virtual Message::Ptr sendMessage_impl(
         ChatId chatId, const std::string& text,
-        ReplyParameters::Ptr replyParameters = nullptr,
+        ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
         const std::string& parseMode = "") const = 0;
 
     // Send a GIF to the chat
     virtual Message::Ptr sendAnimation_impl(
         ChatId chatId, FileOrString animation, const std::string& caption,
-        ReplyParameters::Ptr replyParameters = nullptr,
+        ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
         const std::string& parseMode = "") const = 0;
 
     // Send a sticker to the chat
     virtual Message::Ptr sendSticker_impl(
         ChatId chatId, FileOrString sticker,
-        ReplyParameters::Ptr replyParameters = nullptr) const = 0;
+        ReplyParametersExt::Ptr replyParameters = nullptr) const = 0;
 
     // Create a new sticker set
     virtual bool createNewStickerSet_impl(
@@ -223,7 +223,7 @@ struct TgBotApi {
 
     virtual MessageId copyMessage_impl(
         ChatId fromChatId, MessageId messageId,
-        ReplyParameters::Ptr replyParameters = nullptr) const = 0;
+        ReplyParametersExt::Ptr replyParameters = nullptr) const = 0;
 
     virtual bool answerCallbackQuery_impl(const std::string& callbackQueryId,
                                           const std::string& text = "",
@@ -244,21 +244,21 @@ struct TgBotApi {
     // Send a file to the chat
     virtual Message::Ptr sendDocument_impl(
         ChatId chatId, FileOrString document, const std::string& caption,
-        ReplyParameters::Ptr replyParameters = nullptr,
+        ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
         const std::string& parseMode = "") const = 0;
 
     // Send a photo to the chat
     virtual Message::Ptr sendPhoto_impl(
         ChatId chatId, FileOrString photo, const std::string& caption,
-        ReplyParameters::Ptr replyParameters = nullptr,
+        ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
         const std::string& parseMode = "") const = 0;
 
     // Send a video to the chat
     virtual Message::Ptr sendVideo_impl(
         ChatId chatId, FileOrString photo, const std::string& caption,
-        ReplyParameters::Ptr replyParameters = nullptr,
+        ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
         const std::string& parseMode = "") const = 0;
 
@@ -320,19 +320,20 @@ struct TgBotApi {
     Message::Ptr sendReplyMessage(
         const Message::Ptr& replyToMessage, const std::string& message,
         const GenericReply::Ptr& replyMarkup = nullptr) const {
-        return sendReplyMessage<mode>(replyToMessage->chat->id,
-                                      replyToMessage->messageId, message,
-                                      replyMarkup);
+        return sendReplyMessage<mode>(
+            replyToMessage->chat->id, replyToMessage->messageId,
+            replyToMessage->messageThreadId, message, replyMarkup);
     }
 
     template <ParseMode mode = ParseMode::None>
     Message::Ptr sendReplyMessage(
         const ChatId chatId, const MessageId messageId,
-        const std::string& message,
+        const MessageThreadId messageTid, const std::string& message,
         const GenericReply::Ptr& replyMarkup = nullptr) const {
-        auto params = std::make_shared<ReplyParameters>();
+        auto params = std::make_shared<ReplyParametersExt>();
         params->messageId = messageId;
         params->chatId = chatId;
+        params->messageThreadId = messageTid;
         return sendMessage_impl(chatId, message, params, replyMarkup,
                                 parseModeToStr<mode>());
     }
@@ -429,7 +430,7 @@ struct TgBotApi {
 
     inline MessageId copyMessage(
         ChatId fromChatId, MessageId messageId,
-        ReplyParameters::Ptr replyParameters = nullptr) const {
+        ReplyParametersExt::Ptr replyParameters = nullptr) const {
         return copyMessage_impl(fromChatId, messageId,
                                 std::move(replyParameters));
     }
@@ -459,7 +460,7 @@ struct TgBotApi {
     template <ParseMode mode = ParseMode::None>
     Message::Ptr sendDocument(ChatIds chatId, FileOrMedia document,
                               const std::string& caption = "",
-                              ReplyParameters::Ptr replyParameters = nullptr,
+                              ReplyParametersExt::Ptr replyParameters = nullptr,
                               GenericReply::Ptr replyMarkup = nullptr) const {
         return sendDocument_impl(chatId, ToFileOrString(document), caption,
                                  std::move(replyParameters),
@@ -470,7 +471,7 @@ struct TgBotApi {
     template <ParseMode mode = ParseMode::None>
     Message::Ptr sendPhoto(ChatIds chatId, const FileOrMedia& photo,
                            const std::string& caption = "",
-                           ReplyParameters::Ptr replyParameters = nullptr,
+                           ReplyParametersExt::Ptr replyParameters = nullptr,
                            GenericReply::Ptr replyMarkup = nullptr) const {
         return sendPhoto_impl(chatId, ToFileOrString(photo), caption,
                               std::move(replyParameters),
@@ -480,7 +481,7 @@ struct TgBotApi {
     template <ParseMode mode = ParseMode::None>
     Message::Ptr sendVideo(ChatIds chatId, const FileOrMedia& video,
                            const std::string& caption = "",
-                           ReplyParameters::Ptr replyParameters = nullptr,
+                           ReplyParametersExt::Ptr replyParameters = nullptr,
                            GenericReply::Ptr replyMarkup = nullptr) const {
         return sendVideo_impl(chatId, ToFileOrString(video), caption,
                               std::move(replyParameters),
@@ -558,11 +559,12 @@ struct TgBotApi {
     }
 
    protected:
-    static ReplyParameters::Ptr createReplyParametersForReply(
+    static ReplyParametersExt::Ptr createReplyParametersForReply(
         const Message::Ptr& message) {
-        auto ptr = std::make_shared<ReplyParameters>();
+        auto ptr = std::make_shared<ReplyParametersExt>();
         ptr->messageId = message->messageId;
         ptr->chatId = message->chat->id;
+        ptr->messageThreadId = message->messageThreadId;
         return ptr;
     }
 };
@@ -580,27 +582,31 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
 
    private:
     Message::Ptr sendMessage_impl(ChatId chatId, const std::string& text,
-                                  ReplyParameters::Ptr replyParameters,
+                                  ReplyParametersExt::Ptr replyParameters,
                                   GenericReply::Ptr replyMarkup,
                                   const std::string& parseMode) const override {
         return getApi().sendMessage(chatId, text, nullptr, replyParameters,
-                                    replyMarkup, parseMode);
+                                    replyMarkup, parseMode, false, {},
+                                    replyParameters ? replyParameters->messageThreadId : 0);
     }
 
     Message::Ptr sendAnimation_impl(
         ChatId chatId, boost::variant<InputFile::Ptr, std::string> animation,
         const std::string& caption,
-        ReplyParameters::Ptr replyParameters = nullptr,
+        ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
         const std::string& parseMode = "") const override {
         return getApi().sendAnimation(chatId, animation, 0, 0, 0, "", caption,
-                                      replyParameters, replyMarkup, parseMode);
+                                      replyParameters, replyMarkup, parseMode,
+                                      false, {},
+                                      replyParameters->messageThreadId);
     }
 
     Message::Ptr sendSticker_impl(
         ChatId chatId, boost::variant<InputFile::Ptr, std::string> sticker,
-        ReplyParameters::Ptr replyParameters) const override {
-        return getApi().sendSticker(chatId, sticker, replyParameters);
+        ReplyParametersExt::Ptr replyParameters) const override {
+        return getApi().sendSticker(chatId, sticker, replyParameters, nullptr,
+                                    false, replyParameters->messageThreadId);
     }
 
     Message::Ptr editMessage_impl(
@@ -623,6 +629,7 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
                 } else if constexpr (std::is_same_v<T, std::string>) {
                     return getApi().editMessageReplyMarkup(0, 0, arg, markup);
                 }
+                LOG(WARNING) << "No-op editMessageReplyMarkup";
                 return Message::Ptr();
             },
             message);
@@ -631,10 +638,11 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
     // Copy a message
     MessageId copyMessage_impl(
         ChatId fromChatId, MessageId messageId,
-        ReplyParameters::Ptr replyParameters = nullptr) const override {
-        const auto ret =
-            getApi().copyMessage(fromChatId, fromChatId, messageId, "", "", {},
-                                 false, replyParameters);
+        ReplyParametersExt::Ptr replyParameters = nullptr) const override {
+        const auto ret = getApi().copyMessage(
+            fromChatId, fromChatId, messageId, "", "", {}, false,
+            replyParameters, std::make_shared<GenericReply>(), false,
+            replyParameters->messageThreadId);
         if (ret) {
             return ret->messageId;
         }
@@ -668,31 +676,35 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
     // Send a file to the chat
     Message::Ptr sendDocument_impl(
         ChatId chatId, FileOrString document, const std::string& caption,
-        ReplyParameters::Ptr replyParameters = nullptr,
+        ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
         const std::string& parseMode = "") const override {
         return getApi().sendDocument(chatId, std::move(document), "", caption,
-                                     replyParameters, replyMarkup, parseMode);
+                                     replyParameters, replyMarkup, parseMode,
+                                     false, {}, false,
+                                     replyParameters->messageThreadId);
     }
 
     // Send a photo to the chat
     Message::Ptr sendPhoto_impl(
         ChatId chatId, FileOrString photo, const std::string& caption,
-        ReplyParameters::Ptr replyParameters = nullptr,
+        ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
         const std::string& parseMode = "") const override {
         return getApi().sendPhoto(chatId, photo, caption, replyParameters,
-                                  replyMarkup, parseMode);
+                                  replyMarkup, parseMode, false, {},
+                                  replyParameters->messageThreadId);
     }
 
     // Send a video to the chat
     Message::Ptr sendVideo_impl(
         ChatId chatId, FileOrString video, const std::string& caption,
-        ReplyParameters::Ptr replyParameters = nullptr,
+        ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
         const std::string& parseMode = "") const override {
         return getApi().sendVideo(chatId, video, false, 0, 0, 0, "", caption,
-                                  replyParameters, replyMarkup, parseMode);
+                                  replyParameters, replyMarkup, parseMode,
+                                  false, {}, replyParameters->messageThreadId);
     }
 
     Message::Ptr sendDice_impl(ChatId chatId) const override {
