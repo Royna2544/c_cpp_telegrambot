@@ -199,3 +199,8 @@ command_module(
     SRCS copystickers.cpp
     LIBS TgBotImgProc
 )
+
+command_module(
+    NAME joinban
+    SRCS joinBan.cpp
+)
