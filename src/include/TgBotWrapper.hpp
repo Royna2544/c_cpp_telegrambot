@@ -17,6 +17,7 @@
 #include "InstanceClassBase.hpp"
 #include "Random.hpp"
 #include "Types.h"
+#include "tgbot/types/Chat.h"
 
 using TgBot::Api;
 using TgBot::Bot;
@@ -274,6 +275,8 @@ struct TgBotApi {
 
     virtual bool pinMessage_impl(MessagePtr message) const = 0;
     virtual bool unpinMessage_impl(MessagePtr message) const = 0;
+    virtual bool banChatMember_impl(const Chat::Ptr& chat,
+                                    const User::Ptr& user) const = 0;
 
     static FileOrString ToFileOrString(const FileOrMedia& media) {
         if (media.which() == 0) {
@@ -528,8 +531,11 @@ struct TgBotApi {
     inline bool pinMessage(MessagePtr message) {
         return pinMessage_impl(message);
     }
-    virtual bool unpinMessage(MessagePtr message) {
+    inline bool unpinMessage(MessagePtr message) {
         return unpinMessage_impl(message);
+    }
+    bool banChatMember(const Chat::Ptr& chat, const User::Ptr& user) {
+        return banChatMember_impl(chat, user);
     }
 
     // TODO: Any better way than this?
@@ -585,9 +591,9 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
                                   ReplyParametersExt::Ptr replyParameters,
                                   GenericReply::Ptr replyMarkup,
                                   const std::string& parseMode) const override {
-        return getApi().sendMessage(chatId, text, nullptr, replyParameters,
-                                    replyMarkup, parseMode, false, {},
-                                    replyParameters ? replyParameters->messageThreadId : 0);
+        return getApi().sendMessage(
+            chatId, text, nullptr, replyParameters, replyMarkup, parseMode,
+            false, {}, replyParameters ? replyParameters->messageThreadId : 0);
     }
 
     Message::Ptr sendAnimation_impl(
@@ -771,6 +777,11 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
     }
     bool unpinMessage_impl(MessagePtr message) const override {
         return getApi().unpinChatMessage(message->chat->id, message->messageId);
+    }
+
+    bool banChatMember_impl(const Chat::Ptr& chat,
+                            const User::Ptr& user) const override {
+        return getApi().banChatMember(chat->id, user->id);
     }
 
    public:
