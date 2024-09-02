@@ -39,6 +39,7 @@ DECLARE_COMMAND_HANDLER(joinban, api, message) {
                         api->sendMessage(message,
                                          "User banned: @" + user->username +
                                              " (keyword: " + ban_keyword + ")");
+                        api->banChatMember(message->chat, user);
                         break;
                     }
                 }
