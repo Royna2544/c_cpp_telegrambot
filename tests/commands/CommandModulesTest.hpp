@@ -154,7 +154,13 @@ class MockTgBotApi : public TgBotApi {
     MOCK_METHOD(bool, unpinMessage_impl, (MessagePtr message),
                 (const override));
     MOCK_METHOD(bool, banChatMember_impl,
-                (const Chat::Ptr& chat, const User::Ptr& user), (const));
+                (const Chat::Ptr& chat, const User::Ptr& user),
+                (const override));
+    MOCK_METHOD(bool, unbanChatMember_impl,
+                (const Chat::Ptr& chat, const User::Ptr& user),
+                (const override));
+    MOCK_METHOD(User::Ptr, getChatMember_impl, (const ChatId, const UserId),
+                (const override));
 
     // Non-TgBotApi methods
     MOCK_METHOD(bool, reloadCommand, (const std::string& cmd), (override));

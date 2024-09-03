@@ -277,6 +277,9 @@ struct TgBotApi {
     virtual bool unpinMessage_impl(MessagePtr message) const = 0;
     virtual bool banChatMember_impl(const Chat::Ptr& chat,
                                     const User::Ptr& user) const = 0;
+    virtual bool unbanChatMember_impl(const Chat::Ptr& chat,
+                                      const User::Ptr& user) const = 0;
+    virtual User::Ptr getChatMember_impl(ChatId chat, UserId user) const = 0;
 
     static FileOrString ToFileOrString(const FileOrMedia& media) {
         if (media.which() == 0) {
@@ -323,6 +326,10 @@ struct TgBotApi {
     Message::Ptr sendReplyMessage(
         const Message::Ptr& replyToMessage, const std::string& message,
         const GenericReply::Ptr& replyMarkup = nullptr) const {
+        MessageThreadId tid = replyToMessage->messageThreadId;
+        if (replyToMessage->chat->type != Chat::Type::Supergroup) {
+            tid = 0;
+        }
         return sendReplyMessage<mode>(
             replyToMessage->chat->id, replyToMessage->messageId,
             replyToMessage->messageThreadId, message, replyMarkup);
@@ -534,8 +541,14 @@ struct TgBotApi {
     inline bool unpinMessage(MessagePtr message) {
         return unpinMessage_impl(message);
     }
-    bool banChatMember(const Chat::Ptr& chat, const User::Ptr& user) {
+    inline bool banChatMember(const Chat::Ptr& chat, const User::Ptr& user) {
         return banChatMember_impl(chat, user);
+    }
+    inline bool unbanChatMember(const Chat::Ptr& chat, const User::Ptr& user) {
+        return unbanChatMember_impl(chat, user);
+    }
+    inline User::Ptr getChatMember(const ChatId chat, const UserId user) {
+        return getChatMember_impl(chat, user);
     }
 
     // TODO: Any better way than this?
@@ -570,7 +583,11 @@ struct TgBotApi {
         auto ptr = std::make_shared<ReplyParametersExt>();
         ptr->messageId = message->messageId;
         ptr->chatId = message->chat->id;
-        ptr->messageThreadId = message->messageThreadId;
+        if (message->chat->type != Chat::Type::Supergroup) {
+            ptr->messageThreadId = 0;
+        } else {
+            ptr->messageThreadId = message->messageThreadId;
+        }
         return ptr;
     }
 };
@@ -782,6 +799,13 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
     bool banChatMember_impl(const Chat::Ptr& chat,
                             const User::Ptr& user) const override {
         return getApi().banChatMember(chat->id, user->id);
+    }
+    bool unbanChatMember_impl(const Chat::Ptr& chat,
+                              const User::Ptr& user) const override {
+        return getApi().unbanChatMember(chat->id, user->id);
+    }
+    User::Ptr getChatMember_impl(ChatId chat, UserId user) const override {
+        return getApi().getChatMember(chat, user)->user;
     }
 
    public:
