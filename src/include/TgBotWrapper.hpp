@@ -17,6 +17,7 @@
 #include "InstanceClassBase.hpp"
 #include "Random.hpp"
 #include "Types.h"
+#include "tgbot/TgException.h"
 #include "tgbot/types/Chat.h"
 
 using TgBot::Api;
@@ -169,6 +170,20 @@ struct ChatIds {
         return _id;
     }  // NOLINT(hicpp-explicit-conversions)
     ChatId _id;
+};
+
+struct ReplyParamsToMsgTid {
+    explicit ReplyParamsToMsgTid(
+        const ReplyParametersExt::Ptr& replyParameters) {
+        if (replyParameters) {
+            tid = replyParameters->messageThreadId;
+        } else {
+            tid = ReplyParametersExt::kThreadIdNone;
+        }
+    }
+    operator MessageId() const { return tid; }
+
+    MessageThreadId tid;
 };
 
 // Base interface for operations involving TgBot...
@@ -330,9 +345,9 @@ struct TgBotApi {
         if (!replyToMessage->chat->isForum) {
             tid = 0;
         }
-        return sendReplyMessage<mode>(
-            replyToMessage->chat->id, replyToMessage->messageId,
-            replyToMessage->messageThreadId, message, replyMarkup);
+        return sendReplyMessage<mode>(replyToMessage->chat->id,
+                                      replyToMessage->messageId, tid, message,
+                                      replyMarkup);
     }
 
     template <ParseMode mode = ParseMode::None>
@@ -608,9 +623,21 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
                                   ReplyParametersExt::Ptr replyParameters,
                                   GenericReply::Ptr replyMarkup,
                                   const std::string& parseMode) const override {
-        return getApi().sendMessage(
-            chatId, text, nullptr, replyParameters, replyMarkup, parseMode,
-            false, {}, replyParameters ? replyParameters->messageThreadId : 0);
+        try {
+            return getApi().sendMessage(chatId, text, nullptr, replyParameters,
+                                        replyMarkup, parseMode, false, {},
+                                        ReplyParamsToMsgTid{replyParameters});
+
+        } catch (const TgBot::TgException& ex) {
+            // Allow it if it's FORUM_CLOSED
+            if (replyParameters && replyParameters->hasThreadId()) {
+                LOG(WARNING)
+                    << "Failed to send reply message: " << ex.what() << std::endl;
+                return nullptr;
+            }
+            // Goodbye, if it is not
+            throw;
+        }
     }
 
     Message::Ptr sendAnimation_impl(
@@ -619,17 +646,40 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
         ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
         const std::string& parseMode = "") const override {
-        return getApi().sendAnimation(chatId, animation, 0, 0, 0, "", caption,
-                                      replyParameters, replyMarkup, parseMode,
-                                      false, {},
-                                      replyParameters->messageThreadId);
+        try {
+            return getApi().sendAnimation(chatId, animation, 0, 0, 0, "",
+                                          caption, replyParameters, replyMarkup,
+                                          parseMode, false, {},
+                                          ReplyParamsToMsgTid{replyParameters});
+        } catch (const TgBot::TgException& ex) {
+            // Allow it if it's FORUM_CLOSED
+            if (replyParameters && replyParameters->hasThreadId()) {
+                LOG(WARNING)
+                    << "Failed to send reply message" << ex.what() << std::endl;
+                return nullptr;
+            }
+            // Goodbye, if it is not
+            throw;
+        }
     }
 
     Message::Ptr sendSticker_impl(
         ChatId chatId, boost::variant<InputFile::Ptr, std::string> sticker,
         ReplyParametersExt::Ptr replyParameters) const override {
-        return getApi().sendSticker(chatId, sticker, replyParameters, nullptr,
-                                    false, replyParameters->messageThreadId);
+        try {
+            return getApi().sendSticker(chatId, sticker, replyParameters,
+                                        nullptr, false,
+                                        ReplyParamsToMsgTid{replyParameters});
+        } catch (const TgBot::TgException& ex) {
+            // Allow it if it's FORUM_CLOSED
+            if (replyParameters && replyParameters->hasThreadId()) {
+                LOG(WARNING)
+                    << "Failed to send reply message" << ex.what() << std::endl;
+                return nullptr;
+            }
+            // Goodbye, if it is not
+            throw;
+        }
     }
 
     Message::Ptr editMessage_impl(
@@ -842,17 +892,19 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
      * @brief Registers a callback function to be called when any message is
      * received.
      *
-     * @param callback The function to be called when any message is received.
+     * @param callback The function to be called when any message is
+     * received.
      */
     void registerCallback(const onanymsg_callback_type& callback) override {
         callbacks.emplace_back(callback);
     }
 
     /**
-     * @brief Registers a callback function with a token to be called when any
-     * message is received.
+     * @brief Registers a callback function with a token to be called when
+     * any message is received.
      *
-     * @param callback The function to be called when any message is received.
+     * @param callback The function to be called when any message is
+     * received.
      * @param token A unique identifier for the callback.
      */
     void registerCallback(const onanymsg_callback_type& callback,
@@ -864,7 +916,8 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
      * @brief Unregisters a callback function with a token from the list of
      * callbacks to be called when any message is received.
      *
-     * @param token The unique identifier of the callback to be unregistered.
+     * @param token The unique identifier of the callback to be
+     * unregistered.
      *
      * @return True if the callback with the specified token was found and
      * successfully unregistered, false otherwise.
