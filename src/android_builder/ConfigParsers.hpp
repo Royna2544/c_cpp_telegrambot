@@ -3,6 +3,7 @@
 #include <absl/log/log.h>
 #include <json/json.h>
 
+#include <ostream>
 #include <set>
 #include <string>
 #include <utility>
@@ -189,4 +190,16 @@ static constexpr int VALUE_INDEX = 1;
 template <typename Variant>
 [[nodiscard]] auto getValue(Variant &&variant) {
     return std::get<VALUE_INDEX>(std::forward<Variant>(variant));
+}
+
+inline std::ostream& operator<<(std::ostream& os, const PerBuildData::Variant& variant) {
+    switch (variant) {
+        case PerBuildData::Variant::kUser:
+            return os << "User";
+        case PerBuildData::Variant::kUserDebug:
+            return os << "UserDebug";
+        case PerBuildData::Variant::kEng:
+            return os << "Eng";
+    }
+    return os;
 }
