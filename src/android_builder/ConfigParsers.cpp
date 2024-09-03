@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <fstream>
 #include <memory>
+#include <optional>
+#include <stdexcept>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
@@ -17,7 +19,7 @@ struct NodeItemType {
    private:
     std::string name;
     bool required = true;
-    T value_;
+    std::optional<T> value_;
     bool hasDefaultValue = false;
 
    public:
@@ -27,10 +29,6 @@ struct NodeItemType {
         return *this;
     }
     NodeItemType& setDefaultValue(const T& defaultValue) {
-        static_assert(std::is_same_v<T, std::decay_t<T>>,
-                      "Default value type must match node type");
-        static_assert(!std::is_const_v<T>,
-                      "Default value cannot be a const type");
         value_ = defaultValue;
         hasDefaultValue = true;
         return *this;
@@ -42,9 +40,14 @@ struct NodeItemType {
         value_ = value;
         return *this;
     }
-    operator T() const { return value_; }
+    operator T() const { 
+        if (!hasValue()) {
+            throw std::invalid_argument("Value must have value to get");
+        }
+        return value_.value();
+    }
     [[nodiscard]] bool hasValue() const {
-        return hasDefaultValue || value_ != T{};
+        return hasDefaultValue || value_ != std::nullopt;
     }
 
     template <typename... Args>
