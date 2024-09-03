@@ -327,7 +327,7 @@ struct TgBotApi {
         const Message::Ptr& replyToMessage, const std::string& message,
         const GenericReply::Ptr& replyMarkup = nullptr) const {
         MessageThreadId tid = replyToMessage->messageThreadId;
-        if (replyToMessage->chat->type != Chat::Type::Supergroup) {
+        if (!replyToMessage->chat->isForum) {
             tid = 0;
         }
         return sendReplyMessage<mode>(
@@ -583,7 +583,7 @@ struct TgBotApi {
         auto ptr = std::make_shared<ReplyParametersExt>();
         ptr->messageId = message->messageId;
         ptr->chatId = message->chat->id;
-        if (message->chat->type != Chat::Type::Supergroup) {
+        if (!message->chat->isForum) {
             ptr->messageThreadId = 0;
         } else {
             ptr->messageThreadId = message->messageThreadId;
