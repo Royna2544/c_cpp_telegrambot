@@ -359,6 +359,7 @@ struct TgBotApi {
         params->messageId = messageId;
         params->chatId = chatId;
         params->messageThreadId = messageTid;
+        params->allowSendingWithoutReply = true;
         return sendMessage_impl(chatId, message, params, replyMarkup,
                                 parseModeToStr<mode>());
     }
@@ -598,6 +599,7 @@ struct TgBotApi {
         auto ptr = std::make_shared<ReplyParametersExt>();
         ptr->messageId = message->messageId;
         ptr->chatId = message->chat->id;
+        ptr->allowSendingWithoutReply = true;
         if (!message->chat->isForum) {
             ptr->messageThreadId = 0;
         } else {
