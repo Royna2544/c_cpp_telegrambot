@@ -76,58 +76,64 @@ bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
     pthread_mutex_init(&wdt_mutex, &mutexattr);
     pthread_mutexattr_destroy(&mutexattr);
 
-    if (data->watchdog_enabled) {
-        pdata = mmap(NULL, sizeof(struct popen_wdt_posix_priv),
-                     PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-        if (pdata == MAP_FAILED) {
-            pthread_mutex_destroy(&wdt_mutex);
-            return false;
-        }
-
-        pthread_create(&watchdog_thread, NULL, &watchdog, data);
-        pdata->wdt_thread = watchdog_thread;
-        data->privdata = pdata;
-    } else {
-        pdata = malloc(sizeof(struct popen_wdt_posix_priv));
-        if (pdata == NULL) {
-            pthread_mutex_destroy(&wdt_mutex);
-            return false;
-        }
-        memset(pdata, 0, sizeof(struct popen_wdt_posix_priv));
-        data->privdata = pdata;
-    }
-
-    if (pipe(pipefd) == -1) {
+    pdata = calloc(1, sizeof(struct popen_wdt_posix_priv));
+    if (pdata == NULL) {
         pthread_mutex_destroy(&wdt_mutex);
         return false;
     }
 
-    pid = fork();
+    if (data->watchdog_enabled) {
+        pthread_create(&watchdog_thread, NULL, &watchdog, data);
+        pdata->wdt_thread = watchdog_thread;
+    }
+    data->privdata = pdata;
+
+    if (pipe(pipefd) == -1) {
+        free(pdata);
+        free(data);
+        *data_in = NULL;
+        pthread_mutex_destroy(&wdt_mutex);
+        return false;
+    }
+
+    pid = vfork();
     if (pid == -1) {
         close(pipefd[0]);
         close(pipefd[1]);
+        free(pdata);
+        free(data);
+        *data_in = NULL;
         pthread_mutex_destroy(&wdt_mutex);
         return NULL;
     }
 
     if (pid == 0) {
+        // Force "C" locale to avoid locale-dependent behavior
         setenv("LC_ALL", "C", true);
-        // Child process
-        if (data->watchdog_enabled) {
-            pdata->wdt_pid = getpid();
-        }
-        pdata->running = true;
+        // Set process group ID it its pid.
         setpgrp();
+        // Close unused file descriptors
         close(pipefd[0]);
         close(STDIN_FILENO);
+        // Redirect stdout and stderr to pipe
         dup2(pipefd[1], STDOUT_FILENO);
         dup2(pipefd[1], STDERR_FILENO);
+        // Call execl to run the command
         execl(BASH_EXE_PATH, "bash", "-c", data->command, (char *)NULL);
         _exit(127);  // If execl fails, exit
     } else {
         // Parent process
-        pdata->pipefd_r = pipefd[0];
+        // Close unused file descriptor
         close(pipefd[1]);
+        // Assign privdata members.
+        pdata->pipefd_r = pipefd[0];
+        pdata->wdt_pid = pid;
+        pdata->running = true;
+        if (data->watchdog_enabled) {
+            POPEN_WDT_DBGLOG("Watchdog is enabled");
+        } else {
+            POPEN_WDT_DBGLOG("Watchdog disabled");
+        }
         POPEN_WDT_DBGLOG("Parent pid is %d", getpid());
         POPEN_WDT_DBGLOG("Child pid is %d", pid);
     }
@@ -171,11 +177,7 @@ void popen_watchdog_destroy(popen_watchdog_data_t **data_in) {
     data = *data_in;
     pdata = data->privdata;
     close(pdata->pipefd_r);
-    if (data->watchdog_enabled) {
-        munmap(pdata, sizeof(struct popen_wdt_posix_priv));
-    } else {
-        free(pdata);
-    }
+    free(pdata);
     free(data);
     data = NULL;
     pthread_mutex_unlock(&wdt_mutex);
