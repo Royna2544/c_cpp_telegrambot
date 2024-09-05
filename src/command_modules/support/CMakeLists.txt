@@ -8,15 +8,6 @@ add_my_library(
     STATIC
 )
 
-add_my_library(
-    NAME _portable_semaphore
-    SRCS
-        portable_sem/portable_sem.c
-    PUBLIC_INC
-        portable_sem
-    STATIC
-)
-
 if (UNIX)
 add_my_library(
     NAME _restartfmt_parser

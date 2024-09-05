@@ -1,6 +1,5 @@
 #include <internal/_FileDescriptor_posix.h>
 #include <popen_wdt.h>
-#include <portable_sem.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -70,7 +69,6 @@ struct InteractiveBashContext {
                         offset += len;
                         if (offset + BASH_READ_BUF > BASH_MAX_BUF) {
                             LOG(INFO) << "Buffer overflow";
-                            kRun = false;
                         }
                     }
                 },
@@ -117,19 +115,6 @@ struct InteractiveBashContext {
         return std::regex_match(str, kExitCommandRegex);
     }
 
-    struct IBashPriv {
-        rk_sema sem{};
-        pid_t child_pid{};
-        IBashPriv() {
-            // Initialize semaphore for inter-process
-            // use, initial value 0
-            rk_sema_init(&sem, 0);
-        }
-        ~IBashPriv() { rk_sema_destroy(&sem); }
-    };
-
-    static void unMap(IBashPriv* addr) { munmap(addr, sizeof(IBashPriv)); }
-
     bool open(const ChatId chat) {
         std::vector<std::function<void(void)>> cleanupStack;
         const auto cleanupFunc = [&cleanupStack]() {
@@ -140,17 +125,6 @@ struct InteractiveBashContext {
         if (is_open) {
             return false;
         }
-
-        void* addr = mmap(nullptr, sizeof(IBashPriv), PROT_READ | PROT_WRITE,
-                          MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-        if (addr == MAP_FAILED) {
-            PLOG(ERROR) << "mmap";
-            return false;
-        }
-        new (addr) IBashPriv();
-        std::unique_ptr<IBashPriv, decltype(&unMap)> privdata(
-            static_cast<IBashPriv*>(addr), &unMap);
-
         pid_t pid = 0;
         int ret = 0;
 
@@ -169,7 +143,7 @@ struct InteractiveBashContext {
                 cleanupStack.emplace_back([pipes]() { pipes->close(); });
             }
         }
-        pid = fork();
+        pid = vfork();
         if (pid < 0) {
             PLOG(ERROR) << "fork";
             cleanupFunc();
@@ -182,19 +156,14 @@ struct InteractiveBashContext {
             dup2(parentToChild.readEnd(), STDIN_FILENO);
             close(childToParent.readEnd());
             close(parentToChild.writeEnd());
-            privdata->child_pid = getpid();
             setpgid(0, 0);
-            rk_sema_post(&privdata->sem);
             execl(BASH_EXE_PATH, "bash", nullptr);
             _exit(127);
         } else {
             close(childToParent.writeEnd());
             close(parentToChild.readEnd());
-            // Ensure bash execl() is up
-            // to be able to read from it
-            rk_sema_wait(&privdata->sem);
-            childpid = privdata->child_pid;
             is_open = true;
+            childpid = pid;
             LOG(INFO) << "Open success, child pid: " << childpid;
         }
         auto msg = wrapper->sendMessage(chat, "IBash starts...");

@@ -132,7 +132,7 @@ command_module(
 command_module(
     NAME ibash
     SRCS ibash.cpp
-    LIBS TgBot_portable_semaphore TgBot_popen_wdt TgBotSocketSelectors
+    LIBS TgBot_popen_wdt TgBotSocketSelectors
     PLATFORM "Unix"
 )
 
