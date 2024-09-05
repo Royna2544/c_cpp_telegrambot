@@ -717,7 +717,7 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
         const auto ret = getApi().copyMessage(
             fromChatId, fromChatId, messageId, "", "", {}, false,
             replyParameters, std::make_shared<GenericReply>(), false,
-            replyParameters->messageThreadId);
+            ReplyParamsToMsgTid{replyParameters});
         if (ret) {
             return ret->messageId;
         }
