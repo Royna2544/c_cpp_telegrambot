@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <concepts>
 #include <filesystem>
+#include <functional>
 #include <imagep/ImageProcAll.hpp>
 #include <libos/libfs.hpp>
 #include <memory>
@@ -26,8 +27,8 @@ struct StickerData {
         DLOG(INFO) << operation << ": " << filePath << " [" << index << "/"
                    << maxIndex << "]";
     }
-    static bool compare(const StickerData& a, const StickerData& b) {
-        return a.fileUniqueId == b.fileUniqueId;
+    auto operator<=>(const StickerData& other) const {
+        return other.fileUniqueId <=> fileUniqueId;
     }
 };
 
@@ -97,9 +98,9 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
         });
 
     // Remove duplicates by unique file IDs
-    std::sort(stickerData.begin(), stickerData.end(), StickerData::compare);
+    std::sort(stickerData.begin(), stickerData.end());
     stickerData.erase(
-        std::ranges::unique(stickerData, StickerData::compare).begin(),
+        std::ranges::unique(stickerData, std::greater<>()).begin(),
         stickerData.end());
 
     // Download all stickers from the set
