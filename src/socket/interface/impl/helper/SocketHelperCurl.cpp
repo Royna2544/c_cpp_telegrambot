@@ -34,7 +34,12 @@ std::string SocketInterfaceBase::INetHelper::getExternalIP() {
 
     // Clean up
     curl_easy_cleanup(curl);
-
+    
+    if (future.wait_for(std::chrono::seconds(5)) ==
+        std::future_status::timeout) {
+        LOG(ERROR) << "Timeout while waiting for external IP";
+        return "[timeout]";
+    }
     return future.get();
 }
 
