@@ -30,7 +30,7 @@ struct String {
     explicit constexpr String(const char (&strings)[Len]) {
         static_assert(Len > 2, "Use the char constructor instead");
         static_assert(Len < N, "Cannot convert string to smaller buffer");
-        c[Len] = '\0';
+        c[Len - 1] = '\0';
         char* dst = c;
 
         for (const char* src : {strings}) {
