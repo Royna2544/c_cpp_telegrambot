@@ -1,3 +1,5 @@
+#pragma once
+
 #include <absl/debugging/stacktrace.h>
 #include <absl/debugging/symbolize.h>
 
