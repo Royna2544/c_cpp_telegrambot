@@ -4,8 +4,10 @@
 #include <array>
 #include <libos/OnTerminateRegistrar.hpp>
 #include <libos/libsighandler.hpp>
+#include <memory>
 
 #include "InstanceClassBase.hpp"
+#include "tgbot/types/LinkPreviewOptions.h"
 
 void TgBotWrapper::commandHandler(const command_callback_t& module_callback,
                                   unsigned int authflags, MessagePtr message) {
@@ -185,9 +187,10 @@ Message::Ptr TgBotWrapper::sendMessage_impl(
     ReplyParametersExt::Ptr replyParameters, GenericReply::Ptr replyMarkup,
     const std::string& parseMode) const {
     try {
-        return getApi().sendMessage(
-            chatId, text, nullptr, replyParameters, replyMarkup, parseMode,
-            kDisableNotifications, {}, ReplyParamsToMsgTid{replyParameters});
+        return getApi().sendMessage(chatId, text, globalLinkOptions,
+                                    replyParameters, replyMarkup, parseMode,
+                                    kDisableNotifications, {},
+                                    ReplyParamsToMsgTid{replyParameters});
 
     } catch (const TgBot::TgException& ex) {
         handleTgBotApiEx(ex, replyParameters);
@@ -228,8 +231,8 @@ Message::Ptr TgBotWrapper::editMessage_impl(
     const TgBot::InlineKeyboardMarkup::Ptr& markup) const {
     DEBUG_ASSERT_NONNULL_PARAM(message);
     return getApi().editMessageText(newText, message->chat->id,
-                                    message->messageId, "", "", nullptr,
-                                    markup);
+                                    message->messageId, "", "",
+                                    globalLinkOptions, markup);
 }
 
 Message::Ptr TgBotWrapper::editMessageMarkup_impl(
@@ -276,7 +279,7 @@ void TgBotWrapper::deleteMessages_impl(
 void TgBotWrapper::restrictChatMember_impl(
     ChatId chatId, UserId userId, TgBot::ChatPermissions::Ptr permissions,
     std::uint32_t untilDate) const {
-        DEBUG_ASSERT_NONNULL_PARAM(permissions);
+    DEBUG_ASSERT_NONNULL_PARAM(permissions);
     getApi().restrictChatMember(chatId, userId, permissions, untilDate);
 }
 
@@ -284,7 +287,6 @@ Message::Ptr TgBotWrapper::sendDocument_impl(
     ChatId chatId, FileOrString document, const std::string& caption,
     ReplyParametersExt::Ptr replyParameters, GenericReply::Ptr replyMarkup,
     const std::string& parseMode) const {
-
     return getApi().sendDocument(chatId, std::move(document), "", caption,
                                  replyParameters, replyMarkup, parseMode,
                                  kDisableNotifications, {}, false,
@@ -335,7 +337,7 @@ bool TgBotWrapper::createNewStickerSet_impl(
 File::Ptr TgBotWrapper::uploadStickerFile_impl(
     std::int64_t userId, InputFile::Ptr sticker,
     const std::string& stickerFormat) const {
-        DEBUG_ASSERT_NONNULL_PARAM(sticker);
+    DEBUG_ASSERT_NONNULL_PARAM(sticker);
     return getApi().uploadStickerFile(userId, sticker, stickerFormat);
 }
 
@@ -366,7 +368,8 @@ User::Ptr TgBotWrapper::getBotUser_impl() const {
 
 bool TgBotWrapper::pinMessage_impl(MessagePtr message) const {
     DEBUG_ASSERT_NONNULL_PARAM(message);
-    return getApi().pinChatMessage(message->chat->id, message->messageId, kDisableNotifications);
+    return getApi().pinChatMessage(message->chat->id, message->messageId,
+                                   kDisableNotifications);
 }
 
 bool TgBotWrapper::unpinMessage_impl(MessagePtr message) const {
@@ -376,14 +379,14 @@ bool TgBotWrapper::unpinMessage_impl(MessagePtr message) const {
 
 bool TgBotWrapper::banChatMember_impl(const Chat::Ptr& chat,
                                       const User::Ptr& user) const {
-                                        DEBUG_ASSERT_NONNULL_PARAM(chat);
+    DEBUG_ASSERT_NONNULL_PARAM(chat);
     DEBUG_ASSERT_NONNULL_PARAM(user);
     return getApi().banChatMember(chat->id, user->id);
 }
 
 bool TgBotWrapper::unbanChatMember_impl(const Chat::Ptr& chat,
                                         const User::Ptr& user) const {
-                                            DEBUG_ASSERT_NONNULL_PARAM(chat);
+    DEBUG_ASSERT_NONNULL_PARAM(chat);
     DEBUG_ASSERT_NONNULL_PARAM(user);
     return getApi().unbanChatMember(chat->id, user->id);
 }
@@ -395,6 +398,11 @@ User::Ptr TgBotWrapper::getChatMember_impl(ChatId chat, UserId user) const {
         return {};
     }
     return member->user;
+}
+
+TgBotWrapper::TgBotWrapper(const std::string& token) : _bot(token) {
+    globalLinkOptions = std::make_shared<TgBot::LinkPreviewOptions>();
+    globalLinkOptions->isDisabled = true;
 }
 
 DECLARE_CLASS_INST(TgBotWrapper);
