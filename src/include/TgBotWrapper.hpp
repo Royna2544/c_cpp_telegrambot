@@ -172,25 +172,18 @@ struct ChatIds {
     ChatId _id;
 };
 
-struct ReplyParamsToMsgTid {
-    explicit ReplyParamsToMsgTid(
-        const ReplyParametersExt::Ptr& replyParameters) {
-        if (replyParameters) {
-            tid = replyParameters->messageThreadId;
-        } else {
-            tid = ReplyParametersExt::kThreadIdNone;
-        }
-    }
-    operator MessageId() const { return tid; }
-
-    MessageThreadId tid;
-};
-
 // Base interface for operations involving TgBot...
 struct TgBotApi {
    public:
     TgBotApi() = default;
     virtual ~TgBotApi() = default;
+
+    // Disable copy and move constructors
+    TgBotApi(const TgBotApi&) = delete;
+    TgBotApi(TgBotApi&&) = delete;
+    TgBotApi& operator=(const TgBotApi&) = delete;
+    TgBotApi& operator=(TgBotApi&&) = delete;
+
     using FileOrString = boost::variant<InputFile::Ptr, std::string>;
     using FileOrMedia = boost::variant<InputFile::Ptr, MediaIds>;
     using StringOrMessage = std::variant<std::string, Message::Ptr>;
@@ -198,103 +191,377 @@ struct TgBotApi {
    protected:
     // Methods to be implemented
 
-    // Send a message to the chat
+    /**
+     * @brief Sends a text message to the specified chat.
+     *
+     * This function sends a text message to the chat with the given `chatId`.
+     * The message content is specified by the `text` parameter.
+     *
+     * @param chatId The ID of the chat to which the message will be sent.
+     * @param text The content of the message to be sent.
+     * @param replyMarkup (Optional) A pointer to an InlineKeyboardMarkup object
+     * that represents the inline keyboard to be added to the message.
+     * @param parseMode (Optional) The parse mode for the text. Default is
+     * Markdown.
+     *
+     * @return A shared pointer to the sent message.
+     */
     virtual Message::Ptr sendMessage_impl(
         ChatId chatId, const std::string& text,
         ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
-        const std::string& parseMode = "") const = 0;
+        const std::string& parseMode = "Markdown") const = 0;
 
-    // Send a GIF to the chat
+    /**
+     * @brief Sends a GIF to the specified chat.
+     *
+     * This function sends a GIF to the chat with the given `chatId`.
+     * The GIF content is specified by the `animation` parameter.
+     *
+     * @param chatId The ID of the chat to which the GIF will be sent.
+     * @param animation The content of the GIF to be sent.
+     * @param caption (Optional) The caption for the GIF.
+     * @param replyParameters (Optional) A pointer to a ReplyParametersExt
+     * object that represents the reply parameters for the message.
+     * @param replyMarkup (Optional) A pointer to an InlineKeyboardMarkup object
+     * that represents the inline keyboard to be added to the message.
+     * @param parseMode (Optional) The parse mode for the caption. Default is
+     * Markdown.
+     *
+     * @return A shared pointer to the sent GIF message.
+     */
     virtual Message::Ptr sendAnimation_impl(
-        ChatId chatId, FileOrString animation, const std::string& caption,
+        ChatId chatId, FileOrString animation, const std::string& caption = "",
         ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
         const std::string& parseMode = "") const = 0;
 
-    // Send a sticker to the chat
+    /**
+     * @brief Sends a sticker to the specified chat.
+     *
+     * This function sends a sticker to the chat with the given `chatId`.
+     * The sticker content is specified by the `sticker` parameter.
+     *
+     * @param chatId The ID of the chat to which the sticker will be sent.
+     * @param sticker The content of the sticker to be sent.
+     * @param replyParameters (Optional) A pointer to a ReplyParametersExt
+     * object that represents the reply parameters for the message.
+     *
+     * @return A shared pointer to the sent sticker message.
+     */
     virtual Message::Ptr sendSticker_impl(
         ChatId chatId, FileOrString sticker,
         ReplyParametersExt::Ptr replyParameters = nullptr) const = 0;
 
-    // Create a new sticker set
+    /**
+     * @brief Creates a new sticker set.
+     *
+     * This function creates a new sticker set with the given parameters.
+     *
+     * @param userId The ID of the user who will own the sticker set.
+     * @param name The name of the sticker set.
+     * @param title The title of the sticker set.
+     * @param stickers The vector of InputSticker objects representing the
+     * stickers in the set.
+     * @param stickerType The type of the stickers in the set.
+     *
+     * @return A boolean value indicating whether the sticker set was created
+     * successfully.
+     */
     virtual bool createNewStickerSet_impl(
         std::int64_t userId, const std::string& name, const std::string& title,
         const std::vector<InputSticker::Ptr>& stickers,
         Sticker::Type stickerType) const = 0;
 
+    /**
+     * @brief Uploads a sticker file.
+     *
+     * This function uploads a sticker file with the given parameters.
+     *
+     * @param userId The ID of the user who will own the sticker file.
+     * @param sticker The sticker file to be uploaded.
+     * @param stickerFormat The format of the sticker file.
+     *
+     * @return A shared pointer to the uploaded sticker file.
+     */
     virtual File::Ptr uploadStickerFile_impl(
         std::int64_t userId, InputFile::Ptr sticker,
         const std::string& stickerFormat) const = 0;
 
-    // Edit a sent message
+    /**
+     * @brief Edits a sent message.
+     *
+     * This function edits a sent message with the given parameters.
+     *
+     * @param message The pointer to the message to be edited.
+     * @param newText The new text for the message.
+     * @param markup The new inline keyboard markup for the message.
+     *
+     * @return A shared pointer to the edited message.
+     */
     virtual Message::Ptr editMessage_impl(
         const Message::Ptr& message, const std::string& newText,
         const TgBot::InlineKeyboardMarkup::Ptr& markup) const = 0;
 
-    // Prefer editMessage_impl for editing text and keyboard
+    /**
+     * @brief Edits a sent message with new markup.
+     *
+     * This function edits a sent message with the given parameters.
+     *
+     * @param message The pointer to the message to be edited.
+     * @param markup The new inline keyboard markup for the message.
+     *
+     * @return A shared pointer to the edited message.
+     */
     virtual Message::Ptr editMessageMarkup_impl(
         const StringOrMessage& message,
         const GenericReply::Ptr& markup) const = 0;
 
+    /**
+     * @brief Copies a message from one chat to another.
+     *
+     * This function copies a message from the chat with the given `fromChatId`
+     * to the chat with the given `toChatId`.
+     *
+     * @param fromChatId The ID of the chat from which the message will be
+     * copied.
+     * @param messageId The ID of the message to be copied.
+     * @param replyParameters (Optional) A pointer to a ReplyParametersExt
+     * object that represents the reply parameters for the copied message.
+     *
+     * @return The ID of the copied message.
+     */
     virtual MessageId copyMessage_impl(
         ChatId fromChatId, MessageId messageId,
         ReplyParametersExt::Ptr replyParameters = nullptr) const = 0;
 
+    /**
+     * @brief Answers a callback query.
+     *
+     * This function answers a callback query with the given parameters.
+     *
+     * @param callbackQueryId The ID of the callback query to be answered.
+     * @param text (Optional) The text to be sent in the callback query answer.
+     * @param showAlert (Optional) A boolean indicating whether to show an
+     * alert.
+     *
+     * @return A boolean value indicating whether the callback query was
+     * answered successfully.
+     */
     virtual bool answerCallbackQuery_impl(const std::string& callbackQueryId,
                                           const std::string& text = "",
                                           bool showAlert = false) const = 0;
 
-    // Delete a sent message
+    /**
+     * @brief Deletes a sent message.
+     *
+     * This function deletes a sent message with the given parameters.
+     *
+     * @param message The pointer to the message to be deleted.
+     */
     virtual void deleteMessage_impl(const Message::Ptr& message) const = 0;
 
-    // Delete a range of messages
+    /**
+     * @brief Deletes a range of sent messages.
+     *
+     * This function deletes a range of sent messages with the given parameters.
+     *
+     * @param chatId The ID of the chat from which the messages will be deleted.
+     * @param messageIds The vector of IDs of the messages to be deleted.
+     */
     virtual void deleteMessages_impl(
         ChatId chatId, const std::vector<MessageId>& messageIds) const = 0;
 
-    // Mute a chat member
+    /**
+     * @brief Mutes a chat member.
+     *
+     * This function mutes a chat member with the given parameters.
+     *
+     * @param chatId The ID of the chat.
+     * @param userId The ID of the user to be muted.
+     * @param permissions The new permissions for the muted user.
+     * @param untilDate (Optional) The timestamp until the user will be muted.
+     */
     virtual void restrictChatMember_impl(
         ChatId chatId, UserId userId, TgBot::ChatPermissions::Ptr permissions,
-        std::uint32_t untilDate) const = 0;
+        std::uint32_t untilDate = 0) const = 0;
 
-    // Send a file to the chat
+    /**
+     * @brief Sends a file to the specified chat.
+     *
+     * This function sends a file to the chat with the given parameters.
+     *
+     * @param chatId The ID of the chat to which the file will be sent.
+     * @param document The content of the file to be sent.
+     * @param caption (Optional) The caption for the file.
+     * @param replyParameters (Optional) A pointer to a ReplyParametersExt
+     * object that represents the reply parameters for the message.
+     * @param replyMarkup (Optional) A pointer to an InlineKeyboardMarkup object
+     * that represents the inline keyboard to be added to the message.
+     * @param parseMode (Optional) The parse mode for the caption. Default is
+     * Markdown.
+     *
+     * @return A shared pointer to the sent file message.
+     */
     virtual Message::Ptr sendDocument_impl(
-        ChatId chatId, FileOrString document, const std::string& caption,
+        ChatId chatId, FileOrString document, const std::string& caption = "",
         ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
         const std::string& parseMode = "") const = 0;
 
-    // Send a photo to the chat
+    /**
+     * @brief Sends a photo to the specified chat.
+     *
+     * This function sends a photo to the chat with the given parameters.
+     *
+     * @param chatId The ID of the chat to which the photo will be sent.
+     * @param photo The content of the photo to be sent.
+     * @param caption (Optional) The caption for the photo.
+     * @param replyParameters (Optional) A pointer to a ReplyParametersExt
+     * object that represents the reply parameters for the message.
+     * @param replyMarkup (Optional) A pointer to an InlineKeyboardMarkup object
+     * that represents the inline keyboard to be added to the message.
+     * @param parseMode (Optional) The parse mode for the caption. Default is
+     * Markdown.
+     *
+     * @return A shared pointer to the sent photo message.
+     */
     virtual Message::Ptr sendPhoto_impl(
-        ChatId chatId, FileOrString photo, const std::string& caption,
+        ChatId chatId, FileOrString photo, const std::string& caption = "",
         ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
         const std::string& parseMode = "") const = 0;
 
-    // Send a video to the chat
+    /**
+     * @brief Sends a video to the specified chat.
+     *
+     * This function sends a video to the chat with the given parameters.
+     *
+     * @param chatId The ID of the chat to which the video will be sent.
+     * @param video The content of the video to be sent.
+     * @param caption (Optional) The caption for the video.
+     * @param replyParameters (Optional) A pointer to a ReplyParametersExt
+     * object that represents the reply parameters for the message.
+     * @param replyMarkup (Optional) A pointer to an InlineKeyboardMarkup object
+     * that represents the inline keyboard to be added to the message.
+     * @param parseMode (Optional) The parse mode for the caption. Default is
+     * Markdown.
+     *
+     * @return A shared pointer to the sent video message.
+     */
     virtual Message::Ptr sendVideo_impl(
-        ChatId chatId, FileOrString photo, const std::string& caption,
+        ChatId chatId, FileOrString video, const std::string& caption = "",
         ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
         const std::string& parseMode = "") const = 0;
 
-    virtual Message::Ptr sendDice_impl(const ChatId chatId) const = 0;
+    /**
+     * @brief Sends a dice to the specified chat.
+     *
+     * This function sends a dice to the chat with the given parameters.
+     *
+     * @param chatId The ID of the chat to which the dice will be sent.
+     *
+     * @return A shared pointer to the sent dice message.
+     */
+    virtual Message::Ptr sendDice_impl(ChatId chatId) const = 0;
 
+    /**
+     * @brief Gets a sticker set.
+     *
+     * This function gets a sticker set with the given parameters.
+     *
+     * @param setName The name of the sticker set to be retrieved.
+     *
+     * @return A shared pointer to the retrieved sticker set.
+     */
     virtual StickerSet::Ptr getStickerSet_impl(
         const std::string& setName) const = 0;
 
-    virtual bool downloadFile_impl(const std::filesystem::path& destfilename,
-                                   const std::string& fileid) const = 0;
+    /**
+     * @brief Downloads a file from the specified file ID.
+     *
+     * This function downloads a file from the specified file ID.
+     *
+     * @param destFilename The destination filename for the downloaded file.
+     * @param fileId The ID of the file to be downloaded.
+     *
+     * @return A boolean value indicating whether the file was downloaded
+     * successfully.
+     */
+    virtual bool downloadFile_impl(const std::filesystem::path& destFilename,
+                                   const std::string& fileId) const = 0;
 
+    /**
+     * @brief Gets the bot user.
+     *
+     * This function retrieves the bot user.
+     *
+     * @return A shared pointer to the bot user.
+     */
     virtual User::Ptr getBotUser_impl() const = 0;
 
+    /**
+     * @brief Pins a message in the specified chat.
+     *
+     * This function pins a message in the specified chat.
+     *
+     * @param message The pointer to the message to be pinned.
+     *
+     * @return A boolean value indicating whether the message was pinned
+     * successfully.
+     */
     virtual bool pinMessage_impl(MessagePtr message) const = 0;
+
+    /**
+     * @brief Unpins a message in the specified chat.
+     *
+     * This function unpins a message in the specified chat.
+     *
+     * @param message The pointer to the message to be unpinned.
+     *
+     * @return A boolean value indicating whether the message was unpinned
+     * successfully.
+     */
     virtual bool unpinMessage_impl(MessagePtr message) const = 0;
+
+    /**
+     * @brief Bans a chat member.
+     *
+     * This function bans a chat member with the given parameters.
+     *
+     * @param chat The pointer to the chat.
+     * @param user The pointer to the user to be banned.
+     *
+     * @return A boolean value indicating whether the chat member was banned
+     * successfully.
+     */
     virtual bool banChatMember_impl(const Chat::Ptr& chat,
                                     const User::Ptr& user) const = 0;
+
+    /**
+     * @brief Unbans a chat member.
+     *
+     * This function unbans a chat member with the given parameters.
+     *
+     * @param chat The pointer to the chat.
+     * @param user The pointer to the user to be unbanned.
+     *
+     * @return A boolean value indicating whether the chat member was unbanned
+     * successfully.
+     */
     virtual bool unbanChatMember_impl(const Chat::Ptr& chat,
                                       const User::Ptr& user) const = 0;
-    virtual User::Ptr getChatMember_impl(ChatId chat, UserId user) const = 0;
+
+    /**
+     * @brief Gets a chat member.
+     *
+     * This function gets a chat member with the given parameters.
+     * @param chat The chat id of the chat.
+     * @param userId The user id of the user.
+     */
+    virtual User::Ptr getChatMember_impl(const ChatId chat,
+                                         const UserId userId) const = 0;
 
     static FileOrString ToFileOrString(const FileOrMedia& media) {
         if (media.which() == 0) {
@@ -461,9 +728,9 @@ struct TgBotApi {
                                 std::move(replyParameters));
     }
 
-    inline bool answerCallbackQuery(const std::string& callbackQueryId,
-                                    const std::string& text = "",
-                                    bool showAlert = false) const {
+    [[nodiscard]] inline bool answerCallbackQuery(
+        const std::string& callbackQueryId, const std::string& text = "",
+        bool showAlert = false) const {
         return answerCallbackQuery_impl(callbackQueryId, text, showAlert);
     }
 
@@ -521,22 +788,25 @@ struct TgBotApi {
         return sendPhoto<mode>(replyToMessage->chat->id, photo, caption);
     }
 
-    inline bool downloadFile(const std::filesystem::path& path,
-                             const std::string& fileid) const {
+    [[nodiscard]] inline bool downloadFile(const std::filesystem::path& path,
+                                           const std::string& fileid) const {
         return downloadFile_impl(path, fileid);
     }
 
-    inline User::Ptr getBotUser() const { return getBotUser_impl(); }
+    [[nodiscard]] inline User::Ptr getBotUser() const {
+        return getBotUser_impl();
+    }
 
     inline Message::Ptr sendDice(const ChatId chat) const {
         return sendDice_impl(chat);
     }
 
-    inline StickerSet::Ptr getStickerSet(const std::string& setName) const {
+    [[nodiscard]] inline StickerSet::Ptr getStickerSet(
+        const std::string& setName) const {
         return getStickerSet_impl(setName);
     }
 
-    inline bool createNewStickerSet(
+    [[nodiscard]] inline bool createNewStickerSet(
         std::int64_t userId, const std::string& name, const std::string& title,
         const std::vector<InputSticker::Ptr>& stickers,
         Sticker::Type stickerType) const {
@@ -544,9 +814,9 @@ struct TgBotApi {
                                         stickerType);
     }
 
-    inline File::Ptr uploadStickerFile(std::int64_t userId,
-                                       InputFile::Ptr sticker,
-                                       const std::string& stickerFormat) const {
+    [[nodiscard]] inline File::Ptr uploadStickerFile(
+        std::int64_t userId, InputFile::Ptr sticker,
+        const std::string& stickerFormat) const {
         return uploadStickerFile_impl(userId, std::move(sticker),
                                       stickerFormat);
     }
@@ -624,212 +894,86 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
     Message::Ptr sendMessage_impl(ChatId chatId, const std::string& text,
                                   ReplyParametersExt::Ptr replyParameters,
                                   GenericReply::Ptr replyMarkup,
-                                  const std::string& parseMode) const override {
-        try {
-            return getApi().sendMessage(chatId, text, nullptr, replyParameters,
-                                        replyMarkup, parseMode, false, {},
-                                        ReplyParamsToMsgTid{replyParameters});
-
-        } catch (const TgBot::TgException& ex) {
-            // Allow it if it's FORUM_CLOSED
-            if (replyParameters && replyParameters->hasThreadId()) {
-                LOG(WARNING) << "Failed to send reply message: " << ex.what()
-                             << std::endl;
-                return nullptr;
-            }
-            // Goodbye, if it is not
-            throw;
-        }
-    }
+                                  const std::string& parseMode) const override;
 
     Message::Ptr sendAnimation_impl(
         ChatId chatId, boost::variant<InputFile::Ptr, std::string> animation,
         const std::string& caption,
         ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
-        const std::string& parseMode = "") const override {
-        try {
-            return getApi().sendAnimation(chatId, animation, 0, 0, 0, "",
-                                          caption, replyParameters, replyMarkup,
-                                          parseMode, false, {},
-                                          ReplyParamsToMsgTid{replyParameters});
-        } catch (const TgBot::TgException& ex) {
-            // Allow it if it's FORUM_CLOSED
-            if (replyParameters && replyParameters->hasThreadId()) {
-                LOG(WARNING)
-                    << "Failed to send reply message" << ex.what() << std::endl;
-                return nullptr;
-            }
-            // Goodbye, if it is not
-            throw;
-        }
-    }
+        const std::string& parseMode = "") const override;
 
     Message::Ptr sendSticker_impl(
         ChatId chatId, boost::variant<InputFile::Ptr, std::string> sticker,
-        ReplyParametersExt::Ptr replyParameters) const override {
-        try {
-            return getApi().sendSticker(chatId, sticker, replyParameters,
-                                        nullptr, false,
-                                        ReplyParamsToMsgTid{replyParameters});
-        } catch (const TgBot::TgException& ex) {
-            // Allow it if it's FORUM_CLOSED
-            if (replyParameters && replyParameters->hasThreadId()) {
-                LOG(WARNING)
-                    << "Failed to send reply message" << ex.what() << std::endl;
-                return nullptr;
-            }
-            // Goodbye, if it is not
-            throw;
-        }
-    }
+        ReplyParametersExt::Ptr replyParameters) const override;
 
     Message::Ptr editMessage_impl(
         const Message::Ptr& message, const std::string& newText,
-        const TgBot::InlineKeyboardMarkup::Ptr& markup) const override {
-        return getApi().editMessageText(newText, message->chat->id,
-                                        message->messageId, "", "", nullptr,
-                                        markup);
-    }
+        const TgBot::InlineKeyboardMarkup::Ptr& markup) const override;
 
     Message::Ptr editMessageMarkup_impl(
         const StringOrMessage& message,
-        const GenericReply::Ptr& markup) const override {
-        return std::visit(
-            [=, this](auto&& arg) {
-                using T = std::decay_t<decltype(arg)>;
-                if constexpr (std::is_same_v<T, Message::Ptr>) {
-                    return getApi().editMessageReplyMarkup(
-                        arg->chat->id, arg->messageId, "", markup);
-                } else if constexpr (std::is_same_v<T, std::string>) {
-                    return getApi().editMessageReplyMarkup(0, 0, arg, markup);
-                }
-                LOG(WARNING) << "No-op editMessageReplyMarkup";
-                return Message::Ptr();
-            },
-            message);
-    }
+        const GenericReply::Ptr& markup) const override;
 
     // Copy a message
     MessageId copyMessage_impl(
         ChatId fromChatId, MessageId messageId,
-        ReplyParametersExt::Ptr replyParameters = nullptr) const override {
-        const auto ret = getApi().copyMessage(
-            fromChatId, fromChatId, messageId, "", "", {}, false,
-            replyParameters, std::make_shared<GenericReply>(), false,
-            ReplyParamsToMsgTid{replyParameters});
-        if (ret) {
-            return ret->messageId;
-        }
-        return 0;
-    }
+        ReplyParametersExt::Ptr replyParameters = nullptr) const override;
 
     bool answerCallbackQuery_impl(const std::string& callbackQueryId,
                                   const std::string& text = "",
                                   bool showAlert = false) const override {
         return getApi().answerCallbackQuery(callbackQueryId, text, showAlert);
     }
-    // Delete a sent message
-    void deleteMessage_impl(const Message::Ptr& message) const override {
-        getApi().deleteMessage(message->chat->id, message->messageId);
-    }
+
+    void deleteMessage_impl(const Message::Ptr& message) const override;
 
     // Delete a range of messages
     void deleteMessages_impl(
-        ChatId chatId,
-        const std::vector<MessageId>& messageIds) const override {
-        getApi().deleteMessages(chatId, messageIds);
-    }
+        ChatId chatId, const std::vector<MessageId>& messageIds) const override;
 
     // Mute a chat member
     void restrictChatMember_impl(ChatId chatId, UserId userId,
                                  TgBot::ChatPermissions::Ptr permissions,
-                                 std::uint32_t untilDate) const override {
-        getApi().restrictChatMember(chatId, userId, permissions, untilDate);
-    }
+                                 std::uint32_t untilDate) const override;
 
     // Send a file to the chat
     Message::Ptr sendDocument_impl(
         ChatId chatId, FileOrString document, const std::string& caption,
         ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
-        const std::string& parseMode = "") const override {
-        return getApi().sendDocument(chatId, std::move(document), "", caption,
-                                     replyParameters, replyMarkup, parseMode,
-                                     false, {}, false,
-                                     ReplyParamsToMsgTid{replyParameters});
-    }
+        const std::string& parseMode = "") const override;
 
     // Send a photo to the chat
     Message::Ptr sendPhoto_impl(
         ChatId chatId, FileOrString photo, const std::string& caption,
         ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
-        const std::string& parseMode = "") const override {
-        return getApi().sendPhoto(chatId, photo, caption, replyParameters,
-                                  replyMarkup, parseMode, false, {},
-                                  ReplyParamsToMsgTid{replyParameters});
-    }
+        const std::string& parseMode = "") const override;
 
     // Send a video to the chat
     Message::Ptr sendVideo_impl(
         ChatId chatId, FileOrString video, const std::string& caption,
         ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
-        const std::string& parseMode = "") const override {
-        return getApi().sendVideo(chatId, video, false, 0, 0, 0, "", caption,
-                                  replyParameters, replyMarkup, parseMode,
-                                  false, {},
-                                  ReplyParamsToMsgTid{replyParameters});
-    }
+        const std::string& parseMode = "") const override;
 
-    Message::Ptr sendDice_impl(ChatId chatId) const override {
-        static const std::vector<std::string> dices = {"🎲", "🎯", "🏀",
-                                                       "⚽", "🎳", "🎰"};
-
-        return getApi().sendDice(
-            chatId, false, nullptr, nullptr,
-            dices[Random::getInstance()->generate(dices.size() - 1)]);
-    }
+    Message::Ptr sendDice_impl(ChatId chatId) const override;
 
     StickerSet::Ptr getStickerSet_impl(
-        const std::string& setName) const override {
-        return getApi().getStickerSet(setName);
-    }
+        const std::string& setName) const override;
 
     bool createNewStickerSet_impl(
         std::int64_t userId, const std::string& name, const std::string& title,
         const std::vector<InputSticker::Ptr>& stickers,
-        Sticker::Type stickerType) const override {
-        return getApi().createNewStickerSet(userId, name, title, stickers,
-                                            stickerType);
-    }
+        Sticker::Type stickerType) const override;
 
     File::Ptr uploadStickerFile_impl(
         std::int64_t userId, InputFile::Ptr sticker,
-        const std::string& stickerFormat) const override {
-        return getApi().uploadStickerFile(userId, sticker, stickerFormat);
-    }
+        const std::string& stickerFormat) const override;
 
     bool downloadFile_impl(const std::filesystem::path& destfilename,
-                           const std::string& fileid) const override {
-        const auto file = getApi().getFile(fileid);
-        if (!file) {
-            LOG(INFO) << "File " << fileid << " not found in Telegram servers.";
-            return false;
-        }
-        // Download the file
-        std::string buffer = getApi().downloadFile(file->filePath);
-        // Save the file to a file on disk
-        std::fstream ofs(destfilename, std::ios::binary | std::ios::out);
-        if (!ofs.is_open()) {
-            LOG(ERROR) << "Failed to open file for writing: " << destfilename;
-            return false;
-        }
-        ofs.write(buffer.data(), buffer.size());
-        ofs.close();
-        return true;
-    }
+                           const std::string& fileid) const override;
 
     /**
      * @brief Retrieves the bot's user object.
@@ -840,26 +984,15 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
      *
      * @return A shared pointer to the bot's user object.
      */
-    User::Ptr getBotUser_impl() const override { return getApi().getMe(); }
+    User::Ptr getBotUser_impl() const override;
 
-    bool pinMessage_impl(MessagePtr message) const override {
-        return getApi().pinChatMessage(message->chat->id, message->messageId);
-    }
-    bool unpinMessage_impl(MessagePtr message) const override {
-        return getApi().unpinChatMessage(message->chat->id, message->messageId);
-    }
-
+    bool pinMessage_impl(MessagePtr message) const override;
+    bool unpinMessage_impl(MessagePtr message) const override;
     bool banChatMember_impl(const Chat::Ptr& chat,
-                            const User::Ptr& user) const override {
-        return getApi().banChatMember(chat->id, user->id);
-    }
+                            const User::Ptr& user) const override;
     bool unbanChatMember_impl(const Chat::Ptr& chat,
-                              const User::Ptr& user) const override {
-        return getApi().unbanChatMember(chat->id, user->id);
-    }
-    User::Ptr getChatMember_impl(ChatId chat, UserId user) const override {
-        return getApi().getChatMember(chat, user)->user;
-    }
+                              const User::Ptr& user) const override;
+    User::Ptr getChatMember_impl(ChatId chat, UserId user) const override;
 
    public:
     // Add commands/Remove commands
