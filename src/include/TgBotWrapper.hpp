@@ -633,8 +633,8 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
         } catch (const TgBot::TgException& ex) {
             // Allow it if it's FORUM_CLOSED
             if (replyParameters && replyParameters->hasThreadId()) {
-                LOG(WARNING)
-                    << "Failed to send reply message: " << ex.what() << std::endl;
+                LOG(WARNING) << "Failed to send reply message: " << ex.what()
+                             << std::endl;
                 return nullptr;
             }
             // Goodbye, if it is not
@@ -757,7 +757,7 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
         return getApi().sendDocument(chatId, std::move(document), "", caption,
                                      replyParameters, replyMarkup, parseMode,
                                      false, {}, false,
-                                     replyParameters->messageThreadId);
+                                     ReplyParamsToMsgTid{replyParameters});
     }
 
     // Send a photo to the chat
@@ -768,7 +768,7 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
         const std::string& parseMode = "") const override {
         return getApi().sendPhoto(chatId, photo, caption, replyParameters,
                                   replyMarkup, parseMode, false, {},
-                                  replyParameters->messageThreadId);
+                                  ReplyParamsToMsgTid{replyParameters});
     }
 
     // Send a video to the chat
@@ -779,7 +779,8 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
         const std::string& parseMode = "") const override {
         return getApi().sendVideo(chatId, video, false, 0, 0, 0, "", caption,
                                   replyParameters, replyMarkup, parseMode,
-                                  false, {}, replyParameters->messageThreadId);
+                                  false, {},
+                                  ReplyParamsToMsgTid{replyParameters});
     }
 
     Message::Ptr sendDice_impl(ChatId chatId) const override {
