@@ -56,8 +56,8 @@ struct TgBotPPImpl_API SpamBlockBase : ManagedThreadRunnable {
     CtrlSpamBlock spamBlockConfig = CtrlSpamBlock::CTRL_ON;
 #endif
    protected:
-    bool isEntryOverThreshold(PerChatHandleConstRef t, const size_t threshold);
-    void _logSpamDetectCommon(PerChatHandleConstRef t, const char *name);
+    static bool isEntryOverThreshold(PerChatHandleConstRef t, const size_t threshold);
+    static void _logSpamDetectCommon(PerChatHandleConstRef t, const char *name);
 
    private:
     void spamDetectFunc(OneChatIterator handle);

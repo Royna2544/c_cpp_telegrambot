@@ -23,8 +23,8 @@ typename Container::iterator _findItImpl(
     Container &c,
     std::function<typename Type::Ptr(typename Container::const_reference)> fn,
     typename Type::Ptr t) {
-    return std::find_if(c.begin(), c.end(),
-                        [=](const auto &it) { return fn(it)->id == t->id; });
+    return std::ranges::find_if(
+        c, [=](const auto &it) { return fn(it)->id == t->id; });
 }
 
 template <class Container>
@@ -44,12 +44,13 @@ typename Container::iterator findUserIt(
 }
 
 std::string SpamBlockBase::commonMsgdataFn(const Message::Ptr &m) {
-    if (m->sticker)
+    if (m->sticker) {
         return m->sticker->fileUniqueId;
-    else if (m->animation)
+    } else if (m->animation) {
         return m->animation->fileUniqueId;
-    else
+    } else {
         return m->text;
+    }
 }
 
 bool SpamBlockBase::isEntryOverThreshold(PerChatHandle::const_reference t,
