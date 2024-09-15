@@ -2,9 +2,11 @@
 #include <TgBotWrapper.hpp>
 #include <algorithm>
 #include <array>
+#include <future>
 #include <libos/OnTerminateRegistrar.hpp>
 #include <libos/libsighandler.hpp>
 #include <memory>
+#include <queue>
 
 #include "InstanceClassBase.hpp"
 #include "tgbot/types/LinkPreviewOptions.h"
@@ -31,12 +33,20 @@ void TgBotWrapper::commandHandler(const command_callback_t& module_callback,
 
 void TgBotWrapper::addCommand(const CommandModule& module, bool isReload) {
     unsigned int authflags = AuthContext::Flags::REQUIRE_USER;
+
     if (!module.isEnforced()) {
         authflags |= AuthContext::Flags::PERMISSIVE;
     }
+
     getEvents().onCommand(
         module.command, [this, authflags, module](const Message::Ptr& message) {
-            commandHandler(module.fn, authflags, message);
+            // If we have too many async tasks, pop the oldest one and wait.
+            if (asyncTasks.size() > MAX_ASYNC_TASKS) {
+                asyncTasks.front().get();
+                asyncTasks.pop();
+            }
+            asyncTasks.emplace(std::async(std::launch::async, &TgBotWrapper::commandHandler,
+                           this, module.fn, authflags, message));
         });
     if (!isReload) {
         _modules.emplace_back(module);
@@ -158,8 +168,8 @@ struct ReplyParamsToMsgTid {
 };
 
 namespace {
-void handleTgBotApiEx(TgBot::TgException ex,
-                      ReplyParametersExt::Ptr replyParameters) {
+void handleTgBotApiEx(const TgBot::TgException& ex,
+                      const ReplyParametersExt::Ptr& replyParameters) {
     // Allow it if it's FORUM_CLOSED
     if (replyParameters && replyParameters->hasThreadId() &&
         ex.errorCode == TgBot::TgException::ErrorCode::BadRequest &&

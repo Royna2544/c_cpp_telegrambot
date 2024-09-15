@@ -10,6 +10,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <queue>
 #include <utility>
 #include <variant>
 
@@ -19,6 +20,7 @@
 #include "Types.h"
 #include "tgbot/TgException.h"
 #include "tgbot/types/Chat.h"
+#include "tgbot/types/LinkPreviewOptions.h"
 
 using TgBot::Api;
 using TgBot::Bot;
@@ -888,7 +890,7 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
       public std::enable_shared_from_this<TgBotWrapper> {
    public:
     // Constructor requires a bot token to create a Bot instance.
-    explicit TgBotWrapper(const std::string& token) : _bot(token){};
+    explicit TgBotWrapper(const std::string& token);
 
    private:
     Message::Ptr sendMessage_impl(ChatId chatId, const std::string& text,
@@ -994,6 +996,9 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
                               const User::Ptr& user) const override;
     User::Ptr getChatMember_impl(ChatId chat, UserId user) const override;
 
+    // A global link preview options
+    TgBot::LinkPreviewOptions::Ptr globalLinkOptions;
+
    public:
     // Add commands/Remove commands
     void addCommand(const CommandModule& module, bool isReload = false);
@@ -1086,6 +1091,11 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
    private:
     [[nodiscard]] EventBroadcaster& getEvents() { return _bot.getEvents(); }
     [[nodiscard]] const Api& getApi() const { return _bot.getApi(); }
+
+    // A queue of command handlers that may block.
+    std::queue<std::future<void>> asyncTasks;
+    // Maximum number of concurrent async tasks.
+    static constexpr int MAX_ASYNC_TASKS = 5;
 
     std::vector<CommandModule> _modules;
     Bot _bot;
