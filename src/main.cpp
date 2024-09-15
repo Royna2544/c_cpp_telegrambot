@@ -19,6 +19,7 @@
 #include <boost/algorithm/string/split.hpp>
 #include <boost/system/system_error.hpp>
 #include <chrono>
+#include <cstddef>
 #include <database/bot/TgBotDatabaseImpl.hpp>
 #include <libos/libsighandler.hpp>
 #include <memory>
@@ -111,7 +112,8 @@ void TgBotApiExHandler(const TgBot::TgException& e) {
     static std::optional<DurationPoint> exceptionDuration;
     auto wrapper = TgBotWrapper::getInstance();
 
-    LOG(ERROR) << "TgBotAPI Exception: " << e.what();
+    LOG(ERROR) << "TgBotAPI Exception: " << e.what()
+               << " (code: " << static_cast<size_t>(e.errorCode) << ")";
     LOG(WARNING) << "Trying to recover";
     const auto ownerid = TgBotDatabaseImpl::getInstance()->getOwnerUserId();
     if (ownerid) {
@@ -257,7 +259,8 @@ int main(int argc, char** argv) {
     collector.initWrapper();
 
 #ifndef WINDOWS_BUILD
-    LOG_IF(WARNING, !RestartFmt::handleMessage(wrapperInst).ok()) << "Failed to handle restart message";
+    LOG_IF(WARNING, !RestartFmt::handleMessage(wrapperInst).ok())
+        << "Failed to handle restart message";
 #endif
 
     try {
