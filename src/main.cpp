@@ -27,6 +27,7 @@
 #include <utility>
 
 #include "Random.hpp"
+#include "tgbot/TgException.h"
 
 #ifndef WINDOWS_BUILD
 #include <restartfmt_parser.hpp>
@@ -108,13 +109,43 @@ void createAndDoInitCall(Args... args) {
 }
 
 namespace {
+
 void TgBotApiExHandler(const TgBot::TgException& e) {
     static std::optional<DurationPoint> exceptionDuration;
     auto wrapper = TgBotWrapper::getInstance();
 
-    LOG(ERROR) << "TgBotAPI Exception: " << e.what()
-               << " (code: " << static_cast<size_t>(e.errorCode) << ")";
-    LOG(WARNING) << "Trying to recover";
+    LOG(ERROR) << "Telegram API error: " << "{ Message: "
+               << std::quoted(e.what())
+               << ", Code: " << static_cast<size_t>(e.errorCode) << "}";
+    switch (e.errorCode) {
+        // This is probably bot's runtime problem... Yet it isn't fatal. So
+        // skip.
+        case TgBot::TgException::ErrorCode::BadRequest:
+        // I don't know what to do with this... Skip
+        case TgBot::TgException::ErrorCode::Internal:
+            return;
+
+        // For floods, this is recoverable, break out of switch to continue
+        // recovering.
+        case TgBot::TgException::ErrorCode::Flood:
+            LOG(INFO) << "Flood detected, trying to recover";
+            break;
+
+        // These should be token fault, or network.
+        case TgBot::TgException::ErrorCode::Unauthorized:
+        case TgBot::TgException::ErrorCode::Forbidden:
+        case TgBot::TgException::ErrorCode::NotFound:
+            LOG(FATAL) << "FATAL PROBLEM DETECTED";
+            break;
+        // Only tgbot-cpp library fault can cause this error... Just ignore
+        case TgBot::TgException::ErrorCode::InvalidJson:
+        case TgBot::TgException::ErrorCode::HtmlResponse:
+            LOG(ERROR) << "BUG on tgbot-cpp library";
+            return;
+        default:
+            break;
+    }
+
     const auto ownerid = TgBotDatabaseImpl::getInstance()->getOwnerUserId();
     if (ownerid) {
         try {
