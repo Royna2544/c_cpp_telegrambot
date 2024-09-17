@@ -4,7 +4,6 @@
 
 #include <array>
 #include <cstdio>
-#include <gsl/gsl_complex.h>
 #include <cstdlib>
 #include <limits>
 
