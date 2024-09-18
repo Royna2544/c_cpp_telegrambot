@@ -20,6 +20,42 @@ class TgBotPPImpl_shared_deps_API AuthContext
                              // of this flag, it excludes blacklist)
     };
 
+    // Holds result of isAuthorized() function
+    struct Result {
+        // Was it authorized?
+        bool authorized{};
+        // Reason for authorization failure.
+        enum class Reason {
+            UNKNOWN,
+            // Used if authorization succeeded, only if.
+            OK,
+            // Message timestamp is over the limit towards the past.
+            MESSAGE_TOO_OLD,
+            // Blacklisted user
+            BLACKLISTED_USER,
+            // Global authentication is disabled
+            GLOBAL_FLAG_OFF,
+            // Not allowed, i.e. User is not in whitelist or owner
+            // but tried to run enforced command.
+            NOT_IN_WHITELIST,
+            // Requires a user, but not provided.
+            REQUIRES_USER
+        } reason{};
+
+        operator bool() const { return authorized; }
+
+        // Constructor for Result.
+        Result(const bool _cond, const Reason _reason) {
+            if (_cond) {
+                authorized = true;
+                reason = Reason::OK;
+            } else {
+                authorized = false;
+                reason = _reason;
+            }
+        }
+    };
+
     // Set/Get the global 'authorized' bool object.
     [[nodiscard]] bool& isAuthorized() noexcept { return authorized; }
 
@@ -34,8 +70,8 @@ class TgBotPPImpl_shared_deps_API AuthContext
      * @param flags A bitwise combination of the AuthContext::Flags values.
      * @return True if the message is authorized, false otherwise.
      */
-    [[nodiscard]] bool isAuthorized(const Message::Ptr& message,
-                                    const unsigned flags) const;
+    [[nodiscard]] Result isAuthorized(const Message::Ptr& message,
+                                      const unsigned flags) const;
 
     /**
      * @brief Checks if the message is within the allowed time limit.

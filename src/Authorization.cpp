@@ -34,8 +34,8 @@ bool isInList(const UserId user) {
     }
 }
 
-bool AuthContext::isAuthorized(const Message::Ptr& message,
-                               const unsigned flags) const {
+AuthContext::Result AuthContext::isAuthorized(const Message::Ptr& message,
+                                              const unsigned flags) const {
     const auto database = TgBotDatabaseImpl::getInstance();
 #ifdef AUTHORIZATION_DEBUG
     static std::mutex authStdoutLock;
@@ -52,7 +52,14 @@ bool AuthContext::isAuthorized(const Message::Ptr& message,
             DLOG(INFO) << "why?: Message is too old";
         }
 #endif
-        return false;
+        Result::Reason reason{};
+        if (!authorized) {
+            reason = Result::Reason::GLOBAL_FLAG_OFF;
+        }
+        if (!isMessageUnderTimeLimit(message)) {
+            reason = Result::Reason::MESSAGE_TOO_OLD;
+        }
+        return {false, reason};
     }
 
     if (message->from) {
@@ -69,7 +76,7 @@ bool AuthContext::isAuthorized(const Message::Ptr& message,
             DLOG(INFO) << "User id in blacklist: " << std::boolalpha
                        << isInBlacklist;
 #endif
-            return !isInBlacklist;
+            return {!isInBlacklist, Result::Reason::BLACKLISTED_USER};
         } else {
             bool ret = isInList<DatabaseBase::ListType::WHITELIST>(id);
             bool ret2 = id == database->getOwnerUserId();
@@ -81,14 +88,14 @@ bool AuthContext::isAuthorized(const Message::Ptr& message,
             DLOG(INFO) << "User is owner of this bot: " << std::boolalpha
                        << ret2;
 #endif
-            return ret || ret2;
+            return {ret || ret2, Result::Reason::NOT_IN_WHITELIST};
         }
     } else {
         bool ignore = (flags & Flags::REQUIRE_USER) == Flags::REQUIRE_USER;
 #ifdef AUTHORIZATION_DEBUG
         DLOG(INFO) << "Should ignore the message: " << std::boolalpha << ignore;
 #endif
-        return !ignore;
+        return {!ignore, Result::Reason::REQUIRES_USER};
     }
 }
 
