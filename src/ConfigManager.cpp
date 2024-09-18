@@ -125,8 +125,6 @@ struct ConfigBackendBoostPOBase : public ConfigBackendBase {
 };
 
 struct ConfigBackendFile : public ConfigBackendBoostPOBase {
-    [[deprecated]]
-    static constexpr std::string_view kTgBotConfigFileOld = ".tgbot_conf.ini";
     static constexpr std::string_view kTgBotConfigFile = "tgbotserver.ini";
     bool load() override {
         std::filesystem::path home;
@@ -140,17 +138,7 @@ struct ConfigBackendFile : public ConfigBackendBoostPOBase {
         std::ifstream ifs(confPath);
         if (ifs.fail()) {
             LOG(ERROR) << "Opening " << confPath << " failed";
-
-            confPath = (home / kTgBotConfigFileOld.data()).string();
-            ifs.open(confPath);
-            if (ifs.fail()) {
-                LOG(ERROR) << "Opening " << confPath << " failed";
-                return false;
-            } else {
-                LOG(WARNING) << "Using " << confPath << " instead, but"
-                             << " this path is deprecated, and will be removed "
-                                "in the future";
-            }
+            return false;
         }
         try {
             po::store(po::parse_config_file(ifs, getTgBotOptionsDesc()), mp);
