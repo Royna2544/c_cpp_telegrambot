@@ -230,6 +230,10 @@ struct SocketInterfaceBase {
 
         // Function to get the data and reset it if not persistent
         [[nodiscard]] T get() const {
+            // Specially for bool types.
+            if constexpr (std::is_same_v<T, bool>) {
+                return data.value_or(false);
+            }
             if (!operator bool()) {
                 LOG(WARNING) << "Trying to get data which is not set!";
             }

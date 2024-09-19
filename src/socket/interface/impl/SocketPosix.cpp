@@ -6,6 +6,7 @@
 
 #include <cstring>
 #include <socket/selector/SelectorPosix.hpp>
+
 #include "socket/selector/Selectors.hpp"
 
 void SocketInterfaceUnix::startListening(socket_handle_t handle,
@@ -30,29 +31,36 @@ void SocketInterfaceUnix::startListening(socket_handle_t handle,
         if (!selector.init()) {
             break;
         }
-        selector.add(kListenTerminate.readEnd(), [this, &should_break]() {
-            dummy_listen_buf_t buf = {};
-            ssize_t rc = read(kListenTerminate.readEnd(), &buf,
-                              sizeof(dummy_listen_buf_t));
-            if (rc < 0) {
-                PLOG(ERROR) << "Reading data from forcestop fd";
-            }
-            should_break = true;
-        }, Selector::Mode::READ);
-        selector.add(handle, [handle, this, &should_break, onNewData] {
-            struct sockaddr addr {};
-            socklen_t len = sizeof(addr);
-            socket_handle_t cfd = accept(handle, &addr, &len);
+        selector.add(
+            kListenTerminate.readEnd(),
+            [this, &should_break]() {
+                dummy_listen_buf_t buf = {};
+                ssize_t rc = read(kListenTerminate.readEnd(), &buf,
+                                  sizeof(dummy_listen_buf_t));
+                if (rc < 0) {
+                    PLOG(ERROR) << "Reading data from forcestop fd";
+                }
+                should_break = true;
+            },
+            Selector::Mode::READ);
+        selector.add(
+            handle,
+            [handle, this, &should_break, onNewData] {
+                struct sockaddr addr {};
+                socklen_t len = sizeof(addr);
+                socket_handle_t cfd = accept(handle, &addr, &len);
 
-            if (!isValidSocketHandle(cfd)) {
-                PLOG(ERROR) << "Accept failed";
-            } else {
-                printRemoteAddress(cfd);
-                SocketConnContext ctx(cfd, addr);
-                should_break = onNewData(ctx);
-                closeSocketHandle(cfd);
-            }
-        }, Selector::Mode::READ);
+                if (!isValidSocketHandle(cfd)) {
+                    PLOG(ERROR) << "Accept failed";
+                } else {
+                    printRemoteAddress(cfd);
+                    setSocketOptTimeout(cfd, 5);
+                    SocketConnContext ctx(cfd, addr);
+                    should_break = onNewData(ctx);
+                    closeSocketHandle(cfd);
+                }
+            },
+            Selector::Mode::READ);
         while (!should_break) {
             switch (selector.poll()) {
                 case Selector::PollResult::FAILED:
@@ -83,24 +91,91 @@ void SocketInterfaceUnix::forceStopListening() {
     }
 }
 
+namespace libc_shim {
+
+bool should_retry() { return errno == EINTR || errno == EWOULDBLOCK; }
+
+bool recv(int fd, void* buf, size_t n, int flags) {
+    ssize_t remaining = n;
+    ssize_t rc = 0;
+    while (remaining > 0) {
+        rc = ::recv(fd, buf, remaining, flags);
+        if (rc < 0) {
+            if (should_retry()) {
+                continue;
+            } else {
+                PLOG(ERROR) << "Failed to receive from socket";
+                return false;
+            }
+        } else if (rc == 0) {
+            LOG(WARNING) << "Connection aborted";
+            return false;
+        }
+        remaining -= rc;
+        buf = static_cast<char*>(buf) + rc;
+    }
+    return true;
+}
+
+bool send(int fd, const void* buf, size_t n, int flags) {
+    ssize_t remaining = n;
+    ssize_t rc = 0;
+    while (remaining > 0) {
+        rc = ::send(fd, buf, remaining, flags);
+        if (rc < 0) {
+            if (should_retry()) {
+                continue;
+            } else {
+                PLOG(ERROR) << "Failed to send to socket";
+                return false;
+            }
+        } else if (rc == 0) {
+            LOG(WARNING) << "Connection aborted";
+            return false;
+        }
+        remaining -= rc;
+        buf = static_cast<const char*>(buf) + rc;
+    }
+    return true;
+}
+
+template <typename... Args>
+bool sendto(Args&&... args) {
+    ssize_t rc = ::sendto(std::forward<Args>(args)...);
+    if (rc < 0) {
+        PLOG(ERROR) << "Failed to sendto to socket";
+        return false;
+    }
+    return true;
+}
+
+
+template <typename... Args>
+bool recvfrom(Args&&... args) {
+    ssize_t rc = ::recvfrom(std::forward<Args>(args)...);
+    if (rc < 0) {
+        PLOG(ERROR) << "Failed to recvfrom from socket";
+        return false;
+    }
+    return true;
+}
+
+}  // namespace libc_shim
+
 bool SocketInterfaceUnix::writeToSocket(SocketConnContext context,
                                         SharedMalloc data) {
     auto* socketData = static_cast<char*>(data.get());
     auto* addr = static_cast<sockaddr*>(context.addr.get());
-    bool use_udp = static_cast<bool>(options.use_udp) && options.use_udp.get();
-    ssize_t count = 0;
+    bool use_udp = options.use_udp.get();
+    constexpr int kSendFlags = MSG_NOSIGNAL;
 
     if (use_udp) {
-        count = sendto(context.cfd, socketData, data->getSize(), MSG_NOSIGNAL, addr,
-                       context.addr->getSize());
+        return libc_shim::sendto(context.cfd, socketData, data->getSize(),
+                                 kSendFlags, addr, context.addr->getSize());
     } else {
-        count = send(context.cfd, socketData, data->getSize(), MSG_NOSIGNAL);
+        return libc_shim::send(context.cfd, socketData, data->getSize(),
+                               kSendFlags);
     }
-    if (count < 0) {
-        PLOG(ERROR) << "Failed to send to socket";
-        return false;
-    }
-    return true;
 }
 
 std::optional<SharedMalloc> SocketInterfaceUnix::readFromSocket(
@@ -108,19 +183,17 @@ std::optional<SharedMalloc> SocketInterfaceUnix::readFromSocket(
     SharedMalloc buf(length);
     auto* addr = static_cast<sockaddr*>(handle.addr.get());
     socklen_t addrlen = handle.addr->getSize();
-    bool use_udp = static_cast<bool>(options.use_udp) && options.use_udp.get();
     ssize_t count = 0;
-    constexpr int kRecvFlags = MSG_NOSIGNAL | MSG_WAITALL;
+    constexpr int kRecvFlags = MSG_NOSIGNAL;
+    bool sent = false;
 
-    if (use_udp) {
-        count =
-            recvfrom(handle.cfd, buf.get(), length, kRecvFlags, addr, &addrlen);
+    if (options.use_udp.get()) {
+        sent = libc_shim::recvfrom(handle.cfd, buf.get(), length, kRecvFlags,
+                                   addr, &addrlen);
     } else {
-        count = recv(handle.cfd, buf.get(), length, kRecvFlags);
+        sent = libc_shim::recv(handle.cfd, buf.get(), length, kRecvFlags);
     }
-    if (count != length) {
-        PLOG(ERROR) << "Failed to read from socket";
-    } else {
+    if (sent) {
         return buf;
     }
     return std::nullopt;
