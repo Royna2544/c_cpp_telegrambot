@@ -83,6 +83,11 @@ bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
     }
 
     if (data->watchdog_enabled) {
+        POPEN_WDT_DBGLOG("Watchdog is enabled");
+    } else {
+        POPEN_WDT_DBGLOG("Watchdog disabled");
+    }
+    if (data->watchdog_enabled) {
         pthread_create(&watchdog_thread, NULL, &watchdog, data);
         pdata->wdt_thread = watchdog_thread;
     }
@@ -129,11 +134,6 @@ bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
         pdata->pipefd_r = pipefd[0];
         pdata->wdt_pid = pid;
         pdata->running = true;
-        if (data->watchdog_enabled) {
-            POPEN_WDT_DBGLOG("Watchdog is enabled");
-        } else {
-            POPEN_WDT_DBGLOG("Watchdog disabled");
-        }
         POPEN_WDT_DBGLOG("Parent pid is %d", getpid());
         POPEN_WDT_DBGLOG("Child pid is %d", pid);
     }

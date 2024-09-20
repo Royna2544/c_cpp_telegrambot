@@ -7,6 +7,7 @@
 #include <StringResManager.hpp>
 #include <chrono>
 #include <cstdio>
+#include <ios>
 #include <libos/libfs.hpp>
 #include <memory>
 #include <ostream>
@@ -46,6 +47,7 @@ void CompilerInTg::runCommand(std::string cmd, std::stringstream &res,
     }
     p_wdt_data->command = cmd.c_str();
     p_wdt_data->watchdog_enabled = use_wdt;
+    DLOG(INFO) << "use_wdt: " << std::boolalpha << p_wdt_data->watchdog_enabled;
 
     if (!popen_watchdog_start(&p_wdt_data)) {
         LOG(ERROR) << "popen_watchdog_start failed";
