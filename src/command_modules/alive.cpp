@@ -7,8 +7,6 @@
 #include <CompileTimeStringConcat.hpp>
 #include <StringResManager.hpp>
 #include <TgBotWrapper.hpp>
-#include <boost/algorithm/string/replace.hpp>
-#include <boost/config.hpp>
 #include <database/bot/TgBotDatabaseImpl.hpp>
 #include <filesystem>
 #include <mutex>
@@ -64,17 +62,12 @@ static DECLARE_COMMAND_HANDLER(alive, wrapper, message) {
 }
 
 DYN_COMMAND_FN(name, module) {
-    if (name == nullptr) {
-        return false;
-    }
-    std::string commandName = name;
-    if (commandName != "alive" && commandName != "start") {
+    if (name != "alive" && name != "start") {
         return false;
     }
     module.flags = CommandModule::Flags::None;
-    module.command = commandName;
+    module.command = name;
     module.description = GETSTR(ALIVE_CMD_DESC);
-    module.fn = COMMAND_HANDLER_NAME(alive);
-    module.isLoaded = true;
+    module.function = COMMAND_HANDLER_NAME(alive);
     return true;
 }

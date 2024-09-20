@@ -33,6 +33,6 @@ DYN_COMMAND_FN(name, module) {
     module.command = "fileid";
     module.description = "Get fileId of a media";
     module.flags = CommandModule::Flags::None;
-    module.fn = COMMAND_HANDLER_NAME(fileid);
+    module.function = COMMAND_HANDLER_NAME(fileid);
     return true;
 }

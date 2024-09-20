@@ -142,7 +142,6 @@ find_package(Boost COMPONENTS program_options REQUIRED)
 find_package(OpenSSL REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package(Protobuf)
-include_directories(${Boost_INCLUDE_DIR})
 
 # If we couldn't find protobuf...
 if (NOT Protobuf_FOUND)
@@ -169,30 +168,11 @@ set(SRC_LIST
   src/RegEXHandler.cpp
   src/RegEXHandlerImpl.cpp
   src/SpamBlocker.cpp
-  src/RTCommandLoader.cpp
   src/web/TgBotWebServer.cpp
 )
 #####################################################################
 
 ######################## Define SQLite3 target ######################
-add_my_library(
-  NAME CommandLine
-  SRCS src/CommandLine.cpp
-)
-add_my_library(
-  NAME PPImpl_shared_deps
-  SRCS 
-    src/Authorization.cpp
-    src/ManagedThread.cpp
-    src/ThreadManager.cpp
-    src/TgBotWrapper.cpp
-  LIBS
-    TgBot
-    TgBotStringResManager
-    TgBotRandom
-    TgBotDBImpl
-)
-
 add_subdirectory(src/android_builder)
 add_subdirectory(src/database)
 add_subdirectory(src/random)
@@ -209,6 +189,25 @@ if (WIN32)
 endif()
 add_subdirectory(tests)
 #################################################################
+
+add_my_library(
+  NAME CommandLine
+  SRCS src/CommandLine.cpp
+)
+add_my_library(
+  NAME PPImpl_shared_deps
+  SRCS 
+    src/Authorization.cpp
+    src/ManagedThread.cpp
+    src/ThreadManager.cpp
+    src/TgBotWrapper.cpp
+  LIBS
+    TgBot
+    TgBotStringResManager
+    TgBotRandom
+    TgBotDBImpl
+    ${CMAKE_DL_LIBS}
+)
 
 ####################### TgBot Socket Library #######################
 if (USE_UNIX_SOCKETS)
@@ -230,7 +229,7 @@ include(CMake/tgbotutils.cmake)
 
 ################### The Bot's main functionaility ###################
 set(LD_LIST TgBot TgBotUtils TgBotWeb absl::status
-            TgBotStringResManager TgBotPPImpl_shared_deps ${CMAKE_DL_LIBS})
+            TgBotStringResManager TgBotPPImpl_shared_deps)
 extend_set_if(LD_LIST USE_UNIX_SOCKETS TgBotSocket)
 add_my_library(
   NAME PPImpl

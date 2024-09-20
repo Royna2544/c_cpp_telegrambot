@@ -3,6 +3,7 @@
 
 #include <TgBotWrapper.hpp>
 #include <database/DatabaseBase.hpp>
+#include <initializer_list>
 #include <source_location>
 #include <utility>
 
@@ -150,8 +151,9 @@ class MockTgBotApi : public TgBotApi {
                  bool showAlert),
                 (const override));
 
-    MOCK_METHOD(bool, pinMessage_impl, (MessagePtr message), (const override));
-    MOCK_METHOD(bool, unpinMessage_impl, (MessagePtr message),
+    MOCK_METHOD(bool, pinMessage_impl, (Message::Ptr message),
+                (const override));
+    MOCK_METHOD(bool, unpinMessage_impl, (Message::Ptr message),
                 (const override));
     MOCK_METHOD(bool, banChatMember_impl,
                 (const Chat::Ptr& chat, const User::Ptr& user),
@@ -165,22 +167,12 @@ class MockTgBotApi : public TgBotApi {
     // Non-TgBotApi methods
     MOCK_METHOD(bool, reloadCommand, (const std::string& cmd), (override));
     MOCK_METHOD(bool, unloadCommand, (const std::string& cmd), (override));
-    MOCK_METHOD(void, registerCallback,
-                (const onanymsg_callback_type& callback, size_t token),
+    MOCK_METHOD(void, onAnyMessage, (const onAnyMessage_handler_t& callback),
                 (override));
-    MOCK_METHOD(bool, unregisterCallback, (size_t token), (override));
 };
 
 class CommandModulesTest : public ::testing::Test {
    protected:
-    struct ModuleHandle {
-        void* handle;
-        CommandModule module;
-
-        // Shorthand
-        void execute(ApiPtr api, MessagePtr msg) const { module.fn(api, msg); }
-    };
-
     /**
      * @brief Set up the test suite before running any tests.
      * This function is called once before running all tests in the test
@@ -216,21 +208,21 @@ class CommandModulesTest : public ::testing::Test {
      * @return An optional containing the loaded module handle if successful,
      *         or an empty optional if the module could not be loaded.
      */
-    std::optional<ModuleHandle> loadModule(const std::string& name) const;
+    std::optional<CommandModule> loadModule(const std::string& name) const;
 
     /**
      * @brief Unload a command module.
      *
      * @param module The module handle to unload.
      */
-    static void unloadModule(ModuleHandle&& module);
+    static void unloadModule(CommandModule&& module);
 
     /**
      * @brief Create a default message object for testing purposes.
      *
      * @return A shared pointer to a default message object.
      */
-    static Message::Ptr createDefaultMessage();
+    static MessageExt::Ptr createDefaultMessage();
 
     /**
      * @brief Create a default user object for testing purposes.
@@ -287,7 +279,9 @@ class CommandTestBase : public CommandModulesTest {
         defaultProvidedMessage = createDefaultMessage();
     }
     void TearDown() override {
-        unloadModule(std::move(module));
+        if (module) {
+            unloadModule(std::move(module.value()));
+        }
         CommandModulesTest::TearDown();
         defaultProvidedMessage.reset();
     }
@@ -303,12 +297,21 @@ class CommandTestBase : public CommandModulesTest {
     }
 
    public:
-    void setCommandExtArgs(const std::string& command) {
+    void setCommandExtArgs(const std::initializer_list<std::string>& command) {
         setCommandExtArgs();
-        defaultProvidedMessage->text += " " + command;
+        for (const auto& arg : command) {
+            defaultProvidedMessage->text += ' ' + arg;
+        }
+        defaultProvidedMessage->update();
+        defaultProvidedMessage->update(SplitMessageText::ByWhitespace);
     }
-    void setCommandExtArgs() { defaultProvidedMessage->text = "/" + name; }
-    void execute() { module.execute(botApi, defaultProvidedMessage); }
+    void setCommandExtArgs() {
+        defaultProvidedMessage->text = "/" + name;
+        defaultProvidedMessage->entities[0]->length =
+            defaultProvidedMessage->text.size();
+        defaultProvidedMessage->update();
+    }
+    void execute() { module->function(botApi, defaultProvidedMessage); }
 
     struct SentMessage {
         Message::Ptr message;
@@ -442,6 +445,6 @@ class CommandTestBase : public CommandModulesTest {
 
    protected:
     std::string name;
-    ModuleHandle module;
-    Message::Ptr defaultProvidedMessage;
+    std::optional<CommandModule> module;
+    MessageExt::Ptr defaultProvidedMessage;
 };

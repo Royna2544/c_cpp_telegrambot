@@ -4,12 +4,12 @@
 #include "CompilerInTelegram.hpp"
 #include "absl/status/status.h"
 
-void CompilerInTgForBash::run(const Message::Ptr& message) {
+void CompilerInTgForBash::run(const MessagePtr message) {
     std::stringstream res;
-    MessageWrapperLimited wrapper(message);
 
-    if (wrapper.hasExtraText()) {
-        runCommand(wrapper.getExtraText(), res, !allowhang);
+    if (message->has<MessageExt::Attrs::ExtraText>()) {
+        runCommand(message->get<MessageExt::Attrs::ExtraText>(), res,
+                   !allowhang);
         _interface->onResultReady(res.str());
     } else {
         _interface->onErrorStatus(

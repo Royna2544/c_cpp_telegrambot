@@ -15,6 +15,6 @@ DYN_COMMAND_FN(n, module) {
     module.command = "setowner";
     module.description = "Set owner of the bot, for once";
     module.flags = CommandModule::Flags::HideDescription;
-    module.fn = COMMAND_HANDLER_NAME(setowner);
+    module.function = COMMAND_HANDLER_NAME(setowner);
     return true;
 }

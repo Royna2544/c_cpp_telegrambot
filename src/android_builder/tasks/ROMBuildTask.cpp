@@ -1,6 +1,7 @@
 #include "ROMBuildTask.hpp"
 
 #include <ArgumentBuilder.hpp>
+#include <fstream>
 #include <mutex>
 #include <regex>
 

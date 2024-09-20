@@ -1,7 +1,7 @@
 #include <ResourceManager.h>
 #include <absl/log/log.h>
+#include <absl/strings/ascii.h>
 
-#include <boost/algorithm/string/trim.hpp>
 #include <fstream>
 #include <libos/libfs.hpp>
 #include <sstream>
@@ -51,7 +51,7 @@ void ResourceManager::preloadResourceDirectory() {
     if (ifs) {
         std::string line;
         while (std::getline(ifs, line)) {
-            boost::trim(line);
+            line = absl::StripAsciiWhitespace(line);
             if (!line.empty()) {
                 ignoredResources.emplace_back(line);
             }

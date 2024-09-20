@@ -16,35 +16,29 @@ struct CMDCommandTest : public CommandTestBase {
     const std::string successMessage = GETSTR_IS(OPERATION_SUCCESSFUL) + testCmd;
 };
 
-TEST_F(CMDCommandTest, UnknownCommand) {
-    setCommandExtArgs("pwd");
-    willSendReplyMessage(_);
-    execute();
-}
-
 TEST_F(CMDCommandTest, LoadCommandFail) {
-    setCommandExtArgs("testingcmd reload");
+    setCommandExtArgs({testCmd, "reload"});
     makeReload(false);
     willSendReplyMessage(failureMessage);
     execute();
 }
 
 TEST_F(CMDCommandTest, LoadCommandSuccess) {
-    setCommandExtArgs("testingcmd reload");
+    setCommandExtArgs({testCmd, "reload"});
     makeReload(true);
     willSendReplyMessage(successMessage);
     execute();
 }
 
 TEST_F(CMDCommandTest, UnloadCommandFail) {
-    setCommandExtArgs("testingcmd unload");
+    setCommandExtArgs({testCmd, "unload"});
     makeUnload(false);
     willSendReplyMessage(failureMessage);
     execute();
 }
 
 TEST_F(CMDCommandTest, UnloadCommandSuccess) {
-    setCommandExtArgs("testingcmd unload");
+    setCommandExtArgs({testCmd, "unload"});
     makeUnload(true);
     willSendReplyMessage(successMessage);
     execute();

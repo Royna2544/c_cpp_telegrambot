@@ -1,14 +1,13 @@
 // Compiles string res xml to numbers
 
 #include <absl/log/log.h>
+#include <absl/strings/ascii.h>
 
 #include <AbslLogInit.hpp>
-#include <boost/algorithm/string.hpp>
 #include <cstdlib>
 #include <fstream>
 
 #include "StringResLoader.hpp"
-
 int main(int argc, char** argv) {
     StringResLoader manager;
     TgBot_AbslLogInit();
@@ -35,8 +34,8 @@ int main(int argc, char** argv) {
     int index = 0;
     LOG(INFO) << "Total strings count: " << manager.m_strings.size();
     for (const auto& elem : manager.m_strings) {
-        ofs << "#define STRINGRES_" << boost::to_upper_copy<std::string>(elem.first)
-            << " " << index << std::endl;
+        ofs << "#define STRINGRES_" << absl::AsciiStrToUpper(elem.first) << " "
+            << index << std::endl;
         index++;
     }
     ofs << "#define STRINGRES_MAX " << index;

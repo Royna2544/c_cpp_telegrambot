@@ -30,6 +30,6 @@ DYN_COMMAND_FN(/*name*/, module) {
     module.command = "delay";
     module.description = "Ping the bot for network delay";
     module.flags = CommandModule::Flags::None;
-    module.fn = COMMAND_HANDLER_NAME(delay);
+    module.function = COMMAND_HANDLER_NAME(delay);
     return true;
 }

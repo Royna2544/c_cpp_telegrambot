@@ -67,6 +67,6 @@ struct ROMBuildTask : ForkAndRun {
     PythonClass::FunctionHandle::Ptr _get_total_mem;
     PythonClass::FunctionHandle::Ptr _get_used_mem;
     Shmem smem{};
-    decltype(std::chrono::system_clock::now()) clock;
-    decltype(std::chrono::system_clock::now()) startTime;
+    std::chrono::system_clock::time_point clock;
+    std::chrono::system_clock::time_point startTime;
 };

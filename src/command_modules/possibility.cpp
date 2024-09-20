@@ -1,14 +1,13 @@
-#include <Random.hpp>
+#include <absl/strings/str_split.h>
 
+#include <Random.hpp>
 #include <TgBotWrapper.hpp>
-#include <boost/algorithm/string/split.hpp>
 #include <set>
 
 #include "StringToolsExt.hpp"
 
-DECLARE_COMMAND_HANDLER(possibility, botWrapper, message){
+DECLARE_COMMAND_HANDLER(possibility, botWrapper, message) {
     constexpr int PERCENT_MAX = 100;
-    MessageWrapper messageWrapper(botWrapper, message);
     std::string text;
     std::string lastItem;
     std::stringstream outStream;
@@ -18,19 +17,19 @@ DECLARE_COMMAND_HANDLER(possibility, botWrapper, message){
     Random::ret_type total = 0;
     using map_t = std::pair<std::string, Random::ret_type>;
 
-    if (!messageWrapper.hasExtraText()) {
-        messageWrapper.sendMessageOnExit(
-            "Send avaliable conditions sperated by newline");
+    if (!message->has<MessageExt::Attrs::ExtraText>()) {
+        botWrapper->sendReplyMessage(
+            message, "Send avaliable conditions sperated by newline");
         return;
     }
-    text = messageWrapper.getExtraText();
+    text = message->get<MessageExt::Attrs::ExtraText>();
     // Split string by newline
-    boost::split(set, text, isNewline);
+    set = absl::StrSplit(text, '\n');
     // Pre-reserve memory
     kItemAndPercentMap.reserve(set.size());
     // Can't get possitibities for 1 element
     if (set.size() == 1) {
-        messageWrapper.sendMessageOnExit("Give more than 1 choice");
+        botWrapper->sendReplyMessage(message, "Give more than 1 choice");
         return;
     }
     // Put it in vector again and shuffle it.
@@ -79,6 +78,6 @@ DYN_COMMAND_FN(n, module) {
     module.command = "possibility";
     module.description = "Get possibilities";
     module.flags = CommandModule::Flags::None;
-    module.fn = COMMAND_HANDLER_NAME(possibility);
+    module.function = COMMAND_HANDLER_NAME(possibility);
     return true;
 }

@@ -1,6 +1,5 @@
 #include <Authorization.h>
 #include <ConfigManager.h>
-#include <RTCommandLoader.h>
 #include <ResourceManager.h>
 #include <absl/log/log.h>
 #include <absl/log/log_sink_registry.h>
@@ -16,17 +15,19 @@
 #include <StringResManager.hpp>
 #include <TgBotWebpage.hpp>
 #include <TryParseStr.hpp>
-#include <boost/algorithm/string/split.hpp>
 #include <boost/system/system_error.hpp>
 #include <chrono>
 #include <cstddef>
 #include <database/bot/TgBotDatabaseImpl.hpp>
+#include <filesystem>
+#include <libos/libfs.hpp>
 #include <libos/libsighandler.hpp>
 #include <memory>
 #include <ml/ChatDataCollector.hpp>
 #include <utility>
 
 #include "Random.hpp"
+#include "TgBotWrapper.hpp"
 #include "tgbot/TgException.h"
 
 #ifndef WINDOWS_BUILD
@@ -205,8 +206,20 @@ void createAndDoInitCallAll() {
     createAndDoInitCall<StringResManager>();
     createAndDoInitCall<TgBotWebServer, ThreadManager::Usage::WEBSERVER_THREAD>(
         kWebServerListenPort);
-    createAndDoInitCall<RTCommandLoader>();
     createAndDoInitCall<Random>(nullptr);
+
+    // Load modules
+    std::filesystem::path modules_path =
+        FS::getPathForType(FS::PathType::MODULES_INSTALLED);
+    LOG(INFO) << "Loading commands from " << modules_path.string();
+    for (std::filesystem::directory_iterator it(modules_path);
+         it != std::filesystem::directory_iterator(); ++it) {
+        if (it->path().filename().string().starts_with("libcmd_")) {
+            auto module = std::make_unique<CommandModule>(*it);
+            bot->addCommand(std::move(module));
+        }
+    }
+
     LOG(INFO) << "Updating commands list based on loaded commands...";
     try {
         LOG_IF(ERROR, !bot->setBotCommands())
@@ -226,7 +239,6 @@ void createAndDoInitCallAll() {
     createAndDoInitCall<SpamBlockManager>(bot);
     createAndDoInitCall<ResourceManager>();
     createAndDoInitCall<TgBotDatabaseImpl>();
-    bot->registerOnAnyMsgCallback();
     // Must be last
     OnTerminateRegistrar::getInstance()->registerCallback(
         []() { ThreadManager::getInstance()->destroyManager(); });

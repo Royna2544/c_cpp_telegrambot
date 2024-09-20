@@ -5,7 +5,6 @@
 #include <ManagedThreads.hpp>
 #include <TgBotSocket_Export.hpp>
 #include <TryParseStr.hpp>
-#include <boost/crc.hpp>
 #include <cstddef>
 #include <cstdlib>
 #include <cstring>
@@ -277,9 +276,10 @@ int main(int argc, char** argv) {
                    << CommandHelpers::toStr(cmd).c_str();
         return EXIT_FAILURE;
     } else {
-        boost::crc_32_type crc;
-        crc.process_bytes(pkt->data.get(), pkt->header.data_size);
-        pkt->header.checksum = crc.checksum();
+        uLong crc = crc32(0L, Z_NULL, 0);  // Initial value
+        pkt->header.checksum =
+            crc32(crc, reinterpret_cast<Bytef*>(pkt->data.get()),
+                  pkt->header.data_size);
     }
 
     SocketClientWrapper backend(

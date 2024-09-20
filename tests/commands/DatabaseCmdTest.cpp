@@ -62,8 +62,6 @@ struct DatabaseCommandTest : public CommandTestBase {
 
     template <int X, int Y, typename Matcher>
     void test_impl(Matcher&& matcher) {
-        Random::initInstance(std::make_unique<MockRandom>());
-
         GenericReply::Ptr reply;
         TgBot::GenericReply::Ptr keyboard;
         constexpr size_t token = 1231;
@@ -76,7 +74,7 @@ struct DatabaseCommandTest : public CommandTestBase {
                                      createMessageReplyMatcher(), _, ""))
             .WillOnce(DoAll(WithArg<3>(verifyKeyboard), SaveArg<3>(&keyboard),
                             Return(sentMessage)));
-        EXPECT_CALL(*botApi, registerCallback(_, _))
+        EXPECT_CALL(*botApi, onAnyMessage(_))
             .WillOnce(DoAll(
                 Invoke([&]() {
                     recievedMessage->text =
@@ -86,15 +84,10 @@ struct DatabaseCommandTest : public CommandTestBase {
                             ->text;
                 }),
                 InvokeArgument<0>(botApi, recievedMessage), Return()));
-        EXPECT_CALL(*static_cast<MockRandom*>(Random::getInstance()->getImpl()),
-                    generate(_, _))
-            .WillOnce(Return(token));
-        EXPECT_CALL(*botApi, unregisterCallback(token)).WillOnce(Return(true));
         EXPECT_CALL(*botApi,
                     editMessageMarkup_impl(
                         MockTgBotApi::StringOrMessage(sentMessage), IsNull()));
         execute();
-        Random::destroyInstance();
     }
 };
 

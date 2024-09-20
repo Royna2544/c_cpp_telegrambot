@@ -1,3 +1,4 @@
+#include <absl/strings/ascii.h>
 #include <internal/_FileDescriptor_posix.h>
 #include <popen_wdt.h>
 #include <sys/mman.h>
@@ -5,8 +6,8 @@
 #include <unistd.h>
 
 #include <ManagedThreads.hpp>
+#include <SelectorPosix.hpp>
 #include <TgBotWrapper.hpp>
-#include <boost/algorithm/string/trim.hpp>
 #include <csignal>
 #include <cstdlib>
 #include <functional>
@@ -16,7 +17,6 @@
 #include <string_view>
 #include <utility>
 
-#include <SelectorPosix.hpp>
 #include "compiler/CompilerInTelegram.hpp"  // BASH_MAX_BUF, BASH_READ_BUF
 
 using std::chrono_literals::operator""s;
@@ -245,7 +245,7 @@ struct InteractiveBashContext {
 
     [[nodiscard]] bool sendCommandNoCheck(std::string str) const {
         ssize_t rc = 0;
-        boost::trim(str);
+        str = absl::StripAsciiWhitespace(str);
         str += '\n';
         rc = write(parentToChild.writeEnd(), str.c_str(), str.size());
         if (rc < 0) {
@@ -259,21 +259,21 @@ struct InteractiveBashContext {
 DECLARE_COMMAND_HANDLER(ibash, bot, message) {
     static InteractiveBashContext ctx;
     std::string command;
-    MessageWrapper wrapper(bot, message);
 
-    if (!wrapper.hasExtraText()) {
+    if (!message->has<MessageExt::Attrs::ExtraText>()) {
         if (!ctx.is_open) {
-            wrapper.sendMessageOnExit("Opening...");
+            auto statusMessage = bot->sendReplyMessage(message, "Opening...");
             if (ctx.open(message->chat->id)) {
-                wrapper.sendMessageOnExit("Opened bash subprocess.");
+                bot->editMessage(statusMessage, "Opened bash subprocess.");
             } else {
-                wrapper.sendMessageOnExit("Failed to open child process");
+                bot->editMessage(statusMessage, "Failed to open child process");
             }
         } else {
-            wrapper.sendMessageOnExit("Bash subprocess is already running");
+            bot->sendReplyMessage(message,
+                                  "Bash subprocess is already running");
         }
     } else {
-        wrapper.getExtraText(command);
+        command = message->get<MessageExt::Attrs::ExtraText>();
         if (InteractiveBashContext::isExitCommand(command)) {
             if (ctx.is_open) {
                 LOG(INFO) << "Received exit command: '" << command << "'";
@@ -282,11 +282,11 @@ DECLARE_COMMAND_HANDLER(ibash, bot, message) {
         } else {
             if (ctx.is_open) {
                 if (!ctx.sendCommand(command)) {
-                    wrapper.sendMessageOnExit("Failed to send command");
+                    bot->sendReplyMessage(message, "Failed to send command");
                     ctx.exit(message);
                 }
             } else {
-                wrapper.sendMessageOnExit("Bash subprocess is not open");
+                bot->sendReplyMessage(message, "Bash subprocess is not open");
             }
         }
     }
@@ -296,6 +296,6 @@ DYN_COMMAND_FN(n, module) {
     module.command = "ibash";
     module.description = "Interactive bash";
     module.flags = CommandModule::Flags::Enforced;
-    module.fn = COMMAND_HANDLER_NAME(ibash);
+    module.function = COMMAND_HANDLER_NAME(ibash);
     return true;
 }

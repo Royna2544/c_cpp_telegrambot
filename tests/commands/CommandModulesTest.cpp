@@ -1,10 +1,8 @@
 #include "CommandModulesTest.hpp"
 
-#include <command_modules/support/popen_wdt/popen_wdt.h>
-#include <dlfcn.h>
-
 #include <database/bot/TgBotDatabaseImpl.hpp>
 #include <libos/libfs.hpp>
+#include <memory>
 
 void CommandModulesTest::SetUpTestSuite() {}
 
@@ -27,58 +25,40 @@ void CommandModulesTest::TearDown() {
     TgBotDatabaseImpl::destroyInstance();
 }
 
-std::optional<CommandModulesTest::ModuleHandle> CommandModulesTest::loadModule(
+std::optional<CommandModule> CommandModulesTest::loadModule(
     const std::string& name) const {
     std::filesystem::path moduleFileName = "libcmd_" + name;
     const auto moduleFilePath =
         modulePath / FS::appendDylibExtension(moduleFileName);
-    bool (*sym)(const char*, CommandModule&) = nullptr;
+    loadcmd_function_cstyle_t sym = nullptr;
 
     LOG(INFO) << "Loading module " << std::quoted(name) << " for testing...";
-    void* handle = dlopen(moduleFilePath.string().c_str(), RTLD_NOW);
-    if (handle == nullptr) {
-        LOG(ERROR) << "Error loading module: " << dlerror();
-        return std::nullopt;
+    CommandModule module(moduleFilePath);
+
+    auto ret = module.load();
+    EXPECT_TRUE(ret);
+
+    if (ret) {
+        LOG(INFO) << "Module " << name << " loaded successfully.";
     }
-    sym = reinterpret_cast<decltype(sym)>(dlsym(handle, DYN_COMMAND_SYM_STR));
-    if (sym == nullptr) {
-        LOG(ERROR) << "Error getting symbol: " << dlerror();
-        dlclose(handle);
-        return std::nullopt;
-    }
-    CommandModule cmdmodule;
-    try {
-        if (!sym(name.c_str(), cmdmodule)) {
-            LOG(ERROR) << "Error initializing module";
-            cmdmodule.fn = nullptr;
-            unloadModule({handle, cmdmodule});
-            return std::nullopt;
-        }
-    } catch (const std::exception& e) {
-        LOG(ERROR) << "Exception thrown while executing module function: "
-                   << e.what();
-        cmdmodule.fn = nullptr;
-        unloadModule({handle, cmdmodule});
-        return std::nullopt;
-    }
-    LOG(INFO) << "Module " << name << " loaded successfully.";
-    return {{handle, cmdmodule}};
+    return module;
 }
 
-void CommandModulesTest::unloadModule(ModuleHandle&& module) {
-    // Clear function pointer to prevent double free
-    module.module.fn = nullptr;
-    dlclose(module.handle);
+void CommandModulesTest::unloadModule(CommandModule&& module) {
+    module.unload();
 }
 
-Message::Ptr CommandModulesTest::createDefaultMessage() {
+MessageExt::Ptr CommandModulesTest::createDefaultMessage() {
     static MessageId messageId = TEST_MESSAGE_ID;
     auto message = std::make_shared<Message>();
     message->chat = std::make_shared<Chat>();
     message->chat->id = TEST_CHAT_ID;
     message->from = createDefaultUser();
     message->messageId = messageId++;
-    return message;
+    message->entities.emplace_back(std::make_shared<TgBot::MessageEntity>());
+    message->entities[0]->type = TgBot::MessageEntity::Type::BotCommand;
+    message->entities[0]->offset = 0;
+    return std::make_shared<MessageExt>(message);
 }
 
 User::Ptr CommandModulesTest::createDefaultUser(off_t id_offset) {

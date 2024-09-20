@@ -2,8 +2,9 @@
 #include <libos/libfs.hpp>
 
 #include "CompilerInTelegram.hpp"
+#include "TgBotWrapper.hpp"
 
-void CompilerInTgForCCpp::run(const Message::Ptr& message) {
+void CompilerInTgForCCpp::run(const MessagePtr message) {
     std::string extraargs;
     std::stringstream cmd, resultbuf;
 #ifdef WINDOWS_BUILD

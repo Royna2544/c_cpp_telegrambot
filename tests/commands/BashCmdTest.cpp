@@ -14,7 +14,7 @@ struct UBashCommandTest : public CommandTestBase {
 };
 
 TEST_F(BashCommandTest, PwdCommand) {
-    setCommandExtArgs("pwd");
+    setCommandExtArgs({"pwd"});
 
     // First, "Working on it...\nCommand is: pwd\n"
     // Edit, to add the exec done.
@@ -40,7 +40,7 @@ TEST_F(BashCommandTest, watchdogTimeout) {
 
     const std::string command = "sleep 20";
     // Set command to sleep 20 seconds
-    setCommandExtArgs(command);
+    setCommandExtArgs({command});
     // "Working on it...\nCommand is: sleep 20"
     willSendReplyMessage(GETSTR(WORKING) + command + "\n")
         // Sends total time
@@ -64,7 +64,7 @@ TEST_F(BashCommandTest, watchdogTimeout) {
 }
 
 TEST_F(UBashCommandTest, PwdCommand) {
-    setCommandExtArgs("pwd");
+    setCommandExtArgs({"pwd"});
 
     // First, "Working on it...\nCommand is: pwd\n"
     // Edit, to add the exec done.
@@ -92,7 +92,7 @@ TEST_F(UBashCommandTest, WatchdogTimeout) {
     const std::string command = "sleep 20";
 
     // Set command to sleep 20 seconds
-    setCommandExtArgs(command);
+    setCommandExtArgs({command});
 
     // "Working on it...\nCommand is: sleep 20"
     willSendReplyMessage(GETSTR(WORKING) + "sleep 20\n")

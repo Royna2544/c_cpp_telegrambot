@@ -1,7 +1,7 @@
+#include <absl/strings/match.h>
+#include <absl/strings/str_split.h>
 #include <Random.hpp>
 #include <TgBotWrapper.hpp>
-#include <boost/algorithm/string/predicate.hpp>
-#include <boost/algorithm/string/split.hpp>
 #include <chrono>
 #include <mutex>
 #include <optional>
@@ -9,7 +9,6 @@
 #include <thread>
 
 #include "ResourceManager.h"
-#include "StringToolsExt.hpp"
 
 constexpr std::string_view kZipExtensionSuffix = ".zip";
 constexpr int FLASH_DELAY_MAX_SEC = 5;
@@ -21,7 +20,6 @@ DECLARE_COMMAND_HANDLER(flash, botWrapper, message) {
     std::optional<std::string> msg;
     std::stringstream ss;
     Message::Ptr sentmsg;
-    MessageWrapper wrapper(botWrapper, message);
     const auto sleep_secs =
         Random::getInstance()->generate(FLASH_DELAY_MAX_SEC);
     Random::ret_type pos = 0;
@@ -29,37 +27,27 @@ DECLARE_COMMAND_HANDLER(flash, botWrapper, message) {
     std::call_once(once, [] {
         std::string buf;
         buf = ResourceManager::getInstance()->getResource("flash.txt");
-        boost::split(reasons, buf, isNewline);
+        reasons = absl::StrSplit(buf, '\n');
     });
 
-    pos = Random::getInstance()->generate(reasons.size());
-
-    if (wrapper.hasReplyToMessage()) {
-        wrapper.switchToReplyToMessage();
-        if (!wrapper.hasText()) {
-            wrapper.sendMessageOnExit("Reply to a text message");
-        } else {
-            msg = wrapper.getText();
-        }
+    if (message->replyToMessage_has<MessageExt::Attrs::ExtraText>()) {
+        msg = message->replyToMessage->text;
+    } else if (message->has<MessageExt::Attrs::ExtraText>()) {
+        msg = message->get<MessageExt::Attrs::ExtraText>();
     } else {
-        if (!wrapper.hasExtraText()) {
-            wrapper.sendMessageOnExit("Send a file name");
-        } else {
-            msg = wrapper.getExtraText();
-        }
-    }
-
-    if (!msg) {
+        botWrapper->sendReplyMessage(message,
+                                     "Reply to a message or send a file name");
         return;
     }
+    pos = Random::getInstance()->generate(reasons.size());
 
     if (msg->find('\n') != std::string::npos) {
-        wrapper.sendMessageOnExit(
-            "Invalid input: Zip names shouldn't have newlines");
+        botWrapper->sendReplyMessage(
+            message, "Invalid input: Zip names shouldn't have newlines");
         return;
     }
     std::replace(msg->begin(), msg->end(), ' ', '_');
-    if (!boost::ends_with(msg.value(), kZipExtensionSuffix.data())) {
+    if (!absl::EndsWith(msg.value(), kZipExtensionSuffix.data())) {
         msg.value() += kZipExtensionSuffix;
     }
     ss << "Flashing " << std::quoted(msg.value()) << "..." << std::endl;
@@ -79,6 +67,6 @@ DYN_COMMAND_FN(n, module) {
     module.command = "flash";
     module.description = "Flash and get a random result";
     module.flags = CommandModule::Flags::None;
-    module.fn = COMMAND_HANDLER_NAME(flash);
+    module.function = COMMAND_HANDLER_NAME(flash);
     return true;
 }

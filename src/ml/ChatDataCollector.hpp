@@ -24,7 +24,7 @@ class ChatDataCollector : public InitCall {
     };
 
     void doInitCall() override {
-        TgBotWrapper::getInstance()->registerCallback(
+        TgBotWrapper::getInstance()->onAnyMessage(
             [this](auto api, auto message) {
                 Data::MsgType msgType{};
                 if (!message->text.empty()) {
@@ -45,6 +45,7 @@ class ChatDataCollector : public InitCall {
                 Data data{message->chat->id, message->from->id, message->date,
                           msgType};
                 chatData.emplace_back(data);
+                return TgBotWrapper::AnyMessageResult::Handled;
             });
         OnTerminateRegistrar::getInstance()->registerCallback(
             [this]() {

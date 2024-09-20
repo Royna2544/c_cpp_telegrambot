@@ -1,23 +1,23 @@
+#include <absl/status/status.h>
+
 #include <TgBotWrapper.hpp>
 #include <filesystem>
+#include <fstream>
 
 #include "CompilerInTelegram.hpp"
-#include "absl/status/status.h"
 
 // Verify, Parse, Write
-bool CompilerInTgForGeneric::verifyParseWrite(const Message::Ptr& message,
+bool CompilerInTgForGeneric::verifyParseWrite(MessagePtr message,
                                               std::string& extraargs) {
-    MessageWrapperLimited wrapper(message);
-    if (wrapper.hasExtraText()) {
-        extraargs = wrapper.getExtraText();
-    }
-    if (!wrapper.hasReplyToMessage()) {
+    if (!message->has<MessageExt::Attrs::IsReplyMessage>()) {
         _interface->onErrorStatus(
             absl::InvalidArgumentError("Need a replied-to message"));
         return false;
     }
-    wrapper.switchToReplyToMessage();
-    if (wrapper.getText().empty()) {
+    if (message->has<MessageExt::Attrs::ExtraText>()) {
+        extraargs = message->get<MessageExt::Attrs::ExtraText>();
+    }
+    if (message->replyToMessage->text.empty()) {
         _interface->onErrorStatus(
             absl::InvalidArgumentError("Reply must contain a non-empty text"));
         return false;
@@ -28,12 +28,12 @@ bool CompilerInTgForGeneric::verifyParseWrite(const Message::Ptr& message,
             absl::InternalError("Unable to write out file"));
         return false;
     }
-    file << wrapper.getText();
+    file << message->replyToMessage->text;
     file.close();
     return true;
 }
 
-void CompilerInTgForGeneric::run(const Message::Ptr& message) {
+void CompilerInTgForGeneric::run(MessagePtr message) {
     std::string extargs;
     std::stringstream cmd;
     std::stringstream res;

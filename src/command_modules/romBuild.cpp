@@ -138,7 +138,7 @@ class ROMBuildQueryHandler
     ROMBuildQueryHandler(std::shared_ptr<TgBotApi> api, MessagePtr userMessage);
     ~ROMBuildQueryHandler();
 
-    void updateSentMessage(MessagePtr message);
+    void updateSentMessage(Message::Ptr message);
 
    private:
     using Query = TgBot::CallbackQuery::Ptr;
@@ -199,10 +199,9 @@ class ROMBuildQueryHandler
     // Handle type selection button
     void handle_type(const Query& query);
 
-#define DECLARE_BUTTON_HANDLER(name, key)                               \
-    ButtonHandler {                                                     \
-        name, #key, [this](const Query& query) { handle_##key(query); } \
-    }
+#define DECLARE_BUTTON_HANDLER(name, key) \
+    ButtonHandler{name, #key,             \
+                  [this](const Query& query) { handle_##key(query); }}
 #define DECLARE_BUTTON_HANDLER_WITHPREFIX(name, key, prefix)             \
     ButtonHandler {                                                      \
         name, #key, [this](const Query& query) { handle_##key(query); }, \
@@ -271,7 +270,7 @@ class TaskWrapperBase {
 
    public:
     TaskWrapperBase(std::shared_ptr<ROMBuildQueryHandler> handler,
-                    const PerBuildData& data, ApiPtr api, MessagePtr message)
+                    const PerBuildData& data, ApiPtr api, Message::Ptr message)
         : queryHandler(std::move(handler)),
           data(data),
           api(api),
@@ -505,7 +504,7 @@ ROMBuildQueryHandler::~ROMBuildQueryHandler() {
     api->deleteMessage(sentMessage);
 }
 
-void ROMBuildQueryHandler::updateSentMessage(MessagePtr message) {
+void ROMBuildQueryHandler::updateSentMessage(Message::Ptr message) {
     sentMessage = message;
 }
 
@@ -683,8 +682,6 @@ void ROMBuildQueryHandler::onCallbackQuery(
 }
 
 DECLARE_COMMAND_HANDLER(rombuild, tgWrapper, message) {
-    MessageWrapper wrapper(tgWrapper, message);
-
     static std::shared_ptr<ROMBuildQueryHandler> handler;
     if (handler) {
         return;
@@ -712,6 +709,6 @@ DYN_COMMAND_FN(n, module) {
     module.command = "rombuild";
     module.description = "Build a ROM, I'm lazy";
     module.flags = CommandModule::Flags::Enforced;
-    module.fn = COMMAND_HANDLER_NAME(rombuild);
+    module.function = COMMAND_HANDLER_NAME(rombuild);
     return true;
 }

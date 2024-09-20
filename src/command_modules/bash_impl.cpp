@@ -23,19 +23,14 @@ DECLARE_COMMAND_HANDLER(ubash, wrapper, message) {
 }  // namespace
 
 DYN_COMMAND_FN(name, module) {
-    if (name == nullptr) {
-        return false;
-    }
-    std::string commandName = name;
-    module.command = commandName;
-    module.isLoaded = true;
+    module.command = name;
     module.flags = CommandModule::Flags::Enforced;
-    if (commandName == "bash") {
+    if (name == "bash") {
         module.description = GETSTR(BASH_CMD_DESC);
-        module.fn = COMMAND_HANDLER_NAME(bash);
-    } else if (commandName == "ubash") {
+        module.function = COMMAND_HANDLER_NAME(bash);
+    } else if (name == "ubash") {
         module.description = GETSTR(UBASH_CMD_DESC);
-        module.fn = COMMAND_HANDLER_NAME(ubash);
+        module.function = COMMAND_HANDLER_NAME(ubash);
     }
     return true;
 }

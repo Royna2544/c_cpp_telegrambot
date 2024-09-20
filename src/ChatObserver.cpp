@@ -55,11 +55,12 @@ void ChatObserver::process(const Message::Ptr& msg) {
 }
 
 void ChatObserver::doInitCall() {
-    TgBotWrapper::getInstance()->registerCallback(
+    TgBotWrapper::getInstance()->onAnyMessage(
         [this](const auto, const Message::Ptr& message) {
             if (!observedChatIds.empty() || observeAllChats) {
                 process(message);
             }
+            return TgBotWrapper::AnyMessageResult::Handled;
         });
 }
 

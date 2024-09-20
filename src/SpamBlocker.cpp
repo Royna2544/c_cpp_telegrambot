@@ -262,12 +262,13 @@ void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle,
 }
 
 void SpamBlockManager::doInitCall() {
-    _api->registerCallback([this](const auto, const Message::Ptr &message) {
+    _api->onAnyMessage([this](const auto, const Message::Ptr &message) {
         static auto spamMgr =
             ThreadManager::getInstance()
                 ->createController<ThreadManager::Usage::SPAMBLOCK_THREAD,
                                    SpamBlockManager>(_api);
         spamMgr->addMessage(message);
+        return TgBotWrapper::AnyMessageResult::Handled;
     });
 }
 

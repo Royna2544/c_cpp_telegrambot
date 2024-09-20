@@ -1,10 +1,10 @@
 #include <ConfigManager.h>
 #include <EnumArrayHelpers.h>
 #include <absl/log/log.h>
+#include <absl/strings/str_replace.h>
 
 #include <DurationPoint.hpp>
 #include <StringResManager.hpp>
-#include <boost/algorithm/string/replace.hpp>
 #include <chrono>
 #include <cstdio>
 #include <libos/libfs.hpp>
@@ -33,8 +33,7 @@ void CompilerInTg::runCommand(std::string cmd, std::stringstream &res,
     size_t buf_len = 0;
     popen_watchdog_data_t *p_wdt_data = nullptr;
 
-    boost::replace_all(cmd, std::string(1, '"'), "\\\"");
-
+    cmd = absl::StrReplaceAll(cmd, {{"\"", "\\\""}});
     LOG(INFO) << __func__ << ": +++";
     _interface->onExecutionStarted(cmd);
     LOG(INFO) << GETSTR_IS(COMMAND) << SingleQuoted(cmd);

@@ -5,7 +5,6 @@
 
 #include <StringResManager.hpp>
 #include <TgBotWrapper.hpp>
-#include <boost/algorithm/string/trim.hpp>
 #include <thread>
 #include <utility>
 

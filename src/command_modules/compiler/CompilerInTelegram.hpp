@@ -57,7 +57,7 @@ struct CompilerInTgForBash : CompilerInTg {
     using CompilerInTg::CompilerInTg;
     void allowHang(bool _allowhang) { allowhang = _allowhang; }
     ~CompilerInTgForBash() override = default;
-    void run(const Message::Ptr& message) override;
+    void run(MessagePtr message) override;
 
    private:
     bool allowhang;
@@ -75,16 +75,16 @@ struct CompilerInTgForGeneric : CompilerInTg {
         : CompilerInTg(std::move(interface)), params(std::move(params)) {}
 
     Params params;
-    bool verifyParseWrite(const Message::Ptr& message, std::string& extraargs);
+    bool verifyParseWrite(const MessagePtr message, std::string& extraargs);
     ~CompilerInTgForGeneric() override = default;
-    void run(const Message::Ptr& message) override;
+    void run(MessagePtr message) override;
 };
 
 struct CompilerInTgForCCpp : CompilerInTgForGeneric {
     using CompilerInTgForGeneric::CompilerInTgForGeneric;
     using CompilerInTgForGeneric::Params;
     ~CompilerInTgForCCpp() override = default;
-    void run(const Message::Ptr& message) override;
+    void run(MessagePtr message) override;
 };
 
 // Read buffer size, max allowed buffer size

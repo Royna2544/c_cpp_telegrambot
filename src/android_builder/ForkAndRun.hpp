@@ -1,11 +1,11 @@
 #pragma once
 
 // Helper class to fork and run a subprocess with stdout/err
+#include <absl/strings/ascii.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 #include <array>
-#include <boost/algorithm/string/trim.hpp>
 #include <iostream>
 #include <string_view>
 
@@ -67,7 +67,7 @@ class ForkAndRun {
      */
     virtual void onNewStderrBuffer(BufferType& buffer) {
         std::string lines = buffer.data();
-        std::cerr << boost::trim_copy(lines) << std::endl;
+        std::cerr << absl::StripAsciiWhitespace(lines) << std::endl;
     }
 
     /**

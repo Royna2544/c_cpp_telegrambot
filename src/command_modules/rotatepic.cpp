@@ -1,8 +1,6 @@
 #include <StringToolsExt.hpp>
 #include <TgBotWrapper.hpp>
 #include <TryParseStr.hpp>
-#include <algorithm>
-#include <boost/algorithm/string/split.hpp>
 #include <cctype>
 #include <filesystem>
 #include <imagep/ImageProcAll.hpp>
@@ -39,57 +37,37 @@ constexpr std::string_view kDownloadFile = "inpic.bin";
 constexpr std::string_view kOutputFile = "outpic.png";
 
 DECLARE_COMMAND_HANDLER(rotatepic, tgWrapper, message) {
-    MessageWrapper wrapper(tgWrapper, message);
-    std::string extText = wrapper.getExtraText();
-    std::vector<std::string> args;
+    std::vector<std::string> args = message->arguments();
     int rotation = 0;
     bool greyscale = false;
+    std::optional<std::string> fileid;
 
-    if (extText.empty()) {
-        wrapper.sendMessageOnExit("Usage: /rotatepic <angle> [greyscale]");
-        return;
+    if (message->replyToMessage_has<MessageExt::Attrs::Photo>()) {
+        const auto photo = message->replyToMessage->photo;
+        // Select the best quality photos available
+        fileid = photo.back()->fileId;
+    } else if (message->replyToMessage_has<MessageExt::Attrs::Sticker>()) {
+        const auto stick = message->replyToMessage->sticker;
+        if (stick->isAnimated || stick->isVideo) {
+            tgWrapper->sendReplyMessage(
+                message, "Cannot rotate animated or video sticker");
+        }
+        fileid = stick->fileId;
     }
 
-    if (!wrapper.switchToReplyToMessage("Reply to a sticker or picture")) {
-        return;
-    }
-    boost::split(args, extText, isspace);
-    std::ranges::remove_if(args, isEmptyOrBlank);
-
-    if (args.size() < 1 || args.size() > 2) {
-        wrapper.sendMessageOnExit(
-            "Invalid arguments. Use /rotatepic <angle> [greyscale]");
-        return;
-    }
     if (!try_parse(args[0], &rotation)) {
-        wrapper.sendMessageOnExit("Invalid angle. (0-360 are allowed)");
+        tgWrapper->sendReplyMessage(message,
+                                    "Invalid angle. (0-360 are allowed)");
         return;
     }
     if (args.size() == 2) {
         greyscale = args[1] == "greyscale";
     }
-    std::optional<std::string> fileid;
-    if (wrapper.hasSticker()) {
-        const auto stick = wrapper.getSticker();
-        if (stick->isAnimated || stick->isVideo) {
-            wrapper.sendMessageOnExit(
-                "Cannot rotate animated or video sticker");
-        }
-        fileid = stick->fileId;
-    } else if (wrapper.hasPhoto()) {
-        // Select the best quality photos available
-        fileid = wrapper.getPhoto().back()->fileId;
-    } else {
-        wrapper.sendMessageOnExit("Reply to a sticker or photo");
-    }
-
-    if (!fileid) {
-        return;
-    }
 
     // Download the sticker file
     if (!tgWrapper->downloadFile(kDownloadFile.data(), fileid.value())) {
-        wrapper.sendMessageOnExit("Failed to download sticker file.");
+        tgWrapper->sendReplyMessage(message,
+                                    "Failed to download sticker file.");
         return;
     }
 
@@ -106,16 +84,14 @@ DECLARE_COMMAND_HANDLER(rotatepic, tgWrapper, message) {
     if (processPhotoFile(params)) {
         const auto infile =
             TgBot::InputFile::fromFile(params.destPath.string(), "image/png");
-        const auto replyParams = std::make_shared<TgBot::ReplyParameters>();
-        replyParams->messageId = message->messageId;
-        replyParams->chatId = message->chat->id;
-        if (wrapper.hasSticker()) {
+        if (message->replyToMessage_has<MessageExt::Attrs::Sticker>()) {
             tgWrapper->sendReplySticker(message, infile);
-        } else if (wrapper.hasPhoto()) {
+        } else if (message->replyToMessage_has<MessageExt::Attrs::Photo>()) {
             tgWrapper->sendReplyPhoto(message, infile, "Rotated picture");
         }
     } else {
-        wrapper.sendMessageOnExit("Unknown image type, or processing failed");
+        tgWrapper->sendReplyMessage(message,
+                                    "Unknown image type, or processing failed");
     }
     std::filesystem::remove(params.srcPath);  // Delete the temporary file
     std::filesystem::remove(params.destPath);
@@ -126,6 +102,11 @@ DYN_COMMAND_FN(n, module) {
     module.command = "rotatepic";
     module.description = "Rotate a sticker";
     module.flags = CommandModule::Flags::None;
-    module.fn = COMMAND_HANDLER_NAME(rotatepic);
+    module.function = COMMAND_HANDLER_NAME(rotatepic);
+    module.valid_arguments.enabled = true;
+    module.valid_arguments.counts = {1, 2};
+    module.valid_arguments.split_type =
+        CommandModule::ValidArgs::Split::ByWhitespace;
+    module.valid_arguments.usage = "/rotatepic angle [greyscale]";
     return true;
 }

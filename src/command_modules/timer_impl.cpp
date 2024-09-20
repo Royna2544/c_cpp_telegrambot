@@ -30,13 +30,12 @@ DECLARE_COMMAND_HANDLER(starttimer, bot, message) {
     auto ctrl = tm->createController<ThreadManager::Usage::TIMER_THREAD,
 
                                      TimerImplThread>(message->chat->id);
-    MessageWrapper wrapper(bot, message);
     bool ok = false;
     std::string result;
-    if (wrapper.hasExtraText()) {
-        switch (ctrl->parse(wrapper.getExtraText())) {
+    if (message->has<MessageExt::Attrs::ExtraText>()) {
+        switch (ctrl->parse(message->text)) {
             case TimerThread::Result::TIME_CANNOT_PARSE:
-                result = "Could not parse time: " + wrapper.getExtraText();
+                result = "Could not parse time: " + message->text;
                 break;
             case TimerThread::Result::TIME_TOO_SHORT:
                 result = "Time too short. Please specify a time longer";
@@ -92,14 +91,14 @@ DECLARE_COMMAND_HANDLER(stoptimer, bot, message) {
 }
 
 DYN_COMMAND_FN(name, module) {
-    if (strcmp(name, "starttimer") == 0) {
+    if (name == "starttimer") {
         module.command = "starttimer";
         module.description = "Start timer of the bot";
-        module.fn = COMMAND_HANDLER_NAME(starttimer);
-    } else if (strcmp(name, "stoptimer") == 0) {
+        module.function = COMMAND_HANDLER_NAME(starttimer);
+    } else if (name == "stoptimer") {
         module.command = "stoptimer";
         module.description = "Stop timer of the bot";
-        module.fn = COMMAND_HANDLER_NAME(stoptimer);
+        module.function = COMMAND_HANDLER_NAME(stoptimer);
     } else {
         return false;
     }

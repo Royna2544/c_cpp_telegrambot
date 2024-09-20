@@ -1,9 +1,9 @@
 #include "RepoSyncTask.hpp"
 
+#include <absl/strings/str_split.h>
 #include <git2.h>
 
 #include <algorithm>
-#include <boost/algorithm/string/split.hpp>
 #include <chrono>
 #include <filesystem>
 #include <functional>
@@ -400,7 +400,7 @@ struct MatchesData {
                 }
             } else {
                 LOG(WARNING) << "Failed to get extensions.preciousobjects: "
-                           << git_error_last_str();
+                             << git_error_last_str();
             }
             // Manual, to save the file to disk
             git_config_free(config);
@@ -599,7 +599,7 @@ void RepoSyncTask::onNewStderrBuffer(ForkAndRun::BufferType& buffer) {
     std::vector<std::string> lines;
 
     // Split the buffer into lines
-    boost::split(lines, buffer.data(), [](const char c) { return c == '\n'; });
+    lines = absl::StrSplit(buffer.data(), '\n');
     if (std::chrono::system_clock::now() - clock > 10s) {
         clock = std::chrono::system_clock::now();
         wrapper->editMessage(message, "Sync in progress...:\n" + lines[0]);

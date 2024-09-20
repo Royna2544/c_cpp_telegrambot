@@ -1,13 +1,11 @@
 
+#include <absl/strings/str_split.h>
 #include <tgbot/tools/StringTools.h>
 
 #include <TgBotWrapper.hpp>
 #include <TryParseStr.hpp>
-#include <boost/algorithm/string/split.hpp>
 #include <functional>
 #include <thread>
-
-#include "StringToolsExt.hpp"
 
 constexpr int MAX_SPAM_COUNT = 10;
 constexpr auto kSpamDelayTime = std::chrono::milliseconds(700);
@@ -40,40 +38,40 @@ void try_parse_spamcnt(const std::string& data, int& count) {
 DECLARE_COMMAND_HANDLER(spam, bot, message) {
     std::function<void(void)> fp;
     int count = 0;
-    MessageWrapper wrapper(bot, message);
     bool spamable = false;
 
-    if (wrapper.hasReplyToMessage()) {
-        if (wrapper.hasExtraText()) {
-            const auto chatid = wrapper.getChatId();
+    if (message->has<MessageExt::Attrs::IsReplyMessage>()) {
+        const auto chatid = message->replyToMessage->chat->id;
 
-            spamable = true;
-            try_parse_spamcnt(wrapper.getExtraText(), count);
-            wrapper.switchToReplyToMessage();
-            if (wrapper.hasSticker()) {
-                fp = [bot, message, &wrapper, chatid] {
-                    bot->sendSticker(chatid, MediaIds(wrapper.getSticker()));
-                };
-            } else if (wrapper.hasAnimation()) {
-                fp = [bot, message, chatid, &wrapper] {
-                    bot->sendAnimation(chatid,
-                                       MediaIds(wrapper.getAnimation()));
-                };
-            } else if (wrapper.hasText()) {
-                fp = [bot, message, chatid, &wrapper] {
-                    bot->sendMessage(chatid, wrapper.getText());
-                };
-            } else {
-                wrapper.sendMessageOnExit(
-                    "Supports sticker/GIF/text for reply to "
-                    "messages, give count");
-                spamable = false;
-            }
+        spamable = true;
+        try_parse_spamcnt(message->get<MessageExt::Attrs::ExtraText>(), count);
+        if (message->replyToMessage_has<MessageExt::Attrs::Sticker>()) {
+            fp = [bot, message, chatid] {
+                bot->sendSticker(chatid,
+                                 MediaIds(message->replyToMessage->sticker));
+            };
+        } else if (message->replyToMessage_has<
+                       MessageExt::Attrs::Animation>()) {
+            fp = [bot, message, chatid] {
+                bot->sendAnimation(
+                    chatid, MediaIds(message->replyToMessage->animation));
+            };
+        } else if (message->replyToMessage_has<
+                       MessageExt::Attrs::ExtraText>()) {
+            fp = [bot, message, chatid] {
+                bot->sendMessage(chatid, message->replyToMessage->text);
+            };
+        } else {
+            bot->sendReplyMessage(message,
+                                  "Supports sticker/GIF/text for reply to "
+                                  "messages, give count");
+            spamable = false;
         }
-    } else if (wrapper.hasExtraText()) {
+
+    } else if (message->has<MessageExt::Attrs::ExtraText>()) {
         std::vector<std::string> commands;
         std::pair<int, std::string> spamData;
-        splitWithSpaces(wrapper.getExtraText(), commands);
+        commands = absl::StrSplit(message->text, ' ', absl::SkipWhitespace());
         if (commands.size() == 2) {
             try_parse_spamcnt(commands[0], spamData.first);
             spamData.second = commands[1];
@@ -83,11 +81,12 @@ DECLARE_COMMAND_HANDLER(spam, bot, message) {
             count = spamData.first;
             spamable = true;
         } else {
-            wrapper.sendMessageOnExit("Invalid argument size for spam config");
+            bot->sendReplyMessage(message,
+                                  "Invalid argument size for spam config");
         }
     } else {
-        wrapper.sendMessageOnExit(
-            "Send a pair of spam count and message to spam");
+        bot->sendReplyMessage(message,
+                              "Send a pair of spam count and message to spam");
     }
     if (spamable) {
         for_count(count, fp);
@@ -98,6 +97,6 @@ DYN_COMMAND_FN(n, module) {
     module.command = "spam";
     module.description = "Spam a given literal or media";
     module.flags = CommandModule::Flags::Enforced;
-    module.fn = COMMAND_HANDLER_NAME(spam);
+    module.function = COMMAND_HANDLER_NAME(spam);
     return true;
 }

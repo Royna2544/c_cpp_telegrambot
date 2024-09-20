@@ -3,6 +3,7 @@
 #include <Python.h>
 #include <absl/log/log.h>
 #include <absl/log/log_sink_registry.h>
+#include <absl/strings/ascii.h>
 #include <fcntl.h>
 #include <internal/_FileDescriptor_posix.h>
 #include <sys/mman.h>
@@ -10,7 +11,6 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include <boost/algorithm/string/trim.hpp>
 #include <csignal>
 #include <cstdlib>
 #include <libos/OnTerminateRegistrar.hpp>
@@ -133,7 +133,7 @@ bool ForkAndRun::execute() {
                     read(python_pipe.readEnd(), buf.data(), buf.size() - 1);
                 if (bytes_read >= 0) {
                     std::cout << "Python output: "
-                              << boost::trim_copy(std::string(buf.data()))
+                              << absl::StripAsciiWhitespace(buf.data())
                               << std::endl;
                     buf.fill(0);
                 }

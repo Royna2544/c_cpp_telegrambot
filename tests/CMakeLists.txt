@@ -18,7 +18,6 @@ add_my_executable(
   SRCS
     TestMain.cpp
     AuthorizationTest.cpp
-    MessageWrapperTest.cpp
     ConfigManagerTest.cpp
     RegexHandlerTest.cpp
     ResourceManagerTest.cpp

@@ -2,26 +2,26 @@
 
 #include <Authorization.h>
 #include <TgBotPPImpl_shared_depsExports.h>
+#include <Types.h>
+#include <absl/log/check.h>
 #include <tgbot/tgbot.h>
 
+#include <CompileTimeStringConcat.hpp>
+#include <InstanceClassBase.hpp>
 #include <ReplyParametersExt.hpp>
-#include <boost/algorithm/string/trim.hpp>
+#include <cstddef>
 #include <filesystem>
-#include <map>
+#include <functional>
+#include <ios>
 #include <memory>
-#include <optional>
 #include <queue>
+#include <sstream>
+#include <type_traits>
 #include <utility>
 #include <variant>
+#include <vector>
 
-#include "CompileTimeStringConcat.hpp"
-#include "InstanceClassBase.hpp"
-#include "Random.hpp"
-#include "Types.h"
-#include "tgbot/TgException.h"
-#include "tgbot/types/Chat.h"
-#include "tgbot/types/LinkPreviewOptions.h"
-
+using TgBot::Animation;
 using TgBot::Api;
 using TgBot::Bot;
 using TgBot::BotCommand;
@@ -38,37 +38,238 @@ using TgBot::StickerSet;
 using TgBot::TgLongPoll;
 using TgBot::User;
 
-struct MessageWrapper;
-struct MessageWrapperLimited;
 // API part wrapper (base)
 struct TgBotApi;
+struct MessageExt;
+struct CommandModule;
 
-using MessagePtr = const Message::Ptr&;
+using MessagePtr = std::shared_ptr<MessageExt>;
 using ApiPtr = const std::shared_ptr<TgBotApi>&;
 
 #define DYN_COMMAND_SYM_STR "loadcmd"
 #define DYN_COMMAND_SYM loadcmd
 #define DYN_COMMAND_FN(n, m) \
-    extern "C" bool DYN_COMMAND_SYM(const char* n, CommandModule& m)
+    extern "C" bool DYN_COMMAND_SYM(const std::string_view n, CommandModule& m)
 #define COMMAND_HANDLER_NAME(cmd) handle_command_##cmd
 #define DECLARE_COMMAND_HANDLER(cmd, w, m) \
     void COMMAND_HANDLER_NAME(cmd)(ApiPtr w, MessagePtr m)
 
-using onanymsg_callback_type = std::function<void(ApiPtr, MessagePtr)>;
 using command_callback_t = std::function<void(ApiPtr wrapper, MessagePtr)>;
+using loadcmd_function_cstyle_t = bool (*)(const std::string_view,
+                                           CommandModule&);
+using loadcmd_function_t =
+    std::function<std::remove_pointer_t<loadcmd_function_cstyle_t>>;
 
-struct CommandModule : TgBot::BotCommand {
-    enum Flags { None = 0, Enforced = 1 << 0, HideDescription = 1 << 1 };
-    command_callback_t fn;
-    unsigned int flags{};
-    bool isLoaded = false;
-    CommandModule(const std::string& name, const std::string& description,
-                  command_callback_t fn, unsigned int flags) noexcept
-        : fn(std::move(fn)), flags(flags) {
-        this->command = name;
-        this->description = description;
+enum class MessageExt_Attrs {
+    IsReplyMessage,
+    ExtraText,
+    Photo,
+    Sticker,
+    Animation,
+};
+
+// Split type to obtain arguments.
+enum class SplitMessageText {
+    None,
+    ByWhitespace,
+    ByComma,
+};
+
+template <MessageExt_Attrs T>
+struct GetAttribute;
+template <>
+struct GetAttribute<MessageExt_Attrs::Animation> {
+    using type = Animation::Ptr;
+};
+template <>
+struct GetAttribute<MessageExt_Attrs::Sticker> {
+    using type = Sticker::Ptr;
+};
+template <>
+struct GetAttribute<MessageExt_Attrs::Photo> {
+    using type = TgBot::PhotoSize::Ptr;
+};
+template <>
+struct GetAttribute<MessageExt_Attrs::ExtraText> {
+    using type = std::string;
+};
+template <>
+struct GetAttribute<MessageExt_Attrs::IsReplyMessage> {
+    using type = std::nullptr_t;
+};
+
+struct TgBotPPImpl_shared_deps_API MessageExt : Message {
+    using Ptr = std::shared_ptr<MessageExt>;
+    struct Command {
+        // e.g. start in /start@some_bot
+        std::string name;
+        // e.g. @some_bot in /start@some_bot
+        std::string target;
+    };
+    MessageExt() = default;
+    // Make assignments possible from Message
+    MessageExt(const Message& other) : Message(other) {
+        update();
     }
-    CommandModule() = default;
+    MessageExt(Message&& other) noexcept : Message(std::move(other)) {
+        update();
+    }
+    MessageExt(const Message::Ptr& other) : Message(*other) {
+        update();
+    }
+
+    // Update the Ext parameters with the base.
+    void update();
+    // Update the Ext parameters with the base and howto split the text.
+    void update(const SplitMessageText& how);
+
+    using Attrs = ::MessageExt_Attrs;
+
+    // Get an attribute value
+    template <Attrs attr>
+    [[nodiscard]] auto get() const {
+        return get_attribute<attr>(this);
+    }
+
+    template <Attrs attr>
+    [[nodiscard]] typename GetAttribute<attr>::type replyToMessage_get() const {
+        if (!replyToMessage) {
+            return {};
+        }
+        return get_attribute<attr>(
+            static_cast<MessageExt*>(replyToMessage.get()));
+    }
+
+    // Has an attribute?
+    template <Attrs... attrs>
+    [[nodiscard]] bool has() const {
+        return (has_attribute(this, attrs) && ...);
+    }
+    template <Attrs... attrs>
+    [[nodiscard]] bool replyToMessage_has() const {
+        if (!replyToMessage) {
+            return false;
+        }
+        auto* const message = static_cast<MessageExt*>(replyToMessage.get());
+        return (has_attribute(message, attrs) && ...);
+    }
+
+    template <Attrs... attrs>
+    std::string why_not() {
+        std::stringstream message;
+        ([this, &message](const Attrs& attr) {
+            message << "Has ";
+            switch (attr) {
+                case Attrs::IsReplyMessage:
+                    message << "reply to message";
+                    break;
+                case Attrs::ExtraText:
+                    message << "arguments";
+                    break;
+                case Attrs::Photo:
+                    message << "photo";
+                    break;
+                case Attrs::Sticker:
+                    message << "sticker";
+                    break;
+                case Attrs::Animation:
+                    message << "animation";
+                    break;
+            }
+            message << "? " << std::boolalpha << has_attribute(this, attr)
+                    << std::endl;
+        }(attrs...));
+        return message.str();
+    }
+
+    [[nodiscard]] std::vector<std::string> arguments() const {
+        return _arguments;
+    }
+    [[nodiscard]] const Command& get_command() const { return command; }
+
+#define HAS_AND_GETTER(name, varname)                     \
+    bool has##name() const { return varname != nullptr; } \
+    name ::Ptr get##name() const { return varname; }
+
+    HAS_AND_GETTER(Chat, chat);
+    HAS_AND_GETTER(Message, replyToMessage);
+    HAS_AND_GETTER(Sticker, sticker);
+    HAS_AND_GETTER(Animation, animation);
+    HAS_AND_GETTER(User, from);
+
+   private:
+    // Like /start@some_bot
+    Command command;
+    // Additional arguments following the bot command
+    std::string _extra_args;
+    // Splitted arguments
+    std::vector<std::string> _arguments;
+
+    static bool has_attribute(const MessageExt* interest, const Attrs attr) {
+        switch (attr) {
+            case Attrs::IsReplyMessage:
+                return interest->replyToMessage != nullptr;
+            case Attrs::ExtraText:
+                return !interest->_extra_args.empty();
+            case Attrs::Photo:
+                return !interest->photo.empty();
+            case Attrs::Sticker:
+                return interest->sticker != nullptr;
+            case Attrs::Animation:
+                return interest->animation != nullptr;
+        }
+        return false;
+    }
+    template <Attrs attr>
+        requires(attr != Attrs::IsReplyMessage)
+    [[nodiscard]] static constexpr typename GetAttribute<attr>::type
+    get_attribute(const MessageExt* interest) {
+        if constexpr (attr == Attrs::ExtraText) {
+            return interest->_extra_args;
+        } else if constexpr (attr == Attrs::Photo) {
+            return interest->photo.back();
+        } else if constexpr (attr == Attrs::Sticker) {
+            return interest->sticker;
+        } else if constexpr (attr == Attrs::Animation) {
+            return interest->animation;
+        }
+        CHECK(false) << "Unreachable: " << static_cast<int>(attr);
+        return {};
+    }
+
+};
+
+struct TgBotPPImpl_shared_deps_API CommandModule : TgBot::BotCommand {
+    using Ptr = std::unique_ptr<CommandModule>;
+
+    enum Flags { None = 0, Enforced = 1 << 0, HideDescription = 1 << 1 };
+    command_callback_t function;
+    unsigned int flags = None;
+
+    struct ValidArgs {
+        // Is it enabled?
+        bool enabled;
+        // Int array to the valid argument count array.
+        std::vector<int> counts;
+        // Split type to obtain arguments.
+        using Split = ::SplitMessageText;
+        Split split_type;
+        // Usage information for the command.
+        std::string usage;
+    } valid_arguments{};
+
+   private:
+    bool isLoaded = false;
+    void* handle = nullptr;
+    std::filesystem::path filePath;
+
+   public:
+    explicit CommandModule(std::filesystem::path filePath);
+    ~CommandModule() override = default;
+
+    bool load();
+    bool unload();
+    [[nodiscard]] bool getLoaded() const { return isLoaded; }
 
     [[nodiscard]] constexpr bool isEnforced() const {
         return (flags & Enforced) != 0;
@@ -141,18 +342,7 @@ struct MediaIds {
      * @return True if the IDs and unique IDs of both objects are equal, false
      * otherwise.
      */
-    bool operator==(const MediaIds& other) const {
-        return id == other.id && uniqueid == other.uniqueid;
-    }
-
-    /**
-     * @brief Compares two MediaIds objects for inequality.
-     *
-     * @param other The MediaIds object to compare with this one.
-     * @return True if the IDs and unique IDs of both objects are not equal,
-     * false otherwise.
-     */
-    bool operator!=(const MediaIds& other) const { return !(*this == other); }
+    auto operator<=>(const MediaIds& other) const { return id <=> other.id; }
 
     /**
      * @brief Checks if the MediaIds object is empty.
@@ -165,12 +355,10 @@ struct MediaIds {
 
 // Helper to remove duplicate overloads for ChatId and MessageTypes
 struct ChatIds {
-    ChatIds(ChatId id) : _id(id) {}  // NOLINT(hicpp-explicit-conversions)
-    ChatIds(MessagePtr message)
-        : _id(message->chat->id) {}  // NOLINT(hicpp-explicit-conversions)
-    operator ChatId() const {
-        return _id;
-    }  // NOLINT(hicpp-explicit-conversions)
+    ChatIds(ChatId id) : _id(id) {}
+    ChatIds(MessagePtr message) : _id(message->chat->id) {}
+    ChatIds(Message::Ptr message) : _id(message->chat->id) {}
+    operator ChatId() const { return _id; }
     ChatId _id;
 };
 
@@ -513,7 +701,7 @@ struct TgBotApi {
      * @return A boolean value indicating whether the message was pinned
      * successfully.
      */
-    virtual bool pinMessage_impl(MessagePtr message) const = 0;
+    virtual bool pinMessage_impl(Message::Ptr message) const = 0;
 
     /**
      * @brief Unpins a message in the specified chat.
@@ -525,7 +713,7 @@ struct TgBotApi {
      * @return A boolean value indicating whether the message was unpinned
      * successfully.
      */
-    virtual bool unpinMessage_impl(MessagePtr message) const = 0;
+    virtual bool unpinMessage_impl(Message::Ptr message) const = 0;
 
     /**
      * @brief Bans a chat member.
@@ -723,11 +911,13 @@ struct TgBotApi {
         return editMessageMarkup_impl(message, replyMarkup);
     }
 
-    inline MessageId copyMessage(
-        ChatId fromChatId, MessageId messageId,
-        ReplyParametersExt::Ptr replyParameters = nullptr) const {
-        return copyMessage_impl(fromChatId, messageId,
-                                std::move(replyParameters));
+    inline MessageId copyMessage(const Message::Ptr& message) const {
+        return copyMessage_impl(message->chat->id, message->messageId);
+    }
+
+    inline MessageId copyAndReplyAsMessage(const Message::Ptr& message) const {
+        return copyMessage_impl(message->chat->id, message->messageId,
+                                createReplyParametersForReply(message));
     }
 
     [[nodiscard]] inline bool answerCallbackQuery(
@@ -823,10 +1013,10 @@ struct TgBotApi {
                                       stickerFormat);
     }
 
-    inline bool pinMessage(MessagePtr message) {
+    inline bool pinMessage(Message::Ptr message) {
         return pinMessage_impl(message);
     }
-    inline bool unpinMessage(MessagePtr message) {
+    inline bool unpinMessage(Message::Ptr message) {
         return unpinMessage_impl(message);
     }
     inline bool banChatMember(const Chat::Ptr& chat, const User::Ptr& user) {
@@ -849,15 +1039,17 @@ struct TgBotApi {
         return false;  // Dummy implementation
     }
 
-    virtual void registerCallback(const onanymsg_callback_type& callback) {
+    enum class AnyMessageResult {
+        // Handled, keep giving me callbacks
+        Handled,
+        // Don't give me callbacks, deregister this handler...
+        Deregister,
+    };
+
+    using onAnyMessage_handler_t = std::function<AnyMessageResult(ApiPtr, MessagePtr)>;
+
+    virtual void onAnyMessage(const onAnyMessage_handler_t& callback) {
         // Dummy implementation
-    }
-    virtual void registerCallback(const onanymsg_callback_type& callback,
-                                  const size_t token) {
-        // Dummy implementation
-    }
-    virtual bool unregisterCallback(const size_t token) {
-        return false;  // Dummy implementation
     }
 
     virtual void onCallbackQuery(
@@ -891,6 +1083,7 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
    public:
     // Constructor requires a bot token to create a Bot instance.
     explicit TgBotWrapper(const std::string& token);
+    ~TgBotWrapper() override;
 
    private:
     Message::Ptr sendMessage_impl(ChatId chatId, const std::string& text,
@@ -988,8 +1181,8 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
      */
     User::Ptr getBotUser_impl() const override;
 
-    bool pinMessage_impl(MessagePtr message) const override;
-    bool unpinMessage_impl(MessagePtr message) const override;
+    bool pinMessage_impl(Message::Ptr message) const override;
+    bool unpinMessage_impl(Message::Ptr message) const override;
     bool banChatMember_impl(const Chat::Ptr& chat,
                             const User::Ptr& user) const override;
     bool unbanChatMember_impl(const Chat::Ptr& chat,
@@ -1001,7 +1194,7 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
 
    public:
     // Add commands/Remove commands
-    void addCommand(const CommandModule& module, bool isReload = false);
+    void addCommand(CommandModule::Ptr module);
     // Remove a command from being handled
     void removeCommand(const std::string& cmd);
 
@@ -1021,14 +1214,17 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
     bool reloadCommand(const std::string& command) override;
     bool isLoadedCommand(const std::string& command);
     bool isKnownCommand(const std::string& command);
-    void commandHandler(const command_callback_t& module_callback,
-                        unsigned int authflags, MessagePtr message);
+    void commandHandler(unsigned int authflags, MessageExt::Ptr message);
 
     template <unsigned Len>
     static consteval auto getInitCallNameForClient(const char (&str)[Len]) {
         return StringConcat::cat("Register onAnyMessage callbacks: ", str);
     }
 
+   private:
+    std::vector<onAnyMessage_handler_t> callbacks;
+
+   public:
     /**
      * @brief Registers a callback function to be called when any message is
      * received.
@@ -1036,51 +1232,8 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
      * @param callback The function to be called when any message is
      * received.
      */
-    void registerCallback(const onanymsg_callback_type& callback) override {
+    void onAnyMessage(const onAnyMessage_handler_t& callback) override {
         callbacks.emplace_back(callback);
-    }
-
-    /**
-     * @brief Registers a callback function with a token to be called when
-     * any message is received.
-     *
-     * @param callback The function to be called when any message is
-     * received.
-     * @param token A unique identifier for the callback.
-     */
-    void registerCallback(const onanymsg_callback_type& callback,
-                          const size_t token) override {
-        callbacksWithToken[token] = callback;
-    }
-
-    /**
-     * @brief Unregisters a callback function with a token from the list of
-     * callbacks to be called when any message is received.
-     *
-     * @param token The unique identifier of the callback to be
-     * unregistered.
-     *
-     * @return True if the callback with the specified token was found and
-     * successfully unregistered, false otherwise.
-     */
-    bool unregisterCallback(const size_t token) override {
-        auto it = callbacksWithToken.find(token);
-        if (it == callbacksWithToken.end()) {
-            return false;
-        }
-        callbacksWithToken.erase(it);
-        return true;
-    }
-
-    void registerOnAnyMsgCallback() {
-        getEvents().onAnyMessage([this](const Message::Ptr& message) {
-            for (auto& callback : callbacks) {
-                callback(shared_from_this(), message);
-            }
-            for (auto& [token, callback] : callbacksWithToken) {
-                callback(shared_from_this(), message);
-            }
-        });
     }
 
     void onCallbackQuery(const TgBot::EventBroadcaster::CallbackQueryListener&
@@ -1092,157 +1245,21 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
     [[nodiscard]] EventBroadcaster& getEvents() { return _bot.getEvents(); }
     [[nodiscard]] const Api& getApi() const { return _bot.getApi(); }
 
-    // A queue of command handlers that may block.
-    std::queue<std::future<void>> asyncTasks;
-    // Maximum number of concurrent async tasks.
-    static constexpr int MAX_ASYNC_TASKS = 5;
+    // Support async command handling
+    // A flag to stop worker
+    std::atomic<bool> stopWorker = false;
+    // A queue to handle command (commandname, async future)
+    std::queue<std::pair<std::string, std::future<void>>> asyncTasks;
+    // mutex to protect shared queue
+    std::mutex queueMutex;
+    // condition variable to wait for async tasks to finish.
+    std::condition_variable queueCV;
+    // worker thread(s) to consume command queue
+    std::vector<std::thread> workerThreads;
 
-    std::vector<CommandModule> _modules;
+    std::vector<std::unique_ptr<CommandModule>> _modules;
     Bot _bot;
-    std::vector<onanymsg_callback_type> callbacks;
-    std::map<size_t, onanymsg_callback_type> callbacksWithToken;
     decltype(_modules)::iterator findModulePosition(const std::string& command);
-};
-
-// Simple wrapper for TgBot::Message::Ptr.
-// Provides easy access, without bot
-struct MessageWrapperLimited {
-    TgBot::Message::Ptr message;
-    std::shared_ptr<MessageWrapperLimited> parent;
-
-    [[nodiscard]] ChatId getChatId() const { return message->chat->id; }
-    [[nodiscard]] bool hasReplyToMessage() const {
-        return message->replyToMessage != nullptr;
-    }
-    virtual bool switchToReplyToMessage() noexcept {
-        if (message->replyToMessage) {
-            parent = std::make_shared<MessageWrapperLimited>(
-                MessageWrapperLimited(message, parent));
-            message = message->replyToMessage;
-            return true;
-        }
-        return false;
-    }
-    virtual void switchToParent() noexcept {
-        if (parent) {
-            message = parent->message;
-            parent = parent->parent;
-        }
-    }
-
-    [[nodiscard]] bool hasExtraText() const noexcept {
-        return firstBlank(message) != std::string::npos;
-    }
-    [[nodiscard]] std::string getExtraText() const noexcept {
-        if (!hasExtraText()) {
-            return {};
-        }
-        return message->text.substr(firstBlank(message) + 1);
-    }
-    void getExtraText(std::string& extraText) const noexcept {
-        extraText = getExtraText();
-    }
-    [[nodiscard]] bool hasSticker() const noexcept {
-        return message->sticker != nullptr;
-    }
-    [[nodiscard]] TgBot::Sticker::Ptr getSticker() const noexcept {
-        return message->sticker;
-    }
-    [[nodiscard]] bool hasAnimation() const noexcept {
-        return message->animation != nullptr;
-    }
-    [[nodiscard]] TgBot::Animation::Ptr getAnimation() const noexcept {
-        return message->animation;
-    }
-    [[nodiscard]] bool hasText() const noexcept {
-        return !message->text.empty();
-    }
-    [[nodiscard]] std::string getText() const noexcept { return message->text; }
-
-    [[nodiscard]] bool hasUser() const noexcept {
-        return message->from != nullptr;
-    }
-    [[nodiscard]] TgBot::User::Ptr getUser() const noexcept {
-        return message->from;
-    }
-    [[nodiscard]] bool hasPhoto() const noexcept {
-        return !message->photo.empty();
-    }
-    [[nodiscard]] std::vector<TgBot::PhotoSize::Ptr> getPhoto() const noexcept {
-        return message->photo;
-    }
-    [[nodiscard]] Message::Ptr getMessage() const noexcept { return message; }
-    explicit MessageWrapperLimited(Message::Ptr message)
-        : message(std::move(message)) {}
-
-    virtual ~MessageWrapperLimited() = default;
-
-   private:
-    MessageWrapperLimited(Message::Ptr message,
-                          std::shared_ptr<MessageWrapperLimited> parent)
-        : MessageWrapperLimited(std::move(message)) {
-        this->parent = std::move(parent);
-    }
-    [[nodiscard]] static std::string::size_type firstBlank(
-        const TgBot::Message::Ptr& msg) noexcept {
-        return msg->text.find_first_of(" \n\r");
-    }
-};
-
-// Simple wrapper for TgBot::Message::Ptr.
-// Provides easy access
-struct MessageWrapper : MessageWrapperLimited {
-    std::shared_ptr<MessageWrapper> parent;
-    std::shared_ptr<TgBotApi> botWrapper;  // To access bot APIs
-
-    bool switchToReplyToMessage(const std::string& text) noexcept {
-        if (switchToReplyToMessage()) {
-            return true;
-        } else {
-            botWrapper->sendReplyMessage(message, text);
-            return false;
-        }
-    }
-    bool switchToReplyToMessage() noexcept override {
-        if (message->replyToMessage) {
-            parent = std::make_shared<MessageWrapper>(
-                MessageWrapper(botWrapper, message, parent));
-            message = message->replyToMessage;
-            return true;
-        }
-        return false;
-    }
-    void switchToParent() noexcept override {
-        if (parent) {
-            message = parent->message;
-            parent = parent->parent;
-        }
-    }
-
-    explicit MessageWrapper(std::shared_ptr<TgBotApi> api, Message::Ptr message)
-        : MessageWrapperLimited(std::move(message)),
-          botWrapper(std::move(api)) {}
-    ~MessageWrapper() noexcept override {
-        Message::Ptr Rmessage;
-        if (parent) {
-            Rmessage = parent->message;
-        } else {
-            Rmessage = message;
-        }
-        if (onExitMessage && !onExitMessage->empty()) {
-            botWrapper->sendReplyMessage(Rmessage, *onExitMessage);
-        }
-    }
-    void sendMessageOnExit(std::string message) noexcept {
-        onExitMessage = std::move(message);
-    }
-    void sendMessageOnExit() noexcept { onExitMessage = std::nullopt; }
-
-   private:
-    MessageWrapper(std::shared_ptr<TgBotApi> api, Message::Ptr message,
-                   std::shared_ptr<MessageWrapper> parent)
-        : MessageWrapper(std::move(api), std::move(message)) {
-        this->parent = std::move(parent);
-    }
-    std::optional<std::string> onExitMessage;
+    void startQueueConsumerThread();
+    void stopQueueConsumerThread();
 };

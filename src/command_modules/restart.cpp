@@ -59,6 +59,6 @@ DYN_COMMAND_FN(n, module) {
     module.command = "restart";
     module.description = "Restarts the bot";
     module.flags = CommandModule::Flags::Enforced;
-    module.fn = COMMAND_HANDLER_NAME(restart);
+    module.function = COMMAND_HANDLER_NAME(restart);
     return true;
 }

@@ -1,8 +1,8 @@
 #include <absl/log/log.h>
 #include <absl/status/status.h>
+#include <absl/strings/ascii.h>
 
 #include <RegEXHandler.hpp>
-#include <boost/algorithm/string/trim.hpp>
 #include <ios>
 #include <optional>
 #include <regex>
@@ -101,7 +101,7 @@ OptionalWrapper<std::string> RegexHandlerBase::doRegexDeleteCommand() {
                 }
             }
             out = kOutStream.str();
-            boost::trim(out);
+            out = absl::StripAsciiWhitespace(out);
             return {out};
         }
     }

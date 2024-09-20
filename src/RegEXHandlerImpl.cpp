@@ -13,7 +13,7 @@ class RegexHandlerInterface : public RegexHandlerBase::Interface {
             "RegexHandler has encountered an error: " + status.ToString());
     }
     void onSuccess(const std::string& result) override {
-        _api->sendReplyMessage(_message, result);
+        _api->sendReplyMessage(_message->replyToMessage, result);
     }
     void setMessage(Message::Ptr message) { _message = std::move(message); }
 
@@ -30,21 +30,23 @@ void RegexHandler::doInitCall() {
     static std::shared_ptr<RegexHandlerInterface> intf;
     static std::shared_ptr<RegexHandlerBase> handler;
 
-    TgBotWrapper::getInstance()->registerCallback(
-        [](ApiPtr api, MessagePtr message) {
-            std::call_once(once, [api]() {
-                intf = std::make_shared<RegexHandlerInterface>(api);
-                handler = std::make_shared<RegexHandlerBase>(intf);
-            });
-
-            MessageWrapperLimited wrapper(message);
-            if (wrapper.hasText() && wrapper.switchToReplyToMessage() &&
-                wrapper.hasText()) {
-                intf->setMessage(message);
-                handler->setContext({.regexCommand = message->text,
-                                     .text = message->replyToMessage->text});
-
-                handler->process();
-            }
+    TgBotWrapper::getInstance()->onAnyMessage([](ApiPtr api,
+                                                     MessagePtr message) {
+        std::call_once(once, [api]() {
+            intf = std::make_shared<RegexHandlerInterface>(api);
+            handler = std::make_shared<RegexHandlerBase>(intf);
         });
+
+        if (message->has<MessageExt::Attrs::IsReplyMessage,
+                         MessageExt::Attrs::ExtraText>() &&
+            message
+                ->replyToMessage_has<MessageExt::Attrs::ExtraText>()) {
+            intf->setMessage(message);
+            handler->setContext({.regexCommand = message->text,
+                                 .text = message->replyToMessage->text});
+
+            handler->process();
+        }
+        return TgBotWrapper::AnyMessageResult::Handled;
+    });
 }

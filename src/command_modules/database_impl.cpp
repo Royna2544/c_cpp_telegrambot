@@ -7,9 +7,7 @@
 #include <database/bot/TgBotDatabaseImpl.hpp>
 #include <memory>
 #include <optional>
-
-#include "Random.hpp"
-#include "StringToolsExt.hpp"
+#include "tgbot/types/InlineKeyboardMarkup.h"
 
 template <DatabaseBase::ListType type>
 void handleAddUser(ApiPtr wrapper, const Message::Ptr& message,
@@ -92,8 +90,6 @@ constexpr std::string_view addtoblacklist = "Add to blacklist";
 constexpr std::string_view removefromblacklist = "Remove from blacklist";
 
 DECLARE_COMMAND_HANDLER(database, wrapper, message) {
-    MessageWrapper msgWrapper(wrapper, message);
-
     auto reply = std::make_shared<TgBot::ReplyKeyboardMarkup>();
     reply->keyboard = genKeyboard(4, 2);
     reply->keyboard[0][0]->text = addtowhitelist;
@@ -104,22 +100,21 @@ DECLARE_COMMAND_HANDLER(database, wrapper, message) {
     reply->resizeKeyboard = true;
     reply->selective = true;
 
-    if (!msgWrapper.switchToReplyToMessage(GETSTR(REPLY_TO_USER_MSG))) {
+    if (!message->has<MessageExt::Attrs::IsReplyMessage>()) {
+        wrapper->sendReplyMessage(message, GETSTR(REPLY_TO_USER_MSG));
         return;
     }
 
-    UserId userId = msgWrapper.getUser()->id;
+    UserId userId = message->replyToMessage->from->id;
 
-    auto msg =
-        wrapper->sendReplyMessage(message,
-                                  "Choose what u want to do with " +
-                                      UserPtr_toString(msgWrapper.getUser()),
-                                  reply);
+    auto msg = wrapper->sendReplyMessage(
+        message,
+        "Choose what u want to do with " +
+            UserPtr_toString(message->replyToMessage->from),
+        reply);
 
-    const auto token = Random::getInstance()->generate(100);
-
-    wrapper->registerCallback(
-        [msg, token, userId](ApiPtr wrapper, MessagePtr m) {
+    wrapper->onAnyMessage(
+        [msg, userId](ApiPtr wrapper, MessagePtr m) {
             if (m->replyToMessage &&
                 m->replyToMessage->messageId == msg->messageId) {
                 if (m->text == addtowhitelist) {
@@ -135,76 +130,65 @@ DECLARE_COMMAND_HANDLER(database, wrapper, message) {
                     handleRemoveUser<DatabaseBase::ListType::BLACKLIST>(
                         wrapper, m, userId);
                 }
-                wrapper->unregisterCallback(token);
                 wrapper->editMessageMarkup(msg, nullptr);
+                return TgBotWrapper::AnyMessageResult::Deregister;
             }
-        },
-        token);
+            return TgBotWrapper::AnyMessageResult::Handled;
+        });
 };
 
 DECLARE_COMMAND_HANDLER(saveid, bot, message) {
-    MessageWrapper msgWrapper(bot, message);
-    if (msgWrapper.hasExtraText()) {
-        std::optional<std::string> fileId;
-        std::optional<std::string> fileUniqueId;
-        std::vector<std::string> names;
-        splitWithSpaces(msgWrapper.getExtraText(), names);
+    if (!(message->has<MessageExt::Attrs::ExtraText>() &&
+          message->replyToMessage_has<MessageExt::Attrs::Sticker>())) {
+        bot->sendReplyMessage(message, GETSTR(REPLY_TO_GIF_OR_STICKER));
+        return;
+    }
+    std::optional<std::string> fileId;
+    std::optional<std::string> fileUniqueId;
 
-        if (!msgWrapper.switchToReplyToMessage(
-                GETSTR(REPLY_TO_GIF_OR_STICKER))) {
-            return;
+    if (message->replyToMessage_has<MessageExt::Attrs::Animation>()) {
+        fileId = message->replyToMessage->animation->fileId;
+        fileUniqueId = message->replyToMessage->animation->fileUniqueId;
+    } else if (message->replyToMessage_has<MessageExt::Attrs::Sticker>()) {
+        fileId = message->replyToMessage->sticker->fileId;
+        fileUniqueId = message->replyToMessage->sticker->fileUniqueId;
+    }
+
+    CHECK(fileId && fileUniqueId) << "They should be set";
+
+    DatabaseBase::MediaInfo info{};
+    auto const& backend = TgBotDatabaseImpl::getInstance();
+    info.mediaId = fileId.value();
+    info.mediaUniqueId = fileUniqueId.value();
+    info.names = message->arguments();
+
+    if (backend->addMediaInfo(info)) {
+        std::stringstream ss;
+        ss << "Media with names:" << std::endl;
+        for (const auto& name : info.names) {
+            ss << "- " << name << std::endl;
         }
-
-        if (msgWrapper.hasAnimation()) {
-            fileId = msgWrapper.getAnimation()->fileId;
-            fileUniqueId = msgWrapper.getAnimation()->fileUniqueId;
-        } else if (msgWrapper.hasSticker()) {
-            fileId = msgWrapper.getSticker()->fileId;
-            fileUniqueId = msgWrapper.getSticker()->fileUniqueId;
-        } else {
-            msgWrapper.sendMessageOnExit(GETSTR(REPLY_TO_GIF_OR_STICKER));
-            return;
-        }
-
-        CHECK(fileId && fileUniqueId) << "They should be set";
-
-        DatabaseBase::MediaInfo info{};
-        auto const& backend = TgBotDatabaseImpl::getInstance();
-        info.mediaId = fileId.value();
-        info.mediaUniqueId = fileUniqueId.value();
-        info.names = names;
-
-        msgWrapper.switchToParent();
-        if (backend->addMediaInfo(info)) {
-            std::stringstream ss;
-            ss << "Media with names:" << std::endl;
-            for (const auto& name : names) {
-                ss << "- " << name << std::endl;
-            }
-            ss << "added";
-            msgWrapper.sendMessageOnExit(ss.str());
-        } else {
-            msgWrapper.sendMessageOnExit(GETSTR(MEDIA_ALREADY_IN_DB));
-        }
+        ss << "added";
+        bot->sendReplyMessage(message, ss.str());
     } else {
-        msgWrapper.sendMessageOnExit(GETSTR(SEND_A_NAME_TO_SAVE));
+        bot->sendReplyMessage(message, GETSTR(MEDIA_ALREADY_IN_DB));
     }
 }
 
 }  // namespace
 
 DYN_COMMAND_FN(name, module) {
-    if (std::string(name) == "database") {
-        module.command = "database";
+    if (name == "database") {
+        module.command = name;
         module.description = GETSTR(DATABASE_CMD_DESC);
         module.flags = CommandModule::Flags::Enforced;
-        module.fn = COMMAND_HANDLER_NAME(database);
-    } else if (std::string(name) == "saveid") {
-        module.command = "saveid";
+        module.function = COMMAND_HANDLER_NAME(database);
+    } else if (name == "saveid") {
+        module.command = name;
         module.description = GETSTR(SAVEID_CMD_DESC);
         module.flags = CommandModule::Flags::Enforced |
                        CommandModule::Flags::HideDescription;
-        module.fn = COMMAND_HANDLER_NAME(saveid);
+        module.function = COMMAND_HANDLER_NAME(saveid);
     } else {
         return false;  // Command not found.
     }

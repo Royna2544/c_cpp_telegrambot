@@ -32,12 +32,6 @@ struct StickerData {
     }
 };
 
-template <typename T>
-    requires std::equality_comparable<T>
-T min(T x, T y) {
-    return (x > y) ? y : x;
-}
-
 std::string ratio_to_percentage(double ratio) {
     std::stringstream ss;
     ss << std::fixed << std::setprecision(2) << ratio * 100 << "%";
@@ -50,21 +44,18 @@ constexpr int GOOD_MAX_STICKERS_SIZE = 40;
 constexpr int RATELIMIT_DELIMITER_FOR_CONVERT_UPDATE = 5;
 
 DECLARE_COMMAND_HANDLER(copystickers, api, message) {
-    MessageWrapper wrapper(api, message);
-    if (!wrapper.switchToReplyToMessage("Reply to a sticker")) {
+    if (!message->replyToMessage_has<MessageExt::Attrs::Sticker>()) {
+        api->sendReplyMessage(message, "Reply to a sticker");
         return;
     }
-    if (!wrapper.hasSticker()) {
-        wrapper.sendMessageOnExit("Please send a sticker");
-        return;
-    }
-    const auto set = api->getStickerSet(wrapper.getSticker()->setName);
+    const auto set = api->getStickerSet(
+        message->replyToMessage_get<MessageExt::Attrs::Sticker>()->setName);
     if (!set) {
-        wrapper.sendMessageOnExit("Sticker set not found");
+        api->sendReplyMessage(message, "Sticker set not found");
         return;
     }
     if (createDirectory("stickers")) {
-        wrapper.sendMessageOnExit("Failed to create stickers directory");
+        api->sendReplyMessage(message, "Failed to create stickers directory");
         return;
     }
     int counter = 0;
@@ -72,7 +63,7 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
             return sticker->isAnimated || sticker->isVideo;
         })) {
         LOG(WARNING) << "Sticker set contains animated stickers";
-        wrapper.sendMessageOnExit("Animated stickers are not supported");
+        api->sendReplyMessage(message, "Animated stickers are not supported");
         return;
     }
 
@@ -94,7 +85,7 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
                 sticker->fileId,
                 sticker->emoji,
                 counter++,
-                min<size_t>(set->stickers.size(), GOOD_MAX_STICKERS_SIZE)};
+                std::min<size_t>(set->stickers.size(), GOOD_MAX_STICKERS_SIZE)};
         });
 
     // Remove duplicates by unique file IDs
@@ -115,28 +106,28 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
         }
         sticker.printProgress("Downloading");
         if (!api->downloadFile(sticker.filePath, sticker.fileId)) {
-            wrapper.sendMessageOnExit("Failed to download sticker file");
+            api->sendReplyMessage(message, "Failed to download sticker file");
             return;
         }
         sticker.printProgress("Converting");
         ImageProcessingAll imageProc(sticker.filePath);
         if (!imageProc.read()) {
-            wrapper.sendMessageOnExit("Failed to read sticker file");
+            api->sendReplyMessage(message, "Failed to read sticker file");
             return;
         }
         imageProc.to_greyscale();
         if (!imageProc.write(sticker.filePath)) {
-            wrapper.sendMessageOnExit("Failed to write sticker file");
+            api->sendReplyMessage(message, "Failed to write sticker file");
             return;
         }
         sticker.printProgress("Uploading");
         const auto file = api->uploadStickerFile(
-            wrapper.getUser()->id,
+            message->from->id,
             InputFile::fromFile(sticker.filePath.generic_string(),
                                 "image/webp"),
             "static");
         if (!file) {
-            wrapper.sendMessageOnExit("Failed to upload sticker file");
+            api->sendReplyMessage(message, "Failed to upload sticker file");
             return;
         }
         sticker.printProgress("Sending");
@@ -170,7 +161,7 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
               << ", title: " << std::quoted(title)
               << " size: " << stickerToSend.size();
     try {
-        api->createNewStickerSet(wrapper.getUser()->id, setName, title,
+        api->createNewStickerSet(message->from->id, setName, title,
                                  stickerToSend, Sticker::Type::Regular);
         LOG(INFO) << "Created: https://t.me/addstickers/" + setName;
         api->editMessage(
@@ -187,6 +178,6 @@ DYN_COMMAND_FN(/*name*/, module) {
     module.command = "copystickers";
     module.description = "Copy sticker pack with a remap";
     module.flags = CommandModule::Flags::None;
-    module.fn = COMMAND_HANDLER_NAME(copystickers);
+    module.function = COMMAND_HANDLER_NAME(copystickers);
     return true;
 }
