@@ -9,6 +9,6 @@ if (USE_UNIX_SOCKETS)
   add_my_executable(
     NAME logcat
     SRCS LoggingClient.cpp
-    LIBS TgBotSocket
+    LIBS TgBotSocket TgBotUtils
   )
 endif()

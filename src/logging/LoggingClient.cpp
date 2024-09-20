@@ -1,10 +1,7 @@
-#include <absl/base/log_severity.h>
 #include <absl/log/log.h>
-#include <absl/log/log_entry.h>
-#include <absl/log/log_sink.h>
-#include <absl/log/log_sink_registry.h>
+#include <absl/strings/ascii.h>
+#include <libos/libsighandler.hpp>
 
-#include <boost/algorithm/string/trim.hpp>
 #include <cstdlib>
 #include <impl/bot/ClientBackend.hpp>
 
@@ -25,9 +22,11 @@ int main() {
         return EXIT_FAILURE;
     }
 
+    SignalHandler::install();
+
     LOG(INFO) << "Now waiting to read from the server's logs";
 
-    while (true) {
+    while (!SignalHandler::isSignaled()) {
         auto data =
             wrapper->readFromSocket(clientSocket.value(), sizeof(LogEntry));
         if (!data) {
@@ -39,8 +38,9 @@ int main() {
             return EXIT_FAILURE;
         }
         std::string message = entry.message.data();
-        boost::trim(message);
+        message = absl::StripAsciiWhitespace(message);
         LOG(INFO) << entry.severity << " " << message;
     }
+    wrapper->closeSocketHandle(clientSocket.value());
     return EXIT_SUCCESS;
 }
