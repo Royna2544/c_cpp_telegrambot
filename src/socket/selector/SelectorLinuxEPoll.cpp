@@ -2,6 +2,7 @@
 #include <sys/epoll.h>
 
 #include <algorithm>
+#include <cerrno>
 
 #include "SelectorPosix.hpp"
 
@@ -65,9 +66,14 @@ bool EPollSelector::remove(socket_handle_t fd) {
     return found;
 }
 
+#define CALL_RETRY(retvar, expression) do { \
+    retvar = (expression); \
+} while (retvar == -1 && errno == EINTR);
+
 EPollSelector::SelectorPollResult EPollSelector::poll() {
     epoll_event result_event{};
-    int result = epoll_wait(epollfd, &result_event, 1, getSOrDefault());
+    int result = 0;
+    CALL_RETRY(result, epoll_wait(epollfd, &result_event, 1, getSOrDefault()));
     if (result < 0) {
         PLOG(ERROR) << "epoll_wait failed";
         return SelectorPollResult::FAILED;
