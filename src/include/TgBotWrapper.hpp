@@ -14,6 +14,7 @@
 #include <functional>
 #include <ios>
 #include <memory>
+#include <mutex>
 #include <queue>
 #include <sstream>
 #include <type_traits>
@@ -108,15 +109,11 @@ struct TgBotPPImpl_shared_deps_API MessageExt : Message {
     };
     MessageExt() = default;
     // Make assignments possible from Message
-    MessageExt(const Message& other) : Message(other) {
-        update();
-    }
+    MessageExt(const Message& other) : Message(other) { update(); }
     MessageExt(Message&& other) noexcept : Message(std::move(other)) {
         update();
     }
-    MessageExt(const Message::Ptr& other) : Message(*other) {
-        update();
-    }
+    MessageExt(const Message::Ptr& other) : Message(*other) { update(); }
 
     // Update the Ext parameters with the base.
     void update();
@@ -236,7 +233,6 @@ struct TgBotPPImpl_shared_deps_API MessageExt : Message {
         CHECK(false) << "Unreachable: " << static_cast<int>(attr);
         return {};
     }
-
 };
 
 struct TgBotPPImpl_shared_deps_API CommandModule : TgBot::BotCommand {
@@ -1046,7 +1042,8 @@ struct TgBotApi {
         Deregister,
     };
 
-    using onAnyMessage_handler_t = std::function<AnyMessageResult(ApiPtr, MessagePtr)>;
+    using onAnyMessage_handler_t =
+        std::function<AnyMessageResult(ApiPtr, MessagePtr)>;
 
     virtual void onAnyMessage(const onAnyMessage_handler_t& callback) {
         // Dummy implementation
@@ -1222,6 +1219,9 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
     }
 
    private:
+    // Protect callbacks
+    std::mutex callbackMutex;
+    // A callback list where it is called when any message is received
     std::vector<onAnyMessage_handler_t> callbacks;
 
    public:
@@ -1233,6 +1233,7 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
      * received.
      */
     void onAnyMessage(const onAnyMessage_handler_t& callback) override {
+        const std::lock_guard<std::mutex> _(callbackMutex);
         callbacks.emplace_back(callback);
     }
 

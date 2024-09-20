@@ -378,13 +378,18 @@ void TgBotWrapper::startPoll() {
         LOG(INFO) << "Unknown command: " << message->text;
     });
     getEvents().onAnyMessage([this](const Message::Ptr& message) {
-        auto it = callbacks.rbegin();
+        decltype(callbacks)::reverse_iterator it;
         std::vector<std::pair<std::future<AnyMessageResult>, decltype(it)>> vec;
-        while (it != callbacks.rend()) {
-            vec.emplace_back(
-                std::async(std::launch::async, *it, shared_from_this(),
-                           std::make_shared<MessageExt>(message)),
-                it++);
+
+        {
+            std::lock_guard<std::mutex> lock(callbackMutex);
+            it = callbacks.rbegin();
+            while (it != callbacks.rend()) {
+                vec.emplace_back(
+                    std::async(std::launch::async, *it, shared_from_this(),
+                               std::make_shared<MessageExt>(message)),
+                    it++);
+            }
         }
         for (auto& [future, callback] : vec) {
             try {
@@ -392,7 +397,7 @@ void TgBotWrapper::startPoll() {
                     // Skip
                     case TgBotApi::AnyMessageResult::Handled:
                         break;
-                    
+
                     case TgBotApi::AnyMessageResult::Deregister:
                         callbacks.erase(std::next(callback).base());
                         break;
@@ -529,8 +534,7 @@ MessageId TgBotWrapper::copyMessage_impl(
     ReplyParametersExt::Ptr replyParameters) const {
     const auto ret = getApi().copyMessage(
         fromChatId, fromChatId, messageId, "", "", {}, kDisableNotifications,
-        replyParameters, nullptr, false,
-        ReplyParamsToMsgTid{replyParameters});
+        replyParameters, nullptr, false, ReplyParamsToMsgTid{replyParameters});
     if (ret) {
         return ret->messageId;
     }
