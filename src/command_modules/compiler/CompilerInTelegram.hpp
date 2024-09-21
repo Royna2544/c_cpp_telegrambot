@@ -54,8 +54,8 @@ struct CompilerInTg {
 };
 
 struct CompilerInTgForBash : CompilerInTg {
-    using CompilerInTg::CompilerInTg;
-    void allowHang(bool _allowhang) { allowhang = _allowhang; }
+    CompilerInTgForBash(std::shared_ptr<Interface> interface, bool allowhang)
+        : CompilerInTg(std::move(interface)), allowhang(allowhang) {}
     ~CompilerInTgForBash() override = default;
     void run(MessagePtr message) override;
 

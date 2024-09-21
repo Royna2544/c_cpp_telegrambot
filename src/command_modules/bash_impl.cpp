@@ -9,14 +9,13 @@ namespace {
 DECLARE_COMMAND_HANDLER(bash, wrapper, message) {
     const auto helper =
         std::make_shared<CompilerInTgBotInterface>(wrapper, message);
-    CompilerInTgForBash bash(helper);
+    CompilerInTgForBash bash(helper, false);
     bash.run(message);
 }
 DECLARE_COMMAND_HANDLER(ubash, wrapper, message) {
     const auto helper =
         std::make_shared<CompilerInTgBotInterface>(wrapper, message);
-    CompilerInTgForBash ubash(helper);
-    ubash.allowHang(true);
+    CompilerInTgForBash ubash(helper, true);
     ubash.run(message);
 }
 
