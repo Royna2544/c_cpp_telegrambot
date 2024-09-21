@@ -16,15 +16,17 @@ enum class Commands {
     Dump,
     AddChat,
     SetOwnerId,
+    WhiteBlackList,
     DeleteMedia = Noop,
     DeleteChat = Noop,
 };
 
 // Structure to hold command data for easier manipulation and handling
 struct CommandData {
-    std::vector<std::string>
-        args;  // Array of command arguments after (exe, command)
-    std::shared_ptr<TgBotDatabaseImpl> impl;  // Instance of TgBotDatabaseImpl
+    // Array of command arguments after (exe, command)
+    std::vector<std::string> args;
+    // Instance of TgBotDatabaseImpl
+    std::shared_ptr<TgBotDatabaseImpl> impl;
 };
 
 namespace {
@@ -52,6 +54,9 @@ void executeCommand<Commands::Help>(const CommandData& data) {
     std::cout << "- delete_chat: Delete a chat info from the database"
               << std::endl;
     std::cout << "- set_owner_id: Set the owner ID for the database"
+              << std::endl;
+    std::cout << "- set_white_black_list: Add/remove the white/black list user "
+                 "for the database"
               << std::endl;
 }
 
@@ -99,6 +104,51 @@ void executeCommand<Commands::SetOwnerId>(const CommandData& data) {
     LOG(INFO) << "Owner ID set to " << ownerId;
 }
 
+template <>
+void executeCommand<Commands::WhiteBlackList>(const CommandData& data) {
+    if (data.args.size() < 3) {
+        LOG(ERROR)
+            << "Need <whitelist|blacklist> <add|remove> <user_id> as arguments";
+        return;
+    }
+    std::string typeStr = data.args[0];
+    if (typeStr != "whitelist" && typeStr != "blacklist") {
+        LOG(ERROR) << "Invalid type specified. Use 'whitelist' or 'blacklist'";
+        return;
+    }
+    DatabaseBase::ListType type{};
+    if (typeStr == "whitelist") {
+        type = DatabaseBase::ListType::WHITELIST;
+    } else {
+        type = DatabaseBase::ListType::BLACKLIST;
+    }
+    std::string action = data.args[1];
+    if (action != "add" && action != "remove") {
+        LOG(ERROR) << "Invalid action specified. Use 'add' or'remove'";
+        return;
+    }
+    UserId userId{};
+    if (!try_parse(data.args[2], &userId)) {
+        LOG(ERROR) << "Invalid user_id specified";
+        return;
+    }
+    if (action == "add") {
+        if (data.impl->addUserToList(type, userId) ==
+            DatabaseBase::ListResult::OK) {
+            LOG(INFO) << "Added user_id=" << userId << " to list";
+        } else {
+            LOG(ERROR) << "Failed to add user_id=" << userId << " to list";
+        }
+    } else if (action == "remove") {
+        if (data.impl->removeUserFromList(type, userId) ==
+            DatabaseBase::ListResult::OK) {
+            LOG(INFO) << "Removed user_id=" << userId << " from list";
+        } else {
+            LOG(ERROR) << "Failed to remove user_id=" << userId << " from list";
+        }
+    }
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -135,6 +185,8 @@ int main(int argc, char** argv) {
         executeCommand<Commands::DeleteChat>(data);
     } else if (command == "set_owner_id") {
         executeCommand<Commands::SetOwnerId>(data);
+    } else if (command == "set_white_black_list") {
+        executeCommand<Commands::WhiteBlackList>(data);
     } else {
         LOG(ERROR) << "Unknown command: " << command;
     }
