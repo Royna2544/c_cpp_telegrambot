@@ -26,7 +26,7 @@
 
 struct popen_wdt_posix_priv {
     pthread_t wdt_thread;
-    pid_t wdt_pid;
+    pid_t childprocess_pid;
     int pipefd_r;  // Subprocess' readfd, write end for the child
     bool running;
 };
@@ -48,11 +48,12 @@ static void *watchdog(void *arg) {
     struct popen_wdt_posix_priv *pdata = data->privdata;
 
     POPEN_WDT_DBGLOG("Check subprocess");
-    if (kill(pdata->wdt_pid, 0) == 0) {
-        killpg(pdata->wdt_pid, SIGINT);
+    if (kill(pdata->childprocess_pid, 0) == 0) {
+        killpg(pdata->childprocess_pid, SIGINT);
         data->watchdog_activated = true;
         POPEN_WDT_DBGLOG("Watchdog activated");
     }
+
     POPEN_WDT_DBGLOG("--");
     pdata->running = false;
     return NULL;
@@ -132,7 +133,7 @@ bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
         close(pipefd[1]);
         // Assign privdata members.
         pdata->pipefd_r = pipefd[0];
-        pdata->wdt_pid = pid;
+        pdata->childprocess_pid = pid;
         pdata->running = true;
         POPEN_WDT_DBGLOG("Parent pid is %d", getpid());
         POPEN_WDT_DBGLOG("Child pid is %d", pid);
@@ -168,14 +169,23 @@ void popen_watchdog_stop(popen_watchdog_data_t **data_in) {
 void popen_watchdog_destroy(popen_watchdog_data_t **data_in) {
     popen_watchdog_data_t *data = NULL;
     struct popen_wdt_posix_priv *pdata = NULL;
+    int status = 0;
 
     pthread_mutex_lock(&wdt_mutex);
     if (!check_popen_wdt_data(data_in)) {
         pthread_mutex_unlock(&wdt_mutex);
         return;
     }
+
     data = *data_in;
     pdata = data->privdata;
+    if (waitpid(pdata->childprocess_pid, &status, 0) < 0) {
+        POPEN_WDT_DBGLOG("Failed to wait for child process");
+    } else {
+        POPEN_WDT_DBGLOG("Child process %d exited with status %d signal %d",
+                         pdata->childprocess_pid, WEXITSTATUS(status),
+                         WTERMSIG(status));
+    }
     close(pdata->pipefd_r);
     free(pdata);
     free(data);
