@@ -8,7 +8,6 @@
 #include <TgBotWrapper.hpp>
 #include <algorithm>
 #include <array>
-#include <cstddef>
 #include <filesystem>
 #include <fstream>
 #include <future>
@@ -72,7 +71,6 @@ CommandModule::CommandModule(std::filesystem::path filePath)
     : filePath(std::move(filePath)) {}
 
 bool CommandModule::load() {
-    const char* dlerrorBuf = nullptr;
     loadcmd_function_t sym = nullptr;
     const std::string cmdNameStr =
         filePath.filename().replace_extension().string();
@@ -83,26 +81,24 @@ bool CommandModule::load() {
         return false;
     }
 
-    handle = dlopen(filePath.string().c_str(), RTLD_NOW);
+    handle = DLWrapper(filePath);
     if (handle == nullptr) {
-        dlerrorBuf = dlerror() ?: "unknown";
         LOG(WARNING) << "dlopen failed for " << filePath.filename() << ": "
-                     << dlerrorBuf;
+                     << DLWrapper::error();
         return false;
     }
-    sym = reinterpret_cast<loadcmd_function_cstyle_t>(
-        dlsym(handle, DYN_COMMAND_SYM_STR));
+    sym = handle.sym<loadcmd_function_cstyle_t>(DYN_COMMAND_SYM_STR);
     if (sym == nullptr) {
         LOG(WARNING) << "Failed to lookup symbol '" DYN_COMMAND_SYM_STR "' in "
                      << filePath;
-        dlclose(handle);
+        handle.reset();
         return false;
     }
 
     if (!sym(cmdNameView.data(), *this)) {
         LOG(WARNING) << "Failed to load command module from " << filePath;
         function = nullptr;
-        dlclose(handle);
+        handle.reset();
         return false;
     }
     isLoaded = true;
@@ -110,11 +106,10 @@ bool CommandModule::load() {
 #ifndef NDEBUG
     Dl_info info{};
     void* fnptr = nullptr;
-    if (dladdr(dlsym(handle, DYN_COMMAND_SYM_STR), &info) < 0) {
-        dlerrorBuf = dlerror() ?: "unknown";
-        LOG(WARNING) << "dladdr failed for " << filePath << ": " << dlerrorBuf;
-    } else {
+    if (handle.info(DYN_COMMAND_SYM_STR, &info)) {
         fnptr = info.dli_saddr;
+    } else {
+        LOG(WARNING) << "dladdr failed for " << filePath << ": " << DLWrapper::error();
     }
 
     DLOG(INFO) << "Loaded RT command module from " << filePath.filename();
@@ -128,8 +123,6 @@ bool CommandModule::unload() {
     if ((handle != nullptr) && isLoaded) {
         isLoaded = false;
         function = nullptr;
-        dlclose(handle);
-        handle = nullptr;
         return true;
     }
     return false;
@@ -266,7 +259,6 @@ void TgBotWrapper::addCommand(CommandModule::Ptr module) {
     unsigned int authflags = AuthContext::Flags::REQUIRE_USER;
 
     if (!module->getLoaded()) {
-        DLOG(INFO) << "Module not loaded, trying to load it...";
         if (!module->load()) {
             DLOG(ERROR) << "Failed to load command module";
             return;
@@ -302,7 +294,9 @@ bool TgBotWrapper::setBotCommands() const {
     std::vector<TgBot::BotCommand::Ptr> buffer;
     for (const auto& cmd : _modules) {
         if (!cmd->isHideDescription()) {
-            auto onecommand = std::make_shared<CommandModule>(*cmd);
+            auto onecommand = std::make_shared<TgBot::BotCommand>();
+            onecommand->command = cmd->command;
+            onecommand->description = cmd->description;
             if (cmd->isEnforced()) {
                 onecommand->description += " " + GETSTR_BRACE(OWNER);
             }
@@ -383,6 +377,9 @@ void TgBotWrapper::startPoll() {
 
         {
             std::lock_guard<std::mutex> lock(callbackMutex);
+            if (callbacks.empty()) {
+                return;
+            }
             it = callbacks.rbegin();
             while (it != callbacks.rend()) {
                 vec.emplace_back(

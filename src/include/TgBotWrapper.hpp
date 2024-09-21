@@ -4,6 +4,7 @@
 #include <TgBotPPImpl_shared_depsExports.h>
 #include <Types.h>
 #include <absl/log/check.h>
+#include <dlfcn.h>
 #include <tgbot/tgbot.h>
 
 #include <CompileTimeStringConcat.hpp>
@@ -17,6 +18,8 @@
 #include <mutex>
 #include <queue>
 #include <sstream>
+#include <stdexcept>
+#include <string_view>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -235,6 +238,51 @@ struct TgBotPPImpl_shared_deps_API MessageExt : Message {
     }
 };
 
+class TgBotPPImpl_shared_deps_API DLWrapper {
+    std::unique_ptr<void, decltype(&dlclose)> handle;
+
+    [[nodiscard]] void* sym(const std::string_view name) const {
+        if (!handle) {
+            throw std::invalid_argument("Handle is nullptr");
+        }
+        return dlsym(handle.get(), name.data());
+    }
+
+   public:
+    // Constructors
+    explicit DLWrapper(const std::filesystem::path& libPath)
+        : handle(dlopen(libPath.string().c_str(), RTLD_NOW), &dlclose){};
+    DLWrapper() : handle(nullptr, &dlclose){};
+
+    // Operators
+    DLWrapper& operator=(std::nullptr_t /*rhs*/) {
+        handle = nullptr;
+        return *this;
+    }
+    bool operator==(std::nullptr_t) const { return handle == nullptr; }
+    operator bool() const { return handle != nullptr; }
+
+    // dlfcn functions.
+    template <typename T>
+    T sym(const std::string_view name) const {
+        return reinterpret_cast<T>(sym(name));
+    }
+    bool info(const std::string_view name, Dl_info* info) const {
+        // return value of 0 or more is a valid one...
+        return dladdr(sym(name), info) >= 0;
+    }
+    static std::string_view error() {
+        const char* err = dlerror();
+        if (err != nullptr) {
+            return err;
+        }
+        return "unknown";
+    }
+
+    // Other methods
+    void reset() { handle.reset(); }
+};
+
 struct TgBotPPImpl_shared_deps_API CommandModule : TgBot::BotCommand {
     using Ptr = std::unique_ptr<CommandModule>;
 
@@ -256,7 +304,7 @@ struct TgBotPPImpl_shared_deps_API CommandModule : TgBot::BotCommand {
 
    private:
     bool isLoaded = false;
-    void* handle = nullptr;
+    DLWrapper handle;
     std::filesystem::path filePath;
 
    public:

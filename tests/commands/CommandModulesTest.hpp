@@ -205,17 +205,16 @@ class CommandModulesTest : public ::testing::Test {
      * @brief Load a command module from the specified file.
      *
      * @param name The name of the file containing the command module.
-     * @return An optional containing the loaded module handle if successful,
-     *         or an empty optional if the module could not be loaded.
+     * @return loaded module handle if successful.
      */
-    std::optional<CommandModule> loadModule(const std::string& name) const;
+    CommandModule::Ptr loadModule(const std::string& name) const;
 
     /**
      * @brief Unload a command module.
      *
      * @param module The module handle to unload.
      */
-    static void unloadModule(CommandModule&& module);
+    static void unloadModule(CommandModule::Ptr module);
 
     /**
      * @brief Create a default message object for testing purposes.
@@ -273,14 +272,13 @@ class CommandTestBase : public CommandModulesTest {
    protected:
     void SetUp() override {
         CommandModulesTest::SetUp();
-        const auto mod = loadModule(name);
-        ASSERT_TRUE(mod);
-        module = mod.value();
+        module = loadModule(name);
+        ASSERT_NE(module, nullptr);
         defaultProvidedMessage = createDefaultMessage();
     }
     void TearDown() override {
         if (module) {
-            unloadModule(std::move(module.value()));
+            unloadModule(std::move(module));
         }
         CommandModulesTest::TearDown();
         defaultProvidedMessage.reset();
@@ -445,6 +443,6 @@ class CommandTestBase : public CommandModulesTest {
 
    protected:
     std::string name;
-    std::optional<CommandModule> module;
+    CommandModule::Ptr module;
     MessageExt::Ptr defaultProvidedMessage;
 };

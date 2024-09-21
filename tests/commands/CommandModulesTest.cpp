@@ -3,6 +3,8 @@
 #include <database/bot/TgBotDatabaseImpl.hpp>
 #include <libos/libfs.hpp>
 #include <memory>
+#include <optional>
+#include "TgBotWrapper.hpp"
 
 void CommandModulesTest::SetUpTestSuite() {}
 
@@ -25,7 +27,7 @@ void CommandModulesTest::TearDown() {
     TgBotDatabaseImpl::destroyInstance();
 }
 
-std::optional<CommandModule> CommandModulesTest::loadModule(
+CommandModule::Ptr CommandModulesTest::loadModule(
     const std::string& name) const {
     std::filesystem::path moduleFileName = "libcmd_" + name;
     const auto moduleFilePath =
@@ -33,19 +35,22 @@ std::optional<CommandModule> CommandModulesTest::loadModule(
     loadcmd_function_cstyle_t sym = nullptr;
 
     LOG(INFO) << "Loading module " << std::quoted(name) << " for testing...";
-    CommandModule module(moduleFilePath);
+    auto module = std::make_unique<CommandModule>(moduleFilePath);
 
-    auto ret = module.load();
+    auto ret = module->load();
     EXPECT_TRUE(ret);
 
     if (ret) {
         LOG(INFO) << "Module " << name << " loaded successfully.";
+    } else {
+        LOG(WARNING) << "Failed to load module " << name;
+        return nullptr;
     }
     return module;
 }
 
-void CommandModulesTest::unloadModule(CommandModule&& module) {
-    module.unload();
+void CommandModulesTest::unloadModule(CommandModule::Ptr module) {
+    module->unload();
 }
 
 MessageExt::Ptr CommandModulesTest::createDefaultMessage() {
