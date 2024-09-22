@@ -134,8 +134,8 @@ bool CommandModule::load() {
     }
 
     DLWrapper dlwrapper(filePath);
-    if (handle == nullptr) {
-        LOG(WARNING) << "dlopen failed for " << filePath.filename() << ": "
+    if (dlwrapper == nullptr) {
+        LOG(WARNING) << "dlopen failed for " << filePath << ": "
                      << DLWrapper::error();
         return false;
     }
@@ -143,14 +143,14 @@ bool CommandModule::load() {
     if (sym == nullptr) {
         LOG(WARNING) << "Failed to lookup symbol '" DYN_COMMAND_SYM_STR "' in "
                      << filePath;
-        handle.reset();
+        dlwrapper.reset();
         return false;
     }
 
     if (!sym(cmdNameView.data(), *this)) {
         LOG(WARNING) << "Failed to load command module from " << filePath;
         function = nullptr;
-        handle.reset();
+        dlwrapper.reset();
         return false;
     }
     isLoaded = true;
