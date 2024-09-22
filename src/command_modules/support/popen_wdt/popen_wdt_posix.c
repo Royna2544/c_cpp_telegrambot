@@ -182,9 +182,13 @@ void popen_watchdog_destroy(popen_watchdog_data_t **data_in) {
     if (waitpid(pdata->childprocess_pid, &status, 0) < 0) {
         POPEN_WDT_DBGLOG("Failed to wait for child process");
     } else {
-        POPEN_WDT_DBGLOG("Child process %d exited with status %d signal %d",
-                         pdata->childprocess_pid, WEXITSTATUS(status),
-                         WTERMSIG(status));
+        if (WIFSIGNALED(status)) {
+            POPEN_WDT_DBGLOG("Child process %d exited with signal %d",
+                             pdata->childprocess_pid, WTERMSIG(status));
+        } else if (WIFEXITED(status)) {
+            POPEN_WDT_DBGLOG("Child process %d exited with status %d",
+                             pdata->childprocess_pid, WEXITSTATUS(status));
+        }
     }
     close(pdata->pipefd_r);
     free(pdata);
