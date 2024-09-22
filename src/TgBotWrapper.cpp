@@ -67,8 +67,60 @@ void MessageExt::update(const SplitMessageText& how) {
     }
 }
 
+class DLWrapper {
+    using RAIIHandle = std::unique_ptr<void, decltype(&dlclose)>;
+    RAIIHandle handle;
+
+    [[nodiscard]] void* sym(const std::string_view name) const {
+        if (!handle) {
+            throw std::invalid_argument("Handle is nullptr");
+        }
+        return dlsym(handle.get(), name.data());
+    }
+
+   public:
+    // Constructors
+    explicit DLWrapper(const std::filesystem::path& libPath)
+        : handle(dlopen(libPath.string().c_str(), RTLD_NOW), &dlclose){};
+    DLWrapper() : handle(nullptr, &dlclose){};
+
+    // Operators
+    DLWrapper& operator=(std::nullptr_t /*rhs*/) {
+        handle = nullptr;
+        return *this;
+    }
+    bool operator==(std::nullptr_t) const { return handle == nullptr; }
+    operator bool() const { return handle != nullptr; }
+
+    RAIIHandle underlying() {
+        auto tmp = std::move(handle);
+        handle = nullptr;
+        return std::move(tmp);
+    }
+
+    // dlfcn functions.
+    template <typename T>
+    T sym(const std::string_view name) const {
+        return reinterpret_cast<T>(sym(name));
+    }
+    bool info(const std::string_view name, Dl_info* info) const {
+        // return value of 0 or more is a valid one...
+        return dladdr(sym(name), info) >= 0;
+    }
+    static std::string_view error() {
+        const char* err = dlerror();
+        if (err != nullptr) {
+            return err;
+        }
+        return "unknown";
+    }
+
+    // Other methods
+    void reset() { handle.reset(); }
+};
+
 CommandModule::CommandModule(std::filesystem::path filePath)
-    : filePath(std::move(filePath)) {}
+    : filePath(std::move(filePath)), handle(nullptr, &dlclose) {}
 
 bool CommandModule::load() {
     loadcmd_function_t sym = nullptr;
@@ -81,13 +133,13 @@ bool CommandModule::load() {
         return false;
     }
 
-    handle = DLWrapper(filePath);
+    DLWrapper dlwrapper(filePath);
     if (handle == nullptr) {
         LOG(WARNING) << "dlopen failed for " << filePath.filename() << ": "
                      << DLWrapper::error();
         return false;
     }
-    sym = handle.sym<loadcmd_function_cstyle_t>(DYN_COMMAND_SYM_STR);
+    sym = dlwrapper.sym<loadcmd_function_cstyle_t>(DYN_COMMAND_SYM_STR);
     if (sym == nullptr) {
         LOG(WARNING) << "Failed to lookup symbol '" DYN_COMMAND_SYM_STR "' in "
                      << filePath;
@@ -106,16 +158,18 @@ bool CommandModule::load() {
 #ifndef NDEBUG
     Dl_info info{};
     void* fnptr = nullptr;
-    if (handle.info(DYN_COMMAND_SYM_STR, &info)) {
+    if (dlwrapper.info(DYN_COMMAND_SYM_STR, &info)) {
         fnptr = info.dli_saddr;
     } else {
-        LOG(WARNING) << "dladdr failed for " << filePath << ": " << DLWrapper::error();
+        LOG(WARNING) << "dladdr failed for " << filePath << ": "
+                     << DLWrapper::error();
     }
 
     DLOG(INFO) << "Loaded RT command module from " << filePath.filename();
     DLOG(INFO) << "Module dump: { enforced: " << isEnforced()
                << ", name: " << command << ", fn: " << fnptr << " }";
 #endif
+    handle = std::move(dlwrapper.underlying());
     return true;
 }
 
