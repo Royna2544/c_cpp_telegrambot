@@ -1,7 +1,7 @@
 #include <EnumArrayHelpers.h>
 #include <absl/log/log.h>
 
-#include <TgBotSocket_Export.hpp>
+#include <_TgBotSocketCommands.hpp>
 #include <mutex>
 #include <sstream>
 

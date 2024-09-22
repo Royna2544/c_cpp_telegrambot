@@ -12,34 +12,13 @@
 
 #include "../../include/SharedMalloc.hpp"
 #include "../../include/Types.h"
+#include "_TgBotSocketCommands.hpp"
 
 namespace TgBotSocket {
 
 constexpr int MAX_PATH_SIZE = 256;
 constexpr int MAX_MSG_SIZE = 256;
 constexpr int ALIGNMENT = 8;
-
-enum class Command : std::int32_t {
-    CMD_WRITE_MSG_TO_CHAT_ID,
-    CMD_CTRL_SPAMBLOCK,
-    CMD_OBSERVE_CHAT_ID,
-    CMD_SEND_FILE_TO_CHAT_ID,
-    CMD_OBSERVE_ALL_CHATS,
-    CMD_DELETE_CONTROLLER_BY_ID,
-    CMD_GET_UPTIME,
-    CMD_UPLOAD_FILE,
-    CMD_DOWNLOAD_FILE,
-    CMD_CLIENT_MAX,
-
-    // Below are internal commands
-    CMD_SERVER_INTERNAL_START = 100,
-    CMD_GET_UPTIME_CALLBACK = CMD_SERVER_INTERNAL_START,
-    CMD_GENERIC_ACK,
-    CMD_UPLOAD_FILE_DRY,
-    CMD_UPLOAD_FILE_DRY_CALLBACK,
-    CMD_DOWNLOAD_FILE_CALLBACK,
-    CMD_MAX,
-};
 
 /**
  * @brief Header for TgBotCommand Packets
