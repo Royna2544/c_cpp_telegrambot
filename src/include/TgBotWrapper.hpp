@@ -100,7 +100,9 @@ struct GetAttribute<MessageExt_Attrs::IsReplyMessage> {
     using type = std::nullptr_t;
 };
 
-struct TgBotPPImpl_shared_deps_API MessageExt : Message {
+struct TgBotPPImpl_shared_deps_API MessageExt
+    : Message,
+      public std::enable_shared_from_this<MessageExt> {
     using Ptr = std::shared_ptr<MessageExt>;
     struct Command {
         // e.g. start in /start@some_bot
@@ -126,7 +128,7 @@ struct TgBotPPImpl_shared_deps_API MessageExt : Message {
     // Get an attribute value
     template <Attrs attr>
     [[nodiscard]] auto get() const {
-        return get_attribute<attr>(this);
+        return get_attribute<attr>(shared_from_this());
     }
 
     template <Attrs attr>
@@ -134,22 +136,20 @@ struct TgBotPPImpl_shared_deps_API MessageExt : Message {
         if (!replyToMessage) {
             return {};
         }
-        return get_attribute<attr>(
-            static_cast<MessageExt*>(replyToMessage.get()));
+        return get_attribute<attr>(std::make_shared<MessageExt>(replyToMessage));
     }
 
     // Has an attribute?
     template <Attrs... attrs>
     [[nodiscard]] bool has() const {
-        return (has_attribute(this, attrs) && ...);
+        return (has_attribute(shared_from_this(), attrs) && ...);
     }
     template <Attrs... attrs>
     [[nodiscard]] bool replyToMessage_has() const {
         if (!replyToMessage) {
             return false;
         }
-        auto* const message = static_cast<MessageExt*>(replyToMessage.get());
-        return (has_attribute(message, attrs) && ...);
+        return (has_attribute(std::make_shared<MessageExt>(replyToMessage), attrs) && ...);
     }
 
     template <Attrs... attrs>
@@ -174,7 +174,7 @@ struct TgBotPPImpl_shared_deps_API MessageExt : Message {
                     message << "animation";
                     break;
             }
-            message << "? " << std::boolalpha << has_attribute(this, attr)
+            message << "? " << std::boolalpha << has_attribute(shared_from_this(), attr)
                     << std::endl;
         }(attrs...));
         return message.str();
@@ -203,7 +203,8 @@ struct TgBotPPImpl_shared_deps_API MessageExt : Message {
     // Splitted arguments
     std::vector<std::string> _arguments;
 
-    static bool has_attribute(const MessageExt* interest, const Attrs attr) {
+    static bool has_attribute(const std::shared_ptr<const MessageExt>& interest,
+                              const Attrs attr) {
         switch (attr) {
             case Attrs::IsReplyMessage:
                 return interest->replyToMessage != nullptr;
@@ -221,7 +222,7 @@ struct TgBotPPImpl_shared_deps_API MessageExt : Message {
     template <Attrs attr>
         requires(attr != Attrs::IsReplyMessage)
     [[nodiscard]] static constexpr typename GetAttribute<attr>::type
-    get_attribute(const MessageExt* interest) {
+    get_attribute(const std::shared_ptr<const MessageExt>& interest) {
         if constexpr (attr == Attrs::ExtraText) {
             return interest->_extra_args;
         } else if constexpr (attr == Attrs::Photo) {
@@ -258,7 +259,7 @@ struct TgBotPPImpl_shared_deps_API CommandModule : TgBot::BotCommand {
    private:
     bool isLoaded = false;
     // dlclose RAII handle
-    std::unique_ptr<void, int(*)(void *)> handle;
+    std::unique_ptr<void, int (*)(void*)> handle;
     std::filesystem::path filePath;
 
    public:

@@ -434,9 +434,9 @@ void TgBotWrapper::startPoll() {
             return;
         }
         const auto thiz = shared_from_this();
-        it = callbacks.rbegin();
-        while (it != callbacks.rend()) {
-            auto fn_copy = *it;
+        it = callbacks.crbegin();
+        while (it != callbacks.crend()) {
+            const auto fn_copy = *it;
             vec.emplace_back(std::async(std::launch::async, fn_copy, thiz,
                                         std::make_shared<MessageExt>(message)),
                              it++);
@@ -734,6 +734,9 @@ TgBotWrapper::TgBotWrapper(const std::string& token) : _bot(token) {
     startQueueConsumerThread();
 }
 
-TgBotWrapper::~TgBotWrapper() { stopQueueConsumerThread(); }
+TgBotWrapper::~TgBotWrapper() {
+    stopQueueConsumerThread();
+    std::ranges::for_each(callbacks, [](auto&& fn) { fn = nullptr; }); 
+}
 
 DECLARE_CLASS_INST(TgBotWrapper);
