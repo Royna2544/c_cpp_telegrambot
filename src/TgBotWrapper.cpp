@@ -426,22 +426,22 @@ void TgBotWrapper::startPoll() {
         LOG(INFO) << "Unknown command: " << message->text;
     });
     getEvents().onAnyMessage([this](const Message::Ptr& message) {
-        decltype(callbacks)::reverse_iterator it;
+        decltype(callbacks)::const_reverse_iterator it;
         std::vector<std::pair<std::future<AnyMessageResult>, decltype(it)>> vec;
+        const std::lock_guard<std::mutex> lock(callbackMutex);
 
-        {
-            std::lock_guard<std::mutex> lock(callbackMutex);
-            if (callbacks.empty()) {
-                return;
-            }
-            it = callbacks.rbegin();
-            while (it != callbacks.rend()) {
-                vec.emplace_back(
-                    std::async(std::launch::async, *it, shared_from_this(),
-                               std::make_shared<MessageExt>(message)),
-                    it++);
-            }
+        if (callbacks.empty()) {
+            return;
         }
+        const auto thiz = shared_from_this();
+        it = callbacks.rbegin();
+        while (it != callbacks.rend()) {
+            auto fn_copy = *it;
+            vec.emplace_back(std::async(std::launch::async, fn_copy, thiz,
+                                        std::make_shared<MessageExt>(message)),
+                             it++);
+        }
+
         for (auto& [future, callback] : vec) {
             try {
                 switch (future.get()) {
