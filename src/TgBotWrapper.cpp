@@ -47,10 +47,10 @@ void MessageExt::update() {
 }
 
 void MessageExt::update(const SplitMessageText& how) {
-    _arguments.clear();
     if (_extra_args.size() == 0) {
         return;  // No arguments, nothing to split.
     }
+    _arguments.clear();
     switch (how) {
         case CommandModule::ValidArgs::Split::ByWhitespace:
             _arguments =
@@ -68,7 +68,7 @@ void MessageExt::update(const SplitMessageText& how) {
 }
 
 class DLWrapper {
-    using RAIIHandle = std::unique_ptr<void, decltype(&dlclose)>;
+    using RAIIHandle = std::unique_ptr<void, int (*)(void*)>;
     RAIIHandle handle;
 
     [[nodiscard]] void* sym(const std::string_view name) const {
@@ -114,9 +114,6 @@ class DLWrapper {
         }
         return "unknown";
     }
-
-    // Other methods
-    void reset() { handle.reset(); }
 };
 
 CommandModule::CommandModule(std::filesystem::path filePath)
@@ -143,14 +140,12 @@ bool CommandModule::load() {
     if (sym == nullptr) {
         LOG(WARNING) << "Failed to lookup symbol '" DYN_COMMAND_SYM_STR "' in "
                      << filePath;
-        dlwrapper.reset();
         return false;
     }
 
     if (!sym(cmdNameView.data(), *this)) {
         LOG(WARNING) << "Failed to load command module from " << filePath;
         function = nullptr;
-        dlwrapper.reset();
         return false;
     }
     isLoaded = true;
@@ -229,6 +224,8 @@ void TgBotWrapper::commandHandler(unsigned int authflags,
                     break;
                 case AuthContext::Result::Reason::REQUIRES_USER:
                     LOG(INFO) << "Reason: Requires user";
+                    break;
+                default:
                     break;
             }
         }
@@ -420,44 +417,56 @@ decltype(TgBotWrapper::_modules)::iterator TgBotWrapper::findModulePosition(
                                 });
 }
 
+void TgBotWrapper::onAnyMessageFunction(const Message::Ptr& message) {
+    decltype(callbacks)::const_reverse_iterator it;
+    std::vector<std::pair<std::future<AnyMessageResult>, decltype(it)>> vec;
+    const std::lock_guard<std::mutex> lock(callbackMutex);
+
+    if (callbacks.empty()) {
+        return;
+    }
+    const auto thiz = shared_from_this();
+    it = callbacks.crbegin();
+    while (it != callbacks.crend()) {
+        const auto fn_copy = *it;
+        vec.emplace_back(std::async(std::launch::async, fn_copy, thiz,
+                                    std::make_shared<MessageExt>(message)),
+                         it++);
+    }
+
+    for (auto& [future, callback] : vec) {
+        try {
+            switch (future.get()) {
+                // Skip
+                case TgBotApi::AnyMessageResult::Handled:
+                    break;
+
+                case TgBotApi::AnyMessageResult::Deregister:
+                    callbacks.erase(callback.base());
+                    break;
+            }
+        } catch (const TgBot::TgException& ex) {
+            LOG(ERROR) << "Error in onAnyMessageCallback: " << ex.what();
+        }
+    }
+}
+
 void TgBotWrapper::startPoll() {
+    const auto& botUser = getBotUser();
+    LOG(INFO) << "Bot username: " << botUser->username;
+    // Deleting webhook
     getApi().deleteWebhook();
-    getEvents().onUnknownCommand([](Message::Ptr message) {
+    // Register -> onUnknownCommand
+    getEvents().onUnknownCommand([username = botUser->username](const Message::Ptr& message) {
+        const auto ext = std::make_shared<MessageExt>(message);
+        if (ext->get_command().target != username) {
+            return; // ignore, unless explicitly targetted this bot.
+        }
         LOG(INFO) << "Unknown command: " << message->text;
     });
-    getEvents().onAnyMessage([this](const Message::Ptr& message) {
-        decltype(callbacks)::const_reverse_iterator it;
-        std::vector<std::pair<std::future<AnyMessageResult>, decltype(it)>> vec;
-        const std::lock_guard<std::mutex> lock(callbackMutex);
-
-        if (callbacks.empty()) {
-            return;
-        }
-        const auto thiz = shared_from_this();
-        it = callbacks.crbegin();
-        while (it != callbacks.crend()) {
-            const auto fn_copy = *it;
-            vec.emplace_back(std::async(std::launch::async, fn_copy, thiz,
-                                        std::make_shared<MessageExt>(message)),
-                             it++);
-        }
-
-        for (auto& [future, callback] : vec) {
-            try {
-                switch (future.get()) {
-                    // Skip
-                    case TgBotApi::AnyMessageResult::Handled:
-                        break;
-
-                    case TgBotApi::AnyMessageResult::Deregister:
-                        callbacks.erase(std::next(callback).base());
-                        break;
-                }
-            } catch (const TgBot::TgException& ex) {
-                LOG(ERROR) << "Error in onAnyMessageCallback: " << ex.what();
-            }
-        }
-    });
+    // Register -> onAnyMessage
+    getEvents().onAnyMessage(
+        [this](const Message::Ptr& message) { onAnyMessageFunction(message); });
 
     OnTerminateRegistrar::getInstance()->registerCallback([this]() {
         std::ranges::for_each(
@@ -736,7 +745,7 @@ TgBotWrapper::TgBotWrapper(const std::string& token) : _bot(token) {
 
 TgBotWrapper::~TgBotWrapper() {
     stopQueueConsumerThread();
-    std::ranges::for_each(callbacks, [](auto&& fn) { fn = nullptr; }); 
+    std::ranges::for_each(callbacks, [](auto&& fn) { fn = nullptr; });
 }
 
 DECLARE_CLASS_INST(TgBotWrapper);

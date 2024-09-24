@@ -313,8 +313,6 @@ int main(int argc, char** argv) {
     }
     while (!SignalHandler::isSignaled()) {
         try {
-            LOG(INFO) << "Bot username: "
-                      << wrapperInst->getBotUser()->username;
             wrapperInst->startPoll();
         } catch (const TgBot::TgException& e) {
             TgBotApiExHandler(e);

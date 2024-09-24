@@ -1264,6 +1264,7 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
     std::vector<std::unique_ptr<CommandModule>> _modules;
     Bot _bot;
     decltype(_modules)::iterator findModulePosition(const std::string& command);
+    void onAnyMessageFunction(const Message::Ptr& message);
     void startQueueConsumerThread();
     void stopQueueConsumerThread();
 };
