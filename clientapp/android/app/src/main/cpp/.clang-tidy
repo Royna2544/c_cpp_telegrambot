@@ -1,0 +1,6 @@
+---
+Checks: "
+         -cppcoreguidelines-pro-type-vararg
+         -cppcoreguidelines-avoid-do-while
+         -misc-no-recursion
+"

@@ -10,6 +10,7 @@
 #include <cstring>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "JNIOnLoad.h"
 #include "JavaCppConverter.hpp"
@@ -23,17 +24,18 @@ using namespace TgBotSocket::callback;
 
 struct SocketConfig {
     std::string address;
-    enum { USE_IPV4, USE_IPV6 } mode;
-    int port;
+    enum : std::uint8_t { USE_IPV4, USE_IPV6 } mode {};
+    int port {};
 
     int timeout_s = 5;
 };
 
 #define SOCKNATIVE_JAVACLS "com/royna/tgbotclient/SocketCommandNative"
-#define SOCKNATIVE_CMDCB_JAVACLS SOCKNATIVE_JAVACLS "$ICommandCallback"
+#define SOCKNATIVE_CMDCB_JAVACLS SOCKNATIVE_JAVACLS "$ICommandStatusCallback"
 #define SOCKNATIVE_DSTINFO_JAVACLS SOCKNATIVE_JAVACLS "$DestinationInfo"
 #define SOCKNATIVE_DSTTYPE_JAVACLS SOCKNATIVE_JAVACLS "$DestinationType"
 #define STRING_JAVACLS "java/lang/String"
+#define OBJECT_JAVACLS "java/lang/Object"
 
 class TgBotSocketNative {
    public:
@@ -64,17 +66,16 @@ class TgBotSocketNative {
     }
     UploadFile::Options getUploadFileOptions() { return uploadOptions; }
 
-    static std::shared_ptr<TgBotSocketNative> getInstance() {
-        static auto instance =
-            std::make_shared<TgBotSocketNative>(TgBotSocketNative());
-        return instance;
+    static TgBotSocketNative* getInstance() {
+        static auto instance = TgBotSocketNative();
+        return &instance;
     }
 
     static void callSuccess(JNIEnv *env, jobject callbackObj,
                             jobject resultObj) {
         jclass callbackClass = env->FindClass(SOCKNATIVE_CMDCB_JAVACLS);
         jmethodID success = env->GetMethodID(callbackClass, "onSuccess",
-                                             "(Ljava/lang/Object;)V");
+                                             "(L" OBJECT_JAVACLS ";)V");
         ABSL_DLOG(INFO) << "Will execute: " << __func__;
         env->CallVoidMethod(callbackObj, success, resultObj);
         ABSL_LOG(INFO) << "Called onSuccess callback";
@@ -87,7 +88,7 @@ class TgBotSocketNative {
             env->GetMethodID(callbackClass, "onError", "(L" STRING_JAVACLS ";)V");
 
         ABSL_DLOG(INFO) << "Will execute: " << __func__;
-        env->CallVoidMethod(callbackObj, failed, Convert<jstring>(env, message));
+        env->CallVoidMethod(callbackObj, failed, Convert<jstring>(env, std::move(message)));
         ABSL_LOG(INFO) << "Called onFailed callback";
     }
 
@@ -99,10 +100,10 @@ class TgBotSocketNative {
 
     TgBotSocketNative() = default;
 
-    static void closeFd(int *fd) { close(*fd); }
+    static void closeFd(const int *fd) { close(*fd); }
 
     static void _callFailed(JNIEnv *env, jobject callbackObj,
-                            std::string message) {
+                            const std::string& message) {
         ABSL_PLOG(ERROR) << message;
         callFailed(env, callbackObj, message);
     }
@@ -307,14 +308,14 @@ class TgBotSocketNative {
     template <>
     void handleSpecificData<Command::CMD_GET_UPTIME_CALLBACK>(
         JNIEnv *env, jobject callbackObj, const void *data,
-        PacketHeader::length_type len) const {
+        PacketHeader::length_type  /*len*/) const {
         const auto *uptime = static_cast<const char *>(data);
         callSuccess(env, callbackObj, Convert<jstring>(env, uptime));
     }
     template <>
     void handleSpecificData<Command::CMD_UPLOAD_FILE_DRY_CALLBACK>(
         JNIEnv *env, jobject callbackObj, const void *data,
-        PacketHeader::length_type len) const {
+        PacketHeader::length_type  /*len*/) const {
         const auto *callback = static_cast<const UploadFileDryCallback *>(data);
         if (callback->result == AckType::SUCCESS) {
             FileDataHelper::DataFromFileParam param{};
@@ -335,12 +336,12 @@ class TgBotSocketNative {
 
 namespace {
 
-void initLogging(JNIEnv *env, jobject thiz) {
+void initLogging(JNIEnv __unused *env, jobject __unused thiz) {
     absl::InitializeLog();
     ABSL_LOG(INFO) << __func__;
 }
 
-jboolean changeDestinationInfo(JNIEnv *env, jobject thiz, jstring ipaddr,
+jboolean changeDestinationInfo(JNIEnv *env, jobject __unused thiz, jstring ipaddr,
                                jint type, jint port) {
     auto sockIntf = TgBotSocketNative::getInstance();
     std::string newAddress = Convert<std::string>(env, ipaddr);
@@ -355,16 +356,17 @@ jboolean changeDestinationInfo(JNIEnv *env, jobject thiz, jstring ipaddr,
             break;
         default:
             ABSL_LOG(ERROR) << "Unknown af type:" << type;
-            return false;
+            return JNI_FALSE;
     }
     config.address = newAddress;
     config.port = port;
     ABSL_LOG(INFO) << "Switched to IP " << std::quoted(newAddress, '\'')
                    << ", af: " << type << ", port: " << port;
     sockIntf->setSocketConfig(config);
-    return true;
+    return JNI_TRUE;
 }
-jobject getCurrentDestinationInfo(JNIEnv *env, jobject thiz) {
+
+jobject getCurrentDestinationInfo(JNIEnv *env, __unused jobject thiz) {
     auto cf = TgBotSocketNative::getInstance()->getSocketConfig();
     jclass info = env->FindClass(SOCKNATIVE_DSTINFO_JAVACLS);
     jmethodID ctor = env->GetMethodID(info, "<init>",
@@ -375,7 +377,7 @@ jobject getCurrentDestinationInfo(JNIEnv *env, jobject thiz) {
         env->GetStaticMethodID(destType, "valueOf",
                                "(L" STRING_JAVACLS ";)"
                                "L" SOCKNATIVE_DSTTYPE_JAVACLS ";");
-    jobject destTypeVal;
+    jobject destTypeVal = nullptr;
     switch (cf.mode) {
         case SocketConfig::USE_IPV4:
             destTypeVal = env->CallStaticObjectMethod(
@@ -389,21 +391,21 @@ jobject getCurrentDestinationInfo(JNIEnv *env, jobject thiz) {
     return env->NewObject(info, ctor, Convert<jstring>(env, cf.address),
                           destTypeVal, cf.port);
 }
-void sendWriteMessageToChatId(JNIEnv *env, jobject thiz, jlong chat_id,
+void sendWriteMessageToChatId(JNIEnv *env, jobject __unused thiz, jlong chat_id,
                               jstring text, jobject callback) {
-    WriteMsgToChatId data;
+    WriteMsgToChatId data{};
     data.chat = chat_id;
     copyTo(data.message, Convert<std::string>(env, text).c_str());
     auto pkt = Packet(Command::CMD_WRITE_MSG_TO_CHAT_ID, data);
     TgBotSocketNative::getInstance()->sendContext(pkt, env, callback);
 }
 
-void getUptime(JNIEnv *env, jobject thiz, jobject callback) {
+void getUptime(JNIEnv *env, jobject __unused thiz, jobject callback) {
     auto pkt = Packet(Command::CMD_GET_UPTIME, true);
     TgBotSocketNative::getInstance()->sendContext(pkt, env, callback);
 }
 
-void uploadFile(JNIEnv *env, jobject thiz, jstring path, jstring dest_file_path,
+void uploadFile(JNIEnv *env, jobject __unused thiz, jstring path, jstring dest_file_path,
                 jobject callback) {
     FileDataHelper::DataFromFileParam params{};
     params.filepath = Convert<std::string>(env, path);
@@ -424,7 +426,7 @@ void uploadFile(JNIEnv *env, jobject thiz, jstring path, jstring dest_file_path,
     }
 }
 
-void downloadFile(JNIEnv *env, jobject thiz, jstring remote_file_path,
+void downloadFile(JNIEnv *env, jobject __unused thiz, jstring remote_file_path,
                   jstring local_file_path, jobject callback) {
     DownloadFile req{};
     copyTo(req.filepath, Convert<std::string>(env, remote_file_path).c_str());
@@ -434,14 +436,14 @@ void downloadFile(JNIEnv *env, jobject thiz, jstring remote_file_path,
     TgBotSocketNative::getInstance()->sendContext(pkt, env, callback);
 }
 
-void setUploadFileOptions(JNIEnv *env, jobject thiz, jboolean failIfExist, jboolean failIfChecksumMatch) {
+void setUploadFileOptions(JNIEnv * __unused env, jobject __unused thiz, jboolean failIfExist, jboolean failIfChecksumMatch) {
     TgBotSocketNative::getInstance()->setUploadFileOptions({
-        .overwrite = !failIfExist,
-        .hash_ignore = !failIfChecksumMatch,
+        .overwrite = failIfExist == JNI_FALSE,
+        .hash_ignore = failIfChecksumMatch == JNI_FALSE,
     });
     ABSL_LOG(INFO) << "===============" << __func__ << "===============";
-    ABSL_LOG(INFO) << std::boolalpha << "overwrite opt: " << !failIfExist;
-    ABSL_LOG(INFO) << std::boolalpha << "hash_ignore opt: " << !failIfChecksumMatch;
+    ABSL_LOG(INFO) << std::boolalpha << "overwrite opt: " << (failIfExist == JNI_TRUE);
+    ABSL_LOG(INFO) << std::boolalpha << "hash_ignore opt: " << (failIfChecksumMatch == JNI_TRUE);
 }
 }  // namespace
 
