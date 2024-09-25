@@ -18,6 +18,7 @@ import com.royna.tgbotclient.SocketCommandNative.setUploadFileOptions
 import com.royna.tgbotclient.SocketCommandNative.UploadOption.*
 import com.royna.tgbotclient.databinding.FragmentUploadFileBinding
 import com.royna.tgbotclient.ui.CurrentSettingFragment
+import com.royna.tgbotclient.util.FileUtils.queryFileName
 import com.royna.tgbotclient.util.Logging
 
 class UploadFileFragment : Fragment() {
@@ -39,7 +40,7 @@ class UploadFileFragment : Fragment() {
             registerForActivityResult(ActivityResultContracts.OpenDocument()) {
                 if (it != null) {
                     vm.setLiveData(it)
-                    vm.queryName(requireActivity().contentResolver, it)
+                    queryFileName(requireActivity().contentResolver, it)
                         ?.let { filename ->
                             binding.uploadFileView.text = filename
                         }

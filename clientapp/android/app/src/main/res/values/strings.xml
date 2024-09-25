@@ -37,8 +37,9 @@
     <string name="get_desc">Press the get button</string>
     <string name="get_wip">Getting…</string>
     <string name="select_file">Select File</string>
+    <string name="select_folder">Select Folder</string>
     <string name="no_file_selected">No file selected</string>
-    <string name="upload_file">Upload File</string>
+    <string name="couldnt_open_file">Couldn\'t open destination file</string>
     <string name="choose_upload_options">Choose one of three upload options:</string>
     <string name="upload_option_1">Don\'t send file if it already exists on the remote</string>
     <string name="upload_option_2">Don\'t send file if it already exists and the checksum (sha256)

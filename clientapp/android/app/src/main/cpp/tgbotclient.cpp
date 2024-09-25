@@ -1,7 +1,7 @@
 #include <absl/log/initialize.h>
 #include <android/log.h>
 #include <arpa/inet.h>
-#include <errno.h>
+#include <cerrno>
 #include <jni.h>
 #include <unistd.h>
 #include <zlib.h>
@@ -20,9 +20,6 @@
 using namespace TgBotSocket;
 using namespace TgBotSocket::data;
 using namespace TgBotSocket::callback;
-
-#define __LOG(level, str) \
-    __android_log_print(ANDROID_LOG_##level, "TGBotCli:CPP", "%s", str)
 
 struct SocketConfig {
     std::string address;
@@ -63,7 +60,7 @@ class TgBotSocketNative {
     SocketConfig getSocketConfig() { return config; }
 
     void setUploadFileOptions(UploadFile::Options options_in) {
-        uploadOptions = std::move(options_in);
+        uploadOptions = options_in;
     }
     UploadFile::Options getUploadFileOptions() { return uploadOptions; }
 
@@ -131,6 +128,10 @@ class TgBotSocketNative {
                        << ", Port: " << config.port;
         setupSockAddress(&addr);
 
+        struct timeval timeout {.tv_sec = 5 };
+        setsockopt(sockfd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
+        setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+
         // Calculate CRC32
         uLong crc = crc32(0L, Z_NULL, 0);  // Initial value
         crc = crc32(crc, reinterpret_cast<Bytef *>(context.data.get()),
@@ -177,10 +178,12 @@ class TgBotSocketNative {
             _callFailed(env, callbackObj, "Failed to get socket fd flags");
             return;
         }
-        ret = fcntl(sockfd, F_SETFL, ret & ~O_NONBLOCK);
-        if (ret < 0) {
-            _callFailed(env, callbackObj, "Failed to set socket fd blocking");
-            return;
+        if (!(ret & O_NONBLOCK)) {
+            ret = fcntl(sockfd, F_SETFL, ret & ~O_NONBLOCK);
+            if (ret < 0) {
+                _callFailed(env, callbackObj, "Failed to set socket fd blocking");
+                return;
+            }
         }
 
         ABSL_LOG(INFO) << "Connected to server";
@@ -204,8 +207,15 @@ class TgBotSocketNative {
         ABSL_LOG(INFO) << "Done sending data";
         ABSL_LOG(INFO) << "Now reading callback";
 
+#define RETRY(exp) ({         \
+    __typeof__(exp) _rc;                   \
+    do {                                   \
+        _rc = (exp);                       \
+    } while (_rc == -1 && (errno == EINTR || errno == EAGAIN)); \
+    _rc; })
+
         PacketHeader header;
-        ret = recv(sockfd, &header, sizeof(header), kRecvFlags);
+        ret = RETRY(recv(sockfd, &header, sizeof(header), kRecvFlags));
         if (ret < 0) {
             _callFailed(env, callbackObj, "Failed to read callback header");
             return;
@@ -214,14 +224,19 @@ class TgBotSocketNative {
             _callFailed(env, callbackObj, "Bad magic value of callback header");
             return;
         }
+        ABSL_DLOG(INFO) << "Allocating " << header.data_size << " bytes...";
         SharedMalloc data(header.data_size);
         if (data.get() == nullptr) {
-            errno = ENOMEM;
-            _callFailed(env, callbackObj,
-                        "Failed to alloc data for callback header");
+            if (header.data_size == 0) {
+                callFailed(env, callbackObj, "Server returned 0 bytes of data");
+            } else {
+                errno = ENOMEM;
+                _callFailed(env, callbackObj,
+                            "Failed to alloc data for callback header");
+            }
             return;
         }
-        ret = recv(sockfd, data.get(), header.data_size, kRecvFlags);
+        ret = RETRY(recv(sockfd, data.get(), header.data_size, kRecvFlags));
         if (ret < 0) {
             _callFailed(env, callbackObj, "Failed to read callback data");
             return;

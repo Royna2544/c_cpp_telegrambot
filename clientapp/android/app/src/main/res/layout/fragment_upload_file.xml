@@ -34,7 +34,7 @@
             android:layout_height="wrap_content"
             android:layout_margin="@dimen/padding_medium"
             style="?android:attr/buttonBarButtonStyle"
-            android:text="@string/upload_file" />
+            android:text="@string/menu_upload_file" />
 
     </LinearLayout>
 
