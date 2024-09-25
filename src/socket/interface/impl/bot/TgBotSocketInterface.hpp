@@ -2,9 +2,8 @@
 #include <SocketBase.hpp>
 #include <functional>
 #include <initcalls/Initcall.hpp>
-#include <map>
+#include <TgBotWrapper.hpp>
 #include <memory>
-#include <utility>
 
 #include "TgBotPacketParser.hpp"
 #include "TgBotSocket_Export.hpp"
@@ -34,11 +33,13 @@ struct TgBotPPImpl_API SocketInterfaceTgBot : ManagedThreadRunnable,
     void runFunction() override;
 
     explicit SocketInterfaceTgBot(
-        std::shared_ptr<SocketInterfaceBase> _interface);
+        std::shared_ptr<SocketInterfaceBase> _interface, std::shared_ptr<TgBotApi> _api);
 
    private:
     std::shared_ptr<SocketInterfaceBase> interface = nullptr;
-    decltype(std::chrono::system_clock::now()) startTp =
+    std::shared_ptr<TgBotApi> api = nullptr;
+    
+    std::chrono::system_clock::time_point startTp =
         std::chrono::system_clock::now();
     using command_handler_fn_t = std::function<void(
         socket_handle_t source, void* addr, socklen_t len, const void* data)>;

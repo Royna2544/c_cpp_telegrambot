@@ -2,16 +2,19 @@
 
 #include <ManagedThreads.hpp>
 #include <memory>
-#include <string>
 #include <utility>
 
 #include "../backends/ServerBackend.hpp"
 #include "SocketBase.hpp"
+#include "TgBotWrapper.hpp"
 
 using HandleState = SocketInterfaceTgBot::HandleState;
 
-SocketInterfaceTgBot::SocketInterfaceTgBot(std::shared_ptr<SocketInterfaceBase> _interface)
+SocketInterfaceTgBot::SocketInterfaceTgBot(
+    std::shared_ptr<SocketInterfaceBase> _interface,
+    std::shared_ptr<TgBotApi> _api)
     : interface(std::move(_interface)),
+      api(std::move(_api)),
       TgBotSocketParser(_interface.get()) {}
 
 void SocketInterfaceTgBot::doInitCall() {
@@ -23,18 +26,19 @@ void SocketInterfaceTgBot::doInitCall() {
         threads.emplace_back(
             mgr->createController<ThreadManager::Usage::SOCKET_THREAD,
                                   SocketInterfaceTgBot>(
-                 wrapper.getInternalInterface()));
+                wrapper.getInternalInterface(), api));
     }
     if (wrapper.getExternalInterface()) {
         threads.emplace_back(
             mgr->createController<ThreadManager::Usage::SOCKET_EXTERNAL_THREAD,
                                   SocketInterfaceTgBot>(
-                wrapper.getExternalInterface()));
+                wrapper.getExternalInterface(), api));
     }
     for (auto& thr : threads) {
         thr->interface->options.port = SocketInterfaceBase::kTgBotHostPort;
         // TODO: This is only needed for AF_UNIX sockets
-        thr->interface->options.address = SocketInterfaceBase::LocalHelper::getSocketPath().string();
+        thr->interface->options.address =
+            SocketInterfaceBase::LocalHelper::getSocketPath().string();
         thr->run();
     }
 }

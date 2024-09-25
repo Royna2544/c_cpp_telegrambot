@@ -88,7 +88,7 @@ template <typename T, typename... Args>
     requires(!HasInstanceGetter<T>) && HasInitCaller<T>
 void createAndDoInitCall(Args&&... args) {
     if constexpr (sizeof...(args) != 0) {
-        T t(std::forward<Args...>(args...));
+        T t(std::forward<Args>(args)...);
         t.initWrapper();
     } else {
         T t;
@@ -232,7 +232,7 @@ void createAndDoInitCallAll() {
 #ifdef SOCKET_CONNECTION
     createAndDoInitCall<NetworkLogSink,
                         ThreadManager::Usage::LOGSERVER_THREAD>();
-    createAndDoInitCall<SocketInterfaceTgBot>(nullptr);
+    createAndDoInitCall<SocketInterfaceTgBot>(nullptr, bot);
     createAndDoInitCall<ChatObserver>();
 #endif
     createAndDoInitCall<RegexHandler>();
