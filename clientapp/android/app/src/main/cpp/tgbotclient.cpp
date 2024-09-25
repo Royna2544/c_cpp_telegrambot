@@ -30,6 +30,7 @@ struct SocketConfig {
     int timeout_s = 5;
 };
 
+// Java class definitions
 #define SOCKNATIVE_JAVACLS "com/royna/tgbotclient/SocketCommandNative"
 #define SOCKNATIVE_CMDCB_JAVACLS SOCKNATIVE_JAVACLS "$ICommandStatusCallback"
 #define SOCKNATIVE_DSTINFO_JAVACLS SOCKNATIVE_JAVACLS "$DestinationInfo"
@@ -37,80 +38,150 @@ struct SocketConfig {
 #define STRING_JAVACLS "java/lang/String"
 #define OBJECT_JAVACLS "java/lang/Object"
 
-class TgBotSocketNative {
+class Callbacks {
    public:
-    void sendContext(Packet &packet, JNIEnv *env, jobject callbackObj) const {
-        switch (config.mode) {
-            case SocketConfig::USE_IPV4:
-                sendContextCommon<AF_INET, sockaddr_in>(packet, env,
-                                                        callbackObj);
+    enum class Status {
+        INVALID,
+        CONNECTION_PREPARED,
+        CONNECTED,
+        HEADER_PACKET_SENT,
+        DATA_PACKET_SENT,
+        HEADER_PACKET_RECEIVED,
+        DATA_PACKET_RECEIVED,
+        PROCESSED_DATA,
+        DONE,
+    };
+
+    Callbacks(JNIEnv *_env, jobject _callbackObj) : env(_env), callbackInstance(_callbackObj) {
+        const auto callbackClass = env->FindClass(SOCKNATIVE_CMDCB_JAVACLS);
+        methods.success = env->GetMethodID(callbackClass, "onSuccess",
+                                           "(L" OBJECT_JAVACLS ";)V");
+        methods.failure = env->GetMethodID(callbackClass, "onError", "(L" STRING_JAVACLS ";)V");
+        methods.status = env->GetMethodID(callbackClass, "onStatusUpdate", "(I)V");
+    }
+
+    void success(jobject result) const {
+        ABSL_DLOG(INFO) << "Calling callback: " << __func__;
+        env->CallVoidMethod(callbackInstance, methods.success, result);
+    }
+
+    void success(const std::string_view result) const {
+        success(Convert<jstring>(env, result));
+    }
+
+    void failure(const std::string_view message) const {
+        ABSL_LOG(ERROR) << message;
+        _failure(message);
+    }
+
+    void plog_failure(const std::string_view message) const {
+        ABSL_PLOG(ERROR) << message;
+        _failure(message);
+    }
+
+    void status(const Status status) const {
+#ifndef NDEBUG
+#define STATUSLOG "[status_log] "
+        switch (status) {
+            case Status::CONNECTION_PREPARED:
+                ABSL_LOG(INFO) << STATUSLOG "Preparing connection";
                 break;
-            case SocketConfig::USE_IPV6:
-                sendContextCommon<AF_INET6, sockaddr_in6>(packet, env,
-                                                          callbackObj);
+            case Status::CONNECTED:
+                ABSL_LOG(INFO) << STATUSLOG "Connected";
+                break;
+            case Status::HEADER_PACKET_SENT:
+                ABSL_LOG(INFO) << STATUSLOG "Header packet sent";
+                break;
+            case Status::DATA_PACKET_SENT:
+                ABSL_LOG(INFO) << STATUSLOG "Data packet sent";
+                break;
+            case Status::HEADER_PACKET_RECEIVED:
+                ABSL_LOG(INFO) << STATUSLOG "Header packet received";
+                break;
+            case Status::DATA_PACKET_RECEIVED:
+                ABSL_LOG(INFO) << STATUSLOG "Data packet received";
+                break;
+            case Status::PROCESSED_DATA:
+                ABSL_LOG(INFO) << STATUSLOG "Processed result packet";
+                break;
+            case Status::DONE:
+                ABSL_LOG(INFO) << STATUSLOG "Finished";
                 break;
             default:
-                ABSL_LOG(ERROR)
-                    << "Unknown mode: " << static_cast<int>(config.mode);
+                break;
+        }
+#endif
+        env->CallVoidMethod(callbackInstance, methods.status, static_cast<int>(status));
+    }
+
+   private:
+    inline void _failure(const std::string_view message) const {
+        ABSL_DLOG(INFO) << "Calling callback: " << __func__;
+        env->CallVoidMethod(callbackInstance, methods.failure,
+                            Convert<jstring>(env, message));
+    }
+    JNIEnv *env;
+    jobject callbackInstance;
+    struct {
+        jmethodID success;
+        jmethodID failure;
+        jmethodID status;
+    } methods{};
+};
+
+class TgBotSocketNative {
+   public:
+
+    void sendContext(Packet &packet, JNIEnv *env, jobject callbackObj) const {
+        sendContext(packet, std::make_unique<Callbacks>(env, callbackObj));
+    }
+
+    void sendContext(Packet &packet, std::unique_ptr<Callbacks> callbacks) const {
+        switch (config.mode) {
+            case SocketConfig::USE_IPV4:
+                sendContextCommon<AF_INET, sockaddr_in>(packet, std::move(callbacks));
+                break;
+            case SocketConfig::USE_IPV6:
+                sendContextCommon<AF_INET6, sockaddr_in6>(packet, std::move(callbacks));
+                break;
+            default:
+                ABSL_LOG(ERROR) << "Unknown mode: " << static_cast<int>(config.mode);
                 break;
         }
     }
-
-    void setSocketConfig(SocketConfig config_in) {
-        config = std::move(config_in);
-    }
-    SocketConfig getSocketConfig() { return config; }
-
-    void setUploadFileOptions(UploadFile::Options options_in) {
-        uploadOptions = options_in;
-    }
-    UploadFile::Options getUploadFileOptions() { return uploadOptions; }
 
     static TgBotSocketNative* getInstance() {
         static auto instance = TgBotSocketNative();
         return &instance;
     }
 
-    static void callSuccess(JNIEnv *env, jobject callbackObj,
-                            jobject resultObj) {
-        jclass callbackClass = env->FindClass(SOCKNATIVE_CMDCB_JAVACLS);
-        jmethodID success = env->GetMethodID(callbackClass, "onSuccess",
-                                             "(L" OBJECT_JAVACLS ";)V");
-        ABSL_DLOG(INFO) << "Will execute: " << __func__;
-        env->CallVoidMethod(callbackObj, success, resultObj);
-        ABSL_LOG(INFO) << "Called onSuccess callback";
-    }
-
-    static void callFailed(JNIEnv *env, jobject callbackObj,
-                           std::string message) {
-        jclass callbackClass = env->FindClass(SOCKNATIVE_CMDCB_JAVACLS);
-        jmethodID failed =
-            env->GetMethodID(callbackClass, "onError", "(L" STRING_JAVACLS ";)V");
-
-        ABSL_DLOG(INFO) << "Will execute: " << __func__;
-        env->CallVoidMethod(callbackObj, failed, Convert<jstring>(env, std::move(message)));
-        ABSL_LOG(INFO) << "Called onFailed callback";
-    }
-
+    SocketConfig config{};
+    UploadFile::Options uploadOptions{};
    private:
     constexpr static int kRecvFlags = MSG_WAITALL | MSG_NOSIGNAL;
     constexpr static int kSendFlags = MSG_NOSIGNAL;
-    SocketConfig config;
-    UploadFile::Options uploadOptions;
 
     TgBotSocketNative() = default;
 
-    static void closeFd(const int *fd) { close(*fd); }
+    // Partial template specialization for sockaddr_in/sockaddr_in6
+    template <typename SockAddr>
+    void setupSockAddress(SockAddr *addr) const = delete;
 
-    static void _callFailed(JNIEnv *env, jobject callbackObj,
-                            const std::string& message) {
-        ABSL_PLOG(ERROR) << message;
-        callFailed(env, callbackObj, message);
+    template <>
+    [[maybe_unused]] void setupSockAddress(sockaddr_in *addr) const {
+        addr->sin_family = AF_INET;
+        inet_pton(AF_INET, config.address.c_str(), &addr->sin_addr);
+        addr->sin_port = htons(config.port);
+    }
+    template <>
+    [[maybe_unused]] void setupSockAddress(sockaddr_in6 *addr) const {
+        addr->sin6_family = AF_INET6;
+        inet_pton(AF_INET6, config.address.c_str(), &addr->sin6_addr);
+        addr->sin6_port = htons(config.port);
     }
 
     template <int af, typename SockAddr>
-    void sendContextCommon(Packet &context, JNIEnv *env,
-                           jobject callbackObj) const {
+    void sendContextCommon(Packet &context, std::unique_ptr<Callbacks> callbacks) const {
         SockAddr addr{};
         socklen_t len = sizeof(SockAddr);
         int sockfd{};
@@ -119,12 +190,12 @@ class TgBotSocketNative {
         ABSL_LOG(INFO) << "Prepare to send CommandContext";
         sockfd = socket(af, SOCK_STREAM | SOCK_NONBLOCK, 0);
         if (sockfd < 0) {
-            _callFailed(env, callbackObj, "Failed to create socket");
+            callbacks->plog_failure("Failed to create socket");
             return;
         }
 
-        auto sockFdCloser = std::unique_ptr<int, decltype(&closeFd)>(
-            &sockfd, &TgBotSocketNative::closeFd);
+        auto sockFdCloser = std::unique_ptr<int, void(*)(const int*)>(
+            &sockfd, [](const int *fd) { close(*fd); });
         ABSL_LOG(INFO) << "Using IP: " << std::quoted(config.address, '\'')
                        << ", Port: " << config.port;
         setupSockAddress(&addr);
@@ -139,9 +210,12 @@ class TgBotSocketNative {
                     context.header.data_size);
         context.header.checksum = crc;
 
+        // Update status 1
+        callbacks->status(Callbacks::Status::CONNECTION_PREPARED);
+
         if (connect(sockfd, reinterpret_cast<sockaddr *>(&addr), len) != 0) {
             if (errno != EINPROGRESS) {
-                _callFailed(env, callbackObj, "Failed to initiate connect()");
+                callbacks->plog_failure("Failed to initiate connect()");
                 return;
             }
         }
@@ -152,10 +226,10 @@ class TgBotSocketNative {
         fds.fd = sockfd;
         ret = poll(&fds, 1, config.timeout_s * 1000);
         if (ret < 0) {
-            _callFailed(env, callbackObj, "Failed to poll()");
+            callbacks->plog_failure("Failed to poll()");
             return;
         } else if (!(fds.revents & POLLOUT)) {
-            _callFailed(env, callbackObj, "The server didn't respond");
+            callbacks->plog_failure("The server didn't respond");
             return;
         }
 
@@ -164,48 +238,52 @@ class TgBotSocketNative {
         socklen_t error_len = sizeof(error);
         ret = getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &error, &error_len);
         if (ret < 0) {
-            _callFailed(env, callbackObj, "Failed to getsockopt()");
+            callbacks->plog_failure("Failed to getsockopt()");
             return;
         }
 
         // If failed to connect, abort
         if (error != 0) {
-            callFailed(env, callbackObj, "Failed to connect to server");
+            callbacks->plog_failure("Failed to connect to server");
             return;
         }
 
+        callbacks->status(Callbacks::Status::CONNECTED);
+
         ret = fcntl(sockfd, F_GETFL);
         if (ret < 0) {
-            _callFailed(env, callbackObj, "Failed to get socket fd flags");
+            callbacks->plog_failure("Failed to get socket fd flags");
             return;
         }
         if (!(ret & O_NONBLOCK)) {
             ret = fcntl(sockfd, F_SETFL, ret & ~O_NONBLOCK);
             if (ret < 0) {
-                _callFailed(env, callbackObj, "Failed to set socket fd blocking");
+                callbacks->plog_failure("Failed to set socket fd blocking");
                 return;
             }
         }
 
-        ABSL_LOG(INFO) << "Connected to server";
         ret = send(sockfd, &context.header, sizeof(PacketHeader), kSendFlags);
         if (ret < 0) {
-            _callFailed(env, callbackObj, "Failed to send packet header");
+            callbacks->plog_failure("Failed to send packet header");
             return;
         } else {
             ABSL_LOG(INFO) << "Sent header packet with cmd "
                            << static_cast<int>(context.header.cmd) << ", "
                            << ret << " bytes";
         }
+        callbacks->status(Callbacks::Status::HEADER_PACKET_SENT);
+
         ret = send(sockfd, context.data.get(), context.header.data_size,
                    kSendFlags);
         if (ret < 0) {
-            _callFailed(env, callbackObj, "Failed to send packet data");
+            callbacks->plog_failure("Failed to send packet data");
             return;
         } else {
             ABSL_LOG(INFO) << "Sent data packet, " << ret << " bytes";
         }
-        ABSL_LOG(INFO) << "Done sending data";
+        callbacks->status(Callbacks::Status::DATA_PACKET_SENT);
+
         ABSL_LOG(INFO) << "Now reading callback";
 
 #define RETRY(exp) ({         \
@@ -218,104 +296,103 @@ class TgBotSocketNative {
         PacketHeader header;
         ret = RETRY(recv(sockfd, &header, sizeof(header), kRecvFlags));
         if (ret < 0) {
-            _callFailed(env, callbackObj, "Failed to read callback header");
+            callbacks->plog_failure("Failed to read callback header");
             return;
         }
+        callbacks->status(Callbacks::Status::HEADER_PACKET_RECEIVED);
+
         if (header.magic != PacketHeader ::MAGIC_VALUE) {
-            _callFailed(env, callbackObj, "Bad magic value of callback header");
+            ABSL_LOG(WARNING) << "Magic value offset: " << header.magic - PacketHeader::MAGIC_VALUE_BASE;
+            callbacks->failure("Bad magic value of callback header");
             return;
         }
         ABSL_DLOG(INFO) << "Allocating " << header.data_size << " bytes...";
         SharedMalloc data(header.data_size);
         if (data.get() == nullptr) {
             if (header.data_size == 0) {
-                callFailed(env, callbackObj, "Server returned 0 bytes of data");
+                callbacks->failure("Server returned 0 bytes of data");
             } else {
                 errno = ENOMEM;
-                _callFailed(env, callbackObj,
-                            "Failed to alloc data for callback header");
+                callbacks->plog_failure("Failed to alloc data for callback header");
             }
             return;
         }
         ret = RETRY(recv(sockfd, data.get(), header.data_size, kRecvFlags));
         if (ret < 0) {
-            _callFailed(env, callbackObj, "Failed to read callback data");
+            callbacks->plog_failure("Failed to read callback data");
             return;
         }
+        callbacks->status(Callbacks::Status::DATA_PACKET_RECEIVED);
+
+#define CHECK_RESULTDATA_SIZE(type, size) do {\
+    if ((size) != sizeof(type)) {\
+        ABSL_LOG(ERROR) << "Received packet with invalid size: " << (size);\
+        callbacks->failure("Invalid size for " #type);\
+        return;\
+    }} while(false)
+
         ABSL_LOG(INFO) << "Command received: " << static_cast<int>(header.cmd);
         switch (header.cmd) {
             case Command::CMD_GET_UPTIME_CALLBACK:
                 handleSpecificData<Command::CMD_GET_UPTIME_CALLBACK>(
-                    env, callbackObj, data.get(), header.data_size);
+                    std::move(callbacks), data.get(), header.data_size);
                 break;
             case Command::CMD_DOWNLOAD_FILE_CALLBACK:
                 handleSpecificData<Command::CMD_DOWNLOAD_FILE_CALLBACK>(
-                    env, callbackObj, data.get(), header.data_size);
+                        std::move(callbacks), data.get(), header.data_size);
                 break;
             case Command::CMD_UPLOAD_FILE_DRY_CALLBACK:
                 handleSpecificData<Command::CMD_UPLOAD_FILE_DRY_CALLBACK>(
-                        env, callbackObj, data.get(), header.data_size);
+                        std::move(callbacks), data.get(), header.data_size);
                 break;
             default: {
                 GenericAck AckData{};
                 bool success{};
-
+                CHECK_RESULTDATA_SIZE(GenericAck, header.data_size);
                 memcpy(&AckData, data.get(), sizeof(AckData));
                 success = AckData.result == AckType::SUCCESS;
                 ABSL_LOG(INFO) << "Command ACK: " << std::boolalpha << success;
                 if (!success) {
                     ABSL_LOG(ERROR) << "Reason: " << AckData.error_msg.data();
-                    callFailed(env, callbackObj, AckData.error_msg.data());
+                    callbacks->plog_failure(AckData.error_msg.data());
                 } else {
-                    callSuccess(env, callbackObj, nullptr);
+                    callbacks->success(nullptr);
                 }
                 break;
             }
         }
     }
 
-    template <typename SockAddr>
-    void setupSockAddress(SockAddr *addr) const = delete;
-    template <>
-    [[maybe_unused]] void setupSockAddress(sockaddr_in *addr) const {
-        addr->sin_family = AF_INET;
-        inet_pton(AF_INET, config.address.c_str(), &addr->sin_addr);
-        addr->sin_port = htons(config.port);
-    }
-    template <>
-    [[maybe_unused]] void setupSockAddress(sockaddr_in6 *addr) const {
-        addr->sin6_family = AF_INET6;
-        inet_pton(AF_INET6, config.address.c_str(), &addr->sin6_addr);
-        addr->sin6_port = htons(config.port);
-    }
 
     template <Command cmd>
-    void handleSpecificData(JNIEnv *env, jobject callbackObj, const void *data,
+    void handleSpecificData(std::unique_ptr<Callbacks> callbacks, const void *data,
                             PacketHeader::length_type len) const = delete;
     template <>
     void handleSpecificData<Command::CMD_DOWNLOAD_FILE_CALLBACK>(
-        JNIEnv *env, jobject callbackObj, const void *data,
-        PacketHeader::length_type len) const {
+            std::unique_ptr<Callbacks> callbacks, const void *data, PacketHeader::length_type len) const {
         bool rc =
             FileDataHelper::DataToFile<FileDataHelper::Pass::DOWNLOAD_FILE>(
                 data, len);
         if (rc) {
-            callSuccess(env, callbackObj, nullptr);
+            callbacks->success(nullptr);
         } else {
-            callFailed(env, callbackObj, "Failed to handle download file");
+            callbacks->failure("Failed to handle download file");
         }
     }
     template <>
     void handleSpecificData<Command::CMD_GET_UPTIME_CALLBACK>(
-        JNIEnv *env, jobject callbackObj, const void *data,
-        PacketHeader::length_type  /*len*/) const {
+        std::unique_ptr<Callbacks> callbacks, const void *data,
+        PacketHeader::length_type len) const {
         const auto *uptime = static_cast<const char *>(data);
-        callSuccess(env, callbackObj, Convert<jstring>(env, uptime));
+        CHECK_RESULTDATA_SIZE(GetUptimeCallback, len);
+        callbacks->success(uptime);
     }
+
     template <>
     void handleSpecificData<Command::CMD_UPLOAD_FILE_DRY_CALLBACK>(
-        JNIEnv *env, jobject callbackObj, const void *data,
-        PacketHeader::length_type  /*len*/) const {
+            std::unique_ptr<Callbacks>  callbacks, const void *data,
+        PacketHeader::length_type len) const {
+        CHECK_RESULTDATA_SIZE(UploadFileDryCallback, len);
         const auto *callback = static_cast<const UploadFileDryCallback *>(data);
         if (callback->result == AckType::SUCCESS) {
             FileDataHelper::DataFromFileParam param{};
@@ -323,13 +400,12 @@ class TgBotSocketNative {
             param.destfilepath = callback->requestdata.destfilepath.data();
             auto p = FileDataHelper::DataFromFile<FileDataHelper::Pass::UPLOAD_FILE>(param);
             if (p) {
-                sendContext(p.value(), env, callbackObj);
+                sendContext(p.value(), std::move(callbacks));
             } else {
-                ABSL_LOG(ERROR) << "Failed to prepare file";
-                callFailed(env, callbackObj, "Failed to prepare file");
+                callbacks->failure("Failed to prepare file");
             }
         } else {
-            callFailed(env, callbackObj, callback->error_msg.data());
+            callbacks->failure(callback->error_msg.data());
         }
     }
 };
@@ -362,12 +438,12 @@ jboolean changeDestinationInfo(JNIEnv *env, jobject __unused thiz, jstring ipadd
     config.port = port;
     ABSL_LOG(INFO) << "Switched to IP " << std::quoted(newAddress, '\'')
                    << ", af: " << type << ", port: " << port;
-    sockIntf->setSocketConfig(config);
+    sockIntf->config = config;
     return JNI_TRUE;
 }
 
 jobject getCurrentDestinationInfo(JNIEnv *env, __unused jobject thiz) {
-    auto cf = TgBotSocketNative::getInstance()->getSocketConfig();
+    auto cf = TgBotSocketNative::getInstance()->config;
     jclass info = env->FindClass(SOCKNATIVE_DSTINFO_JAVACLS);
     jmethodID ctor = env->GetMethodID(info, "<init>",
                                       "(L" STRING_JAVACLS
@@ -388,7 +464,7 @@ jobject getCurrentDestinationInfo(JNIEnv *env, __unused jobject thiz) {
                 destType, valueOf, Convert<jstring>(env, "IPv6"));
             break;
     }
-    return env->NewObject(info, ctor, Convert<jstring>(env, cf.address),
+    return env->NewObject(info, ctor, Convert<jstring>(env, &cf.address),
                           destTypeVal, cf.port);
 }
 void sendWriteMessageToChatId(JNIEnv *env, jobject __unused thiz, jlong chat_id,
@@ -407,10 +483,11 @@ void getUptime(JNIEnv *env, jobject __unused thiz, jobject callback) {
 
 void uploadFile(JNIEnv *env, jobject __unused thiz, jstring path, jstring dest_file_path,
                 jobject callback) {
+    const auto* native = TgBotSocketNative::getInstance();
     FileDataHelper::DataFromFileParam params{};
     params.filepath = Convert<std::string>(env, path);
     params.destfilepath = Convert<std::string>(env, dest_file_path);
-    params.options = TgBotSocketNative::getInstance()->getUploadFileOptions();
+    params.options = native->uploadOptions;
 
     ABSL_LOG(INFO) << "===============" << __func__ << "===============";
     ABSL_LOG(INFO) << std::boolalpha << "overwrite opt: " << params.options.overwrite;
@@ -418,11 +495,9 @@ void uploadFile(JNIEnv *env, jobject __unused thiz, jstring path, jstring dest_f
     auto rc =
         FileDataHelper::DataFromFile<FileDataHelper::Pass::UPLOAD_FILE_DRY>(params);
     if (rc) {
-        TgBotSocketNative::getInstance()->sendContext(rc.value(), env,
-                                                      callback);
+        native->sendContext(rc.value(), env, callback);
     } else {
-        ABSL_LOG(ERROR) << "Failed to prepare file";
-        TgBotSocketNative::callFailed(env, callback, "Failed to prepare file");
+        Callbacks(env, callback).failure("Failed to prepare file");
     }
 }
 
@@ -437,10 +512,10 @@ void downloadFile(JNIEnv *env, jobject __unused thiz, jstring remote_file_path,
 }
 
 void setUploadFileOptions(JNIEnv * __unused env, jobject __unused thiz, jboolean failIfExist, jboolean failIfChecksumMatch) {
-    TgBotSocketNative::getInstance()->setUploadFileOptions({
+    TgBotSocketNative::getInstance()->uploadOptions = {
         .overwrite = failIfExist == JNI_FALSE,
         .hash_ignore = failIfChecksumMatch == JNI_FALSE,
-    });
+    };
     ABSL_LOG(INFO) << "===============" << __func__ << "===============";
     ABSL_LOG(INFO) << std::boolalpha << "overwrite opt: " << (failIfExist == JNI_TRUE);
     ABSL_LOG(INFO) << std::boolalpha << "hash_ignore opt: " << (failIfChecksumMatch == JNI_TRUE);

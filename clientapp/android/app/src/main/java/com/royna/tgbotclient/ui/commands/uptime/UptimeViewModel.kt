@@ -14,7 +14,11 @@ import kotlin.coroutines.resumeWithException
 class UptimeViewModel : SingleViewModelBase<String, String>() {
 
     override suspend fun coroutineFunction(activity: FragmentActivity): String = suspendCancellableCoroutine {
-        getUptime(object : SocketCommandNative.ICommandCallback {
+        getUptime(object : SocketCommandNative.ICommandStatusCallback {
+            override fun onStatusUpdate(status: SocketCommandNative.Status) {
+
+            }
+
             override fun onSuccess(result: Any?) {
                 if (result is String) {
                     it.resumeWith(Result.success(result))

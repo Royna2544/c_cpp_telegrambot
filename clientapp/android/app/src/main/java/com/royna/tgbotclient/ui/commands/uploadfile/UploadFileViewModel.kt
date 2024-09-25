@@ -42,8 +42,11 @@ class UploadFileViewModel : SingleViewModelBase<Uri, Unit>() {
         val name = queryFileName(activity.contentResolver,contentUri) ?: fileName
         Logging.info("Uploading file as : $name")
         SocketCommandNative.uploadFile(tempFile.absolutePath, name,
-            object : SocketCommandNative.ICommandCallback {
-            override fun onSuccess(result: Any?) {
+            object : SocketCommandNative.ICommandStatusCallback {
+                override fun onStatusUpdate(status: SocketCommandNative.Status) {
+                }
+
+                override fun onSuccess(result: Any?) {
                 Logging.info ("File uploaded successfully")
                 cancellableContinuation.resume(Unit)
             }

@@ -56,17 +56,21 @@ class DownloadFileViewModel : DualViewModelBase<Uri, String, DownloadFileViewMod
         Logging.info("Downloading file as : $downloadedFilePath")
         var downloadRet = false
         SocketCommandNative.downloadFile(downloadedFilePath, tempFile.absolutePath,
-            object : SocketCommandNative.ICommandCallback {
-            override fun onSuccess(result: Any?) {
-                Logging.info ("File uploaded successfully")
-                downloadRet = true
-            }
+            object : SocketCommandNative.ICommandStatusCallback {
+                override fun onStatusUpdate(status: SocketCommandNative.Status) {
+                }
 
-            override fun onError(error: String) {
-                Logging.error ("File upload failed: $error")
-                cancellableContinuation.resumeWithException(RuntimeException(error))
+                override fun onSuccess(result: Any?) {
+                    Logging.info ("File uploaded successfully")
+                    downloadRet = true
+                }
+
+                override fun onError(error: String) {
+                    Logging.error ("File upload failed: $error")
+                    cancellableContinuation.resumeWithException(RuntimeException(error))
+                }
             }
-        })
+        )
         if (!downloadRet) {
             return@suspendCancellableCoroutine
         }

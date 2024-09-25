@@ -41,8 +41,12 @@ class TextToChatViewModel @Inject constructor(private val operation: IChatIDOper
     private suspend fun sendAndWait(chatid: Long, message: String) : Unit =
         suspendCancellableCoroutine { continuation ->
             SocketCommandNative.sendWriteMessageToChatId(chatid, message,
-                object : SocketCommandNative.ICommandCallback {
-                override fun onSuccess(result: Any?) {
+                object : SocketCommandNative.ICommandStatusCallback {
+                    override fun onStatusUpdate(status: SocketCommandNative.Status) {
+
+                    }
+
+                    override fun onSuccess(result: Any?) {
                     continuation.resumeWith(Result.success(Unit))
                 }
                 override fun onError(error: String) {
