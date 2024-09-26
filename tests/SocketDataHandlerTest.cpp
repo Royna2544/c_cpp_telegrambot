@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 
 #include <SharedMalloc.hpp>
+#include <cstdint>
 #include <impl/bot/TgBotSocketInterface.hpp>
 #include <memory>
 #include <utility>
@@ -136,7 +137,7 @@ TEST_F(SocketDataHandlerTest, TestCmdWriteMsgToChatId) {
 }
 
 TEST_F(SocketDataHandlerTest, TestCmdWriteMsgToChatIdTgBotApiEx) {
-    constexpr ChatId testChatId = 101848141293;
+    constexpr ChatId testChatId = 1848141293;
     TgBotSocket::data::WriteMsgToChatId data{
         .chat = testChatId,
         .message = {"Hello, World!"},
@@ -154,6 +155,31 @@ TEST_F(SocketDataHandlerTest, TestCmdWriteMsgToChatIdTgBotApiEx) {
                                                                &callbackData);
     isGenericAck_Error<TgBotSocket::callback::AckType::ERROR_TGAPI_EXCEPTION>(
         callbackData);
+    // Done
+    verifyAndClear();
+}
+
+TEST_F(SocketDataHandlerTest, TestCmdWriteMsgToChatIdINVALID) {
+    constexpr ChatId testChatId = 101848141293;
+    struct {
+        TgBotSocket::data::WriteMsgToChatId realdata{
+            .chat = testChatId,
+            .message = {"Hello, World!"},
+        };
+        std::uintmax_t FAKEVALUE = 0;
+    } data;
+
+    // For this test to be valid...
+    static_assert(sizeof(data) > sizeof(data.realdata));
+    //...the size of the test data must be larger than the size of the real data.
+
+    TgBotSocket::Packet pkt(TgBotSocket::Command::CMD_WRITE_MSG_TO_CHAT_ID,
+                            data);
+    TgBotSocket::callback::GenericAck callbackData{};
+    sendAndVerifyHeader<TgBotSocket::callback::GenericAck,
+                        TgBotSocket::Command::CMD_GENERIC_ACK>(pkt,
+                                                               &callbackData);
+    isGenericAck_Error<TgBotSocket::callback::AckType::ERROR_COMMAND_IGNORED>(callbackData);
     // Done
     verifyAndClear();
 }
