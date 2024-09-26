@@ -29,7 +29,8 @@ void MessageExt::update() {
     if (botCommandEnt != entities.end()) {
         const auto entry = *botCommandEnt;
         LOG_IF(WARNING, entry->offset != 0)
-            << "Unexpected offset: " << entry->offset;
+            << "Unexpected offset: " << entry->offset << " for "
+            << std::quoted(text);
         _extra_args = absl::StripAsciiWhitespace(
             text.substr(entry->offset + entry->length));
         auto command_string = text.substr(0, entry->length);
@@ -457,13 +458,14 @@ void TgBotWrapper::startPoll() {
     // Deleting webhook
     getApi().deleteWebhook();
     // Register -> onUnknownCommand
-    getEvents().onUnknownCommand([username = botUser->username](const Message::Ptr& message) {
-        const auto ext = std::make_shared<MessageExt>(message);
-        if (ext->get_command().target != username) {
-            return; // ignore, unless explicitly targetted this bot.
-        }
-        LOG(INFO) << "Unknown command: " << message->text;
-    });
+    getEvents().onUnknownCommand(
+        [username = botUser->username](const Message::Ptr& message) {
+            const auto ext = std::make_shared<MessageExt>(message);
+            if (ext->get_command().target != username) {
+                return;  // ignore, unless explicitly targetted this bot.
+            }
+            LOG(INFO) << "Unknown command: " << message->text;
+        });
     // Register -> onAnyMessage
     getEvents().onAnyMessage(
         [this](const Message::Ptr& message) { onAnyMessageFunction(message); });
