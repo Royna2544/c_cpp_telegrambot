@@ -202,7 +202,7 @@ GenericAck SocketInterfaceTgBot::handle_UploadFile(
 UploadFileDryCallback SocketInterfaceTgBot::handle_UploadFileDry(
     const void* ptr, TgBotSocket::PacketHeader::length_type len) {
     bool ret = false;
-    const auto f = static_cast<const UploadFileDry*>(ptr);
+    const auto* f = static_cast<const UploadFileDry*>(ptr);
     UploadFileDryCallback callback;
     callback.requestdata = *f;
 
@@ -255,23 +255,38 @@ void SocketInterfaceTgBot::handle_CommandPacket(SocketConnContext ctx,
     const void* ptr = pkt.data.get();
     std::variant<GenericAck, UploadFileDryCallback, bool> ret;
 
+#define CHECK_PACKET_SIZE(type)                                                \
+    if (pkt.header.data_size != sizeof(type)) {                                \
+        LOG(ERROR) << "Invalid packet size for cmd: "                          \
+                   << CommandHelpers::toStr(pkt.header.cmd);                   \
+        ret =                                                                  \
+            GenericAck(AckType::ERROR_COMMAND_IGNORED, "Invalid packet size"); \
+        break;                                                                 \
+    }
+
     switch (pkt.header.cmd) {
         case Command::CMD_WRITE_MSG_TO_CHAT_ID:
+            CHECK_PACKET_SIZE(WriteMsgToChatId);
             ret = handle_WriteMsgToChatId(ptr);
             break;
         case Command::CMD_CTRL_SPAMBLOCK:
+            CHECK_PACKET_SIZE(CtrlSpamBlock);
             ret = handle_CtrlSpamBlock(ptr);
             break;
         case Command::CMD_OBSERVE_CHAT_ID:
+            CHECK_PACKET_SIZE(ObserveChatId);
             ret = handle_ObserveChatId(ptr);
             break;
         case Command::CMD_SEND_FILE_TO_CHAT_ID:
+            CHECK_PACKET_SIZE(SendFileToChatId);
             ret = handle_SendFileToChatId(ptr);
             break;
         case Command::CMD_OBSERVE_ALL_CHATS:
+            CHECK_PACKET_SIZE(ObserveAllChats);
             ret = handle_ObserveAllChats(ptr);
             break;
         case Command::CMD_DELETE_CONTROLLER_BY_ID:
+            CHECK_PACKET_SIZE(DeleteControllerById);
             ret = handle_DeleteControllerById(ptr);
             break;
         case Command::CMD_GET_UPTIME:
@@ -281,6 +296,7 @@ void SocketInterfaceTgBot::handle_CommandPacket(SocketConnContext ctx,
             ret = handle_UploadFile(ptr, pkt.header.data_size);
             break;
         case Command::CMD_UPLOAD_FILE_DRY:
+            CHECK_PACKET_SIZE(UploadFileDry);
             ret = handle_UploadFileDry(ptr, pkt.header.data_size);
             break;
         case Command::CMD_DOWNLOAD_FILE:
