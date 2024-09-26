@@ -64,20 +64,6 @@ struct PhotoBase {
      */
     virtual ~PhotoBase() = default;
 
-    /**
-     * @brief Creates a unique_ptr that will automatically close the given FILE*
-     * when it goes out of scope.
-     *
-     * @param file The FILE* to be closed when the unique_ptr goes out of scope.
-     *
-     * @return A unique_ptr that will automatically close the given FILE* when
-     * it goes out of scope.
-     */
-    static auto createFileCloser(FILE* file) {
-        return std::unique_ptr<FILE, void (*)(FILE*)>(
-            file, [](FILE* f) { fclose(f); });
-    }
-
     [[nodiscard]] virtual std::string version() const = 0;
 
    protected:

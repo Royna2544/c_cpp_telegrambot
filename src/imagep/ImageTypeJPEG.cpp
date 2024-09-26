@@ -1,17 +1,18 @@
 // clang-format off
-#include <array>
-#include <csetjmp>
-#include <cstddef>
 #include <cstdio>
+#include <cstddef>
 #include <jpeglib.h>
 // clang-format on
+#include "ImageTypeJPEG.hpp"
+
 #include <absl/log/check.h>
 #include <absl/log/log.h>
 
+#include <StructF.hpp>
+#include <array>
+#include <csetjmp>
 #include <cstring>
-#include "ImageTypeJPEG.hpp"
 #include <memory>
-#include "absl/status/status.h"
 
 struct jpegimg_error_mgr {
     jpeg_error_mgr pub;
@@ -21,7 +22,7 @@ using jpegimg_error_ptr = jpegimg_error_mgr*;
 
 METHODDEF(void)
 jpegimg_error_exit(j_common_ptr cinfo) {
-    const auto myerr = (jpegimg_error_ptr)cinfo->err;
+    auto* const myerr = (jpegimg_error_ptr)cinfo->err;
     (*cinfo->err->output_message)(cinfo);
     longjmp(myerr->setjmpbuf, 1);
 }
@@ -34,12 +35,11 @@ jpegimg_output_message(j_common_ptr cinfo) {
 }
 
 bool JPEGImage::read(const std::filesystem::path& filename) {
-    FILE* infile = fopen(filename.string().c_str(), "rb");
-    if (infile == nullptr) {
+    F infile;
+    if (!infile.open(filename, F::Mode::ReadBinary)) {
         LOG(ERROR) << "Error opening file: " << filename;
         return false;
     }
-    const auto autoCloser = createFileCloser(infile);
 
     jpeg_decompress_struct cinfo{};
     jpegimg_error_mgr jerr{};
@@ -163,8 +163,9 @@ void JPEGImage::to_greyscale() {
 }
 
 bool JPEGImage::write(const std::filesystem::path& filename) {
-    FILE* outfile = fopen(filename.string().c_str(), "wb");
-    if (outfile == nullptr) {
+    F outfile;
+    
+    if (!outfile.open(filename, F::Mode::WriteBinary)) {
         LOG(ERROR) << "Error opening file: " << filename;
         return false;
     }
@@ -182,7 +183,7 @@ bool JPEGImage::write(const std::filesystem::path& filename) {
     cinfo.in_color_space = num_channels == 3 ? JCS_RGB : JCS_GRAYSCALE;
 
     jpeg_set_defaults(&cinfo);
-    jpeg_set_quality(&cinfo, 95, TRUE);
+    jpeg_set_quality(&cinfo, QUALITY, TRUE);
     jpeg_start_compress(&cinfo, TRUE);
 
     size_t row_stride = width * num_channels;
@@ -195,7 +196,6 @@ bool JPEGImage::write(const std::filesystem::path& filename) {
 
     jpeg_finish_compress(&cinfo);
     jpeg_destroy_compress(&cinfo);
-    fclose(outfile);
 
     return true;
 }

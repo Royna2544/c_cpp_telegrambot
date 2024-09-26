@@ -5,7 +5,7 @@
 
 #include <cstddef>
 #include <filesystem>
-#include <memory>
+#include <SharedMalloc.hpp>
 #include <vector>
 
 #include "ImagePBase.hpp"
@@ -14,28 +14,18 @@ struct PngImage : PhotoBase {
     PngImage() noexcept = default;
     ~PngImage() override = default;
 
-    struct MiniSharedMalloc {
-        MiniSharedMalloc(std::size_t size) : data(malloc(size)) {}
-        MiniSharedMalloc() = default;
-        ~MiniSharedMalloc() {
-            if (data)  // Only free if data is not nullptr.
-                free(data);
-        }
-        void* data = nullptr;
-    };
-
     struct PngRefMem {
         void add(std::size_t size) {
-            auto m = std::make_shared<MiniSharedMalloc>(size);
-            mallocs.emplace_back(m);
-            row_data.emplace_back(static_cast<png_bytep>(m->data));
+            auto m = SharedMalloc(size);
+            row_data.emplace_back(static_cast<png_bytep>(m.get()));
+            mallocs.emplace_back(std::move(m));
         }
         void resize(std::size_t size) { row_data.resize(size); }
         [[nodiscard]] png_bytepp data() { return row_data.data(); }
         png_bytep& operator[](std::size_t size) { return row_data[size]; }
 
        private:
-        std::vector<std::shared_ptr<MiniSharedMalloc>> mallocs;
+        std::vector<SharedMalloc> mallocs;
         std::vector<png_bytep> row_data;
     } refmem;
 
@@ -93,6 +83,6 @@ struct PngImage : PhotoBase {
      * @param transform A function that takes the source coordinates and
      * transforms them to the destination coordinates.
      */
-    void rotate_image_impl(int new_width, int new_height,
-                           transform_fn_t transform);
+    void rotate_image_impl(png_uint_32 new_width, png_uint_32 new_height,
+                           const transform_fn_t& transform);
 };

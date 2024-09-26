@@ -1,13 +1,14 @@
 #include "ImageTypePNG.hpp"
 
 #include <absl/log/log.h>
+#include <absl/status/status.h>
 #include <png.h>
 #include <pngconf.h>
 
+#include <StructF.hpp>
 #include <cstddef>
 #include <filesystem>
 #include <string>
-#include "absl/status/status.h"
 
 #if (PNG_LIBPNG_VER < 10500)
 #define png_longjmp_fn(png, val) longjmp(png->jmpbuf, val);
@@ -28,7 +29,7 @@ void absl_error_fn(png_structp png_ptr, png_const_charp error_message) {
 }  // namespace
 
 bool PngImage::read(const std::filesystem::path& filename) {
-    FILE* fp = nullptr;
+    F fp;
     png_structp png = nullptr;
     png_infop info = nullptr;
 
@@ -37,12 +38,10 @@ bool PngImage::read(const std::filesystem::path& filename) {
         return false;
     }
 
-    fp = fopen(filename.string().c_str(), "rb");
-    if (fp == nullptr) {
+    if (!fp.open(filename, F::Mode::ReadBinary)) {
         LOG(ERROR) << "Can't open file " << filename << " for reading";
         return false;
     }
-    const auto fileCloser = createFileCloser(fp);
 
     png = png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr,
                                  nullptr);
@@ -116,9 +115,9 @@ void PngImage::to_greyscale() {
         return;
     }
     LOG(INFO) << "Converting image to greyscale";
-    for (int y = 0; y < height; y++) {
+    for (ptrdiff_t y = 0; y < height; y++) {
         png_bytep row = refmem[y];
-        for (int x = 0; x < width; x++) {
+        for (ptrdiff_t x = 0; x < width; x++) {
             png_bytep px = &(row[x * 4]);
             const auto gray = static_cast<uint8_t>(
                 0.299 * px[0] + 0.587 * px[1] + 0.114 * px[2]);
@@ -127,8 +126,8 @@ void PngImage::to_greyscale() {
     }
 }
 
-void PngImage::rotate_image_impl(int new_width, int new_height,
-                                 transform_fn_t transform) {
+void PngImage::rotate_image_impl(png_uint_32 new_width, png_uint_32 new_height,
+                                 const transform_fn_t& transform) {
     PngImage src = *this;
 
     width = new_width;
@@ -198,7 +197,7 @@ absl::Status PngImage::_rotate_image(int angle) {
 }
 
 bool PngImage::write(const std::filesystem::path& filename) {
-    FILE* fp = nullptr;
+    F fp;
     png_structp png = nullptr;
     png_infop info = nullptr;
 
@@ -207,12 +206,10 @@ bool PngImage::write(const std::filesystem::path& filename) {
         return false;
     }
 
-    fp = fopen(filename.string().c_str(), "wb");
-    if (fp == nullptr) {
+    if (!fp.open(filename, F::Mode::WriteBinary)) {
         LOG(ERROR) << "Can't open file " << filename << " for writing";
         return false;
     }
-    const auto fileCloser = createFileCloser(fp);
 
     png = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr,
                                   nullptr);

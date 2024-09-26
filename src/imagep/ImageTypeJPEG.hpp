@@ -24,4 +24,5 @@ class JPEGImage : public PhotoBase {
     size_t width{};
     size_t height{};
     int num_channels{};
+    static constexpr int QUALITY = 95;
 };

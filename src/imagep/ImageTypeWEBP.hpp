@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
@@ -59,7 +60,9 @@ class WebPImage : public PhotoBase {
     std::string version() const override;
 
    private:
-    long width_{};
-    long height_{};
+    using webpimage_size_t = int;
+    webpimage_size_t width_{};
+    webpimage_size_t height_{};
     std::unique_ptr<uint8_t[]> data_;
+    constexpr static float QUALITY = .5f;
 };
