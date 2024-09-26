@@ -170,10 +170,10 @@ bool SocketInterfaceUnix::writeToSocket(SocketConnContext context,
     constexpr int kSendFlags = MSG_NOSIGNAL;
 
     if (use_udp) {
-        return libc_shim::sendto(context.cfd, socketData, data->getSize(),
-                                 kSendFlags, addr, context.addr->getSize());
+        return libc_shim::sendto(context.cfd, socketData, data->size(),
+                                 kSendFlags, addr, context.addr->size());
     } else {
-        return libc_shim::send(context.cfd, socketData, data->getSize(),
+        return libc_shim::send(context.cfd, socketData, data->size(),
                                kSendFlags);
     }
 }
@@ -182,7 +182,7 @@ std::optional<SharedMalloc> SocketInterfaceUnix::readFromSocket(
     SocketConnContext handle, buffer_len_t length) {
     SharedMalloc buf(length);
     auto* addr = static_cast<sockaddr*>(handle.addr.get());
-    socklen_t addrlen = handle.addr->getSize();
+    socklen_t addrlen = handle.addr->size();
     ssize_t count = 0;
     constexpr int kRecvFlags = MSG_NOSIGNAL;
     bool sent = false;

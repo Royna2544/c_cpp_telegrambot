@@ -15,7 +15,7 @@
 
 struct SharedMallocParent {
     explicit SharedMallocParent(size_t size)
-        : data(malloc(size), free), size(size) {
+        : data(malloc(size), free), _size(size) {
         if (data == nullptr) {
             throw std::bad_alloc();
         }
@@ -36,12 +36,12 @@ struct SharedMallocParent {
         if (data == nullptr) {
             throw std::bad_alloc();
         }
-        size = newSize;
+        _size = newSize;
     }
-    [[nodiscard]] size_t getSize() const { return size; }
+    [[nodiscard]] size_t size() const { return _size; }
 
    private:
-    size_t size{};
+    size_t _size{};
     std::unique_ptr<void, decltype(&free)> data;
 };
 
@@ -77,7 +77,7 @@ struct SharedMalloc {
         memcpy(get(), &value, sizeof(T));
     }
 
-    SharedMallocParent *operator->() { return parent.get(); }
+    SharedMallocParent *operator->() const { return parent.get(); }
     bool operator!=(std::nullptr_t value) { return parent.get() != value; }
 
     template <typename T>
@@ -89,9 +89,9 @@ struct SharedMalloc {
 
     template <typename T>
     void assignTo(T *ref, size_t size, size_t offset) const {
-        CHECK(size + offset <= parent->getSize())
+        CHECK(size + offset <= parent->size())
             << ": Requested size is bigger than what's stored in memory ("
-            << size + offset << " > " << parent->getSize() << ")";
+            << size + offset << " > " << parent->size() << ")";
         memcpy(ref, static_cast<char *>(get()) + offset, size);
     }
 
@@ -109,16 +109,16 @@ struct SharedMalloc {
     template <typename T>
         requires(std::is_class_v<T>)
     void assignFrom(T &ref) {
-        CHECK(sizeof(T) == parent->getSize())
+        CHECK(sizeof(T) == parent->size())
             << "Must have same size to assign from";
         assignFrom(&ref, sizeof(T));
     }
 
     template <typename T>
     void assignFrom(const T *ref, size_t size) {
-        CHECK(size <= parent->getSize())
+        CHECK(size <= parent->size())
             << ": Requested size is bigger than what's stored in memory ("
-            << size << " > " << parent->getSize() << ")";
+            << size << " > " << parent->size() << ")";
         memcpy(get(), ref, size);
     }
 
@@ -135,7 +135,7 @@ struct SharedMalloc {
             return true;
         }
         // Check if both shared memory blocks have same size
-        if (parent->getSize() != other.parent->getSize()) {
+        if (parent->size() != other.parent->size()) {
             return false;
         }
         // Check if either shared memory blocks are nullptr.
@@ -143,7 +143,7 @@ struct SharedMalloc {
         if (get() == nullptr || other.get() == nullptr) {
             return get() == other.get();
         }
-        return memcmp(get(), other.get(), parent->getSize()) == 0;
+        return memcmp(get(), other.get(), parent->size()) == 0;
     }
 
    private:

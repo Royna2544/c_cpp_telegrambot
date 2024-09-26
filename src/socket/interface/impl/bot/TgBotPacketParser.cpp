@@ -16,7 +16,7 @@ HandleState TgBotSocketParser::handle_PacketHeader(
     int64_t diff = 0;
 
     if (!socketData ||
-        socketData.value()->getSize() != TgBotSocket::Packet::hdr_sz) {
+        socketData.value()->size() != TgBotSocket::Packet::hdr_sz) {
         LOG(ERROR) << "Failed to read from socket";
         return HandleState::Ignore;
     }
@@ -51,7 +51,7 @@ HandleState TgBotSocketParser::handle_Packet(
     }
 
     auto& socketDataVal = socketData.value();
-    if (socketDataVal->getSize() != pkt->header.data_size) {
+    if (socketDataVal->size() != pkt->header.data_size) {
         LOG(WARNING) << "Invalid packet data size, dropping buffer";
         return HandleState::Ignore;
     }

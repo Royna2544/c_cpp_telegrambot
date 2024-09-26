@@ -34,12 +34,12 @@ SocketInterfaceWindowsLocal::createServerSocket() {
     if (!createLocalSocket(&ret)) {
         return std::nullopt;
     }
-    if (bind(ret.cfd, _name, ret.addr->getSize()) != 0) {
+    if (bind(ret.cfd, _name, ret.addr->size()) != 0) {
         bool succeeded = false;
         LOG(ERROR) << "Failed to bind to socket: " << WSALastErrorStr();
         if (WSAGetLastError() == WSAEADDRINUSE) {
             cleanupServerSocket();
-            if (bind(ret.cfd, _name, ret.addr->getSize()) == 0) {
+            if (bind(ret.cfd, _name, ret.addr->size()) == 0) {
                 LOG(INFO) << "Bind succeeded by removing socket file";
                 succeeded = true;
             }
@@ -60,7 +60,7 @@ SocketInterfaceWindowsLocal::createClientSocket() {
     if (!createLocalSocket(&ret)) {
         return std::nullopt;
     }
-    if (connect(ret.cfd, _name, ret.addr->getSize()) != 0) {
+    if (connect(ret.cfd, _name, ret.addr->size()) != 0) {
         LOG(ERROR) << "Failed to connect to socket: " << WSALastErrorStr();
         closeSocketHandle(ret.cfd);
         return std::nullopt;

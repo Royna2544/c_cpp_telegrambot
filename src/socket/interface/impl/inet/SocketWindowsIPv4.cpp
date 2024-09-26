@@ -13,7 +13,7 @@ SocketInterfaceWindowsIPv4::createServerSocket() {
         auto *_name = static_cast<sockaddr *>(context.addr.get());
 
         name->sin_addr.s_addr = INADDR_ANY;
-        if (bind(context.cfd, _name, context.addr->getSize()) != 0) {
+        if (bind(context.cfd, _name, context.addr->size()) != 0) {
             LOG(ERROR) << "Failed to bind to socket: " << WSALastErrorStr();
             closeSocketHandle(context.cfd);
             return std::nullopt;
@@ -32,7 +32,7 @@ SocketInterfaceWindowsIPv4::createClientSocket() {
         auto *_name = static_cast<sockaddr *>(context.addr.get());
 
         InetPton(AF_INET, options.address.get().c_str(), &name->sin_addr);
-        if (connect(context.cfd, _name, context.addr->getSize()) != 0) {
+        if (connect(context.cfd, _name, context.addr->size()) != 0) {
             LOG(ERROR) << "Failed to connect to socket: " << WSALastErrorStr();
             closeSocketHandle(context.cfd);
             return std::nullopt;
