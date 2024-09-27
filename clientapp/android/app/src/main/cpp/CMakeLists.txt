@@ -27,7 +27,8 @@ project("tgbotclient")
 # used in the AndroidManifest.xml file.
 add_library(${CMAKE_PROJECT_NAME} SHARED
     # List C/C++ source files with relative paths to this CMakeLists.txt.
-    tgbotclient.cpp)
+    tgbotclient.cpp
+    ../../../../../../src/socket/interface/impl/bot/TgBotSocketFileHelperNew.cpp)
 
 set(ABSL_PROPAGATE_CXX_STD ON)
 add_subdirectory(../../../../../../src/third-party/abseil-cpp abseil-cpp)
@@ -48,5 +49,5 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
 
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE include)
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE external/openssl/include)
-target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ../../../../../../src/socket/include)
+target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ../../../../../../src/socket/include ../../../../../../src/include)
 target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE -fmacro-prefix-map=${CMAKE_SOURCE_DIR}/=)

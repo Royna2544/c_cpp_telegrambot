@@ -1,6 +1,6 @@
 #include <absl/log/initialize.h>
-#include <android/log.h>
 #include <arpa/inet.h>
+#include <absl/log/log.h>
 #include <cerrno>
 #include <jni.h>
 #include <unistd.h>
@@ -15,8 +15,7 @@
 #include "JNIOnLoad.h"
 #include "JavaCppConverter.hpp"
 // Include the tgbot's exported header
-#include "../../../../../../src/socket/include/TgBotSocket_Export.hpp"
-#include "../../../../../../src/socket/interface/impl/bot/TgBotSocketFileHelper.hpp"
+#include "../../../../../../src/socket/interface/impl/bot/TgBotSocketFileHelperNew.hpp"
 
 using namespace TgBotSocket;
 using namespace TgBotSocket::data;
@@ -61,7 +60,7 @@ class Callbacks {
     }
 
     void success(jobject result) const {
-        ABSL_DLOG(INFO) << "Calling callback: " << __func__;
+        DLOG(INFO) << "Calling callback: " << __func__;
         env->CallVoidMethod(callbackInstance, methods.success, result);
     }
 
@@ -70,12 +69,12 @@ class Callbacks {
     }
 
     void failure(const std::string_view message) const {
-        ABSL_LOG(ERROR) << message;
+        LOG(ERROR) << message;
         _failure(message);
     }
 
     void plog_failure(const std::string_view message) const {
-        ABSL_PLOG(ERROR) << message;
+        PLOG(ERROR) << message;
         _failure(message);
     }
 
@@ -84,28 +83,28 @@ class Callbacks {
 #define STATUSLOG "[status_log] "
         switch (status) {
             case Status::CONNECTION_PREPARED:
-                ABSL_LOG(INFO) << STATUSLOG "Preparing connection";
+                LOG(INFO) << STATUSLOG "Preparing connection";
                 break;
             case Status::CONNECTED:
-                ABSL_LOG(INFO) << STATUSLOG "Connected";
+                LOG(INFO) << STATUSLOG "Connected";
                 break;
             case Status::HEADER_PACKET_SENT:
-                ABSL_LOG(INFO) << STATUSLOG "Header packet sent";
+                LOG(INFO) << STATUSLOG "Header packet sent";
                 break;
             case Status::DATA_PACKET_SENT:
-                ABSL_LOG(INFO) << STATUSLOG "Data packet sent";
+                LOG(INFO) << STATUSLOG "Data packet sent";
                 break;
             case Status::HEADER_PACKET_RECEIVED:
-                ABSL_LOG(INFO) << STATUSLOG "Header packet received";
+                LOG(INFO) << STATUSLOG "Header packet received";
                 break;
             case Status::DATA_PACKET_RECEIVED:
-                ABSL_LOG(INFO) << STATUSLOG "Data packet received";
+                LOG(INFO) << STATUSLOG "Data packet received";
                 break;
             case Status::PROCESSED_DATA:
-                ABSL_LOG(INFO) << STATUSLOG "Processed result packet";
+                LOG(INFO) << STATUSLOG "Processed result packet";
                 break;
             case Status::DONE:
-                ABSL_LOG(INFO) << STATUSLOG "Finished";
+                LOG(INFO) << STATUSLOG "Finished";
                 break;
             default:
                 break;
@@ -116,7 +115,7 @@ class Callbacks {
 
    private:
     inline void _failure(const std::string_view message) const {
-        ABSL_DLOG(INFO) << "Calling callback: " << __func__;
+        DLOG(INFO) << "Calling callback: " << __func__;
         env->CallVoidMethod(callbackInstance, methods.failure,
                             Convert<jstring>(env, message));
     }
@@ -128,6 +127,8 @@ class Callbacks {
         jmethodID status;
     } methods{};
 };
+
+const auto FileDataHelper = std::make_shared<SocketFile2DataHelper>(std::make_shared<RealFS>());
 
 class TgBotSocketNative {
    public:
@@ -145,7 +146,7 @@ class TgBotSocketNative {
                 sendContextCommon<AF_INET6, sockaddr_in6>(packet, std::move(callbacks));
                 break;
             default:
-                ABSL_LOG(ERROR) << "Unknown mode: " << static_cast<int>(config.mode);
+                LOG(ERROR) << "Unknown mode: " << static_cast<int>(config.mode);
                 break;
         }
     }
@@ -187,7 +188,7 @@ class TgBotSocketNative {
         int sockfd{};
         int ret{};
 
-        ABSL_LOG(INFO) << "Prepare to send CommandContext";
+        LOG(INFO) << "Prepare to send CommandContext";
         sockfd = socket(af, SOCK_STREAM | SOCK_NONBLOCK, 0);
         if (sockfd < 0) {
             callbacks->plog_failure("Failed to create socket");
@@ -196,7 +197,7 @@ class TgBotSocketNative {
 
         auto sockFdCloser = std::unique_ptr<int, void(*)(const int*)>(
             &sockfd, [](const int *fd) { close(*fd); });
-        ABSL_LOG(INFO) << "Using IP: " << std::quoted(config.address, '\'')
+        LOG(INFO) << "Using IP: " << std::quoted(config.address, '\'')
                        << ", Port: " << config.port;
         setupSockAddress(&addr);
 
@@ -268,7 +269,7 @@ class TgBotSocketNative {
             callbacks->plog_failure("Failed to send packet header");
             return;
         } else {
-            ABSL_LOG(INFO) << "Sent header packet with cmd "
+            LOG(INFO) << "Sent header packet with cmd "
                            << static_cast<int>(context.header.cmd) << ", "
                            << ret << " bytes";
         }
@@ -280,11 +281,11 @@ class TgBotSocketNative {
             callbacks->plog_failure("Failed to send packet data");
             return;
         } else {
-            ABSL_LOG(INFO) << "Sent data packet, " << ret << " bytes";
+            LOG(INFO) << "Sent data packet, " << ret << " bytes";
         }
         callbacks->status(Callbacks::Status::DATA_PACKET_SENT);
 
-        ABSL_LOG(INFO) << "Now reading callback";
+        LOG(INFO) << "Now reading callback";
 
 #define RETRY(exp) ({         \
     __typeof__(exp) _rc;                   \
@@ -302,11 +303,11 @@ class TgBotSocketNative {
         callbacks->status(Callbacks::Status::HEADER_PACKET_RECEIVED);
 
         if (header.magic != PacketHeader ::MAGIC_VALUE) {
-            ABSL_LOG(WARNING) << "Magic value offset: " << header.magic - PacketHeader::MAGIC_VALUE_BASE;
+            LOG(WARNING) << "Magic value offset: " << header.magic - PacketHeader::MAGIC_VALUE_BASE;
             callbacks->failure("Bad magic value of callback header");
             return;
         }
-        ABSL_DLOG(INFO) << "Allocating " << header.data_size << " bytes...";
+        DLOG(INFO) << "Allocating " << header.data_size << " bytes...";
         SharedMalloc data(header.data_size);
         if (data.get() == nullptr) {
             if (header.data_size == 0) {
@@ -326,12 +327,12 @@ class TgBotSocketNative {
 
 #define CHECK_RESULTDATA_SIZE(type, size) do {\
     if ((size) != sizeof(type)) {\
-        ABSL_LOG(ERROR) << "Received packet with invalid size: " << (size);\
+        LOG(ERROR) << "Received packet with invalid size: " << (size);\
         callbacks->failure("Invalid size for " #type);\
         return;\
     }} while(false)
 
-        ABSL_LOG(INFO) << "Command received: " << static_cast<int>(header.cmd);
+        LOG(INFO) << "Command received: " << static_cast<int>(header.cmd);
         switch (header.cmd) {
             case Command::CMD_GET_UPTIME_CALLBACK:
                 handleSpecificData<Command::CMD_GET_UPTIME_CALLBACK>(
@@ -351,9 +352,9 @@ class TgBotSocketNative {
                 CHECK_RESULTDATA_SIZE(GenericAck, header.data_size);
                 memcpy(&AckData, data.get(), sizeof(AckData));
                 success = AckData.result == AckType::SUCCESS;
-                ABSL_LOG(INFO) << "Command ACK: " << std::boolalpha << success;
+                LOG(INFO) << "Command ACK: " << std::boolalpha << success;
                 if (!success) {
-                    ABSL_LOG(ERROR) << "Reason: " << AckData.error_msg.data();
+                    LOG(ERROR) << "Reason: " << AckData.error_msg.data();
                     callbacks->plog_failure(AckData.error_msg.data());
                 } else {
                     callbacks->success(nullptr);
@@ -371,7 +372,7 @@ class TgBotSocketNative {
     void handleSpecificData<Command::CMD_DOWNLOAD_FILE_CALLBACK>(
             std::unique_ptr<Callbacks> callbacks, const void *data, PacketHeader::length_type len) const {
         bool rc =
-            FileDataHelper::DataToFile<FileDataHelper::Pass::DOWNLOAD_FILE>(
+            FileDataHelper->DataToFile<SocketFile2DataHelper::Pass::DOWNLOAD_FILE>(
                 data, len);
         if (rc) {
             callbacks->success(nullptr);
@@ -395,10 +396,10 @@ class TgBotSocketNative {
         CHECK_RESULTDATA_SIZE(UploadFileDryCallback, len);
         const auto *callback = static_cast<const UploadFileDryCallback *>(data);
         if (callback->result == AckType::SUCCESS) {
-            FileDataHelper::DataFromFileParam param{};
+            SocketFile2DataHelper::DataFromFileParam param{};
             param.filepath = callback->requestdata.srcfilepath.data();
             param.destfilepath = callback->requestdata.destfilepath.data();
-            auto p = FileDataHelper::DataFromFile<FileDataHelper::Pass::UPLOAD_FILE>(param);
+            auto p = FileDataHelper->DataFromFile<SocketFile2DataHelper::Pass::UPLOAD_FILE>(param);
             if (p) {
                 sendContext(p.value(), std::move(callbacks));
             } else {
@@ -414,7 +415,7 @@ namespace {
 
 void initLogging(JNIEnv __unused *env, jobject __unused thiz) {
     absl::InitializeLog();
-    ABSL_LOG(INFO) << __func__;
+    LOG(INFO) << __func__;
 }
 
 jboolean changeDestinationInfo(JNIEnv *env, jobject __unused thiz, jstring ipaddr,
@@ -431,12 +432,12 @@ jboolean changeDestinationInfo(JNIEnv *env, jobject __unused thiz, jstring ipadd
             config.mode = SocketConfig::USE_IPV6;
             break;
         default:
-            ABSL_LOG(ERROR) << "Unknown af type:" << type;
+            LOG(ERROR) << "Unknown af type:" << type;
             return JNI_FALSE;
     }
     config.address = newAddress;
     config.port = port;
-    ABSL_LOG(INFO) << "Switched to IP " << std::quoted(newAddress, '\'')
+    LOG(INFO) << "Switched to IP " << std::quoted(newAddress, '\'')
                    << ", af: " << type << ", port: " << port;
     sockIntf->config = config;
     return JNI_TRUE;
@@ -484,16 +485,16 @@ void getUptime(JNIEnv *env, jobject __unused thiz, jobject callback) {
 void uploadFile(JNIEnv *env, jobject __unused thiz, jstring path, jstring dest_file_path,
                 jobject callback) {
     const auto* native = TgBotSocketNative::getInstance();
-    FileDataHelper::DataFromFileParam params{};
+    SocketFile2DataHelper::DataFromFileParam params{};
     params.filepath = Convert<std::string>(env, path);
     params.destfilepath = Convert<std::string>(env, dest_file_path);
     params.options = native->uploadOptions;
 
-    ABSL_LOG(INFO) << "===============" << __func__ << "===============";
-    ABSL_LOG(INFO) << std::boolalpha << "overwrite opt: " << params.options.overwrite;
-    ABSL_LOG(INFO) << std::boolalpha << "hash_ignore opt: " << params.options.hash_ignore;
+    LOG(INFO) << "===============" << __func__ << "===============";
+    LOG(INFO) << std::boolalpha << "overwrite opt: " << params.options.overwrite;
+    LOG(INFO) << std::boolalpha << "hash_ignore opt: " << params.options.hash_ignore;
     auto rc =
-        FileDataHelper::DataFromFile<FileDataHelper::Pass::UPLOAD_FILE_DRY>(params);
+        FileDataHelper->DataFromFile<SocketFile2DataHelper::Pass::UPLOAD_FILE_DRY>(params);
     if (rc) {
         native->sendContext(rc.value(), env, callback);
     } else {
@@ -516,9 +517,9 @@ void setUploadFileOptions(JNIEnv * __unused env, jobject __unused thiz, jboolean
         .overwrite = failIfExist == JNI_FALSE,
         .hash_ignore = failIfChecksumMatch == JNI_FALSE,
     };
-    ABSL_LOG(INFO) << "===============" << __func__ << "===============";
-    ABSL_LOG(INFO) << std::boolalpha << "overwrite opt: " << (failIfExist == JNI_TRUE);
-    ABSL_LOG(INFO) << std::boolalpha << "hash_ignore opt: " << (failIfChecksumMatch == JNI_TRUE);
+    LOG(INFO) << "===============" << __func__ << "===============";
+    LOG(INFO) << std::boolalpha << "overwrite opt: " << (failIfExist == JNI_TRUE);
+    LOG(INFO) << std::boolalpha << "hash_ignore opt: " << (failIfChecksumMatch == JNI_TRUE);
 }
 }  // namespace
 
