@@ -9,10 +9,19 @@
 #include <cstdint>
 #include <cstring>
 #include <string>
+#include <type_traits>
 
 #include "../../include/SharedMalloc.hpp"
 #include "../../include/Types.h"
 #include "_TgBotSocketCommands.hpp"
+
+template <typename T, size_t size>
+bool arraycmp(const std::array<T, size>& lhs, const std::array<T, size>& rhs) {
+    if constexpr (std::is_same_v<T, char>) {
+        return std::strncmp(lhs.data(), rhs.data(), size) == 0;
+    }
+    return std::memcmp(lhs.data(), rhs.data(), size) == 0;
+}
 
 namespace TgBotSocket {
 
@@ -25,7 +34,7 @@ constexpr int ALIGNMENT = 8;
  *
  * Header contains the magic value, command, and the size of the data
  */
- 
+
 struct alignas(ALIGNMENT) PacketHeader {
     using length_type = uint64_t;
     constexpr static int64_t MAGIC_VALUE_BASE = 0xDEADFACE;
@@ -35,17 +44,19 @@ struct alignas(ALIGNMENT) PacketHeader {
     // 3: Uploadfile has a sha256sum check, std::array conversions
     // 4: Move CMD_UPLOAD_FILE_DRY to internal namespace
     // 5: Use the packed attribute for structs
-    // 6: Make CMD_UPLOAD_FILE_DRY_CALLBACK return sperate callback, and add srcpath to UploadFile
-    // 7: Remove packed attribute, align all as 8 bytes
+    // 6: Make CMD_UPLOAD_FILE_DRY_CALLBACK return sperate callback, and add
+    // srcpath to UploadFile 7: Remove packed attribute, align all as 8 bytes
     constexpr static int DATA_VERSION = 7;
     constexpr static int64_t MAGIC_VALUE = MAGIC_VALUE_BASE + DATA_VERSION;
 
     int64_t magic = MAGIC_VALUE;  ///< Magic value to verify the packet
     Command cmd{};                ///< Command to be executed
-    [[maybe_unused]] uint32_t padding1;            ///< Padding to align `data_size` to 8 bytes
-    length_type data_size{};      ///< Size of the data in the packet
-    uint32_t checksum{};          ///< Checksum of the packet data
-    [[maybe_unused]] uint32_t padding2;            ///< Padding to ensure struct size is a multiple of 8 bytes
+    [[maybe_unused]] uint32_t
+        padding1;             ///< Padding to align `data_size` to 8 bytes
+    length_type data_size{};  ///< Size of the data in the packet
+    uint32_t checksum{};      ///< Checksum of the packet data
+    [[maybe_unused]] uint32_t
+        padding2;  ///< Padding to ensure struct size is a multiple of 8 bytes
 };
 
 /**
@@ -78,7 +89,8 @@ struct alignas(ALIGNMENT) Packet {
 
     // Constructor that takes pointer, uses malloc but with size
     template <typename T>
-    explicit Packet(Command cmd, T in_data, header_type::length_type size) : data(size) {
+    explicit Packet(Command cmd, T in_data, header_type::length_type size)
+        : data(size) {
         static_assert(std::is_pointer_v<T>,
                       "This constructor should not be used with non pointer");
         header.cmd = cmd;
@@ -124,8 +136,8 @@ enum class CtrlSpamBlock {
     CTRL_MAX,
 };
 
-struct alignas(ALIGNMENT)  WriteMsgToChatId {
-    ChatId chat;                             // destination chatid
+struct alignas(ALIGNMENT) WriteMsgToChatId {
+    ChatId chat;                 // destination chatid
     MessageStringArray message;  // Msg to send
 };
 
@@ -136,8 +148,8 @@ struct alignas(ALIGNMENT) ObserveChatId {
 };
 
 struct alignas(ALIGNMENT) SendFileToChatId {
-    ChatId chat;                               // Destination ChatId
-    FileType fileType;                         // File type for file
+    ChatId chat;               // Destination ChatId
+    FileType fileType;         // File type for file
     PathStringArray filePath;  // Path to file (local)
 };
 
@@ -151,23 +163,36 @@ struct alignas(ALIGNMENT) DeleteControllerById {
 };
 
 struct alignas(ALIGNMENT) UploadFileDry {
-    PathStringArray destfilepath{};   // Destination file name 
-    PathStringArray srcfilepath{};    // Source file name (This is not used on the remote, used if dry=true)
+    PathStringArray destfilepath{};  // Destination file name
+    PathStringArray srcfilepath{};  // Source file name (This is not used on the
+                                    // remote, used if dry=true)
     SHA256StringArray sha256_hash{};  // SHA256 hash of the file
 
     // Returns AckType::ERROR_COMMAND_IGNORED on options failure
     struct Options {
         // Overwrite existing file if exists
-        bool overwrite = false;  
+        bool overwrite = false;
 
         // Ignore hash, always upload file even if the same file
         // exists and the hash matches. Depends on overwrite flag
         // for actual overwriting
         bool hash_ignore = false;
 
-        // If true, just check the hashes and return result.  
+        // If true, just check the hashes and return result.
         bool dry_run = false;
+
+        bool operator==(const Options& other) const {
+            return overwrite == other.overwrite &&
+                   hash_ignore == other.hash_ignore && dry_run == other.dry_run;
+        }
     } options;
+
+    bool operator==(const UploadFileDry& other) const {
+        return options == other.options &&
+               arraycmp(destfilepath, other.destfilepath) &&
+               arraycmp(srcfilepath, other.srcfilepath) &&
+               arraycmp(sha256_hash, other.sha256_hash);
+    }
 };
 
 struct alignas(ALIGNMENT) UploadFile : public UploadFileDry {

@@ -232,7 +232,9 @@ void createAndDoInitCallAll() {
 #ifdef SOCKET_CONNECTION
     createAndDoInitCall<NetworkLogSink,
                         ThreadManager::Usage::LOGSERVER_THREAD>();
-    createAndDoInitCall<SocketInterfaceTgBot>(nullptr, bot);
+    createAndDoInitCall<SocketInterfaceTgBot>(
+        nullptr, bot,
+        std::make_shared<SocketFile2DataHelper>(std::make_shared<RealFS>()));
     createAndDoInitCall<ChatObserver>();
 #endif
     createAndDoInitCall<RegexHandler>();

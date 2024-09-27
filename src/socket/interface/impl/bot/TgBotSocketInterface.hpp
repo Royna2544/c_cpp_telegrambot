@@ -1,11 +1,12 @@
 #include <ManagedThreads.hpp>
 #include <SocketBase.hpp>
+#include <TgBotWrapper.hpp>
 #include <functional>
 #include <initcalls/Initcall.hpp>
-#include <TgBotWrapper.hpp>
 #include <memory>
 
 #include "TgBotPacketParser.hpp"
+#include "TgBotSocketFileHelperNew.hpp"
 #include "TgBotSocket_Export.hpp"
 
 #ifdef WINDOWS_BUILD
@@ -33,12 +34,14 @@ struct TgBotPPImpl_API SocketInterfaceTgBot : ManagedThreadRunnable,
     void runFunction() override;
 
     explicit SocketInterfaceTgBot(
-        std::shared_ptr<SocketInterfaceBase> _interface, std::shared_ptr<TgBotApi> _api);
+        std::shared_ptr<SocketInterfaceBase> _interface,
+        std::shared_ptr<TgBotApi> _api, std::shared_ptr<SocketFile2DataHelper> helper);
 
    private:
     std::shared_ptr<SocketInterfaceBase> interface = nullptr;
     std::shared_ptr<TgBotApi> api = nullptr;
-    
+    std::shared_ptr<SocketFile2DataHelper> helper;
+
     std::chrono::system_clock::time_point startTp =
         std::chrono::system_clock::now();
     using command_handler_fn_t = std::function<void(
@@ -51,9 +54,9 @@ struct TgBotPPImpl_API SocketInterfaceTgBot : ManagedThreadRunnable,
     static GenericAck handle_ObserveChatId(const void* ptr);
     static GenericAck handle_ObserveAllChats(const void* ptr);
     static GenericAck handle_DeleteControllerById(const void* ptr);
-    static GenericAck handle_UploadFile(
-        const void* ptr, TgBotSocket::PacketHeader::length_type len);
-    static UploadFileDryCallback handle_UploadFileDry(
+    GenericAck handle_UploadFile(const void* ptr,
+                                 TgBotSocket::PacketHeader::length_type len);
+    UploadFileDryCallback handle_UploadFileDry(
         const void* ptr, TgBotSocket::PacketHeader::length_type len);
 
     // These have their own ack handlers

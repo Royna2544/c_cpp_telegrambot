@@ -10,11 +10,10 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
-#include <impl/bot/TgBotSocketFileHelper.hpp>
+#include <impl/bot/TgBotSocketFileHelperNew.hpp>
 #include <impl/bot/TgBotSocketInterface.hpp>
 #include <mutex>
 #include <socket/TgBotCommandMap.hpp>
-#include <type_traits>
 #include <variant>
 
 #include "TgBotWrapper.hpp"
@@ -193,7 +192,7 @@ GenericAck SocketInterfaceTgBot::handle_DeleteControllerById(const void* ptr) {
 
 GenericAck SocketInterfaceTgBot::handle_UploadFile(
     const void* ptr, TgBotSocket::PacketHeader::length_type len) {
-    if (!FileDataHelper::DataToFile<FileDataHelper::UPLOAD_FILE>(ptr, len)) {
+    if (!helper->DataToFile<SocketFile2DataHelper::Pass::UPLOAD_FILE>(ptr, len)) {
         return GenericAck(AckType::ERROR_RUNTIME_ERROR, "Failed to write file");
     }
     return GenericAck::ok();
@@ -206,7 +205,7 @@ UploadFileDryCallback SocketInterfaceTgBot::handle_UploadFileDry(
     UploadFileDryCallback callback;
     callback.requestdata = *f;
 
-    ret = FileDataHelper::DataToFile<FileDataHelper::UPLOAD_FILE_DRY>(ptr, len);
+    ret = helper->DataToFile<SocketFile2DataHelper::Pass::UPLOAD_FILE_DRY>(ptr, len);
     if (!ret) {
         copyTo(callback.error_msg, "Options verification failed");
         callback.result = AckType::ERROR_COMMAND_IGNORED;
@@ -220,11 +219,11 @@ UploadFileDryCallback SocketInterfaceTgBot::handle_UploadFileDry(
 bool SocketInterfaceTgBot::handle_DownloadFile(SocketConnContext ctx,
                                                const void* ptr) {
     const auto* data = static_cast<const DownloadFile*>(ptr);
-    FileDataHelper::DataFromFileParam params;
+    SocketFile2DataHelper::DataFromFileParam params;
     params.filepath = data->filepath.data();
     params.destfilepath = data->destfilename.data();
     auto pkt =
-        FileDataHelper::DataFromFile<FileDataHelper::DOWNLOAD_FILE>(params);
+        helper->DataFromFile<SocketFile2DataHelper::Pass::DOWNLOAD_FILE>(params);
     if (!pkt) {
         LOG(ERROR) << "Failed to prepare download file packet";
         return false;

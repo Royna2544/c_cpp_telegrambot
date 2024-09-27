@@ -3,13 +3,17 @@
 
 #include <SharedMalloc.hpp>
 #include <cstdint>
+#include <filesystem>
 #include <impl/bot/TgBotSocketInterface.hpp>
 #include <memory>
+#include <string_view>
 #include <utility>
 
 #include "SocketBase.hpp"
 #include "TgBotSocket_Export.hpp"
 #include "commands/CommandModulesTest.hpp"
+#include "gmock/gmock.h"
+#include "impl/bot/TgBotSocketFileHelperNew.hpp"
 
 using testing::_;
 using testing::DoAll;
@@ -39,6 +43,22 @@ class SocketInterfaceImplMock : public SocketInterfaceBase {
     MOCK_METHOD(void, printRemoteAddress, (socket_handle_t handle), (override));
 };
 
+class VFSOperationsMock : public VFSOperations {
+   public:
+    MOCK_METHOD(bool, writeFile,
+                (const std::filesystem::path& filename,
+                 const uint8_t* startAddr, size_t size),
+                (override));
+
+    MOCK_METHOD(std::optional<SharedMalloc>, readFile,
+                (const std::filesystem::path& filename), (override));
+
+    MOCK_METHOD(bool, exists, (const std::filesystem::path& path), (override));
+
+    MOCK_METHOD(void, SHA256, (const SharedMalloc& memory, HashContainer& data),
+                (override));
+};
+
 class SocketDataHandlerTest : public ::testing::Test {
     static constexpr int kSocket = 1000;
 
@@ -46,11 +66,14 @@ class SocketDataHandlerTest : public ::testing::Test {
     SocketDataHandlerTest()
         : _mockImpl(std::make_shared<SocketInterfaceImplMock>()),
           _mockApi(std::make_shared<MockTgBotApi>()),
-          mockInterface(_mockImpl, _mockApi),
+          _mockVFS(std::make_unique<VFSOperationsMock>()),
+          mockInterface(_mockImpl, _mockApi,
+                        std::make_shared<SocketFile2DataHelper>(_mockVFS)),
           fakeConn(kSocket, nullptr) {}
 
     std::shared_ptr<SocketInterfaceImplMock> _mockImpl;
     std::shared_ptr<MockTgBotApi> _mockApi;
+    std::shared_ptr<VFSOperationsMock> _mockVFS;
     SocketInterfaceTgBot mockInterface;
     // Dummy, not under a real connection
     SocketConnContext fakeConn;
@@ -77,7 +100,7 @@ class SocketDataHandlerTest : public ::testing::Test {
         // Checking packet header
         EXPECT_NO_FATAL_FAILURE(packetData.assignTo(recv_header));
         EXPECT_EQ(recv_header.cmd, retCmd);
-        EXPECT_EQ(recv_header.data_size, sizeof(DataT));
+        ASSERT_EQ(recv_header.data_size, sizeof(DataT));
         // Checking packet data
         EXPECT_NO_FATAL_FAILURE(packetData.assignTo(
             out, sizeof(DataT), TgBotSocket::Packet::hdr_sz));
@@ -101,7 +124,18 @@ class SocketDataHandlerTest : public ::testing::Test {
     void verifyAndClear() {
         testing::Mock::VerifyAndClearExpectations(_mockImpl.get());
         testing::Mock::VerifyAndClearExpectations(_mockApi.get());
+        testing::Mock::VerifyAndClearExpectations(_mockVFS.get());
     }
+
+    static SharedMalloc createFileMem() {
+        constexpr std::string_view fileContent =
+            "Alex is very dumb, go sleep kid.";
+        SharedMalloc fileMem(fileContent.size());
+        fileMem.assignFrom(fileContent.data(), fileContent.size());
+        return fileMem;
+    }
+
+    using FSP = std::filesystem::path;
 };
 
 TEST_F(SocketDataHandlerTest, TestCmdGetUptime) {
@@ -166,12 +200,14 @@ TEST_F(SocketDataHandlerTest, TestCmdWriteMsgToChatIdINVALID) {
             .chat = testChatId,
             .message = {"Hello, World!"},
         };
+        // Fake padding to increase data size
         std::uintmax_t FAKEVALUE = 0;
     } data;
 
     // For this test to be valid...
     static_assert(sizeof(data) > sizeof(data.realdata));
-    //...the size of the test data must be larger than the size of the real data.
+    //...the size of the test data must be larger than the size of the real
+    // data.
 
     TgBotSocket::Packet pkt(TgBotSocket::Command::CMD_WRITE_MSG_TO_CHAT_ID,
                             data);
@@ -179,7 +215,117 @@ TEST_F(SocketDataHandlerTest, TestCmdWriteMsgToChatIdINVALID) {
     sendAndVerifyHeader<TgBotSocket::callback::GenericAck,
                         TgBotSocket::Command::CMD_GENERIC_ACK>(pkt,
                                                                &callbackData);
-    isGenericAck_Error<TgBotSocket::callback::AckType::ERROR_COMMAND_IGNORED>(callbackData);
+    isGenericAck_Error<TgBotSocket::callback::AckType::ERROR_COMMAND_IGNORED>(
+        callbackData);
     // Done
     verifyAndClear();
+}
+
+TEST_F(SocketDataHandlerTest, TestCmdUploadFileDryDoesntExist) {
+    auto data = UploadFileDry{.destfilepath = {"test"},
+                              .srcfilepath = {"testsrc"},
+                              .sha256_hash = {"asdqwdsadsad"},
+                              .options = {
+                                  .overwrite = true,
+                                  .hash_ignore = true,
+                                  .dry_run = true,
+                              }};
+
+    // Set expectations
+    TgBotSocket::Packet pkt(TgBotSocket::Command::CMD_UPLOAD_FILE_DRY, data);
+    EXPECT_CALL(*_mockVFS, exists(FSP(data.destfilepath.data())))
+        .WillOnce(Return(false));
+
+    // Verify result
+    TgBotSocket::callback::UploadFileDryCallback callback;
+    sendAndVerifyHeader<TgBotSocket::callback::UploadFileDryCallback,
+                        TgBotSocket::Command::CMD_UPLOAD_FILE_DRY_CALLBACK>(
+        pkt, &callback);
+    EXPECT_NE(callback.result,
+              TgBotSocket::callback::AckType::ERROR_COMMAND_IGNORED);
+    EXPECT_EQ(callback.requestdata, data);
+}
+
+TEST_F(SocketDataHandlerTest, TestCmdUploadFileDryExistsHashDoesntMatch) {
+    auto data = UploadFileDry{.destfilepath = {"test"},
+                              .srcfilepath = {"testsrc"},
+                              .sha256_hash = {"asdqwdsadsad"},
+                              .options = {
+                                  .overwrite = true,
+                                  .hash_ignore = false,
+                                  .dry_run = true,
+                              }};
+    // Prepare file contents
+    const auto fileMem = createFileMem();
+
+    // Set expectations
+    TgBotSocket::Packet pkt(TgBotSocket::Command::CMD_UPLOAD_FILE_DRY, data);
+    EXPECT_CALL(*_mockVFS, exists(FSP(data.destfilepath.data())))
+        .WillOnce(Return(true));
+    EXPECT_CALL(*_mockVFS, readFile(FSP(data.destfilepath.data())))
+        .WillOnce(Return(fileMem));
+    EXPECT_CALL(*_mockVFS, SHA256(fileMem, _))
+        .WillOnce(testing::SetArgReferee<1>(HashContainer{data.sha256_hash}));
+
+    // Verify result
+    TgBotSocket::callback::UploadFileDryCallback callback;
+    sendAndVerifyHeader<TgBotSocket::callback::UploadFileDryCallback,
+                        TgBotSocket::Command::CMD_UPLOAD_FILE_DRY_CALLBACK>(
+        pkt, &callback);
+    EXPECT_NE(callback.result, TgBotSocket::callback::AckType::SUCCESS);
+    EXPECT_EQ(callback.requestdata, data);
+}
+
+TEST_F(SocketDataHandlerTest, TestCmdUploadFileDryExistsOptSaidNo) {
+    auto data = UploadFileDry{.destfilepath = {"test"},
+                              .srcfilepath = {"testsrc"},
+                              .sha256_hash = {"asdqwdsadsad"},
+                              .options = {
+                                  .overwrite = false,
+                                  .hash_ignore = false,
+                                  .dry_run = true,
+                              }};
+    // Prepare file contents
+    const auto fileMem = createFileMem();
+
+    // Set expectations
+    TgBotSocket::Packet pkt(TgBotSocket::Command::CMD_UPLOAD_FILE_DRY, data);
+    EXPECT_CALL(*_mockVFS,
+                exists(std::filesystem::path(data.destfilepath.data())))
+        .WillOnce(Return(true));
+
+    // Verify result
+    TgBotSocket::callback::UploadFileDryCallback callback;
+    sendAndVerifyHeader<TgBotSocket::callback::UploadFileDryCallback,
+                        TgBotSocket::Command::CMD_UPLOAD_FILE_DRY_CALLBACK>(
+        pkt, &callback);
+    EXPECT_EQ(callback.result,
+              TgBotSocket::callback::AckType::ERROR_COMMAND_IGNORED);
+    EXPECT_EQ(callback.requestdata, data);
+}
+
+TEST_F(SocketDataHandlerTest, TestCmdUploadFileOK) {
+    // Prepare file contents
+    const auto filemem = createFileMem();
+    SharedMalloc mem(sizeof(UploadFile) + filemem->size());
+    auto* uploadfile = static_cast<UploadFile*>(mem.get());
+    uploadfile->srcfilepath = {"sourcefile"};
+    uploadfile->destfilepath = {"destinationfile"};
+    uploadfile->sha256_hash = {"asdqwdsadsad"};
+    uploadfile->options.hash_ignore = true;
+    uploadfile->options.overwrite = true;
+    uploadfile->options.dry_run = false;
+    mem.assignTo(filemem.get(), filemem->size(), sizeof(UploadFile));
+
+    // Set expectations
+    TgBotSocket::Packet pkt(TgBotSocket::Command::CMD_UPLOAD_FILE, mem.get(),
+                            mem->size());
+    EXPECT_CALL(*_mockVFS, writeFile(FSP(uploadfile->destfilepath.data()), _,
+                                     filemem->size())).WillOnce(Return(true));
+
+    // Verify result
+    TgBotSocket::callback::GenericAck callback;
+    sendAndVerifyHeader<TgBotSocket::callback::GenericAck,
+                        TgBotSocket::Command::CMD_GENERIC_ACK>(pkt, &callback);
+    isGenericAck_OK(callback);
 }

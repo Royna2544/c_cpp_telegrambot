@@ -89,6 +89,9 @@ struct SharedMalloc {
 
     template <typename T>
     void assignTo(T *ref, size_t size, size_t offset) const {
+        static_assert(!std::is_const_v<T>,
+                      "Using assignTo to a const pointer, did you mean to use "
+                      "assignFrom?");
         CHECK(size + offset <= parent->size())
             << ": Requested size is bigger than what's stored in memory ("
             << size + offset << " > " << parent->size() << ")";

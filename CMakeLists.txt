@@ -216,6 +216,7 @@ if (USE_UNIX_SOCKETS)
     src/ChatObserver.cpp
     src/logging/LoggingServer.cpp
     ${SOCKET_SRC_INTERFACE}/impl/bot/SocketDataHandler.cpp
+    ${SOCKET_SRC_INTERFACE}/impl/bot/TgBotSocketFileHelperNew.cpp
     ${SOCKET_SRC_INTERFACE}/impl/bot/TgBotSocketInterface.cpp
     ${SOCKET_SRC_INTERFACE}/impl/backends/ServerBackend.cpp
     ${SOCKET_SRC_INTERFACE}/impl/backends/ServerBackend_${TARGET_VARIANT}.cpp)
