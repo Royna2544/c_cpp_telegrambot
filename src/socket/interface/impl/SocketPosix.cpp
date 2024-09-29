@@ -100,6 +100,7 @@ bool recv(int fd, void* buf, size_t n, int flags) {
     ssize_t rc = 0;
     while (remaining > 0) {
         rc = ::recv(fd, buf, remaining, flags);
+        DLOG(INFO) << "recv: rc=" << rc << " remaining=" << remaining;
         if (rc < 0) {
             if (should_retry()) {
                 continue;
@@ -122,6 +123,7 @@ bool send(int fd, const void* buf, size_t n, int flags) {
     ssize_t rc = 0;
     while (remaining > 0) {
         rc = ::send(fd, buf, remaining, flags);
+        DLOG(INFO) << "send: rc=" << rc << " remaining=" << remaining;
         if (rc < 0) {
             if (should_retry()) {
                 continue;
