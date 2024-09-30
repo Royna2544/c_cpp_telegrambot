@@ -6,7 +6,7 @@
 
 namespace TgBotSocket {
 
-std::optional<Packet> readPacket(
+std::optional<Packet> TgBotSocket_API readPacket(
     const std::shared_ptr<SocketInterfaceBase> &interface,
     const SocketConnContext &context);
     

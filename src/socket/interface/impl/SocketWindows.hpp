@@ -1,3 +1,4 @@
+#include <TgBotSocketExports.h>
 #include <absl/log/log.h>
 #include <winsock2.h>
 #include <ws2ipdef.h>
@@ -8,7 +9,7 @@
 #include "SharedMalloc.hpp"
 #include "SocketDescriptor_defs.hpp"
 
-struct SocketInterfaceWindows : SocketInterfaceBase {
+struct TgBotSocket_API SocketInterfaceWindows : SocketInterfaceBase {
     bool isValidSocketHandle(socket_handle_t handle) override {
         return handle != INVALID_SOCKET;
     };
@@ -52,7 +53,7 @@ struct SocketInterfaceWindows : SocketInterfaceBase {
 
 static inline const auto WSAEStr = SocketInterfaceWindows::WSALastErrorStr;
 
-struct SocketInterfaceWindowsLocal : SocketInterfaceWindows {
+struct TgBotSocket_API SocketInterfaceWindowsLocal : SocketInterfaceWindows {
     std::optional<SocketConnContext> createClientSocket() override;
     std::optional<socket_handle_t> createServerSocket() override;
     void cleanupServerSocket() override;
@@ -63,7 +64,7 @@ struct SocketInterfaceWindowsLocal : SocketInterfaceWindows {
     bool createLocalSocket(SocketConnContext* ctx);
 };
 
-struct SocketInterfaceWindowsIPv4 : SocketInterfaceWindows {
+struct TgBotSocket_API SocketInterfaceWindowsIPv4 : SocketInterfaceWindows {
     std::optional<SocketConnContext> createClientSocket() override;
     std::optional<socket_handle_t> createServerSocket() override;
     void printRemoteAddress(socket_handle_t s) override;
@@ -72,7 +73,7 @@ struct SocketInterfaceWindowsIPv4 : SocketInterfaceWindows {
     socket_handle_t makeSocket(bool is_client);
 };
 
-struct SocketInterfaceWindowsIPv6 : SocketInterfaceWindows {
+struct TgBotSocket_API SocketInterfaceWindowsIPv6 : SocketInterfaceWindows {
     std::optional<SocketConnContext> createClientSocket() override;
     std::optional<socket_handle_t> createServerSocket() override;
     void printRemoteAddress(socket_handle_t s) override;

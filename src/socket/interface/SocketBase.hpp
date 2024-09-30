@@ -1,5 +1,6 @@
 #pragma once
 
+#include <TgBotSocketExports.h>
 #include <absl/log/log.h>
 
 #include <SocketDescriptor_defs.hpp>
@@ -13,7 +14,7 @@
 
 using std::chrono_literals::operator""s;
 
-struct SocketConnContext {
+struct TgBotSocket_API SocketConnContext {
     socket_handle_t cfd{};  // connection socket file descriptor
     SharedMalloc addr;      // struct sockaddr_*'s address
 
@@ -29,7 +30,7 @@ struct SocketConnContext {
     template <typename SocketAddr>
     explicit SocketConnContext(socket_handle_t sock, SocketAddr Myaddr)
         : SocketConnContext(Myaddr) {
-        cfd = sock;
+        cfd = sock; // NOLINT(cppcoreguidelines-prefer-member-initializer)
     }
     bool operator!=(const SocketConnContext &other) const noexcept {
         return !(*this == other);
@@ -40,7 +41,7 @@ struct SocketConnContext {
 };
 
 // A base class for socket operations
-struct SocketInterfaceBase {
+struct TgBotSocket_API SocketInterfaceBase {
     // addr is used as void pointer to maintain platform independence.
     using listener_callback_t = std::function<bool(SocketConnContext ctx)>;
     using dummy_listen_buf_t = char;
@@ -168,11 +169,11 @@ struct SocketInterfaceBase {
      */
     virtual bool isValidSocketHandle(socket_handle_t handle) = 0;
 
-    struct Helper {
+    struct TgBotSocket_API Helper {
         explicit Helper(SocketInterfaceBase *interface_)
             : inet(interface_), local(interface_) {}
 
-        struct INetHelper {
+        struct TgBotSocket_API INetHelper {
             explicit INetHelper(SocketInterfaceBase *interface_)
                 : interface(interface_) {}
             int getPortNum();
@@ -184,7 +185,7 @@ struct SocketInterfaceBase {
             SocketInterfaceBase *interface;
         } inet;
 
-        struct LocalHelper {
+        struct TgBotSocket_API LocalHelper {
             explicit LocalHelper(SocketInterfaceBase *interface_)
                 : interface(interface_) {}
             bool canSocketBeClosed();

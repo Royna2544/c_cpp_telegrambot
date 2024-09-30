@@ -74,6 +74,7 @@ struct VFSOperations {
     virtual void SHA256(const SharedMalloc& memory, HashContainer& data) = 0;
 };
 
+#ifndef TgBotSocket_API
 #if defined _WIN32 || defined __CYGWIN__
 #ifdef TgBotSocket_EXPORTS
 #define TgBotSocket_API __declspec(dllexport)
@@ -82,6 +83,7 @@ struct VFSOperations {
 #endif
 #else
 #define TgBotSocket_API
+#endif
 #endif
 
 struct TgBotSocket_API RealFS : public VFSOperations {
@@ -130,7 +132,7 @@ using TgBotSocket::data::DownloadFile;
 using TgBotSocket::data::UploadFile;
 using TgBotSocket::data::UploadFileDry;
 
-class TgBotPPImpl_API SocketFile2DataHelper {
+class TgBotSocket_API SocketFile2DataHelper {
     std::shared_ptr<VFSOperations> vfs;
 
    public:
@@ -190,3 +192,5 @@ class TgBotPPImpl_API SocketFile2DataHelper {
     std::optional<TgBotSocket::Packet> DataFromFile_DOWNLOAD_FILE(
         const DataFromFileParam& params);
 };
+
+#undef TgBotSocket_API
