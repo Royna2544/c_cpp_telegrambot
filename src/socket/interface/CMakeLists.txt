@@ -7,7 +7,7 @@ if (UNIX)
     impl/inet/SocketPosixIPv4.cpp
     impl/inet/SocketPosixIPv6.cpp
     impl/helper/SocketHelperPosix.cpp
-    impl/bot/ClientBackendPosix.cpp
+    impl/backends/ClientBackendPosix.cpp
   )
   if (APPLE)
     extend_set(SOCKET_SRC_LIST
@@ -25,7 +25,7 @@ elseif(WIN32)
     impl/inet/SocketWindowsIPv4.cpp
     impl/inet/SocketWindowsIPv6.cpp
     impl/helper/SocketHelperWindows.cpp
-    impl/bot/ClientBackendWindows.cpp
+    impl/backends/ClientBackendWindows.cpp
   )
 endif()
 extend_set(SOCKET_SRC_LIST
