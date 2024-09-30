@@ -45,7 +45,7 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
     log
     z
     crypto_openssl
-    absl::log_initialize absl::log)
+    absl::log_initialize absl::log absl::check)
 
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE include)
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE external/openssl/include)
