@@ -3,8 +3,8 @@
 #include <SharedMalloc.hpp>
 
 TEST(SharedMallocTest, UseCount) {
-    SharedMalloc shared_malloc(10);
-    SharedMalloc some(1000);
+    SharedMalloc shared_malloc(51);
+    SharedMalloc some(3);
     auto v = shared_malloc.getChild();
     {
         auto v2 = shared_malloc.getChild();
@@ -21,7 +21,7 @@ TEST(SharedMallocTest, UseCount) {
 }
 
 TEST(SharedMallocChildTest, ReturnValidObject) {
-    SharedMalloc shared_malloc(10);
+    SharedMalloc shared_malloc(41);
     auto child = shared_malloc.getChild();
     EXPECT_NE(child.get(), nullptr);
 }

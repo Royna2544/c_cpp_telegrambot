@@ -192,7 +192,8 @@ GenericAck SocketInterfaceTgBot::handle_DeleteControllerById(const void* ptr) {
 
 GenericAck SocketInterfaceTgBot::handle_UploadFile(
     const void* ptr, TgBotSocket::PacketHeader::length_type len) {
-    if (!helper->DataToFile<SocketFile2DataHelper::Pass::UPLOAD_FILE>(ptr, len)) {
+    if (!helper->DataToFile<SocketFile2DataHelper::Pass::UPLOAD_FILE>(ptr,
+                                                                      len)) {
         return GenericAck(AckType::ERROR_RUNTIME_ERROR, "Failed to write file");
     }
     return GenericAck::ok();
@@ -205,7 +206,8 @@ UploadFileDryCallback SocketInterfaceTgBot::handle_UploadFileDry(
     UploadFileDryCallback callback;
     callback.requestdata = *f;
 
-    ret = helper->DataToFile<SocketFile2DataHelper::Pass::UPLOAD_FILE_DRY>(ptr, len);
+    ret = helper->DataToFile<SocketFile2DataHelper::Pass::UPLOAD_FILE_DRY>(ptr,
+                                                                           len);
     if (!ret) {
         copyTo(callback.error_msg, "Options verification failed");
         callback.result = AckType::ERROR_COMMAND_IGNORED;
@@ -222,8 +224,8 @@ bool SocketInterfaceTgBot::handle_DownloadFile(SocketConnContext ctx,
     SocketFile2DataHelper::DataFromFileParam params;
     params.filepath = data->filepath.data();
     params.destfilepath = data->destfilename.data();
-    auto pkt =
-        helper->DataFromFile<SocketFile2DataHelper::Pass::DOWNLOAD_FILE>(params);
+    auto pkt = helper->DataFromFile<SocketFile2DataHelper::Pass::DOWNLOAD_FILE>(
+        params);
     if (!pkt) {
         LOG(ERROR) << "Failed to prepare download file packet";
         return false;
@@ -282,8 +284,8 @@ bool CHECK_PACKET_SIZE(Packet& pkt) {
         return __ret;                                         \
     }())
 
-void SocketInterfaceTgBot::handle_CommandPacket(SocketConnContext ctx,
-                                                TgBotSocket::Packet pkt) {
+void SocketInterfaceTgBot::handlePacket(SocketConnContext ctx,
+                                        TgBotSocket::Packet pkt) {
     const void* ptr = pkt.data.get();
     std::variant<GenericAck, UploadFileDryCallback, bool> ret;
     const auto invalidPacketAck =

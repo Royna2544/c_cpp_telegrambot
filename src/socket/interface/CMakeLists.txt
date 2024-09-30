@@ -31,7 +31,8 @@ endif()
 extend_set(SOCKET_SRC_LIST
   SocketBase.cpp
   impl/helper/SocketHelper.cpp
-  impl/bot/TgBotPacketParser.cpp)
+  impl/bot/TgBotPacketParser.cpp
+  impl/bot/TgBotSocketFileHelperNew.cpp)
 
 set(CURL_LIBS)
 if (CURL_FOUND)
@@ -48,6 +49,6 @@ add_my_library(
   SRCS ${SOCKET_SRC_LIST}
   PRIVATE_INC ${CURL_INCLUDE_DIRS}
   PUBLIC_INC . ../include
-  LIBS TgBotUtils TgBotSocketSelectors TgBotSocketCommandMap ${CURL_LIBS} ZLIB::ZLIB
+  LIBS TgBotUtils TgBotSocketSelectors TgBotSocketCommandMap ${CURL_LIBS} ZLIB::ZLIB OpenSSL::Crypto
   LIBS_WIN32 wsock32 Ws2_32
 )

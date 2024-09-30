@@ -7,15 +7,14 @@
 #include "../backends/ServerBackend.hpp"
 #include "SocketBase.hpp"
 #include "TgBotWrapper.hpp"
-
-using HandleState = SocketInterfaceTgBot::HandleState;
+#include "impl/bot/TgBotPacketParser.hpp"
 
 SocketInterfaceTgBot::SocketInterfaceTgBot(
     std::shared_ptr<SocketInterfaceBase> _interface,
-    std::shared_ptr<TgBotApi> _api, std::shared_ptr<SocketFile2DataHelper> helper)
+    std::shared_ptr<TgBotApi> _api,
+    std::shared_ptr<SocketFile2DataHelper> helper)
     : interface(std::move(_interface)),
       api(std::move(_api)),
-      TgBotSocketParser(_interface.get()),
       helper(std::move(helper)) {}
 
 void SocketInterfaceTgBot::doInitCall() {
@@ -46,6 +45,12 @@ void SocketInterfaceTgBot::doInitCall() {
 
 void SocketInterfaceTgBot::runFunction() {
     setPreStopFunction([this](auto*) { interface->forceStopListening(); });
-    interface->startListeningAsServer(
-        [this](SocketConnContext ctx) { return onNewBuffer(std::move(ctx)); });
+    interface->startListeningAsServer([this](SocketConnContext ctx) {
+        auto pkt = TgBotSocket::readPacket(interface, ctx);
+        if (pkt) {
+            handlePacket(ctx, std::move(pkt.value()));
+            return true;
+        }
+        return false;
+    });
 }

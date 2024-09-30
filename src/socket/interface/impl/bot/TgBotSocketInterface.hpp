@@ -1,3 +1,5 @@
+#include <TgBotPPImplExports.h>
+
 #include <ManagedThreads.hpp>
 #include <SocketBase.hpp>
 #include <TgBotWrapper.hpp>
@@ -9,33 +11,23 @@
 #include "TgBotSocketFileHelperNew.hpp"
 #include "TgBotSocket_Export.hpp"
 
-#ifdef WINDOWS_BUILD
-#include "impl/SocketWindows.hpp"
-#else  // WINDOWS_BUILD
-#include "impl/SocketPosix.hpp"
-#endif  // WINDOWS_BUILD
-
-#include <TgBotPPImplExports.h>
-
 using TgBotSocket::callback::GenericAck;
 using TgBotSocket::callback::UploadFileDryCallback;
 
-struct TgBotPPImpl_API SocketInterfaceTgBot : ManagedThreadRunnable,
-                                              InitCall,
-                                              TgBotSocketParser {
+struct TgBotPPImpl_API SocketInterfaceTgBot : ManagedThreadRunnable, InitCall {
     void doInitCall() override;
     const CStringLifetime getInitCallName() const override {
         return "Create sockets and setup";
     }
 
-    void handle_CommandPacket(SocketConnContext ctx,
-                              TgBotSocket::Packet pkt) override;
+    void handlePacket(SocketConnContext ctx, TgBotSocket::Packet pkt);
 
     void runFunction() override;
 
     explicit SocketInterfaceTgBot(
         std::shared_ptr<SocketInterfaceBase> _interface,
-        std::shared_ptr<TgBotApi> _api, std::shared_ptr<SocketFile2DataHelper> helper);
+        std::shared_ptr<TgBotApi> _api,
+        std::shared_ptr<SocketFile2DataHelper> helper);
 
    private:
     std::shared_ptr<SocketInterfaceBase> interface = nullptr;

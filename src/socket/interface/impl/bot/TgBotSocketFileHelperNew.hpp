@@ -19,17 +19,6 @@
 #define TgBotPPImpl_API
 #endif
 
-template <size_t size>
-inline void copyTo(std::array<char, size>& arr_in, const char* buf) {
-    strncpy(arr_in.data(), buf, size);
-}
-template <size_t size, size_t size2>
-    requires(size > size2)
-inline void copyTo(std::array<char, size>& arr_in,
-                   std::array<char, size2> buf) {
-    copyTo(arr_in, buf.data());
-}
-
 // Represents a SHA-256 hash
 struct HashContainer {
     std::array<unsigned char, SHA256_DIGEST_LENGTH> m_data;

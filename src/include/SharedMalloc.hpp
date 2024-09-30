@@ -71,10 +71,9 @@ struct SharedMalloc {
     SharedMalloc() { parent = std::make_shared<SharedMallocParent>(); }
 
     template <typename T>
-        requires(!std::is_pointer_v<T> && !std::is_integral_v<T>)
     explicit SharedMalloc(T value) {
         parent = std::make_shared<SharedMallocParent>(sizeof(T));
-        memcpy(get(), &value, sizeof(T));
+        assignFrom(value);
     }
 
     SharedMallocParent *operator->() const { return parent.get(); }
@@ -87,20 +86,31 @@ struct SharedMalloc {
         return value;
     }
 
+   private:
+    // A fortify check.
+    inline void newSizeCheck(const size_t newSize) const {
+        CHECK_LE(newSize, parent->size())
+            << ": Requested size is bigger than this->size()";
+    }
+
+    inline void offsetCheck(const size_t offset) const {
+        CHECK_LE(offset, parent->size())
+            << ": Requested offset is bigger than this->size()";
+    }
+
+    [[nodiscard]] inline char *offsetGet(const size_t offset) const {
+        return static_cast<char *>(get()) + offset;
+    }
+
+   public:
     template <typename T>
-    void assignTo(T *ref, size_t size, size_t offset) const {
+    void assignTo(T *ref, const size_t size, const size_t offset = 0) const {
         static_assert(!std::is_const_v<T>,
                       "Using assignTo to a const pointer, did you mean to use "
                       "assignFrom?");
-        CHECK(size + offset <= parent->size())
-            << ": Requested size is bigger than what's stored in memory ("
-            << size + offset << " > " << parent->size() << ")";
+        offsetCheck(offset);
+        newSizeCheck(size + offset);
         memcpy(ref, static_cast<char *>(get()) + offset, size);
-    }
-
-    template <typename T>
-    void assignTo(T *ref, size_t size) const {
-        assignTo(ref, size, 0);
     }
 
     template <typename T>
@@ -110,19 +120,27 @@ struct SharedMalloc {
     }
 
     template <typename T>
-        requires(std::is_class_v<T>)
-    void assignFrom(T &ref) {
-        CHECK(sizeof(T) == parent->size())
-            << "Must have same size to assign from";
+        requires(!std::is_pointer_v<T>)
+    void assignFrom(const T &ref) {
+        CHECK_LE(sizeof(T), parent->size())
+            << ": *this Must have bigger size than sizeof(T)";
         assignFrom(&ref, sizeof(T));
     }
 
     template <typename T>
-    void assignFrom(const T *ref, size_t size) {
-        CHECK(size <= parent->size())
-            << ": Requested size is bigger than what's stored in memory ("
-            << size << " > " << parent->size() << ")";
-        memcpy(get(), ref, size);
+    void assignFrom(const T *ref, const size_t size, const size_t offset = 0) {
+        offsetCheck(offset);
+        newSizeCheck(size + offset);
+        memcpy(offsetGet(offset), ref, size);
+    }
+
+    // Move memory of [startOffset] with size of [size] to [newOffset]
+    void move(const size_t startOffset, const size_t destOffset,
+              const size_t size) {
+        offsetCheck(startOffset);
+        offsetCheck(destOffset);
+        newSizeCheck(size + destOffset);
+        memmove(offsetGet(destOffset), offsetGet(startOffset), size);
     }
 
     // get returns a shared pointer to the shared memory block

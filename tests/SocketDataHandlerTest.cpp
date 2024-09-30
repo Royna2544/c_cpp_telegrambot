@@ -93,7 +93,7 @@ class SocketDataHandlerTest : public ::testing::Test {
 
         EXPECT_CALL(*_mockImpl, writeToSocket(fakeConn, _))
             .WillOnce(DoAll(SaveArg<1>(&packetData), Return(true)));
-        mockInterface.handle_CommandPacket(fakeConn, std::move(pkt));
+        mockInterface.handlePacket(fakeConn, std::move(pkt));
 
         // Expect valid packet
         EXPECT_TRUE(packetData.get());

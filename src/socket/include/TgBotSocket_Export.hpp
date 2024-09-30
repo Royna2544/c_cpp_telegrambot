@@ -16,12 +16,35 @@
 #include "_TgBotSocketCommands.hpp"
 
 template <typename T, size_t size>
-bool arraycmp(const std::array<T, size>& lhs, const std::array<T, size>& rhs) {
+inline bool arraycmp(const std::array<T, size>& lhs,
+                     const std::array<T, size>& rhs) {
     if constexpr (std::is_same_v<T, char>) {
         return std::strncmp(lhs.data(), rhs.data(), size) == 0;
     }
     return std::memcmp(lhs.data(), rhs.data(), size) == 0;
 }
+
+template <size_t size>
+inline void copyTo(std::array<char, size>& arr_in, const char* buf) {
+    strncpy(arr_in.data(), buf, size);
+}
+
+template <size_t size, size_t size2>
+    requires(size > size2)
+inline void copyTo(std::array<char, size>& arr_in,
+                   std::array<char, size2> buf) {
+    copyTo(arr_in, buf.data());
+}
+
+#ifdef __cpp_concepts
+template <size_t size, size_t size2>
+    requires(size == size2)
+inline void copyTo(std::array<char, size>& arr_in,
+                   std::array<char, size2> buf) {
+    copyTo(arr_in, buf.data());
+    arr_in[size - 1] = '\0';
+}
+#endif
 
 namespace TgBotSocket {
 
@@ -45,18 +68,22 @@ struct alignas(ALIGNMENT) PacketHeader {
     // 4: Move CMD_UPLOAD_FILE_DRY to internal namespace
     // 5: Use the packed attribute for structs
     // 6: Make CMD_UPLOAD_FILE_DRY_CALLBACK return sperate callback, and add
-    // srcpath to UploadFile 7: Remove packed attribute, align all as 8 bytes
-    constexpr static int DATA_VERSION = 7;
+    // srcpath to UploadFile 
+    // 7: Remove packed attribute, align all as 8 bytes
+    // 8: change checksum to uint64_t
+    constexpr static int DATA_VERSION = 8;
     constexpr static int64_t MAGIC_VALUE = MAGIC_VALUE_BASE + DATA_VERSION;
 
     int64_t magic = MAGIC_VALUE;  ///< Magic value to verify the packet
     Command cmd{};                ///< Command to be executed
-    [[maybe_unused]] uint32_t
-        padding1;             ///< Padding to align `data_size` to 8 bytes
-    length_type data_size{};  ///< Size of the data in the packet
-    uint32_t checksum{};      ///< Checksum of the packet data
-    [[maybe_unused]] uint32_t
-        padding2;  ///< Padding to ensure struct size is a multiple of 8 bytes
+    ///< Padding to align `data_size` to 8 bytes
+    [[maybe_unused]] uint32_t padding1;
+    ///< Size of the data in the packet
+    length_type data_size{};
+    ///< Checksum of the packet data
+    uint64_t checksum{};
+    ///< Padding to ensure struct size is a multiple of 8 bytes
+    [[maybe_unused]] uint32_t padding2;
 };
 
 /**
@@ -97,18 +124,25 @@ struct alignas(ALIGNMENT) Packet {
         header.magic = header_type::MAGIC_VALUE;
         header.data_size = size;
         data.assignFrom(in_data, header.data_size);
-        uLong crc = crc32(0L, Z_NULL, 0);  // Initial value
-        header.checksum =
-            crc32(crc, reinterpret_cast<Bytef*>(data.get()), header.data_size);
+        header.checksum = crc32_function(data.get(), header.data_size);
     }
 
     // Converts to full SocketData object, including header
     SharedMalloc toSocketData() {
         data->realloc(hdr_sz + header.data_size);
-        memmove(static_cast<char*>(data.get()) + hdr_sz, data.get(),
-                header.data_size);
-        memcpy(data.get(), &header, hdr_sz);
+        data.move(0, sizeof(header), header.data_size);
+        data.assignFrom(header);
         return data;
+    }
+
+    static uLong crc32_function(const void* data, const size_t data_size) {
+        uLong crc = crc32(0L, Z_NULL, 0);  // Initial value
+        crc32(crc, static_cast<const Bytef*>(data), data_size);
+        return crc;
+    }
+
+    static uLong crc32_function(const SharedMalloc& data) {
+        return crc32_function(data.get(), data->size());
     }
 };
 
@@ -230,8 +264,7 @@ struct alignas(ALIGNMENT) GenericAck {
     // Create a new instance of the Generic Ack, error.
     explicit GenericAck(AckType result, const std::string& errorMsg)
         : result(result) {
-        std::strncpy(this->error_msg.data(), errorMsg.c_str(), MAX_MSG_SIZE);
-        this->error_msg[MAX_MSG_SIZE - 1] = '\0';
+        copyTo(error_msg, errorMsg.c_str());
     }
     GenericAck() = default;
 
@@ -260,7 +293,7 @@ ASSERT_SIZE(ObserveAllChats, 8);
 ASSERT_SIZE(DeleteControllerById, 8);
 ASSERT_SIZE(UploadFile, 552);
 ASSERT_SIZE(DownloadFile, 512);
-ASSERT_SIZE(PacketHeader, 32);
+ASSERT_SIZE(PacketHeader, 40);
 }  // namespace TgBotSocket::data
 
 namespace TgBotSocket::callback {

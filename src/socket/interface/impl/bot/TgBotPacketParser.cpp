@@ -1,106 +1,62 @@
 #include "TgBotPacketParser.hpp"
 
 #include <absl/log/log.h>
-#include <zlib.h>
 
-#include <SharedMalloc.hpp>
 #include <SocketBase.hpp>
 #include <TgBotSocket_Export.hpp>
+#include <optional>
 #include <socket/TgBotCommandMap.hpp>
+#include <utility>
 
-using HandleState = TgBotSocketParser::HandleState;
+namespace TgBotSocket {
 
-HandleState TgBotSocketParser::handle_PacketHeader(
-    std::optional<SharedMalloc>& socketData,
-    std::optional<TgBotSocket::Packet>& pkt) {
-    int64_t diff = 0;
+std::optional<Packet> readPacket(
+    const std::shared_ptr<SocketInterfaceBase>& interface,
+    const SocketConnContext& context) {
+    TgBotSocket::PacketHeader header;
 
-    if (!socketData ||
-        socketData.value()->size() != TgBotSocket::Packet::hdr_sz) {
-        LOG(ERROR) << "Failed to read from socket";
-        return HandleState::Ignore;
+    const auto headerData =
+        interface->readFromSocket(context, sizeof(TgBotSocket::PacketHeader));
+    if (!headerData) {
+        LOG(ERROR) << "While reading header, failed";
+        return std::nullopt;
     }
-    pkt = TgBotSocket::Packet(TgBotSocket::Packet::hdr_sz);
-    socketData->assignTo(pkt->header);
+    headerData->assignTo(header);
 
-    diff = pkt->header.magic - TgBotSocket::PacketHeader::MAGIC_VALUE_BASE;
+    const auto diff =
+        header.magic - TgBotSocket::PacketHeader::MAGIC_VALUE_BASE;
     if (diff != TgBotSocket::PacketHeader::DATA_VERSION) {
         LOG(WARNING) << "Invalid magic value, dropping buffer";
-        if (diff >= 0) {
+        constexpr int reasonable_datadiff = 5;
+        if (diff >= 0 && diff < TgBotSocket::PacketHeader::DATA_VERSION + reasonable_datadiff) {
             LOG(INFO) << "This packet contains header data version " << diff
                       << ", but we have version "
                       << TgBotSocket::PacketHeader::DATA_VERSION;
         }
-        return HandleState::Ignore;
+        return std::nullopt;
     }
 
-    return HandleState::Ok;
-}
-
-HandleState TgBotSocketParser::handle_Packet(
-    std::optional<SharedMalloc>& socketData,
-    std::optional<TgBotSocket::Packet>& pkt) {
-    if (TgBotSocket::CommandHelpers::isClientCommand(pkt->header.cmd)) {
-        LOG(INFO) << "Received buf with "
-                  << TgBotSocket::CommandHelpers::toStr(pkt->header.cmd)
+    using namespace TgBotSocket::CommandHelpers;
+    if (isClientCommand(header.cmd)) {
+        LOG(INFO) << "Received buf with " << toStr(header.cmd)
                   << ", invoke callback!";
     }
 
-    if (!socketData.has_value()) {
-        return HandleState::Ignore;
+    const size_t newLength =
+        sizeof(TgBotSocket::PacketHeader) + header.data_size;
+    TgBotSocket::Packet packet(newLength);
+
+    auto data = interface->readFromSocket(context, header.data_size);
+    if (!data) {
+        LOG(ERROR) << "While reading data, failed";
+        return std::nullopt;
     }
-
-    auto& socketDataVal = socketData.value();
-    if (socketDataVal->size() != pkt->header.data_size) {
-        LOG(WARNING) << "Invalid packet data size, dropping buffer";
-        return HandleState::Ignore;
+    if (header.checksum != Packet::crc32_function(data.value())) {
+        LOG(WARNING) << "Checksum mismatch, dropping buffer";
+        return std::nullopt;
     }
-
-    uLong crc = crc32(0L, Z_NULL, 0);  // Initial value
-    crc = crc32(crc, reinterpret_cast<Bytef*>(socketData->get()),
-                pkt->header.data_size);
-    if (crc != pkt->header.checksum) {
-        LOG(WARNING) << "Invalid packet checksum, dropping buffer";
-        return HandleState::Ignore;
-    }
-
-    pkt->data->realloc(pkt->header.data_size);
-    socketData->assignTo(pkt->data.get(), pkt->header.data_size);
-
-    return HandleState::Ok;
+    packet.data = std::move(data.value());
+    packet.header = header;
+    return packet;
 }
-
-bool TgBotSocketParser::onNewBuffer(SocketConnContext ctx) {
-    std::optional<SharedMalloc> data;
-    std::optional<TgBotSocket::Packet> pkt;
-    bool ret = false;
-
-    data = interface->readFromSocket(ctx, sizeof(TgBotSocket::PacketHeader));
-    switch (handle_PacketHeader(data, pkt)) {
-        case HandleState::Ok: {
-            data = interface->readFromSocket(ctx, pkt->header.data_size);
-            switch (handle_Packet(data, pkt)) {
-                case HandleState::Ok: {
-                    handle_CommandPacket(ctx, pkt.value());
-                    break;
-                }
-                case HandleState::Ignore: {
-                    break;
-                }
-                case HandleState::Fail: {
-                    ret = true;
-                    break;
-                }
-            }
-            [[fallthrough]];
-        }
-        case HandleState::Ignore:
-            ret = false;
-            break;
-        case HandleState::Fail:
-            LOG(ERROR) << "Failed to handle packet header";
-            ret = true;
-            break;
-    }
-    return ret;
-}
+}  // namespace TgBotSocket

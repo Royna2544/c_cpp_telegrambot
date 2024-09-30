@@ -10,7 +10,7 @@
 #include <cstring>
 #include <impl/bot/ClientBackend.hpp>
 #include <impl/bot/TgBotPacketParser.hpp>
-#include <impl/bot/TgBotSocketFileHelper.hpp>
+#include <impl/bot/TgBotSocketFileHelperNew.hpp>
 #include <iostream>
 #include <optional>
 #include <string>
@@ -43,12 +43,6 @@ bool verifyArgsCount(Command cmd, int argc) {
     return true;
 }
 
-template <size_t N>
-void copyToStrBuf(std::array<char, N>& dst, char* src) {
-    memset(dst.data(), 0, dst.size());
-    strncpy(dst.data(), src, dst.size() - 1);
-}
-
 template <class C>
 bool parseOneEnum(C* res, C max, const char* str, const char* name) {
     int parsed{};
@@ -78,81 +72,84 @@ std::string_view AckTypeToStr(callback::AckType type) {
             return "Failed: Command ignored";
         case AckType::ERROR_RUNTIME_ERROR:
             return "Failed: Runtime error";
+        case AckType::ERROR_CLIENT_ERROR:
+            return "Failed: Client error";
     }
     return "Unknown ack type";
 }
 
 }  // namespace
 
-struct ClientParser : TgBotSocketParser {
-    explicit ClientParser(SocketClientWrapper wrapper)
-        : TgBotSocketParser(wrapper.getRawInterface()), wrapper(wrapper) {}
-    void handle_CommandPacket(SocketConnContext context, Packet pkt) override {
-        using callback::AckType;
-        using callback::GenericAck;
+void handle_CommandPacket(const SocketClientWrapper& wrapper,
+                          SocketConnContext& context, const Packet& pkt) {
+    using callback::AckType;
+    using callback::GenericAck;
+    std::string resultText;
+    const auto helper =
+        std::make_shared<SocketFile2DataHelper>(std::make_shared<RealFS>());
 
-        std::string resultText;
-
-        switch (pkt.header.cmd) {
-            case Command::CMD_GET_UPTIME_CALLBACK: {
-                callback::GetUptimeCallback callbackData = {};
-                pkt.data.assignTo(callbackData);
-                LOG(INFO) << "Server replied: " << callbackData.uptime.data();
-                break;
-            }
-            case Command::CMD_DOWNLOAD_FILE_CALLBACK: {
-                FileDataHelper::DataToFile<FileDataHelper::DOWNLOAD_FILE>(
-                    pkt.data.get(), pkt.header.data_size);
-                break;
-            }
-            case Command::CMD_UPLOAD_FILE_DRY_CALLBACK: {
-                callback::UploadFileDryCallback callbackData{};
-                pkt.data.assignTo(callbackData);
-                LOG(INFO) << "Response from server: "
-                          << AckTypeToStr(callbackData.result);
-                if (callbackData.result != AckType::SUCCESS) {
-                    LOG(ERROR) << "Reason: " << callbackData.error_msg.data();
-                } else {
-                    wrapper->closeSocketHandle(context);
-                    auto it = wrapper->createClientSocket();
-                    if (!it) {
-                        LOG(ERROR) << "Failed to recreate client socket";
-                        return;
-                    }
-                    context = it.value();
-                    LOG(INFO) << "Recreated client socket";
-                    auto params_in = callbackData.requestdata;
-                    FileDataHelper::DataFromFileParam param;
-                    param.destfilepath = params_in.destfilepath.data();
-                    param.filepath = params_in.srcfilepath.data();
-                    param.options = params_in.options;
-                    auto newPkt = FileDataHelper::DataFromFile<
-                        FileDataHelper::UPLOAD_FILE>(param);
-                    LOG(INFO) << "Sending the actual file content again...";
-                    wrapper->writeToSocket(context, newPkt->toSocketData());
-                    onNewBuffer(context);
-                }
-                break;
-            }
-            case Command::CMD_GENERIC_ACK: {
-                callback::GenericAck callbackData{};
-                pkt.data.assignTo(callbackData);
-                LOG(INFO) << "Response from server: "
-                          << AckTypeToStr(callbackData.result);
-                if (callbackData.result != AckType::SUCCESS) {
-                    LOG(ERROR) << "Reason: " << callbackData.error_msg.data();
-                }
-                break;
-            }
-            default:
-                LOG(ERROR) << "Unhandled callback of command: "
-                           << static_cast<int>(pkt.header.cmd);
-                break;
+    switch (pkt.header.cmd) {
+        case Command::CMD_GET_UPTIME_CALLBACK: {
+            callback::GetUptimeCallback callbackData = {};
+            pkt.data.assignTo(callbackData);
+            LOG(INFO) << "Server replied: " << callbackData.uptime.data();
+            break;
         }
-        wrapper->closeSocketHandle(context);
+        case Command::CMD_DOWNLOAD_FILE_CALLBACK: {
+            helper->DataToFile<SocketFile2DataHelper::Pass::DOWNLOAD_FILE>(
+                pkt.data.get(), pkt.header.data_size);
+            break;
+        }
+        case Command::CMD_UPLOAD_FILE_DRY_CALLBACK: {
+            callback::UploadFileDryCallback callbackData{};
+            pkt.data.assignTo(callbackData);
+            LOG(INFO) << "Response from server: "
+                      << AckTypeToStr(callbackData.result);
+            if (callbackData.result != AckType::SUCCESS) {
+                LOG(ERROR) << "Reason: " << callbackData.error_msg.data();
+            } else {
+                wrapper->closeSocketHandle(context);
+                auto it = wrapper->createClientSocket();
+                if (!it) {
+                    LOG(ERROR) << "Failed to recreate client socket";
+                    return;
+                }
+                context = it.value();
+                LOG(INFO) << "Recreated client socket";
+                auto params_in = callbackData.requestdata;
+                SocketFile2DataHelper::DataFromFileParam param;
+                param.destfilepath = params_in.destfilepath.data();
+                param.filepath = params_in.srcfilepath.data();
+                param.options = params_in.options;
+                auto newPkt = helper->DataFromFile<
+                    SocketFile2DataHelper::Pass::UPLOAD_FILE>(param);
+                LOG(INFO) << "Sending the actual file content again...";
+                wrapper->writeToSocket(context, newPkt->toSocketData());
+                auto it2 =
+                    TgBotSocket::readPacket(wrapper.getRawInterface(), context);
+                if (it2) {
+                    handle_CommandPacket(wrapper, it.value(), it2.value());
+                }
+            }
+            break;
+        }
+        case Command::CMD_GENERIC_ACK: {
+            callback::GenericAck callbackData{};
+            pkt.data.assignTo(callbackData);
+            LOG(INFO) << "Response from server: "
+                      << AckTypeToStr(callbackData.result);
+            if (callbackData.result != AckType::SUCCESS) {
+                LOG(ERROR) << "Reason: " << callbackData.error_msg.data();
+            }
+            break;
+        }
+        default:
+            LOG(ERROR) << "Unhandled callback of command: "
+                       << static_cast<int>(pkt.header.cmd);
+            break;
     }
-    SocketClientWrapper wrapper;
-};
+    wrapper->closeSocketHandle(context);
+}
 
 int main(int argc, char** argv) {
     enum Command cmd {};
@@ -186,6 +183,9 @@ int main(int argc, char** argv) {
         usage(exe, false);
     }
 
+    const auto helper =
+        std::make_shared<SocketFile2DataHelper>(std::make_shared<RealFS>());
+
     switch (cmd) {
         case Command::CMD_WRITE_MSG_TO_CHAT_ID: {
             data::WriteMsgToChatId data{};
@@ -194,16 +194,16 @@ int main(int argc, char** argv) {
                 break;
             }
             data.chat = id;
-            copyToStrBuf(data.message, argv[1]);
+            copyTo(data.message, argv[1]);
             pkt = Packet(cmd, data);
             break;
         }
         case Command::CMD_CTRL_SPAMBLOCK: {
             data::CtrlSpamBlock data;
             if (parseOneEnum(&data, data::CtrlSpamBlock::CTRL_MAX, argv[0],
-                             "spamblock"))
-
+                             "spamblock")) {
                 pkt = Packet(cmd, data);
+            }
             break;
         }
         case Command::CMD_OBSERVE_CHAT_ID: {
@@ -226,13 +226,13 @@ int main(int argc, char** argv) {
                              "type")) {
                 data.chat = id;
                 data.fileType = fileType;
-                copyToStrBuf(data.filePath, argv[2]);
+                copyTo(data.filePath, argv[2]);
                 pkt = Packet(cmd, data);
             }
         } break;
         case Command::CMD_OBSERVE_ALL_CHATS: {
             data::ObserveAllChats data{};
-            bool observe;
+            bool observe = false;
             if (try_parse(argv[0], &observe)) {
                 data.observe = observe;
                 pkt = Packet(cmd, data);
@@ -251,19 +251,19 @@ int main(int argc, char** argv) {
             break;
         }
         case Command::CMD_UPLOAD_FILE: {
-            FileDataHelper::DataFromFileParam params;
+            SocketFile2DataHelper::DataFromFileParam params;
             params.filepath = argv[0];
             params.destfilepath = argv[1];
             params.options.hash_ignore = false;  //= true;
             params.options.overwrite = true;
-            pkt = FileDataHelper::DataFromFile<FileDataHelper::UPLOAD_FILE_DRY>(
-                params);
+            pkt = helper->DataFromFile<
+                SocketFile2DataHelper::Pass::UPLOAD_FILE_DRY>(params);
             break;
         }
         case Command::CMD_DOWNLOAD_FILE: {
             data::DownloadFile data{};
-            copyToStrBuf(data.filepath, argv[0]);
-            copyToStrBuf(data.destfilename, argv[1]);
+            copyTo(data.filepath, argv[0]);
+            copyTo(data.destfilename, argv[1]);
             pkt = Packet(cmd, data);
             break;
         }
@@ -273,13 +273,10 @@ int main(int argc, char** argv) {
 
     if (!pkt) {
         LOG(ERROR) << "Failed parsing arguments for "
-                   << CommandHelpers::toStr(cmd).c_str();
+                   << CommandHelpers::toStr(cmd);
         return EXIT_FAILURE;
     } else {
-        uLong crc = crc32(0L, Z_NULL, 0);  // Initial value
-        pkt->header.checksum =
-            crc32(crc, reinterpret_cast<Bytef*>(pkt->data.get()),
-                  pkt->header.data_size);
+        pkt->header.checksum = pkt->crc32_function(pkt->data);
     }
 
     SocketClientWrapper backend(
@@ -291,9 +288,10 @@ int main(int argc, char** argv) {
     if (handle) {
         backend->writeToSocket(handle.value(), pkt->toSocketData());
         LOG(INFO) << "Sent the command: Waiting for callback...";
-        // Handle callbacks
-        ClientParser parser(backend);
-        parser.onNewBuffer(handle.value());
+        auto it = TgBotSocket::readPacket(backend.getRawInterface(), handle.value());
+        if (it) {
+            handle_CommandPacket(backend, handle.value(), it.value());
+        }
     }
 
     return static_cast<int>(!pkt.has_value());

@@ -8,10 +8,10 @@
 struct SocketClientWrapper {
     explicit SocketClientWrapper(
         std::optional<std::filesystem::path> localSocketPath = std::nullopt);
-    [[nodiscard]] SocketInterfaceBase *getRawInterface() const {
-        return backend.get();
+    [[nodiscard]] std::shared_ptr<SocketInterfaceBase> getRawInterface() const {
+        return backend;
     }
-    SocketInterfaceBase *operator->() const { return getRawInterface(); }
+    std::shared_ptr<SocketInterfaceBase> operator->() const { return getRawInterface(); }
 
    private:
     constexpr static std::string_view kIPv4EnvVar = "IPV4_ADDRESS";

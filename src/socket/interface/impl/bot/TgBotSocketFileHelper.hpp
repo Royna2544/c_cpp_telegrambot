@@ -17,17 +17,6 @@
 
 #include "../../../../include/StructF.hpp"
 
-template <size_t size>
-inline void copyTo(std::array<char, size>& arr_in, const char* buf) {
-    strncpy(arr_in.data(), buf, size);
-}
-template <size_t size, size_t size2>
-    requires(size > size2)
-inline void copyTo(std::array<char, size>& arr_in,
-                   std::array<char, size2> buf) {
-    copyTo(arr_in, buf.data());
-}
-
 namespace FileDataHelper {
 using len_t = TgBotSocket::PacketHeader::length_type;
 using RAIIMalloc = std::unique_ptr<void, decltype(&free)>;
