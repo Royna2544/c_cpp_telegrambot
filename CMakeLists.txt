@@ -80,7 +80,7 @@ function(add_my_executable)
   if (NOT TGBOT_EXE_NO_PREFIX)
     set(TGBOT_EXE_NAME ${PROJECT_NAME}_${TGBOT_EXE_NAME})
   endif()
-  add_executable(${TGBOT_EXE_NAME} ${TGBOT_EXE_SRCS})
+  add_executable(${TGBOT_EXE_NAME} ${TGBOT_EXE_SRCS} ${CMAKE_SOURCE_DIR}/src/log_message.cc)
   install(TARGETS ${TGBOT_EXE_NAME} DESTINATION bin)
   add_sanitizers(${TGBOT_EXE_NAME})
   target_link_libraries(${TGBOT_EXE_NAME} absl::log TgBotLogInit ${TGBOT_EXE_LIBS})
@@ -216,7 +216,6 @@ if (USE_UNIX_SOCKETS)
     src/ChatObserver.cpp
     src/logging/LoggingServer.cpp
     ${SOCKET_SRC_INTERFACE}/impl/bot/SocketDataHandler.cpp
-    ${SOCKET_SRC_INTERFACE}/impl/bot/TgBotSocketFileHelperNew.cpp
     ${SOCKET_SRC_INTERFACE}/impl/bot/TgBotSocketInterface.cpp
     ${SOCKET_SRC_INTERFACE}/impl/backends/ServerBackend.cpp
     ${SOCKET_SRC_INTERFACE}/impl/backends/ServerBackend_${TARGET_VARIANT}.cpp)
