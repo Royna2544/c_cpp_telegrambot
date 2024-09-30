@@ -74,7 +74,17 @@ struct VFSOperations {
     virtual void SHA256(const SharedMalloc& memory, HashContainer& data) = 0;
 };
 
-struct TgBotPPImpl_API RealFS : public VFSOperations {
+#if defined _WIN32 || defined __CYGWIN__
+#ifdef TgBotSocket_EXPORTS
+#define TgBotSocket_API __declspec(dllexport)
+#else
+#define TgBotSocket_API __declspec(dllimport)
+#endif
+#else
+#define TgBotSocket_API
+#endif
+
+struct TgBotSocket_API RealFS : public VFSOperations {
     ~RealFS() override = default;
 
     /**
