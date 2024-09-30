@@ -5,6 +5,7 @@
 #include <sys/socket.h>
 
 #include <impl/SocketPosix.hpp>
+#include <mutex>
 
 #include "../helper/HelperPosix.hpp"
 #include "SocketBase.hpp"
@@ -22,10 +23,16 @@ std::optional<socket_handle_t> SocketInterfaceUnixIPv4::createServerSocket() {
         return std::nullopt;
     }
 
-    LOG(INFO) << "[IPv4] Dump of active interfaces' addresses";
-    forEachINetAddress<sockaddr_in, in_addr, AF_INET>([](const auto& data) {
-        LOG(INFO) << "[IPv4] ifname " << data.name << ": addr " << data.addr;
+    static std::once_flag once;
+    std::call_once(once, [&]() {
+        helper.inet.getExternalIP();
+        LOG(INFO) << "[IPv4] Dump of active interfaces' addresses";
+        forEachINetAddress<sockaddr_in, in_addr, AF_INET>([](const auto& data) {
+            LOG(INFO) << "[IPv4] ifname " << data.name << ": addr "
+                      << data.addr;
+        });
     });
+    
     forEachINetAddress<sockaddr_in, in_addr, AF_INET>(
         [&iface_done, sfd](const auto& data) {
             if (!iface_done && kLocalInterface.data() != data.name) {
@@ -39,7 +46,6 @@ std::optional<socket_handle_t> SocketInterfaceUnixIPv4::createServerSocket() {
         LOG(ERROR) << "[IPv4] Failed to find any valid interface to bind to";
         return ret;
     }
-    helper.inet.getExternalIP();
 
     name.sin_family = AF_INET;
     name.sin_port = htons(helper.inet.getPortNum());
@@ -78,7 +84,8 @@ std::optional<SocketConnContext> SocketInterfaceUnixIPv4::createClientSocket() {
         closeSocketHandle(ctx.cfd);
         return std::nullopt;
     }
-    if (posixHelper.connectionTimeoutEnabled() && !posixHelper.handleConnectTimeoutPost(ctx.cfd)) {
+    if (posixHelper.connectionTimeoutEnabled() &&
+        !posixHelper.handleConnectTimeoutPost(ctx.cfd)) {
         closeSocketHandle(ctx.cfd);
         return std::nullopt;
     }

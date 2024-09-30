@@ -8,6 +8,7 @@
 #include <cstring>
 #include <functional>
 #include <impl/SocketPosix.hpp>
+#include <mutex>
 
 #include "../helper/HelperPosix.hpp"
 
@@ -23,9 +24,15 @@ std::optional<socket_handle_t> SocketInterfaceUnixIPv6::createServerSocket() {
         return std::nullopt;
     }
 
-    LOG(INFO) << "[IPv6] Dump of active interfaces' addresses";
-    forEachINetAddress<sockaddr_in6, in6_addr, AF_INET6>([](const auto& data) {
-        LOG(INFO) << "[IPv6] ifname " << data.name << ": addr " << data.addr;
+    static std::once_flag once;
+    std::call_once(once, [&]() {
+        helper.inet.getExternalIP();
+        LOG(INFO) << "[IPv6] Dump of active interfaces' addresses";
+        forEachINetAddress<sockaddr_in6, in6_addr, AF_INET6>(
+            [](const auto& data) {
+                LOG(INFO) << "[IPv6] ifname " << data.name << ": addr "
+                          << data.addr;
+            });
     });
     forEachINetAddress<sockaddr_in6, in6_addr, AF_INET6>(
         [&iface_done, sfd](const auto& data) {
@@ -39,7 +46,6 @@ std::optional<socket_handle_t> SocketInterfaceUnixIPv6::createServerSocket() {
         LOG(ERROR) << "[IPv6] Failed to find any valid interface to bind to";
         return std::nullopt;
     }
-    helper.inet.getExternalIP();
 
     name.sin6_family = AF_INET6;
     name.sin6_port = htons(helper.inet.getPortNum());
@@ -77,7 +83,8 @@ std::optional<SocketConnContext> SocketInterfaceUnixIPv6::createClientSocket() {
         closeSocketHandle(ctx.cfd);
         return std::nullopt;
     }
-    if (posixHelper.connectionTimeoutEnabled() && !posixHelper.handleConnectTimeoutPost(ctx.cfd)) {
+    if (posixHelper.connectionTimeoutEnabled() &&
+        !posixHelper.handleConnectTimeoutPost(ctx.cfd)) {
         closeSocketHandle(ctx.cfd);
         return std::nullopt;
     }
