@@ -28,9 +28,9 @@ void MessageExt::update() {
     // I believe entity must be sent here.
     if (botCommandEnt != entities.end()) {
         const auto entry = *botCommandEnt;
-        LOG_IF(WARNING, entry->offset != 0)
-            << "Unexpected offset: " << entry->offset << " for "
-            << std::quoted(text);
+        if (entry->offset != 0) {
+            return;
+        }
         _extra_args = absl::StripAsciiWhitespace(
             text.substr(entry->offset + entry->length));
         auto command_string = text.substr(0, entry->length);
