@@ -12,12 +12,12 @@ namespace {
 
 struct SendMsgInput {
     ChatId chatid;
-    char message[MAX_PATH_SIZE];
+    std::array<char, MAX_PATH_SIZE> message;
     HWND dialog;
 };
 struct SendMsgResult {
     bool success;
-    char reason[MAX_MSG_SIZE];
+    std::array<char, MAX_MSG_SIZE> reason;
 };
 
 unsigned __stdcall SendMsgTask(void* param) {
@@ -30,10 +30,11 @@ unsigned __stdcall SendMsgTask(void* param) {
         free(param);
         return 0;
     }
-    sendMessageToChat(in->chatid, in->message, [result](const GenericAck* data) {
+    sendMessageToChat(in->chatid, in->message.data(),
+                      [result](const GenericAck* data) {
         result->success = data->result == AckType::SUCCESS;
         if (!result->success) {
-            copyTo(result->reason, data->error_msg, MAX_MSG_SIZE);
+            copyTo(result->reason, data->error_msg);
         }
     });
 
@@ -87,8 +88,7 @@ INT_PTR CALLBACK SendMsgToChat(HWND hDlg, UINT message, WPARAM wParam,
                             blk.start();
                             in->chatid = chatid;
                             in->dialog = hDlg;
-                            strncpy(in->message, msgbuf.data(),
-                                    MAX_MSG_SIZE - 1);
+                            copyTo(in->message, msgbuf);
                             in->message[MAX_MSG_SIZE - 1] = 0;
                             _beginthreadex(NULL, 0, SendMsgTask, in, 0, NULL);
                         } else {
@@ -114,7 +114,7 @@ INT_PTR CALLBACK SendMsgToChat(HWND hDlg, UINT message, WPARAM wParam,
                 StringLoader::String errtext;
                 errtext = loader.getString(IDS_CMD_FAILED_SVR) + kLineBreak;
                 errtext += loader.getString(IDS_CMD_FAILED_SVR_RSN);
-                errtext += charToWstring(res->reason);
+                errtext += charToWstring(res->reason.data());
                 MessageBox(hDlg, errtext.c_str(),
                            loader.getString(IDS_FAILED).c_str(),
                            ERROR_DIALOG);

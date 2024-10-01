@@ -33,16 +33,6 @@ constexpr TCHAR kLineBreak[] = _T("\r\n");
 constexpr INT_PTR DIALOG_OK = (INT_PTR)TRUE;
 constexpr INT_PTR DIALOG_NO = (INT_PTR)FALSE;
 
-template <size_t size>
-inline void copyTo(std::array<char, size>& arr_in, const char* buf) {
-    strncpy(arr_in.data(), buf, size);
-}
-template <size_t arrsize>
-inline void copyTo(char* in_buf,
-                   const std::array<char, arrsize>& arr_in, size_t size) {
-    strncpy(in_buf, arr_in.data(), size - 1);
-}
-
 template <typename CharT>
 std::size_t Length(CharT* str) = delete;
 
