@@ -199,6 +199,26 @@ void initLogging() {
     }
 }
 
+class RegexHandlerInterface : public RegexHandler::Interface {
+   public:
+    void onError(const absl::Status& status) override {
+        _api->sendReplyMessage(
+            _message,
+            "RegexHandler has encountered an error: " + status.ToString());
+    }
+    void onSuccess(const std::string& result) override {
+        _api->sendReplyMessage(_message->replyToMessage, result);
+    }
+
+    explicit RegexHandlerInterface(std::shared_ptr<TgBotApi> api,
+                                   Message::Ptr message)
+        : _api(std::move(api)), _message(std::move(message)) {}
+
+   private:
+    std::shared_ptr<TgBotApi> _api;
+    Message::Ptr _message;
+};
+
 void createAndDoInitCallAll() {
     constexpr int kWebServerListenPort = 8080;
 
@@ -237,10 +257,23 @@ void createAndDoInitCallAll() {
         std::make_shared<SocketFile2DataHelper>(std::make_shared<RealFS>()));
     createAndDoInitCall<ChatObserver>();
 #endif
-    createAndDoInitCall<RegexHandler>();
     createAndDoInitCall<SpamBlockManager>(bot);
     createAndDoInitCall<ResourceManager>();
     createAndDoInitCall<TgBotDatabaseImpl>();
+
+    const auto regex = std::make_shared<RegexHandler>();
+    bot->onAnyMessage([regex](ApiPtr api, MessagePtr message) {
+        if (message->has<MessageExt::Attrs::IsReplyMessage,
+                         MessageExt::Attrs::ExtraText>() &&
+            message->replyToMessage_has<MessageExt::Attrs::ExtraText>()) {
+            auto intf = std::make_shared<RegexHandlerInterface>(api, message);
+            regex->execute(
+                intf,
+                message->replyToMessage_get<MessageExt::Attrs::ExtraText>(),
+                message->get<MessageExt::Attrs::ExtraText>());
+        }
+        return TgBotWrapper::AnyMessageResult::Handled;
+    });
     // Must be last
     OnTerminateRegistrar::getInstance()->registerCallback(
         []() { ThreadManager::getInstance()->destroyManager(); });

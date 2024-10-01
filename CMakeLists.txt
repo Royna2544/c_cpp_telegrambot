@@ -166,7 +166,6 @@ endif()
 ############################ Source list ############################
 set(SRC_LIST
   src/RegEXHandler.cpp
-  src/RegEXHandlerImpl.cpp
   src/SpamBlocker.cpp
   src/web/TgBotWebServer.cpp
 )

@@ -2,44 +2,72 @@
 
 #include <TgBotPPImplExports.h>
 #include <absl/status/status.h>
+
+#include <expected_cpp20>
 #include <memory>
-#include <optional>
 #include <regex>
 #include <string>
-#include <utility>
-#include <vector>
 
-#include "CStringLifetime.h"
-#include "TgBotWrapper.hpp"
-#include "initcalls/Initcall.hpp"
 
-using std::regex_constants::syntax_option_type;
-using TgBot::Bot;
-using TgBot::Message;
+/**
+ * @brief Interface for a regex command.
+ *
+ * This interface defines the methods that a regex command should implement.
+ * The derived classes should provide the regex pattern for the command,
+ * a brief description of the command, and a method to process the command.
+ */
+class TgBotPPImpl_API RegexCommand {
+   public:
+    RegexCommand() = default;
+    virtual ~RegexCommand() = default;
 
-template <typename T>
-class OptionalWrapper {
-    std::optional<T> val;
+    enum class Error {
+        InvalidRegexMatchIndex,  // in s/src/dest/g3 for 'srcsrc' for example.
+        InvalidRegexOption,      // Unknown regex option.
+        // Using a global flag and a match index doesn't make sense.
+        GlobalFlagAndMatchIndexInvalid,
+        InvalidRegex, // Regex command itself is invalid
+        None,  // Regex didn't match, so just ignore.
+    };
+
+    using Result = std_cpp20::expected<std::string, RegexCommand::Error>;
+
+    /**
+     * @brief Returns a brief description of the command.
+     *
+     * @return A brief description of the command.
+     */
+    [[nodiscard]] virtual std::string_view description() const = 0;
+    
+   protected:
+    /**
+     * @brief Returns the regex pattern for the command.
+     *
+     * @return The regex pattern for the command.
+     */
+    [[nodiscard]] virtual std::regex command_regex() const = 0;
+
+
+    /**
+     * @brief Processes the command using the given source and command strings.
+     *
+     * @param source The source string on which the command will be applied.
+     * @param command The command string to be processed.
+     *
+     * @return The result of processing the command.
+     */
+    [[nodiscard]] virtual Result process(const std::string& source,
+                                         const std::smatch command) const = 0;
 
    public:
-    OptionalWrapper(const std::optional<T> _val) : val(_val) {}
-    OptionalWrapper() : val(std::nullopt) {}
-
-    bool has_value() const { return val.has_value(); }
-    T value() const { return val.value(); }
-    T operator*() const { return value(); }
-    operator bool() const { return has_value(); }
-    OptionalWrapper<T> operator|=(OptionalWrapper<T>&& other) {
-        if (this != &other) {
-            if (other.has_value() && !has_value()) {
-                val = std::move(other.val);
-            }
-        }
-        return *this;
-    }
+    [[nodiscard]] Result process(const std::string& source,
+                                 const std::string& regexCommand) const;
 };
 
-struct TgBotPPImpl_API RegexHandlerBase {
+struct TgBotPPImpl_API RegexHandler {
+    RegexHandler();
+    ~RegexHandler() = default;
+
     struct Interface {
         virtual ~Interface() = default;
         // Called when regex processing is complete. Error or success
@@ -47,52 +75,33 @@ struct TgBotPPImpl_API RegexHandlerBase {
         virtual void onSuccess(const std::string& result) = 0;
     };
 
-    explicit RegexHandlerBase(std::shared_ptr<Interface> interface) : _interface(std::move(interface)) {}
-    virtual ~RegexHandlerBase() = default;
+    /**
+     * @brief Registers a regex command handler with the RegexHandler.
+     *
+     * This function adds a unique pointer to a RegexCommand object to the
+     * internal handlers vector. The ownership of the RegexCommand object is
+     * transferred to the RegexHandler.
+     *
+     * @param handler A unique pointer to a RegexCommand object.
+     */
+    void registerCommand(std::unique_ptr<RegexCommand> handler);
 
-    // Available functions
-    enum class Command {
-        RegexReplace,
-        RegexDelete,
-    };
-
-    // Context for making this class reusable against changed params
-    struct Context {
-        std::string regexCommand;  // e.g. s/s\d+/ssss/g
-        std::string text;
-    };
-
-    // Process regex pattern in the given context.
-    // If regex processing fails, it calls onComplete with appropriate status.
-    // If regex processing succeeds, it calls onComplete with a success status.
-    void process();
-
-    void setContext(Context&& context) { _context = std::move(context); }
+    /**
+     * @brief Executes the registered regex commands and notifies the callback.
+     *
+     * This function iterates through all the registered regex command handlers,
+     * processes the commands, and notifies the provided callback interface with
+     * the result or error status.
+     *
+     * @param callback A shared pointer to an Interface object that will receive
+     *                 the result or error status.
+     * @param source The source string on which the commands will be applied.
+     * @param regexCommand The command string to be processed.
+     */
+    void execute(const std::shared_ptr<Interface>& callback,
+                 const std::string& source, const std::string& regexCommand);
 
    private:
-    std::optional<Context> _context;
-
-    // Tries to match a regex syntax, (if it is sed delete command or replace
-    // command), and returns a vector of substrings sperated by '/'
-    std::vector<std::string> tryParseCommand(const std::regex& regexMatcher);
-
-    // Tries to construct regex given pattern and flags
-    std::optional<std::regex> constructRegex(const std::string& pattern,
-                                             const syntax_option_type flags);
-
-   protected:
-    // TODO: For testing purposes
-    std::shared_ptr<Interface> _interface;
-    OptionalWrapper<std::string> doRegexReplaceCommand();
-    OptionalWrapper<std::string> doRegexDeleteCommand();
-};
-
-struct TgBotPPImpl_API RegexHandler : public InitCall {
-    RegexHandler() = default;
-    ~RegexHandler() = default;
-
-    void doInitCall() override;
-    const CStringLifetime getInitCallName() const override {
-        return TgBotWrapper::getInitCallNameForClient("RegexHandler");
-    }
+    std::vector<std::unique_ptr<RegexCommand>> _handlers;
+    std::mutex _mutex;
 };
