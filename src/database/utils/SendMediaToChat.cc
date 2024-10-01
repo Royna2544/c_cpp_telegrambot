@@ -3,13 +3,12 @@
 
 #include <AbslLogInit.hpp>
 #include <CommandLine.hpp>
+#include <TryParseStr.hpp>
 #include <cstdlib>
 #include <cstring>
+#include <database/bot/TgBotDatabaseImpl.hpp>
 #include <impl/backends/ClientBackend.hpp>
 #include <iostream>
-
-#include "TryParseStr.hpp"
-#include "database/bot/TgBotDatabaseImpl.hpp"
 
 [[noreturn]] static void usage(const char* argv0, const int exitCode) {
     std::cerr << "Usage: " << argv0 << " <chat(Id/Name)> <medianame>"
@@ -54,7 +53,7 @@ int main(int argc, char** argv) {
         LOG(INFO) << "Found, sending (fileid " << info->mediaId << ") to chat "
                   << chatId;
     }
-    strncpy(data.filePath.data(), info->mediaId.c_str(), data.filePath.size());
+    copyTo(data.filePath, info->mediaId.c_str());
     data.chat = chatId;
     data.fileType = TgBotSocket::data::FileType::TYPE_DOCUMENT;
 
