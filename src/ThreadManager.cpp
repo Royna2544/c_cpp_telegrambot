@@ -1,19 +1,25 @@
 #include <ManagedThreads.hpp>
 #include <mutex>
 
+#include "DurationPoint.hpp"
 #include "InstanceClassBase.hpp"
+#include "internal/_std_chrono_templates.h"
 
 void ThreadManager::destroyController(const Usage usage, bool deleteIt) {
     static std::array<std::mutex, static_cast<int>(Usage::MAX)> kPerUsageLocks;
-    const std::scoped_lock lk(kPerUsageLocks[static_cast<int>(usage)], mControllerLock);
+    const std::scoped_lock lk(kPerUsageLocks[static_cast<int>(usage)],
+                              mControllerLock);
     auto it = kControllers.find(usage);
     if (it != kControllers.end() && it->second) {
-        DLOG(INFO) << "Stopping: " << it->second->mgr_priv.usage.str
+        LOG(INFO) << "Stopping: " << it->second->mgr_priv.usage.str
                    << " controller";
+        DurationPoint dp;
         it->second->stop();
         it->second.reset();
-        if (deleteIt) kControllers.erase(it);
-        DLOG(INFO) << "Stopped!";
+        if (deleteIt) {
+            kControllers.erase(it);
+        }
+        LOG(INFO) << "Stopped. Took " << to_msecs(dp.get()).count() << " milliseconds";
     }
 }
 
