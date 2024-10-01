@@ -25,6 +25,8 @@ void MessageExt::update() {
             return entity->type == TgBot::MessageEntity::Type::BotCommand;
         });
 
+    // Initially think extra_args is full text.
+    _extra_args = text;
     // I believe entity must be sent here.
     if (botCommandEnt != entities.end()) {
         const auto entry = *botCommandEnt;
