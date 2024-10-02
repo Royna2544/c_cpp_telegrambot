@@ -96,14 +96,14 @@ class DLWrapper {
     operator bool() const { return handle != nullptr; }
 
     RAIIHandle underlying() {
-        auto tmp = std::move(handle);
-        handle = nullptr;
+        RAIIHandle tmp(nullptr, &dlclose);
+        std::swap(handle, tmp);
         return std::move(tmp);
     }
 
     // dlfcn functions.
     template <typename T>
-    T sym(const std::string_view name) const {
+    [[nodiscard]] T sym(const std::string_view name) const {
         return reinterpret_cast<T>(sym(name));
     }
     bool info(const std::string_view name, Dl_info* info) const {
