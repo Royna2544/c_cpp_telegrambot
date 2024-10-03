@@ -54,10 +54,9 @@ struct SQLiteDatabase : DatabaseBase {
                                                 UserId user) const override;
     [[nodiscard]] ListResult checkUserInList(ListType type,
                                              UserId user) const override;
-    bool loadDatabaseFromFile(std::filesystem::path filepath) override;
+    bool load(std::filesystem::path filepath) override;
     bool unloadDatabase() override;
     [[nodiscard]] std::optional<UserId> getOwnerUserId() const override;
-    void initDatabase() override;
     [[nodiscard]] std::optional<MediaInfo> queryMediaInfo(
         std::string str) const override;
     [[nodiscard]] bool addMediaInfo(const MediaInfo &info) const override;

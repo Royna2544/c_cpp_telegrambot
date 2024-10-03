@@ -96,3 +96,24 @@ constexpr std::chrono::seconds kMaxTimestampDelay = std::chrono::seconds(10);
 constexpr std::chrono::seconds kErrorRecoveryDelay = std::chrono::seconds(7);
 constexpr std::chrono::seconds kErrorMaxDuration = std::chrono::minutes(5);
 static_assert(kMaxTimestampDelay > kErrorRecoveryDelay);
+
+inline std::ostream& operator<<(std::ostream& self,
+                                const AuthContext::Result::Reason& reason) {
+#define CASE_STR(enum)                      \
+    case AuthContext::Result::Reason::enum: \
+        self << #enum;                      \
+        break
+
+    switch (reason) {
+        CASE_STR(UNKNOWN);
+        CASE_STR(OK);
+        CASE_STR(MESSAGE_TOO_OLD);
+        CASE_STR(BLACKLISTED_USER);
+        CASE_STR(GLOBAL_FLAG_OFF);
+        CASE_STR(NOT_IN_WHITELIST);
+        CASE_STR(REQUIRES_USER);
+    };
+
+#undef CASE_STR
+    return self;
+}

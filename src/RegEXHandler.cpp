@@ -59,7 +59,6 @@ struct ReplaceCommand : public RegexCommand {
 
         if (hasOptions) {
             const auto& options = command[5].str();
-            DLOG(INFO) << "Options: " << options;
             for (size_t i = 0; i < options.length();) {
                 char option = options[i];
                 if (option == 'g') {

@@ -1,17 +1,18 @@
-#include <ctime>
+#include <Types.h>
 
-#include "CStringLifetime.h"
-#include "TgBotWrapper.hpp"
-#include "Types.h"
-#include "database/bot/TgBotDatabaseImpl.hpp"
-#include "initcalls/Initcall.hpp"
+#include <InitTask.hpp>
+#include <TgBotWrapper.hpp>
+#include <ctime>
+#include <fstream>
+#include <libos/OnTerminateRegistrar.hpp>
 
 // Collects user data to a CSV
-class ChatDataCollector : public InitCall {
+class ChatDataCollector {
+   public:
     struct Data {
-        ChatId chatId;
-        UserId userId;
-        std::time_t timestamp;
+        ChatId chatId{};
+        UserId userId{};
+        std::time_t timestamp{};
         enum class MsgType {
             TEXT,
             PHOTO,
@@ -20,69 +21,77 @@ class ChatDataCollector : public InitCall {
             STICKER,
             GIF,
             ETC
-        } msgType;
+        } msgType{};
+
+        Data() = default;
+        explicit Data(const Message::Ptr& message) {
+            Data::MsgType msgType{};
+            if (!message->text.empty()) {
+                msgType = Data::MsgType::TEXT;
+            } else if (!message->photo.empty()) {
+                msgType = Data::MsgType::PHOTO;
+            } else if (message->video) {
+                msgType = Data::MsgType::VIDEO;
+            } else if (message->document) {
+                msgType = Data::MsgType::DOCUMENT;
+            } else if (message->sticker) {
+                msgType = Data::MsgType::STICKER;
+            } else if (message->animation) {
+                msgType = Data::MsgType::GIF;
+            } else {
+                msgType = Data::MsgType::ETC;
+            }
+        }
     };
 
-    void doInitCall() override {
-        TgBotWrapper::getInstance()->onAnyMessage(
-            [this](auto api, auto message) {
-                Data::MsgType msgType{};
-                if (!message->text.empty()) {
-                    msgType = Data::MsgType::TEXT;
-                } else if (!message->photo.empty()) {
-                    msgType = Data::MsgType::PHOTO;
-                } else if (message->video) {
-                    msgType = Data::MsgType::VIDEO;
-                } else if (message->document) {
-                    msgType = Data::MsgType::DOCUMENT;
-                } else if (message->sticker) {
-                    msgType = Data::MsgType::STICKER;
-                } else if (message->animation) {
-                    msgType = Data::MsgType::GIF;
-                } else {
-                    msgType = Data::MsgType::ETC;
-                }
-                Data data{message->chat->id, message->from->id, message->date,
-                          msgType};
-                chatData.emplace_back(data);
-                return TgBotWrapper::AnyMessageResult::Handled;
-            });
-        OnTerminateRegistrar::getInstance()->registerCallback(
-            [this]() {
-                bool existed = false;
-                constexpr const char* kChatDataFile = "chat_data.csv";
-
-                if (chatData.empty()) {
-                    LOG(INFO)
-                        << "No chat data collected, skipping chat data writing";
-                    return;
-                }
-                // Write chat data to chat_data.csv
-                if (std::filesystem::exists(kChatDataFile)) {
-                    // Then skip writing header
-                    existed = true;
-                }
-                std::ofstream chatDataFile;
-                if (existed) {
-                    chatDataFile.open(kChatDataFile, std::ios::app);
-                } else {
-                    chatDataFile.open(kChatDataFile);
-                }
-                if (!existed) {
-                    chatDataFile << "chat_id,user_id,timestamp,message_type\n";
-                }
-                for (const auto& data : chatData) {
-                    chatDataFile << data.chatId << "," << data.userId << ","
-                                 << data.timestamp << ","
-                                 << static_cast<int>(data.msgType) << "\n";
-                }
-                LOG(INFO) << "Chat data collected and saved to chat_data.csv: "
-                          << chatData.size() << " entries";
-            });
+    void onMessage(const Message::Ptr& message) {
+        chatData.emplace_back(message);
     }
 
-    const CStringLifetime getInitCallName() const override {
-        return "Setup ChatDataCollector";
-    }
+    ChatDataCollector();
+
+   private:
     std::vector<Data> chatData;
 };
+
+inline std::ostream& operator<<(std::ostream& os, ChatDataCollector::Data d) {
+    os << d.chatId << "," << d.userId << "," << d.timestamp << ","
+       << static_cast<int>(d.msgType) << "\n";
+    return os;
+}
+
+inline ChatDataCollector::ChatDataCollector() {
+    TgBotWrapper::getInstance()->onAnyMessage([this](auto api, auto message) {
+        onMessage(message);
+        return TgBotWrapper::AnyMessageResult::Handled;
+    });
+
+    OnTerminateRegistrar::getInstance()->registerCallback([this]() {
+        bool existed = false;
+        constexpr const char* kChatDataFile = "chat_data.csv";
+
+        if (chatData.empty()) {
+            LOG(INFO) << "No chat data collected, skipping chat data writing";
+            return;
+        }
+        // Write chat data to chat_data.csv
+        if (std::filesystem::exists(kChatDataFile)) {
+            // Then skip writing header
+            existed = true;
+        }
+        std::ofstream chatDataFile;
+        if (existed) {
+            chatDataFile.open(kChatDataFile, std::ios::app);
+        } else {
+            chatDataFile.open(kChatDataFile);
+        }
+        if (!existed) {
+            chatDataFile << "chat_id,user_id,timestamp,message_type\n";
+        }
+        for (const auto& data : chatData) {
+            chatDataFile << data;
+        }
+        LOG(INFO) << "Chat data collected and saved to chat_data.csv: "
+                  << chatData.size() << " entries";
+    });
+}

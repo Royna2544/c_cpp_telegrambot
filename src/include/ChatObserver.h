@@ -6,16 +6,13 @@
 
 #include <vector>
 
-#include "CStringLifetime.h"
 #include "InstanceClassBase.hpp"
 #include "TgBotWrapper.hpp"
-#include "initcalls/Initcall.hpp"
 
 using TgBot::Message;
 using TgBot::User;
 
-struct TgBotPPImpl_API ChatObserver : InitCall,
-                                      InstanceClassBase<ChatObserver> {
+struct TgBotPPImpl_API ChatObserver : InstanceClassBase<ChatObserver> {
     // Global ChatId list to observe
     std::vector<ChatId> observedChatIds;
     bool observeAllChats;
@@ -29,9 +26,4 @@ struct TgBotPPImpl_API ChatObserver : InitCall,
      * @param msg message object to observe
      */
     void process(const Message::Ptr& msg);
-
-    void doInitCall() override;
-    const CStringLifetime getInitCallName() const override {
-        return TgBotWrapper::getInitCallNameForClient("ChatObserver");
-    }
 };

@@ -39,7 +39,7 @@ struct DatabaseCommandTest : public CommandTestBase {
 
         defaultProvidedMessage->replyToMessage->from =
             createDefaultUser(14);  // NOLINT
-        EXPECT_CALL(database,
+        EXPECT_CALL(*database,
                     addUserToList(
                         type, defaultProvidedMessage->replyToMessage->from->id))
             .WillOnce(Return(result));
@@ -53,7 +53,7 @@ struct DatabaseCommandTest : public CommandTestBase {
         defaultProvidedMessage->replyToMessage->from =
             createDefaultUser(324);  // NOLINT
 
-        EXPECT_CALL(database,
+        EXPECT_CALL(*database,
                     removeUserFromList(
                         type, defaultProvidedMessage->replyToMessage->from->id))
             .WillOnce(Return(result));

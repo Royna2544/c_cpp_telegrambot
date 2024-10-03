@@ -3,6 +3,8 @@
 #include <sstream>
 #include <thread>
 
+using std::chrono_literals::operator""s;
+
 #include "StringToolsExt.hpp"
 
 DECLARE_COMMAND_HANDLER(decide, wrapperBot, message) {

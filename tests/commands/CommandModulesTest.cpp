@@ -5,6 +5,7 @@
 #include <memory>
 #include <optional>
 #include "TgBotWrapper.hpp"
+#include "gmock/gmock.h"
 
 void CommandModulesTest::SetUpTestSuite() {}
 
@@ -15,11 +16,15 @@ void CommandModulesTest::TearDownTestSuite() {
 void CommandModulesTest::SetUp() {
     modulePath = FS::getPathForType(FS::PathType::MODULES_INSTALLED);
     auto dbinst = TgBotDatabaseImpl::getInstance();
+    TgBotDatabaseImpl::Providers provider;
 
-    EXPECT_CALL(database, loadDatabaseFromFile(_)).WillOnce(Return(true));
-    ASSERT_TRUE(dbinst->setImpl(&database));
-    ASSERT_TRUE(dbinst->loadDatabaseFromFile(
-        std::filesystem::current_path().root_path()));
+    database = new MockDatabase();
+    provider.registerProvider("testing", std::unique_ptr<MockDatabase>(database));
+    ASSERT_TRUE(provider.chooseProvider("testing"));
+    ASSERT_TRUE(dbinst->setImpl(std::move(provider)));
+    EXPECT_CALL(*database, load(_)).WillOnce(Return(true));
+    ASSERT_TRUE(dbinst->load({}));
+    ON_CALL(*database, unloadDatabase).WillByDefault(Return(true));
 }
 
 void CommandModulesTest::TearDown() {

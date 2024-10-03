@@ -20,7 +20,7 @@ struct ProtoDatabase : DatabaseBase {
                                                 UserId user) const override;
     [[nodiscard]] ListResult checkUserInList(ListType type,
                                              UserId user) const override;
-    bool loadDatabaseFromFile(std::filesystem::path filepath) override;
+    bool load(std::filesystem::path filepath) override;
     bool unloadDatabase() override;
     [[nodiscard]] std::optional<UserId> getOwnerUserId() const override;
     [[nodiscard]] std::optional<MediaInfo> queryMediaInfo(
@@ -36,15 +36,15 @@ struct ProtoDatabase : DatabaseBase {
 
    private:
     struct Info {
-        mutable Database protoDatabaseObject;
-        std::filesystem::path protoFilePath;
+        mutable Database object;
+        std::filesystem::path path;
     };
-    std::optional<Info> db_info;
+    std::optional<Info> dbinfo;
 
     static void dumpList(std::ostream &os, const PersonList &list,
                          const char *name);
     RepeatedPtrField<MediaToName> *getMediaToName() const {
-        return db_info->protoDatabaseObject.mutable_mediatonames();
+        return dbinfo->object.mutable_mediatonames();
     }
     const PersonList &getPersonList(ListType type) const;
     PersonList *getMutablePersonList(ListType type) const;

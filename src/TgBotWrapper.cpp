@@ -135,7 +135,7 @@ bool CommandModule::load() {
 
     DLWrapper dlwrapper(filePath);
     if (dlwrapper == nullptr) {
-        LOG(WARNING) << "dlopen failed for " << filePath << ": "
+        LOG(WARNING) << "dlopen failed for " << filePath.filename() << ": "
                      << DLWrapper::error();
         return false;
     }
@@ -352,7 +352,8 @@ bool TgBotWrapper::setBotCommands() const {
             onecommand->command = cmd->command;
             onecommand->description = cmd->description;
             if (cmd->isEnforced()) {
-                onecommand->description += " " + GETSTR_BRACE(OWNER);
+                std::stringstream ss;
+                ss << onecommand->description << " " << GETSTR_BRACE(OWNER);
             }
             buffer.emplace_back(onecommand);
         }

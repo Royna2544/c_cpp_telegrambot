@@ -6,8 +6,6 @@
 #include <memory>
 #include <string_view>
 
-#include "gmock/gmock.h"
-
 using testing::_;
 
 struct RegexHandlerMockInterface : public RegexHandler::Interface {

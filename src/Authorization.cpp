@@ -43,8 +43,7 @@ AuthContext::Result AuthContext::isAuthorized(const Message::Ptr& message,
     if (message->from) {
         const UserId id = message->from->id;
         if ((flags & Flags::PERMISSIVE) != 0) {
-            bool isInBlacklist = false;
-            isInBlacklist = isInList<DatabaseBase::ListType::BLACKLIST>(id);
+            bool isInBlacklist = isInList<DatabaseBase::ListType::BLACKLIST>(id);
             return {!isInBlacklist, Result::Reason::BLACKLISTED_USER};
         } else {
             bool ret = isInList<DatabaseBase::ListType::WHITELIST>(id);

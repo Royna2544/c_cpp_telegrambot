@@ -9,7 +9,7 @@ class AliveCommandTest : public CommandTestBase {
     ~AliveCommandTest() override = default;
     void SetUp() override {
         CommandTestBase::SetUp();
-        ResourceManager::getInstance()->initWrapper();
+        ResourceManager::getInstance()->preloadResourceDirectory();
     }
     void TearDown() override {
         CommandTestBase::TearDown();
@@ -27,7 +27,7 @@ TEST_F(AliveCommandTest, hasAliveMediaName) {
         .WillRepeatedly(Return(botUser));
 
     // First, if alive medianame existed
-    EXPECT_CALL(database, queryMediaInfo(ALIVE_FILE_ID))
+    EXPECT_CALL(*database, queryMediaInfo(ALIVE_FILE_ID))
         .WillOnce(Return(TEST_MEDIAINFO));
 
     // Expected to pass the fileid and parsemode as HTML
@@ -45,7 +45,7 @@ TEST_F(AliveCommandTest, DoesntHaveAliveMediaName) {
         .Times(2)
         .WillRepeatedly(Return(botUser));
     // Second, if alive medianame not existed
-    EXPECT_CALL(database, queryMediaInfo(ALIVE_FILE_ID))
+    EXPECT_CALL(*database, queryMediaInfo(ALIVE_FILE_ID))
         .WillOnce(Return(std::nullopt));
 
     willSendReplyMessage<TgBotWrapper::ParseMode::HTML>(_);

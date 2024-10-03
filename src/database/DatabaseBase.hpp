@@ -28,15 +28,6 @@ struct DatabaseBase {
     };
 
     /**
-     * @brief Initialize the database.
-     *
-     * This function should initialize the database, creating any necessary
-     * structures. This function should be called before any other functions
-     * in the database are used.
-     */
-    virtual void initDatabase() {}
-
-    /**
      * @brief Add a user to the database list
      *
      * @param type type of the list
@@ -79,7 +70,7 @@ struct DatabaseBase {
      *
      * @param filepath Path to the file containing the database.
      */
-    virtual bool loadDatabaseFromFile(std::filesystem::path filepath) = 0;
+    virtual bool load(std::filesystem::path filepath) = 0;
 
     /**
      * @brief Unload the database from memory.
@@ -180,3 +171,29 @@ struct DatabaseBase {
         }
     }
 };
+
+inline std::ostream& operator<<(std::ostream& os, const DatabaseBase::ListType& type) {
+    switch (type) {
+        case DatabaseBase::ListType::WHITELIST:
+            return os << "WHITELIST";
+        case DatabaseBase::ListType::BLACKLIST:
+            return os << "BLACKLIST";
+    }
+    return os;
+}
+
+inline std::ostream& operator<<(std::ostream& os, const DatabaseBase::ListResult& result) {
+    switch (result) {
+        case DatabaseBase::ListResult::OK:
+            return os << "OK";
+        case DatabaseBase::ListResult::NOT_IN_LIST:
+            return os << "NOT_IN_LIST";
+        case DatabaseBase::ListResult::ALREADY_IN_LIST:
+            return os << "ALREADY_IN_LIST";
+        case DatabaseBase::ListResult::ALREADY_IN_OTHER_LIST:
+            return os << "ALREADY_IN_OTHER_LIST";
+        case DatabaseBase::ListResult::BACKEND_ERROR:
+            return os << "BACKEND_ERROR";
+    }
+    return os;
+}

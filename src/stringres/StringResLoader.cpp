@@ -8,7 +8,7 @@
 #include <filesystem>
 #include <vector>
 
-bool StringResLoader::parseFromFile(const std::filesystem::path &path,
+bool StringResLoader::parse(const std::filesystem::path &path,
                                      int expected_size) {
     // Initialize the library and check potential ABI mismatches
     LIBXML_TEST_VERSION;
@@ -77,6 +77,10 @@ bool StringResLoader::parseFromFile(const std::filesystem::path &path,
     return true;
 }
 
-std::string StringResLoader::getString(const int key) const {
+std::string_view StringResLoader::getString(const int key) const {
+    if (key > m_strings.size() || key < 0) {
+        LOG(WARNING) << "Invalid key: " << key;
+        return "";
+    }
     return m_strings.at(key).second;
 }

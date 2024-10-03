@@ -136,7 +136,8 @@ struct TgBotPPImpl_shared_deps_API MessageExt
         if (!replyToMessage) {
             return {};
         }
-        return get_attribute<attr>(std::make_shared<MessageExt>(replyToMessage));
+        return get_attribute<attr>(
+            std::make_shared<MessageExt>(replyToMessage));
     }
 
     // Has an attribute?
@@ -149,7 +150,9 @@ struct TgBotPPImpl_shared_deps_API MessageExt
         if (!replyToMessage) {
             return false;
         }
-        return (has_attribute(std::make_shared<MessageExt>(replyToMessage), attrs) && ...);
+        return (has_attribute(std::make_shared<MessageExt>(replyToMessage),
+                              attrs) &&
+                ...);
     }
 
     template <Attrs... attrs>
@@ -174,8 +177,8 @@ struct TgBotPPImpl_shared_deps_API MessageExt
                     message << "animation";
                     break;
             }
-            message << "? " << std::boolalpha << has_attribute(shared_from_this(), attr)
-                    << std::endl;
+            message << "? " << std::boolalpha
+                    << has_attribute(shared_from_this(), attr) << std::endl;
         }(attrs...));
         return message.str();
     }

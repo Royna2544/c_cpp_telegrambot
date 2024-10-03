@@ -10,7 +10,6 @@
 #include <future>
 #include <impl/backends/ServerBackend.hpp>
 #include <impl/bot/TgBotSocketFileHelper.hpp>
-#include <initcalls/Initcall.hpp>
 #include <memory>
 #include <mutex>
 
@@ -39,19 +38,6 @@ void NetworkLogSink::Send(const absl::LogEntry& entry) {
     }
 }
 
-void NetworkLogSink::doInitCall() {
-    if (!interface) {
-        LOG(ERROR) << "Cannot export log socket, skipping initialization";
-        return;
-    }
-    setPreStopFunction([this](auto*) {
-        LOG(INFO) << "onServerShutdown";
-        enabled = false;
-        onClientDisconnected.set_value();
-    });
-    run();
-}
-
 void NetworkLogSink::runFunction() {
     std::shared_future<void> future = onClientDisconnected.get_future();
     bool isSinkAdded = false;
@@ -78,10 +64,6 @@ void NetworkLogSink::runFunction() {
     if (isSinkAdded) {
         absl::RemoveLogSink(this);
     }
-}
-
-const CStringLifetime NetworkLogSink::getInitCallName() const {
-    return "Initialize network logsink";
 }
 
 NetworkLogSink::NetworkLogSink() {

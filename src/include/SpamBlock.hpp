@@ -5,14 +5,13 @@
 #include <tgbot/types/Chat.h>
 #include <tgbot/types/Message.h>
 #include <tgbot/types/User.h>
+
 #include <memory>
 
 #include "CStringLifetime.h"
 #include "InstanceClassBase.hpp"
 #include "ManagedThreads.hpp"
 #include "TgBotWrapper.hpp"
-#include "initcalls/Initcall.hpp"
-
 
 #ifdef SOCKET_CONNECTION
 #include <socket/include/TgBotSocket_Export.hpp>
@@ -56,7 +55,8 @@ struct TgBotPPImpl_API SpamBlockBase : ManagedThreadRunnable {
     CtrlSpamBlock spamBlockConfig = CtrlSpamBlock::CTRL_ON;
 #endif
    protected:
-    static bool isEntryOverThreshold(PerChatHandleConstRef t, const size_t threshold);
+    static bool isEntryOverThreshold(PerChatHandleConstRef t,
+                                     const size_t threshold);
     static void _logSpamDetectCommon(PerChatHandleConstRef t, const char *name);
 
    private:
@@ -69,9 +69,8 @@ struct TgBotPPImpl_API SpamBlockBase : ManagedThreadRunnable {
 };
 
 struct TgBotPPImpl_API SpamBlockManager : SpamBlockBase,
-                                          InitCall,
                                           InstanceClassBase<SpamBlockManager> {
-    explicit SpamBlockManager(ApiPtr api) : _api(api) {};
+    explicit SpamBlockManager(ApiPtr api) : _api(api){};
     ~SpamBlockManager() override = default;
 
     using SpamBlockBase::run;
@@ -79,10 +78,6 @@ struct TgBotPPImpl_API SpamBlockManager : SpamBlockBase,
     void handleUserAndMessagePair(PerChatHandleConstRef e, OneChatIterator it,
                                   const size_t threshold,
                                   const char *name) override;
-    void doInitCall() override;
-    const CStringLifetime getInitCallName() const override {
-        return TgBotWrapper::getInitCallNameForClient("SpamBlock");
-    }
 
    private:
     constexpr static auto kMuteDuration = std::chrono::minutes(3);

@@ -7,12 +7,9 @@
 #include <type_traits>
 #include <vector>
 
-#include "CStringLifetime.h"
 #include "InstanceClassBase.hpp"
-#include "initcalls/Initcall.hpp"
 
-class TgBotRandom_API Random : public InstanceClassBase<Random>,
-                               public InitCall {
+class TgBotRandom_API Random : public InstanceClassBase<Random> {
    public:
     // Retval type for random
     using ret_type = size_t;
@@ -117,7 +114,11 @@ class TgBotRandom_API Random : public InstanceClassBase<Random>,
         }
     };
 
+    // Use impl as the implementation
     explicit Random(std::unique_ptr<ImplBase> impl) : impl_(std::move(impl)){};
+    
+    // Choose from default lists
+    Random();
 
     /**
      * generate - Generate random number given a range.
@@ -152,17 +153,7 @@ class TgBotRandom_API Random : public InstanceClassBase<Random>,
      * @throws No exceptions are thrown by this function.
      */
     void shuffleArray(std::vector<std::string>& inArray);
-
-    void doInitCall() override;
-
-    const CStringLifetime getInitCallName() const override {
-        return "Choose random number generator impl";
-    }
-
-    [[nodiscard]] ImplBase* getImpl() const {
-        return impl_.get();
-    }
-
+    
    private:
     std::unique_ptr<ImplBase> impl_;
 };

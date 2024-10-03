@@ -337,13 +337,6 @@ SQLiteDatabase::ListResult SQLiteDatabase::removeUserFromList(
     return ListResult::BACKEND_ERROR;
 }
 
-void SQLiteDatabase::initDatabase() {
-    auto helper = Helper::create(db, Helper::kCreateDatabaseFile.data());
-    if (!helper->executeAsScript()) {
-        throw std::runtime_error("Error initializing database");
-    }
-}
-
 [[nodiscard]] DatabaseBase::ListResult SQLiteDatabase::checkUserInList(
     ListType type, UserId user) const {
     return checkUserInList(toInfoType(type), user);
@@ -376,16 +369,28 @@ void SQLiteDatabase::initDatabase() {
     return result;
 }
 
-bool SQLiteDatabase::loadDatabaseFromFile(std::filesystem::path filepath) {
+bool SQLiteDatabase::load(std::filesystem::path filepath) {
     int ret = 0;
+    bool fileExisted = false;
 
     if (db != nullptr) {
+        LOG(WARNING) << "Attempting to load database while it is already open.";
         return false;
     }
+
+    fileExisted = FS::exists(filepath);
     ret = sqlite3_open(filepath.string().c_str(), &db);
     if (ret != SQLITE_OK) {
         LOG(ERROR) << "Could not open database: " << sqlite3_errmsg(db);
         return false;
+    }
+    if (!fileExisted) {
+        LOG(INFO) << "Running initialization script...";
+        const auto helper =
+            Helper::create(db, Helper::kCreateDatabaseFile.data());
+        if (!helper->executeAsScript()) {
+            throw std::runtime_error("Error initializing database");
+        }
     }
     LOG(INFO) << "Loaded SQLite database: " << filepath;
     return true;

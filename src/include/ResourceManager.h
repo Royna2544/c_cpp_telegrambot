@@ -8,23 +8,15 @@
 #include <string>
 #include <vector>
 
-#include "CStringLifetime.h"
 #include "InstanceClassBase.hpp"
-#include "initcalls/Initcall.hpp"
-
 
 struct TgBotUtils_API ResourceManager
-    : public InstanceClassBase<ResourceManager>,
-      InitCall {
+    : public InstanceClassBase<ResourceManager>{
     bool preloadOneFile(std::filesystem::path p);
     void preloadResourceDirectory(void);
     const std::string& getResource(std::filesystem::path filename);
 
     static constexpr auto kResourceDirname = "resources";
-    void doInitCall() override { preloadResourceDirectory(); }
-    const CStringLifetime getInitCallName() const override {
-        return "Preload resources";
-    }
 
    private:
     std::map<std::filesystem::path, std::string> kResources;

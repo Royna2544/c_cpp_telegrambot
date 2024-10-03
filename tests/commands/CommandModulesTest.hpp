@@ -1,5 +1,6 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <gtest/gtest_prod.h>
 
 #include <TgBotWrapper.hpp>
 #include <database/DatabaseBase.hpp>
@@ -51,9 +52,8 @@ class MockDatabase : public DatabaseBase {
     MOCK_METHOD(std::optional<ChatId>, getChatId, (const std::string& name),
                 (const, override));
 
-    MOCK_METHOD(bool, loadDatabaseFromFile, (std::filesystem::path filepath),
+    MOCK_METHOD(bool, load, (std::filesystem::path filepath),
                 (override));
-
     MOCK_METHOD(bool, unloadDatabase, (), (override));
 };
 
@@ -258,13 +258,13 @@ class CommandModulesTest : public ::testing::Test {
     static constexpr const char* ALIVE_FILE_ID = "alive";
     static constexpr const char* TEST_MEDIA_ID = "TOO_ID";
     static constexpr const char* TEST_MEDIA_UNIQUEID = "TOO_UNIQUE";
-    static constexpr off_t TEST_BOT_USER_ID_OFFSET = 1000;
+    static constexpr long TEST_BOT_USER_ID_OFFSET = 1000;
     const MediaIds TEST_MEDIAIDS{TEST_MEDIA_ID, TEST_MEDIA_UNIQUEID};
     const DatabaseBase::MediaInfo TEST_MEDIAINFO{TEST_MEDIA_ID,
                                                  TEST_MEDIA_UNIQUEID};
 
     std::shared_ptr<MockTgBotApi> botApi = std::make_shared<MockTgBotApi>();
-    MockDatabase database;
+    MockDatabase *database;
     std::filesystem::path modulePath;
 };
 

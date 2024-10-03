@@ -2,19 +2,36 @@
 
 #include <TgBotDBImplExports.h>
 #include <Types.h>
+#include <internal/_class_helper_macros.h>
 
+#include <InitTask.hpp>
 #include <InstanceClassBase.hpp>
-#include <initcalls/Initcall.hpp>
-#include <libos/OnTerminateRegistrar.hpp>
+#include <database/DatabaseBase.hpp>
+#include <map>
 #include <memory>
 
-#include "database/DatabaseBase.hpp"
-
 struct TgBotDBImpl_API TgBotDatabaseImpl : InstanceClassBase<TgBotDatabaseImpl>,
-                                           InitCall,
                                            DatabaseBase {
-    ~TgBotDatabaseImpl() override = default;
-    
+    struct TgBotDBImpl_API Providers {
+        Providers();
+
+        void registerProvider(const std::string_view name,
+                              std::unique_ptr<DatabaseBase> provider);
+        bool chooseProvider(const std::string_view name);
+
+        friend struct TgBotDatabaseImpl;
+
+       private:
+        // Not owning the string as it will always be a literal
+        std::map<std::string_view, std::unique_ptr<DatabaseBase>> _providers;
+        std::unique_ptr<DatabaseBase> chosenProvider;
+    };
+
+    TgBotDatabaseImpl() = default;
+    ~TgBotDatabaseImpl() override;
+
+    NO_COPY_CTOR(TgBotDatabaseImpl);
+
     // Unload the database
     bool unloadDatabase() override;
 
@@ -38,21 +55,14 @@ struct TgBotDBImpl_API TgBotDatabaseImpl : InstanceClassBase<TgBotDatabaseImpl>,
     [[nodiscard]] std::optional<ChatId> getChatId(
         const std::string &name) const override;
 
-    // Overload for setImpl, assuming the caller maintains lifetime of DatabaseImpl pointer
-    bool setImpl(DatabaseBase *impl);
     // Load database from file
-    bool loadDatabaseFromFile(std::filesystem::path filepath) override;
-    
-    const CStringLifetime getInitCallName() const override {
-        return "Load database";
-    }
-    void doInitCall() override;
+    bool load(std::filesystem::path filepath) override;
 
+    bool setImpl(Providers providers);
    private:
     // Takes a std::unique_ptr containing the implementation
     bool setImpl(std::unique_ptr<DatabaseBase> impl);
 
     std::unique_ptr<DatabaseBase> _databaseImpl;
-    DatabaseBase *_databaseImplRaw;
     bool loaded = false;
 };

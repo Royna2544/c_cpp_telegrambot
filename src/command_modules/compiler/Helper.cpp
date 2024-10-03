@@ -15,7 +15,7 @@ CompilerInTgBotInterface::CompilerInTgBotInterface(
 void CompilerInTgBotInterface::onExecutionStarted(
     const std::string_view& command) {
     timePoint.init();
-    output << GETSTR(WORKING) + command.data() << std::endl;
+    output << GETSTR(WORKING) << command.data() << std::endl;
     sentMessage = botApi->sendReplyMessage(requestedMessage, output.str());
 }
 

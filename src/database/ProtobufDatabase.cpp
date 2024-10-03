@@ -6,6 +6,8 @@
 #include <fstream>
 #include <optional>
 
+#include "TgBotDB.pb.h"
+
 using namespace tgbot::proto;
 
 std::optional<int> ProtoDatabase::findByUid(const RepeatedField<UserId> list,
@@ -60,51 +62,55 @@ ProtoDatabase::ListResult ProtoDatabase::removeUserFromList(ListType type,
     return ListResult::NOT_IN_LIST;
 }
 
-bool ProtoDatabase::loadDatabaseFromFile(std::filesystem::path filepath) {
+bool ProtoDatabase::load(std::filesystem::path filepath) {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
-    if (db_info.has_value()) {
+    if (dbinfo.has_value()) {
+        LOG(WARNING) << "Database is already loaded";
         return false;
     }
+    dbinfo.emplace();
+    dbinfo->path = filepath;
+
     std::fstream input(filepath.string(), std::ios::in | std::ios::binary);
-    {
-        Info info;
-        info.protoFilePath = filepath;
-        db_info.emplace(info);
-    }
     if (!input.is_open()) {
-        LOG(INFO) << "Creating new";
+        LOG(INFO) << "Creating new file";
+        // Nothing to load here...
         return true;
     }
-    return db_info->protoDatabaseObject.ParseFromIstream(&input);
+    if (dbinfo->object.ParseFromIstream(&input)) {
+        return true;
+    }
+    LOG(ERROR) << "Failed to parse input file as protobuf";
+    dbinfo.reset();
+    return false;
 }
 
 bool ProtoDatabase::unloadDatabase() {
-    if (!db_info.has_value()) {
+    if (!dbinfo.has_value()) {
         return false;
     }
-    std::fstream output(db_info->protoFilePath.string(),
-                        std::ios::out | std::ios::binary);
+    std::fstream output(dbinfo->path.string(), std::ios::out | std::ios::binary);
     if (!output.is_open()) {
         return false;
     }
-    if (!db_info->protoDatabaseObject.SerializeToOstream(&output)) {
+    if (!dbinfo->object.SerializeToOstream(&output)) {
         return false;
     }
-    db_info.reset();
+    dbinfo.reset();
     return true;
 }
 
 std::optional<UserId> ProtoDatabase::getOwnerUserId() const {
-    if (!db_info.has_value()) {
+    if (!dbinfo.has_value()) {
         LOG(WARNING) << "Database not loaded! Cannot determine owner user id!";
         return std::nullopt;
     }
-    if (!db_info->protoDatabaseObject.has_ownerid()) {
+    if (!dbinfo->object.has_ownerid()) {
         LOG(WARNING) << "Database does not contain owner user id!";
         return std::nullopt;
     }
-    return db_info->protoDatabaseObject.ownerid();
+    return dbinfo->object.ownerid();
 }
 
 void ProtoDatabase::dumpList(std::ostream &os, const PersonList &list,
@@ -122,9 +128,9 @@ const PersonList &ProtoDatabase::getPersonList(
     ProtoDatabase::ListType type) const {
     switch (type) {
         case DatabaseBase::ListType::WHITELIST:
-            return db_info->protoDatabaseObject.whitelist();
+            return dbinfo->object.whitelist();
         case DatabaseBase::ListType::BLACKLIST:
-            return db_info->protoDatabaseObject.blacklist();
+            return dbinfo->object.blacklist();
     }
     CHECK(false) << "unreachable";
 }
@@ -132,9 +138,9 @@ const PersonList &ProtoDatabase::getPersonList(
 PersonList *ProtoDatabase::getMutablePersonList(ListType type) const {
     switch (type) {
         case DatabaseBase::ListType::WHITELIST:
-            return db_info->protoDatabaseObject.mutable_whitelist();
+            return dbinfo->object.mutable_whitelist();
         case DatabaseBase::ListType::BLACKLIST:
-            return db_info->protoDatabaseObject.mutable_blacklist();
+            return dbinfo->object.mutable_blacklist();
     }
     CHECK(false) << "unreachable";
 }
@@ -153,7 +159,7 @@ const PersonList &ProtoDatabase::getOtherPersonList(
 std::optional<ProtoDatabase::MediaInfo> ProtoDatabase::queryMediaInfo(
     std::string str) const {
     std::optional<tgbot::proto::MediaToName> it;
-    const auto &obj = db_info->protoDatabaseObject;
+    const auto &obj = dbinfo->object;
     for (const auto &mediaEntriesIt : obj.mediatonames()) {
         for (const auto &name : mediaEntriesIt.names()) {
             if (strcasecmp(name.c_str(), str.c_str()) == 0) {
@@ -172,8 +178,7 @@ std::optional<ProtoDatabase::MediaInfo> ProtoDatabase::queryMediaInfo(
 }
 
 bool ProtoDatabase::addMediaInfo(const MediaInfo &info) const {
-    auto *const mediaEntries =
-        db_info->protoDatabaseObject.mutable_mediatonames();
+    auto *const mediaEntries = dbinfo->object.mutable_mediatonames();
     for (const auto &elem : *mediaEntries) {
         if (elem.telegrammediauniqueid() == info.mediaUniqueId) {
             return false;
@@ -190,12 +195,12 @@ bool ProtoDatabase::addMediaInfo(const MediaInfo &info) const {
 }
 
 std::ostream &ProtoDatabase::dump(std::ostream &os) const {
-    if (!db_info.has_value()) {
+    if (!dbinfo.has_value()) {
         os << "Database not loaded!";
         return os;
     }
-    const auto &db = db_info->protoDatabaseObject;
-    os << "Dump of database file: " << db_info->protoFilePath << std::endl;
+    const auto &db = dbinfo->object;
+    os << "Dump of database file: " << dbinfo->path << std::endl;
     os << "Owner ID: ";
     if (db.has_ownerid()) {
         os << db.ownerid();
@@ -237,7 +242,7 @@ std::ostream &ProtoDatabase::dump(std::ostream &os) const {
             }
         }
     }
-    const auto chatDB = db_info->protoDatabaseObject.chattonames();
+    const auto chatDB = dbinfo->object.chattonames();
     if (const auto chatDBSize = chatDB.size(); chatDBSize > 0) {
         for (int i = 0; i < chatDBSize; ++i) {
             const auto it = chatDB.Get(i);
@@ -261,20 +266,20 @@ std::ostream &ProtoDatabase::dump(std::ostream &os) const {
 }
 
 void ProtoDatabase::setOwnerUserId(UserId userId) const {
-    if (!db_info.has_value()) {
+    if (!dbinfo.has_value()) {
         LOG(WARNING) << "Database not loaded! Cannot set owner user id!";
         return;
     }
-    if (db_info->protoDatabaseObject.has_ownerid()) {
+    if (dbinfo->object.has_ownerid()) {
         LOG(WARNING) << "Database already contains owner user id!";
         return;
     }
-    db_info->protoDatabaseObject.set_ownerid(userId);
+    dbinfo->object.set_ownerid(userId);
 }
 
 [[nodiscard]] bool ProtoDatabase::addChatInfo(const ChatId chatid,
                                               const std::string &name) const {
-    auto *const chats = db_info->protoDatabaseObject.mutable_chattonames();
+    auto *const chats = dbinfo->object.mutable_chattonames();
     for (const auto &chat : *chats) {
         if (chat.telegramchatid() == chatid) {
             return false;
@@ -288,7 +293,7 @@ void ProtoDatabase::setOwnerUserId(UserId userId) const {
 
 [[nodiscard]] std::optional<ChatId> ProtoDatabase::getChatId(
     const std::string &name) const {
-    const auto &obj = db_info->protoDatabaseObject;
+    const auto &obj = dbinfo->object;
     for (const auto &chat : obj.chattonames()) {
         if (strcasecmp(chat.name().c_str(), name.c_str()) == 0) {
             return chat.telegramchatid();

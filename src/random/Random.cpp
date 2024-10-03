@@ -110,8 +110,7 @@ struct KernelRand : Random::ImplBase {
 };
 #endif
 
-void Random::doInitCall() {
-    std::unique_ptr<Random::ImplBase> impl = nullptr;
+Random::Random() {
     std::vector<std::unique_ptr<Random::ImplBase>> impl_list;
 
 #ifdef RDRAND_MAYBE_SUPPORTED
@@ -126,15 +125,11 @@ void Random::doInitCall() {
 
     for (auto& i : impl_list) {
         if (i->isSupported()) {
-            impl = std::move(i);
-            LOG(INFO) << "Using " << impl->getName() << " as RNG impl";
+            impl_ = std::move(i);
+            LOG(INFO) << "Using " << impl_->getName() << " as RNG impl";
             break;
         }
     }
-
-    // Nuke the stub impl
-    destroyInstance();
-    initInstance(impl);
 }
 
 void Random::shuffleArray(std::vector<std::string>& array) {

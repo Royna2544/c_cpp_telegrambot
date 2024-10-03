@@ -1,21 +1,15 @@
 // CLimits provides _WIN32_WINNT, do not move
+#include <TgBotPPImplExports.h>
+#include <TgBotWebExports.h>
 #include <httplib.h>
 
 #include <climits>
-
-//
-
-#include <TgBotPPImplExports.h>
-#include <TgBotWebExports.h>
-
 #include <filesystem>
 #include <functional>
 #include <string_view>
 
 #include "CStringLifetime.h"
 #include "ManagedThreads.hpp"
-#include "initcalls/Initcall.hpp"
-
 
 class TgBotWeb_API TgBotWebServerBase {
    public:
@@ -54,15 +48,9 @@ class TgBotWeb_API TgBotWebServerBase {
 };
 
 class TgBotPPImpl_API TgBotWebServer : public ManagedThreadRunnable,
-                                       InitCall,
                                        TgBotWebServerBase {
    public:
     explicit TgBotWebServer(int serverPort);
 
-    using InitCall::initWrapper;
     void runFunction() override;
-
-    void doInitCall() override;
-
-    const CStringLifetime getInitCallName() const override;
 };

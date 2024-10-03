@@ -54,14 +54,4 @@ void ChatObserver::process(const Message::Ptr& msg) {
     }
 }
 
-void ChatObserver::doInitCall() {
-    TgBotWrapper::getInstance()->onAnyMessage(
-        [this](const auto, const Message::Ptr& message) {
-            if (!observedChatIds.empty() || observeAllChats) {
-                process(message);
-            }
-            return TgBotWrapper::AnyMessageResult::Handled;
-        });
-}
-
 DECLARE_CLASS_INST(ChatObserver);

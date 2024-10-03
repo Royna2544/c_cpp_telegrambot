@@ -77,7 +77,10 @@ class TgBotPPImpl_shared_deps_API ThreadManager
 
 struct TgBotPPImpl_shared_deps_API ManagedThread {
     using thread_function = std::function<void(void)>;
-    using prestop_function = std::function<void(ManagedThread*)>;
+    template <typename T>
+        requires std::is_base_of_v<ManagedThread, T>
+    using prestop_function_t = std::function<void(T*)>;
+    using prestop_function = prestop_function_t<ManagedThread>;
 
     // Set thread function and run - implictly starts the thread as well
     void runWith(thread_function fn);
@@ -90,6 +93,12 @@ struct TgBotPPImpl_shared_deps_API ManagedThread {
     // Does this controller have a thread inside it?
     [[nodiscard]] bool isRunning() const;
 
+    template <typename T>
+    void onPreStop(prestop_function_t<T> fn) {
+        preStop = [fn](ManagedThread *thiz){
+            fn(static_cast<T*>(thiz));
+        };
+    }
     ManagedThread() {
         timer_mutex.lk = std::unique_lock<std::timed_mutex>(timer_mutex.m);
     };

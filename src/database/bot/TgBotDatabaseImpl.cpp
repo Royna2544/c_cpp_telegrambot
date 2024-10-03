@@ -1,6 +1,16 @@
 #include "TgBotDatabaseImpl.hpp"
 
 #include <ConfigManager.h>
+#include <Types.h>
+
+#include <StringToolsExt.hpp>
+#include <database/DatabaseBase.hpp>
+#include <filesystem>
+#include <memory>
+#include <optional>
+#include <ostream>
+#include <string_view>
+#include <system_error>
 
 #ifdef HAVE_PROTOBUF
 #include <database/ProtobufDatabase.hpp>
@@ -8,57 +18,49 @@
 #ifdef HAVE_SQLITE
 #include <database/SQLiteDatabase.hpp>
 #endif
-#include <filesystem>
-#include <libos/libfs.hpp>
-#include <memory>
-#include <optional>
-#include <ostream>
-#include <system_error>
 
-#include "Types.h"
+TgBotDatabaseImpl::~TgBotDatabaseImpl() {
+    // Unload the database if it was loaded
+    if (loaded) {
+        unloadDatabase();
+    }
+}
 
 bool TgBotDatabaseImpl::setImpl(std::unique_ptr<DatabaseBase> impl) {
-    if (_databaseImplRaw != nullptr) {
+    if (_databaseImpl != nullptr) {
         LOG(WARNING) << "Implemention is already set.";
         return false;
     }
     _databaseImpl = std::move(impl);
-    _databaseImplRaw = _databaseImpl.get();
     return true;
 }
 
-bool TgBotDatabaseImpl::setImpl(DatabaseBase* impl) {
-    if (_databaseImplRaw != nullptr) {
-        LOG(WARNING) << "Implemention is already set.";
+bool TgBotDatabaseImpl::setImpl(Providers provider) {
+    if (!provider.chosenProvider) {
+        LOG(WARNING) << "No provider chosen.";
         return false;
     }
-    _databaseImpl = nullptr;
-    _databaseImplRaw = impl;
-    return true;
+    return setImpl(std::move(provider.chosenProvider));
 }
 
-bool TgBotDatabaseImpl::loadDatabaseFromFile(std::filesystem::path filepath) {
-    bool isCreated = false;  // i.e. Did it exist before?
-
+bool TgBotDatabaseImpl::load(std::filesystem::path filepath) {
     if (loaded) {
         LOG(WARNING) << "Database is already loaded";
         return false;
     }
-    if (!FS::exists(filepath)) {
-        DLOG(INFO) << "isCreated: true, creating new database file";
-        isCreated = true;
+    if (!_databaseImpl) {
+        LOG(WARNING) << "No implementation set.";
+        return false;
     }
-    loaded = _databaseImplRaw->loadDatabaseFromFile(filepath);
-    if (isCreated && loaded) {
-        _databaseImplRaw->initDatabase();
-    }
+
+    loaded = _databaseImpl->load(filepath);
     return loaded;
 }
 
 bool TgBotDatabaseImpl::unloadDatabase() {
     if (loaded) {
         loaded = false;
-        return _databaseImplRaw->unloadDatabase();
+        return _databaseImpl->unloadDatabase();
     } else {
         LOG(WARNING) << "No database to unload.";
     }
@@ -73,7 +75,7 @@ DatabaseBase::ListResult TgBotDatabaseImpl::addUserToList(
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return DatabaseBase::ListResult::BACKEND_ERROR;
     }
-    return _databaseImplRaw->addUserToList(type, user);
+    return _databaseImpl->addUserToList(type, user);
 }
 
 DatabaseBase::ListResult TgBotDatabaseImpl::removeUserFromList(
@@ -82,7 +84,7 @@ DatabaseBase::ListResult TgBotDatabaseImpl::removeUserFromList(
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return DatabaseBase::ListResult::BACKEND_ERROR;
     }
-    return _databaseImplRaw->removeUserFromList(type, user);
+    return _databaseImpl->removeUserFromList(type, user);
 }
 
 DatabaseBase::ListResult TgBotDatabaseImpl::checkUserInList(
@@ -91,7 +93,7 @@ DatabaseBase::ListResult TgBotDatabaseImpl::checkUserInList(
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return DatabaseBase::ListResult::BACKEND_ERROR;
     }
-    return _databaseImplRaw->checkUserInList(type, user);
+    return _databaseImpl->checkUserInList(type, user);
 }
 
 std::optional<UserId> TgBotDatabaseImpl::getOwnerUserId() const {
@@ -99,7 +101,7 @@ std::optional<UserId> TgBotDatabaseImpl::getOwnerUserId() const {
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return std::nullopt;
     }
-    return _databaseImplRaw->getOwnerUserId();
+    return _databaseImpl->getOwnerUserId();
 }
 
 std::optional<DatabaseBase::MediaInfo> TgBotDatabaseImpl::queryMediaInfo(
@@ -108,7 +110,7 @@ std::optional<DatabaseBase::MediaInfo> TgBotDatabaseImpl::queryMediaInfo(
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return std::nullopt;
     }
-    return _databaseImplRaw->queryMediaInfo(str);
+    return _databaseImpl->queryMediaInfo(str);
 }
 
 bool TgBotDatabaseImpl::addMediaInfo(
@@ -117,7 +119,7 @@ bool TgBotDatabaseImpl::addMediaInfo(
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return false;
     }
-    return _databaseImplRaw->addMediaInfo(info);
+    return _databaseImpl->addMediaInfo(info);
 }
 
 std::ostream& TgBotDatabaseImpl::dump(std::ostream& ofs) const {
@@ -125,7 +127,7 @@ std::ostream& TgBotDatabaseImpl::dump(std::ostream& ofs) const {
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return ofs;
     }
-    return _databaseImplRaw->dump(ofs);
+    return _databaseImpl->dump(ofs);
 }
 
 void TgBotDatabaseImpl::setOwnerUserId(const UserId user) const {
@@ -133,7 +135,7 @@ void TgBotDatabaseImpl::setOwnerUserId(const UserId user) const {
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return;
     }
-    _databaseImplRaw->setOwnerUserId(user);
+    _databaseImpl->setOwnerUserId(user);
 }
 
 bool TgBotDatabaseImpl::addChatInfo(const ChatId chatid,
@@ -142,7 +144,7 @@ bool TgBotDatabaseImpl::addChatInfo(const ChatId chatid,
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return false;
     }
-    return _databaseImplRaw->addChatInfo(chatid, name);
+    return _databaseImpl->addChatInfo(chatid, name);
 }
 
 std::optional<ChatId> TgBotDatabaseImpl::getChatId(
@@ -151,72 +153,42 @@ std::optional<ChatId> TgBotDatabaseImpl::getChatId(
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return std::nullopt;
     }
-    return _databaseImplRaw->getChatId(name);
+    return _databaseImpl->getChatId(name);
 }
 
-void TgBotDatabaseImpl::doInitCall() {
-    const auto dbConf =
-        ConfigManager::getVariable(ConfigManager::Configs::DATABASE_BACKEND);
-    std::error_code ec;
-
-    if (dbConf) {
-        const std::string& config = dbConf.value();
-        DLOG(INFO) << "Database configuration string: "
-                   << std::quoted(dbConf.value());
-        const auto speratorIdx = config.find(':');
-
-        if (speratorIdx == std::string::npos) {
-            LOG(ERROR) << "Invalid database configuration";
-            return;
-        }
-        // Expected format: <backend>:filename relative to git root (Could be
-        // absolute)
-        const auto backendStr = config.substr(0, speratorIdx);
-        const auto filenameStr = config.substr(speratorIdx + 1);
-        DLOG(INFO) << "Database backend: " << backendStr;
-        DLOG(INFO) << "Database filename: " << filenameStr;
-
-        if (backendStr == "sqlite") {
-#ifdef HAVE_SQLITE
-            setImpl(std::make_unique<SQLiteDatabase>());
-#else
-            LOG(ERROR) << "SQLite support is not available in this build";
-            goto fail;
-#endif
-        } else if (backendStr == "protobuf") {
-#ifdef HAVE_PROTOBUF
-            setImpl(std::make_unique<ProtoDatabase>());
-#else
-            LOG(ERROR) << "Proto support is not available in this build";
-            goto fail;
-#endif
-        } else {
-            LOG(ERROR) << "Invalid database backend: " << backendStr;
-            goto fail;
-        }
-
-        std::filesystem::path parent;
-        if (std::filesystem::path(filenameStr).is_relative()) {
-            parent = std::filesystem::current_path(ec);
-            if (ec) {
-                LOG(ERROR) << "Failed to get current path: " << ec.message();
-                return;
-            }
-        }
-        loaded = loadDatabaseFromFile(parent / filenameStr);
-        if (!loaded) {
-            LOG(ERROR) << "Failed to load database from file";
-        } else {
-            DLOG(INFO) << "Database loaded";
-        }
-    }
-fail:
-    if (!loaded) {
-        LOG(ERROR) << "Failed to load database, the bot will not be able to "
-                      "save changes.";
-    } else {
-        OnTerminateRegistrar::getInstance()->registerCallback(
-            [this]() { unloadDatabase(); });
-    }
-}
 DECLARE_CLASS_INST(TgBotDatabaseImpl);
+
+TgBotDatabaseImpl::Providers::Providers() {
+#ifdef HAVE_SQLITE
+    registerProvider("sqlite", std::make_unique<SQLiteDatabase>());
+#endif
+#ifdef HAVE_PROTOBUF
+    registerProvider("protobuf", std::make_unique<ProtoDatabase>());
+#endif
+}
+
+void TgBotDatabaseImpl::Providers::registerProvider(
+    const std::string_view name, std::unique_ptr<DatabaseBase> provider) {
+    // Check if the provider has already been registered
+    if (_providers.contains(name)) {
+        LOG(WARNING) << "Database provider with name " << SingleQuoted(name)
+                     << " already registered.";
+        return;
+    }
+
+    DLOG(INFO) << "TgBotDatabaseImpl::registerProvider: " << name;
+
+    // Move the provider to the map and return
+    _providers[name] = std::move(provider);
+}
+
+bool TgBotDatabaseImpl::Providers::chooseProvider(const std::string_view name) {
+    if (_providers.contains(name)) {
+        chosenProvider = std::move(_providers[name]);
+        _providers.clear();
+    } else {
+        LOG(ERROR) << "Unsupported database backend: " << name;
+        chosenProvider = nullptr;
+    }
+    return chosenProvider != nullptr;
+}

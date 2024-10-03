@@ -1,9 +1,12 @@
 #include <../src/command_modules/support/popen_wdt/popen_wdt.h>
 #include <gtest/gtest.h>
 
+#include <DurationPoint.hpp>
 #include <StringResManager.hpp>
 
 #include "CommandModulesTest.hpp"
+
+using std::chrono_literals::operator""s;
 
 struct BashCommandTest : public CommandTestBase {
     BashCommandTest() : CommandTestBase("bash") {}

@@ -40,7 +40,7 @@ add_my_library(
 add_my_library(
   NAME DBImpl
   SRCS bot/TgBotDatabaseImpl.cpp
-  LIBS TgBotUtils TgBotDB
+  LIBS TgBotDB
   DEFS
     ${DATABASE_DEFS}
 )

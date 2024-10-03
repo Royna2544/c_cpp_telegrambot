@@ -4,22 +4,16 @@
 #include <SocketBase.hpp>
 #include <TgBotWrapper.hpp>
 #include <functional>
-#include <initcalls/Initcall.hpp>
 #include <memory>
 
-#include "TgBotPacketParser.hpp"
+#include "InitTask.hpp"
 #include "TgBotSocketFileHelperNew.hpp"
 #include "TgBotSocket_Export.hpp"
 
 using TgBotSocket::callback::GenericAck;
 using TgBotSocket::callback::UploadFileDryCallback;
 
-struct TgBotPPImpl_API SocketInterfaceTgBot : ManagedThreadRunnable, InitCall {
-    void doInitCall() override;
-    const CStringLifetime getInitCallName() const override {
-        return "Create sockets and setup";
-    }
-
+struct TgBotPPImpl_API SocketInterfaceTgBot : ManagedThreadRunnable {
     void handlePacket(SocketConnContext ctx, TgBotSocket::Packet pkt);
 
     void runFunction() override;
@@ -28,7 +22,7 @@ struct TgBotPPImpl_API SocketInterfaceTgBot : ManagedThreadRunnable, InitCall {
         std::shared_ptr<SocketInterfaceBase> _interface,
         std::shared_ptr<TgBotApi> _api,
         std::shared_ptr<SocketFile2DataHelper> helper);
-
+    
    private:
     std::shared_ptr<SocketInterfaceBase> interface = nullptr;
     std::shared_ptr<TgBotApi> api = nullptr;
