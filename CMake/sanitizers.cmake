@@ -11,6 +11,10 @@ endif()
 if (DISABLE_SANITIZERS)
     message(STATUS "Sanitizers disabled by option")
 endif()
+if (CMAKE_BUILD_TYPE STREQUAL "Release")
+    message(STATUS "Disabling sanitizers as release build")
+    set(DISABLE_SANITIZERS ON)
+endif()
 
 # Define a macro to add sanitizers to a target.
 function(add_sanitizers target)
