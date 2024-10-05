@@ -159,7 +159,7 @@ struct PerBuildData {
         kEng
     } variant;  // Target build variant
 
-    enum class Result { SUCCESS, ERROR_NONFATAL, ERROR_FATAL, NONE };
+    enum class Result { NONE, SUCCESS, ERROR_NONFATAL, ERROR_FATAL };
 
     void reset() {
         device.clear();

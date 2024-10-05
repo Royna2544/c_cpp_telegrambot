@@ -5,8 +5,7 @@
 #include <memory>
 #include <string_view>
 
-#include "PythonClass.hpp"
-
+#include "Shmem.hpp"
 struct ROMBuildTask : ForkAndRun {
     static constexpr std::string_view kShmemROMBuild = "shmem_rombuild";
     static constexpr std::string_view kErrorLogFile = "out/error.log";
@@ -63,10 +62,7 @@ struct ROMBuildTask : ForkAndRun {
     PerBuildData data;
     TgBot::Message::Ptr message;
     std::shared_ptr<TgBotApi> botWrapper;
-    PythonClass::Ptr _py;
-    PythonClass::FunctionHandle::Ptr _get_total_mem;
-    PythonClass::FunctionHandle::Ptr _get_used_mem;
-    Shmem smem{};
+    std::unique_ptr<AllocatedShmem> smem;
     std::chrono::system_clock::time_point clock;
     std::chrono::system_clock::time_point startTime;
 };

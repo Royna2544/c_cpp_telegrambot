@@ -1,3 +1,5 @@
+#pragma once
+
 #include <absl/log/log.h>
 #include <unistd.h>
 
@@ -116,17 +118,3 @@ struct Pipe {
      */
     pipe_t underlying;
 };
-
-/**
- * @brief Creates a unique_ptr that automatically closes the given file
- * descriptor when it goes out of scope.
- *
- * @param[in, out] fd A pointer to the file descriptor to be managed.
- *
- * @return A unique_ptr that owns the given file descriptor and will
- * automatically close it when it goes out of scope.
- */
-inline auto createFdAutoCloser(int* fd) {
-    return std::unique_ptr<int, void (*)(int*)>(
-        fd, [](int* _fd) { closeFd(*_fd); });
-}

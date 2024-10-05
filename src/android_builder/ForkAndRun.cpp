@@ -1,6 +1,5 @@
 #include "ForkAndRun.hpp"
 
-#include <Python.h>
 #include <absl/log/log.h>
 #include <absl/log/log_sink_registry.h>
 #include <absl/strings/ascii.h>
@@ -11,80 +10,55 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <Random.hpp>
 #include <csignal>
 #include <cstdlib>
+#include <filesystem>
+#include <internal/raii.hpp>
 #include <libos/OnTerminateRegistrar.hpp>
-#include <optional>
-#include <thread>
-
-#include <PythonClass.hpp>
-#include <Random.hpp>
 #include <libos/libsighandler.hpp>
+#include <memory>
+#include <mutex>
+#include <shared_mutex>
+#include <string_view>
+#include <system_error>
+#include <thread>
+#include <utility>
+#include <vector>
 
-void sigchld_handler(int) {
-    while (waitpid(-1, nullptr, WNOHANG) > 0) {
-    }
-}
+#include "AbslLogInit.hpp"
 
 bool ForkAndRun::execute() {
     Pipe stdout_pipe{};
     Pipe stderr_pipe{};
-    Pipe python_pipe{};
 
-    if (!stderr_pipe.pipe() || !stdout_pipe.pipe() || !python_pipe.pipe()) {
+    if (!stderr_pipe.pipe() || !stdout_pipe.pipe()) {
         stderr_pipe.close();
         stdout_pipe.close();
-        python_pipe.close();
         PLOG(ERROR) << "Failed to create pipes";
         return false;
     }
 
-    auto* mainTS = PyEval_SaveThread();
     pid_t pid = fork();
     if (pid == 0) {
         FDLogSink sink;
+        TgBot_AbslLogDeInit();
         absl::AddLogSink(&sink);
+    
         dup2(stdout_pipe.writeEnd(), STDOUT_FILENO);
         dup2(stderr_pipe.writeEnd(), STDERR_FILENO);
         close(stdout_pipe.readEnd());
         close(stderr_pipe.readEnd());
-        close(python_pipe.readEnd());
 
         // Clear handlers
         SignalHandler::uninstall();
 
-        // Handle sigchld
-        struct sigaction sa {};
-        sa.sa_handler = sigchld_handler;
-        sigemptyset(&sa.sa_mask);
-        sa.sa_flags = SA_RESTART;
-        sigaction(SIGCHLD, &sa, nullptr);
-
         // Set the process group to the current process ID
         setpgrp();
-
-        python = PythonClass::get();
-        
-        // Append PYTHON LOG FD
-        PyEval_RestoreThread(mainTS);
-        {
-            GILStateManagement _gil;
-            PyObject* os = PyImport_ImportModule("os");
-            PyObject* os_environ = PyObject_GetAttrString(os, "environ");
-            PyObject* value = PyUnicode_FromString(
-                std::to_string(python_pipe.writeEnd()).c_str());
-            PyMapping_SetItemString(os_environ, "PYTHON_LOG_FD", value);
-
-            // Clean up
-            Py_DECREF(value);
-            Py_DECREF(os_environ);
-            Py_DECREF(os);
-        }
 
         int ret = 0;
         ret = runFunction() ? EXIT_SUCCESS : EXIT_FAILURE;
         absl::RemoveLogSink(&sink);
-        python.reset();
         _exit(ret);
     } else if (pid > 0) {
         Pipe program_termination_pipe{};
@@ -98,7 +72,6 @@ bool ForkAndRun::execute() {
         childProcessId = pid;
         close(stdout_pipe.writeEnd());
         close(stderr_pipe.writeEnd());
-        close(python_pipe.writeEnd());
         program_termination_pipe.pipe();
 
         selector.add(
@@ -121,20 +94,6 @@ bool ForkAndRun::execute() {
                     read(stderr_pipe.readEnd(), buf.data(), buf.size() - 1);
                 if (bytes_read >= 0) {
                     onNewStderrBuffer(buf);
-                    buf.fill(0);
-                }
-            },
-            Selector::Mode::READ);
-        selector.add(
-            python_pipe.readEnd(),
-            [python_pipe, this] {
-                BufferType buf{};
-                ssize_t bytes_read =
-                    read(python_pipe.readEnd(), buf.data(), buf.size() - 1);
-                if (bytes_read >= 0) {
-                    std::cout << "Python output: "
-                              << absl::StripAsciiWhitespace(buf.data())
-                              << std::endl;
                     buf.fill(0);
                 }
             },
@@ -165,7 +124,6 @@ bool ForkAndRun::execute() {
             onExit(0);
         }
 
-        PyEval_RestoreThread(mainTS);
         // Notify the polling thread that program has ended.
         write(program_termination_pipe.writeEnd(), &status, sizeof(status));
         pollThread.join();
@@ -175,11 +133,9 @@ bool ForkAndRun::execute() {
         selector.remove(stdout_pipe.readEnd());
         selector.remove(stderr_pipe.readEnd());
         selector.remove(program_termination_pipe.readEnd());
-        selector.remove(python_pipe.readEnd());
         program_termination_pipe.close();
         stderr_pipe.close();
         stdout_pipe.close();
-        python_pipe.close();
         tregi->unregisterCallback(token);
     } else {
         PLOG(ERROR) << "Unable to fork";
@@ -187,86 +143,194 @@ bool ForkAndRun::execute() {
     return true;
 }
 
-void ForkAndRun::cancel() {
+void ForkAndRun::cancel() const {
     if (childProcessId < 0) {
         LOG(WARNING) << "Attempting to cancel non-existing child";
         return;
     }
 
     killpg(childProcessId, SIGTERM);
+}
 
-    // Wait for the child process to terminate.
-    int status = 0;
-    // The canceler should not be blocked by the signal handler.
-    pid_t pid = waitpid(childProcessId, &status, WNOHANG);
-    if (pid == 0) {
-        PLOG(WARNING) << "Child still running after timeout";
+DeferredExit::DeferredExit(DeferredExit::fail_t /*unused*/)
+    : type(Type::EXIT), code(1) {}
+
+DeferredExit::DeferredExit(int status) {
+    if (WIFEXITED(status)) {
+        type = Type::EXIT;
+        code = WEXITSTATUS(status);
+    } else if (WIFSIGNALED(status)) {
+        type = Type::SIGNAL;
+        code = WTERMSIG(status);
+    } else {
+        type = Type::UNKNOWN;
+        code = 0;
+    }
+}
+
+DeferredExit::~DeferredExit() {
+    if (!destory) {
         return;
     }
-    if (WIFSIGNALED(status)) {
-        LOG(INFO) << "Subprocess terminated by signal: "
-                  << strsignal(WTERMSIG(status));
+
+    DLOG(INFO) << "At ~DeferredExit";
+    if (*this) {
+        DLOG(INFO) << "Skip the deferred exit";
+        return;
+    }
+    switch (type) {
+        case Type::EXIT:
+            _exit(code);
+            break;
+        case Type::SIGNAL:
+            kill(0, code);
+            break;
+        case Type::UNKNOWN:
+            LOG(WARNING) << "Deferred exit: unknown type. BYdef-exit1";
+            _exit(EXIT_FAILURE);
+            break;
+    }
+}
+
+DeferredExit::operator bool() const noexcept {
+    return type == Type::EXIT && code == 0;
+}
+
+ForkAndRunSimple::ForkAndRunSimple(std::vector<std::string> argv)
+    : args_(std::move(argv)) {}
+
+DeferredExit ForkAndRunSimple::operator()() {
+    // Owns the strings
+    std::vector<std::string> args;
+    args.reserve(args_.size());
+    args.insert(args.end(), args_.begin(), args_.end());
+
+    // Convert to raw C-style strings
+    std::vector<char*> rawArgs;
+    rawArgs.reserve(args.size() + 1);
+    for (auto& arg : args) {
+        rawArgs.emplace_back(arg.data());
+    }
+    rawArgs.emplace_back(nullptr);
+
+    // Execute the program
+    pid_t pid = vfork();
+    if (pid == 0) {
+        execvp(args_[0].data(), rawArgs.data());
+        _exit(EXIT_FAILURE);
+    } else if (pid > 0) {
+        int status = 0;
+        if (waitpid(pid, &status, 0) < 0) {
+            PLOG(ERROR) << "Failed to wait for child";
+            return DeferredExit::generic_fail;
+        }
+        return DeferredExit{status};
     } else {
-        LOG(WARNING) << "Unexpected status: " << status;
+        PLOG(ERROR) << "Unable to fork";
     }
-    childProcessId = -1;
+    return DeferredExit::generic_fail;
 }
 
-std::optional<ForkAndRun::Shmem> ForkAndRun::allocShmem(
-    const std::string_view& path, off_t size) {
-    void* ptr = nullptr;
-    int fd = shm_open(path.data(), O_CREAT | O_RDWR, 0666);
-    if (fd == -1) {
-        PLOG(ERROR) << "shm_open failed";
-        return std::nullopt;
+ForkAndRunShell::ForkAndRunShell(std::filesystem::path shell_path)
+    : shell_path_(std::move(shell_path)) {}
+
+bool ForkAndRunShell::open() {
+    LOG(INFO) << "Using shell: " << shell_path_;
+
+    if (!pipe_.pipe()) {
+        PLOG(ERROR) << "Failed to create pipe";
+        return false;
     }
-    const auto fdCloser = createFdAutoCloser(&fd);
-    if (ftruncate(fd, size) == -1) {
-        PLOG(ERROR) << "ftruncate failed";
-        return std::nullopt;
+    shell_pid_ = fork();
+    if (shell_pid_ < 0) {
+        PLOG(ERROR) << "Unable to fork shell";
+        return false;
+    } else if (shell_pid_ == 0) {
+        dup2(pipe_.readEnd(), STDIN_FILENO);
+        ::close(pipe_.writeEnd());
+        auto stringLen = shell_path_.string().size();
+        auto ptr = std::make_unique_for_overwrite<char[]>(stringLen + 1);
+        std::strcpy(ptr.get(), shell_path_.c_str());
+        ptr.get()[stringLen] = 0;
+        char* argv[] = {ptr.get(), nullptr};
+        execvp(ptr.get(), argv);
+        _exit(EXIT_FAILURE);
+    } else {
+        LOG(INFO) << "Shell opened with pid " << shell_pid_;
+        ::close(pipe_.readEnd());
+        opened = true;
+        terminate_watcher_thread = std::thread([this] {
+            int status = 0;
+            while (true) {
+                {
+                    std::shared_lock<std::shared_mutex> pidLk(pid_mutex_);
+                    if (waitpid(shell_pid_, &status, 0) < 0) {
+                        PLOG(ERROR) << "Failed to wait for shell";
+                        break;
+                    }
+                }
+                // Promote to unique
+                {
+                    std::unique_lock<std::shared_mutex> lock(pid_mutex_);
+                    shell_pid_ = -1;
+                }
+                result = DeferredExit{status};
+            }
+        });
     }
-    ptr = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    if (ptr == MAP_FAILED) {
-        PLOG(ERROR) << "mmap failed";
-        return std::nullopt;
-    }
-    DLOG(INFO) << "Shmem created with path: " << path.data()
-               << " size: " << size << " bytes";
-    return Shmem{path.data(), size, ptr, true};
+    return true;
 }
 
-void ForkAndRun::freeShmem(Shmem& shmem) {
-    if (munmap(shmem.memory, shmem.size) == -1) {
-        PLOG(ERROR) << "munmap failed";
+const ForkAndRunShell& ForkAndRunShell::operator<<(
+    const endl_t /*unused*/) const {
+    const std::shared_lock<std::shared_mutex> _(pid_mutex_);
+
+    if (!opened || shell_pid_ < 0) {
+        LOG(ERROR) << "Shell not open. Ignoring endl";
+        return *this;
     }
-    if (shm_unlink(shmem.path.c_str()) == -1) {
-        PLOG(ERROR) << "shm_unlink failed";
-    }
-    DLOG(INFO) << "Shmem freed";
-    shmem.isAllocated = false;
+    write(pipe_.writeEnd(), "\n", 1);
+    return *this;
 }
 
-std::optional<ForkAndRun::Shmem> ForkAndRun::connectShmem(
-    const std::string_view& path, const off_t size) {
-    int fd = shm_open(path.data(), O_RDWR, 0);
-    if (fd == -1) {
-        PLOG(ERROR) << "shm_open failed";
-        return std::nullopt;
+void ForkAndRunShell::writeString(const std::string& args) const {
+    const std::shared_lock<std::shared_mutex> _(pid_mutex_);
+
+    if (!opened || shell_pid_ < 0) {
+        LOG(ERROR) << "Shell not open. Ignoring " << std::quoted(args);
+        return;
     }
-    const auto fdCloser = createFdAutoCloser(&fd);
-    void* ptr = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    if (ptr == MAP_FAILED) {
-        PLOG(ERROR) << "mmap failed";
-        return std::nullopt;
-    }
-    DLOG(INFO) << "Shmem connected with path: " << path.data();
-    return Shmem{path.data(), size, ptr, true};
+    write(pipe_.writeEnd(), args.data(), args.size());
 }
 
-void ForkAndRun::disconnectShmem(Shmem& shmem) {
-    if (munmap(shmem.memory, shmem.size) == -1) {
-        PLOG(ERROR) << "munmap failed";
+DeferredExit ForkAndRunShell::close() {
+    bool do_wait = false;
+    if (!opened) {
+        LOG(ERROR) << "Didn't open, so no close.";
+        return DeferredExit::generic_fail;
     }
-    DLOG(INFO) << "Shmem disconnected";
-    shmem.isAllocated = false;
+    {
+        const std::unique_lock<std::shared_mutex> lock(pid_mutex_);
+        if (shell_pid_ >= 0) {
+            do_wait = true;
+        }
+    }
+    opened = false;  // Prevent future write operations.
+    LOG(INFO) << "Writing exit command";
+    const std::string_view eof = "exit\n";
+    const auto rc =
+        write(pipe_.writeEnd(), eof.data(), eof.size());  // EOF to shell
+    if (rc < 0) {
+        PLOG(ERROR) << "Failed to write exit command";
+        return DeferredExit::generic_fail;
+    }
+    LOG(INFO) << "Exit command written";
+    if (do_wait || terminate_watcher_thread.joinable()) {
+        terminate_watcher_thread.join();
+        ::close(pipe_.writeEnd());
+        return std::move(result);
+    } else {
+        LOG(ERROR) << "Shell not open";
+    }
+    return DeferredExit::generic_fail;
 }

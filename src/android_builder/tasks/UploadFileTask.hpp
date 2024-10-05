@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <ConfigParsers.hpp>
 
+#include "Shmem.hpp"
 #include "ForkAndRun.hpp"
 
 struct UploadFileTask : ForkAndRun {
@@ -43,5 +44,5 @@ struct UploadFileTask : ForkAndRun {
     ~UploadFileTask() override;
    private:
     PerBuildData data;
-    Shmem smem;
+    std::unique_ptr<AllocatedShmem> smem;
 };

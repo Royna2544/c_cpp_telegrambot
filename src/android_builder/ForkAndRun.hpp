@@ -1,18 +1,23 @@
 #pragma once
 
 // Helper class to fork and run a subprocess with stdout/err
+#include <absl/log/log_entry.h>
+#include <absl/log/log_sink.h>
 #include <absl/strings/ascii.h>
+#include <internal/_FileDescriptor_posix.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 #include <array>
+#include <filesystem>
+#include <initializer_list>
 #include <iostream>
+#include <shared_mutex>
+#include <socket/selector/SelectorPosix.hpp>
 #include <string_view>
+#include <thread>
 
-#include "PythonClass.hpp"
-#include "absl/log/log_entry.h"
-#include "absl/log/log_sink.h"
-#include "socket/selector/SelectorPosix.hpp"
+#include "internal/_class_helper_macros.h"
 
 struct FDLogSink : public absl::LogSink {
     void Send(const absl::LogEntry& logSink) override {
@@ -54,7 +59,10 @@ class ForkAndRun {
      *
      * @param buffer The buffer containing the new stdout data.
      */
-    virtual void onNewStdoutBuffer(BufferType& buffer) {}
+    virtual void onNewStdoutBuffer(BufferType& buffer) {
+        std::string lines = buffer.data();
+        std::cout << absl::StripAsciiWhitespace(lines) << std::endl;
+    }
 
     /**
      * @brief Callback function for handling new stderr data.
@@ -115,63 +123,116 @@ class ForkAndRun {
      * the `execute` method. It sets the appropriate flags to indicate that the
      * subprocess should be stopped.
      */
-    void cancel();
-
-    struct Shmem {
-        std::string path;
-        off_t size;
-        void* memory;
-        bool isAllocated;
-    };
-
-    /**
-     * @brief Allocates shared memory for the subprocess.
-     *
-     * This method allocates shared memory for the subprocess using the
-     * specified path and size. It returns a pointer to the allocated memory.
-     *
-     * @param path The path to the shared memory segment.
-     * @param size The size of the shared memory segment in bytes.
-     *
-     * @return A Shmem object containing the allocated shared memory segment,
-     * or std::nullopt if the allocation failed.
-     */
-    static std::optional<Shmem> allocShmem(const std::string_view& path,
-                                           off_t size);
-
-    /**
-     * @brief Frees the shared memory allocated for the subprocess.
-     *
-     * This method frees the shared memory that was allocated for the subprocess
-     * using the `allocShmem` method. It takes a pointer to the allocated memory
-     * as an argument and frees the memory associated with it.
-     *
-     * @param shmem The Shmem object containing the allocated shared memory
-     * segment.
-     */
-    static void freeShmem(Shmem& shmem);
-
-    /**
-     * @brief Connects to a shared memory segment.
-     *
-     * This method connects to a shared memory segment specified by the given
-     * path. It returns a pointer to the allocated shared memory segment.
-     *
-     * @param path The path to the shared memory segment.
-     * @param size The size of the shared memory segment.
-     *
-     * @return A Shmem object containing the connected shared memory segment,
-     * or std::nullopt if the connection failed.
-     */
-    static std::optional<Shmem> connectShmem(const std::string_view& path,
-                                             const off_t size);
-
-    static void disconnectShmem(Shmem& shmem);
-
-   protected:
-    std::shared_ptr<PythonClass> python;
+    void cancel() const;
 
    private:
     UnixSelector selector;
     pid_t childProcessId = -1;
+};
+
+struct DeferredExit {
+    struct fail_t {};
+    constexpr static inline fail_t generic_fail{};
+
+    // Create a deferred exit with the given status.
+    explicit DeferredExit(int status);
+    // Create a default-failure
+    DeferredExit(fail_t);
+    // Re-do the deferred exit.
+    ~DeferredExit();
+    // Default ctor
+    DeferredExit() = default;
+
+    NO_COPY_CTOR(DeferredExit);
+
+    // Move operator
+    DeferredExit(DeferredExit&& other) noexcept
+        : type(other.type), code(other.code) {
+        other.destory = false;
+    }
+    DeferredExit& operator=(DeferredExit&& other) noexcept {
+        if (this != &other) {
+            type = other.type;
+            code = other.code;
+            other.destory = false;
+        }
+        return *this;
+    }
+
+    operator bool() const noexcept;
+
+    enum class Type { UNKNOWN, EXIT, SIGNAL } type;
+    int code;
+    bool destory = true;
+};
+
+inline std::ostream& operator<<(std::ostream& os, DeferredExit const& df) {
+    if (df.type == DeferredExit::Type::EXIT) {
+        os << "Deferred exit: " << df.code;
+    } else if (df.type == DeferredExit::Type::SIGNAL) {
+        os << "Deferred signal: " << df.code;
+    } else {
+        os << "Deferred exit: (unknown type)";
+    }
+    return os;
+}
+
+class ForkAndRunSimple {
+    std::vector<std::string> args_;
+
+   public:
+    explicit ForkAndRunSimple(std::vector<std::string> argv);
+
+    // Runs the argv, and either exits or kills itself, no return.
+    DeferredExit operator()();
+};
+
+template <typename T>
+concept WriteableToStdOstream = requires(T t) { std::cout << t; };
+
+class ForkAndRunShell {
+    std::filesystem::path shell_path_;
+    Pipe pipe_{};
+
+    // Protect shell_pid_, and if process terminated, we wont want write() to
+    // block.
+    mutable std::shared_mutex pid_mutex_;
+    pid_t shell_pid_ = -1;
+
+    // terminate watcher
+    std::thread terminate_watcher_thread;
+    DeferredExit result;
+
+    bool opened = false;
+
+    void writeString(const std::string& args) const;
+
+   public:
+    explicit ForkAndRunShell(std::filesystem::path shell_path);
+
+    // Tag object
+    struct endl_t {};
+    static constexpr endl_t endl{};
+
+    bool open();
+
+    // Write arguments to the shell
+    template <typename T>
+        requires WriteableToStdOstream<T>
+    const ForkAndRunShell& operator<<(const T& args) const {
+        if constexpr (std::is_same_v<T, std::string>) {
+            writeString(args);
+        } else {
+            std::stringstream ss;
+            ss << args;
+            writeString(ss.str());
+        }
+        return *this;
+    }
+
+    // Support ForkAndRunShell::endl
+    const ForkAndRunShell& operator<<(const endl_t) const;
+
+    // waits for anything and either exits or kills itself, no return.
+    DeferredExit close();
 };

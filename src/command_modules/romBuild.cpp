@@ -4,7 +4,6 @@
 #include <absl/strings/strip.h>
 
 #include <ConfigParsers.hpp>
-#include <PythonClass.hpp>
 #include <TgBotWrapper.hpp>
 #include <algorithm>
 #include <concepts>
@@ -20,6 +19,7 @@
 #include <tasks/UploadFileTask.hpp>
 #include <utility>
 
+#include "SystemInfo.hpp"
 #include "tgbot/TgException.h"
 
 template <typename Impl>
@@ -376,8 +376,11 @@ class Build : public TaskWrapperBase<ROMBuildTask> {
             case PerBuildData::Result::SUCCESS:
                 api->editMessage(sentMessage, "Build completed successfully");
                 break;
-            case PerBuildData::Result::ERROR_NONFATAL:
             case PerBuildData::Result::NONE:
+                // To reach here, only if the subprocess was killed, is this value possible.
+                api->editMessage(sentMessage, "FATAL ERROR");
+                break;
+            case PerBuildData::Result::ERROR_NONFATAL:
                 break;
         }
     }
@@ -412,30 +415,6 @@ class Upload : public TaskWrapperBase<UploadFileTask> {
         queryHandler->updateSentMessage(msg);
     }
 };
-
-namespace {
-
-std::string getSystemInfo() {
-    auto py = PythonClass::get();
-    auto mod = py->importModule("system_info");
-    if (!mod) {
-        LOG(ERROR) << "Failed to import system_info module";
-        return "";
-    }
-    auto fn = mod->lookupFunction("get_system_summary");
-    if (!fn) {
-        LOG(ERROR) << "Failed to find get_system_summary function";
-        return "";
-    }
-    std::string summary;
-    if (!fn->call(nullptr, &summary)) {
-        LOG(ERROR) << "Failed to call get_system_summary function";
-        return "";
-    }
-    return summary;
-}
-
-}  // namespace
 
 class CwdRestorer {
     std::filesystem::path cwd;
@@ -546,8 +525,9 @@ void ROMBuildQueryHandler::handle_cancel(const Query& /*query*/) {
 }
 
 void ROMBuildQueryHandler::handle_send_system_info(const Query& query) {
-    const static auto info = getSystemInfo();
-    api->editMessage(sentMessage, info, backKeyboard);
+    std::stringstream ss;
+    ss << SystemSummary();
+    api->editMessage(sentMessage, ss.str(), backKeyboard);
 }
 
 void ROMBuildQueryHandler::handle_settings(const Query& /*query*/) {
@@ -623,7 +603,7 @@ void ROMBuildQueryHandler::handle_rom(const Query& query) {
     std::string_view rom = query->data;
     absl::ConsumePrefix(&rom, "rom_");
     std::vector<std::string> c = absl::StrSplit(rom, '_');
-    CHECK(c.size() == 2);
+    CHECK_EQ(c.size(), 2);
     const auto romName = c[0];
     // Basically an assert
     const int androidVersion = std::stoi(c[1]);
@@ -688,8 +668,6 @@ DECLARE_COMMAND_HANDLER(rombuild, tgWrapper, message) {
     }
     static const auto buildRoot =
         FS::getPathForType(FS::PathType::GIT_ROOT) / "src" / "android_builder";
-    PythonClass::init();
-    PythonClass::get()->addLookupDirectory(buildRoot / "scripts");
 
     try {
         handler = std::make_shared<ROMBuildQueryHandler>(tgWrapper, message);

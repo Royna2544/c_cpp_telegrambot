@@ -101,10 +101,6 @@ struct RepoSyncTask : ForkAndRun {
      */
     void onNewStderrBuffer(ForkAndRun::BufferType& buffer) override;
 
-    void onNewStdoutBuffer(ForkAndRun::BufferType& buffer) override {
-        onNewStderrBuffer(buffer);
-    }
-
     /**
      * @brief Handles the process exit event.
      *
@@ -141,7 +137,7 @@ struct RepoSyncTask : ForkAndRun {
     RepoSyncNetworkHook networkHook;
     std::shared_ptr<TgBotApi> wrapper;
     Message::Ptr message;
-    decltype(std::chrono::system_clock::now()) clock =
+    std::chrono::system_clock::time_point clock =
         std::chrono::system_clock::now();
     bool runWithReducedJobs = false;
 };

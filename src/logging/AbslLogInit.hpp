@@ -12,3 +12,6 @@
  * @note The behavior of the TgBot library is undefined if this function is not called before using other TgBot functions.
  */
 extern void TgBot_AbslLogInit();
+
+// Deregister stdoutsink
+extern void TgBot_AbslLogDeInit();

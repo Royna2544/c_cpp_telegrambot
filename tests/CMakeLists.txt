@@ -21,7 +21,6 @@ add_my_executable(
     ConfigManagerTest.cpp
     RegexHandlerTest.cpp
     ResourceManagerTest.cpp
-    PythonClassTest.cpp
     TryParseTest.cpp
     SharedMallocTest.cpp
     ConstexprStringCatTest.cpp
@@ -35,5 +34,4 @@ add_my_executable(
     GTest::gtest
     GTest::gmock
     TgBotPPImpl
-    TgBotPython
 )
