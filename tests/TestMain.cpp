@@ -20,5 +20,3 @@ int main(int argc, char** argv) {
     int ret = RUN_ALL_TESTS();
     return ret;
 }
-
-extern "C" const char* __asan_default_options() { return "detect_leaks=0"; }
