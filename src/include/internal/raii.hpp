@@ -1,6 +1,7 @@
 #pragma once
 
 #include <sys/mman.h>
+
 #include <functional>
 #include <memory>
 #include <type_traits>
@@ -29,8 +30,10 @@ struct RAII2 {
 
     template <typename Ret>
     static auto create(Type r, const std::function<Ret(Type)> deleter) {
-        return Value(std::make_unique<Type>(r).release(),
-                     [deleter](Type *p) { deleter(*p); });
+        return Value(new Type(r), [deleter](Type *p) {
+            deleter(*p);
+            delete p;
+        });
     }
 };
 
@@ -48,7 +51,6 @@ inline auto createAutoCloser(int fd) {
 }
 
 inline auto createAutoUnmapper(void *mem, size_t size) {
-    return RAII<void *>::create<void>(mem, [size](void *mem) {
-        munmap(mem, size);
-    });
+    return RAII<void *>::create<void>(mem,
+                                      [size](void *mem) { munmap(mem, size); });
 }
