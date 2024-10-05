@@ -92,13 +92,7 @@ struct TgBotPPImpl_shared_deps_API ManagedThread {
     void reset();
     // Does this controller have a thread inside it?
     [[nodiscard]] bool isRunning() const;
-
-    template <typename T>
-    void onPreStop(prestop_function_t<T> fn) {
-        preStop = [fn](ManagedThread *thiz){
-            fn(static_cast<T*>(thiz));
-        };
-    }
+    
     ManagedThread() {
         timer_mutex.lk = std::unique_lock<std::timed_mutex>(timer_mutex.m);
     };
