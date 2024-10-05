@@ -104,7 +104,6 @@ void init<TgBotWebServer>(InitTask& task) {
         ThreadManager::getInstance()
             ->createController<ThreadManager::Usage::WEBSERVER_THREAD,
                                TgBotWebServer>(kTgBotWebServerPort);
-    server->onPreStop<TgBotWebServer>([](auto* thread) { thread->stop(); });
     server->run();
     task << InitSuccess;
 }
@@ -501,6 +500,5 @@ int main(int argc, char** argv) {
             break;
         }
     }
-    OnTerminateRegistrar::getInstance()->callCallbacks();
     return EXIT_SUCCESS;
 }

@@ -10,6 +10,7 @@ void SignalHandler::signalHandler() {
         LOG(INFO) << "Received signal...";
         kUnderSignal = true;
     }
+    OnTerminateRegistrar::getInstance()->callCallbacks();
 }
 
 DECLARE_CLASS_INST(OnTerminateRegistrar);
