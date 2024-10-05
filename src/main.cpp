@@ -104,7 +104,7 @@ void init<TgBotWebServer>(InitTask& task) {
         ThreadManager::getInstance()
             ->createController<ThreadManager::Usage::WEBSERVER_THREAD,
                                TgBotWebServer>(kTgBotWebServerPort);
-    server->setPreStopFunction([](auto* thread) { ((TgBotWebServer *)thread)->stop(); });
+    server->onPreStop<TgBotWebServer>([](auto* thread) { thread->stop(); });
     server->run();
     task << InitSuccess;
 }
