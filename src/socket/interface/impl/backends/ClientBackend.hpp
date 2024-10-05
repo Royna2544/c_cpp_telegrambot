@@ -4,8 +4,9 @@
 #include <filesystem>
 #include <memory>
 #include <optional>
+#include <TgBotSocket_Export.hpp>
 
-struct SocketClientWrapper {
+struct TgBotSocket_API SocketClientWrapper {
     explicit SocketClientWrapper(
         std::optional<std::filesystem::path> localSocketPath = std::nullopt);
     [[nodiscard]] std::shared_ptr<SocketInterfaceBase> getRawInterface() const {
