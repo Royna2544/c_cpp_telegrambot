@@ -38,6 +38,7 @@ std::string findTCL() {
             return it->path().filename().replace_extension();
         }
     }
+    LOG(INFO) << "Didn't find any tcl, but it is fine";
     // Ignore if we failed to open, this path is only valid in Android 14+
     return {};
 }
@@ -62,6 +63,7 @@ bool ROMBuildTask::runFunction() {
 
     shell << "set -e" << ForkAndRunShell::endl;
     shell << ". build/envsetup.sh" << ForkAndRunShell::endl;
+    shell << "unset USE_CCACHE" << ForkAndRunShell::endl;
     auto release = findTCL();
     if (release.empty()) {
         shell << "lunch " << findVendor() << "_" << data.device << "-";
