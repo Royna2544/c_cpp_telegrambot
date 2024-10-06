@@ -40,7 +40,7 @@ struct NodeItemType {
         value_ = value;
         return *this;
     }
-    operator T() const { 
+    operator T() const {
         if (!hasValue()) {
             throw std::invalid_argument("Value must have value to get");
         }
@@ -295,12 +295,6 @@ bool ConfigParser::Parser::merge() {
     auto devices = parseDevices();
     auto localManifests = parseLocalManifestBranch();
 
-    // Create maps for quick lookup
-    std::unordered_map<std::string, ROMBranch::Ptr> romBranchMap;
-    for (const auto& branch : romBranches) {
-        romBranchMap[branch->branch] = branch;
-    }
-
     std::unordered_map<std::string, Device::Ptr> deviceMap;
     for (const auto& device : devices) {
         deviceMap[device->codename] = device;
@@ -309,7 +303,7 @@ bool ConfigParser::Parser::merge() {
 
     // Link local manifests to ROM branches and devices
     for (const auto& localManifest : localManifests) {
-        const auto& romLookup =
+        const auto romLookup =
             std::get<LocalManifest::ROMLookup>(localManifest->rom);
 
         // Link devices to local manifest
@@ -321,15 +315,11 @@ bool ConfigParser::Parser::merge() {
                 deviceList.emplace_back(deviceIt->second);
             } else {
                 LOG(WARNING)
-                    << "Device info not found for codename: " << codename
-                    << ", create dummy";
-                if (std::ranges::any_of(deviceList,
-                                        [codename](const Device::Ptr& device) {
-                                            return device->codename == codename;
-                                        })) {
-                    LOG(WARNING) << "Already exists, skip adding device.";
-                }
-                deviceList.emplace_back(std::make_shared<Device>(codename));
+                    << "Device info not found for codename: " << codename;
+                auto obj = std::make_shared<Device>(codename);
+
+                deviceMap[codename] = obj;
+                deviceList.emplace_back(obj);
             }
         }
         std::ranges::sort(deviceList,
@@ -344,7 +334,7 @@ bool ConfigParser::Parser::merge() {
         // version
         if (romLookup.name == "*") {
             ROMBranch::Ptr firstBranch = nullptr;
-            for (const auto& [branchName, branchPtr] : romBranchMap) {
+            for (const auto& branchPtr : romBranches) {
                 if (branchPtr->androidVersion == romLookup.androidVersion) {
                     if (!firstBranch) {
                         foundRomBranch = true;
@@ -363,7 +353,7 @@ bool ConfigParser::Parser::merge() {
             }
             localManifest->rom = firstBranch;
         } else {
-            for (const auto& [branchName, branchPtr] : romBranchMap) {
+            for (const auto& branchPtr : romBranches) {
                 if (branchPtr->romInfo->name == romLookup.name &&
                     branchPtr->androidVersion == romLookup.androidVersion) {
                     localManifest->rom = branchPtr;
