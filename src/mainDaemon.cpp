@@ -10,7 +10,7 @@
 // Wrapper launcher to create a daemon process from the bot
 int main(const int argc, char** argv) {
     std::array<char, std::numeric_limits<pid_t>::digits10 + 1> kLogFile{};
-    snprintf(kLogFile.data(), sizeof(kLogFile) - 1, "log_%d", getpid());
+    snprintf(kLogFile.data(), sizeof(kLogFile) - 1, "log_%d.txt", getpid());
 
     if (argc < 2) {
         puts("A wrapper launcher to create a daemon process.");
