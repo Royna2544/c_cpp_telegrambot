@@ -88,13 +88,17 @@ bool ProtoDatabase::load(std::filesystem::path filepath) {
 
 bool ProtoDatabase::unloadDatabase() {
     if (!dbinfo.has_value()) {
+        LOG(WARNING) << "Database not loaded! Cannot unload!";
         return false;
     }
     std::fstream output(dbinfo->path.string(), std::ios::out | std::ios::binary);
     if (!output.is_open()) {
+        LOG(ERROR) << "Failed to open output file for writing: "
+                   << dbinfo->path;
         return false;
     }
     if (!dbinfo->object.SerializeToOstream(&output)) {
+        LOG(ERROR) << "Failed to serialize protobuf to output file";
         return false;
     }
     dbinfo.reset();
