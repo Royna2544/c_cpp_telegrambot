@@ -47,11 +47,31 @@
             ]
         },
         {
+            "name": "DerpFest",
+            "link": "https://github.com/DerpFest-AOSP/manifest",
+            "target": "bacon",
+            "outzip_prefix": "DerpFest",
+            "branches": [
+                {
+                    "android_version": 15,
+                    "branch": "15"
+                },
+                {
+                    "android_version": 14,
+                    "branch": "14"
+                }
+            ]
+        },
+        {
             "name": "LineageOS",
             "link": "https://github.com/LineageOS/android",
             "target": "bacon",
             "outzip_prefix": "lineage",
             "branches": [
+                {
+                    "android_version": 15,
+                    "branch": "lineage-22.0"
+                },
                 {
                     "android_version": 14,
                     "branch": "lineage-21.0"
@@ -84,6 +104,19 @@
             "name": "Royna's Playground",
             "url": "https://github.com/Roynas-Android-Playground/local_manifests/",
             "branches": [
+                {
+                    "name": "Exynos7885-fifteen",
+                    "target_rom": "*",
+                    "android_version": 15,
+                    "devices": [
+                        "a10",
+                        "a20",
+                        "a20e",
+                        "a30",
+                        "a30s",
+                        "a40"
+                    ]
+                },
                 {
                     "name": "Exynos7885-fourteen",
                     "target_rom": "*",
