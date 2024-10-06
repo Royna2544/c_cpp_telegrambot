@@ -199,9 +199,10 @@ class ROMBuildQueryHandler
     // Handle type selection button
     void handle_type(const Query& query);
 
-#define DECLARE_BUTTON_HANDLER(name, key) \
-    ButtonHandler{name, #key,             \
-                  [this](const Query& query) { handle_##key(query); }}
+#define DECLARE_BUTTON_HANDLER(name, key)                               \
+    ButtonHandler {                                                     \
+        name, #key, [this](const Query& query) { handle_##key(query); } \
+    }
 #define DECLARE_BUTTON_HANDLER_WITHPREFIX(name, key, prefix)             \
     ButtonHandler {                                                      \
         name, #key, [this](const Query& query) { handle_##key(query); }, \
@@ -258,7 +259,8 @@ class TaskWrapperBase {
         do {
             bool execRes = impl.execute();
             if (!execRes || result.value == PerBuildData::Result::NONE) {
-                LOG(ERROR) << "Failed to exec";
+                LOG(ERROR) << "The process failed to execute or it didn't "
+                              "update result";
                 onExecuteFailed();
                 return false;
             }
@@ -274,7 +276,7 @@ class TaskWrapperBase {
         : queryHandler(std::move(handler)),
           data(data),
           api(api),
-          userMessage(message) {
+          userMessage(std::move(message)) {
         this->data.result = &result;
         backKeyboard =
             KeyboardBuilder()
@@ -295,7 +297,9 @@ class TaskWrapperBase {
      * handle any necessary error handling or recovery.
      */
     virtual void onExecuteFailed() {
-        api->editMessage(sentMessage, "Failed to execute");
+        api->editMessage(
+            sentMessage,
+            "The process failed to execute or it didn't update result");
     }
 
     /**
@@ -377,7 +381,8 @@ class Build : public TaskWrapperBase<ROMBuildTask> {
                 api->editMessage(sentMessage, "Build completed successfully");
                 break;
             case PerBuildData::Result::NONE:
-                // To reach here, only if the subprocess was killed, is this value possible.
+                // To reach here, only if the subprocess was killed, is this
+                // value possible.
                 api->editMessage(sentMessage, "FATAL ERROR");
                 break;
             case PerBuildData::Result::ERROR_NONFATAL:

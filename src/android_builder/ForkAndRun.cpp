@@ -44,7 +44,7 @@ bool ForkAndRun::execute() {
         FDLogSink sink;
         TgBot_AbslLogDeInit();
         absl::AddLogSink(&sink);
-    
+
         dup2(stdout_pipe.writeEnd(), STDOUT_FILENO);
         dup2(stderr_pipe.writeEnd(), STDERR_FILENO);
         close(stdout_pipe.readEnd());
@@ -261,21 +261,23 @@ bool ForkAndRunShell::open() {
         opened = true;
         terminate_watcher_thread = std::thread([this] {
             int status = 0;
-            while (true) {
-                {
-                    std::shared_lock<std::shared_mutex> pidLk(pid_mutex_);
-                    if (waitpid(shell_pid_, &status, 0) < 0) {
-                        PLOG(ERROR) << "Failed to wait for shell";
-                        break;
-                    }
+            {
+                std::shared_lock<std::shared_mutex> pidLk(pid_mutex_);
+                if (shell_pid_ < 0) {
+                    LOG(INFO) << "shell_pid is negative";
+                    return;
                 }
-                // Promote to unique
-                {
-                    std::unique_lock<std::shared_mutex> lock(pid_mutex_);
-                    shell_pid_ = -1;
+                if (waitpid(shell_pid_, &status, 0) < 0) {
+                    PLOG(ERROR) << "Failed to wait for shell";
+                    return;
                 }
-                result = DeferredExit{status};
             }
+            // Promote to unique
+            {
+                std::unique_lock<std::shared_mutex> lock(pid_mutex_);
+                shell_pid_ = -1;
+            }
+            result = DeferredExit{status};
         });
     }
     return true;
@@ -310,7 +312,7 @@ DeferredExit ForkAndRunShell::close() {
         return DeferredExit::generic_fail;
     }
     {
-        const std::unique_lock<std::shared_mutex> lock(pid_mutex_);
+        const std::shared_lock<std::shared_mutex> lock(pid_mutex_);
         if (shell_pid_ >= 0) {
             do_wait = true;
         }
