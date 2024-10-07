@@ -84,7 +84,9 @@ struct alignas(ALIGNMENT) PacketHeader {
     uint64_t checksum{};
     ///< Padding to ensure struct size is a multiple of 8 bytes
     [[maybe_unused]] uint32_t padding2{};
+
 };
+static_assert(offsetof(TgBotSocket::PacketHeader, magic) == 0);
 
 /**
  * @brief Packet for sending commands to the server

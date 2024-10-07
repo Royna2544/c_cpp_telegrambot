@@ -14,27 +14,40 @@ std::optional<Packet> readPacket(
     const std::shared_ptr<SocketInterfaceBase>& interface,
     const SocketConnContext& context) {
     TgBotSocket::PacketHeader header;
+    decltype(header.magic) magic{};
 
+    // Read header and check magic value, despite the header size, the magic was
+    // always the first element of the struct.
+    const auto magicData = interface->readFromSocket(context, sizeof(magic));
+    if (!magicData) {
+        LOG(ERROR) << "While reading magic, failed";
+        return std::nullopt;
+    }
+
+    const auto diff = magic - TgBotSocket::PacketHeader::MAGIC_VALUE_BASE;
+    if (diff != TgBotSocket::PacketHeader::DATA_VERSION) {
+        LOG(WARNING) << "Invalid magic value, dropping buffer";
+        constexpr int reasonable_datadiff = 5;
+        if (diff >= 0 && diff < TgBotSocket::PacketHeader::DATA_VERSION +
+                                    reasonable_datadiff) {
+            LOG(INFO) << "This packet contains header data version " << diff
+                      << ", but we have version "
+                      << TgBotSocket::PacketHeader::DATA_VERSION;
+        } else {
+            LOG(INFO) << "This is probably not a valid packet";
+        }
+        return std::nullopt;
+    }
+
+    // Read rest of the packet header.
     const auto headerData =
-        interface->readFromSocket(context, sizeof(TgBotSocket::PacketHeader));
+        interface->readFromSocket(context, sizeof(TgBotSocket::PacketHeader) - sizeof(magic));
     if (!headerData) {
         LOG(ERROR) << "While reading header, failed";
         return std::nullopt;
     }
     headerData->assignTo(header);
-
-    const auto diff =
-        header.magic - TgBotSocket::PacketHeader::MAGIC_VALUE_BASE;
-    if (diff != TgBotSocket::PacketHeader::DATA_VERSION) {
-        LOG(WARNING) << "Invalid magic value, dropping buffer";
-        constexpr int reasonable_datadiff = 5;
-        if (diff >= 0 && diff < TgBotSocket::PacketHeader::DATA_VERSION + reasonable_datadiff) {
-            LOG(INFO) << "This packet contains header data version " << diff
-                      << ", but we have version "
-                      << TgBotSocket::PacketHeader::DATA_VERSION;
-        }
-        return std::nullopt;
-    }
+    header.magic = magic;
 
     using namespace TgBotSocket::CommandHelpers;
     if (isClientCommand(header.cmd)) {
