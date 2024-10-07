@@ -369,8 +369,8 @@ struct MediaIds {
 // Helper to remove duplicate overloads for ChatId and MessageTypes
 struct ChatIds {
     ChatIds(ChatId id) : _id(id) {}
-    ChatIds(MessagePtr message) : _id(message->chat->id) {}
-    ChatIds(Message::Ptr message) : _id(message->chat->id) {}
+    ChatIds(const MessagePtr& message) : _id(message->chat->id) {}
+    ChatIds(const Message::Ptr& message) : _id(message->chat->id) {}
     operator ChatId() const { return _id; }
     ChatId _id;
 };
