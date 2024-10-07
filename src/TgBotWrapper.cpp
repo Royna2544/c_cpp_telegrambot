@@ -2,8 +2,8 @@
 #include <absl/strings/str_split.h>
 #include <absl/strings/strip.h>
 #include <dlfcn.h>
-#include <fmt/core.h>
 #include <fmt/format.h>
+#include <fmt/ranges.h>
 
 #include <Random.hpp>
 #include <StringResManager.hpp>
