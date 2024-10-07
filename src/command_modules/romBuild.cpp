@@ -103,8 +103,8 @@ class ROMBuildQueryHandler
     };
     PerBuildData per_build;
     Message::Ptr sentMessage;
-    Message::Ptr userMessage;
-    std::shared_ptr<TgBotApi> api;
+    Message::Ptr _userMessage;
+    std::shared_ptr<TgBotApi> _api;
     using KeyboardType = TgBot::InlineKeyboardMarkup::Ptr;
 
     struct {
@@ -478,10 +478,10 @@ class CwdRestorer {
 
 ROMBuildQueryHandler::ROMBuildQueryHandler(std::shared_ptr<TgBotApi> api,
                                            MessagePtr userMessage)
-    : api(std::move(api)),
+    : _api(std::move(api)),
       parser(FS::getPathForType(FS::PathType::GIT_ROOT) / "src" /
              "command_modules" / "android_builder" / "configs"),
-      userMessage(std::move(userMessage)) {
+      _userMessage(std::move(userMessage)) {
     settingsKeyboard =
         createKeyboardWith<Buttons::repo_sync, Buttons::upload,
                            Buttons::pin_message, Buttons::back>();
@@ -490,11 +490,11 @@ ROMBuildQueryHandler::ROMBuildQueryHandler(std::shared_ptr<TgBotApi> api,
                            Buttons::settings, Buttons::cancel>(2);
     backKeyboard = createKeyboardWith<Buttons::back>();
     sentMessage =
-        this->api->sendMessage(userMessage, "Will build ROM...", mainKeyboard);
+        _api->sendMessage(_userMessage, "Will build ROM...", mainKeyboard);
 }
 
 ROMBuildQueryHandler::~ROMBuildQueryHandler() {
-    api->deleteMessage(sentMessage);
+    _api->deleteMessage(sentMessage);
 }
 
 void ROMBuildQueryHandler::updateSentMessage(Message::Ptr message) {
@@ -509,46 +509,46 @@ std::string keyToString(const std::string& key, const bool enabled) {
 
 void ROMBuildQueryHandler::handle_repo_sync(const Query& query) {
     do_repo_sync = !do_repo_sync;
-    (void)api->answerCallbackQuery(query->id,
-                                   keyToString("Repo sync", do_repo_sync));
+    (void)_api->answerCallbackQuery(query->id,
+                                    keyToString("Repo sync", do_repo_sync));
 }
 
 void ROMBuildQueryHandler::handle_upload(const Query& query) {
     do_upload = !do_upload;
-    (void)api->answerCallbackQuery(query->id,
-                                   keyToString("Uploading", do_upload));
+    (void)_api->answerCallbackQuery(query->id,
+                                    keyToString("Uploading", do_upload));
 }
 
 void ROMBuildQueryHandler::handle_pin_message(const Query& query) {
-    (void)api->answerCallbackQuery(query->id, "Trying to pin this message...");
+    (void)_api->answerCallbackQuery(query->id, "Trying to pin this message...");
     try {
-        api->pinMessage(sentMessage);
+        _api->pinMessage(sentMessage);
     } catch (const TgBot::TgException& e) {
         LOG(ERROR) << "Failed to pin message: " << e.what();
-        (void)api->answerCallbackQuery(query->id, "Failed to pin message");
+        (void)_api->answerCallbackQuery(query->id, "Failed to pin message");
         return;
     }
-    (void)api->answerCallbackQuery(query->id, "Pinned message");
+    (void)_api->answerCallbackQuery(query->id, "Pinned message");
 }
 
 void ROMBuildQueryHandler::handle_back(const Query& /*query*/) {
-    api->editMessage(sentMessage, "Will build ROM", mainKeyboard);
+    _api->editMessage(sentMessage, "Will build ROM", mainKeyboard);
     per_build.reset();
 }
 
 void ROMBuildQueryHandler::handle_cancel(const Query& /*query*/) {
-    api->deleteMessage(sentMessage);
+    _api->deleteMessage(sentMessage);
     sentMessage.reset();
 }
 
 void ROMBuildQueryHandler::handle_send_system_info(const Query& query) {
     std::stringstream ss;
     ss << SystemSummary();
-    api->editMessage(sentMessage, ss.str(), backKeyboard);
+    _api->editMessage(sentMessage, ss.str(), backKeyboard);
 }
 
 void ROMBuildQueryHandler::handle_settings(const Query& /*query*/) {
-    api->editMessage(sentMessage, "Settings", settingsKeyboard);
+    _api->editMessage(sentMessage, "Settings", settingsKeyboard);
 }
 
 void ROMBuildQueryHandler::handle_build(const Query& query) {
@@ -564,37 +564,37 @@ void ROMBuildQueryHandler::handle_build(const Query& query) {
         });
     builder.addKeyboard(buttons);
     builder.addKeyboard(getButtonOf<Buttons::back>());
-    api->editMessage(sentMessage, "Select device...", builder.get());
+    _api->editMessage(sentMessage, "Select device...", builder.get());
 }
 
 void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     constexpr static std::string_view kBuildDirectory = "rom_build/";
-    api->editMessage(sentMessage, "Building...");
+    _api->editMessage(sentMessage, "Building...");
     std::error_code ec;
     CwdRestorer cwd(std::filesystem::current_path(ec) / kBuildDirectory);
 
     if (ec) {
-        api->editMessage(sentMessage, "Failed to determine cwd directory");
+        _api->editMessage(sentMessage, "Failed to determine cwd directory");
         return;
     }
     if (!cwd) {
-        api->editMessage(sentMessage, "Failed to push cwd");
+        _api->editMessage(sentMessage, "Failed to push cwd");
         return;
     }
     if (do_repo_sync) {
-        RepoSync repoSync(shared_from_this(), per_build, api, userMessage);
+        RepoSync repoSync(shared_from_this(), per_build, _api, _userMessage);
         if (!repoSync.execute()) {
             LOG(INFO) << "RepoSync::execute fails...";
             return;
         }
     }
-    Build build(shared_from_this(), per_build, api, userMessage);
+    Build build(shared_from_this(), per_build, _api, _userMessage);
     if (!build.execute()) {
         LOG(INFO) << "Build::execute fails...";
         return;
     }
     if (do_upload) {
-        Upload upload(shared_from_this(), per_build, api, userMessage);
+        Upload upload(shared_from_this(), per_build, _api, _userMessage);
         if (!upload.execute()) {
             LOG(INFO) << "Upload::execute fails...";
             return;
@@ -613,7 +613,7 @@ void ROMBuildQueryHandler::handle_device(const Query& query) {
                                            roms->androidVersion)});
     }
     builder.addKeyboard(getButtonOf<Buttons::back>());
-    api->editMessage(sentMessage, "Select ROM...", builder.get());
+    _api->editMessage(sentMessage, "Select ROM...", builder.get());
 }
 
 void ROMBuildQueryHandler::handle_rom(const Query& query) {
@@ -633,7 +633,7 @@ void ROMBuildQueryHandler::handle_rom(const Query& query) {
     builder.addKeyboard({{"User build", "type_user"},
                          {"Userdebug build", "type_userdebug"},
                          {"Eng build", "type_eng"}});
-    api->editMessage(sentMessage, "Select build variant...", builder.get());
+    _api->editMessage(sentMessage, "Select build variant...", builder.get());
 }
 
 void ROMBuildQueryHandler::handle_type(const Query& query) {
@@ -652,8 +652,8 @@ void ROMBuildQueryHandler::handle_type(const Query& query) {
         "Build variant: {}\nDevice: {}\nRom: {}\nAndroid version: {}", type,
         per_build.device, rom->romInfo->name, rom->androidVersion);
 
-    api->editMessage(sentMessage, confirm,
-                     createKeyboardWith<Buttons::confirm, Buttons::back>());
+    _api->editMessage(sentMessage, confirm,
+                      createKeyboardWith<Buttons::confirm, Buttons::back>());
 }
 
 void ROMBuildQueryHandler::onCallbackQuery(
@@ -661,8 +661,8 @@ void ROMBuildQueryHandler::onCallbackQuery(
     if (sentMessage == nullptr) {
         return;
     }
-    if (query->from->id != userMessage->from->id) {
-        api->answerCallbackQuery(
+    if (query->from->id != _userMessage->from->id) {
+        _api->answerCallbackQuery(
             query->id,
             "Sorry son, you are not allowed to touch this keyboard.");
         return;
