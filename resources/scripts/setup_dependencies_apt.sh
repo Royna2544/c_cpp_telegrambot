@@ -2,7 +2,7 @@
 
 APT_COMMAND="apt update; apt install libcurl4-openssl-dev libssl-dev libboost-all-dev \
     cmake clang ninja-build cargo libpng-dev libwebp-dev \
-    libjpeg-dev libopencv-dev libgit2-dev libgtest-dev libgmock-dev libjsoncpp-dev"
+    libjpeg-dev libopencv-dev libgit2-dev libgtest-dev libgmock-dev libjsoncpp-dev libfmt-dev"
 
 function lecho () {
     echo "$0: $1"

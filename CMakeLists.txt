@@ -30,7 +30,8 @@ string(TIMESTAMP TODAY "%Y-%m-%d")
 configure_file(resources/about.html.in ${CMAKE_SOURCE_DIR}/resources/about.html)
 #####################################################################
 
-################## Add a common logging init lib ####################
+################## Declare common macros ####################
+find_package(fmt REQUIRED)
 function(add_my_library)
   cmake_parse_arguments(TGBOT_LIBRARY
     "NO_LIBPREFIX;STATIC" # Options
@@ -57,7 +58,7 @@ function(add_my_library)
     ${EXPORTCONF_DIR}${TGBOT_LIBRARY_NAME}Exports.h)
   target_include_directories(${TGBOT_LIBRARY_NAME} PUBLIC ${TGBOT_LIBRARY_PUBLIC_INC} ${EXPORTCONF_DIR})
   target_include_directories(${TGBOT_LIBRARY_NAME} PRIVATE ${TGBOT_LIBRARY_PRIVATE_INC})
-  target_link_libraries(${TGBOT_LIBRARY_NAME} absl::log absl::check ${TGBOT_LIBRARY_LIBS})
+  target_link_libraries(${TGBOT_LIBRARY_NAME} absl::log absl::check fmt::fmt ${TGBOT_LIBRARY_LIBS})
   if (WIN32)
     target_link_libraries(${TGBOT_LIBRARY_NAME} ${TGBOT_LIBRARY_LIBS_WIN32})
   endif()
@@ -172,7 +173,6 @@ set(SRC_LIST
 #####################################################################
 
 ######################## Define SQLite3 target ######################
-add_subdirectory(src/android_builder)
 add_subdirectory(src/database)
 add_subdirectory(src/random)
 add_subdirectory(src/command_modules)

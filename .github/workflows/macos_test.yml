@@ -19,7 +19,7 @@ jobs:
         # https://github.com/Homebrew/homebrew-core/issues/169820#issuecomment-2080459578
       - name: Set up dependencies
         run: |
-          brew install boost ninja gcc webp libpng libgit2 googletest jsoncpp openssl
+          brew install boost ninja gcc webp libpng libgit2 googletest jsoncpp openssl fmt
           git submodule update --init
 
       - name: Compile with Apple GCC

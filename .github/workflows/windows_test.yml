@@ -50,6 +50,7 @@ jobs:
           opencv:p
           libgit2:p
           gtest:p
+          fmt:p
 
     - name: 'Setup submodule'
       run: |
