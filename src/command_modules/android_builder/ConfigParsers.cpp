@@ -466,7 +466,7 @@ ConfigParser::LocalManifest::Ptr ConfigParser::getLocalManifest(
     for (const auto& manifest : parsedManifests) {
         const auto& rom = getValue(manifest->rom);
         const auto& deviceList = getValue(manifest->devices);
-        if (rom == romBranch &&
+        if (*rom == *romBranch &&
             std::ranges::any_of(
                 deviceList, [&device](const auto& d) { return d == device; })) {
             return manifest;

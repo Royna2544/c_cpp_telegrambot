@@ -20,6 +20,8 @@ class ConfigParser {
         std::string url;             // URL of the ROM repo
         std::string target;          // build target to build a ROM
         std::string prefixOfOutput;  // prefix of output zip file
+
+        bool operator==(const ROMInfo &other) const = default;
     };
 
     struct ROMBranch {
@@ -37,6 +39,12 @@ class ConfigParser {
             }
             return romInfo->name + " (Android " +
                    std::to_string(androidVersion) + ")";
+        }
+
+        bool operator==(const ROMBranch &other) const {
+            return branch == other.branch &&
+                   androidVersion == other.androidVersion &&
+                   *romInfo == *other.romInfo;
         }
     };
 
@@ -192,7 +200,8 @@ template <typename Variant>
     return std::get<VALUE_INDEX>(std::forward<Variant>(variant));
 }
 
-inline std::ostream& operator<<(std::ostream& os, const PerBuildData::Variant& variant) {
+inline std::ostream &operator<<(std::ostream &os,
+                                const PerBuildData::Variant &variant) {
     switch (variant) {
         case PerBuildData::Variant::kUser:
             return os << "User";
