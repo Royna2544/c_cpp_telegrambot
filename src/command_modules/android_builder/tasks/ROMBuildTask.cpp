@@ -4,6 +4,7 @@
 #include <fmt/core.h>
 
 #include <SystemInfo.hpp>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -153,15 +154,17 @@ void ROMBuildTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
                 type = "eng";
                 break;
         }
+        auto roundedTime =
+            std::chrono::duration_cast<std::chrono::seconds>(now - startTime);
         buildInfoBuffer << fmt::format(
             "Start time: {}\n"
-            "Time spent: {}\n"
+            "Time spent: {:%H hours %M minutes %S seconds}\n"
             "Last updated on: {}\n"
             "Target ROM: {}, branch: {}, device: {}\n"
             "Job count: {}\n"
-            "Memory usage: {}%\n"
-            "Build variant: {}",
-            startTime, now - startTime, now, rom->romInfo->name, rom->branch,
+            "Memory usage: {:.2f}%\n"
+            "Build variant: {}\n\n",
+            startTime, roundedTime, now, rom->romInfo->name, rom->branch,
             data.device, guessJobCount(), MemoryInfo().usage().value, type);
         buildInfoBuffer << buffer.data();
         botWrapper->editMessage(message, buildInfoBuffer.str());
