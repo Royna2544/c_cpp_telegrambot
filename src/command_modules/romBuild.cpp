@@ -628,6 +628,10 @@ void ROMBuildQueryHandler::handle_rom(const Query& query) {
     lookup.rom = parser.getROMBranches(romName, androidVersion);
     per_build.localManifest =
         parser.getLocalManifest(lookup.rom, lookup.device);
+    if (!per_build.localManifest) {
+        LOG(ERROR) << "Failed to get local manifest";
+        return;
+    }
 
     KeyboardBuilder builder;
     builder.addKeyboard({{"User build", "type_user"},
