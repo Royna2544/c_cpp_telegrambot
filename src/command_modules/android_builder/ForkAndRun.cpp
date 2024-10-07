@@ -4,12 +4,14 @@
 #include <absl/log/log_sink_registry.h>
 #include <absl/strings/ascii.h>
 #include <fcntl.h>
+#include <fmt/core.h>
 #include <internal/_FileDescriptor_posix.h>
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
+#include <AbslLogInit.hpp>
 #include <Random.hpp>
 #include <csignal>
 #include <cstdlib>
@@ -21,12 +23,9 @@
 #include <mutex>
 #include <shared_mutex>
 #include <string_view>
-#include <system_error>
 #include <thread>
 #include <utility>
 #include <vector>
-
-#include "AbslLogInit.hpp"
 
 bool ForkAndRun::execute() {
     Pipe stdout_pipe{};
@@ -177,6 +176,21 @@ DeferredExit::~DeferredExit() {
     if (*this) {
         DLOG(INFO) << "Skip the deferred exit";
         return;
+    } else {
+        std::string_view typeStr;
+        switch (type) {
+            case Type::EXIT:
+                typeStr = "EXIT";
+                break;
+            case Type::SIGNAL:
+                typeStr = "SIGNAL";
+                break;
+            case Type::UNKNOWN:
+                typeStr = "UNKNOWN";
+                break;
+        };
+        DLOG(INFO) << fmt::format("I am a bomb, I contain code {} and type {}",
+                                  code, typeStr);
     }
     switch (type) {
         case Type::EXIT:
@@ -186,7 +200,7 @@ DeferredExit::~DeferredExit() {
             kill(0, code);
             break;
         case Type::UNKNOWN:
-            LOG(WARNING) << "Deferred exit: unknown type. BYdef-exit1";
+            LOG(WARNING) << "Deferred exit: unknown type. Take default action: exit 1";
             _exit(EXIT_FAILURE);
             break;
     }

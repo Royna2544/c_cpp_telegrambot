@@ -2,10 +2,10 @@
 
 #include <absl/log/log.h>
 #include <fcntl.h>
+#include <fmt/core.h>
 #include <sys/mman.h>
 
 #include <internal/raii.hpp>
-
 
 AllocatedShmem::AllocatedShmem(const std::string_view& path, off_t size) {
     void* ptr = nullptr;
@@ -24,8 +24,8 @@ AllocatedShmem::AllocatedShmem(const std::string_view& path, off_t size) {
         PLOG(ERROR) << "mmap failed";
         throw syscall_perror("mmap");
     }
-    DLOG(INFO) << "Shmem created with path: " << path.data()
-               << " size: " << size << " bytes";
+    DLOG(INFO) << fmt::format("Shmem created with path: {} size: {} bytes",
+                              path.data(), size);
     this->path = path;
     this->size = size;
     this->memory = ptr;

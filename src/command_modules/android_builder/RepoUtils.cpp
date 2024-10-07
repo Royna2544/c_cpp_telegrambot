@@ -3,69 +3,30 @@
 #include <absl/log/log.h>
 #include <absl/strings/str_replace.h>
 #include <absl/strings/str_split.h>
+#include <fmt/core.h>
 #include <git2.h>
-#include <git2/types.h>
 #include <internal/_class_helper_macros.h>
 
 #include <internal/raii.hpp>
-#include <map>
 #include <memory>
-#include <string_view>
 #include <type_traits>
 
-#include "CompileTimeStringConcat.hpp"
 #include "ForkAndRun.hpp"
 
-template <typename T>
-concept hasToString = requires(T t) { std::to_string(t); };
-template <typename T>
-concept convertableToString = requires(T t) { std::string(t); };
-
-template <typename T>
-std::string toString(const T& value) = delete;
-
-template <typename T>
-    requires hasToString<T>
-std::string toString(const T& value) {
-    return std::to_string(value);
-}
-template <typename T>
-    requires convertableToString<T>
-std::string toString(const T& value) {
-    return std::string(value);
-}
-
-template <typename... Args>
-std::vector<std::string> createArgs(
-    const std::string_view& format,
-    std::pair<std::string_view, Args>&&... args) {
-    std::map<std::string_view, std::string> replacements;
-    ((replacements[args.first] = toString(args.second)), ...);
-    auto newStr = absl::StrReplaceAll(format, replacements);
-    DLOG(INFO) << "Crafted command line: " << newStr;
-    return absl::StrSplit(newStr, ' ', absl::SkipWhitespace());
-}
-
-constexpr std::string_view url_key = "{url}";
-constexpr std::string_view branch_key = "{branch}";
-constexpr std::string_view jobs_key = "{jobs}";
-constexpr std::string_view repoInitArgs =
-    "repo init -u {url} -b {branch} --git-lfs --depth=1";
-constexpr std::string_view repoSyncArgs =
-    "repo sync -c -j{jobs} --force-sync --no-clone-bundle --no-tags "
-    "--force-remove-dirty";
-
 void RepoUtils::repo_init(const RepoInfo& options) {
-    auto args = createArgs(repoInitArgs, std::make_pair(url_key, options.url),
-                           std::make_pair(branch_key, options.branch));
-    ForkAndRunSimple simple(args);
+    const auto args = fmt::format("repo init -u {} -b {} --git-lfs --depth={}",
+                                  options.url, options.branch, 1);
+    ForkAndRunSimple simple(absl::StrSplit(args, ' '));
     const auto ret = simple();
     LOG(INFO) << "Repo init result: " << ret;
 }
 
 void RepoUtils::repo_sync(const long job_count) {
-    auto args = createArgs(repoSyncArgs, std::make_pair(jobs_key, job_count));
-    ForkAndRunSimple simple(args);
+    const auto args = fmt::format(
+        "repo sync -c -j{} --force-sync --no-clone-bundle --no-tags "
+        "--force-remove-dirty",
+        job_count);
+    ForkAndRunSimple simple(absl::StrSplit(args, ' '));
     const auto ret = simple();
     LOG(INFO) << "Repo sync result: " << ret;
 }

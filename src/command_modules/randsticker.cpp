@@ -1,6 +1,7 @@
+#include <fmt/core.h>
+
 #include <Random.hpp>
 #include <TgBotWrapper.hpp>
-#include "tgbot/TgException.h"
 
 using TgBot::StickerSet;
 
@@ -13,7 +14,6 @@ DECLARE_COMMAND_HANDLER(randsticker, wrapper, message) {
     auto sticker = message->replyToMessage->sticker;
     Random::ret_type pos{};
     StickerSet::Ptr stickset;
-    std::stringstream ss;
     try {
         stickset = wrapper->getStickerSet(sticker->setName);
     } catch (const TgBot::TgException& e) {
@@ -23,10 +23,10 @@ DECLARE_COMMAND_HANDLER(randsticker, wrapper, message) {
     pos = Random::getInstance()->generate(stickset->stickers.size() - 1);
     wrapper->sendSticker(message, MediaIds(stickset->stickers[pos]));
 
-    ss << "Sticker idx: " << pos + 1
-       << " emoji: " << stickset->stickers[pos]->emoji << std::endl
-       << "From pack " << std::quoted(stickset->title);
-    wrapper->sendMessage(message, ss.str());
+    const auto arg =
+        fmt::format("Sticker idx: {} emoji: {}\nFrom pack: \"{}\"", pos + 1,
+                    stickset->stickers[pos]->emoji, stickset->title);
+    wrapper->sendMessage(message, arg);
 }
 
 DYN_COMMAND_FN(n, module) {

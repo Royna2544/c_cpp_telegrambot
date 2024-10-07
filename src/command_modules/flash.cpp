@@ -7,6 +7,7 @@
 #include <optional>
 #include <regex>
 #include <thread>
+#include <fmt/core.h>
 
 #include "ResourceManager.h"
 
@@ -50,15 +51,14 @@ DECLARE_COMMAND_HANDLER(flash, botWrapper, message) {
     if (!absl::EndsWith(msg.value(), kZipExtensionSuffix.data())) {
         msg.value() += kZipExtensionSuffix;
     }
-    ss << "Flashing " << std::quoted(msg.value()) << "..." << std::endl;
+    ss << fmt::format("Flashing {}...", msg.value());
     sentmsg = botWrapper->sendReplyMessage(message, ss.str());
 
     std::this_thread::sleep_for(std::chrono::seconds(sleep_secs));
     if (pos != reasons.size()) {
-        ss << "Failed successfully!" << std::endl;
-        ss << "Reason: " << reasons[pos];
+        ss << fmt::format("Failed successfully!\nReason: {}", reasons[pos]);
     } else {
-        ss << "Success! Chance was 1/" << reasons.size();
+        ss << fmt::format("Success! Chance was 1/{}", reasons.size());
     }
     botWrapper->editMessage(sentmsg, ss.str());
 }

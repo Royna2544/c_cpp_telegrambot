@@ -1,4 +1,4 @@
-#include <internal/_std_chrono_templates.h>
+#include <fmt/chrono.h>
 
 #include <ManagedThreads.hpp>
 #include <memory>
@@ -11,8 +11,8 @@ struct TimerImplThread : TimerThread {
         message = botwrapper->sendMessage(chatid, "Timer started");
     }
     void onTimerPoint(const std::chrono::seconds &timeLeft) override {
-        message = botwrapper->editMessage(message,
-                                          "Time left: " + to_string(timeLeft));
+        message = botwrapper->editMessage(
+            message, fmt::format("Time left: {}", timeLeft));
     }
     void onTimerEnd() override {
         message = botwrapper->editMessage(message, "Timer ended");

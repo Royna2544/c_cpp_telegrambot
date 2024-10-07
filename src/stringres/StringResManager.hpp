@@ -9,8 +9,6 @@
 
 // Shorthand macro for getting a string
 #define GETSTR(x) StringResManager::getInstance()->getString(STRINGRES_##x)
-#define GETSTR_IS(x) GETSTR(x) + ": "
-#define GETSTR_BRACE(x) "(" + GETSTR(x) + ")"
 
 // Implementation of StringResManager (Proxy class)
 struct TgBotStringResManager_API StringResManager

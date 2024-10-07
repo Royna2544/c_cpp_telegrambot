@@ -24,7 +24,7 @@ DECLARE_COMMAND_HANDLER(possibility, botWrapper, message) {
     }
     text = message->get<MessageExt::Attrs::ExtraText>();
     // Split string by newline
-    set = absl::StrSplit(text, '\n');
+    set = absl::StrSplit(text, '\n', absl::SkipWhitespace());
     // Pre-reserve memory
     kItemAndPercentMap.reserve(set.size());
     // Can't get possitibities for 1 element
@@ -34,9 +34,6 @@ DECLARE_COMMAND_HANDLER(possibility, botWrapper, message) {
     }
     // Put it in vector again and shuffle it.
     vec = {set.begin(), set.end()};
-    auto [start, end] = std::ranges::remove_if(
-        vec, [](auto &&e) { return !isEmptyOrBlank(e); });
-    vec = {start, end};
     // Shuffle the vector.
     Random::getInstance()->shuffleArray(vec);
     // Start the output stream

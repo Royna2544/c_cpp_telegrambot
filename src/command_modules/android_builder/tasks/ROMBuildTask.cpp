@@ -1,5 +1,8 @@
 #include "ROMBuildTask.hpp"
 
+#include <fmt/chrono.h>
+#include <fmt/core.h>
+
 #include <SystemInfo.hpp>
 #include <filesystem>
 #include <fstream>
@@ -138,29 +141,28 @@ void ROMBuildTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
     double memUsage = NAN;
     if (clock + std::chrono::minutes(1) < now) {
         clock = now;
-        buildInfoBuffer << "Start time: " << fromTP(startTime) << std::endl;
-        buildInfoBuffer << "Time spent: " << to_string(now - startTime)
-                        << std::endl;
-        buildInfoBuffer << "Last updated on: " << fromTP(now) << std::endl;
-        buildInfoBuffer << "Target ROM: " << rom->romInfo->name
-                        << ", branch: " << rom->branch << std::endl;
-        buildInfoBuffer << "Target device: " << data.device << std::endl;
-        buildInfoBuffer << "Job count: " << guessJobCount();
-        buildInfoBuffer << ", memory usage: " << MemoryInfo().usage();
-        buildInfoBuffer << std::endl;
-        buildInfoBuffer << "Variant: ";
+        std::string_view type;
         switch (data.variant) {
             case PerBuildData::Variant::kUser:
-                buildInfoBuffer << "user";
+                type = "user";
                 break;
             case PerBuildData::Variant::kUserDebug:
-                buildInfoBuffer << "userdebug";
+                type = "userdebug";
                 break;
             case PerBuildData::Variant::kEng:
-                buildInfoBuffer << "eng";
+                type = "eng";
                 break;
         }
-        buildInfoBuffer << std::endl << std::endl;
+        buildInfoBuffer << fmt::format(
+            "Start time: {}\n"
+            "Time spent: {}\n"
+            "Last updated on: {}\n"
+            "Target ROM: {}, branch: {}, device: {}\n"
+            "Job count: {}\n"
+            "Memory usage: {}%\n"
+            "Build variant: {}",
+            startTime, now - startTime, now, rom->romInfo->name, rom->branch,
+            data.device, guessJobCount(), MemoryInfo().usage().value, type);
         buildInfoBuffer << buffer.data();
         botWrapper->editMessage(message, buildInfoBuffer.str());
     }

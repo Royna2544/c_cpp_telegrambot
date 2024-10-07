@@ -2,6 +2,8 @@
 #include <absl/strings/str_split.h>
 #include <absl/strings/strip.h>
 #include <dlfcn.h>
+#include <fmt/core.h>
+#include <fmt/format.h>
 
 #include <Random.hpp>
 #include <StringResManager.hpp>
@@ -11,6 +13,7 @@
 #include <filesystem>
 #include <fstream>
 #include <future>
+#include <iterator>
 #include <libos/OnTerminateRegistrar.hpp>
 #include <libos/libsighandler.hpp>
 #include <memory>
@@ -135,14 +138,15 @@ bool CommandModule::load() {
 
     DLWrapper dlwrapper(filePath);
     if (dlwrapper == nullptr) {
-        LOG(WARNING) << "dlopen failed for " << filePath.filename() << ": "
-                     << DLWrapper::error();
+        LOG(WARNING) << fmt::format("dlopen failed for {}: {}",
+                                    filePath.filename().string(),
+                                    DLWrapper::error());
         return false;
     }
     sym = dlwrapper.sym<loadcmd_function_cstyle_t>(DYN_COMMAND_SYM_STR);
     if (sym == nullptr) {
-        LOG(WARNING) << "Failed to lookup symbol '" DYN_COMMAND_SYM_STR "' in "
-                     << filePath;
+        LOG(WARNING) << fmt::format("Failed to lookup symbol '{}' in {}",
+                                    DYN_COMMAND_SYM_STR, filePath.string());
         return false;
     }
 
@@ -163,9 +167,9 @@ bool CommandModule::load() {
                      << DLWrapper::error();
     }
 
-    DLOG(INFO) << "Loaded RT command module from " << filePath.filename();
-    DLOG(INFO) << "Module dump: { enforced: " << isEnforced()
-               << ", name: " << command << ", fn: " << fnptr << " }";
+    DLOG(INFO) << fmt::format("Module {}: enforced: {}, name: {}, fn: {}",
+                              filePath.filename().string(), isEnforced(),
+                              command, fmt::ptr(fnptr));
 #endif
     handle = std::move(dlwrapper.underlying());
     return true;
@@ -180,6 +184,52 @@ bool CommandModule::unload() {
     return false;
 }
 
+bool TgBotWrapper::validateValidArgs(const CommandModule::Ptr& module,
+                                     MessageExt::Ptr& message) {
+    if (!module->valid_arguments.enabled) {
+        return true;  // No validation needed.
+    }
+    bool check_argc = !module->valid_arguments.counts.empty();
+
+    // Try to split them.
+    message->update(module->valid_arguments.split_type);
+    const std::vector<std::string>& args = message->arguments();
+    if (check_argc) {
+        std::vector<int> _valid_argc = module->valid_arguments.counts;
+        // Sort the valid_arguments
+        std::ranges::sort(_valid_argc);
+        // Push it to a set, so remove duplicates.
+        std::set valid_argc(_valid_argc.begin(), _valid_argc.end());
+
+        // Check if the number of arguments matches the expected.
+        if (!valid_argc.contains(static_cast<int>(args.size()))) {
+            std::vector<std::string_view> strings;
+            strings.emplace_back("Invalid number of arguments. Expected");
+            if (args.size() < *valid_argc.begin()) {
+                strings.emplace_back(
+                    fmt::format("at least {}", *valid_argc.begin()));
+            } else if (args.size() > *valid_argc.rbegin()) {
+                strings.emplace_back(
+                    fmt::format("at most {}", *valid_argc.begin()));
+            } else {
+                strings.emplace_back(
+                    fmt::format("one of {}", fmt::join(valid_argc, ",")));
+            }
+            strings.emplace_back(
+                fmt::format("arguments. But got {}.", args.size()));
+            
+            if (!module->valid_arguments.usage.empty()) {
+                strings.emplace_back(
+                    fmt::format("Usage: {}", module->valid_arguments.usage));
+            }
+            sendReplyMessage(message,
+                             fmt::format("{}", fmt::join(strings, " ")));
+            return false;
+        }
+    }
+
+    return true;
+}
 void TgBotWrapper::commandHandler(unsigned int authflags,
                                   MessageExt::Ptr message) {
     static const std::string myName = getBotUser()->username;
@@ -206,9 +256,9 @@ void TgBotWrapper::commandHandler(unsigned int authflags,
     if (!authRet) {
         // Unauthorized user, don't run the command.
         if (message->from) {
-            LOG(INFO) << "Unauthorized command " << module->command << " from "
-                      << message->from->username
-                      << " (id: " << message->from->id << ")";
+            LOG(INFO) << fmt::format("Unauthorized command {} from {} (id: {})",
+                                     module->command, message->from->username,
+                                     message->from->id);
             switch (authRet.reason) {
                 case AuthContext::Result::Reason::UNKNOWN:
                     LOG(INFO) << "Reason: Unknown";
@@ -236,41 +286,8 @@ void TgBotWrapper::commandHandler(unsigned int authflags,
     }
 
     // Partital offloading to common code.
-    if (module->valid_arguments.enabled) {
-        bool check_argc = !module->valid_arguments.counts.empty();
-
-        // Try to split them.
-        message->update(module->valid_arguments.split_type);
-        const std::vector<std::string>& args = message->arguments();
-        if (check_argc) {
-            std::vector<int> _valid_argc = module->valid_arguments.counts;
-            // Sort the valid_arguments
-            std::ranges::sort(_valid_argc);
-            // Push it to a set, so remove duplicates.
-            std::set valid_argc(_valid_argc.begin(), _valid_argc.end());
-
-            // Check if the number of arguments matches the expected.
-            if (!std::ranges::any_of(valid_argc, [&args](int count) {
-                    return args.size() == count;
-                })) {
-                std::stringstream ss;
-                ss << "Invalid number of arguments. Expected ";
-                if (args.size() < *valid_argc.begin()) {
-                    ss << "at least " << *valid_argc.begin();
-                } else if (args.size() > *valid_argc.rbegin()) {
-                    ss << "at most " << *valid_argc.rbegin();
-                } else {
-                    ss << "one of ";
-                    for (const auto& arg : valid_argc) {
-                        ss << arg << " ";
-                    }
-                }
-                ss << " arguments. But got " << args.size() << "." << std::endl;
-                ss << "Usage: " << module->valid_arguments.usage;
-                sendReplyMessage(message, ss.str());
-                return;
-            }
-        }
+    if (!validateValidArgs(module, message)) {
+        return;
     }
 
     module->function(shared_from_this(), std::move(message));
@@ -291,8 +308,10 @@ void TgBotWrapper::startQueueConsumerThread() {
                     // Wait for the task to complete
                     front.second.get();
                 } catch (const TgBot::TgException& e) {
-                    LOG(ERROR) << "[AsyncConsumer] While handling command: "
-                               << front.first << ": " << e.what();
+                    LOG(ERROR) << fmt::format(
+                        "[AsyncConsumer] While handling command: {}: "
+                        "Exception: {}",
+                        front.first, e.what());
                 }
             }
         }
@@ -352,8 +371,7 @@ bool TgBotWrapper::setBotCommands() const {
             onecommand->command = cmd->command;
             onecommand->description = cmd->description;
             if (cmd->isEnforced()) {
-                std::stringstream ss;
-                ss << onecommand->description << " " << GETSTR_BRACE(OWNER);
+                onecommand->description += fmt::format(" {}", GETSTR(OWNER));
             }
             buffer.emplace_back(onecommand);
         }
@@ -361,19 +379,18 @@ bool TgBotWrapper::setBotCommands() const {
     try {
         getApi().setMyCommands(buffer);
     } catch (const TgBot::TgException& e) {
-        LOG(ERROR) << GETSTR_IS(ERROR_UPDATING_BOT_COMMANDS) << e.what();
+        LOG(ERROR) << fmt::format("{}: {}", GETSTR(ERROR_UPDATING_BOT_COMMANDS),
+                                  e.what());
         return false;
     }
     return true;
 }
 
 std::string TgBotWrapper::getCommandModulesStr() const {
-    std::stringstream ss;
-
-    for (const auto& module : _modules) {
-        ss << module->command << " ";
-    }
-    return ss.str();
+    std::vector<std::string> strings;
+    std::ranges::transform(_modules, std::back_inserter(strings),
+                           [](auto&& x) { return x->command; });
+    return fmt::format("{}", fmt::join(strings, ", "));
 }
 
 bool TgBotWrapper::unloadCommand(const std::string& command) {

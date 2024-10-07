@@ -2,6 +2,7 @@
 #include <ResourceManager.h>
 #include <absl/log/log.h>
 #include <absl/strings/str_replace.h>
+#include <fmt/core.h>
 #include <internal/_tgbot.h>
 
 #include <CompileTimeStringConcat.hpp>
@@ -52,7 +53,8 @@ static DECLARE_COMMAND_HANDLER(alive, wrapper, message) {
             sentAnimation = true;
         } catch (const TgBot::TgException& e) {
             // Fallback to HTML if no GIF
-            LOG(ERROR) << GETSTR_IS(ERROR_SENDING_GIF) << e.what();
+            LOG(ERROR) << fmt::format("{}: {}", GETSTR(ERROR_SENDING_GIF),
+                                      e.what());
         }
     }
     if (!sentAnimation) {

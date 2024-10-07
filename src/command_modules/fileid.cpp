@@ -1,3 +1,5 @@
+#include <fmt/core.h>
+
 #include "TgBotWrapper.hpp"
 
 DECLARE_COMMAND_HANDLER(fileid, wrapper, message) {
@@ -23,7 +25,7 @@ DECLARE_COMMAND_HANDLER(fileid, wrapper, message) {
         }
         wrapper->sendReplyMessage<TgBotWrapper::ParseMode::Markdown>(
             message,
-            "FileId: `" + file + "`\n" + "FileUniqueId: `" + unifile + '`');
+            fmt::format("FileId: `{}`\nFileUniqueId: `{}`", file, unifile));
     } else {
         wrapper->sendReplyMessage(message, "Reply to a media");
     }

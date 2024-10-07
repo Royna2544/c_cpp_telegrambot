@@ -7,7 +7,6 @@
 #include <database/bot/TgBotDatabaseImpl.hpp>
 #include <memory>
 #include <optional>
-#include "tgbot/types/InlineKeyboardMarkup.h"
 
 template <DatabaseBase::ListType type>
 void handleAddUser(ApiPtr wrapper, const Message::Ptr& message,

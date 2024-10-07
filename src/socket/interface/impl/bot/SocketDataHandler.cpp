@@ -1,5 +1,6 @@
 #include <ChatObserver.h>
 #include <ResourceManager.h>
+#include <fmt/chrono.h>
 #include <internal/_std_chrono_templates.h>
 #include <rapidjson/document.h>
 #include <rapidjson/rapidjson.h>
@@ -241,7 +242,7 @@ bool SocketInterfaceTgBot::handle_GetUptime(SocketConnContext ctx,
     std::stringstream uptime;
     std::string uptimeStr;
 
-    uptime << "Uptime: " << to_string(diff);
+    uptime << fmt::format("Uptime: {}", diff);
     uptimeStr = uptime.str();
     CHECK(uptimeStr.size() < sizeof(GetUptimeCallback));
     LOG(INFO) << "Sending text back: " << std::quoted(uptimeStr);

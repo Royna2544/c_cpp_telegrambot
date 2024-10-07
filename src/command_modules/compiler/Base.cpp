@@ -2,6 +2,7 @@
 #include <EnumArrayHelpers.h>
 #include <absl/log/log.h>
 #include <absl/strings/str_replace.h>
+#include <fmt/core.h>
 
 #include <DurationPoint.hpp>
 #include <StringResManager.hpp>
@@ -37,7 +38,7 @@ void CompilerInTg::runCommand(std::string cmd, std::stringstream &res,
     cmd = absl::StrReplaceAll(cmd, {{"\"", "\\\""}});
     LOG(INFO) << __func__ << ": +++";
     _interface->onExecutionStarted(cmd);
-    LOG(INFO) << GETSTR_IS(COMMAND) << SingleQuoted(cmd);
+    LOG(INFO) << fmt::format("{}: '{}'", GETSTR(COMMAND), cmd);
 
     if (!popen_watchdog_init(&p_wdt_data)) {
         LOG(ERROR) << "popen_watchdog_init failed";

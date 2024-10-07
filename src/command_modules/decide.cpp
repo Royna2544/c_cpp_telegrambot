@@ -1,3 +1,5 @@
+#include <fmt/core.h>
+
 #include <Random.hpp>
 #include <TgBotWrapper.hpp>
 #include <sstream>
@@ -17,11 +19,11 @@ DECLARE_COMMAND_HANDLER(decide, wrapperBot, message) {
     int count = COUNT_MAX;
     int yesno = 0;
 
-    msgtxt << "Deciding " << SingleQuoted(obj) << "...";
+    msgtxt << fmt::format("Deciding '{}'...", obj);
     msg = wrapperBot->sendReplyMessage(message, msgtxt.str());
     msgtxt << std::endl << std::endl;
     do {
-        msgtxt << "Try " + std::to_string(COUNT_MAX - count + 1) + " : ";
+        msgtxt << fmt::format("Try {}: ", COUNT_MAX - count + 1);
         if (Random::getInstance()->generate(RANDOM_RANGE_NUM) % 2 == 1) {
             msgtxt << "Yes";
             ++yesno;

@@ -2,6 +2,7 @@
 
 #include <absl/log/check.h>
 #include <absl/log/log.h>
+#include <fmt/core.h>
 
 #include <StacktracePrint.hpp>
 #include <cstdint>
@@ -587,9 +588,7 @@ std::ostream& SQLiteDatabase::dump(std::ostream& ofs) const {
 
     // Because of the race condition with logging, use stringstream and output
     // later.
-    ss << "Owner Id: "
-       << std::quoted(std::to_string(getOwnerUserId().value_or(0)))
-       << std::endl;
+    ss << fmt::format("Owner Id: {}\n", getOwnerUserId().value_or(0));
 
     auto helper = Helper::create(db, Helper::kDumpDatabaseFile);
     if (helper->prepare()) {
@@ -599,7 +598,7 @@ std::ostream& SQLiteDatabase::dump(std::ostream& ofs) const {
             int type = row->get<int>(1);
             if (type <= static_cast<int>(InfoType::MIN) ||
                 type >= static_cast<int>(InfoType::MAX)) {
-                ss << " type: Invalid(" << type << ")" << std::endl;
+                ss << fmt::format(" type: Invalid({})\n", type);
                 continue;
             }
             auto info = static_cast<InfoType>(type);
@@ -613,6 +612,9 @@ std::ostream& SQLiteDatabase::dump(std::ostream& ofs) const {
                     break;
                 case InfoType::OWNER:
                     ss << "OWNER";
+                    break;
+                case InfoType::MIN:
+                case InfoType::MAX:
                     break;
             };
             ss << std::endl;

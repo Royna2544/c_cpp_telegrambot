@@ -3,6 +3,7 @@
 #include <absl/log/log.h>
 #include <internal/_std_chrono_templates.h>
 #include <internal/_tgbot.h>
+#include <fmt/chrono.h>
 
 #include <ManagedThreads.hpp>
 #include <TgBotWrapper.hpp>
@@ -82,7 +83,7 @@ std::optional<std::string> TimerThread::describeParsedTime() const {
     if (!parsedTime) {
         return std::nullopt;
     }
-    return to_string(parsedTime.value());
+    return fmt::format("{}", parsedTime.value());
 }
 
 TimerThread::Result TimerThread::start() {

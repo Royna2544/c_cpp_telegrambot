@@ -16,12 +16,12 @@ void CompilerInTgForCCpp::run(const MessagePtr message) {
     if (verifyParseWrite(message, extraargs)) {
         cmd << params.exe.string() << SPACE << extraargs << SPACE << params.outfile.string();
 
-        resultbuf << GETSTR_IS(COMPILE_TIME) << std::endl;
+        resultbuf << GETSTR(COMPILE_TIME) << ":\n";
         runCommand(cmd.str(), resultbuf);
         resultbuf << std::endl;
 
         if (FS::exists(aoutname)) {
-            resultbuf << GETSTR_IS(RUN_TIME) << std::endl;
+            resultbuf << GETSTR(RUN_TIME) << ":\n";
             runCommand(aoutname.data(), resultbuf);
             std::filesystem::remove(aoutname);
         }

@@ -1,12 +1,12 @@
 
 #include <ConfigManager.h>
 #include <absl/log/log.h>
+#include <fmt/core.h>
 #include <unistd.h>
 
 #include <CommandLine.hpp>
 #include <TgBotWrapper.hpp>
 #include <TryParseStr.hpp>
-#include <cinttypes>
 #include <cstdlib>
 #include <libos/libsighandler.hpp>
 #include <restartfmt_parser.hpp>
@@ -47,8 +47,8 @@ DECLARE_COMMAND_HANDLER(restart, tgBotWrapper, message) {
     auto *const exe = argv[0];
 
     // Log the restart command and the arguments to be used to restart the bot
-    LOG(INFO) << "Restarting bot with exe: " << exe << ", addenv "
-              << restartBuf.data();
+    LOG(INFO) << fmt::format("Restarting bot with exe: {}, addenv {}", exe,
+                             restartBuf.data());
     tgBotWrapper->sendReplyMessage(message, "Restarting bot instance...");
 
     // Call exeve

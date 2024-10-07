@@ -91,7 +91,8 @@ bool ProtoDatabase::unloadDatabase() {
         LOG(WARNING) << "Database not loaded! Cannot unload!";
         return false;
     }
-    std::fstream output(dbinfo->path.string(), std::ios::out | std::ios::binary);
+    std::fstream output(dbinfo->path.string(),
+                        std::ios::out | std::ios::binary);
     if (!output.is_open()) {
         LOG(ERROR) << "Failed to open output file for writing: "
                    << dbinfo->path;

@@ -378,6 +378,8 @@ struct ChatIds {
 // Base interface for operations involving TgBot...
 struct TgBotApi {
    public:
+    using Ptr = std::shared_ptr<TgBotApi>;
+    
     TgBotApi() = default;
     virtual ~TgBotApi() = default;
 
@@ -924,13 +926,13 @@ struct TgBotApi {
         return editMessageMarkup_impl(message, replyMarkup);
     }
 
-    inline MessageId copyMessage(const Message::Ptr& message) const {
-        return copyMessage_impl(message->chat->id, message->messageId);
+    inline MessageId copyAndReplyAsMessage(const Message::Ptr& message) const {
+        return copyAndReplyAsMessage(message, message);
     }
 
-    inline MessageId copyAndReplyAsMessage(const Message::Ptr& message) const {
+    inline MessageId copyAndReplyAsMessage(const Message::Ptr& message, const Message::Ptr& replyToMessage) const {
         return copyMessage_impl(message->chat->id, message->messageId,
-                                createReplyParametersForReply(message));
+                                createReplyParametersForReply(replyToMessage));
     }
 
     [[nodiscard]] inline bool answerCallbackQuery(
@@ -1229,6 +1231,7 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
     bool isLoadedCommand(const std::string& command);
     bool isKnownCommand(const std::string& command);
     void commandHandler(unsigned int authflags, MessageExt::Ptr message);
+    bool validateValidArgs(const CommandModule::Ptr& module, MessageExt::Ptr& message);
 
     template <unsigned Len>
     static consteval auto getInitCallNameForClient(const char (&str)[Len]) {

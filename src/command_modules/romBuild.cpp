@@ -2,6 +2,7 @@
 #include <absl/strings/match.h>
 #include <absl/strings/str_split.h>
 #include <absl/strings/strip.h>
+#include <fmt/core.h>
 
 #include <ConfigParsers.hpp>
 #include <TgBotWrapper.hpp>
@@ -270,10 +271,10 @@ class TaskWrapperBase {
 
    public:
     TaskWrapperBase(std::shared_ptr<ROMBuildQueryHandler> handler,
-                    const PerBuildData& data, ApiPtr api, Message::Ptr message)
+                    PerBuildData data, TgBotApi::Ptr api, Message::Ptr message)
         : queryHandler(std::move(handler)),
-          data(data),
-          api(api),
+          data(std::move(data)),
+          api(std::move(api)),
           userMessage(std::move(message)) {
         this->data.result = &result;
         backKeyboard =
@@ -345,6 +346,9 @@ class RepoSync : public TaskWrapperBase<RepoSyncTask> {
             queryHandler->updateSentMessage(msg);
         }
     }
+
+   public:
+    virtual ~RepoSync() = default;
 };
 
 class Build : public TaskWrapperBase<ROMBuildTask> {
@@ -362,7 +366,8 @@ class Build : public TaskWrapperBase<ROMBuildTask> {
             case PerBuildData::Result::ERROR_FATAL: {
                 LOG(ERROR) << "Failed to build ROM";
                 const auto msg = api->editMessage(
-                    sentMessage, "Build failed:\n" + result.getMessage(),
+                    sentMessage,
+                    fmt::format("Build failed:\n{}", result.getMessage()),
                     backKeyboard);
                 queryHandler->updateSentMessage(msg);
                 if (fs::file_size(ROMBuildTask::kErrorLogFile, ec) != 0U) {
@@ -387,6 +392,9 @@ class Build : public TaskWrapperBase<ROMBuildTask> {
                 break;
         }
     }
+
+   public:
+    virtual ~Build() = default;
 };
 
 class Upload : public TaskWrapperBase<UploadFileTask> {
@@ -417,6 +425,9 @@ class Upload : public TaskWrapperBase<UploadFileTask> {
         }
         queryHandler->updateSentMessage(msg);
     }
+
+   public:
+    virtual ~Upload() = default;
 };
 
 class CwdRestorer {
@@ -492,7 +503,7 @@ void ROMBuildQueryHandler::updateSentMessage(Message::Ptr message) {
 
 namespace {
 std::string keyToString(const std::string& key, const bool enabled) {
-    return key + " is now " + (enabled ? "enabled" : "disabled");
+    return fmt::format("{} is now {}", key, enabled ? "enabled" : "disabled");
 }
 }  // namespace
 
@@ -598,8 +609,8 @@ void ROMBuildQueryHandler::handle_device(const Query& query) {
     lookup.device = parser.getDevice(device);
     for (const auto& roms : parser.getROMBranches(lookup.device)) {
         builder.addKeyboard(
-            {roms->toString(), "rom_" + roms->romInfo->name + "_" +
-                                   std::to_string(roms->androidVersion)});
+            {roms->toString(), fmt::format("rom_{}_{}", roms->romInfo->name,
+                                           roms->androidVersion)});
     }
     builder.addKeyboard(getButtonOf<Buttons::back>());
     api->editMessage(sentMessage, "Select ROM...", builder.get());
@@ -635,15 +646,13 @@ void ROMBuildQueryHandler::handle_type(const Query& query) {
     } else if (type == "eng") {
         per_build.variant = PerBuildData::Variant::kEng;
     }
-    std::stringstream confirm;
     const auto& rom = getValue(per_build.localManifest->rom);
 
-    confirm << "Build variant: " << type << "\n";
-    confirm << "Device: " << per_build.device << "\n";
-    confirm << "Rom: " << rom->romInfo->name << "\n";
-    confirm << "Android version: " << rom->androidVersion << "\n";
+    const auto confirm = fmt::format(
+        "Build variant: {}\nDevice: {}\nRom: {}\nAndroid version: {}", type,
+        per_build.device, rom->romInfo->name, rom->androidVersion);
 
-    api->editMessage(sentMessage, confirm.str(),
+    api->editMessage(sentMessage, confirm,
                      createKeyboardWith<Buttons::confirm, Buttons::back>());
 }
 

@@ -1,3 +1,5 @@
+#include <fmt/core.h>
+
 #include <StringResManager.hpp>
 #include <TgBotWrapper.hpp>
 
@@ -6,22 +8,29 @@ DECLARE_COMMAND_HANDLER(cmd, botWrapper, message) {
     const auto& command = args[0];
     const auto& action = args[1];
     bool ret = false;
+    bool valid = false;
+
+    std::string result_message;
     if (action == "reload") {
         ret = botWrapper->reloadCommand(command);
+        valid = true;
     } else if (action == "unload") {
         ret = botWrapper->unloadCommand(command);
-    } else {
-        botWrapper->sendReplyMessage(message,
-                                     GETSTR_IS(UNKNOWN_ACTION) + action);
-        return;
+        valid = true;
     }
-    if (ret) {
-        botWrapper->sendReplyMessage(message,
-                                     GETSTR_IS(OPERATION_SUCCESSFUL) + command);
+
+    if (valid) {
+        if (ret) {
+            result_message = fmt::format("{} {}: {}", command, action,
+                                         GETSTR(OPERATION_SUCCESSFUL));
+        } else {
+            result_message = fmt::format("{} {}: {}", command, action,
+                                         GETSTR(OPERATION_FAILURE));
+        }
     } else {
-        botWrapper->sendReplyMessage(message,
-                                     GETSTR_IS(OPERATION_FAILURE) + command);
+        result_message = fmt::format("{}: {}", GETSTR(UNKNOWN_ACTION), action);
     }
+    botWrapper->sendReplyMessage(message, result_message);
 }
 
 DYN_COMMAND_FN(/*name*/, module) {

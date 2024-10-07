@@ -1,7 +1,8 @@
 
+#include <fmt/core.h>
+
 #include <TgBotWrapper.hpp>
 #include <algorithm>
-#include <concepts>
 #include <filesystem>
 #include <functional>
 #include <imagep/ImageProcAll.hpp>
@@ -24,8 +25,8 @@ struct StickerData {
     size_t maxIndex;
 
     void printProgress(const std::string& operation) const {
-        DLOG(INFO) << operation << ": " << filePath << " [" << index << "/"
-                   << maxIndex << "]";
+        DLOG(INFO) << fmt::format("{}: {} [{}/{}]", operation,
+                                  filePath.string(), index, maxIndex);
     }
     auto operator<=>(const StickerData& other) const {
         return other.fileUniqueId <=> fileUniqueId;
@@ -95,14 +96,15 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
         stickerData.end());
 
     // Download all stickers from the set
-    LOG(INFO) << "Now downloading " << stickerData.size() << " stickers";
+    LOG(INFO) << fmt::format("Now downloading {} stickers", stickerData.size());
     size_t count = 0;
     for (const auto& sticker : stickerData) {
         if (count % RATELIMIT_DELIMITER_FOR_CONVERT_UPDATE == 0) {
             const auto percent =
                 ratio_to_percentage(static_cast<double>(count) /
                                     static_cast<double>(stickerData.size()));
-            api->editMessage(sentMessage, "Converting stickers... " + percent);
+            api->editMessage(sentMessage,
+                             fmt::format("Converting stickers... {}", percent));
         }
         sticker.printProgress("Downloading");
         if (!api->downloadFile(sticker.filePath, sticker.fileId)) {
