@@ -146,7 +146,7 @@ TEST_F(SocketDataHandlerTest, TestCmdGetUptime) {
     sendAndVerifyHeader<TgBotSocket::callback::GetUptimeCallback,
                         TgBotSocket::Command::CMD_GET_UPTIME_CALLBACK>(
         pkt, &callbackData);
-    EXPECT_STREQ(callbackData.uptime.data(), "Uptime: 0h 0m 0s");
+    EXPECT_STREQ(callbackData.uptime.data(), "Uptime: 00:00:00.00");
     // Done
     verifyAndClear();
 }

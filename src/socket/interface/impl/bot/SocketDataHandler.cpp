@@ -15,6 +15,7 @@
 #include <impl/bot/TgBotSocketInterface.hpp>
 #include <mutex>
 #include <socket/TgBotCommandMap.hpp>
+#include <utility>
 #include <variant>
 
 #include "TgBotWrapper.hpp"
@@ -239,16 +240,13 @@ bool SocketInterfaceTgBot::handle_GetUptime(SocketConnContext ctx,
                                             const void* /*ptr*/) {
     auto now = std::chrono::system_clock::now();
     const auto diff = now - startTp;
-    std::stringstream uptime;
-    std::string uptimeStr;
+    GetUptimeCallback callback{};
 
-    uptime << fmt::format("Uptime: {}", diff);
-    uptimeStr = uptime.str();
-    CHECK(uptimeStr.size() < sizeof(GetUptimeCallback));
-    LOG(INFO) << "Sending text back: " << std::quoted(uptimeStr);
-    Packet pkt(Command::CMD_GET_UPTIME_CALLBACK, uptimeStr.c_str(),
-               sizeof(GetUptimeCallback));
-    interface->writeToSocket(ctx, pkt.toSocketData());
+    (void)std::snprintf(callback.uptime.data(), callback.uptime.size() - 1,
+                        "%s", fmt::format("Uptime: {:%H:%M:%S}", diff).c_str());
+    LOG(INFO) << "Sending text back: " << std::quoted(callback.uptime.data());
+    Packet pkt(Command::CMD_GET_UPTIME_CALLBACK, callback);
+    interface->writeToSocket(std::move(ctx), pkt.toSocketData());
     return true;
 }
 
