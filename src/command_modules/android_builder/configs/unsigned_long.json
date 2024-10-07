@@ -1,0 +1,36 @@
+{
+    "targets": [
+    ],
+    "roms": [
+        {
+            "name": "LineageOS",
+            "link": "https://github.com/LineageOS/android",
+            "target": "bacon",
+            "outzip_prefix": "lineage",
+            "branches": [
+                {
+                    "android_version": 15,
+                    "branch": "lineage-22.0"
+                },
+                {
+                    "android_version": 14,
+                    "branch": "lineage-21.0"
+                }
+            ]
+        }
+    ],
+    "local_manifests": [
+        {
+            "name": "Lumi's Playground",
+            "url": "https://github.com/LumiPlayground/local_manifests",
+            "branches": [
+                {
+                    "name": "vin8953-a14",
+                    "target_rom": "LineageOS",
+                    "android_version": 14,
+                    "device": "vin8953"
+                }
+            ]
+        }
+    ]
+}
