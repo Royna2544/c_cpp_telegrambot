@@ -23,11 +23,14 @@ std::optional<Packet> readPacket(
         LOG(ERROR) << "While reading magic, failed";
         return std::nullopt;
     }
+    magicData->assignTo(magic);
 
-    const auto diff = magic - TgBotSocket::PacketHeader::MAGIC_VALUE_BASE;
+    auto diff = magic - TgBotSocket::PacketHeader::MAGIC_VALUE_BASE;
     if (diff != TgBotSocket::PacketHeader::DATA_VERSION) {
         LOG(WARNING) << "Invalid magic value, dropping buffer";
         constexpr int reasonable_datadiff = 5;
+        // Only a small difference is worth logging.
+        diff = abs(diff);
         if (diff >= 0 && diff < TgBotSocket::PacketHeader::DATA_VERSION +
                                     reasonable_datadiff) {
             LOG(INFO) << "This packet contains header data version " << diff
@@ -40,13 +43,13 @@ std::optional<Packet> readPacket(
     }
 
     // Read rest of the packet header.
-    const auto headerData =
-        interface->readFromSocket(context, sizeof(TgBotSocket::PacketHeader) - sizeof(magic));
+    const auto headerData = interface->readFromSocket(
+        context, sizeof(TgBotSocket::PacketHeader) - sizeof(magic));
     if (!headerData) {
         LOG(ERROR) << "While reading header, failed";
         return std::nullopt;
     }
-    headerData->assignTo(header);
+    headerData->assignTo((decltype(magic) *)&header+1, sizeof(header) - sizeof(magic));
     header.magic = magic;
 
     using namespace TgBotSocket::CommandHelpers;
