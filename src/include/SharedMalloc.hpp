@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdlib>
 #include <memory>
+#include <stdexcept>
 #include <type_traits>
 
 #include "internal/_class_helper_macros.h"
@@ -88,14 +89,21 @@ struct SharedMalloc {
 
    private:
     // A fortify check.
-    inline void newSizeCheck(const size_t newSize) const {
-        CHECK_LE(newSize, parent->size())
-            << ": Requested size is bigger than this->size()";
+    inline void validateBoundsForSize(const size_t newSize) const {
+        DCHECK_LE(newSize, parent->size())
+            << ": Operation size exceeds allocated memory size";
+        if (newSize > parent->size()) {
+            throw std::out_of_range(
+                "Operation size exceeds allocated memory size");
+        }
     }
 
     inline void offsetCheck(const size_t offset) const {
-        CHECK_LE(offset, parent->size())
-            << ": Requested offset is bigger than this->size()";
+        DCHECK_LE(offset, parent->size())
+            << ": Offset exceeds allocated memory bounds";
+        if (offset > parent->size()) {
+            throw std::out_of_range("Offset exceeds allocated memory bounds");
+        }
     }
 
     [[nodiscard]] inline char *offsetGet(const size_t offset) const {
@@ -103,22 +111,80 @@ struct SharedMalloc {
     }
 
    public:
+    /**
+     * @brief Assigns a block of memory from this object to the destination
+     * pointed to by `ref`.
+     *
+     * Copies `size` bytes from the internal memory (starting from the given
+     * `offset`) to the memory pointed to by `ref`. This method ensures that the
+     * operation does not exceed memory bounds.
+     *
+     * @tparam T The type of the destination object pointed to by `ref`.
+     * @param ref Pointer to the destination where data will be copied to.
+     * @param size Number of bytes to be copied.
+     * @param offset Offset from which to start copying from the internal
+     * memory. Default is 0.
+     * @throws std::out_of_range if the offset or size exceeds the allocated
+     * memory.
+     * @note This method cannot be used with const pointers. Use `assignFrom`
+     * for const pointers.
+     */
     template <typename T>
     void assignTo(T *ref, const size_t size, const size_t offset = 0) const {
         static_assert(!std::is_const_v<T>,
-                      "Using assignTo to a const pointer, did you mean to use "
-                      "assignFrom?");
+                      "Using assignTo with a const pointer, did you mean to "
+                      "use assignFrom?");
         offsetCheck(offset);
-        newSizeCheck(size + offset);
-        memcpy(ref, static_cast<char *>(get()) + offset, size);
+        validateBoundsForSize(size + offset);
+        memcpy(ref, offsetGet(offset), size);
     }
 
+    /**
+     * @brief Assigns an object from this internal memory to the reference
+     * `ref`.
+     *
+     * Copies the entire object (of type T) from the internal memory (starting
+     * from the given `offset`) to the destination object `ref`.
+     *
+     * @tparam T The type of the object to copy.
+     * @param ref Reference to the object where data will be copied to.
+     * @param offset Offset from which to start copying from the internal
+     * memory.
+     * @throws std::out_of_range if the offset or size exceeds the allocated
+     * memory.
+     */
+    template <typename T>
+    void assignTo(T &ref, const size_t offset) const {
+        assignTo(&ref, sizeof(T), offset);
+    }
+
+    /**
+     * @brief Assigns an object from this internal memory to the reference
+     * `ref`.
+     *
+     * Copies the entire object (of type T) from the internal memory to the
+     * destination object `ref`.
+     *
+     * @tparam T The type of the object to copy. Cannot be a pointer type.
+     * @param ref Reference to the object where data will be copied to.
+     * @throws std::out_of_range if the size exceeds the allocated memory.
+     */
     template <typename T>
         requires(!std::is_pointer_v<T>)
     void assignTo(T &ref) const {
         assignTo(&ref, sizeof(T));
     }
 
+    /**
+     * @brief Assigns data from a source object to this internal memory.
+     *
+     * Copies the entire object (of type T) from `ref` into the internal memory,
+     * ensuring that the internal memory size is sufficient.
+     *
+     * @tparam T The type of the object to assign. Cannot be a pointer type.
+     * @param ref Reference to the source object.
+     * @throws std::out_of_range if the size of T exceeds the allocated memory.
+     */
     template <typename T>
         requires(!std::is_pointer_v<T>)
     void assignFrom(const T &ref) {
@@ -127,19 +193,46 @@ struct SharedMalloc {
         assignFrom(&ref, sizeof(T));
     }
 
+    /**
+     * @brief Assigns a block of memory from a source pointer `ref` to this
+     * internal memory.
+     *
+     * Copies `size` bytes from the memory pointed to by `ref` into this
+     * object's internal memory, starting from the specified `offset`.
+     *
+     * @tparam T The type of the source data.
+     * @param ref Pointer to the source data to be copied.
+     * @param size Number of bytes to be copied.
+     * @param offset Offset within the internal memory where the data should be
+     * copied to. Default is 0.
+     * @throws std::out_of_range if the offset or size exceeds the allocated
+     * memory.
+     */
     template <typename T>
     void assignFrom(const T *ref, const size_t size, const size_t offset = 0) {
         offsetCheck(offset);
-        newSizeCheck(size + offset);
+        validateBoundsForSize(size + offset);
         memcpy(offsetGet(offset), ref, size);
     }
 
-    // Move memory of [startOffset] with size of [size] to [newOffset]
+    /**
+     * @brief Moves a block of memory within the internal memory.
+     *
+     * Moves `size` bytes of memory starting from `startOffset` to the position
+     * starting at `destOffset` within the internal memory. This operation
+     * supports overlapping memory regions.
+     *
+     * @param startOffset Offset from which to start moving memory.
+     * @param destOffset Offset to where the memory should be moved.
+     * @param size Number of bytes to move.
+     * @throws std::out_of_range if either the startOffset, destOffset, or size
+     * exceeds the allocated memory.
+     */
     void move(const size_t startOffset, const size_t destOffset,
               const size_t size) {
         offsetCheck(startOffset);
         offsetCheck(destOffset);
-        newSizeCheck(size + destOffset);
+        validateBoundsForSize(size + destOffset);
         memmove(offsetGet(destOffset), offsetGet(startOffset), size);
     }
 
