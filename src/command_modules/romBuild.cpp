@@ -198,10 +198,9 @@ class ROMBuildQueryHandler
     // Handle type selection button
     void handle_type(const Query& query);
 
-#define DECLARE_BUTTON_HANDLER(name, key)                               \
-    ButtonHandler {                                                     \
-        name, #key, [this](const Query& query) { handle_##key(query); } \
-    }
+#define DECLARE_BUTTON_HANDLER(name, key) \
+    ButtonHandler{name, #key,             \
+                  [this](const Query& query) { handle_##key(query); }}
 #define DECLARE_BUTTON_HANDLER_WITHPREFIX(name, key, prefix)             \
     ButtonHandler {                                                      \
         name, #key, [this](const Query& query) { handle_##key(query); }, \
@@ -630,6 +629,11 @@ void ROMBuildQueryHandler::handle_rom(const Query& query) {
         parser.getLocalManifest(lookup.rom, lookup.device);
     if (!per_build.localManifest) {
         LOG(ERROR) << "Failed to get local manifest";
+        _api->editMessage(
+            sentMessage,
+            fmt::format(
+                "Failed to assemble local manifest. ROM name: {}, Android {}",
+                romName, androidVersion));
         return;
     }
 
