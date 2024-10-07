@@ -65,11 +65,9 @@ bool ROMBuildTask::runFunction() {
     shell << ". build/envsetup.sh" << ForkAndRunShell::endl;
     shell << "unset USE_CCACHE" << ForkAndRunShell::endl;
     auto release = findTCL();
-    if (release.empty()) {
-        shell << "lunch " << findVendor() << "_" << data.device << "-";
-    } else {
-        shell << "lunch " << findVendor() << "_" << data.device << "-"
-              << release << "-";
+    shell << "lunch " << findVendor() << "_" << data.device << "-";
+    if (!release.empty()) {
+        shell << release << "-";
     }
     switch (data.variant) {
         case PerBuildData::Variant::kUser:
@@ -171,11 +169,6 @@ void ROMBuildTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
 void ROMBuildTask::onExit(int exitCode) {
     LOG(INFO) << "Process exited with code: " << exitCode;
     std::memcpy(data.result, smem->memory, sizeof(PerBuildData::ResultData));
-}
-
-[[noreturn]] void ROMBuildTask::errorAndThrow(const std::string& message) {
-    LOG(ERROR) << message;
-    throw std::runtime_error(message);
 }
 
 ROMBuildTask::ROMBuildTask(ApiPtr wrapper, TgBot::Message::Ptr message,

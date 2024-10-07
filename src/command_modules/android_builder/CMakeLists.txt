@@ -5,7 +5,7 @@ if (NOT ${jsoncpp_FOUND})
     return()
 endif()
 
-################# Android ROM builder with C++/Python #################
+################# Android ROM builder with C++ #################
 if (UNIX AND NOT APPLE)
 add_my_library(
     NAME AndroidBuilder-cpp
@@ -24,5 +24,6 @@ add_my_library(
     PUBLIC_INC
         .
     NO_LIBPREFIX
+    STATIC
 )
 endif()

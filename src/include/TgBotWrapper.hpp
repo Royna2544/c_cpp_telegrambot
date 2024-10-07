@@ -155,6 +155,17 @@ struct TgBotPPImpl_shared_deps_API MessageExt
                 ...);
     }
 
+    // Equality comparsion.
+    template <Attrs attr>
+    bool equals(std::add_lvalue_reference_t<
+                std::add_const_t<typename GetAttribute<attr>::type>>
+                    object) const {
+        if (!has<attr>()) {
+            return false;
+        }
+        return get<attr>() == object;
+    }
+
     template <Attrs... attrs>
     std::string why_not() {
         std::stringstream message;

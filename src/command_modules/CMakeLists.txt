@@ -155,13 +155,15 @@ command_module(
     PLATFORM "Unix"
 )
 
+find_package(CURL)
+add_subdirectory(android_builder)
 command_module(
     NAME rombuild
     SRCS romBuild.cpp
-        androidbuilder_tasks/ROMBuildTask.cpp
-        androidbuilder_tasks/UploadFileTask.cpp
-        androidbuilder_tasks/RepoSyncTask.cpp
-    LIBS AndroidBuilder-cpp
+        android_builder/tasks/ROMBuildTask.cpp
+        android_builder/tasks/UploadFileTask.cpp
+        android_builder/tasks/RepoSyncTask.cpp
+    LIBS AndroidBuilder-cpp CURL::libcurl
     PLATFORM "Linux"
 )
 

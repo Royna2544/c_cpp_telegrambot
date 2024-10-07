@@ -9,7 +9,6 @@
 #include <concepts>
 #include <filesystem>
 #include <initializer_list>
-#include <libos/OnTerminateRegistrar.hpp>
 #include <libos/libfs.hpp>
 #include <memory>
 #include <string>
@@ -20,7 +19,6 @@
 #include <utility>
 
 #include "SystemInfo.hpp"
-#include "tgbot/TgException.h"
 
 template <typename Impl>
 concept canCreateWithApi =
@@ -471,8 +469,8 @@ ROMBuildQueryHandler::ROMBuildQueryHandler(std::shared_ptr<TgBotApi> api,
                                            MessagePtr userMessage)
     : api(std::move(api)),
       parser(FS::getPathForType(FS::PathType::GIT_ROOT) / "src" /
-             "android_builder" / "configs"),
-      userMessage(userMessage) {
+             "command_modules" / "android_builder" / "configs"),
+      userMessage(std::move(userMessage)) {
     settingsKeyboard =
         createKeyboardWith<Buttons::repo_sync, Buttons::upload,
                            Buttons::pin_message, Buttons::back>();
@@ -489,34 +487,37 @@ ROMBuildQueryHandler::~ROMBuildQueryHandler() {
 }
 
 void ROMBuildQueryHandler::updateSentMessage(Message::Ptr message) {
-    sentMessage = message;
+    sentMessage = std::move(message);
 }
 
 namespace {
 std::string keyToString(const std::string& key, const bool enabled) {
-    return key + ": " + (enabled ? "enabled" : "disabled");
+    return key + " is now " + (enabled ? "enabled" : "disabled");
 }
 }  // namespace
 
 void ROMBuildQueryHandler::handle_repo_sync(const Query& query) {
     do_repo_sync = !do_repo_sync;
-    api->answerCallbackQuery(query->id,
-                             keyToString("Repo sync enabled", do_repo_sync));
+    (void)api->answerCallbackQuery(query->id,
+                                   keyToString("Repo sync", do_repo_sync));
 }
 
 void ROMBuildQueryHandler::handle_upload(const Query& query) {
     do_upload = !do_upload;
-    api->answerCallbackQuery(query->id,
-                             keyToString("Uploading enabled", do_upload));
+    (void)api->answerCallbackQuery(query->id,
+                                   keyToString("Uploading", do_upload));
 }
 
 void ROMBuildQueryHandler::handle_pin_message(const Query& query) {
-    api->answerCallbackQuery(query->id, "Trying to pin this message...");
+    (void)api->answerCallbackQuery(query->id, "Trying to pin this message...");
     try {
         api->pinMessage(sentMessage);
     } catch (const TgBot::TgException& e) {
         LOG(ERROR) << "Failed to pin message: " << e.what();
+        (void)api->answerCallbackQuery(query->id, "Failed to pin message");
+        return;
     }
+    (void)api->answerCallbackQuery(query->id, "Pinned message");
 }
 
 void ROMBuildQueryHandler::handle_back(const Query& /*query*/) {
@@ -668,12 +669,15 @@ void ROMBuildQueryHandler::onCallbackQuery(
 
 DECLARE_COMMAND_HANDLER(rombuild, tgWrapper, message) {
     static std::shared_ptr<ROMBuildQueryHandler> handler;
-    if (handler) {
-        return;
-    }
-    static const auto buildRoot =
-        FS::getPathForType(FS::PathType::GIT_ROOT) / "src" / "android_builder";
 
+    if (handler) {
+        if (message->equals<MessageExt::Attrs::ExtraText>("reset")) {
+            handler.reset();
+            tgWrapper->sendReplyMessage(message, "Resetting ROM build...");
+        } else {
+            return;
+        }
+    }
     try {
         handler = std::make_shared<ROMBuildQueryHandler>(tgWrapper, message);
     } catch (const std::exception& e) {
@@ -683,8 +687,12 @@ DECLARE_COMMAND_HANDLER(rombuild, tgWrapper, message) {
         return;
     }
 
-    tgWrapper->onCallbackQuery([=](const TgBot::CallbackQuery::Ptr& query) {
-        handler->onCallbackQuery(query);
+    tgWrapper->onCallbackQuery([](const TgBot::CallbackQuery::Ptr& query) {
+        if (handler) {
+            handler->onCallbackQuery(query);
+        } else {
+            LOG(WARNING) << "No ROMBuildQueryHandler to handle callback query";
+        }
     });
 }
 

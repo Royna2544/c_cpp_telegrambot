@@ -44,9 +44,6 @@ struct ROMBuildTask : ForkAndRun {
      * @param exitCode The exit code of the process.
      */
     void onExit(int exitCode) override;
-
-    [[noreturn]] static void errorAndThrow(const std::string& message);
-
     /**
      * Creates a new ROMBuildTask object.
      *
