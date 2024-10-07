@@ -49,7 +49,7 @@ void SocketInterfaceWindows::startListening(
             } else {
                 printRemoteAddress(cfd);
                 SocketConnContext ctx(cfd, addr);
-                should_break = onNewData(ctx);
+                should_break = !onNewData(ctx);
                 closesocket(cfd);
             }
         }, Selector::Mode::READ);

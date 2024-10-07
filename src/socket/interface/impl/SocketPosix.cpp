@@ -56,7 +56,7 @@ void SocketInterfaceUnix::startListening(socket_handle_t handle,
                     printRemoteAddress(cfd);
                     setSocketOptTimeout(cfd, 5);
                     SocketConnContext ctx(cfd, addr);
-                    should_break = onNewData(ctx);
+                    should_break = !onNewData(ctx);
                     closeSocketHandle(cfd);
                 }
             },
