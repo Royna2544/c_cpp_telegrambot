@@ -25,8 +25,7 @@ void SocketInterfaceTgBot::runFunction() {
         auto pkt = TgBotSocket::readPacket(interface, ctx);
         if (pkt) {
             handlePacket(ctx, std::move(pkt.value()));
-            return true;
         }
-        return false;
+        return true;
     });
 }
