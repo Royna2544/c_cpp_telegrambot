@@ -19,6 +19,7 @@
 #include <tasks/UploadFileTask.hpp>
 #include <utility>
 
+#include "ForkAndRun.hpp"
 #include "SystemInfo.hpp"
 
 template <typename Impl>
@@ -237,7 +238,10 @@ class ROMBuildQueryHandler
         pin_message,
     };
 
+    ForkAndRun* current{};
+
    public:
+    void setCurrentForkAndRun(ForkAndRun* forkAndRun) { current = forkAndRun; }
     void onCallbackQuery(const TgBot::CallbackQuery::Ptr& query) const;
 };
 
@@ -251,19 +255,23 @@ class TaskWrapperBase {
     Message::Ptr userMessage;  // User's message
     Message::Ptr sentMessage;  // Message sent by the bot
     TgBot::InlineKeyboardMarkup::Ptr backKeyboard;
+    TgBot::InlineKeyboardMarkup::Ptr cancelKeyboard;
     std::shared_ptr<ROMBuildQueryHandler> queryHandler;
 
     bool executeCommon(Impl&& impl) {
+        queryHandler->setCurrentForkAndRun(&impl);
         do {
             bool execRes = impl.execute();
             if (!execRes || result.value == PerBuildData::Result::NONE) {
                 LOG(ERROR) << "The process failed to execute or it didn't "
                               "update result";
+                queryHandler->setCurrentForkAndRun(nullptr);
                 onExecuteFailed();
                 return false;
             }
         } while (result.value == PerBuildData::Result::ERROR_NONFATAL);
         onExecuteFinished(result);
+        queryHandler->setCurrentForkAndRun(nullptr);
 
         return result.value == PerBuildData::Result::SUCCESS;
     }
@@ -280,6 +288,8 @@ class TaskWrapperBase {
             KeyboardBuilder()
                 .addKeyboard({{"Back", "back"}, {"Retry", "confirm"}})
                 .get();
+        cancelKeyboard =
+            KeyboardBuilder().addKeyboard({{"Cancel", "cancel"}}).get();
     }
 
     /**
@@ -333,7 +343,8 @@ class RepoSync : public TaskWrapperBase<RepoSyncTask> {
     using TaskWrapperBase<RepoSyncTask>::TaskWrapperBase;
 
     Message::Ptr onPreExecute() override {
-        return api->sendReplyMessage(userMessage, "Now syncing...");
+        return api->sendReplyMessage(userMessage, "Now syncing...",
+                                     cancelKeyboard);
     }
 
     void onExecuteFinished(PerBuildData::ResultData result) override {
@@ -354,7 +365,8 @@ class Build : public TaskWrapperBase<ROMBuildTask> {
     using TaskWrapperBase<ROMBuildTask>::TaskWrapperBase;
 
     Message::Ptr onPreExecute() override {
-        return api->sendReplyMessage(userMessage, "Now starting build...");
+        return api->sendReplyMessage(userMessage, "Now starting build...",
+                                     cancelKeyboard);
     }
 
     void onExecuteFinished(PerBuildData::ResultData result) override {
@@ -400,7 +412,8 @@ class Upload : public TaskWrapperBase<UploadFileTask> {
     using TaskWrapperBase<UploadFileTask>::TaskWrapperBase;
 
     Message::Ptr onPreExecute() override {
-        return api->sendReplyMessage(userMessage, "Now uploading...");
+        return api->sendReplyMessage(userMessage, "Now uploading...",
+                                     cancelKeyboard);
     }
     void onExecuteFinished(PerBuildData::ResultData result) override {
         std::string resultText = result.getMessage();
@@ -535,7 +548,12 @@ void ROMBuildQueryHandler::handle_back(const Query& /*query*/) {
     per_build.reset();
 }
 
-void ROMBuildQueryHandler::handle_cancel(const Query& /*query*/) {
+void ROMBuildQueryHandler::handle_cancel(const Query& query) {
+    if (current != nullptr) {
+        current->cancel();
+        current = nullptr;
+        handle_back(query);
+    }
     _api->deleteMessage(sentMessage);
     sentMessage.reset();
 }
