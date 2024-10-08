@@ -35,7 +35,6 @@ void CompilerInTg::runCommand(std::string cmd, std::stringstream &res,
     size_t buf_len = 0;
     popen_watchdog_data_t *p_wdt_data = nullptr;
 
-    cmd = absl::StrReplaceAll(cmd, {{"\"", "\\\""}});
     LOG(INFO) << __func__ << ": +++";
     _interface->onExecutionStarted(cmd);
     LOG(INFO) << fmt::format("{}: '{}'", GETSTR(COMMAND), cmd);
