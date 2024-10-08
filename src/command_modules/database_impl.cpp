@@ -1,4 +1,5 @@
 #include <absl/log/check.h>
+#include <fmt/format.h>
 #include <internal/_tgbot.h>
 #include <tgbot/tgbot.h>
 
@@ -7,6 +8,7 @@
 #include <database/bot/TgBotDatabaseImpl.hpp>
 #include <memory>
 #include <optional>
+#include <string>
 
 template <DatabaseBase::ListType type>
 void handleAddUser(ApiPtr wrapper, const Message::Ptr& message,
@@ -89,6 +91,11 @@ constexpr std::string_view addtoblacklist = "Add to blacklist";
 constexpr std::string_view removefromblacklist = "Remove from blacklist";
 
 DECLARE_COMMAND_HANDLER(database, wrapper, message) {
+    if (!message->has<MessageExt::Attrs::IsReplyMessage>()) {
+        wrapper->sendReplyMessage(message, GETSTR(REPLY_TO_USER_MSG));
+        return;
+    }
+
     auto reply = std::make_shared<TgBot::ReplyKeyboardMarkup>();
     reply->keyboard = genKeyboard(4, 2);
     reply->keyboard[0][0]->text = addtowhitelist;
@@ -99,11 +106,6 @@ DECLARE_COMMAND_HANDLER(database, wrapper, message) {
     reply->resizeKeyboard = true;
     reply->selective = true;
 
-    if (!message->has<MessageExt::Attrs::IsReplyMessage>()) {
-        wrapper->sendReplyMessage(message, GETSTR(REPLY_TO_USER_MSG));
-        return;
-    }
-
     UserId userId = message->replyToMessage->from->id;
 
     auto msg = wrapper->sendReplyMessage(
@@ -112,33 +114,33 @@ DECLARE_COMMAND_HANDLER(database, wrapper, message) {
             UserPtr_toString(message->replyToMessage->from),
         reply);
 
-    wrapper->onAnyMessage(
-        [msg, userId](ApiPtr wrapper, MessagePtr m) {
-            if (m->replyToMessage &&
-                m->replyToMessage->messageId == msg->messageId) {
-                if (m->text == addtowhitelist) {
-                    handleAddUser<DatabaseBase::ListType::WHITELIST>(wrapper, m,
-                                                                     userId);
-                } else if (m->text == removefromwhitelist) {
-                    handleRemoveUser<DatabaseBase::ListType::WHITELIST>(
-                        wrapper, m, userId);
-                } else if (m->text == addtoblacklist) {
-                    handleAddUser<DatabaseBase::ListType::BLACKLIST>(wrapper, m,
-                                                                     userId);
-                } else if (m->text == removefromblacklist) {
-                    handleRemoveUser<DatabaseBase::ListType::BLACKLIST>(
-                        wrapper, m, userId);
-                }
-                wrapper->editMessageMarkup(msg, nullptr);
-                return TgBotWrapper::AnyMessageResult::Deregister;
+    wrapper->onAnyMessage([msg, userId](ApiPtr wrapper, MessagePtr m) {
+        if (m->replyToMessage &&
+            m->replyToMessage->messageId == msg->messageId) {
+            if (m->text == addtowhitelist) {
+                handleAddUser<DatabaseBase::ListType::WHITELIST>(wrapper, m,
+                                                                 userId);
+            } else if (m->text == removefromwhitelist) {
+                handleRemoveUser<DatabaseBase::ListType::WHITELIST>(wrapper, m,
+                                                                    userId);
+            } else if (m->text == addtoblacklist) {
+                handleAddUser<DatabaseBase::ListType::BLACKLIST>(wrapper, m,
+                                                                 userId);
+            } else if (m->text == removefromblacklist) {
+                handleRemoveUser<DatabaseBase::ListType::BLACKLIST>(wrapper, m,
+                                                                    userId);
             }
-            return TgBotWrapper::AnyMessageResult::Handled;
-        });
+            wrapper->editMessageMarkup(msg, nullptr);
+            return TgBotWrapper::AnyMessageResult::Deregister;
+        }
+        return TgBotWrapper::AnyMessageResult::Handled;
+    });
 };
 
 DECLARE_COMMAND_HANDLER(saveid, bot, message) {
     if (!(message->has<MessageExt::Attrs::ExtraText>() &&
-          message->replyToMessage_has<MessageExt::Attrs::Sticker>())) {
+          message->replyToMessage_hasany<MessageExt::Attrs::Animation,
+                                         MessageExt::Attrs::Sticker>())) {
         bot->sendReplyMessage(message, GETSTR(REPLY_TO_GIF_OR_STICKER));
         return;
     }
@@ -146,11 +148,16 @@ DECLARE_COMMAND_HANDLER(saveid, bot, message) {
     std::optional<std::string> fileUniqueId;
 
     if (message->replyToMessage_has<MessageExt::Attrs::Animation>()) {
-        fileId = message->replyToMessage->animation->fileId;
-        fileUniqueId = message->replyToMessage->animation->fileUniqueId;
+        fileId =
+            message->replyToMessage_get<MessageExt::Attrs::Animation>()->fileId;
+        fileUniqueId =
+            message->replyToMessage_get<MessageExt::Attrs::Animation>()
+                ->fileUniqueId;
     } else if (message->replyToMessage_has<MessageExt::Attrs::Sticker>()) {
-        fileId = message->replyToMessage->sticker->fileId;
-        fileUniqueId = message->replyToMessage->sticker->fileUniqueId;
+        fileId =
+            message->replyToMessage_get<MessageExt::Attrs::Sticker>()->fileId;
+        fileUniqueId = message->replyToMessage_get<MessageExt::Attrs::Sticker>()
+                           ->fileUniqueId;
     }
 
     CHECK(fileId && fileUniqueId) << "They should be set";
@@ -162,13 +169,9 @@ DECLARE_COMMAND_HANDLER(saveid, bot, message) {
     info.names = message->arguments();
 
     if (backend->addMediaInfo(info)) {
-        std::stringstream ss;
-        ss << "Media with names:" << std::endl;
-        for (const auto& name : info.names) {
-            ss << "- " << name << std::endl;
-        }
-        ss << "added";
-        bot->sendReplyMessage(message, ss.str());
+        const auto content = fmt::format("Media with names:\n{}\nadded",
+                                         fmt::join(info.names, "\n"));
+        bot->sendReplyMessage(message, content);
     } else {
         bot->sendReplyMessage(message, GETSTR(MEDIA_ALREADY_IN_DB));
     }
@@ -188,6 +191,9 @@ DYN_COMMAND_FN(name, module) {
         module.flags = CommandModule::Flags::Enforced |
                        CommandModule::Flags::HideDescription;
         module.function = COMMAND_HANDLER_NAME(saveid);
+        module.valid_arguments.enabled = true;
+        module.valid_arguments.split_type =
+            CommandModule::ValidArgs::Split::ByComma;
     } else {
         return false;  // Command not found.
     }

@@ -154,6 +154,15 @@ struct TgBotPPImpl_shared_deps_API MessageExt
                               attrs) &&
                 ...);
     }
+    template <Attrs... attrs>
+    [[nodiscard]] bool replyToMessage_hasany() const {
+        if (!replyToMessage) {
+            return false;
+        }
+        return (has_attribute(std::make_shared<MessageExt>(replyToMessage),
+                              attrs) ||
+                ...);
+    }
 
     // Equality comparsion.
     template <Attrs attr>
