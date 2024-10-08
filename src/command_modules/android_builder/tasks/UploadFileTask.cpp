@@ -1,5 +1,9 @@
 #include "UploadFileTask.hpp"
 
+#include <filesystem>
+#include <libos/libfs.hpp>
+#include <system_error>
+
 #include "ConfigParsers.hpp"
 #include "ForkAndRun.hpp"
 
@@ -20,8 +24,40 @@ bool UploadFileTask::runFunction() {
         return false;
     }
     shell << "set -e" << ForkAndRunShell::endl;
-    shell << "echo cum" << data.device
-          << getValue(data.localManifest->rom)->romInfo->prefixOfOutput
+    // First determine zip file path
+    std::filesystem::directory_iterator it;
+    std::filesystem::path zipFilePath;
+
+    for (it = decltype(it)(std::filesystem::path() / "out" / "target" /
+                           "product" / data.device);
+         it != decltype(it)(); ++it) {
+        if (it->is_regular_file() && it->path().extension() == ".zip" &&
+            it->path().string().starts_with(
+                getValue(data.localManifest->rom)->romInfo->prefixOfOutput)) {
+            LOG(INFO) << "zipFile=" << it->path().string();
+            zipFilePath = it->path();
+            break;
+        }
+    }
+    if (zipFilePath.empty()) {
+        LOG(ERROR) << "Zip file not found";
+        return false;
+    }
+    std::error_code ec;
+    const auto scripts =
+        FS::getPathForType(FS::PathType::RESOURCES) / "scripts";
+    std::filesystem::path scriptFile;
+    if (std::filesystem::exists(scripts / "upload.bash", ec)) {
+        LOG(INFO) << "Using upload.bash file";
+        scriptFile = scripts / "upload.bash";
+    }
+
+    // Else, use default upload script.
+    scriptFile = scripts / "upload.default.bash";
+
+    // Run the upload script.
+    LOG(INFO) << "Starting upload";
+    shell << "bash " << scriptFile << " " << zipFilePath.string()
           << ForkAndRunShell::endl;
     shell.close();
     return true;

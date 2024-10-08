@@ -222,6 +222,8 @@ class ForkAndRunShell {
     const ForkAndRunShell& operator<<(const T& args) const {
         if constexpr (std::is_same_v<T, std::string>) {
             writeString(args);
+        } else if constexpr (std::is_same_v<T, std::filesystem::path>) {
+            writeString(args.string());
         } else {
             std::stringstream ss;
             ss << args;
