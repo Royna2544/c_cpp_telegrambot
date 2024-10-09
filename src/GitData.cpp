@@ -3,18 +3,16 @@
 #include <git2.h>
 
 #include <mutex>
-
-#include "git2/types.h"
-
+#include "libos/libfs.hpp"
 
 constexpr int SHA1_HASH_LEN = 40;
 
 bool GitData::Fill(GitData *data) {
     std::filesystem::path path = std::filesystem::current_path();
-    git_repository *repo = NULL;
-    git_commit *head_commit = NULL;
-    git_reference *head_ref = NULL;
-    git_remote *origin = NULL;
+    git_repository *repo = nullptr;
+    git_commit *head_commit = nullptr;
+    git_reference *head_ref = nullptr;
+    git_remote *origin = nullptr;
     std::array<char, SHA1_HASH_LEN + 1> head_sha = {0};
     bool rc = true;
 
@@ -25,25 +23,14 @@ bool GitData::Fill(GitData *data) {
 
     // Open the repository, try going up the directory tree until we find a .git
     // folder
-    error = git_repository_open(&repo, path.string().c_str());
-    if (error != 0) {
-        for (; path.has_parent_path(); path = path.parent_path()) {
-            if (path.root_path() == path) {
-                LOG(ERROR) << "Error opening git repository";
-                return false;
-            }
-            error = git_repository_open(&repo, path.string().c_str());
-            if (error == 0) {
-                break;
-            }
-        }
-        if (error != 0) {
-            LOG(ERROR)
-                << "Not a git repository (or any of the parent directories)";
-            return false;
-        }
+    auto gitdir = walk_up_tree([&repo](const std::filesystem::path& path) {
+        return git_repository_open(&repo, path.string().c_str()) == 0;
+    });
+    if (!gitdir) {
+        LOG(ERROR) << "Couldn't find git repository";
+        return false;
     }
-    data->gitSrcRoot = path;
+    data->gitSrcRoot = gitdir.value();
 
     error = git_repository_head(&head_ref, repo);
     if (error == 0) {

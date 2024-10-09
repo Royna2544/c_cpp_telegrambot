@@ -3,6 +3,8 @@
 #include <TgBotUtilsExports.h>
 
 #include <filesystem>
+#include <functional>
+#include <optional>
 #include <system_error>
 
 // Implemented sperately by OS
@@ -101,4 +103,39 @@ inline std::error_code createDirectory(const std::filesystem::path& path) {
         ec.clear();
     }
     return ec;
+}
+
+template <bool consider_cwd = true>
+std::optional<std::filesystem::path> walk_up_tree(
+    const std::function<bool(const std::filesystem::path&)>& predicate,
+    const std::filesystem::path& starting = std::filesystem::current_path()) {
+    auto current = starting;
+    if constexpr (!consider_cwd) {
+        current = current.parent_path();
+    }
+    while (current != starting.root_path()) {
+        if (predicate(current)) {
+            return current;
+        }
+        current = current.parent_path();
+    }
+    return std::nullopt;
+}
+
+template <bool consider_cwd = true>
+std::vector<std::filesystem::path> walk_up_tree_and_gather(
+    const std::function<bool(const std::filesystem::path&)>& predicate,
+    const std::filesystem::path& starting = std::filesystem::current_path()) {
+    std::vector<std::filesystem::path> result;
+    auto current = starting;
+    if constexpr (!consider_cwd) {
+        current = current.parent_path();
+    }
+    while (current != starting.root_path()) {
+        if (predicate(current)) {
+            result.emplace_back(current);
+        }
+        current = current.parent_path();
+    }
+    return result;
 }

@@ -18,6 +18,7 @@
 
 #include "CompileTimeStringConcat.hpp"
 #include "RepoUtils.hpp"
+#include "libos/libfs.hpp"
 
 bool RepoSyncLocalHook::process(const std::string& line) {
     static const std::regex kRepoRemoveFail(
@@ -119,6 +120,18 @@ bool RepoSyncTask::runFunction() {
     if (!repoDirExists || !switcher()) {
         RepoUtils::repo_init({rom->romInfo->url, rom->branch});
     }
+    if (const auto val = walk_up_tree_and_gather<false>(
+            [](const std::filesystem::path& path) {
+                return std::filesystem::exists(path / ".repo");
+            });
+        val.size() != 0) {
+        for (const auto& dir : val) {
+            LOG(ERROR) << "Found .repo directory in parent directory: "
+                       << dir.string();
+            std::filesystem::remove_all(dir / ".repo");
+        }
+        RepoUtils::repo_init({rom->romInfo->url, rom->branch});
+    }
     if (!std::filesystem::exists(kLocalManifestPath)) {
         GitUtils::git_clone(data.localManifest->repo_info,
                             kLocalManifestPath.data());
@@ -133,10 +146,11 @@ bool RepoSyncTask::runFunction() {
         if (switcherLocal()) {
             LOG(INFO) << "Repo is up-to-date.";
         } else {
-            LOG(WARNING) << "Local manifest is not the correct repository, deleting it.";
+            LOG(WARNING)
+                << "Local manifest is not the correct repository, deleting it.";
             std::filesystem::remove_all(kLocalManifestPath);
             GitUtils::git_clone(data.localManifest->repo_info,
-                            kLocalManifestPath.data());
+                                kLocalManifestPath.data());
         }
     }
     unsigned int job_count = std::thread::hardware_concurrency() / 2;
