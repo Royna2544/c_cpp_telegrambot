@@ -200,10 +200,9 @@ class ROMBuildQueryHandler
     // Handle type selection button
     void handle_type(const Query& query);
 
-#define DECLARE_BUTTON_HANDLER(name, key)                               \
-    ButtonHandler {                                                     \
-        name, #key, [this](const Query& query) { handle_##key(query); } \
-    }
+#define DECLARE_BUTTON_HANDLER(name, key) \
+    ButtonHandler{name, #key,             \
+                  [this](const Query& query) { handle_##key(query); }}
 #define DECLARE_BUTTON_HANDLER_WITHPREFIX(name, key, prefix)             \
     ButtonHandler {                                                      \
         name, #key, [this](const Query& query) { handle_##key(query); }, \
@@ -704,6 +703,10 @@ void ROMBuildQueryHandler::handle_type(const Query& query) {
 void ROMBuildQueryHandler::onCallbackQuery(
     const TgBot::CallbackQuery::Ptr& query) const {
     if (sentMessage == nullptr) {
+        return;
+    }
+    if (query->message->chat->id != sentMessage->chat->id ||
+        query->message->messageId != sentMessage->messageId) {
         return;
     }
     if (query->from->id != _userMessage->from->id) {
