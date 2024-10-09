@@ -139,6 +139,7 @@ class ROMBuildQueryHandler
     ~ROMBuildQueryHandler();
 
     void updateSentMessage(Message::Ptr message);
+    void start(Message::Ptr userMessage);
 
    private:
     using Query = TgBot::CallbackQuery::Ptr;
@@ -492,8 +493,7 @@ ROMBuildQueryHandler::ROMBuildQueryHandler(std::shared_ptr<TgBotApi> api,
                                            MessagePtr userMessage)
     : _api(std::move(api)),
       parser(FS::getPathForType(FS::PathType::GIT_ROOT) / "src" /
-             "command_modules" / "android_builder" / "configs"),
-      _userMessage(std::move(userMessage)) {
+             "command_modules" / "android_builder" / "configs") {
     settingsKeyboard =
         createKeyboardWith<Buttons::repo_sync, Buttons::upload,
                            Buttons::pin_message, Buttons::back>();
@@ -501,12 +501,21 @@ ROMBuildQueryHandler::ROMBuildQueryHandler(std::shared_ptr<TgBotApi> api,
         createKeyboardWith<Buttons::build_rom, Buttons::send_system_info,
                            Buttons::settings, Buttons::cancel>(2);
     backKeyboard = createKeyboardWith<Buttons::back>();
-    sentMessage =
-        _api->sendMessage(_userMessage, "Will build ROM...", mainKeyboard);
+    start(userMessage);
 }
 
 ROMBuildQueryHandler::~ROMBuildQueryHandler() {
     _api->deleteMessage(sentMessage);
+}
+
+void ROMBuildQueryHandler::start(Message::Ptr userMessage) {
+    _userMessage = std::move(userMessage);
+    if (sentMessage) {
+        _api->deleteMessage(sentMessage);
+    }
+    sentMessage =
+        _api->sendMessage(_userMessage, "Will build ROM...", mainKeyboard);
+    per_build.reset();
 }
 
 void ROMBuildQueryHandler::updateSentMessage(Message::Ptr message) {
@@ -706,12 +715,8 @@ DECLARE_COMMAND_HANDLER(rombuild, tgWrapper, message) {
     static std::shared_ptr<ROMBuildQueryHandler> handler;
 
     if (handler) {
-        if (message->equals<MessageExt::Attrs::ExtraText>("reset")) {
-            handler.reset();
-            tgWrapper->sendReplyMessage(message, "Resetting ROM build...");
-        } else {
-            return;
-        }
+        handler->start(message);
+        return;
     }
     try {
         handler = std::make_shared<ROMBuildQueryHandler>(tgWrapper, message);
