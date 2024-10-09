@@ -5,6 +5,7 @@
 #include <absl/strings/str_split.h>
 #include <fmt/core.h>
 #include <git2.h>
+#include <git2/oid.h>
 #include <internal/_class_helper_macros.h>
 
 #include <filesystem>
@@ -254,21 +255,6 @@ bool GitBranchSwitcher::operator()() const {
         return false;
     }
 
-    current_branch = git_reference_shorthand(head_ref);
-
-    // Check if the branch is the one we're interested in
-    if (desiredBranch == current_branch) {
-        LOG(INFO) << "Already on the desired branch";
-        return true;
-    } else {
-        LOG(INFO) << "Expected branch: " << desiredBranch
-                  << ", current branch: " << current_branch;
-        if (!checkout) {
-            LOG(INFO) << "Checkout: false. Done";
-            return false;
-        }
-    }
-    LOG(INFO) << "Switching to branch: " << desiredBranch;
     struct {
         // refs/heads/*branch*
         std::string local;
@@ -281,28 +267,62 @@ bool GitBranchSwitcher::operator()() const {
     target_ref_name.remote += "/";
     target_ref_name.remote += desiredBranch;
 
+    // Maybe remote has it?
+    ret = git_remote_fetch(remote, nullptr, nullptr, nullptr);
+    if (ret != 0) {
+        LOG(ERROR) << "Failed to fetch remote: " << git_error_last_str();
+        return false;
+    }
+
+    // Now try to find the branch in the remote
+    ret = git_reference_lookup(target_remote_ref, repo,
+                               target_ref_name.remote.c_str());
+    if (ret != 0) {
+        LOG(ERROR) << "Failed to find the branch "
+                      "in the remote: "
+                   << git_error_last_str();
+        return false;
+    }
+
+    current_branch = git_reference_shorthand(head_ref);
+    // Check if the branch is the one we're interested in
+    if (desiredBranch == current_branch) {
+        LOG(INFO) << "Already on the desired branch";
+        return true;
+    } else {
+        LOG(INFO) << "Expected branch: " << desiredBranch
+                  << ", current branch: " << current_branch;
+        if (!checkout) {
+            // You know, we may be on the same sha1 still, check it.
+            git_oid local_head_oid{};
+            git_oid remote_head_oid{};
+            if (git_reference_name_to_id(&local_head_oid, repo, "HEAD") != 0) {
+                LOG(ERROR) << "Failed to resolve local HEAD: "
+                           << git_error_last_str();
+                return false;
+            }
+            if (git_reference_name_to_id(&remote_head_oid, repo,
+                                         target_ref_name.remote.c_str()) != 0) {
+                LOG(ERROR) << "Failed to resolve remote HEAD: "
+                           << git_error_last_str();
+                return false;
+            }
+            if (git_oid_cmp(&local_head_oid, &remote_head_oid) != 0) {
+                LOG(INFO) << "Checkout: false. Done";
+                return false;
+            } else {
+                LOG(INFO) << "Local and remote HEAD are the same";
+                return true;
+            }
+        }
+    }
+    LOG(INFO) << "Switching to branch: " << desiredBranch;
+
     // Try to find the branch ref in the repository
     ret = git_reference_lookup(target_ref, repo, target_ref_name.local.c_str());
     if (ret != 0) {
         LOG(WARNING) << "Failed to find the branch ref in local: "
                      << git_error_last_str();
-
-        // Maybe remote has it?
-        ret = git_remote_fetch(remote, nullptr, nullptr, nullptr);
-        if (ret != 0) {
-            LOG(ERROR) << "Failed to fetch remote: " << git_error_last_str();
-            return false;
-        }
-
-        // Now try to find the branch in the remote
-        ret = git_reference_lookup(target_remote_ref, repo,
-                                   target_ref_name.remote.c_str());
-        if (ret != 0) {
-            LOG(ERROR) << "Failed to find the branch "
-                          "in the remote: "
-                       << git_error_last_str();
-            return false;
-        }
 
         // Get the commit of the target branch ref
         ret = git_commit_lookup(commit, repo,
