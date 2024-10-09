@@ -28,7 +28,7 @@ if [ -z "$server" ]; then
 fi
 
 # Upload the file using the server name
-upload_result=$(curl --progress-bar -X POST "https://$server.gofile.io/contents/uploadfile" -F "file=@$file_path")
+upload_result=$(curl -X POST "https://$server.gofile.io/contents/uploadfile" -F "file=@$file_path")
 
 # Extract and print the download link
 download_link=$(echo "$upload_result" | jq -r '.data.downloadPage')
