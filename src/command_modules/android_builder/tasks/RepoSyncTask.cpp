@@ -133,8 +133,10 @@ bool RepoSyncTask::runFunction() {
         if (switcherLocal()) {
             LOG(INFO) << "Repo is up-to-date.";
         } else {
-            LOG(ERROR) << "Repo sync not possible: local manifest is not mine";
-            return false;
+            LOG(WARNING) << "Local manifest is not the correct repository, deleting it.";
+            std::filesystem::remove_all(kLocalManifestPath);
+            GitUtils::git_clone(data.localManifest->repo_info,
+                            kLocalManifestPath.data());
         }
     }
     unsigned int job_count = std::thread::hardware_concurrency() / 2;
