@@ -205,7 +205,7 @@ class ForkAndRunShell {
 
     bool opened = false;
 
-    void writeString(const std::string& args) const;
+    void writeString(const std::string_view& args) const;
 
    public:
     explicit ForkAndRunShell(std::filesystem::path shell_path);
@@ -220,7 +220,7 @@ class ForkAndRunShell {
     template <typename T>
         requires WriteableToStdOstream<T>
     const ForkAndRunShell& operator<<(const T& args) const {
-        if constexpr (std::is_same_v<T, std::string>) {
+        if constexpr (std::is_constructible_v<std::string_view, T>) {
             writeString(args);
         } else if constexpr (std::is_same_v<T, std::filesystem::path>) {
             writeString(args.string());

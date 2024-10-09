@@ -309,7 +309,7 @@ const ForkAndRunShell& ForkAndRunShell::operator<<(
     return *this;
 }
 
-void ForkAndRunShell::writeString(const std::string& args) const {
+void ForkAndRunShell::writeString(const std::string_view& args) const {
     const std::shared_lock<std::shared_mutex> _(pid_mutex_);
 
     if (!opened || shell_pid_ < 0) {
