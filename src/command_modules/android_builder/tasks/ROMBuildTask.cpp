@@ -60,6 +60,12 @@ bool ROMBuildTask::runFunction() {
     }
     auto* resultdata = dataShmem->get<PerBuildData::ResultData>();
     resultdata->value = PerBuildData::Result::ERROR_FATAL;
+    auto release = findTCL();
+    auto vendor = findVendor();
+    if (vendor.empty()) {
+        return false;
+    }
+
     ForkAndRunShell shell("bash");
     if (!shell.open()) {
         return false;
@@ -68,8 +74,7 @@ bool ROMBuildTask::runFunction() {
     shell << "set -e" << ForkAndRunShell::endl;
     shell << ". build/envsetup.sh" << ForkAndRunShell::endl;
     shell << "unset USE_CCACHE" << ForkAndRunShell::endl;
-    auto release = findTCL();
-    shell << "lunch " << findVendor() << "_" << data.device << "-";
+    shell << "lunch " << vendor << "_" << data.device << "-";
     if (!release.empty()) {
         shell << release << "-";
     }
