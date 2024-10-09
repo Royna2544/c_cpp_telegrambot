@@ -200,9 +200,10 @@ class ROMBuildQueryHandler
     // Handle type selection button
     void handle_type(const Query& query);
 
-#define DECLARE_BUTTON_HANDLER(name, key) \
-    ButtonHandler{name, #key,             \
-                  [this](const Query& query) { handle_##key(query); }}
+#define DECLARE_BUTTON_HANDLER(name, key)                               \
+    ButtonHandler {                                                     \
+        name, #key, [this](const Query& query) { handle_##key(query); } \
+    }
 #define DECLARE_BUTTON_HANDLER_WITHPREFIX(name, key, prefix)             \
     ButtonHandler {                                                      \
         name, #key, [this](const Query& query) { handle_##key(query); }, \
@@ -549,6 +550,7 @@ void ROMBuildQueryHandler::handle_pin_message(const Query& query) {
         (void)_api->answerCallbackQuery(query->id, "Failed to pin message");
         return;
     }
+    didpin = true;
     (void)_api->answerCallbackQuery(query->id, "Pinned message");
 }
 
@@ -624,6 +626,14 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
         if (!upload.execute()) {
             LOG(INFO) << "Upload::execute fails...";
             return;
+        }
+    }
+    _api->editMessage(sentMessage, "Build completed");
+    if (didpin) {
+        try {
+            _api->unpinMessage(sentMessage);
+        } catch (const TgBot::TgException& e) {
+            LOG(ERROR) << "Failed to unpin message: " << e.what();
         }
     }
 }
