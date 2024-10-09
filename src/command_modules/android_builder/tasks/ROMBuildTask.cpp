@@ -119,7 +119,6 @@ bool ROMBuildTask::runFunction() {
 }
 
 int ROMBuildTask::guessJobCount() {
-    static constexpr int Multiplier = 1024;
     static constexpr int kDefaultJobCount = 6;
 
     static std::once_flag once;
@@ -129,7 +128,7 @@ int ROMBuildTask::guessJobCount() {
         const auto totalMem =
             MemoryInfo().totalMemory.to<SizeTypes::GigaBytes>();
         LOG(INFO) << "Total memory: " << totalMem;
-        jobCount = static_cast<int>(sqrt(totalMem));
+        jobCount = static_cast<int>(totalMem / 4 - 1);
         LOG(INFO) << "Using job count: " << jobCount;
     });
     return jobCount;
