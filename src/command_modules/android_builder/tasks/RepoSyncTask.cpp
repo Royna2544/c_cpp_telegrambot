@@ -113,7 +113,7 @@ bool RepoSyncTask::runFunction() {
     }
 
     const auto& rom = getValue(data.localManifest->rom);
-    GitBranchSwitcher switcher{.gitDirectory = ".repo/manifests",
+    GitBranchSwitcher switcher{.gitDirectory = ".repo/manifests.git",
                                .desiredBranch = rom->branch,
                                .desiredUrl = rom->romInfo->url,
                                .checkout = false};

@@ -7,6 +7,7 @@
 #include <git2.h>
 #include <internal/_class_helper_macros.h>
 
+#include <filesystem>
 #include <internal/raii.hpp>
 #include <memory>
 #include <type_traits>
@@ -181,7 +182,6 @@ bool GitBranchSwitcher::operator()() const {
     git_remote_ptr remote;
     git_repository_ptr repo;
     git_reference_ptr head_ref;
-    git_config* config = nullptr;
     const char* current_branch = nullptr;
     ScopedLibGit2 _;
 
@@ -190,26 +190,36 @@ bool GitBranchSwitcher::operator()() const {
     git_checkout_options checkout_opts = GIT_CHECKOUT_OPTIONS_INIT;
     checkout_opts.checkout_strategy = GIT_CHECKOUT_SAFE;
 
-    ret = git_config_open_ondisk(&config, (gitDirectory / "config").c_str());
-    if (ret != 0) {
-        LOG(WARNING) << "Failed to open config file: " << git_error_last_str();
-        git_config_free(config);
-    } else {
-        int val = 0;
-        ret = git_config_get_bool(&val, config, "extensions.preciousObjects");
-        if (ret == 0) {
-            LOG(INFO) << "Removing extensions.preciousobjects...";
-            ret = git_config_delete_entry(config, "extensions.preciousobjects");
-            if (ret != 0) {
-                LOG(ERROR) << "Failed to delete extensions.preciousobjects: "
-                           << git_error_last_str();
-            }
-        } else {
-            LOG(WARNING) << "Failed to get extensions.preciousobjects: "
+    // We could either get the repo, or the .git directory
+    const auto configPath = gitDirectory / "config";
+    if (std::filesystem::exists(configPath)) {
+        git_config* config = nullptr;
+        DLOG(INFO) << "Config file found: " << configPath.string();
+        ret = git_config_open_ondisk(&config, configPath.c_str());
+        if (ret != 0) {
+            LOG(WARNING) << "Failed to open config file: "
                          << git_error_last_str();
+            git_config_free(config);
+        } else {
+            int val = 0;
+            ret =
+                git_config_get_bool(&val, config, "extensions.preciousObjects");
+            if (ret == 0) {
+                LOG(INFO) << "Removing extensions.preciousobjects...";
+                ret = git_config_delete_entry(config,
+                                              "extensions.preciousobjects");
+                if (ret != 0) {
+                    LOG(ERROR)
+                        << "Failed to delete extensions.preciousobjects: "
+                        << git_error_last_str();
+                }
+            } else {
+                LOG(WARNING) << "Failed to get extensions.preciousobjects: "
+                             << git_error_last_str();
+            }
+            // Manual, to save the file to disk
+            git_config_free(config);
         }
-        // Manual, to save the file to disk
-        git_config_free(config);
     }
 
     ret = git_repository_open(repo, gitDirectory.c_str());
