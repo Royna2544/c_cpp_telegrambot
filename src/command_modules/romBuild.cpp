@@ -200,9 +200,10 @@ class ROMBuildQueryHandler
     // Handle type selection button
     void handle_type(const Query& query);
 
-#define DECLARE_BUTTON_HANDLER(name, key) \
-    ButtonHandler{name, #key,             \
-                  [this](const Query& query) { handle_##key(query); }}
+#define DECLARE_BUTTON_HANDLER(name, key)                               \
+    ButtonHandler {                                                     \
+        name, #key, [this](const Query& query) { handle_##key(query); } \
+    }
 #define DECLARE_BUTTON_HANDLER_WITHPREFIX(name, key, prefix)             \
     ButtonHandler {                                                      \
         name, #key, [this](const Query& query) { handle_##key(query); }, \
@@ -740,13 +741,15 @@ DECLARE_COMMAND_HANDLER(rombuild, tgWrapper, message) {
         return;
     }
 
-    tgWrapper->onCallbackQuery([](const TgBot::CallbackQuery::Ptr& query) {
-        if (handler) {
-            handler->onCallbackQuery(query);
-        } else {
-            LOG(WARNING) << "No ROMBuildQueryHandler to handle callback query";
-        }
-    });
+    tgWrapper->onCallbackQuery(
+        "rombuild", [](const TgBot::CallbackQuery::Ptr& query) {
+            if (handler) {
+                handler->onCallbackQuery(query);
+            } else {
+                LOG(WARNING)
+                    << "No ROMBuildQueryHandler to handle callback query";
+            }
+        });
 }
 
 DYN_COMMAND_FN(n, module) {

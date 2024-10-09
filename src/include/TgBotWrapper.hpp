@@ -12,7 +12,9 @@
 #include <cstddef>
 #include <filesystem>
 #include <functional>
+#include <future>
 #include <ios>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <queue>
@@ -22,6 +24,9 @@
 #include <utility>
 #include <variant>
 #include <vector>
+
+#include "tgbot/EventBroadcaster.h"
+#include "tgbot/types/CallbackQuery.h"
 
 using TgBot::Animation;
 using TgBot::Api;
@@ -388,7 +393,7 @@ struct ChatIds {
 struct TgBotApi {
    public:
     using Ptr = std::shared_ptr<TgBotApi>;
-    
+
     TgBotApi() = default;
     virtual ~TgBotApi() = default;
 
@@ -939,7 +944,8 @@ struct TgBotApi {
         return copyAndReplyAsMessage(message, message);
     }
 
-    inline MessageId copyAndReplyAsMessage(const Message::Ptr& message, const Message::Ptr& replyToMessage) const {
+    inline MessageId copyAndReplyAsMessage(
+        const Message::Ptr& message, const Message::Ptr& replyToMessage) const {
         return copyMessage_impl(message->chat->id, message->messageId,
                                 createReplyParametersForReply(replyToMessage));
     }
@@ -1078,6 +1084,7 @@ struct TgBotApi {
     }
 
     virtual void onCallbackQuery(
+        const std::string& message,
         const TgBot::EventBroadcaster::CallbackQueryListener& listener) {
         // Dummy implementation
     }
@@ -1240,7 +1247,8 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
     bool isLoadedCommand(const std::string& command);
     bool isKnownCommand(const std::string& command);
     void commandHandler(unsigned int authflags, MessageExt::Ptr message);
-    bool validateValidArgs(const CommandModule::Ptr& module, MessageExt::Ptr& message);
+    bool validateValidArgs(const CommandModule::Ptr& module,
+                           MessageExt::Ptr& message);
 
     template <unsigned Len>
     static consteval auto getInitCallNameForClient(const char (&str)[Len]) {
@@ -1249,9 +1257,12 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
 
    private:
     // Protect callbacks
-    std::mutex callbackMutex;
+    std::mutex callback_anycommand_mutex;
+    std::mutex callback_callbackquery_mutex;
     // A callback list where it is called when any message is received
-    std::vector<onAnyMessage_handler_t> callbacks;
+    std::vector<onAnyMessage_handler_t> callbacks_anycommand;
+    std::multimap<std::string, TgBot::EventBroadcaster::CallbackQueryListener>
+        callbacks_callbackquery;
 
    public:
     /**
@@ -1262,35 +1273,48 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
      * received.
      */
     void onAnyMessage(const onAnyMessage_handler_t& callback) override {
-        const std::lock_guard<std::mutex> _(callbackMutex);
-        callbacks.emplace_back(callback);
+        const std::lock_guard<std::mutex> _(callback_anycommand_mutex);
+        callbacks_anycommand.emplace_back(callback);
     }
 
-    void onCallbackQuery(const TgBot::EventBroadcaster::CallbackQueryListener&
+    void onCallbackQuery(const std::string& command,
+                         const TgBot::EventBroadcaster::CallbackQueryListener&
                              listener) override {
-        getEvents().onCallbackQuery(listener);
+        const std::lock_guard<std::mutex> _(callback_callbackquery_mutex);
+        callbacks_callbackquery.emplace(command, listener);
     }
 
    private:
     [[nodiscard]] EventBroadcaster& getEvents() { return _bot.getEvents(); }
     [[nodiscard]] const Api& getApi() const { return _bot.getApi(); }
 
-    // Support async command handling
-    // A flag to stop worker
-    std::atomic<bool> stopWorker = false;
-    // A queue to handle command (commandname, async future)
-    std::queue<std::pair<std::string, std::future<void>>> asyncTasks;
-    // mutex to protect shared queue
-    std::mutex queueMutex;
-    // condition variable to wait for async tasks to finish.
-    std::condition_variable queueCV;
-    // worker thread(s) to consume command queue
-    std::vector<std::thread> workerThreads;
+    struct Async {
+        // A flag to stop CallbackQuery worker
+        std::atomic<bool> stopWorker = false;
+        // A queue to handle command (commandname, async future)
+        std::queue<std::pair<std::string, std::future<void>>> tasks;
+        // mutex to protect shared queue
+        std::mutex mutex;
+        // condition variable to wait for async tasks to finish.
+        std::condition_variable condVariable;
+        // worker thread(s) to consume command queue
+        std::vector<std::thread> threads;
+
+        void emplaceTask(const std::string& command,
+                         std::future<void>&& future) {
+            std::unique_lock<std::mutex> lock(mutex);
+            tasks.emplace(std::forward<const std::string&>(command),
+                          std::forward<std::future<void>>(future));
+            condVariable.notify_one();
+        }
+
+    } queryAsync, commandAsync;
 
     std::vector<std::unique_ptr<CommandModule>> _modules;
     Bot _bot;
     decltype(_modules)::iterator findModulePosition(const std::string& command);
     void onAnyMessageFunction(const Message::Ptr& message);
+    void onCallbackQueryFunction(const TgBot::CallbackQuery::Ptr& query);
     void startQueueConsumerThread();
     void stopQueueConsumerThread();
 };

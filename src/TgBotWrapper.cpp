@@ -17,9 +17,12 @@
 #include <libos/OnTerminateRegistrar.hpp>
 #include <libos/libsighandler.hpp>
 #include <memory>
+#include <mutex>
 #include <queue>
 #include <string_view>
 #include <utility>
+
+#include "tgbot/types/CallbackQuery.h"
 
 void MessageExt::update() {
     // Try to find botcommand entity
@@ -217,7 +220,7 @@ bool TgBotWrapper::validateValidArgs(const CommandModule::Ptr& module,
             }
             strings.emplace_back(
                 fmt::format("arguments. But got {}.", args.size()));
-            
+
             if (!module->valid_arguments.usage.empty()) {
                 strings.emplace_back(
                     fmt::format("Usage: {}", module->valid_arguments.usage));
@@ -294,15 +297,16 @@ void TgBotWrapper::commandHandler(unsigned int authflags,
 }
 
 void TgBotWrapper::startQueueConsumerThread() {
-    workerThreads.emplace_back([this]() {
-        while (!stopWorker) {
-            std::unique_lock<std::mutex> lock(queueMutex);
-            queueCV.wait(lock,
-                         [this] { return !asyncTasks.empty() || stopWorker; });
+    const auto threadFn = [](Async* async) {
+        while (!async->stopWorker) {
+            std::unique_lock<std::mutex> lock(async->mutex);
+            async->condVariable.wait(lock, [async] {
+                return !async->tasks.empty() || async->stopWorker;
+            });
 
-            if (!asyncTasks.empty()) {
-                auto front = std::move(asyncTasks.front());
-                asyncTasks.pop();
+            if (!async->tasks.empty()) {
+                auto front = std::move(async->tasks.front());
+                async->tasks.pop();
                 lock.unlock();
                 try {
                     // Wait for the task to complete
@@ -315,17 +319,23 @@ void TgBotWrapper::startQueueConsumerThread() {
                 }
             }
         }
-    });
+    };
+    commandAsync.threads.emplace_back(threadFn, &commandAsync);
+    queryAsync.threads.emplace_back(threadFn, &queryAsync);
 }
 
 void TgBotWrapper::stopQueueConsumerThread() {
-    stopWorker = true;
-    queueCV.notify_all();
-    for (auto& thread : workerThreads) {
-        if (thread.joinable()) {
-            thread.join();
+    const auto stopFn = [](Async* async) {
+        async->stopWorker = true;
+        async->condVariable.notify_all();
+        for (auto& thread : async->threads) {
+            if (thread.joinable()) {
+                thread.join();
+            }
         }
-    }
+    };
+    stopFn(&commandAsync);
+    stopFn(&queryAsync);
 }
 
 void TgBotWrapper::addCommand(CommandModule::Ptr module) {
@@ -344,12 +354,10 @@ void TgBotWrapper::addCommand(CommandModule::Ptr module) {
     getEvents().onCommand(
         module->command,
         [this, authflags, cmd = module->command](const Message::Ptr& message) {
-            std::lock_guard<std::mutex> lock(queueMutex);
-            asyncTasks.emplace(
+            commandAsync.emplaceTask(
                 cmd, std::async(std::launch::async,
                                 &TgBotWrapper::commandHandler, this, authflags,
                                 std::make_shared<MessageExt>(message)));
-            queueCV.notify_one();
         });
     _modules.emplace_back(std::move(module));
 }
@@ -439,16 +447,16 @@ decltype(TgBotWrapper::_modules)::iterator TgBotWrapper::findModulePosition(
 }
 
 void TgBotWrapper::onAnyMessageFunction(const Message::Ptr& message) {
-    decltype(callbacks)::const_reverse_iterator it;
+    decltype(callbacks_anycommand)::const_reverse_iterator it;
     std::vector<std::pair<std::future<AnyMessageResult>, decltype(it)>> vec;
-    const std::lock_guard<std::mutex> lock(callbackMutex);
+    const std::lock_guard<std::mutex> lock(callback_anycommand_mutex);
 
-    if (callbacks.empty()) {
+    if (callbacks_anycommand.empty()) {
         return;
     }
     const auto thiz = shared_from_this();
-    it = callbacks.crbegin();
-    while (it != callbacks.crend()) {
+    it = callbacks_anycommand.crbegin();
+    while (it != callbacks_anycommand.crend()) {
         const auto fn_copy = *it;
         vec.emplace_back(std::async(std::launch::async, fn_copy, thiz,
                                     std::make_shared<MessageExt>(message)),
@@ -463,12 +471,24 @@ void TgBotWrapper::onAnyMessageFunction(const Message::Ptr& message) {
                     break;
 
                 case TgBotApi::AnyMessageResult::Deregister:
-                    callbacks.erase(callback.base());
+                    callbacks_anycommand.erase(callback.base());
                     break;
             }
         } catch (const TgBot::TgException& ex) {
             LOG(ERROR) << "Error in onAnyMessageCallback: " << ex.what();
         }
+    }
+}
+
+void TgBotWrapper::onCallbackQueryFunction(
+    const TgBot::CallbackQuery::Ptr& query) {
+    const std::lock_guard<std::mutex> lock(callback_callbackquery_mutex);
+    if (callbacks_callbackquery.empty()) {
+        return;
+    }
+    for (const auto& [command, callback] : callbacks_callbackquery) {
+        queryAsync.emplaceTask(command,
+                               std::async(std::launch::async, callback, query));
     }
 }
 
@@ -489,6 +509,10 @@ void TgBotWrapper::startPoll() {
     // Register -> onAnyMessage
     getEvents().onAnyMessage(
         [this](const Message::Ptr& message) { onAnyMessageFunction(message); });
+    // Register->onCallbackQuery
+    getEvents().onCallbackQuery([this](const TgBot::CallbackQuery::Ptr& query) {
+        onCallbackQueryFunction(query);
+    });
 
     OnTerminateRegistrar::getInstance()->registerCallback([this]() {
         std::ranges::for_each(
@@ -773,7 +797,8 @@ TgBotWrapper::TgBotWrapper(const std::string& token) : _bot(token) {
 
 TgBotWrapper::~TgBotWrapper() {
     stopQueueConsumerThread();
-    std::ranges::for_each(callbacks, [](auto&& fn) { fn = nullptr; });
+    std::ranges::for_each(callbacks_anycommand,
+                          [](auto&& fn) { fn = nullptr; });
 }
 
 DECLARE_CLASS_INST(TgBotWrapper);
