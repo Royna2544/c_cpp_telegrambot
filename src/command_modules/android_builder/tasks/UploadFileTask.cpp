@@ -19,11 +19,6 @@ bool UploadFileTask::runFunction() {
     }
     auto* resultdata = dataShmem->get<PerBuildData::ResultData>();
 
-    ForkAndRunShell shell("bash");
-    if (!shell.open()) {
-        return false;
-    }
-    shell << "set -e" << ForkAndRunShell::endl;
     // First determine zip file path
     std::filesystem::directory_iterator it;
     std::filesystem::path zipFilePath;
@@ -31,12 +26,15 @@ bool UploadFileTask::runFunction() {
     for (it = decltype(it)(std::filesystem::path() / "out" / "target" /
                            "product" / data.device);
          it != decltype(it)(); ++it) {
-        if (it->is_regular_file() && it->path().extension() == ".zip" &&
-            it->path().string().starts_with(
-                getValue(data.localManifest->rom)->romInfo->prefixOfOutput)) {
-            LOG(INFO) << "zipFile=" << it->path().string();
-            zipFilePath = it->path();
-            break;
+        if (it->is_regular_file() && it->path().extension() == ".zip") {
+            DLOG(INFO) << "Entry: " << it->path();
+            if (it->path().filename().string().starts_with(
+                    getValue(data.localManifest->rom)
+                        ->romInfo->prefixOfOutput)) {
+                LOG(INFO) << "zipFile=" << it->path().string();
+                zipFilePath = it->path();
+                break;
+            }
         }
     }
     if (zipFilePath.empty()) {
@@ -57,6 +55,10 @@ bool UploadFileTask::runFunction() {
 
     // Run the upload script.
     LOG(INFO) << "Starting upload";
+    ForkAndRunShell shell("bash");
+    if (!shell.open()) {
+        return false;
+    }
     shell << "bash " << scriptFile << " " << zipFilePath.string()
           << ForkAndRunShell::endl;
     shell.close();
@@ -64,18 +66,13 @@ bool UploadFileTask::runFunction() {
 }
 
 void UploadFileTask::onExit(int exitCode) {
-    switch (exitCode) {
-        case EXIT_SUCCESS:
-            data.result->value = PerBuildData::Result::SUCCESS;
-            break;
-        case EXIT_FAILURE:
-            data.result->value = PerBuildData::Result::ERROR_FATAL;
-            break;
-        default:
-            break;
-    }
     LOG(INFO) << "Process exited with code: " << exitCode;
     std::memcpy(data.result, smem->memory, sizeof(PerBuildData::ResultData));
+    if (exitCode == EXIT_SUCCESS) {
+        data.result->value = PerBuildData::Result::SUCCESS;
+    } else {
+        data.result->value = PerBuildData::Result::ERROR_FATAL;
+    }
 }
 
 UploadFileTask::UploadFileTask(PerBuildData data) : data(std::move(data)) {
