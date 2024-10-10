@@ -135,6 +135,7 @@ class ROMBuildQueryHandler
     }
 
    public:
+    bool pinned() const { return didpin; }
     ROMBuildQueryHandler(std::shared_ptr<TgBotApi> api, MessagePtr userMessage);
     ~ROMBuildQueryHandler();
 
@@ -200,10 +201,9 @@ class ROMBuildQueryHandler
     // Handle type selection button
     void handle_type(const Query& query);
 
-#define DECLARE_BUTTON_HANDLER(name, key)                               \
-    ButtonHandler {                                                     \
-        name, #key, [this](const Query& query) { handle_##key(query); } \
-    }
+#define DECLARE_BUTTON_HANDLER(name, key) \
+    ButtonHandler{name, #key,             \
+                  [this](const Query& query) { handle_##key(query); }}
 #define DECLARE_BUTTON_HANDLER_WITHPREFIX(name, key, prefix)             \
     ButtonHandler {                                                      \
         name, #key, [this](const Query& query) { handle_##key(query); }, \
@@ -293,6 +293,11 @@ class TaskWrapperBase {
         cancelKeyboard =
             KeyboardBuilder().addKeyboard({{"Cancel", "cancel"}}).get();
     }
+    ~TaskWrapperBase() {
+        if (sentMessage && queryHandler->pinned()) {
+            api->unpinMessage(sentMessage);
+        }
+    }
 
     /**
      * @brief Virtual function to be called before the execution of the build
@@ -329,15 +334,21 @@ class TaskWrapperBase {
         requires canCreateWithApi<Impl>
     {
         sentMessage = onPreExecute();
+        if (queryHandler->pinned()) {
+            api->pinMessage(sentMessage);
+        }
         Impl impl(api, sentMessage, data);
-        return executeCommon(std::forward<Impl>(impl));
+        return executeCommon(std::move(impl));
     }
     bool execute()
         requires canCreateWithData<Impl>
     {
         sentMessage = onPreExecute();
+        if (queryHandler->pinned()) {
+            api->pinMessage(sentMessage);
+        }
         Impl impl(data);
-        return executeCommon(std::forward<Impl>(impl));
+        return executeCommon(std::move(impl));
     }
 };
 
@@ -598,6 +609,9 @@ void ROMBuildQueryHandler::handle_build(const Query& query) {
 void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     constexpr static std::string_view kBuildDirectory = "rom_build/";
     _api->editMessage(sentMessage, "Building...");
+    if (didpin) {
+        _api->unpinMessage(sentMessage);
+    }
     std::error_code ec;
     CwdRestorer cwd(std::filesystem::current_path(ec) / kBuildDirectory);
 
