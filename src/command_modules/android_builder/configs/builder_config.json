@@ -38,7 +38,10 @@
             "name": "Evolution-X",
             "link": "https://github.com/Evolution-XYZ/manifest",
             "target": "evolution",
-            "outzip_prefix": "EvolutionX",
+            "artifact": {
+                "matcher": "ZipFilePrefixer",
+                "data": "EvolutionX"
+            },
             "branches": [
                 {
                     "android_version": 14,
@@ -50,7 +53,10 @@
             "name": "DerpFest",
             "link": "https://github.com/DerpFest-AOSP/manifest",
             "target": "bacon",
-            "outzip_prefix": "DerpFest",
+            "artifact": {
+                "matcher": "ZipFilePrefixer",
+                "data": "DerpFest"
+            },
             "branches": [
                 {
                     "android_version": 15,
@@ -66,7 +72,10 @@
             "name": "LineageOS",
             "link": "https://github.com/LineageOS/android",
             "target": "bacon",
-            "outzip_prefix": "lineage",
+            "artifact": {
+                "matcher": "ZipFilePrefixer",
+                "data": "lineage"
+            },
             "branches": [
                 {
                     "android_version": 15,
@@ -90,7 +99,10 @@
             "name": "RisingDroid",
             "link": "https://github.com/RisingTechOSS/android",
             "target": "bacon",
-            "outzip_prefix": "RisingOS",
+            "artifact": {
+                "matcher": "ZipFilePrefixer",
+                "data": "RisingOS"
+            },
             "branches": [
                 {
                     "android_version": 14,
@@ -161,6 +173,44 @@
                     "android_version": 11,
                     "device": "baffinvektt"
                 }
+            ]
+        }
+    ],
+    "recoveries": [
+        {
+            "name": "TWRP",
+            "link": "https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp",
+            "artifact": {
+                "matcher": "ExactMatcher",
+                "data": "recovery.img"
+            },
+            "branches": [
+                {
+                    "android_version": 11,
+                    "branch": "twrp-11"
+                }
+            ]
+        }
+    ],
+    "recovery_targets": [
+        {
+            "name": "TWRP for Exynos7885",
+            "clone_mapping": [
+                {
+                    "link": "https://github.com/Roynas-Android-Playground/device_samsung_exynos7885-twrp",
+                    "branch": "android-11",
+                    "destination": "device/samsung"
+                }
+            ],
+            "android_version": 11,
+            "target_recovery": "TWRP",
+            "devices": [
+                "a10",
+                "a20",
+                "a20e",
+                "a30",
+                "a30s",
+                "a40"
             ]
         }
     ]

@@ -23,14 +23,17 @@ bool UploadFileTask::runFunction() {
     std::filesystem::directory_iterator it;
     std::filesystem::path zipFilePath;
 
+    auto matcher = getValue(data.localManifest->rom)->romInfo->artifact;
+    if (matcher == nullptr) {
+        LOG(ERROR) << "No artifact matcher found";
+        return false;
+    }
     for (it = decltype(it)(std::filesystem::path() / "out" / "target" /
                            "product" / data.device);
          it != decltype(it)(); ++it) {
-        if (it->is_regular_file() && it->path().extension() == ".zip") {
+        if (it->is_regular_file()) {
             DLOG(INFO) << "Entry: " << it->path();
-            if (it->path().filename().string().starts_with(
-                    getValue(data.localManifest->rom)
-                        ->romInfo->prefixOfOutput)) {
+            if ((*matcher)(it->path().filename().string())) {
                 LOG(INFO) << "zipFile=" << it->path().string();
                 zipFilePath = it->path();
                 break;
@@ -38,7 +41,7 @@ bool UploadFileTask::runFunction() {
         }
     }
     if (zipFilePath.empty()) {
-        LOG(ERROR) << "Zip file not found";
+        LOG(ERROR) << "Artifact file not found";
         return false;
     }
     std::error_code ec;
@@ -48,10 +51,10 @@ bool UploadFileTask::runFunction() {
     if (std::filesystem::exists(scripts / "upload.bash", ec)) {
         LOG(INFO) << "Using upload.bash file";
         scriptFile = scripts / "upload.bash";
+    } else {
+        // Else, use default upload script.
+        scriptFile = scripts / "upload.default.bash";
     }
-
-    // Else, use default upload script.
-    scriptFile = scripts / "upload.default.bash";
 
     // Run the upload script.
     LOG(INFO) << "Starting upload";

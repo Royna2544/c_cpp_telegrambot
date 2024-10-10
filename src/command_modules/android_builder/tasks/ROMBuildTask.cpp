@@ -91,7 +91,7 @@ bool ROMBuildTask::runFunction() {
     }
     shell << ForkAndRunShell::endl;
     shell << "m " << getValue(data.localManifest->rom)->romInfo->target << " -j"
-          << guessJobCount() << ForkAndRunShell::endl;
+          << data.localManifest->job_count << ForkAndRunShell::endl;
     auto result = shell.close();
 
     if (result) {
@@ -121,22 +121,6 @@ bool ROMBuildTask::runFunction() {
         }
     }
     return result;
-}
-
-int ROMBuildTask::guessJobCount() {
-    static constexpr int kDefaultJobCount = 6;
-
-    static std::once_flag once;
-    static int jobCount = kDefaultJobCount;
-    std::call_once(once, [this] {
-        MemoryInfo info;
-        const auto totalMem =
-            MemoryInfo().totalMemory.to<SizeTypes::GigaBytes>();
-        LOG(INFO) << "Total memory: " << totalMem;
-        jobCount = static_cast<int>(totalMem / 4 - 1);
-        LOG(INFO) << "Using job count: " << jobCount;
-    });
-    return jobCount;
 }
 
 void ROMBuildTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
@@ -170,7 +154,8 @@ void ROMBuildTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
             "Build variant: {}\n\n"
             "{}",
             startTime, roundedTime, now, rom->romInfo->name, rom->branch,
-            data.device, guessJobCount(), MemoryInfo().usage().value, type, buffer.data());
+            data.device, data.localManifest->job_count,
+            MemoryInfo().usage().value, type, buffer.data());
         botWrapper->editMessage(message, buildInfoBuffer);
     }
 }

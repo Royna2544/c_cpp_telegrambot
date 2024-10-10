@@ -6,6 +6,7 @@
 #include <string_view>
 
 #include "Shmem.hpp"
+
 struct ROMBuildTask : ForkAndRun {
     static constexpr std::string_view kShmemROMBuild = "shmem_rombuild";
     static constexpr std::string_view kErrorLogFile = "out/error.log";
@@ -21,8 +22,6 @@ struct ROMBuildTask : ForkAndRun {
      * otherwise.
      */
     bool runFunction() override;
-
-    int guessJobCount();
 
     /**
      * @brief Handles new standard output data.

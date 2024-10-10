@@ -1,4 +1,5 @@
 find_package(jsoncpp)
+find_package(LibXml2 REQUIRED)
 
 if (NOT ${jsoncpp_FOUND})
     message(STATUS "libjsoncpp not found, disable AndroidBuilder-cpp")
@@ -20,10 +21,17 @@ add_my_library(
         TgBotRandom
         TgBotSocketSelectors
         JsonCpp::JsonCpp
+        LibXml2::LibXml2
         ${LIBGIT2_LIBS}
     PUBLIC_INC
         .
     NO_LIBPREFIX
     STATIC
+)
+
+add_my_executable(
+    NAME ConfigParserTest
+    SRCS ConfigParserTest.cpp
+    LIBS AndroidBuilder-cpp
 )
 endif()

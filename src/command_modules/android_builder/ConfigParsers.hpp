@@ -1,11 +1,12 @@
 #pragma once
 
 #include <absl/log/log.h>
-#include <json/json.h>
 
+#include <memory>
 #include <ostream>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <variant>
 
@@ -13,13 +14,35 @@
 
 class ConfigParser {
    public:
+    struct ArtifactMatcher {
+        using Ptr = std::shared_ptr<ArtifactMatcher>;
+        using MatcherType = std::function<bool(const std::string_view filename,
+                                               const std::string_view data)>;
+        ArtifactMatcher(MatcherType matcher, std::string name)
+            : matcher_(std::move(matcher)), name_(std::move(name)) {}
+
+       private:
+        MatcherType matcher_;
+        std::string name_;
+        std::string data_;
+
+       public:
+        bool operator()(std::string_view filename) const {
+            return matcher_(filename, data_);
+        }
+        bool operator==(const ArtifactMatcher &other) const {
+            return name_ == other.name_;
+        }
+        void setData(std::string data) { data_ = std::move(data); }
+    };
+
     struct ROMInfo {
         using Ptr = std::shared_ptr<ROMInfo>;
 
-        std::string name;            // name of the ROM
-        std::string url;             // URL of the ROM repo
-        std::string target;          // build target to build a ROM
-        std::string prefixOfOutput;  // prefix of output zip file
+        std::string name;               // name of the ROM
+        std::string url;                // URL of the ROM repo
+        std::string target;             // build target to build a ROM
+        ArtifactMatcher::Ptr artifact;  // matcher for the out artifact
 
         bool operator==(const ROMInfo &other) const = default;
     };
@@ -75,6 +98,33 @@ class ConfigParser {
     };
 
     struct LocalManifest {
+        struct PrepareBase {
+            virtual ~PrepareBase() = default;
+            // Do the preparation
+            // With the manifest path being `path'
+            virtual bool operator()(const std::filesystem::path &path) = 0;
+        };
+
+        struct GitPrepare : PrepareBase {
+            RepoUtils::RepoInfo info;
+            explicit GitPrepare(RepoUtils::RepoInfo info)
+                : info(std::move(info)) {}
+            bool operator()(const std::filesystem::path &path) override;
+        };
+
+        struct WritePrepare : PrepareBase {
+            struct Data : RepoInfo {
+                std::filesystem::path destination;
+
+                explicit Data(std::string url, std::string branch,
+                              std::filesystem::path destination)
+                    : RepoInfo(std::move(url), std::move(branch)),
+                      destination(std::move(destination)) {}
+            };
+            std::vector<Data> data;
+            bool operator()(const std::filesystem::path &path) override;
+        };
+
         using Ptr = std::shared_ptr<LocalManifest>;
         template <typename match>
         using StringArrayOr =
@@ -88,9 +138,10 @@ class ConfigParser {
         std::string name;  // name of the manifest
         // associated ROM and its branch
         std::variant<ROMLookup, ROMBranch::Ptr> rom;
-        RepoUtils::RepoInfo repo_info;  // local manifest information
+        std::shared_ptr<PrepareBase> prepare;  // local manifest information
         // First type is used before merge, second type is used after merge
         StringArrayOr<Device::Ptr> devices;
+        long job_count;      // number of jobs
     };
 
     explicit ConfigParser(const std::filesystem::path &jsonFileDir);
@@ -136,24 +187,7 @@ class ConfigParser {
    private:
     std::vector<LocalManifest::Ptr> parsedManifests;
 
-    class Parser {
-        Json::Value root;
-
-        // Parse 'roms' section
-        std::vector<ROMBranch::Ptr> parseROMManifest();
-        // Parse 'targets' section
-        std::vector<Device::Ptr> parseDevices();
-        // Parse 'local_manifests' section
-        std::vector<LocalManifest::Ptr> parseLocalManifestBranch();
-        // Merge parsed data to create a linked list of LocalManifests
-        bool merge();
-
-        std::vector<LocalManifest::Ptr> mergedManifests;
-
-       public:
-        explicit Parser(const std::filesystem::path &jsonFileDir);
-        [[nodiscard]] std::vector<LocalManifest::Ptr> parse();
-    };
+    class Parser;
 };
 
 struct PerBuildData {

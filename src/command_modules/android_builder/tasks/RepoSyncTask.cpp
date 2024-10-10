@@ -122,6 +122,7 @@ bool RepoSyncTask::runFunction() {
     }
     if (const auto val = walk_up_tree_and_gather<false>(
             [](const std::filesystem::path& path) {
+                DLOG(INFO) << "Walking up: " << path;
                 return std::filesystem::exists(path / ".repo");
             });
         val.size() != 0) {
@@ -130,28 +131,9 @@ bool RepoSyncTask::runFunction() {
                        << dir.string();
             std::filesystem::remove_all(dir / ".repo");
         }
-        RepoUtils::repo_init({rom->romInfo->url, rom->branch});
     }
-    if (!std::filesystem::exists(kLocalManifestPath)) {
-        GitUtils::git_clone(data.localManifest->repo_info,
-                            kLocalManifestPath.data());
-    } else {
-        LOG(INFO) << "Local manifest exists already...";
-        GitBranchSwitcher switcherLocal{
-            .gitDirectory = RepoSyncTask::kLocalManifestPath.data(),
-            .desiredBranch = data.localManifest->repo_info.branch,
-            .desiredUrl = data.localManifest->repo_info.url,
-            .checkout = true,
-        };
-        if (switcherLocal()) {
-            LOG(INFO) << "Repo is up-to-date.";
-        } else {
-            LOG(WARNING)
-                << "Local manifest is not the correct repository, deleting it.";
-            std::filesystem::remove_all(kLocalManifestPath);
-            GitUtils::git_clone(data.localManifest->repo_info,
-                                kLocalManifestPath.data());
-        }
+    if (!(*data.localManifest->prepare)(kLocalManifestPath.data())) {
+        return false;
     }
     unsigned int job_count = std::thread::hardware_concurrency() / 2;
     if (runWithReducedJobs) {
