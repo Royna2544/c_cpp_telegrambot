@@ -611,12 +611,6 @@ Message::Ptr TgBotWrapper::sendSticker_impl(
 Message::Ptr TgBotWrapper::editMessage_impl(
     const Message::Ptr& message, const std::string& newText,
     const TgBot::InlineKeyboardMarkup::Ptr& markup) const {
-    if (message->text == newText) {
-        // Nothing to do, same text, no need to edit
-        // Only causes exceptions if sent.
-        LOG(WARNING) << "No-op editMessage_impl as content is same";
-        return message;
-    }
     DEBUG_ASSERT_NONNULL_PARAM(message);
     return getApi().editMessageText(newText, message->chat->id,
                                     message->messageId, "", "",
