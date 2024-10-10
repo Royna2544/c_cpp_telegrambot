@@ -7,8 +7,6 @@
 
 using std::chrono_literals::operator""s;
 
-#include "StringToolsExt.hpp"
-
 DECLARE_COMMAND_HANDLER(decide, wrapperBot, message) {
     constexpr int COUNT_MAX = 10;
     constexpr int RANDOM_RANGE_NUM = 10;

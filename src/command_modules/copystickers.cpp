@@ -34,9 +34,7 @@ struct StickerData {
 };
 
 std::string ratio_to_percentage(double ratio) {
-    std::stringstream ss;
-    ss << std::fixed << std::setprecision(2) << ratio * 100 << "%";
-    return ss.str();
+    return fmt::format("{:.2f}%", ratio);
 }
 
 // Too many stickers in req to create a sticker set at once doesn't work
@@ -100,11 +98,11 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
     size_t count = 0;
     for (const auto& sticker : stickerData) {
         if (count % RATELIMIT_DELIMITER_FOR_CONVERT_UPDATE == 0) {
-            const auto percent =
-                ratio_to_percentage(static_cast<double>(count) /
-                                    static_cast<double>(stickerData.size()));
-            api->editMessage(sentMessage,
-                             fmt::format("Converting stickers... {}", percent));
+            const auto ratio = static_cast<double>(count) /
+                               static_cast<double>(stickerData.size());
+            api->editMessage(
+                sentMessage,
+                fmt::format("Converting stickers... {:.2f}%", ratio));
         }
         sticker.printProgress("Downloading");
         if (!api->downloadFile(sticker.filePath, sticker.fileId)) {

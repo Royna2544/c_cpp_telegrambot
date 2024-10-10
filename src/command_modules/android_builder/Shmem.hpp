@@ -2,22 +2,20 @@
 
 #include <absl/log/check.h>
 #include <absl/log/log.h>
+#include <fmt/format.h>
 #include <sys/types.h>
 
 #include <cstring>
-#include <sstream>
 #include <string>
 #include <string_view>
+
 #include "internal/_class_helper_macros.h"
 
 class syscall_perror : public std::exception {
    public:
     explicit syscall_perror(const std::string_view syscall, int _errno = errno)
-        : _errno(_errno) {
-        std::stringstream ss;
-        ss << "Error in " << syscall << ": " << strerror(_errno);
-        message = ss.str();
-    }
+        : _errno(_errno),
+          message(fmt::format("Error in {}: {}", syscall, strerror(_errno))) {}
 
     const char* what() const noexcept override { return message.c_str(); }
     [[nodiscard]] int error_code() const noexcept { return _errno; }

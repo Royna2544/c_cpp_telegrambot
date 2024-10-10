@@ -42,7 +42,7 @@ std::string findTCL() {
             return it->path().filename().replace_extension();
         }
     }
-    LOG(INFO) << "Didn't find any tcl, but it is fine";
+    LOG(INFO) << "Didn't find any scl, but it is fine";
     // Ignore if we failed to open, this path is only valid in Android 14+
     return {};
 }
@@ -140,7 +140,7 @@ int ROMBuildTask::guessJobCount() {
 }
 
 void ROMBuildTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
-    std::stringstream buildInfoBuffer;
+    std::string buildInfoBuffer;
     const auto now = std::chrono::system_clock::now();
     const auto& rom = getValue(data.localManifest->rom);
     double memUsage = NAN;
@@ -160,18 +160,18 @@ void ROMBuildTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
         }
         auto roundedTime =
             std::chrono::duration_cast<std::chrono::seconds>(now - startTime);
-        buildInfoBuffer << fmt::format(
+        buildInfoBuffer = fmt::format(
             "Start time: {}\n"
             "Time spent: {:%H hours %M minutes %S seconds}\n"
             "Last updated on: {}\n"
             "Target ROM: {}, branch: {}, device: {}\n"
             "Job count: {}\n"
             "Memory usage: {:.2f}%\n"
-            "Build variant: {}\n\n",
+            "Build variant: {}\n\n"
+            "{}",
             startTime, roundedTime, now, rom->romInfo->name, rom->branch,
-            data.device, guessJobCount(), MemoryInfo().usage().value, type);
-        buildInfoBuffer << buffer.data();
-        botWrapper->editMessage(message, buildInfoBuffer.str());
+            data.device, guessJobCount(), MemoryInfo().usage().value, type, buffer.data());
+        botWrapper->editMessage(message, buildInfoBuffer);
     }
 }
 

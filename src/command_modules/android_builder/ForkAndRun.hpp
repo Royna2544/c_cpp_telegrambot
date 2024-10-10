@@ -4,13 +4,13 @@
 #include <absl/log/log_entry.h>
 #include <absl/log/log_sink.h>
 #include <absl/strings/ascii.h>
+#include <fmt/format.h>
 #include <internal/_FileDescriptor_posix.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 #include <array>
 #include <filesystem>
-#include <initializer_list>
 #include <iostream>
 #include <shared_mutex>
 #include <socket/selector/SelectorPosix.hpp>
@@ -225,9 +225,7 @@ class ForkAndRunShell {
         } else if constexpr (std::is_same_v<T, std::filesystem::path>) {
             writeString(args.string());
         } else {
-            std::stringstream ss;
-            ss << args;
-            writeString(ss.str());
+            writeString(fmt::to_string(args));
         }
         return *this;
     }
