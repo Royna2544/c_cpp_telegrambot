@@ -799,6 +799,8 @@ TgBotWrapper::~TgBotWrapper() {
     stopQueueConsumerThread();
     std::ranges::for_each(callbacks_anycommand,
                           [](auto&& fn) { fn = nullptr; });
+    std::ranges::for_each(callbacks_callbackquery,
+                          [](auto&& ent) { ent.second = nullptr; });
 }
 
 DECLARE_CLASS_INST(TgBotWrapper);
