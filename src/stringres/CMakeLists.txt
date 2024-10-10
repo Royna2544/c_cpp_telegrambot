@@ -4,9 +4,8 @@ find_package(LibXml2 REQUIRED)
 add_my_library(
   NAME StringRes 
   SRCS StringResLoader.cpp
-  LIBS ${LIBXML2_LIBRARIES}
+  LIBS LibXml2::LibXml2
   PUBLIC_INC .
-  PRIVATE_INC ${LIBXML2_INCLUDE_DIR}
 )
 
 add_my_library(
