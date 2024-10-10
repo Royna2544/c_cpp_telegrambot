@@ -22,6 +22,7 @@
 #include <string_view>
 #include <utility>
 
+#include "tgbot/TgException.h"
 #include "tgbot/types/CallbackQuery.h"
 
 void MessageExt::update() {
@@ -548,6 +549,12 @@ void handleTgBotApiEx(const TgBot::TgException& ex,
         (strstr(ex.what(), "FORUM_CLOSED") != nullptr)) {
         LOG(WARNING) << "Failed to send reply message: Bot attempted to send "
                         "reply message to a closed forum";
+        return;
+    }
+    if (ex.errorCode == TgBot::TgException::ErrorCode::BadRequest &&
+        (strstr(ex.what(), "message is not modified") != nullptr)) {
+        LOG(WARNING) << "Capturing message not modified.";
+        return;
     }
     // Goodbye, if it is not
     throw;
@@ -612,27 +619,37 @@ Message::Ptr TgBotWrapper::editMessage_impl(
     const Message::Ptr& message, const std::string& newText,
     const TgBot::InlineKeyboardMarkup::Ptr& markup) const {
     DEBUG_ASSERT_NONNULL_PARAM(message);
-    return getApi().editMessageText(newText, message->chat->id,
-                                    message->messageId, "", "",
-                                    globalLinkOptions, markup);
+    try {
+        return getApi().editMessageText(newText, message->chat->id,
+                                        message->messageId, "", "",
+                                        globalLinkOptions, markup);
+    } catch (const TgBot::TgException& ex) {
+        handleTgBotApiEx(ex, nullptr);
+        return nullptr;
+    }
 }
 
 Message::Ptr TgBotWrapper::editMessageMarkup_impl(
     const StringOrMessage& message, const GenericReply::Ptr& markup) const {
-    return std::visit(
-        [=, this](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (std::is_same_v<T, Message::Ptr>) {
-                DEBUG_ASSERT_NONNULL_PARAM(arg);
-                return getApi().editMessageReplyMarkup(
-                    arg->chat->id, arg->messageId, "", markup);
-            } else if constexpr (std::is_same_v<T, std::string>) {
-                return getApi().editMessageReplyMarkup(0, 0, arg, markup);
-            }
-            LOG(WARNING) << "No-op editMessageReplyMarkup";
-            return Message::Ptr();
-        },
-        message);
+    try {
+        return std::visit(
+            [=, this](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<T, Message::Ptr>) {
+                    DEBUG_ASSERT_NONNULL_PARAM(arg);
+                    return getApi().editMessageReplyMarkup(
+                        arg->chat->id, arg->messageId, "", markup);
+                } else if constexpr (std::is_same_v<T, std::string>) {
+                    return getApi().editMessageReplyMarkup(0, 0, arg, markup);
+                }
+                LOG(WARNING) << "No-op editMessageReplyMarkup";
+                return Message::Ptr();
+            },
+            message);
+    } catch (const TgBot::TgException& ex) {
+        handleTgBotApiEx(ex, nullptr);
+        return nullptr;
+    }
 }
 
 MessageId TgBotWrapper::copyMessage_impl(
