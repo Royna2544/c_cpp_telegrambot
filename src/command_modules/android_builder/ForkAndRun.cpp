@@ -200,7 +200,8 @@ DeferredExit::~DeferredExit() {
             kill(0, code);
             break;
         case Type::UNKNOWN:
-            LOG(WARNING) << "Deferred exit: unknown type. Take default action: exit 1";
+            LOG(WARNING)
+                << "Deferred exit: unknown type. Take default action: exit 1";
             _exit(EXIT_FAILURE);
             break;
     }
@@ -262,12 +263,10 @@ bool ForkAndRunShell::open() {
     } else if (shell_pid_ == 0) {
         dup2(pipe_.readEnd(), STDIN_FILENO);
         ::close(pipe_.writeEnd());
-        auto stringLen = shell_path_.string().size();
-        auto ptr = std::make_unique_for_overwrite<char[]>(stringLen + 1);
-        std::strcpy(ptr.get(), shell_path_.c_str());
-        ptr.get()[stringLen] = 0;
-        char* argv[] = {ptr.get(), nullptr};
-        execvp(ptr.get(), argv);
+        std::unique_ptr<char, decltype(&free)> string(
+            strdup(shell_path_.string().c_str()), free);
+        std::array<char*, 2> argv{string.get(), nullptr};
+        execvp(string.get(), argv.data());
         _exit(EXIT_FAILURE);
     } else {
         LOG(INFO) << "Shell opened with pid " << shell_pid_;
