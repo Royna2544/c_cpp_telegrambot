@@ -298,24 +298,21 @@ bool ForkAndRunShell::open() {
 
 const ForkAndRunShell& ForkAndRunShell::operator<<(
     const endl_t /*unused*/) const {
-    const std::shared_lock<std::shared_mutex> _(pid_mutex_);
-
-    if (!opened || shell_pid_ < 0) {
-        LOG(ERROR) << "Shell not open. Ignoring endl";
-        return *this;
-    }
-    write(pipe_.writeEnd(), "\n", 1);
+    writeString("\n");
     return *this;
 }
 
-void ForkAndRunShell::writeString(const std::string_view& args) const {
+void ForkAndRunShell::writeString(const std::string_view& str) const {
     const std::shared_lock<std::shared_mutex> _(pid_mutex_);
 
     if (!opened || shell_pid_ < 0) {
-        LOG(ERROR) << "Shell not open. Ignoring " << std::quoted(args);
+        LOG(ERROR) << "Shell not open. Ignoring " << std::quoted(str);
         return;
     }
-    write(pipe_.writeEnd(), args.data(), args.size());
+    
+    if (::write(pipe_.writeEnd(), str.data(), str.size()) < 0) {
+        PLOG(ERROR) << fmt::format("Failed to write '{}' to pipe", str);
+    }
 }
 
 DeferredExit ForkAndRunShell::close() {
@@ -331,14 +328,7 @@ DeferredExit ForkAndRunShell::close() {
         }
     }
     opened = false;  // Prevent future write operations.
-    LOG(INFO) << "Writing exit command";
-    const std::string_view eof = "exit\n";
-    const auto rc =
-        write(pipe_.writeEnd(), eof.data(), eof.size());  // EOF to shell
-    if (rc < 0) {
-        PLOG(ERROR) << "Failed to write exit command";
-        return DeferredExit::generic_fail;
-    }
+    *this << "exit" << endl;
     LOG(INFO) << "Exit command written";
     if (do_wait || terminate_watcher_thread.joinable()) {
         terminate_watcher_thread.join();
