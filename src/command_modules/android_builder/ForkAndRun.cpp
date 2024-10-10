@@ -327,8 +327,8 @@ DeferredExit ForkAndRunShell::close() {
             do_wait = true;
         }
     }
-    opened = false;  // Prevent future write operations.
     *this << "exit" << endl;
+    opened = false;  // Prevent future write operations.
     LOG(INFO) << "Exit command written";
     if (do_wait || terminate_watcher_thread.joinable()) {
         terminate_watcher_thread.join();
