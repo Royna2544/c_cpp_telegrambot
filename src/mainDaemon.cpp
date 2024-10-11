@@ -1,24 +1,23 @@
+#include <fmt/format.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 
-#include <array>
 #include <cstdio>
 #include <cstdlib>
-#include <limits>
+#include <iostream>
 
 // Wrapper launcher to create a daemon process from the bot
 int main(const int argc, char** argv) {
-    std::array<char, std::numeric_limits<pid_t>::digits10 + 1> kLogFile{};
-    snprintf(kLogFile.data(), sizeof(kLogFile) - 1, "log_%d.txt", getpid());
+    const auto kLogFile = fmt::format("log_{}.txt", getpid());
 
     if (argc < 2) {
         puts("A wrapper launcher to create a daemon process.");
         puts("No bot executable provided.");
-        printf("Usage: %s <bot_exe_path> args...\n", argv[0]);
+        fmt::print("Usage: {} <bot_exe_path> args...\n", argv[0]);
         return EXIT_FAILURE;
     }
-    printf("My pid is %d\n", getpid());
+    fmt::print("My pid is {}\n", getpid());
 
     pid_t pid = fork();
 
@@ -32,12 +31,13 @@ int main(const int argc, char** argv) {
     }
 
     // Child process continues
-    printf("Daemon process created with PID: %d\n", getpid());
-    printf("Redirecting stdout and stderr to %s\n", kLogFile.data());
-    printf("Executable is: %s, argument count: %d\n", argv[1], argc - 1);
+    fmt::print("Daemon process created with PID: {}\n", getpid());
+    fmt::print("Redirecting stdout and stderr to {}\n", kLogFile.data());
+    fmt::print("Executable is: {}, argument count: {}\n", argv[1], argc - 1);
 
     if (access(argv[1], R_OK | X_OK) != 0) {
-        fprintf(stderr, "Error: Bot executable not found or not executable.\n");
+        std::cerr << "Error: Bot executable not found or not executable."
+                  << std::endl;
         return EXIT_FAILURE;
     }
 
