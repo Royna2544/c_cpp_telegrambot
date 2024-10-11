@@ -16,8 +16,9 @@ class ConfigParser {
    public:
     struct ArtifactMatcher {
         using Ptr = std::shared_ptr<ArtifactMatcher>;
-        using MatcherType = std::function<bool(const std::string_view filename,
-                                               const std::string_view data)>;
+        using MatcherType =
+            std::function<bool(const std::string_view filename,
+                               const std::string_view data, const bool debug)>;
         ArtifactMatcher(MatcherType matcher, std::string name)
             : matcher_(std::move(matcher)), name_(std::move(name)) {}
 
@@ -27,8 +28,8 @@ class ConfigParser {
         std::string data_;
 
        public:
-        bool operator()(std::string_view filename) const {
-            return matcher_(filename, data_);
+        bool operator()(std::string_view filename, const bool debug = false) const {
+            return matcher_(filename, data_, debug);
         }
         bool operator==(const ArtifactMatcher &other) const {
             return name_ == other.name_;
@@ -141,7 +142,7 @@ class ConfigParser {
         std::shared_ptr<PrepareBase> prepare;  // local manifest information
         // First type is used before merge, second type is used after merge
         StringArrayOr<Device::Ptr> devices;
-        long job_count;      // number of jobs
+        long job_count;  // number of jobs
     };
 
     explicit ConfigParser(const std::filesystem::path &jsonFileDir);

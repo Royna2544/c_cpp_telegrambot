@@ -28,9 +28,9 @@ bool UploadFileTask::runFunction() {
         LOG(ERROR) << "No artifact matcher found";
         return false;
     }
-    for (it = decltype(it)(std::filesystem::path() / "out" / "target" /
-                           "product" / data.device);
-         it != decltype(it)(); ++it) {
+    const auto dir =
+        std::filesystem::path() / "out" / "target" / "product" / data.device;
+    for (it = decltype(it)(dir); it != decltype(it)(); ++it) {
         if (it->is_regular_file()) {
             DLOG(INFO) << "Entry: " << it->path();
             if ((*matcher)(it->path().filename().string())) {
@@ -42,6 +42,15 @@ bool UploadFileTask::runFunction() {
     }
     if (zipFilePath.empty()) {
         LOG(ERROR) << "Artifact file not found";
+
+        // Iterate over and print debug info.
+        for (it = decltype(it)(dir); it != decltype(it)(); ++it) {
+            if (it->is_regular_file()) {
+                (*matcher)(it->path().filename().string(), true);
+            } else {
+                DLOG(INFO) << "Not a file: " << it->path();
+            }
+        }
         return false;
     }
     std::error_code ec;
