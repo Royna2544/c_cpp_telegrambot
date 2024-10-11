@@ -90,7 +90,7 @@ bool RepoSyncNetworkHook::process(const std::string& line) {
         R"(^Failed to connect to (github\.com|gitlab\.com) port \d+ after \d+ ms: Couldn't connect to server$)");
     if (std::regex_match(line, kSyncErrorNetworkRegex) ||
         std::regex_match(line, kSyncErrorNetworkRegex2)) {
-        LOG(INFO) << "Detected sync issue, caused by network";
+        LOG(INFO) << "Detected sync issue, caused by network: " << line;
         hadProblems = true;
         return true;
     }
