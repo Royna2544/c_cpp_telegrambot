@@ -33,14 +33,14 @@
 
 struct FDLogSink : public absl::LogSink {
     void Send(const absl::LogEntry& logSink) override {
-        const auto message = logSink.text_message_with_prefix_and_newline();
-        constexpr std::string_view prefix = "SubProcess: ";
         if (isWritable) {
-            write(stdout_fd, prefix.data(), prefix.size());
-            write(stdout_fd, message.data(), message.size());
+            const std::string newLine =
+                fmt::format("SubProcess (PID: {}): {}", pid_,
+                            logSink.text_message_with_prefix_and_newline());
+            write(stdout_fd, newLine.c_str(), newLine.size());
         }
     }
-    explicit FDLogSink() : stdout_fd(::dup(STDOUT_FILENO)) {
+    explicit FDLogSink() : stdout_fd(::dup(STDOUT_FILENO)), pid_(getpid()) {
         if (stdout_fd < 0) {
             PLOG(ERROR) << "Failed to duplicate stdout";
             isWritable = false;
@@ -51,6 +51,7 @@ struct FDLogSink : public absl::LogSink {
    private:
     int stdout_fd;
     bool isWritable = true;
+    pid_t pid_;
 };
 
 template <typename Sink>
