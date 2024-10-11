@@ -22,6 +22,8 @@ struct UploadFileTask : ForkAndRun {
      */
     bool runFunction() override;
 
+    void onNewStdoutBuffer(ForkAndRun::BufferType& buffer) override;
+
     /**
      * @brief Callback function for handling the exit of the subprocess.
      *
@@ -45,4 +47,5 @@ struct UploadFileTask : ForkAndRun {
    private:
     PerBuildData data;
     std::unique_ptr<AllocatedShmem> smem;
+    std::string stdoutOutput;
 };

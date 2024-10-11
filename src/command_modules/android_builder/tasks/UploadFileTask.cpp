@@ -68,11 +68,18 @@ bool UploadFileTask::runFunction() {
     return true;
 }
 
+void UploadFileTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
+    stdoutOutput.append(buffer.data());
+}
+
 void UploadFileTask::onExit(int exitCode) {
     LOG(INFO) << "Process exited with code: " << exitCode;
     std::memcpy(data.result, smem->memory, sizeof(PerBuildData::ResultData));
     if (exitCode == EXIT_SUCCESS) {
         data.result->value = PerBuildData::Result::SUCCESS;
+        // Return the last N bytes of the stdout buffer.
+        data.result->setMessage(stdoutOutput.substr(
+            stdoutOutput.size() - PerBuildData::ResultData::MSG_SIZE + 1));
     } else {
         data.result->value = PerBuildData::Result::ERROR_FATAL;
     }
