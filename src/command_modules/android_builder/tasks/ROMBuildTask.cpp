@@ -48,7 +48,7 @@ std::string findTCL() {
 }
 }  // namespace
 
-bool ROMBuildTask::runFunction() {
+DeferredExit ROMBuildTask::runFunction() {
     std::unique_ptr<ConnectedShmem> dataShmem;
 
     try {
@@ -56,19 +56,19 @@ bool ROMBuildTask::runFunction() {
             kShmemROMBuild, sizeof(PerBuildData::ResultData));
     } catch (const syscall_perror& ex) {
         LOG(ERROR) << ex.what();
-        return false;
+        return DeferredExit::generic_fail;
     }
     auto* resultdata = dataShmem->get<PerBuildData::ResultData>();
     resultdata->value = PerBuildData::Result::ERROR_FATAL;
     auto release = findTCL();
     auto vendor = findVendor();
     if (vendor.empty()) {
-        return false;
+        return DeferredExit::generic_fail;
     }
 
     ForkAndRunShell shell("bash");
     if (!shell.open()) {
-        return false;
+        return DeferredExit::generic_fail;
     }
 
     shell << "set -e" << ForkAndRunShell::endl;

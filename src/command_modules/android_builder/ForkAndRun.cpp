@@ -1,6 +1,7 @@
 #include "ForkAndRun.hpp"
 
 #include <absl/log/log.h>
+#include <absl/log/log_sink.h>
 #include <absl/log/log_sink_registry.h>
 #include <absl/strings/ascii.h>
 #include <fcntl.h>
@@ -24,8 +25,48 @@
 #include <shared_mutex>
 #include <string_view>
 #include <thread>
+#include <type_traits>
 #include <utility>
 #include <vector>
+
+#include "internal/_class_helper_macros.h"
+
+struct FDLogSink : public absl::LogSink {
+    void Send(const absl::LogEntry& logSink) override {
+        const auto message = logSink.text_message_with_prefix_and_newline();
+        constexpr std::string_view prefix = "SubProcess: ";
+        if (isWritable) {
+            write(stdout_fd, prefix.data(), prefix.size());
+            write(stdout_fd, message.data(), message.size());
+        }
+    }
+    explicit FDLogSink() : stdout_fd(::dup(STDOUT_FILENO)) {
+        if (stdout_fd < 0) {
+            PLOG(ERROR) << "Failed to duplicate stdout";
+            isWritable = false;
+        }
+    }
+    ~FDLogSink() override { ::close(stdout_fd); }
+
+   private:
+    int stdout_fd;
+    bool isWritable = true;
+};
+
+template <typename Sink>
+    requires(std::is_base_of_v<absl::LogSink, Sink>)
+struct RAIILogSink {
+    explicit RAIILogSink() : _sink(std::make_unique<Sink>()) {
+        absl::AddLogSink(_sink.get());
+    }
+    ~RAIILogSink() { absl::RemoveLogSink(_sink.get()); }
+
+    NO_MOVE_CTOR(RAIILogSink);
+    NO_COPY_CTOR(RAIILogSink);
+
+   private:
+    std::unique_ptr<Sink> _sink;
+};
 
 bool ForkAndRun::execute() {
     Pipe stdout_pipe{};
@@ -40,25 +81,29 @@ bool ForkAndRun::execute() {
 
     pid_t pid = fork();
     if (pid == 0) {
-        FDLogSink sink;
         TgBot_AbslLogDeInit();
-        absl::AddLogSink(&sink);
+        {
+            DeferredExit exit;
+            {
+                RAIILogSink<FDLogSink> logSink;
 
-        dup2(stdout_pipe.writeEnd(), STDOUT_FILENO);
-        dup2(stderr_pipe.writeEnd(), STDERR_FILENO);
-        close(stdout_pipe.readEnd());
-        close(stderr_pipe.readEnd());
+                dup2(stdout_pipe.writeEnd(), STDOUT_FILENO);
+                dup2(stderr_pipe.writeEnd(), STDERR_FILENO);
+                close(stdout_pipe.readEnd());
+                close(stderr_pipe.readEnd());
 
-        // Clear handlers
-        SignalHandler::uninstall();
+                // Clear handlers
+                SignalHandler::uninstall();
 
-        // Set the process group to the current process ID
-        setpgrp();
+                // Set the process group to the current process ID
+                setpgrp();
 
-        int ret = 0;
-        ret = runFunction() ? EXIT_SUCCESS : EXIT_FAILURE;
-        absl::RemoveLogSink(&sink);
-        _exit(ret);
+                // Run the function.
+                exit = runFunction();
+            }
+            // Destructor of exit should exit the process.
+        }
+        _exit(std::numeric_limits<uint8_t>::max());  // Just in case.
     } else if (pid > 0) {
         Pipe program_termination_pipe{};
         bool breakIt = false;
@@ -152,7 +197,7 @@ void ForkAndRun::cancel() const {
 }
 
 DeferredExit::DeferredExit(DeferredExit::fail_t /*unused*/)
-    : type(Type::EXIT), code(1) {}
+    : type(Type::EXIT), code(EXIT_FAILURE) {}
 
 DeferredExit::DeferredExit(int status) {
     if (WIFEXITED(status)) {
@@ -173,10 +218,7 @@ DeferredExit::~DeferredExit() {
     }
 
     DLOG(INFO) << "At ~DeferredExit";
-    if (*this) {
-        DLOG(INFO) << "Skip the deferred exit";
-        return;
-    } else {
+    if (!*this) {
         std::string_view typeStr;
         switch (type) {
             case Type::EXIT:
@@ -309,7 +351,7 @@ void ForkAndRunShell::writeString(const std::string_view& str) const {
         LOG(ERROR) << "Shell not open. Ignoring " << std::quoted(str);
         return;
     }
-    
+
     if (::write(pipe_.writeEnd(), str.data(), str.size()) < 0) {
         PLOG(ERROR) << fmt::format("Failed to write '{}' to pipe", str);
     }

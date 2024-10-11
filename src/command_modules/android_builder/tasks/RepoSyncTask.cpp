@@ -17,6 +17,7 @@
 #include <utility>
 
 #include "CompileTimeStringConcat.hpp"
+#include "ForkAndRun.hpp"
 #include "RepoUtils.hpp"
 #include "libos/libfs.hpp"
 
@@ -97,7 +98,7 @@ bool RepoSyncNetworkHook::process(const std::string& line) {
     return false;
 }
 
-bool RepoSyncTask::runFunction() {
+DeferredExit RepoSyncTask::runFunction() {
     std::error_code ec;
     bool repoDirExists = false;
 
@@ -106,7 +107,7 @@ bool RepoSyncTask::runFunction() {
         ec != std::make_error_code(std::errc::no_such_file_or_directory)) {
         LOG(ERROR) << "Failed to check .repo directory existence: "
                    << ec.message();
-        return false;
+        return DeferredExit::generic_fail;
     } else {
         DLOG(INFO) << ".repo directory exists: " << std::boolalpha
                    << repoDirExists;
@@ -133,7 +134,8 @@ bool RepoSyncTask::runFunction() {
         }
     }
     if (!(*data.localManifest->prepare)(kLocalManifestPath.data())) {
-        return false;
+        LOG(ERROR) << "Failed to prepare local manifest";
+        return DeferredExit::generic_fail;
     }
     unsigned int job_count = std::thread::hardware_concurrency() / 2;
     if (runWithReducedJobs) {
@@ -142,7 +144,7 @@ bool RepoSyncTask::runFunction() {
     } else {
         RepoUtils::repo_sync(job_count);
     }
-    return true;
+    return {}; // Success
 }
 
 void RepoSyncTask::onNewStderrBuffer(ForkAndRun::BufferType& buffer) {

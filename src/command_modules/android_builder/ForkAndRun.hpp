@@ -19,26 +19,40 @@
 
 #include "internal/_class_helper_macros.h"
 
-struct FDLogSink : public absl::LogSink {
-    void Send(const absl::LogEntry& logSink) override {
-        const auto message = logSink.text_message_with_prefix_and_newline();
-        constexpr std::string_view prefix = "SubProcess: ";
-        if (isWritable) {
-            write(stdout_fd, prefix.data(), prefix.size());
-            write(stdout_fd, message.data(), message.size());
-        }
-    }
-    explicit FDLogSink() : stdout_fd(::dup(STDOUT_FILENO)) {
-        if (stdout_fd < 0) {
-            PLOG(ERROR) << "Failed to duplicate stdout";
-            isWritable = false;
-        }
-    }
-    ~FDLogSink() override { ::close(stdout_fd); }
+struct DeferredExit {
+    struct fail_t {};
+    constexpr static inline fail_t generic_fail{};
 
-   private:
-    int stdout_fd;
-    bool isWritable = true;
+    // Create a deferred exit with the given status.
+    explicit DeferredExit(int status);
+    // Create a default-failure
+    DeferredExit(fail_t);
+    // Re-do the deferred exit.
+    ~DeferredExit();
+    // Default ctor
+    DeferredExit() : code(0), type(Type::EXIT) {}
+
+    NO_COPY_CTOR(DeferredExit);
+
+    // Move operator
+    DeferredExit(DeferredExit&& other) noexcept
+        : type(other.type), code(other.code) {
+        other.destory = false;
+    }
+    DeferredExit& operator=(DeferredExit&& other) noexcept {
+        if (this != &other) {
+            type = other.type;
+            code = other.code;
+            other.destory = false;
+        }
+        return *this;
+    }
+
+    operator bool() const noexcept;
+
+    enum class Type { UNKNOWN, EXIT, SIGNAL } type;
+    int code;
+    bool destory = true;
 };
 
 class ForkAndRun {
@@ -85,7 +99,9 @@ class ForkAndRun {
      *
      * @param exitCode The exit code of the subprocess.
      */
-    virtual void onExit(int exitCode) {}
+    virtual void onExit(int exitCode) {
+        LOG(INFO) << "Process exits with exit code " << exitCode;
+    }
 
     /**
      * @brief Callback function for handling the exit of the subprocess.
@@ -94,16 +110,27 @@ class ForkAndRun {
      *
      * @param signal The signal that caused the subprocess to exit.
      */
-    virtual void onSignal(int signal) { onExit(signal); }
+    virtual void onSignal(int signal) {
+        LOG(INFO) << "Process exits due to signal " << signal;
+    }
 
     /**
-     * @brief The function to be run in the subprocess.
+     * @brief Pure virtual function to be implemented by derived classes.
+     * This function is responsible for the main logic of the subprocess to be
+     * run.
      *
-     * @return True if the function execution was successful, false otherwise.
-     * This method must be overridden in derived classes to specify the function
-     * to be run in the subprocess.
+     * DeferredExit is used to delay the process exit.
+     *
+     * @return A DeferredExit object indicating the exit status of the
+     * subprocess.
+     *         - DeferredExit::success: Indicates successful exit of the
+     * subprocess.
+     *         - DeferredExit::generic_fail: Indicates a generic failure in the
+     * subprocess.
+     *         - DeferredExit(int status): Indicates an exit with a specific
+     * exit code.
      */
-    virtual bool runFunction() = 0;
+    virtual DeferredExit runFunction() = 0;
 
     /**
      * @brief Executes the subprocess with the specified function to be run.
@@ -130,42 +157,6 @@ class ForkAndRun {
     pid_t childProcessId = -1;
 };
 
-struct DeferredExit {
-    struct fail_t {};
-    constexpr static inline fail_t generic_fail{};
-
-    // Create a deferred exit with the given status.
-    explicit DeferredExit(int status);
-    // Create a default-failure
-    DeferredExit(fail_t);
-    // Re-do the deferred exit.
-    ~DeferredExit();
-    // Default ctor
-    DeferredExit() = default;
-
-    NO_COPY_CTOR(DeferredExit);
-
-    // Move operator
-    DeferredExit(DeferredExit&& other) noexcept
-        : type(other.type), code(other.code) {
-        other.destory = false;
-    }
-    DeferredExit& operator=(DeferredExit&& other) noexcept {
-        if (this != &other) {
-            type = other.type;
-            code = other.code;
-            other.destory = false;
-        }
-        return *this;
-    }
-
-    operator bool() const noexcept;
-
-    enum class Type { UNKNOWN, EXIT, SIGNAL } type;
-    int code;
-    bool destory = true;
-};
-
 inline std::ostream& operator<<(std::ostream& os, DeferredExit const& df) {
     if (df.type == DeferredExit::Type::EXIT) {
         os << "Deferred exit: " << df.code;
@@ -184,7 +175,7 @@ class ForkAndRunSimple {
     explicit ForkAndRunSimple(std::vector<std::string> argv);
 
     // Runs the argv, and either exits or kills itself, no return.
-    DeferredExit operator()();
+    [[nodiscard]] DeferredExit operator()();
 };
 
 template <typename T>
@@ -234,5 +225,5 @@ class ForkAndRunShell {
     const ForkAndRunShell& operator<<(const endl_t) const;
 
     // waits for anything and either exits or kills itself, no return.
-    DeferredExit close();
+    [[nodiscard]] DeferredExit close();
 };

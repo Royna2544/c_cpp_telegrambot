@@ -7,7 +7,7 @@
 #include "ConfigParsers.hpp"
 #include "ForkAndRun.hpp"
 
-bool UploadFileTask::runFunction() {
+DeferredExit UploadFileTask::runFunction() {
     std::unique_ptr<ConnectedShmem> dataShmem;
 
     try {
@@ -15,7 +15,7 @@ bool UploadFileTask::runFunction() {
             kShmemUpload, sizeof(PerBuildData::ResultData));
     } catch (const syscall_perror& ex) {
         LOG(ERROR) << "Failed to connect to shared memory: " << ex.what();
-        return false;
+        return DeferredExit::generic_fail;
     }
     auto* resultdata = dataShmem->get<PerBuildData::ResultData>();
 
@@ -26,7 +26,7 @@ bool UploadFileTask::runFunction() {
     auto matcher = getValue(data.localManifest->rom)->romInfo->artifact;
     if (matcher == nullptr) {
         LOG(ERROR) << "No artifact matcher found";
-        return false;
+        return DeferredExit::generic_fail;
     }
     const auto dir =
         std::filesystem::path() / "out" / "target" / "product" / data.device;
@@ -51,7 +51,7 @@ bool UploadFileTask::runFunction() {
                 DLOG(INFO) << "Not a file: " << it->path();
             }
         }
-        return false;
+        return DeferredExit::generic_fail;
     }
     std::error_code ec;
     const auto scripts =
@@ -69,12 +69,11 @@ bool UploadFileTask::runFunction() {
     LOG(INFO) << "Starting upload";
     ForkAndRunShell shell("bash");
     if (!shell.open()) {
-        return false;
+        return DeferredExit::generic_fail;
     }
     shell << "bash " << scriptFile << " " << zipFilePath.string()
           << ForkAndRunShell::endl;
-    shell.close();
-    return true;
+    return shell.close();
 }
 
 void UploadFileTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {

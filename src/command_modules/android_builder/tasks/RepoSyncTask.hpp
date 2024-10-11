@@ -78,17 +78,7 @@ struct RepoSyncTask : ForkAndRun {
     constexpr static std::string_view kLocalManifestPath =
         ".repo/local_manifests";
 
-    /**
-     * @brief Runs the function that performs the repository synchronization.
-     *
-     * This function is responsible for executing the repository synchronization
-     * process. It overrides the base class's runFunction() method to provide
-     * custom behavior.
-     *
-     * @return True if the synchronization process is successful, false
-     * otherwise.
-     */
-    bool runFunction() override;
+    DeferredExit runFunction() override;
 
     /**
      * @brief Handles new standard error data.

@@ -21,7 +21,7 @@ struct ROMBuildTask : ForkAndRun {
      * @return True if the synchronization process is successful, false
      * otherwise.
      */
-    bool runFunction() override;
+    DeferredExit runFunction() override;
 
     /**
      * @brief Handles new standard output data.
