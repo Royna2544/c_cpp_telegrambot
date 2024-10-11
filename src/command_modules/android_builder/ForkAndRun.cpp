@@ -35,7 +35,7 @@ struct FDLogSink : public absl::LogSink {
     void Send(const absl::LogEntry& logSink) override {
         if (isWritable) {
             const std::string newLine =
-                fmt::format("SubProcess (PID: {}): {}", pid_,
+                fmt::format("SubProcess (PID: {}, TID: {}): {}", pid_, gettid(),
                             logSink.text_message_with_prefix_and_newline());
             write(stdout_fd, newLine.c_str(), newLine.size());
         }
