@@ -571,12 +571,12 @@ ConfigParser::Parser::Parser(const std::filesystem::path& jsonFileDir) {
                                  jsonFileDir.string());
     }
     file >> root;
-    LOG(INFO) << "JSON file loaded successfully";
+    DLOG(INFO) << "JSON file loaded successfully";
 }
 
 ConfigParser::ConfigParser(const std::filesystem::path& jsonFileDir) {
     // Load files
-    DLOG(INFO) << "Loading JSON files from directory: " << jsonFileDir;
+    LOG(INFO) << "Loading JSON files from directory: " << jsonFileDir;
     for (const auto& entry : std::filesystem::directory_iterator(jsonFileDir)) {
         if (entry.is_regular_file() && entry.path().extension() == ".json") {
             DLOG(INFO) << "Parsing JSON file: " << entry.path().filename();
@@ -589,7 +589,7 @@ ConfigParser::ConfigParser(const std::filesystem::path& jsonFileDir) {
                 }
                 parsedManifests.insert(parsedManifests.end(), parsed.begin(),
                                        parsed.end());
-                LOG(INFO) << fmt::format(
+                DLOG(INFO) << fmt::format(
                     "Adding {} manifests to the global set.", parsed.size());
             } catch (const std::exception& e) {
                 LOG(ERROR) << "Error parsing JSON file: "
