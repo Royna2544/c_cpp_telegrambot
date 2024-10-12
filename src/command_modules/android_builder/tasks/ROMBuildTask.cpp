@@ -89,6 +89,18 @@ DeferredExit ROMBuildTask::runFunction() {
             shell << "eng";
             break;
     }
+    shell << "|| lunch " << vendor << "_" << data.device << "-";
+    switch (data.variant) {
+        case PerBuildData::Variant::kUser:
+            shell << "user";
+            break;
+        case PerBuildData::Variant::kUserDebug:
+            shell << "userdebug";
+            break;
+        case PerBuildData::Variant::kEng:
+            shell << "eng";
+            break;
+    }
     shell << ForkAndRunShell::endl;
     shell << "m " << getValue(data.localManifest->rom)->romInfo->target << " -j"
           << data.localManifest->job_count << ForkAndRunShell::endl;
