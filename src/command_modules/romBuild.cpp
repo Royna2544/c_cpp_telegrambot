@@ -642,7 +642,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
             return;
         }
     }
-    _api->editMessage(sentMessage, "Build completed");
+    _api->sendMessage(sentMessage, "Build completed");
     if (didpin) {
         try {
             _api->unpinMessage(sentMessage);
