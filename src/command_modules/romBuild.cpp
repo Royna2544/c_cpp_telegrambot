@@ -629,6 +629,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
             return;
         }
     }
+    _api->editMessageMarkup(sentMessage, nullptr);
     _api->sendMessage(sentMessage, "Build completed");
     if (didpin) {
         try {
