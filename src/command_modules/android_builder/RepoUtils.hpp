@@ -4,6 +4,7 @@
 
 #include <filesystem>
 #include <string>
+#include "ForkAndRun.hpp"
 
 struct RepoInfo {
     std::string url;
@@ -14,8 +15,8 @@ class RepoUtils {
    public:
     using RepoInfo = ::RepoInfo;
 
-    static void repo_init(const RepoInfo& options);
-    static void repo_sync(const long job_count);
+    [[nodiscard]] static DeferredExit repo_init(const RepoInfo& options);
+    [[nodiscard]] static DeferredExit repo_sync(const long job_count);
 };
 
 class GitUtils {

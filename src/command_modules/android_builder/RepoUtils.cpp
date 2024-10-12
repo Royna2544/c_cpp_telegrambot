@@ -15,22 +15,24 @@
 
 #include "ForkAndRun.hpp"
 
-void RepoUtils::repo_init(const RepoInfo& options) {
+DeferredExit RepoUtils::repo_init(const RepoInfo& options) {
     const auto args = fmt::format("repo init -u {} -b {} --git-lfs --depth={}",
                                   options.url, options.branch, 1);
     ForkAndRunSimple simple(absl::StrSplit(args, ' '));
-    const auto ret = simple();
+    auto ret = simple();
     LOG(INFO) << "Repo init result: " << ret;
+    return ret;
 }
 
-void RepoUtils::repo_sync(const long job_count) {
+DeferredExit RepoUtils::repo_sync(const long job_count) {
     const auto args = fmt::format(
         "repo sync -c -j{} --force-sync --no-clone-bundle --no-tags "
         "--force-remove-dirty",
         job_count);
     ForkAndRunSimple simple(absl::StrSplit(args, ' '));
-    const auto ret = simple();
+    auto ret = simple();
     LOG(INFO) << "Repo sync result: " << ret;
+    return ret;
 }
 
 struct ScopedLibGit2 {

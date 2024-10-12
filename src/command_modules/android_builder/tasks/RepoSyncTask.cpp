@@ -119,7 +119,10 @@ DeferredExit RepoSyncTask::runFunction() {
                                .desiredUrl = rom->romInfo->url,
                                .checkout = false};
     if (!repoDirExists || !switcher()) {
-        RepoUtils::repo_init({rom->romInfo->url, rom->branch});
+        auto r = RepoUtils::repo_init({rom->romInfo->url, rom->branch});
+        if (!r) {
+            return r;
+        }
     }
     if (const auto val = walk_up_tree_and_gather<false>(
             [](const std::filesystem::path& path) {
@@ -138,13 +141,17 @@ DeferredExit RepoSyncTask::runFunction() {
         return DeferredExit::generic_fail;
     }
     unsigned int job_count = std::thread::hardware_concurrency() / 2;
+    DeferredExit rs;
     if (runWithReducedJobs) {
         // Futher reduce the number of jobs count
-        RepoUtils::repo_sync(job_count / 4);
+        rs = RepoUtils::repo_sync(job_count / 4);
     } else {
-        RepoUtils::repo_sync(job_count);
+        rs = RepoUtils::repo_sync(job_count);
     }
-    return {}; // Success
+    if (!rs) {
+        return rs;
+    }
+    return {};  // Success
 }
 
 void RepoSyncTask::onNewStderrBuffer(ForkAndRun::BufferType& buffer) {
