@@ -1,20 +1,22 @@
 #include "ROMBuildTask.hpp"
 
+#include <ResourceManager.h>
 #include <fmt/chrono.h>
 #include <fmt/core.h>
 
 #include <SystemInfo.hpp>
+#include <TgBotWrapper.hpp>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <memory>
 #include <mutex>
 #include <regex>
+#include <string_view>
 #include <system_error>
 
 #include "ConfigParsers.hpp"
 #include "ForkAndRun.hpp"
-#include "TgBotWrapper.hpp"
 
 namespace {
 std::string findVendor() {
@@ -45,6 +47,22 @@ std::string findTCL() {
     LOG(INFO) << "Didn't find any scl, but it is fine";
     // Ignore if we failed to open, this path is only valid in Android 14+
     return {};
+}
+
+std::string craftPercentage(double percent) {
+    constexpr static std::string_view green = "🟩";
+    constexpr static std::string_view red = "🟥";
+
+    std::vector<std::string_view> colorBar;
+    const auto greenBars = static_cast<int>(percent) / 10;
+    colorBar.reserve(greenBars);
+    for (int i = 0; i < greenBars; ++i) {
+        colorBar.emplace_back(green);
+    }
+    for (int i = greenBars; i < 10; ++i) {
+        colorBar.emplace_back(red);
+    }
+    return fmt::format("{} {:.2f}%", fmt::join(colorBar, ""), percent);
 }
 }  // namespace
 
@@ -89,9 +107,11 @@ DeferredExit ROMBuildTask::runFunction() {
     shell << "unset USE_CCACHE" << ForkAndRunShell::endl;
     const auto lunch = [&, this](std::string_view release) {
         if (release.empty()) {
-            return fmt::format("lunch {}_{}-{}", vendor, data.device, kBuildVariant);
+            return fmt::format("lunch {}_{}-{}", vendor, data.device,
+                               kBuildVariant);
         } else {
-            return fmt::format("lunch {}_{}-{}-{}", vendor, data.device, release, kBuildVariant);
+            return fmt::format("lunch {}_{}-{}-{}", vendor, data.device,
+                               release, kBuildVariant);
         }
     };
     shell << lunch(release);
@@ -154,18 +174,24 @@ void ROMBuildTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
         auto roundedTime =
             std::chrono::duration_cast<std::chrono::seconds>(now - startTime);
         buildInfoBuffer = fmt::format(
-            "Start time: {}\n"
-            "Time spent: {:%H hours %M minutes %S seconds}\n"
-            "Last updated on: {}\n"
-            "Target ROM: {}, branch: {}, device: {}\n"
-            "Job count: {}\n"
-            "Memory usage: {:.2f}%\n"
-            "Build variant: {}\n\n"
-            "{}",
+            R"(
+<blockquote>▶️ <b>Start time</b>: {}
+🕐 <b>Time spent</b>: {:%H hours %M minutes %S seconds}
+🔄 <b>Last updated on</b>: {}</blockquote>
+
+<blockquote>🎯 <b>Target ROM</b>: {}
+🏷 <b>Target branch</b>: {}
+📱 <b>Device</b>: {}
+❕ <b>Job count</b>: {}
+💾 <b>Memory usage</b>: {}
+🧬 <b>Build variant</b>: {}</blockquote>
+
+<blockquote>{}</blockquote>)",
             startTime, roundedTime, now, rom->romInfo->name, rom->branch,
             data.device, data.localManifest->job_count,
-            MemoryInfo().usage().value, type, buffer.data());
-        botWrapper->editMessage(message, buildInfoBuffer);
+            craftPercentage(MemoryInfo().usage().value), type, buffer.data());
+        botWrapper->editMessage<TgBotWrapper::ParseMode::HTML>(
+            message, buildInfoBuffer);
     }
 }
 
