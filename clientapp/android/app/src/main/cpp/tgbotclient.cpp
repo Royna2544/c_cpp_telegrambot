@@ -206,10 +206,7 @@ class TgBotSocketNative {
         setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
         // Calculate CRC32
-        uLong crc = crc32(0L, Z_NULL, 0);  // Initial value
-        crc = crc32(crc, reinterpret_cast<Bytef *>(context.data.get()),
-                    context.header.data_size);
-        context.header.checksum = crc;
+        context.header.checksum = Packet::crc32_function(context.data);
 
         // Update status 1
         callbacks->status(Callbacks::Status::CONNECTION_PREPARED);
