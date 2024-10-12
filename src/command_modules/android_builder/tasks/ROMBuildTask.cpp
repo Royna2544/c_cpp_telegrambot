@@ -50,19 +50,22 @@ std::string findTCL() {
 }
 
 std::string craftPercentage(double percent) {
-    constexpr static std::string_view green = "🟩";
-    constexpr static std::string_view red = "🟥";
+    constexpr static std::string_view filled = "■";
+    constexpr static std::string_view empty = "□";
+    constexpr int divider = 5;
 
     std::vector<std::string_view> colorBar;
-    const auto greenBars = static_cast<int>(percent) / 10;
-    colorBar.reserve(greenBars);
+    const auto greenBars = static_cast<int>(percent) / divider;
+    colorBar.reserve(divider + 2);
+    colorBar.emplace_back("[");
     for (int i = 0; i < greenBars; ++i) {
-        colorBar.emplace_back(green);
+        colorBar.emplace_back(filled);
     }
-    for (int i = greenBars; i < 10; ++i) {
-        colorBar.emplace_back(red);
+    for (int i = greenBars; i < Percent::MAX / divider; ++i) {
+        colorBar.emplace_back(empty);
     }
-    return fmt::format("{} {:.2f}%", fmt::join(colorBar, ""), percent);
+    colorBar.emplace_back("]");
+    return fmt::format("{:.2f}% {}", percent, fmt::join(colorBar, ""));
 }
 }  // namespace
 
@@ -185,7 +188,7 @@ void ROMBuildTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
 🧬 <b>Build variant</b>: {}
 💻 <b>CPU usage</b>: {}
 💾 <b>Memory usage</b>: {}
-❕ <b>Job count</b>: {}</blockquote>
+❗️ <b>Job count</b>: {}</blockquote>
 
 <blockquote>{}</blockquote>)",
             startTime, roundedTime, now, rom->romInfo->name, rom->branch,
