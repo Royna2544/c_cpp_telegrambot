@@ -33,11 +33,23 @@ class ConfigParser::Parser {
     std::vector<LocalManifest::Ptr> mergedManifests;
 
     // Artifact matcher
-    std::unordered_map<std::string, ArtifactMatcher::Ptr> artifactMatchers;
-    void addArtifactMatcher(const std::string& name,
-                            const ArtifactMatcher::MatcherType& fn) {
-        artifactMatchers[name] = std::make_shared<ArtifactMatcher>(fn, name);
-    }
+    struct MatcherStorage {
+        std::unordered_map<std::string, ArtifactMatcher::Ptr> artifactMatchers;
+        void add(const std::string& name,
+                 const ArtifactMatcher::MatcherType& fn) {
+            artifactMatchers[name] =
+                std::make_shared<ArtifactMatcher>(fn, name);
+        }
+        ArtifactMatcher::Ptr get(const std::string& name) const {
+            if (!artifactMatchers.contains(name)) {
+                LOG(INFO) << fmt::format("No artifact matcher found for '{}'",
+                                         name);
+                return nullptr;
+            }
+            return std::make_shared<ArtifactMatcher>(
+                *artifactMatchers.at(name).get());
+        }
+    } storage;
 
    public:
     explicit Parser(const std::filesystem::path& jsonFileDir);
@@ -247,12 +259,10 @@ ConfigParser::Parser::parseROMManifest() {
                           << entry.toStyledString();
                 return;
             }
-            if (!artifactMatchers.contains(matcher)) {
-                LOG(WARNING) << "No matching artifact matcher found for: "
-                             << static_cast<std::string>(matcher);
+            romInfo->artifact = storage.get(matcher);
+            if (!romInfo->artifact) {
                 return;
             }
-            romInfo->artifact = artifactMatchers[matcher];
             romInfo->artifact->setData(data);
         }
 
@@ -562,8 +572,8 @@ bool exactMatcher(std::string_view filename, std::string_view prefix,
 
 ConfigParser::Parser::Parser(const std::filesystem::path& jsonFileDir) {
     // Add default matchers
-    addArtifactMatcher("ZipFilePrefixer", zipFilePrefixer);
-    addArtifactMatcher("ExactMatcher", exactMatcher);
+    storage.add("ZipFilePrefixer", zipFilePrefixer);
+    storage.add("ExactMatcher", exactMatcher);
     // Load and parse file
     std::ifstream file(jsonFileDir);
     if (!file.is_open()) {
