@@ -17,6 +17,7 @@
 
 #include "ConfigParsers.hpp"
 #include "ForkAndRun.hpp"
+#include "tgbot/TgException.h"
 
 namespace {
 std::string findVendor() {
@@ -50,22 +51,42 @@ std::string findTCL() {
 }
 
 std::string craftPercentage(double percent) {
-    constexpr static std::string_view filled = "■";
-    constexpr static std::string_view empty = "□";
+    constexpr std::string_view filled = "■";
+    constexpr std::string_view empty = "□";
     constexpr int divider = 5;
+    constexpr int totalBars = Percent::MAX / divider;
+    constexpr int middleidx = totalBars / 2;
 
-    std::vector<std::string_view> colorBar;
-    const auto greenBars = static_cast<int>(percent) / divider;
-    colorBar.reserve(divider + 2);
-    colorBar.emplace_back("[");
-    for (int i = 0; i < greenBars; ++i) {
-        colorBar.emplace_back(filled);
+    const int greenBars = static_cast<int>(percent) / divider;
+    const std::string percentStr = fmt::format("{:.2f}%", percent);
+    const int textsize = static_cast<int>(percentStr.size());
+    
+
+    std::ostringstream colorBar;
+    int index = 0;
+    colorBar << "[";
+
+    // Fill the bar before the percentage string
+    for (; index < greenBars; ++index) {
+        if (index == middleidx - textsize / 2) {
+            colorBar << percentStr;
+            index += textsize;
+        }
+        colorBar << filled;
     }
-    for (int i = greenBars; i < Percent::MAX / divider; ++i) {
-        colorBar.emplace_back(empty);
+
+    // Fill the bar after the percentage string
+    for (; index < totalBars; ++index) {
+        if (index == middleidx - textsize / 2) {
+            colorBar << percentStr;
+            index += textsize;
+        }
+        colorBar << empty;
     }
-    colorBar.emplace_back("]");
-    return fmt::format("{:.2f}% {}", percent, fmt::join(colorBar, ""));
+
+    colorBar << "]";
+
+    return colorBar.str();
 }
 }  // namespace
 
@@ -181,22 +202,25 @@ void ROMBuildTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
 <blockquote>▶️ <b>Start time</b>: {}
 🕐 <b>Time spent</b>: {:%H hours %M minutes %S seconds}
 🔄 <b>Last updated on</b>: {}</blockquote>
-
 <blockquote>🎯 <b>Target ROM</b>: {}
 🏷 <b>Target branch</b>: {}
 📱 <b>Device</b>: {}
 🧬 <b>Build variant</b>: {}
-💻 <b>CPU usage</b>: {}
-💾 <b>Memory usage</b>: {}
+💻 <b>CPU</b>: {}
+💾 <b>Memory</b>: {}
 ❗️ <b>Job count</b>: {}</blockquote>
-
 <blockquote>{}</blockquote>)",
             startTime, roundedTime, now, rom->romInfo->name, rom->branch,
             data.device, type, craftPercentage(MemoryInfo().usage().value),
             craftPercentage(CPUInfo().usage.value),
             data.localManifest->job_count, buffer.data());
-        botWrapper->editMessage<TgBotWrapper::ParseMode::HTML>(message,
-                                                               buildInfoBuffer);
+        try {
+            botWrapper->editMessage<TgBotWrapper::ParseMode::HTML>(
+                message, buildInfoBuffer);
+        } catch (const TgBot::TgException& e) {
+            LOG(ERROR) << "Couldn't parse markdown, with content:";
+            LOG(ERROR) << buildInfoBuffer;
+        }
     }
 }
 
