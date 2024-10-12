@@ -71,35 +71,32 @@ DeferredExit ROMBuildTask::runFunction() {
         return DeferredExit::generic_fail;
     }
 
+    std::string_view kBuildVariant;
+    switch (data.variant) {
+        case PerBuildData::Variant::kUser:
+            kBuildVariant = "user";
+            break;
+        case PerBuildData::Variant::kUserDebug:
+            kBuildVariant = "userdebug";
+            break;
+        case PerBuildData::Variant::kEng:
+            kBuildVariant = "eng";
+            break;
+    }
+
     shell << "set -e" << ForkAndRunShell::endl;
     shell << ". build/envsetup.sh" << ForkAndRunShell::endl;
     shell << "unset USE_CCACHE" << ForkAndRunShell::endl;
-    shell << "lunch " << vendor << "_" << data.device << "-";
+    const auto lunch = [&, this](std::string_view release) {
+        if (release.empty()) {
+            return fmt::format("lunch {}_{}-{}", vendor, data.device, kBuildVariant);
+        } else {
+            return fmt::format("lunch {}_{}-{}-{}", vendor, data.device, release, kBuildVariant);
+        }
+    };
+    shell << lunch(release);
     if (!release.empty()) {
-        shell << release << "-";
-    }
-    switch (data.variant) {
-        case PerBuildData::Variant::kUser:
-            shell << "user";
-            break;
-        case PerBuildData::Variant::kUserDebug:
-            shell << "userdebug";
-            break;
-        case PerBuildData::Variant::kEng:
-            shell << "eng";
-            break;
-    }
-    shell << "|| lunch " << vendor << "_" << data.device << "-";
-    switch (data.variant) {
-        case PerBuildData::Variant::kUser:
-            shell << "user";
-            break;
-        case PerBuildData::Variant::kUserDebug:
-            shell << "userdebug";
-            break;
-        case PerBuildData::Variant::kEng:
-            shell << "eng";
-            break;
+        shell << " || " << lunch({});
     }
     shell << ForkAndRunShell::endl;
     shell << "m " << getValue(data.localManifest->rom)->romInfo->target << " -j"
