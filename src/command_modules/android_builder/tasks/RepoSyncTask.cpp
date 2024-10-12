@@ -182,28 +182,30 @@ void RepoSyncTask::onNewStderrBuffer(ForkAndRun::BufferType& buffer) {
 void RepoSyncTask::onExit(int exitCode) {
     LOG(INFO) << "Repo sync exited with code: " << exitCode;
     auto* result = data.result;
-    if (localHook.hasProblems()) {
-        result->setMessage(localHook.getLogMessage());
-        result->value = localHook.hasFatalProblems()
-                            ? PerBuildData::Result::ERROR_FATAL
-                            : PerBuildData::Result::ERROR_NONFATAL;
-    } else if (networkHook.hasProblems()) {
-        result->setMessage(networkHook.getLogMessage());
-        result->value = PerBuildData::Result::ERROR_NONFATAL;
-        if (runWithReducedJobs) {
-            // Second try failed, lets get out of here.
-            result->value = PerBuildData::Result::ERROR_FATAL;
-            result->setMessage("Repo sync failed, even with retries");
-            return;
-        }
-        // Will be picked up by next loop
-        runWithReducedJobs = true;
-    } else if (exitCode != 0) {
-        result->value = PerBuildData::Result::ERROR_FATAL;
-        result->setMessage("Repo sync failed");
-    } else {
+    if (exitCode == 0) {
         result->value = PerBuildData::Result::SUCCESS;
         result->setMessage("Repo sync successful");
+    } else {
+        if (localHook.hasProblems()) {
+            result->setMessage(localHook.getLogMessage());
+            result->value = localHook.hasFatalProblems()
+                                ? PerBuildData::Result::ERROR_FATAL
+                                : PerBuildData::Result::ERROR_NONFATAL;
+        } else if (networkHook.hasProblems()) {
+            result->setMessage(networkHook.getLogMessage());
+            result->value = PerBuildData::Result::ERROR_NONFATAL;
+            if (runWithReducedJobs) {
+                // Second try failed, lets get out of here.
+                result->value = PerBuildData::Result::ERROR_FATAL;
+                result->setMessage("Repo sync failed, even with retries");
+                return;
+            }
+            // Will be picked up by next loop
+            runWithReducedJobs = true;
+        } else {
+            result->value = PerBuildData::Result::ERROR_FATAL;
+            result->setMessage("Repo sync failed");
+        }
     }
     localHook.clearProblems();  // Per-sync only, retrying won't help
 }
