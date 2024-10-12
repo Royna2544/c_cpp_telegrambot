@@ -515,12 +515,15 @@ struct TgBotApi {
      * @param message The pointer to the message to be edited.
      * @param newText The new text for the message.
      * @param markup The new inline keyboard markup for the message.
+     * @param parseMode (Optional) The parse mode for the new text. Default is
+     * empty
      *
      * @return A shared pointer to the edited message.
      */
     virtual Message::Ptr editMessage_impl(
         const Message::Ptr& message, const std::string& newText,
-        const TgBot::InlineKeyboardMarkup::Ptr& markup) const = 0;
+        const TgBot::InlineKeyboardMarkup::Ptr& markup,
+        const std::string& parseMode) const = 0;
 
     /**
      * @brief Edits a sent message with new markup.
@@ -928,10 +931,12 @@ struct TgBotApi {
         return sendSticker_impl(chatId, ToFileOrString(mediaId));
     }
 
-    inline Message::Ptr editMessage(
+    template <ParseMode mode = ParseMode::None>
+    Message::Ptr editMessage(
         const Message::Ptr& message, const std::string& newText,
         const TgBot::InlineKeyboardMarkup::Ptr& markup = nullptr) const {
-        return editMessage_impl(message, newText, markup);
+        return editMessage_impl(message, newText, markup,
+                                parseModeToStr<mode>());
     }
 
     inline Message::Ptr editMessageMarkup(
@@ -1136,7 +1141,8 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
 
     Message::Ptr editMessage_impl(
         const Message::Ptr& message, const std::string& newText,
-        const TgBot::InlineKeyboardMarkup::Ptr& markup) const override;
+        const TgBot::InlineKeyboardMarkup::Ptr& markup,
+        const std::string& parseMode) const override;
 
     Message::Ptr editMessageMarkup_impl(
         const StringOrMessage& message,

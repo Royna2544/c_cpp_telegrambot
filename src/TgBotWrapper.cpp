@@ -617,11 +617,12 @@ Message::Ptr TgBotWrapper::sendSticker_impl(
 
 Message::Ptr TgBotWrapper::editMessage_impl(
     const Message::Ptr& message, const std::string& newText,
-    const TgBot::InlineKeyboardMarkup::Ptr& markup) const {
+    const TgBot::InlineKeyboardMarkup::Ptr& markup,
+    const std::string& parseMode) const {
     DEBUG_ASSERT_NONNULL_PARAM(message);
     try {
         return getApi().editMessageText(newText, message->chat->id,
-                                        message->messageId, "", "",
+                                        message->messageId, "", parseMode,
                                         globalLinkOptions, markup);
     } catch (const TgBot::TgException& ex) {
         handleTgBotApiEx(ex, nullptr);

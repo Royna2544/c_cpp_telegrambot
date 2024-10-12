@@ -52,8 +52,7 @@ class MockDatabase : public DatabaseBase {
     MOCK_METHOD(std::optional<ChatId>, getChatId, (const std::string& name),
                 (const, override));
 
-    MOCK_METHOD(bool, load, (std::filesystem::path filepath),
-                (override));
+    MOCK_METHOD(bool, load, (std::filesystem::path filepath), (override));
     MOCK_METHOD(bool, unloadDatabase, (), (override));
 };
 
@@ -79,7 +78,8 @@ class MockTgBotApi : public TgBotApi {
 
     MOCK_METHOD(Message::Ptr, editMessage_impl,
                 (const Message::Ptr& message, const std::string& newText,
-                 const TgBot::InlineKeyboardMarkup::Ptr& markup),
+                 const TgBot::InlineKeyboardMarkup::Ptr& markup,
+                 const std::string& parseMode),
                 (const, override));
 
     MOCK_METHOD(Message::Ptr, editMessageMarkup_impl,
@@ -264,7 +264,7 @@ class CommandModulesTest : public ::testing::Test {
                                                  TEST_MEDIA_UNIQUEID};
 
     std::shared_ptr<MockTgBotApi> botApi = std::make_shared<MockTgBotApi>();
-    MockDatabase *database;
+    MockDatabase* database;
     std::filesystem::path modulePath;
 };
 
@@ -319,7 +319,7 @@ class CommandTestBase : public CommandModulesTest {
         const SentMessage& willEdit(T&& matcher,
                                     const st& location = st::current()) const {
             testRun("Edit message expectation", location);
-            EXPECT_CALL(*botApi, editMessage_impl(_, matcher, IsNull()))
+            EXPECT_CALL(*botApi, editMessage_impl(_, matcher, IsNull(), ""))
                 .WillOnce(DoAll(
                     WithArg<0>([=, addr = message.get()](auto&& message_in) {
                         EXPECT_EQ(message_in.get(), addr);
