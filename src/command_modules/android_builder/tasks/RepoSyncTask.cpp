@@ -123,6 +123,7 @@ DeferredExit RepoSyncTask::runFunction() {
         if (!r) {
             return r;
         }
+        r.defuse();
     }
     if (const auto val = walk_up_tree_and_gather<false>(
             [](const std::filesystem::path& path) {
@@ -151,6 +152,7 @@ DeferredExit RepoSyncTask::runFunction() {
     if (!rs) {
         return rs;
     }
+    rs.defuse();
     return {};  // Success
 }
 
