@@ -60,6 +60,13 @@ struct Bytes {
     }
 };
 
+struct Percent {
+    static constexpr int MAX = 100;
+    static constexpr int MIN = 0;
+
+    double value;
+};
+
 struct CPUInfo {
     CPUInfo();
 
@@ -67,6 +74,7 @@ struct CPUInfo {
     std::string cpuVendor;
     std::string cpuModel;
     std::string cpuMHz;
+    Percent usage;
 };
 
 struct MemoryInfo {
@@ -76,12 +84,6 @@ struct MemoryInfo {
     Bytes freeMemory;
     Bytes usedMemory;
 
-    struct Percent {
-        static constexpr int MAX = 100;
-        static constexpr int MIN = 0;
-
-        double value;
-    };
     [[nodiscard]] Percent usage() const {
         const auto ret =
             static_cast<Bytes::size_type_floating>(usedMemory.value) *
@@ -116,5 +118,4 @@ extern std::ostream& operator<<(std::ostream& os, MemoryInfo const& info);
 extern std::ostream& operator<<(std::ostream& os, DiskInfo const& info);
 extern std::ostream& operator<<(std::ostream& os, SystemSummary const& summary);
 extern std::ostream& operator<<(std::ostream& os, ConvertedBytes const& bytes);
-extern std::ostream& operator<<(std::ostream& os,
-                                MemoryInfo::Percent const& percent);
+extern std::ostream& operator<<(std::ostream& os, Percent const& percent);

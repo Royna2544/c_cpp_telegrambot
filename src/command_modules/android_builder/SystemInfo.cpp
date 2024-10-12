@@ -10,13 +10,61 @@
 #include <unistd.h>
 
 #include <TryParseStr.hpp>
+#include <chrono>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <string>
 #include <string_view>
 #include <system_error>
+#include <thread>
 #include <unordered_map>
+
+struct CPUData {
+    long user, nice, system, idle, iowait, irq, softirq, steal;
+
+    CPUData();
+    [[nodiscard]] long getTotalTime() const;
+    [[nodiscard]] long getActiveTime() const;
+    [[nodiscard]] static Percent getUsage();
+};
+
+CPUData::CPUData() {
+    std::ifstream file("/proc/stat");
+    std::string line;
+
+    if (std::getline(file, line)) {
+        std::istringstream iss(line);
+        std::string cpu;
+        iss >> cpu >> user >> nice >> system >> idle >> iowait >> irq >>
+            softirq >> steal;
+    }
+}
+
+long CPUData::getTotalTime() const {
+    return user + nice + system + idle + iowait + irq + softirq + steal;
+}
+
+long CPUData::getActiveTime() const {
+    return user + nice + system + irq + softirq + steal;
+}
+
+Percent CPUData::getUsage() {
+    CPUData prevData;
+    std::this_thread::sleep_for(std::chrono::seconds(1));  // 1 second delay
+    CPUData currData;
+
+    long prevTotalTime = prevData.getTotalTime();
+    long currTotalTime = currData.getTotalTime();
+
+    long prevActiveTime = prevData.getActiveTime();
+    long currActiveTime = currData.getActiveTime();
+
+    const auto percent =
+        double(currActiveTime - prevActiveTime) / double(currTotalTime - prevTotalTime);
+
+    return {(assert_downcast<double>(percent)) * 100.0};
+}
 
 CPUInfo::CPUInfo() : coreCount(sysconf(_SC_NPROCESSORS_ONLN)) {
     std::ifstream cpuInfoFile("/proc/cpuinfo");
@@ -38,6 +86,7 @@ CPUInfo::CPUInfo() : coreCount(sysconf(_SC_NPROCESSORS_ONLN)) {
             cpuMHz = line.substr(line.find(':') + 2);
         }
     }
+    usage = CPUData::getUsage();
 }
 
 MemoryInfo::MemoryInfo() {
@@ -99,6 +148,7 @@ std::ostream& operator<<(std::ostream& os, CPUInfo const& info) {
     os << "CPU model: " << info.cpuModel << "\n";
     os << "CPU frequency: " << info.cpuMHz << "Mhz\n";
     os << "CPU vendor: " << info.cpuVendor << "\n";
+    os << "CPU Usage: " << info.usage << "\n";
     return os;
 }
 
@@ -156,9 +206,8 @@ std::ostream& operator<<(std::ostream& os, ConvertedBytes const& bytes) {
     return os;
 }
 
-std::ostream& operator<<(std::ostream& os, MemoryInfo::Percent const& percent) {
-    if (percent.value >= MemoryInfo::Percent::MIN &&
-        percent.value <= MemoryInfo::Percent::MAX) {
+std::ostream& operator<<(std::ostream& os, Percent const& percent) {
+    if (percent.value >= Percent::MIN && percent.value <= Percent::MAX) {
         os << percent.value << "%";
     } else {
         os << "Invalid percent value(" << percent.value << ")";

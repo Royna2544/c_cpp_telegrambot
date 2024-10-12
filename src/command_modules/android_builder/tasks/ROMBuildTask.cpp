@@ -182,16 +182,18 @@ void ROMBuildTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
 <blockquote>🎯 <b>Target ROM</b>: {}
 🏷 <b>Target branch</b>: {}
 📱 <b>Device</b>: {}
-❕ <b>Job count</b>: {}
+🧬 <b>Build variant</b>: {}
+💻 <b>CPU usage</b>: {}
 💾 <b>Memory usage</b>: {}
-🧬 <b>Build variant</b>: {}</blockquote>
+❕ <b>Job count</b>: {}</blockquote>
 
 <blockquote>{}</blockquote>)",
             startTime, roundedTime, now, rom->romInfo->name, rom->branch,
             data.device, data.localManifest->job_count,
-            craftPercentage(MemoryInfo().usage().value), type, buffer.data());
-        botWrapper->editMessage<TgBotWrapper::ParseMode::HTML>(
-            message, buildInfoBuffer);
+            craftPercentage(MemoryInfo().usage().value),
+            craftPercentage(CPUInfo().usage.value), type, buffer.data());
+        botWrapper->editMessage<TgBotWrapper::ParseMode::HTML>(message,
+                                                               buildInfoBuffer);
     }
 }
 
