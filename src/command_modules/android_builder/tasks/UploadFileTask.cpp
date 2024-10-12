@@ -32,7 +32,6 @@ DeferredExit UploadFileTask::runFunction() {
         std::filesystem::path() / "out" / "target" / "product" / data.device;
     for (it = decltype(it)(dir); it != decltype(it)(); ++it) {
         if (it->is_regular_file()) {
-            DLOG(INFO) << "Entry: " << it->path();
             if ((*matcher)(it->path().filename().string())) {
                 LOG(INFO) << "zipFile=" << it->path().string();
                 zipFilePath = it->path();
