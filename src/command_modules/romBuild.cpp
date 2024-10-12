@@ -435,19 +435,6 @@ class Upload : public TaskWrapperBase<UploadFileTask> {
         }
         const auto msg =
             api->editMessage(sentMessage, resultText, backKeyboard);
-        if (result.value == PerBuildData::Result::ERROR_FATAL) {
-            namespace fs = std::filesystem;
-            std::error_code ec;
-            if (fs::exists("upload_err.txt", ec)) {
-                api->sendDocument(
-                    sentMessage->chat->id,
-                    TgBot::InputFile::fromFile("upload_err.txt", "text/plain"));
-            }
-            if (ec) {
-                LOG(ERROR) << "Failed to check for upload_err.txt: "
-                           << ec.message();
-            }
-        }
         queryHandler->updateSentMessage(msg);
     }
 
