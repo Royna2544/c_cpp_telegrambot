@@ -500,5 +500,9 @@ int main(int argc, char** argv) {
             break;
         }
     }
+    if (!SignalHandler::isSignaled()) {
+        // Exiting due to exception
+        OnTerminateRegistrar::getInstance()->callCallbacks();
+    }
     return EXIT_SUCCESS;
 }
