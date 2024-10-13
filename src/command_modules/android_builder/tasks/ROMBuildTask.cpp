@@ -58,7 +58,7 @@ std::string craftPercentage(double percent) {
     constexpr int middleidx = totalBars / 2;
 
     const int greenBars = static_cast<int>(percent) / divider;
-    const std::string percentStr = fmt::format("{:.2f}%", percent);
+    const std::string percentStr = fmt::format(" {:.2f}% ", percent);
     const int textsize = static_cast<int>(percentStr.size());
     
 
