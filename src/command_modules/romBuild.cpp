@@ -201,9 +201,10 @@ class ROMBuildQueryHandler
     // Handle type selection button
     void handle_type(const Query& query);
 
-#define DECLARE_BUTTON_HANDLER(name, key) \
-    ButtonHandler{name, #key,             \
-                  [this](const Query& query) { handle_##key(query); }}
+#define DECLARE_BUTTON_HANDLER(name, key)                               \
+    ButtonHandler {                                                     \
+        name, #key, [this](const Query& query) { handle_##key(query); } \
+    }
 #define DECLARE_BUTTON_HANDLER_WITHPREFIX(name, key, prefix)             \
     ButtonHandler {                                                      \
         name, #key, [this](const Query& query) { handle_##key(query); }, \
@@ -402,6 +403,11 @@ class Build : public TaskWrapperBase<ROMBuildTask> {
                         sentMessage->chat->id,
                         TgBot::InputFile::fromFile(
                             ROMBuildTask::kErrorLogFile.data(), "text/plain"));
+                    if (!std::filesystem::remove(ROMBuildTask::kErrorLogFile,
+                                                 ec)) {
+                        LOG(ERROR) << "Failed to remove error log file: "
+                                   << ec.message();
+                    }
                 }
             } break;
             case PerBuildData::Result::SUCCESS:
