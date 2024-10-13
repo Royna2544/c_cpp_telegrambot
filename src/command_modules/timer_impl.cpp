@@ -12,7 +12,8 @@ struct TimerImplThread : TimerThread {
     }
     void onTimerPoint(const std::chrono::seconds &timeLeft) override {
         message = botwrapper->editMessage(
-            message, fmt::format("Time left: {}", timeLeft));
+            message, fmt::format("Time left: {:%H hours %M minutes %S seconds}",
+                                 timeLeft));
     }
     void onTimerEnd() override {
         message = botwrapper->editMessage(message, "Timer ended");
@@ -33,7 +34,7 @@ DECLARE_COMMAND_HANDLER(starttimer, bot, message) {
     bool ok = false;
     std::string result;
     if (message->has<MessageExt::Attrs::ExtraText>()) {
-        switch (ctrl->parse(message->text)) {
+        switch (ctrl->parse(message->get<MessageExt::Attrs::ExtraText>())) {
             case TimerThread::Result::TIME_CANNOT_PARSE:
                 result = "Could not parse time: " + message->text;
                 break;

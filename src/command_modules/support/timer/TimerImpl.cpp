@@ -83,7 +83,7 @@ std::optional<std::string> TimerThread::describeParsedTime() const {
     if (!parsedTime) {
         return std::nullopt;
     }
-    return fmt::format("{}", parsedTime.value());
+    return fmt::format("{:%H hours %M minutes %S seconds}", parsedTime.value());
 }
 
 TimerThread::Result TimerThread::start() {
