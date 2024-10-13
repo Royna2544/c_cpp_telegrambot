@@ -85,8 +85,12 @@ void UploadFileTask::onExit(int exitCode) {
     if (exitCode == EXIT_SUCCESS) {
         data.result->value = PerBuildData::Result::SUCCESS;
         // Return the last N bytes of the stdout buffer.
-        data.result->setMessage(stdoutOutput.substr(
+        if (stdoutOutput.size() > PerBuildData::ResultData::MSG_SIZE) {
+            data.result->setMessage(stdoutOutput.substr(
             stdoutOutput.size() - PerBuildData::ResultData::MSG_SIZE + 1));
+        } else {
+            data.result->setMessage(stdoutOutput);
+        }
     } else {
         data.result->value = PerBuildData::Result::ERROR_FATAL;
     }
