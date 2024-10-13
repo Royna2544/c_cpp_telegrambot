@@ -212,7 +212,7 @@ struct PerBuildData {
     }
 
     struct ResultData {
-        static constexpr int MSG_SIZE = 250;
+        static constexpr int MSG_SIZE = 512;
         Result value = Result::NONE;
         std::array<char, MSG_SIZE> msg{};
         void setMessage(const std::string &message) {
