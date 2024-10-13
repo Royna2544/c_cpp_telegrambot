@@ -182,8 +182,18 @@ void ROMBuildTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
     const auto now = std::chrono::system_clock::now();
     const auto& rom = getValue(data.localManifest->rom);
     double memUsage = NAN;
+    static bool once = false;
+
+    if (!once) {
+        std::fstream ofs(kErrorLogFile.data(), std::ios::app | std::ios::out);
+        if (ofs) {
+            ofs << buffer.data();
+        }
+    }
+
     if (clock + std::chrono::minutes(1) < now) {
         clock = now;
+        once = true;
         std::string_view type;
         switch (data.variant) {
             case PerBuildData::Variant::kUser:
