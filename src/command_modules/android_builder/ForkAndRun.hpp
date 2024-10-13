@@ -11,7 +11,9 @@
 
 #include <array>
 #include <filesystem>
+#include <initializer_list>
 #include <iostream>
+#include <map>
 #include <shared_mutex>
 #include <socket/selector/SelectorPosix.hpp>
 #include <string_view>
@@ -48,9 +50,7 @@ struct DeferredExit {
         return *this;
     }
 
-    void defuse() {
-        destory = false;
-    }
+    void defuse() { destory = false; }
     operator bool() const noexcept;
 
     enum class Type { UNKNOWN, EXIT, SIGNAL } type;
@@ -198,6 +198,7 @@ class ForkAndRunShell {
     DeferredExit result;
 
     bool opened = false;
+    std::map<std::string_view, std::string_view> envMap;
 
     void writeString(const std::string_view& args) const;
 
@@ -209,6 +210,8 @@ class ForkAndRunShell {
     static constexpr endl_t endl{};
 
     bool open();
+    void addEnv(const std::initializer_list<
+                std::pair<std::string_view, std::string_view>>& list);
 
     // Write arguments to the shell
     template <typename T>

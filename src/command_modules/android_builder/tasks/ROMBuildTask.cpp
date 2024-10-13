@@ -60,7 +60,6 @@ std::string craftPercentage(double percent) {
     const int greenBars = static_cast<int>(percent) / divider;
     const std::string percentStr = fmt::format(" {:.2f}% ", percent);
     const int textsize = static_cast<int>(percentStr.size());
-    
 
     std::ostringstream colorBar;
     int index = 0;
@@ -109,6 +108,8 @@ DeferredExit ROMBuildTask::runFunction() {
     }
 
     ForkAndRunShell shell("bash");
+    shell.addEnv(
+        {{"BUILD_HOSTNAME", "VM"}, {"BUILD_USERNAME", "c_cpp_telegrambot"}});
     if (!shell.open()) {
         return DeferredExit::generic_fail;
     }

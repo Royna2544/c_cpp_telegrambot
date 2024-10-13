@@ -292,6 +292,15 @@ DeferredExit ForkAndRunSimple::operator()() {
 ForkAndRunShell::ForkAndRunShell(std::filesystem::path shell_path)
     : shell_path_(std::move(shell_path)) {}
 
+void ForkAndRunShell::addEnv(
+    const std::initializer_list<std::pair<std::string_view, std::string_view>>&
+        list) {
+    if (list.size() == 0) {
+        return;
+    }
+    envMap.insert(list.begin(), list.end());
+}
+
 bool ForkAndRunShell::open() {
     LOG(INFO) << "Using shell: " << shell_path_;
 
@@ -306,10 +315,26 @@ bool ForkAndRunShell::open() {
     } else if (shell_pid_ == 0) {
         dup2(pipe_.readEnd(), STDIN_FILENO);
         ::close(pipe_.writeEnd());
+
+        // Craft argv
         std::unique_ptr<char, decltype(&free)> string(
             strdup(shell_path_.string().c_str()), free);
         std::array<char*, 2> argv{string.get(), nullptr};
-        execvp(string.get(), argv.data());
+
+        // Craft envp (string_view as we don't have to copy the environment strings)
+        std::vector<char *> envp;
+        std::vector<std::string> owners;
+        for (int x = 0; environ[x] != nullptr; x++) {
+            envp.emplace_back(environ[x]);
+        }
+        for (const auto& [key, value] : envMap) {
+            LOG(INFO) << "Setting env " << key << "=" << value;
+            owners.emplace_back(fmt::format("{}={}", key, value));
+            envp.emplace_back(owners.back().data());
+        }
+        envp.emplace_back(nullptr);
+
+        execvpe(string.get(), argv.data(), envp.data());
         _exit(EXIT_FAILURE);
     } else {
         LOG(INFO) << "Shell opened with pid " << shell_pid_;
