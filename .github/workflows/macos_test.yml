@@ -28,7 +28,7 @@ jobs:
           CXX: g++
         run: |
           mkdir build
-          cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release -DDISABLE_SANITIZERS=ON .
+          cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release .
           cmake --build build -j4
 
       - name: Run Tests

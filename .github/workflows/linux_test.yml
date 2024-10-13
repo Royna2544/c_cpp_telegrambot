@@ -63,7 +63,7 @@ jobs:
           CXX: ${{ matrix.real_cxx }}
         run: |
           mkdir build
-          cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release -DDISABLE_SANITIZERS=ON ${{ matrix.flags }} .
+          cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release ${{ matrix.flags }} .
           cmake --build build -j4
 
       - name: Run Tests
