@@ -5,7 +5,6 @@
 #include <absl/strings/str_split.h>
 #include <fmt/core.h>
 #include <git2.h>
-#include <git2/oid.h>
 #include <internal/_class_helper_macros.h>
 
 #include <filesystem>
@@ -85,6 +84,13 @@ struct deleter<git_diff> {
     void operator()(git_diff* diff) const { git_diff_free(diff); }
 };
 
+template <>
+struct deleter<git_annotated_commit> {
+    void operator()(git_annotated_commit* commit) const {
+        git_annotated_commit_free(commit);
+    }
+};
+
 template <typename T>
     requires hasDeleter<T>
 inline auto git_wrap(T* object) {
@@ -117,6 +123,7 @@ struct GitPtrWrapper {
 using git_repository_ptr = GitPtrWrapper<git_repository*>;
 using git_reference_ptr = GitPtrWrapper<git_reference*>;
 using git_commit_ptr = GitPtrWrapper<git_commit*>;
+using git_annotated_commit_ptr = GitPtrWrapper<git_annotated_commit*>;
 using git_tree_ptr = GitPtrWrapper<git_tree*>;
 using git_object_ptr = GitPtrWrapper<git_object*>;
 using git_remote_ptr = GitPtrWrapper<git_remote*>;
@@ -269,11 +276,13 @@ bool GitBranchSwitcher::operator()() const {
     target_ref_name.remote += "/";
     target_ref_name.remote += desiredBranch;
 
+    bool fetchOk = true;
     // Maybe remote has it?
     ret = git_remote_fetch(remote, nullptr, nullptr, nullptr);
     if (ret != 0) {
-        LOG(ERROR) << "Failed to fetch remote: " << git_error_last_str();
-        return false;
+        LOG(WARNING) << "Failed to fetch remote: " << git_error_last_str();
+        // This is only for updating origin/ refs, not a requirement.
+        fetchOk = false;
     }
 
     // Now try to find the branch in the remote
@@ -285,6 +294,28 @@ bool GitBranchSwitcher::operator()() const {
                    << git_error_last_str();
         return false;
     }
+
+    // Optional: Try ff
+    do {
+        git_merge_options merge_opts = GIT_MERGE_OPTIONS_INIT;
+        // Get the remote branch's OID (SHA)
+        git_annotated_commit_ptr remote_commit;
+
+        ret = git_annotated_commit_from_ref(remote_commit, repo,
+                                            target_remote_ref);
+        if (ret != 0) {
+            LOG(WARNING) << "Failed to get remote commit: "
+                         << git_error_last_str();
+            break;
+        }
+        git_annotated_commit** _commit = remote_commit;
+        ret = git_merge(repo, const_cast<const git_annotated_commit**>(_commit),
+                        1, &merge_opts, &checkout_opts);
+        if (ret != 0) {
+            LOG(WARNING) << "Failed to merge branch: " << git_error_last_str();
+            break;
+        }
+    } while (false);
 
     current_branch = git_reference_shorthand(head_ref);
     // Check if the branch is the one we're interested in
