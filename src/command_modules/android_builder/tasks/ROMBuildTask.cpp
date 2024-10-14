@@ -62,7 +62,7 @@ std::string craftPercentage(double percent) {
     const int textsize = static_cast<int>(percentStr.size());
 
     std::ostringstream colorBar;
-    int index = 0;
+    int index = 1;
     colorBar << "[";
 
     // Fill the bar before the percentage string
