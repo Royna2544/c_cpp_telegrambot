@@ -81,6 +81,8 @@ int main(const int argc, char** argv) {
         PLOG(ERROR) << "setsid failed";
         return EXIT_FAILURE;
     }
+    // Increment argv to skip the first element
+    argv++;
 redo_vfork:
     // Second fork to prevent the daemon from acquiring a terminal
     pid = vfork();
@@ -92,10 +94,9 @@ redo_vfork:
     if (pid == 0) {
         // Set the process group ID to the same as the process ID
         setpgrp();
-        // Increment argv to skip the first element
-        argv++;
         // Execute the bot executable with the provided arguments
-        LOG(INFO) << "Executing the child process, " << argv[0] << " with pid " << getpid();
+        LOG(INFO) << "Executing the child process, " << argv[0] << " with pid "
+                  << getpid();
         execvp(argv[0], argv);  // Pass the modified argv to execvp
         _exit(std::numeric_limits<std::uint8_t>::max());
     } else {
@@ -129,6 +130,7 @@ redo_vfork:
             LOG(INFO) << "Pid file gone, exiting";
             return EXIT_SUCCESS;
         }
+        std::filesystem::remove(kPidFile);  // Remove the pid file after termination
         goto redo_vfork;  // Restart the daemon process loop
     }
 }
