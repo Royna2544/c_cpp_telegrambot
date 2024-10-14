@@ -3,9 +3,9 @@
 #include <fmt/format.h>
 
 #include <filesystem>
+#include <fstream>
 #include <libos/libfs.hpp>
 #include <regex>
-#include <string_view>
 #include <system_error>
 #include <vector>
 
@@ -93,18 +93,38 @@ void UploadFileTask::onExit(int exitCode) {
             R"(https:\/\/(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(?:\/[^\s]*)?)");
         std::smatch smatch;
         std::string::const_iterator search_start(stdoutOutput.cbegin());
-        std::vector<std::string_view> urls;
+        std::vector<std::string> urls;
+        int matches = 0;
 
         while (std::regex_search(search_start, stdoutOutput.cend(), smatch,
                                  sHttpsUrlRegex)) {
             LOG(INFO) << "Found URL: " << smatch[0].str();
-            urls.emplace_back(smatch[0].str());
+            urls.emplace_back(
+                fmt::format("[{}] {}", ++matches, smatch[0].str()));
             // Move the iterator to the end of the current match to avoid
             // infinite loop
             search_start = smatch.suffix().first;
         }
-        data.result->setMessage(fmt::format("URLs grabbed from output:\n\n{}",
-                                            fmt::join(urls, "\n")));
+        if (urls.empty()) {
+            LOG(WARNING) << "No URLs found in output";
+            std::filesystem::path path(
+                fmt::format("upload_output_{}.txt", getpid()));
+            std::ofstream stream(path);
+            if (stream) {
+                stream << stdoutOutput;
+                stream.close();
+                data.result->setMessage(fmt::format(
+                    "No URLs found in output, saved to {}", path.string()));
+            } else {
+                data.result->setMessage(
+                    "No URLs found in output, and couldn't even save to file");
+                LOG(INFO) << "Script output:\n" << stdoutOutput;
+            }
+        } else {
+            data.result->setMessage(
+                fmt::format("URLs grabbed from upload script output:\n\n{}",
+                            fmt::join(urls, "\n")));
+        }
     } else {
         data.result->value = PerBuildData::Result::ERROR_FATAL;
     }
