@@ -50,7 +50,13 @@ struct DeferredExit {
         return *this;
     }
 
-    void defuse() { destory = false; }
+    DeferredExit&& defuse() && {
+        if (*this) {
+            destory = false;
+        }
+        return std::move(*this);
+    }
+    
     operator bool() const noexcept;
 
     enum class Type { UNKNOWN, EXIT, SIGNAL } type;
