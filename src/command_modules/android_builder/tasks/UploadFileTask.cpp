@@ -1,8 +1,13 @@
 #include "UploadFileTask.hpp"
 
+#include <fmt/format.h>
+
 #include <filesystem>
 #include <libos/libfs.hpp>
+#include <regex>
+#include <string_view>
 #include <system_error>
+#include <vector>
 
 #include "ConfigParsers.hpp"
 #include "ForkAndRun.hpp"
@@ -84,13 +89,22 @@ void UploadFileTask::onExit(int exitCode) {
     std::memcpy(data.result, smem->memory, sizeof(PerBuildData::ResultData));
     if (exitCode == EXIT_SUCCESS) {
         data.result->value = PerBuildData::Result::SUCCESS;
-        // Return the last N bytes of the stdout buffer.
-        if (stdoutOutput.size() > PerBuildData::ResultData::MSG_SIZE) {
-            data.result->setMessage(stdoutOutput.substr(
-            stdoutOutput.size() - PerBuildData::ResultData::MSG_SIZE + 1));
-        } else {
-            data.result->setMessage(stdoutOutput);
+        const static std::regex sHttpsUrlRegex(
+            R"(https:\/\/(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(?:\/[^\s]*)?)");
+        std::smatch smatch;
+        std::string::const_iterator search_start(stdoutOutput.cbegin());
+        std::vector<std::string_view> urls;
+
+        while (std::regex_search(search_start, stdoutOutput.cend(), smatch,
+                                 sHttpsUrlRegex)) {
+            LOG(INFO) << "Found URL: " << smatch[0].str();
+            urls.emplace_back(smatch[0].str());
+            // Move the iterator to the end of the current match to avoid
+            // infinite loop
+            search_start = smatch.suffix().first;
         }
+        data.result->setMessage(fmt::format("URLs grabbed from output:\n\n{}",
+                                            fmt::join(urls, "\n")));
     } else {
         data.result->value = PerBuildData::Result::ERROR_FATAL;
     }
