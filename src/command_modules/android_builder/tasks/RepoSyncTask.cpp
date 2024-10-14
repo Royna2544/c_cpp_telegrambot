@@ -119,11 +119,11 @@ DeferredExit RepoSyncTask::runFunction() {
                                .desiredUrl = rom->romInfo->url,
                                .checkout = false};
     if (!repoDirExists || !switcher()) {
-        auto r =
-            RepoUtils::repo_init({rom->romInfo->url, rom->branch}).defuse();
+        auto r = RepoUtils::repo_init({rom->romInfo->url, rom->branch});
         if (!r) {
             return r;
         }
+        r.defuse();
     }
     if (const auto val = walk_up_tree_and_gather<false>(
             [](const std::filesystem::path& path) {
@@ -145,13 +145,14 @@ DeferredExit RepoSyncTask::runFunction() {
     DeferredExit rs;
     if (runWithReducedJobs) {
         // Futher reduce the number of jobs count
-        rs = RepoUtils::repo_sync(job_count / 4).defuse();
+        rs = RepoUtils::repo_sync(job_count / 4);
     } else {
-        rs = RepoUtils::repo_sync(job_count).defuse();
+        rs = RepoUtils::repo_sync(job_count);
     }
     if (!rs) {
         return rs;
     }
+    rs.defuse();
     return {};  // Success
 }
 
