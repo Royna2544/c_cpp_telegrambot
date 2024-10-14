@@ -945,6 +945,7 @@ struct TgBotApi {
         return editMessageMarkup_impl(message, replyMarkup);
     }
 
+    // Copy message content and reply to it, requires the message isnt deleted.
     inline MessageId copyAndReplyAsMessage(const Message::Ptr& message) const {
         return copyAndReplyAsMessage(message, message);
     }

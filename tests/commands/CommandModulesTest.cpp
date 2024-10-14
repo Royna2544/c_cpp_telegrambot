@@ -4,6 +4,7 @@
 #include <libos/libfs.hpp>
 #include <memory>
 #include <optional>
+
 #include "TgBotWrapper.hpp"
 #include "gmock/gmock.h"
 
@@ -19,7 +20,8 @@ void CommandModulesTest::SetUp() {
     TgBotDatabaseImpl::Providers provider;
 
     database = new MockDatabase();
-    provider.registerProvider("testing", std::unique_ptr<MockDatabase>(database));
+    provider.registerProvider("testing",
+                              std::unique_ptr<MockDatabase>(database));
     ASSERT_TRUE(provider.chooseProvider("testing"));
     ASSERT_TRUE(dbinst->setImpl(std::move(provider)));
     EXPECT_CALL(*database, load(_)).WillOnce(Return(true));
@@ -37,7 +39,6 @@ CommandModule::Ptr CommandModulesTest::loadModule(
     std::filesystem::path moduleFileName = "libcmd_" + name;
     const auto moduleFilePath =
         modulePath / FS::appendDylibExtension(moduleFileName);
-    loadcmd_function_cstyle_t sym = nullptr;
 
     LOG(INFO) << "Loading module " << std::quoted(name) << " for testing...";
     auto module = std::make_unique<CommandModule>(moduleFilePath);
@@ -71,7 +72,7 @@ MessageExt::Ptr CommandModulesTest::createDefaultMessage() {
     return std::make_shared<MessageExt>(message);
 }
 
-User::Ptr CommandModulesTest::createDefaultUser(off_t id_offset) {
+User::Ptr CommandModulesTest::createDefaultUser(long id_offset) {
     auto user = std::make_shared<User>();
     // id_offset is used to generate unique user IDs for testing purposes
     user->id = TEST_USER_ID + id_offset;
@@ -80,8 +81,8 @@ User::Ptr CommandModulesTest::createDefaultUser(off_t id_offset) {
     return user;
 }
 
-bool CommandModulesTest::isReplyToThisMsg(ReplyParametersExt::Ptr rhs,
-                                          MessagePtr message) {
+bool CommandModulesTest::isReplyToThisMsg(const ReplyParametersExt::Ptr& rhs,
+                                          const Message::Ptr& message) {
     if (!rhs) {
         LOG(INFO) << "ReplyParameters is nullptr";
         return false;

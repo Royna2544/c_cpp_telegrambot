@@ -1,10 +1,10 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
-#include <gtest/gtest_prod.h>
 
 #include <TgBotWrapper.hpp>
 #include <database/DatabaseBase.hpp>
 #include <initializer_list>
+#include <memory>
 #include <source_location>
 #include <utility>
 
@@ -207,7 +207,7 @@ class CommandModulesTest : public ::testing::Test {
      * @param name The name of the file containing the command module.
      * @return loaded module handle if successful.
      */
-    CommandModule::Ptr loadModule(const std::string& name) const;
+    [[nodiscard]] CommandModule::Ptr loadModule(const std::string& name) const;
 
     /**
      * @brief Unload a command module.
@@ -229,7 +229,7 @@ class CommandModulesTest : public ::testing::Test {
      * @param id_offset An optional offset to add to the default user ID.
      * @return A shared pointer to a default user object.
      */
-    static User::Ptr createDefaultUser(off_t id_offset = 0);
+    static User::Ptr createDefaultUser(long id_offset = 0);
 
     /**
      * @brief Check if a reply parameters object refers to a specific message.
@@ -239,8 +239,8 @@ class CommandModulesTest : public ::testing::Test {
      * @return True if the reply parameters refer to the specified message,
      *         false otherwise.
      */
-    static bool isReplyToThisMsg(ReplyParametersExt::Ptr rhs,
-                                 MessagePtr message);
+    static bool isReplyToThisMsg(const ReplyParametersExt::Ptr& rhs,
+                                 const Message::Ptr& message);
 
     /**
      * @brief Get the current working directory path.
@@ -329,10 +329,12 @@ class CommandTestBase : public CommandModulesTest {
         }
     };
 
-    auto createMessageReplyMatcher(MessagePtr message = nullptr) {
+    auto createMessageReplyMatcher(Message::Ptr message = nullptr) {
         return Truly([=, this](ReplyParametersExt::Ptr m) {
             return isReplyToThisMsg(std::move(m),
-                                    message ?: defaultProvidedMessage);
+                                    message
+                                        ?: std::static_pointer_cast<Message>(
+                                               defaultProvidedMessage));
         });
     }
 

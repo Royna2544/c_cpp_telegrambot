@@ -1,9 +1,8 @@
+#include <Random.hpp>
 #include <StringResManager.hpp>
 #include <memory>
 
 #include "CommandModulesTest.hpp"
-#include "Random.hpp"
-#include "gmock/gmock.h"
 
 namespace {
 void verifyKeyboard(const TgBot::GenericReply::Ptr& reply) {

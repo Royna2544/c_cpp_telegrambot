@@ -29,6 +29,7 @@ add_my_executable(
     commands/BashCmdTest.cpp
     commands/CmdCmdTest.cpp
     commands/DatabaseCmdTest.cpp
+    commands/DeleteEchoCmdTest.cpp
     ${SOCKET_TEST_FILE}
   LIBS
     GTest::gtest
