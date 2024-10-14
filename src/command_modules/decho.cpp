@@ -15,8 +15,7 @@ static DECLARE_COMMAND_HANDLER(decho, tgBotWrapper, message) {
     if (message->has<MessageExt::Attrs::IsReplyMessage,
                      MessageExt::Attrs::ExtraText>()) {
         tgBotWrapper->copyAndReplyAsMessage(message, message->replyToMessage);
-    }
-    if (message->has<MessageExt::Attrs::IsReplyMessage>()) {
+    } else if (message->has<MessageExt::Attrs::IsReplyMessage>()) {
         tgBotWrapper->copyAndReplyAsMessage(message->replyToMessage);
     } else if (message->has<MessageExt::Attrs::ExtraText>()) {
         tgBotWrapper->sendMessage(message,
