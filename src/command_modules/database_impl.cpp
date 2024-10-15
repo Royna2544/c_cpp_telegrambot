@@ -146,18 +146,20 @@ DECLARE_COMMAND_HANDLER(saveid, bot, message) {
     }
     std::optional<std::string> fileId;
     std::optional<std::string> fileUniqueId;
+    DatabaseBase::MediaType type{};
 
     if (message->replyToMessage_has<MessageExt::Attrs::Animation>()) {
-        fileId =
-            message->replyToMessage_get<MessageExt::Attrs::Animation>()->fileId;
-        fileUniqueId =
-            message->replyToMessage_get<MessageExt::Attrs::Animation>()
-                ->fileUniqueId;
+        const auto p =
+            message->replyToMessage_get<MessageExt::Attrs::Animation>();
+        fileId = p->fileId;
+        fileUniqueId = p->fileUniqueId;
+        type = DatabaseBase::MediaType::GIF;
     } else if (message->replyToMessage_has<MessageExt::Attrs::Sticker>()) {
-        fileId =
-            message->replyToMessage_get<MessageExt::Attrs::Sticker>()->fileId;
-        fileUniqueId = message->replyToMessage_get<MessageExt::Attrs::Sticker>()
-                           ->fileUniqueId;
+        const auto p =
+            message->replyToMessage_get<MessageExt::Attrs::Sticker>();
+        fileId = p->fileId;
+        fileUniqueId = p->fileUniqueId;
+        type = DatabaseBase::MediaType::STICKER;
     }
 
     CHECK(fileId && fileUniqueId) << "They should be set";
@@ -167,6 +169,7 @@ DECLARE_COMMAND_HANDLER(saveid, bot, message) {
     info.mediaId = fileId.value();
     info.mediaUniqueId = fileUniqueId.value();
     info.names = message->arguments();
+    info.mediaType = type;
 
     if (backend->addMediaInfo(info)) {
         const auto content = fmt::format("Media with names:\n{}\nadded",

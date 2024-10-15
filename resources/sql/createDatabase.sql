@@ -21,6 +21,7 @@ CREATE TABLE mediamap (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     medianameid INTEGER NOT NULL,
     mediaid INTEGER NOT NULL,
+    mediatype INTEGER NOT NULL,
     FOREIGN KEY (medianameid) REFERENCES medianame(id) ON DELETE CASCADE,
     FOREIGN KEY (mediaid) REFERENCES mediaids(id) ON DELETE CASCADE
 );

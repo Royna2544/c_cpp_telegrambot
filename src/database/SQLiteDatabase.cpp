@@ -7,9 +7,9 @@
 #include <StacktracePrint.hpp>
 #include <cstdint>
 #include <fstream>
-#include <iomanip>
 #include <iostream>
 #include <libos/libfs.hpp>
+#include <map>
 #include <memory>
 #include <optional>
 #include <source_location>
@@ -443,6 +443,7 @@ bool SQLiteDatabase::addMediaInfo(const MediaInfo& info) const {
     int count = 0;
     int mediaIdIndex = 0;
     std::vector<UpdateInfo> updates(info.names.size());
+    MediaType type = info.mediaType;
 
     if (info.names.size() == 0) {
         LOG(ERROR) << "Zero-length names specified";
@@ -542,9 +543,10 @@ bool SQLiteDatabase::addMediaInfo(const MediaInfo& info) const {
         if (!insertMediaMapHelper->prepare()) {
             return false;
         }
-        insertMediaMapHelper->addArgument(mediaIdIndex);
-        insertMediaMapHelper->addArgument(data);
-        insertMediaMapHelper->bindArguments();
+        insertMediaMapHelper->addArgument(mediaIdIndex)
+            ->addArgument(data)
+            ->addArgument(static_cast<int>(type))
+            ->bindArguments();
 
         if (!insertMediaMapHelper->execute()) {
             return false;
@@ -632,6 +634,8 @@ std::ostream& SQLiteDatabase::dump(std::ostream& ofs) const {
             ss << "MediaId: " << row->get<std::string>(0) << std::endl;
             ss << "MediaUniqueId: " << row->get<std::string>(1) << std::endl;
             ss << "MediaName: " << row->get<std::string>(2) << std::endl;
+            ss << "MediaType: " << static_cast<MediaType>(row->get<int>(3))
+               << std::endl;
             ss << std::endl;
             any = true;
         }

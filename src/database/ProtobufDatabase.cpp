@@ -2,11 +2,47 @@
 
 #include <absl/log/check.h>
 #include <absl/log/log.h>
+#include <absl/strings/match.h>
+#include <fmt/format.h>
 
 #include <fstream>
 #include <optional>
 
 #include "TgBotDB.pb.h"
+
+template <>
+struct fmt::formatter<tgbot::proto::MediaType> : formatter<string_view> {
+    // parse is inherited from formatter<string_view>.
+    auto format(tgbot::proto::MediaType c,
+                format_context &ctx) const -> format_context::iterator {
+        string_view name = "unknown";
+        switch (c) {
+            case tgbot::proto::MediaType::VIDEO:
+                name = "VIDEO";
+                break;
+            case tgbot::proto::MediaType::AUDIO:
+                name = "AUDIO";
+                break;
+            case tgbot::proto::MediaType::STICKER:
+                name = "STICKER";
+                break;
+            case tgbot::proto::MediaType::UNKNOWN:
+                name = "UNKNOWN";
+                break;
+            case tgbot::proto::MediaType::PHOTO:
+                name = "PHOTO";
+                break;
+            case tgbot::proto::MediaType::GIF:
+                name = "GIF";
+                break;
+            default:
+                LOG(ERROR) << "Unknown media type: " << static_cast<int>(c);
+                name = "WTF";
+                break;
+        }
+        return formatter<string_view>::format(name, ctx);
+    }
+};
 
 using namespace tgbot::proto;
 
@@ -167,7 +203,7 @@ std::optional<ProtoDatabase::MediaInfo> ProtoDatabase::queryMediaInfo(
     const auto &obj = dbinfo->object;
     for (const auto &mediaEntriesIt : obj.mediatonames()) {
         for (const auto &name : mediaEntriesIt.names()) {
-            if (strcasecmp(name.c_str(), str.c_str()) == 0) {
+            if (absl::EqualsIgnoreCase(name, str)) {
                 it = mediaEntriesIt;
                 break;
             }
@@ -179,6 +215,7 @@ std::optional<ProtoDatabase::MediaInfo> ProtoDatabase::queryMediaInfo(
     MediaInfo info;
     info.mediaId = it->telegrammediaid();
     info.mediaUniqueId = it->telegrammediauniqueid();
+    info.mediaType = static_cast<MediaType>(it->mediatype());
     return info;
 }
 
@@ -192,6 +229,8 @@ bool ProtoDatabase::addMediaInfo(const MediaInfo &info) const {
     auto *const mediaEntry = mediaEntries->Add();
     mediaEntry->set_telegrammediaid(info.mediaId);
     mediaEntry->set_telegrammediauniqueid(info.mediaUniqueId);
+    mediaEntry->set_mediatype(
+        static_cast<tgbot::proto::MediaType>(info.mediaType));
     auto *const mediaNames = mediaEntry->mutable_names();
     for (const auto &name : info.names) {
         *mediaNames->Add() = name;
@@ -205,14 +244,10 @@ std::ostream &ProtoDatabase::dump(std::ostream &os) const {
         return os;
     }
     const auto &db = dbinfo->object;
-    os << "Dump of database file: " << dbinfo->path << std::endl;
-    os << "Owner ID: ";
-    if (db.has_ownerid()) {
-        os << db.ownerid();
-    } else {
-        os << "Not set";
-    }
-    os << std::endl;
+
+    os << fmt::format("Dump of database file: {}\nOwner ID: {}\n",
+                      dbinfo->path.string(),
+                      db.has_ownerid() ? db.ownerid() : -1);
 
     if (db.has_whitelist()) {
         dumpList(os, db.whitelist(), "whitelist");
@@ -220,51 +255,34 @@ std::ostream &ProtoDatabase::dump(std::ostream &os) const {
     if (db.has_blacklist()) {
         dumpList(os, db.blacklist(), "blacklist");
     }
-    const auto &mediaDB = getMediaToName();
-    if (const auto mediaDBSize = mediaDB->size(); mediaDBSize > 0) {
-        for (int i = 0; i < mediaDBSize; ++i) {
-            const auto it = mediaDB->Get(i);
-            std::cout << "- Entry " << i << ":" << std::endl;
-            if (it.has_telegrammediaid()) {
-                std::cout << "   -> "
-                             "Media FileId: "
-                          << it.telegrammediaid() << std::endl;
-            }
-            if (it.has_telegrammediauniqueid()) {
-                std::cout << "   -> "
-                             "Media FileUniqueId: "
-                          << it.telegrammediauniqueid() << std::endl;
-            }
-            if (const auto namesSize = it.names_size(); namesSize > 0) {
-                for (int j = 0; j < namesSize; ++j) {
-                    std::cout << "   -> "
-                                 "Media Name "
-                              << j << ": " << it.names(j) << std::endl;
-                }
-            }
-            if (i != mediaDBSize - 1) {
-                std::cout << std::endl;
-            }
+
+    int count = 0;
+    os << fmt::format("\nMediaNames Dump: (Size {})\n", db.mediatonames_size());
+    for (auto const &medias : *getMediaToName()) {
+        os << fmt::format("- Entry {}:\n", count++);
+        if (medias.has_telegrammediaid()) {
+            os << fmt::format("\tMedia FileId: {}\n", medias.telegrammediaid());
         }
+        if (medias.has_telegrammediauniqueid()) {
+            os << fmt::format("\tMedia Unique FileId: {}\n",
+                              medias.telegrammediauniqueid());
+        }
+        if (medias.has_mediatype()) {
+            os << fmt::format("\tMedia type: {}\n", medias.mediatype());
+        }
+        os << fmt::format("\tMedia Names: {}\n",
+                          fmt::join(medias.names(), ", "));
     }
-    const auto chatDB = dbinfo->object.chattonames();
-    if (const auto chatDBSize = chatDB.size(); chatDBSize > 0) {
-        for (int i = 0; i < chatDBSize; ++i) {
-            const auto it = chatDB.Get(i);
-            std::cout << "- Entry " << i << ":" << std::endl;
-            if (it.has_telegramchatid()) {
-                std::cout << "   -> "
-                             "Chat Id: "
-                          << it.telegramchatid() << std::endl;
-            }
-            if (it.has_name()) {
-                std::cout << "   -> "
-                             "Chat Name: "
-                          << it.name() << std::endl;
-            }
-            if (i != chatDBSize - 1) {
-                std::cout << std::endl;
-            }
+    os << fmt::format("\nChatNames Dump: (Size {})\n",
+                      dbinfo->object.chattonames_size());
+    count = 0;
+    for (const auto &chat : db.chattonames()) {
+        os << fmt::format("- Entry {}:\n", count);
+        if (chat.has_telegramchatid()) {
+            os << fmt::format("\tChat Id: {}\n", chat.telegramchatid());
+        }
+        if (chat.has_name()) {
+            os << fmt::format("\tChat Name: {}\n", chat.name());
         }
     }
     return os;

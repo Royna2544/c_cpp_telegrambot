@@ -21,10 +21,21 @@ struct DatabaseBase {
         BACKEND_ERROR
     };
 
+    enum class MediaType {
+        UNKNOWN,
+        PHOTO,
+        VIDEO,
+        AUDIO,
+        // DOCUMENT,
+        STICKER = 5,
+        GIF
+    };
+
     struct MediaInfo {
         std::string mediaId;
         std::string mediaUniqueId;
         std::vector<std::string> names;
+        MediaType mediaType;
     };
 
     /**
@@ -172,7 +183,8 @@ struct DatabaseBase {
     }
 };
 
-inline std::ostream& operator<<(std::ostream& os, const DatabaseBase::ListType& type) {
+inline std::ostream& operator<<(std::ostream& os,
+                                const DatabaseBase::ListType& type) {
     switch (type) {
         case DatabaseBase::ListType::WHITELIST:
             return os << "WHITELIST";
@@ -182,7 +194,8 @@ inline std::ostream& operator<<(std::ostream& os, const DatabaseBase::ListType& 
     return os;
 }
 
-inline std::ostream& operator<<(std::ostream& os, const DatabaseBase::ListResult& result) {
+inline std::ostream& operator<<(std::ostream& os,
+                                const DatabaseBase::ListResult& result) {
     switch (result) {
         case DatabaseBase::ListResult::OK:
             return os << "OK";
@@ -194,6 +207,25 @@ inline std::ostream& operator<<(std::ostream& os, const DatabaseBase::ListResult
             return os << "ALREADY_IN_OTHER_LIST";
         case DatabaseBase::ListResult::BACKEND_ERROR:
             return os << "BACKEND_ERROR";
+    }
+    return os;
+}
+
+inline std::ostream& operator<<(std::ostream& os,
+                                const DatabaseBase::MediaType& type) {
+    switch (type) {
+        case DatabaseBase::MediaType::UNKNOWN:
+            return os << "UNKNOWN";
+        case DatabaseBase::MediaType::PHOTO:
+            return os << "PHOTO";
+        case DatabaseBase::MediaType::VIDEO:
+            return os << "VIDEO";
+        case DatabaseBase::MediaType::AUDIO:
+            return os << "AUDIO";
+        case DatabaseBase::MediaType::STICKER:
+            return os << "STICKER";
+        case DatabaseBase::MediaType::GIF:
+            return os << "GIF";
     }
     return os;
 }

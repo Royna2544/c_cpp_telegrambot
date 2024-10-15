@@ -11,6 +11,7 @@
 #include <database/bot/TgBotDatabaseImpl.hpp>
 #include <filesystem>
 #include <mutex>
+#include "database/DatabaseBase.hpp"
 
 template <unsigned Len>
 consteval auto cat(const char (&strings)[Len]) {
@@ -46,7 +47,7 @@ static DECLARE_COMMAND_HANDLER(alive, wrapper, message) {
     });
     const auto info = TgBotDatabaseImpl::getInstance()->queryMediaInfo("alive");
     bool sentAnimation = false;
-    if (info) {
+    if (info && info->mediaType == DatabaseBase::MediaType::GIF) {
         try {
             wrapper->sendReplyAnimation<TgBotWrapper::ParseMode::HTML>(
                 message, MediaIds{info->mediaId, info->mediaUniqueId}, version);
