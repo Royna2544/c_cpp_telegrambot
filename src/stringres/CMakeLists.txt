@@ -6,6 +6,7 @@ add_my_library(
   SRCS StringResLoader.cpp
   LIBS LibXml2::LibXml2
   PUBLIC_INC .
+  STATIC
 )
 
 add_my_library(

@@ -5,6 +5,7 @@ add_my_library(
   NAME SocketCommandMap 
   SRCS TgBotCommandMap.cpp
   PRIVATE_INC include
+  STATIC
 )
 
 find_package(ZLIB REQUIRED)

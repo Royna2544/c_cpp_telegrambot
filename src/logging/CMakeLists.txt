@@ -3,6 +3,7 @@ add_my_library(
   SRCS AbslLogInit.cpp
   LIBS absl::log_initialize absl::log_sink_registry
   PUBLIC_INC .
+  STATIC
 )
 
 if (USE_UNIX_SOCKETS)
