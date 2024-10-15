@@ -25,9 +25,6 @@
 #include <variant>
 #include <vector>
 
-#include "tgbot/EventBroadcaster.h"
-#include "tgbot/types/CallbackQuery.h"
-
 using TgBot::Animation;
 using TgBot::Api;
 using TgBot::Bot;
@@ -1266,12 +1263,31 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
     // Protect callbacks
     std::mutex callback_anycommand_mutex;
     std::mutex callback_callbackquery_mutex;
+    std::mutex callback_result_mutex;
     // A callback list where it is called when any message is received
     std::vector<onAnyMessage_handler_t> callbacks_anycommand;
     std::multimap<std::string, TgBot::EventBroadcaster::CallbackQueryListener>
         callbacks_callbackquery;
+    using InlineCallback =
+        std::function<std::vector<TgBot::InlineQueryResult::Ptr>(
+            const std::string_view)>;
+    std::map<std::string, InlineCallback> queryResults;
 
    public:
+    void addInlineQueryKeyboard(std::string key,
+                                TgBot::InlineQueryResult::Ptr result) {
+        queryResults[std::move(key)] =
+            [result = std::move(result)](const std::string_view /*unused*/) {
+                return std::vector{result};
+            };
+    }
+    void addInlineQueryKeyboard(std::string key, InlineCallback result) {
+        queryResults[std::move(key)] = std::move(result);
+    }
+    void removeInlineQueryKeyboard(const std::string& key) {
+        queryResults.erase(key);
+    }
+
     /**
      * @brief Registers a callback function to be called when any message is
      * received.

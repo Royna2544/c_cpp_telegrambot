@@ -1,4 +1,5 @@
 #include <absl/strings/ascii.h>
+#include <absl/strings/match.h>
 #include <absl/strings/str_split.h>
 #include <absl/strings/strip.h>
 #include <dlfcn.h>
@@ -21,9 +22,6 @@
 #include <queue>
 #include <string_view>
 #include <utility>
-
-#include "tgbot/TgException.h"
-#include "tgbot/types/CallbackQuery.h"
 
 void MessageExt::update() {
     // Try to find botcommand entity
@@ -380,7 +378,7 @@ bool TgBotWrapper::setBotCommands() const {
             onecommand->command = cmd->command;
             onecommand->description = cmd->description;
             if (cmd->isEnforced()) {
-                onecommand->description += fmt::format(" {}", GETSTR(OWNER));
+                onecommand->description += fmt::format(" ({})", GETSTR(OWNER));
             }
             buffer.emplace_back(onecommand);
         }
@@ -514,12 +512,26 @@ void TgBotWrapper::startPoll() {
     getEvents().onCallbackQuery([this](const TgBot::CallbackQuery::Ptr& query) {
         onCallbackQueryFunction(query);
     });
+    getEvents().onInlineQuery([this](const TgBot::InlineQuery::Ptr& query) {
+        const std::lock_guard m(callback_result_mutex);
 
+        if (queryResults.empty()) {
+            return;
+        }
+        std::vector<TgBot::InlineQueryResult::Ptr> inlineResults;
+        std::ranges::for_each(queryResults, [&query, &inlineResults](auto&& x) {
+            std::string_view suffix = query->query;
+            if (absl::ConsumePrefix(&suffix, x.first)) {
+                auto vec = x.second(suffix);
+                inlineResults.insert(inlineResults.end(), vec.begin(), vec.end());
+            }
+        });
+        getApi().answerInlineQuery(query->id, inlineResults);
+    });
     OnTerminateRegistrar::getInstance()->registerCallback([this]() {
         std::ranges::for_each(
             _modules, [this](auto& elem) { unloadCommand(elem->command); });
     });
-
     TgLongPoll longPoll(_bot);
     while (!SignalHandler::isSignaled()) {
         longPoll.start();
