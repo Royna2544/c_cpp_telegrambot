@@ -22,13 +22,14 @@ TEST_F(AliveCommandTest, hasAliveMediaName) {
     const auto botUser = std::make_shared<User>();
 
     // Would call two times for username, nickname
-    EXPECT_CALL(*botApi, getBotUser_impl())
-        .Times(2)
-        .WillRepeatedly(Return(botUser));
+    ON_CALL(*botApi, getBotUser_impl())
+        .WillByDefault(Return(botUser));
 
     // First, if alive medianame existed
+    auto ret = TEST_MEDIAINFO;
+    ret.mediaType = DatabaseBase::MediaType::GIF;
     EXPECT_CALL(*database, queryMediaInfo(ALIVE_FILE_ID))
-        .WillOnce(Return(TEST_MEDIAINFO));
+        .WillOnce(Return(ret));
 
     // Expected to pass the fileid and parsemode as HTML
     willSendReplyFile<TgBotWrapper::ParseMode::HTML>(
@@ -41,9 +42,8 @@ TEST_F(AliveCommandTest, DoesntHaveAliveMediaName) {
     const auto botUser = std::make_shared<User>();
 
     // Would call two times for username, nickname
-    EXPECT_CALL(*botApi, getBotUser_impl())
-        .Times(2)
-        .WillRepeatedly(Return(botUser));
+    ON_CALL(*botApi, getBotUser_impl())
+        .WillByDefault(Return(botUser));
     // Second, if alive medianame not existed
     EXPECT_CALL(*database, queryMediaInfo(ALIVE_FILE_ID))
         .WillOnce(Return(std::nullopt));
