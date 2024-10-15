@@ -57,30 +57,27 @@ std::string craftPercentage(double percent) {
     constexpr int totalBars = Percent::MAX / divider;
     constexpr int middleidx = totalBars / 2;
 
-    const int greenBars = static_cast<int>(percent) / divider;
+    const int filledBars = static_cast<int>(percent) / divider;
     const std::string percentStr = fmt::format(" {:.2f}% ", percent);
+    // Minus one so the next increment will be correct.
     const int textsize = static_cast<int>(percentStr.size());
 
     std::ostringstream colorBar;
     int index = 0;
     colorBar << "[";
 
-    // Fill the bar before the percentage string
-    for (; index < greenBars; ++index) {
+    while (index < totalBars) {
+        // Insert percentage string at the middle and skip the next few bars
         if (index == middleidx - textsize / 2) {
             colorBar << percentStr;
-            index += textsize;
+            index += textsize; 
         }
-        colorBar << filled;
-    }
-
-    // Fill the bar after the percentage string
-    for (; index < totalBars; ++index) {
-        if (index == middleidx - textsize / 2) {
-            colorBar << percentStr;
-            index += textsize;
+        if (index < filledBars) {
+            colorBar << filled;
+        } else if (index < totalBars) {
+            colorBar << empty;
         }
-        colorBar << empty;
+        ++index;
     }
 
     colorBar << "]";
