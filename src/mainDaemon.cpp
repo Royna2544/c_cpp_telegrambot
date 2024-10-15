@@ -12,7 +12,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
-#include <iostream>
 #include <limits>
 #include <logging/AbslLogInit.hpp>
 #include <string_view>
@@ -36,7 +35,7 @@ int main(const int argc, char** argv) {
     }
 
     LOG(INFO) << fmt::format("Parent pid is {}", getpid());
-    pid_t pid = fork();
+    static pid_t pid = fork();
 
     if (pid < 0) {
         PLOG(ERROR) << "Fork failed";
@@ -111,6 +110,18 @@ redo_vfork:
             return EXIT_FAILURE;
         }
         pidFile.close();
+
+        // Install signal handlers for termination signals
+        const auto handler = [](int signum) {
+            LOG(INFO) << "Sending " << strsignal(signum) << " to child process";
+            killpg(pid, signum);
+            waitpid(pid, nullptr, 0);
+            LOG(INFO) << "Exiting the daemon process";
+            exit(EXIT_SUCCESS);
+        };
+        (void)signal(SIGINT, handler);
+        (void)signal(SIGTERM, handler);
+        (void)signal(SIGHUP, SIG_IGN);  // SIGHUP is ignored in daemon mode
 
         int status{};
         if (waitpid(pid, &status, 0) < 0) {
