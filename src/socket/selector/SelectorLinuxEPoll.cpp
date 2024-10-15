@@ -6,16 +6,19 @@
 
 #include "SelectorPosix.hpp"
 
-bool EPollSelector::init() { return (isValidFd(epollfd = epoll_create(MAX_EPOLLFDS))); }
+bool EPollSelector::init() {
+    return (isValidFd(epollfd = epoll_create(MAX_EPOLLFDS)));
+}
 
-bool EPollSelector::add(socket_handle_t fd, OnSelectedCallback callback, Mode mode) {
+bool EPollSelector::add(socket_handle_t fd, OnSelectedCallback callback,
+                        Mode mode) {
     struct epoll_event event {};
 
     if (data.size() > MAX_EPOLLFDS) {
         LOG(WARNING) << "epoll fd buffer full";
         return false;
     }
-    
+
     if (std::ranges::any_of(data,
                             [fd](const auto &data) { return data.fd == fd; })) {
         LOG(WARNING) << "epoll fd " << fd << " is already added";
@@ -23,7 +26,7 @@ bool EPollSelector::add(socket_handle_t fd, OnSelectedCallback callback, Mode mo
     }
 
     event.data.fd = fd;
-    
+
     switch (mode) {
         case Mode::READ:
             event.events = EPOLLIN;
@@ -53,8 +56,9 @@ bool EPollSelector::remove(socket_handle_t fd) {
     bool found = std::ranges::any_of(
         data, [fd](const auto &data) { return data.fd == fd; });
     if (found) {
-        std::ranges::remove_if(
+        auto [first, last] = std::ranges::remove_if(
             data, [fd](const auto &data) { return data.fd == fd; });
+        data.erase(first, last);
         if (epoll_ctl(epollfd, EPOLL_CTL_DEL, fd, nullptr) < 0) {
             PLOG(ERROR) << "epoll_ctl failed";
             return false;
@@ -66,9 +70,10 @@ bool EPollSelector::remove(socket_handle_t fd) {
     return found;
 }
 
-#define CALL_RETRY(retvar, expression) do { \
-    retvar = (expression); \
-} while (retvar == -1 && errno == EINTR);
+#define CALL_RETRY(retvar, expression) \
+    do {                               \
+        retvar = (expression);         \
+    } while (retvar == -1 && errno == EINTR);
 
 EPollSelector::SelectorPollResult EPollSelector::poll() {
     epoll_event result_event{};
@@ -100,6 +105,4 @@ void EPollSelector::shutdown() {
     }
 }
 
-bool EPollSelector::reinit() {
-    return true;
-}
+bool EPollSelector::reinit() { return true; }
