@@ -4,6 +4,7 @@
 #include <absl/log/log.h>
 #include <absl/strings/match.h>
 #include <fmt/format.h>
+#include <fmt/ranges.h>
 
 #include <fstream>
 #include <optional>
