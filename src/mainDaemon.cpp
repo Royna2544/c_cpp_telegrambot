@@ -11,6 +11,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <csignal>
 #include <filesystem>
 #include <limits>
 #include <logging/AbslLogInit.hpp>
