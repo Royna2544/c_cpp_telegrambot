@@ -15,6 +15,7 @@
 #include <source_location>
 #include <stdexcept>
 #include <string>
+#include <map>
 #include <string_view>
 #include <type_traits>
 #include <variant>
@@ -553,6 +554,40 @@ bool SQLiteDatabase::addMediaInfo(const MediaInfo& info) const {
         }
     }
     return true;
+}
+
+std::vector<SQLiteDatabase::MediaInfo> SQLiteDatabase::getAllMediaInfos() const {
+    using MergeMap = std::map<std::pair<std::string, std::string>, std::pair<std::vector<std::string>, MediaType>>;
+    MergeMap map;
+    std::vector<MediaInfo> result;
+
+    auto helper = Helper::create(db, Helper::kFindAllMediaMapFile);
+    if (!helper->prepare()) {
+        return result;
+    }
+    while (auto rows = helper->execAndGetRow()) {
+        MediaInfo info;
+        info.mediaId = rows->get<std::string>(0);
+        info.mediaUniqueId = rows->get<std::string>(1);
+        info.names.emplace_back(rows->get<std::string>(2));
+        info.mediaType = static_cast<MediaType>(rows->get<int>(3));
+        result.emplace_back(info);
+    }
+    for (const auto& info : result) {
+        auto key = std::make_pair(info.mediaUniqueId, info.mediaId);
+        map[key].first.insert(map[key].first.end(), info.names.begin(), info.names.end());
+        map[key].second = info.mediaType;
+    }
+    result.clear();
+    for (const auto& pair : map) {
+        MediaInfo info;
+        info.mediaId = pair.first.second;
+        info.mediaUniqueId = pair.first.first;
+        info.names = pair.second.first;
+        info.mediaType = pair.second.second;
+        result.emplace_back(info);
+    }
+    return result;
 }
 
 std::optional<UserId> SQLiteDatabase::getOwnerUserId() const {

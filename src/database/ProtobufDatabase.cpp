@@ -238,6 +238,21 @@ bool ProtoDatabase::addMediaInfo(const MediaInfo &info) const {
     return true;
 }
 
+std::vector<ProtoDatabase::MediaInfo> ProtoDatabase::getAllMediaInfos() const {
+    std::vector<MediaInfo> result;
+    for (const auto &mediaEntriesIt : dbinfo->object.mediatonames()) {
+        MediaInfo info;
+        info.mediaId = mediaEntriesIt.telegrammediaid();
+        info.mediaUniqueId = mediaEntriesIt.telegrammediauniqueid();
+        info.mediaType = static_cast<MediaType>(mediaEntriesIt.mediatype());
+        for (const auto &name : mediaEntriesIt.names()) {
+            info.names.emplace_back(name);
+        }
+        result.emplace_back(info);
+    }
+    return result;
+}
+
 std::ostream &ProtoDatabase::dump(std::ostream &os) const {
     if (!dbinfo.has_value()) {
         os << "Database not loaded!";

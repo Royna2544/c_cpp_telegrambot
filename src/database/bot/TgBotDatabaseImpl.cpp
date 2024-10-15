@@ -10,7 +10,6 @@
 #include <optional>
 #include <ostream>
 #include <string_view>
-#include <system_error>
 
 #ifdef HAVE_PROTOBUF
 #include <database/ProtobufDatabase.hpp>
@@ -120,6 +119,15 @@ bool TgBotDatabaseImpl::addMediaInfo(
         return false;
     }
     return _databaseImpl->addMediaInfo(info);
+}
+
+std::vector<TgBotDatabaseImpl::MediaInfo> TgBotDatabaseImpl::getAllMediaInfos()
+    const {
+    if (!isLoaded()) {
+        LOG(ERROR) << __func__ << ": No-op due to missing database";
+        return {};
+    }
+    return _databaseImpl->getAllMediaInfos();
 }
 
 std::ostream& TgBotDatabaseImpl::dump(std::ostream& ofs) const {

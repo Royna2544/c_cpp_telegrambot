@@ -40,6 +40,8 @@ class MockDatabase : public DatabaseBase {
 
     MOCK_METHOD(bool, addMediaInfo, (const DatabaseBase::MediaInfo& info),
                 (const, override));
+                
+    MOCK_METHOD(std::vector<MediaInfo>, getAllMediaInfos, (), (const override));
 
     MOCK_METHOD(std::ostream&, dump, (std::ostream & ofs), (const, override));
 

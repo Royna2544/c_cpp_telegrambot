@@ -127,6 +127,14 @@ struct DatabaseBase {
     [[nodiscard]] virtual bool addMediaInfo(const MediaInfo& info) const = 0;
 
     /**
+     * @brief Get all media infos inside the database
+     *
+     * @return std::vector<MediaInfo> containing all the media infos in the
+     * database.
+     */
+    [[nodiscard]] virtual std::vector<MediaInfo> getAllMediaInfos() const = 0;
+
+    /**
      * @brief Add a chat info to the database
      *
      * This function adds a new chat info to the database. The chat info

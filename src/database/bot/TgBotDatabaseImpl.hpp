@@ -48,6 +48,7 @@ struct TgBotDBImpl_API TgBotDatabaseImpl : InstanceClassBase<TgBotDatabaseImpl>,
         std::string str) const override;
     [[nodiscard]] bool addMediaInfo(
         const DatabaseBase::MediaInfo &info) const override;
+    [[nodiscard]] std::vector<MediaInfo> getAllMediaInfos() const override;
     std::ostream &dump(std::ostream &ofs) const override;
     void setOwnerUserId(UserId userid) const override;
     [[nodiscard]] bool addChatInfo(const ChatId chatid,

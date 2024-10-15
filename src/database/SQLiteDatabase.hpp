@@ -60,6 +60,7 @@ struct SQLiteDatabase : DatabaseBase {
     [[nodiscard]] std::optional<MediaInfo> queryMediaInfo(
         std::string str) const override;
     [[nodiscard]] bool addMediaInfo(const MediaInfo &info) const override;
+    [[nodiscard]] std::vector<MediaInfo> getAllMediaInfos() const override;
     void setOwnerUserId(UserId userId) const override;
     std::ostream &dump(std::ostream &ofs) const override;
     [[nodiscard]] bool addChatInfo(const ChatId chatid,
@@ -99,6 +100,7 @@ struct SQLiteDatabase : DatabaseBase {
             "dumpDatabase.sql";
         static constexpr std::string_view kInsertChatFile = "insertChat.sql";
         static constexpr std::string_view kFindChatIdFile = "findChatId.sql";
+        static constexpr std::string_view kFindAllMediaMapFile = "findAllMediaMap.sql";
 
         struct Row {
             template <typename T>
