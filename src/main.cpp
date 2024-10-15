@@ -3,6 +3,7 @@
 #include <ResourceManager.h>
 #include <absl/log/log.h>
 #include <absl/log/log_sink_registry.h>
+#include <absl/strings/match.h>
 
 #include <AbslLogInit.hpp>
 #include <CommandLine.hpp>
@@ -26,6 +27,10 @@
 #include <memory>
 #include <ml/ChatDataCollector.hpp>
 #include <utility>
+#include <vector>
+
+#include "tgbot/types/InlineQueryResult.h"
+#include "tgbot/types/InlineQueryResultCachedSticker.h"
 
 #ifndef WINDOWS_BUILD
 #include <restartfmt_parser.hpp>
@@ -444,6 +449,40 @@ void onBotInitialized(const std::shared_ptr<TgBotWrapper>& wrapper,
         "unknown platform"
 #endif
     );
+    wrapper->addInlineQueryKeyboard(
+        "media ",
+        [](std::string_view x) -> std::vector<TgBot::InlineQueryResult::Ptr> {
+            std::vector<TgBot::InlineQueryResult::Ptr> results;
+            const auto medias =
+                TgBotDatabaseImpl::getInstance()->getAllMediaInfos();
+            for (const auto& media : medias) {
+                for (const auto& name : media.names) {
+                    if (absl::StartsWith(name, x)) {
+                        switch (media.mediaType) {
+                            case DatabaseBase::MediaType::STICKER: {
+                                auto sticker = std::make_shared<
+                                    TgBot::InlineQueryResultCachedSticker>();
+                                sticker->stickerFileId = media.mediaId;
+                                sticker->id = media.mediaUniqueId;
+                                results.emplace_back(sticker);
+                                break;
+                            }
+                            case DatabaseBase::MediaType::GIF: {
+                                auto gif = std::make_shared<
+                                    TgBot::InlineQueryResultCachedGif>();
+                                gif->gifFileId = media.mediaId;
+                                gif->id = media.mediaUniqueId;
+                                results.emplace_back(gif);
+                                break;
+                            }
+                            default:
+                                break;
+                        }
+                    }
+                }
+            }
+            return results;
+        });
 }
 
 }  // namespace
