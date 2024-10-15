@@ -523,14 +523,11 @@ void TgBotWrapper::startPoll() {
             std::string_view suffix = query->query;
             if (absl::ConsumePrefix(&suffix, x.first)) {
                 auto vec = x.second(suffix);
-                inlineResults.insert(inlineResults.end(), vec.begin(), vec.end());
+                inlineResults.insert(inlineResults.end(), vec.begin(),
+                                     vec.end());
             }
         });
         getApi().answerInlineQuery(query->id, inlineResults);
-    });
-    OnTerminateRegistrar::getInstance()->registerCallback([this]() {
-        std::ranges::for_each(
-            _modules, [this](auto& elem) { unloadCommand(elem->command); });
     });
     TgLongPoll longPoll(_bot);
     while (!SignalHandler::isSignaled()) {
@@ -825,6 +822,8 @@ TgBotWrapper::~TgBotWrapper() {
                           [](auto&& fn) { fn = nullptr; });
     std::ranges::for_each(callbacks_callbackquery,
                           [](auto&& ent) { ent.second = nullptr; });
+    std::ranges::for_each(_modules,
+                          [this](auto& elem) { unloadCommand(elem->command); });
 }
 
 DECLARE_CLASS_INST(TgBotWrapper);

@@ -289,7 +289,7 @@ struct TgBotPPImpl_shared_deps_API CommandModule : TgBot::BotCommand {
 
    public:
     explicit CommandModule(std::filesystem::path filePath);
-    ~CommandModule() override = default;
+    ~CommandModule() override { function = nullptr; }
 
     bool load();
     bool unload();
