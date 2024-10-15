@@ -15,6 +15,7 @@ add_my_library(
         absl::status
     PUBLIC_INC
         ${CMAKE_CURRENT_BINARY_DIR}
+    STATIC
 )
 
 find_package(Python3 COMPONENTS Interpreter)

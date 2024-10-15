@@ -35,6 +35,7 @@ add_my_library(
     ${Protobuf_INCLUDE_DIRS}
   LIBS
     ${DATABASE_LIBS} TgBotUtils
+  STATIC
 )
 
 add_my_library(
