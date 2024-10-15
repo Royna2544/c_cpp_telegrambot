@@ -181,6 +181,7 @@ bool CommandModule::unload() {
     if ((handle != nullptr) && isLoaded) {
         isLoaded = false;
         function = nullptr;
+        handle = nullptr;
         return true;
     }
     return false;
@@ -822,8 +823,6 @@ TgBotWrapper::~TgBotWrapper() {
                           [](auto&& fn) { fn = nullptr; });
     std::ranges::for_each(callbacks_callbackquery,
                           [](auto&& ent) { ent.second = nullptr; });
-    std::ranges::for_each(_modules,
-                          [this](auto& elem) { unloadCommand(elem->command); });
 }
 
 DECLARE_CLASS_INST(TgBotWrapper);
