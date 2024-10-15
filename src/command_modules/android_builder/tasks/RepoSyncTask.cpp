@@ -125,8 +125,8 @@ DeferredExit RepoSyncTask::runFunction() {
         }
         r.defuse();
     }
-    if (const auto val = walk_up_tree_and_gather<1>(
-            [](const std::filesystem::path& path) {
+    if (const auto val =
+            walk_up_tree_and_gather<1>([](const std::filesystem::path& path) {
                 DLOG(INFO) << "Walking up: " << path;
                 return std::filesystem::is_directory(path / ".repo");
             });
@@ -161,9 +161,14 @@ void RepoSyncTask::onNewStderrBuffer(ForkAndRun::BufferType& buffer) {
 
     // Split the buffer into lines
     lines = absl::StrSplit(buffer.data(), '\n');
-    if (std::chrono::system_clock::now() - clock > 10s) {
+    if (std::chrono::system_clock::now() - clock > 30s) {
         clock = std::chrono::system_clock::now();
-        wrapper->editMessage(message, "Sync in progress...:\n" + lines[0]);
+        constexpr int PRINTING_LINES_COUNT = 5;
+        if (lines.size() > PRINTING_LINES_COUNT) {
+            lines.resize(PRINTING_LINES_COUNT);
+        }
+        wrapper->editMessage(message, fmt::format("Sync in progress...:\n{}",
+                                                  fmt::join(lines, "\n")));
     }
     for (const auto& line : lines) {
         if (line.empty()) {
