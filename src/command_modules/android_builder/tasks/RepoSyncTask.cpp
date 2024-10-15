@@ -125,10 +125,10 @@ DeferredExit RepoSyncTask::runFunction() {
         }
         r.defuse();
     }
-    if (const auto val = walk_up_tree_and_gather<false>(
+    if (const auto val = walk_up_tree_and_gather<1>(
             [](const std::filesystem::path& path) {
                 DLOG(INFO) << "Walking up: " << path;
-                return std::filesystem::exists(path / ".repo");
+                return std::filesystem::is_directory(path / ".repo");
             });
         val.size() != 0) {
         for (const auto& dir : val) {

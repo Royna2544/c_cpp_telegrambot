@@ -105,12 +105,12 @@ inline std::error_code createDirectory(const std::filesystem::path& path) {
     return ec;
 }
 
-template <bool consider_cwd = true>
+template <int push = 0>
 std::optional<std::filesystem::path> walk_up_tree(
     const std::function<bool(const std::filesystem::path&)>& predicate,
     const std::filesystem::path& starting = std::filesystem::current_path()) {
     auto current = starting;
-    if constexpr (!consider_cwd) {
+    for (int x = 0; x < push; ++x) {
         current = current.parent_path();
     }
     while (current != starting.root_path()) {
@@ -122,13 +122,13 @@ std::optional<std::filesystem::path> walk_up_tree(
     return std::nullopt;
 }
 
-template <bool consider_cwd = true>
+template <int push = 0>
 std::vector<std::filesystem::path> walk_up_tree_and_gather(
     const std::function<bool(const std::filesystem::path&)>& predicate,
     const std::filesystem::path& starting = std::filesystem::current_path()) {
     std::vector<std::filesystem::path> result;
     auto current = starting;
-    if constexpr (!consider_cwd) {
+    for (int x = 0; x < push; ++x) {
         current = current.parent_path();
     }
     while (current != starting.root_path()) {
