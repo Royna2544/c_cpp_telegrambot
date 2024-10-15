@@ -7,6 +7,7 @@
 #include <SystemInfo.hpp>
 #include <TgBotWrapper.hpp>
 #include <chrono>
+#include <concepts>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -14,6 +15,7 @@
 #include <regex>
 #include <string_view>
 #include <system_error>
+#include <utility>
 
 #include "ConfigParsers.hpp"
 #include "ForkAndRun.hpp"
@@ -50,15 +52,24 @@ std::string findTCL() {
     return {};
 }
 
-std::string craftPercentage(double percent) {
+template <typename T>
+concept hasUsageFleid =
+    requires (T t){
+        {t.usage} -> std::same_as<Percent&>;
+    };
+
+template <typename T, typename... Args>
+    requires hasUsageFleid<T>
+std::string getPercent(Args&&... args) {
     constexpr std::string_view filled = "■";
     constexpr std::string_view empty = "□";
     constexpr int divider = 5;
     constexpr int totalBars = Percent::MAX / divider;
     constexpr int middleidx = totalBars / 2;
 
-    const int filledBars = static_cast<int>(percent) / divider;
-    const std::string percentStr = fmt::format(" {:.2f}% ", percent);
+    T percent(std::forward<Args&&>(args...)...);
+    const int filledBars = static_cast<int>(percent.usage.value) / divider;
+    const std::string percentStr = fmt::format(" {:.2f}% ", percent.usage.value);
     // Minus one so the next increment will be correct.
     const int textsize = static_cast<int>(percentStr.size());
 
@@ -70,7 +81,7 @@ std::string craftPercentage(double percent) {
         // Insert percentage string at the middle and skip the next few bars
         if (index == middleidx - textsize / 2) {
             colorBar << percentStr;
-            index += textsize; 
+            index += textsize;
         }
         if (index < filledBars) {
             colorBar << filled;
@@ -180,6 +191,7 @@ void ROMBuildTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
     const auto& rom = getValue(data.localManifest->rom);
     double memUsage = NAN;
     static bool once = false;
+    const auto cwd = std::filesystem::current_path();
 
     if (!once) {
         std::fstream ofs(kErrorLogFile.data(), std::ios::app | std::ios::out);
@@ -216,12 +228,15 @@ void ROMBuildTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
 🧬 <b>Build variant</b>: {}
 💻 <b>CPU</b>: {}
 💾 <b>Memory</b>: {}
+💾 <b>Disk</b>: {}
 ❗️ <b>Job count</b>: {}</blockquote>
-<blockquote>{}</blockquote>)",
+<blockquote>{}</blockquote>
+Note: Time is based on GMT)",
             startTime, roundedTime, now, rom->romInfo->name, rom->branch,
-            data.device, type, craftPercentage(MemoryInfo().usage().value),
-            craftPercentage(CPUInfo().usage.value),
-            data.localManifest->job_count, buffer.data());
+            data.device, type, getPercent<CPUInfo>(),
+            getPercent<MemoryInfo>(),
+            getPercent<DiskInfo>(cwd), data.localManifest->job_count,
+            buffer.data());
         try {
             botWrapper->editMessage<TgBotWrapper::ParseMode::HTML>(
                 message, buildInfoBuffer);

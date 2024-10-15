@@ -60,8 +60,8 @@ Percent CPUData::getUsage() {
     long prevActiveTime = prevData.getActiveTime();
     long currActiveTime = currData.getActiveTime();
 
-    const auto percent =
-        double(currActiveTime - prevActiveTime) / double(currTotalTime - prevTotalTime);
+    const auto percent = double(currActiveTime - prevActiveTime) /
+                         double(currTotalTime - prevTotalTime);
 
     return {(assert_downcast<double>(percent)) * 100.0};
 }
@@ -117,6 +117,10 @@ MemoryInfo::MemoryInfo() {
     freeMemory = kMemoryMap["MemFree"];
     usedMemory =
         totalMemory - freeMemory - kMemoryMap["Buffers"] - kMemoryMap["Cached"];
+
+    usage = {assert_downcast<double>(
+        static_cast<Bytes::size_type_floating>(usedMemory.value) *
+        Percent::MAX / totalMemory.value)};
 }
 
 // Get disk info
@@ -125,11 +129,14 @@ DiskInfo::DiskInfo(std::filesystem::path path) : path_(std::move(path)) {
 
     if (statvfs(path_.c_str(), &stat) != 0) {
         PLOG(ERROR) << "Could not retrieve disk information";
+        return;
     }
 
-    // 0 * 0, so 0.
     availableSpace = stat.f_bsize * stat.f_bavail;
     totalSpace = stat.f_bsize * stat.f_blocks;
+    usage = {assert_downcast<double>(
+        static_cast<Bytes::size_type_floating>(availableSpace) * Percent::MAX /
+        totalSpace)};
 }
 
 SystemSummary::SystemSummary() {
@@ -173,7 +180,7 @@ std::ostream& operator<<(std::ostream& os, MemoryInfo const& info) {
     os << "Total Memory: " << info.totalMemory << "\n";
     os << "Free Memory: " << info.freeMemory << "\n";
     os << "Used Memory: " << info.usedMemory << "\n";
-    os << "Usage: " << info.usage() << "\n";
+    os << "Usage: " << info.usage << "\n";
     return os;
 }
 

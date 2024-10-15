@@ -83,13 +83,7 @@ struct MemoryInfo {
     Bytes totalMemory;
     Bytes freeMemory;
     Bytes usedMemory;
-
-    [[nodiscard]] Percent usage() const {
-        const auto ret =
-            static_cast<Bytes::size_type_floating>(usedMemory.value) *
-            Percent::MAX / totalMemory.value;
-        return {assert_downcast<double>(ret)};
-    }
+    Percent usage;
 };
 
 struct DiskInfo {
@@ -99,6 +93,7 @@ struct DiskInfo {
 
     Bytes totalSpace;
     Bytes availableSpace;
+    Percent usage{};
 };
 
 struct SystemSummary {
