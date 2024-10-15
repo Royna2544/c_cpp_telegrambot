@@ -17,7 +17,7 @@ DECLARE_COMMAND_HANDLER(fileid, wrapper, message) {
         } else if (replyMsg->video) {
             file = replyMsg->video->fileId;
             unifile = replyMsg->video->fileUniqueId;
-        } else if (replyMsg->photo.size() == 1) {
+        } else if (replyMsg->photo.size() != 0) {
             file = replyMsg->photo.front()->fileId;
             unifile = replyMsg->photo.front()->fileUniqueId;
         } else {
