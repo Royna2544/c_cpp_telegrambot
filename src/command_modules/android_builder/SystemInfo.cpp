@@ -135,8 +135,8 @@ DiskInfo::DiskInfo(std::filesystem::path path) : path_(std::move(path)) {
     availableSpace = stat.f_bsize * stat.f_bavail;
     totalSpace = stat.f_bsize * stat.f_blocks;
     usage = {assert_downcast<double>(
-        static_cast<Bytes::size_type_floating>(availableSpace) * Percent::MAX /
-        totalSpace)};
+        static_cast<Bytes::size_type_floating>(totalSpace - availableSpace) *
+        Percent::MAX / totalSpace)};
 }
 
 SystemSummary::SystemSummary() {
