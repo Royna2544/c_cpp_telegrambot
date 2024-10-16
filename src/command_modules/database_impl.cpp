@@ -10,6 +10,8 @@
 #include <optional>
 #include <string>
 
+using TgBot::ReplyKeyboardRemove;
+
 template <DatabaseBase::ListType type>
 void handleAddUser(ApiPtr wrapper, const Message::Ptr& message,
                    const UserId user) {
@@ -33,7 +35,9 @@ void handleAddUser(ApiPtr wrapper, const Message::Ptr& message,
             LOG(ERROR) << "Unhandled result type " << static_cast<int>(res);
             text = GETSTR(UNKNOWN_ERROR);
     }
-    wrapper->sendReplyMessage(message, text);
+    auto remove = std::make_shared<ReplyKeyboardRemove>();
+    remove->removeKeyboard = true;
+    wrapper->sendReplyMessage(message, text, remove);
 }
 
 template <DatabaseBase::ListType type>
@@ -59,7 +63,9 @@ void handleRemoveUser(ApiPtr wrapper, const Message::Ptr& message,
             LOG(ERROR) << "Unhandled result type " << static_cast<int>(res);
             text = GETSTR(UNKNOWN_ERROR);
     }
-    wrapper->sendReplyMessage(message, text);
+    auto remove = std::make_shared<ReplyKeyboardRemove>();
+    remove->removeKeyboard = true;
+    wrapper->sendReplyMessage(message, text, remove);
 }
 
 namespace {
@@ -130,7 +136,6 @@ DECLARE_COMMAND_HANDLER(database, wrapper, message) {
                 handleRemoveUser<DatabaseBase::ListType::BLACKLIST>(wrapper, m,
                                                                     userId);
             }
-            wrapper->editMessageMarkup(msg, nullptr);
             return TgBotWrapper::AnyMessageResult::Deregister;
         }
         return TgBotWrapper::AnyMessageResult::Handled;

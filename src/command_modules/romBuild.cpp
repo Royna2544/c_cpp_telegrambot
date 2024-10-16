@@ -137,7 +137,6 @@ class ROMBuildQueryHandler
    public:
     bool pinned() const { return didpin; }
     ROMBuildQueryHandler(std::shared_ptr<TgBotApi> api, MessagePtr userMessage);
-    ~ROMBuildQueryHandler();
 
     void updateSentMessage(Message::Ptr message);
     void start(Message::Ptr userMessage);
@@ -509,10 +508,6 @@ ROMBuildQueryHandler::ROMBuildQueryHandler(std::shared_ptr<TgBotApi> api,
     start(userMessage);
 }
 
-ROMBuildQueryHandler::~ROMBuildQueryHandler() {
-    _api->deleteMessage(sentMessage);
-}
-
 void ROMBuildQueryHandler::start(Message::Ptr userMessage) {
     _userMessage = std::move(userMessage);
     if (sentMessage) {
@@ -635,6 +630,8 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
             return;
         }
     }
+    auto remove = std::make_shared<TgBot::ReplyKeyboardRemove>();
+    remove->removeKeyboard = true;
     _api->editMessageMarkup(sentMessage, nullptr);
     _api->sendMessage(sentMessage, "Build completed");
     if (didpin) {
