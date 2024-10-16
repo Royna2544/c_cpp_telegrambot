@@ -53,10 +53,9 @@ std::string findTCL() {
 }
 
 template <typename T>
-concept hasUsageFleid =
-    requires (T t){
-        {t.usage} -> std::same_as<Percent&>;
-    };
+concept hasUsageFleid = requires(T t) {
+    { t.usage } -> std::same_as<Percent&>;
+};
 
 template <typename T, typename... Args>
     requires hasUsageFleid<T>
@@ -69,7 +68,8 @@ std::string getPercent(Args&&... args) {
 
     T percent(std::forward<Args&&>(args...)...);
     const int filledBars = static_cast<int>(percent.usage.value) / divider;
-    const std::string percentStr = fmt::format(" {:.2f}% ", percent.usage.value);
+    const std::string percentStr =
+        fmt::format(" {:.2f}% ", percent.usage.value);
     // Minus one so the next increment will be correct.
     const int textsize = static_cast<int>(percentStr.size() - 2);
 
@@ -140,11 +140,11 @@ DeferredExit ROMBuildTask::runFunction() {
     shell << "unset USE_CCACHE" << ForkAndRunShell::endl;
     const auto lunch = [&, this](std::string_view release) {
         if (release.empty()) {
-            return fmt::format("lunch {}_{}-{}", vendor, data.device,
+            return fmt::format("lunch {}_{}-{}", vendor, data.device->codename,
                                kBuildVariant);
         } else {
-            return fmt::format("lunch {}_{}-{}-{}", vendor, data.device,
-                               release, kBuildVariant);
+            return fmt::format("lunch {}_{}-{}-{}", vendor,
+                               data.device->codename, release, kBuildVariant);
         }
     };
     shell << lunch(release);
@@ -233,10 +233,9 @@ void ROMBuildTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
 <blockquote>{}</blockquote>
 Note: Time is based on GMT)",
             startTime, roundedTime, now, rom->romInfo->name, rom->branch,
-            data.device, type, getPercent<CPUInfo>(),
-            getPercent<MemoryInfo>(),
-            getPercent<DiskInfo>(cwd), data.localManifest->job_count,
-            buffer.data());
+            data.device->toString(), type, getPercent<CPUInfo>(),
+            getPercent<MemoryInfo>(), getPercent<DiskInfo>(cwd),
+            data.localManifest->job_count, buffer.data());
         try {
             botWrapper->editMessage<TgBotWrapper::ParseMode::HTML>(
                 message, buildInfoBuffer);

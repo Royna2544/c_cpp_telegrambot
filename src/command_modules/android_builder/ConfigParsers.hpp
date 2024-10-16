@@ -193,7 +193,7 @@ class ConfigParser {
 
 struct PerBuildData {
     // device codename
-    std::string device;
+    ConfigParser::Device::Ptr device;
     // associated local manifest
     ConfigParser::LocalManifest::Ptr localManifest;
     enum class Variant {
@@ -205,7 +205,7 @@ struct PerBuildData {
     enum class Result { NONE, SUCCESS, ERROR_NONFATAL, ERROR_FATAL };
 
     void reset() {
-        device.clear();
+        device.reset();
         localManifest.reset();
         variant = Variant::kUser;
         result = nullptr;

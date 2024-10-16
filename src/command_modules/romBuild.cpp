@@ -200,10 +200,9 @@ class ROMBuildQueryHandler
     // Handle type selection button
     void handle_type(const Query& query);
 
-#define DECLARE_BUTTON_HANDLER(name, key)                               \
-    ButtonHandler {                                                     \
-        name, #key, [this](const Query& query) { handle_##key(query); } \
-    }
+#define DECLARE_BUTTON_HANDLER(name, key) \
+    ButtonHandler{name, #key,             \
+                  [this](const Query& query) { handle_##key(query); }}
 #define DECLARE_BUTTON_HANDLER_WITHPREFIX(name, key, prefix)             \
     ButtonHandler {                                                      \
         name, #key, [this](const Query& query) { handle_##key(query); }, \
@@ -645,9 +644,8 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
 void ROMBuildQueryHandler::handle_device(const Query& query) {
     std::string_view device = query->data;
     absl::ConsumePrefix(&device, "device_");
-    per_build.device = device;
+    per_build.device = lookup.device = parser.getDevice(device);
     KeyboardBuilder builder;
-    lookup.device = parser.getDevice(device);
     for (const auto& roms : parser.getROMBranches(lookup.device)) {
         builder.addKeyboard(
             {roms->toString(), fmt::format("rom_{}_{}", roms->romInfo->name,
@@ -700,7 +698,7 @@ void ROMBuildQueryHandler::handle_type(const Query& query) {
 
     const auto confirm = fmt::format(
         "Build variant: {}\nDevice: {}\nRom: {}\nAndroid version: {}", type,
-        per_build.device, rom->romInfo->name, rom->androidVersion);
+        per_build.device->codename, rom->romInfo->name, rom->androidVersion);
 
     _api->editMessage(sentMessage, confirm,
                       createKeyboardWith<Buttons::confirm, Buttons::back>());

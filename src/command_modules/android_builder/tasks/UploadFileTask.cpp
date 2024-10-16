@@ -34,7 +34,7 @@ DeferredExit UploadFileTask::runFunction() {
         return DeferredExit::generic_fail;
     }
     const auto dir =
-        std::filesystem::path() / "out" / "target" / "product" / data.device;
+        std::filesystem::path() / "out" / "target" / "product" / data.device->codename;
     for (it = decltype(it)(dir); it != decltype(it)(); ++it) {
         if (it->is_regular_file()) {
             if ((*matcher)(it->path().filename().string())) {
