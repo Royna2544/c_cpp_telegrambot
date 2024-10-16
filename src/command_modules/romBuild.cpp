@@ -139,6 +139,7 @@ class ROMBuildQueryHandler
     ROMBuildQueryHandler(std::shared_ptr<TgBotApi> api, MessagePtr userMessage);
     ~ROMBuildQueryHandler();
 
+    void updateSentMessage(Message::Ptr message);
     void start(Message::Ptr userMessage);
 
    private:
@@ -366,6 +367,7 @@ class RepoSync : public TaskWrapperBase<RepoSyncTask> {
         } else {
             const auto msg =
                 api->editMessage(sentMessage, "Repo sync failed", backKeyboard);
+            queryHandler->updateSentMessage(msg);
         }
     }
 
@@ -392,6 +394,7 @@ class Build : public TaskWrapperBase<ROMBuildTask> {
                     sentMessage,
                     fmt::format("Build failed:\n{}", result.getMessage()),
                     backKeyboard);
+                queryHandler->updateSentMessage(msg);
                 if (fs::file_size(ROMBuildTask::kErrorLogFile, ec) != 0U) {
                     if (ec) {
                         break;
@@ -438,6 +441,7 @@ class Upload : public TaskWrapperBase<UploadFileTask> {
         }
         const auto msg =
             api->editMessage(sentMessage, resultText, backKeyboard);
+        queryHandler->updateSentMessage(msg);
     }
 
    public:
@@ -517,6 +521,10 @@ void ROMBuildQueryHandler::start(Message::Ptr userMessage) {
     sentMessage =
         _api->sendMessage(_userMessage, "Will build ROM...", mainKeyboard);
     per_build.reset();
+}
+
+void ROMBuildQueryHandler::updateSentMessage(Message::Ptr message) {
+    sentMessage = std::move(message);
 }
 
 namespace {
