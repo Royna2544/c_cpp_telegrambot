@@ -1,6 +1,6 @@
 [submodule "src/third-party/tgbot-cpp"]
 	path = src/third-party/tgbot-cpp
-	url = https://github.com/roynatech2544/tgbot-cpp.git
+	url = https://github.com/Royna2544/tgbot-cpp.git
 [submodule "src/third-party/dlfcn-win32"]
 	path = src/third-party/dlfcn-win32
 	url = https://github.com/dlfcn-win32/dlfcn-win32.git
