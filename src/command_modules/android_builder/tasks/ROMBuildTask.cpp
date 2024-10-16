@@ -71,7 +71,7 @@ std::string getPercent(Args&&... args) {
     const int filledBars = static_cast<int>(percent.usage.value) / divider;
     const std::string percentStr = fmt::format(" {:.2f}% ", percent.usage.value);
     // Minus one so the next increment will be correct.
-    const int textsize = static_cast<int>(percentStr.size());
+    const int textsize = static_cast<int>(percentStr.size() - 2);
 
     std::ostringstream colorBar;
     int index = 0;
