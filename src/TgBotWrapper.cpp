@@ -22,6 +22,9 @@
 #include <queue>
 #include <string_view>
 #include <utility>
+#include "tgbot/types/InlineQueryResultArticle.h"
+#include "tgbot/types/InputMessageContent.h"
+#include "tgbot/types/InputTextMessageContent.h"
 
 void MessageExt::update() {
     // Try to find botcommand entity
@@ -528,6 +531,19 @@ void TgBotWrapper::startPoll() {
                                      vec.end());
             }
         });
+        if (inlineResults.empty()) {
+            static int articleCount = 0;
+            for (const auto& queryCallbacks : queryResults) {
+                auto article = std::make_shared<TgBot::InlineQueryResultArticle>();
+                article->id = fmt::format("article-{}", articleCount++);
+                article->title = queryCallbacks.first;
+                article->description = fmt::format("We have command {}", queryCallbacks.first);
+                auto content = std::make_shared<TgBot::InputTextMessageContent>();
+                content->messageText = fmt::format("Usage: /{}", queryCallbacks.first);
+                article->inputMessageContent = content;
+                inlineResults.emplace_back(std::move(article));
+            }
+        }
         getApi().answerInlineQuery(query->id, inlineResults);
     });
     TgLongPoll longPoll(_bot);
