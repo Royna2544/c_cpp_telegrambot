@@ -70,7 +70,7 @@ endfunction(add_my_library)
 
 function(add_my_executable)
   cmake_parse_arguments(TGBOT_EXE
-    "NO_PREFIX" # Options
+    "NO_PREFIX;OPTIONAL" # Options
     "NAME" # One-value keywords
     "SRCS;LIBS;LIBS_WIN32;LIBS_UNIX" # Multiple-value keywords
     ${ARGN}
@@ -81,7 +81,11 @@ function(add_my_executable)
   if (NOT TGBOT_EXE_NO_PREFIX)
     set(TGBOT_EXE_NAME ${PROJECT_NAME}_${TGBOT_EXE_NAME})
   endif()
-  add_executable(${TGBOT_EXE_NAME} ${TGBOT_EXE_SRCS})
+  if (TGBOT_EXE_OPTIONAL)
+    add_executable(${TGBOT_EXE_NAME} EXCLUDE_FROM_ALL ${TGBOT_EXE_SRCS})
+  else()
+    add_executable(${TGBOT_EXE_NAME} ${TGBOT_EXE_SRCS})
+  endif()
   install(TARGETS ${TGBOT_EXE_NAME} DESTINATION bin)
   add_sanitizers(${TGBOT_EXE_NAME})
   target_link_libraries(${TGBOT_EXE_NAME} absl::log TgBotLogInit ${TGBOT_EXE_LIBS})
