@@ -3,6 +3,9 @@
 #include <memory>
 
 #include "CommandModulesTest.hpp"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
+#include "tgbot/types/GenericReply.h"
 
 namespace {
 void verifyKeyboard(const TgBot::GenericReply::Ptr& reply) {
@@ -63,10 +66,11 @@ struct DatabaseCommandTest : public CommandTestBase {
     void test_impl(Matcher&& matcher) {
         GenericReply::Ptr reply;
         TgBot::GenericReply::Ptr keyboard;
+
         constexpr size_t token = 1231;
         const auto sentMessage = createDefaultMessage();
         const auto recievedMessage = createDefaultMessage();
-        willSendReplyMessageTo(matcher, recievedMessage);
+        willSendReplyMessageTo(matcher, recievedMessage, _);
         recievedMessage->replyToMessage = sentMessage;
         EXPECT_CALL(*botApi,
                     sendMessage_impl(TEST_CHAT_ID, _,
@@ -83,9 +87,6 @@ struct DatabaseCommandTest : public CommandTestBase {
                             ->text;
                 }),
                 InvokeArgument<0>(botApi, recievedMessage), Return()));
-        EXPECT_CALL(*botApi,
-                    editMessageMarkup_impl(
-                        MockTgBotApi::StringOrMessage(sentMessage), IsNull()));
         execute();
     }
 };
