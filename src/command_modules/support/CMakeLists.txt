@@ -8,6 +8,14 @@ add_my_library(
     STATIC
 )
 
+add_library(progress INTERFACE)
+target_include_directories(progress INTERFACE progress/)
+add_my_executable(
+    NAME ProgressTest
+    SRCS progress/ProgressTest.cpp
+    OPTIONAL
+)
+
 if (UNIX)
 add_my_library(
     NAME _restartfmt_parser

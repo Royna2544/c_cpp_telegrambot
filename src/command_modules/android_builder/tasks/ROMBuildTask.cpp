@@ -4,6 +4,7 @@
 #include <fmt/chrono.h>
 #include <fmt/core.h>
 
+#include <Progress.hpp>
 #include <SystemInfo.hpp>
 #include <TgBotWrapper.hpp>
 #include <chrono>
@@ -20,9 +21,6 @@
 #include "ConfigParsers.hpp"
 #include "ForkAndRun.hpp"
 #include "internal/_tgbot.h"
-#include "tgbot/TgException.h"
-#include "tgbot/types/InlineQueryResultArticle.h"
-#include "tgbot/types/InputTextMessageContent.h"
 
 namespace {
 std::string findVendor() {
@@ -63,40 +61,8 @@ concept hasUsageFleid = requires(T t) {
 template <typename T, typename... Args>
     requires hasUsageFleid<T>
 std::string getPercent(Args&&... args) {
-    constexpr std::string_view filled = "■";
-    constexpr std::string_view empty = "□";
-    constexpr int divider = 5;
-    constexpr int totalBars = Percent::MAX / divider;
-    constexpr int middleidx = totalBars / 2;
-
     T percent(std::forward<Args&&>(args...)...);
-    const int filledBars = static_cast<int>(percent.usage.value) / divider;
-    const std::string percentStr =
-        fmt::format(" {:.2f}% ", percent.usage.value);
-    // Minus one so the next increment will be correct.
-    const int textsize = static_cast<int>(percentStr.size() - 2);
-
-    std::ostringstream colorBar;
-    int index = 0;
-    colorBar << "[";
-
-    while (index < totalBars) {
-        // Insert percentage string at the middle and skip the next few bars
-        if (index == middleidx - textsize / 2) {
-            colorBar << percentStr;
-            index += textsize;
-        }
-        if (index < filledBars) {
-            colorBar << filled;
-        } else if (index < totalBars) {
-            colorBar << empty;
-        }
-        ++index;
-    }
-
-    colorBar << "]";
-
-    return colorBar.str();
+    return progressbar::create(percent.usage.value);
 }
 }  // namespace
 
@@ -270,7 +236,8 @@ ROMBuildTask::ROMBuildTask(TgBotApi::Ptr wrapper, TgBot::Message::Ptr message,
     romBuildArticle->id = fmt::format("rombuild-{}", this->message->messageId);
     romBuildArticle->inputMessageContent = textContent =
         std::make_shared<TgBot::InputTextMessageContent>();
-    textContent->parseMode = TgBotWrapper::parseModeToStr<TgBotWrapper::ParseMode::Markdown>();
+    textContent->parseMode =
+        TgBotWrapper::parseModeToStr<TgBotWrapper::ParseMode::Markdown>();
     botWrapper->addInlineQueryKeyboard("rombuild status", romBuildArticle);
 }
 
