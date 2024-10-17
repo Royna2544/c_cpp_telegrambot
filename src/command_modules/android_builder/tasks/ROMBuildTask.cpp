@@ -19,7 +19,10 @@
 
 #include "ConfigParsers.hpp"
 #include "ForkAndRun.hpp"
+#include "internal/_tgbot.h"
 #include "tgbot/TgException.h"
+#include "tgbot/types/InlineQueryResultArticle.h"
+#include "tgbot/types/InputTextMessageContent.h"
 
 namespace {
 std::string findVendor() {
@@ -219,9 +222,9 @@ void ROMBuildTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
             std::chrono::duration_cast<std::chrono::seconds>(now - startTime);
         buildInfoBuffer = fmt::format(
             R"(
-<blockquote>▶️ <b>Start time</b>: {}
+<blockquote>▶️ <b>Start time</b>: {} [GMT]
 🕐 <b>Time spent</b>: {:%H hours %M minutes %S seconds}
-🔄 <b>Last updated on</b>: {}</blockquote>
+🔄 <b>Last updated on</b>: {} [GMT]</blockquote>
 <blockquote>🎯 <b>Target ROM</b>: {}
 🏷 <b>Target branch</b>: {}
 📱 <b>Device</b>: {}
@@ -230,8 +233,7 @@ void ROMBuildTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
 💾 <b>Memory</b>: {}
 💾 <b>Disk</b>: {}
 ❗️ <b>Job count</b>: {}</blockquote>
-<blockquote>{}</blockquote>
-Note: Time is based on GMT)",
+<blockquote>{}</blockquote>)",
             startTime, roundedTime, now, rom->romInfo->name, rom->branch,
             data.device->toString(), type, getPercent<CPUInfo>(),
             getPercent<MemoryInfo>(), getPercent<DiskInfo>(cwd),
@@ -243,6 +245,7 @@ Note: Time is based on GMT)",
             LOG(ERROR) << "Couldn't parse markdown, with content:";
             LOG(ERROR) << buildInfoBuffer;
         }
+        textContent->messageText = std::move(buildInfoBuffer);
     }
 }
 
@@ -251,15 +254,26 @@ void ROMBuildTask::onExit(int exitCode) {
     std::memcpy(data.result, smem->memory, sizeof(PerBuildData::ResultData));
 }
 
-ROMBuildTask::ROMBuildTask(ApiPtr wrapper, TgBot::Message::Ptr message,
+ROMBuildTask::ROMBuildTask(TgBotApi::Ptr wrapper, TgBot::Message::Ptr message,
                            PerBuildData data)
-    : botWrapper(wrapper), data(std::move(data)), message(std::move(message)) {
-    clock = std::chrono::system_clock::now();
-    startTime = std::chrono::system_clock::now();
-
-    // Allocate shared memory for the data object.
-    smem = std::make_unique<AllocatedShmem>(kShmemROMBuild,
-                                            sizeof(PerBuildData::ResultData));
+    : botWrapper(std::move(wrapper)),
+      data(std::move(data)),
+      message(std::move(message)),
+      clock(std::chrono::system_clock::now()),
+      startTime(clock),
+      smem(std::make_unique<AllocatedShmem>(kShmemROMBuild,
+                                            sizeof(PerBuildData::ResultData))) {
+    auto romBuildArticle(std::make_shared<TgBot::InlineQueryResultArticle>());
+    romBuildArticle->title = "Build progress";
+    romBuildArticle->description = "Show the build progress running in chat " +
+                                   ChatPtr_toString(this->message->chat);
+    romBuildArticle->id = fmt::format("rombuild-{}", this->message->messageId);
+    romBuildArticle->inputMessageContent = textContent =
+        std::make_shared<TgBot::InputTextMessageContent>();
+    textContent->parseMode = TgBotWrapper::parseModeToStr<TgBotWrapper::ParseMode::Markdown>();
+    botWrapper->addInlineQueryKeyboard("rombuild status", romBuildArticle);
 }
 
-ROMBuildTask::~ROMBuildTask() = default;
+ROMBuildTask::~ROMBuildTask() {
+    botWrapper->removeInlineQueryKeyboard("rombuild status");
+}

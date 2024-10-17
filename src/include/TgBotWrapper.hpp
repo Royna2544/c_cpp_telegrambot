@@ -1047,10 +1047,10 @@ struct TgBotApi {
     }
 
     inline bool pinMessage(Message::Ptr message) {
-        return pinMessage_impl(message);
+        return pinMessage_impl(std::move(message));
     }
     inline bool unpinMessage(Message::Ptr message) {
-        return unpinMessage_impl(message);
+        return unpinMessage_impl(std::move(message));
     }
     inline bool banChatMember(const Chat::Ptr& chat, const User::Ptr& user) {
         return banChatMember_impl(chat, user);
@@ -1089,6 +1089,22 @@ struct TgBotApi {
     virtual void onCallbackQuery(
         const std::string& message,
         const TgBot::EventBroadcaster::CallbackQueryListener& listener) {
+        // Dummy implementation
+    }
+
+    using InlineCallback =
+        std::function<std::vector<TgBot::InlineQueryResult::Ptr>(
+            const std::string_view)>;
+
+    virtual void addInlineQueryKeyboard(std::string key,
+                                        TgBot::InlineQueryResult::Ptr result) {
+        // Dummy implementation
+    }
+    virtual void addInlineQueryKeyboard(std::string key,
+                                        InlineCallback result) {
+        // Dummy implementation
+    }
+    virtual void removeInlineQueryKeyboard(const std::string& key) {
         // Dummy implementation
     }
 
@@ -1268,23 +1284,20 @@ class TgBotPPImpl_shared_deps_API TgBotWrapper
     std::vector<onAnyMessage_handler_t> callbacks_anycommand;
     std::multimap<std::string, TgBot::EventBroadcaster::CallbackQueryListener>
         callbacks_callbackquery;
-    using InlineCallback =
-        std::function<std::vector<TgBot::InlineQueryResult::Ptr>(
-            const std::string_view)>;
     std::map<std::string, InlineCallback> queryResults;
 
    public:
     void addInlineQueryKeyboard(std::string key,
-                                TgBot::InlineQueryResult::Ptr result) {
+                                TgBot::InlineQueryResult::Ptr result) override {
         queryResults[std::move(key)] =
             [result = std::move(result)](const std::string_view /*unused*/) {
                 return std::vector{result};
             };
     }
-    void addInlineQueryKeyboard(std::string key, InlineCallback result) {
+    void addInlineQueryKeyboard(std::string key, InlineCallback result) override {
         queryResults[std::move(key)] = std::move(result);
     }
-    void removeInlineQueryKeyboard(const std::string& key) {
+    void removeInlineQueryKeyboard(const std::string& key) override {
         queryResults.erase(key);
     }
 
