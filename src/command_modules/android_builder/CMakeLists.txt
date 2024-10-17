@@ -20,6 +20,7 @@ add_my_library(
         TgBotLogInit
         TgBotRandom
         TgBotSocketSelectors
+        progress
         JsonCpp::JsonCpp
         LibXml2::LibXml2
         ${LIBGIT2_LIBS}
@@ -33,5 +34,6 @@ add_my_executable(
     NAME ConfigParserTest
     SRCS ConfigParserTest.cpp
     LIBS AndroidBuilder-cpp
+    OPTIONAL
 )
 endif()
