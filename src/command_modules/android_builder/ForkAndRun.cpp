@@ -3,11 +3,9 @@
 #include <absl/log/log.h>
 #include <absl/log/log_sink.h>
 #include <absl/log/log_sink_registry.h>
-#include <absl/strings/ascii.h>
-#include <fcntl.h>
-#include <fmt/core.h>
+#include <fmt/format.h>
 #include <internal/_FileDescriptor_posix.h>
-#include <sys/mman.h>
+#include <internal/_class_helper_macros.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -25,11 +23,8 @@
 #include <shared_mutex>
 #include <string_view>
 #include <thread>
-#include <type_traits>
 #include <utility>
 #include <vector>
-
-#include "internal/_class_helper_macros.h"
 
 struct FDLogSink : public absl::LogSink {
     void Send(const absl::LogEntry& logSink) override {
@@ -317,12 +312,13 @@ bool ForkAndRunShell::open() {
         ::close(pipe_.writeEnd());
 
         // Craft argv
-        std::unique_ptr<char, decltype(&free)> string(
+        auto string = RAII<char*>::create<void>(
             strdup(shell_path_.string().c_str()), free);
         std::array<char*, 2> argv{string.get(), nullptr};
 
-        // Craft envp (string_view as we don't have to copy the environment strings)
-        std::vector<char *> envp;
+        // Craft envp (string_view as we don't have to copy the environment
+        // strings)
+        std::vector<char*> envp;
         std::vector<std::string> owners;
         for (int x = 0; environ[x] != nullptr; x++) {
             envp.emplace_back(environ[x]);
