@@ -16,7 +16,7 @@ struct RAII {
     using Value = std::unique_ptr<Type, Deleter<Ret>>;
 
     template <typename Ret>
-    static auto create(Ref r, Deleter<Ret> deleter) {
+    [[nodiscard]] static auto create(Ref r, Deleter<Ret> deleter) {
         return Value<Ret>(r, deleter);
     }
 };
@@ -29,7 +29,7 @@ struct RAII2 {
         std::unique_ptr<Type, std::function<void(std::add_pointer_t<Type>)>>;
 
     template <typename Ret>
-    static auto create(Type r, const std::function<Ret(Type)> deleter) {
+    [[nodiscard]] static auto create(Type r, const std::function<Ret(Type)> deleter) {
         return Value(new Type(r), [deleter](Type *p) {
             deleter(*p);
             delete p;
