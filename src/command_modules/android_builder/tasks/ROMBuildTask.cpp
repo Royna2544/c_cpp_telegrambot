@@ -237,7 +237,7 @@ ROMBuildTask::ROMBuildTask(TgBotApi::Ptr wrapper, TgBot::Message::Ptr message,
     romBuildArticle->inputMessageContent = textContent =
         std::make_shared<TgBot::InputTextMessageContent>();
     textContent->parseMode =
-        TgBotWrapper::parseModeToStr<TgBotWrapper::ParseMode::Markdown>();
+        TgBotWrapper::parseModeToStr<TgBotWrapper::ParseMode::HTML>();
     botWrapper->addInlineQueryKeyboard("rombuild status", romBuildArticle);
 }
 
