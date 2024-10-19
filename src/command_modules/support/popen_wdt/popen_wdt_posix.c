@@ -9,23 +9,15 @@
 #include <sys/mman.h>
 #include <sys/poll.h>
 #include <sys/wait.h>
-#include <time.h>
 #include <unistd.h>
 
 #include "popen_wdt.h"
 
 #ifdef POPEN_WDT_DEBUG
-struct timespec start_time = {0, 0};
-
-#define POPEN_WDT_DBGLOG(fmt, ...)                                          \
-    do {                                                                    \
-        struct timespec curr_time;                                          \
-        clock_gettime(CLOCK_MONOTONIC, &curr_time);                         \
-        printf("POPEN_WDT::UNIX: offset %lds:%ldns: Func %s, Line %d: " fmt \
-               "\n",                                                        \
-               curr_time.tv_sec - start_time.tv_sec,                        \
-               curr_time.tv_nsec - start_time.tv_nsec, __func__, __LINE__,  \
-               ##__VA_ARGS__);                                              \
+#define POPEN_WDT_DBGLOG(fmt, ...)                                       \
+    do {                                                                 \
+        printf("POPEN_WDT::UNIX: Func %s, Line %d: " fmt "\n", __func__, \
+               __LINE__, ##__VA_ARGS__);                                 \
     } while (0)
 #else
 #define POPEN_WDT_DBGLOG(fmt, ...)
@@ -88,9 +80,6 @@ bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
         return false;
     }
     data = *data_in;
-#ifdef POPEN_WDT_DEBUG
-    clock_gettime(CLOCK_MONOTONIC, &start_time);
-#endif
 
     pthread_mutexattr_init(&mutexattr);
     pthread_mutexattr_setpshared(&mutexattr, PTHREAD_PROCESS_SHARED);
