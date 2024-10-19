@@ -4,6 +4,7 @@
 #include <absl/log/log.h>
 #include <absl/log/log_sink_registry.h>
 #include <absl/strings/match.h>
+#include <fmt/format.h>
 
 #include <AbslLogInit.hpp>
 #include <CommandLine.hpp>
@@ -25,8 +26,10 @@
 #include <libos/libsighandler.hpp>
 #include <memory>
 #include <ml/ChatDataCollector.hpp>
+#include <stdexcept>
 #include <utility>
 #include <vector>
+#include "tgbot/types/InputTextMessageContent.h"
 
 #ifndef WINDOWS_BUILD
 #include <restartfmt_parser.hpp>
@@ -321,11 +324,12 @@ void TgBotApiExHandler(const TgBot::TgException& e) {
 
     LOG(ERROR) << "Telegram API error: " << "{ Message: "
                << std::quoted(e.what())
-               << ", Code: " << static_cast<int32_t>(e.errorCode) << "}";
+               << ", Code: " << static_cast<int32_t>(e.errorCode) << " }";
     switch (e.errorCode) {
         // This is probably bot's runtime problem... Yet it isn't fatal. So
         // skip.
         case TgBot::TgException::ErrorCode::BadRequest:
+            break;
         // I don't know what to do with this... Skip
         case TgBot::TgException::ErrorCode::Internal:
             return;
@@ -349,8 +353,7 @@ void TgBotApiExHandler(const TgBot::TgException& e) {
             return;
         case TgBot::TgException::ErrorCode::Conflict:
             LOG(INFO) << "Conflict detected, shutting down now.";
-            OnTerminateRegistrar::getInstance()->callCallbacks();
-            std::exit(EXIT_FAILURE);
+            throw e;
         default:
             break;
     }
@@ -451,7 +454,7 @@ void onBotInitialized(TgBotApiImpl* wrapper, DurationPoint& startupDp,
     );
     wrapper->addInlineQueryKeyboard(
         TgBotApi::InlineQuery{"media", "Get media with the name from database",
-                              true},
+                              true, false},
         [](std::string_view x) -> std::vector<TgBot::InlineQueryResult::Ptr> {
             std::vector<TgBot::InlineQueryResult::Ptr> results;
             const auto medias =
@@ -481,6 +484,17 @@ void onBotInitialized(TgBotApiImpl* wrapper, DurationPoint& startupDp,
                         }
                     }
                 }
+            }
+            if (results.empty()) {
+                auto noResult = std::make_shared<
+                    TgBot::InlineQueryResultArticle>();
+                noResult->id = "no_result";
+                noResult->title = fmt::format("No results found by {}", x);
+                noResult->description = "Try searching for something else";
+                auto text = std::make_shared<TgBot::InputTextMessageContent>();
+                text->messageText = "Try searching for something else";
+                noResult->inputMessageContent = text;
+                results.emplace_back(noResult);
             }
             return results;
         });
