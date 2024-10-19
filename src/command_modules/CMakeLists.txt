@@ -148,7 +148,6 @@ command_module(
     PLATFORM "Unix"
 )
 
-find_package(CURL)
 add_subdirectory(android_builder)
 command_module(
     NAME rombuild
@@ -156,14 +155,14 @@ command_module(
         android_builder/tasks/ROMBuildTask.cpp
         android_builder/tasks/UploadFileTask.cpp
         android_builder/tasks/RepoSyncTask.cpp
-    LIBS AndroidBuilder-cpp CURL::libcurl
+    LIBS AndroidBuilder-cpp TgBot
     PLATFORM "Linux"
 )
 
 command_module(
     NAME rotatepic
     SRCS rotatepic.cpp
-    LIBS TgBotImgProc
+    LIBS TgBotImgProc TgBot
 )
 
 command_module(
@@ -192,5 +191,5 @@ multi_command_module(
 command_module(
     NAME copystickers
     SRCS copystickers.cpp
-    LIBS TgBotImgProc
+    LIBS TgBotImgProc TgBot
 )
