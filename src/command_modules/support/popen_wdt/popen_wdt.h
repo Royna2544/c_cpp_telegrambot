@@ -10,8 +10,6 @@
 #define WDT_BITE_STR \
     "-> Intercept: This task was hanging more than " STR(SLEEP_SECONDS) "s"
 
-#define BASH_EXE_PATH "/bin/bash"
-
 #ifndef NDEBUG
 #define POPEN_WDT_DEBUG
 #endif

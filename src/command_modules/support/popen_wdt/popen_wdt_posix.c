@@ -125,7 +125,7 @@ bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
         dup2(pipefd[1], STDOUT_FILENO);
         dup2(pipefd[1], STDERR_FILENO);
         // Call execl to run the command
-        execl(BASH_EXE_PATH, "bash", "-c", data->command, (char *)NULL);
+        execlp("bash", "bash", "-c", data->command, (char *)NULL);
         _exit(127);  // If execl fails, exit
     } else {
         // Parent process
