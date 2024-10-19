@@ -7,7 +7,7 @@ if (NOT ${jsoncpp_FOUND})
 endif()
 
 ################# Android ROM builder with C++ #################
-if (UNIX AND NOT APPLE)
+if (LINUX)
 add_my_library(
     NAME AndroidBuilder-cpp
     SRCS 

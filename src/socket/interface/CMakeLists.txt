@@ -13,7 +13,7 @@ if (UNIX)
     list(APPEND TGBOTSOCKET_SRC_LIST
       impl/helper/SocketHelperDarwin.cpp
     )
-  else()
+  elseif(LINUX)
     list(APPEND TGBOTSOCKET_SRC_LIST
       impl/helper/SocketHelperLinux.cpp
     )
