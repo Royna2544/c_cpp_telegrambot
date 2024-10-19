@@ -21,7 +21,7 @@ class DLWrapper {
    public:
     // Constructors
     explicit DLWrapper(const std::filesystem::path& libPath)
-        : handle(dlopen(libPath.string().c_str(), RTLD_NOW), &dlclose){};
+        : handle(dlopen(libPath.string().c_str(), RTLD_LAZY), &dlclose){};
     DLWrapper() : handle(nullptr, &dlclose){};
 
     // Operators
