@@ -1,17 +1,12 @@
 #pragma once
 
 #include <TgBotPPImplExports.h>
-#include <tgbot/Bot.h>
-#include <tgbot/types/Chat.h>
-#include <tgbot/types/Message.h>
-#include <tgbot/types/User.h>
 
 #include <memory>
 
-#include "CStringLifetime.h"
-#include "InstanceClassBase.hpp"
-#include "ManagedThreads.hpp"
-#include "TgBotWrapper.hpp"
+#include <InstanceClassBase.hpp>
+#include <ManagedThreads.hpp>
+#include "api/TgBotApi.hpp"
 
 #ifdef SOCKET_CONNECTION
 #include <socket/include/TgBotSocket_Export.hpp>
@@ -19,12 +14,12 @@
 
 #include <map>
 #include <mutex>
+#include <utility>
 
 #ifdef SOCKET_CONNECTION
 using namespace TgBotSocket::data;
 #endif
 
-using TgBot::Bot;
 using TgBot::Chat;
 using TgBot::Message;
 using TgBot::User;
@@ -70,7 +65,7 @@ struct TgBotPPImpl_API SpamBlockBase : ManagedThreadRunnable {
 
 struct TgBotPPImpl_API SpamBlockManager : SpamBlockBase,
                                           InstanceClassBase<SpamBlockManager> {
-    explicit SpamBlockManager(ApiPtr api) : _api(api){};
+    explicit SpamBlockManager(TgBotApi::Ptr api) : _api(api){};
     ~SpamBlockManager() override = default;
 
     using SpamBlockBase::run;
@@ -84,5 +79,5 @@ struct TgBotPPImpl_API SpamBlockManager : SpamBlockBase,
     void _deleteAndMuteCommon(const OneChatIterator &handle,
                               PerChatHandleConstRef t, const size_t threshold,
                               const char *name, const bool mute);
-    std::shared_ptr<TgBotApi> _api;
+    TgBotApi::Ptr _api;
 };

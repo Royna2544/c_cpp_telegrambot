@@ -1,7 +1,7 @@
 #pragma once
 
 #include <absl/log/log.h>
-#include <internal/_class_helper_macros.h>
+#include <trivial_helpers/_class_helper_macros.h>
 
 #include <DurationPoint.hpp>
 #include <iomanip>

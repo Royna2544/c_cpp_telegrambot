@@ -1,13 +1,14 @@
+#include <fmt/format.h>
+#include <tgbot/TgException.h>
 
-#include <fmt/core.h>
-
-#include <TgBotWrapper.hpp>
 #include <algorithm>
+#include <api/CommandModule.hpp>
+#include <api/MessageExt.hpp>
+#include <api/TgBotApi.hpp>
 #include <filesystem>
 #include <functional>
 #include <imagep/ImageProcAll.hpp>
 #include <libos/libfs.hpp>
-#include <memory>
 #include <regex>
 
 using std::string_literals::operator""s;
@@ -43,18 +44,19 @@ constexpr int GOOD_MAX_STICKERS_SIZE = 40;
 constexpr int RATELIMIT_DELIMITER_FOR_CONVERT_UPDATE = 5;
 
 DECLARE_COMMAND_HANDLER(copystickers, api, message) {
-    if (!message->replyToMessage_has<MessageExt::Attrs::Sticker>()) {
-        api->sendReplyMessage(message, "Reply to a sticker");
+    if (!message->replyMessage()->has<MessageAttrs::Sticker>()) {
+        api->sendReplyMessage(message->message(), "Reply to a sticker");
         return;
     }
     const auto set = api->getStickerSet(
-        message->replyToMessage_get<MessageExt::Attrs::Sticker>()->setName);
+        message->replyMessage()->get<MessageAttrs::Sticker>()->setName);
     if (!set) {
-        api->sendReplyMessage(message, "Sticker set not found");
+        api->sendReplyMessage(message->message(), "Sticker set not found");
         return;
     }
     if (createDirectory("stickers")) {
-        api->sendReplyMessage(message, "Failed to create stickers directory");
+        api->sendReplyMessage(message->message(),
+                              "Failed to create stickers directory");
         return;
     }
     int counter = 0;
@@ -62,7 +64,8 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
             return sticker->isAnimated || sticker->isVideo;
         })) {
         LOG(WARNING) << "Sticker set contains animated stickers";
-        api->sendReplyMessage(message, "Animated stickers are not supported");
+        api->sendReplyMessage(message->message(),
+                              "Animated stickers are not supported");
         return;
     }
 
@@ -70,7 +73,7 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
               << ". Started";
 
     const auto sentMessage =
-        api->sendReplyMessage(message, "Starting conversion...");
+        api->sendReplyMessage(message->message(), "Starting conversion...");
 
     // Make a list of file IDs of all stickers in the set
     std::vector<StickerData> stickerData;
@@ -106,28 +109,32 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
         }
         sticker.printProgress("Downloading");
         if (!api->downloadFile(sticker.filePath, sticker.fileId)) {
-            api->sendReplyMessage(message, "Failed to download sticker file");
+            api->sendReplyMessage(message->message(),
+                                  "Failed to download sticker file");
             return;
         }
         sticker.printProgress("Converting");
         ImageProcessingAll imageProc(sticker.filePath);
         if (!imageProc.read()) {
-            api->sendReplyMessage(message, "Failed to read sticker file");
+            api->sendReplyMessage(message->message(),
+                                  "Failed to read sticker file");
             return;
         }
         imageProc.to_greyscale();
         if (!imageProc.write(sticker.filePath)) {
-            api->sendReplyMessage(message, "Failed to write sticker file");
+            api->sendReplyMessage(message->message(),
+                                  "Failed to write sticker file");
             return;
         }
         sticker.printProgress("Uploading");
         const auto file = api->uploadStickerFile(
-            message->from->id,
+            message->get<MessageAttrs::User>()->id,
             InputFile::fromFile(sticker.filePath.generic_string(),
                                 "image/webp"),
             "static");
         if (!file) {
-            api->sendReplyMessage(message, "Failed to upload sticker file");
+            api->sendReplyMessage(message->message(),
+                                  "Failed to upload sticker file");
             return;
         }
         sticker.printProgress("Sending");
@@ -161,8 +168,9 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
               << ", title: " << std::quoted(title)
               << " size: " << stickerToSend.size();
     try {
-        api->createNewStickerSet(message->from->id, setName, title,
-                                 stickerToSend, Sticker::Type::Regular);
+        api->createNewStickerSet(message->get<MessageAttrs::User>()->id,
+                                 setName, title, stickerToSend,
+                                 Sticker::Type::Regular);
         LOG(INFO) << "Created: https://t.me/addstickers/" + setName;
         api->editMessage(
             sentMessage,
@@ -175,7 +183,7 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
 }
 
 DYN_COMMAND_FN(/*name*/, module) {
-    module.command = "copystickers";
+    module.name = "copystickers";
     module.description = "Copy sticker pack with a remap";
     module.flags = CommandModule::Flags::None;
     module.function = COMMAND_HANDLER_NAME(copystickers);

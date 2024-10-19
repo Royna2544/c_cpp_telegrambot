@@ -8,11 +8,10 @@
 #include <stdexcept>
 #include <string_view>
 #include <type_traits>
-#include <utility>
 
-#define DECLARE_CLASS_INST(type)                    \
-    template <>                                     \
-    std::shared_ptr<type> TGBOTPP_HELPER_DLL_EXPORT \
+#define DECLARE_CLASS_INST(type)                  \
+    template <>                                   \
+    std::optional<type> TGBOTPP_HELPER_DLL_EXPORT \
         InstanceClassBase<type>::instance = {}
 
 #pragma clang diagnostic push
@@ -24,20 +23,23 @@ template <typename T>
  * @tparam T the type of the instance
  */
 struct InstanceClassBase {
+    using pointer_type = std::add_pointer_t<T>;
+    using const_pointer_type = std::add_const_t<pointer_type>;
+
     template <typename... Args>
-    static std::shared_ptr<T> initInstance(Args&&... args) {
+    static pointer_type initInstance(Args&&... args) {
         if (instance) {
             throw std::runtime_error("An instance of the class already exists");
         }
-        instance = std::make_shared<T>(std::move(args)...);
-        return instance;
+        instance.emplace(std::move(args)...);
+        return &instance.value();
     }
 
     /**
      * @brief Get the single instance of the class
      * @return a pointer to the instance
      */
-    static std::shared_ptr<T> getInstance() {
+    static pointer_type getInstance() {
         if (!instance) {
             if constexpr (std::is_default_constructible_v<T>) {
                 initInstance();
@@ -53,11 +55,11 @@ struct InstanceClassBase {
                     "first");
             }
         }
-        return instance;
+        return &instance.value();
     }
 
     static void destroyInstance() { instance.reset(); }
-    static std::shared_ptr<T> instance;
+    static std::optional<T> instance;
 };
 
 #pragma clang diagnostic pop

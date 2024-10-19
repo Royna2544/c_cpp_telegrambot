@@ -170,8 +170,8 @@ endif()
 
 ############################ Source list ############################
 set(SRC_LIST
-  src/RegEXHandler.cpp
-  src/SpamBlocker.cpp
+  src/global_handlers/RegEXHandler.cpp
+  src/global_handlers/SpamBlocker.cpp
   src/web/TgBotWebServer.cpp
 )
 #####################################################################
@@ -203,7 +203,9 @@ add_my_library(
     src/Authorization.cpp
     src/ManagedThread.cpp
     src/ThreadManager.cpp
-    src/TgBotWrapper.cpp
+    src/api/TgBotApiImpl.cpp
+    src/api/CommandModule.cpp
+    src/api/MessageExt.cpp
   LIBS
     TgBot
     TgBotStringResManager
@@ -215,8 +217,8 @@ add_my_library(
 ####################### TgBot Socket Library #######################
 if (USE_UNIX_SOCKETS)
   set(SOCKET_SRC_INTERFACE src/socket/interface)
-  extend_set(SRC_LIST
-    src/ChatObserver.cpp
+  set(SOCKET_SRC_LIST
+    src/global_handlers/ChatObserver.cpp
     src/logging/LoggingServer.cpp
     ${SOCKET_SRC_INTERFACE}/impl/bot/SocketDataHandler.cpp
     ${SOCKET_SRC_INTERFACE}/impl/bot/TgBotSocketInterface.cpp
@@ -236,7 +238,11 @@ set(LD_LIST TgBot TgBotUtils TgBotWeb absl::status
 extend_set_if(LD_LIST USE_UNIX_SOCKETS TgBotSocket)
 add_my_library(
   NAME PPImpl
-  SRCS ${SRC_LIST}
+  SRCS 
+    src/global_handlers/RegEXHandler.cpp
+    src/global_handlers/SpamBlocker.cpp
+    src/web/TgBotWebServer.cpp
+    ${SOCKET_SRC_LIST}
   PRIVATE_INC src/third-party/rapidjson/include
   LIBS ${LD_LIST}
 )

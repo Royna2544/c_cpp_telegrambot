@@ -1,13 +1,10 @@
-#include <ChatObserver.h>
 #include <absl/log/log.h>
+#include <trivial_helpers/_tgbot.h>
 
 #include <algorithm>
+#include <global_handlers/ChatObserver.hpp>
 #include <iostream>
 #include <mutex>
-
-#include "InstanceClassBase.hpp"
-#include "TgBotWrapper.hpp"
-#include "internal/_tgbot.h"
 
 using TgBot::Message;
 
@@ -30,9 +27,7 @@ void ChatObserver::printChatMsg(const Message::Ptr& msg,
     else
         msgtext = msg->text;
 
-    std::cout << "[ChatObserveLog][" << ChatPtr_toString(msg->chat) << "] "
-              << UserPtr_toString(from) << " (@" << from->username
-              << "): " << msgtext << std::endl;
+    fmt::print("[ChatObserveLog][{}]: {}\n", msg->chat, msg->from, msgtext);
 }
 
 void ChatObserver::process(const Message::Ptr& msg) {

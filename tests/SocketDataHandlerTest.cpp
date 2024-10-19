@@ -1,19 +1,18 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <tgbot/TgException.h>
 
 #include <SharedMalloc.hpp>
 #include <cstdint>
 #include <filesystem>
+#include <impl/bot/TgBotSocketFileHelperNew.hpp>
 #include <impl/bot/TgBotSocketInterface.hpp>
 #include <memory>
 #include <string_view>
 #include <utility>
 
-#include "SocketBase.hpp"
 #include "TgBotSocket_Export.hpp"
 #include "commands/CommandModulesTest.hpp"
-#include "gmock/gmock.h"
-#include "impl/bot/TgBotSocketFileHelperNew.hpp"
 
 using testing::_;
 using testing::DoAll;
@@ -67,7 +66,7 @@ class SocketDataHandlerTest : public ::testing::Test {
         : _mockImpl(std::make_shared<SocketInterfaceImplMock>()),
           _mockApi(std::make_shared<MockTgBotApi>()),
           _mockVFS(std::make_unique<VFSOperationsMock>()),
-          mockInterface(_mockImpl, _mockApi,
+          mockInterface(_mockImpl, _mockApi.get(),
                         std::make_shared<SocketFile2DataHelper>(_mockVFS)),
           fakeConn(kSocket, nullptr) {}
 
@@ -321,7 +320,8 @@ TEST_F(SocketDataHandlerTest, TestCmdUploadFileOK) {
     TgBotSocket::Packet pkt(TgBotSocket::Command::CMD_UPLOAD_FILE, mem.get(),
                             mem->size());
     EXPECT_CALL(*_mockVFS, writeFile(FSP(uploadfile->destfilepath.data()), _,
-                                     filemem->size())).WillOnce(Return(true));
+                                     filemem->size()))
+        .WillOnce(Return(true));
 
     // Verify result
     TgBotSocket::callback::GenericAck callback;

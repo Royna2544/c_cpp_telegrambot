@@ -1,10 +1,10 @@
 #include <ConfigParsers.hpp>
 #include <ForkAndRun.hpp>
 #include <RepoUtils.hpp>
+#include <api/TgBotApi.hpp>
 #include <chrono>
 #include <memory>
-
-#include "TgBotWrapper.hpp"
+#include "InstanceClassBase.hpp"
 
 class NewStdErrBufferHook {
     std::stringstream logMessage;
@@ -114,18 +114,18 @@ struct RepoSyncTask : ForkAndRun {
     /**
      * Creates a new RepoSyncTask object.
      *
-     * @param wrapper A pointer to the Telegram Bot API wrapper.
+     * @param api A pointer to the Telegram Bot API wrapper.
      * @param message The Telegram message associated with the build task.
      * @param data Per-build configuration and path data.
      */
-    explicit RepoSyncTask(ApiPtr wrapper, Message::Ptr message,
+    explicit RepoSyncTask(InstanceClassBase<TgBotApi>::const_pointer_type api, Message::Ptr message,
                           PerBuildData data);
 
    private:
     PerBuildData data;
     RepoSyncLocalHook localHook;
     RepoSyncNetworkHook networkHook;
-    std::shared_ptr<TgBotApi> wrapper;
+    InstanceClassBase<TgBotApi>::pointer_type api;
     Message::Ptr message;
     std::chrono::system_clock::time_point clock =
         std::chrono::system_clock::now();

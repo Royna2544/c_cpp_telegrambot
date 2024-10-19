@@ -2,11 +2,16 @@
 
 #include <ManagedThreads.hpp>
 #include <SocketBase.hpp>
-#include <TgBotWrapper.hpp>
+#include <api/TgBotApi.hpp>
 #include <functional>
 #include <memory>
 
-#include "InitTask.hpp"
+#if defined(__linux__) || defined(__APPLE__)
+#include <sys/socket.h>
+#elif defined(WINDOWS_BUILD)
+#include <ws2tcpip.h>
+#endif
+
 #include "TgBotSocketFileHelperNew.hpp"
 #include "TgBotSocket_Export.hpp"
 
@@ -20,12 +25,12 @@ struct TgBotPPImpl_API SocketInterfaceTgBot : ManagedThreadRunnable {
 
     explicit SocketInterfaceTgBot(
         std::shared_ptr<SocketInterfaceBase> _interface,
-        std::shared_ptr<TgBotApi> _api,
+        InstanceClassBase<TgBotApi>::pointer_type _api,
         std::shared_ptr<SocketFile2DataHelper> helper);
-    
+
    private:
     std::shared_ptr<SocketInterfaceBase> interface = nullptr;
-    std::shared_ptr<TgBotApi> api = nullptr;
+    InstanceClassBase<TgBotApi>::pointer_type api = nullptr;
     std::shared_ptr<SocketFile2DataHelper> helper;
 
     std::chrono::system_clock::time_point startTp =

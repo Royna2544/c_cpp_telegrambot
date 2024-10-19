@@ -12,16 +12,15 @@
 #include <LogSinks.hpp>
 #include <ManagedThreads.hpp>
 #include <Random.hpp>
-#include <RegEXHandler.hpp>
-#include <SpamBlock.hpp>
 #include <StringResManager.hpp>
 #include <TgBotWebpage.hpp>
-#include <TgBotWrapper.hpp>
-#include <TryParseStr.hpp>
+#include <api/TgBotApiImpl.hpp>
 #include <boost/system/system_error.hpp>
 #include <cstdint>
 #include <database/bot/TgBotDatabaseImpl.hpp>
 #include <filesystem>
+#include <global_handlers/RegEXHandler.hpp>
+#include <global_handlers/SpamBlock.hpp>
 #include <libos/libfs.hpp>
 #include <libos/libsighandler.hpp>
 #include <memory>
@@ -29,16 +28,12 @@
 #include <utility>
 #include <vector>
 
-#include "tgbot/types/InlineQueryResult.h"
-#include "tgbot/types/InlineQueryResultCachedSticker.h"
-
 #ifndef WINDOWS_BUILD
 #include <restartfmt_parser.hpp>
 #endif
 
 #ifdef SOCKET_CONNECTION
-#include <ChatObserver.h>
-
+#include <global_handlers/ChatObserver.hpp>
 #include <logging/LoggingServer.hpp>
 #include <socket/interface/impl/bot/TgBotSocketInterface.hpp>
 #endif
@@ -70,9 +65,9 @@ void init<StringResManager>(InitTask& task) {
 }
 
 template <>
-void init<TgBotWrapper>(InitTask& task) {
+void init<TgBotApiImpl>(InitTask& task) {
     task << "Load command modules";
-    const auto& bot = TgBotWrapper::getInstance();
+    const auto& bot = TgBotApiImpl::getInstance();
 
     // Load modules
     std::filesystem::path modules_path =
@@ -127,7 +122,7 @@ template <>
 void init<SocketInterfaceTgBot>(InitTask& task) {
     task << "Start socket threads";
     auto mgr = ThreadManager::getInstance();
-    auto api = TgBotWrapper::getInstance();
+    auto api = TgBotApiImpl::getInstance();
     SocketServerWrapper wrapper;
     std::vector<std::shared_ptr<SocketInterfaceTgBot>> threads;
     const auto helper =
@@ -153,15 +148,15 @@ void init<SocketInterfaceTgBot>(InitTask& task) {
 
 template <>
 void init<ChatObserver>(InitTask& task) {
-    task << TgBotWrapper::getInitCallNameForClient("ChatObserver");
+    task << TgBotApiImpl::getInitCallNameForClient("ChatObserver");
 
-    TgBotWrapper::getInstance()->onAnyMessage(
-        [](const auto, const Message::Ptr& message) {
+    TgBotApiImpl::getInstance()->onAnyMessage(
+        [](InstanceClassBase<TgBotApi>::const_pointer_type, const Message::Ptr& message) {
             const auto& inst = ChatObserver::getInstance();
             if (!inst->observedChatIds.empty() || inst->observeAllChats) {
                 inst->process(message);
             }
-            return TgBotWrapper::AnyMessageResult::Handled;
+            return TgBotApi::AnyMessageResult::Handled;
         });
     task << InitSuccess;
 }
@@ -212,48 +207,53 @@ class RegexHandlerInterface : public RegexHandler::Interface {
         _api->sendReplyMessage(_message->replyToMessage, result);
     }
 
-    explicit RegexHandlerInterface(std::shared_ptr<TgBotApi> api,
-                                   Message::Ptr message)
-        : _api(std::move(api)), _message(std::move(message)) {}
+    explicit RegexHandlerInterface(
+        InstanceClassBase<TgBotApi>::pointer_type api,
+        Message::Ptr message)
+        : _api(api), _message(std::move(message)) {}
 
    private:
-    std::shared_ptr<TgBotApi> _api;
+    InstanceClassBase<TgBotApi>::pointer_type _api;
     Message::Ptr _message;
 };
 
 template <>
 void init<RegexHandler>(InitTask& task) {
-    task << TgBotWrapper::getInitCallNameForClient("RegexHandler");
+    task << TgBotApiImpl::getInitCallNameForClient("RegexHandler");
 
     const auto regex = std::make_shared<RegexHandler>();
-    TgBotWrapper::getInstance()->onAnyMessage([regex](ApiPtr api,
-                                                      MessagePtr message) {
-        if (message->has<MessageExt::Attrs::IsReplyMessage,
-                         MessageExt::Attrs::ExtraText>() &&
-            message->replyToMessage_has<MessageExt::Attrs::ExtraText>()) {
-            auto intf = std::make_shared<RegexHandlerInterface>(api, message);
-            regex->execute(
-                intf,
-                message->replyToMessage_get<MessageExt::Attrs::ExtraText>(),
-                message->get<MessageExt::Attrs::ExtraText>());
-        }
-        return TgBotWrapper::AnyMessageResult::Handled;
-    });
+    TgBotApiImpl::getInstance()->onAnyMessage(
+        [regex](InstanceClassBase<TgBotApi>::const_pointer_type api,
+                const Message::Ptr& message) {
+            const auto ext = std::make_shared<MessageExt>(message);
+            if (ext->has<MessageAttrs::ExtraText>() &&
+                ext->replyMessage()->has<MessageAttrs::ExtraText>()) {
+                auto intf =
+                    std::make_shared<RegexHandlerInterface>(api, message);
+                regex->execute(
+                    intf, ext->replyMessage()->get<MessageAttrs::ExtraText>(),
+                    ext->get<MessageAttrs::ExtraText>());
+            }
+            return TgBotApi::AnyMessageResult::Handled;
+        });
     task << InitSuccess;
 }
 
 template <>
 void init<SpamBlockManager>(InitTask& task) {
-    task << TgBotWrapper::getInitCallNameForClient("SpamBlockManager");
-    TgBotWrapper::getInstance()->onAnyMessage(
-        [](const auto, const Message::Ptr& message) {
+    task << TgBotApiImpl::getInitCallNameForClient("SpamBlockManager");
+    ThreadManager::getInstance()
+        ->createController<ThreadManager::Usage::SPAMBLOCK_THREAD,
+                           SpamBlockManager>(TgBotApiImpl::getInstance());
+    TgBotApiImpl::getInstance()->onAnyMessage(
+        [](InstanceClassBase<TgBotApi>::const_pointer_type,
+           const Message::Ptr& message) {
             static auto spamMgr =
                 ThreadManager::getInstance()
-                    ->createController<ThreadManager::Usage::SPAMBLOCK_THREAD,
-                                       SpamBlockManager>(
-                        TgBotWrapper::getInstance());
+                    ->getController<ThreadManager::Usage::SPAMBLOCK_THREAD,
+                                    SpamBlockManager>();
             spamMgr->addMessage(message);
-            return TgBotWrapper::AnyMessageResult::Handled;
+            return TgBotApi::AnyMessageResult::Handled;
         });
     task << InitSuccess;
 }
@@ -317,7 +317,7 @@ namespace {
 
 void TgBotApiExHandler(const TgBot::TgException& e) {
     static std::optional<DurationPoint> exceptionDuration;
-    auto wrapper = TgBotWrapper::getInstance();
+    auto wrapper = TgBotApiImpl::getInstance();
 
     LOG(ERROR) << "Telegram API error: " << "{ Message: "
                << std::quoted(e.what())
@@ -423,7 +423,7 @@ void createAndDoInitCallAll() {
     init<ResourceManager>(task);
     init<TgBotDatabaseImpl>(task);
     init<RegexHandler>(task);
-    init<TgBotWrapper>(task);
+    init<TgBotApiImpl>(task);
     init<ChatDataCollector>(task);
 
     // Must be last
@@ -431,26 +431,27 @@ void createAndDoInitCallAll() {
         []() { ThreadManager::getInstance()->destroyManager(); });
 }
 
-void onBotInitialized(const std::shared_ptr<TgBotWrapper>& wrapper,
-                      DurationPoint& startupDp, const char* exe) {
+void onBotInitialized(TgBotApiImpl* wrapper, DurationPoint& startupDp,
+                      const char* exe) {
     LOG(INFO) << "Subsystems initialized, bot started: " << exe;
     LOG(INFO) << "Started in " << startupDp.get().count() << " milliseconds";
 
     wrapper->setDescriptions(
         "Royna's telegram bot, written in C++. Go on you can talk to him",
         "One of @roynatech's TgBot C++ project bots. I'm currently hosted on "
-#if BOOST_OS_WINDOWS
+#ifdef WINDOWS_BUILD
         "Windows"
-#elif BOOST_OS_LINUX
+#elif defined(__linux__)
         "Linux"
-#elif BOOST_OS_MACOS
+#elif defined(__APPLE__)
         "macOS"
 #else
         "unknown platform"
 #endif
     );
     wrapper->addInlineQueryKeyboard(
-        "media ",
+        TgBotApi::InlineQuery{"media", "Get media with the name from database",
+                              true},
         [](std::string_view x) -> std::vector<TgBot::InlineQueryResult::Ptr> {
             std::vector<TgBot::InlineQueryResult::Ptr> results;
             const auto medias =
@@ -511,7 +512,7 @@ int main(int argc, char** argv) {
     }
 
     // Initialize TgBotWrapper instance with provided token
-    auto wrapperInst = TgBotWrapper::initInstance(token.value());
+    auto* wrapperInst = TgBotApiImpl::initInstance(token.value());
 
     // Install signal handlers
     SignalHandler::install();

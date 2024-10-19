@@ -1,8 +1,7 @@
 #pragma once
 
 #include <absl/status/status.h>
-#include <tgbot/Bot.h>
-#include <tgbot/types/Message.h>
+#include <api/MessageExt.hpp>
 
 #include <filesystem>
 #include <memory>
@@ -10,9 +9,6 @@
 #include <string>
 #include <utility>
 
-#include "TgBotWrapper.hpp"
-
-using TgBot::Bot;
 using TgBot::Message;
 
 struct CompilerInTg {
@@ -30,9 +26,9 @@ struct CompilerInTg {
      * @brief This functions proivides a common interface for the command
      * implementations.
      */
-    virtual void run(MessagePtr message) = 0;
+    virtual void run(MessageExt::Ptr message) = 0;
 
-    explicit CompilerInTg(std::shared_ptr<Interface> interface);
+    explicit CompilerInTg(std::unique_ptr<Interface> interface);
     virtual ~CompilerInTg() = default;
 
     /**
@@ -46,18 +42,18 @@ struct CompilerInTg {
     void runCommand(std::string cmd, std::stringstream& res,
                     bool use_wdt = true);
 
-    constexpr static const char SPACE = ' ';
-    constexpr static const char EMPTY[] = "(empty)";
+    constexpr static char SPACE = ' ';
+    constexpr static std::string_view EMPTY = "(empty)";
 
    protected:
-    std::shared_ptr<Interface> _interface;
+    std::unique_ptr<Interface> _interface;
 };
 
 struct CompilerInTgForBash : CompilerInTg {
-    CompilerInTgForBash(std::shared_ptr<Interface> interface, bool allowhang)
+    CompilerInTgForBash(std::unique_ptr<Interface> interface, bool allowhang)
         : CompilerInTg(std::move(interface)), allowhang(allowhang) {}
     ~CompilerInTgForBash() override = default;
-    void run(MessagePtr message) override;
+    void run(MessageExt::Ptr message) override;
 
    private:
     bool allowhang;
@@ -70,21 +66,21 @@ struct CompilerInTgForGeneric : CompilerInTg {
         // e.g. /tmp/output.c (Where to write the code to compile/interpret)
         std::filesystem::path outfile;
     };
-    explicit CompilerInTgForGeneric(std::shared_ptr<Interface> interface,
+    explicit CompilerInTgForGeneric(std::unique_ptr<Interface> interface,
                                     Params params)
         : CompilerInTg(std::move(interface)), params(std::move(params)) {}
 
     Params params;
-    bool verifyParseWrite(const MessagePtr message, std::string& extraargs);
+    bool verifyParseWrite(const MessageExt::Ptr& message, std::string& extraargs);
     ~CompilerInTgForGeneric() override = default;
-    void run(MessagePtr message) override;
+    void run(MessageExt::Ptr message) override;
 };
 
 struct CompilerInTgForCCpp : CompilerInTgForGeneric {
     using CompilerInTgForGeneric::CompilerInTgForGeneric;
     using CompilerInTgForGeneric::Params;
     ~CompilerInTgForCCpp() override = default;
-    void run(MessagePtr message) override;
+    void run(MessageExt::Ptr message) override;
 };
 
 // Read buffer size, max allowed buffer size

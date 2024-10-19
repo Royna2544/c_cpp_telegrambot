@@ -1,12 +1,13 @@
+#include <tgbot/types/InputTextMessageContent.h>
+
 #include <ConfigParsers.hpp>
 #include <ForkAndRun.hpp>
-#include <TgBotWrapper.hpp>
+#include <api/TgBotApi.hpp>
 #include <chrono>
 #include <memory>
 #include <string_view>
 
 #include "Shmem.hpp"
-#include "tgbot/types/InlineQueryResultArticle.h"
 
 struct ROMBuildTask : ForkAndRun {
     static constexpr std::string_view kShmemROMBuild = "shmem_rombuild";
@@ -51,8 +52,9 @@ struct ROMBuildTask : ForkAndRun {
      * @param message The Telegram message associated with the build task.
      * @param data Per-build configuration and path data.
      */
-    explicit ROMBuildTask(TgBotApi::Ptr wrapper, Message::Ptr message,
-                          PerBuildData data);
+    explicit ROMBuildTask(
+        InstanceClassBase<TgBotApi>::const_pointer_type wrapper,
+        Message::Ptr message, PerBuildData data);
     ~ROMBuildTask() override;
 
    private:

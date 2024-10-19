@@ -8,7 +8,7 @@
 #include <stdexcept>
 #include <type_traits>
 
-#include "internal/_class_helper_macros.h"
+#include "trivial_helpers/_class_helper_macros.h"
 
 #ifndef __cpp_concepts
 #define requires(x)

@@ -4,7 +4,6 @@
 #include <cstdlib>
 #include <database/bot/TgBotDatabaseImpl.hpp>
 #include <iostream>
-#include <memory>
 #include <vector>
 #include <ConfigManager.h>
 
@@ -27,7 +26,7 @@ struct CommandData {
     // Array of command arguments after (exe, command)
     std::vector<std::string> args;
     // Instance of TgBotDatabaseImpl
-    std::shared_ptr<TgBotDatabaseImpl> impl;
+    InstanceClassBase<TgBotDatabaseImpl>::pointer_type impl;
 };
 
 namespace {

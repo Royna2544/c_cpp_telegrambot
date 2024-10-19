@@ -1,12 +1,15 @@
 #include <StringToolsExt.hpp>
-#include <TgBotWrapper.hpp>
 #include <TryParseStr.hpp>
+#include <api/CommandModule.hpp>
+#include <api/TgBotApi.hpp>
 #include <cctype>
 #include <filesystem>
 #include <imagep/ImageProcAll.hpp>
 #include <memory>
 #include <string>
 #include <string_view>
+
+#include "api/MessageExt.hpp"
 
 struct ProcessImageParam {
     std::filesystem::path srcPath;
@@ -36,27 +39,27 @@ bool processPhotoFile(ProcessImageParam& param) {
 constexpr std::string_view kDownloadFile = "inpic.bin";
 constexpr std::string_view kOutputFile = "outpic.png";
 
-DECLARE_COMMAND_HANDLER(rotatepic, tgWrapper, message) {
-    std::vector<std::string> args = message->arguments();
+DECLARE_COMMAND_HANDLER(rotatepic, api, message) {
+    std::vector<std::string> args =
+        message->get<MessageAttrs::ParsedArgumentsList>();
     int rotation = 0;
     bool greyscale = false;
     std::optional<std::string> fileid;
 
-    if (message->replyToMessage_has<MessageExt::Attrs::Photo>()) {
-        const auto photo = message->replyToMessage->photo;
-        // Select the best quality photos available
-        fileid = photo.back()->fileId;
-    } else if (message->replyToMessage_has<MessageExt::Attrs::Sticker>()) {
-        const auto stick = message->replyToMessage->sticker;
+    if (message->replyMessage()->has<MessageAttrs::Photo>()) {
+        fileid = message->replyMessage()->get<MessageAttrs::Photo>()->fileId;
+    } else if (message->replyMessage()->has<MessageAttrs::Sticker>()) {
+        const auto stick =
+            message->replyMessage()->get<MessageAttrs::Sticker>();
         if (stick->isAnimated || stick->isVideo) {
-            tgWrapper->sendReplyMessage(
-                message, "Cannot rotate animated or video sticker");
+            api->sendReplyMessage(
+                message->message(), "Cannot rotate animated or video sticker");
         }
         fileid = stick->fileId;
     }
 
     if (!try_parse(args[0], &rotation)) {
-        tgWrapper->sendReplyMessage(message,
+        api->sendReplyMessage(message->message(),
                                     "Invalid angle. (0-360 are allowed)");
         return;
     }
@@ -65,8 +68,8 @@ DECLARE_COMMAND_HANDLER(rotatepic, tgWrapper, message) {
     }
 
     // Download the sticker file
-    if (!tgWrapper->downloadFile(kDownloadFile.data(), fileid.value())) {
-        tgWrapper->sendReplyMessage(message,
+    if (!api->downloadFile(kDownloadFile.data(), fileid.value())) {
+        api->sendReplyMessage(message->message(),
                                     "Failed to download sticker file.");
         return;
     }
@@ -84,13 +87,14 @@ DECLARE_COMMAND_HANDLER(rotatepic, tgWrapper, message) {
     if (processPhotoFile(params)) {
         const auto infile =
             TgBot::InputFile::fromFile(params.destPath.string(), "image/png");
-        if (message->replyToMessage_has<MessageExt::Attrs::Sticker>()) {
-            tgWrapper->sendReplySticker(message, infile);
-        } else if (message->replyToMessage_has<MessageExt::Attrs::Photo>()) {
-            tgWrapper->sendReplyPhoto(message, infile, "Rotated picture");
+        if (message->replyMessage()->get<MessageAttrs::Sticker>()) {
+            api->sendReplySticker(message->message(), infile);
+        } else if (message->replyMessage()->get<MessageAttrs::Photo>()) {
+            api->sendReplyPhoto(message->message(), infile,
+                                      "Rotated picture");
         }
     } else {
-        tgWrapper->sendReplyMessage(message,
+        api->sendReplyMessage(message->message(),
                                     "Unknown image type, or processing failed");
     }
     std::filesystem::remove(params.srcPath);  // Delete the temporary file
@@ -99,7 +103,7 @@ DECLARE_COMMAND_HANDLER(rotatepic, tgWrapper, message) {
 }  // namespace
 
 DYN_COMMAND_FN(n, module) {
-    module.command = "rotatepic";
+    module.name = "rotatepic";
     module.description = "Rotate a sticker";
     module.flags = CommandModule::Flags::None;
     module.function = COMMAND_HANDLER_NAME(rotatepic);

@@ -1,12 +1,12 @@
 #include "TimerImpl.hpp"
 
 #include <absl/log/log.h>
-#include <internal/_std_chrono_templates.h>
-#include <internal/_tgbot.h>
 #include <fmt/chrono.h>
+#include <trivial_helpers/_std_chrono_templates.h>
+#include <trivial_helpers/_tgbot.h>
 
 #include <ManagedThreads.hpp>
-#include <TgBotWrapper.hpp>
+#include <api/TgBotApi.hpp>
 #include <chrono>
 #include <cmath>
 #include <sstream>

@@ -5,9 +5,6 @@
 #include <memory>
 #include <optional>
 
-#include "TgBotWrapper.hpp"
-#include "gmock/gmock.h"
-
 void CommandModulesTest::SetUpTestSuite() {}
 
 void CommandModulesTest::TearDownTestSuite() {
@@ -59,7 +56,7 @@ void CommandModulesTest::unloadModule(CommandModule::Ptr module) {
     module->unload();
 }
 
-MessageExt::Ptr CommandModulesTest::createDefaultMessage() {
+Message::Ptr CommandModulesTest::createDefaultMessage() {
     static MessageId messageId = TEST_MESSAGE_ID;
     auto message = std::make_shared<Message>();
     message->chat = std::make_shared<Chat>();
@@ -69,7 +66,7 @@ MessageExt::Ptr CommandModulesTest::createDefaultMessage() {
     message->entities.emplace_back(std::make_shared<TgBot::MessageEntity>());
     message->entities[0]->type = TgBot::MessageEntity::Type::BotCommand;
     message->entities[0]->offset = 0;
-    return std::make_shared<MessageExt>(message);
+    return message;
 }
 
 User::Ptr CommandModulesTest::createDefaultUser(long id_offset) {

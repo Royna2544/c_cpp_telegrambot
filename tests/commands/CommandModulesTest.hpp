@@ -1,7 +1,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include <TgBotWrapper.hpp>
+#include <api/CommandModule.hpp>
+#include <api/TgBotApi.hpp>
 #include <database/DatabaseBase.hpp>
 #include <initializer_list>
 #include <memory>
@@ -21,6 +22,7 @@ using testing::SaveArg;
 using testing::StartsWith;
 using testing::Truly;
 using testing::WithArg;
+using TgBot::ChatPermissions;
 
 class MockDatabase : public DatabaseBase {
    public:
@@ -40,7 +42,7 @@ class MockDatabase : public DatabaseBase {
 
     MOCK_METHOD(bool, addMediaInfo, (const DatabaseBase::MediaInfo& info),
                 (const, override));
-                
+
     MOCK_METHOD(std::vector<MediaInfo>, getAllMediaInfos, (), (const override));
 
     MOCK_METHOD(std::ostream&, dump, (std::ostream & ofs), (const, override));
@@ -169,7 +171,7 @@ class MockTgBotApi : public TgBotApi {
     // Non-TgBotApi methods
     MOCK_METHOD(bool, reloadCommand, (const std::string& cmd), (override));
     MOCK_METHOD(bool, unloadCommand, (const std::string& cmd), (override));
-    MOCK_METHOD(void, onAnyMessage, (const onAnyMessage_handler_t& callback),
+    MOCK_METHOD(void, onAnyMessage, (const AnyMessageCallback& callback),
                 (override));
 };
 
@@ -223,7 +225,7 @@ class CommandModulesTest : public ::testing::Test {
      *
      * @return A shared pointer to a default message object.
      */
-    static MessageExt::Ptr createDefaultMessage();
+    static Message::Ptr createDefaultMessage();
 
     /**
      * @brief Create a default user object for testing purposes.
@@ -302,16 +304,17 @@ class CommandTestBase : public CommandModulesTest {
         for (const auto& arg : command) {
             defaultProvidedMessage->text += ' ' + arg;
         }
-        defaultProvidedMessage->update();
-        defaultProvidedMessage->update(SplitMessageText::ByWhitespace);
     }
     void setCommandExtArgs() {
         defaultProvidedMessage->text = "/" + name;
         defaultProvidedMessage->entities[0]->length =
             defaultProvidedMessage->text.size();
-        defaultProvidedMessage->update();
     }
-    void execute() { module->function(botApi, defaultProvidedMessage); }
+    void execute() {
+        module->function(botApi.get(), std::make_shared<MessageExt>(
+                                           defaultProvidedMessage,
+                                           SplitMessageText::ByWhitespace));
+    }
 
     struct SentMessage {
         Message::Ptr message;
@@ -342,7 +345,7 @@ class CommandTestBase : public CommandModulesTest {
 
    private:
     // Template function for sending a message with expectations
-    template <TgBotWrapper::ParseMode mode = TgBotWrapper::ParseMode::None,
+    template <TgBotApi::ParseMode mode = TgBotApi::ParseMode::None,
               typename TextMatcher, typename ReplyMatcher, typename MarkMatcher>
     SentMessage _willSendMessage(TextMatcher&& textMatcher,
                                  ReplyMatcher&& replyMatcher,
@@ -357,11 +360,11 @@ class CommandTestBase : public CommandModulesTest {
                                      std::forward<TextMatcher>(textMatcher),
                                      std::forward<ReplyMatcher>(replyMatcher),
                                      std::forward<MarkMatcher>(markMatcher),
-                                     TgBotWrapper::parseModeToStr<mode>()))
+                                     TgBotApi::parseModeToStr<mode>()))
             .WillOnce(Return(sentMessage));
         return {sentMessage, botApi};
     }
-    template <TgBotWrapper::ParseMode mode = TgBotWrapper::ParseMode::None,
+    template <TgBotApi::ParseMode mode = TgBotApi::ParseMode::None,
               typename FileIdMatcher, typename CaptionMatcher,
               typename ReplyMatcher, typename MarkMatcher = decltype(IsNull())>
     SentMessage _willSendFile(FileIdMatcher&& fileIdMatcher,
@@ -378,13 +381,13 @@ class CommandTestBase : public CommandModulesTest {
                                  std::forward<CaptionMatcher>(textMatcher),
                                  std::forward<ReplyMatcher>(replyMatcher),
                                  std::forward<MarkMatcher>(markMatcher),
-                                 TgBotWrapper::parseModeToStr<mode>()))
+                                 TgBotApi::parseModeToStr<mode>()))
             .WillOnce(Return(sentMessage));
         return {sentMessage, botApi};
     }
 
    public:
-    template <TgBotWrapper::ParseMode mode = TgBotWrapper::ParseMode::None,
+    template <TgBotApi::ParseMode mode = TgBotApi::ParseMode::None,
               typename TextMatcher, typename MarkMatcher = decltype(IsNull())>
     SentMessage willSendMessage(TextMatcher&& textMatcher,
                                 MarkMatcher&& markMatcher = IsNull(),
@@ -394,7 +397,7 @@ class CommandTestBase : public CommandModulesTest {
             std::forward<MarkMatcher>(markMatcher), location);
     }
 
-    template <TgBotWrapper::ParseMode mode = TgBotWrapper::ParseMode::None,
+    template <TgBotApi::ParseMode mode = TgBotApi::ParseMode::None,
               typename TextMatcher, typename MarkMatcher = decltype(IsNull())>
     SentMessage willSendReplyMessage(TextMatcher&& textMatcher,
                                      MarkMatcher&& markMatcher = IsNull(),
@@ -404,19 +407,19 @@ class CommandTestBase : public CommandModulesTest {
             std::forward<MarkMatcher>(markMatcher), location);
     }
 
-    template <TgBotWrapper::ParseMode mode = TgBotWrapper::ParseMode::None,
+    template <TgBotApi::ParseMode mode = TgBotApi::ParseMode::None,
               typename TextMatcher, typename MarkMatcher = decltype(IsNull())>
     SentMessage willSendReplyMessageTo(TextMatcher&& textMatcher,
-                                       MessagePtr replyToMessage,
+                                       Message::Ptr replyToMessage,
                                        MarkMatcher&& markMatcher = IsNull(),
                                        const st& location = st::current()) {
-        return _willSendMessage<mode>(std::forward<TextMatcher>(textMatcher),
-                                      createMessageReplyMatcher(replyToMessage),
-                                      std::forward<MarkMatcher>(markMatcher),
-                                      location);
+        return _willSendMessage<mode>(
+            std::forward<TextMatcher>(textMatcher),
+            createMessageReplyMatcher(std::move(replyToMessage)),
+            std::forward<MarkMatcher>(markMatcher), location);
     }
 
-    template <TgBotWrapper::ParseMode mode = TgBotWrapper::ParseMode::None,
+    template <TgBotApi::ParseMode mode = TgBotApi::ParseMode::None,
               typename FileIdMatcher, typename CaptionMatcher,
               typename MarkMatcher = decltype(IsNull())>
     SentMessage willSendFile(FileIdMatcher&& fileIdMatcher,
@@ -429,7 +432,7 @@ class CommandTestBase : public CommandModulesTest {
             std::forward<MarkMatcher>(markMatcher), location);
     }
 
-    template <TgBotWrapper::ParseMode mode = TgBotWrapper::ParseMode::None,
+    template <TgBotApi::ParseMode mode = TgBotApi::ParseMode::None,
               typename FileIdMatcher, typename CaptionMatcher,
               typename MarkMatcher = decltype(IsNull())>
     SentMessage willSendReplyFile(FileIdMatcher&& fileIdMatcher,
@@ -448,5 +451,5 @@ class CommandTestBase : public CommandModulesTest {
    protected:
     std::string name;
     CommandModule::Ptr module;
-    MessageExt::Ptr defaultProvidedMessage;
+    Message::Ptr defaultProvidedMessage;
 };

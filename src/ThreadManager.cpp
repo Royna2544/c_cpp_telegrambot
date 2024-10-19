@@ -1,9 +1,9 @@
+#include <fmt/chrono.h>
+#include <fmt/format.h>
+
+#include <DurationPoint.hpp>
 #include <ManagedThreads.hpp>
 #include <mutex>
-
-#include "DurationPoint.hpp"
-#include "InstanceClassBase.hpp"
-#include "internal/_std_chrono_templates.h"
 
 void ThreadManager::destroyController(const Usage usage, bool deleteIt) {
     static std::array<std::mutex, static_cast<int>(Usage::MAX)> kPerUsageLocks;
@@ -12,14 +12,15 @@ void ThreadManager::destroyController(const Usage usage, bool deleteIt) {
     auto it = kControllers.find(usage);
     if (it != kControllers.end() && it->second) {
         LOG(INFO) << "Stopping: " << it->second->mgr_priv.usage.str
-                   << " controller";
+                  << " controller";
         DurationPoint dp;
         it->second->stop();
         it->second.reset();
         if (deleteIt) {
             kControllers.erase(it);
         }
-        LOG(INFO) << "Stopped. Took " << to_msecs(dp.get()).count() << " milliseconds";
+
+        LOG(INFO) << fmt::format("Stopped. Took {}", dp.get());
     }
 }
 

@@ -1,12 +1,10 @@
 #pragma once
 
-#include <absl/log/log.h>
-#include <arpa/inet.h>
-#include <internal/_FileDescriptor_posix.h>
+#include <trivial_helpers/_FileDescriptor_posix.h>
 
+#include <SharedMalloc.hpp>
 #include <SocketBase.hpp>
 
-#include "SharedMalloc.hpp"
 #include "SocketDescriptor_defs.hpp"
 
 struct SocketInterfaceUnix : SocketInterfaceBase {

@@ -5,8 +5,9 @@
 #include <absl/log/log_sink.h>
 #include <absl/strings/ascii.h>
 #include <fmt/format.h>
-#include <internal/_FileDescriptor_posix.h>
 #include <sys/types.h>
+#include <trivial_helpers/_FileDescriptor_posix.h>
+#include <trivial_helpers/_class_helper_macros.h>
 #include <unistd.h>
 
 #include <array>
@@ -18,8 +19,6 @@
 #include <socket/selector/SelectorPosix.hpp>
 #include <string_view>
 #include <thread>
-
-#include "internal/_class_helper_macros.h"
 
 struct DeferredExit {
     struct fail_t {};

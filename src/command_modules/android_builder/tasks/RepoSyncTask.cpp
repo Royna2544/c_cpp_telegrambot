@@ -8,12 +8,12 @@
 #include <chrono>
 #include <filesystem>
 #include <functional>
-#include <internal/raii.hpp>
 #include <ios>
 #include <regex>
 #include <string>
 #include <system_error>
 #include <thread>
+#include <trivial_helpers/raii.hpp>
 #include <utility>
 
 #include "CompileTimeStringConcat.hpp"
@@ -167,8 +167,8 @@ void RepoSyncTask::onNewStderrBuffer(ForkAndRun::BufferType& buffer) {
         if (lines.size() > PRINTING_LINES_COUNT) {
             lines.resize(PRINTING_LINES_COUNT);
         }
-        wrapper->editMessage(message, fmt::format("Sync in progress...:\n{}",
-                                                  fmt::join(lines, "\n")));
+        api->editMessage(message, fmt::format("Sync in progress...:\n{}",
+                                              fmt::join(lines, "\n")));
     }
     for (const auto& line : lines) {
         if (line.empty()) {
@@ -219,6 +219,6 @@ void RepoSyncTask::onSignal(int signalCode) {
     LOG(INFO) << "Repo sync received signal: " << strsignal(signalCode);
 }
 
-RepoSyncTask::RepoSyncTask(ApiPtr wrapper, Message::Ptr message,
-                           PerBuildData data)
-    : data(std::move(data)), wrapper(wrapper), message(std::move(message)) {}
+RepoSyncTask::RepoSyncTask(InstanceClassBase<TgBotApi>::pointer_type api,
+                           Message::Ptr message, PerBuildData data)
+    : data(std::move(data)), api(api), message(std::move(message)) {}

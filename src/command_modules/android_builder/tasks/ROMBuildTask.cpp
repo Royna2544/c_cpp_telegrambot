@@ -2,25 +2,25 @@
 
 #include <ResourceManager.h>
 #include <fmt/chrono.h>
-#include <fmt/core.h>
+#include <fmt/format.h>
+#include <tgbot/TgException.h>
+#include <tgbot/types/InlineQueryResultArticle.h>
+#include <trivial_helpers/_tgbot.h>
 
+#include <ConfigParsers.hpp>
 #include <Progress.hpp>
 #include <SystemInfo.hpp>
-#include <TgBotWrapper.hpp>
 #include <chrono>
 #include <concepts>
 #include <filesystem>
 #include <fstream>
 #include <memory>
-#include <mutex>
 #include <regex>
 #include <string_view>
 #include <system_error>
 #include <utility>
 
-#include "ConfigParsers.hpp"
-#include "ForkAndRun.hpp"
-#include "internal/_tgbot.h"
+#include "api/TgBotApi.hpp"
 
 namespace {
 std::string findVendor() {
@@ -205,8 +205,8 @@ void ROMBuildTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
             getPercent<MemoryInfo>(), getPercent<DiskInfo>(cwd),
             data.localManifest->job_count, buffer.data());
         try {
-            botWrapper->editMessage<TgBotWrapper::ParseMode::HTML>(
-                message, buildInfoBuffer);
+            botWrapper->editMessage<TgBotApi::ParseMode::HTML>(message,
+                                                               buildInfoBuffer);
         } catch (const TgBot::TgException& e) {
             LOG(ERROR) << "Couldn't parse markdown, with content:";
             LOG(ERROR) << buildInfoBuffer;
@@ -220,9 +220,10 @@ void ROMBuildTask::onExit(int exitCode) {
     std::memcpy(data.result, smem->memory, sizeof(PerBuildData::ResultData));
 }
 
-ROMBuildTask::ROMBuildTask(TgBotApi::Ptr wrapper, TgBot::Message::Ptr message,
-                           PerBuildData data)
-    : botWrapper(std::move(wrapper)),
+ROMBuildTask::ROMBuildTask(
+    InstanceClassBase<TgBotApi>::const_pointer_type wrapper,
+    TgBot::Message::Ptr message, PerBuildData data)
+    : botWrapper(wrapper),
       data(std::move(data)),
       message(std::move(message)),
       clock(std::chrono::system_clock::now()),
@@ -231,14 +232,17 @@ ROMBuildTask::ROMBuildTask(TgBotApi::Ptr wrapper, TgBot::Message::Ptr message,
                                             sizeof(PerBuildData::ResultData))) {
     auto romBuildArticle(std::make_shared<TgBot::InlineQueryResultArticle>());
     romBuildArticle->title = "Build progress";
-    romBuildArticle->description = "Show the build progress running in chat " +
-                                   ChatPtr_toString(this->message->chat);
+    romBuildArticle->description = fmt::format(
+        "Show the build progress running in chat {}", this->message->chat);
     romBuildArticle->id = fmt::format("rombuild-{}", this->message->messageId);
     romBuildArticle->inputMessageContent = textContent =
         std::make_shared<TgBot::InputTextMessageContent>();
     textContent->parseMode =
-        TgBotWrapper::parseModeToStr<TgBotWrapper::ParseMode::HTML>();
-    botWrapper->addInlineQueryKeyboard("rombuild status", romBuildArticle);
+        TgBotApi::parseModeToStr<TgBotApi::ParseMode::HTML>();
+    botWrapper->addInlineQueryKeyboard(
+        TgBotApi::InlineQuery{"rombuild status", "See the ROM build progress",
+                              false},
+        romBuildArticle);
 }
 
 ROMBuildTask::~ROMBuildTask() {

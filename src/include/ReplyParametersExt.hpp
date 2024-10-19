@@ -1,3 +1,5 @@
+#pragma once
+
 #include <tgbot/types/ReplyParameters.h>
 
 #include <memory>
@@ -6,7 +8,7 @@
 
 // Extension of ReplyParameters
 struct ReplyParametersExt : public TgBot::ReplyParameters {
-    typedef std::shared_ptr<ReplyParametersExt> Ptr;
+    using Ptr = std::shared_ptr<ReplyParametersExt>;
     static constexpr MessageThreadId kThreadIdNone = 0;
 
     MessageThreadId messageThreadId{};

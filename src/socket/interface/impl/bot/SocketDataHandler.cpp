@@ -1,16 +1,17 @@
-#include <ChatObserver.h>
 #include <ResourceManager.h>
 #include <fmt/chrono.h>
-#include <internal/_std_chrono_templates.h>
 #include <rapidjson/document.h>
 #include <rapidjson/rapidjson.h>
+#include <tgbot/TgException.h>
+#include <trivial_helpers/_std_chrono_templates.h>
 
 #include <ManagedThreads.hpp>
-#include <SpamBlock.hpp>
 #include <TgBotSocket_Export.hpp>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <global_handlers/ChatObserver.hpp>
+#include <global_handlers/SpamBlock.hpp>
 #include <impl/bot/TgBotSocketFileHelperNew.hpp>
 #include <impl/bot/TgBotSocketInterface.hpp>
 #include <mutex>
@@ -18,9 +19,6 @@
 #include <utility>
 #include <variant>
 
-#include "TgBotWrapper.hpp"
-
-using TgBot::Api;
 using TgBot::InputFile;
 namespace fs = std::filesystem;
 using namespace TgBotSocket;
@@ -111,29 +109,29 @@ GenericAck SocketInterfaceTgBot::handle_ObserveChatId(const void* ptr) {
 GenericAck SocketInterfaceTgBot::handle_SendFileToChatId(const void* ptr) {
     const auto* data = static_cast<const SendFileToChatId*>(ptr);
     const auto* file = data->filePath.data();
-    std::function<Message::Ptr(ChatId, const TgBotWrapper::FileOrMedia&)> fn;
+    std::function<Message::Ptr(ChatId, const TgBotApi::FileOrMedia&)> fn;
     switch (data->fileType) {
         case FileType::TYPE_PHOTO:
-            fn = [this](ChatId id, const TgBotWrapper::FileOrMedia& file) {
+            fn = [this](ChatId id, const TgBotApi::FileOrMedia& file) {
                 return api->sendPhoto(id, file);
             };
             break;
         case FileType::TYPE_VIDEO:
-            fn = [this](ChatId id, const TgBotWrapper::FileOrMedia& file) {
+            fn = [this](ChatId id, const TgBotApi::FileOrMedia& file) {
                 return api->sendVideo(id, file);
             };
             break;
         case FileType::TYPE_GIF:
-            fn = [this](ChatId id, const TgBotWrapper::FileOrMedia& file) {
+            fn = [this](ChatId id, const TgBotApi::FileOrMedia& file) {
                 return api->sendAnimation(id, file);
             };
         case FileType::TYPE_DOCUMENT:
-            fn = [this](ChatId id, const TgBotWrapper::FileOrMedia& file) {
+            fn = [this](ChatId id, const TgBotApi::FileOrMedia& file) {
                 return api->sendDocument(id, file);
             };
             break;
         case FileType::TYPE_STICKER:
-            fn = [this](ChatId id, const TgBotWrapper::FileOrMedia& file) {
+            fn = [this](ChatId id, const TgBotApi::FileOrMedia& file) {
                 return api->sendSticker(id, file);
             };
             break;
@@ -142,7 +140,7 @@ GenericAck SocketInterfaceTgBot::handle_SendFileToChatId(const void* ptr) {
             return GenericAck::ok();
         }
         default:
-            fn = [data](ChatId, const TgBotWrapper::FileOrMedia&) {
+            fn = [data](ChatId, const TgBotApi::FileOrMedia&) {
                 throw TgBot::TgException(
                     "Invalid file type: " +
                         std::to_string(static_cast<int>(data->fileType)),

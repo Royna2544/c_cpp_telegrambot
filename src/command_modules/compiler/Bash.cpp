@@ -1,15 +1,12 @@
 #include <StringResManager.hpp>
-#include <TgBotWrapper.hpp>
 
 #include "CompilerInTelegram.hpp"
-#include "absl/status/status.h"
 
-void CompilerInTgForBash::run(const MessagePtr message) {
+void CompilerInTgForBash::run(MessageExt::Ptr message) {
     std::stringstream res;
 
-    if (message->has<MessageExt::Attrs::ExtraText>()) {
-        runCommand(message->get<MessageExt::Attrs::ExtraText>(), res,
-                   !allowhang);
+    if (message->has<MessageAttrs::ExtraText>()) {
+        runCommand(message->get<MessageAttrs::ExtraText>(), res, !allowhang);
         _interface->onResultReady(res.str());
     } else {
         _interface->onErrorStatus(

@@ -10,7 +10,6 @@
 #include <vector>
 
 #include "ConfigParsers.hpp"
-#include "ForkAndRun.hpp"
 
 DeferredExit UploadFileTask::runFunction() {
     std::unique_ptr<ConnectedShmem> dataShmem;

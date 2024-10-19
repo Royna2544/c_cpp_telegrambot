@@ -132,14 +132,14 @@ TEST_P(AuthorizationTest, expectedForMessagesInTime) {
 
     static auto authflags = AuthContext::getInstance();
 
-    unsigned flags = 0;
+    AuthContext::Flags flags{};
     if (param.flags.permissive) {
-        flags |= AuthContext::PERMISSIVE;
+        flags |= AuthContext::Flags::PERMISSIVE;
     }
     if (param.flags.requireuser) {
-        flags |= AuthContext::REQUIRE_USER;
+        flags |= AuthContext::Flags::REQUIRE_USER;
     }
-    const auto& res = authflags->isAuthorized(message, flags);
+    const auto res = authflags->isAuthorized(message, flags);
     if (param.expected.ret) {
         EXPECT_TRUE(res);
         EXPECT_EQ(res.reason, AuthContext::Result::Reason::OK);
@@ -200,4 +200,15 @@ INSTANTIATE_TEST_SUITE_P(
         // Permissive mode, whitelisted user
         Param{FAKE_WHITELISTED_ID,
               {true, false},
-              {true, AuthContext::Result::Reason::OK}}));
+              {true, AuthContext::Result::Reason::OK}},
+              
+        // Permissive mode, blacklisted user
+        Param{FAKE_BLACKLISTED_ID,
+              {true, true},
+              {false, AuthContext::Result::Reason::BLACKLISTED_USER}},
+
+        // Non-ermissive mode, whitelisted user
+        Param{FAKE_WHITELISTED_ID,
+              {false, false},
+              {true, AuthContext::Result::Reason::OK}}
+));

@@ -2,7 +2,8 @@
 
 #include "CompilerInTelegram.hpp"
 #include "DurationPoint.hpp"
-#include "TgBotWrapper.hpp"
+#include "InstanceClassBase.hpp"
+#include "api/TgBotApi.hpp"
 
 class CompilerInTgBotInterface : public CompilerInTg::Interface {
    public:
@@ -13,12 +14,13 @@ class CompilerInTgBotInterface : public CompilerInTg::Interface {
     void onResultReady(const std::string& text) override;
     void onWdtTimeout() override;
 
-    explicit CompilerInTgBotInterface(std::shared_ptr<TgBotApi> api,
-                                      Message::Ptr requestedMessage);
+    explicit CompilerInTgBotInterface(
+        InstanceClassBase<TgBotApi>::const_pointer_type api,
+        MessageExt::Ptr requestedMessage);
 
    private:
-    std::shared_ptr<TgBotApi> botApi;
-    Message::Ptr requestedMessage;
+    InstanceClassBase<TgBotApi>::const_pointer_type botApi;
+    MessageExt::Ptr requestedMessage;
     Message::Ptr sentMessage;
     DurationPoint timePoint;
     std::stringstream output;

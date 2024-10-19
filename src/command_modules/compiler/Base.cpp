@@ -16,7 +16,6 @@
 #include <utility>
 
 #include "CompilerInTelegram.hpp"
-#include "StringToolsExt.hpp"
 #include "absl/status/status.h"
 #include "popen_wdt.h"
 
@@ -24,7 +23,7 @@ using std::chrono_literals::operator""ms;
 using std::chrono::high_resolution_clock;
 using std::chrono::milliseconds;
 
-CompilerInTg::CompilerInTg(std::shared_ptr<Interface> interface)
+CompilerInTg::CompilerInTg(std::unique_ptr<Interface> interface)
     : _interface(std::move(interface)) {}
 
 void CompilerInTg::runCommand(std::string cmd, std::stringstream &res,

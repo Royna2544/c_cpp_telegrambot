@@ -130,13 +130,6 @@ command_module(
 )
 
 command_module(
-    NAME ibash
-    SRCS ibash.cpp
-    LIBS TgBot_popen_wdt TgBotSocketSelectors
-    PLATFORM "Unix"
-)
-
-command_module(
     NAME possibility
     SRCS possibility.cpp
     LIBS TgBotRandom

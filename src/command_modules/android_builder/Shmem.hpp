@@ -9,7 +9,7 @@
 #include <string>
 #include <string_view>
 
-#include "internal/_class_helper_macros.h"
+#include "trivial_helpers/_class_helper_macros.h"
 
 class syscall_perror : public std::exception {
    public:

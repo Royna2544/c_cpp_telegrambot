@@ -1,11 +1,11 @@
+#include <tgbot/types/GenericReply.h>
+#include <tgbot/types/ReplyKeyboardMarkup.h>
+
 #include <Random.hpp>
 #include <StringResManager.hpp>
 #include <memory>
 
 #include "CommandModulesTest.hpp"
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
-#include "tgbot/types/GenericReply.h"
 
 namespace {
 void verifyKeyboard(const TgBot::GenericReply::Ptr& reply) {
@@ -86,7 +86,7 @@ struct DatabaseCommandTest : public CommandTestBase {
                             ->keyboard[X][Y]
                             ->text;
                 }),
-                InvokeArgument<0>(botApi, recievedMessage), Return()));
+                InvokeArgument<0>(botApi.get(), recievedMessage), Return()));
         execute();
     }
 };

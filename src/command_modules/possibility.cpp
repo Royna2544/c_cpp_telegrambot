@@ -1,7 +1,8 @@
 #include <absl/strings/str_split.h>
 
 #include <Random.hpp>
-#include <TgBotWrapper.hpp>
+#include <api/CommandModule.hpp>
+#include <api/TgBotApi.hpp>
 #include <set>
 
 #include "StringToolsExt.hpp"
@@ -17,19 +18,19 @@ DECLARE_COMMAND_HANDLER(possibility, botWrapper, message) {
     Random::ret_type total = 0;
     using map_t = std::pair<std::string, Random::ret_type>;
 
-    if (!message->has<MessageExt::Attrs::ExtraText>()) {
+    if (!message->has<MessageAttrs::ExtraText>()) {
         botWrapper->sendReplyMessage(
-            message, "Send avaliable conditions sperated by newline");
+            message->message(), "Send avaliable conditions sperated by newline");
         return;
     }
-    text = message->get<MessageExt::Attrs::ExtraText>();
+    text = message->get<MessageAttrs::ExtraText>();
     // Split string by newline
     set = absl::StrSplit(text, '\n', absl::SkipWhitespace());
     // Pre-reserve memory
     kItemAndPercentMap.reserve(set.size());
     // Can't get possitibities for 1 element
     if (set.size() == 1) {
-        botWrapper->sendReplyMessage(message, "Give more than 1 choice");
+        botWrapper->sendReplyMessage(message->message(), "Give more than 1 choice");
         return;
     }
     // Put it in vector again and shuffle it.
@@ -68,11 +69,11 @@ DECLARE_COMMAND_HANDLER(possibility, botWrapper, message) {
     for (const map_t &m : elem) {
         outStream << m.first << " : " << m.second << "%" << std::endl;
     }
-    botWrapper->sendReplyMessage(message, outStream.str());
+    botWrapper->sendReplyMessage(message->message(), outStream.str());
 }
 
 DYN_COMMAND_FN(n, module) {
-    module.command = "possibility";
+    module.name = "possibility";
     module.description = "Get possibilities";
     module.flags = CommandModule::Flags::None;
     module.function = COMMAND_HANDLER_NAME(possibility);

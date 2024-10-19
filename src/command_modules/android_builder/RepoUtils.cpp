@@ -5,11 +5,11 @@
 #include <absl/strings/str_split.h>
 #include <fmt/core.h>
 #include <git2.h>
-#include <internal/_class_helper_macros.h>
+#include <trivial_helpers/_class_helper_macros.h>
 
 #include <filesystem>
-#include <internal/raii.hpp>
 #include <memory>
+#include <trivial_helpers/raii.hpp>
 #include <type_traits>
 
 #include "ForkAndRun.hpp"

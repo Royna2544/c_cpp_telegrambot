@@ -7,8 +7,7 @@
 
 class ResourceManagerTest : public testing::Test {
    protected:
-    std::shared_ptr<ResourceManager> gResourceManager =
-        ResourceManager::getInstance();
+    ResourceManager* const gResourceManager = ResourceManager::getInstance();
     constexpr static const char kResourceTestFile[] = "test.txt";
     void SetUp() override { gResourceManager->preloadResourceDirectory(); }
 };

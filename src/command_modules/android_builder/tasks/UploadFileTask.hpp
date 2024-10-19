@@ -1,6 +1,5 @@
 #include <absl/log/log.h>
 
-#include <TgBotWrapper.hpp>
 #include <cstdlib>
 #include <ConfigParsers.hpp>
 

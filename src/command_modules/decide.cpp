@@ -1,7 +1,8 @@
 #include <fmt/core.h>
 
 #include <Random.hpp>
-#include <TgBotWrapper.hpp>
+#include <api/TgBotApi.hpp>
+#include <api/CommandModule.hpp>
 #include <sstream>
 #include <thread>
 
@@ -11,14 +12,14 @@ DECLARE_COMMAND_HANDLER(decide, wrapperBot, message) {
     constexpr int COUNT_MAX = 10;
     constexpr int RANDOM_RANGE_NUM = 10;
 
-    std::string obj = message->get<MessageExt::Attrs::ExtraText>();
+    std::string obj = message->get<MessageAttrs::ExtraText>();
     std::stringstream msgtxt;
     Message::Ptr msg;
     int count = COUNT_MAX;
     int yesno = 0;
 
     msgtxt << fmt::format("Deciding '{}'...", obj);
-    msg = wrapperBot->sendReplyMessage(message, msgtxt.str());
+    msg = wrapperBot->sendReplyMessage(message->message(), msgtxt.str());
     msgtxt << std::endl << std::endl;
     do {
         msgtxt << fmt::format("Try {}: ", COUNT_MAX - count + 1);
@@ -55,7 +56,7 @@ DECLARE_COMMAND_HANDLER(decide, wrapperBot, message) {
 }
 
 DYN_COMMAND_FN(/*name*/, module) {
-    module.command = "decide";
+    module.name = "decide";
     module.description = "Decide a statement";
     module.flags = CommandModule::Flags::None;
     module.function = COMMAND_HANDLER_NAME(decide);

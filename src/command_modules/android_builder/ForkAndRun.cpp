@@ -4,10 +4,10 @@
 #include <absl/log/log_sink.h>
 #include <absl/log/log_sink_registry.h>
 #include <fmt/format.h>
-#include <internal/_FileDescriptor_posix.h>
-#include <internal/_class_helper_macros.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <trivial_helpers/_FileDescriptor_posix.h>
+#include <trivial_helpers/_class_helper_macros.h>
 #include <unistd.h>
 
 #include <AbslLogInit.hpp>
@@ -15,7 +15,6 @@
 #include <csignal>
 #include <cstdlib>
 #include <filesystem>
-#include <internal/raii.hpp>
 #include <libos/OnTerminateRegistrar.hpp>
 #include <libos/libsighandler.hpp>
 #include <memory>
@@ -23,6 +22,7 @@
 #include <shared_mutex>
 #include <string_view>
 #include <thread>
+#include <trivial_helpers/raii.hpp>
 #include <utility>
 #include <vector>
 

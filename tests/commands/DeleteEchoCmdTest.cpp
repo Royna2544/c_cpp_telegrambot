@@ -1,9 +1,5 @@
-
-#include <memory>
 #include "CommandModulesTest.hpp"
-#include "gmock/gmock.h"
 #include "tgbot/TgException.h"
-#include "tgbot/types/Animation.h"
 
 struct DeleteEchoCommandTest : public CommandTestBase {
     DeleteEchoCommandTest() : CommandTestBase("decho") {}
@@ -27,7 +23,7 @@ TEST_F(DeleteEchoCommandTest, WithRepliedMessageNoArgs) {
 
 TEST_F(DeleteEchoCommandTest, WithRepliedMessageWithArgs) {
     defaultProvidedMessage->replyToMessage = createDefaultMessage();
-    defaultProvidedMessage->text = "This is alex /del";
+    setCommandExtArgs({"This is alex /del"});
 
     Message::Ptr deletedMessage;
     EXPECT_CALL(*botApi, deleteMessage_impl(_))
@@ -35,7 +31,7 @@ TEST_F(DeleteEchoCommandTest, WithRepliedMessageWithArgs) {
     EXPECT_CALL(
         *botApi,
         copyMessage_impl(
-            TEST_CHAT_ID, defaultProvidedMessage->replyToMessage->messageId,
+            TEST_CHAT_ID, defaultProvidedMessage->messageId,
             createMessageReplyMatcher(defaultProvidedMessage->replyToMessage)));
     execute();
     EXPECT_EQ(deletedMessage, defaultProvidedMessage);

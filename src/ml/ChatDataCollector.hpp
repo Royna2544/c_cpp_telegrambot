@@ -1,7 +1,7 @@
 #include <Types.h>
 
 #include <InitTask.hpp>
-#include <TgBotWrapper.hpp>
+#include <api/TgBotApiImpl.hpp>
 #include <ctime>
 #include <fstream>
 #include <libos/OnTerminateRegistrar.hpp>
@@ -62,9 +62,9 @@ inline std::ostream& operator<<(std::ostream& os, ChatDataCollector::Data d) {
 }
 
 inline ChatDataCollector::ChatDataCollector() {
-    TgBotWrapper::getInstance()->onAnyMessage([this](auto api, auto message) {
+    TgBotApiImpl::getInstance()->onAnyMessage([this](auto api, auto message) {
         onMessage(message);
-        return TgBotWrapper::AnyMessageResult::Handled;
+        return TgBotApiImpl::AnyMessageResult::Handled;
     });
 }
 

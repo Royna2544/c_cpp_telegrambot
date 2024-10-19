@@ -13,11 +13,13 @@ using TgBot::Message;
 class TgBotPPImpl_shared_deps_API AuthContext
     : public InstanceClassBase<AuthContext> {
    public:
-    enum Flags : unsigned int {
-        REQUIRE_USER = 0x1,  // If set, don't allow non-users
-                             // e.g. channels, groups...
-        PERMISSIVE = 0x2,    // If set, allow only for normal users (nonetheless
-                             // of this flag, it excludes blacklist)
+    enum class Flags {
+        None = 0,
+        // If set, don't allow non-users e.g. channels, groups..
+        REQUIRE_USER = 0x1,
+        // If set, allow only for normal users (nonetheless of this flag, it
+        // excludes blacklist)
+        PERMISSIVE = 0x2,
     };
 
     // Holds result of isAuthorized() function
@@ -71,7 +73,7 @@ class TgBotPPImpl_shared_deps_API AuthContext
      * @return True if the message is authorized, false otherwise.
      */
     [[nodiscard]] Result isAuthorized(const Message::Ptr& message,
-                                      const unsigned flags) const;
+                                      const Flags flags) const;
 
     /**
      * @brief Checks if the message is within the allowed time limit.
@@ -116,4 +118,15 @@ inline std::ostream& operator<<(std::ostream& self,
 
 #undef CASE_STR
     return self;
+}
+
+constexpr inline AuthContext::Flags operator|=(AuthContext::Flags& lhs,
+                                               const AuthContext::Flags& rhs) {
+    return lhs = static_cast<AuthContext::Flags>(static_cast<int>(lhs) |
+                                                 static_cast<int>(rhs));
+}
+
+constexpr inline bool operator&(const AuthContext::Flags& lhs,
+                                const AuthContext::Flags& rhs) {
+    return static_cast<bool>(static_cast<int>(lhs) & static_cast<int>(rhs));
 }

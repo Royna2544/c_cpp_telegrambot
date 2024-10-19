@@ -4,7 +4,7 @@
 
 #include <chrono>
 
-#include "internal/_std_chrono_templates.h"
+#include "trivial_helpers/_std_chrono_templates.h"
 
 struct DurationPoint {
     explicit DurationPoint() { init(); }

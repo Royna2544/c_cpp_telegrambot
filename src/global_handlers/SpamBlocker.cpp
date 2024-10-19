@@ -1,18 +1,16 @@
 #include <Authorization.h>
 #include <CStringLifetime.h>
 #include <absl/log/log.h>
-#include <internal/_std_chrono_templates.h>
-#include <internal/_tgbot.h>
-#include <tgbot/types/Chat.h>
+#include <tgbot/TgException.h>
+#include <trivial_helpers/_std_chrono_templates.h>
+#include <trivial_helpers/_tgbot.h>
 
 #include <InstanceClassBase.hpp>
-#include <SpamBlock.hpp>
 #include <algorithm>
+#include <global_handlers/SpamBlock.hpp>
 #include <memory>
 #include <mutex>
 
-#include "ManagedThreads.hpp"
-#include "TgBotWrapper.hpp"
 #include "Types.h"
 
 using std::chrono_literals::operator""s;
@@ -64,8 +62,8 @@ bool SpamBlockBase::isEntryOverThreshold(PerChatHandle::const_reference t,
 
 void SpamBlockBase::_logSpamDetectCommon(PerChatHandle::const_reference t,
                                          const char *name) {
-    LOG(INFO) << "Spam detected for user " << UserPtr_toString(t.first)
-              << ", filtered by " << name;
+    LOG(INFO) << fmt::format("Spam detected for user {}, filtered by ", t.first,
+                             name);
 }
 
 void SpamBlockBase::takeAction(OneChatIterator it, const PerChatHandle &map,
@@ -114,7 +112,7 @@ void SpamBlockBase::runFunction() {
             const std::lock_guard<std::mutex> _(buffer_m);
             if (buffer_sub.size() > 0) {
                 auto its = buffer_sub.begin();
-                const CStringLifetime chatName = ChatPtr_toString(its->first);
+                const CStringLifetime chatName = fmt::format("{}", its->first);
                 while (its != buffer_sub.end()) {
                     const auto it = findChatIt(
                         buffer, [](const auto &it) { return it.first; },
@@ -148,7 +146,8 @@ void SpamBlockBase::addMessage(const Message::Ptr &message) {
     }
 #endif
     // I'm allowed always
-    if (AuthContext::getInstance()->isAuthorized(message, 0)) {
+    if (AuthContext::getInstance()->isAuthorized(message,
+                                                 AuthContext::Flags::None)) {
         return;
     }
 
@@ -230,13 +229,13 @@ void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle,
     // Initial set - all false set
     static auto perms = std::make_shared<ChatPermissions>();
     if (isEntryOverThreshold(t, threshold)) {
-        const CStringLifetime userstr = UserPtr_toString(t.first);
-        const CStringLifetime chatstr = ChatPtr_toString(handle->first);
-
         _logSpamDetectCommon(t, name);
 
-        wrapper->sendMessage(handle->first->id,
-                             "Spam detected @" + t.first->username);
+        if (!t.first->username.empty()) {
+            wrapper->sendMessage(
+                handle->first->id,
+                fmt::format("Spam detected @{}", t.first->username));
+        }
         std::vector<MessageId> message_ids;
         std::ranges::for_each(t.second, [&message_ids](auto &&messageIn) {
             message_ids.emplace_back(messageIn->messageId);
@@ -247,15 +246,15 @@ void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle,
             DLOG(INFO) << "Error deleting message: " << e.what();
         }
         if (mute) {
-            LOG(INFO) << "Try mute user " << userstr.get() << " in chat "
-                      << chatstr.get();
+            LOG(INFO) << fmt::format("Try mute user {} in chat {}", t.first,
+                                     handle->first);
             try {
                 wrapper->muteChatMember(handle->first->id, t.first->id, perms,
                                         to_secs(kMuteDuration).count());
             } catch (const TgBot::TgException &e) {
                 LOG(WARNING)
-                    << "Cannot mute user " << userstr.get() << " in chat "
-                    << chatstr.get() << ": " << e.what();
+                    << fmt::format("Cannot mute user {} in chat {}: {}",
+                                   t.first, handle->first, e.what());
             }
         }
     }

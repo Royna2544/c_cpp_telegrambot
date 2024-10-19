@@ -5,7 +5,7 @@
 #include <fmt/core.h>
 #include <sys/mman.h>
 
-#include <internal/raii.hpp>
+#include <trivial_helpers/raii.hpp>
 
 AllocatedShmem::AllocatedShmem(const std::string_view& path, off_t size) {
     void* ptr = nullptr;

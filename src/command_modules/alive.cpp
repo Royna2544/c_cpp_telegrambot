@@ -2,16 +2,16 @@
 #include <ResourceManager.h>
 #include <absl/log/log.h>
 #include <absl/strings/str_replace.h>
-#include <fmt/core.h>
-#include <internal/_tgbot.h>
+#include <fmt/format.h>
+#include <tgbot/TgException.h>
+#include <trivial_helpers/_tgbot.h>
 
 #include <CompileTimeStringConcat.hpp>
 #include <StringResManager.hpp>
-#include <TgBotWrapper.hpp>
+#include <api/CommandModule.hpp>
+#include <api/TgBotApi.hpp>
 #include <database/bot/TgBotDatabaseImpl.hpp>
-#include <filesystem>
 #include <mutex>
-#include "database/DatabaseBase.hpp"
 
 template <unsigned Len>
 consteval auto cat(const char (&strings)[Len]) {
@@ -42,15 +42,16 @@ static DECLARE_COMMAND_HANDLER(alive, wrapper, message) {
                        {commitid, data.commitid},
                        {commitmsg, data.commitmsg},
                        {originurl, data.originurl},
-                       {botname, UserPtr_toString(wrapper->getBotUser())},
+                       {botname, wrapper->getBotUser()->firstName},
                        {botusername, wrapper->getBotUser()->username}});
     });
     const auto info = TgBotDatabaseImpl::getInstance()->queryMediaInfo("alive");
     bool sentAnimation = false;
     if (info && info->mediaType == DatabaseBase::MediaType::GIF) {
         try {
-            wrapper->sendReplyAnimation<TgBotWrapper::ParseMode::HTML>(
-                message, MediaIds{info->mediaId, info->mediaUniqueId}, version);
+            wrapper->sendReplyAnimation<TgBotApi::ParseMode::HTML>(
+                message->message(),
+                MediaIds{info->mediaId, info->mediaUniqueId}, version);
             sentAnimation = true;
         } catch (const TgBot::TgException& e) {
             // Fallback to HTML if no GIF
@@ -59,8 +60,8 @@ static DECLARE_COMMAND_HANDLER(alive, wrapper, message) {
         }
     }
     if (!sentAnimation) {
-        wrapper->sendReplyMessage<TgBotWrapper::ParseMode::HTML>(message,
-                                                                 version);
+        wrapper->sendReplyMessage<TgBotApi::ParseMode::HTML>(message->message(),
+                                                             version);
     }
 }
 
@@ -69,7 +70,7 @@ DYN_COMMAND_FN(name, module) {
         return false;
     }
     module.flags = CommandModule::Flags::None;
-    module.command = name;
+    module.name = name;
     module.description = GETSTR(ALIVE_CMD_DESC);
     module.function = COMMAND_HANDLER_NAME(alive);
     return true;

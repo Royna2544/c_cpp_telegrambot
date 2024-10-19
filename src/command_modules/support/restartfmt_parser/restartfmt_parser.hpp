@@ -1,7 +1,7 @@
 
 #include <optional>
 #include <string>
-#include <TgBotWrapper.hpp>
+#include <api/TgBotApi.hpp>
 #include <absl/status/status.h>
 
 #include "Types.h"
@@ -26,7 +26,7 @@ class RestartFmt {
     // function to convert chat_id and message_id to a string
     static std::string toString(const data_type& data, bool withPrefix = false);
 
-    static absl::Status handleMessage(ApiPtr api);
+    static absl::Status handleMessage(InstanceClassBase<TgBotApi>::const_pointer_type api);
 
     constexpr static const char* ENV_VAR_NAME = "RESTART";
     // typical chatid:int32_max

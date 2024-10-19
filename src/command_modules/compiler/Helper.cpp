@@ -4,19 +4,21 @@
 #include <absl/log/log.h>
 
 #include <StringResManager.hpp>
-#include <TgBotWrapper.hpp>
 #include <thread>
 #include <utility>
 
+#include "api/MessageExt.hpp"
+
 CompilerInTgBotInterface::CompilerInTgBotInterface(
-    std::shared_ptr<TgBotApi> api, Message::Ptr requestedMessage)
-    : botApi(std::move(api)), requestedMessage(std::move(requestedMessage)) {}
+    InstanceClassBase<TgBotApi>::const_pointer_type api, MessageExt::Ptr requestedMessage)
+    : botApi(api), requestedMessage(std::move(requestedMessage)) {}
 
 void CompilerInTgBotInterface::onExecutionStarted(
     const std::string_view& command) {
     timePoint.init();
     output << GETSTR(WORKING) << command.data() << std::endl;
-    sentMessage = botApi->sendReplyMessage(requestedMessage, output.str());
+    sentMessage =
+        botApi->sendReplyMessage(requestedMessage->message(), output.str());
 }
 
 void CompilerInTgBotInterface::onExecutionFinished(
@@ -32,13 +34,13 @@ void CompilerInTgBotInterface::onErrorStatus(absl::Status status) {
     if (sentMessage) {
         botApi->editMessage(sentMessage, output.str());
     } else {
-        botApi->sendReplyMessage(requestedMessage, output.str());
+        botApi->sendReplyMessage(requestedMessage->message(), output.str());
     }
 }
 
 void CompilerInTgBotInterface::onResultReady(const std::string& text) {
     if (!text.empty()) {
-        botApi->sendMessage(requestedMessage, text);
+        botApi->sendMessage(requestedMessage->get<MessageAttrs::Chat>(), text);
     } else {
         output << "Output is empty" << std::endl;
         botApi->editMessage(sentMessage, output.str());

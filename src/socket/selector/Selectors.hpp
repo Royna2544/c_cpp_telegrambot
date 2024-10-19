@@ -7,7 +7,7 @@
 #include <optional>
 
 #include "../include/SocketDescriptor_defs.hpp"
-#include "internal/_std_chrono_templates.h"
+#include "trivial_helpers/_std_chrono_templates.h"
 
 // Base interface for a fd selector, e.g. poll(2) or select(2).
 struct Selector {

@@ -2,7 +2,7 @@
 
 #include <TgBotDBImplExports.h>
 #include <Types.h>
-#include <internal/_class_helper_macros.h>
+#include <trivial_helpers/_class_helper_macros.h>
 
 #include <InitTask.hpp>
 #include <InstanceClassBase.hpp>

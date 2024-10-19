@@ -2,11 +2,14 @@
 #include <absl/strings/match.h>
 #include <absl/strings/str_split.h>
 #include <absl/strings/strip.h>
-#include <fmt/core.h>
+#include <fmt/format.h>
+#include <tgbot/TgException.h>
+#include <tgbot/types/ReplyKeyboardRemove.h>
 
 #include <ConfigParsers.hpp>
-#include <TgBotWrapper.hpp>
 #include <algorithm>
+#include <api/CommandModule.hpp>
+#include <api/TgBotApi.hpp>
 #include <concepts>
 #include <filesystem>
 #include <initializer_list>
@@ -19,14 +22,12 @@
 #include <tasks/UploadFileTask.hpp>
 #include <utility>
 
-#include "ForkAndRun.hpp"
 #include "SystemInfo.hpp"
 
 template <typename Impl>
-concept canCreateWithApi =
-    requires(ApiPtr api, MessagePtr message, PerBuildData data) {
-        Impl{api, message, data};
-    };
+concept canCreateWithApi = requires(
+    InstanceClassBase<TgBotApi>::pointer_type api, Message::Ptr message,
+    PerBuildData data) { Impl{api, message, data}; };
 
 template <typename Impl>
 concept canCreateWithData = requires(PerBuildData data) { Impl{data}; };
@@ -99,13 +100,13 @@ class ROMBuildQueryHandler
     : public std::enable_shared_from_this<ROMBuildQueryHandler> {
     struct {
         bool do_repo_sync = true;
-        bool do_upload = false;
+        bool do_upload = true;
         bool didpin = false;
     };
     PerBuildData per_build;
     Message::Ptr sentMessage;
     Message::Ptr _userMessage;
-    std::shared_ptr<TgBotApi> _api;
+    InstanceClassBase<TgBotApi>::pointer_type _api;
     using KeyboardType = TgBot::InlineKeyboardMarkup::Ptr;
 
     struct {
@@ -136,7 +137,8 @@ class ROMBuildQueryHandler
 
    public:
     bool pinned() const { return didpin; }
-    ROMBuildQueryHandler(std::shared_ptr<TgBotApi> api, MessagePtr userMessage);
+    ROMBuildQueryHandler(InstanceClassBase<TgBotApi>::pointer_type api,
+                         Message::Ptr userMessage);
 
     void updateSentMessage(Message::Ptr message);
     void start(Message::Ptr userMessage);
@@ -252,7 +254,7 @@ class TaskWrapperBase {
     PerBuildData data{};
 
    protected:
-    std::shared_ptr<TgBotApi> api;
+    InstanceClassBase<TgBotApi>::pointer_type api;
     Message::Ptr userMessage;  // User's message
     Message::Ptr sentMessage;  // Message sent by the bot
     TgBot::InlineKeyboardMarkup::Ptr backKeyboard;
@@ -279,10 +281,12 @@ class TaskWrapperBase {
 
    public:
     TaskWrapperBase(std::shared_ptr<ROMBuildQueryHandler> handler,
-                    PerBuildData data, TgBotApi::Ptr api, Message::Ptr message)
+                    PerBuildData data,
+                    InstanceClassBase<TgBotApi>::pointer_type api,
+                    Message::Ptr message)
         : queryHandler(std::move(handler)),
           data(std::move(data)),
-          api(std::move(api)),
+          api(api),
           userMessage(std::move(message)) {
         this->data.result = &result;
         backKeyboard =
@@ -492,9 +496,9 @@ class CwdRestorer {
     operator bool() const noexcept { return !ec; }
 };
 
-ROMBuildQueryHandler::ROMBuildQueryHandler(std::shared_ptr<TgBotApi> api,
-                                           MessagePtr userMessage)
-    : _api(std::move(api)),
+ROMBuildQueryHandler::ROMBuildQueryHandler(
+    InstanceClassBase<TgBotApi>::pointer_type api, Message::Ptr userMessage)
+    : _api(api),
       parser(FS::getPathForType(FS::PathType::GIT_ROOT) / "src" /
              "command_modules" / "android_builder" / "configs") {
     settingsKeyboard =
@@ -504,7 +508,7 @@ ROMBuildQueryHandler::ROMBuildQueryHandler(std::shared_ptr<TgBotApi> api,
         createKeyboardWith<Buttons::build_rom, Buttons::send_system_info,
                            Buttons::settings, Buttons::cancel>(2);
     backKeyboard = createKeyboardWith<Buttons::back>();
-    start(userMessage);
+    start(std::move(userMessage));
 }
 
 void ROMBuildQueryHandler::start(Message::Ptr userMessage) {
@@ -512,8 +516,8 @@ void ROMBuildQueryHandler::start(Message::Ptr userMessage) {
     if (sentMessage) {
         _api->deleteMessage(sentMessage);
     }
-    sentMessage =
-        _api->sendMessage(_userMessage, "Will build ROM...", mainKeyboard);
+    sentMessage = _api->sendMessage(_userMessage->chat, "Will build ROM...",
+                                    mainKeyboard);
     per_build.reset();
 }
 
@@ -632,7 +636,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     auto remove = std::make_shared<TgBot::ReplyKeyboardRemove>();
     remove->removeKeyboard = true;
     _api->editMessageMarkup(sentMessage, nullptr);
-    _api->sendMessage(sentMessage, "Build completed");
+    _api->sendMessage(sentMessage->chat, "Build completed");
     if (didpin) {
         try {
             _api->unpinMessage(sentMessage);
@@ -728,23 +732,23 @@ void ROMBuildQueryHandler::onCallbackQuery(
     LOG(ERROR) << "Unknown callback query: " << query->data;
 }
 
-DECLARE_COMMAND_HANDLER(rombuild, tgWrapper, message) {
+DECLARE_COMMAND_HANDLER(rombuild, api, message) {
     static std::shared_ptr<ROMBuildQueryHandler> handler;
 
     if (handler) {
-        handler->start(message);
+        handler->start(message->message());
         return;
     }
     try {
-        handler = std::make_shared<ROMBuildQueryHandler>(tgWrapper, message);
+        handler = std::make_shared<ROMBuildQueryHandler>(api, message->message());
     } catch (const std::exception& e) {
         LOG(ERROR) << "Failed to create ROMBuildQueryHandler: " << e.what();
-        tgWrapper->sendMessage(message,
+        api->sendMessage(message->get<MessageAttrs::Chat>(),
                                "Failed to initialize ROM build: "s + e.what());
         return;
     }
 
-    tgWrapper->onCallbackQuery(
+    api->onCallbackQuery(
         "rombuild", [](const TgBot::CallbackQuery::Ptr& query) {
             if (handler) {
                 handler->onCallbackQuery(query);
@@ -756,7 +760,7 @@ DECLARE_COMMAND_HANDLER(rombuild, tgWrapper, message) {
 }
 
 DYN_COMMAND_FN(n, module) {
-    module.command = "rombuild";
+    module.name = "rombuild";
     module.description = "Build a ROM, I'm lazy";
     module.flags = CommandModule::Flags::Enforced;
     module.function = COMMAND_HANDLER_NAME(rombuild);

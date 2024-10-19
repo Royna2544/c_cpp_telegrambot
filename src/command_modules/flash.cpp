@@ -1,15 +1,17 @@
+#include <ResourceManager.h>
 #include <absl/strings/match.h>
+#include <absl/strings/str_replace.h>
 #include <absl/strings/str_split.h>
+#include <fmt/core.h>
+
 #include <Random.hpp>
-#include <TgBotWrapper.hpp>
+#include <api/CommandModule.hpp>
+#include <api/TgBotApi.hpp>
 #include <chrono>
 #include <mutex>
 #include <optional>
 #include <regex>
 #include <thread>
-#include <fmt/core.h>
-
-#include "ResourceManager.h"
 
 constexpr std::string_view kZipExtensionSuffix = ".zip";
 constexpr int FLASH_DELAY_MAX_SEC = 5;
@@ -31,12 +33,12 @@ DECLARE_COMMAND_HANDLER(flash, botWrapper, message) {
         reasons = absl::StrSplit(buf, '\n');
     });
 
-    if (message->replyToMessage_has<MessageExt::Attrs::ExtraText>()) {
-        msg = message->replyToMessage->text;
-    } else if (message->has<MessageExt::Attrs::ExtraText>()) {
-        msg = message->get<MessageExt::Attrs::ExtraText>();
+    if (message->replyMessage()->has<MessageAttrs::ExtraText>()) {
+        msg = message->replyMessage()->get<MessageAttrs::ExtraText>();
+    } else if (message->has<MessageAttrs::ExtraText>()) {
+        msg = message->get<MessageAttrs::ExtraText>();
     } else {
-        botWrapper->sendReplyMessage(message,
+        botWrapper->sendReplyMessage(message->message(),
                                      "Reply to a message or send a file name");
         return;
     }
@@ -44,7 +46,7 @@ DECLARE_COMMAND_HANDLER(flash, botWrapper, message) {
 
     if (msg->find('\n') != std::string::npos) {
         botWrapper->sendReplyMessage(
-            message, "Invalid input: Zip names shouldn't have newlines");
+            message->message(), "Invalid input: Zip names shouldn't have newlines");
         return;
     }
     std::replace(msg->begin(), msg->end(), ' ', '_');
@@ -52,7 +54,7 @@ DECLARE_COMMAND_HANDLER(flash, botWrapper, message) {
         msg.value() += kZipExtensionSuffix;
     }
     ss << fmt::format("Flashing {}...", msg.value());
-    sentmsg = botWrapper->sendReplyMessage(message, ss.str());
+    sentmsg = botWrapper->sendReplyMessage(message->message(), ss.str());
 
     std::this_thread::sleep_for(std::chrono::seconds(sleep_secs));
     if (pos != reasons.size()) {
@@ -64,7 +66,7 @@ DECLARE_COMMAND_HANDLER(flash, botWrapper, message) {
 }
 
 DYN_COMMAND_FN(n, module) {
-    module.command = "flash";
+    module.name = "flash";
     module.description = "Flash and get a random result";
     module.flags = CommandModule::Flags::None;
     module.function = COMMAND_HANDLER_NAME(flash);

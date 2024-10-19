@@ -1,28 +1,28 @@
 #include <StringResManager.hpp>
 
-#include "TgBotWrapper.hpp"
+#include <api/CommandModule.hpp>
 #include "compiler/CompilerInTelegram.hpp"
 #include "compiler/Helper.hpp"
 
 namespace {
 
 DECLARE_COMMAND_HANDLER(bash, wrapper, message) {
-    const auto helper =
-        std::make_shared<CompilerInTgBotInterface>(wrapper, message);
-    CompilerInTgForBash bash(helper, false);
+    auto helper =
+        std::make_unique<CompilerInTgBotInterface>(wrapper, message);
+    CompilerInTgForBash bash(std::move(helper), false);
     bash.run(message);
 }
 DECLARE_COMMAND_HANDLER(ubash, wrapper, message) {
-    const auto helper =
-        std::make_shared<CompilerInTgBotInterface>(wrapper, message);
-    CompilerInTgForBash ubash(helper, true);
+    auto helper =
+        std::make_unique<CompilerInTgBotInterface>(wrapper, message);
+    CompilerInTgForBash ubash(std::move(helper), true);
     ubash.run(message);
 }
 
 }  // namespace
 
 DYN_COMMAND_FN(name, module) {
-    module.command = name;
+    module.name = name;
     module.flags = CommandModule::Flags::Enforced;
     if (name == "bash") {
         module.description = GETSTR(BASH_CMD_DESC);

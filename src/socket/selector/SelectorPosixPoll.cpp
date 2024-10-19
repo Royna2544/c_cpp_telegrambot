@@ -1,6 +1,6 @@
-#include <internal/_FileDescriptor_posix.h>
 #include <poll.h>
 #include <sys/poll.h>
+#include <trivial_helpers/_FileDescriptor_posix.h>
 
 #include <memory>
 

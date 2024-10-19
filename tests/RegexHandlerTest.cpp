@@ -2,7 +2,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include <RegEXHandler.hpp>
+#include <global_handlers/RegEXHandler.hpp>
 #include <memory>
 #include <string_view>
 
@@ -114,4 +114,4 @@ INSTANTIATE_TEST_SUITE_P(
         // Invalid backreference
         Params{"Hello, World!", "s/(Hello)\\2/Hi/g", "Exception"}
         // Reference to non-existent group
-));
+        ));

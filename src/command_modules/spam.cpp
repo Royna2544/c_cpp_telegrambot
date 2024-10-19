@@ -2,10 +2,13 @@
 #include <absl/strings/str_split.h>
 #include <tgbot/tools/StringTools.h>
 
-#include <TgBotWrapper.hpp>
 #include <TryParseStr.hpp>
+#include <api/CommandModule.hpp>
+#include <api/TgBotApi.hpp>
 #include <functional>
 #include <thread>
+
+#include "api/MessageExt.hpp"
 
 constexpr int MAX_SPAM_COUNT = 10;
 constexpr auto kSpamDelayTime = std::chrono::milliseconds(700);
@@ -40,52 +43,57 @@ DECLARE_COMMAND_HANDLER(spam, bot, message) {
     int count = 0;
     bool spamable = false;
 
-    if (message->has<MessageExt::Attrs::IsReplyMessage>()) {
-        const auto chatid = message->replyToMessage->chat->id;
+    if (message->replyMessage()->exists()) {
+        const auto chatid = message->replyMessage()->get<MessageAttrs::Chat>();
 
         spamable = true;
-        try_parse_spamcnt(message->get<MessageExt::Attrs::ExtraText>(), count);
-        if (message->replyToMessage_has<MessageExt::Attrs::Sticker>()) {
+        try_parse_spamcnt(message->get<MessageAttrs::ExtraText>(), count);
+        if (message->replyMessage()->has<MessageAttrs::Sticker>()) {
             fp = [bot, message, chatid] {
-                bot->sendSticker(chatid,
-                                 MediaIds(message->replyToMessage->sticker));
+                bot->sendSticker(
+                    chatid,
+                    MediaIds(
+                        message->replyMessage()->get<MessageAttrs::Sticker>()));
             };
-        } else if (message->replyToMessage_has<
-                       MessageExt::Attrs::Animation>()) {
+        } else if (message->replyMessage()->has<MessageAttrs::Animation>()) {
             fp = [bot, message, chatid] {
                 bot->sendAnimation(
-                    chatid, MediaIds(message->replyToMessage->animation));
+                    chatid, MediaIds(message->replyMessage()
+                                         ->get<MessageAttrs::Animation>()));
             };
-        } else if (message->replyToMessage_has<
-                       MessageExt::Attrs::ExtraText>()) {
+        } else if (message->replyMessage()->has<MessageAttrs::ExtraText>()) {
             fp = [bot, message, chatid] {
-                bot->sendMessage(chatid, message->replyToMessage->text);
+                bot->sendMessage(
+                    chatid,
+                    message->replyMessage()->get<MessageAttrs::ExtraText>());
             };
         } else {
-            bot->sendReplyMessage(message,
+            bot->sendReplyMessage(message->message(),
                                   "Supports sticker/GIF/text for reply to "
                                   "messages, give count");
             spamable = false;
         }
 
-    } else if (message->has<MessageExt::Attrs::ExtraText>()) {
+    } else if (message->has<MessageAttrs::ExtraText>()) {
         std::vector<std::string> commands;
         std::pair<int, std::string> spamData;
-        commands = absl::StrSplit(message->text, ' ', absl::SkipWhitespace());
+        commands = absl::StrSplit(message->get<MessageAttrs::ExtraText>(), ' ',
+                                  absl::SkipWhitespace());
         if (commands.size() == 2) {
             try_parse_spamcnt(commands[0], spamData.first);
             spamData.second = commands[1];
             fp = [bot, message, spamData] {
-                bot->sendMessage(message->chat->id, spamData.second);
+                bot->sendMessage(message->get<MessageAttrs::Chat>()->id,
+                                 spamData.second);
             };
             count = spamData.first;
             spamable = true;
         } else {
-            bot->sendReplyMessage(message,
+            bot->sendReplyMessage(message->message(),
                                   "Invalid argument size for spam config");
         }
     } else {
-        bot->sendReplyMessage(message,
+        bot->sendReplyMessage(message->message(),
                               "Send a pair of spam count and message to spam");
     }
     if (spamable) {
@@ -94,7 +102,7 @@ DECLARE_COMMAND_HANDLER(spam, bot, message) {
 }
 
 DYN_COMMAND_FN(n, module) {
-    module.command = "spam";
+    module.name = "spam";
     module.description = "Spam a given literal or media";
     module.flags = CommandModule::Flags::Enforced;
     module.function = COMMAND_HANDLER_NAME(spam);

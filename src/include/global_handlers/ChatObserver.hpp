@@ -6,8 +6,7 @@
 
 #include <vector>
 
-#include "InstanceClassBase.hpp"
-#include "TgBotWrapper.hpp"
+#include <InstanceClassBase.hpp>
 
 using TgBot::Message;
 using TgBot::User;

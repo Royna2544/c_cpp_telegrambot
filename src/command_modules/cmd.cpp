@@ -1,10 +1,11 @@
-#include <fmt/core.h>
+#include <fmt/format.h>
 
 #include <StringResManager.hpp>
-#include <TgBotWrapper.hpp>
+#include <api/CommandModule.hpp>
+#include <api/TgBotApi.hpp>
 
 DECLARE_COMMAND_HANDLER(cmd, botWrapper, message) {
-    const auto& args = message->arguments();
+    const auto& args = message->get<MessageAttrs::ParsedArgumentsList>();
     const auto& command = args[0];
     const auto& action = args[1];
     bool ret = false;
@@ -30,11 +31,11 @@ DECLARE_COMMAND_HANDLER(cmd, botWrapper, message) {
     } else {
         result_message = fmt::format("{}: {}", GETSTR(UNKNOWN_ACTION), action);
     }
-    botWrapper->sendReplyMessage(message, result_message);
+    botWrapper->sendReplyMessage(message->message(), result_message);
 }
 
 DYN_COMMAND_FN(/*name*/, module) {
-    module.command = "cmd";
+    module.name = "cmd";
     module.description = "unload/reload a command";
     module.flags = CommandModule::Flags::Enforced;
     module.function = COMMAND_HANDLER_NAME(cmd);

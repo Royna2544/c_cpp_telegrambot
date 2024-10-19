@@ -1,12 +1,11 @@
 #pragma once
 
-#include <ios>
 #if defined __APPLE__ || defined __linux__
 
 #include <absl/log/check.h>
 #include <absl/log/log.h>
 #include <fcntl.h>
-#include <internal/_FileDescriptor_posix.h>
+#include <trivial_helpers/_FileDescriptor_posix.h>
 #include <unistd.h>
 
 #include <array>
@@ -33,12 +32,11 @@ struct kernel_rand_engine {
     }
     kernel_rand_engine() { isSupported(); }
     ~kernel_rand_engine() { closeFd(fd); }
-    kernel_rand_engine(kernel_rand_engine&& other) {
-        fd = other.fd;
+    kernel_rand_engine(kernel_rand_engine&& other) : fd(other.fd) {
         other.fd = -1;
     }
 
-    bool isSupported(void) {
+    bool isSupported() {
         static bool kSupported = false;
         static std::once_flag once;
 
@@ -47,7 +45,8 @@ struct kernel_rand_engine {
             for (const auto& n : nodes) {
                 fd = open(n.c_str(), O_RDONLY);
                 if (!isValidFd(fd)) {
-                    PLOG(ERROR) << "Opening node " << std::quoted(n) << " failed";
+                    PLOG(ERROR)
+                        << "Opening node " << std::quoted(n) << " failed";
                 } else {
                     // Test read some bytes
                     int data = 0;

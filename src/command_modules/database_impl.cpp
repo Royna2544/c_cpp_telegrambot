@@ -1,10 +1,15 @@
 #include <absl/log/check.h>
 #include <fmt/format.h>
 #include <fmt/ranges.h>
-#include <internal/_tgbot.h>
+#include <tgbot/types/KeyboardButton.h>
+#include <tgbot/types/ReplyKeyboardMarkup.h>
+#include <tgbot/types/ReplyKeyboardRemove.h>
+#include <trivial_helpers/_tgbot.h>
 
 #include <StringResManager.hpp>
-#include <TgBotWrapper.hpp>
+#include <api/CommandModule.hpp>
+#include <api/MessageExt.hpp>
+#include <api/TgBotApi.hpp>
 #include <database/bot/TgBotDatabaseImpl.hpp>
 #include <memory>
 #include <optional>
@@ -13,9 +18,9 @@
 using TgBot::ReplyKeyboardRemove;
 
 template <DatabaseBase::ListType type>
-void handleAddUser(ApiPtr wrapper, const Message::Ptr& message,
+void handleAddUser(const InstanceClassBase<TgBotApi>::pointer_type api, const Message::Ptr& message,
                    const UserId user) {
-    auto base = TgBotDatabaseImpl::getInstance();
+    auto* base = TgBotDatabaseImpl::getInstance();
     auto res = base->addUserToList(type, user);
     std::string text;
     switch (res) {
@@ -37,11 +42,11 @@ void handleAddUser(ApiPtr wrapper, const Message::Ptr& message,
     }
     auto remove = std::make_shared<ReplyKeyboardRemove>();
     remove->removeKeyboard = true;
-    wrapper->sendReplyMessage(message, text, remove);
+    api->sendReplyMessage(message, text, remove);
 }
 
 template <DatabaseBase::ListType type>
-void handleRemoveUser(ApiPtr wrapper, const Message::Ptr& message,
+void handleRemoveUser(const InstanceClassBase<TgBotApi>::pointer_type api, const Message::Ptr& message,
                       const UserId user) {
     auto base = TgBotDatabaseImpl::getInstance();
     auto res = base->removeUserFromList(type, user);
@@ -65,7 +70,7 @@ void handleRemoveUser(ApiPtr wrapper, const Message::Ptr& message,
     }
     auto remove = std::make_shared<ReplyKeyboardRemove>();
     remove->removeKeyboard = true;
-    wrapper->sendReplyMessage(message, text, remove);
+    api->sendReplyMessage(message, text, remove);
 }
 
 namespace {
@@ -97,8 +102,9 @@ constexpr std::string_view addtoblacklist = "Add to blacklist";
 constexpr std::string_view removefromblacklist = "Remove from blacklist";
 
 DECLARE_COMMAND_HANDLER(database, wrapper, message) {
-    if (!message->has<MessageExt::Attrs::IsReplyMessage>()) {
-        wrapper->sendReplyMessage(message, GETSTR(REPLY_TO_USER_MSG));
+    if (!message->replyMessage()->exists()) {
+        wrapper->sendReplyMessage(message->message(),
+                                  GETSTR(REPLY_TO_USER_MSG));
         return;
     }
 
@@ -112,56 +118,56 @@ DECLARE_COMMAND_HANDLER(database, wrapper, message) {
     reply->resizeKeyboard = true;
     reply->selective = true;
 
-    UserId userId = message->replyToMessage->from->id;
+    UserId userId = message->replyMessage()->get<MessageAttrs::User>()->id;
 
     auto msg = wrapper->sendReplyMessage(
-        message,
-        "Choose what u want to do with " +
-            UserPtr_toString(message->replyToMessage->from),
+        message->message(),
+        fmt::format("Choose what u want to do with {}",
+                    message->replyMessage()->get<MessageAttrs::User>()),
         reply);
 
-    wrapper->onAnyMessage([msg, userId](ApiPtr wrapper, MessagePtr m) {
-        if (m->replyToMessage &&
-            m->replyToMessage->messageId == msg->messageId) {
-            if (m->text == addtowhitelist) {
-                handleAddUser<DatabaseBase::ListType::WHITELIST>(wrapper, m,
-                                                                 userId);
-            } else if (m->text == removefromwhitelist) {
-                handleRemoveUser<DatabaseBase::ListType::WHITELIST>(wrapper, m,
-                                                                    userId);
-            } else if (m->text == addtoblacklist) {
-                handleAddUser<DatabaseBase::ListType::BLACKLIST>(wrapper, m,
-                                                                 userId);
-            } else if (m->text == removefromblacklist) {
-                handleRemoveUser<DatabaseBase::ListType::BLACKLIST>(wrapper, m,
-                                                                    userId);
+    wrapper->onAnyMessage(
+        [msg, userId](const InstanceClassBase<TgBotApi>::pointer_type api, const Message::Ptr& m) {
+            if (m->replyToMessage &&
+                m->replyToMessage->messageId == msg->messageId) {
+                if (m->text == addtowhitelist) {
+                    handleAddUser<DatabaseBase::ListType::WHITELIST>(api, m,
+                                                                     userId);
+                } else if (m->text == removefromwhitelist) {
+                    handleRemoveUser<DatabaseBase::ListType::WHITELIST>(api, m,
+                                                                        userId);
+                } else if (m->text == addtoblacklist) {
+                    handleAddUser<DatabaseBase::ListType::BLACKLIST>(api, m,
+                                                                     userId);
+                } else if (m->text == removefromblacklist) {
+                    handleRemoveUser<DatabaseBase::ListType::BLACKLIST>(api, m,
+                                                                        userId);
+                }
+                return TgBotApi::AnyMessageResult::Deregister;
             }
-            return TgBotWrapper::AnyMessageResult::Deregister;
-        }
-        return TgBotWrapper::AnyMessageResult::Handled;
-    });
+            return TgBotApi::AnyMessageResult::Handled;
+        });
 };
 
 DECLARE_COMMAND_HANDLER(saveid, bot, message) {
-    if (!(message->has<MessageExt::Attrs::ExtraText>() &&
-          message->replyToMessage_hasany<MessageExt::Attrs::Animation,
-                                         MessageExt::Attrs::Sticker>())) {
-        bot->sendReplyMessage(message, GETSTR(REPLY_TO_GIF_OR_STICKER));
+    if (!(message->has<MessageAttrs::ExtraText>() &&
+          message->replyMessage()->any(
+              {MessageAttrs::Animation, MessageAttrs::Sticker}))) {
+        bot->sendReplyMessage(message->message(),
+                              GETSTR(REPLY_TO_GIF_OR_STICKER));
         return;
     }
     std::optional<std::string> fileId;
     std::optional<std::string> fileUniqueId;
     DatabaseBase::MediaType type{};
 
-    if (message->replyToMessage_has<MessageExt::Attrs::Animation>()) {
-        const auto p =
-            message->replyToMessage_get<MessageExt::Attrs::Animation>();
+    if (message->replyMessage()->has<MessageAttrs::Animation>()) {
+        const auto p = message->replyMessage()->get<MessageAttrs::Animation>();
         fileId = p->fileId;
         fileUniqueId = p->fileUniqueId;
         type = DatabaseBase::MediaType::GIF;
-    } else if (message->replyToMessage_has<MessageExt::Attrs::Sticker>()) {
-        const auto p =
-            message->replyToMessage_get<MessageExt::Attrs::Sticker>();
+    } else if (message->replyMessage()->has<MessageAttrs::Sticker>()) {
+        const auto p = message->replyMessage()->get<MessageAttrs::Sticker>();
         fileId = p->fileId;
         fileUniqueId = p->fileUniqueId;
         type = DatabaseBase::MediaType::STICKER;
@@ -173,15 +179,15 @@ DECLARE_COMMAND_HANDLER(saveid, bot, message) {
     auto const& backend = TgBotDatabaseImpl::getInstance();
     info.mediaId = fileId.value();
     info.mediaUniqueId = fileUniqueId.value();
-    info.names = message->arguments();
+    info.names = message->get<MessageAttrs::ParsedArgumentsList>();
     info.mediaType = type;
 
     if (backend->addMediaInfo(info)) {
         const auto content = fmt::format("Media with names:\n{}\nadded",
                                          fmt::join(info.names, "\n"));
-        bot->sendReplyMessage(message, content);
+        bot->sendReplyMessage(message->message(), content);
     } else {
-        bot->sendReplyMessage(message, GETSTR(MEDIA_ALREADY_IN_DB));
+        bot->sendReplyMessage(message->message(), GETSTR(MEDIA_ALREADY_IN_DB));
     }
 }
 
@@ -189,12 +195,12 @@ DECLARE_COMMAND_HANDLER(saveid, bot, message) {
 
 DYN_COMMAND_FN(name, module) {
     if (name == "database") {
-        module.command = name;
+        module.name = name;
         module.description = GETSTR(DATABASE_CMD_DESC);
         module.flags = CommandModule::Flags::Enforced;
         module.function = COMMAND_HANDLER_NAME(database);
     } else if (name == "saveid") {
-        module.command = name;
+        module.name = name;
         module.description = GETSTR(SAVEID_CMD_DESC);
         module.flags = CommandModule::Flags::Enforced |
                        CommandModule::Flags::HideDescription;

@@ -1,17 +1,21 @@
 
 #include <ConfigManager.h>
 #include <absl/log/log.h>
-#include <fmt/core.h>
+#include <fmt/format.h>
 #include <unistd.h>
 
 #include <CommandLine.hpp>
-#include <TgBotWrapper.hpp>
 #include <TryParseStr.hpp>
+#include <api/CommandModule.hpp>
+#include <api/TgBotApi.hpp>
 #include <cstdlib>
 #include <libos/libsighandler.hpp>
 #include <restartfmt_parser.hpp>
 
-extern char **environ;
+#include "Types.h"
+#include "api/MessageExt.hpp"
+
+extern char **environ;  // NOLINT
 
 DECLARE_COMMAND_HANDLER(restart, tgBotWrapper, message) {
     // typical chatid:int32_max
@@ -35,7 +39,9 @@ DECLARE_COMMAND_HANDLER(restart, tgBotWrapper, message) {
 
     // Set the restart command env to the environment buffer
     const auto restartEnv =
-        RestartFmt::toString({message->chat->id, message->messageId}, true);
+        RestartFmt::toString({message->get<MessageAttrs::Chat>()->id,
+                              message->get<MessageAttrs::MessageId>()},
+                             true);
     strncpy(restartBuf.data(), restartEnv.c_str(), restartEnv.size());
 
     // Append the restart env to the environment buffer
@@ -49,14 +55,15 @@ DECLARE_COMMAND_HANDLER(restart, tgBotWrapper, message) {
     // Log the restart command and the arguments to be used to restart the bot
     LOG(INFO) << fmt::format("Restarting bot with exe: {}, addenv {}", exe,
                              restartBuf.data());
-    tgBotWrapper->sendReplyMessage(message, "Restarting bot instance...");
+    tgBotWrapper->sendReplyMessage(message->message(),
+                                   "Restarting bot instance...");
 
     // Call exeve
     execve(exe, argv, myEnviron.data());
 }
 
 DYN_COMMAND_FN(n, module) {
-    module.command = "restart";
+    module.name = "restart";
     module.description = "Restarts the bot";
     module.flags = CommandModule::Flags::Enforced;
     module.function = COMMAND_HANDLER_NAME(restart);

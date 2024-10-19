@@ -1,44 +1,43 @@
 #include <CompilerPaths.hpp>
 #include <StringResManager.hpp>
+#include <api/CommandModule.hpp>
 #include <memory>
 
-#include "TgBotWrapper.hpp"
-#include "compiler/Helper.hpp"
 #include "compiler/CompilerInTelegram.hpp"
+#include "compiler/Helper.hpp"
 
 DECLARE_COMMAND_HANDLER(c, bot, message) {
     CompilerInTgForCCpp::Params params;
-    const auto intf = std::make_shared<CompilerInTgBotInterface>(bot, message);
+    auto intf = std::make_unique<CompilerInTgBotInterface>(bot, message);
     params.exe = kCCompiler;
     params.outfile = "out.c";
 
-    CompilerInTgForCCpp c(intf, params);
+    CompilerInTgForCCpp c(std::move(intf), std::move(params));
     c.run(message);
 }
 
 DECLARE_COMMAND_HANDLER(cpp, bot, message) {
     CompilerInTgForCCpp::Params params;
-    const auto intf = std::make_shared<CompilerInTgBotInterface>(bot, message);
+    auto intf = std::make_unique<CompilerInTgBotInterface>(bot, message);
     params.exe = kCXXCompiler;
     params.outfile = "out.cpp";
 
-    CompilerInTgForCCpp cpp(intf, params);
+    CompilerInTgForCCpp cpp(std::move(intf), std::move(params));
     cpp.run(message);
 }
 
-
 DECLARE_COMMAND_HANDLER(py, bot, message) {
     CompilerInTgForGeneric::Params params;
-    const auto intf = std::make_shared<CompilerInTgBotInterface>(bot, message);
+    auto intf = std::make_unique<CompilerInTgBotInterface>(bot, message);
     params.exe = kPythonInterpreter;
     params.outfile = "out.py";
 
-    CompilerInTgForGeneric py(intf, params);
+    CompilerInTgForGeneric py(std::move(intf), std::move(params));
     py.run(message);
 }
 
 DYN_COMMAND_FN(commandName, module) {
-    module.command = commandName;
+    module.name = commandName;
     module.flags = CommandModule::Flags::Enforced;
     if (commandName == "c") {
         module.function = COMMAND_HANDLER_NAME(c);

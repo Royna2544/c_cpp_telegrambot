@@ -1,7 +1,7 @@
 #include "TgBotSocketInterface.hpp"
 
 #include <ManagedThreads.hpp>
-#include <TgBotWrapper.hpp>
+#include <api/TgBotApi.hpp>
 #include <impl/backends/ServerBackend.hpp>
 #include <impl/bot/TgBotPacketParser.hpp>
 #include <memory>
@@ -9,10 +9,10 @@
 
 SocketInterfaceTgBot::SocketInterfaceTgBot(
     std::shared_ptr<SocketInterfaceBase> _interface,
-    std::shared_ptr<TgBotApi> _api,
+    TgBotApi::Ptr _api,
     std::shared_ptr<SocketFile2DataHelper> helper)
     : interface(std::move(_interface)),
-      api(std::move(_api)),
+      api(_api),
       helper(std::move(helper)) {}
 
 void SocketInterfaceTgBot::runFunction() {
