@@ -28,7 +28,7 @@ jobs:
           CXX: g++
         run: |
           mkdir build
-          cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release .
+          cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Debug .
           cmake --build build -j4
 
       - name: Run Tests
