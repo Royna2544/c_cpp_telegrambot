@@ -25,14 +25,18 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
 endif()
 
 ## Sanitizers configuration
-set(SANITIZER_CONFIG "MSan")
+set(SANITIZER_CONFIG "ASan")
 set(SANITIZER_FLAG)
 
 if (NOT SANITIZER_CONFIG)
     message(STATUS "No sanitizers enabled")
 elseif (SANITIZER_CONFIG STREQUAL "ASan")
     message(STATUS "Address sanitizer enabled")
-    set(SANITIZER_FLAG "-fsanitize=address,leak")
+    if (NOT APPLE)
+        set(SANITIZER_FLAG "-fsanitize=address,leak")
+    else() # On apple, leak sanitizer is not implemented
+        set(SANITIZER_FLAG "-fsanitize=address")
+    endif()
 elseif (SANITIZER_CONFIG STREQUAL "TSan")
     message(STATUS "Thread sanitizer enabled")
     set(SANITIZER_FLAG "-fsanitize=thread")
