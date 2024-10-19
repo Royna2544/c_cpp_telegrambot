@@ -25,7 +25,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release")
 endif()
 
 ## Sanitizers configuration
-set(SANITIZER_CONFIG "ASan")
+set(SANITIZER_CONFIG "MSan")
 set(SANITIZER_FLAG)
 
 if (NOT SANITIZER_CONFIG)

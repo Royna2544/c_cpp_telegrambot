@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.13)
 project(TgBot++ LANGUAGES CXX C)
 
 ####################### Set CMake Policy #######################
-include(CMake/macros.cmake)
 include(CMake/CompilerConfig.cmake)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake")
 
@@ -111,9 +110,9 @@ endif()
 ################### Check Windows's AF_UNIX support ###################
 ################# Versions later than Win10 RS3 does #################
 if (WIN32)
-  perform_test(USE_UNIX_SOCKETS)
-  try_compile(USE_UNIX_SOCKETS ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/tests/test_af_unix.c)
-  perform_test_ret(USE_UNIX_SOCKETS)
+  include(CheckCSourceCompiles)
+  FILE(READ ${CMAKE_SOURCE_DIR}/tests/test_af_unix.c AF_UNIX_TEST_FILE)
+  check_c_source_compiles("${AF_UNIX_TEST_FILE}" USE_UNIX_SOCKETS)
 else()
   set(USE_UNIX_SOCKETS TRUE)
 endif()
