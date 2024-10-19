@@ -1,4 +1,4 @@
-#include <Authorization.h>
+#include <Authorization.hpp>
 #include <ConfigManager.h>
 #include <ResourceManager.h>
 #include <absl/log/log.h>

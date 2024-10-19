@@ -1,9 +1,5 @@
 #pragma once
 
-#include <TgBotPPImplExports.h>
-
-#include <memory>
-
 #include <InstanceClassBase.hpp>
 #include <ManagedThreads.hpp>
 #include "api/TgBotApi.hpp"
@@ -14,7 +10,6 @@
 
 #include <map>
 #include <mutex>
-#include <utility>
 
 #ifdef SOCKET_CONNECTION
 using namespace TgBotSocket::data;
@@ -24,7 +19,7 @@ using TgBot::Chat;
 using TgBot::Message;
 using TgBot::User;
 
-struct TgBotPPImpl_API SpamBlockBase : ManagedThreadRunnable {
+struct SpamBlockBase : ManagedThreadRunnable {
     // User and array of message pointers sent by that user
     using PerChatHandle = std::map<User::Ptr, std::vector<Message::Ptr>>;
     // Iterator type of buffer object, which contains <chats <users <msgs>>> map
@@ -63,7 +58,7 @@ struct TgBotPPImpl_API SpamBlockBase : ManagedThreadRunnable {
     std::mutex buffer_m;  // Protect buffer, buffer_sub
 };
 
-struct TgBotPPImpl_API SpamBlockManager : SpamBlockBase,
+struct SpamBlockManager : SpamBlockBase,
                                           InstanceClassBase<SpamBlockManager> {
     explicit SpamBlockManager(TgBotApi::Ptr api) : _api(api){};
     ~SpamBlockManager() override = default;

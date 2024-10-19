@@ -1,17 +1,16 @@
 // CLimits provides _WIN32_WINNT, do not move
-#include <TgBotPPImplExports.h>
-#include <TgBotWebExports.h>
-#include <httplib.h>
-
+// clang-format off
 #include <climits>
+#include <httplib.h>
+// clang-format on
+
 #include <filesystem>
 #include <functional>
 #include <string_view>
 
-#include "CStringLifetime.h"
 #include "ManagedThreads.hpp"
 
-class TgBotWeb_API TgBotWebServerBase {
+class TgBotWebServerBase {
    public:
     void startServer();
     void stopServer();
@@ -47,7 +46,7 @@ class TgBotWeb_API TgBotWebServerBase {
     std::filesystem::path webServerRootPath;
 };
 
-class TgBotPPImpl_API TgBotWebServer : public ManagedThreadRunnable,
+class TgBotWebServer : public ManagedThreadRunnable,
                                        TgBotWebServerBase {
    public:
     explicit TgBotWebServer(int serverPort);

@@ -13,10 +13,8 @@
 
 #include "../../../../include/SharedMalloc.hpp"
 
-#if __has_include(<TgBotPPImplExports.h>)
-#include <TgBotPPImplExports.h>
-#else
-#define TgBotPPImpl_API
+#if __has_include(<TgBotSocketExports.h>)
+#include <TgBotSocketExports.h>
 #endif
 
 // Represents a SHA-256 hash

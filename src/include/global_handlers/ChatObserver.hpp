@@ -1,6 +1,5 @@
 #pragma once
 
-#include <TgBotPPImplExports.h>
 #include <Types.h>
 #include <tgbot/types/Message.h>
 
@@ -11,7 +10,7 @@
 using TgBot::Message;
 using TgBot::User;
 
-struct TgBotPPImpl_API ChatObserver : InstanceClassBase<ChatObserver> {
+struct ChatObserver : InstanceClassBase<ChatObserver> {
     // Global ChatId list to observe
     std::vector<ChatId> observedChatIds;
     bool observeAllChats;

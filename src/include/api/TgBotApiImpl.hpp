@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Authorization.h>
+#include <Authorization.hpp>
 #include <TgBotPPImpl_shared_depsExports.h>
 #include <Types.h>
 #include <absl/log/check.h>
@@ -41,7 +41,7 @@ using TgBot::User;
 // A class to effectively wrap TgBot::Api to stable interface
 // This class owns the Bot instance, and users of this code cannot directly
 // access it.
-class TgBotPPImpl_shared_deps_API TgBotApiImpl
+class TgBotApiImpl
     : public InstanceClassBase<TgBotApiImpl>,
       public TgBotApi {
    public:

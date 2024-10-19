@@ -1,13 +1,10 @@
 #pragma once
 
-#include <TgBotPPImpl_shared_depsExports.h>
-
 #include <filesystem>
 #include <functional>
 #include <memory>
 #include <string_view>
 
-#include "InstanceClassBase.hpp"
 #include "api/MessageExt.hpp"
 #include "api/TgBotApi.hpp"
 
@@ -32,7 +29,7 @@ using loadcmd_function_cstyle_t = bool (*)(const std::string_view,
 using loadcmd_function_t =
     std::function<std::remove_pointer_t<loadcmd_function_cstyle_t>>;
 
-class TgBotPPImpl_shared_deps_API CommandModule {
+class CommandModule {
    public:
     using Ptr = std::unique_ptr<CommandModule>;
 

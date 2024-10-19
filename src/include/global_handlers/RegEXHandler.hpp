@@ -1,13 +1,11 @@
 #pragma once
 
-#include <TgBotPPImplExports.h>
 #include <absl/status/status.h>
 
 #include <expected_cpp20>
 #include <memory>
 #include <regex>
 #include <string>
-
 
 /**
  * @brief Interface for a regex command.
@@ -16,7 +14,7 @@
  * The derived classes should provide the regex pattern for the command,
  * a brief description of the command, and a method to process the command.
  */
-class TgBotPPImpl_API RegexCommand {
+class RegexCommand {
    public:
     RegexCommand() = default;
     virtual ~RegexCommand() = default;
@@ -64,7 +62,7 @@ class TgBotPPImpl_API RegexCommand {
                                  const std::string& regexCommand) const;
 };
 
-struct TgBotPPImpl_API RegexHandler {
+struct RegexHandler {
     RegexHandler();
     ~RegexHandler() = default;
 

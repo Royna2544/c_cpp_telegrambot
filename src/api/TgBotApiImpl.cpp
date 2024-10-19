@@ -24,7 +24,7 @@
 #include <string_view>
 #include <utility>
 
-#include "Authorization.h"
+#include "Authorization.hpp"
 
 bool TgBotApiImpl::validateValidArgs(const CommandModule::Ptr& module,
                                      MessageExt::Ptr& message) {

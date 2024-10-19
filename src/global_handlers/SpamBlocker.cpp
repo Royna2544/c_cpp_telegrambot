@@ -1,4 +1,4 @@
-#include <Authorization.h>
+#include <Authorization.hpp>
 #include <CStringLifetime.h>
 #include <absl/log/log.h>
 #include <tgbot/TgException.h>

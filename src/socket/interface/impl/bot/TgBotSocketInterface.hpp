@@ -1,5 +1,3 @@
-#include <TgBotPPImplExports.h>
-
 #include <ManagedThreads.hpp>
 #include <SocketBase.hpp>
 #include <api/TgBotApi.hpp>
@@ -18,7 +16,7 @@
 using TgBotSocket::callback::GenericAck;
 using TgBotSocket::callback::UploadFileDryCallback;
 
-struct TgBotPPImpl_API SocketInterfaceTgBot : ManagedThreadRunnable {
+struct SocketInterfaceTgBot : ManagedThreadRunnable {
     void handlePacket(SocketConnContext ctx, TgBotSocket::Packet pkt);
 
     void runFunction() override;

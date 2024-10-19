@@ -1,6 +1,6 @@
 #pragma once
 
-#include <TgBotPPImplExports.h>
+#include <TgBotPPImpl_shared_depsExports.h>
 #include <absl/log/log.h>
 
 #include <StacktracePrint.hpp>

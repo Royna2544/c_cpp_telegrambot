@@ -1,6 +1,5 @@
 #pragma once
 
-#include <TgBotPPImplExports.h>
 #include <absl/log/log_entry.h>
 #include <absl/log/log_sink.h>
 
@@ -12,7 +11,7 @@
 
 #include "SocketBase.hpp"
 
-struct TgBotPPImpl_API NetworkLogSink : private absl::LogSink,
+struct NetworkLogSink : private absl::LogSink,
                                         ManagedThreadRunnable {
     void Send(const absl::LogEntry& entry) override;
 

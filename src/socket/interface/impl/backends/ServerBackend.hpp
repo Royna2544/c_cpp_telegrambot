@@ -1,7 +1,6 @@
 #include <SocketBase.hpp>
-#include <TgBotPPImplExports.h>
 
-struct TgBotPPImpl_API SocketServerWrapper {
+struct SocketServerWrapper {
     explicit SocketServerWrapper();
 
     enum class BackendType { Ipv4, Ipv6, Local, Unknown };

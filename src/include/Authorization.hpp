@@ -1,6 +1,5 @@
 #pragma once
 
-#include <TgBotPPImpl_shared_depsExports.h>
 #include <Types.h>
 #include <tgbot/types/Message.h>
 
@@ -11,8 +10,7 @@
 using TgBot::Message;
 using TgBot::User;
 
-class TgBotPPImpl_shared_deps_API AuthContext
-    : public InstanceClassBase<AuthContext> {
+class AuthContext : public InstanceClassBase<AuthContext> {
    public:
     enum class Flags {
         None = 0,
