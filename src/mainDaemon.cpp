@@ -106,7 +106,7 @@ redo_vfork:
             PLOG(ERROR) << "Failed to open bot.pid";
             return EXIT_FAILURE;
         }
-        if (pidFile.puts(fmt::format("{}", pid)) != F::Result::ok()) {
+        if (pidFile.puts(fmt::format("{}", getpid())) != F::Result::ok()) {
             LOG(ERROR) << "Failed to write to bot.pid";
             return EXIT_FAILURE;
         }
