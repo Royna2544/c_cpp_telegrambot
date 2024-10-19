@@ -9,9 +9,9 @@
 #include <string_view>
 #include <type_traits>
 
-#define DECLARE_CLASS_INST(type)                  \
-    template <>                                   \
-    std::optional<type> TGBOTPP_HELPER_DLL_EXPORT \
+#define DECLARE_CLASS_INST(type)                    \
+    template <>                                     \
+    std::unique_ptr<type> TGBOTPP_HELPER_DLL_EXPORT \
         InstanceClassBase<type>::instance = {}
 
 #pragma clang diagnostic push
@@ -31,8 +31,8 @@ struct InstanceClassBase {
         if (instance) {
             throw std::runtime_error("An instance of the class already exists");
         }
-        instance.emplace(std::move(args)...);
-        return &instance.value();
+        instance = std::make_unique<T>(std::move(args)...);
+        return instance.get();
     }
 
     /**
@@ -55,11 +55,13 @@ struct InstanceClassBase {
                     "first");
             }
         }
-        return &instance.value();
+        return instance.get();
     }
 
-    static void destroyInstance() { instance.reset(); }
-    static std::optional<T> instance;
+    static void destroyInstance() {
+        instance = nullptr;
+    }
+    static std::unique_ptr<T> instance;
 };
 
 #pragma clang diagnostic pop
