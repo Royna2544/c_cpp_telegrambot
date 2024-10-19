@@ -2,12 +2,8 @@ cmake_minimum_required(VERSION 3.13)
 project(TgBot++ LANGUAGES CXX C)
 
 ####################### Set CMake Policy #######################
-cmake_policy(SET CMP0077 NEW) # option() command prefers to do nothing
-                              # when a normal variable of the given name already exists.
-
 include(CMake/macros.cmake)
-include(CMake/variables.cmake)
-include(CMake/sanitizers.cmake)
+include(CMake/CompilerConfig.cmake)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake")
 
 # Set RPATH for Unix-like systems
@@ -17,8 +13,6 @@ if(UNIX)
     set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 endif()
 ################ EXE NAMES STEMMED FROM PROJECT_NAME ################
-set(PROJECT_MAINEXE_NAME ${PROJECT_NAME}_main)
-#####################################################################
 
 ############################## OPTIONS ##############################
 option(ENABLE_RUST_SUPPORT "Enable rust support" OFF)
