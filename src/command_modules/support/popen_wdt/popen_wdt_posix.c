@@ -2,7 +2,6 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <signal.h>
-#include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,15 +9,23 @@
 #include <sys/mman.h>
 #include <sys/poll.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "popen_wdt.h"
 
 #ifdef POPEN_WDT_DEBUG
-#define POPEN_WDT_DBGLOG(fmt, ...)                                       \
-    do {                                                                 \
-        printf("POPEN_WDT::UNIX: Func %s, Line %d: " fmt "\n", __func__, \
-               __LINE__, ##__VA_ARGS__);                                 \
+struct timespec start_time = {0, 0};
+
+#define POPEN_WDT_DBGLOG(fmt, ...)                                          \
+    do {                                                                    \
+        struct timespec curr_time;                                          \
+        clock_gettime(CLOCK_MONOTONIC, &curr_time);                         \
+        printf("POPEN_WDT::UNIX: offset %lds:%ldns: Func %s, Line %d: " fmt \
+               "\n",                                                        \
+               curr_time.tv_sec - start_time.tv_sec,                        \
+               curr_time.tv_nsec - start_time.tv_nsec, __func__, __LINE__,  \
+               ##__VA_ARGS__);                                              \
     } while (0)
 #else
 #define POPEN_WDT_DBGLOG(fmt, ...)
@@ -34,13 +41,16 @@ struct popen_wdt_posix_priv {
 static pthread_mutex_t wdt_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // Users should hold mutex
-static bool check_popen_wdt_data(popen_watchdog_data_t **data) {
+static bool _check_popen_wdt_data(popen_watchdog_data_t **data,
+                                  const char *func) {
     bool ret = data && *data && (*data)->privdata;
-    POPEN_WDT_DBGLOG("%s: %d", __FUNCTION__, ret);
+    POPEN_WDT_DBGLOG("%s: %d. Called from %s", __FUNCTION__, ret, func);
     return ret;
 }
+#define check_popen_wdt_data(data) _check_popen_wdt_data(data, __FUNCTION__)
 
 static void *watchdog(void *arg) {
+    POPEN_WDT_DBGLOG("Watchdog sleeping for %d seconds", SLEEP_SECONDS);
     sleep(SLEEP_SECONDS);
 
     POPEN_WDT_DBGLOG("++");
@@ -48,10 +58,17 @@ static void *watchdog(void *arg) {
     struct popen_wdt_posix_priv *pdata = data->privdata;
 
     POPEN_WDT_DBGLOG("Check subprocess");
-    if (kill(pdata->childprocess_pid, 0) == 0) {
-        killpg(pdata->childprocess_pid, SIGINT);
-        data->watchdog_activated = true;
-        POPEN_WDT_DBGLOG("Watchdog activated");
+    if (killpg(pdata->childprocess_pid, 0) == 0) {
+        if (killpg(pdata->childprocess_pid, SIGINT) == -1) {
+            POPEN_WDT_DBGLOG("Failed to send SIGINT to process group: %s",
+                             strerror(errno));
+        } else {
+            POPEN_WDT_DBGLOG("SIGINT signal sent to child process group");
+            data->watchdog_activated = true;
+        }
+    } else {
+        POPEN_WDT_DBGLOG("Child process group %d does not exist",
+                         pdata->childprocess_pid);
     }
 
     POPEN_WDT_DBGLOG("--");
@@ -71,6 +88,9 @@ bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
         return false;
     }
     data = *data_in;
+#ifdef POPEN_WDT_DEBUG
+    clock_gettime(CLOCK_MONOTONIC, &start_time);
+#endif
 
     pthread_mutexattr_init(&mutexattr);
     pthread_mutexattr_setpshared(&mutexattr, PTHREAD_PROCESS_SHARED);
@@ -89,7 +109,16 @@ bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
         POPEN_WDT_DBGLOG("Watchdog disabled");
     }
     if (data->watchdog_enabled) {
-        pthread_create(&watchdog_thread, NULL, &watchdog, data);
+        int result = pthread_create(&watchdog_thread, NULL, &watchdog, data);
+        if (result != 0) {
+            POPEN_WDT_DBGLOG("Failed to create watchdog thread: %s",
+                             strerror(result));
+            free(pdata);
+            free(data);
+            *data_in = NULL;
+            pthread_mutex_destroy(&wdt_mutex);
+            return false;
+        }
         pdata->wdt_thread = watchdog_thread;
     }
     data->privdata = pdata;
@@ -117,7 +146,12 @@ bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
         // Force "C" locale to avoid locale-dependent behavior
         setenv("LC_ALL", "C", true);
         // Set process group ID it its pid.
-        setpgrp();
+        if (setpgrp() == -1) {
+            POPEN_WDT_DBGLOG("Failed to set process group: %s",
+                             strerror(errno));
+            _exit(127);
+        }
+
         // Close unused file descriptors
         close(pipefd[0]);
         close(STDIN_FILENO);
@@ -221,9 +255,35 @@ bool popen_watchdog_read(popen_watchdog_data_t **data, char *buf, int size) {
     fds.events = POLLIN;
     fds.revents = 0;
     fds.fd = pdata->pipefd_r;
-    if (poll(&fds, 1, data_->watchdog_enabled ? SLEEP_SECONDS * one_sec : -1) >
-        0) {
-        ret = read(pdata->pipefd_r, buf, size) > 0;
+    int pollRet =
+        poll(&fds, 1, data_->watchdog_enabled ? SLEEP_SECONDS * one_sec : -1);
+    switch (pollRet) {
+        case 0:
+            POPEN_WDT_DBGLOG("Timeout...");
+            break;
+        case -1:
+            POPEN_WDT_DBGLOG("poll() failed: %s", strerror(errno));
+            break;
+        default:
+            if (fds.revents & POLLIN) {
+                POPEN_WDT_DBGLOG("POLLIN");
+                ssize_t readBytes = read(pdata->pipefd_r, buf, size);
+                if (readBytes == -1) {
+                    POPEN_WDT_DBGLOG("read() failed: %s", strerror(errno));
+                } else if (readBytes == 0) {
+                    POPEN_WDT_DBGLOG("Child process closed the pipe");
+                } else {
+                    POPEN_WDT_DBGLOG("read %d bytes: %.*s", (int)readBytes,
+                                     (int)readBytes, buf);
+                    ret = true;
+                }
+            } else if (fds.revents & POLLHUP) {
+                POPEN_WDT_DBGLOG("POLLHUP");
+                ret = false;
+            } else {
+                POPEN_WDT_DBGLOG("Poll events: %d", fds.revents);
+            }
+            break;
     }
     pthread_mutex_unlock(&wdt_mutex);
     return ret;

@@ -3,12 +3,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#define _STR(x) #x
-#define STR(x) _STR(x)
-
 #define SLEEP_SECONDS 10
-#define WDT_BITE_STR \
-    "-> Intercept: This task was hanging more than " STR(SLEEP_SECONDS) "s"
 
 #ifndef NDEBUG
 #define POPEN_WDT_DEBUG
