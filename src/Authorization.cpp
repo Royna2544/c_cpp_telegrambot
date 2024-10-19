@@ -27,20 +27,22 @@ bool isInList(const UserId user) {
 
 AuthContext::Result AuthContext::isAuthorized(const Message::Ptr& message,
                                               const Flags flags) const {
+    if (isMessageUnderTimeLimit(message)) {
+        return isAuthorized(message->from, flags);
+    } else {
+        return {false, Result::Reason::MESSAGE_TOO_OLD};
+    }
+}
+
+AuthContext::Result AuthContext::isAuthorized(const User::Ptr& user,
+                                              const Flags flags) const {
     auto* const database = TgBotDatabaseImpl::getInstance();
-    if (!authorized || !isMessageUnderTimeLimit(message)) {
-        Result::Reason reason{};
-        if (!authorized) {
-            reason = Result::Reason::GLOBAL_FLAG_OFF;
-        }
-        if (!isMessageUnderTimeLimit(message)) {
-            reason = Result::Reason::MESSAGE_TOO_OLD;
-        }
-        return {false, reason};
+    if (!authorized) {
+        return {false, Result::Reason::GLOBAL_FLAG_OFF};
     }
 
-    if (message->from) {
-        const UserId id = message->from->id;
+    if (user) {
+        const UserId id = user->id;
         if (flags & Flags::PERMISSIVE) {
             bool isInBlacklist =
                 isInList<DatabaseBase::ListType::BLACKLIST>(id);

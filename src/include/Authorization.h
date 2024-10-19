@@ -9,6 +9,7 @@
 #include "InstanceClassBase.hpp"
 
 using TgBot::Message;
+using TgBot::User;
 
 class TgBotPPImpl_shared_deps_API AuthContext
     : public InstanceClassBase<AuthContext> {
@@ -68,10 +69,15 @@ class TgBotPPImpl_shared_deps_API AuthContext
      * authorized to use the bot. The authorization is determined by the
      * blacklists and whitelists in the database.
      *
-     * @param message The Telegram message.
+     * @param user The Telegram user.
      * @param flags A bitwise combination of the AuthContext::Flags values.
      * @return True if the message is authorized, false otherwise.
      */
+
+    [[nodiscard]] Result isAuthorized(const User::Ptr& user,
+                                      const Flags flags) const;
+
+    // Overload taking a message instead of user
     [[nodiscard]] Result isAuthorized(const Message::Ptr& message,
                                       const Flags flags) const;
 
