@@ -1,5 +1,16 @@
 # A Telegram bot, mostly used by my own uses and learning purposes
 
+## Status
+[![Build TgBot++ (Linux)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/linux_test.yml/badge.svg)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/linux_test.yml)
+
+[![Build TgBot++ (macOS)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/macos_test.yml/badge.svg?event=push)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/macos_test.yml)
+
+[![Build TgBot++ (Windows)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/windows_test.yml/badge.svg)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/windows_test.yml)
+
+[![Build TgBot++ Client (Android)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/android_client_test.yml/badge.svg)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/android_client_test.yml)
+
+[![Build TgBot++ Client (Windows)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/windows_client_test.yml/badge.svg)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/windows_client_test.yml)
+
 ## Used languages
 | C | C++ | Kotlin | Javascript | SQLite3 | HTML5 | CSS | SCSS | PHP |
 |-- | --- | ------ | ---------- | --- | ----- | --- | ---- | --- |
