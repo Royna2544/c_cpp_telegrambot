@@ -200,18 +200,12 @@ add_my_library(
 add_my_library(
   NAME PPImpl_shared_deps
   SRCS 
-    src/Authorization.cpp
     src/ManagedThread.cpp
     src/ThreadManager.cpp
-    src/api/TgBotApiImpl.cpp
-    src/api/CommandModule.cpp
     src/api/MessageExt.cpp
   LIBS
-    TgBot
-    TgBotStringResManager
-    TgBotRandom
-    TgBotDBImpl
-    ${CMAKE_DL_LIBS}
+  PUBLIC_INC
+    $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>
 )
 
 ####################### TgBot Socket Library #######################
@@ -233,20 +227,24 @@ include(CMake/tgbotutils.cmake)
 #####################################################################
 
 ################### The Bot's main functionaility ###################
-set(LD_LIST TgBot TgBotUtils TgBotWeb absl::status
-            TgBotStringResManager TgBotPPImpl_shared_deps)
+set(LD_LIST TgBot TgBotUtils TgBotWeb TgBotDBImpl absl::status TgBotRandom
+            TgBotStringResManager TgBotPPImpl_shared_deps ${CMAKE_DL_LIBS})
 if (USE_UNIX_SOCKETS)
   list(APPEND LD_LIST TgBotSocket)
 endif()
 add_my_library(
   NAME PPImpl
   SRCS 
+    src/Authorization.cpp
+    src/api/TgBotApiImpl.cpp
+    src/api/CommandModule.cpp
     src/global_handlers/RegEXHandler.cpp
     src/global_handlers/SpamBlocker.cpp
     src/web/TgBotWebServer.cpp
     ${SOCKET_SRC_LIST}
   PRIVATE_INC src/third-party/rapidjson/include
   LIBS ${LD_LIST}
+  STATIC
 )
 #####################################################################
 
@@ -254,7 +252,7 @@ add_my_library(
 add_my_executable(
   NAME main
   SRCS src/main.cpp
-  LIBS TgBotPPImpl TgBotLogInit
+  LIBS TgBotPPImpl
   LIBS_UNIX TgBot_restartfmt_parser
 )
 
