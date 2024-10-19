@@ -224,7 +224,7 @@ struct F {
     constexpr static long INVALID_SIZE = -1;
 
    private:
-    using HANDLE = std::unique_ptr<FILE, decltype(&fclose)>;
+    using HANDLE = std::unique_ptr<FILE, int(*)(FILE*)>;
     HANDLE handle;
     bool external_managed;
 
