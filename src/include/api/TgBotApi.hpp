@@ -744,6 +744,8 @@ class TgBotApi {
         // hasMoreArguments, if true, consume one of more spaces, otherwise
         // consume none.
         bool hasMoreArguments;
+        // Whether it is limited to whitelist users or owners
+        bool enforced;
 
         auto operator<=>(const InlineQuery& other) const = default;
     };

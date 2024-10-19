@@ -363,18 +363,34 @@ void TgBotApiImpl::startPoll() {
         if (queryResults.empty()) {
             return;
         }
-        std::vector<TgBot::InlineQueryResult::Ptr> inlineResults;
-        std::ranges::for_each(queryResults, [&query, &inlineResults](auto&& x) {
-            std::string_view suffix = query->query;
-            if (absl::ConsumePrefix(&suffix, x.first.name)) {
-                if (x.first.hasMoreArguments) {
-                    suffix = absl::StripLeadingAsciiWhitespace(suffix);
-                }
-                auto vec = x.second(suffix);
-                inlineResults.insert(inlineResults.end(), vec.begin(),
-                                     vec.end());
+        AuthContext::Flags flags = AuthContext::Flags::REQUIRE_USER;
+        bool canDoPrivileged = false;
+        canDoPrivileged =
+            AuthContext::getInstance()->isAuthorized(query->from, flags);
+        if (!canDoPrivileged) {
+            flags |= AuthContext::Flags::PERMISSIVE;
+            bool canDoNonPrivileged =
+                AuthContext::getInstance()->isAuthorized(query->from, flags);
+            if (!canDoNonPrivileged) {
+                return;  // no permission to answer.
             }
-        });
+        }
+        std::vector<TgBot::InlineQueryResult::Ptr> inlineResults;
+        std::ranges::for_each(
+            queryResults, [&query, &inlineResults, canDoPrivileged](auto&& x) {
+                std::string_view suffix = query->query;
+                if (!canDoPrivileged && x.first.enforced) {
+                    return; // Skip this.
+                }
+                if (absl::ConsumePrefix(&suffix, x.first.name)) {
+                    if (x.first.hasMoreArguments) {
+                        suffix = absl::StripLeadingAsciiWhitespace(suffix);
+                    }
+                    auto vec = x.second(suffix);
+                    inlineResults.insert(inlineResults.end(), vec.begin(),
+                                         vec.end());
+                }
+            });
         if (inlineResults.empty()) {
             static int articleCount = 0;
             for (const auto& queryCallbacks : queryResults) {

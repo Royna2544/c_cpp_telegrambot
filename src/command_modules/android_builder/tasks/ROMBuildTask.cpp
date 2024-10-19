@@ -241,7 +241,7 @@ ROMBuildTask::ROMBuildTask(
         TgBotApi::parseModeToStr<TgBotApi::ParseMode::HTML>();
     botWrapper->addInlineQueryKeyboard(
         TgBotApi::InlineQuery{"rombuild status", "See the ROM build progress",
-                              false},
+                              false, true},
         romBuildArticle);
 }
 
