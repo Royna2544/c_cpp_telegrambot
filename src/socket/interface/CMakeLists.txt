@@ -10,16 +10,16 @@ if (UNIX)
     impl/backends/ClientBackendPosix.cpp
   )
   if (APPLE)
-    extend_set(TGBOTSOCKET_SRC_LIST
+    list(APPEND TGBOTSOCKET_SRC_LIST
       impl/helper/SocketHelperDarwin.cpp
     )
   else()
-    extend_set(TGBOTSOCKET_SRC_LIST
+    list(APPEND TGBOTSOCKET_SRC_LIST
       impl/helper/SocketHelperLinux.cpp
     )
   endif()
 elseif(WIN32)
-  extend_set(TGBOTSOCKET_SRC_LIST 
+  list(APPEND TGBOTSOCKET_SRC_LIST 
     impl/SocketWindows.cpp
     impl/local/SocketWindowsLocal.cpp
     impl/inet/SocketWindowsIPv4.cpp
@@ -28,7 +28,7 @@ elseif(WIN32)
     impl/backends/ClientBackendWindows.cpp
   )
 endif()
-extend_set(TGBOTSOCKET_SRC_LIST
+list(APPEND TGBOTSOCKET_SRC_LIST
   SocketBase.cpp
   impl/helper/SocketHelper.cpp
   impl/bot/TgBotPacketParser.cpp
@@ -36,11 +36,11 @@ extend_set(TGBOTSOCKET_SRC_LIST
 
 set(CURL_LIBS)
 if (CURL_FOUND)
-  extend_set(TGBOTSOCKET_SRC_LIST
+  list(APPEND TGBOTSOCKET_SRC_LIST
     impl/helper/SocketHelperCurl.cpp)
   set(CURL_LIBS CURL::libcurl)
 else()
-  extend_set(TGBOTSOCKET_SRC_LIST
+  list(APPEND TGBOTSOCKET_SRC_LIST
     impl/helper/SocketHelperNoCurl.cpp)
 endif()
 

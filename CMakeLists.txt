@@ -235,7 +235,9 @@ include(CMake/tgbotutils.cmake)
 ################### The Bot's main functionaility ###################
 set(LD_LIST TgBot TgBotUtils TgBotWeb absl::status
             TgBotStringResManager TgBotPPImpl_shared_deps)
-extend_set_if(LD_LIST USE_UNIX_SOCKETS TgBotSocket)
+if (USE_UNIX_SOCKETS)
+  list(APPEND LD_LIST TgBotSocket)
+endif()
 add_my_library(
   NAME PPImpl
   SRCS 

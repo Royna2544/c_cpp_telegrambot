@@ -6,16 +6,16 @@ if (UNIX)
     SelectorUnix.cpp
   )
   if (APPLE)
-    extend_set(SELECTOR_SRC_LIST
+  list(APPEND SELECTOR_SRC_LIST
       SelectorLinuxEPollStub.cpp
     )
   else()
-    extend_set(SELECTOR_SRC_LIST
+    list(APPEND SELECTOR_SRC_LIST
       SelectorLinuxEPoll.cpp
     )
   endif()
 elseif(WIN32)
-  extend_set(SELECTOR_SRC_LIST 
+  list(APPEND SELECTOR_SRC_LIST 
     SelectorWindowsSelect.cpp
   )
 endif()
