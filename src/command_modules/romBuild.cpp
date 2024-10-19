@@ -26,7 +26,7 @@
 
 template <typename Impl>
 concept canCreateWithApi = requires(
-    InstanceClassBase<TgBotApi>::pointer_type api, Message::Ptr message,
+    TgBotApi::Ptr api, Message::Ptr message,
     PerBuildData data) { Impl{api, message, data}; };
 
 template <typename Impl>
@@ -106,7 +106,7 @@ class ROMBuildQueryHandler
     PerBuildData per_build;
     Message::Ptr sentMessage;
     Message::Ptr _userMessage;
-    InstanceClassBase<TgBotApi>::pointer_type _api;
+    TgBotApi::Ptr _api;
     using KeyboardType = TgBot::InlineKeyboardMarkup::Ptr;
 
     struct {
@@ -137,7 +137,7 @@ class ROMBuildQueryHandler
 
    public:
     bool pinned() const { return didpin; }
-    ROMBuildQueryHandler(InstanceClassBase<TgBotApi>::pointer_type api,
+    ROMBuildQueryHandler(TgBotApi::Ptr api,
                          Message::Ptr userMessage);
 
     void updateSentMessage(Message::Ptr message);
@@ -254,7 +254,7 @@ class TaskWrapperBase {
     PerBuildData data{};
 
    protected:
-    InstanceClassBase<TgBotApi>::pointer_type api;
+    TgBotApi::Ptr api;
     Message::Ptr userMessage;  // User's message
     Message::Ptr sentMessage;  // Message sent by the bot
     TgBot::InlineKeyboardMarkup::Ptr backKeyboard;
@@ -282,7 +282,7 @@ class TaskWrapperBase {
    public:
     TaskWrapperBase(std::shared_ptr<ROMBuildQueryHandler> handler,
                     PerBuildData data,
-                    InstanceClassBase<TgBotApi>::pointer_type api,
+                    TgBotApi::Ptr api,
                     Message::Ptr message)
         : queryHandler(std::move(handler)),
           data(std::move(data)),
@@ -497,7 +497,7 @@ class CwdRestorer {
 };
 
 ROMBuildQueryHandler::ROMBuildQueryHandler(
-    InstanceClassBase<TgBotApi>::pointer_type api, Message::Ptr userMessage)
+    TgBotApi::Ptr api, Message::Ptr userMessage)
     : _api(api),
       parser(FS::getPathForType(FS::PathType::GIT_ROOT) / "src" /
              "command_modules" / "android_builder" / "configs") {

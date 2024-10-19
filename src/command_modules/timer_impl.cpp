@@ -21,12 +21,12 @@ struct TimerImplThread : TimerThread {
     void onTimerEnd() override {
         message = api->editMessage(message, "Timer ended");
     }
-    explicit TimerImplThread(InstanceClassBase<TgBotApi>::pointer_type api,
+    explicit TimerImplThread(TgBotApi::Ptr api,
                              ChatId chatid)
         : api(api), chatid(chatid) {}
 
    private:
-    InstanceClassBase<TgBotApi>::pointer_type api;
+    TgBotApi::Ptr api;
     Message::Ptr message;
     ChatId chatid;
 };

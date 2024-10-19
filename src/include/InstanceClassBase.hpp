@@ -24,7 +24,7 @@ template <typename T>
  */
 struct InstanceClassBase {
     using pointer_type = std::add_pointer_t<T>;
-    using const_pointer_type = std::add_const_t<pointer_type>;
+    using const_pointer_type = std::add_pointer_t<std::add_const_t<T>>;
 
     template <typename... Args>
     static pointer_type initInstance(Args&&... args) {

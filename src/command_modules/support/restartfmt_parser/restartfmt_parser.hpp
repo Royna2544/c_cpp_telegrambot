@@ -26,7 +26,7 @@ class RestartFmt {
     // function to convert chat_id and message_id to a string
     static std::string toString(const data_type& data, bool withPrefix = false);
 
-    static absl::Status handleMessage(InstanceClassBase<TgBotApi>::const_pointer_type api);
+    static absl::Status handleMessage(TgBotApi::CPtr api);
 
     constexpr static const char* ENV_VAR_NAME = "RESTART";
     // typical chatid:int32_max

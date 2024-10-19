@@ -10,7 +10,7 @@
 #include "api/MessageExt.hpp"
 
 CompilerInTgBotInterface::CompilerInTgBotInterface(
-    InstanceClassBase<TgBotApi>::const_pointer_type api, MessageExt::Ptr requestedMessage)
+    TgBotApi::CPtr api, MessageExt::Ptr requestedMessage)
     : botApi(api), requestedMessage(std::move(requestedMessage)) {}
 
 void CompilerInTgBotInterface::onExecutionStarted(

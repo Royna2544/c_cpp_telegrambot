@@ -25,12 +25,12 @@ struct TgBotPPImpl_API SocketInterfaceTgBot : ManagedThreadRunnable {
 
     explicit SocketInterfaceTgBot(
         std::shared_ptr<SocketInterfaceBase> _interface,
-        InstanceClassBase<TgBotApi>::pointer_type _api,
+        TgBotApi::Ptr _api,
         std::shared_ptr<SocketFile2DataHelper> helper);
 
    private:
     std::shared_ptr<SocketInterfaceBase> interface = nullptr;
-    InstanceClassBase<TgBotApi>::pointer_type api = nullptr;
+    TgBotApi::Ptr api = nullptr;
     std::shared_ptr<SocketFile2DataHelper> helper;
 
     std::chrono::system_clock::time_point startTp =

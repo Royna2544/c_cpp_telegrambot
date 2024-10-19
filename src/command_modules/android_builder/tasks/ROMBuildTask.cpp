@@ -205,7 +205,7 @@ void ROMBuildTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
             getPercent<MemoryInfo>(), getPercent<DiskInfo>(cwd),
             data.localManifest->job_count, buffer.data());
         try {
-            botWrapper->editMessage<TgBotApi::ParseMode::HTML>(message,
+            api->editMessage<TgBotApi::ParseMode::HTML>(message,
                                                                buildInfoBuffer);
         } catch (const TgBot::TgException& e) {
             LOG(ERROR) << "Couldn't parse markdown, with content:";
@@ -221,9 +221,9 @@ void ROMBuildTask::onExit(int exitCode) {
 }
 
 ROMBuildTask::ROMBuildTask(
-    InstanceClassBase<TgBotApi>::const_pointer_type wrapper,
+    TgBotApi::Ptr api,
     TgBot::Message::Ptr message, PerBuildData data)
-    : botWrapper(wrapper),
+    : api(api),
       data(std::move(data)),
       message(std::move(message)),
       clock(std::chrono::system_clock::now()),
@@ -239,12 +239,12 @@ ROMBuildTask::ROMBuildTask(
         std::make_shared<TgBot::InputTextMessageContent>();
     textContent->parseMode =
         TgBotApi::parseModeToStr<TgBotApi::ParseMode::HTML>();
-    botWrapper->addInlineQueryKeyboard(
+    api->addInlineQueryKeyboard(
         TgBotApi::InlineQuery{"rombuild status", "See the ROM build progress",
                               false, true},
         romBuildArticle);
 }
 
 ROMBuildTask::~ROMBuildTask() {
-    botWrapper->removeInlineQueryKeyboard("rombuild status");
+    api->removeInlineQueryKeyboard("rombuild status");
 }

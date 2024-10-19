@@ -18,7 +18,7 @@
 using TgBot::ReplyKeyboardRemove;
 
 template <DatabaseBase::ListType type>
-void handleAddUser(const InstanceClassBase<TgBotApi>::pointer_type api, const Message::Ptr& message,
+void handleAddUser(TgBotApi::CPtr api, const Message::Ptr& message,
                    const UserId user) {
     auto* base = TgBotDatabaseImpl::getInstance();
     auto res = base->addUserToList(type, user);
@@ -46,7 +46,7 @@ void handleAddUser(const InstanceClassBase<TgBotApi>::pointer_type api, const Me
 }
 
 template <DatabaseBase::ListType type>
-void handleRemoveUser(const InstanceClassBase<TgBotApi>::pointer_type api, const Message::Ptr& message,
+void handleRemoveUser(TgBotApi::CPtr api, const Message::Ptr& message,
                       const UserId user) {
     auto base = TgBotDatabaseImpl::getInstance();
     auto res = base->removeUserFromList(type, user);
@@ -123,7 +123,7 @@ DECLARE_COMMAND_HANDLER(database, wrapper, message) {
         reply);
 
     wrapper->onAnyMessage(
-        [msg, userId](const InstanceClassBase<TgBotApi>::pointer_type api, const Message::Ptr& m) {
+        [msg, userId](TgBotApi::CPtr api, const Message::Ptr& m) {
             if (m->replyToMessage &&
                 m->replyToMessage->messageId == msg->messageId) {
                 if (m->text == addtowhitelist) {

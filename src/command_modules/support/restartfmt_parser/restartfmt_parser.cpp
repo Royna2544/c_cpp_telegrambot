@@ -58,7 +58,7 @@ std::string RestartFmt::toString(const data_type& data, bool withPrefix) {
     }
 }
 
-absl::Status RestartFmt::handleMessage(InstanceClassBase<TgBotApi>::const_pointer_type api) {
+absl::Status RestartFmt::handleMessage(TgBotApi::CPtr api) {
     if (const char* env = getenv(RestartFmt::ENV_VAR_NAME); env != nullptr) {
         const auto v = RestartFmt::fromEnvVar();
         if (!v) {

@@ -118,14 +118,14 @@ struct RepoSyncTask : ForkAndRun {
      * @param message The Telegram message associated with the build task.
      * @param data Per-build configuration and path data.
      */
-    explicit RepoSyncTask(InstanceClassBase<TgBotApi>::const_pointer_type api, Message::Ptr message,
+    explicit RepoSyncTask(TgBotApi::CPtr api, Message::Ptr message,
                           PerBuildData data);
 
    private:
     PerBuildData data;
     RepoSyncLocalHook localHook;
     RepoSyncNetworkHook networkHook;
-    InstanceClassBase<TgBotApi>::pointer_type api;
+    TgBotApi::CPtr api;
     Message::Ptr message;
     std::chrono::system_clock::time_point clock =
         std::chrono::system_clock::now();

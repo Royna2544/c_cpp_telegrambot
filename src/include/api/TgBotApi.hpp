@@ -33,6 +33,7 @@ using TgBot::User;
 class TgBotApi {
    public:
     using Ptr = InstanceClassBase<TgBotApi>::pointer_type;
+    using CPtr = InstanceClassBase<TgBotApi>::const_pointer_type;
     
     TgBotApi() = default;
     virtual ~TgBotApi() = default;
@@ -723,7 +724,7 @@ class TgBotApi {
     };
 
     using AnyMessageCallback = std::function<AnyMessageResult(
-        InstanceClassBase<TgBotApi>::const_pointer_type,
+        TgBotApi::CPtr,
         const Message::Ptr&)>;
 
     virtual void onAnyMessage(const AnyMessageCallback& callback) {

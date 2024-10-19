@@ -154,7 +154,7 @@ void init<ChatObserver>(InitTask& task) {
     task << TgBotApiImpl::getInitCallNameForClient("ChatObserver");
 
     TgBotApiImpl::getInstance()->onAnyMessage(
-        [](InstanceClassBase<TgBotApi>::const_pointer_type, const Message::Ptr& message) {
+        [](TgBotApi::CPtr, const Message::Ptr& message) {
             const auto& inst = ChatObserver::getInstance();
             if (!inst->observedChatIds.empty() || inst->observeAllChats) {
                 inst->process(message);
@@ -211,12 +211,12 @@ class RegexHandlerInterface : public RegexHandler::Interface {
     }
 
     explicit RegexHandlerInterface(
-        InstanceClassBase<TgBotApi>::pointer_type api,
+        TgBotApi::CPtr api,
         Message::Ptr message)
         : _api(api), _message(std::move(message)) {}
 
    private:
-    InstanceClassBase<TgBotApi>::pointer_type _api;
+    TgBotApi::CPtr _api;
     Message::Ptr _message;
 };
 
@@ -226,7 +226,7 @@ void init<RegexHandler>(InitTask& task) {
 
     const auto regex = std::make_shared<RegexHandler>();
     TgBotApiImpl::getInstance()->onAnyMessage(
-        [regex](InstanceClassBase<TgBotApi>::const_pointer_type api,
+        [regex](TgBotApi::CPtr api,
                 const Message::Ptr& message) {
             const auto ext = std::make_shared<MessageExt>(message);
             if (ext->has<MessageAttrs::ExtraText>() &&
@@ -249,7 +249,7 @@ void init<SpamBlockManager>(InitTask& task) {
         ->createController<ThreadManager::Usage::SPAMBLOCK_THREAD,
                            SpamBlockManager>(TgBotApiImpl::getInstance());
     TgBotApiImpl::getInstance()->onAnyMessage(
-        [](InstanceClassBase<TgBotApi>::const_pointer_type,
+        [](TgBotApi::CPtr,
            const Message::Ptr& message) {
             static auto spamMgr =
                 ThreadManager::getInstance()

@@ -9,12 +9,13 @@
 
 #include "InstanceClassBase.hpp"
 #include "api/MessageExt.hpp"
+#include "api/TgBotApi.hpp"
 
 class TgBotApi;
 class CommandModule;
 
 using command_callback_t = std::function<void(
-    InstanceClassBase<TgBotApi>::pointer_type api, const MessageExt::Ptr&)>;
+    TgBotApi::Ptr api, const MessageExt::Ptr&)>;
 
 #define DYN_COMMAND_SYM_STR "loadcmd"
 #define DYN_COMMAND_SYM loadcmd
@@ -24,7 +25,7 @@ using command_callback_t = std::function<void(
 #define COMMAND_HANDLER_NAME(cmd) handle_command_##cmd
 #define DECLARE_COMMAND_HANDLER(cmd, api, message)      \
     void COMMAND_HANDLER_NAME(cmd)(                     \
-        InstanceClassBase<TgBotApi>::pointer_type(api), \
+        TgBotApi::Ptr(api), \
         const MessageExt::Ptr&(message))
 using loadcmd_function_cstyle_t = bool (*)(const std::string_view,
                                            CommandModule&);

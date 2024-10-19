@@ -45,22 +45,23 @@ struct ROMBuildTask : ForkAndRun {
      * @param exitCode The exit code of the process.
      */
     void onExit(int exitCode) override;
+    
     /**
      * Creates a new ROMBuildTask object.
      *
-     * @param wrapper A pointer to the Telegram Bot API wrapper.
+     * @param api A pointer to the Telegram Bot API wrapper.
      * @param message The Telegram message associated with the build task.
      * @param data Per-build configuration and path data.
      */
     explicit ROMBuildTask(
-        InstanceClassBase<TgBotApi>::const_pointer_type wrapper,
+        TgBotApi::Ptr api,
         Message::Ptr message, PerBuildData data);
     ~ROMBuildTask() override;
 
    private:
     PerBuildData data;
     TgBot::Message::Ptr message;
-    std::shared_ptr<TgBotApi> botWrapper;
+    TgBotApi::Ptr api;
     std::unique_ptr<AllocatedShmem> smem;
     std::chrono::system_clock::time_point clock;
     std::chrono::system_clock::time_point startTime;

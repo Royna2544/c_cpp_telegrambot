@@ -15,11 +15,11 @@ class CompilerInTgBotInterface : public CompilerInTg::Interface {
     void onWdtTimeout() override;
 
     explicit CompilerInTgBotInterface(
-        InstanceClassBase<TgBotApi>::const_pointer_type api,
+        TgBotApi::CPtr api,
         MessageExt::Ptr requestedMessage);
 
    private:
-    InstanceClassBase<TgBotApi>::const_pointer_type botApi;
+    TgBotApi::CPtr botApi;
     MessageExt::Ptr requestedMessage;
     Message::Ptr sentMessage;
     DurationPoint timePoint;

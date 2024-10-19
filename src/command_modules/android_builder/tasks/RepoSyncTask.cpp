@@ -219,6 +219,6 @@ void RepoSyncTask::onSignal(int signalCode) {
     LOG(INFO) << "Repo sync received signal: " << strsignal(signalCode);
 }
 
-RepoSyncTask::RepoSyncTask(InstanceClassBase<TgBotApi>::pointer_type api,
+RepoSyncTask::RepoSyncTask(TgBotApi::CPtr api,
                            Message::Ptr message, PerBuildData data)
     : data(std::move(data)), api(api), message(std::move(message)) {}

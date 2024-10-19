@@ -380,7 +380,7 @@ void TgBotApiImpl::startPoll() {
             queryResults, [&query, &inlineResults, canDoPrivileged](auto&& x) {
                 std::string_view suffix = query->query;
                 if (!canDoPrivileged && x.first.enforced) {
-                    return; // Skip this.
+                    return;  // Skip this.
                 }
                 if (absl::ConsumePrefix(&suffix, x.first.name)) {
                     if (x.first.hasMoreArguments) {
@@ -698,10 +698,6 @@ TgBotApiImpl::TgBotApiImpl(const std::string& token) : _bot(token) {
 
 TgBotApiImpl::~TgBotApiImpl() {
     stopQueueConsumerThread();
-    std::ranges::for_each(callbacks_anycommand,
-                          [](auto&& fn) { fn = nullptr; });
-    std::ranges::for_each(callbacks_callbackquery,
-                          [](auto&& ent) { ent.second = nullptr; });
 }
 
 DECLARE_CLASS_INST(TgBotApiImpl);
