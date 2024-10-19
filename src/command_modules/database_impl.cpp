@@ -77,21 +77,17 @@ namespace {
 
 using TgBot::KeyboardButton;
 
-std::vector<std::vector<KeyboardButton::Ptr>> genKeyboard(const int total,
-                                                          const int x) {
+template <int X, int Y>
+std::vector<std::vector<KeyboardButton::Ptr>> genKeyboard() {
     std::vector<std::vector<KeyboardButton::Ptr>> keyboard;
-    int yrow = total / x;
-    if (total % x != 0) {
-        yrow += 1;
-    }
-    keyboard.reserve(yrow);
-    for (int i = 0; i < yrow; i++) {
+    keyboard.reserve(Y);
+    for (int i = 0; i < Y; i++) {
         std::vector<KeyboardButton::Ptr> row;
-        row.reserve(x);
-        for (int j = 0; j < x; j++) {
+        row.reserve(X);
+        for (int j = 0; j < X; j++) {
             row.emplace_back(std::make_shared<KeyboardButton>());
         }
-        keyboard.push_back(row);
+        keyboard.emplace_back(std::move(row));
     }
     return keyboard;
 }
@@ -109,11 +105,11 @@ DECLARE_COMMAND_HANDLER(database, wrapper, message) {
     }
 
     auto reply = std::make_shared<TgBot::ReplyKeyboardMarkup>();
-    reply->keyboard = genKeyboard(4, 2);
-    reply->keyboard[0][0]->text = addtowhitelist;
-    reply->keyboard[0][1]->text = removefromwhitelist;
-    reply->keyboard[1][0]->text = addtoblacklist;
-    reply->keyboard[1][1]->text = removefromblacklist;
+    reply->keyboard = genKeyboard<2, 2>();
+    reply->keyboard.at(0).at(0)->text = addtowhitelist;
+    reply->keyboard.at(0).at(1)->text = removefromwhitelist;
+    reply->keyboard.at(1).at(0)->text = addtoblacklist;
+    reply->keyboard.at(1).at(1)->text = removefromblacklist;
     reply->oneTimeKeyboard = true;
     reply->resizeKeyboard = true;
     reply->selective = true;
