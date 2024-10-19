@@ -56,7 +56,7 @@ function(add_my_library)
   set(EXPORTCONF_DIR ${CMAKE_BINARY_DIR}/exportConfig/)
   configure_file(${CMAKE_SOURCE_DIR}/src/include/LibraryExports.h.inc
     ${EXPORTCONF_DIR}${TGBOT_LIBRARY_NAME}Exports.h)
-  target_include_directories(${TGBOT_LIBRARY_NAME} PUBLIC ${TGBOT_LIBRARY_PUBLIC_INC} ${EXPORTCONF_DIR})
+  target_include_directories(${TGBOT_LIBRARY_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR} ${TGBOT_LIBRARY_PUBLIC_INC} ${EXPORTCONF_DIR})
   target_include_directories(${TGBOT_LIBRARY_NAME} PRIVATE ${TGBOT_LIBRARY_PRIVATE_INC})
   target_link_libraries(${TGBOT_LIBRARY_NAME} absl::log absl::check fmt::fmt ${TGBOT_LIBRARY_LIBS})
   if (WIN32)

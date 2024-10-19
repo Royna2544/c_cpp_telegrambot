@@ -24,8 +24,6 @@ add_my_library(
         JsonCpp::JsonCpp
         LibXml2::LibXml2
         ${LIBGIT2_LIBS}
-    PUBLIC_INC
-        .
     NO_LIBPREFIX
     STATIC
 )

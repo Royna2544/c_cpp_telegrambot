@@ -25,5 +25,4 @@ add_my_library(
   SRCS ${SELECTOR_SRC_LIST}
   LIBS TgBotUtils
   LIBS_WIN32 Ws2_32
-  PUBLIC_INC .
 )

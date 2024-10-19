@@ -1,7 +1,6 @@
 add_my_library(
   NAME Random
   SRCS Random.cpp
-  PUBLIC_INC .
 )
 ################# Detecting x86/x86_64 Architecture ################
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "i[3-6]86|x86_64|AMD64|amd64" AND NOT MSVC)

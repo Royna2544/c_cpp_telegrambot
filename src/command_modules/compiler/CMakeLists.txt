@@ -9,9 +9,8 @@ add_my_library(
     LIBS
         TgBotUtils
         TgBotStringResManager
-        TgBot
-        TgBotRandom
         TgBot_popen_wdt
+        TgBot
         absl::status
     PUBLIC_INC
         ${CMAKE_CURRENT_BINARY_DIR}
