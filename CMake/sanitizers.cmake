@@ -1,39 +1,44 @@
-set(SANITIZE_ADDRESS ON)  # Enable ASanitizer
-set(SANITIZE_THREAD OFF)  # Disable TSanitizer
-set(SANITIZE_UNDEFINED ON)  # Enable UBSan
+set(SANITIZER_CONFIG "ASan")
+set(SANITIZER_FLAG)
 
-# MSYS2 is special - They don't have any sanitizers
-if (WIN32)
-    set(SANITIZE_ADDRESS OFF)
-    set(SANITIZE_UNDEFINED OFF)
+if (NOT SANITIZER_CONFIG)
+    message(STATUS "No sanitizers enabled")
+elseif (SANITIZER_CONFIG STREQUAL "ASan")
+    message(STATUS "Address sanitizer enabled")
+    set(SANITIZER_FLAG "-fsanitize=address,leak")
+elseif (SANITIZER_CONFIG STREQUAL "TSan")
+    message(STATUS "Thread sanitizer enabled")
+    set(SANITIZER_FLAG "-fsanitize=thread")
+elseif (SANITIZER_CONFIG STREQUAL "MSan")
+    if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        message(STATUS "Memory sanitizer enabled")
+        set(SANITIZER_FLAG "-fsanitize=memory")
+    else()
+        message(WARNING "Memory sanitizer is only supported with Clang")
+    endif()
+else()
+    message(WARNING "Unknown sanitizer configuration: ${SANITIZER_CONFIG}")
 endif()
 
 if (DISABLE_SANITIZERS)
     message(STATUS "Sanitizers disabled by option")
+    unset(SANITIZER_FLAG)
 endif()
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
     message(STATUS "Disabling sanitizers as release build")
-    set(DISABLE_SANITIZERS ON)
+    unset(SANITIZER_FLAG)
+endif()
+# MSYS2 is special - They don't have any sanitizers
+if (MINGW OR MSYS)
+    message(STATUS "MSYS2 detected - Disabling sanitizers")
+    unset(SANITIZER_FLAG)
 endif()
 
 # Define a macro to add sanitizers to a target.
 function(add_sanitizers target)
-    if (DISABLE_SANITIZERS)
-        return()
-    endif()
-    if (SANITIZE_ADDRESS)
-        target_compile_options(${target} PRIVATE -fsanitize=address)
-        target_link_options(${target} PRIVATE -fsanitize=address)
-    endif()
-
-    if (SANITIZE_THREAD)
-        target_compile_options(${target} PRIVATE -fsanitize=thread)
-        target_link_options(${target}  PRIVATE -fsanitize=thread)
-    endif()
-
-    if (SANITIZE_UNDEFINED)
-        target_compile_options(${target} PRIVATE -fsanitize=undefined)
-        target_link_options(${target} PRIVATE -fsanitize=undefined)
+    if (SANITIZER_FLAG)
+        target_compile_options(${target} PRIVATE ${SANITIZER_FLAG})
+        target_link_options(${target} PRIVATE ${SANITIZER_FLAG})
     endif()
 endfunction()
 
