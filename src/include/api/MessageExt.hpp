@@ -2,6 +2,7 @@
 
 #include <TgBotPPImpl_shared_depsExports.h>
 #include <absl/log/check.h>
+#include <absl/log/log.h>
 #include <tgbot/types/Message.h>
 
 #include <algorithm>
@@ -38,6 +39,34 @@ enum class MessageAttrs {
     Date,
     MessageId,
 };
+
+inline std::ostream& operator<<(std::ostream& stream,
+                                const MessageAttrs& attrs) {
+    switch (attrs) {
+        case MessageAttrs::ExtraText:
+            return stream << "ExtraText";
+        case MessageAttrs::Photo:
+            return stream << "Photo";
+        case MessageAttrs::Sticker:
+            return stream << "Sticker";
+        case MessageAttrs::Animation:
+            return stream << "Animation";
+        case MessageAttrs::User:
+            return stream << "User";
+        case MessageAttrs::Chat:
+            return stream << "Chat";
+        case MessageAttrs::BotCommand:
+            return stream << "BotCommand";
+        case MessageAttrs::ParsedArgumentsList:
+            return stream << "ParsedArgumentsList";
+        case MessageAttrs::Date:
+            return stream << "Date";
+        case MessageAttrs::MessageId:
+            return stream << "MessageId";
+        default:
+            return stream << "Unknown";
+    }
+}
 
 namespace internal::message {
 
@@ -110,6 +139,12 @@ class TgBotPPImpl_shared_deps_API MessageExt {
     [[nodiscard]] typename internal::message::AttributeType<attr>::type get()
         const {
         DCHECK(_message);
+        if (!has<attr>()) {
+            LOG(WARNING) << "Attribute " << attr
+                         << " not found, use get_or() instead if you are not "
+                            "completely sure it exists.";
+            return {};
+        }
         if constexpr (attr == MessageAttrs::ExtraText) {
             return _extra_args;
         } else if constexpr (attr == MessageAttrs::Photo) {
@@ -133,6 +168,16 @@ class TgBotPPImpl_shared_deps_API MessageExt {
         }
         CHECK(false) << "Unreachable: " << static_cast<int>(attr);
         return {};
+    }
+
+    template <MessageAttrs attr>
+    [[nodiscard]] typename internal::message::AttributeType<attr>::type get_or(
+        typename internal::message::AttributeType<attr>::type default_value)
+        const {
+        if (!has<attr>()) {
+            return default_value;
+        }
+        return get<attr>();
     }
 
     // Has an attribute?

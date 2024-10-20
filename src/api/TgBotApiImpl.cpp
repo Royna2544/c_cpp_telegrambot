@@ -345,7 +345,7 @@ void TgBotApiImpl::startPoll() {
     getEvents().onUnknownCommand(
         [username = botUser->username](const Message::Ptr& message) {
             const auto ext = std::make_shared<MessageExt>(message);
-            if (ext->get<MessageAttrs::BotCommand>().target != username) {
+            if (ext->get_or<MessageAttrs::BotCommand>({}).target != username) {
                 return;  // ignore, unless explicitly targetted this bot.
             }
             LOG(INFO) << "Unknown command: " << message->text;
