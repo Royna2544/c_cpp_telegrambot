@@ -25,3 +25,7 @@ void SocketInterfaceBase::startListeningAsServer(
 bool SocketInterfaceBase::closeSocketHandle(SocketConnContext& context) {
     return closeSocketHandle(context.cfd);
 }
+
+// Required for Windows
+constexpr int SocketInterfaceBase::kTgBotHostPort; // NOLINT
+constexpr int SocketInterfaceBase::kTgBotLogPort; // NOLINT
