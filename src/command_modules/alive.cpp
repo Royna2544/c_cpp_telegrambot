@@ -41,7 +41,6 @@ static DECLARE_COMMAND_HANDLER(alive, wrapper, message) {
             _version, {{modules, wrapper->getCommandModulesStr()},
                        {commitid, data.commitid},
                        {commitmsg, data.commitmsg},
-                       {originurl, data.originurl},
                        {botname, wrapper->getBotUser()->firstName},
                        {botusername, wrapper->getBotUser()->username}});
     });

@@ -1,33 +1,20 @@
 <b>My name</b> _botname_ (@_botusername_)
 
-<blockquote>
-<b>ABOUT</b>:
+<blockquote><b>ABOUT</b>:
 - Telegram bot for fun
 - Proudly backed by C/C++
-- Supports in-chat compiler (Owner only)
 - Spam purge feature
-- Rich set of utility commands
 - Regex command support
 - Runs on Windows (MSYS2), macOS, Linux
 - Exports a network control interface with IPv4 and IPv6
-- Client apps supported for Win32/Android
-</blockquote>
+- Client apps supported for Win32/Android</blockquote>
 
-<blockquote>
-<b>BUILD INFO</b>:
+<blockquote><b>BUILD INFO</b>:
 - Host OS: @CMAKE_SYSTEM_NAME@
 - C Compiler: @CMAKE_C_COMPILER@ v@CMAKE_C_COMPILER_VERSION@
 - CXX Compiler: @CMAKE_CXX_COMPILER@ v@CMAKE_CXX_COMPILER_VERSION@
-- Date: @TODAY@
-- Loaded Command Modules: _commandmodules_
-</blockquote>
+- Date: @TODAY@</blockquote>
 
-<blockquote>
-<b>GIT INFO</b>:
-- Repo URL: <a href="_originurl_">Here</a>
+<blockquote><b>GIT INFO</b>:
 - Commit-Id: _commitid_
-- Commit-Msg: _commitmsg_
-</blockquote>
-
-<b>Notes</b>:
-Finally, cum about it.
+- Commit-Msg: _commitmsg_</blockquote>
