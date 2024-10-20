@@ -2,6 +2,7 @@
 
 #ifdef WINDOWS_BUILD
 #include <winsock2.h>
+#include <windows.h>
 #undef interface
 #else
 #endif
