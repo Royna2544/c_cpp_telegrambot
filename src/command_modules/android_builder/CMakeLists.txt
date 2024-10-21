@@ -1,4 +1,5 @@
 find_package(jsoncpp)
+find_package(libgit2 REQUIRED)
 find_package(LibXml2 REQUIRED)
 
 if (NOT ${jsoncpp_FOUND})
