@@ -27,6 +27,7 @@
 #include <memory>
 #include <ml/ChatDataCollector.hpp>
 #include <stdexcept>
+#include <system_error>
 #include <utility>
 #include <vector>
 #include "tgbot/types/InputTextMessageContent.h"
@@ -75,13 +76,19 @@ void init<TgBotApiImpl>(InitTask& task) {
     // Load modules
     std::filesystem::path modules_path =
         FS::getPathForType(FS::PathType::MODULES_INSTALLED);
-    LOG(INFO) << "Loading commands from " << modules_path.string();
-    for (std::filesystem::directory_iterator it(modules_path);
+    std::error_code ec;
+    LOG(INFO) << "Loading commands from " << modules_path;
+    for (std::filesystem::directory_iterator it(modules_path, ec);
          it != std::filesystem::directory_iterator(); ++it) {
         if (it->path().filename().string().starts_with("libcmd_")) {
             auto module = std::make_unique<CommandModule>(*it);
             bot->addCommand(std::move(module));
         }
+    }
+    if (ec) {
+        LOG(ERROR) << "Failed to iterate through modules: " << ec.message();
+        task << InitFailed;
+        return;
     }
     task << InitSuccess;
 
