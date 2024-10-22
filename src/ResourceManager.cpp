@@ -43,7 +43,6 @@ bool ResourceManager::preloadOneFile(std::filesystem::path path) {
 }
 
 void ResourceManager::preloadResourceDirectory() {
-    std::filesystem::directory_iterator end;
     auto rd = FS::getPathForType(FS::PathType::RESOURCES);
     std::ifstream ifs(rd / kResourceLoadIgnoreFile);
     std::error_code ec;
@@ -61,9 +60,9 @@ void ResourceManager::preloadResourceDirectory() {
     }
 
     LOG(INFO) << "Preloading resource directory: " << rd;
-    for (std::filesystem::directory_iterator it(rd, ec); it != end; ++it) {
-        if (it->is_regular_file()) {
-            preloadOneFile(*it);
+    for (const auto& it : std::filesystem::directory_iterator(rd, ec)) {
+        if (it.is_regular_file()) {
+            preloadOneFile(it);
         }
     }
     if (ec) {

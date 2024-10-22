@@ -24,13 +24,12 @@
 
 namespace {
 std::string findVendor() {
-    std::filesystem::directory_iterator it;
-    for (it = decltype(it)("vendor/"); it != decltype(it)(); ++it) {
-        DLOG(INFO) << "Checking: " << *it;
-        if (it->is_directory() &&
-            std::filesystem::exists(it->path() / "config" / "common.mk")) {
-            LOG(INFO) << "Found: " << *it;
-            return it->path().filename().string();
+    for (const auto& it : std::filesystem::directory_iterator("vendor/")) {
+        DLOG(INFO) << "Checking: " << it;
+        if (it.is_directory() &&
+            std::filesystem::exists(it.path() / "config" / "common.mk")) {
+            LOG(INFO) << "Found: " << it;
+            return it.path().filename().string();
         }
     }
     LOG(ERROR) << "Couldn't find vendor";
@@ -39,13 +38,12 @@ std::string findVendor() {
 
 std::string findTCL() {
     std::error_code ec;
-    std::filesystem::directory_iterator it;
-    for (it = decltype(it)("build/release/build_config/", ec);
-         it != decltype(it)(); ++it) {
-        if (it->is_regular_file() && it->path().extension() == ".scl") {
-            LOG(INFO) << "Found a valid scl, " << *it << " release_name="
-                      << it->path().filename().replace_extension();
-            return it->path().filename().replace_extension();
+    for (const auto& it : std::filesystem::directory_iterator(
+             "build/release/build_config/", ec)) {
+        if (it.is_regular_file() && it.path().extension() == ".scl") {
+            LOG(INFO) << "Found a valid scl, " << it << " release_name="
+                      << it.path().filename().replace_extension();
+            return it.path().filename().replace_extension();
         }
     }
     LOG(INFO) << "Didn't find any scl, but it is fine";
@@ -206,7 +204,7 @@ void ROMBuildTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
             data.localManifest->job_count, buffer.data());
         try {
             api->editMessage<TgBotApi::ParseMode::HTML>(message,
-                                                               buildInfoBuffer);
+                                                        buildInfoBuffer);
         } catch (const TgBot::TgException& e) {
             LOG(ERROR) << "Couldn't parse markdown, with content:";
             LOG(ERROR) << buildInfoBuffer;
@@ -220,9 +218,8 @@ void ROMBuildTask::onExit(int exitCode) {
     std::memcpy(data.result, smem->memory, sizeof(PerBuildData::ResultData));
 }
 
-ROMBuildTask::ROMBuildTask(
-    TgBotApi::Ptr api,
-    TgBot::Message::Ptr message, PerBuildData data)
+ROMBuildTask::ROMBuildTask(TgBotApi::Ptr api, TgBot::Message::Ptr message,
+                           PerBuildData data)
     : api(api),
       data(std::move(data)),
       message(std::move(message)),

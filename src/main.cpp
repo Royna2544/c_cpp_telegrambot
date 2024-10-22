@@ -1,4 +1,3 @@
-#include <Authorization.hpp>
 #include <ConfigManager.h>
 #include <ResourceManager.h>
 #include <absl/log/log.h>
@@ -7,6 +6,7 @@
 #include <fmt/format.h>
 
 #include <AbslLogInit.hpp>
+#include <Authorization.hpp>
 #include <CommandLine.hpp>
 #include <DurationPoint.hpp>
 #include <InitTask.hpp>
@@ -30,6 +30,7 @@
 #include <system_error>
 #include <utility>
 #include <vector>
+
 #include "tgbot/types/InputTextMessageContent.h"
 
 #ifndef WINDOWS_BUILD
@@ -78,9 +79,9 @@ void init<TgBotApiImpl>(InitTask& task) {
         FS::getPathForType(FS::PathType::MODULES_INSTALLED);
     std::error_code ec;
     LOG(INFO) << "Loading commands from " << modules_path;
-    for (std::filesystem::directory_iterator it(modules_path, ec);
-         it != std::filesystem::directory_iterator(); ++it) {
-        if (it->path().filename().string().starts_with("libcmd_")) {
+    for (const auto& it :
+         std::filesystem::directory_iterator(modules_path, ec);) {
+        if (it.path().filename().string().starts_with("libcmd_")) {
             auto module = std::make_unique<CommandModule>(*it);
             bot->addCommand(std::move(module));
         }
@@ -217,9 +218,7 @@ class RegexHandlerInterface : public RegexHandler::Interface {
         _api->sendReplyMessage(_message->replyToMessage, result);
     }
 
-    explicit RegexHandlerInterface(
-        TgBotApi::CPtr api,
-        Message::Ptr message)
+    explicit RegexHandlerInterface(TgBotApi::CPtr api, Message::Ptr message)
         : _api(api), _message(std::move(message)) {}
 
    private:
@@ -233,8 +232,7 @@ void init<RegexHandler>(InitTask& task) {
 
     const auto regex = std::make_shared<RegexHandler>();
     TgBotApiImpl::getInstance()->onAnyMessage(
-        [regex](TgBotApi::CPtr api,
-                const Message::Ptr& message) {
+        [regex](TgBotApi::CPtr api, const Message::Ptr& message) {
             const auto ext = std::make_shared<MessageExt>(message);
             if (ext->has<MessageAttrs::ExtraText>() &&
                 ext->replyMessage()->has<MessageAttrs::ExtraText>()) {
@@ -256,8 +254,7 @@ void init<SpamBlockManager>(InitTask& task) {
         ->createController<ThreadManager::Usage::SPAMBLOCK_THREAD,
                            SpamBlockManager>(TgBotApiImpl::getInstance());
     TgBotApiImpl::getInstance()->onAnyMessage(
-        [](TgBotApi::CPtr,
-           const Message::Ptr& message) {
+        [](TgBotApi::CPtr, const Message::Ptr& message) {
             static auto spamMgr =
                 ThreadManager::getInstance()
                     ->getController<ThreadManager::Usage::SPAMBLOCK_THREAD,
@@ -493,8 +490,8 @@ void onBotInitialized(TgBotApiImpl* wrapper, DurationPoint& startupDp,
                 }
             }
             if (results.empty()) {
-                auto noResult = std::make_shared<
-                    TgBot::InlineQueryResultArticle>();
+                auto noResult =
+                    std::make_shared<TgBot::InlineQueryResultArticle>();
                 noResult->id = "no_result";
                 noResult->title = fmt::format("No results found by {}", x);
                 noResult->description = "Try searching for something else";
