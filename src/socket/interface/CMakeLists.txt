@@ -34,6 +34,7 @@ list(APPEND TGBOTSOCKET_SRC_LIST
   impl/bot/TgBotPacketParser.cpp
   impl/bot/TgBotSocketFileHelperNew.cpp)
 
+find_package(CURL)
 set(CURL_LIBS)
 if (CURL_FOUND)
   list(APPEND TGBOTSOCKET_SRC_LIST

@@ -10,4 +10,6 @@ std::string SocketInterfaceBase::INetHelper::getExternalIP() {
 size_t SocketInterfaceBase::INetHelper::externalIPCallback(void *contents,
                                                            size_t size,
                                                            size_t nmemb,
-                                                           void *userp) {}
+                                                           void *userp) {
+    return 0;
+}

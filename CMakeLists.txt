@@ -24,7 +24,6 @@ configure_file(resources/about.html.in ${CMAKE_SOURCE_DIR}/resources/about.html)
 #####################################################################
 
 ################## Declare common macros ####################
-find_package(fmt REQUIRED)
 function(add_my_library)
   cmake_parse_arguments(TGBOT_LIBRARY
     "NO_LIBPREFIX;STATIC" # Options
@@ -91,7 +90,7 @@ function(add_my_executable)
     install(TARGETS ${TGBOT_EXE_NAME} DESTINATION bin)
   endif()
   add_sanitizers(${TGBOT_EXE_NAME})
-  target_link_libraries(${TGBOT_EXE_NAME} absl::log TgBotLogInit ${TGBOT_EXE_LIBS})
+  target_link_libraries(${TGBOT_EXE_NAME} TgBotLogInit absl::log ${TGBOT_EXE_LIBS})
   if (WIN32)
     target_link_libraries(${TGBOT_EXE_NAME} ${TGBOT_EXE_LIBS_WIN32})
   endif()
@@ -141,14 +140,10 @@ include_directories(src/)
 #####################################################################
 
 ############################# Check lib #############################
-find_package(CURL)
-if (${CURL_FOUND})
-  add_definitions(-DHAVE_CURL)
-endif()
 find_package(OpenSSL REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package(Protobuf)
-
+find_package(fmt REQUIRED)
 # If we couldn't find protobuf...
 if (NOT Protobuf_FOUND)
   # Then we can just include source-abseil
@@ -185,6 +180,7 @@ add_subdirectory(src/imagep)
 add_subdirectory(src/stringres)
 add_subdirectory(src/logging)
 add_subdirectory(src/web)
+set(HTTPLIB_COMPILE ON)
 add_subdirectory(src/third-party/cpp-httplib)
 add_subdirectory(src/third-party/tgbot-cpp)
 if (WIN32)
