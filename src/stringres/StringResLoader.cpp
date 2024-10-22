@@ -1,29 +1,60 @@
 #include "StringResLoader.hpp"
 
-#include <CStringLifetime.h>
 #include <absl/log/log.h>
+#include <absl/strings/str_split.h>
+#include <fmt/format.h>
 #include <libxml/parser.h>
 #include <libxml/tree.h>
+#include <libxml/valid.h>
 
+#include <array>
 #include <filesystem>
 #include <vector>
 
+struct libxml2_error_ctx {
+    int code;
+    std::string message;
+};
+
+namespace {
+void libxml_error_handler(void *ctx, const char *msg, ...) {
+    va_list args;
+    std::array<char, 256> errorBuffer{};
+    va_start(args, msg);
+    vsnprintf(errorBuffer.data(), errorBuffer.size(), msg, args);
+    va_end(args);
+    auto *error_ctx = static_cast<libxml2_error_ctx *>(ctx);
+    error_ctx->code = xmlGetLastError()->code;
+    error_ctx->message += errorBuffer.data();
+}
+}  // namespace
+
 bool StringResLoader::parse(const std::filesystem::path &path,
-                                     int expected_size) {
+                            int expected_size) {
     // Initialize the library and check potential ABI mismatches
     LIBXML_TEST_VERSION;
-    CStringLifetime filename = path.string().c_str();
     xmlChar resourceKey[] = "resources";
     xmlChar stringKey[] = "string";
     xmlChar nameProp[] = "name";
+
+    libxml2_error_ctx ctx;
+
+    // Set up error handling
+    xmlSetGenericErrorFunc(&ctx, libxml_error_handler);
+
     // Parse the XML file
-    xmlDocPtr doc = xmlReadFile(filename, nullptr, 0);
+    xmlDocPtr doc = xmlReadFile(path.string().c_str(), nullptr, 0);
     if (doc == nullptr) {
-        LOG(ERROR) << "Could not parse file " << filename;
+        LOG(ERROR) << fmt::format("Could not parse file {} (code: {})",
+                                  path.string(), ctx.code);
+        std::vector<std::string> errors = absl::StrSplit(ctx.message, '\n', absl::SkipEmpty());
+        for (const auto &error : errors) {
+            LOG(ERROR) << "libxml2 messages: " << error;
+        }
         return false;
     }
 
-    LOG(INFO) << "Parsing file: " << filename;
+    LOG(INFO) << "Parsing file: " << path;
 
     // Get the root element node
     xmlNodePtr rootElement = xmlDocGetRootElement(doc);
