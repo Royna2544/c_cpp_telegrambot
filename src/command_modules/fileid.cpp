@@ -35,5 +35,9 @@ DYN_COMMAND_FN(name, module) {
     module.description = "Get fileId of a media";
     module.flags = CommandModule::Flags::None;
     module.function = COMMAND_HANDLER_NAME(fileid);
+    module.valid_arguments.enabled = true;
+    module.valid_arguments.counts.emplace_back(0);
+    module.valid_arguments.split_type = CommandModule::ValidArgs::Split::None;
+    module.valid_arguments.usage = "<reply-to-a-media>";
     return true;
 }
