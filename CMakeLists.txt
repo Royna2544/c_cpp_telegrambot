@@ -16,6 +16,7 @@ endif()
 ############################## OPTIONS ##############################
 option(ENABLE_RUST_SUPPORT "Enable rust support" OFF)
 option(DISABLE_SANITIZERS "Disable all sanitizers (ASan, TSan, etc)" OFF)
+option(DIRTY_ABSEIL_FIX "Enable dirty abseil linkage fix" OFF)
 #####################################################################
 
 ##################### Fill in readme with cmake #####################
@@ -80,6 +81,9 @@ function(add_my_executable)
   if (NOT TGBOT_EXE_SRCS OR NOT TGBOT_EXE_NAME)
     message(FATAL_ERROR "Must specify src or name")
   endif()
+  if (DIRTY_ABSEIL_FIX)
+    list(APPEND TGBOT_EXE_SRCS ${CMAKE_SOURCE_DIR}/src/logging/log_message.cc)
+  endif()
   if (NOT TGBOT_EXE_NO_PREFIX)
     set(TGBOT_EXE_NAME ${PROJECT_NAME}_${TGBOT_EXE_NAME})
   endif()
@@ -120,7 +124,7 @@ endif()
 ################# Versions later than Win10 RS3 does #################
 if (WIN32)
   include(CheckCSourceCompiles)
-  FILE(READ ${CMAKE_SOURCE_DIR}/tests/test_af_unix.c AF_UNIX_TEST_FILE)
+  FILE(READ tests/test_af_unix.c AF_UNIX_TEST_FILE)
   check_c_source_compiles("${AF_UNIX_TEST_FILE}" USE_UNIX_SOCKETS)
 else()
   set(USE_UNIX_SOCKETS TRUE)
@@ -144,8 +148,8 @@ find_package(OpenSSL REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package(Protobuf)
 find_package(fmt REQUIRED)
-# If we couldn't find protobuf...
-if (NOT Protobuf_FOUND)
+# If we couldn't find protobuf or dirty abseil fix is enabled.
+if (DIRTY_ABSEIL_FIX OR NOT Protobuf_FOUND)
   # Then we can just include source-abseil
   message(STATUS "Using abseil-cpp as submodule")
   set(ABSL_PROPAGATE_CXX_STD ON)
