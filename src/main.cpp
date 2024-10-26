@@ -421,8 +421,14 @@ int main(int argc, char** argv) {
     auto socketFactor = injector.get<SocketComponentFactory_t>();
     // Initialize actual pointers to injected instances
     SocketServerWrapper wrapper;
-    auto rawP = wrapper.getInternalInterface();
-    socketFactor(ThreadManager::Usage::SOCKET_THREAD, rawP.get());
+    if (wrapper.getInternalInterface()) {
+        auto rawP = wrapper.getInternalInterface();
+        socketFactor(ThreadManager::Usage::SOCKET_THREAD, rawP.get());
+    }
+    if (wrapper.getExternalInterface()) {
+        auto rawP = wrapper.getExternalInterface();
+        socketFactor(ThreadManager::Usage::SOCKET_EXTERNAL_THREAD, rawP.get());
+    }
 
     // Must be last
     OnTerminateRegistrar::getInstance()->registerCallback(
