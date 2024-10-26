@@ -10,16 +10,43 @@
 #include <string_view>
 #include <vector>
 
-struct TgBotUtils_API ResourceManager{
-    bool preloadOneFile(std::filesystem::path p);
-    void preloadResourceDirectory(void);
-    std::string_view getResource(std::filesystem::path filename) const;
+/**
+ * @brief Interface for providing resources.
+ *
+ * This interface defines the methods for getting and preloading resources.
+ */
+struct ResourceProvider {
+    /**
+     * @brief Get a resource by its filename.
+     *
+     * This method retrieves the content of a resource specified by its filename.
+     *
+     * @param filename The path to the resource file.
+     * @return A string_view containing the content of the resource.
+     */
+    virtual std::string_view get(std::filesystem::path filename) const = 0;
 
-    APPLE_INJECT(ResourceManager()) {
-        preloadResourceDirectory();
-    }
-    static constexpr auto kResourceDirname = "resources";
+    /**
+     * @brief Preload a resource.
+     *
+     * This method preloads a resource specified by its path.
+     *
+     * @param p The path to the resource file.
+     * @return True if the resource was successfully preloaded, false otherwise.
+     */
+    virtual bool preload(std::filesystem::path p) = 0;
 
+    virtual ~ResourceProvider() = default;
+};
+
+struct TgBotUtils_API ResourceManager : ResourceProvider {
+    [[nodiscard]] std::string_view get(std::filesystem::path filename) const override;
+    bool preload(std::filesystem::path p) override;
+
+    APPLE_INJECT(ResourceManager());
+    ~ResourceManager() override = default;
+
+    static constexpr std::string_view kResourceDirname = "resources";
    private:
     std::map<std::filesystem::path, std::string> kResources;
     std::vector<std::string> ignoredResources;

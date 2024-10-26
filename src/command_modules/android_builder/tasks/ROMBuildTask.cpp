@@ -1,6 +1,5 @@
 #include "ROMBuildTask.hpp"
 
-#include <ResourceManager.h>
 #include <fmt/chrono.h>
 #include <fmt/format.h>
 #include <tgbot/TgException.h>

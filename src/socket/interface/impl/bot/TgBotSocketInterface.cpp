@@ -12,7 +12,7 @@ SocketInterfaceTgBot::SocketInterfaceTgBot(SocketInterfaceBase* _interface,
                                            ChatObserver* observer,
                                            SpamBlockBase* spamblock,
                                            SocketFile2DataHelper* helper,
-                                           ResourceManager* resource)
+                                           ResourceProvider* resource)
     : interface(_interface),
       api(_api),
       observer(observer),

@@ -30,7 +30,7 @@ DECLARE_COMMAND_HANDLER(flash) {
 
     std::call_once(once, [provider] {
         std::string buf;
-        buf = provider->resource->getResource("flash.txt");
+        buf = provider->resource->get("flash.txt");
         reasons = absl::StrSplit(buf, '\n');
     });
 

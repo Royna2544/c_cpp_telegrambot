@@ -8,7 +8,7 @@
 #include <sstream>
 #include <system_error>
 
-bool ResourceManager::preloadOneFile(std::filesystem::path path) {
+bool ResourceManager::preload(std::filesystem::path path) {
     std::ifstream file(path);
     std::stringstream linebuf;
     bool found = false;
@@ -43,7 +43,7 @@ bool ResourceManager::preloadOneFile(std::filesystem::path path) {
     return true;
 }
 
-void ResourceManager::preloadResourceDirectory() {
+ResourceManager::ResourceManager() {
     auto rd = FS::getPathForType(FS::PathType::RESOURCES);
     std::ifstream ifs(rd / kResourceLoadIgnoreFile);
     std::error_code ec;
@@ -63,7 +63,7 @@ void ResourceManager::preloadResourceDirectory() {
     LOG(INFO) << "Preloading resource directory: " << rd;
     for (const auto& it : std::filesystem::directory_iterator(rd, ec)) {
         if (it.is_regular_file()) {
-            preloadOneFile(it);
+            preload(it);
         }
     }
     if (ec) {
@@ -73,7 +73,7 @@ void ResourceManager::preloadResourceDirectory() {
     }
 }
 
-std::string_view ResourceManager::getResource(std::filesystem::path filename) const {
+std::string_view ResourceManager::get(std::filesystem::path filename) const {
     filename.make_preferred();
     for (const auto& [elem, data] : kResources) {
         if (elem.string() == filename.string()) {

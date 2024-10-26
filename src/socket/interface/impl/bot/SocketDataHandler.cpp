@@ -27,14 +27,14 @@ using namespace TgBotSocket::data;
 
 namespace {
 
-std::string getMIMEString(const ResourceManager* resource, const std::string& path) {
+std::string getMIMEString(const ResourceProvider* resource, const std::string& path) {
     static std::once_flag once;
     static rapidjson::Document doc;
     std::string extension = fs::path(path).extension().string();
 
     std::call_once(once, [resource] {
         std::string_view buf;
-        buf = resource->getResource("mimeData.json");
+        buf = resource->get("mimeData.json");
         doc.Parse(buf.data());
         // This should be an assert, we know the data file at compile time
         LOG_IF(FATAL, doc.HasParseError())

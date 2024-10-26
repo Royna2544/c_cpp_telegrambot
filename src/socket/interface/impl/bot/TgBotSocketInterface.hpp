@@ -30,7 +30,7 @@ struct SocketInterfaceTgBot : ManagedThreadRunnable {
     APPLE_EXPLICIT_INJECT(SocketInterfaceTgBot(
         SocketInterfaceBase* _interface, TgBotApi::Ptr _api,
         ChatObserver* observer, SpamBlockBase* spamblock,
-        SocketFile2DataHelper* helper, ResourceManager* resource));
+        SocketFile2DataHelper* helper, ResourceProvider* resource));
 
    private:
     SocketInterfaceBase* interface = nullptr;
@@ -38,7 +38,7 @@ struct SocketInterfaceTgBot : ManagedThreadRunnable {
     SocketFile2DataHelper* helper;
     ChatObserver* observer = nullptr;
     SpamBlockBase* spamblock = nullptr;
-    ResourceManager* resource = nullptr;
+    ResourceProvider* resource = nullptr;
 
     std::chrono::system_clock::time_point startTp =
         std::chrono::system_clock::now();

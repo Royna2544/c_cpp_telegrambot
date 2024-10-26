@@ -36,7 +36,7 @@ static DECLARE_COMMAND_HANDLER(alive) {
         const auto botusername = cat("botusername");
 
         GitData::Fill(&data);
-        _version = provider->resource->getResource("about.html");
+        _version = provider->resource->get("about.html");
 
         // Replace placeholders in the version string with actual values.
         version = absl::StrReplaceAll(

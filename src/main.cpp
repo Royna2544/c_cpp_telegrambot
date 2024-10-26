@@ -189,6 +189,11 @@ fruit::Component<TgBotDatabaseImpl, DatabaseBase> getDatabaseComponent() {
         });
 }
 
+fruit::Component<ResourceProvider> getResourceProvider() {
+    return fruit::createComponent()
+        .bind<ResourceProvider, ResourceManager>();
+}
+
 fruit::Component<fruit::Required<AuthContext, StringResLoaderBase, Providers>,
                  TgBotApiImpl, TgBotApi>
 getTgBotApiImplComponent() {
@@ -271,7 +276,7 @@ using SocketComponentFactory_t = std::function<Unused<SocketInterfaceTgBot>(
     ThreadManager::Usage usage, SocketInterfaceBase*)>;
 fruit::Component<
     fruit::Required<TgBotApi, ChatObserver, WrapPtr<SpamBlockBase>,
-                    SocketFile2DataHelper, ThreadManager, ResourceManager>,
+                    SocketFile2DataHelper, ThreadManager, ResourceProvider>,
     SocketComponentFactory_t>
 getSocketInterfaceComponent() {
     return fruit::createComponent()
@@ -280,12 +285,12 @@ getSocketInterfaceComponent() {
             fruit::Assisted<SocketInterfaceBase*> interface, TgBotApi::Ptr api,
             ChatObserver * observer, WrapPtr<SpamBlockBase> spamblock,
             SocketFile2DataHelper * helper, ThreadManager * manager,
-            ResourceManager * resource)>(
+            ResourceProvider * resource)>(
             [](ThreadManager::Usage usage, SocketInterfaceBase* interface,
                TgBotApi::Ptr api, ChatObserver* observer,
                WrapPtr<SpamBlockBase> spamblock, SocketFile2DataHelper* helper,
                ThreadManager* manager,
-               ResourceManager* resource) -> Unused<SocketInterfaceTgBot> {
+               ResourceProvider* resource) -> Unused<SocketInterfaceTgBot> {
                 auto thread = manager->create<SocketInterfaceTgBot>(
                     usage, interface, api, observer, spamblock.ptr, helper,
                     resource);
@@ -332,7 +337,8 @@ getAllComponent() {
         .install(getSpamBlockComponent)
         .install(getWebServerComponent)
         .install(getStringResLoaderComponent)
-        .install(getSocketInterfaceComponent);
+        .install(getSocketInterfaceComponent)
+        .install(getResourceProvider);
 }
 
 std::vector<TgBot::InlineQueryResult::Ptr> mediaQueryKeyboardFunction(
