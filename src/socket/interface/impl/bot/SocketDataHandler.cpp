@@ -27,14 +27,14 @@ using namespace TgBotSocket::data;
 
 namespace {
 
-std::string getMIMEString(const std::string& path) {
+std::string getMIMEString(const ResourceManager* resource, const std::string& path) {
     static std::once_flag once;
     static rapidjson::Document doc;
     std::string extension = fs::path(path).extension().string();
 
-    std::call_once(once, [] {
+    std::call_once(once, [resource] {
         std::string_view buf;
-        buf = ResourceManager().getResource("mimeData.json");
+        buf = resource->getResource("mimeData.json");
         doc.Parse(buf.data());
         // This should be an assert, we know the data file at compile time
         LOG_IF(FATAL, doc.HasParseError())
@@ -150,7 +150,7 @@ GenericAck SocketInterfaceTgBot::handle_SendFileToChatId(const void* ptr) {
     DLOG(INFO) << "Sending " << file << " to " << data->chat;
     // Try to send as local file first
     try {
-        fn(data->chat, InputFile::fromFile(file, getMIMEString(file)));
+        fn(data->chat, InputFile::fromFile(file, getMIMEString(resource, file)));
     } catch (std::ifstream::failure& e) {
         LOG(INFO) << "Failed to send '" << file
                   << "' as local file, trying as Telegram "

@@ -6,6 +6,7 @@
 #include <global_handlers/SpamBlock.hpp>
 #include <memory>
 
+#include "ResourceManager.h"
 #include "impl/SocketPosix.hpp"
 #include "trivial_helpers/fruit_inject.hpp"
 
@@ -29,7 +30,7 @@ struct SocketInterfaceTgBot : ManagedThreadRunnable {
     APPLE_EXPLICIT_INJECT(SocketInterfaceTgBot(
         SocketInterfaceBase* _interface, TgBotApi::Ptr _api,
         ChatObserver* observer, SpamBlockBase* spamblock,
-        SocketFile2DataHelper* helper));
+        SocketFile2DataHelper* helper, ResourceManager* resource));
 
    private:
     SocketInterfaceBase* interface = nullptr;
@@ -37,6 +38,7 @@ struct SocketInterfaceTgBot : ManagedThreadRunnable {
     SocketFile2DataHelper* helper;
     ChatObserver* observer = nullptr;
     SpamBlockBase* spamblock = nullptr;
+    ResourceManager* resource = nullptr;
 
     std::chrono::system_clock::time_point startTp =
         std::chrono::system_clock::now();

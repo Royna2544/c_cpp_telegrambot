@@ -269,22 +269,26 @@ getNetworkLogSinkComponent() {
 
 using SocketComponentFactory_t = std::function<Unused<SocketInterfaceTgBot>(
     ThreadManager::Usage usage, SocketInterfaceBase*)>;
-fruit::Component<fruit::Required<TgBotApi, ChatObserver, WrapPtr<SpamBlockBase>,
-                                 SocketFile2DataHelper, ThreadManager>,
-                 SocketComponentFactory_t>
+fruit::Component<
+    fruit::Required<TgBotApi, ChatObserver, WrapPtr<SpamBlockBase>,
+                    SocketFile2DataHelper, ThreadManager, ResourceManager>,
+    SocketComponentFactory_t>
 getSocketInterfaceComponent() {
     return fruit::createComponent()
         .registerFactory<Unused<SocketInterfaceTgBot>(
             fruit::Assisted<ThreadManager::Usage> usage,
             fruit::Assisted<SocketInterfaceBase*> interface, TgBotApi::Ptr api,
             ChatObserver * observer, WrapPtr<SpamBlockBase> spamblock,
-            SocketFile2DataHelper * helper, ThreadManager * manager)>(
+            SocketFile2DataHelper * helper, ThreadManager * manager,
+            ResourceManager * resource)>(
             [](ThreadManager::Usage usage, SocketInterfaceBase* interface,
                TgBotApi::Ptr api, ChatObserver* observer,
                WrapPtr<SpamBlockBase> spamblock, SocketFile2DataHelper* helper,
-               ThreadManager* manager) -> Unused<SocketInterfaceTgBot> {
+               ThreadManager* manager,
+               ResourceManager* resource) -> Unused<SocketInterfaceTgBot> {
                 auto thread = manager->create<SocketInterfaceTgBot>(
-                    usage, interface, api, observer, spamblock.ptr, helper);
+                    usage, interface, api, observer, spamblock.ptr, helper,
+                    resource);
                 thread->run();
                 return {};
             });

@@ -11,12 +11,14 @@ SocketInterfaceTgBot::SocketInterfaceTgBot(SocketInterfaceBase* _interface,
                                            TgBotApi::Ptr _api,
                                            ChatObserver* observer,
                                            SpamBlockBase* spamblock,
-                                           SocketFile2DataHelper* helper)
+                                           SocketFile2DataHelper* helper,
+                                           ResourceManager* resource)
     : interface(_interface),
       api(_api),
       observer(observer),
       spamblock(spamblock),
-      helper(helper) {}
+      helper(helper),
+      resource(resource) {}
 
 void SocketInterfaceTgBot::runFunction() {
     interface->options.port = SocketInterfaceBase::kTgBotHostPort;
