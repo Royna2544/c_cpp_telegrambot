@@ -7,22 +7,24 @@
 #include <trivial_helpers/_tgbot.h>
 
 #include <CompileTimeStringConcat.hpp>
-#include <StringResManager.hpp>
 #include <api/CommandModule.hpp>
+#include <api/Providers.hpp>
 #include <api/TgBotApi.hpp>
 #include <database/bot/TgBotDatabaseImpl.hpp>
 #include <mutex>
+
+#include "StringResLoader.hpp"
 
 template <unsigned Len>
 consteval auto cat(const char (&strings)[Len]) {
     return StringConcat::cat("_", strings, "_");
 }
 
-static DECLARE_COMMAND_HANDLER(alive, wrapper, message) {
+static DECLARE_COMMAND_HANDLER(alive) {
     static std::string version;
     static std::once_flag once;
 
-    std::call_once(once, [wrapper] {
+    std::call_once(once, [provider, api] {
         std::string _version;
         GitData data;
 
@@ -34,33 +36,32 @@ static DECLARE_COMMAND_HANDLER(alive, wrapper, message) {
         const auto botusername = cat("botusername");
 
         GitData::Fill(&data);
-        _version = ResourceManager::getInstance()->getResource("about.html");
+        _version = provider->resource->getResource("about.html");
 
         // Replace placeholders in the version string with actual values.
         version = absl::StrReplaceAll(
-            _version, {{modules, wrapper->getCommandModulesStr()},
-                       {commitid, data.commitid},
+            _version, {{commitid, data.commitid},
                        {commitmsg, data.commitmsg},
-                       {botname, wrapper->getBotUser()->firstName},
-                       {botusername, wrapper->getBotUser()->username}});
+                       {botname, api->getBotUser()->firstName},
+                       {botusername, api->getBotUser()->username}});
     });
-    const auto info = TgBotDatabaseImpl::getInstance()->queryMediaInfo("alive");
+    const auto info = provider->database->queryMediaInfo("alive");
     bool sentAnimation = false;
     if (info && info->mediaType == DatabaseBase::MediaType::GIF) {
         try {
-            wrapper->sendReplyAnimation<TgBotApi::ParseMode::HTML>(
+            api->sendReplyAnimation<TgBotApi::ParseMode::HTML>(
                 message->message(),
                 MediaIds{info->mediaId, info->mediaUniqueId}, version);
             sentAnimation = true;
         } catch (const TgBot::TgException& e) {
             // Fallback to HTML if no GIF
-            LOG(ERROR) << fmt::format("{}: {}", GETSTR(ERROR_SENDING_GIF),
-                                      e.what());
+            LOG(ERROR) << fmt::format(
+                "{}: {}", access(res, Strings::ERROR_SENDING_GIF), e.what());
         }
     }
     if (!sentAnimation) {
-        wrapper->sendReplyMessage<TgBotApi::ParseMode::HTML>(message->message(),
-                                                             version);
+        api->sendReplyMessage<TgBotApi::ParseMode::HTML>(message->message(),
+                                                         version);
     }
 }
 
@@ -70,7 +71,7 @@ DYN_COMMAND_FN(name, module) {
     }
     module.flags = CommandModule::Flags::None;
     module.name = name;
-    module.description = GETSTR(ALIVE_CMD_DESC);
+    module.description = "Test if a bot is alive";
     module.function = COMMAND_HANDLER_NAME(alive);
     return true;
 }

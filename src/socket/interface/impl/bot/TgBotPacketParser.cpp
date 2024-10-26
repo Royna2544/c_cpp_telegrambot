@@ -11,7 +11,7 @@
 namespace TgBotSocket {
 
 std::optional<Packet> readPacket(
-    const std::shared_ptr<SocketInterfaceBase>& interface,
+    SocketInterfaceBase* interface,
     const SocketConnContext& context) {
     TgBotSocket::PacketHeader header;
     decltype(header.magic) magic{};

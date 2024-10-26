@@ -7,13 +7,16 @@
 #include <memory>
 #include <utility>
 
-SocketInterfaceTgBot::SocketInterfaceTgBot(
-    std::shared_ptr<SocketInterfaceBase> _interface,
-    TgBotApi::Ptr _api,
-    std::shared_ptr<SocketFile2DataHelper> helper)
-    : interface(std::move(_interface)),
+SocketInterfaceTgBot::SocketInterfaceTgBot(SocketInterfaceBase* _interface,
+                                           TgBotApi::Ptr _api,
+                                           ChatObserver* observer,
+                                           SpamBlockBase* spamblock,
+                                           SocketFile2DataHelper* helper)
+    : interface(_interface),
       api(_api),
-      helper(std::move(helper)) {}
+      observer(observer),
+      spamblock(spamblock),
+      helper(helper) {}
 
 void SocketInterfaceTgBot::runFunction() {
     interface->options.port = SocketInterfaceBase::kTgBotHostPort;

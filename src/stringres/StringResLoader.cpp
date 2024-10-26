@@ -1,6 +1,7 @@
 #include "StringResLoader.hpp"
 
 #include <absl/log/log.h>
+#include <absl/strings/ascii.h>
 #include <absl/strings/str_split.h>
 #include <fmt/format.h>
 #include <libxml/parser.h>
@@ -9,10 +10,13 @@
 
 #include <array>
 #include <filesystem>
-#include <vector>
+#include <memory>
+#include <string_view>
+#include <trivial_helpers/raii.hpp>
+#include <utility>
 
 struct libxml2_error_ctx {
-    int code;
+    int code{};
     std::string message;
 };
 
@@ -29,89 +33,154 @@ void libxml_error_handler(void *ctx, const char *msg, ...) {
 }
 }  // namespace
 
-bool StringResLoader::parse(const std::filesystem::path &path,
-                            int expected_size) {
+StringResLoader::StringResLoader(std::filesystem::path path)
+    : m_path(std::move(path)) {
     // Initialize the library and check potential ABI mismatches
     LIBXML_TEST_VERSION;
-    xmlChar resourceKey[] = "resources";
-    xmlChar stringKey[] = "string";
-    xmlChar nameProp[] = "name";
+
+    // Load XML files from the specified path
+    for (const auto &entry : std::filesystem::directory_iterator(m_path)) {
+        if (entry.is_regular_file() &&
+            absl::EndsWith(entry.path().filename().string(), ".xml")) {
+            DLOG(INFO) << "Parsing XML file: " << entry.path().filename();
+            std::shared_ptr<LocaleStringsImpl> map;
+            try {
+                map =
+                    std::make_shared<LocaleStringsImpl>(entry.path().string());
+            } catch (const LocaleStringsImpl::invalid_xml_error &e) {
+                LOG(ERROR) << "Invalid XML file: " << entry.path();
+                continue;
+            }
+            const auto localeStr = entry.path().filename().stem().string();
+            if (Locale::en_US == localeStr) {
+                localeMap[Locale::en_US] = std::move(map);
+            } else if (Locale::fr_FR == localeStr) {
+                localeMap[Locale::fr_FR] = std::move(map);
+            } else if (Locale::ko_KR == localeStr){
+                localeMap[Locale::ko_KR] = std::move(map);
+            } else {
+                LOG(WARNING) << "Unknown locale in file: " << entry.path();
+            }
+        }
+    }
+}
+
+StringResLoader::~StringResLoader() { xmlCleanupParser(); }
+
+struct XmlCharWrapper {
+    RAII<xmlChar *>::Value<void> xmlChar;
+
+    operator ::xmlChar *() const { return xmlChar.get(); }
+};
+
+XmlCharWrapper operator""_xmlChar(const char *string, size_t length) {
+    return {RAII<xmlChar *>::create<void>(xmlCharStrdup(string), xmlFree)};
+}
+
+namespace {
+Strings get(const std::string_view string) {
+#define fn(x) \
+    if (string == #x) return Strings::x;
+    MAKE_STRINGS(fn);
+#undef fn
+    return {};
+}
+
+std::string_view get(const Strings string) {
+    switch (string) {
+#define fn(x)        \
+    case Strings::x: \
+        return #x;
+        MAKE_STRINGS(fn);
+#undef fn
+    }
+    return "";
+}
+}  // namespace
+
+LocaleStringsImpl::LocaleStringsImpl(const std::filesystem::path &filename) {
+    auto resourceKey = "resources"_xmlChar;
+    auto stringKey = "string"_xmlChar;
+    auto nameProp = "name"_xmlChar;
 
     libxml2_error_ctx ctx;
-
     // Set up error handling
     xmlSetGenericErrorFunc(&ctx, libxml_error_handler);
 
     // Parse the XML file
-    xmlDocPtr doc = xmlReadFile(path.string().c_str(), nullptr, 0);
+    auto doc = RAII<xmlDocPtr>::template create<void>(
+        xmlReadFile(filename.string().c_str(), nullptr, 0), xmlFreeDoc);
     if (doc == nullptr) {
         LOG(ERROR) << fmt::format("Could not parse file {} (code: {})",
-                                  path.string(), ctx.code);
-        std::vector<std::string> errors = absl::StrSplit(ctx.message, '\n', absl::SkipEmpty());
+                                  filename.string(), ctx.code);
+        std::vector<std::string> errors =
+            absl::StrSplit(ctx.message, '\n', absl::SkipEmpty());
         for (const auto &error : errors) {
             LOG(ERROR) << "libxml2 messages: " << error;
-        }
-        return false;
+        };
+        throw invalid_xml_error();
     }
 
-    LOG(INFO) << "Parsing file: " << path;
-
     // Get the root element node
-    xmlNodePtr rootElement = xmlDocGetRootElement(doc);
+    xmlNodePtr rootElement = xmlDocGetRootElement(doc.get());
 
     // Ensure the root element is <resources>
     if (xmlStrcmp(rootElement->name, resourceKey) != 0) {
         LOG(ERROR) << "Root element is not <resources>";
-        xmlFreeDoc(doc);
-        return false;
+        throw invalid_xml_error();
     }
 
-    // Iterate through <string> elements
     for (xmlNodePtr cur = rootElement->children; cur != nullptr;
          cur = cur->next) {
         if (cur->type == XML_ELEMENT_NODE &&
-            (xmlStrcmp(cur->name, stringKey) == 0)) {
-            xmlChar *nameAttr = xmlGetProp(cur, nameProp);
-            xmlChar *content = xmlNodeListGetString(doc, cur->children, 1);
+            xmlStrcmp(cur->name, stringKey) == 0) {
+            auto nameAttr = RAII<xmlChar *>::template create<void>(
+                xmlGetProp(cur, nameProp), xmlFree);
+            auto content = RAII<xmlChar *>::template create<void>(
+                xmlNodeListGetString(doc.get(), cur->children, 1), xmlFree);
 
-            if ((nameAttr != nullptr) && (content != nullptr)) {
-                m_strings.emplace_back(reinterpret_cast<char *>(nameAttr),
-                                       reinterpret_cast<char *>(content));
-            }
-
-            if (nameAttr != nullptr) {
-                xmlFree(nameAttr);
-            }
-            if (content != nullptr) {
-                xmlFree(content);
+            if (nameAttr && content) {
+                auto upper = absl::AsciiStrToUpper(
+                    reinterpret_cast<const char *>(nameAttr.get()));
+                auto string = get(upper);
+                if (string == Strings::__INVALID__) {
+                    LOG(WARNING) << "String name not in enumerator: " << upper;
+                    continue;
+                }
+                m_data.emplace(string,
+                               reinterpret_cast<const char *>(content.get()));
             }
         }
     }
-
-    // Sort the strings by name
-    std::ranges::sort(m_strings, [](auto &&lfs, auto &&rfs) {
-        return lfs.first > rfs.first;
-    });
-
-    // Free the document
-    xmlFreeDoc(doc);
-
-    // Cleanup function for the XML library
-    xmlCleanupParser();
-
-    if (expected_size > 0 && m_strings.size() != expected_size) {
-        LOG(ERROR) << "Number of strings(" << m_strings.size()
-                   << ") is not equal to expected_size(" << expected_size
-                   << ")";
-        return false;
+    int absent = 0;
+    for (int x = static_cast<int>(Strings::__INVALID__) + 1;
+         x < static_cast<int>(Strings::__MAX__); ++x) {
+        if (!m_data.contains(static_cast<Strings>(x))) {
+            LOG(WARNING) << "Missing string: " << get(static_cast<Strings>(x));
+            ++absent;
+        }
     }
-    return true;
+    if (absent != 0) {
+        LOG(ERROR) << "Incomplete XML file. Missing strings: " << absent;
+        throw invalid_xml_error();
+    }
 }
 
-std::string_view StringResLoader::getString(const int key) const {
-    if (key > m_strings.size() || key < 0) {
-        LOG(WARNING) << "Invalid key: " << key;
-        return "";
+std::string_view LocaleStringsImpl::operator[](const Strings &string) const {
+    if (m_data.contains(string)) {
+        return m_data.at(string);
+    } else {
+        LOG(WARNING) << "String not found: " << get(string);
+        return {};
     }
-    return m_strings.at(key).second;
+}
+
+const StringResLoader::LocaleStrings *StringResLoader::operator[](
+    const Locale key) const {
+    if (localeMap.contains(key)) {
+        return localeMap.at(key).get();
+    } else {
+        LOG(WARNING) << "Locale not found: " << static_cast<int>(key);
+        return &empty;
+    }
 }

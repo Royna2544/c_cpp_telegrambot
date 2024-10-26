@@ -3,209 +3,51 @@
 #include <absl/log/log.h>
 #include <absl/log/log_sink_registry.h>
 #include <absl/strings/match.h>
+#include <fmt/chrono.h>
 #include <fmt/format.h>
+#include <fruit/injector.h>
 
 #include <AbslLogInit.hpp>
 #include <Authorization.hpp>
 #include <CommandLine.hpp>
 #include <DurationPoint.hpp>
-#include <InitTask.hpp>
 #include <LogSinks.hpp>
 #include <ManagedThreads.hpp>
 #include <Random.hpp>
-#include <StringResManager.hpp>
+#include <StringResLoader.hpp>
 #include <TgBotWebpage.hpp>
 #include <api/TgBotApiImpl.hpp>
 #include <boost/system/system_error.hpp>
 #include <cstdint>
+#include <cstdlib>
 #include <database/bot/TgBotDatabaseImpl.hpp>
 #include <filesystem>
+#include <functional>
+#include <global_handlers/ChatObserver.hpp>
 #include <global_handlers/RegEXHandler.hpp>
 #include <global_handlers/SpamBlock.hpp>
+#include <impl/backends/ServerBackend.hpp>
+#include <impl/bot/TgBotSocketFileHelperNew.hpp>
+#include <impl/bot/TgBotSocketInterface.hpp>
 #include <libos/libfs.hpp>
 #include <libos/libsighandler.hpp>
+#include <logging/LoggingServer.hpp>
 #include <memory>
 #include <ml/ChatDataCollector.hpp>
 #include <stdexcept>
 #include <system_error>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
-#include "tgbot/types/InputTextMessageContent.h"
-
+#include "DatabaseBase.hpp"
+#include "api/TgBotApi.hpp"
+#include "fruit/fruit.h"
+#include "fruit/fruit_forward_decls.h"
+#include "trivial_helpers/fruit_inject.hpp"
 #ifndef WINDOWS_BUILD
 #include <restartfmt_parser.hpp>
 #endif
-
-#ifdef SOCKET_CONNECTION
-#include <global_handlers/ChatObserver.hpp>
-#include <logging/LoggingServer.hpp>
-#include <socket/interface/impl/bot/TgBotSocketInterface.hpp>
-#endif
-
-#include <tgbot/tgbot.h>
-
-template <typename T>
-void init(InitTask& task) = delete;
-
-template <>
-void init<StringResManager>(InitTask& task) {
-    task << "Load string resources";
-    auto locale = getVariable(ConfigManager::Configs::LOCALE);
-    if (!locale) {
-        LOG(WARNING) << "Using default locale: en-US";
-        locale = "en-US";
-    }
-    auto loader = std::make_unique<StringResLoader>();
-    bool res = loader->parse(FS::getPathForType(FS::PathType::RESOURCES) /
-                                 "strings" / locale->append(".xml"),
-                             STRINGRES_MAX);
-    if (!res) {
-        LOG(ERROR) << "Failed to parse string res";
-        task << InitFailed;
-    } else {
-        StringResManager::initInstance(std::move(loader));
-        task << InitSuccess;
-    }
-}
-
-template <>
-void init<TgBotApiImpl>(InitTask& task) {
-    task << "Load command modules";
-    const auto& bot = TgBotApiImpl::getInstance();
-
-    // Load modules
-    std::filesystem::path modules_path =
-        FS::getPathForType(FS::PathType::MODULES_INSTALLED);
-    std::error_code ec;
-    LOG(INFO) << "Loading commands from " << modules_path;
-    for (const auto& it :
-         std::filesystem::directory_iterator(modules_path, ec);) {
-        if (it.path().filename().string().starts_with("libcmd_")) {
-            auto module = std::make_unique<CommandModule>(*it);
-            bot->addCommand(std::move(module));
-        }
-    }
-    if (ec) {
-        LOG(ERROR) << "Failed to iterate through modules: " << ec.message();
-        task << InitFailed;
-        return;
-    }
-    task << InitSuccess;
-
-    task << "Updating bot command list";
-    bool success = false;
-    try {
-        success = bot->setBotCommands();
-    } catch (const boost::system::system_error& e) {
-        LOG(ERROR) << "Exception updating commands list: " << e.what();
-    }
-    if (success) {
-        task << InitSuccess;
-    } else {
-        task << InitFailed;
-    }
-}
-
-template <>
-void init<TgBotWebServer>(InitTask& task) {
-    task << "Start webserver";
-    constexpr int kTgBotWebServerPort = 8080;
-    const auto server =
-        ThreadManager::getInstance()
-            ->createController<ThreadManager::Usage::WEBSERVER_THREAD,
-                               TgBotWebServer>(kTgBotWebServerPort);
-    server->run();
-    task << InitSuccess;
-}
-
-template <>
-void init<Random>(InitTask& task) {
-    task << "Choose random number generator impl";
-    Random::initInstance();
-    task << InitSuccess;
-}
-
-#ifdef SOCKET_CONNECTION
-#include <impl/backends/ServerBackend.hpp>
-
-template <>
-void init<SocketInterfaceTgBot>(InitTask& task) {
-    task << "Start socket threads";
-    auto mgr = ThreadManager::getInstance();
-    auto api = TgBotApiImpl::getInstance();
-    SocketServerWrapper wrapper;
-    std::vector<std::shared_ptr<SocketInterfaceTgBot>> threads;
-    const auto helper =
-        std::make_shared<SocketFile2DataHelper>(std::make_shared<RealFS>());
-
-    if (wrapper.getInternalInterface()) {
-        threads.emplace_back(
-            mgr->createController<ThreadManager::Usage::SOCKET_THREAD,
-                                  SocketInterfaceTgBot>(
-                wrapper.getInternalInterface(), api, helper));
-    }
-    if (wrapper.getExternalInterface()) {
-        threads.emplace_back(
-            mgr->createController<ThreadManager::Usage::SOCKET_EXTERNAL_THREAD,
-                                  SocketInterfaceTgBot>(
-                wrapper.getExternalInterface(), api, helper));
-    }
-    for (auto& thr : threads) {
-        thr->run();
-    }
-    task << InitSuccess;
-}
-
-template <>
-void init<ChatObserver>(InitTask& task) {
-    task << TgBotApiImpl::getInitCallNameForClient("ChatObserver");
-
-    TgBotApiImpl::getInstance()->onAnyMessage(
-        [](TgBotApi::CPtr, const Message::Ptr& message) {
-            const auto& inst = ChatObserver::getInstance();
-            if (!inst->observedChatIds.empty() || inst->observeAllChats) {
-                inst->process(message);
-            }
-            return TgBotApi::AnyMessageResult::Handled;
-        });
-    task << InitSuccess;
-}
-
-InitTask& operator<<(InitTask& tag, NetworkLogSink& thiz) {
-    tag << "Initialize Network LogSink";
-    if (!thiz.interface) {
-        LOG(ERROR) << "Cannot export log socket, skipping initialization";
-        tag << InitFailed;
-        return tag;
-    }
-    thiz.setPreStopFunction([](auto* arg) {
-        LOG(INFO) << "onServerShutdown";
-        auto* const thiz = static_cast<NetworkLogSink*>(arg);
-        thiz->enabled = false;
-        thiz->onClientDisconnected.set_value();
-    });
-    thiz.run();
-    tag << InitSuccess;
-    return tag;
-}
-
-template <>
-void init<NetworkLogSink>(InitTask& task) {
-    auto handler =
-        ThreadManager::getInstance()
-            ->createController<ThreadManager::Usage::LOGSERVER_THREAD,
-                               NetworkLogSink>();
-    task << *handler;
-}
-#endif
-
-template <>
-void init<ResourceManager>(InitTask& task) {
-    task << "Load resource manager";
-    ResourceManager::getInstance()->preloadResourceDirectory();
-    task << InitSuccess;
-}
 
 class RegexHandlerInterface : public RegexHandler::Interface {
    public:
@@ -226,288 +68,317 @@ class RegexHandlerInterface : public RegexHandler::Interface {
     Message::Ptr _message;
 };
 
-template <>
-void init<RegexHandler>(InitTask& task) {
-    task << TgBotApiImpl::getInitCallNameForClient("RegexHandler");
+struct TgBotApiExHandler {
+    TgBotApi* api{};
+    AuthContext* auth{};
+    DatabaseBase* database{};
+    ThreadManager* thread{};
+    std::optional<DurationPoint> exceptionDuration;
 
-    const auto regex = std::make_shared<RegexHandler>();
-    TgBotApiImpl::getInstance()->onAnyMessage(
-        [regex](TgBotApi::CPtr api, const Message::Ptr& message) {
-            const auto ext = std::make_shared<MessageExt>(message);
-            if (ext->has<MessageAttrs::ExtraText>() &&
-                ext->replyMessage()->has<MessageAttrs::ExtraText>()) {
-                auto intf =
-                    std::make_shared<RegexHandlerInterface>(api, message);
-                regex->execute(
-                    intf, ext->replyMessage()->get<MessageAttrs::ExtraText>(),
-                    ext->get<MessageAttrs::ExtraText>());
+    APPLE_INJECT(TgBotApiExHandler(TgBotApi* _api, AuthContext* _auth,
+                                   DatabaseBase* _database,
+                                   ThreadManager* _thread))
+        : api(_api), auth(_auth), database(_database), thread(_thread) {}
+
+    void handle(const TgBot::TgException& e) {
+        LOG(ERROR) << "Telegram API error: " << "{ Message: "
+                   << std::quoted(e.what())
+                   << ", Code: " << static_cast<int32_t>(e.errorCode) << " }";
+        switch (e.errorCode) {
+            // This is probably bot's runtime problem... Yet it isn't fatal. So
+            // skip.
+            case TgBot::TgException::ErrorCode::BadRequest:
+                break;
+            // I don't know what to do with this... Skip
+            case TgBot::TgException::ErrorCode::Internal:
+                return;
+
+            // For floods, this is recoverable, break out of switch to continue
+            // recovering.
+            case TgBot::TgException::ErrorCode::Flood:
+                LOG(INFO) << "Flood detected, trying to recover";
+                break;
+
+            // These should be token fault, or network.
+            case TgBot::TgException::ErrorCode::Unauthorized:
+            case TgBot::TgException::ErrorCode::Forbidden:
+            case TgBot::TgException::ErrorCode::NotFound:
+                LOG(FATAL) << "FATAL PROBLEM DETECTED";
+                break;
+            // Only tgbot-cpp library fault can cause this error... Just ignore
+            case TgBot::TgException::ErrorCode::InvalidJson:
+            case TgBot::TgException::ErrorCode::HtmlResponse:
+                LOG(ERROR) << "BUG on tgbot-cpp library";
+                return;
+            case TgBot::TgException::ErrorCode::Conflict:
+                LOG(INFO) << "Conflict detected, shutting down now.";
+                throw e;
+            default:
+                break;
+        }
+
+        const auto ownerid = database->getOwnerUserId();
+        if (ownerid) {
+            try {
+                api->sendMessage(ownerid.value(),
+                                 std::string("Exception occured: ") + e.what());
+            } catch (const TgBot::TgException& e) {
+                LOG(FATAL) << e.what();
             }
-            return TgBotApi::AnyMessageResult::Handled;
-        });
-    task << InitSuccess;
-}
-
-template <>
-void init<SpamBlockManager>(InitTask& task) {
-    task << TgBotApiImpl::getInitCallNameForClient("SpamBlockManager");
-    ThreadManager::getInstance()
-        ->createController<ThreadManager::Usage::SPAMBLOCK_THREAD,
-                           SpamBlockManager>(TgBotApiImpl::getInstance());
-    TgBotApiImpl::getInstance()->onAnyMessage(
-        [](TgBotApi::CPtr, const Message::Ptr& message) {
-            static auto spamMgr =
-                ThreadManager::getInstance()
-                    ->getController<ThreadManager::Usage::SPAMBLOCK_THREAD,
-                                    SpamBlockManager>();
-            spamMgr->addMessage(message);
-            return TgBotApi::AnyMessageResult::Handled;
-        });
-    task << InitSuccess;
-}
-
-template <>
-void init<TgBotDatabaseImpl>(InitTask& task) {
-    task << "Loading database";
-    auto dbimpl = TgBotDatabaseImpl::getInstance();
-    using namespace ConfigManager;
-    const auto dbConf = getVariable(Configs::DATABASE_BACKEND);
-    std::error_code ec;
-    bool loaded = false;
-
-    if (!dbConf) {
-        LOG(ERROR) << "No database backend specified in config";
-        task << InitFailed;
-        return;
+        }
+        if (exceptionDuration && exceptionDuration->get() < kErrorMaxDuration) {
+            if (ownerid) {
+                api->sendMessage(ownerid.value(), "Recovery failed");
+            }
+            LOG(FATAL) << "Recover failed";
+        }
+        exceptionDuration.emplace();
+        exceptionDuration->init();
+        if (ownerid) {
+            api->sendMessage(ownerid.value(), "Restarting...");
+        }
+        LOG(INFO) << "Re-init";
+        auth->isAuthorized() = false;
+        auto* cl =
+            thread->create<ThreadManager::Usage::ERROR_RECOVERY_THREAD>();
+        if (cl == nullptr) {
+            cl = thread->get<ThreadManager::Usage::ERROR_RECOVERY_THREAD>();
+            cl->reset();
+        }
+        if (cl != nullptr) {
+            cl->runWith([this] {
+                std::this_thread::sleep_for(kErrorRecoveryDelay);
+                auth->isAuthorized() = true;
+            });
+        }
     }
+};
 
-    const std::string& config = dbConf.value();
-    const auto speratorIdx = config.find(':');
-
-    if (speratorIdx == std::string::npos) {
-        LOG(ERROR) << "Invalid database configuration";
-        task << InitFailed;
-        return;
-    }
-
-    // Expected format: <backend>:filename relative to git root (Could be
-    // absolute)
-    const auto backendStr = config.substr(0, speratorIdx);
-    const auto filenameStr = config.substr(speratorIdx + 1);
-
-    TgBotDatabaseImpl::Providers provider;
-    if (!provider.chooseProvider(backendStr)) {
-        LOG(ERROR) << "Failed to choose provider";
-        task << InitFailed;
-        return;
-    }
-    dbimpl->setImpl(std::move(provider));
-
-    if (std::filesystem::path(filenameStr).is_relative()) {
-        LOG(WARNING) << "Relative filepaths may result in inconsistent paths";
-    }
-    loaded = dbimpl->load(filenameStr);
-    if (!loaded) {
-        LOG(ERROR) << "Failed to load database, the bot will not be able to "
-                      "save changes.";
-    } else {
-        DLOG(INFO) << "Database loaded";
-    }
-    task << loaded;
-}
-
-template <>
-void init<ChatDataCollector>(InitTask& task) {
-    static ChatDataCollector c;
-}
-
+extern bool loadDB_TO_BE_FIXED_TODO(TgBotDatabaseImpl* dbimpl);
 namespace {
 
-void TgBotApiExHandler(const TgBot::TgException& e) {
-    static std::optional<DurationPoint> exceptionDuration;
-    auto wrapper = TgBotApiImpl::getInstance();
+template <typename T>
+struct Unused {};
 
-    LOG(ERROR) << "Telegram API error: " << "{ Message: "
-               << std::quoted(e.what())
-               << ", Code: " << static_cast<int32_t>(e.errorCode) << " }";
-    switch (e.errorCode) {
-        // This is probably bot's runtime problem... Yet it isn't fatal. So
-        // skip.
-        case TgBot::TgException::ErrorCode::BadRequest:
-            break;
-        // I don't know what to do with this... Skip
-        case TgBot::TgException::ErrorCode::Internal:
-            return;
+template <typename T>
+struct WrapPtr {
+    T* ptr;
+};
 
-        // For floods, this is recoverable, break out of switch to continue
-        // recovering.
-        case TgBot::TgException::ErrorCode::Flood:
-            LOG(INFO) << "Flood detected, trying to recover";
-            break;
-
-        // These should be token fault, or network.
-        case TgBot::TgException::ErrorCode::Unauthorized:
-        case TgBot::TgException::ErrorCode::Forbidden:
-        case TgBot::TgException::ErrorCode::NotFound:
-            LOG(FATAL) << "FATAL PROBLEM DETECTED";
-            break;
-        // Only tgbot-cpp library fault can cause this error... Just ignore
-        case TgBot::TgException::ErrorCode::InvalidJson:
-        case TgBot::TgException::ErrorCode::HtmlResponse:
-            LOG(ERROR) << "BUG on tgbot-cpp library";
-            return;
-        case TgBot::TgException::ErrorCode::Conflict:
-            LOG(INFO) << "Conflict detected, shutting down now.";
-            throw e;
-        default:
-            break;
-    }
-
-    const auto ownerid = TgBotDatabaseImpl::getInstance()->getOwnerUserId();
-    if (ownerid) {
-        try {
-            wrapper->sendMessage(ownerid.value(),
-                                 std::string("Exception occured: ") + e.what());
-        } catch (const TgBot::TgException& e) {
-            LOG(FATAL) << e.what();
-        }
-    }
-    if (exceptionDuration && exceptionDuration->get() < kErrorMaxDuration) {
-        if (ownerid) {
-            wrapper->sendMessage(ownerid.value(), "Recovery failed");
-        }
-        LOG(FATAL) << "Recover failed";
-    }
-    exceptionDuration.emplace();
-    exceptionDuration->init();
-    if (ownerid) {
-        wrapper->sendMessage(ownerid.value(), "Restarting...");
-    }
-    LOG(INFO) << "Re-init";
-    AuthContext::getInstance()->isAuthorized() = false;
-    const auto thrmgr = ThreadManager::getInstance();
-    auto cl =
-        thrmgr->createController<ThreadManager::Usage::ERROR_RECOVERY_THREAD>();
-    if (!cl) {
-        cl = thrmgr
-                 ->getController<ThreadManager::Usage::ERROR_RECOVERY_THREAD>();
-        cl->reset();
-    }
-    if (cl) {
-        cl->runWith([] {
-            std::this_thread::sleep_for(kErrorRecoveryDelay);
-            AuthContext::getInstance()->isAuthorized() = true;
+fruit::Component<StringResLoader, StringResLoaderBase>
+getStringResLoaderComponent() {
+    return fruit::createComponent()
+        .bind<StringResLoaderBase, StringResLoader>()
+        .registerProvider([] {
+            StringResLoader loader(FS::getPathForType(FS::PathType::RESOURCES) /
+                                   "strings");
+            return loader;
         });
-    }
 }
 
-void initLogging() {
-    using namespace ConfigManager;
-    static std::optional<LogFileSink> log_sink;
-
-    TgBot_AbslLogInit();
-    LOG(INFO) << "Registered LogSink_stdout";
-    if (const auto it = getVariable(Configs::LOG_FILE); it) {
-        log_sink.emplace();
-        log_sink->init(*it);
-        absl::AddLogSink(&log_sink.value());
-        LOG(INFO) << "Register LogSink_file: " << it.value();
-    }
+fruit::Component<TgBotDatabaseImpl, DatabaseBase> getDatabaseComponent() {
+    return fruit::createComponent()
+        .bind<DatabaseBase, TgBotDatabaseImpl>()
+        .registerProvider([] {
+            auto impl = std::make_unique<TgBotDatabaseImpl>();
+            if (!loadDB_TO_BE_FIXED_TODO(impl.get())) {
+                LOG(ERROR) << "Failed to load database";
+                throw std::runtime_error("Failed to load database");
+            }
+            return impl.release();
+        });
 }
 
-void createAndDoInitCallAll() {
-    InitTask task;
+fruit::Component<fruit::Required<AuthContext, StringResLoaderBase, Providers>,
+                 TgBotApiImpl, TgBotApi>
+getTgBotApiImplComponent() {
+    return fruit::createComponent()
+        .bind<TgBotApi, TgBotApiImpl>()
+        .registerProvider([](AuthContext* auth, StringResLoaderBase* strings,
+                             Providers* provider) -> TgBotApiImpl* {
+            auto token = getVariable(ConfigManager::Configs::TOKEN);
+            if (!token) {
+                LOG(ERROR) << "Failed to get TOKEN variable";
+                throw std::invalid_argument("No TOKEN");
+            }
 
-    init<StringResManager>(task);
-    init<TgBotWebServer>(task);
-    init<Random>(task);
+            // Initialize TgBotWrapper instance with provided token
+            auto bot = new TgBotApiImpl(token.value(), auth, strings, provider);
 
-#ifdef SOCKET_CONNECTION
-    init<NetworkLogSink>(task);
-    init<SocketInterfaceTgBot>(task);
-    init<ChatObserver>(task);
-#endif
-    init<SpamBlockManager>(task);
-    init<ResourceManager>(task);
-    init<TgBotDatabaseImpl>(task);
-    init<RegexHandler>(task);
-    init<TgBotApiImpl>(task);
-    init<ChatDataCollector>(task);
-
-    // Must be last
-    OnTerminateRegistrar::getInstance()->registerCallback(
-        []() { ThreadManager::getInstance()->destroyManager(); });
-}
-
-void onBotInitialized(TgBotApiImpl* wrapper, DurationPoint& startupDp,
-                      const char* exe) {
-    LOG(INFO) << "Subsystems initialized, bot started: " << exe;
-    LOG(INFO) << "Started in " << startupDp.get().count() << " milliseconds";
-
-    wrapper->setDescriptions(
-        "Royna's telegram bot, written in C++. Go on you can talk to him",
-        "One of @roynatech's TgBot C++ project bots. I'm currently hosted on "
-#ifdef WINDOWS_BUILD
-        "Windows"
-#elif defined(__linux__)
-        "Linux"
-#elif defined(__APPLE__)
-        "macOS"
-#else
-        "unknown platform"
-#endif
-    );
-    wrapper->addInlineQueryKeyboard(
-        TgBotApi::InlineQuery{"media", "Get media with the name from database",
-                              true, false},
-        [](std::string_view x) -> std::vector<TgBot::InlineQueryResult::Ptr> {
-            std::vector<TgBot::InlineQueryResult::Ptr> results;
-            const auto medias =
-                TgBotDatabaseImpl::getInstance()->getAllMediaInfos();
-            for (const auto& media : medias) {
-                for (const auto& name : media.names) {
-                    if (absl::StartsWith(name, x)) {
-                        switch (media.mediaType) {
-                            case DatabaseBase::MediaType::STICKER: {
-                                auto sticker = std::make_shared<
-                                    TgBot::InlineQueryResultCachedSticker>();
-                                sticker->stickerFileId = media.mediaId;
-                                sticker->id = media.mediaUniqueId;
-                                results.emplace_back(sticker);
-                                break;
-                            }
-                            case DatabaseBase::MediaType::GIF: {
-                                auto gif = std::make_shared<
-                                    TgBot::InlineQueryResultCachedGif>();
-                                gif->gifFileId = media.mediaId;
-                                gif->id = media.mediaUniqueId;
-                                results.emplace_back(gif);
-                                break;
-                            }
-                            default:
-                                break;
-                        }
-                    }
+            // Load modules
+            std::filesystem::path modules_path =
+                FS::getPathForType(FS::PathType::MODULES_INSTALLED);
+            std::error_code ec;
+            LOG(INFO) << "Loading commands from " << modules_path;
+            for (const auto& it :
+                 std::filesystem::directory_iterator(modules_path, ec)) {
+                if (it.path().filename().string().starts_with(
+                        CommandModule::prefix)) {
+                    bot->addCommand(std::make_unique<CommandModule>(it));
                 }
             }
-            if (results.empty()) {
-                auto noResult =
-                    std::make_shared<TgBot::InlineQueryResultArticle>();
-                noResult->id = "no_result";
-                noResult->title = fmt::format("No results found by {}", x);
-                noResult->description = "Try searching for something else";
-                auto text = std::make_shared<TgBot::InputTextMessageContent>();
-                text->messageText = "Try searching for something else";
-                noResult->inputMessageContent = text;
-                results.emplace_back(noResult);
+            if (ec) {
+                LOG(ERROR) << "Failed to iterate through modules: "
+                           << ec.message();
+                return bot;
             }
-            return results;
+            try {
+                LOG(INFO) << "Updating botcommands with loaded modules...";
+                bot->setBotCommands();
+            } catch (const boost::system::system_error& e) {
+                LOG(ERROR) << "Exception updating commands list: " << e.what();
+            }
+            return bot;
         });
+}
+
+fruit::Component<Unused<TgBotWebServer>> getWebServerComponent() {
+    return fruit::createComponent()
+        .bind<TgBotWebServerBase, TgBotWebServer>()
+        .registerProvider([](ThreadManager* threadManager)
+                              -> Unused<TgBotWebServer> {
+            constexpr int kTgBotWebServerPort = 8080;
+            const auto server =
+                threadManager->create<ThreadManager::Usage::WEBSERVER_THREAD,
+                                      TgBotWebServer>(kTgBotWebServerPort);
+            server->run();
+            return {};
+        });
+}
+
+fruit::Component<fruit::Required<ThreadManager, TgBotApi, AuthContext>,
+                 WrapPtr<SpamBlockBase>>
+getSpamBlockComponent() {
+    return fruit::createComponent().registerProvider(
+        [](ThreadManager* thread, TgBotApi::Ptr api,
+           AuthContext* auth) -> WrapPtr<SpamBlockBase> {
+            return {thread->create<ThreadManager::Usage::SPAMBLOCK_THREAD,
+                                   SpamBlockManager>(api, auth)};
+        });
+}
+
+fruit::Component<fruit::Required<ThreadManager>, Unused<NetworkLogSink>>
+getNetworkLogSinkComponent() {
+    return fruit::createComponent().registerProvider(
+        [](ThreadManager* thread) -> Unused<NetworkLogSink> {
+            thread->create<ThreadManager::Usage::LOGSERVER_THREAD,
+                           NetworkLogSink>();
+            return {};
+        });
+}
+
+using SocketComponentFactory_t = std::function<Unused<SocketInterfaceTgBot>(
+    ThreadManager::Usage usage, SocketInterfaceBase*)>;
+fruit::Component<fruit::Required<TgBotApi, ChatObserver, WrapPtr<SpamBlockBase>,
+                                 SocketFile2DataHelper, ThreadManager>,
+                 SocketComponentFactory_t>
+getSocketInterfaceComponent() {
+    return fruit::createComponent()
+        .registerFactory<Unused<SocketInterfaceTgBot>(
+            fruit::Assisted<ThreadManager::Usage> usage,
+            fruit::Assisted<SocketInterfaceBase*> interface, TgBotApi::Ptr api,
+            ChatObserver * observer, WrapPtr<SpamBlockBase> spamblock,
+            SocketFile2DataHelper * helper, ThreadManager * manager)>(
+            [](ThreadManager::Usage usage, SocketInterfaceBase* interface,
+               TgBotApi::Ptr api, ChatObserver* observer,
+               WrapPtr<SpamBlockBase> spamblock, SocketFile2DataHelper* helper,
+               ThreadManager* manager) -> Unused<SocketInterfaceTgBot> {
+                auto thread = manager->create<SocketInterfaceTgBot>(
+                    usage, interface, api, observer, spamblock.ptr, helper);
+                thread->run();
+                return {};
+            });
+}
+
+fruit::Component<fruit::Required<TgBotApi>, Unused<RegexHandler>>
+getRegexHandlerComponent() {
+    return fruit::createComponent().registerProvider(
+        [](TgBotApi::Ptr api) -> Unused<RegexHandler> {
+            api->onAnyMessage([](TgBotApi::CPtr api,
+                                 const Message::Ptr& message) {
+                static auto regex = std::make_unique<RegexHandler>();
+                const auto ext = std::make_shared<MessageExt>(message);
+                if (ext->has<MessageAttrs::ExtraText>() &&
+                    ext->replyMessage()->has<MessageAttrs::ExtraText>()) {
+                    auto intf =
+                        std::make_shared<RegexHandlerInterface>(api, message);
+                    regex->execute(
+                        std::move(intf),
+                        ext->replyMessage()->get<MessageAttrs::ExtraText>(),
+                        ext->get<MessageAttrs::ExtraText>());
+                }
+                return TgBotApi::AnyMessageResult::Handled;
+            });
+            return {};
+        });
+}
+
+fruit::Component<TgBotApi, AuthContext, DatabaseBase, ThreadManager,
+                 RegexHandler, Unused<NetworkLogSink>, WrapPtr<SpamBlockBase>,
+                 Unused<TgBotWebServer>, TgBotApiExHandler,
+                 SocketComponentFactory_t>
+getAllComponent() {
+    return fruit::createComponent()
+        .bind<TgBotWebServerBase, TgBotWebServer>()
+        .bind<VFSOperations, RealFS>()
+        .install(getDatabaseComponent)
+        .install(getTgBotApiImplComponent)
+        .install(getRegexHandlerComponent)
+        .install(getNetworkLogSinkComponent)
+        .install(getSpamBlockComponent)
+        .install(getWebServerComponent)
+        .install(getStringResLoaderComponent)
+        .install(getSocketInterfaceComponent);
+}
+
+std::vector<TgBot::InlineQueryResult::Ptr> mediaQueryKeyboardFunction(
+    DatabaseBase* database, std::string_view word) {
+    std::vector<TgBot::InlineQueryResult::Ptr> results;
+    const auto medias = database->getAllMediaInfos();
+    for (const auto& media : medias) {
+        for (const auto& name : media.names) {
+            if (absl::StartsWith(name, word)) {
+                switch (media.mediaType) {
+                    case DatabaseBase::MediaType::STICKER: {
+                        auto sticker = std::make_shared<
+                            TgBot::InlineQueryResultCachedSticker>();
+                        sticker->stickerFileId = media.mediaId;
+                        sticker->id = media.mediaUniqueId;
+                        results.emplace_back(sticker);
+                        break;
+                    }
+                    case DatabaseBase::MediaType::GIF: {
+                        auto gif = std::make_shared<
+                            TgBot::InlineQueryResultCachedGif>();
+                        gif->gifFileId = media.mediaId;
+                        gif->id = media.mediaUniqueId;
+                        results.emplace_back(gif);
+                        break;
+                    }
+                    default:
+                        break;
+                }
+            }
+        }
+    }
+    if (results.empty()) {
+        auto noResult = std::make_shared<TgBot::InlineQueryResultArticle>();
+        noResult->id = "no_result";
+        noResult->title = fmt::format("No results found by {}", word);
+        noResult->description = "Try searching for something else";
+        auto text = std::make_shared<TgBot::InputTextMessageContent>();
+        text->messageText = "Try searching for something else";
+        noResult->inputMessageContent = text;
+        results.emplace_back(noResult);
+    }
+    return results;
 }
 
 }  // namespace
 
+using std::string_view_literals::operator""sv;
+
 int main(int argc, char** argv) {
-    std::optional<std::string> token;
     DurationPoint startupDp;
     using namespace ConfigManager;
 
@@ -515,7 +386,16 @@ int main(int argc, char** argv) {
     CommandLine::initInstance(argc, argv);
 
     // Initialize logging
-    initLogging();
+    using namespace ConfigManager;
+    RAIILogSink<LogFileSink> logFileSink;
+
+    TgBot_AbslLogInit();
+    LOG(INFO) << "Registered LogSink_stdout";
+    if (const auto it = getVariable(Configs::LOG_FILE); it) {
+        auto sink = std::make_unique<LogFileSink>(*it);
+        LOG(INFO) << "Register LogSink_file: " << it.value();
+        logFileSink = std::move(sink);
+    }
 
     // Print help and return if help option is set
     if (ConfigManager::getVariable(ConfigManager::Configs::HELP)) {
@@ -523,36 +403,65 @@ int main(int argc, char** argv) {
         return EXIT_SUCCESS;
     }
 
-    token = getVariable(Configs::TOKEN);
-    if (!token) {
-        LOG(ERROR) << "Failed to get TOKEN variable";
-        return EXIT_FAILURE;
-    }
-
-    // Initialize TgBotWrapper instance with provided token
-    auto* wrapperInst = TgBotApiImpl::initInstance(token.value());
-
     // Install signal handlers
     SignalHandler::install();
 
-    // Initialize subsystems
-    createAndDoInitCallAll();
+    // Initialize dependencies
+    fruit::Injector<TgBotApi, AuthContext, DatabaseBase, ThreadManager,
+                    RegexHandler, Unused<NetworkLogSink>,
+                    WrapPtr<SpamBlockBase>, Unused<TgBotWebServer>,
+                    TgBotApiExHandler, SocketComponentFactory_t>
+        injector(getAllComponent);
+
+    auto threadManager = injector.get<ThreadManager*>();
+    auto api = injector.get<TgBotApi*>();
+    auto database = injector.get<DatabaseBase*>();
+    auto exHandle = injector.get<TgBotApiExHandler*>();
+
+    auto socketFactor = injector.get<SocketComponentFactory_t>();
+    // Initialize actual pointers to injected instances
+    SocketServerWrapper wrapper;
+    auto rawP = wrapper.getInternalInterface();
+    socketFactor(ThreadManager::Usage::SOCKET_THREAD, rawP.get());
+
+    // Must be last
+    OnTerminateRegistrar::getInstance()->registerCallback(
+        [threadManager]() { threadManager->destroyManager(); });
 
 #ifndef WINDOWS_BUILD
-    LOG_IF(WARNING, !RestartFmt::handleMessage(wrapperInst).ok())
+    LOG_IF(WARNING, !RestartFmt::handleMessage(api).ok())
         << "Failed to handle restart message";
 #endif
 
-    try {
-        // Bot starts
-        onBotInitialized(wrapperInst, startupDp, argv[0]);
-    } catch (...) {
-    }
+    LOG(INFO) << "Subsystems initialized, bot started: " << argv[0];
+    LOG(INFO) << fmt::format("Starting took {}", startupDp.get());
+
+    api->setDescriptions(
+        "Royna's telegram bot, written in C++. Go on you can talk to it"sv,
+        "One of @roynatech's TgBot C++ project bots. I'm currently hosted on "
+#ifdef WINDOWS_BUILD
+        "Windows"sv
+#elif defined(__linux__)
+        "Linux"sv
+#elif defined(__APPLE__)
+        "macOS"sv
+#else
+        "unknown platform"sv
+#endif
+    );
+
+    api->addInlineQueryKeyboard(
+        TgBotApi::InlineQuery{"media", "Get media with the name from database",
+                              true, false},
+        [database](
+            std::string_view x) -> std::vector<TgBot::InlineQueryResult::Ptr> {
+            return mediaQueryKeyboardFunction(database, x);
+        });
     while (!SignalHandler::isSignaled()) {
         try {
-            wrapperInst->startPoll();
+            api->startPoll();
         } catch (const TgBot::TgException& e) {
-            TgBotApiExHandler(e);
+            exHandle->handle(e);
         } catch (const std::exception& e) {
             LOG(ERROR) << "Uncaught Exception: " << e.what();
             break;

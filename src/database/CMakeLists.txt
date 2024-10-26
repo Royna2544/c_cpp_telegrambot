@@ -51,23 +51,29 @@ add_my_library(
     ${DATABASE_DEFS}
 )
 
+add_my_library(
+  NAME DBLoading
+  SRCS utils/LoadingDatabase.cpp
+  LIBS TgBotUtils TgBotDBImpl
+  STATIC
+)
+
 ################# Utility Programs (Database Ctl) ##################
 add_my_executable(
   NAME DatabaseCtl
   SRCS utils/DatabaseCtrl.cc
-  LIBS TgBotDBImpl
+  LIBS TgBotDBImpl TgBotDBLoading
 )
 #####################################################################
 
 ############### Utility Programs (Send Media to chat) ################
-if (USE_UNIX_SOCKETS)
-  add_my_executable(
-    NAME MediaCli
-    SRCS utils/SendMediaToChat.cc
-    LIBS 
-      TgBotDBImpl
-      TgBotSocket
-      OpenSSL::Crypto
-  )
-endif()
+add_my_executable(
+  NAME MediaCli
+  SRCS utils/SendMediaToChat.cc
+  LIBS 
+    TgBotDBImpl
+    TgBotSocket
+    OpenSSL::Crypto
+    TgBotDBLoading
+)
 #####################################################################

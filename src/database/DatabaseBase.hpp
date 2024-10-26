@@ -9,7 +9,6 @@
 #include "Types.h"
 
 struct DatabaseBase {
-    DatabaseBase() = default;
     virtual ~DatabaseBase() = default;
 
     enum class ListType { WHITELIST, BLACKLIST };

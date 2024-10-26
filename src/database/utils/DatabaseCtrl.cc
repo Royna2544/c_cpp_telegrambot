@@ -26,7 +26,7 @@ struct CommandData {
     // Array of command arguments after (exe, command)
     std::vector<std::string> args;
     // Instance of TgBotDatabaseImpl
-    InstanceClassBase<TgBotDatabaseImpl>::pointer_type impl;
+    std::unique_ptr<TgBotDatabaseImpl> impl;
 };
 
 namespace {
@@ -148,47 +148,9 @@ void executeCommand<Commands::WhiteBlackList>(const CommandData& data) {
         }
     }
 }
-
-bool loadDB_TO_BE_FIXED_TODO() {
-    auto dbimpl = TgBotDatabaseImpl::getInstance();
-    using namespace ConfigManager;
-    const auto dbConf = getVariable(Configs::DATABASE_BACKEND);
-    std::error_code ec;
-    bool loaded = false;
-
-    if (!dbConf) {
-        LOG(ERROR) << "No database backend specified in config";
-        return false;
-    }
-
-    const std::string& config = dbConf.value();
-    const auto speratorIdx = config.find(':');
-
-    if (speratorIdx == std::string::npos) {
-        LOG(ERROR) << "Invalid database configuration";
-        return false;
-    }
-
-    // Expected format: <backend>:filename relative to git root (Could be
-    // absolute)
-    const auto backendStr = config.substr(0, speratorIdx);
-    const auto filenameStr = config.substr(speratorIdx + 1);
-
-    TgBotDatabaseImpl::Providers provider;
-    if (!provider.chooseProvider(backendStr)) {
-        LOG(ERROR) << "Failed to choose provider";
-        return false;
-    }
-    dbimpl->setImpl(std::move(provider));
-    loaded = dbimpl->load(filenameStr);
-    if (!loaded) {
-        LOG(ERROR) << "Failed to load database";
-    } else {
-        DLOG(INFO) << "Database loaded";
-    }
-    return loaded;
-}
 }  // namespace
+
+extern bool loadDB_TO_BE_FIXED_TODO(TgBotDatabaseImpl* dbimpl);
 
 int main(int argc, char** argv) {
     TgBot_AbslLogInit();
@@ -202,8 +164,8 @@ int main(int argc, char** argv) {
         return EXIT_SUCCESS;
     }
 
-    auto dbImpl = TgBotDatabaseImpl::getInstance();
-    loadDB_TO_BE_FIXED_TODO();
+    auto dbImpl = std::make_unique<TgBotDatabaseImpl>();
+    loadDB_TO_BE_FIXED_TODO(dbImpl.get());
     if (!dbImpl->isLoaded()) {
         LOG(ERROR) << "Failed to load database";
         return EXIT_FAILURE;
@@ -211,7 +173,7 @@ int main(int argc, char** argv) {
     const std::string command = args[1];
     // Erase exe, command name
     args.erase(args.begin(), args.begin() + 2);
-    data = {args, dbImpl};
+    data = {args, std::move(dbImpl)};
 
     DLOG(INFO) << "Executing command: " << command;
     if (command == "dump") {
@@ -229,5 +191,4 @@ int main(int argc, char** argv) {
     } else {
         LOG(ERROR) << "Unknown command: " << command;
     }
-    dbImpl->unloadDatabase();
 }

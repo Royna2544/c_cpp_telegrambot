@@ -16,7 +16,7 @@
 
 struct SharedMallocParent {
     explicit SharedMallocParent(size_t size)
-        : data(malloc(size), free), _size(size) {
+        : _size(size), data(malloc(size), free) {
         if (data == nullptr) {
             throw std::bad_alloc();
         }

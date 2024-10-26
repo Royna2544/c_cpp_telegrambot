@@ -65,7 +65,7 @@ bool CommandModule::load() {
         filePath.filename().replace_extension().string();
     std::string_view cmdNameView(cmdNameStr);
 
-    if (!absl::ConsumePrefix(&cmdNameView, "libcmd_")) {
+    if (!absl::ConsumePrefix(&cmdNameView, prefix)) {
         LOG(WARNING) << "Failed to extract command name from " << filePath;
         return false;
     }

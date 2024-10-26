@@ -5,7 +5,6 @@
 #include <fmt/core.h>
 
 #include <DurationPoint.hpp>
-#include <StringResManager.hpp>
 #include <chrono>
 #include <cstdio>
 #include <ios>
@@ -23,8 +22,9 @@ using std::chrono_literals::operator""ms;
 using std::chrono::high_resolution_clock;
 using std::chrono::milliseconds;
 
-CompilerInTg::CompilerInTg(std::unique_ptr<Interface> interface)
-    : _interface(std::move(interface)) {}
+CompilerInTg::CompilerInTg(std::unique_ptr<Interface> interface,
+                           const StringResLoaderBase::LocaleStrings *loader)
+    : _interface(std::move(interface)), _locale(loader) {}
 
 void CompilerInTg::runCommand(std::string cmd, std::stringstream &res,
                               bool use_wdt) {
@@ -36,7 +36,7 @@ void CompilerInTg::runCommand(std::string cmd, std::stringstream &res,
 
     LOG(INFO) << __func__ << ": +++";
     _interface->onExecutionStarted(cmd);
-    LOG(INFO) << fmt::format("{}: '{}'", GETSTR(COMMAND), cmd);
+    LOG(INFO) << fmt::format("Command is: '{}'", cmd);
 
     if (!popen_watchdog_init(&p_wdt_data)) {
         LOG(ERROR) << "popen_watchdog_init failed";

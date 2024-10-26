@@ -2,47 +2,90 @@
     <string name="send_bash_command">Send a bash command to run</string>
     <string name="compile_time">Compile time</string>
     <string name="run_time">Run time</string>
-    <string name="reply_to_a_code">Reply to a message with code as text</string>
-    <string name="working">Working on it...
-Command is: </string>
-    <string name="owner">Owner</string>
-    <string name="command">Command</string>
-    <string name="truncated">Truncated due to too much output</string>
+    <string name="working_on_it">Working on it...</string>
+    <string name="command_is">Command is</string>
+    <string name="need_a_nonempty_reply_message">Need a replied-to message with a non-empty text</string>
     <string name="example">Example</string>
-    <string name="need_user">You must specify a user</string>
     <string name="unknown_action">Unknown action</string>
     <string name="operation_successful">Operation Sucessful</string>
     <string name="operation_failure">Operation failed</string>
-    <string name="not_supported_in_current_host">Not supported in current host</string>
-    <string name="reply_to_user_msg">Reply to a user's message</string>
-    <string name="reply_to_gif_or_sticker">Reply to a GIF or sticker</string>
+    <string name="unknown">Unknown</string>
+
+    <!-- Saveid cmd -->
     <string name="media_already_in_db">Media already in database</string>
     <string name="send_a_name_to_save">Send a name to save</string>
 
+    <string name="done_took">Done. Execution took</string>
+    <string name="error_took">Error Occurred. Execution took</string>
+    <string name="output_is_empty">Output is empty</string>
 
+    <!-- decide cmd -->
+    <string name="deciding">Deciding</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+    <string name="so_yes">So, yes</string>
+    <string name="so_idk">So, idk</string>
+    <string name="so_no">So, no</string>
+    <string name="short_circuited_to_the_answer">Short circuited to the answer</string>
+
+    <!-- possiblity cmd -->
+    <string name="send_possibilities">Send avaliable conditions sperated by newline</string>
+    <string name="total_items_prefix">Total</string>
+    <string name="total_items_suffix">items</string>
+    <string name="give_more_than_one">Give more than one choice</string>
+
+    <!-- copystickers cmd -->
+    <string name="starting_conversion">Starting conversion</string>
+    <string name="conversion_in_progress">Conversion in progress</string>
+    <string name="creating_new_sticker_set">Creating new sticker set</string>
+    <string name="sticker_pack_created">Sticker pack created</string>
+    <string name="failed_to_create_new_sticker_set">Failed to create new sticker set</string>
+
+    <!-- setowner cmd -->
+    <string name="bot_owner_set">Bot's owner has been set</string>
+    
+    <!-- flash cmd -->
+    <string name="flashing_zip">Flashing zip</string>
+    <string name="send_a_file_name_to_flash">Send a file name to flash</string>
+    <string name="invalid_input_no_newline">Invalid input: filenames shouldn't include newlines</string>
+    <string name="failed_successfully">Failed successfully!</string>
+    <string name="reason">Reason</string>
+    <string name="success_chance_was">Success! Chance was</string>
+
+    <!-- restart cmd -->
+    <string name="restarting_bot">Restarting bot instance...</string>
+
+    <!-- rotatepic cmd -->
+    <string name="cannot_rotate_nonstatic">Cannot rotate sticker that is not static</string>
+    <string name="invalid_angle">Invalid angle provided</string>
+    <string name="rotated_picture">Rotated picture</string>
+    <string name="failed_to_rotate_image">Failed to rotate image</string>
+
+    <!-- Database -->
     <string name="user_added">User added to the list</string>
     <string name="user_removed">User removed from the list</string>
     <string name="user_already_in_list">User is already in the list</string>
     <string name="user_already_in_other_list">User is already in other list</string>
     <string name="user_not_in_list">User is not in the list</string>
 
+    <!-- Reply to -->
+    <string name="reply_to_a_sticker">Reply to a sticker</string>
+    <string name="reply_to_user_msg">Reply to a user's message</string>
+    <string name="reply_to_gif_or_sticker">Reply to a GIF or sticker</string>
+    <string name="reply_to_a_code">Reply to a message with code as text</string>
+    <string name="reply_to_a_media">Reply to a media</string>
+
     <!-- Fails and errors -->
     <string name="failed_to_write_file">Failed to write file</string>
-    <string name="failed_to_run_command">Failed to run command</string>
+    <string name="failed_to_create_directory">Failed to create directory</string>
     <string name="failed_to_parse_input">Failed to parse input</string>
-    <string name="error_path_cannot_be_empty">PATH cannot be empty</string>
-    <string name="error_updating_bot_commands">Error updating bot commands list</string>
+    <string name="failed_to_download_file">Failed to download file</string>
+    <string name="failed_to_read_file">Failed to read file</string>
+    <string name="failed_to_upload_file">Failed to upload file</string>
+
     <string name="error_sending_gif">Error sending GIF</string>
     <string name="backend_error">Backend error</string>
     <string name="unknown_error">Unknown error</string>
     <string name="invalid_args_passed">Invalid arguments passed</string>
-
-    <!-- Command desc -->
-    <string name="alive_cmd_desc">Test if a bot is alive</string>
-    <string name="start_cmd_desc">Alias for alive command</string>
-    <string name="bash_cmd_desc">Run bash commands</string>
-    <string name="ubash_cmd_desc">Run bash commands w/o timeout</string>
-    <string name="database_cmd_desc">Run database commands</string>
-    <string name="saveid_cmd_desc">Save a Telegram media as name</string>
-    <string name="decho_cmd_desc">Delete and echo message</string>
+    <string name="sticker_set_not_found">Sticker set not found</string>
 </resources>

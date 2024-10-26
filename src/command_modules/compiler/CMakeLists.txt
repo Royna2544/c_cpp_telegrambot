@@ -7,8 +7,8 @@ add_my_library(
         Generic.cpp
         Helper.cpp
     LIBS
-        TgBotStringResManager
         TgBot_popen_wdt
+        TgBotStringRes
         absl::status
     PUBLIC_INC
         ${CMAKE_CURRENT_BINARY_DIR}

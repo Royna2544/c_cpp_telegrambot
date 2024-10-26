@@ -1,11 +1,10 @@
-#include <Authorization.hpp>
 #include <CStringLifetime.h>
 #include <absl/log/log.h>
 #include <tgbot/TgException.h>
 #include <trivial_helpers/_std_chrono_templates.h>
 #include <trivial_helpers/_tgbot.h>
 
-#include <InstanceClassBase.hpp>
+#include <Authorization.hpp>
 #include <algorithm>
 #include <global_handlers/SpamBlock.hpp>
 #include <memory>
@@ -139,15 +138,13 @@ void SpamBlockBase::runFunction() {
 void SpamBlockBase::addMessage(const Message::Ptr &message) {
     static std::once_flag once;
 
-#ifdef SOCKET_CONNECTION
     // Global cfg
     if (spamBlockConfig == CtrlSpamBlock::CTRL_OFF) {
         return;
     }
-#endif
-    // I'm allowed always
-    if (AuthContext::getInstance()->isAuthorized(message,
-                                                 AuthContext::Flags::None)) {
+
+    // Run possible additional checks
+    if (additionalHook(message)) {
         return;
     }
 
@@ -200,7 +197,6 @@ void SpamBlockManager::handleUserAndMessagePair(PerChatHandleConstRef e,
                                                 const size_t threshold,
                                                 const char *name) {
     bool enforce = false;
-#ifdef SOCKET_CONNECTION
     switch (spamBlockConfig) {
         case CtrlSpamBlock::CTRL_ENFORCE:
             enforce = true;
@@ -210,15 +206,13 @@ void SpamBlockManager::handleUserAndMessagePair(PerChatHandleConstRef e,
             break;
         }
         case CtrlSpamBlock::CTRL_LOGGING_ONLY_ON:
-            if (isEntryOverThreshold(e, threshold))
+            if (isEntryOverThreshold(e, threshold)) {
                 _logSpamDetectCommon(e, name);
+            }
             break;
         default:
             break;
     };
-#else
-    _deleteAndMuteCommon(it, e, threshold, name, enforce);
-#endif
 }
 
 void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle,
@@ -260,4 +254,14 @@ void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle,
     }
 }
 
-DECLARE_CLASS_INST(SpamBlockManager);
+bool SpamBlockManager::additionalHook(const Message::Ptr &msg) {
+    return _auth->isAuthorized(msg, AuthContext::Flags::None);
+}
+
+SpamBlockManager::SpamBlockManager(TgBotApi::Ptr api, AuthContext *auth)
+    : _api(api), _auth(auth) {
+    api->onAnyMessage([this](TgBotApi::CPtr, const Message::Ptr &message) {
+        addMessage(message);
+        return TgBotApi::AnyMessageResult::Handled;
+    });
+}

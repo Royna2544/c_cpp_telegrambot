@@ -25,6 +25,7 @@
 #include <trivial_helpers/raii.hpp>
 #include <utility>
 #include <vector>
+#include <LogSinks.hpp>
 
 struct FDLogSink : public absl::LogSink {
     void Send(const absl::LogEntry& logSink) override {
@@ -47,21 +48,6 @@ struct FDLogSink : public absl::LogSink {
     int stdout_fd;
     bool isWritable = true;
     pid_t pid_;
-};
-
-template <typename Sink>
-    requires(std::is_base_of_v<absl::LogSink, Sink>)
-struct RAIILogSink {
-    explicit RAIILogSink() : _sink(std::make_unique<Sink>()) {
-        absl::AddLogSink(_sink.get());
-    }
-    ~RAIILogSink() { absl::RemoveLogSink(_sink.get()); }
-
-    NO_MOVE_CTOR(RAIILogSink);
-    NO_COPY_CTOR(RAIILogSink);
-
-   private:
-    std::unique_ptr<Sink> _sink;
 };
 
 bool ForkAndRun::execute() {
@@ -104,7 +90,7 @@ bool ForkAndRun::execute() {
         Pipe program_termination_pipe{};
         bool breakIt = false;
         int status = 0;
-        auto token = Random::getInstance()->generate(100);
+        static int token = 0;
         auto tregi = OnTerminateRegistrar::getInstance();
 
         tregi->registerCallback([this]() { cancel(); }, token);
@@ -177,6 +163,7 @@ bool ForkAndRun::execute() {
         stderr_pipe.close();
         stdout_pipe.close();
         tregi->unregisterCallback(token);
+        ++token;
     } else {
         PLOG(ERROR) << "Unable to fork";
     }

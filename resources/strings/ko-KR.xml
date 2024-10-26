@@ -1,0 +1,65 @@
+<resources>
+    <string name="send_bash_command">Bash 명령어를 실행합니다</string>
+    <string name="compile_time">컴파일 시간</string>
+    <string name="run_time">실행 시간</string>
+    <string name="working_on_it">작업 중...</string>
+    <string name="command_is">명령어는</string>
+    <string name="need_a_nonempty_reply_message">비어 있지 않은 답변 메시지가 필요합니다</string>
+    <string name="example">예</string>
+    <string name="need_user">사용자를 지정해야 합니다</string>
+    <string name="unknown_action">알 수 없는 동작</string>
+    <string name="operation_successful">작업이 성공했습니다</string>
+    <string name="operation_failure">작업 실패</string>
+
+    <!-- Saveid cmd -->
+    <string name="media_already_in_db">미디어가 이미 데이터베이스에 있습니다</string>
+    <string name="send_a_name_to_save">저장할 이름을 보내세요</string>
+
+    <string name="done_took">완료되었습니다. 실행 시간:</string>
+    <string name="error_took">오류 발생. 실행 시간:</string>
+    <string name="output_is_empty">출력이 비어 있습니다</string>
+
+    <!-- decide cmd -->
+    <string name="deciding">결정 중</string>
+    <string name="yes">예</string>
+    <string name="no">아니오</string>
+    <string name="so_yes">그래서, 예</string>
+    <string name="so_idk">그래서, 잘 모르겠습니다</string>
+    <string name="so_no">그래서, 아니오</string>
+    <string name="short_circuited_to_the_answer">결과로 바로 이동했습니다</string>
+
+    <!-- copystickers cmd -->
+    <string name="starting_conversion">변환 시작 중</string>
+    <string name="conversion_in_progress">변환 진행 중</string>
+    <string name="creating_new_sticker_set">새 스티커 세트 생성 중</string>
+    <string name="sticker_pack_created">스티커 세트가 생성되었습니다</string>
+    <string name="failed_to_create_sticker_set">새 스티커 세트 생성 실패</string>
+
+    <!-- Database -->
+    <string name="user_added">사용자가 목록에 추가되었습니다</string>
+    <string name="user_removed">사용자가 목록에서 제거되었습니다</string>
+    <string name="user_already_in_list">사용자가 이미 목록에 있습니다</string>
+    <string name="user_already_in_other_list">사용자가 이미 다른 목록에 있습니다</string>
+    <string name="user_not_in_list">사용자가 목록에 없습니다</string>
+
+    <!-- Reply to -->
+    <string name="reply_to_a_sticker">스티커에 답장하세요</string>
+    <string name="reply_to_user_msg">사용자의 메시지에 답장하세요</string>
+    <string name="reply_to_gif_or_sticker">GIF 또는 스티커에 답장하세요</string>
+    <string name="reply_to_a_code">코드가 포함된 메시지에 답장하세요</string>
+
+    <!-- Fails and errors -->
+    <string name="failed_to_write_file">파일 쓰기에 실패했습니다</string>
+    <string name="failed_to_create_directory">디렉토리 생성에 실패했습니다</string>
+    <string name="failed_to_run_command">명령어 실행에 실패했습니다</string>
+    <string name="failed_to_parse_input">입력 파싱에 실패했습니다</string>
+    <string name="failed_to_download_file">파일 다운로드에 실패했습니다</string>
+    <string name="failed_to_read_file">파일 읽기에 실패했습니다</string>
+    <string name="failed_to_upload_file">파일 업로드에 실패했습니다</string>
+
+    <string name="error_sending_gif">GIF 전송 중 오류가 발생했습니다</string>
+    <string name="backend_error">백엔드 오류</string>
+    <string name="unknown_error">알 수 없는 오류</string>
+    <string name="invalid_args_passed">잘못된 인수가 전달되었습니다</string>
+    <string name="sticker_set_not_found">스티커 세트를 찾을 수 없습니다</string>
+</resources>

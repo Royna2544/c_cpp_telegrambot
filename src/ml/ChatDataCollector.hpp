@@ -1,10 +1,11 @@
 #include <Types.h>
 
-#include <InitTask.hpp>
 #include <api/TgBotApiImpl.hpp>
 #include <ctime>
 #include <fstream>
 #include <libos/OnTerminateRegistrar.hpp>
+#include "api/TgBotApi.hpp"
+#include "trivial_helpers/fruit_inject.hpp"
 
 // Collects user data to a CSV
 class ChatDataCollector {
@@ -25,7 +26,6 @@ class ChatDataCollector {
 
         Data() = default;
         explicit Data(const Message::Ptr& message) {
-            Data::MsgType msgType{};
             if (!message->text.empty()) {
                 msgType = Data::MsgType::TEXT;
             } else if (!message->photo.empty()) {
@@ -41,6 +41,9 @@ class ChatDataCollector {
             } else {
                 msgType = Data::MsgType::ETC;
             }
+            chatId = message->chat->id;
+            userId = message->from->id;
+            timestamp = message->date;
         }
     };
 
@@ -48,7 +51,7 @@ class ChatDataCollector {
         chatData.emplace_back(message);
     }
 
-    ChatDataCollector();
+    APPLE_EXPLICIT_INJECT(ChatDataCollector(TgBotApi::Ptr api));
     ~ChatDataCollector();
 
    private:
@@ -61,8 +64,9 @@ inline std::ostream& operator<<(std::ostream& os, ChatDataCollector::Data d) {
     return os;
 }
 
-inline ChatDataCollector::ChatDataCollector() {
-    TgBotApiImpl::getInstance()->onAnyMessage([this](auto api, auto message) {
+
+inline ChatDataCollector::ChatDataCollector(TgBotApi::Ptr api) {
+    api->onAnyMessage([this](auto api, auto message) {
         onMessage(message);
         return TgBotApiImpl::AnyMessageResult::Handled;
     });

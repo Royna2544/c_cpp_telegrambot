@@ -12,18 +12,19 @@
 #include <libos/libsighandler.hpp>
 #include <restartfmt_parser.hpp>
 
+#include "StringResLoader.hpp"
 #include "Types.h"
 #include "api/MessageExt.hpp"
 
 extern char **environ;  // NOLINT
 
-DECLARE_COMMAND_HANDLER(restart, tgBotWrapper, message) {
+DECLARE_COMMAND_HANDLER(restart) {
     // typical chatid:int32_max
     std::array<char, RestartFmt::MAX_KNOWN_LENGTH> restartBuf = {0};
     int count = 0;
     std::vector<char *> myEnviron;
 
-    const auto status = RestartFmt::handleMessage(tgBotWrapper);
+    const auto status = RestartFmt::handleMessage(api);
     LOG_IF(ERROR, status.code() == absl::StatusCode::kInvalidArgument)
         << "Failed to handle restart message: " << status;
     if (status.ok()) {
@@ -55,8 +56,8 @@ DECLARE_COMMAND_HANDLER(restart, tgBotWrapper, message) {
     // Log the restart command and the arguments to be used to restart the bot
     LOG(INFO) << fmt::format("Restarting bot with exe: {}, addenv {}", exe,
                              restartBuf.data());
-    tgBotWrapper->sendReplyMessage(message->message(),
-                                   "Restarting bot instance...");
+    api->sendReplyMessage(message->message(),
+                          access(res, Strings::RESTARTING_BOT));
 
     // Call exeve
     execve(exe, argv, myEnviron.data());

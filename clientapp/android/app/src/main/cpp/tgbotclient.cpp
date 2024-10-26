@@ -128,7 +128,8 @@ class Callbacks {
     } methods{};
 };
 
-const auto FileDataHelper = std::make_shared<SocketFile2DataHelper>(std::make_shared<RealFS>());
+RealFS realfs;
+SocketFile2DataHelper helper(&realfs);
 
 class TgBotSocketNative {
    public:
@@ -369,7 +370,7 @@ class TgBotSocketNative {
     void handleSpecificData<Command::CMD_DOWNLOAD_FILE_CALLBACK>(
             std::unique_ptr<Callbacks> callbacks, const void *data, PacketHeader::length_type len) const {
         bool rc =
-            FileDataHelper->DataToFile<SocketFile2DataHelper::Pass::DOWNLOAD_FILE>(
+            helper.DataToFile<SocketFile2DataHelper::Pass::DOWNLOAD_FILE>(
                 data, len);
         if (rc) {
             callbacks->success(nullptr);
@@ -396,7 +397,7 @@ class TgBotSocketNative {
             SocketFile2DataHelper::DataFromFileParam param{};
             param.filepath = callback->requestdata.srcfilepath.data();
             param.destfilepath = callback->requestdata.destfilepath.data();
-            auto p = FileDataHelper->DataFromFile<SocketFile2DataHelper::Pass::UPLOAD_FILE>(param);
+            auto p = helper.DataFromFile<SocketFile2DataHelper::Pass::UPLOAD_FILE>(param);
             if (p) {
                 sendContext(p.value(), std::move(callbacks));
             } else {
@@ -491,7 +492,7 @@ void uploadFile(JNIEnv *env, jobject __unused thiz, jstring path, jstring dest_f
     LOG(INFO) << std::boolalpha << "overwrite opt: " << params.options.overwrite;
     LOG(INFO) << std::boolalpha << "hash_ignore opt: " << params.options.hash_ignore;
     auto rc =
-        FileDataHelper->DataFromFile<SocketFile2DataHelper::Pass::UPLOAD_FILE_DRY>(params);
+        helper.DataFromFile<SocketFile2DataHelper::Pass::UPLOAD_FILE_DRY>(params);
     if (rc) {
         native->sendContext(rc.value(), env, callback);
     } else {

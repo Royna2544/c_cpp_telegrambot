@@ -85,8 +85,9 @@ void handle_CommandPacket(const SocketClientWrapper& wrapper,
     using callback::AckType;
     using callback::GenericAck;
     std::string resultText;
-    const auto helper =
-        std::make_shared<SocketFile2DataHelper>(std::make_shared<RealFS>());
+
+    RealFS real;
+    SocketFile2DataHelper helper(&real);
 
     switch (pkt.header.cmd) {
         case Command::CMD_GET_UPTIME_CALLBACK: {
@@ -96,7 +97,7 @@ void handle_CommandPacket(const SocketClientWrapper& wrapper,
             break;
         }
         case Command::CMD_DOWNLOAD_FILE_CALLBACK: {
-            helper->DataToFile<SocketFile2DataHelper::Pass::DOWNLOAD_FILE>(
+            helper.DataToFile<SocketFile2DataHelper::Pass::DOWNLOAD_FILE>(
                 pkt.data.get(), pkt.header.data_size);
             break;
         }
@@ -121,12 +122,15 @@ void handle_CommandPacket(const SocketClientWrapper& wrapper,
                 param.destfilepath = params_in.destfilepath.data();
                 param.filepath = params_in.srcfilepath.data();
                 param.options = params_in.options;
-                auto newPkt = helper->DataFromFile<
-                    SocketFile2DataHelper::Pass::UPLOAD_FILE>(param);
+                auto newPkt =
+                    helper
+                        .DataFromFile<SocketFile2DataHelper::Pass::UPLOAD_FILE>(
+                            param);
                 LOG(INFO) << "Sending the actual file content again...";
                 wrapper->writeToSocket(context, newPkt->toSocketData());
+                auto v = wrapper.getRawInterface();
                 auto it2 =
-                    TgBotSocket::readPacket(wrapper.getRawInterface(), context);
+                    TgBotSocket::readPacket(v.get(), context);
                 if (it2) {
                     handle_CommandPacket(wrapper, it.value(), it2.value());
                 }
@@ -183,8 +187,8 @@ int main(int argc, char** argv) {
         usage(exe, false);
     }
 
-    const auto helper =
-        std::make_shared<SocketFile2DataHelper>(std::make_shared<RealFS>());
+    RealFS realfs;
+    SocketFile2DataHelper helper(&realfs);
 
     switch (cmd) {
         case Command::CMD_WRITE_MSG_TO_CHAT_ID: {
@@ -256,8 +260,10 @@ int main(int argc, char** argv) {
             params.destfilepath = argv[1];
             params.options.hash_ignore = false;  //= true;
             params.options.overwrite = true;
-            pkt = helper->DataFromFile<
-                SocketFile2DataHelper::Pass::UPLOAD_FILE_DRY>(params);
+            pkt =
+                helper
+                    .DataFromFile<SocketFile2DataHelper::Pass::UPLOAD_FILE_DRY>(
+                        params);
             break;
         }
         case Command::CMD_DOWNLOAD_FILE: {
@@ -288,7 +294,9 @@ int main(int argc, char** argv) {
     if (handle) {
         backend->writeToSocket(handle.value(), pkt->toSocketData());
         LOG(INFO) << "Sent the command: Waiting for callback...";
-        auto it = TgBotSocket::readPacket(backend.getRawInterface(), handle.value());
+        auto b = backend.getRawInterface();
+        auto it =
+            TgBotSocket::readPacket(b.get(), handle.value());
         if (it) {
             handle_CommandPacket(backend, handle.value(), it.value());
         }

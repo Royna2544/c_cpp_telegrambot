@@ -5,33 +5,40 @@
 #include <memory>
 #include <string_view>
 
+#include "StringResLoader.hpp"
 #include "api/MessageExt.hpp"
 #include "api/TgBotApi.hpp"
+#include "api/Providers.hpp"
 
-class TgBotApi;
 class CommandModule;
 
-using command_callback_t = std::function<void(
-    TgBotApi::Ptr api, const MessageExt::Ptr&)>;
-
-#define DYN_COMMAND_SYM_STR "loadcmd"
-#define DYN_COMMAND_SYM loadcmd
-#define DYN_COMMAND_FN(n, m) \
-    extern "C" bool DYN_COMMAND_SYM(const std::string_view n, CommandModule& m)
-
-#define COMMAND_HANDLER_NAME(cmd) handle_command_##cmd
-#define DECLARE_COMMAND_HANDLER(cmd, api, message)      \
-    void COMMAND_HANDLER_NAME(cmd)(                     \
-        TgBotApi::Ptr(api), \
-        const MessageExt::Ptr&(message))
+// Loading commandmodule definitions
 using loadcmd_function_cstyle_t = bool (*)(const std::string_view,
                                            CommandModule&);
 using loadcmd_function_t =
     std::function<std::remove_pointer_t<loadcmd_function_cstyle_t>>;
 
+#define DYN_COMMAND_SYM_STR "loadcmd"
+#define DYN_COMMAND_SYM loadcmd
+#define DYN_COMMAND_FN(n, m) \
+    extern "C" bool DYN_COMMAND_SYM(const std::string_view n, CommandModule&(m))
+
+// Command handler helper macros
+#define COMMAND_HANDLER_NAME(cmd) handle_command_##cmd
+#define DECLARE_COMMAND_HANDLER(cmd)                \
+    void COMMAND_HANDLER_NAME(cmd)(                 \
+        TgBotApi::Ptr api, MessageExt::Ptr message, \
+        const StringResLoaderBase::LocaleStrings* res, const Providers* provider)
+
+using command_callback_t = std::function<void(
+    TgBotApi::Ptr api, MessageExt::Ptr,
+    const StringResLoaderBase::LocaleStrings*, const Providers* provider)>;
+
 class CommandModule {
    public:
     using Ptr = std::unique_ptr<CommandModule>;
+
+    static constexpr std::string_view prefix = "libcmd_";
 
     // Module information.
     enum Flags { None = 0, Enforced = 1 << 0, HideDescription = 1 << 1 };

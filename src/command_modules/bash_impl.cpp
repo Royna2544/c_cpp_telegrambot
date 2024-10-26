@@ -1,21 +1,18 @@
-#include <StringResManager.hpp>
-
 #include <api/CommandModule.hpp>
+
 #include "compiler/CompilerInTelegram.hpp"
 #include "compiler/Helper.hpp"
 
 namespace {
 
-DECLARE_COMMAND_HANDLER(bash, wrapper, message) {
-    auto helper =
-        std::make_unique<CompilerInTgBotInterface>(wrapper, message);
-    CompilerInTgForBash bash(std::move(helper), false);
+DECLARE_COMMAND_HANDLER(bash) {
+    auto helper = std::make_unique<CompilerInTgBotInterface>(api, res, message);
+    CompilerInTgForBash bash(std::move(helper), res, false);
     bash.run(message);
 }
-DECLARE_COMMAND_HANDLER(ubash, wrapper, message) {
-    auto helper =
-        std::make_unique<CompilerInTgBotInterface>(wrapper, message);
-    CompilerInTgForBash ubash(std::move(helper), true);
+DECLARE_COMMAND_HANDLER(ubash) {
+    auto helper = std::make_unique<CompilerInTgBotInterface>(api, res, message);
+    CompilerInTgForBash ubash(std::move(helper), res, true);
     ubash.run(message);
 }
 
@@ -25,10 +22,10 @@ DYN_COMMAND_FN(name, module) {
     module.name = name;
     module.flags = CommandModule::Flags::Enforced;
     if (name == "bash") {
-        module.description = GETSTR(BASH_CMD_DESC);
+        module.description = "Run bash commands";
         module.function = COMMAND_HANDLER_NAME(bash);
     } else if (name == "ubash") {
-        module.description = GETSTR(UBASH_CMD_DESC);
+        module.description = "Run bash commands w/o timeout";
         module.function = COMMAND_HANDLER_NAME(ubash);
     }
     return true;

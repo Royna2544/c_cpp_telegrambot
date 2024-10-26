@@ -1,12 +1,13 @@
-#include <database/bot/TgBotDatabaseImpl.hpp>
 #include <api/CommandModule.hpp>
 #include <api/TgBotApi.hpp>
+#include <database/bot/TgBotDatabaseImpl.hpp>
 
-DECLARE_COMMAND_HANDLER(setowner, tgWrapper, message) {
-    auto *impl = TgBotDatabaseImpl::getInstance();
+DECLARE_COMMAND_HANDLER(setowner) {
+    auto *impl = provider->database.get();
     if (!impl->getOwnerUserId().has_value()) {
         impl->setOwnerUserId(message->get<MessageAttrs::User>()->id);
-        tgWrapper->sendReplyMessage(message->message(), "Owner set");
+        api->sendReplyMessage(message->message(),
+                              access(res, Strings::BOT_OWNER_SET));
     } else {
         LOG(WARNING) << "Your word rejected";
     }

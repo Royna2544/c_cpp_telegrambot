@@ -1,19 +1,13 @@
 #pragma once
 
-#include <InstanceClassBase.hpp>
+#include <Authorization.hpp>
 #include <ManagedThreads.hpp>
-#include "api/TgBotApi.hpp"
-
-#ifdef SOCKET_CONNECTION
-#include <socket/include/TgBotSocket_Export.hpp>
-#endif
-
+#include <api/TgBotApi.hpp>
 #include <map>
 #include <mutex>
+#include <socket/include/TgBotSocket_Export.hpp>
 
-#ifdef SOCKET_CONNECTION
 using namespace TgBotSocket::data;
-#endif
 
 using TgBot::Chat;
 using TgBot::Message;
@@ -35,15 +29,14 @@ struct SpamBlockBase : ManagedThreadRunnable {
                                           OneChatIterator it,
                                           const size_t threshold,
                                           const char *name) {};
+    virtual bool additionalHook(const Message::Ptr &msg) { return false; }
 
     void runFunction() override;
     void addMessage(const Message::Ptr &message);
 
     static std::string commonMsgdataFn(const Message::Ptr &m);
 
-#ifdef SOCKET_CONNECTION
     CtrlSpamBlock spamBlockConfig = CtrlSpamBlock::CTRL_ON;
-#endif
    protected:
     static bool isEntryOverThreshold(PerChatHandleConstRef t,
                                      const size_t threshold);
@@ -58,9 +51,8 @@ struct SpamBlockBase : ManagedThreadRunnable {
     std::mutex buffer_m;  // Protect buffer, buffer_sub
 };
 
-struct SpamBlockManager : SpamBlockBase,
-                                          InstanceClassBase<SpamBlockManager> {
-    explicit SpamBlockManager(TgBotApi::Ptr api) : _api(api){};
+struct SpamBlockManager : SpamBlockBase {
+    explicit SpamBlockManager(TgBotApi::Ptr api, AuthContext *auth);
     ~SpamBlockManager() override = default;
 
     using SpamBlockBase::run;
@@ -68,6 +60,10 @@ struct SpamBlockManager : SpamBlockBase,
     void handleUserAndMessagePair(PerChatHandleConstRef e, OneChatIterator it,
                                   const size_t threshold,
                                   const char *name) override;
+    // Additional hook for handling messages
+    // that should be handled differently
+    // (e.g., delete messages, mute users)
+    bool additionalHook(const Message::Ptr &msg) override;
 
    private:
     constexpr static auto kMuteDuration = std::chrono::minutes(3);
@@ -75,4 +71,5 @@ struct SpamBlockManager : SpamBlockBase,
                               PerChatHandleConstRef t, const size_t threshold,
                               const char *name, const bool mute);
     TgBotApi::Ptr _api;
+    AuthContext *_auth;
 };

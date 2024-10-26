@@ -2,6 +2,7 @@
 
 #include <ManagedThreads.hpp>
 #include <api/CommandModule.hpp>
+#include <api/Providers.hpp>
 #include <api/TgBotApi.hpp>
 #include <memory>
 
@@ -21,8 +22,7 @@ struct TimerImplThread : TimerThread {
     void onTimerEnd() override {
         message = api->editMessage(message, "Timer ended");
     }
-    explicit TimerImplThread(TgBotApi::Ptr api,
-                             ChatId chatid)
+    explicit TimerImplThread(TgBotApi::Ptr api, ChatId chatid)
         : api(api), chatid(chatid) {}
 
    private:
@@ -31,12 +31,12 @@ struct TimerImplThread : TimerThread {
     ChatId chatid;
 };
 
-DECLARE_COMMAND_HANDLER(starttimer, bot, message) {
-    auto *const tm = ThreadManager::getInstance();
-    auto ctrl = tm->createController<ThreadManager::Usage::TIMER_THREAD,
+DECLARE_COMMAND_HANDLER(starttimer) {
+    auto *const tm = provider->manager.get();
+    auto ctrl = tm->create<ThreadManager::Usage::TIMER_THREAD,
 
-                                     TimerImplThread>(
-        bot, message->get<MessageAttrs::Chat>()->id);
+                           TimerImplThread>(
+        api, message->get<MessageAttrs::Chat>()->id);
     bool ok = false;
     std::string result;
     if (message->has<MessageAttrs::ExtraText>()) {
@@ -82,19 +82,18 @@ DECLARE_COMMAND_HANDLER(starttimer, bot, message) {
         tm->destroyController(ThreadManager::Usage::TIMER_THREAD);
     }
     if (!result.empty()) {
-        bot->sendReplyMessage(message->message(), result);
+        api->sendReplyMessage(message->message(), result);
     }
 }
 
-DECLARE_COMMAND_HANDLER(stoptimer, bot, message) {
-    auto *const tm = ThreadManager::getInstance();
-    auto ctrl = tm->getController<ThreadManager::Usage::TIMER_THREAD,
-                                  TimerImplThread>();
+DECLARE_COMMAND_HANDLER(stoptimer) {
+    auto *const tm = provider->manager.get();
+    auto ctrl = tm->get<ThreadManager::Usage::TIMER_THREAD, TimerImplThread>();
     if (ctrl) {
         ctrl->stop();
         tm->destroyController(ThreadManager::Usage::TIMER_THREAD);
     } else {
-        bot->sendReplyMessage(message->message(), "Timer not started");
+        api->sendReplyMessage(message->message(), "Timer not started");
     }
 }
 

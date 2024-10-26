@@ -6,71 +6,65 @@
 #include <tgbot/types/ReplyKeyboardRemove.h>
 #include <trivial_helpers/_tgbot.h>
 
-#include <StringResManager.hpp>
 #include <api/CommandModule.hpp>
 #include <api/MessageExt.hpp>
+#include <api/Providers.hpp>
 #include <api/TgBotApi.hpp>
 #include <database/bot/TgBotDatabaseImpl.hpp>
 #include <memory>
 #include <optional>
 #include <string>
 
+#include "StringResLoader.hpp"
+
 using TgBot::ReplyKeyboardRemove;
 
 template <DatabaseBase::ListType type>
-void handleAddUser(TgBotApi::CPtr api, const Message::Ptr& message,
-                   const UserId user) {
-    auto* base = TgBotDatabaseImpl::getInstance();
-    auto res = base->addUserToList(type, user);
-    std::string text;
+Strings handleAddUser(const Providers* provider, const UserId user) {
+    auto res = provider->database.get()->addUserToList(type, user);
+    Strings text{};
     switch (res) {
         case DatabaseBase::ListResult::OK:
-            text = GETSTR(USER_ADDED);
+            text = Strings::USER_ADDED;
             break;
         case DatabaseBase::ListResult::ALREADY_IN_LIST:
-            text = GETSTR(USER_ALREADY_IN_LIST);
+            text = Strings::USER_ALREADY_IN_LIST;
             break;
         case DatabaseBase::ListResult::ALREADY_IN_OTHER_LIST:
-            text = GETSTR(USER_ALREADY_IN_OTHER_LIST);
+            text = Strings::USER_ALREADY_IN_OTHER_LIST;
             break;
         case DatabaseBase::ListResult::BACKEND_ERROR:
-            text = GETSTR(BACKEND_ERROR);
+            text = Strings::BACKEND_ERROR;
             break;
         default:
             LOG(ERROR) << "Unhandled result type " << static_cast<int>(res);
-            text = GETSTR(UNKNOWN_ERROR);
+            text = Strings::UNKNOWN_ERROR;
     }
-    auto remove = std::make_shared<ReplyKeyboardRemove>();
-    remove->removeKeyboard = true;
-    api->sendReplyMessage(message, text, remove);
+    return text;
 }
 
 template <DatabaseBase::ListType type>
-void handleRemoveUser(TgBotApi::CPtr api, const Message::Ptr& message,
-                      const UserId user) {
-    auto base = TgBotDatabaseImpl::getInstance();
-    auto res = base->removeUserFromList(type, user);
-    std::string text;
+Strings handleRemoveUser(const Providers* provider, const UserId user) {
+    auto res = provider->database->removeUserFromList(type, user);
+    Strings text{};
     switch (res) {
         case DatabaseBase::ListResult::OK:
-            text = GETSTR(USER_REMOVED);
+            text = Strings::USER_REMOVED;
             break;
         case DatabaseBase::ListResult::NOT_IN_LIST:
-            text = GETSTR(USER_NOT_IN_LIST);
+            text = Strings::USER_NOT_IN_LIST;
             break;
         case DatabaseBase::ListResult::ALREADY_IN_OTHER_LIST:
-            text = GETSTR(USER_ALREADY_IN_OTHER_LIST);
+            text = Strings::USER_ALREADY_IN_OTHER_LIST;
             break;
         case DatabaseBase::ListResult::BACKEND_ERROR:
-            text = GETSTR(BACKEND_ERROR);
+            text = Strings::BACKEND_ERROR;
             break;
         default:
             LOG(ERROR) << "Unhandled result type " << static_cast<int>(res);
-            text = GETSTR(UNKNOWN_ERROR);
+            text = Strings::UNKNOWN_ERROR;
     }
-    auto remove = std::make_shared<ReplyKeyboardRemove>();
-    remove->removeKeyboard = true;
-    api->sendReplyMessage(message, text, remove);
+    return text;
 }
 
 namespace {
@@ -80,14 +74,14 @@ using TgBot::KeyboardButton;
 template <int X, int Y>
 std::vector<std::vector<KeyboardButton::Ptr>> genKeyboard() {
     std::vector<std::vector<KeyboardButton::Ptr>> keyboard;
-    keyboard.reserve(Y);
+    keyboard.resize(Y);
     for (int i = 0; i < Y; i++) {
         std::vector<KeyboardButton::Ptr> row;
-        row.reserve(X);
+        row.resize(X);
         for (int j = 0; j < X; j++) {
-            row.emplace_back(std::make_shared<KeyboardButton>());
+            row[j] = std::make_shared<KeyboardButton>();
         }
-        keyboard.emplace_back(std::move(row));
+        keyboard[i] = std::move(row);
     }
     return keyboard;
 }
@@ -97,10 +91,10 @@ constexpr std::string_view removefromwhitelist = "Remove from whitelist";
 constexpr std::string_view addtoblacklist = "Add to blacklist";
 constexpr std::string_view removefromblacklist = "Remove from blacklist";
 
-DECLARE_COMMAND_HANDLER(database, wrapper, message) {
+DECLARE_COMMAND_HANDLER(database) {
     if (!message->replyMessage()->exists()) {
-        wrapper->sendReplyMessage(message->message(),
-                                  GETSTR(REPLY_TO_USER_MSG));
+        api->sendReplyMessage(message->message(),
+                                  access(res, Strings::REPLY_TO_USER_MSG));
         return;
     }
 
@@ -116,41 +110,45 @@ DECLARE_COMMAND_HANDLER(database, wrapper, message) {
 
     UserId userId = message->replyMessage()->get<MessageAttrs::User>()->id;
 
-    auto msg = wrapper->sendReplyMessage(
+    auto msg = api->sendReplyMessage(
         message->message(),
         fmt::format("Choose what u want to do with {}",
                     message->replyMessage()->get<MessageAttrs::User>()),
         reply);
 
-    wrapper->onAnyMessage(
-        [msg, userId](TgBotApi::CPtr api, const Message::Ptr& m) {
+    api->onAnyMessage(
+        [msg, userId, res, provider](TgBotApi::CPtr api, const Message::Ptr& m) {
             if (m->replyToMessage &&
                 m->replyToMessage->messageId == msg->messageId) {
+                Strings text{};
                 if (m->text == addtowhitelist) {
-                    handleAddUser<DatabaseBase::ListType::WHITELIST>(api, m,
-                                                                     userId);
+                    text = handleAddUser<DatabaseBase::ListType::WHITELIST>(
+                        provider, userId);
                 } else if (m->text == removefromwhitelist) {
-                    handleRemoveUser<DatabaseBase::ListType::WHITELIST>(api, m,
-                                                                        userId);
+                    text = handleRemoveUser<DatabaseBase::ListType::WHITELIST>(
+                        provider, userId);
                 } else if (m->text == addtoblacklist) {
-                    handleAddUser<DatabaseBase::ListType::BLACKLIST>(api, m,
-                                                                     userId);
+                    text = handleAddUser<DatabaseBase::ListType::BLACKLIST>(
+                        provider, userId);
                 } else if (m->text == removefromblacklist) {
-                    handleRemoveUser<DatabaseBase::ListType::BLACKLIST>(api, m,
-                                                                        userId);
+                    text = handleRemoveUser<DatabaseBase::ListType::BLACKLIST>(
+                        provider, userId);
                 }
+                auto remove = std::make_shared<ReplyKeyboardRemove>();
+                remove->removeKeyboard = true;
+                api->sendReplyMessage(m, access(res, text), remove);
                 return TgBotApi::AnyMessageResult::Deregister;
             }
             return TgBotApi::AnyMessageResult::Handled;
         });
 };
 
-DECLARE_COMMAND_HANDLER(saveid, bot, message) {
+DECLARE_COMMAND_HANDLER(saveid) {
     if (!(message->has<MessageAttrs::ExtraText>() &&
           message->replyMessage()->any(
               {MessageAttrs::Animation, MessageAttrs::Sticker}))) {
-        bot->sendReplyMessage(message->message(),
-                              GETSTR(REPLY_TO_GIF_OR_STICKER));
+        api->sendReplyMessage(message->message(),
+                              access(res, Strings::REPLY_TO_GIF_OR_STICKER));
         return;
     }
     std::optional<std::string> fileId;
@@ -172,18 +170,18 @@ DECLARE_COMMAND_HANDLER(saveid, bot, message) {
     CHECK(fileId && fileUniqueId) << "They should be set";
 
     DatabaseBase::MediaInfo info{};
-    auto const& backend = TgBotDatabaseImpl::getInstance();
     info.mediaId = fileId.value();
     info.mediaUniqueId = fileUniqueId.value();
     info.names = message->get<MessageAttrs::ParsedArgumentsList>();
     info.mediaType = type;
 
-    if (backend->addMediaInfo(info)) {
+    if (provider->database->addMediaInfo(info)) {
         const auto content = fmt::format("Media with names:\n{}\nadded",
                                          fmt::join(info.names, "\n"));
-        bot->sendReplyMessage(message->message(), content);
+        api->sendReplyMessage(message->message(), content);
     } else {
-        bot->sendReplyMessage(message->message(), GETSTR(MEDIA_ALREADY_IN_DB));
+        api->sendReplyMessage(message->message(),
+                              access(res, Strings::MEDIA_ALREADY_IN_DB));
     }
 }
 
@@ -192,12 +190,12 @@ DECLARE_COMMAND_HANDLER(saveid, bot, message) {
 DYN_COMMAND_FN(name, module) {
     if (name == "database") {
         module.name = name;
-        module.description = GETSTR(DATABASE_CMD_DESC);
+        module.description = "Run database commands";
         module.flags = CommandModule::Flags::Enforced;
         module.function = COMMAND_HANDLER_NAME(database);
     } else if (name == "saveid") {
         module.name = name;
-        module.description = GETSTR(SAVEID_CMD_DESC);
+        module.description = "Save a Telegram media as name";
         module.flags = CommandModule::Flags::Enforced |
                        CommandModule::Flags::HideDescription;
         module.function = COMMAND_HANDLER_NAME(saveid);

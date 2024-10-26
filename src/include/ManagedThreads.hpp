@@ -11,20 +11,20 @@
 #include <mutex>
 #include <optional>
 #include <shared_mutex>
+#include <string_view>
 #include <thread>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
 
 #include "EnumArrayHelpers.h"
-#include "InstanceClassBase.hpp"
+#include "trivial_helpers/fruit_inject.hpp"
 
 struct ManagedThread;
 
-class TgBotPPImpl_shared_deps_API ThreadManager
-    : public InstanceClassBase<ThreadManager> {
+class TgBotPPImpl_shared_deps_API ThreadManager {
    public:
-    using controller_type = std::shared_ptr<ManagedThread>;
+    APPLE_INJECT(ThreadManager()) = default;
 
     enum class Usage {
         SOCKET_THREAD,
@@ -53,16 +53,41 @@ class TgBotPPImpl_shared_deps_API ThreadManager
             USAGE_AND_STR(WEBSERVER_THREAD), USAGE_AND_STR(LOGSERVER_THREAD));
 
     template <Usage u>
-    constexpr static const char* ThreadUsageToStr() {
+    constexpr static std::string_view usageToStr() {
         return array_helpers::find(ThreadUsageToStrMap, u)->second;
     }
+    static std::string_view usageToStr(Usage u) {
+        return array_helpers::find(ThreadUsageToStrMap, u)->second;
+    }
+
     template <Usage usage, class T = ManagedThread, typename... Args>
         requires std::is_base_of_v<ManagedThread, T>
-    std::shared_ptr<T> createController(Args... args);
+    T* create(Args&&... args) {
+        constexpr std::string_view usageStr = usageToStr<usage>();
+        return create_internal<T>(usage, usageStr,
+                                  std::forward<Args&&>(args)...);
+    }
+    template <class T = ManagedThread, typename... Args>
+        requires std::is_base_of_v<ManagedThread, T>
+    T* create(Usage usage, Args&&... args) {
+        std::string_view usageStr = usageToStr(usage);
+        return create_internal<T>(usage, usageStr,
+                                  std::forward<Args&&>(args)...);
+    }
 
     template <Usage usage, class T = ManagedThread>
         requires std::is_base_of_v<ManagedThread, T>
-    std::shared_ptr<T> getController();
+    T* get() {
+        constexpr std::string_view usageStr = usageToStr<usage>();
+        return get_internal<T>(usage, usageStr);
+    }
+
+    template <class T = ManagedThread>
+        requires std::is_base_of_v<ManagedThread, T>
+    T* get(Usage usage) {
+        std::string_view usageStr = usageToStr(usage);
+        return get_internal<T>(usage, usageStr);
+    }
 
     // Stop all controllers managed by this manager, and shutdown this.
     void destroyManager();
@@ -70,9 +95,15 @@ class TgBotPPImpl_shared_deps_API ThreadManager
     void destroyController(Usage usage, bool deleteIt = true);
 
    private:
+    template <class T, typename... Args>
+    T* create_internal(Usage usage, std::string_view usageStr, Args&&... args);
+
+    template <class T>
+    T* get_internal(Usage usage, std::string_view usageStr);
+
     std::atomic_bool kIsUnderStopAll = false;
     std::shared_mutex mControllerLock;
-    std::unordered_map<Usage, controller_type> kControllers;
+    std::unordered_map<Usage, std::unique_ptr<ManagedThread>> kControllers;
 };
 
 struct TgBotPPImpl_shared_deps_API ManagedThread {
@@ -95,9 +126,7 @@ struct TgBotPPImpl_shared_deps_API ManagedThread {
 
     template <typename T>
     void onPreStop(prestop_function_t<T> fn) {
-        preStop = [fn](ManagedThread *thiz){
-            fn(static_cast<T*>(thiz));
-        };
+        preStop = [fn](ManagedThread* thiz) { fn(static_cast<T*>(thiz)); };
     }
     ManagedThread() {
         timer_mutex.lk = std::unique_lock<std::timed_mutex>(timer_mutex.m);
@@ -144,10 +173,10 @@ struct TgBotPPImpl_shared_deps_API ManagedThread {
         std::unique_lock<std::timed_mutex> lk;
     } timer_mutex;
     struct {
-        size_t sizeOfThis;
+        size_t sizeOfThis{};
         struct {
             // It would'nt be a dangling one
-            const char* str;
+            std::string_view str;
             ThreadManager::Usage val;
         } usage;
     } mgr_priv{};
@@ -163,13 +192,12 @@ struct TgBotPPImpl_shared_deps_API ManagedThreadRunnable : ManagedThread {
     ~ManagedThreadRunnable() override = default;
 };
 
-template <ThreadManager::Usage usage, class T, typename... Args>
-    requires std::is_base_of_v<ManagedThread, T>
-std::shared_ptr<T> ThreadManager::createController(Args... args) {
-    const char* usageStr = ThreadUsageToStr<usage>();
-    std::shared_ptr<T> newIt;
+template <class T, typename... Args>
+T* ThreadManager::create_internal(Usage usage, std::string_view usageStr,
+                                  Args&&... args) {
+    std::unique_ptr<T> newIt;
 
-    if (getController<usage, T>()) {
+    if (get<T>(usage)) {
         LOG(ERROR) << usageStr << " controller already exists";
         return nullptr;
     }
@@ -177,35 +205,32 @@ std::shared_ptr<T> ThreadManager::createController(Args... args) {
 
     DLOG(INFO) << "New allocation: " << usageStr << " controller";
     if constexpr (sizeof...(args) != 0) {
-        newIt = std::make_shared<T>(std::forward<Args>(args)...);
+        newIt = std::make_unique<T>(std::forward<Args>(args)...);
     } else {
-        newIt = std::make_shared<T>();
+        newIt = std::make_unique<T>();
     }
-    auto ctrlit = std::static_pointer_cast<ManagedThread>(newIt);
-    ctrlit->mgr_priv.usage.str = usageStr;
-    ctrlit->mgr_priv.usage.val = usage;
-    ctrlit->mgr_priv.sizeOfThis = sizeof(T);
-    CHECK(ctrlit->timer_mutex.lk.owns_lock())
+    newIt->mgr_priv.usage.str = usageStr;
+    newIt->mgr_priv.usage.val = usage;
+    newIt->mgr_priv.sizeOfThis = sizeof(T);
+    CHECK(newIt->timer_mutex.lk.owns_lock())
         << usageStr
         << " controller unique_lock is not holding mutex. Probably "
            "constructor is not called.";
-    kControllers[usage] = newIt;
-    return newIt;
+    kControllers[usage] = std::move(newIt);
+    return static_cast<T*>(kControllers[usage].get());
 }
 
-template <ThreadManager::Usage usage, class T>
-    requires std::is_base_of_v<ManagedThread, T>
-std::shared_ptr<T> ThreadManager::getController() {
-    const char* usageStr = ThreadUsageToStr<usage>();
+template <class T>
+T* ThreadManager::get_internal(Usage usage, std::string_view usageStr) {
     std::lock_guard<std::shared_mutex> lock(mControllerLock);
     auto it = kControllers.find(usage);
     if (it == kControllers.end()) {
-        LOG(WARNING) << usageStr << " controller does not exist";
+        DLOG(WARNING) << usageStr << " controller does not exist";
         return nullptr;
     }
     if (it->second->mgr_priv.sizeOfThis != sizeof(T)) {
         LOG(ERROR) << usageStr << " controller is of wrong type";
         return nullptr;
     }
-    return std::static_pointer_cast<T>(it->second);
+    return static_cast<T*>(it->second.get());
 }

@@ -3,15 +3,12 @@
 #include <TgBotDBImplExports.h>
 #include <Types.h>
 #include <trivial_helpers/_class_helper_macros.h>
-
-#include <InitTask.hpp>
-#include <InstanceClassBase.hpp>
+#include <trivial_helpers/fruit_inject.hpp>
 #include <database/DatabaseBase.hpp>
 #include <map>
 #include <memory>
 
-struct TgBotDBImpl_API TgBotDatabaseImpl : InstanceClassBase<TgBotDatabaseImpl>,
-                                           DatabaseBase {
+struct TgBotDBImpl_API TgBotDatabaseImpl : DatabaseBase {
     struct TgBotDBImpl_API Providers {
         Providers();
 
@@ -27,7 +24,7 @@ struct TgBotDBImpl_API TgBotDatabaseImpl : InstanceClassBase<TgBotDatabaseImpl>,
         std::unique_ptr<DatabaseBase> chosenProvider;
     };
 
-    TgBotDatabaseImpl() = default;
+    APPLE_INJECT(TgBotDatabaseImpl()) = default;
     ~TgBotDatabaseImpl() override;
 
     NO_COPY_CTOR(TgBotDatabaseImpl);

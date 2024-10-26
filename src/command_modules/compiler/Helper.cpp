@@ -2,21 +2,28 @@
 
 #include <absl/log/check.h>
 #include <absl/log/log.h>
+#include <fmt/chrono.h>
+#include <fmt/format.h>
 
-#include <StringResManager.hpp>
+#include <api/MessageExt.hpp>
 #include <thread>
 #include <utility>
 
-#include "api/MessageExt.hpp"
+#include "StringResLoader.hpp"
 
 CompilerInTgBotInterface::CompilerInTgBotInterface(
-    TgBotApi::CPtr api, MessageExt::Ptr requestedMessage)
-    : botApi(api), requestedMessage(std::move(requestedMessage)) {}
+    TgBotApi::CPtr api, const StringResLoaderBase::LocaleStrings* locale,
+    MessageExt::Ptr requestedMessage)
+    : botApi(api),
+      requestedMessage(std::move(requestedMessage)),
+      _locale(locale) {}
 
 void CompilerInTgBotInterface::onExecutionStarted(
     const std::string_view& command) {
     timePoint.init();
-    output << GETSTR(WORKING) << command.data() << std::endl;
+    output << fmt::format("{}...\n{}: {}",
+                          access(_locale, Strings::WORKING_ON_IT),
+                          access(_locale, Strings::COMMAND_IS), command.data());
     sentMessage =
         botApi->sendReplyMessage(requestedMessage->message(), output.str());
 }
@@ -24,13 +31,12 @@ void CompilerInTgBotInterface::onExecutionStarted(
 void CompilerInTgBotInterface::onExecutionFinished(
     const std::string_view& command) {
     const auto timePassed = timePoint.get();
-    output << "Done. Execution took " << timePassed.count() << " milliseconds"
-           << std::endl;
+    output << fmt::format("{} {}", access(_locale, Strings::DONE_TOOK), timePassed);
     botApi->editMessage(sentMessage, output.str());
 }
 
 void CompilerInTgBotInterface::onErrorStatus(absl::Status status) {
-    output << "Error executing: " << status;
+    output << access(_locale, Strings::ERROR_TOOK) << ": " << status;
     if (sentMessage) {
         botApi->editMessage(sentMessage, output.str());
     } else {
@@ -42,7 +48,7 @@ void CompilerInTgBotInterface::onResultReady(const std::string& text) {
     if (!text.empty()) {
         botApi->sendMessage(requestedMessage->get<MessageAttrs::Chat>(), text);
     } else {
-        output << "Output is empty" << std::endl;
+        output << fmt::format("{}\n", access(_locale, Strings::OUTPUT_IS_EMPTY));
         botApi->editMessage(sentMessage, output.str());
     }
 }

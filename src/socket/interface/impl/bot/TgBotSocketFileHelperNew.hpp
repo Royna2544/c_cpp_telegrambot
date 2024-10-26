@@ -13,10 +13,13 @@
 
 #include "../../../../include/SharedMalloc.hpp"
 
-#if __has_include(<TgBotSocketExports.h>)
+#ifdef __TGBOT__
 #include <TgBotSocketExports.h>
+#include <trivial_helpers/fruit_inject.hpp>
 #else
 #define TgBotSocket_API
+#define APPLE_INJECT(x) x
+#define APPLE_EXPLICIT_INJECT(x) explicit x
 #endif
 
 // Represents a SHA-256 hash
@@ -76,6 +79,7 @@ struct VFSOperations {
 
 struct TgBotSocket_API RealFS : public VFSOperations {
     ~RealFS() override = default;
+    APPLE_INJECT(RealFS()) = default;
 
     /**
      * @brief Writes a block of memory to a file.
@@ -121,11 +125,10 @@ using TgBotSocket::data::UploadFile;
 using TgBotSocket::data::UploadFileDry;
 
 class TgBotSocket_API SocketFile2DataHelper {
-    std::shared_ptr<VFSOperations> vfs;
+    VFSOperations* vfs;
 
    public:
-    explicit SocketFile2DataHelper(std::shared_ptr<VFSOperations> vfs)
-        : vfs(std::move(vfs)) {}
+    APPLE_EXPLICIT_INJECT(SocketFile2DataHelper(VFSOperations* vfs)) : vfs(vfs) {}
 
     enum class Pass {
         UPLOAD_FILE_DRY,

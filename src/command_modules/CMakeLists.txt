@@ -38,7 +38,10 @@ function(command_module)
     set(TGBOT_CMDMODULE_LIBNAME ${CMDMODULE_PREFIX}${TGBOT_CMDMODULE_NAME})
     add_library(${TGBOT_CMDMODULE_LIBNAME} ${TGBOT_CMDMODULE_SRCS})
     target_link_libraries(${TGBOT_CMDMODULE_LIBNAME} ${TGBOT_CMDMODULE_LIBS}
-                          TgBotPPImpl_shared_deps absl::log TgBotStringResManager)
+                          TgBotPPImpl_shared_deps absl::log)
+    target_include_directories(${TGBOT_CMDMODULE_LIBNAME} PRIVATE
+        $<TARGET_PROPERTY:TgBotStringRes,INTERFACE_INCLUDE_DIRECTORIES>
+        $<TARGET_PROPERTY:TgBotRandom,INTERFACE_INCLUDE_DIRECTORIES>)
     install(TARGETS ${TGBOT_CMDMODULE_LIBNAME} DESTINATION lib/commands)
     add_sanitizers(${TGBOT_CMDMODULE_LIBNAME})
 endfunction()

@@ -1,15 +1,16 @@
 #pragma once
 
 #include <TgBotRandomExports.h>
+#include <absl/log/log.h>
 
+#include <algorithm>
 #include <memory>
 #include <string>
+#include <trivial_helpers/fruit_inject.hpp>
 #include <type_traits>
 #include <vector>
 
-#include "InstanceClassBase.hpp"
-
-class TgBotRandom_API Random : public InstanceClassBase<Random> {
+class TgBotRandom_API Random {
    public:
     // Retval type for random
     using ret_type = size_t;
@@ -64,7 +65,6 @@ class TgBotRandom_API Random : public InstanceClassBase<Random> {
         virtual ~ImplBase() = default;
 
        protected:
-       
         /**
          * @brief      Shuffles the elements in a container using the specified
          * random number engine.
@@ -116,9 +116,9 @@ class TgBotRandom_API Random : public InstanceClassBase<Random> {
 
     // Use impl as the implementation
     explicit Random(std::unique_ptr<ImplBase> impl) : impl_(std::move(impl)){};
-    
+
     // Choose from default lists
-    Random();
+    APPLE_INJECT(Random());
 
     /**
      * generate - Generate random number given a range.
@@ -153,7 +153,7 @@ class TgBotRandom_API Random : public InstanceClassBase<Random> {
      * @throws No exceptions are thrown by this function.
      */
     void shuffleArray(std::vector<std::string>& inArray);
-    
+
    private:
     std::unique_ptr<ImplBase> impl_;
 };

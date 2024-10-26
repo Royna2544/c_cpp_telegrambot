@@ -1,38 +1,37 @@
 #include <CompilerPaths.hpp>
-#include <StringResManager.hpp>
 #include <api/CommandModule.hpp>
 #include <memory>
 
 #include "compiler/CompilerInTelegram.hpp"
 #include "compiler/Helper.hpp"
 
-DECLARE_COMMAND_HANDLER(c, bot, message) {
+DECLARE_COMMAND_HANDLER(c) {
     CompilerInTgForCCpp::Params params;
-    auto intf = std::make_unique<CompilerInTgBotInterface>(bot, message);
+    auto intf = std::make_unique<CompilerInTgBotInterface>(api, res, message);
     params.exe = kCCompiler;
     params.outfile = "out.c";
 
-    CompilerInTgForCCpp c(std::move(intf), std::move(params));
+    CompilerInTgForCCpp c(std::move(intf), res, std::move(params));
     c.run(message);
 }
 
-DECLARE_COMMAND_HANDLER(cpp, bot, message) {
+DECLARE_COMMAND_HANDLER(cpp) {
     CompilerInTgForCCpp::Params params;
-    auto intf = std::make_unique<CompilerInTgBotInterface>(bot, message);
+    auto intf = std::make_unique<CompilerInTgBotInterface>(api, res, message);
     params.exe = kCXXCompiler;
     params.outfile = "out.cpp";
 
-    CompilerInTgForCCpp cpp(std::move(intf), std::move(params));
+    CompilerInTgForCCpp cpp(std::move(intf), res, std::move(params));
     cpp.run(message);
 }
 
-DECLARE_COMMAND_HANDLER(py, bot, message) {
+DECLARE_COMMAND_HANDLER(py) {
     CompilerInTgForGeneric::Params params;
-    auto intf = std::make_unique<CompilerInTgBotInterface>(bot, message);
+    auto intf = std::make_unique<CompilerInTgBotInterface>(api, res, message);
     params.exe = kPythonInterpreter;
     params.outfile = "out.py";
 
-    CompilerInTgForGeneric py(std::move(intf), std::move(params));
+    CompilerInTgForGeneric py(std::move(intf), res, std::move(params));
     py.run(message);
 }
 

@@ -34,7 +34,7 @@ std::string getMIMEString(const std::string& path) {
 
     std::call_once(once, [] {
         std::string_view buf;
-        buf = ResourceManager::getInstance()->getResource("mimeData.json");
+        buf = ResourceManager().getResource("mimeData.json");
         doc.Parse(buf.data());
         // This should be an assert, we know the data file at compile time
         LOG_IF(FATAL, doc.HasParseError())
@@ -62,7 +62,7 @@ std::string getMIMEString(const std::string& path) {
 GenericAck SocketInterfaceTgBot::handle_WriteMsgToChatId(const void* ptr) {
     const auto* data = static_cast<const WriteMsgToChatId*>(ptr);
     try {
-        api->sendMessage(data->chat, data->message.data());
+        api->sendMessage(data->chat, data->message);
     } catch (const TgBot::TgException& e) {
         LOG(ERROR) << "Exception at handler: " << e.what();
         return GenericAck(AckType::ERROR_TGAPI_EXCEPTION, e.what());
@@ -72,35 +72,33 @@ GenericAck SocketInterfaceTgBot::handle_WriteMsgToChatId(const void* ptr) {
 
 GenericAck SocketInterfaceTgBot::handle_CtrlSpamBlock(const void* ptr) {
     const auto* data = static_cast<const CtrlSpamBlock*>(ptr);
-    SpamBlockManager::getInstance()->spamBlockConfig = *data;
+    spamblock->spamBlockConfig = *data;
     return GenericAck::ok();
 }
 
 GenericAck SocketInterfaceTgBot::handle_ObserveChatId(const void* ptr) {
     const auto* data = static_cast<const ObserveChatId*>(ptr);
-    auto obs = ChatObserver::getInstance();
-    const std::lock_guard<std::mutex> _(obs->m);
-    auto it = std::ranges::find(obs->observedChatIds, data->chat);
 
     bool observe = data->observe;
-    if (obs->observeAllChats) {
+    if (!observer->observeAll(true)) {
         return GenericAck(AckType::ERROR_COMMAND_IGNORED,
                           "CMD_OBSERVE_ALL_CHATS active");
+    } else {
+        observer->observeAll(false);
     }
-    if (it == obs->observedChatIds.end()) {
-        if (observe) {
-            obs->observedChatIds.push_back(data->chat);
+    if (observe) {
+        if (observer->startObserving(data->chat)) {
+            LOG(INFO) << "Observing chat '" << data->chat << "'";
+        } else {
+            return GenericAck(AckType::ERROR_COMMAND_IGNORED,
+                              "Target chat was already being observed");
+        }
+    } else {
+        if (observer->stopObserving(data->chat)) {
+            LOG(INFO) << "Stopped observing chat '" << data->chat << "'";
         } else {
             return GenericAck(AckType::ERROR_COMMAND_IGNORED,
                               "Target chat wasn't being observed");
-        }
-    } else {
-        if (observe) {
-            return GenericAck(AckType::ERROR_COMMAND_IGNORED,
-                              "Target chat was already being observed");
-        } else {
-            LOG(INFO) << "Removing chat from observer";
-            obs->observedChatIds.erase(it);
         }
     }
     return GenericAck::ok();
@@ -170,24 +168,12 @@ GenericAck SocketInterfaceTgBot::handle_SendFileToChatId(const void* ptr) {
 }
 
 GenericAck SocketInterfaceTgBot::handle_ObserveAllChats(const void* ptr) {
-    auto obs = ChatObserver::getInstance();
-    const std::lock_guard<std::mutex> _(obs->m);
-    obs->observeAllChats = static_cast<const ObserveAllChats*>(ptr)->observe;
+    observer->observeAll(static_cast<const ObserveAllChats*>(ptr)->observe);
     return GenericAck::ok();
 }
 
 GenericAck SocketInterfaceTgBot::handle_DeleteControllerById(const void* ptr) {
-    DeleteControllerById data = *static_cast<const DeleteControllerById*>(ptr);
-    enum ThreadManager::Usage threadUsage{};
-    if (data.controller_id < 0 ||
-        data.controller_id >= static_cast<int>(ThreadManager::Usage::MAX)) {
-        LOG(ERROR) << "Invalid controller id: " << data.controller_id;
-        return GenericAck(AckType::ERROR_INVALID_ARGUMENT,
-                          "Invalid controller id");
-    }
-    threadUsage = static_cast<ThreadManager::Usage>(data.controller_id);
-    ThreadManager::getInstance()->destroyController(threadUsage);
-    return GenericAck::ok();
+    return GenericAck{AckType::ERROR_COMMAND_IGNORED, "This command is removed."};
 }
 
 GenericAck SocketInterfaceTgBot::handle_UploadFile(

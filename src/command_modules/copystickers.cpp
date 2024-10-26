@@ -11,7 +11,9 @@
 #include <libos/libfs.hpp>
 #include <regex>
 
-using std::string_literals::operator""s;
+#include "StringResLoader.hpp"
+
+using std::string_view_literals::operator""sv;
 
 std::filesystem::path operator""_fs(const char* str, const size_t /*size*/) {
     return str;
@@ -43,37 +45,39 @@ constexpr int GOOD_MAX_STICKERS_SIZE = 40;
 // To not spam editMessage request
 constexpr int RATELIMIT_DELIMITER_FOR_CONVERT_UPDATE = 5;
 
-DECLARE_COMMAND_HANDLER(copystickers, api, message) {
+DECLARE_COMMAND_HANDLER(copystickers) {
     if (!message->replyMessage()->has<MessageAttrs::Sticker>()) {
-        api->sendReplyMessage(message->message(), "Reply to a sticker");
+        api->sendReplyMessage(message->message(),
+                              access(res, Strings::REPLY_TO_A_STICKER));
         return;
     }
     const auto set = api->getStickerSet(
         message->replyMessage()->get<MessageAttrs::Sticker>()->setName);
     if (!set) {
-        api->sendReplyMessage(message->message(), "Sticker set not found");
+        api->sendReplyMessage(message->message(),
+                              access(res, Strings::STICKER_SET_NOT_FOUND));
         return;
     }
-    if (createDirectory("stickers")) {
+    if (createDirectory("stickers"_fs)) {
         api->sendReplyMessage(message->message(),
-                              "Failed to create stickers directory");
+                              access(res, Strings::FAILED_TO_CREATE_DIRECTORY));
         return;
     }
     int counter = 0;
     if (std::ranges::any_of(set->stickers, [](const auto& sticker) {
             return sticker->isAnimated || sticker->isVideo;
         })) {
-        LOG(WARNING) << "Sticker set contains animated stickers";
-        api->sendReplyMessage(message->message(),
-                              "Animated stickers are not supported");
+        api->sendReplyMessage(
+            message->message(),
+            access(res, Strings::ANIMATED_STICKERS_NOT_SUPPORTED));
         return;
     }
 
     LOG(INFO) << "Copy stickers from set " << std::quoted(set->title)
               << ". Started";
 
-    const auto sentMessage =
-        api->sendReplyMessage(message->message(), "Starting conversion...");
+    const auto sentMessage = api->sendReplyMessage(
+        message->message(), access(res, Strings::STARTING_CONVERSION));
 
     // Make a list of file IDs of all stickers in the set
     std::vector<StickerData> stickerData;
@@ -105,25 +109,28 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
                                static_cast<double>(stickerData.size());
             api->editMessage(
                 sentMessage,
-                fmt::format("Converting stickers... {:.2f}%", ratio));
+                fmt::format("{}... {:.2f}%",
+                            access(res, Strings::CONVERSION_IN_PROGRESS),
+                            ratio));
         }
         sticker.printProgress("Downloading");
         if (!api->downloadFile(sticker.filePath, sticker.fileId)) {
-            api->sendReplyMessage(message->message(),
-                                  "Failed to download sticker file");
+            api->sendReplyMessage(
+                message->message(),
+                access(res, Strings::FAILED_TO_DOWNLOAD_FILE));
             return;
         }
         sticker.printProgress("Converting");
         ImageProcessingAll imageProc(sticker.filePath);
         if (!imageProc.read()) {
             api->sendReplyMessage(message->message(),
-                                  "Failed to read sticker file");
+                                  access(res, Strings::FAILED_TO_READ_FILE));
             return;
         }
         imageProc.to_greyscale();
         if (!imageProc.write(sticker.filePath)) {
             api->sendReplyMessage(message->message(),
-                                  "Failed to write sticker file");
+                                  access(res, Strings::FAILED_TO_WRITE_FILE));
             return;
         }
         sticker.printProgress("Uploading");
@@ -131,10 +138,10 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
             message->get<MessageAttrs::User>()->id,
             InputFile::fromFile(sticker.filePath.generic_string(),
                                 "image/webp"),
-            "static");
+            "static"sv);
         if (!file) {
             api->sendReplyMessage(message->message(),
-                                  "Failed to upload sticker file");
+                                  access(res, Strings::FAILED_TO_UPLOAD_FILE));
             return;
         }
         sticker.printProgress("Sending");
@@ -142,7 +149,7 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
         inputSticker->sticker = file->fileId;
         inputSticker->format = "static";
         inputSticker->emojiList.emplace_back(sticker.emoji);
-        stickerToSend.emplace_back(inputSticker);
+        stickerToSend.emplace_back(std::move(inputSticker));
         std::filesystem::remove(sticker.filePath);
         ++count;
     }
@@ -163,7 +170,9 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
         setName += "_by_" + api->getBotUser()->username;
     }
 
-    api->editMessage(sentMessage, "Creating new sticker set...");
+    api->editMessage(
+        sentMessage,
+        fmt::format("{}...", access(res, Strings::CREATING_NEW_STICKER_SET)));
     LOG(INFO) << "Now creating new sticker set, name: " << std::quoted(setName)
               << ", title: " << std::quoted(title)
               << " size: " << stickerToSend.size();
@@ -174,11 +183,15 @@ DECLARE_COMMAND_HANDLER(copystickers, api, message) {
         LOG(INFO) << "Created: https://t.me/addstickers/" + setName;
         api->editMessage(
             sentMessage,
-            "Sticker pack created: https://t.me/addstickers/" + setName);
+            fmt::format("{}: https://t.me/addstickers/{}",
+                        access(res, Strings::STICKER_PACK_CREATED), setName));
     } catch (const TgBot::TgException& e) {
-        DLOG(ERROR) << "Failed to create new sticker set: " << e.what();
-        api->editMessage(sentMessage,
-                         "Failed to create new sticker set: "s + e.what());
+        LOG(ERROR) << "Failed to create new sticker set: " << e.what();
+        api->editMessage(
+            sentMessage,
+            fmt::format("{}: {}",
+                        access(res, Strings::FAILED_TO_CREATE_NEW_STICKER_SET),
+                        e.what()));
     }
 }
 

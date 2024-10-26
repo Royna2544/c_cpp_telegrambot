@@ -1,13 +1,13 @@
 #include <absl/strings/str_split.h>
+#include <fmt/format.h>
 
 #include <Random.hpp>
 #include <api/CommandModule.hpp>
+#include <api/Providers.hpp>
 #include <api/TgBotApi.hpp>
 #include <set>
 
-#include "StringToolsExt.hpp"
-
-DECLARE_COMMAND_HANDLER(possibility, botWrapper, message) {
+DECLARE_COMMAND_HANDLER(possibility) {
     constexpr int PERCENT_MAX = 100;
     std::string text;
     std::string lastItem;
@@ -19,8 +19,8 @@ DECLARE_COMMAND_HANDLER(possibility, botWrapper, message) {
     using map_t = std::pair<std::string, Random::ret_type>;
 
     if (!message->has<MessageAttrs::ExtraText>()) {
-        botWrapper->sendReplyMessage(
-            message->message(), "Send avaliable conditions sperated by newline");
+        api->sendReplyMessage(message->message(),
+                              access(res, Strings::SEND_POSSIBILITIES));
         return;
     }
     text = message->get<MessageAttrs::ExtraText>();
@@ -30,15 +30,18 @@ DECLARE_COMMAND_HANDLER(possibility, botWrapper, message) {
     kItemAndPercentMap.reserve(set.size());
     // Can't get possitibities for 1 element
     if (set.size() == 1) {
-        botWrapper->sendReplyMessage(message->message(), "Give more than 1 choice");
+        api->sendReplyMessage(message->message(),
+                              access(res, Strings::GIVE_MORE_THAN_ONE));
         return;
     }
     // Put it in vector again and shuffle it.
     vec = {set.begin(), set.end()};
     // Shuffle the vector.
-    Random::getInstance()->shuffleArray(vec);
+    provider->random->shuffleArray(vec);
     // Start the output stream
-    outStream << "Total " << vec.size() << " items" << std::endl;
+    outStream << fmt::format(
+        "{} {} {}\n", access(res, Strings::TOTAL_ITEMS_PREFIX), vec.size(),
+        access(res, Strings::TOTAL_ITEMS_SUFFIX));
     // Get the last item and remove it from the vector.
     lastItem = vec.back();
     vec.pop_back();
@@ -46,7 +49,7 @@ DECLARE_COMMAND_HANDLER(possibility, botWrapper, message) {
     for (const auto &cond : vec) {
         Random::ret_type thisper = 0;
         if (total < PERCENT_MAX) {
-            thisper = Random::getInstance()->generate(PERCENT_MAX - total);
+            thisper = provider->random->generate(PERCENT_MAX - total);
             if (total + thisper >= PERCENT_MAX) {
                 thisper = PERCENT_MAX - total;
             }
@@ -69,7 +72,7 @@ DECLARE_COMMAND_HANDLER(possibility, botWrapper, message) {
     for (const map_t &m : elem) {
         outStream << m.first << " : " << m.second << "%" << std::endl;
     }
-    botWrapper->sendReplyMessage(message->message(), outStream.str());
+    api->sendReplyMessage(message->message(), outStream.str());
 }
 
 DYN_COMMAND_FN(n, module) {

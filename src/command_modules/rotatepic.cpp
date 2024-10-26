@@ -9,6 +9,7 @@
 #include <string>
 #include <string_view>
 
+#include "StringResLoader.hpp"
 #include "api/MessageExt.hpp"
 
 struct ProcessImageParam {
@@ -39,7 +40,7 @@ bool processPhotoFile(ProcessImageParam& param) {
 constexpr std::string_view kDownloadFile = "inpic.bin";
 constexpr std::string_view kOutputFile = "outpic.png";
 
-DECLARE_COMMAND_HANDLER(rotatepic, api, message) {
+DECLARE_COMMAND_HANDLER(rotatepic) {
     std::vector<std::string> args =
         message->get<MessageAttrs::ParsedArgumentsList>();
     int rotation = 0;
@@ -53,14 +54,16 @@ DECLARE_COMMAND_HANDLER(rotatepic, api, message) {
             message->replyMessage()->get<MessageAttrs::Sticker>();
         if (stick->isAnimated || stick->isVideo) {
             api->sendReplyMessage(
-                message->message(), "Cannot rotate animated or video sticker");
+                message->message(),
+                access(res, Strings::CANNOT_ROTATE_NONSTATIC));
+            return;
         }
         fileid = stick->fileId;
     }
 
     if (!try_parse(args[0], &rotation)) {
         api->sendReplyMessage(message->message(),
-                                    "Invalid angle. (0-360 are allowed)");
+                              access(res, Strings::INVALID_ANGLE));
         return;
     }
     if (args.size() == 2) {
@@ -70,7 +73,7 @@ DECLARE_COMMAND_HANDLER(rotatepic, api, message) {
     // Download the sticker file
     if (!api->downloadFile(kDownloadFile.data(), fileid.value())) {
         api->sendReplyMessage(message->message(),
-                                    "Failed to download sticker file.");
+                              access(res, Strings::FAILED_TO_DOWNLOAD_FILE));
         return;
     }
 
@@ -91,11 +94,11 @@ DECLARE_COMMAND_HANDLER(rotatepic, api, message) {
             api->sendReplySticker(message->message(), infile);
         } else if (message->replyMessage()->get<MessageAttrs::Photo>()) {
             api->sendReplyPhoto(message->message(), infile,
-                                      "Rotated picture");
+                                access(res, Strings::ROTATED_PICTURE));
         }
     } else {
         api->sendReplyMessage(message->message(),
-                                    "Unknown image type, or processing failed");
+                              access(res, Strings::FAILED_TO_ROTATE_IMAGE));
     }
     std::filesystem::remove(params.srcPath);  // Delete the temporary file
     std::filesystem::remove(params.destPath);

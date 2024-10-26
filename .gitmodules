@@ -19,3 +19,6 @@
 [submodule "clientapp/android/app/src/main/cpp/abseil-cpp"]
 	path = src/third-party/abseil-cpp
 	url = https://github.com/abseil/abseil-cpp/
+[submodule "src/third-party/fruit"]
+	path = src/third-party/fruit
+	url = https://github.com/google/fruit

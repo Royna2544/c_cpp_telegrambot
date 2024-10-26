@@ -1,7 +1,9 @@
-#include <StringResManager.hpp>
+#include <fmt/format.h>
+
 #include <libos/libfs.hpp>
 
 #include "CompilerInTelegram.hpp"
+#include "StringResLoader.hpp"
 
 void CompilerInTgForCCpp::run(MessageExt::Ptr message) {
     std::string extraargs;
@@ -13,14 +15,15 @@ void CompilerInTgForCCpp::run(MessageExt::Ptr message) {
 #endif
 
     if (verifyParseWrite(message, extraargs)) {
-        cmd << params.exe.string() << SPACE << extraargs << SPACE << params.outfile.string();
+        cmd << params.exe.string() << SPACE << extraargs << SPACE
+            << params.outfile.string();
 
-        resultbuf << GETSTR(COMPILE_TIME) << ":\n";
+        resultbuf << fmt::format("{}: {}\n", access(_locale, Strings::COMMAND_IS), cmd.str());
         runCommand(cmd.str(), resultbuf);
         resultbuf << std::endl;
 
         if (FS::exists(aoutname)) {
-            resultbuf << GETSTR(RUN_TIME) << ":\n";
+            resultbuf << access(_locale, Strings::RUN_TIME) << ":\n";
             runCommand(aoutname.data(), resultbuf);
             std::filesystem::remove(aoutname);
         }

@@ -3,10 +3,18 @@
 
 #include <algorithm>
 #include <global_handlers/ChatObserver.hpp>
-#include <iostream>
 #include <mutex>
 
 using TgBot::Message;
+
+ChatObserver::ChatObserver(TgBotApi::Ptr api) {
+    api->onAnyMessage([this](TgBotApi::CPtr, const Message::Ptr& message) {
+        if (static_cast<bool>(*this)) {
+            process(message);
+        }
+        return TgBotApi::AnyMessageResult::Handled;
+    });
+}
 
 void ChatObserver::printChatMsg(const Message::Ptr& msg,
                                 const User::Ptr& from) {
@@ -35,8 +43,7 @@ void ChatObserver::process(const Message::Ptr& msg) {
     auto from = msg->from;
     if (from && chat) {
         std::lock_guard<std::mutex> _(m);
-        auto it =
-            std::find(observedChatIds.begin(), observedChatIds.end(), chat->id);
+        auto it = std::ranges::find(observedChatIds, chat->id);
         if (it != observedChatIds.end()) {
             if (chat->type != Chat::Type::Supergroup) {
                 LOG(WARNING) << "Removing chat '" << chat->title
@@ -49,4 +56,42 @@ void ChatObserver::process(const Message::Ptr& msg) {
     }
 }
 
-DECLARE_CLASS_INST(ChatObserver);
+bool ChatObserver::startObserving(ChatId chatId) {
+    std::lock_guard _(m);
+    if (std::ranges::find(observedChatIds, chatId) == observedChatIds.end()) {
+        observedChatIds.push_back(chatId);
+        return true;
+    } else {
+        LOG(WARNING) << "Already observing chat '" << chatId << "'";
+        return false;
+    }
+}
+
+bool ChatObserver::stopObserving(ChatId chatId) {
+    std::lock_guard _(m);
+    auto it = std::ranges::find(observedChatIds, chatId);
+    if (it != observedChatIds.end()) {
+        observedChatIds.erase(it);
+        return true;
+    } else {
+        LOG(WARNING) << "Not observing chat '" << chatId << "'";
+        return false;
+    }
+}
+
+bool ChatObserver::observeAll(bool observe) {
+    std::lock_guard _(m);
+    bool prev = observeAllChats;
+    observeAllChats = observe;
+    if (observeAllChats) {
+        LOG(INFO) << "Observing all chats";
+    } else {
+        LOG(INFO) << "Not observing all chats";
+    }
+    return prev != observe;
+}
+
+ChatObserver::operator bool() const {
+    std::lock_guard _(m);
+    return !observedChatIds.empty() || observeAllChats;
+}

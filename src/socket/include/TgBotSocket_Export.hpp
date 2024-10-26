@@ -68,7 +68,7 @@ struct alignas(ALIGNMENT) PacketHeader {
     // 4: Move CMD_UPLOAD_FILE_DRY to internal namespace
     // 5: Use the packed attribute for structs
     // 6: Make CMD_UPLOAD_FILE_DRY_CALLBACK return sperate callback, and add
-    // srcpath to UploadFile 
+    // srcpath to UploadFile
     // 7: Remove packed attribute, align all as 8 bytes
     // 8: change checksum to uint64_t
     constexpr static int DATA_VERSION = 8;
@@ -77,14 +77,13 @@ struct alignas(ALIGNMENT) PacketHeader {
     int64_t magic = MAGIC_VALUE;  ///< Magic value to verify the packet
     Command cmd{};                ///< Command to be executed
     ///< Padding to align `data_size` to 8 bytes
-    [[maybe_unused]] uint32_t padding1{};
+    uint32_t padding1{};
     ///< Size of the data in the packet
     length_type data_size{};
     ///< Checksum of the packet data
     uint64_t checksum{};
     ///< Padding to ensure struct size is a multiple of 8 bytes
-    [[maybe_unused]] uint32_t padding2{};
-
+    uint32_t padding2{};
 };
 static_assert(offsetof(TgBotSocket::PacketHeader, magic) == 0);
 
@@ -217,18 +216,10 @@ struct alignas(ALIGNMENT) UploadFileDry {
         // If true, just check the hashes and return result.
         bool dry_run = false;
 
-        bool operator==(const Options& other) const {
-            return overwrite == other.overwrite &&
-                   hash_ignore == other.hash_ignore && dry_run == other.dry_run;
-        }
+        bool operator==(const Options& other) const = default;
     } options;
 
-    bool operator==(const UploadFileDry& other) const {
-        return options == other.options &&
-               arraycmp(destfilepath, other.destfilepath) &&
-               arraycmp(srcfilepath, other.srcfilepath) &&
-               arraycmp(sha256_hash, other.sha256_hash);
-    }
+    bool operator==(const UploadFileDry& other) const = default;
 };
 
 struct alignas(ALIGNMENT) UploadFile : public UploadFileDry {

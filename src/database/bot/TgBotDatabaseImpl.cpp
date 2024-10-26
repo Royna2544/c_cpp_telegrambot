@@ -164,8 +164,6 @@ std::optional<ChatId> TgBotDatabaseImpl::getChatId(
     return _databaseImpl->getChatId(name);
 }
 
-DECLARE_CLASS_INST(TgBotDatabaseImpl);
-
 TgBotDatabaseImpl::Providers::Providers() {
 #ifdef HAVE_SQLITE
     registerProvider("sqlite", std::make_unique<SQLiteDatabase>());

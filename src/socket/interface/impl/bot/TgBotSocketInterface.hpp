@@ -2,7 +2,12 @@
 #include <SocketBase.hpp>
 #include <api/TgBotApi.hpp>
 #include <functional>
+#include <global_handlers/ChatObserver.hpp>
+#include <global_handlers/SpamBlock.hpp>
 #include <memory>
+
+#include "impl/SocketPosix.hpp"
+#include "trivial_helpers/fruit_inject.hpp"
 
 #if defined(__linux__) || defined(__APPLE__)
 #include <sys/socket.h>
@@ -21,15 +26,17 @@ struct SocketInterfaceTgBot : ManagedThreadRunnable {
 
     void runFunction() override;
 
-    explicit SocketInterfaceTgBot(
-        std::shared_ptr<SocketInterfaceBase> _interface,
-        TgBotApi::Ptr _api,
-        std::shared_ptr<SocketFile2DataHelper> helper);
+    APPLE_EXPLICIT_INJECT(SocketInterfaceTgBot(
+        SocketInterfaceBase* _interface, TgBotApi::Ptr _api,
+        ChatObserver* observer, SpamBlockBase* spamblock,
+        SocketFile2DataHelper* helper));
 
    private:
-    std::shared_ptr<SocketInterfaceBase> interface = nullptr;
+    SocketInterfaceBase* interface = nullptr;
     TgBotApi::Ptr api = nullptr;
-    std::shared_ptr<SocketFile2DataHelper> helper;
+    SocketFile2DataHelper* helper;
+    ChatObserver* observer = nullptr;
+    SpamBlockBase* spamblock = nullptr;
 
     std::chrono::system_clock::time_point startTp =
         std::chrono::system_clock::now();
@@ -39,9 +46,9 @@ struct SocketInterfaceTgBot : ManagedThreadRunnable {
     // Command handlers
     GenericAck handle_WriteMsgToChatId(const void* ptr);
     GenericAck handle_SendFileToChatId(const void* ptr);
-    static GenericAck handle_CtrlSpamBlock(const void* ptr);
-    static GenericAck handle_ObserveChatId(const void* ptr);
-    static GenericAck handle_ObserveAllChats(const void* ptr);
+    GenericAck handle_CtrlSpamBlock(const void* ptr);
+    GenericAck handle_ObserveChatId(const void* ptr);
+    GenericAck handle_ObserveAllChats(const void* ptr);
     static GenericAck handle_DeleteControllerById(const void* ptr);
     GenericAck handle_UploadFile(const void* ptr,
                                  TgBotSocket::PacketHeader::length_type len);

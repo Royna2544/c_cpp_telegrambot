@@ -1,13 +1,15 @@
 #pragma once
 
 #include <absl/status/status.h>
-#include <api/MessageExt.hpp>
 
+#include <api/MessageExt.hpp>
 #include <filesystem>
 #include <memory>
 #include <sstream>
 #include <string>
 #include <utility>
+
+#include "StringResLoader.hpp"
 
 using TgBot::Message;
 
@@ -28,7 +30,8 @@ struct CompilerInTg {
      */
     virtual void run(MessageExt::Ptr message) = 0;
 
-    explicit CompilerInTg(std::unique_ptr<Interface> interface);
+    explicit CompilerInTg(std::unique_ptr<Interface> interface,
+                          const StringResLoaderBase::LocaleStrings* loader);
     virtual ~CompilerInTg() = default;
 
     /**
@@ -47,11 +50,14 @@ struct CompilerInTg {
 
    protected:
     std::unique_ptr<Interface> _interface;
+    const StringResLoaderBase::LocaleStrings* _locale;
 };
 
 struct CompilerInTgForBash : CompilerInTg {
-    CompilerInTgForBash(std::unique_ptr<Interface> interface, bool allowhang)
-        : CompilerInTg(std::move(interface)), allowhang(allowhang) {}
+    CompilerInTgForBash(std::unique_ptr<Interface> interface,
+                        const StringResLoaderBase::LocaleStrings* _loader,
+                        bool allowhang)
+        : CompilerInTg(std::move(interface), _loader), allowhang(allowhang) {}
     ~CompilerInTgForBash() override = default;
     void run(MessageExt::Ptr message) override;
 
@@ -66,12 +72,15 @@ struct CompilerInTgForGeneric : CompilerInTg {
         // e.g. /tmp/output.c (Where to write the code to compile/interpret)
         std::filesystem::path outfile;
     };
-    explicit CompilerInTgForGeneric(std::unique_ptr<Interface> interface,
-                                    Params params)
-        : CompilerInTg(std::move(interface)), params(std::move(params)) {}
+    explicit CompilerInTgForGeneric(
+        std::unique_ptr<Interface> interface,
+        const StringResLoaderBase::LocaleStrings* _locale, Params params)
+        : CompilerInTg(std::move(interface), _locale),
+          params(std::move(params)) {}
 
     Params params;
-    bool verifyParseWrite(const MessageExt::Ptr& message, std::string& extraargs);
+    bool verifyParseWrite(const MessageExt::Ptr& message,
+                          std::string& extraargs);
     ~CompilerInTgForGeneric() override = default;
     void run(MessageExt::Ptr message) override;
 };

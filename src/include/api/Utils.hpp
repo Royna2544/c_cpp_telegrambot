@@ -1,12 +1,17 @@
 #pragma once
 
-#include <string>
-#include <tgbot/types/Animation.h>
-#include <tgbot/types/PhotoSize.h>
-#include <tgbot/types/Video.h>
-#include <tgbot/types/Sticker.h>
-#include <tgbot/types/Chat.h>
 #include <Types.h>
+#include <tgbot/types/Animation.h>
+#include <tgbot/types/Chat.h>
+#include <tgbot/types/PhotoSize.h>
+#include <tgbot/types/Sticker.h>
+#include <tgbot/types/Video.h>
+
+#include <array>
+#include <exception>
+#include <ostream>
+#include <string>
+#include <utility>
 
 /**
  * @brief A utility class to hold Telegram media IDs and unique IDs.
@@ -89,3 +94,76 @@ struct ChatIds {
     operator ChatId() const { return _id; }
     ChatId _id;
 };
+
+/**
+ * @brief A utility class to hold a string or a string view.
+ *
+ * This class encapsulates a string or a string view, allowing for efficient
+ * handling of both types. It provides constructors for both types and an
+ * implicit conversion operator to retrieve the string.
+ */
+struct StringOrView {
+   private:
+    std::string str;  //!< The underlying string.
+   public:
+    /**
+     * @brief Constructs a StringOrView object from a std::string.
+     *
+     * @param s The std::string to initialize the object with.
+     */
+    StringOrView(std::string s) : str(std::move(s)) {}
+
+    /**
+     * @brief Constructs a StringOrView object from a std::string_view.
+     *
+     * @param s The std::string_view to initialize the object with.
+     */
+    StringOrView(std::string_view s) : str(s) {}
+
+    /**
+     * @brief Default constructor. Initializes the object with an empty string.
+     */
+    StringOrView() = default;
+
+    /**
+     * @brief Constructs a StringOrView object from an exception object.
+     *
+     * @param ex The exception object to initialize the object with.
+     */
+    StringOrView(const std::exception& ex) : str(ex.what()) {}
+
+    /**
+     * @brief Constructs a StringOrView object from a character array.
+     *
+     * @tparam N Number of characters
+     * @param buffer The character array to initialize the object with.
+     */
+    template <size_t N>
+    StringOrView(const std::array<char, N>& buffer) : str(buffer.data()) {}
+
+    /**
+     * @brief Constructs a StringOrView object from a character array.
+     *
+     * @param s The character array to initialize the object with.
+     *
+     * @deprecated Do not directly use string literals, use translatable string resources instead.
+     */
+    template <int N>
+    [[deprecated("Do not directly use string literals, use translatable string resources instead")]]
+    StringOrView(const char (&s)[N])
+        : str(s) {}
+
+    /**
+     * @brief Implicit conversion operator to retrieve the underlying string.
+     *
+     * @return A const reference to the underlying string.
+     */
+    operator const std::string&() { return str; }
+
+    friend std::ostream& operator<<(std::ostream& self,
+                                    const StringOrView& view);
+};
+
+inline std::ostream& operator<<(std::ostream& self, const StringOrView& view) {
+    return self << view.str;
+}

@@ -3,7 +3,6 @@
 #include <absl/log/log_entry.h>
 #include <absl/log/log_sink.h>
 
-#include <InitTask.hpp>
 #include <ManagedThreads.hpp>
 #include <future>
 #include <memory>
@@ -18,9 +17,6 @@ struct NetworkLogSink : private absl::LogSink,
     void runFunction() override;
 
     explicit NetworkLogSink();
-
-    friend InitTask& operator<<(InitTask& tag, NetworkLogSink& thiz);
-
    private:
     std::shared_ptr<SocketInterfaceBase> interface;
     std::atomic_bool enabled = true;

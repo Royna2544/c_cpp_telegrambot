@@ -732,7 +732,7 @@ void ROMBuildQueryHandler::onCallbackQuery(
     LOG(ERROR) << "Unknown callback query: " << query->data;
 }
 
-DECLARE_COMMAND_HANDLER(rombuild, api, message) {
+DECLARE_COMMAND_HANDLER(rombuild) {
     static std::shared_ptr<ROMBuildQueryHandler> handler;
 
     if (handler) {

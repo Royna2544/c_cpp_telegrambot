@@ -3,15 +3,17 @@
 #include <Types.h>
 #include <tgbot/types/Message.h>
 
+#include <bot/TgBotDatabaseImpl.hpp>
 #include <chrono>
-
-#include "InstanceClassBase.hpp"
+#include "trivial_helpers/fruit_inject.hpp"
 
 using TgBot::Message;
 using TgBot::User;
 
-class AuthContext : public InstanceClassBase<AuthContext> {
+class AuthContext {
    public:
+    APPLE_EXPLICIT_INJECT(AuthContext(DatabaseBase* database)) : _impl(database) {}
+
     enum class Flags {
         None = 0,
         // If set, don't allow non-users e.g. channels, groups..
@@ -94,8 +96,12 @@ class AuthContext : public InstanceClassBase<AuthContext> {
      */
     static bool isMessageUnderTimeLimit(const Message::Ptr& msg) noexcept;
 
+    [[nodiscard]] bool isInList(DatabaseBase::ListType type,
+                                const UserId user) const;
+
    private:
     bool authorized = true;
+    DatabaseBase* _impl;
 };
 
 constexpr std::chrono::seconds kMaxTimestampDelay = std::chrono::seconds(10);

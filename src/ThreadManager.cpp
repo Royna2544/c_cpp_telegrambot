@@ -32,5 +32,3 @@ void ThreadManager::destroyManager() {
         lk.lock();
     });
 }
-
-DECLARE_CLASS_INST(ThreadManager);

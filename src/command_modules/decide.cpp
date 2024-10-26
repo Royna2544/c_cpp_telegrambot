@@ -1,14 +1,17 @@
 #include <fmt/core.h>
 
 #include <Random.hpp>
-#include <api/TgBotApi.hpp>
 #include <api/CommandModule.hpp>
+#include <api/Providers.hpp>
+#include <api/TgBotApi.hpp>
 #include <sstream>
 #include <thread>
 
+#include "StringResLoader.hpp"
+
 using std::chrono_literals::operator""s;
 
-DECLARE_COMMAND_HANDLER(decide, wrapperBot, message) {
+DECLARE_COMMAND_HANDLER(decide) {
     constexpr int COUNT_MAX = 10;
     constexpr int RANDOM_RANGE_NUM = 10;
 
@@ -18,24 +21,25 @@ DECLARE_COMMAND_HANDLER(decide, wrapperBot, message) {
     int count = COUNT_MAX;
     int yesno = 0;
 
-    msgtxt << fmt::format("Deciding '{}'...", obj);
-    msg = wrapperBot->sendReplyMessage(message->message(), msgtxt.str());
+    msgtxt << fmt::format("{} '{}'...", access(res, Strings::DECIDING), obj);
+    msg = api->sendReplyMessage(message->message(), msgtxt.str());
     msgtxt << std::endl << std::endl;
     do {
         msgtxt << fmt::format("Try {}: ", COUNT_MAX - count + 1);
-        if (Random::getInstance()->generate(RANDOM_RANGE_NUM) % 2 == 1) {
-            msgtxt << "Yes";
+        if (provider->random->generate(RANDOM_RANGE_NUM) % 2 == 1) {
+            msgtxt << access(res, Strings::YES);
             ++yesno;
         } else {
-            msgtxt << "No";
+            msgtxt << access(res, Strings::NO);
             --yesno;
         }
         msgtxt << std::endl;
         count--;
-        wrapperBot->editMessage(msg, msgtxt.str());
+        api->editMessage(msg, msgtxt.str());
         if (count != 0) {
             if (abs(yesno) > count) {
-                msgtxt << "Short circuited to the answer" << std::endl;
+                msgtxt << access(res, Strings::SHORT_CIRCUITED_TO_THE_ANSWER)
+                       << std::endl;
                 break;
             }
         } else {
@@ -46,13 +50,13 @@ DECLARE_COMMAND_HANDLER(decide, wrapperBot, message) {
     } while (count > 0);
     msgtxt << std::endl;
     if (yesno > 0) {
-        msgtxt << "So, yes.";
+        msgtxt << access(res, Strings::SO_YES);
     } else if (yesno == 0) {
-        msgtxt << "So, idk.";
+        msgtxt << access(res, Strings::SO_IDK);
     } else {
-        msgtxt << "So, no.";
+        msgtxt << access(res, Strings::SO_NO);
     }
-    wrapperBot->editMessage(msg, msgtxt.str());
+    api->editMessage(msg, msgtxt.str());
 }
 
 DYN_COMMAND_FN(/*name*/, module) {

@@ -18,8 +18,8 @@ using ConstArray = std::array<ConstArrayElem<T, V>, size>;
 
 template <class Container, typename T>
 constexpr auto find(Container& c, T val) {
-    return std::find_if(c.begin(), c.end(),
-                        [=](const auto& e) { return e.first == val; });
+    return std::ranges::find_if(c,
+                                [=](const auto& e) { return e.first == val; });
 }
 
 // T, V : Map elements, N: count, E valargs
@@ -30,8 +30,8 @@ constexpr ConstArray<T, V, N> make(E&&... e) {
 }
 
 template <typename T, typename V>
-constexpr ArrayElem<T, V> make_elem(T&& t, V&& v) {
-    return std::make_pair<T, V>(std::forward<T>(t), std::forward<V>(v));
+constexpr ArrayElem<T, V> make_elem(T t, V v) {
+    return std::make_pair(std::move(t), std::move(v));
 }
 
 }  // namespace array_helpers

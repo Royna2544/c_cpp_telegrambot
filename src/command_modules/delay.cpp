@@ -12,7 +12,7 @@
 #include <sstream>
 #include <string>
 
-DECLARE_COMMAND_HANDLER(delay, wrapper, message) {
+DECLARE_COMMAND_HANDLER(delay) {
     using std::chrono::duration;
     using std::chrono::high_resolution_clock;
     using std::chrono::system_clock;
@@ -26,10 +26,10 @@ DECLARE_COMMAND_HANDLER(delay, wrapper, message) {
         "Difference: {}\n",
         msgTP, nowTP, to_secs(nowTP - msgTP));
     auto dp = DurationPoint();
-    auto sentMsg = wrapper->sendReplyMessage(message->message(), ss.str());
+    auto sentMsg = api->sendReplyMessage(message->message(), ss.str());
     ss << fmt::format("Sending reply message took: {}", dp.get());
     // Update the sent message with the delay information
-    wrapper->editMessage(sentMsg, ss.str());
+    api->editMessage(sentMsg, ss.str());
 }
 
 DYN_COMMAND_FN(/*name*/, module) {

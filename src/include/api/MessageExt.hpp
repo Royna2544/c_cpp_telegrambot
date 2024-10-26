@@ -228,6 +228,9 @@ class TgBotPPImpl_shared_deps_API MessageExt {
     MessageExt::Ptr _replyMessage;
 
     [[nodiscard]] bool has_attribute(const MessageAttrs& attr) const {
+        if (!_message) {
+            return false;
+        }
         switch (attr) {
             case MessageAttrs::ExtraText:
                 return !_extra_args.empty();

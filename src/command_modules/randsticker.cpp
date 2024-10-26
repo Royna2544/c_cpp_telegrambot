@@ -1,15 +1,16 @@
 #include <fmt/format.h>
 #include <tgbot/TgException.h>
 
-#include <Random.hpp>
 #include <api/CommandModule.hpp>
+#include <api/Providers.hpp>
 #include <api/TgBotApi.hpp>
 
 using TgBot::StickerSet;
 
-DECLARE_COMMAND_HANDLER(randsticker, wrapper, message) {
+DECLARE_COMMAND_HANDLER(randsticker) {
     if (!message->replyMessage()->has<MessageAttrs::Sticker>()) {
-        wrapper->sendReplyMessage(message->message(), "Reply to a sticker");
+        api->sendReplyMessage(message->message(),
+                                  access(res, Strings::REPLY_TO_A_STICKER));
         return;
     }
 
@@ -17,19 +18,19 @@ DECLARE_COMMAND_HANDLER(randsticker, wrapper, message) {
     Random::ret_type pos{};
     StickerSet::Ptr stickset;
     try {
-        stickset = wrapper->getStickerSet(sticker->setName);
+        stickset = api->getStickerSet(sticker->setName);
     } catch (const TgBot::TgException& e) {
-        wrapper->sendReplyMessage(message->message(), e.what());
+        api->sendReplyMessage(message->message(), e);
         return;
     }
-    pos = Random::getInstance()->generate(stickset->stickers.size() - 1);
-    wrapper->sendSticker(message->get<MessageAttrs::Chat>(),
+    pos = provider->random->generate(stickset->stickers.size() - 1);
+    api->sendSticker(message->get<MessageAttrs::Chat>(),
                          MediaIds(stickset->stickers[pos]));
 
     const auto arg =
         fmt::format("Sticker idx: {} emoji: {}\nFrom pack: \"{}\"", pos + 1,
                     stickset->stickers[pos]->emoji, stickset->title);
-    wrapper->sendMessage(message->get<MessageAttrs::Chat>(), arg);
+    api->sendMessage(message->get<MessageAttrs::Chat>(), arg);
 }
 
 DYN_COMMAND_FN(n, module) {

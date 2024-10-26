@@ -1,11 +1,53 @@
 #pragma once
 
 #include <absl/base/log_severity.h>
-#include <absl/log/log_sink.h>
 #include <absl/log/log.h>
-#include <StructF.hpp>
+#include <absl/log/log_sink.h>
+#include <absl/log/log_sink_registry.h>
+#include <trivial_helpers/_class_helper_macros.h>
 
+#include <StructF.hpp>
+#include <memory>
 #include <mutex>
+#include <type_traits>
+
+template <typename Sink>
+    requires(std::is_base_of_v<absl::LogSink, Sink>)
+struct RAIILogSink {
+    explicit RAIILogSink()
+        requires std::is_default_constructible_v<Sink>
+        : _sink(std::make_unique<Sink>()) {
+        absl::AddLogSink(_sink.get());
+    }
+    template <typename... Args>
+    explicit RAIILogSink(Args&&... args)
+        requires std::is_constructible_v<Sink, Args...> &&
+                 (sizeof...(Args) != 0)
+        : _sink(std::make_unique<Sink>(args...)) {
+        absl::AddLogSink(_sink.get());
+    }
+    RAIILogSink() = default;
+    ~RAIILogSink() {
+        if (_sink) {
+            absl::RemoveLogSink(_sink.get());
+        }
+    }
+
+    RAIILogSink& operator=(std::unique_ptr<Sink>&& sink) & {
+        if (_sink) {
+            absl::RemoveLogSink(_sink.get());
+        }
+        _sink = std::move(sink);
+        if (_sink) {
+            absl::AddLogSink(_sink.get());
+        }
+    }
+
+    NO_COPY_CTOR(RAIILogSink);
+
+   private:
+    std::unique_ptr<Sink> _sink;
+};
 
 struct FileSinkBase : absl::LogSink {
     void Send(const absl::LogEntry& entry) override {
@@ -23,10 +65,11 @@ struct FileSinkBase : absl::LogSink {
 };
 
 struct LogFileSink : FileSinkBase {
-    void init(const std::string& filename) {
+    explicit LogFileSink(std::string_view filename) {
         const auto& res = file.open(filename, F::Mode::Write);
         if (!res) {
-            LOG(ERROR) << "Couldn't open file " << filename << ": " << res.reason;
+            LOG(ERROR) << "Couldn't open file " << filename << ": "
+                       << res.reason;
             file = nullptr;
         }
     }

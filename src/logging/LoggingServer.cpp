@@ -75,4 +75,11 @@ NetworkLogSink::NetworkLogSink() {
     } else {
         LOG(ERROR) << "Failed to find default socket interface";
     }
+    setPreStopFunction([](auto* arg) {
+        LOG(INFO) << "onServerShutdown";
+        auto* const thiz = static_cast<NetworkLogSink*>(arg);
+        thiz->enabled = false;
+        thiz->onClientDisconnected.set_value();
+    });
+    run();
 }

@@ -1,10 +1,11 @@
 #include <fmt/format.h>
 
-#include <StringResManager.hpp>
 #include <api/CommandModule.hpp>
 #include <api/TgBotApi.hpp>
 
-DECLARE_COMMAND_HANDLER(cmd, botWrapper, message) {
+#include "StringResLoader.hpp"
+
+DECLARE_COMMAND_HANDLER(cmd) {
     const auto& args = message->get<MessageAttrs::ParsedArgumentsList>();
     const auto& command = args[0];
     const auto& action = args[1];
@@ -13,25 +14,28 @@ DECLARE_COMMAND_HANDLER(cmd, botWrapper, message) {
 
     std::string result_message;
     if (action == "reload") {
-        ret = botWrapper->reloadCommand(command);
+        ret = api->reloadCommand(command);
         valid = true;
     } else if (action == "unload") {
-        ret = botWrapper->unloadCommand(command);
+        ret = api->unloadCommand(command);
         valid = true;
     }
 
     if (valid) {
         if (ret) {
-            result_message = fmt::format("{} {}: {}", command, action,
-                                         GETSTR(OPERATION_SUCCESSFUL));
+            result_message =
+                fmt::format("{} {}: {}", command, action,
+                            access(res, Strings::OPERATION_SUCCESSFUL));
         } else {
-            result_message = fmt::format("{} {}: {}", command, action,
-                                         GETSTR(OPERATION_FAILURE));
+            result_message =
+                fmt::format("{} {}: {}", command, action,
+                            access(res, Strings::OPERATION_FAILURE));
         }
     } else {
-        result_message = fmt::format("{}: {}", GETSTR(UNKNOWN_ACTION), action);
+        result_message =
+            fmt::format("{}: {}", access(res, Strings::UNKNOWN_ACTION), action);
     }
-    botWrapper->sendReplyMessage(message->message(), result_message);
+    api->sendReplyMessage(message->message(), result_message);
 }
 
 DYN_COMMAND_FN(/*name*/, module) {

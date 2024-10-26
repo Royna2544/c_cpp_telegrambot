@@ -47,7 +47,7 @@ class TgBotWebServerBase {
 };
 
 class TgBotWebServer : public ManagedThreadRunnable,
-                                       TgBotWebServerBase {
+                                       public TgBotWebServerBase {
    public:
     explicit TgBotWebServer(int serverPort);
 

@@ -1,6 +1,7 @@
 #include <ResourceManager.h>
 #include <absl/log/log.h>
 #include <absl/strings/ascii.h>
+#include <fmt/format.h>
 
 #include <fstream>
 #include <libos/libfs.hpp>
@@ -72,7 +73,7 @@ void ResourceManager::preloadResourceDirectory() {
     }
 }
 
-const std::string& ResourceManager::getResource(std::filesystem::path path) {
+std::string_view ResourceManager::getResource(std::filesystem::path path) {
     path.make_preferred();
     for (const auto& [elem, data] : kResources) {
         if (elem.string() == path.string()) {
@@ -80,8 +81,6 @@ const std::string& ResourceManager::getResource(std::filesystem::path path) {
         }
     }
     LOG(ERROR) << "Resource not found: " << path;
-    throw std::runtime_error(std::string("Resource not found: ") +
-                             path.string());
+    throw std::runtime_error(
+        fmt::format("Resource not found: {}", path.string()));
 }
-
-DECLARE_CLASS_INST(ResourceManager);

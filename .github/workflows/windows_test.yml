@@ -16,10 +16,9 @@ jobs:
       fail-fast: false
       matrix:
         sys: [mingw64, ucrt64] # clang64
-        text: ['', ' unsupported']
 
 
-    name: "🚧 ${{ matrix.sys }} (AF_UNIX${{matrix.text}})"
+    name: "🚧 ${{ matrix.sys }}"
     defaults:
       run:
         shell: msys2 {0}
@@ -56,11 +55,6 @@ jobs:
     - name: 'Setup submodule'
       run: |
         git submodule update --init
-
-    - name: 'Break build of test_af_unix.c'
-      if: matrix.text != ''
-      run: |
-        echo ${{matrix.text}} >> tests/test_af_unix.c
 
     - name: '🚧 Build TgBot++'
       run: |

@@ -19,6 +19,17 @@ option(DISABLE_SANITIZERS "Disable all sanitizers (ASan, TSan, etc)" OFF)
 option(DIRTY_ABSEIL_FIX "Enable dirty abseil linkage fix" OFF)
 #####################################################################
 
+if (WIN32)
+  add_subdirectory(src/third-party/dlfcn-win32)
+  set(CMAKE_DL_LIBS dl)
+else()
+  find_library(DL dl)
+  add_library(dl SHARED IMPORTED)
+  set_target_properties(dl PROPERTIES
+    IMPORTED_LOCATION "${DL}"
+  )
+endif()
+
 ##################### Fill in readme with cmake #####################
 string(TIMESTAMP TODAY "%Y-%m-%d")
 configure_file(resources/about.html.in ${CMAKE_SOURCE_DIR}/resources/about.html)
@@ -65,7 +76,7 @@ function(add_my_library)
   if (WIN32)
     target_link_libraries(${TGBOT_LIBRARY_NAME} ${TGBOT_LIBRARY_LIBS_WIN32})
   endif()
-  target_compile_definitions(${TGBOT_LIBRARY_NAME} PRIVATE ${TGBOT_LIBRARY_DEFS})
+  target_compile_definitions(${TGBOT_LIBRARY_NAME} PRIVATE ${TGBOT_LIBRARY_DEFS} -D__TGBOT__)
   if (TGBOT_LIBRARY_DEPENDS)
     add_dependencies(${TGBOT_LIBRARY_NAME} ${TGBOT_LIBRARY_DEPENDS})
   endif()
@@ -101,6 +112,7 @@ function(add_my_executable)
   if (UNIX)
     target_link_libraries(${TGBOT_EXE_NAME} ${TGBOT_EXE_LIBS_UNIX})
   endif()
+  target_compile_definitions(${TGBOT_EXE_NAME} PRIVATE -D__TGBOT__)
 endfunction(add_my_executable)
 
 ############################ RUST support ###########################
@@ -117,20 +129,6 @@ if (NOT MSVC)
 endif()
 if (WIN32)
   add_compile_definitions(-DWINDOWS_BUILD)
-endif()
-#####################################################################
-
-################### Check Windows's AF_UNIX support ###################
-################# Versions later than Win10 RS3 does #################
-if (WIN32)
-  include(CheckCSourceCompiles)
-  FILE(READ tests/test_af_unix.c AF_UNIX_TEST_FILE)
-  check_c_source_compiles("${AF_UNIX_TEST_FILE}" USE_UNIX_SOCKETS)
-else()
-  set(USE_UNIX_SOCKETS TRUE)
-endif()
-if (USE_UNIX_SOCKETS)
-  add_definitions(-DSOCKET_CONNECTION)
 endif()
 #####################################################################
 
@@ -187,16 +185,7 @@ add_subdirectory(src/web)
 set(HTTPLIB_COMPILE ON)
 add_subdirectory(src/third-party/cpp-httplib)
 add_subdirectory(src/third-party/tgbot-cpp)
-if (WIN32)
-  add_subdirectory(src/third-party/dlfcn-win32)
-  set(CMAKE_DL_LIBS dl)
-else()
-  find_library(DL dl)
-  add_library(dl SHARED IMPORTED)
-  set_target_properties(dl PROPERTIES
-    IMPORTED_LOCATION "${DL}"
-  )
-endif()
+add_subdirectory(src/third-party/fruit)
 add_subdirectory(tests)
 #################################################################
 
@@ -208,15 +197,12 @@ add_my_library(
   NAME PPImpl_shared_deps
   SRCS 
     src/ManagedThread.cpp
-    src/ThreadManager.cpp
     src/api/MessageExt.cpp
-  LIBS
   PUBLIC_INC
     $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>
 )
 
 ####################### TgBot Socket Library #######################
-if (USE_UNIX_SOCKETS)
   set(SOCKET_SRC_INTERFACE src/socket/interface)
   set(SOCKET_SRC_LIST
     src/global_handlers/ChatObserver.cpp
@@ -226,7 +212,6 @@ if (USE_UNIX_SOCKETS)
     ${SOCKET_SRC_INTERFACE}/impl/backends/ServerBackend.cpp
     ${SOCKET_SRC_INTERFACE}/impl/backends/ServerBackend_${TARGET_VARIANT}.cpp)
   add_subdirectory(src/socket)
-endif()
 #####################################################################
 
 ################# TgBot Utilities (generic) Library #################
@@ -234,11 +219,6 @@ include(CMake/tgbotutils.cmake)
 #####################################################################
 
 ################### The Bot's main functionaility ###################
-set(LD_LIST TgBot TgBotUtils TgBotWeb TgBotDBImpl absl::status TgBotRandom
-            TgBotStringResManager TgBotPPImpl_shared_deps ${CMAKE_DL_LIBS})
-if (USE_UNIX_SOCKETS)
-  list(APPEND LD_LIST TgBotSocket)
-endif()
 add_my_library(
   NAME PPImpl
   SRCS 
@@ -248,9 +228,16 @@ add_my_library(
     src/global_handlers/RegEXHandler.cpp
     src/global_handlers/SpamBlocker.cpp
     src/web/TgBotWebServer.cpp
-    ${SOCKET_SRC_LIST}
+    src/ThreadManager.cpp
+    src/global_handlers/ChatObserver.cpp
+    src/logging/LoggingServer.cpp
+    src/socket/interface/impl/bot/SocketDataHandler.cpp
+    src/socket/interface/impl/bot/TgBotSocketInterface.cpp
+    src/socket/interface/impl/backends/ServerBackend.cpp
+    src/socket/interface/impl/backends/ServerBackend_${TARGET_VARIANT}.cpp
   PRIVATE_INC src/third-party/rapidjson/include
-  LIBS ${LD_LIST}
+  LIBS  TgBot TgBotUtils TgBotWeb TgBotDBImpl absl::status TgBotRandom
+        TgBotPPImpl_shared_deps TgBotStringRes ${CMAKE_DL_LIBS} fruit TgBotSocket
   STATIC
 )
 #####################################################################
@@ -259,7 +246,7 @@ add_my_library(
 add_my_executable(
   NAME main
   SRCS src/main.cpp
-  LIBS TgBotPPImpl
+  LIBS TgBotPPImpl TgBotDBLoading
   LIBS_UNIX TgBot_restartfmt_parser
 )
 

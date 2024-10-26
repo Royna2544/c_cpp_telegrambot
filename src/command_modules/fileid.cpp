@@ -2,9 +2,11 @@
 
 #include <api/CommandModule.hpp>
 #include <api/TgBotApi.hpp>
+
+#include "StringResLoader.hpp"
 #include "api/MessageExt.hpp"
 
-DECLARE_COMMAND_HANDLER(fileid, wrapper, message) {
+DECLARE_COMMAND_HANDLER(fileid) {
     std::string file;
     std::string unifile;
 
@@ -20,13 +22,14 @@ DECLARE_COMMAND_HANDLER(fileid, wrapper, message) {
             file = reply->get<MessageAttrs::Photo>()->fileId;
             unifile = reply->get<MessageAttrs::Photo>()->fileUniqueId;
         } else {
-            file = unifile = "Unknown";
+            file = unifile = access(res, Strings::UNKNOWN);
         }
-        wrapper->sendReplyMessage<TgBotApi::ParseMode::Markdown>(
+        api->sendReplyMessage<TgBotApi::ParseMode::Markdown>(
             message->message(),
             fmt::format("FileId: `{}`\nFileUniqueId: `{}`", file, unifile));
     } else {
-        wrapper->sendReplyMessage(message->message(), "Reply to a media");
+        api->sendReplyMessage(message->message(),
+                                  access(res, Strings::REPLY_TO_A_MEDIA));
     }
 }
 

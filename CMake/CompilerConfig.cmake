@@ -1,5 +1,4 @@
 #################### Submodule's configuration ###################
-set(BUILD_SHARED_LIBS ON CACHE BOOL "Build libs as shared libraries" FORCE)
 set(BUILD_TESTS OFF CACHE BOOL "Build tests" FORCE)
 set(ABSL_BUILD_TEST_HELPERS OFF CACHE BOOL "[abseil] Build gtest helpers" FORCE)
 set(ABSL_ENABLE_INSTALL ON CACHE BOOL "[abseil] Enable installation" FORCE)

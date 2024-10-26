@@ -38,7 +38,7 @@ void try_parse_spamcnt(const std::string& data, int& count) {
 /**
  * @brief A command module for spamming.
  */
-DECLARE_COMMAND_HANDLER(spam, bot, message) {
+DECLARE_COMMAND_HANDLER(spam) {
     std::function<void(void)> fp;
     int count = 0;
     bool spamable = false;
@@ -49,26 +49,26 @@ DECLARE_COMMAND_HANDLER(spam, bot, message) {
         spamable = true;
         try_parse_spamcnt(message->get<MessageAttrs::ExtraText>(), count);
         if (message->replyMessage()->has<MessageAttrs::Sticker>()) {
-            fp = [bot, message, chatid] {
-                bot->sendSticker(
+            fp = [api, message, chatid] {
+                api->sendSticker(
                     chatid,
                     MediaIds(
                         message->replyMessage()->get<MessageAttrs::Sticker>()));
             };
         } else if (message->replyMessage()->has<MessageAttrs::Animation>()) {
-            fp = [bot, message, chatid] {
-                bot->sendAnimation(
+            fp = [api, message, chatid] {
+                api->sendAnimation(
                     chatid, MediaIds(message->replyMessage()
                                          ->get<MessageAttrs::Animation>()));
             };
         } else if (message->replyMessage()->has<MessageAttrs::ExtraText>()) {
-            fp = [bot, message, chatid] {
-                bot->sendMessage(
+            fp = [api, message, chatid] {
+                api->sendMessage(
                     chatid,
                     message->replyMessage()->get<MessageAttrs::ExtraText>());
             };
         } else {
-            bot->sendReplyMessage(message->message(),
+            api->sendReplyMessage(message->message(),
                                   "Supports sticker/GIF/text for reply to "
                                   "messages, give count");
             spamable = false;
@@ -82,18 +82,18 @@ DECLARE_COMMAND_HANDLER(spam, bot, message) {
         if (commands.size() == 2) {
             try_parse_spamcnt(commands[0], spamData.first);
             spamData.second = commands[1];
-            fp = [bot, message, spamData] {
-                bot->sendMessage(message->get<MessageAttrs::Chat>()->id,
+            fp = [api, message, spamData] {
+                api->sendMessage(message->get<MessageAttrs::Chat>()->id,
                                  spamData.second);
             };
             count = spamData.first;
             spamable = true;
         } else {
-            bot->sendReplyMessage(message->message(),
+            api->sendReplyMessage(message->message(),
                                   "Invalid argument size for spam config");
         }
     } else {
-        bot->sendReplyMessage(message->message(),
+        api->sendReplyMessage(message->message(),
                               "Send a pair of spam count and message to spam");
     }
     if (spamable) {
