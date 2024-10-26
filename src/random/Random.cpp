@@ -7,7 +7,6 @@
 #include <random>
 #include <string_view>
 
-#include "InstanceClassBase.hpp"
 #include "engines/KernelRandEngine.hpp"
 #include "engines/RDRandEngine.hpp"
 
@@ -143,5 +142,3 @@ Random::ret_type Random::generate(const ret_type max) {
 Random::ret_type Random::generate(const ret_type min, const ret_type max) {
     return impl_->generate(min, max);
 }
-
-DECLARE_CLASS_INST(Random);

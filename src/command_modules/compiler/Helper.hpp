@@ -1,8 +1,6 @@
-#include <memory>
 
 #include "CompilerInTelegram.hpp"
 #include "DurationPoint.hpp"
-#include "InstanceClassBase.hpp"
 #include "api/TgBotApi.hpp"
 
 class CompilerInTgBotInterface : public CompilerInTg::Interface {

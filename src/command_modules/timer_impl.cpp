@@ -4,9 +4,7 @@
 #include <api/CommandModule.hpp>
 #include <api/Providers.hpp>
 #include <api/TgBotApi.hpp>
-#include <memory>
 
-#include "InstanceClassBase.hpp"
 #include "api/MessageExt.hpp"
 #include "support/timer/TimerImpl.hpp"
 

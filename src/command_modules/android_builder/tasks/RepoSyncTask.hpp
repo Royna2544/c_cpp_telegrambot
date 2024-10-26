@@ -3,8 +3,6 @@
 #include <RepoUtils.hpp>
 #include <api/TgBotApi.hpp>
 #include <chrono>
-#include <memory>
-#include "InstanceClassBase.hpp"
 
 class NewStdErrBufferHook {
     std::stringstream logMessage;
