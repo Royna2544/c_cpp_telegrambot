@@ -61,14 +61,16 @@ class TgBotPPImpl_shared_deps_API ThreadManager {
     }
 
     template <Usage usage, class T = ManagedThread, typename... Args>
-        requires std::is_base_of_v<ManagedThread, T>
+        requires std::is_base_of_v<ManagedThread, T> &&
+                 std::is_constructible_v<T, Args...>
     T* create(Args&&... args) {
         constexpr std::string_view usageStr = usageToStr<usage>();
         return create_internal<T>(usage, usageStr,
                                   std::forward<Args&&>(args)...);
     }
     template <class T = ManagedThread, typename... Args>
-        requires std::is_base_of_v<ManagedThread, T>
+        requires std::is_base_of_v<ManagedThread, T> &&
+                 std::is_constructible_v<T, Args...>
     T* create(Usage usage, Args&&... args) {
         std::string_view usageStr = usageToStr(usage);
         return create_internal<T>(usage, usageStr,
