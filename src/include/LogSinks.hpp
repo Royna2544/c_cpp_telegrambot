@@ -41,6 +41,7 @@ struct RAIILogSink {
         if (_sink) {
             absl::AddLogSink(_sink.get());
         }
+        return *this;
     }
 
     NO_COPY_CTOR(RAIILogSink);
