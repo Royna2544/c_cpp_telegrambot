@@ -40,6 +40,7 @@
     <string name="creating_new_sticker_set">Creating new sticker set</string>
     <string name="sticker_pack_created">Sticker pack created</string>
     <string name="failed_to_create_new_sticker_set">Failed to create new sticker set</string>
+    <string name="animated_stickers_not_supported">Animated stickers not supported</string>
 
     <!-- setowner cmd -->
     <string name="bot_owner_set">Bot's owner has been set</string>
