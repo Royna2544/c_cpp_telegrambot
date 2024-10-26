@@ -73,14 +73,14 @@ void ResourceManager::preloadResourceDirectory() {
     }
 }
 
-std::string_view ResourceManager::getResource(std::filesystem::path path) {
-    path.make_preferred();
+std::string_view ResourceManager::getResource(std::filesystem::path filename) const {
+    filename.make_preferred();
     for (const auto& [elem, data] : kResources) {
-        if (elem.string() == path.string()) {
+        if (elem.string() == filename.string()) {
             return data;
         }
     }
-    LOG(ERROR) << "Resource not found: " << path;
+    LOG(ERROR) << "Resource not found: " << filename;
     throw std::runtime_error(
-        fmt::format("Resource not found: {}", path.string()));
+        fmt::format("Resource not found: {}", filename.string()));
 }

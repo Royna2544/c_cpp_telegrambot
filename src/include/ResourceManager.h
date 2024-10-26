@@ -13,7 +13,7 @@
 struct TgBotUtils_API ResourceManager{
     bool preloadOneFile(std::filesystem::path p);
     void preloadResourceDirectory(void);
-    std::string_view getResource(std::filesystem::path filename);
+    std::string_view getResource(std::filesystem::path filename) const;
 
     APPLE_INJECT(ResourceManager()) {
         preloadResourceDirectory();
