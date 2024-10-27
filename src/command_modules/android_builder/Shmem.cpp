@@ -14,7 +14,7 @@ AllocatedShmem::AllocatedShmem(const std::string_view& path, off_t size) {
         PLOG(ERROR) << "shm_open failed";
         throw syscall_perror("shm_open");
     }
-    const auto fdCloser = createAutoCloser(fd);
+    const auto fdCloser = RAII2<int>::create<int>(fd, close);
     if (ftruncate(fd, size) == -1) {
         PLOG(ERROR) << "ftruncate failed";
         throw syscall_perror("ftruncate");
@@ -47,7 +47,7 @@ ConnectedShmem::ConnectedShmem(const std::string_view& path, const off_t size) {
         PLOG(ERROR) << "shm_open failed";
         throw syscall_perror("shm_open");
     }
-    const auto fdCloser = createAutoCloser(fd);
+    const auto fdCloser = RAII2<int>::create<int>(fd, close);
     void* ptr = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (ptr == MAP_FAILED) {
         PLOG(ERROR) << "mmap failed";
