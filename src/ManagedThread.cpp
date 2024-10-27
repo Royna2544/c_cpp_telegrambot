@@ -31,7 +31,7 @@ void ManagedThread::setPreStopFunction(prestop_function fn) {
         case ControlState::UNINITIALIZED:
         case ControlState::STOPPED_BY_STOP_CMD:
         case ControlState::STOPPED_PREMATURE:
-        case ControlState::RUNNING:           
+        case ControlState::RUNNING:
             preStop = std::move(fn);
             break;
     };
@@ -43,12 +43,17 @@ void ManagedThread::stop() {
             if (preStop) {
                 preStop(this);
             }
-            kRun = false;
-            timer_mutex.lk.unlock();
+            {
+                std::unique_lock<std::mutex> lock(condvar.mutex);
+                kRun = false;
+            }
+            condvar.variable.notify_all();
             state = ControlState::STOPPED_BY_STOP_CMD;
             [[fallthrough]];
         case ControlState::STOPPED_PREMATURE:
-            if (threadP->joinable()) threadP->join();
+            if (threadP->joinable()) {
+                threadP->join();
+            }
             threadP.reset();
             break;
         default:
@@ -57,19 +62,14 @@ void ManagedThread::stop() {
 }
 
 void ManagedThread::reset() {
-    bool shouldRelock = false;
     switch (state) {
         case ControlState::RUNNING:
-            shouldRelock = true;
             [[fallthrough]];
         case ControlState::STOPPED_PREMATURE:
             stop();
             [[fallthrough]];
         case ControlState::STOPPED_BY_STOP_CMD:
             kRun = true;
-            if (shouldRelock) {
-                timer_mutex.lk.lock();
-            }
             state = ControlState::UNINITIALIZED;
             break;
         default:

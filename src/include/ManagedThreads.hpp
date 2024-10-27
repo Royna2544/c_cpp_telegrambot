@@ -6,6 +6,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -130,14 +131,11 @@ struct TgBotPPImpl_shared_deps_API ManagedThread {
     void onPreStop(prestop_function_t<T> fn) {
         preStop = [fn](ManagedThread* thiz) { fn(static_cast<T*>(thiz)); };
     }
-    ManagedThread() {
-        timer_mutex.lk = std::unique_lock<std::timed_mutex>(timer_mutex.m);
-    };
+    
+    ManagedThread() = default;
     virtual ~ManagedThread() {
         if (isRunning()) {
             stop();
-        } else if (timer_mutex.lk.owns_lock()) {
-            timer_mutex.lk.unlock();
         }
     }
 
@@ -146,12 +144,11 @@ struct TgBotPPImpl_shared_deps_API ManagedThread {
    protected:
     std::atomic_bool kRun = true;
     void delayUnlessStop(const std::chrono::seconds secs) {
-        std::unique_lock<std::timed_mutex> lk(timer_mutex.m, std::defer_lock);
-        // Unused because of unique_lock dtor
-        bool ret [[maybe_unused]] = lk.try_lock_for(secs);
-    }
-    void delayUnlessStop(const int secs) {
-        delayUnlessStop(std::chrono::seconds(secs));
+        if (!kRun.load()) {
+            return;
+        }
+        std::unique_lock<std::mutex> lk(condvar.mutex);
+        condvar.variable.wait_for(lk, secs, [this] { return !kRun.load(); });
     }
 
    private:
@@ -163,17 +160,14 @@ struct TgBotPPImpl_shared_deps_API ManagedThread {
     } state = ControlState::UNINITIALIZED;
 
     void _threadFn(thread_function fn);
-    void logInvalidState(const char* state);
+    void logInvalidState(const char* func);
     std::optional<std::thread> threadP;
     prestop_function preStop;
 
     struct {
-        // This works, via the main thread will lock the mutex first. Then later
-        // thread function would try to lock it, but as it is a timed mutex, it
-        // could
-        std::timed_mutex m;
-        std::unique_lock<std::timed_mutex> lk;
-    } timer_mutex;
+        std::mutex mutex;
+        std::condition_variable variable;
+    } condvar;
     struct {
         size_t sizeOfThis{};
         struct {
@@ -214,10 +208,6 @@ T* ThreadManager::create_internal(Usage usage, std::string_view usageStr,
     newIt->mgr_priv.usage.str = usageStr;
     newIt->mgr_priv.usage.val = usage;
     newIt->mgr_priv.sizeOfThis = sizeof(T);
-    CHECK(newIt->timer_mutex.lk.owns_lock())
-        << usageStr
-        << " controller unique_lock is not holding mutex. Probably "
-           "constructor is not called.";
     kControllers[usage] = std::move(newIt);
     return static_cast<T*>(kControllers[usage].get());
 }
