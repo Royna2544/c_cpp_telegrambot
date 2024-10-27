@@ -4,7 +4,6 @@
 #include <api/TgBotApi.hpp>
 #include <impl/backends/ServerBackend.hpp>
 #include <impl/bot/TgBotPacketParser.hpp>
-#include <memory>
 #include <utility>
 
 SocketInterfaceTgBot::SocketInterfaceTgBot(SocketInterfaceBase* _interface,

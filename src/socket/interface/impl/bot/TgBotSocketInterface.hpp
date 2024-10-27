@@ -1,3 +1,5 @@
+#include <ResourceManager.h>
+
 #include <ManagedThreads.hpp>
 #include <SocketBase.hpp>
 #include <api/TgBotApi.hpp>
@@ -5,10 +7,7 @@
 #include <global_handlers/ChatObserver.hpp>
 #include <global_handlers/SpamBlock.hpp>
 #include <memory>
-
-#include "ResourceManager.h"
-#include "impl/SocketPosix.hpp"
-#include "trivial_helpers/fruit_inject.hpp"
+#include <trivial_helpers/fruit_inject.hpp>
 
 #if defined(__linux__) || defined(__APPLE__)
 #include <sys/socket.h>
