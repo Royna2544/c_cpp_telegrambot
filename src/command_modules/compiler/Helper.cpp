@@ -30,13 +30,14 @@ void CompilerInTgBotInterface::onExecutionStarted(
 
 void CompilerInTgBotInterface::onExecutionFinished(
     const std::string_view& command) {
-    const auto timePassed = timePoint.get();
-    output << fmt::format("{} {}", access(_locale, Strings::DONE_TOOK), timePassed);
+    output << fmt::format("{} {}", access(_locale, Strings::DONE_TOOK),
+                          timePoint.get());
     botApi->editMessage(sentMessage, output.str());
 }
 
 void CompilerInTgBotInterface::onErrorStatus(absl::Status status) {
-    output << access(_locale, Strings::ERROR_TOOK) << ": " << status;
+    output << fmt::format("{} {}\n{}", access(_locale, Strings::ERROR_TOOK),
+                          timePoint.get(), status.ToString());
     if (sentMessage) {
         botApi->editMessage(sentMessage, output.str());
     } else {
@@ -48,7 +49,8 @@ void CompilerInTgBotInterface::onResultReady(const std::string& text) {
     if (!text.empty()) {
         botApi->sendMessage(requestedMessage->get<MessageAttrs::Chat>(), text);
     } else {
-        output << fmt::format("{}\n", access(_locale, Strings::OUTPUT_IS_EMPTY));
+        output << fmt::format("{}\n",
+                              access(_locale, Strings::OUTPUT_IS_EMPTY));
         botApi->editMessage(sentMessage, output.str());
     }
 }
