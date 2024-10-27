@@ -156,7 +156,7 @@ LocaleStringsImpl::LocaleStringsImpl(const std::filesystem::path &filename) {
     for (int x = static_cast<int>(Strings::__INVALID__) + 1;
          x < static_cast<int>(Strings::__MAX__); ++x) {
         if (!m_data.contains(static_cast<Strings>(x))) {
-            LOG(WARNING) << "Missing string: " << get(static_cast<Strings>(x));
+            LOG(WARNING) << "Missing string: " << getStrings(static_cast<Strings>(x));
             ++absent;
         }
     }
