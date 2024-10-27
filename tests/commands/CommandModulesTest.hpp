@@ -1,3 +1,5 @@
+#include <fmt/core.h>
+#include <fmt/format.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -8,6 +10,11 @@
 #include <memory>
 #include <source_location>
 #include <utility>
+
+#include "../ClassProviders.hpp"
+#include "api/Providers.hpp"
+#include "api/Utils.hpp"
+#include "fruit/fruit.h"
 
 using testing::_;
 using testing::DoAll;
@@ -24,173 +31,8 @@ using testing::Truly;
 using testing::WithArg;
 using TgBot::ChatPermissions;
 
-class MockDatabase : public DatabaseBase {
-   public:
-    MOCK_METHOD(DatabaseBase::ListResult, addUserToList,
-                (DatabaseBase::ListType type, UserId user), (const, override));
-
-    MOCK_METHOD(DatabaseBase::ListResult, removeUserFromList,
-                (DatabaseBase::ListType type, UserId user), (const, override));
-
-    MOCK_METHOD(DatabaseBase::ListResult, checkUserInList,
-                (DatabaseBase::ListType type, UserId user), (const, override));
-
-    MOCK_METHOD(std::optional<UserId>, getOwnerUserId, (), (const, override));
-
-    MOCK_METHOD(std::optional<DatabaseBase::MediaInfo>, queryMediaInfo,
-                (std::string str), (const, override));
-
-    MOCK_METHOD(bool, addMediaInfo, (const DatabaseBase::MediaInfo& info),
-                (const, override));
-
-    MOCK_METHOD(std::vector<MediaInfo>, getAllMediaInfos, (), (const override));
-
-    MOCK_METHOD(std::ostream&, dump, (std::ostream & ofs), (const, override));
-
-    MOCK_METHOD(void, setOwnerUserId, (UserId userid), (const, override));
-
-    MOCK_METHOD(bool, addChatInfo,
-                (const ChatId chatid, const std::string& name),
-                (const, override));
-
-    MOCK_METHOD(std::optional<ChatId>, getChatId, (const std::string& name),
-                (const, override));
-
-    MOCK_METHOD(bool, load, (std::filesystem::path filepath), (override));
-    MOCK_METHOD(bool, unloadDatabase, (), (override));
-};
-
-class MockTgBotApi : public TgBotApi {
-   public:
-    MOCK_METHOD(Message::Ptr, sendMessage_impl,
-                (ChatId chatId, const std::string& text,
-                 ReplyParametersExt::Ptr replyParameters,
-                 GenericReply::Ptr replyMarkup, const std::string& parseMode),
-                (const, override));
-
-    MOCK_METHOD(Message::Ptr, sendAnimation_impl,
-                (ChatId chatId, FileOrString animation,
-                 const std::string& caption,
-                 ReplyParametersExt::Ptr replyParameters,
-                 GenericReply::Ptr replyMarkup, const std::string& parseMode),
-                (const, override));
-
-    MOCK_METHOD(Message::Ptr, sendSticker_impl,
-                (ChatId chatId, FileOrString sticker,
-                 ReplyParametersExt::Ptr replyParameters),
-                (const, override));
-
-    MOCK_METHOD(Message::Ptr, editMessage_impl,
-                (const Message::Ptr& message, const std::string& newText,
-                 const TgBot::InlineKeyboardMarkup::Ptr& markup,
-                 const std::string& parseMode),
-                (const, override));
-
-    MOCK_METHOD(Message::Ptr, editMessageMarkup_impl,
-                (const StringOrMessage& message,
-                 const GenericReply::Ptr& replyMarkup),
-                (const, override));
-
-    MOCK_METHOD(void, deleteMessage_impl, (const Message::Ptr& message),
-                (const, override));
-
-    MOCK_METHOD(void, deleteMessages_impl,
-                (ChatId chatId, const std::vector<MessageId>& messageIds),
-                (const, override));
-
-    MOCK_METHOD(void, restrictChatMember_impl,
-                (ChatId chatId, UserId userId, ChatPermissions::Ptr permissions,
-                 std::uint32_t untilDate),
-                (const, override));
-
-    MOCK_METHOD(Message::Ptr, sendDocument_impl,
-                (ChatId chatId, FileOrString document,
-                 const std::string& caption,
-                 ReplyParametersExt::Ptr replyParameters,
-                 GenericReply::Ptr replyMarkup, const std::string& parseMode),
-                (const, override));
-
-    MOCK_METHOD(Message::Ptr, sendPhoto_impl,
-                (ChatId chatId, FileOrString photo, const std::string& caption,
-                 ReplyParametersExt::Ptr replyParameters,
-                 GenericReply::Ptr replyMarkup, const std::string& parseMode),
-                (const, override));
-
-    MOCK_METHOD(Message::Ptr, sendVideo_impl,
-                (ChatId chatId, FileOrString photo, const std::string& caption,
-                 ReplyParametersExt::Ptr replyParameters,
-                 GenericReply::Ptr replyMarkup, const std::string& parseMode),
-                (const, override));
-
-    MOCK_METHOD(Message::Ptr, sendDice_impl, (const ChatId chatId),
-                (const, override));
-
-    MOCK_METHOD(StickerSet::Ptr, getStickerSet_impl,
-                (const std::string& setName), (const, override));
-
-    MOCK_METHOD(bool, createNewStickerSet_impl,
-                (std::int64_t userId, const std::string& name,
-                 const std::string& title,
-                 const std::vector<InputSticker::Ptr>& stickers,
-                 Sticker::Type stickerType),
-                (const, override));
-
-    MOCK_METHOD(File::Ptr, uploadStickerFile_impl,
-                (std::int64_t userId, InputFile::Ptr sticker,
-                 const std::string& stickerFormat),
-                (const, override));
-
-    MOCK_METHOD(bool, downloadFile_impl,
-                (const std::filesystem::path& destfilename,
-                 const std::string& fileid),
-                (const, override));
-
-    MOCK_METHOD(User::Ptr, getBotUser_impl, (), (const, override));
-
-    MOCK_METHOD(MessageId, copyMessage_impl,
-                (ChatId chat, MessageId message, ReplyParametersExt::Ptr reply),
-                (const, override));
-    MOCK_METHOD(bool, answerCallbackQuery_impl,
-                (const std::string& callbackQueryId, const std::string& text,
-                 bool showAlert),
-                (const override));
-
-    MOCK_METHOD(bool, pinMessage_impl, (Message::Ptr message),
-                (const override));
-    MOCK_METHOD(bool, unpinMessage_impl, (Message::Ptr message),
-                (const override));
-    MOCK_METHOD(bool, banChatMember_impl,
-                (const Chat::Ptr& chat, const User::Ptr& user),
-                (const override));
-    MOCK_METHOD(bool, unbanChatMember_impl,
-                (const Chat::Ptr& chat, const User::Ptr& user),
-                (const override));
-    MOCK_METHOD(User::Ptr, getChatMember_impl, (const ChatId, const UserId),
-                (const override));
-
-    // Non-TgBotApi methods
-    MOCK_METHOD(bool, reloadCommand, (const std::string& cmd), (override));
-    MOCK_METHOD(bool, unloadCommand, (const std::string& cmd), (override));
-    MOCK_METHOD(void, onAnyMessage, (const AnyMessageCallback& callback),
-                (override));
-};
-
 class CommandModulesTest : public ::testing::Test {
    protected:
-    /**
-     * @brief Set up the test suite before running any tests.
-     * This function is called once before running all tests in the test
-     * suite. It is responsible for any necessary setup tasks.
-     */
-    static void SetUpTestSuite();
-
-    /**
-     * @brief Tear down the test suite after running all tests.
-     * This function is called once after running all tests in the test suite.
-     * It is responsible for any necessary cleanup tasks.
-     */
-    static void TearDownTestSuite();
-
     /**
      * @brief Set up the test fixture before each test case.
      * This function is called before each test case in the test fixture.
@@ -269,6 +111,7 @@ class CommandModulesTest : public ::testing::Test {
 
     std::shared_ptr<MockTgBotApi> botApi = std::make_shared<MockTgBotApi>();
     MockDatabase* database;
+    TgBotDatabaseImpl databaseImpl;
     std::filesystem::path modulePath;
 };
 
@@ -285,7 +128,6 @@ class CommandTestBase : public CommandModulesTest {
             unloadModule(std::move(module));
         }
         CommandModulesTest::TearDown();
-        defaultProvidedMessage.reset();
     }
 
     constexpr static bool kTestDebug = true;
@@ -294,16 +136,17 @@ class CommandTestBase : public CommandModulesTest {
         if (!kTestDebug) {
             return;
         }
-        std::cout << message << " [file: " << location.file_name()
-                  << ", line: " << location.line() << "]" << std::endl;
+        std::cout << fmt::format("{} [file: {}, line: {}]", message,
+                                 location.file_name(), location.line())
+                  << std::endl;
     }
 
    public:
-    void setCommandExtArgs(const std::initializer_list<std::string>& command) {
+    void setCommandExtArgs(
+        const std::initializer_list<std::string_view>& command) {
         setCommandExtArgs();
-        for (const auto& arg : command) {
-            defaultProvidedMessage->text += ' ' + arg;
-        }
+        defaultProvidedMessage->text +=
+            fmt::format("{}", fmt::join(command, " "));
     }
     void setCommandExtArgs() {
         defaultProvidedMessage->text = "/" + name;
@@ -311,9 +154,13 @@ class CommandTestBase : public CommandModulesTest {
             defaultProvidedMessage->text.size();
     }
     void execute() {
-        module->function(botApi.get(), std::make_shared<MessageExt>(
-                                           defaultProvidedMessage,
-                                           SplitMessageText::ByWhitespace));
+        fruit::Injector<Providers> provideInject(getProviders);
+
+        module->function(
+            botApi.get(),
+            std::make_shared<MessageExt>(defaultProvidedMessage,
+                                         SplitMessageText::ByWhitespace),
+            &strings, provideInject.get<Providers*>());
     }
 
     struct SentMessage {
@@ -324,7 +171,11 @@ class CommandTestBase : public CommandModulesTest {
         const SentMessage& willEdit(T&& matcher,
                                     const st& location = st::current()) const {
             testRun("Edit message expectation", location);
-            EXPECT_CALL(*botApi, editMessage_impl(_, matcher, IsNull(), ""))
+            EXPECT_CALL(
+                *botApi,
+                editMessage_impl(
+                    _, matcher, IsNull(),
+                    TgBotApi::parseModeToStr<TgBotApi::ParseMode::None>()))
                 .WillOnce(DoAll(
                     WithArg<0>([=, addr = message.get()](auto&& message_in) {
                         EXPECT_EQ(message_in.get(), addr);
@@ -335,11 +186,11 @@ class CommandTestBase : public CommandModulesTest {
     };
 
     auto createMessageReplyMatcher(Message::Ptr message = nullptr) {
-        return Truly([=, this](ReplyParametersExt::Ptr m) {
-            return isReplyToThisMsg(std::move(m),
-                                    message
-                                        ?: std::static_pointer_cast<Message>(
-                                               defaultProvidedMessage));
+        return Truly([=, message = std::move(message),
+                      this](ReplyParametersExt::Ptr m) {
+            return isReplyToThisMsg(m, message
+                                           ?: std::static_pointer_cast<Message>(
+                                                  defaultProvidedMessage));
         });
     }
 
@@ -452,4 +303,5 @@ class CommandTestBase : public CommandModulesTest {
     std::string name;
     CommandModule::Ptr module;
     Message::Ptr defaultProvidedMessage;
+    MockLocaleStrings strings;
 };

@@ -8,14 +8,6 @@ class AliveCommandTest : public CommandTestBase {
    public:
     AliveCommandTest() : CommandTestBase("alive") {}
     ~AliveCommandTest() override = default;
-    void SetUp() override {
-        CommandTestBase::SetUp();
-        ResourceManager::getInstance()->preloadResourceDirectory();
-    }
-    void TearDown() override {
-        CommandTestBase::TearDown();
-        ResourceManager::destroyInstance();
-    }
 };
 
 TEST_F(AliveCommandTest, hasAliveMediaName) {

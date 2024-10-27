@@ -1,16 +1,19 @@
-#include <Authorization.hpp>
 #include <Types.h>
 #include <absl/strings/ascii.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <Authorization.hpp>
 #include <chrono>
 #include <database/bot/TgBotDatabaseImpl.hpp>
 #include <memory>
 
-#include "commands/CommandModulesTest.hpp"
+#include "ClassProviders.hpp"
 
-struct Param {
+using testing::Return;
+using testing::_;
+
+struct AuthParam {
     UserId userId{};
     struct {
         bool permissive = false;
@@ -22,14 +25,13 @@ struct Param {
     } expected;
 };
 
-
 constexpr static UserId FAKE_OWNER_ID = 120412;
 constexpr static UserId FAKE_BLACKLISTED_ID = 123456;
 constexpr static UserId FAKE_WHITELISTED_ID = 1234567890;
 constexpr static UserId FAKE_RANDOM_ID = 1234567891;
 
-std::ostream& operator<<(std::ostream& os, const Param& param) {
-    switch (param.userId) {
+std::ostream& operator<<(std::ostream& os, const AuthParam& Authparam) {
+    switch (Authparam.userId) {
         case FAKE_OWNER_ID:
             os << "Owner";
             break;
@@ -43,32 +45,28 @@ std::ostream& operator<<(std::ostream& os, const Param& param) {
             os << "RandomUser";
             break;
         default:
-            os << "User(" << param.userId << ")";
+            os << "User(" << Authparam.userId << ")";
             break;
     }
     os << " With flags: " << std::boolalpha;
-    os << "{ permissive: " << param.flags.permissive;
-    os << ", requireuser: " << param.flags.requireuser;
-    os << " }, Expected: ret=" << param.expected.ret;
-    os << ", reason=" << param.expected.reason;
+    os << "{ permissive: " << Authparam.flags.permissive;
+    os << ", requireuser: " << Authparam.flags.requireuser;
+    os << " }, Expected: ret=" << Authparam.expected.ret;
+    os << ", reason=" << Authparam.expected.reason;
     return os;
 }
 
-class AuthorizationTest : public ::testing::TestWithParam<Param> {
+class AuthorizationTest : public ::testing::TestWithParam<AuthParam> {
    protected:
     void SetUp() override {
-        auto dbinst = TgBotDatabaseImpl::initInstance();
         TgBotDatabaseImpl::Providers provider;
-        database = new MockDatabase();
         provider.registerProvider("testing",
                                   std::unique_ptr<MockDatabase>(database));
         ASSERT_TRUE(provider.chooseProvider("testing"));
-        ASSERT_TRUE(dbinst->setImpl(std::move(provider)));
+        ASSERT_TRUE(databaseImpl.setImpl(std::move(provider)));
         EXPECT_CALL(*database, load(_)).WillOnce(Return(true));
-        ASSERT_TRUE(dbinst->load({}));
+        ASSERT_TRUE(databaseImpl.load({}));
     }
-
-    void TearDown() override { TgBotDatabaseImpl::destroyInstance(); }
 
    public:
     static void MakeMessageDateBefore(Message::Ptr& message) {
@@ -79,14 +77,19 @@ class AuthorizationTest : public ::testing::TestWithParam<Param> {
         message->date = std::chrono::system_clock::to_time_t(before);
     }
 
+    // The new MockDatabase would be deleted by databaseImpl
+    AuthorizationTest() : database(new MockDatabase), auth(database) {}
+
     MockDatabase* database = nullptr;
+    TgBotDatabaseImpl databaseImpl;
+    AuthContext auth;
 };
 
 TEST_P(AuthorizationTest, expectedForMessagesInTime) {
-    const auto& param = GetParam();
+    const auto& Authparam = GetParam();
     auto message = std::make_shared<Message>();
     message->from = std::make_shared<TgBot::User>();
-    message->from->id = param.userId;
+    message->from->id = Authparam.userId;
 
     // Set up some expectations
 
@@ -130,22 +133,20 @@ TEST_P(AuthorizationTest, expectedForMessagesInTime) {
     message->date =
         std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 
-    static auto authflags = AuthContext::getInstance();
-
     AuthContext::Flags flags{};
-    if (param.flags.permissive) {
+    if (Authparam.flags.permissive) {
         flags |= AuthContext::Flags::PERMISSIVE;
     }
-    if (param.flags.requireuser) {
+    if (Authparam.flags.requireuser) {
         flags |= AuthContext::Flags::REQUIRE_USER;
     }
-    const auto res = authflags->isAuthorized(message, flags);
-    if (param.expected.ret) {
+    const auto res = auth.isAuthorized(message, flags);
+    if (Authparam.expected.ret) {
         EXPECT_TRUE(res);
         EXPECT_EQ(res.reason, AuthContext::Result::Reason::OK);
     } else {
         EXPECT_FALSE(res);
-        EXPECT_EQ(res.reason, param.expected.reason);
+        EXPECT_EQ(res.reason, Authparam.expected.reason);
     }
 }
 
@@ -153,62 +154,61 @@ INSTANTIATE_TEST_SUITE_P(
     AuthorizationTest, AuthorizationTest,
     ::testing::Values(
         // Permissive mode, require user, owner
-        Param{FAKE_OWNER_ID,
+        AuthParam{FAKE_OWNER_ID,
               {true, true},
               {true, AuthContext::Result::Reason::OK}},
 
         // Permissive mode, require user, not owner
-        Param{FAKE_RANDOM_ID,
+        AuthParam{FAKE_RANDOM_ID,
               {true, true},
               {true, AuthContext::Result::Reason::OK}},
 
         // Permissive mode, no require user, owner
-        Param{FAKE_OWNER_ID,
+        AuthParam{FAKE_OWNER_ID,
               {true, false},
               {true, AuthContext::Result::Reason::OK}},
 
         // Permissive mode, no require user, not owner
-        Param{FAKE_RANDOM_ID,
+        AuthParam{FAKE_RANDOM_ID,
               {false, false},
               {false, AuthContext::Result::Reason::NOT_IN_WHITELIST}},
 
         // Non-permissive mode, require user, owner
-        Param{FAKE_OWNER_ID,
+        AuthParam{FAKE_OWNER_ID,
               {false, true},
               {true, AuthContext::Result::Reason::OK}},
 
         // Non-permissive mode, require user, not owner
-        Param{FAKE_RANDOM_ID,
+        AuthParam{FAKE_RANDOM_ID,
               {false, true},
               {false, AuthContext::Result::Reason::NOT_IN_WHITELIST}},
 
         // Non-permissive mode, no require user, owner
-        Param{FAKE_OWNER_ID,
+        AuthParam{FAKE_OWNER_ID,
               {false, false},
               {true, AuthContext::Result::Reason::OK}},
 
         // Non-permissive mode, no require user, not owner
-        Param{FAKE_RANDOM_ID,
+        AuthParam{FAKE_RANDOM_ID,
               {false, false},
               {false, AuthContext::Result::Reason::NOT_IN_WHITELIST}},
 
         // Non-permissive mode, blacklisted user
-        Param{FAKE_BLACKLISTED_ID,
+        AuthParam{FAKE_BLACKLISTED_ID,
               {false, true},
               {false, AuthContext::Result::Reason::NOT_IN_WHITELIST}},
 
         // Permissive mode, whitelisted user
-        Param{FAKE_WHITELISTED_ID,
+        AuthParam{FAKE_WHITELISTED_ID,
               {true, false},
               {true, AuthContext::Result::Reason::OK}},
-              
+
         // Permissive mode, blacklisted user
-        Param{FAKE_BLACKLISTED_ID,
+        AuthParam{FAKE_BLACKLISTED_ID,
               {true, true},
               {false, AuthContext::Result::Reason::BLACKLISTED_USER}},
 
         // Non-ermissive mode, whitelisted user
-        Param{FAKE_WHITELISTED_ID,
+        AuthParam{FAKE_WHITELISTED_ID,
               {false, false},
-              {true, AuthContext::Result::Reason::OK}}
-));
+              {true, AuthContext::Result::Reason::OK}}));

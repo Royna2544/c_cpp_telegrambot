@@ -7,12 +7,19 @@
 #include <filesystem>
 #include <impl/bot/TgBotSocketFileHelperNew.hpp>
 #include <impl/bot/TgBotSocketInterface.hpp>
-#include <memory>
 #include <string_view>
 #include <utility>
 
+#include "DatabaseBase.hpp"
+#include "ResourceManager.h"
+#include "SocketBase.hpp"
 #include "TgBotSocket_Export.hpp"
+#include "api/TgBotApi.hpp"
+#include "api/Utils.hpp"
 #include "commands/CommandModulesTest.hpp"
+#include "global_handlers/SpamBlock.hpp"
+#include "tests/ClassProviders.hpp"
+#include "trivial_helpers/fruit_inject.hpp"
 
 using testing::_;
 using testing::DoAll;
@@ -21,6 +28,8 @@ using testing::SaveArg;
 
 class SocketInterfaceImplMock : public SocketInterfaceBase {
    public:
+    APPLE_INJECT(SocketInterfaceImplMock()) = default;
+
     MOCK_METHOD(bool, isValidSocketHandle, (socket_handle_t handle),
                 (override));
     MOCK_METHOD(bool, writeToSocket,
@@ -44,6 +53,8 @@ class SocketInterfaceImplMock : public SocketInterfaceBase {
 
 class VFSOperationsMock : public VFSOperations {
    public:
+    APPLE_INJECT(VFSOperationsMock()) = default;
+
     MOCK_METHOD(bool, writeFile,
                 (const std::filesystem::path& filename,
                  const uint8_t* startAddr, size_t size),
@@ -58,24 +69,41 @@ class VFSOperationsMock : public VFSOperations {
                 (override));
 };
 
+fruit::Component<MockTgBotApi, SocketInterfaceImplMock, VFSOperationsMock,
+                 SocketInterfaceTgBot>
+getSocketComponent() {
+    return fruit::createComponent()
+        .bind<TgBotApi, MockTgBotApi>()
+        .bind<SocketInterfaceBase, SocketInterfaceImplMock>()
+        .bind<VFSOperations, VFSOperationsMock>()
+        .bind<ResourceProvider, MockResource>()
+        .bind<SpamBlockBase, SpamBlockManager>()
+        .bind<DatabaseBase, MockDatabase>();
+}
+
 class SocketDataHandlerTest : public ::testing::Test {
     static constexpr int kSocket = 1000;
 
    public:
     SocketDataHandlerTest()
-        : _mockImpl(std::make_shared<SocketInterfaceImplMock>()),
-          _mockApi(std::make_shared<MockTgBotApi>()),
-          _mockVFS(std::make_unique<VFSOperationsMock>()),
-          mockInterface(_mockImpl, _mockApi.get(),
-                        std::make_shared<SocketFile2DataHelper>(_mockVFS)),
-          fakeConn(kSocket, nullptr) {}
+        : fakeConn(kSocket, nullptr),
+          _injector(getSocketComponent),
+          _mockImpl(_injector.get<SocketInterfaceImplMock*>()),
+          _mockVFS(_injector.get<VFSOperationsMock*>()),
+          mockInterface(_injector.get<SocketInterfaceTgBot*>()),
+          _mockApi(_injector.get<MockTgBotApi*>()) {}
 
-    std::shared_ptr<SocketInterfaceImplMock> _mockImpl;
-    std::shared_ptr<MockTgBotApi> _mockApi;
-    std::shared_ptr<VFSOperationsMock> _mockVFS;
-    SocketInterfaceTgBot mockInterface;
     // Dummy, not under a real connection
     SocketConnContext fakeConn;
+
+    // Injector owns the below mocks
+    fruit::Injector<MockTgBotApi, SocketInterfaceImplMock, VFSOperationsMock,
+                    SocketInterfaceTgBot>
+        _injector;
+    SocketInterfaceImplMock* _mockImpl{};
+    VFSOperationsMock* _mockVFS{};
+    SocketInterfaceTgBot* mockInterface{};
+    MockTgBotApi* _mockApi{};
 
     /**
      * @brief Send a command packet and verify the header and assigns data to
@@ -92,7 +120,7 @@ class SocketDataHandlerTest : public ::testing::Test {
 
         EXPECT_CALL(*_mockImpl, writeToSocket(fakeConn, _))
             .WillOnce(DoAll(SaveArg<1>(&packetData), Return(true)));
-        mockInterface.handlePacket(fakeConn, std::move(pkt));
+        mockInterface->handlePacket(fakeConn, std::move(pkt));
 
         // Expect valid packet
         EXPECT_TRUE(packetData.get());
@@ -120,10 +148,11 @@ class SocketDataHandlerTest : public ::testing::Test {
     /**
      * @brief Verify and clear all expectations on the mock objects.
      */
-    void verifyAndClear() {
-        testing::Mock::VerifyAndClearExpectations(_mockImpl.get());
-        testing::Mock::VerifyAndClearExpectations(_mockApi.get());
-        testing::Mock::VerifyAndClearExpectations(_mockVFS.get());
+    void verifyAndClear() const {
+        testing::Mock::VerifyAndClearExpectations(_mockImpl);
+        testing::Mock::VerifyAndClearExpectations(_mockApi);
+        testing::Mock::VerifyAndClearExpectations(_mockVFS);
+        testing::Mock::VerifyAndClearExpectations(mockInterface);
     }
 
     static SharedMalloc createFileMem() {
@@ -158,8 +187,10 @@ TEST_F(SocketDataHandlerTest, TestCmdWriteMsgToChatId) {
     };
     TgBotSocket::Packet pkt(TgBotSocket::Command::CMD_WRITE_MSG_TO_CHAT_ID,
                             data);
-    EXPECT_CALL(*_mockApi, sendMessage_impl(testChatId, data.message.data(),
-                                            IsNull(), IsNull(), ""));
+    EXPECT_CALL(*_mockApi,
+                sendMessage_impl(
+                    testChatId, data.message.data(), IsNull(), IsNull(),
+                    TgBotApi::parseModeToStr<TgBotApi::ParseMode::None>()));
     TgBotSocket::callback::GenericAck callbackData{};
     sendAndVerifyHeader<TgBotSocket::callback::GenericAck,
                         TgBotSocket::Command::CMD_GENERIC_ACK>(pkt,
@@ -177,8 +208,10 @@ TEST_F(SocketDataHandlerTest, TestCmdWriteMsgToChatIdTgBotApiEx) {
     };
     TgBotSocket::Packet pkt(TgBotSocket::Command::CMD_WRITE_MSG_TO_CHAT_ID,
                             data);
-    EXPECT_CALL(*_mockApi, sendMessage_impl(testChatId, data.message.data(),
-                                            IsNull(), IsNull(), ""))
+    EXPECT_CALL(
+        *_mockApi,
+        sendMessage_impl(testChatId, data.message.data(), IsNull(), IsNull(),
+                         TgBotApi::parseModeToStr<TgBotApi::ParseMode::None>()))
         .WillOnce(testing::Throw(TgBot::TgException(
             "AAAAA", TgBot::TgException::ErrorCode::Forbidden)));
 
@@ -243,6 +276,7 @@ TEST_F(SocketDataHandlerTest, TestCmdUploadFileDryDoesntExist) {
     EXPECT_NE(callback.result,
               TgBotSocket::callback::AckType::ERROR_COMMAND_IGNORED);
     EXPECT_EQ(callback.requestdata, data);
+    verifyAndClear();
 }
 
 TEST_F(SocketDataHandlerTest, TestCmdUploadFileDryExistsHashDoesntMatch) {
@@ -273,6 +307,7 @@ TEST_F(SocketDataHandlerTest, TestCmdUploadFileDryExistsHashDoesntMatch) {
         pkt, &callback);
     EXPECT_NE(callback.result, TgBotSocket::callback::AckType::SUCCESS);
     EXPECT_EQ(callback.requestdata, data);
+    verifyAndClear();
 }
 
 TEST_F(SocketDataHandlerTest, TestCmdUploadFileDryExistsOptSaidNo) {
@@ -301,6 +336,7 @@ TEST_F(SocketDataHandlerTest, TestCmdUploadFileDryExistsOptSaidNo) {
     EXPECT_EQ(callback.result,
               TgBotSocket::callback::AckType::ERROR_COMMAND_IGNORED);
     EXPECT_EQ(callback.requestdata, data);
+    verifyAndClear();
 }
 
 TEST_F(SocketDataHandlerTest, TestCmdUploadFileOK) {
@@ -328,4 +364,6 @@ TEST_F(SocketDataHandlerTest, TestCmdUploadFileOK) {
     sendAndVerifyHeader<TgBotSocket::callback::GenericAck,
                         TgBotSocket::Command::CMD_GENERIC_ACK>(pkt, &callback);
     isGenericAck_OK(callback);
+    // Done
+    verifyAndClear();
 }

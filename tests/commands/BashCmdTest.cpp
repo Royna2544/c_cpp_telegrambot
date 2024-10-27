@@ -2,14 +2,20 @@
 #include <gtest/gtest.h>
 
 #include <DurationPoint.hpp>
-#include <StringResManager.hpp>
 
 #include "CommandModulesTest.hpp"
+#include "api/Utils.hpp"
 
 using std::chrono_literals::operator""s;
 
+constexpr std::string_view working = "I am working, already";
+constexpr std::string_view command_is = "Command is";
+
 struct BashCommandTest : public CommandTestBase {
-    BashCommandTest() : CommandTestBase("bash") {}
+    BashCommandTest() : CommandTestBase("bash") {
+        ON_CALL(strings, get(Strings::WORKING_ON_IT)).WillByDefault(Return(working));
+        ON_CALL(strings, get(Strings::COMMAND_IS)).WillByDefault(Return(command_is));
+    }
 };
 
 struct UBashCommandTest : public CommandTestBase {
@@ -21,8 +27,8 @@ TEST_F(BashCommandTest, PwdCommand) {
 
     // First, "Working on it...\nCommand is: pwd\n"
     // Edit, to add the exec done.
-    willSendReplyMessage(GETSTR(WORKING) + "pwd\n")
-        .willEdit(StartsWith(GETSTR(WORKING)));
+    willSendReplyMessage(working)
+        .willEdit(StartsWith(working));
 
     // Second, Command result of pwd command
     willSendMessage(StartsWith(current_path()));
@@ -45,7 +51,7 @@ TEST_F(BashCommandTest, watchdogTimeout) {
     // Set command to sleep 20 seconds
     setCommandExtArgs({command});
     // "Working on it...\nCommand is: sleep 20"
-    willSendReplyMessage(GETSTR(WORKING) + command + "\n")
+    willSendReplyMessage(working)
         // Sends total time
         .willEdit(EndsWith("milliseconds\n"))
         // Sends watchdog timeout
@@ -71,8 +77,8 @@ TEST_F(UBashCommandTest, PwdCommand) {
 
     // First, "Working on it...\nCommand is: pwd\n"
     // Edit, to add the exec done.
-    willSendReplyMessage(GETSTR(WORKING) + "pwd\n")
-        .willEdit(StartsWith(GETSTR(WORKING)));
+    willSendReplyMessage(working)
+        .willEdit(StartsWith(working));
 
     // Second, Command result of pwd command
     willSendMessage(StartsWith(current_path()));
@@ -98,7 +104,7 @@ TEST_F(UBashCommandTest, WatchdogTimeout) {
     setCommandExtArgs({command});
 
     // "Working on it...\nCommand is: sleep 20"
-    willSendReplyMessage(GETSTR(WORKING) + "sleep 20\n")
+    willSendReplyMessage(working)
         // Sends total time
         .willEdit(EndsWith("milliseconds\n"))
         // After 15 seconds, sends nothing

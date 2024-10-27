@@ -1,21 +1,27 @@
 #include "CommandModulesTest.hpp"
-#include <StringResManager.hpp>
 
 using testing::HasSubstr;
 
 struct CMDCommandTest : public CommandTestBase {
-    CMDCommandTest() : CommandTestBase("cmd") {}
-    
-    void makeReload(const bool ret) {
-        EXPECT_CALL(*botApi, reloadCommand(testCmd)).WillOnce(Return(ret));
-    }
-    void makeUnload(const bool ret) {
-        EXPECT_CALL(*botApi, unloadCommand(testCmd)).WillOnce(Return(ret));
+    CMDCommandTest() : CommandTestBase("cmd") {
+        ON_CALL(strings, get(Strings::OPERATION_SUCCESSFUL))
+            .WillByDefault(Return("SSUCCESSFUL"));
+        ON_CALL(strings, get(Strings::OPERATION_FAILURE))
+            .WillByDefault(Return("FAILURE"));
     }
 
-    const std::string testCmd = "testingcmd";
-    const std::string failureMessage = GETSTR(OPERATION_FAILURE);
-    const std::string successMessage = GETSTR(OPERATION_SUCCESSFUL);
+    void makeReload(const bool ret) {
+        EXPECT_CALL(*botApi, reloadCommand(testCmd))
+            .WillOnce(Return(ret));
+    }
+    void makeUnload(const bool ret) {
+        EXPECT_CALL(*botApi, unloadCommand(testCmd))
+            .WillOnce(Return(ret));
+    }
+
+    constexpr static std::string_view testCmd = "testingcmd";
+    constexpr static std::string_view failureMessage = "FAILURE";
+    constexpr static std::string_view successMessage = "SSUCCESSFUL";
 };
 
 TEST_F(CMDCommandTest, LoadCommandFail) {

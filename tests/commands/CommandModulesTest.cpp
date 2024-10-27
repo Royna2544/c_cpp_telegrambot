@@ -1,39 +1,34 @@
 #include "CommandModulesTest.hpp"
+#include <fmt/format.h>
 
 #include <database/bot/TgBotDatabaseImpl.hpp>
 #include <libos/libfs.hpp>
 #include <memory>
-#include <optional>
 
-void CommandModulesTest::SetUpTestSuite() {}
-
-void CommandModulesTest::TearDownTestSuite() {
-    TgBotDatabaseImpl::destroyInstance();
-}
+#include "api/CommandModule.hpp"
 
 void CommandModulesTest::SetUp() {
     modulePath = FS::getPathForType(FS::PathType::MODULES_INSTALLED);
-    auto dbinst = TgBotDatabaseImpl::getInstance();
     TgBotDatabaseImpl::Providers provider;
 
     database = new MockDatabase();
     provider.registerProvider("testing",
                               std::unique_ptr<MockDatabase>(database));
     ASSERT_TRUE(provider.chooseProvider("testing"));
-    ASSERT_TRUE(dbinst->setImpl(std::move(provider)));
+    ASSERT_TRUE(databaseImpl.setImpl(std::move(provider)));
     EXPECT_CALL(*database, load(_)).WillOnce(Return(true));
-    ASSERT_TRUE(dbinst->load({}));
+    ASSERT_TRUE(databaseImpl.load({}));
     ON_CALL(*database, unloadDatabase).WillByDefault(Return(true));
 }
 
 void CommandModulesTest::TearDown() {
     Mock::VerifyAndClearExpectations(botApi.get());
-    TgBotDatabaseImpl::destroyInstance();
+    Mock::VerifyAndClearExpectations(database);
 }
 
 CommandModule::Ptr CommandModulesTest::loadModule(
     const std::string& name) const {
-    std::filesystem::path moduleFileName = "libcmd_" + name;
+    std::filesystem::path moduleFileName = fmt::format("{}{}", CommandModule::prefix, name);
     const auto moduleFilePath =
         modulePath / FS::appendDylibExtension(moduleFileName);
 

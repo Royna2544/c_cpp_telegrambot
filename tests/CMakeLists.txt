@@ -7,17 +7,12 @@ if (NOT ${GTest_FOUND})
   return()
 endif()
 
-if (USE_UNIX_SOCKETS)
-  set(SOCKET_TEST_FILE SocketDataHandlerTest.cpp)
-else()
-  set(SOCKET_TEST_FILE)
-endif()
-
 add_my_executable(
   NAME test
   SRCS
     TestMain.cpp
     AuthorizationTest.cpp
+    DatabaseBackendsTest.cpp
     ConfigManagerTest.cpp
     RegexHandlerTest.cpp
     ResourceManagerTest.cpp
@@ -30,7 +25,7 @@ add_my_executable(
     commands/CmdCmdTest.cpp
     commands/DatabaseCmdTest.cpp
     commands/DeleteEchoCmdTest.cpp
-    ${SOCKET_TEST_FILE}
+    SocketDataHandlerTest.cpp
   LIBS
     GTest::gtest
     GTest::gmock

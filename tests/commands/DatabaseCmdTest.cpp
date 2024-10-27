@@ -2,10 +2,13 @@
 #include <tgbot/types/ReplyKeyboardMarkup.h>
 
 #include <Random.hpp>
-#include <StringResManager.hpp>
 #include <memory>
 
 #include "CommandModulesTest.hpp"
+#include "StringResLoader.hpp"
+#include "api/TgBotApi.hpp"
+#include "api/Utils.hpp"
+#include "gmock/gmock.h"
 
 namespace {
 void verifyKeyboard(const TgBot::GenericReply::Ptr& reply) {
@@ -20,17 +23,6 @@ void verifyKeyboard(const TgBot::GenericReply::Ptr& reply) {
 }
 }  // namespace
 
-class MockRandom : public Random::ImplBase {
-   public:
-    using ret_type = Random::ret_type;
-
-    MOCK_METHOD(bool, isSupported, (), (const, override));
-    MOCK_METHOD(ret_type, generate, (const ret_type min, const ret_type max),
-                (const, override));
-    MOCK_METHOD(std::string_view, getName, (), (const));
-    MOCK_METHOD(void, shuffle, (std::vector<std::string>&), (const));
-};
-
 struct DatabaseCommandTest : public CommandTestBase {
     DatabaseCommandTest() : CommandTestBase("database") {}
 
@@ -41,11 +33,16 @@ struct DatabaseCommandTest : public CommandTestBase {
 
         defaultProvidedMessage->replyToMessage->from =
             createDefaultUser(14);  // NOLINT
+
+        constexpr std::string_view something = "sdf";
+        EXPECT_CALL(strings, get(Strings::USER_ADDED))
+            .WillOnce(Return(something));
+
         EXPECT_CALL(*database,
                     addUserToList(
                         type, defaultProvidedMessage->replyToMessage->from->id))
             .WillOnce(Return(result));
-        test_impl<X, Y>(GETSTR(USER_ADDED));
+        test_impl<X, Y>(something);
     }
 
     template <DatabaseBase::ListType type, DatabaseBase::ListResult result,
@@ -55,11 +52,15 @@ struct DatabaseCommandTest : public CommandTestBase {
         defaultProvidedMessage->replyToMessage->from =
             createDefaultUser(324);  // NOLINT
 
+        constexpr std::string_view something = "NOSUERE";
+        EXPECT_CALL(strings, get(Strings::USER_REMOVED))
+            .WillOnce(Return(something));
+
         EXPECT_CALL(*database,
                     removeUserFromList(
                         type, defaultProvidedMessage->replyToMessage->from->id))
             .WillOnce(Return(result));
-        test_impl<X, Y>(GETSTR(USER_REMOVED));
+        test_impl<X, Y>(something);
     }
 
     template <int X, int Y, typename Matcher>
@@ -67,14 +68,14 @@ struct DatabaseCommandTest : public CommandTestBase {
         GenericReply::Ptr reply;
         TgBot::GenericReply::Ptr keyboard;
 
-        constexpr size_t token = 1231;
         const auto sentMessage = createDefaultMessage();
         const auto recievedMessage = createDefaultMessage();
         willSendReplyMessageTo(matcher, recievedMessage, _);
         recievedMessage->replyToMessage = sentMessage;
         EXPECT_CALL(*botApi,
-                    sendMessage_impl(TEST_CHAT_ID, _,
-                                     createMessageReplyMatcher(), _, ""))
+                    sendMessage_impl(
+                        TEST_CHAT_ID, _, createMessageReplyMatcher(), _,
+                        TgBotApi::parseModeToStr<TgBotApi::ParseMode::None>()))
             .WillOnce(DoAll(WithArg<3>(verifyKeyboard), SaveArg<3>(&keyboard),
                             Return(sentMessage)));
         EXPECT_CALL(*botApi, onAnyMessage(_))
@@ -93,7 +94,10 @@ struct DatabaseCommandTest : public CommandTestBase {
 
 TEST_F(DatabaseCommandTest, WithoutUser) {
     setCommandExtArgs();
-    willSendReplyMessage(GETSTR(REPLY_TO_USER_MSG));
+    constexpr std::string_view something = "something";
+    EXPECT_CALL(strings, get(Strings::REPLY_TO_USER_MSG))
+        .WillOnce(Return(something));
+    willSendReplyMessage(something);
     execute();
 }
 
