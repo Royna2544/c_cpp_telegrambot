@@ -122,6 +122,20 @@ enum class Strings {
 };
 #undef X
 
+inline std::ostream& operator<<(std::ostream& os, const Strings string) {
+    switch (string) {
+#define fn(x)        \
+    case Strings::x: \
+        os << #x;    \
+        break;
+        MAKE_STRINGS(fn);
+#undef fn
+        default:
+            os << "STRINGRES_UNKNOWN";
+    }
+    return os;
+}
+
 struct StringResLoaderBase {
     virtual ~StringResLoaderBase() = default;
 
