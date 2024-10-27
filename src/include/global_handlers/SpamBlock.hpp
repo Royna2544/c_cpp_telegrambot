@@ -6,6 +6,7 @@
 #include <map>
 #include <mutex>
 #include <socket/include/TgBotSocket_Export.hpp>
+#include "trivial_helpers/fruit_inject.hpp"
 
 using namespace TgBotSocket::data;
 
@@ -29,7 +30,7 @@ struct SpamBlockBase : ManagedThreadRunnable {
                                           OneChatIterator it,
                                           const size_t threshold,
                                           const char *name) {};
-    virtual bool additionalHook(const Message::Ptr &msg) { return false; }
+    virtual bool shouldBeSkipped(const Message::Ptr &msg) const = 0;
 
     void runFunction() override;
     void addMessage(const Message::Ptr &message);
@@ -37,6 +38,7 @@ struct SpamBlockBase : ManagedThreadRunnable {
     static std::string commonMsgdataFn(const Message::Ptr &m);
 
     CtrlSpamBlock spamBlockConfig = CtrlSpamBlock::CTRL_ON;
+
    protected:
     static bool isEntryOverThreshold(PerChatHandleConstRef t,
                                      const size_t threshold);
@@ -52,7 +54,7 @@ struct SpamBlockBase : ManagedThreadRunnable {
 };
 
 struct SpamBlockManager : SpamBlockBase {
-    explicit SpamBlockManager(TgBotApi::Ptr api, AuthContext *auth);
+    APPLE_INJECT(SpamBlockManager(TgBotApi::Ptr api, AuthContext *auth));
     ~SpamBlockManager() override = default;
 
     using SpamBlockBase::run;
@@ -63,7 +65,7 @@ struct SpamBlockManager : SpamBlockBase {
     // Additional hook for handling messages
     // that should be handled differently
     // (e.g., delete messages, mute users)
-    bool additionalHook(const Message::Ptr &msg) override;
+    bool shouldBeSkipped(const Message::Ptr &message) const override;
 
    private:
     constexpr static auto kMuteDuration = std::chrono::minutes(3);

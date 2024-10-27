@@ -61,7 +61,7 @@ bool SpamBlockBase::isEntryOverThreshold(PerChatHandle::const_reference t,
 
 void SpamBlockBase::_logSpamDetectCommon(PerChatHandle::const_reference t,
                                          const char *name) {
-    LOG(INFO) << fmt::format("Spam detected for user {}, filtered by ", t.first,
+    LOG(INFO) << fmt::format("Spam detected for user {}, filtered by {}", t.first,
                              name);
 }
 
@@ -73,7 +73,8 @@ void SpamBlockBase::takeAction(OneChatIterator it, const PerChatHandle &map,
 }
 
 void SpamBlockBase::spamDetectFunc(OneChatIterator handle) {
-    PerChatHandle MaxSameMsgMap, MaxMsgMap;
+    PerChatHandle MaxSameMsgMap;
+    PerChatHandle MaxMsgMap;
     // By most msgs sent by that user
     for (const auto &perUser : handle->second) {
         std::apply(
@@ -93,11 +94,10 @@ void SpamBlockBase::spamDetectFunc(OneChatIterator handle) {
             commonMap[cnt.first].emplace_back(cnt.second);
         }
         // Find the most common value
-        auto mostCommonIt =
-            std::max_element(commonMap.begin(), commonMap.end(),
-                             [](const auto &lhs, const auto &rhs) {
-                                 return lhs.second.size() < rhs.second.size();
-                             });
+        auto mostCommonIt = std::ranges::max_element(
+            commonMap, [](const auto &lhs, const auto &rhs) {
+                return lhs.second.size() < rhs.second.size();
+            });
         MaxSameMsgMap.emplace(pair.first, mostCommonIt->second);
     }
 
@@ -138,28 +138,8 @@ void SpamBlockBase::runFunction() {
 void SpamBlockBase::addMessage(const Message::Ptr &message) {
     static std::once_flag once;
 
-    // Global cfg
-    if (spamBlockConfig == CtrlSpamBlock::CTRL_OFF) {
-        return;
-    }
-
     // Run possible additional checks
-    if (additionalHook(message)) {
-        return;
-    }
-
-    // Ignore old messages
-    if (!AuthContext::isMessageUnderTimeLimit(message)) {
-        return;
-    }
-
-    // We care GIF, sticker, text spams only, or if it isn't fowarded msg
-    if ((!message->animation && message->text.empty() && !message->sticker) ||
-        message->forwardOrigin) {
-        return;
-    }
-    // Bot's PM is not a concern
-    if (message->chat->type == TgBot::Chat::Type::Private) {
+    if (shouldBeSkipped(message)) {
         return;
     }
 
@@ -219,14 +199,13 @@ void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle,
                                             PerChatHandle::const_reference t,
                                             const size_t threshold,
                                             const char *name, const bool mute) {
-    const auto wrapper = _api;
     // Initial set - all false set
     static auto perms = std::make_shared<ChatPermissions>();
     if (isEntryOverThreshold(t, threshold)) {
         _logSpamDetectCommon(t, name);
 
         if (!t.first->username.empty()) {
-            wrapper->sendMessage(
+            _api->sendMessage(
                 handle->first->id,
                 fmt::format("Spam detected @{}", t.first->username));
         }
@@ -235,7 +214,7 @@ void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle,
             message_ids.emplace_back(messageIn->messageId);
         });
         try {
-            wrapper->deleteMessages(handle->first->id, message_ids);
+            _api->deleteMessages(handle->first->id, message_ids);
         } catch (const TgBot::TgException &e) {
             DLOG(INFO) << "Error deleting message: " << e.what();
         }
@@ -243,8 +222,8 @@ void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle,
             LOG(INFO) << fmt::format("Try mute user {} in chat {}", t.first,
                                      handle->first);
             try {
-                wrapper->muteChatMember(handle->first->id, t.first->id, perms,
-                                        to_secs(kMuteDuration).count());
+                _api->muteChatMember(handle->first->id, t.first->id, perms,
+                                     to_secs(kMuteDuration).count());
             } catch (const TgBot::TgException &e) {
                 LOG(WARNING)
                     << fmt::format("Cannot mute user {} in chat {}: {}",
@@ -254,8 +233,32 @@ void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle,
     }
 }
 
-bool SpamBlockManager::additionalHook(const Message::Ptr &msg) {
-    return _auth->isAuthorized(msg, AuthContext::Flags::None);
+bool SpamBlockManager::shouldBeSkipped(const Message::Ptr &message) const {
+    if (_auth->isAuthorized(message, AuthContext::Flags::None)) {
+        return true;
+    }
+    
+    // Global cfg
+    if (spamBlockConfig == CtrlSpamBlock::CTRL_OFF) {
+        return true;
+    }
+
+    // Ignore old messages
+    if (!AuthContext::isMessageUnderTimeLimit(message)) {
+        return true;
+    }
+
+    // We care GIF, sticker, text spams only, or if it isn't fowarded msg
+    if ((!message->animation && message->text.empty() && !message->sticker) ||
+        message->forwardOrigin) {
+        return true;
+    }
+    
+    // Bot's PM is not a concern
+    if (message->chat->type == TgBot::Chat::Type::Private) {
+        return true;
+    }
+    return false;
 }
 
 SpamBlockManager::SpamBlockManager(TgBotApi::Ptr api, AuthContext *auth)
