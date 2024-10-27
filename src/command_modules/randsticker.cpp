@@ -20,7 +20,7 @@ DECLARE_COMMAND_HANDLER(randsticker) {
     try {
         stickset = api->getStickerSet(sticker->setName);
     } catch (const TgBot::TgException& e) {
-        api->sendReplyMessage(message->message(), e);
+        api->sendReplyMessage(message->message(), e.what());
         return;
     }
     pos = provider->random->generate(stickset->stickers.size() - 1);

@@ -7,7 +7,6 @@
 #include <tgbot/types/Message.h>
 #include <tgbot/types/Sticker.h>
 #include <tgbot/types/StickerSet.h>
-#include <trivial_helpers/fruit_inject.hpp>
 
 #include <ReplyParametersExt.hpp>
 #include <boost/variant.hpp>
@@ -16,6 +15,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <trivial_helpers/fruit_inject.hpp>
 #include <utility>
 #include <variant>
 
@@ -37,7 +37,7 @@ class TgBotApi {
     using Ptr = std::add_pointer_t<TgBotApi>;
     using CPtr = std::add_pointer_t<std::add_const_t<TgBotApi>>;
 
-    APPLE_INJECT(TgBotApi()) = default;
+    TgBotApi() = default;
     virtual ~TgBotApi() = default;
 
     // Disable copy and move constructors
@@ -69,10 +69,10 @@ class TgBotApi {
      * @return A shared pointer to the sent message.
      */
     virtual Message::Ptr sendMessage_impl(
-        ChatId chatId, StringOrView text,
+        ChatId chatId, const std::string_view text,
         ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
-        StringOrView parseMode = {}) const = 0;
+        const std::string_view parseMode = {}) const = 0;
 
     /**
      * @brief Sends a GIF to the specified chat.
@@ -93,10 +93,11 @@ class TgBotApi {
      * @return A shared pointer to the sent GIF message.
      */
     virtual Message::Ptr sendAnimation_impl(
-        ChatId chatId, FileOrString animation, StringOrView caption = {},
+        ChatId chatId, FileOrString animation,
+        const std::string_view caption = {},
         ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
-        StringOrView parseMode = {}) const = 0;
+        const std::string_view parseMode = {}) const = 0;
 
     /**
      * @brief Sends a sticker to the specified chat.
@@ -131,7 +132,8 @@ class TgBotApi {
      * successfully.
      */
     virtual bool createNewStickerSet_impl(
-        std::int64_t userId, StringOrView name, StringOrView title,
+        std::int64_t userId, const std::string_view name,
+        const std::string_view title,
         const std::vector<InputSticker::Ptr>& stickers,
         Sticker::Type stickerType) const = 0;
 
@@ -148,7 +150,7 @@ class TgBotApi {
      */
     virtual File::Ptr uploadStickerFile_impl(
         std::int64_t userId, InputFile::Ptr sticker,
-        StringOrView stickerFormat) const = 0;
+        const std::string_view stickerFormat) const = 0;
 
     /**
      * @brief Edits a sent message.
@@ -164,9 +166,9 @@ class TgBotApi {
      * @return A shared pointer to the edited message.
      */
     virtual Message::Ptr editMessage_impl(
-        const Message::Ptr& message, StringOrView newText,
+        const Message::Ptr& message, const std::string_view newText,
         const TgBot::InlineKeyboardMarkup::Ptr& markup,
-        StringOrView parseMode) const = 0;
+        const std::string_view parseMode) const = 0;
 
     /**
      * @brief Edits a sent message with new markup.
@@ -213,9 +215,9 @@ class TgBotApi {
      * @return A boolean value indicating whether the callback query was
      * answered successfully.
      */
-    virtual bool answerCallbackQuery_impl(StringOrView callbackQueryId,
-                                          StringOrView text = {},
-                                          bool showAlert = false) const = 0;
+    virtual bool answerCallbackQuery_impl(
+        const std::string_view callbackQueryId,
+        const std::string_view text = {}, bool showAlert = false) const = 0;
 
     /**
      * @brief Deletes a sent message.
@@ -269,10 +271,11 @@ class TgBotApi {
      * @return A shared pointer to the sent file message.
      */
     virtual Message::Ptr sendDocument_impl(
-        ChatId chatId, FileOrString document, StringOrView caption = {},
+        ChatId chatId, FileOrString document,
+        const std::string_view caption = {},
         ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
-        StringOrView parseMode = {}) const = 0;
+        const std::string_view parseMode = {}) const = 0;
 
     /**
      * @brief Sends a photo to the specified chat.
@@ -292,10 +295,10 @@ class TgBotApi {
      * @return A shared pointer to the sent photo message.
      */
     virtual Message::Ptr sendPhoto_impl(
-        ChatId chatId, FileOrString photo, StringOrView caption = {},
+        ChatId chatId, FileOrString photo, const std::string_view caption = {},
         ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
-        StringOrView parseMode = {}) const = 0;
+        const std::string_view parseMode = {}) const = 0;
 
     /**
      * @brief Sends a video to the specified chat.
@@ -315,10 +318,10 @@ class TgBotApi {
      * @return A shared pointer to the sent video message.
      */
     virtual Message::Ptr sendVideo_impl(
-        ChatId chatId, FileOrString video, StringOrView caption = {},
+        ChatId chatId, FileOrString video, const std::string_view caption = {},
         ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
-        StringOrView parseMode = {}) const = 0;
+        const std::string_view parseMode = {}) const = 0;
 
     /**
      * @brief Sends a dice to the specified chat.
@@ -340,7 +343,8 @@ class TgBotApi {
      *
      * @return A shared pointer to the retrieved sticker set.
      */
-    virtual StickerSet::Ptr getStickerSet_impl(StringOrView setName) const = 0;
+    virtual StickerSet::Ptr getStickerSet_impl(
+        const std::string_view setName) const = 0;
 
     /**
      * @brief Downloads a file from the specified file ID.
@@ -354,7 +358,7 @@ class TgBotApi {
      * successfully.
      */
     virtual bool downloadFile_impl(const std::filesystem::path& destFilename,
-                                   StringOrView fileId) const = 0;
+                                   const std::string_view fileId) const = 0;
 
     /**
      * @brief Gets the bot user.
@@ -427,8 +431,9 @@ class TgBotApi {
     virtual User::Ptr getChatMember_impl(const ChatId chat,
                                          const UserId userId) const = 0;
 
-    virtual void setDescriptions_impl(StringOrView description,
-                                      StringOrView shortDescription) const = 0;
+    virtual void setDescriptions_impl(
+        const std::string_view description,
+        const std::string_view shortDescription) const = 0;
 
     static FileOrString ToFileOrString(const FileOrMedia& media) {
         if (media.which() == 0) {
@@ -473,7 +478,7 @@ class TgBotApi {
      */
     template <ParseMode mode = ParseMode::None>
     Message::Ptr sendReplyMessage(
-        const Message::Ptr& replyToMessage, StringOrView message,
+        const Message::Ptr& replyToMessage, const std::string_view message,
         const GenericReply::Ptr& replyMarkup = nullptr) const {
         MessageThreadId tid = replyToMessage->messageThreadId;
         if (!replyToMessage->chat->isForum) {
@@ -487,7 +492,7 @@ class TgBotApi {
     template <ParseMode mode = ParseMode::None>
     Message::Ptr sendReplyMessage(
         const ChatId chatId, const MessageId messageId,
-        const MessageThreadId messageTid, StringOrView message,
+        const MessageThreadId messageTid, const std::string_view message,
         const GenericReply::Ptr& replyMarkup = nullptr) const {
         auto params = std::make_shared<ReplyParametersExt>();
         params->messageId = messageId;
@@ -511,7 +516,8 @@ class TgBotApi {
      * @return A shared pointer to the sent message.
      */
     template <ParseMode mode = ParseMode::None>
-    Message::Ptr sendMessage(const ChatIds& chatId, StringOrView message,
+    Message::Ptr sendMessage(const ChatIds& chatId,
+                             const std::string_view message,
                              const GenericReply::Ptr& markup = nullptr) const {
         return sendMessage_impl(chatId, message, nullptr, markup,
                                 parseModeToStr<mode>());
@@ -520,7 +526,7 @@ class TgBotApi {
     template <ParseMode mode = ParseMode::None>
     Message::Ptr sendReplyAnimation(const Message::Ptr& replyToMessage,
                                     const FileOrMedia& mediaId,
-                                    StringOrView caption = {}) const {
+                                    const std::string_view caption = {}) const {
         return sendAnimation_impl(replyToMessage->chat->id,
                                   ToFileOrString(mediaId), caption,
                                   createReplyParametersForReply(replyToMessage),
@@ -546,7 +552,7 @@ class TgBotApi {
     template <ParseMode mode = ParseMode::None>
     Message::Ptr sendAnimation(const ChatIds& chatid,
                                const FileOrMedia& mediaId,
-                               StringOrView caption = {}) const {
+                               const std::string_view caption = {}) const {
         return sendAnimation_impl(chatid, ToFileOrString(mediaId), caption,
                                   nullptr, nullptr, parseModeToStr<mode>());
     }
@@ -578,7 +584,7 @@ class TgBotApi {
 
     template <ParseMode mode = ParseMode::None>
     Message::Ptr editMessage(
-        const Message::Ptr& message, StringOrView newText,
+        const Message::Ptr& message, const std::string_view newText,
         const TgBot::InlineKeyboardMarkup::Ptr& markup = nullptr) const {
         return editMessage_impl(message, newText, markup,
                                 parseModeToStr<mode>());
@@ -602,8 +608,8 @@ class TgBotApi {
     }
 
     [[nodiscard]] inline bool answerCallbackQuery(
-        StringOrView callbackQueryId, StringOrView text = {},
-        bool showAlert = false) const {
+        const std::string_view callbackQueryId,
+        const std::string_view text = {}, bool showAlert = false) const {
         return answerCallbackQuery_impl(callbackQueryId, text, showAlert);
     }
 
@@ -625,7 +631,7 @@ class TgBotApi {
 
     template <ParseMode mode = ParseMode::None>
     Message::Ptr sendDocument(ChatIds chatId, FileOrMedia document,
-                              StringOrView caption = {},
+                              const std::string_view caption = {},
                               ReplyParametersExt::Ptr replyParameters = nullptr,
                               GenericReply::Ptr replyMarkup = nullptr) const {
         return sendDocument_impl(chatId, ToFileOrString(document), caption,
@@ -636,7 +642,7 @@ class TgBotApi {
 
     template <ParseMode mode = ParseMode::None>
     Message::Ptr sendPhoto(ChatIds chatId, const FileOrMedia& photo,
-                           StringOrView caption = {},
+                           const std::string_view caption = {},
                            ReplyParametersExt::Ptr replyParameters = nullptr,
                            GenericReply::Ptr replyMarkup = nullptr) const {
         return sendPhoto_impl(chatId, ToFileOrString(photo), caption,
@@ -646,7 +652,7 @@ class TgBotApi {
 
     template <ParseMode mode = ParseMode::None>
     Message::Ptr sendVideo(ChatIds chatId, const FileOrMedia& video,
-                           StringOrView caption = {},
+                           const std::string_view caption = {},
                            ReplyParametersExt::Ptr replyParameters = nullptr,
                            GenericReply::Ptr replyMarkup = nullptr) const {
         return sendVideo_impl(chatId, ToFileOrString(video), caption,
@@ -657,12 +663,13 @@ class TgBotApi {
     template <ParseMode mode = ParseMode::None>
     Message::Ptr sendReplyPhoto(const Message::Ptr& replyToMessage,
                                 const FileOrMedia& photo,
-                                StringOrView caption = {}) const {
+                                const std::string_view caption = {}) const {
         return sendPhoto<mode>(replyToMessage->chat->id, photo, caption);
     }
 
-    [[nodiscard]] inline bool downloadFile(const std::filesystem::path& path,
-                                           StringOrView fileid) const {
+    [[nodiscard]] inline bool downloadFile(
+        const std::filesystem::path& path,
+        const std::string_view fileid) const {
         return downloadFile_impl(path, fileid);
     }
 
@@ -675,12 +682,13 @@ class TgBotApi {
     }
 
     [[nodiscard]] inline StickerSet::Ptr getStickerSet(
-        StringOrView setName) const {
+        const std::string_view setName) const {
         return getStickerSet_impl(setName);
     }
 
     [[nodiscard]] inline bool createNewStickerSet(
-        std::int64_t userId, StringOrView name, StringOrView title,
+        std::int64_t userId, const std::string_view name,
+        const std::string_view title,
         const std::vector<InputSticker::Ptr>& stickers,
         Sticker::Type stickerType) const {
         return createNewStickerSet_impl(userId, name, title, stickers,
@@ -689,7 +697,7 @@ class TgBotApi {
 
     [[nodiscard]] inline File::Ptr uploadStickerFile(
         std::int64_t userId, InputFile::Ptr sticker,
-        StringOrView stickerFormat) const {
+        const std::string_view stickerFormat) const {
         return uploadStickerFile_impl(userId, std::move(sticker),
                                       stickerFormat);
     }
@@ -710,8 +718,8 @@ class TgBotApi {
         return getChatMember_impl(chat, user);
     }
 
-    inline void setDescriptions(StringOrView description,
-                                StringOrView shortDescription) {
+    inline void setDescriptions(const std::string_view description,
+                                const std::string_view shortDescription) {
         setDescriptions_impl(std::move(description),
                              std::move(shortDescription));
     }
@@ -721,10 +729,10 @@ class TgBotApi {
     virtual void startPoll() {
         // Dummy implementation
     }
-    virtual bool unloadCommand(StringOrView command) {
+    virtual bool unloadCommand(const std::string_view command) {
         return false;  // Dummy implementation
     }
-    virtual bool reloadCommand(StringOrView command) {
+    virtual bool reloadCommand(const std::string_view command) {
         return false;  // Dummy implementation
     }
 
@@ -743,7 +751,7 @@ class TgBotApi {
     }
 
     virtual void onCallbackQuery(
-        StringOrView message,
+        const std::string_view message,
         const TgBot::EventBroadcaster::CallbackQueryListener& listener) {
         // Dummy implementation
     }
@@ -773,7 +781,7 @@ class TgBotApi {
                                         InlineCallback result) {
         // Dummy implementation
     }
-    virtual void removeInlineQueryKeyboard(StringOrView key) {
+    virtual void removeInlineQueryKeyboard(const std::string_view key) {
         // Dummy implementation
     }
 

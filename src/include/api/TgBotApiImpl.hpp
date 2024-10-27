@@ -49,30 +49,31 @@ using TgBot::User;
 class TgBotApiImpl : public TgBotApi {
    public:
     // Constructor requires a bot token to create a Bot instance.
-    TgBotApiImpl(StringOrView token, AuthContext* auth,
+    TgBotApiImpl(const std::string_view token, AuthContext* auth,
                  StringResLoaderBase* loader, Providers* providers);
     ~TgBotApiImpl() override;
 
    private:
-    Message::Ptr sendMessage_impl(ChatId chatId, StringOrView text,
-                                  ReplyParametersExt::Ptr replyParameters,
-                                  GenericReply::Ptr replyMarkup,
-                                  StringOrView parseMode) const override;
+    Message::Ptr sendMessage_impl(
+        ChatId chatId, const std::string_view text,
+        ReplyParametersExt::Ptr replyParameters, GenericReply::Ptr replyMarkup,
+        const std::string_view parseMode) const override;
 
     Message::Ptr sendAnimation_impl(
         ChatId chatId, boost::variant<InputFile::Ptr, std::string> animation,
-        StringOrView caption, ReplyParametersExt::Ptr replyParameters = nullptr,
+        const std::string_view caption,
+        ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
-        StringOrView parseMode = {}) const override;
+        const std::string_view parseMode = {}) const override;
 
     Message::Ptr sendSticker_impl(
         ChatId chatId, boost::variant<InputFile::Ptr, std::string> sticker,
         ReplyParametersExt::Ptr replyParameters) const override;
 
     Message::Ptr editMessage_impl(
-        const Message::Ptr& message, StringOrView newText,
+        const Message::Ptr& message, const std::string_view newText,
         const TgBot::InlineKeyboardMarkup::Ptr& markup,
-        StringOrView parseMode) const override;
+        const std::string_view parseMode) const override;
 
     Message::Ptr editMessageMarkup_impl(
         const StringOrMessage& message,
@@ -83,8 +84,8 @@ class TgBotApiImpl : public TgBotApi {
         ChatId fromChatId, MessageId messageId,
         ReplyParametersExt::Ptr replyParameters = nullptr) const override;
 
-    bool answerCallbackQuery_impl(StringOrView callbackQueryId,
-                                  StringOrView text = {},
+    bool answerCallbackQuery_impl(const std::string_view callbackQueryId,
+                                  const std::string_view text = {},
                                   bool showAlert = false) const override {
         return getApi().answerCallbackQuery(callbackQueryId, text, showAlert);
     }
@@ -102,40 +103,42 @@ class TgBotApiImpl : public TgBotApi {
 
     // Send a file to the chat
     Message::Ptr sendDocument_impl(
-        ChatId chatId, FileOrString document, StringOrView caption,
+        ChatId chatId, FileOrString document, const std::string_view caption,
         ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
-        StringOrView parseMode = {}) const override;
+        const std::string_view parseMode = {}) const override;
 
     // Send a photo to the chat
     Message::Ptr sendPhoto_impl(
-        ChatId chatId, FileOrString photo, StringOrView caption,
+        ChatId chatId, FileOrString photo, const std::string_view caption,
         ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
-        StringOrView parseMode = {}) const override;
+        const std::string_view parseMode = {}) const override;
 
     // Send a video to the chat
     Message::Ptr sendVideo_impl(
-        ChatId chatId, FileOrString video, StringOrView caption,
+        ChatId chatId, FileOrString video, const std::string_view caption,
         ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
-        StringOrView parseMode = {}) const override;
+        const std::string_view parseMode = {}) const override;
 
     Message::Ptr sendDice_impl(ChatId chatId) const override;
 
-    StickerSet::Ptr getStickerSet_impl(StringOrView setName) const override;
+    StickerSet::Ptr getStickerSet_impl(
+        const std::string_view setName) const override;
 
     bool createNewStickerSet_impl(
-        std::int64_t userId, StringOrView name, StringOrView title,
+        std::int64_t userId, const std::string_view name,
+        const std::string_view title,
         const std::vector<InputSticker::Ptr>& stickers,
         Sticker::Type stickerType) const override;
 
-    File::Ptr uploadStickerFile_impl(std::int64_t userId,
-                                     InputFile::Ptr sticker,
-                                     StringOrView stickerFormat) const override;
+    File::Ptr uploadStickerFile_impl(
+        std::int64_t userId, InputFile::Ptr sticker,
+        const std::string_view stickerFormat) const override;
 
     bool downloadFile_impl(const std::filesystem::path& destfilename,
-                           StringOrView fileid) const override;
+                           const std::string_view fileid) const override;
 
     /**
      * @brief Retrieves the bot's user object.
@@ -156,8 +159,9 @@ class TgBotApiImpl : public TgBotApi {
                               const User::Ptr& user) const override;
     User::Ptr getChatMember_impl(ChatId chat, UserId user) const override;
 
-    void setDescriptions_impl(StringOrView description,
-                              StringOrView shortDescription) const override {
+    void setDescriptions_impl(
+        const std::string_view description,
+        const std::string_view shortDescription) const override {
         getApi().setMyDescription(description);
         getApi().setMyShortDescription(shortDescription);
     }
@@ -169,16 +173,16 @@ class TgBotApiImpl : public TgBotApi {
     // Add commands/Remove commands
     void addCommand(CommandModule::Ptr module);
     // Remove a command from being handled
-    void removeCommand(StringOrView cmd);
+    void removeCommand(const std::string_view cmd);
 
     [[nodiscard]] bool setBotCommands() const;
 
     void startPoll() override;
 
-    bool unloadCommand(StringOrView command) override;
-    bool reloadCommand(StringOrView command) override;
-    bool isLoadedCommand(StringOrView command);
-    bool isKnownCommand(StringOrView command);
+    bool unloadCommand(const std::string_view command) override;
+    bool reloadCommand(const std::string_view command) override;
+    bool isLoadedCommand(const std::string_view command);
+    bool isKnownCommand(const std::string_view command);
     void commandHandler(const std::string_view command,
                         AuthContext::Flags authflags, Message::Ptr message);
     bool validateValidArgs(const CommandModule::Ptr& module,
@@ -214,7 +218,7 @@ class TgBotApiImpl : public TgBotApi {
         const std::lock_guard _(callback_result_mutex);
         queryResults[std::move(query)] = std::move(result);
     }
-    void removeInlineQueryKeyboard(StringOrView key) override {
+    void removeInlineQueryKeyboard(const std::string_view key) override {
         const std::lock_guard _(callback_result_mutex);
         for (auto it = queryResults.begin(); it != queryResults.end(); ++it) {
             if (it->first.name == static_cast<std::string>(key)) {
@@ -236,7 +240,7 @@ class TgBotApiImpl : public TgBotApi {
         callbacks_anycommand.emplace_back(callback);
     }
 
-    void onCallbackQuery(StringOrView command,
+    void onCallbackQuery(const std::string_view command,
                          const TgBot::EventBroadcaster::CallbackQueryListener&
                              listener) override {
         const std::lock_guard<std::mutex> _(callback_callbackquery_mutex);
@@ -259,9 +263,10 @@ class TgBotApiImpl : public TgBotApi {
         // worker thread(s) to consume command queue
         std::vector<std::thread> threads;
 
-        void emplaceTask(StringOrView command, std::future<void>&& future) {
+        void emplaceTask(const std::string_view command,
+                         std::future<void>&& future) {
             std::unique_lock<std::mutex> lock(mutex);
-            tasks.emplace(std::forward<StringOrView>(command),
+            tasks.emplace(std::forward<const std::string_view>(command),
                           std::forward<std::future<void>>(future));
             condVariable.notify_one();
         }
@@ -270,7 +275,8 @@ class TgBotApiImpl : public TgBotApi {
 
     std::vector<std::unique_ptr<CommandModule>> _modules;
     Bot _bot;
-    decltype(_modules)::iterator findModulePosition(StringOrView command);
+    decltype(_modules)::iterator findModulePosition(
+        const std::string_view command);
     void onAnyMessageFunction(const Message::Ptr& message);
     void onCallbackQueryFunction(const TgBot::CallbackQuery::Ptr& query);
     void startQueueConsumerThread();

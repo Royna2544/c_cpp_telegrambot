@@ -45,7 +45,7 @@ bool TgBotApiImpl::validateValidArgs(const CommandModule::Ptr& module,
 
         // Check if the number of arguments matches the expected.
         if (!valid_argc.contains(static_cast<int>(args.size()))) {
-            std::vector<std::string_view> strings;
+            std::vector<std::string> strings;
             strings.emplace_back("Invalid number of arguments. Expected");
             if (args.size() < *valid_argc.begin()) {
                 strings.emplace_back(
@@ -213,11 +213,11 @@ void TgBotApiImpl::addCommand(CommandModule::Ptr module) {
     _modules.emplace_back(std::move(module));
 }
 
-void TgBotApiImpl::removeCommand(StringOrView cmd) {
+void TgBotApiImpl::removeCommand(const std::string_view cmd) {
     const auto it = findModulePosition(cmd);
     if (it != _modules.end()) {
         _modules.erase(it);
-        getEvents().onCommand(cmd, {});
+        getEvents().onCommand(std::string(cmd), {});
         LOG(INFO) << "Removed command " << cmd;
     }
 }
@@ -245,7 +245,7 @@ bool TgBotApiImpl::setBotCommands() const {
     return true;
 }
 
-bool TgBotApiImpl::unloadCommand(StringOrView command) {
+bool TgBotApiImpl::unloadCommand(const std::string_view command) {
     if (!isKnownCommand(command)) {
         LOG(INFO) << "Command " << command << " is not present";
         return false;
@@ -256,7 +256,7 @@ bool TgBotApiImpl::unloadCommand(StringOrView command) {
     return true;
 }
 
-bool TgBotApiImpl::reloadCommand(StringOrView command) {
+bool TgBotApiImpl::reloadCommand(const std::string_view command) {
     if (!isKnownCommand(command)) {
         LOG(INFO) << "Command " << command << " is not present";
         return false;
@@ -270,7 +270,7 @@ bool TgBotApiImpl::reloadCommand(StringOrView command) {
     return true;
 }
 
-bool TgBotApiImpl::isLoadedCommand(StringOrView command) {
+bool TgBotApiImpl::isLoadedCommand(const std::string_view command) {
     if (!isKnownCommand(command)) {
         LOG(INFO) << "Command " << command << " is not present";
         return false;
@@ -278,16 +278,15 @@ bool TgBotApiImpl::isLoadedCommand(StringOrView command) {
     return (*findModulePosition(command))->isLoaded();
 }
 
-bool TgBotApiImpl::isKnownCommand(StringOrView command) {
-    return findModulePosition(std::move(command)) != _modules.end();
+bool TgBotApiImpl::isKnownCommand(const std::string_view command) {
+    return findModulePosition(command) != _modules.end();
 }
 
 decltype(TgBotApiImpl::_modules)::iterator TgBotApiImpl::findModulePosition(
-    StringOrView command) {
+    const std::string_view command) {
     return std::ranges::find_if(
-        _modules, [&command](const CommandModule::Ptr& e) {
-            return e->name == static_cast<std::string>(command);
-        });
+        _modules,
+        [&command](const CommandModule::Ptr& e) { return e->name == command; });
 }
 
 void TgBotApiImpl::onAnyMessageFunction(const Message::Ptr& message) {
@@ -457,8 +456,9 @@ constexpr bool kDisableNotifications = false;
 #endif
 
 Message::Ptr TgBotApiImpl::sendMessage_impl(
-    ChatId chatId, StringOrView text, ReplyParametersExt::Ptr replyParameters,
-    GenericReply::Ptr replyMarkup, StringOrView parseMode) const {
+    ChatId chatId, const std::string_view text,
+    ReplyParametersExt::Ptr replyParameters, GenericReply::Ptr replyMarkup,
+    const std::string_view parseMode) const {
     try {
         return getApi().sendMessage(chatId, text, globalLinkOptions,
                                     replyParameters, replyMarkup, parseMode,
@@ -473,8 +473,8 @@ Message::Ptr TgBotApiImpl::sendMessage_impl(
 
 Message::Ptr TgBotApiImpl::sendAnimation_impl(
     ChatId chatId, boost::variant<InputFile::Ptr, std::string> animation,
-    StringOrView caption, ReplyParametersExt::Ptr replyParameters,
-    GenericReply::Ptr replyMarkup, StringOrView parseMode) const {
+    const std::string_view caption, ReplyParametersExt::Ptr replyParameters,
+    GenericReply::Ptr replyMarkup, const std::string_view parseMode) const {
     try {
         return getApi().sendAnimation(chatId, animation, 0, 0, 0, "", caption,
                                       replyParameters, replyMarkup, parseMode,
@@ -500,9 +500,9 @@ Message::Ptr TgBotApiImpl::sendSticker_impl(
 }
 
 Message::Ptr TgBotApiImpl::editMessage_impl(
-    const Message::Ptr& message, StringOrView newText,
+    const Message::Ptr& message, const std::string_view newText,
     const TgBot::InlineKeyboardMarkup::Ptr& markup,
-    StringOrView parseMode) const {
+    const std::string_view parseMode) const {
     DEBUG_ASSERT_NONNULL_PARAM(message);
     try {
         return getApi().editMessageText(newText, message->chat->id,
@@ -567,9 +567,9 @@ void TgBotApiImpl::restrictChatMember_impl(
 }
 
 Message::Ptr TgBotApiImpl::sendDocument_impl(
-    ChatId chatId, FileOrString document, StringOrView caption,
+    ChatId chatId, FileOrString document, const std::string_view caption,
     ReplyParametersExt::Ptr replyParameters, GenericReply::Ptr replyMarkup,
-    StringOrView parseMode) const {
+    const std::string_view parseMode) const {
     return getApi().sendDocument(chatId, std::move(document), "", caption,
                                  replyParameters, replyMarkup, parseMode,
                                  kDisableNotifications, {}, false,
@@ -577,18 +577,18 @@ Message::Ptr TgBotApiImpl::sendDocument_impl(
 }
 
 Message::Ptr TgBotApiImpl::sendPhoto_impl(
-    ChatId chatId, FileOrString photo, StringOrView caption,
+    ChatId chatId, FileOrString photo, const std::string_view caption,
     ReplyParametersExt::Ptr replyParameters, GenericReply::Ptr replyMarkup,
-    StringOrView parseMode) const {
+    const std::string_view parseMode) const {
     return getApi().sendPhoto(chatId, photo, caption, replyParameters,
                               replyMarkup, parseMode, kDisableNotifications, {},
                               ReplyParamsToMsgTid{replyParameters});
 }
 
 Message::Ptr TgBotApiImpl::sendVideo_impl(
-    ChatId chatId, FileOrString video, StringOrView caption,
+    ChatId chatId, FileOrString video, const std::string_view caption,
     ReplyParametersExt::Ptr replyParameters, GenericReply::Ptr replyMarkup,
-    StringOrView parseMode) const {
+    const std::string_view parseMode) const {
     return getApi().sendVideo(chatId, video, false, 0, 0, 0, "", caption,
                               replyParameters, replyMarkup, parseMode,
                               kDisableNotifications, {},
@@ -604,12 +604,14 @@ Message::Ptr TgBotApiImpl::sendDice_impl(ChatId chatId) const {
         dices[_provider->random->generate(dices.size() - 1)]);
 }
 
-StickerSet::Ptr TgBotApiImpl::getStickerSet_impl(StringOrView setName) const {
+StickerSet::Ptr TgBotApiImpl::getStickerSet_impl(
+    const std::string_view setName) const {
     return getApi().getStickerSet(setName);
 }
 
 bool TgBotApiImpl::createNewStickerSet_impl(
-    std::int64_t userId, StringOrView name, StringOrView title,
+    std::int64_t userId, const std::string_view name,
+    const std::string_view title,
     const std::vector<InputSticker::Ptr>& stickers,
     Sticker::Type stickerType) const {
     return getApi().createNewStickerSet(userId, name, title, stickers,
@@ -618,13 +620,13 @@ bool TgBotApiImpl::createNewStickerSet_impl(
 
 File::Ptr TgBotApiImpl::uploadStickerFile_impl(
     std::int64_t userId, InputFile::Ptr sticker,
-    StringOrView stickerFormat) const {
+    const std::string_view stickerFormat) const {
     DEBUG_ASSERT_NONNULL_PARAM(sticker);
     return getApi().uploadStickerFile(userId, sticker, stickerFormat);
 }
 
 bool TgBotApiImpl::downloadFile_impl(const std::filesystem::path& destfilename,
-                                     StringOrView fileid) const {
+                                     const std::string_view fileid) const {
     const auto file = getApi().getFile(fileid);
     if (!file) {
         LOG(INFO) << "File " << fileid << " not found in Telegram servers.";
@@ -682,9 +684,12 @@ User::Ptr TgBotApiImpl::getChatMember_impl(ChatId chat, UserId user) const {
     return member->user;
 }
 
-TgBotApiImpl::TgBotApiImpl(StringOrView token, AuthContext* auth,
+TgBotApiImpl::TgBotApiImpl(const std::string_view token, AuthContext* auth,
                            StringResLoaderBase* loader, Providers* providers)
-    : _bot(token), _auth(auth), _loader(loader), _provider(providers) {
+    : _bot(std::string(token)),
+      _auth(auth),
+      _loader(loader),
+      _provider(providers) {
     globalLinkOptions = std::make_shared<TgBot::LinkPreviewOptions>();
     globalLinkOptions->isDisabled = true;
     // Start two async consumers.

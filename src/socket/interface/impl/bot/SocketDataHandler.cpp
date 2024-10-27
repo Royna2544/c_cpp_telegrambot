@@ -62,7 +62,7 @@ std::string getMIMEString(const ResourceProvider* resource, const std::string& p
 GenericAck SocketInterfaceTgBot::handle_WriteMsgToChatId(const void* ptr) {
     const auto* data = static_cast<const WriteMsgToChatId*>(ptr);
     try {
-        api->sendMessage(data->chat, data->message);
+        api->sendMessage(data->chat, data->message.data());
     } catch (const TgBot::TgException& e) {
         LOG(ERROR) << "Exception at handler: " << e.what();
         return GenericAck(AckType::ERROR_TGAPI_EXCEPTION, e.what());
