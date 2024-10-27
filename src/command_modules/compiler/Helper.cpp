@@ -30,7 +30,7 @@ void CompilerInTgBotInterface::onExecutionStarted(
 
 void CompilerInTgBotInterface::onExecutionFinished(
     const std::string_view& command) {
-    output << fmt::format("{} {}", access(_locale, Strings::DONE_TOOK),
+    output << fmt::format("\n{} {}", access(_locale, Strings::DONE_TOOK),
                           timePoint.get());
     botApi->editMessage(sentMessage, output.str());
 }
