@@ -68,9 +68,9 @@ StringResLoader::StringResLoader(std::filesystem::path path)
 StringResLoader::~StringResLoader() { xmlCleanupParser(); }
 
 struct XmlCharWrapper {
-    RAII<xmlChar *>::Value<void> xmlChar;
+    RAII<xmlChar *>::Value<void> string;
 
-    operator ::xmlChar *() const { return xmlChar.get(); }
+    operator ::xmlChar *() const { return string.get(); }
 };
 
 XmlCharWrapper operator""_xmlChar(const char *string, size_t length) {
