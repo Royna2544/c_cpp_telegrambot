@@ -197,6 +197,7 @@ add_my_library(
   NAME PPImpl_shared_deps
   SRCS 
     src/ManagedThread.cpp
+    src/ThreadManager.cpp
     src/api/MessageExt.cpp
   PUBLIC_INC
     $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>
@@ -228,7 +229,6 @@ add_my_library(
     src/global_handlers/RegEXHandler.cpp
     src/global_handlers/SpamBlocker.cpp
     src/web/TgBotWebServer.cpp
-    src/ThreadManager.cpp
     src/global_handlers/ChatObserver.cpp
     src/logging/LoggingServer.cpp
     src/socket/interface/impl/bot/SocketDataHandler.cpp
