@@ -15,7 +15,6 @@
 #include <source_location>
 #include <stdexcept>
 #include <string>
-#include <map>
 #include <string_view>
 #include <type_traits>
 #include <variant>
@@ -26,7 +25,7 @@
 namespace {
 bool backtracePrint(const std::string_view& entry) {
     LOG(ERROR) << entry;
-    return std::string(entry).find("SQLiteDatabase") != std::string::npos;
+    return entry.find("SQLiteDatabase") != std::string::npos;
 }
 }  // namespace
 
@@ -373,20 +372,20 @@ SQLiteDatabase::ListResult SQLiteDatabase::removeUserFromList(
 
 bool SQLiteDatabase::load(std::filesystem::path filepath) {
     int ret = 0;
-    bool fileExisted = false;
 
     if (db != nullptr) {
         LOG(WARNING) << "Attempting to load database while it is already open.";
         return false;
     }
 
-    fileExisted = FS::exists(filepath);
     ret = sqlite3_open(filepath.string().c_str(), &db);
     if (ret != SQLITE_OK) {
         LOG(ERROR) << "Could not open database: " << sqlite3_errmsg(db);
         return false;
     }
-    if (!fileExisted) {
+
+    // Check if the database exists and initialize it if necessary.
+    if (!FS::exists(filepath) || filepath == kInMemoryDatabase) {
         LOG(INFO) << "Running initialization script...";
         const auto helper =
             Helper::create(db, Helper::kCreateDatabaseFile.data());
@@ -394,7 +393,11 @@ bool SQLiteDatabase::load(std::filesystem::path filepath) {
             throw std::runtime_error("Error initializing database");
         }
     }
-    LOG(INFO) << "Loaded SQLite database: " << filepath;
+    if (filepath != kInMemoryDatabase) {
+        LOG(INFO) << "Loaded SQLite database: " << filepath;
+    } else {
+        LOG(INFO) << "Loaded in-memory SQLite database";
+    }
     return true;
 }
 

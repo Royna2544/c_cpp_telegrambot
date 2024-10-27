@@ -68,6 +68,8 @@ struct SQLiteDatabase : DatabaseBase {
     [[nodiscard]] std::optional<ChatId> getChatId(
         const std::string &name) const override;
 
+    static constexpr std::string_view kInMemoryDatabase = ":memory:";
+    
     /**
      * SQLiteDatabase::Helper is a helper class for executing SQL statements
      * with parameters. It is designed to simplify the process of preparing and
