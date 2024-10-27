@@ -1,48 +1,92 @@
-
 <resources>
     <string name="send_bash_command">Envoyer une commande bash à exécuter</string>
     <string name="compile_time">Temps de compilation</string>
     <string name="run_time">Temps d'exécution</string>
-    <string name="reply_to_a_code">Répondre à un message avec du code en texte</string>
-    <string name="working">En cours...</string>
-    <string name="owner">Propriétaire</string>
-    <string name="command">Commande</string>
-    <string name="truncated">Tronqué en raison d'une sortie trop volumineuse</string>
+    <string name="working_on_it">En cours...</string>
+    <string name="command_is">La commande est</string>
+    <string name="need_a_nonempty_reply_message">Un message de réponse avec du texte non vide est nécessaire</string>
     <string name="example">Exemple</string>
-    <string name="need_user">Vous devez spécifier un utilisateur</string>
     <string name="unknown_action">Action inconnue</string>
-    <string name="cmd_not_loaded">Commande non chargée</string>
-    <string name="cmd_already_loaded">Commande déjà chargée</string>
-    <string name="cmd_not_found_to_load">Commande introuvable à charger</string>
-    <string name="cmd_not_found_to_unload">Commande introuvable à décharger</string>
-    <string name="not_supported_in_current_host">Non supporté dans l'hôte actuel</string>
-    <string name="reply_to_user_msg">Répondre à un message utilisateur</string>
-    <string name="reply_to_gif_or_sticker">Répondre à un GIF ou un sticker</string>
+    <string name="operation_successful">Opération réussie</string>
+    <string name="operation_failure">Échec de l'opération</string>
+    <string name="unknown">Inconnu</string>
+
+    <!-- Saveid cmd -->
     <string name="media_already_in_db">Média déjà dans la base de données</string>
-    <string name="send_a_name_to_save">Envoyer un nom à enregistrer</string>
+    <string name="send_a_name_to_save">Envoyez un nom à enregistrer</string>
+
+    <string name="done_took">Terminé. L'exécution a pris</string>
+    <string name="error_took">Une erreur s'est produite. L'exécution a pris</string>
+    <string name="output_is_empty">Sortie vide</string>
+
+    <!-- decide cmd -->
+    <string name="deciding">Décision en cours</string>
+    <string name="yes">Oui</string>
+    <string name="no">Non</string>
+    <string name="so_yes">Donc, oui</string>
+    <string name="so_idk">Donc, je ne sais pas</string>
+    <string name="so_no">Donc, non</string>
+    <string name="short_circuited_to_the_answer">Court-circuité à la réponse</string>
+
+    <!-- possibility cmd -->
+    <string name="send_possibilities">Envoyez les conditions disponibles séparées par une nouvelle ligne</string>
+    <string name="total_items_prefix">Total</string>
+    <string name="total_items_suffix">éléments</string>
+    <string name="give_more_than_one">Donnez plus d'un choix</string>
+
+    <!-- copystickers cmd -->
+    <string name="starting_conversion">Démarrage de la conversion</string>
+    <string name="conversion_in_progress">Conversion en cours</string>
+    <string name="creating_new_sticker_set">Création d'un nouveau pack de stickers</string>
+    <string name="sticker_pack_created">Pack de stickers créé</string>
+    <string name="failed_to_create_new_sticker_set">Échec de la création du nouveau pack de stickers</string>
+    <string name="animated_stickers_not_supported">Les stickers animés ne sont pas supportés</string>
+
+    <!-- setowner cmd -->
+    <string name="bot_owner_set">Le propriétaire du bot a été défini</string>
     
-<string name="user_added">Utilisateur ajouté à la liste</string>
-<string name="user_removed">Utilisateur retiré de la liste</string>
-<string name="user_already_in_list">L'utilisateur est déjà dans la liste</string>
-<string name="user_already_in_other_list">L'utilisateur est déjà dans une autre liste</string>
-<string name="user_not_in_list">L'utilisateur n'est pas dans la liste</string>
+    <!-- flash cmd -->
+    <string name="flashing_zip">Flashage du fichier zip</string>
+    <string name="send_a_file_name_to_flash">Envoyez un nom de fichier à flasher</string>
+    <string name="invalid_input_no_newline">Entrée invalide : les noms de fichiers ne doivent pas contenir de nouvelles lignes</string>
+    <string name="failed_successfully">Échec réussi !</string>
+    <string name="reason">Raison</string>
+    <string name="success_chance_was">Succès ! La chance était de</string>
 
-<!-- Fails and errors -->
-<string name="failed_to_write_file">Échec de l'écriture du fichier</string>
-<string name="failed_to_run_command">Échec de l'exécution de la commande</string>
-<string name="failed_to_parse_input">Échec de l'analyse de l'entrée</string>
-<string name="error_path_cannot_be_empty">Le chemin ne peut pas être vide</string>
-<string name="error_updating_bot_commands">Erreur lors de la mise à jour de la liste des commandes du bot</string>
-<string name="error_sending_gif">Erreur lors de l'envoi du GIF</string>
-<string name="backend_error">Erreur du serveur</string>
-<string name="unknown_error">Erreur inconnue</string>
-<string name="invalid_args_passed">Arguments invalides passés</string>
+    <!-- restart cmd -->
+    <string name="restarting_bot">Redémarrage de l'instance du bot...</string>
 
-<!-- Command desc -->
-<string name="alive_cmd_desc">Tester si un bot est actif</string>
-<string name="start_cmd_desc">Alias pour la commande alive</string>
-<string name="bash_cmd_desc">Exécuter des commandes bash</string>
-<string name="ubash_cmd_desc">Exécuter des commandes bash sans limite de temps</string>
-<string name="database_cmd_desc">Exécuter des commandes de base de données</string>
-<string name="saveid_cmd_desc">Enregistrer un média tg sous un nom</string>
+    <!-- rotatepic cmd -->
+    <string name="cannot_rotate_nonstatic">Impossible de faire pivoter le sticker qui n'est pas statique</string>
+    <string name="invalid_angle">Angle invalide fourni</string>
+    <string name="rotated_picture">Image pivotée</string>
+    <string name="failed_to_rotate_image">Échec de la rotation de l'image</string>
+
+    <!-- Database -->
+    <string name="user_added">Utilisateur ajouté à la liste</string>
+    <string name="user_removed">Utilisateur supprimé de la liste</string>
+    <string name="user_already_in_list">L'utilisateur est déjà dans la liste</string>
+    <string name="user_already_in_other_list">L'utilisateur est déjà dans une autre liste</string>
+    <string name="user_not_in_list">L'utilisateur n'est pas dans la liste</string>
+
+    <!-- Reply to -->
+    <string name="reply_to_a_sticker">Répondez à un sticker</string>
+    <string name="reply_to_user_msg">Répondez au message d'un utilisateur</string>
+    <string name="reply_to_gif_or_sticker">Répondez à un GIF ou un sticker</string>
+    <string name="reply_to_a_code">Répondez à un message avec du code en texte</string>
+    <string name="reply_to_a_media">Répondez à un média</string>
+
+    <!-- Fails and errors -->
+    <string name="failed_to_write_file">Échec de l'écriture du fichier</string>
+    <string name="failed_to_create_directory">Échec de la création du répertoire</string>
+    <string name="failed_to_parse_input">Échec de l'analyse de l'entrée</string>
+    <string name="failed_to_download_file">Échec du téléchargement du fichier</string>
+    <string name="failed_to_read_file">Échec de la lecture du fichier</string>
+    <string name="failed_to_upload_file">Échec de l'envoi du fichier</string>
+
+    <string name="error_sending_gif">Erreur d'envoi du GIF</string>
+    <string name="backend_error">Erreur du serveur</string>
+    <string name="unknown_error">Erreur inconnue</string>
+    <string name="invalid_args_passed">Arguments invalides fournis</string>
+    <string name="sticker_set_not_found">Pack de stickers introuvable</string>
 </resources>
