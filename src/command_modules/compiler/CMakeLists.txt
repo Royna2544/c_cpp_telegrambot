@@ -10,6 +10,7 @@ add_my_library(
         TgBot_popen_wdt
         TgBotStringRes
         absl::status
+        TgBotUtils
     PUBLIC_INC
         ${CMAKE_CURRENT_BINARY_DIR}
         $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>
