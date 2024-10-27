@@ -11,6 +11,8 @@
 struct DatabaseBase {
     virtual ~DatabaseBase() = default;
 
+    static constexpr std::string_view kInMemoryDatabase = ":memory:";
+    
     enum class ListType { WHITELIST, BLACKLIST };
     enum class ListResult {
         OK,

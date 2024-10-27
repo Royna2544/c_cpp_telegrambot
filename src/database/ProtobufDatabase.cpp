@@ -106,8 +106,14 @@ bool ProtoDatabase::load(std::filesystem::path filepath) {
         LOG(WARNING) << "Database is already loaded";
         return false;
     }
+
     dbinfo.emplace();
     dbinfo->path = filepath;
+
+    if (filepath == kInMemoryDatabase) {
+        LOG(INFO) << "Loading in-memory database";
+        return true;
+    }
 
     std::fstream input(filepath.string(), std::ios::in | std::ios::binary);
     if (!input.is_open()) {
@@ -128,6 +134,12 @@ bool ProtoDatabase::unloadDatabase() {
         LOG(WARNING) << "Database not loaded! Cannot unload!";
         return false;
     }
+
+    if (dbinfo->path == kInMemoryDatabase) {
+        // Effectively no-op
+        return true;
+    }
+
     std::fstream output(dbinfo->path.string(),
                         std::ios::out | std::ios::binary);
     if (!output.is_open()) {
