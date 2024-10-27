@@ -32,3 +32,6 @@ void ThreadManager::destroyManager() {
         lk.lock();
     });
 }
+
+constexpr array_helpers::ConstArray<ThreadManager::Usage, const char*, 10>
+    ThreadManager::ThreadUsageToStrMap; // NOLINT
