@@ -53,6 +53,7 @@ MessageExt::MessageExt(Message::Ptr message, SplitMessageText how)
                 break;
             case SplitMessageText::None:
                 // No-op, considering one argument.
+                _arguments.emplace_back(_extra_args);
                 break;
         }
     }
