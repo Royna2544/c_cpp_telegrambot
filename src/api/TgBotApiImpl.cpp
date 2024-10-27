@@ -146,7 +146,7 @@ void TgBotApiImpl::commandHandler(const std::string_view command,
         locale <= ext->get<MessageAttrs::User>()->languageCode;
     }
 
-    module->function(this, std::move(ext), (*_loader)[locale], _provider);
+    module->function(this, std::move(ext), (*_loader).at(locale), _provider);
 }
 
 void TgBotApiImpl::startQueueConsumerThread() {

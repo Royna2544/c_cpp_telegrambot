@@ -127,11 +127,11 @@ struct StringResLoaderBase {
 
     struct LocaleStrings {
         virtual ~LocaleStrings() = default;
-        virtual std::string_view operator[](const Strings& string) const = 0;
+        virtual std::string_view get(const Strings& string) const = 0;
         virtual size_t size() const noexcept = 0;
     };
 
-    virtual const LocaleStrings* operator[](const Locale key) const = 0;
+    virtual const LocaleStrings* at(const Locale key) const = 0;
     virtual size_t size() const noexcept = 0;
 };
 
@@ -152,7 +152,7 @@ class LocaleStringsImpl : public StringResLoaderBase::LocaleStrings {
         std::string m_what;
     };
 
-    std::string_view operator[](const Strings& string) const override;
+    std::string_view get(const Strings& string) const override;
     [[nodiscard]] size_t size() const noexcept override {
         return m_data.size();
     }
@@ -175,10 +175,10 @@ class StringResLoader : public StringResLoaderBase {
         return localeMap.size();
     }
 
-    const LocaleStrings* operator[](const Locale key) const override;
+    const LocaleStrings* at(const Locale key) const override;
 };
 
 inline std::string_view access(const StringResLoaderBase::LocaleStrings* locale,
                                Strings strings) {
-    return locale->operator[](strings);
+    return locale->get(strings);
 }

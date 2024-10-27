@@ -78,7 +78,7 @@ XmlCharWrapper operator""_xmlChar(const char *string, size_t length) {
 }
 
 namespace {
-Strings get(const std::string_view string) {
+Strings getStrings(const std::string_view string) {
 #define fn(x) \
     if (string == #x) return Strings::x;
     MAKE_STRINGS(fn);
@@ -86,7 +86,7 @@ Strings get(const std::string_view string) {
     return {};
 }
 
-std::string_view get(const Strings string) {
+std::string_view getStrings(const Strings string) {
     switch (string) {
 #define fn(x)        \
     case Strings::x: \
@@ -142,7 +142,7 @@ LocaleStringsImpl::LocaleStringsImpl(const std::filesystem::path &filename) {
             if (nameAttr && content) {
                 auto upper = absl::AsciiStrToUpper(
                     reinterpret_cast<const char *>(nameAttr.get()));
-                auto string = get(upper);
+                auto string = getStrings(upper);
                 if (string == Strings::__INVALID__) {
                     LOG(WARNING) << "String name not in enumerator: " << upper;
                     continue;
@@ -166,16 +166,16 @@ LocaleStringsImpl::LocaleStringsImpl(const std::filesystem::path &filename) {
     }
 }
 
-std::string_view LocaleStringsImpl::operator[](const Strings &string) const {
+std::string_view LocaleStringsImpl::get(const Strings &string) const {
     if (m_data.contains(string)) {
         return m_data.at(string);
     } else {
-        LOG(WARNING) << "String not found: " << get(string);
+        LOG(WARNING) << "String not found: " << getStrings(string);
         return {};
     }
 }
 
-const StringResLoader::LocaleStrings *StringResLoader::operator[](
+const StringResLoader::LocaleStrings *StringResLoader::at(
     const Locale key) const {
     if (localeMap.contains(key)) {
         return localeMap.at(key).get();
