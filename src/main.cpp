@@ -444,10 +444,6 @@ int main(int argc, char** argv) {
         socketFactor(ThreadManager::Usage::SOCKET_EXTERNAL_THREAD, rawP.get());
     }
 
-    // Must be last
-    OnTerminateRegistrar::getInstance()->registerCallback(
-        [threadManager]() { threadManager->destroyManager(); });
-
 #ifndef WINDOWS_BUILD
     LOG_IF(WARNING, !RestartFmt::handleMessage(api).ok())
         << "Failed to handle restart message";
@@ -487,9 +483,6 @@ int main(int argc, char** argv) {
             break;
         }
     }
-    if (!SignalHandler::isSignaled()) {
-        // Exiting due to exception
-        OnTerminateRegistrar::getInstance()->callCallbacks();
-    }
+    threadManager->destroyManager();
     return EXIT_SUCCESS;
 }

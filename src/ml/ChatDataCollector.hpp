@@ -3,7 +3,6 @@
 #include <api/TgBotApiImpl.hpp>
 #include <ctime>
 #include <fstream>
-#include <libos/OnTerminateRegistrar.hpp>
 #include "api/TgBotApi.hpp"
 #include "trivial_helpers/fruit_inject.hpp"
 
