@@ -137,9 +137,11 @@ bool ProtoDatabase::unloadDatabase() {
 
     if (dbinfo->path == kInMemoryDatabase) {
         // Effectively no-op
+        LOG(INFO) << "Unload in-memory database: noop";
+        dbinfo.reset();
         return true;
     }
-
+    
     std::fstream output(dbinfo->path.string(),
                         std::ios::out | std::ios::binary);
     if (!output.is_open()) {
