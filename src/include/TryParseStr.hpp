@@ -38,11 +38,11 @@ bool _try_parse(const String& str, String* outval) {
 }
 
 template <typename T>
-bool try_parse(const std::string& str, T* outval) {
-    return _try_parse<std::string, std::stringstream>(str, outval);
+bool try_parse(const std::string_view str, T* outval) {
+    return _try_parse<std::string_view, std::stringstream>(str, outval);
 }
 
 template <typename T>
-bool try_parse(const std::wstring& str, T* outval) {
-    return _try_parse<std::wstring, std::wstringstream>(str, outval);
+bool try_parse(const std::wstring_view str, T* outval) {
+    return _try_parse<std::wstring_view, std::wstringstream>(str, outval);
 }
