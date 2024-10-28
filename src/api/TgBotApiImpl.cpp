@@ -697,4 +697,9 @@ TgBotApiImpl::TgBotApiImpl(const std::string_view token, AuthContext* auth,
     startQueueConsumerThread();
 }
 
-TgBotApiImpl::~TgBotApiImpl() { stopQueueConsumerThread(); }
+TgBotApiImpl::~TgBotApiImpl() {
+    callbacks_anycommand.clear();
+    callbacks_callbackquery.clear();
+    stopQueueConsumerThread();
+    _modules.clear();
+}
