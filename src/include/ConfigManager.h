@@ -14,15 +14,12 @@ namespace ConfigManager {
 
 enum class Configs {
     TOKEN,
-    SRC_ROOT,
-    PATH,
     LOG_FILE,
-    DATABASE_BACKEND,
+    DATABASE_CFG,
     HELP,
     OVERRIDE_CONF,
-    SOCKET_BACKEND,
+    SOCKET_CFG,
     SELECTOR,
-    LOCALE,
     MAX
 };
 
@@ -42,33 +39,28 @@ using DescStr = StringConcat::String<50>;
 
 constexpr auto kConfigsMap =
     array_helpers::make<static_cast<int>(Configs::MAX), Configs, ConfigStr>(
-        CONFIG_AND_STR(TOKEN), CONFIG_AND_STR(SRC_ROOT), CONFIG_AND_STR(PATH),
-        CONFIG_AND_STR(LOG_FILE), CONFIG_AND_STR(DATABASE_BACKEND),
-        CONFIG_AND_STR(HELP), CONFIG_AND_STR(OVERRIDE_CONF),
-        CONFIG_AND_STR(SOCKET_BACKEND), CONFIG_AND_STR(SELECTOR),
-        CONFIG_AND_STR(LOCALE));
+        CONFIG_AND_STR(TOKEN), CONFIG_AND_STR(LOG_FILE),
+        CONFIG_AND_STR(DATABASE_CFG), CONFIG_AND_STR(HELP),
+        CONFIG_AND_STR(OVERRIDE_CONF), CONFIG_AND_STR(SOCKET_CFG),
+        CONFIG_AND_STR(SELECTOR));
 
 constexpr auto kConfigsAliasMap =
     array_helpers::make<static_cast<int>(Configs::MAX), Configs, const char>(
-        CONFIGALIAS_AND_STR(TOKEN, 't'), CONFIGALIAS_AND_STR(SRC_ROOT, 'r'),
-        CONFIGALIAS_AND_STR(PATH, 'p'), CONFIGALIAS_AND_STR(LOG_FILE, 'f'),
-        CONFIGALIAS_AND_STR(DATABASE_BACKEND, 'd'),
-        CONFIGALIAS_AND_STR(HELP, 'h'), CONFIGALIAS_AND_STR(OVERRIDE_CONF, 'c'),
-        CONFIGALIAS_AND_STR(SOCKET_BACKEND, 's'),
-        CONFIGALIAS_AND_STR(SELECTOR, 'u'), CONFIGALIAS_AND_STR(LOCALE, 'l'));
+        CONFIGALIAS_AND_STR(TOKEN, 't'), CONFIGALIAS_AND_STR(LOG_FILE, 'f'),
+        CONFIGALIAS_AND_STR(DATABASE_CFG, 'd'), CONFIGALIAS_AND_STR(HELP, 'h'),
+        CONFIGALIAS_AND_STR(OVERRIDE_CONF, 'c'),
+        CONFIGALIAS_AND_STR(SOCKET_CFG, 's'),
+        CONFIGALIAS_AND_STR(SELECTOR, 'u'));
 
 constexpr auto kConfigsDescMap =
     array_helpers::make<static_cast<int>(Configs::MAX), Configs, DescStr>(
         DESC_AND_STR(TOKEN, "Bot Token"),
-        DESC_AND_STR(SRC_ROOT, "Root directory of source tree"),
-        DESC_AND_STR(PATH, "Environment variable PATH (to override)"),
         DESC_AND_STR(LOG_FILE, "File path to log"),
-        DESC_AND_STR(DATABASE_BACKEND, "Database backend to use"),
+        DESC_AND_STR(DATABASE_CFG, "Database backend to use"),
         DESC_AND_STR(HELP, "Print this help message"),
         DESC_AND_STR(OVERRIDE_CONF, "Override config file"),
-        DESC_AND_STR(SOCKET_BACKEND, "Socket backend to use"),
-        DESC_AND_STR(SELECTOR, "Selector(poll(2), etc...) backend to use"),
-        DESC_AND_STR(LOCALE, "Locale of the language to use (Current: en,fr)"));
+        DESC_AND_STR(SOCKET_CFG, "Socket backend to use"),
+        DESC_AND_STR(SELECTOR, "Selector(poll(2), etc...) backend to use"));
 
 /**
  * getVariable - Function used to retrieve the value of a specific
@@ -120,4 +112,3 @@ TgBotUtils_API bool getEnv(const std::string &name, std::string &value);
 TgBotUtils_API void serializeHelpToOStream(std::ostream &out);
 
 };  // namespace ConfigManager
-

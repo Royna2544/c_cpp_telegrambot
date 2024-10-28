@@ -3,7 +3,7 @@
 
 bool loadDB_TO_BE_FIXED_TODO(TgBotDatabaseImpl* dbimpl) {
     using namespace ConfigManager;
-    const auto dbConf = getVariable(Configs::DATABASE_BACKEND);
+    const auto dbConf = getVariable(Configs::DATABASE_CFG);
     std::error_code ec;
     bool loaded = false;
 

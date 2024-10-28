@@ -6,7 +6,7 @@
 
 SocketServerWrapper::SocketServerWrapper() {
     auto value =
-        ConfigManager::getVariable(ConfigManager::Configs::SOCKET_BACKEND);
+        ConfigManager::getVariable(ConfigManager::Configs::SOCKET_CFG);
     if (!value) {
         LOG(ERROR) << "No socket backend specified, not creating sockets";
         return;

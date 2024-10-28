@@ -87,14 +87,11 @@ struct ConfigBackendBoostPOBase : public ConfigBackendBase {
         static std::once_flag once;
         std::call_once(once, [] {
             AddOption<std::string, Configs::TOKEN>(desc);
-            AddOption<std::string, Configs::SRC_ROOT>(desc);
-            AddOption<std::string, Configs::PATH>(desc);
             AddOption<std::string, Configs::LOG_FILE>(desc);
-            AddOption<std::string, Configs::DATABASE_BACKEND>(desc);
+            AddOption<std::string, Configs::DATABASE_CFG>(desc);
             AddOption<std::string, Configs::OVERRIDE_CONF>(desc);
-            AddOption<std::string, Configs::SOCKET_BACKEND>(desc);
+            AddOption<std::string, Configs::SOCKET_CFG>(desc);
             AddOption<std::string, Configs::SELECTOR>(desc);
-            AddOption<std::string, Configs::LOCALE>(desc);
         });
         return desc;
     }
