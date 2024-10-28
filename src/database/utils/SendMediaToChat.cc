@@ -2,20 +2,20 @@
 #include <absl/log/log.h>
 
 #include <AbslLogInit.hpp>
-#include <CommandLine.hpp>
 #include <TryParseStr.hpp>
 #include <cstdlib>
 #include <cstring>
 #include <database/bot/TgBotDatabaseImpl.hpp>
 #include <impl/backends/ClientBackend.hpp>
 #include <iostream>
+#include <memory>
+#include "ConfigManager.hpp"
 
 [[noreturn]] static void usage(const char* argv0, const int exitCode) {
     std::cerr << "Usage: " << argv0 << " <chat(Id/Name)> <medianame>"
               << std::endl;
     exit(exitCode);
 }
-extern bool loadDB_TO_BE_FIXED_TODO(TgBotDatabaseImpl* dbimpl);
 
 int main(int argc, char** argv) {
     ChatId chatId = 0;
@@ -24,13 +24,13 @@ int main(int argc, char** argv) {
         usage(capture0, std::forward<decltype(PH1)>(PH1));
     };
     TgBot_AbslLogInit();
-    CommandLine::initInstance(argc, argv);
+    auto config = std::make_unique<ConfigManager>(argc, argv);
 
     if (argc != 3) {
         _usage(EXIT_SUCCESS);
     }
     auto backend = std::make_unique<TgBotDatabaseImpl>();
-    loadDB_TO_BE_FIXED_TODO(backend.get());
+    TgBotDatabaseImpl::load(config.get(), backend.get());
     if (!backend->isLoaded()) {
         LOG(ERROR) << "Failed to load DB from config";
         return EXIT_FAILURE;

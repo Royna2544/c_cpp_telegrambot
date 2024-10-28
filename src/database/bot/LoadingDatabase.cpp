@@ -1,9 +1,9 @@
 #include <database/bot/TgBotDatabaseImpl.hpp>
-#include <ConfigManager.h>
+#include <ConfigManager.hpp>
+#include <absl/log/log.h>
 
-bool loadDB_TO_BE_FIXED_TODO(TgBotDatabaseImpl* dbimpl) {
-    using namespace ConfigManager;
-    const auto dbConf = getVariable(Configs::DATABASE_CFG);
+bool TgBotDatabaseImpl::load(ConfigManager* configmgr, TgBotDatabaseImpl* dbimpl) {
+    const auto dbConf = configmgr->get(ConfigManager::Configs::DATABASE_CFG);
     std::error_code ec;
     bool loaded = false;
 

@@ -3,10 +3,12 @@
 #include <TgBotDBImplExports.h>
 #include <Types.h>
 #include <trivial_helpers/_class_helper_macros.h>
-#include <trivial_helpers/fruit_inject.hpp>
+
+#include <ConfigManager.hpp>
 #include <database/DatabaseBase.hpp>
 #include <map>
 #include <memory>
+#include <trivial_helpers/fruit_inject.hpp>
 
 struct TgBotDBImpl_API TgBotDatabaseImpl : DatabaseBase {
     struct TgBotDBImpl_API Providers {
@@ -57,6 +59,9 @@ struct TgBotDBImpl_API TgBotDatabaseImpl : DatabaseBase {
     bool load(std::filesystem::path filepath) override;
 
     bool setImpl(Providers providers);
+
+    static bool load(ConfigManager *configmgr, TgBotDatabaseImpl *dbimpl);
+
    private:
     // Takes a std::unique_ptr containing the implementation
     bool setImpl(std::unique_ptr<DatabaseBase> impl);

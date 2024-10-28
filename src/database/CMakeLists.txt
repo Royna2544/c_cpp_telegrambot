@@ -48,7 +48,7 @@ add_my_library(
 
 add_my_library(
   NAME DBLoading
-  SRCS utils/LoadingDatabase.cpp
+  SRCS bot/LoadingDatabase.cpp
   LIBS TgBotUtils TgBotDBImpl
   STATIC
 )

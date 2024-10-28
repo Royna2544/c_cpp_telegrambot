@@ -1,14 +1,13 @@
 #include <absl/log/log.h>
 
 #include <AbslLogInit.hpp>
+#include <TryParseStr.hpp>
 #include <cstdlib>
 #include <database/bot/TgBotDatabaseImpl.hpp>
 #include <iostream>
+#include <memory>
 #include <vector>
-#include <ConfigManager.h>
-
-#include "CommandLine.hpp"
-#include "TryParseStr.hpp"
+#include "ConfigManager.hpp"
 
 enum class Commands {
     Noop,
@@ -24,7 +23,7 @@ enum class Commands {
 // Structure to hold command data for easier manipulation and handling
 struct CommandData {
     // Array of command arguments after (exe, command)
-    std::vector<std::string> args;
+    std::vector<std::string_view> args;
     // Instance of TgBotDatabaseImpl
     std::unique_ptr<TgBotDatabaseImpl> impl;
 };
@@ -76,7 +75,7 @@ void executeCommand<Commands::AddChat>(const CommandData& data) {
         LOG(ERROR) << "Invalid chatid specified";
         return;
     }
-    const std::string name = data.args[1];
+    const std::string name = std::string(data.args[1]);
     if (data.impl->addChatInfo(chatid, name)) {
         LOG(INFO) << "Added chat info for chatid=" << chatid
                   << " name=" << name;
@@ -111,7 +110,7 @@ void executeCommand<Commands::WhiteBlackList>(const CommandData& data) {
             << "Need <whitelist|blacklist> <add|remove> <user_id> as arguments";
         return;
     }
-    std::string typeStr = data.args[0];
+    std::string_view typeStr = data.args[0];
     if (typeStr != "whitelist" && typeStr != "blacklist") {
         LOG(ERROR) << "Invalid type specified. Use 'whitelist' or 'blacklist'";
         return;
@@ -122,7 +121,7 @@ void executeCommand<Commands::WhiteBlackList>(const CommandData& data) {
     } else {
         type = DatabaseBase::ListType::BLACKLIST;
     }
-    std::string action = data.args[1];
+    std::string_view action = data.args[1];
     if (action != "add" && action != "remove") {
         LOG(ERROR) << "Invalid action specified. Use 'add' or'remove'";
         return;
@@ -150,13 +149,15 @@ void executeCommand<Commands::WhiteBlackList>(const CommandData& data) {
 }
 }  // namespace
 
-extern bool loadDB_TO_BE_FIXED_TODO(TgBotDatabaseImpl* dbimpl);
-
 int main(int argc, char** argv) {
     TgBot_AbslLogInit();
-    auto inst = CommandLine::initInstance(argc, argv);
 
-    std::vector<std::string> args = inst->getArguments();
+    auto config = std::make_unique<ConfigManager>(argc, argv);
+    std::vector<std::string_view> args;
+    args.reserve(argc);
+    for (int i = 1; i < argc; ++i) {
+        args.emplace_back(argv[i]);
+    }
     CommandData data = {args, nullptr};
 
     if (args.size() < 2) {
@@ -165,12 +166,12 @@ int main(int argc, char** argv) {
     }
 
     auto dbImpl = std::make_unique<TgBotDatabaseImpl>();
-    loadDB_TO_BE_FIXED_TODO(dbImpl.get());
+    TgBotDatabaseImpl::load(nullptr, dbImpl.get());
     if (!dbImpl->isLoaded()) {
         LOG(ERROR) << "Failed to load database";
         return EXIT_FAILURE;
     }
-    const std::string command = args[1];
+    const std::string_view command = args[1];
     // Erase exe, command name
     args.erase(args.begin(), args.begin() + 2);
     data = {args, std::move(dbImpl)};
