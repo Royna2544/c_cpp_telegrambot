@@ -9,7 +9,6 @@
 #include <tgbot/types/StickerSet.h>
 
 #include <ReplyParametersExt.hpp>
-#include <boost/variant.hpp>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
@@ -46,8 +45,8 @@ class TgBotApi {
     TgBotApi& operator=(const TgBotApi&) = delete;
     TgBotApi& operator=(TgBotApi&&) = delete;
 
-    using FileOrString = boost::variant<InputFile::Ptr, std::string>;
-    using FileOrMedia = boost::variant<InputFile::Ptr, MediaIds>;
+    using FileOrString = std::variant<InputFile::Ptr, std::string>;
+    using FileOrMedia = std::variant<InputFile::Ptr, MediaIds>;
     using StringOrMessage = std::variant<std::string, Message::Ptr>;
 
    protected:
@@ -436,11 +435,18 @@ class TgBotApi {
         const std::string_view shortDescription) const = 0;
 
     static FileOrString ToFileOrString(const FileOrMedia& media) {
-        if (media.which() == 0) {
-            return boost::get<InputFile::Ptr>(media);
-        } else {
-            return boost::get<MediaIds>(media).id;
-        }
+        return std::visit(
+            [](auto& x) -> FileOrString {
+                using T = std::decay_t<decltype(x)>;
+                if constexpr (std::is_same_v<T, InputFile::Ptr>) {
+                    return x;
+                } else if constexpr (std::is_same_v<T, MediaIds>) {
+                    return x.id;
+                } else {
+                    static_assert(false, "Invalid media type");
+                }
+            },
+            media);
     }
 
    public:

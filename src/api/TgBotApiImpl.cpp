@@ -472,7 +472,7 @@ Message::Ptr TgBotApiImpl::sendMessage_impl(
 }
 
 Message::Ptr TgBotApiImpl::sendAnimation_impl(
-    ChatId chatId, boost::variant<InputFile::Ptr, std::string> animation,
+    ChatId chatId, std::variant<InputFile::Ptr, std::string> animation,
     const std::string_view caption, ReplyParametersExt::Ptr replyParameters,
     GenericReply::Ptr replyMarkup, const std::string_view parseMode) const {
     try {
@@ -487,7 +487,7 @@ Message::Ptr TgBotApiImpl::sendAnimation_impl(
 }
 
 Message::Ptr TgBotApiImpl::sendSticker_impl(
-    ChatId chatId, boost::variant<InputFile::Ptr, std::string> sticker,
+    ChatId chatId, std::variant<InputFile::Ptr, std::string> sticker,
     ReplyParametersExt::Ptr replyParameters) const {
     try {
         return getApi().sendSticker(chatId, sticker, replyParameters, nullptr,

@@ -23,8 +23,6 @@
 #include "MessageExt.hpp"
 #include "Providers.hpp"
 #include "TgBotApi.hpp"
-#include "api/Utils.hpp"
-#include "trivial_helpers/fruit_inject.hpp"
 
 using TgBot::Animation;
 using TgBot::Api;
@@ -60,14 +58,14 @@ class TgBotApiImpl : public TgBotApi {
         const std::string_view parseMode) const override;
 
     Message::Ptr sendAnimation_impl(
-        ChatId chatId, boost::variant<InputFile::Ptr, std::string> animation,
+        ChatId chatId, std::variant<InputFile::Ptr, std::string> animation,
         const std::string_view caption,
         ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
         const std::string_view parseMode = {}) const override;
 
     Message::Ptr sendSticker_impl(
-        ChatId chatId, boost::variant<InputFile::Ptr, std::string> sticker,
+        ChatId chatId, std::variant<InputFile::Ptr, std::string> sticker,
         ReplyParametersExt::Ptr replyParameters) const override;
 
     Message::Ptr editMessage_impl(
