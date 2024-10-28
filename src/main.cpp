@@ -189,8 +189,7 @@ fruit::Component<TgBotDatabaseImpl, DatabaseBase> getDatabaseComponent() {
 }
 
 fruit::Component<ResourceProvider> getResourceProvider() {
-    return fruit::createComponent()
-        .bind<ResourceProvider, ResourceManager>();
+    return fruit::createComponent().bind<ResourceProvider, ResourceManager>();
 }
 
 fruit::Component<fruit::Required<AuthContext, StringResLoaderBase, Providers>,
@@ -410,6 +409,12 @@ int main(int argc, char** argv) {
     if (ConfigManager::getVariable(ConfigManager::Configs::HELP)) {
         ConfigManager::serializeHelpToOStream(std::cout);
         return EXIT_SUCCESS;
+    }
+
+    // Pre-obtain token, so we won't have to catch exceptions below
+    if (!ConfigManager::getVariable(ConfigManager::Configs::TOKEN)) {
+        LOG(ERROR) << "TOKEN is not set, but is required";
+        return EXIT_FAILURE;
     }
 
     // Install signal handlers
