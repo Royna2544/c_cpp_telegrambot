@@ -66,7 +66,7 @@ inline std::ostream& operator<<(std::ostream& os, ChatDataCollector::Data d) {
 
 
 inline ChatDataCollector::ChatDataCollector(TgBotApi::Ptr api) {
-    api->onAnyMessage([this](auto api, auto message) {
+    api->onAnyMessage([this](TgBotApi::CPtr api, const Message::Ptr& message) {
         onMessage(message);
         return TgBotApiImpl::AnyMessageResult::Handled;
     });

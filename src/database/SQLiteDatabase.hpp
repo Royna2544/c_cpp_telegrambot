@@ -11,6 +11,7 @@
 #include <string_view>
 #include <utility>
 #include <variant>
+#include <TgBotDBImplExports.h>
 
 #include "DatabaseBase.hpp"
 
@@ -40,7 +41,7 @@ template <>
 
 }  // namespace detail
 
-struct SQLiteDatabase : DatabaseBase {
+struct TgBotDBImpl_API SQLiteDatabase : DatabaseBase {
     enum class InfoType {
         MIN = -1,
         OWNER = 0,

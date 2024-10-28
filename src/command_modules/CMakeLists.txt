@@ -95,7 +95,7 @@ add_subdirectory(compiler)
 multi_command_module(
     PROVIDES alive start
     SRCS alive.cpp
-    LIBS absl::strings TgBotDBImpl
+    LIBS absl::strings TgBotDBImpl TgBotUtils
 )
 
 multi_command_module(

@@ -30,23 +30,18 @@ if (${SQLite3_FOUND})
 endif()
 
 add_my_library(
-  NAME DB 
+  NAME DBImpl
   SRCS
     ${SQLITE_SRCS}
     ${PROTO_SRCS}
+    bot/TgBotDatabaseImpl.cpp
   PUBLIC_INC 
     ${PROTO_HDRS_DIR}
   PRIVATE_INC
     ${Protobuf_INCLUDE_DIRS}
-  LIBS
-    ${DATABASE_LIBS} TgBotUtils
-  STATIC
-)
-
-add_my_library(
-  NAME DBImpl
-  SRCS bot/TgBotDatabaseImpl.cpp
-  LIBS TgBotDB
+  LIBS_STATIC
+    ${DATABASE_LIBS}
+  LIBS TgBotUtils
   DEFS
     ${DATABASE_DEFS}
 )
