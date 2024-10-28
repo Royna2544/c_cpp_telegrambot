@@ -99,9 +99,6 @@ bool ForkAndRun::execute() {
         auto sig_fun = [](int signum) {
             LOG(INFO) << "Got signal " << strsignal(signum);
             instance->cancel();
-            if (old_sighandler != SIG_DFL && old_sighandler != SIG_IGN) {
-                old_sighandler(signum);
-            }
         };
         auto old_sig = signal(SIGINT, sig_fun);
         (void)signal(SIGTERM, sig_fun);
