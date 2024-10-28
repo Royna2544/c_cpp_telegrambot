@@ -36,7 +36,7 @@ function(command_module)
         endif()
     endif()
     set(TGBOT_CMDMODULE_LIBNAME ${CMDMODULE_PREFIX}${TGBOT_CMDMODULE_NAME})
-    add_library(${TGBOT_CMDMODULE_LIBNAME} ${TGBOT_CMDMODULE_SRCS})
+    add_library(${TGBOT_CMDMODULE_LIBNAME} SHARED ${TGBOT_CMDMODULE_SRCS})
     target_link_libraries(${TGBOT_CMDMODULE_LIBNAME} ${TGBOT_CMDMODULE_LIBS}
                           TgBotPPImpl_shared_deps absl::log)
     target_include_directories(${TGBOT_CMDMODULE_LIBNAME} PRIVATE
