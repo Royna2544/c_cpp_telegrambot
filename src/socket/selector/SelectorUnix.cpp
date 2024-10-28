@@ -7,7 +7,7 @@
 #include "SelectorPosix.hpp"
 
 UnixSelector::UnixSelector() {
-    auto string = ConfigManager::getVariable(ConfigManager::Configs::SELECTOR);
+    auto string = ConfigManager::getVariable(ConfigManager::Configs::SELECTOR_CFG);
     bool found = false;
 
     if (string) {
