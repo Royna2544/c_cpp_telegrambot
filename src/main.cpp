@@ -183,7 +183,6 @@ fruit::Component<TgBotDatabaseImpl, DatabaseBase> getDatabaseComponent() {
             auto impl = std::make_unique<TgBotDatabaseImpl>();
             if (!loadDB_TO_BE_FIXED_TODO(impl.get())) {
                 LOG(ERROR) << "Failed to load database";
-                throw std::runtime_error("Failed to load database");
             }
             return impl.release();
         });
