@@ -1,7 +1,5 @@
 #pragma once
 
-#include <absl/log/log.h>
-
 #include <string>
 #include <string_view>
 
@@ -9,18 +7,19 @@ namespace StringConcat {
 
 // we cannot return a char array from a function, therefore we need a wrapper
 template <unsigned N>
-struct String {
+class String {
     char c[N] = {};
 
+   public:
     constexpr char operator[](unsigned i) const { return c[i]; }
-    
+
     template <unsigned M>
     constexpr operator String<M>() const {
         String<M> result{};
 
         static_assert(M > N, "Cannot convert string to smaller buffer");
         for (unsigned i = 0; i < N; i++) {
-            result.c[i] = c[i];
+            result.at(i) = c[i];
         }
         return result;
     }
@@ -46,11 +45,19 @@ struct String {
         c[1] = '\0';
     }
 
-    [[nodiscard]] constexpr unsigned getSize() const { return N - 1; }
-
-    constexpr operator std::string_view() const {
+    [[nodiscard]] constexpr unsigned size() const { return N - 1; }
+    [[nodiscard]] constexpr std::string_view get() const {
         return std::string_view(c, N - 1);
     }
+
+    template <size_t i>
+    [[nodiscard]] constexpr char& at()
+        requires(i < N) && (N >= 0)
+    {
+        return c[i];
+    }
+    constexpr char& at(size_t i) { return c[i]; }
+    constexpr operator std::string_view() const { return get(); }
     operator std::string() const { return std::string(c, N - 1); }
 };
 
@@ -59,17 +66,15 @@ constexpr auto createString(const char (&str)[N]) {
     return String<N + 1>(str);
 }
 
-constexpr auto createString(const char (&str)) {
-    return String<2>(str);
-}
+constexpr auto createString(const char(&str)) { return String<2>(str); }
 
 template <unsigned... Len>
 consteval auto cat(const char (&... strings)[Len]) {
     constexpr unsigned N = (... + Len) - sizeof...(Len);
     String<N + 1> result = {};
-    result.c[N] = '\0';
+    result.at(N) = '\0';
 
-    char* dst = result.c;
+    char* dst = const_cast<char*>(result.get().data());
     for (const char* src : {strings...}) {
         for (; *src != '\0'; src++, dst++) {
             *dst = *src;
@@ -82,9 +87,9 @@ template <unsigned Len>
 consteval auto append(const String<Len>& srcBuf, char** dstBuf) {
     int j = 0;
     char* dst = *dstBuf;
-    const char* src = srcBuf.c;
+    const char* src = srcBuf.get().data();
 
-    for (; *src != '\0' && j < srcBuf.getSize(); j++, src++, dst++) {
+    for (; *src != '\0' && j < srcBuf.size(); j++, src++, dst++) {
         *dst = *src;
     }
     *dstBuf = dst;
@@ -94,9 +99,9 @@ template <unsigned... Len>
 consteval auto cat(const String<Len>&... strings) {
     constexpr unsigned N = (... + Len) - sizeof...(Len);
     String<N + 1> result = {};
-    result.c[N] = '\0';
+    result.at(N) = '\0';
 
-    char* dst = result.c;
+    char* dst = const_cast<char*>(result.get().data());
 
     (append(strings, &dst), ...);
     return result;
