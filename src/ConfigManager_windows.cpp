@@ -1,11 +1,9 @@
-#include <ConfigManager.h>
+#include <ConfigManager.hpp>
 #include <windows.h>
 
 #include "CStringLifetime.h"
 
-using namespace ConfigManager;
-
-void ConfigManager::setVariable(Configs config, const std::string &value_) {
+void ConfigManager::set(Configs config, const std::string &value_) {
     CStringLifetime key =
         ConfigManager::kConfigsMap.at(static_cast<int>(config)).second;
     CStringLifetime value = value_;

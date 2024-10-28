@@ -1,5 +1,3 @@
-
-#include <ConfigManager.h>
 #include <absl/log/log.h>
 #include <fmt/format.h>
 #include <unistd.h>
@@ -13,7 +11,6 @@
 #include <restartfmt_parser.hpp>
 
 #include "StringResLoader.hpp"
-#include "Types.h"
 #include "api/MessageExt.hpp"
 
 extern char **environ;  // NOLINT

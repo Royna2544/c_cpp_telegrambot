@@ -1,7 +1,7 @@
-#include <ConfigManager.h>
 #include <absl/log/log.h>
+#include <fmt/format.h>
 
-#include <CommandLine.hpp>
+#include <ConfigManager.hpp>
 #include <StringToolsExt.hpp>
 #include <boost/program_options.hpp>
 #include <cstdlib>
@@ -18,54 +18,37 @@
 #include "CompileTimeStringConcat.hpp"
 
 namespace po = boost::program_options;
-using namespace ConfigManager;
 using namespace StringConcat;
 
-template <typename T, Configs config>
+template <typename T, ConfigManager::Configs config>
 void AddOption(po::options_description &desc) {
     constexpr int index = static_cast<int>(config);
     constexpr auto confstr =
-        cat(kConfigsMap.at(index).second, createString(','),
-            createString(kConfigsAliasMap.at(index).second));
+        cat(ConfigManager::kConfigsMap.at(index).second, createString(','),
+            createString(ConfigManager::kConfigsAliasMap.at(index).second));
 
-    desc.add_options()(confstr.c, po::value<T>(),
-                       kConfigsDescMap.at(index).second.c);
+    desc.add_options()(
+        confstr.get().data(), po::value<T>(),
+        ConfigManager::kConfigsDescMap.at(index).second.get().data());
 }
 
-template <Configs config>
+template <ConfigManager::Configs config>
 void AddOption(po::options_description &desc) {
     constexpr int index = static_cast<int>(config);
-    constexpr auto confstr =
-        StringConcat::cat(kConfigsMap.at(index).second, createString(','),
-                          createString(kConfigsAliasMap.at(index).second));
+    constexpr auto confstr = StringConcat::cat(
+        ConfigManager::kConfigsMap.at(index).second, createString(','),
+        createString(ConfigManager::kConfigsAliasMap.at(index).second));
 
-    desc.add_options()(confstr.c, kConfigsDescMap.at(index).second.c);
+    desc.add_options()(
+        confstr.get().data(),
+        ConfigManager::kConfigsDescMap.at(index).second.get().data());
 }
 
-struct ConfigBackendBase {
-    virtual ~ConfigBackendBase() = default;
-    constexpr static std::string_view kConfigOverrideVar =
-        array_helpers::find(ConfigManager::kConfigsMap, Configs::OVERRIDE_CONF)
-            ->second;
-
-    virtual bool load() { return true; }
-    virtual std::optional<std::string> getVariable(const std::string &name) = 0;
-    virtual bool doOverride(const std::string & /*config*/) { return false; }
-
-    /**
-     * @brief This field stores the name of the backend.
-     *
-     * This field stores the name of the backend, such as "Command line" or
-     * "File". This field is used for logging purposes.
-     */
-    [[nodiscard]] virtual std::string_view getName() const = 0;
-};
-
-struct ConfigBackendEnv : public ConfigBackendBase {
+struct ConfigBackendEnv : public ConfigManager::Backend {
     ~ConfigBackendEnv() override = default;
     ConfigBackendEnv() = default;
 
-    std::optional<std::string> getVariable(const std::string &name) override {
+    std::optional<std::string> get(const std::string &name) override {
         std::string outvalue;
         if (ConfigManager::getEnv(name, outvalue)) {
             return outvalue;
@@ -76,27 +59,27 @@ struct ConfigBackendEnv : public ConfigBackendBase {
     bool doOverride(const std::string &config) override {
         std::string value;
         std::string kConfigOverrideVariable(kConfigOverrideVar);
-        return getVariable(kConfigOverrideVariable) && value == config;
+        return get(kConfigOverrideVariable) && value == config;
     }
-    [[nodiscard]] std::string_view getName() const override { return "Env"; }
+    [[nodiscard]] std::string_view name() const override { return "Env"; }
 };
 
-struct ConfigBackendBoostPOBase : public ConfigBackendBase {
+struct ConfigBackendBoostPOBase : public ConfigManager::Backend {
     static po::options_description getTgBotOptionsDesc() {
         static po::options_description desc("TgBot++ Configs");
         static std::once_flag once;
         std::call_once(once, [] {
-            AddOption<std::string, Configs::TOKEN>(desc);
-            AddOption<std::string, Configs::LOG_FILE>(desc);
-            AddOption<std::string, Configs::DATABASE_CFG>(desc);
-            AddOption<std::string, Configs::OVERRIDE_CONF>(desc);
-            AddOption<std::string, Configs::SOCKET_CFG>(desc);
-            AddOption<std::string, Configs::SELECTOR_CFG>(desc);
+            AddOption<std::string, ConfigManager::Configs::TOKEN>(desc);
+            AddOption<std::string, ConfigManager::Configs::LOG_FILE>(desc);
+            AddOption<std::string, ConfigManager::Configs::DATABASE_CFG>(desc);
+            AddOption<std::string, ConfigManager::Configs::OVERRIDE_CONF>(desc);
+            AddOption<std::string, ConfigManager::Configs::SOCKET_CFG>(desc);
+            AddOption<std::string, ConfigManager::Configs::SELECTOR_CFG>(desc);
         });
         return desc;
     }
 
-    std::optional<std::string> getVariable(const std::string &name) override {
+    std::optional<std::string> get(const std::string &name) override {
         if (name != kConfigOverrideVar) {
             if (const auto it = mp[name]; !it.empty()) {
                 return it.as<std::string>();
@@ -148,36 +131,28 @@ struct ConfigBackendFile : public ConfigBackendBoostPOBase {
         LOG(INFO) << "Loaded " << mp.size() << " entries from " << confPath;
         return true;
     }
-    [[nodiscard]] std::string_view getName() const override { return "File"; }
+    [[nodiscard]] std::string_view name() const override { return "File"; }
 
     ConfigBackendFile() = default;
     ~ConfigBackendFile() override = default;
 };
 
 struct ConfigBackendCmdline : public ConfigBackendBoostPOBase {
+    char *const *_argv;
+    int _argc;
+
     static po::options_description getTgBotOptionsDesc() {
         auto desc = ConfigBackendBoostPOBase::getTgBotOptionsDesc();
 
-        AddOption<Configs::HELP>(desc);
+        AddOption<ConfigManager::Configs::HELP>(desc);
         return desc;
     }
 
     bool load() override {
-        const auto cmdInst = CommandLine::getInstance()->getArguments();
-        const auto argc = static_cast<int>(cmdInst.size());
-        auto argv = std::make_unique<const char *[]>(argc);
-        std::transform(cmdInst.begin(), cmdInst.end(), argv.get(),
-                       [](const std::string &arg) { return arg.c_str(); });
-
-        if (argv == nullptr) {
-            LOG(WARNING)
-                << "Command line copy failed, probably it wasn't saved before";
-            return false;
-        }
-
         try {
-            po::store(po::parse_command_line(argc, argv.get(), getTgBotOptionsDesc()),
-                      mp);
+            po::store(
+                po::parse_command_line(_argc, _argv, getTgBotOptionsDesc()),
+                mp);
         } catch (const boost::program_options::error &e) {
             LOG(ERROR) << "Cmdline backend failed to parse: " << e.what();
             return false;
@@ -187,15 +162,12 @@ struct ConfigBackendCmdline : public ConfigBackendBoostPOBase {
         LOG(INFO) << "Loaded " << mp.size() << " entries (cmdline)";
         return true;
     }
-    [[nodiscard]] std::string_view getName() const override {
-        return "Cmdline";
-    }
+    [[nodiscard]] std::string_view name() const override { return "Cmdline"; }
 
-    ConfigBackendCmdline() = default;
+    ConfigBackendCmdline(int argc, char *const *argv)
+        : _argv(argv), _argc(argc) {}
     ~ConfigBackendCmdline() override = default;
 };
-
-namespace ConfigManager {
 
 enum class Passes {
     INIT,
@@ -204,36 +176,29 @@ enum class Passes {
     DONE,
 };
 
-namespace details {
-
-std::vector<std::unique_ptr<ConfigBackendBase>> &getAvailableBackends() {
-    static std::vector<std::unique_ptr<ConfigBackendBase>> backends;
-    static std::once_flag status;
-    std::call_once(status, [] {
-        auto cmdline = std::make_unique<ConfigBackendCmdline>();
-        if (cmdline->load()) {
-            backends.emplace_back(std::move(cmdline));
-        }
-        auto env = std::make_unique<ConfigBackendEnv>();
-        if (env->load()) {
-            backends.emplace_back(std::move(env));
-        }
-        auto file = std::make_unique<ConfigBackendFile>();
-        if (file->load()) {
-            backends.emplace_back(std::move(file));
-        }
-        DLOG(INFO) << "Loaded " << backends.size() << " config sources";
-    });
-    return backends;
+ConfigManager::ConfigManager(int argc, char *const *argv)
+    : _argc(argc),
+      _argv(argv),
+      startingDirectory(std::filesystem::current_path()) {
+    auto cmdline = std::make_unique<ConfigBackendCmdline>(_argc, _argv);
+    if (cmdline->load()) {
+        backends.emplace_back(std::move(cmdline));
+    }
+    auto env = std::make_unique<ConfigBackendEnv>();
+    if (env->load()) {
+        backends.emplace_back(std::move(env));
+    }
+    auto file = std::make_unique<ConfigBackendFile>();
+    if (file->load()) {
+        backends.emplace_back(std::move(file));
+    }
+    DLOG(INFO) << "Loaded " << backends.size() << " config sources";
 }
 
-}  // namespace details
-
-std::optional<std::string> getVariable(Configs config) {
+std::optional<std::string> ConfigManager::get(Configs config) {
     Passes p = Passes::INIT;
     std::string outvalue;
     std::string name = array_helpers::find(kConfigsMap, config)->second;
-    auto const &backends = details::getAvailableBackends();
     name.resize(strlen(name.c_str()));
 
     p = Passes::FIND_OVERRIDE;
@@ -242,21 +207,21 @@ std::optional<std::string> getVariable(Configs config) {
             case Passes::FIND_OVERRIDE:
                 for (const auto &bit : backends) {
                     if (bit->doOverride(name)) {
-                        DLOG(INFO) << "Used " << SingleQuoted(bit->getName())
-                                   << " backend for fetching var "
-                                   << SingleQuoted(name) << " (forced)";
-                        return bit->getVariable(name);
+                        DLOG(INFO) << fmt::format(
+                            "Used '{}' backend for variable {} (forced)",
+                            bit->name(), name);
+                        return bit->get(name);
                     }
                 }
                 p = Passes::ACTUAL_GET;
                 break;
             case Passes::ACTUAL_GET:
                 for (const auto &bit : backends) {
-                    const auto &result = bit->getVariable(name);
+                    const auto &result = bit->get(name);
                     if (result.has_value()) {
-                        DLOG(INFO) << "Used " << SingleQuoted(bit->getName())
-                                   << " backend for fetching var "
-                                   << SingleQuoted(name);
+                        DLOG(INFO)
+                            << fmt::format("Used '{}' backend for variable {}",
+                                           bit->name(), name);
                         return result;
                     }
                 }
@@ -272,8 +237,14 @@ std::optional<std::string> getVariable(Configs config) {
     return std::nullopt;
 }
 
-void serializeHelpToOStream(std::ostream &out) {
+void ConfigManager::serializeHelpToOStream(std::ostream &out) {
     out << ConfigBackendCmdline::getTgBotOptionsDesc() << std::endl;
 }
 
-}  // namespace ConfigManager
+char *const *ConfigManager::argv() const { return _argv; }
+
+int ConfigManager::argc() const { return _argc; }
+
+std::filesystem::path ConfigManager::exe() const {
+    return startingDirectory / _argv[0];
+}
