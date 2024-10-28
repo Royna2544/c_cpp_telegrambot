@@ -11,11 +11,12 @@
 #include <unistd.h>
 
 #include <AbslLogInit.hpp>
+#include <LogSinks.hpp>
 #include <Random.hpp>
 #include <csignal>
 #include <cstdlib>
+#include <cstring>
 #include <filesystem>
-#include <libos/OnTerminateRegistrar.hpp>
 #include <libos/libsighandler.hpp>
 #include <memory>
 #include <mutex>
@@ -23,9 +24,9 @@
 #include <string_view>
 #include <thread>
 #include <trivial_helpers/raii.hpp>
+#include <type_traits>
 #include <utility>
 #include <vector>
-#include <LogSinks.hpp>
 
 struct FDLogSink : public absl::LogSink {
     void Send(const absl::LogEntry& logSink) override {
@@ -87,13 +88,23 @@ bool ForkAndRun::execute() {
         }
         _exit(std::numeric_limits<uint8_t>::max());  // Just in case.
     } else if (pid > 0) {
+        static ForkAndRun* instance = nullptr;
+        static void (*old_sighandler)(int) = nullptr;
+
         Pipe program_termination_pipe{};
         bool breakIt = false;
         int status = 0;
-        static int token = 0;
-        auto tregi = OnTerminateRegistrar::getInstance();
 
-        tregi->registerCallback([this]() { cancel(); }, token);
+        instance = this;
+        auto sig_fun = [](int signum) {
+            LOG(INFO) << "Got signal " << strsignal(signum);
+            instance->cancel();
+            if (old_sighandler != SIG_DFL && old_sighandler != SIG_IGN) {
+                old_sighandler(signum);
+            }
+        };
+        auto old_sig = signal(SIGINT, sig_fun);
+        (void)signal(SIGTERM, sig_fun);
 
         childProcessId = pid;
         close(stdout_pipe.writeEnd());
@@ -162,8 +173,10 @@ bool ForkAndRun::execute() {
         program_termination_pipe.close();
         stderr_pipe.close();
         stdout_pipe.close();
-        tregi->unregisterCallback(token);
-        ++token;
+
+        // Restore signal handlers
+        (void)signal(SIGINT, old_sig);
+        (void)signal(SIGTERM, old_sig);
     } else {
         PLOG(ERROR) << "Unable to fork";
     }
