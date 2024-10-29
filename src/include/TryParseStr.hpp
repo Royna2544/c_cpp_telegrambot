@@ -11,10 +11,10 @@
  * @param outval the output value to fill with the parsed value
  * @return true if the parsing was successful, false otherwise
  */
-template <typename String, typename StringStream, typename T>
+template <typename String, typename StringView, typename StringStream, typename T>
     requires std::is_trivially_copyable_v<T>
-bool _try_parse(const String& str, T* outval) {
-    StringStream ss(str);
+bool _try_parse(const StringView& str, T* outval) {
+    StringStream ss(str.data());
     String unused;
     T temp{};
 
@@ -31,7 +31,7 @@ bool _try_parse(const String& str, T* outval) {
     return false;
 }
 
-template <typename String, typename StringStream>
+template <typename String, typename StringView, typename StringStream>
 bool _try_parse(const String& str, String* outval) {
     *outval = str;
     return true;
@@ -39,10 +39,10 @@ bool _try_parse(const String& str, String* outval) {
 
 template <typename T>
 bool try_parse(const std::string_view str, T* outval) {
-    return _try_parse<std::string_view, std::stringstream>(str, outval);
+    return _try_parse<std::string, std::string_view, std::stringstream>(str, outval);
 }
 
 template <typename T>
 bool try_parse(const std::wstring_view str, T* outval) {
-    return _try_parse<std::wstring_view, std::wstringstream>(str, outval);
+    return _try_parse<std::wstring, std::wstring_view, std::wstringstream>(str, outval);
 }
