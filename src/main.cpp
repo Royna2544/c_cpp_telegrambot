@@ -1,4 +1,3 @@
-#include <ConfigManager.h>
 #include <ResourceManager.h>
 #include <absl/log/log.h>
 #include <absl/log/log_sink_registry.h>
@@ -9,7 +8,7 @@
 
 #include <AbslLogInit.hpp>
 #include <Authorization.hpp>
-#include <CommandLine.hpp>
+#include <ConfigManager.hpp>
 #include <DurationPoint.hpp>
 #include <LogSinks.hpp>
 #include <ManagedThreads.hpp>
@@ -29,7 +28,7 @@
 #include <impl/backends/ServerBackend.hpp>
 #include <impl/bot/TgBotSocketFileHelperNew.hpp>
 #include <impl/bot/TgBotSocketInterface.hpp>
-#include <libos/libfs.hpp>
+#include <libfs.hpp>
 #include <libos/libsighandler.hpp>
 #include <logging/LoggingServer.hpp>
 #include <memory>
@@ -41,6 +40,7 @@
 #include <vector>
 
 #include "DatabaseBase.hpp"
+#include "SocketBase.hpp"
 #include "api/TgBotApi.hpp"
 #include "fruit/fruit.h"
 #include "fruit/fruit_forward_decls.h"
@@ -154,34 +154,84 @@ struct TgBotApiExHandler {
     }
 };
 
-extern bool loadDB_TO_BE_FIXED_TODO(TgBotDatabaseImpl* dbimpl);
-namespace {
-
 template <typename T>
 struct Unused {};
 
 template <typename T>
-struct WrapPtr {
+class WrapPtr {
     T* ptr;
+
+   public:
+    WrapPtr(T* ptr) : ptr(ptr) {}
+
+    T* pointer() const { return ptr; }
+    T* operator->() { return pointer(); }
+    operator bool() const { return pointer() != nullptr; }
 };
+
+template <typename T>
+class WrapSharedPtr {
+    std::shared_ptr<T> ptr;
+
+   public:
+    WrapSharedPtr(std::shared_ptr<T>&& ptr) : ptr(std::move(ptr)) {}
+    T* pointer() const { return ptr.get(); }
+    T* operator->() const { return pointer(); }
+    operator bool() const { return pointer() != nullptr; }
+};
+
+namespace std {
+template <>
+struct hash<WrapPtr<ConfigManager>> {
+    size_t operator()(const WrapPtr<ConfigManager>& ptr) const {
+        // Customize the hashing logic based on your class’s structure
+        return std::hash<ConfigManager*>()(
+            ptr.pointer());  // Example using pointer hash
+    }
+};
+}  // namespace std
+
+namespace {
+fruit::Component<fruit::Required<WrapPtr<ConfigManager>>, ConfigManager>
+getConfigManagerComponent() {
+    return fruit::createComponent().registerProvider(
+        [](WrapPtr<ConfigManager> config) { return config.pointer(); });
+}
+
+fruit::Component<fruit::Required<ConfigManager>,
+                 WrapSharedPtr<SocketServerWrapper>>
+getSocketServerComponent() {
+    return fruit::createComponent().registerProvider(
+        [](ConfigManager* configManager) -> WrapSharedPtr<SocketServerWrapper> {
+            auto value = configManager->get(ConfigManager::Configs::SOCKET_CFG);
+            if (!value) {
+                LOG(ERROR)
+                    << "No socket backend specified, not creating sockets";
+                return {nullptr};
+            }
+            return {std::make_shared<SocketServerWrapper>(value.value())};
+        });
+}
 
 fruit::Component<StringResLoader, StringResLoaderBase>
 getStringResLoaderComponent() {
     return fruit::createComponent()
         .bind<StringResLoaderBase, StringResLoader>()
         .registerProvider([] {
-            StringResLoader loader(FS::getPathForType(FS::PathType::RESOURCES) /
+            StringResLoader loader(FS::getPath(FS::PathType::RESOURCES) /
                                    "strings");
             return loader;
         });
 }
 
-fruit::Component<TgBotDatabaseImpl, DatabaseBase> getDatabaseComponent() {
+fruit::Component<fruit::Required<ConfigManager>, TgBotDatabaseImpl,
+                 DatabaseBase>
+getDatabaseComponent() {
     return fruit::createComponent()
         .bind<DatabaseBase, TgBotDatabaseImpl>()
-        .registerProvider([] {
+        .registerProvider([](ConfigManager* manager) {
             auto impl = std::make_unique<TgBotDatabaseImpl>();
-            if (!loadDB_TO_BE_FIXED_TODO(impl.get())) {
+            if (!TgBotDatabaseImpl::load(manager, impl.get())) {
                 LOG(ERROR) << "Failed to load database";
             }
             return impl.release();
@@ -192,14 +242,16 @@ fruit::Component<ResourceProvider> getResourceProvider() {
     return fruit::createComponent().bind<ResourceProvider, ResourceManager>();
 }
 
-fruit::Component<fruit::Required<AuthContext, StringResLoaderBase, Providers>,
-                 TgBotApiImpl, TgBotApi>
+fruit::Component<
+    fruit::Required<AuthContext, StringResLoaderBase, Providers, ConfigManager>,
+    TgBotApiImpl, TgBotApi>
 getTgBotApiImplComponent() {
     return fruit::createComponent()
         .bind<TgBotApi, TgBotApiImpl>()
         .registerProvider([](AuthContext* auth, StringResLoaderBase* strings,
-                             Providers* provider) -> TgBotApiImpl* {
-            auto token = getVariable(ConfigManager::Configs::TOKEN);
+                             Providers* provider,
+                             ConfigManager* config) -> TgBotApiImpl* {
+            auto token = config->get(ConfigManager::Configs::TOKEN);
             if (!token) {
                 LOG(ERROR) << "Failed to get TOKEN variable";
                 throw std::invalid_argument("No TOKEN");
@@ -209,9 +261,9 @@ getTgBotApiImplComponent() {
             auto bot = new TgBotApiImpl(token.value(), auth, strings, provider);
 
             // Load modules
-            std::filesystem::path modules_path =
-                FS::getPathForType(FS::PathType::MODULES_INSTALLED);
+            std::filesystem::path modules_path = config->exe().parent_path();
             std::error_code ec;
+            
             LOG(INFO) << "Loading commands from " << modules_path;
             for (const auto& it :
                  std::filesystem::directory_iterator(modules_path, ec)) {
@@ -260,12 +312,16 @@ getSpamBlockComponent() {
         });
 }
 
-fruit::Component<fruit::Required<ThreadManager>, Unused<NetworkLogSink>>
+fruit::Component<
+    fruit::Required<ThreadManager, WrapSharedPtr<SocketServerWrapper>>,
+    Unused<NetworkLogSink>>
 getNetworkLogSinkComponent() {
     return fruit::createComponent().registerProvider(
-        [](ThreadManager* thread) -> Unused<NetworkLogSink> {
+        [](ThreadManager* thread,
+           const WrapSharedPtr<SocketServerWrapper>& config)
+            -> Unused<NetworkLogSink> {
             thread->create<ThreadManager::Usage::LOGSERVER_THREAD,
-                           NetworkLogSink>();
+                           NetworkLogSink>(config.pointer());
             return {};
         });
 }
@@ -290,8 +346,8 @@ getSocketInterfaceComponent() {
                ThreadManager* manager,
                ResourceProvider* resource) -> Unused<SocketInterfaceTgBot> {
                 auto thread = manager->create<SocketInterfaceTgBot>(
-                    usage, interface, api, observer, spamblock.ptr, helper,
-                    resource);
+                    usage, interface, api, observer, spamblock.pointer(),
+                    helper, resource);
                 thread->run();
                 return {};
             });
@@ -321,10 +377,12 @@ getRegexHandlerComponent() {
 }
 
 fruit::Component<TgBotApi, AuthContext, DatabaseBase, ThreadManager,
-                 RegexHandler, Unused<NetworkLogSink>, WrapPtr<SpamBlockBase>,
-                 Unused<TgBotWebServer>, TgBotApiExHandler,
-                 SocketComponentFactory_t>
-getAllComponent() {
+                 Unused<RegexHandler>, Unused<NetworkLogSink>,
+                 WrapPtr<SpamBlockBase>, Unused<TgBotWebServer>,
+                 TgBotApiExHandler, SocketComponentFactory_t,
+                 WrapSharedPtr<SocketServerWrapper>>
+getAllComponent(WrapPtr<ConfigManager> config) {
+    static const auto _config = config;
     return fruit::createComponent()
         .bind<TgBotWebServerBase, TgBotWebServer>()
         .bind<VFSOperations, RealFS>()
@@ -336,7 +394,10 @@ getAllComponent() {
         .install(getWebServerComponent)
         .install(getStringResLoaderComponent)
         .install(getSocketInterfaceComponent)
-        .install(getResourceProvider);
+        .install(getResourceProvider)
+        .install(getConfigManagerComponent)
+        .install(getSocketServerComponent)
+        .bindInstance(_config);
 }
 
 std::vector<TgBot::InlineQueryResult::Ptr> mediaQueryKeyboardFunction(
@@ -388,31 +449,31 @@ using std::string_view_literals::operator""sv;
 
 int main(int argc, char** argv) {
     DurationPoint startupDp;
-    using namespace ConfigManager;
 
-    // Insert command line arguments
-    CommandLine::initInstance(argc, argv);
+    // Initialize Abseil logging system
+    TgBot_AbslLogInit();
+
+    // Create configmanager
+    auto configMgr = std::make_unique<ConfigManager>(argc, argv);
 
     // Initialize logging
-    using namespace ConfigManager;
     RAIILogSink<LogFileSink> logFileSink;
 
-    TgBot_AbslLogInit();
     LOG(INFO) << "Registered LogSink_stdout";
-    if (const auto it = getVariable(Configs::LOG_FILE); it) {
+    if (const auto it = configMgr->get(ConfigManager::Configs::LOG_FILE); it) {
         auto sink = std::make_unique<LogFileSink>(*it);
         LOG(INFO) << "Register LogSink_file: " << it.value();
         logFileSink = std::move(sink);
     }
 
     // Print help and return if help option is set
-    if (ConfigManager::getVariable(ConfigManager::Configs::HELP)) {
+    if (configMgr->get(ConfigManager::Configs::HELP)) {
         ConfigManager::serializeHelpToOStream(std::cout);
         return EXIT_SUCCESS;
     }
 
     // Pre-obtain token, so we won't have to catch exceptions below
-    if (!ConfigManager::getVariable(ConfigManager::Configs::TOKEN)) {
+    if (!configMgr->get(ConfigManager::Configs::TOKEN)) {
         LOG(ERROR) << "TOKEN is not set, but is required";
         return EXIT_FAILURE;
     }
@@ -420,28 +481,45 @@ int main(int argc, char** argv) {
     // Install signal handlers
     SignalHandler::install();
 
+    // Transfer ConfigManager ownership
+    WrapPtr configPtr{configMgr.release()};
+
     // Initialize dependencies
     fruit::Injector<TgBotApi, AuthContext, DatabaseBase, ThreadManager,
-                    RegexHandler, Unused<NetworkLogSink>,
+                    Unused<RegexHandler>, Unused<NetworkLogSink>,
                     WrapPtr<SpamBlockBase>, Unused<TgBotWebServer>,
-                    TgBotApiExHandler, SocketComponentFactory_t>
-        injector(getAllComponent);
+                    TgBotApiExHandler, SocketComponentFactory_t,
+                    WrapSharedPtr<SocketServerWrapper>>
+        injector(getAllComponent, configPtr);
 
     auto threadManager = injector.get<ThreadManager*>();
     auto api = injector.get<TgBotApi*>();
     auto database = injector.get<DatabaseBase*>();
     auto exHandle = injector.get<TgBotApiExHandler*>();
 
+    // Not directly used components
+    injector.get<Unused<NetworkLogSink>*>();
+    injector.get<Unused<RegexHandler>*>();
+    injector.get<WrapPtr<SpamBlockBase>*>();
+    injector.get<Unused<TgBotWebServer>*>();
+
     auto socketFactor = injector.get<SocketComponentFactory_t>();
+    auto _socketServer = injector.get<WrapSharedPtr<SocketServerWrapper>>();
+    std::shared_ptr<SocketInterfaceBase> socketInternal;
+    std::shared_ptr<SocketInterfaceBase> socketExternal;
+
     // Initialize actual pointers to injected instances
-    SocketServerWrapper wrapper;
-    if (wrapper.getInternalInterface()) {
-        auto rawP = wrapper.getInternalInterface();
-        socketFactor(ThreadManager::Usage::SOCKET_THREAD, rawP.get());
-    }
-    if (wrapper.getExternalInterface()) {
-        auto rawP = wrapper.getExternalInterface();
-        socketFactor(ThreadManager::Usage::SOCKET_EXTERNAL_THREAD, rawP.get());
+    if (_socketServer.pointer() != nullptr) {
+        if (socketInternal = _socketServer->getInternalInterface();
+            socketInternal) {
+            socketFactor(ThreadManager::Usage::SOCKET_THREAD,
+                         socketInternal.get());
+        }
+        if (socketExternal = _socketServer->getExternalInterface();
+            socketExternal) {
+            socketFactor(ThreadManager::Usage::SOCKET_EXTERNAL_THREAD,
+                         socketExternal.get());
+        }
     }
 
 #ifndef WINDOWS_BUILD
@@ -454,7 +532,8 @@ int main(int argc, char** argv) {
 
     api->setDescriptions(
         "Royna's telegram bot, written in C++. Go on you can talk to it"sv,
-        "One of @roynatech's TgBot C++ project bots. I'm currently hosted on "
+        "One of @roynatech's TgBot C++ project bots. I'm currently hosted "
+        "on "
 #ifdef WINDOWS_BUILD
         "Windows"sv
 #elif defined(__linux__)

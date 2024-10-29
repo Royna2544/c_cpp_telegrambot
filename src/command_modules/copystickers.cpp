@@ -8,7 +8,7 @@
 #include <filesystem>
 #include <functional>
 #include <imagep/ImageProcAll.hpp>
-#include <libos/libfs.hpp>
+#include <libfs.hpp>
 #include <regex>
 
 #include "StringResLoader.hpp"

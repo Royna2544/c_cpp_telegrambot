@@ -1,4 +1,4 @@
-#include <ConfigManager.h>
+#include <ConfigManager.hpp>
 
 #include <iomanip>
 #include <type_traits>
@@ -7,7 +7,7 @@
 #include "SelectorPosix.hpp"
 
 UnixSelector::UnixSelector() {
-    auto string = ConfigManager::getVariable(ConfigManager::Configs::SELECTOR_CFG);
+    std::optional<std::string> string = "poll"; // TODO: fix this
     bool found = false;
 
     if (string) {

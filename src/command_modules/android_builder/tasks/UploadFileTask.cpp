@@ -4,7 +4,7 @@
 
 #include <filesystem>
 #include <fstream>
-#include <libos/libfs.hpp>
+#include <libfs.hpp>
 #include <regex>
 #include <system_error>
 #include <vector>
@@ -58,7 +58,7 @@ DeferredExit UploadFileTask::runFunction() {
     }
     std::error_code ec;
     const auto scripts =
-        FS::getPathForType(FS::PathType::RESOURCES) / "scripts";
+        FS::getPath(FS::PathType::RESOURCES) / "scripts";
     std::filesystem::path scriptFile;
     if (std::filesystem::exists(scripts / "upload.bash", ec)) {
         LOG(INFO) << "Using upload.bash file";

@@ -155,7 +155,7 @@ int main(int argc, char** argv) {
     auto config = std::make_unique<ConfigManager>(argc, argv);
     std::vector<std::string_view> args;
     args.reserve(argc);
-    for (int i = 1; i < argc; ++i) {
+    for (int i = 0; i < argc; ++i) {
         args.emplace_back(argv[i]);
     }
     CommandData data = {args, nullptr};

@@ -9,6 +9,7 @@
 
 #include "CompileTimeStringConcat.hpp"
 #include "EnumArrayHelpers.h"
+#include "trivial_helpers/fruit_inject.hpp"
 
 // Abstract manager for config loader
 // Currently have three sources, env and file, cmdline
@@ -77,6 +78,7 @@ class ConfigManager {
 
     // Constructor
     ConfigManager(int argc, char* const* argv);
+    APPLE_INJECT(ConfigManager());
 
     [[nodiscard]] char* const* argv() const;
     [[nodiscard]] int argc() const;

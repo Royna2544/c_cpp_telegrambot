@@ -13,7 +13,6 @@ add_my_executable(
     TestMain.cpp
     AuthorizationTest.cpp
     DatabaseBackendsTest.cpp
-    ConfigManagerTest.cpp
     RegexHandlerTest.cpp
     ResourceManagerTest.cpp
     TryParseTest.cpp

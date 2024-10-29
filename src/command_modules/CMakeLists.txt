@@ -170,7 +170,7 @@ command_module(
 command_module(
     NAME restart
     SRCS restart.cpp
-    LIBS TgBotCommandLine TgBot_restartfmt_parser
+    LIBS TgBotUtils TgBot_restartfmt_parser
     PLATFORM "Unix"
 )
 
@@ -217,5 +217,5 @@ multi_command_module(
 command_module(
     NAME copystickers
     SRCS copystickers.cpp
-    LIBS TgBotImgProc TgBot
+    LIBS TgBotImgProc TgBotUtils
 )

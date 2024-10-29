@@ -1,14 +1,14 @@
 #include "CommandModulesTest.hpp"
+
 #include <fmt/format.h>
 
 #include <database/bot/TgBotDatabaseImpl.hpp>
-#include <libos/libfs.hpp>
+#include <libfs.hpp>
 #include <memory>
 
 #include "api/CommandModule.hpp"
 
 void CommandModulesTest::SetUp() {
-    modulePath = FS::getPathForType(FS::PathType::MODULES_INSTALLED);
     TgBotDatabaseImpl::Providers provider;
 
     database = new MockDatabase();
@@ -28,9 +28,9 @@ void CommandModulesTest::TearDown() {
 
 CommandModule::Ptr CommandModulesTest::loadModule(
     const std::string& name) const {
-    std::filesystem::path moduleFileName = fmt::format("{}{}", CommandModule::prefix, name);
-    const auto moduleFilePath =
-        modulePath / FS::appendDylibExtension(moduleFileName);
+    std::filesystem::path moduleFileName =
+        fmt::format("{}{}", CommandModule::prefix, name);
+    const auto moduleFilePath = modulePath / moduleFileName / FS::SharedLib;
 
     LOG(INFO) << "Loading module " << std::quoted(name) << " for testing...";
     auto module = std::make_unique<CommandModule>(moduleFilePath);

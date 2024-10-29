@@ -106,7 +106,7 @@ function(add_my_executable)
     install(TARGETS ${TGBOT_EXE_NAME} DESTINATION bin)
   endif()
   add_sanitizers(${TGBOT_EXE_NAME})
-  target_link_libraries(${TGBOT_EXE_NAME} TgBotLogInit TgBotCommandLine absl::log ${TGBOT_EXE_LIBS})
+  target_link_libraries(${TGBOT_EXE_NAME} TgBotLogInit absl::log ${TGBOT_EXE_LIBS})
   if (WIN32)
     target_link_libraries(${TGBOT_EXE_NAME} ${TGBOT_EXE_LIBS_WIN32})
   endif()
@@ -167,14 +167,6 @@ else()
 endif()
 #####################################################################
 
-############################ Source list ############################
-set(SRC_LIST
-  src/global_handlers/RegEXHandler.cpp
-  src/global_handlers/SpamBlocker.cpp
-  src/web/TgBotWebServer.cpp
-)
-#####################################################################
-
 ######################## Define SQLite3 target ######################
 add_subdirectory(src/database)
 add_subdirectory(src/random)
@@ -182,7 +174,10 @@ add_subdirectory(src/command_modules)
 add_subdirectory(src/imagep)
 add_subdirectory(src/stringres)
 add_subdirectory(src/logging)
+add_subdirectory(src/socket)
+add_subdirectory(src/utils)
 add_subdirectory(src/web)
+add_subdirectory(src/libos)
 set(HTTPLIB_COMPILE ON)
 add_subdirectory(src/third-party/cpp-httplib)
 add_subdirectory(src/third-party/tgbot-cpp)
@@ -190,10 +185,6 @@ add_subdirectory(src/third-party/fruit)
 add_subdirectory(tests)
 #################################################################
 
-add_my_library(
-  NAME CommandLine
-  SRCS src/CommandLine.cpp
-)
 add_my_library(
   NAME PPImpl_shared_deps
   SRCS 
@@ -204,22 +195,6 @@ add_my_library(
     $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>
 )
 
-####################### TgBot Socket Library #######################
-  set(SOCKET_SRC_INTERFACE src/socket/interface)
-  set(SOCKET_SRC_LIST
-    src/global_handlers/ChatObserver.cpp
-    src/logging/LoggingServer.cpp
-    ${SOCKET_SRC_INTERFACE}/impl/bot/SocketDataHandler.cpp
-    ${SOCKET_SRC_INTERFACE}/impl/bot/TgBotSocketInterface.cpp
-    ${SOCKET_SRC_INTERFACE}/impl/backends/ServerBackend.cpp
-    ${SOCKET_SRC_INTERFACE}/impl/backends/ServerBackend_${TARGET_VARIANT}.cpp)
-  add_subdirectory(src/socket)
-#####################################################################
-
-################# TgBot Utilities (generic) Library #################
-include(CMake/tgbotutils.cmake)
-#####################################################################
-
 ################### The Bot's main functionaility ###################
 add_my_library(
   NAME PPImpl
@@ -229,8 +204,8 @@ add_my_library(
     src/api/CommandModule.cpp
     src/global_handlers/RegEXHandler.cpp
     src/global_handlers/SpamBlocker.cpp
-    src/web/TgBotWebServer.cpp
     src/global_handlers/ChatObserver.cpp
+    src/web/TgBotWebServer.cpp
     src/logging/LoggingServer.cpp
     src/socket/interface/impl/bot/SocketDataHandler.cpp
     src/socket/interface/impl/bot/TgBotSocketInterface.cpp
@@ -247,7 +222,7 @@ add_my_library(
 add_my_executable(
   NAME main
   SRCS src/main.cpp
-  LIBS TgBotPPImpl TgBotDBLoading
+  LIBS TgBotPPImpl TgBotDBLoading TgBotsighandler
   LIBS_UNIX TgBot_restartfmt_parser
 )
 

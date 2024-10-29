@@ -1,7 +1,6 @@
 #include <absl/log/log.h>
 
 #include <AbslLogInit.hpp>
-#include <CommandLine.hpp>
 #include <ManagedThreads.hpp>
 #include <TgBotSocket_Export.hpp>
 #include <TryParseStr.hpp>
@@ -161,7 +160,6 @@ int main(int argc, char** argv) {
     const char* exe = argv[0];
 
     TgBot_AbslLogInit();
-    CommandLine::initInstance(argc, argv);
     if (argc == 1) {
         usage(exe, true);
     }

@@ -8,7 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <libos/libfs.hpp>
+#include <libfs.hpp>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -110,7 +110,7 @@ struct ConfigBackendFile : public ConfigBackendBoostPOBase {
         std::filesystem::path home;
         std::string line;
 
-        home = FS::getPathForType(FS::PathType::HOME);
+        home = FS::getPath(FS::PathType::HOME);
         if (home.empty()) {
             return false;
         }
@@ -193,6 +193,21 @@ ConfigManager::ConfigManager(int argc, char *const *argv)
         backends.emplace_back(std::move(file));
     }
     DLOG(INFO) << "Loaded " << backends.size() << " config sources";
+}
+
+ConfigManager::ConfigManager()
+    : startingDirectory(std::filesystem::current_path()) {
+    auto env = std::make_unique<ConfigBackendEnv>();
+    if (env->load()) {
+        backends.emplace_back(std::move(env));
+    }
+    auto file = std::make_unique<ConfigBackendFile>();
+    if (file->load()) {
+        backends.emplace_back(std::move(file));
+    }
+    DLOG(INFO) << "Loaded " << backends.size() << " config sources";
+    _argc = -1;
+    _argv = nullptr;
 }
 
 std::optional<std::string> ConfigManager::get(Configs config) {

@@ -1,12 +1,12 @@
-#include <ConfigManager.h>
-
+#include <ConfigManager.hpp>
 #include <TryParseStr.hpp>
+#include <impl/SocketWindows.hpp>
 #include <string>
 
 #include "ClientBackend.hpp"
-#include "impl/SocketWindows.hpp"
 
-SocketClientWrapper::SocketClientWrapper(std::optional<std::filesystem::path> localSocketPath) {
+SocketClientWrapper::SocketClientWrapper(
+    std::optional<std::filesystem::path> localSocketPath) {
     std::string addressString;
     int port = 0;
     bool needPortCfg = false;

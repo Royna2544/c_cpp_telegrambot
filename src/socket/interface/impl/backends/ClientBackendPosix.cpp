@@ -1,13 +1,13 @@
+#include <ConfigManager.hpp>
+#include <TryParseStr.hpp>
+#include <impl/SocketPosix.hpp>
 #include <memory>
 #include <string>
 
 #include "ClientBackend.hpp"
-#include "ConfigManager.h"
-#include "SocketBase.hpp"
-#include "TryParseStr.hpp"
-#include "impl/SocketPosix.hpp"
 
-SocketClientWrapper::SocketClientWrapper(std::optional<std::filesystem::path> localSocketPath) {
+SocketClientWrapper::SocketClientWrapper(
+    std::optional<std::filesystem::path> localSocketPath) {
     std::string addressString;
     int port = 0;
     bool needPortCfg = false;

@@ -13,7 +13,7 @@
 #include <concepts>
 #include <filesystem>
 #include <initializer_list>
-#include <libos/libfs.hpp>
+#include <libfs.hpp>
 #include <memory>
 #include <string>
 #include <system_error>
@@ -25,9 +25,10 @@
 #include "SystemInfo.hpp"
 
 template <typename Impl>
-concept canCreateWithApi = requires(
-    TgBotApi::Ptr api, Message::Ptr message,
-    PerBuildData data) { Impl{api, message, data}; };
+concept canCreateWithApi =
+    requires(TgBotApi::Ptr api, Message::Ptr message, PerBuildData data) {
+        Impl{api, message, data};
+    };
 
 template <typename Impl>
 concept canCreateWithData = requires(PerBuildData data) { Impl{data}; };
@@ -137,8 +138,7 @@ class ROMBuildQueryHandler
 
    public:
     bool pinned() const { return didpin; }
-    ROMBuildQueryHandler(TgBotApi::Ptr api,
-                         Message::Ptr userMessage);
+    ROMBuildQueryHandler(TgBotApi::Ptr api, Message::Ptr userMessage);
 
     void updateSentMessage(Message::Ptr message);
     void start(Message::Ptr userMessage);
@@ -202,9 +202,10 @@ class ROMBuildQueryHandler
     // Handle type selection button
     void handle_type(const Query& query);
 
-#define DECLARE_BUTTON_HANDLER(name, key) \
-    ButtonHandler{name, #key,             \
-                  [this](const Query& query) { handle_##key(query); }}
+#define DECLARE_BUTTON_HANDLER(name, key)                               \
+    ButtonHandler {                                                     \
+        name, #key, [this](const Query& query) { handle_##key(query); } \
+    }
 #define DECLARE_BUTTON_HANDLER_WITHPREFIX(name, key, prefix)             \
     ButtonHandler {                                                      \
         name, #key, [this](const Query& query) { handle_##key(query); }, \
@@ -281,9 +282,7 @@ class TaskWrapperBase {
 
    public:
     TaskWrapperBase(std::shared_ptr<ROMBuildQueryHandler> handler,
-                    PerBuildData data,
-                    TgBotApi::Ptr api,
-                    Message::Ptr message)
+                    PerBuildData data, TgBotApi::Ptr api, Message::Ptr message)
         : queryHandler(std::move(handler)),
           data(std::move(data)),
           api(api),
@@ -496,11 +495,11 @@ class CwdRestorer {
     operator bool() const noexcept { return !ec; }
 };
 
-ROMBuildQueryHandler::ROMBuildQueryHandler(
-    TgBotApi::Ptr api, Message::Ptr userMessage)
+ROMBuildQueryHandler::ROMBuildQueryHandler(TgBotApi::Ptr api,
+                                           Message::Ptr userMessage)
     : _api(api),
-      parser(FS::getPathForType(FS::PathType::GIT_ROOT) / "src" /
-             "command_modules" / "android_builder" / "configs") {
+      parser(FS::getPath(FS::PathType::GIT_ROOT) / "src" / "command_modules" /
+             "android_builder" / "configs") {
     settingsKeyboard =
         createKeyboardWith<Buttons::repo_sync, Buttons::upload,
                            Buttons::pin_message, Buttons::back>();
@@ -740,11 +739,12 @@ DECLARE_COMMAND_HANDLER(rombuild) {
         return;
     }
     try {
-        handler = std::make_shared<ROMBuildQueryHandler>(api, message->message());
+        handler =
+            std::make_shared<ROMBuildQueryHandler>(api, message->message());
     } catch (const std::exception& e) {
         LOG(ERROR) << "Failed to create ROMBuildQueryHandler: " << e.what();
         api->sendMessage(message->get<MessageAttrs::Chat>(),
-                               "Failed to initialize ROM build: "s + e.what());
+                         "Failed to initialize ROM build: "s + e.what());
         return;
     }
 

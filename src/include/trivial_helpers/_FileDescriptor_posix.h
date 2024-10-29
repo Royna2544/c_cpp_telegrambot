@@ -12,6 +12,17 @@ constexpr int kInvalidFD = -1;
 
 inline bool isValidFd(int fd) { return fd != kInvalidFD; }
 
+inline void closeFd(int&& fd) {
+    int rc = 0;
+
+    if (isValidFd(fd)) {
+        rc = close(fd);
+    }
+
+    PLOG_IF(ERROR, (rc != 0 && errno != EBADF))
+        << "Failed to close fd: " << fd;
+}
+
 inline void closeFd(int& fd) {
     int rc = 0;
 
@@ -118,3 +129,9 @@ struct Pipe {
      */
     pipe_t underlying;
 };
+
+inline std::ostream& operator<<(std::ostream& os, const Pipe& pipe) {
+    os << "Pipe[valid=" << pipe.isVaild() << ", readEnd=" << pipe.readEnd()
+       << ", writeEnd=" << pipe.writeEnd() << "]";
+    return os;
+}

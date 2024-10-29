@@ -34,7 +34,7 @@ class SocketInterfaceImplMock : public SocketInterfaceBase {
                 (override));
     MOCK_METHOD(bool, writeToSocket,
                 (SocketConnContext context, SharedMalloc data), (override));
-    MOCK_METHOD(void, forceStopListening, (), (override));
+    MOCK_METHOD(bool, forceStopListening, (), (override));
     MOCK_METHOD(void, startListening,
                 (socket_handle_t handle, const listener_callback_t onNewData),
                 (override));

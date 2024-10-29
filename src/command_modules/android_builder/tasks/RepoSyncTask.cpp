@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <functional>
 #include <ios>
+#include <libfs.hpp>
 #include <regex>
 #include <string>
 #include <system_error>
@@ -19,7 +20,6 @@
 #include "CompileTimeStringConcat.hpp"
 #include "ForkAndRun.hpp"
 #include "RepoUtils.hpp"
-#include "libos/libfs.hpp"
 
 bool RepoSyncLocalHook::process(const std::string& line) {
     static const std::regex kRepoRemoveFail(
@@ -219,6 +219,6 @@ void RepoSyncTask::onSignal(int signalCode) {
     LOG(INFO) << "Repo sync received signal: " << strsignal(signalCode);
 }
 
-RepoSyncTask::RepoSyncTask(TgBotApi::CPtr api,
-                           Message::Ptr message, PerBuildData data)
+RepoSyncTask::RepoSyncTask(TgBotApi::CPtr api, Message::Ptr message,
+                           PerBuildData data)
     : data(std::move(data)), api(api), message(std::move(message)) {}

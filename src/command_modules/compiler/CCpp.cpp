@@ -1,6 +1,6 @@
 #include <fmt/format.h>
 
-#include <libos/libfs.hpp>
+#include <libfs.hpp>
 
 #include "CompilerInTelegram.hpp"
 #include "StringResLoader.hpp"

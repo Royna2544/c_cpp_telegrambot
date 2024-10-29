@@ -2,6 +2,7 @@
 
 #include <ResourceManager.h>
 
+#include <ConfigManager.hpp>
 #include <ManagedThreads.hpp>
 #include <Random.hpp>
 #include <database/DatabaseBase.hpp>
@@ -23,12 +24,15 @@ class Providers {
     Installable<ResourceManager> resource{};
     Installable<DatabaseBase> database{};
     Installable<ThreadManager> manager{};
+    Installable<ConfigManager> config{};
 
     APPLE_INJECT(Providers(Random *random, ResourceManager *resource,
-                           DatabaseBase *database, ThreadManager *thread)) {
+                           DatabaseBase *database, ThreadManager *thread,
+                           ConfigManager *config)) {
         this->random.instance = random;
         this->resource.instance = resource;
         this->database.instance = database;
         this->manager.instance = thread;
+        this->config.instance = config;
     }
 };

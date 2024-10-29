@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <libos/libfs.hpp>
+#include <libfs.hpp>
 #include <memory>
 #include <string_view>
 
@@ -15,14 +15,13 @@ class ResourceManagerTest : public testing::Test {
 
 TEST_F(ResourceManagerTest, PreloadOneFile) {
     const std::string expected = "This is a test file";
-    const std::string_view actual =
-        gResourceManager->get(kResourceTestFile);
+    const std::string_view actual = gResourceManager->get(kResourceTestFile);
     EXPECT_EQ(expected, actual);
 }
 
 TEST_F(ResourceManagerTest, PreloadAgain) {
-    bool rc = gResourceManager->preload(
-        FS::getPathForType(FS::PathType::RESOURCES) / kResourceTestFile);
+    bool rc = gResourceManager->preload(FS::getPath(FS::PathType::RESOURCES) /
+                                        kResourceTestFile);
     EXPECT_FALSE(rc);
     rc = gResourceManager->preload(kResourceTestFile);
     EXPECT_FALSE(rc);

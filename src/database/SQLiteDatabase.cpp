@@ -8,7 +8,7 @@
 #include <cstdint>
 #include <fstream>
 #include <iostream>
-#include <libos/libfs.hpp>
+#include <libfs.hpp>
 #include <map>
 #include <memory>
 #include <optional>
@@ -62,7 +62,7 @@ void SQLiteDatabase::Helper::logInvalidState(
 
 SQLiteDatabase::Helper::Helper(sqlite3* db, const std::string_view& filename)
     : db(db) {
-    static auto sqlResPath = FS::getPathForType(FS::PathType::RESOURCES_SQL);
+    static auto sqlResPath = FS::getPath(FS::PathType::RESOURCES_SQL);
 
     std::ifstream sqlFile(sqlResPath / filename.data());
     int ret = 0;

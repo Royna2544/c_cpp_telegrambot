@@ -4,7 +4,7 @@
 #include <fmt/format.h>
 
 #include <fstream>
-#include <libos/libfs.hpp>
+#include <libfs.hpp>
 #include <sstream>
 #include <system_error>
 
@@ -22,8 +22,7 @@ bool ResourceManager::preload(std::filesystem::path path) {
         }
     }
     if (found) {
-        path = path.lexically_relative(
-            FS::getPathForType(FS::PathType::RESOURCES));
+        path = path.lexically_relative(FS::getPath(FS::PathType::RESOURCES));
     }
 
     if (std::ranges::find(ignoredResources, path.string()) !=
@@ -44,7 +43,7 @@ bool ResourceManager::preload(std::filesystem::path path) {
 }
 
 ResourceManager::ResourceManager() {
-    auto rd = FS::getPathForType(FS::PathType::RESOURCES);
+    auto rd = FS::getPath(FS::PathType::RESOURCES);
     std::ifstream ifs(rd / kResourceLoadIgnoreFile);
     std::error_code ec;
 

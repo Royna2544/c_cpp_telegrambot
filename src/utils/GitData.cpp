@@ -3,7 +3,7 @@
 #include <git2.h>
 
 #include <mutex>
-#include "libos/libfs.hpp"
+#include <libfs.hpp>
 
 constexpr int SHA1_HASH_LEN = 40;
 

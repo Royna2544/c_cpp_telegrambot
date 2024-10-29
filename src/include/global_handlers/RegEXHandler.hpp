@@ -6,7 +6,8 @@
 #include <memory>
 #include <regex>
 #include <string>
-#include "trivial_helpers/fruit_inject.hpp"
+#include <api/TgBotApi.hpp>
+#include <trivial_helpers/fruit_inject.hpp>
 
 /**
  * @brief Interface for a regex command.
@@ -64,7 +65,7 @@ class RegexCommand {
 };
 
 struct RegexHandler {
-    APPLE_INJECT(RegexHandler());
+    RegexHandler();
     ~RegexHandler() = default;
 
     struct Interface {
