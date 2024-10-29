@@ -16,7 +16,7 @@ struct TgBotSocket_API SocketInterfaceWindows : SocketInterfaceBase {
     static std::string WSALastErrorStr();
 
     bool writeToSocket(SocketConnContext context, SharedMalloc data) override;
-    void forceStopListening(void) override;
+    bool forceStopListening(void) override;
     void startListening(socket_handle_t handle,
                         const listener_callback_t onNewData) override;
     bool closeSocketHandle(socket_handle_t& handle) override;

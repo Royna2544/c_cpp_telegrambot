@@ -212,7 +212,7 @@ struct TgBotSocket_API SocketInterfaceBase {
      * It is intended to be used in cases where the program needs to terminate
      * immediately, and the normal shutdown process is not sufficient.
      */
-    virtual void forceStopListening(void) = 0;
+    virtual bool forceStopListening(void) = 0;
 
     // A generic template struct to hold optional data and a persistent flag
     template <typename T>

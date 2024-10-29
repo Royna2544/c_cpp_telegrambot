@@ -11,7 +11,6 @@
 
 void SocketInterfaceUnix::startListening(socket_handle_t handle,
                                          const listener_callback_t onNewData) {
-    bool should_break = false;
     int rc = 0;
     UnixSelector selector;
 
@@ -33,19 +32,20 @@ void SocketInterfaceUnix::startListening(socket_handle_t handle,
         }
         selector.add(
             kListenTerminate.readEnd(),
-            [this, &should_break]() {
+            [this]() {
                 dummy_listen_buf_t buf = {};
                 ssize_t rc = read(kListenTerminate.readEnd(), &buf,
                                   sizeof(dummy_listen_buf_t));
                 if (rc < 0) {
                     PLOG(ERROR) << "Reading data from forcestop fd";
                 }
-                should_break = true;
+                kShouldRun = false;
+                closeFd(kListenTerminate.readEnd());
             },
             Selector::Mode::READ);
         selector.add(
             handle,
-            [handle, this, &should_break, onNewData] {
+            [handle, this, onNewData] {
                 struct sockaddr addr {};
                 socklen_t len = sizeof(addr);
                 socket_handle_t cfd = accept(handle, &addr, &len);
@@ -56,15 +56,16 @@ void SocketInterfaceUnix::startListening(socket_handle_t handle,
                     printRemoteAddress(cfd);
                     setSocketOptTimeout(cfd, 5);
                     SocketConnContext ctx(cfd, addr);
-                    should_break = !onNewData(ctx);
+                    kShouldRun = onNewData(ctx);
                     closeSocketHandle(cfd);
                 }
             },
             Selector::Mode::READ);
-        while (!should_break) {
+        sInitialized = true;
+        while (kShouldRun) {
             switch (selector.poll()) {
                 case Selector::PollResult::FAILED:
-                    should_break = true;
+                    kShouldRun = false;
                     break;
                 case Selector::PollResult::OK:
                 case Selector::PollResult::TIMEOUT:
@@ -78,7 +79,12 @@ void SocketInterfaceUnix::startListening(socket_handle_t handle,
     cleanupServerSocket();
 }
 
-void SocketInterfaceUnix::forceStopListening() {
+bool SocketInterfaceUnix::forceStopListening() {
+    if (!sInitialized) {
+        LOG(INFO) << "Initialized=false, putting kShouldRun=false";
+        kShouldRun = false;
+        return true;
+    }
     if (kListenTerminate.isVaild()) {
         dummy_listen_buf_t d = {};
         ssize_t count = 0;
@@ -88,6 +94,12 @@ void SocketInterfaceUnix::forceStopListening() {
         if (count < 0) {
             PLOG(ERROR) << "Failed to write to notify pipe";
         }
+        closeFd(notify_fd);
+        return true;
+    } else {
+        LOG(ERROR) << "Force stop listening not possible...";
+        LOG(ERROR) << kListenTerminate;
+        return false;
     }
 }
 

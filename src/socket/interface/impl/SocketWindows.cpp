@@ -88,7 +88,7 @@ bool SocketInterfaceWindows::writeToSocket(SocketConnContext context,
     return true;
 }
 
-void SocketInterfaceWindows::forceStopListening(void) { kRun = false; }
+bool SocketInterfaceWindows::forceStopListening(void) { kRun = false; return true; }
 
 std::optional<SharedMalloc> SocketInterfaceWindows::readFromSocket(
     SocketConnContext context, TgBotSocket::PacketHeader::length_type length) {
