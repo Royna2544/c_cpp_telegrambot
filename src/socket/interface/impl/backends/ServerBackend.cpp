@@ -1,24 +1,17 @@
 #include "ServerBackend.hpp"
 
-#include <ConfigManager.h>
+#include <ConfigManager.hpp>
 
 #include <iomanip>
 
-SocketServerWrapper::SocketServerWrapper() {
-    auto value =
-        ConfigManager::getVariable(ConfigManager::Configs::SOCKET_CFG);
-    if (!value) {
-        LOG(ERROR) << "No socket backend specified, not creating sockets";
-        return;
-    }
-    auto& string = *value;
-    auto indexOfSep = string.find(',');
+SocketServerWrapper::SocketServerWrapper(std::string config) {
+    auto indexOfSep = config.find(',');
     if (indexOfSep == std::string::npos) {
-        LOG(INFO) << "Bootstrap interface: " << std::quoted(string);
-        internalBackend = getInterfaceForString(string);
+        LOG(INFO) << "Bootstrap interface: " << std::quoted(config);
+        internal = fromString(config);
     } else {
-        auto first = string.substr(0, indexOfSep);
-        auto second = string.substr(indexOfSep + 1);
+        auto first = config.substr(0, indexOfSep);
+        auto second = config.substr(indexOfSep + 1);
         if (first == second) {
             LOG(ERROR) << "Two interfaces cannot be the same! (Same as "
                        << std::quoted(first) << ")";
@@ -26,13 +19,13 @@ SocketServerWrapper::SocketServerWrapper() {
             return;
         }
         LOG(INFO) << "Bootstrap i:" << first << " e:" << second << " interface";
-        internalBackend = getInterfaceForString(first);
-        externalBackend = getInterfaceForString(second);
+        internal = fromString(first);
+        internal = fromString(second);
     }
 }
 
 SocketServerWrapper::BackendType SocketServerWrapper::fromString(
-    const std::string& str) {
+    const std::string_view str) {
     if (str == "ipv4") {
         return BackendType::Ipv4;
     }
@@ -44,9 +37,4 @@ SocketServerWrapper::BackendType SocketServerWrapper::fromString(
     }
     LOG(ERROR) << "Unknown backend type: " << str;
     return BackendType::Unknown;
-}
-
-std::shared_ptr<SocketInterfaceBase> SocketServerWrapper::getInterfaceForString(
-    const std::string& str) {
-    return getInterfaceForType(fromString(str));
 }

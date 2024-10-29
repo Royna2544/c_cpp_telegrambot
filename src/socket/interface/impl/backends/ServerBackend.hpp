@@ -1,26 +1,27 @@
+#pragma once
+
 #include <SocketBase.hpp>
+#include <memory>
 
 struct SocketServerWrapper {
-    explicit SocketServerWrapper();
+    explicit SocketServerWrapper(std::string config);
 
     enum class BackendType { Ipv4, Ipv6, Local, Unknown };
 
     [[nodiscard]] std::shared_ptr<SocketInterfaceBase> getInternalInterface()
         const {
-        return internalBackend;
+        return getInterfaceForType(internal);
     }
     [[nodiscard]] std::shared_ptr<SocketInterfaceBase> getExternalInterface()
         const {
-        return externalBackend;
+        return getInterfaceForType(external);
     }
 
    private:
-    std::shared_ptr<SocketInterfaceBase> internalBackend;
-    std::shared_ptr<SocketInterfaceBase> externalBackend;
+    BackendType internal;
+    BackendType external;
 
-    static BackendType fromString(const std::string& str);
+    static BackendType fromString(const std::string_view str);
     static std::shared_ptr<SocketInterfaceBase> getInterfaceForType(
         BackendType type);
-    static std::shared_ptr<SocketInterfaceBase> getInterfaceForString(
-        const std::string& str);
 };
