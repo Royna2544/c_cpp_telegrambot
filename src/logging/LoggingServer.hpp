@@ -5,6 +5,7 @@
 
 #include <ManagedThreads.hpp>
 #include <future>
+#include <impl/backends/ServerBackend.hpp>
 #include <memory>
 #include <mutex>
 
@@ -16,12 +17,14 @@ struct NetworkLogSink : private absl::LogSink,
 
     void runFunction() override;
 
-    explicit NetworkLogSink();
+    explicit NetworkLogSink(SocketServerWrapper* wrapper);
    private:
     std::shared_ptr<SocketInterfaceBase> interface;
     std::atomic_bool enabled = true;
     std::promise<void> onClientDisconnected;
 
+    bool socketThreadFunction(SocketConnContext c, std::shared_future<void> future);
     std::mutex mContextMutex;  // Protects context
     SocketConnContext* context = nullptr;
+    bool isSinkAdded = false;
 };

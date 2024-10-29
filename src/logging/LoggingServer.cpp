@@ -38,26 +38,31 @@ void NetworkLogSink::Send(const absl::LogEntry& entry) {
     }
 }
 
+bool NetworkLogSink::socketThreadFunction(SocketConnContext c,
+                                          std::shared_future<void> _future) {
+    auto future = std::move(_future);
+    {
+        std::lock_guard<std::mutex> _(mContextMutex);
+        context = &c;
+    }
+    absl::AddLogSink(this);
+    isSinkAdded = true;
+    future.wait();
+    {
+        std::lock_guard<std::mutex> _(mContextMutex);
+        context = nullptr;
+    }
+    return true;
+}
+
 void NetworkLogSink::runFunction() {
     std::shared_future<void> future = onClientDisconnected.get_future();
     bool isSinkAdded = false;
-    const auto function = [this, future,
-                           &isSinkAdded](SocketConnContext c) -> bool {
-        {
-            std::lock_guard<std::mutex> _(mContextMutex);
-            context = &c;
-        }
-        absl::AddLogSink(this);
-        isSinkAdded = true;
-        future.wait();
-        {
-            std::lock_guard<std::mutex> _(mContextMutex);
-            context = nullptr;
-        }
-        return true;
-    };
-    std::thread listenThread(
-        [this, function]() { interface->startListeningAsServer(function); });
+    std::thread listenThread([this, future]() {
+        interface->startListeningAsServer([this, future](SocketConnContext c) {
+            return socketThreadFunction(c, future);
+        });
+    });
     future.wait();
     interface->forceStopListening();
     listenThread.join();
@@ -66,14 +71,14 @@ void NetworkLogSink::runFunction() {
     }
 }
 
-NetworkLogSink::NetworkLogSink() {
-    SocketServerWrapper wrapper;
-    interface = wrapper.getInternalInterface();
+NetworkLogSink::NetworkLogSink(SocketServerWrapper* wrapper) {
+    interface = wrapper->getInternalInterface();
     if (interface) {
         interface->options.address.set(getSocketPathForLogging().string());
         interface->options.port.set(SocketInterfaceBase::kTgBotLogPort);
     } else {
         LOG(ERROR) << "Failed to find default socket interface";
+        return;
     }
     setPreStopFunction([](auto* arg) {
         LOG(INFO) << "onServerShutdown";
