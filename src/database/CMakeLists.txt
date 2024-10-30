@@ -57,7 +57,7 @@ add_my_library(
 add_my_executable(
   NAME DatabaseCtl
   SRCS utils/DatabaseCtrl.cc
-  LIBS TgBotDBImpl TgBotDBLoading
+  LIBS TgBotDBImpl TgBotDBLoading TgBotUtils
 )
 #####################################################################
 

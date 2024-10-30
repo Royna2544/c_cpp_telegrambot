@@ -13,7 +13,7 @@
 
 // Abstract manager for config loader
 // Currently have three sources, env and file, cmdline
-class ConfigManager {
+class TgBotUtils_API ConfigManager {
    public:
     enum class Configs {
         TOKEN,

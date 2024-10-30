@@ -6,9 +6,7 @@
 #include <Windows.h>
 #endif
 
-#include <TgBotUtilsExports.h>
-
-class TgBotUtils_API SignalHandler {
+class SignalHandler {
    public:
     /**
      * @brief Installs the signal handler.
