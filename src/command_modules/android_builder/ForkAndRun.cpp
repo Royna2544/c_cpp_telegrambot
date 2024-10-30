@@ -89,7 +89,6 @@ bool ForkAndRun::execute() {
         _exit(std::numeric_limits<uint8_t>::max());  // Just in case.
     } else if (pid > 0) {
         static ForkAndRun* instance = nullptr;
-        static void (*old_sighandler)(int) = nullptr;
 
         Pipe program_termination_pipe{};
         bool breakIt = false;
