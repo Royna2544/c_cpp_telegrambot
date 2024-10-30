@@ -120,4 +120,9 @@ std::vector<std::filesystem::path> walk_up_tree_and_gather(
     return result;
 }
 
-extern std::filesystem::path operator/(std::filesystem::path path, FS::SharedLibType test);
+inline std::filesystem::path operator/(std::filesystem::path path, FS::SharedLibType test) {
+    if (!path.has_extension()) {
+        path += FS::kDylibExtension;
+    }
+    return path;
+}

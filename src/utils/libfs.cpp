@@ -7,14 +7,6 @@
 
 #include "GitData.h"
 
-std::filesystem::path operator/(std::filesystem::path path,
-                                FS::SharedLibType /*unused*/) {
-    if (!path.has_extension()) {
-        path += FS::kDylibExtension;
-    }
-    return path;
-}
-
 std::filesystem::path FS::getPath(PathType type) {
     std::filesystem::path path;
     GitData data;
