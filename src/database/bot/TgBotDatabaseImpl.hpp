@@ -60,8 +60,6 @@ struct TgBotDBImpl_API TgBotDatabaseImpl : DatabaseBase {
 
     bool setImpl(Providers providers);
 
-    static bool load(ConfigManager *configmgr, TgBotDatabaseImpl *dbimpl);
-
    private:
     // Takes a std::unique_ptr containing the implementation
     bool setImpl(std::unique_ptr<DatabaseBase> impl);
@@ -69,3 +67,5 @@ struct TgBotDBImpl_API TgBotDatabaseImpl : DatabaseBase {
     std::unique_ptr<DatabaseBase> _databaseImpl;
     bool loaded = false;
 };
+
+extern bool TgBotDatabaseImpl_load(ConfigManager *configmgr, TgBotDatabaseImpl *dbimpl);

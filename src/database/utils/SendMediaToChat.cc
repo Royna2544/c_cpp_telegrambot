@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
         _usage(EXIT_SUCCESS);
     }
     auto backend = std::make_unique<TgBotDatabaseImpl>();
-    TgBotDatabaseImpl::load(config.get(), backend.get());
+    TgBotDatabaseImpl_load(config.get(), backend.get());
     if (!backend->isLoaded()) {
         LOG(ERROR) << "Failed to load DB from config";
         return EXIT_FAILURE;

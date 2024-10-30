@@ -2,7 +2,7 @@
 #include <ConfigManager.hpp>
 #include <absl/log/log.h>
 
-bool TgBotDatabaseImpl::load(ConfigManager* configmgr, TgBotDatabaseImpl* dbimpl) {
+bool TgBotDatabaseImpl_load(ConfigManager* configmgr, TgBotDatabaseImpl* dbimpl) {
     const auto dbConf = configmgr->get(ConfigManager::Configs::DATABASE_CFG);
     std::error_code ec;
     bool loaded = false;

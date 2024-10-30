@@ -166,7 +166,7 @@ int main(int argc, char** argv) {
     }
 
     auto dbImpl = std::make_unique<TgBotDatabaseImpl>();
-    TgBotDatabaseImpl::load(nullptr, dbImpl.get());
+    TgBotDatabaseImpl_load(config.get(), dbImpl.get());
     if (!dbImpl->isLoaded()) {
         LOG(ERROR) << "Failed to load database";
         return EXIT_FAILURE;

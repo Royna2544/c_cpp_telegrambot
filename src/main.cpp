@@ -231,7 +231,7 @@ getDatabaseComponent() {
         .bind<DatabaseBase, TgBotDatabaseImpl>()
         .registerProvider([](ConfigManager* manager) {
             auto impl = std::make_unique<TgBotDatabaseImpl>();
-            if (!TgBotDatabaseImpl::load(manager, impl.get())) {
+            if (!TgBotDatabaseImpl_load(manager, impl.get())) {
                 LOG(ERROR) << "Failed to load database";
             }
             return impl.release();
