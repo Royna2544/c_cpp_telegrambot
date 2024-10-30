@@ -589,7 +589,7 @@ ConfigParser::ConfigParser(const std::filesystem::path& jsonFileDir) {
     LOG(INFO) << "Loading JSON files from directory: " << jsonFileDir;
     for (const auto& entry : std::filesystem::directory_iterator(jsonFileDir)) {
         if (entry.is_regular_file() && entry.path().extension() == ".json") {
-            DLOG(INFO) << "Parsing JSON file: " << entry.path().filename();
+            LOG(INFO) << "Parsing JSON file: " << entry.path().filename();
             try {
                 Parser parser(entry.path());
                 const auto parsed = parser.parse();
