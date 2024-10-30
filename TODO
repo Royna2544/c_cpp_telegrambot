@@ -1,4 +1,2 @@
-- Python could generate loadcmd_* functions
-- clang-* compilers add, preferred
-- Make SQL use RDB again
-- Save chat id on database as well
+- Handle forked process in forkandrun when the main process exits due to network.
+- Use jthread for ThreadManager
