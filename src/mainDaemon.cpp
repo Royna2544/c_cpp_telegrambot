@@ -16,6 +16,7 @@
 #include <limits>
 #include <logging/AbslLogInit.hpp>
 #include <string_view>
+#include <thread>
 
 // Wrapper launcher to create a daemon process from the bot
 int main(const int argc, char** argv) {
@@ -137,7 +138,9 @@ redo_vfork:
                     "Child process terminated by signal: {}", WTERMSIG(status));
             }
         }
-        LOG(INFO) << "Consumed child death";
+        constexpr std::chrono::seconds sleep_secs(10);
+        LOG(INFO) << fmt::format("Consumed child death, sleeping for {}", sleep_secs);
+        std::this_thread::sleep_for(sleep_secs);
         if (!std::filesystem::exists(kPidFile)) {
             LOG(INFO) << "Pid file gone, exiting";
             return EXIT_SUCCESS;
