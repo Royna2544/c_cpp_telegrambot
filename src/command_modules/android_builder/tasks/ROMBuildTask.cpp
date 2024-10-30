@@ -99,7 +99,7 @@ DeferredExit ROMBuildTask::runFunction() {
 
     ForkAndRunShell shell("bash");
     shell.addEnv(
-        {{"BUILD_HOSTNAME", "VM"}, {"BUILD_USERNAME", "c_cpp_telegrambot"}});
+        {{"BUILD_HOSTNAME", "build-server"}, {"BUILD_USERNAME", "cpp20-tgbot-builder"}});
     if (!shell.open()) {
         return DeferredExit::generic_fail;
     }
