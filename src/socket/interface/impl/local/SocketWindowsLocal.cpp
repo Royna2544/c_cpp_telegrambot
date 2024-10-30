@@ -9,7 +9,7 @@
 
 #include <CStringLifetime.h>
 
-#include <libos/libfs.hpp>
+#include <libfs.hpp>
 
 bool SocketInterfaceWindowsLocal::createLocalSocket(SocketConnContext *ctx) {
     ctx->cfd = socket(AF_UNIX, getSocketType(this), 0);
