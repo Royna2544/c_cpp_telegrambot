@@ -35,18 +35,34 @@ std::string findVendor() {
     return {};
 }
 
-std::string findTCL() {
+std::string findREL() {
     std::error_code ec;
+    // Try the build/release/build_config, scl for Android 14
     for (const auto& it : std::filesystem::directory_iterator(
              "build/release/build_config/", ec)) {
-        if (it.is_regular_file() && it.path().extension() == ".scl") {
-            LOG(INFO) << "Found a valid scl, " << it << " release_name="
-                      << it.path().filename().replace_extension();
-            return it.path().filename().replace_extension();
+        if (it.path().extension() == ".scl") {
+            auto file = it.path().filename();
+            LOG(INFO) << "Found a valid scl, " << it
+                      << " release_name=" << file.replace_extension();
+            return file;
         }
     }
-    LOG(INFO) << "Didn't find any scl, but it is fine";
-    // Ignore if we failed to open, this path is only valid in Android 14+
+    LOG(INFO) << "Didn't find any scl, trying textproto...";
+    // Try build/release/release_configs, textproto, another stuff added on
+    // Android 15
+    for (const auto& it : std::filesystem::directory_iterator(
+             "build/release/release_configs/", ec)) {
+        if (it.path().extension() == ".textproto") {
+            auto file = it.path().filename().replace_extension().string();
+            if (file.starts_with("trunk") || file == "root") {
+                continue;
+            }
+            LOG(INFO) << "Found a valid textproto, " << it
+                      << " release_name=" << file;
+            return file;
+        }
+    }
+    // Ignore if we failed to open, these paths are only valid in Android 14+
     return {};
 }
 
@@ -75,7 +91,7 @@ DeferredExit ROMBuildTask::runFunction() {
     }
     auto* resultdata = dataShmem->get<PerBuildData::ResultData>();
     resultdata->value = PerBuildData::Result::ERROR_FATAL;
-    auto release = findTCL();
+    auto release = findREL();
     auto vendor = findVendor();
     if (vendor.empty()) {
         return DeferredExit::generic_fail;
