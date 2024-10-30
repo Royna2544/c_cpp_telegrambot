@@ -181,7 +181,7 @@ command_module(
         android_builder/tasks/ROMBuildTask.cpp
         android_builder/tasks/UploadFileTask.cpp
         android_builder/tasks/RepoSyncTask.cpp
-    LIBS AndroidBuilder-cpp TgBot
+    LIBS AndroidBuilder-cpp TgBotsighandler
     PLATFORM "Linux"
 )
 
