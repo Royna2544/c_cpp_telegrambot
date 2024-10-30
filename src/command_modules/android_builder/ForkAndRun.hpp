@@ -197,7 +197,7 @@ class ForkAndRunShell {
     DeferredExit result;
 
     bool opened = false;
-    std::map<std::string_view, std::string_view> envMap;
+    std::map<std::string, std::string> envMap;
 
     void writeString(const std::string_view& args) const;
 
@@ -209,8 +209,8 @@ class ForkAndRunShell {
     static constexpr endl_t endl{};
 
     bool open();
-    void addEnv(const std::initializer_list<
-                std::pair<std::string_view, std::string_view>>& list);
+    void addEnv(
+        const std::initializer_list<std::pair<std::string, std::string>>& list);
 
     // Write arguments to the shell
     template <typename T>

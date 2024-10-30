@@ -284,7 +284,7 @@ ForkAndRunShell::ForkAndRunShell(std::filesystem::path shell_path)
     : shell_path_(std::move(shell_path)) {}
 
 void ForkAndRunShell::addEnv(
-    const std::initializer_list<std::pair<std::string_view, std::string_view>>&
+    const std::initializer_list<std::pair<std::string, std::string>>&
         list) {
     if (list.size() == 0) {
         return;
@@ -312,8 +312,7 @@ bool ForkAndRunShell::open() {
             strdup(shell_path_.string().c_str()), free);
         std::array<char*, 2> argv{string.get(), nullptr};
 
-        // Craft envp (string_view as we don't have to copy the environment
-        // strings)
+        // Craft envp
         std::vector<char*> envp;
         std::vector<std::string> owners;
         for (int x = 0; environ[x] != nullptr; x++) {
