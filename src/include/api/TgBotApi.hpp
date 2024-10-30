@@ -442,8 +442,6 @@ class TgBotApi {
                     return x;
                 } else if constexpr (std::is_same_v<T, MediaIds>) {
                     return x.id;
-                } else {
-                    static_assert(false, "Invalid media type");
                 }
             },
             media);
