@@ -79,7 +79,7 @@ DeferredExit UploadFileTask::runFunction() {
     return shell.close();
 }
 
-void UploadFileTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
+void UploadFileTask::handleStdoutData(ForkAndRun::BufferViewType buffer) {
     stdoutOutput.append(buffer.data());
 }
 

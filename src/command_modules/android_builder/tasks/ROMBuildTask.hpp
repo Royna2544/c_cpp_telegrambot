@@ -34,7 +34,7 @@ struct ROMBuildTask : ForkAndRun {
      *
      * @param buffer The buffer containing the new standard output data.
      */
-    void onNewStdoutBuffer(ForkAndRun::BufferType& buffer) override;
+    void handleStdoutData(ForkAndRun::BufferViewType buffer) override;
 
     /**
      * @brief Handles the process exit event.

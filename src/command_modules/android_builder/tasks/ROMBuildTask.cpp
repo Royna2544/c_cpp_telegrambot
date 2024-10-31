@@ -167,7 +167,7 @@ DeferredExit ROMBuildTask::runFunction() {
     return result;
 }
 
-void ROMBuildTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
+void ROMBuildTask::handleStdoutData(ForkAndRun::BufferViewType buffer) {
     std::string buildInfoBuffer;
     const auto now = std::chrono::system_clock::now();
     const auto& rom = getValue(data.localManifest->rom);
@@ -216,7 +216,7 @@ void ROMBuildTask::onNewStdoutBuffer(ForkAndRun::BufferType& buffer) {
             startTime, roundedTime, now, rom->romInfo->name, rom->branch,
             data.device->toString(), type, getPercent<CPUInfo>(),
             getPercent<MemoryInfo>(), getPercent<DiskInfo>(cwd),
-            data.localManifest->job_count, buffer.data());
+            data.localManifest->job_count, buffer);
         try {
             api->editMessage<TgBotApi::ParseMode::HTML>(message,
                                                         buildInfoBuffer);

@@ -21,7 +21,7 @@ struct UploadFileTask : ForkAndRun {
      */
     DeferredExit runFunction() override;
 
-    void onNewStdoutBuffer(ForkAndRun::BufferType& buffer) override;
+    void handleStdoutData(ForkAndRun::BufferViewType buffer) override;
 
     /**
      * @brief Callback function for handling the exit of the subprocess.

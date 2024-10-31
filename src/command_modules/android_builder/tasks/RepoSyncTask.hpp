@@ -11,7 +11,7 @@ class NewStdErrBufferHook {
     bool hadProblems = false;
     bool hadFatalProblems = false;
 
-    void errorAndLog(const std::string& message) {
+    void errorAndLog(const std::string_view message) {
         LOG(ERROR) << message;
         logMessage << message << std::endl;
     }
@@ -87,7 +87,7 @@ struct RepoSyncTask : ForkAndRun {
      *
      * @param buffer The buffer containing the new standard error data.
      */
-    void onNewStderrBuffer(ForkAndRun::BufferType& buffer) override;
+    void handleStderrData(ForkAndRun::BufferViewType buffer) override;
 
     /**
      * @brief Handles the process exit event.

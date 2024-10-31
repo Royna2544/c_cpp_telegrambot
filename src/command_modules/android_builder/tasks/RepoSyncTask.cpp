@@ -156,11 +156,11 @@ DeferredExit RepoSyncTask::runFunction() {
     return {};  // Success
 }
 
-void RepoSyncTask::onNewStderrBuffer(ForkAndRun::BufferType& buffer) {
+void RepoSyncTask::handleStderrData(ForkAndRun::BufferViewType buffer) {
     std::vector<std::string> lines;
 
     // Split the buffer into lines
-    lines = absl::StrSplit(buffer.data(), '\n');
+    lines = absl::StrSplit(buffer, '\n');
     if (std::chrono::system_clock::now() - clock > 30s) {
         clock = std::chrono::system_clock::now();
         constexpr int PRINTING_LINES_COUNT = 5;

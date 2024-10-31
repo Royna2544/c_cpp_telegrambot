@@ -64,6 +64,7 @@ class ForkAndRun {
      * @brief The size of the buffer used for stdout and stderr.
      */
     constexpr static int kBufferSize = 1024;
+    using BufferViewType = std::string_view;
     using BufferType = std::array<char, kBufferSize>;
 
     /**
@@ -75,9 +76,8 @@ class ForkAndRun {
      *
      * @param buffer The buffer containing the new stdout data.
      */
-    virtual void onNewStdoutBuffer(BufferType& buffer) {
-        std::string lines = buffer.data();
-        std::cout << absl::StripAsciiWhitespace(lines) << std::endl;
+    virtual void handleStdoutData(BufferViewType buffer) {
+        std::cout << buffer << std::endl;
     }
 
     /**
@@ -89,9 +89,8 @@ class ForkAndRun {
      *
      * @param buffer The buffer containing the new stderr data.
      */
-    virtual void onNewStderrBuffer(BufferType& buffer) {
-        std::string lines = buffer.data();
-        std::cerr << absl::StripAsciiWhitespace(lines) << std::endl;
+    virtual void handleStderrData(BufferViewType buffer) {
+        std::cerr << buffer << std::endl;
     }
 
     /**

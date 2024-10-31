@@ -114,8 +114,7 @@ bool ForkAndRun::execute() {
                 ssize_t bytes_read =
                     read(stdout_pipe.readEnd(), buf.data(), buf.size() - 1);
                 if (bytes_read >= 0) {
-                    onNewStdoutBuffer(buf);
-                    buf.fill(0);
+                    handleStdoutData(buf.data());
                 }
             },
             Selector::Mode::READ);
@@ -126,8 +125,7 @@ bool ForkAndRun::execute() {
                 ssize_t bytes_read =
                     read(stderr_pipe.readEnd(), buf.data(), buf.size() - 1);
                 if (bytes_read >= 0) {
-                    onNewStderrBuffer(buf);
-                    buf.fill(0);
+                    handleStderrData(buf.data());
                 }
             },
             Selector::Mode::READ);
