@@ -402,6 +402,10 @@ getAllComponent(WrapPtr<ConfigManager> config) {
 
 std::vector<TgBot::InlineQueryResult::Ptr> mediaQueryKeyboardFunction(
     DatabaseBase* database, std::string_view word) {
+    if (word.empty()) {
+        return {};  // Nothing to search.
+    }
+    // Perform search in media database.
     std::vector<TgBot::InlineQueryResult::Ptr> results;
     const auto medias = database->getAllMediaInfos();
     for (const auto& media : medias) {
@@ -433,7 +437,7 @@ std::vector<TgBot::InlineQueryResult::Ptr> mediaQueryKeyboardFunction(
     if (results.empty()) {
         auto noResult = std::make_shared<TgBot::InlineQueryResultArticle>();
         noResult->id = "no_result";
-        noResult->title = fmt::format("No results found by {}", word);
+        noResult->title = fmt::format("No results found by '{}'", word);
         noResult->description = "Try searching for something else";
         auto text = std::make_shared<TgBot::InputTextMessageContent>();
         text->messageText = "Try searching for something else";
