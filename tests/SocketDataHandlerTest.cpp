@@ -1,8 +1,11 @@
+#include <absl/strings/match.h>
+#include <fmt/chrono.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <tgbot/TgException.h>
 
 #include <SharedMalloc.hpp>
+#include <chrono>
 #include <cstdint>
 #include <filesystem>
 #include <impl/bot/TgBotSocketFileHelperNew.hpp>
@@ -174,7 +177,9 @@ TEST_F(SocketDataHandlerTest, TestCmdGetUptime) {
     sendAndVerifyHeader<TgBotSocket::callback::GetUptimeCallback,
                         TgBotSocket::Command::CMD_GET_UPTIME_CALLBACK>(
         pkt, &callbackData);
-    EXPECT_STREQ(callbackData.uptime.data(), "Uptime: 00:00:00.00");
+    EXPECT_TRUE(
+        absl::StrContains(callbackData.uptime.data(),
+                          fmt::format("{:%H:%M:%S}", std::chrono::seconds(0))));
     // Done
     verifyAndClear();
 }

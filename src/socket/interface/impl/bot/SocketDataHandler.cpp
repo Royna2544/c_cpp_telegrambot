@@ -226,7 +226,7 @@ bool SocketInterfaceTgBot::handle_DownloadFile(SocketConnContext ctx,
 bool SocketInterfaceTgBot::handle_GetUptime(SocketConnContext ctx,
                                             const void* /*ptr*/) {
     auto now = std::chrono::system_clock::now();
-    const auto diff = now - startTp;
+    const auto diff = to_secs(now - startTp);
     GetUptimeCallback callback{};
 
     copyTo(callback.uptime, fmt::format("Uptime: {:%H:%M:%S}", diff).c_str());
