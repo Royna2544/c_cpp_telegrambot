@@ -21,12 +21,12 @@ class Providers {
 
    public:
     Installable<Random> random{};
-    Installable<ResourceManager> resource{};
+    Installable<ResourceProvider> resource{};
     Installable<DatabaseBase> database{};
     Installable<ThreadManager> manager{};
     Installable<ConfigManager> config{};
 
-    APPLE_INJECT(Providers(Random *random, ResourceManager *resource,
+    APPLE_INJECT(Providers(Random *random, ResourceProvider *resource,
                            DatabaseBase *database, ThreadManager *thread,
                            ConfigManager *config)) {
         this->random.instance = random;
