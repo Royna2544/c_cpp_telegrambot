@@ -2,7 +2,6 @@
 #include <fmt/format.h>
 
 #include <ConfigManager.hpp>
-#include <StringToolsExt.hpp>
 #include <boost/program_options.hpp>
 #include <cstdlib>
 #include <filesystem>

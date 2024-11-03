@@ -2,8 +2,8 @@
 
 #include <Types.h>
 #include <absl/log/log.h>
+#include <fmt/format.h>
 
-#include <StringToolsExt.hpp>
 #include <database/DatabaseBase.hpp>
 #include <filesystem>
 #include <memory>
@@ -177,8 +177,7 @@ void TgBotDatabaseImpl::Providers::registerProvider(
     const std::string_view name, std::unique_ptr<DatabaseBase> provider) {
     // Check if the provider has already been registered
     if (_providers.contains(name)) {
-        LOG(WARNING) << "Database provider with name " << SingleQuoted(name)
-                     << " already registered.";
+        LOG(WARNING) << fmt::format("Database provider with name '{}' already registered.", name);
         return;
     }
 

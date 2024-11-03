@@ -1,4 +1,3 @@
-#include <StringToolsExt.hpp>
 #include <TryParseStr.hpp>
 #include <api/CommandModule.hpp>
 #include <api/TgBotApi.hpp>

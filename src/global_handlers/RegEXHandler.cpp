@@ -1,15 +1,14 @@
 #include <absl/log/log.h>
 #include <absl/status/status.h>
+#include <fmt/format.h>
 
-#include <global_handlers/RegEXHandler.hpp>
 #include <cctype>
+#include <expected_cpp20>
+#include <global_handlers/RegEXHandler.hpp>
 #include <ios>
 #include <optional>
 #include <regex>
 #include <string>
-
-#include "StringToolsExt.hpp"
-#include <expected_cpp20>
 
 using std::regex_constants::ECMAScript;
 using std::regex_constants::format_first_only;
@@ -117,7 +116,8 @@ struct ReplaceCommand : public RegexCommand {
             }
 
             if (!replaced) {
-                LOG(INFO) << "Found " << count << " matches, been told to replace " << *replaceIndex;
+                LOG(INFO) << "Found " << count
+                          << " matches, been told to replace " << *replaceIndex;
                 return std_cpp20::unexpected(Error::InvalidRegexMatchIndex);
             }
             // Append the remainder
@@ -126,12 +126,10 @@ struct ReplaceCommand : public RegexCommand {
             return result;
         }
 
-        DLOG(INFO) << "Replace from: (regex)" << SingleQuoted(target)
-                   << " To : " << SingleQuoted(replacement) << std::boolalpha
-                   << " global: "
-                   << ((kRegexMatchFlags & format_first_only) == 0)
-                   << std::boolalpha
-                   << " icase: " << ((kRegexFlags & icase) != 0);
+        DLOG(INFO) << fmt::format(
+            "Replace from: (regex) {} To : {} global: {} icase: {}", target,
+            replacement, (kRegexMatchFlags & format_first_only) == 0,
+            (kRegexFlags & icase) == 0);
 
         // Global replacement or case-insensitive
         return std::regex_replace(source, std::regex(target, kRegexFlags),

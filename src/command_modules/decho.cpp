@@ -1,7 +1,6 @@
 #include <absl/log/log.h>
 #include <tgbot/TgException.h>
 
-#include <StringToolsExt.hpp>
 #include <api/CommandModule.hpp>
 #include <api/MessageExt.hpp>
 #include <api/TgBotApi.hpp>

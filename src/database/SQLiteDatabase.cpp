@@ -2,6 +2,7 @@
 
 #include <absl/log/check.h>
 #include <absl/log/log.h>
+#include <absl/strings/ascii.h>
 #include <fmt/core.h>
 
 #include <StacktracePrint.hpp>
@@ -19,7 +20,6 @@
 #include <type_traits>
 #include <variant>
 
-#include "StringToolsExt.hpp"
 #include "Types.h"
 
 namespace {
@@ -263,7 +263,7 @@ SQLiteDatabase::Helper::getNextStatement() {
             return nullptr;
     }
 
-    if (isEmptyOrBlank(scriptContentUnparsed)) {
+    if (absl::StripAsciiWhitespace(scriptContentUnparsed).empty()) {
         return nullptr;
     }
     return std::make_shared<SQLiteDatabase::Helper>(
