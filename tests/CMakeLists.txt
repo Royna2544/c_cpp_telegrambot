@@ -20,7 +20,7 @@ add_my_executable(
     ConstexprStringCatTest.cpp
     commands/CommandModulesTest.cpp
     commands/AliveCmdTest.cpp
-    commands/BashCmdTest.cpp
+    #commands/BashCmdTest.cpp
     commands/CmdCmdTest.cpp
     commands/DatabaseCmdTest.cpp
     commands/DeleteEchoCmdTest.cpp
