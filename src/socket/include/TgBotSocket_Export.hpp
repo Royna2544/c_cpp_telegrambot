@@ -130,7 +130,7 @@ struct alignas(ALIGNMENT) Packet {
 
     // Converts to full SocketData object, including header
     SharedMalloc toSocketData() {
-        data->realloc(hdr_sz + header.data_size);
+        data->realloc(sizeof(PacketHeader) + header.data_size);
         data.move(0, sizeof(header), header.data_size);
         data.assignFrom(header);
         return data;

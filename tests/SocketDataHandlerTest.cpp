@@ -130,7 +130,7 @@ class SocketDataHandlerTest : public ::testing::Test {
         ASSERT_EQ(recv_header.data_size, sizeof(DataT));
         // Checking packet data
         EXPECT_NO_FATAL_FAILURE(packetData.assignTo(
-            out, sizeof(DataT), TgBotSocket::Packet::hdr_sz));
+            out, sizeof(DataT), sizeof(TgBotSocket::PacketHeader)));
     }
 
     static void isGenericAck_OK(const TgBotSocket::callback::GenericAck& ack) {
