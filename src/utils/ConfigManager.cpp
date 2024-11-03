@@ -13,7 +13,9 @@
 #include <optional>
 #include <ostream>
 #include <string_view>
+#include <utility>
 
+#include "CommandLine.hpp"
 #include "CompileTimeStringConcat.hpp"
 
 namespace po = boost::program_options;
@@ -137,8 +139,7 @@ struct ConfigBackendFile : public ConfigBackendBoostPOBase {
 };
 
 struct ConfigBackendCmdline : public ConfigBackendBoostPOBase {
-    char *const *_argv;
-    int _argc;
+    CommandLine _line;
 
     static po::options_description getTgBotOptionsDesc() {
         auto desc = ConfigBackendBoostPOBase::getTgBotOptionsDesc();
@@ -149,9 +150,9 @@ struct ConfigBackendCmdline : public ConfigBackendBoostPOBase {
 
     bool load() override {
         try {
-            po::store(
-                po::parse_command_line(_argc, _argv, getTgBotOptionsDesc()),
-                mp);
+            po::store(po::parse_command_line(_line.argc(), _line.argv(),
+                                             getTgBotOptionsDesc()),
+                      mp);
         } catch (const boost::program_options::error &e) {
             LOG(ERROR) << "Cmdline backend failed to parse: " << e.what();
             return false;
@@ -163,8 +164,7 @@ struct ConfigBackendCmdline : public ConfigBackendBoostPOBase {
     }
     [[nodiscard]] std::string_view name() const override { return "Cmdline"; }
 
-    ConfigBackendCmdline(int argc, char *const *argv)
-        : _argv(argv), _argc(argc) {}
+    explicit ConfigBackendCmdline(CommandLine line) : _line(std::move(line)) {}
     ~ConfigBackendCmdline() override = default;
 };
 
@@ -175,11 +175,8 @@ enum class Passes {
     DONE,
 };
 
-ConfigManager::ConfigManager(int argc, char *const *argv)
-    : _argc(argc),
-      _argv(argv),
-      startingDirectory(std::filesystem::current_path()) {
-    auto cmdline = std::make_unique<ConfigBackendCmdline>(_argc, _argv);
+ConfigManager::ConfigManager(CommandLine line) {
+    auto cmdline = std::make_unique<ConfigBackendCmdline>(std::move(line));
     if (cmdline->load()) {
         backends.emplace_back(std::move(cmdline));
     }
@@ -238,15 +235,4 @@ std::optional<std::string> ConfigManager::get(Configs config) {
 
 void ConfigManager::serializeHelpToOStream(std::ostream &out) {
     out << ConfigBackendCmdline::getTgBotOptionsDesc() << std::endl;
-}
-
-char *const *ConfigManager::argv() const { return _argv; }
-
-int ConfigManager::argc() const { return _argc; }
-
-std::filesystem::path ConfigManager::exe() const {
-    if (_argv == nullptr || _argv[0] == nullptr) {
-        return {};
-    }
-    return startingDirectory / _argv[0];
 }

@@ -46,7 +46,7 @@ DECLARE_COMMAND_HANDLER(restart) {
     myEnviron[count + 1] = nullptr;
 
     // Copy the command line used to launch the bot
-    auto *const argv = provider->config->argv();
+    auto *const argv = provider->cmdline->argv();
     auto *const exe = argv[0];
 
     // Log the restart command and the arguments to be used to restart the bot

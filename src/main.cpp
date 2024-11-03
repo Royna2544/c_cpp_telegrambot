@@ -39,6 +39,7 @@
 #include <utility>
 #include <vector>
 
+#include "CommandLine.hpp"
 #include "DatabaseBase.hpp"
 #include "SocketBase.hpp"
 #include "api/TgBotApi.hpp"
@@ -182,20 +183,23 @@ class WrapSharedPtr {
 
 namespace std {
 template <>
-struct hash<WrapPtr<ConfigManager>> {
-    size_t operator()(const WrapPtr<ConfigManager>& ptr) const {
-        // Customize the hashing logic based on your class’s structure
-        return std::hash<ConfigManager*>()(
-            ptr.pointer());  // Example using pointer hash
+struct hash<CommandLine> {
+    size_t operator()(const CommandLine& ptr) const {
+        size_t seed = 0;
+        for (int i = 1; i < ptr.argc(); ++i) {
+            seed ^= std::hash<std::string_view>{}(ptr.argv()[i]);
+        }
+        return seed;
     }
 };
 }  // namespace std
 
 namespace {
-fruit::Component<fruit::Required<WrapPtr<ConfigManager>>, ConfigManager>
+
+fruit::Component<fruit::Required<CommandLine>, ConfigManager>
 getConfigManagerComponent() {
     return fruit::createComponent().registerProvider(
-        [](WrapPtr<ConfigManager> config) { return config.pointer(); });
+        [](CommandLine line) { return ConfigManager(std::move(line)); });
 }
 
 fruit::Component<fruit::Required<ConfigManager>,
@@ -242,15 +246,15 @@ fruit::Component<ResourceProvider> getResourceProvider() {
     return fruit::createComponent().bind<ResourceProvider, ResourceManager>();
 }
 
-fruit::Component<
-    fruit::Required<AuthContext, StringResLoaderBase, Providers, ConfigManager>,
-    TgBotApiImpl, TgBotApi>
+fruit::Component<fruit::Required<AuthContext, StringResLoaderBase, Providers,
+                                 ConfigManager, CommandLine>,
+                 TgBotApiImpl, TgBotApi>
 getTgBotApiImplComponent() {
     return fruit::createComponent()
         .bind<TgBotApi, TgBotApiImpl>()
         .registerProvider([](AuthContext* auth, StringResLoaderBase* strings,
-                             Providers* provider,
-                             ConfigManager* config) -> TgBotApiImpl* {
+                             Providers* provider, ConfigManager* config,
+                             CommandLine* line) -> TgBotApiImpl* {
             auto token = config->get(ConfigManager::Configs::TOKEN);
             if (!token) {
                 LOG(ERROR) << "Failed to get TOKEN variable";
@@ -261,9 +265,9 @@ getTgBotApiImplComponent() {
             auto bot = new TgBotApiImpl(token.value(), auth, strings, provider);
 
             // Load modules
-            std::filesystem::path modules_path = config->exe().parent_path();
+            std::filesystem::path modules_path = line->exe().parent_path();
             std::error_code ec;
-            
+
             LOG(INFO) << "Loading commands from " << modules_path;
             for (const auto& it :
                  std::filesystem::directory_iterator(modules_path, ec)) {
@@ -376,13 +380,13 @@ getRegexHandlerComponent() {
         });
 }
 
-fruit::Component<TgBotApi, AuthContext, DatabaseBase, ThreadManager,
+fruit::Component<TgBotApi, AuthContext, DatabaseBase, ThreadManager, ConfigManager,
                  Unused<RegexHandler>, Unused<NetworkLogSink>,
                  WrapPtr<SpamBlockBase>, Unused<TgBotWebServer>,
                  TgBotApiExHandler, SocketComponentFactory_t,
                  WrapSharedPtr<SocketServerWrapper>>
-getAllComponent(WrapPtr<ConfigManager> config) {
-    static const auto _config = config;
+getAllComponent(CommandLine cmd) {
+    static auto _cmd = std::move(cmd);
     return fruit::createComponent()
         .bind<TgBotWebServerBase, TgBotWebServer>()
         .bind<VFSOperations, RealFS>()
@@ -397,7 +401,7 @@ getAllComponent(WrapPtr<ConfigManager> config) {
         .install(getResourceProvider)
         .install(getConfigManagerComponent)
         .install(getSocketServerComponent)
-        .bindInstance(_config);
+        .bindInstance(_cmd);
 }
 
 std::vector<TgBot::InlineQueryResult::Ptr> mediaQueryKeyboardFunction(
@@ -456,9 +460,19 @@ int main(int argc, char** argv) {
 
     // Initialize Abseil logging system
     TgBot_AbslLogInit();
+    
+    // Install signal handlers
+    SignalHandler::install();
 
-    // Create configmanager
-    auto configMgr = std::make_unique<ConfigManager>(argc, argv);
+    // Initialize dependencies
+    fruit::Injector<TgBotApi, AuthContext, DatabaseBase, ThreadManager, ConfigManager,
+                    Unused<RegexHandler>, Unused<NetworkLogSink>,
+                    WrapPtr<SpamBlockBase>, Unused<TgBotWebServer>,
+                    TgBotApiExHandler, SocketComponentFactory_t,
+                    WrapSharedPtr<SocketServerWrapper>>
+        injector(getAllComponent, CommandLine{argc, argv});
+
+    auto configMgr = injector.get<ConfigManager*>();
 
     // Initialize logging
     RAIILogSink<LogFileSink> logFileSink;
@@ -481,20 +495,6 @@ int main(int argc, char** argv) {
         LOG(ERROR) << "TOKEN is not set, but is required";
         return EXIT_FAILURE;
     }
-
-    // Install signal handlers
-    SignalHandler::install();
-
-    // Transfer ConfigManager ownership
-    WrapPtr configPtr{configMgr.release()};
-
-    // Initialize dependencies
-    fruit::Injector<TgBotApi, AuthContext, DatabaseBase, ThreadManager,
-                    Unused<RegexHandler>, Unused<NetworkLogSink>,
-                    WrapPtr<SpamBlockBase>, Unused<TgBotWebServer>,
-                    TgBotApiExHandler, SocketComponentFactory_t,
-                    WrapSharedPtr<SocketServerWrapper>>
-        injector(getAllComponent, configPtr);
 
     auto threadManager = injector.get<ThreadManager*>();
     auto api = injector.get<TgBotApi*>();

@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "CommandLine.hpp"
 #include "CompileTimeStringConcat.hpp"
 #include "EnumArrayHelpers.h"
 #include "trivial_helpers/fruit_inject.hpp"
@@ -69,17 +70,9 @@ class TgBotUtils_API ConfigManager {
     static void serializeHelpToOStream(std::ostream& out);
 
     // Constructor
-    APPLE_INJECT(ConfigManager(int argc, char* const* argv));
-
-    [[nodiscard]] char* const* argv() const;
-    [[nodiscard]] int argc() const;
-    [[nodiscard]] std::filesystem::path exe() const;
+    APPLE_EXPLICIT_INJECT(ConfigManager(CommandLine line));
 
    private:
-    int _argc;
-    char* const* _argv;
-    std::filesystem::path startingDirectory;
-
     using ConfigStr = StringConcat::String<20>;
     using DescStr = StringConcat::String<50>;
 

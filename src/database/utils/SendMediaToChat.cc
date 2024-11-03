@@ -24,7 +24,7 @@ int main(int argc, char** argv) {
         usage(capture0, std::forward<decltype(PH1)>(PH1));
     };
     TgBot_AbslLogInit();
-    auto config = std::make_unique<ConfigManager>(argc, argv);
+    auto config = std::make_unique<ConfigManager>(CommandLine{argc, argv});
 
     if (argc != 3) {
         _usage(EXIT_SUCCESS);

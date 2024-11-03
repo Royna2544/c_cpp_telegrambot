@@ -6,13 +6,14 @@
 #include <libfs.hpp>
 #include <memory>
 
+#include "CommandLine.hpp"
 #include "ConfigManager.hpp"
 #include "api/CommandModule.hpp"
 #include "api/Providers.hpp"
 #include "api/TgBotApi.hpp"
 #include "tests/ClassProviders.hpp"
 
-fruit::Component<ConfigManager> getConfigManager() {
+fruit::Component<CommandLine> getCommandLine() {
     return fruit::createComponent().registerProvider([] {
         static auto strings = testing::internal::GetArgvs();
         static std::vector<char*> c_strings;
@@ -23,21 +24,21 @@ fruit::Component<ConfigManager> getConfigManager() {
         }
         c_strings.emplace_back(nullptr);
 
-        return ConfigManager(strings.size(), c_strings.data());
+        return CommandLine(strings.size(), c_strings.data());
     });
 }
 
-fruit::Component<MockTgBotApi, Providers, MockDatabase, MockResource, MockRandom, ConfigManager> CommandModulesTest::getProviders() {
+fruit::Component<MockTgBotApi, Providers, MockDatabase, MockResource, MockRandom, ConfigManager, CommandLine> CommandModulesTest::getProviders() {
     return fruit::createComponent()
         .bind<Random::ImplBase, MockRandom>()
         .bind<ResourceProvider, MockResource>()
         .bind<DatabaseBase, MockDatabase>()
         .bind<TgBotApi, MockTgBotApi>()
-        .install(getConfigManager);
+        .install(getCommandLine);
 }
 
 void CommandModulesTest::SetUp() {
-    modulePath = provideInject.get<ConfigManager *>()->exe().parent_path();
+    modulePath = provideInject.get<CommandLine *>()->exe().parent_path();
     database = provideInject.get<MockDatabase*>();
     random = provideInject.get<MockRandom*>();
     resource = provideInject.get<MockResource*>();

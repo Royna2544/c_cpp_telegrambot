@@ -7,6 +7,7 @@
 #include <iostream>
 #include <memory>
 #include <vector>
+#include "CommandLine.hpp"
 #include "ConfigManager.hpp"
 
 enum class Commands {
@@ -152,7 +153,7 @@ void executeCommand<Commands::WhiteBlackList>(const CommandData& data) {
 int main(int argc, char** argv) {
     TgBot_AbslLogInit();
 
-    auto config = std::make_unique<ConfigManager>(argc, argv);
+    auto config = std::make_unique<ConfigManager>(CommandLine{argc, argv});
     std::vector<std::string_view> args;
     args.reserve(argc);
     for (int i = 0; i < argc; ++i) {

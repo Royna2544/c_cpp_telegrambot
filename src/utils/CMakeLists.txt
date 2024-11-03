@@ -8,6 +8,7 @@ add_my_library(
     ConfigManager.cpp
     ConfigManager_${TARGET_VARIANT}.cpp
     GitData.cpp
+    CommandLine.cpp
     ResourceManager.cpp
     libfs.cpp
     libfs_${TARGET_VARIANT}.cpp
