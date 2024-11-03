@@ -100,7 +100,7 @@ class CommandModulesTest : public ::testing::Test {
     static std::string current_path();
 
     static fruit::Component<MockTgBotApi, Providers, MockDatabase, MockResource,
-                            MockRandom, ConfigManager, CommandLine>
+                            MockRandom, CommandLine>
     getProviders();
 
     // Testing data
@@ -127,7 +127,7 @@ class CommandModulesTest : public ::testing::Test {
     MockRandom* random{};
     ConfigManager* configManager{};
     fruit::Injector<MockTgBotApi, Providers, MockDatabase, MockResource,
-                    MockRandom, ConfigManager, CommandLine>
+                    MockRandom, CommandLine>
         provideInject;
 };
 

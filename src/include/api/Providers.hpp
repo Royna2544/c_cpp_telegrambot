@@ -6,7 +6,6 @@
 #include <Random.hpp>
 #include <database/DatabaseBase.hpp>
 #include <trivial_helpers/fruit_inject.hpp>
-#include <utils/ConfigManager.hpp>
 
 #include "utils/CommandLine.hpp"
 
@@ -26,17 +25,15 @@ class Providers {
     Installable<ResourceProvider> resource{};
     Installable<DatabaseBase> database{};
     Installable<ThreadManager> manager{};
-    Installable<ConfigManager> config{};
     Installable<CommandLine> cmdline{};
 
     APPLE_INJECT(Providers(Random *random, ResourceProvider *resource,
                            DatabaseBase *database, ThreadManager *thread,
-                           ConfigManager *config, CommandLine *cmd)) {
+                           CommandLine *cmd)) {
         this->random.instance = random;
         this->resource.instance = resource;
         this->database.instance = database;
         this->manager.instance = thread;
-        this->config.instance = config;
         this->cmdline.instance = cmd;
     }
 };

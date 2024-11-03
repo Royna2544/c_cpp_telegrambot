@@ -28,7 +28,7 @@ fruit::Component<CommandLine> getCommandLine() {
     });
 }
 
-fruit::Component<MockTgBotApi, Providers, MockDatabase, MockResource, MockRandom, ConfigManager, CommandLine> CommandModulesTest::getProviders() {
+fruit::Component<MockTgBotApi, Providers, MockDatabase, MockResource, MockRandom, CommandLine> CommandModulesTest::getProviders() {
     return fruit::createComponent()
         .bind<Random::ImplBase, MockRandom>()
         .bind<ResourceProvider, MockResource>()
