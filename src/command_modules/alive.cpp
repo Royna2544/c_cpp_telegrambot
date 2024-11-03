@@ -2,6 +2,7 @@
 #include <ResourceManager.h>
 #include <absl/log/log.h>
 #include <absl/strings/str_replace.h>
+#include <absl/strings/str_split.h>
 #include <fmt/format.h>
 #include <tgbot/TgException.h>
 #include <trivial_helpers/_tgbot.h>
@@ -38,10 +39,13 @@ static DECLARE_COMMAND_HANDLER(alive) {
         GitData::Fill(&data);
         _version = provider->resource->get("about.html");
 
+        std::vector<std::string> splitMsg =
+            absl::StrSplit(data.commitmsg, '\n');
+
         // Replace placeholders in the version string with actual values.
         version = absl::StrReplaceAll(
             _version, {{commitid, data.commitid},
-                       {commitmsg, data.commitmsg},
+                       {commitmsg, splitMsg.front()},
                        {botname, api->getBotUser()->firstName},
                        {botusername, api->getBotUser()->username}});
     });
