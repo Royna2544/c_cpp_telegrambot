@@ -16,7 +16,8 @@ bool TgBotDatabaseImpl_load(ConfigManager* configmgr,
 
     if (dbConf) {
         // Expected format: <backend>:<filename>
-        configPair = absl::StrSplit(dbConf.value(), ":");
+        // Example: sqlite:database.db
+        configPair = absl::StrSplit(dbConf.value(), ",");
 
         if (!provider.chooseProvider(configPair.first)) {
             LOG(ERROR) << "Failed to choose provider";
