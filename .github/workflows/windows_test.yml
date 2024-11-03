@@ -63,8 +63,5 @@ jobs:
         cmake --build build -j4
 
     - name: Run Tests
-      env: 
-        DATABASE_BACKEND: sqlite:new.db
       run: |
-          ./build/bin/TgBot++_DatabaseCtl.exe set_owner_id 12345
           ./build/bin/TgBot++_test.exe
