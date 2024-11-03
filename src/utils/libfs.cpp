@@ -43,3 +43,6 @@ std::filesystem::path FS::getPath(PathType type) {
     }
     return path;
 }
+
+constexpr FS::SharedLibType FS::SharedLib; // NOLINT
+constexpr std::string_view FS::kDylibExtension; // NOLINT

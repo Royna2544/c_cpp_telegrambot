@@ -19,7 +19,7 @@ struct TgBotUtils_API FS {
     };
 
     struct SharedLibType {};
-    static constexpr inline SharedLibType SharedLib{};
+    static constexpr SharedLibType SharedLib{};
 
     /**
      * Returns the path associated with the specified type.
