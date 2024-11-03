@@ -188,7 +188,7 @@ command_module(
 command_module(
     NAME rotatepic
     SRCS rotatepic.cpp
-    LIBS TgBotImgProc TgBot
+    LIBS TgBotImgProc
 )
 
 command_module(
