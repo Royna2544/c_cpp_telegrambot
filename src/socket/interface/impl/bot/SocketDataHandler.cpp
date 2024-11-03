@@ -27,7 +27,8 @@ using namespace TgBotSocket::data;
 
 namespace {
 
-std::string getMIMEString(const ResourceProvider* resource, const std::string& path) {
+std::string getMIMEString(const ResourceProvider* resource,
+                          const std::string& path) {
     static std::once_flag once;
     static rapidjson::Document doc;
     std::string extension = fs::path(path).extension().string();
@@ -150,7 +151,8 @@ GenericAck SocketInterfaceTgBot::handle_SendFileToChatId(const void* ptr) {
     DLOG(INFO) << "Sending " << file << " to " << data->chat;
     // Try to send as local file first
     try {
-        fn(data->chat, InputFile::fromFile(file, getMIMEString(resource, file)));
+        fn(data->chat,
+           InputFile::fromFile(file, getMIMEString(resource, file)));
     } catch (std::ifstream::failure& e) {
         LOG(INFO) << "Failed to send '" << file
                   << "' as local file, trying as Telegram "
@@ -173,7 +175,8 @@ GenericAck SocketInterfaceTgBot::handle_ObserveAllChats(const void* ptr) {
 }
 
 GenericAck SocketInterfaceTgBot::handle_DeleteControllerById(const void* ptr) {
-    return GenericAck{AckType::ERROR_COMMAND_IGNORED, "This command is removed."};
+    return GenericAck{AckType::ERROR_COMMAND_IGNORED,
+                      "This command is removed."};
 }
 
 GenericAck SocketInterfaceTgBot::handle_UploadFile(
@@ -245,28 +248,6 @@ bool CHECK_PACKET_SIZE(Packet& pkt) {
     return true;
 }
 
-#define HANDLE(type, args...)               \
-    ([&]() -> decltype(ret) {               \
-        decltype(ret) __ret;                \
-        if (CHECK_PACKET_SIZE<type>(pkt)) { \
-            __ret = handle_##type(ptr);     \
-        } else {                            \
-            __ret = invalidPacketAck;       \
-        }                                   \
-        return __ret;                       \
-    }())
-
-#define HANDLE_EXT(type)                                      \
-    ([&]() -> decltype(ret) {                                 \
-        decltype(ret) __ret;                                  \
-        if (CHECK_PACKET_SIZE<type>(pkt)) {                   \
-            __ret = handle_##type(ptr, pkt.header.data_size); \
-        } else {                                              \
-            __ret = invalidPacketAck;                         \
-        }                                                     \
-        return __ret;                                         \
-    }())
-
 void SocketInterfaceTgBot::handlePacket(SocketConnContext ctx,
                                         TgBotSocket::Packet pkt) {
     const void* ptr = pkt.data.get();
@@ -276,22 +257,46 @@ void SocketInterfaceTgBot::handlePacket(SocketConnContext ctx,
 
     switch (pkt.header.cmd) {
         case Command::CMD_WRITE_MSG_TO_CHAT_ID:
-            ret = HANDLE(WriteMsgToChatId, 1);
+            if (CHECK_PACKET_SIZE<WriteMsgToChatId>(pkt)) {
+                ret = handle_WriteMsgToChatId(ptr);
+            } else {
+                ret = invalidPacketAck;
+            }
             break;
         case Command::CMD_CTRL_SPAMBLOCK:
-            ret = HANDLE(CtrlSpamBlock);
+            if (CHECK_PACKET_SIZE<CtrlSpamBlock>(pkt)) {
+                ret = handle_CtrlSpamBlock(ptr);
+            } else {
+                ret = invalidPacketAck;
+            }
             break;
         case Command::CMD_OBSERVE_CHAT_ID:
-            ret = HANDLE(ObserveChatId);
+            if (CHECK_PACKET_SIZE<ObserveChatId>(pkt)) {
+                ret = handle_ObserveChatId(ptr);
+            } else {
+                ret = invalidPacketAck;
+            }
             break;
         case Command::CMD_SEND_FILE_TO_CHAT_ID:
-            ret = HANDLE(SendFileToChatId);
+            if (CHECK_PACKET_SIZE<SendFileToChatId>(pkt)) {
+                ret = handle_SendFileToChatId(ptr);
+            } else {
+                ret = invalidPacketAck;
+            }
             break;
         case Command::CMD_OBSERVE_ALL_CHATS:
-            ret = HANDLE(ObserveAllChats);
+            if (CHECK_PACKET_SIZE<ObserveAllChats>(pkt)) {
+                ret = handle_ObserveAllChats(ptr);
+            } else {
+                ret = invalidPacketAck;
+            }
             break;
         case Command::CMD_DELETE_CONTROLLER_BY_ID:
-            ret = HANDLE(DeleteControllerById);
+            if (CHECK_PACKET_SIZE<DeleteControllerById>(pkt)) {
+                ret = handle_DeleteControllerById(ptr);
+            } else {
+                ret = invalidPacketAck;
+            }
             break;
         case Command::CMD_GET_UPTIME:
             ret = handle_GetUptime(ctx, ptr);
@@ -300,7 +305,11 @@ void SocketInterfaceTgBot::handlePacket(SocketConnContext ctx,
             ret = handle_UploadFile(ptr, pkt.header.data_size);
             break;
         case Command::CMD_UPLOAD_FILE_DRY:
-            ret = HANDLE_EXT(UploadFileDry);
+            if (CHECK_PACKET_SIZE<UploadFileDry>(pkt)) {
+                ret = handle_UploadFileDry(ptr, pkt.header.data_size);
+            } else {
+                ret = invalidPacketAck;
+            }
             break;
         case Command::CMD_DOWNLOAD_FILE:
             ret = handle_DownloadFile(ctx, ptr);
