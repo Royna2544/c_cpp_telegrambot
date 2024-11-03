@@ -324,8 +324,10 @@ getNetworkLogSinkComponent() {
         [](ThreadManager* thread,
            const WrapSharedPtr<SocketServerWrapper>& config)
             -> Unused<NetworkLogSink> {
-            thread->create<ThreadManager::Usage::LOGSERVER_THREAD,
-                           NetworkLogSink>(config.pointer());
+            if (config) {
+                thread->create<ThreadManager::Usage::LOGSERVER_THREAD,
+                               NetworkLogSink>(config.pointer());
+            }
             return {};
         });
 }
@@ -380,8 +382,8 @@ getRegexHandlerComponent() {
         });
 }
 
-fruit::Component<TgBotApi, AuthContext, DatabaseBase, ThreadManager, ConfigManager,
-                 Unused<RegexHandler>, Unused<NetworkLogSink>,
+fruit::Component<TgBotApi, AuthContext, DatabaseBase, ThreadManager,
+                 ConfigManager, Unused<RegexHandler>, Unused<NetworkLogSink>,
                  WrapPtr<SpamBlockBase>, Unused<TgBotWebServer>,
                  TgBotApiExHandler, SocketComponentFactory_t,
                  WrapSharedPtr<SocketServerWrapper>>
@@ -460,13 +462,13 @@ int main(int argc, char** argv) {
 
     // Initialize Abseil logging system
     TgBot_AbslLogInit();
-    
+
     // Install signal handlers
     SignalHandler::install();
 
     // Initialize dependencies
-    fruit::Injector<TgBotApi, AuthContext, DatabaseBase, ThreadManager, ConfigManager,
-                    Unused<RegexHandler>, Unused<NetworkLogSink>,
+    fruit::Injector<TgBotApi, AuthContext, DatabaseBase, ThreadManager,
+                    ConfigManager, Unused<RegexHandler>, Unused<NetworkLogSink>,
                     WrapPtr<SpamBlockBase>, Unused<TgBotWebServer>,
                     TgBotApiExHandler, SocketComponentFactory_t,
                     WrapSharedPtr<SocketServerWrapper>>
