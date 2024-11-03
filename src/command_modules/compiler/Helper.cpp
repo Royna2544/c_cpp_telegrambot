@@ -49,13 +49,13 @@ void CompilerInTgBotInterface::onResultReady(const std::string& text) {
     if (!text.empty()) {
         botApi->sendMessage(requestedMessage->get<MessageAttrs::Chat>(), text);
     } else {
-        output << fmt::format("{}\n",
+        output << fmt::format("\n{}",
                               access(_locale, Strings::OUTPUT_IS_EMPTY));
         botApi->editMessage(sentMessage, output.str());
     }
 }
 
 void CompilerInTgBotInterface::onWdtTimeout() {
-    output << "WDT TIMEOUT" << std::endl;
+    output << "\nWDT TIMEOUT" << std::endl;
     botApi->editMessage(sentMessage, output.str());
 }
