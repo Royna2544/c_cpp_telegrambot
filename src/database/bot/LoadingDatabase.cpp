@@ -1,35 +1,45 @@
-#include <database/bot/TgBotDatabaseImpl.hpp>
-#include <ConfigManager.hpp>
 #include <absl/log/log.h>
+#include <absl/strings/str_split.h>
 
-bool TgBotDatabaseImpl_load(ConfigManager* configmgr, TgBotDatabaseImpl* dbimpl) {
+#include <ConfigManager.hpp>
+#include <database/bot/TgBotDatabaseImpl.hpp>
+
+#include "DatabaseBase.hpp"
+
+bool TgBotDatabaseImpl_load(ConfigManager* configmgr,
+                            TgBotDatabaseImpl* dbimpl) {
     const auto dbConf = configmgr->get(ConfigManager::Configs::DATABASE_CFG);
-    std::error_code ec;
     bool loaded = false;
-
-    if (!dbConf) {
-        LOG(ERROR) << "No database backend specified in config";
-        return false;
-    }
-
-    const std::string& config = dbConf.value();
-    const auto speratorIdx = config.find(':');
-
-    if (speratorIdx == std::string::npos) {
-        LOG(ERROR) << "Invalid database configuration";
-        return false;
-    }
-
-    // Expected format: <backend>:filename relative to git root (Could be
-    // absolute)
-    const auto backendStr = config.substr(0, speratorIdx);
-    const auto filenameStr = config.substr(speratorIdx + 1);
-
     TgBotDatabaseImpl::Providers provider;
-    if (!provider.chooseProvider(backendStr)) {
-        LOG(ERROR) << "Failed to choose provider";
+    std::pair<std::string, std::string> configPair;
+    bool configValid = false;
+
+    if (dbConf) {
+        std::vector<std::string> config = absl::StrSplit(dbConf.value(), ":");
+        if (config.size() != 2) {
+            LOG(ERROR) << "Invalid database configuration";
+            return false;
+        }
+
+        // Expected format: <backend>:filename relative to git root (Could be
+        // absolute)
+        configPair = {std::move(config[0]), std::move(config[1])};
+
+        if (!provider.chooseProvider(configPair.first)) {
+            LOG(ERROR) << "Failed to choose provider";
+        } else {
+            configValid = true;
+        }
+    } else {
+        LOG(ERROR) << "No database backend specified in config";
+    }
+
+    if (!configValid && !provider.chooseAnyProvider()) {
+        LOG(ERROR) << "No available database providers";
         return false;
     }
+    std::filesystem::path filenameStr =
+        configValid ? configPair.second : DatabaseBase::kInMemoryDatabase;
     dbimpl->setImpl(std::move(provider));
     loaded = dbimpl->load(filenameStr);
     if (!loaded) {

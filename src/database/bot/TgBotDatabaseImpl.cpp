@@ -165,10 +165,10 @@ std::optional<ChatId> TgBotDatabaseImpl::getChatId(
 }
 
 TgBotDatabaseImpl::Providers::Providers() {
-#ifdef HAVE_SQLITE
+#ifdef DATABASE_HAVE_SQLITE
     registerProvider("sqlite", std::make_unique<SQLiteDatabase>());
 #endif
-#ifdef HAVE_PROTOBUF
+#ifdef DATABASE_HAVE_PROTOBUF
     registerProvider("protobuf", std::make_unique<ProtoDatabase>());
 #endif
 }
@@ -197,4 +197,19 @@ bool TgBotDatabaseImpl::Providers::chooseProvider(const std::string_view name) {
         chosenProvider = nullptr;
     }
     return chosenProvider != nullptr;
+}
+
+bool TgBotDatabaseImpl::Providers::chooseAnyProvider() {
+    if (!_providers.empty()) {
+        // Move the first provider to chosenProvider and clear the map
+        auto first = _providers.begin();
+        chosenProvider = std::move(first->second);
+        DLOG(INFO) << "Chosen any database provider: " << first->first;
+        _providers.clear();
+        return true;
+    } else {
+        chosenProvider = nullptr;
+        LOG(WARNING) << "No database providers registered.";
+        return false;
+    }
 }

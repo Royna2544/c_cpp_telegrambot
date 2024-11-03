@@ -10,13 +10,39 @@
 #include <memory>
 #include <trivial_helpers/fruit_inject.hpp>
 
+/**
+ * @brief TgBotDatabaseImpl is a class that implements the DatabaseBase
+ * interface for managing bot data. It provides functionality for interacting
+ * with different database providers.
+ */
 struct TgBotDBImpl_API TgBotDatabaseImpl : DatabaseBase {
+    /**
+     * @brief Providers is a nested struct that manages different database
+     * providers.
+     */
     struct TgBotDBImpl_API Providers {
         Providers();
 
+        /**
+         * @brief Registers a new database provider with the given name.
+         * @param name The name of the provider.
+         * @param provider A unique pointer to the database provider instance.
+         */
         void registerProvider(const std::string_view name,
                               std::unique_ptr<DatabaseBase> provider);
+
+        /**
+         * @brief Chooses the database provider with the given name.
+         * @param name The name of the provider.
+         * @return True if the provider is successfully chosen, false otherwise.
+         */
         bool chooseProvider(const std::string_view name);
+
+        /**
+         * @brief Chooses any available database provider.
+         * @return True if the provider is successfully chosen, false otherwise.
+         */
+        bool chooseAnyProvider();
 
         friend struct TgBotDatabaseImpl;
 
@@ -68,4 +94,5 @@ struct TgBotDBImpl_API TgBotDatabaseImpl : DatabaseBase {
     bool loaded = false;
 };
 
-extern bool TgBotDatabaseImpl_load(ConfigManager *configmgr, TgBotDatabaseImpl *dbimpl);
+extern bool TgBotDatabaseImpl_load(ConfigManager *configmgr,
+                                   TgBotDatabaseImpl *dbimpl);
