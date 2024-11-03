@@ -117,7 +117,7 @@ bool ProtoDatabase::load(std::filesystem::path filepath) {
 
     std::fstream input(filepath.string(), std::ios::in | std::ios::binary);
     if (!input.is_open()) {
-        LOG(INFO) << "Creating new file";
+        LOG(INFO) << "Creating new file: " << filepath;
         // Nothing to load here...
         return true;
     }
