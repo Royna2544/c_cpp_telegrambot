@@ -3,7 +3,7 @@
 #include <Types.h>
 #include <tgbot/types/Message.h>
 
-#include <bot/TgBotDatabaseImpl.hpp>
+#include <database/DatabaseBase.hpp>
 #include <chrono>
 #include "trivial_helpers/fruit_inject.hpp"
 
