@@ -1,6 +1,5 @@
 #include "LoggingServer.hpp"
 
-#include <CStringLifetime.h>
 #include <absl/log/log_entry.h>
 #include <absl/log/log_sink.h>
 #include <absl/log/log_sink_registry.h>

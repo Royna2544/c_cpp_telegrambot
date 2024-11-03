@@ -2,7 +2,6 @@
 #include <api/TgBotApi.hpp>
 #include <string_view>
 
-#include "CStringLifetime.h"
 #include "api/MessageExt.hpp"
 
 extern "C" {
@@ -12,8 +11,8 @@ void calculate_string_free(const char *expr);
 
 DECLARE_COMMAND_HANDLER(calc) {
     if (message->has<MessageAttrs::ExtraText>()) {
-        CStringLifetime expr = message->get<MessageAttrs::ExtraText>();
-        const std::string_view result = calculate_string(expr);
+        auto expr = message->get<MessageAttrs::ExtraText>();
+        const std::string_view result = calculate_string(expr.c_str());
         api->sendReplyMessage(message->message(), result);
         calculate_string_free(result.data());
     }

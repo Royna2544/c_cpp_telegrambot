@@ -1,13 +1,12 @@
 #include <shlobj.h>
 #include <shlwapi.h>
-
 #include <filesystem>
-#include <CStringLifetime.h>
+#include <string_view>
 #include "libfs.hpp"
 
 bool FS::exists(const std::filesystem::path& path) {
-    CStringLifetime filepath(path);
-    return PathFileExistsA(filepath) && !PathIsDirectoryA(filepath);
+    std::string filepath(path.string());
+    return PathFileExistsA(filepath.c_str()) && !PathIsDirectoryA(filepath.c_str());
 }
 
 bool FS::getHomePath(std::filesystem::path& buf) {
@@ -21,6 +20,6 @@ bool FS::getHomePath(std::filesystem::path& buf) {
 }
 
 bool FS::deleteFile(const std::filesystem::path &filename) {
-    CStringLifetime filepath(filename);
-    return DeleteFileA(filepath) != 0;
+    std::string filepath(filename.string());
+    return DeleteFileA(filepath.c_str()) != 0;
 }

@@ -1,4 +1,3 @@
-#include <CStringLifetime.h>
 #include <absl/log/log.h>
 #include <tgbot/TgException.h>
 #include <trivial_helpers/_std_chrono_templates.h>
@@ -111,7 +110,6 @@ void SpamBlockBase::runFunction() {
             const std::lock_guard<std::mutex> _(buffer_m);
             if (buffer_sub.size() > 0) {
                 auto its = buffer_sub.begin();
-                const CStringLifetime chatName = fmt::format("{}", its->first);
                 while (its != buffer_sub.end()) {
                     const auto it = findChatIt(
                         buffer, [](const auto &it) { return it.first; },
@@ -121,8 +119,7 @@ void SpamBlockBase::runFunction() {
                         continue;
                     }
                     if (its->second >= sSpamDetectThreshold) {
-                        LOG(INFO) << "Launching spamdetect for chat "
-                                  << std::quoted(chatName.get());
+                        LOG(INFO) << fmt::format("Launching spamdetect for chat {}", its->first);
                         spamDetectFunc(it);
                     }
                     buffer.erase(it);

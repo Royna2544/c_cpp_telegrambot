@@ -7,8 +7,6 @@
 #include <afunix.h>
 // clang-format on
 
-#include <CStringLifetime.h>
-
 #include <libfs.hpp>
 
 bool SocketInterfaceWindowsLocal::createLocalSocket(SocketConnContext *ctx) {
