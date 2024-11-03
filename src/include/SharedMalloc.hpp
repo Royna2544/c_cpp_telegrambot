@@ -71,10 +71,13 @@ struct SharedMalloc {
     }
     SharedMalloc() { parent = std::make_shared<SharedMallocParent>(); }
 
-    template <typename T>
+    template <typename T, std::enable_if_t<std::is_class_v<T>, bool> = true>
     explicit SharedMalloc(T value) {
         parent = std::make_shared<SharedMallocParent>(sizeof(T));
         assignFrom(value);
+    }
+    explicit SharedMalloc(std::nullptr_t  /*value*/) {
+        parent = std::make_shared<SharedMallocParent>();
     }
 
     SharedMallocParent *operator->() const { return parent.get(); }
