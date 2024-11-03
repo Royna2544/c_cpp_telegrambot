@@ -10,12 +10,51 @@
 #include <type_traits>
 #include <vector>
 
-class TgBotRandom_API Random {
+class TgBotRandom_API RandomBase {
    public:
     // Retval type for random
     using ret_type = size_t;
     static_assert(std::is_integral_v<ret_type>);
 
+    /**
+     * generate - Generate random number given a range.
+     * Conditionally uses platform-specific RNG.
+     *
+     * @param min min value
+     * @param max max value
+     * @throws std::runtime_error if min >= max
+     * @return Generated number
+     */
+    virtual ret_type generate(const ret_type min, const ret_type max) const = 0;
+
+    /**
+     * Alias for genRandomNumber(int, int) with min parameter as 0
+     * @param max max value
+     *
+     * @throws std::runtime_error if min >= max
+     * @return Generated number
+     */
+    ret_type generate(const ret_type max) const {
+        return generate(0, max);
+    }
+
+    /**
+     * Specialization of shuffle for std::string type.
+     * Calls an external function shuffleStringArray to shuffle the vector of
+     * strings.
+     *
+     * @param in The vector of strings to be shuffled.
+     *
+     * @note This function is called only when the template parameter Elem is
+     * std::string. It calls an external function shuffleStringArray.
+     *
+     * @throws No exceptions are thrown by this function.
+     */
+    virtual void shuffle(std::vector<std::string>& inArray) const = 0;
+};
+
+class TgBotRandom_API Random : public RandomBase {
+   public:
     /**
      * @brief      Base class for random number generators.
      *
@@ -114,9 +153,6 @@ class TgBotRandom_API Random {
         }
     };
 
-    // Use impl as the implementation
-    explicit Random(std::unique_ptr<ImplBase> impl) : impl_(std::move(impl)){};
-
     // Choose from default lists
     APPLE_INJECT(Random());
 
@@ -129,19 +165,10 @@ class TgBotRandom_API Random {
      * @throws std::runtime_error if min >= max
      * @return Generated number
      */
-    ret_type generate(const ret_type min, const ret_type max);
+    ret_type generate(const ret_type min, const ret_type max) const override;
 
     /**
-     * Alias for genRandomNumber(int, int) with min parameter as 0
-     * @param max max value
-     *
-     * @throws std::runtime_error if min >= max
-     * @return Generated number
-     */
-    ret_type generate(const ret_type max);
-
-    /**
-     * Specialization of shuffleArray for std::string type.
+     * Specialization of shuffle for std::string type.
      * Calls an external function shuffleStringArray to shuffle the vector of
      * strings.
      *
@@ -152,7 +179,7 @@ class TgBotRandom_API Random {
      *
      * @throws No exceptions are thrown by this function.
      */
-    void shuffleArray(std::vector<std::string>& inArray);
+    void shuffle(std::vector<std::string>& inArray) const override;
 
    private:
     std::unique_ptr<ImplBase> impl_;

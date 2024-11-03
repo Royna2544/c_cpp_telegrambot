@@ -37,7 +37,7 @@ DECLARE_COMMAND_HANDLER(possibility) {
     // Put it in vector again and shuffle it.
     vec = {set.begin(), set.end()};
     // Shuffle the vector.
-    provider->random->shuffleArray(vec);
+    provider->random->shuffle(vec);
     // Start the output stream
     outStream << fmt::format(
         "{} {} {}\n", access(res, Strings::TOTAL_ITEMS_PREFIX), vec.size(),

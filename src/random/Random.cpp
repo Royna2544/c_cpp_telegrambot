@@ -131,14 +131,10 @@ Random::Random() {
     }
 }
 
-void Random::shuffleArray(std::vector<std::string>& array) {
+void Random::shuffle(std::vector<std::string>& array) const {
     impl_->shuffle(array);
 }
 
-Random::ret_type Random::generate(const ret_type max) {
-    return impl_->generate(0, max);
-}
-
-Random::ret_type Random::generate(const ret_type min, const ret_type max) {
+Random::ret_type Random::generate(const ret_type min, const ret_type max) const {
     return impl_->generate(min, max);
 }

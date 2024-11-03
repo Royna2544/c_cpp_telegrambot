@@ -21,7 +21,7 @@ class Providers {
     };
 
    public:
-    Installable<Random> random{};
+    Installable<RandomBase> random{};
     Installable<ResourceProvider> resource{};
     Installable<DatabaseBase> database{};
     Installable<ThreadManager> manager{};

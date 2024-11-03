@@ -185,16 +185,14 @@ class MockTgBotApi : public TgBotApi {
                 (override));
 };
 
-class MockRandom : public Random::ImplBase {
+class MockRandom : public RandomBase {
    public:
     using ret_type = Random::ret_type;
     APPLE_INJECT(MockRandom()) = default;
 
-    MOCK_METHOD(bool, isSupported, (), (const, override));
     MOCK_METHOD(ret_type, generate, (const ret_type min, const ret_type max),
                 (const, override));
-    MOCK_METHOD(std::string_view, getName, (), (const));
-    MOCK_METHOD(void, shuffle, (std::vector<std::string>&), (const));
+    MOCK_METHOD(void, shuffle, (std::vector<std::string>&), (const, override));
 };
 
 class MockResource : public ResourceProvider {

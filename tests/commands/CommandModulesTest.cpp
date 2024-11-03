@@ -8,10 +8,14 @@
 
 #include "CommandLine.hpp"
 #include "ConfigManager.hpp"
+#include "Random.hpp"
 #include "api/CommandModule.hpp"
 #include "api/Providers.hpp"
 #include "api/TgBotApi.hpp"
+#include "fruit/fruit.h"
+#include "fruit/fruit_forward_decls.h"
 #include "tests/ClassProviders.hpp"
+#include "trivial_helpers/fruit_inject.hpp"
 
 fruit::Component<CommandLine> getCommandLine() {
     return fruit::createComponent().registerProvider([] {
@@ -28,17 +32,19 @@ fruit::Component<CommandLine> getCommandLine() {
     });
 }
 
-fruit::Component<MockTgBotApi, Providers, MockDatabase, MockResource, MockRandom, CommandLine> CommandModulesTest::getProviders() {
+fruit::Component<MockTgBotApi, Providers, MockDatabase, MockResource,
+                 CommandLine, MockRandom>
+CommandModulesTest::getProviders() {
     return fruit::createComponent()
-        .bind<Random::ImplBase, MockRandom>()
         .bind<ResourceProvider, MockResource>()
         .bind<DatabaseBase, MockDatabase>()
         .bind<TgBotApi, MockTgBotApi>()
+        .bind<RandomBase, MockRandom>()
         .install(getCommandLine);
 }
 
 void CommandModulesTest::SetUp() {
-    modulePath = provideInject.get<CommandLine *>()->exe().parent_path();
+    modulePath = provideInject.get<CommandLine*>()->exe().parent_path();
     database = provideInject.get<MockDatabase*>();
     random = provideInject.get<MockRandom*>();
     resource = provideInject.get<MockResource*>();
