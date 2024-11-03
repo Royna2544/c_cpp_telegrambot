@@ -127,7 +127,7 @@ struct ReplaceCommand : public RegexCommand {
         }
 
         DLOG(INFO) << fmt::format(
-            "Replace from: (regex) {} To : {} global: {} icase: {}", target,
+            "Replace with RegEX: '{}', target: '{}', Opt: global={} icase={}", target,
             replacement, (kRegexMatchFlags & format_first_only) == 0,
             (kRegexFlags & icase) == 0);
 
