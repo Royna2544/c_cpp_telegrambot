@@ -1,5 +1,5 @@
-#include <fmt/ranges.h>
 #include <fmt/format.h>
+#include <fmt/ranges.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -12,6 +12,7 @@
 #include <utility>
 
 #include "../ClassProviders.hpp"
+#include "ConfigManager.hpp"
 #include "api/Providers.hpp"
 #include "api/Utils.hpp"
 #include "fruit/fruit.h"
@@ -32,6 +33,9 @@ using testing::WithArg;
 using TgBot::ChatPermissions;
 
 class CommandModulesTest : public ::testing::Test {
+   public:
+    CommandModulesTest() : provideInject(getProviders) {}
+
    protected:
     /**
      * @brief Set up the test fixture before each test case.
@@ -110,9 +114,10 @@ class CommandModulesTest : public ::testing::Test {
                                                  TEST_MEDIA_UNIQUEID};
 
     std::shared_ptr<MockTgBotApi> botApi = std::make_shared<MockTgBotApi>();
-    MockDatabase* database;
+    MockDatabase* database{};
     TgBotDatabaseImpl databaseImpl;
     std::filesystem::path modulePath;
+    fruit::Injector<Providers, ConfigManager> provideInject;
 };
 
 class CommandTestBase : public CommandModulesTest {
@@ -154,8 +159,6 @@ class CommandTestBase : public CommandModulesTest {
             defaultProvidedMessage->text.size();
     }
     void execute() {
-        fruit::Injector<Providers> provideInject(getProviders);
-
         module->function(
             botApi.get(),
             std::make_shared<MessageExt>(defaultProvidedMessage,

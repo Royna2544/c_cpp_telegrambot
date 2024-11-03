@@ -6,11 +6,13 @@
 #include <libfs.hpp>
 #include <memory>
 
+#include "ConfigManager.hpp"
 #include "api/CommandModule.hpp"
 
 void CommandModulesTest::SetUp() {
     TgBotDatabaseImpl::Providers provider;
 
+    modulePath = provideInject.get<ConfigManager *>()->exe().parent_path();
     database = new MockDatabase();
     provider.registerProvider("testing",
                               std::unique_ptr<MockDatabase>(database));

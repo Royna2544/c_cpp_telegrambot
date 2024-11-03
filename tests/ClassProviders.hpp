@@ -5,7 +5,9 @@
 #include <Random.hpp>
 #include <api/TgBotApi.hpp>
 #include <database/DatabaseBase.hpp>
+#include <string_view>
 
+#include "ConfigManager.hpp"
 #include "ResourceManager.h"
 #include "StringResLoader.hpp"
 #include "api/Providers.hpp"
@@ -13,6 +15,7 @@
 #include "fruit/fruit.h"
 #include "fruit/fruit_forward_decls.h"
 #include "fruit/provider.h"
+#include "gtest/gtest.h"
 #include "trivial_helpers/fruit_inject.hpp"
 
 class MockDatabase : public DatabaseBase {
@@ -212,9 +215,25 @@ struct MockLocaleStrings : public StringResLoaderBase::LocaleStrings {
     MOCK_METHOD(size_t, size, (), (override, const, noexcept));
 };
 
-inline fruit::Component<Providers> getProviders() {
+inline fruit::Component<ConfigManager> getConfigManager() {
+    return fruit::createComponent().registerProvider([] {
+        static auto strings = testing::internal::GetArgvs();
+        static std::vector<char*> c_strings;
+
+        c_strings.reserve(strings.size() + 1);
+        for (auto& s : strings) {
+            c_strings.emplace_back(s.data());
+        }
+        c_strings.emplace_back(nullptr);
+
+        return ConfigManager(strings.size(), c_strings.data());
+    });
+}
+
+inline fruit::Component<Providers, ConfigManager> getProviders() {
     return fruit::createComponent()
         .bind<Random::ImplBase, MockRandom>()
         .bind<ResourceProvider, MockResource>()
-        .bind<DatabaseBase, MockDatabase>();
+        .bind<DatabaseBase, MockDatabase>()
+        .install(getConfigManager);
 }
