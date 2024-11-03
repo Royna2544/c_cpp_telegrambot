@@ -229,8 +229,7 @@ bool SocketInterfaceTgBot::handle_GetUptime(SocketConnContext ctx,
     const auto diff = now - startTp;
     GetUptimeCallback callback{};
 
-    (void)std::snprintf(callback.uptime.data(), callback.uptime.size() - 1,
-                        "%s", fmt::format("Uptime: {:%H:%M:%S}", diff).c_str());
+    copyTo(callback.uptime, fmt::format("Uptime: {:%H:%M:%S}", diff).c_str());
     LOG(INFO) << "Sending text back: " << std::quoted(callback.uptime.data());
     Packet pkt(Command::CMD_GET_UPTIME_CALLBACK, callback);
     interface->writeToSocket(std::move(ctx), pkt.toSocketData());
