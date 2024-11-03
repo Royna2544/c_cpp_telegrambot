@@ -96,7 +96,8 @@ INSTANTIATE_TEST_SUITE_P(
         Params{"Hello, World!", "s/[Hello/Hi/g", "Exception"},
 
         // Invalid range in character class
-        Params{"Hello, World!", "s/[z-a]/Hi/g", "Exception"},
+        // Params{"Hello, World!", "s/[z-a]/Hi/g", "Exception"},
+        // libc++ doesn't it as a fault, so remove.
 
         // Invalid escape sequence (seems not be an error here...)
         // Invalid combination of flags (Skipped as the code would ignore it
