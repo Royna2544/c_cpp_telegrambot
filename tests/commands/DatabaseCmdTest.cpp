@@ -87,7 +87,7 @@ struct DatabaseCommandTest : public CommandTestBase {
                             ->keyboard[X][Y]
                             ->text;
                 }),
-                InvokeArgument<0>(botApi.get(), recievedMessage), Return()));
+                InvokeArgument<0>(botApi, recievedMessage), Return()));
         execute();
     }
 };

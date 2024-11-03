@@ -99,6 +99,10 @@ class CommandModulesTest : public ::testing::Test {
      */
     static std::string current_path();
 
+    static fruit::Component<MockTgBotApi, Providers, MockDatabase, MockResource,
+                            MockRandom, ConfigManager>
+    getProviders();
+
     // Testing data
     static constexpr ChatId TEST_CHAT_ID = 123123;
     static constexpr UserId TEST_USER_ID = 456456;
@@ -111,13 +115,20 @@ class CommandModulesTest : public ::testing::Test {
     static constexpr long TEST_BOT_USER_ID_OFFSET = 1000;
     const MediaIds TEST_MEDIAIDS{TEST_MEDIA_ID, TEST_MEDIA_UNIQUEID};
     const DatabaseBase::MediaInfo TEST_MEDIAINFO{TEST_MEDIA_ID,
-                                                 TEST_MEDIA_UNIQUEID};
+                                                 TEST_MEDIA_UNIQUEID,
+                                                 {"name1", "name2"},
+                                                 DatabaseBase::MediaType::GIF};
 
-    std::shared_ptr<MockTgBotApi> botApi = std::make_shared<MockTgBotApi>();
-    MockDatabase* database{};
-    TgBotDatabaseImpl databaseImpl;
     std::filesystem::path modulePath;
-    fruit::Injector<Providers, ConfigManager> provideInject;
+    // Mocked objects
+    MockTgBotApi* botApi{};
+    MockDatabase* database{};
+    MockResource* resource{};
+    MockRandom* random{};
+    ConfigManager* configManager{};
+    fruit::Injector<MockTgBotApi, Providers, MockDatabase, MockResource,
+                    MockRandom, ConfigManager>
+        provideInject;
 };
 
 class CommandTestBase : public CommandModulesTest {
@@ -160,7 +171,7 @@ class CommandTestBase : public CommandModulesTest {
     }
     void execute() {
         module->function(
-            botApi.get(),
+            botApi,
             std::make_shared<MessageExt>(defaultProvidedMessage,
                                          SplitMessageText::ByWhitespace),
             &strings, provideInject.get<Providers*>());
@@ -168,7 +179,7 @@ class CommandTestBase : public CommandModulesTest {
 
     struct SentMessage {
         Message::Ptr message;
-        std::shared_ptr<MockTgBotApi> botApi;
+        MockTgBotApi* botApi;
 
         template <typename T>
         const SentMessage& willEdit(T&& matcher,
