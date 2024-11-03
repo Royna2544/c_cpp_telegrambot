@@ -67,6 +67,12 @@ TEST_P(DatabaseBaseTest, LoadAndUnloadDatabase) {
 
     // Load the database from file
     EXPECT_TRUE(db->load(testFilePath));
+
+    // Unload the database again
+    EXPECT_TRUE(db->unloadDatabase());
+
+    // Remove file
+    EXPECT_TRUE(std::filesystem::remove(testFilePath));
 }
 
 // Test setting and getting owner user ID
