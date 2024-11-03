@@ -378,6 +378,8 @@ bool SQLiteDatabase::load(std::filesystem::path filepath) {
         return false;
     }
 
+    bool existed = FS::exists(filepath);
+
     ret = sqlite3_open(filepath.string().c_str(), &db);
     if (ret != SQLITE_OK) {
         LOG(ERROR) << "Could not open database: " << sqlite3_errmsg(db);
@@ -385,7 +387,7 @@ bool SQLiteDatabase::load(std::filesystem::path filepath) {
     }
 
     // Check if the database exists and initialize it if necessary.
-    if (!FS::exists(filepath) || filepath == kInMemoryDatabase) {
+    if (!existed || filepath == kInMemoryDatabase) {
         LOG(INFO) << "Running initialization script...";
         const auto helper =
             Helper::create(db, Helper::kCreateDatabaseFile.data());
