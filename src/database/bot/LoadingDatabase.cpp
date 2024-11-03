@@ -11,19 +11,12 @@ bool TgBotDatabaseImpl_load(ConfigManager* configmgr,
     const auto dbConf = configmgr->get(ConfigManager::Configs::DATABASE_CFG);
     bool loaded = false;
     TgBotDatabaseImpl::Providers provider;
-    std::pair<std::string, std::string> configPair;
+    std::pair<std::string, std::filesystem::path> configPair;
     bool configValid = false;
 
     if (dbConf) {
-        std::vector<std::string> config = absl::StrSplit(dbConf.value(), ":");
-        if (config.size() != 2) {
-            LOG(ERROR) << "Invalid database configuration";
-            return false;
-        }
-
-        // Expected format: <backend>:filename relative to git root (Could be
-        // absolute)
-        configPair = {std::move(config[0]), std::move(config[1])};
+        // Expected format: <backend>:<filename>
+        configPair = absl::StrSplit(dbConf.value(), ":");
 
         if (!provider.chooseProvider(configPair.first)) {
             LOG(ERROR) << "Failed to choose provider";
