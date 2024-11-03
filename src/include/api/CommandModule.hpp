@@ -7,8 +7,8 @@
 
 #include "StringResLoader.hpp"
 #include "api/MessageExt.hpp"
-#include "api/TgBotApi.hpp"
 #include "api/Providers.hpp"
+#include "api/TgBotApi.hpp"
 
 class CommandModule;
 
@@ -25,10 +25,11 @@ using loadcmd_function_t =
 
 // Command handler helper macros
 #define COMMAND_HANDLER_NAME(cmd) handle_command_##cmd
-#define DECLARE_COMMAND_HANDLER(cmd)                \
-    void COMMAND_HANDLER_NAME(cmd)(                 \
-        TgBotApi::Ptr api, MessageExt::Ptr message, \
-        const StringResLoaderBase::LocaleStrings* res, const Providers* provider)
+#define DECLARE_COMMAND_HANDLER(cmd)                   \
+    void COMMAND_HANDLER_NAME(cmd)(                    \
+        TgBotApi::Ptr api, MessageExt::Ptr message,    \
+        const StringResLoaderBase::LocaleStrings* res, \
+        const Providers* provider)
 
 using command_callback_t = std::function<void(
     TgBotApi::Ptr api, MessageExt::Ptr,
@@ -41,9 +42,9 @@ class CommandModule {
     static constexpr std::string_view prefix = "libcmd_";
 
     // Module information.
-    enum Flags { None = 0, Enforced = 1 << 0, HideDescription = 1 << 1 };
+    enum class Flags { None = 0, Enforced = 1 << 0, HideDescription = 1 << 1 };
     command_callback_t function;
-    unsigned int flags = None;
+    Flags flags = Flags::None;
     std::string name;
     std::string description;
 
@@ -111,9 +112,16 @@ class CommandModule {
     bool unload();
 
     // Trival accessors.
-    [[nodiscard]] bool isLoaded() const { return handle != nullptr; }
-    [[nodiscard]] bool isEnforced() const { return (flags & Enforced) != 0; }
-    [[nodiscard]] bool isHideDescription() const {
-        return (flags & HideDescription) != 0;
-    }
+    [[nodiscard]] bool isLoaded() const;
+    [[nodiscard]] bool isEnforced() const;
+    [[nodiscard]] bool isHideDescription() const;
 };
+
+inline bool operator&(const CommandModule::Flags& lhs,
+                      const CommandModule::Flags& rhs) {
+    return (static_cast<int>(lhs) & static_cast<int>(rhs)) != 0;
+}
+
+inline CommandModule::Flags operator|(const CommandModule::Flags& lhs, const CommandModule::Flags& rhs) {
+    return static_cast<CommandModule::Flags>(static_cast<int>(lhs) | static_cast<int>(rhs));
+}

@@ -116,3 +116,9 @@ bool CommandModule::unload() {
     }
     return false;
 }
+
+bool CommandModule::isLoaded() const { return handle != nullptr; }
+bool CommandModule::isEnforced() const { return flags & Flags::Enforced; }
+bool CommandModule::isHideDescription() const {
+    return flags & Flags::HideDescription;
+}
