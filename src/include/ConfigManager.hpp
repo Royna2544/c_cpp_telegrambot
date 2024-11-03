@@ -77,8 +77,7 @@ class TgBotUtils_API ConfigManager {
     static void serializeHelpToOStream(std::ostream& out);
 
     // Constructor
-    ConfigManager(int argc, char* const* argv);
-    APPLE_INJECT(ConfigManager());
+    APPLE_INJECT(ConfigManager(int argc, char* const* argv));
 
     [[nodiscard]] char* const* argv() const;
     [[nodiscard]] int argc() const;

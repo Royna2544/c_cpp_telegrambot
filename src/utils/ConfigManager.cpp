@@ -195,21 +195,6 @@ ConfigManager::ConfigManager(int argc, char *const *argv)
     DLOG(INFO) << "Loaded " << backends.size() << " config sources";
 }
 
-ConfigManager::ConfigManager()
-    : startingDirectory(std::filesystem::current_path()) {
-    auto env = std::make_unique<ConfigBackendEnv>();
-    if (env->load()) {
-        backends.emplace_back(std::move(env));
-    }
-    auto file = std::make_unique<ConfigBackendFile>();
-    if (file->load()) {
-        backends.emplace_back(std::move(file));
-    }
-    DLOG(INFO) << "Loaded " << backends.size() << " config sources";
-    _argc = -1;
-    _argv = nullptr;
-}
-
 std::optional<std::string> ConfigManager::get(Configs config) {
     Passes p = Passes::INIT;
     std::string outvalue;
@@ -261,5 +246,8 @@ char *const *ConfigManager::argv() const { return _argv; }
 int ConfigManager::argc() const { return _argc; }
 
 std::filesystem::path ConfigManager::exe() const {
+    if (_argv == nullptr || _argv[0] == nullptr) {
+        return {};
+    }
     return startingDirectory / _argv[0];
 }
