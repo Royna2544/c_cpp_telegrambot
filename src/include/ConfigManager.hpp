@@ -37,14 +37,6 @@ class TgBotUtils_API ConfigManager {
     std::optional<std::string> get(Configs config);
 
     /**
-     * set - Function used to set the value of a specific configuration.
-     *
-     * @param config The configuration for which the value is to be set.
-     * @param value The new value to be set for the specified configuration.
-     */
-    static void set(Configs config, const std::string& value);
-
-    /**
      * getEnv - Function used to retrieve the value of an environment variable.
      *
      * @param name The name of the environment variable for which the value is
@@ -65,7 +57,7 @@ class TgBotUtils_API ConfigManager {
      * If the environment variable is found but its value is empty, the 'value'
      * parameter will be set to an empty string.
      */
-    static bool getEnv(const std::string& name, std::string& value);
+    static bool getEnv(const std::string_view name, std::string& value);
 
     /**
      * serializeHelpToOStream - Function used to serialize the help information

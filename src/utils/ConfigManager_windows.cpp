@@ -1,19 +1,9 @@
 #include <ConfigManager.hpp>
-#include <windows.h>
+#include <Windows.h>
 
-#include "CStringLifetime.h"
-
-void ConfigManager::set(Configs config, const std::string &value_) {
-    CStringLifetime key =
-        ConfigManager::kConfigsMap.at(static_cast<int>(config)).second;
-    CStringLifetime value = value_;
-    SetEnvironmentVariable(key, value);
-}
-
-bool ConfigManager::getEnv(const std::string &name, std::string &value) {
-    CStringLifetime key = name;
+bool ConfigManager::getEnv(const std::string_view name, std::string &value) {
     std::array<char, 1024> buf = {};
-    if (GetEnvironmentVariable(key, buf.data(), buf.size()) != 0) {
+    if (GetEnvironmentVariable(name.data(), buf.data(), buf.size()) != 0) {
         value = buf.data();
         return true;
     }
