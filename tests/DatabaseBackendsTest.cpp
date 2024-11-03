@@ -1,7 +1,12 @@
 #include <gtest/gtest.h>
 
+#ifdef DATABASE_HAVE_PROTOBUF
 #include <database/ProtobufDatabase.hpp>
+#endif
+#ifdef DATABASE_HAVE_SQLITE
 #include <database/SQLiteDatabase.hpp>
+#endif
+
 #include <memory>
 #include <string>
 
@@ -135,5 +140,13 @@ TEST_P(DatabaseBaseTest, DumpDatabase) {
 INSTANTIATE_TEST_SUITE_P(
     DatabaseImplementations, DatabaseBaseTest,
     ::testing::Values(
-        DBParam{std::make_shared<ProtoDatabase>(), "ProtoDatabase"},
-        DBParam{std::make_shared<SQLiteDatabase>(), "SQLiteDatabase"}));
+#ifdef DATABASE_HAVE_PROTOBUF
+        DBParam{std::make_shared<ProtoDatabase>(), "ProtoDatabase"}
+#endif
+#if defined DATABASE_HAVE_PROTOBUF && defined DATABASE_HAVE_SQLITE
+,
+#endif
+#if defined DATABASE_HAVE_SQLITE
+        DBParam{std::make_shared<SQLiteDatabase>(), "SQLiteDatabase"}
+#endif
+    ));

@@ -11,10 +11,10 @@
 #include <ostream>
 #include <string_view>
 
-#ifdef HAVE_PROTOBUF
+#ifdef DATABASE_HAVE_PROTOBUF
 #include <database/ProtobufDatabase.hpp>
 #endif
-#ifdef HAVE_SQLITE
+#ifdef DATABASE_HAVE_SQLITE
 #include <database/SQLiteDatabase.hpp>
 #endif
 
