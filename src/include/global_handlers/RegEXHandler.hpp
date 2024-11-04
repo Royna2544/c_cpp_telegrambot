@@ -8,6 +8,7 @@
 #include <string>
 #include <api/TgBotApi.hpp>
 #include <trivial_helpers/fruit_inject.hpp>
+#include <mutex>
 
 /**
  * @brief Interface for a regex command.

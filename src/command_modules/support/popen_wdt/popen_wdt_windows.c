@@ -94,7 +94,7 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
     popen_watchdog_data_t* wdt_data = NULL;
     struct popen_wdt_windows_priv pdata;
 
-    CHAR buffer[PATH_MAX] = {0};
+    CHAR buffer[MAX_PATH] = {0};
     BOOL success = 0;
     SECURITY_ATTRIBUTES saAttr;
     STARTUPINFO si;
@@ -122,8 +122,6 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
             CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0,
                               sizeof(struct popen_wdt_windows_priv), NULL);
         if (hMapFile == NULL) {
-            CloseHandle(child_stdout_r);
-            CloseHandle(child_stdout_w);
             return false;
         }
 
@@ -133,13 +131,14 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
             sizeof(struct popen_wdt_windows_priv));
         if (wdt_data->privdata == NULL) {
             CloseHandle(hMapFile);
-            CloseHandle(child_stdout_r);
-            CloseHandle(child_stdout_w);
             return false;
         }
     } else {
         // Malloc does the work here, no need to be shared among threads
         wdt_data->privdata = malloc(sizeof(struct popen_wdt_windows_priv));
+        if (wdt_data->privdata == NULL) {
+            return false;
+        }
     }
 
     // memset memory
@@ -158,6 +157,8 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
         if (wdt_data->watchdog_enabled) {
             UnmapViewOfFile(wdt_data->privdata);
             CloseHandle(hMapFile);
+        } else {
+            free(wdt_data->privdata);
         }
         return false;
     }
@@ -168,6 +169,8 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
         if (wdt_data->watchdog_enabled) {
             UnmapViewOfFile(wdt_data->privdata);
             CloseHandle(hMapFile);
+        } else {
+            free(wdt_data->privdata);
         }
         CloseHandle(child_stdout_w);
         return false;
@@ -198,6 +201,8 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
         if (wdt_data->watchdog_enabled) {
             UnmapViewOfFile(wdt_data->privdata);
             CloseHandle(hMapFile);
+        } else {
+            free(wdt_data->privdata);
         }
         CloseHandle(child_stdout_r);
         CloseHandle(child_stdout_w);
@@ -218,6 +223,8 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
             UnmapViewOfFile(wdt_data->privdata);
             CloseHandle(hMapFile);
             return false;
+        } else {
+            free(wdt_data->privdata);
         }
     } else {
         ResumeThread(pi.hThread);

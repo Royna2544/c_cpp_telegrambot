@@ -2,9 +2,12 @@
 
 #ifdef WINDOWS_BUILD
 #include <winsock2.h>
+#include <ws2ipdef.h>
+#include <ws2tcpip.h>
+#include <afunix.h>
 #include <windows.h>
-#undef interface
 #else
+#include <sys/socket.h> // socklen_t
 #endif
 
 #ifdef WINDOWS_BUILD

@@ -12,8 +12,15 @@ MessageExt::MessageExt(Message::Ptr message, SplitMessageText how)
         return;
     }
     _replyMessage = std::make_shared<MessageExt>(_message->replyToMessage);
+
+    // Empty message won't need parsing
+    if (_message->text.empty()) {
+        return;
+    }
+
     // Initially, _extra_args is full text
     _extra_args = _message->text;
+
     // Try to find botcommand entity
     const auto botCommandEnt =
         std::ranges::find_if(_message->entities, [](const auto& entity) {
@@ -22,23 +29,16 @@ MessageExt::MessageExt(Message::Ptr message, SplitMessageText how)
         });
 
     // I believe entity must be sent here.
-    if (botCommandEnt != _message->entities.end()) {
+    if (botCommandEnt != _message->entities.end() &&
+        _message->text.front() == '/') {
         const auto entry = *botCommandEnt;
         // Grab /start@username
-        _extra_args = absl::StripAsciiWhitespace(
-            _message->text.substr(entry->offset + entry->length));
-        auto command_string = _message->text.substr(0, entry->length);
-        command_string = absl::StripPrefix(command_string, "/");
+        _extra_args = _message->text.substr(entry->length);
         command.emplace();
-        const auto at_pos = command_string.find('@');
-        if (at_pos != std::string::npos) {
-            command->name = command_string.substr(0, at_pos);
-            command->target = command_string.substr(at_pos + 1);
-            LOG_IF(WARNING, command->target.empty() || command->name.empty())
-                << "Parsing logic error, target or name is empty";
-        } else {
-            command->name = command_string;
-        }
+        std::pair<std::string, std::string> kCommandSplit =
+            absl::StrSplit(_message->text.substr(1, entry->length), "@");
+        command->name = kCommandSplit.first;
+        command->target = kCommandSplit.second;
     }
 
     if (_extra_args.size() != 0) {
@@ -55,6 +55,9 @@ MessageExt::MessageExt(Message::Ptr message, SplitMessageText how)
                 // No-op, considering one argument.
                 _arguments.emplace_back(_extra_args);
                 break;
+        }
+        for (auto& x : _arguments) {
+            x = absl::StripAsciiWhitespace(x).data();
         }
     }
 }

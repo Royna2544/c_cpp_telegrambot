@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.13)
+cmake_minimum_required(VERSION 3.15)
 project(TgBot++ LANGUAGES CXX C)
 
 ####################### Set CMake Policy #######################
@@ -181,7 +181,7 @@ add_subdirectory(src/libos)
 set(HTTPLIB_COMPILE ON)
 add_subdirectory(src/third-party/cpp-httplib)
 add_subdirectory(src/third-party/tgbot-cpp)
-add_subdirectory(src/third-party/fruit)
+add_subdirectory(src/third-party/fruit EXCLUDE_FROM_ALL)
 add_subdirectory(tests)
 #################################################################
 
@@ -193,6 +193,7 @@ add_my_library(
     src/api/MessageExt.cpp
   PUBLIC_INC
     $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>
+    Boost::headers
 )
 
 ################### The Bot's main functionaility ###################

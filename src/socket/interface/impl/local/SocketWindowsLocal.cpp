@@ -1,12 +1,6 @@
 #include <impl/SocketWindows.hpp>
 #include "../helper/HelperWindows.hpp"
 
-// clang-format off
-#include <winsock2.h>
-#include <winsock.h>
-#include <afunix.h>
-// clang-format on
-
 #include <libfs.hpp>
 
 bool SocketInterfaceWindowsLocal::createLocalSocket(SocketConnContext *ctx) {

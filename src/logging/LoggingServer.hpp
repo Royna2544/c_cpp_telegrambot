@@ -19,7 +19,7 @@ struct NetworkLogSink : private absl::LogSink,
 
     explicit NetworkLogSink(SocketServerWrapper* wrapper);
    private:
-    std::shared_ptr<SocketInterfaceBase> interface;
+    std::shared_ptr<SocketInterfaceBase> _interface;
     std::atomic_bool enabled = true;
     std::promise<void> onClientDisconnected;
 

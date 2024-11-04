@@ -1,8 +1,5 @@
 #include <TgBotSocketExports.h>
 #include <absl/log/log.h>
-#include <winsock2.h>
-#include <ws2ipdef.h>
-#include <ws2tcpip.h>
 
 #include <SocketBase.hpp>
 
@@ -26,13 +23,13 @@ struct TgBotSocket_API SocketInterfaceWindows : SocketInterfaceBase {
         TgBotSocket::PacketHeader::length_type length) override;
 
     struct WinHelper {
-        explicit WinHelper(SocketInterfaceWindows* interface)
-            : interface(interface) {}
+        explicit WinHelper(SocketInterfaceWindows* _interface)
+            : _interface(_interface) {}
         bool createInetSocketAddr(SocketConnContext& context);
         bool createInet6SocketAddr(SocketConnContext& context);
 
        private:
-        SocketInterfaceWindows* interface;
+        SocketInterfaceWindows* _interface;
     } win_helper;
 
     constexpr static DWORD kWSAVersion = MAKEWORD(2, 2);

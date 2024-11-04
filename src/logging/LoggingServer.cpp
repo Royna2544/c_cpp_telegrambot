@@ -27,7 +27,7 @@ void NetworkLogSink::Send(const absl::LogEntry& entry) {
     {
         std::lock_guard<std::mutex> _(mContextMutex);
         if (context != nullptr) {
-            ret = interface->writeToSocket(*context, logData);
+            ret = _interface->writeToSocket(*context, logData);
         }
     }
     if (!ret) {
@@ -58,12 +58,12 @@ void NetworkLogSink::runFunction() {
     std::shared_future<void> future = onClientDisconnected.get_future();
     bool isSinkAdded = false;
     std::thread listenThread([this, future]() {
-        interface->startListeningAsServer([this, future](SocketConnContext c) {
+        _interface->startListeningAsServer([this, future](SocketConnContext c) {
             return socketThreadFunction(c, future);
         });
     });
     future.wait();
-    interface->forceStopListening();
+    _interface->forceStopListening();
     listenThread.join();
     if (isSinkAdded) {
         absl::RemoveLogSink(this);
@@ -71,10 +71,10 @@ void NetworkLogSink::runFunction() {
 }
 
 NetworkLogSink::NetworkLogSink(SocketServerWrapper* wrapper) {
-    interface = wrapper->getInternalInterface();
-    if (interface) {
-        interface->options.address.set(getSocketPathForLogging().string());
-        interface->options.port.set(SocketInterfaceBase::kTgBotLogPort);
+    _interface = wrapper->getInternalInterface();
+    if (_interface) {
+        _interface->options.address.set(getSocketPathForLogging().string());
+        _interface->options.port.set(SocketInterfaceBase::kTgBotLogPort);
     } else {
         LOG(ERROR) << "Failed to find default socket interface";
         return;

@@ -1,5 +1,5 @@
 #include <absl/log/log.h>
-#include <winsock2.h>
+#include "../include/SocketDescriptor_defs.hpp"
 
 #include "SelectorWindows.hpp"
 

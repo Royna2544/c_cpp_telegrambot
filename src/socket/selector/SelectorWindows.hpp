@@ -1,6 +1,7 @@
 #include "Selectors.hpp"
+#include <TgBotSocketSelectorsExports.h>
 
-struct SelectSelector : Selector {
+struct TgBotSocketSelectors_API SelectSelector : Selector {
     bool init() override;
     bool add(socket_handle_t fd, OnSelectedCallback callback, Mode mode) override;
     bool remove(socket_handle_t fd) override;

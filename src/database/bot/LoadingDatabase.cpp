@@ -11,7 +11,7 @@ bool TgBotDatabaseImpl_load(ConfigManager* configmgr,
     const auto dbConf = configmgr->get(ConfigManager::Configs::DATABASE_CFG);
     bool loaded = false;
     TgBotDatabaseImpl::Providers provider;
-    std::pair<std::string, std::filesystem::path> configPair;
+    std::pair<std::string, std::string> configPair;
     bool configValid = false;
 
     if (dbConf) {

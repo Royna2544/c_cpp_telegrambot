@@ -1,14 +1,7 @@
-// clang-format off
-#include <winsock2.h>
-#include <winsock.h>
-#include <afunix.h>
-#include <windows.h>
-// clang-format on
-#include <boost/algorithm/string/trim.hpp>
+#include <absl/strings/str_split.h>
 #include <impl/SocketWindows.hpp>
 #include <socket/selector/SelectorWindows.hpp>
 
-#include "SocketDescriptor_defs.hpp"
 #include "helper/HelperWindows.hpp"
 #include "socket/selector/Selectors.hpp"
 
@@ -19,8 +12,7 @@ std::string SocketInterfaceWindows::WSALastErrorStr() {
                   nullptr, WSAGetLastError(),
                   MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US), (LPSTR)&s, 0,
                   nullptr);
-    std::string ret(s);
-    boost::trim(ret);
+    std::string ret = absl::StripAsciiWhitespace(s).data();
     LocalFree(s);
     return ret;
 }

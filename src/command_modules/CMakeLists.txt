@@ -1,4 +1,5 @@
 set(CMDMODULE_PREFIX cmd_)
+
 function(command_module)
     cmake_parse_arguments(TGBOT_CMDMODULE
         "RUST" # Options
@@ -37,6 +38,7 @@ function(command_module)
     endif()
     set(TGBOT_CMDMODULE_LIBNAME ${CMDMODULE_PREFIX}${TGBOT_CMDMODULE_NAME})
     add_library(${TGBOT_CMDMODULE_LIBNAME} SHARED ${TGBOT_CMDMODULE_SRCS})
+    set_target_properties(${TGBOT_CMDMODULE_LIBNAME} PROPERTIES PREFIX "lib")
     target_link_libraries(${TGBOT_CMDMODULE_LIBNAME} ${TGBOT_CMDMODULE_LIBS}
                           TgBotPPImpl_shared_deps absl::log)
     target_include_directories(${TGBOT_CMDMODULE_LIBNAME} PRIVATE

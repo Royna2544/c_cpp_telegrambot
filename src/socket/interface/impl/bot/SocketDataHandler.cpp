@@ -219,7 +219,7 @@ bool SocketInterfaceTgBot::handle_DownloadFile(SocketConnContext ctx,
         LOG(ERROR) << "Failed to prepare download file packet";
         return false;
     }
-    interface->writeToSocket(std::move(ctx), pkt->toSocketData());
+    _interface->writeToSocket(std::move(ctx), pkt->toSocketData());
     return true;
 }
 
@@ -232,7 +232,7 @@ bool SocketInterfaceTgBot::handle_GetUptime(SocketConnContext ctx,
     copyTo(callback.uptime, fmt::format("Uptime: {:%H:%M:%S}", diff).c_str());
     LOG(INFO) << "Sending text back: " << std::quoted(callback.uptime.data());
     Packet pkt(Command::CMD_GET_UPTIME_CALLBACK, callback);
-    interface->writeToSocket(std::move(ctx), pkt.toSocketData());
+    _interface->writeToSocket(std::move(ctx), pkt.toSocketData());
     return true;
 }
 
@@ -338,7 +338,7 @@ void SocketInterfaceTgBot::handlePacket(SocketConnContext ctx,
                           sizeof(UploadFileDryCallback));
             LOG(INFO) << "Sending CMD_UPLOAD_FILE_DRY ack: " << std::boolalpha
                       << (result.result == AckType::SUCCESS);
-            interface->writeToSocket(ctx, ackpkt.toSocketData());
+            _interface->writeToSocket(ctx, ackpkt.toSocketData());
             break;
         }
         case Command::CMD_WRITE_MSG_TO_CHAT_ID:
@@ -353,7 +353,7 @@ void SocketInterfaceTgBot::handlePacket(SocketConnContext ctx,
                           sizeof(GenericAck));
             LOG(INFO) << "Sending ack: " << std::boolalpha
                       << (result.result == AckType::SUCCESS);
-            interface->writeToSocket(ctx, ackpkt.toSocketData());
+            _interface->writeToSocket(ctx, ackpkt.toSocketData());
             break;
         }
         default:

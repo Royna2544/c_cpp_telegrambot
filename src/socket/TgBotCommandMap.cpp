@@ -40,14 +40,14 @@ const auto kTgBotCommandArgsCount =
 namespace TgBotSocket::CommandHelpers {
 
 std::string toStr(Command cmd) {
-    const auto* const it = array_helpers::find(kTgBotCommandStrMap, cmd);
+    const auto it = array_helpers::find(kTgBotCommandStrMap, cmd);
     LOG_IF(FATAL, it == kTgBotCommandStrMap.end())
         << "Couldn't find cmd " << static_cast<int>(cmd) << " in map";
     return it->second;
 }
 
 int toCount(Command cmd) {
-    const auto* const it = array_helpers::find(kTgBotCommandArgsCount, cmd);
+    const auto it = array_helpers::find(kTgBotCommandArgsCount, cmd);
     LOG_IF(FATAL, it == kTgBotCommandArgsCount.end())
         << "Couldn't find cmd " << static_cast<int>(cmd) << " in map";
     return it->second;

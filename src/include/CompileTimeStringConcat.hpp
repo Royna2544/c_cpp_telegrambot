@@ -2,6 +2,7 @@
 
 #include <string>
 #include <string_view>
+#include <absl/strings/string_view.h>
 
 namespace StringConcat {
 
@@ -46,8 +47,10 @@ class String {
     }
 
     [[nodiscard]] constexpr unsigned size() const { return N - 1; }
+
+    template <typename View = std::string_view>
     [[nodiscard]] constexpr std::string_view get() const {
-        return std::string_view(c, N - 1);
+        return View(c, N - 1);
     }
 
     template <size_t i>

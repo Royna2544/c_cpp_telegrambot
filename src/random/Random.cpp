@@ -48,18 +48,7 @@ struct RDRand : Random::ImplBase {
         return gen_impl(&engine, min, max);
     }
 
-    bool isSupported(void) const override {
-        unsigned int eax = 0;
-        unsigned int ebx = 0;
-        unsigned int ecx = 0;
-        unsigned int edx = 0;
-
-        if (__get_cpuid(1, &eax, &ebx, &ecx, &edx) == 0) {
-            LOG(WARNING) << "CPUID information is not available";
-            return false;
-        }
-        return BIT_SET(ecx, 30);
-    }
+    bool isSupported(void) const override { return rdrand_engine::supported(); }
 
     template <typename T>
     void shuffle(std::vector<T>& in) const {

@@ -1,5 +1,3 @@
-#include <ws2ipdef.h>
-#include <ws2tcpip.h>
 #include <array>
 #include <cstddef>
 

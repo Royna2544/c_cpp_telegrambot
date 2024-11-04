@@ -7,7 +7,6 @@
 #include <tgbot/TgException.h>
 #include <trivial_helpers/_tgbot.h>
 
-#include <CompileTimeStringConcat.hpp>
 #include <api/CommandModule.hpp>
 #include <api/Providers.hpp>
 #include <api/TgBotApi.hpp>
@@ -15,11 +14,6 @@
 #include <mutex>
 
 #include "StringResLoader.hpp"
-
-template <unsigned Len>
-consteval auto cat(const char (&strings)[Len]) {
-    return StringConcat::cat("_", strings, "_");
-}
 
 static DECLARE_COMMAND_HANDLER(alive) {
     static std::string version;
@@ -29,13 +23,6 @@ static DECLARE_COMMAND_HANDLER(alive) {
         std::string _version;
         GitData data;
 
-        const auto modules = cat("commandmodules");
-        const auto commitid = cat("commitid");
-        const auto commitmsg = cat("commitmsg");
-        const auto originurl = cat("originurl");
-        const auto botname = cat("botname");
-        const auto botusername = cat("botusername");
-
         GitData::Fill(&data);
         _version = provider->resource->get("about.html");
 
@@ -44,10 +31,12 @@ static DECLARE_COMMAND_HANDLER(alive) {
 
         // Replace placeholders in the version string with actual values.
         version = absl::StrReplaceAll(
-            _version, {{commitid, data.commitid},
-                       {commitmsg, splitMsg.front()},
-                       {botname, api->getBotUser()->firstName},
-                       {botusername, api->getBotUser()->username}});
+            _version, {
+                {"_commitid_", data.commitid},
+                {"_commitmsg_", splitMsg.front()},
+                {"_botname_", api->getBotUser()->firstName},
+                {"_botusername_", api->getBotUser()->username}
+            });
     });
     const auto info = provider->database->queryMediaInfo("alive");
     bool sentAnimation = false;

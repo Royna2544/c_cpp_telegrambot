@@ -9,11 +9,7 @@
 #include <memory>
 #include <trivial_helpers/fruit_inject.hpp>
 
-#if defined(__linux__) || defined(__APPLE__)
-#include <sys/socket.h>
-#elif defined(WINDOWS_BUILD)
-#include <ws2tcpip.h>
-#endif
+#include "SocketDescriptor_defs.hpp"
 
 #include "TgBotSocketFileHelperNew.hpp"
 #include "TgBotSocket_Export.hpp"
@@ -32,7 +28,7 @@ struct SocketInterfaceTgBot : ManagedThreadRunnable {
         SocketFile2DataHelper* helper, ResourceProvider* resource));
 
    private:
-    SocketInterfaceBase* interface = nullptr;
+    SocketInterfaceBase* _interface = nullptr;
     TgBotApi::Ptr api = nullptr;
     SocketFile2DataHelper* helper;
     ChatObserver* observer = nullptr;

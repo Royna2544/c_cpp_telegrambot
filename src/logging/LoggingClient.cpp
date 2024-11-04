@@ -37,9 +37,7 @@ int main() {
             LOG(ERROR) << "Invalid magic number";
             return EXIT_FAILURE;
         }
-        std::string message = entry.message.data();
-        message = absl::StripAsciiWhitespace(message);
-        LOG(INFO) << entry.severity << " " << message;
+        LOG(INFO) << entry.severity << " " << entry.message.data();
     }
     wrapper->closeSocketHandle(clientSocket.value());
     return EXIT_SUCCESS;

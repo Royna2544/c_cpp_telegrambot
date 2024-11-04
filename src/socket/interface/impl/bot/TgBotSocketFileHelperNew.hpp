@@ -23,7 +23,7 @@
 #endif
 
 // Represents a SHA-256 hash
-struct HashContainer {
+struct TgBotSocket_API HashContainer {
     std::array<unsigned char, SHA256_DIGEST_LENGTH> m_data;
 };
 
@@ -35,7 +35,7 @@ inline std::ostream& operator<<(std::ostream& self, const HashContainer& data) {
     return self;
 }
 
-struct VFSOperations {
+struct TgBotSocket_API VFSOperations {
     virtual ~VFSOperations() = default;
 
     /**

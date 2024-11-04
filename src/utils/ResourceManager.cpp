@@ -50,9 +50,9 @@ ResourceManager::ResourceManager() {
     if (ifs) {
         std::string line;
         while (std::getline(ifs, line)) {
-            line = absl::StripAsciiWhitespace(line);
-            if (!line.empty()) {
-                ignoredResources.emplace_back(line);
+            absl::string_view _line = absl::StripAsciiWhitespace(line);
+            if (!_line.empty()) {
+                ignoredResources.emplace_back(_line.data());
             }
         }
         ignoredResources.emplace_back(kResourceLoadIgnoreFile);

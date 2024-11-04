@@ -20,8 +20,13 @@ using loadcmd_function_t =
 
 #define DYN_COMMAND_SYM_STR "loadcmd"
 #define DYN_COMMAND_SYM loadcmd
+#ifdef WINDOWS_BUILD
+#define DYN_COMMAND_EXPORT __declspec(dllexport)
+#else
+#define DYN_COMMAND_EXPORT
+#endif
 #define DYN_COMMAND_FN(n, m) \
-    extern "C" bool DYN_COMMAND_SYM(const std::string_view n, CommandModule&(m))
+    extern "C" DYN_COMMAND_EXPORT bool DYN_COMMAND_SYM(const std::string_view n, CommandModule&(m))
 
 // Command handler helper macros
 #define COMMAND_HANDLER_NAME(cmd) handle_command_##cmd

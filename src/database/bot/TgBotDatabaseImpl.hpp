@@ -8,7 +8,9 @@
 #include <database/DatabaseBase.hpp>
 #include <map>
 #include <memory>
-#include <trivial_helpers/fruit_inject.hpp>
+#include <string_view>
+#include <optional>
+#include <filesystem>
 
 /**
  * @brief TgBotDatabaseImpl is a class that implements the DatabaseBase

@@ -11,14 +11,14 @@
 namespace TgBotSocket {
 
 std::optional<Packet> readPacket(
-    SocketInterfaceBase* interface,
+    SocketInterfaceBase* _interface,
     const SocketConnContext& context) {
     TgBotSocket::PacketHeader header;
     decltype(header.magic) magic{};
 
     // Read header and check magic value, despite the header size, the magic was
     // always the first element of the struct.
-    const auto magicData = interface->readFromSocket(context, sizeof(magic));
+    const auto magicData = _interface->readFromSocket(context, sizeof(magic));
     if (!magicData) {
         LOG(ERROR) << "While reading magic, failed";
         return std::nullopt;
@@ -43,7 +43,7 @@ std::optional<Packet> readPacket(
     }
 
     // Read rest of the packet header.
-    const auto headerData = interface->readFromSocket(
+    const auto headerData = _interface->readFromSocket(
         context, sizeof(TgBotSocket::PacketHeader) - sizeof(magic));
     if (!headerData) {
         LOG(ERROR) << "While reading header, failed";
@@ -62,7 +62,7 @@ std::optional<Packet> readPacket(
         sizeof(TgBotSocket::PacketHeader) + header.data_size;
     TgBotSocket::Packet packet(newLength);
 
-    auto data = interface->readFromSocket(context, header.data_size);
+    auto data = _interface->readFromSocket(context, header.data_size);
     if (!data) {
         LOG(ERROR) << "While reading data, failed";
         return std::nullopt;

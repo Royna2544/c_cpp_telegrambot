@@ -12,6 +12,11 @@
 #include "EnumArrayHelpers.h"
 #include "trivial_helpers/fruit_inject.hpp"
 
+#ifdef _MSC_VER
+#define make_unique make_shared
+#define unique_ptr shared_ptr
+#endif
+
 // Abstract manager for config loader
 // Currently have three sources, env and file, cmdline
 class TgBotUtils_API ConfigManager {
@@ -142,3 +147,8 @@ class TgBotUtils_API ConfigManager {
    private:
     std::vector<std::unique_ptr<Backend>> backends;
 };
+
+#ifdef _MSC_VER
+#undef make_unique
+#undef unique_ptr
+#endif

@@ -175,26 +175,26 @@ struct TgBotSocket_API SocketInterfaceBase {
 
         struct TgBotSocket_API INetHelper {
             explicit INetHelper(SocketInterfaceBase *interface_)
-                : interface(interface_) {}
+                : _interface(interface_) {}
             int getPortNum();
             std::string getExternalIP(void);
             static size_t externalIPCallback(void *contents, size_t size,
                                              size_t nmemb, void *userp);
 
            private:
-            SocketInterfaceBase *interface;
+            SocketInterfaceBase *_interface;
         } inet;
 
         struct TgBotSocket_API LocalHelper {
             explicit LocalHelper(SocketInterfaceBase *interface_)
-                : interface(interface_) {}
+                : _interface(interface_) {}
             bool canSocketBeClosed();
             void cleanupServerSocket();
             static void printRemoteAddress(socket_handle_t handle);
             static std::filesystem::path getSocketPath();
 
            private:
-            SocketInterfaceBase *interface;
+            SocketInterfaceBase *_interface;
         } local;
     } helper;
 

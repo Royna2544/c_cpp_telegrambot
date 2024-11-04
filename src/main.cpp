@@ -271,8 +271,9 @@ getTgBotApiImplComponent() {
             LOG(INFO) << "Loading commands from " << modules_path;
             for (const auto& it :
                  std::filesystem::directory_iterator(modules_path, ec)) {
-                if (it.path().filename().string().starts_with(
-                        CommandModule::prefix)) {
+                const auto filename = it.path().filename();
+                if (filename.string().starts_with(
+                        CommandModule::prefix) && filename.extension() == FS::kDylibExtension) {
                     bot->addCommand(std::make_unique<CommandModule>(it));
                 }
             }
@@ -342,17 +343,17 @@ getSocketInterfaceComponent() {
     return fruit::createComponent()
         .registerFactory<Unused<SocketInterfaceTgBot>(
             fruit::Assisted<ThreadManager::Usage> usage,
-            fruit::Assisted<SocketInterfaceBase*> interface, TgBotApi::Ptr api,
+            fruit::Assisted<SocketInterfaceBase*> _interface, TgBotApi::Ptr api,
             ChatObserver * observer, WrapPtr<SpamBlockBase> spamblock,
             SocketFile2DataHelper * helper, ThreadManager * manager,
             ResourceProvider * resource)>(
-            [](ThreadManager::Usage usage, SocketInterfaceBase* interface,
+            [](ThreadManager::Usage usage, SocketInterfaceBase* _interface,
                TgBotApi::Ptr api, ChatObserver* observer,
                WrapPtr<SpamBlockBase> spamblock, SocketFile2DataHelper* helper,
                ThreadManager* manager,
                ResourceProvider* resource) -> Unused<SocketInterfaceTgBot> {
                 auto thread = manager->create<SocketInterfaceTgBot>(
-                    usage, interface, api, observer, spamblock.pointer(),
+                    usage, _interface, api, observer, spamblock.pointer(),
                     helper, resource);
                 thread->run();
                 return {};
@@ -416,7 +417,7 @@ std::vector<TgBot::InlineQueryResult::Ptr> mediaQueryKeyboardFunction(
     const auto medias = database->getAllMediaInfos();
     for (const auto& media : medias) {
         for (const auto& name : media.names) {
-            if (absl::StartsWith(name, word)) {
+            if (absl::StartsWith(name, word.data())) {
                 switch (media.mediaType) {
                     case DatabaseBase::MediaType::STICKER: {
                         auto sticker = std::make_shared<

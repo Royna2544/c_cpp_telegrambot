@@ -9,6 +9,7 @@
 #include <trivial_helpers/fruit_inject.hpp>
 #include <type_traits>
 #include <vector>
+#include <random>
 
 class TgBotRandom_API RandomBase {
    public:

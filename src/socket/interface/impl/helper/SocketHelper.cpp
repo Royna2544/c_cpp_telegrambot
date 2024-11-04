@@ -11,7 +11,7 @@
 
 int SocketInterfaceBase::INetHelper::getPortNum() {
     try {
-        return interface->options.port.get();
+        return _interface->options.port.get();
     } catch (const std::bad_optional_access& e) {
         LOG(ERROR) << "Could not get port number";
         return -1;
@@ -21,7 +21,7 @@ int SocketInterfaceBase::INetHelper::getPortNum() {
 bool SocketInterfaceBase::LocalHelper::canSocketBeClosed() {
     bool socketValid = true;
 
-    if (!FS::exists(interface->options.address.get())) {
+    if (!FS::exists(_interface->options.address.get())) {
         LOG(WARNING) << "Socket file was deleted";
         socketValid = false;
     }
@@ -29,7 +29,7 @@ bool SocketInterfaceBase::LocalHelper::canSocketBeClosed() {
 }
 
 void SocketInterfaceBase::LocalHelper::cleanupServerSocket() {
-    const auto path = std::filesystem::path(interface->options.address.get());
+    const auto path = std::filesystem::path(_interface->options.address.get());
     DLOG(INFO) << "Cleaning up server socket...";
     FS::deleteFile(path);
 }

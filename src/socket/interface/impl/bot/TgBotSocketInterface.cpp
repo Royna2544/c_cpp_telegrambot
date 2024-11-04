@@ -12,7 +12,7 @@ SocketInterfaceTgBot::SocketInterfaceTgBot(SocketInterfaceBase* _interface,
                                            SpamBlockBase* spamblock,
                                            SocketFile2DataHelper* helper,
                                            ResourceProvider* resource)
-    : interface(_interface),
+    : _interface(_interface),
       api(_api),
       observer(observer),
       spamblock(spamblock),
@@ -20,13 +20,13 @@ SocketInterfaceTgBot::SocketInterfaceTgBot(SocketInterfaceBase* _interface,
       resource(resource) {}
 
 void SocketInterfaceTgBot::runFunction() {
-    interface->options.port = SocketInterfaceBase::kTgBotHostPort;
+    _interface->options.port = SocketInterfaceBase::kTgBotHostPort;
     // TODO: This is only needed for AF_UNIX sockets
-    interface->options.address =
+    _interface->options.address =
         SocketInterfaceBase::LocalHelper::getSocketPath().string();
-    setPreStopFunction([this](auto*) { interface->forceStopListening(); });
-    interface->startListeningAsServer([this](SocketConnContext ctx) {
-        auto pkt = TgBotSocket::readPacket(interface, ctx);
+    setPreStopFunction([this](auto*) { _interface->forceStopListening(); });
+    _interface->startListeningAsServer([this](SocketConnContext ctx) {
+        auto pkt = TgBotSocket::readPacket(_interface, ctx);
         if (pkt) {
             handlePacket(ctx, std::move(pkt.value()));
         }

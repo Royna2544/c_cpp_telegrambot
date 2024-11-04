@@ -21,6 +21,14 @@ if (${Protobuf_FOUND})
 else()
   set(PROTO_SRCS)
   set(PROTO_HDRS_DIR)
+  file(GLOB PROTOBUF_FILELIST proto/*.proto)
+  foreach(proto_file ${PROTOBUF_FILELIST})
+   get_filename_component(proto_name ${proto_file} NAME_WE)
+   get_filename_component(proto_path proto ABSOLUTE)
+   set_source_files_properties("${proto_path}/${proto_name}.pb.cc"
+                               "${proto_path}/${proto_name}.pb.h"
+                               PROPERTIES GENERATED TRUE)
+  endforeach()
 endif()
 
 if (${SQLite3_FOUND})

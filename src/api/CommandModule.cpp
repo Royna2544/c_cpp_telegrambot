@@ -63,9 +63,10 @@ bool CommandModule::load() {
     loadcmd_function_t sym = nullptr;
     const std::string cmdNameStr =
         filePath.filename().replace_extension().string();
-    std::string_view cmdNameView(cmdNameStr);
+    absl::string_view cmdNameView(cmdNameStr);
+    constexpr absl::string_view prefixView(prefix.data());
 
-    if (!absl::ConsumePrefix(&cmdNameView, prefix)) {
+    if (!absl::ConsumePrefix(&cmdNameView, prefixView)) {
         LOG(WARNING) << "Failed to extract command name from " << filePath;
         return false;
     }

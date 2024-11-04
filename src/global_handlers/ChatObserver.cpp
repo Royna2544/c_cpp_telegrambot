@@ -57,7 +57,7 @@ void ChatObserver::process(const Message::Ptr& msg) {
 }
 
 bool ChatObserver::startObserving(ChatId chatId) {
-    std::lock_guard _(m);
+    std::lock_guard<std::mutex> _(m);
     if (std::ranges::find(observedChatIds, chatId) == observedChatIds.end()) {
         observedChatIds.push_back(chatId);
         return true;
@@ -68,7 +68,7 @@ bool ChatObserver::startObserving(ChatId chatId) {
 }
 
 bool ChatObserver::stopObserving(ChatId chatId) {
-    std::lock_guard _(m);
+    std::lock_guard<std::mutex> _(m);
     auto it = std::ranges::find(observedChatIds, chatId);
     if (it != observedChatIds.end()) {
         observedChatIds.erase(it);
@@ -80,7 +80,7 @@ bool ChatObserver::stopObserving(ChatId chatId) {
 }
 
 bool ChatObserver::observeAll(bool observe) {
-    std::lock_guard _(m);
+    std::lock_guard<std::mutex> _(m);
     bool prev = observeAllChats;
     observeAllChats = observe;
     if (observeAllChats) {
@@ -92,6 +92,6 @@ bool ChatObserver::observeAll(bool observe) {
 }
 
 ChatObserver::operator bool() const {
-    std::lock_guard _(m);
+    std::lock_guard<std::mutex> _(m);
     return !observedChatIds.empty() || observeAllChats;
 }

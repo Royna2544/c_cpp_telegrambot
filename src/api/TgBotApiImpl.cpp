@@ -373,7 +373,7 @@ void TgBotApiImpl::startPoll() {
         std::vector<TgBot::InlineQueryResult::Ptr> inlineResults;
         std::ranges::for_each(
             queryResults, [&query, &inlineResults, canDoPrivileged](auto&& x) {
-                std::string_view suffix = query->query;
+                absl::string_view suffix = query->query;
                 if (!canDoPrivileged && x.first.enforced) {
                     return;  // Skip this.
                 }
@@ -381,7 +381,7 @@ void TgBotApiImpl::startPoll() {
                     if (x.first.hasMoreArguments) {
                         suffix = absl::StripLeadingAsciiWhitespace(suffix);
                     }
-                    auto vec = x.second(suffix);
+                    auto vec = x.second(std::string_view(suffix.data()));
                     inlineResults.insert(inlineResults.end(), vec.begin(),
                                          vec.end());
                 }
