@@ -1,116 +1,61 @@
 #include <ConfigManager.hpp>
-
 #include <iomanip>
 #include <type_traits>
+#include <utility>
 #include <variant>
 
 #include "SelectorPosix.hpp"
 
 UnixSelector::UnixSelector() {
-    std::optional<std::string> string = "poll"; // TODO: fix this
-    bool found = false;
+    std::optional<std::string> string = "poll";  // TODO: fix this
 
     if (string) {
         if (string == "poll") {
-            m_selector = PollSelector();
-            found = true;
+            m_selector = std::make_unique<PollSelector>();
         } else if (string == "epoll") {
 #ifdef __linux__
-            m_selector = EPollSelector();
-            found = true;
+            m_selector = std::make_unique<EPollSelector>();
 #else
             LOG(ERROR) << "epoll is not supported on this platform";
 #endif
         } else if (string == "select") {
-            m_selector = SelectSelector();
-            found = true;
+            m_selector = std::make_unique<SelectSelector>();
         } else {
             LOG(ERROR) << "Unknown selector: " << std::quoted(*string);
         }
     }
-    if (!found) {
+    if (!m_selector) {
         LOG(INFO) << "Config invalid or not set, using default selector: poll";
-        m_selector = PollSelector();
+        m_selector = std::make_unique<PollSelector>();
         string = "poll";
     }
     DLOG(INFO) << "Using selector: " << string.value();
 }
 
-bool UnixSelector::init() {
-    return std::visit(
-        [](auto &&arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (isKnownSelector<T>()) {
-                return arg.init();
-            }
-        },
-        m_selector);
-}
+bool UnixSelector::init() { return m_selector->init(); }
 
 bool UnixSelector::add(socket_handle_t fd,
                        Selector::OnSelectedCallback callback,
                        Selector::Mode mode) {
-    return std::visit(
-        [fd, callback, mode](auto &&arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (isKnownSelector<T>()) {
-                return arg.add(fd, callback, mode);
-            }
-        },
-        m_selector);
+    return m_selector->add(fd, std::move(callback), mode);
 }
 
 bool UnixSelector::remove(socket_handle_t fd) {
-    return std::visit(
-        [fd](auto &&arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (isKnownSelector<T>()) {
-                return arg.remove(fd);
-            }
-        },
-        m_selector);
+    return m_selector->remove(fd);
 }
 
 Selector::SelectorPollResult UnixSelector::poll() {
-    return std::visit(
-        [](auto &&arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (isKnownSelector<T>()) {
-                return arg.poll();
-            }
-        },
-        m_selector);
+    return m_selector->poll();
 }
 
 void UnixSelector::shutdown() {
-    return std::visit(
-        [](auto &&arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (isKnownSelector<T>()) {
-                return arg.shutdown();
-            }
-        },
-        m_selector);
+    m_selector->shutdown();
 }
 
 bool UnixSelector::reinit() {
-    return std::visit(
-        [](auto &&arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (isKnownSelector<T>()) {
-                return arg.reinit();
-            }
-        },
-        m_selector);
+    return m_selector->reinit();
 }
 
 void UnixSelector::enableTimeout(bool enabled) {
-    return std::visit(
-        [enabled](auto &&arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (isKnownSelector<T>()) {
-                return arg.enableTimeout(enabled);
-            }
-        },
-        m_selector);
+    m_selector->enableTimeout(enabled);
 }

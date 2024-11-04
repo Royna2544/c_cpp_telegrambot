@@ -2,6 +2,7 @@
 #include <sys/poll.h>
 #include <sys/select.h>
 
+#include <memory>
 #include <utility>
 #include <variant>
 
@@ -85,22 +86,11 @@ struct UnixSelector {
     // Set the timeout for the selector.
     template <typename Rep, typename Period>
     void setTimeout(const std::chrono::duration<Rep, Period> timeout) {
-        return std::visit(
-            [timeout](auto &&arg) {
-                using T = std::decay_t<decltype(arg)>;
-                if constexpr (isKnownSelector<T>()) {
-                    return arg.setTimeout(timeout);
-                }
-            },
-            m_selector);
+        if (m_selector) {
+            m_selector->setTimeout(timeout);
+        }
     }
 
    private:
-    template <typename T>
-    constexpr static bool isKnownSelector() {
-        return std::is_same_v<T, PollSelector> ||
-               std::is_same_v<T, SelectSelector> ||
-               std::is_same_v<T, EPollSelector>;
-    }
-    std::variant<PollSelector, SelectSelector, EPollSelector> m_selector;
+    std::unique_ptr<Selector> m_selector;
 };
