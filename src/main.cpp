@@ -17,6 +17,7 @@
 #include <TgBotWebpage.hpp>
 #include <api/TgBotApiImpl.hpp>
 #include <boost/system/system_error.hpp>
+#include <boost/throw_exception.hpp>
 #include <cstdint>
 #include <cstdlib>
 #include <database/bot/TgBotDatabaseImpl.hpp>
@@ -140,7 +141,7 @@ struct TgBotApiExHandler {
         }
         LOG(INFO) << "Re-init";
         auth->isAuthorized() = false;
-        std::thread([this]{
+        std::thread([this] {
             std::this_thread::sleep_for(kErrorRecoveryDelay);
             auth->isAuthorized() = true;
         }).detach();
@@ -264,8 +265,8 @@ getTgBotApiImplComponent() {
             for (const auto& it :
                  std::filesystem::directory_iterator(modules_path, ec)) {
                 const auto filename = it.path().filename();
-                if (filename.string().starts_with(
-                        CommandModule::prefix) && filename.extension() == FS::kDylibExtension) {
+                if (filename.string().starts_with(CommandModule::prefix) &&
+                    filename.extension() == FS::kDylibExtension) {
                     bot->addCommand(std::make_unique<CommandModule>(it));
                 }
             }
@@ -529,33 +530,44 @@ int main(int argc, char** argv) {
     LOG(INFO) << "Subsystems initialized, bot started: " << argv[0];
     LOG(INFO) << fmt::format("Starting took {}", startupDp.get());
 
-    api->setDescriptions(
-        "Royna's telegram bot, written in C++. Go on you can talk to it"sv,
-        "One of @roynatech's TgBot C++ project bots. I'm currently hosted "
-        "on "
-#ifdef WINDOWS_BUILD
-        "Windows"sv
-#elif defined(__linux__)
-        "Linux"sv
-#elif defined(__APPLE__)
-        "macOS"sv
-#else
-        "unknown platform"sv
-#endif
-    );
+    using NetworkException = boost::wrapexcept<boost::system::system_error>;
 
-    api->addInlineQueryKeyboard(
-        TgBotApi::InlineQuery{"media", "Get media with the name from database",
-                              true, false},
-        [database](
-            std::string_view x) -> std::vector<TgBot::InlineQueryResult::Ptr> {
-            return mediaQueryKeyboardFunction(database, x);
-        });
+    try {
+        api->setDescriptions(
+            "Royna's telegram bot, written in C++. Go on you can talk to it"sv,
+            "One of @roynatech's TgBot C++ project bots. I'm currently hosted "
+            "on "
+#ifdef WINDOWS_BUILD
+            "Windows"sv
+#elif defined(__linux__)
+            "Linux"sv
+#elif defined(__APPLE__)
+            "macOS"sv
+#else
+            "unknown platform"sv
+#endif
+        );
+
+        api->addInlineQueryKeyboard(
+            TgBotApi::InlineQuery{
+                "media", "Get media with the name from database", true, false},
+            [database](std::string_view x)
+                -> std::vector<TgBot::InlineQueryResult::Ptr> {
+                return mediaQueryKeyboardFunction(database, x);
+            });
+    } catch (const NetworkException& e) {
+        LOG(ERROR) << "Network error: " << e.what();
+        return EXIT_FAILURE;
+    }
+
     while (!SignalHandler::isSignaled()) {
         try {
             api->startPoll();
         } catch (const TgBot::TgException& e) {
             exHandle->handle(e);
+        } catch (const NetworkException& e) {
+            LOG(ERROR) << "Network error: " << e.what() << "sleeping for a minute...";
+            std::this_thread::sleep_for(std::chrono::minutes(1));
         } catch (const std::exception& e) {
             LOG(ERROR) << "Uncaught Exception: " << e.what();
             break;
