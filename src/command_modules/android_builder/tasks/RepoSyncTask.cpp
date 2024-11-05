@@ -161,15 +161,6 @@ void RepoSyncTask::handleStderrData(ForkAndRun::BufferViewType buffer) {
 
     // Split the buffer into lines
     lines = absl::StrSplit(buffer, '\n');
-    if (std::chrono::system_clock::now() - clock > 30s) {
-        clock = std::chrono::system_clock::now();
-        constexpr int PRINTING_LINES_COUNT = 5;
-        if (lines.size() > PRINTING_LINES_COUNT) {
-            lines.resize(PRINTING_LINES_COUNT);
-        }
-        api->editMessage(message, fmt::format("Sync in progress...:\n{}",
-                                              fmt::join(lines, "\n")));
-    }
     for (const auto& line : lines) {
         if (line.empty()) {
             continue;
