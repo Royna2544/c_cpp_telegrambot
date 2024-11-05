@@ -7,8 +7,6 @@
 #include <cstring>
 #include <socket/selector/SelectorPosix.hpp>
 
-#include "socket/selector/Selectors.hpp"
-
 void SocketInterfaceUnix::startListening(socket_handle_t handle,
                                          const listener_callback_t onNewData) {
     int rc = 0;

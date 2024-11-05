@@ -1,91 +1,28 @@
+#include <fmt/format.h>
+
 #include <ManagedThreads.hpp>
-#include <mutex>
-#include <utility>
+#include <stop_token>
 
-bool ManagedThread::isRunning() const { return state == ControlState::RUNNING; }
-
-void ManagedThread::logInvalidState(const char *func) {
-    LOG(ERROR) << "Invalid state " << static_cast<int>(state) << " for " << func
-               << ": " << mgr_priv.usage.str << " controller";
+void ManagedThreadRunnable::run() {
+    threadP = std::jthread(&ManagedThreadRunnable::threadFunction, this);
 }
 
-void ManagedThread::runWith(thread_function fn) {
-    switch (state) {
-        case ControlState::STOPPED_PREMATURE:
-        case ControlState::STOPPED_BY_STOP_CMD:
-            reset();
-            [[fallthrough]];
-        case ControlState::UNINITIALIZED:
-            threadP = std::thread(&ManagedThread::_threadFn, this, fn);
-            state = ControlState::RUNNING;
-            break;
-        case ControlState::RUNNING:
-            LOG(WARNING) << "Thread is already running: " << mgr_priv.usage.str
-                         << " controller";
-            break;
-    };
-}
-
-void ManagedThread::setPreStopFunction(prestop_function fn) {
-    switch (state) {
-        case ControlState::UNINITIALIZED:
-        case ControlState::STOPPED_BY_STOP_CMD:
-        case ControlState::STOPPED_PREMATURE:
-        case ControlState::RUNNING:
-            preStop = std::move(fn);
-            break;
-    };
-}
-
-void ManagedThread::stop() {
-    switch (state) {
-        case ControlState::RUNNING:
-            if (preStop) {
-                preStop(this);
-            }
-            {
-                std::unique_lock<std::mutex> lock(condvar.mutex);
-                kRun = false;
-            }
-            condvar.variable.notify_all();
-            state = ControlState::STOPPED_BY_STOP_CMD;
-            [[fallthrough]];
-        case ControlState::STOPPED_PREMATURE:
-            if (threadP->joinable()) {
-                threadP->join();
-            }
-            threadP.reset();
-            break;
-        default:
-            break;
+void ManagedThreadRunnable::threadFunction(const std::stop_token& token,
+                                           ManagedThreadRunnable* thiz) {
+    ++(*thiz->mgr_priv.launched);
+    DLOG(INFO) << fmt::format("{} started (lunched: {})",
+                              thiz->mgr_priv.usage.str,
+                              *thiz->mgr_priv.launched);
+    auto callback = std::make_unique<StopCallBackJust>(
+        thiz->mgr_priv.stopToken, [thiz] { thiz->onPreStop(); });
+    thiz->runFunction(token);
+    if (!thiz->mgr_priv.stopToken.stop_requested()) {
+        LOG(INFO) << thiz->mgr_priv.usage.str << " has ended";
+        callback.reset();
     }
-}
-
-void ManagedThread::reset() {
-    switch (state) {
-        case ControlState::RUNNING:
-            [[fallthrough]];
-        case ControlState::STOPPED_PREMATURE:
-            stop();
-            [[fallthrough]];
-        case ControlState::STOPPED_BY_STOP_CMD:
-            kRun = true;
-            state = ControlState::UNINITIALIZED;
-            break;
-        default:
-            logInvalidState(__func__);
-            break;
-    }
-}
-
-void ManagedThread::_threadFn(thread_function fn) {
-    fn();
-    if (kRun) {
-        LOG(INFO) << mgr_priv.usage.str
-                  << " controller ended before stop command";
-        state = ControlState::STOPPED_PREMATURE;
-        kRun = false;
-    } else {
-        state = ControlState::STOPPED_BY_STOP_CMD;
-    }
+    --(*thiz->mgr_priv.launched);
+    thiz->mgr_priv.completeBarrier->count_down();
+    DLOG(INFO) << fmt::format("{} joined the barrier (lunched: {})",
+                              thiz->mgr_priv.usage.str,
+                              *thiz->mgr_priv.launched);
 }

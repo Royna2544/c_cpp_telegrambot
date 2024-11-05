@@ -6,6 +6,7 @@
 
 #include <filesystem>
 #include <functional>
+#include <stop_token>
 #include <string_view>
 
 #include "ManagedThreads.hpp"
@@ -46,10 +47,10 @@ class TgBotWebServerBase {
     std::filesystem::path webServerRootPath;
 };
 
-class TgBotWebServer : public ManagedThreadRunnable,
-                                       public TgBotWebServerBase {
+class TgBotWebServer : public ManagedThreadRunnable, public TgBotWebServerBase {
    public:
     explicit TgBotWebServer(int serverPort);
 
-    void runFunction() override;
+    void runFunction(const std::stop_token &token) override;
+    void onPreStop() override;
 };

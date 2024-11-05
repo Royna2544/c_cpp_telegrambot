@@ -4,34 +4,19 @@
 #include <DurationPoint.hpp>
 #include <ManagedThreads.hpp>
 #include <mutex>
+#include <shared_mutex>
 
-void ThreadManager::destroyController(const Usage usage, bool deleteIt) {
-    static std::array<std::mutex, static_cast<int>(Usage::MAX)> kPerUsageLocks;
-    const std::scoped_lock lk(kPerUsageLocks[static_cast<int>(usage)],
-                              mControllerLock);
-    auto it = kControllers.find(usage);
-    if (it != kControllers.end() && it->second) {
-        LOG(INFO) << "Stopping: " << it->second->mgr_priv.usage.str
-                  << " controller";
-        DurationPoint dp;
-        it->second->stop();
-        it->second.reset();
-        if (deleteIt) {
-            kControllers.erase(it);
-        }
-
-        LOG(INFO) << fmt::format("Stopped. Took {}", dp.get());
-    }
+void ThreadManager::destroy() {
+    const std::lock_guard<std::shared_mutex> _(mControllerLock);
+    DLOG(INFO) << "Starting ThreadManager::destroy, launchCount=" << launchCount;
+    auto countdown = static_cast<int>(Usage::MAX) - launchCount;
+    barrier.count_down(countdown);
+    DLOG(INFO) << "Counted down " << countdown << " times...";
+    stopSource.request_stop();
+    LOG(INFO) << "Requested stop, now waiting...";
+    barrier.wait();
 }
 
-void ThreadManager::destroyManager() {
-    std::unique_lock<std::shared_mutex> lk(mControllerLock);
-    std::ranges::for_each(kControllers, [this, &lk](const auto& e) {
-        lk.unlock();
-        destroyController(e.first, false);
-        lk.lock();
-    });
-}
-
-constexpr array_helpers::ConstArray<ThreadManager::Usage, const char*, 10>
-    ThreadManager::ThreadUsageToStrMap; // NOLINT
+constexpr array_helpers::ConstArray<ThreadManager::Usage, const char*,
+                                    static_cast<int>(ThreadManager::Usage::MAX)>
+    ThreadManager::ThreadUsageToStrMap;  // NOLINT

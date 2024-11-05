@@ -7,6 +7,7 @@
 #include <global_handlers/ChatObserver.hpp>
 #include <global_handlers/SpamBlock.hpp>
 #include <memory>
+#include <stop_token>
 #include <trivial_helpers/fruit_inject.hpp>
 
 #include "SocketDescriptor_defs.hpp"
@@ -20,7 +21,8 @@ using TgBotSocket::callback::UploadFileDryCallback;
 struct SocketInterfaceTgBot : ManagedThreadRunnable {
     void handlePacket(SocketConnContext ctx, TgBotSocket::Packet pkt);
 
-    void runFunction() override;
+    void runFunction(const std::stop_token& token) override;
+    void onPreStop() override;
 
     APPLE_EXPLICIT_INJECT(SocketInterfaceTgBot(
         SocketInterfaceBase* _interface, TgBotApi::Ptr _api,

@@ -8,6 +8,7 @@
 #include <impl/backends/ServerBackend.hpp>
 #include <memory>
 #include <mutex>
+#include <stop_token>
 
 #include "SocketBase.hpp"
 
@@ -15,7 +16,9 @@ struct NetworkLogSink : private absl::LogSink,
                                         ManagedThreadRunnable {
     void Send(const absl::LogEntry& entry) override;
 
-    void runFunction() override;
+    void runFunction(const std::stop_token& token) override;
+    
+    void onPreStop() override;
 
     explicit NetworkLogSink(SocketServerWrapper* wrapper);
    private:

@@ -19,12 +19,11 @@ SocketInterfaceTgBot::SocketInterfaceTgBot(SocketInterfaceBase* _interface,
       helper(helper),
       resource(resource) {}
 
-void SocketInterfaceTgBot::runFunction() {
+void SocketInterfaceTgBot::runFunction(const std::stop_token& token) {
     _interface->options.port = SocketInterfaceBase::kTgBotHostPort;
     // TODO: This is only needed for AF_UNIX sockets
     _interface->options.address =
         SocketInterfaceBase::LocalHelper::getSocketPath().string();
-    setPreStopFunction([this](auto*) { _interface->forceStopListening(); });
     _interface->startListeningAsServer([this](SocketConnContext ctx) {
         auto pkt = TgBotSocket::readPacket(_interface, ctx);
         if (pkt) {
@@ -33,3 +32,5 @@ void SocketInterfaceTgBot::runFunction() {
         return true;
     });
 }
+
+void SocketInterfaceTgBot::onPreStop() { _interface->forceStopListening(); }

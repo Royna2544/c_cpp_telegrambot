@@ -8,6 +8,7 @@
 #include <global_handlers/SpamBlock.hpp>
 #include <memory>
 #include <mutex>
+#include <stop_token>
 
 #include "Types.h"
 
@@ -60,8 +61,8 @@ bool SpamBlockBase::isEntryOverThreshold(PerChatHandle::const_reference t,
 
 void SpamBlockBase::_logSpamDetectCommon(PerChatHandle::const_reference t,
                                          const char *name) {
-    LOG(INFO) << fmt::format("Spam detected for user {}, filtered by {}", t.first,
-                             name);
+    LOG(INFO) << fmt::format("Spam detected for user {}, filtered by {}",
+                             t.first, name);
 }
 
 void SpamBlockBase::takeAction(OneChatIterator it, const PerChatHandle &map,
@@ -104,8 +105,8 @@ void SpamBlockBase::spamDetectFunc(OneChatIterator handle) {
     takeAction(handle, MaxMsgMap, sMaxMsgThreshold, "MaxMsg");
 }
 
-void SpamBlockBase::runFunction() {
-    while (kRun) {
+void SpamBlockBase::runFunction(const std::stop_token &token) {
+    while (!token.stop_requested()) {
         {
             const std::lock_guard<std::mutex> _(buffer_m);
             if (buffer_sub.size() > 0) {
@@ -119,7 +120,8 @@ void SpamBlockBase::runFunction() {
                         continue;
                     }
                     if (its->second >= sSpamDetectThreshold) {
-                        LOG(INFO) << fmt::format("Launching spamdetect for chat {}", its->first);
+                        LOG(INFO) << fmt::format(
+                            "Launching spamdetect for chat {}", its->first);
                         spamDetectFunc(it);
                     }
                     buffer.erase(it);
@@ -234,7 +236,7 @@ bool SpamBlockManager::shouldBeSkipped(const Message::Ptr &message) const {
     if (_auth->isAuthorized(message, AuthContext::Flags::None)) {
         return true;
     }
-    
+
     // Global cfg
     if (spamBlockConfig == CtrlSpamBlock::CTRL_OFF) {
         return true;
@@ -250,7 +252,7 @@ bool SpamBlockManager::shouldBeSkipped(const Message::Ptr &message) const {
         message->forwardOrigin) {
         return true;
     }
-    
+
     // Bot's PM is not a concern
     if (message->chat->type == TgBot::Chat::Type::Private) {
         return true;

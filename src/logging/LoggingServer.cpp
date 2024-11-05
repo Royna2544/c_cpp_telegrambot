@@ -11,6 +11,8 @@
 #include <impl/bot/TgBotSocketFileHelper.hpp>
 #include <memory>
 #include <mutex>
+#include <stop_token>
+#include <utility>
 
 #include "LogcatData.hpp"
 #include "SocketBase.hpp"
@@ -54,12 +56,12 @@ bool NetworkLogSink::socketThreadFunction(SocketConnContext c,
     return true;
 }
 
-void NetworkLogSink::runFunction() {
+void NetworkLogSink::runFunction(const std::stop_token& token) {
     std::shared_future<void> future = onClientDisconnected.get_future();
     bool isSinkAdded = false;
     std::thread listenThread([this, future]() {
         _interface->startListeningAsServer([this, future](SocketConnContext c) {
-            return socketThreadFunction(c, future);
+            return socketThreadFunction(std::move(c), future);
         });
     });
     future.wait();
@@ -68,6 +70,12 @@ void NetworkLogSink::runFunction() {
     if (isSinkAdded) {
         absl::RemoveLogSink(this);
     }
+}
+
+void NetworkLogSink::onPreStop() {
+    enabled = false;
+    onClientDisconnected.set_value();
+    LOG(INFO) << "onPreStop";
 }
 
 NetworkLogSink::NetworkLogSink(SocketServerWrapper* wrapper) {
@@ -79,11 +87,5 @@ NetworkLogSink::NetworkLogSink(SocketServerWrapper* wrapper) {
         LOG(ERROR) << "Failed to find default socket interface";
         return;
     }
-    setPreStopFunction([](auto* arg) {
-        LOG(INFO) << "onServerShutdown";
-        auto* const thiz = static_cast<NetworkLogSink*>(arg);
-        thiz->enabled = false;
-        thiz->onClientDisconnected.set_value();
-    });
     run();
 }

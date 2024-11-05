@@ -6,6 +6,7 @@
 #include <map>
 #include <mutex>
 #include <socket/include/TgBotSocket_Export.hpp>
+#include <stop_token>
 #include "trivial_helpers/fruit_inject.hpp"
 
 using namespace TgBotSocket::data;
@@ -32,7 +33,7 @@ struct SpamBlockBase : ManagedThreadRunnable {
                                           const char *name) {};
     virtual bool shouldBeSkipped(const Message::Ptr &msg) const = 0;
 
-    void runFunction() override;
+    void runFunction(const std::stop_token& token) override;
     void addMessage(const Message::Ptr &message);
 
     static std::string commonMsgdataFn(const Message::Ptr &m);

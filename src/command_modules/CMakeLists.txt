@@ -211,11 +211,6 @@ command_module(
     RUST
 )
 
-multi_command_module(
-    PROVIDES starttimer stoptimer
-    SRCS timer_impl.cpp support/timer/TimerImpl.cpp
-)
-
 command_module(
     NAME copystickers
     SRCS copystickers.cpp

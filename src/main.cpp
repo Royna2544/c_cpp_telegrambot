@@ -140,18 +140,10 @@ struct TgBotApiExHandler {
         }
         LOG(INFO) << "Re-init";
         auth->isAuthorized() = false;
-        auto* cl =
-            thread->create<ThreadManager::Usage::ERROR_RECOVERY_THREAD>();
-        if (cl == nullptr) {
-            cl = thread->get<ThreadManager::Usage::ERROR_RECOVERY_THREAD>();
-            cl->reset();
-        }
-        if (cl != nullptr) {
-            cl->runWith([this] {
-                std::this_thread::sleep_for(kErrorRecoveryDelay);
-                auth->isAuthorized() = true;
-            });
-        }
+        std::thread([this]{
+            std::this_thread::sleep_for(kErrorRecoveryDelay);
+            auth->isAuthorized() = true;
+        }).detach();
     }
 };
 
@@ -569,6 +561,6 @@ int main(int argc, char** argv) {
             break;
         }
     }
-    threadManager->destroyManager();
+    threadManager->destroy();
     return EXIT_SUCCESS;
 }
