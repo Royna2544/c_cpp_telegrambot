@@ -133,8 +133,7 @@ struct TgBotPPImpl_shared_deps_API ManagedThreadRunnable {
     // Underlying thread handle
     std::jthread threadP;
     // Wrapper around 'runFunction'
-    static void threadFunction(const std::stop_token& token,
-                               ManagedThreadRunnable* thiz);
+    void threadFunction();
 
     struct {
         std::mutex mutex;
