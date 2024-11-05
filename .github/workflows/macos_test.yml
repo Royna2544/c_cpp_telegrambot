@@ -25,11 +25,11 @@ jobs:
 
       - name: Compile with Apple GCC
         env: 
-          CC: /opt/homebrew/bin/gcc
-          CXX: /opt/homebrew/bin/g++
+          CC: /opt/homebrew/bin/gcc-14
+          CXX: /opt/homebrew/bin/g++-14
         run: |
           mkdir build
-          cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Debug .
+          cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release .
           cmake --build build -j4
 
       - name: Run Tests
