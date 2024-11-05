@@ -7,12 +7,12 @@
 #include <trivial_helpers/_class_helper_macros.h>
 
 #include <StructF.hpp>
+#include <concepts>
 #include <memory>
 #include <mutex>
 #include <type_traits>
 
-template <typename Sink>
-    requires(std::is_base_of_v<absl::LogSink, Sink>)
+template <std::derived_from<absl::LogSink> Sink>
 struct RAIILogSink {
     explicit RAIILogSink()
         requires std::is_default_constructible_v<Sink>

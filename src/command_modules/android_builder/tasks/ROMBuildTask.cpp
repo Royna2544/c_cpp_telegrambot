@@ -71,8 +71,7 @@ concept hasUsageFleid = requires(T t) {
     { t.usage } -> std::same_as<Percent&>;
 };
 
-template <typename T, typename... Args>
-    requires hasUsageFleid<T>
+template <hasUsageFleid T, typename... Args>
 std::string getPercent(Args&&... args) {
     T percent(std::forward<Args&&>(args...)...);
     return progressbar::create(percent.usage.value);

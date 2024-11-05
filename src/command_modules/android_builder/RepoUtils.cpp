@@ -91,8 +91,7 @@ struct deleter<git_annotated_commit> {
     }
 };
 
-template <typename T>
-    requires hasDeleter<T>
+template <hasDeleter T>
 inline auto git_wrap(T* object) {
     return RAII<T*>::template create<void>(object, [](T* obj) {
         if (obj) {

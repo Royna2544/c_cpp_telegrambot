@@ -7,6 +7,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <concepts>
 #include <condition_variable>
 #include <functional>
 #include <latch>
@@ -55,32 +56,35 @@ class TgBotPPImpl_shared_deps_API ThreadManager {
         return array_helpers::find(ThreadUsageToStrMap, u)->second;
     }
 
-    template <Usage usage, class T = ManagedThreadRunnable, typename... Args>
-        requires std::is_base_of_v<ManagedThreadRunnable, T> &&
-                 std::is_constructible_v<T, Args...>
+    template <
+        Usage usage,
+        std::derived_from<ManagedThreadRunnable> T = ManagedThreadRunnable,
+        typename... Args>
+        requires std::is_constructible_v<T, Args...>
     T* create(Args&&... args) {
         constexpr std::string_view usageStr = usageToStr<usage>();
         return create_internal<T>(usage, usageStr,
                                   std::forward<Args&&>(args)...);
     }
-    template <class T = ManagedThreadRunnable, typename... Args>
-        requires std::is_base_of_v<ManagedThreadRunnable, T> &&
-                 std::is_constructible_v<T, Args...>
+    template <
+        std::derived_from<ManagedThreadRunnable> T = ManagedThreadRunnable,
+        typename... Args>
+        requires std::is_constructible_v<T, Args...>
     T* create(Usage usage, Args&&... args) {
         std::string_view usageStr = usageToStr(usage);
         return create_internal<T>(usage, usageStr,
                                   std::forward<Args&&>(args)...);
     }
 
-    template <Usage usage, class T = ManagedThreadRunnable>
-        requires std::is_base_of_v<ManagedThreadRunnable, T>
+    template <Usage usage, std::derived_from<ManagedThreadRunnable> T =
+                               ManagedThreadRunnable>
     T* get() {
         constexpr std::string_view usageStr = usageToStr<usage>();
         return get_internal<T>(usage, usageStr);
     }
 
-    template <class T = ManagedThreadRunnable>
-        requires std::is_base_of_v<ManagedThreadRunnable, T>
+    template <
+        std::derived_from<ManagedThreadRunnable> T = ManagedThreadRunnable>
     T* get(Usage usage) {
         std::string_view usageStr = usageToStr(usage);
         return get_internal<T>(usage, usageStr);

@@ -61,8 +61,7 @@ class KeyboardBuilder {
     }
 
     // Enable method chaining, templated for STL containers
-    template <typename ListLike = ListOfButton>
-        requires isSTLContainer<ListLike>
+    template <isSTLContainer ListLike = ListOfButton>
     KeyboardBuilder& addKeyboard(const ListLike& list) {
         // We call resize because we know the number of rows and columns
         // If list size has a remainder, we need to add extra row

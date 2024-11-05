@@ -212,8 +212,7 @@ class ForkAndRunShell {
         const std::initializer_list<std::pair<std::string, std::string>>& list);
 
     // Write arguments to the shell
-    template <typename T>
-        requires WriteableToStdOstream<T>
+    template <WriteableToStdOstream T>
     const ForkAndRunShell& operator<<(const T& args) const {
         if constexpr (std::is_constructible_v<std::string_view, T>) {
             writeString(args);
