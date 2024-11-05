@@ -12,7 +12,7 @@ void ManagedThreadRunnable::threadFunction(const std::stop_token& token,
     ++(*thiz->mgr_priv.launched);
     DLOG(INFO) << fmt::format("{} started (lunched: {})",
                               thiz->mgr_priv.usage.str,
-                              *thiz->mgr_priv.launched);
+                              thiz->mgr_priv.launched->load());
     auto callback = std::make_unique<StopCallBackJust>(
         thiz->mgr_priv.stopToken, [thiz] { thiz->onPreStop(); });
     thiz->runFunction(token);
@@ -24,5 +24,5 @@ void ManagedThreadRunnable::threadFunction(const std::stop_token& token,
     thiz->mgr_priv.completeBarrier->count_down();
     DLOG(INFO) << fmt::format("{} joined the barrier (lunched: {})",
                               thiz->mgr_priv.usage.str,
-                              *thiz->mgr_priv.launched);
+                              thiz->mgr_priv.launched->load());
 }
