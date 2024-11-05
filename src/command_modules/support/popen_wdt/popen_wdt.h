@@ -13,6 +13,15 @@
 extern "C" {
 #endif
 
+// Identical to POSIX SIGINT, what is currently used to terminate the process
+#define POPEN_WDT_SIGTERM 2
+
+typedef struct {
+    int exitcode; /* exit code of the process, default -255 */
+    bool signal;  /* if the process was signaled, then the exit code becomes the
+                     signum */
+} popen_watchdog_exit_t;
+
 typedef struct {
     const char *command;     /* command string */
     bool watchdog_enabled;   /* Is watchdog enabled? [in] */
@@ -68,16 +77,19 @@ bool popen_watchdog_activated(popen_watchdog_data_t **data);
 bool popen_watchdog_read(popen_watchdog_data_t **data, char *buf, int size);
 
 /**
- * @brief Cleans up and frees the resources associated with the popen watchdog data.
+ * @brief Cleans up and frees the resources associated with the popen watchdog
+ * data.
  *
- * This function should be called when the popen watchdog data is no longer needed.
- * It closes the file pointer, frees the memory allocated for the data structure,
- * and sets the data pointer to NULL.
+ * This function should be called when the popen watchdog data is no longer
+ * needed. It closes the file pointer, frees the memory allocated for the data
+ * structure, and sets the data pointer to NULL.
  *
- * @param data A double pointer to the popen watchdog data. The function will set
- * this pointer to NULL after cleaning up the resources.
+ * @param data A double pointer to the popen watchdog data. The function will
+ * set this pointer to NULL after cleaning up the resources.
+ * @return The exit status of the process. If the process was signaled, the
+ * exit status will be the signum.
  */
-void popen_watchdog_destroy(popen_watchdog_data_t **data);
+popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t **data);
 
 #ifdef __cplusplus
 }

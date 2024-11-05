@@ -4,9 +4,8 @@
 
 bool popen_watchdog_init(popen_watchdog_data_t **data) {
     if (data != NULL) {
-        *data = malloc(sizeof(popen_watchdog_data_t));
+        *data = calloc(1, sizeof(popen_watchdog_data_t));
         if (*data != NULL) {
-            memset(*data, 0, sizeof(popen_watchdog_data_t));
             return true;
         }
     }

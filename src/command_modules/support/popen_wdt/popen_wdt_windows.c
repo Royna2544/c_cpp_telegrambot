@@ -71,7 +71,7 @@ static DWORD WINAPI watchdog(LPVOID arg) {
         } else if (GetTickCount64() > endTime) {
             POPEN_WDT_DBGLOG("Beginning watchdog trigger event");
             POPEN_WDT_DBGLOG("Now terminating subprocess");
-            TerminateProcess(pdata->wdt_data.sub_Process, 0);
+            TerminateProcess(pdata->wdt_data.sub_Process, POPEN_WDT_SIGTERM);
             POPEN_WDT_DBGLOG("... done");
             (*data)->watchdog_activated = true;
             break;
@@ -251,14 +251,23 @@ void popen_watchdog_stop(popen_watchdog_data_t** data_in) {
     }
 }
 
-void popen_watchdog_destroy(popen_watchdog_data_t** data) {
+popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t** data) {
+    popen_watchdog_exit_t ret = {};
+    DWORD exitcode = 0;
+    
     if (!check_data_privdata(data)) {
-        return;
+        return ret;
     }
     struct popen_wdt_windows_priv* pdata = (*data)->privdata;
     POPEN_WDT_DBGLOG("Starting cleanup");
-    POPEN_WDT_DBGLOG("HANDLEs of pdata are being closed");
+    if (GetExitCodeProcess(pdata->wdt_data.sub_Process, &exitcode)) {
+        ret.exitcode = exitcode;
+        ret.signal = (*data)->watchdog_activated;
+    } else {
+        POPEN_WDT_DBGLOG("GetExitCodeProcess failed with error %lu\n", GetLastError());
+    }
 
+    POPEN_WDT_DBGLOG("HANDLEs of pdata are being closed");
     CloseHandle(pdata->read_hdl);
     CloseHandle(pdata->write_hdl);
     if ((*data)->watchdog_enabled) {
@@ -279,6 +288,7 @@ void popen_watchdog_destroy(popen_watchdog_data_t** data) {
     free(*data);
     *data = NULL;
     POPEN_WDT_DBGLOG("Cleanup done");
+    return ret;
 }
 
 bool popen_watchdog_read(popen_watchdog_data_t** data, char* buf, int size) {

@@ -51,7 +51,7 @@ static void *watchdog(void *arg) {
 
     POPEN_WDT_DBGLOG("Check subprocess");
     if (killpg(pdata->childprocess_pid, 0) == 0) {
-        if (killpg(pdata->childprocess_pid, SIGINT) == -1) {
+        if (killpg(pdata->childprocess_pid, POPEN_WDT_SIGTERM) == -1) {
             POPEN_WDT_DBGLOG("Failed to send SIGINT to process group: %s",
                              strerror(errno));
         } else {
@@ -189,15 +189,16 @@ void popen_watchdog_stop(popen_watchdog_data_t **data_in) {
     pdata->running = false;
 }
 
-void popen_watchdog_destroy(popen_watchdog_data_t **data_in) {
+popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t **data_in) {
     popen_watchdog_data_t *data = NULL;
     struct popen_wdt_posix_priv *pdata = NULL;
     int status = 0;
+    popen_watchdog_exit_t ret = {};
 
     pthread_mutex_lock(&wdt_mutex);
     if (!check_popen_wdt_data(data_in)) {
         pthread_mutex_unlock(&wdt_mutex);
-        return;
+        return ret;
     }
 
     data = *data_in;
@@ -208,9 +209,12 @@ void popen_watchdog_destroy(popen_watchdog_data_t **data_in) {
         if (WIFSIGNALED(status)) {
             POPEN_WDT_DBGLOG("Child process %d exited with signal %d",
                              pdata->childprocess_pid, WTERMSIG(status));
+            ret.signal = true;
+            ret.exitcode = WTERMSIG(status);
         } else if (WIFEXITED(status)) {
             POPEN_WDT_DBGLOG("Child process %d exited with status %d",
                              pdata->childprocess_pid, WEXITSTATUS(status));
+            ret.exitcode = WEXITSTATUS(status);
         }
     }
     close(pdata->pipefd_r);
@@ -220,6 +224,7 @@ void popen_watchdog_destroy(popen_watchdog_data_t **data_in) {
     pthread_mutex_unlock(&wdt_mutex);
     pthread_mutex_destroy(&wdt_mutex);
     *data_in = NULL;
+    return ret;
 }
 
 bool popen_watchdog_read(popen_watchdog_data_t **data, char *buf, int size) {
