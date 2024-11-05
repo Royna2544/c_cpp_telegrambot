@@ -77,7 +77,7 @@ class ForkAndRun {
      * @param buffer The buffer containing the new stdout data.
      */
     virtual void handleStdoutData(BufferViewType buffer) {
-        std::cout << buffer << std::endl;
+        std::cout << buffer;
     }
 
     /**
@@ -90,7 +90,7 @@ class ForkAndRun {
      * @param buffer The buffer containing the new stderr data.
      */
     virtual void handleStderrData(BufferViewType buffer) {
-        std::cerr << buffer << std::endl;
+        std::cerr << buffer;
     }
 
     /**
