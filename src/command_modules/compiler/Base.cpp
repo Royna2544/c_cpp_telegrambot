@@ -66,7 +66,7 @@ void CompilerInTg::runCommand(std::string cmd, std::stringstream &res,
             _interface->onWdtTimeout();
         }
     }
-    popen_watchdog_destroy(&p_wdt_data);
-    _interface->onExecutionFinished(cmd);
+    auto ret = popen_watchdog_destroy(&p_wdt_data);
+    _interface->onExecutionFinished(cmd, ret);
     LOG(INFO) << __func__ << ": ---";
 }

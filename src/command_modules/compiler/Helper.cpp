@@ -6,10 +6,12 @@
 #include <fmt/format.h>
 
 #include <api/MessageExt.hpp>
+#include <string_view>
 #include <thread>
 #include <utility>
 
 #include "StringResLoader.hpp"
+#include "popen_wdt.h"
 
 CompilerInTgBotInterface::CompilerInTgBotInterface(
     TgBotApi::CPtr api, const StringResLoaderBase::LocaleStrings* locale,
@@ -29,9 +31,12 @@ void CompilerInTgBotInterface::onExecutionStarted(
 }
 
 void CompilerInTgBotInterface::onExecutionFinished(
-    const std::string_view& command) {
-    output << fmt::format("\n{} {}", access(_locale, Strings::DONE_TOOK),
-                          timePoint.get());
+    const std::string_view& command, const popen_watchdog_exit_t& exit) {
+    const std::string_view type = exit.signal ? "signal" : "exit";
+    output << fmt::format("\n{} {}\n{} {} {}",
+                          access(_locale, Strings::DONE_TOOK), timePoint.get(),
+                          access(_locale, Strings::PROCESS_EXITED), type,
+                          exit.exitcode);
     botApi->editMessage(sentMessage, output.str());
 }
 

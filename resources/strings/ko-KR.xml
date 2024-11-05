@@ -15,6 +15,7 @@
     <string name="media_already_in_db">미디어가 이미 데이터베이스에 있습니다</string>
     <string name="send_a_name_to_save">저장할 이름을 보내세요</string>
 
+    <string name="process_exited">프로세스 반환값</string>
     <string name="done_took">완료. 실행 시간</string>
     <string name="error_took">오류 발생. 실행 시간</string>
     <string name="output_is_empty">출력이 비어 있습니다</string>

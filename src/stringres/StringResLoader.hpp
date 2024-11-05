@@ -113,6 +113,7 @@ inline constexpr void operator<=(Locale& lhs, const std::string_view& rhs) {
     x(BACKEND_ERROR)                                                           \
     x(STICKER_PACK_CREATED)                                                    \
     x(FLASHING_ZIP)                                                            \
+    x(PROCESS_EXITED)                                                          \
     x(__MAX__)
 // clang-format on
 

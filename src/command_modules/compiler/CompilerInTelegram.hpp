@@ -10,17 +10,80 @@
 #include <utility>
 
 #include "StringResLoader.hpp"
+#include "popen_wdt.h"
 
 using TgBot::Message;
 
 struct CompilerInTg {
-    // Interface for handling events from this class
+    /**
+     * @brief Abstract interface to handle execution events.
+     *
+     * This interface defines methods to handle various events
+     * that occur during the execution process, such as when
+     * an execution starts, finishes, encounters an error,
+     * produces results, or times out.
+     *
+     * ### Typical Call Flow:
+     * - **Normal Execution Flow**:
+     *   - `onExecutionStarted()` →
+     * `onExecutionFinished()` → `onResultReady()`
+     * - **Timeout Execution Flow**:
+     *   - `onExecutionStarted()` → `onWdtTimeout()` →
+     * `onExecutionFinished()` → `onResultReady()`
+     * - **Error Execution Flow**:
+     *   - `onExecutionStarted()` → `onErrorStatus()`
+     */
     struct Interface {
+        /**
+         * @brief Virtual destructor.
+         *
+         * Ensures derived classes can be properly destroyed via base pointers.
+         */
         virtual ~Interface() = default;
+
+        /**
+         * @brief Called when execution of a command starts.
+         *
+         * @param command A string view of the command that has started
+         * execution.
+         */
         virtual void onExecutionStarted(const std::string_view& command) = 0;
-        virtual void onExecutionFinished(const std::string_view& command) = 0;
+
+        /**
+         * @brief Called when execution of a command finishes.
+         *
+         * @param command A string view of the command that has finished
+         * execution.
+         * @param exit An exit status structure (popen_watchdog_exit_t)
+         * indicating the result of the command execution, such as success,
+         * failure, or exit code.
+         */
+        virtual void onExecutionFinished(const std::string_view& command,
+                                         const popen_watchdog_exit_t& exit) = 0;
+
+        /**
+         * @brief Called when an error status occurs during execution.
+         *
+         * @param status An absl::Status object representing the error
+         * encountered. Provides details of the error, including code and
+         * message.
+         */
         virtual void onErrorStatus(absl::Status status) = 0;
+
+        /**
+         * @brief Called when the result of the execution is ready.
+         *
+         * @param text A string containing the result text produced by the
+         * command.
+         */
         virtual void onResultReady(const std::string& text) = 0;
+
+        /**
+         * @brief Called when a watchdog timeout occurs.
+         *
+         * Indicates that the execution process has timed out based on a
+         * predefined watchdog timer setting.
+         */
         virtual void onWdtTimeout() = 0;
     };
 

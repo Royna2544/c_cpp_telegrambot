@@ -566,7 +566,8 @@ int main(int argc, char** argv) {
         } catch (const TgBot::TgException& e) {
             exHandle->handle(e);
         } catch (const NetworkException& e) {
-            LOG(ERROR) << "Network error: " << e.what() << "sleeping for a minute...";
+            LOG(ERROR) << "Network error: " << e.what();
+            LOG(INFO) << "Sleeping for a minute...";
             std::this_thread::sleep_for(std::chrono::minutes(1));
         } catch (const std::exception& e) {
             LOG(ERROR) << "Uncaught Exception: " << e.what();

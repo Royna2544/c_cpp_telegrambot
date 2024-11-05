@@ -15,6 +15,7 @@
     <string name="media_already_in_db">Média déjà dans la base de données</string>
     <string name="send_a_name_to_save">Envoyez un nom à enregistrer</string>
 
+    <string name="process_exited">processus terminé avec</string>
     <string name="done_took">Terminé. L'exécution a pris</string>
     <string name="error_took">Une erreur s'est produite. L'exécution a pris</string>
     <string name="output_is_empty">Sortie vide</string>

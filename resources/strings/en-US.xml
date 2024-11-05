@@ -15,6 +15,7 @@
     <string name="media_already_in_db">Media already in database</string>
     <string name="send_a_name_to_save">Send a name to save</string>
 
+    <string name="process_exited">Process exited with</string>
     <string name="done_took">Done. Execution took</string>
     <string name="error_took">Error Occurred. Execution took</string>
     <string name="output_is_empty">Output is empty</string>
