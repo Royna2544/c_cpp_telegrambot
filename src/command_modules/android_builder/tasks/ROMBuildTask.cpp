@@ -19,6 +19,7 @@
 #include <system_error>
 #include <utility>
 
+#include "ForkAndRun.hpp"
 #include "api/TgBotApi.hpp"
 
 namespace {
@@ -130,7 +131,7 @@ DeferredExit ROMBuildTask::runFunction() {
     };
     shell << lunch(release);
     if (!release.empty()) {
-        shell << " || " << lunch({});
+        shell << ForkAndRunShell::suppress_output << ForkAndRunShell::orl << lunch({});
     }
     shell << ForkAndRunShell::endl;
     shell << "m " << getValue(data.localManifest->rom)->romInfo->target << " -j"
