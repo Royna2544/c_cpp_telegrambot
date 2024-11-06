@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <fstream>
 #include <libfs.hpp>
+#include <mutex>
 #include <regex>
 #include <system_error>
 #include <vector>
@@ -34,11 +35,12 @@ DeferredExit UploadFileTask::runFunction() {
     }
     const auto dir =
         std::filesystem::path() / "out" / "target" / "product" / data.device->codename;
-    for (it = decltype(it)(dir); it != decltype(it)(); ++it) {
-        if (it->is_regular_file()) {
-            if ((*matcher)(it->path().filename().string())) {
-                LOG(INFO) << "zipFile=" << it->path().string();
-                zipFilePath = it->path();
+    for (const auto &it : std::filesystem::directory_iterator(dir)) {
+        if (it.is_regular_file()) {
+            auto file = it.path();
+            if ((*matcher)(file.filename().string())) {
+                LOG(INFO) << "zipFile=" << file.string();
+                zipFilePath = std::move(file);
                 break;
             }
         }
@@ -47,11 +49,11 @@ DeferredExit UploadFileTask::runFunction() {
         LOG(ERROR) << "Artifact file not found";
 
         // Iterate over and print debug info.
-        for (it = decltype(it)(dir); it != decltype(it)(); ++it) {
-            if (it->is_regular_file()) {
-                (*matcher)(it->path().filename().string(), true);
+        for (const auto &it : std::filesystem::directory_iterator(dir)) {
+            if (it.is_regular_file()) {
+                (*matcher)(it.path().filename().string(), true);
             } else {
-                DLOG(INFO) << "Not a file: " << it->path();
+                DLOG(INFO) << "Not a file: " << it.path();
             }
         }
         return DeferredExit::generic_fail;
@@ -65,6 +67,7 @@ DeferredExit UploadFileTask::runFunction() {
         scriptFile = scripts / "upload.bash";
     } else {
         // Else, use default upload script.
+        LOG(INFO) << "Using default upload script";
         scriptFile = scripts / "upload.default.bash";
     }
 
@@ -80,7 +83,12 @@ DeferredExit UploadFileTask::runFunction() {
 }
 
 void UploadFileTask::handleStdoutData(ForkAndRun::BufferViewType buffer) {
-    stdoutOutput.append(buffer.data());
+    const std::lock_guard<std::mutex> _(stdout_mutex);
+    outputString.append(buffer.data());
+}
+void UploadFileTask::handleStderrData(ForkAndRun::BufferViewType buffer) {
+    const std::lock_guard<std::mutex> _(stdout_mutex);
+    outputString.append(buffer.data());
 }
 
 void UploadFileTask::onExit(int exitCode) {
@@ -91,11 +99,11 @@ void UploadFileTask::onExit(int exitCode) {
         const static std::regex sHttpsUrlRegex(
             R"(https:\/\/(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(?:\/[^\s]*)?)");
         std::smatch smatch;
-        std::string::const_iterator search_start(stdoutOutput.cbegin());
+        std::string::const_iterator search_start(outputString.cbegin());
         std::vector<std::string> urls;
         int matches = 0;
 
-        while (std::regex_search(search_start, stdoutOutput.cend(), smatch,
+        while (std::regex_search(search_start, outputString.cend(), smatch,
                                  sHttpsUrlRegex)) {
             LOG(INFO) << "Found URL: " << smatch[0].str();
             urls.emplace_back(
@@ -110,14 +118,14 @@ void UploadFileTask::onExit(int exitCode) {
                 fmt::format("upload_output_{}.txt", getpid()));
             std::ofstream stream(path);
             if (stream) {
-                stream << stdoutOutput;
+                stream << outputString;
                 stream.close();
                 data.result->setMessage(fmt::format(
                     "No URLs found in output, saved to {}", path.string()));
             } else {
                 data.result->setMessage(
                     "No URLs found in output, and couldn't even save to file");
-                LOG(INFO) << "Script output:\n" << stdoutOutput;
+                LOG(INFO) << "Script output:\n" << outputString;
             }
         } else {
             data.result->setMessage(
