@@ -5,7 +5,6 @@
 #include <absl/strings/ascii.h>
 #include <fmt/core.h>
 
-#include <StacktracePrint.hpp>
 #include <cstdint>
 #include <fstream>
 #include <iostream>
@@ -14,6 +13,7 @@
 #include <memory>
 #include <optional>
 #include <source_location>
+#include <stacktrace>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -21,13 +21,6 @@
 #include <variant>
 
 #include "Types.h"
-
-namespace {
-bool backtracePrint(const std::string_view& entry) {
-    LOG(ERROR) << entry;
-    return entry.find("SQLiteDatabase") != std::string::npos;
-}
-}  // namespace
 
 void SQLiteDatabase::Helper::logInvalidState(
     const std::source_location& location, SQLiteDatabase::Helper::State state) {
@@ -57,7 +50,7 @@ void SQLiteDatabase::Helper::logInvalidState(
     }
     LOG(ERROR) << "Invalid state for " << location.function_name() << ": "
                << stateString;
-    PrintStackTrace(backtracePrint);
+    LOG(ERROR) << std::stacktrace::current();
 }
 
 SQLiteDatabase::Helper::Helper(sqlite3* db, const std::string_view& filename)
@@ -207,7 +200,7 @@ bool SQLiteDatabase::Helper::commonExecCheck(
         case State::HAS_ARGUMENTS:
             LOG(WARNING) << location.function_name()
                          << " called with added arguments, but is not bound?";
-            PrintStackTrace(backtracePrint);
+            LOG(WARNING) << std::stacktrace::current();
             bindArguments();
             return true;
         default:
@@ -561,8 +554,10 @@ bool SQLiteDatabase::addMediaInfo(const MediaInfo& info) const {
     return true;
 }
 
-std::vector<SQLiteDatabase::MediaInfo> SQLiteDatabase::getAllMediaInfos() const {
-    using MergeMap = std::map<std::pair<std::string, std::string>, std::pair<std::vector<std::string>, MediaType>>;
+std::vector<SQLiteDatabase::MediaInfo> SQLiteDatabase::getAllMediaInfos()
+    const {
+    using MergeMap = std::map<std::pair<std::string, std::string>,
+                              std::pair<std::vector<std::string>, MediaType>>;
     MergeMap map;
     std::vector<MediaInfo> result;
 
@@ -580,7 +575,8 @@ std::vector<SQLiteDatabase::MediaInfo> SQLiteDatabase::getAllMediaInfos() const 
     }
     for (const auto& info : result) {
         auto key = std::make_pair(info.mediaUniqueId, info.mediaId);
-        map[key].first.insert(map[key].first.end(), info.names.begin(), info.names.end());
+        map[key].first.insert(map[key].first.end(), info.names.begin(),
+                              info.names.end());
         map[key].second = info.mediaType;
     }
     result.clear();

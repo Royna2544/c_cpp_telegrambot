@@ -34,6 +34,7 @@
 #include <logging/LoggingServer.hpp>
 #include <memory>
 #include <ml/ChatDataCollector.hpp>
+#include <stacktrace>
 #include <stdexcept>
 #include <system_error>
 #include <type_traits>
@@ -559,6 +560,7 @@ int main(int argc, char** argv) {
         LOG(ERROR) << "Network error: " << e.what();
         return EXIT_FAILURE;
     }
+    LOG(WARNING) << std::stacktrace::current();
 
     while (!SignalHandler::isSignaled()) {
         try {
