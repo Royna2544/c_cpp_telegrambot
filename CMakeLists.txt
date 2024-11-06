@@ -193,7 +193,6 @@ add_my_library(
     src/api/MessageExt.cpp
   PUBLIC_INC
     $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>
-    Boost::headers
 )
 
 ################### The Bot's main functionaility ###################
