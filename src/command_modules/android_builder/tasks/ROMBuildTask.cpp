@@ -98,8 +98,9 @@ DeferredExit ROMBuildTask::runFunction() {
     }
 
     ForkAndRunShell shell("bash");
-    shell.addEnv(
-        {{"BUILD_HOSTNAME", "build-server"}, {"BUILD_USERNAME", "cpp20-tgbot-builder"}});
+    // This is the build user/host config
+    shell.env["BUILD_HOSTNAME"] = "build-server";
+    shell.env["BUILD_USERNAME"] = "cpp20-tgbot-builder";
     if (!shell.open()) {
         return DeferredExit::generic_fail;
     }
@@ -131,7 +132,8 @@ DeferredExit ROMBuildTask::runFunction() {
     };
     shell << lunch(release);
     if (!release.empty()) {
-        shell << ForkAndRunShell::suppress_output << ForkAndRunShell::orl << lunch({});
+        shell << ForkAndRunShell::suppress_output << ForkAndRunShell::orl
+              << lunch({});
     }
     shell << ForkAndRunShell::endl;
     shell << "m " << getValue(data.localManifest->rom)->romInfo->target << " -j"

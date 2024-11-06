@@ -281,15 +281,6 @@ DeferredExit ForkAndRunSimple::operator()() {
 ForkAndRunShell::ForkAndRunShell(std::filesystem::path shell_path)
     : shell_path_(std::move(shell_path)) {}
 
-void ForkAndRunShell::addEnv(
-    const std::initializer_list<std::pair<std::string, std::string>>&
-        list) {
-    if (list.size() == 0) {
-        return;
-    }
-    envMap.insert(list.begin(), list.end());
-}
-
 bool ForkAndRunShell::open() {
     LOG(INFO) << "Using shell: " << shell_path_;
 
@@ -316,7 +307,7 @@ bool ForkAndRunShell::open() {
         for (int x = 0; environ[x] != nullptr; x++) {
             envp.emplace_back(environ[x]);
         }
-        for (const auto& [key, value] : envMap) {
+        for (const auto& [key, value] : env.map) {
             LOG(INFO) << "Setting env " << key << "=" << value;
             owners.emplace_back(fmt::format("{}={}", key, value));
             envp.emplace_back(owners.back().data());

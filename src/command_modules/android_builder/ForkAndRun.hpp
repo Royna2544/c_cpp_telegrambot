@@ -10,8 +10,10 @@
 #include <trivial_helpers/_class_helper_macros.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <array>
 #include <filesystem>
+#include <functional>
 #include <initializer_list>
 #include <iostream>
 #include <map>
@@ -19,6 +21,9 @@
 #include <socket/selector/SelectorPosix.hpp>
 #include <string_view>
 #include <thread>
+#include <type_traits>
+#include <unordered_map>
+#include <utility>
 
 struct DeferredExit {
     struct fail_t {};
@@ -182,6 +187,25 @@ class ForkAndRunSimple {
 template <typename T>
 concept WriteableToStdOstream = requires(T t) { std::cout << t; };
 
+namespace details {
+
+template <typename... Bases>
+struct overload : Bases... {
+    using is_transparent = void;
+    using Bases::operator()...;
+};
+
+struct char_pointer_hash {
+    auto operator()(const char* ptr) const noexcept {
+        return std::hash<std::string_view>{}(ptr);
+    }
+};
+
+using transparent_string_hash =
+    overload<std::hash<std::string>, std::hash<std::string_view>,
+             char_pointer_hash>;
+}  // namespace details
+
 class ForkAndRunShell {
     std::filesystem::path shell_path_;
     Pipe pipe_{};
@@ -196,7 +220,6 @@ class ForkAndRunShell {
     DeferredExit result;
 
     bool opened = false;
-    std::map<std::string, std::string> envMap;
 
     void writeString(const std::string_view& args) const;
 
@@ -213,9 +236,65 @@ class ForkAndRunShell {
     struct or_t {};
     static constexpr or_t orl{};
 
+    class Env {
+        struct Comp {
+            using is_transparent = void;
+            bool operator()(const std::string& string,
+                            std::string_view view) const {
+                return string < view;
+            }
+            bool operator()(std::string_view view,
+                            const std::string& string) const {
+                return view < string;
+            }
+        };
+        std::unordered_map<std::string, std::string,
+                           details::transparent_string_hash, std::equal_to<>>
+            map;
+
+       public:
+        Env() = default;
+        friend class ForkAndRunShell;
+
+        struct ValueEntry {
+            decltype(map)::pointer _it;
+            Env* _env;
+
+            ValueEntry(Env* env, decltype(map)::pointer it)
+                : _it(it), _env(env) {}
+
+            void operator=(const std::string_view other) const&& {
+                _it->second.assign(other);
+            }
+            void clear() const&& { _env->erase(_it->first); }
+
+            // Do not allow copying of this element outside the function use.
+            NO_COPY_CTOR(ValueEntry);
+            NO_MOVE_CTOR(ValueEntry);
+            ValueEntry() = delete;
+            ~ValueEntry() = default;
+        };
+
+        ValueEntry operator[](const std::string_view key) {
+            auto ent = map.find(key);
+            if (ent == map.end()) {
+                map.emplace(key, "");
+                ent = map.find(key);
+            }
+            return {this, &(*ent)};
+        }
+
+        void erase(const std::string_view key) {
+            auto it = map.find(key);
+            if (it != map.end()) {
+                map.erase(it);
+            } else {
+                LOG(WARNING) << "Attempting to erase non-existent key: " << key;
+            }
+        }
+    } env;
+
     bool open();
-    void addEnv(
-        const std::initializer_list<std::pair<std::string, std::string>>& list);
 
     // Write arguments to the shell
     template <WriteableToStdOstream T>
