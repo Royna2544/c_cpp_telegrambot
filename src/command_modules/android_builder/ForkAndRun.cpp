@@ -278,11 +278,11 @@ DeferredExit ForkAndRunSimple::operator()() {
     return DeferredExit::generic_fail;
 }
 
-ForkAndRunShell::ForkAndRunShell(std::filesystem::path shell_path)
-    : shell_path_(std::move(shell_path)) {}
+ForkAndRunShell::ForkAndRunShell(std::string shellName)
+    : _shellName(std::move(shellName)) {}
 
 bool ForkAndRunShell::open() {
-    LOG(INFO) << "Using shell: " << shell_path_;
+    LOG(INFO) << "Using shell: " << _shellName;
 
     if (!pipe_.pipe()) {
         PLOG(ERROR) << "Failed to create pipe";
@@ -298,7 +298,7 @@ bool ForkAndRunShell::open() {
 
         // Craft argv
         auto string = RAII<char*>::create<void>(
-            strdup(shell_path_.string().c_str()), free);
+            strdup(_shellName.c_str()), free);
         std::array<char*, 2> argv{string.get(), nullptr};
 
         // Craft envp

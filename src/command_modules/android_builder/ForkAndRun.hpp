@@ -207,7 +207,7 @@ using transparent_string_hash =
 }  // namespace details
 
 class ForkAndRunShell {
-    std::filesystem::path shell_path_;
+    std::string _shellName;
     Pipe pipe_{};
 
     // Protect shell_pid_, and if process terminated, we wont want write() to
@@ -224,7 +224,7 @@ class ForkAndRunShell {
     void writeString(const std::string_view& args) const;
 
    public:
-    explicit ForkAndRunShell(std::filesystem::path shell_path);
+    explicit ForkAndRunShell(std::string shellName);
 
     // Tag objects
     struct endl_t {};
