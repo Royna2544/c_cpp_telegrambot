@@ -359,6 +359,24 @@ const ForkAndRunShell& ForkAndRunShell::operator<<(
     return *this;
 }
 
+const ForkAndRunShell& ForkAndRunShell::operator<<(
+    const suppress_output_t /*unused*/) const {
+    // Suppress output
+    writeString(" >/dev/null 2>&1");
+    return *this;
+}
+
+const ForkAndRunShell& ForkAndRunShell::operator<<(const and_t /* unused */) const {
+    writeString(" &&");
+    return *this;
+}
+
+
+const ForkAndRunShell& ForkAndRunShell::operator<<(const or_t /* unused */) const {
+    writeString(" ||");
+    return *this;
+}
+
 void ForkAndRunShell::writeString(const std::string_view& str) const {
     const std::shared_lock<std::shared_mutex> _(pid_mutex_);
 

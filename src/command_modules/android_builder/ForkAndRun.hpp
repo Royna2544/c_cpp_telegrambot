@@ -203,9 +203,15 @@ class ForkAndRunShell {
    public:
     explicit ForkAndRunShell(std::filesystem::path shell_path);
 
-    // Tag object
+    // Tag objects
     struct endl_t {};
     static constexpr endl_t endl{};
+    struct suppress_output_t {};
+    static constexpr suppress_output_t suppress_output{};
+    struct and_t {};
+    static constexpr and_t andl{};
+    struct or_t {};
+    static constexpr or_t orl{};
 
     bool open();
     void addEnv(
@@ -226,6 +232,15 @@ class ForkAndRunShell {
 
     // Support ForkAndRunShell::endl
     const ForkAndRunShell& operator<<(const endl_t) const;
+
+    // Support ForkAndRunShell::suppress_output
+    const ForkAndRunShell& operator<<(const suppress_output_t) const;
+
+    // Support ForkAndRunShell::and
+    const ForkAndRunShell& operator<<(const and_t) const;
+
+    // Support ForkAndRunShell::or
+    const ForkAndRunShell& operator<<(const or_t) const;
 
     // waits for anything and either exits or kills itself, no return.
     [[nodiscard]] DeferredExit close();
