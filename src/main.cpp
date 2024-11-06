@@ -585,6 +585,7 @@ int main(int argc, char** argv) {
         LOG(ERROR) << "Network error: " << e.what();
         return EXIT_FAILURE;
     }
+    LOG(WARNING) << std::stacktrace::current();
 
     while (!SignalHandler::isSignaled()) {
         try {
