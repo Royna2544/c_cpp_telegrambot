@@ -9,7 +9,7 @@ void ManagedThreadRunnable::run() {
 
 void ManagedThreadRunnable::threadFunction() {
     ++(*mgr_priv.launched);
-    DLOG(INFO) << fmt::format("{} started (lunched: {})", mgr_priv.usage.str,
+    DLOG(INFO) << fmt::format("{} started (launched: {})", mgr_priv.usage.str,
                               mgr_priv.launched->load());
     auto callback = std::make_unique<StopCallBackJust>(mgr_priv.stopToken,
                                                        [this] { onPreStop(); });
@@ -20,6 +20,6 @@ void ManagedThreadRunnable::threadFunction() {
     }
     --(*mgr_priv.launched);
     mgr_priv.completeBarrier->count_down();
-    DLOG(INFO) << fmt::format("{} joined the barrier (lunched: {})",
+    DLOG(INFO) << fmt::format("{} joined the barrier (launched: {})",
                               mgr_priv.usage.str, mgr_priv.launched->load());
 }
