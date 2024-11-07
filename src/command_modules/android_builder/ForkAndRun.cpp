@@ -3,19 +3,20 @@
 #include <absl/log/log.h>
 #include <absl/log/log_sink.h>
 #include <absl/log/log_sink_registry.h>
-#include <fmt/format.h>
+#include <absl/strings/strip.h>
+#include <sys/ptrace.h>
+#include <sys/syscall.h>
 #include <sys/types.h>
+#include <sys/user.h>
 #include <sys/wait.h>
 #include <trivial_helpers/_FileDescriptor_posix.h>
-#include <trivial_helpers/_class_helper_macros.h>
 #include <unistd.h>
 
 #include <AbslLogInit.hpp>
 #include <LogSinks.hpp>
-#include <Random.hpp>
+#include <array>
 #include <csignal>
 #include <cstdlib>
-#include <cstring>
 #include <filesystem>
 #include <libos/libsighandler.hpp>
 #include <memory>
@@ -24,7 +25,6 @@
 #include <string_view>
 #include <thread>
 #include <trivial_helpers/raii.hpp>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -51,6 +51,130 @@ struct FDLogSink : public absl::LogSink {
     pid_t pid_;
 };
 
+std::string read_string_from_child(pid_t child_pid, unsigned long addr) {
+    std::array<char, PATH_MAX> buf{};
+    int i = 0;
+    unsigned long word = 0;
+
+    // Read the string word by word
+    while (i < buf.size()) {
+        errno = 0;
+        word = ptrace(PTRACE_PEEKDATA, child_pid, addr + i, NULL);
+        if (errno != 0) {
+            PLOG(ERROR) << "ptrace(PTRACE_PEEKDATA)";
+            break;
+        }
+
+        // Copy bytes from the word to the buffer
+        memcpy(buf.data() + i, &word, sizeof(word));
+
+        // Check if we've hit the null terminator
+        if (memchr(&word, 0, sizeof(word)) != nullptr) {
+            break;
+        }
+
+        i += sizeof(word);
+    }
+
+    // Ensure the buffer is null-terminated
+    buf[buf.size() - 1] = '\0';
+    return buf.data();
+}
+
+DeferredExit ptrace_common_parent(pid_t pid) {
+    int status = 0;
+    DeferredExit exit;
+
+    // Wait for child to stop
+    waitpid(pid, &status, 0);
+
+    if (WIFEXITED(status)) {
+        LOG(ERROR) << "Child exited too early.";
+        exit.code = WEXITSTATUS(status);
+        exit.type = DeferredExit::Type::EXIT;
+        return std::move(exit);
+    }
+
+    // Loop to trace the system calls
+    while (true) {
+        struct user_regs_struct regs {};
+        bool blockReq = false;
+
+        // Step to the next system call entry or exit
+        if (ptrace(PTRACE_SYSCALL, pid, NULL, NULL) == -1) {
+            PLOG(ERROR) << "ptrace(PTRACE_SYSCALL) failed";
+            break;
+        }
+
+        // Wait for the child to enter a syscall
+        waitpid(pid, &status, 0);
+        if (WIFEXITED(status)) {
+            LOG(INFO) << "Child exited";
+            break;
+        }
+
+        // syscall has been executed in this stage
+
+        // Step to the syscall exit
+        if (ptrace(PTRACE_SYSCALL, pid, NULL, NULL) == -1) {
+            PLOG(ERROR) << "ptrace(PTRACE_SYSCALL)";
+            break;
+        }
+
+        // Wait for the child to exit the syscall
+        waitpid(pid, &status, 0);
+        if (WIFEXITED(status)) {
+            exit.code = WEXITSTATUS(status);
+            exit.type = DeferredExit::Type::EXIT;
+            break;
+        }
+
+        // Get the registers again after syscall completes
+        if (ptrace(PTRACE_GETREGS, pid, NULL, &regs) == -1) {
+            PLOG(ERROR) << "ptrace(PTRACE_GETREGS) failed";
+            break;
+        }
+
+        // Hooks
+        switch (regs.orig_rax) {
+            case SYS_newfstatat: {
+                std::string buf = read_string_from_child(pid, regs.rsi);
+                std::string_view bufView = buf;
+                if (absl::ConsumeSuffix(&bufView, ".repo/repo/main.py")) {
+                    if (!std::filesystem::equivalent(
+                            std::filesystem::current_path(), bufView)) {
+                        LOG(WARNING) << "BLOCKING ACCESS TO " << buf;
+                        regs.rax = -ENOENT;
+                        regs.orig_rax = -1;
+                    }
+                }
+                break;
+            }
+            default:
+                continue;
+        }
+
+        if (ptrace(PTRACE_SETREGS, pid, NULL, &regs) == -1) {
+            PLOG(ERROR) << "ptrace(PTRACE_SETREGS) failed";
+            break;
+        }
+    }
+
+    // Detach from the child
+    ptrace(PTRACE_DETACH, pid, NULL, NULL);
+    return std::move(exit);
+}
+
+void ptrace_common_child() {
+    // Enable tracing
+    if (ptrace(PTRACE_TRACEME, 0, NULL, NULL) == -1) {
+        PLOG(ERROR) << "ptrace(PTRACE_TRACEME) failed";
+        _exit(EXIT_FAILURE);
+    }
+    // Trigger a stop so the parent can start tracing
+    kill(getpid(), SIGSTOP);
+}
+
 bool ForkAndRun::execute() {
     Pipe stdout_pipe{};
     Pipe stderr_pipe{};
@@ -64,10 +188,13 @@ bool ForkAndRun::execute() {
 
     pid_t pid = fork();
     if (pid == 0) {
-        TgBot_AbslLogDeInit();
+        // Child process
+        ptrace_common_child();
         {
             DeferredExit exit;
             {
+                // Switch to subprocess logging
+                TgBot_AbslLogDeInit();
                 RAIILogSink<FDLogSink> logSink;
 
                 dup2(stdout_pipe.writeEnd(), STDOUT_FILENO);
@@ -133,6 +260,7 @@ bool ForkAndRun::execute() {
             program_termination_pipe.readEnd(),
             [program_termination_pipe, &breakIt]() { breakIt = true; },
             Selector::Mode::READ);
+
         std::thread pollThread([&breakIt, this]() {
             while (!breakIt) {
                 switch (selector.poll()) {
@@ -145,14 +273,19 @@ bool ForkAndRun::execute() {
                 }
             }
         });
-        waitpid(pid, &status, 0);
-        if (WIFEXITED(status)) {
-            onExit(WEXITSTATUS(status));
-        } else if (WIFSIGNALED(status)) {
-            onSignal(WTERMSIG(status));
-        } else {
-            LOG(WARNING) << "Unknown program termination: " << status;
-            onExit(0);
+
+        auto e = ptrace_common_parent(pid);
+        e.defuse();
+        switch (e.type) {
+            case DeferredExit::Type::EXIT:
+                onExit(e.code);
+                break;
+            case DeferredExit::Type::SIGNAL:
+                onSignal(e.code);
+                break;
+            default:
+                LOG(ERROR) << "Unexpected exit type: "
+                           << static_cast<int>(e.type);
         }
 
         // Notify the polling thread that program has ended.
@@ -261,17 +394,13 @@ DeferredExit ForkAndRunSimple::operator()() {
     rawArgs.emplace_back(nullptr);
 
     // Execute the program
-    pid_t pid = vfork();
+    pid_t pid = fork();
     if (pid == 0) {
+        ptrace_common_child();
         execvp(args_[0].data(), rawArgs.data());
         _exit(EXIT_FAILURE);
     } else if (pid > 0) {
-        int status = 0;
-        if (waitpid(pid, &status, 0) < 0) {
-            PLOG(ERROR) << "Failed to wait for child";
-            return DeferredExit::generic_fail;
-        }
-        return DeferredExit{status};
+        return ptrace_common_parent(pid);
     } else {
         PLOG(ERROR) << "Unable to fork";
     }
@@ -296,9 +425,11 @@ bool ForkAndRunShell::open() {
         dup2(pipe_.readEnd(), STDIN_FILENO);
         ::close(pipe_.writeEnd());
 
+        ptrace_common_child();
+
         // Craft argv
-        auto string = RAII<char*>::create<void>(
-            strdup(_shellName.c_str()), free);
+        auto string =
+            RAII<char*>::create<void>(strdup(_shellName.c_str()), free);
         std::array<char*, 2> argv{string.get(), nullptr};
 
         // Craft envp
@@ -328,17 +459,13 @@ bool ForkAndRunShell::open() {
                     LOG(INFO) << "shell_pid is negative";
                     return;
                 }
-                if (waitpid(shell_pid_, &status, 0) < 0) {
-                    PLOG(ERROR) << "Failed to wait for shell";
-                    return;
-                }
+                result = ptrace_common_parent(shell_pid_);
             }
             // Promote to unique
             {
                 std::unique_lock<std::shared_mutex> lock(pid_mutex_);
                 shell_pid_ = -1;
             }
-            result = DeferredExit{status};
         });
     }
     return true;
@@ -357,13 +484,14 @@ const ForkAndRunShell& ForkAndRunShell::operator<<(
     return *this;
 }
 
-const ForkAndRunShell& ForkAndRunShell::operator<<(const and_t /* unused */) const {
+const ForkAndRunShell& ForkAndRunShell::operator<<(
+    const and_t /* unused */) const {
     writeString(" &&");
     return *this;
 }
 
-
-const ForkAndRunShell& ForkAndRunShell::operator<<(const or_t /* unused */) const {
+const ForkAndRunShell& ForkAndRunShell::operator<<(
+    const or_t /* unused */) const {
     writeString(" ||");
     return *this;
 }

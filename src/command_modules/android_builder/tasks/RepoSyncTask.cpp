@@ -125,18 +125,6 @@ DeferredExit RepoSyncTask::runFunction() {
         }
         r.defuse();
     }
-    if (const auto val =
-            walk_up_tree_and_gather<1>([](const std::filesystem::path& path) {
-                DLOG(INFO) << "Walking up: " << path;
-                return std::filesystem::is_directory(path / ".repo");
-            });
-        val.size() != 0) {
-        for (const auto& dir : val) {
-            LOG(ERROR) << "Found .repo directory in parent directory: "
-                       << dir.string();
-            std::filesystem::remove_all(dir / ".repo");
-        }
-    }
     if (!(*data.localManifest->prepare)(kLocalManifestPath.data())) {
         LOG(ERROR) << "Failed to prepare local manifest";
         return DeferredExit::generic_fail;
