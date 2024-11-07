@@ -24,6 +24,7 @@ add_my_library(
         progress
         JsonCpp::JsonCpp
         LibXml2::LibXml2
+        TgBotsighandler
         ${LIBGIT2_LIBS}
     NO_LIBPREFIX
     STATIC
@@ -35,4 +36,5 @@ add_my_executable(
     LIBS AndroidBuilder-cpp
     OPTIONAL
 )
+
 endif()
