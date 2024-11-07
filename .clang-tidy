@@ -14,7 +14,9 @@ Checks: "*,
         -cppcoreguidelines-non-private-member-variables-in-classes,
         -misc-non-private-member-variables-in-classes,
         -hicpp-signed-bitwise,
-        -cppcoreguidelines-owning-memory
+        -cppcoreguidelines-owning-memory,
+        -hicpp-vararg,
+        -cppcoreguidelines-pro-type-vararg
 "
 WarningsAsErrors: ''
 HeaderFilterRegex: ''
