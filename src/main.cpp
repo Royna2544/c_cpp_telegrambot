@@ -575,5 +575,6 @@ int main(int argc, char** argv) {
         }
     }
     threadManager->destroy();
+    LOG(INFO) << fmt::format("{} : exiting now...", std::filesystem::path(argv[0]).filename().string());
     return EXIT_SUCCESS;
 }
