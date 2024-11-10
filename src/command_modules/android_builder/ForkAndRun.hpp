@@ -257,6 +257,7 @@ class ForkAndRunSimple {
 
    public:
     explicit ForkAndRunSimple(std::string_view argv);
+    static constexpr bool kEnablePtraceHook = true;
 
     ForkAndRun::Env env;
 
@@ -287,6 +288,7 @@ class ForkAndRunShell {
    public:
     constexpr static std::string_view DefaultShell = "bash";
     explicit ForkAndRunShell(std::string shellName = DefaultShell.data());
+    static constexpr bool kEnablePtraceHook = false;
 
     // Tag objects
     struct endl_t {};

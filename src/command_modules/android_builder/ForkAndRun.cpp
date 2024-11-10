@@ -5,7 +5,6 @@
 #include <absl/log/log_sink_registry.h>
 #include <absl/strings/str_split.h>
 #include <absl/strings/strip.h>
-#include <asm-generic/errno.h>
 #include <sys/ptrace.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
@@ -408,7 +407,9 @@ DeferredExit ForkAndRunSimple::execute() {
     // Execute the program
     pid_t pid = fork();
     if (pid == 0) {
-        ptrace_common_child();
+        if constexpr (kEnablePtraceHook) {
+            ptrace_common_child();
+        }
 
         // Craft envp
         std::vector<char*> envp;
@@ -426,7 +427,16 @@ DeferredExit ForkAndRunSimple::execute() {
         execvpe(args_[0].data(), rawArgs.data(), envp.data());
         _exit(EXIT_FAILURE);
     } else if (pid > 0) {
-        return ptrace_common_parent(pid);
+        if constexpr (kEnablePtraceHook) {
+            return ptrace_common_parent(pid);
+        } else {
+            int status = 0;
+            if (waitpid(pid, &status, 0) < 0) {
+                PLOG(ERROR) << "Failed to wait for shell";
+                return DeferredExit::generic_fail;
+            }
+            return DeferredExit(status);
+        }
     } else {
         PLOG(ERROR) << "Unable to fork";
     }
@@ -451,7 +461,9 @@ bool ForkAndRunShell::open() {
         dup2(pipe_.readEnd(), STDIN_FILENO);
         ::close(pipe_.writeEnd());
 
-        // ptrace_common_child();
+        if constexpr (kEnablePtraceHook) {
+            ptrace_common_child();
+        }
 
         // Craft argv
         auto string =
@@ -485,12 +497,15 @@ bool ForkAndRunShell::open() {
                     LOG(INFO) << "shell_pid is negative";
                     return;
                 }
-                if (waitpid(shell_pid_, &status, 0) < 0) {
-                    PLOG(ERROR) << "Failed to wait for shell";
-                    return;
+                if constexpr (kEnablePtraceHook) {
+                    result = ptrace_common_parent(shell_pid_);
+                } else {
+                    if (waitpid(shell_pid_, &status, 0) < 0) {
+                        PLOG(ERROR) << "Failed to wait for shell";
+                        return;
+                    }
+                    result = DeferredExit(status);
                 }
-                result = DeferredExit(status);
-                // result = ptrace_common_parent(shell_pid_);
             }
             // Promote to unique
             {
