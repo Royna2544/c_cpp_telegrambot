@@ -33,7 +33,7 @@ void CompilerInTgBotInterface::onExecutionStarted(
 void CompilerInTgBotInterface::onExecutionFinished(
     const std::string_view& command, const popen_watchdog_exit_t& exit) {
     const std::string_view type = exit.signal ? "signal" : "exit";
-    output << fmt::format("\n{} {}\n{} {} {}",
+    output << fmt::format("\n{} {}\n{} {} {}\n",
                           access(_locale, Strings::DONE_TOOK), timePoint.get(),
                           access(_locale, Strings::PROCESS_EXITED), type,
                           exit.exitcode);
