@@ -58,6 +58,10 @@ DECLARE_COMMAND_HANDLER(rotatepic) {
             return;
         }
         fileid = stick->fileId;
+    } else {
+        api->sendReplyMessage(message->message(),
+                              access(res, Strings::REPLY_TO_A_MEDIA));
+        return;
     }
 
     if (!try_parse(args[0], &rotation)) {
