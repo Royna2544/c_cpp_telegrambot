@@ -22,6 +22,7 @@
 #include <tasks/UploadFileTask.hpp>
 #include <utility>
 
+#include "ConfigManager.hpp"
 #include "SystemInfo.hpp"
 
 template <typename Impl>
@@ -201,10 +202,9 @@ class ROMBuildQueryHandler
     // Handle type selection button
     void handle_type(const Query& query);
 
-#define DECLARE_BUTTON_HANDLER(name, key)                               \
-    ButtonHandler {                                                     \
-        name, #key, [this](const Query& query) { handle_##key(query); } \
-    }
+#define DECLARE_BUTTON_HANDLER(name, key) \
+    ButtonHandler{name, #key,             \
+                  [this](const Query& query) { handle_##key(query); }}
 #define DECLARE_BUTTON_HANDLER_WITHPREFIX(name, key, prefix)             \
     ButtonHandler {                                                      \
         name, #key, [this](const Query& query) { handle_##key(query); }, \
@@ -737,6 +737,7 @@ DECLARE_COMMAND_HANDLER(rombuild) {
         handler->start(message->message());
         return;
     }
+
     try {
         handler =
             std::make_shared<ROMBuildQueryHandler>(api, message->message());
@@ -745,6 +746,24 @@ DECLARE_COMMAND_HANDLER(rombuild) {
         api->sendMessage(message->get<MessageAttrs::Chat>(),
                          "Failed to initialize ROM build: "s + e.what());
         return;
+    }
+
+    auto gitAskPass =
+        FS::getPath(FS::PathType::RESOURCES_SCRIPTS) / RepoSyncTask::kGitAskPassFile;
+    if (auto token =
+            provider->config->get(ConfigManager::Configs::GITHUB_TOKEN)) {
+        LOG(INFO) << "Create and write git-askpass file";
+        std::ofstream ofs(gitAskPass);
+        ofs << "echo " << *token << std::endl;
+        ofs.close();
+        std::error_code ec;
+        std::filesystem::permissions(gitAskPass,
+                                     std::filesystem::perms::owner_all, ec);
+        if (ec) {
+            LOG(ERROR) << "Failed to set permissions for git-askpass file: "
+                       << ec.message();
+            std::filesystem::remove(gitAskPass, ec);
+        }
     }
 
     api->onCallbackQuery(

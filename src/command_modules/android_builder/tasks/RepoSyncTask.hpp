@@ -75,6 +75,8 @@ class RepoSyncNetworkHook : public NewStdErrBufferHook {
 struct RepoSyncTask : ForkAndRun {
     constexpr static std::string_view kLocalManifestPath =
         ".repo/local_manifests";
+    constexpr static std::string_view kGitAskPassFile = "git-askpass.sh";
+    constexpr static std::string_view kGitAskPassEnv = "GIT_ASKPASS";
 
     DeferredExit runFunction() override;
 

@@ -35,6 +35,10 @@ std::filesystem::path FS::getPath(PathType type) {
             path = getPath(PathType::GIT_ROOT) / "www";
             ok = true;
             break;
+        case PathType::RESOURCES_SCRIPTS:
+            path = getPath(PathType::RESOURCES) / "scripts";
+            ok = true;
+            break;
     }
     if (ok) {
         path.make_preferred();
@@ -44,5 +48,5 @@ std::filesystem::path FS::getPath(PathType type) {
     return path;
 }
 
-constexpr FS::SharedLibType FS::SharedLib; // NOLINT
-constexpr std::string_view FS::kDylibExtension; // NOLINT
+constexpr FS::SharedLibType FS::SharedLib;       // NOLINT
+constexpr std::string_view FS::kDylibExtension;  // NOLINT

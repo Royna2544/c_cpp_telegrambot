@@ -12,28 +12,6 @@
 #include <trivial_helpers/raii.hpp>
 #include <type_traits>
 
-#include "ForkAndRun.hpp"
-
-DeferredExit RepoUtils::repo_init(const RepoInfo& options) {
-    const auto args = fmt::format("repo init -u {} -b {} --git-lfs --depth={}",
-                                  options.url, options.branch, 1);
-    ForkAndRunSimple simple(absl::StrSplit(args, ' '));
-    auto ret = simple();
-    LOG(INFO) << "Repo init result: " << ret;
-    return ret;
-}
-
-DeferredExit RepoUtils::repo_sync(const long job_count) {
-    const auto args = fmt::format(
-        "repo sync -c -j{} --force-sync --no-clone-bundle --no-tags "
-        "--force-remove-dirty",
-        job_count);
-    ForkAndRunSimple simple(absl::StrSplit(args, ' '));
-    auto ret = simple();
-    LOG(INFO) << "Repo sync result: " << ret;
-    return ret;
-}
-
 struct ScopedLibGit2 {
     ScopedLibGit2() { git_libgit2_init(); }
     ~ScopedLibGit2() { git_libgit2_shutdown(); }

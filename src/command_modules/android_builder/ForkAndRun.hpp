@@ -62,6 +62,25 @@ struct DeferredExit {
     bool destory = true;
 };
 
+namespace details {
+
+template <typename... Bases>
+struct overload : Bases... {
+    using is_transparent = void;
+    using Bases::operator()...;
+};
+
+struct char_pointer_hash {
+    auto operator()(const char* ptr) const noexcept {
+        return std::hash<std::string_view>{}(ptr);
+    }
+};
+
+using transparent_string_hash =
+    overload<std::hash<std::string>, std::hash<std::string_view>,
+             char_pointer_hash>;
+}  // namespace details
+
 class ForkAndRun {
    public:
     virtual ~ForkAndRun() = default;
@@ -158,84 +177,6 @@ class ForkAndRun {
      */
     void cancel() const;
 
-   private:
-    UnixSelector selector;
-    pid_t childProcessId = -1;
-};
-
-inline std::ostream& operator<<(std::ostream& os, DeferredExit const& df) {
-    if (df.type == DeferredExit::Type::EXIT) {
-        os << "Deferred exit: " << df.code;
-    } else if (df.type == DeferredExit::Type::SIGNAL) {
-        os << "Deferred signal: " << df.code;
-    } else {
-        os << "Deferred exit: (unknown type)";
-    }
-    return os;
-}
-
-class ForkAndRunSimple {
-    std::vector<std::string> args_;
-
-   public:
-    explicit ForkAndRunSimple(std::vector<std::string> argv);
-
-    // Runs the argv, and either exits or kills itself, no return.
-    [[nodiscard]] DeferredExit operator()();
-};
-
-template <typename T>
-concept WriteableToStdOstream = requires(T t) { std::cout << t; };
-
-namespace details {
-
-template <typename... Bases>
-struct overload : Bases... {
-    using is_transparent = void;
-    using Bases::operator()...;
-};
-
-struct char_pointer_hash {
-    auto operator()(const char* ptr) const noexcept {
-        return std::hash<std::string_view>{}(ptr);
-    }
-};
-
-using transparent_string_hash =
-    overload<std::hash<std::string>, std::hash<std::string_view>,
-             char_pointer_hash>;
-}  // namespace details
-
-class ForkAndRunShell {
-    std::string _shellName;
-    Pipe pipe_{};
-
-    // Protect shell_pid_, and if process terminated, we wont want write() to
-    // block.
-    mutable std::shared_mutex pid_mutex_;
-    pid_t shell_pid_ = -1;
-
-    // terminate watcher
-    std::thread terminate_watcher_thread;
-    DeferredExit result;
-
-    bool opened = false;
-
-    void writeString(const std::string_view& args) const;
-
-   public:
-    explicit ForkAndRunShell(std::string shellName);
-
-    // Tag objects
-    struct endl_t {};
-    static constexpr endl_t endl{};
-    struct suppress_output_t {};
-    static constexpr suppress_output_t suppress_output{};
-    struct and_t {};
-    static constexpr and_t andl{};
-    struct or_t {};
-    static constexpr or_t orl{};
-
     class Env {
         struct Comp {
             using is_transparent = void;
@@ -255,6 +196,7 @@ class ForkAndRunShell {
        public:
         Env() = default;
         friend class ForkAndRunShell;
+        friend class ForkAndRunSimple;
 
         struct ValueEntry {
             decltype(map)::pointer _it;
@@ -292,7 +234,71 @@ class ForkAndRunShell {
                 LOG(WARNING) << "Attempting to erase non-existent key: " << key;
             }
         }
-    } env;
+    };
+
+   private:
+    UnixSelector selector;
+    pid_t childProcessId = -1;
+};
+
+inline std::ostream& operator<<(std::ostream& os, DeferredExit const& df) {
+    if (df.type == DeferredExit::Type::EXIT) {
+        os << "Deferred exit: " << df.code;
+    } else if (df.type == DeferredExit::Type::SIGNAL) {
+        os << "Deferred signal: " << df.code;
+    } else {
+        os << "Deferred exit: (unknown type)";
+    }
+    return os;
+}
+
+class ForkAndRunSimple {
+    std::vector<std::string> args_;
+
+   public:
+    explicit ForkAndRunSimple(std::string_view argv);
+
+    ForkAndRun::Env env;
+
+    // Runs the argv, and returns the result.
+    [[nodiscard]] DeferredExit execute();
+};
+
+template <typename T>
+concept WriteableToStdOstream = requires(T t) { std::cout << t; };
+
+class ForkAndRunShell {
+    std::string _shellName;
+    Pipe pipe_{};
+
+    // Protect shell_pid_, and if process terminated, we wont want write() to
+    // block.
+    mutable std::shared_mutex pid_mutex_;
+    pid_t shell_pid_ = -1;
+
+    // terminate watcher
+    std::thread terminate_watcher_thread;
+    DeferredExit result;
+
+    bool opened = false;
+
+    void writeString(const std::string_view& args) const;
+
+   public:
+    constexpr static std::string_view DefaultShell = "bash";
+    explicit ForkAndRunShell(std::string shellName = DefaultShell.data());
+
+    // Tag objects
+    struct endl_t {};
+    static constexpr endl_t endl{};
+    struct suppress_output_t {};
+    static constexpr suppress_output_t suppress_output{};
+    struct and_t {};
+    static constexpr and_t andl{};
+    struct or_t {};
+    static constexpr or_t orl{};
+
+    ForkAndRun::Env env;
 
     bool open();
 

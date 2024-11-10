@@ -8,6 +8,7 @@
 #include <trivial_helpers/fruit_inject.hpp>
 
 #include "utils/CommandLine.hpp"
+#include "utils/ConfigManager.hpp"
 
 // Providers to supply DI
 class Providers {
@@ -25,12 +26,15 @@ class Providers {
     Installable<ResourceProvider> resource{};
     Installable<DatabaseBase> database{};
     Installable<CommandLine> cmdline{};
+    Installable<ConfigManager> config{};
 
     APPLE_INJECT(Providers(Random *random, ResourceProvider *resource,
-                           DatabaseBase *database, CommandLine *cmd)) {
+                           DatabaseBase *database, CommandLine *cmd,
+                           ConfigManager *configManager)) {
         this->random.instance = random;
         this->resource.instance = resource;
         this->database.instance = database;
         this->cmdline.instance = cmd;
+        this->config.instance = configManager;
     }
 };

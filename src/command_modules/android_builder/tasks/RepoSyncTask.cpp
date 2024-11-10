@@ -94,11 +94,18 @@ bool RepoSyncNetworkHook::process(const std::string& line) {
     return false;
 }
 
+constexpr std::string_view initCommand =
+    "repo init -u {} -b {} --git-lfs --depth={}";
+constexpr std::string_view kLocalManifestGitPath = ".repo/manifest.git";
+constexpr std::string_view syncCommand =
+    "repo sync -c -j{} --force-sync --no-clone-bundle --no-tags "
+    "--force-remove-dirty";
+
 DeferredExit RepoSyncTask::runFunction() {
     std::error_code ec;
     bool repoDirExists = false;
 
-    repoDirExists = std::filesystem::is_directory(".repo/manifests.git", ec);
+    repoDirExists = std::filesystem::is_directory(kLocalManifestGitPath, ec);
     if (ec &&
         ec != std::make_error_code(std::errc::no_such_file_or_directory)) {
         LOG(ERROR) << "Failed to check .repo directory existence: "
@@ -109,29 +116,41 @@ DeferredExit RepoSyncTask::runFunction() {
                    << repoDirExists;
     }
 
+    auto gitAskPass =
+        FS::getPath(FS::PathType::RESOURCES_SCRIPTS) / kGitAskPassFile;
     const auto& rom = getValue(data.localManifest->rom);
-    GitBranchSwitcher switcher{.gitDirectory = ".repo/manifests.git",
+    GitBranchSwitcher switcher{.gitDirectory = kLocalManifestGitPath,
                                .desiredBranch = rom->branch,
                                .desiredUrl = rom->romInfo->url,
                                .checkout = false};
     if (!repoDirExists || !switcher()) {
-        auto r = RepoUtils::repo_init({rom->romInfo->url, rom->branch});
-        if (!r) {
-            return r;
+        ForkAndRunSimple shell(fmt::format(initCommand, rom->romInfo->url, rom->branch, 1));
+        shell.env[kGitAskPassEnv] = gitAskPass.string();
+        auto ret = shell.execute();
+        LOG(INFO) << "Repo init result: " << ret;
+        if (!ret) {
+            return ret;
         }
-        r.defuse();
+        ret.defuse();
     }
     if (!(*data.localManifest->prepare)(kLocalManifestPath.data())) {
         LOG(ERROR) << "Failed to prepare local manifest";
         return DeferredExit::generic_fail;
     }
     unsigned int job_count = std::thread::hardware_concurrency() / 2;
+    auto sync = [&gitAskPass](unsigned int jobCount) {
+        ForkAndRunSimple shell(fmt::format(syncCommand, jobCount));
+        shell.env[kGitAskPassEnv] = gitAskPass.string();
+        auto ret = shell.execute();
+        LOG(INFO) << "Repo sync result: " << ret;
+        return ret;
+    };
     DeferredExit rs;
     if (runWithReducedJobs) {
         // Futher reduce the number of jobs count
-        rs = RepoUtils::repo_sync(job_count / 4);
+        rs = sync(job_count / 4);
     } else {
-        rs = RepoUtils::repo_sync(job_count);
+        rs = sync(job_count);
     }
     if (!rs) {
         return rs;

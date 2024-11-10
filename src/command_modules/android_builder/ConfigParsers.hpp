@@ -107,8 +107,8 @@ class ConfigParser {
         };
 
         struct GitPrepare : PrepareBase {
-            RepoUtils::RepoInfo info;
-            explicit GitPrepare(RepoUtils::RepoInfo info)
+            RepoInfo info;
+            explicit GitPrepare(RepoInfo info)
                 : info(std::move(info)) {}
             bool operator()(const std::filesystem::path &path) override;
         };

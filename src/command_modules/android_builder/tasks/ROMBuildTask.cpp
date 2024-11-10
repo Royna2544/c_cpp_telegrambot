@@ -63,6 +63,7 @@ std::string findREL() {
             return file;
         }
     }
+    LOG(INFO) << "Not found";
     // Ignore if we failed to open, these paths are only valid in Android 14+
     return {};
 }

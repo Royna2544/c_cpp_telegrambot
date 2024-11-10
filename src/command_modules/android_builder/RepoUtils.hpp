@@ -4,19 +4,10 @@
 
 #include <filesystem>
 #include <string>
-#include "ForkAndRun.hpp"
 
 struct RepoInfo {
     std::string url;
     std::string branch;
-};
-
-class RepoUtils {
-   public:
-    using RepoInfo = ::RepoInfo;
-
-    [[nodiscard]] static DeferredExit repo_init(const RepoInfo& options);
-    [[nodiscard]] static DeferredExit repo_sync(const long job_count);
 };
 
 class GitUtils {

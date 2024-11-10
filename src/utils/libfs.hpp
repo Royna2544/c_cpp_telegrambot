@@ -16,6 +16,7 @@ struct TgBotUtils_API FS {
         RESOURCES,
         RESOURCES_SQL,
         RESOURCES_WEBPAGE,
+        RESOURCES_SCRIPTS,
     };
 
     struct SharedLibType {};

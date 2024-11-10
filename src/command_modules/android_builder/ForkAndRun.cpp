@@ -3,7 +3,9 @@
 #include <absl/log/log.h>
 #include <absl/log/log_sink.h>
 #include <absl/log/log_sink_registry.h>
+#include <absl/strings/str_split.h>
 #include <absl/strings/strip.h>
+#include <asm-generic/errno.h>
 #include <sys/ptrace.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
@@ -15,9 +17,11 @@
 #include <AbslLogInit.hpp>
 #include <LogSinks.hpp>
 #include <array>
+#include <cerrno>
 #include <csignal>
 #include <cstdlib>
 #include <filesystem>
+#include <iomanip>
 #include <libos/libsighandler.hpp>
 #include <memory>
 #include <mutex>
@@ -102,6 +106,15 @@ DeferredExit ptrace_common_parent(pid_t pid) {
 
         // Step to the next system call entry or exit
         if (ptrace(PTRACE_SYSCALL, pid, NULL, NULL) == -1) {
+            if (errno == ESRCH) {
+                ptrace(PTRACE_DETACH, pid, NULL, NULL);
+                if (waitpid(pid, &status, 0) < 0) {
+                    PLOG(ERROR) << "Failed to wait for pid";
+                    break;
+                }
+                exit = DeferredExit(status);
+                break;
+            }
             PLOG(ERROR) << "ptrace(PTRACE_SYSCALL) failed";
             break;
         }
@@ -109,7 +122,7 @@ DeferredExit ptrace_common_parent(pid_t pid) {
         // Wait for the child to enter a syscall
         waitpid(pid, &status, 0);
         if (WIFEXITED(status)) {
-            LOG(INFO) << "Child exited";
+            exit = DeferredExit(status);
             break;
         }
 
@@ -124,8 +137,7 @@ DeferredExit ptrace_common_parent(pid_t pid) {
         // Wait for the child to exit the syscall
         waitpid(pid, &status, 0);
         if (WIFEXITED(status)) {
-            exit.code = WEXITSTATUS(status);
-            exit.type = DeferredExit::Type::EXIT;
+            exit = DeferredExit(status);
             break;
         }
 
@@ -376,10 +388,10 @@ DeferredExit::operator bool() const noexcept {
     return type == Type::EXIT && code == 0;
 }
 
-ForkAndRunSimple::ForkAndRunSimple(std::vector<std::string> argv)
-    : args_(std::move(argv)) {}
+ForkAndRunSimple::ForkAndRunSimple(std::string_view argv)
+    : args_(absl::StrSplit(argv, ' ', absl::SkipWhitespace())) {}
 
-DeferredExit ForkAndRunSimple::operator()() {
+DeferredExit ForkAndRunSimple::execute() {
     // Owns the strings
     std::vector<std::string> args;
     args.reserve(args_.size());
@@ -397,7 +409,21 @@ DeferredExit ForkAndRunSimple::operator()() {
     pid_t pid = fork();
     if (pid == 0) {
         ptrace_common_child();
-        execvp(args_[0].data(), rawArgs.data());
+
+        // Craft envp
+        std::vector<char*> envp;
+        std::vector<std::string> owners;
+        for (int x = 0; environ[x] != nullptr; x++) {
+            envp.emplace_back(environ[x]);
+        }
+        for (const auto& [key, value] : env.map) {
+            LOG(INFO) << "Setting env " << key << "=" << value;
+            owners.emplace_back(fmt::format("{}={}", key, value));
+            envp.emplace_back(owners.back().data());
+        }
+        envp.emplace_back(nullptr);
+
+        execvpe(args_[0].data(), rawArgs.data(), envp.data());
         _exit(EXIT_FAILURE);
     } else if (pid > 0) {
         return ptrace_common_parent(pid);
@@ -425,7 +451,7 @@ bool ForkAndRunShell::open() {
         dup2(pipe_.readEnd(), STDIN_FILENO);
         ::close(pipe_.writeEnd());
 
-        ptrace_common_child();
+        // ptrace_common_child();
 
         // Craft argv
         auto string =
@@ -459,7 +485,12 @@ bool ForkAndRunShell::open() {
                     LOG(INFO) << "shell_pid is negative";
                     return;
                 }
-                result = ptrace_common_parent(shell_pid_);
+                if (waitpid(shell_pid_, &status, 0) < 0) {
+                    PLOG(ERROR) << "Failed to wait for shell";
+                    return;
+                }
+                result = DeferredExit(status);
+                // result = ptrace_common_parent(shell_pid_);
             }
             // Promote to unique
             {
@@ -521,8 +552,10 @@ DeferredExit ForkAndRunShell::close() {
             do_wait = true;
         }
     }
-    *this << "exit" << endl;
-    opened = false;  // Prevent future write operations.
+    if (do_wait) {
+        *this << "exit" << endl;
+        opened = false;  // Prevent future write operations.
+    }
     LOG(INFO) << "Exit command written";
     if (do_wait || terminate_watcher_thread.joinable()) {
         terminate_watcher_thread.join();

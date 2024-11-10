@@ -72,6 +72,7 @@ struct ConfigBackendBoostPOBase : public ConfigManager::Backend {
             AddOption<std::string, ConfigManager::Configs::OVERRIDE_CONF>(desc);
             AddOption<std::string, ConfigManager::Configs::SOCKET_CFG>(desc);
             AddOption<std::string, ConfigManager::Configs::SELECTOR_CFG>(desc);
+            AddOption<std::string, ConfigManager::Configs::GITHUB_TOKEN>(desc);
         });
         return desc;
     }
