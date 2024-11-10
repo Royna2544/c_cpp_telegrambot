@@ -2,6 +2,7 @@
 #include <fmt/format.h>
 
 #include <ConfigManager.hpp>
+#include <algorithm>
 #include <boost/program_options.hpp>
 #include <cstdlib>
 #include <filesystem>
@@ -16,7 +17,6 @@
 #include <utility>
 
 #include "CommandLine.hpp"
-#include "CompileTimeStringConcat.hpp"
 
 #ifdef _MSC_VER
 #define make_unique make_shared
@@ -24,37 +24,28 @@
 #endif
 
 namespace po = boost::program_options;
-using namespace StringConcat;
 
 template <typename T, ConfigManager::Configs config>
 void AddOption(po::options_description &desc) {
-    constexpr int index = static_cast<int>(config);
-    constexpr auto confstr =
-        cat(ConfigManager::kConfigsMap.at(index).second, createString(','),
-            createString(ConfigManager::kConfigsAliasMap.at(index).second));
-
-    desc.add_options()(
-        confstr.get().data(), po::value<T>(),
-        ConfigManager::kConfigsDescMap.at(index).second.get().data());
-}
-
-template <ConfigManager::Configs config>
-void AddOption(po::options_description &desc) {
-    constexpr int index = static_cast<int>(config);
-    constexpr auto confstr = StringConcat::cat(
-        ConfigManager::kConfigsMap.at(index).second, createString(','),
-        createString(ConfigManager::kConfigsAliasMap.at(index).second));
-
-    desc.add_options()(
-        confstr.get().data(),
-        ConfigManager::kConfigsDescMap.at(index).second.get().data());
+    auto index = std::ranges::find_if(ConfigManager::kConfigMap,
+                                      [](const ConfigManager::Entry &entry) {
+                                          return entry.config == config;
+                                      });
+    if (index->alias != ConfigManager::Entry::ALIAS_NONE) {
+        desc.add_options()(
+            fmt::format("{},{}", index->name, index->alias).c_str(),
+            po::value<T>(), index->description.data());
+    } else {
+        desc.add_options()(index->name.data(), po::value<T>(),
+                           index->description.data());
+    }
 }
 
 struct ConfigBackendEnv : public ConfigManager::Backend {
     ~ConfigBackendEnv() override = default;
     ConfigBackendEnv() = default;
 
-    std::optional<std::string> get(const std::string &name) override {
+    std::optional<std::string> get(const std::string_view name) override {
         std::string outvalue;
         if (ConfigManager::getEnv(name, outvalue)) {
             return outvalue;
@@ -62,7 +53,7 @@ struct ConfigBackendEnv : public ConfigManager::Backend {
         return std::nullopt;
     }
 
-    bool doOverride(const std::string &config) override {
+    bool doOverride(const std::string_view config) override {
         std::string value;
         std::string kConfigOverrideVariable(kConfigOverrideVar);
         return get(kConfigOverrideVariable) && value == config;
@@ -85,16 +76,16 @@ struct ConfigBackendBoostPOBase : public ConfigManager::Backend {
         return desc;
     }
 
-    std::optional<std::string> get(const std::string &name) override {
+    std::optional<std::string> get(const std::string_view name) override {
         if (name != kConfigOverrideVar) {
-            if (const auto it = mp[name]; !it.empty()) {
+            if (const auto it = mp[std::string(name)]; !it.empty()) {
                 return it.as<std::string>();
             }
         }
         return std::nullopt;
     }
 
-    bool doOverride(const std::string &config) override {
+    bool doOverride(const std::string_view config) override {
         if (const auto it = mp[kConfigOverrideVar.data()]; !it.empty()) {
             const auto &vec = it.as<std::vector<std::string>>();
             return std::ranges::find(vec, config) != vec.end();
@@ -149,7 +140,7 @@ struct ConfigBackendCmdline : public ConfigBackendBoostPOBase {
     static po::options_description getTgBotOptionsDesc() {
         auto desc = ConfigBackendBoostPOBase::getTgBotOptionsDesc();
 
-        AddOption<ConfigManager::Configs::HELP>(desc);
+        AddOption<bool, ConfigManager::Configs::HELP>(desc);
         return desc;
     }
 
@@ -199,8 +190,9 @@ ConfigManager::ConfigManager(CommandLine line) {
 std::optional<std::string> ConfigManager::get(Configs config) {
     Passes p = Passes::INIT;
     std::string outvalue;
-    std::string name = array_helpers::find(kConfigsMap, config)->second;
-    name.resize(strlen(name.c_str()));
+    std::string_view name = std::ranges::find_if(kConfigMap, [config](const Entry& entry) {
+        return entry.config == config;
+    })->name;
 
     p = Passes::FIND_OVERRIDE;
     do {

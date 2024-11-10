@@ -2,13 +2,12 @@
 
 #include <TgBotUtilsExports.h>
 
-#include <filesystem>
+#include <array>
 #include <optional>
 #include <string>
 #include <vector>
 
 #include "CommandLine.hpp"
-#include "CompileTimeStringConcat.hpp"
 #include "EnumArrayHelpers.h"
 #include "trivial_helpers/fruit_inject.hpp"
 
@@ -29,8 +28,10 @@ class TgBotUtils_API ConfigManager {
         OVERRIDE_CONF,
         SOCKET_CFG,
         SELECTOR_CFG,
+        GITHUB_TOKEN,
         MAX
     };
+    static constexpr int CONFIG_MAX = static_cast<int>(Configs::MAX);
 
     /**
      * get - Function used to retrieve the value of a specific
@@ -77,63 +78,33 @@ class TgBotUtils_API ConfigManager {
     // Constructor
     APPLE_EXPLICIT_INJECT(ConfigManager(CommandLine line));
 
-   private:
-    using ConfigStr = StringConcat::String<20>;
-    using DescStr = StringConcat::String<50>;
+    struct Entry {
+        static constexpr char ALIAS_NONE = '\0';
 
-#define CONFIG_AND_STR(e)                                        \
-    array_helpers::make_elem<ConfigManager::Configs, ConfigStr>( \
-        ConfigManager::Configs::e, StringConcat::createString(#e))
+        Configs config;
+        std::string_view name;
+        std::string_view description;
+        char alias;
+    };
 
-#define CONFIGALIAS_AND_STR(e, alias)                             \
-    array_helpers::make_elem<ConfigManager::Configs, const char>( \
-        ConfigManager::Configs::e, alias)
-
-#define DESC_AND_STR(e, desc)                                  \
-    array_helpers::make_elem<ConfigManager::Configs, DescStr>( \
-        ConfigManager::Configs::e, StringConcat::createString(desc))
-
-   public:
-    constexpr static auto kConfigsMap =
-        array_helpers::make<static_cast<int>(ConfigManager::Configs::MAX),
-                            ConfigManager::Configs, ConfigStr>(
-            CONFIG_AND_STR(TOKEN), CONFIG_AND_STR(LOG_FILE),
-            CONFIG_AND_STR(DATABASE_CFG), CONFIG_AND_STR(HELP),
-            CONFIG_AND_STR(OVERRIDE_CONF), CONFIG_AND_STR(SOCKET_CFG),
-            CONFIG_AND_STR(SELECTOR_CFG));
-
-    constexpr static auto kConfigsAliasMap =
-        array_helpers::make<static_cast<int>(ConfigManager::Configs::MAX),
-                            ConfigManager::Configs, const char>(
-            CONFIGALIAS_AND_STR(TOKEN, 't'), CONFIGALIAS_AND_STR(LOG_FILE, 'f'),
-            CONFIGALIAS_AND_STR(DATABASE_CFG, 'd'),
-            CONFIGALIAS_AND_STR(HELP, 'h'),
-            CONFIGALIAS_AND_STR(OVERRIDE_CONF, 'c'),
-            CONFIGALIAS_AND_STR(SOCKET_CFG, 's'),
-            CONFIGALIAS_AND_STR(SELECTOR_CFG, 'u'));
-
-    constexpr static auto kConfigsDescMap =
-        array_helpers::make<static_cast<int>(ConfigManager::Configs::MAX),
-                            ConfigManager::Configs, DescStr>(
-            DESC_AND_STR(TOKEN, "Bot Token"),
-            DESC_AND_STR(LOG_FILE, "File path to log"),
-            DESC_AND_STR(DATABASE_CFG, "Database backend to use"),
-            DESC_AND_STR(HELP, "Print this help message"),
-            DESC_AND_STR(OVERRIDE_CONF, "Override config file"),
-            DESC_AND_STR(SOCKET_CFG, "Socket backend to use"),
-            DESC_AND_STR(SELECTOR_CFG,
-                         "Selector(poll(2), etc...) backend to use"));
+    static constexpr std::array<Entry, CONFIG_MAX> kConfigMap = {
+        Entry{Configs::TOKEN, "TOKEN", "Telegram bot token", 't'},
+        {Configs::LOG_FILE, "LOG_FILE", "Log file path", 'f'},
+        {Configs::DATABASE_CFG, "DATABASE_CFG", "Database configuration file path", 'd'},
+        {Configs::HELP, "HELP", "Display help information", 'h'},
+        {Configs::OVERRIDE_CONF, "OVERRIDE_CONF", "Override configuration from this source", 'o'},
+        {Configs::SOCKET_CFG, "SOCKET_CFG", "Sockets (ipv4/ipv6/local)", Entry::ALIAS_NONE},
+        {Configs::SELECTOR_CFG, "SELECTOR_CFG", "Selectors (poll/epoll/select)", Entry::ALIAS_NONE},
+        {Configs::GITHUB_TOKEN, "GITHUB_TOKEN", "Github token", Entry::ALIAS_NONE}
+    };
 
     struct Backend {
         virtual ~Backend() = default;
-        constexpr static std::string_view kConfigOverrideVar =
-            array_helpers::find(ConfigManager::kConfigsMap,
-                                ConfigManager::Configs::OVERRIDE_CONF)
-                ->second;
+        constexpr static std::string_view kConfigOverrideVar = "OVERRIDE_CONF";
 
         virtual bool load() { return true; }
-        virtual std::optional<std::string> get(const std::string& name) = 0;
-        virtual bool doOverride(const std::string& /*config*/) { return false; }
+        virtual std::optional<std::string> get(const std::string_view name) = 0;
+        virtual bool doOverride(const std::string_view /*config*/) { return false; }
 
         /**
          * @brief This field stores the name of the backend.
