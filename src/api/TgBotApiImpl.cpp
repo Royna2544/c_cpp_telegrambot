@@ -88,6 +88,7 @@ void TgBotApiImpl::commandHandler(const std::string_view command,
     const auto botCommand = ext->get<MessageAttrs::BotCommand>();
     const auto target = botCommand.target;
     if (target != myName && !target.empty()) {
+        DLOG(INFO) << "Ignore mismatched target: " << std::quoted(target);
         return;
     }
 
