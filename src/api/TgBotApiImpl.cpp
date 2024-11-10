@@ -231,7 +231,7 @@ bool TgBotApiImpl::setBotCommands() const {
             onecommand->command = cmd->name;
             onecommand->description = cmd->description;
             if (cmd->isEnforced()) {
-                onecommand->description += "(Owner)";
+                onecommand->description += " (Owner)";
             }
             buffer.emplace_back(onecommand);
         }
@@ -379,8 +379,9 @@ void TgBotApiImpl::startPoll() {
                     return;  // Skip this.
                 }
                 if (absl::ConsumePrefix(&suffix, x.first.name)) {
+                    std::string arg(suffix);
                     if (x.first.hasMoreArguments) {
-                        suffix = absl::StripLeadingAsciiWhitespace(suffix);
+                        absl::StripLeadingAsciiWhitespace(&arg);
                     }
                     auto vec = x.second(std::string_view(suffix.data()));
                     inlineResults.insert(inlineResults.end(), vec.begin(),

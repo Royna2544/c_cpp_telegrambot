@@ -59,7 +59,7 @@ MessageExt::MessageExt(Message::Ptr message, SplitMessageText how)
                 break;
         }
         for (auto& x : _arguments) {
-            x = absl::StripAsciiWhitespace(x).data();
+            absl::StripAsciiWhitespace(&x);
         }
     }
 }
