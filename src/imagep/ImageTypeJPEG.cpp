@@ -1,6 +1,7 @@
 // clang-format off
 #include <cstdio>
 #include <cstddef>
+#include <absl/status/status.h>
 #include <jpeglib.h>
 // clang-format on
 #include "ImageTypeJPEG.hpp"
@@ -12,6 +13,7 @@
 #include <array>
 #include <csetjmp>
 #include <cstring>
+#include <limits>
 #include <memory>
 
 struct jpegimg_error_mgr {
@@ -34,11 +36,17 @@ jpegimg_output_message(j_common_ptr cinfo) {
     LOG(ERROR) << "libjpeg: " << buffer.data();
 }
 
-bool JPEGImage::read(const std::filesystem::path& filename) {
+absl::Status JPEGImage::read(const std::filesystem::path& filename,
+                             const Target target) {
+    if (target != Target::kPhoto) {
+        LOG(ERROR) << "Invalid target for JPEG image";
+        return absl::InvalidArgumentError("Invalid target for JPEG image");
+    }
+
     F infile;
     if (!infile.open(filename, F::Mode::ReadBinary)) {
         LOG(ERROR) << "Error opening file: " << filename;
-        return false;
+        return absl::InternalError("Error opening file");
     }
 
     jpeg_decompress_struct cinfo{};
@@ -50,7 +58,7 @@ bool JPEGImage::read(const std::filesystem::path& filename) {
 
     if (setjmp(jerr.setjmpbuf)) {
         LOG(ERROR) << "Error creating decompress struct";
-        return false;
+        return absl::InternalError("Error creating decompress struct");
     }
 
     jpeg_create_decompress(&cinfo);
@@ -58,7 +66,7 @@ bool JPEGImage::read(const std::filesystem::path& filename) {
     if (setjmp(jerr.setjmpbuf)) {
         LOG(ERROR) << "Error decompressing JPEG file";
         jpeg_destroy_decompress(&cinfo);
-        return false;
+        return absl::InternalError("Error decompressing JPEG file");
     }
 
     jpeg_stdio_src(&cinfo, infile);
@@ -82,10 +90,10 @@ bool JPEGImage::read(const std::filesystem::path& filename) {
     jpeg_finish_decompress(&cinfo);
     jpeg_destroy_decompress(&cinfo);
 
-    return true;
+    return absl::OkStatus();
 }
 
-absl::Status JPEGImage::_rotate_image(int angle) {
+absl::Status JPEGImage::rotate(int angle) {
     size_t new_width = 0;
     size_t new_height = 0;
     std::unique_ptr<unsigned char[]> new_image_data = nullptr;
@@ -146,7 +154,7 @@ absl::Status JPEGImage::_rotate_image(int angle) {
     return absl::OkStatus();
 }
 
-void JPEGImage::to_greyscale() {
+void JPEGImage::greyscale() {
     if (num_channels < 3) {
         LOG(WARNING)
             << "Image does not have enough color channels to convert to "
@@ -162,12 +170,29 @@ void JPEGImage::to_greyscale() {
     }
 }
 
-bool JPEGImage::write(const std::filesystem::path& filename) {
+void JPEGImage::invert() {
+    for (size_t i = 0; i < width * height * num_channels; ++i) {
+        image_data[i] = std::numeric_limits<uint8_t>::max() - image_data[i];
+    }
+}
+
+absl::Status JPEGImage::processAndWrite(const std::filesystem::path& filename) {
     F outfile;
-    
+
+    if (options.greyscale.get()) {
+        greyscale();
+    }
+    auto err = rotate(options.rotate_angle.get());
+    if (!err.ok()) {
+        return err;
+    }
+    if (options.invert_color.get()) {
+        invert();
+    }
+
     if (!outfile.open(filename, F::Mode::WriteBinary)) {
         LOG(ERROR) << "Error opening file: " << filename;
-        return false;
+        return absl::InternalError("Error opening file");
     }
 
     jpeg_compress_struct cinfo{};
@@ -197,7 +222,7 @@ bool JPEGImage::write(const std::filesystem::path& filename) {
     jpeg_finish_compress(&cinfo);
     jpeg_destroy_compress(&cinfo);
 
-    return true;
+    return absl::OkStatus();
 }
 
 #define _STR(x) #x

@@ -2,6 +2,7 @@
 
 #include <absl/log/check.h>
 #include <absl/log/log.h>
+#include <absl/status/status.h>
 #include <webp/decode.h>
 #include <webp/encode.h>
 #include <webp/types.h>
@@ -11,32 +12,34 @@
 #include <cstdint>
 #include <memory>
 
-bool WebPImage::read(const std::filesystem::path& filename) {
+absl::Status WebPImage::read(const std::filesystem::path& filename,
+                             const Target target) {
     int width = 0;
     int height = 0;
     uint8_t* decoded_data = nullptr;
     F file;
 
+    if (target != Target::kPhoto) {
+        return absl::InvalidArgumentError("Invalid target for WebP image");
+    }
+
     // Open the file for reading in binary mode
     if (!file.open(filename, F::Mode::ReadBinary)) {
-        LOG(ERROR) << "Can't open file " << filename;
-        return false;
+        return absl::InternalError("Can't open file for reading");
     }
 
     const auto file_size = file.size();
 
     auto data = std::make_unique_for_overwrite<uint8_t[]>(file_size);
     if (!file.read(data.get(), 1, file_size)) {
-        LOG(ERROR) << "Failed to read from file";
-        return false;
+        return absl::InternalError("Failed to read from file");
     }
     file.close();
 
     decoded_data = WebPDecodeRGBA(data.get(), file_size, &width, &height);
 
     if (decoded_data == nullptr) {
-        LOG(ERROR) << "Couldn't decode image data";
-        return false;
+        return absl::InternalError("Couldn't decode image data");
     }
 
     width_ = width;
@@ -46,12 +49,11 @@ bool WebPImage::read(const std::filesystem::path& filename) {
     memcpy(data_.get(), decoded_data, bufferSize);
     WebPFree(decoded_data);
 
-    return true;
+    return absl::OkStatus();
 }
 
-absl::Status WebPImage::_rotate_image(int angle) {
+absl::Status WebPImage::rotate(int angle) {
     if (data_ == nullptr) {
-        LOG(ERROR) << "No image data to rotate";
         return absl::NotFoundError("No image data to rotate");
     }
 
@@ -112,7 +114,7 @@ absl::Status WebPImage::_rotate_image(int angle) {
     return absl::OkStatus();
 }
 
-void WebPImage::to_greyscale() {
+void WebPImage::greyscale() {
     if (data_ == nullptr) {
         LOG(ERROR) << "No image data to convert to greyscale";
         return;
@@ -127,16 +129,39 @@ void WebPImage::to_greyscale() {
     }
 }
 
-bool WebPImage::write(const std::filesystem::path& filename) {
+
+void WebPImage::invert() {
     if (data_ == nullptr) {
-        LOG(ERROR) << "No image data to write";
-        return false;
+        LOG(ERROR) << "No image data to invert";
+        return;
+    }
+
+    for (size_t i = 0; i < static_cast<size_t>(width_) * height_; ++i) {
+        data_[i * 4] = std::numeric_limits<uint8_t>::max() - data_[i * 4];
+        data_[i * 4 + 1] = std::numeric_limits<uint8_t>::max() - data_[i * 4 + 1];
+        data_[i * 4 + 2] = std::numeric_limits<uint8_t>::max() - data_[i * 4 + 2];
+    }
+}
+
+absl::Status WebPImage::processAndWrite(const std::filesystem::path& filename) {
+    if (data_ == nullptr) {
+        return absl::NotFoundError("No image data to write");
+    }
+
+    if (options.greyscale.get()) {
+        greyscale();
+    }
+    auto err = rotate(options.rotate_angle.get());
+    if (!err.ok()) {
+        return err;
+    }
+    if (options.invert_color.get()) {
+        invert();
     }
 
     F file;
     if (!file.open(filename, F::Mode::WriteBinary)) {
-        LOG(ERROR) << "Can't open file " << filename;
-        return false;
+        return absl::InternalError("Can't open file: " + filename.string());
     }
 
     int stride = width_ * 4;
@@ -146,20 +171,17 @@ bool WebPImage::write(const std::filesystem::path& filename) {
     output_size =
         WebPEncodeRGBA(data_.get(), width_, height_, stride, QUALITY, &output);
     if (output_size == 0) {
-        LOG(ERROR) << "Failed to encode WebP image";
-        return false;
+        return absl::InternalError("Failed to encode WebP image");
     }
 
     if (!file.write(output, 1, output_size)) {
-        LOG(ERROR) << "Failed to write to file";
-        return false;
+        return absl::InternalError("Failed to write to file");
     }
     file.close();
     WebPFree(output);
 
     LOG(INFO) << "New WebP image written to " << filename;
-
-    return true;
+    return absl::OkStatus();
 }
 
 std::string WebPImage::version() const {

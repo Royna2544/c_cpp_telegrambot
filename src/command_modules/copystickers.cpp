@@ -11,6 +11,7 @@
 #include <libfs.hpp>
 #include <regex>
 
+#include "ImagePBase.hpp"
 #include "StringResLoader.hpp"
 
 using std::string_view_literals::operator""sv;
@@ -122,13 +123,14 @@ DECLARE_COMMAND_HANDLER(copystickers) {
         }
         sticker.printProgress("Converting");
         ImageProcessingAll imageProc(sticker.filePath);
-        if (!imageProc.read()) {
+        if (!imageProc.read(PhotoBase::Target::kPhoto)) {
             api->sendReplyMessage(message->message(),
                                   access(res, Strings::FAILED_TO_READ_FILE));
             return;
         }
-        imageProc.to_greyscale();
-        if (!imageProc.write(sticker.filePath)) {
+        imageProc.options.greyscale = true;
+        auto ret = imageProc.processAndWrite(sticker.filePath);
+        if (!ret.ok()) {
             api->sendReplyMessage(message->message(),
                                   access(res, Strings::FAILED_TO_WRITE_FILE));
             return;

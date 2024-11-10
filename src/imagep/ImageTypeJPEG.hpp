@@ -1,5 +1,7 @@
 #pragma once
 
+#include <absl/status/status.h>
+
 #include "ImagePBase.hpp"
 
 /**
@@ -13,13 +15,16 @@ class JPEGImage : public PhotoBase {
     JPEGImage() noexcept = default;
     ~JPEGImage() override = default;
 
-    bool read(const std::filesystem::path& filename) override;
-    absl::Status _rotate_image(int angle) override;
-    void to_greyscale() override;
-    bool write(const std::filesystem::path& filename) override;
+    absl::Status read(const std::filesystem::path& filename,
+                      Target target = Target::kNone) override;
+    absl::Status processAndWrite(
+        const std::filesystem::path& filename) override;
     std::string version() const override;
 
    private:
+    absl::Status rotate(int angle);
+    void greyscale();
+    void invert();
     std::unique_ptr<unsigned char[]> image_data;
     size_t width{};
     size_t height{};

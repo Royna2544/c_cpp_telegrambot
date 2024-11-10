@@ -11,6 +11,7 @@
 #include <functional>
 #include <optional>
 #include <string>
+#include <trivial_helpers/generic_opt.hpp>
 
 using std::chrono_literals::operator""s;
 
@@ -30,7 +31,7 @@ struct TgBotSocket_API SocketConnContext {
     template <typename SocketAddr>
     explicit SocketConnContext(socket_handle_t sock, SocketAddr Myaddr)
         : SocketConnContext(Myaddr) {
-        cfd = sock; // NOLINT(cppcoreguidelines-prefer-member-initializer)
+        cfd = sock;  // NOLINT(cppcoreguidelines-prefer-member-initializer)
     }
     bool operator!=(const SocketConnContext &other) const noexcept {
         return !(*this == other);
@@ -214,45 +215,10 @@ struct TgBotSocket_API SocketInterfaceBase {
      */
     virtual bool forceStopListening(void) = 0;
 
-    // A generic template struct to hold optional data and a persistent flag
-    template <typename T>
-    struct Option {
-        // std::optional to hold the data
-        std::optional<T> data;
-
-        // Default constructor
-        Option() = default;
-
-        // Option with default value
-        explicit Option(T defaultValue) : data(defaultValue) {}
-
-        // Function to set the data
-        void set(T dataIn) { data = dataIn; }
-
-        // Function to get the data and reset it if not persistent
-        [[nodiscard]] T get() const {
-            // Specially for bool types.
-            if constexpr (std::is_same_v<T, bool>) {
-                return data.value_or(false);
-            }
-            if (!operator bool()) {
-                LOG(WARNING) << "Trying to get data which is not set!";
-            }
-            // Throws std::bad_optional_access if not set
-            return data.value();
-        }
-
-        Option &operator=(const T &other) {
-            set(other);
-            return *this;
-        }
-
-        // Explicit conversion operator to check if data is present
-        explicit operator bool() const { return data.has_value(); }
-    };
-
     // A nested struct to hold optional parameters for the socket operations
     struct {
+        template <typename T>
+        using Option = generic_opt::Option<T>;
         // Option to set the address for socket operations
         Option<std::string> address;
         // Option to set the port for socket operations

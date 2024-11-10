@@ -1,6 +1,10 @@
 #pragma once
 
-#include <opencv2/opencv.hpp>
+#include <absl/status/status.h>
+
+#include <filesystem>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/videoio.hpp>
 
 #include "ImagePBase.hpp"
 
@@ -15,12 +19,37 @@ class OpenCVImage : public PhotoBase {
     OpenCVImage() noexcept = default;
     ~OpenCVImage() override = default;
 
-    bool read(const std::filesystem::path& filename) override;
-    absl::Status _rotate_image(int angle) override;
-    void to_greyscale() override;
-    bool write(const std::filesystem::path& filename) override;
+    absl::Status read(const std::filesystem::path& filename,
+                      Target flags) override;
+    absl::Status processAndWrite(
+        const std::filesystem::path& filename) override;
     std::string version() const override;
 
    private:
-    cv::Mat image;
+    struct ComponentBase {
+        virtual ~ComponentBase() = default;
+        virtual absl::Status read(const std::filesystem::path& file) = 0;
+        virtual absl::Status procAndW(
+            const Options* opt, const std::filesystem::path& dest) = 0;
+    };
+    
+    struct Image : public ComponentBase {
+        cv::Mat handle;
+
+        absl::Status read(const std::filesystem::path& file) override;
+        static void rotate(cv::Mat& mat, int angle);
+        static void greyscale(cv::Mat& mat);
+        static void invert(cv::Mat& mat);
+
+        absl::Status procAndW(const Options* opt,
+                              const std::filesystem::path& dest) override;
+    };
+    struct Video : public ComponentBase {
+        cv::VideoCapture handle;
+
+        absl::Status read(const std::filesystem::path& file) override;
+        absl::Status procAndW(const Options* opt,
+                              const std::filesystem::path& filename) override;
+    };
+    std::unique_ptr<ComponentBase> component;
 };

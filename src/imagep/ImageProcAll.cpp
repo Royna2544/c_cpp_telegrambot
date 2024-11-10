@@ -1,65 +1,65 @@
 #include "ImageProcAll.hpp"
 
+#include <absl/status/status.h>
+
 #include <filesystem>
+
+#ifdef IMAGEPROC_HAVE_OPENCV
+#include "ImageProcOpenCV.hpp"
+#endif
+#ifdef IMAGEPROC_HAVE_LIBJPEG
+#include "ImageTypeJPEG.hpp"
+#endif
+#ifdef IMAGEPROC_HAVE_LIBPNG
+#include "ImageTypePNG.hpp"
+#endif
+#ifdef IMAGEPROC_HAVE_LIBWEBP
+#include "ImageTypeWEBP.hpp"
+#endif
 
 ImageProcessingAll::ImageProcessingAll(std::filesystem::path filename)
     : _filename(std::move(filename)) {
-#ifdef HAVE_OPENCV
+#ifdef IMAGEPROC_HAVE_OPENCV
     impls.emplace_back(std::make_unique<OpenCVImage>());
 #endif
-#ifdef HAVE_LIBJPEG
+#ifdef IMAGEPROC_HAVE_LIBJPEG
     impls.emplace_back(std::make_unique<JPEGImage>());
 #endif
-#ifdef HAVE_LIBPNG
+#ifdef IMAGEPROC_HAVE_LIBPNG
     impls.emplace_back(std::make_unique<PngImage>());
 #endif
-#ifdef HAVE_LIBWEBP
+#ifdef IMAGEPROC_HAVE_LIBWEBP
     impls.emplace_back(std::make_unique<WebPImage>());
 #endif
 }
 
-bool ImageProcessingAll::read() {
+bool ImageProcessingAll::read(PhotoBase::Target target) {
+    LOG(INFO) << "read(): file=" << _filename << " target=" << target;
     for (auto& impl : impls) {
-        if (impl->read(_filename)) {
+        DLOG(INFO) << "Trying to read with impl: " << impl->version();
+        auto ret = impl->read(_filename, target);
+        if (ret.ok()) {
             // We found the backend suitable. Select one and dealloc others.
             _impl = std::move(impl);
             impls.clear();
 
-            LOG(INFO) << "Using implementation: " << _impl->version();
+            LOG(INFO) << "Successfully read";
             return true;
         }
+        DLOG(INFO) << "Failed to read: " << ret;
     }
     LOG(INFO) << "No backend was suitable to read";
     return false;
 }
 
-absl::Status ImageProcessingAll::rotate(int angle) {
-    if (!_impl) {
-        LOG(ERROR) << "No backend selected for rotation";
-        return absl::UnavailableError("No backend available");
-    }
-    DLOG(INFO) << "Calling impl->rotate with angle: " << angle;
-    return _impl->rotate_image(angle);
-}
-
-void ImageProcessingAll::to_greyscale() {
-    if (!_impl) {
-        LOG(ERROR) << "No backend selected for greyscale conversion";
-        return;
-    }
-    DLOG(INFO) << "Calling impl->to_greyscale";
-    _impl->to_greyscale();
-}
-
-bool ImageProcessingAll::write(const std::filesystem::path& filename) {
+absl::Status ImageProcessingAll::processAndWrite(
+    const std::filesystem::path& filename) {
     if (!_impl) {
         LOG(ERROR) << "No backend selected for writing";
-        return false;
+        return absl::UnavailableError("No backend selected for writing");
     }
-    if (filename.empty()) {
-        LOG(ERROR) << "Filename is empty";
-        return false;
-    }
-    DLOG(INFO) << "Calling impl->write with filename: " << filename;
-    return _impl->write(filename);
+    DLOG(INFO) << "Passing options to backend";
+    _impl->options = options;
+    DLOG(INFO) << "Calling impl->processAndWrite with filename: " << filename;
+    return _impl->processAndWrite(filename);
 }

@@ -28,40 +28,40 @@ void absl_error_fn(png_structp png_ptr, png_const_charp error_message) {
 }
 }  // namespace
 
-bool PngImage::read(const std::filesystem::path& filename) {
+absl::Status PngImage::read(const std::filesystem::path& filename,
+                            const Target target) {
+    if (target != Target::kPhoto) {
+        return absl::InvalidArgumentError("Invalid target for PNG image");
+    }
+
     F fp;
     png_structp png = nullptr;
     png_infop info = nullptr;
 
     if (contains_data) {
-        LOG(WARNING) << "Already contains data, ignore";
-        return false;
+        return absl::InvalidArgumentError("Already contains data");
     }
 
     if (!fp.open(filename, F::Mode::ReadBinary)) {
-        LOG(ERROR) << "Can't open file " << filename << " for reading";
-        return false;
+        return absl::InternalError("Can't open file for reading");
     }
 
     png = png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr,
                                  nullptr);
     if (png == nullptr) {
-        LOG(ERROR) << "png_create_read_struct failed";
-        return false;
+        return absl::InternalError("png_create_read_struct failed");
     }
 
     info = png_create_info_struct(png);
     if (info == nullptr) {
-        LOG(ERROR) << "png_create_info_struct failed";
-        return false;
+        return absl::InternalError("png_create_info_struct failed");
     }
 
     png_set_error_fn(png, nullptr, absl_error_fn, absl_warn_fn);
 
     if (setjmp(png_jmpbuf(png))) {
-        LOG(ERROR) << "Error during reading image header";
         png_destroy_read_struct(&png, &info, nullptr);
-        return false;
+        return absl::InternalError("Error during reading image header");
     }
 
     png_init_io(png, fp);
@@ -73,9 +73,8 @@ bool PngImage::read(const std::filesystem::path& filename) {
     bit_depth = png_get_bit_depth(png, info);
 
     if (setjmp(png_jmpbuf(png))) {
-        LOG(ERROR) << "Error during updating image information";
         png_destroy_read_struct(&png, &info, nullptr);
-        return false;
+        return absl::InternalError("Error during updating image information");
     }
     if (bit_depth == 16) {
         png_set_strip_16(png);
@@ -106,10 +105,10 @@ bool PngImage::read(const std::filesystem::path& filename) {
     png_destroy_read_struct(&png, &info, nullptr);
 
     contains_data = true;
-    return true;
+    return absl::OkStatus();
 }
 
-void PngImage::to_greyscale() {
+void PngImage::greyscale() {
     if (!contains_data) {
         LOG(ERROR) << "No image data to convert to greyscale";
         return;
@@ -151,9 +150,8 @@ void PngImage::rotate_image_impl(png_uint_32 new_width, png_uint_32 new_height,
     }
 }
 
-absl::Status PngImage::_rotate_image(int angle) {
+absl::Status PngImage::rotate(int angle) {
     if (!contains_data) {
-        LOG(ERROR) << "No image data to rotate";
         return absl::UnavailableError("No image data to rotate");
     }
 
@@ -196,45 +194,68 @@ absl::Status PngImage::_rotate_image(int angle) {
     return absl::OkStatus();
 }
 
-bool PngImage::write(const std::filesystem::path& filename) {
+void PngImage::invert() {
+    if (!contains_data) {
+        LOG(ERROR) << "No image data to invert";
+        return;
+    }
+    LOG(INFO) << "Inverting image";
+    for (ptrdiff_t y = 0; y < height; y++) {
+        png_bytep row = refmem[y];
+        for (ptrdiff_t x = 0; x < width; x++) {
+            png_bytep px = &(row[x * 4]);
+            px[0] = ~px[0];
+            px[1] = ~px[1];
+            px[2] = ~px[2];
+        }
+    }
+}
+
+absl::Status PngImage::processAndWrite(const std::filesystem::path& filename) {
     F fp;
     png_structp png = nullptr;
     png_infop info = nullptr;
 
     if (!contains_data) {
-        LOG(ERROR) << "No image data to write";
-        return false;
+        return absl::NotFoundError("No image data to write");
+    }
+    
+    if (options.greyscale.get()) {
+        greyscale();
+    }
+    auto err = rotate(options.rotate_angle.get());
+    if (!err.ok()) {
+        return err;
+    }
+    if (options.invert_color.get()) {
+        invert();
     }
 
     if (!fp.open(filename, F::Mode::WriteBinary)) {
-        LOG(ERROR) << "Can't open file " << filename << " for writing";
-        return false;
+        return absl::InternalError("Can't open file for writing: " + filename.string());
     }
 
     png = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr,
                                   nullptr);
     if (png == nullptr) {
-        LOG(ERROR) << "png_create_write_struct failed";
-        return false;
+        return absl::InternalError("png_create_write_struct failed");
     }
 
     info = png_create_info_struct(png);
     if (info == nullptr) {
-        LOG(ERROR) << "png_create_info_struct failed";
-        return false;
+        return absl::InternalError("png_create_info_struct failed");
     }
 
     if (setjmp(png_jmpbuf(png))) {
-        LOG(ERROR) << "Error during init_io";
         png_destroy_write_struct(&png, &info);
-        return false;
+        return absl::InternalError("Error during init_io");
     }
 
     png_init_io(png, fp);
 
     if (setjmp(png_jmpbuf(png))) {
-        LOG(ERROR) << "Error during writing header";
-        return false;
+        png_destroy_write_struct(&png, &info);
+        return absl::InternalError("Error during writing header");
     }
 
     png_set_IHDR(png, info, width, height, bit_depth, color_type,
@@ -243,17 +264,15 @@ bool PngImage::write(const std::filesystem::path& filename) {
     png_write_info(png, info);
 
     if (setjmp(png_jmpbuf(png))) {
-        LOG(ERROR) << "Error during writing bytes";
         png_destroy_write_struct(&png, &info);
-        return false;
+        return absl::InternalError("Error during writing bytes");
     }
 
     png_write_image(png, refmem.data());
 
     if (setjmp(png_jmpbuf(png))) {
-        LOG(ERROR) << "Error during end of write";
         png_destroy_write_struct(&png, &info);
-        return false;
+        return absl::InternalError("Error during end of write");
     }
 
     png_write_end(png, nullptr);
@@ -261,7 +280,7 @@ bool PngImage::write(const std::filesystem::path& filename) {
     png_destroy_write_struct(&png, &info);
 
     contains_data = false;
-    return true;
+    return absl::OkStatus();
 }
 
-std::string PngImage::version() const { return PNG_LIBPNG_VER_STRING; }
+std::string PngImage::version() const { return "libPNG version " PNG_LIBPNG_VER_STRING; }

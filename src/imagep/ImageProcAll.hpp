@@ -1,30 +1,18 @@
 #pragma once
 
+#include <TgBotImgProcExports.h>
+#include <absl/status/status.h>
+
 #include <memory>
 
-#ifdef HAVE_OPENCV
-#include "ImageProcOpenCV.hpp"
-#endif
-#ifdef HAVE_LIBJPEG
-#include "ImageTypeJPEG.hpp"
-#endif
-#ifdef HAVE_LIBPNG
-#include "ImageTypePNG.hpp"
-#endif
-#ifdef HAVE_LIBWEBP
-#include "ImageTypeWEBP.hpp"
-#endif
 #include "ImagePBase.hpp"
 
-#include <TgBotImgProcExports.h>
-
 struct TgBotImgProc_API ImageProcessingAll {
-    bool read();
-    absl::Status rotate(int angle);
-    void to_greyscale();
-    bool write(const std::filesystem::path& filename);
+    bool read(PhotoBase::Target target);
+    absl::Status processAndWrite(const std::filesystem::path& filename);
 
     explicit ImageProcessingAll(std::filesystem::path filename);
+    PhotoBase::Options options;
 
    private:
     std::filesystem::path _filename;

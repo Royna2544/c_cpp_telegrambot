@@ -1,5 +1,6 @@
 #pragma once
 
+#include <absl/status/status.h>
 #include <png.h>
 #include <pngconf.h>
 
@@ -40,32 +41,17 @@ struct PngImage : PhotoBase {
      *
      * @return True if the image was successfully read, false otherwise.
      */
-    bool read(const std::filesystem::path& filename) override;
-
-    /**
-     * @brief Rotates the image with the specified new dimensions and
-     * transformation function.
-     *
-     * @param angle The angle of rotation.
-     *
-     * @return A Result object that indicates whether the rotation operation was
-     * successful.
-     */
-    absl::Status _rotate_image(int angle) override;
-
-    /**
-     * @brief Converts the image to grayscale.
-     */
-    void to_greyscale() override;
+    absl::Status read(const std::filesystem::path& filename, const Target target) override;
 
     /**
      * @brief Writes the image to the specified file path.
      *
      * @param filename The path to write the image to.
      *
-     * @return True if the image was successfully written, false otherwise.
+     * @return A Result object that indicates whether the writing operation was
+     * successful.
      */
-    bool write(const std::filesystem::path& filename) override;
+    absl::Status processAndWrite(const std::filesystem::path& filename) override;
 
     std::string version() const override;
     
@@ -85,4 +71,8 @@ struct PngImage : PhotoBase {
      */
     void rotate_image_impl(png_uint_32 new_width, png_uint_32 new_height,
                            const transform_fn_t& transform);
+
+    void greyscale();
+    void invert();
+    absl::Status rotate(int angle);
 };

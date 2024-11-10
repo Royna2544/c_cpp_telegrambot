@@ -1,5 +1,6 @@
 #pragma once
 
+#include <absl/status/status.h>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -22,28 +23,7 @@ class WebPImage : public PhotoBase {
      *
      * @return True if the image is successfully read, false otherwise.
      */
-    bool read(const std::filesystem::path& filename) override;
-
-    /**
-     * @brief Rotates the image by the specified angle in degrees.
-     *
-     * This method rotates the image by the specified angle in degrees. The
-     * internal data of the image is updated accordingly.
-     *
-     * @param angle The angle in degrees by which the image should be rotated.
-     *
-     * @return A Result object indicating the success or failure of the
-     * operation.
-     */
-    absl::Status _rotate_image(int angle) override;
-
-    /**
-     * @brief Converts the image to grayscale.
-     *
-     * This function converts the image to grayscale by averaging the RGB values
-     * of each pixel. The internal data of the image is updated accordingly.
-     */
-    void to_greyscale() override;
+    absl::Status read(const std::filesystem::path& filename, const Target target) override;
 
     /**
      * @brief Writes the image to the specified file path.
@@ -55,11 +35,34 @@ class WebPImage : public PhotoBase {
      *
      * @return True if the image is successfully written, false otherwise.
      */
-    bool write(const std::filesystem::path& filename) override;
+    absl::Status processAndWrite(const std::filesystem::path& filename) override;
 
     std::string version() const override;
 
    private:
+    /**
+     * @brief Rotates the image by the specified angle in degrees.
+     *
+     * This method rotates the image by the specified angle in degrees. The
+     * internal data of the image is updated accordingly.
+     *
+     * @param angle The angle in degrees by which the image should be rotated.
+     *
+     * @return A Result object indicating the success or failure of the
+     * operation.
+     */
+    absl::Status rotate(int angle);
+
+    /**
+     * @brief Converts the image to grayscale.
+     *
+     * This function converts the image to grayscale by averaging the RGB values
+     * of each pixel. The internal data of the image is updated accordingly.
+     */
+    void greyscale();
+
+    void invert();
+
     using webpimage_size_t = int;
     webpimage_size_t width_{};
     webpimage_size_t height_{};

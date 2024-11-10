@@ -4,6 +4,25 @@
 #include <absl/status/status.h>
 
 #include <filesystem>
+#include <trivial_helpers/generic_opt.hpp>
+
+template <int Min, int Max>
+class RangeRestricted {
+    static_assert(Min <= Max,
+                  "Low value must be less than or equal to Max value");
+
+    int _value;
+
+   public:
+    RangeRestricted(int value) : _value(value) {
+        if (_value < Min || _value > Max) {
+            _value %= Max - Min;
+        }
+    }
+    operator int() const {
+        return _value;
+    }
+};
 
 /**
  * @brief Base class for photo manipulation.
@@ -18,46 +37,56 @@ struct PhotoBase {
     static constexpr int kAngle270 = 270;
     static constexpr int kAngleMax = 360;
 
+    enum class Target {
+        kNone,
+        kVideo,
+        kPhoto,
+    };
+
+    template <typename T>
+    using Option = generic_opt::Option<T>;
+
+    struct Options {
+        Option<RangeRestricted<kAngleMin, kAngleMax>> rotate_angle;
+        Option<bool> greyscale;
+        Option<bool> invert_color;
+    } options;
+
     /**
      * @brief Reads an image from the specified file.
      *
      * @param[in] filename The path to the image file.
-     * @return True if the image was successfully read, false otherwise.
+     * @param[in] target Target specification for the image reading process.
+     * @return The result of the read operation
      */
-    virtual bool read(const std::filesystem::path& filename) = 0;
+    virtual absl::Status read(const std::filesystem::path& filename,
+                              Target target = Target::kNone) = 0;
 
     /**
-     * @brief Rotates the image by the specified angle.
+     * @brief Processes and writes the image to the specified file.
      *
-     * This function rotates the image by the given angle in degrees. The
-     * rotation is performed counter-clockwise.
+     * This function applies the specified options (if any) to the image and
+     * writes the processed image to the specified file. The options include
+     * rotation, greyscale conversion, color inversion, and destination file
+     * path.
      *
-     * @param[in] angle The angle in degrees to rotate the image. The valid
-     * range is from 0 to 360.
+     * @param[in] filename The path to the output image file. If the destination
+     * option is set, this parameter is ignored.
+     *
+     * @return An absl::Status indicating the success or failure of the
+     * operation.
+     * - absl::StatusCode::kOk: The operation was successful.
+     * - absl::StatusCode::kInvalidArgument: Invalid input parameters.
+     * - absl::StatusCode::kFailedPrecondition: The image is not valid or cannot
+     * be processed.
+     * - absl::StatusCode::kUnknown: An unknown error occurred during the
+     * operation.
      *
      * @note The function does not handle cases where the image is not valid or
-     *       cannot be rotated.
+     *       cannot be processed.
      */
-    absl::Status rotate_image(int angle) {
-        if (angle < kAngleMin || angle > kAngleMax) {
-            LOG(ERROR) << "Invalid rotation angle: " << angle;
-            return absl::InvalidArgumentError("Invalid rotation angle");
-        }
-        return _rotate_image(angle);
-    }
-
-    /**
-     * @brief Converts the image to grayscale.
-     */
-    virtual void to_greyscale() = 0;
-
-    /**
-     * @brief Writes the image to the specified file.
-     *
-     * @param[in] filename The path to the image file.
-     * @return True if the image was successfully written, false otherwise.
-     */
-    virtual bool write(const std::filesystem::path& filename) = 0;
+    virtual absl::Status processAndWrite(
+        const std::filesystem::path& filename) = 0;
 
     /**
      * @brief Destructor for the photo manipulation base class.
@@ -65,19 +94,16 @@ struct PhotoBase {
     virtual ~PhotoBase() = default;
 
     [[nodiscard]] virtual std::string version() const = 0;
-
-   protected:
-    /**
-     * @brief Rotates the image by the specified angle.
-     *
-     * This function rotates the image by the given angle in degrees. The
-     * rotation is performed counter-clockwise.
-     *
-     * @param[in] angle The angle in degrees to rotate the image. The valid
-     * range is from 0 to 360.
-     *
-     * @note The function does not handle cases where the image is not valid or
-     *       cannot be rotated.
-     */
-    virtual absl::Status _rotate_image(int angle) = 0;
 };
+
+inline std::ostream& operator<<(std::ostream& os, const PhotoBase::Target t) {
+    switch (t) {
+        case PhotoBase::Target::kNone:
+            return os << "none";
+        case PhotoBase::Target::kVideo:
+            return os << "video";
+        case PhotoBase::Target::kPhoto:
+            return os << "photo";
+    }
+    return os;
+}
