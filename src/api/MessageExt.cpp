@@ -33,7 +33,8 @@ MessageExt::MessageExt(Message::Ptr message, SplitMessageText how)
         _message->text.front() == '/') {
         const auto entry = *botCommandEnt;
         // Grab /start@username
-        _extra_args = _message->text.substr(entry->length);
+        auto _extra_args = _message->text.substr(entry->length);
+        absl::StripLeadingAsciiWhitespace(&_extra_args);
         command.emplace();
         std::pair<std::string, std::string> kCommandSplit =
             absl::StrSplit(_message->text.substr(1, entry->length), "@");
