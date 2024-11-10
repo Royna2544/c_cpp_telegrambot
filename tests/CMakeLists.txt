@@ -17,7 +17,6 @@ add_my_executable(
     ResourceManagerTest.cpp
     TryParseTest.cpp
     SharedMallocTest.cpp
-    ConstexprStringCatTest.cpp
     commands/CommandModulesTest.cpp
     commands/AliveCmdTest.cpp
     #commands/BashCmdTest.cpp

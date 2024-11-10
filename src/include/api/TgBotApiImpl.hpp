@@ -6,7 +6,6 @@
 #include <tgbot/tgbot.h>
 
 #include <Authorization.hpp>
-#include <CompileTimeStringConcat.hpp>
 #include <ManagedThreads.hpp>
 #include <Random.hpp>
 #include <ReplyParametersExt.hpp>
@@ -187,8 +186,8 @@ class TgBotApiImpl : public TgBotApi {
                            MessageExt::Ptr& message);
 
     template <unsigned Len>
-    static consteval auto getInitCallNameForClient(const char (&str)[Len]) {
-        return StringConcat::cat("Register onAnyMessage callbacks: ", str);
+    static auto getInitCallNameForClient(const char (&str)[Len]) {
+        return fmt::format("Register onAnyMessage callbacks: {}", str);
     }
 
    private:

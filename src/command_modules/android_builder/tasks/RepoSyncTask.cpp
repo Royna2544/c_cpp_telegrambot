@@ -4,10 +4,7 @@
 #include <git2.h>
 #include <git2/clone.h>
 
-#include <algorithm>
-#include <chrono>
 #include <filesystem>
-#include <functional>
 #include <ios>
 #include <libfs.hpp>
 #include <regex>
@@ -17,7 +14,6 @@
 #include <trivial_helpers/raii.hpp>
 #include <utility>
 
-#include "CompileTimeStringConcat.hpp"
 #include "ForkAndRun.hpp"
 #include "RepoUtils.hpp"
 
