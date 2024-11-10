@@ -166,6 +166,49 @@ bool checkRequirements(const Json::Value& value, Args&... args) {
     return allRequiredMet;
 }
 
+enum class ValueType {
+    nullValue = Json::nullValue,
+    intValue = Json::intValue,
+    uintValue = Json::uintValue,
+    realValue = Json::realValue,
+    stringValue = Json::stringValue,
+    arrayValue = Json::arrayValue,
+    objectValue = Json::objectValue
+};
+
+template <>
+struct fmt::formatter<ValueType> : formatter<std::string_view> {
+    // parse is inherited from formatter<string_view>.
+    auto format(ValueType c,
+                format_context& ctx) const -> format_context::iterator {
+        string_view name = "unknown";
+        switch (c) {
+            case ValueType::nullValue:
+                name = "nullValue";
+                break;
+            case ValueType::intValue:
+                name = "intValue";
+                break;
+            case ValueType::uintValue:
+                name = "uintValue";
+                break;
+            case ValueType::realValue:
+                name = "realValue";
+                break;
+            case ValueType::stringValue:
+                name = "stringValue";
+                break;
+            case ValueType::arrayValue:
+                name = "arrayValue";
+                break;
+            case ValueType::objectValue:
+                name = "objectValue";
+                break;
+        }
+        return formatter<string_view>::format(name, ctx);
+    }
+};
+
 /**
  * @brief Proxy class for handling JSON objects and providing iterator access.
  *
@@ -210,9 +253,8 @@ class ProxyJsonBranch {
         : root_(root[name]), isValidObject(root_.isArray()) {
         if (!isValidObject) {
             LOG(ERROR) << fmt::format(
-                "Expected object, found: (Json::ValueType){} while accessing "
-                "property '{}'",
-                static_cast<int>(root_.type()), name);
+                "Expected object, found: {} while accessing property '{}'",
+                static_cast<ValueType>(root_.type()), name);
             switch (root_.type()) {
                 case Json::ValueType::nullValue:
                     LOG(WARNING) << "Note: Root value is not an object, means "

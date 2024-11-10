@@ -18,6 +18,7 @@
 #include <utility>
 #include <variant>
 
+#include "Types.h"
 #include "Utils.hpp"
 
 using TgBot::Chat;
@@ -26,6 +27,7 @@ using TgBot::GenericReply;
 using TgBot::InputFile;
 using TgBot::InputSticker;
 using TgBot::Message;
+using TgBot::ReactionType;
 using TgBot::Sticker;
 using TgBot::StickerSet;
 using TgBot::User;
@@ -429,10 +431,41 @@ class TgBotApi {
      */
     virtual User::Ptr getChatMember_impl(const ChatId chat,
                                          const UserId userId) const = 0;
-
+    /**
+     * @brief Sets the descriptions for a chat.
+     *
+     * @param description The long description of the chat, which may contain
+     * markdown or HTML.
+     * @param shortDescription A short description of the chat, typically shown
+     * in a preview.
+     *
+     * @note The descriptions are used to provide context or information about
+     * the chat.
+     */
     virtual void setDescriptions_impl(
         const std::string_view description,
         const std::string_view shortDescription) const = 0;
+
+    /**
+     * @brief Sets a reaction to a message in a chat.
+     *
+     * @param chatId The unique identifier of the chat where the message
+     * resides.
+     * @param messageId The unique identifier of the message to which the
+     * reaction is being added.
+     * @param reaction A vector of reaction types (e.g., emoji or custom
+     * reactions) to apply to the message.
+     * @param isBig A flag indicating whether the reaction should be displayed
+     * in a larger size.
+     *
+     * @return True if the reaction was successfully set, otherwise false.
+     *
+     * @note Reactions are visual indicators for users to show their response to
+     * a message.
+     */
+    virtual bool setMessageReaction_impl(
+        ChatId chatId, MessageId messageId,
+        const std::vector<ReactionType::Ptr>& reaction, bool isBig) const = 0;
 
     static FileOrString ToFileOrString(const FileOrMedia& media) {
         return std::visit(
@@ -724,8 +757,14 @@ class TgBotApi {
 
     inline void setDescriptions(const std::string_view description,
                                 const std::string_view shortDescription) {
-        setDescriptions_impl(std::move(description),
-                             std::move(shortDescription));
+        setDescriptions_impl(description, shortDescription);
+    }
+
+    inline bool setMessageReaction(
+        const Message::Ptr& message,
+        const std::vector<ReactionType::Ptr>& reaction, bool isBig) const {
+        return setMessageReaction_impl(message->chat->id, message->messageId,
+                                       reaction, isBig);
     }
 
     // TODO: Any better way than this?

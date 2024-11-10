@@ -685,6 +685,25 @@ User::Ptr TgBotApiImpl::getChatMember_impl(ChatId chat, UserId user) const {
     return member->user;
 }
 
+void TgBotApiImpl::setDescriptions_impl(
+    const std::string_view description,
+    const std::string_view shortDescription) const {
+    getApi().setMyDescription(description);
+    getApi().setMyShortDescription(shortDescription);
+}
+
+bool TgBotApiImpl::setMessageReaction_impl(
+    const ChatId chatid, const MessageId message,
+    const std::vector<ReactionType::Ptr>& reaction, bool isBig) const {
+    return getApi().setMessageReaction(chatid, message, reaction, isBig);
+}
+
+bool TgBotApiImpl::answerCallbackQuery_impl(
+    const std::string_view callbackQueryId, const std::string_view text,
+    bool showAlert) const {
+    return getApi().answerCallbackQuery(callbackQueryId, text, showAlert);
+}
+
 TgBotApiImpl::TgBotApiImpl(const std::string_view token, AuthContext* auth,
                            StringResLoaderBase* loader, Providers* providers)
     : _bot(std::string(token)),
