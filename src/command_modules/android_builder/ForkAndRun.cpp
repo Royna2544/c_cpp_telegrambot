@@ -105,15 +105,6 @@ DeferredExit ptrace_common_parent(pid_t pid) {
 
         // Step to the next system call entry or exit
         if (ptrace(PTRACE_SYSCALL, pid, NULL, NULL) == -1) {
-            if (errno == ESRCH) {
-                ptrace(PTRACE_DETACH, pid, NULL, NULL);
-                if (waitpid(pid, &status, 0) < 0) {
-                    PLOG(ERROR) << "Failed to wait for pid";
-                    break;
-                }
-                exit = DeferredExit(status);
-                break;
-            }
             PLOG(ERROR) << "ptrace(PTRACE_SYSCALL) failed";
             break;
         }
@@ -200,7 +191,6 @@ bool ForkAndRun::execute() {
     pid_t pid = fork();
     if (pid == 0) {
         // Child process
-        ptrace_common_child();
         {
             DeferredExit exit;
             {
@@ -285,7 +275,13 @@ bool ForkAndRun::execute() {
             }
         });
 
-        auto e = ptrace_common_parent(pid);
+        if (waitpid(pid, &status, 0) < 0) {
+            PLOG(ERROR) << "Failed to wait for child";
+            cancel();
+        }
+
+        // Create deferred exit just to dedup code
+        auto e = DeferredExit(status);
         e.defuse();
         switch (e.type) {
             case DeferredExit::Type::EXIT:
