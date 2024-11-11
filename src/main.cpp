@@ -379,7 +379,7 @@ fruit::Component<TgBotApi, AuthContext, DatabaseBase, ThreadManager,
                  ConfigManager, Unused<RegexHandler>, Unused<NetworkLogSink>,
                  WrapPtr<SpamBlockBase>, Unused<TgBotWebServer>,
                  TgBotApiExHandler, SocketComponentFactory_t,
-                 WrapSharedPtr<SocketServerWrapper>>
+                 WrapSharedPtr<SocketServerWrapper>, ChatDataCollector>
 getAllComponent(CommandLine cmd) {
     static auto _cmd = std::move(cmd);
     return fruit::createComponent()
@@ -464,7 +464,7 @@ int main(int argc, char** argv) {
                     ConfigManager, Unused<RegexHandler>, Unused<NetworkLogSink>,
                     WrapPtr<SpamBlockBase>, Unused<TgBotWebServer>,
                     TgBotApiExHandler, SocketComponentFactory_t,
-                    WrapSharedPtr<SocketServerWrapper>>
+                    WrapSharedPtr<SocketServerWrapper>, ChatDataCollector>
         injector(getAllComponent, CommandLine{argc, argv});
 
     auto configMgr = injector.get<ConfigManager*>();
@@ -501,6 +501,7 @@ int main(int argc, char** argv) {
     injector.get<Unused<RegexHandler>*>();
     injector.get<WrapPtr<SpamBlockBase>*>();
     injector.get<Unused<TgBotWebServer>*>();
+    injector.get<ChatDataCollector*>();
 
     auto socketFactor = injector.get<SocketComponentFactory_t>();
     auto _socketServer = injector.get<WrapSharedPtr<SocketServerWrapper>>();
