@@ -61,5 +61,9 @@ absl::Status ImageProcessingAll::processAndWrite(
     DLOG(INFO) << "Passing options to backend";
     _impl->options = options;
     DLOG(INFO) << "Calling impl->processAndWrite with filename: " << filename;
-    return _impl->processAndWrite(filename);
+    auto ret =  _impl->processAndWrite(filename);
+    if (!ret.ok()) {
+        LOG(ERROR) << "impl->processAndWrite returned: " << ret;
+    }
+    return ret;
 }
