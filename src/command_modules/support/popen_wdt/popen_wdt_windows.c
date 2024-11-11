@@ -153,7 +153,7 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
         POPEN_WDT_PIPE, PIPE_ACCESS_OUTBOUND | FILE_FLAG_OVERLAPPED,
         PIPE_TYPE_BYTE | PIPE_WAIT, 1, 0, 0, 0, &saAttr);
     if (child_stdout_w == INVALID_HANDLE_VALUE) {
-        POPEN_WDT_DBGLOG("CreateNamedPipe failed with error %lu\n",
+        POPEN_WDT_DBGLOG("CreateNamedPipe failed with error %lu",
                          GetLastError());
         if (wdt_data->watchdog_enabled) {
             UnmapViewOfFile(wdt_data->privdata);
@@ -167,7 +167,7 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
     child_stdout_r = CreateFileA(POPEN_WDT_PIPE, GENERIC_READ, 0, NULL,
                                  OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
     if (child_stdout_r == INVALID_HANDLE_VALUE) {
-        POPEN_WDT_DBGLOG("CreateFile failed with error %lu\n", GetLastError());
+        POPEN_WDT_DBGLOG("CreateFile failed with error %lu", GetLastError());
         if (wdt_data->watchdog_enabled) {
             UnmapViewOfFile(wdt_data->privdata);
             CloseHandle(hMapFile);
