@@ -43,29 +43,29 @@ DECLARE_COMMAND_HANDLER(spam) {
     int count = 0;
     bool spamable = false;
 
-    if (message->replyMessage()->exists()) {
-        const auto chatid = message->replyMessage()->get<MessageAttrs::Chat>();
+    if (message->reply()->exists()) {
+        const auto chatid = message->reply()->get<MessageAttrs::Chat>();
 
         spamable = true;
         try_parse_spamcnt(message->get<MessageAttrs::ExtraText>(), count);
-        if (message->replyMessage()->has<MessageAttrs::Sticker>()) {
+        if (message->reply()->has<MessageAttrs::Sticker>()) {
             fp = [api, message, chatid] {
                 api->sendSticker(
                     chatid,
                     MediaIds(
-                        message->replyMessage()->get<MessageAttrs::Sticker>()));
+                        message->reply()->get<MessageAttrs::Sticker>()));
             };
-        } else if (message->replyMessage()->has<MessageAttrs::Animation>()) {
+        } else if (message->reply()->has<MessageAttrs::Animation>()) {
             fp = [api, message, chatid] {
                 api->sendAnimation(
-                    chatid, MediaIds(message->replyMessage()
+                    chatid, MediaIds(message->reply()
                                          ->get<MessageAttrs::Animation>()));
             };
-        } else if (message->replyMessage()->has<MessageAttrs::ExtraText>()) {
+        } else if (message->reply()->has<MessageAttrs::ExtraText>()) {
             fp = [api, message, chatid] {
                 api->sendMessage(
                     chatid,
-                    message->replyMessage()->get<MessageAttrs::ExtraText>());
+                    message->reply()->get<MessageAttrs::ExtraText>());
             };
         } else {
             api->sendReplyMessage(message->message(),

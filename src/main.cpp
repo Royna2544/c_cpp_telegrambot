@@ -362,13 +362,12 @@ getRegexHandlerComponent() {
                 static auto regex = std::make_unique<RegexHandler>();
                 const auto ext = std::make_shared<MessageExt>(message);
                 if (ext->has<MessageAttrs::ExtraText>() &&
-                    ext->replyMessage()->has<MessageAttrs::ExtraText>()) {
+                    ext->reply()->has<MessageAttrs::ExtraText>()) {
                     auto intf =
                         std::make_shared<RegexHandlerInterface>(api, message);
-                    regex->execute(
-                        std::move(intf),
-                        ext->replyMessage()->get<MessageAttrs::ExtraText>(),
-                        ext->get<MessageAttrs::ExtraText>());
+                    regex->execute(std::move(intf),
+                                   ext->reply()->get<MessageAttrs::ExtraText>(),
+                                   ext->get<MessageAttrs::ExtraText>());
                 }
                 return TgBotApi::AnyMessageResult::Handled;
             });
@@ -575,6 +574,8 @@ int main(int argc, char** argv) {
         }
     }
     threadManager->destroy();
-    LOG(INFO) << fmt::format("{} : exiting now...", std::filesystem::path(argv[0]).filename().string());
+    LOG(INFO) << fmt::format(
+        "{} : exiting now...",
+        std::filesystem::path(argv[0]).filename().string());
     return EXIT_SUCCESS;
 }

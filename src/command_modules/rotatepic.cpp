@@ -43,7 +43,7 @@ DECLARE_COMMAND_HANDLER(rotatepic) {
     enum class MediaType { INVALID, MPEG4, WEBM, PNG } mediaType{};
     MessageAttrs attr{};
 
-    auto replyMessage = message->replyMessage();
+    auto replyMessage = message->reply();
 
     if (replyMessage->has<MessageAttrs::Photo>()) {
         fileid = replyMessage->get<MessageAttrs::Photo>()->fileId;

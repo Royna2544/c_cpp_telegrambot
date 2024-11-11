@@ -10,8 +10,8 @@ DECLARE_COMMAND_HANDLER(fileid) {
     std::string file;
     std::string unifile;
 
-    if (message->replyMessage()->exists()) {
-        const auto reply = message->replyMessage();
+    if (message->reply()->exists()) {
+        const auto reply = message->reply();
         if (reply->has<MessageAttrs::Sticker>()) {
             file = reply->get<MessageAttrs::Sticker>()->fileId;
             unifile = reply->get<MessageAttrs::Sticker>()->fileUniqueId;

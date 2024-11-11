@@ -47,13 +47,13 @@ constexpr int GOOD_MAX_STICKERS_SIZE = 40;
 constexpr int RATELIMIT_DELIMITER_FOR_CONVERT_UPDATE = 5;
 
 DECLARE_COMMAND_HANDLER(copystickers) {
-    if (!message->replyMessage()->has<MessageAttrs::Sticker>()) {
+    if (!message->reply()->has<MessageAttrs::Sticker>()) {
         api->sendReplyMessage(message->message(),
                               access(res, Strings::REPLY_TO_A_STICKER));
         return;
     }
     const auto set = api->getStickerSet(
-        message->replyMessage()->get<MessageAttrs::Sticker>()->setName);
+        message->reply()->get<MessageAttrs::Sticker>()->setName);
     if (!set) {
         api->sendReplyMessage(message->message(),
                               access(res, Strings::STICKER_SET_NOT_FOUND));

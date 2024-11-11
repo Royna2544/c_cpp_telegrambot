@@ -14,11 +14,11 @@ DECLARE_COMMAND_HANDLER(decho) {
         return;
     }
     if (message->has({MessageAttrs::ExtraText}) &&
-        message->replyMessage()->exists()) {
+        message->reply()->exists()) {
         api->copyAndReplyAsMessage(message->message(),
-                                   message->replyMessage()->message());
-    } else if (message->replyMessage()->exists()) {
-        api->copyAndReplyAsMessage(message->replyMessage()->message());
+                                   message->reply()->message());
+    } else if (message->reply()->exists()) {
+        api->copyAndReplyAsMessage(message->reply()->message());
     } else if (message->has<MessageAttrs::ExtraText>()) {
         api->sendMessage(message->get<MessageAttrs::Chat>(),
                          message->get<MessageAttrs::ExtraText>());

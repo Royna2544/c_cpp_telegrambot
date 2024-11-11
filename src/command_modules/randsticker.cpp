@@ -8,13 +8,13 @@
 using TgBot::StickerSet;
 
 DECLARE_COMMAND_HANDLER(randsticker) {
-    if (!message->replyMessage()->has<MessageAttrs::Sticker>()) {
+    if (!message->reply()->has<MessageAttrs::Sticker>()) {
         api->sendReplyMessage(message->message(),
                                   access(res, Strings::REPLY_TO_A_STICKER));
         return;
     }
 
-    auto sticker = message->replyMessage()->get<MessageAttrs::Sticker>();
+    auto sticker = message->reply()->get<MessageAttrs::Sticker>();
     Random::ret_type pos{};
     StickerSet::Ptr stickset;
     try {

@@ -222,7 +222,7 @@ class TgBotPPImpl_shared_deps_API MessageExt {
     [[nodiscard]] bool exists() const { return _message != nullptr; }
 
     [[nodiscard]] const Message::Ptr& message() const { return _message; }
-    [[nodiscard]] MessageExt::Ptr replyMessage() const { return _replyMessage; }
+    [[nodiscard]] MessageExt::Ptr reply() const { return _replyMessage; }
 
    private:
     // Like /start@some_bot

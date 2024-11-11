@@ -92,7 +92,7 @@ constexpr std::string_view addtoblacklist = "Add to blacklist";
 constexpr std::string_view removefromblacklist = "Remove from blacklist";
 
 DECLARE_COMMAND_HANDLER(database) {
-    if (!message->replyMessage()->exists()) {
+    if (!message->reply()->exists()) {
         api->sendReplyMessage(message->message(),
                                   access(res, Strings::REPLY_TO_USER_MSG));
         return;
@@ -108,12 +108,12 @@ DECLARE_COMMAND_HANDLER(database) {
     reply->resizeKeyboard = true;
     reply->selective = true;
 
-    UserId userId = message->replyMessage()->get<MessageAttrs::User>()->id;
+    UserId userId = message->reply()->get<MessageAttrs::User>()->id;
 
     auto msg = api->sendReplyMessage(
         message->message(),
         fmt::format("Choose what u want to do with {}",
-                    message->replyMessage()->get<MessageAttrs::User>()),
+                    message->reply()->get<MessageAttrs::User>()),
         reply);
 
     api->onAnyMessage(
@@ -145,7 +145,7 @@ DECLARE_COMMAND_HANDLER(database) {
 
 DECLARE_COMMAND_HANDLER(saveid) {
     if (!(message->has<MessageAttrs::ExtraText>() &&
-          message->replyMessage()->any(
+          message->reply()->any(
               {MessageAttrs::Animation, MessageAttrs::Sticker}))) {
         api->sendReplyMessage(message->message(),
                               access(res, Strings::REPLY_TO_GIF_OR_STICKER));
@@ -155,13 +155,13 @@ DECLARE_COMMAND_HANDLER(saveid) {
     std::optional<std::string> fileUniqueId;
     DatabaseBase::MediaType type{};
 
-    if (message->replyMessage()->has<MessageAttrs::Animation>()) {
-        const auto p = message->replyMessage()->get<MessageAttrs::Animation>();
+    if (message->reply()->has<MessageAttrs::Animation>()) {
+        const auto p = message->reply()->get<MessageAttrs::Animation>();
         fileId = p->fileId;
         fileUniqueId = p->fileUniqueId;
         type = DatabaseBase::MediaType::GIF;
-    } else if (message->replyMessage()->has<MessageAttrs::Sticker>()) {
-        const auto p = message->replyMessage()->get<MessageAttrs::Sticker>();
+    } else if (message->reply()->has<MessageAttrs::Sticker>()) {
+        const auto p = message->reply()->get<MessageAttrs::Sticker>();
         fileId = p->fileId;
         fileUniqueId = p->fileUniqueId;
         type = DatabaseBase::MediaType::STICKER;
