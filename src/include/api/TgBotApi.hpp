@@ -566,7 +566,7 @@ class TgBotApi {
                                     const std::string_view caption = {}) const {
         return sendAnimation_impl(replyToMessage->chat->id,
                                   ToFileOrString(mediaId), caption,
-                                  createReplyParametersForReply(replyToMessage),
+                                  createReplyParameters(replyToMessage),
                                   nullptr, parseModeToStr<mode>());
     }
 
@@ -598,9 +598,15 @@ class TgBotApi {
                                   const FileOrMedia& sticker) const {
         return sendSticker_impl(replyToMessage->chat->id,
                                 ToFileOrString(sticker),
-                                createReplyParametersForReply(replyToMessage));
+                                createReplyParameters(replyToMessage));
     }
 
+    Message::Ptr sendReplyVideo(const Message::Ptr& replyToMessage,
+                                const FileOrMedia& video,
+                                const std::string_view caption = {}) const {
+        return sendVideo_impl(replyToMessage->chat->id, ToFileOrString(video),
+                              caption, createReplyParameters(replyToMessage));
+    }
     /**
      * @brief Sends a sticker message to the specified chat.
      *
@@ -641,7 +647,7 @@ class TgBotApi {
     inline MessageId copyAndReplyAsMessage(
         const Message::Ptr& message, const Message::Ptr& replyToMessage) const {
         return copyMessage_impl(message->chat->id, message->messageId,
-                                createReplyParametersForReply(replyToMessage));
+                                createReplyParameters(replyToMessage));
     }
 
     [[nodiscard]] inline bool answerCallbackQuery(
@@ -829,16 +835,16 @@ class TgBotApi {
     }
 
    protected:
-    static ReplyParametersExt::Ptr createReplyParametersForReply(
-        const Message::Ptr& message) {
+    static ReplyParametersExt::Ptr createReplyParameters(
+        const Message::Ptr& messageToReply) {
         auto ptr = std::make_shared<ReplyParametersExt>();
-        ptr->messageId = message->messageId;
-        ptr->chatId = message->chat->id;
+        ptr->messageId = messageToReply->messageId;
+        ptr->chatId = messageToReply->chat->id;
         ptr->allowSendingWithoutReply = true;
-        if (!message->chat->isForum) {
+        if (!messageToReply->chat->isForum) {
             ptr->messageThreadId = 0;
         } else {
-            ptr->messageThreadId = message->messageThreadId;
+            ptr->messageThreadId = messageToReply->messageThreadId;
         }
         return ptr;
     }

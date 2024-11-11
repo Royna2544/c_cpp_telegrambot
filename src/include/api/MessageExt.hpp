@@ -19,6 +19,7 @@ using TgBot::Message;
 using TgBot::PhotoSize;
 using TgBot::Sticker;
 using TgBot::User;
+using TgBot::Video;
 
 // Split type to obtain arguments.
 enum class SplitMessageText {
@@ -38,6 +39,7 @@ enum class MessageAttrs {
     ParsedArgumentsList,
     Date,
     MessageId,
+    Video
 };
 
 inline std::ostream& operator<<(std::ostream& stream,
@@ -63,9 +65,10 @@ inline std::ostream& operator<<(std::ostream& stream,
             return stream << "Date";
         case MessageAttrs::MessageId:
             return stream << "MessageId";
-        default:
-            return stream << "Unknown";
+        case MessageAttrs::Video:
+            return stream << "Video";
     }
+    return stream;
 }
 
 namespace internal::message {
@@ -121,6 +124,10 @@ template <>
 struct AttributeType<MessageAttrs::MessageId> {
     using type = MessageId;
 };
+template <>
+struct AttributeType<MessageAttrs::Video> {
+    using type = Video::Ptr;
+};
 
 }  // namespace internal::message
 
@@ -165,6 +172,8 @@ class TgBotPPImpl_shared_deps_API MessageExt {
             return std::chrono::system_clock::from_time_t(_message->date);
         } else if constexpr (attr == MessageAttrs::MessageId) {
             return _message->messageId;
+        } else if constexpr (attr == MessageAttrs::Video) {
+            return _message->video;
         }
         CHECK(false) << "Unreachable: " << static_cast<int>(attr);
         return {};
@@ -248,6 +257,8 @@ class TgBotPPImpl_shared_deps_API MessageExt {
                 return command.has_value();
             case MessageAttrs::ParsedArgumentsList:
                 return !_arguments.empty();
+            case MessageAttrs::Video:
+                return _message->video != nullptr;
             case MessageAttrs::Date:
             case MessageAttrs::MessageId:
                 return true;

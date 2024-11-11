@@ -22,10 +22,9 @@ struct ProcessImageParam {
 };
 
 namespace {
-absl::Status processPhotoFile(ProcessImageParam& param) {
+absl::Status processFile(ProcessImageParam& param) {
     ImageProcessingAll procAll(param.srcPath);
     if (procAll.read(param.target)) {
-        LOG(INFO) << "Successfully read image";
         procAll.options = param.options;
         return procAll.processAndWrite(param.destPath);
     }
@@ -37,17 +36,21 @@ constexpr std::string_view kOutputFile = "outpic";
 
 DECLARE_COMMAND_HANDLER(rotatepic) {
     int rotation = 0;
-    bool greyscale = false;
-    bool invert = false;
-    std::optional<std::string> fileid;
-    enum class MediaType { MPEG4, WEBM, PNG } mediaType{};
+    ProcessImageParam params{};
+    params.srcPath = kDownloadFile.data();
+    params.destPath = kOutputFile.data();
+    std::string fileid;
+    enum class MediaType { INVALID, MPEG4, WEBM, PNG } mediaType{};
+    MessageAttrs attr{};
 
-    if (message->replyMessage()->has<MessageAttrs::Photo>()) {
-        fileid = message->replyMessage()->get<MessageAttrs::Photo>()->fileId;
+    auto replyMessage = message->replyMessage();
+
+    if (replyMessage->has<MessageAttrs::Photo>()) {
+        fileid = replyMessage->get<MessageAttrs::Photo>()->fileId;
         mediaType = MediaType::PNG;
-    } else if (message->replyMessage()->has<MessageAttrs::Sticker>()) {
-        const auto stick =
-            message->replyMessage()->get<MessageAttrs::Sticker>();
+        attr = MessageAttrs::Photo;
+    } else if (replyMessage->has<MessageAttrs::Sticker>()) {
+        const auto stick = replyMessage->get<MessageAttrs::Sticker>();
         if (stick->isAnimated || stick->isVideo) {
 #ifndef IMAGEPROC_HAVE_OPENCV
             api->sendReplyMessage(
@@ -60,11 +63,16 @@ DECLARE_COMMAND_HANDLER(rotatepic) {
             mediaType = MediaType::PNG;
         }
         fileid = stick->fileId;
+        attr = MessageAttrs::Sticker;
 #ifdef IMAGEPROC_HAVE_OPENCV
-    } else if (message->replyMessage()->has<MessageAttrs::Animation>()) {
-        fileid =
-            message->replyMessage()->get<MessageAttrs::Animation>()->fileId;
+    } else if (replyMessage->has<MessageAttrs::Animation>()) {
+        fileid = replyMessage->get<MessageAttrs::Animation>()->fileId;
         mediaType = MediaType::MPEG4;
+        attr = MessageAttrs::Animation;
+    } else if (replyMessage->has<MessageAttrs::Video>()) {
+        fileid = replyMessage->get<MessageAttrs::Video>()->fileId;
+        mediaType = MediaType::MPEG4;
+        attr = MessageAttrs::Video;
 #endif
     } else {
         api->sendReplyMessage(message->message(),
@@ -79,17 +87,12 @@ DECLARE_COMMAND_HANDLER(rotatepic) {
         return;
     }
     if (args.size() == 2) {
-        greyscale = args[1] == "greyscale";
-        invert = args[1] == "invert";
+        params.options.greyscale = args[1] == "greyscale";
+        params.options.invert_color = args[1] == "invert";
     }
+    params.options.rotate_angle = rotation;
 
     // Process the image
-    ProcessImageParam params{};
-    params.srcPath = kDownloadFile.data();
-    params.options.greyscale = greyscale;
-    params.options.rotate_angle = rotation;
-    params.options.invert_color = invert;  // Invert color
-    params.destPath = kOutputFile.data();
     switch (mediaType) {
         case MediaType::WEBM: {
             params.srcPath.replace_extension(".webm");
@@ -109,30 +112,43 @@ DECLARE_COMMAND_HANDLER(rotatepic) {
             params.destPath.replace_extension(".webp");
             params.target = PhotoBase::Target::kPhoto;
         } break;
+        case MediaType::INVALID:
+            return;
     }
 
     // Download the sticker file
-    if (!api->downloadFile(params.srcPath, fileid.value())) {
+    if (!api->downloadFile(params.srcPath, fileid)) {
         api->sendReplyMessage(message->message(),
                               access(res, Strings::FAILED_TO_DOWNLOAD_FILE));
         return;
     }
 
-    if (processPhotoFile(params).ok()) {
+    if (auto ret = processFile(params); ret.ok()) {
         const auto infile = TgBot::InputFile::fromFile(params.destPath.string(),
                                                        params.mimeType);
-        if (message->replyMessage()->get<MessageAttrs::Sticker>()) {
-            api->sendReplySticker(message->message(), infile);
-        } else if (message->replyMessage()->get<MessageAttrs::Photo>()) {
-            api->sendReplyPhoto(message->message(), infile,
-                                access(res, Strings::ROTATED_PICTURE));
-        } else if (message->replyMessage()->get<MessageAttrs::Animation>()) {
-            api->sendReplyAnimation(message->message(), infile,
+        switch (attr) {
+            case MessageAttrs::Photo:
+                api->sendReplyPhoto(message->message(), infile,
                                     access(res, Strings::ROTATED_PICTURE));
+                break;
+            case MessageAttrs::Sticker:
+                api->sendReplySticker(message->message(), infile);
+                break;
+            case MessageAttrs::Animation:
+                api->sendReplyAnimation(message->message(), infile,
+                                        access(res, Strings::ROTATED_PICTURE));
+                break;
+            case MessageAttrs::Video:
+                api->sendReplyVideo(message->message(), infile);
+                break;
+            default:
+                // Not possible
+                break;
         }
     } else {
         api->sendReplyMessage(message->message(),
                               access(res, Strings::FAILED_TO_ROTATE_IMAGE));
+        api->sendReplyMessage(message->message(), ret.message());
     }
     std::filesystem::remove(params.srcPath);  // Delete the temporary file
     std::filesystem::remove(params.destPath);
