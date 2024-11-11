@@ -22,6 +22,7 @@
 #include "MessageExt.hpp"
 #include "Providers.hpp"
 #include "TgBotApi.hpp"
+#include "tgbot/types/ChatJoinRequest.h"
 
 using TgBot::Animation;
 using TgBot::Api;
@@ -497,6 +498,7 @@ class TgBotApiImpl : public TgBotApi {
 
     } queryAsync, commandAsync;
 
+    std::vector<TgBot::ChatJoinRequest::Ptr> joinReqs;
     std::vector<std::unique_ptr<CommandModule>> _modules;
     Bot _bot;
     decltype(_modules)::iterator findModulePosition(

@@ -20,11 +20,16 @@
 #include <memory>
 #include <mutex>
 #include <queue>
+#include <string>
 #include <string_view>
 #include <utility>
 
 #include "StringResLoader.hpp"
 #include "api/Utils.hpp"
+#include "tgbot/types/CallbackQuery.h"
+#include "tgbot/types/ChatJoinRequest.h"
+#include "tgbot/types/InlineKeyboardButton.h"
+#include "tgbot/types/InlineKeyboardMarkup.h"
 
 bool TgBotApiImpl::validateValidArgs(const CommandModule::Ptr& module,
                                      MessageExt::Ptr& message) {
@@ -355,6 +360,65 @@ void TgBotApiImpl::startPoll() {
     getEvents().onCallbackQuery([this](const TgBot::CallbackQuery::Ptr& query) {
         onCallbackQueryFunction(query);
     });
+    getEvents().onChatJoinRequest([this](TgBot::ChatJoinRequest::Ptr ptr) {
+        auto markup = std::make_shared<TgBot::InlineKeyboardMarkup>();
+        markup->inlineKeyboard.resize(1);
+        markup->inlineKeyboard.at(0).resize(2);
+        markup->inlineKeyboard.at(0).at(0) =
+            std::make_shared<TgBot::InlineKeyboardButton>();
+        markup->inlineKeyboard.at(0).at(0)->text = "✅ Approve user";
+        markup->inlineKeyboard.at(0).at(0)->callbackData =
+            fmt::format("chatjoin_{}_approve", ptr->date);
+        markup->inlineKeyboard.at(0).at(1) =
+            std::make_shared<TgBot::InlineKeyboardButton>();
+        markup->inlineKeyboard.at(0).at(1)->text = "❌ Kick user";
+        markup->inlineKeyboard.at(0).at(1)->callbackData =
+            fmt::format("chatjoin_{}_disapprove", ptr->date);
+        std::string bio;
+        if (!ptr->bio.empty()) {
+            bio = fmt::format("\nTheir Bio: '{}'", ptr->bio);
+        }
+        sendMessage(
+            ptr->chat,
+            fmt::format("A new chat join request by {}{}", ptr->from, bio),
+            std::move(markup));
+        joinReqs.emplace_back(std::move(ptr));
+    });
+    onCallbackQuery(
+        "__builtin_chatjoinreq_handler__",
+        [this](const TgBot::CallbackQuery::Ptr& query) {
+            absl::string_view queryData = query->data;
+            if (!absl::ConsumePrefix(&queryData, "chatjoin_")) {
+                return;
+            }
+            auto reqIt = std::ranges::find_if(
+                joinReqs, [queryData](const TgBot::ChatJoinRequest::Ptr& req) {
+                    return absl::StartsWith(queryData,
+                                            fmt::to_string(req->date));
+                });
+            if (reqIt != joinReqs.end()) {
+                const auto& request = *reqIt;
+                DCHECK(absl::ConsumePrefix(&queryData,
+                                           fmt::format("{}_", request->date)))
+                    << "Should be able to consume";
+                if (queryData == "approve") {
+                    LOG(INFO) << fmt::format("Approving {} in chat {}",
+                                             request->from, request->chat);
+                    getApi().approveChatJoinRequest(request->chat->id,
+                                                    request->from->id);
+                    answerCallbackQuery(query->id, "Approved user");
+                } else if (queryData == "disapprove") {
+                    LOG(INFO) << fmt::format("Unapproving {} in chat {}",
+                                             request->from, request->chat);
+                    getApi().declineChatJoinRequest(request->chat->id,
+                                                    request->from->id);
+                    answerCallbackQuery(query->id, "Disapproved user");
+                } else {
+                    LOG(ERROR) << "Invalid payload: " << query->data;
+                }
+                joinReqs.erase(reqIt);
+            }
+        });
     getEvents().onInlineQuery([this](const TgBot::InlineQuery::Ptr& query) {
         const std::lock_guard m(callback_result_mutex);
 
