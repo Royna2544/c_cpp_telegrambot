@@ -4,7 +4,7 @@ Hi! I'm <a href="https://t.me/_botusername_">_botname_</a>
 - Proudly backed by C/C++
 - Spam purge feature
 - Regex command support
-- Runs on Windows (MSYS2), macOS, Linux
+- Runs on Windows (MSYS2/MSVC), macOS, Linux
 - Exports a network control interface with IPv4 and IPv6
 - Client apps supported for Win32/Android</blockquote>
 <blockquote><b>BUILD INFO</b>:
