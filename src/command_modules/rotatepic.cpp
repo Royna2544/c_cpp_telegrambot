@@ -148,7 +148,7 @@ DECLARE_COMMAND_HANDLER(rotatepic) {
     } else {
         api->sendReplyMessage(message->message(),
                               access(res, Strings::FAILED_TO_ROTATE_IMAGE));
-        api->sendReplyMessage(message->message(), ret.message());
+        api->sendReplyMessage(message->message(), ret.message().data());
     }
     std::filesystem::remove(params.srcPath);  // Delete the temporary file
     std::filesystem::remove(params.destPath);

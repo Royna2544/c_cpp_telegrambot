@@ -118,8 +118,10 @@ absl::Status OpenCVImage::Video::procAndW(const Options* opt,
     }
 
     // Get original video properties
-    const auto frame_width = static_cast<int>(handle.get(cv::CAP_PROP_FRAME_WIDTH));
-    const auto frame_height = static_cast<int>(handle.get(cv::CAP_PROP_FRAME_HEIGHT));
+    const auto frame_width =
+        static_cast<int>(handle.get(cv::CAP_PROP_FRAME_WIDTH));
+    const auto frame_height =
+        static_cast<int>(handle.get(cv::CAP_PROP_FRAME_HEIGHT));
     const auto fps = handle.get(cv::CAP_PROP_FPS);
 
     int fourcc = 0;
@@ -131,10 +133,11 @@ absl::Status OpenCVImage::Video::procAndW(const Options* opt,
         return absl::InvalidArgumentError("Unsupported output file format: " +
                                           dest.extension().string());
     }
-    
+
     // Set up VideoWriter
     auto size = cv::Size(frame_width, frame_height);
-    cv::VideoWriter writer(dest, fourcc, fps, size, !opt->greyscale.get());
+    cv::VideoWriter writer(dest.string(), fourcc, fps, size,
+                           !opt->greyscale.get());
 
     if (!writer.isOpened()) {
         return absl::InternalError("Failed to open the output video file: " +
@@ -200,7 +203,7 @@ absl::Status OpenCVImage::Image::procAndW(const Options* opt,
 
     // Write the processed image to the output file
     try {
-        if (!cv::imwrite(dest, handle)) {
+        if (!cv::imwrite(dest.string(), handle)) {
             return absl::InternalError("Failed to write image to: " +
                                        dest.string());
         }
