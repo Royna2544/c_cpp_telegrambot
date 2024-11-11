@@ -108,11 +108,6 @@ absl::Status OpenCVImage::Video::read(const std::filesystem::path& file) {
     }
     LOG(INFO) << "Video dimensions: " << handle.get(cv::CAP_PROP_FRAME_WIDTH)
               << "x" << handle.get(cv::CAP_PROP_FRAME_HEIGHT);
-    fourcc = static_cast<int>(handle.get(cv::CAP_PROP_FOURCC));
-    LOG(INFO) << "Using FOURCC: "
-              << fmt::format("{:c}{:c}{:c}{:c}", fourcc & 255,
-                             (fourcc >> 8) & 255, (fourcc >> 16) & 255,
-                             (fourcc >> 24) & 255);
     return absl::OkStatus();
 }
 
@@ -127,6 +122,16 @@ absl::Status OpenCVImage::Video::procAndW(const Options* opt,
     const auto frame_height = static_cast<int>(handle.get(cv::CAP_PROP_FRAME_HEIGHT));
     const auto fps = handle.get(cv::CAP_PROP_FPS);
 
+    int fourcc = 0;
+    if (dest.extension() == ".mp4") {
+        fourcc = cv::VideoWriter::fourcc('m', 'p', '4', 'v');
+    } else if (dest.extension() == ".webm") {
+        fourcc = cv::VideoWriter::fourcc('V', 'P', '8', '0');
+    } else {
+        return absl::InvalidArgumentError("Unsupported output file format: " +
+                                          dest.extension().string());
+    }
+    
     // Set up VideoWriter
     auto size = cv::Size(frame_width, frame_height);
     cv::VideoWriter writer(dest, fourcc, fps, size, !opt->greyscale.get());
