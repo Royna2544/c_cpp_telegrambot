@@ -1,6 +1,7 @@
 #include "ImageProcOpenCV.hpp"
 
 #include <absl/status/status.h>
+#include <fmt/format.h>
 
 #include <filesystem>
 #include <memory>
@@ -27,24 +28,28 @@ absl::Status OpenCVImage::read(const std::filesystem::path& filename,
 }
 
 void OpenCVImage::Image::rotate(cv::Mat& mat, int angle) {
-    // Make it clockwise
-    angle = kAngleMax - angle;
+    // Adjust angle to be clockwise
+    angle = -angle;
 
     cv::Point2d center(mat.cols / 2.0, mat.rows / 2.0);
+
+    // Compute the rotation matrix
     cv::Mat rotation_matrix = cv::getRotationMatrix2D(center, angle, 1.0);
 
-    // Calculate the bounding box of the rotated image
-    cv::Rect bbox =
-        cv::RotatedRect(cv::Point2f(), mat.size(), angle).boundingRect();
+    // Calculate bounding box with the center of the image
+    cv::Rect bbox = cv::RotatedRect(center, mat.size(), angle).boundingRect();
 
-    // Adjust the rotation matrix to take into account translation
+    // Adjust rotation matrix for translation to keep the image centered
     rotation_matrix.at<double>(0, 2) += bbox.width / 2.0 - center.x;
     rotation_matrix.at<double>(1, 2) += bbox.height / 2.0 - center.y;
 
+    // Apply the rotation with adjusted matrix and bounding box size
     cv::Mat rotated_image;
-    cv::warpAffine(mat, rotated_image, rotation_matrix, bbox.size());
+    cv::warpAffine(mat, rotated_image, rotation_matrix, bbox.size(),
+                   cv::INTER_LINEAR, cv::BORDER_REFLECT);
 
-    std::swap(mat, rotated_image);
+    // Copy rotated image back to the original
+    mat = rotated_image;
 }
 
 void OpenCVImage::Image::greyscale(cv::Mat& mat) {
@@ -88,7 +93,8 @@ void OpenCVImage::Image::invert(cv::Mat& mat) {
 absl::Status OpenCVImage::Image::read(const std::filesystem::path& file) {
     handle = cv::imread(file.string(), cv::IMREAD_UNCHANGED);
     if (handle.empty()) {
-        return absl::InternalError("Error opening image: " + file.filename().string());
+        return absl::InternalError("Error opening image: " +
+                                   file.filename().string());
     }
     LOG(INFO) << "Image dimensions: " << handle.cols << "x" << handle.rows;
     return absl::OkStatus();
@@ -102,6 +108,11 @@ absl::Status OpenCVImage::Video::read(const std::filesystem::path& file) {
     }
     LOG(INFO) << "Video dimensions: " << handle.get(cv::CAP_PROP_FRAME_WIDTH)
               << "x" << handle.get(cv::CAP_PROP_FRAME_HEIGHT);
+    fourcc = static_cast<int>(handle.get(cv::CAP_PROP_FOURCC));
+    LOG(INFO) << "Using FOURCC: "
+              << fmt::format("{:c}{:c}{:c}{:c}", fourcc & 255,
+                             (fourcc >> 8) & 255, (fourcc >> 16) & 255,
+                             (fourcc >> 24) & 255);
     return absl::OkStatus();
 }
 
@@ -111,24 +122,14 @@ absl::Status OpenCVImage::Video::procAndW(const Options* opt,
         return absl::NotFoundError("No video data to rotate");
     }
 
-    int fourcc = 0;
-    if (dest.extension() == ".mp4") {
-        fourcc = cv::VideoWriter::fourcc('m', 'p', '4', 'v');
-    } else if (dest.extension() == ".webm") {
-        fourcc = cv::VideoWriter::fourcc('V', 'P', '8', '0');
-    } else {
-        return absl::InvalidArgumentError("Unsupported output file format: " +
-                                          dest.extension().string());
-    }
-
     // Get original video properties
-    int frame_width = static_cast<int>(handle.get(cv::CAP_PROP_FRAME_WIDTH));
-    int frame_height = static_cast<int>(handle.get(cv::CAP_PROP_FRAME_HEIGHT));
-    int fps = static_cast<int>(handle.get(cv::CAP_PROP_FPS));
+    const auto frame_width = static_cast<int>(handle.get(cv::CAP_PROP_FRAME_WIDTH));
+    const auto frame_height = static_cast<int>(handle.get(cv::CAP_PROP_FRAME_HEIGHT));
+    const auto fps = handle.get(cv::CAP_PROP_FPS);
 
     // Set up VideoWriter
-    auto outVidSize = cv::Size(frame_width, frame_height);
-    cv::VideoWriter writer(dest, fourcc, fps, outVidSize);
+    auto size = cv::Size(frame_width, frame_height);
+    cv::VideoWriter writer(dest, fourcc, fps, size, !opt->greyscale.get());
 
     if (!writer.isOpened()) {
         return absl::InternalError("Failed to open the output video file: " +
@@ -137,15 +138,17 @@ absl::Status OpenCVImage::Video::procAndW(const Options* opt,
 
     // Rotate each frame and write it to the output video
     cv::Mat frame;
+    bool logOnce = false;
     while (true) {
         handle >> frame;
+
         if (frame.empty()) {
             break;  // End of video
         }
 
         // Rotate the frame
         Image::rotate(frame, opt->rotate_angle.get());
-        // Convert the frame to grayscale
+
         if (opt->greyscale.get()) {
             Image::greyscale(frame);
         }
@@ -154,13 +157,21 @@ absl::Status OpenCVImage::Video::procAndW(const Options* opt,
             Image::invert(frame);
         }
 
-        if (frame.size[0] != outVidSize.width ||
-            frame.size[1] != outVidSize.height) {
-            cv::resize(frame, frame, outVidSize);
+        if (frame.size[0] != size.width || frame.size[1] != size.height) {
+            cv::Mat resizedFrame;
+            if (!logOnce) {
+                LOG(INFO) << fmt::format(
+                    "Converted frame: {}x{}, VideoWriter config: {}x{}, "
+                    "resizing",
+                    frame.size[0], frame.size[1], size.width, size.height);
+                logOnce = true;
+            }
+            cv::resize(frame, resizedFrame, size);
+            writer << resizedFrame;
+        } else {
+            // Write the rotated frame to the output video
+            writer << frame;
         }
-
-        // Write the rotated frame to the output video
-        writer << frame;
     }
     return absl::OkStatus();
 }

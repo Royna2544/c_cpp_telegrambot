@@ -46,6 +46,7 @@ class OpenCVImage : public PhotoBase {
     };
     struct Video : public ComponentBase {
         cv::VideoCapture handle;
+        int fourcc{};
 
         absl::Status read(const std::filesystem::path& file) override;
         absl::Status procAndW(const Options* opt,
