@@ -153,25 +153,28 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
         POPEN_WDT_PIPE, PIPE_ACCESS_OUTBOUND | FILE_FLAG_OVERLAPPED,
         PIPE_TYPE_BYTE | PIPE_WAIT, 1, 0, 0, 0, &saAttr);
     if (child_stdout_w == INVALID_HANDLE_VALUE) {
-        printf("CreateNamedPipe failed with error %lu\n", GetLastError());
+        POPEN_WDT_DBGLOG("CreateNamedPipe failed with error %lu\n",
+                         GetLastError());
         if (wdt_data->watchdog_enabled) {
             UnmapViewOfFile(wdt_data->privdata);
             CloseHandle(hMapFile);
         } else {
             free(wdt_data->privdata);
         }
+        wdt_data->privdata = NULL;
         return false;
     }
     child_stdout_r = CreateFileA(POPEN_WDT_PIPE, GENERIC_READ, 0, NULL,
                                  OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
     if (child_stdout_r == INVALID_HANDLE_VALUE) {
-        printf("CreateFile failed with error %lu\n", GetLastError());
+        POPEN_WDT_DBGLOG("CreateFile failed with error %lu\n", GetLastError());
         if (wdt_data->watchdog_enabled) {
             UnmapViewOfFile(wdt_data->privdata);
             CloseHandle(hMapFile);
         } else {
             free(wdt_data->privdata);
         }
+        wdt_data->privdata = NULL;
         CloseHandle(child_stdout_w);
         return false;
     }
@@ -204,6 +207,7 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
         } else {
             free(wdt_data->privdata);
         }
+        wdt_data->privdata = NULL;
         CloseHandle(child_stdout_r);
         CloseHandle(child_stdout_w);
         return false;
@@ -220,11 +224,14 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
         if (pdata.wdt_data.thread == NULL) {
             CloseHandle(child_stdout_r);
             CloseHandle(child_stdout_w);
-            UnmapViewOfFile(wdt_data->privdata);
-            CloseHandle(hMapFile);
+            if (wdt_data->watchdog_enabled) {
+                UnmapViewOfFile(wdt_data->privdata);
+                CloseHandle(hMapFile);
+            } else {
+                free(wdt_data->privdata);
+            }
+            wdt_data->privdata = NULL;
             return false;
-        } else {
-            free(wdt_data->privdata);
         }
     } else {
         ResumeThread(pi.hThread);
@@ -259,6 +266,7 @@ popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t** data) {
         return ret;
     }
     struct popen_wdt_windows_priv* pdata = (*data)->privdata;
+
     POPEN_WDT_DBGLOG("Starting cleanup");
     if (GetExitCodeProcess(pdata->wdt_data.sub_Process, &exitcode)) {
         ret.exitcode = exitcode;
