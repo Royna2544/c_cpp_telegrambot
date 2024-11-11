@@ -14,6 +14,7 @@
 #include <optional>
 #include <ostream>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 
 #include "CommandLine.hpp"
@@ -31,13 +32,23 @@ void AddOption(po::options_description &desc) {
                                       [](const ConfigManager::Entry &entry) {
                                           return entry.config == config;
                                       });
-    if (index->alias != ConfigManager::Entry::ALIAS_NONE) {
-        desc.add_options()(
-            fmt::format("{},{}", index->name, index->alias).c_str(),
-            po::value<T>(), index->description.data());
+    if constexpr (std::is_same_v<T, void>) {
+        if (index->alias != ConfigManager::Entry::ALIAS_NONE) {
+            desc.add_options()(
+                fmt::format("{},{}", index->name, index->alias).c_str(),
+                index->description.data());
+        } else {
+            desc.add_options()(index->name.data(), index->description.data());
+        }
     } else {
-        desc.add_options()(index->name.data(), po::value<T>(),
-                           index->description.data());
+        if (index->alias != ConfigManager::Entry::ALIAS_NONE) {
+            desc.add_options()(
+                fmt::format("{},{}", index->name, index->alias).c_str(),
+                po::value<T>(), index->description.data());
+        } else {
+            desc.add_options()(index->name.data(), po::value<T>(),
+                               index->description.data());
+        }
     }
 }
 
@@ -141,7 +152,7 @@ struct ConfigBackendCmdline : public ConfigBackendBoostPOBase {
     static po::options_description getTgBotOptionsDesc() {
         auto desc = ConfigBackendBoostPOBase::getTgBotOptionsDesc();
 
-        AddOption<bool, ConfigManager::Configs::HELP>(desc);
+        AddOption<void, ConfigManager::Configs::HELP>(desc);
         return desc;
     }
 
@@ -191,9 +202,10 @@ ConfigManager::ConfigManager(CommandLine line) {
 std::optional<std::string> ConfigManager::get(Configs config) {
     Passes p = Passes::INIT;
     std::string outvalue;
-    std::string_view name = std::ranges::find_if(kConfigMap, [config](const Entry& entry) {
-        return entry.config == config;
-    })->name;
+    std::string_view name =
+        std::ranges::find_if(kConfigMap, [config](const Entry &entry) {
+            return entry.config == config;
+        })->name;
 
     p = Passes::FIND_OVERRIDE;
     do {
