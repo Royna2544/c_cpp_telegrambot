@@ -1,8 +1,6 @@
 #include <ConfigManager.hpp>
 #include <iomanip>
-#include <type_traits>
 #include <utility>
-#include <variant>
 
 #include "SelectorPosix.hpp"
 

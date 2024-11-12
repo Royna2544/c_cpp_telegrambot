@@ -1,8 +1,10 @@
 
+#include <absl/status/status.h>
+
+#include <api/TgBotApi.hpp>
+#include <limits>
 #include <optional>
 #include <string>
-#include <api/TgBotApi.hpp>
-#include <absl/status/status.h>
 
 #include "Types.h"
 
@@ -18,7 +20,8 @@ class RestartFmt {
     using data_type = Type;
 
     // function to parse the given string and populate chat_id and message_id
-    static std::optional<data_type> fromString(const std::string& string, bool withPrefix = false);
+    static std::optional<data_type> fromString(const std::string& string,
+                                               bool withPrefix = false);
 
     // parse the string from environment variables
     static std::optional<data_type> fromEnvVar();
@@ -31,5 +34,7 @@ class RestartFmt {
     constexpr static const char* ENV_VAR_NAME = "RESTART";
     // typical chatid:int32_max
     constexpr static size_t MAX_KNOWN_LENGTH =
-        sizeof("RESTART=-00000000000:2147483647");
+        sizeof("RESTART=-00000000000:") +
+        std::numeric_limits<MessageId>::digits10 + sizeof(":") +
+        std::numeric_limits<MessageThreadId>::digits10;
 };
