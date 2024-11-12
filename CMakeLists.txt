@@ -202,6 +202,12 @@ add_my_library(
     src/Authorization.cpp
     src/api/TgBotApiImpl.cpp
     src/api/CommandModule.cpp
+    src/api/components/OnAnyMessage.cpp
+    src/api/components/ChatJoinRequest.cpp
+    src/api/components/OnCallbackQuery.cpp
+    src/api/components/OnInlineQuery.cpp
+    src/api/components/Async.cpp
+    src/api/components/UnknownCommand.cpp
     src/global_handlers/RegEXHandler.cpp
     src/global_handlers/SpamBlocker.cpp
     src/global_handlers/ChatObserver.cpp

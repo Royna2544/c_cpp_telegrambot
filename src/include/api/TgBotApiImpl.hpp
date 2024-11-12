@@ -4,6 +4,7 @@
 #include <Types.h>
 #include <absl/log/check.h>
 #include <tgbot/tgbot.h>
+#include <trivial_helpers/_class_helper_macros.h>
 
 #include <Authorization.hpp>
 #include <ManagedThreads.hpp>
@@ -22,7 +23,6 @@
 #include "MessageExt.hpp"
 #include "Providers.hpp"
 #include "TgBotApi.hpp"
-#include "tgbot/types/ChatJoinRequest.h"
 
 using TgBot::Animation;
 using TgBot::Api;
@@ -46,26 +46,46 @@ using TgBot::User;
 // access it.
 class TgBotApiImpl : public TgBotApi {
    public:
+    using Ptr = std::add_pointer_t<TgBotApiImpl>;
+    using CPtr = std::add_pointer_t<std::add_const_t<TgBotApiImpl>>;
+
     // Constructor requires a bot token to create a Bot instance.
     TgBotApiImpl(const std::string_view token, AuthContext* auth,
                  StringResLoaderBase* loader, Providers* providers);
     ~TgBotApiImpl() override;
 
-   private: /**
-             * @brief Sends a message to a chat.
-             *
-             * @param chatId The unique identifier for the target chat (could be
-             * a user or a group chat).
-             * @param text The content of the message to be sent.
-             * @param replyParameters Optional. Parameters for replying to a
-             * message, such as timeouts.
-             * @param replyMarkup Optional. Inline keyboard markup for replies.
-             * @param parseMode Optional. Defines the parsing mode for the
-             * message (e.g., HTML, Markdown).
-             *
-             * @return A shared pointer to a Message object representing the
-             * sent message.
-             */
+    class OnAnyMessageImpl;
+    friend class OnAnyMessageImpl;
+    std::unique_ptr<OnAnyMessageImpl> onAnyMessageImpl;
+    class OnCallbackQueryImpl;
+    friend class OnCallbackQueryImpl;
+    std::unique_ptr<OnCallbackQueryImpl> onCallbackQueryImpl;
+    class OnUnknownCommandImpl;
+    friend class OnUnknownCommandImpl;
+    std::unique_ptr<OnUnknownCommandImpl> onUnknownCommandImpl;
+    class OnInlineQueryImpl;
+    friend class OnInlineQueryImpl;
+    std::unique_ptr<OnInlineQueryImpl> onInlineQueryImpl;
+    class ChatJoinRequestImpl;
+    friend class ChatJoinRequestImpl;
+    std::unique_ptr<ChatJoinRequestImpl> onChatJoinRequestImpl;
+
+   private:
+    /**
+     * @brief Sends a message to a chat.
+     *
+     * @param chatId The unique identifier for the target chat (could be
+     * a user or a group chat).
+     * @param text The content of the message to be sent.
+     * @param replyParameters Optional. Parameters for replying to a
+     * message, such as timeouts.
+     * @param replyMarkup Optional. Inline keyboard markup for replies.
+     * @param parseMode Optional. Defines the parsing mode for the
+     * message (e.g., HTML, Markdown).
+     *
+     * @return A shared pointer to a Message object representing the
+     * sent message.
+     */
     Message::Ptr sendMessage_impl(
         ChatId chatId, const std::string_view text,
         ReplyParametersExt::Ptr replyParameters, GenericReply::Ptr replyMarkup,
@@ -418,41 +438,13 @@ class TgBotApiImpl : public TgBotApi {
         return fmt::format("Register onAnyMessage callbacks: {}", str);
     }
 
-   private:
-    // Protect callbacks
-    std::mutex callback_anycommand_mutex;
-    std::mutex callback_callbackquery_mutex;
-    std::mutex callback_result_mutex;
-    // A callback list where it is called when any message is received
-    std::vector<AnyMessageCallback> callbacks_anycommand;
-    std::multimap<std::string, TgBot::EventBroadcaster::CallbackQueryListener>
-        callbacks_callbackquery;
-    std::map<InlineQuery, InlineCallback> queryResults;
-
-   public:
+   
     void addInlineQueryKeyboard(InlineQuery query,
-                                TgBot::InlineQueryResult::Ptr result) override {
-        const std::lock_guard _(callback_result_mutex);
-        queryResults[std::move(query)] =
-            [result = std::move(result)](const std::string_view /*unused*/) {
-                return std::vector{result};
-            };
-    }
+                                TgBot::InlineQueryResult::Ptr result) override;
     void addInlineQueryKeyboard(InlineQuery query,
-                                InlineCallback result) override {
-        const std::lock_guard _(callback_result_mutex);
-        queryResults[std::move(query)] = std::move(result);
-    }
-    void removeInlineQueryKeyboard(const std::string_view key) override {
-        const std::lock_guard _(callback_result_mutex);
-        for (auto it = queryResults.begin(); it != queryResults.end(); ++it) {
-            if (it->first.name == static_cast<std::string>(key)) {
-                queryResults.erase(it);
-                break;
-            }
-        }
-    }
-
+                                InlineCallback result) override;
+    void removeInlineQueryKeyboard(const std::string_view key) override;
+    
     /**
      * @brief Registers a callback function to be called when any message is
      * received.
@@ -460,23 +452,17 @@ class TgBotApiImpl : public TgBotApi {
      * @param callback The function to be called when any message is
      * received.
      */
-    void onAnyMessage(const AnyMessageCallback& callback) override {
-        const std::lock_guard<std::mutex> _(callback_anycommand_mutex);
-        callbacks_anycommand.emplace_back(callback);
-    }
+    void onAnyMessage(const AnyMessageCallback& callback) override;
 
-    void onCallbackQuery(const std::string_view command,
-                         const TgBot::EventBroadcaster::CallbackQueryListener&
-                             listener) override {
-        const std::lock_guard<std::mutex> _(callback_callbackquery_mutex);
-        callbacks_callbackquery.emplace(command, listener);
-    }
+    void onCallbackQuery(
+        std::string command,
+        TgBot::EventBroadcaster::CallbackQueryListener listener) override;
 
    private:
     [[nodiscard]] EventBroadcaster& getEvents() { return _bot.getEvents(); }
     [[nodiscard]] const Api& getApi() const { return _bot.getApi(); }
 
-    struct Async {
+    class Async {
         // A flag to stop CallbackQuery worker
         std::atomic<bool> stopWorker = false;
         // A queue to handle command (commandname, async future)
@@ -488,25 +474,21 @@ class TgBotApiImpl : public TgBotApi {
         // worker thread(s) to consume command queue
         std::vector<std::thread> threads;
 
-        void emplaceTask(const std::string_view command,
-                         std::future<void>&& future) {
-            std::unique_lock<std::mutex> lock(mutex);
-            tasks.emplace(std::forward<const std::string_view>(command),
-                          std::forward<std::future<void>>(future));
-            condVariable.notify_one();
-        }
+        void threadFunction();
 
-    } queryAsync, commandAsync;
+       public:
+        explicit Async(const int count);
+        ~Async();
+
+        NO_COPY_CTOR(Async);
+        void emplaceTask(std::string command, std::future<void> future);
+    } commandAsync;
 
     std::vector<TgBot::ChatJoinRequest::Ptr> joinReqs;
     std::vector<std::unique_ptr<CommandModule>> _modules;
     Bot _bot;
     decltype(_modules)::iterator findModulePosition(
         const std::string_view command);
-    void onAnyMessageFunction(const Message::Ptr& message);
-    void onCallbackQueryFunction(const TgBot::CallbackQuery::Ptr& query);
-    void startQueueConsumerThread();
-    void stopQueueConsumerThread();
 
     AuthContext* _auth;
     StringResLoaderBase* _loader;

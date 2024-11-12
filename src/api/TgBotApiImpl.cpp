@@ -1,16 +1,18 @@
-#include <absl/strings/ascii.h>
-#include <absl/strings/match.h>
-#include <absl/strings/str_split.h>
-#include <absl/strings/strip.h>
 #include <dlfcn.h>
 #include <fmt/format.h>
 #include <fmt/ranges.h>
 #include <trivial_helpers/_tgbot.h>
 
 #include <Authorization.hpp>
-#include <Random.hpp>
 #include <algorithm>
+#include <api/TgBotApi.hpp>
 #include <api/TgBotApiImpl.hpp>
+#include <api/Utils.hpp>
+#include <api/components/ChatJoinRequest.hpp>
+#include <api/components/OnAnyMessage.hpp>
+#include <api/components/OnCallbackQuery.hpp>
+#include <api/components/OnInlineQuery.hpp>
+#include <api/components/UnknownCommand.hpp>
 #include <array>
 #include <filesystem>
 #include <fstream>
@@ -18,18 +20,12 @@
 #include <iterator>
 #include <libos/libsighandler.hpp>
 #include <memory>
-#include <mutex>
-#include <queue>
+#include <set>
 #include <string>
 #include <string_view>
 #include <utility>
 
 #include "StringResLoader.hpp"
-#include "api/Utils.hpp"
-#include "tgbot/types/CallbackQuery.h"
-#include "tgbot/types/ChatJoinRequest.h"
-#include "tgbot/types/InlineKeyboardButton.h"
-#include "tgbot/types/InlineKeyboardMarkup.h"
 
 bool TgBotApiImpl::validateValidArgs(const CommandModule::Ptr& module,
                                      MessageExt::Ptr& message) {
@@ -155,48 +151,6 @@ void TgBotApiImpl::commandHandler(const std::string_view command,
     module->function(this, std::move(ext), (*_loader).at(locale), _provider);
 }
 
-void TgBotApiImpl::startQueueConsumerThread() {
-    const auto threadFn = [](Async* async) {
-        while (!async->stopWorker) {
-            std::unique_lock<std::mutex> lock(async->mutex);
-            async->condVariable.wait(lock, [async] {
-                return !async->tasks.empty() || async->stopWorker;
-            });
-
-            if (!async->tasks.empty()) {
-                auto front = std::move(async->tasks.front());
-                async->tasks.pop();
-                lock.unlock();
-                try {
-                    // Wait for the task to complete
-                    front.second.get();
-                } catch (const TgBot::TgException& e) {
-                    LOG(ERROR) << fmt::format(
-                        "[AsyncConsumer] While handling command: {}: "
-                        "Exception: {}",
-                        front.first, e.what());
-                }
-            }
-        }
-    };
-    commandAsync.threads.emplace_back(threadFn, &commandAsync);
-    queryAsync.threads.emplace_back(threadFn, &queryAsync);
-}
-
-void TgBotApiImpl::stopQueueConsumerThread() {
-    const auto stopFn = [](Async* async) {
-        async->stopWorker = true;
-        async->condVariable.notify_all();
-        for (auto& thread : async->threads) {
-            if (thread.joinable()) {
-                thread.join();
-            }
-        }
-    };
-    stopFn(&commandAsync);
-    stopFn(&queryAsync);
-}
-
 void TgBotApiImpl::addCommand(CommandModule::Ptr module) {
     auto authflags = AuthContext::Flags::REQUIRE_USER;
 
@@ -295,48 +249,29 @@ decltype(TgBotApiImpl::_modules)::iterator TgBotApiImpl::findModulePosition(
         [&command](const CommandModule::Ptr& e) { return e->name == command; });
 }
 
-void TgBotApiImpl::onAnyMessageFunction(const Message::Ptr& message) {
-    decltype(callbacks_anycommand)::const_reverse_iterator it;
-    std::vector<std::pair<std::future<AnyMessageResult>, decltype(it)>> vec;
-    const std::lock_guard<std::mutex> lock(callback_anycommand_mutex);
-
-    if (callbacks_anycommand.empty()) {
-        return;
-    }
-    it = callbacks_anycommand.crbegin();
-    while (it != callbacks_anycommand.crend()) {
-        const auto fn_copy = *it;
-        vec.emplace_back(std::async(std::launch::async, fn_copy, this, message),
-                         it++);
-    }
-
-    for (auto& [future, callback] : vec) {
-        try {
-            switch (future.get()) {
-                // Skip
-                case TgBotApi::AnyMessageResult::Handled:
-                    break;
-
-                case TgBotApi::AnyMessageResult::Deregister:
-                    callbacks_anycommand.erase(callback.base());
-                    break;
-            }
-        } catch (const TgBot::TgException& ex) {
-            LOG(ERROR) << "Error in onAnyMessageCallback: " << ex.what();
-        }
-    }
+void TgBotApiImpl::onAnyMessage(const AnyMessageCallback& callback) {
+    onAnyMessageImpl->onAnyMessage(callback);
 }
 
-void TgBotApiImpl::onCallbackQueryFunction(
-    const TgBot::CallbackQuery::Ptr& query) {
-    const std::lock_guard<std::mutex> lock(callback_callbackquery_mutex);
-    if (callbacks_callbackquery.empty()) {
-        return;
-    }
-    for (const auto& [command, callback] : callbacks_callbackquery) {
-        queryAsync.emplaceTask(command,
-                               std::async(std::launch::async, callback, query));
-    }
+void TgBotApiImpl::onCallbackQuery(
+    std::string command,
+    TgBot::EventBroadcaster::CallbackQueryListener listener) {
+    onCallbackQueryImpl->onCallbackQuery(std::move(command),
+                                         std::move(listener));
+}
+
+void TgBotApiImpl::addInlineQueryKeyboard(
+    InlineQuery query, TgBot::InlineQueryResult::Ptr result) {
+    onInlineQueryImpl->add(std::move(query), std::move(result));
+}
+
+void TgBotApiImpl::addInlineQueryKeyboard(InlineQuery query,
+                                          InlineCallback result) {
+    onInlineQueryImpl->add(std::move(query), std::move(result));
+}
+
+void TgBotApiImpl::removeInlineQueryKeyboard(const std::string_view key) {
+    onInlineQueryImpl->remove(key);
 }
 
 void TgBotApiImpl::startPoll() {
@@ -344,133 +279,12 @@ void TgBotApiImpl::startPoll() {
     LOG(INFO) << "Bot username: " << botUser->username;
     // Deleting webhook
     getApi().deleteWebhook();
-    // Register -> onUnknownCommand
-    getEvents().onUnknownCommand(
-        [username = botUser->username](const Message::Ptr& message) {
-            const auto ext = std::make_shared<MessageExt>(message);
-            if (ext->get_or<MessageAttrs::BotCommand>({}).target != username) {
-                return;  // ignore, unless explicitly targetted this bot.
-            }
-            LOG(INFO) << "Unknown command: " << message->text;
-        });
-    // Register -> onAnyMessage
-    getEvents().onAnyMessage(
-        [this](const Message::Ptr& message) { onAnyMessageFunction(message); });
-    // Register->onCallbackQuery
-    getEvents().onCallbackQuery([this](const TgBot::CallbackQuery::Ptr& query) {
-        onCallbackQueryFunction(query);
-    });
-    getEvents().onChatJoinRequest([this](TgBot::ChatJoinRequest::Ptr ptr) {
-        auto markup = std::make_shared<TgBot::InlineKeyboardMarkup>();
-        markup->inlineKeyboard.resize(1);
-        markup->inlineKeyboard.at(0).resize(2);
-        markup->inlineKeyboard.at(0).at(0) =
-            std::make_shared<TgBot::InlineKeyboardButton>();
-        markup->inlineKeyboard.at(0).at(0)->text = "✅ Approve user";
-        markup->inlineKeyboard.at(0).at(0)->callbackData =
-            fmt::format("chatjoin_{}_approve", ptr->date);
-        markup->inlineKeyboard.at(0).at(1) =
-            std::make_shared<TgBot::InlineKeyboardButton>();
-        markup->inlineKeyboard.at(0).at(1)->text = "❌ Kick user";
-        markup->inlineKeyboard.at(0).at(1)->callbackData =
-            fmt::format("chatjoin_{}_disapprove", ptr->date);
-        std::string bio;
-        if (!ptr->bio.empty()) {
-            bio = fmt::format("\nTheir Bio: '{}'", ptr->bio);
-        }
-        sendMessage(
-            ptr->chat,
-            fmt::format("A new chat join request by {}{}", ptr->from, bio),
-            std::move(markup));
-        joinReqs.emplace_back(std::move(ptr));
-    });
-    onCallbackQuery(
-        "__builtin_chatjoinreq_handler__",
-        [this](const TgBot::CallbackQuery::Ptr& query) {
-            absl::string_view queryData = query->data;
-            if (!absl::ConsumePrefix(&queryData, "chatjoin_")) {
-                return;
-            }
-            auto reqIt = std::ranges::find_if(
-                joinReqs, [queryData](const TgBot::ChatJoinRequest::Ptr& req) {
-                    return absl::StartsWith(queryData,
-                                            fmt::to_string(req->date));
-                });
-            if (reqIt != joinReqs.end()) {
-                const auto& request = *reqIt;
-                DCHECK(absl::ConsumePrefix(&queryData,
-                                           fmt::format("{}_", request->date)))
-                    << "Should be able to consume";
-                if (queryData == "approve") {
-                    LOG(INFO) << fmt::format("Approving {} in chat {}",
-                                             request->from, request->chat);
-                    getApi().approveChatJoinRequest(request->chat->id,
-                                                    request->from->id);
-                    answerCallbackQuery(query->id, "Approved user");
-                } else if (queryData == "disapprove") {
-                    LOG(INFO) << fmt::format("Unapproving {} in chat {}",
-                                             request->from, request->chat);
-                    getApi().declineChatJoinRequest(request->chat->id,
-                                                    request->from->id);
-                    answerCallbackQuery(query->id, "Disapproved user");
-                } else {
-                    LOG(ERROR) << "Invalid payload: " << query->data;
-                }
-                joinReqs.erase(reqIt);
-            }
-        });
-    getEvents().onInlineQuery([this](const TgBot::InlineQuery::Ptr& query) {
-        const std::lock_guard m(callback_result_mutex);
+    getEvents().onMyChatMember([](const TgBot::ChatMemberUpdated::Ptr& update) {
 
-        if (queryResults.empty()) {
-            return;
-        }
-        AuthContext::Flags flags = AuthContext::Flags::REQUIRE_USER;
-        bool canDoPrivileged = false;
-        canDoPrivileged = _auth->isAuthorized(query->from, flags);
-        if (!canDoPrivileged) {
-            flags |= AuthContext::Flags::PERMISSIVE;
-            bool canDoNonPrivileged = _auth->isAuthorized(query->from, flags);
-            if (!canDoNonPrivileged) {
-                return;  // no permission to answer.
-            }
-        }
-        std::vector<TgBot::InlineQueryResult::Ptr> inlineResults;
-        std::ranges::for_each(
-            queryResults, [&query, &inlineResults, canDoPrivileged](auto&& x) {
-                absl::string_view suffix = query->query;
-                if (!canDoPrivileged && x.first.enforced) {
-                    return;  // Skip this.
-                }
-                if (absl::ConsumePrefix(&suffix, x.first.name)) {
-                    std::string arg(suffix);
-                    if (x.first.hasMoreArguments) {
-                        absl::StripLeadingAsciiWhitespace(&arg);
-                    }
-                    auto vec = x.second(std::string_view(suffix.data()));
-                    inlineResults.insert(inlineResults.end(), vec.begin(),
-                                         vec.end());
-                }
-            });
-        if (inlineResults.empty()) {
-            static int articleCount = 0;
-            for (const auto& queryCallbacks : queryResults) {
-                auto article =
-                    std::make_shared<TgBot::InlineQueryResultArticle>();
-                article->id = fmt::format("article-{}", articleCount++);
-                article->title =
-                    fmt::format("Query: {}", queryCallbacks.first.name);
-                article->description = queryCallbacks.first.description;
-                auto content =
-                    std::make_shared<TgBot::InputTextMessageContent>();
-                content->messageText = queryCallbacks.first.description;
-                article->inputMessageContent = content;
-                inlineResults.emplace_back(std::move(article));
-            }
-        }
-        getApi().answerInlineQuery(query->id, inlineResults);
     });
-    TgLongPoll longPoll(_bot);
+    TgLongPoll longPoll(_bot, 100, 10,
+                        {"message", "inline_query", "callback_query",
+                         "my_chat_member", "chat_member", "chat_join_request"});
     while (!SignalHandler::isSignaled()) {
         longPoll.start();
     }
@@ -774,17 +588,24 @@ TgBotApiImpl::TgBotApiImpl(const std::string_view token, AuthContext* auth,
     : _bot(std::string(token)),
       _auth(auth),
       _loader(loader),
-      _provider(providers) {
+      _provider(providers),
+      commandAsync(2) {
     globalLinkOptions = std::make_shared<TgBot::LinkPreviewOptions>();
     globalLinkOptions->isDisabled = true;
-    // Start two async consumers.
-    startQueueConsumerThread();
-    startQueueConsumerThread();
+    // Register -> onUnknownCommand
+    onUnknownCommandImpl =
+        std::make_unique<TgBotApiImpl::OnUnknownCommandImpl>(this);
+    // Register -> onAnyMessage
+    onAnyMessageImpl = std::make_unique<TgBotApiImpl::OnAnyMessageImpl>(this);
+    // Register->onCallbackQuery
+    onCallbackQueryImpl =
+        std::make_unique<TgBotApiImpl::OnCallbackQueryImpl>(this);
+    // Register -> onInlineQuery
+    onInlineQueryImpl =
+        std::make_unique<TgBotApiImpl::OnInlineQueryImpl>(_auth, this);
+    // Register -> ChatJoinRequest
+    onChatJoinRequestImpl =
+        std::make_unique<TgBotApiImpl::ChatJoinRequestImpl>(this);
 }
 
-TgBotApiImpl::~TgBotApiImpl() {
-    callbacks_anycommand.clear();
-    callbacks_callbackquery.clear();
-    stopQueueConsumerThread();
-    _modules.clear();
-}
+TgBotApiImpl::~TgBotApiImpl() { _modules.clear(); }

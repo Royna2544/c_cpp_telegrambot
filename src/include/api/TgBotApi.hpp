@@ -800,8 +800,8 @@ class TgBotApi {
     }
 
     virtual void onCallbackQuery(
-        const std::string_view message,
-        const TgBot::EventBroadcaster::CallbackQueryListener& listener) {
+        std::string message,
+        TgBot::EventBroadcaster::CallbackQueryListener listener) {
         // Dummy implementation
     }
 
