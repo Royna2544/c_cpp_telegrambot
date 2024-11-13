@@ -8,7 +8,6 @@
 #include <vector>
 
 #include "CommandLine.hpp"
-#include "EnumArrayHelpers.h"
 #include "trivial_helpers/fruit_inject.hpp"
 
 #ifdef _MSC_VER
