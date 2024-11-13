@@ -178,17 +178,6 @@ class ForkAndRun {
     void cancel() const;
 
     class Env {
-        struct Comp {
-            using is_transparent = void;
-            bool operator()(const std::string& string,
-                            std::string_view view) const {
-                return string < view;
-            }
-            bool operator()(std::string_view view,
-                            const std::string& string) const {
-                return view < string;
-            }
-        };
         std::unordered_map<std::string, std::string,
                            details::transparent_string_hash, std::equal_to<>>
             map;
