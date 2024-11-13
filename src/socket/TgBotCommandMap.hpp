@@ -4,7 +4,7 @@
 
 #include <string>
 
-#include "include/TgBotSocket_Export.hpp"
+#include "_TgBotSocketCommands.hpp"
 
 template <>
 struct fmt::formatter<TgBotSocket::Command> : formatter<std::string_view> {
