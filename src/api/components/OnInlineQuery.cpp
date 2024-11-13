@@ -31,7 +31,7 @@ void TgBotApiImpl::OnInlineQueryImpl::onInlineQueryFunction(
             if (x.first.hasMoreArguments) {
                 absl::StripLeadingAsciiWhitespace(&arg);
             }
-            auto vec = x.second(std::string_view(suffix.data()));
+            auto vec = x.second(arg);
             inlineResults.insert(inlineResults.end(), vec.begin(), vec.end());
         }
     });
