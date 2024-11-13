@@ -110,5 +110,6 @@ class TgBotUtils_API ConfigManager {
     };
 
    private:
-    std::vector<std::unique_ptr<Backend>> backends;
+    // CommandLine, Env, File
+    std::array<std::unique_ptr<Backend>, 3> backends;
 };

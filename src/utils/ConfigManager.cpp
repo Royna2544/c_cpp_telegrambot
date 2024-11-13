@@ -158,15 +158,15 @@ struct ConfigBackendCmdline : public ConfigBackendBoostPOBase {
 ConfigManager::ConfigManager(CommandLine line) {
     auto cmdline = std::make_unique<ConfigBackendCmdline>(std::move(line));
     if (cmdline->load()) {
-        backends.emplace_back(std::move(cmdline));
+        backends[0] = std::move(cmdline);
     }
     auto env = std::make_unique<ConfigBackendEnv>();
     if (env->load()) {
-        backends.emplace_back(std::move(env));
+        backends[1] = std::move(env);
     }
     auto file = std::make_unique<ConfigBackendFile>();
     if (file->load()) {
-        backends.emplace_back(std::move(file));
+        backends[2] = std::move(file);
     }
     DLOG(INFO) << "Loaded " << backends.size() << " config sources";
 }
@@ -178,6 +178,9 @@ std::optional<std::string> ConfigManager::get(Configs config) {
         })->name;
 
     for (const auto &bit : backends) {
+        if (!bit) {
+            continue;
+        }
         const auto &result = bit->get(name);
         if (result.has_value()) {
             DLOG(INFO) << fmt::format("Used '{}' backend for variable {}",

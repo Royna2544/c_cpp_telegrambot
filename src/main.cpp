@@ -426,7 +426,7 @@ struct OptionalComponents {
     bool webServer;
     bool dataCollector;
 
-    void fromString(const std::string_view configString) {
+    void fromString(const absl::string_view configString) {
         std::vector<std::string> enabledComp =
             absl::StrSplit(configString, ',', absl::SkipWhitespace());
         const auto finder = [&enabledComp](const std::string_view name) {

@@ -348,7 +348,7 @@ void ProtoDatabase::setOwnerUserId(UserId userId) const {
     const std::string_view name) const {
     const auto &obj = dbinfo->object;
     for (const auto &chat : obj.chattonames()) {
-        if (absl::EqualsIgnoreCase(chat.name(), name)) {
+        if (absl::EqualsIgnoreCase(chat.name(), name.data())) {
             return chat.telegramchatid();
         }
     }

@@ -35,11 +35,11 @@ constexpr std::array<CommandEntry, static_cast<int>(Command::CMD_CLIENT_MAX)>
     };
 
 int toCount(Command cmd) {
-    const auto* const it = std::ranges::find_if(
+    const auto it = std::ranges::find_if(
         kCommandArray,
         [cmd](const CommandEntry& ent) { return ent.cmd == cmd; });
-    DCHECK(it);
-    return (it != nullptr) ? it->argCount : 0;
+    DCHECK(it != kCommandArray.end());
+    return (it != kCommandArray.end()) ? it->argCount : 0;
 }
 
 bool isClientCommand(Command cmd) { return cmd < Command::CMD_CLIENT_MAX; }
