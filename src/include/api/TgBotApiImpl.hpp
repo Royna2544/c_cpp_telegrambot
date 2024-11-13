@@ -72,6 +72,9 @@ class TgBotApiImpl : public TgBotApi {
     class OnMyChatMemberImpl;
     friend class OnMyChatMemberImpl;
     std::unique_ptr<OnMyChatMemberImpl> onMyChatMemberImpl;
+    class ModulesManagement;
+    friend class ModulesManagement;
+    std::unique_ptr<ModulesManagement> kModuleLoader;
 
    private:
     /**
@@ -418,22 +421,13 @@ class TgBotApiImpl : public TgBotApi {
     TgBot::LinkPreviewOptions::Ptr globalLinkOptions;
 
    public:
-    // Add commands/Remove commands
-    void addCommand(CommandModule::Ptr module);
-    // Remove a command from being handled
-    void removeCommand(const std::string_view cmd);
-
-    [[nodiscard]] bool setBotCommands() const;
-
     void startPoll() override;
 
-    bool unloadCommand(const std::string_view command) override;
-    bool reloadCommand(const std::string_view command) override;
-    bool isLoadedCommand(const std::string_view command);
-    bool isKnownCommand(const std::string_view command);
-    void commandHandler(const std::string_view command,
+    bool unloadCommand(const std::string& command) override;
+    bool reloadCommand(const std::string& command) override;
+    void commandHandler(const std::string& command,
                         AuthContext::Flags authflags, Message::Ptr message);
-    bool validateValidArgs(const CommandModule::Ptr& module,
+    bool validateValidArgs(const CommandModule* module,
                            MessageExt::Ptr& message);
 
     template <unsigned Len>
@@ -485,13 +479,9 @@ class TgBotApiImpl : public TgBotApi {
 
         NO_COPY_CTOR(Async);
         void emplaceTask(std::string command, std::future<void> future);
-    } commandAsync;
+    };
 
-    std::vector<TgBot::ChatJoinRequest::Ptr> joinReqs;
-    std::vector<std::unique_ptr<CommandModule>> _modules;
     Bot _bot;
-    decltype(_modules)::iterator findModulePosition(
-        const std::string_view command);
 
     AuthContext* _auth;
     StringResLoaderBase* _loader;

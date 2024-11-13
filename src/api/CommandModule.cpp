@@ -60,6 +60,10 @@ CommandModule::CommandModule(std::filesystem::path filePath)
     : filePath(std::move(filePath)), handle(nullptr, &dlclose) {}
 
 bool CommandModule::load() {
+    if (handle != nullptr) {
+        LOG(WARNING) << "Preventing double loading";
+        return false;
+    }
     loadcmd_function_t sym = nullptr;
     const std::string cmdNameStr =
         filePath.filename().replace_extension().string();
@@ -115,6 +119,7 @@ bool CommandModule::unload() {
         handle = nullptr;
         return true;
     }
+    LOG(WARNING) << "Attempted to unload unloaded module";
     return false;
 }
 

@@ -778,10 +778,10 @@ class TgBotApi {
     virtual void startPoll() {
         // Dummy implementation
     }
-    virtual bool unloadCommand(const std::string_view command) {
+    virtual bool unloadCommand(const std::string& command) {
         return false;  // Dummy implementation
     }
-    virtual bool reloadCommand(const std::string_view command) {
+    virtual bool reloadCommand(const std::string& command) {
         return false;  // Dummy implementation
     }
 

@@ -241,15 +241,15 @@ fruit::Component<ResourceProvider> getResourceProvider() {
     return fruit::createComponent().bind<ResourceProvider, ResourceManager>();
 }
 
-fruit::Component<fruit::Required<AuthContext, StringResLoaderBase, Providers,
-                                 ConfigManager, CommandLine>,
-                 TgBotApiImpl, TgBotApi>
+fruit::Component<
+    fruit::Required<AuthContext, StringResLoaderBase, Providers, ConfigManager>,
+    TgBotApiImpl, TgBotApi>
 getTgBotApiImplComponent() {
     return fruit::createComponent()
         .bind<TgBotApi, TgBotApiImpl>()
         .registerProvider([](AuthContext* auth, StringResLoaderBase* strings,
-                             Providers* provider, ConfigManager* config,
-                             CommandLine* line) -> TgBotApiImpl* {
+                             Providers* provider,
+                             ConfigManager* config) -> TgBotApiImpl* {
             auto token = config->get(ConfigManager::Configs::TOKEN);
             if (!token) {
                 LOG(ERROR) << "Failed to get TOKEN variable";
@@ -257,33 +257,7 @@ getTgBotApiImplComponent() {
             }
 
             // Initialize TgBotWrapper instance with provided token
-            auto bot = new TgBotApiImpl(token.value(), auth, strings, provider);
-
-            // Load modules
-            std::filesystem::path modules_path = line->exe().parent_path();
-            std::error_code ec;
-
-            LOG(INFO) << "Loading commands from " << modules_path;
-            for (const auto& it :
-                 std::filesystem::directory_iterator(modules_path, ec)) {
-                const auto filename = it.path().filename();
-                if (filename.string().starts_with(CommandModule::prefix) &&
-                    filename.extension() == FS::kDylibExtension) {
-                    bot->addCommand(std::make_unique<CommandModule>(it));
-                }
-            }
-            if (ec) {
-                LOG(ERROR) << "Failed to iterate through modules: "
-                           << ec.message();
-                return bot;
-            }
-            try {
-                LOG(INFO) << "Updating botcommands with loaded modules...";
-                bot->setBotCommands();
-            } catch (const boost::system::system_error& e) {
-                LOG(ERROR) << "Exception updating commands list: " << e.what();
-            }
-            return bot;
+            return new TgBotApiImpl{token.value(), auth, strings, provider};
         });
 }
 
@@ -521,7 +495,8 @@ int main(int argc, char** argv) {
     injector.get<WrapPtr<SpamBlockBase>*>();
 
     OptionalComponents comp{};
-    if (auto c = configMgr->get(ConfigManager::Configs::OPTIONAL_COMPONENTS); c) {
+    if (auto c = configMgr->get(ConfigManager::Configs::OPTIONAL_COMPONENTS);
+        c) {
         comp.fromString(c.value());
     }
     if (comp.webServer) {

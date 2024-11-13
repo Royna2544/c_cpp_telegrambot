@@ -9,6 +9,7 @@
 #include <api/TgBotApiImpl.hpp>
 #include <api/Utils.hpp>
 #include <api/components/ChatJoinRequest.hpp>
+#include <api/components/ModuleManagement.hpp>
 #include <api/components/OnAnyMessage.hpp>
 #include <api/components/OnCallbackQuery.hpp>
 #include <api/components/OnInlineQuery.hpp>
@@ -28,7 +29,7 @@
 
 #include "StringResLoader.hpp"
 
-bool TgBotApiImpl::validateValidArgs(const CommandModule::Ptr& module,
+bool TgBotApiImpl::validateValidArgs(const CommandModule* module,
                                      MessageExt::Ptr& message) {
     if (!module->valid_arguments.enabled) {
         return true;  // No validation needed.
@@ -75,11 +76,11 @@ bool TgBotApiImpl::validateValidArgs(const CommandModule::Ptr& module,
     return true;
 }
 
-void TgBotApiImpl::commandHandler(const std::string_view command,
+void TgBotApiImpl::commandHandler(const std::string& command,
                                   const AuthContext::Flags authflags,
                                   Message::Ptr message) {
     // Find the module first.
-    const auto& module = *findModulePosition(command);
+    const auto& module = (*kModuleLoader)[command];
     static const std::string myName = getBotUser()->username;
 
     // Create MessageExt object.
@@ -152,102 +153,12 @@ void TgBotApiImpl::commandHandler(const std::string_view command,
     module->function(this, std::move(ext), (*_loader).at(locale), _provider);
 }
 
-void TgBotApiImpl::addCommand(CommandModule::Ptr module) {
-    auto authflags = AuthContext::Flags::REQUIRE_USER;
-
-    if (!module->isLoaded()) {
-        if (!module->load()) {
-            DLOG(ERROR) << "Failed to load command module";
-            return;
-        }
-    }
-    if (!module->isEnforced()) {
-        authflags |= AuthContext::Flags::PERMISSIVE;
-    }
-
-    getEvents().onCommand(module->name, [this, authflags, cmd = module->name](
-                                            Message::Ptr message) {
-        commandAsync.emplaceTask(
-            cmd, std::async(std::launch::async, &TgBotApiImpl::commandHandler,
-                            this, cmd, authflags, std::move(message)));
-    });
-    _modules.emplace_back(std::move(module));
+bool TgBotApiImpl::unloadCommand(const std::string& command) {
+    return (*kModuleLoader) -= command;
 }
 
-void TgBotApiImpl::removeCommand(const std::string_view cmd) {
-    const auto it = findModulePosition(cmd);
-    if (it != _modules.end()) {
-        _modules.erase(it);
-        getEvents().onCommand(std::string(cmd), {});
-        LOG(INFO) << "Removed command " << cmd;
-    }
-}
-
-bool TgBotApiImpl::setBotCommands() const {
-    std::vector<TgBot::BotCommand::Ptr> buffer;
-    for (const auto& cmd : _modules) {
-        if (!cmd->isHideDescription()) {
-            auto onecommand = std::make_shared<TgBot::BotCommand>();
-            onecommand->command = cmd->name;
-            onecommand->description = cmd->description;
-            if (cmd->isEnforced()) {
-                onecommand->description += " (Owner)";
-            }
-            buffer.emplace_back(onecommand);
-        }
-    }
-    try {
-        getApi().setMyCommands(buffer);
-    } catch (const TgBot::TgException& e) {
-        LOG(ERROR) << fmt::format("Error updating bot commands list: {}",
-                                  e.what());
-        return false;
-    }
-    return true;
-}
-
-bool TgBotApiImpl::unloadCommand(const std::string_view command) {
-    if (!isKnownCommand(command)) {
-        LOG(INFO) << "Command " << command << " is not present";
-        return false;
-    }
-    auto& it = *findModulePosition(command);
-    it->unload();
-    LOG(INFO) << "Command " << command << " unloaded";
-    return true;
-}
-
-bool TgBotApiImpl::reloadCommand(const std::string_view command) {
-    if (!isKnownCommand(command)) {
-        LOG(INFO) << "Command " << command << " is not present";
-        return false;
-    }
-    auto& it = *findModulePosition(command);
-    if (!it->load()) {
-        LOG(WARNING) << "Failed to load command " << command;
-        return false;
-    }
-    LOG(INFO) << "Command " << command << " is loaded";
-    return true;
-}
-
-bool TgBotApiImpl::isLoadedCommand(const std::string_view command) {
-    if (!isKnownCommand(command)) {
-        LOG(INFO) << "Command " << command << " is not present";
-        return false;
-    }
-    return (*findModulePosition(command))->isLoaded();
-}
-
-bool TgBotApiImpl::isKnownCommand(const std::string_view command) {
-    return findModulePosition(command) != _modules.end();
-}
-
-decltype(TgBotApiImpl::_modules)::iterator TgBotApiImpl::findModulePosition(
-    const std::string_view command) {
-    return std::ranges::find_if(
-        _modules,
-        [&command](const CommandModule::Ptr& e) { return e->name == command; });
+bool TgBotApiImpl::reloadCommand(const std::string& command) {
+    return (*kModuleLoader) += command;
 }
 
 void TgBotApiImpl::onAnyMessage(const AnyMessageCallback& callback) {
@@ -572,8 +483,7 @@ TgBotApiImpl::TgBotApiImpl(const std::string_view token, AuthContext* auth,
     : _bot(std::string(token)),
       _auth(auth),
       _loader(loader),
-      _provider(providers),
-      commandAsync(2) {
+      _provider(providers) {
     globalLinkOptions = std::make_shared<TgBot::LinkPreviewOptions>();
     globalLinkOptions->isDisabled = true;
     // Register -> onUnknownCommand
@@ -593,6 +503,9 @@ TgBotApiImpl::TgBotApiImpl(const std::string_view token, AuthContext* auth,
     // Register -> OnMyChatMember
     onMyChatMemberImpl =
         std::make_unique<TgBotApiImpl::OnMyChatMemberImpl>(this);
+    // Load modules
+    kModuleLoader = std::make_unique<ModulesManagement>(
+        this, providers->cmdline->exe().parent_path());
 }
 
-TgBotApiImpl::~TgBotApiImpl() { _modules.clear(); }
+TgBotApiImpl::~TgBotApiImpl() = default;
