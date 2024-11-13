@@ -2,7 +2,9 @@
 
 #include <TgBotUtilsExports.h>
 
+#include <algorithm>
 #include <array>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -110,6 +112,29 @@ class TgBotUtils_API ConfigManager {
     };
 
    private:
+    enum class BackendType { COMMAND_LINE, ENV, FILE, MAX };
+
+    class BackendStorage {
+        std::array<std::unique_ptr<Backend>, static_cast<int>(BackendType::MAX)>
+            backends;
+
+       public:
+        std::unique_ptr<Backend>& operator[](const BackendType type) {
+            return backends[static_cast<int>(type)];
+        }
+
+        [[nodiscard]] decltype(backends)::const_iterator begin() const {
+            return backends.cbegin();
+        }
+
+        [[nodiscard]] decltype(backends)::const_iterator end() const {
+            return backends.cend();
+        }
+
+        [[nodiscard]] size_t size() const {
+            return std::ranges::count_if(
+                backends, [](const auto& ent) { return ent != nullptr; });
+        }
+    } storage;
     // CommandLine, Env, File
-    std::array<std::unique_ptr<Backend>, 3> backends;
 };

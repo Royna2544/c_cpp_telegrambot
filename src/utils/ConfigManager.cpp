@@ -158,17 +158,17 @@ struct ConfigBackendCmdline : public ConfigBackendBoostPOBase {
 ConfigManager::ConfigManager(CommandLine line) {
     auto cmdline = std::make_unique<ConfigBackendCmdline>(std::move(line));
     if (cmdline->load()) {
-        backends[0] = std::move(cmdline);
+        storage[BackendType::COMMAND_LINE] = std::move(cmdline);
     }
     auto env = std::make_unique<ConfigBackendEnv>();
     if (env->load()) {
-        backends[1] = std::move(env);
+        storage[BackendType::ENV] = std::move(env);
     }
     auto file = std::make_unique<ConfigBackendFile>();
     if (file->load()) {
-        backends[2] = std::move(file);
+        storage[BackendType::FILE] = std::move(file);
     }
-    DLOG(INFO) << "Loaded " << backends.size() << " config sources";
+    DLOG(INFO) << "Loaded " << storage.size() << " config sources";
 }
 
 std::optional<std::string> ConfigManager::get(Configs config) {
@@ -177,7 +177,7 @@ std::optional<std::string> ConfigManager::get(Configs config) {
             return entry.config == config;
         })->name;
 
-    for (const auto &bit : backends) {
+    for (const auto &bit : storage) {
         if (!bit) {
             continue;
         }
