@@ -111,13 +111,11 @@ bool CommandModulesTest::isReplyToThisMsg(const ReplyParametersExt::Ptr& rhs,
         LOG(INFO) << "ReplyParameters is nullptr";
         return false;
     }
-    ChatId lChatId = rhs->chatId;
-    ChatId rChatId = message->chat->id;
     MessageId lMessageId = rhs->messageId;
     MessageId rMessageId = message->messageId;
-    if (lChatId != rChatId || lMessageId != rMessageId) {
-        LOG(INFO) << "ReplyToThisMsg false: " << lChatId << " " << lMessageId
-                  << " vs " << rChatId << " " << rMessageId;
+    if (lMessageId != rMessageId) {
+        LOG(INFO) << "ReplyToThisMsg false: " << lMessageId << " vs "
+                  << rMessageId;
         return false;
     }
     return true;
