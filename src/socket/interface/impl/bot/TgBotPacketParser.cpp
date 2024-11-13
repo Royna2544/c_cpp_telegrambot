@@ -54,8 +54,7 @@ std::optional<Packet> readPacket(
 
     using namespace TgBotSocket::CommandHelpers;
     if (isClientCommand(header.cmd)) {
-        LOG(INFO) << "Received buf with " << toStr(header.cmd)
-                  << ", invoke callback!";
+        LOG(INFO) << fmt::format("Received buf with {}, invoking callback!", header.cmd);
     }
 
     const size_t newLength =

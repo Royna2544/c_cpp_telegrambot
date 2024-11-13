@@ -34,9 +34,7 @@ namespace {
 bool verifyArgsCount(Command cmd, int argc) {
     int required = CommandHelpers::toCount(cmd);
     if (required != argc) {
-        LOG(ERROR) << "Invalid argument count " << argc << " for cmd "
-                   << CommandHelpers::toStr(cmd) << ", " << required
-                   << " required";
+        LOG(ERROR) << fmt::format("Invalid argument count {} for cmd {}, {} required.", argc, cmd, required);
         return false;
     }
     return true;
@@ -272,12 +270,11 @@ int main(int argc, char** argv) {
             break;
         }
         default:
-            LOG(FATAL) << "Unhandled command: " << CommandHelpers::toStr(cmd);
+            LOG(FATAL) << fmt::format("Unhandled command: {}", cmd);
     };
 
     if (!pkt) {
-        LOG(ERROR) << "Failed parsing arguments for "
-                   << CommandHelpers::toStr(cmd);
+        LOG(ERROR) << fmt::format("Failed parsing arguments for {}", cmd);
         return EXIT_FAILURE;
     } else {
         pkt->header.checksum = pkt->crc32_function(pkt->data);

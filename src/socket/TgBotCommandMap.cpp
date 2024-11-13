@@ -1,56 +1,46 @@
+#include "TgBotCommandMap.hpp"
+
 #include <EnumArrayHelpers.h>
+#include <absl/log/check.h>
 #include <absl/log/log.h>
+#include <fmt/format.h>
+#include <fmt/ranges.h>
 
 #include <_TgBotSocketCommands.hpp>
 #include <mutex>
-#include <sstream>
-
-
-#define ARGUMENT_SIZE(enum, len) array_helpers::make_elem(Command::enum, len)
-
-#undef ENUM_AND_STR
-#define ENUM_AND_STR(e) \
-    array_helpers::make_elem<Command, const char*>(Command::e, #e)
-
-using namespace TgBotSocket;
-
-constexpr int MAX_LEN = static_cast<int>(Command::CMD_CLIENT_MAX);
-
-constexpr auto kTgBotCommandStrMap =
-    array_helpers::make<MAX_LEN, TgBotSocket::Command, const char*>(
-        ENUM_AND_STR(CMD_WRITE_MSG_TO_CHAT_ID),
-        ENUM_AND_STR(CMD_CTRL_SPAMBLOCK), ENUM_AND_STR(CMD_OBSERVE_CHAT_ID),
-        ENUM_AND_STR(CMD_SEND_FILE_TO_CHAT_ID),
-        ENUM_AND_STR(CMD_OBSERVE_ALL_CHATS),
-        ENUM_AND_STR(CMD_DELETE_CONTROLLER_BY_ID), ENUM_AND_STR(CMD_GET_UPTIME),
-        ENUM_AND_STR(CMD_UPLOAD_FILE), ENUM_AND_STR(CMD_DOWNLOAD_FILE));
-
-const auto kTgBotCommandArgsCount =
-    array_helpers::make<MAX_LEN, TgBotSocket::Command, int>(
-        ARGUMENT_SIZE(CMD_WRITE_MSG_TO_CHAT_ID, 2),  // chatid, msg
-        ARGUMENT_SIZE(CMD_CTRL_SPAMBLOCK, 1),        // policy
-        ARGUMENT_SIZE(CMD_OBSERVE_CHAT_ID, 2),       // chatid, policy
-        ARGUMENT_SIZE(CMD_SEND_FILE_TO_CHAT_ID, 3),  // chatid, type, filepath
-        ARGUMENT_SIZE(CMD_OBSERVE_ALL_CHATS, 1),     // policy
-        ARGUMENT_SIZE(CMD_DELETE_CONTROLLER_BY_ID, 1),  // id
-        ARGUMENT_SIZE(CMD_GET_UPTIME, 0),
-        ARGUMENT_SIZE(CMD_UPLOAD_FILE, 2),     // source, dest filepath
-        ARGUMENT_SIZE(CMD_DOWNLOAD_FILE, 2));  // source, dest filepath
 
 namespace TgBotSocket::CommandHelpers {
 
-std::string toStr(Command cmd) {
-    const auto it = array_helpers::find(kTgBotCommandStrMap, cmd);
-    LOG_IF(FATAL, it == kTgBotCommandStrMap.end())
-        << "Couldn't find cmd " << static_cast<int>(cmd) << " in map";
-    return it->second;
-}
+struct CommandEntry {
+    TgBotSocket::Command cmd;
+    int argCount;
+    std::string_view argHelp;
+};
+
+constexpr std::array<CommandEntry, static_cast<int>(Command::CMD_CLIENT_MAX)>
+    kCommandArray{
+        CommandEntry{Command::CMD_WRITE_MSG_TO_CHAT_ID, 2, "Chat ID, Message"},
+        CommandEntry{Command::CMD_CTRL_SPAMBLOCK, 1, "SpamBlockCtrl enum"},
+        CommandEntry{Command::CMD_OBSERVE_CHAT_ID, 2,
+                     "Chat ID, Observe_or_not"},
+        CommandEntry{Command::CMD_SEND_FILE_TO_CHAT_ID, 3,
+                     "Chat ID, FileType enum, FilePath"},
+        CommandEntry{Command::CMD_OBSERVE_ALL_CHATS, 1, "Observe_or_not"},
+        CommandEntry{Command::CMD_DELETE_CONTROLLER_BY_ID, 1,
+                     "ThreadManager::Usage enum, now no-op"},
+        CommandEntry{Command::CMD_GET_UPTIME, 0, ""},
+        CommandEntry{Command::CMD_UPLOAD_FILE, 2,
+                     "Source File (In local), Dest File (In remote)"},
+        CommandEntry{Command::CMD_DOWNLOAD_FILE, 2,
+                     "Source File (In remote), Dest File (In local)"},
+    };
 
 int toCount(Command cmd) {
-    const auto it = array_helpers::find(kTgBotCommandArgsCount, cmd);
-    LOG_IF(FATAL, it == kTgBotCommandArgsCount.end())
-        << "Couldn't find cmd " << static_cast<int>(cmd) << " in map";
-    return it->second;
+    const auto* const it = std::ranges::find_if(
+        kCommandArray,
+        [cmd](const CommandEntry& ent) { return ent.cmd == cmd; });
+    DCHECK(it);
+    return (it != nullptr) ? it->argCount : 0;
 }
 
 bool isClientCommand(Command cmd) { return cmd < Command::CMD_CLIENT_MAX; }
@@ -64,20 +54,20 @@ std::string getHelpText() {
     static std::once_flag once;
 
     std::call_once(once, [] {
-        std::stringstream help;
-        for (const auto& ent : kTgBotCommandStrMap) {
-            int count = 0;
-
-            count = toCount(ent.first);
-
-            help << ent.second << ": value " << static_cast<int>(ent.first)
-                 << ", Requires " << count << " argument";
-            if (count > 1) {
-                help << "s";
+        std::vector<std::string> help;
+        help.reserve(kCommandArray.size());
+        for (const auto& ent : kCommandArray) {
+            if (ent.argCount > 0) {
+                help.emplace_back(fmt::format("{}: value {}, No arguments",
+                                              ent.cmd,
+                                              static_cast<int>(ent.cmd)));
+            } else {
+                help.emplace_back(fmt::format(
+                    "{}: value {}, Arguments({}): {}", ent.cmd,
+                    static_cast<int>(ent.cmd), ent.argCount, ent.argHelp));
             }
-            help << std::endl;
         }
-        helptext = help.str();
+        helptext = fmt::format("{}", fmt::join(help, "\n"));
     });
     return helptext;
 }

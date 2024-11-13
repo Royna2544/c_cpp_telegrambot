@@ -239,9 +239,9 @@ bool SocketInterfaceTgBot::handle_GetUptime(SocketConnContext ctx,
 template <typename DataT>
 bool CHECK_PACKET_SIZE(Packet& pkt) {
     if (pkt.header.data_size != sizeof(DataT)) {
-        LOG(WARNING) << "Invalid packet size for cmd: "
-                     << CommandHelpers::toStr(pkt.header.cmd)
-                     << " diff: " << pkt.header.data_size - sizeof(DataT);
+        LOG(WARNING) << fmt::format("Invalid packet size for cmd: {}. diff: {}",
+                                    pkt.header.cmd,
+                                    pkt.header.data_size - sizeof(DataT));
         return false;
     }
     return true;
@@ -315,8 +315,7 @@ void SocketInterfaceTgBot::handlePacket(SocketConnContext ctx,
             break;
         default:
             if (CommandHelpers::isClientCommand(pkt.header.cmd)) {
-                LOG(ERROR) << "Unhandled cmd: "
-                           << CommandHelpers::toStr(pkt.header.cmd);
+                LOG(ERROR) << fmt::format("Unhandled cmd: {}", pkt.header.cmd);
             } else {
                 LOG(WARNING) << "cmd ignored (as internal): "
                              << static_cast<int>(pkt.header.cmd);
@@ -328,8 +327,8 @@ void SocketInterfaceTgBot::handlePacket(SocketConnContext ctx,
         case Command::CMD_DOWNLOAD_FILE: {
             // This has its own callback, so we don't need to send ack.
             bool result = std::get<bool>(ret);
-            DLOG_IF(INFO, (!result))
-                << "Command failed: " << CommandHelpers::toStr(pkt.header.cmd);
+            LOG_IF(WARNING, (!result))
+                << fmt::format("Command failed: {}", pkt.header.cmd);
             break;
         }
         case Command::CMD_UPLOAD_FILE_DRY: {
