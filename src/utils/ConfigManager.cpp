@@ -64,11 +64,6 @@ struct ConfigBackendEnv : public ConfigManager::Backend {
         return std::nullopt;
     }
 
-    bool doOverride(const std::string_view config) override {
-        std::string value;
-        std::string kConfigOverrideVariable(kConfigOverrideVar);
-        return get(kConfigOverrideVariable) && value == config;
-    }
     [[nodiscard]] std::string_view name() const override { return "Env"; }
 };
 
@@ -80,7 +75,6 @@ struct ConfigBackendBoostPOBase : public ConfigManager::Backend {
             AddOption<std::string, ConfigManager::Configs::TOKEN>(desc);
             AddOption<std::string, ConfigManager::Configs::LOG_FILE>(desc);
             AddOption<std::string, ConfigManager::Configs::DATABASE_CFG>(desc);
-            AddOption<std::string, ConfigManager::Configs::OVERRIDE_CONF>(desc);
             AddOption<std::string, ConfigManager::Configs::SOCKET_CFG>(desc);
             AddOption<std::string, ConfigManager::Configs::SELECTOR_CFG>(desc);
             AddOption<std::string, ConfigManager::Configs::GITHUB_TOKEN>(desc);
@@ -90,21 +84,10 @@ struct ConfigBackendBoostPOBase : public ConfigManager::Backend {
     }
 
     std::optional<std::string> get(const std::string_view name) override {
-        if (name != kConfigOverrideVar) {
-            if (const auto it = mp[std::string(name)]; !it.empty()) {
-                return it.as<std::string>();
-            }
+        if (const auto it = mp[std::string(name)]; !it.empty()) {
+            return it.as<std::string>();
         }
         return std::nullopt;
-    }
-
-    bool doOverride(const std::string_view config) override {
-        if (const auto it = mp[kConfigOverrideVar.data()]; !it.empty()) {
-            const auto &vec = it.as<std::vector<std::string>>();
-            return std::ranges::find(vec, config) != vec.end();
-        }
-
-        return false;
     }
 
     ConfigBackendBoostPOBase() = default;
@@ -177,13 +160,6 @@ struct ConfigBackendCmdline : public ConfigBackendBoostPOBase {
     ~ConfigBackendCmdline() override = default;
 };
 
-enum class Passes {
-    INIT,
-    FIND_OVERRIDE,
-    ACTUAL_GET,
-    DONE,
-};
-
 ConfigManager::ConfigManager(CommandLine line) {
     auto cmdline = std::make_unique<ConfigBackendCmdline>(std::move(line));
     if (cmdline->load()) {
@@ -201,45 +177,19 @@ ConfigManager::ConfigManager(CommandLine line) {
 }
 
 std::optional<std::string> ConfigManager::get(Configs config) {
-    Passes p = Passes::INIT;
-    std::string outvalue;
     std::string_view name =
         std::ranges::find_if(kConfigMap, [config](const Entry &entry) {
             return entry.config == config;
         })->name;
 
-    p = Passes::FIND_OVERRIDE;
-    do {
-        switch (p) {
-            case Passes::FIND_OVERRIDE:
-                for (const auto &bit : backends) {
-                    if (bit->doOverride(name)) {
-                        DLOG(INFO) << fmt::format(
-                            "Used '{}' backend for variable {} (forced)",
-                            bit->name(), name);
-                        return bit->get(name);
-                    }
-                }
-                p = Passes::ACTUAL_GET;
-                break;
-            case Passes::ACTUAL_GET:
-                for (const auto &bit : backends) {
-                    const auto &result = bit->get(name);
-                    if (result.has_value()) {
-                        DLOG(INFO)
-                            << fmt::format("Used '{}' backend for variable {}",
-                                           bit->name(), name);
-                        return result;
-                    }
-                }
-                p = Passes::DONE;
-                break;
-            default:
-                LOG(FATAL) << "Should never reach here";
-                break;
+    for (const auto &bit : backends) {
+        const auto &result = bit->get(name);
+        if (result.has_value()) {
+            DLOG(INFO) << fmt::format("Used '{}' backend for variable {}",
+                                      bit->name(), name);
+            return result;
         }
-
-    } while (p != Passes::DONE);
+    }
 
     return std::nullopt;
 }

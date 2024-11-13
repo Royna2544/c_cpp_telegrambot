@@ -24,7 +24,6 @@ class TgBotUtils_API ConfigManager {
         LOG_FILE,
         DATABASE_CFG,
         HELP,
-        OVERRIDE_CONF,
         SOCKET_CFG,
         SELECTOR_CFG,
         GITHUB_TOKEN,
@@ -93,7 +92,6 @@ class TgBotUtils_API ConfigManager {
         {Configs::LOG_FILE, "LOG_FILE", "Log file path", 'f'},
         {Configs::DATABASE_CFG, "DATABASE_CFG", "Database configuration file path", 'd'},
         {Configs::HELP, "HELP", "Display help information", 'h'},
-        {Configs::OVERRIDE_CONF, "OVERRIDE_CONF", "Override configuration from this source", 'o'},
         {Configs::SOCKET_CFG, "SOCKET_CFG", "Sockets (ipv4/ipv6/local)", Entry::ALIAS_NONE},
         {Configs::SELECTOR_CFG, "SELECTOR_CFG", "Selectors (poll/epoll/select)", Entry::ALIAS_NONE},
         {Configs::GITHUB_TOKEN, "GITHUB_TOKEN", "Github token", Entry::ALIAS_NONE},
@@ -103,11 +101,9 @@ class TgBotUtils_API ConfigManager {
 
     struct Backend {
         virtual ~Backend() = default;
-        constexpr static std::string_view kConfigOverrideVar = "OVERRIDE_CONF";
 
         virtual bool load() { return true; }
         virtual std::optional<std::string> get(const std::string_view name) = 0;
-        virtual bool doOverride(const std::string_view /*config*/) { return false; }
 
         /**
          * @brief This field stores the name of the backend.
