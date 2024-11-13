@@ -16,7 +16,3 @@ void ThreadManager::destroy() {
     LOG(INFO) << "Requested stop, now waiting...";
     barrier.wait();
 }
-
-constexpr array_helpers::ConstArray<ThreadManager::Usage, const char*,
-                                    static_cast<int>(ThreadManager::Usage::MAX)>
-    ThreadManager::ThreadUsageToStrMap;  // NOLINT

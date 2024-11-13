@@ -18,18 +18,19 @@ int load_before_inc_dec(std::atomic_int* counter) {
 
 void ManagedThreadRunnable::threadFunction() {
     ++(*mgr_priv.launched);
-    DLOG(INFO) << fmt::format("{} started (launched: {})", mgr_priv.usage.str,
+    DLOG(INFO) << fmt::format("{} started (launched: {})", mgr_priv.usage,
                               load_before_inc_dec(mgr_priv.launched));
     auto callback = std::make_unique<StopCallBackJust>(mgr_priv.stopToken,
                                                        [this] { onPreStop(); });
     runFunction(mgr_priv.stopToken);
     if (!mgr_priv.stopToken.stop_requested()) {
-        LOG(INFO) << mgr_priv.usage.str << " has ended";
+        LOG(INFO) << fmt::format("{} has stopped before stop request",
+                                 mgr_priv.usage);
         callback.reset();
     }
     --(*mgr_priv.launched);
     mgr_priv.completeBarrier->count_down();
     DLOG(INFO) << fmt::format("{} joined the barrier (launched: {})",
-                              mgr_priv.usage.str,
+                              mgr_priv.usage,
                               load_before_inc_dec(mgr_priv.launched));
 }

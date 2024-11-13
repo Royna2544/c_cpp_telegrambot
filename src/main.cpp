@@ -288,15 +288,15 @@ getTgBotApiImplComponent() {
 fruit::Component<Unused<TgBotWebServer>> getWebServerComponent() {
     return fruit::createComponent()
         .bind<TgBotWebServerBase, TgBotWebServer>()
-        .registerProvider([](ThreadManager* threadManager)
-                              -> Unused<TgBotWebServer> {
-            constexpr int kTgBotWebServerPort = 8080;
-            const auto server =
-                threadManager->create<ThreadManager::Usage::WEBSERVER_THREAD,
-                                      TgBotWebServer>(kTgBotWebServerPort);
-            server->run();
-            return {};
-        });
+        .registerProvider(
+            [](ThreadManager* threadManager) -> Unused<TgBotWebServer> {
+                constexpr int kTgBotWebServerPort = 8080;
+                const auto server = threadManager->create<TgBotWebServer>(
+                    ThreadManager::Usage::WEBSERVER_THREAD,
+                    kTgBotWebServerPort);
+                server->run();
+                return {};
+            });
 }
 
 fruit::Component<fruit::Required<ThreadManager, TgBotApi, AuthContext>,
@@ -305,8 +305,8 @@ getSpamBlockComponent() {
     return fruit::createComponent().registerProvider(
         [](ThreadManager* thread, TgBotApi::Ptr api,
            AuthContext* auth) -> WrapPtr<SpamBlockBase> {
-            return {thread->create<ThreadManager::Usage::SPAMBLOCK_THREAD,
-                                   SpamBlockManager>(api, auth)};
+            return {thread->create<SpamBlockManager>(
+                ThreadManager::Usage::SPAMBLOCK_THREAD, api, auth)};
         });
 }
 
@@ -319,8 +319,8 @@ getNetworkLogSinkComponent() {
            const WrapSharedPtr<SocketServerWrapper>& config)
             -> Unused<NetworkLogSink> {
             if (config) {
-                thread->create<ThreadManager::Usage::LOGSERVER_THREAD,
-                               NetworkLogSink>(config.pointer());
+                thread->create<NetworkLogSink>(
+                    ThreadManager::Usage::LOGSERVER_THREAD, config.pointer());
             }
             return {};
         });
