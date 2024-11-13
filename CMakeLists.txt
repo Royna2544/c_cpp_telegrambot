@@ -187,12 +187,11 @@ add_subdirectory(tests)
 
 add_my_library(
   NAME PPImpl_shared_deps
-  SRCS 
-    src/ManagedThread.cpp
-    src/ThreadManager.cpp
+  SRCS
     src/api/MessageExt.cpp
   PUBLIC_INC
     $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>
+  STATIC
 )
 
 ################### The Bot's main functionaility ###################
@@ -200,6 +199,8 @@ add_my_library(
   NAME PPImpl
   SRCS 
     src/Authorization.cpp
+    src/ManagedThread.cpp
+    src/ThreadManager.cpp
     src/api/TgBotApiImpl.cpp
     src/api/CommandModule.cpp
     src/api/components/OnAnyMessage.cpp

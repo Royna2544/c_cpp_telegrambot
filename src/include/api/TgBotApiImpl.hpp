@@ -1,6 +1,5 @@
 #pragma once
 
-#include <TgBotPPImpl_shared_depsExports.h>
 #include <Types.h>
 #include <absl/log/check.h>
 #include <tgbot/tgbot.h>

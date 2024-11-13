@@ -1,6 +1,5 @@
 #pragma once
 
-#include <TgBotPPImpl_shared_depsExports.h>
 #include <absl/log/check.h>
 #include <absl/log/log.h>
 #include <fmt/format.h>
@@ -25,7 +24,7 @@
 
 struct ManagedThreadRunnable;
 
-class TgBotPPImpl_shared_deps_API ThreadManager {
+class ThreadManager {
    public:
     APPLE_INJECT(ThreadManager()) : barrier(static_cast<int>(Usage::MAX)) {}
 
@@ -90,7 +89,7 @@ struct fmt::formatter<ThreadManager::Usage> : formatter<std::string_view> {
     }
 };
 
-struct TgBotPPImpl_shared_deps_API ManagedThreadRunnable {
+struct ManagedThreadRunnable {
     using just_function = std::function<void(void)>;
     using StopCallBackJust = std::stop_callback<just_function>;
 

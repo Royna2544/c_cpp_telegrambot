@@ -1,6 +1,5 @@
 #pragma once
 
-#include <TgBotPPImpl_shared_depsExports.h>
 #include <absl/log/check.h>
 #include <absl/log/log.h>
 #include <tgbot/types/Message.h>
@@ -131,7 +130,7 @@ struct AttributeType<MessageAttrs::Video> {
 
 }  // namespace internal::message
 
-class TgBotPPImpl_shared_deps_API MessageExt {
+class MessageExt {
    public:
     using Ptr = std::shared_ptr<MessageExt>;
     using AttrList = std::initializer_list<MessageAttrs>;
