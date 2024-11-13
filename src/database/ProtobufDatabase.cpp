@@ -129,7 +129,7 @@ bool ProtoDatabase::load(std::filesystem::path filepath) {
     return false;
 }
 
-bool ProtoDatabase::unloadDatabase() {
+bool ProtoDatabase::unload() {
     if (!dbinfo.has_value()) {
         LOG(WARNING) << "Database not loaded! Cannot unload!";
         return false;
@@ -141,7 +141,7 @@ bool ProtoDatabase::unloadDatabase() {
         dbinfo.reset();
         return true;
     }
-    
+
     std::fstream output(dbinfo->path.string(),
                         std::ios::out | std::ios::binary);
     if (!output.is_open()) {
@@ -234,11 +234,11 @@ std::optional<ProtoDatabase::MediaInfo> ProtoDatabase::queryMediaInfo(
     return info;
 }
 
-bool ProtoDatabase::addMediaInfo(const MediaInfo &info) const {
+ProtoDatabase::AddResult ProtoDatabase::addMediaInfo(const MediaInfo &info) const {
     auto *const mediaEntries = dbinfo->object.mutable_mediatonames();
     for (const auto &elem : *mediaEntries) {
         if (elem.telegrammediauniqueid() == info.mediaUniqueId) {
-            return false;
+            return AddResult::ALREADY_EXISTS;
         }
     }
     auto *const mediaEntry = mediaEntries->Add();
@@ -250,7 +250,7 @@ bool ProtoDatabase::addMediaInfo(const MediaInfo &info) const {
     for (const auto &name : info.names) {
         *mediaNames->Add() = name;
     }
-    return true;
+    return AddResult::OK;
 }
 
 std::vector<ProtoDatabase::MediaInfo> ProtoDatabase::getAllMediaInfos() const {
@@ -330,22 +330,22 @@ void ProtoDatabase::setOwnerUserId(UserId userId) const {
     dbinfo->object.set_ownerid(userId);
 }
 
-[[nodiscard]] bool ProtoDatabase::addChatInfo(const ChatId chatid,
-                                              const std::string &name) const {
+[[nodiscard]] ProtoDatabase::AddResult ProtoDatabase::addChatInfo(
+    const ChatId chatid, const std::string_view name) const {
     auto *const chats = dbinfo->object.mutable_chattonames();
     for (const auto &chat : *chats) {
         if (chat.telegramchatid() == chatid) {
-            return false;
+            return AddResult::ALREADY_EXISTS;
         }
     }
     auto *const chat = chats->Add();
     chat->set_telegramchatid(chatid);
-    chat->set_name(name);
-    return true;
+    chat->set_name(name.data());
+    return AddResult::OK;
 }
 
 [[nodiscard]] std::optional<ChatId> ProtoDatabase::getChatId(
-    const std::string &name) const {
+    const std::string_view name) const {
     const auto &obj = dbinfo->object;
     for (const auto &chat : obj.chattonames()) {
         if (absl::EqualsIgnoreCase(chat.name(), name)) {

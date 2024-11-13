@@ -128,7 +128,7 @@ TEST_P(AuthorizationTest, expectedForMessagesInTime) {
         .WillByDefault(Return(DatabaseBase::ListResult::NOT_IN_LIST));
 
     // Unloading of database
-    ON_CALL(*database, unloadDatabase).WillByDefault(Return(true));
+    ON_CALL(*database, unload).WillByDefault(Return(true));
 
     // Modify date to current date
     message->date =

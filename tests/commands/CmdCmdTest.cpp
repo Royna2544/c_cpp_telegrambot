@@ -11,11 +11,11 @@ struct CMDCommandTest : public CommandTestBase {
     }
 
     void makeReload(const bool ret) {
-        EXPECT_CALL(*botApi, reloadCommand(testCmd))
+        EXPECT_CALL(*botApi, reloadCommand(testCmd.data()))
             .WillOnce(Return(ret));
     }
     void makeUnload(const bool ret) {
-        EXPECT_CALL(*botApi, unloadCommand(testCmd))
+        EXPECT_CALL(*botApi, unloadCommand(testCmd.data()))
             .WillOnce(Return(ret));
     }
 

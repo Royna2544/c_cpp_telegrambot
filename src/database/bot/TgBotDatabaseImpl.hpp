@@ -6,11 +6,11 @@
 
 #include <ConfigManager.hpp>
 #include <database/DatabaseBase.hpp>
+#include <filesystem>
 #include <map>
 #include <memory>
-#include <string_view>
 #include <optional>
-#include <filesystem>
+#include <string_view>
 
 /**
  * @brief TgBotDatabaseImpl is a class that implements the DatabaseBase
@@ -60,7 +60,7 @@ struct TgBotDBImpl_API TgBotDatabaseImpl : DatabaseBase {
     NO_COPY_CTOR(TgBotDatabaseImpl);
 
     // Unload the database
-    bool unloadDatabase() override;
+    bool unload() override;
 
     // Wrappers
     [[nodiscard]] bool isLoaded() const;
@@ -73,15 +73,15 @@ struct TgBotDBImpl_API TgBotDatabaseImpl : DatabaseBase {
     [[nodiscard]] std::optional<UserId> getOwnerUserId() const override;
     [[nodiscard]] std::optional<DatabaseBase::MediaInfo> queryMediaInfo(
         std::string str) const override;
-    [[nodiscard]] bool addMediaInfo(
+    [[nodiscard]] AddResult addMediaInfo(
         const DatabaseBase::MediaInfo &info) const override;
     [[nodiscard]] std::vector<MediaInfo> getAllMediaInfos() const override;
     std::ostream &dump(std::ostream &ofs) const override;
     void setOwnerUserId(UserId userid) const override;
-    [[nodiscard]] bool addChatInfo(const ChatId chatid,
-                                   const std::string &name) const override;
+    [[nodiscard]] AddResult addChatInfo(
+        const ChatId chatid, const std::string_view name) const override;
     [[nodiscard]] std::optional<ChatId> getChatId(
-        const std::string &name) const override;
+        const std::string_view name) const override;
 
     // Load database from file
     bool load(std::filesystem::path filepath) override;

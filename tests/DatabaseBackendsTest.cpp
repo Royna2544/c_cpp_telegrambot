@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include "DatabaseBase.hpp"
 
 #ifdef DATABASE_HAVE_PROTOBUF
 #include <database/ProtobufDatabase.hpp>
@@ -28,7 +29,7 @@ class DatabaseBaseTest : public ::testing::TestWithParam<DBParam> {
         db = GetParam().db;  // Get the actual implementation
         db->load(db_path);
     }
-    void TearDown() override { db->unloadDatabase(); }
+    void TearDown() override { db->unload(); }
 };
 
 // Test addUserToList, checkUserInList, removeUserFromList
@@ -63,13 +64,13 @@ TEST_P(DatabaseBaseTest, LoadAndUnloadDatabase) {
     std::filesystem::path testFilePath = "test_database_file.db";
 
     // Unload the database
-    EXPECT_TRUE(db->unloadDatabase());
+    EXPECT_TRUE(db->unload());
 
     // Load the database from file
     EXPECT_TRUE(db->load(testFilePath));
 
     // Unload the database again
-    EXPECT_TRUE(db->unloadDatabase());
+    EXPECT_TRUE(db->unload());
 
     // Remove file
     EXPECT_TRUE(std::filesystem::remove(testFilePath));
@@ -101,8 +102,8 @@ TEST_P(DatabaseBaseTest, MediaInfoOperations) {
         "media2", "unique2", {"name2"}, DatabaseBase::MediaType::VIDEO};
 
     // Add media info
-    EXPECT_TRUE(db->addMediaInfo(mediaInfo1));
-    EXPECT_TRUE(db->addMediaInfo(mediaInfo2));
+    EXPECT_EQ(db->addMediaInfo(mediaInfo1), DatabaseBase::AddResult::OK);
+    EXPECT_EQ(db->addMediaInfo(mediaInfo2), DatabaseBase::AddResult::OK);
 
     // Query media info
     auto queriedInfo = db->queryMediaInfo("name1");
@@ -122,8 +123,8 @@ TEST_P(DatabaseBaseTest, ChatInfoOperations) {
     std::string chatName2 = "chat_name_2";
 
     // Add chat info
-    EXPECT_TRUE(db->addChatInfo(chatId1, chatName1));
-    EXPECT_TRUE(db->addChatInfo(chatId2, chatName2));
+    EXPECT_EQ(db->addChatInfo(chatId1, chatName1), DatabaseBase::AddResult::OK);
+    EXPECT_EQ(db->addChatInfo(chatId2, chatName2), DatabaseBase::AddResult::OK);
 
     // Get chat ID by name
     auto chatId = db->getChatId(chatName1);

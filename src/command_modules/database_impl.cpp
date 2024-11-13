@@ -94,7 +94,7 @@ constexpr std::string_view removefromblacklist = "Remove from blacklist";
 DECLARE_COMMAND_HANDLER(database) {
     if (!message->reply()->exists()) {
         api->sendReplyMessage(message->message(),
-                                  access(res, Strings::REPLY_TO_USER_MSG));
+                              access(res, Strings::REPLY_TO_USER_MSG));
         return;
     }
 
@@ -116,31 +116,31 @@ DECLARE_COMMAND_HANDLER(database) {
                     message->reply()->get<MessageAttrs::User>()),
         reply);
 
-    api->onAnyMessage(
-        [msg, userId, res, provider](TgBotApi::CPtr api, const Message::Ptr& m) {
-            if (m->replyToMessage &&
-                m->replyToMessage->messageId == msg->messageId) {
-                Strings text{};
-                if (m->text == addtowhitelist) {
-                    text = handleAddUser<DatabaseBase::ListType::WHITELIST>(
-                        provider, userId);
-                } else if (m->text == removefromwhitelist) {
-                    text = handleRemoveUser<DatabaseBase::ListType::WHITELIST>(
-                        provider, userId);
-                } else if (m->text == addtoblacklist) {
-                    text = handleAddUser<DatabaseBase::ListType::BLACKLIST>(
-                        provider, userId);
-                } else if (m->text == removefromblacklist) {
-                    text = handleRemoveUser<DatabaseBase::ListType::BLACKLIST>(
-                        provider, userId);
-                }
-                auto remove = std::make_shared<ReplyKeyboardRemove>();
-                remove->removeKeyboard = true;
-                api->sendReplyMessage(m, access(res, text), remove);
-                return TgBotApi::AnyMessageResult::Deregister;
+    api->onAnyMessage([msg, userId, res, provider](TgBotApi::CPtr api,
+                                                   const Message::Ptr& m) {
+        if (m->replyToMessage &&
+            m->replyToMessage->messageId == msg->messageId) {
+            Strings text{};
+            if (m->text == addtowhitelist) {
+                text = handleAddUser<DatabaseBase::ListType::WHITELIST>(
+                    provider, userId);
+            } else if (m->text == removefromwhitelist) {
+                text = handleRemoveUser<DatabaseBase::ListType::WHITELIST>(
+                    provider, userId);
+            } else if (m->text == addtoblacklist) {
+                text = handleAddUser<DatabaseBase::ListType::BLACKLIST>(
+                    provider, userId);
+            } else if (m->text == removefromblacklist) {
+                text = handleRemoveUser<DatabaseBase::ListType::BLACKLIST>(
+                    provider, userId);
             }
-            return TgBotApi::AnyMessageResult::Handled;
-        });
+            auto remove = std::make_shared<ReplyKeyboardRemove>();
+            remove->removeKeyboard = true;
+            api->sendReplyMessage(m, access(res, text), remove);
+            return TgBotApi::AnyMessageResult::Deregister;
+        }
+        return TgBotApi::AnyMessageResult::Handled;
+    });
 };
 
 DECLARE_COMMAND_HANDLER(saveid) {
@@ -175,13 +175,22 @@ DECLARE_COMMAND_HANDLER(saveid) {
     info.names = message->get<MessageAttrs::ParsedArgumentsList>();
     info.mediaType = type;
 
-    if (provider->database->addMediaInfo(info)) {
-        const auto content = fmt::format("Media with names:\n{}\nadded",
-                                         fmt::join(info.names, "\n"));
-        api->sendReplyMessage(message->message(), content);
-    } else {
-        api->sendReplyMessage(message->message(),
-                              access(res, Strings::MEDIA_ALREADY_IN_DB));
+    switch (provider->database->addMediaInfo(info)) {
+        case DatabaseBase::AddResult::OK: {
+            const auto content = fmt::format("Media with names:\n{}\nadded",
+                                             fmt::join(info.names, "\n"));
+            api->sendReplyMessage(message->message(), content);
+            break;
+        }
+        case DatabaseBase::AddResult::ALREADY_EXISTS:
+
+            api->sendReplyMessage(message->message(),
+                                  access(res, Strings::MEDIA_ALREADY_IN_DB));
+            break;
+        case DatabaseBase::AddResult::BACKEND_ERROR:
+            api->sendReplyMessage(message->message(),
+                                  access(res, Strings::BACKEND_ERROR));
+            break;
     }
 }
 

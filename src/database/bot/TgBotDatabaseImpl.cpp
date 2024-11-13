@@ -21,7 +21,7 @@
 TgBotDatabaseImpl::~TgBotDatabaseImpl() {
     // Unload the database if it was loaded
     if (loaded) {
-        unloadDatabase();
+        unload();
     }
 }
 
@@ -56,10 +56,10 @@ bool TgBotDatabaseImpl::load(std::filesystem::path filepath) {
     return loaded;
 }
 
-bool TgBotDatabaseImpl::unloadDatabase() {
+bool TgBotDatabaseImpl::unload() {
     if (loaded) {
         loaded = false;
-        return _databaseImpl->unloadDatabase();
+        return _databaseImpl->unload();
     } else {
         LOG(WARNING) << "No database to unload.";
     }
@@ -112,11 +112,11 @@ std::optional<DatabaseBase::MediaInfo> TgBotDatabaseImpl::queryMediaInfo(
     return _databaseImpl->queryMediaInfo(str);
 }
 
-bool TgBotDatabaseImpl::addMediaInfo(
+TgBotDatabaseImpl::AddResult TgBotDatabaseImpl::addMediaInfo(
     const DatabaseBase::MediaInfo& info) const {
     if (!isLoaded()) {
         LOG(ERROR) << __func__ << ": No-op due to missing database";
-        return false;
+        return AddResult::BACKEND_ERROR;
     }
     return _databaseImpl->addMediaInfo(info);
 }
@@ -146,17 +146,17 @@ void TgBotDatabaseImpl::setOwnerUserId(const UserId user) const {
     _databaseImpl->setOwnerUserId(user);
 }
 
-bool TgBotDatabaseImpl::addChatInfo(const ChatId chatid,
-                                    const std::string& name) const {
+TgBotDatabaseImpl::AddResult TgBotDatabaseImpl::addChatInfo(
+    const ChatId chatid, const std::string_view name) const {
     if (!isLoaded()) {
         LOG(ERROR) << __func__ << ": No-op due to missing database";
-        return false;
+        return AddResult::BACKEND_ERROR;
     }
     return _databaseImpl->addChatInfo(chatid, name);
 }
 
 std::optional<ChatId> TgBotDatabaseImpl::getChatId(
-    const std::string& name) const {
+    const std::string_view name) const {
     if (!isLoaded()) {
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return std::nullopt;
@@ -177,7 +177,8 @@ void TgBotDatabaseImpl::Providers::registerProvider(
     const std::string_view name, std::unique_ptr<DatabaseBase> provider) {
     // Check if the provider has already been registered
     if (_providers.contains(name)) {
-        LOG(WARNING) << fmt::format("Database provider with name '{}' already registered.", name);
+        LOG(WARNING) << fmt::format(
+            "Database provider with name '{}' already registered.", name);
         return;
     }
 

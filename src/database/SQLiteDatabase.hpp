@@ -1,5 +1,6 @@
 #pragma once
 
+#include <TgBotDBImplExports.h>
 #include <sqlite3.h>
 
 #include <cstddef>
@@ -11,7 +12,6 @@
 #include <string_view>
 #include <utility>
 #include <variant>
-#include <TgBotDBImplExports.h>
 
 #include "DatabaseBase.hpp"
 
@@ -56,19 +56,19 @@ struct TgBotDBImpl_API SQLiteDatabase : DatabaseBase {
     [[nodiscard]] ListResult checkUserInList(ListType type,
                                              UserId user) const override;
     bool load(std::filesystem::path filepath) override;
-    bool unloadDatabase() override;
+    bool unload() override;
     [[nodiscard]] std::optional<UserId> getOwnerUserId() const override;
     [[nodiscard]] std::optional<MediaInfo> queryMediaInfo(
         std::string str) const override;
-    [[nodiscard]] bool addMediaInfo(const MediaInfo &info) const override;
+    [[nodiscard]] AddResult addMediaInfo(const MediaInfo &info) const override;
     [[nodiscard]] std::vector<MediaInfo> getAllMediaInfos() const override;
     void setOwnerUserId(UserId userId) const override;
     std::ostream &dump(std::ostream &ofs) const override;
-    [[nodiscard]] bool addChatInfo(const ChatId chatid,
-                                   const std::string &name) const override;
+    [[nodiscard]] AddResult addChatInfo(
+        const ChatId chatid, const std::string_view name) const override;
     [[nodiscard]] std::optional<ChatId> getChatId(
-        const std::string &name) const override;
-    
+        const std::string_view name) const override;
+
     /**
      * SQLiteDatabase::Helper is a helper class for executing SQL statements
      * with parameters. It is designed to simplify the process of preparing and
@@ -76,7 +76,7 @@ struct TgBotDBImpl_API SQLiteDatabase : DatabaseBase {
      */
     class Helper : public std::enable_shared_from_this<Helper> {
        public:
-        using ArgTypes = std::variant<int32_t, int64_t, std::string>;
+        using ArgTypes = std::variant<int32_t, int64_t, std::string_view>;
 
         static constexpr std::string_view kInsertUserFile = "insertUser.sql";
         static constexpr std::string_view kRemoveUserFile = "removeUser.sql";
@@ -101,7 +101,8 @@ struct TgBotDBImpl_API SQLiteDatabase : DatabaseBase {
             "dumpDatabase.sql";
         static constexpr std::string_view kInsertChatFile = "insertChat.sql";
         static constexpr std::string_view kFindChatIdFile = "findChatId.sql";
-        static constexpr std::string_view kFindAllMediaMapFile = "findAllMediaMap.sql";
+        static constexpr std::string_view kFindAllMediaMapFile =
+            "findAllMediaMap.sql";
 
         struct Row {
             template <typename T>

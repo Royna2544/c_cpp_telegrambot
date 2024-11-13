@@ -36,8 +36,8 @@ class MockDatabase : public DatabaseBase {
     MOCK_METHOD(std::optional<DatabaseBase::MediaInfo>, queryMediaInfo,
                 (std::string str), (const, override));
 
-    MOCK_METHOD(bool, addMediaInfo, (const DatabaseBase::MediaInfo& info),
-                (const, override));
+    MOCK_METHOD(MockDatabase::AddResult, addMediaInfo,
+                (const DatabaseBase::MediaInfo& info), (const, override));
 
     MOCK_METHOD(std::vector<MediaInfo>, getAllMediaInfos, (), (const override));
 
@@ -45,15 +45,15 @@ class MockDatabase : public DatabaseBase {
 
     MOCK_METHOD(void, setOwnerUserId, (UserId userid), (const, override));
 
-    MOCK_METHOD(bool, addChatInfo,
-                (const ChatId chatid, const std::string& name),
+    MOCK_METHOD(MockDatabase::AddResult, addChatInfo,
+                (const ChatId chatid, const std::string_view name),
                 (const, override));
 
-    MOCK_METHOD(std::optional<ChatId>, getChatId, (const std::string& name),
+    MOCK_METHOD(std::optional<ChatId>, getChatId, (const std::string_view name),
                 (const, override));
 
     MOCK_METHOD(bool, load, (std::filesystem::path filepath), (override));
-    MOCK_METHOD(bool, unloadDatabase, (), (override));
+    MOCK_METHOD(bool, unload, (), (override));
 };
 
 class MockTgBotApi : public TgBotApi {
@@ -183,8 +183,8 @@ class MockTgBotApi : public TgBotApi {
                 (const override));
 
     // Non-TgBotApi methods
-    MOCK_METHOD(bool, reloadCommand, (const std::string_view cmd), (override));
-    MOCK_METHOD(bool, unloadCommand, (const std::string_view cmd), (override));
+    MOCK_METHOD(bool, reloadCommand, (const std::string& cmd), (override));
+    MOCK_METHOD(bool, unloadCommand, (const std::string& cmd), (override));
     MOCK_METHOD(void, onAnyMessage, (const AnyMessageCallback& callback),
                 (override));
 };

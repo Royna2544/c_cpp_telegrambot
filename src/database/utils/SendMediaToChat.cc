@@ -48,7 +48,7 @@ int main(int argc, char** argv) {
     auto info = backend->queryMediaInfo(argv[2]);
     if (!info.has_value()) {
         LOG(ERROR) << "Failed to find entry for name '" << argv[2] << "'";
-        backend->unloadDatabase();
+        backend->unload();
         return EXIT_FAILURE;
     } else {
         LOG(INFO) << "Found, sending (fileid " << info->mediaId << ") to chat "
@@ -63,5 +63,5 @@ int main(int argc, char** argv) {
     SocketClientWrapper wrapper(
         SocketInterfaceBase::LocalHelper::getSocketPath());
     wrapper->writeAsClientToSocket(pkt.toSocketData());
-    backend->unloadDatabase();
+    backend->unload();
 }

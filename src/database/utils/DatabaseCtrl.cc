@@ -9,6 +9,7 @@
 #include <vector>
 #include "CommandLine.hpp"
 #include "ConfigManager.hpp"
+#include "DatabaseBase.hpp"
 
 enum class Commands {
     Noop,
@@ -77,11 +78,16 @@ void executeCommand<Commands::AddChat>(const CommandData& data) {
         return;
     }
     const std::string name = std::string(data.args[1]);
-    if (data.impl->addChatInfo(chatid, name)) {
-        LOG(INFO) << "Added chat info for chatid=" << chatid
-                  << " name=" << name;
-    } else {
-        LOG(ERROR) << "Failed to add chat info";
+    switch (data.impl->addChatInfo(chatid, name)) {
+        case DatabaseBase::AddResult::ALREADY_EXISTS:
+            LOG(ERROR) << "Chat info already exists for chatid=" << chatid;
+            break;
+        case DatabaseBase::AddResult::BACKEND_ERROR:
+            LOG(ERROR) << "Failed to add chat info to the database";
+            break;
+        default:
+            LOG(INFO) << "Added chat info for chatid=" << chatid
+                      << " name=" << name;
     }
 }
 

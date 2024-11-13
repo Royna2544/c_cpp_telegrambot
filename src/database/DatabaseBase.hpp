@@ -12,7 +12,7 @@ struct DatabaseBase {
     virtual ~DatabaseBase() = default;
 
     static constexpr std::string_view kInMemoryDatabase = ":memory:";
-    
+
     enum class ListType { WHITELIST, BLACKLIST };
     enum class ListResult {
         OK,
@@ -91,7 +91,7 @@ struct DatabaseBase {
      * resources associated with it. After calling this function, the database
      * should no longer be accessible.
      */
-    virtual bool unloadDatabase() = 0;
+    virtual bool unload() = 0;
 
     /**
      * @brief Get the user id of the owner of the database
@@ -119,13 +119,20 @@ struct DatabaseBase {
     [[nodiscard]] virtual std::optional<MediaInfo> queryMediaInfo(
         std::string str) const = 0;
 
+    // Return value for addXXX methods.
+    enum class AddResult { OK, ALREADY_EXISTS, BACKEND_ERROR };
+
     /**
      * @brief Add a media info to the database
      *
      * @param info the media info to add
-     * @return true if the media info was added, false if it already exists
+     * @return Result of the operation
+     * `AddResult::OK' if successful
+     * `AddResult::ALREADY_EXISTS' if the media info already exists in the
+     * database `AddResult::BACKEND_ERROR' if a backend error occurs.
      */
-    [[nodiscard]] virtual bool addMediaInfo(const MediaInfo& info) const = 0;
+    [[nodiscard]] virtual AddResult addMediaInfo(
+        const MediaInfo& info) const = 0;
 
     /**
      * @brief Get all media infos inside the database
@@ -144,10 +151,15 @@ struct DatabaseBase {
      *
      * @param chatid The unique identifier of the chat.
      * @param name The name of the chat.
-     * @return true if the chat info was added successfully, false otherwise.
+     * @return Result of the operation
+     * `AddResult::OK' if successful
+     * `AddResult::ALREADY_EXISTS' if the chat info already exists in the
+     * database `AddResult::BACKEND_ERROR' if a backend error occurs.
+     *
+     * @note The chat id and name should be unique within the database.
      */
-    [[nodiscard]] virtual bool addChatInfo(const ChatId chatid,
-                                           const std::string& name) const = 0;
+    [[nodiscard]] virtual AddResult addChatInfo(
+        const ChatId chatid, const std::string_view name) const = 0;
 
     /**
      * @brief Get the chat id associated with a given chat name
@@ -161,7 +173,7 @@ struct DatabaseBase {
      * does not exist, the function should return std::nullopt.
      */
     [[nodiscard]] virtual std::optional<ChatId> getChatId(
-        const std::string& name) const = 0;
+        const std::string_view name) const = 0;
 
     /**
      * @brief Dump the database to the specified output stream.

@@ -403,7 +403,7 @@ bool SQLiteDatabase::load(std::filesystem::path filepath) {
     return true;
 }
 
-bool SQLiteDatabase::unloadDatabase() {
+bool SQLiteDatabase::unload() {
     if (db != nullptr) {
         if (sqlite3_close(db) == SQLITE_OK) {
             db = nullptr;
@@ -437,7 +437,8 @@ std::optional<SQLiteDatabase::MediaInfo> SQLiteDatabase::queryMediaInfo(
     return info;
 }
 
-bool SQLiteDatabase::addMediaInfo(const MediaInfo& info) const {
+SQLiteDatabase::AddResult SQLiteDatabase::addMediaInfo(
+    const MediaInfo& info) const {
     struct UpdateInfo {
         enum class Op {
             INSERT,  // This name does not exist in namemap: I should insert it
@@ -453,14 +454,15 @@ bool SQLiteDatabase::addMediaInfo(const MediaInfo& info) const {
 
     if (info.names.size() == 0) {
         LOG(ERROR) << "Zero-length names specified";
-        return false;  // No names to insert, so no need to run the query
+        // No names to insert, so no need to run the query
+        return AddResult::BACKEND_ERROR;
     }
 
     // Determine stuff to insert, and the ones that already exist
     for (const auto& name : info.names) {
         auto helper = Helper::create(db, Helper::kFindMediaNameFile);
         if (!helper->prepare()) {
-            return false;
+            return AddResult::BACKEND_ERROR;
         }
         helper->addArgument(name);
         helper->bindArguments();
@@ -486,25 +488,33 @@ bool SQLiteDatabase::addMediaInfo(const MediaInfo& info) const {
                 auto insertHelper =
                     Helper::create(db, Helper::kInsertMediaNameFile);
                 if (!insertHelper->prepare()) {
-                    return false;
+                    return AddResult::BACKEND_ERROR;
                 }
                 insertHelper->addArgument(name);
                 insertHelper->bindArguments();
                 if (!insertHelper->execute()) {
-                    return false;
+                    // We could not insert the media name here.
+                    // And this cannot be unique constraint issue, as we checked
+                    // it above.
+                    LOG(ERROR) << "Could not insert media name: " << name;
+                    return AddResult::BACKEND_ERROR;
                 }
 
                 // Get the index again
                 auto findHelper =
                     Helper::create(db, Helper::kFindMediaNameFile);
                 if (!findHelper->prepare()) {
-                    return false;
+                    return AddResult::BACKEND_ERROR;
                 }
                 findHelper->addArgument(name);
                 findHelper->bindArguments();
                 const auto row = findHelper->execAndGetRow();
                 if (!row) {
-                    return false;
+                    // The name was inserted, and we are just trying to get the
+                    // index. This should not happen, but we check it just in
+                    // case.
+                    LOG(ERROR) << "Could not find inserted media name index";
+                    return AddResult::BACKEND_ERROR;
                 }
                 info.data = row->get<int>(0);
                 break;
@@ -519,35 +529,41 @@ bool SQLiteDatabase::addMediaInfo(const MediaInfo& info) const {
     auto insertMediaHelper = Helper::create(db, Helper::kInsertMediaIdFile);
 
     if (!insertMediaHelper->prepare()) {
-        return false;
+        return AddResult::BACKEND_ERROR;
     }
     insertMediaHelper->addArgument(info.mediaUniqueId)
         ->addArgument(info.mediaId)
         ->bindArguments();
     if (!insertMediaHelper->execute()) {
-        return false;
+        // This is most likely at a fault at unique constraint violation.
+        // TODO: Undo the media names adding here.
+        // In this case, we return ALREADY_EXISTS
+        return AddResult::ALREADY_EXISTS;
     }
 
     // Get the inserted media index
     auto findMediaIdHelper = Helper::create(db, Helper::kFindMediaIdFile);
     if (!findMediaIdHelper->prepare()) {
-        return false;
+        return AddResult::BACKEND_ERROR;
     }
     findMediaIdHelper->addArgument(info.mediaUniqueId)->bindArguments();
     const auto row = findMediaIdHelper->execAndGetRow();
     if (!row) {
-        return false;
+        // The mediaids was inserted, and we are just trying to get the index.
+        // This should not happen, but we check it just in case.
+        LOG(ERROR) << "Could not find inserted media id index";
+        return AddResult::BACKEND_ERROR;
     }
     mediaIdIndex = row->get<int>(0);
 
-    // Insert the actual map into the database
+    // Insert the actual mediaindex-name-type into the database
     for (const auto& info : updates) {
         int data = std::get<int>(info.data);
 
         auto insertMediaMapHelper =
             Helper::create(db, Helper::kInsertMediaMapFile);
         if (!insertMediaMapHelper->prepare()) {
-            return false;
+            return AddResult::BACKEND_ERROR;
         }
         insertMediaMapHelper->addArgument(mediaIdIndex)
             ->addArgument(data)
@@ -555,14 +571,17 @@ bool SQLiteDatabase::addMediaInfo(const MediaInfo& info) const {
             ->bindArguments();
 
         if (!insertMediaMapHelper->execute()) {
-            return false;
+            LOG(ERROR) << "Failed to insert the final media map";
+            return AddResult::BACKEND_ERROR;
         }
     }
-    return true;
+    return AddResult::OK;
 }
 
-std::vector<SQLiteDatabase::MediaInfo> SQLiteDatabase::getAllMediaInfos() const {
-    using MergeMap = std::map<std::pair<std::string, std::string>, std::pair<std::vector<std::string>, MediaType>>;
+std::vector<SQLiteDatabase::MediaInfo> SQLiteDatabase::getAllMediaInfos()
+    const {
+    using MergeMap = std::map<std::pair<std::string, std::string>,
+                              std::pair<std::vector<std::string>, MediaType>>;
     MergeMap map;
     std::vector<MediaInfo> result;
 
@@ -580,7 +599,8 @@ std::vector<SQLiteDatabase::MediaInfo> SQLiteDatabase::getAllMediaInfos() const 
     }
     for (const auto& info : result) {
         auto key = std::make_pair(info.mediaUniqueId, info.mediaId);
-        map[key].first.insert(map[key].first.end(), info.names.begin(), info.names.end());
+        map[key].first.insert(map[key].first.end(), info.names.begin(),
+                              info.names.end());
         map[key].second = info.mediaType;
     }
     result.clear();
@@ -728,17 +748,25 @@ void SQLiteDatabase::setOwnerUserId(UserId userId) const {
     }
 }
 
-bool SQLiteDatabase::addChatInfo(const ChatId chatid,
-                                 const std::string& name) const {
+SQLiteDatabase::AddResult SQLiteDatabase::addChatInfo(
+    const ChatId chatid, const std::string_view name) const {
+    if (getChatId(name)) {
+        return AddResult::ALREADY_EXISTS;
+    }
     auto insertHelper = Helper::create(db, Helper::kInsertChatFile);
     if (!insertHelper->prepare()) {
-        return false;
+        return AddResult::BACKEND_ERROR;
     }
     insertHelper->addArgument(chatid)->addArgument(name)->bindArguments();
-    return insertHelper->execute();
+    if (insertHelper->execute()) {
+        return AddResult::OK;
+    } else {
+        return AddResult::BACKEND_ERROR;
+    }
 }
 
-std::optional<ChatId> SQLiteDatabase::getChatId(const std::string& name) const {
+std::optional<ChatId> SQLiteDatabase::getChatId(
+    const std::string_view name) const {
     auto helper = Helper::create(db, Helper::kFindChatIdFile);
     if (!helper->prepare()) {
         return std::nullopt;
