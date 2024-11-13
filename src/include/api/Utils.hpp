@@ -7,9 +7,7 @@
 #include <tgbot/types/Sticker.h>
 #include <tgbot/types/Video.h>
 
-#include <array>
-#include <exception>
-#include <ostream>
+#include <ReplyParametersExt.hpp>
 #include <string>
 #include <utility>
 
@@ -93,4 +91,18 @@ struct ChatIds {
     ChatIds(const TgBot::Chat::Ptr& chat) : _id(chat->id) {}
     operator ChatId() const { return _id; }
     ChatId _id;
+};
+
+struct ReplyParamsToMsgTid {
+    explicit ReplyParamsToMsgTid(
+        const ReplyParametersExt::Ptr& replyParameters) {
+        if (replyParameters) {
+            tid = replyParameters->messageThreadId;
+        } else {
+            tid = ReplyParametersExt::kThreadIdNone;
+        }
+    }
+    operator MessageId() const { return tid; }
+
+    MessageThreadId tid;
 };

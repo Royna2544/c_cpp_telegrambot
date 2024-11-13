@@ -839,11 +839,8 @@ class TgBotApi {
         const Message::Ptr& messageToReply) {
         auto ptr = std::make_shared<ReplyParametersExt>();
         ptr->messageId = messageToReply->messageId;
-        ptr->chatId = messageToReply->chat->id;
         ptr->allowSendingWithoutReply = true;
-        if (!messageToReply->chat->isForum) {
-            ptr->messageThreadId = 0;
-        } else {
+        if (messageToReply->chat->isForum) {
             ptr->messageThreadId = messageToReply->messageThreadId;
         }
         return ptr;
