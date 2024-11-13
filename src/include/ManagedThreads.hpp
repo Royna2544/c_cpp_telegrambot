@@ -82,6 +82,9 @@ struct fmt::formatter<ThreadManager::Usage> : formatter<std::string_view> {
             case ThreadManager::Usage::WEBSERVER_THREAD:
                 name = "WEBSERVER_THREAD";
                 break;
+            default:
+                LOG(ERROR) << "Unknown usage: " << static_cast<int>(c);
+                break;
         }
         return formatter<string_view>::format(name, ctx);
     }
