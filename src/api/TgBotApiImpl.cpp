@@ -12,6 +12,7 @@
 #include <api/components/OnAnyMessage.hpp>
 #include <api/components/OnCallbackQuery.hpp>
 #include <api/components/OnInlineQuery.hpp>
+#include <api/components/OnMyChatMember.hpp>
 #include <api/components/UnknownCommand.hpp>
 #include <array>
 #include <filesystem>
@@ -275,13 +276,10 @@ void TgBotApiImpl::removeInlineQueryKeyboard(const std::string_view key) {
 }
 
 void TgBotApiImpl::startPoll() {
-    const auto& botUser = getBotUser();
-    LOG(INFO) << "Bot username: " << botUser->username;
+    LOG(INFO) << "Bot username: " << getBotUser()->username;
     // Deleting webhook
     getApi().deleteWebhook();
-    getEvents().onMyChatMember([](const TgBot::ChatMemberUpdated::Ptr& update) {
 
-    });
     TgLongPoll longPoll(_bot, 100, 10,
                         {"message", "inline_query", "callback_query",
                          "my_chat_member", "chat_member", "chat_join_request"});
@@ -289,20 +287,6 @@ void TgBotApiImpl::startPoll() {
         longPoll.start();
     }
 }
-
-struct ReplyParamsToMsgTid {
-    explicit ReplyParamsToMsgTid(
-        const ReplyParametersExt::Ptr& replyParameters) {
-        if (replyParameters) {
-            tid = replyParameters->messageThreadId;
-        } else {
-            tid = ReplyParametersExt::kThreadIdNone;
-        }
-    }
-    operator MessageId() const { return tid; }
-
-    MessageThreadId tid;
-};
 
 namespace {
 void handleTgBotApiEx(const TgBot::TgException& ex,
@@ -606,6 +590,9 @@ TgBotApiImpl::TgBotApiImpl(const std::string_view token, AuthContext* auth,
     // Register -> ChatJoinRequest
     onChatJoinRequestImpl =
         std::make_unique<TgBotApiImpl::ChatJoinRequestImpl>(this);
+    // Register -> OnMyChatMember
+    onMyChatMemberImpl =
+        std::make_unique<TgBotApiImpl::OnMyChatMemberImpl>(this);
 }
 
 TgBotApiImpl::~TgBotApiImpl() { _modules.clear(); }

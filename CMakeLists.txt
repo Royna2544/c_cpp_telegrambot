@@ -206,6 +206,7 @@ add_my_library(
     src/api/components/ChatJoinRequest.cpp
     src/api/components/OnCallbackQuery.cpp
     src/api/components/OnInlineQuery.cpp
+    src/api/components/OnMyChatMember.cpp
     src/api/components/Async.cpp
     src/api/components/UnknownCommand.cpp
     src/global_handlers/RegEXHandler.cpp

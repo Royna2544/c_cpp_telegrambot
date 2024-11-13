@@ -69,6 +69,9 @@ class TgBotApiImpl : public TgBotApi {
     class ChatJoinRequestImpl;
     friend class ChatJoinRequestImpl;
     std::unique_ptr<ChatJoinRequestImpl> onChatJoinRequestImpl;
+    class OnMyChatMemberImpl;
+    friend class OnMyChatMemberImpl;
+    std::unique_ptr<OnMyChatMemberImpl> onMyChatMemberImpl;
 
    private:
     /**
