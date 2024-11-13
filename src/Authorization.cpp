@@ -22,7 +22,7 @@ bool AuthContext::isInList(DatabaseBase::ListType type,
 
 AuthContext::Result AuthContext::isAuthorized(const Message::Ptr& message,
                                               const Flags flags) const {
-    if (isMessageUnderTimeLimit(message)) {
+    if (isUnderTimeLimit(message)) {
         return isAuthorized(message->from, flags);
     } else {
         return {false, Result::Reason::MESSAGE_TOO_OLD};
@@ -52,8 +52,12 @@ AuthContext::Result AuthContext::isAuthorized(const User::Ptr& user,
     }
 }
 
-bool AuthContext::isMessageUnderTimeLimit(const Message::Ptr& msg) noexcept {
-    const auto MessageTp = std::chrono::system_clock::from_time_t(msg->date);
+bool AuthContext::isUnderTimeLimit(const Message::Ptr& msg) noexcept {
+    return isUnderTimeLimit(msg->date);
+}
+
+bool AuthContext::isUnderTimeLimit(const time_t time) noexcept {
+    const auto MessageTp = std::chrono::system_clock::from_time_t(time);
     const auto CurrentTp = std::chrono::system_clock::now();
     return (CurrentTp - MessageTp) <= kMaxTimestampDelay;
 }

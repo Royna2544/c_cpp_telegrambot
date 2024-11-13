@@ -94,7 +94,9 @@ class AuthContext {
      * @return True if the message is within the allowed time limit, false
      * otherwise.
      */
-    static bool isMessageUnderTimeLimit(const Message::Ptr& msg) noexcept;
+    static bool isUnderTimeLimit(const Message::Ptr& msg) noexcept;
+    // Overload taking a time_t
+    static bool isUnderTimeLimit(const time_t time) noexcept;
 
     [[nodiscard]] bool isInList(DatabaseBase::ListType type,
                                 const UserId user) const;

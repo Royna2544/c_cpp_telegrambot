@@ -243,7 +243,7 @@ bool SpamBlockManager::shouldBeSkipped(const Message::Ptr &message) const {
     }
 
     // Ignore old messages
-    if (!AuthContext::isMessageUnderTimeLimit(message)) {
+    if (!AuthContext::isUnderTimeLimit(message)) {
         return true;
     }
 

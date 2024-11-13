@@ -12,9 +12,12 @@
 
 void TgBotApiImpl::ChatJoinRequestImpl::onChatJoinRequestFunction(
     TgBot::ChatJoinRequest::Ptr ptr) {
+    if (!AuthContext::isUnderTimeLimit(ptr->date)) {
+        // No need to add old requests.
+        return;
+    }
     templateMarkup->inlineKeyboard.at(0).at(0)->callbackData =
         fmt::format("chatjoin_{}_approve", ptr->date);
-    ;
     templateMarkup->inlineKeyboard.at(0).at(1)->callbackData =
         fmt::format("chatjoin_{}_disapprove", ptr->date);
     std::string bio;
@@ -57,7 +60,7 @@ void TgBotApiImpl::ChatJoinRequestImpl::onCallbackQueryFunction(
                                                   request->from->id);
             _api->getApi().answerCallbackQuery(query->id, "Disapproved user");
         } else {
-            LOG(ERROR) << "Invalid payload: " << query->data;
+            LOG(ERROR) << "Invalid payload: " << query->data << ". Parsed item: " << queryData;
         }
         joinReqs.erase(reqIt);
     }
