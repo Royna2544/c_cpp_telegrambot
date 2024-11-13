@@ -385,7 +385,7 @@ std::vector<TgBot::InlineQueryResult::Ptr> mediaQueryKeyboardFunction(
     const auto medias = database->getAllMediaInfos();
     for (const auto& media : medias) {
         for (const auto& name : media.names) {
-            if (absl::StartsWith(name, word.data())) {
+            if (absl::StartsWith(name, word.data()) || word.empty()) {
                 switch (media.mediaType) {
                     case DatabaseBase::MediaType::STICKER: {
                         auto sticker = std::make_shared<
