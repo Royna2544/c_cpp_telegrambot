@@ -15,6 +15,7 @@
 #include <Random.hpp>
 #include <StringResLoader.hpp>
 #include <TgBotWebpage.hpp>
+#include <algorithm>
 #include <api/TgBotApiImpl.hpp>
 #include <boost/system/system_error.hpp>
 #include <boost/throw_exception.hpp>
@@ -43,6 +44,7 @@
 #include "CommandLine.hpp"
 #include "DatabaseBase.hpp"
 #include "SocketBase.hpp"
+#include "absl/strings/str_split.h"
 #include "api/TgBotApi.hpp"
 #include "fruit/fruit.h"
 #include "fruit/fruit_forward_decls.h"
@@ -446,6 +448,23 @@ std::vector<TgBot::InlineQueryResult::Ptr> mediaQueryKeyboardFunction(
     return results;
 }
 
+struct OptionalComponents {
+    bool webServer;
+    bool dataCollector;
+
+    void fromString(const std::string_view configString) {
+        std::vector<std::string> enabledComp =
+            absl::StrSplit(configString, ',', absl::SkipWhitespace());
+        const auto finder = [&enabledComp](const std::string_view name) {
+            return std::ranges::any_of(
+                enabledComp,
+                [name](const std::string& comp) { return comp == name; });
+        };
+        webServer = finder("webserver");
+        dataCollector = finder("datacollector");
+    }
+    OptionalComponents() = default;
+};
 }  // namespace
 
 using std::string_view_literals::operator""sv;
@@ -500,8 +519,21 @@ int main(int argc, char** argv) {
     injector.get<Unused<NetworkLogSink>*>();
     injector.get<Unused<RegexHandler>*>();
     injector.get<WrapPtr<SpamBlockBase>*>();
-    injector.get<Unused<TgBotWebServer>*>();
-    injector.get<ChatDataCollector*>();
+
+    OptionalComponents comp{};
+    if (auto c = configMgr->get(ConfigManager::Configs::OPTIONAL_COMPONENTS); c) {
+        comp.fromString(c.value());
+    }
+    if (comp.webServer) {
+        injector.get<Unused<TgBotWebServer>*>();
+    } else {
+        DLOG(INFO) << "Skip TgBotWebServer init";
+    }
+    if (comp.dataCollector) {
+        injector.get<ChatDataCollector*>();
+    } else {
+        DLOG(INFO) << "Skip ChatDataCollector init";
+    }
 
     auto socketFactor = injector.get<SocketComponentFactory_t>();
     auto _socketServer = injector.get<WrapSharedPtr<SocketServerWrapper>>();

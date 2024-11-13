@@ -28,6 +28,7 @@ class TgBotUtils_API ConfigManager {
         SOCKET_CFG,
         SELECTOR_CFG,
         GITHUB_TOKEN,
+        OPTIONAL_COMPONENTS,
         MAX
     };
     static constexpr int CONFIG_MAX = static_cast<int>(Configs::MAX);
@@ -86,6 +87,7 @@ class TgBotUtils_API ConfigManager {
         char alias;
     };
 
+    // clang-format off
     static constexpr std::array<Entry, CONFIG_MAX> kConfigMap = {
         Entry{Configs::TOKEN, "TOKEN", "Telegram bot token", 't'},
         {Configs::LOG_FILE, "LOG_FILE", "Log file path", 'f'},
@@ -94,8 +96,10 @@ class TgBotUtils_API ConfigManager {
         {Configs::OVERRIDE_CONF, "OVERRIDE_CONF", "Override configuration from this source", 'o'},
         {Configs::SOCKET_CFG, "SOCKET_CFG", "Sockets (ipv4/ipv6/local)", Entry::ALIAS_NONE},
         {Configs::SELECTOR_CFG, "SELECTOR_CFG", "Selectors (poll/epoll/select)", Entry::ALIAS_NONE},
-        {Configs::GITHUB_TOKEN, "GITHUB_TOKEN", "Github token", Entry::ALIAS_NONE}
+        {Configs::GITHUB_TOKEN, "GITHUB_TOKEN", "Github token", Entry::ALIAS_NONE},
+        {Configs::OPTIONAL_COMPONENTS, "OPTIONAL_COMPONENTS", "Enable optional components (webserver/datacollector)", Entry::ALIAS_NONE}
     };
+    // clang-format on
 
     struct Backend {
         virtual ~Backend() = default;

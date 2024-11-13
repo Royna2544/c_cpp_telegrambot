@@ -84,6 +84,7 @@ struct ConfigBackendBoostPOBase : public ConfigManager::Backend {
             AddOption<std::string, ConfigManager::Configs::SOCKET_CFG>(desc);
             AddOption<std::string, ConfigManager::Configs::SELECTOR_CFG>(desc);
             AddOption<std::string, ConfigManager::Configs::GITHUB_TOKEN>(desc);
+            AddOption<std::string, ConfigManager::Configs::OPTIONAL_COMPONENTS>(desc);
         });
         return desc;
     }
