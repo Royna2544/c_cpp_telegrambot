@@ -757,7 +757,9 @@ SQLiteDatabase::AddResult SQLiteDatabase::addChatInfo(
     if (!insertHelper->prepare()) {
         return AddResult::BACKEND_ERROR;
     }
-    insertHelper->addArgument(chatid)->addArgument(name)->bindArguments();
+    insertHelper->addArgument(chatid)
+        ->addArgument(std::string(name))
+        ->bindArguments();
     if (insertHelper->execute()) {
         return AddResult::OK;
     } else {
@@ -771,7 +773,7 @@ std::optional<ChatId> SQLiteDatabase::getChatId(
     if (!helper->prepare()) {
         return std::nullopt;
     }
-    helper->addArgument(name);
+    helper->addArgument(std::string(name));
     helper->bindArguments();
 
     auto row = helper->execAndGetRow();

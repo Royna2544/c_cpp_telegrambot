@@ -76,7 +76,7 @@ struct TgBotDBImpl_API SQLiteDatabase : DatabaseBase {
      */
     class Helper : public std::enable_shared_from_this<Helper> {
        public:
-        using ArgTypes = std::variant<int32_t, int64_t, std::string_view>;
+        using ArgTypes = std::variant<int32_t, int64_t, std::string>;
 
         static constexpr std::string_view kInsertUserFile = "insertUser.sql";
         static constexpr std::string_view kRemoveUserFile = "removeUser.sql";
