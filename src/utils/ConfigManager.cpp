@@ -19,11 +19,6 @@
 
 #include "CommandLine.hpp"
 
-#ifdef _MSC_VER
-#define make_unique make_shared
-#define unique_ptr shared_ptr
-#endif
-
 namespace po = boost::program_options;
 
 template <typename T, ConfigManager::Configs config>
