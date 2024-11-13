@@ -83,13 +83,24 @@ TgBotApiImpl::OnMyChatMemberImpl::MessageReport::MessageReport(
 
 void TgBotApiImpl::OnMyChatMemberImpl::MessageReport::onStatusChange(
     const Chat::Ptr& chat, const BotState oldStatus, const BotState newStatus) {
-    _api->sendMessage(
-        chat, fmt::format("In chat {}, status changed from {} to {}", chat,
-                          oldStatus, newStatus));
+    if (oldStatus == newStatus && oldStatus == BotState::IS_ADMIN) {
+        _api->sendMessage(
+            chat,
+            fmt::format("In chat {}, admin permission has changed", chat));
+    } else {
+        _api->sendMessage(
+            chat, fmt::format("In chat {}, status changed from {} to {}", chat,
+                              oldStatus, newStatus));
+    }
 }
 
 void TgBotApiImpl::OnMyChatMemberImpl::LoggingReport::onStatusChange(
     const Chat::Ptr& chat, const BotState oldStatus, const BotState newStatus) {
-    LOG(INFO) << fmt::format("In chat {}, status changed from {} to {}", chat,
-                             oldStatus, newStatus);
+    if (oldStatus == newStatus && oldStatus == BotState::IS_ADMIN) {
+        LOG(INFO) << fmt::format("In chat {}, admin permission has changed",
+                                 chat);
+    } else {
+        LOG(INFO) << fmt::format("In chat {}, status changed from {} to {}",
+                                 chat, oldStatus, newStatus);
+    }
 }
