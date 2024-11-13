@@ -212,6 +212,7 @@ add_my_library(
     src/global_handlers/RegEXHandler.cpp
     src/global_handlers/SpamBlocker.cpp
     src/global_handlers/ChatObserver.cpp
+    src/ml/ChatDataCollector.cpp
     src/web/TgBotWebServer.cpp
     src/logging/LoggingServer.cpp
     src/socket/interface/impl/bot/SocketDataHandler.cpp
