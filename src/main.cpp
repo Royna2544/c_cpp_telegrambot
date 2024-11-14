@@ -96,6 +96,8 @@ struct TgBotApiExHandler {
             // I don't know what to do with this... Skip
             case TgBot::TgException::ErrorCode::Internal:
                 return;
+            case TgBot::TgException::ErrorCode::Forbidden:
+                break;
 
             // For floods, this is recoverable, break out of switch to continue
             // recovering.
@@ -105,7 +107,6 @@ struct TgBotApiExHandler {
 
             // These should be token fault, or network.
             case TgBot::TgException::ErrorCode::Unauthorized:
-            case TgBot::TgException::ErrorCode::Forbidden:
             case TgBot::TgException::ErrorCode::NotFound:
                 LOG(FATAL) << "FATAL PROBLEM DETECTED";
                 break;
