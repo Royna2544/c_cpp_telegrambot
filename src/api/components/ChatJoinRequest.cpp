@@ -7,9 +7,6 @@
 #include <api/components/ChatJoinRequest.hpp>
 #include <mutex>
 
-#include "tgbot/types/ChatMemberMember.h"
-#include "tgbot/types/ChatMemberUpdated.h"
-
 void TgBotApiImpl::ChatJoinRequestImpl::onChatJoinRequestFunction(
     TgBot::ChatJoinRequest::Ptr ptr) {
     if (!AuthContext::isUnderTimeLimit(ptr->date)) {
@@ -64,6 +61,9 @@ void TgBotApiImpl::ChatJoinRequestImpl::onCallbackQueryFunction(
             LOG(ERROR) << "Invalid payload: " << query->data << ". Parsed item: " << queryData;
             _api->getApi().answerCallbackQuery(query->id, "Error occurred while parsing");
         }
+        // Delete the message after handling the callback query.
+        _api->deleteMessage(reqIt->first);
+        // Erase the request from the list after handling it.
         joinReqs.erase(reqIt);
     }
 }
