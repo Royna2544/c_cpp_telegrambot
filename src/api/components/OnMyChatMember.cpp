@@ -85,12 +85,12 @@ void TgBotApiImpl::OnMyChatMemberImpl::MessageReport::onStatusChange(
     const Chat::Ptr& chat, const BotState oldStatus, const BotState newStatus) {
     if (oldStatus == newStatus && oldStatus == BotState::IS_ADMIN) {
         _api->sendMessage(
-            chat,
+            _ownerId,
             fmt::format("In chat {}, admin permission has changed", chat));
     } else {
         _api->sendMessage(
-            chat, fmt::format("In chat {}, status changed from {} to {}", chat,
-                              oldStatus, newStatus));
+            _ownerId, fmt::format("In chat {}, status changed from {} to {}",
+                                  chat, oldStatus, newStatus));
     }
 }
 
