@@ -12,6 +12,7 @@ class TgBotApiImpl::OnMyChatMemberImpl {
         IS_ADMIN = 1 << 1 | IS_MEMBER,
         IS_RESTRICTED = 1 << 2 | IS_MEMBER,
         IS_BANNED = 1 << 3,
+        IS_KICKED = 1 << 4,
     };
 
    private:

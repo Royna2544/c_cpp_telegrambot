@@ -5,6 +5,7 @@
 
 #include "tgbot/types/ChatMemberAdministrator.h"
 #include "tgbot/types/ChatMemberBanned.h"
+#include "tgbot/types/ChatMemberLeft.h"
 #include "tgbot/types/ChatMemberMember.h"
 #include "tgbot/types/ChatMemberRestricted.h"
 
@@ -31,6 +32,9 @@ struct fmt::formatter<TgBotApiImpl::OnMyChatMemberImpl::BotState>
             case TgBotApiImpl::OnMyChatMemberImpl::BotState::IS_BANNED:
                 name = "banned";
                 break;
+            case TgBotApiImpl::OnMyChatMemberImpl::BotState::IS_KICKED:
+                name = "kicked";
+                break;
         }
         return formatter<string_view>::format(name, ctx);
     }
@@ -48,6 +52,8 @@ TgBotApiImpl::OnMyChatMemberImpl::parseState(
         return BotState::IS_MEMBER;
     } else if (status == TgBot::ChatMemberRestricted::STATUS) {
         return BotState::IS_RESTRICTED;
+    } else if (status == TgBot::ChatMemberLeft::STATUS) {
+        return BotState::IS_KICKED;
     }
     LOG(ERROR) << "Unhandled status: " << status;
     return BotState::UNKNOWN;
