@@ -22,4 +22,5 @@ class TgBotApiImpl::ModulesManagement {
     bool loadFrom(const std::filesystem::path& directory);
 
     explicit ModulesManagement(TgBotApiImpl::Ptr api, const std::filesystem::path& modules_dir);
+    ~ModulesManagement();
 };

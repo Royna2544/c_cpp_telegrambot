@@ -129,3 +129,8 @@ TgBotApiImpl::ModulesManagement::ModulesManagement(
     : _api(api), commandAsync(2) {
     loadFrom(modules_dir);
 }
+
+
+TgBotApiImpl::ModulesManagement::~ModulesManagement() {
+    LOG(INFO) << "Unloading total " << _handles.size() << " modules";
+}
