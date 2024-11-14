@@ -28,6 +28,10 @@ bool TgBotApiImpl::ModulesManagement::operator+=(CommandModule::Ptr module) {
             return false;
         }
         moduleName = module->_module->name;
+        if (_handles.contains(moduleName)) {
+            LOG(WARNING) << fmt::format("Module with name {} already loaded. REJECT", moduleName);
+            return false;
+        }
         _handles.emplace(moduleName, std::move(module));
     }
     // Register the command
