@@ -18,15 +18,18 @@ DECLARE_COMMAND_HANDLER(ubash) {
 
 }  // namespace
 
-DYN_COMMAND_FN(name, module) {
-    module.name = name;
-    module.flags = CommandModule::Flags::Enforced;
-    if (name == "bash") {
-        module.description = "Run bash commands";
-        module.function = COMMAND_HANDLER_NAME(bash);
-    } else if (name == "ubash") {
-        module.description = "Run bash commands w/o timeout";
-        module.function = COMMAND_HANDLER_NAME(ubash);
-    }
-    return true;
-}
+
+extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
+    .flags = DynModule::Flags::Enforced,
+#ifdef cmd_bash_EXPORTS
+    .name = "bash",
+    .description = "Run bash commands",
+    .function = COMMAND_HANDLER_NAME(bash),
+#endif
+#ifdef cmd_ubash_EXPORTS
+    .name = "ubash",
+    .description = "Run bash commands w/o timeout",
+    .function = COMMAND_HANDLER_NAME(ubash),
+#endif
+    .valid_args = {}
+};

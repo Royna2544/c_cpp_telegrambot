@@ -101,10 +101,13 @@ DECLARE_COMMAND_HANDLER(spam) {
     }
 }
 
-DYN_COMMAND_FN(n, module) {
-    module.name = "spam";
-    module.description = "Spam a given literal or media";
-    module.flags = CommandModule::Flags::Enforced;
-    module.function = COMMAND_HANDLER_NAME(spam);
-    return true;
-}
+extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
+    .flags = DynModule::Flags::Enforced,
+    .name = "spam",
+    .description = "Spam a given literal or media",
+    .function = COMMAND_HANDLER_NAME(spam),
+    .valid_args = {
+        .enabled = true,
+        .counts = DynModule::craftArgCountMask<1, 2>(),
+    },
+};

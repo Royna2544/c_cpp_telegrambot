@@ -5,7 +5,7 @@
 #include <api/CommandModule.hpp>
 #include <api/Providers.hpp>
 #include <api/TgBotApi.hpp>
-#include <set>
+#include "api/MessageExt.hpp"
 
 DECLARE_COMMAND_HANDLER(possibility) {
     constexpr int PERCENT_MAX = 100;
@@ -14,28 +14,30 @@ DECLARE_COMMAND_HANDLER(possibility) {
     std::stringstream outStream;
     std::unordered_map<std::string, Random::ret_type> kItemAndPercentMap;
     std::vector<std::string> vec;
-    std::set<std::string> set;
     Random::ret_type total = 0;
     using map_t = std::pair<std::string, Random::ret_type>;
 
-    if (!message->has<MessageAttrs::ExtraText>()) {
+    if (!message->get<MessageAttrs::ParsedArgumentsList>().empty()) {
         api->sendReplyMessage(message->message(),
                               access(res, Strings::SEND_POSSIBILITIES));
         return;
     }
     text = message->get<MessageAttrs::ExtraText>();
     // Split string by newline
-    set = absl::StrSplit(text, '\n', absl::SkipWhitespace());
+    vec = message->get<MessageAttrs::ParsedArgumentsList>();
     // Pre-reserve memory
-    kItemAndPercentMap.reserve(set.size());
+    kItemAndPercentMap.reserve(vec.size());
+
+    auto [b, e] = std::ranges::unique(vec);
+    // Create a set of unique items
+    vec.erase(b, e);
+
     // Can't get possitibities for 1 element
-    if (set.size() == 1) {
+    if (vec.size() == 1) {
         api->sendReplyMessage(message->message(),
                               access(res, Strings::GIVE_MORE_THAN_ONE));
         return;
     }
-    // Put it in vector again and shuffle it.
-    vec = {set.begin(), set.end()};
     // Shuffle the vector.
     provider->random->shuffle(vec);
     // Start the output stream
@@ -75,10 +77,14 @@ DECLARE_COMMAND_HANDLER(possibility) {
     api->sendReplyMessage(message->message(), outStream.str());
 }
 
-DYN_COMMAND_FN(n, module) {
-    module.name = "possibility";
-    module.description = "Get possibilities";
-    module.flags = CommandModule::Flags::None;
-    module.function = COMMAND_HANDLER_NAME(possibility);
-    return true;
-}
+extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
+    .flags = DynModule::Flags::None,
+    .name = "possibility",
+    .description = "Get possibilities",
+    .function = COMMAND_HANDLER_NAME(possibility),
+    .valid_args = {
+        .enabled = true,
+        .split_type = DynModule::ValidArgs::Split::ByNewline,
+        .usage = "/possibility conditions-by-newline",
+    }
+};

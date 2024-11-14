@@ -33,14 +33,15 @@ DECLARE_COMMAND_HANDLER(fileid) {
     }
 }
 
-DYN_COMMAND_FN(name, module) {
-    module.name = "fileid";
-    module.description = "Get fileId of a media";
-    module.flags = CommandModule::Flags::None;
-    module.function = COMMAND_HANDLER_NAME(fileid);
-    module.valid_arguments.enabled = true;
-    module.valid_arguments.counts.emplace_back(0);
-    module.valid_arguments.split_type = CommandModule::ValidArgs::Split::None;
-    module.valid_arguments.usage = "<reply-to-a-media>";
-    return true;
-}
+extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
+    .flags = DynModule::Flags::None,
+    .name = "fileid",
+    .description = "Get fileId of a media",
+    .function = COMMAND_HANDLER_NAME(fileid),
+    .valid_args = {
+        .enabled = true,
+        .counts = DynModule::craftArgCountMask<0>(),
+        .split_type = DynModule::ValidArgs::Split::None,
+        .usage = "<reply-to-a-media>",
+    }
+};

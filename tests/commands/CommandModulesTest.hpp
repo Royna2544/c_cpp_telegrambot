@@ -170,7 +170,7 @@ class CommandTestBase : public CommandModulesTest {
             defaultProvidedMessage->text.size();
     }
     void execute() {
-        module->function(
+        module->_module->function(
             botApi,
             std::make_shared<MessageExt>(defaultProvidedMessage,
                                          SplitMessageText::ByWhitespace),

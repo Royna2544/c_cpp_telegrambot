@@ -66,10 +66,15 @@ DECLARE_COMMAND_HANDLER(flash) {
     api->editMessage(sentmsg, ss.str());
 }
 
-DYN_COMMAND_FN(n, module) {
-    module.name = "flash";
-    module.description = "Flash and get a random result";
-    module.flags = CommandModule::Flags::None;
-    module.function = COMMAND_HANDLER_NAME(flash);
-    return true;
-}
+extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
+    .flags = DynModule::Flags::None,
+    .name = "flash",
+    .description = "Flash and get a random result",
+    .function = COMMAND_HANDLER_NAME(flash),
+    .valid_args = {
+        .enabled = true,
+        .counts = DynModule::craftArgCountMask<1>(),
+        .split_type = DynModule::ValidArgs::Split::None,
+        .usage = "/flash [filename-to-flash]",
+    }
+};

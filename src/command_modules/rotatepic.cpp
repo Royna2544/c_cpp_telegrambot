@@ -155,15 +155,15 @@ DECLARE_COMMAND_HANDLER(rotatepic) {
 }
 }  // namespace
 
-DYN_COMMAND_FN(n, module) {
-    module.name = "rotatepic";
-    module.description = "Rotate a sticker";
-    module.flags = CommandModule::Flags::None;
-    module.function = COMMAND_HANDLER_NAME(rotatepic);
-    module.valid_arguments.enabled = true;
-    module.valid_arguments.counts = {1, 2};
-    module.valid_arguments.split_type =
-        CommandModule::ValidArgs::Split::ByWhitespace;
-    module.valid_arguments.usage = "/rotatepic angle [greyscale]";
-    return true;
-}
+extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
+    .flags = DynModule::Flags::None,
+    .name = "rotatepic",
+    .description = "Rotate a sticker/video/photo",
+    .function = COMMAND_HANDLER_NAME(rotatepic),
+    .valid_args = {
+        .enabled = true,
+        .counts = DynModule::craftArgCountMask<1,2>(),
+        .split_type = DynModule::ValidArgs::Split::ByWhitespace,
+        .usage = "/rotatepic angle [greyscale|invert]",
+    },
+};

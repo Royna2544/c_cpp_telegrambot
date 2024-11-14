@@ -35,20 +35,22 @@ DECLARE_COMMAND_HANDLER(py) {
     py.run(message);
 }
 
-DYN_COMMAND_FN(commandName, module) {
-    module.name = commandName;
-    module.flags = CommandModule::Flags::Enforced;
-    if (commandName == "c") {
-        module.function = COMMAND_HANDLER_NAME(c);
-        module.description = "Run C source code in-chat";
-    } else if (commandName == "cpp") {
-        module.function = COMMAND_HANDLER_NAME(cpp);
-        module.description = "Run C++ source code in-chat";
-    } else if (commandName == "py") {
-        module.function = COMMAND_HANDLER_NAME(py);
-        module.description = "Run Python script in-chat";
-    } else {
-        return false;
-    }
-    return true;
-}
+extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
+    .flags = DynModule::Flags::Enforced,
+#ifdef cmd_c_EXPORTS
+    .name = "c",
+    .description = "Run C source code in-chat",
+    .function = COMMAND_HANDLER_NAME(c),
+#endif
+#ifdef cmd_cpp_EXPORTS
+    .name = "cpp",
+    .description = "Run C++ source code in-chat",
+    .function = COMMAND_HANDLER_NAME(cpp),
+#endif
+#ifdef cmd_py_EXPORTS
+    .name = "py",
+    .description = "Run Python script in-chat",
+    .function = COMMAND_HANDLER_NAME(py),
+#endif
+    .valid_args = {}
+};

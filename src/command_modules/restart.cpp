@@ -59,10 +59,9 @@ DECLARE_COMMAND_HANDLER(restart) {
     execve(exe, argv, myEnviron.data());
 }
 
-DYN_COMMAND_FN(n, module) {
-    module.name = "restart";
-    module.description = "Restarts the bot";
-    module.flags = CommandModule::Flags::Enforced;
-    module.function = COMMAND_HANDLER_NAME(restart);
-    return true;
-}
+extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
+    .flags = DynModule::Flags::Enforced,
+    .name = "restart",
+    .description = "Restarts the bot",
+    .function = COMMAND_HANDLER_NAME(restart),
+};

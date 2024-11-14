@@ -426,7 +426,7 @@ class TgBotApiImpl : public TgBotApi {
     bool reloadCommand(const std::string& command) override;
     void commandHandler(const std::string& command,
                         AuthContext::Flags authflags, Message::Ptr message);
-    bool validateValidArgs(const CommandModule* module,
+    bool validateValidArgs(const DynModule* module,
                            MessageExt::Ptr& message);
 
     template <unsigned Len>

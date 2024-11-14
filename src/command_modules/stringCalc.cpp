@@ -15,13 +15,14 @@ DECLARE_COMMAND_HANDLER(calc) {
         const std::string_view result = calculate_string(expr.c_str());
         api->sendReplyMessage(message->message(), result);
         calculate_string_free(result.data());
+    } else {
+        api->sendReplyMessage(message->message(), "Usage: /calc <expression>");
     }
 }
 
-DYN_COMMAND_FN(n, module) {
-    module.name = "calc";
-    module.description = "Calculate a string";
-    module.function = COMMAND_HANDLER_NAME(calc);
-    module.flags = CommandModule::Flags::None;
-    return true;
-}
+extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
+    .flags = DynModule::Flags::None,
+    .name = "calc",
+    .description = "Calculate a string",
+    .function = COMMAND_HANDLER_NAME(calc),
+};

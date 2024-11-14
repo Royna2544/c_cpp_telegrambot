@@ -777,10 +777,9 @@ DECLARE_COMMAND_HANDLER(rombuild) {
         });
 }
 
-DYN_COMMAND_FN(n, module) {
-    module.name = "rombuild";
-    module.description = "Build a ROM, I'm lazy";
-    module.flags = CommandModule::Flags::Enforced;
-    module.function = COMMAND_HANDLER_NAME(rombuild);
-    return true;
-}
+extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
+    .flags = DynModule::Flags::Enforced,
+    .name = "rombuild",
+    .description = "Build a ROM, I'm lazy",
+    .function = COMMAND_HANDLER_NAME(rombuild),
+};

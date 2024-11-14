@@ -25,6 +25,7 @@ enum class SplitMessageText {
     None,
     ByWhitespace,
     ByComma,
+    ByNewline,
 };
 
 enum class MessageAttrs {

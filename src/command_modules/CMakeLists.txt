@@ -58,37 +58,15 @@ function(multi_command_module)
     if (NOT TGBOT_MULTI_CMDMODULE_PROVIDES)
         message(FATAL_ERROR "Must specify modules provided by this source")
     endif()
-    if (UNIX)
-        list(GET TGBOT_MULTI_CMDMODULE_PROVIDES 0 PROVIDES_FIRST) # Forward the arguments
+    foreach (module ${TGBOT_MULTI_CMDMODULE_PROVIDES})
+        # Forward the arguments
         command_module(
-            NAME ${PROVIDES_FIRST}
+            NAME ${module}
             SRCS ${TGBOT_MULTI_CMDMODULE_SRCS}
             LIBS ${TGBOT_MULTI_CMDMODULE_LIBS}
             PLATFORM ${TGBOT_MULTI_CMDMODULE_PLATFORM}
         )
-        list(REMOVE_AT TGBOT_MULTI_CMDMODULE_PROVIDES 0)
-        foreach (module ${TGBOT_MULTI_CMDMODULE_PROVIDES})
-            set(SOURCE_FILENAME ${CMAKE_SHARED_LIBRARY_PREFIX}${CMDMODULE_PREFIX}${PROVIDES_FIRST}${CMAKE_SHARED_LIBRARY_SUFFIX})
-            set(DEST_FILENAME ${CMAKE_SHARED_LIBRARY_PREFIX}${CMDMODULE_PREFIX}${module}${CMAKE_SHARED_LIBRARY_SUFFIX})
-            add_custom_target(
-                ${CMDMODULE_PREFIX}${module} ALL
-                COMMAND cmake -E create_symlink ${SOURCE_FILENAME} ${DEST_FILENAME}
-                WORKING_DIRECTORY ${CMAKE_LIBRARY_OUTPUT_DIRECTORY}
-                DEPENDS cmd_${PROVIDES_FIRST}
-                COMMENT "Creating library symlink ${SOURCE_FILENAME} => ${DEST_FILENAME}"
-            )
-        endforeach()
-    else()
-        foreach (module ${TGBOT_MULTI_CMDMODULE_PROVIDES})
-            # Forward the arguments
-            command_module(
-                NAME ${module}
-                SRCS ${TGBOT_MULTI_CMDMODULE_SRCS}
-                LIBS ${TGBOT_MULTI_CMDMODULE_LIBS}
-                PLATFORM ${TGBOT_MULTI_CMDMODULE_PLATFORM}
-            )
-        endforeach()
-    endif()
+    endforeach()
 endfunction()
 
 add_subdirectory(support)

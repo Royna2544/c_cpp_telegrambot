@@ -64,7 +64,6 @@ bool CommandModule::load() {
         LOG(WARNING) << "Preventing double loading";
         return false;
     }
-    loadcmd_function_t sym = nullptr;
     const std::string cmdNameStr =
         filePath.filename().replace_extension().string();
     absl::string_view cmdNameView(cmdNameStr);
@@ -82,32 +81,27 @@ bool CommandModule::load() {
                                     DLWrapper::error());
         return false;
     }
-    sym = dlwrapper.sym<loadcmd_function_cstyle_t>(DYN_COMMAND_SYM_STR);
-    if (sym == nullptr) {
+    _module = dlwrapper.sym<decltype(_module)>(DYN_COMMAND_SYM_STR);
+    if (_module == nullptr) {
         LOG(WARNING) << fmt::format("Failed to lookup symbol '{}' in {}",
                                     DYN_COMMAND_SYM_STR, filePath.string());
         return false;
     }
 
-    if (!sym(cmdNameView.data(), *this)) {
-        LOG(WARNING) << "Failed to load command module from " << filePath;
-        function = nullptr;
-        return false;
-    }
-
 #ifndef NDEBUG
     Dl_info info{};
-    void* fnptr = nullptr;
+    void* modulePtr = nullptr;
     if (dlwrapper.info(DYN_COMMAND_SYM_STR, &info)) {
-        fnptr = info.dli_saddr;
+        modulePtr = info.dli_saddr;
     } else {
         LOG(WARNING) << "dladdr failed for " << filePath << ": "
                      << DLWrapper::error();
     }
 
     DLOG(INFO) << fmt::format("Module {}: enforced: {}, name: {}, fn: {}",
-                              filePath.filename().string(), isEnforced(), name,
-                              fmt::ptr(fnptr));
+                              filePath.filename().string(),
+                              _module->isEnforced(), _module->name,
+                              fmt::ptr(modulePtr));
 #endif
     handle = std::move(dlwrapper.underlying());
     return true;
@@ -115,7 +109,6 @@ bool CommandModule::load() {
 
 bool CommandModule::unload() {
     if (handle) {
-        function = nullptr;
         handle = nullptr;
         return true;
     }
@@ -123,8 +116,8 @@ bool CommandModule::unload() {
     return false;
 }
 
-bool CommandModule::isLoaded() const { return handle != nullptr; }
-bool CommandModule::isEnforced() const { return flags & Flags::Enforced; }
-bool CommandModule::isHideDescription() const {
+bool DynModule::isEnforced() const { return flags & Flags::Enforced; }
+bool DynModule::isHideDescription() const {
     return flags & Flags::HideDescription;
 }
+bool CommandModule::isLoaded() const { return handle != nullptr; }

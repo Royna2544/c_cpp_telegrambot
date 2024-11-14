@@ -24,10 +24,10 @@ bool TgBotApiImpl::ModulesManagement::operator+=(CommandModule::Ptr module) {
             return false;
         }
         if (!module->load()) {
-            LOG(ERROR) << "Failed to load module with name " << module->name;
+            LOG(ERROR) << "Failed to load module";
             return false;
         }
-        moduleName = module->name;
+        moduleName = module->_module->name;
         _handles.emplace(moduleName, std::move(module));
     }
     // Register the command
@@ -50,7 +50,7 @@ bool TgBotApiImpl::ModulesManagement::operator+=(const std::string& name) {
     }
 
     auto authflags = AuthContext::Flags::REQUIRE_USER;
-    if (!_handles.at(name)->isEnforced()) {
+    if (!_handles.at(name)->_module->isEnforced()) {
         authflags |= AuthContext::Flags::PERMISSIVE;
     }
 
@@ -100,11 +100,11 @@ bool TgBotApiImpl::ModulesManagement::loadFrom(
     std::vector<TgBot::BotCommand::Ptr> buffer;
     buffer.reserve(_handles.size());
     for (const auto& [name, mod] : _handles) {
-        if (!mod->isHideDescription()) {
+        if (!mod->_module->isHideDescription()) {
             auto onecommand = std::make_shared<TgBot::BotCommand>();
-            onecommand->command = mod->name;
-            onecommand->description = mod->description;
-            if (mod->isEnforced()) {
+            onecommand->command = mod->_module->name;
+            onecommand->description = mod->_module->description;
+            if (mod->_module->isEnforced()) {
                 onecommand->description += " (Owner)";
             }
             buffer.emplace_back(onecommand);

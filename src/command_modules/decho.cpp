@@ -13,8 +13,7 @@ DECLARE_COMMAND_HANDLER(decho) {
         // Cannot use delete echo in thie case.
         return;
     }
-    if (message->has({MessageAttrs::ExtraText}) &&
-        message->reply()->exists()) {
+    if (message->has({MessageAttrs::ExtraText}) && message->reply()->exists()) {
         api->copyAndReplyAsMessage(message->message(),
                                    message->reply()->message());
     } else if (message->reply()->exists()) {
@@ -25,10 +24,16 @@ DECLARE_COMMAND_HANDLER(decho) {
     }
 }
 
-DYN_COMMAND_FN(/*name*/, module) {
-    module.name = "decho";
-    module.description = "Delete and echo message";
-    module.flags = CommandModule::Flags::None;
-    module.function = COMMAND_HANDLER_NAME(decho);
-    return true;
-}
+extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
+    .flags = DynModule::Flags::None,
+    .name = "decho",
+    .description = "Delete and echo message",
+    .function = COMMAND_HANDLER_NAME(decho),
+    .valid_args =
+        {
+            .enabled = true,
+            .counts = DynModule::craftArgCountMask<0, 1>(),
+            .split_type = DynModule::ValidArgs::Split::None,
+            .usage = "/decho [something-to-echo]",
+        },
+};

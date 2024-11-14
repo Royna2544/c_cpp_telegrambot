@@ -33,10 +33,13 @@ DECLARE_COMMAND_HANDLER(randsticker) {
     api->sendMessage(message->get<MessageAttrs::Chat>(), arg);
 }
 
-DYN_COMMAND_FN(n, module) {
-    module.name = "randsticker";
-    module.description = "Random sticker from that pack";
-    module.flags = CommandModule::Flags::None;
-    module.function = COMMAND_HANDLER_NAME(randsticker);
-    return true;
-}
+extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
+    .flags = DynModule::Flags::None,
+    .name = "randsticker",
+    .description = "Random sticker from that pack",
+    .function = COMMAND_HANDLER_NAME(randsticker),
+    .valid_args = {
+        .enabled = true,
+        .counts = DynModule::craftArgCountMask<0>()
+    },
+};

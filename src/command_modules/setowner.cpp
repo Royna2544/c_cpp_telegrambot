@@ -13,10 +13,9 @@ DECLARE_COMMAND_HANDLER(setowner) {
     }
 }
 
-DYN_COMMAND_FN(n, module) {
-    module.name = "setowner";
-    module.description = "Set owner of the bot, for once";
-    module.flags = CommandModule::Flags::HideDescription;
-    module.function = COMMAND_HANDLER_NAME(setowner);
-    return true;
-}
+extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
+    .flags = DynModule::Flags::HideDescription,
+    .name = "setowner",
+    .description = "Set owner of the bot, for once",
+    .function = COMMAND_HANDLER_NAME(setowner),
+};

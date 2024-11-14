@@ -32,10 +32,13 @@ DECLARE_COMMAND_HANDLER(delay) {
     api->editMessage(sentMsg, ss.str());
 }
 
-DYN_COMMAND_FN(/*name*/, module) {
-    module.name = "delay";
-    module.description = "Ping the bot for network delay";
-    module.flags = CommandModule::Flags::None;
-    module.function = COMMAND_HANDLER_NAME(delay);
-    return true;
-}
+extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
+    .flags = DynModule::Flags::None,
+    .name = "delay",
+    .description = "Ping the bot for network delay",
+    .function = COMMAND_HANDLER_NAME(delay),
+    .valid_args = {
+        .enabled = true,
+        .counts = DynModule::craftArgCountMask<0>()
+    }
+};

@@ -57,6 +57,10 @@ MessageExt::MessageExt(Message::Ptr message, SplitMessageText how)
                 // No-op, considering one argument.
                 _arguments.emplace_back(_extra_args);
                 break;
+            case SplitMessageText::ByNewline:
+                _arguments =
+                    absl::StrSplit(_extra_args, '\n', absl::SkipWhitespace());
+                break;
         }
         for (auto& x : _arguments) {
             absl::StripAsciiWhitespace(&x);

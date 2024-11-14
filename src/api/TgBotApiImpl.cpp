@@ -28,23 +28,22 @@
 #include <utility>
 
 #include "StringResLoader.hpp"
+#include "api/CommandModule.hpp"
 
-bool TgBotApiImpl::validateValidArgs(const CommandModule* module,
+bool TgBotApiImpl::validateValidArgs(const DynModule* module,
                                      MessageExt::Ptr& message) {
-    if (!module->valid_arguments.enabled) {
+    if (!module->valid_args.enabled) {
         return true;  // No validation needed.
     }
-    bool check_argc = !module->valid_arguments.counts.empty();
+    bool check_argc = module->valid_args.counts != 0;
 
     // Try to split them.
     const std::vector<std::string>& args =
         message->get<MessageAttrs::ParsedArgumentsList>();
+
     if (check_argc) {
-        std::vector<int> _valid_argc = module->valid_arguments.counts;
-        // Sort the valid_arguments
-        std::ranges::sort(_valid_argc);
-        // Push it to a set, so remove duplicates.
-        std::set valid_argc(_valid_argc.begin(), _valid_argc.end());
+        std::set<int> valid_argc =
+            DynModule::fromArgCountMask(module->valid_args.counts);
 
         // Check if the number of arguments matches the expected.
         if (!valid_argc.contains(static_cast<int>(args.size()))) {
@@ -55,7 +54,7 @@ bool TgBotApiImpl::validateValidArgs(const CommandModule* module,
                     fmt::format("at least {}", *valid_argc.begin()));
             } else if (args.size() > *valid_argc.rbegin()) {
                 strings.emplace_back(
-                    fmt::format("at most {}", *valid_argc.begin()));
+                    fmt::format("at most {}", *valid_argc.rbegin()));
             } else {
                 strings.emplace_back(
                     fmt::format("one of {}", fmt::join(valid_argc, ",")));
@@ -63,9 +62,9 @@ bool TgBotApiImpl::validateValidArgs(const CommandModule* module,
             strings.emplace_back(
                 fmt::format("arguments. But got {}.", args.size()));
 
-            if (!module->valid_arguments.usage.empty()) {
+            if (module->valid_args.usage != nullptr) {
                 strings.emplace_back(
-                    fmt::format("Usage: {}", module->valid_arguments.usage));
+                    fmt::format("Usage: {}", module->valid_args.usage));
             }
             sendReplyMessage(message->message(),
                              fmt::format("{}", fmt::join(strings, " ")));
@@ -80,12 +79,12 @@ void TgBotApiImpl::commandHandler(const std::string& command,
                                   const AuthContext::Flags authflags,
                                   Message::Ptr message) {
     // Find the module first.
-    const auto& module = (*kModuleLoader)[command];
+    const auto* module = (*kModuleLoader)[command];
     static const std::string myName = getBotUser()->username;
 
     // Create MessageExt object.
-    SplitMessageText how = module->valid_arguments.enabled
-                               ? module->valid_arguments.split_type
+    SplitMessageText how = module->_module->valid_args.enabled
+                               ? module->_module->valid_args.split_type
                                : SplitMessageText::None;
     auto ext = std::make_shared<MessageExt>(std::move(message), how);
     const auto botCommand = ext->get<MessageAttrs::BotCommand>();
@@ -97,13 +96,13 @@ void TgBotApiImpl::commandHandler(const std::string& command,
 
     if (!module->isLoaded()) {
         // Probably unloaded.
-        LOG(INFO) << "Command module is unloaded: " << module->name;
+        LOG(INFO) << "Command module is unloaded: " << module->_module->name;
         return;
     }
-    if (module->function == nullptr) {
+    if (module->_module->function == nullptr) {
         // Just in case.
         LOG(ERROR) << "Command module does not have a function: "
-                   << module->name;
+                   << module->_module->name;
         return;
     }
 
@@ -112,7 +111,7 @@ void TgBotApiImpl::commandHandler(const std::string& command,
         // Unauthorized user, don't run the command.
         if (ext->has<MessageAttrs::User>()) {
             LOG(INFO) << fmt::format("Unauthorized command {} from {}",
-                                     module->name,
+                                     module->_module->name,
                                      ext->get<MessageAttrs::User>());
             switch (authRet.reason) {
                 case AuthContext::Result::Reason::UNKNOWN:
@@ -141,7 +140,7 @@ void TgBotApiImpl::commandHandler(const std::string& command,
     }
 
     // Partital offloading to common code.
-    if (!validateValidArgs(module, ext)) {
+    if (!validateValidArgs(module->_module, ext)) {
         return;
     }
 
@@ -150,7 +149,8 @@ void TgBotApiImpl::commandHandler(const std::string& command,
         locale <= ext->get<MessageAttrs::User>()->languageCode;
     }
 
-    module->function(this, std::move(ext), (*_loader).at(locale), _provider);
+    module->_module->function(this, std::move(ext), (*_loader).at(locale),
+                              _provider);
 }
 
 bool TgBotApiImpl::unloadCommand(const std::string& command) {

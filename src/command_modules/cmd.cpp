@@ -38,15 +38,15 @@ DECLARE_COMMAND_HANDLER(cmd) {
     api->sendReplyMessage(message->message(), result_message);
 }
 
-DYN_COMMAND_FN(/*name*/, module) {
-    module.name = "cmd";
-    module.description = "unload/reload a command";
-    module.flags = CommandModule::Flags::Enforced;
-    module.function = COMMAND_HANDLER_NAME(cmd);
-    module.valid_arguments.enabled = true;
-    module.valid_arguments.counts.emplace_back(2);
-    module.valid_arguments.split_type =
-        CommandModule::ValidArgs::Split::ByWhitespace;
-    module.valid_arguments.usage = "/cmd <cmdname> <reload/unload>";
-    return true;
-}
+extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
+    .flags = DynModule::Flags::Enforced,
+    .name = "cmd",
+    .description = "unload/reload a command",
+    .function = COMMAND_HANDLER_NAME(cmd),
+    .valid_args = {
+        .enabled = true,
+        .counts = DynModule::craftArgCountMask<2>(),
+        .split_type = DynModule::ValidArgs::Split::ByWhitespace,
+        .usage = "/cmd <cmdname> <reload/unload>",
+    }
+};

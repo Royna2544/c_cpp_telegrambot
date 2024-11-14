@@ -15,7 +15,7 @@
 
 #include "StringResLoader.hpp"
 
-static DECLARE_COMMAND_HANDLER(alive) {
+DECLARE_COMMAND_HANDLER(alive) {
     static std::string version;
     static std::once_flag once;
 
@@ -58,13 +58,18 @@ static DECLARE_COMMAND_HANDLER(alive) {
     }
 }
 
-DYN_COMMAND_FN(name, module) {
-    if (name != "alive" && name != "start") {
-        return false;
+extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
+    .flags = DynModule::Flags::None,
+#ifdef cmd_alive_EXPORTS
+    .name = "alive",
+#endif
+#ifdef cmd_start_EXPORTS
+    .name = "start",
+#endif
+    .description = "Test if a bot is alive",
+    .function = COMMAND_HANDLER_NAME(alive),
+    .valid_args = {
+        .enabled = true,
+        .counts = DynModule::craftArgCountMask<0>()
     }
-    module.flags = CommandModule::Flags::None;
-    module.name = name;
-    module.description = "Test if a bot is alive";
-    module.function = COMMAND_HANDLER_NAME(alive);
-    return true;
-}
+};

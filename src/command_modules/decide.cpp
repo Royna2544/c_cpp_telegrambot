@@ -70,14 +70,16 @@ DECLARE_COMMAND_HANDLER(decide) {
     api->editMessage(msg, msgtxt.str());
 }
 
-DYN_COMMAND_FN(/*name*/, module) {
-    module.name = "decide";
-    module.description = "Decide a statement";
-    module.flags = CommandModule::Flags::None;
-    module.function = COMMAND_HANDLER_NAME(decide);
-    module.valid_arguments.enabled = true;
-    module.valid_arguments.counts.emplace_back(1);
-    module.valid_arguments.split_type = CommandModule::ValidArgs::Split::None;
-    module.valid_arguments.usage = "/decide <statement>";
-    return true;
-}
+extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
+    .flags = DynModule::Flags::None,
+    .name = "decide",
+    .description = "Decide a statement",
+    .function = COMMAND_HANDLER_NAME(decide),
+    .valid_args =
+        {
+            .enabled = true,
+            .counts = DynModule::craftArgCountMask<1>(),
+            .split_type = DynModule::ValidArgs::Split::None,
+            .usage = "/decide <statement>",
+        },
+};

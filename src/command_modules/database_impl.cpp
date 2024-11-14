@@ -196,23 +196,24 @@ DECLARE_COMMAND_HANDLER(saveid) {
 
 }  // namespace
 
-DYN_COMMAND_FN(name, module) {
-    if (name == "database") {
-        module.name = name;
-        module.description = "Run database commands";
-        module.flags = CommandModule::Flags::Enforced;
-        module.function = COMMAND_HANDLER_NAME(database);
-    } else if (name == "saveid") {
-        module.name = name;
-        module.description = "Save a Telegram media as name";
-        module.flags = CommandModule::Flags::Enforced |
-                       CommandModule::Flags::HideDescription;
-        module.function = COMMAND_HANDLER_NAME(saveid);
-        module.valid_arguments.enabled = true;
-        module.valid_arguments.split_type =
-            CommandModule::ValidArgs::Split::ByComma;
-    } else {
-        return false;  // Command not found.
-    }
-    return true;
-}
+extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
+#ifdef cmd_database_EXPORTS
+    .flags = DynModule::Flags::Enforced,
+    .name = "database",
+    .description = "Run database commands",
+    .function = COMMAND_HANDLER_NAME(database),
+    .valid_args = {},
+#endif
+#ifdef cmd_saveid_EXPORTS
+    .flags = DynModule::Flags::Enforced | DynModule::Flags::HideDescription,
+    .name = "saveid",
+    .description = "Save a Telegram media as name",
+    .function = COMMAND_HANDLER_NAME(saveid),
+    .valid_args =
+        {
+            .enabled = true,
+            .split_type = DynModule::ValidArgs::Split::ByComma,
+            .usage = "/saveid <names>,...",
+        },
+#endif
+};

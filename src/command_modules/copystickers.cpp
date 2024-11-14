@@ -197,10 +197,10 @@ DECLARE_COMMAND_HANDLER(copystickers) {
     }
 }
 
-DYN_COMMAND_FN(/*name*/, module) {
-    module.name = "copystickers";
-    module.description = "Copy sticker pack with a remap";
-    module.flags = CommandModule::Flags::None;
-    module.function = COMMAND_HANDLER_NAME(copystickers);
-    return true;
-}
+extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
+    .flags = DynModule::Flags::None,
+    .name = "copystickers",
+    .description = "Copy sticker pack with a remap",
+    .function = COMMAND_HANDLER_NAME(copystickers),
+    .valid_args = {},
+};
