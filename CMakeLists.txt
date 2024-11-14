@@ -133,10 +133,6 @@ if (WIN32)
 endif()
 #####################################################################
 
-################ TgBot lib + Boost creates a warning ################
-add_definitions(-DBOOST_BIND_GLOBAL_PLACEHOLDERS)
-#####################################################################
-
 ######################## Include directories ########################
 include_directories(src/include)
 include_directories(src/)
@@ -178,7 +174,11 @@ add_subdirectory(src/socket)
 add_subdirectory(src/utils)
 add_subdirectory(src/web)
 add_subdirectory(src/libos)
-set(HTTPLIB_COMPILE ON)
+find_package(Python3 QUIET)
+if (Python3_FOUND)
+  message(STATUS "Enabling cpp-httplib compilation")
+  set(HTTPLIB_COMPILE ON)
+endif()
 add_subdirectory(src/third-party/cpp-httplib)
 add_subdirectory(src/third-party/tgbot-cpp)
 add_subdirectory(src/third-party/fruit EXCLUDE_FROM_ALL)
