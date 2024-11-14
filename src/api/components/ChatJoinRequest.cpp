@@ -44,9 +44,10 @@ void TgBotApiImpl::ChatJoinRequestImpl::onCallbackQueryFunction(
     });
     if (reqIt != joinReqs.end()) {
         const auto& request = reqIt->second;
-        DCHECK(
-            absl::ConsumePrefix(&queryData, fmt::format("{}_", request->date)))
-            << "Should be able to consume";
+        if (!absl::ConsumePrefix(&queryData, fmt::format("{}_", request->date))) {
+            LOG(ERROR) << "Cannot consume date prefix: " << query->data << ". Parsed item: " << queryData;
+            return;
+        }
         if (queryData == "approve") {
             LOG(INFO) << fmt::format("Approving {} in chat {}", request->from,
                                      request->chat);
@@ -61,6 +62,7 @@ void TgBotApiImpl::ChatJoinRequestImpl::onCallbackQueryFunction(
             _api->getApi().answerCallbackQuery(query->id, "Disapproved user");
         } else {
             LOG(ERROR) << "Invalid payload: " << query->data << ". Parsed item: " << queryData;
+            _api->getApi().answerCallbackQuery(query->id, "Error occurred while parsing");
         }
         joinReqs.erase(reqIt);
     }
