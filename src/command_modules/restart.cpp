@@ -49,6 +49,9 @@ DECLARE_COMMAND_HANDLER(restart) {
     auto *const argv = provider->cmdline->argv();
     auto *const exe = argv[0];
 
+    // Stop threads
+    provider->threads->destroy();
+
     // Log the restart command and the arguments to be used to restart the bot
     LOG(INFO) << fmt::format("Restarting bot with exe: {}, addenv {}", exe,
                              restartBuf.data());

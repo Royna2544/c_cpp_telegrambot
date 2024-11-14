@@ -27,14 +27,17 @@ class Providers {
     Installable<DatabaseBase> database{};
     Installable<CommandLine> cmdline{};
     Installable<ConfigManager> config{};
+    Installable<ThreadManager> threads{};
 
     APPLE_INJECT(Providers(Random *random, ResourceProvider *resource,
                            DatabaseBase *database, CommandLine *cmd,
-                           ConfigManager *configManager)) {
+                           ConfigManager *configManager,
+                           ThreadManager *thread)) {
         this->random.instance = random;
         this->resource.instance = resource;
         this->database.instance = database;
         this->cmdline.instance = cmd;
         this->config.instance = configManager;
+        this->threads.instance = thread;
     }
 };
