@@ -4,7 +4,6 @@
 #include <trivial_helpers/_tgbot.h>
 
 #include <Authorization.hpp>
-#include <algorithm>
 #include <api/TgBotApi.hpp>
 #include <api/TgBotApiImpl.hpp>
 #include <api/Utils.hpp>
@@ -15,10 +14,10 @@
 #include <api/components/OnInlineQuery.hpp>
 #include <api/components/OnMyChatMember.hpp>
 #include <api/components/UnknownCommand.hpp>
+#include <api/components/Restart.hpp>
 #include <array>
 #include <filesystem>
 #include <fstream>
-#include <future>
 #include <iterator>
 #include <libos/libsighandler.hpp>
 #include <memory>
@@ -75,6 +74,43 @@ bool TgBotApiImpl::validateValidArgs(const DynModule* module,
     return true;
 }
 
+bool TgBotApiImpl::authorized(const MessageExt::Ptr& message,
+                              const std::string_view commandName,
+                              AuthContext::Flags flags) const {
+    const auto authRet = _auth->isAuthorized(message->message(), flags);
+    if (authRet) {
+        return true;
+    }
+    // Unauthorized user, don't run the command.
+    if (message->has<MessageAttrs::User>()) {
+        LOG(INFO) << fmt::format("Unauthorized command {} from {}", commandName,
+                                 message->get<MessageAttrs::User>());
+        switch (authRet.reason) {
+            case AuthContext::Result::Reason::UNKNOWN:
+                LOG(INFO) << "Reason: Unknown";
+                break;
+            case AuthContext::Result::Reason::MESSAGE_TOO_OLD:
+                LOG(INFO) << "Reason: Message is too old";
+                break;
+            case AuthContext::Result::Reason::BLACKLISTED_USER:
+                LOG(INFO) << "Reason: Blacklisted user";
+                break;
+            case AuthContext::Result::Reason::GLOBAL_FLAG_OFF:
+                LOG(INFO) << "Reason: Global flag is off";
+                break;
+            case AuthContext::Result::Reason::NOT_IN_WHITELIST:
+                LOG(INFO) << "Reason: Not in whitelist";
+                break;
+            case AuthContext::Result::Reason::REQUIRES_USER:
+                LOG(INFO) << "Reason: Requires user";
+                break;
+            default:
+                break;
+        }
+    }
+    return false;
+}
+
 void TgBotApiImpl::commandHandler(const std::string& command,
                                   const AuthContext::Flags authflags,
                                   Message::Ptr message) {
@@ -106,36 +142,7 @@ void TgBotApiImpl::commandHandler(const std::string& command,
         return;
     }
 
-    const auto authRet = _auth->isAuthorized(ext->message(), authflags);
-    if (!authRet) {
-        // Unauthorized user, don't run the command.
-        if (ext->has<MessageAttrs::User>()) {
-            LOG(INFO) << fmt::format("Unauthorized command {} from {}",
-                                     module->_module->name,
-                                     ext->get<MessageAttrs::User>());
-            switch (authRet.reason) {
-                case AuthContext::Result::Reason::UNKNOWN:
-                    LOG(INFO) << "Reason: Unknown";
-                    break;
-                case AuthContext::Result::Reason::MESSAGE_TOO_OLD:
-                    LOG(INFO) << "Reason: Message is too old";
-                    break;
-                case AuthContext::Result::Reason::BLACKLISTED_USER:
-                    LOG(INFO) << "Reason: Blacklisted user";
-                    break;
-                case AuthContext::Result::Reason::GLOBAL_FLAG_OFF:
-                    LOG(INFO) << "Reason: Global flag is off";
-                    break;
-                case AuthContext::Result::Reason::NOT_IN_WHITELIST:
-                    LOG(INFO) << "Reason: Not in whitelist";
-                    break;
-                case AuthContext::Result::Reason::REQUIRES_USER:
-                    LOG(INFO) << "Reason: Requires user";
-                    break;
-                default:
-                    break;
-            }
-        }
+    if (!authorized(ext, command, authflags)) {
         return;
     }
 
@@ -144,13 +151,10 @@ void TgBotApiImpl::commandHandler(const std::string& command,
         return;
     }
 
-    Locale locale = Locale::Default;
-    if (ext->has<MessageAttrs::User>()) {
-        locale <= ext->get<MessageAttrs::User>()->languageCode;
-    }
-
-    module->_module->function(this, std::move(ext), (*_loader).at(locale),
-                              _provider);
+    module->_module->function(
+        this, std::move(ext),
+        (*_loader).at(ext->get_or<MessageAttrs::Locale>(Locale::Default)),
+        _provider);
 }
 
 bool TgBotApiImpl::unloadCommand(const std::string& command) {
@@ -506,6 +510,8 @@ TgBotApiImpl::TgBotApiImpl(const std::string_view token, AuthContext* auth,
     // Load modules
     kModuleLoader = std::make_unique<ModulesManagement>(
         this, providers->cmdline->exe().parent_path());
+    // Restart command
+    restartCommand = std::make_unique<RestartCommand>(this);
 }
 
 TgBotApiImpl::~TgBotApiImpl() = default;

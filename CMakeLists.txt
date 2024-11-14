@@ -40,7 +40,7 @@ function(add_my_library)
   cmake_parse_arguments(TGBOT_LIBRARY
     "NO_LIBPREFIX;STATIC" # Options
     "NAME" # One-value keywords
-    "SRCS;LIBS;LIBS_STATIC;PUBLIC_INC;PRIVATE_INC;DEPENDS;DEFS;LIBS_WIN32" # Multiple-value keywords
+    "SRCS;LIBS;LIBS_STATIC;LIBS_UNIX;PUBLIC_INC;PRIVATE_INC;DEPENDS;DEFS;LIBS_WIN32" # Multiple-value keywords
     ${ARGN}
   )
   if (NOT TGBOT_LIBRARY_SRCS OR NOT TGBOT_LIBRARY_NAME)
@@ -76,6 +76,9 @@ function(add_my_library)
   target_link_libraries(${TGBOT_LIBRARY_NAME} PRIVATE ${TGBOT_LIBRARY_LIBS_STATIC})
   if (WIN32)
     target_link_libraries(${TGBOT_LIBRARY_NAME} PUBLIC ${TGBOT_LIBRARY_LIBS_WIN32})
+  endif()
+  if (UNIX)
+    target_link_libraries(${TGBOT_LIBRARY_NAME} PUBLIC ${TGBOT_LIBRARY_LIBS_UNIX})
   endif()
   target_compile_definitions(${TGBOT_LIBRARY_NAME} PUBLIC ${TGBOT_LIBRARY_DEFS} -D__TGBOT__)
   if (TGBOT_LIBRARY_DEPENDS)
@@ -198,9 +201,9 @@ add_my_library(
 add_my_library(
   NAME PPImpl
   SRCS 
-    src/Authorization.cpp
     src/ManagedThread.cpp
     src/ThreadManager.cpp
+    src/Authorization.cpp
     src/api/TgBotApiImpl.cpp
     src/api/CommandModule.cpp
     src/api/components/OnAnyMessage.cpp
@@ -209,6 +212,7 @@ add_my_library(
     src/api/components/OnInlineQuery.cpp
     src/api/components/OnMyChatMember.cpp
     src/api/components/Async.cpp
+    src/api/components/Restart_${TARGET_VARIANT}.cpp
     src/api/components/ModuleManagement.cpp
     src/api/components/UnknownCommand.cpp
     src/global_handlers/RegEXHandler.cpp
@@ -224,6 +228,7 @@ add_my_library(
   PRIVATE_INC src/third-party/rapidjson/include
   LIBS  TgBot TgBotUtils TgBotWeb TgBotDBImpl absl::status TgBotRandom
         TgBotPPImpl_shared_deps TgBotStringRes ${CMAKE_DL_LIBS} fruit TgBotSocket
+  LIBS_UNIX TgBot_restartfmt_parser
   STATIC
 )
 #####################################################################

@@ -147,13 +147,6 @@ command_module(
     LIBS TgBotRandom
 )
 
-command_module(
-    NAME restart
-    SRCS restart.cpp
-    LIBS TgBotUtils TgBot_restartfmt_parser
-    PLATFORM "Unix"
-)
-
 add_subdirectory(android_builder)
 command_module(
     NAME rombuild

@@ -1,26 +1,28 @@
-#include <absl/log/log.h>
-#include <fmt/format.h>
-#include <unistd.h>
-
-#include <TryParseStr.hpp>
-#include <api/CommandModule.hpp>
-#include <api/TgBotApi.hpp>
-#include <cstdlib>
-#include <libos/libsighandler.hpp>
+#include <api/MessageExt.hpp>
+#include <api/components/Restart.hpp>
 #include <restartfmt_parser.hpp>
+#include <api/components/OnAnyMessage.hpp>
+#include <api/components/OnCallbackQuery.hpp>
+#include <api/components/ModuleManagement.hpp>
 
-#include "StringResLoader.hpp"
-#include "api/MessageExt.hpp"
+TgBotApiImpl::RestartCommand::RestartCommand(TgBotApiImpl::Ptr api)
+    : _api(api) {
+    api->getEvents().onCommand("restart", [this](Message::Ptr message) {
+        commandFunction(std::make_shared<MessageExt>(std::move(message)));
+    });
+}
 
-extern char **environ;  // NOLINT
+void TgBotApiImpl::RestartCommand::commandFunction(MessageExt::Ptr message) {
+    if (!_api->authorized(message, "restart", AuthContext::Flags::None)) {
+        return;
+    }
 
-DECLARE_COMMAND_HANDLER(restart) {
     // typical chatid:int32_max
     std::array<char, RestartFmt::MAX_KNOWN_LENGTH> restartBuf = {0};
     int count = 0;
     std::vector<char *> myEnviron;
 
-    const auto status = RestartFmt::handleMessage(api);
+    const auto status = RestartFmt::handleMessage(_api);
     LOG_IF(ERROR, status.code() == absl::StatusCode::kInvalidArgument)
         << "Failed to handle restart message: " << status;
     if (status.ok()) {
@@ -46,25 +48,31 @@ DECLARE_COMMAND_HANDLER(restart) {
     myEnviron[count + 1] = nullptr;
 
     // Copy the command line used to launch the bot
-    auto *const argv = provider->cmdline->argv();
+    auto *const argv = _api->_provider->cmdline->argv();
     auto *const exe = argv[0];
 
     // Stop threads
-    provider->threads->destroy();
+    DLOG(INFO) << "Stopping running threads...";
+    _api->_provider->threads->destroy();
+
+    DLOG(INFO) << "Unloading command modules...";
+    _api->kModuleLoader.reset();
+
+    // Shut down async threads
+    DLOG(INFO) << "Stopping async threads...";
+    _api->onAnyMessageImpl.reset();
+    _api->onCallbackQueryImpl.reset();
 
     // Log the restart command and the arguments to be used to restart the bot
     LOG(INFO) << fmt::format("Restarting bot with exe: {}, addenv {}", exe,
                              restartBuf.data());
-    api->sendReplyMessage(message->message(),
-                          access(res, Strings::RESTARTING_BOT));
+
+    _api->sendReplyMessage(
+        message->message(),
+        access(_api->_loader->at(
+                   message->get_or<MessageAttrs::Locale>(Locale::Default)),
+               Strings::RESTARTING_BOT));
 
     // Call exeve
     execve(exe, argv, myEnviron.data());
 }
-
-extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
-    .flags = DynModule::Flags::Enforced,
-    .name = "restart",
-    .description = "Restarts the bot",
-    .function = COMMAND_HANDLER_NAME(restart),
-};

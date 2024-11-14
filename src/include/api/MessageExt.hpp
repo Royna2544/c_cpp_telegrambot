@@ -4,6 +4,7 @@
 #include <absl/log/log.h>
 #include <tgbot/types/Message.h>
 
+#include <Localization.hpp>
 #include <algorithm>
 #include <chrono>
 #include <initializer_list>
@@ -39,7 +40,8 @@ enum class MessageAttrs {
     ParsedArgumentsList,
     Date,
     MessageId,
-    Video
+    Video,
+    Locale
 };
 
 inline std::ostream& operator<<(std::ostream& stream,
@@ -67,6 +69,8 @@ inline std::ostream& operator<<(std::ostream& stream,
             return stream << "MessageId";
         case MessageAttrs::Video:
             return stream << "Video";
+        case MessageAttrs::Locale:
+            return stream << "Locale";
     }
     return stream;
 }
@@ -128,6 +132,10 @@ template <>
 struct AttributeType<MessageAttrs::Video> {
     using type = Video::Ptr;
 };
+template <>
+struct AttributeType<MessageAttrs::Locale> {
+    using type = Locale;
+};
 
 }  // namespace internal::message
 
@@ -174,6 +182,12 @@ class MessageExt {
             return _message->messageId;
         } else if constexpr (attr == MessageAttrs::Video) {
             return _message->video;
+        } else if constexpr (attr == MessageAttrs::Locale) {
+            Locale loc{};
+            if (has<MessageAttrs::User>()) {
+                loc <= get<MessageAttrs::User>()->languageCode;
+            }
+            return loc;
         }
         CHECK(false) << "Unreachable: " << static_cast<int>(attr);
         return {};
@@ -250,6 +264,7 @@ class MessageExt {
             case MessageAttrs::Animation:
                 return _message->animation != nullptr;
             case MessageAttrs::User:
+            case MessageAttrs::Locale:
                 return _message->from != nullptr;
             case MessageAttrs::Chat:
                 return _message->chat != nullptr;

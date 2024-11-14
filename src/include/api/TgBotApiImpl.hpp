@@ -70,6 +70,9 @@ class TgBotApiImpl : public TgBotApi {
     class ModulesManagement;
     friend class ModulesManagement;
     std::unique_ptr<ModulesManagement> kModuleLoader;
+    class RestartCommand;
+    friend class RestartCommand;
+    std::unique_ptr<RestartCommand> restartCommand;
 
    private:
     /**
@@ -422,21 +425,19 @@ class TgBotApiImpl : public TgBotApi {
     bool reloadCommand(const std::string& command) override;
     void commandHandler(const std::string& command,
                         AuthContext::Flags authflags, Message::Ptr message);
-    bool validateValidArgs(const DynModule* module,
-                           MessageExt::Ptr& message);
+    bool validateValidArgs(const DynModule* module, MessageExt::Ptr& message);
 
     template <unsigned Len>
     static auto getInitCallNameForClient(const char (&str)[Len]) {
         return fmt::format("Register onAnyMessage callbacks: {}", str);
     }
 
-   
     void addInlineQueryKeyboard(InlineQuery query,
                                 TgBot::InlineQueryResult::Ptr result) override;
     void addInlineQueryKeyboard(InlineQuery query,
                                 InlineCallback result) override;
     void removeInlineQueryKeyboard(const std::string_view key) override;
-    
+
     /**
      * @brief Registers a callback function to be called when any message is
      * received.
@@ -453,6 +454,10 @@ class TgBotApiImpl : public TgBotApi {
    private:
     [[nodiscard]] EventBroadcaster& getEvents() { return _bot.getEvents(); }
     [[nodiscard]] const Api& getApi() const { return _bot.getApi(); }
+
+    bool authorized(const MessageExt::Ptr& message,
+                    const std::string_view commandName,
+                    AuthContext::Flags flags) const;
 
     class Async;
     Bot _bot;
