@@ -66,7 +66,7 @@ std::string getHelpText() {
                     static_cast<int>(ent.cmd), ent.argCount, ent.argHelp));
             }
         }
-        helptext = fmt::format("{}", fmt::join(help, "\n"));
+        helptext = fmt::format("{}\n", fmt::join(help, "\n"));
     });
     return helptext;
 }
