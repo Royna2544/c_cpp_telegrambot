@@ -2,6 +2,8 @@
 
 #include "../TgBotApiImpl.hpp"
 
+#include "Async.hpp"
+
 class TgBotApiImpl::OnAnyMessageImpl {
     std::mutex mutex;
     std::vector<TgBotApi::AnyMessageCallback> callbacks;

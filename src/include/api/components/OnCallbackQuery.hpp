@@ -1,6 +1,8 @@
 #pragma once
 
 #include "../TgBotApiImpl.hpp"
+#include "Async.hpp"
+#include <map>
 
 class TgBotApiImpl::OnCallbackQueryImpl {
     std::mutex mutex;

@@ -1,5 +1,6 @@
 #include "../TgBotApiImpl.hpp"
 #include "api/CommandModule.hpp"
+#include "Async.hpp"
 
 class TgBotApiImpl::ModulesManagement {
     std::map<std::string, CommandModule::Ptr> _handles;

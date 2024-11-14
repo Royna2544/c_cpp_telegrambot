@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Types.h>
-#include <absl/log/check.h>
 #include <tgbot/tgbot.h>
 #include <trivial_helpers/_class_helper_macros.h>
 
@@ -11,10 +10,7 @@
 #include <ReplyParametersExt.hpp>
 #include <StringResLoader.hpp>
 #include <filesystem>
-#include <future>
 #include <memory>
-#include <mutex>
-#include <queue>
 #include <string_view>
 #include <vector>
 
@@ -458,28 +454,7 @@ class TgBotApiImpl : public TgBotApi {
     [[nodiscard]] EventBroadcaster& getEvents() { return _bot.getEvents(); }
     [[nodiscard]] const Api& getApi() const { return _bot.getApi(); }
 
-    class Async {
-        // A flag to stop CallbackQuery worker
-        std::atomic<bool> stopWorker = false;
-        // A queue to handle command (commandname, async future)
-        std::queue<std::pair<std::string, std::future<void>>> tasks;
-        // mutex to protect shared queue
-        std::mutex mutex;
-        // condition variable to wait for async tasks to finish.
-        std::condition_variable condVariable;
-        // worker thread(s) to consume command queue
-        std::vector<std::thread> threads;
-
-        void threadFunction();
-
-       public:
-        explicit Async(const int count);
-        ~Async();
-
-        NO_COPY_CTOR(Async);
-        void emplaceTask(std::string command, std::future<void> future);
-    };
-
+    class Async;
     Bot _bot;
 
     AuthContext* _auth;

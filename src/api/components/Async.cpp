@@ -1,4 +1,5 @@
 #include <api/TgBotApiImpl.hpp>
+#include <api/components/Async.hpp>
 
 void TgBotApiImpl::Async::emplaceTask(std::string command,
                                       std::future<void> future) {
