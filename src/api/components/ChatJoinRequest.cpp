@@ -7,6 +7,8 @@
 #include <api/components/ChatJoinRequest.hpp>
 #include <mutex>
 
+#include "tgbot/types/ChatMemberAdministrator.h"
+
 void TgBotApiImpl::ChatJoinRequestImpl::onChatJoinRequestFunction(
     TgBot::ChatJoinRequest::Ptr ptr) {
     if (!AuthContext::isUnderTimeLimit(ptr->date)) {
@@ -40,9 +42,17 @@ void TgBotApiImpl::ChatJoinRequestImpl::onCallbackQueryFunction(
         return absl::StartsWith(queryData, fmt::to_string(req.second->date));
     });
     if (reqIt != joinReqs.end()) {
+        if (auto user = _api->getApi().getChatMember(reqIt->first->chat->id,
+                                                     query->from->id);
+            user && user->status != TgBot::ChatMemberAdministrator::STATUS) {
+            _api->answerCallbackQuery(query->id,
+                                      "Sorry, you are not allowed to");
+        }
         const auto& request = reqIt->second;
-        if (!absl::ConsumePrefix(&queryData, fmt::format("{}_", request->date))) {
-            LOG(ERROR) << "Cannot consume date prefix: " << query->data << ". Parsed item: " << queryData;
+        if (!absl::ConsumePrefix(&queryData,
+                                 fmt::format("{}_", request->date))) {
+            LOG(ERROR) << "Cannot consume date prefix: " << query->data
+                       << ". Parsed item: " << queryData;
             return;
         }
         if (queryData == "approve") {
@@ -58,8 +68,10 @@ void TgBotApiImpl::ChatJoinRequestImpl::onCallbackQueryFunction(
                                                   request->from->id);
             _api->getApi().answerCallbackQuery(query->id, "Disapproved user");
         } else {
-            LOG(ERROR) << "Invalid payload: " << query->data << ". Parsed item: " << queryData;
-            _api->getApi().answerCallbackQuery(query->id, "Error occurred while parsing");
+            LOG(ERROR) << "Invalid payload: " << query->data
+                       << ". Parsed item: " << queryData;
+            _api->getApi().answerCallbackQuery(query->id,
+                                               "Error occurred while parsing");
         }
         // Delete the message after handling the callback query.
         _api->deleteMessage(reqIt->first);
