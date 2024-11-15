@@ -212,7 +212,7 @@ add_my_library(
     src/api/components/OnInlineQuery.cpp
     src/api/components/OnMyChatMember.cpp
     src/api/components/Async.cpp
-    src/api/components/Restart_${TARGET_VARIANT}.cpp
+    src/api/components/Restart.cpp
     src/api/components/ModuleManagement.cpp
     src/api/components/UnknownCommand.cpp
     src/global_handlers/RegEXHandler.cpp
