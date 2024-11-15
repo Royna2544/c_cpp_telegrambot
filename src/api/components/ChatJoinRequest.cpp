@@ -7,8 +7,6 @@
 #include <api/components/ChatJoinRequest.hpp>
 #include <mutex>
 
-#include "tgbot/types/ChatMemberAdministrator.h"
-
 void TgBotApiImpl::ChatJoinRequestImpl::onChatJoinRequestFunction(
     TgBot::ChatJoinRequest::Ptr ptr) {
     if (!AuthContext::isUnderTimeLimit(ptr->date)) {
@@ -115,7 +113,11 @@ TgBotApiImpl::ChatJoinRequestImpl::ChatJoinRequestImpl(TgBotApiImpl::Ptr api)
 
     _api->getEvents().onChatJoinRequest(
         [this](TgBot::ChatJoinRequest::Ptr query) {
-            onChatJoinRequestFunction(std::move(query));
+            try {
+                onChatJoinRequestFunction(std::move(query));
+            } catch (const TgBot::TgException& ex) {
+                LOG(ERROR) << "Error in onChatJoinRequest: " << ex.what();
+            }
         });
     _api->onCallbackQuery("__builtin_chatjoinreq_handler__",
                           [this](const TgBot::CallbackQuery::Ptr& query) {
@@ -123,6 +125,10 @@ TgBotApiImpl::ChatJoinRequestImpl::ChatJoinRequestImpl(TgBotApiImpl::Ptr api)
                           });
     _api->getEvents().onChatMember(
         [this](const TgBot::ChatMemberUpdated::Ptr& update) {
-            onChatMemberFunction(update);
+            try {
+                onChatMemberFunction(update);
+            } catch (const TgBot::TgException& ex) {
+                LOG(ERROR) << "Error in onChatMember: " << ex.what();
+            }
         });
 }
