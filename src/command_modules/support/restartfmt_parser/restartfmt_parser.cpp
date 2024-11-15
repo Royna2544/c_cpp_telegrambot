@@ -7,6 +7,8 @@
 
 #include <TryParseStr.hpp>
 
+#include "utils/Env.hpp"
+
 std::optional<RestartFmt::data_type> RestartFmt::fromString(
     const std::string& string, bool withPrefix) {
     std::string_view view = string;
@@ -38,12 +40,12 @@ std::optional<RestartFmt::data_type> RestartFmt::fromString(
 }
 
 std::optional<RestartFmt::data_type> RestartFmt::fromEnvVar() {
-    const char* restartStr = getenv(ENV_VAR_NAME);  // NOLINT
-    if (restartStr == nullptr) {
+    const auto restartStr = Env()[ENV_VAR_NAME];
+    if (!restartStr.has()) {
         LOG(WARNING) << "No " << ENV_VAR_NAME << " environment variable found";
         return std::nullopt;
     }
-    return fromString(restartStr, false);
+    return fromString(restartStr.get(), false);
 }
 
 std::string RestartFmt::toString(const data_type& data, bool withPrefix) {
@@ -59,18 +61,18 @@ std::string RestartFmt::toString(const data_type& data, bool withPrefix) {
 }
 
 absl::Status RestartFmt::handleMessage(TgBotApi::CPtr api) {
-    if (const char* env = getenv(RestartFmt::ENV_VAR_NAME); env != nullptr) {
+    if (const auto env = Env()[ENV_VAR_NAME]; env.has()) {
         const auto v = RestartFmt::fromEnvVar();
         if (!v) {
             LOG(ERROR) << "Invalid restart command format: " << env;
-            unsetenv(RestartFmt::ENV_VAR_NAME);
+            Env()[ENV_VAR_NAME].clear();
             return absl::InvalidArgumentError(
                 "Invalid restart variable format");
         } else {
             LOG(INFO) << "Restart successful";
-
-            api->sendReplyMessage(v->first, v->second, v->third, "Restart success!");
-            unsetenv(RestartFmt::ENV_VAR_NAME);
+            api->sendReplyMessage(v->first, v->second, v->third,
+                                  "Restart success!");
+            Env()[ENV_VAR_NAME].clear();
             return absl::OkStatus();
         }
     }

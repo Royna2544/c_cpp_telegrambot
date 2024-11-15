@@ -1,5 +1,3 @@
 add_subdirectory(popen_wdt)
 add_subdirectory(progress)
-if (UNIX)
 add_subdirectory(restartfmt_parser)
-endif()
