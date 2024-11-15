@@ -22,11 +22,13 @@ class TgBotApiImpl::Async {
     std::condition_variable condVariable;
     // worker thread(s) to consume command queue
     std::vector<std::thread> threads;
+    // name, for logging purposes
+    std::string _name;
 
     void threadFunction();
 
    public:
-    explicit Async(const int count);
+    explicit Async(std::string name, const int count);
     ~Async();
 
     NO_COPY_CTOR(Async);

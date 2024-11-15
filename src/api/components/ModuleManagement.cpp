@@ -126,7 +126,7 @@ bool TgBotApiImpl::ModulesManagement::loadFrom(
 
 TgBotApiImpl::ModulesManagement::ModulesManagement(
     TgBotApiImpl::Ptr api, const std::filesystem::path& modules_dir)
-    : _api(api), commandAsync(2) {
+    : _api(api), commandAsync("commands", 2) {
     loadFrom(modules_dir);
 }
 

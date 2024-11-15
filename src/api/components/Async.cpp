@@ -8,15 +8,15 @@ void TgBotApiImpl::Async::emplaceTask(std::string command,
     condVariable.notify_one();
 }
 
-TgBotApiImpl::Async::Async(const int count) {
-    DLOG(INFO) << "Starting AsyncThreads, count: " << count;
+TgBotApiImpl::Async::Async(std::string name, const int count) : _name(std::move(name)) {
+    DLOG(INFO) << fmt::format("Starting AsyncThreads '{}', count: {}", _name, count);
     for (int i = 0; i < count; ++i) {
         threads.emplace_back([this]() { threadFunction(); });
     }
 }
 
 TgBotApiImpl::Async::~Async() {
-    DLOG(INFO) << "Stopping AsyncThreads";
+    DLOG(INFO) << fmt::format("Stopping AsyncThreads '{}'", _name);
     stopWorker = true;
     condVariable.notify_all();
     for (auto& thread : threads) {

@@ -20,7 +20,7 @@ void TgBotApiImpl::OnCallbackQueryImpl::onCallbackQuery(
 }
 
 TgBotApiImpl::OnCallbackQueryImpl::OnCallbackQueryImpl(TgBotApiImpl::Ptr api)
-    : _api(api), queryAsync(2) {
+    : _api(api), queryAsync("callbackquery", 2) {
     _api->getEvents().onCallbackQuery([this](TgBot::CallbackQuery::Ptr query) {
         onCallbackQueryFunction(std::move(query));
     });
