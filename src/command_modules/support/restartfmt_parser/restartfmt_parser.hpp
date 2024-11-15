@@ -1,37 +1,32 @@
 
 #include <absl/status/status.h>
 
+#include <api/MessageExt.hpp>
 #include <api/TgBotApi.hpp>
 #include <limits>
-#include <optional>
 #include <string>
 
 #include "Types.h"
 
 class RestartFmt {
    public:
-    using MessageThreadId = int;
-
     struct Type {
-        ChatId first;
-        MessageId second;
-        MessageThreadId third;
+        ChatId chat_id{};
+        MessageId message_id{};
+        MessageThreadId message_thread_id{};
+
+        explicit Type(const std::string_view string);
+        explicit Type(const Message::Ptr& message);
+        std::string to_string() const;
+        bool operator==(const Type& other) const;
     };
     using data_type = Type;
 
-    // function to parse the given string and populate chat_id and message_id
-    static std::optional<data_type> fromString(const std::string& string,
-                                               bool withPrefix = false);
+    static bool checkEnvAndVerifyRestart(TgBotApi::CPtr api);
+    static bool isRestartedByThisMessage(const MessageExt::Ptr& message);
 
-    // parse the string from environment variables
-    static std::optional<data_type> fromEnvVar();
+    constexpr static std::string_view ENV_VAR_NAME = "RESTART";
 
-    // function to convert chat_id and message_id to a string
-    static std::string toString(const data_type& data, bool withPrefix = false);
-
-    static absl::Status handleMessage(TgBotApi::CPtr api);
-
-    constexpr static const char* ENV_VAR_NAME = "RESTART";
     // typical chatid:int32_max
     constexpr static size_t MAX_KNOWN_LENGTH =
         sizeof("RESTART=-00000000000:") +

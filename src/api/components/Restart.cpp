@@ -1,9 +1,10 @@
+#include <Env.hpp>
 #include <api/MessageExt.hpp>
-#include <api/components/Restart.hpp>
-#include <restartfmt_parser.hpp>
+#include <api/components/ModuleManagement.hpp>
 #include <api/components/OnAnyMessage.hpp>
 #include <api/components/OnCallbackQuery.hpp>
-#include <api/components/ModuleManagement.hpp>
+#include <api/components/Restart.hpp>
+#include <restartfmt_parser.hpp>
 
 TgBotApiImpl::RestartCommand::RestartCommand(TgBotApiImpl::Ptr api)
     : _api(api) {
@@ -16,18 +17,17 @@ void TgBotApiImpl::RestartCommand::commandFunction(MessageExt::Ptr message) {
     if (!_api->authorized(message, "restart", AuthContext::Flags::None)) {
         return;
     }
-
-    // typical chatid:int32_max
-    std::array<char, RestartFmt::MAX_KNOWN_LENGTH> restartBuf = {0};
-    int count = 0;
-    std::vector<char *> myEnviron;
-
-    const auto status = RestartFmt::handleMessage(_api);
-    LOG_IF(ERROR, status.code() == absl::StatusCode::kInvalidArgument)
-        << "Failed to handle restart message: " << status;
-    if (status.ok()) {
+    if (!_api->isMyCommand(message)) {
         return;
     }
+    if (RestartFmt::isRestartedByThisMessage(message)) {
+        DLOG(INFO) << "Avoiding restart loop";
+        return;
+    }
+
+    // typical chatid:int32_max
+    int count = 0;
+    std::vector<char *> myEnviron;
 
     // Get the size of environment buffer
     for (; environ[count] != nullptr; ++count);
@@ -35,12 +35,22 @@ void TgBotApiImpl::RestartCommand::commandFunction(MessageExt::Ptr message) {
     myEnviron.resize(count + 2);
     // Copy the environment buffer to the new buffer
     memcpy(myEnviron.data(), environ, count * sizeof(char *));
+    // Check if the environ RESTART exists already
+    auto [be, en] = std::ranges::remove_if(myEnviron, [](const char *env) {
+        return env != nullptr
+                   ? std::string_view(env).starts_with(RestartFmt::ENV_VAR_NAME)
+                   : false;
+    });
+    // If the environ RESTART exists, remove it
+    if (std::distance(be, en) != 0) {
+        DLOG(INFO) << "Removing existing RESTART=";
+        myEnviron.erase(be, en);
+    }
 
-    // Set the restart command env to the environment buffer
-    const auto restartEnv =
-        RestartFmt::toString({message->get<MessageAttrs::Chat>()->id,
-                              message->get<MessageAttrs::MessageId>()},
-                             true);
+    std::array<char, RestartFmt::MAX_KNOWN_LENGTH> restartBuf = {0};
+    std::string restartEnv =
+        fmt::format("{}={}", RestartFmt::ENV_VAR_NAME,
+                    RestartFmt::Type{message->message()}.to_string());
     strncpy(restartBuf.data(), restartEnv.c_str(), restartEnv.size());
 
     // Append the restart env to the environment buffer
@@ -73,6 +83,5 @@ void TgBotApiImpl::RestartCommand::commandFunction(MessageExt::Ptr message) {
                    message->get_or<MessageAttrs::Locale>(Locale::Default)),
                Strings::RESTARTING_BOT));
 
-    // Call exeve
-    execve(exe, argv, myEnviron.data());
+    execve(argv[0], argv, myEnviron.data());
 }

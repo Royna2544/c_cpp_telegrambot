@@ -530,10 +530,8 @@ int main(int argc, char** argv) {
         }
     }
 
-#ifndef WINDOWS_BUILD
-    LOG_IF(WARNING, !RestartFmt::handleMessage(api).ok())
+    LOG_IF(WARNING, !RestartFmt::checkEnvAndVerifyRestart(api))
         << "Failed to handle restart message";
-#endif
 
     LOG(INFO) << "Subsystems initialized, bot started: " << argv[0];
     LOG(INFO) << fmt::format("Starting took {}", startupDp.get());

@@ -455,9 +455,11 @@ class TgBotApiImpl : public TgBotApi {
     [[nodiscard]] EventBroadcaster& getEvents() { return _bot.getEvents(); }
     [[nodiscard]] const Api& getApi() const { return _bot.getApi(); }
 
-    bool authorized(const MessageExt::Ptr& message,
-                    const std::string_view commandName,
-                    AuthContext::Flags flags) const;
+    [[nodiscard]] bool authorized(const MessageExt::Ptr& message,
+                                  const std::string_view commandName,
+                                  AuthContext::Flags flags) const;
+
+    [[nodiscard]] bool isMyCommand(const MessageExt::Ptr& message) const;
 
     class Async;
     Bot _bot;

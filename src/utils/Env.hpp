@@ -37,6 +37,25 @@ class TgBotUtils_API Env {
             return _key;
         }
 
+        ValueEntry& operator=(const ValueEntry& other) {
+            if (this == &other) {
+                return *this;
+            }
+            *this = other.get();
+            return *this;
+        }
+
+        // This is a ValueEntry, we are only playing with values...
+        ValueEntry& operator=(ValueEntry&& other) {
+            *this = std::move(other.get());
+            other.clear();
+            return *this;
+        }
+
+        bool operator==(const std::string_view other) const {
+            return get() == other;
+        }
+
         // Append a string to the current value.
         // Note: This will not overwrite the existing value.
         // To overwrite, use operator=
@@ -46,9 +65,6 @@ class TgBotUtils_API Env {
             return *this;
         }
 
-        // Do not allow copying of this element outside the function use.
-        NO_COPY_CTOR(ValueEntry);
-        NO_MOVE_CTOR(ValueEntry);
         ValueEntry() = delete;
         ~ValueEntry() = default;
     };

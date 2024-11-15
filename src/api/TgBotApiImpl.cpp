@@ -28,6 +28,7 @@
 
 #include "StringResLoader.hpp"
 #include "api/CommandModule.hpp"
+#include "api/MessageExt.hpp"
 
 bool TgBotApiImpl::validateValidArgs(const DynModule* module,
                                      MessageExt::Ptr& message) {
@@ -74,6 +75,16 @@ bool TgBotApiImpl::validateValidArgs(const DynModule* module,
     return true;
 }
 
+bool TgBotApiImpl::isMyCommand(const MessageExt::Ptr& message) const {
+    const auto botCommand = message->get<MessageAttrs::BotCommand>();
+    const auto target = botCommand.target;
+    if (target != getBotUser()->username && !target.empty()) {
+        DLOG(INFO) << "Ignore mismatched target: " << std::quoted(target);
+        return false;
+    }
+    return true;
+}
+
 bool TgBotApiImpl::authorized(const MessageExt::Ptr& message,
                               const std::string_view commandName,
                               AuthContext::Flags flags) const {
@@ -116,17 +127,14 @@ void TgBotApiImpl::commandHandler(const std::string& command,
                                   Message::Ptr message) {
     // Find the module first.
     const auto* module = (*kModuleLoader)[command];
-    static const std::string myName = getBotUser()->username;
 
     // Create MessageExt object.
     SplitMessageText how = module->_module->valid_args.enabled
                                ? module->_module->valid_args.split_type
                                : SplitMessageText::None;
     auto ext = std::make_shared<MessageExt>(std::move(message), how);
-    const auto botCommand = ext->get<MessageAttrs::BotCommand>();
-    const auto target = botCommand.target;
-    if (target != myName && !target.empty()) {
-        DLOG(INFO) << "Ignore mismatched target: " << std::quoted(target);
+
+    if (!isMyCommand(ext)) {
         return;
     }
 
@@ -135,6 +143,7 @@ void TgBotApiImpl::commandHandler(const std::string& command,
         LOG(INFO) << "Command module is unloaded: " << module->_module->name;
         return;
     }
+
     if (module->_module->function == nullptr) {
         // Just in case.
         LOG(ERROR) << "Command module does not have a function: "
