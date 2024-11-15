@@ -6,8 +6,9 @@
 
 #include "Env.hpp"
 
-void Env::ValueEntry::operator=(const std::string_view value) const {
+const Env::ValueEntry& Env::ValueEntry::operator=(const std::string_view value) const {
     SetEnvironmentVariableA(_key.data(), value.data());
+    return *this;
 }
 
 void Env::ValueEntry::clear() const {

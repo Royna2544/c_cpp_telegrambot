@@ -1,8 +1,8 @@
 #pragma once
 
+#include <absl/strings/str_cat.h>
 #include <trivial_helpers/_class_helper_macros.h>
 
-#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <TgBotUtilsExports.h>
@@ -18,18 +18,32 @@ class TgBotUtils_API Env {
        public:
         explicit ValueEntry(const std::string_view key) : _key(key) {}
         // Aka, setenv
-        void operator=(const std::string_view value) const;
+        const Env::ValueEntry& operator=(const std::string_view value) const;
         // Aka, unsetenv
         void clear() const;
         // Aka, getenv
         [[nodiscard]] std::string get() const;
+
         [[nodiscard]] bool has() const;
+
         bool assign(std::string& ref) const {
             if (has()) {
                 ref = get();
                 return true;
             }
             return false;
+        }
+        std::string_view key() const {
+            return _key;
+        }
+
+        // Append a string to the current value.
+        // Note: This will not overwrite the existing value.
+        // To overwrite, use operator=
+        // When get() throws, this won't catch it.
+        const Env::ValueEntry& operator+=(const std::string_view addition) const {
+            *this = absl::StrCat(get(), addition);
+            return *this;
         }
 
         // Do not allow copying of this element outside the function use.
@@ -43,3 +57,12 @@ class TgBotUtils_API Env {
         return ValueEntry{key};
     }
 };
+
+inline std::ostream& operator<<(std::ostream& o, const Env::ValueEntry& entry) {
+    if (entry.has()) {
+        o << entry.get();
+    } else {
+        o << "(nonexistent variable " <<  entry.key() << ")";
+    }
+    return o;
+}

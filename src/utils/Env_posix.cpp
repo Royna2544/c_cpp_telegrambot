@@ -3,8 +3,9 @@
 
 #include "Env.hpp"
 
-void Env::ValueEntry::operator=(const std::string_view value) const {
+const Env::ValueEntry& Env::ValueEntry::operator=(const std::string_view value) const {
     setenv(_key.data(), value.data(), 1);
+    return *this;
 }
 
 void Env::ValueEntry::clear() const { unsetenv(_key.data()); }
