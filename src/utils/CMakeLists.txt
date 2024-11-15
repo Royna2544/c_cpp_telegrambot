@@ -6,7 +6,7 @@ add_my_library(
   NAME Utils
   SRCS
     ConfigManager.cpp
-    ConfigManager_${TARGET_VARIANT}.cpp
+    Env_${TARGET_VARIANT}.cpp
     GitData.cpp
     CommandLine.cpp
     ResourceManager.cpp

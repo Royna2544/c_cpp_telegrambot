@@ -13,11 +13,13 @@
 #include <mutex>
 #include <optional>
 #include <ostream>
+#include <stdexcept>
 #include <string_view>
 #include <type_traits>
 #include <utility>
 
 #include "CommandLine.hpp"
+#include "Env.hpp"
 
 namespace po = boost::program_options;
 
@@ -52,9 +54,9 @@ struct ConfigBackendEnv : public ConfigManager::Backend {
     ConfigBackendEnv() = default;
 
     std::optional<std::string> get(const std::string_view name) override {
-        std::string outvalue;
-        if (ConfigManager::getEnv(name, outvalue)) {
-            return outvalue;
+        Env env;
+        if (env[name].has()) {
+            return env[name].get();
         }
         return std::nullopt;
     }
