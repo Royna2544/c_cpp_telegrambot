@@ -13,8 +13,8 @@
 #include <api/components/OnCallbackQuery.hpp>
 #include <api/components/OnInlineQuery.hpp>
 #include <api/components/OnMyChatMember.hpp>
-#include <api/components/UnknownCommand.hpp>
 #include <api/components/Restart.hpp>
+#include <api/components/UnknownCommand.hpp>
 #include <array>
 #include <filesystem>
 #include <fstream>
@@ -151,10 +151,9 @@ void TgBotApiImpl::commandHandler(const std::string& command,
         return;
     }
 
-    module->_module->function(
-        this, std::move(ext),
-        (*_loader).at(ext->get_or<MessageAttrs::Locale>(Locale::Default)),
-        _provider);
+    const auto msgLocale = ext->get_or<MessageAttrs::Locale>(Locale::Default);
+    module->_module->function(this, std::move(ext), (*_loader).at(msgLocale),
+                              _provider);
 }
 
 bool TgBotApiImpl::unloadCommand(const std::string& command) {
