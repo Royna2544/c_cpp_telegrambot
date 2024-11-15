@@ -50,13 +50,8 @@ struct RDRand : Random::ImplBase {
 
     bool isSupported(void) const override { return rdrand_engine::supported(); }
 
-    template <typename T>
-    void shuffle(std::vector<T>& in) const {
-        ShuffleImpl(in, &engine);
-    }
-
     void shuffle(std::vector<std::string>& it) const override {
-        shuffle(it);
+        ShuffleImpl(it, &engine);
     }
 
     [[nodiscard]] std::string_view getName() const override {
