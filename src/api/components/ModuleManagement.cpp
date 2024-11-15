@@ -71,7 +71,7 @@ bool TgBotApiImpl::ModulesManagement::operator-=(const std::string& name) {
     std::lock_guard<std::mutex> lock(mutex);
     if (!_handles.contains(name)) {
         LOG(WARNING) << "Module with name " << name
-                     << " doesn't exist to load.";
+                     << " doesn't exist to unload.";
         return false;
     }
     if (_handles.at(name)->isLoaded()) {
