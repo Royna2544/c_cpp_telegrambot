@@ -23,6 +23,9 @@ endif()
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
   set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
 endif()
+if (APPLE)
+  add_compile_options(-fexperimental-library)
+endif()
 
 ## Sanitizers configuration
 set(SANITIZER_CONFIG "ASan")
