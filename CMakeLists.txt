@@ -40,7 +40,7 @@ function(add_my_library)
   cmake_parse_arguments(TGBOT_LIBRARY
     "NO_LIBPREFIX;STATIC" # Options
     "NAME" # One-value keywords
-    "SRCS;LIBS;LIBS_STATIC;LIBS_UNIX;PUBLIC_INC;PRIVATE_INC;DEPENDS;DEFS;LIBS_WIN32" # Multiple-value keywords
+    "SRCS;LIBS;LIBS_STATIC;PUBLIC_INC;PRIVATE_INC;DEPENDS;DEFS;LIBS_WIN32" # Multiple-value keywords
     ${ARGN}
   )
   if (NOT TGBOT_LIBRARY_SRCS OR NOT TGBOT_LIBRARY_NAME)
@@ -77,9 +77,6 @@ function(add_my_library)
   if (WIN32)
     target_link_libraries(${TGBOT_LIBRARY_NAME} PUBLIC ${TGBOT_LIBRARY_LIBS_WIN32})
   endif()
-  if (UNIX)
-    target_link_libraries(${TGBOT_LIBRARY_NAME} PUBLIC ${TGBOT_LIBRARY_LIBS_UNIX})
-  endif()
   target_compile_definitions(${TGBOT_LIBRARY_NAME} PUBLIC ${TGBOT_LIBRARY_DEFS} -D__TGBOT__)
   if (TGBOT_LIBRARY_DEPENDS)
     add_dependencies(${TGBOT_LIBRARY_NAME} ${TGBOT_LIBRARY_DEPENDS})
@@ -90,7 +87,7 @@ function(add_my_executable)
   cmake_parse_arguments(TGBOT_EXE
     "NO_PREFIX;OPTIONAL" # Options
     "NAME" # One-value keywords
-    "SRCS;LIBS;LIBS_WIN32;LIBS_UNIX" # Multiple-value keywords
+    "SRCS;LIBS;LIBS_WIN32" # Multiple-value keywords
     ${ARGN}
   )
   if (NOT TGBOT_EXE_SRCS OR NOT TGBOT_EXE_NAME)
@@ -112,9 +109,6 @@ function(add_my_executable)
   target_link_libraries(${TGBOT_EXE_NAME} TgBotLogInit absl::log ${TGBOT_EXE_LIBS})
   if (WIN32)
     target_link_libraries(${TGBOT_EXE_NAME} ${TGBOT_EXE_LIBS_WIN32})
-  endif()
-  if (UNIX)
-    target_link_libraries(${TGBOT_EXE_NAME} ${TGBOT_EXE_LIBS_UNIX})
   endif()
   target_compile_definitions(${TGBOT_EXE_NAME} PRIVATE -D__TGBOT__)
 endfunction(add_my_executable)
@@ -226,9 +220,8 @@ add_my_library(
     src/socket/interface/impl/backends/ServerBackend.cpp
     src/socket/interface/impl/backends/ServerBackend_${TARGET_VARIANT}.cpp
   PRIVATE_INC src/third-party/rapidjson/include
-  LIBS  TgBot TgBotUtils TgBotWeb TgBotDBImpl absl::status TgBotRandom
+  LIBS  TgBot TgBotUtils TgBotWeb TgBotDBImpl absl::status TgBotRandom TgBot_restartfmt_parser
         TgBotPPImpl_shared_deps TgBotStringRes ${CMAKE_DL_LIBS} fruit TgBotSocket
-  LIBS_UNIX TgBot_restartfmt_parser
   STATIC
 )
 #####################################################################
@@ -237,8 +230,7 @@ add_my_library(
 add_my_executable(
   NAME main
   SRCS src/main.cpp
-  LIBS TgBotPPImpl TgBotDBLoading TgBotsighandler
-  LIBS_UNIX TgBot_restartfmt_parser
+  LIBS TgBotPPImpl TgBotDBLoading TgBotsighandler TgBot_restartfmt_parser
 )
 
 if (UNIX)
