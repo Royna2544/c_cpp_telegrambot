@@ -152,6 +152,16 @@ else()
 endif()
 #####################################################################
 
+# Configure Ccache if available
+find_program(CCACHE_FOUND ccache)
+if (CCACHE_FOUND)
+  message(STATUS "Found ccache")
+  set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
+  set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
+else()
+  message(STATUS "Could NOT find ccache (this is NOT an error)")
+endif()
+
 ############################# Platforms #############################
 if(WIN32)
   set(TARGET_VARIANT windows)
