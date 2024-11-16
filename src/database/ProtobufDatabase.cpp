@@ -8,6 +8,7 @@
 
 #include <fstream>
 #include <optional>
+#include <trivial_helpers/log_once.hpp>
 
 #include "TgBotDB.pb.h"
 
@@ -159,11 +160,12 @@ bool ProtoDatabase::unload() {
 
 std::optional<UserId> ProtoDatabase::getOwnerUserId() const {
     if (!dbinfo.has_value()) {
-        LOG(WARNING) << "Database not loaded! Cannot determine owner user id!";
+        LOG_ONCE(WARNING)
+            << "Database not loaded! Cannot determine owner user id!";
         return std::nullopt;
     }
     if (!dbinfo->object.has_ownerid()) {
-        LOG(WARNING) << "Database does not contain owner user id!";
+        LOG_ONCE(WARNING) << "Database does not contain owner user id!";
         return std::nullopt;
     }
     return dbinfo->object.ownerid();
@@ -234,7 +236,8 @@ std::optional<ProtoDatabase::MediaInfo> ProtoDatabase::queryMediaInfo(
     return info;
 }
 
-ProtoDatabase::AddResult ProtoDatabase::addMediaInfo(const MediaInfo &info) const {
+ProtoDatabase::AddResult ProtoDatabase::addMediaInfo(
+    const MediaInfo &info) const {
     auto *const mediaEntries = dbinfo->object.mutable_mediatonames();
     for (const auto &elem : *mediaEntries) {
         if (elem.telegrammediauniqueid() == info.mediaUniqueId) {
