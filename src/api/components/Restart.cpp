@@ -6,6 +6,8 @@
 #include <api/components/Restart.hpp>
 #include <restartfmt_parser.hpp>
 
+extern char** environ; // NOLINT (Needed for macOS)
+
 TgBotApiImpl::RestartCommand::RestartCommand(TgBotApiImpl::Ptr api)
     : _api(api) {
     api->getEvents().onCommand("restart", [this](Message::Ptr message) {
