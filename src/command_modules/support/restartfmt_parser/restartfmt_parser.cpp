@@ -5,6 +5,7 @@
 #include <absl/strings/str_split.h>
 #include <absl/strings/strip.h>
 #include <fmt/format.h>
+#include <tgbot/TgException.h>
 
 #include <TryParseStr.hpp>
 #include <stdexcept>
@@ -43,14 +44,14 @@ std::string RestartFmt::Type::to_string() const {
 
 bool RestartFmt::checkEnvAndVerifyRestart(TgBotApi::CPtr api) {
     // Check if the environment variable is set and valid
-    LOG(INFO) << "RestartFmt::checkEnvAndVerifyRestart";
+    DLOG(INFO) << "RestartFmt::checkEnvAndVerifyRestart";
     auto env = Env()[ENV_VAR_NAME];
     if (!env.has()) {
-        LOG(INFO) << fmt::format("ENV_VAR {} is not set", ENV_VAR_NAME);
+        DLOG(INFO) << fmt::format("ENV_VAR {} is not set", ENV_VAR_NAME);
         return false;
     }
     std::string value = env.get();
-    LOG(INFO) << fmt::format("GETENV {}: is set to {}", ENV_VAR_NAME, value);
+    DLOG(INFO) << fmt::format("GETENV {}: is set to {}", ENV_VAR_NAME, value);
     LOG(INFO) << "Restart successful";
     try {
         Type t{value};
@@ -60,6 +61,9 @@ bool RestartFmt::checkEnvAndVerifyRestart(TgBotApi::CPtr api) {
         LOG(ERROR) << "Invalid format for RESTART=" << value << ": "
                    << ex.what();
         return false;
+    } catch (const TgBot::TgException& ex) {
+        LOG(ERROR) << "Failed to send message: " << ex.what();
+        return false;
     }
     return true;
 }
@@ -67,15 +71,15 @@ bool RestartFmt::checkEnvAndVerifyRestart(TgBotApi::CPtr api) {
 bool RestartFmt::isRestartedByThisMessage(const MessageExt::Ptr& message) {
     auto env = Env()[ENV_VAR_NAME];
     if (!env.has()) {
-        LOG(INFO) << fmt::format("ENV_VAR {} is not set", ENV_VAR_NAME);
+        DLOG(INFO) << fmt::format("ENV_VAR {} is not set", ENV_VAR_NAME);
         return false;
     }
     std::string value = env.get();
-    LOG(INFO) << fmt::format("GETENV {}: is set to {}", ENV_VAR_NAME, value);
+    DLOG(INFO) << fmt::format("GETENV {}: is set to {}", ENV_VAR_NAME, value);
     if (Type{message->message()} == Type{value}) {
-        LOG(INFO) << "bot is restarted by this message";
+        DLOG(INFO) << "bot is restarted by this message";
         return true;
     }
-    LOG(INFO) << "bot is not restarted by this message";
+    DLOG(INFO) << "bot is not restarted by this message";
     return false;
 }
