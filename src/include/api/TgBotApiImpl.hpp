@@ -18,6 +18,7 @@
 #include "MessageExt.hpp"
 #include "Providers.hpp"
 #include "TgBotApi.hpp"
+#include "api/components/FileCheck.hpp"
 
 using TgBot::Animation;
 using TgBot::Api;
@@ -74,6 +75,7 @@ class TgBotApiImpl : public TgBotApi {
     friend class RestartCommand;
     std::unique_ptr<RestartCommand> restartCommand;
 
+    std::unique_ptr<FileCheck> virusChecker;
    private:
     /**
      * @brief Sends a message to a chat.

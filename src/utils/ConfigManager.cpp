@@ -64,18 +64,57 @@ struct ConfigBackendEnv : public ConfigManager::Backend {
     [[nodiscard]] std::string_view name() const override { return "Env"; }
 };
 
+template <ConfigManager::Entry::ArgType type>
+struct ArgTypeDeducer {};
+
+template <>
+struct ArgTypeDeducer<ConfigManager::Entry::ArgType::STRING> {
+    using Type = std::string;
+};
+
+template <>
+struct ArgTypeDeducer<ConfigManager::Entry::ArgType::NONE> {
+    using Type = void;
+};
+
+template <ConfigManager::Configs config>
+void verifyUniqueConfig() {
+    constexpr auto count = std::ranges::count_if(
+        ConfigManager::kConfigMap,
+        [](const auto &entry) { return entry.config == config; });
+    static_assert(count == 1,
+                  "kConfigMap must and only contain one of each configs");
+}
+
+template <size_t index>
+void addIndexConfig(po::options_description &desc) {
+    constexpr auto config = static_cast<ConfigManager::Configs>(index);
+
+    // Handle special cases.
+    if constexpr (config == ConfigManager::Configs::HELP || config == ConfigManager::Configs::MAX) {
+        return;
+    }
+
+    constexpr auto argtype =
+        std::ranges::find_if(ConfigManager::kConfigMap, [](const auto &entry) {
+            return entry.config == config;
+        })->type;
+    verifyUniqueConfig<config>();
+    using ArgType = ArgTypeDeducer<argtype>::Type;
+    AddOption<ArgType, config>(desc);
+}
+
+template <size_t... index>
+void addAll(po::options_description &desc, const std::index_sequence<index...> indexs) {
+    (addIndexConfig<index>(desc), ...);
+}
+
 struct ConfigBackendBoostPOBase : public ConfigManager::Backend {
     static po::options_description getTgBotOptionsDesc() {
         static po::options_description desc("TgBot++ Configs");
         static std::once_flag once;
         std::call_once(once, [] {
-            AddOption<std::string, ConfigManager::Configs::TOKEN>(desc);
-            AddOption<std::string, ConfigManager::Configs::LOG_FILE>(desc);
-            AddOption<std::string, ConfigManager::Configs::DATABASE_CFG>(desc);
-            AddOption<std::string, ConfigManager::Configs::SOCKET_CFG>(desc);
-            AddOption<std::string, ConfigManager::Configs::SELECTOR_CFG>(desc);
-            AddOption<std::string, ConfigManager::Configs::GITHUB_TOKEN>(desc);
-            AddOption<std::string, ConfigManager::Configs::OPTIONAL_COMPONENTS>(desc);
+            addAll(desc, std::make_index_sequence<ConfigManager::CONFIG_MAX>());
         });
         return desc;
     }

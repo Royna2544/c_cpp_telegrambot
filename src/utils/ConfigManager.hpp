@@ -25,9 +25,10 @@ class TgBotUtils_API ConfigManager {
         SELECTOR_CFG,
         GITHUB_TOKEN,
         OPTIONAL_COMPONENTS,
+        VIRUSTOTAL_API_KEY,
         MAX
     };
-    static constexpr int CONFIG_MAX = static_cast<int>(Configs::MAX);
+    static constexpr size_t CONFIG_MAX = static_cast<int>(Configs::MAX);
 
     /**
      * get - Function used to retrieve the value of a specific
@@ -58,20 +59,74 @@ class TgBotUtils_API ConfigManager {
         std::string_view name;
         std::string_view description;
         char alias;
+        enum class ArgType { NONE, STRING } type;
     };
 
-    // clang-format off
     static constexpr std::array<Entry, CONFIG_MAX> kConfigMap = {
-        Entry{Configs::TOKEN, "TOKEN", "Telegram bot token", 't'},
-        {Configs::LOG_FILE, "LOG_FILE", "Log file path", 'f'},
-        {Configs::DATABASE_CFG, "DATABASE_CFG", "Database configuration file path", 'd'},
-        {Configs::HELP, "HELP", "Display help information", 'h'},
-        {Configs::SOCKET_CFG, "SOCKET_CFG", "Sockets (ipv4/ipv6/local)", Entry::ALIAS_NONE},
-        {Configs::SELECTOR_CFG, "SELECTOR_CFG", "Selectors (poll/epoll/select)", Entry::ALIAS_NONE},
-        {Configs::GITHUB_TOKEN, "GITHUB_TOKEN", "Github token", Entry::ALIAS_NONE},
-        {Configs::OPTIONAL_COMPONENTS, "OPTIONAL_COMPONENTS", "Enable optional components (webserver/datacollector)", Entry::ALIAS_NONE}
+        Entry{
+            Configs::TOKEN,
+            "TOKEN",
+            "Telegram bot token",
+            't',
+            Entry::ArgType::STRING,
+        },
+        {
+            Configs::LOG_FILE,
+            "LOG_FILE",
+            "Log file path",
+            'f',
+            Entry::ArgType::STRING,
+        },
+        {
+            Configs::DATABASE_CFG,
+            "DATABASE_CFG",
+            "Database configuration",
+            'd',
+            Entry::ArgType::STRING,
+        },
+        {
+            Configs::HELP,
+            "HELP",
+            "Display help information",
+            'h',
+            Entry::ArgType::NONE,
+        },
+        {
+            Configs::SOCKET_CFG,
+            "SOCKET_CFG",
+            "Sockets (ipv4/ipv6/local)",
+            Entry::ALIAS_NONE,
+            Entry::ArgType::STRING,
+        },
+        {
+            Configs::SELECTOR_CFG,
+            "SELECTOR_CFG",
+            "Selectors (poll/epoll/select)",
+            Entry::ALIAS_NONE,
+            Entry::ArgType::STRING,
+        },
+        {
+            Configs::GITHUB_TOKEN,
+            "GITHUB_TOKEN",
+            "Github token",
+            Entry::ALIAS_NONE,
+            Entry::ArgType::STRING,
+        },
+        {
+            Configs::OPTIONAL_COMPONENTS,
+            "OPTIONAL_COMPONENTS",
+            "Enable optional components (webserver/datacollector)",
+            Entry::ALIAS_NONE,
+            Entry::ArgType::STRING,
+        },
+        {
+            Configs::VIRUSTOTAL_API_KEY,
+            "VIRUSTOTAL_API_KEY",
+            "VirusTotal API key",
+            Entry::ALIAS_NONE,
+            Entry::ArgType::STRING,
+        },
     };
-    // clang-format on
 
     struct Backend {
         virtual ~Backend() = default;
