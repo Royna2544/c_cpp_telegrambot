@@ -2,11 +2,13 @@
 #include <curl/curl.h>
 #include <fmt/chrono.h>
 #include <fmt/format.h>
+#include <fmt/ranges.h>
 #include <trivial_helpers/_tgbot.h>
 
 #include <api/components/FileCheck.hpp>
 #include <chrono>
 #include <filesystem>
+#include <optional>
 #include <thread>
 #include <utility>
 
@@ -25,7 +27,7 @@ struct EngineResult {
     struct {
         std::string name;
         std::string version;
-        std::chrono::year_month_day date{};
+        std::string date;
     } engine;
     std::string method;
     std::string result;
@@ -46,22 +48,6 @@ struct VirusTotalResult {
         pending,
         in_progress,
     } status{};
-};
-
-// Specialize fmt::formatter for EngineResult
-template <>
-struct fmt::formatter<std::chrono::year_month_day> {
-    static constexpr auto parse(fmt::format_parse_context &ctx) {
-        return ctx.begin();
-    }
-
-    static auto format(const std::chrono::year_month_day &result,
-                       fmt::format_context &ctx) {
-        if (result.ok()) {
-            return fmt::format_to(ctx.out(), "{}", std::format("{}", result));
-        }
-        return fmt::format_to(ctx.out(), "unknown");
-    }
 };
 
 template <>
@@ -399,19 +385,8 @@ std::optional<GetAnalysisAPI::return_type> GetAnalysisAPI::parseResponse(
         auto resultsNode = attributesNode["results"];
         for (const auto &items : resultsNode) {
             EngineResult result;
-            auto dateString = items["engine_update"].asString();
-            std::istringstream stream(dateString);
-            // Parse the date string into the year_month_day object
-            stream >> std::chrono::parse("%Y%m%d", result.engine.date);
-
-            // Check if parsing was successful
-            if (stream.fail()) {
-                LOG(WARNING) << "Failed to parse date string!: " << dateString;
-                continue;
-            }
 
             auto categoryString = items["category"].asString();
-
             if (categoryString == "confirmed-timeout") {
                 result.category = EngineResult::Category::confirmed_timeout;
             } else if (categoryString == "timeout") {
@@ -435,9 +410,10 @@ std::optional<GetAnalysisAPI::return_type> GetAnalysisAPI::parseResponse(
 
             result.engine.name = items["engine_name"].asString();
             result.engine.version = items["engine_version"].asString();
+            result.engine.date = items["engine_update"].asString();
             result.method = items["method"].asString();
             result.result = items["result"].asString();
-            virusresult.results.push_back(result);
+            virusresult.results.emplace_back(std::move(result));
         }
         return virusresult;
     } else {
