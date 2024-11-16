@@ -32,10 +32,10 @@ std::optional<socket_handle_t> SocketInterfaceUnixIPv4::createServerSocket() {
                       << data.addr;
         });
     });
-    
+
     forEachINetAddress<sockaddr_in, in_addr, AF_INET>(
         [&iface_done, sfd](const auto& data) {
-            if (!iface_done && kLocalInterface.data() != data.name) {
+            if (!iface_done && !data.name.starts_with(kLocalInterface)) {
                 LOG(INFO) << "[IPv4] Choosing ifname " << data.name;
                 bindToInterface(sfd, data.name);
                 iface_done = true;

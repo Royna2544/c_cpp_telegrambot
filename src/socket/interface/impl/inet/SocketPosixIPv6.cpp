@@ -36,7 +36,7 @@ std::optional<socket_handle_t> SocketInterfaceUnixIPv6::createServerSocket() {
     });
     forEachINetAddress<sockaddr_in6, in6_addr, AF_INET6>(
         [&iface_done, sfd](const auto& data) {
-            if (!iface_done && kLocalInterface.data() != data.name) {
+            if (!iface_done && !data.name.starts_with(kLocalInterface)) {
                 LOG(INFO) << "[IPv6] Choosing ifname " << data.name;
                 bindToInterface(sfd, data.name);
                 iface_done = true;
