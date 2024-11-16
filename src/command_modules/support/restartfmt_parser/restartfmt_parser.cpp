@@ -12,7 +12,7 @@
 
 #include "utils/Env.hpp"
 
-RestartFmt::Type::Type(const std::string_view string) {
+RestartFmt::Type::Type(const absl::string_view string) {
     std::vector<std::string> parts =
         absl::StrSplit(string, ":", absl::SkipEmpty());
     if (parts.size() != 3) {

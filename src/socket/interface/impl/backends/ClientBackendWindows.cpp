@@ -2,6 +2,7 @@
 #include <TryParseStr.hpp>
 #include <impl/SocketWindows.hpp>
 #include <string>
+#include <Env.hpp>
 
 #include "ClientBackend.hpp"
 

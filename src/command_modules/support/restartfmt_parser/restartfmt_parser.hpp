@@ -15,7 +15,7 @@ class RestartFmt {
         MessageId message_id{};
         MessageThreadId message_thread_id{};
 
-        explicit Type(const std::string_view string);
+        explicit Type(const absl::string_view string);
         explicit Type(const Message::Ptr& message);
         std::string to_string() const;
         bool operator==(const Type& other) const;

@@ -5,6 +5,7 @@
 
 #include <string>
 #include <string_view>
+#include <ostream>
 #include <TgBotUtilsExports.h>
 
 // A C++-like interface for manipulating environment variables.
@@ -12,7 +13,7 @@ class TgBotUtils_API Env {
    public:
     Env() = default;
 
-    class ValueEntry {
+    class TgBotUtils_API ValueEntry {
         std::string _key;
 
        public:
@@ -60,7 +61,7 @@ class TgBotUtils_API Env {
         // Note: This will not overwrite the existing value.
         // To overwrite, use operator=
         // When get() throws, this won't catch it.
-        const Env::ValueEntry& operator+=(const std::string_view addition) const {
+        const Env::ValueEntry& operator+=(const absl::string_view addition) const {
             *this = absl::StrCat(get(), addition);
             return *this;
         }
@@ -78,7 +79,7 @@ inline std::ostream& operator<<(std::ostream& o, const Env::ValueEntry& entry) {
     if (entry.has()) {
         o << entry.get();
     } else {
-        o << "(nonexistent variable " <<  entry.key() << ")";
+        o << "(nonexistent variable " << entry.key() << ")";
     }
     return o;
 }

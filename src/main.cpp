@@ -2,12 +2,16 @@
 #include <absl/log/log.h>
 #include <absl/log/log_sink_registry.h>
 #include <absl/strings/match.h>
+#include <absl/strings/str_split.h>
 #include <fmt/chrono.h>
 #include <fmt/format.h>
+#include <fruit/fruit.h>
+#include <fruit/fruit_forward_decls.h>
 #include <fruit/injector.h>
 
 #include <AbslLogInit.hpp>
 #include <Authorization.hpp>
+#include <CommandLine.hpp>
 #include <ConfigManager.hpp>
 #include <DurationPoint.hpp>
 #include <LogSinks.hpp>
@@ -35,23 +39,11 @@
 #include <logging/LoggingServer.hpp>
 #include <memory>
 #include <ml/ChatDataCollector.hpp>
+#include <restartfmt_parser.hpp>
 #include <stdexcept>
-#include <system_error>
-#include <type_traits>
+#include <trivial_helpers/fruit_inject.hpp>
 #include <utility>
 #include <vector>
-
-#include "CommandLine.hpp"
-#include "DatabaseBase.hpp"
-#include "SocketBase.hpp"
-#include "absl/strings/str_split.h"
-#include "api/TgBotApi.hpp"
-#include "fruit/fruit.h"
-#include "fruit/fruit_forward_decls.h"
-#include "trivial_helpers/fruit_inject.hpp"
-#ifndef WINDOWS_BUILD
-#include <restartfmt_parser.hpp>
-#endif
 
 class RegexHandlerInterface : public RegexHandler::Interface {
    public:
