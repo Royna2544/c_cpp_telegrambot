@@ -1,4 +1,5 @@
 #include <absl/log/log.h>
+#include <absl/strings/strip.h>
 #include <curl/curl.h>
 #include <fmt/chrono.h>
 #include <fmt/format.h>
@@ -8,9 +9,14 @@
 #include <api/components/FileCheck.hpp>
 #include <chrono>
 #include <filesystem>
+#include <memory>
 #include <optional>
 #include <thread>
 #include <utility>
+
+#include "TryParseStr.hpp"
+#include "tgbot/types/CallbackQuery.h"
+#include "tgbot/types/InlineKeyboardMarkup.h"
 
 struct EngineResult {
     enum class Category {
@@ -32,12 +38,14 @@ struct EngineResult {
     std::string method;
     std::string result;
 
-    bool virus() const {
+    [[nodiscard]] bool virus() const {
         return category == Category::malicious ||
                category == Category::suspicious;
     }
-    bool harmless() const { return category == Category::harmless; }
-    bool idk() const { return !harmless() && !virus(); }
+    [[nodiscard]] bool harmless() const {
+        return category == Category::harmless;
+    }
+    [[nodiscard]] bool idk() const { return !harmless() && !virus(); }
 };
 
 struct VirusTotalResult {
@@ -48,6 +56,8 @@ struct VirusTotalResult {
         pending,
         in_progress,
     } status{};
+
+    bool verbose = false;
 };
 
 template <>
@@ -59,23 +69,21 @@ struct fmt::formatter<EngineResult::Category> : formatter<string_view> {
         switch (c) {
             case EngineResult::Category::confirmed_timeout:
             case EngineResult::Category::timeout:
-                category = "⏳";
+                category = "T";
                 break;
             case EngineResult::Category::failure:
             case EngineResult::Category::type_unsupported:
-                category = "😵";
+                category = "F";
                 break;
             case EngineResult::Category::harmless:
-                category = "✅";
+                category = "O";
                 break;
             case EngineResult::Category::undetected:
-                category = "❓";
+                category = "U";
                 break;
             case EngineResult::Category::suspicious:
-                category = "⚠️";
-                break;
             case EngineResult::Category::malicious:
-                category = "❌";
+                category = "X";
                 break;
             default:
                 break;
@@ -87,14 +95,19 @@ struct fmt::formatter<EngineResult::Category> : formatter<string_view> {
 // Specialize fmt::formatter for EngineResult
 template <>
 struct fmt::formatter<EngineResult> {
+    static constexpr bool kVerbose = false;
     static constexpr auto parse(fmt::format_parse_context &ctx) {
         return ctx.begin();
     }
 
     static auto format(const EngineResult &result, fmt::format_context &ctx) {
-        return fmt::format_to(ctx.out(), "{} (d: {}, v: {}): {}",
-                              result.engine.name, result.engine.date,
-                              result.engine.version, result.category);
+        if constexpr (kVerbose) {
+            return fmt::format_to(ctx.out(), "{} (d: {}, v: {}): {}",
+                                  result.engine.name, result.engine.date,
+                                  result.engine.version, result.category);
+        }
+        return fmt::format_to(ctx.out(), "{}: {}", result.engine.name,
+                              result.category);
     }
 };
 
@@ -131,20 +144,25 @@ struct fmt::formatter<VirusTotalResult> {
 
     static auto format(const VirusTotalResult &result,
                        fmt::format_context &ctx) {
-        return fmt::format_to(
-            ctx.out(),
+        std::string nonverboseout = fmt::format(
             "VirusTotal scan result (status: {}):\nSummary: "
-            "Virus: {}, Not Virus: {}, IDK: {}\n- {}",
+            "Virus: {}, Not Virus: {}, IDK: {}",
             result.status,
             std::ranges::count_if(result.results,
                                   [](const auto &res) { return res.virus(); }),
             std::ranges::count_if(
                 result.results, [](const auto &res) { return res.harmless(); }),
             std::ranges::count_if(result.results,
-                                  [](const auto &res) { return res.idk(); }),
-            fmt::join(result.results, "\n- "));
+                                  [](const auto &res) { return res.idk(); }));
 
-        return ctx.out();
+        if (result.verbose) {
+            return fmt::format_to(ctx.out(),
+                                  "{}\nLegend: T: timeout, F: AV failure, O: "
+                                  "harmless, X: malicious, U: unknown\n- {}",
+                                  nonverboseout,
+                                  fmt::join(result.results, "\n- "));
+        }
+        return fmt::format_to(ctx.out(), "{}", nonverboseout);
     }
 };
 
@@ -474,9 +492,27 @@ TgBotApi::AnyMessageResult FileCheck::onAnyMessage(
         }
         LOG(INFO) << "Analysis results received";
 
+        // Append data to the vec
+        ResultHolder holder;
+        auto virus = analysisResult.value();
+        holder.result = fmt::format("{}", virus);
+        virus.verbose = true;
+        holder.verboseResult = fmt::format("{}", virus);
+        holder.verbose_state = false;
+        holder.summary =
+            std::make_shared<TgBot::InlineKeyboardMarkup>(viewShortKeyboard);
+        holder.all =
+            std::make_shared<TgBot::InlineKeyboardMarkup>(viewFullyKeyboard);
+        holder.summary->inlineKeyboard[0][0]->callbackData =
+            holder.all->inlineKeyboard[0][0]->callbackData =
+                fmt::format("{}{}", kQueryDataPrefix, counter);
+
         // Send the analysis result
-        api->sendReplyMessage(message,
-                              fmt::format("{}", analysisResult.value()));
+        holder.message =
+            api->sendReplyMessage(message, holder.result, holder.all);
+
+        _resultHolder[counter] = holder;
+        counter++;
 
         // Delete the downloaded file
         std::filesystem::remove(filePath);
@@ -484,9 +520,43 @@ TgBotApi::AnyMessageResult FileCheck::onAnyMessage(
     return TgBotApi::AnyMessageResult::Handled;
 }
 
+void FileCheck::onCallbackQueryFunction(
+    const TgBot::CallbackQuery::Ptr &query) {
+    absl::string_view id = query->data;
+    if (!absl::ConsumePrefix(&id, kQueryDataPrefix)) {
+        return;
+    }
+    int counter = 0;
+    if (!try_parse(id, &counter)) {
+        return;
+    }
+    if (!_resultHolder.contains(counter)) {
+        return;
+    }
+    auto &holder = _resultHolder[counter];
+    holder.verbose_state = !holder.verbose_state;
+    _api->editMessage(
+        holder.message,
+        holder.verbose_state ? holder.verboseResult : holder.result,
+        holder.verbose_state ? holder.summary : holder.all);
+}
+
 FileCheck::FileCheck(TgBotApi::Ptr api, std::string virusTotalToken)
-    : _token(std::move(virusTotalToken)) {
+    : _token(std::move(virusTotalToken)), _api(api) {
     api->onAnyMessage([this](TgBotApi::CPtr api, const Message::Ptr &message) {
         return onAnyMessage(api, message);
     });
+    api->onCallbackQuery("__builtin_filecheck_handler__",
+                         [this](const TgBot::CallbackQuery::Ptr &query) {
+                             onCallbackQueryFunction(query);
+                         });
+    viewShortKeyboard.inlineKeyboard.emplace_back();
+    viewShortKeyboard.inlineKeyboard[0].emplace_back(
+        std::make_shared<TgBot::InlineKeyboardButton>());
+    viewShortKeyboard.inlineKeyboard[0][0]->text = "View short";
+
+    viewFullyKeyboard.inlineKeyboard.emplace_back();
+    viewFullyKeyboard.inlineKeyboard[0].emplace_back(
+        std::make_shared<TgBot::InlineKeyboardButton>());
+    viewFullyKeyboard.inlineKeyboard[0][0]->text = "View all";
 }
