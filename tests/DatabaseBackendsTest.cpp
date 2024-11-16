@@ -23,7 +23,7 @@ std::ostream& operator<<(std::ostream& os, const DBParam& params) {
 class DatabaseBaseTest : public ::testing::TestWithParam<DBParam> {
    protected:
     std::shared_ptr<DatabaseBase> db;
-    std::filesystem::path db_path = SQLiteDatabase::kInMemoryDatabase;
+    std::filesystem::path db_path = DatabaseBase::kInMemoryDatabase;
 
     void SetUp() override {
         db = GetParam().db;  // Get the actual implementation

@@ -22,12 +22,14 @@ option(DIRTY_ABSEIL_FIX "Enable dirty abseil linkage fix" OFF)
 if (WIN32)
   add_subdirectory(src/third-party/dlfcn-win32)
   set(CMAKE_DL_LIBS dl)
-else()
+elseif(NOT ANDROID)
   find_library(DL dl)
   add_library(dl SHARED IMPORTED)
   set_target_properties(dl PROPERTIES
     IMPORTED_LOCATION "${DL}"
   )
+else()
+  set(CMAKE_DL_LIBS)
 endif()
 
 ##################### Fill in readme with cmake #####################

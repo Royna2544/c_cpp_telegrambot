@@ -180,7 +180,9 @@ void popen_watchdog_stop(popen_watchdog_data_t **data_in) {
     }
     if (data->watchdog_enabled) {
         POPEN_WDT_DBGLOG("Stopping watchdog");
+#ifndef __BIONIC__
         pthread_cancel(pdata->wdt_thread);
+#endif
         pthread_mutex_unlock(&wdt_mutex);
         pthread_join(pdata->wdt_thread, NULL);
     } else {
