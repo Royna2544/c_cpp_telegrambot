@@ -177,8 +177,8 @@ function(add_my_library)
     add_library(${TGBOT_LIBRARY_NAME} STATIC ${TGBOT_LIBRARY_SRCS})
   else()
     add_library(${TGBOT_LIBRARY_NAME} SHARED ${TGBOT_LIBRARY_SRCS})
+    install(TARGETS ${TGBOT_LIBRARY_NAME} DESTINATION lib)
   endif()
-  install(TARGETS ${TGBOT_LIBRARY_NAME} DESTINATION lib)
   add_sanitizers(${TGBOT_LIBRARY_NAME})
     set(EXPORTCONF_DIR ${CMAKE_BINARY_DIR}/exportConfig/)
   if (NOT TGBOT_LIBRARY_STATIC)
@@ -389,5 +389,16 @@ add_my_executable(
 endif()
 #####################################################################
 
-install(DIRECTORY resources/ DESTINATION resources FILES_MATCHING  PATTERN "*"
+install(DIRECTORY resources/ DESTINATION resources FILES_MATCHING PATTERN "*"
   PATTERN "*.in" EXCLUDE)
+
+# Set CPack configurations
+set(CPACK_PACKAGE_NAME "TgBot++")
+set(CPACK_PACKAGE_VERSION "1.0.0")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "A Telegram bot coded in C++")
+set(CPACK_PACKAGE_CONTACT "support@example.com")
+set(CPACK_GENERATOR "ZIP;TGZ;NSIS")
+set(CPACK_PACKAGE_INSTALL_DIRECTORY "TgBot C++ server ${CPACK_PACKAGE_VERSION}")
+
+# Include CPack
+include(CPack)

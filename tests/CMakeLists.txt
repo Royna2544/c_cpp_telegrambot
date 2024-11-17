@@ -20,6 +20,7 @@ add_my_executable(
     GTest::gtest
     GTest::gmock
     TgBotPPImpl fruit
+  OPTIONAL
 )
 
 # Add the test executable to CTest
@@ -33,6 +34,7 @@ add_my_executable(
   LIBS
     GTest::gtest
     TgBotDBImpl
+  OPTIONAL
 )
 # Add the test executable to CTest
 add_test(NAME TestSuiteDatabase COMMAND TgBot++_test_database)
@@ -47,6 +49,7 @@ add_my_executable(
     GTest::gmock
     TgBotPPImpl
     fruit
+  OPTIONAL
 )
 # Add the test executable to CTest
 add_test(NAME TestSuiteSocketDataHandler COMMAND TgBot++_test_socketdatahandler)

@@ -19,20 +19,18 @@ jobs:
 
     name: "🚧 MSVC ${{ matrix.configuration }} with vcpkg"
     steps:
+    - uses: lukka/get-cmake@latest
+
     - name: '🧰 Checkout'
-      uses: actions/checkout@v3.5.3
+      uses: actions/checkout@v4.2.2
       with:
         fetch-depth: 0
-
-    - name: 'Clone vcpkg'
-      run: |
-        git clone https://github.com/microsoft/vcpkg.git
-        cd vcpkg
-        ./bootstrap-vcpkg.bat
-
-    - name: 'Install Dependencies with vcpkg'
-      run: |
-        ./vcpkg/vcpkg.exe install boost-system libgit2 libxml2 libpng libwebp libjpeg-turbo opencv fmt sqlite3 jsoncpp openssl
+    
+    - name: Prepare VCPKG
+      uses: lukka/run-vcpkg@v11
+      with:
+        vcpkgJsonGlob: "**/resources/vcpkg.json"
+        vcpkgGitCommitId: "435a9415ca61939ee0382f703009c440a8eae273"
 
     - name: '🚧 Build TgBot++'
       run: |
