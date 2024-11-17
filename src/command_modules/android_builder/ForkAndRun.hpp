@@ -10,13 +10,10 @@
 #include <trivial_helpers/_class_helper_macros.h>
 #include <unistd.h>
 
-#include <algorithm>
 #include <array>
 #include <filesystem>
 #include <functional>
-#include <initializer_list>
 #include <iostream>
-#include <map>
 #include <shared_mutex>
 #include <socket/selector/SelectorPosix.hpp>
 #include <string_view>
@@ -25,7 +22,57 @@
 #include <unordered_map>
 #include <utility>
 
-struct DeferredExit {
+class ExitStatusParser {
+   protected:
+    void update(int status);
+    ExitStatusParser() = default;
+
+   public:
+    enum class Type { UNKNOWN, EXIT, SIGNAL };
+
+    // Returns true if the process has exited with code 0
+    explicit operator bool() const noexcept;
+
+    // Default ctor
+    ExitStatusParser(int code, Type type) : code(code), type(type) {}
+
+    // Calls a waitpid on the pid, and returns ExitStatusParser
+    static ExitStatusParser fromPid(pid_t pid, bool nohang = false);
+
+    // Create a ExitStatusParser with the given status.
+    static ExitStatusParser fromStatus(int status);
+
+    Type type{};
+    int code{};
+};
+
+// Specialize fmt::formatter for EngineResult
+template <>
+struct fmt::formatter<ExitStatusParser> {
+    static constexpr auto parse(fmt::format_parse_context& ctx) {
+        return ctx.begin();
+    }
+
+    static auto format(const ExitStatusParser& status,
+                       fmt::format_context& ctx) {
+        std::string_view typeStr;
+        switch (status.type) {
+            case ExitStatusParser::Type::EXIT:
+                typeStr = "EXIT";
+                break;
+            case ExitStatusParser::Type::SIGNAL:
+                typeStr = "SIGNAL";
+                break;
+            case ExitStatusParser::Type::UNKNOWN:
+                typeStr = "UNKNOWN";
+                break;
+        };
+        return fmt::format_to(ctx.out(), "ExitStatus [code {}, type {}]",
+                              status.code, typeStr);
+    }
+};
+
+struct DeferredExit : ExitStatusParser {
     struct fail_t {};
     constexpr static inline fail_t generic_fail{};
 
@@ -36,29 +83,23 @@ struct DeferredExit {
     // Re-do the deferred exit.
     ~DeferredExit();
     // Default ctor
-    DeferredExit() : code(0), type(Type::EXIT) {}
+    DeferredExit() = default;
 
     NO_COPY_CTOR(DeferredExit);
 
     // Move operator
-    DeferredExit(DeferredExit&& other) noexcept
-        : type(other.type), code(other.code) {
+    DeferredExit(DeferredExit&& other) noexcept : ExitStatusParser(other) {
         other.destory = false;
     }
     DeferredExit& operator=(DeferredExit&& other) noexcept {
         if (this != &other) {
-            type = other.type;
-            code = other.code;
+            ExitStatusParser::operator=(other);
             other.destory = false;
         }
         return *this;
     }
 
     void defuse() { destory = false; }
-    operator bool() const noexcept;
-
-    enum class Type { UNKNOWN, EXIT, SIGNAL } type;
-    int code;
     bool destory = true;
 };
 

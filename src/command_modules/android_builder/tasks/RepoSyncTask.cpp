@@ -145,18 +145,12 @@ DeferredExit RepoSyncTask::runFunction() {
         LOG(INFO) << "Repo sync result: " << ret;
         return ret;
     };
-    DeferredExit rs;
     if (runWithReducedJobs) {
         // Futher reduce the number of jobs count
-        rs = sync(job_count / 4);
+        return sync(job_count / 4);
     } else {
-        rs = sync(job_count);
+        return sync(job_count);
     }
-    if (!rs) {
-        return rs;
-    }
-    rs.defuse();
-    return {};  // Success
 }
 
 void RepoSyncTask::handleStderrData(ForkAndRun::BufferViewType buffer) {

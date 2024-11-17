@@ -12,6 +12,7 @@
 #include <api/CommandModule.hpp>
 #include <api/TgBotApi.hpp>
 #include <concepts>
+#include <cstdlib>
 #include <filesystem>
 #include <initializer_list>
 #include <libfs.hpp>
@@ -25,6 +26,8 @@
 #include <utility>
 
 #include "ConfigManager.hpp"
+#include "ForkAndRun.hpp"
+#include "Shmem.hpp"
 #include "SystemInfo.hpp"
 
 template <typename Impl>
@@ -643,15 +646,31 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
         _exit(0);  // Exit the child process.
     }
     // As vfork, parent will be delayed until the child exits.
-    if (waitpid(pid, nullptr, 0) < 0) {
-        PLOG(ERROR) << "Failed to wait for child process";
+    try {
+        auto result = ExitStatusParser::fromPid(pid);
+        switch (result.type) {
+            case ExitStatusParser::Type::EXIT: {
+                if (result.code == 0) {
+                    _api->editMessageMarkup(sentMessage, nullptr);
+                    _api->sendMessage(sentMessage->chat, "Build completed");
+                }
+                break;
+            }
+            case ExitStatusParser::Type::SIGNAL: {
+                LOG(ERROR) << "Child process terminated by signal: "
+                           << result.code;
+                _api->editMessage(sentMessage,
+                                  "Child process terminated by signal");
+                break;
+            }
+            case ExitStatusParser::Type::UNKNOWN:
+                break;
+        }
+    } catch (const syscall_perror& ex) {
+        LOG(ERROR) << ex.what();
         _api->editMessage(sentMessage, "Failed to wait for child process");
         return;
     }
-    auto remove = std::make_shared<TgBot::ReplyKeyboardRemove>();
-    remove->removeKeyboard = true;
-    _api->editMessageMarkup(sentMessage, nullptr);
-    _api->sendMessage(sentMessage->chat, "Build completed");
     if (didpin) {
         try {
             _api->unpinMessage(sentMessage);
@@ -660,6 +679,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
         }
     }
 }
+
 void ROMBuildQueryHandler::handle_device(const Query& query) {
     std::string_view device = query->data;
     absl::ConsumePrefix(&device, "device_");

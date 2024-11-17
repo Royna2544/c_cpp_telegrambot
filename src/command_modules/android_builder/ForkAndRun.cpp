@@ -31,6 +31,8 @@
 #include <utility>
 #include <vector>
 
+#include "Shmem.hpp"
+
 struct FDLogSink : public absl::LogSink {
     void Send(const absl::LogEntry& logSink) override {
         if (isWritable) {
@@ -93,8 +95,7 @@ DeferredExit ptrace_common_parent(pid_t pid) {
 
     if (WIFEXITED(status)) {
         LOG(ERROR) << "Child exited too early.";
-        exit.code = WEXITSTATUS(status);
-        exit.type = DeferredExit::Type::EXIT;
+        exit = DeferredExit(status);
         return std::move(exit);
     }
 
@@ -281,8 +282,7 @@ bool ForkAndRun::execute() {
         }
 
         // Create deferred exit just to dedup code
-        auto e = DeferredExit(status);
-        e.defuse();
+        auto e = ExitStatusParser::fromStatus(status);
         switch (e.type) {
             case DeferredExit::Type::EXIT:
                 onExit(e.code);
@@ -290,9 +290,9 @@ bool ForkAndRun::execute() {
             case DeferredExit::Type::SIGNAL:
                 onSignal(e.code);
                 break;
-            default:
-                LOG(ERROR) << "Unexpected exit type: "
-                           << static_cast<int>(e.type);
+            case ExitStatusParser::Type::UNKNOWN:
+                LOG(WARNING) << "Unknown exit status";
+                break;
         }
 
         // Notify the polling thread that program has ended.
@@ -326,10 +326,7 @@ void ForkAndRun::cancel() const {
     killpg(childProcessId, SIGTERM);
 }
 
-DeferredExit::DeferredExit(DeferredExit::fail_t /*unused*/)
-    : type(Type::EXIT), code(EXIT_FAILURE) {}
-
-DeferredExit::DeferredExit(int status) {
+void ExitStatusParser::update(int status) {
     if (WIFEXITED(status)) {
         type = Type::EXIT;
         code = WEXITSTATUS(status);
@@ -342,6 +339,30 @@ DeferredExit::DeferredExit(int status) {
     }
 }
 
+ExitStatusParser ExitStatusParser::fromStatus(int status) {
+    ExitStatusParser exitstatus{};
+    exitstatus.update(status);
+    return exitstatus;
+}
+
+ExitStatusParser ExitStatusParser::fromPid(pid_t pid, bool nohang) {
+    int status = 0;
+    if (waitpid(pid, &status, nohang ? WNOHANG : 0) < 0) {
+        throw syscall_perror("waitpid");
+    } else {
+        return fromStatus(status);
+    }
+}
+
+ExitStatusParser::operator bool() const noexcept {
+    return type == Type::EXIT && code == 0;
+}
+
+DeferredExit::DeferredExit(DeferredExit::fail_t /*unused*/)
+    : ExitStatusParser(EXIT_FAILURE, Type::EXIT) {}
+
+DeferredExit::DeferredExit(int status) { update(status); }
+
 DeferredExit::~DeferredExit() {
     if (!destory) {
         return;
@@ -349,20 +370,8 @@ DeferredExit::~DeferredExit() {
 
     DLOG(INFO) << "At ~DeferredExit";
     if (!*this) {
-        std::string_view typeStr;
-        switch (type) {
-            case Type::EXIT:
-                typeStr = "EXIT";
-                break;
-            case Type::SIGNAL:
-                typeStr = "SIGNAL";
-                break;
-            case Type::UNKNOWN:
-                typeStr = "UNKNOWN";
-                break;
-        };
-        DLOG(INFO) << fmt::format("I am a bomb, I contain code {} and type {}",
-                                  code, typeStr);
+        DLOG(INFO) << fmt::format("I am a bomb, {}",
+                                  *static_cast<ExitStatusParser*>(this));
     }
     switch (type) {
         case Type::EXIT:
@@ -372,15 +381,10 @@ DeferredExit::~DeferredExit() {
             kill(0, code);
             break;
         case Type::UNKNOWN:
-            LOG(WARNING)
-                << "Deferred exit: unknown type. Take default action: exit 1";
+            LOG(WARNING) << "Unknown type: just exiting with status 1";
             _exit(EXIT_FAILURE);
             break;
     }
-}
-
-DeferredExit::operator bool() const noexcept {
-    return type == Type::EXIT && code == 0;
 }
 
 ForkAndRunSimple::ForkAndRunSimple(std::string_view argv)
