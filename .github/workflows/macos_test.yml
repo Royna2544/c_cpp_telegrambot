@@ -11,7 +11,7 @@ on:
     
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-13
 
     steps:
       - name: Checkout code
@@ -25,8 +25,8 @@ jobs:
 
       - name: Compile with Apple GCC
         env: 
-          CC: /opt/homebrew/bin/gcc-14
-          CXX: /opt/homebrew/bin/g++-14
+          CC: /usr/local/opt/gcc/bin/gcc-14
+          CXX: /usr/local/opt/gcc/bin/g++-14
         run: |
           mkdir build
           cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release .
