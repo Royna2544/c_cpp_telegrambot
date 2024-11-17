@@ -41,7 +41,8 @@ enum class MessageAttrs {
     Date,
     MessageId,
     Video,
-    Locale
+    Locale,
+    Document
 };
 
 inline std::ostream& operator<<(std::ostream& stream,
@@ -71,6 +72,8 @@ inline std::ostream& operator<<(std::ostream& stream,
             return stream << "Video";
         case MessageAttrs::Locale:
             return stream << "Locale";
+        case MessageAttrs::Document:
+            return stream << "Document";
     }
     return stream;
 }
@@ -136,6 +139,10 @@ template <>
 struct AttributeType<MessageAttrs::Locale> {
     using type = Locale;
 };
+template <>
+struct AttributeType<MessageAttrs::Document> {
+    using type = TgBot::Document::Ptr;
+};
 
 }  // namespace internal::message
 
@@ -188,6 +195,8 @@ class MessageExt {
                 loc <= get<MessageAttrs::User>()->languageCode;
             }
             return loc;
+        } else if constexpr (attr == MessageAttrs::Document) {
+            return _message->document;
         }
         CHECK(false) << "Unreachable: " << static_cast<int>(attr);
         return {};
@@ -277,6 +286,8 @@ class MessageExt {
             case MessageAttrs::Date:
             case MessageAttrs::MessageId:
                 return true;
+            case MessageAttrs::Document:
+                return _message->document != nullptr;
         }
         return false;
     }

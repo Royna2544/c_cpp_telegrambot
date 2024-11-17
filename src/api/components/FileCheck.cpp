@@ -15,6 +15,7 @@
 #include <utility>
 
 #include "TryParseStr.hpp"
+#include "api/MessageExt.hpp"
 #include "libos/libsighandler.hpp"
 #include "tgbot/types/CallbackQuery.h"
 #include "tgbot/types/InlineKeyboardMarkup.h"
@@ -443,81 +444,87 @@ std::optional<GetAnalysisAPI::return_type> GetAnalysisAPI::parseResponse(
 }
 
 TgBotApi::AnyMessageResult FileCheck::onAnyMessage(
-    TgBotApi::CPtr api, const Message::Ptr &message) {
-    if (message->document != nullptr) {
-        std::filesystem::path filePath =
-            std::filesystem::temp_directory_path() / "virustotal.bin";
-        DLOG(INFO) << fmt::format("Received file: by {} in chat {}",
-                                  message->from, message->chat);
-
-        LOG(INFO) << "Downloading file";
-        // Download the file using the TgBotApi::downloadFile function
-        if (!api->downloadFile(filePath, message->document->fileId)) {
-            LOG(ERROR) << "Failed to download file";
-            return TgBotApi::AnyMessageResult::Handled;
-        }
-        LOG(INFO) << "Downloaded file";
-
-        // Check the file
-        SendFileAPI sendFileAPI(_token);
-        auto sendFileRes = sendFileAPI.request(filePath);
-
-        LOG(INFO) << "Sending file to VirusTotal API server";
-        if (!sendFileRes) {
-            LOG(ERROR) << "Failed to send file to VirusTotal API";
-            return TgBotApi::AnyMessageResult::Handled;
-        }
-        LOG(INFO) << "Successfully sent file";
-
-        auto sendFileProcRes = sendFileAPI.parseResponse(sendFileRes.value());
-        if (!sendFileProcRes) {
-            LOG(ERROR) << "Failed to parse response from VirusTotal API";
-            return TgBotApi::AnyMessageResult::Handled;
-        }
-
-        GetAnalysisAPI getAnalysis(_token);
-        std::optional<GetAnalysisAPI::return_type> analysisResult;
-        while (!analysisResult || SignalHandler::isSignaled()) {
-            LOG(INFO) << "Getting analysis results";
-            auto analfut = getAnalysis.request(sendFileProcRes.value());
-            if (!analfut) {
-                LOG(ERROR) << "Failed to request analysis results";
-                return TgBotApi::AnyMessageResult::Handled;
-            }
-
-            analysisResult = getAnalysis.parseResponse(analfut.value());
-            if (!analysisResult) {
-                LOG(ERROR) << "Failed to get analysis results";
-                std::this_thread::sleep_for(std::chrono::seconds(5));
-            }
-        }
-        LOG(INFO) << "Analysis results received";
-
-        // Append data to the vec
-        ResultHolder holder;
-        auto virus = analysisResult.value();
-        holder.result = fmt::format("{}", virus);
-        virus.verbose = true;
-        holder.verboseResult = fmt::format("{}", virus);
-        holder.verbose_state = false;
-        holder.summary =
-            std::make_shared<TgBot::InlineKeyboardMarkup>(viewShortKeyboard);
-        holder.all =
-            std::make_shared<TgBot::InlineKeyboardMarkup>(viewFullyKeyboard);
-        holder.summary->inlineKeyboard[0][0]->callbackData =
-            holder.all->inlineKeyboard[0][0]->callbackData =
-                fmt::format("{}{}", kQueryDataPrefix, counter);
-
-        // Send the analysis result
-        holder.message =
-            api->sendReplyMessage(message, holder.result, holder.all);
-
-        _resultHolder[counter] = holder;
-        counter++;
-
-        // Delete the downloaded file
-        std::filesystem::remove(filePath);
+    TgBotApi::CPtr api, const MessageExt::Ptr &message) {
+    if (message->any({MessageAttrs::Animation, MessageAttrs::Photo,
+                      MessageAttrs::Sticker, MessageAttrs::Video}) ||
+        !message->has<MessageAttrs::Document>()) {
+        return TgBotApi::AnyMessageResult::Handled;
     }
+    std::filesystem::path filePath =
+        std::filesystem::temp_directory_path() / "virustotal.bin";
+    DLOG(INFO) << fmt::format("Received file: by {} in chat {}",
+                              message->get<MessageAttrs::User>(),
+                              message->get<MessageAttrs::Chat>());
+
+    LOG(INFO) << "Downloading file";
+    // Download the file using the TgBotApi::downloadFile function
+    if (!api->downloadFile(filePath,
+                           message->get<MessageAttrs::Document>()->fileId)) {
+        LOG(ERROR) << "Failed to download file";
+        return TgBotApi::AnyMessageResult::Handled;
+    }
+    LOG(INFO) << "Downloaded file";
+
+    // Check the file
+    SendFileAPI sendFileAPI(_token);
+    auto sendFileRes = sendFileAPI.request(filePath);
+
+    LOG(INFO) << "Sending file to VirusTotal API server";
+    if (!sendFileRes) {
+        LOG(ERROR) << "Failed to send file to VirusTotal API";
+        return TgBotApi::AnyMessageResult::Handled;
+    }
+    LOG(INFO) << "Successfully sent file";
+
+    auto sendFileProcRes = sendFileAPI.parseResponse(sendFileRes.value());
+    if (!sendFileProcRes) {
+        LOG(ERROR) << "Failed to parse response from VirusTotal API";
+        return TgBotApi::AnyMessageResult::Handled;
+    }
+
+    GetAnalysisAPI getAnalysis(_token);
+    std::optional<GetAnalysisAPI::return_type> analysisResult;
+    while (!analysisResult || SignalHandler::isSignaled()) {
+        LOG(INFO) << "Getting analysis results";
+        auto analfut = getAnalysis.request(sendFileProcRes.value());
+        if (!analfut) {
+            LOG(ERROR) << "Failed to request analysis results";
+            return TgBotApi::AnyMessageResult::Handled;
+        }
+
+        analysisResult = getAnalysis.parseResponse(analfut.value());
+        if (!analysisResult) {
+            LOG(ERROR) << "Failed to get analysis results";
+            std::this_thread::sleep_for(std::chrono::seconds(5));
+        }
+    }
+    LOG(INFO) << "Analysis results received";
+
+    // Append data to the vec
+    ResultHolder holder;
+    auto virus = analysisResult.value();
+    holder.result = fmt::format("{}", virus);
+    virus.verbose = true;
+    holder.verboseResult = fmt::format("{}", virus);
+    holder.verbose_state = false;
+    holder.summary =
+        std::make_shared<TgBot::InlineKeyboardMarkup>(viewShortKeyboard);
+    holder.all =
+        std::make_shared<TgBot::InlineKeyboardMarkup>(viewFullyKeyboard);
+    holder.summary->inlineKeyboard[0][0]->callbackData =
+        holder.all->inlineKeyboard[0][0]->callbackData =
+            fmt::format("{}{}", kQueryDataPrefix, counter);
+
+    // Send the analysis result
+    holder.message =
+        api->sendReplyMessage(message->message(), holder.result, holder.all);
+
+    _resultHolder[counter] = holder;
+    counter++;
+
+    // Delete the downloaded file
+    std::filesystem::remove(filePath);
+
     return TgBotApi::AnyMessageResult::Handled;
 }
 
@@ -544,8 +551,8 @@ void FileCheck::onCallbackQueryFunction(
 
 FileCheck::FileCheck(TgBotApi::Ptr api, std::string virusTotalToken)
     : _token(std::move(virusTotalToken)), _api(api) {
-    api->onAnyMessage([this](TgBotApi::CPtr api, const Message::Ptr &message) {
-        return onAnyMessage(api, message);
+    api->onAnyMessage([this](TgBotApi::CPtr api, Message::Ptr message) {
+        return onAnyMessage(api, std::make_shared<MessageExt>(std::move(message)));
     });
     api->onCallbackQuery("__builtin_filecheck_handler__",
                          [this](const TgBot::CallbackQuery::Ptr &query) {
