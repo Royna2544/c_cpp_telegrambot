@@ -2,7 +2,7 @@
 
 #include <atomic>
 
-#ifdef WINDOWS_BUILD
+#ifdef _WIN32
 #define _WINSOCKAPI_  // stops windows.h including winsock.h
 #include <Windows.h>
 #endif
@@ -56,7 +56,7 @@ class SignalHandler {
      */
     static bool isSignaled() { return kUnderSignal.load(); }
 
-#ifdef WINDOWS_BUILD
+#ifdef _WIN32
    friend BOOL WINAPI CtrlHandler(DWORD fdwCtrlType);
 #endif
    private:

@@ -19,7 +19,7 @@ class CommandModule;
 #define DYN_COMMAND_SYM_STR "cmd"
 #define DYN_COMMAND_SYM cmd
 
-#ifdef WINDOWS_BUILD
+#ifdef _WIN32
 #define DYN_COMMAND_EXPORT __declspec(dllexport)
 #else
 #define DYN_COMMAND_EXPORT

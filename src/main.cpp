@@ -535,7 +535,7 @@ int main(int argc, char** argv) {
             "Royna's telegram bot, written in C++. Go on you can talk to it"sv,
             "One of @roynatech's TgBot C++ project bots. I'm currently hosted "
             "on "
-#ifdef WINDOWS_BUILD
+#if defined(_WIN32)
             "Windows"sv
 #elif defined(__linux__)
             "Linux"sv

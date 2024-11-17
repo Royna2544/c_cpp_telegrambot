@@ -51,7 +51,7 @@ struct TgBotUtils_API FS {
     static bool deleteFile(const std::filesystem::path& filename);
 
     static constexpr std::string_view kDylibExtension =
-#ifdef WINDOWS_BUILD
+#ifdef _WIN32
         ".dll";
 #elif defined __APPLE__
         ".dylib";

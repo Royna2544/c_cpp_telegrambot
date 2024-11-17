@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.15)
 project(TgBot++ LANGUAGES CXX C)
 
 ####################### Set CMake Policy #######################
-include(CMake/CompilerConfig.cmake)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake")
 
 # Set RPATH for Unix-like systems
@@ -11,7 +10,6 @@ if(UNIX)
     set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
     set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 endif()
-################ EXE NAMES STEMMED FROM PROJECT_NAME ################
 
 ############################## OPTIONS ##############################
 option(ENABLE_RUST_SUPPORT "Enable rust support" OFF)
@@ -19,17 +17,143 @@ option(DISABLE_SANITIZERS "Disable all sanitizers (ASan, TSan, etc)" OFF)
 option(DIRTY_ABSEIL_FIX "Enable dirty abseil linkage fix" OFF)
 #####################################################################
 
+#################### Submodule's configuration ###################
+set(BUILD_TESTS OFF CACHE BOOL "Build tests" FORCE)
+set(ABSL_BUILD_TEST_HELPERS OFF CACHE BOOL "[abseil] Build gtest helpers" FORCE)
+set(ABSL_ENABLE_INSTALL ON CACHE BOOL "[abseil] Enable installation" FORCE)
+set(BUILD_SHARED_LIBS ON CACHE BOOL "Build shared libraries" FORCE)
+#####################################################################
+set(LIBS_INSTALL_PATH ${CMAKE_BINARY_DIR}/bin)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${LIBS_INSTALL_PATH} CACHE STRING 
+  "Output to store binaries (win32)" FORCE)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${LIBS_INSTALL_PATH} CACHE STRING
+  "Output to store binaries (linux)" FORCE)
+#####################################################################
+
+######################### C++ Configuration #########################
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+#####################################################################
+
+## Compiler specific settings
+set(GLOBAL_COMPILE_OPTIONS)
+set(GLOBAL_DEFINITIONS -D__TGBOT__)
+
+if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  set(CMAKE_EXE_LINKER_FLAGS "-fuse-ld=lld")
+  set(CMAKE_SHARED_LINKER_FLAGS "-fuse-ld=lld")
+  if (APPLE OR ANDROID)
+    list(APPEND GLOBAL_COMPILE_OPTIONS -fexperimental-library)
+  endif()
+endif()
+if (CMAKE_BUILD_TYPE STREQUAL "Release" AND NOT ANDROID)
+  include(CheckIPOSupported)
+  check_ipo_supported(LTO_SUPPORTED)
+  if (LTO_SUPPORTED)
+    message(STATUS "Enabling LTO (Link time optimization)")
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+  endif()
+endif()
+if (WIN32)
+  if (MSVC)
+    list(APPEND GLOBAL_COMPILE_OPTIONS /utf-8)
+    list(APPEND GLOBAL_DEFINITIONS /D_WIN32_WINNT=0x0A00)
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug" AND NOT SANITIZER_FLAG)
+      list(APPEND GLOBAL_COMPILE_OPTIONS /ZI)
+    endif()
+  else()
+    list(APPEND GLOBAL_DEFINITIONS -D_WIN32_WINNT=0x0A00)
+  endif()
+endif()
+if (NOT MSVC)
+  list(APPEND GLOBAL_COMPILE_OPTIONS -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/=)
+endif()
+
+## Check PIE support
+include(CheckPIESupported)
+check_pie_supported()
+if (CMAKE_CXX_LINK_PIE_SUPPORTED AND CMAKE_C_LINK_PIE_SUPPORTED)
+  message(STATUS "Enabling PIE (Position Independent Executable) support")
+  set(PIE_SUPPORTED TRUE CACHE BOOL "Whether PIE is supported")
+else()
+  message(STATUS "PIE (Position Independent Executable) not enabled")
+endif()
+
+## Sanitizers configuration
+set(SANITIZER_CONFIG "ASan")
+set(SANITIZER_FLAG)
+
+if (NOT SANITIZER_CONFIG)
+    message(STATUS "No sanitizers enabled")
+elseif (SANITIZER_CONFIG STREQUAL "ASan")
+    message(STATUS "Address sanitizer enabled")
+    if (APPLE) # On apple, leak sanitizer is not implemented
+        set(SANITIZER_FLAG "-fsanitize=address")
+    elseif (MSVC)
+        set(SANITIZER_FLAG "/fsanitize=address")
+    else()
+        set(SANITIZER_FLAG "-fsanitize=address,leak")
+    endif()
+elseif (SANITIZER_CONFIG STREQUAL "UBSan")
+    if (MSVC)
+        set(SANITIZER_FLAG "/fsanitize=undefined")
+    else()
+        set(SANITIZER_FLAG "-fsanitize=undefined")
+    endif()
+elseif (SANITIZER_CONFIG STREQUAL "TSan")
+    message(STATUS "Thread sanitizer enabled")
+    if (MSVC)
+        set(SANITIZER_FLAG "/fsanitize=thread")
+    else()
+        set(SANITIZER_FLAG "-fsanitize=thread")
+    endif()
+elseif (SANITIZER_CONFIG STREQUAL "MSan")
+    if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+        message(STATUS "Memory sanitizer enabled")
+        set(SANITIZER_FLAG "-fsanitize=memory")
+    else()
+        message(WARNING "Memory sanitizer is only supported with Clang")
+    endif()
+else()
+    message(WARNING "Unknown sanitizer configuration: ${SANITIZER_CONFIG}")
+endif()
+
+if (DISABLE_SANITIZERS)
+    message(STATUS "Sanitizers disabled by option")
+    unset(SANITIZER_FLAG)
+endif()
+if (CMAKE_BUILD_TYPE STREQUAL "Release")
+    message(STATUS "Disabling sanitizers as release build")
+    unset(SANITIZER_FLAG)
+endif()
+# MSYS2 is special - They don't have any sanitizers
+if (MINGW OR MSYS)
+    message(STATUS "MSYS2 detected - Disabling sanitizers")
+    unset(SANITIZER_FLAG)
+endif()
+
+# Define a macro to add sanitizers to a target.
+function(add_sanitizers target)
+    if (SANITIZER_FLAG)
+        target_compile_options(${target} PRIVATE ${SANITIZER_FLAG})
+        target_link_options(${target} PRIVATE ${SANITIZER_FLAG})
+    endif()
+endfunction()
+
+# dlfcn (libdl)
 if (WIN32)
   add_subdirectory(src/third-party/dlfcn-win32)
   set(CMAKE_DL_LIBS dl)
-elseif(NOT ANDROID)
+elseif(ANDROID)
+  set(CMAKE_DL_LIBS)
+else()
   find_library(DL dl)
   add_library(dl SHARED IMPORTED)
   set_target_properties(dl PROPERTIES
     IMPORTED_LOCATION "${DL}"
   )
-else()
-  set(CMAKE_DL_LIBS)
 endif()
 
 ##################### Fill in readme with cmake #####################
@@ -57,7 +181,6 @@ function(add_my_library)
     add_library(${TGBOT_LIBRARY_NAME} SHARED ${TGBOT_LIBRARY_SRCS})
   endif()
   install(TARGETS ${TGBOT_LIBRARY_NAME} DESTINATION lib)
-  set_target_properties(${TGBOT_LIBRARY_NAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)
   add_sanitizers(${TGBOT_LIBRARY_NAME})
     set(EXPORTCONF_DIR ${CMAKE_BINARY_DIR}/exportConfig/)
   if (NOT TGBOT_LIBRARY_STATIC)
@@ -79,10 +202,18 @@ function(add_my_library)
   if (WIN32)
     target_link_libraries(${TGBOT_LIBRARY_NAME} PUBLIC ${TGBOT_LIBRARY_LIBS_WIN32})
   endif()
-  target_compile_definitions(${TGBOT_LIBRARY_NAME} PUBLIC ${TGBOT_LIBRARY_DEFS} -D__TGBOT__)
   if (TGBOT_LIBRARY_DEPENDS)
     add_dependencies(${TGBOT_LIBRARY_NAME} ${TGBOT_LIBRARY_DEPENDS})
   endif()
+  target_compile_definitions(${TGBOT_LIBRARY_NAME} PUBLIC ${TGBOT_LIBRARY_DEFS})
+
+  # PIE
+  if (PIE_SUPPORTED)
+    set_target_properties(${TGBOT_LIBRARY_NAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  endif()
+  # Global variables
+  target_compile_definitions(${TGBOT_LIBRARY_NAME} PRIVATE ${GLOBAL_DEFINITIONS})
+  target_compile_options(${TGBOT_LIBRARY_NAME} PRIVATE ${GLOBAL_COMPILE_OPTIONS})
 endfunction(add_my_library)
 
 function(add_my_executable)
@@ -112,23 +243,20 @@ function(add_my_executable)
   if (WIN32)
     target_link_libraries(${TGBOT_EXE_NAME} ${TGBOT_EXE_LIBS_WIN32})
   endif()
-  target_compile_definitions(${TGBOT_EXE_NAME} PRIVATE -D__TGBOT__)
+
+  # PIE
+  if (PIE_SUPPORTED)
+    set_target_properties(${TGBOT_EXE_NAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  endif()
+  # Global variables
+  target_compile_definitions(${TGBOT_EXE_NAME} PRIVATE ${GLOBAL_DEFINITIONS})
+  target_compile_options(${TGBOT_EXE_NAME} PRIVATE ${GLOBAL_COMPILE_OPTIONS})
 endfunction(add_my_executable)
 
 ############################ RUST support ###########################
 if (ENABLE_RUST_SUPPORT)
   add_subdirectory(src/third-party/corrosion)
   corrosion_import_crate(MANIFEST_PATH src/rust/stringcalc/Cargo.toml)
-endif()
-#####################################################################
-
-####################### Global compiler flags #######################
-if (NOT MSVC)
-  add_compile_options(
-    -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/=)  
-endif()
-if (WIN32)
-  add_compile_definitions(-DWINDOWS_BUILD)
 endif()
 #####################################################################
 
@@ -234,7 +362,7 @@ add_my_library(
     src/socket/interface/impl/backends/ServerBackend_${TARGET_VARIANT}.cpp
   PRIVATE_INC src/third-party/rapidjson/include
   LIBS  TgBot TgBotUtils TgBotWeb TgBotDBImpl absl::status TgBotRandom TgBot_restartfmt_parser
-        TgBotPPImpl_shared_deps TgBotStringRes ${CMAKE_DL_LIBS} fruit TgBotSocket
+        TgBotPPImpl_shared_deps TgBotStringRes ${CMAKE_DL_LIBS} TgBotSocket
   STATIC
 )
 #####################################################################
@@ -243,7 +371,7 @@ add_my_library(
 add_my_executable(
   NAME main
   SRCS src/main.cpp
-  LIBS TgBotPPImpl TgBotDBLoading TgBotsighandler TgBot_restartfmt_parser
+  LIBS TgBotPPImpl TgBotDBLoading TgBotsighandler TgBot_restartfmt_parser fruit
 )
 
 if (UNIX)

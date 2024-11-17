@@ -8,7 +8,7 @@
 void CompilerInTgForCCpp::run(MessageExt::Ptr message) {
     std::string extraargs;
     std::stringstream cmd, resultbuf;
-#ifdef WINDOWS_BUILD
+#ifdef _WIN32
     constexpr std::string_view aoutname = "./a.exe";
 #else
     constexpr std::string_view aoutname = "./a.out";

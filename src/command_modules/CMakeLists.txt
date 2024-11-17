@@ -46,6 +46,14 @@ function(command_module)
         $<TARGET_PROPERTY:TgBotRandom,INTERFACE_INCLUDE_DIRECTORIES>)
     install(TARGETS ${TGBOT_CMDMODULE_LIBNAME} DESTINATION lib/commands)
     add_sanitizers(${TGBOT_CMDMODULE_LIBNAME})
+
+    # PIE
+    if (PIE_SUPPORTED)
+      set_target_properties(${TGBOT_CMDMODULE_LIBNAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    endif()
+    # Global variables
+    target_compile_definitions(${TGBOT_CMDMODULE_LIBNAME} PRIVATE ${GLOBAL_DEFINITIONS})
+    target_compile_options(${TGBOT_CMDMODULE_LIBNAME} PRIVATE ${GLOBAL_COMPILE_OPTIONS})
 endfunction()
 
 function(multi_command_module)
