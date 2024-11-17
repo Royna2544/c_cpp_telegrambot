@@ -20,13 +20,14 @@ jobs:
         # https://github.com/Homebrew/homebrew-core/issues/169820#issuecomment-2080459578
       - name: Set up dependencies
         run: |
-          brew install boost ninja gcc webp libpng libgit2 googletest jsoncpp openssl fmt
+          brew install boost ninja llvm lld webp libpng libgit2 googletest jsoncpp openssl fmt
           git submodule update --init
+          sed -i '' '/^#define _LIBCPP_HAS_NO_VENDOR_AVAILABILITY_ANNOTATIONS/d' "$(brew --prefix llvm)"/include/c++/v1/__config_site
 
       - name: Compile with Apple GCC
         env: 
-          CC: /usr/local/opt/gcc/bin/gcc-14
-          CXX: /usr/local/opt/gcc/bin/g++-14
+          CC: /usr/local/opt/llvm/bin/clang
+          CXX: /usr/local/opt/llvm/bin/clang++
         run: |
           mkdir build
           cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release .
