@@ -1,6 +1,6 @@
 add_my_library(
   NAME Web 
   SRCS WebServerBase.cpp
-  LIBS httplib::httplib
+  LIBS httplib::httplib JsonCpp::JsonCpp
   STATIC
 )

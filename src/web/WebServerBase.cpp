@@ -3,12 +3,11 @@
 // #undef CPPHTTPLIB_BROTLI_SUPPORT
 
 #include <absl/log/log.h>
+#include <json/json.h>
 
 #include <TgBotWebpage.hpp>
 #include <iomanip>
 #include <utility>
-
-#include "third-party/rapidjson/include/rapidjson/document.h"
 
 constexpr bool WEBSERVER_INBOUND_VERBOSE = false;
 
@@ -94,16 +93,16 @@ void TgBotWebServerBase::Callbacks::handleAPIVotes(const httplib::Request &req,
     constexpr std::string_view kContentTypeJson = "application/json";
     if (req.has_header(kContentType.data()) &&
         req.get_header_value(kContentType.data()) == kContentTypeJson) {
-        rapidjson::Document document{};
+        Json::Value document{};
+        Json::Reader reader;
         std::string maybeVote;
 
-        document.Parse(req.body.c_str());
-        if (document.HasParseError()) {
+        if (!reader.parse(req.body, document)) {
             LOG(ERROR) << "Failed to parse JSON";
             res.status = httplib::StatusCode::BadRequest_400;
             return;
         }
-        maybeVote = document[Constants::kAPIVotesKey.data()].GetString();
+        maybeVote = document[Constants::kAPIVotesKey.data()].asString();
         if (maybeVote.empty()) {
             LOG(ERROR) << "Invalid API request: Missing vote value";
             res.status = httplib::StatusCode::BadRequest_400;

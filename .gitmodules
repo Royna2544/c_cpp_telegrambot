@@ -4,9 +4,6 @@
 [submodule "src/third-party/dlfcn-win32"]
 	path = src/third-party/dlfcn-win32
 	url = https://github.com/dlfcn-win32/dlfcn-win32.git
-[submodule "src/third-party/rapidjson"]
-	path = src/third-party/rapidjson
-	url = https://github.com/Tencent/rapidjson.git
 [submodule "src/third-party/corrosion"]
 	path = src/third-party/corrosion
 	url = https://github.com/corrosion-rs/corrosion

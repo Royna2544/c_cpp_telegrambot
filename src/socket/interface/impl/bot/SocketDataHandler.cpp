@@ -1,7 +1,6 @@
 #include <ResourceManager.h>
 #include <fmt/chrono.h>
-#include <rapidjson/document.h>
-#include <rapidjson/rapidjson.h>
+#include <json/json.h>
 #include <tgbot/TgException.h>
 #include <trivial_helpers/_std_chrono_templates.h>
 
@@ -16,6 +15,7 @@
 #include <impl/bot/TgBotSocketInterface.hpp>
 #include <mutex>
 #include <socket/TgBotCommandMap.hpp>
+#include <trivial_helpers/log_once.hpp>
 #include <utility>
 #include <variant>
 
@@ -30,27 +30,31 @@ namespace {
 std::string getMIMEString(const ResourceProvider* resource,
                           const std::string& path) {
     static std::once_flag once;
-    static rapidjson::Document doc;
+    static Json::Value doc;
     std::string extension = fs::path(path).extension().string();
 
     std::call_once(once, [resource] {
         std::string_view buf;
         buf = resource->get("mimeData.json");
-        doc.Parse(buf.data());
-        // This should be an assert, we know the data file at compile time
-        LOG_IF(FATAL, doc.HasParseError())
-            << "Failed to parse mimedata: " << doc.GetParseError();
+        Json::Reader reader;
+        if (!reader.parse(buf.data(), doc)) {
+            LOG(ERROR) << "Failed to parse mimedata: "
+                       << reader.getFormattedErrorMessages();
+        }
     });
     if (!extension.empty()) {
-        for (rapidjson::SizeType i = 0; i < doc.Size(); i++) {
-            const rapidjson::Value& oneJsonElement = doc[i];
-            const rapidjson::Value& availableTypes =
-                oneJsonElement["types"].GetArray();
-            for (rapidjson::SizeType i = 0; i < availableTypes.Size(); i++) {
-                if (availableTypes[i].GetString() == extension) {
-                    const auto* mime = oneJsonElement["name"].GetString();
-                    LOG(INFO) << "Found MIME type: '" << mime << "'";
-                    return mime;
+        if (doc.empty()) {
+            LOG_ONCE(ERROR) << "Failed to load mimedata";
+            return {};
+        }
+        // Look for MIME type in json file.
+        for (const auto& elem : doc) {
+            if (!elem.isMember("types")) {
+                continue;
+            }
+            for (const auto &ex : elem["types"]) {
+                if (ex.asString() == extension) {
+                    return elem["name"].asString();
                 }
             }
         }

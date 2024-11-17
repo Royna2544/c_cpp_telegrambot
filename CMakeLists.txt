@@ -270,6 +270,7 @@ find_package(OpenSSL REQUIRED)
 find_package(ZLIB REQUIRED)
 find_package(Protobuf)
 find_package(fmt REQUIRED)
+find_package(jsoncpp REQUIRED) # Required by tgbot-cpp anyways...
 # If we couldn't find protobuf or dirty abseil fix is enabled.
 if (DIRTY_ABSEIL_FIX OR NOT Protobuf_FOUND)
   # Then we can just include source-abseil
@@ -360,9 +361,8 @@ add_my_library(
     src/socket/interface/impl/bot/TgBotSocketInterface.cpp
     src/socket/interface/impl/backends/ServerBackend.cpp
     src/socket/interface/impl/backends/ServerBackend_${TARGET_VARIANT}.cpp
-  PRIVATE_INC src/third-party/rapidjson/include
   LIBS  TgBot TgBotUtils TgBotWeb TgBotDBImpl absl::status TgBotRandom TgBot_restartfmt_parser
-        TgBotPPImpl_shared_deps TgBotStringRes ${CMAKE_DL_LIBS} TgBotSocket
+        TgBotPPImpl_shared_deps TgBotStringRes ${CMAKE_DL_LIBS} TgBotSocket JsonCpp::JsonCpp
   STATIC
 )
 #####################################################################
