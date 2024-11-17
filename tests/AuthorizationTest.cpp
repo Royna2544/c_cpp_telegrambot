@@ -1,5 +1,6 @@
 #include <Types.h>
 #include <absl/strings/ascii.h>
+#include <fruit/fruit.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -8,9 +9,7 @@
 #include <database/bot/TgBotDatabaseImpl.hpp>
 #include <memory>
 
-#include "ClassProviders.hpp"
-#include "DatabaseBase.hpp"
-#include "fruit/fruit.h"
+#include "mocks/DatabaseBase.hpp"
 
 using testing::_;
 using testing::Return;

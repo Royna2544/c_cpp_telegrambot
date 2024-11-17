@@ -1,60 +1,7 @@
 #pragma once
 
-#include <gmock/gmock.h>
-
-#include <Random.hpp>
 #include <api/TgBotApi.hpp>
-#include <database/DatabaseBase.hpp>
-#include <string_view>
-
-#include "ConfigManager.hpp"
-#include "ResourceManager.h"
-#include "StringResLoader.hpp"
-#include "api/Providers.hpp"
-#include "bot/TgBotDatabaseImpl.hpp"
-#include "fruit/fruit.h"
-#include "fruit/fruit_forward_decls.h"
-#include "fruit/provider.h"
-#include "gtest/gtest.h"
-#include "trivial_helpers/fruit_inject.hpp"
-
-class MockDatabase : public DatabaseBase {
-   public:
-    APPLE_INJECT(MockDatabase()) = default;
-
-    MOCK_METHOD(DatabaseBase::ListResult, addUserToList,
-                (DatabaseBase::ListType type, UserId user), (const, override));
-
-    MOCK_METHOD(DatabaseBase::ListResult, removeUserFromList,
-                (DatabaseBase::ListType type, UserId user), (const, override));
-
-    MOCK_METHOD(DatabaseBase::ListResult, checkUserInList,
-                (DatabaseBase::ListType type, UserId user), (const, override));
-
-    MOCK_METHOD(std::optional<UserId>, getOwnerUserId, (), (const, override));
-
-    MOCK_METHOD(std::optional<DatabaseBase::MediaInfo>, queryMediaInfo,
-                (std::string str), (const, override));
-
-    MOCK_METHOD(MockDatabase::AddResult, addMediaInfo,
-                (const DatabaseBase::MediaInfo& info), (const, override));
-
-    MOCK_METHOD(std::vector<MediaInfo>, getAllMediaInfos, (), (const override));
-
-    MOCK_METHOD(std::ostream&, dump, (std::ostream & ofs), (const, override));
-
-    MOCK_METHOD(void, setOwnerUserId, (UserId userid), (const, override));
-
-    MOCK_METHOD(MockDatabase::AddResult, addChatInfo,
-                (const ChatId chatid, const std::string_view name),
-                (const, override));
-
-    MOCK_METHOD(std::optional<ChatId>, getChatId, (const std::string_view name),
-                (const, override));
-
-    MOCK_METHOD(bool, load, (std::filesystem::path filepath), (override));
-    MOCK_METHOD(bool, unload, (), (override));
-};
+#include <gmock/gmock.h>
 
 class MockTgBotApi : public TgBotApi {
    public:
@@ -187,32 +134,4 @@ class MockTgBotApi : public TgBotApi {
     MOCK_METHOD(bool, unloadCommand, (const std::string& cmd), (override));
     MOCK_METHOD(void, onAnyMessage, (const AnyMessageCallback& callback),
                 (override));
-};
-
-class MockRandom : public RandomBase {
-   public:
-    using ret_type = Random::ret_type;
-    APPLE_INJECT(MockRandom()) = default;
-
-    MOCK_METHOD(ret_type, generate, (const ret_type min, const ret_type max),
-                (const, override));
-    MOCK_METHOD(void, shuffle, (std::vector<std::string>&), (const, override));
-};
-
-class MockResource : public ResourceProvider {
-   public:
-    APPLE_INJECT(MockResource()) = default;
-
-    MOCK_METHOD(std::string_view, get, (std::filesystem::path filename),
-                (const, override));
-    MOCK_METHOD(bool, preload, (std::filesystem::path p), ());
-};
-
-struct MockLocaleStrings : public StringResLoaderBase::LocaleStrings {
-   public:
-    APPLE_INJECT(MockLocaleStrings()) = default;
-
-    MOCK_METHOD(std::string_view, get, (const Strings& string),
-                (const, override));
-    MOCK_METHOD(size_t, size, (), (override, const, noexcept));
 };

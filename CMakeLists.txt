@@ -318,7 +318,16 @@ endif()
 add_subdirectory(src/third-party/cpp-httplib)
 add_subdirectory(src/third-party/tgbot-cpp)
 add_subdirectory(src/third-party/fruit EXCLUDE_FROM_ALL)
-add_subdirectory(tests)
+
+# Tests
+find_package(GTest)
+if (GTest_FOUND)
+  enable_testing()
+  add_subdirectory(tests)
+else()
+  message(STATUS "Disabling tests")
+endif()
+
 #################################################################
 
 add_my_library(

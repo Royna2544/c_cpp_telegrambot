@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 
 #include <AbslLogInit.hpp>
-#include <StringResLoader.hpp>
 
 int main(int argc, char** argv) {
     testing::InitGoogleTest(&argc, argv);

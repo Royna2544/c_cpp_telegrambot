@@ -11,11 +11,18 @@
 #include <source_location>
 #include <utility>
 
-#include "../ClassProviders.hpp"
 #include "ConfigManager.hpp"
 #include "api/Providers.hpp"
 #include "api/Utils.hpp"
 #include "fruit/fruit.h"
+
+#include "../mocks/TgBotApi.hpp"
+#include "../mocks/SocketInterfaceImpl.hpp"
+#include "../mocks/VFSOperations.hpp"
+#include "../mocks/DatabaseBase.hpp"
+#include "../mocks/ResourceProvider.hpp"
+#include "../mocks/Random.hpp"
+#include "../mocks/LocaleStrings.hpp"
 
 using testing::_;
 using testing::DoAll;

@@ -12,65 +12,19 @@
 #include <impl/bot/TgBotSocketInterface.hpp>
 #include <string_view>
 #include <utility>
+#include <fruit/fruit.h>
 
-#include "DatabaseBase.hpp"
-#include "ResourceManager.h"
-#include "SocketBase.hpp"
-#include "TgBotSocket_Export.hpp"
-#include "api/TgBotApi.hpp"
-#include "api/Utils.hpp"
-#include "commands/CommandModulesTest.hpp"
-#include "global_handlers/SpamBlock.hpp"
-#include "tests/ClassProviders.hpp"
-#include "trivial_helpers/fruit_inject.hpp"
+#include "mocks/TgBotApi.hpp"
+#include "mocks/SocketInterfaceImpl.hpp"
+#include "mocks/VFSOperations.hpp"
+#include "mocks/DatabaseBase.hpp"
+#include "mocks/ResourceProvider.hpp"
 
 using testing::_;
 using testing::DoAll;
 using testing::Return;
 using testing::SaveArg;
-
-class SocketInterfaceImplMock : public SocketInterfaceBase {
-   public:
-    APPLE_INJECT(SocketInterfaceImplMock()) = default;
-
-    MOCK_METHOD(bool, isValidSocketHandle, (socket_handle_t handle),
-                (override));
-    MOCK_METHOD(bool, writeToSocket,
-                (SocketConnContext context, SharedMalloc data), (override));
-    MOCK_METHOD(bool, forceStopListening, (), (override));
-    MOCK_METHOD(void, startListening,
-                (socket_handle_t handle, const listener_callback_t onNewData),
-                (override));
-    MOCK_METHOD(bool, closeSocketHandle, (socket_handle_t & handle),
-                (override));
-    MOCK_METHOD(bool, setSocketOptTimeout,
-                (socket_handle_t handle, int timeout), (override));
-    MOCK_METHOD(std::optional<SharedMalloc>, readFromSocket,
-                (SocketConnContext context, buffer_len_t length), (override));
-    MOCK_METHOD(std::optional<SocketConnContext>, createClientSocket, (),
-                (override));
-    MOCK_METHOD(std::optional<socket_handle_t>, createServerSocket, (),
-                (override));
-    MOCK_METHOD(void, printRemoteAddress, (socket_handle_t handle), (override));
-};
-
-class VFSOperationsMock : public VFSOperations {
-   public:
-    APPLE_INJECT(VFSOperationsMock()) = default;
-
-    MOCK_METHOD(bool, writeFile,
-                (const std::filesystem::path& filename,
-                 const uint8_t* startAddr, size_t size),
-                (override));
-
-    MOCK_METHOD(std::optional<SharedMalloc>, readFile,
-                (const std::filesystem::path& filename), (override));
-
-    MOCK_METHOD(bool, exists, (const std::filesystem::path& path), (override));
-
-    MOCK_METHOD(void, SHA256, (const SharedMalloc& memory, HashContainer& data),
-                (override));
-};
+using testing::IsNull;
 
 fruit::Component<MockTgBotApi, SocketInterfaceImplMock, VFSOperationsMock,
                  SocketInterfaceTgBot>

@@ -7,15 +7,11 @@
 #include <memory>
 
 #include "CommandLine.hpp"
-#include "ConfigManager.hpp"
 #include "Random.hpp"
 #include "api/CommandModule.hpp"
 #include "api/Providers.hpp"
 #include "api/TgBotApi.hpp"
-#include "fruit/fruit.h"
 #include "fruit/fruit_forward_decls.h"
-#include "tests/ClassProviders.hpp"
-#include "trivial_helpers/fruit_inject.hpp"
 
 fruit::Component<CommandLine> getCommandLine() {
     return fruit::createComponent().registerProvider([] {
