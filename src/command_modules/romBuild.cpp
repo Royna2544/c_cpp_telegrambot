@@ -607,7 +607,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
         _api->unpinMessage(sentMessage);
     }
 
-    pid_t pid = vfork();
+    pid_t pid = fork();
     if (pid < 0) {
         _api->editMessage(sentMessage, "Failed to fork");
         return;
@@ -645,7 +645,6 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
         }
         _exit(0);  // Exit the child process.
     }
-    // As vfork, parent will be delayed until the child exits.
     try {
         auto result = ExitStatusParser::fromPid(pid);
         switch (result.type) {
