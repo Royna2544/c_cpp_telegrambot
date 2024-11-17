@@ -1,0 +1,42 @@
+name: Build TgBot++ (Windows with MSVC)
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [Debug, Release]
+
+    name: "🚧 MSVC ${{ matrix.configuration }} with vcpkg"
+    steps:
+    - name: '🧰 Checkout'
+      uses: actions/checkout@v3.5.3
+      with:
+        fetch-depth: 0
+
+    - name: 'Clone vcpkg'
+      run: |
+        git clone https://github.com/microsoft/vcpkg.git
+        cd vcpkg
+        ./bootstrap-vcpkg.bat
+
+    - name: 'Install Dependencies with vcpkg'
+      run: |
+        ./vcpkg/vcpkg.exe install boost-system libgit2 libxml2 libpng libwebp libjpeg-turbo opencv fmt sqlite3 jsoncpp openssl
+
+    - name: '🚧 Build TgBot++'
+      run: |
+        mkdir build
+        cd build
+        cmake -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=${{ matrix.configuration }} -DCMAKE_TOOLCHAIN_FILE=../vcpkg/scripts/buildsystems/vcpkg.cmake ..
+        cmake --build . --config ${{ matrix.configuration }} -- /m
