@@ -8,10 +8,10 @@
 #include <unistd.h>
 
 #include <StructF.hpp>
+#include <csignal>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
-#include <csignal>
 #include <filesystem>
 #include <limits>
 #include <logging/AbslLogInit.hpp>
@@ -94,7 +94,7 @@ redo_vfork:
 
     if (pid == 0) {
         // Set the process group ID to the same as the process ID
-        setpgrp();
+        setpgid(0, 0);
         // Execute the bot executable with the provided arguments
         LOG(INFO) << "Executing the child process, " << argv[0] << " with pid "
                   << getpid();
@@ -139,13 +139,15 @@ redo_vfork:
             }
         }
         constexpr std::chrono::seconds sleep_secs(10);
-        LOG(INFO) << fmt::format("Consumed child death, sleeping for {}", sleep_secs);
+        LOG(INFO) << fmt::format("Consumed child death, sleeping for {}",
+                                 sleep_secs);
         std::this_thread::sleep_for(sleep_secs);
         if (!std::filesystem::exists(kPidFile)) {
             LOG(INFO) << "Pid file gone, exiting";
             return EXIT_SUCCESS;
         }
-        std::filesystem::remove(kPidFile);  // Remove the pid file after termination
+        std::filesystem::remove(
+            kPidFile);    // Remove the pid file after termination
         goto redo_vfork;  // Restart the daemon process loop
     }
 }

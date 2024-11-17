@@ -4,12 +4,20 @@
 
 void SocketInterfaceUnix::bindToInterface(const socket_handle_t sock,
                                           const std::string& iface) {
+#ifdef SO_BINDTODEVICE
     struct ifreq intf {};
+    strncpy(intf.ifr_name, iface.c_str(), IFNAMSIZ);
+    if (setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE, &intf, sizeof(intf)) <
+        0) {
+        PLOG(ERROR) << "setsockopt(SO_BINDTODEVICE) failed";
+        return;
+    }
+#endif
     int opt = 1;
 
-    memset(&intf, 0, sizeof(intf));
-    strncpy(intf.ifr_ifrn.ifrn_name, iface.c_str(), IFNAMSIZ);
-    setsockopt(sock, SOL_SOCKET, SO_BINDTODEVICE, &intf, sizeof(intf));
-    setsockopt(sock, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt,
-               sizeof(opt));
+    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt,
+                   sizeof(opt)) < 0) {
+        PLOG(ERROR) << "setsockopt(SO_REUSEADDR/SO_REUSEPORT) failed";
+        return;
+    }
 }

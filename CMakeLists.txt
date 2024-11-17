@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.25)
 project(TgBot++ LANGUAGES CXX C)
 
 ####################### Set CMake Policy #######################
@@ -115,7 +115,7 @@ set(GLOBAL_DEFINITIONS -D__TGBOT__)
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   set(CMAKE_EXE_LINKER_FLAGS "-fuse-ld=lld")
   set(CMAKE_SHARED_LINKER_FLAGS "-fuse-ld=lld")
-  if (APPLE OR ANDROID)
+  if (APPLE OR ANDROID OR BSD)
     list(APPEND GLOBAL_COMPILE_OPTIONS -fexperimental-library)
   endif()
 endif()

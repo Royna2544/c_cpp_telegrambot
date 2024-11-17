@@ -9,7 +9,7 @@ if (UNIX)
   list(APPEND SELECTOR_SRC_LIST
       SelectorLinuxEPollStub.cpp
     )
-  else()
+  elseif(LINUX)
     list(APPEND SELECTOR_SRC_LIST
       SelectorLinuxEPoll.cpp
     )

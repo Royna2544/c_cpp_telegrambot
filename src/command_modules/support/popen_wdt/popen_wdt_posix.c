@@ -135,7 +135,7 @@ bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
         // Force "C" locale to avoid locale-dependent behavior
         setenv("LC_ALL", "C", true);
         // Set process group ID it its pid.
-        if (setpgrp() == -1) {
+        if (setpgid(0, 0) == -1) {
             POPEN_WDT_DBGLOG("Failed to set process group: %s",
                              strerror(errno));
             _exit(127);
