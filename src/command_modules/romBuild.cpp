@@ -97,8 +97,7 @@ class KeyboardBuilder {
     TgBot::InlineKeyboardMarkup::Ptr get() { return keyboard; }
 };
 
-class ROMBuildQueryHandler
-    : public std::enable_shared_from_this<ROMBuildQueryHandler> {
+class ROMBuildQueryHandler {
     struct {
         bool do_repo_sync = true;
         bool do_upload = true;
@@ -202,9 +201,10 @@ class ROMBuildQueryHandler
     // Handle type selection button
     void handle_type(const Query& query);
 
-#define DECLARE_BUTTON_HANDLER(name, key) \
-    ButtonHandler{name, #key,             \
-                  [this](const Query& query) { handle_##key(query); }}
+#define DECLARE_BUTTON_HANDLER(name, key)                               \
+    ButtonHandler {                                                     \
+        name, #key, [this](const Query& query) { handle_##key(query); } \
+    }
 #define DECLARE_BUTTON_HANDLER_WITHPREFIX(name, key, prefix)             \
     ButtonHandler {                                                      \
         name, #key, [this](const Query& query) { handle_##key(query); }, \
@@ -259,7 +259,7 @@ class TaskWrapperBase {
     Message::Ptr sentMessage;  // Message sent by the bot
     TgBot::InlineKeyboardMarkup::Ptr backKeyboard;
     TgBot::InlineKeyboardMarkup::Ptr cancelKeyboard;
-    std::shared_ptr<ROMBuildQueryHandler> queryHandler;
+    ROMBuildQueryHandler* queryHandler;
 
     bool executeCommon(Impl&& impl) {
         queryHandler->setCurrentForkAndRun(&impl);
@@ -280,9 +280,9 @@ class TaskWrapperBase {
     }
 
    public:
-    TaskWrapperBase(std::shared_ptr<ROMBuildQueryHandler> handler,
-                    PerBuildData data, TgBotApi::Ptr api, Message::Ptr message)
-        : queryHandler(std::move(handler)),
+    TaskWrapperBase(ROMBuildQueryHandler* handler, PerBuildData data,
+                    TgBotApi::Ptr api, Message::Ptr message)
+        : queryHandler(handler),
           data(std::move(data)),
           api(api),
           userMessage(std::move(message)) {
@@ -463,7 +463,7 @@ class CwdRestorer {
             return;
         }
 
-        DLOG(INFO) << "Changing cwd to: " << newCwd.string();
+        LOG(INFO) << "Changing cwd to: " << newCwd.string();
         std::filesystem::current_path(newCwd, ec);
         if (!ec) {
             // Successfully changed cwd
@@ -484,7 +484,7 @@ class CwdRestorer {
     }
 
     ~CwdRestorer() {
-        DLOG(INFO) << "Restoring cwd to: " << cwd;
+        LOG(INFO) << "Restoring cwd to: " << cwd;
         std::filesystem::current_path(cwd, ec);
         if (ec) {
             LOG(ERROR) << "Error while restoring cwd: " << ec.message();
@@ -612,20 +612,21 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
         _api->editMessage(sentMessage, "Failed to push cwd");
         return;
     }
+
     if (do_repo_sync) {
-        RepoSync repoSync(shared_from_this(), per_build, _api, _userMessage);
+        RepoSync repoSync(this, per_build, _api, _userMessage);
         if (!repoSync.execute()) {
             LOG(INFO) << "RepoSync::execute fails...";
             return;
         }
     }
-    Build build(shared_from_this(), per_build, _api, _userMessage);
+    Build build(this, per_build, _api, _userMessage);
     if (!build.execute()) {
         LOG(INFO) << "Build::execute fails...";
         return;
     }
     if (do_upload) {
-        Upload upload(shared_from_this(), per_build, _api, _userMessage);
+        Upload upload(this, per_build, _api, _userMessage);
         if (!upload.execute()) {
             LOG(INFO) << "Upload::execute fails...";
             return;
@@ -748,8 +749,8 @@ DECLARE_COMMAND_HANDLER(rombuild) {
         return;
     }
 
-    auto gitAskPass =
-        FS::getPath(FS::PathType::RESOURCES_SCRIPTS) / RepoSyncTask::kGitAskPassFile;
+    auto gitAskPass = FS::getPath(FS::PathType::RESOURCES_SCRIPTS) /
+                      RepoSyncTask::kGitAskPassFile;
     if (auto token =
             provider->config->get(ConfigManager::Configs::GITHUB_TOKEN)) {
         LOG(INFO) << "Create and write git-askpass file";
