@@ -484,7 +484,7 @@ TgBotApi::AnyMessageResult FileCheck::onAnyMessage(
 
     GetAnalysisAPI getAnalysis(_token);
     std::optional<GetAnalysisAPI::return_type> analysisResult;
-    while (!analysisResult || SignalHandler::isSignaled()) {
+    while (!analysisResult && !SignalHandler::isSignaled()) {
         LOG(INFO) << "Getting analysis results";
         auto analfut = getAnalysis.request(sendFileProcRes.value());
         if (!analfut) {
