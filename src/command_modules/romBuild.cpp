@@ -3,6 +3,7 @@
 #include <absl/strings/str_split.h>
 #include <absl/strings/strip.h>
 #include <fmt/format.h>
+#include <sys/wait.h>
 #include <tgbot/TgException.h>
 #include <tgbot/types/ReplyKeyboardRemove.h>
 
@@ -14,6 +15,7 @@
 #include <filesystem>
 #include <initializer_list>
 #include <libfs.hpp>
+#include <limits>
 #include <memory>
 #include <string>
 #include <system_error>
@@ -601,36 +603,50 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     if (didpin) {
         _api->unpinMessage(sentMessage);
     }
-    std::error_code ec;
-    CwdRestorer cwd(std::filesystem::current_path(ec) / kBuildDirectory);
 
-    if (ec) {
-        _api->editMessage(sentMessage, "Failed to determine cwd directory");
+    pid_t pid = vfork();
+    if (pid < 0) {
+        _api->editMessage(sentMessage, "Failed to fork");
         return;
     }
-    if (!cwd) {
-        _api->editMessage(sentMessage, "Failed to push cwd");
-        return;
-    }
+    if (pid == 0) {
+        std::error_code ec;
+        CwdRestorer cwd(std::filesystem::current_path(ec) / kBuildDirectory);
 
-    if (do_repo_sync) {
-        RepoSync repoSync(this, per_build, _api, _userMessage);
-        if (!repoSync.execute()) {
-            LOG(INFO) << "RepoSync::execute fails...";
-            return;
+        if (ec) {
+            _api->editMessage(sentMessage, "Failed to determine cwd directory");
+            _exit(std::numeric_limits<uint8_t>::max());
         }
+        if (!cwd) {
+            _api->editMessage(sentMessage, "Failed to push cwd");
+            _exit(std::numeric_limits<uint8_t>::max());
+        }
+        if (do_repo_sync) {
+            RepoSync repoSync(this, per_build, _api, _userMessage);
+            if (!repoSync.execute()) {
+                LOG(INFO) << "RepoSync::execute fails...";
+                _exit(std::numeric_limits<uint8_t>::max());
+            }
+        }
+        Build build(this, per_build, _api, _userMessage);
+        if (!build.execute()) {
+            LOG(INFO) << "Build::execute fails...";
+            _exit(std::numeric_limits<uint8_t>::max());
+        }
+        if (do_upload) {
+            Upload upload(this, per_build, _api, _userMessage);
+            if (!upload.execute()) {
+                LOG(INFO) << "Upload::execute fails...";
+                _exit(std::numeric_limits<uint8_t>::max());
+            }
+        }
+        _exit(0);  // Exit the child process.
     }
-    Build build(this, per_build, _api, _userMessage);
-    if (!build.execute()) {
-        LOG(INFO) << "Build::execute fails...";
+    // As vfork, parent will be delayed until the child exits.
+    if (waitpid(pid, nullptr, 0) < 0) {
+        PLOG(ERROR) << "Failed to wait for child process";
+        _api->editMessage(sentMessage, "Failed to wait for child process");
         return;
-    }
-    if (do_upload) {
-        Upload upload(this, per_build, _api, _userMessage);
-        if (!upload.execute()) {
-            LOG(INFO) << "Upload::execute fails...";
-            return;
-        }
     }
     auto remove = std::make_shared<TgBot::ReplyKeyboardRemove>();
     remove->removeKeyboard = true;
