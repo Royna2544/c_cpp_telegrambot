@@ -44,7 +44,7 @@ std::string getMIMEString(const ResourceProvider* resource,
     });
     if (!extension.empty()) {
         if (doc.empty()) {
-            LOG_ONCE(ERROR) << "Failed to load mimedata";
+            LOG(ERROR) << "Failed to load mimedata";
             return {};
         }
         // Look for MIME type in json file.

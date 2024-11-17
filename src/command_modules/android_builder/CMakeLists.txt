@@ -1,12 +1,10 @@
-find_package(jsoncpp)
 find_package(libgit2 REQUIRED)
 find_package(LibXml2 REQUIRED)
 
-if (ANDROID)
+if (NOT LINUX)
     return()
 endif()
-if (NOT ${jsoncpp_FOUND})
-    message(STATUS "libjsoncpp not found, disable AndroidBuilder-cpp")
+if (NOT CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|amd64")
     return()
 endif()
 
