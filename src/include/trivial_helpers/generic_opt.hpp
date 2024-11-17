@@ -31,8 +31,13 @@ struct Option {
         if (!operator bool()) {
             LOG(WARNING) << "Trying to get data which is not set!";
         }
-        // Throws std::bad_optional_access if not set
-        return data.value();
+        if constexpr (std::is_default_constructible_v<T>) {
+            // Just default value
+            return data.value_or(T{});
+        } else {
+            // Let it crash...
+            return *data;
+        }
     }
 
     template <typename V>
@@ -44,12 +49,12 @@ struct Option {
     }
     template <typename... V>
     Option &operator=(const V &...other)
-        requires std::is_trivially_constructible_v<std::add_lvalue_reference_t<T>, V...>
+        requires std::is_trivially_constructible_v<
+            std::add_lvalue_reference_t<T>, V...>
     {
         set(T{other...});
         return *this;
     }
-
 
     // Explicit conversion operator to check if data is present
     explicit operator bool() const { return data.has_value(); }

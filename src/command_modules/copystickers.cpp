@@ -96,10 +96,9 @@ DECLARE_COMMAND_HANDLER(copystickers) {
         });
 
     // Remove duplicates by unique file IDs
-    std::sort(stickerData.begin(), stickerData.end());
-    stickerData.erase(
-        std::ranges::unique(stickerData, std::greater<>()).begin(),
-        stickerData.end());
+    std::ranges::sort(stickerData, std::greater<>());
+    auto [s, e] = std::ranges::unique(stickerData, std::greater<>());
+    stickerData.erase(s, e);
 
     // Download all stickers from the set
     LOG(INFO) << fmt::format("Now downloading {} stickers", stickerData.size());

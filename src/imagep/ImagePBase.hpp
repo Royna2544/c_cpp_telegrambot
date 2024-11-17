@@ -19,6 +19,7 @@ class RangeRestricted {
             _value %= Max - Min;
         }
     }
+    RangeRestricted() : _value(0) {}
     operator int() const {
         return _value;
     }
