@@ -19,10 +19,7 @@ class RangeRestricted {
             _value %= Max - Min;
         }
     }
-    RangeRestricted() : _value(0) {}
-    operator int() const {
-        return _value;
-    }
+    operator int() const { return _value; }
 };
 
 /**
@@ -48,7 +45,7 @@ struct PhotoBase {
     using Option = generic_opt::Option<T>;
 
     struct Options {
-        Option<RangeRestricted<kAngleMin, kAngleMax>> rotate_angle;
+        Option<RangeRestricted<kAngleMin, kAngleMax>> rotate_angle{0};
         Option<bool> greyscale;
         Option<bool> invert_color;
     } options;

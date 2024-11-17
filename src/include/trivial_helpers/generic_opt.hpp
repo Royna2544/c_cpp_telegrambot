@@ -3,6 +3,7 @@
 #include <absl/log/log.h>
 
 #include <optional>
+#include <tuple>
 #include <type_traits>
 
 namespace generic_opt {
@@ -12,12 +13,22 @@ template <typename T>
 struct Option {
     // std::optional to hold the data
     std::optional<T> data;
+    T defaultValue;
 
-    // Default constructor
-    Option() = default;
+    // Default constructor (If T is default constructible)
+    Option()
+        requires std::is_default_constructible_v<T>
+        : defaultValue(T{}) {}
+    // Default version is a deleted default constructor
+    Option() = delete;
 
     // Option with default value
-    explicit Option(T defaultValue) : data(defaultValue) {}
+    explicit Option(T defaultValue) : defaultValue(defaultValue) {}
+
+    template <typename... Args>
+        requires std::is_constructible_v<T, Args...>
+    explicit Option(Args &&...args)
+        : defaultValue(std::forward<Args>(args)...) {}
 
     // Function to set the data
     void set(T dataIn) { data = dataIn; }
@@ -29,15 +40,10 @@ struct Option {
             return data.value_or(false);
         }
         if (!operator bool()) {
-            LOG(WARNING) << "Trying to get data which is not set!";
+            DLOG(WARNING) << "Trying to get data which is not set!";
         }
-        if constexpr (std::is_default_constructible_v<T>) {
-            // Just default value
-            return data.value_or(T{});
-        } else {
-            // Let it crash...
-            return *data;
-        }
+        // Just default value
+        return data.value_or(defaultValue);
     }
 
     template <typename V>
