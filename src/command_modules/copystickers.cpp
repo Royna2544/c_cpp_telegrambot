@@ -52,8 +52,13 @@ DECLARE_COMMAND_HANDLER(copystickers) {
                               access(res, Strings::REPLY_TO_A_STICKER));
         return;
     }
-    const auto set = api->getStickerSet(
-        message->reply()->get<MessageAttrs::Sticker>()->setName);
+    const auto sticker = message->reply()->get<MessageAttrs::Sticker>();
+    if (!sticker->setName) {
+        api->sendReplyMessage(message->message(),
+                              access(res, Strings::STICKER_SET_NOT_FOUND));
+        return;
+    }
+    const auto set = api->getStickerSet(*sticker->setName);
     if (!set) {
         api->sendReplyMessage(message->message(),
                               access(res, Strings::STICKER_SET_NOT_FOUND));
@@ -90,7 +95,7 @@ DECLARE_COMMAND_HANDLER(copystickers) {
                 "stickers"_fs / (sticker->fileUniqueId + ".webp"),
                 sticker->fileUniqueId,
                 sticker->fileId,
-                sticker->emoji,
+                sticker->emoji.value_or("👍"),
                 counter++,
                 std::min<size_t>(set->stickers.size(), GOOD_MAX_STICKERS_SIZE)};
         });
@@ -168,7 +173,7 @@ DECLARE_COMMAND_HANDLER(copystickers) {
             setName =
                 setName.substr(0, match.position()) + match.suffix().str();
         }
-        setName += "_by_" + api->getBotUser()->username;
+        setName += "_by_" + api->getBotUser()->username.value();
     }
 
     api->editMessage(

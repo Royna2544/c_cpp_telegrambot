@@ -32,8 +32,13 @@ void ChatObserver::printChatMsg(const Message::Ptr& msg,
         msgtext = "Video";
     else if (msg->dice)
         msgtext = "(Dice) " + msg->dice->emoji;
-    else
-        msgtext = msg->text;
+    else {
+        if (msg->text) {
+            msgtext = *msg->text;
+        } else {
+            return;
+        }
+    }
 
     fmt::print("[ChatObserveLog][{}]: {}\n", msg->chat, msg->from, msgtext);
 }
@@ -46,7 +51,7 @@ void ChatObserver::process(const Message::Ptr& msg) {
         auto it = std::ranges::find(observedChatIds, chat->id);
         if (it != observedChatIds.end()) {
             if (chat->type != Chat::Type::Supergroup) {
-                LOG(WARNING) << "Removing chat '" << chat->title
+                LOG(WARNING) << "Removing chat '" << chat->title.value()
                              << "' from observer: Not a supergroup";
                 observedChatIds.erase(it);
                 return;

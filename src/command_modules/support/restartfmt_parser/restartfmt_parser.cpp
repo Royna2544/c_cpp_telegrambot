@@ -31,7 +31,7 @@ RestartFmt::Type::Type(const absl::string_view string) {
 RestartFmt::Type::Type(const Message::Ptr& message)
     : chat_id(message->chat->id),
       message_id(message->messageId),
-      message_thread_id(message->messageThreadId) {}
+      message_thread_id(message->messageThreadId.value_or(0)) {}
 
 bool RestartFmt::Type::operator==(const Type& other) const {
     return chat_id == other.chat_id && message_id == other.message_id &&

@@ -15,10 +15,13 @@ DECLARE_COMMAND_HANDLER(randsticker) {
     }
 
     auto sticker = message->reply()->get<MessageAttrs::Sticker>();
+    if (!sticker->setName) {
+        return;
+    }
     Random::ret_type pos{};
     StickerSet::Ptr stickset;
     try {
-        stickset = api->getStickerSet(sticker->setName);
+        stickset = api->getStickerSet(*sticker->setName);
     } catch (const TgBot::TgException& e) {
         api->sendReplyMessage(message->message(), e.what());
         return;
@@ -29,7 +32,7 @@ DECLARE_COMMAND_HANDLER(randsticker) {
 
     const auto arg =
         fmt::format("Sticker idx: {} emoji: {}\nFrom pack: \"{}\"", pos + 1,
-                    stickset->stickers[pos]->emoji, stickset->title);
+                    stickset->stickers[pos]->emoji.value_or("none"), stickset->title);
     api->sendMessage(message->get<MessageAttrs::Chat>(), arg);
 }
 

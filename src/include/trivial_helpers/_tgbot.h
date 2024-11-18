@@ -24,27 +24,31 @@ constexpr auto fmt::formatter<User::Ptr>::parse(ParseContext& ctx) {
 template <typename FormatContext>
 auto fmt::formatter<User::Ptr>::format(const User::Ptr& user,
                                        FormatContext& ctx) const {
-    if (!user->lastName.empty()) {
+    if (!user->lastName.has_value()) {
         return fmt::format_to(ctx.out(), "{} {} (id: {})", user->firstName,
-                              user->lastName, user->id);
+                              user->lastName.value(), user->id);
     }
     return fmt::format_to(ctx.out(), "{} (id: {})", user->firstName, user->id);
 }
 
 template <>
-struct fmt::formatter<Chat::Ptr> : formatter<string_view> {
+struct fmt::formatter<Chat::Ptr> : formatter<std::string> {
     // parse is inherited from formatter<string_view>.
-    auto format(const Chat::Ptr& chat,
-                format_context& ctx) const -> format_context::iterator {
-        string_view name;
+    static auto format(const Chat::Ptr& chat,
+                       format_context& ctx) -> format_context::iterator {
+        std::string name;
         switch (chat->type) {
             case Chat::Type::Private:
-                name = "Private chat";
-                break;
+                return fmt::format_to(ctx.out(), "Private chat (@{})",
+                                      chat->username.value_or("unknown"));
+            case Chat::Type::Channel:
+                return fmt::format_to(ctx.out(), "Channel (@{})",
+                                      chat->username.value_or("unknown"));
+            case Chat::Type::Supergroup:
+                return fmt::format_to(ctx.out(), "Group (@{})",
+                                      chat->username.value_or("unknown"));
             default:
-                name = chat->title;
-                break;
+                return fmt::format_to(ctx.out(), "Unknown chat");
         }
-        return formatter<string_view>::format(name, ctx);
     }
 };

@@ -517,7 +517,7 @@ class TgBotApi {
     Message::Ptr sendReplyMessage(
         const Message::Ptr& replyToMessage, const std::string_view message,
         const GenericReply::Ptr& replyMarkup = nullptr) const {
-        MessageThreadId tid = replyToMessage->messageThreadId;
+        MessageThreadId tid = replyToMessage->messageThreadId.value_or(0);
         if (!replyToMessage->chat->isForum) {
             tid = 0;
         }
@@ -841,7 +841,7 @@ class TgBotApi {
         ptr->messageId = messageToReply->messageId;
         ptr->allowSendingWithoutReply = true;
         if (messageToReply->chat->isForum) {
-            ptr->messageThreadId = messageToReply->messageThreadId;
+            ptr->messageThreadId = messageToReply->messageThreadId.value();
         }
         return ptr;
     }

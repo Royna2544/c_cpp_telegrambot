@@ -46,7 +46,7 @@ std::string SpamBlockBase::commonMsgdataFn(const Message::Ptr &m) {
     } else if (m->animation) {
         return m->animation->fileUniqueId;
     } else {
-        return m->text;
+        return m->text.value_or("");
     }
 }
 
@@ -203,10 +203,10 @@ void SpamBlockManager::_deleteAndMuteCommon(const OneChatIterator &handle,
     if (isEntryOverThreshold(t, threshold)) {
         _logSpamDetectCommon(t, name);
 
-        if (!t.first->username.empty()) {
+        if (!t.first->username) {
             _api->sendMessage(
                 handle->first->id,
-                fmt::format("Spam detected @{}", t.first->username));
+                fmt::format("Spam detected @{}", t.first->username.value()));
         }
         std::vector<MessageId> message_ids;
         std::ranges::for_each(t.second, [&message_ids](auto &&messageIn) {
@@ -248,7 +248,7 @@ bool SpamBlockManager::shouldBeSkipped(const Message::Ptr &message) const {
     }
 
     // We care GIF, sticker, text spams only, or if it isn't fowarded msg
-    if ((!message->animation && message->text.empty() && !message->sticker) ||
+    if ((!message->animation && !message->text && !message->sticker) ||
         message->forwardOrigin) {
         return true;
     }

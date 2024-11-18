@@ -14,12 +14,12 @@ MessageExt::MessageExt(Message::Ptr message, SplitMessageText how)
     _replyMessage = std::make_shared<MessageExt>(_message->replyToMessage);
 
     // Empty message won't need parsing
-    if (_message->text.empty()) {
+    if (!_message->text) {
         return;
     }
 
     // Initially, _extra_args is full text
-    _extra_args = _message->text;
+    _extra_args = _message->text.value();
 
     // Try to find botcommand entity
     const auto botCommandEnt =
@@ -30,14 +30,14 @@ MessageExt::MessageExt(Message::Ptr message, SplitMessageText how)
 
     // I believe entity must be sent here.
     if (botCommandEnt != _message->entities.end() &&
-        _message->text.front() == '/') {
+        _message->text->front() == '/') {
         const auto entry = *botCommandEnt;
         // Grab /start@username
-        _extra_args = _message->text.substr(entry->length);
+        _extra_args = _message->text->substr(entry->length);
         absl::StripLeadingAsciiWhitespace(&_extra_args);
         command.emplace();
         std::pair<std::string, std::string> kCommandSplit =
-            absl::StrSplit(_message->text.substr(1, entry->length), "@");
+            absl::StrSplit(_message->text->substr(1, entry->length), "@");
         command->name = kCommandSplit.first;
         command->target = kCommandSplit.second;
         absl::StripTrailingAsciiWhitespace(&command->target);

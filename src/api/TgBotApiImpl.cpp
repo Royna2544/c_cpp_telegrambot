@@ -201,7 +201,7 @@ void TgBotApiImpl::removeInlineQueryKeyboard(const std::string_view key) {
 }
 
 void TgBotApiImpl::startPoll() {
-    LOG(INFO) << "Bot username: " << getBotUser()->username;
+    LOG(INFO) << "Bot username: " << getBotUser()->username.value_or("Unknown");
     // Deleting webhook
     getApi().deleteWebhook();
 
@@ -421,8 +421,12 @@ bool TgBotApiImpl::downloadFile_impl(const std::filesystem::path& destfilename,
         LOG(INFO) << "File " << fileid << " not found in Telegram servers.";
         return false;
     }
+    if (!file->filePath) {
+        LOG(INFO) << "Cannot retrieve filePath";
+        return false;
+    }
     // Download the file
-    std::string buffer = getApi().downloadFile(file->filePath);
+    std::string buffer = getApi().downloadFile(*file->filePath);
     // Save the file to a file on disk
     std::fstream ofs(destfilename, std::ios::binary | std::ios::out);
     if (!ofs.is_open()) {
