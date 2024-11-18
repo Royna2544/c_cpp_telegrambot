@@ -3,6 +3,7 @@
 
 #include <api/components/OnAnyMessage.hpp>
 #include <future>
+#include "Authorization.hpp"
 
 void TgBotApiImpl::OnAnyMessageImpl::onAnyMessage(
     const TgBotApi::AnyMessageCallback& callback) {
@@ -48,6 +49,9 @@ void TgBotApiImpl::OnAnyMessageImpl::onAnyMessageFunction(
 TgBotApiImpl::OnAnyMessageImpl::OnAnyMessageImpl(TgBotApiImpl::Ptr api)
     : _api(api) {
     _api->getEvents().onAnyMessage([this](Message::Ptr message) {
+        if (!AuthContext::isUnderTimeLimit(message)) {
+            return;
+        }
         onAnyMessageFunction(std::move(message));
     });
 }
