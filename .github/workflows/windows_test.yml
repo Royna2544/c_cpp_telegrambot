@@ -64,4 +64,5 @@ jobs:
 
     - name: Run Tests
       run: |
-          ./build/bin/TgBot++_test.exe
+          cd build
+          ctest

@@ -35,7 +35,7 @@ DECLARE_COMMAND_HANDLER(alive) {
                 {"_commitid_", data.commitid},
                 {"_commitmsg_", splitMsg.front()},
                 {"_botname_", api->getBotUser()->firstName},
-                {"_botusername_", api->getBotUser()->username.value()}
+                {"_botusername_", api->getBotUser()->username.value_or("unknown")}
             });
     });
     const auto info = provider->database->queryMediaInfo("alive");

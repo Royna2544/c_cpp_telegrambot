@@ -24,7 +24,7 @@ constexpr auto fmt::formatter<User::Ptr>::parse(ParseContext& ctx) {
 template <typename FormatContext>
 auto fmt::formatter<User::Ptr>::format(const User::Ptr& user,
                                        FormatContext& ctx) const {
-    if (!user->lastName.has_value()) {
+    if (user->lastName.has_value()) {
         return fmt::format_to(ctx.out(), "{} {} (id: {})", user->firstName,
                               user->lastName.value(), user->id);
     }

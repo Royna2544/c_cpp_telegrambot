@@ -201,15 +201,16 @@ void TgBotApiImpl::removeInlineQueryKeyboard(const std::string_view key) {
 }
 
 void TgBotApiImpl::startPoll() {
-    LOG(INFO) << "Bot username: " << getBotUser()->username.value_or("Unknown");
+    LOG(INFO) << "Bot username: " << getBotUser()->username.value();
     // Deleting webhook
     getApi().deleteWebhook();
 
-    TgLongPoll longPoll(_bot, 100, 10,
-                        {"message", "inline_query", "callback_query",
-                         "my_chat_member", "chat_member", "chat_join_request"});
+    auto* longPoll = _bot.createLongPoll(
+        100, 10,
+        {"message", "inline_query", "callback_query", "my_chat_member",
+         "chat_member", "chat_join_request"});
     while (!SignalHandler::isSignaled()) {
-        longPoll.start();
+        longPoll->start();
     }
 }
 

@@ -2,7 +2,7 @@
 ###################### Creates the test target ######################
 
 add_my_executable(
-  NAME test
+  NAME main
   SRCS
     TestMain.cpp
     AuthorizationTest.cpp
@@ -20,27 +20,22 @@ add_my_executable(
     GTest::gtest
     GTest::gmock
     TgBotPPImpl fruit
-  OPTIONAL
+  TEST
 )
 
-# Add the test executable to CTest
-add_test(NAME TestSuite COMMAND TgBot++_test)
-
 add_my_executable(
-  NAME test_database
+  NAME database
   SRCS
     TestMain.cpp
     DatabaseBackendsTest.cpp
   LIBS
     GTest::gtest
     TgBotDBImpl
-  OPTIONAL
+  TEST
 )
-# Add the test executable to CTest
-add_test(NAME TestSuiteDatabase COMMAND TgBot++_test_database)
 
 add_my_executable(
-  NAME test_socketdatahandler
+  NAME socketdatahandler
   SRCS
     TestMain.cpp
     SocketDataHandlerTest.cpp
@@ -49,7 +44,5 @@ add_my_executable(
     GTest::gmock
     TgBotPPImpl
     fruit
-  OPTIONAL
+  TEST
 )
-# Add the test executable to CTest
-add_test(NAME TestSuiteSocketDataHandler COMMAND TgBot++_test_socketdatahandler)

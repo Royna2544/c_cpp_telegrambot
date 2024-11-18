@@ -354,6 +354,7 @@ getAllComponent(CommandLine cmd) {
     return fruit::createComponent()
         .bind<TgBotWebServerBase, TgBotWebServer>()
         .bind<VFSOperations, RealFS>()
+        .bind<RandomBase, Random>()
         .install(getDatabaseComponent)
         .install(getTgBotApiImplComponent)
         .install(getRegexHandlerComponent)

@@ -29,7 +29,7 @@ class Providers {
     Installable<ConfigManager> config{};
     Installable<ThreadManager> threads{};
 
-    APPLE_INJECT(Providers(Random *random, ResourceProvider *resource,
+    APPLE_INJECT(Providers(RandomBase *random, ResourceProvider *resource,
                            DatabaseBase *database, CommandLine *cmd,
                            ConfigManager *configManager,
                            ThreadManager *thread)) {

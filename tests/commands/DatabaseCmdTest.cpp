@@ -5,10 +5,7 @@
 #include <memory>
 
 #include "CommandModulesTest.hpp"
-#include "StringResLoader.hpp"
 #include "api/TgBotApi.hpp"
-#include "api/Utils.hpp"
-#include "gmock/gmock.h"
 
 namespace {
 void verifyKeyboard(const TgBot::GenericReply::Ptr& reply) {
@@ -16,10 +13,10 @@ void verifyKeyboard(const TgBot::GenericReply::Ptr& reply) {
         std::dynamic_pointer_cast<TgBot::ReplyKeyboardMarkup>(reply);
     ASSERT_TRUE(keyboardReply);
 
-    EXPECT_TRUE(keyboardReply->resizeKeyboard);
-    EXPECT_TRUE(keyboardReply->oneTimeKeyboard);
-    EXPECT_TRUE(keyboardReply->selective);
-    EXPECT_FALSE(keyboardReply->isPersistent);
+    EXPECT_TRUE(keyboardReply->resizeKeyboard.value());
+    EXPECT_TRUE(keyboardReply->oneTimeKeyboard.value());
+    EXPECT_TRUE(keyboardReply->selective.value());
+    EXPECT_FALSE(keyboardReply->isPersistent.value());
 }
 }  // namespace
 

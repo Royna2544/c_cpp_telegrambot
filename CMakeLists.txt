@@ -223,7 +223,7 @@ endfunction(add_my_library)
 
 function(add_my_executable)
   cmake_parse_arguments(TGBOT_EXE
-    "NO_PREFIX;OPTIONAL" # Options
+    "NO_PREFIX;OPTIONAL;TEST" # Options
     "NAME" # One-value keywords
     "SRCS;LIBS;LIBS_WIN32" # Multiple-value keywords
     ${ARGN}
@@ -234,14 +234,22 @@ function(add_my_executable)
   if (DIRTY_ABSEIL_FIX)
     list(APPEND TGBOT_EXE_SRCS ${CMAKE_SOURCE_DIR}/src/logging/log_message.cc)
   endif()
+  set(TGBOT_EXE_NAME_BAK ${TGBOT_EXE_NAME})
+  if (TGBOT_EXE_TEST)
+    set(TEST_EXT test_)
+  endif()
   if (NOT TGBOT_EXE_NO_PREFIX)
-    set(TGBOT_EXE_NAME ${PROJECT_NAME}_${TGBOT_EXE_NAME})
+	  set(TGBOT_EXE_NAME ${PROJECT_NAME}_${TEST_EXT}${TGBOT_EXE_NAME})
   endif()
   if (TGBOT_EXE_OPTIONAL)
     add_executable(${TGBOT_EXE_NAME} EXCLUDE_FROM_ALL ${TGBOT_EXE_SRCS})
   else()
     add_executable(${TGBOT_EXE_NAME} ${TGBOT_EXE_SRCS})
-    install(TARGETS ${TGBOT_EXE_NAME} DESTINATION bin)
+    if (TGBOT_EXE_TEST)
+      add_test(NAME TestSuite_${TGBOT_EXE_NAME_BAK} COMMAND ${TGBOT_EXE_NAME})
+    else()
+      install(TARGETS ${TGBOT_EXE_NAME} DESTINATION bin)
+    endif()
   endif()
   add_sanitizers(${TGBOT_EXE_NAME})
   target_link_libraries(${TGBOT_EXE_NAME} TgBotLogInit absl::log ${TGBOT_EXE_LIBS})
@@ -376,7 +384,7 @@ add_my_library(
     src/socket/interface/impl/backends/ServerBackend.cpp
     src/socket/interface/impl/backends/ServerBackend_${TARGET_VARIANT}.cpp
   LIBS  TgBot TgBotUtils TgBotWeb TgBotDBImpl absl::status TgBotRandom TgBot_restartfmt_parser
-        TgBotPPImpl_shared_deps TgBotStringRes ${CMAKE_DL_LIBS} TgBotSocket JsonCpp::JsonCpp
+        TgBotPPImpl_shared_deps TgBotStringRes ${CMAKE_DL_LIBS} TgBotSocket JsonCpp::JsonCpp TgBotsighandler 
   STATIC
 )
 #####################################################################
@@ -385,7 +393,7 @@ add_my_library(
 add_my_executable(
   NAME main
   SRCS src/main.cpp
-  LIBS TgBotPPImpl TgBotDBLoading TgBotsighandler TgBot_restartfmt_parser fruit
+  LIBS TgBotPPImpl TgBotDBLoading TgBot_restartfmt_parser fruit
 )
 
 if (UNIX)

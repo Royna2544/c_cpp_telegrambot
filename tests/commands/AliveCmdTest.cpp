@@ -12,7 +12,8 @@ class AliveCommandTest : public CommandTestBase {
 
 TEST_F(AliveCommandTest, hasAliveMediaName) {
     setCommandExtArgs();
-    const auto botUser = std::make_shared<User>();
+    auto botUser = std::make_shared<User>();
+    botUser->username = "ALALALASL";
 
     // Would call two times for username, nickname
     ON_CALL(*botApi, getBotUser_impl()).WillByDefault(Return(botUser));

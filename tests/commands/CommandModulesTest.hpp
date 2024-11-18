@@ -168,13 +168,13 @@ class CommandTestBase : public CommandModulesTest {
     void setCommandExtArgs(
         const std::initializer_list<std::string_view>& command) {
         setCommandExtArgs();
-        defaultProvidedMessage->text +=
+        (*defaultProvidedMessage->text) +=
             fmt::format("{}", fmt::join(command, " "));
     }
     void setCommandExtArgs() {
         defaultProvidedMessage->text = "/" + name;
         defaultProvidedMessage->entities[0]->length =
-            defaultProvidedMessage->text.size();
+            defaultProvidedMessage->text->size();
     }
     void execute() {
         module->_module->function(
