@@ -499,6 +499,10 @@ TgBotApi::AnyMessageResult FileCheck::onAnyMessage(
         }
     }
     LOG(INFO) << "Analysis results received";
+    if (SignalHandler::isSignaled()) {
+        LOG(INFO) << "Signal handler was triggered";
+        return TgBotApi::AnyMessageResult::Handled;
+    }
 
     // Append data to the vec
     ResultHolder holder;
