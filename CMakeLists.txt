@@ -1,5 +1,12 @@
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 3.14)
 project(TgBot++ LANGUAGES CXX C)
+
+# CMake 3.25 added LINUX variable
+if (CMAKE_VERSION VERSION_LESS "3.25")
+  if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(LINUX TRUE CACHE BOOL "Linux platform")
+  endif()
+endif()
 
 ####################### Set CMake Policy #######################
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake")
