@@ -147,7 +147,7 @@ T* ThreadManager::create(Usage usage, Args&&... args) {
 
     std::lock_guard<std::shared_mutex> lock(mControllerLock);
 
-    DLOG(INFO) << fmt::format("MGR: Starting {}...", usage);
+    LOG(INFO) << fmt::format("MGR: Starting {}...", usage);
     if constexpr (sizeof...(args) != 0) {
         newIt = std::make_unique<T>(std::forward<Args>(args)...);
     } else {

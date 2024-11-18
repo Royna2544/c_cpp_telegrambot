@@ -77,7 +77,7 @@ GenericAck SocketInterfaceTgBot::handle_WriteMsgToChatId(const void* ptr) {
 
 GenericAck SocketInterfaceTgBot::handle_CtrlSpamBlock(const void* ptr) {
     const auto* data = static_cast<const CtrlSpamBlock*>(ptr);
-    spamblock->spamBlockConfig = *data;
+    spamblock->setConfig(*data);
     return GenericAck::ok();
 }
 

@@ -163,12 +163,13 @@ enum class FileType {
     TYPE_MAX
 };
 
+// Cannot use DELETE, as it conflicts with winnt.h
 enum class CtrlSpamBlock {
-    CTRL_OFF,              // Disabled
-    CTRL_LOGGING_ONLY_ON,  // Logging only, not taking action
-    CTRL_ON,               // Enabled, does delete but doesn't mute
-    CTRL_ENFORCE,          // Enabled, deletes and mutes
-    CTRL_MAX,
+    OFF,                   // Disabled
+    LOGGING_ONLY,          // Logging only, not taking action
+    PURGE,                 // Enabled, does delete but doesn't mute
+    PURGE_AND_MUTE,        // Enabled, deletes and mutes
+    MAX,
 };
 
 struct alignas(ALIGNMENT) WriteMsgToChatId {

@@ -1,5 +1,6 @@
 #include <absl/strings/match.h>
 #include <fmt/chrono.h>
+#include <fruit/fruit.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <tgbot/TgException.h>
@@ -12,19 +13,19 @@
 #include <impl/bot/TgBotSocketInterface.hpp>
 #include <string_view>
 #include <utility>
-#include <fruit/fruit.h>
 
-#include "mocks/TgBotApi.hpp"
-#include "mocks/SocketInterfaceImpl.hpp"
-#include "mocks/VFSOperations.hpp"
+#include "global_handlers/SpamBlock.hpp"
 #include "mocks/DatabaseBase.hpp"
 #include "mocks/ResourceProvider.hpp"
+#include "mocks/SocketInterfaceImpl.hpp"
+#include "mocks/TgBotApi.hpp"
+#include "mocks/VFSOperations.hpp"
 
 using testing::_;
 using testing::DoAll;
+using testing::IsNull;
 using testing::Return;
 using testing::SaveArg;
-using testing::IsNull;
 
 fruit::Component<MockTgBotApi, SocketInterfaceImplMock, VFSOperationsMock,
                  SocketInterfaceTgBot>
@@ -34,8 +35,8 @@ getSocketComponent() {
         .bind<SocketInterfaceBase, SocketInterfaceImplMock>()
         .bind<VFSOperations, VFSOperationsMock>()
         .bind<ResourceProvider, MockResource>()
-        .bind<SpamBlockBase, SpamBlockManager>()
-        .bind<DatabaseBase, MockDatabase>();
+        .bind<DatabaseBase, MockDatabase>()
+        .registerConstructor<SpamBlockBase()>();
 }
 
 class SocketDataHandlerTest : public ::testing::Test {

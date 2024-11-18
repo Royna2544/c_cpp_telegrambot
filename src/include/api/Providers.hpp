@@ -3,7 +3,7 @@
 #include <ResourceManager.h>
 
 #include <ManagedThreads.hpp>
-#include <Random.hpp>
+#include <random/Random.hpp>
 #include <database/DatabaseBase.hpp>
 #include <trivial_helpers/fruit_inject.hpp>
 

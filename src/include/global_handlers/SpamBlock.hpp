@@ -1,78 +1,129 @@
 #pragma once
 
+#include <absl/log/log.h>
+#include <fmt/format.h>
+
 #include <Authorization.hpp>
-#include <ManagedThreads.hpp>
+#include <algorithm>
 #include <api/TgBotApi.hpp>
+#include <chrono>
+#include <concepts>
 #include <map>
 #include <mutex>
 #include <socket/include/TgBotSocket_Export.hpp>
-#include <stop_token>
-#include "trivial_helpers/fruit_inject.hpp"
-
-using namespace TgBotSocket::data;
 
 using TgBot::Chat;
 using TgBot::Message;
 using TgBot::User;
 
-struct SpamBlockBase : ManagedThreadRunnable {
-    // User and array of message pointers sent by that user
-    using PerChatHandle = std::map<User::Ptr, std::vector<Message::Ptr>>;
-    // Iterator type of buffer object, which contains <chats <users <msgs>>> map
-    using OneChatIterator = std::map<Chat::Ptr, PerChatHandle>::const_iterator;
-    using PerChatHandleConstRef = PerChatHandle::const_reference;
-    using ManagedThreadRunnable::ManagedThreadRunnable;
-    constexpr static int sMaxSameMsgThreshold = 3;
-    constexpr static int sMaxMsgThreshold = 5;
+struct SpamBlockBase {
+    // This is a per-chat map, containing UserId and the vector of pair of
+    // messageid-messagecontent
+    using UserMessagesMap =
+        std::map<UserId, std::vector<std::pair<MessageId, std::string>>>;
+    using Config = TgBotSocket::data::CtrlSpamBlock;
+
+    // Triggered when a chat has more than sSpamDetectThreshold messages
+    // In sSpamDetectDelay delay.
     constexpr static int sSpamDetectThreshold = 5;
+    constexpr static std::chrono::seconds sSpamDetectDelay{10};
 
-    ~SpamBlockBase() override = default;
-    virtual void handleUserAndMessagePair(PerChatHandleConstRef e,
-                                          OneChatIterator it,
-                                          const size_t threshold,
-                                          const char *name) {};
-    virtual bool shouldBeSkipped(const Message::Ptr &msg) const = 0;
+    // Describing a SpamBlockDetector.
+    class Matcher {
+       public:
+        virtual ~Matcher() = default;
 
-    void runFunction(const std::stop_token& token) override;
-    void addMessage(const Message::Ptr &message);
+        // Describes threshold for spam detection.
+        // Need to be redeclared in the child scope.
+        static constexpr int kThreshold = 0;
 
-    static std::string commonMsgdataFn(const Message::Ptr &m);
+        // Declares the name of this Matcher.
+        // Need to be redeclared in the child scope.
+        static constexpr std::string_view name{};
 
-    CtrlSpamBlock spamBlockConfig = CtrlSpamBlock::CTRL_ON;
+        // Returns the count of messages per user, that matches the criteria.
+        static int count(const UserMessagesMap::const_iterator entry) {
+            return 0;
+        }
 
+        template <std::derived_from<Matcher> T>
+        static bool detect(const UserMessagesMap::const_iterator entry) {
+            static_assert(!T::name.empty(), "Must have a name");
+            static_assert(T::kThreshold != 0, "Threshold must be positive");
+            int count = T::count(entry);
+            if (count >= T::kThreshold) {
+                LOG(INFO) << fmt::format(
+                    "Detected: {} Value {} is over threshold {}", T::name,
+                    count, T::kThreshold);
+            }
+            return count >= T::kThreshold;
+        }
+    };
+
+    class SameMessageMatcher : public Matcher {
+       public:
+        static constexpr int kThreshold = 3;
+        static constexpr std::string_view name = "SameMessageMatcher";
+        static int count(const UserMessagesMap::const_iterator entry) {
+            std::map<std::string, int> kSameMessageMap;
+            for (const auto &elem : entry->second) {
+                const auto &[id, content] = elem;
+                if (!kSameMessageMap.contains(content)) {
+                    kSameMessageMap[content] = 1;
+                } else {
+                    ++kSameMessageMap[content];
+                }
+            }
+            return std::ranges::max_element(
+                       kSameMessageMap,
+                       [](const auto &smsg, const auto &rmsg) {
+                           return smsg.second > rmsg.second;
+                       })
+                ->second;
+        }
+    };
+
+    class MessageCountMatcher : public Matcher {
+       public:
+        static constexpr int kThreshold = 5;
+        static constexpr std::string_view name = "MessageCountMatcher";
+        static int count(const UserMessagesMap::const_iterator entry) {
+            return static_cast<int>(entry->second.size());
+        }
+    };
+
+    SpamBlockBase() = default;
+    virtual ~SpamBlockBase() = default;
+
+    // Pure virtual function, hooks before the message is added.
+    // Returns true if the message should be skipped, false otherwise.
+    // Dummy version: Returns false.
+    virtual bool shouldBeSkipped(const Message::Ptr & /*msg*/) const {
+        return false;
+    }
+
+    // Set the SpamBlock config. Based on SpamBlockBase::Config.
+    virtual void setConfig(Config config);
+
+    // Function called when the SpamBlock framework detects spamming user.
+    // Arguments passed: ChatId, UserId, Offending messageIds
+    virtual void onDetected(ChatId chat, UserId user,
+                            std::vector<MessageId> messageIds) const;
+
+    // Add a message to the buffer.
+    void addMessage(Message::Ptr message);
+
+    // Run the SpamBlock framework.
+    void consumeAndDetect();
+
+   private:
+    std::map<ChatId, UserMessagesMap> chat_messages_data;
+
+    // Cache these for easy lookup
+    std::map<ChatId, Chat::Ptr> chat_map;
+    std::map<UserId, User::Ptr> user_map;
+
+    mutable std::mutex mutex;  // Protect above maps
    protected:
-    static bool isEntryOverThreshold(PerChatHandleConstRef t,
-                                     const size_t threshold);
-    static void _logSpamDetectCommon(PerChatHandleConstRef t, const char *name);
-
-   private:
-    void spamDetectFunc(OneChatIterator handle);
-    void takeAction(OneChatIterator handle, const PerChatHandle &map,
-                    const size_t threshold, const char *name);
-    std::map<Chat::Ptr, PerChatHandle> buffer;
-    std::map<Chat::Ptr, int> buffer_sub;
-    std::mutex buffer_m;  // Protect buffer, buffer_sub
-};
-
-struct SpamBlockManager : SpamBlockBase {
-    APPLE_INJECT(SpamBlockManager(TgBotApi::Ptr api, AuthContext *auth));
-    ~SpamBlockManager() override = default;
-
-    using SpamBlockBase::run;
-    using SpamBlockBase::runFunction;
-    void handleUserAndMessagePair(PerChatHandleConstRef e, OneChatIterator it,
-                                  const size_t threshold,
-                                  const char *name) override;
-    // Additional hook for handling messages
-    // that should be handled differently
-    // (e.g., delete messages, mute users)
-    bool shouldBeSkipped(const Message::Ptr &message) const override;
-
-   private:
-    constexpr static auto kMuteDuration = std::chrono::minutes(3);
-    void _deleteAndMuteCommon(const OneChatIterator &handle,
-                              PerChatHandleConstRef t, const size_t threshold,
-                              const char *name, const bool mute);
-    TgBotApi::Ptr _api;
-    AuthContext *_auth;
+    Config _config = Config::PURGE;
 };

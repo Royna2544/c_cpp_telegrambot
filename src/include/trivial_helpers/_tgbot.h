@@ -43,10 +43,10 @@ struct fmt::formatter<Chat::Ptr> : formatter<std::string> {
                                       chat->username.value_or("unknown"));
             case Chat::Type::Channel:
                 return fmt::format_to(ctx.out(), "Channel (@{})",
-                                      chat->username.value_or("unknown"));
+                                      chat->title.value_or("unknown"));
             case Chat::Type::Supergroup:
                 return fmt::format_to(ctx.out(), "Group (@{})",
-                                      chat->username.value_or("unknown"));
+                                      chat->title.value_or("unknown"));
             default:
                 return fmt::format_to(ctx.out(), "Unknown chat");
         }

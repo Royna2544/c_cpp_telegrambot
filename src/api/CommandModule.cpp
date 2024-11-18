@@ -35,7 +35,7 @@ class DLWrapper {
     RAIIHandle underlying() {
         RAIIHandle tmp(nullptr, &dlclose);
         std::swap(handle, tmp);
-        return std::move(tmp);
+        return tmp;
     }
 
     // dlfcn functions.
@@ -57,7 +57,7 @@ class DLWrapper {
 };
 
 CommandModule::CommandModule(std::filesystem::path filePath)
-    : filePath(std::move(filePath)), handle(nullptr, &dlclose) {}
+    : handle(nullptr, &dlclose), filePath(std::move(filePath)) {}
 
 bool CommandModule::load() {
     if (handle != nullptr) {
@@ -103,7 +103,7 @@ bool CommandModule::load() {
                               _module->isEnforced(), _module->name,
                               fmt::ptr(modulePtr));
 #endif
-    handle = std::move(dlwrapper.underlying());
+    handle = dlwrapper.underlying();
     return true;
 }
 

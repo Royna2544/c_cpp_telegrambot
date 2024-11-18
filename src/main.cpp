@@ -30,7 +30,7 @@
 #include <functional>
 #include <global_handlers/ChatObserver.hpp>
 #include <global_handlers/RegEXHandler.hpp>
-#include <global_handlers/SpamBlock.hpp>
+#include <global_handlers/SpamBlockManager.hpp>
 #include <impl/backends/ServerBackend.hpp>
 #include <impl/bot/TgBotSocketFileHelperNew.hpp>
 #include <impl/bot/TgBotSocketInterface.hpp>

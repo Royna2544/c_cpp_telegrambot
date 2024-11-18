@@ -200,7 +200,7 @@ int main(int argc, char** argv) {
         }
         case Command::CMD_CTRL_SPAMBLOCK: {
             data::CtrlSpamBlock data;
-            if (parseOneEnum(&data, data::CtrlSpamBlock::CTRL_MAX, argv[0],
+            if (parseOneEnum(&data, data::CtrlSpamBlock::MAX, argv[0],
                              "spamblock")) {
                 pkt = Packet(cmd, data);
             }

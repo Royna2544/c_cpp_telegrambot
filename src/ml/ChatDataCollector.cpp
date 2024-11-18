@@ -6,7 +6,7 @@
 #include <fstream>
 
 ChatDataCollector::Data::Data(const Message::Ptr& message) {
-    if (!message->text) {
+    if (message->text) {
         msgType = Data::MsgType::TEXT;
     } else if (!message->photo.empty()) {
         msgType = Data::MsgType::PHOTO;

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Random.hpp>
+#include <random/Random.hpp>
 #include <gmock/gmock.h>
 
 class MockRandom : public RandomBase {

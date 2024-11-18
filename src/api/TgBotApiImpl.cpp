@@ -4,10 +4,15 @@
 #include <trivial_helpers/_tgbot.h>
 
 #include <Authorization.hpp>
+#include <ConfigManager.hpp>
+#include <StringResLoader.hpp>
+#include <api/CommandModule.hpp>
+#include <api/MessageExt.hpp>
 #include <api/TgBotApi.hpp>
 #include <api/TgBotApiImpl.hpp>
 #include <api/Utils.hpp>
 #include <api/components/ChatJoinRequest.hpp>
+#include <api/components/FileCheck.hpp>
 #include <api/components/ModuleManagement.hpp>
 #include <api/components/OnAnyMessage.hpp>
 #include <api/components/OnCallbackQuery.hpp>
@@ -25,12 +30,6 @@
 #include <string>
 #include <string_view>
 #include <utility>
-
-#include "ConfigManager.hpp"
-#include "StringResLoader.hpp"
-#include "api/CommandModule.hpp"
-#include "api/MessageExt.hpp"
-#include "api/components/FileCheck.hpp"
 
 bool TgBotApiImpl::validateValidArgs(const DynModule* module,
                                      MessageExt::Ptr& message) {

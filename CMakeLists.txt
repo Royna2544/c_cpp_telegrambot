@@ -284,6 +284,7 @@ find_package(ZLIB REQUIRED)
 find_package(Protobuf)
 find_package(fmt REQUIRED)
 find_package(jsoncpp REQUIRED) # Required by tgbot-cpp anyways...
+find_package(CURL REQUIRED)
 # If we couldn't find protobuf or dirty abseil fix is enabled.
 if (DIRTY_ABSEIL_FIX OR NOT Protobuf_FOUND)
   # Then we can just include source-abseil
@@ -356,8 +357,34 @@ add_my_library(
 
 ################### The Bot's main functionaility ###################
 add_my_library(
+  NAME Regex
+  SRCS
+    src/global_handlers/RegEXHandler.cpp
+  LIBS absl::status
+  STATIC
+)
+
+add_my_library(
   NAME PPImpl
-  SRCS 
+  SRCS
+    src/Authorization.cpp
+    src/api/CommandModule.cpp
+    src/global_handlers/SpamBlocker.cpp
+    src/global_handlers/ChatObserver.cpp
+    src/socket/interface/impl/bot/SocketDataHandler.cpp
+    src/socket/interface/impl/bot/TgBotSocketInterface.cpp
+  LIBS  TgBot TgBotUtils TgBotDBImpl 
+        TgBotPPImpl_shared_deps TgBotStringRes ${CMAKE_DL_LIBS} TgBotSocket JsonCpp::JsonCpp 
+        CURL::libcurl
+  STATIC
+)
+#####################################################################
+
+################# The Bot's main launcher (program) #################
+add_my_executable(
+  NAME main
+  SRCS
+    src/main.cpp
     src/ManagedThread.cpp
     src/ThreadManager.cpp
     src/Authorization.cpp
@@ -375,6 +402,7 @@ add_my_library(
     src/api/components/UnknownCommand.cpp
     src/global_handlers/RegEXHandler.cpp
     src/global_handlers/SpamBlocker.cpp
+    src/global_handlers/SpamBlockManager.cpp
     src/global_handlers/ChatObserver.cpp
     src/ml/ChatDataCollector.cpp
     src/web/TgBotWebServer.cpp
@@ -383,17 +411,9 @@ add_my_library(
     src/socket/interface/impl/bot/TgBotSocketInterface.cpp
     src/socket/interface/impl/backends/ServerBackend.cpp
     src/socket/interface/impl/backends/ServerBackend_${TARGET_VARIANT}.cpp
-  LIBS  TgBot TgBotUtils TgBotWeb TgBotDBImpl absl::status TgBotRandom TgBot_restartfmt_parser
-        TgBotPPImpl_shared_deps TgBotStringRes ${CMAKE_DL_LIBS} TgBotSocket JsonCpp::JsonCpp TgBotsighandler 
-  STATIC
-)
-#####################################################################
-
-################# The Bot's main launcher (program) #################
-add_my_executable(
-  NAME main
-  SRCS src/main.cpp
-  LIBS TgBotPPImpl TgBotDBLoading TgBot_restartfmt_parser fruit
+  LIBS TgBotDBLoading TgBot_restartfmt_parser fruit TgBot TgBotUtils TgBotWeb TgBotDBImpl
+       absl::status TgBotRandom TgBot_restartfmt_parser CURL::libcurl TgBotRegex
+       TgBotPPImpl_shared_deps TgBotStringRes ${CMAKE_DL_LIBS} TgBotSocket JsonCpp::JsonCpp TgBotsighandler 
 )
 
 if (UNIX)

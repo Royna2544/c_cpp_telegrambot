@@ -6,7 +6,6 @@ add_my_executable(
   SRCS
     TestMain.cpp
     AuthorizationTest.cpp
-    RegexHandlerTest.cpp
     ResourceManagerTest.cpp
     TryParseTest.cpp
     SharedMallocTest.cpp
@@ -31,6 +30,18 @@ add_my_executable(
   LIBS
     GTest::gtest
     TgBotDBImpl
+  TEST
+)
+
+add_my_executable(
+  NAME regex
+  SRCS
+    TestMain.cpp
+    RegexHandlerTest.cpp
+  LIBS
+    GTest::gtest
+    GTest::gmock
+    TgBotRegex
   TEST
 )
 
