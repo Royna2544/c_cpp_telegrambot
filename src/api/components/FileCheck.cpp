@@ -484,7 +484,9 @@ TgBotApi::AnyMessageResult FileCheck::onAnyMessage(
 
     GetAnalysisAPI getAnalysis(_token);
     std::optional<GetAnalysisAPI::return_type> analysisResult;
-    while (!analysisResult && !SignalHandler::isSignaled()) {
+    int count = 0;
+    constexpr int kAnalysisRetryCount = 10;
+    while (!analysisResult && count < kAnalysisRetryCount && !SignalHandler::isSignaled()) {
         LOG(INFO) << "Getting analysis results";
         auto analfut = getAnalysis.request(sendFileProcRes.value());
         if (!analfut) {
@@ -497,12 +499,17 @@ TgBotApi::AnyMessageResult FileCheck::onAnyMessage(
             LOG(ERROR) << "Failed to get analysis results";
             std::this_thread::sleep_for(std::chrono::seconds(5));
         }
+        count++;
     }
-    LOG(INFO) << "Analysis results received";
     if (SignalHandler::isSignaled()) {
         LOG(INFO) << "Signal handler was triggered";
         return TgBotApi::AnyMessageResult::Handled;
     }
+    if (!analysisResult) {
+        LOG(WARNING) << "Failed to get analysis result";
+        return TgBotApi::AnyMessageResult::Handled;
+    }
+    LOG(INFO) << "Analysis results received";
 
     // Append data to the vec
     ResultHolder holder;
