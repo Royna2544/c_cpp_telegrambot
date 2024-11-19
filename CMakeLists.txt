@@ -15,11 +15,14 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake")
 option(ENABLE_RUST_SUPPORT "Enable rust support" OFF)
 option(SANITIZER_CONFIG "Sanitizers config for debug builds (ASan, TSan, etc)" "ASan")
 option(DIRTY_ABSEIL_FIX "Enable dirty abseil linkage fix" OFF)
+option(BUILD_SHARED_LIBS "Build some dependent libraries as shared" OFF)
 #####################################################################
 
 #####################################################################
 # Make vcpkg copy the dlls required.
-set(VCPKG_APPLOCAL_DEPS ON)
+set(VCPKG_APPLOCAL_DEPS ON CACHE BOOL "Copy VCPKG's dlls to exe directory" FORCE)
+# On installation too.
+set(X_VCPKG_APPLOCAL_DEPS_INSTALL ON CACHE BOOL "Copy VCPKG's dlls to install" FORCE)
 #####################################################################
 
 ######################### C++ Configuration #########################
@@ -118,7 +121,6 @@ if (WIN32)
     list(APPEND GLOBAL_COMPILE_OPTIONS /utf-8)
   endif()
 endif()
-# Hide src compile info
 if (NOT MSVC)
   list(APPEND GLOBAL_COMPILE_OPTIONS -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/=)
 endif()
@@ -167,7 +169,8 @@ function(add_my_library)
     endif()
   endif()
   add_sanitizers(${TGBOT_LIBRARY_NAME})
-    set(EXPORTCONF_DIR ${CMAKE_BINARY_DIR}/exportConfig/)
+  
+  set(EXPORTCONF_DIR ${CMAKE_BINARY_DIR}/exportConfig/)
   if (NOT TGBOT_LIBRARY_STATIC)
     configure_file(${CMAKE_SOURCE_DIR}/src/include/LibraryExports.h.inc
       ${EXPORTCONF_DIR}${TGBOT_LIBRARY_NAME}Exports.h)
@@ -198,6 +201,7 @@ function(add_my_library)
   else()
     set_target_properties(${TGBOT_LIBRARY_NAME} PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
   endif()
+
   # PIE
   if (PIE_SUPPORTED)
     set_target_properties(${TGBOT_LIBRARY_NAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -240,17 +244,25 @@ function(add_my_executable)
       install(TARGETS ${TGBOT_EXE_NAME})
     endif()
   endif()
-  add_sanitizers(${TGBOT_EXE_NAME})    
+  add_sanitizers(${TGBOT_EXE_NAME})
   # Set RPATH for Unix-like systems
-  if(UNIX)
+  if (UNIX)
     # bin/main bin/cli lib/libTgBot.so
     set_target_properties(${TGBOT_EXE_NAME} PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
-    set_target_properties(${TGBOT_EXE_NAME} PROPERTIES BUILD_RPATH_USE_ORIGIN ON)
-    set_target_properties(${TGBOT_EXE_NAME} PROPERTIES INSTALL_RPATH "../lib")
+    set_target_properties(${TGBOT_EXE_NAME} PROPERTIES INSTALL_RPATH "$ORIGIN/../lib")
   endif()
   target_link_libraries(${TGBOT_EXE_NAME} TgBotLogInit absl::log ${TGBOT_EXE_LIBS})
   if (WIN32)
+     set_target_properties(${lib} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+  else()
+     set_target_properties(${lib} PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+  endif()
+  if (WIN32)
     target_link_libraries(${TGBOT_EXE_NAME} ${TGBOT_EXE_LIBS_WIN32})
+    add_custom_command(TARGET ${TGBOT_EXE_NAME} POST_BUILD
+      COMMAND ${CMAKE_COMMAND} -E copy -t $<TARGET_FILE_DIR:${TGBOT_EXE_NAME}> $<TARGET_RUNTIME_DLLS:${TGBOT_EXE_NAME}>
+      COMMAND_EXPAND_LISTS
+    )
     install(FILES $<TARGET_RUNTIME_DLLS:${TGBOT_EXE_NAME}> TYPE BIN)
   endif()
 
@@ -335,14 +347,14 @@ add_subdirectory(src/socket)
 add_subdirectory(src/utils)
 add_subdirectory(src/web)
 add_subdirectory(src/libos)
+add_subdirectory(src/third-party/tgbot-cpp)
+add_subdirectory(src/third-party/fruit EXCLUDE_FROM_ALL)
 find_package(Python3 QUIET)
 if (Python3_FOUND)
   message(STATUS "Enabling cpp-httplib compilation")
   set(HTTPLIB_COMPILE ON)
 endif()
 add_subdirectory(src/third-party/cpp-httplib)
-add_subdirectory(src/third-party/tgbot-cpp)
-add_subdirectory(src/third-party/fruit EXCLUDE_FROM_ALL)
 
 # Tests
 find_package(GTest)
@@ -412,7 +424,7 @@ add_my_executable(
     src/socket/interface/impl/backends/ServerBackend_${TARGET_VARIANT}.cpp
   LIBS TgBotDBLoading TgBot_restartfmt_parser fruit TgBot TgBotUtils TgBotWeb TgBotDBImpl
        absl::status TgBotRandom TgBot_restartfmt_parser CURL::libcurl TgBotRegex
-      TgBotStringRes ${CMAKE_DL_LIBS} TgBotSocket JsonCpp::JsonCpp TgBotsighandler 
+      TgBotStringRes ${CMAKE_DL_LIBS} TgBotSocket JsonCpp::JsonCpp TgBotsighandler OpenSSL::SSL
 )
 
 if (UNIX)
