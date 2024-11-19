@@ -443,6 +443,25 @@ int main(int argc, char** argv) {
     // Initialize Abseil logging system
     TgBot_AbslLogInit();
 
+    // Delibrately try to access current directory.
+    std::error_code ec;
+    (void)std::filesystem::current_path(ec);
+    if (ec) {
+        LOG(ERROR) << "Failed to get current cwd: " << ec.message();
+#ifdef _POSIX_C_SOURCE
+        struct stat statbuf{};
+        if (stat(".", &statbuf) < 0) {
+            PLOG(ERROR) << "Couldn't stat cwd";
+            return EXIT_FAILURE;
+        }
+        LOG(INFO) << "Current directory: Inode=" << statbuf.st_ino << " NLink=" << statbuf.st_nlink;
+        if (statbuf.st_ino == 0) {
+            LOG(INFO) << "This directory is deleted.";
+        }
+#endif
+        return EXIT_FAILURE;
+    }
+
     // Install signal handlers
     SignalHandler::install();
 
