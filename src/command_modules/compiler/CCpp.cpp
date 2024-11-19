@@ -1,6 +1,8 @@
 #include <fmt/format.h>
 
+#include <filesystem>
 #include <libfs.hpp>
+#include <system_error>
 
 #include "CompilerInTelegram.hpp"
 #include "StringResLoader.hpp"
@@ -22,7 +24,8 @@ void CompilerInTgForCCpp::run(MessageExt::Ptr message) {
         runCommand(cmd.str(), resultbuf);
         resultbuf << std::endl;
 
-        if (FS::exists(aoutname)) {
+        std::error_code ec;
+        if (std::filesystem::exists(aoutname, ec)) {
             resultbuf << access(_locale, Strings::RUN_TIME) << ":\n";
             runCommand(aoutname.data(), resultbuf);
             std::filesystem::remove(aoutname);

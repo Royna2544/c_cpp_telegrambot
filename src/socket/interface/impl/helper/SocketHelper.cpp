@@ -6,6 +6,7 @@
 #include <libfs.hpp>
 #include <optional>
 #include <string>
+#include <system_error>
 
 #include "SocketDescriptor_defs.hpp"
 
@@ -21,7 +22,7 @@ int SocketInterfaceBase::INetHelper::getPortNum() {
 bool SocketInterfaceBase::LocalHelper::canSocketBeClosed() {
     bool socketValid = true;
 
-    if (!FS::exists(_interface->options.address.get())) {
+    if (!std::filesystem::exists(_interface->options.address.get())) {
         LOG(WARNING) << "Socket file was deleted";
         socketValid = false;
     }
@@ -31,7 +32,11 @@ bool SocketInterfaceBase::LocalHelper::canSocketBeClosed() {
 void SocketInterfaceBase::LocalHelper::cleanupServerSocket() {
     const auto path = std::filesystem::path(_interface->options.address.get());
     DLOG(INFO) << "Cleaning up server socket...";
-    FS::deleteFile(path);
+    std::error_code ec;
+    std::filesystem::remove(path, ec);
+    if (ec) {
+        LOG(ERROR) << "Failed to remove socket file: " << ec.message();
+    }
 }
 
 void SocketInterfaceBase::LocalHelper::printRemoteAddress(socket_handle_t  /*socket*/) {

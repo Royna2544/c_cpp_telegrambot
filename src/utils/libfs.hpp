@@ -30,26 +30,6 @@ struct TgBotUtils_API FS {
      */
     static std::filesystem::path getPath(PathType type);
 
-    /**
-     * Checks if a file exists.
-     *
-     * @param filename the path to the file
-     * @return true if the file exists, false otherwise
-     */
-    static bool exists(const std::filesystem::path& filename);
-
-    /**
-     * Deletes the specified file.
-     *
-     * This function attempts to delete the file located at the given path.
-     * If the file does not exist or cannot be deleted for any reason, this
-     * function will return false.
-     *
-     * @param filename The path to the file to be deleted.
-     * @return true if the file was successfully deleted, false otherwise.
-     */
-    static bool deleteFile(const std::filesystem::path& filename);
-
     static constexpr std::string_view kDylibExtension =
 #ifdef _WIN32
         ".dll";

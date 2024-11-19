@@ -17,6 +17,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <type_traits>
 #include <variant>
 
@@ -372,14 +373,20 @@ SQLiteDatabase::ListResult SQLiteDatabase::removeUserFromList(
 
 bool SQLiteDatabase::load(std::filesystem::path filepath) {
     int ret = 0;
+    std::error_code ec;
 
     if (db != nullptr) {
         LOG(WARNING) << "Attempting to load database while it is already open.";
         return false;
     }
 
-    bool existed = FS::exists(filepath);
-
+    bool existed = std::filesystem::exists(filepath, ec);
+    if (ec) {
+        LOG(ERROR) << "Failed to check if file exists: " << filepath << ": "
+                   << ec.message();
+        return false;
+    }
+    
     ret = sqlite3_open(filepath.string().c_str(), &db);
     if (ret != SQLITE_OK) {
         LOG(ERROR) << "Could not open database: " << sqlite3_errmsg(db);

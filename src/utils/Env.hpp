@@ -1,12 +1,14 @@
 #pragma once
 
+#include <TgBotUtilsExports.h>
 #include <absl/strings/str_cat.h>
 #include <trivial_helpers/_class_helper_macros.h>
 
+#include <concepts>
+#include <ostream>
 #include <string>
 #include <string_view>
-#include <ostream>
-#include <TgBotUtilsExports.h>
+#include <type_traits>
 
 // A C++-like interface for manipulating environment variables.
 class TgBotUtils_API Env {
@@ -27,16 +29,16 @@ class TgBotUtils_API Env {
 
         [[nodiscard]] bool has() const;
 
-        bool assign(std::string& ref) const {
+        template <typename T>
+            requires std::is_assignable_v<std::string, T>
+        bool assign(T ref) const {
             if (has()) {
                 ref = get();
                 return true;
             }
             return false;
         }
-        std::string_view key() const {
-            return _key;
-        }
+        std::string_view key() const { return _key; }
 
         ValueEntry& operator=(const ValueEntry& other) {
             if (this == &other) {
@@ -61,7 +63,8 @@ class TgBotUtils_API Env {
         // Note: This will not overwrite the existing value.
         // To overwrite, use operator=
         // When get() throws, this won't catch it.
-        const Env::ValueEntry& operator+=(const absl::string_view addition) const {
+        const Env::ValueEntry& operator+=(
+            const absl::string_view addition) const {
             *this = absl::StrCat(get(), addition);
             return *this;
         }
