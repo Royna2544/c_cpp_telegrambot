@@ -1,5 +1,6 @@
 #include <absl/log/log.h>
 #include <absl/status/status.h>
+#include <absl/strings/ascii.h>
 #include <fmt/format.h>
 
 #include <cctype>
@@ -15,10 +16,6 @@ using std::regex_constants::format_first_only;
 using std::regex_constants::format_sed;
 using std::regex_constants::icase;
 using std::regex_constants::match_not_null;
-
-namespace Vstd {
-bool isdigit(const char c) { return std::isdigit(c) != 0; }
-}  // namespace Vstd
 
 [[nodiscard]] RegexCommand::Result RegexCommand::process(
     const std::string& source, const std::string& regexCommand) const {
@@ -68,9 +65,9 @@ struct ReplaceCommand : public RegexCommand {
                     // Case-insensitive
                     kRegexFlags |= icase;
                     ++i;
-                } else if (Vstd::isdigit(option)) {
+                } else if (absl::ascii_isdigit(option)) {
                     int value = 0;
-                    while (i < options.length() && Vstd::isdigit(options[i])) {
+                    while (i < options.length() && absl::ascii_isdigit(options[i])) {
                         value = value * 10 + (options[i] - '0');
                         ++i;
                     }
