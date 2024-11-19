@@ -10,6 +10,7 @@ BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
         case CTRL_LOGOFF_EVENT:
         case CTRL_SHUTDOWN_EVENT:
             SignalHandler::signalHandler();
+            return TRUE;
         default:
             return FALSE;
     }
