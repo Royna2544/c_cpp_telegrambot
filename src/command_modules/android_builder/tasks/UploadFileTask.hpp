@@ -1,10 +1,10 @@
 #include <absl/log/log.h>
 
-#include <cstdlib>
 #include <ConfigParsers.hpp>
+#include <cstdlib>
 
-#include "Shmem.hpp"
 #include "ForkAndRun.hpp"
+#include "Shmem.hpp"
 
 struct UploadFileTask : ForkAndRun {
     static constexpr std::string_view kShmemUpload = "shmem_upload";
@@ -40,13 +40,17 @@ struct UploadFileTask : ForkAndRun {
      *
      * @param data The data object containing the necessary configuration and
      * paths.
+     * @param scriptsDirectory The directory containing the script files.
      */
-    explicit UploadFileTask(PerBuildData data);
+    explicit UploadFileTask(PerBuildData data,
+                            std::filesystem::path scriptsDirectory);
 
     ~UploadFileTask() override;
+
    private:
     PerBuildData data;
     std::unique_ptr<AllocatedShmem> smem;
     std::string outputString;
     std::mutex stdout_mutex;
+    std::filesystem::path _scriptDirectory;
 };

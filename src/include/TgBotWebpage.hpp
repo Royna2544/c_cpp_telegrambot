@@ -49,7 +49,7 @@ class TgBotWebServerBase {
 
 class TgBotWebServer : public ManagedThreadRunnable, public TgBotWebServerBase {
    public:
-    explicit TgBotWebServer(int serverPort);
+    explicit TgBotWebServer(std::filesystem::path wwwResource, int serverPort);
 
     void runFunction(const std::stop_token &token) override;
     void onPreStop() override;

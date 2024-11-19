@@ -38,4 +38,7 @@ add_my_executable(
     OPTIONAL
 )
 
+install(DIRECTORY configs/ DESTINATION share/${PROJECT_NAME}/android_builder)
+file(COPY configs/ DESTINATION ${CMAKE_BINARY_DIR}/share/${PROJECT_NAME}/android_builder)
+
 endif()

@@ -10,19 +10,11 @@
 #include "api/Providers.hpp"
 #include "api/TgBotApi.hpp"
 #include "fruit/fruit_forward_decls.h"
+#include "../GetCommandLine.hpp"
 
 fruit::Component<CommandLine> getCommandLine() {
-    return fruit::createComponent().registerProvider([] {
-        static auto strings = testing::internal::GetArgvs();
-        static std::vector<char*> c_strings;
-
-        c_strings.reserve(strings.size() + 1);
-        for (auto& s : strings) {
-            c_strings.emplace_back(s.data());
-        }
-        c_strings.emplace_back(nullptr);
-
-        return CommandLine(strings.size(), c_strings.data());
+    return fruit::createComponent().registerProvider([] () -> CommandLine {
+        return getCmdLine();
     });
 }
 
@@ -38,7 +30,8 @@ CommandModulesTest::getProviders() {
 }
 
 void CommandModulesTest::SetUp() {
-    modulePath = provideInject.get<CommandLine*>()->exe().parent_path().parent_path() / "lib" / "modules";
+    modulePath =
+        provideInject.get<CommandLine*>()->getPath(FS::PathType::CMD_MODULES);
     database = provideInject.get<MockDatabase*>();
     random = provideInject.get<MockRandom*>();
     resource = provideInject.get<MockResource*>();

@@ -49,6 +49,9 @@ struct TgBotDBImpl_API SQLiteDatabase : DatabaseBase {
         WHITELIST = 2,
         MAX = 3
     };
+
+    explicit SQLiteDatabase(std::filesystem::path sqlScriptDirectory);
+    
     [[nodiscard]] ListResult addUserToList(ListType type,
                                            UserId user) const override;
     [[nodiscard]] ListResult removeUserFromList(ListType type,
@@ -150,7 +153,7 @@ struct TgBotDBImpl_API SQLiteDatabase : DatabaseBase {
          * int64_t, or std::string.
          * @return A reference to the current Helper object.
          */
-        std::shared_ptr<Helper> addArgument(ArgTypes value);
+        Helper &addArgument(const ArgTypes& value);
 
         /**
          * @brief Binds the arguments to the SQL statement.
@@ -200,8 +203,10 @@ struct TgBotDBImpl_API SQLiteDatabase : DatabaseBase {
         std::shared_ptr<Helper> getNextStatement();
 
         static std::shared_ptr<Helper> create(
-            sqlite3 *db, const std::string_view &filename) {
-            return std::make_shared<Helper>(Helper(db, filename));
+            sqlite3 *db, const std::filesystem::path &scriptDirectory,
+            const std::string_view &filename) {
+            return std::make_shared<Helper>(
+                Helper(db, scriptDirectory, filename));
         }
 
        private:
@@ -210,10 +215,12 @@ struct TgBotDBImpl_API SQLiteDatabase : DatabaseBase {
          * Private to make it only available as a shared pointer
          *
          * @param db A pointer to the SQLite database.
+         * @param sqlScriptsPath The path to the SQL script files.
          * @param filename The name of the SQL script file to be executed.
          * @throws std::runtime_error if the SQL script file cannot be loaded..
          */
-        explicit Helper(sqlite3 *db, const std::string_view &filename);
+        explicit Helper(sqlite3 *db, const std::filesystem::path &sqlScriptPath,
+                        const std::string_view &filename);
 
         // Used for methods that have multiple statements
         explicit Helper(sqlite3 *db, std::string content);
@@ -291,4 +298,5 @@ struct TgBotDBImpl_API SQLiteDatabase : DatabaseBase {
     [[nodiscard]] ListResult checkUserInList(InfoType type, UserId user) const;
     static InfoType toInfoType(ListType type);
     sqlite3 *db = nullptr;
+    std::filesystem::path _sqlScriptsPath;
 };

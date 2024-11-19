@@ -7,6 +7,7 @@
 
 #include <StacktracePrint.hpp>
 #include <cstdint>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <libfs.hpp>
@@ -61,11 +62,11 @@ void SQLiteDatabase::Helper::logInvalidState(
     PrintStackTrace(backtracePrint);
 }
 
-SQLiteDatabase::Helper::Helper(sqlite3* db, const std::string_view& filename)
+SQLiteDatabase::Helper::Helper(sqlite3* db,
+                               const std::filesystem::path& sqlScriptPath,
+                               const std::string_view& filename)
     : db(db) {
-    static auto sqlResPath = FS::getPath(FS::PathType::RESOURCES_SQL);
-
-    std::ifstream sqlFile(sqlResPath / filename.data());
+    std::ifstream sqlFile(sqlScriptPath / filename.data());
     int ret = 0;
 
     if (!sqlFile.is_open()) {
@@ -149,8 +150,8 @@ SQLiteDatabase::Helper::~Helper() {
     }
 }
 
-std::shared_ptr<SQLiteDatabase::Helper> SQLiteDatabase::Helper::addArgument(
-    SQLiteDatabase::Helper::ArgTypes value) {
+SQLiteDatabase::Helper& SQLiteDatabase::Helper::addArgument(
+    const ArgTypes& value) {
     switch (state) {
         case State::HAS_ARGUMENTS:
         case State::PREPARED:
@@ -162,7 +163,7 @@ std::shared_ptr<SQLiteDatabase::Helper> SQLiteDatabase::Helper::addArgument(
             break;
     };
     state = State::HAS_ARGUMENTS;
-    return shared_from_this();
+    return *this;
 }
 
 bool SQLiteDatabase::Helper::bindArguments() {
@@ -290,13 +291,13 @@ SQLiteDatabase::ListResult SQLiteDatabase::addUserToList(InfoType type,
         case ListResult::BACKEND_ERROR:
             return res;
     }
-    auto helper = Helper::create(db, Helper::kInsertUserFile);
+    auto helper = Helper::create(db, _sqlScriptsPath, Helper::kInsertUserFile);
     if (!helper->prepare()) {
         return ListResult::BACKEND_ERROR;
     }
     helper->addArgument(user)
-        ->addArgument(static_cast<int>(type))
-        ->bindArguments();
+        .addArgument(static_cast<int>(type))
+        .bindArguments();
     if (helper->execute()) {
         return ListResult::OK;
     }
@@ -326,7 +327,8 @@ SQLiteDatabase::ListResult SQLiteDatabase::removeUserFromList(
             return res;
     }
 
-    auto helper = Helper::create(db, Helper::kRemoveUserFile.data());
+    auto helper =
+        Helper::create(db, _sqlScriptsPath, Helper::kRemoveUserFile.data());
     if (!helper->prepare()) {
         return ListResult::BACKEND_ERROR;
     }
@@ -349,11 +351,12 @@ SQLiteDatabase::ListResult SQLiteDatabase::removeUserFromList(
     ListResult result = ListResult::BACKEND_ERROR;
     std::optional<Helper::Row> row;
 
-    auto helper = Helper::create(db, Helper::kFindUserFile.data());
+    auto helper =
+        Helper::create(db, _sqlScriptsPath, Helper::kFindUserFile.data());
     if (!helper->prepare()) {
         return result;
     }
-    helper->addArgument(user)->bindArguments();
+    helper->addArgument(user).bindArguments();
     row = helper->execAndGetRow();
     if (row) {
         const auto info = static_cast<InfoType>(row->get<int>(0));
@@ -386,7 +389,7 @@ bool SQLiteDatabase::load(std::filesystem::path filepath) {
                    << ec.message();
         return false;
     }
-    
+
     ret = sqlite3_open(filepath.string().c_str(), &db);
     if (ret != SQLITE_OK) {
         LOG(ERROR) << "Could not open database: " << sqlite3_errmsg(db);
@@ -396,8 +399,8 @@ bool SQLiteDatabase::load(std::filesystem::path filepath) {
     // Check if the database exists and initialize it if necessary.
     if (!existed || filepath == kInMemoryDatabase) {
         LOG(INFO) << "Running initialization script...";
-        const auto helper =
-            Helper::create(db, Helper::kCreateDatabaseFile.data());
+        const auto helper = Helper::create(db, _sqlScriptsPath,
+                                           Helper::kCreateDatabaseFile.data());
         if (!helper->executeAsScript()) {
             throw std::runtime_error("Error initializing database");
         }
@@ -427,11 +430,12 @@ std::optional<SQLiteDatabase::MediaInfo> SQLiteDatabase::queryMediaInfo(
     std::string str) const {
     MediaInfo info{};
 
-    auto helper = Helper::create(db, Helper::kFindMediaInfoFile);
+    auto helper =
+        Helper::create(db, _sqlScriptsPath, Helper::kFindMediaInfoFile);
     if (!helper->prepare()) {
         return std::nullopt;
     }
-    helper->addArgument(str)->bindArguments();
+    helper->addArgument(str).bindArguments();
     auto row = helper->execAndGetRow();
 
     if (row) {
@@ -467,7 +471,8 @@ SQLiteDatabase::AddResult SQLiteDatabase::addMediaInfo(
 
     // Determine stuff to insert, and the ones that already exist
     for (const auto& name : info.names) {
-        auto helper = Helper::create(db, Helper::kFindMediaNameFile);
+        auto helper =
+            Helper::create(db, _sqlScriptsPath, Helper::kFindMediaNameFile);
         if (!helper->prepare()) {
             return AddResult::BACKEND_ERROR;
         }
@@ -492,8 +497,8 @@ SQLiteDatabase::AddResult SQLiteDatabase::addMediaInfo(
                 const auto name = std::get<std::string>(info.data);
 
                 // Insert into database
-                auto insertHelper =
-                    Helper::create(db, Helper::kInsertMediaNameFile);
+                auto insertHelper = Helper::create(
+                    db, _sqlScriptsPath, Helper::kInsertMediaNameFile);
                 if (!insertHelper->prepare()) {
                     return AddResult::BACKEND_ERROR;
                 }
@@ -508,8 +513,8 @@ SQLiteDatabase::AddResult SQLiteDatabase::addMediaInfo(
                 }
 
                 // Get the index again
-                auto findHelper =
-                    Helper::create(db, Helper::kFindMediaNameFile);
+                auto findHelper = Helper::create(db, _sqlScriptsPath,
+                                                 Helper::kFindMediaNameFile);
                 if (!findHelper->prepare()) {
                     return AddResult::BACKEND_ERROR;
                 }
@@ -533,14 +538,15 @@ SQLiteDatabase::AddResult SQLiteDatabase::addMediaInfo(
     }
 
     // Insert the media info into the database
-    auto insertMediaHelper = Helper::create(db, Helper::kInsertMediaIdFile);
+    auto insertMediaHelper =
+        Helper::create(db, _sqlScriptsPath, Helper::kInsertMediaIdFile);
 
     if (!insertMediaHelper->prepare()) {
         return AddResult::BACKEND_ERROR;
     }
     insertMediaHelper->addArgument(info.mediaUniqueId)
-        ->addArgument(info.mediaId)
-        ->bindArguments();
+        .addArgument(info.mediaId)
+        .bindArguments();
     if (!insertMediaHelper->execute()) {
         // This is most likely at a fault at unique constraint violation.
         // TODO: Undo the media names adding here.
@@ -549,11 +555,12 @@ SQLiteDatabase::AddResult SQLiteDatabase::addMediaInfo(
     }
 
     // Get the inserted media index
-    auto findMediaIdHelper = Helper::create(db, Helper::kFindMediaIdFile);
+    auto findMediaIdHelper =
+        Helper::create(db, _sqlScriptsPath, Helper::kFindMediaIdFile);
     if (!findMediaIdHelper->prepare()) {
         return AddResult::BACKEND_ERROR;
     }
-    findMediaIdHelper->addArgument(info.mediaUniqueId)->bindArguments();
+    findMediaIdHelper->addArgument(info.mediaUniqueId).bindArguments();
     const auto row = findMediaIdHelper->execAndGetRow();
     if (!row) {
         // The mediaids was inserted, and we are just trying to get the index.
@@ -568,14 +575,14 @@ SQLiteDatabase::AddResult SQLiteDatabase::addMediaInfo(
         int data = std::get<int>(info.data);
 
         auto insertMediaMapHelper =
-            Helper::create(db, Helper::kInsertMediaMapFile);
+            Helper::create(db, _sqlScriptsPath, Helper::kInsertMediaMapFile);
         if (!insertMediaMapHelper->prepare()) {
             return AddResult::BACKEND_ERROR;
         }
         insertMediaMapHelper->addArgument(mediaIdIndex)
-            ->addArgument(data)
-            ->addArgument(static_cast<int>(type))
-            ->bindArguments();
+            .addArgument(data)
+            .addArgument(static_cast<int>(type))
+            .bindArguments();
 
         if (!insertMediaMapHelper->execute()) {
             LOG(ERROR) << "Failed to insert the final media map";
@@ -592,7 +599,8 @@ std::vector<SQLiteDatabase::MediaInfo> SQLiteDatabase::getAllMediaInfos()
     MergeMap map;
     std::vector<MediaInfo> result;
 
-    auto helper = Helper::create(db, Helper::kFindAllMediaMapFile);
+    auto helper =
+        Helper::create(db, _sqlScriptsPath, Helper::kFindAllMediaMapFile);
     if (!helper->prepare()) {
         return result;
     }
@@ -623,7 +631,7 @@ std::vector<SQLiteDatabase::MediaInfo> SQLiteDatabase::getAllMediaInfos()
 }
 
 std::optional<UserId> SQLiteDatabase::getOwnerUserId() const {
-    auto helper = Helper::create(db, Helper::kFindOwnerFile);
+    auto helper = Helper::create(db, _sqlScriptsPath, Helper::kFindOwnerFile);
     if (!helper->prepare()) {
         return std::nullopt;
     }
@@ -659,7 +667,8 @@ std::ostream& SQLiteDatabase::dump(std::ostream& ofs) const {
     // later.
     ss << fmt::format("Owner Id: {}\n", getOwnerUserId().value_or(0));
 
-    auto helper = Helper::create(db, Helper::kDumpDatabaseFile);
+    auto helper =
+        Helper::create(db, _sqlScriptsPath, Helper::kDumpDatabaseFile);
     if (helper->prepare()) {
         std::optional<Helper::Row> row;
         while ((row = helper->execAndGetRow())) {
@@ -760,13 +769,14 @@ SQLiteDatabase::AddResult SQLiteDatabase::addChatInfo(
     if (getChatId(name)) {
         return AddResult::ALREADY_EXISTS;
     }
-    auto insertHelper = Helper::create(db, Helper::kInsertChatFile);
+    auto insertHelper =
+        Helper::create(db, _sqlScriptsPath, Helper::kInsertChatFile);
     if (!insertHelper->prepare()) {
         return AddResult::BACKEND_ERROR;
     }
     insertHelper->addArgument(chatid)
-        ->addArgument(std::string(name))
-        ->bindArguments();
+        .addArgument(std::string(name))
+        .bindArguments();
     if (insertHelper->execute()) {
         return AddResult::OK;
     } else {
@@ -776,7 +786,7 @@ SQLiteDatabase::AddResult SQLiteDatabase::addChatInfo(
 
 std::optional<ChatId> SQLiteDatabase::getChatId(
     const std::string_view name) const {
-    auto helper = Helper::create(db, Helper::kFindChatIdFile);
+    auto helper = Helper::create(db, _sqlScriptsPath, Helper::kFindChatIdFile);
     if (!helper->prepare()) {
         return std::nullopt;
     }
@@ -788,4 +798,9 @@ std::optional<ChatId> SQLiteDatabase::getChatId(
         return std::nullopt;
     }
     return row->get<ChatId>(0);
+}
+
+SQLiteDatabase::SQLiteDatabase(std::filesystem::path sqlScriptDirectory)
+    : _sqlScriptsPath(std::move(sqlScriptDirectory)) {
+    DLOG(INFO) << "Init with sql script directory " << _sqlScriptsPath;
 }

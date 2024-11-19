@@ -139,8 +139,7 @@ struct ConfigBackendFile : public ConfigBackendBoostPOBase {
         std::filesystem::path home;
         std::string line;
 
-        home = FS::getPath(FS::PathType::HOME);
-        if (home.empty()) {
+        if (!FS::getHomePath(home)) {
             return false;
         }
         auto confPath = (home / kTgBotConfigFile.data()).string();

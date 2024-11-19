@@ -24,13 +24,14 @@ int main(int argc, char** argv) {
         usage(capture0, std::forward<decltype(PH1)>(PH1));
     };
     TgBot_AbslLogInit();
-    auto config = std::make_unique<ConfigManager>(CommandLine{argc, argv});
+    CommandLine line{argc, argv};
+    auto config = std::make_unique<ConfigManager>(line);
 
     if (argc != 3) {
         _usage(EXIT_SUCCESS);
     }
     auto backend = std::make_unique<TgBotDatabaseImpl>();
-    TgBotDatabaseImpl_load(config.get(), backend.get());
+    TgBotDatabaseImpl_load(config.get(), backend.get(), &line);
     if (!backend->isLoaded()) {
         LOG(ERROR) << "Failed to load DB from config";
         return EXIT_FAILURE;

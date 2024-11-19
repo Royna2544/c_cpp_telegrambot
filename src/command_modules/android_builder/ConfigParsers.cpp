@@ -629,6 +629,8 @@ ConfigParser::Parser::Parser(const std::filesystem::path& jsonFileDir) {
 ConfigParser::ConfigParser(const std::filesystem::path& jsonFileDir) {
     // Load files
     LOG(INFO) << "Loading JSON files from directory: " << jsonFileDir;
+    // Directory iterator exception handling is intentionally not implemented
+    // As invalid config directory should abort creating the ROMBUILD handler
     for (const auto& entry : std::filesystem::directory_iterator(jsonFileDir)) {
         if (entry.is_regular_file() && entry.path().extension() == ".json") {
             LOG(INFO) << "Parsing JSON file: " << entry.path().filename();

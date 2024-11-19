@@ -7,28 +7,9 @@
 #include <optional>
 #include <system_error>
 
-// Implemented sperately by OS
-
-struct TgBotUtils_API FS {
-    enum class PathType {
-        HOME,
-        GIT_ROOT,
-        RESOURCES,
-        RESOURCES_SQL,
-        RESOURCES_WEBPAGE,
-        RESOURCES_SCRIPTS,
-    };
-
+namespace FS {
     struct SharedLibType {};
     static constexpr SharedLibType SharedLib{};
-
-    /**
-     * Returns the path associated with the specified type.
-     *
-     * @param type The type of path to retrieve.
-     * @return The path, if it exists, or an empty path.
-     */
-    static std::filesystem::path getPath(PathType type);
 
     static constexpr std::string_view kDylibExtension =
 #ifdef _WIN32
@@ -39,7 +20,6 @@ struct TgBotUtils_API FS {
         ".so";
 #endif
 
-   private:
     /**
      * Returns the home directory path of the current user.
      *
@@ -51,7 +31,7 @@ struct TgBotUtils_API FS {
      * @return `true` if the home directory was successfully retrieved, or
      * `false` if an error occurred.
      */
-    static bool getHomePath(std::filesystem::path& buf);
+    bool getHomePath(std::filesystem::path& buf);
 };
 
 // Create a directory at the specified path, but allows EEXIST

@@ -31,6 +31,8 @@
 #include <string_view>
 #include <utility>
 
+#include "CommandLine.hpp"
+
 bool TgBotApiImpl::validateValidArgs(const DynModule* module,
                                      MessageExt::Ptr& message) {
     if (!module->valid_args.enabled) {
@@ -525,7 +527,7 @@ TgBotApiImpl::TgBotApiImpl(const std::string_view token, AuthContext* auth,
         std::make_unique<TgBotApiImpl::OnMyChatMemberImpl>(this);
     // Load modules (../lib/modules)
     kModuleLoader = std::make_unique<ModulesManagement>(
-        this, providers->cmdline->exe().parent_path().parent_path() / "lib" / "modules");
+        this, providers->cmdline->getPath(FS::PathType::CMD_MODULES));
     // Restart command
     restartCommand = std::make_unique<RestartCommand>(this);
 

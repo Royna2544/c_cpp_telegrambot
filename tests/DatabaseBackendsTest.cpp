@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
+
+#include "CommandLine.hpp"
 #include "DatabaseBase.hpp"
+#include "GetCommandLine.hpp"
 
 #ifdef DATABASE_HAVE_PROTOBUF
 #include <database/ProtobufDatabase.hpp>
@@ -151,9 +154,11 @@ INSTANTIATE_TEST_SUITE_P(
         DBParam{std::make_shared<ProtoDatabase>(), "ProtoDatabase"}
 #endif
 #if defined DATABASE_HAVE_PROTOBUF && defined DATABASE_HAVE_SQLITE
-,
+        ,
 #endif
 #if defined DATABASE_HAVE_SQLITE
-        DBParam{std::make_shared<SQLiteDatabase>(), "SQLiteDatabase"}
+        DBParam{std::make_shared<SQLiteDatabase>(
+                    getCmdLine().getPath(FS::PathType::RESOURCES_SQL)),
+                "SQLiteDatabase"}
 #endif
-    ));
+        ));

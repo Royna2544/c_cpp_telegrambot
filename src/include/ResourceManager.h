@@ -43,13 +43,12 @@ struct TgBotUtils_API ResourceManager : ResourceProvider {
     [[nodiscard]] std::string_view get(std::filesystem::path filename) const override;
     bool preload(std::filesystem::path p) override;
 
-    APPLE_INJECT(ResourceManager());
+    explicit ResourceManager(std::filesystem::path resourceDirectory);
     ~ResourceManager() override = default;
 
-    static constexpr std::string_view kResourceDirname = "resources";
    private:
     std::map<std::filesystem::path, std::string> kResources;
     std::vector<std::string> ignoredResources;
-    std::once_flag m_once;
+    std::filesystem::path m_resourceDirectory;
     static constexpr std::string_view kResourceLoadIgnoreFile = ".loadignore";
 };

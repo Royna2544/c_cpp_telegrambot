@@ -4,6 +4,19 @@
 
 #include <filesystem>
 
+namespace FS {
+
+enum class PathType {
+    INSTALL_ROOT,
+    RESOURCES,
+    RESOURCES_SQL,
+    RESOURCES_WEBPAGE,
+    RESOURCES_SCRIPTS,
+    CMD_MODULES
+};
+
+}
+
 class TgBotUtils_API CommandLine {
    public:
     using argv_type = char* const*;
@@ -12,7 +25,7 @@ class TgBotUtils_API CommandLine {
    private:
     argc_type _argc;
     argv_type _argv;
-    std::filesystem::path startingDirectory;
+    std::filesystem::path exePath;
 
    public:
     CommandLine(argc_type argc, argv_type argv);
@@ -21,4 +34,6 @@ class TgBotUtils_API CommandLine {
     [[nodiscard]] std::filesystem::path exe() const;
 
     bool operator==(const CommandLine& other) const;
+
+    [[nodiscard]] std::filesystem::path getPath(FS::PathType type) const;
 };

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <TgBotUtilsExports.h>
+#include <absl/log/log.h>
 #include <absl/strings/str_cat.h>
 #include <trivial_helpers/_class_helper_macros.h>
 
@@ -31,11 +32,12 @@ class TgBotUtils_API Env {
 
         template <typename T>
             requires std::is_assignable_v<std::string, T>
-        bool assign(T ref) const {
+        bool assign(T& ref) const {
             if (has()) {
                 ref = get();
                 return true;
             }
+            LOG(ERROR) << "assign: " << _key << " not found";
             return false;
         }
         std::string_view key() const { return _key; }

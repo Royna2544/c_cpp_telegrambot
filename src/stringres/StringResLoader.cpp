@@ -12,6 +12,7 @@
 #include <filesystem>
 #include <memory>
 #include <string_view>
+#include <system_error>
 #include <trivial_helpers/raii.hpp>
 #include <utility>
 
@@ -38,10 +39,11 @@ StringResLoader::StringResLoader(std::filesystem::path path)
     // Initialize the library and check potential ABI mismatches
     LIBXML_TEST_VERSION;
 
+    std::error_code ec;
     // Load XML files from the specified path
-    for (const auto &entry : std::filesystem::directory_iterator(m_path)) {
+    for (const auto &entry : std::filesystem::directory_iterator(m_path, ec)) {
         if (entry.is_regular_file() &&
-            absl::EndsWith(entry.path().filename().string(), ".xml")) {
+            entry.path().filename().extension() == ".xml") {
             DLOG(INFO) << "Parsing XML file: " << entry.path().filename();
             std::shared_ptr<LocaleStringsImpl> map;
             try {
@@ -56,12 +58,15 @@ StringResLoader::StringResLoader(std::filesystem::path path)
                 localeMap[Locale::en_US] = std::move(map);
             } else if (Locale::fr_FR == localeStr) {
                 localeMap[Locale::fr_FR] = std::move(map);
-            } else if (Locale::ko_KR == localeStr){
+            } else if (Locale::ko_KR == localeStr) {
                 localeMap[Locale::ko_KR] = std::move(map);
             } else {
                 LOG(WARNING) << "Unknown locale in file: " << entry.path();
             }
         }
+    }
+    if (ec) {
+        LOG(ERROR) << "Error reading directory: " << ec.message();
     }
 }
 
@@ -156,7 +161,8 @@ LocaleStringsImpl::LocaleStringsImpl(const std::filesystem::path &filename) {
     for (int x = static_cast<int>(Strings::__INVALID__) + 1;
          x < static_cast<int>(Strings::__MAX__); ++x) {
         if (!m_data.contains(static_cast<Strings>(x))) {
-            LOG(WARNING) << "Missing string: " << getStrings(static_cast<Strings>(x));
+            LOG(WARNING) << "Missing string: "
+                         << getStrings(static_cast<Strings>(x));
             ++absent;
         }
     }

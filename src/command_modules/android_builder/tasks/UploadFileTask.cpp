@@ -8,6 +8,7 @@
 #include <mutex>
 #include <regex>
 #include <system_error>
+#include <utility>
 #include <vector>
 
 #include "ConfigParsers.hpp"
@@ -33,9 +34,9 @@ DeferredExit UploadFileTask::runFunction() {
         LOG(ERROR) << "No artifact matcher found";
         return DeferredExit::generic_fail;
     }
-    const auto dir =
-        std::filesystem::path() / "out" / "target" / "product" / data.device->codename;
-    for (const auto &it : std::filesystem::directory_iterator(dir)) {
+    const auto dir = std::filesystem::path() / "out" / "target" / "product" /
+                     data.device->codename;
+    for (const auto& it : std::filesystem::directory_iterator(dir)) {
         if (it.is_regular_file()) {
             auto file = it.path();
             if ((*matcher)(file.filename().string())) {
@@ -49,7 +50,7 @@ DeferredExit UploadFileTask::runFunction() {
         LOG(ERROR) << "Artifact file not found";
 
         // Iterate over and print debug info.
-        for (const auto &it : std::filesystem::directory_iterator(dir)) {
+        for (const auto& it : std::filesystem::directory_iterator(dir)) {
             if (it.is_regular_file()) {
                 (*matcher)(it.path().filename().string(), true);
             } else {
@@ -59,16 +60,14 @@ DeferredExit UploadFileTask::runFunction() {
         return DeferredExit::generic_fail;
     }
     std::error_code ec;
-    const auto scripts =
-        FS::getPath(FS::PathType::RESOURCES) / "scripts";
     std::filesystem::path scriptFile;
-    if (std::filesystem::exists(scripts / "upload.bash", ec)) {
+    if (std::filesystem::exists(_scriptDirectory / "upload.bash", ec)) {
         LOG(INFO) << "Using upload.bash file";
-        scriptFile = scripts / "upload.bash";
+        scriptFile = _scriptDirectory / "upload.bash";
     } else {
         // Else, use default upload script.
         LOG(INFO) << "Using default upload script";
-        scriptFile = scripts / "upload.default.bash";
+        scriptFile = _scriptDirectory / "upload.default.bash";
     }
 
     // Run the upload script.
@@ -137,7 +136,9 @@ void UploadFileTask::onExit(int exitCode) {
     }
 }
 
-UploadFileTask::UploadFileTask(PerBuildData data) : data(std::move(data)) {
+UploadFileTask::UploadFileTask(PerBuildData data,
+                               std::filesystem::path scriptDirectory)
+    : data(std::move(data)), _scriptDirectory(std::move(scriptDirectory)) {
     smem = std::make_unique<AllocatedShmem>(kShmemUpload,
                                             sizeof(PerBuildData::ResultData));
 }

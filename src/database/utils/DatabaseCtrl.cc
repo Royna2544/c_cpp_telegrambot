@@ -7,6 +7,7 @@
 #include <iostream>
 #include <memory>
 #include <vector>
+
 #include "CommandLine.hpp"
 #include "ConfigManager.hpp"
 #include "DatabaseBase.hpp"
@@ -158,8 +159,8 @@ void executeCommand<Commands::WhiteBlackList>(const CommandData& data) {
 
 int main(int argc, char** argv) {
     TgBot_AbslLogInit();
-
-    auto config = std::make_unique<ConfigManager>(CommandLine{argc, argv});
+    CommandLine line{argc, argv};
+    auto config = std::make_unique<ConfigManager>(line);
     std::vector<std::string_view> args;
     args.reserve(argc);
     for (int i = 0; i < argc; ++i) {
@@ -173,7 +174,7 @@ int main(int argc, char** argv) {
     }
 
     auto dbImpl = std::make_unique<TgBotDatabaseImpl>();
-    TgBotDatabaseImpl_load(config.get(), dbImpl.get());
+    TgBotDatabaseImpl_load(config.get(), dbImpl.get(), &line);
     if (!dbImpl->isLoaded()) {
         LOG(ERROR) << "Failed to load database";
         return EXIT_FAILURE;

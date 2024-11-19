@@ -10,7 +10,6 @@ add_my_library(
     GitData.cpp
     CommandLine.cpp
     ResourceManager.cpp
-    libfs.cpp
     libfs_${TARGET_VARIANT}.cpp
   LIBS Boost::program_options ${LIBGIT2_LIBRARIES}
   LIBS_WIN32 shlwapi

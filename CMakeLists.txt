@@ -434,9 +434,10 @@ add_my_executable(
 )
 endif()
 #####################################################################
-
-install(DIRECTORY resources/ DESTINATION resources FILES_MATCHING PATTERN "*"
+# Resource dirs
+install(DIRECTORY resources/ DESTINATION share/${PROJECT_NAME} FILES_MATCHING PATTERN "*"
   PATTERN "*.in" EXCLUDE)
+file(COPY resources/ DESTINATION ${CMAKE_BINARY_DIR}/share/${PROJECT_NAME})
 
 # Set CPack configurations
 set(CPACK_PACKAGE_NAME "TgBot++")

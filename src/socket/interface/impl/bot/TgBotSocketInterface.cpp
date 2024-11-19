@@ -15,8 +15,8 @@ SocketInterfaceTgBot::SocketInterfaceTgBot(SocketInterfaceBase* _interface,
     : _interface(_interface),
       api(_api),
       observer(observer),
-      spamblock(spamblock),
       helper(helper),
+      spamblock(spamblock),
       resource(resource) {}
 
 void SocketInterfaceTgBot::runFunction(const std::stop_token& token) {

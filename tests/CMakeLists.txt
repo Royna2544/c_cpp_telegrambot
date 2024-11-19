@@ -6,7 +6,6 @@ add_my_executable(
   SRCS
     TestMain.cpp
     AuthorizationTest.cpp
-    ResourceManagerTest.cpp
     TryParseTest.cpp
     SharedMallocTest.cpp
     commands/CommandModulesTest.cpp

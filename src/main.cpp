@@ -205,33 +205,38 @@ getSocketServerComponent() {
         });
 }
 
-fruit::Component<StringResLoader, StringResLoaderBase>
+fruit::Component<fruit::Required<CommandLine>, StringResLoader,
+                 StringResLoaderBase>
 getStringResLoaderComponent() {
     return fruit::createComponent()
         .bind<StringResLoaderBase, StringResLoader>()
-        .registerProvider([] {
-            StringResLoader loader(FS::getPath(FS::PathType::RESOURCES) /
+        .registerProvider([](CommandLine* cmdline) {
+            return StringResLoader(cmdline->getPath(FS::PathType::RESOURCES) /
                                    "strings");
-            return loader;
         });
 }
 
-fruit::Component<fruit::Required<ConfigManager>, TgBotDatabaseImpl,
+fruit::Component<fruit::Required<ConfigManager, CommandLine>, TgBotDatabaseImpl,
                  DatabaseBase>
 getDatabaseComponent() {
     return fruit::createComponent()
         .bind<DatabaseBase, TgBotDatabaseImpl>()
-        .registerProvider([](ConfigManager* manager) {
+        .registerProvider([](ConfigManager* manager, CommandLine* cmdline) {
             auto impl = std::make_unique<TgBotDatabaseImpl>();
-            if (!TgBotDatabaseImpl_load(manager, impl.get())) {
+            if (!TgBotDatabaseImpl_load(manager, impl.get(), cmdline)) {
                 LOG(ERROR) << "Failed to load database";
             }
             return impl.release();
         });
 }
 
-fruit::Component<ResourceProvider> getResourceProvider() {
-    return fruit::createComponent().bind<ResourceProvider, ResourceManager>();
+fruit::Component<fruit::Required<CommandLine>, ResourceProvider>
+getResourceProvider() {
+    return fruit::createComponent()
+        .bind<ResourceProvider, ResourceManager>()
+        .registerProvider([](CommandLine* line) -> ResourceManager {
+            return ResourceManager(line->getPath(FS::PathType::RESOURCES));
+        });
 }
 
 fruit::Component<
@@ -254,18 +259,21 @@ getTgBotApiImplComponent() {
         });
 }
 
-fruit::Component<Unused<TgBotWebServer>> getWebServerComponent() {
+fruit::Component<fruit::Required<ThreadManager, CommandLine>,
+                 Unused<TgBotWebServer>>
+getWebServerComponent() {
     return fruit::createComponent()
         .bind<TgBotWebServerBase, TgBotWebServer>()
-        .registerProvider(
-            [](ThreadManager* threadManager) -> Unused<TgBotWebServer> {
-                constexpr int kTgBotWebServerPort = 8080;
-                const auto server = threadManager->create<TgBotWebServer>(
-                    ThreadManager::Usage::WEBSERVER_THREAD,
-                    kTgBotWebServerPort);
-                server->run();
-                return {};
-            });
+        .registerProvider([](ThreadManager* threadManager,
+                             CommandLine* cmdline) -> Unused<TgBotWebServer> {
+            constexpr int kTgBotWebServerPort = 8080;
+            const auto server = threadManager->create<TgBotWebServer>(
+                ThreadManager::Usage::WEBSERVER_THREAD,
+                cmdline->getPath(FS::PathType::RESOURCES_WEBPAGE),
+                kTgBotWebServerPort);
+            server->run();
+            return {};
+        });
 }
 
 fruit::Component<fruit::Required<ThreadManager, TgBotApi, AuthContext>,
@@ -449,13 +457,14 @@ int main(int argc, char** argv) {
     if (ec) {
         LOG(ERROR) << "Failed to get current cwd: " << ec.message();
 #ifdef _POSIX_C_SOURCE
-        struct stat statbuf{};
+        struct stat statbuf {};
         if (stat(".", &statbuf) < 0) {
             PLOG(ERROR) << "Couldn't stat cwd";
             return EXIT_FAILURE;
         }
-        LOG(INFO) << "Current directory: Inode=" << statbuf.st_ino << " NLink=" << statbuf.st_nlink;
-        if (statbuf.st_ino == 0) {
+        LOG(INFO) << "Current directory: Inode=" << statbuf.st_ino
+                  << " NLink=" << statbuf.st_nlink;
+        if (statbuf.st_nlink == 0) {
             LOG(INFO) << "This directory is deleted.";
         }
 #endif

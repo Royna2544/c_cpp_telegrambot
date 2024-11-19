@@ -12,6 +12,8 @@
 #include <optional>
 #include <string_view>
 
+#include "CommandLine.hpp"
+
 /**
  * @brief TgBotDatabaseImpl is a class that implements the DatabaseBase
  * interface for managing bot data. It provides functionality for interacting
@@ -23,7 +25,7 @@ struct TgBotDBImpl_API TgBotDatabaseImpl : DatabaseBase {
      * providers.
      */
     struct TgBotDBImpl_API Providers {
-        Providers();
+        explicit Providers(CommandLine *cmdline);
 
         /**
          * @brief Registers a new database provider with the given name.
@@ -97,4 +99,5 @@ struct TgBotDBImpl_API TgBotDatabaseImpl : DatabaseBase {
 };
 
 extern bool TgBotDatabaseImpl_load(ConfigManager *configmgr,
-                                   TgBotDatabaseImpl *dbimpl);
+                                   TgBotDatabaseImpl *dbimpl,
+                                   CommandLine *cmdline);

@@ -192,7 +192,8 @@ class MessageExt {
         } else if constexpr (attr == MessageAttrs::Locale) {
             Locale loc{};
             if (has<MessageAttrs::User>()) {
-                loc <= get<MessageAttrs::User>()->languageCode.value_or("");
+                loc = locale::fromString(
+                    get<MessageAttrs::User>()->languageCode.value_or(""));
             }
             return loc;
         } else if constexpr (attr == MessageAttrs::Document) {

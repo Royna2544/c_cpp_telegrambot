@@ -164,9 +164,13 @@ std::optional<ChatId> TgBotDatabaseImpl::getChatId(
     return _databaseImpl->getChatId(name);
 }
 
-TgBotDatabaseImpl::Providers::Providers() {
+TgBotDatabaseImpl::Providers::Providers(CommandLine* cmdline) {
 #ifdef DATABASE_HAVE_SQLITE
-    registerProvider("sqlite", std::make_unique<SQLiteDatabase>());
+    registerProvider("sqlite", std::make_unique<SQLiteDatabase>(
+        cmdline->getPath(FS::PathType::RESOURCES_SQL)
+    ));
+#else
+    (void)cmdline;
 #endif
 #ifdef DATABASE_HAVE_PROTOBUF
     registerProvider("protobuf", std::make_unique<ProtoDatabase>());

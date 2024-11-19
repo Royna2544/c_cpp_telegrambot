@@ -4,13 +4,15 @@
 #include <ConfigManager.hpp>
 #include <database/bot/TgBotDatabaseImpl.hpp>
 
+#include "CommandLine.hpp"
 #include "DatabaseBase.hpp"
 
 bool TgBotDatabaseImpl_load(ConfigManager* configmgr,
-                            TgBotDatabaseImpl* dbimpl) {
+                            TgBotDatabaseImpl* dbimpl,
+                            CommandLine* cmdline) {
     const auto dbConf = configmgr->get(ConfigManager::Configs::DATABASE_CFG);
     bool loaded = false;
-    TgBotDatabaseImpl::Providers provider;
+    TgBotDatabaseImpl::Providers provider(cmdline);
     std::pair<std::string, std::string> configPair;
     bool configValid = false;
 

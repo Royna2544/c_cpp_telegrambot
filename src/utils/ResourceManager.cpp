@@ -3,10 +3,12 @@
 #include <absl/strings/ascii.h>
 #include <fmt/format.h>
 
+#include <filesystem>
 #include <fstream>
 #include <libfs.hpp>
 #include <sstream>
 #include <system_error>
+#include <utility>
 
 bool ResourceManager::preload(std::filesystem::path path) {
     std::ifstream file(path);
@@ -16,13 +18,13 @@ bool ResourceManager::preload(std::filesystem::path path) {
     path.make_preferred();
     for (auto p = path.parent_path(); p != path.root_path();
          p = p.parent_path()) {
-        if (p.filename() == kResourceDirname) {
+        if (std::filesystem::equivalent(p, m_resourceDirectory)) {
             found = true;
             break;
         }
     }
     if (found) {
-        path = path.lexically_relative(FS::getPath(FS::PathType::RESOURCES));
+        path = path.lexically_relative(m_resourceDirectory);
     }
 
     if (std::ranges::find(ignoredResources, path.string()) !=
@@ -42,9 +44,9 @@ bool ResourceManager::preload(std::filesystem::path path) {
     return true;
 }
 
-ResourceManager::ResourceManager() {
-    auto rd = FS::getPath(FS::PathType::RESOURCES);
-    std::ifstream ifs(rd / kResourceLoadIgnoreFile);
+ResourceManager::ResourceManager(std::filesystem::path kResourceDirectory)
+    : m_resourceDirectory(std::move(kResourceDirectory)) {
+    std::ifstream ifs(m_resourceDirectory / kResourceLoadIgnoreFile);
     std::error_code ec;
 
     if (ifs) {
@@ -59,8 +61,8 @@ ResourceManager::ResourceManager() {
         LOG(INFO) << "Applied resource ignore configuration";
     }
 
-    LOG(INFO) << "Preloading resource directory: " << rd;
-    for (const auto& it : std::filesystem::directory_iterator(rd, ec)) {
+    LOG(INFO) << "Preloading resource directory: " << m_resourceDirectory;
+    for (const auto& it : std::filesystem::directory_iterator(m_resourceDirectory, ec)) {
         if (it.is_regular_file()) {
             preload(it);
         }

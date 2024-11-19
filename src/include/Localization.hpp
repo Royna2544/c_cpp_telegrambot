@@ -26,18 +26,24 @@ inline constexpr bool operator==(const Locale& lhs,
     }
 }
 
+namespace locale {
+
 // This is used for assigning, not comparing.
-inline constexpr void operator<=(Locale& lhs, const std::string_view& rhs) {
-    if (rhs == "en") {
+inline Locale fromString(const std::string_view locale) {
+    Locale lhs;
+    if (locale == "en") {
         lhs = Locale::en_US;
-    } else if (rhs == "fr") {
+    } else if (locale == "fr") {
         lhs = Locale::fr_FR;
-    } else if (rhs == "ko") {
+    } else if (locale == "ko") {
         lhs = Locale::ko_KR;
     } else {
         lhs = Locale::Default;
     }
+    return lhs;
 }
+
+}  // namespace locale
 
 // clang-format off
 #define MAKE_STRINGS(x)                                                        \

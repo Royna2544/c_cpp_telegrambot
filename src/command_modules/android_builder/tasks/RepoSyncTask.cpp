@@ -14,6 +14,7 @@
 #include <trivial_helpers/raii.hpp>
 #include <utility>
 
+#include "CommandLine.hpp"
 #include "ForkAndRun.hpp"
 #include "RepoUtils.hpp"
 
@@ -116,16 +117,15 @@ DeferredExit RepoSyncTask::runFunction() {
                    << repoDirExists;
     }
 
-    auto gitAskPass =
-        FS::getPath(FS::PathType::RESOURCES_SCRIPTS) / kGitAskPassFile;
     const auto& rom = getValue(data.localManifest->rom);
     GitBranchSwitcher switcher{.gitDirectory = kLocalManifestGitPath,
                                .desiredBranch = rom->branch,
                                .desiredUrl = rom->romInfo->url,
                                .checkout = false};
     if (!repoDirExists || !switcher()) {
-        ForkAndRunSimple shell(fmt::format(initCommand, rom->romInfo->url, rom->branch, 1));
-        shell.env[kGitAskPassEnv] = gitAskPass.string();
+        ForkAndRunSimple shell(
+            fmt::format(initCommand, rom->romInfo->url, rom->branch, 1));
+        shell.env[kGitAskPassEnv] = _gitAskPassFile.string();
         auto ret = shell.execute();
         LOG(INFO) << "Repo init result: " << ret;
         if (!ret) {
@@ -138,9 +138,9 @@ DeferredExit RepoSyncTask::runFunction() {
         return DeferredExit::generic_fail;
     }
     unsigned int job_count = std::thread::hardware_concurrency() / 2;
-    auto sync = [&gitAskPass](unsigned int jobCount) {
+    auto sync = [this](unsigned int jobCount) {
         ForkAndRunSimple shell(fmt::format(syncCommand, jobCount));
-        shell.env[kGitAskPassEnv] = gitAskPass.string();
+        shell.env[kGitAskPassEnv] = _gitAskPassFile.string();
         auto ret = shell.execute();
         LOG(INFO) << "Repo sync result: " << ret;
         return ret;
@@ -208,5 +208,9 @@ void RepoSyncTask::onSignal(int signalCode) {
 }
 
 RepoSyncTask::RepoSyncTask(TgBotApi::CPtr api, Message::Ptr message,
-                           PerBuildData data)
-    : data(std::move(data)), api(api), message(std::move(message)) {}
+                           PerBuildData data,
+                           std::filesystem::path gitAskPassFile)
+    : data(std::move(data)),
+      api(api),
+      message(std::move(message)),
+      _gitAskPassFile(std::move(gitAskPassFile)) {}

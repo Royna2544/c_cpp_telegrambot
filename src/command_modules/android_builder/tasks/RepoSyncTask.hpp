@@ -119,7 +119,8 @@ struct RepoSyncTask : ForkAndRun {
      * @param data Per-build configuration and path data.
      */
     explicit RepoSyncTask(TgBotApi::CPtr api, Message::Ptr message,
-                          PerBuildData data);
+                          PerBuildData data,
+                          std::filesystem::path _gitAskPassFile);
 
    private:
     PerBuildData data;
@@ -129,5 +130,6 @@ struct RepoSyncTask : ForkAndRun {
     Message::Ptr message;
     std::chrono::system_clock::time_point clock =
         std::chrono::system_clock::now();
+    std::filesystem::path _gitAskPassFile;
     bool runWithReducedJobs = false;
 };

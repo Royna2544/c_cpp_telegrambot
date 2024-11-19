@@ -25,6 +25,7 @@
 #include <tasks/UploadFileTask.hpp>
 #include <utility>
 
+#include "CommandLine.hpp"
 #include "ConfigManager.hpp"
 #include "ForkAndRun.hpp"
 #include "Shmem.hpp"
@@ -112,6 +113,7 @@ class ROMBuildQueryHandler {
     Message::Ptr sentMessage;
     Message::Ptr _userMessage;
     TgBotApi::Ptr _api;
+    CommandLine* _commandLine;
     using KeyboardType = TgBot::InlineKeyboardMarkup::Ptr;
 
     struct {
@@ -142,7 +144,8 @@ class ROMBuildQueryHandler {
 
    public:
     bool pinned() const { return didpin; }
-    ROMBuildQueryHandler(TgBotApi::Ptr api, Message::Ptr userMessage);
+    ROMBuildQueryHandler(TgBotApi::Ptr api, Message::Ptr userMessage,
+                         CommandLine* line);
 
     void updateSentMessage(Message::Ptr message);
     void start(Message::Ptr userMessage);
@@ -336,24 +339,34 @@ class TaskWrapperBase {
      */
     virtual void onExecuteFinished(PerBuildData::ResultData result) {}
 
-    bool execute()
-        requires canCreateWithApi<Impl>
-    {
+    void preexecute() {
+        if (sentMessage && queryHandler->pinned()) {
+            api->unpinMessage(sentMessage);
+        }
         sentMessage = onPreExecute();
         if (queryHandler->pinned()) {
             api->pinMessage(sentMessage);
         }
-        Impl impl(api, sentMessage, data);
+    }
+    bool execute(std::filesystem::path gitAskPassFile)
+        requires std::is_same_v<Impl, RepoSyncTask>
+    {
+        preexecute();
+        RepoSyncTask impl(api, sentMessage, data, std::move(gitAskPassFile));
         return executeCommon(std::move(impl));
     }
     bool execute()
-        requires canCreateWithData<Impl>
+        requires std::is_same_v<Impl, ROMBuildTask>
     {
-        sentMessage = onPreExecute();
-        if (queryHandler->pinned()) {
-            api->pinMessage(sentMessage);
-        }
-        Impl impl(data);
+        preexecute();
+        ROMBuildTask impl(api, sentMessage, data);
+        return executeCommon(std::move(impl));
+    }
+    bool execute(std::filesystem::path scriptDirectory)
+        requires std::is_same_v<Impl, UploadFileTask>
+    {
+        preexecute();
+        UploadFileTask impl(data, std::move(scriptDirectory));
         return executeCommon(std::move(impl));
     }
 };
@@ -500,10 +513,10 @@ class CwdRestorer {
 };
 
 ROMBuildQueryHandler::ROMBuildQueryHandler(TgBotApi::Ptr api,
-                                           Message::Ptr userMessage)
+                                           Message::Ptr userMessage,
+                                           CommandLine* line)
     : _api(api),
-      parser(FS::getPath(FS::PathType::GIT_ROOT) / "src" / "command_modules" /
-             "android_builder" / "configs") {
+      parser(line->getPath(FS::PathType::RESOURCES) / "android_builder") {
     settingsKeyboard =
         createKeyboardWith<Buttons::repo_sync, Buttons::upload,
                            Buttons::pin_message, Buttons::back>();
@@ -606,21 +619,18 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     if (didpin) {
         _api->unpinMessage(sentMessage);
     }
-
-    std::error_code ec;
-    CwdRestorer cwd(std::filesystem::current_path(ec) / kBuildDirectory);
-
-    if (ec) {
-        _api->editMessage(sentMessage, "Failed to determine cwd directory");
-        return;
-    }
+    auto scriptDirectory =
+        _commandLine->getPath(FS::PathType::RESOURCES_SCRIPTS);
+    auto gitAskFile = scriptDirectory / RepoSyncTask::kGitAskPassFile;
+    CwdRestorer cwd(_commandLine->getPath(FS::PathType::INSTALL_ROOT) /
+                    kBuildDirectory);
     if (!cwd) {
         _api->editMessage(sentMessage, "Failed to push cwd");
         return;
     }
     if (do_repo_sync) {
         RepoSync repoSync(this, per_build, _api, _userMessage);
-        if (!repoSync.execute()) {
+        if (!repoSync.execute(std::move(gitAskFile))) {
             LOG(INFO) << "RepoSync::execute fails...";
             return;
         }
@@ -632,7 +642,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     }
     if (do_upload) {
         Upload upload(this, per_build, _api, _userMessage);
-        if (!upload.execute()) {
+        if (!upload.execute(std::move(scriptDirectory))) {
             LOG(INFO) << "Upload::execute fails...";
             return;
         }
@@ -745,8 +755,8 @@ DECLARE_COMMAND_HANDLER(rombuild) {
     }
 
     try {
-        handler =
-            std::make_shared<ROMBuildQueryHandler>(api, message->message());
+        handler = std::make_shared<ROMBuildQueryHandler>(
+            api, message->message(), provider->cmdline.get());
     } catch (const std::exception& e) {
         LOG(ERROR) << "Failed to create ROMBuildQueryHandler: " << e.what();
         api->sendMessage(message->get<MessageAttrs::Chat>(),
@@ -754,8 +764,9 @@ DECLARE_COMMAND_HANDLER(rombuild) {
         return;
     }
 
-    auto gitAskPass = FS::getPath(FS::PathType::RESOURCES_SCRIPTS) /
-                      RepoSyncTask::kGitAskPassFile;
+    auto gitAskPass =
+        provider->cmdline->getPath(FS::PathType::RESOURCES_SCRIPTS) /
+        RepoSyncTask::kGitAskPassFile;
     if (auto token =
             provider->config->get(ConfigManager::Configs::GITHUB_TOKEN)) {
         LOG(INFO) << "Create and write git-askpass file";
