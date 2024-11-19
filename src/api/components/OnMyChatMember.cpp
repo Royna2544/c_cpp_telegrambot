@@ -59,8 +59,7 @@ TgBotApiImpl::OnMyChatMemberImpl::parseState(
     return BotState::UNKNOWN;
 }
 
-TgBotApiImpl::OnMyChatMemberImpl::OnMyChatMemberImpl(TgBotApiImpl::Ptr api)
-    : _api(api) {
+TgBotApiImpl::OnMyChatMemberImpl::OnMyChatMemberImpl(TgBotApiImpl::Ptr api) {
     reporters.emplace_back(std::make_unique<LoggingReport>());
     if (auto owner = api->_provider->database->getOwnerUserId(); owner) {
         reporters.emplace_back(

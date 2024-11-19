@@ -45,7 +45,6 @@ class TgBotApiImpl::OnMyChatMemberImpl {
                             const BotState newStatus) override;
     };
 
-    TgBotApiImpl::Ptr _api;
     std::vector<std::unique_ptr<Reporter>> reporters;
 
     static BotState parseState(const TgBot::ChatMember::Ptr& update);
