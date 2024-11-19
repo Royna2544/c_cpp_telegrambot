@@ -607,70 +607,39 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
         _api->unpinMessage(sentMessage);
     }
 
-    pid_t pid = vfork();
-    if (pid < 0) {
-        _api->editMessage(sentMessage, "Failed to fork");
-        return;
-    }
-    if (pid == 0) {
-        std::error_code ec;
-        CwdRestorer cwd(std::filesystem::current_path(ec) / kBuildDirectory);
+    std::error_code ec;
+    CwdRestorer cwd(std::filesystem::current_path(ec) / kBuildDirectory);
 
-        if (ec) {
-            _api->editMessage(sentMessage, "Failed to determine cwd directory");
-            _exit(std::numeric_limits<uint8_t>::max());
-        }
-        if (!cwd) {
-            _api->editMessage(sentMessage, "Failed to push cwd");
-            _exit(std::numeric_limits<uint8_t>::max());
-        }
-        if (do_repo_sync) {
-            RepoSync repoSync(this, per_build, _api, _userMessage);
-            if (!repoSync.execute()) {
-                LOG(INFO) << "RepoSync::execute fails...";
-                _exit(std::numeric_limits<uint8_t>::max());
-            }
-        }
-        Build build(this, per_build, _api, _userMessage);
-        if (!build.execute()) {
-            LOG(INFO) << "Build::execute fails...";
-            _exit(std::numeric_limits<uint8_t>::max());
-        }
-        if (do_upload) {
-            Upload upload(this, per_build, _api, _userMessage);
-            if (!upload.execute()) {
-                LOG(INFO) << "Upload::execute fails...";
-                _exit(std::numeric_limits<uint8_t>::max());
-            }
-        }
-        _exit(0);  // Exit the child process.
-    }
-    // As vfork, parent will be delayed until the child exits.
-    try {
-        auto result = ExitStatusParser::fromPid(pid);
-        switch (result.type) {
-            case ExitStatusParser::Type::EXIT: {
-                if (result.code == 0) {
-                    _api->editMessageMarkup(sentMessage, nullptr);
-                    _api->sendMessage(sentMessage->chat, "Build completed");
-                }
-                break;
-            }
-            case ExitStatusParser::Type::SIGNAL: {
-                LOG(ERROR) << "Child process terminated by signal: "
-                           << result.code;
-                _api->editMessage(sentMessage,
-                                  "Child process terminated by signal");
-                break;
-            }
-            case ExitStatusParser::Type::UNKNOWN:
-                break;
-        }
-    } catch (const syscall_perror& ex) {
-        LOG(ERROR) << ex.what();
-        _api->editMessage(sentMessage, "Failed to wait for child process");
+    if (ec) {
+        _api->editMessage(sentMessage, "Failed to determine cwd directory");
         return;
     }
+    if (!cwd) {
+        _api->editMessage(sentMessage, "Failed to push cwd");
+        return;
+    }
+    if (do_repo_sync) {
+        RepoSync repoSync(this, per_build, _api, _userMessage);
+        if (!repoSync.execute()) {
+            LOG(INFO) << "RepoSync::execute fails...";
+            return;
+        }
+    }
+    Build build(this, per_build, _api, _userMessage);
+    if (!build.execute()) {
+        LOG(INFO) << "Build::execute fails...";
+        return;
+    }
+    if (do_upload) {
+        Upload upload(this, per_build, _api, _userMessage);
+        if (!upload.execute()) {
+            LOG(INFO) << "Upload::execute fails...";
+            return;
+        }
+    }
+    // Success
+    _api->editMessageMarkup(sentMessage, nullptr);
+    _api->sendMessage(sentMessage->chat, "Build completed");
     if (didpin) {
         try {
             _api->unpinMessage(sentMessage);
