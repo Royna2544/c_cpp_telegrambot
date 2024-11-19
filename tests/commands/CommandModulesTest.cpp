@@ -38,7 +38,7 @@ CommandModulesTest::getProviders() {
 }
 
 void CommandModulesTest::SetUp() {
-    modulePath = provideInject.get<CommandLine*>()->exe().parent_path();
+    modulePath = provideInject.get<CommandLine*>()->exe().parent_path().parent_path() / "lib" / "modules";
     database = provideInject.get<MockDatabase*>();
     random = provideInject.get<MockRandom*>();
     resource = provideInject.get<MockResource*>();

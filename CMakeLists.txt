@@ -11,37 +11,21 @@ endif()
 ####################### Set CMake Policy #######################
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake")
 
-# Set RPATH for Unix-like systems
-if(UNIX)
-    set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-    set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
-    set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
-endif()
-
 ############################## OPTIONS ##############################
 option(ENABLE_RUST_SUPPORT "Enable rust support" OFF)
 option(DISABLE_SANITIZERS "Disable all sanitizers (ASan, TSan, etc)" OFF)
 option(DIRTY_ABSEIL_FIX "Enable dirty abseil linkage fix" OFF)
 #####################################################################
 
-#################### Submodule's configuration ###################
-set(BUILD_TESTS OFF CACHE BOOL "Build tests" FORCE)
-set(ABSL_BUILD_TEST_HELPERS OFF CACHE BOOL "[abseil] Build gtest helpers" FORCE)
-set(ABSL_ENABLE_INSTALL ON CACHE BOOL "[abseil] Enable installation" FORCE)
-set(BUILD_SHARED_LIBS ON CACHE BOOL "Build shared libraries" FORCE)
 #####################################################################
-set(LIBS_INSTALL_PATH ${CMAKE_BINARY_DIR}/bin)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${LIBS_INSTALL_PATH} CACHE STRING 
-  "Output to store binaries (win32)" FORCE)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${LIBS_INSTALL_PATH} CACHE STRING
-  "Output to store binaries (linux)" FORCE)
+# Make vcpkg copy the dlls required.
+set(VCPKG_APPLOCAL_DEPS ON)
 #####################################################################
 
 ######################### C++ Configuration #########################
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 #####################################################################
 
 ## Check PIE support
@@ -122,6 +106,7 @@ set(GLOBAL_DEFINITIONS -D__TGBOT__)
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   set(CMAKE_EXE_LINKER_FLAGS "-fuse-ld=lld")
   set(CMAKE_SHARED_LINKER_FLAGS "-fuse-ld=lld")
+  # These platforms happen to not have proper C++20
   if (APPLE OR ANDROID OR BSD)
     list(APPEND GLOBAL_COMPILE_OPTIONS -fexperimental-library)
   endif()
@@ -216,6 +201,12 @@ function(add_my_library)
   endif()
   target_compile_definitions(${TGBOT_LIBRARY_NAME} PUBLIC ${TGBOT_LIBRARY_DEFS})
 
+  # Set library output directory
+  if (WIN32)
+    set_target_properties(${TGBOT_LIBRARY_NAME} PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+  else()
+    set_target_properties(${TGBOT_LIBRARY_NAME} PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+  endif()
   # PIE
   if (PIE_SUPPORTED)
     set_target_properties(${TGBOT_LIBRARY_NAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -252,15 +243,27 @@ function(add_my_executable)
     if (TGBOT_EXE_TEST)
       add_test(NAME TestSuite_${TGBOT_EXE_NAME_BAK} COMMAND ${TGBOT_EXE_NAME})
     else()
-      install(TARGETS ${TGBOT_EXE_NAME} DESTINATION bin)
+      install(TARGETS ${TGBOT_EXE_NAME})
     endif()
   endif()
-  add_sanitizers(${TGBOT_EXE_NAME})
+  add_sanitizers(${TGBOT_EXE_NAME})    
+  # Set RPATH for Unix-like systems
+  if(UNIX)
+    # bin/main bin/cli lib/libTgBot.so
+    set_target_properties(${TGBOT_EXE_NAME} PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
+    set_target_properties(${TGBOT_EXE_NAME} PROPERTIES BUILD_RPATH_USE_ORIGIN ON)
+    set_target_properties(${TGBOT_EXE_NAME} PROPERTIES INSTALL_RPATH "../lib")
+  endif()
   target_link_libraries(${TGBOT_EXE_NAME} TgBotLogInit absl::log ${TGBOT_EXE_LIBS})
   if (WIN32)
     target_link_libraries(${TGBOT_EXE_NAME} ${TGBOT_EXE_LIBS_WIN32})
+    install(FILES $<TARGET_RUNTIME_DLLS:${TGBOT_EXE_NAME}> TYPE BIN)
   endif()
 
+  # Set library output directory
+  if (NOT TGBOT_EXE_TEST)
+    set_target_properties(${TGBOT_EXE_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+  endif()
   # PIE
   if (PIE_SUPPORTED)
     set_target_properties(${TGBOT_EXE_NAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -294,7 +297,11 @@ if (DIRTY_ABSEIL_FIX OR NOT Protobuf_FOUND)
   # Then we can just include source-abseil
   message(STATUS "Using abseil-cpp as submodule")
   set(ABSL_PROPAGATE_CXX_STD ON)
+  set(ABSL_BUILD_TEST_HELPERS OFF)
+  set(ABSL_ENABLE_INSTALL ON)
+  set(BUILD_SHARED_LIBS ON)
   add_subdirectory(src/third-party/abseil-cpp)
+  unset(BUILD_SHARED_LIBS)
 else()
   # If there was, then we can cause collision with the system abseil
   find_package(absl REQUIRED)
@@ -348,17 +355,6 @@ else()
   message(STATUS "Disabling tests")
 endif()
 
-#################################################################
-
-add_my_library(
-  NAME PPImpl_shared_deps
-  SRCS
-    src/api/MessageExt.cpp
-  PUBLIC_INC
-    $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>
-  STATIC
-)
-
 ################### The Bot's main functionaility ###################
 add_my_library(
   NAME Regex
@@ -373,12 +369,12 @@ add_my_library(
   SRCS
     src/Authorization.cpp
     src/api/CommandModule.cpp
+    src/api/MessageExt.cpp
     src/global_handlers/SpamBlocker.cpp
     src/global_handlers/ChatObserver.cpp
     src/socket/interface/impl/bot/SocketDataHandler.cpp
     src/socket/interface/impl/bot/TgBotSocketInterface.cpp
-  LIBS  TgBot TgBotUtils TgBotDBImpl 
-        TgBotPPImpl_shared_deps TgBotStringRes ${CMAKE_DL_LIBS} TgBotSocket JsonCpp::JsonCpp 
+  LIBS  TgBot TgBotUtils TgBotDBImpl TgBotStringRes ${CMAKE_DL_LIBS} TgBotSocket JsonCpp::JsonCpp 
         CURL::libcurl
   STATIC
 )
@@ -394,6 +390,7 @@ add_my_executable(
     src/Authorization.cpp
     src/api/TgBotApiImpl.cpp
     src/api/CommandModule.cpp
+    src/api/MessageExt.cpp
     src/api/components/OnAnyMessage.cpp
     src/api/components/ChatJoinRequest.cpp
     src/api/components/OnCallbackQuery.cpp
@@ -417,7 +414,7 @@ add_my_executable(
     src/socket/interface/impl/backends/ServerBackend_${TARGET_VARIANT}.cpp
   LIBS TgBotDBLoading TgBot_restartfmt_parser fruit TgBot TgBotUtils TgBotWeb TgBotDBImpl
        absl::status TgBotRandom TgBot_restartfmt_parser CURL::libcurl TgBotRegex
-       TgBotPPImpl_shared_deps TgBotStringRes ${CMAKE_DL_LIBS} TgBotSocket JsonCpp::JsonCpp TgBotsighandler 
+      TgBotStringRes ${CMAKE_DL_LIBS} TgBotSocket JsonCpp::JsonCpp TgBotsighandler 
 )
 
 if (UNIX)

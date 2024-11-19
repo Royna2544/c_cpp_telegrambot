@@ -39,14 +39,15 @@ function(command_module)
     set(TGBOT_CMDMODULE_LIBNAME ${CMDMODULE_PREFIX}${TGBOT_CMDMODULE_NAME})
     add_library(${TGBOT_CMDMODULE_LIBNAME} SHARED ${TGBOT_CMDMODULE_SRCS})
     set_target_properties(${TGBOT_CMDMODULE_LIBNAME} PROPERTIES PREFIX "lib")
-    target_link_libraries(${TGBOT_CMDMODULE_LIBNAME} ${TGBOT_CMDMODULE_LIBS}
-                          TgBotPPImpl_shared_deps absl::log)
+    target_link_libraries(${TGBOT_CMDMODULE_LIBNAME} ${TGBOT_CMDMODULE_LIBS} absl::log)
     target_include_directories(${TGBOT_CMDMODULE_LIBNAME} PRIVATE
         $<TARGET_PROPERTY:TgBotStringRes,INTERFACE_INCLUDE_DIRECTORIES>
-        $<TARGET_PROPERTY:TgBotRandom,INTERFACE_INCLUDE_DIRECTORIES>)
-    install(TARGETS ${TGBOT_CMDMODULE_LIBNAME} DESTINATION lib/commands)
+        $<TARGET_PROPERTY:TgBotRandom,INTERFACE_INCLUDE_DIRECTORIES>
+        $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>)
     add_sanitizers(${TGBOT_CMDMODULE_LIBNAME})
-
+    # Install command modules to lib/modules
+    install(TARGETS ${TGBOT_CMDMODULE_LIBNAME} DESTINATION lib/modules)
+    set_target_properties(${TGBOT_CMDMODULE_LIBNAME} PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib/modules)
     # PIE
     if (PIE_SUPPORTED)
       set_target_properties(${TGBOT_CMDMODULE_LIBNAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)
