@@ -13,7 +13,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake")
 
 ############################## OPTIONS ##############################
 option(ENABLE_RUST_SUPPORT "Enable rust support" OFF)
-option(DISABLE_SANITIZERS "Disable all sanitizers (ASan, TSan, etc)" OFF)
+option(SANITIZER_CONFIG "Sanitizers config for debug builds (ASan, TSan, etc)" "ASan")
 option(DIRTY_ABSEIL_FIX "Enable dirty abseil linkage fix" OFF)
 #####################################################################
 
@@ -39,7 +39,6 @@ else()
 endif()
 
 ## Sanitizers configuration
-set(SANITIZER_CONFIG "ASan")
 set(SANITIZER_FLAG)
 
 if (NOT SANITIZER_CONFIG)
@@ -76,11 +75,6 @@ elseif (SANITIZER_CONFIG STREQUAL "MSan")
 else()
     message(WARNING "Unknown sanitizer configuration: ${SANITIZER_CONFIG}")
 endif()
-
-if (DISABLE_SANITIZERS)
-    message(STATUS "Sanitizers disabled by option")
-    unset(SANITIZER_FLAG)
-endif()
 if (CMAKE_BUILD_TYPE STREQUAL "Release")
     message(STATUS "Disabling sanitizers as release build")
     unset(SANITIZER_FLAG)
@@ -116,18 +110,15 @@ if (CMAKE_BUILD_TYPE STREQUAL "Release" AND NOT ANDROID)
   check_ipo_supported(RESULT LTO_SUPPORTED)
   if (LTO_SUPPORTED)
     message(STATUS "Enabling LTO (Link time optimization)")
-    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
   endif()
 endif()
 if (WIN32)
   list(APPEND GLOBAL_DEFINITIONS _WIN32_WINNT=0x0A00)
   if (MSVC)
     list(APPEND GLOBAL_COMPILE_OPTIONS /utf-8)
-    if (CMAKE_BUILD_TYPE STREQUAL "Debug" AND NOT SANITIZER_FLAG)
-      list(APPEND GLOBAL_COMPILE_OPTIONS /ZI)
-    endif()
   endif()
 endif()
+# Hide src compile info
 if (NOT MSVC)
   list(APPEND GLOBAL_COMPILE_OPTIONS -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/=)
 endif()
@@ -203,13 +194,16 @@ function(add_my_library)
 
   # Set library output directory
   if (WIN32)
-    set_target_properties(${TGBOT_LIBRARY_NAME} PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+    set_target_properties(${TGBOT_LIBRARY_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
   else()
     set_target_properties(${TGBOT_LIBRARY_NAME} PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
   endif()
   # PIE
   if (PIE_SUPPORTED)
     set_target_properties(${TGBOT_LIBRARY_NAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  endif()
+  if (LTO_SUPPORTED)
+    set_target_properties(${TGBOT_LIBRARY_NAME} PROPERTIES INTERPROCEDURAL_OPTIMIZATION ON)
   endif()
   # Global variables
   target_compile_definitions(${TGBOT_LIBRARY_NAME} PRIVATE ${GLOBAL_DEFINITIONS})
@@ -263,6 +257,10 @@ function(add_my_executable)
   # Set library output directory
   if (NOT TGBOT_EXE_TEST)
     set_target_properties(${TGBOT_EXE_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+  endif()
+  # LTO
+  if (LTO_SUPPORTED)
+    set_target_properties(${TGBOT_LIBRARY_NAME} PROPERTIES INTERPROCEDURAL_OPTIMIZATION ON)
   endif()
   # PIE
   if (PIE_SUPPORTED)

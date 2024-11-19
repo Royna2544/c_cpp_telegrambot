@@ -39,7 +39,7 @@ function(command_module)
     set(TGBOT_CMDMODULE_LIBNAME ${CMDMODULE_PREFIX}${TGBOT_CMDMODULE_NAME})
     add_library(${TGBOT_CMDMODULE_LIBNAME} SHARED ${TGBOT_CMDMODULE_SRCS})
     set_target_properties(${TGBOT_CMDMODULE_LIBNAME} PROPERTIES PREFIX "lib")
-    target_link_libraries(${TGBOT_CMDMODULE_LIBNAME} ${TGBOT_CMDMODULE_LIBS} absl::log)
+    target_link_libraries(${TGBOT_CMDMODULE_LIBNAME} ${TGBOT_CMDMODULE_LIBS} absl::log fmt::fmt)
     target_include_directories(${TGBOT_CMDMODULE_LIBNAME} PRIVATE
         $<TARGET_PROPERTY:TgBotStringRes,INTERFACE_INCLUDE_DIRECTORIES>
         $<TARGET_PROPERTY:TgBotRandom,INTERFACE_INCLUDE_DIRECTORIES>
@@ -47,10 +47,18 @@ function(command_module)
     add_sanitizers(${TGBOT_CMDMODULE_LIBNAME})
     # Install command modules to lib/modules
     install(TARGETS ${TGBOT_CMDMODULE_LIBNAME} DESTINATION lib/modules)
-    set_target_properties(${TGBOT_CMDMODULE_LIBNAME} PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib/modules)
+    if (WIN32)
+        set_target_properties(${TGBOT_CMDMODULE_LIBNAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib/modules)
+    else()
+        set_target_properties(${TGBOT_CMDMODULE_LIBNAME} PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib/modules)
+    endif()
     # PIE
     if (PIE_SUPPORTED)
       set_target_properties(${TGBOT_CMDMODULE_LIBNAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    endif()
+    # LTO
+    if (LTO_SUPPORTED)
+        set_target_properties(${TGBOT_LIBRARY_NAME} PROPERTIES INTERPROCEDURAL_OPTIMIZATION ON)
     endif()
     # Global variables
     target_compile_definitions(${TGBOT_CMDMODULE_LIBNAME} PRIVATE ${GLOBAL_DEFINITIONS})
