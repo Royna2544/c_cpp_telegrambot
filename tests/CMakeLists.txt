@@ -17,7 +17,7 @@ add_my_executable(
   LIBS
     GTest::gtest
     GTest::gmock
-    TgBotPPImpl fruit
+    TgBotPPImpl fruit TgBotRandom
   TEST
 )
 
