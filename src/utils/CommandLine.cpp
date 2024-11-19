@@ -11,7 +11,7 @@ CommandLine::CommandLine(CommandLine::argc_type argc,
         LOG(ERROR) << "Invalid argv passed";
         throw std::invalid_argument("Invalid argv passed");
     }
-    exePath = std::filesystem::path(argv[0]);
+    exePath = std::filesystem::current_path() / std::filesystem::path(argv[0]);
 }
 
 CommandLine::argv_type CommandLine::argv() const { return _argv; }
