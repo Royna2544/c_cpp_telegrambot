@@ -7,7 +7,7 @@
       "libpng",
       "libwebp",
       "libjpeg-turbo",
-      "opencv",
+      "opencv4",
       "fmt",
       "sqlite3",
       "jsoncpp",
