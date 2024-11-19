@@ -42,10 +42,10 @@ struct fmt::formatter<Chat::Ptr> : formatter<std::string> {
                 return fmt::format_to(ctx.out(), "Private chat (@{})",
                                       chat->username.value_or("unknown"));
             case Chat::Type::Channel:
-                return fmt::format_to(ctx.out(), "Channel (@{})",
+                return fmt::format_to(ctx.out(), "Channel ({})",
                                       chat->title.value_or("unknown"));
             case Chat::Type::Supergroup:
-                return fmt::format_to(ctx.out(), "Group (@{})",
+                return fmt::format_to(ctx.out(), "Group ({})",
                                       chat->title.value_or("unknown"));
             default:
                 return fmt::format_to(ctx.out(), "Unknown chat");
