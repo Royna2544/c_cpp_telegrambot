@@ -46,14 +46,15 @@ bool TgBotApiImpl::validateValidArgs(const DynModule* module,
         std::set<int> valid_argc =
             DynModule::fromArgCountMask(module->valid_args.counts);
 
+        const int in_args_size = static_cast<int>(args.size());
         // Check if the number of arguments matches the expected.
-        if (!valid_argc.contains(static_cast<int>(args.size()))) {
+        if (!valid_argc.contains(in_args_size)) {
             std::vector<std::string> strings;
             strings.emplace_back("Invalid number of arguments. Expected");
-            if (args.size() < *valid_argc.begin()) {
+            if (in_args_size < *valid_argc.begin()) {
                 strings.emplace_back(
                     fmt::format("at least {}", *valid_argc.begin()));
-            } else if (args.size() > *valid_argc.rbegin()) {
+            } else if (in_args_size > *valid_argc.rbegin()) {
                 strings.emplace_back(
                     fmt::format("at most {}", *valid_argc.rbegin()));
             } else {
@@ -522,9 +523,9 @@ TgBotApiImpl::TgBotApiImpl(const std::string_view token, AuthContext* auth,
     // Register -> OnMyChatMember
     onMyChatMemberImpl =
         std::make_unique<TgBotApiImpl::OnMyChatMemberImpl>(this);
-    // Load modules
+    // Load modules (../lib/modules)
     kModuleLoader = std::make_unique<ModulesManagement>(
-        this, providers->cmdline->exe().parent_path());
+        this, providers->cmdline->exe().parent_path().parent_path() / "lib" / "modules");
     // Restart command
     restartCommand = std::make_unique<RestartCommand>(this);
 
