@@ -3,6 +3,7 @@
 #include <CommandLine.hpp>
 #include <filesystem>
 #include <stdexcept>
+#include <system_error>
 
 CommandLine::CommandLine(CommandLine::argc_type argc,
                          CommandLine::argv_type argv)
@@ -12,6 +13,12 @@ CommandLine::CommandLine(CommandLine::argc_type argc,
         throw std::invalid_argument("Invalid argv passed");
     }
     exePath = std::filesystem::current_path() / std::filesystem::path(argv[0]);
+    std::error_code ec;
+    exePath = std::filesystem::canonical(exePath, ec);
+    if (ec) {
+        LOG(WARNING) << "Cannot fully resolve path";
+    }
+    DLOG(INFO) << "exePath: " << exePath;
 }
 
 CommandLine::argv_type CommandLine::argv() const { return _argv; }
