@@ -9,11 +9,10 @@
 // Extension of ReplyParameters
 struct ReplyParametersExt : public TgBot::ReplyParameters {
     using Ptr = std::shared_ptr<ReplyParametersExt>;
-    static constexpr MessageThreadId kThreadIdNone = 0;
 
-    MessageThreadId messageThreadId{};
+    std::optional<MessageThreadId> messageThreadId;
 
     [[nodiscard]] bool hasThreadId() const {
-        return messageThreadId != kThreadIdNone;
+        return messageThreadId.has_value();
     }
 };

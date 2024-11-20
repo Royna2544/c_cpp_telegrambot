@@ -32,6 +32,8 @@
 #include <utility>
 
 #include "CommandLine.hpp"
+#include "GitData.h"
+#include "tgbot/Api.h"
 
 bool TgBotApiImpl::validateValidArgs(const DynModule* module,
                                      MessageExt::Ptr& message) {
@@ -207,10 +209,39 @@ void TgBotApiImpl::startPoll() {
     // Deleting webhook
     getApi().deleteWebhook();
 
+    GitData data;
+    GitData::Fill(&data);
+
+    getApi().setMyDescription(
+        fmt::format("A C++ written Telegram bot, sources: {}", data.originurl));
+
+    std::string ownerString;
+    if (auto owner = _provider->database->getOwnerUserId(); owner) {
+        auto chat = getApi().getChat(*owner);
+        ownerString = fmt::format(" Owned by @{}.", *chat->username);
+    }
+    constexpr std::string_view OS =
+#if defined(_WIN32)
+        "Windows";
+#elif defined(__linux__)
+        "Linux";
+#elif defined(__APPLE__)
+        "macOS";
+#else
+        "unknown platform";
+#endif
+    getApi().setMyShortDescription(fmt::format(
+        "C++ Telegram bot.{} I'm currently hosted on {}", ownerString, OS));
+
     auto* longPoll = _bot.createLongPoll(
-        100, 10,
-        {"message", "inline_query", "callback_query", "my_chat_member",
-         "chat_member", "chat_join_request"});
+        {}, {},
+        TgBot::Update::Types::message | TgBot::Update::Types::inline_query |
+            TgBot::Update::Types::callback_query |
+            TgBot::Update::Types::my_chat_member |
+            TgBot::Update::Types::chat_member |
+            TgBot::Update::Types::chat_join_request);
+
+    // Start the long poll loop.
     while (!SignalHandler::isSignaled()) {
         longPoll->start();
     }
@@ -250,11 +281,11 @@ constexpr bool kDisableNotifications = false;
 Message::Ptr TgBotApiImpl::sendMessage_impl(
     ChatId chatId, const std::string_view text,
     ReplyParametersExt::Ptr replyParameters, GenericReply::Ptr replyMarkup,
-    const std::string_view parseMode) const {
+    const TgBot::Api::ParseMode parseMode) const {
     try {
         return getApi().sendMessage(chatId, text, globalLinkOptions,
-                                    replyParameters, replyMarkup, parseMode,
-                                    kDisableNotifications, {},
+                                    replyParameters, std::move(replyMarkup),
+                                    parseMode, kDisableNotifications, {},
                                     ReplyParamsToMsgTid{replyParameters});
 
     } catch (const TgBot::TgException& ex) {
@@ -266,11 +297,11 @@ Message::Ptr TgBotApiImpl::sendMessage_impl(
 Message::Ptr TgBotApiImpl::sendAnimation_impl(
     ChatId chatId, std::variant<InputFile::Ptr, std::string> animation,
     const std::string_view caption, ReplyParametersExt::Ptr replyParameters,
-    GenericReply::Ptr replyMarkup, const std::string_view parseMode) const {
+    GenericReply::Ptr replyMarkup, const ParseMode parseMode) const {
     try {
-        return getApi().sendAnimation(chatId, animation, 0, 0, 0, "", caption,
-                                      replyParameters, replyMarkup, parseMode,
-                                      kDisableNotifications, {},
+        return getApi().sendAnimation(chatId, animation, {}, {}, {}, {},
+                                      caption, replyParameters, replyMarkup,
+                                      parseMode, kDisableNotifications, {},
                                       ReplyParamsToMsgTid{replyParameters});
     } catch (const TgBot::TgException& ex) {
         handleTgBotApiEx(ex, replyParameters);
@@ -294,11 +325,11 @@ Message::Ptr TgBotApiImpl::sendSticker_impl(
 Message::Ptr TgBotApiImpl::editMessage_impl(
     const Message::Ptr& message, const std::string_view newText,
     const TgBot::InlineKeyboardMarkup::Ptr& markup,
-    const std::string_view parseMode) const {
+    const ParseMode parseMode) const {
     DEBUG_ASSERT_NONNULL_PARAM(message);
     try {
         return getApi().editMessageText(newText, message->chat->id,
-                                        message->messageId, "", parseMode,
+                                        message->messageId, {}, parseMode,
                                         globalLinkOptions, markup);
     } catch (const TgBot::TgException& ex) {
         handleTgBotApiEx(ex, nullptr);
@@ -315,9 +346,9 @@ Message::Ptr TgBotApiImpl::editMessageMarkup_impl(
                 if constexpr (std::is_same_v<T, Message::Ptr>) {
                     DEBUG_ASSERT_NONNULL_PARAM(arg);
                     return getApi().editMessageReplyMarkup(
-                        arg->chat->id, arg->messageId, "", markup);
+                        arg->chat->id, arg->messageId, {}, markup);
                 } else if constexpr (std::is_same_v<T, std::string>) {
-                    return getApi().editMessageReplyMarkup(0, 0, arg, markup);
+                    return getApi().editMessageReplyMarkup({}, {}, arg, markup);
                 }
                 LOG(WARNING) << "No-op editMessageReplyMarkup";
                 return Message::Ptr();
@@ -333,8 +364,8 @@ MessageId TgBotApiImpl::copyMessage_impl(
     ChatId fromChatId, MessageId messageId,
     ReplyParametersExt::Ptr replyParameters) const {
     const auto ret = getApi().copyMessage(
-        fromChatId, fromChatId, messageId, "", "", {}, kDisableNotifications,
-        replyParameters, nullptr, false, ReplyParamsToMsgTid{replyParameters});
+        fromChatId, fromChatId, messageId, {}, {}, {}, kDisableNotifications,
+        replyParameters, nullptr, {}, ReplyParamsToMsgTid{replyParameters});
     if (ret) {
         return ret->messageId;
     }
@@ -353,7 +384,7 @@ void TgBotApiImpl::deleteMessages_impl(
 
 void TgBotApiImpl::restrictChatMember_impl(
     ChatId chatId, UserId userId, TgBot::ChatPermissions::Ptr permissions,
-    std::uint32_t untilDate) const {
+    std::chrono::system_clock::time_point untilDate) const {
     DEBUG_ASSERT_NONNULL_PARAM(permissions);
     getApi().restrictChatMember(chatId, userId, permissions, untilDate);
 }
@@ -361,8 +392,8 @@ void TgBotApiImpl::restrictChatMember_impl(
 Message::Ptr TgBotApiImpl::sendDocument_impl(
     ChatId chatId, FileOrString document, const std::string_view caption,
     ReplyParametersExt::Ptr replyParameters, GenericReply::Ptr replyMarkup,
-    const std::string_view parseMode) const {
-    return getApi().sendDocument(chatId, std::move(document), "", caption,
+    const ParseMode parseMode) const {
+    return getApi().sendDocument(chatId, std::move(document), {}, caption,
                                  replyParameters, replyMarkup, parseMode,
                                  kDisableNotifications, {}, false,
                                  ReplyParamsToMsgTid{replyParameters});
@@ -371,7 +402,7 @@ Message::Ptr TgBotApiImpl::sendDocument_impl(
 Message::Ptr TgBotApiImpl::sendPhoto_impl(
     ChatId chatId, FileOrString photo, const std::string_view caption,
     ReplyParametersExt::Ptr replyParameters, GenericReply::Ptr replyMarkup,
-    const std::string_view parseMode) const {
+    const ParseMode parseMode) const {
     return getApi().sendPhoto(chatId, photo, caption, replyParameters,
                               replyMarkup, parseMode, kDisableNotifications, {},
                               ReplyParamsToMsgTid{replyParameters});
@@ -380,16 +411,16 @@ Message::Ptr TgBotApiImpl::sendPhoto_impl(
 Message::Ptr TgBotApiImpl::sendVideo_impl(
     ChatId chatId, FileOrString video, const std::string_view caption,
     ReplyParametersExt::Ptr replyParameters, GenericReply::Ptr replyMarkup,
-    const std::string_view parseMode) const {
-    return getApi().sendVideo(chatId, video, false, 0, 0, 0, "", caption,
+    const ParseMode parseMode) const {
+    return getApi().sendVideo(chatId, video, {}, {}, {}, {}, {}, caption,
                               replyParameters, replyMarkup, parseMode,
                               kDisableNotifications, {},
                               ReplyParamsToMsgTid{replyParameters});
 }
 
 Message::Ptr TgBotApiImpl::sendDice_impl(ChatId chatId) const {
-    static const std::array<std::string, 6> dices = {"🎲", "🎯", "🏀",
-                                                     "⚽", "🎳", "🎰"};
+    static constexpr std::array<std::string_view, 6> dices = {"🎲", "🎯", "🏀",
+                                                              "⚽", "🎳", "🎰"};
 
     return getApi().sendDice(
         chatId, kDisableNotifications, nullptr, nullptr,
@@ -412,7 +443,7 @@ bool TgBotApiImpl::createNewStickerSet_impl(
 
 File::Ptr TgBotApiImpl::uploadStickerFile_impl(
     std::int64_t userId, InputFile::Ptr sticker,
-    const std::string_view stickerFormat) const {
+    const TgBot::Api::StickerFormat stickerFormat) const {
     DEBUG_ASSERT_NONNULL_PARAM(sticker);
     return getApi().uploadStickerFile(userId, sticker, stickerFormat);
 }

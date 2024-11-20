@@ -76,6 +76,7 @@ class TgBotApiImpl : public TgBotApi {
     std::unique_ptr<RestartCommand> restartCommand;
 
     std::unique_ptr<FileCheck> virusChecker;
+
    private:
     /**
      * @brief Sends a message to a chat.
@@ -95,7 +96,7 @@ class TgBotApiImpl : public TgBotApi {
     Message::Ptr sendMessage_impl(
         ChatId chatId, const std::string_view text,
         ReplyParametersExt::Ptr replyParameters, GenericReply::Ptr replyMarkup,
-        const std::string_view parseMode) const override;
+        const TgBot::Api::ParseMode parseMode) const override;
 
     /**
      * @brief Sends an animation (GIF or video) to a chat.
@@ -115,7 +116,7 @@ class TgBotApiImpl : public TgBotApi {
         const std::string_view caption,
         ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
-        const std::string_view parseMode = {}) const override;
+        const TgBot::Api::ParseMode parseMode = {}) const override;
 
     /**
      * @brief Sends a sticker to a chat.
@@ -145,7 +146,7 @@ class TgBotApiImpl : public TgBotApi {
     Message::Ptr editMessage_impl(
         const Message::Ptr& message, const std::string_view newText,
         const TgBot::InlineKeyboardMarkup::Ptr& markup,
-        const std::string_view parseMode) const override;
+        const TgBot::Api::ParseMode parseMode) const override;
 
     /**
      * @brief Edits the inline keyboard markup of a message.
@@ -211,9 +212,9 @@ class TgBotApiImpl : public TgBotApi {
      * @param untilDate The date until the restrictions apply (in Unix timestamp
      * format).
      */
-    void restrictChatMember_impl(ChatId chatId, UserId userId,
-                                 TgBot::ChatPermissions::Ptr permissions,
-                                 std::uint32_t untilDate) const override;
+    void restrictChatMember_impl(
+        ChatId chatId, UserId userId, TgBot::ChatPermissions::Ptr permissions,
+        std::chrono::system_clock::time_point untilDate) const override;
 
     /**
      * @brief Sends a document (file) to a chat.
@@ -232,7 +233,7 @@ class TgBotApiImpl : public TgBotApi {
         ChatId chatId, FileOrString document, const std::string_view caption,
         ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
-        const std::string_view parseMode = {}) const override;
+        const TgBot::Api::ParseMode parseMode = {}) const override;
 
     /**
      * @brief Sends a photo to a chat.
@@ -250,7 +251,7 @@ class TgBotApiImpl : public TgBotApi {
         ChatId chatId, FileOrString photo, const std::string_view caption,
         ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
-        const std::string_view parseMode = {}) const override;
+        const TgBot::Api::ParseMode parseMode = {}) const override;
 
     /**
      * @brief Sends a video to a chat.
@@ -268,7 +269,7 @@ class TgBotApiImpl : public TgBotApi {
         ChatId chatId, FileOrString video, const std::string_view caption,
         ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
-        const std::string_view parseMode = {}) const override;
+        const TgBot::Api::ParseMode parseMode = {}) const override;
 
     /**
      * @brief Sends a dice roll to a chat.
@@ -321,7 +322,7 @@ class TgBotApiImpl : public TgBotApi {
      */
     File::Ptr uploadStickerFile_impl(
         UserId userId, InputFile::Ptr sticker,
-        const std::string_view stickerFormat) const override;
+        const TgBot::Api::StickerFormat stickerFormat) const override;
 
     /**
      * @brief Downloads a file from the Telegram server.

@@ -8,6 +8,7 @@
 #include <imagep/ImageProcAll.hpp>
 #include <string>
 #include <string_view>
+#include <system_error>
 
 #include "ImagePBase.hpp"
 #include "StringResLoader.hpp"
@@ -37,8 +38,16 @@ constexpr std::string_view kOutputFile = "outpic";
 DECLARE_COMMAND_HANDLER(rotatepic) {
     int rotation = 0;
     ProcessImageParam params{};
-    params.srcPath = kDownloadFile.data();
-    params.destPath = kOutputFile.data();
+    std::error_code ec;
+    auto tmpPath = std::filesystem::temp_directory_path(ec);
+    if (ec) {
+        api->sendReplyMessage(
+            message->message(),
+            access(res, Strings::FAILED_TO_DOWNLOAD_FILE));
+        return;
+    }
+    params.srcPath = tmpPath / kDownloadFile.data();
+    params.destPath = tmpPath / kOutputFile.data();
     std::string fileid;
     enum class MediaType { INVALID, MPEG4, WEBM, PNG } mediaType{};
     MessageAttrs attr{};

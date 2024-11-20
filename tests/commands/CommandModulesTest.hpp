@@ -232,7 +232,7 @@ class CommandTestBase : public CommandModulesTest {
                                      std::forward<TextMatcher>(textMatcher),
                                      std::forward<ReplyMatcher>(replyMatcher),
                                      std::forward<MarkMatcher>(markMatcher),
-                                     TgBotApi::parseModeToStr<mode>()))
+                                     mode))
             .WillOnce(Return(sentMessage));
         return {sentMessage, botApi};
     }
@@ -253,7 +253,7 @@ class CommandTestBase : public CommandModulesTest {
                                  std::forward<CaptionMatcher>(textMatcher),
                                  std::forward<ReplyMatcher>(replyMatcher),
                                  std::forward<MarkMatcher>(markMatcher),
-                                 TgBotApi::parseModeToStr<mode>()))
+                                 mode))
             .WillOnce(Return(sentMessage));
         return {sentMessage, botApi};
     }

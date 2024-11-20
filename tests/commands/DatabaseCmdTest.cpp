@@ -68,10 +68,9 @@ struct DatabaseCommandTest : public CommandTestBase {
         const auto recievedMessage = createDefaultMessage();
         willSendReplyMessageTo(matcher, recievedMessage, _);
         recievedMessage->replyToMessage = sentMessage;
-        EXPECT_CALL(*botApi,
-                    sendMessage_impl(
-                        TEST_CHAT_ID, _, createMessageReplyMatcher(), _,
-                        TgBotApi::parseModeToStr<TgBotApi::ParseMode::None>()))
+        EXPECT_CALL(*botApi, sendMessage_impl(TEST_CHAT_ID, _,
+                                              createMessageReplyMatcher(), _,
+                                              TgBotApi::ParseMode::None))
             .WillOnce(DoAll(WithArg<3>(verifyKeyboard), SaveArg<3>(&keyboard),
                             Return(sentMessage)));
         EXPECT_CALL(*botApi, onAnyMessage(_))

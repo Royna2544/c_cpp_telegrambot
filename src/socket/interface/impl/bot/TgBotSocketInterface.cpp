@@ -14,8 +14,8 @@ SocketInterfaceTgBot::SocketInterfaceTgBot(SocketInterfaceBase* _interface,
                                            ResourceProvider* resource)
     : _interface(_interface),
       api(_api),
-      observer(observer),
       helper(helper),
+      observer(observer),
       spamblock(spamblock),
       resource(resource) {}
 

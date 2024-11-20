@@ -1,5 +1,6 @@
 #pragma once
 
+#include <tgbot/Api.h>
 #include <tgbot/EventBroadcaster.h>
 #include <tgbot/types/InlineQueryResult.h>
 #include <tgbot/types/InputFile.h>
@@ -9,6 +10,7 @@
 #include <tgbot/types/StickerSet.h>
 
 #include <ReplyParametersExt.hpp>
+#include <chrono>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
@@ -73,7 +75,7 @@ class TgBotApi {
         ChatId chatId, const std::string_view text,
         ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
-        const std::string_view parseMode = {}) const = 0;
+        const TgBot::Api::ParseMode parseMode = {}) const = 0;
 
     /**
      * @brief Sends a GIF to the specified chat.
@@ -98,7 +100,7 @@ class TgBotApi {
         const std::string_view caption = {},
         ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
-        const std::string_view parseMode = {}) const = 0;
+        const TgBot::Api::ParseMode parseMode = {}) const = 0;
 
     /**
      * @brief Sends a sticker to the specified chat.
@@ -151,7 +153,7 @@ class TgBotApi {
      */
     virtual File::Ptr uploadStickerFile_impl(
         std::int64_t userId, InputFile::Ptr sticker,
-        const std::string_view stickerFormat) const = 0;
+        const TgBot::Api::StickerFormat stickerFormat) const = 0;
 
     /**
      * @brief Edits a sent message.
@@ -169,7 +171,7 @@ class TgBotApi {
     virtual Message::Ptr editMessage_impl(
         const Message::Ptr& message, const std::string_view newText,
         const TgBot::InlineKeyboardMarkup::Ptr& markup,
-        const std::string_view parseMode) const = 0;
+        const TgBot::Api::ParseMode parseMode) const = 0;
 
     /**
      * @brief Edits a sent message with new markup.
@@ -252,7 +254,7 @@ class TgBotApi {
      */
     virtual void restrictChatMember_impl(
         ChatId chatId, UserId userId, TgBot::ChatPermissions::Ptr permissions,
-        std::uint32_t untilDate = 0) const = 0;
+        std::chrono::system_clock::time_point untilDate = {}) const = 0;
 
     /**
      * @brief Sends a file to the specified chat.
@@ -276,7 +278,7 @@ class TgBotApi {
         const std::string_view caption = {},
         ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
-        const std::string_view parseMode = {}) const = 0;
+        const TgBot::Api::ParseMode parseMode = {}) const = 0;
 
     /**
      * @brief Sends a photo to the specified chat.
@@ -299,7 +301,7 @@ class TgBotApi {
         ChatId chatId, FileOrString photo, const std::string_view caption = {},
         ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
-        const std::string_view parseMode = {}) const = 0;
+        const TgBot::Api::ParseMode parseMode = {}) const = 0;
 
     /**
      * @brief Sends a video to the specified chat.
@@ -322,7 +324,7 @@ class TgBotApi {
         ChatId chatId, FileOrString video, const std::string_view caption = {},
         ReplyParametersExt::Ptr replyParameters = nullptr,
         GenericReply::Ptr replyMarkup = nullptr,
-        const std::string_view parseMode = {}) const = 0;
+        const TgBot::Api::ParseMode parseMode = {}) const = 0;
 
     /**
      * @brief Sends a dice to the specified chat.
@@ -482,11 +484,7 @@ class TgBotApi {
 
    public:
     // Convience wrappers over real API
-    enum class ParseMode {
-        Markdown,
-        HTML,
-        None,
-    };
+    using ParseMode = TgBot::Api::ParseMode;
 
     template <ParseMode mode>
     static consteval std::string_view parseModeToStr() {
@@ -495,10 +493,11 @@ class TgBotApi {
                 return "Markdown";
             case ParseMode::HTML:
                 return "HTML";
+            case ParseMode::MarkdownV2:
+                return "MarkdownV2";
             case ParseMode::None:
                 return {};
         }
-        return "Unknown";
     }
 
     /**
@@ -517,9 +516,9 @@ class TgBotApi {
     Message::Ptr sendReplyMessage(
         const Message::Ptr& replyToMessage, const std::string_view message,
         const GenericReply::Ptr& replyMarkup = nullptr) const {
-        MessageThreadId tid = replyToMessage->messageThreadId.value_or(0);
+        auto tid = replyToMessage->messageThreadId;
         if (!replyToMessage->chat->isForum) {
-            tid = 0;
+            tid.reset();
         }
         return sendReplyMessage<mode>(replyToMessage->chat->id,
                                       replyToMessage->messageId, tid, message,
@@ -529,15 +528,15 @@ class TgBotApi {
     template <ParseMode mode = ParseMode::None>
     Message::Ptr sendReplyMessage(
         const ChatId chatId, const MessageId messageId,
-        const MessageThreadId messageTid, const std::string_view message,
+        const std::optional<MessageThreadId> messageTid,
+        const std::string_view message,
         const GenericReply::Ptr& replyMarkup = nullptr) const {
         auto params = std::make_shared<ReplyParametersExt>();
         params->messageId = messageId;
         params->chatId = chatId;
         params->messageThreadId = messageTid;
         params->allowSendingWithoutReply = true;
-        return sendMessage_impl(chatId, message, params, replyMarkup,
-                                parseModeToStr<mode>());
+        return sendMessage_impl(chatId, message, params, replyMarkup, mode);
     }
 
     /**
@@ -556,18 +555,16 @@ class TgBotApi {
     Message::Ptr sendMessage(const ChatIds& chatId,
                              const std::string_view message,
                              const GenericReply::Ptr& markup = nullptr) const {
-        return sendMessage_impl(chatId, message, nullptr, markup,
-                                parseModeToStr<mode>());
+        return sendMessage_impl(chatId, message, nullptr, markup, mode);
     }
 
     template <ParseMode mode = ParseMode::None>
     Message::Ptr sendReplyAnimation(const Message::Ptr& replyToMessage,
                                     const FileOrMedia& mediaId,
                                     const std::string_view caption = {}) const {
-        return sendAnimation_impl(replyToMessage->chat->id,
-                                  ToFileOrString(mediaId), caption,
-                                  createReplyParameters(replyToMessage),
-                                  nullptr, parseModeToStr<mode>());
+        return sendAnimation_impl(
+            replyToMessage->chat->id, ToFileOrString(mediaId), caption,
+            createReplyParameters(replyToMessage), nullptr, mode);
     }
 
     /**
@@ -591,7 +588,7 @@ class TgBotApi {
                                const FileOrMedia& mediaId,
                                const std::string_view caption = {}) const {
         return sendAnimation_impl(chatid, ToFileOrString(mediaId), caption,
-                                  nullptr, nullptr, parseModeToStr<mode>());
+                                  nullptr, nullptr, mode);
     }
 
     Message::Ptr sendReplySticker(const Message::Ptr& replyToMessage,
@@ -629,8 +626,7 @@ class TgBotApi {
     Message::Ptr editMessage(
         const Message::Ptr& message, const std::string_view newText,
         const TgBot::InlineKeyboardMarkup::Ptr& markup = nullptr) const {
-        return editMessage_impl(message, newText, markup,
-                                parseModeToStr<mode>());
+        return editMessage_impl(message, newText, markup, mode);
     }
 
     inline Message::Ptr editMessageMarkup(
@@ -665,9 +661,9 @@ class TgBotApi {
         deleteMessages_impl(chatid, messages);
     }
 
-    inline void muteChatMember(ChatId chatId, UserId userId,
-                               TgBot::ChatPermissions::Ptr permissions,
-                               std::uint32_t untilDate) const {
+    inline void muteChatMember(
+        ChatId chatId, UserId userId, TgBot::ChatPermissions::Ptr permissions,
+        std::chrono::system_clock::time_point untilDate) const {
         restrictChatMember_impl(chatId, userId, std::move(permissions),
                                 untilDate);
     }
@@ -679,8 +675,7 @@ class TgBotApi {
                               GenericReply::Ptr replyMarkup = nullptr) const {
         return sendDocument_impl(chatId, ToFileOrString(document), caption,
                                  std::move(replyParameters),
-                                 std::move(replyMarkup),
-                                 parseModeToStr<mode>());
+                                 std::move(replyMarkup), mode);
     }
 
     template <ParseMode mode = ParseMode::None>
@@ -690,7 +685,7 @@ class TgBotApi {
                            GenericReply::Ptr replyMarkup = nullptr) const {
         return sendPhoto_impl(chatId, ToFileOrString(photo), caption,
                               std::move(replyParameters),
-                              std::move(replyMarkup), parseModeToStr<mode>());
+                              std::move(replyMarkup), mode);
     }
 
     template <ParseMode mode = ParseMode::None>
@@ -700,7 +695,7 @@ class TgBotApi {
                            GenericReply::Ptr replyMarkup = nullptr) const {
         return sendVideo_impl(chatId, ToFileOrString(video), caption,
                               std::move(replyParameters),
-                              std::move(replyMarkup), parseModeToStr<mode>());
+                              std::move(replyMarkup), mode);
     }
 
     template <ParseMode mode = ParseMode::None>
@@ -740,7 +735,7 @@ class TgBotApi {
 
     [[nodiscard]] inline File::Ptr uploadStickerFile(
         std::int64_t userId, InputFile::Ptr sticker,
-        const std::string_view stickerFormat) const {
+        const TgBot::Api::StickerFormat stickerFormat) const {
         return uploadStickerFile_impl(userId, std::move(sticker),
                                       stickerFormat);
     }
@@ -840,8 +835,8 @@ class TgBotApi {
         auto ptr = std::make_shared<ReplyParametersExt>();
         ptr->messageId = messageToReply->messageId;
         ptr->allowSendingWithoutReply = true;
-        if (messageToReply->chat->isForum) {
-            ptr->messageThreadId = messageToReply->messageThreadId.value();
+        if (messageToReply->isTopicMessage.value_or(false)) {
+            ptr->messageThreadId = *messageToReply->messageThreadId;
         }
         return ptr;
     }

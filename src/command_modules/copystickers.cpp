@@ -144,7 +144,7 @@ DECLARE_COMMAND_HANDLER(copystickers) {
             message->get<MessageAttrs::User>()->id,
             InputFile::fromFile(sticker.filePath.generic_string(),
                                 "image/webp"),
-            "static"sv);
+            TgBot::Api::StickerFormat::Static);
         if (!file) {
             api->sendReplyMessage(message->message(),
                                   access(res, Strings::FAILED_TO_UPLOAD_FILE));

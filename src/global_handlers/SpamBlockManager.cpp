@@ -2,6 +2,7 @@
 #include <trivial_helpers/_std_chrono_templates.h>
 #include <trivial_helpers/_tgbot.h>
 
+#include <chrono>
 #include <global_handlers/SpamBlockManager.hpp>
 
 void SpamBlockManager::runFunction(const std::stop_token &token) {
@@ -19,8 +20,9 @@ void SpamBlockManager::onDetected(ChatId chat, UserId user,
         case Config::PURGE_AND_MUTE:
             LOG(INFO) << fmt::format("Try mute offending user");
             try {
-                _api->muteChatMember(chat, user, perms,
-                                     to_secs(kMuteDuration).count());
+                _api->muteChatMember(
+                    chat, user, perms,
+                    std::chrono::system_clock::now() + kMuteDuration);
             } catch (const TgBot::TgException &e) {
                 LOG(WARNING) << fmt::format("Cannot mute: {}", e.what());
             }

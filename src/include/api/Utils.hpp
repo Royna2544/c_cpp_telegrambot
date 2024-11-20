@@ -96,13 +96,11 @@ struct ChatIds {
 struct ReplyParamsToMsgTid {
     explicit ReplyParamsToMsgTid(
         const ReplyParametersExt::Ptr& replyParameters) {
-        if (replyParameters) {
+        if (replyParameters && replyParameters->messageThreadId) {
             tid = replyParameters->messageThreadId;
-        } else {
-            tid = ReplyParametersExt::kThreadIdNone;
         }
     }
-    operator MessageId() const { return tid; }
+    operator std::optional<MessageThreadId>() const { return tid; }
 
-    MessageThreadId tid;
+    std::optional<MessageThreadId> tid;
 };

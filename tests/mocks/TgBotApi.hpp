@@ -1,7 +1,8 @@
 #pragma once
 
-#include <api/TgBotApi.hpp>
 #include <gmock/gmock.h>
+
+#include <api/TgBotApi.hpp>
 
 class MockTgBotApi : public TgBotApi {
    public:
@@ -10,16 +11,14 @@ class MockTgBotApi : public TgBotApi {
     MOCK_METHOD(Message::Ptr, sendMessage_impl,
                 (ChatId chatId, const std::string_view text,
                  ReplyParametersExt::Ptr replyParameters,
-                 GenericReply::Ptr replyMarkup,
-                 const std::string_view parseMode),
+                 GenericReply::Ptr replyMarkup, const ParseMode parseMode),
                 (const, override));
 
     MOCK_METHOD(Message::Ptr, sendAnimation_impl,
                 (ChatId chatId, FileOrString animation,
                  const std::string_view caption,
                  ReplyParametersExt::Ptr replyParameters,
-                 GenericReply::Ptr replyMarkup,
-                 const std::string_view parseMode),
+                 GenericReply::Ptr replyMarkup, const ParseMode parseMode),
                 (const, override));
 
     MOCK_METHOD(Message::Ptr, sendSticker_impl,
@@ -30,7 +29,7 @@ class MockTgBotApi : public TgBotApi {
     MOCK_METHOD(Message::Ptr, editMessage_impl,
                 (const Message::Ptr& message, const std::string_view newText,
                  const TgBot::InlineKeyboardMarkup::Ptr& markup,
-                 const std::string_view parseMode),
+                 const ParseMode parseMode),
                 (const, override));
 
     MOCK_METHOD(Message::Ptr, editMessageMarkup_impl,
@@ -48,31 +47,28 @@ class MockTgBotApi : public TgBotApi {
     MOCK_METHOD(void, restrictChatMember_impl,
                 (ChatId chatId, UserId userId,
                  TgBot::ChatPermissions::Ptr permissions,
-                 std::uint32_t untilDate),
+                 std::chrono::system_clock::time_point untilDate),
                 (const, override));
 
     MOCK_METHOD(Message::Ptr, sendDocument_impl,
                 (ChatId chatId, FileOrString document,
                  const std::string_view caption,
                  ReplyParametersExt::Ptr replyParameters,
-                 GenericReply::Ptr replyMarkup,
-                 const std::string_view parseMode),
+                 GenericReply::Ptr replyMarkup, const ParseMode parseMode),
                 (const, override));
 
     MOCK_METHOD(Message::Ptr, sendPhoto_impl,
                 (ChatId chatId, FileOrString photo,
                  const std::string_view caption,
                  ReplyParametersExt::Ptr replyParameters,
-                 GenericReply::Ptr replyMarkup,
-                 const std::string_view parseMode),
+                 GenericReply::Ptr replyMarkup, const ParseMode parseMode),
                 (const, override));
 
     MOCK_METHOD(Message::Ptr, sendVideo_impl,
                 (ChatId chatId, FileOrString photo,
                  const std::string_view caption,
                  ReplyParametersExt::Ptr replyParameters,
-                 GenericReply::Ptr replyMarkup,
-                 const std::string_view parseMode),
+                 GenericReply::Ptr replyMarkup, const ParseMode parseMode),
                 (const, override));
 
     MOCK_METHOD(Message::Ptr, sendDice_impl, (const ChatId chatId),
@@ -90,7 +86,7 @@ class MockTgBotApi : public TgBotApi {
 
     MOCK_METHOD(File::Ptr, uploadStickerFile_impl,
                 (std::int64_t userId, InputFile::Ptr sticker,
-                 const std::string_view stickerFormat),
+                 const TgBot::Api::StickerFormat stickerFormat),
                 (const, override));
 
     MOCK_METHOD(bool, downloadFile_impl,

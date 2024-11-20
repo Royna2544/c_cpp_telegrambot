@@ -560,20 +560,6 @@ int main(int argc, char** argv) {
     using NetworkException = boost::wrapexcept<boost::system::system_error>;
 
     try {
-        api->setDescriptions(
-            "Royna's telegram bot, written in C++. Go on you can talk to it"sv,
-            "One of @roynatech's TgBot C++ project bots. I'm currently hosted "
-            "on "
-#if defined(_WIN32)
-            "Windows"sv
-#elif defined(__linux__)
-            "Linux"sv
-#elif defined(__APPLE__)
-            "macOS"sv
-#else
-            "unknown platform"sv
-#endif
-        );
 
         api->addInlineQueryKeyboard(
             TgBotApi::InlineQuery{

@@ -148,9 +148,8 @@ TEST_F(SocketDataHandlerTest, TestCmdWriteMsgToChatId) {
     TgBotSocket::Packet pkt(TgBotSocket::Command::CMD_WRITE_MSG_TO_CHAT_ID,
                             data);
     EXPECT_CALL(*_mockApi,
-                sendMessage_impl(
-                    testChatId, data.message.data(), IsNull(), IsNull(),
-                    TgBotApi::parseModeToStr<TgBotApi::ParseMode::None>()));
+                sendMessage_impl(testChatId, data.message.data(), IsNull(),
+                                 IsNull(), TgBotApi::ParseMode::None));
     TgBotSocket::callback::GenericAck callbackData{};
     sendAndVerifyHeader<TgBotSocket::callback::GenericAck,
                         TgBotSocket::Command::CMD_GENERIC_ACK>(pkt,
@@ -168,10 +167,9 @@ TEST_F(SocketDataHandlerTest, TestCmdWriteMsgToChatIdTgBotApiEx) {
     };
     TgBotSocket::Packet pkt(TgBotSocket::Command::CMD_WRITE_MSG_TO_CHAT_ID,
                             data);
-    EXPECT_CALL(
-        *_mockApi,
-        sendMessage_impl(testChatId, data.message.data(), IsNull(), IsNull(),
-                         TgBotApi::parseModeToStr<TgBotApi::ParseMode::None>()))
+    EXPECT_CALL(*_mockApi,
+                sendMessage_impl(testChatId, data.message.data(), IsNull(),
+                                 IsNull(), TgBotApi::ParseMode::None))
         .WillOnce(testing::Throw(TgBot::TgException(
             "AAAAA", TgBot::TgException::ErrorCode::Forbidden)));
 
