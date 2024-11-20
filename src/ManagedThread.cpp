@@ -9,7 +9,7 @@ void ManagedThreadRunnable::run() {
 
 int load_before_inc_dec(std::atomic_int* counter) {
     int current = counter->load(std::memory_order_acquire);
-    while (!counter->compare_exchange_weak(current, current,
+    while (!counter->compare_exchange_strong(current, current,
                                            std::memory_order_acquire)) {
         // Reload current until no inc/dec operations interfere
     }
@@ -17,6 +17,10 @@ int load_before_inc_dec(std::atomic_int* counter) {
 }
 
 void ManagedThreadRunnable::threadFunction() {
+    DLOG(INFO) << "Waiting for privdata init";
+    initLatch.wait();
+    DLOG(INFO) << "Privdata init complete";
+    
     ++(*mgr_priv.launched);
     DLOG(INFO) << fmt::format("{} started (launched: {})", mgr_priv.usage,
                               load_before_inc_dec(mgr_priv.launched));

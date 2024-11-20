@@ -96,7 +96,7 @@ struct ManagedThreadRunnable {
     // Run the thread
     void run();
 
-    ManagedThreadRunnable() = default;
+    ManagedThreadRunnable() : initLatch(1) {}
     virtual ~ManagedThreadRunnable() = default;
 
     friend class ThreadManager;
@@ -133,6 +133,8 @@ struct ManagedThreadRunnable {
         std::atomic_int* launched;
         std::latch* completeBarrier;
     } mgr_priv{};
+    // After filling the privdata, push the latch
+    std::latch initLatch;
 };
 
 template <std::derived_from<ManagedThreadRunnable> T, typename... Args>
@@ -159,6 +161,9 @@ T* ThreadManager::create(Usage usage, Args&&... args) {
     newIt->mgr_priv.launched = &launchCount;
     newIt->mgr_priv.completeBarrier = &barrier;
     kControllers[usage] = std::move(newIt);
+    // Notify privdata init complete
+    kControllers[usage]->initLatch.count_down();
+
     return static_cast<T*>(kControllers[usage].get());
 }
 
