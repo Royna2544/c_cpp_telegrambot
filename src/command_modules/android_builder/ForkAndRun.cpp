@@ -86,9 +86,12 @@ std::string read_string_from_child(pid_t child_pid, unsigned long addr) {
     return buf.data();
 }
 
-DeferredExit ptrace_common_parent(pid_t pid) {
+DeferredExit ptrace_common_parent(pid_t pid,
+                                  const std::filesystem::path& sandboxPath) {
     int status = 0;
     DeferredExit exit;
+
+    LOG(INFO) << "Sandbox dir: " << sandboxPath;
 
     // Wait for child to stop
     waitpid(pid, &status, 0);
@@ -144,8 +147,9 @@ DeferredExit ptrace_common_parent(pid_t pid) {
                 std::string buf = read_string_from_child(pid, regs.rsi);
                 std::string_view bufView = buf;
                 if (absl::ConsumeSuffix(&bufView, ".repo/repo/main.py")) {
-                    if (!std::filesystem::equivalent(
-                            std::filesystem::current_path(), bufView)) {
+                    DLOG(INFO) << "sandboxPath: " << sandboxPath
+                              << " accessPath: " << buf;
+                    if (!std::filesystem::equivalent(sandboxPath, bufView)) {
                         LOG(WARNING) << "BLOCKING ACCESS TO " << buf;
                         regs.rax = -ENOENT;
                         regs.orig_rax = -1;
@@ -428,7 +432,7 @@ DeferredExit ForkAndRunSimple::execute() {
         _exit(EXIT_FAILURE);
     } else if (pid > 0) {
         if constexpr (kEnablePtraceHook) {
-            return ptrace_common_parent(pid);
+            return ptrace_common_parent(pid, std::filesystem::current_path());
         } else {
             int status = 0;
             if (waitpid(pid, &status, 0) < 0) {
@@ -498,7 +502,8 @@ bool ForkAndRunShell::open() {
                     return;
                 }
                 if constexpr (kEnablePtraceHook) {
-                    result = ptrace_common_parent(shell_pid_);
+                    result = ptrace_common_parent(
+                        shell_pid_, std::filesystem::current_path());
                 } else {
                     if (waitpid(shell_pid_, &status, 0) < 0) {
                         PLOG(ERROR) << "Failed to wait for shell";
