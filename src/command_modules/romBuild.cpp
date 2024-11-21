@@ -515,7 +515,7 @@ class CwdRestorer {
 ROMBuildQueryHandler::ROMBuildQueryHandler(TgBotApi::Ptr api,
                                            Message::Ptr userMessage,
                                            CommandLine* line)
-    : _api(api),
+    : _api(api), _commandLine(line),
       parser(line->getPath(FS::PathType::RESOURCES) / "android_builder") {
     settingsKeyboard =
         createKeyboardWith<Buttons::repo_sync, Buttons::upload,
