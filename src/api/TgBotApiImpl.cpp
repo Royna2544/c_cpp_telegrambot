@@ -209,17 +209,21 @@ void TgBotApiImpl::startPoll() {
     // Deleting webhook
     getApi().deleteWebhook();
 
+    std::string sourceString;
     GitData data;
-    GitData::Fill(&data);
+    if (GitData::Fill(&data)) {
+        sourceString = fmt::format(", sources: {}", data.originurl);
+    }
 
     getApi().setMyDescription(
-        fmt::format("A C++ written Telegram bot, sources: {}", data.originurl));
+        fmt::format("A C++ written Telegram bot{}", sourceString));
 
     std::string ownerString;
     if (auto owner = _provider->database->getOwnerUserId(); owner) {
         auto chat = getApi().getChat(*owner);
         ownerString = fmt::format(" Owned by @{}.", *chat->username);
     }
+
     constexpr std::string_view OS =
 #if defined(_WIN32)
         "Windows";
