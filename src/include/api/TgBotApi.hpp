@@ -517,7 +517,7 @@ class TgBotApi {
         const Message::Ptr& replyToMessage, const std::string_view message,
         const GenericReply::Ptr& replyMarkup = nullptr) const {
         auto tid = replyToMessage->messageThreadId;
-        if (!replyToMessage->chat->isForum) {
+        if (!replyToMessage->isTopicMessage.value_or(false)) {
             tid.reset();
         }
         return sendReplyMessage<mode>(replyToMessage->chat->id,
@@ -531,12 +531,9 @@ class TgBotApi {
         const std::optional<MessageThreadId> messageTid,
         const std::string_view message,
         const GenericReply::Ptr& replyMarkup = nullptr) const {
-        auto params = std::make_shared<ReplyParametersExt>();
-        params->messageId = messageId;
-        params->chatId = chatId;
-        params->messageThreadId = messageTid;
-        params->allowSendingWithoutReply = true;
-        return sendMessage_impl(chatId, message, params, replyMarkup, mode);
+        return sendMessage_impl(chatId, message,
+                                createReplyParameters(messageId, messageTid),
+                                replyMarkup, mode);
     }
 
     /**
@@ -832,12 +829,20 @@ class TgBotApi {
    protected:
     static ReplyParametersExt::Ptr createReplyParameters(
         const Message::Ptr& messageToReply) {
-        auto ptr = std::make_shared<ReplyParametersExt>();
-        ptr->messageId = messageToReply->messageId;
-        ptr->allowSendingWithoutReply = true;
+        MessageId messageId = messageToReply->messageId;
+        std::optional<MessageThreadId> threadId;
         if (messageToReply->isTopicMessage.value_or(false)) {
-            ptr->messageThreadId = *messageToReply->messageThreadId;
+            threadId = *messageToReply->messageThreadId;
         }
+        return createReplyParameters(messageId, threadId);
+    }
+
+    static ReplyParametersExt::Ptr createReplyParameters(
+        MessageId messageId, std::optional<MessageThreadId> messageThreadId) {
+        auto ptr = std::make_shared<ReplyParametersExt>();
+        ptr->messageId = messageId;
+        ptr->allowSendingWithoutReply = true;
+        ptr->messageThreadId = messageThreadId;
         return ptr;
     }
 };
