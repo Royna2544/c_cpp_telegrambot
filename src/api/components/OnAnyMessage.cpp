@@ -13,37 +13,35 @@ void TgBotApiImpl::OnAnyMessageImpl::onAnyMessage(
 
 void TgBotApiImpl::OnAnyMessageImpl::onAnyMessageFunction(
     Message::Ptr message) {
-    decltype(callbacks)::const_reverse_iterator it;
-    std::vector<
-        std::pair<std::future<TgBotApi::AnyMessageResult>, decltype(it)>>
-        vec;
+    std::map<int, std::future<TgBotApi::AnyMessageResult>> vec;
     const std::lock_guard<std::mutex> lock(mutex);
 
     if (callbacks.empty()) {
         return;
     }
-    it = callbacks.crbegin();
-    while (it != callbacks.crend()) {
-        const auto fn_copy = *it;
-        vec.emplace_back(std::async(std::launch::async, fn_copy, _api, message),
-                         it++);
+    int index = 0;
+    for (const auto& iter : callbacks) {
+        vec.emplace(index++, std::async(std::launch::async, iter, _api, message));
     }
 
-    for (auto& [future, callback] : vec) {
+    index = 0;
+    auto [b, e] = std::ranges::remove_if(callbacks, [&](const auto& result) {
         try {
-            switch (future.get()) {
+            switch (vec[index++].get()) {
                 // Skip
                 case TgBotApi::AnyMessageResult::Handled:
-                    break;
+                    return false;
 
                 case TgBotApi::AnyMessageResult::Deregister:
-                    callbacks.erase(callback.base());
-                    break;
+                    return true;
             }
         } catch (const TgBot::TgException& ex) {
             LOG(ERROR) << "Error in onAnyMessageCallback: " << ex.what();
+            LOG(INFO) << "Deregistering handler (As further errors can occur)";
         }
-    }
+        return true;
+    });
+    callbacks.erase(b, e);
 }
 
 TgBotApiImpl::OnAnyMessageImpl::OnAnyMessageImpl(TgBotApiImpl::Ptr api)
