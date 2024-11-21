@@ -1,3 +1,4 @@
+#include <absl/strings/match.h>
 #include <dlfcn.h>
 #include <fmt/format.h>
 #include <fmt/ranges.h>
@@ -252,20 +253,20 @@ void TgBotApiImpl::startPoll() {
 }
 
 namespace {
-void handleTgBotApiEx(const TgBot::TgException& ex,
-                      const ReplyParametersExt::Ptr& replyParameters) {
-    // Allow it if it's FORUM_CLOSED
-    if (replyParameters && replyParameters->hasThreadId() &&
-        ex.errorCode == TgBot::TgException::ErrorCode::BadRequest &&
-        (strstr(ex.what(), "FORUM_CLOSED") != nullptr)) {
-        LOG(WARNING) << "Failed to send reply message: Bot attempted to send "
-                        "reply message to a closed forum";
-        return;
-    }
-    if (ex.errorCode == TgBot::TgException::ErrorCode::BadRequest &&
-        (strstr(ex.what(), "message is not modified") != nullptr)) {
-        LOG(WARNING) << "Capturing message not modified.";
-        return;
+void handleTgBotApiEx(const TgBot::TgException& ex) {
+    switch (ex.errorCode) {
+        case TgBot::TgException::ErrorCode::BadRequest: {
+            if (absl::StrContains(ex.what(), "FORUM_CLOSED")) {
+                LOG(WARNING) << "Forum closed. Skipping message.";
+                return;
+            }
+            if (absl::StrContains(ex.what(), "message is not modified")) {
+                LOG(WARNING) << "Capturing message not modified.";
+                return;
+            }
+        }
+        default:
+            break;
     }
     // Goodbye, if it is not
     throw;
@@ -293,7 +294,7 @@ Message::Ptr TgBotApiImpl::sendMessage_impl(
                                     ReplyParamsToMsgTid{replyParameters});
 
     } catch (const TgBot::TgException& ex) {
-        handleTgBotApiEx(ex, replyParameters);
+        handleTgBotApiEx(ex);
         return nullptr;
     }
 }
@@ -308,7 +309,7 @@ Message::Ptr TgBotApiImpl::sendAnimation_impl(
                                       parseMode, kDisableNotifications, {},
                                       ReplyParamsToMsgTid{replyParameters});
     } catch (const TgBot::TgException& ex) {
-        handleTgBotApiEx(ex, replyParameters);
+        handleTgBotApiEx(ex);
         return nullptr;
     }
 }
@@ -321,7 +322,7 @@ Message::Ptr TgBotApiImpl::sendSticker_impl(
                                     kDisableNotifications,
                                     ReplyParamsToMsgTid{replyParameters});
     } catch (const TgBot::TgException& ex) {
-        handleTgBotApiEx(ex, replyParameters);
+        handleTgBotApiEx(ex);
         return nullptr;
     }
 }
@@ -336,7 +337,7 @@ Message::Ptr TgBotApiImpl::editMessage_impl(
                                         message->messageId, {}, parseMode,
                                         globalLinkOptions, markup);
     } catch (const TgBot::TgException& ex) {
-        handleTgBotApiEx(ex, nullptr);
+        handleTgBotApiEx(ex);
         return nullptr;
     }
 }
@@ -359,7 +360,7 @@ Message::Ptr TgBotApiImpl::editMessageMarkup_impl(
             },
             message);
     } catch (const TgBot::TgException& ex) {
-        handleTgBotApiEx(ex, nullptr);
+        handleTgBotApiEx(ex);
         return nullptr;
     }
 }
