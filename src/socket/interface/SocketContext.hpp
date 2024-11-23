@@ -39,7 +39,7 @@ class TgBotSocket_API Context {
 
     struct RemoteEndpoint {
         std::string address;
-        boost::asio::ip::port_type port;
+        uint_least16_t port;
     };
 
     // A specialized overload to write TgBotSocket::Packet.

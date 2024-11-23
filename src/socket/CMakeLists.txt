@@ -1,11 +1,19 @@
 add_subdirectory(selector)
-add_subdirectory(interface)
 
+find_package(Boost CONFIG COMPONENTS system)
 add_my_library(
-  NAME SocketCommandMap 
-  SRCS TgBotCommandMap.cpp
-  PRIVATE_INC include
-  STATIC
+  NAME Socket
+  SRCS
+    interface/Context.cpp
+    interface/Local.cpp
+    interface/UDP.cpp
+    interface/TCP.cpp
+    interface/bot/TgBotPacketParser.cpp
+    interface/bot/TgBotSocketFileHelperNew.cpp
+    interface/backends/ClientBackend.cpp
+    TgBotCommandMap.cpp
+  PUBLIC_INC include interface
+  LIBS TgBotUtils ZLIB::ZLIB OpenSSL::Crypto Boost::system
 )
 
 find_package(ZLIB REQUIRED)

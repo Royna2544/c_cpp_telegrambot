@@ -8,7 +8,7 @@
 namespace TgBotSocket {
 
 Context::Local::Local(const std::filesystem::path& path)
-    : socket_(io_context), acceptor_(io_context), endpoint_(path) {
+    : socket_(io_context), acceptor_(io_context), endpoint_(path.string()) {
     LOG(INFO) << "Local::Local: Path=" << path;
     std::error_code ec;
     if (std::filesystem::exists(path, ec)) {

@@ -4,14 +4,13 @@
 #include <TryParseStr.hpp>
 #include <memory>
 #include <string>
-#include <boost/process/environment.hpp>
 #include "Env.hpp"
 #include "SocketContext.hpp"
 
 bool SocketClientWrapper::connect(unsigned short defaultPort,
                                   std::filesystem::path defaultPath) {
     std::string addressString;
-    boost::asio::ip::port_type port = 0;
+    uint_least16_t port = 0;
     bool foundPort = false;
     Env env;
     std::string portStr;
