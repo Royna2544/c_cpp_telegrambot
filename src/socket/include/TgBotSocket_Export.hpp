@@ -11,8 +11,13 @@
 #include <string>
 #include <type_traits>
 
+#ifdef __TGBOT__
+#include <SharedMalloc.hpp>
+#include <Types.h>
+#else
 #include "../../include/SharedMalloc.hpp"
 #include "../../include/Types.h"
+#endif
 #include "_TgBotSocketCommands.hpp"
 
 template <typename T, size_t size>
@@ -128,14 +133,6 @@ struct alignas(ALIGNMENT) Packet {
         header.checksum = crc32_function(data.get(), header.data_size);
     }
 
-    // Converts to full SocketData object, including header
-    SharedMalloc toSocketData() {
-        data->realloc(sizeof(PacketHeader) + header.data_size);
-        data.move(0, sizeof(header), header.data_size);
-        data.assignFrom(header);
-        return data;
-    }
-
     static uLong crc32_function(const void* data, const size_t data_size) {
         uLong crc = crc32(0L, Z_NULL, 0);  // Initial value
         crc32(crc, static_cast<const Bytef*>(data), data_size);
@@ -143,7 +140,7 @@ struct alignas(ALIGNMENT) Packet {
     }
 
     static uLong crc32_function(const SharedMalloc& data) {
-        return crc32_function(data.get(), data->size());
+        return crc32_function(data.get(), data.size());
     }
 };
 

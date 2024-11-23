@@ -11,13 +11,15 @@
 #include <fstream>
 #include <global_handlers/ChatObserver.hpp>
 #include <global_handlers/SpamBlock.hpp>
-#include <impl/bot/TgBotSocketFileHelperNew.hpp>
-#include <impl/bot/TgBotSocketInterface.hpp>
 #include <mutex>
 #include <socket/TgBotCommandMap.hpp>
 #include <trivial_helpers/log_once.hpp>
 #include <utility>
 #include <variant>
+
+#include "SocketContext.hpp"
+#include "TgBotSocketFileHelperNew.hpp"
+#include "TgBotSocketInterface.hpp"
 
 using TgBot::InputFile;
 namespace fs = std::filesystem;
@@ -52,7 +54,7 @@ std::string getMIMEString(const ResourceProvider* resource,
             if (!elem.isMember("types")) {
                 continue;
             }
-            for (const auto &ex : elem["types"]) {
+            for (const auto& ex : elem["types"]) {
                 if (ex.asString() == extension) {
                     return elem["name"].asString();
                 }
@@ -211,7 +213,7 @@ UploadFileDryCallback SocketInterfaceTgBot::handle_UploadFileDry(
     return callback;
 }
 
-bool SocketInterfaceTgBot::handle_DownloadFile(SocketConnContext ctx,
+bool SocketInterfaceTgBot::handle_DownloadFile(const TgBotSocket::Context& ctx,
                                                const void* ptr) {
     const auto* data = static_cast<const DownloadFile*>(ptr);
     SocketFile2DataHelper::DataFromFileParam params;
@@ -223,11 +225,11 @@ bool SocketInterfaceTgBot::handle_DownloadFile(SocketConnContext ctx,
         LOG(ERROR) << "Failed to prepare download file packet";
         return false;
     }
-    _interface->writeToSocket(std::move(ctx), pkt->toSocketData());
+    ctx.write(pkt.value());
     return true;
 }
 
-bool SocketInterfaceTgBot::handle_GetUptime(SocketConnContext ctx,
+bool SocketInterfaceTgBot::handle_GetUptime(const TgBotSocket::Context& ctx,
                                             const void* /*ptr*/) {
     auto now = std::chrono::system_clock::now();
     const auto diff = to_secs(now - startTp);
@@ -236,7 +238,7 @@ bool SocketInterfaceTgBot::handle_GetUptime(SocketConnContext ctx,
     copyTo(callback.uptime, fmt::format("Uptime: {:%H:%M:%S}", diff).c_str());
     LOG(INFO) << "Sending text back: " << std::quoted(callback.uptime.data());
     Packet pkt(Command::CMD_GET_UPTIME_CALLBACK, callback);
-    _interface->writeToSocket(std::move(ctx), pkt.toSocketData());
+    ctx.write(pkt);
     return true;
 }
 
@@ -251,7 +253,7 @@ bool CHECK_PACKET_SIZE(Packet& pkt) {
     return true;
 }
 
-void SocketInterfaceTgBot::handlePacket(SocketConnContext ctx,
+void SocketInterfaceTgBot::handlePacket(const TgBotSocket::Context& ctx,
                                         TgBotSocket::Packet pkt) {
     const void* ptr = pkt.data.get();
     std::variant<GenericAck, UploadFileDryCallback, bool> ret;
@@ -341,7 +343,7 @@ void SocketInterfaceTgBot::handlePacket(SocketConnContext ctx,
                           sizeof(UploadFileDryCallback));
             LOG(INFO) << "Sending CMD_UPLOAD_FILE_DRY ack: " << std::boolalpha
                       << (result.result == AckType::SUCCESS);
-            _interface->writeToSocket(ctx, ackpkt.toSocketData());
+            ctx.write(ackpkt);
             break;
         }
         case Command::CMD_WRITE_MSG_TO_CHAT_ID:
@@ -356,7 +358,7 @@ void SocketInterfaceTgBot::handlePacket(SocketConnContext ctx,
                           sizeof(GenericAck));
             LOG(INFO) << "Sending ack: " << std::boolalpha
                       << (result.result == AckType::SUCCESS);
-            _interface->writeToSocket(ctx, ackpkt.toSocketData());
+            ctx.write(ackpkt);
             break;
         }
         default:

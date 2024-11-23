@@ -22,7 +22,7 @@
 
 #include "trivial_helpers/fruit_inject.hpp"
 
-struct ManagedThreadRunnable;
+struct ThreadRunner;
 
 class ThreadManager {
    public:
@@ -37,14 +37,12 @@ class ThreadManager {
         MAX
     };
 
-    template <
-        std::derived_from<ManagedThreadRunnable> T = ManagedThreadRunnable,
-        typename... Args>
+    template <std::derived_from<ThreadRunner> T = ThreadRunner,
+              typename... Args>
         requires std::is_constructible_v<T, Args...>
     T* create(Usage usage, Args&&... args);
 
-    template <
-        std::derived_from<ManagedThreadRunnable> T = ManagedThreadRunnable>
+    template <std::derived_from<ThreadRunner> T = ThreadRunner>
     T* get(Usage usage);
 
     // Stop all controllers managed by this manager, and shutdown this.
@@ -52,8 +50,7 @@ class ThreadManager {
 
    private:
     std::shared_mutex mControllerLock;
-    std::unordered_map<Usage, std::unique_ptr<ManagedThreadRunnable>>
-        kControllers;
+    std::unordered_map<Usage, std::unique_ptr<ThreadRunner>> kControllers;
     std::stop_source stopSource;
     std::latch barrier;
     std::atomic_int launchCount;
@@ -89,25 +86,19 @@ struct fmt::formatter<ThreadManager::Usage> : formatter<std::string_view> {
     }
 };
 
-struct ManagedThreadRunnable {
+struct ThreadRunner {
     using just_function = std::function<void(void)>;
     using StopCallBackJust = std::stop_callback<just_function>;
 
     // Run the thread
     void run();
 
-    ManagedThreadRunnable() : initLatch(1) {}
-    virtual ~ManagedThreadRunnable() = default;
+    ThreadRunner() : initLatch(1) {}
+    virtual ~ThreadRunner() = default;
 
     friend class ThreadManager;
 
    protected:
-    void delayUnlessStop(const std::chrono::seconds secs) {
-        std::unique_lock<std::mutex> lk(condvar.mutex);
-        condvar.variable.wait_for(
-            lk, secs, [this] { return mgr_priv.stopToken.stop_requested(); });
-    }
-
     // The main thread function.
     virtual void runFunction(const std::stop_token& token) = 0;
 
@@ -120,10 +111,7 @@ struct ManagedThreadRunnable {
     // Wrapper around 'runFunction'
     void threadFunction();
 
-    struct {
-        std::mutex mutex;
-        std::condition_variable variable;
-    } condvar;
+    bool isRunning = false;
 
    public:
     struct {
@@ -135,9 +123,11 @@ struct ManagedThreadRunnable {
     } mgr_priv{};
     // After filling the privdata, push the latch
     std::latch initLatch;
+
+    [[nodiscard]] bool running() const noexcept { return isRunning; }
 };
 
-template <std::derived_from<ManagedThreadRunnable> T, typename... Args>
+template <std::derived_from<ThreadRunner> T, typename... Args>
     requires std::is_constructible_v<T, Args...>
 T* ThreadManager::create(Usage usage, Args&&... args) {
     std::unique_ptr<T> newIt;
@@ -167,7 +157,7 @@ T* ThreadManager::create(Usage usage, Args&&... args) {
     return static_cast<T*>(kControllers[usage].get());
 }
 
-template <std::derived_from<ManagedThreadRunnable> T>
+template <std::derived_from<ThreadRunner> T>
 T* ThreadManager::get(Usage usage) {
     std::lock_guard<std::shared_mutex> lock(mControllerLock);
     auto it = kControllers.find(usage);

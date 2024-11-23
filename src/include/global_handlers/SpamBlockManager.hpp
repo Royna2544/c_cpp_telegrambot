@@ -4,7 +4,7 @@
 
 #include "SpamBlock.hpp"
 
-struct SpamBlockManager : SpamBlockBase, ManagedThreadRunnable {
+struct SpamBlockManager : SpamBlockBase, ThreadRunner {
     APPLE_INJECT(SpamBlockManager(TgBotApi::Ptr api, AuthContext *auth));
     ~SpamBlockManager() override = default;
 

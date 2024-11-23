@@ -1,5 +1,5 @@
-#include <trivial_helpers/_FileDescriptor_posix.h>
 #include <sys/epoll.h>
+#include <trivial_helpers/_FileDescriptor_posix.h>
 
 #include <algorithm>
 #include <cerrno>
@@ -10,8 +10,7 @@ bool EPollSelector::init() {
     return (isValidFd(epollfd = epoll_create(MAX_EPOLLFDS)));
 }
 
-bool EPollSelector::add(socket_handle_t fd, OnSelectedCallback callback,
-                        Mode mode) {
+bool EPollSelector::add(HandleType fd, OnSelectedCallback callback, Mode mode) {
     struct epoll_event event {};
 
     if (data.size() > MAX_EPOLLFDS) {
@@ -52,7 +51,7 @@ bool EPollSelector::add(socket_handle_t fd, OnSelectedCallback callback,
     return true;
 }
 
-bool EPollSelector::remove(socket_handle_t fd) {
+bool EPollSelector::remove(HandleType fd) {
     bool found = std::ranges::any_of(
         data, [fd](const auto &data) { return data.fd == fd; });
     if (found) {
@@ -72,16 +71,16 @@ bool EPollSelector::remove(socket_handle_t fd) {
 
 #define CALL_RETRY(retvar, expression) \
     do {                               \
-        retvar = (expression);         \
-    } while (retvar == -1 && errno == EINTR);
+        (retvar) = (expression);       \
+    } while ((retvar) == -1 && errno == EINTR);
 
-EPollSelector::SelectorPollResult EPollSelector::poll() {
+EPollSelector::PollResult EPollSelector::poll() {
     epoll_event result_event{};
     int result = 0;
     CALL_RETRY(result, epoll_wait(epollfd, &result_event, 1, getSOrDefault()));
     if (result < 0) {
         PLOG(ERROR) << "epoll_wait failed";
-        return SelectorPollResult::FAILED;
+        return PollResult::FAILED;
     } else if (result > 0) {
         bool any = false;
         for (const auto &data : data) {
@@ -94,9 +93,9 @@ EPollSelector::SelectorPollResult EPollSelector::poll() {
         if (!any) {
             LOG(WARNING) << "Nothing reported";
         }
-        return SelectorPollResult::TIMEOUT;
+        return PollResult::TIMEOUT;
     }
-    return SelectorPollResult::OK;
+    return PollResult::OK;
 }
 
 void EPollSelector::shutdown() {

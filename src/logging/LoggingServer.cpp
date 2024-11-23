@@ -6,19 +6,15 @@
 
 #include <ManagedThreads.hpp>
 #include <SharedMalloc.hpp>
-#include <future>
-#include <impl/backends/ServerBackend.hpp>
-#include <impl/bot/TgBotSocketFileHelper.hpp>
-#include <memory>
 #include <mutex>
 #include <stop_token>
-#include <utility>
 
+#include "LogSinks.hpp"
 #include "LogcatData.hpp"
-#include "SocketBase.hpp"
+#include "SocketContext.hpp"
 
-void NetworkLogSink::Send(const absl::LogEntry& entry) {
-    if (!enabled) {
+void NetworkLogSink::LogSinkImpl::Send(const absl::LogEntry& entry) {
+    if (_stop.stop_requested()) {
         return;
     }
     LogEntry le{};
@@ -26,64 +22,35 @@ void NetworkLogSink::Send(const absl::LogEntry& entry) {
     copyTo(le.message, entry.text_message().data());
     SharedMalloc logData(le);
     bool ret = false;
-    {
-        std::lock_guard<std::mutex> _(mContextMutex);
-        if (context != nullptr) {
-            ret = _interface->writeToSocket(*context, logData);
+    if (context != nullptr) {
+        ret = context->write(logData);
+        if (!ret) {
+            LOG(ERROR) << "Failed to send log data to client";
+            _stop.request_stop();
         }
     }
-    if (!ret) {
-        LOG(INFO) << "onClientDisconnected";
-        enabled = false;
-        onClientDisconnected.set_value();
-    }
-}
-
-bool NetworkLogSink::socketThreadFunction(SocketConnContext c,
-                                          std::shared_future<void> _future) {
-    auto future = std::move(_future);
-    {
-        std::lock_guard<std::mutex> _(mContextMutex);
-        context = &c;
-    }
-    absl::AddLogSink(this);
-    isSinkAdded = true;
-    future.wait();
-    {
-        std::lock_guard<std::mutex> _(mContextMutex);
-        context = nullptr;
-    }
-    return true;
 }
 
 void NetworkLogSink::runFunction(const std::stop_token& token) {
-    std::shared_future<void> future = onClientDisconnected.get_future();
-    bool isSinkAdded = false;
-    std::thread listenThread([this, future]() {
-        _interface->startListeningAsServer([this, future](SocketConnContext c) {
-            return socketThreadFunction(std::move(c), future);
+    context->listen([token](const TgBotSocket::Context& c) {
+        std::stop_source source;
+        std::stop_token sink_token = source.get_token();
+        RAIILogSink<LogSinkImpl> sink(&c, source);
+        std::mutex mutex;
+        std::unique_lock<std::mutex> lock(mutex);
+        std::condition_variable condVariable;
+
+        condVariable.wait(lock, [&token, &sink_token] {
+            return !token.stop_requested() && !sink_token.stop_requested();
         });
     });
-    future.wait();
-    _interface->forceStopListening();
-    listenThread.join();
-    if (isSinkAdded) {
-        absl::RemoveLogSink(this);
-    }
 }
 
-void NetworkLogSink::onPreStop() {
-    enabled = false;
-    onClientDisconnected.set_value();
-    LOG(INFO) << "onPreStop";
-}
+void NetworkLogSink::onPreStop() { context->abortConnections(); }
 
-NetworkLogSink::NetworkLogSink(SocketServerWrapper* wrapper) {
-    _interface = wrapper->getInternalInterface();
-    if (_interface) {
-        _interface->options.address.set(getSocketPathForLogging().string());
-        _interface->options.port.set(SocketInterfaceBase::kTgBotLogPort);
-    } else {
+NetworkLogSink::NetworkLogSink(TgBotSocket::Context* context)
+    : context(context) {
+    if (context == nullptr) {
         LOG(ERROR) << "Failed to find default socket interface";
         return;
     }

@@ -382,10 +382,9 @@ add_my_library(
     src/api/MessageExt.cpp
     src/global_handlers/SpamBlocker.cpp
     src/global_handlers/ChatObserver.cpp
-    src/socket/interface/impl/bot/SocketDataHandler.cpp
-    src/socket/interface/impl/bot/TgBotSocketInterface.cpp
-  LIBS  TgBot TgBotUtils TgBotDBImpl TgBotStringRes ${CMAKE_DL_LIBS} TgBotSocket JsonCpp::JsonCpp 
-        CURL::libcurl
+    src/socket/interface/bot/SocketDataHandler.cpp
+    src/socket/interface/bot/TgBotSocketInterface.cpp
+  LIBS  TgBot TgBotUtils TgBotDBImpl TgBotStringRes ${CMAKE_DL_LIBS} TgBotSocket JsonCpp::JsonCpp
   STATIC
 )
 #####################################################################
@@ -418,10 +417,8 @@ add_my_executable(
     src/ml/ChatDataCollector.cpp
     src/web/TgBotWebServer.cpp
     src/logging/LoggingServer.cpp
-    src/socket/interface/impl/bot/SocketDataHandler.cpp
-    src/socket/interface/impl/bot/TgBotSocketInterface.cpp
-    src/socket/interface/impl/backends/ServerBackend.cpp
-    src/socket/interface/impl/backends/ServerBackend_${TARGET_VARIANT}.cpp
+    src/socket/interface/bot/SocketDataHandler.cpp
+    src/socket/interface/bot/TgBotSocketInterface.cpp
   LIBS TgBotDBLoading TgBot_restartfmt_parser fruit TgBot TgBotUtils TgBotWeb TgBotDBImpl
        absl::status TgBotRandom TgBot_restartfmt_parser CURL::libcurl TgBotRegex
       TgBotStringRes ${CMAKE_DL_LIBS} TgBotSocket JsonCpp::JsonCpp TgBotsighandler OpenSSL::SSL

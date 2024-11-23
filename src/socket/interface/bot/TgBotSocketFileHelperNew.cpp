@@ -3,6 +3,7 @@
 #include <absl/log/log.h>
 
 #include <StructF.hpp>
+
 #include "TgBotSocket_Export.hpp"
 
 bool RealFS::writeFile(const std::filesystem::path& filename,
@@ -54,7 +55,7 @@ bool RealFS::exists(const std::filesystem::path& path) {
 }
 
 void RealFS::SHA256(const SharedMalloc& memory, HashContainer& data) {
-    ::SHA256(static_cast<const unsigned char*>(memory.get()), memory->size(),
+    ::SHA256(static_cast<const unsigned char*>(memory.get()), memory.size(),
              data.m_data.data());
 }
 
@@ -115,7 +116,8 @@ bool SocketFile2DataHelper::DataToFile_DOWNLOAD_FILE(
                           len - sizeof(DownloadFile));
 }
 
-std::optional<TgBotSocket::Packet> SocketFile2DataHelper::DataFromFile_UPLOAD_FILE(
+std::optional<TgBotSocket::Packet>
+SocketFile2DataHelper::DataFromFile_UPLOAD_FILE(
     const DataFromFileParam& params) {
     const auto _result = vfs->readFile(params.filepath);
     HashContainer hash{};
@@ -127,13 +129,13 @@ std::optional<TgBotSocket::Packet> SocketFile2DataHelper::DataFromFile_UPLOAD_FI
     const auto& result = _result.value();
 
     // Create result packet buffer
-    auto resultPointer = SharedMalloc(result->size() + sizeof(UploadFile));
+    auto resultPointer = SharedMalloc(result.size() + sizeof(UploadFile));
     // The front bytes of the buffer is UploadFile, hence cast it
     auto* uploadFile = static_cast<UploadFile*>(resultPointer.get());
     // Copy destination file name info to the buffer
     copyTo(uploadFile->destfilepath, params.destfilepath.string().c_str());
     // Copy source file data to the buffer
-    memcpy(&uploadFile->buf[0], result.get(), result->size());
+    memcpy(&uploadFile->buf[0], result.get(), result.size());
     // Calculate SHA256 hash
     vfs->SHA256(result, hash);
     // Copy hash to the buffer
@@ -145,10 +147,11 @@ std::optional<TgBotSocket::Packet> SocketFile2DataHelper::DataFromFile_UPLOAD_FI
 
     return TgBotSocket::Packet{TgBotSocket::Command::CMD_UPLOAD_FILE,
                                resultPointer.get(),
-                               result->size() + sizeof(UploadFile)};
+                               result.size() + sizeof(UploadFile)};
 }
 
-std::optional<TgBotSocket::Packet> SocketFile2DataHelper::DataFromFile_UPLOAD_FILE_DRY(
+std::optional<TgBotSocket::Packet>
+SocketFile2DataHelper::DataFromFile_UPLOAD_FILE_DRY(
     const DataFromFileParam& params) {
     const auto _result = vfs->readFile(params.filepath);
     HashContainer hash{};
@@ -180,7 +183,8 @@ std::optional<TgBotSocket::Packet> SocketFile2DataHelper::DataFromFile_UPLOAD_FI
                                resultPointer.get(), sizeof(UploadFileDry)};
 }
 
-std::optional<TgBotSocket::Packet> SocketFile2DataHelper::DataFromFile_DOWNLOAD_FILE(
+std::optional<TgBotSocket::Packet>
+SocketFile2DataHelper::DataFromFile_DOWNLOAD_FILE(
     const DataFromFileParam& params) {
     const auto _result = vfs->readFile(params.filepath);
     HashContainer hash{};
@@ -191,17 +195,17 @@ std::optional<TgBotSocket::Packet> SocketFile2DataHelper::DataFromFile_DOWNLOAD_
     }
     const auto& result = _result.value();
     // Create result packet buffer
-    auto resultPointer = SharedMalloc(result->size() + sizeof(DownloadFile));
+    auto resultPointer = SharedMalloc(result.size() + sizeof(DownloadFile));
     // The front bytes of the buffer is DownloadFile, hence cast it
     auto* downloadFile = static_cast<DownloadFile*>(resultPointer.get());
     // Copy destination file name info to the buffer
     copyTo(downloadFile->destfilename, params.destfilepath.string().c_str());
     // Copy source file data to the buffer
-    memcpy(&downloadFile->buf[0], result.get(), result->size());
+    memcpy(&downloadFile->buf[0], result.get(), result.size());
     // Calculate SHA256 hash
     vfs->SHA256(result, hash);
 
     return TgBotSocket::Packet{TgBotSocket::Command::CMD_DOWNLOAD_FILE_CALLBACK,
                                resultPointer.get(),
-                               result->size() + sizeof(DownloadFile)};
+                               result.size() + sizeof(DownloadFile)};
 }

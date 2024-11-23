@@ -8,7 +8,7 @@
 
 bool PollSelector::init() { return true; }
 
-bool PollSelector::add(socket_handle_t fd, OnSelectedCallback callback,
+bool PollSelector::add(Selector::HandleType fd, OnSelectedCallback callback,
                        Mode mode) {
     struct pollfd pfd {};
 
@@ -42,7 +42,7 @@ bool PollSelector::add(socket_handle_t fd, OnSelectedCallback callback,
     return true;
 }
 
-bool PollSelector::remove(socket_handle_t fd) {
+bool PollSelector::remove(Selector::HandleType fd) {
     bool ret = false;
     std::erase_if(pollfds, [fd, &ret](const PollFdData &e) {
         if (e.poll_fd.fd == fd) {
@@ -56,7 +56,7 @@ bool PollSelector::remove(socket_handle_t fd) {
 
 constexpr bool kPollDebug = false;
 
-PollSelector::SelectorPollResult PollSelector::poll() {
+PollSelector::PollResult PollSelector::poll() {
     const size_t fds_len = pollfds.size();
     bool any = false;
 
@@ -67,13 +67,13 @@ PollSelector::SelectorPollResult PollSelector::poll() {
     int rc = ::poll(pfds.get(), pollfds.size(), getMsOrDefault());
     if (rc < 0) {
         PLOG(ERROR) << "Poll failed";
-        return SelectorPollResult::FAILED;
+        return PollResult::FAILED;
     }
-#define CHECK_AND_INFO(event, index, x)               \
-    if ((event) & (x)) {                              \
-        if (kPollDebug) LOG(INFO) << #x << " is set"; \
-        pollfds[index].callback();                    \
-        any = true;                                   \
+#define CHECK_AND_INFO(event, index, x)                         \
+    if ((event) & (x)) {                                        \
+        if constexpr (kPollDebug) LOG(INFO) << #x << " is set"; \
+        pollfds[index].callback();                              \
+        any = true;                                             \
     }
 #define CHECK_AND_WARN(event, x)         \
     if ((event) & (x)) {                 \
@@ -82,12 +82,12 @@ PollSelector::SelectorPollResult PollSelector::poll() {
 
     for (int i = 0; i < pollfds.size(); ++i) {
         const auto revents = pfds[i].revents;
-        if (kPollDebug) {
+        if constexpr (kPollDebug) {
             DLOG(INFO) << "My fd: " << pollfds[i].poll_fd.fd;
         }
 
         if (revents == 0) {
-            if (kPollDebug) {
+            if constexpr (kPollDebug) {
                 LOG(INFO) << "No events are set";
             }
             continue;
@@ -107,9 +107,9 @@ PollSelector::SelectorPollResult PollSelector::poll() {
 
     if (!any) {
         LOG(WARNING) << "None of the fd returned events";
-        return SelectorPollResult::TIMEOUT;
+        return PollResult::TIMEOUT;
     }
-    return SelectorPollResult::OK;
+    return PollResult::OK;
 }
 
 void PollSelector::shutdown() {}

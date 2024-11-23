@@ -1,24 +1,22 @@
 #include <absl/log/log.h>
 #include <absl/strings/ascii.h>
-#include <libos/libsighandler.hpp>
 
+#include <backends/ClientBackend.hpp>
 #include <cstdlib>
-#include <impl/backends/ClientBackend.hpp>
+#include <libos/libsighandler.hpp>
 
 #include "AbslLogInit.hpp"
 #include "LogcatData.hpp"
-#include "SocketBase.hpp"
 
 int main() {
     TgBot_AbslLogInit();
 
-    SocketClientWrapper wrapper(getSocketPathForLogging());
+    SocketClientWrapper wrapper;
     LogEntry entry{};
 
-    wrapper->options.port = SocketInterfaceBase::kTgBotLogPort;
-    auto clientSocket = wrapper->createClientSocket();
-    if (!clientSocket) {
-        LOG(ERROR) << "Failed to create client socket";
+    if (!wrapper.connect(TgBotSocket::Context::kTgBotLogPort,
+                         TgBotSocket::Context::logPath())) {
+        LOG(ERROR) << "Failed to create socket and connect";
         return EXIT_FAILURE;
     }
 
@@ -27,8 +25,7 @@ int main() {
     LOG(INFO) << "Now waiting to read from the server's logs";
 
     while (!SignalHandler::isSignaled()) {
-        auto data =
-            wrapper->readFromSocket(clientSocket.value(), sizeof(LogEntry));
+        auto data = wrapper->read(sizeof(LogEntry));
         if (!data) {
             return EXIT_FAILURE;
         }
@@ -39,6 +36,6 @@ int main() {
         }
         LOG(INFO) << entry.severity << " " << entry.message.data();
     }
-    wrapper->closeSocketHandle(clientSocket.value());
+    wrapper->close();
     return EXIT_SUCCESS;
 }

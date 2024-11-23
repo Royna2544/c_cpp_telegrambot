@@ -1,4 +1,3 @@
-#include <ConfigManager.hpp>
 #include <iomanip>
 #include <utility>
 
@@ -32,17 +31,17 @@ UnixSelector::UnixSelector() {
 
 bool UnixSelector::init() { return m_selector->init(); }
 
-bool UnixSelector::add(socket_handle_t fd,
+bool UnixSelector::add(Selector::HandleType fd,
                        Selector::OnSelectedCallback callback,
                        Selector::Mode mode) {
     return m_selector->add(fd, std::move(callback), mode);
 }
 
-bool UnixSelector::remove(socket_handle_t fd) {
+bool UnixSelector::remove(Selector::HandleType fd) {
     return m_selector->remove(fd);
 }
 
-Selector::SelectorPollResult UnixSelector::poll() {
+Selector::PollResult UnixSelector::poll() {
     return m_selector->poll();
 }
 

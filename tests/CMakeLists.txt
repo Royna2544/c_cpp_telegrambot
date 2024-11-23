@@ -7,7 +7,6 @@ add_my_executable(
     TestMain.cpp
     AuthorizationTest.cpp
     TryParseTest.cpp
-    SharedMallocTest.cpp
     commands/CommandModulesTest.cpp
     commands/AliveCmdTest.cpp
     #commands/BashCmdTest.cpp

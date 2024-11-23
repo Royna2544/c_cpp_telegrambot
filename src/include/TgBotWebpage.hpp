@@ -47,7 +47,7 @@ class TgBotWebServerBase {
     std::filesystem::path webServerRootPath;
 };
 
-class TgBotWebServer : public ManagedThreadRunnable, public TgBotWebServerBase {
+class TgBotWebServer : public ThreadRunner, public TgBotWebServerBase {
    public:
     explicit TgBotWebServer(std::filesystem::path wwwResource, int serverPort);
 

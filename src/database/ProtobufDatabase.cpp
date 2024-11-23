@@ -173,13 +173,8 @@ std::optional<UserId> ProtoDatabase::getOwnerUserId() const {
 
 void ProtoDatabase::dumpList(std::ostream &os, const PersonList &list,
                              const char *name) {
-    const int id_size = list.id_size();
-    os << "Dump of " << name << std::endl;
-    os << "Size: " << id_size << std::endl;
-    if (id_size > 0) {
-        for (int i = 0; i < id_size; i++) os << "- " << list.id(i) << std::endl;
-        os << std::endl;
-    }
+    os << fmt::format("Dump of {}\nSize: {}\n{}", name, list.id_size(),
+                      fmt::join(list.id(), "\n"));
 }
 
 const PersonList &ProtoDatabase::getPersonList(

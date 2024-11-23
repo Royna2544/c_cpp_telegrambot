@@ -6,14 +6,15 @@
 #include <tgbot/TgException.h>
 
 #include <SharedMalloc.hpp>
+#include <bot/TgBotSocketFileHelperNew.hpp>
+#include <bot/TgBotSocketInterface.hpp>
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
-#include <impl/bot/TgBotSocketFileHelperNew.hpp>
-#include <impl/bot/TgBotSocketInterface.hpp>
 #include <string_view>
 #include <utility>
 
+#include "SocketContext.hpp"
 #include "global_handlers/SpamBlock.hpp"
 #include "mocks/DatabaseBase.hpp"
 #include "mocks/ResourceProvider.hpp"
@@ -27,12 +28,12 @@ using testing::IsNull;
 using testing::Return;
 using testing::SaveArg;
 
-fruit::Component<MockTgBotApi, SocketInterfaceImplMock, VFSOperationsMock,
+fruit::Component<MockTgBotApi, MockContext, VFSOperationsMock,
                  SocketInterfaceTgBot>
 getSocketComponent() {
     return fruit::createComponent()
         .bind<TgBotApi, MockTgBotApi>()
-        .bind<SocketInterfaceBase, SocketInterfaceImplMock>()
+        .bind<TgBotSocket::Context, MockContext>()
         .bind<VFSOperations, VFSOperationsMock>()
         .bind<ResourceProvider, MockResource>()
         .bind<DatabaseBase, MockDatabase>()
@@ -44,21 +45,17 @@ class SocketDataHandlerTest : public ::testing::Test {
 
    public:
     SocketDataHandlerTest()
-        : fakeConn(kSocket, nullptr),
-          _injector(getSocketComponent),
-          _mockImpl(_injector.get<SocketInterfaceImplMock*>()),
+        : _injector(getSocketComponent),
+          _mockImpl(_injector.get<MockContext*>()),
           _mockVFS(_injector.get<VFSOperationsMock*>()),
           mockInterface(_injector.get<SocketInterfaceTgBot*>()),
           _mockApi(_injector.get<MockTgBotApi*>()) {}
 
-    // Dummy, not under a real connection
-    SocketConnContext fakeConn;
-
     // Injector owns the below mocks
-    fruit::Injector<MockTgBotApi, SocketInterfaceImplMock, VFSOperationsMock,
+    fruit::Injector<MockTgBotApi, MockContext, VFSOperationsMock,
                     SocketInterfaceTgBot>
         _injector;
-    SocketInterfaceImplMock* _mockImpl{};
+    MockContext* _mockImpl{};
     VFSOperationsMock* _mockVFS{};
     SocketInterfaceTgBot* mockInterface{};
     MockTgBotApi* _mockApi{};
@@ -76,9 +73,9 @@ class SocketDataHandlerTest : public ::testing::Test {
         SharedMalloc packetData;
         TgBotSocket::PacketHeader recv_header;
 
-        EXPECT_CALL(*_mockImpl, writeToSocket(fakeConn, _))
-            .WillOnce(DoAll(SaveArg<1>(&packetData), Return(true)));
-        mockInterface->handlePacket(fakeConn, std::move(pkt));
+        EXPECT_CALL(*_mockImpl, write(_))
+            .WillOnce(DoAll(SaveArg<0>(&packetData), Return(true)));
+        mockInterface->handlePacket(*_mockImpl, std::move(pkt));
 
         // Expect valid packet
         EXPECT_TRUE(packetData.get());
@@ -300,7 +297,7 @@ TEST_F(SocketDataHandlerTest, TestCmdUploadFileDryExistsOptSaidNo) {
 TEST_F(SocketDataHandlerTest, TestCmdUploadFileOK) {
     // Prepare file contents
     const auto filemem = createFileMem();
-    SharedMalloc mem(sizeof(UploadFile) + filemem->size());
+    SharedMalloc mem(sizeof(UploadFile) + filemem.size());
     auto* uploadfile = static_cast<UploadFile*>(mem.get());
     uploadfile->srcfilepath = {"sourcefile"};
     uploadfile->destfilepath = {"destinationfile"};
@@ -308,13 +305,13 @@ TEST_F(SocketDataHandlerTest, TestCmdUploadFileOK) {
     uploadfile->options.hash_ignore = true;
     uploadfile->options.overwrite = true;
     uploadfile->options.dry_run = false;
-    mem.assignTo(filemem.get(), filemem->size(), sizeof(UploadFile));
+    mem.assignTo(filemem.get(), filemem.size(), sizeof(UploadFile));
 
     // Set expectations
     TgBotSocket::Packet pkt(TgBotSocket::Command::CMD_UPLOAD_FILE, mem.get(),
-                            mem->size());
+                            mem.size());
     EXPECT_CALL(*_mockVFS, writeFile(FSP(uploadfile->destfilepath.data()), _,
-                                     filemem->size()))
+                                     filemem.size()))
         .WillOnce(Return(true));
 
     // Verify result

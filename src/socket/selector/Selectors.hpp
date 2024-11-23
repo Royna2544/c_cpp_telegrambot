@@ -6,7 +6,6 @@
 #include <functional>
 #include <optional>
 
-#include "../include/SocketDescriptor_defs.hpp"
 #include "trivial_helpers/_std_chrono_templates.h"
 
 // Base interface for a fd selector, e.g. poll(2) or select(2).
@@ -23,9 +22,13 @@ struct Selector {
         EXCEPT,      // When exception happens
     };
 
-    // Shim for old code
-    using SelectorPollResult = PollResult;
     using OnSelectedCallback = std::function<void(void)>;
+#ifdef _WIN32
+    using HandleType = SOCKET;
+#else
+    using HandleType = int;
+#endif
+
     static constexpr std::chrono::seconds kDefaultTimeoutSecs{5};
 
     virtual ~Selector() = default;
@@ -38,14 +41,13 @@ struct Selector {
 
     // Add a file descriptor to the selector, with a callback. return false on
     // failure.
-    virtual bool add(socket_handle_t fd, OnSelectedCallback callback,
-                     Mode mode) = 0;
+    virtual bool add(HandleType fd, OnSelectedCallback callback, Mode mode) = 0;
 
     // Remove a file descriptor from the selector, return false on failure.
-    virtual bool remove(socket_handle_t fd) = 0;
+    virtual bool remove(HandleType fd) = 0;
 
-    // Poll the selector, return SelectorPollResult object.
-    virtual SelectorPollResult poll() = 0;
+    // Poll the selector, return PollResult object.
+    virtual PollResult poll() = 0;
 
     // Shutdown the selector.
     virtual void shutdown() = 0;

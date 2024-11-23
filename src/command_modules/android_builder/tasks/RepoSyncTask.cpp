@@ -2,11 +2,9 @@
 
 #include <absl/strings/str_split.h>
 #include <git2.h>
-#include <git2/clone.h>
 
 #include <filesystem>
 #include <ios>
-#include <libfs.hpp>
 #include <regex>
 #include <string>
 #include <system_error>
@@ -14,7 +12,6 @@
 #include <trivial_helpers/raii.hpp>
 #include <utility>
 
-#include "CommandLine.hpp"
 #include "ForkAndRun.hpp"
 #include "RepoUtils.hpp"
 

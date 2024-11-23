@@ -14,73 +14,59 @@
 #define requires(x)
 #endif
 
-struct SharedMallocParent {
-    explicit SharedMallocParent(size_t size)
-        : _size(size), data(malloc(size), free) {
-        if (data == nullptr) {
-            throw std::bad_alloc();
-        }
-    }
-    explicit SharedMallocParent() : data(nullptr, free) {}
-
-    NO_MOVE_CTOR(SharedMallocParent);
-    NO_COPY_CTOR(SharedMallocParent);
-    friend struct SharedMallocChild;
-
-    // alloc allocates a new shared memory block of the specified size
-    void realloc(size_t newSize) {
-        if (data == nullptr) {
-            data.reset(::malloc(newSize));
-        } else {
-            data.reset(::realloc(data.release(), newSize));
-        }
-        if (data == nullptr) {
-            throw std::bad_alloc();
-        }
-        _size = newSize;
-    }
-    [[nodiscard]] size_t size() const { return _size; }
-
-   private:
-    size_t _size{};
-    std::unique_ptr<void, decltype(&free)> data;
-};
-
-struct SharedMallocChild {
-    template <typename T>
-    explicit operator const T *() const {
-        return static_cast<T *>(m_data);
-    }
-    [[nodiscard]] void *get() const { return m_data; }
-
-    explicit SharedMallocChild(std::shared_ptr<SharedMallocParent> _parent)
-        : parent(std::move(_parent)), m_data(parent->data.get()) {}
-
-   private:
-    std::shared_ptr<SharedMallocParent> parent;
-    void *m_data{};
-};
-
 struct SharedMalloc {
+    struct Parent {
+        explicit Parent(size_t size) : _size(size), _data(malloc(size), free) {
+            if (_data == nullptr) {
+                throw std::bad_alloc();
+            }
+        }
+        explicit Parent() : _data(nullptr, free) {}
+
+        NO_MOVE_CTOR(Parent);
+        NO_COPY_CTOR(Parent);
+
+        // alloc allocates a new shared memory block of the specified size
+        void realloc(size_t newSize) {
+            if (newSize == _size) {
+                return;  // No-op
+            }
+            if (_data == nullptr) {
+                _data.reset(::malloc(newSize));
+            } else {
+                _data.reset(::realloc(_data.release(), newSize));
+            }
+            if (_data == nullptr) {
+                throw std::bad_alloc();
+            }
+            _size = newSize;
+        }
+        [[nodiscard]] size_t size() const { return _size; }
+        [[nodiscard]] void* data() const { return _data.get(); }
+
+       private:
+        size_t _size{};
+        std::unique_ptr<void, decltype(&free)> _data;
+    };
+
     explicit SharedMalloc(size_t size) {
         if (size == 0) {
-            parent = std::make_shared<SharedMallocParent>();
+            parent = std::make_shared<Parent>();
         } else {
-            parent = std::make_shared<SharedMallocParent>(size);
+            parent = std::make_shared<Parent>(size);
         }
     }
-    SharedMalloc() { parent = std::make_shared<SharedMallocParent>(); }
+    SharedMalloc() { parent = std::make_shared<Parent>(); }
 
     template <typename T, std::enable_if_t<std::is_class_v<T>, bool> = true>
     explicit SharedMalloc(T value) {
-        parent = std::make_shared<SharedMallocParent>(sizeof(T));
+        parent = std::make_shared<Parent>(sizeof(T));
         assignFrom(value);
     }
-    explicit SharedMalloc(std::nullptr_t  /*value*/) {
-        parent = std::make_shared<SharedMallocParent>();
+    explicit SharedMalloc(std::nullptr_t /*value*/) {
+        parent = std::make_shared<Parent>();
     }
 
-    SharedMallocParent *operator->() const { return parent.get(); }
     bool operator!=(std::nullptr_t value) { return parent.get() != value; }
 
     template <typename T>
@@ -89,22 +75,23 @@ struct SharedMalloc {
         assignTo(value);
         return value;
     }
+    [[nodiscard]] size_t size() const noexcept { return parent->size(); }
+    void resize(size_t newSize) const noexcept { parent->realloc(newSize); }
 
    private:
     // A fortify check.
     inline void validateBoundsForSize(const size_t newSize) const {
-        DCHECK_LE(newSize, parent->size())
+        DCHECK_LE(newSize, size())
             << ": Operation size exceeds allocated memory size";
-        if (newSize > parent->size()) {
+        if (newSize > size()) {
             throw std::out_of_range(
                 "Operation size exceeds allocated memory size");
         }
     }
 
     inline void offsetCheck(const size_t offset) const {
-        DCHECK_LE(offset, parent->size())
-            << ": Offset exceeds allocated memory bounds";
-        if (offset > parent->size()) {
+        DCHECK_LE(offset, size()) << ": Offset exceeds allocated memory bounds";
+        if (offset > size()) {
             throw std::out_of_range("Offset exceeds allocated memory bounds");
         }
     }
@@ -191,7 +178,7 @@ struct SharedMalloc {
     template <typename T>
         requires(!std::is_pointer_v<T>)
     void assignFrom(const T &ref) {
-        CHECK_LE(sizeof(T), parent->size())
+        CHECK_LE(sizeof(T), size())
             << ": *this Must have bigger size than sizeof(T)";
         assignFrom(&ref, sizeof(T));
     }
@@ -240,10 +227,7 @@ struct SharedMalloc {
     }
 
     // get returns a shared pointer to the shared memory block
-    [[nodiscard]] SharedMallocChild getChild() const noexcept {
-        return SharedMallocChild(parent);
-    }
-    [[nodiscard]] void *get() const noexcept { return getChild().get(); }
+    [[nodiscard]] void *get() const noexcept { return parent->data(); }
     [[nodiscard]] long use_count() const noexcept { return parent.use_count(); }
 
     bool operator==(const SharedMalloc &other) const noexcept {
@@ -252,7 +236,7 @@ struct SharedMalloc {
             return true;
         }
         // Check if both shared memory blocks have same size
-        if (parent->size() != other.parent->size()) {
+        if (size() != other.size()) {
             return false;
         }
         // Check if either shared memory blocks are nullptr.
@@ -260,9 +244,9 @@ struct SharedMalloc {
         if (get() == nullptr || other.get() == nullptr) {
             return get() == other.get();
         }
-        return memcmp(get(), other.get(), parent->size()) == 0;
+        return memcmp(get(), other.get(), size()) == 0;
     }
 
    private:
-    std::shared_ptr<SharedMallocParent> parent;
+    std::shared_ptr<Parent> parent;
 };

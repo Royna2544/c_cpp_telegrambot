@@ -5,29 +5,32 @@
 
 #include <ManagedThreads.hpp>
 #include <future>
-#include <impl/backends/ServerBackend.hpp>
 #include <memory>
 #include <mutex>
 #include <stop_token>
+#include <utility>
 
-#include "SocketBase.hpp"
+#include "SocketContext.hpp"
 
-struct NetworkLogSink : private absl::LogSink,
-                                        ManagedThreadRunnable {
-    void Send(const absl::LogEntry& entry) override;
+struct NetworkLogSink : public ThreadRunner {
+    class LogSinkImpl : public absl::LogSink {
+        void Send(const absl::LogEntry& entry) override;
+        const TgBotSocket::Context* context = nullptr;
+        std::stop_source _stop;
+
+       public:
+        // Requires an accepted socket.
+        explicit LogSinkImpl(const TgBotSocket::Context* context,
+                             std::stop_source source)
+            : context(context), _stop(std::move(source)){};
+    };
 
     void runFunction(const std::stop_token& token) override;
-    
+
     void onPreStop() override;
 
-    explicit NetworkLogSink(SocketServerWrapper* wrapper);
-   private:
-    std::shared_ptr<SocketInterfaceBase> _interface;
-    std::atomic_bool enabled = true;
-    std::promise<void> onClientDisconnected;
+    explicit NetworkLogSink(TgBotSocket::Context* context);
 
-    bool socketThreadFunction(SocketConnContext c, std::shared_future<void> future);
-    std::mutex mContextMutex;  // Protects context
-    SocketConnContext* context = nullptr;
-    bool isSinkAdded = false;
+   private:
+    TgBotSocket::Context* context = nullptr;
 };

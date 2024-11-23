@@ -1,2 +1,2 @@
 - Handle forked process in forkandrun when the main process exits due to network.
-- SQLiteDatabase should return something else when database backend has failed, instead of bool
+- Better installer on Windows.

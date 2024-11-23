@@ -2,11 +2,10 @@
 
 #include <ManagedThreads.hpp>
 #include <api/TgBotApi.hpp>
-#include <impl/backends/ServerBackend.hpp>
-#include <impl/bot/TgBotPacketParser.hpp>
 #include <utility>
+#include "TgBotPacketParser.hpp"
 
-SocketInterfaceTgBot::SocketInterfaceTgBot(SocketInterfaceBase* _interface,
+SocketInterfaceTgBot::SocketInterfaceTgBot(TgBotSocket::Context* _interface,
                                            TgBotApi::Ptr _api,
                                            ChatObserver* observer,
                                            SpamBlockBase* spamblock,
@@ -20,17 +19,15 @@ SocketInterfaceTgBot::SocketInterfaceTgBot(SocketInterfaceBase* _interface,
       resource(resource) {}
 
 void SocketInterfaceTgBot::runFunction(const std::stop_token& token) {
-    _interface->options.port = SocketInterfaceBase::kTgBotHostPort;
-    // TODO: This is only needed for AF_UNIX sockets
-    _interface->options.address =
-        SocketInterfaceBase::LocalHelper::getSocketPath().string();
-    _interface->startListeningAsServer([this](SocketConnContext ctx) {
-        auto pkt = TgBotSocket::readPacket(_interface, ctx);
+    bool ret = _interface->listen([this](const TgBotSocket::Context& ctx) {
+        auto pkt = TgBotSocket::readPacket(ctx);
         if (pkt) {
             handlePacket(ctx, std::move(pkt.value()));
         }
-        return true;
     });
+    if (!ret) {
+        LOG(ERROR) << "Failed to start listening on socket";
+    }
 }
 
-void SocketInterfaceTgBot::onPreStop() { _interface->forceStopListening(); }
+void SocketInterfaceTgBot::onPreStop() { _interface->abortConnections(); }

@@ -23,6 +23,8 @@
 #include <api/TgBotApiImpl.hpp>
 #include <boost/system/system_error.hpp>
 #include <boost/throw_exception.hpp>
+#include <bot/TgBotSocketFileHelperNew.hpp>
+#include <bot/TgBotSocketInterface.hpp>
 #include <cstdint>
 #include <cstdlib>
 #include <database/bot/TgBotDatabaseImpl.hpp>
@@ -31,9 +33,6 @@
 #include <global_handlers/ChatObserver.hpp>
 #include <global_handlers/RegEXHandler.hpp>
 #include <global_handlers/SpamBlockManager.hpp>
-#include <impl/backends/ServerBackend.hpp>
-#include <impl/bot/TgBotSocketFileHelperNew.hpp>
-#include <impl/bot/TgBotSocketInterface.hpp>
 #include <libfs.hpp>
 #include <libos/libsighandler.hpp>
 #include <logging/LoggingServer.hpp>
@@ -44,6 +43,8 @@
 #include <trivial_helpers/fruit_inject.hpp>
 #include <utility>
 #include <vector>
+
+#include "SocketContext.hpp"
 
 class RegexHandlerInterface : public RegexHandler::Interface {
    public:
@@ -182,27 +183,46 @@ struct hash<CommandLine> {
 };
 }  // namespace std
 
+struct SocketChooser {
+    std::shared_ptr<TgBotSocket::Context> internal;
+    std::shared_ptr<TgBotSocket::Context> external;
+    std::shared_ptr<TgBotSocket::Context> logging;
+
+    APPLE_EXPLICIT_INJECT(SocketChooser(ConfigManager* manager)) {
+        auto value = manager->get(ConfigManager::Configs::SOCKET_CFG);
+        if (!value) {
+            LOG(INFO) << "No socket backend specified, not creating sockets";
+            return;
+        }
+        if (*value == "ipv4") {
+            external = std::make_shared<TgBotSocket::Context::TCP>(
+                boost::asio::ip::tcp::v4(),
+                TgBotSocket::Context::kTgBotHostPort);
+            logging = std::make_shared<TgBotSocket::Context::TCP>(
+                boost::asio::ip::tcp::v4(),
+                TgBotSocket::Context::kTgBotLogPort);
+        } else if (*value == "ipv6") {
+            external = std::make_shared<TgBotSocket::Context::TCP>(
+                boost::asio::ip::tcp::v6(),
+                TgBotSocket::Context::kTgBotHostPort);
+            logging = std::make_shared<TgBotSocket::Context::TCP>(
+                boost::asio::ip::tcp::v6(),
+                TgBotSocket::Context::kTgBotLogPort);
+        } else {
+            LOG(ERROR) << "Invalid socket backend specified: " << *value;
+            return;
+        }
+        internal = std::make_shared<TgBotSocket::Context::Local>(
+            TgBotSocket::Context::hostPath());
+    }
+};
+
 namespace {
 
 fruit::Component<fruit::Required<CommandLine>, ConfigManager>
 getConfigManagerComponent() {
     return fruit::createComponent().registerProvider(
         [](CommandLine line) { return ConfigManager(std::move(line)); });
-}
-
-fruit::Component<fruit::Required<ConfigManager>,
-                 WrapSharedPtr<SocketServerWrapper>>
-getSocketServerComponent() {
-    return fruit::createComponent().registerProvider(
-        [](ConfigManager* configManager) -> WrapSharedPtr<SocketServerWrapper> {
-            auto value = configManager->get(ConfigManager::Configs::SOCKET_CFG);
-            if (!value) {
-                LOG(ERROR)
-                    << "No socket backend specified, not creating sockets";
-                return {nullptr};
-            }
-            return {std::make_shared<SocketServerWrapper>(value.value())};
-        });
 }
 
 fruit::Component<fruit::Required<CommandLine>, StringResLoader,
@@ -287,24 +307,23 @@ getSpamBlockComponent() {
         });
 }
 
-fruit::Component<
-    fruit::Required<ThreadManager, WrapSharedPtr<SocketServerWrapper>>,
-    Unused<NetworkLogSink>>
+fruit::Component<fruit::Required<ThreadManager, SocketChooser>,
+                 Unused<NetworkLogSink>>
 getNetworkLogSinkComponent() {
     return fruit::createComponent().registerProvider(
         [](ThreadManager* thread,
-           const WrapSharedPtr<SocketServerWrapper>& config)
-            -> Unused<NetworkLogSink> {
-            if (config) {
+           const SocketChooser& config) -> Unused<NetworkLogSink> {
+            if (config.logging) {
                 thread->create<NetworkLogSink>(
-                    ThreadManager::Usage::LOGSERVER_THREAD, config.pointer());
+                    ThreadManager::Usage::LOGSERVER_THREAD,
+                    config.logging.get());
             }
             return {};
         });
 }
 
 using SocketComponentFactory_t = std::function<Unused<SocketInterfaceTgBot>(
-    ThreadManager::Usage usage, SocketInterfaceBase*)>;
+    ThreadManager::Usage usage, TgBotSocket::Context*)>;
 fruit::Component<
     fruit::Required<TgBotApi, ChatObserver, WrapPtr<SpamBlockBase>,
                     SocketFile2DataHelper, ThreadManager, ResourceProvider>,
@@ -313,19 +332,20 @@ getSocketInterfaceComponent() {
     return fruit::createComponent()
         .registerFactory<Unused<SocketInterfaceTgBot>(
             fruit::Assisted<ThreadManager::Usage> usage,
-            fruit::Assisted<SocketInterfaceBase*> _interface, TgBotApi::Ptr api,
-            ChatObserver * observer, WrapPtr<SpamBlockBase> spamblock,
-            SocketFile2DataHelper * helper, ThreadManager * manager,
-            ResourceProvider * resource)>(
-            [](ThreadManager::Usage usage, SocketInterfaceBase* _interface,
+            fruit::Assisted<TgBotSocket::Context*> _interface,
+            TgBotApi::Ptr api, ChatObserver * observer,
+            WrapPtr<SpamBlockBase> spamblock, SocketFile2DataHelper * helper,
+            ThreadManager * manager, ResourceProvider * resource)>(
+            [](ThreadManager::Usage usage, TgBotSocket::Context* _interface,
                TgBotApi::Ptr api, ChatObserver* observer,
                WrapPtr<SpamBlockBase> spamblock, SocketFile2DataHelper* helper,
                ThreadManager* manager,
                ResourceProvider* resource) -> Unused<SocketInterfaceTgBot> {
-                auto thread = manager->create<SocketInterfaceTgBot>(
-                    usage, _interface, api, observer, spamblock.pointer(),
-                    helper, resource);
-                thread->run();
+                manager
+                    ->create<SocketInterfaceTgBot>(
+                        usage, _interface, api, observer, spamblock.pointer(),
+                        helper, resource)
+                    ->run();
                 return {};
             });
 }
@@ -355,8 +375,8 @@ getRegexHandlerComponent() {
 fruit::Component<TgBotApi, AuthContext, DatabaseBase, ThreadManager,
                  ConfigManager, Unused<RegexHandler>, Unused<NetworkLogSink>,
                  WrapPtr<SpamBlockBase>, Unused<TgBotWebServer>,
-                 TgBotApiExHandler, SocketComponentFactory_t,
-                 WrapSharedPtr<SocketServerWrapper>, ChatDataCollector>
+                 TgBotApiExHandler, SocketComponentFactory_t, SocketChooser,
+                 ChatDataCollector>
 getAllComponent(CommandLine cmd) {
     static auto _cmd = std::move(cmd);
     return fruit::createComponent()
@@ -373,7 +393,6 @@ getAllComponent(CommandLine cmd) {
         .install(getSocketInterfaceComponent)
         .install(getResourceProvider)
         .install(getConfigManagerComponent)
-        .install(getSocketServerComponent)
         .bindInstance(_cmd);
 }
 
@@ -478,8 +497,8 @@ int main(int argc, char** argv) {
     fruit::Injector<TgBotApi, AuthContext, DatabaseBase, ThreadManager,
                     ConfigManager, Unused<RegexHandler>, Unused<NetworkLogSink>,
                     WrapPtr<SpamBlockBase>, Unused<TgBotWebServer>,
-                    TgBotApiExHandler, SocketComponentFactory_t,
-                    WrapSharedPtr<SocketServerWrapper>, ChatDataCollector>
+                    TgBotApiExHandler, SocketComponentFactory_t, SocketChooser,
+                    ChatDataCollector>
         injector(getAllComponent, CommandLine{argc, argv});
 
     auto configMgr = injector.get<ConfigManager*>();
@@ -533,24 +552,17 @@ int main(int argc, char** argv) {
     }
 
     auto socketFactor = injector.get<SocketComponentFactory_t>();
-    auto _socketServer = injector.get<WrapSharedPtr<SocketServerWrapper>>();
-    std::shared_ptr<SocketInterfaceBase> socketInternal;
-    std::shared_ptr<SocketInterfaceBase> socketExternal;
+    auto _socketServer = injector.get<SocketChooser*>();
 
     // Initialize actual pointers to injected instances
-    if (_socketServer.pointer() != nullptr) {
-        if (socketInternal = _socketServer->getInternalInterface();
-            socketInternal) {
-            socketFactor(ThreadManager::Usage::SOCKET_THREAD,
-                         socketInternal.get());
-        }
-        if (socketExternal = _socketServer->getExternalInterface();
-            socketExternal) {
-            socketFactor(ThreadManager::Usage::SOCKET_EXTERNAL_THREAD,
-                         socketExternal.get());
-        }
+    if (_socketServer->internal != nullptr) {
+        socketFactor(ThreadManager::Usage::SOCKET_THREAD,
+                     _socketServer->internal.get());
     }
-
+    if (_socketServer->external != nullptr) {
+        socketFactor(ThreadManager::Usage::SOCKET_EXTERNAL_THREAD,
+                     _socketServer->external.get());
+    }
     LOG_IF(WARNING, !RestartFmt::checkEnvAndVerifyRestart(api))
         << "Failed to handle restart message";
 
@@ -560,7 +572,6 @@ int main(int argc, char** argv) {
     using NetworkException = boost::wrapexcept<boost::system::system_error>;
 
     try {
-
         api->addInlineQueryKeyboard(
             TgBotApi::InlineQuery{
                 "media", "Get media with the name from database", true, false},

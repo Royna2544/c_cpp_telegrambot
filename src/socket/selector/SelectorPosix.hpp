@@ -10,10 +10,9 @@
 
 struct PollSelector : Selector {
     bool init() override;
-    bool add(socket_handle_t fd, OnSelectedCallback callback,
-             Mode mode) override;
-    bool remove(socket_handle_t fd) override;
-    SelectorPollResult poll() override;
+    bool add(HandleType fd, OnSelectedCallback callback, Mode mode) override;
+    bool remove(HandleType fd) override;
+    PollResult poll() override;
     void shutdown() override;
 
    private:
@@ -29,34 +28,33 @@ struct PollSelector : Selector {
 
 struct SelectSelector : Selector {
     bool init() override;
-    bool add(socket_handle_t fd, OnSelectedCallback callback,
-             Mode mode) override;
-    bool remove(socket_handle_t fd) override;
-    SelectorPollResult poll() override;
+    bool add(HandleType fd, OnSelectedCallback callback, Mode mode) override;
+    bool remove(HandleType fd) override;
+    PollResult poll() override;
     void shutdown() override;
     bool reinit() override;
 
    private:
     struct SelectFdData {
-        socket_handle_t fd;
+        HandleType fd;
         OnSelectedCallback callback;
         Mode mode;
 
-        explicit SelectFdData(socket_handle_t fd, OnSelectedCallback callback,
+        explicit SelectFdData(HandleType fd, OnSelectedCallback callback,
                               Mode mode)
             : fd(fd), callback(std::move(callback)), mode(mode) {}
     };
     fd_set read_set;
     fd_set write_set;
+    fd_set except_set;
     std::vector<SelectFdData> data;
 };
 
 struct EPollSelector : Selector {
     bool init() override;
-    bool add(socket_handle_t fd, OnSelectedCallback callback,
-             Mode mode) override;
-    bool remove(socket_handle_t fd) override;
-    SelectorPollResult poll() override;
+    bool add(HandleType fd, OnSelectedCallback callback, Mode mode) override;
+    bool remove(HandleType fd) override;
+    PollResult poll() override;
     void shutdown() override;
     bool reinit() override;
 
@@ -75,10 +73,10 @@ struct UnixSelector {
     explicit UnixSelector();
 
     bool init();
-    bool add(socket_handle_t fd, Selector::OnSelectedCallback callback,
+    bool add(Selector::HandleType fd, Selector::OnSelectedCallback callback,
              Selector::Mode flags);
-    bool remove(socket_handle_t fd);
-    Selector::SelectorPollResult poll();
+    bool remove(Selector::HandleType fd);
+    Selector::PollResult poll();
     void shutdown();
     bool reinit();
     void enableTimeout(bool enabled);

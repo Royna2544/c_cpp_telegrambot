@@ -15,7 +15,6 @@
 #include <cstdlib>
 #include <filesystem>
 #include <initializer_list>
-#include <libfs.hpp>
 #include <limits>
 #include <memory>
 #include <string>
@@ -25,11 +24,12 @@
 #include <tasks/UploadFileTask.hpp>
 #include <utility>
 
-#include "CommandLine.hpp"
-#include "ConfigManager.hpp"
+#include "utils/CommandLine.hpp"
+#include "utils/ConfigManager.hpp"
 #include "ForkAndRun.hpp"
 #include "Shmem.hpp"
 #include "SystemInfo.hpp"
+#include "utils/libfs.hpp"
 
 template <typename Impl>
 concept canCreateWithApi =

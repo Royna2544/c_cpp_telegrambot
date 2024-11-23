@@ -4,11 +4,12 @@
 
 #include <chrono>
 #include <global_handlers/SpamBlockManager.hpp>
+#include <thread>
 
 void SpamBlockManager::runFunction(const std::stop_token &token) {
     while (!token.stop_requested()) {
         consumeAndDetect();
-        delayUnlessStop(sSpamDetectDelay);
+        std::this_thread::sleep_for(sSpamDetectDelay);
     }
 }
 

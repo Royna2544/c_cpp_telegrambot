@@ -2,7 +2,6 @@
 
 #include <absl/log/log.h>
 
-#include <SocketBase.hpp>
 #include <TgBotSocket_Export.hpp>
 #include <optional>
 #include <socket/TgBotCommandMap.hpp>
@@ -10,15 +9,13 @@
 
 namespace TgBotSocket {
 
-std::optional<Packet> readPacket(
-    SocketInterfaceBase* _interface,
-    const SocketConnContext& context) {
+std::optional<Packet> readPacket(const TgBotSocket::Context& context) {
     TgBotSocket::PacketHeader header;
     decltype(header.magic) magic{};
 
     // Read header and check magic value, despite the header size, the magic was
     // always the first element of the struct.
-    const auto magicData = _interface->readFromSocket(context, sizeof(magic));
+    const auto magicData = context.read(sizeof(magic));
     if (!magicData) {
         LOG(ERROR) << "While reading magic, failed";
         return std::nullopt;
@@ -43,25 +40,26 @@ std::optional<Packet> readPacket(
     }
 
     // Read rest of the packet header.
-    const auto headerData = _interface->readFromSocket(
-        context, sizeof(TgBotSocket::PacketHeader) - sizeof(magic));
+    const auto headerData = context.read(sizeof(TgBotSocket::PacketHeader) - sizeof(magic));
     if (!headerData) {
         LOG(ERROR) << "While reading header, failed";
         return std::nullopt;
     }
-    headerData->assignTo((decltype(magic) *)&header+1, sizeof(header) - sizeof(magic));
+    headerData->assignTo((decltype(magic)*)&header + 1,
+                         sizeof(header) - sizeof(magic));
     header.magic = magic;
 
     using namespace TgBotSocket::CommandHelpers;
     if (isClientCommand(header.cmd)) {
-        LOG(INFO) << fmt::format("Received buf with {}, invoking callback!", header.cmd);
+        LOG(INFO) << fmt::format("Received buf with {}, invoking callback!",
+                                 header.cmd);
     }
 
     const size_t newLength =
         sizeof(TgBotSocket::PacketHeader) + header.data_size;
     TgBotSocket::Packet packet(newLength);
 
-    auto data = _interface->readFromSocket(context, header.data_size);
+    auto data = context.read(header.data_size);
     if (!data) {
         LOG(ERROR) << "While reading data, failed";
         return std::nullopt;

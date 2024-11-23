@@ -6,7 +6,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <database/bot/TgBotDatabaseImpl.hpp>
-#include <impl/backends/ClientBackend.hpp>
+#include <backends/ClientBackend.hpp>
 #include <iostream>
 #include <memory>
 #include "ConfigManager.hpp"
@@ -61,8 +61,8 @@ int main(int argc, char** argv) {
 
     struct TgBotSocket::Packet pkt(
         TgBotSocket::Command::CMD_SEND_FILE_TO_CHAT_ID, data);
-    SocketClientWrapper wrapper(
-        SocketInterfaceBase::LocalHelper::getSocketPath());
-    wrapper->writeAsClientToSocket(pkt.toSocketData());
+    SocketClientWrapper wrapper;
+    wrapper.connect(TgBotSocket::Context::kTgBotHostPort, TgBotSocket::Context::hostPath());
+    wrapper->write(pkt);
     backend->unload();
 }

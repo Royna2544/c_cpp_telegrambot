@@ -4,17 +4,17 @@
 #include <ManagedThreads.hpp>
 #include <TgBotSocket_Export.hpp>
 #include <TryParseStr.hpp>
+#include <backends/ClientBackend.hpp>
+#include <bot/TgBotPacketParser.hpp>
+#include <bot/TgBotSocketFileHelperNew.hpp>
 #include <cstddef>
 #include <cstdlib>
 #include <cstring>
-#include <impl/backends/ClientBackend.hpp>
-#include <impl/bot/TgBotPacketParser.hpp>
-#include <impl/bot/TgBotSocketFileHelperNew.hpp>
 #include <iostream>
 #include <optional>
 #include <string>
 
-#include "SocketBase.hpp"
+#include "SocketContext.hpp"
 #include "TgBotCommandMap.hpp"
 #include "Types.h"
 
@@ -34,7 +34,9 @@ namespace {
 bool verifyArgsCount(Command cmd, int argc) {
     int required = CommandHelpers::toCount(cmd);
     if (required != argc) {
-        LOG(ERROR) << fmt::format("Invalid argument count {} for cmd {}, {} required.", argc, cmd, required);
+        LOG(ERROR) << fmt::format(
+            "Invalid argument count {} for cmd {}, {} required.", argc, cmd,
+            required);
         return false;
     }
     return true;
@@ -77,8 +79,7 @@ std::string_view AckTypeToStr(callback::AckType type) {
 
 }  // namespace
 
-void handle_CommandPacket(const SocketClientWrapper& wrapper,
-                          SocketConnContext& context, const Packet& pkt) {
+void handle_CommandPacket(SocketClientWrapper wrapper, const Packet& pkt) {
     using callback::AckType;
     using callback::GenericAck;
     std::string resultText;
@@ -106,13 +107,12 @@ void handle_CommandPacket(const SocketClientWrapper& wrapper,
             if (callbackData.result != AckType::SUCCESS) {
                 LOG(ERROR) << "Reason: " << callbackData.error_msg.data();
             } else {
-                wrapper->closeSocketHandle(context);
-                auto it = wrapper->createClientSocket();
-                if (!it) {
+                wrapper->close();
+                if (!wrapper.connect(Context::kTgBotHostPort,
+                                     Context::hostPath())) {
                     LOG(ERROR) << "Failed to recreate client socket";
                     return;
                 }
-                context = it.value();
                 LOG(INFO) << "Recreated client socket";
                 auto params_in = callbackData.requestdata;
                 SocketFile2DataHelper::DataFromFileParam param;
@@ -124,12 +124,10 @@ void handle_CommandPacket(const SocketClientWrapper& wrapper,
                         .DataFromFile<SocketFile2DataHelper::Pass::UPLOAD_FILE>(
                             param);
                 LOG(INFO) << "Sending the actual file content again...";
-                wrapper->writeToSocket(context, newPkt->toSocketData());
-                auto v = wrapper.getRawInterface();
-                auto it2 =
-                    TgBotSocket::readPacket(v.get(), context);
+                wrapper->write(newPkt.value());
+                auto it2 = TgBotSocket::readPacket(wrapper.chosen_interface());
                 if (it2) {
-                    handle_CommandPacket(wrapper, it.value(), it2.value());
+                    handle_CommandPacket(std::move(wrapper), it2.value());
                 }
             }
             break;
@@ -149,7 +147,7 @@ void handle_CommandPacket(const SocketClientWrapper& wrapper,
                        << static_cast<int>(pkt.header.cmd);
             break;
     }
-    wrapper->closeSocketHandle(context);
+    wrapper->close();
 }
 
 int main(int argc, char** argv) {
@@ -280,20 +278,13 @@ int main(int argc, char** argv) {
         pkt->header.checksum = pkt->crc32_function(pkt->data);
     }
 
-    SocketClientWrapper backend(
-        SocketInterfaceBase::LocalHelper::getSocketPath());
-    backend->options.use_connect_timeout.set(true);
-    backend->options.connect_timeout.set(3s);
-    auto handle = backend->createClientSocket();
-
-    if (handle) {
-        backend->writeToSocket(handle.value(), pkt->toSocketData());
+    SocketClientWrapper backend;
+    if (backend.connect(Context::kTgBotHostPort, Context::hostPath())) {
+        backend->write(*pkt);
         LOG(INFO) << "Sent the command: Waiting for callback...";
-        auto b = backend.getRawInterface();
-        auto it =
-            TgBotSocket::readPacket(b.get(), handle.value());
+        auto it = TgBotSocket::readPacket(backend.chosen_interface());
         if (it) {
-            handle_CommandPacket(backend, handle.value(), it.value());
+            handle_CommandPacket(std::move(backend), it.value());
         }
     }
 

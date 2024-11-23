@@ -1,6 +1,6 @@
 #pragma once
 
-#include <impl/bot/TgBotSocketFileHelperNew.hpp>
+#include <bot/TgBotSocketFileHelperNew.hpp>
 #include <gmock/gmock.h>
 
 class VFSOperationsMock : public VFSOperations {

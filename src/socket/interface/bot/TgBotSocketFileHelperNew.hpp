@@ -11,15 +11,15 @@
 #include <memory>
 #include <optional>
 
-#include "../../../../include/SharedMalloc.hpp"
-
 #ifdef __TGBOT__
 #include <TgBotSocketExports.h>
 #include <trivial_helpers/fruit_inject.hpp>
+#include <SharedMalloc.hpp>
 #else
 #define TgBotSocket_API
 #define APPLE_INJECT(x) x
 #define APPLE_EXPLICIT_INJECT(x) explicit x
+#include "../../../include/SharedMalloc.hpp"
 #endif
 
 // Represents a SHA-256 hash

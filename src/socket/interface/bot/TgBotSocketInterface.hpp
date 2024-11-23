@@ -1,16 +1,12 @@
 #include <ResourceManager.h>
 
 #include <ManagedThreads.hpp>
-#include <SocketBase.hpp>
+#include <SocketContext.hpp>
 #include <api/TgBotApi.hpp>
-#include <functional>
 #include <global_handlers/ChatObserver.hpp>
 #include <global_handlers/SpamBlock.hpp>
-#include <memory>
 #include <stop_token>
 #include <trivial_helpers/fruit_inject.hpp>
-
-#include "SocketDescriptor_defs.hpp"
 
 #include "TgBotSocketFileHelperNew.hpp"
 #include "TgBotSocket_Export.hpp"
@@ -18,19 +14,19 @@
 using TgBotSocket::callback::GenericAck;
 using TgBotSocket::callback::UploadFileDryCallback;
 
-struct SocketInterfaceTgBot : ManagedThreadRunnable {
-    void handlePacket(SocketConnContext ctx, TgBotSocket::Packet pkt);
+struct SocketInterfaceTgBot : ThreadRunner {
+    void handlePacket(const TgBotSocket::Context& ctx, TgBotSocket::Packet pkt);
 
     void runFunction(const std::stop_token& token) override;
     void onPreStop() override;
 
     APPLE_EXPLICIT_INJECT(SocketInterfaceTgBot(
-        SocketInterfaceBase* _interface, TgBotApi::Ptr _api,
+        TgBotSocket::Context* _interface, TgBotApi::Ptr _api,
         ChatObserver* observer, SpamBlockBase* spamblock,
         SocketFile2DataHelper* helper, ResourceProvider* resource));
 
    private:
-    SocketInterfaceBase* _interface = nullptr;
+    TgBotSocket::Context* _interface = nullptr;
     TgBotApi::Ptr api = nullptr;
     SocketFile2DataHelper* helper;
     ChatObserver* observer = nullptr;
@@ -39,8 +35,6 @@ struct SocketInterfaceTgBot : ManagedThreadRunnable {
 
     std::chrono::system_clock::time_point startTp =
         std::chrono::system_clock::now();
-    using command_handler_fn_t = std::function<void(
-        socket_handle_t source, void* addr, socklen_t len, const void* data)>;
 
     // Command handlers
     GenericAck handle_WriteMsgToChatId(const void* ptr);
@@ -55,6 +49,6 @@ struct SocketInterfaceTgBot : ManagedThreadRunnable {
         const void* ptr, TgBotSocket::PacketHeader::length_type len);
 
     // These have their own ack handlers
-    bool handle_GetUptime(SocketConnContext ctx, const void* ptr);
-    bool handle_DownloadFile(SocketConnContext ctx, const void* ptr);
+    bool handle_GetUptime(const TgBotSocket::Context& ctx, const void* ptr);
+    bool handle_DownloadFile(const TgBotSocket::Context& ctx, const void* ptr);
 };
