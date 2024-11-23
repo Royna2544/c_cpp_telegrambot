@@ -21,8 +21,8 @@ bool Context::write(const Packet& packet) const {
 constexpr int Context::kTgBotHostPort;
 constexpr int Context::kTgBotLogPort;
 
-std::ostream& operator<<(std::ostream& stream,
-                         const Context::RemoteEndpoint& endpoint) {
+std::ostream& TgBotSocket_API
+operator<<(std::ostream& stream, const Context::RemoteEndpoint& endpoint) {
     stream << endpoint.address << ":" << endpoint.port;
     return stream;
 }

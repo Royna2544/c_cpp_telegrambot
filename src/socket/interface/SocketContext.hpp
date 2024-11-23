@@ -148,8 +148,8 @@ class TgBotSocket_API Context {
     // enum class Role { kNone, kServer, kClient } role;
 };
 
-extern std::ostream &operator<<(std::ostream &stream,
-                                const Context::RemoteEndpoint &endpoint);
+extern std::ostream TgBotSocket_API &operator<<(
+    std::ostream &stream, const Context::RemoteEndpoint &endpoint);
 
 class TgBotSocket_API Context::TCP : public Context {
     mutable boost::asio::ip::tcp::socket socket_;
