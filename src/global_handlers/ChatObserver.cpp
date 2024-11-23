@@ -40,7 +40,7 @@ void ChatObserver::printChatMsg(const Message::Ptr& msg,
         }
     }
 
-    fmt::print("[ChatObserveLog][{}]: {}\n", msg->chat, msg->from, msgtext);
+    fmt::print("[ChatObserveLog][{}]: {} {}\n", msg->chat, msg->from, msgtext);
 }
 
 void ChatObserver::process(const Message::Ptr& msg) {
