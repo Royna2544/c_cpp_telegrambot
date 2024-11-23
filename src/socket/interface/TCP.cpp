@@ -28,7 +28,8 @@ Context::TCP::TCP(const boost::asio::ip::tcp type, const int port)
     : socket_(io_context),
       acceptor_(io_context),
       endpoint_(boost::asio::ip::tcp::endpoint(type, port)) {
-    LOG(INFO) << fmt::format("TCP::TCP: Protocol {} listening on port {}", type, port);
+    LOG(INFO) << fmt::format("TCP::TCP: Protocol {} listening on port {}", type,
+                             port);
 }
 
 bool Context::TCP::write(const SharedMalloc& data) const {
@@ -85,16 +86,23 @@ bool Context::TCP::listen(listener_callback_t listener) {
             acceptor_.listen();
             is_listening_ = true;
         }
-        while (!io_context.stopped()) {
-            acceptor_.accept(socket_);
-            LOG(INFO) << "Handling new connection: Client address: "
-                      << remoteAddress();
-            listener(*this);
-            // After handling the connection, create a new socket for the next
-            // client
-            socket_ = boost::asio::ip::tcp::socket(io_context);
-        }
-        DLOG(INFO) << "I/O context stopped, exiting";
+        acceptor_.async_accept(
+            socket_, [this, listener](boost::system::error_code ec) {
+                if (ec) {
+                    LOG(ERROR) << "Accept error: " << ec.message();
+                    return;
+                }
+                LOG(INFO) << "Handling new connection: Client address: "
+                          << remoteAddress();
+                listener(*this);
+                if (!io_context.stopped()) {
+                    // After handling the connection, create a new socket for
+                    // the next client
+                    socket_ = boost::asio::ip::tcp::socket(io_context);
+                    listen(listener);
+                }
+            });
+        io_context.run();
         return true;
     } catch (const boost::system::system_error& e) {
         LOG(ERROR) << "TCP::listen: " << e.what();

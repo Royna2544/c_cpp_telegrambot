@@ -74,22 +74,30 @@ bool Context::Local::listen(listener_callback_t listener) {
             boost::system::error_code ec;
             acceptor_.bind(endpoint_, ec);  // NOLINT
             if (ec) {
-                LOG(ERROR) << "Local::listen: Cannot bind to endpoint: "
-                           << ec.message();
+                LOG(ERROR) << "Cannot bind to endpoint: " << ec.message();
                 return false;
             }
             acceptor_.listen();
             is_listening_ = true;
         }
-        while (!io_context.stopped()) {
-            acceptor_.accept(socket_);
-            LOG(INFO) << "Accepted local connection from: "
-                      << remoteAddress().address;
-            listener(*this);
-            // After handling the connection, create a new socket for the next
-            // client
-            socket_ = boost::asio::local::stream_protocol::socket(io_context);
-        }
+        acceptor_.async_accept(
+            socket_, [this, listener](boost::system::error_code ec) {
+                if (ec) {
+                    LOG(ERROR) << "Accept error: " << ec.message();
+                    return;
+                }
+                LOG(INFO) << "Accepted local connection from: "
+                          << remoteAddress().address;
+                listener(*this);
+                // After handling the connection, create a new socket for
+                // the next client
+                if (!io_context.stopped()) {
+                    socket_ =
+                        boost::asio::local::stream_protocol::socket(io_context);
+                    listen(listener);
+                }
+            });
+        io_context.run();
         return true;
     } catch (const boost::system::system_error& e) {
         LOG(ERROR) << "Local::listen: " << e.what();
@@ -124,7 +132,9 @@ bool Context::Local::abortConnections() {
     if (ec) {
         LOG(WARNING) << "Cannot close acceptor: " << ec.message();
     }
-    close();
+    if (operator bool()) {
+        close();
+    }
     io_context.stop();
     return !ec;
 }

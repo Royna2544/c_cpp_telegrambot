@@ -591,8 +591,10 @@ int main(int argc, char** argv) {
             exHandle->handle(e);
         } catch (const NetworkException& e) {
             LOG(ERROR) << "Network error: " << e.what();
-            LOG(INFO) << "Sleeping for a minute...";
-            std::this_thread::sleep_for(std::chrono::minutes(1));
+            if (!SignalHandler::isSignaled()) {
+                LOG(INFO) << "Sleeping for a minute...";
+                std::this_thread::sleep_for(std::chrono::minutes(1));
+            }
         } catch (const std::exception& e) {
             LOG(ERROR) << "Uncaught Exception: " << e.what();
             break;
