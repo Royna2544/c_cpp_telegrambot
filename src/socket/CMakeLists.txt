@@ -14,6 +14,7 @@ add_my_library(
     TgBotCommandMap.cpp
   PUBLIC_INC include interface
   LIBS TgBotUtils ZLIB::ZLIB OpenSSL::Crypto Boost::system
+  LIBS_WIN32 wsock32 Ws2_32
 )
 
 find_package(ZLIB REQUIRED)
