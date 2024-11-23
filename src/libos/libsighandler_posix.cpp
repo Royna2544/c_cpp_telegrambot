@@ -25,4 +25,7 @@ void SignalHandler::uninstall() {
             PLOG(ERROR) << "Failed to uninstall signal handler";
         }
     }
+    if (signal(SIGUSR1, SIG_DFL) == SIG_ERR) {
+        PLOG(ERROR) << "Failed to restore SIGUSR1";
+    }
 }
