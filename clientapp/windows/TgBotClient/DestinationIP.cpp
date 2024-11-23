@@ -20,6 +20,7 @@ INT_PTR CALLBACK DestinationIP(HWND hDlg, UINT message, WPARAM wParam,
             SendMessage(hUseINet4, BM_SETCHECK, BST_CHECKED, 0);
             config.emplace();
             config->mode = SocketConfig::Mode::USE_IPV4;
+            config->port = 50000;
             return DIALOG_OK;
 
         case WM_COMMAND:

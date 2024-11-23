@@ -2,7 +2,11 @@
 
 #include <absl/log/log.h>
 
+#ifdef __TGBOT__
 #include <StructF.hpp>
+#else
+#include "../../../include/StructF.hpp"
+#endif
 
 #include "TgBotSocket_Export.hpp"
 

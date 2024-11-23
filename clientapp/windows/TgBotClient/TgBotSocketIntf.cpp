@@ -16,7 +16,7 @@
 #include <optional>
 #include <stdexcept>
 
-#include "../../../src/socket/interface/impl/bot/TgBotSocketFileHelper.hpp"
+#include "../../../src/socket/interface/bot/TgBotSocketFileHelperNew.cpp"
 
 static std::string WSALastErrStr() {
     char *s = nullptr;
@@ -105,10 +105,7 @@ class TgBotSocketNative {
         setupSockAddress(&addr);
 
         // Calculate CRC32
-        uLong crc = crc32(0L, Z_NULL, 0);  // Initial value
-        crc = crc32(crc, reinterpret_cast<Bytef *>(context.data.get()),
-                    context.header.data_size);
-        context.header.checksum = crc;
+        context.header.checksum = Packet::crc32_function(context.data);
 
         if (connect(sockfd, reinterpret_cast<sockaddr *>(&addr), len) != 0) {
             LogWSAErr("connect to server");
@@ -245,12 +242,14 @@ bool sendFileToChat(ChatId id, std::filesystem::path filepath, FileType type,
     SendFileToChatId data{};
     GenericAck resultAck{};
     bool ret = false;
-    FileDataHelper::DataFromFileParam param;
+    RealFS fs;
+    SocketFile2DataHelper helper{&fs};
+    SocketFile2DataHelper::DataFromFileParam param;
 
     param.filepath = filepath;
     param.destfilepath = filepath.filename();
     auto fData =
-        FileDataHelper::DataFromFile<FileDataHelper::Pass::UPLOAD_FILE_DRY>(
+        helper.DataFromFile<SocketFile2DataHelper::Pass::UPLOAD_FILE_DRY>(
             param);
     if (!fData) {
         resultAck.result = AckType::ERROR_RUNTIME_ERROR;
@@ -272,7 +271,9 @@ bool sendFileToChat(ChatId id, std::filesystem::path filepath, FileType type,
     }
 
     fData =
-        FileDataHelper::DataFromFile<FileDataHelper::Pass::UPLOAD_FILE>(param);
+        helper.DataFromFile<
+        SocketFile2DataHelper::Pass::UPLOAD_FILE>(
+            param);
     ret = TgBotSocketNative::getInstance()->sendContext(
         fData.value(),
         [&resultAck](const void *data, PacketHeader::length_type sz) {
@@ -307,7 +308,9 @@ bool downloadFile(std::filesystem::path localDest,
     auto pkt = Packet(Command::CMD_DOWNLOAD_FILE, data);
     return TgBotSocketNative::getInstance()->sendContext(
         pkt, [](const void *data, PacketHeader::length_type sz) {
-            return FileDataHelper::DataToFile<FileDataHelper::DOWNLOAD_FILE>(
+            RealFS fs;
+            SocketFile2DataHelper helper{&fs};
+            return helper.DataToFile<SocketFile2DataHelper::Pass::DOWNLOAD_FILE>(
                 data, sz);
         });
 }
