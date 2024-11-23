@@ -1,3 +1,5 @@
+#pragma once
+
 #include "TgBotCommandMap.hpp"
 
 #include <absl/log/check.h>
@@ -34,7 +36,7 @@ constexpr std::array<CommandEntry, static_cast<int>(Command::CMD_CLIENT_MAX)>
                      "Source File (In remote), Dest File (In local)"},
     };
 
-int toCount(Command cmd) {
+int TgBotSocket_API toCount(Command cmd) {
     const decltype(kCommandArray)::const_iterator iter = std::ranges::find_if(
         kCommandArray,
         [cmd](const CommandEntry& ent) { return ent.cmd == cmd; });
@@ -42,13 +44,15 @@ int toCount(Command cmd) {
     return (iter != kCommandArray.end()) ? iter->argCount : 0;
 }
 
-bool isClientCommand(Command cmd) { return cmd < Command::CMD_CLIENT_MAX; }
+bool TgBotSocket_API isClientCommand(Command cmd) {
+    return cmd < Command::CMD_CLIENT_MAX;
+}
 
-bool isInternalCommand(Command cmd) {
+bool TgBotSocket_API isInternalCommand(Command cmd) {
     return cmd >= Command::CMD_SERVER_INTERNAL_START;
 }
 
-std::string getHelpText() {
+std::string TgBotSocket_API getHelpText() {
     static std::string helptext;
     static std::once_flag once;
 

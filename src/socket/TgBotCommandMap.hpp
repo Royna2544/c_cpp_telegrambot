@@ -4,6 +4,7 @@
 
 #include <string>
 
+#include <TgBotSocketExports.h>
 #include "_TgBotSocketCommands.hpp"
 
 template <>
@@ -50,7 +51,7 @@ namespace TgBotSocket::CommandHelpers {
  * @param cmd Command to get arg count of
  * @return required arg count of Command
  */
-int toCount(Command cmd);
+int TgBotSocket_API toCount(Command cmd);
 
 /**
  * @brief Check if given command is a client command
@@ -58,7 +59,7 @@ int toCount(Command cmd);
  * @param cmd Command to check
  * @return true if given command is a client command, false otherwise
  */
-bool isClientCommand(Command cmd);
+bool TgBotSocket_API isClientCommand(Command cmd);
 
 /**
  * @brief Check if given command is an internal command
@@ -66,12 +67,12 @@ bool isClientCommand(Command cmd);
  * @param cmd Command to check
  * @return true if given command is an internal command, false otherwise
  */
-bool isInternalCommand(Command cmd);
+bool TgBotSocket_API isInternalCommand(Command cmd);
 
 /**
  * @brief Get help text for Command
  *
  * @return std::string help text for Command
  */
-std::string getHelpText(void);
+std::string TgBotSocket_API getHelpText(void);
 }  // namespace TgBotSocket::CommandHelpers
