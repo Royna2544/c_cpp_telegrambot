@@ -35,6 +35,7 @@
 #include "CommandLine.hpp"
 #include "GitData.h"
 #include "tgbot/Api.h"
+#include "tgbot/net/CurlHttpClient.h"
 
 bool TgBotApiImpl::validateValidArgs(const DynModule* module,
                                      MessageExt::Ptr& message) {
@@ -538,7 +539,7 @@ bool TgBotApiImpl::answerCallbackQuery_impl(
 
 TgBotApiImpl::TgBotApiImpl(const std::string_view token, AuthContext* auth,
                            StringResLoaderBase* loader, Providers* providers)
-    : _bot(std::string(token)),
+    : _bot(std::string(token), std::make_unique<TgBot::CurlHttpClient>()),
       _auth(auth),
       _loader(loader),
       _provider(providers) {
