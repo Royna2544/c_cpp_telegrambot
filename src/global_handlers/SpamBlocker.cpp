@@ -18,7 +18,36 @@ void SpamBlockBase::onDetected(ChatId chat, UserId user,
                              chat_map.at(chat), user_map.at(user));
 }
 
-void SpamBlockBase::setConfig(Config config) { _config = config; }
+template <>
+struct fmt::formatter<SpamBlockBase::Config> : formatter<std::string_view> {
+    // parse is inherited from formatter<string_view>.
+    auto format(SpamBlockBase::Config c,
+                format_context &ctx) const -> format_context::iterator {
+        std::string_view name = "unknown";
+        switch (c) {
+            case TgBotSocket::data::CtrlSpamBlock::OFF:
+                name = "OFF";
+                break;
+            case TgBotSocket::data::CtrlSpamBlock::LOGGING_ONLY:
+                name = "LOGGING_ONLY";
+                break;
+            case TgBotSocket::data::CtrlSpamBlock::PURGE:
+                name = "PURGE";
+                break;
+            case TgBotSocket::data::CtrlSpamBlock::PURGE_AND_MUTE:
+                name = "PURGE_AND_MUTE";
+                break;
+            default:
+                break;
+        }
+        return formatter<string_view>::format(name, ctx);
+    }
+};
+
+void SpamBlockBase::setConfig(Config config) {
+    LOG(INFO) << fmt::format("Config updated. {} => {}", _config, config);
+    _config = config;
+}
 
 void SpamBlockBase::consumeAndDetect() {
     const std::lock_guard<std::mutex> _(mutex);
@@ -69,7 +98,7 @@ void SpamBlockBase::addMessage(Message::Ptr message) {
     std::string messageData;
     if (message->text) {
         messageData = *message->text;
-    } else if (message->animation){
+    } else if (message->animation) {
         messageData = message->animation->fileUniqueId;
     } else if (message->sticker) {
         messageData = message->sticker->fileUniqueId;
