@@ -56,7 +56,7 @@ std::string getHelpText() {
         std::vector<std::string> help;
         help.reserve(kCommandArray.size());
         for (const auto& ent : kCommandArray) {
-            if (ent.argCount > 0) {
+            if (ent.argCount == 0) {
                 help.emplace_back(fmt::format("{}: value {}, No arguments",
                                               ent.cmd,
                                               static_cast<int>(ent.cmd)));
