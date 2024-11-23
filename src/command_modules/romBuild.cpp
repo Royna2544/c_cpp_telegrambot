@@ -24,11 +24,11 @@
 #include <tasks/UploadFileTask.hpp>
 #include <utility>
 
-#include "utils/CommandLine.hpp"
-#include "utils/ConfigManager.hpp"
 #include "ForkAndRun.hpp"
 #include "Shmem.hpp"
 #include "SystemInfo.hpp"
+#include "utils/CommandLine.hpp"
+#include "utils/ConfigManager.hpp"
 #include "utils/libfs.hpp"
 
 template <typename Impl>
@@ -515,7 +515,8 @@ class CwdRestorer {
 ROMBuildQueryHandler::ROMBuildQueryHandler(TgBotApi::Ptr api,
                                            Message::Ptr userMessage,
                                            CommandLine* line)
-    : _api(api), _commandLine(line),
+    : _api(api),
+      _commandLine(line),
       parser(line->getPath(FS::PathType::RESOURCES) / "android_builder") {
     settingsKeyboard =
         createKeyboardWith<Buttons::repo_sync, Buttons::upload,
@@ -725,10 +726,12 @@ void ROMBuildQueryHandler::handle_type(const Query& query) {
 void ROMBuildQueryHandler::onCallbackQuery(
     const TgBot::CallbackQuery::Ptr& query) const {
     if (sentMessage == nullptr) {
+        DLOG(INFO) << "No message to handle callback query";
         return;
     }
     if (query->message->chat->id != sentMessage->chat->id ||
         query->message->messageId != sentMessage->messageId) {
+        DLOG(INFO) << "Mismatch on message id";
         return;
     }
     if (query->from->id != _userMessage->from->id) {
