@@ -58,6 +58,12 @@ bool SpamBlockManager::shouldBeSkipped(const Message::Ptr &message) const {
     if (message->chat->type == TgBot::Chat::Type::Private) {
         return true;
     }
+
+    // Allow photos to be sent
+    if (!message->photo.empty()) {
+        return true;
+    }
+    
     return false;
 }
 
