@@ -15,7 +15,7 @@
 #include "JNIOnLoad.h"
 #include "JavaCppConverter.hpp"
 // Include the tgbot's exported header
-#include "../../../../../../src/socket/interface/impl/bot/TgBotSocketFileHelperNew.hpp"
+#include "../../../../../../src/socket/interface/bot/TgBotSocketFileHelperNew.hpp"
 
 using namespace TgBotSocket;
 using namespace TgBotSocket::data;
