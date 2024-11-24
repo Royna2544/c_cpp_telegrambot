@@ -24,6 +24,7 @@ TgBotApiImpl::Async::~Async() {
             thread.join();
         }
     }
+    threads.clear();
 }
 
 void TgBotApiImpl::Async::threadFunction() {
