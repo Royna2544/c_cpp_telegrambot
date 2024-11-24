@@ -262,7 +262,7 @@ class TgBotSocketNative {
             }
         }
 
-        ret = send(sockfd, &context.header, sizeof(PacketHeader), kSendFlags);
+        ret = send(sockfd, &context.header, sizeof(Packet::Header), kSendFlags);
         if (ret < 0) {
             callbacks->plog_failure("Failed to send packet header");
             return;
@@ -292,7 +292,7 @@ class TgBotSocketNative {
     } while (_rc == -1 && (errno == EINTR || errno == EAGAIN)); \
     _rc; })
 
-        PacketHeader header;
+        Packet::Header header;
         ret = RETRY(recv(sockfd, &header, sizeof(header), kRecvFlags));
         if (ret < 0) {
             callbacks->plog_failure("Failed to read callback header");
@@ -300,8 +300,8 @@ class TgBotSocketNative {
         }
         callbacks->status(Callbacks::Status::HEADER_PACKET_RECEIVED);
 
-        if (header.magic != PacketHeader ::MAGIC_VALUE) {
-            LOG(WARNING) << "Magic value offset: " << header.magic - PacketHeader::MAGIC_VALUE_BASE;
+        if (header.magic != Packet::Header ::MAGIC_VALUE) {
+            LOG(WARNING) << "Magic value offset: " << header.magic - Packet::Header::MAGIC_VALUE_BASE;
             callbacks->failure("Bad magic value of callback header");
             return;
         }
@@ -365,10 +365,10 @@ class TgBotSocketNative {
 
     template <Command cmd>
     void handleSpecificData(std::unique_ptr<Callbacks> callbacks, const void *data,
-                            PacketHeader::length_type len) const = delete;
+                            Packet::Header::length_type len) const = delete;
     template <>
     void handleSpecificData<Command::CMD_DOWNLOAD_FILE_CALLBACK>(
-            std::unique_ptr<Callbacks> callbacks, const void *data, PacketHeader::length_type len) const {
+            std::unique_ptr<Callbacks> callbacks, const void *data, Packet::Header::length_type len) const {
         bool rc =
             helper.DataToFile<SocketFile2DataHelper::Pass::DOWNLOAD_FILE>(
                 data, len);
@@ -381,7 +381,7 @@ class TgBotSocketNative {
     template <>
     void handleSpecificData<Command::CMD_GET_UPTIME_CALLBACK>(
         std::unique_ptr<Callbacks> callbacks, const void *data,
-        PacketHeader::length_type len) const {
+        Packet::Header::length_type len) const {
         const auto *uptime = static_cast<const char *>(data);
         CHECK_RESULTDATA_SIZE(GetUptimeCallback, len);
         callbacks->success(uptime);
@@ -390,7 +390,7 @@ class TgBotSocketNative {
     template <>
     void handleSpecificData<Command::CMD_UPLOAD_FILE_DRY_CALLBACK>(
             std::unique_ptr<Callbacks>  callbacks, const void *data,
-        PacketHeader::length_type len) const {
+        Packet::Header::length_type len) const {
         CHECK_RESULTDATA_SIZE(UploadFileDryCallback, len);
         const auto *callback = static_cast<const UploadFileDryCallback *>(data);
         if (callback->result == AckType::SUCCESS) {

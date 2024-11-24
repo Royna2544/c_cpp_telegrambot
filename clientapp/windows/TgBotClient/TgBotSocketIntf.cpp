@@ -33,7 +33,7 @@ static std::string WSALastErrStr() {
 class TgBotSocketNative {
    public:
     using callback_data_handler_f =
-        std::function<bool(const void *, PacketHeader::length_type)>;
+        std::function<bool(const void *, Packet::Header::length_type)>;
 
     bool sendContext(Packet &pkt, callback_data_handler_f fn) const {
         bool ret = false;
@@ -113,7 +113,7 @@ class TgBotSocketNative {
         }
         LOG(INFO) << "Connected to server";
         ret = send(sockfd, reinterpret_cast<const char *>(&context.header),
-                   sizeof(PacketHeader), 0);
+                   sizeof(Packet::Header), 0);
         if (ret < 0) {
             LogWSAErr("send packet header");
             return false;
@@ -133,14 +133,14 @@ class TgBotSocketNative {
         LOG(INFO) << "Done sending data";
         LOG(INFO) << "Now reading callback";
 
-        PacketHeader header;
+        Packet::Header header;
         ret = recv(sockfd, reinterpret_cast<char *>(&header), sizeof(header),
                    kRecvFlags);
         if (ret < 0) {
             LogWSAErr("read callback header");
             return false;
         }
-        if (header.magic != PacketHeader::MAGIC_VALUE) {
+        if (header.magic != Packet::Header::MAGIC_VALUE) {
             LOG(ERROR) << "Failed to validate magic value of callback header";
             return false;
         }
@@ -216,7 +216,7 @@ std::string getUptime() {
     std::string result;
     bool dummy = true;
     trySendContext<Command::CMD_GET_UPTIME>(
-        dummy, [&result](const void *data, PacketHeader::length_type sz) {
+        dummy, [&result](const void *data, Packet::Header::length_type sz) {
             const auto *uptime = static_cast<const char *>(data);
             result = std::string(uptime, sz);
             return true;
@@ -230,7 +230,7 @@ bool sendMessageToChat(ChatId id, std::string message,
     copyTo(data.message, message.c_str());
     data.chat = id;
     return trySendContext<Command::CMD_WRITE_MSG_TO_CHAT_ID>(
-        data, [callback](const void *data, PacketHeader::length_type sz) {
+        data, [callback](const void *data, Packet::Header::length_type sz) {
             const auto *result = static_cast<const GenericAck *>(data);
             callback(result);
             return true;
@@ -261,7 +261,7 @@ bool sendFileToChat(ChatId id, std::filesystem::path filepath, FileType type,
 
     ret = TgBotSocketNative::getInstance()->sendContext(
         fData.value(),
-        [&resultAck](const void *data, PacketHeader::length_type sz) {
+        [&resultAck](const void *data, Packet::Header::length_type sz) {
             resultAck = *static_cast<const GenericAck *>(data);
             return true;
         });
@@ -276,7 +276,7 @@ bool sendFileToChat(ChatId id, std::filesystem::path filepath, FileType type,
             param);
     ret = TgBotSocketNative::getInstance()->sendContext(
         fData.value(),
-        [&resultAck](const void *data, PacketHeader::length_type sz) {
+        [&resultAck](const void *data, Packet::Header::length_type sz) {
             resultAck = *static_cast<const GenericAck *>(data);
             return true;
         });
@@ -289,7 +289,7 @@ bool sendFileToChat(ChatId id, std::filesystem::path filepath, FileType type,
     data.chat = id;
     data.fileType = type;
     ret = trySendContext<Command::CMD_SEND_FILE_TO_CHAT_ID>(
-        data, [callback](const void *data, PacketHeader::length_type sz) {
+        data, [callback](const void *data, Packet::Header::length_type sz) {
             const auto *result = static_cast<const GenericAck *>(data);
             callback(result);
             return true;
@@ -307,7 +307,7 @@ bool downloadFile(std::filesystem::path localDest,
     copyTo(data.destfilename, localDest.string().c_str());
     auto pkt = Packet(Command::CMD_DOWNLOAD_FILE, data);
     return TgBotSocketNative::getInstance()->sendContext(
-        pkt, [](const void *data, PacketHeader::length_type sz) {
+        pkt, [](const void *data, Packet::Header::length_type sz) {
             RealFS fs;
             SocketFile2DataHelper helper{&fs};
             return helper.DataToFile<SocketFile2DataHelper::Pass::DOWNLOAD_FILE>(
