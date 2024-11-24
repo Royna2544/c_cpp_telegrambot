@@ -147,7 +147,6 @@ void handle_CommandPacket(SocketClientWrapper wrapper, const Packet& pkt) {
                        << static_cast<int>(pkt.header.cmd);
             break;
     }
-    wrapper->close();
 }
 
 int main(int argc, char** argv) {
