@@ -38,6 +38,17 @@ struct ROMBuildTask : ForkAndRun {
     void handleStdoutData(ForkAndRun::BufferViewType buffer) override;
 
     /**
+     * @brief Handles new standard output data.
+     *
+     * This function is called when new standard output data is available. It
+     * overrides the base class's onNewStdoutBuffer() method to provide custom
+     * behavior.
+     *
+     * @param buffer The buffer containing the new standard output data.
+     */
+    void handleStderrData(ForkAndRun::BufferViewType buffer) override;
+
+    /**
      * @brief Handles the process exit event.
      *
      * This function is called when the process exits. It overrides the base
@@ -67,4 +78,5 @@ struct ROMBuildTask : ForkAndRun {
     std::chrono::system_clock::time_point clock;
     std::chrono::system_clock::time_point startTime;
     TgBot::InputTextMessageContent::Ptr textContent;
+    bool once = false;
 };

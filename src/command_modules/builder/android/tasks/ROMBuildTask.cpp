@@ -175,10 +175,9 @@ void ROMBuildTask::handleStdoutData(ForkAndRun::BufferViewType buffer) {
     const auto now = std::chrono::system_clock::now();
     const auto& rom = getValue(data.localManifest->rom);
     double memUsage = NAN;
-    static bool once = false;
     const auto cwd = std::filesystem::current_path();
 
-    if (!once) {
+    if (!once) [[unlikely]] {
         std::fstream ofs(kPreLogFile.data(), std::ios::app | std::ios::out);
         if (ofs) {
             ofs << buffer.data();
@@ -228,6 +227,17 @@ void ROMBuildTask::handleStdoutData(ForkAndRun::BufferViewType buffer) {
             LOG(ERROR) << buildInfoBuffer;
         }
         textContent->messageText = std::move(buildInfoBuffer);
+    }
+}
+
+void ROMBuildTask::handleStderrData(ForkAndRun::BufferViewType buffer) {
+    if (!once) [[unlikely]] {
+        std::fstream ofs(kPreLogFile.data(), std::ios::app | std::ios::out);
+        if (ofs) {
+            ofs << buffer.data();
+        }
+    } else {
+        std::cerr << buffer;
     }
 }
 

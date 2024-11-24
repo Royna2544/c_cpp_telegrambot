@@ -420,8 +420,7 @@ class Build : public TaskWrapperBase<ROMBuildTask> {
 
     void onExecuteFinished(PerBuildData::ResultData result) override {
         std::error_code ec;
-        namespace fs = std::filesystem;
-
+        
         switch (result.value) {
             case PerBuildData::Result::ERROR_FATAL: {
                 LOG(ERROR) << "Failed to build ROM";
@@ -593,6 +592,7 @@ void ROMBuildQueryHandler::handle_cancel(const Query& query) {
     if (current != nullptr) {
         current->cancel();
         current = nullptr;
+        LOG(INFO) << "User cancelled build";
         handle_back(query);
         _api->answerCallbackQuery(query->id, "Task successfully cancelled!");
     }
