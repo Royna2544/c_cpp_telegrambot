@@ -88,6 +88,7 @@ endfunction()
 
 add_subdirectory(support)
 add_subdirectory(compiler)
+add_subdirectory(builder)
 
 multi_command_module(
     PROVIDES alive start
@@ -164,13 +165,9 @@ command_module(
     LIBS TgBotRandom
 )
 
-add_subdirectory(android_builder)
 command_module(
     NAME rombuild
     SRCS romBuild.cpp
-        android_builder/tasks/ROMBuildTask.cpp
-        android_builder/tasks/UploadFileTask.cpp
-        android_builder/tasks/RepoSyncTask.cpp
     LIBS AndroidBuilder-cpp TgBotsighandler
     PLATFORM "Linux"
 )

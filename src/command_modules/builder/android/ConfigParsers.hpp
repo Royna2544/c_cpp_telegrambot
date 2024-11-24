@@ -10,7 +10,7 @@
 #include <utility>
 #include <variant>
 
-#include "RepoUtils.hpp"
+#include "../RepoUtils.hpp"
 
 class ConfigParser {
    public:
