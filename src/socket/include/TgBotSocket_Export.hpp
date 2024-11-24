@@ -32,7 +32,8 @@ inline bool arraycmp(const std::array<T, size>& lhs,
 
 template <size_t size>
 inline void copyTo(std::array<char, size>& arr_in, const char* buf) {
-    strncpy(arr_in.data(), buf, size);
+    strncpy(arr_in.data(), buf, size - 1);
+    arr_in[size - 1] = '\0';
 }
 
 template <size_t size, size_t size2>
