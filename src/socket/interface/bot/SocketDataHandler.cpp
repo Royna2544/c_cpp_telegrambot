@@ -130,6 +130,7 @@ GenericAck SocketInterfaceTgBot::handle_SendFileToChatId(const void* ptr) {
             fn = [this](ChatId id, const TgBotApi::FileOrMedia& file) {
                 return api->sendAnimation(id, file);
             };
+            break;
         case FileType::TYPE_DOCUMENT:
             fn = [this](ChatId id, const TgBotApi::FileOrMedia& file) {
                 return api->sendDocument(id, file);
