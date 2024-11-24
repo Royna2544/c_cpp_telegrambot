@@ -643,7 +643,7 @@ class TgBotApi {
                                 createReplyParameters(replyToMessage));
     }
 
-    [[nodiscard]] inline bool answerCallbackQuery(
+    inline bool answerCallbackQuery(
         const std::string_view callbackQueryId,
         const std::string_view text = {}, bool showAlert = false) const {
         return answerCallbackQuery_impl(callbackQueryId, text, showAlert);
@@ -721,7 +721,7 @@ class TgBotApi {
         return getStickerSet_impl(setName);
     }
 
-    [[nodiscard]] inline bool createNewStickerSet(
+    inline bool createNewStickerSet(
         std::int64_t userId, const std::string_view name,
         const std::string_view title,
         const std::vector<InputSticker::Ptr>& stickers,
