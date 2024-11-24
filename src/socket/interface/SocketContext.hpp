@@ -157,6 +157,7 @@ class TgBotSocket_API Context::TCP : public Context {
     boost::asio::ip::tcp::endpoint endpoint_;
     bool is_listening_ = false;
     std::chrono::seconds timeout_duration_{};
+    constexpr static std::size_t chunk_size = 1024;
 
    public:
     /**

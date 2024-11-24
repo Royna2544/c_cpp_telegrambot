@@ -4,6 +4,7 @@
 #include <string_view>
 
 #include "SocketContext.hpp"
+#include "TgBotSocket_Export.hpp"
 
 template <>
 struct fmt::formatter<boost::asio::ip::tcp> : formatter<string_view> {
@@ -34,9 +35,35 @@ Context::TCP::TCP(const boost::asio::ip::tcp type, const int port)
 
 bool Context::TCP::write(const SharedMalloc& data) const {
     try {
-        boost::asio::write(socket_,
-                           boost::asio::buffer(data.get(), data.size()));
+        std::size_t total_size = data.size();
+        std::size_t bytes_written = 0;
+        const char* data_ptr = (char*)data.get();
+
+        DLOG(INFO) << "TCP::write:" << data.size() << " bytes requested";
+        while (bytes_written < total_size) {
+            // Calculate the size of the next chunk
+            std::size_t write_size = std::min<Packet::Header::length_type>(
+                chunk_size, total_size - bytes_written);
+
+            // Write the current chunk
+            std::size_t written = boost::asio::write(
+                socket_,
+                boost::asio::buffer(data_ptr + bytes_written, write_size));
+
+            bytes_written += written;
+
+            // Log or update progress
+            LOG_EVERY_N_SEC(INFO, 5) << "TCP::write: Sent " << bytes_written
+                                     << " / " << total_size << " bytes.";
+
+            // delay 10ms
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+
+        DLOG(INFO) << "TCP::write: Finished sending " << total_size
+                   << " bytes.";
         return true;
+
     } catch (const boost::system::system_error& e) {
         LOG(ERROR) << "TCP::write: " << e.what();
         return false;
@@ -47,10 +74,38 @@ std::optional<SharedMalloc> Context::TCP::read(
     Packet::Header::length_type length) const {
     try {
         SharedMalloc buffer(length);
-        size_t bytes_read = boost::asio::read(
-            socket_, boost::asio::buffer(buffer.get(), length));
+        char* buffer_ptr = (char*)buffer.get();
+        size_t bytes_read = 0;
+
+        DLOG(INFO) << "TCP::read:" << length << " bytes requested";
+        while (bytes_read < length) {
+            // Calculate the size of the next chunk to read
+            std::size_t read_size = std::min<Packet::Header::length_type>(
+                chunk_size, length - bytes_read);
+
+            // Read the current chunk
+            size_t chunk_bytes = boost::asio::read(
+                socket_,
+                boost::asio::buffer(buffer_ptr + bytes_read, read_size));
+
+            bytes_read += chunk_bytes;
+
+            // Log or update progress
+            LOG_EVERY_N_SEC(INFO, 5) << "TCP::read: Received " << bytes_read
+                                     << " / " << length << " bytes.";
+
+            if (io_context.stopped()) {
+                break;
+            }
+        }
+
+        // Adjust the buffer size to the actual number of bytes read (if needed)
         buffer.resize(bytes_read);
+
+        DLOG(INFO) << "TCP::read: Finished receiving " << bytes_read
+                   << " bytes.";
         return buffer;
+
     } catch (const boost::system::system_error& e) {
         LOG(ERROR) << "TCP::read: " << e.what();
         return std::nullopt;
