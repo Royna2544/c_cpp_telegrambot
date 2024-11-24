@@ -343,7 +343,7 @@ class TaskWrapperBase {
         if (sentMessage && queryHandler->pinned()) {
             api->unpinMessage(sentMessage);
         }
-        sentMessage = onPreExecute();
+        queryHandler->updateSentMessage(sentMessage = onPreExecute());
         if (queryHandler->pinned()) {
             api->pinMessage(sentMessage);
         }
@@ -408,10 +408,14 @@ class Build : public TaskWrapperBase<ROMBuildTask> {
         switch (result.value) {
             case PerBuildData::Result::ERROR_FATAL: {
                 LOG(ERROR) << "Failed to build ROM";
-                const auto msg = api->editMessage(
-                    sentMessage,
-                    fmt::format("Build failed:\n{}", result.getMessage()),
-                    backKeyboard);
+                std::string message = result.getMessage();
+                if (message.empty()) {
+                    message = "Failed to build ROM";
+                } else {
+                    message = fmt::format("Build failed:\n{}", message);
+                }
+                const auto msg =
+                    api->editMessage(sentMessage, message, backKeyboard);
                 queryHandler->updateSentMessage(msg);
                 if (fs::file_size(ROMBuildTask::kErrorLogFile, ec) != 0U) {
                     if (ec) {
@@ -583,9 +587,8 @@ void ROMBuildQueryHandler::handle_cancel(const Query& query) {
         current->cancel();
         current = nullptr;
         handle_back(query);
+        _api->answerCallbackQuery(query->id, "Task successfully cancelled!");
     }
-    _api->deleteMessage(sentMessage);
-    sentMessage.reset();
 }
 
 void ROMBuildQueryHandler::handle_send_system_info(const Query& query) {
