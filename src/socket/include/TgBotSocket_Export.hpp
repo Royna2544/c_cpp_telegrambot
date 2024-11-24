@@ -12,8 +12,9 @@
 #include <type_traits>
 
 #ifdef __TGBOT__
-#include <SharedMalloc.hpp>
 #include <Types.h>
+
+#include <SharedMalloc.hpp>
 #else
 #include "../../include/SharedMalloc.hpp"
 #include "../../include/Types.h"
@@ -58,41 +59,6 @@ constexpr int MAX_MSG_SIZE = 256;
 constexpr int ALIGNMENT = 8;
 
 /**
- * @brief Header for TgBotCommand Packets
- *
- * Header contains the magic value, command, and the size of the data
- */
-
-struct alignas(ALIGNMENT) PacketHeader {
-    using length_type = uint64_t;
-    constexpr static int64_t MAGIC_VALUE_BASE = 0xDEADFACE;
-    // Version number, to be increased on breaking changes
-    // 1: Initial version
-    // 2: Added crc32 checks to packet data
-    // 3: Uploadfile has a sha256sum check, std::array conversions
-    // 4: Move CMD_UPLOAD_FILE_DRY to internal namespace
-    // 5: Use the packed attribute for structs
-    // 6: Make CMD_UPLOAD_FILE_DRY_CALLBACK return sperate callback, and add
-    // srcpath to UploadFile
-    // 7: Remove packed attribute, align all as 8 bytes
-    // 8: change checksum to uint64_t
-    constexpr static int DATA_VERSION = 8;
-    constexpr static int64_t MAGIC_VALUE = MAGIC_VALUE_BASE + DATA_VERSION;
-
-    int64_t magic = MAGIC_VALUE;  ///< Magic value to verify the packet
-    Command cmd{};                ///< Command to be executed
-    ///< Padding to align `data_size` to 8 bytes
-    uint32_t padding1{};
-    ///< Size of the data in the packet
-    length_type data_size{};
-    ///< Checksum of the packet data
-    uint64_t checksum{};
-    ///< Padding to ensure struct size is a multiple of 8 bytes
-    uint32_t padding2{};
-};
-static_assert(offsetof(TgBotSocket::PacketHeader, magic) == 0);
-
-/**
  * @brief Packet for sending commands to the server
  *
  * @code data_ptr is only vaild for this scope: This should not be sent, instead
@@ -103,13 +69,42 @@ static_assert(offsetof(TgBotSocket::PacketHeader, magic) == 0);
  * size of the data. The data is then followed by the actual data.
  */
 struct alignas(ALIGNMENT) Packet {
-    static constexpr auto hdr_sz = sizeof(PacketHeader);
-    using header_type = PacketHeader;
-    header_type header{};
+    /**
+     * @brief Header for TgBotCommand Packets
+     *
+     * Header contains the magic value, command, and the size of the data
+     */
+    struct alignas(ALIGNMENT) Header {
+        using length_type = uint64_t;
+        constexpr static int64_t MAGIC_VALUE_BASE = 0xDEADFACE;
+        // Version number, to be increased on breaking changes
+        // 1: Initial version
+        // 2: Added crc32 checks to packet data
+        // 3: Uploadfile has a sha256sum check, std::array conversions
+        // 4: Move CMD_UPLOAD_FILE_DRY to internal namespace
+        // 5: Use the packed attribute for structs
+        // 6: Make CMD_UPLOAD_FILE_DRY_CALLBACK return sperate callback, and add
+        // srcpath to UploadFile
+        // 7: Remove packed attribute, align all as 8 bytes
+        // 8: change checksum to uint64_t
+        // 9: Remove padding objects
+        constexpr static int DATA_VERSION = 9;
+        constexpr static int64_t MAGIC_VALUE = MAGIC_VALUE_BASE + DATA_VERSION;
+
+        int64_t magic = MAGIC_VALUE;  ///< Magic value to verify the packet
+        Command cmd{};                ///< Command to be executed
+        ///< Size of the data in the packet
+        length_type data_size{};
+        ///< Checksum of the packet data
+        uint64_t checksum{};
+    };
+    static_assert(offsetof(Header, magic) == 0);
+
+    Header header{};
     SharedMalloc data;
 
-    explicit Packet(header_type::length_type length) : data(length) {
-        header.magic = header_type::MAGIC_VALUE;
+    explicit Packet(Header::length_type length) : data(length) {
+        header.magic = Header::MAGIC_VALUE;
         header.data_size = length;
     }
 
@@ -122,12 +117,12 @@ struct alignas(ALIGNMENT) Packet {
 
     // Constructor that takes pointer, uses malloc but with size
     template <typename T>
-    explicit Packet(Command cmd, T in_data, header_type::length_type size)
+    explicit Packet(Command cmd, T in_data, Header::length_type size)
         : data(size) {
         static_assert(std::is_pointer_v<T>,
                       "This constructor should not be used with non pointer");
         header.cmd = cmd;
-        header.magic = header_type::MAGIC_VALUE;
+        header.magic = Header::MAGIC_VALUE;
         header.data_size = size;
         data.assignFrom(in_data, header.data_size);
         header.checksum = crc32_function(data.get(), header.data_size);
@@ -162,10 +157,10 @@ enum class FileType {
 
 // Cannot use DELETE, as it conflicts with winnt.h
 enum class CtrlSpamBlock {
-    OFF,                   // Disabled
-    LOGGING_ONLY,          // Logging only, not taking action
-    PURGE,                 // Enabled, does delete but doesn't mute
-    PURGE_AND_MUTE,        // Enabled, deletes and mutes
+    OFF,             // Disabled
+    LOGGING_ONLY,    // Logging only, not taking action
+    PURGE,           // Enabled, does delete but doesn't mute
+    PURGE_AND_MUTE,  // Enabled, deletes and mutes
     MAX,
 };
 
@@ -284,7 +279,7 @@ ASSERT_SIZE(ObserveAllChats, 8);
 ASSERT_SIZE(DeleteControllerById, 8);
 ASSERT_SIZE(UploadFile, 552);
 ASSERT_SIZE(DownloadFile, 512);
-ASSERT_SIZE(PacketHeader, 40);
+ASSERT_SIZE(Packet::Header, 32);
 }  // namespace TgBotSocket::data
 
 namespace TgBotSocket::callback {

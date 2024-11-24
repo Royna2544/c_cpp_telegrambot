@@ -144,7 +144,7 @@ class TgBotSocket_API SocketFile2DataHelper {
 
     template <Pass P>
     bool DataToFile(const void* ptr,
-                    TgBotSocket::PacketHeader::length_type len) {
+                    TgBotSocket::Packet::Header::length_type len) {
         if constexpr (P == Pass::UPLOAD_FILE) {
             return DataToFile_UPLOAD_FILE(ptr, len);
         } else if constexpr (P == Pass::DOWNLOAD_FILE) {
@@ -170,11 +170,11 @@ class TgBotSocket_API SocketFile2DataHelper {
 
    private:
     bool DataToFile_UPLOAD_FILE_DRY(const void* ptr,
-                                    TgBotSocket::PacketHeader::length_type len);
+                                    TgBotSocket::Packet::Header::length_type len);
     bool DataToFile_UPLOAD_FILE(const void* ptr,
-                                TgBotSocket::PacketHeader::length_type len);
+                                TgBotSocket::Packet::Header::length_type len);
     bool DataToFile_DOWNLOAD_FILE(const void* ptr,
-                                  TgBotSocket::PacketHeader::length_type len);
+                                  TgBotSocket::Packet::Header::length_type len);
 
     std::optional<TgBotSocket::Packet> DataFromFile_UPLOAD_FILE(
         const DataFromFileParam& params);

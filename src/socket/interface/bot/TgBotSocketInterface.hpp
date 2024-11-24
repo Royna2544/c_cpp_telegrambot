@@ -44,9 +44,9 @@ struct SocketInterfaceTgBot : ThreadRunner {
     GenericAck handle_ObserveAllChats(const void* ptr);
     static GenericAck handle_DeleteControllerById(const void* ptr);
     GenericAck handle_UploadFile(const void* ptr,
-                                 TgBotSocket::PacketHeader::length_type len);
+                                 TgBotSocket::Packet::Header::length_type len);
     UploadFileDryCallback handle_UploadFileDry(
-        const void* ptr, TgBotSocket::PacketHeader::length_type len);
+        const void* ptr, TgBotSocket::Packet::Header::length_type len);
 
     // These have their own ack handlers
     bool handle_GetUptime(const TgBotSocket::Context& ctx, const void* ptr);

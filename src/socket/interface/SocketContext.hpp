@@ -61,12 +61,12 @@ class TgBotSocket_API Context {
      * Attempts to read a specified number of bytes from the socket.
      *
      * @param length The number of bytes to read, specified by
-     * `PacketHeader::length_type`.
+     * `Packet::Header::length_type`.
      * @return An `std::optional<SharedMalloc>` containing the read data if
      * successful; `std::nullopt` if the read operation failed.
      */
     virtual std::optional<SharedMalloc> read(
-        PacketHeader::length_type length) const = 0;
+        Packet::Header::length_type length) const = 0;
 
     /**
      * @brief Closes the socket connection.
@@ -187,12 +187,12 @@ class TgBotSocket_API Context::TCP : public Context {
      * Attempts to read a specified number of bytes from the socket.
      *
      * @param length The number of bytes to read, specified by
-     * `PacketHeader::length_type`.
+     * `Packet::Header::length_type`.
      * @return An `std::optional<SharedMalloc>` containing the read data if
      * successful; `std::nullopt` if the read operation failed.
      */
     [[nodiscard]] std::optional<SharedMalloc> read(
-        PacketHeader::length_type length) const override;
+        Packet::Header::length_type length) const override;
 
     /**
      * @brief Closes the socket connection.
@@ -298,12 +298,12 @@ class TgBotSocket_API Context::UDP : public Context {
      * Attempts to read a specified number of bytes from the socket.
      *
      * @param length The number of bytes to read, specified by
-     * `PacketHeader::length_type`.
+     * `Packet::Header::length_type`.
      * @return An `std::optional<SharedMalloc>` containing the read data if
      * successful; `std::nullopt` if the read operation failed.
      */
     [[nodiscard]] std::optional<SharedMalloc> read(
-        PacketHeader::length_type length) const override;
+        Packet::Header::length_type length) const override;
 
     /**
      * @brief Closes the socket connection.
@@ -414,12 +414,12 @@ class TgBotSocket_API Context::Local : public Context {
      * Attempts to read a specified number of bytes from the socket.
      *
      * @param length The number of bytes to read, specified by
-     * `PacketHeader::length_type`.
+     * `Packet::Header::length_type`.
      * @return An `std::optional<SharedMalloc>` containing the read data if
      * successful; `std::nullopt` if the read operation failed.
      */
     [[nodiscard]] std::optional<SharedMalloc> read(
-        PacketHeader::length_type length) const override;
+        Packet::Header::length_type length) const override;
 
     /**
      * @brief Closes the socket connection.

@@ -39,7 +39,7 @@ bool Context::UDP::write(const SharedMalloc& data) const {
 }
 
 std::optional<SharedMalloc> Context::UDP::read(
-    PacketHeader::length_type length) const {
+    Packet::Header::length_type length) const {
     try {
         SharedMalloc buffer(length);
         boost::asio::ip::udp::endpoint sender_endpoint;

@@ -10,7 +10,7 @@ class MockContext : public TgBotSocket::Context {
     APPLE_INJECT(MockContext()) = default;
     MOCK_METHOD(bool, write, (const SharedMalloc& data), (const, override));
     MOCK_METHOD(std::optional<SharedMalloc>, read,
-                (TgBotSocket::PacketHeader::length_type length),
+                (TgBotSocket::Packet::Header::length_type length),
                 (const, override));
     MOCK_METHOD(bool, close, (), (const, override));
     MOCK_METHOD(bool, timeout, (std::chrono::seconds time), (override));

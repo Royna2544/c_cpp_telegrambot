@@ -187,7 +187,7 @@ GenericAck SocketInterfaceTgBot::handle_DeleteControllerById(const void* ptr) {
 }
 
 GenericAck SocketInterfaceTgBot::handle_UploadFile(
-    const void* ptr, TgBotSocket::PacketHeader::length_type len) {
+    const void* ptr, TgBotSocket::Packet::Header::length_type len) {
     if (!helper->DataToFile<SocketFile2DataHelper::Pass::UPLOAD_FILE>(ptr,
                                                                       len)) {
         return GenericAck(AckType::ERROR_RUNTIME_ERROR, "Failed to write file");
@@ -196,7 +196,7 @@ GenericAck SocketInterfaceTgBot::handle_UploadFile(
 }
 
 UploadFileDryCallback SocketInterfaceTgBot::handle_UploadFileDry(
-    const void* ptr, TgBotSocket::PacketHeader::length_type len) {
+    const void* ptr, TgBotSocket::Packet::Header::length_type len) {
     bool ret = false;
     const auto* f = static_cast<const UploadFileDry*>(ptr);
     UploadFileDryCallback callback;

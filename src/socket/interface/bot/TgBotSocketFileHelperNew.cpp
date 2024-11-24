@@ -68,7 +68,7 @@ using TgBotSocket::data::UploadFile;
 using TgBotSocket::data::UploadFileDry;
 
 bool SocketFile2DataHelper::DataToFile_UPLOAD_FILE_DRY(
-    const void* ptr, TgBotSocket::PacketHeader::length_type len) {
+    const void* ptr, TgBotSocket::Packet::Header::length_type len) {
     const auto* data = static_cast<const UploadFileDry*>(ptr);
     const char* filename = data->destfilepath.data();
     bool exists = false;
@@ -106,14 +106,14 @@ bool SocketFile2DataHelper::DataToFile_UPLOAD_FILE_DRY(
     return true;
 }
 bool SocketFile2DataHelper::DataToFile_UPLOAD_FILE(
-    const void* ptr, TgBotSocket::PacketHeader::length_type len) {
+    const void* ptr, TgBotSocket::Packet::Header::length_type len) {
     const auto* data = static_cast<const UploadFile*>(ptr);
 
     return vfs->writeFile(data->destfilepath.data(), &data->buf[0],
                           len - sizeof(UploadFile));
 }
 bool SocketFile2DataHelper::DataToFile_DOWNLOAD_FILE(
-    const void* ptr, TgBotSocket::PacketHeader::length_type len) {
+    const void* ptr, TgBotSocket::Packet::Header::length_type len) {
     const auto* data = static_cast<const DownloadFile*>(ptr);
 
     return vfs->writeFile(data->destfilename.data(), &data->buf[0],

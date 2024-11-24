@@ -34,7 +34,7 @@ bool Context::Local::write(const SharedMalloc& data) const {
 }
 
 std::optional<SharedMalloc> Context::Local::read(
-    PacketHeader::length_type length) const {
+    Packet::Header::length_type length) const {
     try {
         SharedMalloc buffer(length);
         size_t bytes_read = boost::asio::read(

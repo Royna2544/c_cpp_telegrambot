@@ -71,7 +71,7 @@ class SocketDataHandlerTest : public ::testing::Test {
     template <typename DataT, TgBotSocket::Command retCmd>
     void sendAndVerifyHeader(TgBotSocket::Packet pkt, DataT* out) {
         SharedMalloc packetData;
-        TgBotSocket::PacketHeader recv_header;
+        TgBotSocket::Packet::Header recv_header;
 
         EXPECT_CALL(*_mockImpl, write(_))
             .WillOnce(DoAll(SaveArg<0>(&packetData), Return(true)));
@@ -85,7 +85,7 @@ class SocketDataHandlerTest : public ::testing::Test {
         ASSERT_EQ(recv_header.data_size, sizeof(DataT));
         // Checking packet data
         EXPECT_NO_FATAL_FAILURE(packetData.assignTo(
-            out, sizeof(DataT), sizeof(TgBotSocket::PacketHeader)));
+            out, sizeof(DataT), sizeof(TgBotSocket::Packet::Header)));
     }
 
     static void isGenericAck_OK(const TgBotSocket::callback::GenericAck& ack) {

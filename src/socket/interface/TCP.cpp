@@ -44,7 +44,7 @@ bool Context::TCP::write(const SharedMalloc& data) const {
 }
 
 std::optional<SharedMalloc> Context::TCP::read(
-    PacketHeader::length_type length) const {
+    Packet::Header::length_type length) const {
     try {
         SharedMalloc buffer(length);
         size_t bytes_read = boost::asio::read(

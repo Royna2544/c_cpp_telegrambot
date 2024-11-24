@@ -10,7 +10,7 @@
 namespace TgBotSocket {
 
 std::optional<Packet> readPacket(const TgBotSocket::Context& context) {
-    TgBotSocket::PacketHeader header;
+    TgBotSocket::Packet::Header header;
     decltype(header.magic) magic{};
 
     // Read header and check magic value, despite the header size, the magic was
@@ -22,17 +22,17 @@ std::optional<Packet> readPacket(const TgBotSocket::Context& context) {
     }
     magicData->assignTo(magic);
 
-    auto diff = magic - TgBotSocket::PacketHeader::MAGIC_VALUE_BASE;
-    if (diff != TgBotSocket::PacketHeader::DATA_VERSION) {
+    auto diff = magic - TgBotSocket::Packet::Header::MAGIC_VALUE_BASE;
+    if (diff != TgBotSocket::Packet::Header::DATA_VERSION) {
         LOG(WARNING) << "Invalid magic value, dropping buffer";
         constexpr int reasonable_datadiff = 5;
         // Only a small difference is worth logging.
         diff = abs(diff);
-        if (diff >= 0 && diff < TgBotSocket::PacketHeader::DATA_VERSION +
+        if (diff >= 0 && diff < TgBotSocket::Packet::Header::DATA_VERSION +
                                     reasonable_datadiff) {
             LOG(INFO) << "This packet contains header data version " << diff
                       << ", but we have version "
-                      << TgBotSocket::PacketHeader::DATA_VERSION;
+                      << TgBotSocket::Packet::Header::DATA_VERSION;
         } else {
             LOG(INFO) << "This is probably not a valid packet";
         }
@@ -40,7 +40,7 @@ std::optional<Packet> readPacket(const TgBotSocket::Context& context) {
     }
 
     // Read rest of the packet header.
-    const auto headerData = context.read(sizeof(TgBotSocket::PacketHeader) - sizeof(magic));
+    const auto headerData = context.read(sizeof(TgBotSocket::Packet::Header) - sizeof(magic));
     if (!headerData) {
         LOG(ERROR) << "While reading header, failed";
         return std::nullopt;
@@ -56,7 +56,7 @@ std::optional<Packet> readPacket(const TgBotSocket::Context& context) {
     }
 
     const size_t newLength =
-        sizeof(TgBotSocket::PacketHeader) + header.data_size;
+        sizeof(TgBotSocket::Packet::Header) + header.data_size;
     TgBotSocket::Packet packet(newLength);
 
     auto data = context.read(header.data_size);
