@@ -179,7 +179,7 @@ void ROMBuildTask::handleStdoutData(ForkAndRun::BufferViewType buffer) {
     const auto cwd = std::filesystem::current_path();
 
     if (!once) {
-        std::fstream ofs(kErrorLogFile.data(), std::ios::app | std::ios::out);
+        std::fstream ofs(kPreLogFile.data(), std::ios::app | std::ios::out);
         if (ofs) {
             ofs << buffer.data();
         }

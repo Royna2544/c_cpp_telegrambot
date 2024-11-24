@@ -12,6 +12,7 @@
 struct ROMBuildTask : ForkAndRun {
     static constexpr std::string_view kShmemROMBuild = "shmem_rombuild";
     static constexpr std::string_view kErrorLogFile = "out/error.log";
+    static constexpr std::string_view kPreLogFile = "out/preappend.log";
 
     /**
      * @brief Runs the function that performs the repository synchronization.

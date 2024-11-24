@@ -287,6 +287,23 @@ class TaskWrapperBase {
         return result.value == PerBuildData::Result::SUCCESS;
     }
 
+    void sendFile(const std::string_view filename) {
+        std::error_code ec;
+        if (std::filesystem::file_size(filename, ec) != 0U) {
+            if (ec) {
+                DLOG(INFO) << "Nonexistent file: " << filename;
+                return;
+            }
+            api->sendDocument(
+                sentMessage->chat->id,
+                TgBot::InputFile::fromFile(filename, "text/plain"));
+            if (!std::filesystem::remove(filename, ec)) {
+                LOG(ERROR) << "Failed to remove error log file: "
+                           << ec.message();
+            }
+        }
+    }
+
    public:
     TaskWrapperBase(ROMBuildQueryHandler* handler, PerBuildData data,
                     TgBotApi::Ptr api, Message::Ptr message)
@@ -417,19 +434,9 @@ class Build : public TaskWrapperBase<ROMBuildTask> {
                 const auto msg =
                     api->editMessage(sentMessage, message, backKeyboard);
                 queryHandler->updateSentMessage(msg);
-                if (fs::file_size(ROMBuildTask::kErrorLogFile, ec) != 0U) {
-                    if (ec) {
-                        break;
-                    }
-                    api->sendDocument(
-                        sentMessage->chat->id,
-                        TgBot::InputFile::fromFile(
-                            ROMBuildTask::kErrorLogFile.data(), "text/plain"));
-                    if (!std::filesystem::remove(ROMBuildTask::kErrorLogFile,
-                                                 ec)) {
-                        LOG(ERROR) << "Failed to remove error log file: "
-                                   << ec.message();
-                    }
+                for (const auto& file :
+                     {ROMBuildTask::kErrorLogFile, ROMBuildTask::kPreLogFile}) {
+                    sendFile(file);
                 }
             } break;
             case PerBuildData::Result::SUCCESS:
