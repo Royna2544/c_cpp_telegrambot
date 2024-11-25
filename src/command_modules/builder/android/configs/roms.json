@@ -11,6 +11,10 @@
             {
                 "android_version": 14,
                 "branch": "udc"
+            },
+            {
+                "android_version": 15,
+                "branch": "vic"
             }
         ]
     },
