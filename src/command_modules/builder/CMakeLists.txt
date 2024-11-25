@@ -14,7 +14,8 @@ add_my_library(
         TgBotLogInit
         TgBotSocketSelectors
         TgBotsighandler
-        ${LIBGIT2_LIBS}
+    LIBS_STATIC
+        ${LIBGIT2_LIBRARIES}
     NO_LIBPREFIX
     STATIC
 )

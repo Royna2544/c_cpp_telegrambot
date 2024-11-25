@@ -1,0 +1,16 @@
+[
+    {
+        "name": "TWRP",
+        "link": "https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp",
+        "artifact": {
+            "matcher": "ExactMatcher",
+            "data": "recovery.img"
+        },
+        "branches": [
+            {
+                "android_version": 11,
+                "branch": "twrp-11"
+            }
+        ]
+    }
+]

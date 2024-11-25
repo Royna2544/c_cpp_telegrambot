@@ -1,0 +1,63 @@
+{
+    "name": "Royna's Playground",
+    "url": "https://github.com/Roynas-Android-Playground/local_manifests/",
+    "branches": [
+        {
+            "name": "Exynos7885-fifteen",
+            "target_rom": "*",
+            "android_version": 15,
+            "devices": [
+                "a10",
+                "a20",
+                "a20e",
+                "a30",
+                "a30s",
+                "a40"
+            ]
+        },
+        {
+            "name": "Exynos7885-fourteen",
+            "target_rom": "*",
+            "android_version": 14,
+            "devices": [
+                "a10",
+                "a20",
+                "a20e",
+                "a30",
+                "a30s",
+                "a40"
+            ]
+        },
+        {
+            "name": "Exynos7885-thirteen",
+            "target_rom": "*",
+            "android_version": 13,
+            "devices": [
+                "a10",
+                "a20",
+                "a20e",
+                "a30",
+                "a30s",
+                "a40"
+            ]
+        },
+        {
+            "name": "r3q-Evolution-X-udc",
+            "target_rom": "Evolution-X",
+            "android_version": 14,
+            "device": "r3q"
+        },
+        {
+            "name": "tb128fu-Evolution-X-udc",
+            "target_rom": "Evolution-X",
+            "android_version": 14,
+            "device": "tb128fu"
+        },
+        {
+            "name": "tb128fu-DerpFest-15",
+            "target_rom": "DerpFest",
+            "android_version": 15,
+            "device": "tb128fu"
+        }
+    ]
+}

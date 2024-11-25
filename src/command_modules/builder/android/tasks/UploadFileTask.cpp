@@ -25,10 +25,9 @@ DeferredExit UploadFileTask::runFunction() {
     auto* resultdata = dataShmem->get<PerBuildData::ResultData>();
 
     // First determine zip file path
-    std::filesystem::directory_iterator it;
     std::filesystem::path zipFilePath;
 
-    auto matcher = getValue(data.localManifest->rom)->romInfo->artifact;
+    auto matcher = data.localManifest->rom->romInfo->artifact;
     if (matcher == nullptr) {
         LOG(ERROR) << "No artifact matcher found";
         return DeferredExit::generic_fail;

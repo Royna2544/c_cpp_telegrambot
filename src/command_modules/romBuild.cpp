@@ -723,7 +723,7 @@ void ROMBuildQueryHandler::handle_type(const Query& query) {
     } else if (type == "eng") {
         per_build.variant = PerBuildData::Variant::kEng;
     }
-    const auto& rom = getValue(per_build.localManifest->rom);
+    const auto& rom = per_build.localManifest->rom;
 
     const auto confirm = fmt::format(
         "Build variant: {}\nDevice: {}\nRom: {}\nAndroid version: {}", type,

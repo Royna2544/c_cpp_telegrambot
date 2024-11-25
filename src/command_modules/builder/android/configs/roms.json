@@ -1,0 +1,78 @@
+[
+    {
+        "name": "Evolution-X",
+        "link": "https://github.com/Evolution-XYZ/manifest",
+        "target": "evolution",
+        "artifact": {
+            "matcher": "ZipFilePrefixer",
+            "data": "EvolutionX"
+        },
+        "branches": [
+            {
+                "android_version": 14,
+                "branch": "udc"
+            }
+        ]
+    },
+    {
+        "name": "DerpFest",
+        "link": "https://github.com/DerpFest-AOSP/manifest",
+        "target": "bacon",
+        "artifact": {
+            "matcher": "ZipFilePrefixer",
+            "data": "DerpFest"
+        },
+        "branches": [
+            {
+                "android_version": 15,
+                "branch": "15"
+            },
+            {
+                "android_version": 14,
+                "branch": "14"
+            }
+        ]
+    },
+    {
+        "name": "LineageOS",
+        "link": "https://github.com/LineageOS/android",
+        "target": "bacon",
+        "artifact": {
+            "matcher": "ZipFilePrefixer",
+            "data": "lineage"
+        },
+        "branches": [
+            {
+                "android_version": 15,
+                "branch": "lineage-22.0"
+            },
+            {
+                "android_version": 14,
+                "branch": "lineage-21.0"
+            },
+            {
+                "android_version": 13,
+                "branch": "lineage-20.0"
+            },
+            {
+                "android_version": 11,
+                "branch": "lineage-18.1"
+            }
+        ]
+    },
+    {
+        "name": "RisingDroid",
+        "link": "https://github.com/RisingTechOSS/android",
+        "target": "bacon",
+        "artifact": {
+            "matcher": "ZipFilePrefixer",
+            "data": "RisingOS"
+        },
+        "branches": [
+            {
+                "android_version": 14,
+                "branch": "fourteen"
+            }
+        ]
+    }
+]

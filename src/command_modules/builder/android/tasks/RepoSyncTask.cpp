@@ -114,7 +114,7 @@ DeferredExit RepoSyncTask::runFunction() {
                    << repoDirExists;
     }
 
-    const auto& rom = getValue(data.localManifest->rom);
+    const auto& rom = data.localManifest->rom;
     GitBranchSwitcher switcher{.gitDirectory = kLocalManifestGitPath,
                                .desiredBranch = rom->branch,
                                .desiredUrl = rom->romInfo->url,
@@ -130,7 +130,7 @@ DeferredExit RepoSyncTask::runFunction() {
         }
         ret.defuse();
     }
-    if (!(*data.localManifest->prepare)(kLocalManifestPath.data())) {
+    if (data.localManifest->preparar->prepare(kLocalManifestPath.data())) {
         LOG(ERROR) << "Failed to prepare local manifest";
         return DeferredExit::generic_fail;
     }

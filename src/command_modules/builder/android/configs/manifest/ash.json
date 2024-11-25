@@ -1,0 +1,15 @@
+{
+    "name": "Ashs builds",
+    "url": "https://github.com/hac4us06/local_manifests",
+    "branches": [
+        {
+            "name": "derp15",
+            "target_rom": "DerpFest",
+            "android_version": 15,
+            "devices": [
+                "lime",
+                "citrus"
+            ]
+        }
+    ]
+}

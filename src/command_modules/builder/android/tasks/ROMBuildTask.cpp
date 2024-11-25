@@ -137,7 +137,7 @@ DeferredExit ROMBuildTask::runFunction() {
               << lunch({});
     }
     shell << ForkAndRunShell::endl;
-    shell << "m " << getValue(data.localManifest->rom)->romInfo->target << " -j"
+    shell << "m " << data.localManifest->rom->romInfo->target << " -j"
           << data.localManifest->job_count << ForkAndRunShell::endl;
     auto result = shell.close();
 
@@ -173,7 +173,7 @@ DeferredExit ROMBuildTask::runFunction() {
 void ROMBuildTask::handleStdoutData(ForkAndRun::BufferViewType buffer) {
     std::string buildInfoBuffer;
     const auto now = std::chrono::system_clock::now();
-    const auto& rom = getValue(data.localManifest->rom);
+    const auto& rom = data.localManifest->rom;
     double memUsage = NAN;
     const auto cwd = std::filesystem::current_path();
 

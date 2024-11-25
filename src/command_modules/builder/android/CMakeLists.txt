@@ -1,4 +1,5 @@
 find_package(LibXml2 REQUIRED)
+find_package(libgit2 REQUIRED)
 
 ################# Android ROM builder with C++ #################
 if (LINUX)
@@ -6,6 +7,7 @@ add_my_library(
     NAME AndroidBuilder-configparse
     SRCS 
         ConfigParsers.cpp
+        SystemInfo.cpp
     LIBS
         JsonCpp::JsonCpp
         LibXml2::LibXml2
@@ -16,7 +18,6 @@ add_my_library(
 add_my_library(
     NAME AndroidBuilder-cpp
     SRCS 
-        SystemInfo.cpp
         tasks/ROMBuildTask.cpp
         tasks/UploadFileTask.cpp
         tasks/RepoSyncTask.cpp
@@ -32,7 +33,7 @@ add_my_library(
 add_my_executable(
     NAME ConfigParserTest
     SRCS ConfigParserTest.cpp
-    LIBS AndroidBuilder-configparse
+    LIBS AndroidBuilder-configparse BuilderUtilsLinux
     OPTIONAL
 )
 

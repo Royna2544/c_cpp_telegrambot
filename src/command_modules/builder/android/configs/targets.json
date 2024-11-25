@@ -1,0 +1,46 @@
+[
+    {
+        "codename": "a10",
+        "name": "Galaxy A10"
+    },
+    {
+        "codename": "a20",
+        "name": "Galaxy A20"
+    },
+    {
+        "codename": "a20e",
+        "name": "Galaxy A20e"
+    },
+    {
+        "codename": "a30",
+        "name": "Galaxy A30"
+    },
+    {
+        "codename": "a40",
+        "name": "Galaxy A40"
+    },
+    {
+        "codename": "r3q",
+        "name": "Galaxy A90 5G"
+    },
+    {
+        "codename": "tb128fu",
+        "name": "Lenovo XiaoXin Pad 2022"
+    },
+    {
+        "codename": "a30s",
+        "name": "Galaxy A30s"
+    },
+    {
+        "codename": "lime",
+        "name": "Redmi 9T"
+    },
+    {
+        "codename": "citrus",
+        "name": "POCO M3"
+    },
+    {
+        "codename": "vin8953",
+        "name": "Vsmart Joy 3"
+    }
+]

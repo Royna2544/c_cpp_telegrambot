@@ -1,10 +1,13 @@
 #pragma once
 
 #include <absl/log/log.h>
+#include <fmt/format.h>
 
+#include <map>
 #include <memory>
 #include <ostream>
 #include <set>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -28,13 +31,33 @@ class ConfigParser {
         std::string data_;
 
        public:
-        bool operator()(std::string_view filename, const bool debug = false) const {
+        bool operator()(std::string_view filename,
+                        const bool debug = false) const {
             return matcher_(filename, data_, debug);
         }
         bool operator==(const ArtifactMatcher &other) const {
             return name_ == other.name_;
         }
         void setData(std::string data) { data_ = std::move(data); }
+    };
+
+    // Artifact matcher
+    struct MatcherStorage {
+        std::unordered_map<std::string, ArtifactMatcher::Ptr> artifactMatchers;
+        void add(const std::string &name,
+                 const ArtifactMatcher::MatcherType &fn) {
+            artifactMatchers[name] =
+                std::make_shared<ArtifactMatcher>(fn, name);
+        }
+        ArtifactMatcher::Ptr get(const std::string &name) const {
+            if (!artifactMatchers.contains(name)) {
+                LOG(INFO) << fmt::format("No artifact matcher found for '{}'",
+                                         name);
+                return nullptr;
+            }
+            return std::make_shared<ArtifactMatcher>(
+                *artifactMatchers.at(name));
+        }
     };
 
     struct ROMInfo {
@@ -61,8 +84,18 @@ class ConfigParser {
             if (!romInfo) {
                 return {};
             }
-            return romInfo->name + " (Android " +
-                   std::to_string(androidVersion) + ")";
+            return fmt::format("{} (Android {})", romInfo->name,
+                               androidVersion);
+        }
+        [[nodiscard]] static std::string makeKey(std::string_view name,
+                                                 const int androidVersion) {
+            return fmt::format("{}-{}", name, androidVersion);
+        }
+        [[nodiscard]] std::string makeKey() const {
+            if (!romInfo) {
+                throw std::logic_error("No rom info available");
+            }
+            return makeKey(romInfo->name, androidVersion);
         }
 
         bool operator==(const ROMBranch &other) const {
@@ -103,14 +136,13 @@ class ConfigParser {
             virtual ~PrepareBase() = default;
             // Do the preparation
             // With the manifest path being `path'
-            virtual bool operator()(const std::filesystem::path &path) = 0;
+            virtual bool prepare(const std::filesystem::path &path) = 0;
         };
 
         struct GitPrepare : PrepareBase {
             RepoInfo info;
-            explicit GitPrepare(RepoInfo info)
-                : info(std::move(info)) {}
-            bool operator()(const std::filesystem::path &path) override;
+            explicit GitPrepare(RepoInfo info) : info(std::move(info)) {}
+            bool prepare(const std::filesystem::path &path) override;
         };
 
         struct WritePrepare : PrepareBase {
@@ -123,35 +155,32 @@ class ConfigParser {
                       destination(std::move(destination)) {}
             };
             std::vector<Data> data;
-            bool operator()(const std::filesystem::path &path) override;
+            bool prepare(const std::filesystem::path &path) override;
         };
 
         using Ptr = std::shared_ptr<LocalManifest>;
-        template <typename match>
-        using StringArrayOr =
-            std::variant<std::vector<std::string>, std::vector<match>>;
-
-        struct ROMLookup {
-            int androidVersion;  // android version of the ROM
-            std::string name;    // name of the ROM
-        };
-
-        std::string name;  // name of the manifest
+        // name of the manifest
+        std::string name;
         // associated ROM and its branch
-        std::variant<ROMLookup, ROMBranch::Ptr> rom;
-        std::shared_ptr<PrepareBase> prepare;  // local manifest information
-        // First type is used before merge, second type is used after merge
-        StringArrayOr<Device::Ptr> devices;
+        ROMBranch::Ptr rom;
+        // local manifest information
+        std::shared_ptr<PrepareBase> preparar;
+        // associated devices
+        std::vector<Device::Ptr> devices;
         long job_count;  // number of jobs
     };
 
-    explicit ConfigParser(const std::filesystem::path &jsonFileDir);
+    explicit ConfigParser(std::filesystem::path jsonFileDir);
+
+    bool merge();
 
     // Get available devices from config
     [[nodiscard]] std::set<Device::Ptr> getDevices() const;
+
     // Get available ROM branches for a given device
     [[nodiscard]] std::set<ROMBranch::Ptr> getROMBranches(
         const Device::Ptr &device) const;
+
     // Get a local manifest for a given ROM branch and device
     [[nodiscard]] LocalManifest::Ptr getLocalManifest(
         const ROMBranch::Ptr &romBranch, const Device::Ptr &device) const;
@@ -187,8 +216,10 @@ class ConfigParser {
 
    private:
     std::vector<LocalManifest::Ptr> parsedManifests;
-
-    class Parser;
+    std::map<std::string, Device::Ptr> deviceMap;
+    std::map<std::string, ROMBranch::Ptr> romBranchMap;
+    std::filesystem::path _jsonFileDir;
+    MatcherStorage storage;
 };
 
 struct PerBuildData {
@@ -226,14 +257,6 @@ struct PerBuildData {
         }
     } *result;
 };
-
-// Helpers for std variant codebloat, as we have real data on index 1
-static constexpr int VALUE_INDEX = 1;
-
-template <typename Variant>
-[[nodiscard]] auto getValue(Variant &&variant) {
-    return std::get<VALUE_INDEX>(std::forward<Variant>(variant));
-}
 
 inline std::ostream &operator<<(std::ostream &os,
                                 const PerBuildData::Variant &variant) {
