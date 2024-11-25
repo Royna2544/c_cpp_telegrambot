@@ -173,11 +173,27 @@ void TgBotApiImpl::commandHandler(const std::string& command,
                               _provider);
 }
 
+void TgBotApiImpl::addCommandListener(CommandListener* listener) {
+    _listeners.emplace_back(listener);
+}
+
 bool TgBotApiImpl::unloadCommand(const std::string& command) {
+    DLOG(INFO) << "Notifying onUnload listeners";
+    for (auto* listener : _listeners) {
+        listener->onUnload(command);
+    }
+    DLOG(INFO) << "Done notifying";
+    // Remove the command from the loader.
     return (*kModuleLoader) -= command;
 }
 
 bool TgBotApiImpl::reloadCommand(const std::string& command) {
+    DLOG(INFO) << "Notifying onReload listeners";
+    for (auto* listener : _listeners) {
+        listener->onReload(command);
+    }
+    DLOG(INFO) << "Done notifying";
+    // Reload the command to the loader.
     return (*kModuleLoader) += command;
 }
 
@@ -401,7 +417,7 @@ Message::Ptr TgBotApiImpl::sendDocument_impl(
     const ParseMode parseMode) const {
     return getApi().sendDocument(chatId, std::move(document), {}, caption,
                                  replyParameters, replyMarkup, parseMode,
-                                 kDisableNotifications, {}, false,
+                                 kDisableNotifications, {}, {},
                                  ReplyParamsToMsgTid{replyParameters});
 }
 

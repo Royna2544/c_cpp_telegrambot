@@ -77,6 +77,20 @@ class TgBotApiImpl : public TgBotApi {
 
     std::unique_ptr<FileCheck> virusChecker;
 
+    // Interface for listening to command unload/reload
+    struct CommandListener {
+        virtual ~CommandListener() = default;
+        virtual void onUnload(const std::string_view name) = 0;
+        virtual void onReload(const std::string_view name) = 0;
+    };
+
+    /**
+     * @brief Adds a command unload/reload listener
+     *
+     * @param listener The listener to add.
+     */
+    void addCommandListener(CommandListener* listener);
+
    private:
     /**
      * @brief Sends a message to a chat.
@@ -470,4 +484,5 @@ class TgBotApiImpl : public TgBotApi {
     AuthContext* _auth;
     StringResLoaderBase* _loader;
     Providers* _provider;
+    std::vector<CommandListener*> _listeners;
 };

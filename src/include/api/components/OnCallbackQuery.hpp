@@ -4,7 +4,7 @@
 #include "Async.hpp"
 #include <map>
 
-class TgBotApiImpl::OnCallbackQueryImpl {
+class TgBotApiImpl::OnCallbackQueryImpl : TgBotApiImpl::CommandListener {
     std::mutex mutex;
     std::multimap<std::string, TgBot::EventBroadcaster::CallbackQueryListener>
         listeners;
@@ -13,6 +13,8 @@ class TgBotApiImpl::OnCallbackQueryImpl {
 
     void onCallbackQueryFunction(TgBot::CallbackQuery::Ptr query);
 
+    void onUnload(const std::string_view command) override;
+    void onReload(const std::string_view command) override;
    public:
     void onCallbackQuery(
         std::string command,
