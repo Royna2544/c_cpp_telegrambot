@@ -107,14 +107,9 @@ struct NodeItemType {
     }
 
     template <typename... Args>
-    friend bool checkRequirements(const Json::Value& value, Args&... args);
+    friend bool checkRequirements(const Json::Value& value,
+                                  NodeItemType<Args>&... args);
 };
-
-// Check if T is Specialization of NodeNameType
-template <typename T>
-struct IsNodeNameType : std::false_type {};
-template <typename T>
-struct IsNodeNameType<NodeItemType<T>> : std::true_type {};
 
 NodeItemType<std::string> operator""_s(const char* str,
                                        unsigned long /*unused*/) {
@@ -125,12 +120,9 @@ NodeItemType<int> operator""_d(const char* str, unsigned long /*unused*/) {
 }
 
 template <typename... Args>
-bool checkRequirements(const Json::Value& value, Args&... args) {
+bool checkRequirements(const Json::Value& value, NodeItemType<Args>&... args) {
     static_assert(sizeof...(args) > 0,
                   "At least one argument required for checkRequirements");
-
-    static_assert((... && IsNodeNameType<Args>::value),
-                  "All arguments must be NodeItemType");
 
     if (!value.isObject()) {
         LOG(ERROR) << fmt::format("Expected object, found: {}",
@@ -363,7 +355,8 @@ parseDeviceAndRom(
         deviceCodenames, std::back_inserter(devicePtrs),
         [&devicesPtr](const auto& codename) {
             if (!devicesPtr.contains(codename)) {
-                LOG(WARNING) << "No matching DeviceInfo for codename " << codename;
+                LOG(WARNING)
+                    << "No matching DeviceInfo for codename " << codename;
                 // Create dummy device if it doesn't exist, But this isn't gonna
                 // make it available.
                 return std::make_shared<ConfigParser::Device>(codename);
