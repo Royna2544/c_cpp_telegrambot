@@ -595,6 +595,9 @@ void ROMBuildQueryHandler::handle_cancel(const Query& query) {
         LOG(INFO) << "User cancelled build";
         handle_back(query);
         _api->answerCallbackQuery(query->id, "Task successfully cancelled!");
+    } else {
+        _api->deleteMessage(sentMessage);
+        sentMessage = nullptr;
     }
 }
 
