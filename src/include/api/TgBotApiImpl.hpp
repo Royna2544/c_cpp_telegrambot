@@ -50,6 +50,9 @@ class TgBotApiImpl : public TgBotApi {
                  StringResLoaderBase* loader, Providers* providers);
     ~TgBotApiImpl() override;
 
+    class ModulesManagement;
+    friend class ModulesManagement;
+    std::unique_ptr<ModulesManagement> kModuleLoader;
     class OnAnyMessageImpl;
     friend class OnAnyMessageImpl;
     std::unique_ptr<OnAnyMessageImpl> onAnyMessageImpl;
@@ -68,9 +71,6 @@ class TgBotApiImpl : public TgBotApi {
     class OnMyChatMemberImpl;
     friend class OnMyChatMemberImpl;
     std::unique_ptr<OnMyChatMemberImpl> onMyChatMemberImpl;
-    class ModulesManagement;
-    friend class ModulesManagement;
-    std::unique_ptr<ModulesManagement> kModuleLoader;
     class RestartCommand;
     friend class RestartCommand;
     std::unique_ptr<RestartCommand> restartCommand;
