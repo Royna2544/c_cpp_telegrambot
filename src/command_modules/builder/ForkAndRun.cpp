@@ -153,9 +153,10 @@ DeferredExit ptrace_common_parent(pid_t pid,
                         LOG(WARNING) << "BLOCKING ACCESS TO " << buf;
                         regs.rax = -ENOENT;
                         regs.orig_rax = -1;
+                        break;
                     }
                 }
-                break;
+                continue;
             }
             default:
                 continue;
