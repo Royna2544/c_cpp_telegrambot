@@ -6,7 +6,9 @@
 #include <api/components/Restart.hpp>
 #include <restartfmt_parser.hpp>
 
-extern char** environ; // NOLINT (Needed for macOS)
+#ifdef __APPLE__
+extern char **environ;
+#endif  // __APPLE__
 
 TgBotApiImpl::RestartCommand::RestartCommand(TgBotApiImpl::Ptr api)
     : _api(api) {
