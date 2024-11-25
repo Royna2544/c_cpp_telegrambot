@@ -1,10 +1,11 @@
 #include <absl/strings/strip.h>
 
+#include <algorithm>
 #include <api/components/OnInlineQuery.hpp>
 
 void TgBotApiImpl::OnInlineQueryImpl::onInlineQueryFunction(
     TgBot::InlineQuery::Ptr query) {
-    const std::lock_guard m(callback_result_mutex);
+    const std::lock_guard m(mutex);
 
     if (queryResults.empty()) {
         return;
@@ -52,10 +53,24 @@ void TgBotApiImpl::OnInlineQueryImpl::onInlineQueryFunction(
     _api->getApi().answerInlineQuery(query->id, inlineResults);
 }
 
+void TgBotApiImpl::OnInlineQueryImpl::onUnload(const std::string_view command) {
+    for (auto it = queryResults.begin(); it != queryResults.end(); ++it) {
+        if (it->first.name == command) {
+            DLOG(INFO) << "Removing inline query handler for " << command;
+            queryResults.erase(it);
+            break;
+        }
+    }
+}
+
+void TgBotApiImpl::OnInlineQueryImpl::onReload(const std::string_view command) {
+}
+
 TgBotApiImpl::OnInlineQueryImpl::OnInlineQueryImpl(AuthContext* auth,
                                                    TgBotApiImpl::Ptr api)
     : _auth(auth), _api(api) {
     _api->getEvents().onInlineQuery([this](TgBot::InlineQuery::Ptr query) {
         onInlineQueryFunction(std::move(query));
     });
+    _api->addCommandListener(this);
 }

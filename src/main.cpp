@@ -573,8 +573,11 @@ int main(int argc, char** argv) {
 
     try {
         api->addInlineQueryKeyboard(
-            TgBotApi::InlineQuery{
-                "media", "Get media with the name from database", true, false},
+            TgBotApi::InlineQuery{"media",
+                                  "Get media with the name from database",
+                                  {},
+                                  true,
+                                  false},
             [database](std::string_view x)
                 -> std::vector<TgBot::InlineQueryResult::Ptr> {
                 return mediaQueryKeyboardFunction(database, x);

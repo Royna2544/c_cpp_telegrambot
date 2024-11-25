@@ -802,6 +802,8 @@ class TgBotApi {
         std::string name;
         // Any help text
         std::string description;
+        // Command name, if not a command, empty string
+        std::string command;
         // hasMoreArguments, if true, consume one of more spaces, otherwise
         // consume none.
         bool hasMoreArguments;

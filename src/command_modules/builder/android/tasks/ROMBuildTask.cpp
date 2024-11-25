@@ -267,7 +267,7 @@ ROMBuildTask::ROMBuildTask(TgBotApi::Ptr api, TgBot::Message::Ptr message,
     textContent->messageText = "Not yet ready...";
     api->addInlineQueryKeyboard(
         TgBotApi::InlineQuery{"rombuild status", "See the ROM build progress",
-                              false, true},
+                              "rombuild", false, true},
         romBuildArticle);
 }
 
