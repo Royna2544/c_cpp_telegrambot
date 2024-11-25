@@ -94,7 +94,7 @@ bool RepoSyncNetworkHook::process(const std::string& line) {
 
 constexpr std::string_view initCommand =
     "repo init -u {} -b {} --git-lfs --depth={}";
-constexpr std::string_view kLocalManifestGitPath = ".repo/manifest.git";
+constexpr std::string_view kLocalManifestGitPath = ".repo/manifests.git";
 constexpr std::string_view syncCommand =
     "repo sync -c -j{} --force-sync --no-clone-bundle --no-tags "
     "--force-remove-dirty";
@@ -130,7 +130,7 @@ DeferredExit RepoSyncTask::runFunction() {
         }
         ret.defuse();
     }
-    if (data.localManifest->preparar->prepare(kLocalManifestPath.data())) {
+    if (!data.localManifest->preparar->prepare(kLocalManifestPath.data())) {
         LOG(ERROR) << "Failed to prepare local manifest";
         return DeferredExit::generic_fail;
     }
