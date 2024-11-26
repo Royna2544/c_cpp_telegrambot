@@ -3,6 +3,7 @@
 #include <absl/log/log.h>
 #include <absl/log/log_sink.h>
 #include <absl/log/log_sink_registry.h>
+#include <absl/strings/match.h>
 #include <absl/strings/str_split.h>
 #include <absl/strings/strip.h>
 #include <sys/ptrace.h>
@@ -15,6 +16,7 @@
 
 #include <AbslLogInit.hpp>
 #include <LogSinks.hpp>
+#include <algorithm>
 #include <array>
 #include <cerrno>
 #include <csignal>
@@ -148,7 +150,7 @@ DeferredExit ptrace_common_parent(pid_t pid,
                 std::string_view bufView = buf;
                 if (absl::ConsumeSuffix(&bufView, ".repo/repo/main.py")) {
                     DLOG(INFO) << "sandboxPath: " << sandboxPath
-                              << " accessPath: " << buf;
+                               << " accessPath: " << buf;
                     if (!std::filesystem::equivalent(sandboxPath, bufView)) {
                         LOG(WARNING) << "BLOCKING ACCESS TO " << buf;
                         regs.rax = -ENOENT;
@@ -181,6 +183,55 @@ void ptrace_common_child() {
     }
     // Trigger a stop so the parent can start tracing
     kill(getpid(), SIGSTOP);
+}
+
+ForkAndRun::Env::ValueEntry ForkAndRun::Env::operator[](
+    const std::string_view key) {
+    auto ent = map.find(key);
+    if (ent == map.end()) {
+        map.emplace(key, "");
+        ent = map.find(key);
+    }
+    return {this, &(*ent)};
+}
+
+void ForkAndRun::Env::erase(const std::string_view key) {
+    auto it = map.find(key);
+    if (it != map.end()) {
+        map.erase(it);
+    } else {
+        LOG(WARNING) << "Attempting to erase non-existent key: " << key;
+    }
+}
+
+std::pair<std::vector<char*>, std::vector<std::string>> ForkAndRun::Env::craft()
+    const {
+    // Craft envp
+    std::vector<char*> envp;
+    std::vector<std::string> owners;
+    for (int x = 0; environ[x] != nullptr; x++) {
+        envp.emplace_back(environ[x]);
+    }
+    // Erase possible duplicates
+    auto [s, e] = std::ranges::remove_if(envp, [this](const char* buf) {
+        return std::ranges::any_of(map, [buf](const auto& entry) {
+            if (absl::StartsWith(buf, fmt::format("{}=", entry.first))) {
+                LOG(INFO) << "Removing key " << entry.first << " to make way";
+                return true;
+            }
+            return false;
+        });
+    });
+    envp.erase(s, e);
+
+    // Add to environ
+    for (const auto& [key, value] : map) {
+        LOG(INFO) << "Setting env " << key << "=" << value;
+        owners.emplace_back(fmt::format("{}={}", key, value));
+        envp.emplace_back(owners.back().data());
+    }
+    envp.emplace_back(nullptr);
+    return {std::move(envp), std::move(owners)};
 }
 
 bool ForkAndRun::execute() {
@@ -417,17 +468,7 @@ DeferredExit ForkAndRunSimple::execute() {
         }
 
         // Craft envp
-        std::vector<char*> envp;
-        std::vector<std::string> owners;
-        for (int x = 0; environ[x] != nullptr; x++) {
-            envp.emplace_back(environ[x]);
-        }
-        for (const auto& [key, value] : env.map) {
-            LOG(INFO) << "Setting env " << key << "=" << value;
-            owners.emplace_back(fmt::format("{}={}", key, value));
-            envp.emplace_back(owners.back().data());
-        }
-        envp.emplace_back(nullptr);
+        auto [envp, owners] = env.craft();
 
         execvpe(args_[0].data(), rawArgs.data(), envp.data());
         _exit(EXIT_FAILURE);
@@ -476,17 +517,7 @@ bool ForkAndRunShell::open() {
         std::array<char*, 2> argv{string.get(), nullptr};
 
         // Craft envp
-        std::vector<char*> envp;
-        std::vector<std::string> owners;
-        for (int x = 0; environ[x] != nullptr; x++) {
-            envp.emplace_back(environ[x]);
-        }
-        for (const auto& [key, value] : env.map) {
-            LOG(INFO) << "Setting env " << key << "=" << value;
-            owners.emplace_back(fmt::format("{}={}", key, value));
-            envp.emplace_back(owners.back().data());
-        }
-        envp.emplace_back(nullptr);
+        auto [envp, owners] = env.craft();
 
         execvpe(string.get(), argv.data(), envp.data());
         _exit(EXIT_FAILURE);
@@ -552,10 +583,15 @@ void ForkAndRunShell::writeString(const std::string_view& str) const {
     const std::shared_lock<std::shared_mutex> _(pid_mutex_);
 
     if (!opened || shell_pid_ < 0) {
+        if (str == "\n") {
+            // We don't want to write a newline if there is no shell open.
+            return;
+        }
         LOG(ERROR) << "Shell not open. Ignoring " << std::quoted(str);
         return;
     }
 
+    // Write to the pipe
     if (::write(pipe_.writeEnd(), str.data(), str.size()) < 0) {
         PLOG(ERROR) << fmt::format("Failed to write '{}' to pipe", str);
     }

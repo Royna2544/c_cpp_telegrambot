@@ -238,6 +238,10 @@ class ForkAndRun {
             void operator=(const std::string_view other) const&& {
                 _it->second.assign(other);
             }
+            void operator+=(const std::string_view other) const&& {
+                _it->second.append(other);
+            }
+
             void clear() const&& { _env->erase(_it->first); }
 
             // Do not allow copying of this element outside the function use.
@@ -247,23 +251,11 @@ class ForkAndRun {
             ~ValueEntry() = default;
         };
 
-        ValueEntry operator[](const std::string_view key) {
-            auto ent = map.find(key);
-            if (ent == map.end()) {
-                map.emplace(key, "");
-                ent = map.find(key);
-            }
-            return {this, &(*ent)};
-        }
+        ValueEntry operator[](const std::string_view key);
 
-        void erase(const std::string_view key) {
-            auto it = map.find(key);
-            if (it != map.end()) {
-                map.erase(it);
-            } else {
-                LOG(WARNING) << "Attempting to erase non-existent key: " << key;
-            }
-        }
+        void erase(const std::string_view key);
+
+        std::pair<std::vector<char*>, std::vector<std::string>> craft() const;
     };
 
    private:

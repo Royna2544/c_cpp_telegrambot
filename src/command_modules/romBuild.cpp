@@ -11,11 +11,9 @@
 #include <algorithm>
 #include <api/CommandModule.hpp>
 #include <api/TgBotApi.hpp>
-#include <concepts>
 #include <cstdlib>
 #include <filesystem>
 #include <initializer_list>
-#include <limits>
 #include <memory>
 #include <string>
 #include <system_error>
@@ -25,11 +23,11 @@
 #include <utility>
 
 #include "ForkAndRun.hpp"
-#include "Shmem.hpp"
 #include "SystemInfo.hpp"
+#include "support/KeyBoardBuilder.hpp"
 #include "utils/CommandLine.hpp"
 #include "utils/ConfigManager.hpp"
-#include "utils/libfs.hpp"
+#include "support/CwdRestorar.hpp"
 
 template <typename Impl>
 concept canCreateWithApi =
@@ -40,68 +38,7 @@ concept canCreateWithApi =
 template <typename Impl>
 concept canCreateWithData = requires(PerBuildData data) { Impl{data}; };
 
-template <typename T>
-concept isSTLContainer = requires() {
-    typename T::iterator;
-    typename T::const_iterator;
-    { T{}.begin() } -> std::same_as<typename T::iterator>;
-    { T{}.end() } -> std::same_as<typename T::iterator>;
-    { T{}.size() } -> std::convertible_to<int>;
-};
-
 using std::string_literals::operator""s;
-
-class KeyboardBuilder {
-    TgBot::InlineKeyboardMarkup::Ptr keyboard;
-    int x = 1;
-
-   public:
-    using Button = std::pair<std::string, std::string>;
-    using ListOfButton = std::initializer_list<Button>;
-    // When we have x, we use that
-    explicit KeyboardBuilder(int x) : x(x) {
-        keyboard = std::make_shared<TgBot::InlineKeyboardMarkup>();
-    }
-    // When we don't have x, we assume it is 1, oneline keyboard
-    KeyboardBuilder() {
-        keyboard = std::make_shared<TgBot::InlineKeyboardMarkup>();
-    }
-
-    // Enable method chaining, templated for STL containers
-    template <isSTLContainer ListLike = ListOfButton>
-    KeyboardBuilder& addKeyboard(const ListLike& list) {
-        // We call resize because we know the number of rows and columns
-        // If list size has a remainder, we need to add extra row
-        // The thing is... appending could take place after the last element,
-        // Or in a new row.
-        // We will say new row for now...
-        // Create a new keyboard
-        decltype(keyboard->inlineKeyboard) addingList(
-            list.size() / x + (list.size() % x == 0 ? 0 : 1));
-        for (auto& row : addingList) {
-            row.resize(x);
-        }
-        int idx = 0;
-        // Add buttons to keyboard
-        for (const auto& [text, callbackData] : list) {
-            auto button = std::make_shared<TgBot::InlineKeyboardButton>();
-            button->text = text;
-            button->callbackData = callbackData;
-            // We can use cool math to fill keyboard in a nice way
-            addingList[idx / x][idx % x] = button;
-            ++idx;
-        }
-
-        // Insert into main keyboard, if any.
-        keyboard->inlineKeyboard.insert(keyboard->inlineKeyboard.end(),
-                                        addingList.begin(), addingList.end());
-        return *this;
-    }
-    KeyboardBuilder& addKeyboard(const Button& button) {
-        return addKeyboard<std::initializer_list<Button>>({button});
-    }
-    TgBot::InlineKeyboardMarkup::Ptr get() { return keyboard; }
-};
 
 class ROMBuildQueryHandler {
     struct {
@@ -420,7 +357,7 @@ class Build : public TaskWrapperBase<ROMBuildTask> {
 
     void onExecuteFinished(PerBuildData::ResultData result) override {
         std::error_code ec;
-        
+
         switch (result.value) {
             case PerBuildData::Result::ERROR_FATAL: {
                 LOG(ERROR) << "Failed to build ROM";
@@ -476,58 +413,12 @@ class Upload : public TaskWrapperBase<UploadFileTask> {
     virtual ~Upload() = default;
 };
 
-class CwdRestorer {
-    std::filesystem::path cwd;
-    std::error_code ec;
-
-   public:
-    CwdRestorer(const CwdRestorer&) = delete;
-    CwdRestorer& operator=(const CwdRestorer&) = delete;
-
-    explicit CwdRestorer(const std::filesystem::path& newCwd) {
-        cwd = std::filesystem::current_path(ec);
-        if (ec) {
-            LOG(ERROR) << "Failed to get current cwd: " << ec.message();
-            return;
-        }
-
-        LOG(INFO) << "Changing cwd to: " << newCwd.string();
-        std::filesystem::current_path(newCwd, ec);
-        if (!ec) {
-            // Successfully changed cwd
-            return;
-        }
-
-        // If we didn't get ENOENT, then nothing we can do here
-        if (ec == std::errc::no_such_file_or_directory) {
-            // If it was no such file or directory, then we could try to create
-            if (ec = createDirectory(newCwd); ec) {
-                LOG(ERROR) << "Failed to create build directory: "
-                           << ec.message();
-            }
-        } else {
-            LOG(ERROR) << "Unexpected error while changing cwd: "
-                       << ec.message();
-        }
-    }
-
-    ~CwdRestorer() {
-        LOG(INFO) << "Restoring cwd to: " << cwd;
-        std::filesystem::current_path(cwd, ec);
-        if (ec) {
-            LOG(ERROR) << "Error while restoring cwd: " << ec.message();
-        }
-    }
-
-    operator bool() const noexcept { return !ec; }
-};
-
 ROMBuildQueryHandler::ROMBuildQueryHandler(TgBotApi::Ptr api,
                                            Message::Ptr userMessage,
                                            CommandLine* line)
     : _api(api),
       _commandLine(line),
-      parser(line->getPath(FS::PathType::RESOURCES) / "android_builder") {
+      parser(line->getPath(FS::PathType::RESOURCES) / "builder" / "android") {
     settingsKeyboard =
         createKeyboardWith<Buttons::repo_sync, Buttons::upload,
                            Buttons::pin_message, Buttons::back>();

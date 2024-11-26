@@ -2,7 +2,6 @@ find_package(LibXml2 REQUIRED)
 find_package(libgit2 REQUIRED)
 
 ################# Android ROM builder with C++ #################
-if (LINUX)
 add_my_library(
     NAME AndroidBuilder-configparse
     SRCS 
@@ -37,7 +36,6 @@ add_my_executable(
     OPTIONAL
 )
 
-install(DIRECTORY configs/ DESTINATION share/${PROJECT_NAME}/android_builder)
-file(COPY configs/ DESTINATION ${CMAKE_BINARY_DIR}/share/${PROJECT_NAME}/android_builder)
+install(DIRECTORY configs/ DESTINATION share/${PROJECT_NAME}/builder/android)
+file(COPY configs/ DESTINATION ${CMAKE_BINARY_DIR}/share/${PROJECT_NAME}/builder/android)
 
-endif()

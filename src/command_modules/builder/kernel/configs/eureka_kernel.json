@@ -1,0 +1,54 @@
+{
+    "name": "Eureka Kernel",
+    "repo": {
+        "url": "https://github.com/eurekadevelopment/Eureka-Kernel-Exynos7885-Q-R-S",
+        "branch": "R15-Next"
+    },
+    "arch": "arm64",
+    "type": "Image",
+    "toolchains": {
+        "Clang": true,
+        "LLVM Binutils": true,
+        "LLVM IAS": true
+    },
+    "anykernel": {
+        "enabled": true,
+        "location": "AnyKernel3/",
+        "additionalFiles": ["version"]
+    },
+    "defconfig": {
+        "scheme": "exynos7885-{device}_defconfig",
+        "devices": [
+            "a10",
+            "a20",
+            "a20e",
+            "a30",
+            "a30s",
+            "a40"
+        ]
+    },
+    "fragments": [
+        {
+            "name": "oneui",
+            "scheme": "oneui.config",
+            "depends": [],
+            "devices": [],
+            "description": "Enable OneUI target support",
+            "default_enabled": false
+        },
+        {
+            "name": "oneui2",
+            "scheme": "oneui2.config",
+            "depends": ["oneui"],
+            "devices": [],
+            "description": "Enable OneUI2 target support",
+            "default_enabled": false
+        }
+    ],
+    "env": [
+        {
+            "name": "SOME_ARCH",
+            "value": "arm64"
+        }
+    ]
+}

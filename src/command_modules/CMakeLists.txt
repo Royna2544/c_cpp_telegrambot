@@ -173,6 +173,13 @@ command_module(
 )
 
 command_module(
+    NAME kernelbuild
+    SRCS kernelbuild.cpp
+    LIBS KernelBuilder-cpp
+    PLATFORM "Linux"
+)
+
+command_module(
     NAME rotatepic
     SRCS rotatepic.cpp
     LIBS TgBotImgProc
