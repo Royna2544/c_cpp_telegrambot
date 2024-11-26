@@ -43,7 +43,7 @@
         "target": "bacon",
         "artifact": {
             "matcher": "ZipFilePrefixer",
-            "data": "lineage"
+            "data": "lineage-"
         },
         "branches": [
             {
