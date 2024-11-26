@@ -18,7 +18,7 @@ void TgBotApiImpl::ChatJoinRequestImpl::onChatJoinRequestFunction(
     templateMarkup->inlineKeyboard.at(0).at(1)->callbackData =
         fmt::format("chatjoin_{}_disapprove", ptr->date);
     std::string bio;
-    if (ptr->bio) {
+    if (ptr->bio && !ptr->bio->empty()) {
         bio = fmt::format("\nTheir Bio: '{}'", ptr->bio.value());
     }
     auto msg = _api->sendMessage(
