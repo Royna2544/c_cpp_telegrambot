@@ -599,6 +599,10 @@ int main(int argc, char** argv) {
                 std::this_thread::sleep_for(std::chrono::minutes(1));
             }
         } catch (const std::exception& e) {
+            if (std::string_view(e.what()).starts_with("cURL")) {
+                LOG(WARNING) << "cURL error: " << e.what();
+                continue;
+            }
             LOG(ERROR) << "Uncaught Exception: " << e.what();
             break;
         }
