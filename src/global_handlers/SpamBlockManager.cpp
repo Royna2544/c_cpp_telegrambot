@@ -3,13 +3,18 @@
 #include <trivial_helpers/_tgbot.h>
 
 #include <chrono>
+#include <condition_variable>
 #include <global_handlers/SpamBlockManager.hpp>
-#include <thread>
+#include <mutex>
 
 void SpamBlockManager::runFunction(const std::stop_token &token) {
     while (!token.stop_requested()) {
         consumeAndDetect();
-        std::this_thread::sleep_for(sSpamDetectDelay);
+        std::condition_variable condvar;
+        std::mutex mutex;
+        std::unique_lock<std::mutex> lock(mutex);
+        condvar.wait_for(lock, sSpamDetectDelay,
+                         [token] { return token.stop_requested(); });
     }
 }
 
@@ -63,7 +68,7 @@ bool SpamBlockManager::shouldBeSkipped(const Message::Ptr &message) const {
     if (!message->photo.empty()) {
         return true;
     }
-    
+
     return false;
 }
 
