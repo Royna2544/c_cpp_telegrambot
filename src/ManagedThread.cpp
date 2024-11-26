@@ -18,9 +18,7 @@ int load_before_inc_dec(std::atomic_int* counter) {
 }
 
 void ThreadRunner::threadFunction() {
-    DLOG(INFO) << "Waiting for privdata init";
     initLatch.wait();
-    DLOG(INFO) << "Privdata init complete";
 
     ++(*mgr_priv.launched);
     DLOG(INFO) << fmt::format("{} started (launched: {})", mgr_priv.usage,
