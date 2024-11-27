@@ -29,6 +29,8 @@ struct ToolchainConfig {
             case KernelConfig::ClangSupport::FullLLVMWithIAS:
                 return {{"LLVM", "1"}};
                 // TODO: LLVM_IAS?
+            default: [[unlikely]]
+                return {};
         }
     }
 };

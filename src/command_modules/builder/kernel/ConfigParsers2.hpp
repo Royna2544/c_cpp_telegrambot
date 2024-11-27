@@ -3,9 +3,7 @@
 #include <json/value.h>
 
 #include <filesystem>
-#include <iostream>
 #include <map>
-#include <stack>
 #include <string>
 #include <unordered_set>
 #include <vector>
@@ -15,7 +13,6 @@
 struct KernelConfig {
     std::string name;
     std::string underscored_name;
-    using RepoInfo = RepoInfo;
     RepoInfo repo_info;
     enum class Arch { ARM = 1, ARM64, X86, X86_64, MAX = X86_64 } arch{};
     enum class Type {
