@@ -14,6 +14,7 @@
 
 struct KernelConfig {
     std::string name;
+    std::string underscored_name;
     using RepoInfo = RepoInfo;
     RepoInfo repo_info;
     enum class Arch { ARM = 1, ARM64, X86, X86_64, MAX = X86_64 } arch{};
@@ -31,7 +32,6 @@ struct KernelConfig {
     struct AnyKernel {
         bool enabled;
         std::filesystem::path relative_directory;
-        std::vector<std::filesystem::path> additional_files;
     } anyKernel{};
     struct Defconfig {
         std::string scheme;

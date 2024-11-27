@@ -7,6 +7,7 @@
 #include <fmt/chrono.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <trivial_helpers/_tgbot.h>
 #include <zip.h>
 
 #include <Compiler.hpp>
@@ -25,10 +26,11 @@
 #include <thread>
 #include <utility>
 
-#include "api/TgBotApi.hpp"
 #include "support/CwdRestorar.hpp"
 #include "support/KeyBoardBuilder.hpp"
+#include "tgbot/types/InlineQueryResultArticle.h"
 #include "tgbot/types/InputFile.h"
+#include "tgbot/types/InputTextMessageContent.h"
 #include "trivial_helpers/raii.hpp"
 
 class Zip {
@@ -112,7 +114,8 @@ class Zip {
                                               entry.path().filename().string());
             if (entry.is_directory()) {
                 addDir(entry.path(), zipentry);
-            } else if (entry.is_regular_file()) {
+            } else if (entry.is_regular_file() &&
+                       !entry.path().filename().string().starts_with(".")) {
                 addFile(entry.path(), zipentry);
             } else {
                 LOG(WARNING) << "Skipping non-regular file: " << entry.path();
@@ -148,6 +151,7 @@ class Zip {
 };
 
 class ForkAndRunKernel : public ForkAndRun {
+    constexpr static std::string_view kInlineQueryKey = "kernelbuild status";
     DeferredExit runFunction() override;
     void handleStderrData(const BufferViewType buffer) override {
         ForkAndRun::handleStderrData(buffer);
@@ -156,8 +160,7 @@ class ForkAndRunKernel : public ForkAndRun {
     void handleStdoutData(const BufferViewType buffer) override {
         using std::chrono::system_clock;
         if (system_clock::now() - tp > std::chrono::seconds(5)) {
-            api_->editMessage<TgBotApi::ParseMode::HTML>(
-                message_,
+            std::string text = textContent->messageText =
                 fmt::format(R"(<blockquote>Start Time: {} (GMT)
 Time Spent: {:%M minutes %S seconds}</blockquote>
 
@@ -165,12 +168,15 @@ Time Spent: {:%M minutes %S seconds}</blockquote>
                             start,
                             std::chrono::duration_cast<std::chrono::seconds>(
                                 system_clock::now() - start),
-                            buffer));
+                            buffer);
+            api_->editMessage<TgBotApi::ParseMode::HTML>(message_, text);
+
             tp = system_clock::now();
         }
     }
 
     void onExit(int code) override {
+        api_->removeInlineQueryKeyboard(kInlineQueryKey);
         ForkAndRun::onExit(code);
 
         api_->editMessage(message_, fmt::format("Exit code: {}", code));
@@ -194,14 +200,15 @@ Time Spent: {:%M minutes %S seconds}</blockquote>
         std::chrono::system_clock::now();
     std::vector<std::string> args_;
     std::vector<std::string> defconfigArgs_;
-    TgBotApi::CPtr api_;
+    TgBotApi::Ptr api_;
     Message::Ptr message_;
     std::stringstream errorOutput_;
     std::filesystem::path kernelPath_;
     std::optional<bool> ret;
+    TgBot::InputTextMessageContent::Ptr textContent;
 
    public:
-    ForkAndRunKernel(TgBotApi::CPtr api, Message::Ptr message,
+    ForkAndRunKernel(TgBotApi::Ptr api, Message::Ptr message,
                      std::filesystem::path kernelDirectory,
                      std::vector<std::string> args,
                      std::vector<std::string> defconfigArgs)
@@ -209,7 +216,27 @@ Time Spent: {:%M minutes %S seconds}</blockquote>
           defconfigArgs_(std::move(defconfigArgs)),
           api_(api),
           message_(std::move(message)),
-          kernelPath_(std::move(kernelDirectory)) {}
+          kernelPath_(std::move(kernelDirectory)) {
+        auto kernelBuild(std::make_shared<TgBot::InlineQueryResultArticle>());
+        kernelBuild->title = "Build progress";
+        kernelBuild->description = fmt::format(
+            "Show the build progress running in chat {}", message_->chat);
+        kernelBuild->id = fmt::format("kernelbuild-{}", message_->messageId);
+        kernelBuild->inputMessageContent = textContent =
+            std::make_shared<TgBot::InputTextMessageContent>();
+        // TODO: Don't hardcode this
+        kernelBuild->thumbnailUrl =
+            "https://raw.githubusercontent.com/Royna2544/c_cpp_telegrambot/"
+            "refs/heads/master/resources/photo/build.webp";
+        textContent->parseMode =
+            TgBotApi::parseModeToStr<TgBotApi::ParseMode::HTML>();
+        textContent->messageText = "Not yet ready...";
+        api->addInlineQueryKeyboard(
+            TgBotApi::InlineQuery{kInlineQueryKey.data(),
+                                  "See the Kernel build progress",
+                                  "kernelbuild", false, true},
+            kernelBuild);
+    }
 
     bool writeErr(const std::filesystem::path& where) const {
         std::ofstream file(where);
@@ -227,7 +254,7 @@ Time Spent: {:%M minutes %S seconds}</blockquote>
 };
 
 class KernelBuildHandler {
-    TgBotApi::CPtr _api;
+    TgBotApi::Ptr _api;
     std::vector<KernelConfig> configs;
 
     struct {
@@ -241,8 +268,7 @@ class KernelBuildHandler {
     constexpr static std::string_view kOutDirectory = "out";
     constexpr static std::string_view kToolchainDirectory = "toolchain";
     constexpr static std::string_view kCallbackQueryPrefix = "kernel_build_";
-    KernelBuildHandler(TgBotApi::CPtr api, const CommandLine* line)
-        : _api(api) {
+    KernelBuildHandler(TgBotApi::Ptr api, const CommandLine* line) : _api(api) {
         auto jsonDir =
             line->getPath(FS::PathType::RESOURCES) / "builder" / "kernel";
 
@@ -361,10 +387,9 @@ class KernelBuildHandler {
         handle_select_INTERNAL(query);
     }
 
-    void handle_continue(TgBot::CallbackQuery::Ptr query) {
+    std::vector<std::string> craftArgs() const {
         std::vector<std::string> args{"make",
                                       fmt::format("O={}", kOutDirectory)};
-        std::vector<std::string> defconfigArgs;
         std::string arch = "ARCH=";
         switch (intermidiates.current->arch) {
             case KernelConfig::Arch::ARM:
@@ -392,20 +417,32 @@ class KernelBuildHandler {
              ToolchainConfig::getVariables(intermidiates.current->clang)) {
             args.emplace_back(fmt::format("{}={}", key, value));
         }
-        defconfigArgs.emplace_back(
-            absl::StrReplaceAll(intermidiates.current->defconfig.scheme,
-                                {{"{device}", intermidiates.device}}));
+        args.emplace_back(
+            fmt::format("-j{}", std::thread::hardware_concurrency()));
+        return args;
+    }
+
+    std::vector<std::string> craftDefconfigArgs() const {
+        std::vector<std::string> defconfigArgs;
+        std::map<std::string, std::string> kReplacements = {
+            {"{device}", intermidiates.device}};
+        defconfigArgs.emplace_back(absl::StrReplaceAll(
+            intermidiates.current->defconfig.scheme, kReplacements));
         for (const auto& preference : intermidiates.fragment_preference) {
             if (preference.second) {
                 DLOG(INFO) << "Enabled fragment: " << preference.first;
                 // Add the fragment to the build arguments
                 defconfigArgs.emplace_back(absl::StrReplaceAll(
                     intermidiates.current->fragments[preference.first].scheme,
-                    {{"{device}", intermidiates.device}}));
+                    kReplacements));
             }
         }
-        args.emplace_back(
-            fmt::format("-j{}", std::thread::hardware_concurrency()));
+        return defconfigArgs;
+    }
+
+    void handle_continue(TgBot::CallbackQuery::Ptr query) {
+        std::vector<std::string> args = craftArgs();
+        std::vector<std::string> defconfigArgs = craftDefconfigArgs();
         std::filesystem::path kernelDir =
             "/home/royna/universal_android_kernelbuilder/Eureka_Kernel";
 
@@ -417,14 +454,17 @@ class KernelBuildHandler {
             _api->editMessage(query->message, "Failed to execute build");
         }
         if (kernel.result() && intermidiates.current->anyKernel.enabled) {
-            Zip zip("my_amazin_zip");
+            auto zipname = fmt::format(
+                "{}_{}_{:%F}.zip", intermidiates.current->underscored_name,
+                intermidiates.device, std::chrono::system_clock::now());
+            Zip zip(zipname);
             zip.addDir(
                 kernelDir / intermidiates.current->anyKernel.relative_directory,
                 "");
             zip.save();
             _api->sendDocument(
                 query->message->chat,
-                TgBot::InputFile::fromFile("my_amazin_zip", "archive/zip"));
+                TgBot::InputFile::fromFile(zipname, "archive/zip"));
         }
     }
 

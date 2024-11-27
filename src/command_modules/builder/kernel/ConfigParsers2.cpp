@@ -2,9 +2,11 @@
 
 #include <absl/log/log.h>
 #include <absl/strings/match.h>
+#include <absl/strings/str_replace.h>
 
 #include <filesystem>
 #include <fstream>
+#include <string_view>
 #include <type_traits>
 #include <vector>
 
@@ -108,6 +110,12 @@ struct StackingError {
 bool KernelConfig::parse(const Json::Value& node) {
     StackingError errors;
     errors = get(node, "name", &name);
+    underscored_name = absl::StrReplaceAll(name, {
+                                                     {" ", "_"},
+                                                     {"-", "_"},
+                                                     {".", "_"},
+                                                 });
+    LOG(INFO) << "underscored_name=" << underscored_name;
     errors = get(node, "repo", "url", &repo_info.url);
     errors = get(node, "repo", "branch", &repo_info.branch);
     std::string archStr;
@@ -160,8 +168,6 @@ bool KernelConfig::parse(const Json::Value& node) {
     if (anyKernel.enabled) {
         errors =
             get(node, "anykernel", "location", &anyKernel.relative_directory);
-        errors = get(node, "anykernel", "additionalFiles",
-                     &anyKernel.additional_files);
     }
     errors = get(node, "defconfig", "scheme", &defconfig.scheme);
     errors = get(node, "defconfig", "devices", &defconfig.devices);
