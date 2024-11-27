@@ -6,24 +6,31 @@
 #include <regex>
 #include <stdexcept>
 
+#include "ConfigParsers2.hpp"
 #include "command_modules/builder/ForkAndRun.hpp"
 
-Compiler::Compiler(std::filesystem::path path) : _path(std::move(path)) {
-    const std::string filename = _path.filename().string();
-    if (filename.ends_with("gcc")) {
-        if (absl::StrContains(filename, "android-")) {
-            type = Type::GCCAndroid;
-        } else {
-            type = Type::GCC;
-        }
-    } else if (filename == "clang") {
-        type = Type::Clang;
-    } else {
-        throw std::invalid_argument("Unknown compiler name: " + filename);
+Compiler::Compiler(std::filesystem::path toolchainPath, KernelConfig::Arch arch,
+                   Type type)
+    : type(type), _rootPath(std::move(toolchainPath)) {
+    _path = _rootPath / "bin";
+
+    switch (type) {
+        case Type::GCC:
+        case Type::GCCAndroid:
+            _path /= std::string(triple(arch)).append("gcc");
+            break;
+        case Type::Clang:
+            _path /= "clang";
+            break;
+        default:
+            throw std::invalid_argument("Unsupported compiler type");
     }
+    LOG(INFO) << "Compiler CC path: " << _path;
+    compilerVersion = _version();
+    LOG(INFO) << "version: " << compilerVersion;
 }
 
-std::string_view Compiler::getTriple(KernelConfig::Arch arch) const {
+std::string_view Compiler::triple(KernelConfig::Arch arch) const {
     // clang-format off
     return std::ranges::find_if(std::ranges::find_if(kCompilersTripleMap, [this](const PerCompilerTripleMapPair& map) {
         return map.first == type;
@@ -65,7 +72,7 @@ class OutputGetter : private ForkAndRun {
     }
 };
 
-std::string Compiler::version() const {
+std::string Compiler::_version() const {
     OutputGetter getter(_path);
     std::string version;
     try {
@@ -77,7 +84,7 @@ std::string Compiler::version() const {
     std::smatch match;
     switch (type) {
         case Type::GCC:
-        case Type::GCCAndroid:{
+        case Type::GCCAndroid: {
             std::regex gcc_version_re(R"((.*?gcc \(.*\) \d+(\.\d+)*))");
             if (std::regex_search(version, match, gcc_version_re)) {
                 return match[1].str();
@@ -89,7 +96,13 @@ std::string Compiler::version() const {
                 return match[1].str();
             }
         }
-        default: [[unlikely]]
-            return {};
+        default:
+            [[unlikely]] return {};
     }
 }
+
+std::string Compiler::version() const {
+    return compilerVersion;
+}
+
+std::filesystem::path Compiler::path() const { return _rootPath; }

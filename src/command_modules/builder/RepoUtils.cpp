@@ -444,17 +444,14 @@ bool GitBranchSwitcher::operator()() const {
     return true;
 }
 
-bool GitUtils::git_clone(const RepoInfo& options,
-                         const std::filesystem::path& directory) {
+bool RepoInfo::git_clone(const std::filesystem::path& directory) {
     git_repository_ptr repo;
     git_clone_options gitoptions = GIT_CLONE_OPTIONS_INIT;
 
     ScopedLibGit2 _;
-    LOG(INFO) << "Cloning repository, url: " << options.url
-              << ", branch: " << options.branch;
-    gitoptions.checkout_branch = options.branch.c_str();
-    int ret =
-        ::git_clone(repo, options.url.c_str(), directory.c_str(), &gitoptions);
+    LOG(INFO) << "Cloning repository, url: " << url << ", branch: " << branch;
+    gitoptions.checkout_branch = branch.c_str();
+    int ret = ::git_clone(repo, url.c_str(), directory.c_str(), &gitoptions);
     if (ret != 0) {
         const auto* fault = git_error_last();
         LOG(ERROR) << "Couldn't clone repo: " << fault->message;

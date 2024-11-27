@@ -20,6 +20,7 @@
 #include <utility>
 
 #include "ForkAndRun.hpp"
+#include "ProgressBar.hpp"
 #include "api/TgBotApi.hpp"
 
 namespace {
@@ -66,17 +67,6 @@ std::string findREL() {
     LOG(INFO) << "Not found";
     // Ignore if we failed to open, these paths are only valid in Android 14+
     return {};
-}
-
-template <typename T>
-concept hasUsageFleid = requires(T t) {
-    { t.usage } -> std::same_as<Percent&>;
-};
-
-template <hasUsageFleid T, typename... Args>
-std::string getPercent(Args&&... args) {
-    T percent(std::forward<Args&&>(args...)...);
-    return progressbar::create(percent.usage.value);
 }
 }  // namespace
 

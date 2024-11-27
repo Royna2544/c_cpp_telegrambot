@@ -177,11 +177,18 @@ bool KernelConfig::parse(const Json::Value& node) {
         int_errors = get(fragment, "name", &frag.name);
         int_errors = get(fragment, "scheme", &frag.scheme);
         int_errors = get(fragment, "depends", &frag.depends);
-        int_errors = get(fragment, "devices", &frag.target_devices);
         int_errors = get(fragment, "default_enabled", &frag.default_enabled);
         int_errors = get(fragment, "description", &frag.description);
         DLOG(INFO) << "Parsed fragment: " << frag.name;
         fragments[frag.name] = frag;
+    }
+    for (const auto& fragment : node["env"]) {
+        std::pair<std::string, std::string> env;
+        StackingError int_errors;
+        int_errors = get(fragment, "name", &env.first);
+        int_errors = get(fragment, "value", &env.second);
+        DLOG(INFO) << "ENV " << env.first << '=' << env.second;
+        envMap.emplace(env);
     }
     DependencyChecker checker(&fragments);
     if (checker.hasDependencyLoop()) {

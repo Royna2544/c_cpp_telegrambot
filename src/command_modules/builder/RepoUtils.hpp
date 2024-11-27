@@ -8,14 +8,8 @@
 struct RepoInfo {
     std::string url;
     std::string branch;
-};
 
-class GitUtils {
-   public:
-    using RepoInfo = ::RepoInfo;
-
-    static bool git_clone(const RepoInfo& options,
-                          const std::filesystem::path& directory);
+    bool git_clone(const std::filesystem::path& directory);
 };
 
 struct GitBranchSwitcher {

@@ -1,0 +1,52 @@
+{
+    "name": "Exynos9611 Grass Kernel",
+    "repo": {
+        "url": "https://github.com/Roynas-Android-Playground/kernel_samsung_universal9611",
+        "branch": "Grass-Unified"
+    },
+    "arch": "arm64",
+    "type": "Image",
+    "toolchains": {
+        "Clang": true,
+        "LLVM Binutils": true,
+        "LLVM IAS": true
+    },
+    "anykernel": {
+        "enabled": true,
+        "location": "AnyKernel3"
+    },
+    "defconfig": {
+        "scheme": "vendor/{device}_defconfig",
+        "devices": [
+            "a51",
+            "m21",
+            "m31",
+            "m31s",
+            "f41",
+            "gta4xl"
+        ]
+    },
+    "fragments": [
+        {
+            "name": "Grass features",
+            "scheme": "vendor/grass.config",
+            "depends": [],
+            "description": "GrassKernel modifications",
+            "default_enabled": true
+        },
+        {
+            "name": "Device specific",
+            "scheme": "vendor/{device}.config",
+            "depends": [],
+            "description": "Device specific configs",
+            "default_enabled": true
+        },
+        {
+            "name": "AOSP config",
+            "scheme": "vendor/aosp.config",
+            "depends": [],
+            "description": "Enable AOSP ROMs support",
+            "default_enabled": false
+        }
+    ]
+}

@@ -410,7 +410,6 @@ add_my_executable(
     src/api/components/Restart.cpp
     src/api/components/ModuleManagement.cpp
     src/api/components/UnknownCommand.cpp
-    src/global_handlers/RegEXHandler.cpp
     src/global_handlers/SpamBlocker.cpp
     src/global_handlers/SpamBlockManager.cpp
     src/global_handlers/ChatObserver.cpp

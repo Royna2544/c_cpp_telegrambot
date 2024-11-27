@@ -7,261 +7,52 @@
 #include <fmt/chrono.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+#include <tgbot/types/InlineQueryResultArticle.h>
+#include <tgbot/types/InputFile.h>
+#include <tgbot/types/InputTextMessageContent.h>
 #include <trivial_helpers/_tgbot.h>
-#include <zip.h>
 
 #include <Compiler.hpp>
 #include <ConfigParsers2.hpp>
 #include <ForkAndRun.hpp>
 #include <StructF.hpp>
+#include <SystemInfo.hpp>
 #include <ToolchainConfig.hpp>
+#include <ToolchainProvider.hpp>
 #include <api/CommandModule.hpp>
 #include <api/MessageExt.hpp>
+#include <archives/Zip.hpp>
 #include <chrono>
+#include <concepts>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <mutex>
+#include <regex>
 #include <system_error>
 #include <thread>
 #include <utility>
 
+#include "Diagnosis.hpp"
+#include "ProgressBar.hpp"
+#include "api/TgBotApi.hpp"
 #include "support/CwdRestorar.hpp"
 #include "support/KeyBoardBuilder.hpp"
-#include "tgbot/types/InlineQueryResultArticle.h"
-#include "tgbot/types/InputFile.h"
-#include "tgbot/types/InputTextMessageContent.h"
-#include "trivial_helpers/raii.hpp"
-
-class Zip {
-    zip_t* zip = nullptr;
-    std::vector<std::pair<void*, size_t>> mappedFiles;
-
-   public:
-    Zip(const Zip&) = delete;
-    Zip& operator=(const Zip&) = delete;
-
-    ~Zip() {
-        if (zip != nullptr) {
-            save();
-        }
-    }
-    explicit Zip(const std::filesystem::path& path) { open(path); }
-    Zip() = default;
-
-    bool open(const std::filesystem::path& path) {
-        // Create a new zip archive
-        int err = 0;
-        zip = zip_open(path.string().c_str(), ZIP_CREATE | ZIP_TRUNCATE, &err);
-        if (zip == nullptr) {
-            std::array<char, 1024> errbuf{};
-            zip_error_to_str(errbuf.data(), errbuf.size(), err, errno);
-            LOG(ERROR) << fmt::format("Cannot open zip archive: {}",
-                                      std::string(errbuf.data()));
-            return false;
-        }
-        return true;
-    }
-
-    bool addFile(const std::filesystem::path& filepath,
-                 const std::string_view entryname) {
-        // Open the file
-        auto fd = RAII2<int>::create<int>(
-            ::open(filepath.string().c_str(), O_RDONLY), &close);
-        if (*fd == -1) {
-            PLOG(ERROR) << "Couldn't open file " << filepath;
-            fd.reset();
-            return false;
-        }
-
-        // Get the file size
-        struct stat sb {};
-        if (fstat(*fd, &sb) == -1) {
-            PLOG(ERROR) << "Failed to stat file " << filepath;
-            return false;
-        }
-        size_t filesize = sb.st_size;
-        if (filesize == 0) {
-            DLOG(INFO) << "Skipping file " << filepath;
-            return true;
-        }
-
-        // Memory map the file
-        void* mapped = mmap(nullptr, filesize, PROT_READ, MAP_PRIVATE, *fd, 0);
-        if (mapped == MAP_FAILED) {
-            PLOG(ERROR) << "Failed to map file " << filepath;
-            return false;
-        }
-
-        // Add file to the zip archive
-        zip_source_t* source = zip_source_buffer(zip, mapped, filesize, 0);
-        if (source == nullptr ||
-            zip_file_add(zip, entryname.data(), source, ZIP_FL_OVERWRITE) < 0) {
-            LOG(ERROR) << "Cannot add file " << entryname
-                       << " to zip: " << zip_strerror(zip);
-            zip_source_free(source);
-        }
-        mappedFiles.emplace_back(mapped, filesize);
-        return true;
-    }
-
-    bool addDir(const std::filesystem::path& dirpath,
-                const std::filesystem::path& ziproot) {
-        std::error_code ec;
-        for (const auto& entry :
-             std::filesystem::directory_iterator(dirpath, ec)) {
-            const auto zipentry = fmt::format("{}/{}", ziproot.string(),
-                                              entry.path().filename().string());
-            if (entry.is_directory()) {
-                addDir(entry.path(), zipentry);
-            } else if (entry.is_regular_file() &&
-                       !entry.path().filename().string().starts_with(".")) {
-                addFile(entry.path(), zipentry);
-            } else {
-                LOG(WARNING) << "Skipping non-regular file: " << entry.path();
-            }
-        }
-        if (ec) {
-            LOG(ERROR) << "Error while iterating over directory: "
-                       << ec.message();
-            return false;
-        }
-        return true;
-    }
-
-    bool save() {
-        if (zip == nullptr) {
-            LOG(ERROR) << "Cannot save zip archive, it's already closed";
-            return false;
-        }
-        int err = zip_close(zip);
-        if (err != 0) {
-            LOG(ERROR) << "Failed to close zip archive: " << zip_strerror(zip);
-            return false;
-        }
-        for (const auto& [memory, size] : mappedFiles) {
-            int ret = munmap(memory, size);
-            if (ret != 0) {
-                PLOG(ERROR) << "Failed to unmap memory";
-            }
-        }
-        zip = nullptr;
-        return true;
-    }
-};
-
-class ForkAndRunKernel : public ForkAndRun {
-    constexpr static std::string_view kInlineQueryKey = "kernelbuild status";
-    DeferredExit runFunction() override;
-    void handleStderrData(const BufferViewType buffer) override {
-        ForkAndRun::handleStderrData(buffer);
-        errorOutput_ << buffer;
-    }
-    void handleStdoutData(const BufferViewType buffer) override {
-        using std::chrono::system_clock;
-        if (system_clock::now() - tp > std::chrono::seconds(5)) {
-            std::string text = textContent->messageText =
-                fmt::format(R"(<blockquote>Start Time: {} (GMT)
-Time Spent: {:%M minutes %S seconds}</blockquote>
-
-<blockquote>{}</blockquote>)",
-                            start,
-                            std::chrono::duration_cast<std::chrono::seconds>(
-                                system_clock::now() - start),
-                            buffer);
-            api_->editMessage<TgBotApi::ParseMode::HTML>(message_, text);
-
-            tp = system_clock::now();
-        }
-    }
-
-    void onExit(int code) override {
-        api_->removeInlineQueryKeyboard(kInlineQueryKey);
-        ForkAndRun::onExit(code);
-
-        api_->editMessage(message_, fmt::format("Exit code: {}", code));
-        if (code != 0) {
-            auto tempLog = std::filesystem::temp_directory_path() / "tmp.log";
-            if (writeErr(tempLog)) {
-                api_->sendDocument(
-                    message_->chat,
-                    TgBot::InputFile::fromFile(tempLog, "text/plain"),
-                    "Stderr log");
-            }
-            std::filesystem::remove(tempLog);
-            ret = false;
-        } else {
-            ret = true;
-        }
-    }
-
-    std::chrono::system_clock::time_point tp = std::chrono::system_clock::now();
-    std::chrono::system_clock::time_point start =
-        std::chrono::system_clock::now();
-    std::vector<std::string> args_;
-    std::vector<std::string> defconfigArgs_;
-    TgBotApi::Ptr api_;
-    Message::Ptr message_;
-    std::stringstream errorOutput_;
-    std::filesystem::path kernelPath_;
-    std::optional<bool> ret;
-    TgBot::InputTextMessageContent::Ptr textContent;
-
-   public:
-    ForkAndRunKernel(TgBotApi::Ptr api, Message::Ptr message,
-                     std::filesystem::path kernelDirectory,
-                     std::vector<std::string> args,
-                     std::vector<std::string> defconfigArgs)
-        : args_(std::move(args)),
-          defconfigArgs_(std::move(defconfigArgs)),
-          api_(api),
-          message_(std::move(message)),
-          kernelPath_(std::move(kernelDirectory)) {
-        auto kernelBuild(std::make_shared<TgBot::InlineQueryResultArticle>());
-        kernelBuild->title = "Build progress";
-        kernelBuild->description = fmt::format(
-            "Show the build progress running in chat {}", message_->chat);
-        kernelBuild->id = fmt::format("kernelbuild-{}", message_->messageId);
-        kernelBuild->inputMessageContent = textContent =
-            std::make_shared<TgBot::InputTextMessageContent>();
-        // TODO: Don't hardcode this
-        kernelBuild->thumbnailUrl =
-            "https://raw.githubusercontent.com/Royna2544/c_cpp_telegrambot/"
-            "refs/heads/master/resources/photo/build.webp";
-        textContent->parseMode =
-            TgBotApi::parseModeToStr<TgBotApi::ParseMode::HTML>();
-        textContent->messageText = "Not yet ready...";
-        api->addInlineQueryKeyboard(
-            TgBotApi::InlineQuery{kInlineQueryKey.data(),
-                                  "See the Kernel build progress",
-                                  "kernelbuild", false, true},
-            kernelBuild);
-    }
-
-    bool writeErr(const std::filesystem::path& where) const {
-        std::ofstream file(where);
-        if (file.is_open()) {
-            file << errorOutput_.str();
-            file.close();
-            return true;
-        } else {
-            LOG(ERROR) << "Cannot write error output to " << where;
-            return false;
-        }
-    }
-
-    bool result() const { return *ret; }
-};
 
 class KernelBuildHandler {
-    TgBotApi::Ptr _api;
-    std::vector<KernelConfig> configs;
-
-    struct {
+   public:
+    struct Intermidates {
         KernelConfig* current{};
         std::string device;
         std::map<std::string, bool> fragment_preference;
-    } intermidiates;
+    };
+
+   private:
+    TgBotApi::Ptr _api;
+    std::vector<KernelConfig> configs;
+
+    Intermidates intermidiates;
     std::filesystem::path kernelDir;
 
    public:
@@ -387,85 +178,50 @@ class KernelBuildHandler {
         handle_select_INTERNAL(query);
     }
 
-    std::vector<std::string> craftArgs() const {
-        std::vector<std::string> args{"make",
-                                      fmt::format("O={}", kOutDirectory)};
-        std::string arch = "ARCH=";
-        switch (intermidiates.current->arch) {
-            case KernelConfig::Arch::ARM:
-                arch += "arm";
-                break;
-            case KernelConfig::Arch::ARM64:
-                arch += "arm64";
-                break;
-            case KernelConfig::Arch::X86:
-                arch += "x86";
-                break;
-            case KernelConfig::Arch::X86_64:
-                arch += "x86_64";
-                break;
-        }
-        args.push_back(arch);
-        Compiler compiler("clang");
-        LOG(INFO) << "Compiler version: " << compiler.version();
-        if (intermidiates.current->arch != KernelConfig::Arch::X86_64) {
-            args.emplace_back(
-                fmt::format("CROSS_COMPILE={}",
-                            compiler.getTriple(intermidiates.current->arch)));
-        }
-        for (const auto& [key, value] :
-             ToolchainConfig::getVariables(intermidiates.current->clang)) {
-            args.emplace_back(fmt::format("{}={}", key, value));
-        }
-        args.emplace_back(
-            fmt::format("-j{}", std::thread::hardware_concurrency()));
-        return args;
-    }
+    void handle_continue(TgBot::CallbackQuery::Ptr query);
 
-    std::vector<std::string> craftDefconfigArgs() const {
-        std::vector<std::string> defconfigArgs;
-        std::map<std::string, std::string> kReplacements = {
-            {"{device}", intermidiates.device}};
-        defconfigArgs.emplace_back(absl::StrReplaceAll(
-            intermidiates.current->defconfig.scheme, kReplacements));
-        for (const auto& preference : intermidiates.fragment_preference) {
-            if (preference.second) {
-                DLOG(INFO) << "Enabled fragment: " << preference.first;
-                // Add the fragment to the build arguments
-                defconfigArgs.emplace_back(absl::StrReplaceAll(
-                    intermidiates.current->fragments[preference.first].scheme,
-                    kReplacements));
+    template <std::derived_from<toolchains::Provider> T>
+    std::optional<Compiler> download(Compiler::Type type) const {
+        T toolchain;
+        std::error_code ec;
+        // Assume bin/ is always valid path for a valid toolchain...
+        if (!std::filesystem::is_directory(kernelDir / T::dirname / "bin",
+                                           ec)) {
+            if (!toolchain.downloadTo(kernelDir / T::dirname)) {
+                LOG(ERROR) << "Failed to download toolchain";
+                return std::nullopt;
             }
+            LOG(INFO) << "Downloaded toolchain";
+        } else {
+            LOG(INFO) << "Already exists, skip download";
         }
-        return defconfigArgs;
+        return Compiler{kernelDir / T::dirname, intermidiates.current->arch,
+                        type};
     }
 
-    void handle_continue(TgBot::CallbackQuery::Ptr query) {
-        std::vector<std::string> args = craftArgs();
-        std::vector<std::string> defconfigArgs = craftDefconfigArgs();
-        std::filesystem::path kernelDir =
-            "/home/royna/universal_android_kernelbuilder/Eureka_Kernel";
-
-        ForkAndRunKernel kernel(_api, query->message, kernelDir,
-                                std::move(args), std::move(defconfigArgs));
-
-        _api->editMessage(query->message, "Kernel building...");
-        if (!kernel.execute()) {
-            _api->editMessage(query->message, "Failed to execute build");
+    std::optional<Compiler> download_toolchain() {
+        switch (intermidiates.current->clang) {
+            case KernelConfig::ClangSupport::None:
+                switch (intermidiates.current->arch) {
+                    case KernelConfig::Arch::ARM: {
+                        return download<toolchains::GCCAndroidARMProvider>(
+                            Compiler::Type::GCCAndroid);
+                    }
+                    case KernelConfig::Arch::ARM64: {
+                        return download<toolchains::GCCAndroidARM64Provider>(
+                            Compiler::Type::GCCAndroid);
+                    }
+                    default:
+                        break;
+                }
+                break;
+            case KernelConfig::ClangSupport::Clang:
+            case KernelConfig::ClangSupport::FullLLVM:
+            case KernelConfig::ClangSupport::FullLLVMWithIAS:
+                return download<toolchains::ClangProvider>(
+                    Compiler::Type::Clang);
         }
-        if (kernel.result() && intermidiates.current->anyKernel.enabled) {
-            auto zipname = fmt::format(
-                "{}_{}_{:%F}.zip", intermidiates.current->underscored_name,
-                intermidiates.device, std::chrono::system_clock::now());
-            Zip zip(zipname);
-            zip.addDir(
-                kernelDir / intermidiates.current->anyKernel.relative_directory,
-                "");
-            zip.save();
-            _api->sendDocument(
-                query->message->chat,
-                TgBot::InputFile::fromFile(zipname, "archive/zip"));
-        }
+        return std::nullopt;
     }
 
     void handleCallbackQuery(TgBot::CallbackQuery::Ptr query) {
@@ -486,7 +242,275 @@ class KernelBuildHandler {
             LOG(WARNING) << "Unknown query: " << query->data;
         }
     }
+
+    static bool link(const std::filesystem::path& path,
+                     const std::filesystem::path& created) {
+        std::error_code ec;
+        std::filesystem::remove(created, ec);
+        if (ec) {
+            LOG(ERROR) << "Failed to remove existing file: " << ec.message();
+            return false;
+        }
+        std::filesystem::create_directory_symlink(path, created, ec);
+        LOG(INFO) << "Create symlink: " << path << " to " << created;
+        if (ec) {
+            LOG(ERROR) << "Failed to create symlink: " << ec.message();
+            return false;
+        }
+        return true;
+    }
 };
+
+class ForkAndRunKernel : public ForkAndRun {
+    constexpr static std::string_view kInlineQueryKey = "kernelbuild status";
+    DeferredExit runFunction() override;
+    void handleStderrData(const BufferViewType buffer) override {
+        ForkAndRun::handleStderrData(buffer);
+        const std::lock_guard<std::mutex> _(output_mutex_);
+        output_ << buffer;
+    }
+    void handleStdoutData(const BufferViewType buffer) override {
+        using std::chrono::system_clock;
+        if (system_clock::now() - tp > std::chrono::seconds(5)) {
+            std::string text = textContent->messageText = fmt::format(
+                R"(<blockquote>Start Time: {} (GMT)
+Time Spent: {:%M minutes %S seconds}
+Kernel Name: {}
+Compiler: {}</blockquote>
+
+<blockquote>📱 <b>Device</b>: {}
+💻 <b>CPU</b>: {}
+💾 <b>Memory</b>: {}</blockquote>
+
+<blockquote>{}</blockquote>)",
+                start,
+                std::chrono::duration_cast<std::chrono::seconds>(
+                    system_clock::now() - start),
+                intermidates_->current->name, compiler_.version(),
+                intermidates_->device, getPercent<CPUInfo>(),
+                getPercent<MemoryInfo>(), buffer);
+            api_->editMessage<TgBotApi::ParseMode::HTML>(message_, text);
+            tp = system_clock::now();
+        }
+        const std::lock_guard<std::mutex> _(output_mutex_);
+        output_ << buffer;
+    }
+
+    void onExit(int code) override {
+        api_->removeInlineQueryKeyboard(kInlineQueryKey);
+        ForkAndRun::onExit(code);
+
+        api_->editMessage<TgBotApi::ParseMode::HTML>(
+            message_,
+            fmt::format(R"(<blockquote>Device: {}
+Kernel Name: {}
+Took: {:%M minutes %S seconds}
+Exit code: {}</blockquote>)",
+                        intermidates_->device, intermidates_->current->name,
+                        std::chrono::duration_cast<std::chrono::seconds>(
+                            std::chrono::system_clock::now() - start),
+                        code));
+        if (code != 0) {
+            auto tempLog = std::filesystem::temp_directory_path() / "tmp.log";
+            if (writeErr(tempLog)) {
+                api_->sendDocument(
+                    message_->chat,
+                    TgBot::InputFile::fromFile(tempLog, "text/plain"),
+                    "Output of failed build");
+            }
+            std::filesystem::remove(tempLog);
+            ret = false;
+        } else {
+            ret = true;
+        }
+
+        std::string line;
+        while (std::getline(output_, line)) {
+            Diagnosis diag(line);
+            if (diag.valid) {
+                LOG(INFO) << diag.file_path << " has warning " << diag.message;
+            }
+            UndefinedSym sym(line);
+            if (sym.valid) {
+                LOG(INFO) << "undefined symbol " << sym.symbol;
+            }
+        }
+    }
+
+    std::vector<std::string> craftArgs() const {
+        std::vector<std::string> args{
+            "make", fmt::format("O={}", KernelBuildHandler::kOutDirectory)};
+        std::string arch = "ARCH=";
+        switch (intermidates_->current->arch) {
+            case KernelConfig::Arch::ARM:
+                arch += "arm";
+                break;
+            case KernelConfig::Arch::ARM64:
+                arch += "arm64";
+                break;
+            case KernelConfig::Arch::X86:
+                arch += "x86";
+                break;
+            case KernelConfig::Arch::X86_64:
+                arch += "x86_64";
+                break;
+        }
+        args.push_back(arch);
+        // If host architecture is not same, then we are cross compiling
+        if (intermidates_->current->arch != KernelConfig::Arch::X86_64) {
+            args.emplace_back(
+                fmt::format("CROSS_COMPILE={}",
+                            compiler_.triple(intermidates_->current->arch)));
+        }
+        // Add CROSS_COMPILE_ARM32 for ARM64 platforms.
+        if (intermidates_->current->arch == KernelConfig::Arch::ARM64) {
+            args.emplace_back(
+                fmt::format("CROSS_COMPILE_ARM32={}",
+                            compiler_.triple(KernelConfig::Arch::ARM)));
+        }
+        // Adding clang support specific overrides
+        for (const auto& [key, value] :
+             ToolchainConfig::getVariables(intermidates_->current->clang)) {
+            args.emplace_back(fmt::format("{}={}", key, value));
+        }
+        args.emplace_back(
+            fmt::format("-j{}", std::thread::hardware_concurrency()));
+        return args;
+    }
+
+    std::vector<std::string> craftDefconfigArgs() const {
+        std::vector<std::string> defconfigArgs;
+        std::map<std::string, std::string> kReplacements = {
+            {"{device}", intermidates_->device}};
+        defconfigArgs.emplace_back(absl::StrReplaceAll(
+            intermidates_->current->defconfig.scheme, kReplacements));
+        for (const auto& preference : intermidates_->fragment_preference) {
+            if (preference.second) {
+                DLOG(INFO) << "Enabled fragment: " << preference.first;
+                // Add the fragment to the build arguments
+                defconfigArgs.emplace_back(absl::StrReplaceAll(
+                    intermidates_->current->fragments[preference.first].scheme,
+                    kReplacements));
+            }
+        }
+        return defconfigArgs;
+    }
+
+    std::chrono::system_clock::time_point tp = std::chrono::system_clock::now();
+    std::chrono::system_clock::time_point start =
+        std::chrono::system_clock::now();
+
+    TgBotApi::Ptr api_;
+    Message::Ptr message_;
+    std::mutex output_mutex_;
+    std::stringstream output_;
+    std::filesystem::path kernelPath_;
+    std::optional<bool> ret;
+    KernelBuildHandler::Intermidates* intermidates_;
+    Compiler compiler_;
+
+    void createKeyboard() {
+        auto kernelBuild(std::make_shared<TgBot::InlineQueryResultArticle>());
+        kernelBuild->title = "Build progress";
+        kernelBuild->description = fmt::format(
+            "Show the build progress running in chat {}", message_->chat);
+        kernelBuild->id = fmt::format("kernelbuild-{}", message_->messageId);
+        kernelBuild->inputMessageContent = textContent =
+            std::make_shared<TgBot::InputTextMessageContent>();
+        // TODO: Don't hardcode this
+        kernelBuild->thumbnailUrl =
+            "https://raw.githubusercontent.com/Royna2544/c_cpp_telegrambot/"
+            "refs/heads/master/resources/photo/build.webp";
+        textContent->parseMode =
+            TgBotApi::parseModeToStr<TgBotApi::ParseMode::HTML>();
+        textContent->messageText = "Not yet ready...";
+        api_->addInlineQueryKeyboard(
+            TgBotApi::InlineQuery{kInlineQueryKey.data(),
+                                  "See the Kernel build progress",
+                                  "kernelbuild", false, true},
+            kernelBuild);
+    }
+    TgBot::InputTextMessageContent::Ptr textContent;
+
+   public:
+    ForkAndRunKernel(TgBotApi::Ptr api, Message::Ptr message,
+                     std::filesystem::path kernelDirectory, Compiler compiler,
+                     KernelBuildHandler::Intermidates* intermidates)
+        : api_(api),
+          message_(std::move(message)),
+          kernelPath_(std::move(kernelDirectory)),
+          compiler_(std::move(compiler)),
+          intermidates_(intermidates) {
+        createKeyboard();
+    }
+
+    bool writeErr(const std::filesystem::path& where) const {
+        std::ofstream file(where);
+        if (file.is_open()) {
+            file << output_.str();
+            file.close();
+            return true;
+        } else {
+            LOG(ERROR) << "Cannot write error output to " << where;
+            return false;
+        }
+    }
+
+    bool result() const { return *ret; }
+};
+
+void KernelBuildHandler::handle_continue(TgBot::CallbackQuery::Ptr query) {
+    auto compiler = download_toolchain();
+    if (!compiler) {
+        _api->editMessage(query->message, "Failed to download toolchain");
+        return;
+    }
+
+    std::error_code ec;
+    std::filesystem::path kernelSourceDir =
+        kernelDir / intermidiates.current->underscored_name;
+    if (!std::filesystem::exists(kernelSourceDir, ec)) {
+        if (ec) {
+            LOG(ERROR) << "Failed to check repository: " << ec.message();
+            _api->editMessage(query->message, "Failed to check repository");
+            return;
+        }
+        LOG(INFO) << "Cloning repository...";
+        if (!intermidiates.current->repo_info.git_clone(kernelSourceDir)) {
+            _api->editMessage(query->message, "Failed to clone repository");
+            return;
+        }
+    }
+
+    if (!link(compiler->path(), kernelSourceDir / kToolchainDirectory)) {
+        _api->editMessage(query->message, "Failed to link toolchain dir");
+        return;
+    }
+
+    ForkAndRunKernel kernel(_api, query->message, kernelSourceDir,
+                            std::move(*compiler), &intermidiates);
+
+    _api->editMessage(query->message, "Kernel building...");
+    if (!kernel.execute()) {
+        _api->editMessage(query->message, "Failed to execute build");
+    }
+    if (kernel.result() && intermidiates.current->anyKernel.enabled) {
+        auto zipname = fmt::format(
+            "{}_{}_{:%F}.zip", intermidiates.current->underscored_name,
+            intermidiates.device, std::chrono::system_clock::now());
+        Zip zip(zipname);
+        zip.addDir(kernelSourceDir /
+                       intermidiates.current->anyKernel.relative_directory,
+                   "");
+        zip.addFile(kernelSourceDir / kOutDirectory / "arch" /
+                        intermidiates.current->arch / "boot" /
+                        intermidiates.current->type,
+                    fmt::format("{}", intermidiates.current->type));
+        zip.save();
+        _api->sendDocument(query->message->chat,
+                           TgBot::InputFile::fromFile(zipname, "archive/zip"));
+    }
+}
 
 DeferredExit ForkAndRunKernel::runFunction() {
     CwdRestorer re(kernelPath_);
@@ -495,20 +519,50 @@ DeferredExit ForkAndRunKernel::runFunction() {
         return DeferredExit::generic_fail;
     }
     ForkAndRunShell shell;
+
+    // Extend PATH variable
     shell.env["PATH"] = getenv("PATH");
     shell.env["PATH"] += fmt::format(":{}/{}/bin", kernelPath_.string(),
                                      KernelBuildHandler::kToolchainDirectory);
+
+    // Set the config's environment variables
+    for (const auto& [key, value] : intermidates_->current->envMap) {
+        shell.env[key] = value;
+    }
+
+    // Set custom build host and user
+    shell.env["KBUILD_BUILD_HOST"] = "libstdc++";
+    shell.env["KBUILD_BUILD_USER"] = "tgbot-builder";
+
+    // Open shell
     if (!shell.open()) {
         LOG(ERROR) << "Cannot open shell!";
     }
+
+    // Exit on error
     shell << "set -e" << ForkAndRunShell::endl;
+
+    if (std::filesystem::exists(".gitmodules")) {
+        // Pull submodules
+        LOG(INFO) << "Pulling submodules";
+        shell << "git submodule update --init" << ForkAndRunShell::endl;
+    }
+
     LOG(INFO) << "Make defconfig...";
-    shell << fmt::format("{} {}", fmt::join(args_, " "),
-                         fmt::join(defconfigArgs_, " "))
-          << ForkAndRunShell::endl;
+
+    // Make defconfig
+    auto args_ = craftArgs();
+    std::string defconfigArg = fmt::format(
+        "{} {}", fmt::join(args_, " "), fmt::join(craftDefconfigArgs(), " "));
+    DLOG(INFO) << defconfigArg;
+    shell << defconfigArg << ForkAndRunShell::endl;
+
+    // Build kernel
     LOG(INFO) << "Make kernel...";
-    shell << fmt::format("{}", fmt::join(args_, " ")) << ForkAndRunShell::endl;
-    LOG(INFO) << "Build done!";
+    std::string arg = fmt::format("{}", fmt::join(args_, " "));
+    DLOG(INFO) << arg;
+    shell << arg << ForkAndRunShell::endl;
+
     return shell.close();
 }
 
@@ -538,4 +592,5 @@ extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
     .flags = DynModule::Flags::Enforced,
     .name = "kernelbuild",
     .description = "Build a kernel, I'm lazy 2",
-    .function = COMMAND_HANDLER_NAME(kernelbuild)};
+    .function = COMMAND_HANDLER_NAME(kernelbuild),
+};

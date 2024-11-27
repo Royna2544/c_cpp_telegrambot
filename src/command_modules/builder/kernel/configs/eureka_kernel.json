@@ -31,7 +31,6 @@
             "name": "oneui",
             "scheme": "oneui.config",
             "depends": [],
-            "devices": [],
             "description": "Enable OneUI target support",
             "default_enabled": false
         },
@@ -39,7 +38,6 @@
             "name": "oneui2",
             "scheme": "oneui2.config",
             "depends": ["oneui"],
-            "devices": [],
             "description": "Enable OneUI2 target support",
             "default_enabled": false
         }

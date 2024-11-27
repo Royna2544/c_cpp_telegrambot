@@ -763,7 +763,7 @@ ConfigParser::ROMBranch::Ptr ConfigParser::getROMBranches(
 bool ConfigParser::LocalManifest::GitPrepare::prepare(
     const std::filesystem::path& path) {
     if (!std::filesystem::exists(path)) {
-        GitUtils::git_clone(info, path);
+        info.git_clone(path);
     } else {
         LOG(INFO) << "Local manifest exists already...";
         GitBranchSwitcher switcherLocal{
@@ -778,7 +778,7 @@ bool ConfigParser::LocalManifest::GitPrepare::prepare(
             LOG(WARNING)
                 << "Local manifest is not the correct repository, deleting it.";
             std::filesystem::remove_all(path);
-            GitUtils::git_clone(info, path);
+            info.git_clone(path);
         }
     }
     return std::filesystem::exists(path);

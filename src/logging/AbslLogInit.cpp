@@ -1,14 +1,22 @@
 #include <absl/log/initialize.h>
 #include <absl/log/log_sink_registry.h>
+
+#include <optional>
+
 #include "../include/LogSinks.hpp"
 
-static StdFileSink sink;
+static std::optional<StdFileSink> sink;
 
-void TgBot_AbslLogInit() {    
+void TgBot_AbslLogInit() {
     absl::InitializeLog();
-    absl::AddLogSink(&sink);
+    sink.emplace();
+    absl::AddLogSink(&*sink);
 }
 
 void TgBot_AbslLogDeInit() {
-    absl::RemoveLogSink(&sink);
+    if (!sink) {
+        return;
+    }
+    absl::RemoveLogSink(&*sink);
+    sink.reset();
 }

@@ -4,9 +4,15 @@
 
 #include "ConfigParsers2.hpp"
 
-struct Compiler {
-    enum class Type { GCC = 1, GCCAndroid, Clang, MAX = Clang } type;
-    std::filesystem::path _path;
+class Compiler {
+   public:
+    enum class Type { GCC = 1, GCCAndroid, Clang, MAX = Clang };
+
+   private:
+    Type type;
+    std::filesystem::path _path;      // Path of CC
+    std::filesystem::path _rootPath;  // Path of toolchain root
+    std::string compilerVersion;
 
     using ArchAndValuePair = std::pair<KernelConfig::Arch, std::string_view>;
     using PerCompilerTripleMap =
@@ -31,8 +37,13 @@ struct Compiler {
             PerCompilerTripleMapPair{Type::GCCAndroid, kGCCAndroidTripleMap},
             PerCompilerTripleMapPair{Type::GCC, kGCCTripleMap},
             PerCompilerTripleMapPair{Type::Clang, kGCCTripleMap}};
+            
+    [[nodiscard]] std::string _version() const;
 
-    explicit Compiler(std::filesystem::path path);
-    [[nodiscard]] std::string_view getTriple(KernelConfig::Arch arch) const;
+   public:
+    explicit Compiler(std::filesystem::path toolchainPath,
+                      KernelConfig::Arch arch, Type type);
+    [[nodiscard]] std::string_view triple(KernelConfig::Arch arch) const;
     [[nodiscard]] std::string version() const;
+    [[nodiscard]] std::filesystem::path path() const;
 };

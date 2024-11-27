@@ -54,7 +54,8 @@ struct FileSinkBase : absl::LogSink {
     void Send(const absl::LogEntry& entry) override {
         const std::lock_guard<std::mutex> lock(m);
         if (entry.log_severity() < absl::LogSeverity::kError) {
-            (void)file.puts(entry.text_message_with_prefix_and_newline().data());
+            (void)file.puts(
+                entry.text_message_with_prefix_and_newline().data());
         }
     }
     FileSinkBase() = default;
@@ -77,5 +78,5 @@ struct LogFileSink : FileSinkBase {
 };
 
 struct StdFileSink : FileSinkBase {
-    StdFileSink() { file = std::move(StderrF()); }
+    StdFileSink() noexcept { file = std::move(StderrF()); }
 };

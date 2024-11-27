@@ -6,10 +6,10 @@ add_my_library(
     NAME AndroidBuilder-configparse
     SRCS 
         ConfigParsers.cpp
-        SystemInfo.cpp
     LIBS
         JsonCpp::JsonCpp
         LibXml2::LibXml2
+        BuilderUtilsLinux
     NO_LIBPREFIX
     STATIC
 )
@@ -21,7 +21,6 @@ add_my_library(
         tasks/UploadFileTask.cpp
         tasks/RepoSyncTask.cpp
     LIBS
-        progress
         TgBot
         AndroidBuilder-configparse
         BuilderUtilsLinux
