@@ -13,4 +13,9 @@ add_my_library(
 )
 
 install(DIRECTORY configs/ DESTINATION share/${PROJECT_NAME}/builder/kernel)
-file(COPY configs/ DESTINATION ${CMAKE_BINARY_DIR}/share/${PROJECT_NAME}/builder/kernel)
+declare_copy(
+    NAME KernelBuilder
+    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/configs/
+    DEST_DIR share/${PROJECT_NAME}/builder/kernel
+    MAKE_DEPEND KernelBuilder-cpp
+)

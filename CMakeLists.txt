@@ -145,6 +145,36 @@ configure_file(resources/about.html.in ${CMAKE_SOURCE_DIR}/resources/about.html)
 #####################################################################
 
 ################## Declare common macros ####################
+function(declare_copy)
+  cmake_parse_arguments(DECLARE_COPY
+    "" # Options
+    "NAME;SOURCE_DIR;DEST_DIR;MAKE_DEPEND" # One-value keywords
+    "" # Multiple-value keywords
+    ${ARGN}
+  )
+
+  if (NOT DECLARE_COPY_NAME OR NOT DECLARE_COPY_SOURCE_DIR OR NOT DECLARE_COPY_DEST_DIR)
+    message(SEND_ERROR "Missing required parameters")
+  endif()
+  
+  # Copy the files
+  file(GLOB CONFIG_FILES CONFIGURE_DEPENDS DECLARE_COPY_SOURCE_GLOB "${DECLARE_COPY_SOURCE_DIR}/**/*.json")
+  add_custom_command(
+      OUTPUT ${DECLARE_COPY_DEST_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy_directory ${DECLARE_COPY_SOURCE_DIR} ${DECLARE_COPY_DEST_DIR}
+      DEPENDS ${DECLARE_COPY_SOURCE_GLOB} # Ensures it's triggered when the source changes
+      COMMENT "Copying configuration files to ${DECLARE_COPY_DEST_DIR}"
+  )
+
+  # Create a custom target that depends on the copy command
+  add_custom_target(copy_${DECLARE_COPY_NAME}_configs ALL
+      DEPENDS ${DECLARE_COPY_DEST_DIR}
+  )
+  if (DECLARE_COPY_MAKE_DEPEND)
+    add_dependencies(${DECLARE_COPY_MAKE_DEPEND} copy_${DECLARE_COPY_NAME}_configs)
+  endif()
+endfunction(declare_copy)
+
 function(add_my_library)
   cmake_parse_arguments(TGBOT_LIBRARY
     "NO_LIBPREFIX;STATIC" # Options
