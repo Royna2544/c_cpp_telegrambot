@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <fstream>
 #include <string_view>
+#include <system_error>
 #include <type_traits>
 #include <vector>
 
@@ -35,12 +36,19 @@ struct fixup_to<std::filesystem::path> {
     constexpr static bool fix_required = true;
 };
 
-template <typename T>
+enum class Optionality {
+    OPTIONAL,
+    REQUIRED,
+};
+
+template <typename T, Optionality opt = Optionality::REQUIRED>
     requires(!is_vector_v<T>)
 bool get(const Json::Value& value, const std::string_view name, T* result) {
     if (value.isMember(name.data())) {
         *result = value[name.data()].as<T>();
         DLOG(INFO) << name << "=" << *result;
+    } else if constexpr (opt == Optionality::OPTIONAL) {
+        return true;  // Field not present, use default value
     } else {
         LOG(ERROR) << "Missing required field: " << name;
         return false;
@@ -49,7 +57,7 @@ bool get(const Json::Value& value, const std::string_view name, T* result) {
 }
 
 // Overload: Vector types fixup
-template <typename T>
+template <typename T, Optionality opt = Optionality::REQUIRED>
     requires is_vector_v<T>
 bool get(const Json::Value& value, const std::string_view name, T* result) {
     if (value.isMember(name.data())) {
@@ -58,8 +66,10 @@ bool get(const Json::Value& value, const std::string_view name, T* result) {
             result->emplace_back(entry.as<Elem>());
             DLOG(INFO) << name << "+=" << entry.as<Elem>();
         }
+    } else if constexpr (opt == Optionality::OPTIONAL) {
+        return true;  // Field not present, use default value
     } else {
-        LOG(ERROR) << "Missing required field: " << name;
+        LOG(ERROR) << "Missing field: " << name;
         return false;
     }
     return true;
@@ -108,7 +118,37 @@ struct StackingError {
     }
 };
 
-bool KernelConfig::parse(const Json::Value& node) {
+struct FileCopyPatcher : public KernelConfig::Patcher {
+    bool apply() override {
+        std::error_code ec;
+        LOG(INFO) << "Copying " << data1 << " to " << data2;
+        std::filesystem::copy_file(data1, data2, ec);
+        if (ec) {
+            LOG(ERROR) << "Failed to copy file: " << ec.message();
+            return false;
+        }
+        return true;
+    }
+    using KernelConfig::Patcher::Patcher;
+    constexpr static std::string_view NAME = "FileCopier";
+};
+
+struct FileAppender : public KernelConfig::Patcher {
+    bool apply() override {
+        std::ofstream output(data2.data(), std::ios_base::app);
+        if (!output) {
+            LOG(ERROR) << "Failed to open output file for appending";
+            return false;
+        }
+        output << data1;
+        output.close();
+        return true;
+    }
+    using KernelConfig::Patcher::Patcher;
+    constexpr static std::string_view NAME = "FileAppender";
+};
+
+bool KernelConfig::parseName(const Json::Value& node) {
     StackingError errors;
     errors = get(node, "name", &name);
     underscored_name = absl::StrReplaceAll(name, {
@@ -117,10 +157,22 @@ bool KernelConfig::parse(const Json::Value& node) {
                                                      {".", "_"},
                                                  });
     DLOG(INFO) << "underscored_name=" << underscored_name;
+    return static_cast<bool>(errors);
+}
+
+bool KernelConfig::parseRepoInfo(const Json::Value& node) {
+    StackingError errors;
     std::string url, branch;
     errors = get(node, "repo", "url", &url);
     errors = get(node, "repo", "branch", &branch);
+    // Optional value
+    get(node, "repo", "shallow", &shallow_clone);
     repo_info = RepoInfo{std::move(url), std::move(branch)};
+    return static_cast<bool>(errors);
+}
+
+bool KernelConfig::parseArch(const Json::Value& node) {
+    StackingError errors;
     std::string archStr;
     errors = get(node, "arch", &archStr);
     if (absl::EqualsIgnoreCase(archStr, "arm")) {
@@ -135,6 +187,11 @@ bool KernelConfig::parse(const Json::Value& node) {
         LOG(ERROR) << "Invalid kernel architecture: " << archStr;
         return false;
     }
+    return static_cast<bool>(errors);
+}
+
+bool KernelConfig::parseType(const Json::Value& node) {
+    StackingError errors;
     std::string typeStr;
     errors = get(node, "type", &typeStr);
     if (typeStr == "Image") {
@@ -147,18 +204,21 @@ bool KernelConfig::parse(const Json::Value& node) {
         LOG(ERROR) << "Invalid kernel type: " + typeStr;
         return false;
     }
-    bool clangsupported = false;
-    bool clangbinutilssupported = false;
-    bool clangiasupported = false;
-    errors = get(node, "toolchains", "Clang", &clangsupported);
-    errors = get(node, "toolchains", "LLVM Binutils", &clangbinutilssupported);
-    errors = get(node, "toolchains", "LLVM IAS", &clangiasupported);
+    return static_cast<bool>(errors);
+}
 
-    if (!clangsupported) {
+bool KernelConfig::parseClangSupport(const Json::Value& node) {
+    StackingError errors;
+    bool supported = false;
+    errors = get(node, "toolchains", "Clang", &supported);
+
+    if (!supported) {
         clang = ClangSupport::None;
     } else {
-        if (clangbinutilssupported) {
-            if (clangiasupported) {
+        errors = get(node, "toolchains", "LLVM Binutils", &supported);
+        if (supported) {
+            errors = get(node, "toolchains", "LLVM IAS", &supported);
+            if (supported) {
                 clang = ClangSupport::FullLLVMWithIAS;
             } else {
                 clang = ClangSupport::FullLLVM;
@@ -167,13 +227,33 @@ bool KernelConfig::parse(const Json::Value& node) {
             clang = ClangSupport::Clang;
         }
     }
+    return static_cast<bool>(errors);
+}
+
+bool KernelConfig::parseAnyKernel(const Json::Value& node) {
+    if (!node.isMember("anykernel")) {
+        DLOG(INFO) << "No anykernel info provided";
+        return true;
+    }
+    StackingError errors;
     errors = get(node, "anykernel", "enabled", &anyKernel.enabled);
     if (anyKernel.enabled) {
         errors =
             get(node, "anykernel", "location", &anyKernel.relative_directory);
     }
+    return static_cast<bool>(errors);
+}
+bool KernelConfig::parseDefconfig(const Json::Value& node) {
+    StackingError errors;
     errors = get(node, "defconfig", "scheme", &defconfig.scheme);
     errors = get(node, "defconfig", "devices", &defconfig.devices);
+    return static_cast<bool>(errors);
+}
+bool KernelConfig::parseFragments(const Json::Value& node) {
+    if (!node.isMember("fragments")) {
+        DLOG(INFO) << "No fragments provided";
+        return true;
+    }
     for (const auto& fragment : node["fragments"]) {
         Fragments frag;
         StackingError int_errors;
@@ -182,17 +262,79 @@ bool KernelConfig::parse(const Json::Value& node) {
         int_errors = get(fragment, "depends", &frag.depends);
         int_errors = get(fragment, "default_enabled", &frag.default_enabled);
         int_errors = get(fragment, "description", &frag.description);
+        if (!static_cast<bool>(int_errors)) {
+            LOG(ERROR) << "Failed to parse fragment";
+            return false;
+        }
         DLOG(INFO) << "Parsed fragment: " << frag.name;
         fragments[frag.name] = frag;
     }
-    for (const auto& fragment : node["env"]) {
-        std::pair<std::string, std::string> env;
-        StackingError int_errors;
-        int_errors = get(fragment, "name", &env.first);
-        int_errors = get(fragment, "value", &env.second);
-        DLOG(INFO) << "ENV " << env.first << '=' << env.second;
-        envMap.emplace(env);
+    return true;
+}
+bool KernelConfig::parseEnvMap(const Json::Value& node) {
+    if (!node.isMember("env")) {
+        DLOG(INFO) << "No environment variables provided";
+        return true;
     }
+    for (const auto& env : node["env"]) {
+        std::string key, value;
+        StackingError int_errors;
+        int_errors = get(env, "name", &key);
+        int_errors = get(env, "value", &value);
+        if (!static_cast<bool>(int_errors)) {
+            LOG(ERROR) << "Failed to parse environment variable";
+            return false;
+        }
+        DLOG(INFO) << "ENV: " << key << "=" << value;
+        envMap[key] = value;
+    }
+    return true;
+}
+
+bool KernelConfig::parsePatches(const Json::Value& node) {
+    if (!node.isMember("patch")) {
+        DLOG(INFO) << "No patches provided";
+        return true;
+    }
+    for (const auto& patch : node["patch"]) {
+        std::string handler;
+        std::pair<std::string, std::string> data;
+        StackingError int_errors;
+        int_errors = get(patch, "handler", &handler);
+        int_errors = get(patch, "data1", &data.first);
+        int_errors = get(patch, "data2", &data.second);
+        if (!static_cast<bool>(int_errors)) {
+            LOG(ERROR) << "Failed to parse patch data";
+            return false;
+        }
+        if (handler == FileCopyPatcher::NAME) {
+            patches.emplace_back(
+                std::make_unique<FileCopyPatcher>(data.first, data.second));
+        } else if (handler == FileAppender::NAME) {
+            patches.emplace_back(
+                std::make_unique<FileAppender>(data.first, data.second));
+        } else {
+            LOG(ERROR) << "Unknown patch handler: " << handler;
+            return false;
+        }
+        DLOG(INFO) << "Parsed patch: " << handler;
+    }
+    return true;
+}
+
+bool KernelConfig::parse(const Json::Value& node) {
+    StackingError errors;
+    errors = parseName(node);
+    errors = parseRepoInfo(node);
+    errors = parseArch(node);
+    errors = parseType(node);
+    errors = parseClangSupport(node);
+    errors = parseAnyKernel(node);
+    errors = parseDefconfig(node);
+    errors = parseFragments(node);
+    errors = parseEnvMap(node);
+    errors = parsePatches(node);
+
     DependencyChecker checker(&fragments);
     if (checker.hasDependencyLoop()) {
         LOG(ERROR) << "Dependency loop detected in fragments";

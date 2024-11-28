@@ -2,7 +2,8 @@
     "name": "WSL2 Kernel",
     "repo": {
         "url": "https://github.com/microsoft/WSL2-Linux-Kernel",
-        "branch": "linux-msft-wsl-6.6.y"
+        "branch": "linux-msft-wsl-6.6.y",
+        "shallow" : true
     },
     "arch": "x86_64",
     "type": "Image",
@@ -15,7 +16,7 @@
         "enabled": false
     },
     "defconfig": {
-        "scheme": "config-wsl",
+        "scheme": "wsl_defconfig",
         "devices": [
             "generic"
         ]
@@ -25,6 +26,18 @@
         {
             "name": "LOCALVERSION",
             "value": "-WSL2Lover"
+        }
+    ],
+    "patch": [
+        {
+            "handler": "FileCopier",
+            "data1": "arch/x86/configs/config-wsl",
+            "data2": "arch/x86/configs/wsl_defconfig"
+        },
+        {
+            "handler": "FileAppender",
+            "data1": "CONFIG_LTO_CLANG=y",
+            "data2": "arch/x86/configs/wsl_defconfig"
         }
     ]
 }

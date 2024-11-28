@@ -70,7 +70,8 @@ class RepoInfo {
     RepoInfo() : callback_(std::make_unique<Callback>()) {}
 
     // Git clone repo to a directory
-    bool git_clone(const std::filesystem::path& directory) const;
+    bool git_clone(const std::filesystem::path& directory,
+                   bool shallow = false) const;
 
     [[nodiscard]] std::string url() const { return url_; }
     [[nodiscard]] std::string branch() const { return branch_; }

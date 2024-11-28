@@ -447,12 +447,14 @@ bool GitBranchSwitcher::operator()() const {
     return true;
 }
 
-bool RepoInfo::git_clone(const std::filesystem::path& directory) const {
+bool RepoInfo::git_clone(const std::filesystem::path& directory,
+                         bool shallow) const {
     git_repository_ptr repo;
     git_clone_options gitoptions = GIT_CLONE_OPTIONS_INIT;
 
-    ScopedLibGit2 _;
-    LOG(INFO) << "Cloning repository, url: " << url_ << ", branch: " << branch_;
+    LOG(INFO) << fmt::format(
+        "Cloning repository, url: {}, branch: {}, shallow: {}", url_, branch_,
+        shallow);
     gitoptions.checkout_branch = branch_.c_str();
 
     // Git fetch callback
@@ -490,7 +492,8 @@ bool RepoInfo::git_clone(const std::filesystem::path& directory) const {
         +[](const char* path, size_t completed_steps, size_t total_steps,
             void* payload) {
             LOG_EVERY_N_SEC(INFO, 3) << fmt::format(
-                "Packing: ({}/()): {}", completed_steps, total_steps, path);
+                "Packing: ({}/{}): {}", completed_steps, total_steps,
+                (path != nullptr) ? path : "(null)");
             if (payload != nullptr) {
                 auto* callback = static_cast<Callbacks*>(payload);
                 callback->onCheckout(path, completed_steps, total_steps);
@@ -498,6 +501,11 @@ bool RepoInfo::git_clone(const std::filesystem::path& directory) const {
         };
     gitoptions.checkout_opts.progress_payload = callback_.get();
 
+    if (shallow) {
+        gitoptions.fetch_opts.depth = 1;
+    }
+
+    ScopedLibGit2 _;
     int ret = ::git_clone(repo, url_.c_str(), directory.c_str(), &gitoptions);
     if (ret != 0) {
         const auto* fault = git_error_last();

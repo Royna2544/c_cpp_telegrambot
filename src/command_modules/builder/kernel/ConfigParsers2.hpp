@@ -6,7 +6,9 @@
 #include <filesystem>
 #include <map>
 #include <string>
+#include <string_view>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "../RepoUtils.hpp"
@@ -15,6 +17,7 @@ struct KernelConfig {
     std::string name;
     std::string underscored_name;
     RepoInfo repo_info;
+    bool shallow_clone = false;
     enum class Arch { ARM = 1, ARM64, X86, X86_64, MAX = X86_64 } arch{};
     enum class Type {
         Image,
@@ -45,8 +48,33 @@ struct KernelConfig {
     std::map<std::string, Fragments> fragments;
     std::map<std::string, std::string> envMap;
 
+    class Patcher {
+       protected:
+        std::string data1;
+        std::string data2;
+
+       public:
+        virtual ~Patcher() = default;
+        virtual bool apply() = 0;
+        Patcher(std::string data1, std::string data2)
+            : data1(std::move(data1)), data2(std::move(data2)) {}
+    };
+    std::vector<std::unique_ptr<Patcher>> patches;
+
     bool parse(const Json::Value& node);
     explicit KernelConfig(const std::filesystem::path& jsonFile);
+
+   private:
+    bool parseName(const Json::Value& node);
+    bool parseRepoInfo(const Json::Value& node);
+    bool parseArch(const Json::Value& node);
+    bool parseType(const Json::Value& node);
+    bool parseClangSupport(const Json::Value& node);
+    bool parseAnyKernel(const Json::Value& node);
+    bool parseDefconfig(const Json::Value& node);
+    bool parseFragments(const Json::Value& node);
+    bool parseEnvMap(const Json::Value& node);
+    bool parsePatches(const Json::Value& node);
 };
 
 template <>

@@ -82,6 +82,7 @@ class KernelBuildHandler {
     }
 
     constexpr static std::string_view kBuildPrefix = "build_";
+    constexpr static std::string_view kSelectPrefix = "select_";
     void start(const Message::Ptr& message) {
         if (configs.empty()) {
             _api->sendMessage(message->chat, "No kernel configurations found.");
@@ -96,7 +97,6 @@ class KernelBuildHandler {
         _api->sendMessage(message->chat, "Will build kernel...", builder.get());
     }
 
-    constexpr static std::string_view kSelectPrefix = "select_";
     void handle_build(TgBot::CallbackQuery::Ptr query) {
         std::string_view data = query->data;
         if (!absl::ConsumePrefix(&data, kBuildPrefix)) {
@@ -480,8 +480,22 @@ void KernelBuildHandler::handle_continue(TgBot::CallbackQuery::Ptr query) {
                         intermidiates.current->repo_info.url(),
                         intermidiates.current->repo_info.branch()));
         LOG(INFO) << "Cloning repository...";
-        if (!intermidiates.current->repo_info.git_clone(kernelSourceDir)) {
+        if (!intermidiates.current->repo_info.git_clone(
+                kernelSourceDir, intermidiates.current->shallow_clone)) {
             _api->editMessage(query->message, "Failed to clone repository");
+            return;
+        }
+        CwdRestorer cwd(kernelSourceDir);
+        if (cwd) {
+            for (const auto& patch : intermidiates.current->patches) {
+                if (!patch->apply()) {
+                    _api->editMessage(query->message,
+                                      fmt::format("Failed to apply patch"));
+                    return;
+                }
+            }
+        } else {
+            LOG(WARNING) << "Cannot push cwd to source directory";
             return;
         }
     }
