@@ -1,6 +1,8 @@
 #include "ToolchainProvider.hpp"
 
 #include <absl/log/log.h>
+#include <absl/meta/type_traits.h>
+#include <absl/strings/ascii.h>
 #include <curl/curl.h>
 
 #include <archives/Tar.hpp>
@@ -121,7 +123,9 @@ bool ClangProvider::downloadTo(const std::filesystem::path& path) {
             return false;
         }
         if (auto _res = getToolchainTarballURL(); _res) {
-            if (!downloadTarball(*_res, kToolchainTarballPath)) {
+            std::string url = *_res;
+            absl::StripTrailingAsciiWhitespace(&url);
+            if (!downloadTarball(url, kToolchainTarballPath)) {
                 return false;
             }
         } else {
