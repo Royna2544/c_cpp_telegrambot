@@ -487,7 +487,7 @@ bool RepoInfo::git_clone(const std::filesystem::path& directory,
     };
     gitoptions.fetch_opts.callbacks.payload = callback_.get();
 
-    // Git checkout callback
+    // Git checkout callbackd3866 
     gitoptions.checkout_opts.progress_cb =
         +[](const char* path, size_t completed_steps, size_t total_steps,
             void* payload) {
@@ -502,7 +502,11 @@ bool RepoInfo::git_clone(const std::filesystem::path& directory,
     gitoptions.checkout_opts.progress_payload = callback_.get();
 
     if (shallow) {
+#if LIBGIT2_VER_MAJOR > 0 || (LIBGIT2_VER_MAJOR == 0 && LIBGIT2_VER_MINOR >= 24)
         gitoptions.fetch_opts.depth = 1;
+#else
+        LOG(WARNING) << "Shallow cloning is not supported in libgit2 version < 0.24";
+#endif
     }
 
     ScopedLibGit2 _;
