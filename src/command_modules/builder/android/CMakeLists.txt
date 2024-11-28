@@ -36,9 +36,5 @@ add_my_executable(
 )
 
 install(DIRECTORY configs/ DESTINATION share/${PROJECT_NAME}/builder/android)
-declare_copy(
-    NAME AndroidBuilder
-    SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/configs/
-    DEST_DIR share/${PROJECT_NAME}/builder/android
-    MAKE_DEPEND AndroidBuilder-cpp
-)
+file(COPY configs/ DESTINATION ${CMAKE_BINARY_DIR}/share/${PROJECT_NAME}/builder/android)
+
