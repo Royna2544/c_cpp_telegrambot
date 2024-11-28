@@ -5,7 +5,6 @@
 
 #include <archives/Tar.hpp>
 #include <filesystem>
-#include <fstream>
 #include <system_error>
 #include <utils/libfs.hpp>
 
@@ -22,8 +21,7 @@ constexpr ConstRepoInfo kGCCARMRepoInfo = {
 
 bool GCCAndroidARMProvider::downloadTo(const std::filesystem::path& path) {
     // Download and extract GCC toolchain for Android ARM
-    return RepoInfo{kGCCARMRepoInfo.url.data(), kGCCARMRepoInfo.branch.data()}
-        .git_clone(path);
+    return RepoInfo{kGCCARMRepoInfo}.git_clone(path);
 }
 
 constexpr ConstRepoInfo kGCCARM64RepoInfo = {
@@ -34,9 +32,7 @@ constexpr ConstRepoInfo kGCCARM64RepoInfo = {
 
 bool GCCAndroidARM64Provider::downloadTo(const std::filesystem::path& path) {
     // Download and extract GCC toolchain for Android ARM64
-    return RepoInfo{kGCCARM64RepoInfo.url.data(),
-                    kGCCARM64RepoInfo.branch.data()}
-        .git_clone(path);
+    return RepoInfo{kGCCARM64RepoInfo}.git_clone(path);
 }
 
 bool ClangProvider::downloadTo(const std::filesystem::path& path) {
@@ -50,7 +46,8 @@ bool ClangProvider::downloadTo(const std::filesystem::path& path) {
 
     if (!std::filesystem::exists(kToolchainTarballPath, ec)) {
         if (ec) {
-            LOG(ERROR) << "Cannot check existence of toolchain tarball: aborting...";
+            LOG(ERROR)
+                << "Cannot check existence of toolchain tarball: aborting...";
             return false;
         }
         CURL* curl = nullptr;

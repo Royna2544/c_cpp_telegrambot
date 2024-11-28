@@ -1,0 +1,30 @@
+{
+    "name": "WSL2 Kernel",
+    "repo": {
+        "url": "https://github.com/microsoft/WSL2-Linux-Kernel",
+        "branch": "linux-msft-wsl-6.6.y"
+    },
+    "arch": "x86_64",
+    "type": "Image",
+    "toolchains": {
+        "Clang": true,
+        "LLVM Binutils": true,
+        "LLVM IAS": true
+    },
+    "anykernel": {
+        "enabled": false
+    },
+    "defconfig": {
+        "scheme": "config-wsl",
+        "devices": [
+            "generic"
+        ]
+    },
+    "fragments": [],
+    "env": [
+        {
+            "name": "LOCALVERSION",
+            "value": "-WSL2Lover"
+        }
+    ]
+}

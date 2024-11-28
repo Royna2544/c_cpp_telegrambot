@@ -199,7 +199,7 @@ class KernelBuildHandler {
                         type};
     }
 
-    std::optional<Compiler> download_toolchain() {
+    std::optional<Compiler> download_toolchain() const {
         switch (intermidiates.current->clang) {
             case KernelConfig::ClangSupport::None:
                 switch (intermidiates.current->arch) {
@@ -338,36 +338,35 @@ Exit code: {}</blockquote>)",
     }
 
     std::vector<std::string> craftArgs() const {
-        std::vector<std::string> args{
-            "make", fmt::format("O={}", KernelBuildHandler::kOutDirectory)};
-        std::string arch = "ARCH=";
-        switch (intermidates_->current->arch) {
-            case KernelConfig::Arch::ARM:
-                arch += "arm";
-                break;
-            case KernelConfig::Arch::ARM64:
-                arch += "arm64";
-                break;
-            case KernelConfig::Arch::X86:
-                arch += "x86";
-                break;
-            case KernelConfig::Arch::X86_64:
-                arch += "x86_64";
-                break;
-        }
-        args.push_back(arch);
+        std::vector<std::string> args;
+        args.reserve(11);
+
+        // Make command
+        args.emplace_back("make");
+
+        // Output directory
+        args.emplace_back(
+            fmt::format("O={}", KernelBuildHandler::kOutDirectory));
+
         // If host architecture is not same, then we are cross compiling
         if (intermidates_->current->arch != KernelConfig::Arch::X86_64) {
+            // Setting ARCH= is required
+            args.emplace_back(
+                fmt::format("ARCH={}", intermidates_->current->arch));
+
+            // Also the CROSS_COMPILE
             args.emplace_back(
                 fmt::format("CROSS_COMPILE={}",
                             compiler_.triple(intermidates_->current->arch)));
+
+            // Add CROSS_COMPILE_ARM32 for ARM64 platforms.
+            if (intermidates_->current->arch == KernelConfig::Arch::ARM64) {
+                args.emplace_back(
+                    fmt::format("CROSS_COMPILE_ARM32={}",
+                                compiler_.triple(KernelConfig::Arch::ARM)));
+            }
         }
-        // Add CROSS_COMPILE_ARM32 for ARM64 platforms.
-        if (intermidates_->current->arch == KernelConfig::Arch::ARM64) {
-            args.emplace_back(
-                fmt::format("CROSS_COMPILE_ARM32={}",
-                            compiler_.triple(KernelConfig::Arch::ARM)));
-        }
+
         // Adding clang support specific overrides
         for (const auto& [key, value] :
              ToolchainConfig::getVariables(intermidates_->current->clang)) {
@@ -475,6 +474,11 @@ void KernelBuildHandler::handle_continue(TgBot::CallbackQuery::Ptr query) {
             _api->editMessage(query->message, "Failed to check repository");
             return;
         }
+        _api->editMessage(
+            query->message,
+            fmt::format("Cloning repository...\nURL: {}\nBranch: {}",
+                        intermidiates.current->repo_info.url(),
+                        intermidiates.current->repo_info.branch()));
         LOG(INFO) << "Cloning repository...";
         if (!intermidiates.current->repo_info.git_clone(kernelSourceDir)) {
             _api->editMessage(query->message, "Failed to clone repository");

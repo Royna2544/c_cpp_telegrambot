@@ -5,12 +5,15 @@
 #include <absl/strings/str_split.h>
 #include <fmt/core.h>
 #include <git2.h>
+#include <git2/pack.h>
 #include <trivial_helpers/_class_helper_macros.h>
 
 #include <filesystem>
 #include <memory>
 #include <trivial_helpers/raii.hpp>
 #include <type_traits>
+
+#include "SystemInfo.hpp"
 
 struct ScopedLibGit2 {
     ScopedLibGit2() { git_libgit2_init(); }
@@ -444,14 +447,58 @@ bool GitBranchSwitcher::operator()() const {
     return true;
 }
 
-bool RepoInfo::git_clone(const std::filesystem::path& directory) {
+bool RepoInfo::git_clone(const std::filesystem::path& directory) const {
     git_repository_ptr repo;
     git_clone_options gitoptions = GIT_CLONE_OPTIONS_INIT;
 
     ScopedLibGit2 _;
-    LOG(INFO) << "Cloning repository, url: " << url << ", branch: " << branch;
-    gitoptions.checkout_branch = branch.c_str();
-    int ret = ::git_clone(repo, url.c_str(), directory.c_str(), &gitoptions);
+    LOG(INFO) << "Cloning repository, url: " << url_ << ", branch: " << branch_;
+    gitoptions.checkout_branch = branch_.c_str();
+
+    // Git fetch callback
+    gitoptions.fetch_opts.callbacks.transfer_progress =
+        +[](const git_transfer_progress* stats, void* payload) -> int {
+        LOG_EVERY_N_SEC(INFO, 3) << fmt::format(
+            "Fetch: Objects({}/{}/{}) Deltas({}/{}), Total {:.2f}GB",
+            stats->received_objects, stats->indexed_objects,
+            stats->total_objects, stats->indexed_deltas, stats->total_deltas,
+            Bytes(stats->received_bytes).to<SizeTypes::GigaBytes>().value);
+        if (payload != nullptr) {
+            auto* callback = static_cast<Callbacks*>(payload);
+            callback->onFetch(stats);
+        }
+        return 0;  // Continue the transfer.
+    };
+    gitoptions.fetch_opts.callbacks.payload = callback_.get();
+
+    // Update refs callback
+    gitoptions.fetch_opts.callbacks.pack_progress =
+        +[](int stage, uint32_t current, uint32_t total, void* payload) -> int {
+        LOG_EVERY_N_SEC(INFO, 3)
+            << fmt::format("Packing: ({}/{})", current, total);
+
+        if (payload != nullptr) {
+            auto* callback = static_cast<Callbacks*>(payload);
+            callback->onPacking(stage, current, total);
+        }
+        return 0;  // Continue the transfer.
+    };
+    gitoptions.fetch_opts.callbacks.payload = callback_.get();
+
+    // Git checkout callback
+    gitoptions.checkout_opts.progress_cb =
+        +[](const char* path, size_t completed_steps, size_t total_steps,
+            void* payload) {
+            LOG_EVERY_N_SEC(INFO, 3) << fmt::format(
+                "Packing: ({}/()): {}", completed_steps, total_steps, path);
+            if (payload != nullptr) {
+                auto* callback = static_cast<Callbacks*>(payload);
+                callback->onCheckout(path, completed_steps, total_steps);
+            }
+        };
+    gitoptions.checkout_opts.progress_payload = callback_.get();
+
+    int ret = ::git_clone(repo, url_.c_str(), directory.c_str(), &gitoptions);
     if (ret != 0) {
         const auto* fault = git_error_last();
         LOG(ERROR) << "Couldn't clone repo: " << fault->message;

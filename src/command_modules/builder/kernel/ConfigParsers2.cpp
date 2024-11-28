@@ -10,6 +10,7 @@
 #include <type_traits>
 #include <vector>
 
+#include "RepoUtils.hpp"
 #include "json/reader.h"
 
 // vector
@@ -115,9 +116,11 @@ bool KernelConfig::parse(const Json::Value& node) {
                                                      {"-", "_"},
                                                      {".", "_"},
                                                  });
-    LOG(INFO) << "underscored_name=" << underscored_name;
-    errors = get(node, "repo", "url", &repo_info.url);
-    errors = get(node, "repo", "branch", &repo_info.branch);
+    DLOG(INFO) << "underscored_name=" << underscored_name;
+    std::string url, branch;
+    errors = get(node, "repo", "url", &url);
+    errors = get(node, "repo", "branch", &branch);
+    repo_info = RepoInfo{std::move(url), std::move(branch)};
     std::string archStr;
     errors = get(node, "arch", &archStr);
     if (absl::EqualsIgnoreCase(archStr, "arm")) {

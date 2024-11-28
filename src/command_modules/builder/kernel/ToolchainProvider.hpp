@@ -6,11 +6,6 @@
 
 namespace toolchains {
 
-struct ConstRepoInfo {
-    std::string_view url;
-    std::string_view branch;
-};
-
 struct Provider {
     using CompilerBitsetType =
         std::bitset<static_cast<size_t>(Compiler::Type::MAX)>;

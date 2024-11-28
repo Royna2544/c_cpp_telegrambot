@@ -768,8 +768,8 @@ bool ConfigParser::LocalManifest::GitPrepare::prepare(
         LOG(INFO) << "Local manifest exists already...";
         GitBranchSwitcher switcherLocal{
             .gitDirectory = path,
-            .desiredBranch = info.branch,
-            .desiredUrl = info.url,
+            .desiredBranch = info.branch(),
+            .desiredUrl = info.url(),
             .checkout = true,
         };
         if (switcherLocal()) {
@@ -813,14 +813,15 @@ bool ConfigParser::LocalManifest::WritePrepare::prepare(
     for (const auto& repo : data) {
         xmlNodePtr repoNode =
             xmlNewChild(root, nullptr, BAD_CAST "project", nullptr);
-        auto name = absl::StripPrefix(repo.url, kGithubUrl);
+        auto name = absl::StripPrefix(repo.url(), kGithubUrl);
         xmlNewProp(repoNode, BAD_CAST "name", BAD_CAST name.data());
         xmlNewProp(repoNode, BAD_CAST "path",
                    BAD_CAST repo.destination.c_str());
         xmlNewProp(repoNode, BAD_CAST "remote",
                    BAD_CAST kGithubRemoteName.data());
         xmlNewProp(repoNode, BAD_CAST "clone-depth", BAD_CAST "1");
-        xmlNewProp(repoNode, BAD_CAST "revision", BAD_CAST repo.branch.c_str());
+        xmlNewProp(repoNode, BAD_CAST "revision",
+                   BAD_CAST repo.branch().c_str());
     }
 
     // Save the XML file
