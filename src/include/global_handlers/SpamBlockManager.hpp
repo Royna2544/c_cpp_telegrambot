@@ -16,8 +16,12 @@ struct SpamBlockManager : SpamBlockBase, ThreadRunner {
     // (e.g., delete messages, mute users)
     bool shouldBeSkipped(const Message::Ptr &message) const override;
 
+    void onPreStop() override;
+
    private:
     constexpr static auto kMuteDuration = std::chrono::minutes(3);
     TgBotApi::Ptr _api;
     AuthContext *_auth;
+    std::condition_variable condvar;
+    std::mutex mutex;
 };

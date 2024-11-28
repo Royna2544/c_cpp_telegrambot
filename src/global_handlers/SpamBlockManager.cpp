@@ -10,12 +10,18 @@
 void SpamBlockManager::runFunction(const std::stop_token &token) {
     while (!token.stop_requested()) {
         consumeAndDetect();
-        std::condition_variable condvar;
-        std::mutex mutex;
         std::unique_lock<std::mutex> lock(mutex);
         condvar.wait_for(lock, sSpamDetectDelay,
                          [token] { return token.stop_requested(); });
     }
+}
+
+void SpamBlockManager::onPreStop() {
+    {
+        std::lock_guard<std::mutex> lock(mutex);
+    }
+    // Cancel the timer
+    condvar.notify_all();
 }
 
 void SpamBlockManager::onDetected(ChatId chat, UserId user,
