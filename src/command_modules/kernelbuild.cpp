@@ -35,6 +35,7 @@
 #include <utility>
 
 #include "Diagnosis.hpp"
+#include "FileWithTimestamp.hpp"
 #include "ProgressBar.hpp"
 #include "api/TgBotApi.hpp"
 #include "support/CwdRestorar.hpp"
@@ -87,6 +88,15 @@ class KernelBuildHandler {
         if (configs.empty()) {
             _api->sendMessage(message->chat, "No kernel configurations found.");
             return;
+        }
+        for (auto& config : configs) {
+            // Reload config if needed.
+            try {
+                config.reParse();
+            } catch (const std::exception& e) {
+                LOG(ERROR) << "Failed to reload: " << e.what();
+                continue;
+            }
         }
         KeyboardBuilder builder;
         for (const auto& config : configs) {

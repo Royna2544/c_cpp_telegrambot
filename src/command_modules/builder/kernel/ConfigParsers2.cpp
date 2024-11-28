@@ -11,6 +11,7 @@
 #include <type_traits>
 #include <vector>
 
+#include "FileWithTimestamp.hpp"
 #include "RepoUtils.hpp"
 #include "json/reader.h"
 
@@ -317,7 +318,6 @@ bool KernelConfig::parsePatches(const Json::Value& node) {
             LOG(ERROR) << "Unknown patch handler: " << handler;
             return false;
         }
-        DLOG(INFO) << "Parsed patch: " << handler;
     }
     return true;
 }
@@ -344,10 +344,10 @@ bool KernelConfig::parse(const Json::Value& node) {
     return true;
 }
 
-KernelConfig::KernelConfig(const std::filesystem::path& jsonFile) {
+void KernelConfig::parse() {
     Json::Value root;
-    std::ifstream ifs(jsonFile);
-    std::string filePath = jsonFile.filename().string();
+    std::ifstream ifs(_sourceFilePath);
+    std::string filePath = _sourceFilePath.filename().string();
     if (!ifs.is_open()) {
         throw std::runtime_error("Failed to open JSON file: " + filePath);
     }
@@ -359,6 +359,19 @@ KernelConfig::KernelConfig(const std::filesystem::path& jsonFile) {
         throw std::runtime_error("Failed to parse JSON file: " + filePath);
     }
 }
+
+void KernelConfig::reParse() {
+    if (!_file.updated()) {
+        return;
+    }
+    LOG(INFO) << "File has been updated: " << _sourceFilePath.filename();
+    parse();
+}
+
+KernelConfig::KernelConfig(std::filesystem::path jsonFile)
+    : _sourceFilePath(std::move(jsonFile)), _file(_sourceFilePath) {
+    parse();
+}  
 
 bool DependencyChecker::hasDependencyLoop() {
     std::unordered_set<std::string> visited;

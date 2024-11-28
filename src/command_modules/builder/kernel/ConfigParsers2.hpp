@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "../RepoUtils.hpp"
+#include "FileWithTimestamp.hpp"
 
 struct KernelConfig {
     std::string name;
@@ -61,8 +62,8 @@ struct KernelConfig {
     };
     std::vector<std::unique_ptr<Patcher>> patches;
 
-    bool parse(const Json::Value& node);
-    explicit KernelConfig(const std::filesystem::path& jsonFile);
+    explicit KernelConfig(std::filesystem::path jsonFile);
+    void reParse();
 
    private:
     bool parseName(const Json::Value& node);
@@ -75,6 +76,10 @@ struct KernelConfig {
     bool parseFragments(const Json::Value& node);
     bool parseEnvMap(const Json::Value& node);
     bool parsePatches(const Json::Value& node);
+    bool parse(const Json::Value& node);
+    void parse();
+    std::filesystem::path _sourceFilePath;
+    FileWithTimestamp _file;
 };
 
 template <>
