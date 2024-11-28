@@ -13,6 +13,7 @@
 
 #include "RepoUtils.hpp"
 #include "StructF.hpp"
+#include "SystemInfo.hpp"
 
 namespace toolchains {
 
@@ -96,8 +97,25 @@ bool ClangProvider::downloadTarball(const std::string_view url,
             LOG(ERROR) << "Cannot open file for writing";
             return false;
         }
+        // Write callback
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, fwrite);
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, static_cast<FILE*>(file));
+
+        // Set progress callback
+        curl_easy_setopt(
+            curl, CURLOPT_XFERINFOFUNCTION,
+            +[](void* /*clientp*/, curl_off_t /*dltotal*/, curl_off_t dlnow,
+                curl_off_t /*ultotal*/, curl_off_t ulnow) -> int {
+                auto dlnowByte = Bytes{static_cast<Bytes::size_type>(dlnow)}
+                                     .to<SizeTypes::MegaBytes>();
+                auto dltotalByte = Bytes{static_cast<Bytes::size_type>(ulnow)};
+                LOG_EVERY_N_SEC(INFO, 5) << fmt::format(
+                    "Download: {}MB/{}MB", dlnowByte.value, dltotalByte.value);
+                return 0;  // Continue downloading
+            });
+        curl_easy_setopt(curl, CURLOPT_XFERINFODATA, nullptr);
+
+        // Execute it.
         res = curl_easy_perform(curl);
         curl_easy_cleanup(curl);
         if (res != CURLE_OK) {
