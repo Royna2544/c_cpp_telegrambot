@@ -2,11 +2,8 @@
 #include <absl/strings/str_replace.h>
 #include <absl/strings/str_split.h>
 #include <absl/strings/strip.h>
-#include <dirent.h>
-#include <fcntl.h>
 #include <fmt/chrono.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
+#include <tgbot/TgException.h>
 #include <tgbot/types/InlineQueryResultArticle.h>
 #include <tgbot/types/InputFile.h>
 #include <tgbot/types/InputTextMessageContent.h>
@@ -15,7 +12,6 @@
 #include <Compiler.hpp>
 #include <ConfigParsers2.hpp>
 #include <ForkAndRun.hpp>
-#include <StructF.hpp>
 #include <SystemInfo.hpp>
 #include <ToolchainConfig.hpp>
 #include <ToolchainProvider.hpp>
@@ -24,18 +20,13 @@
 #include <archives/Zip.hpp>
 #include <chrono>
 #include <concepts>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
 #include <filesystem>
 #include <mutex>
-#include <regex>
 #include <system_error>
 #include <thread>
 #include <utility>
 
 #include "Diagnosis.hpp"
-#include "FileWithTimestamp.hpp"
 #include "ProgressBar.hpp"
 #include "api/TgBotApi.hpp"
 #include "support/CwdRestorar.hpp"
@@ -299,7 +290,14 @@ Compiler: {}</blockquote>
                 intermidates_->current->name, compiler_.version(),
                 intermidates_->device, getPercent<CPUInfo>(),
                 getPercent<MemoryInfo>(), buffer);
-            api_->editMessage<TgBotApi::ParseMode::HTML>(message_, text);
+            try {
+                api_->editMessage<TgBotApi::ParseMode::HTML>(message_, text);
+            } catch (const TgBot::TgException& e) {
+                LOG(ERROR) << "Couldn't parse markdown, with content:";
+                LOG(ERROR) << text;
+            } catch (const std::exception& e) {
+                LOG(ERROR) << "Error while editing message: " << e.what();
+            }
             tp = system_clock::now();
         }
         const std::lock_guard<std::mutex> _(output_mutex_);

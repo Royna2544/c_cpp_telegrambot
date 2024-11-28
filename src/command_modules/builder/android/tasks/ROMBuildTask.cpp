@@ -215,6 +215,8 @@ void ROMBuildTask::handleStdoutData(ForkAndRun::BufferViewType buffer) {
         } catch (const TgBot::TgException& e) {
             LOG(ERROR) << "Couldn't parse markdown, with content:";
             LOG(ERROR) << buildInfoBuffer;
+        } catch (const std::exception& e) {
+            LOG(ERROR) << "Error while editing message: " << e.what();
         }
         textContent->messageText = std::move(buildInfoBuffer);
     }
