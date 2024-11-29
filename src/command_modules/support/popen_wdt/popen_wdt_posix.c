@@ -43,12 +43,9 @@ static void *watchdog(void *arg) {
     clock_gettime(CLOCK_REALTIME, &ts);
     ts.tv_sec += data->sleep_secs;
 
-    POPEN_WDT_DBGLOG("Watchdog sleeping for %d seconds", data->sleep_secs);
-
     while (waitpid(pdata->childprocess_pid, &pdata->status, WNOHANG) == 0) {
-        POPEN_WDT_DBGLOG("Child process %d still running",
-                         pdata->childprocess_pid);
         pthread_mutex_lock(&pdata->wdt_mutex);
+        POPEN_WDT_DBGLOG("Watchdog sleeping for %d seconds", data->sleep_secs);
         int res =
             pthread_cond_timedwait(&pdata->condition, &pdata->wdt_mutex, &ts);
         POPEN_WDT_DBGLOG("Done condwait");
@@ -59,26 +56,15 @@ static void *watchdog(void *arg) {
                 POPEN_WDT_DBGLOG("Failed to send SIGINT to process group");
             } else {
                 POPEN_WDT_DBGLOG("SIGINT signal sent");
-            }
-            // Finally, waitpid (This would not block if killpg didnt fail)
-            if (waitpid(pdata->childprocess_pid, &pdata->status, 0) < 0) {
-                POPEN_WDT_DBGLOG("Failed to wait for child");
+                pthread_mutex_unlock(&pdata->wdt_mutex);
+                break;
             }
         } else if (res != 0) {
-            POPEN_WDT_DBGLOG("pthread_cond_timedwait failed: %d", errno);
-        } else {
-            POPEN_WDT_DBGLOG("Signaled to cancel");
+            POPEN_WDT_DBGLOG("pthread_cond_timedwait failed: %d", res);
         }
         pthread_mutex_unlock(&pdata->wdt_mutex);
-        if (res == 0) {
-            POPEN_WDT_DBGLOG("Watchdog loop exiting");
-            break;
-        }
     }
-    POPEN_WDT_DBGLOG("Trying to set running=false");
-    pthread_mutex_lock(&pdata->wdt_mutex);
     pdata->running = false;
-    pthread_mutex_unlock(&pdata->wdt_mutex);
     POPEN_WDT_DBGLOG("--");
     return NULL;
 }
@@ -206,21 +192,43 @@ bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
     return true;
 }
 
-
 struct sigchld_handle_ctx {
     int readfd;
-    pthread_cond_t* cond;
+    pthread_cond_t *cond;
+    int *status;
+    pid_t child;
 };
 
 static int sighandler_fd = 0;
-void sighandler(int sig) { write(sighandler_fd, "1", 1); }
+void sighandler(int sig) {
+    int status = 0;
+    pid_t exited = 0;
+    while (exited == 0) {
+        exited = waitpid(-1, &status, WNOHANG);
+    }
+    if (exited > 0) {
+        write(sighandler_fd, &exited, sizeof(exited));
+        write(sighandler_fd, &status, sizeof(status));
+    } else {
+        char dummy[sizeof(status) * 2 + 1] = {'0'};
+        write(sighandler_fd, dummy, sizeof(status) + sizeof(exited));
+    }
+}
 
 void *thread_func(void *arg) {
-    char buf = 0;
+    int buf[2] = {};
     struct sigchld_handle_ctx ctx = *(struct sigchld_handle_ctx *)arg;
-    read(ctx.readfd, &buf, 1);  // Block until signal
-    POPEN_WDT_DBGLOG("SIGCHLD received.");
-    pthread_cond_signal(ctx.cond);
+    if (read(ctx.readfd, &buf, sizeof(buf)) < 0) {
+        POPEN_WDT_DBGLOG("Error reading from pipe: %s", strerror(errno));
+        return NULL;
+    }
+    int exited = buf[0];
+    *ctx.status = buf[1];
+    POPEN_WDT_DBGLOG("Child process %d exited with status %d", exited, *ctx.status);
+    if (exited == ctx.child) {
+        POPEN_WDT_DBGLOG("Watchdog thread signaled child process to stop");
+        pthread_cond_signal(ctx.cond);
+    }
     return NULL;
 }
 
@@ -237,7 +245,6 @@ static void popen_watchdog_wait(popen_watchdog_data_t **data_in) {
     if (data->watchdog_enabled) {
         int signotify[2] = {0};
         pthread_t sigThread = 0;
-        char buf = 0;
         struct sigchld_handle_ctx ctx = {};
 
         if (pipe(signotify) == -1) {
@@ -247,10 +254,12 @@ static void popen_watchdog_wait(popen_watchdog_data_t **data_in) {
         }
 
         // Global variable for signal handler
-        sighandler_fd = signotify[0];
+        sighandler_fd = signotify[1];
         // Thread context
-        ctx.readfd = signotify[1];
+        ctx.readfd = signotify[0];
         ctx.cond = &pdata->condition;
+        ctx.status = &pdata->status;
+        ctx.child = pdata->childprocess_pid;
         // Create signal handler thread
         if (pthread_create(&sigThread, NULL, thread_func, &ctx) != 0) {
             POPEN_WDT_DBGLOG("Failed to create signal thread");
@@ -261,10 +270,10 @@ static void popen_watchdog_wait(popen_watchdog_data_t **data_in) {
         }
         POPEN_WDT_DBGLOG("Waiting for watchdog");
         (void)signal(SIGCHLD, sighandler);
-        pthread_join(pdata->wdt_thread, NULL);
+        pthread_join(sigThread, NULL);
 
         // Unblock if no signal occurred
-        write(signotify[0], &buf, 1);
+        write(signotify[0], &signotify, sizeof(int) * 2);
         close(signotify[0]);
         close(signotify[1]);
         sighandler_fd = -1;
@@ -287,10 +296,8 @@ popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t **data_in) {
     }
 
     pthread_mutex_lock(&pdata->wdt_mutex);
-    if (!data->watchdog_enabled) {
-        if (waitpid(pdata->childprocess_pid, &pdata->status, 0) < 0) {
-            POPEN_WDT_DBGLOG("Failed to wait for child process");
-        }
+    if (waitpid(pdata->childprocess_pid, &pdata->status, 0) < 0) {
+        POPEN_WDT_DBGLOG("Failed to wait for child process");
     }
     int status = pdata->status;
     if (WIFSIGNALED(status)) {

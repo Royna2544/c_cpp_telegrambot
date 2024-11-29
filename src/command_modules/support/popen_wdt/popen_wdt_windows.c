@@ -281,7 +281,6 @@ popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t** data) {
 
     POPEN_WDT_DBGLOG("HANDLEs of pdata are being closed");
     CloseHandle(pdata->read_hdl);
-    CloseHandle(pdata->write_hdl);
     DisconnectNamedPipe(pdata->write_hdl);
     CloseHandle(pdata->write_hdl);
     if ((*data)->watchdog_enabled) {
