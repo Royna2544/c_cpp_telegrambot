@@ -9,6 +9,7 @@
 #include <sys/mman.h>
 #include <sys/poll.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "popen_wdt.h"
@@ -27,6 +28,8 @@ struct popen_wdt_posix_priv {
     pthread_t wdt_thread;
     pid_t childprocess_pid;
     int pipefd_r;  // Subprocess' readfd, write end for the child
+    pthread_cond_t condition;
+    int status;
     bool running;
 };
 
@@ -42,27 +45,40 @@ static bool _check_popen_wdt_data(popen_watchdog_data_t **data,
 #define check_popen_wdt_data(data) _check_popen_wdt_data(data, __FUNCTION__)
 
 static void *watchdog(void *arg) {
-    POPEN_WDT_DBGLOG("Watchdog sleeping for %d seconds", SLEEP_SECONDS);
-    sleep(SLEEP_SECONDS);
-
     POPEN_WDT_DBGLOG("++");
     popen_watchdog_data_t *data = (popen_watchdog_data_t *)arg;
     struct popen_wdt_posix_priv *pdata = data->privdata;
 
-    POPEN_WDT_DBGLOG("Check subprocess");
-    if (killpg(pdata->childprocess_pid, 0) == 0) {
-        if (killpg(pdata->childprocess_pid, POPEN_WDT_SIGTERM) == -1) {
-            POPEN_WDT_DBGLOG("Failed to send SIGINT to process group: %s",
-                             strerror(errno));
-        } else {
-            POPEN_WDT_DBGLOG("SIGINT signal sent to child process group");
-            data->watchdog_activated = true;
-        }
-    } else {
-        POPEN_WDT_DBGLOG("Child process group %d does not exist",
-                         pdata->childprocess_pid);
-    }
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    ts.tv_sec += SLEEP_SECONDS;
 
+    pthread_mutex_lock(&wdt_mutex);
+    POPEN_WDT_DBGLOG("Watchdog sleeping for %d seconds", SLEEP_SECONDS);
+
+    while (waitpid(pdata->childprocess_pid, &pdata->status, WNOHANG) == 0) {
+        int res = pthread_cond_timedwait(&pdata->condition, &wdt_mutex, &ts);
+        if (res == ETIMEDOUT) {
+            POPEN_WDT_DBGLOG("Watchdog timeout");
+            data->watchdog_activated = true;
+            if (killpg(pdata->childprocess_pid, POPEN_WDT_SIGTERM) == -1) {
+                POPEN_WDT_DBGLOG("Failed to send SIGINT to process group: %s",
+                                 strerror(errno));
+            } else {
+                POPEN_WDT_DBGLOG("SIGINT signal sent to child process group");
+            }
+            // Finally, waitpid (This would not block if killpg didnt fail)
+            if (waitpid(pdata->childprocess_pid, &pdata->status, 0) < 0) {
+                POPEN_WDT_DBGLOG("Failed to wait for child: %s",
+                                 strerror(errno));
+            }
+            break;
+        } else if (res != 0) {
+            POPEN_WDT_DBGLOG("pthread_cond_timedwait failed: %d", errno);
+            break;
+        }
+    }
+    pthread_mutex_unlock(&wdt_mutex);
     POPEN_WDT_DBGLOG("--");
     pdata->running = false;
     return NULL;
@@ -94,10 +110,6 @@ bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
 
     if (data->watchdog_enabled) {
         POPEN_WDT_DBGLOG("Watchdog is enabled");
-    } else {
-        POPEN_WDT_DBGLOG("Watchdog disabled");
-    }
-    if (data->watchdog_enabled) {
         int result = pthread_create(&watchdog_thread, NULL, &watchdog, data);
         if (result != 0) {
             POPEN_WDT_DBGLOG("Failed to create watchdog thread: %s",
@@ -109,6 +121,9 @@ bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
             return false;
         }
         pdata->wdt_thread = watchdog_thread;
+        pthread_cond_init(&pdata->condition, NULL);
+    } else {
+        POPEN_WDT_DBGLOG("Watchdog is disabled");
     }
     data->privdata = pdata;
 
@@ -174,17 +189,15 @@ void popen_watchdog_stop(popen_watchdog_data_t **data_in) {
     popen_watchdog_data_t *data = *data_in;
     struct popen_wdt_posix_priv *pdata = data->privdata;
 
+    pthread_mutex_unlock(&wdt_mutex);
     if (!pdata->running) {
-        pthread_mutex_unlock(&wdt_mutex);
         return;
     }
     if (data->watchdog_enabled) {
         POPEN_WDT_DBGLOG("Stopping watchdog");
-#ifndef __BIONIC__
-        pthread_cancel(pdata->wdt_thread);
-#endif
-        pthread_mutex_unlock(&wdt_mutex);
+        pthread_cond_signal(&pdata->condition);
         pthread_join(pdata->wdt_thread, NULL);
+        pthread_cond_destroy(&pdata->condition);
     } else {
         pthread_mutex_unlock(&wdt_mutex);
     }
@@ -194,7 +207,6 @@ void popen_watchdog_stop(popen_watchdog_data_t **data_in) {
 popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t **data_in) {
     popen_watchdog_data_t *data = NULL;
     struct popen_wdt_posix_priv *pdata = NULL;
-    int status = 0;
     popen_watchdog_exit_t ret = {};
 
     pthread_mutex_lock(&wdt_mutex);
@@ -205,19 +217,21 @@ popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t **data_in) {
 
     data = *data_in;
     pdata = data->privdata;
-    if (waitpid(pdata->childprocess_pid, &status, 0) < 0) {
-        POPEN_WDT_DBGLOG("Failed to wait for child process");
-    } else {
-        if (WIFSIGNALED(status)) {
-            POPEN_WDT_DBGLOG("Child process %d exited with signal %d",
-                             pdata->childprocess_pid, WTERMSIG(status));
-            ret.signal = true;
-            ret.exitcode = WTERMSIG(status);
-        } else if (WIFEXITED(status)) {
-            POPEN_WDT_DBGLOG("Child process %d exited with status %d",
-                             pdata->childprocess_pid, WEXITSTATUS(status));
-            ret.exitcode = WEXITSTATUS(status);
+    if (!data->watchdog_enabled)  {
+        if (waitpid(pdata->childprocess_pid, &pdata->status, 0) < 0) {
+            POPEN_WDT_DBGLOG("Failed to wait for child process");
         }
+    }
+    int status = pdata->status;
+    if (WIFSIGNALED(status)) {
+        POPEN_WDT_DBGLOG("Child process %d exited with signal %d",
+                         pdata->childprocess_pid, WTERMSIG(status));
+        ret.signal = true;
+        ret.exitcode = WTERMSIG(status);
+    } else if (WIFEXITED(status)) {
+        POPEN_WDT_DBGLOG("Child process %d exited with status %d",
+                         pdata->childprocess_pid, WEXITSTATUS(status));
+        ret.exitcode = WEXITSTATUS(status);
     }
     close(pdata->pipefd_r);
     free(pdata);
