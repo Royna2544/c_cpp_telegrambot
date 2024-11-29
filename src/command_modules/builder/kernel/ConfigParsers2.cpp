@@ -141,7 +141,7 @@ struct FileAppender : public KernelConfig::Patcher {
             LOG(ERROR) << "Failed to open output file for appending";
             return false;
         }
-        output << data1;
+        output << data1 << "\n";
         output.close();
         return true;
     }
