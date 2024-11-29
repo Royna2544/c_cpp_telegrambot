@@ -33,6 +33,9 @@ class CwdRestorer {
                 LOG(ERROR) << "Failed to create build directory: "
                            << ec.message();
             }
+            // Now try to change cwd again
+            std::filesystem::current_path(newCwd, ec);
+            LOG(INFO) << "Successfully changed cwd with creation";
         } else {
             LOG(ERROR) << "Unexpected error while changing cwd: "
                        << ec.message();
