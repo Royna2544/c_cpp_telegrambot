@@ -70,7 +70,7 @@ struct TgBotApiExHandler {
     AuthContext* auth{};
     DatabaseBase* database{};
     ThreadManager* thread{};
-    std::optional<DurationPoint> exceptionDuration;
+    std::optional<SecondDP> exceptionDuration;
 
     APPLE_INJECT(TgBotApiExHandler(TgBotApi* _api, AuthContext* _auth,
                                    DatabaseBase* _database,
@@ -465,7 +465,7 @@ struct OptionalComponents {
 using std::string_view_literals::operator""sv;
 
 int main(int argc, char** argv) {
-    DurationPoint startupDp;
+    MilliSecondDP startupDp;
 
     // Initialize Abseil logging system
     TgBot_AbslLogInit();

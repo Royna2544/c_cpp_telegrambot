@@ -21,7 +21,7 @@ class CompilerInTgBotInterface : public CompilerInTg::Interface {
     TgBotApi::CPtr botApi;
     MessageExt::Ptr requestedMessage;
     Message::Ptr sentMessage;
-    DurationPoint timePoint;
+    MilliSecondDP timePoint;
     std::stringstream output;
     const StringResLoaderBase::LocaleStrings* _locale;
 };

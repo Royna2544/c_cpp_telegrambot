@@ -25,7 +25,7 @@ DECLARE_COMMAND_HANDLER(delay) {
         "Received at: {}\n"
         "Difference: {}\n",
         msgTP, nowTP, to_secs(nowTP - msgTP));
-    auto dp = DurationPoint();
+    MilliSecondDP dp;
     auto sentMsg = api->sendReplyMessage(message->message(), ss.str());
     ss << fmt::format("Sending reply message took: {}", dp.get());
     // Update the sent message with the delay information
