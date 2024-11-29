@@ -216,7 +216,7 @@ std::pair<std::vector<char*>, std::vector<std::string>> ForkAndRun::Env::craft()
     auto [s, e] = std::ranges::remove_if(envp, [this](const char* buf) {
         return std::ranges::any_of(map, [buf](const auto& entry) {
             if (absl::StartsWith(buf, fmt::format("{}=", entry.first))) {
-                LOG(INFO) << "Removing key " << entry.first << " to make way";
+                DLOG(INFO) << "Removing key " << entry.first << " to make way";
                 return true;
             }
             return false;
