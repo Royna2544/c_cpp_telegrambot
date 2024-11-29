@@ -1,7 +1,9 @@
 #pragma once
 
-#include <concepts>
 #include <tgbot/types/InlineKeyboardMarkup.h>
+
+#include <concepts>
+#include <stdexcept>
 
 template <typename T>
 concept isSTLContainer = requires() {
@@ -21,6 +23,9 @@ class KeyboardBuilder {
     using ListOfButton = std::initializer_list<Button>;
     // When we have x, we use that
     explicit KeyboardBuilder(int x) : x(x) {
+        if (x <= 0) {
+            throw std::logic_error("x must be positive");
+        }
         keyboard = std::make_shared<TgBot::InlineKeyboardMarkup>();
     }
     // When we don't have x, we assume it is 1, oneline keyboard
@@ -37,11 +42,16 @@ class KeyboardBuilder {
         // Or in a new row.
         // We will say new row for now...
         // Create a new keyboard
+        if (list.size() == 0) {
+            return *this;  // No buttons, nothing to do.
+        }
+
         decltype(keyboard->inlineKeyboard) addingList(
             list.size() / x + (list.size() % x == 0 ? 0 : 1));
-        for (auto& row : addingList) {
-            row.resize(x);
+        for (size_t i = 0; i < addingList.size(); ++i) {
+            addingList[i].resize(std::min<size_t>(x, list.size() - i * x));
         }
+
         int idx = 0;
         // Add buttons to keyboard
         for (const auto& [text, callbackData] : list) {
