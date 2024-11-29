@@ -55,3 +55,14 @@ add_my_executable(
     fruit
   TEST
 )
+
+add_my_executable(
+  NAME popenwdt
+  SRCS
+    TestMain.cpp
+    PopenWdtTest.cpp
+  LIBS
+    GTest::gtest
+    TgBot_popen_wdt
+  TEST
+)
