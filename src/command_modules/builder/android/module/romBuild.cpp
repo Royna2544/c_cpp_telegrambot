@@ -24,10 +24,10 @@
 
 #include "ForkAndRun.hpp"
 #include "SystemInfo.hpp"
+#include "support/CwdRestorar.hpp"
 #include "support/KeyBoardBuilder.hpp"
 #include "utils/CommandLine.hpp"
 #include "utils/ConfigManager.hpp"
-#include "support/CwdRestorar.hpp"
 
 template <typename Impl>
 concept canCreateWithApi =
@@ -432,7 +432,11 @@ ROMBuildQueryHandler::ROMBuildQueryHandler(TgBotApi::Ptr api,
 void ROMBuildQueryHandler::start(Message::Ptr userMessage) {
     _userMessage = std::move(userMessage);
     if (sentMessage) {
-        _api->deleteMessage(sentMessage);
+        try {
+            _api->deleteMessage(sentMessage);
+        } catch (...) {
+            // Ignore
+        }
     }
     sentMessage = _api->sendMessage(_userMessage->chat, "Will build ROM...",
                                     mainKeyboard);
