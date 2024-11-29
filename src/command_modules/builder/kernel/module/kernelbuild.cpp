@@ -20,6 +20,7 @@
 #include <archives/Zip.hpp>
 #include <chrono>
 #include <concepts>
+#include <cstdlib>
 #include <filesystem>
 #include <mutex>
 #include <system_error>
@@ -547,9 +548,9 @@ DeferredExit ForkAndRunKernel::runFunction() {
     ForkAndRunShell shell;
 
     // Extend PATH variable
-    shell.env["PATH"] = getenv("PATH");
-    shell.env["PATH"] += fmt::format(":{}/{}/bin", kernelPath_.string(),
-                                     KernelBuildHandler::kToolchainDirectory);
+    shell.env["PATH"] =
+        fmt::format("{}/{}/bin:{}", kernelPath_.string(),
+                    KernelBuildHandler::kToolchainDirectory, getenv("PATH"));
 
     // Set the config's environment variables
     for (const auto& [key, value] : intermidates_->current->envMap) {
