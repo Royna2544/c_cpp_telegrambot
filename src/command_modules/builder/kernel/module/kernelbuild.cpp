@@ -70,7 +70,7 @@ class KernelBuildHandler {
             LOG(ERROR) << "Failed to opendir for kernel configurations: "
                        << ec.message();
         }
-        kernelDir = line->getPath(FS::PathType::RESOURCES) / "kernel_build";
+        kernelDir = line->getPath(FS::PathType::INSTALL_ROOT) / "kernel_build";
     }
 
     constexpr static std::string_view kBuildPrefix = "build_";
