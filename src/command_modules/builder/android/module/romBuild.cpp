@@ -46,6 +46,8 @@ class ROMBuildQueryHandler {
         bool do_upload = true;
         bool didpin = false;
     };
+    constexpr static std::string_view kBuildDirectory = "rom_build/";
+    constexpr static std::string_view kOutDirectory = "out/";
     PerBuildData per_build;
     Message::Ptr sentMessage;
     Message::Ptr _userMessage;
@@ -145,6 +147,8 @@ class ROMBuildQueryHandler {
     void handle_rom(const Query& query);
     // Handle type selection button
     void handle_type(const Query& query);
+    // Handle cleaning directories
+    void handle_clean_directories(const Query& query);
 
 #define DECLARE_BUTTON_HANDLER(name, key)                               \
     ButtonHandler {                                                     \
@@ -168,11 +172,12 @@ class ROMBuildQueryHandler {
         DECLARE_BUTTON_HANDLER("Confirm", confirm),
         DECLARE_BUTTON_HANDLER("Do upload", upload),
         DECLARE_BUTTON_HANDLER("Pin the build message", pin_message),
+        DECLARE_BUTTON_HANDLER_WITHPREFIX("Clean directories",
+                                          clean_directories, "clean_"),
         DECLARE_BUTTON_HANDLER_WITHPREFIX("Select device", device, "device_"),
         DECLARE_BUTTON_HANDLER_WITHPREFIX("Select ROM", rom, "rom_"),
         DECLARE_BUTTON_HANDLER_WITHPREFIX("Select build variant", type,
-                                          "type_"),
-    };
+                                          "type_")};
 
     enum class Buttons {
         repo_sync,
@@ -184,6 +189,7 @@ class ROMBuildQueryHandler {
         confirm,
         upload,
         pin_message,
+        clean_folders
     };
 
     ForkAndRun* current{};
@@ -424,7 +430,8 @@ ROMBuildQueryHandler::ROMBuildQueryHandler(TgBotApi::Ptr api,
                            Buttons::pin_message, Buttons::back>();
     mainKeyboard =
         createKeyboardWith<Buttons::build_rom, Buttons::send_system_info,
-                           Buttons::settings, Buttons::cancel>(2);
+                           Buttons::settings, Buttons::cancel,
+                           Buttons::clean_folders>(2);
     backKeyboard = createKeyboardWith<Buttons::back>();
     start(std::move(userMessage));
 }
@@ -523,7 +530,6 @@ void ROMBuildQueryHandler::handle_build(const Query& query) {
 }
 
 void ROMBuildQueryHandler::handle_confirm(const Query& query) {
-    constexpr static std::string_view kBuildDirectory = "rom_build/";
     _api->editMessage(sentMessage, "Building...");
     if (didpin) {
         _api->unpinMessage(sentMessage);
@@ -629,6 +635,48 @@ void ROMBuildQueryHandler::handle_type(const Query& query) {
 
     _api->editMessage(sentMessage, confirm,
                       createKeyboardWith<Buttons::confirm, Buttons::back>());
+}
+
+void ROMBuildQueryHandler::handle_clean_directories(const Query& query) {
+    KeyboardBuilder builder;
+
+    std::string_view type = query->data;
+    absl::ConsumePrefix(&type, "clean_");
+    auto romRootDir =
+        _commandLine->getPath(FS::PathType::INSTALL_ROOT) / kBuildDirectory;
+    if (type == "rom") {
+        LOG(INFO) << "Cleaning directory " << romRootDir;
+        _api->answerCallbackQuery(query->id,
+                                  "Wait... cleaning may take some time...");
+        std::filesystem::remove_all(romRootDir);
+        _api->answerCallbackQuery(query->id, "Cleaning ROM directory done.");
+    } else if (type == "build") {
+        LOG(INFO) << "Cleaning directory " << romRootDir / kOutDirectory;
+        _api->answerCallbackQuery(query->id,
+                                  "Wait... cleaning may take some time...");
+        std::filesystem::remove_all(romRootDir / kOutDirectory);
+        _api->answerCallbackQuery(query->id, "Cleaning build directory done.");
+    }
+
+    std::string entry;
+    auto romRootSpace = DiskInfo(romRootDir);
+
+    std::error_code ec;
+    entry = "Clean ROM directory";
+    if (!std::filesystem::exists(romRootDir, ec)) {
+        entry += " (Nonexistent)";
+    }
+    builder.addKeyboard({entry, "clean_rom"});
+    entry = "Clean build directory";
+    if (!std::filesystem::exists(romRootDir / kOutDirectory, ec)) {
+        entry += " (Nonexistent)";
+    }
+    builder.addKeyboard({entry, "clean_build"});
+    builder.addKeyboard(getButtonOf<Buttons::back>());
+    _api->editMessage(
+        query->message,
+        fmt::format("Current disk space free: {}", romRootSpace.availableSpace),
+        builder.get());
 }
 
 void ROMBuildQueryHandler::onCallbackQuery(

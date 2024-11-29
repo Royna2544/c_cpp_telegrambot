@@ -464,7 +464,7 @@ bool RepoInfo::git_clone(const std::filesystem::path& directory,
             "Fetch: Objects({}/{}/{}) Deltas({}/{}), Total {:.2f}GB",
             stats->received_objects, stats->indexed_objects,
             stats->total_objects, stats->indexed_deltas, stats->total_deltas,
-            Bytes(stats->received_bytes).to<SizeTypes::GigaBytes>().value);
+            Bytes(stats->received_bytes).to<SizeTypes::GigaBytes>());
         if (payload != nullptr) {
             auto* callback = static_cast<Callbacks*>(payload);
             callback->onFetch(stats);

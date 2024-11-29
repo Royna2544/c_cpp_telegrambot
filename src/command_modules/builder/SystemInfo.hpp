@@ -1,5 +1,7 @@
 #pragma once
 
+#include <fmt/core.h>
+
 #include <array>
 #include <cassert>
 #include <cmath>
@@ -48,7 +50,7 @@ struct Bytes {
     size_type value{};
     constexpr static SizeTypes type = SizeTypes::Bytes;
 
-    operator size_type() const { return value; }
+    explicit operator size_type() const { return value; }
     Bytes(size_type value) : value(value) {}
     Bytes() = default;
 
@@ -57,6 +59,28 @@ struct Bytes {
         size_type_floating v = value;
         v /= std::pow(Bytes::factor_floating, static_cast<int>(type));
         return {assert_downcast<double>(v), type};
+    }
+};
+
+template <>
+struct fmt::formatter<Bytes> {
+    // Parses the format specification.
+    constexpr auto parse(format_parse_context& ctx) { return ctx.begin(); }
+
+    // Formats the Bytes object.
+    template <typename FormatContext>
+    auto format(const Bytes& bytes, FormatContext& ctx) {
+        Bytes::size_type_floating num = bytes.value;
+        int unitIndex = 0;
+
+        while (num >= Bytes::factor_floating &&
+               unitIndex < Bytes::units.size() - 1) {
+            unitIndex++;
+            num /= Bytes::factor_floating;
+        }
+
+        // Format the result with the determined unit.
+        return fmt::format_to(ctx.out(), "{:.2f} {}", num, Bytes::units[unitIndex]);
     }
 };
 

@@ -115,8 +115,10 @@ MemoryInfo::MemoryInfo() {
     }
     totalMemory = kMemoryMap["MemTotal"];
     freeMemory = kMemoryMap["MemFree"];
-    usedMemory =
-        totalMemory - freeMemory - kMemoryMap["Buffers"] - kMemoryMap["Cached"];
+    usedMemory = static_cast<Bytes::size_type>(totalMemory) -
+                 static_cast<Bytes::size_type>(freeMemory) -
+                 static_cast<Bytes::size_type>(kMemoryMap["Buffers"]) -
+                 static_cast<Bytes::size_type>(kMemoryMap["Cached"]);
 
     usage = {assert_downcast<double>(
         static_cast<Bytes::size_type_floating>(usedMemory.value) *
@@ -135,8 +137,10 @@ DiskInfo::DiskInfo(std::filesystem::path path) : path_(std::move(path)) {
     availableSpace = stat.f_bsize * stat.f_bavail;
     totalSpace = stat.f_bsize * stat.f_blocks;
     usage = {assert_downcast<double>(
-        static_cast<Bytes::size_type_floating>(totalSpace - availableSpace) *
-        Percent::MAX / totalSpace)};
+        static_cast<Bytes::size_type_floating>(
+            static_cast<Bytes::size_type>(totalSpace) -
+            static_cast<Bytes::size_type>(availableSpace)) *
+        Percent::MAX / static_cast<Bytes::size_type>(totalSpace))};
 }
 
 SystemSummary::SystemSummary() {
