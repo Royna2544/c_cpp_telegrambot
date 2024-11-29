@@ -14,6 +14,7 @@
 #include "RepoUtils.hpp"
 #include "StructF.hpp"
 #include "SystemInfo.hpp"
+#include "libsighandler.hpp"
 
 namespace toolchains {
 
@@ -111,7 +112,7 @@ bool ClangProvider::downloadTarball(const std::string_view url,
                 auto dltotalByte = Bytes{static_cast<Bytes::size_type>(ulnow)};
                 LOG_EVERY_N_SEC(INFO, 5) << fmt::format(
                     "Download: {}MB/{}MB", dlnowByte.value, dltotalByte.value);
-                return 0;  // Continue downloading
+                return -static_cast<int>(SignalHandler::isSignaled());  // Continue downloading
             });
         curl_easy_setopt(curl, CURLOPT_XFERINFODATA, nullptr);
 

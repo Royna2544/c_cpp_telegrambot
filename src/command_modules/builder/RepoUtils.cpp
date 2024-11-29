@@ -9,6 +9,7 @@
 #include <trivial_helpers/_class_helper_macros.h>
 
 #include <filesystem>
+#include <libos/libsighandler.hpp>
 #include <memory>
 #include <trivial_helpers/raii.hpp>
 #include <type_traits>
@@ -469,7 +470,8 @@ bool RepoInfo::git_clone(const std::filesystem::path& directory,
             auto* callback = static_cast<Callbacks*>(payload);
             callback->onFetch(stats);
         }
-        return 0;  // Continue the transfer.
+        return -static_cast<int>(
+            SignalHandler::isSignaled());  // Continue the transfer.
     };
     gitoptions.fetch_opts.callbacks.payload = callback_.get();
 
@@ -483,11 +485,11 @@ bool RepoInfo::git_clone(const std::filesystem::path& directory,
             auto* callback = static_cast<Callbacks*>(payload);
             callback->onPacking(stage, current, total);
         }
-        return 0;  // Continue the transfer.
+        return -static_cast<int>(SignalHandler::isSignaled());  // Continue the transfer.
     };
     gitoptions.fetch_opts.callbacks.payload = callback_.get();
 
-    // Git checkout callbackd3866 
+    // Git checkout callbackd3866
     gitoptions.checkout_opts.progress_cb =
         +[](const char* path, size_t completed_steps, size_t total_steps,
             void* payload) {
@@ -505,7 +507,8 @@ bool RepoInfo::git_clone(const std::filesystem::path& directory,
 #if LIBGIT2_VER_MAJOR > 0 || (LIBGIT2_VER_MAJOR == 0 && LIBGIT2_VER_MINOR >= 24)
         gitoptions.fetch_opts.depth = 1;
 #else
-        LOG(WARNING) << "Shallow cloning is not supported in libgit2 version < 0.24";
+        LOG(WARNING)
+            << "Shallow cloning is not supported in libgit2 version < 0.24";
 #endif
     }
 
