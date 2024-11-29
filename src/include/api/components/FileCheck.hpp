@@ -5,6 +5,7 @@
 
 #include <api/MessageExt.hpp>
 #include <api/TgBotApi.hpp>
+#include <unordered_map>
 
 // Uses VirusTotal API to check virus files.
 class FileCheck {
@@ -25,7 +26,7 @@ class FileCheck {
         bool verbose_state = false;
     };
 
-    std::map<int, ResultHolder> _resultHolder;
+    std::unordered_map<int, ResultHolder> _resultHolder;
     int counter = 0;
 
     static constexpr absl::string_view kQueryDataPrefix = "FileCheck_";

@@ -8,9 +8,9 @@
 #include <api/TgBotApi.hpp>
 #include <chrono>
 #include <concepts>
-#include <map>
 #include <mutex>
 #include <socket/include/TgBotSocket_Export.hpp>
+#include <unordered_map>
 
 using TgBot::Chat;
 using TgBot::Message;
@@ -20,7 +20,8 @@ struct SpamBlockBase {
     // This is a per-chat map, containing UserId and the vector of pair of
     // messageid-messagecontent
     using UserMessagesMap =
-        std::map<UserId, std::vector<std::pair<MessageId, std::string>>>;
+        std::unordered_map<UserId,
+                           std::vector<std::pair<MessageId, std::string>>>;
     using Config = TgBotSocket::data::CtrlSpamBlock;
 
     // Triggered when a chat has more than sSpamDetectThreshold messages
@@ -65,7 +66,7 @@ struct SpamBlockBase {
         static constexpr int kThreshold = 3;
         static constexpr std::string_view name = "SameMessageMatcher";
         static int count(const UserMessagesMap::const_iterator entry) {
-            std::map<std::string, int> kSameMessageMap;
+            std::unordered_map<std::string, int> kSameMessageMap;
             for (const auto &elem : entry->second) {
                 const auto &[id, content] = elem;
                 if (!kSameMessageMap.contains(content)) {
@@ -117,11 +118,11 @@ struct SpamBlockBase {
     void consumeAndDetect();
 
    private:
-    std::map<ChatId, UserMessagesMap> chat_messages_data;
+    std::unordered_map<ChatId, UserMessagesMap> chat_messages_data;
 
     // Cache these for easy lookup
-    std::map<ChatId, Chat::Ptr> chat_map;
-    std::map<UserId, User::Ptr> user_map;
+    std::unordered_map<ChatId, Chat::Ptr> chat_map;
+    std::unordered_map<UserId, User::Ptr> user_map;
 
     mutable std::mutex mutex;  // Protect above maps
    protected:

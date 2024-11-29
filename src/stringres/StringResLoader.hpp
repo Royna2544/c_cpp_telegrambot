@@ -8,6 +8,7 @@
 #include <string>
 #include <string_view>
 #include <trivial_helpers/fruit_inject.hpp>
+#include <unordered_map>
 
 struct StringResLoaderBase {
     virtual ~StringResLoaderBase() = default;
@@ -45,11 +46,11 @@ class LocaleStringsImpl : public StringResLoaderBase::LocaleStrings {
     }
 
    private:
-    std::map<Strings, std::string> m_data;
+    std::unordered_map<Strings, std::string> m_data;
 };
 
 class StringResLoader : public StringResLoaderBase {
-    std::map<Locale, std::shared_ptr<LocaleStringsImpl>> localeMap;
+    std::unordered_map<Locale, std::shared_ptr<LocaleStringsImpl>> localeMap;
     std::filesystem::path m_path;
     LocaleStringsImpl empty;
 

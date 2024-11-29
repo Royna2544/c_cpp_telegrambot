@@ -325,15 +325,16 @@ struct Recovery {
     }
 };
 
-std::pair<std::vector<ConfigParser::Device::Ptr>,
-          std::vector<ConfigParser::ROMBranch::Ptr>>
-parseDeviceAndRom(
+using DeviceMap = std::unordered_map<std::string, ConfigParser::Device::Ptr>;
+using ROMsMap = std::unordered_map<std::string, ConfigParser::ROMBranch::Ptr>;
+using Devices = std::vector<ConfigParser::Device::Ptr>;
+using ROMs = std::vector<ConfigParser::ROMBranch::Ptr>;
+
+std::pair<Devices, ROMs> parseDeviceAndRom(
     const NodeItemType<std::string>& device, const Json::Value& rootNode,
-    const std::map<std::string, ConfigParser::Device::Ptr>& devicesPtr,
-    const std::map<std::string, ConfigParser::ROMBranch::Ptr>& romsPtr,
+    const DeviceMap& devicesPtr, const ROMsMap& romsPtr,
     const std::string_view target_rom, const int android_version) {
-    std::vector<ConfigParser::Device::Ptr> deviceList;
-    std::vector<ConfigParser::ROMBranch::Ptr> romBranch;
+    ROMs romBranch;
     std::vector<std::string> deviceCodenames;
 
     // Parse codenames array
@@ -390,9 +391,7 @@ struct ROMLocalManifest {
     static constexpr bool kReturnVec = true;
     static constexpr Json::ValueType _value = Json::objectValue;
     static std::vector<return_type> parseOneLocalManifest(
-        const Json::Value& json,
-        const std::map<std::string, ConfigParser::Device::Ptr>& devices,
-        const std::map<std::string, ConfigParser::ROMBranch::Ptr>& roms,
+        const Json::Value& json, const DeviceMap& devices, const ROMsMap& roms,
         std::string name, std::string manifest) {
         ConfigParser::LocalManifest localManifest;
         std::vector<return_type> result;
@@ -443,10 +442,9 @@ struct ROMLocalManifest {
         }
         return result;
     }
-    static std::vector<return_type> parse(
-        const Json::Value& root,
-        const std::map<std::string, ConfigParser::Device::Ptr>& devices,
-        const std::map<std::string, ConfigParser::ROMBranch::Ptr>& roms) {
+    static std::vector<return_type> parse(const Json::Value& root,
+                                          const DeviceMap& devices,
+                                          const ROMsMap& roms) {
         auto name = "name"_s;
         auto manifest = "url"_s;
         if (!checkRequirements(root, name, manifest)) {
@@ -470,10 +468,9 @@ struct ROMLocalManifest {
 struct RecoveryManifest {
     using return_type = ConfigParser::LocalManifest::Ptr;
     static constexpr Json::ValueType _value = Json::objectValue;
-    static std::vector<return_type> parse(
-        const Json::Value& root,
-        const std::map<std::string, ConfigParser::Device::Ptr>& devices,
-        const std::map<std::string, ConfigParser::ROMBranch::Ptr>& roms) {
+    static std::vector<return_type> parse(const Json::Value& root,
+                                          const DeviceMap& devices,
+                                          const ROMsMap& roms) {
         std::vector<return_type> manifests;
         for (const auto& entry : root) {
             ConfigParser::LocalManifest localManifest;
@@ -522,7 +519,7 @@ struct RecoveryManifest {
     }
 };
 
-struct Devices {
+struct DeviceNames {
     using return_type = ConfigParser::Device::Ptr;
     static constexpr bool kReturnVec = false;
     static constexpr Json::ValueType _value = Json::arrayValue;
@@ -585,8 +582,8 @@ bool is_json_file(const std::filesystem::path& path) {
 }  // namespace ParseFiles
 
 bool ConfigParser::merge() {
-    auto devices =
-        ParseFiles::parse<ParseFiles::Devices>(_jsonFileDir / "targets.json");
+    auto devices = ParseFiles::parse<ParseFiles::DeviceNames>(_jsonFileDir /
+                                                              "targets.json");
 
     // Parse all the components
     auto roms = ParseFiles::parse<ParseFiles::ROM>(_jsonFileDir / "roms.json",

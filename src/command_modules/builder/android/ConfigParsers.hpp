@@ -216,8 +216,8 @@ class ConfigParser {
 
    private:
     std::vector<LocalManifest::Ptr> parsedManifests;
-    std::map<std::string, Device::Ptr> deviceMap;
-    std::map<std::string, ROMBranch::Ptr> romBranchMap;
+    std::unordered_map<std::string, Device::Ptr> deviceMap;
+    std::unordered_map<std::string, ROMBranch::Ptr> romBranchMap;
     std::filesystem::path _jsonFileDir;
     MatcherStorage storage;
 };

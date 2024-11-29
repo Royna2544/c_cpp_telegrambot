@@ -1,4 +1,7 @@
 #include <api/TgBotApiImpl.hpp>
+#include <mutex>
+#include <map>
+
 #include "Authorization.hpp"
 
 class TgBotApiImpl::OnInlineQueryImpl : TgBotApiImpl::CommandListener {
@@ -12,9 +15,10 @@ class TgBotApiImpl::OnInlineQueryImpl : TgBotApiImpl::CommandListener {
 
     void onUnload(const std::string_view command) override;
     void onReload(const std::string_view command) override;
+
    public:
     OnInlineQueryImpl(AuthContext* auth, TgBotApiImpl::Ptr api);
-    
+
     void add(InlineQuery query, TgBot::InlineQueryResult::Ptr result) {
         const std::lock_guard _(mutex);
         queryResults[std::move(query)] =

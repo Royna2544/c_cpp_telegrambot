@@ -7,10 +7,10 @@
 #include <ConfigManager.hpp>
 #include <database/DatabaseBase.hpp>
 #include <filesystem>
-#include <map>
 #include <memory>
 #include <optional>
 #include <string_view>
+#include <unordered_map>
 
 #include "CommandLine.hpp"
 
@@ -52,7 +52,8 @@ struct TgBotDBImpl_API TgBotDatabaseImpl : DatabaseBase {
 
        private:
         // Not owning the string as it will always be a literal
-        std::map<std::string_view, std::unique_ptr<DatabaseBase>> _providers;
+        std::unordered_map<std::string_view, std::unique_ptr<DatabaseBase>>
+            _providers;
         std::unique_ptr<DatabaseBase> chosenProvider;
     };
 

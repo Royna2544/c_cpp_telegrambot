@@ -25,6 +25,7 @@
 #include <mutex>
 #include <system_error>
 #include <thread>
+#include <unordered_map>
 #include <utility>
 
 #include "Diagnosis.hpp"
@@ -38,7 +39,7 @@ class KernelBuildHandler {
     struct Intermidates {
         KernelConfig* current{};
         std::string device;
-        std::map<std::string, bool> fragment_preference;
+        std::unordered_map<std::string, bool> fragment_preference;
     };
 
    private:
@@ -388,7 +389,7 @@ Exit code: {}</blockquote>)",
 
     std::vector<std::string> craftDefconfigArgs() const {
         std::vector<std::string> defconfigArgs;
-        std::map<std::string, std::string> kReplacements = {
+        std::unordered_map<std::string, std::string> kReplacements = {
             {"{device}", intermidates_->device}};
         defconfigArgs.emplace_back(absl::StrReplaceAll(
             intermidates_->current->defconfig.scheme, kReplacements));

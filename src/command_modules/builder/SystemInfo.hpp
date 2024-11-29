@@ -22,8 +22,7 @@ template <typename NumTo, typename NumFrom>
 NumTo assert_downcast(const NumFrom num) {
     if constexpr (sizeof(NumFrom) >= sizeof(NumTo)) {
         if (std::numeric_limits<NumTo>::max() < num) {
-            throw std::overflow_error(
-                "Downcasting to larger type resulted in overflow");
+            throw std::overflow_error("Overflow detected during downcasting.");
         }
     }
     return static_cast<NumTo>(num);
@@ -71,16 +70,15 @@ struct fmt::formatter<Bytes> {
     template <typename FormatContext>
     auto format(const Bytes& bytes, FormatContext& ctx) {
         Bytes::size_type_floating num = bytes.value;
-        int unitIndex = 0;
-
-        while (num >= Bytes::factor_floating &&
-               unitIndex < Bytes::units.size() - 1) {
-            unitIndex++;
-            num /= Bytes::factor_floating;
-        }
+        Bytes::size_type unitIndex =
+            std::min(static_cast<Bytes::size_type>(
+                         std::log(num) / std::log(Bytes::factor_floating)),
+                     Bytes::units.size() - 1);
+        num /= std::pow(Bytes::factor_floating, unitIndex);
 
         // Format the result with the determined unit.
-        return fmt::format_to(ctx.out(), "{:.2f} {}", num, Bytes::units[unitIndex]);
+        return fmt::format_to(ctx.out(), "{:.2f} {}", num,
+                              Bytes::units[unitIndex]);
     }
 };
 

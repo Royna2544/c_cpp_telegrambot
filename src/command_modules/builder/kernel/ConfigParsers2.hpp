@@ -6,7 +6,7 @@
 #include <filesystem>
 #include <map>
 #include <string>
-#include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -46,8 +46,8 @@ struct KernelConfig {
         std::string description;
         bool default_enabled;
     };
-    std::map<std::string, Fragments> fragments;
-    std::map<std::string, std::string> envMap;
+    std::unordered_map<std::string, Fragments> fragments;
+    std::unordered_map<std::string, std::string> envMap;
 
     class Patcher {
        protected:
@@ -150,13 +150,13 @@ class DependencyChecker {
     using Fragments = KernelConfig::Fragments;
 
     explicit DependencyChecker(
-        const std::map<std::string, Fragments>* fragments)
+        const std::unordered_map<std::string, Fragments>* fragments)
         : fragments_(fragments) {}
 
     bool hasDependencyLoop();
 
    private:
-    const std::map<std::string, Fragments>* fragments_;
+    const std::unordered_map<std::string, Fragments>* fragments_;
 
     bool detectCycle(const std::string& current,
                      std::unordered_set<std::string>& visited,

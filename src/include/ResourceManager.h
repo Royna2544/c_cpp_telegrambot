@@ -4,10 +4,9 @@
 #include <trivial_helpers/fruit_inject.hpp>
 
 #include <filesystem>
-#include <map>
-#include <mutex>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 /**
@@ -47,7 +46,7 @@ struct TgBotUtils_API ResourceManager : ResourceProvider {
     ~ResourceManager() override = default;
 
    private:
-    std::map<std::filesystem::path, std::string> kResources;
+    std::unordered_map<std::filesystem::path, std::string> kResources;
     std::vector<std::string> ignoredResources;
     std::filesystem::path m_resourceDirectory;
     static constexpr std::string_view kResourceLoadIgnoreFile = ".loadignore";

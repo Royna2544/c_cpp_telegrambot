@@ -1,9 +1,12 @@
+#include <unordered_map>
+#include <mutex>
+
 #include "../TgBotApiImpl.hpp"
-#include "api/CommandModule.hpp"
 #include "Async.hpp"
+#include "api/CommandModule.hpp"
 
 class TgBotApiImpl::ModulesManagement {
-    std::map<std::string, CommandModule::Ptr> _handles;
+    std::unordered_map<std::string, CommandModule::Ptr> _handles;
     TgBotApiImpl::Ptr _api;
     mutable std::mutex mutex;
 
@@ -21,6 +24,7 @@ class TgBotApiImpl::ModulesManagement {
 
     bool loadFrom(const std::filesystem::path& directory);
 
-    explicit ModulesManagement(TgBotApiImpl::Ptr api, const std::filesystem::path& modules_dir);
+    explicit ModulesManagement(TgBotApiImpl::Ptr api,
+                               const std::filesystem::path& modules_dir);
     ~ModulesManagement();
 };
