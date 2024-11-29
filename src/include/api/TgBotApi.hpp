@@ -469,7 +469,7 @@ class TgBotApi {
         ChatId chatId, MessageId messageId,
         const std::vector<ReactionType::Ptr>& reaction, bool isBig) const = 0;
 
-    static FileOrString ToFileOrString(const FileOrMedia& media) {
+    static FileOrString ToFileOrString(FileOrMedia media) {
         return std::visit(
             [](auto& x) -> FileOrString {
                 using T = std::decay_t<decltype(x)>;
@@ -643,9 +643,9 @@ class TgBotApi {
                                 createReplyParameters(replyToMessage));
     }
 
-    inline bool answerCallbackQuery(
-        const std::string_view callbackQueryId,
-        const std::string_view text = {}, bool showAlert = false) const {
+    inline bool answerCallbackQuery(const std::string_view callbackQueryId,
+                                    const std::string_view text = {},
+                                    bool showAlert = false) const {
         return answerCallbackQuery_impl(callbackQueryId, text, showAlert);
     }
 
@@ -668,29 +668,38 @@ class TgBotApi {
     template <ParseMode mode = ParseMode::None>
     Message::Ptr sendDocument(ChatIds chatId, FileOrMedia document,
                               const std::string_view caption = {},
-                              ReplyParametersExt::Ptr replyParameters = nullptr,
                               GenericReply::Ptr replyMarkup = nullptr) const {
-        return sendDocument_impl(chatId, ToFileOrString(document), caption,
-                                 std::move(replyParameters),
-                                 std::move(replyMarkup), mode);
+        return sendDocument_impl(chatId, ToFileOrString(std::move(document)),
+                                 caption, nullptr, std::move(replyMarkup),
+                                 mode);
     }
 
     template <ParseMode mode = ParseMode::None>
-    Message::Ptr sendPhoto(ChatIds chatId, const FileOrMedia& photo,
+    Message::Ptr sendReplyDocument(
+        Message::Ptr message, FileOrMedia document,
+        const std::string_view caption = {},
+        GenericReply::Ptr replyMarkup = nullptr) const {
+        return sendDocument_impl(
+            message->chat->id, ToFileOrString(std::move(document)), caption,
+            createReplyParameters(message), std::move(replyMarkup), mode);
+    }
+
+    template <ParseMode mode = ParseMode::None>
+    Message::Ptr sendPhoto(ChatIds chatId, FileOrMedia photo,
                            const std::string_view caption = {},
                            ReplyParametersExt::Ptr replyParameters = nullptr,
                            GenericReply::Ptr replyMarkup = nullptr) const {
-        return sendPhoto_impl(chatId, ToFileOrString(photo), caption,
+        return sendPhoto_impl(chatId, ToFileOrString(std::move(photo)), caption,
                               std::move(replyParameters),
                               std::move(replyMarkup), mode);
     }
 
     template <ParseMode mode = ParseMode::None>
-    Message::Ptr sendVideo(ChatIds chatId, const FileOrMedia& video,
+    Message::Ptr sendVideo(ChatIds chatId, FileOrMedia video,
                            const std::string_view caption = {},
                            ReplyParametersExt::Ptr replyParameters = nullptr,
                            GenericReply::Ptr replyMarkup = nullptr) const {
-        return sendVideo_impl(chatId, ToFileOrString(video), caption,
+        return sendVideo_impl(chatId, ToFileOrString(std::move(video)), caption,
                               std::move(replyParameters),
                               std::move(replyMarkup), mode);
     }
@@ -699,7 +708,8 @@ class TgBotApi {
     Message::Ptr sendReplyPhoto(const Message::Ptr& replyToMessage,
                                 const FileOrMedia& photo,
                                 const std::string_view caption = {}) const {
-        return sendPhoto<mode>(replyToMessage->chat->id, photo, caption);
+        return sendPhoto<mode>(replyToMessage->chat->id, photo, caption,
+                               createReplyParameters(replyToMessage));
     }
 
     [[nodiscard]] inline bool downloadFile(

@@ -230,16 +230,19 @@ class TaskWrapperBase {
         return result.value == PerBuildData::Result::SUCCESS;
     }
 
-    void sendFile(const std::string_view filename) {
+    void sendFile(const std::string_view filename, bool withReply = false) {
         std::error_code ec;
         if (std::filesystem::file_size(filename, ec) != 0U) {
             if (ec) {
                 DLOG(INFO) << "Nonexistent file: " << filename;
                 return;
             }
-            api->sendDocument(
-                sentMessage->chat->id,
-                TgBot::InputFile::fromFile(filename, "text/plain"));
+            auto file = TgBot::InputFile::fromFile(filename, "text/plain");
+            if (withReply) {
+                api->sendReplyDocument(sentMessage, file);
+            } else {
+                api->sendDocument(sentMessage->chat->id, file);
+            }
             if (!std::filesystem::remove(filename, ec)) {
                 LOG(ERROR) << "Failed to remove error log file: "
                            << ec.message();
@@ -378,7 +381,7 @@ class Build : public TaskWrapperBase<ROMBuildTask> {
                 queryHandler->updateSentMessage(msg);
                 for (const auto& file :
                      {ROMBuildTask::kErrorLogFile, ROMBuildTask::kPreLogFile}) {
-                    sendFile(file);
+                    sendFile(file, true);
                 }
             } break;
             case PerBuildData::Result::SUCCESS:
