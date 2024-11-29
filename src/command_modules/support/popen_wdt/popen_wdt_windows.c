@@ -175,6 +175,7 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
             free(wdt_data->privdata);
         }
         wdt_data->privdata = NULL;
+        DisconnectNamedPipe(child_stdout_w);
         CloseHandle(child_stdout_w);
         return false;
     }
@@ -209,6 +210,7 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
         }
         wdt_data->privdata = NULL;
         CloseHandle(child_stdout_r);
+        DisconnectNamedPipe(child_stdout_w);
         CloseHandle(child_stdout_w);
         return false;
     }
@@ -223,6 +225,7 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
             CreateThread(NULL, 0, watchdog, wdt_data_in, 0, NULL);
         if (pdata.wdt_data.thread == NULL) {
             CloseHandle(child_stdout_r);
+            DisconnectNamedPipe(child_stdout_w);
             CloseHandle(child_stdout_w);
             if (wdt_data->watchdog_enabled) {
                 UnmapViewOfFile(wdt_data->privdata);
@@ -259,9 +262,9 @@ void popen_watchdog_stop(popen_watchdog_data_t** data_in) {
 }
 
 popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t** data) {
-    popen_watchdog_exit_t ret = {};
+    popen_watchdog_exit_t ret = POPEN_WDT_EXIT_INITIALIZER;
     DWORD exitcode = 0;
-    
+
     if (!check_data_privdata(data)) {
         return ret;
     }
@@ -272,11 +275,14 @@ popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t** data) {
         ret.exitcode = exitcode;
         ret.signal = (*data)->watchdog_activated;
     } else {
-        POPEN_WDT_DBGLOG("GetExitCodeProcess failed with error %lu\n", GetLastError());
+        POPEN_WDT_DBGLOG("GetExitCodeProcess failed with error %lu\n",
+                         GetLastError());
     }
 
     POPEN_WDT_DBGLOG("HANDLEs of pdata are being closed");
     CloseHandle(pdata->read_hdl);
+    CloseHandle(pdata->write_hdl);
+    DisconnectNamedPipe(pdata->write_hdl);
     CloseHandle(pdata->write_hdl);
     if ((*data)->watchdog_enabled) {
         CloseHandle(pdata->wdt_data.sub_Process);

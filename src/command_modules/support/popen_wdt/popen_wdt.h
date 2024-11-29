@@ -1,7 +1,6 @@
 #pragma once
 
 #include <stdbool.h>
-#include <stdio.h>
 
 #ifndef NDEBUG
 #define POPEN_WDT_DEBUG
@@ -19,6 +18,8 @@ typedef struct {
     bool signal;  /* if the process was signaled, then the exit code becomes the
                      signum */
 } popen_watchdog_exit_t;
+
+#define POPEN_WDT_EXIT_INITIALIZER { -1, false }
 
 typedef struct {
     const char *command;     /* command string */
@@ -45,14 +46,6 @@ bool popen_watchdog_init(popen_watchdog_data_t **data);
  * @return true if the watchdog was successfully started, false otherwise
  */
 bool popen_watchdog_start(popen_watchdog_data_t **data);
-
-/**
- * @brief stops the popen watchdog, which monitors the given command and kills
- * it if it hangs
- *
- * @param data the data structure containing the command to monitor
- */
-void popen_watchdog_stop(popen_watchdog_data_t **data);
 
 /**
  * @brief Checks if the watchdog has been activated for the given popen data.

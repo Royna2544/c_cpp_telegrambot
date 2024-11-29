@@ -12,7 +12,7 @@ TEST(PopenWdtTest, NonBlockingCommand) {
     EXPECT_TRUE(popen_watchdog_init(&data));
     data->watchdog_enabled = false;
     data->command = "ls";
-    EXPECT_TRUE(popen_watchdog_start(&data));
+    ASSERT_TRUE(popen_watchdog_start(&data));
     EXPECT_FALSE(popen_watchdog_activated(&data));
     auto ret = popen_watchdog_destroy(&data);
     EXPECT_EQ(ret.exitcode, 0);
@@ -25,7 +25,7 @@ TEST(PopenWdtTest, BlockingCommand) {
     data->watchdog_enabled = false;
     data->sleep_secs = 1;
     data->command = "sleep 3";
-    EXPECT_TRUE(popen_watchdog_start(&data));
+    ASSERT_TRUE(popen_watchdog_start(&data));
     EXPECT_FALSE(popen_watchdog_activated(&data));
     auto ret = popen_watchdog_destroy(&data);
     EXPECT_EQ(ret.exitcode, 0);
@@ -38,7 +38,7 @@ TEST(PopenWdtTest, NonBlockingCommandEnabled) {
     data->watchdog_enabled = true;
     data->sleep_secs = 4;
     data->command = "ls";
-    EXPECT_TRUE(popen_watchdog_start(&data));
+    ASSERT_TRUE(popen_watchdog_start(&data));
     EXPECT_FALSE(popen_watchdog_activated(&data));
     auto ret = popen_watchdog_destroy(&data);
     EXPECT_EQ(ret.exitcode, 0);
@@ -51,7 +51,7 @@ TEST(PopenWdtTest, BlockingCommandEnabled) {
     data->watchdog_enabled = true;
     data->sleep_secs = 1;
     data->command = "sleep 3";
-    EXPECT_TRUE(popen_watchdog_start(&data));
+    ASSERT_TRUE(popen_watchdog_start(&data));
     EXPECT_TRUE(popen_watchdog_activated(&data));
     auto ret = popen_watchdog_destroy(&data);
     EXPECT_EQ(ret.exitcode, POPEN_WDT_SIGTERM);
