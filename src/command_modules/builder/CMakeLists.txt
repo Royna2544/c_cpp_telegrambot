@@ -1,9 +1,15 @@
 if (NOT LINUX OR NOT CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|amd64")
+    message(STATUS "Builder: Unsupported platform")
     return()
 endif()
 
 find_package(libgit2 REQUIRED)
-find_package(LibArchive REQUIRED)
+find_package(LibArchive)
+
+if (NOT LibArchive_FOUND)
+    message(STATUS "Builder: No libarchive")
+    return()
+endif()
 
 add_my_library(
     NAME BuilderUtilsLinux

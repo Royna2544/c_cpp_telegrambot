@@ -1,5 +1,7 @@
 set(CMDMODULE_PREFIX cmd_)
 
+set(CMDMODULE_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+
 function(command_module)
     cmake_parse_arguments(TGBOT_CMDMODULE
         "RUST" # Options
@@ -43,7 +45,8 @@ function(command_module)
     target_include_directories(${TGBOT_CMDMODULE_LIBNAME} PRIVATE
         $<TARGET_PROPERTY:TgBotStringRes,INTERFACE_INCLUDE_DIRECTORIES>
         $<TARGET_PROPERTY:TgBotRandom,INTERFACE_INCLUDE_DIRECTORIES>
-        $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>)
+        $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>
+        ${CMDMODULE_ROOT_DIR})
     add_sanitizers(${TGBOT_CMDMODULE_LIBNAME})
     # Install command modules to lib/modules
     install(TARGETS ${TGBOT_CMDMODULE_LIBNAME} DESTINATION lib/modules)
@@ -163,20 +166,6 @@ command_module(
     NAME randsticker
     SRCS randsticker.cpp
     LIBS TgBotRandom
-)
-
-command_module(
-    NAME rombuild
-    SRCS romBuild.cpp
-    LIBS AndroidBuilder-cpp TgBotsighandler
-    PLATFORM "Linux"
-)
-
-command_module(
-    NAME kernelbuild
-    SRCS kernelbuild.cpp
-    LIBS KernelBuilder-cpp
-    PLATFORM "Linux"
 )
 
 command_module(

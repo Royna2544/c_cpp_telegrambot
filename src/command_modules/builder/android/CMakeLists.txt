@@ -37,4 +37,4 @@ add_my_executable(
 
 install(DIRECTORY configs/ DESTINATION share/${PROJECT_NAME}/builder/android)
 file(COPY configs/ DESTINATION ${CMAKE_BINARY_DIR}/share/${PROJECT_NAME}/builder/android)
-
+add_subdirectory(module)
