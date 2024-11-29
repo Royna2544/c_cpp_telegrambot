@@ -81,6 +81,7 @@ static DWORD WINAPI watchdog(LPVOID arg) {
     POPEN_WDT_DBGLOG("Done");
     char buf = 0;
     WriteFile(pdata->write_hdl, &buf, sizeof(char), NULL, NULL);
+    DisconnectNamedPipe(pdata->write_hdl);
     CloseHandle(pdata->write_hdl);
     pdata->write_hdl = NULL;
 
@@ -164,6 +165,26 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
         wdt_data->privdata = NULL;
         return false;
     }
+    
+    // Explicitly wait for a client to connect
+    if (!ConnectNamedPipe(child_stdout_w, NULL)) {
+        DWORD err = GetLastError();
+        // ERROR_PIPE_CONNECTED means the client already connected
+        if (err != ERROR_PIPE_CONNECTED) {  
+            POPEN_WDT_DBGLOG("ConnectNamedPipe failed with error %lu", err);
+            if (wdt_data->watchdog_enabled) {
+                UnmapViewOfFile(wdt_data->privdata);
+                CloseHandle(hMapFile);
+            } else {
+                free(wdt_data->privdata);
+            }
+            wdt_data->privdata = NULL;
+            DisconnectNamedPipe(child_stdout_w);
+            CloseHandle(child_stdout_w);
+            return false;
+        }
+    }
+
     child_stdout_r = CreateFileA(POPEN_WDT_PIPE, GENERIC_READ, 0, NULL,
                                  OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
     if (child_stdout_r == INVALID_HANDLE_VALUE) {
@@ -281,8 +302,10 @@ popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t** data) {
 
     POPEN_WDT_DBGLOG("HANDLEs of pdata are being closed");
     CloseHandle(pdata->read_hdl);
-    DisconnectNamedPipe(pdata->write_hdl);
-    CloseHandle(pdata->write_hdl);
+    if (pdata->write_hdl != NULL) {
+        DisconnectNamedPipe(pdata->write_hdl);
+        CloseHandle(pdata->write_hdl);
+    }
     if ((*data)->watchdog_enabled) {
         CloseHandle(pdata->wdt_data.sub_Process);
         CloseHandle(pdata->wdt_data.sub_Thread);
