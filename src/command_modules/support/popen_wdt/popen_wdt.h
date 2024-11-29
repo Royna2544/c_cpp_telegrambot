@@ -3,8 +3,6 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#define SLEEP_SECONDS 10
-
 #ifndef NDEBUG
 #define POPEN_WDT_DEBUG
 #endif
@@ -27,6 +25,7 @@ typedef struct {
     bool watchdog_enabled;   /* Is watchdog enabled? [in] */
     bool watchdog_activated; /* Result callback, stored true if watchdog did the
                                 work [out] */
+    int sleep_secs;          /* Number of seconds to sleep if watchdog is enabled */
     void *privdata;          /* Private data pointer */
 } popen_watchdog_data_t;
 

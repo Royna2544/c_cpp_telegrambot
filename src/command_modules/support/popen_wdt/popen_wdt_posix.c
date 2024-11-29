@@ -51,10 +51,10 @@ static void *watchdog(void *arg) {
 
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);
-    ts.tv_sec += SLEEP_SECONDS;
+    ts.tv_sec += data->sleep_secs;
 
     pthread_mutex_lock(&wdt_mutex);
-    POPEN_WDT_DBGLOG("Watchdog sleeping for %d seconds", SLEEP_SECONDS);
+    POPEN_WDT_DBGLOG("Watchdog sleeping for %d seconds", data->sleep_secs);
 
     while (waitpid(pdata->childprocess_pid, &pdata->status, WNOHANG) == 0) {
         int res = pthread_cond_timedwait(&pdata->condition, &wdt_mutex, &ts);
@@ -217,7 +217,7 @@ popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t **data_in) {
 
     data = *data_in;
     pdata = data->privdata;
-    if (!data->watchdog_enabled)  {
+    if (!data->watchdog_enabled) {
         if (waitpid(pdata->childprocess_pid, &pdata->status, 0) < 0) {
             POPEN_WDT_DBGLOG("Failed to wait for child process");
         }
@@ -265,8 +265,8 @@ bool popen_watchdog_read(popen_watchdog_data_t **data, char *buf, int size) {
     fds.events = POLLIN;
     fds.revents = 0;
     fds.fd = pdata->pipefd_r;
-    int pollRet =
-        poll(&fds, 1, data_->watchdog_enabled ? SLEEP_SECONDS * one_sec : -1);
+    int pollRet = poll(
+        &fds, 1, data_->watchdog_enabled ? data_->sleep_secs * one_sec : -1);
     switch (pollRet) {
         case 0:
             POPEN_WDT_DBGLOG("Timeout...");

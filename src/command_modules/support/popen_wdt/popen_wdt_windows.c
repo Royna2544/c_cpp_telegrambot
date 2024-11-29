@@ -56,7 +56,7 @@ static DWORD WINAPI watchdog(LPVOID arg) {
     struct popen_wdt_windows_priv* pdata = (*data)->privdata;
     DWORD ret_getexit = 0;
     DWORD exitEvent = 0;
-    const ULONGLONG endTime = GetTickCount64() + SLEEP_SECONDS * 1000ULL;
+    const ULONGLONG endTime = GetTickCount64() + (*data)->sleep_secs * 1000ULL;
 
     ResumeThread(pdata->wdt_data.sub_Thread);
 
@@ -332,7 +332,7 @@ bool popen_watchdog_read(popen_watchdog_data_t** data, char* buf, int size) {
     HANDLE handles[] = {ol.hEvent, pdata->wdt_data.sub_Process};
     waitResult = WaitForMultipleObjects(
         sizeof(handles) / sizeof(HANDLE), handles, FALSE,
-        data_->watchdog_enabled ? SLEEP_SECONDS * one_sec : INFINITE);
+        data_->watchdog_enabled ? data_->sleep_secs * one_sec : INFINITE);
     switch (waitResult) {
         case WAIT_OBJECT_0:
             if (GetOverlappedResult(pdata->read_hdl, &ol, &bytesRead, FALSE)) {
