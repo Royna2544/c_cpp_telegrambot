@@ -38,6 +38,11 @@
             "handler": "FileAppender",
             "data1": "CONFIG_LTO_CLANG=y",
             "data2": "arch/x86/configs/wsl_defconfig"
+        },
+        {
+            "handler": "FileAppender",
+            "data1": "CONFIG_LOCALVERSION=\"\"",
+            "data2": "arch/x86/configs/wsl_defconfig"
         }
     ]
 }
