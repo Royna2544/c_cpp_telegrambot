@@ -81,6 +81,24 @@ static void *watchdog(void *arg) {
     return NULL;
 }
 
+static void cleanup_resources(struct popen_wdt_posix_priv *pdata,
+                              popen_watchdog_data_t *data, int *pipefd) {
+    if (pipefd) {
+        close(pipefd[0]);
+        close(pipefd[1]);
+    }
+    if (pdata) {
+        if (pdata->startup_sem) {
+            rk_sema_destroy(pdata->startup_sem);
+        }
+        pthread_mutex_destroy(&pdata->wdt_mutex);
+        free(pdata);
+    }
+    if (data) {
+        free(data);
+    }
+}
+
 bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
     popen_watchdog_data_t *data = NULL;
     struct popen_wdt_posix_priv *pdata = NULL;
@@ -97,21 +115,15 @@ bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
     }
 
     if (pipe(pipefd) == -1) {
-        free(pdata);
-        free(data);
-        *data_in = NULL;
+        cleanup_resources(pdata, data, NULL);
         return false;
     }
 
     pthread_mutex_init(&pdata->wdt_mutex, NULL);
     pdata->childprocess_pid = fork();
     if (pdata->childprocess_pid == -1) {
-        close(pipefd[0]);
-        close(pipefd[1]);
-        free(pdata);
-        free(data);
+        cleanup_resources(pdata, data, pipefd);
         *data_in = NULL;
-        pthread_mutex_destroy(&pdata->wdt_mutex);
         return NULL;
     }
 
@@ -119,23 +131,27 @@ bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
         // Force "C" locale to avoid locale-dependent behavior
         setenv("LC_ALL", "C", true);
 
+#define WRAP_SYSCALL(x, ...)                                        \
+    do {                                                            \
+        if (x(__VA_ARGS__) == -1) {                                 \
+            POPEN_WDT_DBGLOG("%s failed: %s", #x, strerror(errno)); \
+            _exit(127);                                             \
+        } else {                                                    \
+            POPEN_WDT_DBGLOG("%s succeeded", #x);                   \
+        }                                                           \
+    } while (0)
+
         POPEN_WDT_DBGLOG("Starting subprocess");
         // Set process group ID it its pid.
-        if (setpgid(0, 0) == -1) {
-            POPEN_WDT_DBGLOG("Failed to set process group: %s",
-                             strerror(errno));
-            _exit(127);
-        }
-        POPEN_WDT_DBGLOG("SetPGID done");
-
+        WRAP_SYSCALL(setpgid, 0, 0);
         // Close unused file descriptors
-        close(pipefd[0]);
-        close(STDIN_FILENO);
+        WRAP_SYSCALL(close, pipefd[0]);
+        WRAP_SYSCALL(close, STDIN_FILENO);
 
         POPEN_WDT_DBGLOG("Goodbye stdout");
         // Redirect stdout and stderr to pipe
-        dup2(pipefd[1], STDOUT_FILENO);
-        dup2(pipefd[1], STDERR_FILENO);
+        WRAP_SYSCALL(dup2, pipefd[1], STDOUT_FILENO);
+        WRAP_SYSCALL(dup2, pipefd[1], STDERR_FILENO);
         // Call execl to run the command
         execlp("bash", "bash", "-c", data->command, (char *)NULL);
         _exit(127);  // If execl fails, exit
@@ -157,12 +173,9 @@ bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
 
             POPEN_WDT_DBGLOG("Watchdog is enabled");
             pthread_cond_init(&pdata->condition, NULL);
-            if (pthread_create(&pdata->wdt_thread, NULL, &watchdog, data) !=
-                0) {
+            if (pthread_create(&pdata->wdt_thread, NULL, &watchdog, data)) {
                 POPEN_WDT_DBGLOG("Failed to create watchdog thread");
-                pthread_mutex_destroy(&pdata->wdt_mutex);
-                free(pdata);
-                free(data);
+                cleanup_resources(pdata, data, pipefd);
                 *data_in = NULL;
                 return false;
             }
