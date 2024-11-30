@@ -118,6 +118,7 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
     saAttr.lpSecurityDescriptor = NULL;
 
     if (wdt_data->watchdog_enabled) {
+        POPEN_WDT_DBGLOG("Watchdog enabled");
         // Alloc watchdog data
         // Create Mapping
         hMapFile =
@@ -135,6 +136,7 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
             CloseHandle(hMapFile);
             return false;
         }
+        POPEN_WDT_DBGLOG("Created mmap");
     } else {
         // Malloc does the work here, no need to be shared among threads
         wdt_data->privdata = malloc(sizeof(struct popen_wdt_windows_priv));
@@ -148,6 +150,7 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
     ZeroMemory(&pi, sizeof(PROCESS_INFORMATION));
     ZeroMemory(&si, sizeof(STARTUPINFO));
 
+    POPEN_WDT_DBGLOG("Ready to create named pipe");
     // Setup processinfo
     si.cb = sizeof(STARTUPINFO);
     si.dwFlags |= STARTF_USESTDHANDLES;
@@ -166,6 +169,7 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
         wdt_data->privdata = NULL;
         return false;
     }
+    POPEN_WDT_DBGLOG("Created");
 
     child_stdout_r = CreateFileA(POPEN_WDT_PIPE, GENERIC_READ, 0, NULL,
                                  OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
@@ -182,6 +186,7 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
         CloseHandle(child_stdout_w);
         return false;
     }
+    POPEN_WDT_DBGLOG("Created client connection");
 
     setlocale(LC_ALL, "C");
 
