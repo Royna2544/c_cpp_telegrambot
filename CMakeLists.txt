@@ -126,20 +126,6 @@ if (NOT MSVC)
   list(APPEND GLOBAL_COMPILE_OPTIONS -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/=)
 endif()
 
-# dlfcn (libdl)
-if (WIN32)
-  add_subdirectory(src/third-party/dlfcn-win32)
-  set(CMAKE_DL_LIBS dl)
-elseif(ANDROID)
-  set(CMAKE_DL_LIBS)
-else()
-  find_library(DL dl)
-  add_library(dl SHARED IMPORTED)
-  set_target_properties(dl PROPERTIES
-    IMPORTED_LOCATION "${DL}"
-  )
-endif()
-
 ##################### Fill in readme with cmake #####################
 string(TIMESTAMP TODAY "%Y-%m-%d")
 configure_file(resources/about.html.in ${CMAKE_SOURCE_DIR}/resources/about.html)
@@ -244,7 +230,7 @@ function(add_my_executable)
     add_executable(${TGBOT_EXE_NAME} ${TGBOT_EXE_SRCS})
     if (TGBOT_EXE_TEST)
       add_test(NAME TestSuite_${TGBOT_EXE_NAME_BAK} COMMAND ${TGBOT_EXE_NAME})
-      if (BUILD_SHARED_LIBS AND MSVC)
+      if (MSVC AND BUILD_SHARED_LIBS)
         # https://github.com/google/googletest/issues/292
         target_compile_definitions(${TGBOT_EXE_NAME} PRIVATE GTEST_LINKED_AS_SHARED_LIBRARY)
       endif()
@@ -368,6 +354,7 @@ if (TGBOT_ENABLE_TESTING)
   if (MSVC)
     # Always use source built googletest for MSVC
     # https://github.com/google/googletest/issues/4357
+    set(gtest_force_shared_crt TRUE)
     add_subdirectory(src/third-party/googletest)
   else()
     find_package(GTest REQUIRED)
@@ -378,6 +365,19 @@ else()
   message(STATUS "Disabling tests")
 endif()
 
+# dlfcn (libdl)
+if (WIN32)
+  add_subdirectory(src/third-party/dlfcn-win32)
+  set(CMAKE_DL_LIBS dl)
+elseif(ANDROID)
+  set(CMAKE_DL_LIBS)
+else()
+  find_library(DL dl)
+  add_library(dl SHARED IMPORTED)
+  set_target_properties(dl PROPERTIES
+    IMPORTED_LOCATION "${DL}"
+  )
+endif()
 ################### The Bot's main functionaility ###################
 add_my_library(
   NAME Regex
