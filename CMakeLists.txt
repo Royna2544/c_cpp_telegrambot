@@ -149,7 +149,7 @@ function(add_my_library)
   cmake_parse_arguments(TGBOT_LIBRARY
     "NO_LIBPREFIX;STATIC" # Options
     "NAME" # One-value keywords
-    "SRCS;LIBS;LIBS_STATIC;PUBLIC_INC;PRIVATE_INC;DEPENDS;DEFS;LIBS_WIN32" # Multiple-value keywords
+    "SRCS;SRCS_UNIX;LIBS;LIBS_STATIC;PUBLIC_INC;PRIVATE_INC;DEPENDS;DEFS;LIBS_WIN32" # Multiple-value keywords
     ${ARGN}
   )
   if (NOT TGBOT_LIBRARY_SRCS OR NOT TGBOT_LIBRARY_NAME)
@@ -157,6 +157,9 @@ function(add_my_library)
   endif()
   if (NOT TGBOT_LIBRARY_NO_LIBPREFIX)
     set(TGBOT_LIBRARY_NAME TgBot${TGBOT_LIBRARY_NAME})
+  endif()
+  if (UNIX)
+    list(APPEND TGBOT_LIBRARY_SRCS ${TGBOT_LIBRARY_SRCS_UNIX})
   endif()
   if (TGBOT_LIBRARY_STATIC)
     add_library(${TGBOT_LIBRARY_NAME} STATIC ${TGBOT_LIBRARY_SRCS})
@@ -218,7 +221,7 @@ function(add_my_executable)
   cmake_parse_arguments(TGBOT_EXE
     "NO_PREFIX;OPTIONAL;TEST" # Options
     "NAME" # One-value keywords
-    "SRCS;LIBS;LIBS_WIN32" # Multiple-value keywords
+    "SRCS;LIBS" # Multiple-value keywords
     ${ARGN}
   )
   if (NOT TGBOT_EXE_SRCS OR NOT TGBOT_EXE_NAME)
@@ -258,7 +261,6 @@ function(add_my_executable)
      set_target_properties(${lib} PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
   endif()
   if (WIN32)
-    target_link_libraries(${TGBOT_EXE_NAME} ${TGBOT_EXE_LIBS_WIN32})
     add_custom_command(TARGET ${TGBOT_EXE_NAME} POST_BUILD
       COMMAND ${CMAKE_COMMAND} -E copy -t $<TARGET_FILE_DIR:${TGBOT_EXE_NAME}> $<TARGET_RUNTIME_DLLS:${TGBOT_EXE_NAME}>
       COMMAND_EXPAND_LISTS
