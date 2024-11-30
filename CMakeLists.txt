@@ -436,6 +436,11 @@ add_my_executable(
       TgBotStringRes ${CMAKE_DL_LIBS} TgBotSocket JsonCpp::JsonCpp TgBotsighandler OpenSSL::SSL
 )
 
+# Add an icon
+if (WIN32)
+    target_sources(${PROJECT_NAME}_main PRIVATE resources/photo/resource.rc)
+endif()
+
 if (UNIX)
 add_my_executable(
   NAME maind
@@ -453,8 +458,22 @@ set(CPACK_PACKAGE_NAME "TgBot++")
 set(CPACK_PACKAGE_VERSION "1.0.0")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "A Telegram bot coded in C++")
 set(CPACK_PACKAGE_CONTACT "support@example.com")
-set(CPACK_GENERATOR "ZIP;TGZ;NSIS")
+set(CPACK_GENERATOR "ZIP;TGZ")
 set(CPACK_PACKAGE_INSTALL_DIRECTORY "TgBot C++ server ${CPACK_PACKAGE_VERSION}")
+
+# NSIS
+set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
+set(CPACK_NSIS_MUI_ICON ${CMAKE_SOURCE_DIR}/resources/photo/icon.ico)
+set(CPACK_NSIS_MUI_UNIICON ${CMAKE_SOURCE_DIR}/resources/photo/uninstall.ico)
+set(CPACK_NSIS_DISPLAY_NAME "Telegram Bot Server")
+set(CPACK_NSIS_WELCOME_TITLE "Welcome! Actually, no")
+set(CPACK_NSIS_BRANDING_TEXT "CMake ${CMAKE_VERSION}")
+set(CPACK_NSIS_IGNORE_LICENSE_PAGE ON)
+set(CPACK_NSIS_INSTALLED_ICON_NAME "${CMAKE_INSTALL_PREFIX}/bin/${PROJECT_NAME}_main.exe")
+
+if (WIN32)
+  list(APPEND CPACK_GENERATOR NSIS)
+endif()
 
 # Include CPack
 include(CPack)
