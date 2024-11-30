@@ -152,7 +152,7 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
     si.dwFlags |= STARTF_USESTDHANDLES;
     child_stdout_w = si.hStdError = si.hStdOutput = CreateNamedPipeA(
         POPEN_WDT_PIPE, PIPE_ACCESS_OUTBOUND | FILE_FLAG_OVERLAPPED,
-        PIPE_TYPE_BYTE | PIPE_WAIT, 1, 0, 0, 0, &saAttr);
+        PIPE_TYPE_BYTE | PIPE_WAIT, PIPE_UNLIMITED_INSTANCES, 0, 0, 0, &saAttr);
     if (child_stdout_w == INVALID_HANDLE_VALUE) {
         POPEN_WDT_DBGLOG("CreateNamedPipe failed with error %lu",
                          GetLastError());
@@ -165,12 +165,29 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
         wdt_data->privdata = NULL;
         return false;
     }
-    
+
+    OVERLAPPED ov = {0};
+    ov.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
+    if (ov.hEvent == NULL) {
+        if (wdt_data->watchdog_enabled) {
+            UnmapViewOfFile(wdt_data->privdata);
+            CloseHandle(hMapFile);
+        } else {
+            free(wdt_data->privdata);
+        }
+        wdt_data->privdata = NULL;
+        DisconnectNamedPipe(child_stdout_w);
+        CloseHandle(child_stdout_w);
+        return false;
+    }
+
     // Explicitly wait for a client to connect
-    if (!ConnectNamedPipe(child_stdout_w, NULL)) {
+    if (!ConnectNamedPipe(child_stdout_w, &ov)) {
         DWORD err = GetLastError();
-        // ERROR_PIPE_CONNECTED means the client already connected
-        if (err != ERROR_PIPE_CONNECTED) {  
+        if (err == ERROR_IO_PENDING) {
+            // Wait for the connection to complete
+            WaitForSingleObject(ov.hEvent, INFINITE);
+        } else if (err != ERROR_PIPE_CONNECTED) {
             POPEN_WDT_DBGLOG("ConnectNamedPipe failed with error %lu", err);
             if (wdt_data->watchdog_enabled) {
                 UnmapViewOfFile(wdt_data->privdata);
@@ -181,9 +198,11 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
             wdt_data->privdata = NULL;
             DisconnectNamedPipe(child_stdout_w);
             CloseHandle(child_stdout_w);
+            CloseHandle(ov.hEvent);
             return false;
         }
     }
+    CloseHandle(ov.hEvent);
 
     child_stdout_r = CreateFileA(POPEN_WDT_PIPE, GENERIC_READ, 0, NULL,
                                  OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
