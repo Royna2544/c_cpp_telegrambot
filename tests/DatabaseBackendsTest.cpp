@@ -147,18 +147,23 @@ TEST_P(DatabaseBaseTest, DumpDatabase) {
 }
 
 // Instantiate the parameterized tests with different database implementations
+#if defined DATABASE_HAVE_PROTOBUF && defined DATABASE_HAVE_SQLITE
 INSTANTIATE_TEST_SUITE_P(
     DatabaseImplementations, DatabaseBaseTest,
     ::testing::Values(
-#ifdef DATABASE_HAVE_PROTOBUF
-        DBParam{std::make_shared<ProtoDatabase>(), "ProtoDatabase"}
-#endif
-#if defined DATABASE_HAVE_PROTOBUF && defined DATABASE_HAVE_SQLITE
-        ,
-#endif
-#if defined DATABASE_HAVE_SQLITE
+        DBParam{std::make_shared<ProtoDatabase>(), "ProtoDatabase"},
         DBParam{std::make_shared<SQLiteDatabase>(
-                    getCmdLine().getPath(FS::PathType::RESOURCES_SQL)),
-                "SQLiteDatabase"}
+            getCmdLine().getPath(FS::PathType::RESOURCES_SQL)),
+        "SQLiteDatabase"}));
+#elif defined DATABASE_HAVE_PROTOBUF 
+INSTANTIATE_TEST_SUITE_P(
+    DatabaseImplementations, DatabaseBaseTest,
+    ::testing::Values(
+        DBParam{std::make_shared<ProtoDatabase>(), "ProtoDatabase"}));
+#elif defined DATABASE_HAVE_SQLITE
+INSTANTIATE_TEST_SUITE_P(
+    DatabaseImplementations, DatabaseBaseTest,
+    ::testing::Values(DBParam{std::make_shared<SQLiteDatabase>(
+            getCmdLine().getPath(FS::PathType::RESOURCES_SQL)),
+        "SQLiteDatabase"}));
 #endif
-        ));

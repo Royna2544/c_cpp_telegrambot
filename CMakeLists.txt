@@ -16,6 +16,7 @@ option(ENABLE_RUST_SUPPORT "Enable rust support" OFF)
 option(SANITIZER_CONFIG "Sanitizers config for debug builds (ASan, TSan, etc)" "ASan")
 option(DIRTY_ABSEIL_FIX "Enable dirty abseil linkage fix" OFF)
 option(BUILD_SHARED_LIBS "Build some dependent libraries as shared" OFF)
+option(TGBOT_ENABLE_TESTING "Enable testing" OFF)
 #####################################################################
 
 #####################################################################
@@ -243,6 +244,10 @@ function(add_my_executable)
     add_executable(${TGBOT_EXE_NAME} ${TGBOT_EXE_SRCS})
     if (TGBOT_EXE_TEST)
       add_test(NAME TestSuite_${TGBOT_EXE_NAME_BAK} COMMAND ${TGBOT_EXE_NAME})
+      if (BUILD_SHARED_LIBS AND MSVC)
+        # https://github.com/google/googletest/issues/292
+        target_compile_definitions(${TGBOT_EXE_NAME} PRIVATE GTEST_LINKED_AS_SHARED_LIBRARY)
+      endif()
     else()
       install(TARGETS ${TGBOT_EXE_NAME})
     endif()
@@ -359,8 +364,14 @@ endif()
 add_subdirectory(src/third-party/cpp-httplib)
 
 # Tests
-find_package(GTest)
-if (GTest_FOUND)
+if (TGBOT_ENABLE_TESTING)
+  if (MSVC)
+    # Always use source built googletest for MSVC
+    # https://github.com/google/googletest/issues/4357
+    add_subdirectory(src/third-party/googletest)
+  else()
+    find_package(GTest REQUIRED)
+  endif()
   enable_testing()
   add_subdirectory(tests)
 else()

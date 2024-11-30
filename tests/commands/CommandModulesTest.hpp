@@ -210,7 +210,7 @@ class CommandTestBase : public CommandModulesTest {
         return Truly([=, message = std::move(message),
                       this](ReplyParametersExt::Ptr m) {
             return isReplyToThisMsg(m, message
-                                           ?: std::static_pointer_cast<Message>(
+                                           ? message: std::static_pointer_cast<Message>(
                                                   defaultProvidedMessage));
         });
     }

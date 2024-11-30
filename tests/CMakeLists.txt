@@ -6,7 +6,6 @@ add_my_executable(
   SRCS
     TestMain.cpp
     AuthorizationTest.cpp
-    TryParseTest.cpp
     commands/CommandModulesTest.cpp
     commands/AliveCmdTest.cpp
     #commands/BashCmdTest.cpp

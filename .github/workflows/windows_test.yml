@@ -59,7 +59,7 @@ jobs:
     - name: '🚧 Build TgBot++'
       run: |
         mkdir build
-        cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Debug .
+        cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Debug -DTGBOT_ENABLE_TESTING=ON .
         cmake --build build -j4
 
     - name: Run Tests
