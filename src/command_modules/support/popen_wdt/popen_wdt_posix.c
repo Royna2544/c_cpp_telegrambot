@@ -81,17 +81,9 @@ static void *watchdog(void *arg) {
     return NULL;
 }
 
-#if defined _POSIX_BARRIERS && _POSIX_BARRIERS > 0
-#define USE_BARRIER
-#endif
-
 bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
     popen_watchdog_data_t *data = NULL;
     struct popen_wdt_posix_priv *pdata = NULL;
-#ifdef USE_BARRIER
-    pthread_barrierattr_t attr;
-    pthread_barrier_t *barrier = NULL;
-#endif
     int pipefd[2];
 
     if (data_in == NULL || *data_in == NULL) {
@@ -111,24 +103,6 @@ bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
         return false;
     }
 
-#ifdef USE_BARRIER
-    // Alloc pthread barrier in mmap
-    barrier = mmap(NULL, sizeof(pthread_barrier_t), PROT_READ | PROT_WRITE,
-                   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-
-    if (barrier == MAP_FAILED) {
-        perror("mmap");
-        close(pipefd[0]);
-        close(pipefd[1]);
-        free(pdata);
-        free(data);
-        *data_in = NULL;
-    }
-    pthread_barrier_init(barrier, &attr, 2);
-    pthread_barrierattr_init(&attr);
-    pthread_barrierattr_setpshared(&attr, PTHREAD_PROCESS_SHARED);
-    pthread_barrierattr_destroy(&attr);
-#endif
     pthread_mutex_init(&pdata->wdt_mutex, NULL);
     pdata->childprocess_pid = fork();
     if (pdata->childprocess_pid == -1) {
@@ -162,9 +136,6 @@ bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
         // Redirect stdout and stderr to pipe
         dup2(pipefd[1], STDOUT_FILENO);
         dup2(pipefd[1], STDERR_FILENO);
-#ifdef USE_BARRIER
-        pthread_barrier_wait(barrier);
-#endif
         // Call execl to run the command
         execlp("bash", "bash", "-c", data->command, (char *)NULL);
         _exit(127);  // If execl fails, exit
@@ -177,12 +148,6 @@ bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
         pdata->process_is_running = true;
         POPEN_WDT_DBGLOG("Parent pid is %d", getpid());
         POPEN_WDT_DBGLOG("Child pid is %d", pdata->childprocess_pid);
-#ifdef USE_BARRIER
-        pthread_barrier_wait(barrier);
-        POPEN_WDT_DBGLOG("Waited for barrier");
-        pthread_barrier_destroy(barrier);
-        munmap(barrier, sizeof(pthread_barrier_t));
-#endif
         data->privdata = pdata;
 
         if (data->watchdog_enabled) {

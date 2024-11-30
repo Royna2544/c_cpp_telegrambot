@@ -19,3 +19,6 @@
 [submodule "src/third-party/fruit"]
 	path = src/third-party/fruit
 	url = https://github.com/google/fruit
+[submodule "src/third-party/googletest"]
+	path = src/third-party/googletest
+	url = https://github.com/google/googletest/
