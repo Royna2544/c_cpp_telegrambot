@@ -10,6 +10,7 @@
 #include <string.h>
 #include <synchapi.h>
 #include <winbase.h>
+#include <assert.h>
 #include <winnt.h>
 
 #include "popen_wdt.h"
@@ -93,13 +94,13 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
     HANDLE child_stdout_r = NULL;
     HANDLE hMapFile = NULL;
     popen_watchdog_data_t* wdt_data = NULL;
-    struct popen_wdt_windows_priv pdata;
+    struct popen_wdt_windows_priv pdata = {0};
 
     CHAR buffer[MAX_PATH] = {0};
     BOOL success = 0;
-    SECURITY_ATTRIBUTES saAttr;
-    STARTUPINFO si;
-    PROCESS_INFORMATION pi;
+    SECURITY_ATTRIBUTES saAttr = {0};
+    STARTUPINFO si = {0};
+    PROCESS_INFORMATION pi = {0};
 
     if (wdt_data_in == NULL) {
         POPEN_WDT_DBGLOG("wdt_data_in is NULL");
@@ -152,7 +153,7 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
     si.dwFlags |= STARTF_USESTDHANDLES;
     child_stdout_w = si.hStdError = si.hStdOutput = CreateNamedPipeA(
         POPEN_WDT_PIPE, PIPE_ACCESS_OUTBOUND | FILE_FLAG_OVERLAPPED,
-        PIPE_TYPE_BYTE | PIPE_WAIT, PIPE_UNLIMITED_INSTANCES, 0, 0, 0, &saAttr);
+        PIPE_TYPE_BYTE | PIPE_NOWAIT, PIPE_UNLIMITED_INSTANCES, 0, 0, 0, &saAttr);
     if (child_stdout_w == INVALID_HANDLE_VALUE) {
         POPEN_WDT_DBGLOG("CreateNamedPipe failed with error %lu",
                          GetLastError());
@@ -165,44 +166,6 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
         wdt_data->privdata = NULL;
         return false;
     }
-
-    OVERLAPPED ov = {0};
-    ov.hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-    if (ov.hEvent == NULL) {
-        if (wdt_data->watchdog_enabled) {
-            UnmapViewOfFile(wdt_data->privdata);
-            CloseHandle(hMapFile);
-        } else {
-            free(wdt_data->privdata);
-        }
-        wdt_data->privdata = NULL;
-        DisconnectNamedPipe(child_stdout_w);
-        CloseHandle(child_stdout_w);
-        return false;
-    }
-
-    // Explicitly wait for a client to connect
-    if (!ConnectNamedPipe(child_stdout_w, &ov)) {
-        DWORD err = GetLastError();
-        if (err == ERROR_IO_PENDING) {
-            // Wait for the connection to complete
-            WaitForSingleObject(ov.hEvent, INFINITE);
-        } else if (err != ERROR_PIPE_CONNECTED) {
-            POPEN_WDT_DBGLOG("ConnectNamedPipe failed with error %lu", err);
-            if (wdt_data->watchdog_enabled) {
-                UnmapViewOfFile(wdt_data->privdata);
-                CloseHandle(hMapFile);
-            } else {
-                free(wdt_data->privdata);
-            }
-            wdt_data->privdata = NULL;
-            DisconnectNamedPipe(child_stdout_w);
-            CloseHandle(child_stdout_w);
-            CloseHandle(ov.hEvent);
-            return false;
-        }
-    }
-    CloseHandle(ov.hEvent);
 
     child_stdout_r = CreateFileA(POPEN_WDT_PIPE, GENERIC_READ, 0, NULL,
                                  OPEN_EXISTING, FILE_FLAG_OVERLAPPED, NULL);
@@ -277,28 +240,18 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
             return false;
         }
     } else {
-        ResumeThread(pi.hThread);
-        // Pass the process handle only
+        DWORD suspendCount = ResumeThread(pi.hThread);
+        if (suspendCount < 0) {
+            POPEN_WDT_DBGLOG("ResumeThread failed with error %lu",
+                             GetLastError());
+        }
         pdata.wdt_data.sub_Process = pi.hProcess;
-        CloseHandle(pi.hThread);
+        pdata.wdt_data.sub_Thread = pi.hThread;
     }
+    POPEN_WDT_DBGLOG("Process PID: %d, TID: %d", pi.dwProcessId, pi.dwThreadId);
     CopyMemory(wdt_data->privdata, &pdata,
                sizeof(struct popen_wdt_windows_priv));
     return true;
-}
-
-void popen_watchdog_stop(popen_watchdog_data_t** data_in) {
-    popen_watchdog_data_t* data = NULL;
-    struct popen_wdt_windows_priv* pdata = NULL;
-
-    if (!check_data_privdata(data_in)) {
-        return;
-    }
-    data = *data_in;
-    pdata = data->privdata;
-    if (data->watchdog_enabled) {
-        WaitForSingleObject(pdata->wdt_data.thread, INFINITE);
-    }
 }
 
 popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t** data) {
@@ -311,7 +264,11 @@ popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t** data) {
     struct popen_wdt_windows_priv* pdata = (*data)->privdata;
 
     POPEN_WDT_DBGLOG("Starting cleanup");
+    if (!(*data)->watchdog_enabled) {
+       WaitForSingleObject(pdata->wdt_data.sub_Process, INFINITE);
+    }
     if (GetExitCodeProcess(pdata->wdt_data.sub_Process, &exitcode)) {
+        assert(exitcode != STILL_ACTIVE);
         ret.exitcode = exitcode;
         ret.signal = (*data)->watchdog_activated;
     } else {
@@ -325,16 +282,16 @@ popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t** data) {
         DisconnectNamedPipe(pdata->write_hdl);
         CloseHandle(pdata->write_hdl);
     }
+    POPEN_WDT_DBGLOG("Done closing handles");
+    CloseHandle(pdata->wdt_data.sub_Process);
+    CloseHandle(pdata->wdt_data.sub_Thread);
     if ((*data)->watchdog_enabled) {
-        CloseHandle(pdata->wdt_data.sub_Process);
-        CloseHandle(pdata->wdt_data.sub_Thread);
         CloseHandle(pdata->wdt_data.thread);
         POPEN_WDT_DBGLOG("pdata is being unmapped");
         UnmapViewOfFile(pdata);
         (*data)->privdata = NULL;
     } else {
         POPEN_WDT_DBGLOG("HANDLEs of pdata are being closed");
-        CloseHandle(pdata->wdt_data.sub_Process);
         free(pdata);
         (*data)->privdata = NULL;
     }
@@ -403,12 +360,14 @@ bool popen_watchdog_read(popen_watchdog_data_t** data, char* buf, int size) {
 }
 
 bool popen_watchdog_activated(popen_watchdog_data_t** data) {
-    popen_watchdog_stop(data);
-
-    if (data != NULL && *data != NULL) {
-        POPEN_WDT_DBGLOG("IsWatchdogActivated: %d",
-                         (*data)->watchdog_activated);
-        return (*data)->watchdog_activated;
+    if (!check_data_privdata(data)) {
+        return false;
     }
-    return false;
+    popen_watchdog_data_t* data_ = *data;
+    struct popen_wdt_windows_priv* pdata = data_->privdata;
+    if (data_->watchdog_enabled) {
+        WaitForSingleObject(pdata->wdt_data.thread, INFINITE);
+    }
+    POPEN_WDT_DBGLOG("IsWatchdogActivated: %d", data_->watchdog_activated);
+    return data_->watchdog_activated;
 }
