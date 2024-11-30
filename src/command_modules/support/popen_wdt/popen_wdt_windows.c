@@ -152,7 +152,7 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
     si.dwFlags |= STARTF_USESTDHANDLES;
     child_stdout_w = si.hStdError = si.hStdOutput = CreateNamedPipeA(
         POPEN_WDT_PIPE, PIPE_ACCESS_OUTBOUND | FILE_FLAG_OVERLAPPED,
-        PIPE_TYPE_BYTE | PIPE_NOWAIT, 1, 0, 0, 0, &saAttr);
+        PIPE_TYPE_BYTE | PIPE_WAIT, 1, 0, 0, 0, &saAttr);
     if (child_stdout_w == INVALID_HANDLE_VALUE) {
         POPEN_WDT_DBGLOG("CreateNamedPipe failed with error %lu",
                          GetLastError());
