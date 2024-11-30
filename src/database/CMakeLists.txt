@@ -66,6 +66,7 @@ add_my_executable(
   NAME DatabaseCtl
   SRCS utils/DatabaseCtrl.cc
   LIBS TgBotDBImpl TgBotDBLoading TgBotUtils
+  RELATION Database
 )
 #####################################################################
 
@@ -78,5 +79,6 @@ add_my_executable(
     TgBotSocket
     OpenSSL::Crypto
     TgBotDBLoading
+  RELATION Socket
 )
 #####################################################################

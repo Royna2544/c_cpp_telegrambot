@@ -207,7 +207,7 @@ endfunction(add_my_library)
 function(add_my_executable)
   cmake_parse_arguments(TGBOT_EXE
     "NO_PREFIX;OPTIONAL;TEST" # Options
-    "NAME" # One-value keywords
+    "NAME;RELATION" # One-value keywords
     "SRCS;LIBS" # Multiple-value keywords
     ${ARGN}
   )
@@ -235,7 +235,10 @@ function(add_my_executable)
         target_compile_definitions(${TGBOT_EXE_NAME} PRIVATE GTEST_LINKED_AS_SHARED_LIBRARY)
       endif()
     else()
-      install(TARGETS ${TGBOT_EXE_NAME})
+      if (NOT TGBOT_EXE_RELATION)
+        message(SEND_ERROR "Please specify relation: ${TGBOT_EXE_NAME} Valid are: Socket,Database,Main")
+      endif()
+      install(TARGETS ${TGBOT_EXE_NAME} COMPONENT App${TGBOT_EXE_RELATION})
     endif()
   endif()
   add_sanitizers(${TGBOT_EXE_NAME})
@@ -332,7 +335,6 @@ endif()
 ######################## Define SQLite3 target ######################
 add_subdirectory(src/database)
 add_subdirectory(src/random)
-add_subdirectory(src/command_modules)
 add_subdirectory(src/imagep)
 add_subdirectory(src/stringres)
 add_subdirectory(src/logging)
@@ -355,6 +357,7 @@ if (TGBOT_ENABLE_TESTING)
     # Always use source built googletest for MSVC
     # https://github.com/google/googletest/issues/4357
     set(gtest_force_shared_crt TRUE)
+    set(INSTALL_GTEST FALSE)
     add_subdirectory(src/third-party/googletest)
   else()
     find_package(GTest REQUIRED)
@@ -434,6 +437,7 @@ add_my_executable(
   LIBS TgBotDBLoading TgBot_restartfmt_parser fruit TgBot TgBotUtils TgBotWeb TgBotDBImpl
        absl::status TgBotRandom TgBot_restartfmt_parser CURL::libcurl TgBotRegex
       TgBotStringRes ${CMAKE_DL_LIBS} TgBotSocket JsonCpp::JsonCpp TgBotsighandler OpenSSL::SSL
+  RELATION main
 )
 
 # Add an icon
@@ -445,6 +449,7 @@ if (UNIX)
 add_my_executable(
   NAME maind
   SRCS src/mainDaemon.cpp
+  RELATION main
 )
 endif()
 #####################################################################
@@ -467,9 +472,10 @@ set(CPACK_NSIS_MUI_ICON ${CMAKE_SOURCE_DIR}/resources/photo/icon.ico)
 set(CPACK_NSIS_MUI_UNIICON ${CMAKE_SOURCE_DIR}/resources/photo/uninstall.ico)
 set(CPACK_NSIS_DISPLAY_NAME "Telegram Bot Server")
 set(CPACK_NSIS_WELCOME_TITLE "Welcome! Actually, no")
-set(CPACK_NSIS_BRANDING_TEXT "CMake ${CMAKE_VERSION}")
+set(CPACK_NSIS_BRANDING_TEXT "Created with CMake ${CMAKE_VERSION}")
 set(CPACK_NSIS_IGNORE_LICENSE_PAGE ON)
-set(CPACK_NSIS_INSTALLED_ICON_NAME "${CMAKE_INSTALL_PREFIX}/bin/${PROJECT_NAME}_main.exe")
+set(CPACK_NSIS_INSTALLED_ICON_NAME "${CMAKE_BINARY_DIR}/bin/${PROJECT_NAME}_main.exe")
+set(CPACK_NSIS_MANIFEST_DPI_AWARE TRUE)
 
 if (WIN32)
   list(APPEND CPACK_GENERATOR NSIS)
@@ -477,3 +483,30 @@ endif()
 
 # Include CPack
 include(CPack)
+
+cpack_add_component_group(OptionalCli
+    DISPLAY_NAME "Optional Cli tools"
+    DESCRIPTION "Additional CLIs."
+    EXPANDED # Expand the group by default in the installer UI
+)
+
+cpack_add_component(AppMain
+    DISPLAY_NAME "Main Application"
+    DESCRIPTION "The main server application."
+    REQUIRED # Ensures this component is always installed
+)
+
+cpack_add_component(AppSocket
+    DISPLAY_NAME "Socket Utils"
+    DESCRIPTION "Socket connection clients."
+    GROUP "OptionalCli"
+)
+
+cpack_add_component(AppDatabase
+    DISPLAY_NAME "Database Utils"
+    DESCRIPTION "Database manipulation utils."
+    GROUP "OptionalCli"
+)
+
+# Include last for CPack
+add_subdirectory(src/command_modules)

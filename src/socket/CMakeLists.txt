@@ -23,6 +23,7 @@ add_my_executable(
   NAME SocketCli
   SRCS TgBotSocketClient.cpp
   LIBS TgBotSocket OpenSSL::Crypto ZLIB::ZLIB
+  RELATION Socket
 )
 
 include(TestBigEndian)

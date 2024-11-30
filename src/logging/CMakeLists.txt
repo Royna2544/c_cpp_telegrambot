@@ -17,4 +17,5 @@ add_my_executable(
   NAME logcat
   SRCS LoggingClient.cpp
   LIBS TgBotSocket TgBotUtils TgBotsighandler
+  RELATION Socket
 )

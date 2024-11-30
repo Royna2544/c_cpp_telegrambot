@@ -2,6 +2,12 @@ set(CMDMODULE_PREFIX cmd_)
 
 set(CMDMODULE_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
+cpack_add_component_group(CommandModules
+    DISPLAY_NAME "Command Modules"
+    DESCRIPTION "Command Modules to install."
+    EXPANDED # Expand the group by default in the installer UI
+)
+
 function(command_module)
     cmake_parse_arguments(TGBOT_CMDMODULE
         "RUST" # Options
@@ -48,8 +54,6 @@ function(command_module)
         $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>
         ${CMDMODULE_ROOT_DIR})
     add_sanitizers(${TGBOT_CMDMODULE_LIBNAME})
-    # Install command modules to lib/modules
-    install(TARGETS ${TGBOT_CMDMODULE_LIBNAME} DESTINATION lib/modules)
     if (WIN32)
         set_target_properties(${TGBOT_CMDMODULE_LIBNAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib/modules)
     else()
@@ -66,6 +70,15 @@ function(command_module)
     # Global variables
     target_compile_definitions(${TGBOT_CMDMODULE_LIBNAME} PRIVATE ${GLOBAL_DEFINITIONS})
     target_compile_options(${TGBOT_CMDMODULE_LIBNAME} PRIVATE ${GLOBAL_COMPILE_OPTIONS})
+
+    # CPack
+    cpack_add_component(Command_${TGBOT_CMDMODULE_NAME}
+        DISPLAY_NAME "${TGBOT_CMDMODULE_NAME}"
+        DESCRIPTION "Install command ${TGBOT_CMDMODULE_NAME}."
+        GROUP "CommandModules"
+    )
+    # Install command modules to lib/modules
+    install(TARGETS ${TGBOT_CMDMODULE_LIBNAME} DESTINATION lib/modules COMPONENT Command_${TGBOT_CMDMODULE_NAME})
 endfunction()
 
 function(multi_command_module)
