@@ -168,7 +168,7 @@ void TgBotApiImpl::commandHandler(const std::string& command,
     }
 
     const auto msgLocale = ext->get_or<MessageAttrs::Locale>(Locale::Default);
-    module->_module->function(this, ext.get(), (*_loader).at(msgLocale),
+    module->_module->function(this, ext.get(), _loader->at(msgLocale),
                               _provider);
 }
 
