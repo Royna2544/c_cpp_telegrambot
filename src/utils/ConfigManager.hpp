@@ -1,6 +1,6 @@
 #pragma once
 
-#include <TgBotUtilsExports.h>
+#include <UtilsExports.h>
 
 #include <algorithm>
 #include <array>
@@ -14,7 +14,7 @@
 
 // Abstract manager for config loader
 // Currently have three sources, env and file, cmdline
-class TgBotUtils_API ConfigManager {
+class Utils_API ConfigManager {
    public:
     enum class Configs {
         TOKEN,

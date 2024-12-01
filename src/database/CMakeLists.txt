@@ -49,7 +49,7 @@ add_my_library(
     ${Protobuf_INCLUDE_DIRS}
   LIBS_STATIC
     ${DATABASE_LIBS}
-  LIBS TgBotUtils
+  LIBS Utils
   DEFS
     ${DATABASE_DEFS}
 )
@@ -57,7 +57,7 @@ add_my_library(
 add_my_library(
   NAME DBLoading
   SRCS bot/LoadingDatabase.cpp
-  LIBS TgBotUtils TgBotDBImpl
+  LIBS Utils DBImpl
   STATIC
 )
 
@@ -65,7 +65,7 @@ add_my_library(
 add_my_executable(
   NAME DatabaseCtl
   SRCS utils/DatabaseCtrl.cc
-  LIBS TgBotDBImpl TgBotDBLoading TgBotUtils
+  LIBS DBImpl DBLoading Utils
   RELATION Database
 )
 #####################################################################
@@ -75,10 +75,10 @@ add_my_executable(
   NAME MediaCli
   SRCS utils/SendMediaToChat.cc
   LIBS 
-    TgBotDBImpl
-    TgBotSocket
+    DBImpl
+    Socket
     OpenSSL::Crypto
-    TgBotDBLoading
+    DBLoading
   RELATION Socket
 )
 #####################################################################

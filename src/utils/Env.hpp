@@ -1,6 +1,6 @@
 #pragma once
 
-#include <TgBotUtilsExports.h>
+#include <UtilsExports.h>
 #include <absl/log/log.h>
 #include <absl/strings/str_cat.h>
 #include <trivial_helpers/_class_helper_macros.h>
@@ -12,11 +12,11 @@
 #include <type_traits>
 
 // A C++-like interface for manipulating environment variables.
-class TgBotUtils_API Env {
+class Utils_API Env {
    public:
     Env() = default;
 
-    class TgBotUtils_API ValueEntry {
+    class Utils_API ValueEntry {
         std::string _key;
 
        public:

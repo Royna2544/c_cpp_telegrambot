@@ -21,9 +21,9 @@ add_my_library(
         archives/Zip.cpp
         archives/Tar.cpp
     LIBS
-        TgBotLogInit
-        TgBotSocketSelectors
-        TgBotsighandler
+        LogInit
+        SocketSelectors
+        sighandler
         progress
     LIBS_STATIC
         ${LIBGIT2_LIBRARIES}

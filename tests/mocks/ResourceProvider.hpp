@@ -1,7 +1,7 @@
 #pragma once
 
 #include <gmock/gmock.h>
-#include <ResourceManager.h>
+#include <ResourceManager.hpp>
 
 class MockResource : public ResourceProvider {
    public:

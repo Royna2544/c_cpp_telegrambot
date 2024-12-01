@@ -1,6 +1,6 @@
 #pragma once
 
-#include <TgBotDBImplExports.h>
+#include <DBImplExports.h>
 #include <Types.h>
 #include <trivial_helpers/_class_helper_macros.h>
 
@@ -19,12 +19,12 @@
  * interface for managing bot data. It provides functionality for interacting
  * with different database providers.
  */
-struct TgBotDBImpl_API TgBotDatabaseImpl : DatabaseBase {
+struct DBImpl_API TgBotDatabaseImpl : DatabaseBase {
     /**
      * @brief Providers is a nested struct that manages different database
      * providers.
      */
-    struct TgBotDBImpl_API Providers {
+    struct DBImpl_API Providers {
         explicit Providers(CommandLine *cmdline);
 
         /**
@@ -99,6 +99,6 @@ struct TgBotDBImpl_API TgBotDatabaseImpl : DatabaseBase {
     bool loaded = false;
 };
 
-extern bool TgBotDatabaseImpl_load(ConfigManager *configmgr,
-                                   TgBotDatabaseImpl *dbimpl,
-                                   CommandLine *cmdline);
+extern bool DBImpl_API TgBotDatabaseImpl_load(ConfigManager *configmgr,
+                                              TgBotDatabaseImpl *dbimpl,
+                                              CommandLine *cmdline);

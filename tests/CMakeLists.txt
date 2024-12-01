@@ -15,7 +15,7 @@ add_my_executable(
   LIBS
     GTest::gtest
     GTest::gmock
-    TgBotPPImpl fruit TgBotRandom
+    TestingFileGroup fruit TgBotRandom
   TEST
 )
 
@@ -26,7 +26,7 @@ add_my_executable(
     DatabaseBackendsTest.cpp
   LIBS
     GTest::gtest
-    TgBotDBImpl
+    DBImpl
   TEST
 )
 
@@ -38,7 +38,7 @@ add_my_executable(
   LIBS
     GTest::gtest
     GTest::gmock
-    TgBotRegex
+    Regex
   TEST
 )
 
@@ -50,7 +50,7 @@ add_my_executable(
   LIBS
     GTest::gtest
     GTest::gmock
-    TgBotPPImpl
+    TestingFileGroup
     fruit
   TEST
 )
@@ -62,6 +62,6 @@ add_my_executable(
     PopenWdtTest.cpp
   LIBS
     GTest::gtest
-    TgBot_popen_wdt
+    popen_wdt
   TEST
 )

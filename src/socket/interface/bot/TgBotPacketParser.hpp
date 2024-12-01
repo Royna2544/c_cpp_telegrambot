@@ -1,12 +1,12 @@
 #pragma once
 
-#include <TgBotSocketExports.h>
+#include <SocketExports.h>
 
 #include <SocketContext.hpp>
 #include <optional>
 
 namespace TgBotSocket {
 
-std::optional<Packet> TgBotSocket_API readPacket(const TgBotSocket::Context& context);
+std::optional<Packet> Socket_API readPacket(const TgBotSocket::Context& context);
 
 }

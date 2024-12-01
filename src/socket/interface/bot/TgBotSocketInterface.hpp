@@ -1,6 +1,5 @@
-#include <ResourceManager.h>
-
 #include <ManagedThreads.hpp>
+#include <ResourceManager.hpp>
 #include <SocketContext.hpp>
 #include <api/TgBotApi.hpp>
 #include <global_handlers/ChatObserver.hpp>

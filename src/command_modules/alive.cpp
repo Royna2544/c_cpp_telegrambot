@@ -1,5 +1,3 @@
-#include <GitData.h>
-#include <ResourceManager.h>
 #include <absl/log/log.h>
 #include <absl/strings/str_replace.h>
 #include <absl/strings/str_split.h>
@@ -7,6 +5,7 @@
 #include <tgbot/TgException.h>
 #include <trivial_helpers/_tgbot.h>
 
+#include <GitData.hpp>
 #include <api/CommandModule.hpp>
 #include <api/Providers.hpp>
 #include <api/TgBotApi.hpp>
@@ -31,12 +30,11 @@ DECLARE_COMMAND_HANDLER(alive) {
 
         // Replace placeholders in the version string with actual values.
         version = absl::StrReplaceAll(
-            _version, {
-                {"_commitid_", data.commitid},
-                {"_commitmsg_", splitMsg.front()},
-                {"_botname_", api->getBotUser()->firstName},
-                {"_botusername_", api->getBotUser()->username.value_or("unknown")}
-            });
+            _version, {{"_commitid_", data.commitid},
+                       {"_commitmsg_", splitMsg.front()},
+                       {"_botname_", api->getBotUser()->firstName},
+                       {"_botusername_",
+                        api->getBotUser()->username.value_or("unknown")}});
     });
     const auto info = provider->database->queryMediaInfo("alive");
     bool sentAnimation = false;
@@ -68,8 +66,5 @@ extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
 #endif
     .description = "Test if a bot is alive",
     .function = COMMAND_HANDLER_NAME(alive),
-    .valid_args = {
-        .enabled = true,
-        .counts = DynModule::craftArgCountMask<0>()
-    }
-};
+    .valid_args = {.enabled = true,
+                   .counts = DynModule::craftArgCountMask<0>()}};

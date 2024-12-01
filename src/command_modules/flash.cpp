@@ -1,4 +1,3 @@
-#include <ResourceManager.h>
 #include <absl/strings/match.h>
 #include <absl/strings/str_replace.h>
 #include <absl/strings/str_split.h>

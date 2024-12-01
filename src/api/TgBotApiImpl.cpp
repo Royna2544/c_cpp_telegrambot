@@ -5,7 +5,9 @@
 #include <trivial_helpers/_tgbot.h>
 
 #include <Authorization.hpp>
+#include <CommandLine.hpp>
 #include <ConfigManager.hpp>
+#include <GitData.hpp>
 #include <StringResLoader.hpp>
 #include <api/CommandModule.hpp>
 #include <api/MessageExt.hpp>
@@ -32,9 +34,6 @@
 #include <string_view>
 #include <utility>
 
-#include "CommandLine.hpp"
-#include "GitData.h"
-#include "tgbot/Api.h"
 #include "tgbot/net/CurlHttpClient.h"
 
 bool TgBotApiImpl::validateValidArgs(const DynModule* module,

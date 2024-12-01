@@ -25,6 +25,7 @@ absl::Status OpenCVImage::read(const std::filesystem::path& filename,
         case PhotoBase::Target::kNone:
             return absl::UnavailableError("Invalid target type");
     }
+    return absl::InvalidArgumentError("Invalid target type");
 }
 
 void OpenCVImage::Image::rotate(cv::Mat& mat, int angle) {

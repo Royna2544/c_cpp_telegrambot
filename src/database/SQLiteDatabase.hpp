@@ -1,6 +1,6 @@
 #pragma once
 
-#include <TgBotDBImplExports.h>
+#include <DBImplExports.h>
 #include <sqlite3.h>
 
 #include <cstddef>
@@ -41,7 +41,7 @@ template <>
 
 }  // namespace detail
 
-struct TgBotDBImpl_API SQLiteDatabase : DatabaseBase {
+struct DBImpl_API SQLiteDatabase : DatabaseBase {
     enum class InfoType {
         MIN = -1,
         OWNER = 0,
@@ -77,7 +77,7 @@ struct TgBotDBImpl_API SQLiteDatabase : DatabaseBase {
      * with parameters. It is designed to simplify the process of preparing and
      * executing SQL statements.
      */
-    class Helper : public std::enable_shared_from_this<Helper> {
+    class DBImpl_API Helper : public std::enable_shared_from_this<Helper> {
        public:
         using ArgTypes = std::variant<int32_t, int64_t, std::string>;
 

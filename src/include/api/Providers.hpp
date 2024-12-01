@@ -1,14 +1,13 @@
 #pragma once
 
-#include <ResourceManager.h>
-
 #include <ManagedThreads.hpp>
-#include <random/Random.hpp>
 #include <database/DatabaseBase.hpp>
+#include <random/Random.hpp>
 #include <trivial_helpers/fruit_inject.hpp>
 
 #include "utils/CommandLine.hpp"
 #include "utils/ConfigManager.hpp"
+#include "utils/ResourceManager.hpp"
 
 // Providers to supply DI
 class Providers {

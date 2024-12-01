@@ -12,7 +12,7 @@
 #include <optional>
 
 #ifdef __TGBOT__
-#include <TgBotSocketExports.h>
+#include <SocketExports.h>
 #include <trivial_helpers/fruit_inject.hpp>
 #include <SharedMalloc.hpp>
 #else
@@ -23,7 +23,7 @@
 #endif
 
 // Represents a SHA-256 hash
-struct TgBotSocket_API HashContainer {
+struct Socket_API HashContainer {
     std::array<unsigned char, SHA256_DIGEST_LENGTH> m_data;
 };
 
@@ -35,7 +35,7 @@ inline std::ostream& operator<<(std::ostream& self, const HashContainer& data) {
     return self;
 }
 
-struct TgBotSocket_API VFSOperations {
+struct Socket_API VFSOperations {
     virtual ~VFSOperations() = default;
 
     /**
@@ -77,7 +77,7 @@ struct TgBotSocket_API VFSOperations {
     virtual void SHA256(const SharedMalloc& memory, HashContainer& data) = 0;
 };
 
-struct TgBotSocket_API RealFS : public VFSOperations {
+struct Socket_API RealFS : public VFSOperations {
     ~RealFS() override = default;
     APPLE_INJECT(RealFS()) = default;
 
@@ -124,7 +124,7 @@ using TgBotSocket::data::DownloadFile;
 using TgBotSocket::data::UploadFile;
 using TgBotSocket::data::UploadFileDry;
 
-class TgBotSocket_API SocketFile2DataHelper {
+class Socket_API SocketFile2DataHelper {
     VFSOperations* vfs;
 
    public:

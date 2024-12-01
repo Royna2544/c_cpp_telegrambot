@@ -1,8 +1,8 @@
-#include <ResourceManager.h>
 #include <absl/log/log.h>
 #include <absl/strings/ascii.h>
 #include <fmt/format.h>
 
+#include <ResourceManager.hpp>
 #include <filesystem>
 #include <fstream>
 #include <libfs.hpp>
@@ -62,7 +62,8 @@ ResourceManager::ResourceManager(std::filesystem::path kResourceDirectory)
     }
 
     LOG(INFO) << "Preloading resource directory: " << m_resourceDirectory;
-    for (const auto& it : std::filesystem::directory_iterator(m_resourceDirectory, ec)) {
+    for (const auto& it :
+         std::filesystem::directory_iterator(m_resourceDirectory, ec)) {
         if (it.is_regular_file()) {
             preload(it);
         }

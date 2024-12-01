@@ -1,6 +1,6 @@
 #pragma once
 
-#include <TgBotUtilsExports.h>
+#include <UtilsExports.h>
 
 #include <filesystem>
 #include <functional>

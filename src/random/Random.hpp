@@ -1,6 +1,6 @@
 #pragma once
 
-#include <TgBotRandomExports.h>
+#include <RandomExports.h>
 #include <absl/log/log.h>
 
 #include <algorithm>
@@ -11,7 +11,7 @@
 #include <vector>
 #include <random>
 
-class TgBotRandom_API RandomBase {
+class Random_API RandomBase {
    public:
     // Retval type for random
     using ret_type = size_t;
@@ -54,7 +54,7 @@ class TgBotRandom_API RandomBase {
     virtual void shuffle(std::vector<std::string>& inArray) const = 0;
 };
 
-class TgBotRandom_API Random : public RandomBase {
+class Random_API Random : public RandomBase {
    public:
     /**
      * @brief      Base class for random number generators.

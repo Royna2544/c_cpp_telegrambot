@@ -1,4 +1,4 @@
-#include <ResourceManager.h>
+#include <ResourceManager.hpp>
 #include <fmt/chrono.h>
 #include <json/json.h>
 #include <tgbot/TgException.h>

@@ -124,6 +124,7 @@ if (WIN32)
 endif()
 if (NOT MSVC)
   list(APPEND GLOBAL_COMPILE_OPTIONS -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/=)
+  list(APPEND GLOBAL_COMPILE_OPTIONS -Wno-unused-parameter)
 endif()
 
 ##################### Fill in readme with cmake #####################
@@ -142,9 +143,6 @@ function(add_my_library)
   if (NOT TGBOT_LIBRARY_SRCS OR NOT TGBOT_LIBRARY_NAME)
     message(FATAL_ERROR "Must specify src or name")
   endif()
-  if (NOT TGBOT_LIBRARY_NO_LIBPREFIX)
-    set(TGBOT_LIBRARY_NAME TgBot${TGBOT_LIBRARY_NAME})
-  endif()
   if (UNIX)
     list(APPEND TGBOT_LIBRARY_SRCS ${TGBOT_LIBRARY_SRCS_UNIX})
   endif()
@@ -157,6 +155,9 @@ function(add_my_library)
     else()
       install(TARGETS ${TGBOT_LIBRARY_NAME} DESTINATION lib)
     endif()
+  endif()
+  if (NOT TGBOT_LIBRARY_NO_LIBPREFIX)
+    set_target_properties(${TGBOT_LIBRARY_NAME} PROPERTIES PREFIX ${PROJECT_NAME}_)
   endif()
   add_sanitizers(${TGBOT_LIBRARY_NAME})
   
@@ -221,9 +222,7 @@ function(add_my_executable)
   if (TGBOT_EXE_TEST)
     set(TEST_EXT test_)
   endif()
-  if (NOT TGBOT_EXE_NO_PREFIX)
-	  set(TGBOT_EXE_NAME ${PROJECT_NAME}_${TEST_EXT}${TGBOT_EXE_NAME})
-  endif()
+	set(TGBOT_EXE_NAME ${TEST_EXT}${TGBOT_EXE_NAME})
   if (TGBOT_EXE_OPTIONAL)
     add_executable(${TGBOT_EXE_NAME} EXCLUDE_FROM_ALL ${TGBOT_EXE_SRCS})
   else()
@@ -241,6 +240,9 @@ function(add_my_executable)
       install(TARGETS ${TGBOT_EXE_NAME} COMPONENT App${TGBOT_EXE_RELATION})
     endif()
   endif()
+  if (NOT TGBOT_EXE_NO_PREFIX)
+    set_target_properties(${TGBOT_EXE_NAME} PROPERTIES PREFIX ${PROJECT_NAME}_)
+  endif()
   add_sanitizers(${TGBOT_EXE_NAME})
   # Set RPATH for Unix-like systems
   if (UNIX)
@@ -248,7 +250,7 @@ function(add_my_executable)
     set_target_properties(${TGBOT_EXE_NAME} PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
     set_target_properties(${TGBOT_EXE_NAME} PROPERTIES INSTALL_RPATH "$ORIGIN/../lib")
   endif()
-  target_link_libraries(${TGBOT_EXE_NAME} TgBotLogInit absl::log ${TGBOT_EXE_LIBS})
+  target_link_libraries(${TGBOT_EXE_NAME} LogInit absl::log ${TGBOT_EXE_LIBS})
   if (WIN32)
      set_target_properties(${lib} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
   else()
@@ -391,7 +393,7 @@ add_my_library(
 )
 
 add_my_library(
-  NAME PPImpl
+  NAME TestingFileGroup
   SRCS
     src/Authorization.cpp
     src/api/CommandModule.cpp
@@ -400,7 +402,7 @@ add_my_library(
     src/global_handlers/ChatObserver.cpp
     src/socket/interface/bot/SocketDataHandler.cpp
     src/socket/interface/bot/TgBotSocketInterface.cpp
-  LIBS  TgBot TgBotUtils TgBotDBImpl TgBotStringRes ${CMAKE_DL_LIBS} TgBotSocket JsonCpp::JsonCpp
+  LIBS TgBot Utils DBImpl StringRes ${CMAKE_DL_LIBS} Socket JsonCpp::JsonCpp
   STATIC
 )
 #####################################################################
@@ -434,22 +436,22 @@ add_my_executable(
     src/logging/LoggingServer.cpp
     src/socket/interface/bot/SocketDataHandler.cpp
     src/socket/interface/bot/TgBotSocketInterface.cpp
-  LIBS TgBotDBLoading TgBot_restartfmt_parser fruit TgBot TgBotUtils TgBotWeb TgBotDBImpl
-       absl::status TgBotRandom TgBot_restartfmt_parser CURL::libcurl TgBotRegex
-      TgBotStringRes ${CMAKE_DL_LIBS} TgBotSocket JsonCpp::JsonCpp TgBotsighandler OpenSSL::SSL
-  RELATION main
+  LIBS DBLoading fruit TgBot Utils Web DBImpl
+       absl::status Random restartfmt_parser CURL::libcurl Regex
+       StringRes ${CMAKE_DL_LIBS} Socket JsonCpp::JsonCpp sighandler OpenSSL::SSL
+  RELATION Main
 )
 
 # Add an icon
 if (WIN32)
-    target_sources(${PROJECT_NAME}_main PRIVATE resources/photo/resource.rc)
+    target_sources(main PRIVATE resources/photo/resource.rc)
 endif()
 
 if (UNIX)
 add_my_executable(
   NAME maind
   SRCS src/mainDaemon.cpp
-  RELATION main
+  RELATION Main
 )
 endif()
 #####################################################################

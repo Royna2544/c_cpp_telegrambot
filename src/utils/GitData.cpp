@@ -1,4 +1,4 @@
-#include <GitData.h>
+#include <GitData.hpp>
 #include <absl/log/log.h>
 #include <git2.h>
 

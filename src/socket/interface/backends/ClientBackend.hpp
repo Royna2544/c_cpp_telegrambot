@@ -5,7 +5,7 @@
 #include <filesystem>
 #include <memory>
 
-struct TgBotSocket_API SocketClientWrapper {
+struct Socket_API SocketClientWrapper {
     SocketClientWrapper() = default;
     bool connect(unsigned short defaultPort, std::filesystem::path defaultPath);
     [[nodiscard]] const TgBotSocket::Context& chosen_interface() const;

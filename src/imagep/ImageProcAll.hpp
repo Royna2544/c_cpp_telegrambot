@@ -1,13 +1,13 @@
 #pragma once
 
-#include <TgBotImgProcExports.h>
+#include <ImgProcExports.h>
 #include <absl/status/status.h>
 
 #include <memory>
 
 #include "ImagePBase.hpp"
 
-struct TgBotImgProc_API ImageProcessingAll {
+struct ImgProc_API ImageProcessingAll {
     bool read(PhotoBase::Target target);
     absl::Status processAndWrite(const std::filesystem::path& filename);
 

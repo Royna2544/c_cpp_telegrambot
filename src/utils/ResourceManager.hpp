@@ -1,6 +1,6 @@
 #pragma once
 
-#include <TgBotUtilsExports.h>
+#include <UtilsExports.h>
 #include <trivial_helpers/fruit_inject.hpp>
 
 #include <filesystem>
@@ -14,7 +14,7 @@
  *
  * This interface defines the methods for getting and preloading resources.
  */
-struct ResourceProvider {
+struct Utils_API ResourceProvider {
     /**
      * @brief Get a resource by its filename.
      *
@@ -38,7 +38,7 @@ struct ResourceProvider {
     virtual ~ResourceProvider() = default;
 };
 
-struct TgBotUtils_API ResourceManager : ResourceProvider {
+struct Utils_API ResourceManager : ResourceProvider {
     [[nodiscard]] std::string_view get(std::filesystem::path filename) const override;
     bool preload(std::filesystem::path p) override;
 

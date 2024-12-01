@@ -1,6 +1,6 @@
 #pragma once
 
-#include <TgBotSocketExports.h>
+#include <SocketExports.h>
 #include <absl/log/log.h>
 
 #include <TgBotSocket_Export.hpp>
@@ -18,7 +18,7 @@ using std::chrono_literals::operator""s;
 
 namespace TgBotSocket {
 
-class TgBotSocket_API Context {
+class Socket_API Context {
    public:
     Context();
     virtual ~Context();
@@ -148,10 +148,10 @@ class TgBotSocket_API Context {
     // enum class Role { kNone, kServer, kClient } role;
 };
 
-extern std::ostream TgBotSocket_API &operator<<(
+extern std::ostream Socket_API &operator<<(
     std::ostream &stream, const Context::RemoteEndpoint &endpoint);
 
-class TgBotSocket_API Context::TCP : public Context {
+class Socket_API Context::TCP : public Context {
     mutable boost::asio::ip::tcp::socket socket_;
     boost::asio::ip::tcp::acceptor acceptor_;
     boost::asio::ip::tcp::endpoint endpoint_;
@@ -263,7 +263,7 @@ class TgBotSocket_API Context::TCP : public Context {
     explicit operator bool() const override;
 };
 
-class TgBotSocket_API Context::UDP : public Context {
+class Socket_API Context::UDP : public Context {
     mutable boost::asio::ip::udp::socket socket_;
     mutable boost::asio::ip::udp::endpoint endpoint_;
     bool is_listening_ = false;
@@ -374,7 +374,7 @@ class TgBotSocket_API Context::UDP : public Context {
     explicit operator bool() const override;
 };
 
-class TgBotSocket_API Context::Local : public Context {
+class Socket_API Context::Local : public Context {
     mutable boost::asio::local::stream_protocol::socket socket_;
     mutable boost::asio::local::stream_protocol::acceptor acceptor_;
     boost::asio::local::stream_protocol::endpoint endpoint_;

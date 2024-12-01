@@ -1,4 +1,3 @@
-#include <ResourceManager.h>
 #include <absl/log/log.h>
 #include <absl/log/log_sink_registry.h>
 #include <absl/strings/match.h>
@@ -17,6 +16,7 @@
 #include <LogSinks.hpp>
 #include <ManagedThreads.hpp>
 #include <Random.hpp>
+#include <ResourceManager.hpp>
 #include <StringResLoader.hpp>
 #include <TgBotWebpage.hpp>
 #include <algorithm>

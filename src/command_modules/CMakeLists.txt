@@ -49,8 +49,8 @@ function(command_module)
     set_target_properties(${TGBOT_CMDMODULE_LIBNAME} PROPERTIES PREFIX "lib")
     target_link_libraries(${TGBOT_CMDMODULE_LIBNAME} ${TGBOT_CMDMODULE_LIBS} absl::log fmt::fmt)
     target_include_directories(${TGBOT_CMDMODULE_LIBNAME} PRIVATE
-        $<TARGET_PROPERTY:TgBotStringRes,INTERFACE_INCLUDE_DIRECTORIES>
-        $<TARGET_PROPERTY:TgBotRandom,INTERFACE_INCLUDE_DIRECTORIES>
+        $<TARGET_PROPERTY:StringRes,INTERFACE_INCLUDE_DIRECTORIES>
+        $<TARGET_PROPERTY:Random,INTERFACE_INCLUDE_DIRECTORIES>
         $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>
         ${CMDMODULE_ROOT_DIR})
     add_sanitizers(${TGBOT_CMDMODULE_LIBNAME})
@@ -109,25 +109,25 @@ add_subdirectory(builder)
 multi_command_module(
     PROVIDES alive start
     SRCS alive.cpp
-    LIBS absl::strings TgBotDBImpl TgBotUtils
+    LIBS absl::strings DBImpl Utils
 )
 
 multi_command_module(
     PROVIDES bash ubash
     SRCS bash_impl.cpp
-    LIBS TgBotCompiler
+    LIBS Compiler
 )
 
 multi_command_module(
     PROVIDES c cpp
     SRCS compilers_impl.cpp
-    LIBS TgBotCompiler
+    LIBS Compiler
 )
 
 command_module(
     NAME py
     SRCS compilers_impl.cpp
-    LIBS TgBotCompiler
+    LIBS Compiler
     PACKAGE Python3
 )
 
@@ -139,7 +139,7 @@ command_module(
 multi_command_module(
     PROVIDES database saveid
     SRCS database_impl.cpp
-    LIBS TgBotDBImpl TgBotRandom
+    LIBS DBImpl Random
 )
 
 command_module(
@@ -150,7 +150,7 @@ command_module(
 command_module(
     NAME decide
     SRCS decide.cpp
-    LIBS TgBotRandom
+    LIBS Random
 )
 
 command_module(
@@ -166,31 +166,31 @@ command_module(
 command_module(
     NAME flash
     SRCS flash.cpp
-    LIBS TgBotRandom
+    LIBS Random
 )
 
 command_module(
     NAME possibility
     SRCS possibility.cpp
-    LIBS TgBotRandom
+    LIBS Random
 )
 
 command_module(
     NAME randsticker
     SRCS randsticker.cpp
-    LIBS TgBotRandom
+    LIBS Random
 )
 
 command_module(
     NAME rotatepic
     SRCS rotatepic.cpp
-    LIBS TgBotImgProc
+    LIBS ImgProc
 )
 
 command_module(
     NAME setowner
     SRCS setowner.cpp
-    LIBS TgBotDBImpl
+    LIBS DBImpl
 )
 
 command_module(
@@ -208,5 +208,5 @@ command_module(
 command_module(
     NAME copystickers
     SRCS copystickers.cpp
-    LIBS TgBotImgProc TgBotUtils
+    LIBS ImgProc Utils
 )

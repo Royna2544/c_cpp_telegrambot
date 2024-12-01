@@ -1,5 +1,7 @@
 #pragma once
 
+#include <DBImplExports.h>
+
 #include <filesystem>
 #include <optional>
 #include <ostream>
@@ -8,7 +10,7 @@
 
 #include "Types.h"
 
-struct DatabaseBase {
+struct DBImpl_API DatabaseBase {
     virtual ~DatabaseBase() = default;
 
     static constexpr std::string_view kInMemoryDatabase = ":memory:";

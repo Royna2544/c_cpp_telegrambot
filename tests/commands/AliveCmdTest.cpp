@@ -1,5 +1,3 @@
-#include <ResourceManager.h>
-
 #include <api/TgBotApi.hpp>
 
 #include "CommandModulesTest.hpp"

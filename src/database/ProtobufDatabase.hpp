@@ -1,7 +1,7 @@
 #pragma once
 
 #include <TgBotDB.pb.h>
-#include <TgBotDBImplExports.h>
+#include <DBImplExports.h>
 
 #include <optional>
 #include <ostream>
@@ -14,7 +14,7 @@ using tgbot::proto::Database;
 using tgbot::proto::MediaToName;
 using tgbot::proto::PersonList;
 
-struct TgBotDBImpl_API ProtoDatabase : DatabaseBase {
+struct DBImpl_API ProtoDatabase : DatabaseBase {
     [[nodiscard]] ListResult addUserToList(ListType type,
                                            UserId user) const override;
     [[nodiscard]] ListResult removeUserFromList(ListType type,

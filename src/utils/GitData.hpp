@@ -1,13 +1,13 @@
 #pragma once
 
-#include <TgBotUtilsExports.h>
+#include <UtilsExports.h>
 
 #include <filesystem>
 #include <string>
 
-struct TgBotUtils_API GitData {
+struct Utils_API GitData {
     std::string commitid, commitmsg, originurl;
     std::filesystem::path gitSrcRoot;
     static bool Fill(GitData *gitData);
-    bool Fill(void);
+    bool Fill();
 };

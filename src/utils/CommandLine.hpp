@@ -1,6 +1,6 @@
 #pragma once
 
-#include <TgBotUtilsExports.h>
+#include <UtilsExports.h>
 
 #include <filesystem>
 
@@ -17,7 +17,7 @@ enum class PathType {
 
 }
 
-class TgBotUtils_API CommandLine {
+class Utils_API CommandLine {
    public:
     using argv_type = char* const*;
     using argc_type = int;
