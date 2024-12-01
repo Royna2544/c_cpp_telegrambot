@@ -136,8 +136,6 @@ bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
         if (x(__VA_ARGS__) == -1) {                                 \
             POPEN_WDT_DBGLOG("%s failed: %s", #x, strerror(errno)); \
             _exit(127);                                             \
-        } else {                                                    \
-            POPEN_WDT_DBGLOG("%s succeeded", #x);                   \
         }                                                           \
     } while (0)
 
