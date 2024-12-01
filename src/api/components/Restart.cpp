@@ -13,7 +13,7 @@ extern char **environ;
 TgBotApiImpl::RestartCommand::RestartCommand(TgBotApiImpl::Ptr api)
     : _api(api) {
     api->getEvents().onCommand("restart", [this](Message::Ptr message) {
-        commandFunction(std::make_shared<MessageExt>(std::move(message)));
+        commandFunction(std::make_unique<MessageExt>(std::move(message)).get());
     });
 }
 

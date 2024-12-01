@@ -10,6 +10,7 @@
 #include <initializer_list>
 #include <memory>
 #include <optional>
+#include <type_traits>
 
 #include "Types.h"
 
@@ -148,7 +149,7 @@ struct AttributeType<MessageAttrs::Document> {
 
 class MessageExt {
    public:
-    using Ptr = std::shared_ptr<MessageExt>;
+    using Ptr = std::add_pointer_t<MessageExt>;
     using AttrList = std::initializer_list<MessageAttrs>;
     template <typename T>
     using MakeCRef = std::add_lvalue_reference_t<std::add_const_t<T>>;
@@ -246,7 +247,7 @@ class MessageExt {
     [[nodiscard]] bool exists() const { return _message != nullptr; }
 
     [[nodiscard]] const Message::Ptr& message() const { return _message; }
-    [[nodiscard]] MessageExt::Ptr reply() const { return _replyMessage; }
+    [[nodiscard]] MessageExt::Ptr reply() const { return _replyMessage.get(); }
 
    private:
     // Like /start@some_bot
@@ -258,7 +259,7 @@ class MessageExt {
     // A reference to the original message
     Message::Ptr _message;
     // Reference to the message that this is a reply to (if any)
-    MessageExt::Ptr _replyMessage;
+    std::shared_ptr<MessageExt> _replyMessage;
 
     [[nodiscard]] bool has_attribute(const MessageAttrs& attr) const {
         if (!_message) {

@@ -37,7 +37,7 @@
 #include "tgbot/net/CurlHttpClient.h"
 
 bool TgBotApiImpl::validateValidArgs(const DynModule* module,
-                                     MessageExt::Ptr& message) {
+                                     MessageExt::Ptr message) {
     if (!module->valid_args.enabled) {
         return true;  // No validation needed.
     }
@@ -139,9 +139,9 @@ void TgBotApiImpl::commandHandler(const std::string& command,
     SplitMessageText how = module->_module->valid_args.enabled
                                ? module->_module->valid_args.split_type
                                : SplitMessageText::None;
-    auto ext = std::make_shared<MessageExt>(std::move(message), how);
+    auto ext = std::make_unique<MessageExt>(std::move(message), how);
 
-    if (!isMyCommand(ext)) {
+    if (!isMyCommand(ext.get())) {
         return;
     }
 
@@ -158,17 +158,17 @@ void TgBotApiImpl::commandHandler(const std::string& command,
         return;
     }
 
-    if (!authorized(ext, command, authflags)) {
+    if (!authorized(ext.get(), command, authflags)) {
         return;
     }
 
     // Partital offloading to common code.
-    if (!validateValidArgs(module->_module, ext)) {
+    if (!validateValidArgs(module->_module, ext.get())) {
         return;
     }
 
     const auto msgLocale = ext->get_or<MessageAttrs::Locale>(Locale::Default);
-    module->_module->function(this, std::move(ext), (*_loader).at(msgLocale),
+    module->_module->function(this, ext.get(), (*_loader).at(msgLocale),
                               _provider);
 }
 

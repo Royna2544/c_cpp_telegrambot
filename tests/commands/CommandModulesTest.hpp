@@ -11,18 +11,17 @@
 #include <source_location>
 #include <utility>
 
+#include "../mocks/DatabaseBase.hpp"
+#include "../mocks/LocaleStrings.hpp"
+#include "../mocks/Random.hpp"
+#include "../mocks/ResourceProvider.hpp"
+#include "../mocks/SocketInterfaceImpl.hpp"
+#include "../mocks/TgBotApi.hpp"
+#include "../mocks/VFSOperations.hpp"
 #include "ConfigManager.hpp"
 #include "api/Providers.hpp"
 #include "api/Utils.hpp"
 #include "fruit/fruit.h"
-
-#include "../mocks/TgBotApi.hpp"
-#include "../mocks/SocketInterfaceImpl.hpp"
-#include "../mocks/VFSOperations.hpp"
-#include "../mocks/DatabaseBase.hpp"
-#include "../mocks/ResourceProvider.hpp"
-#include "../mocks/Random.hpp"
-#include "../mocks/LocaleStrings.hpp"
 
 using testing::_;
 using testing::DoAll;
@@ -179,8 +178,9 @@ class CommandTestBase : public CommandModulesTest {
     void execute() {
         module->_module->function(
             botApi,
-            std::make_shared<MessageExt>(defaultProvidedMessage,
-                                         SplitMessageText::ByWhitespace),
+            std::make_unique<MessageExt>(defaultProvidedMessage,
+                                         SplitMessageText::ByWhitespace)
+                .get(),
             &strings, provideInject.get<Providers*>());
     }
 
@@ -210,8 +210,9 @@ class CommandTestBase : public CommandModulesTest {
         return Truly([=, message = std::move(message),
                       this](ReplyParametersExt::Ptr m) {
             return isReplyToThisMsg(m, message
-                                           ? message: std::static_pointer_cast<Message>(
-                                                  defaultProvidedMessage));
+                                           ? message
+                                           : std::static_pointer_cast<Message>(
+                                                 defaultProvidedMessage));
         });
     }
 
@@ -228,11 +229,10 @@ class CommandTestBase : public CommandModulesTest {
         testRun("Send message expectation", location);
 
         EXPECT_CALL(*botApi,
-                    sendMessage_impl(TEST_CHAT_ID,
-                                     std::forward<TextMatcher>(textMatcher),
-                                     std::forward<ReplyMatcher>(replyMatcher),
-                                     std::forward<MarkMatcher>(markMatcher),
-                                     mode))
+                    sendMessage_impl(
+                        TEST_CHAT_ID, std::forward<TextMatcher>(textMatcher),
+                        std::forward<ReplyMatcher>(replyMatcher),
+                        std::forward<MarkMatcher>(markMatcher), mode))
             .WillOnce(Return(sentMessage));
         return {sentMessage, botApi};
     }
@@ -252,8 +252,7 @@ class CommandTestBase : public CommandModulesTest {
                                  std::forward<FileIdMatcher>(fileIdMatcher),
                                  std::forward<CaptionMatcher>(textMatcher),
                                  std::forward<ReplyMatcher>(replyMatcher),
-                                 std::forward<MarkMatcher>(markMatcher),
-                                 mode))
+                                 std::forward<MarkMatcher>(markMatcher), mode))
             .WillOnce(Return(sentMessage));
         return {sentMessage, botApi};
     }

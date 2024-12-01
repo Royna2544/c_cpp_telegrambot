@@ -29,13 +29,13 @@ class CommandModule;
 #define COMMAND_HANDLER_NAME(cmd) handle_command_##cmd
 #define DECLARE_COMMAND_HANDLER(cmd)                   \
     void COMMAND_HANDLER_NAME(cmd)(                    \
-        TgBotApi::Ptr api, MessageExt::Ptr message,    \
+        TgBotApi::Ptr api, MessageExt * message,       \
         const StringResLoaderBase::LocaleStrings* res, \
         const Providers* provider)
 
 struct DynModule {
     using command_callback_t = void (*)(
-        TgBotApi::Ptr api, MessageExt::Ptr,
+        TgBotApi::Ptr api, MessageExt *,
         const StringResLoaderBase::LocaleStrings*, const Providers* provider);
 
     enum class Flags { None = 0, Enforced = 1 << 0, HideDescription = 1 << 1 };
@@ -70,7 +70,7 @@ struct DynModule {
                 result.emplace(i);
             }
         }
-        return result;    
+        return result;
     }
 
     struct ValidArgs {

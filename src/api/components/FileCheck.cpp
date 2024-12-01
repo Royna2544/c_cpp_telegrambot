@@ -563,7 +563,7 @@ void FileCheck::onCallbackQueryFunction(
 FileCheck::FileCheck(TgBotApi::Ptr api, std::string virusTotalToken)
     : _token(std::move(virusTotalToken)), _api(api) {
     api->onAnyMessage([this](TgBotApi::CPtr api, Message::Ptr message) {
-        return onAnyMessage(api, std::make_shared<MessageExt>(std::move(message)));
+        return onAnyMessage(api, std::make_unique<MessageExt>(std::move(message)).get());
     });
     api->onCallbackQuery("__builtin_filecheck_handler__",
                          [this](const TgBot::CallbackQuery::Ptr &query) {
