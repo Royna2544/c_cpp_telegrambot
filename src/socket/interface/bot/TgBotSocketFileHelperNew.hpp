@@ -16,7 +16,7 @@
 #include <trivial_helpers/fruit_inject.hpp>
 #include <SharedMalloc.hpp>
 #else
-#define TgBotSocket_API
+#define Socket_API
 #define APPLE_INJECT(x) x
 #define APPLE_EXPLICIT_INJECT(x) explicit x
 #include "../../../include/SharedMalloc.hpp"

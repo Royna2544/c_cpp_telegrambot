@@ -99,6 +99,6 @@ struct DBImpl_API TgBotDatabaseImpl : DatabaseBase {
     bool loaded = false;
 };
 
-extern bool DBImpl_API TgBotDatabaseImpl_load(ConfigManager *configmgr,
-                                              TgBotDatabaseImpl *dbimpl,
-                                              CommandLine *cmdline);
+extern bool TgBotDatabaseImpl_load(ConfigManager *configmgr,
+                                   TgBotDatabaseImpl *dbimpl,
+                                   CommandLine *cmdline);

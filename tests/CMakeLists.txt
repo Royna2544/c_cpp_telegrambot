@@ -15,7 +15,7 @@ add_my_executable(
   LIBS
     GTest::gtest
     GTest::gmock
-    TestingFileGroup fruit TgBotRandom
+    TestingFileGroup fruit Random
   TEST
 )
 
