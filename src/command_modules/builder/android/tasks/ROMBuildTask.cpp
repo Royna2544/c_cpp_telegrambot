@@ -10,7 +10,6 @@
 #include <Progress.hpp>
 #include <SystemInfo.hpp>
 #include <chrono>
-#include <concepts>
 #include <filesystem>
 #include <fstream>
 #include <memory>
@@ -172,6 +171,7 @@ void ROMBuildTask::handleStdoutData(ForkAndRun::BufferViewType buffer) {
         if (ofs) {
             ofs << buffer.data();
         }
+        builder.addKeyboard({"Cancel", "cancel"});
     }
 
     if (clock + std::chrono::minutes(1) < now) {
@@ -210,8 +210,8 @@ void ROMBuildTask::handleStdoutData(ForkAndRun::BufferViewType buffer) {
             getPercent<MemoryInfo>(), getPercent<DiskInfo>(cwd),
             data.localManifest->job_count, buffer);
         try {
-            api->editMessage<TgBotApi::ParseMode::HTML>(message,
-                                                        buildInfoBuffer);
+            api->editMessage<TgBotApi::ParseMode::HTML>(
+                message, buildInfoBuffer, builder.get());
         } catch (const TgBot::TgException& e) {
             LOG(ERROR) << "Couldn't parse markdown, with content:";
             LOG(ERROR) << buildInfoBuffer;

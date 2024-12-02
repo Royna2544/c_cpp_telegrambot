@@ -8,6 +8,7 @@
 #include <string_view>
 
 #include "Shmem.hpp"
+#include "../../support/KeyBoardBuilder.hpp"
 
 struct ROMBuildTask : ForkAndRun {
     static constexpr std::string_view kShmemROMBuild = "shmem_rombuild";
@@ -78,5 +79,6 @@ struct ROMBuildTask : ForkAndRun {
     std::chrono::system_clock::time_point clock;
     std::chrono::system_clock::time_point startTime;
     TgBot::InputTextMessageContent::Ptr textContent;
+    KeyboardBuilder builder;
     bool once = false;
 };
