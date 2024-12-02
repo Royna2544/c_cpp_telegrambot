@@ -102,15 +102,39 @@ set(GLOBAL_COMPILE_OPTIONS)
 set(GLOBAL_DEFINITIONS -D__TGBOT__)
 set(GLOBAL_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/src/include ${CMAKE_SOURCE_DIR}/src/)
 
+# Test proper c++20 jthread, stop_token
+set(_jthread_test_source "
+#include <thread>
+#include <stop_token>
+
+int main() {
+   std::stop_token st;
+   std::jthread jt;
+}
+")
+
+include(CheckCXXSourceCompiles)
+check_cxx_source_compiles("${_jthread_test_source}" CXX20_JTHREAD_COMPILES)
+
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-  set(CMAKE_EXE_LINKER_FLAGS "-fuse-ld=lld")
-  set(CMAKE_SHARED_LINKER_FLAGS "-fuse-ld=lld")
-  # These platforms happen to not have proper C++20
-  if (APPLE OR ANDROID OR BSD)
-    list(APPEND GLOBAL_COMPILE_OPTIONS -fexperimental-library)
+  # Clang may opt in to experimental library
+  if (NOT CXX20_JTHREAD_COMPILES)
+    set(CMAKE_REQUIRED_FLAGS "-fexperimental-library")
+    set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
+    check_cxx_source_compiles("${_jthread_test_source}" CXX20_JTHREAD_COMPILES_EXPERIMENTAL)
+    if (CXX20_JTHREAD_COMPILES_EXPERIMENTAL)
+       set(CXX20_JTHREAD_COMPILES TRUE)
+       list(APPEND GLOBAL_COMPILE_OPTIONS -fexperimental-library)
+       message(STATUS "Using experimental library")
+    endif()
   endif()
 endif()
-if (CMAKE_BUILD_TYPE STREQUAL "Release" AND NOT ANDROID)
+
+if (NOT CXX20_JTHREAD_COMPILES)
+  message(FATAL_ERROR "Sorry, your compiler is too old")
+endif()
+
+if (CMAKE_BUILD_TYPE STREQUAL "Release")
   include(CheckIPOSupported)
   check_ipo_supported(RESULT LTO_SUPPORTED)
   if (LTO_SUPPORTED)
