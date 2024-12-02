@@ -5,6 +5,9 @@
 #include <stdexcept>
 #include <system_error>
 
+#include "Env.hpp"
+#include "absl/strings/str_split.h"
+
 CommandLine::CommandLine(CommandLine::argc_type argc,
                          CommandLine::argv_type argv)
     : _argc(argc), _argv(argv) {
@@ -17,6 +20,19 @@ CommandLine::CommandLine(CommandLine::argc_type argc,
     exePath = std::filesystem::canonical(exePath, ec);
     if (ec) {
         LOG(WARNING) << "Cannot fully resolve path";
+#ifdef _WIN32
+        constexpr const char kPathDelimiter = ';';
+#else
+        constexpr const char kPathDelimiter = ':';
+#endif
+        for (const auto& path : absl::StrSplit(Env()["PATH"].get(), kPathDelimiter)) {
+            if (std::filesystem::is_regular_file(std::filesystem::path(path) /
+                                                 argv[0])) {
+                LOG(INFO) << "Found exepath";
+                exePath = std::filesystem::path(path) / argv[0];
+                break;
+            }
+        }
     }
     DLOG(INFO) << "exePath: " << exePath;
 }
