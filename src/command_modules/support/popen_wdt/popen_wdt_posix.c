@@ -225,6 +225,7 @@ popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t **data_in) {
     struct popen_wdt_posix_priv *pdata = data->privdata;
 
     if (pdata == NULL) {
+        cleanup_resources(pdata, data, NULL);
         return ret;
     }
 
