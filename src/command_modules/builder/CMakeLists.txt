@@ -1,5 +1,5 @@
 if (NOT LINUX OR NOT CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|amd64")
-    message(STATUS "Builder: Unsupported platform")
+    message(STATUS "Builder: Unsupported platform (Which is ${CMAKE_SYSTEM_PROCESSOR} on ${CMAKE_SYSTEM_NAME})")
     return()
 endif()
 
