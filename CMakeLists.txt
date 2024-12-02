@@ -100,6 +100,7 @@ endfunction()
 ## Compiler specific settings
 set(GLOBAL_COMPILE_OPTIONS)
 set(GLOBAL_DEFINITIONS -D__TGBOT__)
+set(GLOBAL_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/src/include ${CMAKE_SOURCE_DIR}/src/)
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   set(CMAKE_EXE_LINKER_FLAGS "-fuse-ld=lld")
@@ -172,6 +173,7 @@ function(add_my_library)
   if (TGBOT_LIBRARY_STATIC)
     foreach(n ${TGBOT_LIBRARY_LIBS})
       target_include_directories(${TGBOT_LIBRARY_NAME} PRIVATE $<TARGET_PROPERTY:${n},INTERFACE_INCLUDE_DIRECTORIES>)
+      target_compile_definitions(${TGBOT_LIBRARY_NAME} PRIVATE $<TARGET_PROPERTY:${n},INTERFACE_COMPILE_DEFINITIONS>)
     endforeach()
     target_link_libraries(${TGBOT_LIBRARY_NAME} INTERFACE ${TGBOT_LIBRARY_LIBS})
   else()
@@ -203,6 +205,7 @@ function(add_my_library)
   # Global variables
   target_compile_definitions(${TGBOT_LIBRARY_NAME} PRIVATE ${GLOBAL_DEFINITIONS})
   target_compile_options(${TGBOT_LIBRARY_NAME} PRIVATE ${GLOBAL_COMPILE_OPTIONS})
+  target_include_directories(${TGBOT_LIBRARY_NAME} PRIVATE ${GLOBAL_INCLUDE_DIRS})
 endfunction(add_my_library)
 
 function(add_my_executable)
@@ -279,6 +282,7 @@ function(add_my_executable)
   # Global variables
   target_compile_definitions(${TGBOT_EXE_NAME} PRIVATE ${GLOBAL_DEFINITIONS})
   target_compile_options(${TGBOT_EXE_NAME} PRIVATE ${GLOBAL_COMPILE_OPTIONS})
+  target_include_directories(${TGBOT_EXE_NAME} PRIVATE ${GLOBAL_INCLUDE_DIRS})
 endfunction(add_my_executable)
 
 ############################ RUST support ###########################
@@ -286,11 +290,6 @@ if (ENABLE_RUST_SUPPORT)
   add_subdirectory(src/third-party/corrosion)
   corrosion_import_crate(MANIFEST_PATH src/rust/stringcalc/Cargo.toml)
 endif()
-#####################################################################
-
-######################## Include directories ########################
-include_directories(src/include)
-include_directories(src/)
 #####################################################################
 
 ############################# Check lib #############################
@@ -334,7 +333,22 @@ else()
 endif()
 #####################################################################
 
-######################## Define SQLite3 target ######################
+######################## Include subprojects ######################
+# dlfcn (libdl)
+if (WIN32)
+  add_subdirectory(src/third-party/dlfcn-win32)
+  set(CMAKE_DL_LIBS dl)
+elseif(ANDROID)
+  set(CMAKE_DL_LIBS)
+else()
+  find_library(DL dl)
+  add_library(dl SHARED IMPORTED)
+  set_target_properties(dl PROPERTIES
+    IMPORTED_LOCATION "${DL}"
+  )
+endif()
+
+add_subdirectory(src/api)
 add_subdirectory(src/database)
 add_subdirectory(src/random)
 add_subdirectory(src/imagep)
@@ -369,20 +383,6 @@ if (TGBOT_ENABLE_TESTING)
 else()
   message(STATUS "Disabling tests")
 endif()
-
-# dlfcn (libdl)
-if (WIN32)
-  add_subdirectory(src/third-party/dlfcn-win32)
-  set(CMAKE_DL_LIBS dl)
-elseif(ANDROID)
-  set(CMAKE_DL_LIBS)
-else()
-  find_library(DL dl)
-  add_library(dl SHARED IMPORTED)
-  set_target_properties(dl PROPERTIES
-    IMPORTED_LOCATION "${DL}"
-  )
-endif()
 ################### The Bot's main functionaility ###################
 add_my_library(
   NAME Regex
@@ -393,52 +393,37 @@ add_my_library(
 )
 
 add_my_library(
-  NAME TestingFileGroup
+  NAME SocketComponents
   SRCS
-    src/Authorization.cpp
-    src/api/CommandModule.cpp
-    src/api/MessageExt.cpp
     src/global_handlers/SpamBlocker.cpp
     src/global_handlers/ChatObserver.cpp
     src/socket/interface/bot/SocketDataHandler.cpp
     src/socket/interface/bot/TgBotSocketInterface.cpp
-  LIBS TgBot Utils DBImpl StringRes ${CMAKE_DL_LIBS} Socket JsonCpp::JsonCpp
+  LIBS TgBot DBImpl Socket JsonCpp::JsonCpp
+  STATIC
+)
+
+add_my_library(
+  NAME ThreadManager
+  SRCS
+    src/ManagedThread.cpp
+    src/ThreadManager.cpp
   STATIC
 )
 #####################################################################
 
 ################# The Bot's main launcher (program) #################
+
 add_my_executable(
   NAME main
   SRCS
     src/main.cpp
-    src/ManagedThread.cpp
-    src/ThreadManager.cpp
-    src/Authorization.cpp
-    src/api/TgBotApiImpl.cpp
-    src/api/CommandModule.cpp
-    src/api/MessageExt.cpp
-    src/api/components/OnAnyMessage.cpp
-    src/api/components/ChatJoinRequest.cpp
-    src/api/components/OnCallbackQuery.cpp
-    src/api/components/OnInlineQuery.cpp
-    src/api/components/OnMyChatMember.cpp
-    src/api/components/FileCheck.cpp
-    src/api/components/Async.cpp
-    src/api/components/Restart.cpp
-    src/api/components/ModuleManagement.cpp
-    src/api/components/UnknownCommand.cpp
-    src/global_handlers/SpamBlocker.cpp
     src/global_handlers/SpamBlockManager.cpp
-    src/global_handlers/ChatObserver.cpp
     src/ml/ChatDataCollector.cpp
     src/web/TgBotWebServer.cpp
     src/logging/LoggingServer.cpp
-    src/socket/interface/bot/SocketDataHandler.cpp
-    src/socket/interface/bot/TgBotSocketInterface.cpp
-  LIBS DBLoading fruit TgBot Utils Web DBImpl
-       absl::status Random restartfmt_parser CURL::libcurl Regex
-       StringRes ${CMAKE_DL_LIBS} Socket JsonCpp::JsonCpp sighandler OpenSSL::SSL
+  LIBS DBLoading fruit TgBot Utils Web Random restartfmt_parser Regex
+       SocketComponents sighandler Api ApiComponents ThreadManager
   RELATION Main
 )
 
@@ -454,6 +439,7 @@ add_my_executable(
   RELATION Main
 )
 endif()
+
 #####################################################################
 # Resource dirs
 install(DIRECTORY resources/ DESTINATION share/${PROJECT_NAME} FILES_MATCHING PATTERN "*"
@@ -468,19 +454,18 @@ set(CPACK_PACKAGE_CONTACT "support@example.com")
 set(CPACK_GENERATOR "ZIP;TGZ")
 set(CPACK_PACKAGE_INSTALL_DIRECTORY "TgBot C++ server ${CPACK_PACKAGE_VERSION}")
 
-# NSIS
-set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
-set(CPACK_NSIS_MUI_ICON ${CMAKE_SOURCE_DIR}/resources/photo/icon.ico)
-set(CPACK_NSIS_MUI_UNIICON ${CMAKE_SOURCE_DIR}/resources/photo/uninstall.ico)
-set(CPACK_NSIS_DISPLAY_NAME "Telegram Bot Server")
-set(CPACK_NSIS_WELCOME_TITLE "Welcome! Actually, no")
-set(CPACK_NSIS_BRANDING_TEXT "Created with CMake ${CMAKE_VERSION}")
-set(CPACK_NSIS_IGNORE_LICENSE_PAGE ON)
-set(CPACK_NSIS_INSTALLED_ICON_NAME "${CMAKE_BINARY_DIR}/bin/${PROJECT_NAME}_main.exe")
-set(CPACK_NSIS_MANIFEST_DPI_AWARE TRUE)
-
 if (WIN32)
+  # NSIS
   list(APPEND CPACK_GENERATOR NSIS)
+  set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
+  set(CPACK_NSIS_MUI_ICON ${CMAKE_SOURCE_DIR}/resources/photo/icon.ico)
+  set(CPACK_NSIS_MUI_UNIICON ${CMAKE_SOURCE_DIR}/resources/photo/uninstall.ico)
+  set(CPACK_NSIS_DISPLAY_NAME "Telegram Bot Server")
+  set(CPACK_NSIS_WELCOME_TITLE "Welcome! Actually, no")
+  set(CPACK_NSIS_BRANDING_TEXT "Created with CMake ${CMAKE_VERSION}")
+  set(CPACK_NSIS_IGNORE_LICENSE_PAGE ON)
+  set(CPACK_NSIS_INSTALLED_ICON_NAME "${CMAKE_BINARY_DIR}/bin/${PROJECT_NAME}_main.exe")
+  set(CPACK_NSIS_MANIFEST_DPI_AWARE TRUE)
 endif()
 
 # Include CPack

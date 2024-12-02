@@ -70,6 +70,7 @@ function(command_module)
     # Global variables
     target_compile_definitions(${TGBOT_CMDMODULE_LIBNAME} PRIVATE ${GLOBAL_DEFINITIONS})
     target_compile_options(${TGBOT_CMDMODULE_LIBNAME} PRIVATE ${GLOBAL_COMPILE_OPTIONS})
+    target_include_directories(${TGBOT_CMDMODULE_LIBNAME} PRIVATE ${GLOBAL_INCLUDE_DIRS})
 
     # CPack
     cpack_add_component(Command_${TGBOT_CMDMODULE_NAME}

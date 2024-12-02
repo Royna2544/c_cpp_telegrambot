@@ -15,7 +15,8 @@ add_my_executable(
   LIBS
     GTest::gtest
     GTest::gmock
-    TestingFileGroup fruit Random
+    Api
+    fruit
   TEST
 )
 
@@ -50,7 +51,7 @@ add_my_executable(
   LIBS
     GTest::gtest
     GTest::gmock
-    TestingFileGroup
+    SocketComponents
     fruit
   TEST
 )
