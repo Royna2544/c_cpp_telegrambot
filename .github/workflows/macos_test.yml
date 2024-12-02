@@ -36,5 +36,5 @@ jobs:
       - name: Run Tests
         run: |
             cd build
-            ctest --output-on-failure -VV
+            ctest --output-on-failure --timeout 30
   
