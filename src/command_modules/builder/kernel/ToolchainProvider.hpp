@@ -1,6 +1,7 @@
 #pragma once
 
 #include <bitset>
+#include <optional>
 
 #include "Compiler.hpp"
 

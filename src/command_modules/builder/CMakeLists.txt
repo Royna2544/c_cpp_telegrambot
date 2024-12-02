@@ -11,6 +11,13 @@ if (NOT LibArchive_FOUND)
     return()
 endif()
 
+include(CheckStructHasMember)
+check_struct_has_member(git_fetch_options depth git2/clone.h LIBGIT2_HAS_CLONE_DEPTH)
+
+if (LIBGIT2_HAS_CLONE_DEPTH)
+    set(BUILDER_UTILS_LINUX_DEFS LIBGIT2_HAS_CLONE_DEPTH)
+endif()
+
 add_my_library(
     NAME BuilderUtilsLinux
     SRCS 
@@ -28,6 +35,7 @@ add_my_library(
     LIBS_STATIC
         ${LIBGIT2_LIBRARIES}
         LibArchive::LibArchive
+    DEFS ${BUILDER_UTILS_LINUX_DEFS}
     NO_LIBPREFIX
     STATIC
 )
