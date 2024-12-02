@@ -47,6 +47,8 @@ static bool check_data_privdata(popen_watchdog_data_t** data) {
     }
     if ((*data)->privdata == NULL) {
         POPEN_WDT_DBGLOG("data->privdata is NULL");
+        free(*data);
+        *data = NULL;
         return false;
     }
     return true;
