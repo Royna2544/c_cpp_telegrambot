@@ -11,7 +11,7 @@
 #include <vector>
 #include <random>
 
-class Random_API RandomBase {
+class RandomBase {
    public:
     // Retval type for random
     using ret_type = size_t;
