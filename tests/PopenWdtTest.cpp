@@ -9,17 +9,21 @@
 
 TEST(PopenWdtTest, Init) {
     popen_watchdog_data_t* data = nullptr;
-    EXPECT_TRUE(popen_watchdog_init(&data));
+    ASSERT_TRUE(popen_watchdog_init(&data));
     popen_watchdog_destroy(&data);
 }
 
 TEST(PopenWdtTest, NonBlockingCommand) {
     popen_watchdog_data_t* data = nullptr;
-    EXPECT_TRUE(popen_watchdog_init(&data));
+    DLOG(INFO) << "popen_watchdog_init";
+    ASSERT_TRUE(popen_watchdog_init(&data));
     data->watchdog_enabled = false;
     data->command = "pwd";
+    DLOG(INFO) << "popen_watchdog_start";
     ASSERT_TRUE(popen_watchdog_start(&data));
+    DLOG(INFO) << "popen_watchdog_activated";
     EXPECT_FALSE(popen_watchdog_activated(&data));
+    DLOG(INFO) << "popen_watchdog_destroy";
     auto ret = popen_watchdog_destroy(&data);
     EXPECT_EQ(ret.exitcode, 0);
     EXPECT_FALSE(ret.signal);
@@ -27,7 +31,7 @@ TEST(PopenWdtTest, NonBlockingCommand) {
 
 TEST(PopenWdtTest, TestingEchoOutput) {
     popen_watchdog_data_t* data = nullptr;
-    EXPECT_TRUE(popen_watchdog_init(&data));
+    ASSERT_TRUE(popen_watchdog_init(&data));
     data->watchdog_enabled = false;
     data->command = "echo test";
     ASSERT_TRUE(popen_watchdog_start(&data));
@@ -42,7 +46,7 @@ TEST(PopenWdtTest, TestingEchoOutput) {
 
 TEST(PopenWdtTest, BlockingCommand) {
     popen_watchdog_data_t* data = nullptr;
-    EXPECT_TRUE(popen_watchdog_init(&data));
+    ASSERT_TRUE(popen_watchdog_init(&data));
     data->watchdog_enabled = false;
     data->sleep_secs = 1;
     data->command = "sleep 5";
@@ -55,7 +59,7 @@ TEST(PopenWdtTest, BlockingCommand) {
 
 TEST(PopenWdtTest, NonBlockingCommandEnabled) {
     popen_watchdog_data_t* data = nullptr;
-    EXPECT_TRUE(popen_watchdog_init(&data));
+    ASSERT_TRUE(popen_watchdog_init(&data));
     data->watchdog_enabled = true;
     data->sleep_secs = 4;
     data->command = "pwd";
@@ -68,7 +72,7 @@ TEST(PopenWdtTest, NonBlockingCommandEnabled) {
 
 TEST(PopenWdtTest, BlockingCommandEnabled) {
     popen_watchdog_data_t* data = nullptr;
-    EXPECT_TRUE(popen_watchdog_init(&data));
+    ASSERT_TRUE(popen_watchdog_init(&data));
     data->watchdog_enabled = true;
     data->sleep_secs = 1;
     data->command = "sleep 9";
@@ -86,7 +90,7 @@ TEST(PopenWdtTest, BlockingCommandEnabled) {
 
 TEST(PopenWdtTest, BlockingCommandEnabledMultiFork) {
     popen_watchdog_data_t* data = nullptr;
-    EXPECT_TRUE(popen_watchdog_init(&data));
+    ASSERT_TRUE(popen_watchdog_init(&data));
     data->watchdog_enabled = true;
     data->sleep_secs = 1;
     data->command = R"(bash -c "sleep 9; sh -c "CUM"")";
