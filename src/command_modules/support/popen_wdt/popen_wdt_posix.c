@@ -82,10 +82,15 @@ static void *watchdog(void *arg) {
 }
 
 static void cleanup_resources(struct popen_wdt_posix_priv *pdata,
-                              popen_watchdog_data_t *data, int *pipefd) {
+                              popen_watchdog_data_t *data, int *pipefd,
+                              int *writefd) {
     if (pipefd) {
         close(pipefd[0]);
         close(pipefd[1]);
+    }
+    if (writefd) {
+        close(writefd[0]);
+        close(writefd[1]);
     }
     if (pdata) {
         if (pdata->startup_sem) {
@@ -103,6 +108,7 @@ bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
     popen_watchdog_data_t *data = NULL;
     struct popen_wdt_posix_priv *pdata = NULL;
     int pipefd[2];
+    int writefd[2];
 
     if (data_in == NULL || *data_in == NULL) {
         return false;
@@ -115,14 +121,18 @@ bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
     }
 
     if (pipe(pipefd) == -1) {
-        cleanup_resources(pdata, data, NULL);
+        cleanup_resources(pdata, data, NULL, NULL);
+        return false;
+    }
+    if (pipe(writefd) == -1) {
+        cleanup_resources(pdata, data, pipefd, NULL);
         return false;
     }
 
     pthread_mutex_init(&pdata->wdt_mutex, NULL);
     pdata->childprocess_pid = fork();
     if (pdata->childprocess_pid == -1) {
-        cleanup_resources(pdata, data, pipefd);
+        cleanup_resources(pdata, data, pipefd, writefd);
         *data_in = NULL;
         return NULL;
     }
@@ -135,7 +145,7 @@ bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
     do {                                                            \
         if (x(__VA_ARGS__) == -1) {                                 \
             POPEN_WDT_DBGLOG("%s failed: %s", #x, strerror(errno)); \
-            _exit(127);                                             \
+            _exit(POPEN_WDT_EXIT_CODE_MAX);                         \
         }                                                           \
     } while (0)
 
@@ -144,25 +154,47 @@ bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
         WRAP_SYSCALL(setpgid, 0, 0);
         // Close unused file descriptors
         WRAP_SYSCALL(close, pipefd[0]);
-        WRAP_SYSCALL(close, STDIN_FILENO);
+        WRAP_SYSCALL(close, writefd[1]);
 
-        POPEN_WDT_DBGLOG("Goodbye stdout");
-        // Redirect stdout and stderr to pipe
+        // Redirect stdout and stderr and stdin to pipe
         WRAP_SYSCALL(dup2, pipefd[1], STDOUT_FILENO);
         WRAP_SYSCALL(dup2, pipefd[1], STDERR_FILENO);
+        WRAP_SYSCALL(dup2, writefd[0], STDIN_FILENO);
+
         // Call execl to run the command
-        execlp("bash", "bash", "-c", data->command, (char *)NULL);
-        _exit(127);  // If execl fails, exit
+        execlp(POPEN_WDT_DEFAULT_SHELL, POPEN_WDT_DEFAULT_SHELL, NULL);
+        _exit(POPEN_WDT_EXIT_CODE_MAX);  // If execl fails, exit
     } else {
         // Parent process
         // Close unused file descriptor
         close(pipefd[1]);
+        close(writefd[0]);
         // Assign privdata members.
         pdata->pipefd_r = pipefd[0];
+        int pipefd_w = writefd[1];
         pdata->process_is_running = true;
         POPEN_WDT_DBGLOG("Parent pid is %d", getpid());
         POPEN_WDT_DBGLOG("Child pid is %d", pdata->childprocess_pid);
         data->privdata = pdata;
+
+        // Write the command
+        POPEN_WDT_DBGLOG("Write: %s", data->command);
+        if (write(pipefd_w, data->command, strlen(data->command)) == -1) {
+            POPEN_WDT_DBGLOG("Failed to write command to pipe");
+            cleanup_resources(pdata, data, pipefd, writefd);
+            *data_in = NULL;
+            return false;
+        }
+        const char additional[] = "; exit 0";
+        if (write(pipefd_w, additional, sizeof(additional) - 1) == -1) {
+            POPEN_WDT_DBGLOG("Failed to write rest to pipe");
+            cleanup_resources(pdata, data, pipefd, writefd);
+            *data_in = NULL;
+            return false;
+        }
+
+        // Close the write end of the pipe
+        close(pipefd_w); 
 
         if (data->watchdog_enabled) {
             struct rk_sema sem;
@@ -173,7 +205,7 @@ bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
             pthread_cond_init(&pdata->condition, NULL);
             if (pthread_create(&pdata->wdt_thread, NULL, &watchdog, data)) {
                 POPEN_WDT_DBGLOG("Failed to create watchdog thread");
-                cleanup_resources(pdata, data, pipefd);
+                cleanup_resources(pdata, data, pipefd, writefd);
                 *data_in = NULL;
                 return false;
             }
@@ -225,7 +257,7 @@ popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t **data_in) {
     struct popen_wdt_posix_priv *pdata = data->privdata;
 
     if (pdata == NULL) {
-        cleanup_resources(pdata, data, NULL);
+        cleanup_resources(pdata, data, NULL, NULL);
         return ret;
     }
 
