@@ -198,7 +198,7 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
     if (!success) {
         // Hmm? We failed? Try to append powershell -c
         // Create command line string
-        (void)snprintf(buffer, sizeof(buffer), "powershell.exe -c \"%s\"",
+        (void)snprintf(buffer, sizeof(buffer), POPEN_WDT_DEFAULT_SHELL " -c \"%s\"",
                        wdt_data->command);
         POPEN_WDT_DBGLOG("New command is: %s", buffer);
 
