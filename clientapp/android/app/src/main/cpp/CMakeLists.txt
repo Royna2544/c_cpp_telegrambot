@@ -28,7 +28,7 @@ project("tgbotclient")
 add_library(${CMAKE_PROJECT_NAME} SHARED
     # List C/C++ source files with relative paths to this CMakeLists.txt.
     tgbotclient.cpp
-    ../../../../../../src/socket/interface/bot/TgBotSocketFileHelperNew.cpp)
+    ../../../../../../src/socket/bot/TgBotSocketFileHelperNew.cpp)
 
 set(ABSL_PROPAGATE_CXX_STD ON)
 add_subdirectory(../../../../../../src/third-party/abseil-cpp abseil-cpp)

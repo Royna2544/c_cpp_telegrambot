@@ -5,7 +5,7 @@
 #ifdef __TGBOT__
 #include <StructF.hpp>
 #else
-#include "../../../include/StructF.hpp"
+#include "../../include/StructF.hpp"
 #endif
 
 #include "TgBotSocket_Export.hpp"

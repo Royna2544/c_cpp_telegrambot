@@ -16,7 +16,7 @@
 #include <optional>
 #include <stdexcept>
 
-#include "../../../src/socket/interface/bot/TgBotSocketFileHelperNew.cpp"
+#include "../../../src/socket/bot/TgBotSocketFileHelperNew.cpp"
 
 static std::string WSALastErrStr() {
     char *s = nullptr;

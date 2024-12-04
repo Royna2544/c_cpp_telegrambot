@@ -417,8 +417,8 @@ add_my_library(
   SRCS
     src/global_handlers/SpamBlocker.cpp
     src/global_handlers/ChatObserver.cpp
-    src/socket/interface/bot/SocketDataHandler.cpp
-    src/socket/interface/bot/TgBotSocketInterface.cpp
+    src/socket/bot/SocketDataHandler.cpp
+    src/socket/bot/TgBotSocketInterface.cpp
   LIBS TgBot DBImpl Socket JsonCpp::JsonCpp
   STATIC
 )

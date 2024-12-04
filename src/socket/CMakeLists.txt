@@ -4,13 +4,13 @@ find_package(Boost CONFIG COMPONENTS system)
 add_my_library(
   NAME Socket
   SRCS
-    interface/Context.cpp
-    interface/Local.cpp
-    interface/UDP.cpp
-    interface/TCP.cpp
-    interface/bot/TgBotPacketParser.cpp
-    interface/bot/TgBotSocketFileHelperNew.cpp
-    interface/backends/ClientBackend.cpp
+    Context.cpp
+    Local.cpp
+    UDP.cpp
+    TCP.cpp
+    bot/TgBotPacketParser.cpp
+    bot/TgBotSocketFileHelperNew.cpp
+    backends/ClientBackend.cpp
     TgBotCommandMap.cpp
   PUBLIC_INC include interface
   LIBS Utils ZLIB::ZLIB OpenSSL::Crypto Boost::system

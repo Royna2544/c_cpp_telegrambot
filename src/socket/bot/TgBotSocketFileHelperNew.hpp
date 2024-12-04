@@ -19,7 +19,7 @@
 #define Socket_API
 #define APPLE_INJECT(x) x
 #define APPLE_EXPLICIT_INJECT(x) explicit x
-#include "../../../include/SharedMalloc.hpp"
+#include "../../include/SharedMalloc.hpp"
 #endif
 
 // Represents a SHA-256 hash
