@@ -1,10 +1,22 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stdint.h>
+#include <limits.h>
 
 #ifndef NDEBUG
 #define POPEN_WDT_DEBUG
 #endif
+
+#ifdef _WIN32
+typedef unsigned long popen_watchdog_exit_code_t;
+#define POPEN_WDT_EXIT_CODE_MAX ULONG_MAX
+#else
+typedef uint8_t popen_watchdog_exit_code_t;
+#define POPEN_WDT_EXIT_CODE_MAX UINT8_MAX
+#endif
+
+#define POPEN_WDT_DEFAULT_SLEEP_SECS 10
 
 #ifdef __cplusplus
 extern "C" {
@@ -14,12 +26,11 @@ extern "C" {
 #define POPEN_WDT_SIGTERM 2
 
 typedef struct {
-    int exitcode; /* exit code of the process, default -255 */
-    bool signal;  /* if the process was signaled, then the exit code becomes the
-                     signum */
+    popen_watchdog_exit_code_t exitcode; /* exit code of the process, default POPEN_WDT_EXIT_CODE_MAX */
+    bool signal;  /* if the process was signaled, if yes, exitcode is signal num */
 } popen_watchdog_exit_t;
 
-#define POPEN_WDT_EXIT_INITIALIZER { -1, false }
+#define POPEN_WDT_EXIT_INITIALIZER { POPEN_WDT_EXIT_CODE_MAX, false }
 
 typedef struct {
     const char *command;     /* command string */

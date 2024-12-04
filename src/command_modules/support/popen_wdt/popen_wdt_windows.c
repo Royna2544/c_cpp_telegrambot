@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <Windows.h>
 #include "popen_wdt.h"
 
 #ifdef POPEN_WDT_DEBUG
@@ -19,7 +20,7 @@
 #endif
 #define POPEN_WDT_PIPE "\\\\.\\pipe\\popen_wdt"
 // Buffer size
-#define POPEN_WDT_BUFSIZ (1 << 8)
+#define POPEN_WDT_BUFSIZ (1 << 10)
 
 struct popen_wdt_windows_priv {
     struct {
@@ -153,8 +154,8 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
     si.dwFlags |= STARTF_USESTDHANDLES;
     child_stdout_w = si.hStdError = si.hStdOutput = CreateNamedPipeA(
         POPEN_WDT_PIPE, PIPE_ACCESS_OUTBOUND | FILE_FLAG_OVERLAPPED,
-        PIPE_TYPE_BYTE | PIPE_WAIT, PIPE_UNLIMITED_INSTANCES, 0,
-        POPEN_WDT_BUFSIZ, POPEN_WDT_BUFSIZ, &saAttr);
+        PIPE_TYPE_BYTE | PIPE_WAIT, PIPE_UNLIMITED_INSTANCES, POPEN_WDT_BUFSIZ,
+        POPEN_WDT_BUFSIZ, 0, &saAttr);
     if (child_stdout_w == INVALID_HANDLE_VALUE) {
         POPEN_WDT_DBGLOG("CreateNamedPipe failed with error %lu",
                          GetLastError());
