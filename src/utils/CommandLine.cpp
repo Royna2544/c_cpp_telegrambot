@@ -26,10 +26,10 @@ CommandLine::CommandLine(CommandLine::argc_type argc,
         constexpr const char kPathDelimiter = ':';
 #endif
         for (const auto& path : absl::StrSplit(Env()["PATH"].get(), kPathDelimiter)) {
-            if (std::filesystem::is_regular_file(std::filesystem::path(path) /
+            if (std::filesystem::is_regular_file(std::filesystem::path(path.data()) /
                                                  argv[0])) {
                 LOG(INFO) << "Found exepath";
-                exePath = std::filesystem::path(path) / argv[0];
+                exePath = std::filesystem::path(path.data()) / argv[0];
                 break;
             }
         }
