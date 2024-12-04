@@ -3,6 +3,7 @@
 #include <absl/log/log.h>
 #include <fmt/core.h>
 
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 
@@ -29,27 +30,31 @@ bool Zip::open(const std::filesystem::path& path) {
         return false;
     }
 
+    filesAdded.reserve(50);
+
     return true;
 }
 
 bool Zip::addFile(const std::filesystem::path& filepath,
                   const std::string_view entryname) {
-    // Open the file for reading
-    std::ifstream file(filepath, std::ios::binary);
-    if (!file.is_open()) {
-        LOG(ERROR) << "Cannot open file: " << filepath;
+    if (std::ranges::find(filesAdded, entryname) != filesAdded.end()) {
+        LOG(ERROR) << "File already added: " << entryname;
         return false;
     }
-
+    
     // Get file size
     std::error_code ec;
     uintmax_t filesize = std::filesystem::file_size(filepath, ec);
     if (ec) {
         LOG(ERROR) << "Failed to check file size: " << ec.message();
         return false;
-    } else if (filesize == 0) {
-        LOG(WARNING) << "Skipping empty file: " << filepath;
-        return true;
+    }
+
+    // Open the file for reading
+    std::ifstream file(filepath, std::ios::binary);
+    if (!file.is_open()) {
+        LOG(ERROR) << "Cannot open file: " << filepath;
+        return false;
     }
 
     // Create archive entry
@@ -79,8 +84,15 @@ bool Zip::addFile(const std::filesystem::path& filepath,
         }
     }
 
+    filesAdded.emplace_back(entryname);
     archive_entry_free(entry);
     return true;
+}
+
+bool Zip::acceptFile(const std::filesystem::directory_entry& entry) {
+    return entry.is_regular_file() &&
+           !entry.path().filename().string().starts_with(".") &&
+           entry.file_size() != 0;
 }
 
 bool Zip::addDir(const std::filesystem::path& dirpath,
@@ -90,11 +102,10 @@ bool Zip::addDir(const std::filesystem::path& dirpath,
         const auto zipentry = ziproot / entry.path().filename();
         if (entry.is_directory()) {
             addDir(entry.path(), zipentry);
-        } else if (entry.is_regular_file() &&
-                   !entry.path().filename().string().starts_with(".")) {
+        } else if (acceptFile(entry)) {
             addFile(entry.path(), zipentry.string());
         } else {
-            LOG(ERROR) << "Skipping non-regular file: " << entry.path();
+            LOG(INFO) << "Skipping file: " << entry.path();
         }
     }
     if (ec) {

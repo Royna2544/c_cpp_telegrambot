@@ -4,9 +4,13 @@
 #include <archive_entry.h>
 
 #include <filesystem>
+#include <vector>
 
 class Zip {
     struct archive* archive = nullptr;
+
+    static bool acceptFile(const std::filesystem::directory_entry& entry);
+    std::vector<std::string> filesAdded;
 
    public:
     Zip(const Zip&) = delete;
