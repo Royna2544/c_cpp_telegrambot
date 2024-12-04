@@ -7,7 +7,8 @@ packages = [
     'cmake',
     'toolchain',
     'boost',
-    'libgit2'
+    'libgit2',
+    'gtest'
 ]
 
 mappings = {
