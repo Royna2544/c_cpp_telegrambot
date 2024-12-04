@@ -1,17 +1,10 @@
-#include <Windows.h>
-#include <handleapi.h>
+#include <assert.h>
 #include <locale.h>
-#include <memoryapi.h>
-#include <minwinbase.h>
-#include <namedpipeapi.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <synchapi.h>
-#include <winbase.h>
-#include <assert.h>
-#include <winnt.h>
 
 #include "popen_wdt.h"
 
@@ -25,6 +18,8 @@
 #define POPEN_WDT_DBGLOG(fmt, ...)
 #endif
 #define POPEN_WDT_PIPE "\\\\.\\pipe\\popen_wdt"
+// Buffer size
+#define POPEN_WDT_BUFSIZ (1 << 8)
 
 struct popen_wdt_windows_priv {
     struct {
@@ -158,7 +153,8 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
     si.dwFlags |= STARTF_USESTDHANDLES;
     child_stdout_w = si.hStdError = si.hStdOutput = CreateNamedPipeA(
         POPEN_WDT_PIPE, PIPE_ACCESS_OUTBOUND | FILE_FLAG_OVERLAPPED,
-        PIPE_TYPE_BYTE | PIPE_NOWAIT, PIPE_UNLIMITED_INSTANCES, 0, 0, 0, &saAttr);
+        PIPE_TYPE_BYTE | PIPE_WAIT, PIPE_UNLIMITED_INSTANCES, 0,
+        POPEN_WDT_BUFSIZ, POPEN_WDT_BUFSIZ, &saAttr);
     if (child_stdout_w == INVALID_HANDLE_VALUE) {
         POPEN_WDT_DBGLOG("CreateNamedPipe failed with error %lu",
                          GetLastError());
@@ -254,8 +250,8 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
         }
         pdata.wdt_data.sub_Process = pi.hProcess;
         pdata.wdt_data.sub_Thread = pi.hThread;
-    }
-    POPEN_WDT_DBGLOG("Process PID: %d, TID: %d", pi.dwProcessId, pi.dwThreadId);
+    }    
+    POPEN_WDT_DBGLOG("Process PID: %lu, TID: %lu", pi.dwProcessId, pi.dwThreadId);
     CopyMemory(wdt_data->privdata, &pdata,
                sizeof(struct popen_wdt_windows_priv));
     return true;
@@ -272,7 +268,7 @@ popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t** data) {
 
     POPEN_WDT_DBGLOG("Starting cleanup");
     if (!(*data)->watchdog_enabled) {
-       WaitForSingleObject(pdata->wdt_data.sub_Process, INFINITE);
+        WaitForSingleObject(pdata->wdt_data.sub_Process, INFINITE);
     }
     if (GetExitCodeProcess(pdata->wdt_data.sub_Process, &exitcode)) {
         assert(exitcode != STILL_ACTIVE);
