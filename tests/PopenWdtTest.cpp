@@ -93,7 +93,7 @@ TEST(PopenWdtTest, BlockingCommandEnabledMultiFork) {
     ASSERT_TRUE(popen_watchdog_init(&data));
     data->watchdog_enabled = true;
     data->sleep_secs = 1;
-    data->command = R"(bash -c "sleep 9; sh -c "CUM"")";
+    data->command = POPEN_WDT_DEFAULT_SHELL " -c \"sleep 9\"; " POPEN_WDT_DEFAULT_SHELL " -c lll";
     SecondDP dp;
     ASSERT_TRUE(popen_watchdog_start(&data));
     EXPECT_TRUE(popen_watchdog_activated(&data));

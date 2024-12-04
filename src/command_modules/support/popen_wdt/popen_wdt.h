@@ -8,6 +8,7 @@
 #define POPEN_WDT_DEBUG
 #endif
 
+// Exit code types
 #ifdef _WIN32
 typedef unsigned long popen_watchdog_exit_code_t;
 #define POPEN_WDT_EXIT_CODE_MAX ULONG_MAX
@@ -16,14 +17,24 @@ typedef uint8_t popen_watchdog_exit_code_t;
 #define POPEN_WDT_EXIT_CODE_MAX UINT8_MAX
 #endif
 
+// Default shell
+#ifdef _WIN32
+#define POPEN_WDT_DEFAULT_SHELL "powershell.exe"
+#elif __APPLE__
+#define POPEN_WDT_DEFAULT_SHELL "zsh"
+#elif defined _POSIX_C_SOURCE
+#define POPEN_WDT_DEFAULT_SHELL "bash"
+#endif
+
+// Default sleep seconds if not specified.
 #define POPEN_WDT_DEFAULT_SLEEP_SECS 10
+
+// Identical to POSIX SIGINT, what is currently used to terminate the process
+#define POPEN_WDT_SIGTERM 2
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-// Identical to POSIX SIGINT, what is currently used to terminate the process
-#define POPEN_WDT_SIGTERM 2
 
 typedef struct {
     popen_watchdog_exit_code_t exitcode; /* exit code of the process, default POPEN_WDT_EXIT_CODE_MAX */
