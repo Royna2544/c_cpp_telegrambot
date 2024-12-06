@@ -175,44 +175,7 @@ class ConfigParser {
     bool merge();
 
     // Get available devices from config
-    [[nodiscard]] std::set<Device::Ptr> getDevices() const;
-
-    // Get available ROM branches for a given device
-    [[nodiscard]] std::set<ROMBranch::Ptr> getROMBranches(
-        const Device::Ptr &device) const;
-
-    // Get a local manifest for a given ROM branch and device
-    [[nodiscard]] LocalManifest::Ptr getLocalManifest(
-        const ROMBranch::Ptr &romBranch, const Device::Ptr &device) const;
-
-    /**
-     * @brief Finds a device by its codename in the configuration.
-     *
-     * This function iterates through the available devices and checks if the
-     * codename matches the given parameter. If a match is found, a shared
-     * pointer to the device is returned. If no match is found, a nullptr is
-     * returned.
-     *
-     * @param codename The codename of the device to search for.
-     * @return A shared pointer to the device if found, or nullptr if not found.
-     */
-    [[nodiscard]] Device::Ptr getDevice(const std::string_view &codename) const;
-
-    /**
-     * @brief Finds a ROM branch by its branch name in the configuration.
-     *
-     * This function iterates through the available ROM branches and checks if
-     * the branch name matches the given parameter. If a match is found, a
-     * shared pointer to the ROM branch is returned. If no match is found, a
-     * nullptr is returned.
-     *
-     * @param romName The string representitive of the ROM name to search for
-     * @param androidVersion The android version of the ROM branch to search for
-     * @return A shared pointer to the ROM branch if found, or nullptr if not
-     * found.
-     */
-    [[nodiscard]] ROMBranch::Ptr getROMBranches(const std::string &romName,
-                                                const int androidVersion) const;
+    [[nodiscard]] std::vector<ConfigParser::LocalManifest::Ptr> manifests() const;
 
    private:
     std::vector<LocalManifest::Ptr> parsedManifests;

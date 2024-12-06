@@ -694,67 +694,8 @@ ConfigParser::ConfigParser(std::filesystem::path jsonFileDir)
     merge();
 }
 
-std::set<ConfigParser::Device::Ptr> ConfigParser::getDevices() const {
-    std::set<Device::Ptr> deviceSet;
-    for (const auto& [codename, device] : deviceMap) {
-        deviceSet.insert(device);
-    }
-    return deviceSet;
-}
-
-ConfigParser::LocalManifest::Ptr ConfigParser::getLocalManifest(
-    const ROMBranch::Ptr& romBranch, const Device::Ptr& device) const {
-    for (const auto& manifest : parsedManifests) {
-        if (*manifest->rom == *romBranch &&
-            std::ranges::any_of(manifest->devices, [&device](const auto& d) {
-                return d == device;
-            })) {
-            return manifest;
-        }
-    }
-    LOG(WARNING) << "Local manifest not found for ROM branch: "
-                 << romBranch->toString() << ", device: " << device->codename;
-    return nullptr;
-}
-
-ConfigParser::Device::Ptr ConfigParser::getDevice(
-    const std::string_view& codename) const {
-    auto devices = getDevices();
-    auto it = std::ranges::find_if(devices, [codename](const auto& entry) {
-        return entry->codename == codename;
-    });
-    if (it != devices.end()) {
-        return *it;
-    } else {
-        return {};
-    }
-}
-
-std::set<ConfigParser::ROMBranch::Ptr> ConfigParser::getROMBranches(
-    const Device::Ptr& device) const {
-    std::set<ROMBranch::Ptr> romBranches;
-    for (const auto& manifest : parsedManifests) {
-        if (std::ranges::any_of(manifest->devices, [&device](const auto& d) {
-                return d == device;
-            })) {
-            romBranches.insert(manifest->rom);
-        }
-    }
-    return romBranches;
-}
-
-ConfigParser::ROMBranch::Ptr ConfigParser::getROMBranches(
-    const std::string& romName, const int androidVersion) const {
-    for (const auto& localManifest : parsedManifests) {
-        const auto& rom = localManifest->rom;
-        if (rom->romInfo->name == romName &&
-            rom->androidVersion == androidVersion) {
-            return rom;
-        }
-    }
-    LOG(WARNING) << fmt::format("ROM branch not found: {}, Android {}", romName,
-                                androidVersion);
-    return nullptr;
+std::vector<ConfigParser::LocalManifest::Ptr> ConfigParser::manifests() const {
+    return parsedManifests;
 }
 
 bool ConfigParser::LocalManifest::GitPrepare::prepare(

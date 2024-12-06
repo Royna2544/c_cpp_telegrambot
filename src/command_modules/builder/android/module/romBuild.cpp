@@ -14,6 +14,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <initializer_list>
+#include <iterator>
 #include <memory>
 #include <string>
 #include <system_error>
@@ -56,8 +57,8 @@ class ROMBuildQueryHandler {
     using KeyboardType = TgBot::InlineKeyboardMarkup::Ptr;
 
     struct {
-        ConfigParser::ROMBranch::Ptr rom;
-        ConfigParser::Device::Ptr device;
+        std::vector<ConfigParser::LocalManifest::Ptr> _localManifest;
+        std::string codename;
     } lookup;
 
     KeyboardType settingsKeyboard;
@@ -95,12 +96,10 @@ class ROMBuildQueryHandler {
         std::string text;
         std::string data;
         std::function<void(const Query&)> handler;
-        std::function<bool(const Query&)> matcher = [this](const Query& query) {
-            return query->data == data;
-        };
+        std::function<bool(Query&)> matcher;
         ButtonHandler(std::string text, std::string data,
                       std::function<void(const Query&)> handler,
-                      std::function<bool(const Query&)> matcher)
+                      std::function<bool(Query&)> matcher)
             : text(std::move(text)),
               data(std::move(data)),
               handler(std::move(handler)),
@@ -149,6 +148,8 @@ class ROMBuildQueryHandler {
     void handle_type(const Query& query);
     // Handle cleaning directories
     void handle_clean_directories(const Query& query);
+    // Handle local manifest selection button
+    void handle_local_manifest(const Query& query);
 
 #define DECLARE_BUTTON_HANDLER(name, key)                               \
     ButtonHandler {                                                     \
@@ -157,8 +158,13 @@ class ROMBuildQueryHandler {
 #define DECLARE_BUTTON_HANDLER_WITHPREFIX(name, key, prefix)             \
     ButtonHandler {                                                      \
         name, #key, [this](const Query& query) { handle_##key(query); }, \
-            [](const Query& query) {                                     \
-                return absl::StartsWith(query->data, prefix);            \
+            [](Query& query) {                                           \
+                std::string_view data = query->data;                     \
+                if (absl::ConsumePrefix(&data, prefix)) {                \
+                    query->data = data;                                  \
+                    return true;                                         \
+                }                                                        \
+                return false;                                            \
             }                                                            \
     }
 
@@ -174,6 +180,8 @@ class ROMBuildQueryHandler {
         DECLARE_BUTTON_HANDLER("Pin the build message", pin_message),
         DECLARE_BUTTON_HANDLER_WITHPREFIX("Clean directories",
                                           clean_directories, "clean_"),
+        DECLARE_BUTTON_HANDLER_WITHPREFIX("Select local manifest",
+                                          local_manifest, "local_manifest_"),
         DECLARE_BUTTON_HANDLER_WITHPREFIX("Select device", device, "device_"),
         DECLARE_BUTTON_HANDLER_WITHPREFIX("Select ROM", rom, "rom_"),
         DECLARE_BUTTON_HANDLER_WITHPREFIX("Select build variant", type,
@@ -196,7 +204,7 @@ class ROMBuildQueryHandler {
 
    public:
     void setCurrentForkAndRun(ForkAndRun* forkAndRun) { current = forkAndRun; }
-    void onCallbackQuery(const TgBot::CallbackQuery::Ptr& query) const;
+    void onCallbackQuery(TgBot::CallbackQuery::Ptr query) const;
 };
 
 template <typename Impl>
@@ -476,7 +484,7 @@ void ROMBuildQueryHandler::handle_upload(const Query& query) {
 }
 
 void ROMBuildQueryHandler::handle_pin_message(const Query& query) {
-    (void)_api->answerCallbackQuery(query->id, "Trying to pin this message...");
+    _api->answerCallbackQuery(query->id, "Trying to pin this message...");
     try {
         _api->pinMessage(sentMessage);
     } catch (const TgBot::TgException& e) {
@@ -485,12 +493,14 @@ void ROMBuildQueryHandler::handle_pin_message(const Query& query) {
         return;
     }
     didpin = true;
-    (void)_api->answerCallbackQuery(query->id, "Pinned message");
+    _api->answerCallbackQuery(query->id, "Pinned message");
 }
 
 void ROMBuildQueryHandler::handle_back(const Query& /*query*/) {
     _api->editMessage(sentMessage, "Will build ROM", mainKeyboard);
     per_build.reset();
+    lookup._localManifest.clear();
+    lookup.codename.clear();
 }
 
 void ROMBuildQueryHandler::handle_cancel(const Query& query) {
@@ -514,22 +524,6 @@ void ROMBuildQueryHandler::handle_send_system_info(const Query& query) {
 
 void ROMBuildQueryHandler::handle_settings(const Query& /*query*/) {
     _api->editMessage(sentMessage, "Settings", settingsKeyboard);
-}
-
-void ROMBuildQueryHandler::handle_build(const Query& query) {
-    KeyboardBuilder builder;
-    std::vector<KeyboardBuilder::Button> buttons;
-    const auto devices = parser.getDevices();
-
-    std::ranges::transform(
-        devices.begin(), devices.end(), std::back_inserter(buttons),
-        [&](const auto& device) {
-            return std::make_pair(device->toString(),
-                                  "device_" + device->codename);
-        });
-    builder.addKeyboard(buttons);
-    builder.addKeyboard(getButtonOf<Buttons::back>());
-    _api->editMessage(sentMessage, "Select device...", builder.get());
 }
 
 void ROMBuildQueryHandler::handle_confirm(const Query& query) {
@@ -577,12 +571,83 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     }
 }
 
-void ROMBuildQueryHandler::handle_device(const Query& query) {
-    std::string_view device = query->data;
-    absl::ConsumePrefix(&device, "device_");
-    per_build.device = lookup.device = parser.getDevice(device);
+void ROMBuildQueryHandler::handle_build(const Query& query) {
     KeyboardBuilder builder;
-    for (const auto& roms : parser.getROMBranches(lookup.device)) {
+    std::vector<KeyboardBuilder::Button> buttons;
+    lookup._localManifest = parser.manifests();
+
+    std::map<std::string, ConfigParser::LocalManifest::Ptr> localManifest;
+    for (const auto& manifest : lookup._localManifest) {
+        localManifest[manifest->name] = manifest;
+    }
+    buttons.reserve(localManifest.size());
+    for (const auto& [name, manifest] : localManifest) {
+        buttons.emplace_back(name, fmt::format("local_manifest_{}", name));
+    }
+    builder.addKeyboard(buttons);
+    builder.addKeyboard(getButtonOf<Buttons::back>());
+    _api->editMessage(sentMessage, "Select Local manifest...", builder.get());
+}
+
+void ROMBuildQueryHandler::handle_local_manifest(const Query& query) {
+    std::string_view name = query->data;
+    KeyboardBuilder builder;
+
+    // Erase manifest with different name
+    auto [b, e] = std::ranges::remove_if(
+        lookup._localManifest,
+        [&](const auto& manifest) { return manifest->name != name; });
+    lookup._localManifest.erase(b, e);
+
+    // Create a list of devices available for the local manifest.
+    std::vector<ConfigParser::Device::Ptr> devices;
+    for (const auto& manifest : lookup._localManifest) {
+        devices.insert(devices.end(), manifest->devices.begin(),
+                       manifest->devices.end());
+    }
+    // Sort devices
+    std::ranges::sort(devices, [](const auto& a, const auto& b) {
+        return a->codename < b->codename;
+    });
+
+    // Erase duplicates
+    auto [be, en] =
+        std::ranges::unique(devices, [](const auto& a, const auto& b) {
+            return a->codename == b->codename;
+        });
+    devices.erase(be, en);
+
+    for (const auto& device : devices) {
+        builder.addKeyboard(
+            {device->toString(), fmt::format("device_{}", device->codename)});
+    }
+    builder.addKeyboard(getButtonOf<Buttons::back>());
+    _api->editMessage(sentMessage, "Select device...", builder.get());
+}
+
+void ROMBuildQueryHandler::handle_device(const Query& query) {
+    std::string_view devicecodename = lookup.codename = query->data;
+
+    // Erase devices except the selected devices from local manifests
+    auto [be, en] = std::ranges::remove_if(
+        lookup._localManifest, [devicecodename, this](const auto& manifest) {
+            return !std::ranges::any_of(
+                manifest->devices, [devicecodename](const auto& device) {
+                    return device->codename == devicecodename;
+                });
+        });
+    lookup._localManifest.erase(be, en);
+
+    // Collect ROMs
+    std::vector<ConfigParser::ROMBranch::Ptr> roms;
+    std::ranges::transform(lookup._localManifest, std::back_inserter(roms),
+                           [](const auto& manifest) { return manifest->rom; });
+
+    // Very unlikely that there will be duplicates
+    // So, skip this
+
+    KeyboardBuilder builder;
+    for (const auto& roms : roms) {
         builder.addKeyboard(
             {roms->toString(), fmt::format("rom_{}_{}", roms->romInfo->name,
                                            roms->androidVersion)});
@@ -593,18 +658,22 @@ void ROMBuildQueryHandler::handle_device(const Query& query) {
 
 void ROMBuildQueryHandler::handle_rom(const Query& query) {
     std::string_view rom = query->data;
-    absl::ConsumePrefix(&rom, "rom_");
     std::vector<std::string> c = absl::StrSplit(rom, '_');
     CHECK_EQ(c.size(), 2);
     const auto romName = c[0];
     // Basically an assert
     const int androidVersion = std::stoi(c[1]);
 
-    lookup.rom = parser.getROMBranches(romName, androidVersion);
-    per_build.localManifest =
-        parser.getLocalManifest(lookup.rom, lookup.device);
-    if (!per_build.localManifest) {
-        LOG(ERROR) << "Failed to get local manifest";
+    auto [be, en] = std::ranges::remove_if(
+        lookup._localManifest, [romName, androidVersion](const auto& manifest) {
+            return manifest->rom->romInfo->name != romName ||
+                   manifest->rom->androidVersion != androidVersion;
+        });
+    lookup._localManifest.erase(be, en);
+
+    if (lookup._localManifest.size() != 1) {
+        LOG(ERROR) << "Manifest probably contains duplicates, got "
+                   << lookup._localManifest.size();
         _api->editMessage(
             sentMessage,
             fmt::format(
@@ -612,11 +681,24 @@ void ROMBuildQueryHandler::handle_rom(const Query& query) {
                 romName, androidVersion));
         return;
     }
+    per_build.localManifest = lookup._localManifest.front();
+    auto deviceIt = std::ranges::find_if(
+        per_build.localManifest->devices, [this](const auto& device) {
+            return device->codename == lookup.codename;
+        });
+    if (deviceIt == per_build.localManifest->devices.end()) {
+        LOG(ERROR) << "Device not found in local manifest";
+        _api->editMessage(sentMessage, "Failed to assemble local manifest");
+        return;
+    }
+    per_build.device = *deviceIt;
+    lookup._localManifest.clear();
 
     KeyboardBuilder builder;
     builder.addKeyboard({{"User build", "type_user"},
                          {"Userdebug build", "type_userdebug"},
                          {"Eng build", "type_eng"}});
+    builder.addKeyboard(getButtonOf<Buttons::back>());
     _api->editMessage(sentMessage, "Select build variant...", builder.get());
 }
 
@@ -683,7 +765,7 @@ void ROMBuildQueryHandler::handle_clean_directories(const Query& query) {
 }
 
 void ROMBuildQueryHandler::onCallbackQuery(
-    const TgBot::CallbackQuery::Ptr& query) const {
+    TgBot::CallbackQuery::Ptr query) const {
     if (sentMessage == nullptr) {
         DLOG(INFO) << "No message to handle callback query";
         return;
@@ -745,15 +827,13 @@ DECLARE_COMMAND_HANDLER(rombuild) {
         }
     }
 
-    api->onCallbackQuery(
-        "rombuild", [](const TgBot::CallbackQuery::Ptr& query) {
-            if (handler) {
-                handler->onCallbackQuery(query);
-            } else {
-                LOG(WARNING)
-                    << "No ROMBuildQueryHandler to handle callback query";
-            }
-        });
+    api->onCallbackQuery("rombuild", [](TgBot::CallbackQuery::Ptr query) {
+        if (handler) {
+            handler->onCallbackQuery(std::move(query));
+        } else {
+            LOG(WARNING) << "No ROMBuildQueryHandler to handle callback query";
+        }
+    });
 }
 
 extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
