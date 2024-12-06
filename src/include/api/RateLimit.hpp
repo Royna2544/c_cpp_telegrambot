@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <limits>
 
 /**
  * A rate limiter that can rate limit events to N events per M milliseconds.
