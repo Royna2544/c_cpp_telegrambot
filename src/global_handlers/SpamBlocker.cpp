@@ -181,5 +181,6 @@ void SpamBlockBase::addMessage(const Message::Ptr &message) {
         chat_map[chatId] = message->chat;
         user_map[userId] = message->from;
         chat_messages_count++;
+        onMessageAdded(chat_messages_count);
     }
 }

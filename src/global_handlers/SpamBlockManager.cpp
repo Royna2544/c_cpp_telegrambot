@@ -1,3 +1,4 @@
+#include <absl/log/log.h>
 #include <tgbot/TgException.h>
 #include <trivial_helpers/_std_chrono_templates.h>
 #include <trivial_helpers/_tgbot.h>
@@ -6,6 +7,7 @@
 #include <condition_variable>
 #include <global_handlers/SpamBlockManager.hpp>
 #include <mutex>
+#include "global_handlers/SpamBlock.hpp"
 
 void SpamBlockManager::runFunction(const std::stop_token &token) {
     while (!token.stop_requested()) {
@@ -17,10 +19,18 @@ void SpamBlockManager::runFunction(const std::stop_token &token) {
 }
 
 void SpamBlockManager::onPreStop() {
-    {
-        std::lock_guard<std::mutex> lock(mutex);
-    }
+    { std::lock_guard<std::mutex> lock(mutex); }
     // Cancel the timer
+    condvar.notify_all();
+}
+
+void SpamBlockManager::onMessageAdded(const size_t count) {
+    if (count < sImmediateStartThreshold) {
+        return;
+    }
+    { std::lock_guard<std::mutex> lock(mutex); }
+    LOG_EVERY_N_SEC(INFO, sSpamDetectDelay.count()) << "Messages queued: " << count << ". Starting thread now";
+    // Wake up the timer
     condvar.notify_all();
 }
 

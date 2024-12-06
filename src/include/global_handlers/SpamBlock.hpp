@@ -8,6 +8,7 @@
 #include <api/TgBotApi.hpp>
 #include <chrono>
 #include <concepts>
+#include <cstddef>
 #include <mutex>
 #include <socket/include/TgBotSocket_Export.hpp>
 #include <unordered_map>
@@ -37,6 +38,11 @@ struct SpamBlockBase {
     // Dummy version: Returns false.
     virtual bool shouldBeSkipped(const Message::Ptr & /*msg*/) const {
         return false;
+    }
+
+    // virtual function, called when the message is added to the map
+    virtual void onMessageAdded(const size_t count) {
+        // Default: do nothing
     }
 
     // Set the SpamBlock config. Based on SpamBlockBase::Config.

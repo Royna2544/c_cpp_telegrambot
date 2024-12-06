@@ -11,6 +11,8 @@ struct SpamBlockManager : SpamBlockBase, ThreadRunner {
     void runFunction(const std::stop_token &token) override;
     void onDetected(ChatId chat, UserId user,
                     std::vector<MessageId> messageIds) const override;
+    void onMessageAdded(const size_t count) override;
+
     // Additional hook for handling messages
     // that should be handled differently
     // (e.g., delete messages, mute users)
@@ -24,4 +26,7 @@ struct SpamBlockManager : SpamBlockBase, ThreadRunner {
     AuthContext *_auth;
     std::condition_variable condvar;
     std::mutex mutex;
+
+    // Start next iteration when the message in buffer is bigger than sImmediateStartThreshold
+    constexpr static int sImmediateStartThreshold = 10;
 };
