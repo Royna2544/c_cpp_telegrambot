@@ -12,6 +12,14 @@
 #include <pthread.h>  // pthread_kill
 
 #include <csignal>  // SIGKILL
+
+#define THREAD_FORCE_KILL_SUPPORTED
+#endif
+
+#ifdef _WIN32
+#include <windows.h> // TerminateThread
+
+#define THREAD_FORCE_KILL_SUPPORTED
 #endif
 
 constexpr std::chrono::seconds kShutdownDelay(5);
@@ -26,6 +34,7 @@ void ThreadManager::destroy() {
     stopSource.request_stop();
     LOG(INFO) << "Requested stop, now waiting...";
 
+#ifdef THREAD_FORCE_KILL_SUPPORTED
     std::condition_variable condvar;
     std::mutex mutex;
     std::unique_lock<std::mutex> lock(mutex);
@@ -38,7 +47,11 @@ void ThreadManager::destroy() {
 #ifdef _POSIX_C_SOURCE
                 pthread_kill(thread.second->threadP.native_handle(), SIGUSR1);
 #endif
+#ifdef _WIN32
+                TerminateThread(thread.second->threadP.native_handle(), 0);
+#endif
             }
         }
     }
+#endif
 }
