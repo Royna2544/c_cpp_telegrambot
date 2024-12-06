@@ -114,7 +114,7 @@ DeferredExit ROMBuildTask::runFunction() {
         }
     }
     if (ec && ec != std::make_error_code(std::errc::no_such_file_or_directory)) {
-        LOG(WARNING) << "Cannot open out directory for artifact cleanup";
+        LOG(WARNING) << "Cannot open out directory: " << artifactDir;
     }
 
     std::string_view kBuildVariant;
