@@ -46,6 +46,11 @@ set(SANITIZER_FLAG)
 
 if (NOT SANITIZER_CONFIG)
     message(STATUS "No sanitizers enabled")
+elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
+    message(STATUS "Disabling sanitizers as release build")
+# MSYS2 is special - They don't have any sanitizers
+elseif (MINGW OR MSYS)
+    message(STATUS "MSYS2 detected - Disabling sanitizers")
 elseif (SANITIZER_CONFIG STREQUAL "ASan")
     message(STATUS "Address sanitizer enabled")
     if (APPLE) # On apple, leak sanitizer is not implemented
@@ -77,15 +82,6 @@ elseif (SANITIZER_CONFIG STREQUAL "MSan")
     endif()
 else()
     message(WARNING "Unknown sanitizer configuration: ${SANITIZER_CONFIG}")
-endif()
-if (CMAKE_BUILD_TYPE STREQUAL "Release")
-    message(STATUS "Disabling sanitizers as release build")
-    unset(SANITIZER_FLAG)
-endif()
-# MSYS2 is special - They don't have any sanitizers
-if (MINGW OR MSYS)
-    message(STATUS "MSYS2 detected - Disabling sanitizers")
-    unset(SANITIZER_FLAG)
 endif()
 
 # Define a macro to add sanitizers to a target.
