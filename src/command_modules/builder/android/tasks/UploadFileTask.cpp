@@ -37,7 +37,7 @@ DeferredExit UploadFileTask::runFunction() {
     for (const auto& it : std::filesystem::directory_iterator(dir)) {
         if (it.is_regular_file()) {
             auto file = it.path();
-            if ((*matcher)(file.filename().string())) {
+            if (matcher->match(file.filename().string())) {
                 LOG(INFO) << "zipFile=" << file.string();
                 zipFilePath = std::move(file);
                 break;
@@ -50,7 +50,7 @@ DeferredExit UploadFileTask::runFunction() {
         // Iterate over and print debug info.
         for (const auto& it : std::filesystem::directory_iterator(dir)) {
             if (it.is_regular_file()) {
-                (*matcher)(it.path().filename().string(), true);
+                (void)matcher->match(it.path().filename().string(), true);
             } else {
                 DLOG(INFO) << "Not a file: " << it.path();
             }

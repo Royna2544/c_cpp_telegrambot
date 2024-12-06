@@ -95,6 +95,28 @@ DeferredExit ROMBuildTask::runFunction() {
         return DeferredExit::generic_fail;
     }
 
+    // Clean artifacts if exists on out directory.
+    std::error_code ec;
+    auto artifactDir = std::filesystem::path() / "out" / "target" / "product" /
+                       data.device->codename;
+    for (const auto& it :
+         std::filesystem::directory_iterator(artifactDir, ec)) {
+        std::error_code inner_ec;
+        if (data.localManifest->rom->romInfo->artifact->match(it.path().string())) {
+            std::filesystem::remove(it.path(), inner_ec);
+            if (inner_ec) {
+                LOG(ERROR) << fmt::format("Error removing {}: {}",
+                                          it.path().string(),
+                                          inner_ec.message());
+            } else {
+                LOG(INFO) << "Removed: " << it.path().string();
+            }
+        }
+    }
+    if (ec && ec != std::make_error_code(std::errc::no_such_file_or_directory)) {
+        LOG(WARNING) << "Cannot open out directory for artifact cleanup";
+    }
+
     std::string_view kBuildVariant;
     switch (data.variant) {
         case PerBuildData::Variant::kUser:

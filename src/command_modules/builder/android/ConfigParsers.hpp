@@ -31,8 +31,8 @@ class ConfigParser {
         std::string data_;
 
        public:
-        bool operator()(std::string_view filename,
-                        const bool debug = false) const {
+        [[nodiscard]] bool match(std::string_view filename,
+                                 const bool debug = false) const {
             return matcher_(filename, data_, debug);
         }
         bool operator==(const ArtifactMatcher &other) const {
@@ -175,7 +175,8 @@ class ConfigParser {
     bool merge();
 
     // Get available devices from config
-    [[nodiscard]] std::vector<ConfigParser::LocalManifest::Ptr> manifests() const;
+    [[nodiscard]] std::vector<ConfigParser::LocalManifest::Ptr> manifests()
+        const;
 
    private:
     std::vector<LocalManifest::Ptr> parsedManifests;
