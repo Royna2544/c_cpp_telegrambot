@@ -102,7 +102,8 @@ DeferredExit ROMBuildTask::runFunction() {
     for (const auto& it :
          std::filesystem::directory_iterator(artifactDir, ec)) {
         std::error_code inner_ec;
-        if (data.localManifest->rom->romInfo->artifact->match(it.path().string())) {
+        if (data.localManifest->rom->romInfo->artifact->match(
+                it.path().string())) {
             std::filesystem::remove(it.path(), inner_ec);
             if (inner_ec) {
                 LOG(ERROR) << fmt::format("Error removing {}: {}",
@@ -113,7 +114,8 @@ DeferredExit ROMBuildTask::runFunction() {
             }
         }
     }
-    if (ec && ec != std::make_error_code(std::errc::no_such_file_or_directory)) {
+    if (ec &&
+        ec != std::make_error_code(std::errc::no_such_file_or_directory)) {
         LOG(WARNING) << "Cannot open out directory: " << artifactDir;
     }
 
@@ -193,7 +195,6 @@ void ROMBuildTask::handleStdoutData(ForkAndRun::BufferViewType buffer) {
         if (ofs) {
             ofs << buffer.data();
         }
-        builder.addKeyboard({"Cancel", "cancel"});
     }
 
     if (clock + std::chrono::minutes(1) < now) {
@@ -283,6 +284,7 @@ ROMBuildTask::ROMBuildTask(TgBotApi::Ptr api, TgBot::Message::Ptr message,
         TgBotApi::InlineQuery{"rombuild status", "See the ROM build progress",
                               "rombuild", false, true},
         romBuildArticle);
+    builder.addKeyboard({"Cancel", "cancel"});
 }
 
 ROMBuildTask::~ROMBuildTask() {
