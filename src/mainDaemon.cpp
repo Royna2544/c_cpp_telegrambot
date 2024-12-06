@@ -133,6 +133,11 @@ redo_vfork:
             if (WIFEXITED(status)) {
                 LOG(INFO) << fmt::format("Child process exited with status: {}",
                                          WEXITSTATUS(status));
+                if (WEXITSTATUS(status) ==
+                    std::numeric_limits<std::uint8_t>::max()) {
+                    LOG(INFO) << "execve has failed, exiting the daemon process";
+                    return EXIT_SUCCESS;
+                }
             } else if (WIFSIGNALED(status)) {
                 LOG(INFO) << fmt::format(
                     "Child process terminated by signal: {}", WTERMSIG(status));
