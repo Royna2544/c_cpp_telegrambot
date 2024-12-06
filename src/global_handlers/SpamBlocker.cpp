@@ -12,6 +12,73 @@
 
 #include "Types.h"
 
+// Describing a SpamBlockDetector.
+class Matcher {
+   public:
+    virtual ~Matcher() = default;
+
+    // Describes threshold for spam detection.
+    // Need to be redeclared in the child scope.
+    static constexpr int kThreshold = 0;
+
+    // Declares the name of this Matcher.
+    // Need to be redeclared in the child scope.
+    static constexpr std::string_view name{};
+
+    // Returns the count of messages per user, that matches the criteria.
+    static int count(
+        const SpamBlockBase::UserMessagesMap::const_iterator entry) {
+        return 0;
+    }
+
+    template <std::derived_from<Matcher> T>
+    static bool detect(
+        const SpamBlockBase::UserMessagesMap::const_iterator entry) {
+        static_assert(!T::name.empty(), "Must have a name");
+        static_assert(T::kThreshold != 0, "Threshold must be positive");
+        int count = T::count(entry);
+        if (count >= T::kThreshold) {
+            LOG(INFO) << fmt::format(
+                "Detected: {} Value {} is over threshold {}", T::name, count,
+                T::kThreshold);
+        }
+        return count >= T::kThreshold;
+    }
+};
+
+class SameMessageMatcher : public Matcher {
+   public:
+    static constexpr int kThreshold = 3;
+    static constexpr std::string_view name = "SameMessageMatcher";
+    static int count(
+        const SpamBlockBase::UserMessagesMap::const_iterator entry) {
+        std::unordered_map<std::string, int> kSameMessageMap;
+        for (const auto &elem : entry->second) {
+            const auto &[id, content] = elem;
+            if (!kSameMessageMap.contains(content)) {
+                kSameMessageMap[content] = 1;
+            } else {
+                ++kSameMessageMap[content];
+            }
+        }
+        return std::ranges::max_element(kSameMessageMap,
+                                        [](const auto &smsg, const auto &rmsg) {
+                                            return smsg.second > rmsg.second;
+                                        })
+            ->second;
+    }
+};
+
+class MessageCountMatcher : public Matcher {
+   public:
+    static constexpr int kThreshold = 5;
+    static constexpr std::string_view name = "MessageCountMatcher";
+    static int count(
+        const SpamBlockBase::UserMessagesMap::const_iterator entry) {
+        return static_cast<int>(entry->second.size());
+    }
+};
+
 void SpamBlockBase::onDetected(ChatId chat, UserId user,
                                std::vector<MessageId> /*messageIds*/) const {
     LOG(INFO) << fmt::format("Spam detected for chat {}, by user {}",
@@ -75,9 +142,10 @@ void SpamBlockBase::consumeAndDetect() {
         }
     }
     chat_messages_data.clear();
+    chat_messages_count = 0;
 }
 
-void SpamBlockBase::addMessage(Message::Ptr message) {
+void SpamBlockBase::addMessage(const Message::Ptr &message) {
     // Always ignore when spamblock is off
     if (_config == Config::OFF) {
         return;
@@ -112,5 +180,6 @@ void SpamBlockBase::addMessage(Message::Ptr message) {
         chat_messages_data[chatId][userId].emplace_back(messageId, messageData);
         chat_map[chatId] = message->chat;
         user_map[userId] = message->from;
+        chat_messages_count++;
     }
 }
