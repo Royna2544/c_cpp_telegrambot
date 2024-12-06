@@ -96,6 +96,7 @@ static void cleanup_resources(struct popen_wdt_posix_priv *pdata,
         if (pdata->startup_sem) {
             rk_sema_destroy(pdata->startup_sem);
         }
+        pthread_cond_destroy(&pdata->condition);
         pthread_mutex_destroy(&pdata->wdt_mutex);
         free(pdata);
     }
@@ -278,6 +279,7 @@ popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t **data_in) {
     }
     close(pdata->pipefd_r);
     pthread_mutex_unlock(&pdata->wdt_mutex);
+    pthread_cond_destroy(&pdata->condition);
     pthread_mutex_destroy(&pdata->wdt_mutex);
     free(pdata);
     free(data);
