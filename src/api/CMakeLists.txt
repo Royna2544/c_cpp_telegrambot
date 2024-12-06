@@ -5,6 +5,7 @@ add_my_library(
     TgBotApiImpl.cpp
     CommandModule.cpp
     MessageExt.cpp
+    RateLimit.cpp
   LIBS DBImpl ${CMAKE_DL_LIBS} StringRes TgBot
   STATIC
 )

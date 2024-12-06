@@ -16,6 +16,7 @@
 #include "CommandModule.hpp"
 #include "MessageExt.hpp"
 #include "Providers.hpp"
+#include "RateLimit.hpp"
 #include "TgBotApi.hpp"
 #include "api/components/FileCheck.hpp"
 
@@ -484,4 +485,5 @@ class TgBotApiImpl : public TgBotApi {
     StringResLoaderBase* _loader;
     Providers* _provider;
     std::vector<CommandListener*> _listeners;
+    IntervalRateLimiter _rateLimiter;
 };

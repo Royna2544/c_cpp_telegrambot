@@ -24,6 +24,7 @@
 #include <api/components/Restart.hpp>
 #include <api/components/UnknownCommand.hpp>
 #include <array>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -159,6 +160,11 @@ void TgBotApiImpl::commandHandler(const std::string& command,
     }
 
     if (!authorized(ext.get(), command, authflags)) {
+        return;
+    }
+
+    if (!_rateLimiter.check()) {
+        LOG(INFO) << fmt::format("Ratelimiting user {}", ext->get<MessageAttrs::User>());
         return;
     }
 
@@ -557,7 +563,8 @@ TgBotApiImpl::TgBotApiImpl(const std::string_view token, AuthContext* auth,
     : _bot(std::string(token), std::make_unique<TgBot::CurlHttpClient>(30)),
       _auth(auth),
       _loader(loader),
-      _provider(providers) {
+      _provider(providers),
+      _rateLimiter(2, std::chrono::seconds(3)) {
     globalLinkOptions = std::make_shared<TgBot::LinkPreviewOptions>();
     globalLinkOptions->isDisabled = true;
     // Register -> onUnknownCommand
