@@ -103,7 +103,7 @@ DeferredExit ROMBuildTask::runFunction() {
          std::filesystem::directory_iterator(artifactDir, ec)) {
         std::error_code inner_ec;
         if (data.localManifest->rom->romInfo->artifact->match(
-                it.path().string())) {
+                it.path().filename().string())) {
             std::filesystem::remove(it.path(), inner_ec);
             if (inner_ec) {
                 LOG(ERROR) << fmt::format("Error removing {}: {}",
