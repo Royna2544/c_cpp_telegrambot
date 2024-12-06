@@ -26,7 +26,6 @@ void TgBotApiImpl::OnCallbackQueryImpl::onUnload(
         if (it->first == command) {
             DLOG(INFO) << "Removing callback query handler for " << command;
             listeners.erase(it);
-            break;
         }
     }
 }

@@ -58,7 +58,6 @@ void TgBotApiImpl::OnInlineQueryImpl::onUnload(const std::string_view command) {
         if (it->first.name == command) {
             DLOG(INFO) << "Removing inline query handler for " << command;
             queryResults.erase(it);
-            break;
         }
     }
 }
