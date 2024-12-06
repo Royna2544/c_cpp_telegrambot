@@ -94,7 +94,7 @@ endfunction()
 
 ## Compiler specific settings
 set(GLOBAL_COMPILE_OPTIONS)
-set(GLOBAL_DEFINITIONS -D__TGBOT__)
+set(GLOBAL_DEFINITIONS __TGBOT__)
 set(GLOBAL_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/src/include ${CMAKE_SOURCE_DIR}/src/)
 
 # Test proper c++20 jthread, stop_token
@@ -140,6 +140,7 @@ if (WIN32)
   list(APPEND GLOBAL_DEFINITIONS _WIN32_WINNT=0x0A00)
   if (MSVC)
     list(APPEND GLOBAL_COMPILE_OPTIONS /utf-8)
+    list(APPEND GLOBAL_DEFINITIONS NOMINMAX)
   endif()
 endif()
 if (NOT MSVC)
