@@ -28,7 +28,7 @@ void SpamBlockManager::onDetected(ChatId chat, UserId user,
                                   std::vector<MessageId> messageIds) const {
     // Initial set - all false set
     static auto perms = std::make_shared<TgBot::ChatPermissions>();
-    switch (_config) {
+    switch (getConfig()) {
         case Config::PURGE_AND_MUTE:
             LOG(INFO) << fmt::format("Try mute offending user");
             try {

@@ -105,6 +105,7 @@ struct SpamBlockBase {
 
     // Set the SpamBlock config. Based on SpamBlockBase::Config.
     virtual void setConfig(Config config);
+    Config getConfig() const { return _config; }
 
     // Function called when the SpamBlock framework detects spamming user.
     // Arguments passed: ChatId, UserId, Offending messageIds
@@ -118,6 +119,8 @@ struct SpamBlockBase {
     void consumeAndDetect();
 
    private:
+    Config _config = Config::PURGE;
+
     std::unordered_map<ChatId, UserMessagesMap> chat_messages_data;
 
     // Cache these for easy lookup
@@ -125,6 +128,4 @@ struct SpamBlockBase {
     std::unordered_map<UserId, User::Ptr> user_map;
 
     mutable std::mutex mutex;  // Protect above maps
-   protected:
-    Config _config = Config::PURGE;
 };
