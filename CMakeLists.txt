@@ -122,6 +122,8 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
        list(APPEND GLOBAL_COMPILE_OPTIONS -fexperimental-library)
        message(STATUS "Using experimental library")
     endif()
+    unset(CMAKE_REQUIRED_FLAGS)
+    unset(CMAKE_TRY_COMPILE_TARGET_TYPE)
   endif()
 endif()
 
