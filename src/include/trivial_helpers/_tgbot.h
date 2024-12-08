@@ -47,6 +47,9 @@ struct fmt::formatter<Chat::Ptr> : formatter<std::string> {
             case Chat::Type::Supergroup:
                 return fmt::format_to(ctx.out(), "Group ({})",
                                       chat->title.value_or("unknown"));
+            case Chat::Type::Group:
+                return fmt::format_to(ctx.out(), "Private Group (id: {})",
+                                      chat->id);
             default:
                 return fmt::format_to(ctx.out(), "Unknown chat");
         }
