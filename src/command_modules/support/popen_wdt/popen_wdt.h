@@ -22,8 +22,10 @@ typedef uint8_t popen_watchdog_exit_code_t;
 #define POPEN_WDT_DEFAULT_SHELL "powershell.exe"
 #elif __APPLE__
 #define POPEN_WDT_DEFAULT_SHELL "zsh"
-#elif defined _POSIX_C_SOURCE
+#elif defined _POSIX_C_SOURCE || defined __ANDROID__
 #define POPEN_WDT_DEFAULT_SHELL "bash"
+#else
+#error "Unsupported platform"
 #endif
 
 // Default sleep seconds if not specified.
