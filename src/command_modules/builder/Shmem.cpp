@@ -9,7 +9,7 @@
 
 AllocatedShmem::AllocatedShmem(const std::string_view& path, off_t size) {
     void* ptr = nullptr;
-    int fd = shm_open(path.data(), O_CREAT | O_RDWR, 0666);
+    int fd = shm_open(path.data(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
     if (fd == -1) {
         PLOG(ERROR) << "shm_open failed";
         throw syscall_perror("shm_open");
