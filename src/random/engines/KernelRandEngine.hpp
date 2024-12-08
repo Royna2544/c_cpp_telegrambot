@@ -32,7 +32,7 @@ struct kernel_rand_engine {
     }
     kernel_rand_engine() { isSupported(); }
     ~kernel_rand_engine() { closeFd(fd); }
-    kernel_rand_engine(kernel_rand_engine&& other) : fd(other.fd) {
+    kernel_rand_engine(kernel_rand_engine&& other) noexcept : fd(other.fd) {
         other.fd = -1;
     }
 
@@ -41,9 +41,9 @@ struct kernel_rand_engine {
         static std::once_flag once;
 
         std::call_once(once, [this] {
-            int ret = 0;
+            ssize_t ret = 0;
             for (const auto& n : nodes) {
-                fd = open(n.c_str(), O_RDONLY);
+                fd = open(n.data(), O_RDONLY);
                 if (!isValidFd(fd)) {
                     PLOG(ERROR)
                         << "Opening node " << std::quoted(n) << " failed";
@@ -68,7 +68,7 @@ struct kernel_rand_engine {
     }
 
    private:
-    static const inline std::array<std::string, 2> nodes = {
+    static const inline std::array<std::string_view, 2> nodes = {
 #ifdef __linux__
         // Linux 4.16 or below
         "/dev/hw_random",
