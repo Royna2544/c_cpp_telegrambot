@@ -119,7 +119,7 @@ TgBotApiImpl::ChatJoinRequestImpl::ChatJoinRequestImpl(TgBotApiImpl::Ptr api)
                 LOG(ERROR) << "Error in onChatJoinRequest: " << ex.what();
             }
         });
-    _api->onCallbackQuery("__builtin_chatjoinreq_handler__",
+    _api->onCallbackQuery("[builtin::ChatJoinRequest]",
                           [this](const TgBot::CallbackQuery::Ptr& query) {
                               onCallbackQueryFunction(query);
                           });

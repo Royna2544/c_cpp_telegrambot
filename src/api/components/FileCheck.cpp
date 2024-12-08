@@ -65,8 +65,8 @@ struct VirusTotalResult {
 template <>
 struct fmt::formatter<EngineResult::Category> : formatter<string_view> {
     // parse is inherited from formatter<string_view>.
-    auto format(const EngineResult::Category &c,
-                format_context &ctx) const -> format_context::iterator {
+    auto format(const EngineResult::Category &c, format_context &ctx) const
+        -> format_context::iterator {
         std::string_view category = "unknown";
         switch (c) {
             case EngineResult::Category::confirmed_timeout:
@@ -486,7 +486,8 @@ TgBotApi::AnyMessageResult FileCheck::onAnyMessage(
     std::optional<GetAnalysisAPI::return_type> analysisResult;
     int count = 0;
     constexpr int kAnalysisRetryCount = 10;
-    while (!analysisResult && count < kAnalysisRetryCount && !SignalHandler::isSignaled()) {
+    while (!analysisResult && count < kAnalysisRetryCount &&
+           !SignalHandler::isSignaled()) {
         LOG(INFO) << "Getting analysis results";
         auto analfut = getAnalysis.request(sendFileProcRes.value());
         if (!analfut) {
@@ -563,9 +564,10 @@ void FileCheck::onCallbackQueryFunction(
 FileCheck::FileCheck(TgBotApi::Ptr api, std::string virusTotalToken)
     : _token(std::move(virusTotalToken)), _api(api) {
     api->onAnyMessage([this](TgBotApi::CPtr api, Message::Ptr message) {
-        return onAnyMessage(api, std::make_unique<MessageExt>(std::move(message)).get());
+        return onAnyMessage(
+            api, std::make_unique<MessageExt>(std::move(message)).get());
     });
-    api->onCallbackQuery("__builtin_filecheck_handler__",
+    api->onCallbackQuery("[builtin::FileCheck]",
                          [this](const TgBot::CallbackQuery::Ptr &query) {
                              onCallbackQueryFunction(query);
                          });
