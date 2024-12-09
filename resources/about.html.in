@@ -11,7 +11,7 @@ Hi! I'm <a href="https://t.me/_botusername_">_botname_</a>
 - Host OS: @CMAKE_SYSTEM_NAME@
 - C Compiler: @CMAKE_C_COMPILER@ v@CMAKE_C_COMPILER_VERSION@
 - CXX Compiler: @CMAKE_CXX_COMPILER@ v@CMAKE_CXX_COMPILER_VERSION@
-- Date: @TODAY@</blockquote>
+- Build Date: @TODAY@</blockquote>
 <blockquote><b>GIT INFO</b>:
-- Commit-Id: _commitid_
-- Commit-Msg: _commitmsg_</blockquote>
+- Commit-Id: @GIT_COMMIT_ID@
+- Commit-Msg: @GIT_COMMIT_MESSAGE@</blockquote>

@@ -7,7 +7,7 @@
 #include <Authorization.hpp>
 #include <CommandLine.hpp>
 #include <ConfigManager.hpp>
-#include <GitData.hpp>
+#include <GitBuildInfo.hpp>
 #include <StringResLoader.hpp>
 #include <api/CommandModule.hpp>
 #include <api/MessageExt.hpp>
@@ -164,7 +164,8 @@ void TgBotApiImpl::commandHandler(const std::string& command,
     }
 
     if (!_rateLimiter.check()) {
-        LOG(INFO) << fmt::format("Ratelimiting user {}", ext->get<MessageAttrs::User>());
+        LOG(INFO) << fmt::format("Ratelimiting user {}",
+                                 ext->get<MessageAttrs::User>());
         return;
     }
 
@@ -232,14 +233,8 @@ void TgBotApiImpl::startPoll() {
     // Deleting webhook
     getApi().deleteWebhook();
 
-    std::string sourceString;
-    GitData data;
-    if (GitData::Fill(&data)) {
-        sourceString = fmt::format(", sources: {}", data.originurl);
-    }
-
-    getApi().setMyDescription(
-        fmt::format("A C++ written Telegram bot{}", sourceString));
+    getApi().setMyDescription(fmt::format(
+        "A C++ written Telegram bot, sources: {}", git::buildinfo::ORIGIN_URL));
 
     std::string ownerString;
     if (auto owner = _provider->database->getOwnerUserId(); owner) {
@@ -560,7 +555,8 @@ bool TgBotApiImpl::answerCallbackQuery_impl(
 
 TgBotApiImpl::TgBotApiImpl(const std::string_view token, AuthContext* auth,
                            StringResLoaderBase* loader, Providers* providers)
-    : _bot(std::string(token), std::make_unique<TgBot::CurlHttpClient>(std::chrono::seconds(30))),
+    : _bot(std::string(token),
+           std::make_unique<TgBot::CurlHttpClient>(std::chrono::seconds(30))),
       _auth(auth),
       _loader(loader),
       _provider(providers),

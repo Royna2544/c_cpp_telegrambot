@@ -5,7 +5,7 @@
 #include <tgbot/TgException.h>
 #include <trivial_helpers/_tgbot.h>
 
-#include <GitData.hpp>
+#include <GitBuildInfo.hpp>
 #include <api/CommandModule.hpp>
 #include <api/Providers.hpp>
 #include <api/TgBotApi.hpp>
@@ -20,19 +20,11 @@ DECLARE_COMMAND_HANDLER(alive) {
 
     std::call_once(once, [provider, api] {
         std::string _version;
-        GitData data;
-
-        GitData::Fill(&data);
         _version = provider->resource->get("about.html");
-
-        std::vector<std::string> splitMsg =
-            absl::StrSplit(data.commitmsg, '\n');
 
         // Replace placeholders in the version string with actual values.
         version = absl::StrReplaceAll(
-            _version, {{"_commitid_", data.commitid},
-                       {"_commitmsg_", splitMsg.front()},
-                       {"_botname_", api->getBotUser()->firstName},
+            _version, {{"_botname_", api->getBotUser()->firstName},
                        {"_botusername_",
                         api->getBotUser()->username.value_or("unknown")}});
     });

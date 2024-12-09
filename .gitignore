@@ -18,6 +18,7 @@ libTgBot*.so
 # Generated
 resources/scripts/git-askpass.sh
 resources/about.html
+src/include/GitBuildInfo.hpp
 __pycache__
 
 # Visual studio code
