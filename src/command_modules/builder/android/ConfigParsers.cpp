@@ -681,6 +681,16 @@ bool exactMatcher(std::string_view filename, std::string_view prefix,
     }
     return filename == prefix;
 }
+
+bool containsMatcher(std::string_view filename, std::string_view prefix,
+                     const bool debug) {
+    if (debug) {
+        LOG(INFO) << fmt::format(
+            "ContainsMatcher: Checking if '{}' contains '{}'", filename,
+            prefix);
+    }
+    return filename.find(prefix) != std::string::npos;
+}
 }  // namespace
 
 ConfigParser::ConfigParser(std::filesystem::path jsonFileDir)
@@ -688,6 +698,7 @@ ConfigParser::ConfigParser(std::filesystem::path jsonFileDir)
     // Add default matchers
     storage.add("ZipFilePrefixer", zipFilePrefixer);
     storage.add("ExactMatcher", exactMatcher);
+    storage.add("ContainsMatcher", containsMatcher);
 
     // Load files
     LOG(INFO) << "Loading JSON files from directory: " << _jsonFileDir;

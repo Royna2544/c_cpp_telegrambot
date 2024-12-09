@@ -78,5 +78,20 @@
                 "branch": "fourteen"
             }
         ]
+    },
+    {
+        "name": "HentaiOS",
+        "link": "https://github.com/hentaiOS/platform_manifest",
+        "target": "otapackage",
+        "artifact": {
+            "matcher": "ContainsMatcher",
+            "data": "ota"
+        },
+        "branches": [
+            {
+                "android_version": 15,
+                "branch": "Vallhound"
+            }
+        ]
     }
 ]
