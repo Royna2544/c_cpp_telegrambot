@@ -70,9 +70,7 @@ SQLiteDatabase::Helper::Helper(sqlite3* db,
     int ret = 0;
 
     if (!sqlFile.is_open()) {
-        LOG(ERROR) << "Could not open SQL script file: " << filename;
-        throw std::runtime_error("Could not open SQL script file: " +
-                                 std::string(filename));
+        throw exception(fmt::format("Could not open SQL script file: {}", filename));
     }
     scriptContent = std::string((std::istreambuf_iterator<char>(sqlFile)),
                                 std::istreambuf_iterator<char>());

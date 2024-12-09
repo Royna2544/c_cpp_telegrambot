@@ -52,7 +52,12 @@ bool TgBotDatabaseImpl::load(std::filesystem::path filepath) {
         return false;
     }
 
-    loaded = _databaseImpl->load(filepath);
+    try {
+        loaded = _databaseImpl->load(filepath);
+    } catch (const std::exception& ex) {
+        LOG(ERROR) << "Failed to load database: " << ex.what();
+        return false;
+    }
     return loaded;
 }
 
@@ -74,7 +79,12 @@ DatabaseBase::ListResult TgBotDatabaseImpl::addUserToList(
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return DatabaseBase::ListResult::BACKEND_ERROR;
     }
-    return _databaseImpl->addUserToList(type, user);
+    try {
+        return _databaseImpl->addUserToList(type, user);
+    } catch (const exception& ex) {
+        LOG(ERROR) << "Failed to add user to list: " << ex.what();
+        return DatabaseBase::ListResult::BACKEND_ERROR;
+    }
 }
 
 DatabaseBase::ListResult TgBotDatabaseImpl::removeUserFromList(
@@ -83,7 +93,12 @@ DatabaseBase::ListResult TgBotDatabaseImpl::removeUserFromList(
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return DatabaseBase::ListResult::BACKEND_ERROR;
     }
-    return _databaseImpl->removeUserFromList(type, user);
+    try {
+        return _databaseImpl->removeUserFromList(type, user);
+    } catch (const exception& e) {
+        LOG(ERROR) << "Failed to remove user from list: " << e.what();
+        return DatabaseBase::ListResult::BACKEND_ERROR;
+    }
 }
 
 DatabaseBase::ListResult TgBotDatabaseImpl::checkUserInList(
@@ -92,7 +107,12 @@ DatabaseBase::ListResult TgBotDatabaseImpl::checkUserInList(
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return DatabaseBase::ListResult::BACKEND_ERROR;
     }
-    return _databaseImpl->checkUserInList(type, user);
+    try {
+        return _databaseImpl->checkUserInList(type, user);
+    } catch (const exception& ex) {
+        LOG(ERROR) << "Failed to check user in list: " << ex.what();
+        return DatabaseBase::ListResult::BACKEND_ERROR;
+    }
 }
 
 std::optional<UserId> TgBotDatabaseImpl::getOwnerUserId() const {
@@ -100,7 +120,12 @@ std::optional<UserId> TgBotDatabaseImpl::getOwnerUserId() const {
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return std::nullopt;
     }
-    return _databaseImpl->getOwnerUserId();
+    try {
+        return _databaseImpl->getOwnerUserId();
+    } catch (const exception& ex) {
+        LOG(ERROR) << "Failed to get owner user ID: " << ex.what();
+        return std::nullopt;
+    }
 }
 
 std::optional<DatabaseBase::MediaInfo> TgBotDatabaseImpl::queryMediaInfo(
@@ -109,7 +134,12 @@ std::optional<DatabaseBase::MediaInfo> TgBotDatabaseImpl::queryMediaInfo(
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return std::nullopt;
     }
-    return _databaseImpl->queryMediaInfo(str);
+    try {
+        return _databaseImpl->queryMediaInfo(str);
+    } catch (const exception& ex) {
+        LOG(ERROR) << "Failed to query media info: " << ex.what();
+        return std::nullopt;
+    }
 }
 
 TgBotDatabaseImpl::AddResult TgBotDatabaseImpl::addMediaInfo(
@@ -118,7 +148,12 @@ TgBotDatabaseImpl::AddResult TgBotDatabaseImpl::addMediaInfo(
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return AddResult::BACKEND_ERROR;
     }
-    return _databaseImpl->addMediaInfo(info);
+    try {
+        return _databaseImpl->addMediaInfo(info);
+    } catch (const exception& ex) {
+        LOG(ERROR) << "Failed to add media info: " << ex.what();
+        return AddResult::BACKEND_ERROR;
+    }
 }
 
 std::vector<TgBotDatabaseImpl::MediaInfo> TgBotDatabaseImpl::getAllMediaInfos()
@@ -127,7 +162,12 @@ std::vector<TgBotDatabaseImpl::MediaInfo> TgBotDatabaseImpl::getAllMediaInfos()
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return {};
     }
-    return _databaseImpl->getAllMediaInfos();
+    try {
+        return _databaseImpl->getAllMediaInfos();
+    } catch (const exception &ex) {
+        LOG(ERROR) << "Failed to get all media infos: " << ex.what();
+        return {};
+    }
 }
 
 std::ostream& TgBotDatabaseImpl::dump(std::ostream& ofs) const {
@@ -135,7 +175,12 @@ std::ostream& TgBotDatabaseImpl::dump(std::ostream& ofs) const {
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return ofs;
     }
-    return _databaseImpl->dump(ofs);
+    try {
+        return _databaseImpl->dump(ofs);
+    } catch (const std::exception& ex) {
+        LOG(ERROR) << "Failed to dump database: " << ex.what();
+        return ofs;
+    }
 }
 
 void TgBotDatabaseImpl::setOwnerUserId(const UserId user) const {
@@ -143,7 +188,11 @@ void TgBotDatabaseImpl::setOwnerUserId(const UserId user) const {
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return;
     }
-    _databaseImpl->setOwnerUserId(user);
+    try {
+        _databaseImpl->setOwnerUserId(user);
+    } catch (const exception &e) {
+        LOG(ERROR) << "Failed to set owner user ID: " << e.what();
+    }
 }
 
 TgBotDatabaseImpl::AddResult TgBotDatabaseImpl::addChatInfo(
@@ -152,7 +201,12 @@ TgBotDatabaseImpl::AddResult TgBotDatabaseImpl::addChatInfo(
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return AddResult::BACKEND_ERROR;
     }
-    return _databaseImpl->addChatInfo(chatid, name);
+    try {
+        return _databaseImpl->addChatInfo(chatid, name);
+    } catch (const exception& ex) {
+        LOG(ERROR) << "Failed to add chat info: " << ex.what();
+        return AddResult::BACKEND_ERROR;
+    }
 }
 
 std::optional<ChatId> TgBotDatabaseImpl::getChatId(
@@ -161,7 +215,12 @@ std::optional<ChatId> TgBotDatabaseImpl::getChatId(
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return std::nullopt;
     }
-    return _databaseImpl->getChatId(name);
+    try {
+        return _databaseImpl->getChatId(name);
+    } catch (const exception& ex) {
+        LOG(ERROR) << "Failed to get chat ID: " << ex.what();
+        return std::nullopt;
+    }
 }
 
 TgBotDatabaseImpl::Providers::Providers(CommandLine* cmdline) {

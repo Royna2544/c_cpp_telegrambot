@@ -12,6 +12,10 @@
 
 struct DBImpl_API DatabaseBase {
     virtual ~DatabaseBase() = default;
+    
+    struct DBImpl_API exception : public std::runtime_error {
+        using std::runtime_error::runtime_error;
+    };
 
     static constexpr std::string_view kInMemoryDatabase = ":memory:";
 
