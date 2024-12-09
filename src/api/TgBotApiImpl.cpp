@@ -560,7 +560,7 @@ bool TgBotApiImpl::answerCallbackQuery_impl(
 
 TgBotApiImpl::TgBotApiImpl(const std::string_view token, AuthContext* auth,
                            StringResLoaderBase* loader, Providers* providers)
-    : _bot(std::string(token), std::make_unique<TgBot::CurlHttpClient>(30)),
+    : _bot(std::string(token), std::make_unique<TgBot::CurlHttpClient>(std::chrono::seconds(30))),
       _auth(auth),
       _loader(loader),
       _provider(providers),

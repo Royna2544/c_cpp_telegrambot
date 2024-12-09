@@ -40,6 +40,7 @@
 #include <ml/ChatDataCollector.hpp>
 #include <restartfmt_parser.hpp>
 #include <stdexcept>
+#include <thread>
 #include <trivial_helpers/fruit_inject.hpp>
 #include <utility>
 #include <vector>
@@ -569,8 +570,6 @@ int main(int argc, char** argv) {
     LOG(INFO) << "Subsystems initialized, bot started: " << argv[0];
     LOG(INFO) << fmt::format("Starting took {}", startupDp.get());
 
-    using NetworkException = boost::wrapexcept<boost::system::system_error>;
-
     try {
         api->addInlineQueryKeyboard(
             TgBotApi::InlineQuery{"media",
@@ -582,7 +581,7 @@ int main(int argc, char** argv) {
                 -> std::vector<TgBot::InlineQueryResult::Ptr> {
                 return mediaQueryKeyboardFunction(database, x);
             });
-    } catch (const NetworkException& e) {
+    } catch (const TgBot::NetworkException& e) {
         LOG(ERROR) << "Network error: " << e.what();
         return EXIT_FAILURE;
     }
@@ -592,17 +591,13 @@ int main(int argc, char** argv) {
             api->startPoll();
         } catch (const TgBot::TgException& e) {
             exHandle->handle(e);
-        } catch (const NetworkException& e) {
+        } catch (const TgBot::NetworkException& e) {
             LOG(ERROR) << "Network error: " << e.what();
             if (!SignalHandler::isSignaled()) {
                 LOG(INFO) << "Sleeping for a minute...";
                 std::this_thread::sleep_for(std::chrono::minutes(1));
             }
         } catch (const std::exception& e) {
-            if (std::string_view(e.what()).starts_with("cURL")) {
-                LOG(WARNING) << "cURL error: " << e.what();
-                continue;
-            }
             LOG(ERROR) << "Uncaught Exception: " << e.what();
             break;
         }
