@@ -123,7 +123,7 @@ bool Context::Local::connect(const RemoteEndpoint& endpoint) {
 Context::RemoteEndpoint Context::Local::remoteAddress() const {
     // For local sockets, the remote endpoint may not be available
     // We can return the path of the socket
-    return {endpoint_.path(), 0};
+    return {.address=endpoint_.path(), .port=0};
 }
 
 bool Context::Local::abortConnections() {

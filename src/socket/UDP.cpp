@@ -107,7 +107,7 @@ bool Context::UDP::connect(const RemoteEndpoint& endpoint) {
 
 Context::RemoteEndpoint Context::UDP::remoteAddress() const {
     try {
-        return {endpoint_.address().to_string(), endpoint_.port()};
+        return {.address=endpoint_.address().to_string(), .port=endpoint_.port()};
     } catch (const boost::system::system_error& e) {
         LOG(ERROR) << "UDP::remoteAddress: " << e.what();
         return {};

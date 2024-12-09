@@ -187,7 +187,7 @@ bool Context::TCP::connect(const RemoteEndpoint& endpoint) {
 Context::RemoteEndpoint Context::TCP::remoteAddress() const {
     try {
         auto remote_ep = socket_.remote_endpoint();
-        return {remote_ep.address().to_string(), remote_ep.port()};
+        return {.address=remote_ep.address().to_string(), .port=remote_ep.port()};
     } catch (const boost::system::system_error& e) {
         LOG(ERROR) << "TCP::remoteAddress: " << e.what();
         return {};
