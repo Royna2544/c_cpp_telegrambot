@@ -569,6 +569,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
             LOG(ERROR) << "Failed to unpin message: " << e.what();
         }
     }
+    sentMessage = nullptr; // Clear the message out.
 }
 
 void ROMBuildQueryHandler::handle_build(const Query& query) {
