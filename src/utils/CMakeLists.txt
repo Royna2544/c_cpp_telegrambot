@@ -1,4 +1,4 @@
-find_package(Boost COMPONENTS program_options REQUIRED)
+find_package(Boost CONFIG 1.70 COMPONENTS program_options REQUIRED)
 
 ################# TgBot Utilities (generic) Library #################
 add_my_library(

@@ -1,6 +1,6 @@
 add_subdirectory(selector)
 
-find_package(Boost CONFIG COMPONENTS system)
+find_package(Boost 1.70 CONFIG COMPONENTS system)
 add_my_library(
   NAME Socket
   SRCS
