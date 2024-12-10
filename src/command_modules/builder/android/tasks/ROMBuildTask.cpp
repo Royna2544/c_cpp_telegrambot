@@ -36,11 +36,12 @@ std::string findVendor() {
     return {};
 }
 
-std::string findREL() {
+std::string findREL(const std::filesystem::path& releaseDir) {
     std::error_code ec;
+    LOG(INFO) << "Trying to find scls in " << releaseDir;
     // Try the build/release/build_config, scl for Android 14
     for (const auto& it : std::filesystem::directory_iterator(
-             "build/release/build_config/", ec)) {
+             releaseDir / "build_config/", ec)) {
         if (it.path().extension() == ".scl") {
             auto file = it.path().filename();
             LOG(INFO) << "Found a valid scl, " << it
@@ -52,7 +53,7 @@ std::string findREL() {
     // Try build/release/release_configs, textproto, another stuff added on
     // Android 15
     for (const auto& it : std::filesystem::directory_iterator(
-             "build/release/release_configs/", ec)) {
+             releaseDir / "release_configs/", ec)) {
         if (it.path().extension() == ".textproto") {
             auto file = it.path().filename().replace_extension().string();
             if (file.starts_with("trunk") || file == "root") {
@@ -81,13 +82,26 @@ DeferredExit ROMBuildTask::runFunction() {
     }
     auto* resultdata = dataShmem->get<PerBuildData::ResultData>();
     resultdata->value = PerBuildData::Result::ERROR_FATAL;
-    auto release = findREL();
     auto vendor = findVendor();
     if (vendor.empty()) {
         return DeferredExit::generic_fail;
     }
+    std::string release;
+    {
+        std::filesystem::path path;
+        path = "vendor";
+        path /= vendor;
+        path /= "build";
+        path /= "release";
+        release = findREL(path);
+        if (release.empty()) {
+            path = "build";
+            path /= "release";
+            release = findREL(path);
+        }
+    }
 
-    ForkAndRunShell shell("bash");
+    ForkAndRunShell shell;
     // This is the build user/host config
     shell.env["BUILD_HOSTNAME"] = "build-server";
     shell.env["BUILD_USERNAME"] = "cpp20-tgbot-builder";
