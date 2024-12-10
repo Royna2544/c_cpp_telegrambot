@@ -370,7 +370,7 @@ find_package(fmt REQUIRED)
 find_package(jsoncpp REQUIRED) # Required by tgbot-cpp anyways...
 find_package(CURL REQUIRED)
 # If we couldn't find protobuf or dirty abseil fix is enabled.
-if (DIRTY_ABSEIL_FIX OR NOT Protobuf_FOUND)
+if (NOT Protobuf_FOUND)
   # Then we can just include source-abseil
   message(STATUS "Using abseil-cpp as submodule")
   set(ABSL_PROPAGATE_CXX_STD ON)
