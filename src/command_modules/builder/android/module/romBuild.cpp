@@ -761,7 +761,7 @@ void ROMBuildQueryHandler::handle_clean_directories(const Query& query) {
     builder.addKeyboard(getButtonOf<Buttons::back>());
     _api->editMessage(
         query->message,
-        fmt::format("Current disk space free: {}", romRootSpace.availableSpace),
+        fmt::format("Current disk space free: {}GB", romRootSpace.availableSpace.value()),
         builder.get());
 }
 

@@ -11,6 +11,7 @@
 #include <system_error>
 #include <utils/libfs.hpp>
 
+#include "BytesConversion.hpp"
 #include "RepoUtils.hpp"
 #include "StructF.hpp"
 #include "SystemInfo.hpp"
@@ -107,12 +108,12 @@ bool ClangProvider::downloadTarball(const std::string_view url,
             curl, CURLOPT_XFERINFOFUNCTION,
             +[](void* /*clientp*/, curl_off_t /*dltotal*/, curl_off_t dlnow,
                 curl_off_t /*ultotal*/, curl_off_t ulnow) -> int {
-                auto dlnowByte = Bytes{static_cast<Bytes::size_type>(dlnow)}
-                                     .to<SizeTypes::MegaBytes>();
-                auto dltotalByte = Bytes{static_cast<Bytes::size_type>(ulnow)};
-                LOG_EVERY_N_SEC(INFO, 5) << fmt::format(
-                    "Download: {}MB/{}MB", dlnowByte.value, dltotalByte.value);
-                return -static_cast<int>(SignalHandler::isSignaled());  // Continue downloading
+                auto dlnowByte = MegaBytes(dlnow * boost::units::data::bytes);
+                auto dltotalByte = MegaBytes(ulnow * boost::units::data::bytes);
+                LOG_EVERY_N_SEC(INFO, 5)
+                    << fmt::format("Download: {}MB/{}MB", dlnowByte.value(), dltotalByte.value());
+                return -static_cast<int>(
+                    SignalHandler::isSignaled());  // Continue downloading
             });
         curl_easy_setopt(curl, CURLOPT_XFERINFODATA, nullptr);
 

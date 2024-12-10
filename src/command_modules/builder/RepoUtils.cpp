@@ -460,12 +460,12 @@ bool RepoInfo::git_clone(const std::filesystem::path& directory,
 
     // Git fetch callback
     gitoptions.fetch_opts.callbacks.transfer_progress =
-        +[](const git_transfer_progress* stats, void* payload) -> int {
+        +[](const git_indexer_progress* stats, void* payload) -> int {
         LOG_EVERY_N_SEC(INFO, 3) << fmt::format(
             "Fetch: Objects({}/{}/{}) Deltas({}/{}), Total {:.2f}GB",
             stats->received_objects, stats->indexed_objects,
             stats->total_objects, stats->indexed_deltas, stats->total_deltas,
-            Bytes(stats->received_bytes).to<SizeTypes::GigaBytes>());
+            GigaBytes(stats->received_bytes * boost::units::data::bytes).value());
         if (payload != nullptr) {
             auto* callback = static_cast<Callbacks*>(payload);
             callback->onFetch(stats);
@@ -490,7 +490,7 @@ bool RepoInfo::git_clone(const std::filesystem::path& directory,
     };
     gitoptions.fetch_opts.callbacks.payload = callback_.get();
 
-    // Git checkout callbackd3866
+    // Git checkout callback
     gitoptions.checkout_opts.progress_cb =
         +[](const char* path, size_t completed_steps, size_t total_steps,
             void* payload) {

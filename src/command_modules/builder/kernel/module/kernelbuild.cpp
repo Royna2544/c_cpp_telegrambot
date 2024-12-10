@@ -3,6 +3,7 @@
 #include <absl/strings/str_split.h>
 #include <absl/strings/strip.h>
 #include <fmt/chrono.h>
+#include <fmt/ranges.h>
 #include <tgbot/TgException.h>
 #include <tgbot/types/InlineQueryResultArticle.h>
 #include <tgbot/types/InputFile.h>

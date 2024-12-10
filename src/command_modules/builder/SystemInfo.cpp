@@ -13,12 +13,29 @@
 #include <chrono>
 #include <fstream>
 #include <iomanip>
+#include <ios>
 #include <iostream>
 #include <string>
 #include <string_view>
 #include <system_error>
 #include <thread>
 #include <unordered_map>
+
+#include "BytesConversion.hpp"
+
+template <typename T>
+concept isNumber = std::is_floating_point_v<T> || std::is_integral_v<T>;
+
+template <typename NumTo, typename NumFrom>
+    requires(isNumber<NumFrom> && isNumber<NumTo>)
+NumTo assert_downcast(const NumFrom num) {
+    if constexpr (sizeof(NumFrom) >= sizeof(NumTo)) {
+        if (std::numeric_limits<NumTo>::max() < num) {
+            throw std::overflow_error("Overflow detected during downcasting.");
+        }
+    }
+    return static_cast<NumTo>(num);
+}
 
 struct CPUData {
     long user, nice, system, idle, iowait, irq, softirq, steal;
@@ -91,7 +108,7 @@ CPUInfo::CPUInfo() : coreCount(sysconf(_SC_NPROCESSORS_ONLN)) {
 
 MemoryInfo::MemoryInfo() {
     // Use /proc/meminfo instead
-    std::unordered_map<std::string, Bytes> kMemoryMap;
+    std::unordered_map<std::string, MegaBytes> kMemoryMap;
 
     std::ifstream memInfoFile("/proc/meminfo");
     std::string line;
@@ -105,9 +122,9 @@ MemoryInfo::MemoryInfo() {
 
         if (pair.size() == 3 && absl::AsciiStrToLower(pair[2]) == "kb") {
             std::string name(absl::StripSuffix(pair[0], ":"));
-            Bytes::size_type value{};
+            std::int64_t value{};
             if (try_parse(pair[1], &value)) {
-                kMemoryMap[name] = Bytes(value * Bytes::factor);
+                kMemoryMap.emplace(name,value * boost::units::data::kilobytes);
             } else {
                 LOG(WARNING) << "Failed to parse memory value: " << pair[1];
             }
@@ -115,14 +132,11 @@ MemoryInfo::MemoryInfo() {
     }
     totalMemory = kMemoryMap["MemTotal"];
     freeMemory = kMemoryMap["MemFree"];
-    usedMemory = static_cast<Bytes::size_type>(totalMemory) -
-                 static_cast<Bytes::size_type>(freeMemory) -
-                 static_cast<Bytes::size_type>(kMemoryMap["Buffers"]) -
-                 static_cast<Bytes::size_type>(kMemoryMap["Cached"]);
+    usedMemory =
+        totalMemory - freeMemory - kMemoryMap["Buffers"] - kMemoryMap["Cached"];
 
-    usage = {assert_downcast<double>(
-        static_cast<Bytes::size_type_floating>(usedMemory.value) *
-        Percent::MAX / totalMemory.value)};
+    usage = {assert_downcast<double>(usedMemory.value() * Percent::MAX /
+                                     totalMemory.value())};
 }
 
 // Get disk info
@@ -134,13 +148,10 @@ DiskInfo::DiskInfo(std::filesystem::path path) : path_(std::move(path)) {
         return;
     }
 
-    availableSpace = stat.f_bsize * stat.f_bavail;
-    totalSpace = stat.f_bsize * stat.f_blocks;
-    usage = {assert_downcast<double>(
-        static_cast<Bytes::size_type_floating>(
-            static_cast<Bytes::size_type>(totalSpace) -
-            static_cast<Bytes::size_type>(availableSpace)) *
-        Percent::MAX / static_cast<Bytes::size_type>(totalSpace))};
+    availableSpace = GigaBytes(stat.f_bsize * stat.f_bavail * boost::units::data::bytes);
+    totalSpace = GigaBytes(stat.f_bsize * stat.f_blocks * boost::units::data::bytes);
+    usage = {assert_downcast<double>((totalSpace - availableSpace).value() *
+                                     Percent::MAX / totalSpace.value())};
 }
 
 SystemSummary::SystemSummary() {
@@ -160,22 +171,6 @@ std::ostream& operator<<(std::ostream& os, CPUInfo const& info) {
     os << "CPU frequency: " << info.cpuMHz << "Mhz\n";
     os << "CPU vendor: " << info.cpuVendor << "\n";
     os << "CPU Usage: " << info.usage << "\n";
-    return os;
-}
-
-std::ostream& operator<<(std::ostream& os, Bytes const& bytes) {
-    Bytes::size_type_floating num = bytes.value;
-    int unitIndex = 0;
-
-    while (num >= Bytes::factor_floating &&
-           unitIndex < Bytes::units.size() - 1) {
-        unitIndex++;
-        num /= Bytes::factor_floating;
-    }
-
-    os << ConvertedBytes{
-        assert_downcast<ConvertedBytes::size_type_floating>(num),
-        static_cast<SizeTypes>(unitIndex)};
     return os;
 }
 
@@ -203,17 +198,6 @@ std::ostream& operator<<(std::ostream& os, SystemSummary const& summary) {
         os << summary.cwdDiskInfo;
     }
     os << "\n";
-    return os;
-}
-
-std::ostream& operator<<(std::ostream& os, ConvertedBytes const& bytes) {
-    const auto value = bytes.value;
-    auto type = (int)bytes.type;
-
-    CHECK_LT(type, Bytes::units.size()) << "Overflow";
-
-    os << std::fixed << std::setprecision(2) << value << " "
-       << Bytes::units[type];
     return os;
 }
 

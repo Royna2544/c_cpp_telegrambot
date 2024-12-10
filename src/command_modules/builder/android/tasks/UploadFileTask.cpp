@@ -1,6 +1,7 @@
 #include "UploadFileTask.hpp"
 
 #include <fmt/format.h>
+#include <fmt/ranges.h>
 
 #include <filesystem>
 #include <fstream>

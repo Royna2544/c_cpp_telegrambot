@@ -20,6 +20,7 @@
 #include <utility>
 #include <vector>
 
+#include "BytesConversion.hpp"
 #include "SystemInfo.hpp"
 #include "json/value.h"
 
@@ -427,9 +428,9 @@ struct ROMLocalManifest {
             static std::once_flag once;
             std::call_once(once, [&]() {
                 const auto totalMem =
-                    MemoryInfo().totalMemory.to<SizeTypes::GigaBytes>();
+                    GigaBytes(MemoryInfo().totalMemory);
                 LOG(INFO) << "Total memory: " << totalMem;
-                job_count = static_cast<int>(totalMem / 4 - 1);
+                job_count = static_cast<int>(totalMem.value() / 4 - 1);
                 LOG(INFO) << "Using job count: " << job_count
                           << " for ROM build";
             });

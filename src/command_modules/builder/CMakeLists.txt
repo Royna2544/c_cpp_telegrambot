@@ -5,9 +5,10 @@ endif()
 
 find_package(libgit2 REQUIRED)
 find_package(LibArchive)
+find_package(Boost)
 
-if (NOT LibArchive_FOUND)
-    message(STATUS "Builder: No libarchive")
+if (NOT LibArchive_FOUND OR NOT Boost_FOUND)
+    message(STATUS "Builder: No libarchive or Boost.Unit")
     return()
 endif()
 
@@ -35,6 +36,7 @@ add_my_library(
     LIBS_STATIC
         ${LIBGIT2_LIBRARIES}
         LibArchive::LibArchive
+        Boost::boost
     DEFS ${BUILDER_UTILS_LINUX_DEFS}
     NO_LIBPREFIX
     STATIC
