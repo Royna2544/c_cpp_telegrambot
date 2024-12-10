@@ -125,6 +125,10 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     unset(CMAKE_REQUIRED_FLAGS)
     unset(CMAKE_TRY_COMPILE_TARGET_TYPE)
   endif()
+
+  # Prefer LLD
+  list(APPEND CMAKE_EXE_LINKER_FLAGS "-fuse-ld=lld")
+  list(APPEND CMAKE_SHARED_LINKER_FLAGS "-fuse-ld=lld")
 endif()
 
 if (NOT CXX20_JTHREAD_COMPILES)
@@ -296,6 +300,7 @@ function(add_my_executable)
     set(TEST_EXT test_)
   endif()
 	set(TGBOT_EXE_NAME ${TEST_EXT}${TGBOT_EXE_NAME})
+  list(APPEND TGBOT_EXE_SRCS ${CMAKE_SOURCE_DIR}/src/log_message.cpp)
   if (TGBOT_EXE_OPTIONAL)
     add_executable(${TGBOT_EXE_NAME} EXCLUDE_FROM_ALL ${TGBOT_EXE_SRCS})
   else()
