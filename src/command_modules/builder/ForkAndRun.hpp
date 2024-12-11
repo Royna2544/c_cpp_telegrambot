@@ -125,6 +125,9 @@ using transparent_string_hash =
 class ForkAndRun {
    public:
     virtual ~ForkAndRun() = default;
+
+    static bool can_execve(const std::string_view name);
+
     /**
      * @brief The size of the buffer used for stdout and stderr.
      */

@@ -103,6 +103,12 @@ DeferredExit RepoSyncTask::runFunction() {
     std::error_code ec;
     bool repoDirExists = false;
 
+    // Test if repo can be executed
+    if (!ForkAndRun::can_execve("repo")) {
+        LOG(ERROR) << "repo not found";
+        return DeferredExit::generic_fail;
+    }
+
     repoDirExists = std::filesystem::is_directory(kLocalManifestGitPath, ec);
     if (ec &&
         ec != std::make_error_code(std::errc::no_such_file_or_directory)) {

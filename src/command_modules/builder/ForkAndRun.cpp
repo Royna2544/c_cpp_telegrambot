@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "Shmem.hpp"
+#include "utils/Env.hpp"
 
 struct FDLogSink : public absl::LogSink {
     void Send(const absl::LogEntry& logSink) override {
@@ -617,4 +618,13 @@ DeferredExit ForkAndRunShell::close() {
         LOG(ERROR) << "Shell not open";
     }
     return DeferredExit::generic_fail;
+}
+
+bool ForkAndRun::can_execve(const std::string_view name) {
+    std::vector<std::string> path = absl::StrSplit(::Env()["PATH"].get(), ':');
+    return std::ranges::any_of(path, [name](const auto& dir) {
+        const auto full_path = std::filesystem::path(dir) / name;
+        DLOG(INFO) << "access(" << full_path << ", R_OK | X_OK)";
+        return access(full_path.c_str(), R_OK | X_OK) == 0;
+    });
 }
