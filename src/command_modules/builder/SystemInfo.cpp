@@ -12,11 +12,8 @@
 #include <TryParseStr.hpp>
 #include <chrono>
 #include <fstream>
-#include <iomanip>
-#include <ios>
 #include <iostream>
 #include <string>
-#include <string_view>
 #include <system_error>
 #include <thread>
 #include <unordered_map>
@@ -88,7 +85,7 @@ CPUInfo::CPUInfo() : coreCount(sysconf(_SC_NPROCESSORS_ONLN)) {
     std::string line;
 
     if (!cpuInfoFile.is_open()) {
-        PLOG(ERROR) << "Could not open /proc/cpuinfo" << std::endl;
+        PLOG(ERROR) << "Could not open /proc/cpuinfo";
         return;
     }
 
@@ -113,7 +110,7 @@ MemoryInfo::MemoryInfo() {
     std::ifstream memInfoFile("/proc/meminfo");
     std::string line;
     if (!memInfoFile.is_open()) {
-        PLOG(ERROR) << "Could not open /proc/meminfo" << std::endl;
+        PLOG(ERROR) << "Could not open /proc/meminfo";
         return;
     }
     while (std::getline(memInfoFile, line)) {
@@ -124,7 +121,7 @@ MemoryInfo::MemoryInfo() {
             std::string name(absl::StripSuffix(pair[0], ":"));
             std::int64_t value{};
             if (try_parse(pair[1], &value)) {
-                kMemoryMap.emplace(name,value * boost::units::data::kilobytes);
+                kMemoryMap.emplace(name, value * boost::units::data::kilobytes);
             } else {
                 LOG(WARNING) << "Failed to parse memory value: " << pair[1];
             }
@@ -148,8 +145,10 @@ DiskInfo::DiskInfo(std::filesystem::path path) : path_(std::move(path)) {
         return;
     }
 
-    availableSpace = GigaBytes(stat.f_bsize * stat.f_bavail * boost::units::data::bytes);
-    totalSpace = GigaBytes(stat.f_bsize * stat.f_blocks * boost::units::data::bytes);
+    availableSpace =
+        GigaBytes(stat.f_bsize * stat.f_bavail * boost::units::data::bytes);
+    totalSpace =
+        GigaBytes(stat.f_bsize * stat.f_blocks * boost::units::data::bytes);
     usage = {assert_downcast<double>((totalSpace - availableSpace).value() *
                                      Percent::MAX / totalSpace.value())};
 }

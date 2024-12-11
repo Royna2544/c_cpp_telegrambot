@@ -5,7 +5,7 @@ endif()
 
 find_package(libgit2 REQUIRED)
 find_package(LibArchive)
-find_package(Boost)
+find_package(Boost CONFIG)
 
 if (NOT LibArchive_FOUND OR NOT Boost_FOUND)
     message(STATUS "Builder: No libarchive or Boost.Unit")

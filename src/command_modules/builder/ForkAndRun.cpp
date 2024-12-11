@@ -447,15 +447,10 @@ ForkAndRunSimple::ForkAndRunSimple(std::string_view argv)
     : args_(absl::StrSplit(argv, ' ', absl::SkipWhitespace())) {}
 
 DeferredExit ForkAndRunSimple::execute() {
-    // Owns the strings
-    std::vector<std::string> args;
-    args.reserve(args_.size());
-    args.insert(args.end(), args_.begin(), args_.end());
-
     // Convert to raw C-style strings
     std::vector<char*> rawArgs;
-    rawArgs.reserve(args.size() + 1);
-    for (auto& arg : args) {
+    rawArgs.reserve(args_.size() + 1);
+    for (auto& arg : args_) {
         rawArgs.emplace_back(arg.data());
     }
     rawArgs.emplace_back(nullptr);
