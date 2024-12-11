@@ -51,7 +51,7 @@ class Utils_API Env {
         }
 
         // This is a ValueEntry, we are only playing with values...
-        ValueEntry& operator=(ValueEntry&& other) {
+        ValueEntry& operator=(ValueEntry&& other)  noexcept {
             *this = std::move(other.get());
             other.clear();
             return *this;
