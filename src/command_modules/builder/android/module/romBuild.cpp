@@ -83,12 +83,13 @@ class ROMBuildQueryHandler {
     }
 
    public:
-    bool pinned() const { return didpin; }
     ROMBuildQueryHandler(TgBotApi::Ptr api, Message::Ptr userMessage,
                          CommandLine* line);
 
     void updateSentMessage(Message::Ptr message);
     void start(Message::Ptr userMessage);
+    bool pinned() const { return didpin; }
+    auto builddata() const { return per_build; }
 
    private:
     using Query = TgBot::CallbackQuery::Ptr;
@@ -346,8 +347,18 @@ class RepoSync : public TaskWrapperBase<RepoSyncTask> {
     using TaskWrapperBase<RepoSyncTask>::TaskWrapperBase;
 
     Message::Ptr onPreExecute() override {
-        return api->sendReplyMessage(userMessage, "Now syncing...",
-                                     cancelKeyboard);
+        constexpr static std::string_view literal = R"(Now syncing...
+Device: {}
+ROM: {}
+Manifest: {}
+)";
+        return api->sendReplyMessage(
+            userMessage,
+            fmt::format(
+                literal, queryHandler->builddata().device->toString(),
+                queryHandler->builddata().localManifest->rom->toString(),
+                queryHandler->builddata().localManifest->name),
+            cancelKeyboard);
     }
 
     void onExecuteFinished(PerBuildData::ResultData result) override {
@@ -569,7 +580,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
             LOG(ERROR) << "Failed to unpin message: " << e.what();
         }
     }
-    sentMessage = nullptr; // Clear the message out.
+    sentMessage = nullptr;  // Clear the message out.
 }
 
 void ROMBuildQueryHandler::handle_build(const Query& query) {
@@ -735,13 +746,11 @@ void ROMBuildQueryHandler::handle_clean_directories(const Query& query) {
         _api->answerCallbackQuery(query->id,
                                   "Wait... cleaning may take some time...");
         std::filesystem::remove_all(romRootDir);
-        _api->answerCallbackQuery(query->id, "Cleaning ROM directory done.");
     } else if (type == "build") {
         LOG(INFO) << "Cleaning directory " << romRootDir / kOutDirectory;
         _api->answerCallbackQuery(query->id,
                                   "Wait... cleaning may take some time...");
         std::filesystem::remove_all(romRootDir / kOutDirectory);
-        _api->answerCallbackQuery(query->id, "Cleaning build directory done.");
     }
 
     std::string entry;
@@ -759,10 +768,10 @@ void ROMBuildQueryHandler::handle_clean_directories(const Query& query) {
     }
     builder.addKeyboard({entry, "clean_build"});
     builder.addKeyboard(getButtonOf<Buttons::back>());
-    _api->editMessage(
-        query->message,
-        fmt::format("Current disk space free: {}GB", romRootSpace.availableSpace.value()),
-        builder.get());
+    _api->editMessage(query->message,
+                      fmt::format("Current disk space free: {}GB",
+                                  romRootSpace.availableSpace.value()),
+                      builder.get());
 }
 
 void ROMBuildQueryHandler::onCallbackQuery(
