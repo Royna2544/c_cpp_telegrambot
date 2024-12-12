@@ -37,19 +37,22 @@ struct fmt::formatter<Chat::Ptr> : formatter<std::string> {
     static auto format(const Chat::Ptr& chat,
                        format_context& ctx) -> format_context::iterator {
         std::string name;
+        if (chat->title) {
+            name = *chat->title;
+        } else if (chat->username) {
+            name = fmt::format("@{}", *chat->username);
+        } else {
+            name = fmt::format("id: {}", chat->id);
+        }
         switch (chat->type) {
             case Chat::Type::Private:
-                return fmt::format_to(ctx.out(), "Private chat (@{})",
-                                      chat->username.value_or("unknown"));
+                return fmt::format_to(ctx.out(), "Private chat ({})", name);
             case Chat::Type::Channel:
-                return fmt::format_to(ctx.out(), "Channel ({})",
-                                      chat->title.value_or("unknown"));
+                return fmt::format_to(ctx.out(), "Channel ({})", name);
             case Chat::Type::Supergroup:
-                return fmt::format_to(ctx.out(), "Group ({})",
-                                      chat->title.value_or("unknown"));
+                return fmt::format_to(ctx.out(), "Group ({})", name);
             case Chat::Type::Group:
-                return fmt::format_to(ctx.out(), "Private Group (id: {})",
-                                      chat->id);
+                return fmt::format_to(ctx.out(), "Private Group ({})", name);
             default:
                 return fmt::format_to(ctx.out(), "Unknown chat");
         }
