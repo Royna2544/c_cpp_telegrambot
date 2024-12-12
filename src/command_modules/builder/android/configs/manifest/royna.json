@@ -42,6 +42,19 @@
             ]
         },
         {
+            "name": "Exynos7885-twelve",
+            "target_rom": "*",
+            "android_version": 12,
+            "devices": [
+                "a10",
+                "a20",
+                "a20e",
+                "a30",
+                "a30s",
+                "a40"
+            ]
+        },
+        {
             "name": "r3q-Evolution-X-udc",
             "target_rom": "Evolution-X",
             "android_version": 14,
