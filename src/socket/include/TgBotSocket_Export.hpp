@@ -51,9 +51,6 @@ constexpr int ALIGNMENT = 8;
 /**
  * @brief Packet for sending commands to the server
  *
- * @code data_ptr is only vaild for this scope: This should not be sent, instead
- * it must be memcpy'd
- *
  * This packet is used to send commands to the server.
  * It contains a header, which contains the magic value, the command, and the
  * size of the data. The data is then followed by the actual data.
@@ -78,7 +75,8 @@ struct alignas(ALIGNMENT) Packet {
         // 7: Remove packed attribute, align all as 8 bytes
         // 8: change checksum to uint64_t
         // 9: Remove padding objects
-        constexpr static int DATA_VERSION = 9;
+        // 10: Alignments fixing for Python compliance, add INVALID_CMD at 0
+        constexpr static int DATA_VERSION = 10;
         constexpr static int64_t MAGIC_VALUE = MAGIC_VALUE_BASE + DATA_VERSION;
 
         int64_t magic = MAGIC_VALUE;  ///< Magic value to verify the packet
@@ -113,8 +111,7 @@ struct alignas(ALIGNMENT) Packet {
                       "This constructor should not be used with non pointer");
         header.cmd = cmd;
         header.magic = Header::MAGIC_VALUE;
-        header.data_size = size;
-        data.assignFrom(in_data, header.data_size);
+        data.assignFrom(in_data, header.data_size = size);
         header.checksum = crc32_function(data);
     }
 
@@ -166,7 +163,7 @@ struct alignas(ALIGNMENT) ObserveChatId {
 struct alignas(ALIGNMENT) SendFileToChatId {
     ChatId chat;               // Destination ChatId
     FileType fileType;         // File type for file
-    PathStringArray filePath;  // Path to file (local)
+    alignas(ALIGNMENT) PathStringArray filePath;  // Path to file (local)
 };
 
 struct alignas(ALIGNMENT) ObserveAllChats {
@@ -205,13 +202,13 @@ struct alignas(ALIGNMENT) UploadFileDry {
 
 struct alignas(ALIGNMENT) UploadFile : public UploadFileDry {
     using Options = UploadFileDry::Options;
-    uint8_t buf[];  // Buffer
+    alignas(ALIGNMENT) uint8_t buf[];  // Buffer
 };
 
 struct alignas(ALIGNMENT) DownloadFile {
     PathStringArray filepath{};      // Path to file (in remote)
     PathStringArray destfilename{};  // Destination file name
-    uint8_t buf[];                   // Buffer
+    alignas(ALIGNMENT) uint8_t buf[];                   // Buffer
 };
 }  // namespace data
 
@@ -231,9 +228,9 @@ enum class AckType {
 };
 
 struct alignas(ALIGNMENT) GenericAck {
-    AckType result;  // result type
+    AckType result{};  // result type
     // Error message, only valid when result type is not SUCCESS
-    MessageStringArray error_msg{};
+    alignas(ALIGNMENT) MessageStringArray error_msg{};
 
     // Create a new instance of the Generic Ack, error.
     explicit GenericAck(AckType result, const std::string& errorMsg)

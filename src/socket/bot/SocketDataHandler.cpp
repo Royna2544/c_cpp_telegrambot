@@ -1,10 +1,10 @@
-#include <ResourceManager.hpp>
 #include <fmt/chrono.h>
 #include <json/json.h>
 #include <tgbot/TgException.h>
 #include <trivial_helpers/_std_chrono_templates.h>
 
 #include <ManagedThreads.hpp>
+#include <ResourceManager.hpp>
 #include <TgBotSocket_Export.hpp>
 #include <chrono>
 #include <filesystem>
@@ -114,6 +114,9 @@ GenericAck SocketInterfaceTgBot::handle_ObserveChatId(const void* ptr) {
 GenericAck SocketInterfaceTgBot::handle_SendFileToChatId(const void* ptr) {
     const auto* data = static_cast<const SendFileToChatId*>(ptr);
     const auto* file = data->filePath.data();
+    if (data->filePath.empty()) {
+        return GenericAck(AckType::ERROR_INVALID_ARGUMENT, "No file provided");
+    }
     std::function<Message::Ptr(ChatId, const TgBotApi::FileOrMedia&)> fn;
     switch (data->fileType) {
         case FileType::TYPE_PHOTO:
@@ -160,7 +163,7 @@ GenericAck SocketInterfaceTgBot::handle_SendFileToChatId(const void* ptr) {
     try {
         fn(data->chat,
            InputFile::fromFile(file, getMIMEString(resource, file)));
-    } catch (std::ifstream::failure& e) {
+    } catch (const std::ifstream::failure& e) {
         LOG(INFO) << "Failed to send '" << file
                   << "' as local file, trying as Telegram "
                      "file id";
@@ -246,9 +249,10 @@ bool SocketInterfaceTgBot::handle_GetUptime(const TgBotSocket::Context& ctx,
 template <typename DataT>
 bool CHECK_PACKET_SIZE(Packet& pkt) {
     if (pkt.header.data_size != sizeof(DataT)) {
-        LOG(WARNING) << fmt::format("Invalid packet size for cmd: {}. diff: {}",
-                                    pkt.header.cmd,
-                                    pkt.header.data_size - sizeof(DataT));
+        LOG(WARNING) << fmt::format(
+            "Invalid packet size for cmd: {}. Got {}, diff: {}", pkt.header.cmd,
+            pkt.header.data_size,
+            -(int64_t)(sizeof(DataT) - pkt.header.data_size));
         return false;
     }
     return true;
@@ -257,7 +261,7 @@ bool CHECK_PACKET_SIZE(Packet& pkt) {
 void SocketInterfaceTgBot::handlePacket(const TgBotSocket::Context& ctx,
                                         TgBotSocket::Packet pkt) {
     const void* ptr = pkt.data.get();
-    std::variant<GenericAck, UploadFileDryCallback, bool> ret;
+    std::variant<UploadFileDryCallback, GenericAck, bool> ret;
     const auto invalidPacketAck =
         GenericAck(AckType::ERROR_COMMAND_IGNORED, "Invalid packet size");
 
@@ -314,7 +318,7 @@ void SocketInterfaceTgBot::handlePacket(const TgBotSocket::Context& ctx,
             if (CHECK_PACKET_SIZE<UploadFileDry>(pkt)) {
                 ret = handle_UploadFileDry(ptr, pkt.header.data_size);
             } else {
-                ret = invalidPacketAck;
+                ret = UploadFileDryCallback(invalidPacketAck);
             }
             break;
         case Command::CMD_DOWNLOAD_FILE:

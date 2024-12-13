@@ -4,6 +4,7 @@
 
 namespace TgBotSocket {
 enum class Command : std::int32_t {
+    CMD_INVALID,
     CMD_WRITE_MSG_TO_CHAT_ID,
     CMD_CTRL_SPAMBLOCK,
     CMD_OBSERVE_CHAT_ID,

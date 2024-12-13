@@ -40,7 +40,8 @@ std::optional<Packet> readPacket(const TgBotSocket::Context& context) {
     }
 
     // Read rest of the packet header.
-    const auto headerData = context.read(sizeof(TgBotSocket::Packet::Header) - sizeof(magic));
+    const auto headerData =
+        context.read(sizeof(TgBotSocket::Packet::Header) - sizeof(magic));
     if (!headerData) {
         LOG(ERROR) << "While reading header, failed";
         return std::nullopt;
@@ -49,11 +50,8 @@ std::optional<Packet> readPacket(const TgBotSocket::Context& context) {
                          sizeof(header) - sizeof(magic));
     header.magic = magic;
 
-    using namespace TgBotSocket::CommandHelpers;
-    if (isClientCommand(header.cmd)) {
-        LOG(INFO) << fmt::format("Received buf with {}, invoking callback!",
-                                 header.cmd);
-    }
+    LOG(INFO) << fmt::format("Received buf with {}, invoking callback!",
+                             header.cmd);
 
     const size_t newLength =
         sizeof(TgBotSocket::Packet::Header) + header.data_size;

@@ -43,7 +43,7 @@ int toCount(Command cmd) {
 }
 
 bool isClientCommand(Command cmd) {
-    return cmd < Command::CMD_CLIENT_MAX;
+    return cmd < Command::CMD_CLIENT_MAX && cmd > Command::CMD_INVALID;
 }
 
 bool isInternalCommand(Command cmd) {
