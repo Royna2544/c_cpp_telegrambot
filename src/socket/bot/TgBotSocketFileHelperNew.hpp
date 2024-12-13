@@ -1,14 +1,10 @@
 #pragma once
 
-#include <openssl/sha.h>
-
 #include <TgBotSocket_Export.hpp>
-#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <ios>
-#include <memory>
 #include <optional>
 
 #ifdef __TGBOT__
@@ -24,7 +20,7 @@
 
 // Represents a SHA-256 hash
 struct Socket_API HashContainer {
-    std::array<unsigned char, SHA256_DIGEST_LENGTH> m_data;
+    SHA256::result_type m_data;
 };
 
 inline std::ostream& operator<<(std::ostream& self, const HashContainer& data) {

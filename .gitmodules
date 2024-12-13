@@ -10,9 +10,6 @@
 [submodule "src/third-party/cpp-httplib"]
 	path = src/third-party/cpp-httplib
 	url = https://github.com/yhirose/cpp-httplib
-[submodule "clientapp/android/app/src/main/cpp/external/openssl"]
-	path = clientapp/android/app/src/main/cpp/external/openssl
-	url = https://github.com/openssl/openssl
 [submodule "clientapp/android/app/src/main/cpp/abseil-cpp"]
 	path = src/third-party/abseil-cpp
 	url = https://github.com/abseil/abseil-cpp/
@@ -22,3 +19,6 @@
 [submodule "src/third-party/googletest"]
 	path = src/third-party/googletest
 	url = https://github.com/google/googletest/
+[submodule "src/hash/third-party/sha-2"]
+	path = src/hash/sha-2
+	url = https://github.com/amosnier/sha-2/

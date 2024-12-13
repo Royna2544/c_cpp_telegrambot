@@ -73,7 +73,6 @@ add_my_executable(
   LIBS 
     DBImpl
     Socket
-    OpenSSL::Crypto
     DBLoading
   RELATION Socket
 )

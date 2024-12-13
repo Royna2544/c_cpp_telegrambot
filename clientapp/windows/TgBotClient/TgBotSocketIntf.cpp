@@ -2,6 +2,7 @@
 #pragma comment(lib, "ws2_32")
 
 #define _CRT_SECURE_NO_WARNINGS
+#define NOMINMAX
 #include "TgBotSocketIntf.h"
 
 #include <WS2tcpip.h>
@@ -17,6 +18,9 @@
 #include <stdexcept>
 
 #include "../../../src/socket/bot/TgBotSocketFileHelperNew.cpp"
+#include "../../../src/hash/crc32.cpp"
+#include "../../../src/hash/sha256.cpp"
+#include "../../../src/hash/sha-2/sha-256.c"
 
 static std::string WSALastErrStr() {
     char *s = nullptr;

@@ -13,7 +13,7 @@ add_my_library(
     backends/ClientBackend.cpp
     TgBotCommandMap.cpp
   PUBLIC_INC include interface
-  LIBS Utils ZLIB::ZLIB OpenSSL::Crypto Boost::system
+  LIBS Utils minimalhash Boost::system
   LIBS_WIN32 wsock32 Ws2_32
 )
 
@@ -22,7 +22,7 @@ find_package(ZLIB REQUIRED)
 add_my_executable(
   NAME SocketCli
   SRCS TgBotSocketClient.cpp
-  LIBS Socket OpenSSL::Crypto ZLIB::ZLIB
+  LIBS Socket
   RELATION Socket
 )
 

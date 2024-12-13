@@ -1,10 +1,6 @@
 #pragma once
 
 // A header export for the TgBot's socket connection
-
-#include <openssl/sha.h>
-#include <zlib.h>
-
 #include <array>
 #include <cstdint>
 #include <cstring>
@@ -19,6 +15,8 @@
 #include "../../include/SharedMalloc.hpp"
 #include "../../include/Types.h"
 #endif
+#include "../../hash/crc32.hpp"
+#include "../../hash/sha256.hpp"
 #include "_TgBotSocketCommands.hpp"
 
 template <typename T, size_t size>
@@ -37,21 +35,12 @@ inline void copyTo(std::array<char, size>& arr_in, const char* buf) {
 }
 
 template <size_t size, size_t size2>
-    requires(size > size2)
 inline void copyTo(std::array<char, size>& arr_in,
                    std::array<char, size2> buf) {
-    copyTo(arr_in, buf.data());
-}
-
-#ifdef __cpp_concepts
-template <size_t size, size_t size2>
-    requires(size == size2)
-inline void copyTo(std::array<char, size>& arr_in,
-                   std::array<char, size2> buf) {
+    static_assert(size >= size2, "Destination must be same or bigger than source size");
     copyTo(arr_in, buf.data());
     arr_in[size - 1] = '\0';
 }
-#endif
 
 namespace TgBotSocket {
 
@@ -126,23 +115,21 @@ struct alignas(ALIGNMENT) Packet {
         header.magic = Header::MAGIC_VALUE;
         header.data_size = size;
         data.assignFrom(in_data, header.data_size);
-        header.checksum = crc32_function(data.get(), header.data_size);
+        header.checksum = crc32_function(data);
     }
 
-    static uLong crc32_function(const void* data, const size_t data_size) {
-        uLong crc = crc32(0L, Z_NULL, 0);  // Initial value
-        crc32(crc, static_cast<const Bytef*>(data), data_size);
-        return crc;
+    static CRC32::result_type crc32_function(const uint8_t* data, const size_t data_size) {
+        return CRC32::compute(data, data_size);
     }
 
-    static uLong crc32_function(const SharedMalloc& data) {
-        return crc32_function(data.get(), data.size());
+    static CRC32::result_type crc32_function(const SharedMalloc& data) {
+        return crc32_function(static_cast<uint8_t*>(data.get()), data.size());
     }
 };
 
 using PathStringArray = std::array<char, MAX_PATH_SIZE>;
 using MessageStringArray = std::array<char, MAX_MSG_SIZE>;
-using SHA256StringArray = std::array<unsigned char, SHA256_DIGEST_LENGTH>;
+using SHA256StringArray = SHA256::result_type;
 
 namespace data {
 

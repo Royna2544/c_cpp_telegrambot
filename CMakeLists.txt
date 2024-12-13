@@ -368,8 +368,6 @@ endif()
 #####################################################################
 
 ############################# Check lib #############################
-find_package(OpenSSL REQUIRED)
-find_package(ZLIB REQUIRED)
 find_package(Protobuf)
 find_package(fmt REQUIRED)
 find_package(jsoncpp REQUIRED) # Required by tgbot-cpp anyways...
@@ -426,6 +424,7 @@ endif()
 add_subdirectory(src/api)
 add_subdirectory(src/database)
 add_subdirectory(src/random)
+add_subdirectory(src/hash)
 add_subdirectory(src/imagep)
 add_subdirectory(src/stringres)
 add_subdirectory(src/logging)

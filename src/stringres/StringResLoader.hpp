@@ -49,10 +49,21 @@ class LocaleStringsImpl : public StringResLoaderBase::LocaleStrings {
     std::unordered_map<Strings, std::string> m_data;
 };
 
+class LocaleStringsDummy : public StringResLoaderBase::LocaleStrings {
+   public:
+    LocaleStringsDummy() = default;
+    ~LocaleStringsDummy() override = default;
+
+    std::string_view get(const Strings& /*string*/) const override {
+        return "dummy";
+    }
+    [[nodiscard]] size_t size() const noexcept override { return 0; }
+};
+
 class StringResLoader : public StringResLoaderBase {
     std::unordered_map<Locale, std::shared_ptr<LocaleStringsImpl>> localeMap;
     std::filesystem::path m_path;
-    LocaleStringsImpl empty;
+    LocaleStringsDummy empty;
 
    public:
     // Load XML files from the specified path.

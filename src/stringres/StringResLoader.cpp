@@ -177,7 +177,7 @@ std::string_view LocaleStringsImpl::get(const Strings &string) const {
         return m_data.at(string);
     } else {
         LOG(WARNING) << "String not found: " << getStrings(string);
-        return {};
+        return "unknown";
     }
 }
 

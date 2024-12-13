@@ -25,16 +25,15 @@ project("tgbotclient")
 # System.loadLibrary() and pass the name of the library defined here;
 # for GameActivity/NativeActivity derived applications, the same library name must be
 # used in the AndroidManifest.xml file.
+set(SOURCE_DIR ../../../../../../src)
 add_library(${CMAKE_PROJECT_NAME} SHARED
     # List C/C++ source files with relative paths to this CMakeLists.txt.
     tgbotclient.cpp
-    ../../../../../../src/socket/bot/TgBotSocketFileHelperNew.cpp)
+    ${SOURCE_DIR}/socket/bot/TgBotSocketFileHelperNew.cpp
+    ${SOURCE_DIR}/hash/crc32.cpp ${SOURCE_DIR}/hash/sha256.cpp ${SOURCE_DIR}/hash/sha-2/sha-256.c)
 
 set(ABSL_PROPAGATE_CXX_STD ON)
-add_subdirectory(../../../../../../src/third-party/abseil-cpp abseil-cpp)
-
-add_library(crypto_openssl SHARED IMPORTED)
-set_target_properties(crypto_openssl PROPERTIES IMPORTED_LOCATION ${CMAKE_SOURCE_DIR}/../jniLibs/${ANDROID_ABI}/libcrypto.so)
+add_subdirectory(${SOURCE_DIR}/third-party/abseil-cpp abseil-cpp)
 
 # Specifies libraries CMake should link to your target library. You
 # can link libraries from various origins, such as libraries defined in this
@@ -43,11 +42,7 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
     # List libraries link to the target library
     android
     log
-    z
-    crypto_openssl
     absl::log_initialize absl::log absl::check)
 
-target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE include)
-target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE external/openssl/include)
-target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ../../../../../../src/socket/include ../../../../../../src/include)
+target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${SOURCE_DIR}/socket/include ${SOURCE_DIR}/include)
 target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE -fmacro-prefix-map=${CMAKE_SOURCE_DIR}/=)
