@@ -31,18 +31,34 @@ struct SharedMalloc {
             if (newSize == _size) {
                 return;  // No-op
             }
-            if (_data == nullptr) {
-                _data.reset(::malloc(newSize));
-            } else {
-                _data.reset(::realloc(_data.release(), newSize));
+            if (newSize == 0) {
+                _data.reset();  // Free memory and set pointer to nullptr
+                _size = 0;
+                return;
             }
+            void *newMem = nullptr;
             if (_data == nullptr) {
+                newMem = ::calloc(newSize, 1);
+            } else {
+                void *curmem = _data.release();
+                newMem = ::realloc(curmem, newSize);
+                if (newMem == nullptr) {
+                    _data.reset(curmem);
+                }
+            }
+            if (newMem == nullptr) {
                 throw std::bad_alloc();
             }
+            if (newSize > _size) {
+                // Zero-fill the new block
+                char *memoffset = static_cast<char *>(newMem);
+                memset(memoffset + _size, 0, newSize - _size);
+            }
+            _data.reset(newMem);
             _size = newSize;
         }
         [[nodiscard]] size_t size() const { return _size; }
-        [[nodiscard]] void* data() const { return _data.get(); }
+        [[nodiscard]] void *data() const { return _data.get(); }
 
        private:
         size_t _size{};
