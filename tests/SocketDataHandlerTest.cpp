@@ -202,7 +202,7 @@ TEST_F(SocketDataHandlerTest, TestCmdWriteMsgToChatIdINVALID) {
     sendAndVerifyHeader<TgBotSocket::callback::GenericAck,
                         TgBotSocket::Command::CMD_GENERIC_ACK>(pkt,
                                                                &callbackData);
-    isGenericAck_Error<TgBotSocket::callback::AckType::ERROR_COMMAND_IGNORED>(
+    isGenericAck_Error<TgBotSocket::callback::AckType::ERROR_INVALID_ARGUMENT>(
         callbackData);
     // Done
     verifyAndClear();
