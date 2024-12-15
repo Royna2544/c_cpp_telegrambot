@@ -274,6 +274,16 @@ struct alignas(ALIGNMENT) GenericAck {
     static GenericAck ok() { return GenericAck(AckType::SUCCESS, "OK"); }
 };
 
+/**
+ * GenericAck's JSON schema:
+ * {
+ *   "result": True|False
+ *   "__comment__": "Below two fields are optional"
+ *   "error_type": "TGAPI_EXCEPTION"|"INVALID_ARGUMENT"|"COMMAND_IGNORED"|"RUNTIME_ERROR"|"CLIENT_ERROR",
+ *   "error_msg": "Error message"
+ * }
+ */
+ 
 struct alignas(ALIGNMENT) UploadFileDryCallback : public GenericAck {
     data::UploadFileDry requestdata;
 };

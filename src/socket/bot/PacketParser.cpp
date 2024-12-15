@@ -7,6 +7,26 @@
 #include <socket/TgBotCommandMap.hpp>
 #include <utility>
 
+template <>
+struct fmt::formatter<TgBotSocket::PayloadType> : formatter<std::string_view> {
+    using Command = TgBotSocket::Command;
+
+    // parse is inherited from formatter<string_view>.
+    auto format(TgBotSocket::PayloadType c,
+                format_context& ctx) const -> format_context::iterator {
+        string_view name = "unknown";
+        switch (c) {
+            case TgBotSocket::PayloadType::Binary:
+                name = "binary";
+                break;
+            case TgBotSocket::PayloadType::Json:
+                name = "json";
+                break;
+        }
+        return formatter<string_view>::format(name, ctx);
+    }
+};
+
 namespace TgBotSocket {
 
 std::optional<Packet> readPacket(const TgBotSocket::Context& context) {
@@ -50,8 +70,8 @@ std::optional<Packet> readPacket(const TgBotSocket::Context& context) {
                          sizeof(header) - sizeof(magic));
     header.magic = magic;
 
-    LOG(INFO) << fmt::format("Received buf with {}, invoking callback!",
-                             header.cmd);
+    LOG(INFO) << fmt::format("Received Packet{{cmd={}, data_type={}}}",
+                             header.cmd, header.data_type);
 
     const size_t newLength =
         sizeof(TgBotSocket::Packet::Header) + header.data_size;

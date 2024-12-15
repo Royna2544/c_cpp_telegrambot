@@ -90,6 +90,45 @@ std::optional<Json::Value> parseAndCheck(
     return root;
 }
 
+Packet nodeToPacket(const Json::Value& json) {
+    std::string result;
+    Json::FastWriter writer;
+    result = writer.write(json);
+    Packet packet(Command::CMD_GENERIC_ACK, result.c_str(), result.size());
+    packet.header.data_type = PayloadType::Json;
+    return packet;
+}
+
+Packet toJSONPacket(const GenericAck& ack) {
+    Json::Value root;
+    root["result"] = ack.result == AckType::SUCCESS;
+    if (ack.result != AckType::SUCCESS) {
+        root["error_msg"] = ack.error_msg.data();
+        switch (ack.result) {
+            case AckType::ERROR_CLIENT_ERROR:
+                root["error_type"] = "CLIENT_ERROR";
+                break;
+            case AckType::ERROR_COMMAND_IGNORED:
+                root["error_type"] = "COMMAND_IGNORED";
+                break;
+            case AckType::ERROR_INVALID_ARGUMENT:
+                root["error_type"] = "INVALID_ARGUMENT";
+                break;
+            case AckType::ERROR_RUNTIME_ERROR:
+                root["error_type"] = "RUNTIME_ERROR";
+                break;
+            case AckType::ERROR_TGAPI_EXCEPTION:
+                root["error_type"] = "TGAPI_EXCEPTION";
+                break;
+            default:
+                DLOG(WARNING)
+                    << "Unknown ack type: " << static_cast<int>(ack.result);
+                break;
+        }
+    }
+    return nodeToPacket(root);
+}
+
 template <size_t N>
 std::string safeParse(const std::array<char, N>& buf) {
     // Create a larger array to hold the null-terminated string
@@ -391,14 +430,12 @@ GenericAck SocketInterfaceTgBot::handle_SendFileToChatId(
     return GenericAck::ok();
 }
 
-GenericAck SocketInterfaceTgBot::handle_ObserveAllChats(const void* ptr) {
+GenericAck SocketInterfaceTgBot::handle_ObserveAllChats(
+    const void* ptr, TgBotSocket::Packet::Header::length_type len,
+    TgBotSocket::PayloadType type) {
+    auto data = ObserveAllChats::fromBuffer(ptr, len, type);
     observer->observeAll(static_cast<const ObserveAllChats*>(ptr)->observe);
     return GenericAck::ok();
-}
-
-GenericAck SocketInterfaceTgBot::handle_DeleteControllerById(const void* ptr) {
-    return GenericAck{AckType::ERROR_COMMAND_IGNORED,
-                      "This command is removed."};
 }
 
 GenericAck SocketInterfaceTgBot::handle_UploadFile(
@@ -498,11 +535,8 @@ void SocketInterfaceTgBot::handlePacket(const TgBotSocket::Context& ctx,
                                           pkt.header.data_type);
             break;
         case Command::CMD_OBSERVE_ALL_CHATS:
-            if (CHECK_PACKET_SIZE<ObserveAllChats>(pkt)) {
-                ret = handle_ObserveAllChats(ptr);
-            } else {
-                ret = invalidPacketAck;
-            }
+            ret = handle_ObserveAllChats(ptr, pkt.header.data_size,
+                                         pkt.header.data_type);
             break;
         case Command::CMD_GET_UPTIME:
             ret = handle_GetUptime(ctx, ptr);
@@ -554,11 +588,18 @@ void SocketInterfaceTgBot::handlePacket(const TgBotSocket::Context& ctx,
         case Command::CMD_OBSERVE_ALL_CHATS:
         case Command::CMD_UPLOAD_FILE: {
             GenericAck result = std::get<GenericAck>(ret);
-            Packet ackpkt(Command::CMD_GENERIC_ACK, &result,
-                          sizeof(GenericAck));
             LOG(INFO) << "Sending ack: " << std::boolalpha
                       << (result.result == AckType::SUCCESS);
-            ctx.write(ackpkt);
+            switch (pkt.header.data_type) {
+                case PayloadType::Binary: {
+                    Packet ackpkt(Command::CMD_GENERIC_ACK, &result,
+                                  sizeof(GenericAck));
+                    ctx.write(ackpkt);
+                } break;
+                case PayloadType::Json: {
+                    ctx.write(toJSONPacket(result));
+                } break;
+            }
             break;
         }
         default:
