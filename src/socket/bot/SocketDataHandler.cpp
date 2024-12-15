@@ -18,9 +18,9 @@
 #include <utility>
 #include <variant>
 
+#include "FileHelperNew.hpp"
 #include "SocketContext.hpp"
-#include "TgBotSocketFileHelperNew.hpp"
-#include "TgBotSocketInterface.hpp"
+#include "SocketInterface.hpp"
 
 using TgBot::InputFile;
 namespace fs = std::filesystem;
@@ -94,7 +94,7 @@ template <size_t N>
 std::string safeParse(const std::array<char, N>& buf) {
     // Create a larger array to hold the null-terminated string
     std::array<char, N + 1> safebuf{};
-    
+
     // Safely copy N characters from buf to safebuf
     std::ranges::copy_n(buf.begin(), N, safebuf.begin());
 
@@ -206,7 +206,8 @@ struct SendFileToChatId {
                 }
                 return result;
             case PayloadType::Json: {
-                auto _root = parseAndCheck(buffer, size, {"chat", "fileType", "filePath"});
+                auto _root = parseAndCheck(buffer, size,
+                                           {"chat", "fileType", "filePath"});
                 if (!_root) {
                     return std::nullopt;
                 }

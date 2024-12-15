@@ -5,9 +5,8 @@
 #include <TgBotSocket_Export.hpp>
 #include <TryParseStr.hpp>
 #include <backends/ClientBackend.hpp>
-#include <bot/TgBotPacketParser.hpp>
-#include <bot/TgBotSocketFileHelperNew.hpp>
-#include <cstddef>
+#include <bot/FileHelperNew.hpp>
+#include <bot/PacketParser.hpp>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>

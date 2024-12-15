@@ -1,10 +1,9 @@
-#include "TgBotSocketInterface.hpp"
+#include "SocketInterface.hpp"
 
 #include <ManagedThreads.hpp>
+#include <TgBotCommandMap.hpp>
 #include <api/TgBotApi.hpp>
 #include <utility>
-
-#include "TgBotPacketParser.hpp"
 
 SocketInterfaceTgBot::SocketInterfaceTgBot(TgBotSocket::Context* _interface,
                                            TgBotApi::Ptr _api,
@@ -21,7 +20,7 @@ SocketInterfaceTgBot::SocketInterfaceTgBot(TgBotSocket::Context* _interface,
 
 void SocketInterfaceTgBot::runFunction(const std::stop_token& token) {
     bool ret = _interface->listen([this](const TgBotSocket::Context& ctx) {
-        auto pkt = TgBotSocket::readPacket(ctx);
+        auto pkt = readPacket(ctx);
         if (pkt) {
             handlePacket(ctx, std::move(pkt.value()));
         }

@@ -8,8 +8,8 @@ add_my_library(
     Local.cpp
     UDP.cpp
     TCP.cpp
-    bot/TgBotPacketParser.cpp
-    bot/TgBotSocketFileHelperNew.cpp
+    bot/PacketParser.cpp
+    bot/FileHelperNew.cpp
     backends/ClientBackend.cpp
     TgBotCommandMap.cpp
   PUBLIC_INC include interface

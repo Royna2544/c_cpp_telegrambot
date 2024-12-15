@@ -1,4 +1,4 @@
-#include "TgBotSocketFileHelperNew.hpp"
+#include "FileHelperNew.hpp"
 
 #include <absl/log/log.h>
 #include <cstdint>

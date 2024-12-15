@@ -6,8 +6,8 @@
 #include <tgbot/TgException.h>
 
 #include <SharedMalloc.hpp>
-#include <bot/TgBotSocketFileHelperNew.hpp>
-#include <bot/TgBotSocketInterface.hpp>
+#include <bot/FileHelperNew.hpp>
+#include <bot/SocketInterface.hpp>
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
