@@ -15,7 +15,7 @@
 #include "JNIOnLoad.h"
 #include "JavaCppConverter.hpp"
 // Include the tgbot's exported header
-#include "../../../../../../src/socket/bot/TgBotSocketFileHelperNew.hpp"
+#include "../../../../../../src/socket/bot/FileHelperNew.hpp"
 
 using namespace TgBotSocket;
 using namespace TgBotSocket::data;
@@ -207,7 +207,7 @@ class TgBotSocketNative {
         setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
         // Calculate CRC32
-        context.header.checksum = Packet::crc32_function(context.data);
+        context.header.data_checksum = Packet::crc32_function(context.data);
 
         // Update status 1
         callbacks->status(Callbacks::Status::CONNECTION_PREPARED);

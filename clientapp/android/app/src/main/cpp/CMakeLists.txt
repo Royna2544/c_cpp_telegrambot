@@ -29,7 +29,7 @@ set(SOURCE_DIR ../../../../../../src)
 add_library(${CMAKE_PROJECT_NAME} SHARED
     # List C/C++ source files with relative paths to this CMakeLists.txt.
     tgbotclient.cpp
-    ${SOURCE_DIR}/socket/bot/TgBotSocketFileHelperNew.cpp
+    ${SOURCE_DIR}/socket/bot/FileHelperNew.cpp
     ${SOURCE_DIR}/hash/crc32.cpp ${SOURCE_DIR}/hash/sha256.cpp ${SOURCE_DIR}/hash/sha-2/sha-256.c)
 
 set(ABSL_PROPAGATE_CXX_STD ON)
