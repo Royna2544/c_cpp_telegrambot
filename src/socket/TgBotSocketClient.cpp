@@ -235,13 +235,6 @@ int main(int argc, char** argv) {
                 pkt = Packet(cmd, data);
             }
         } break;
-        case Command::CMD_DELETE_CONTROLLER_BY_ID: {
-            ThreadManager::Usage data{};
-            if (parseOneEnum(&data, ThreadManager::Usage::MAX, argv[0],
-                             "usage")) {
-                pkt = Packet(cmd, data);
-            }
-        }
         case Command::CMD_GET_UPTIME: {
             // Data is unused in this case
             pkt = Packet(cmd, 1);
@@ -274,7 +267,7 @@ int main(int argc, char** argv) {
         LOG(ERROR) << fmt::format("Failed parsing arguments for {}", cmd);
         return EXIT_FAILURE;
     } else {
-        pkt->header.checksum = pkt->crc32_function(pkt->data);
+        pkt->header.data_checksum = pkt->crc32_function(pkt->data);
     }
 
     SocketClientWrapper backend;

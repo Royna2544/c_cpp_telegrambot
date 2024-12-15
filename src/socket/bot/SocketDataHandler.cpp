@@ -11,6 +11,7 @@
 #include <fstream>
 #include <global_handlers/ChatObserver.hpp>
 #include <global_handlers/SpamBlock.hpp>
+#include <initializer_list>
 #include <mutex>
 #include <socket/TgBotCommandMap.hpp>
 #include <trivial_helpers/log_once.hpp>
@@ -25,7 +26,6 @@ using TgBot::InputFile;
 namespace fs = std::filesystem;
 using namespace TgBotSocket;
 using namespace TgBotSocket::callback;
-using namespace TgBotSocket::data;
 
 namespace {
 
@@ -66,10 +66,195 @@ std::string getMIMEString(const ResourceProvider* resource,
 }
 }  // namespace
 
-GenericAck SocketInterfaceTgBot::handle_WriteMsgToChatId(const void* ptr) {
-    const auto* data = static_cast<const WriteMsgToChatId*>(ptr);
+std::optional<Json::Value> parseAndCheck(
+    const void* buf, TgBotSocket::Packet::Header::length_type length,
+    const std::initializer_list<const char*> nodes) {
+    Json::Value root;
+    Json::Reader reader;
+    if (!reader.parse(std::string(static_cast<const char*>(buf), length),
+                      root)) {
+        LOG(WARNING) << "Failed to parse json: "
+                     << reader.getFormattedErrorMessages();
+        return std::nullopt;
+    }
+    if (!root.isObject()) {
+        LOG(WARNING) << "Expected an object in json";
+        return std::nullopt;
+    }
+    for (const auto& node : nodes) {
+        if (!root.isMember(node)) {
+            LOG(WARNING) << fmt::format("Missing node '{}' in json", node);
+            return std::nullopt;
+        }
+    }
+    return root;
+}
+
+struct WriteMsgToChatId {
+    ChatId chat;          // destination chatid
+    std::string message;  // Msg to send
+
+    static std::optional<WriteMsgToChatId> fromBuffer(
+        const void* buffer, TgBotSocket::Packet::Header::length_type size,
+        TgBotSocket::PayloadType type) {
+        WriteMsgToChatId result{};
+        switch (type) {
+            case PayloadType::Binary:
+                if (size != sizeof(data::WriteMsgToChatId)) {
+                    DLOG(WARNING)
+                        << "Payload size mismatch on WriteMsgToChatId";
+                    return std::nullopt;
+                }
+                {
+                    const auto* data =
+                        static_cast<const data::WriteMsgToChatId*>(buffer);
+                    result.chat = data->chat;
+                    result.message = data->message.data();
+                }
+                return result;
+            case PayloadType::Json: {
+                auto _root = parseAndCheck(buffer, size, {"chat", "message"});
+                if (!_root) {
+                    return std::nullopt;
+                }
+                auto root = _root.value();
+                result.chat = root["chat"].as<ChatId>();
+                result.message = root["message"].asString();
+                return result;
+            }
+            default:
+                LOG(ERROR) << "Invalid payload type for WriteMsgToChatId";
+                return std::nullopt;
+        }
+    }
+};
+
+struct ObserveChatId {
+    ChatId chat;
+    bool observe;
+
+    static std::optional<ObserveChatId> fromBuffer(
+        const void* buffer, TgBotSocket::Packet::Header::length_type size,
+        TgBotSocket::PayloadType type) {
+        ObserveChatId result{};
+        switch (type) {
+            case PayloadType::Binary:
+                if (size != sizeof(data::ObserveChatId)) {
+                    DLOG(WARNING) << "Payload size mismatch on ObserveChatId";
+                    return std::nullopt;
+                }
+                {
+                    const auto* data =
+                        static_cast<const data::ObserveChatId*>(buffer);
+                    result.chat = data->chat;
+                    result.observe = data->observe;
+                }
+                return result;
+            case PayloadType::Json: {
+                auto _root = parseAndCheck(buffer, size, {"chat", "observe"});
+                if (!_root) {
+                    return std::nullopt;
+                }
+                auto root = _root.value();
+                result.chat = root["chat"].as<ChatId>();
+                result.observe = root["observe"].asBool();
+                return result;
+            }
+            default:
+                LOG(ERROR) << "Invalid payload type for ObserveChatId";
+                return std::nullopt;
+        }
+    }
+};
+
+struct SendFileToChatId {
+    ChatId chat;                           // Destination ChatId
+    TgBotSocket::data::FileType fileType;  // File type for file
+    std::filesystem::path filePath;        // Path to file (local)
+
+    static std::optional<SendFileToChatId> fromBuffer(
+        const void* buffer, TgBotSocket::Packet::Header::length_type size,
+        TgBotSocket::PayloadType type) {
+        SendFileToChatId result{};
+        switch (type) {
+            case PayloadType::Binary:
+                if (size < sizeof(data::SendFileToChatId)) {
+                    DLOG(WARNING)
+                        << "Payload size mismatch on SendFileToChatId";
+                    return std::nullopt;
+                }
+                {
+                    const auto* data =
+                        static_cast<const data::SendFileToChatId*>(buffer);
+                    result.chat = data->chat;
+                    result.fileType = data->fileType;
+                    result.filePath = data->filePath.data();
+                }
+                return result;
+            case PayloadType::Json: {
+                auto _root = parseAndCheck(buffer, size, {"chat", "fileType", "filePath"});
+                if (!_root) {
+                    return std::nullopt;
+                }
+                auto root = _root.value();
+                result.chat = root["chat"].as<ChatId>();
+                result.fileType = static_cast<TgBotSocket::data::FileType>(
+                    root["fileType"].asInt());
+                result.filePath = root["filePath"].asString();
+                return result;
+            }
+            default:
+                LOG(ERROR) << "Invalid payload type for SendFileToChatId";
+                return std::nullopt;
+        }
+    }
+};
+
+struct ObserveAllChats {
+    bool observe;  // new state for all chats,
+                   // true/false - Start/Stop observing
+
+    static std::optional<ObserveAllChats> fromBuffer(
+        const void* buffer, TgBotSocket::Packet::Header::length_type size,
+        TgBotSocket::PayloadType type) {
+        ObserveAllChats result{};
+        switch (type) {
+            case PayloadType::Binary:
+                if (size != sizeof(data::ObserveAllChats)) {
+                    DLOG(WARNING) << "Payload size mismatch on ObserveAllChats";
+                    return std::nullopt;
+                }
+                {
+                    const auto* data =
+                        static_cast<const data::ObserveAllChats*>(buffer);
+                    result.observe = data->observe;
+                }
+                return result;
+            case PayloadType::Json: {
+                auto _root = parseAndCheck(buffer, size, {"observe"});
+                if (!_root) {
+                    return std::nullopt;
+                }
+                auto root = _root.value();
+                result.observe = root["observe"].asBool();
+                return result;
+            }
+            default:
+                LOG(ERROR) << "Invalid payload type for ObserveAllChats";
+                return std::nullopt;
+        }
+    }
+};
+
+GenericAck SocketInterfaceTgBot::handle_WriteMsgToChatId(
+    const void* ptr, TgBotSocket::Packet::Header::length_type len,
+    TgBotSocket::PayloadType type) {
+    const auto data = WriteMsgToChatId::fromBuffer(ptr, len, type);
+    if (!data) {
+        return GenericAck(AckType::ERROR_INVALID_ARGUMENT, "Invalid command");
+    }
     try {
-        api->sendMessage(data->chat, data->message.data());
+        api->sendMessage(data->chat, data->message);
     } catch (const TgBot::TgException& e) {
         LOG(ERROR) << "Exception at handler: " << e.what();
         return GenericAck(AckType::ERROR_TGAPI_EXCEPTION, e.what());
@@ -78,14 +263,20 @@ GenericAck SocketInterfaceTgBot::handle_WriteMsgToChatId(const void* ptr) {
 }
 
 GenericAck SocketInterfaceTgBot::handle_CtrlSpamBlock(const void* ptr) {
-    const auto* data = static_cast<const CtrlSpamBlock*>(ptr);
+    const auto* data =
+        static_cast<const TgBotSocket::data::CtrlSpamBlock*>(ptr);
     spamblock->setConfig(*data);
     return GenericAck::ok();
 }
 
-GenericAck SocketInterfaceTgBot::handle_ObserveChatId(const void* ptr) {
-    const auto* data = static_cast<const ObserveChatId*>(ptr);
+GenericAck SocketInterfaceTgBot::handle_ObserveChatId(
+    const void* ptr, TgBotSocket::Packet::Header::length_type len,
+    TgBotSocket::PayloadType type) {
+    auto data = ObserveChatId::fromBuffer(ptr, len, type);
 
+    if (!data) {
+        return GenericAck(AckType::ERROR_INVALID_ARGUMENT, "Invalid command");
+    }
     bool observe = data->observe;
     if (!observer->observeAll(true)) {
         return GenericAck(AckType::ERROR_COMMAND_IGNORED,
@@ -111,14 +302,20 @@ GenericAck SocketInterfaceTgBot::handle_ObserveChatId(const void* ptr) {
     return GenericAck::ok();
 }
 
-GenericAck SocketInterfaceTgBot::handle_SendFileToChatId(const void* ptr) {
-    const auto* data = static_cast<const SendFileToChatId*>(ptr);
-    const auto* file = data->filePath.data();
+GenericAck SocketInterfaceTgBot::handle_SendFileToChatId(
+    const void* ptr, TgBotSocket::Packet::Header::length_type len,
+    TgBotSocket::PayloadType type) {
+    const auto data = SendFileToChatId::fromBuffer(ptr, len, type);
+    if (!data) {
+        return GenericAck(AckType::ERROR_INVALID_ARGUMENT, "Invalid command");
+    }
+    const auto file = data->filePath.string();
     if (data->filePath.empty()) {
         return GenericAck(AckType::ERROR_INVALID_ARGUMENT, "No file provided");
     }
     std::function<Message::Ptr(ChatId, const TgBotApi::FileOrMedia&)> fn;
     switch (data->fileType) {
+        using FileType = TgBotSocket::data::FileType;
         case FileType::TYPE_PHOTO:
             fn = [this](ChatId id, const TgBotApi::FileOrMedia& file) {
                 return api->sendPhoto(id, file);
@@ -201,7 +398,7 @@ GenericAck SocketInterfaceTgBot::handle_UploadFile(
 UploadFileDryCallback SocketInterfaceTgBot::handle_UploadFileDry(
     const void* ptr, TgBotSocket::Packet::Header::length_type len) {
     bool ret = false;
-    const auto* f = static_cast<const UploadFileDry*>(ptr);
+    const auto* f = static_cast<const data::UploadFileDry*>(ptr);
     UploadFileDryCallback callback;
     callback.requestdata = *f;
 
@@ -219,7 +416,7 @@ UploadFileDryCallback SocketInterfaceTgBot::handle_UploadFileDry(
 
 bool SocketInterfaceTgBot::handle_DownloadFile(const TgBotSocket::Context& ctx,
                                                const void* ptr) {
-    const auto* data = static_cast<const DownloadFile*>(ptr);
+    const auto* data = static_cast<const data::DownloadFile*>(ptr);
     SocketFile2DataHelper::DataFromFileParam params;
     params.filepath = data->filepath.data();
     params.destfilepath = data->destfilename.data();
@@ -267,43 +464,27 @@ void SocketInterfaceTgBot::handlePacket(const TgBotSocket::Context& ctx,
 
     switch (pkt.header.cmd) {
         case Command::CMD_WRITE_MSG_TO_CHAT_ID:
-            if (CHECK_PACKET_SIZE<WriteMsgToChatId>(pkt)) {
-                ret = handle_WriteMsgToChatId(ptr);
-            } else {
-                ret = invalidPacketAck;
-            }
+            ret = handle_WriteMsgToChatId(ptr, pkt.header.data_size,
+                                          pkt.header.data_type);
             break;
         case Command::CMD_CTRL_SPAMBLOCK:
-            if (CHECK_PACKET_SIZE<CtrlSpamBlock>(pkt)) {
+            if (CHECK_PACKET_SIZE<TgBotSocket::data::CtrlSpamBlock>(pkt)) {
                 ret = handle_CtrlSpamBlock(ptr);
             } else {
                 ret = invalidPacketAck;
             }
             break;
         case Command::CMD_OBSERVE_CHAT_ID:
-            if (CHECK_PACKET_SIZE<ObserveChatId>(pkt)) {
-                ret = handle_ObserveChatId(ptr);
-            } else {
-                ret = invalidPacketAck;
-            }
+            ret = handle_ObserveChatId(ptr, pkt.header.data_size,
+                                       pkt.header.data_type);
             break;
         case Command::CMD_SEND_FILE_TO_CHAT_ID:
-            if (CHECK_PACKET_SIZE<SendFileToChatId>(pkt)) {
-                ret = handle_SendFileToChatId(ptr);
-            } else {
-                ret = invalidPacketAck;
-            }
+            ret = handle_SendFileToChatId(ptr, pkt.header.data_size,
+                                          pkt.header.data_type);
             break;
         case Command::CMD_OBSERVE_ALL_CHATS:
             if (CHECK_PACKET_SIZE<ObserveAllChats>(pkt)) {
                 ret = handle_ObserveAllChats(ptr);
-            } else {
-                ret = invalidPacketAck;
-            }
-            break;
-        case Command::CMD_DELETE_CONTROLLER_BY_ID:
-            if (CHECK_PACKET_SIZE<DeleteControllerById>(pkt)) {
-                ret = handle_DeleteControllerById(ptr);
             } else {
                 ret = invalidPacketAck;
             }
@@ -315,7 +496,7 @@ void SocketInterfaceTgBot::handlePacket(const TgBotSocket::Context& ctx,
             ret = handle_UploadFile(ptr, pkt.header.data_size);
             break;
         case Command::CMD_UPLOAD_FILE_DRY:
-            if (CHECK_PACKET_SIZE<UploadFileDry>(pkt)) {
+            if (CHECK_PACKET_SIZE<data::UploadFileDry>(pkt)) {
                 ret = handle_UploadFileDry(ptr, pkt.header.data_size);
             } else {
                 ret = UploadFileDryCallback(invalidPacketAck);
@@ -356,7 +537,6 @@ void SocketInterfaceTgBot::handlePacket(const TgBotSocket::Context& ctx,
         case Command::CMD_OBSERVE_CHAT_ID:
         case Command::CMD_SEND_FILE_TO_CHAT_ID:
         case Command::CMD_OBSERVE_ALL_CHATS:
-        case Command::CMD_DELETE_CONTROLLER_BY_ID:
         case Command::CMD_UPLOAD_FILE: {
             GenericAck result = std::get<GenericAck>(ret);
             Packet ackpkt(Command::CMD_GENERIC_ACK, &result,

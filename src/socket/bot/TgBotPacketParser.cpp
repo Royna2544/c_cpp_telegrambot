@@ -62,7 +62,7 @@ std::optional<Packet> readPacket(const TgBotSocket::Context& context) {
         LOG(ERROR) << "While reading data, failed";
         return std::nullopt;
     }
-    if (header.checksum != Packet::crc32_function(data.value())) {
+    if (header.data_checksum != Packet::crc32_function(data.value())) {
         LOG(WARNING) << "Checksum mismatch, dropping buffer";
         return std::nullopt;
     }

@@ -36,10 +36,16 @@ struct SocketInterfaceTgBot : ThreadRunner {
         std::chrono::system_clock::now();
 
     // Command handlers
-    GenericAck handle_WriteMsgToChatId(const void* ptr);
-    GenericAck handle_SendFileToChatId(const void* ptr);
+    GenericAck handle_WriteMsgToChatId(
+        const void* ptr, TgBotSocket::Packet::Header::length_type len,
+        TgBotSocket::PayloadType type);
+    GenericAck handle_SendFileToChatId(
+        const void* ptr, TgBotSocket::Packet::Header::length_type len,
+        TgBotSocket::PayloadType type);
     GenericAck handle_CtrlSpamBlock(const void* ptr);
-    GenericAck handle_ObserveChatId(const void* ptr);
+    GenericAck handle_ObserveChatId(
+        const void* ptr, TgBotSocket::Packet::Header::length_type len,
+        TgBotSocket::PayloadType type);
     GenericAck handle_ObserveAllChats(const void* ptr);
     static GenericAck handle_DeleteControllerById(const void* ptr);
     GenericAck handle_UploadFile(const void* ptr,

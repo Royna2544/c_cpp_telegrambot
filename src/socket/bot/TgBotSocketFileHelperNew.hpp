@@ -116,10 +116,6 @@ struct Socket_API RealFS : public VFSOperations {
     void SHA256(const SharedMalloc& memory, HashContainer& data) override;
 };
 
-using TgBotSocket::data::DownloadFile;
-using TgBotSocket::data::UploadFile;
-using TgBotSocket::data::UploadFileDry;
-
 class Socket_API SocketFile2DataHelper {
     VFSOperations* vfs;
 

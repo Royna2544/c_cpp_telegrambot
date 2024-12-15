@@ -5,7 +5,6 @@
 #include <fmt/format.h>
 #include <fmt/ranges.h>
 
-#include <_TgBotSocketCommands.hpp>
 #include <mutex>
 
 namespace TgBotSocket::CommandHelpers {
@@ -25,8 +24,6 @@ constexpr std::array<CommandEntry, static_cast<int>(Command::CMD_CLIENT_MAX)>
         CommandEntry{Command::CMD_SEND_FILE_TO_CHAT_ID, 3,
                      "Chat ID, FileType enum, FilePath"},
         CommandEntry{Command::CMD_OBSERVE_ALL_CHATS, 1, "Observe_or_not"},
-        CommandEntry{Command::CMD_DELETE_CONTROLLER_BY_ID, 1,
-                     "ThreadManager::Usage enum, now no-op"},
         CommandEntry{Command::CMD_GET_UPTIME, 0, ""},
         CommandEntry{Command::CMD_UPLOAD_FILE, 2,
                      "Source File (In local), Dest File (In remote)"},

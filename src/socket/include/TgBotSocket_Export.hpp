@@ -17,7 +17,6 @@
 #endif
 #include "../../hash/crc32.hpp"
 #include "../../hash/sha256.hpp"
-#include "_TgBotSocketCommands.hpp"
 
 template <typename T, size_t size>
 inline bool arraycmp(const std::array<T, size>& lhs,
@@ -37,12 +36,37 @@ inline void copyTo(std::array<char, size>& arr_in, const char* buf) {
 template <size_t size, size_t size2>
 inline void copyTo(std::array<char, size>& arr_in,
                    std::array<char, size2> buf) {
-    static_assert(size >= size2, "Destination must be same or bigger than source size");
+    static_assert(size >= size2,
+                  "Destination must be same or bigger than source size");
     copyTo(arr_in, buf.data());
     arr_in[size - 1] = '\0';
 }
 
 namespace TgBotSocket {
+
+enum class Command : std::int32_t {
+    CMD_INVALID,
+    CMD_WRITE_MSG_TO_CHAT_ID,
+    CMD_CTRL_SPAMBLOCK,
+    CMD_OBSERVE_CHAT_ID,
+    CMD_SEND_FILE_TO_CHAT_ID,
+    CMD_OBSERVE_ALL_CHATS,
+    CMD_GET_UPTIME,
+    CMD_UPLOAD_FILE,
+    CMD_DOWNLOAD_FILE,
+    CMD_CLIENT_MAX,
+
+    // Below are internal commands
+    CMD_SERVER_INTERNAL_START = 100,
+    CMD_GET_UPTIME_CALLBACK = CMD_SERVER_INTERNAL_START,
+    CMD_GENERIC_ACK,
+    CMD_UPLOAD_FILE_DRY,
+    CMD_UPLOAD_FILE_DRY_CALLBACK,
+    CMD_DOWNLOAD_FILE_CALLBACK,
+    CMD_MAX,
+};
+
+enum class PayloadType { Binary, Json };
 
 constexpr int MAX_PATH_SIZE = 256;
 constexpr int MAX_MSG_SIZE = 256;
@@ -76,15 +100,18 @@ struct alignas(ALIGNMENT) Packet {
         // 8: change checksum to uint64_t
         // 9: Remove padding objects
         // 10: Alignments fixing for Python compliance, add INVALID_CMD at 0
-        constexpr static int DATA_VERSION = 10;
+        // 11: Remove CMD_DELETE_CONTROLLER_BY_ID, add payload type to header
+        constexpr static int DATA_VERSION = 11;
         constexpr static int64_t MAGIC_VALUE = MAGIC_VALUE_BASE + DATA_VERSION;
 
         int64_t magic = MAGIC_VALUE;  ///< Magic value to verify the packet
         Command cmd{};                ///< Command to be executed
+        ///< Type of payload in the packet
+        PayloadType data_type{};
         ///< Size of the data in the packet
         length_type data_size{};
         ///< Checksum of the packet data
-        uint64_t checksum{};
+        CRC32::result_type data_checksum{};
     };
     static_assert(offsetof(Header, magic) == 0);
 
@@ -112,10 +139,11 @@ struct alignas(ALIGNMENT) Packet {
         header.cmd = cmd;
         header.magic = Header::MAGIC_VALUE;
         data.assignFrom(in_data, header.data_size = size);
-        header.checksum = crc32_function(data);
+        header.data_checksum = crc32_function(data);
     }
 
-    static CRC32::result_type crc32_function(const uint8_t* data, const size_t data_size) {
+    static CRC32::result_type crc32_function(const uint8_t* data,
+                                             const size_t data_size) {
         return CRC32::compute(data, data_size);
     }
 
@@ -161,18 +189,14 @@ struct alignas(ALIGNMENT) ObserveChatId {
 };
 
 struct alignas(ALIGNMENT) SendFileToChatId {
-    ChatId chat;               // Destination ChatId
-    FileType fileType;         // File type for file
+    ChatId chat;                                  // Destination ChatId
+    FileType fileType;                            // File type for file
     alignas(ALIGNMENT) PathStringArray filePath;  // Path to file (local)
 };
 
 struct alignas(ALIGNMENT) ObserveAllChats {
     bool observe;  // new state for all chats,
                    // true/false - Start/Stop observing
-};
-
-struct alignas(ALIGNMENT) DeleteControllerById {
-    int controller_id;
 };
 
 struct alignas(ALIGNMENT) UploadFileDry {
@@ -194,10 +218,17 @@ struct alignas(ALIGNMENT) UploadFileDry {
         // If true, just check the hashes and return result.
         bool dry_run = false;
 
-        bool operator==(const Options& other) const = default;
+        constexpr bool operator==(const Options& other) const {
+            return overwrite == other.overwrite &&
+                   hash_ignore == other.hash_ignore && dry_run == other.dry_run;
+        }
     } options;
 
-    bool operator==(const UploadFileDry& other) const = default;
+    bool operator==(const UploadFileDry& other) const {
+        return arraycmp(destfilepath, other.destfilepath) &&
+               arraycmp(srcfilepath, other.srcfilepath) &&
+               arraycmp(sha256_hash, sha256_hash) && options == other.options;
+    }
 };
 
 struct alignas(ALIGNMENT) UploadFile : public UploadFileDry {
@@ -206,9 +237,9 @@ struct alignas(ALIGNMENT) UploadFile : public UploadFileDry {
 };
 
 struct alignas(ALIGNMENT) DownloadFile {
-    PathStringArray filepath{};      // Path to file (in remote)
-    PathStringArray destfilename{};  // Destination file name
-    alignas(ALIGNMENT) uint8_t buf[];                   // Buffer
+    PathStringArray filepath{};        // Path to file (in remote)
+    PathStringArray destfilename{};    // Destination file name
+    alignas(ALIGNMENT) uint8_t buf[];  // Buffer
 };
 }  // namespace data
 
@@ -261,7 +292,6 @@ ASSERT_SIZE(WriteMsgToChatId, 264);
 ASSERT_SIZE(ObserveChatId, 16);
 ASSERT_SIZE(SendFileToChatId, 272);
 ASSERT_SIZE(ObserveAllChats, 8);
-ASSERT_SIZE(DeleteControllerById, 8);
 ASSERT_SIZE(UploadFile, 552);
 ASSERT_SIZE(DownloadFile, 512);
 ASSERT_SIZE(Packet::Header, 32);

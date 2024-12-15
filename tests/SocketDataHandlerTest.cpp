@@ -209,14 +209,15 @@ TEST_F(SocketDataHandlerTest, TestCmdWriteMsgToChatIdINVALID) {
 }
 
 TEST_F(SocketDataHandlerTest, TestCmdUploadFileDryDoesntExist) {
-    auto data = UploadFileDry{.destfilepath = {"test"},
-                              .srcfilepath = {"testsrc"},
-                              .sha256_hash = {"asdqwdsadsad"},
-                              .options = {
-                                  .overwrite = true,
-                                  .hash_ignore = true,
-                                  .dry_run = true,
-                              }};
+    auto data =
+        TgBotSocket::data::UploadFileDry{.destfilepath = {"test"},
+                                         .srcfilepath = {"testsrc"},
+                                         .sha256_hash = {"asdqwdsadsad"},
+                                         .options = {
+                                             .overwrite = true,
+                                             .hash_ignore = true,
+                                             .dry_run = true,
+                                         }};
 
     // Set expectations
     TgBotSocket::Packet pkt(TgBotSocket::Command::CMD_UPLOAD_FILE_DRY, data);
@@ -235,14 +236,15 @@ TEST_F(SocketDataHandlerTest, TestCmdUploadFileDryDoesntExist) {
 }
 
 TEST_F(SocketDataHandlerTest, TestCmdUploadFileDryExistsHashDoesntMatch) {
-    auto data = UploadFileDry{.destfilepath = {"test"},
-                              .srcfilepath = {"testsrc"},
-                              .sha256_hash = {"asdqwdsadsad"},
-                              .options = {
-                                  .overwrite = true,
-                                  .hash_ignore = false,
-                                  .dry_run = true,
-                              }};
+    auto data =
+        TgBotSocket::data::UploadFileDry{.destfilepath = {"test"},
+                                         .srcfilepath = {"testsrc"},
+                                         .sha256_hash = {"asdqwdsadsad"},
+                                         .options = {
+                                             .overwrite = true,
+                                             .hash_ignore = false,
+                                             .dry_run = true,
+                                         }};
     // Prepare file contents
     const auto fileMem = createFileMem();
 
@@ -266,14 +268,15 @@ TEST_F(SocketDataHandlerTest, TestCmdUploadFileDryExistsHashDoesntMatch) {
 }
 
 TEST_F(SocketDataHandlerTest, TestCmdUploadFileDryExistsOptSaidNo) {
-    auto data = UploadFileDry{.destfilepath = {"test"},
-                              .srcfilepath = {"testsrc"},
-                              .sha256_hash = {"asdqwdsadsad"},
-                              .options = {
-                                  .overwrite = false,
-                                  .hash_ignore = false,
-                                  .dry_run = true,
-                              }};
+    auto data =
+        TgBotSocket::data::UploadFileDry{.destfilepath = {"test"},
+                                         .srcfilepath = {"testsrc"},
+                                         .sha256_hash = {"asdqwdsadsad"},
+                                         .options = {
+                                             .overwrite = false,
+                                             .hash_ignore = false,
+                                             .dry_run = true,
+                                         }};
     // Prepare file contents
     const auto fileMem = createFileMem();
 
@@ -297,15 +300,15 @@ TEST_F(SocketDataHandlerTest, TestCmdUploadFileDryExistsOptSaidNo) {
 TEST_F(SocketDataHandlerTest, TestCmdUploadFileOK) {
     // Prepare file contents
     const auto filemem = createFileMem();
-    SharedMalloc mem(sizeof(UploadFile) + filemem.size());
-    auto* uploadfile = static_cast<UploadFile*>(mem.get());
+    SharedMalloc mem(sizeof(TgBotSocket::data::UploadFile) + filemem.size());
+    auto* uploadfile = static_cast<TgBotSocket::data::UploadFile*>(mem.get());
     uploadfile->srcfilepath = {"sourcefile"};
     uploadfile->destfilepath = {"destinationfile"};
     uploadfile->sha256_hash = {"asdqwdsadsad"};
     uploadfile->options.hash_ignore = true;
     uploadfile->options.overwrite = true;
     uploadfile->options.dry_run = false;
-    mem.assignTo(filemem.get(), filemem.size(), sizeof(UploadFile));
+    mem.assignTo(filemem.get(), filemem.size(), sizeof(TgBotSocket::data::UploadFile));
 
     // Set expectations
     TgBotSocket::Packet pkt(TgBotSocket::Command::CMD_UPLOAD_FILE, mem.get(),
