@@ -70,6 +70,10 @@ using TgBotSocket::data::UploadFileDry;
 bool SocketFile2DataHelper::DataToFile_UPLOAD_FILE_DRY(
     const void* ptr, TgBotSocket::Packet::Header::length_type len) {
     const auto* data = static_cast<const UploadFileDry*>(ptr);
+    if (len != sizeof(UploadFileDry)) {
+        LOG(ERROR) << "Invalid UploadFileDry packet size";
+        return false;
+    }
     const char* filename = data->destfilepath.data();
     bool exists = false;
 
@@ -108,7 +112,10 @@ bool SocketFile2DataHelper::DataToFile_UPLOAD_FILE_DRY(
 bool SocketFile2DataHelper::DataToFile_UPLOAD_FILE(
     const void* ptr, TgBotSocket::Packet::Header::length_type len) {
     const auto* data = static_cast<const UploadFile*>(ptr);
-
+    if (len < sizeof(UploadFile)) {
+        LOG(ERROR) << "Invalid data length for UploadFile";
+        return false;
+    }
     return vfs->writeFile(data->destfilepath.data(), &data->buf[0],
                           len - sizeof(UploadFile));
 }
@@ -116,6 +123,10 @@ bool SocketFile2DataHelper::DataToFile_DOWNLOAD_FILE(
     const void* ptr, TgBotSocket::Packet::Header::length_type len) {
     const auto* data = static_cast<const DownloadFile*>(ptr);
 
+    if (len < sizeof(DownloadFile)) {
+        LOG(ERROR) << "Invalid data length for DownloadFile";
+        return false;
+    }
     return vfs->writeFile(data->destfilename.data(), &data->buf[0],
                           len - sizeof(DownloadFile));
 }
