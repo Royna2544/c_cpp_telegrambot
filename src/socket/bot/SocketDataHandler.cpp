@@ -90,6 +90,20 @@ std::optional<Json::Value> parseAndCheck(
     return root;
 }
 
+template <size_t N>
+std::string safeParse(const std::array<char, N>& buf) {
+    // Create a larger array to hold the null-terminated string
+    std::array<char, N + 1> safebuf{};
+    
+    // Safely copy N characters from buf to safebuf
+    std::ranges::copy_n(buf.begin(), N, safebuf.begin());
+
+    // Null-terminate the new buffer
+    safebuf[N] = '\0';
+
+    return safebuf.data();
+}
+
 struct WriteMsgToChatId {
     ChatId chat;          // destination chatid
     std::string message;  // Msg to send
@@ -109,7 +123,7 @@ struct WriteMsgToChatId {
                     const auto* data =
                         static_cast<const data::WriteMsgToChatId*>(buffer);
                     result.chat = data->chat;
-                    result.message = data->message.data();
+                    result.message = safeParse(data->message);
                 }
                 return result;
             case PayloadType::Json: {
@@ -188,7 +202,7 @@ struct SendFileToChatId {
                         static_cast<const data::SendFileToChatId*>(buffer);
                     result.chat = data->chat;
                     result.fileType = data->fileType;
-                    result.filePath = data->filePath.data();
+                    result.filePath = safeParse(data->filePath);
                 }
                 return result;
             case PayloadType::Json: {
