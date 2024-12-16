@@ -1,14 +1,13 @@
 #pragma once
 
-#include <absl/log/check.h>
+#include <trivial_helpers/_class_helper_macros.h>
 
 #include <cstddef>
 #include <cstdlib>
+#include <cstring>
 #include <memory>
 #include <stdexcept>
 #include <type_traits>
-
-#include "trivial_helpers/_class_helper_macros.h"
 
 #ifndef __cpp_concepts
 #define requires(x)
@@ -72,6 +71,7 @@ struct SharedMalloc {
             parent = std::make_shared<Parent>(size);
         }
     }
+    explicit SharedMalloc(std::nullptr_t) : SharedMalloc() {}
     SharedMalloc() { parent = std::make_shared<Parent>(); }
 
     template <typename T, std::enable_if_t<std::is_class_v<T>, bool> = true>
@@ -79,26 +79,15 @@ struct SharedMalloc {
         parent = std::make_shared<Parent>(sizeof(T));
         assignFrom(value);
     }
-    explicit SharedMalloc(std::nullptr_t /*value*/) {
-        parent = std::make_shared<Parent>();
-    }
 
+    explicit operator bool() const { return parent->size() != 0; }
     bool operator!=(std::nullptr_t value) { return parent.get() != value; }
-
-    template <typename T>
-    explicit operator T() const {
-        T value;
-        assignTo(value);
-        return value;
-    }
     [[nodiscard]] size_t size() const noexcept { return parent->size(); }
     void resize(size_t newSize) const noexcept { parent->realloc(newSize); }
 
    private:
     // A fortify check.
     inline void validateBoundsForSize(const size_t newSize) const {
-        DCHECK_LE(newSize, size())
-            << ": Operation size exceeds allocated memory size";
         if (newSize > size()) {
             throw std::out_of_range(
                 "Operation size exceeds allocated memory size");
@@ -106,7 +95,6 @@ struct SharedMalloc {
     }
 
     inline void offsetCheck(const size_t offset) const {
-        DCHECK_LE(offset, size()) << ": Offset exceeds allocated memory bounds";
         if (offset > size()) {
             throw std::out_of_range("Offset exceeds allocated memory bounds");
         }
@@ -194,8 +182,10 @@ struct SharedMalloc {
     template <typename T>
         requires(!std::is_pointer_v<T>)
     void assignFrom(const T &ref) {
-        CHECK_LE(sizeof(T), size())
-            << ": *this Must have bigger size than sizeof(T)";
+        if (sizeof(T) > size()) {
+            throw std::out_of_range(
+                "Operation size exceeds allocated memory size");
+        }
         assignFrom(&ref, sizeof(T));
     }
 

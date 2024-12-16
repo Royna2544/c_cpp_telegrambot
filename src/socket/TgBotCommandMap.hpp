@@ -5,7 +5,7 @@
 #include <string>
 
 #include <SocketExports.h>
-#include "include/TgBotSocket_Export.hpp"
+#include "TgBotSocket_Export.hpp"
 
 template <>
 struct fmt::formatter<TgBotSocket::Command> : formatter<std::string_view> {
@@ -29,11 +29,14 @@ struct fmt::formatter<TgBotSocket::Command> : formatter<std::string_view> {
             DEFINE_STR(CMD_UPLOAD_FILE);
             DEFINE_STR(CMD_DOWNLOAD_FILE);
             DEFINE_STR(CMD_CLIENT_MAX);
-            DEFINE_STR(CMD_SERVER_INTERNAL_START);
+            DEFINE_STR(CMD_GET_UPTIME_CALLBACK);
             DEFINE_STR(CMD_GENERIC_ACK);
             DEFINE_STR(CMD_UPLOAD_FILE_DRY);
             DEFINE_STR(CMD_UPLOAD_FILE_DRY_CALLBACK);
             DEFINE_STR(CMD_DOWNLOAD_FILE_CALLBACK);
+            DEFINE_STR(CMD_OPEN_SESSION);
+            DEFINE_STR(CMD_OPEN_SESSION_ACK);
+            DEFINE_STR(CMD_CLOSE_SESSION);
 #undef DEFINE_STR
             default:
                 break;

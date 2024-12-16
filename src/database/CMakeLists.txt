@@ -74,6 +74,7 @@ add_my_executable(
     DBImpl
     Socket
     DBLoading
+    JsonCpp::JsonCpp
   RELATION Socket
 )
 #####################################################################

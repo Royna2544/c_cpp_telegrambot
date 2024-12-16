@@ -1,14 +1,11 @@
 #include "FileHelperNew.hpp"
 
 #include <absl/log/log.h>
+
+#include <StructF.hpp>
 #include <cstdint>
 
-#ifdef __TGBOT__
-#include <StructF.hpp>
-#else
-#include "../../include/StructF.hpp"
-#endif
-
+#include "PacketParser.hpp"
 #include "TgBotSocket_Export.hpp"
 
 bool RealFS::writeFile(const std::filesystem::path& filename,
@@ -60,18 +57,19 @@ bool RealFS::exists(const std::filesystem::path& path) {
 }
 
 void RealFS::SHA256(const SharedMalloc& memory, HashContainer& data) {
-    data.m_data = SHA256::compute(static_cast<const uint8_t*>(memory.get()), memory.size());
+    data.m_data = SHA256::compute(static_cast<const uint8_t*>(memory.get()),
+                                  memory.size());
 }
 
 using TgBotSocket::data::DownloadFile;
 using TgBotSocket::data::UploadFile;
-using TgBotSocket::data::UploadFileDry;
+using TgBotSocket::data::UploadFileMeta;
 
 bool SocketFile2DataHelper::DataToFile_UPLOAD_FILE_DRY(
     const void* ptr, TgBotSocket::Packet::Header::length_type len) {
-    const auto* data = static_cast<const UploadFileDry*>(ptr);
-    if (len != sizeof(UploadFileDry)) {
-        LOG(ERROR) << "Invalid UploadFileDry packet size";
+    const auto* data = static_cast<const UploadFileMeta*>(ptr);
+    if (len != sizeof(UploadFileMeta)) {
+        LOG(ERROR) << "Invalid UploadFileMeta packet size";
         return false;
     }
     const char* filename = data->destfilepath.data();
@@ -133,7 +131,8 @@ bool SocketFile2DataHelper::DataToFile_DOWNLOAD_FILE(
 
 std::optional<TgBotSocket::Packet>
 SocketFile2DataHelper::DataFromFile_UPLOAD_FILE(
-    const DataFromFileParam& params) {
+    const DataFromFileParam& params,
+    const TgBotSocket::Packet::Header::session_token_type& session_token) {
     const auto _result = vfs->readFile(params.filepath);
     HashContainer hash{};
 
@@ -148,7 +147,7 @@ SocketFile2DataHelper::DataFromFile_UPLOAD_FILE(
     // The front bytes of the buffer is UploadFile, hence cast it
     auto* uploadFile = static_cast<UploadFile*>(resultPointer.get());
     // Copy destination file name info to the buffer
-    copyTo(uploadFile->destfilepath, params.destfilepath.string().c_str());
+    copyTo(uploadFile->destfilepath, params.destfilepath.string());
     // Copy source file data to the buffer
     memcpy(&uploadFile->buf[0], result.get(), result.size());
     // Calculate SHA256 hash
@@ -160,14 +159,16 @@ SocketFile2DataHelper::DataFromFile_UPLOAD_FILE(
     // Set dry run to false
     uploadFile->options.dry_run = false;
 
-    return TgBotSocket::Packet{TgBotSocket::Command::CMD_UPLOAD_FILE,
-                               resultPointer.get(),
-                               result.size() + sizeof(UploadFile)};
+    return TgBotSocket::createPacket(
+        TgBotSocket::Command::CMD_UPLOAD_FILE, resultPointer.get(),
+        result.size() + sizeof(UploadFile), TgBotSocket::PayloadType::Binary,
+        session_token);
 }
 
 std::optional<TgBotSocket::Packet>
 SocketFile2DataHelper::DataFromFile_UPLOAD_FILE_DRY(
-    const DataFromFileParam& params) {
+    const DataFromFileParam& params,
+    const TgBotSocket::Packet::Header::session_token_type& session_token) {
     const auto _result = vfs->readFile(params.filepath);
     HashContainer hash{};
 
@@ -177,13 +178,13 @@ SocketFile2DataHelper::DataFromFile_UPLOAD_FILE_DRY(
     }
     const auto& result = _result.value();
     // Create result packet buffer
-    auto resultPointer = SharedMalloc(sizeof(UploadFileDry));
+    auto resultPointer = SharedMalloc(sizeof(UploadFileMeta));
     // The front bytes of the buffer is UploadFile, hence cast it
-    auto* uploadFile = static_cast<UploadFileDry*>(resultPointer.get());
+    auto* uploadFile = static_cast<UploadFileMeta*>(resultPointer.get());
     // Copy destination file name info to the buffer
-    copyTo(uploadFile->destfilepath, params.destfilepath.string().c_str());
+    copyTo(uploadFile->destfilepath, params.destfilepath.string());
     // Copy source file name to the buffer
-    copyTo(uploadFile->srcfilepath, params.filepath.string().c_str());
+    copyTo(uploadFile->srcfilepath, params.filepath.string());
 
     // Calculate SHA256 hash
     vfs->SHA256(result, hash);
@@ -194,13 +195,16 @@ SocketFile2DataHelper::DataFromFile_UPLOAD_FILE_DRY(
     // Set dry run to true
     uploadFile->options.dry_run = true;
 
-    return TgBotSocket::Packet{TgBotSocket::Command::CMD_UPLOAD_FILE_DRY,
-                               resultPointer.get(), sizeof(UploadFileDry)};
+    return TgBotSocket::createPacket(
+        TgBotSocket::Command::CMD_UPLOAD_FILE_DRY, resultPointer.get(),
+        sizeof(UploadFileMeta), TgBotSocket::PayloadType::Binary,
+        session_token);
 }
 
 std::optional<TgBotSocket::Packet>
 SocketFile2DataHelper::DataFromFile_DOWNLOAD_FILE(
-    const DataFromFileParam& params) {
+    const DataFromFileParam& params,
+    const TgBotSocket::Packet::Header::session_token_type& session_token) {
     const auto _result = vfs->readFile(params.filepath);
     HashContainer hash{};
 
@@ -214,13 +218,14 @@ SocketFile2DataHelper::DataFromFile_DOWNLOAD_FILE(
     // The front bytes of the buffer is DownloadFile, hence cast it
     auto* downloadFile = static_cast<DownloadFile*>(resultPointer.get());
     // Copy destination file name info to the buffer
-    copyTo(downloadFile->destfilename, params.destfilepath.string().c_str());
+    copyTo(downloadFile->destfilename, params.destfilepath.string());
     // Copy source file data to the buffer
     memcpy(&downloadFile->buf[0], result.get(), result.size());
     // Calculate SHA256 hash
     vfs->SHA256(result, hash);
 
-    return TgBotSocket::Packet{TgBotSocket::Command::CMD_DOWNLOAD_FILE_CALLBACK,
-                               resultPointer.get(),
-                               result.size() + sizeof(DownloadFile)};
+    return TgBotSocket::createPacket(
+        TgBotSocket::Command::CMD_DOWNLOAD_FILE_CALLBACK, resultPointer.get(),
+        result.size() + sizeof(TgBotSocket::data::DownloadFileMeta),
+        TgBotSocket::PayloadType::Binary, session_token);
 }

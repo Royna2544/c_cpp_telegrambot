@@ -1,6 +1,9 @@
+find_package(OpenSSL REQUIRED)
 add_subdirectory(selector)
+add_subdirectory(hash)
 
 find_package(Boost 1.70 CONFIG COMPONENTS system)
+
 add_my_library(
   NAME Socket
   SRCS
@@ -12,17 +15,15 @@ add_my_library(
     bot/FileHelperNew.cpp
     backends/ClientBackend.cpp
     TgBotCommandMap.cpp
-  PUBLIC_INC include interface
-  LIBS Utils minimalhash Boost::system
+  PUBLIC_INC interface
+  LIBS Utils minimalhash Boost::system OpenSSL::Crypto
   LIBS_WIN32 wsock32 Ws2_32
 )
-
-find_package(ZLIB REQUIRED)
 
 add_my_executable(
   NAME SocketCli
   SRCS TgBotSocketClient.cpp
-  LIBS Socket
+  LIBS Socket JsonCpp::JsonCpp
   RELATION Socket
 )
 

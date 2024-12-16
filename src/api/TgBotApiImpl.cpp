@@ -33,6 +33,7 @@
 #include <set>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <utility>
 
 #include "tgbot/net/CurlHttpClient.h"
@@ -266,6 +267,7 @@ void TgBotApiImpl::startPoll() {
     // Start the long poll loop.
     while (!SignalHandler::isSignaled()) {
         longPoll->start();
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 }
 

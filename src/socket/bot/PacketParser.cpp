@@ -1,11 +1,14 @@
 #include "PacketParser.hpp"
 
 #include <absl/log/log.h>
+#include <openssl/evp.h>
+#include <openssl/rand.h>
 
 #include <TgBotSocket_Export.hpp>
+#include <cstring>
 #include <optional>
 #include <socket/TgBotCommandMap.hpp>
-#include <utility>
+#include <trivial_helpers/raii.hpp>
 
 template <>
 struct fmt::formatter<TgBotSocket::PayloadType> : formatter<std::string_view> {
@@ -26,6 +29,148 @@ struct fmt::formatter<TgBotSocket::PayloadType> : formatter<std::string_view> {
         return formatter<string_view>::format(name, ctx);
     }
 };
+
+namespace {
+
+SharedMalloc encrypt_payload(
+    const TgBotSocket::Packet::Header::session_token_type key,
+    const SharedMalloc& payload,
+    TgBotSocket::Packet::Header::init_vector_type& iv) {
+    using Header = TgBotSocket::Packet::Header;
+    // Generate random IV
+    RAND_bytes(iv.data(), Header::IV_LENGTH);
+
+    SharedMalloc encrypted(payload.size() + Header::TAG_LENGTH);
+    int len = 0;
+    int encrypted_payload_len = 0;
+
+    // Initialize encryption
+    auto ctx = RAII<EVP_CIPHER_CTX*>::create<void>(EVP_CIPHER_CTX_new(),
+                                                   &EVP_CIPHER_CTX_free);
+    if (ctx == nullptr) {
+        LOG(ERROR) << "Error initializing encryption context";
+        return {};
+    }
+
+    if (EVP_EncryptInit_ex(ctx.get(), EVP_aes_256_gcm(), nullptr, nullptr,
+                           nullptr) == 0) {
+        LOG(ERROR) << "Error initializing encryption";
+        return {};
+    }
+
+    if (EVP_EncryptInit_ex(ctx.get(), nullptr, nullptr,
+                           reinterpret_cast<const unsigned char*>(key.data()),
+                           iv.data()) == 0) {
+        LOG(ERROR) << "Error initializing encryption with key";
+    }
+
+    // Encrypt the plaintext
+    auto* loc = static_cast<std::uint8_t*>(encrypted.get());
+    if (EVP_EncryptUpdate(ctx.get(), loc, &len,
+                          static_cast<std::uint8_t*>(payload.get()),
+                          payload.size()) == 0) {
+        LOG(ERROR) << "Error encrypting payload";
+        return {};
+    }
+    encrypted_payload_len += len;
+
+    // Finalize encryption
+    if (EVP_EncryptFinal_ex(ctx.get(), loc + encrypted_payload_len, &len) ==
+        0) {
+        LOG(ERROR) << "Error finalizing encryption";
+        return {};
+    }
+    encrypted_payload_len += len;
+
+    // Get the authentication tag and append it
+    if (EVP_CIPHER_CTX_ctrl(ctx.get(), EVP_CTRL_GCM_GET_TAG, Header::TAG_LENGTH,
+                            loc + encrypted_payload_len) == 0) {
+        LOG(ERROR) << "Error getting authentication tag";
+        return {};
+    }
+
+    encrypted_payload_len += Header::TAG_LENGTH;
+    encrypted.resize(encrypted_payload_len);
+
+    ctx.reset();
+    DLOG(INFO) << "Encrypted payload of size " << encrypted_payload_len
+               << " bytes using EVP AES_256";
+    return encrypted;
+}
+
+SharedMalloc decrypt_payload(
+    const TgBotSocket::Packet::Header::session_token_type& key,
+    const SharedMalloc& encrypted,
+    const TgBotSocket::Packet::Header::init_vector_type& iv) {
+    constexpr int tag_size = TgBotSocket::Packet::Header::TAG_LENGTH;
+
+    // Ensure the encrypted size is valid
+    if (encrypted.size() < tag_size) {
+        LOG(ERROR) << "Encrypted payload size too small to contain tag";
+        return {};
+    }
+
+    const size_t decrypted_size = encrypted.size() - tag_size;
+    SharedMalloc decrypted(decrypted_size);
+    int len = 0;
+    int decryped_len = 0;
+
+    // Initialize decryption
+    auto ctx = RAII<EVP_CIPHER_CTX*>::create<void>(EVP_CIPHER_CTX_new(),
+                                                   &EVP_CIPHER_CTX_free);
+    if (ctx == nullptr) {
+        LOG(ERROR) << "Failed to create EVP_CIPHER_CTX";
+        return {};
+    }
+
+    if (EVP_DecryptInit_ex(ctx.get(), EVP_aes_256_gcm(), nullptr, nullptr,
+                           nullptr) == 0) {
+        LOG(ERROR) << "Failed to initialize decryption cipher";
+        return {};
+    }
+
+    if (EVP_DecryptInit_ex(ctx.get(), nullptr, nullptr,
+                           reinterpret_cast<const unsigned char*>(key.data()),
+                           iv.data()) == 0) {
+        LOG(ERROR) << "Failed to set key and IV for decryption";
+        return {};
+    }
+
+    // Decrypt the ciphertext
+    if (EVP_DecryptUpdate(ctx.get(),
+                          static_cast<std::uint8_t*>(decrypted.get()), &len,
+                          static_cast<const std::uint8_t*>(encrypted.get()),
+                          decrypted_size) == 0) {
+        LOG(ERROR) << "Failed during EVP_DecryptUpdate";
+        return {};
+    }
+    decryped_len += len;
+
+    // Set the authentication tag
+    auto* tag_loc =
+        static_cast<std::uint8_t*>(encrypted.get()) + decrypted_size;
+    if (EVP_CIPHER_CTX_ctrl(ctx.get(), EVP_CTRL_GCM_SET_TAG, tag_size,
+                            tag_loc) == 0) {
+        LOG(ERROR) << "Failed to set authentication tag";
+        return {};
+    }
+
+    // Finalize decryption
+    auto* out_loc = static_cast<std::uint8_t*>(decrypted.get()) + decryped_len;
+    if (EVP_DecryptFinal_ex(ctx.get(), out_loc, &len) <= 0) {
+        LOG(ERROR) << "Authentication tag mismatch";
+        return {};
+    }
+
+    decryped_len += len;
+    decrypted.resize(decryped_len);
+
+    ctx.reset();
+    LOG(INFO) << "Decrypted payload successfully, size: " << decryped_len;
+    return decrypted;
+}
+
+}  // namespace
 
 namespace TgBotSocket {
 
@@ -73,21 +218,61 @@ std::optional<Packet> readPacket(const TgBotSocket::Context& context) {
     LOG(INFO) << fmt::format("Received Packet{{cmd={}, data_type={}}}",
                              header.cmd, header.data_type);
 
-    const size_t newLength =
-        sizeof(TgBotSocket::Packet::Header) + header.data_size;
-    TgBotSocket::Packet packet(newLength);
+    TgBotSocket::Packet packet{
+        .header = header, .data = {}  // Will be filled in the next step.
+    };
 
+    packet.header = header;
+    if (packet.header.data_size == 0) {
+        // In this case, no need to fetch or verify data
+        return packet;
+    }
     auto data = context.read(header.data_size);
     if (!data) {
         LOG(ERROR) << "While reading data, failed";
         return std::nullopt;
     }
-    if (header.data_checksum != Packet::crc32_function(data.value())) {
-        LOG(WARNING) << "Checksum mismatch, dropping buffer";
+    std::string_view session_token(header.session_token.data(),
+                                   header.session_token.size());
+    if (session_token.empty()) {
+        LOG(WARNING) << "No session token provided";
         return std::nullopt;
     }
-    packet.data = std::move(data.value());
-    packet.header = header;
+    if (packet.header.hmac !=
+        HMAC::compute(static_cast<const uint8_t*>(data->get()), data->size(),
+                      session_token)) {
+        LOG(ERROR) << "HMAC mismatch";
+        return std::nullopt;
+    }
+    packet.data = decrypt_payload(header.session_token, data.value(),
+                                  packet.header.init_vector);
+    if (!static_cast<bool>(packet.data)) {
+        LOG(ERROR) << "Decryption failed";
+        return std::nullopt;
+    }
+    return packet;
+}
+
+Packet Socket_API
+createPacket(const Command command, const void* data,
+             Packet::Header::length_type length, const PayloadType payloadType,
+             const Packet::Header::session_token_type& sessionToken) {
+    Packet packet{.header = {}, .data = {}};
+    packet.header.cmd = command;
+    packet.header.magic = Packet::Header::MAGIC_VALUE;
+    packet.header.data_type = payloadType;
+    packet.header.session_token = sessionToken;
+    packet.header.nonce = std::time(nullptr);
+    if (data != nullptr && length > 0) {
+        packet.data.resize(length);
+        packet.data.assignFrom(data, length);
+        packet.data = encrypt_payload(sessionToken, packet.data,
+                                      packet.header.init_vector);
+        packet.header.data_size = packet.data.size();
+        packet.header.hmac =
+            HMAC::compute(static_cast<const uint8_t*>(packet.data.get()),
+                          packet.header.data_size, sessionToken.data());
+    }
     return packet;
 }
 }  // namespace TgBotSocket

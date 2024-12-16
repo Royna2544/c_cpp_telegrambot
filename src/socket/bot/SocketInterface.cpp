@@ -3,7 +3,10 @@
 #include <ManagedThreads.hpp>
 #include <TgBotCommandMap.hpp>
 #include <api/TgBotApi.hpp>
+#include <string_view>
 #include <utility>
+
+#include "TgBotSocket_Export.hpp"
 
 SocketInterfaceTgBot::SocketInterfaceTgBot(TgBotSocket::Context* _interface,
                                            TgBotApi::Ptr _api,
@@ -19,12 +22,27 @@ SocketInterfaceTgBot::SocketInterfaceTgBot(TgBotSocket::Context* _interface,
       resource(resource) {}
 
 void SocketInterfaceTgBot::runFunction(const std::stop_token& token) {
-    bool ret = _interface->listen([this](const TgBotSocket::Context& ctx) {
-        auto pkt = readPacket(ctx);
-        if (pkt) {
-            handlePacket(ctx, std::move(pkt.value()));
-        }
-    });
+    bool ret =
+        _interface->listen([this, token](const TgBotSocket::Context& ctx) {
+            while (!token.stop_requested()) {
+                std::optional<TgBotSocket::Packet> pkt;
+                pkt = readPacket(ctx);
+                if (!pkt) {
+                    break;
+                }
+                if (pkt->header.cmd == TgBotSocket::Command::CMD_OPEN_SESSION) {
+                    handle_OpenSession(ctx);
+                    continue;
+                } else if (!verifyHeader(*pkt)) {
+                    continue;
+                } else if (pkt->header.cmd == TgBotSocket::Command::CMD_CLOSE_SESSION) {
+                    handle_CloseSession(pkt->header.session_token);
+                    break;
+                } else {
+                    handlePacket(ctx, std::move(pkt.value()));
+                }
+            }
+        });
     if (!ret) {
         LOG(ERROR) << "Failed to start listening on socket";
     }

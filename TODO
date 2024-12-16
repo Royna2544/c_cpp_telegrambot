@@ -2,3 +2,4 @@
 - Better installer on Windows.
 - dependencies resolving in kernelbuilder
 - optional kernelbuilder
+- SocketDataHandler JSON version test

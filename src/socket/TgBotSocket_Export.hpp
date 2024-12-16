@@ -1,22 +1,17 @@
 #pragma once
 
 // A header export for the TgBot's socket connection
+#include <Types.h>
+
+#include <SharedMalloc.hpp>
 #include <array>
 #include <cstdint>
 #include <cstring>
 #include <string>
 #include <type_traits>
 
-#ifdef __TGBOT__
-#include <Types.h>
-
-#include <SharedMalloc.hpp>
-#else
-#include "../../include/SharedMalloc.hpp"
-#include "../../include/Types.h"
-#endif
-#include "../../hash/crc32.hpp"
-#include "../../hash/sha256.hpp"
+#include "hash/hmac.hpp"
+#include "hash/sha256.hpp"
 
 template <typename T, size_t size>
 inline bool arraycmp(const std::array<T, size>& lhs,
@@ -28,8 +23,8 @@ inline bool arraycmp(const std::array<T, size>& lhs,
 }
 
 template <size_t size>
-inline void copyTo(std::array<char, size>& arr_in, const char* buf) {
-    strncpy(arr_in.data(), buf, size - 1);
+inline void copyTo(std::array<char, size>& arr_in, const std::string_view buf) {
+    strncpy(arr_in.data(), buf.data(), std::min(size - 1, buf.size()));
     arr_in[size - 1] = '\0';
 }
 
@@ -63,6 +58,9 @@ enum class Command : std::int32_t {
     CMD_UPLOAD_FILE_DRY,
     CMD_UPLOAD_FILE_DRY_CALLBACK,
     CMD_DOWNLOAD_FILE_CALLBACK,
+    CMD_OPEN_SESSION,
+    CMD_OPEN_SESSION_ACK,
+    CMD_CLOSE_SESSION,
     CMD_MAX,
 };
 
@@ -86,7 +84,6 @@ struct alignas(ALIGNMENT) Packet {
      * Header contains the magic value, command, and the size of the data
      */
     struct alignas(ALIGNMENT) Header {
-        using length_type = uint64_t;
         constexpr static int64_t MAGIC_VALUE_BASE = 0xDEADFACE;
         // Version number, to be increased on breaking changes
         // 1: Initial version
@@ -101,55 +98,37 @@ struct alignas(ALIGNMENT) Packet {
         // 9: Remove padding objects
         // 10: Alignments fixing for Python compliance, add INVALID_CMD at 0
         // 11: Remove CMD_DELETE_CONTROLLER_BY_ID, add payload type to header
-        constexpr static int DATA_VERSION = 11;
+        // 12: Use OpenSSL's HMAC and AES-GCM algorithm encryption with nounces.
+        // Also use CMD_OPEN_SESSION CMD_CLOSE_SESSION for session based
+        // encryption
+        constexpr static int DATA_VERSION = 12;
         constexpr static int64_t MAGIC_VALUE = MAGIC_VALUE_BASE + DATA_VERSION;
+
+        using length_type = uint32_t;
+        using nounce_type = uint64_t;
+        using hmac_type = HMAC::result_type;
+
+        // Using AES-GCM
+        constexpr static int IV_LENGTH = 12;
+        constexpr static int TAG_LENGTH = 16;
+        constexpr static int SESSION_TOKEN_LENGTH = 32;
+
+        using session_token_type = std::array<char, SESSION_TOKEN_LENGTH>;
+        using init_vector_type = std::array<uint8_t, IV_LENGTH>;
 
         int64_t magic = MAGIC_VALUE;  ///< Magic value to verify the packet
         Command cmd{};                ///< Command to be executed
-        ///< Type of payload in the packet
-        PayloadType data_type{};
-        ///< Size of the data in the packet
-        length_type data_size{};
-        ///< Checksum of the packet data
-        CRC32::result_type data_checksum{};
+        PayloadType data_type{};      ///< Type of payload in the packet
+        length_type data_size{};      ///< Size of the data in the packet
+        session_token_type session_token{};  ///< Session token
+        nounce_type nonce{};             ///< Nonce (Epoch timestamp is used)
+        hmac_type hmac{};                ///< HMAC data
+        init_vector_type init_vector{};  ///< Initialization vector for AES-GCM
     };
     static_assert(offsetof(Header, magic) == 0);
 
     Header header{};
     SharedMalloc data;
-
-    explicit Packet(Header::length_type length) : data(length) {
-        header.magic = Header::MAGIC_VALUE;
-        header.data_size = length;
-    }
-
-    // Constructor that takes malloc
-    template <typename T>
-    explicit Packet(Command cmd, T data) : Packet(cmd, &data, sizeof(T)) {
-        static_assert(!std::is_pointer_v<T>,
-                      "This constructor should not be used with a pointer");
-    }
-
-    // Constructor that takes pointer, uses malloc but with size
-    template <typename T>
-    explicit Packet(Command cmd, T in_data, Header::length_type size)
-        : data(size) {
-        static_assert(std::is_pointer_v<T>,
-                      "This constructor should not be used with non pointer");
-        header.cmd = cmd;
-        header.magic = Header::MAGIC_VALUE;
-        data.assignFrom(in_data, header.data_size = size);
-        header.data_checksum = crc32_function(data);
-    }
-
-    static CRC32::result_type crc32_function(const uint8_t* data,
-                                             const size_t data_size) {
-        return CRC32::compute(data, data_size);
-    }
-
-    static CRC32::result_type crc32_function(const SharedMalloc& data) {
-        return crc32_function(static_cast<uint8_t*>(data.get()), data.size());
-    }
 };
 
 using PathStringArray = std::array<char, MAX_PATH_SIZE>;
@@ -199,7 +178,7 @@ struct alignas(ALIGNMENT) ObserveAllChats {
                    // true/false - Start/Stop observing
 };
 
-struct alignas(ALIGNMENT) UploadFileDry {
+struct alignas(ALIGNMENT) UploadFileMeta {
     PathStringArray destfilepath{};  // Destination file name
     PathStringArray srcfilepath{};  // Source file name (This is not used on the
                                     // remote, used if dry=true)
@@ -224,21 +203,24 @@ struct alignas(ALIGNMENT) UploadFileDry {
         }
     } options;
 
-    bool operator==(const UploadFileDry& other) const {
+    bool operator==(const UploadFileMeta& other) const {
         return arraycmp(destfilepath, other.destfilepath) &&
                arraycmp(srcfilepath, other.srcfilepath) &&
                arraycmp(sha256_hash, sha256_hash) && options == other.options;
     }
 };
 
-struct alignas(ALIGNMENT) UploadFile : public UploadFileDry {
-    using Options = UploadFileDry::Options;
+struct alignas(ALIGNMENT) UploadFile : public UploadFileMeta {
+    using Options = UploadFileMeta::Options;
     alignas(ALIGNMENT) uint8_t buf[];  // Buffer
 };
 
-struct alignas(ALIGNMENT) DownloadFile {
-    PathStringArray filepath{};        // Path to file (in remote)
-    PathStringArray destfilename{};    // Destination file name
+struct alignas(ALIGNMENT) DownloadFileMeta {
+    PathStringArray filepath{};      // Path to file (in remote)
+    PathStringArray destfilename{};  // Destination file name
+};
+
+struct alignas(ALIGNMENT) DownloadFile : DownloadFileMeta {
     alignas(ALIGNMENT) uint8_t buf[];  // Buffer
 };
 }  // namespace data
@@ -279,13 +261,14 @@ struct alignas(ALIGNMENT) GenericAck {
  * {
  *   "result": True|False
  *   "__comment__": "Below two fields are optional"
- *   "error_type": "TGAPI_EXCEPTION"|"INVALID_ARGUMENT"|"COMMAND_IGNORED"|"RUNTIME_ERROR"|"CLIENT_ERROR",
+ *   "error_type":
+ * "TGAPI_EXCEPTION"|"INVALID_ARGUMENT"|"COMMAND_IGNORED"|"RUNTIME_ERROR"|"CLIENT_ERROR",
  *   "error_msg": "Error message"
  * }
  */
- 
+
 struct alignas(ALIGNMENT) UploadFileDryCallback : public GenericAck {
-    data::UploadFileDry requestdata;
+    data::UploadFileMeta requestdata;
 };
 
 }  // namespace callback
@@ -304,7 +287,7 @@ ASSERT_SIZE(SendFileToChatId, 272);
 ASSERT_SIZE(ObserveAllChats, 8);
 ASSERT_SIZE(UploadFile, 552);
 ASSERT_SIZE(DownloadFile, 512);
-ASSERT_SIZE(Packet::Header, 32);
+ASSERT_SIZE(Packet::Header, 144);
 }  // namespace TgBotSocket::data
 
 namespace TgBotSocket::callback {

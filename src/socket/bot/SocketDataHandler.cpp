@@ -11,6 +11,7 @@
 #include <fstream>
 #include <global_handlers/ChatObserver.hpp>
 #include <global_handlers/SpamBlock.hpp>
+#include <hmac.hpp>
 #include <initializer_list>
 #include <mutex>
 #include <socket/TgBotCommandMap.hpp>
@@ -19,8 +20,11 @@
 #include <variant>
 
 #include "FileHelperNew.hpp"
+#include "SharedMalloc.hpp"
 #include "SocketContext.hpp"
 #include "SocketInterface.hpp"
+#include "bot/PacketParser.hpp"
+#include "tgbot/tools/StringTools.h"
 
 using TgBot::InputFile;
 namespace fs = std::filesystem;
@@ -90,16 +94,18 @@ std::optional<Json::Value> parseAndCheck(
     return root;
 }
 
-Packet nodeToPacket(const Json::Value& json) {
+Packet nodeToPacket(const Command& command, const Json::Value& json,
+                    const Packet::Header::session_token_type& session_token) {
     std::string result;
     Json::FastWriter writer;
     result = writer.write(json);
-    Packet packet(Command::CMD_GENERIC_ACK, result.c_str(), result.size());
-    packet.header.data_type = PayloadType::Json;
+    auto packet = createPacket(command, result.c_str(), result.size(),
+                               PayloadType::Json, session_token);
     return packet;
 }
 
-Packet toJSONPacket(const GenericAck& ack) {
+Packet toJSONPacket(const GenericAck& ack,
+                    const Packet::Header::session_token_type& session_token) {
     Json::Value root;
     root["result"] = ack.result == AckType::SUCCESS;
     if (ack.result != AckType::SUCCESS) {
@@ -126,7 +132,7 @@ Packet toJSONPacket(const GenericAck& ack) {
                 break;
         }
     }
-    return nodeToPacket(root);
+    return nodeToPacket(Command::CMD_GENERIC_ACK, root, session_token);
 }
 
 template <size_t N>
@@ -450,7 +456,7 @@ GenericAck SocketInterfaceTgBot::handle_UploadFile(
 UploadFileDryCallback SocketInterfaceTgBot::handle_UploadFileDry(
     const void* ptr, TgBotSocket::Packet::Header::length_type len) {
     bool ret = false;
-    const auto* f = static_cast<const data::UploadFileDry*>(ptr);
+    const auto* f = static_cast<const data::UploadFileMeta*>(ptr);
     UploadFileDryCallback callback;
     callback.requestdata = *f;
 
@@ -466,14 +472,15 @@ UploadFileDryCallback SocketInterfaceTgBot::handle_UploadFileDry(
     return callback;
 }
 
-bool SocketInterfaceTgBot::handle_DownloadFile(const TgBotSocket::Context& ctx,
-                                               const void* ptr) {
+bool SocketInterfaceTgBot::handle_DownloadFile(
+    const TgBotSocket::Context& ctx, const void* ptr,
+    const TgBotSocket::Packet::Header::session_token_type& token) {
     const auto* data = static_cast<const data::DownloadFile*>(ptr);
     SocketFile2DataHelper::DataFromFileParam params;
     params.filepath = data->filepath.data();
     params.destfilepath = data->destfilename.data();
     auto pkt = helper->DataFromFile<SocketFile2DataHelper::Pass::DOWNLOAD_FILE>(
-        params);
+        params, token);
     if (!pkt) {
         LOG(ERROR) << "Failed to prepare download file packet";
         return false;
@@ -482,16 +489,17 @@ bool SocketInterfaceTgBot::handle_DownloadFile(const TgBotSocket::Context& ctx,
     return true;
 }
 
-bool SocketInterfaceTgBot::handle_GetUptime(const TgBotSocket::Context& ctx,
-                                            const void* /*ptr*/) {
+bool SocketInterfaceTgBot::handle_GetUptime(
+    const TgBotSocket::Context& ctx,
+    const TgBotSocket::Packet::Header::session_token_type& token) {
     auto now = std::chrono::system_clock::now();
     const auto diff = to_secs(now - startTp);
     GetUptimeCallback callback{};
 
     copyTo(callback.uptime, fmt::format("Uptime: {:%H:%M:%S}", diff).c_str());
     LOG(INFO) << "Sending text back: " << std::quoted(callback.uptime.data());
-    Packet pkt(Command::CMD_GET_UPTIME_CALLBACK, callback);
-    ctx.write(pkt);
+    ctx.write(createPacket(Command::CMD_GET_UPTIME_CALLBACK, &callback,
+                           sizeof(callback), PayloadType::Binary, token));
     return true;
 }
 
@@ -505,6 +513,65 @@ bool CHECK_PACKET_SIZE(Packet& pkt) {
         return false;
     }
     return true;
+}
+
+bool SocketInterfaceTgBot::verifyHeader(const Packet& packet) {
+    std::string_view their_token(packet.header.session_token.data(),
+                                 Packet::Header::SESSION_TOKEN_LENGTH);
+    if (their_token.empty()) {
+        LOG(WARNING) << "Received packet with empty session token";
+        return false;
+    }
+    if (!session_table.contains(their_token.data())) {
+        LOG(WARNING) << fmt::format(
+            "Received packet with unknown session token: {}", their_token);
+        return false;
+    }
+    auto& session = session_table[their_token.data()];
+    if (std::chrono::system_clock::now() > session.expiry) {
+        LOG(WARNING) << fmt::format("Session token expired: {}", their_token);
+        session_table.erase(their_token.data());
+        return false;
+    }
+    if (session.last_nonce >= packet.header.nonce) {
+        LOG(WARNING) << "Received packet with outdated nonce, ignore";
+        return false;
+    }
+    session.last_nonce = packet.header.nonce;
+    return true;
+}
+
+void SocketInterfaceTgBot::handle_OpenSession(const TgBotSocket::Context& ctx) {
+    auto key = StringTools::generateRandomString(
+        TgBotSocket::Packet::Header::SESSION_TOKEN_LENGTH - 1);
+    Packet::Header::nounce_type last_nounce{};
+    auto tp = std::chrono::system_clock::now() + std::chrono::hours(1);
+
+    LOG(INFO) << "Created new session with key: " << key;
+    session_table.emplace(key, Session(key, last_nounce, tp));
+
+    Json::Value response;
+    response["session_token"] = key;
+    response["expiration_time"] = fmt::format("{:%Y-%m-%d %H:%M:%S}", tp);
+
+    Packet::Header::session_token_type session_token;
+    copyTo(session_token, key);
+
+    ctx.write(
+        nodeToPacket(Command::CMD_OPEN_SESSION_ACK, response, session_token));
+}
+
+void SocketInterfaceTgBot::handle_CloseSession(
+    const TgBotSocket::Packet::Header::session_token_type& token) {
+    auto it = session_table.find(token.data());
+    if (it != session_table.end()) {
+        session_table.erase(it);
+        LOG(INFO) << "Session with key " << token.data() << " closed";
+    } else {
+        LOG(WARNING)
+            << "Received close session request for unknown session token: "
+            << token.data();
+    }
 }
 
 void SocketInterfaceTgBot::handlePacket(const TgBotSocket::Context& ctx,
@@ -539,20 +606,20 @@ void SocketInterfaceTgBot::handlePacket(const TgBotSocket::Context& ctx,
                                          pkt.header.data_type);
             break;
         case Command::CMD_GET_UPTIME:
-            ret = handle_GetUptime(ctx, ptr);
+            ret = handle_GetUptime(ctx, pkt.header.session_token);
             break;
         case Command::CMD_UPLOAD_FILE:
             ret = handle_UploadFile(ptr, pkt.header.data_size);
             break;
         case Command::CMD_UPLOAD_FILE_DRY:
-            if (CHECK_PACKET_SIZE<data::UploadFileDry>(pkt)) {
+            if (CHECK_PACKET_SIZE<data::UploadFileMeta>(pkt)) {
                 ret = handle_UploadFileDry(ptr, pkt.header.data_size);
             } else {
                 ret = UploadFileDryCallback(invalidPacketAck);
             }
             break;
         case Command::CMD_DOWNLOAD_FILE:
-            ret = handle_DownloadFile(ctx, ptr);
+            ret = handle_DownloadFile(ctx, ptr, pkt.header.session_token);
             break;
         default:
             if (CommandHelpers::isClientCommand(pkt.header.cmd)) {
@@ -574,8 +641,10 @@ void SocketInterfaceTgBot::handlePacket(const TgBotSocket::Context& ctx,
         }
         case Command::CMD_UPLOAD_FILE_DRY: {
             const auto result = std::get<UploadFileDryCallback>(ret);
-            Packet ackpkt(Command::CMD_UPLOAD_FILE_DRY_CALLBACK, &result,
-                          sizeof(UploadFileDryCallback));
+            auto ackpkt =
+                createPacket(Command::CMD_UPLOAD_FILE_DRY_CALLBACK, &result,
+                             sizeof(UploadFileDryCallback), PayloadType::Binary,
+                             pkt.header.session_token);
             LOG(INFO) << "Sending CMD_UPLOAD_FILE_DRY ack: " << std::boolalpha
                       << (result.result == AckType::SUCCESS);
             ctx.write(ackpkt);
@@ -592,12 +661,14 @@ void SocketInterfaceTgBot::handlePacket(const TgBotSocket::Context& ctx,
                       << (result.result == AckType::SUCCESS);
             switch (pkt.header.data_type) {
                 case PayloadType::Binary: {
-                    Packet ackpkt(Command::CMD_GENERIC_ACK, &result,
-                                  sizeof(GenericAck));
+                    auto ackpkt = createPacket(Command::CMD_GENERIC_ACK,
+                                               &result, sizeof(GenericAck),
+                                               TgBotSocket::PayloadType::Binary,
+                                               pkt.header.session_token);
                     ctx.write(ackpkt);
                 } break;
                 case PayloadType::Json: {
-                    ctx.write(toJSONPacket(result));
+                    ctx.write(toJSONPacket(result, pkt.header.session_token));
                 } break;
             }
             break;

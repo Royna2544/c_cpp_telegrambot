@@ -1,22 +1,15 @@
 #pragma once
 
+#include <SocketExports.h>
+
+#include <SharedMalloc.hpp>
 #include <TgBotSocket_Export.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <ios>
 #include <optional>
-
-#ifdef __TGBOT__
-#include <SocketExports.h>
 #include <trivial_helpers/fruit_inject.hpp>
-#include <SharedMalloc.hpp>
-#else
-#define Socket_API
-#define APPLE_INJECT(x) x
-#define APPLE_EXPLICIT_INJECT(x) explicit x
-#include "../../include/SharedMalloc.hpp"
-#endif
 
 // Represents a SHA-256 hash
 struct Socket_API HashContainer {
@@ -120,7 +113,8 @@ class Socket_API SocketFile2DataHelper {
     VFSOperations* vfs;
 
    public:
-    APPLE_EXPLICIT_INJECT(SocketFile2DataHelper(VFSOperations* vfs)) : vfs(vfs) {}
+    APPLE_EXPLICIT_INJECT(SocketFile2DataHelper(VFSOperations* vfs))
+        : vfs(vfs) {}
 
     enum class Pass {
         UPLOAD_FILE_DRY,
@@ -149,29 +143,33 @@ class Socket_API SocketFile2DataHelper {
 
     template <Pass P>
     std::optional<TgBotSocket::Packet> DataFromFile(
-        const DataFromFileParam& params) {
+        const DataFromFileParam& params,
+        const TgBotSocket::Packet::Header::session_token_type& session_token) {
         if (P == Pass::UPLOAD_FILE_DRY) {
-            return DataFromFile_UPLOAD_FILE_DRY(params);
+            return DataFromFile_UPLOAD_FILE_DRY(params, session_token);
         } else if (P == Pass::UPLOAD_FILE) {
-            return DataFromFile_UPLOAD_FILE(params);
+            return DataFromFile_UPLOAD_FILE(params, session_token);
         } else if (P == Pass::DOWNLOAD_FILE) {
-            return DataFromFile_DOWNLOAD_FILE(params);
+            return DataFromFile_DOWNLOAD_FILE(params, session_token);
         }
         return std::nullopt;
     }
 
    private:
-    bool DataToFile_UPLOAD_FILE_DRY(const void* ptr,
-                                    TgBotSocket::Packet::Header::length_type len);
+    bool DataToFile_UPLOAD_FILE_DRY(
+        const void* ptr, TgBotSocket::Packet::Header::length_type len);
     bool DataToFile_UPLOAD_FILE(const void* ptr,
                                 TgBotSocket::Packet::Header::length_type len);
     bool DataToFile_DOWNLOAD_FILE(const void* ptr,
                                   TgBotSocket::Packet::Header::length_type len);
 
     std::optional<TgBotSocket::Packet> DataFromFile_UPLOAD_FILE(
-        const DataFromFileParam& params);
+        const DataFromFileParam& params,
+        const TgBotSocket::Packet::Header::session_token_type& session_token);
     std::optional<TgBotSocket::Packet> DataFromFile_UPLOAD_FILE_DRY(
-        const DataFromFileParam& params);
+        const DataFromFileParam& params,
+        const TgBotSocket::Packet::Header::session_token_type& session_token);
     std::optional<TgBotSocket::Packet> DataFromFile_DOWNLOAD_FILE(
-        const DataFromFileParam& params);
+        const DataFromFileParam& params,
+        const TgBotSocket::Packet::Header::session_token_type& session_token);
 };

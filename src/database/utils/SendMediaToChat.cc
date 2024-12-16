@@ -1,20 +1,49 @@
 #include <Types.h>
 #include <absl/log/log.h>
+#include <fmt/format.h>
+#include <json/json.h>
 
 #include <AbslLogInit.hpp>
 #include <TryParseStr.hpp>
+#include <backends/ClientBackend.hpp>
+#include <bot/PacketParser.hpp>
 #include <cstdlib>
 #include <cstring>
 #include <database/bot/TgBotDatabaseImpl.hpp>
-#include <backends/ClientBackend.hpp>
 #include <iostream>
 #include <memory>
+
 #include "ConfigManager.hpp"
+#include "TgBotSocket_Export.hpp"
 
 [[noreturn]] static void usage(const char* argv0, const int exitCode) {
     std::cerr << "Usage: " << argv0 << " <chat(Id/Name)> <medianame>"
               << std::endl;
     exit(exitCode);
+}
+
+std::optional<Json::Value> parseAndCheck(
+    const void* buf, TgBotSocket::Packet::Header::length_type length,
+    const std::initializer_list<const char*> nodes) {
+    Json::Value root;
+    Json::Reader reader;
+    if (!reader.parse(std::string(static_cast<const char*>(buf), length),
+                      root)) {
+        LOG(WARNING) << "Failed to parse json: "
+                     << reader.getFormattedErrorMessages();
+        return std::nullopt;
+    }
+    if (!root.isObject()) {
+        LOG(WARNING) << "Expected an object in json";
+        return std::nullopt;
+    }
+    for (const auto& node : nodes) {
+        if (!root.isMember(node)) {
+            LOG(WARNING) << fmt::format("Missing node '{}' in json", node);
+            return std::nullopt;
+        }
+    }
+    return root;
 }
 
 int main(int argc, char** argv) {
@@ -55,14 +84,63 @@ int main(int argc, char** argv) {
         LOG(INFO) << "Found, sending (fileid " << info->mediaId << ") to chat "
                   << chatId;
     }
-    copyTo(data.filePath, info->mediaId.c_str());
+    copyTo(data.filePath, info->mediaId);
     data.chat = chatId;
     data.fileType = TgBotSocket::data::FileType::TYPE_DOCUMENT;
 
-    struct TgBotSocket::Packet pkt(
-        TgBotSocket::Command::CMD_SEND_FILE_TO_CHAT_ID, data);
     SocketClientWrapper wrapper;
-    wrapper.connect(TgBotSocket::Context::kTgBotHostPort, TgBotSocket::Context::hostPath());
-    wrapper->write(pkt);
-    backend->unload();
+    if (wrapper.connect(TgBotSocket::Context::kTgBotHostPort,
+                        TgBotSocket::Context::hostPath())) {
+        using namespace TgBotSocket;
+        DLOG(INFO) << "Connected to server";
+        Packet openSession = createPacket(Command::CMD_OPEN_SESSION, nullptr, 0,
+                                          PayloadType::Binary, {});
+        wrapper->write(openSession);
+        DLOG(INFO) << "Wrote open session packet";
+        auto openSessionAck =
+            TgBotSocket::readPacket(wrapper.chosen_interface());
+        if (!openSessionAck ||
+            openSessionAck->header.cmd != Command::CMD_OPEN_SESSION_ACK) {
+            LOG(ERROR) << "Failed to open session";
+            return EXIT_FAILURE;
+        }
+        auto _root = parseAndCheck(openSessionAck->data.get(),
+                                   openSessionAck->data.size(),
+                                   {"session_token", "expiration_time"});
+        if (!_root) {
+            LOG(ERROR) << "Invalid open session ack json";
+            return EXIT_FAILURE;
+        }
+        auto root = *_root;
+        LOG(INFO) << "Opened session. Token: " << root["session_token"]
+                  << " expiration_time: " << root["expiration_time"];
+
+        std::string session_token_str = root["session_token"].asString();
+        Packet::Header::session_token_type session_token{};
+        copyTo(session_token, session_token_str);
+        auto pkt =
+            createPacket(TgBotSocket::Command::CMD_SEND_FILE_TO_CHAT_ID, &data,
+                         sizeof(data), PayloadType::Binary, session_token);
+        if (!wrapper->write(pkt)) {
+            LOG(ERROR) << "Failed to write send file to chat id packet";
+            backend->unload();
+            return EXIT_FAILURE;
+        }
+        auto result = TgBotSocket::readPacket(wrapper.chosen_interface());
+        if (!result || result->header.cmd != Command::CMD_GENERIC_ACK) {
+            LOG(ERROR) << "Failed to send file to chat id";
+            backend->unload();
+            return EXIT_FAILURE;
+        }
+        TgBotSocket::callback::GenericAck genericAck;
+        result->data.assignTo(genericAck);
+        if (genericAck.result != TgBotSocket::callback::AckType::SUCCESS) {
+            LOG(ERROR) << "Failed to send file to chat id: "
+                       << genericAck.error_msg.data();
+            backend->unload();
+            return EXIT_FAILURE;
+        }
+        DLOG(INFO) << "File sent successfully";
+        backend->unload();
+    }
 }

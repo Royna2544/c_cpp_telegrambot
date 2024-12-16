@@ -94,7 +94,7 @@ endfunction()
 
 ## Compiler specific settings
 set(GLOBAL_COMPILE_OPTIONS)
-set(GLOBAL_DEFINITIONS __TGBOT__)
+set(GLOBAL_DEFINITIONS)
 set(GLOBAL_INCLUDE_DIRS ${CMAKE_SOURCE_DIR}/src/include ${CMAKE_SOURCE_DIR}/src/)
 
 # Test proper c++20 jthread, stop_token
@@ -424,7 +424,6 @@ endif()
 add_subdirectory(src/api)
 add_subdirectory(src/database)
 add_subdirectory(src/random)
-add_subdirectory(src/hash)
 add_subdirectory(src/imagep)
 add_subdirectory(src/stringres)
 add_subdirectory(src/logging)

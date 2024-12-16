@@ -36,6 +36,15 @@ struct SocketInterfaceTgBot : ThreadRunner {
     std::chrono::system_clock::time_point startTp =
         std::chrono::system_clock::now();
 
+    struct Session {
+        std::string session_key;  // Randomly generated session key
+        TgBotSocket::Packet::Header::nounce_type
+            last_nonce;  // To prevent replay attacks
+        std::chrono::system_clock::time_point expiry;  // Session expiry
+    };
+
+    std::unordered_map<std::string, Session> session_table;
+
     // Command handlers
     GenericAck handle_WriteMsgToChatId(
         const void* ptr, TgBotSocket::Packet::Header::length_type len,
@@ -56,6 +65,15 @@ struct SocketInterfaceTgBot : ThreadRunner {
         const void* ptr, TgBotSocket::Packet::Header::length_type len);
 
     // These have their own ack handlers
-    bool handle_GetUptime(const TgBotSocket::Context& ctx, const void* ptr);
-    bool handle_DownloadFile(const TgBotSocket::Context& ctx, const void* ptr);
+    bool handle_GetUptime(
+        const TgBotSocket::Context& ctx,
+        const TgBotSocket::Packet::Header::session_token_type& token);
+    bool handle_DownloadFile(
+        const TgBotSocket::Context& ctx, const void* ptr,
+        const TgBotSocket::Packet::Header::session_token_type& token);
+
+    void handle_OpenSession(const TgBotSocket::Context& ctx);
+    void handle_CloseSession(const TgBotSocket::Packet::Header::session_token_type& token);
+
+    bool verifyHeader(const TgBotSocket::Packet& packet);
 };
