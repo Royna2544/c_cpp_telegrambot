@@ -27,6 +27,18 @@ namespace TgBotSocket {
 std::optional<Packet> Socket_API
 readPacket(const TgBotSocket::Context& context);
 
+
+/**
+ * @brief Decrypts a packet using the provided context.
+ *
+ * This function attempts to decrypt the given packet using the provided context.
+ * If successful, it returns `true`. If decryption fails, it returns `false`.
+ *
+ * @param packet The packet to decrypt
+ * @return `true` if the packet was successfully decrypted; otherwise, `false`.
+ */
+bool Socket_API decryptPacket(TgBotSocket::Packet& packet);
+
 /**
  * @brief Creates a packet with the given command and data.
  *

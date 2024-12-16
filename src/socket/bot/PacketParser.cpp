@@ -232,25 +232,37 @@ std::optional<Packet> readPacket(const TgBotSocket::Context& context) {
         LOG(ERROR) << "While reading data, failed";
         return std::nullopt;
     }
-    std::string_view session_token(header.session_token.data(),
-                                   header.session_token.size());
-    if (session_token.empty()) {
-        LOG(WARNING) << "No session token provided";
-        return std::nullopt;
-    }
-    if (packet.header.hmac !=
-        HMAC::compute(static_cast<const uint8_t*>(data->get()), data->size(),
-                      session_token)) {
-        LOG(ERROR) << "HMAC mismatch";
-        return std::nullopt;
-    }
-    packet.data = decrypt_payload(header.session_token, data.value(),
-                                  packet.header.init_vector);
-    if (!static_cast<bool>(packet.data)) {
-        LOG(ERROR) << "Decryption failed";
+    packet.data = *data;
+    if (!decryptPacket(packet)) {
         return std::nullopt;
     }
     return packet;
+}
+
+bool Socket_API decryptPacket(TgBotSocket::Packet& packet) {
+    auto& header = packet.header;
+    auto& data = packet.data;
+
+    std::string_view session_token(header.session_token.data(),
+                                   header.session_token.size());
+    if (header.session_token ==
+        TgBotSocket::Packet::Header::session_token_type{}) {
+        LOG(WARNING) << "No session token provided, decryption will be skipped.";
+        return true;
+    }
+    if (packet.header.hmac !=
+        HMAC::compute(static_cast<const uint8_t*>(data.get()), data.size(),
+                      session_token)) {
+        LOG(ERROR) << "HMAC mismatch";
+        return false;
+    }
+    packet.data =
+        decrypt_payload(header.session_token, data, packet.header.init_vector);
+    if (!static_cast<bool>(packet.data)) {
+        LOG(ERROR) << "Decryption failed";
+        return false;
+    }
+    return true;
 }
 
 Packet Socket_API
@@ -266,12 +278,18 @@ createPacket(const Command command, const void* data,
     if (data != nullptr && length > 0) {
         packet.data.resize(length);
         packet.data.assignFrom(data, length);
-        packet.data = encrypt_payload(sessionToken, packet.data,
-                                      packet.header.init_vector);
+
+        if (sessionToken != Packet::Header::session_token_type{}) {
+            packet.data = encrypt_payload(sessionToken, packet.data,
+                                          packet.header.init_vector);
+            packet.header.hmac =
+                HMAC::compute(static_cast<const uint8_t*>(packet.data.get()),
+                              packet.header.data_size, sessionToken.data());
+        } else {
+            LOG(WARNING)
+                << "No session token provided, encryption will be skipped";
+        }
         packet.header.data_size = packet.data.size();
-        packet.header.hmac =
-            HMAC::compute(static_cast<const uint8_t*>(packet.data.get()),
-                          packet.header.data_size, sessionToken.data());
     }
     return packet;
 }

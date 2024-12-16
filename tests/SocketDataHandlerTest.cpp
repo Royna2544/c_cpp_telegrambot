@@ -75,6 +75,7 @@ class SocketDataHandlerTest : public ::testing::Test {
         SharedMalloc packetData;
         TgBotSocket::Packet::Header recv_header;
 
+        EXPECT_TRUE(TgBotSocket::decryptPacket(pkt));
         EXPECT_CALL(*_mockImpl, write(_))
             .WillOnce(DoAll(SaveArg<0>(&packetData), Return(true)));
         mockInterface->handlePacket(*_mockImpl, std::move(pkt));
@@ -313,7 +314,8 @@ TEST_F(SocketDataHandlerTest, TestCmdUploadFileDryExistsOptSaidNo) {
 TEST_F(SocketDataHandlerTest, TestCmdUploadFileOK) {
     // Prepare file contents
     const auto filemem = createFileMem();
-    SharedMalloc mem(sizeof(TgBotSocket::data::UploadFile) + filemem.size());
+    SharedMalloc mem(sizeof(TgBotSocket::data::UploadFileMeta) +
+                     filemem.size());
     auto* uploadfile = static_cast<TgBotSocket::data::UploadFile*>(mem.get());
     uploadfile->srcfilepath = {"sourcefile"};
     uploadfile->destfilepath = {"destinationfile"};
@@ -322,11 +324,11 @@ TEST_F(SocketDataHandlerTest, TestCmdUploadFileOK) {
     uploadfile->options.overwrite = true;
     uploadfile->options.dry_run = false;
     mem.assignTo(filemem.get(), filemem.size(),
-                 sizeof(TgBotSocket::data::UploadFile));
+                 sizeof(TgBotSocket::data::UploadFileMeta));
 
     // Set expectations
     TgBotSocket::Packet pkt = TgBotSocket::createPacket(
-        TgBotSocket::Command::CMD_UPLOAD_FILE_DRY,  mem.get(), mem.size(),
+        TgBotSocket::Command::CMD_UPLOAD_FILE, mem.get(), mem.size(),
         TgBotSocket::PayloadType::Binary, {});
     EXPECT_CALL(*_mockVFS, writeFile(FSP(uploadfile->destfilepath.data()), _,
                                      filemem.size()))
