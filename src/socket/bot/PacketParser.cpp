@@ -2,6 +2,7 @@
 
 #include <absl/log/log.h>
 #include <openssl/evp.h>
+#include <openssl/hmac.h>
 #include <openssl/rand.h>
 
 #include <TgBotSocket_Export.hpp>
@@ -9,6 +10,8 @@
 #include <optional>
 #include <socket/TgBotCommandMap.hpp>
 #include <trivial_helpers/raii.hpp>
+
+#include "SharedMalloc.hpp"
 
 template <>
 struct fmt::formatter<TgBotSocket::PayloadType> : formatter<std::string_view> {
@@ -31,6 +34,19 @@ struct fmt::formatter<TgBotSocket::PayloadType> : formatter<std::string_view> {
 };
 
 namespace {
+
+auto computeHMAC(const SharedMalloc& data,
+                 const TgBotSocket::Packet::Header::session_token_type& key) {
+    // Buffer to store the HMAC result
+    TgBotSocket::Packet::Header::hmac_type hmac_result{};
+    unsigned int hmac_length = 0;
+
+    // Compute the HMAC
+    HMAC(EVP_sha256(), key.data(), key.size(),
+         static_cast<const std::uint8_t*>(data.get()), data.size(),
+         hmac_result.data(), &hmac_length);
+    return hmac_result;
+}
 
 SharedMalloc encrypt_payload(
     const TgBotSocket::Packet::Header::session_token_type key,
@@ -59,7 +75,7 @@ SharedMalloc encrypt_payload(
     }
 
     if (EVP_EncryptInit_ex(ctx.get(), nullptr, nullptr,
-                           reinterpret_cast<const unsigned char*>(key.data()),
+                           reinterpret_cast<const std::uint8_t*>(key.data()),
                            iv.data()) == 0) {
         LOG(ERROR) << "Error initializing encryption with key";
     }
@@ -243,16 +259,13 @@ bool Socket_API decryptPacket(TgBotSocket::Packet& packet) {
     auto& header = packet.header;
     auto& data = packet.data;
 
-    std::string_view session_token(header.session_token.data(),
-                                   header.session_token.size());
     if (header.session_token ==
         TgBotSocket::Packet::Header::session_token_type{}) {
-        LOG(WARNING) << "No session token provided, decryption will be skipped.";
+        LOG(WARNING)
+            << "No session token provided, decryption will be skipped.";
         return true;
     }
-    if (packet.header.hmac !=
-        HMAC::compute(static_cast<const uint8_t*>(data.get()), data.size(),
-                      session_token)) {
+    if (packet.header.hmac != computeHMAC(data, header.session_token)) {
         LOG(ERROR) << "HMAC mismatch";
         return false;
     }
@@ -282,9 +295,7 @@ createPacket(const Command command, const void* data,
         if (sessionToken != Packet::Header::session_token_type{}) {
             packet.data = encrypt_payload(sessionToken, packet.data,
                                           packet.header.init_vector);
-            packet.header.hmac =
-                HMAC::compute(static_cast<const uint8_t*>(packet.data.get()),
-                              packet.header.data_size, sessionToken.data());
+            packet.header.hmac = computeHMAC(packet.data, sessionToken);
         } else {
             LOG(WARNING)
                 << "No session token provided, encryption will be skipped";

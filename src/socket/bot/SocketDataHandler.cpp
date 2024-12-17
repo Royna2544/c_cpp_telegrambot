@@ -1,6 +1,7 @@
 #include <fmt/chrono.h>
 #include <json/json.h>
 #include <tgbot/TgException.h>
+#include <tgbot/tools/StringTools.h>
 #include <trivial_helpers/_std_chrono_templates.h>
 
 #include <ManagedThreads.hpp>
@@ -11,20 +12,16 @@
 #include <fstream>
 #include <global_handlers/ChatObserver.hpp>
 #include <global_handlers/SpamBlock.hpp>
-#include <hmac.hpp>
 #include <initializer_list>
 #include <mutex>
 #include <socket/TgBotCommandMap.hpp>
 #include <trivial_helpers/log_once.hpp>
-#include <utility>
 #include <variant>
 
 #include "FileHelperNew.hpp"
-#include "SharedMalloc.hpp"
 #include "SocketContext.hpp"
 #include "SocketInterface.hpp"
 #include "bot/PacketParser.hpp"
-#include "tgbot/tools/StringTools.h"
 
 using TgBot::InputFile;
 namespace fs = std::filesystem;
@@ -543,11 +540,11 @@ bool SocketInterfaceTgBot::verifyHeader(const Packet& packet) {
 
 void SocketInterfaceTgBot::handle_OpenSession(const TgBotSocket::Context& ctx) {
     auto key = StringTools::generateRandomString(
-        TgBotSocket::Packet::Header::SESSION_TOKEN_LENGTH - 1);
+        TgBotSocket::Packet::Header::SESSION_TOKEN_LENGTH);
     Packet::Header::nounce_type last_nounce{};
     auto tp = std::chrono::system_clock::now() + std::chrono::hours(1);
 
-    LOG(INFO) << "Created new session with key: " << key;
+    LOG(INFO) << "Created new session with key: " << std::quoted(key);
     session_table.emplace(key, Session(key, last_nounce, tp));
 
     Json::Value response;
@@ -555,7 +552,7 @@ void SocketInterfaceTgBot::handle_OpenSession(const TgBotSocket::Context& ctx) {
     response["expiration_time"] = fmt::format("{:%Y-%m-%d %H:%M:%S}", tp);
 
     Packet::Header::session_token_type session_token;
-    copyTo(session_token, key);
+    std::ranges::copy(key, session_token.begin());
 
     ctx.write(
         nodeToPacket(Command::CMD_OPEN_SESSION_ACK, response, session_token));
@@ -563,7 +560,7 @@ void SocketInterfaceTgBot::handle_OpenSession(const TgBotSocket::Context& ctx) {
 
 void SocketInterfaceTgBot::handle_CloseSession(
     const TgBotSocket::Packet::Header::session_token_type& token) {
-    auto it = session_table.find(token.data());
+    auto it = session_table.find(std::string(token.data(), token.size()));
     if (it != session_table.end()) {
         session_table.erase(it);
         LOG(INFO) << "Session with key " << token.data() << " closed";

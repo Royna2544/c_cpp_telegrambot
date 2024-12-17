@@ -57,8 +57,7 @@ bool RealFS::exists(const std::filesystem::path& path) {
 }
 
 void RealFS::SHA256(const SharedMalloc& memory, HashContainer& data) {
-    data.m_data = SHA256::compute(static_cast<const uint8_t*>(memory.get()),
-                                  memory.size());
+    ::SHA256(static_cast<const uint8_t*>(memory.get()), memory.size(), data.m_data.data());
 }
 
 using TgBotSocket::data::DownloadFile;

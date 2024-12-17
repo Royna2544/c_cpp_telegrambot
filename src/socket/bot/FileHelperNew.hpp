@@ -13,7 +13,7 @@
 
 // Represents a SHA-256 hash
 struct Socket_API HashContainer {
-    SHA256::result_type m_data;
+    TgBotSocket::SHA256StringArray m_data;
 };
 
 inline std::ostream& operator<<(std::ostream& self, const HashContainer& data) {

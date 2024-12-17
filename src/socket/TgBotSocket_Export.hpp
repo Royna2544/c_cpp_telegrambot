@@ -2,6 +2,8 @@
 
 // A header export for the TgBot's socket connection
 #include <Types.h>
+#include <openssl/evp.h>
+#include <openssl/sha.h>
 
 #include <SharedMalloc.hpp>
 #include <array>
@@ -9,9 +11,6 @@
 #include <cstring>
 #include <string>
 #include <type_traits>
-
-#include "hash/hmac.hpp"
-#include "hash/sha256.hpp"
 
 template <typename T, size_t size>
 inline bool arraycmp(const std::array<T, size>& lhs,
@@ -106,7 +105,7 @@ struct alignas(ALIGNMENT) Packet {
 
         using length_type = uint32_t;
         using nounce_type = uint64_t;
-        using hmac_type = HMAC::result_type;
+        using hmac_type = std::array<uint8_t, EVP_MAX_MD_SIZE>;
 
         // Using AES-GCM
         constexpr static int IV_LENGTH = 12;
@@ -133,7 +132,7 @@ struct alignas(ALIGNMENT) Packet {
 
 using PathStringArray = std::array<char, MAX_PATH_SIZE>;
 using MessageStringArray = std::array<char, MAX_MSG_SIZE>;
-using SHA256StringArray = SHA256::result_type;
+using SHA256StringArray = std::array<unsigned char, SHA256_DIGEST_LENGTH>;
 
 namespace data {
 
