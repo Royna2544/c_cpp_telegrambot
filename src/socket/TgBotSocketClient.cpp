@@ -306,8 +306,12 @@ int main(int argc, char** argv) {
                   << " expiration_time: " << root["expiration_time"];
 
         std::string session_token_str = root["session_token"].asString();
+        if (session_token_str.size() != Packet::Header::SESSION_TOKEN_LENGTH) {
+            LOG(ERROR) << "Invalid session token length";
+            return EXIT_FAILURE;
+        }
         Packet::Header::session_token_type session_token{};
-        copyTo(session_token, session_token_str);
+        std::ranges::copy_n(session_token_str.begin(), Packet::Header::SESSION_TOKEN_LENGTH, session_token.begin());
 
         std::optional<Packet> pkt;
         switch (cmd) {

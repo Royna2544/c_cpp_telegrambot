@@ -7,12 +7,14 @@
 #include <ManagedThreads.hpp>
 #include <ResourceManager.hpp>
 #include <TgBotSocket_Export.hpp>
+#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <global_handlers/ChatObserver.hpp>
 #include <global_handlers/SpamBlock.hpp>
 #include <initializer_list>
+#include <iterator>
 #include <mutex>
 #include <socket/TgBotCommandMap.hpp>
 #include <trivial_helpers/log_once.hpp>
@@ -513,28 +515,27 @@ bool CHECK_PACKET_SIZE(Packet& pkt) {
 }
 
 bool SocketInterfaceTgBot::verifyHeader(const Packet& packet) {
-    std::string_view their_token(packet.header.session_token.data(),
-                                 Packet::Header::SESSION_TOKEN_LENGTH);
-    if (their_token.empty()) {
-        LOG(WARNING) << "Received packet with empty session token";
+    decltype(session_table)::iterator iter;
+
+    for (iter = session_table.begin(); iter != session_table.end(); ++iter) {
+        if (std::ranges::equal(iter->first, packet.header.session_token)) {
+            break;
+        }
+    }
+    if (iter == session_table.end()) {
+        LOG(WARNING) << "Received packet with unknown session token";
         return false;
     }
-    if (!session_table.contains(their_token.data())) {
-        LOG(WARNING) << fmt::format(
-            "Received packet with unknown session token: {}", their_token);
+    if (std::chrono::system_clock::now() > iter->second.expiry) {
+        LOG(WARNING) << "Session token expired, rejecting and removing";
+        session_table.erase(iter);
         return false;
     }
-    auto& session = session_table[their_token.data()];
-    if (std::chrono::system_clock::now() > session.expiry) {
-        LOG(WARNING) << fmt::format("Session token expired: {}", their_token);
-        session_table.erase(their_token.data());
-        return false;
-    }
-    if (session.last_nonce >= packet.header.nonce) {
+    if (iter->second.last_nonce >= packet.header.nonce) {
         LOG(WARNING) << "Received packet with outdated nonce, ignore";
         return false;
     }
-    session.last_nonce = packet.header.nonce;
+    iter->second.last_nonce = packet.header.nonce;
     return true;
 }
 
@@ -552,7 +553,8 @@ void SocketInterfaceTgBot::handle_OpenSession(const TgBotSocket::Context& ctx) {
     response["expiration_time"] = fmt::format("{:%Y-%m-%d %H:%M:%S}", tp);
 
     Packet::Header::session_token_type session_token;
-    std::ranges::copy(key, session_token.begin());
+    std::ranges::copy_n(key.begin(), Packet::Header::SESSION_TOKEN_LENGTH,
+                        session_token.begin());
 
     ctx.write(
         nodeToPacket(Command::CMD_OPEN_SESSION_ACK, response, session_token));
