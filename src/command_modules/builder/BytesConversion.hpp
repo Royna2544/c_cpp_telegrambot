@@ -7,6 +7,7 @@
 #include <boost/units/quantity.hpp>
 #include <boost/units/systems/si.hpp>
 #include <boost/units/unit.hpp>
+#include <cstddef>
 #include <iomanip>
 
 namespace boost::units::data {
@@ -40,3 +41,15 @@ using Bytes = boost::units::quantity<boost::units::data::byte_unit>;
 using KiloBytes = boost::units::quantity<boost::units::data::kilobyte_unit>;
 using MegaBytes = boost::units::quantity<boost::units::data::megabyte_unit>;
 using GigaBytes = boost::units::quantity<boost::units::data::gigabyte_unit>;
+
+inline GigaBytes operator""_GB(const unsigned long long bytes) {
+    return GigaBytes(bytes * boost::units::data::bytes);
+}
+
+inline MegaBytes operator""_MB(const unsigned long long bytes) {
+    return MegaBytes(bytes * boost::units::data::kilobytes);
+}
+
+inline KiloBytes operator""_KB(const unsigned long long bytes) {
+    return KiloBytes(bytes * boost::units::data::bytes);
+}
