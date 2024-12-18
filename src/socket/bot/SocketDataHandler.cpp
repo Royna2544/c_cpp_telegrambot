@@ -14,7 +14,6 @@
 #include <global_handlers/ChatObserver.hpp>
 #include <global_handlers/SpamBlock.hpp>
 #include <initializer_list>
-#include <iterator>
 #include <mutex>
 #include <socket/TgBotCommandMap.hpp>
 #include <trivial_helpers/log_once.hpp>
@@ -439,7 +438,10 @@ GenericAck SocketInterfaceTgBot::handle_ObserveAllChats(
     const void* ptr, TgBotSocket::Packet::Header::length_type len,
     TgBotSocket::PayloadType type) {
     auto data = ObserveAllChats::fromBuffer(ptr, len, type);
-    observer->observeAll(static_cast<const ObserveAllChats*>(ptr)->observe);
+    if (!data) {
+        return GenericAck(AckType::ERROR_INVALID_ARGUMENT, "Invalid command");
+    }
+    observer->observeAll(data->observe);
     return GenericAck::ok();
 }
 
@@ -490,15 +492,35 @@ bool SocketInterfaceTgBot::handle_DownloadFile(
 
 bool SocketInterfaceTgBot::handle_GetUptime(
     const TgBotSocket::Context& ctx,
-    const TgBotSocket::Packet::Header::session_token_type& token) {
+    const TgBotSocket::Packet::Header::session_token_type& token,
+    TgBotSocket::PayloadType type) {
     auto now = std::chrono::system_clock::now();
     const auto diff = to_secs(now - startTp);
-    GetUptimeCallback callback{};
 
-    copyTo(callback.uptime, fmt::format("Uptime: {:%H:%M:%S}", diff).c_str());
-    LOG(INFO) << "Sending text back: " << std::quoted(callback.uptime.data());
-    ctx.write(createPacket(Command::CMD_GET_UPTIME_CALLBACK, &callback,
-                           sizeof(callback), PayloadType::Binary, token));
+    switch (type) {
+        case PayloadType::Binary: {
+            GetUptimeCallback callback{};
+            copyTo(callback.uptime, fmt::format("Uptime: {:%H:%M:%S}", diff));
+            LOG(INFO) << "Sending text back: "
+                      << std::quoted(callback.uptime.data());
+            ctx.write(createPacket(Command::CMD_GET_UPTIME_CALLBACK, &callback,
+                                   sizeof(callback), PayloadType::Binary,
+                                   token));
+        } break;
+        case PayloadType::Json: {
+            Json::Value payload;
+            payload["start_time"] = fmt::format("{}", startTp);
+            payload["current_time"] = fmt::format("{}", now);
+            payload["uptime"] = fmt::format("{:%Hh %Mm %Ss}", diff);
+            LOG(INFO) << "Sending JSON back: " << payload.toStyledString();
+            ctx.write(
+                nodeToPacket(Command::CMD_GET_UPTIME_CALLBACK, payload, token));
+        } break;
+        default:
+            LOG(WARNING) << "Unsupported payload type: "
+                         << static_cast<int>(type);
+            return false;
+    }
     return true;
 }
 
@@ -605,7 +627,8 @@ void SocketInterfaceTgBot::handlePacket(const TgBotSocket::Context& ctx,
                                          pkt.header.data_type);
             break;
         case Command::CMD_GET_UPTIME:
-            ret = handle_GetUptime(ctx, pkt.header.session_token);
+            ret = handle_GetUptime(ctx, pkt.header.session_token,
+                                   pkt.header.data_type);
             break;
         case Command::CMD_UPLOAD_FILE:
             ret = handle_UploadFile(ptr, pkt.header.data_size);

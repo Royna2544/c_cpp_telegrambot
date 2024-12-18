@@ -67,13 +67,15 @@ struct SocketInterfaceTgBot : ThreadRunner {
     // These have their own ack handlers
     bool handle_GetUptime(
         const TgBotSocket::Context& ctx,
-        const TgBotSocket::Packet::Header::session_token_type& token);
+        const TgBotSocket::Packet::Header::session_token_type& token,
+        TgBotSocket::PayloadType type);
     bool handle_DownloadFile(
         const TgBotSocket::Context& ctx, const void* ptr,
         const TgBotSocket::Packet::Header::session_token_type& token);
 
     void handle_OpenSession(const TgBotSocket::Context& ctx);
-    void handle_CloseSession(const TgBotSocket::Packet::Header::session_token_type& token);
+    void handle_CloseSession(
+        const TgBotSocket::Packet::Header::session_token_type& token);
 
     bool verifyHeader(const TgBotSocket::Packet& packet);
 };

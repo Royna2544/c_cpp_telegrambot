@@ -155,16 +155,47 @@ enum class CtrlSpamBlock {
     MAX,
 };
 
+/**
+ * CMD_WRITE_MESSAGE_TO_CHAT's data structure
+ *
+ * JSON schema:
+ * {
+ *   "chat": int64,
+ *   "message": string
+ * }
+ */
 struct alignas(ALIGNMENT) WriteMsgToChatId {
     ChatId chat;                 // destination chatid
     MessageStringArray message;  // Msg to send
 };
 
+
+/**
+ * CMD_OBSERVE_CHAT_ID's data structure
+ *
+ * JSON schema:
+ * {
+ *   "chat": int64,
+ *   "observe": True/False
+ * }
+ */
 struct alignas(ALIGNMENT) ObserveChatId {
     ChatId chat;
     bool observe;  // new state for given ChatId,
                    // true/false - Start/Stop observing
 };
+
+
+/**
+ * CMD_SEND_FILE_TO_CHAT's data structure
+ *
+ * JSON schema:
+ * {
+ *   "chat": int64,
+ *   "fileType": TgBotSocket::data::FileType value as int (TODO: Make it string representation),
+ *   "filePath": string
+ * }
+ */
 
 struct alignas(ALIGNMENT) SendFileToChatId {
     ChatId chat;                                  // Destination ChatId
@@ -172,6 +203,14 @@ struct alignas(ALIGNMENT) SendFileToChatId {
     alignas(ALIGNMENT) PathStringArray filePath;  // Path to file (local)
 };
 
+/**
+ * CMD_OBSERVE_ALL_CHATS data structure.
+ *
+ * JSON schema:
+ * {
+ *   "observe": True/False
+ * }
+ */
 struct alignas(ALIGNMENT) ObserveAllChats {
     bool observe;  // new state for all chats,
                    // true/false - Start/Stop observing
@@ -226,6 +265,16 @@ struct alignas(ALIGNMENT) DownloadFile : DownloadFileMeta {
 
 namespace callback {
 
+/**
+ * CMD_GET_UPTIME's callback data structure
+ *
+ * JSON schema:
+ * {
+ *   "start_time": timestamp
+ *   "current_time": timestamp
+ *   "uptime": string (format: "Uptime: 999h 99m 99s")
+ * }
+ */
 struct alignas(ALIGNMENT) GetUptimeCallback {
     std::array<char, sizeof("Uptime: 999h 99m 99s")> uptime;
 };
@@ -239,22 +288,6 @@ enum class AckType {
     ERROR_CLIENT_ERROR,
 };
 
-struct alignas(ALIGNMENT) GenericAck {
-    AckType result{};  // result type
-    // Error message, only valid when result type is not SUCCESS
-    alignas(ALIGNMENT) MessageStringArray error_msg{};
-
-    // Create a new instance of the Generic Ack, error.
-    explicit GenericAck(AckType result, const std::string& errorMsg)
-        : result(result) {
-        copyTo(error_msg, errorMsg.c_str());
-    }
-    GenericAck() = default;
-
-    // Create a new instance of the Generic Ack, success.
-    static GenericAck ok() { return GenericAck(AckType::SUCCESS, "OK"); }
-};
-
 /**
  * GenericAck's JSON schema:
  * {
@@ -265,6 +298,22 @@ struct alignas(ALIGNMENT) GenericAck {
  *   "error_msg": "Error message"
  * }
  */
+
+struct alignas(ALIGNMENT) GenericAck {
+    AckType result{};  // result type
+    // Error message, only valid when result type is not SUCCESS
+    alignas(ALIGNMENT) MessageStringArray error_msg{};
+
+    // Create a new instance of the Generic Ack, error.
+    explicit GenericAck(AckType result, const std::string& errorMsg)
+        : result(result) {
+        copyTo(error_msg, errorMsg);
+    }
+    GenericAck() = default;
+
+    // Create a new instance of the Generic Ack, success.
+    static GenericAck ok() { return GenericAck(AckType::SUCCESS, "OK"); }
+};
 
 struct alignas(ALIGNMENT) UploadFileDryCallback : public GenericAck {
     data::UploadFileMeta requestdata;
