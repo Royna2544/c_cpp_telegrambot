@@ -11,11 +11,10 @@ Context::Local::Local(const std::filesystem::path& path)
     : socket_(io_context), acceptor_(io_context), endpoint_(path.string()) {
     LOG(INFO) << "Local::Local: Path=" << path;
     std::error_code ec;
-    if (std::filesystem::exists(path, ec)) {
-        std::filesystem::remove(path, ec);
+
+    if (std::filesystem::remove(path, ec)) {
         LOG(INFO) << "Removed stale file.";
-    }
-    if (ec) {
+    } else if (ec != std::make_error_code(std::errc::no_such_file_or_directory)) {
         LOG(ERROR) << "Cannot remove stale file: " << ec.message();
     }
 }
