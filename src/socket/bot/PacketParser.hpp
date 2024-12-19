@@ -102,6 +102,12 @@ template <size_t N>
 std::optional<std::array<std::uint8_t, N>> hexDecode(
     const absl::string_view hexEncoded) {
     std::string binary;
+
+    if (hexEncoded.empty()) {
+        LOG(ERROR) << "Invalid hex string, empty";
+        return std::nullopt;
+    }
+    
     if (!absl::HexStringToBytes(hexEncoded, &binary)) {
         LOG(ERROR) << "Invalid hex string, HexStringToBytes failed";
         return std::nullopt;
