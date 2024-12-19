@@ -351,6 +351,7 @@ struct TransferFileMeta : SocketFile2DataHelper::Params {
                     }
                     result.hash = parsed.value();
                 }
+                result.options = options;
                 result.file_size = size - offset;
                 result.filebuffer =
                     static_cast<const std::uint8_t*>(buffer) + offset;
