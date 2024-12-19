@@ -5,7 +5,6 @@
 #include <absl/strings/str_split.h>
 #include <fmt/core.h>
 #include <git2.h>
-#include <git2/pack.h>
 #include <trivial_helpers/_class_helper_macros.h>
 
 #include <filesystem>
@@ -13,8 +12,7 @@
 #include <memory>
 #include <trivial_helpers/raii.hpp>
 #include <type_traits>
-
-#include "SystemInfo.hpp"
+#include "BytesConversion.hpp"
 
 struct ScopedLibGit2 {
     ScopedLibGit2() { git_libgit2_init(); }
@@ -289,13 +287,51 @@ bool GitBranchSwitcher::operator()() const {
                          << git_error_last_str();
             break;
         }
-        git_annotated_commit** _commit = remote_commit;
-        ret = git_merge(repo, const_cast<const git_annotated_commit**>(_commit),
-                        1, &merge_opts, &checkout_opts);
+        std::array<const git_annotated_commit*, 1> commits = {remote_commit};
+        ret = git_merge(repo, commits.data(), commits.size(), &merge_opts,
+                        &checkout_opts);
         if (ret != 0) {
             LOG(WARNING) << "Failed to merge branch: " << git_error_last_str();
             break;
         }
+        git_oid target_oid;
+        git_object_ptr target_commit;
+
+        const char* refName = git_reference_name(target_remote_ref);
+
+        // Get the target commit's OID
+        ret = git_reference_name_to_id(&target_oid, repo, refName);
+        if (ret != 0) {
+            LOG(WARNING) << "Failed to resolve remote reference: "
+                         << git_error_last_str();
+            break;
+        }
+
+        // Lookup the target commit
+        ret = git_object_lookup(static_cast<git_object**>(target_commit), repo,
+                                &target_oid, GIT_OBJECT_COMMIT);
+        if (ret != 0) {
+            LOG(WARNING) << "Failed to lookup target commit: "
+                         << git_error_last_str();
+            break;
+        }
+
+        ret = git_checkout_tree(repo, target_commit, &checkout_opts);
+        if (ret != 0) {
+            LOG(WARNING) << "Failed to checkout target commit: "
+                         << git_error_last_str();
+            break;
+        }
+
+        // Update HEAD to the new commit
+        ret = git_repository_set_head(repo, refName);
+
+        if (ret != 0) {
+            LOG(WARNING) << "Failed to update HEAD: " << git_error_last_str();
+            break;
+        }
+
+        LOG(INFO) << "Fast-forward completed successfully.";
     } while (false);
 
     current_branch = git_reference_shorthand(head_ref);
@@ -465,7 +501,8 @@ bool RepoInfo::git_clone(const std::filesystem::path& directory,
             "Fetch: Objects({}/{}/{}) Deltas({}/{}), Total {:.2f}GB",
             stats->received_objects, stats->indexed_objects,
             stats->total_objects, stats->indexed_deltas, stats->total_deltas,
-            GigaBytes(stats->received_bytes * boost::units::data::bytes).value());
+            GigaBytes(stats->received_bytes * boost::units::data::bytes)
+                .value());
         if (payload != nullptr) {
             auto* callback = static_cast<Callbacks*>(payload);
             callback->onFetch(stats);
