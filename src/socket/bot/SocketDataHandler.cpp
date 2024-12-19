@@ -109,12 +109,26 @@ Packet nodeToPacket(const Command& command, const Json::Value& json,
     return packet;
 }
 
+template <size_t N>
+std::string safeParse(const std::array<char, N>& buf) {
+    // Create a larger array to hold the null-terminated string
+    std::array<char, N + 1> safebuf{};
+
+    // Safely copy N characters from buf to safebuf
+    std::ranges::copy_n(buf.begin(), N, safebuf.begin());
+
+    // Null-terminate the new buffer
+    safebuf[N] = '\0';
+
+    return safebuf.data();
+}
+
 Packet toJSONPacket(const GenericAck& ack,
                     const Packet::Header::session_token_type& session_token) {
     Json::Value root;
     root["result"] = ack.result == AckType::SUCCESS;
     if (ack.result != AckType::SUCCESS) {
-        root["error_msg"] = ack.error_msg.data();
+        root["error_msg"] = safeParse(ack.error_msg);
         switch (ack.result) {
             case AckType::ERROR_CLIENT_ERROR:
                 root["error_type"] = "CLIENT_ERROR";
@@ -138,20 +152,6 @@ Packet toJSONPacket(const GenericAck& ack,
         }
     }
     return nodeToPacket(Command::CMD_GENERIC_ACK, root, session_token);
-}
-
-template <size_t N>
-std::string safeParse(const std::array<char, N>& buf) {
-    // Create a larger array to hold the null-terminated string
-    std::array<char, N + 1> safebuf{};
-
-    // Safely copy N characters from buf to safebuf
-    std::ranges::copy_n(buf.begin(), N, safebuf.begin());
-
-    // Null-terminate the new buffer
-    safebuf[N] = '\0';
-
-    return safebuf.data();
 }
 
 struct WriteMsgToChatId {
