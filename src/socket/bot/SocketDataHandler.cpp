@@ -181,7 +181,7 @@ struct WriteMsgToChatId {
                 if (!_root) {
                     return std::nullopt;
                 }
-                auto root = _root.value();
+                auto& root = _root.value();
                 result.chat = root["chat"].as<ChatId>();
                 result.message = root["message"].asString();
                 return result;
@@ -219,7 +219,7 @@ struct ObserveChatId {
                 if (!_root) {
                     return std::nullopt;
                 }
-                auto root = _root.value();
+                auto& root = _root.value();
                 result.chat = root["chat"].as<ChatId>();
                 result.observe = root["observe"].asBool();
                 return result;
@@ -261,7 +261,7 @@ struct SendFileToChatId {
                 if (!_root) {
                     return std::nullopt;
                 }
-                auto root = _root.value();
+                auto& root = _root.value();
                 result.chat = root["chat"].as<ChatId>();
                 result.fileType = static_cast<TgBotSocket::data::FileType>(
                     root["fileType"].asInt());
@@ -300,7 +300,7 @@ struct ObserveAllChats {
                 if (!_root) {
                     return std::nullopt;
                 }
-                auto root = _root.value();
+                auto& root = _root.value();
                 result.observe = root["observe"].asBool();
                 return result;
             }
@@ -313,7 +313,7 @@ struct ObserveAllChats {
 
 template <size_t N>
 std::optional<std::array<std::uint8_t, N>> hexDecode(
-    const std::string_view hexEncoded) {
+    const absl::string_view hexEncoded) {
     std::string binary;
     if (!absl::HexStringToBytes(hexEncoded, &binary)) {
         LOG(ERROR) << "Invalid hex string, HexStringToBytes failed";
@@ -398,7 +398,7 @@ struct TransferFileMeta : SocketFile2DataHelper::Params {
                 if (!_root) {
                     return std::nullopt;
                 }
-                auto root = _root.value();
+                auto& root = _root.value();
                 result.filepath = root["srcfilepath"].asString();
                 result.destfilepath = root["destfilepath"].asString();
                 data::FileTransferMeta::Options options;
