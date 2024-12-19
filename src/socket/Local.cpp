@@ -14,7 +14,7 @@ Context::Local::Local(const std::filesystem::path& path)
 
     if (std::filesystem::remove(path, ec)) {
         LOG(INFO) << "Removed stale file.";
-    } else if (ec != std::make_error_code(std::errc::no_such_file_or_directory)) {
+    } else if (ec && ec != std::make_error_code(std::errc::no_such_file_or_directory)) {
         LOG(ERROR) << "Cannot remove stale file: " << ec.message();
     }
 }
