@@ -238,7 +238,9 @@ struct ObserveAllChats {
         switch (type) {
             case PayloadType::Binary:
                 if (size != sizeof(data::ObserveAllChats)) {
-                    DLOG(WARNING) << "Payload size mismatch on ObserveAllChats for size: " << size;
+                    DLOG(WARNING)
+                        << "Payload size mismatch on ObserveAllChats for size: "
+                        << size;
                     return std::nullopt;
                 }
                 {
@@ -511,7 +513,7 @@ GenericAck SocketInterfaceTgBot::handle_TransferFile(
     const auto f = TransferFileMeta::fromBuffer(ptr, len, type);
     if (!f) {
         return GenericAck(AckType::ERROR_INVALID_ARGUMENT,
-                          "Cannot parse UploadFileMeta");
+                          "Cannot parse TransferFileMeta");
     }
 
     if (!helper->ReceiveTransferMeta(*f)) {
@@ -535,7 +537,7 @@ std::optional<Packet> SocketInterfaceTgBot::handle_TransferFileRequest(
 
     // Since a request is made, we need to send the file
     f->options.dry_run = false;
-    
+
     return helper->CreateTransferMeta(*f, token, type, false);
 }
 
@@ -707,8 +709,11 @@ void SocketInterfaceTgBot::handlePacket(const TgBotSocket::Context& ctx,
                 << fmt::format("Command failed: {}", pkt.header.cmd);
             if (result) {
                 ctx.write(result.value());
+                break;
+            } else {
+                ret = invalidPacketAck;
+                [[fallthrough]];
             }
-            break;
         }
         case Command::CMD_WRITE_MSG_TO_CHAT_ID:
         case Command::CMD_CTRL_SPAMBLOCK:
