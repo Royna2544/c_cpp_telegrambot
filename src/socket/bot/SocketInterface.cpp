@@ -6,6 +6,7 @@
 #include <string_view>
 #include <utility>
 
+#include "PacketParser.hpp"
 #include "TgBotSocket_Export.hpp"
 
 SocketInterfaceTgBot::SocketInterfaceTgBot(TgBotSocket::Context* _interface,
@@ -35,7 +36,8 @@ void SocketInterfaceTgBot::runFunction(const std::stop_token& token) {
                     continue;
                 } else if (!verifyHeader(*pkt)) {
                     continue;
-                } else if (pkt->header.cmd == TgBotSocket::Command::CMD_CLOSE_SESSION) {
+                } else if (pkt->header.cmd ==
+                           TgBotSocket::Command::CMD_CLOSE_SESSION) {
                     handle_CloseSession(pkt->header.session_token);
                     break;
                 } else {

@@ -6,6 +6,7 @@
 
 #include <ManagedThreads.hpp>
 #include <SharedMalloc.hpp>
+#include <algorithm>
 #include <mutex>
 #include <stop_token>
 
@@ -19,7 +20,7 @@ void NetworkLogSink::LogSinkImpl::Send(const absl::LogEntry& entry) {
     }
     LogEntry le{};
     le.severity = entry.log_severity();
-    copyTo(le.message, entry.text_message().data());
+    std::ranges::copy_n(entry.text_message().begin(), MAX_LOGMSG_SIZE - 1, le.message.begin());
     SharedMalloc logData(le);
     bool ret = false;
     if (context != nullptr) {

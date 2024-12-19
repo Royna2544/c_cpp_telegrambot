@@ -1,5 +1,7 @@
+#include <absl/strings/escaping.h>
 #include <fmt/chrono.h>
 #include <json/json.h>
+#include <openssl/sha.h>
 #include <tgbot/TgException.h>
 #include <tgbot/tools/StringTools.h>
 #include <trivial_helpers/_std_chrono_templates.h>
@@ -8,14 +10,19 @@
 #include <ResourceManager.hpp>
 #include <TgBotSocket_Export.hpp>
 #include <algorithm>
+#include <array>
 #include <chrono>
+#include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <global_handlers/ChatObserver.hpp>
 #include <global_handlers/SpamBlock.hpp>
 #include <initializer_list>
 #include <mutex>
+#include <optional>
 #include <socket/TgBotCommandMap.hpp>
+#include <string>
+#include <string_view>
 #include <trivial_helpers/log_once.hpp>
 #include <variant>
 
@@ -279,7 +286,7 @@ struct ObserveAllChats {
         switch (type) {
             case PayloadType::Binary:
                 if (size != sizeof(data::ObserveAllChats)) {
-                    DLOG(WARNING) << "Payload size mismatch on ObserveAllChats";
+                    DLOG(WARNING) << "Payload size mismatch on ObserveAllChats for size: " << size;
                     return std::nullopt;
                 }
                 {
@@ -299,6 +306,125 @@ struct ObserveAllChats {
             }
             default:
                 LOG(ERROR) << "Invalid payload type for ObserveAllChats";
+                return std::nullopt;
+        }
+    }
+};
+
+template <size_t N>
+std::optional<std::array<std::uint8_t, N>> hexDecode(
+    const std::string_view hexEncoded) {
+    std::string binary;
+    if (!absl::HexStringToBytes(hexEncoded, &binary)) {
+        LOG(ERROR) << "Invalid hex string, HexStringToBytes failed";
+        return std::nullopt;
+    }
+
+    if (binary.empty() || binary.size() != N) {  // Validate size
+        LOG(ERROR) << "Invalid hex string length or content";
+        return std::nullopt;
+    }
+
+    std::array<std::uint8_t, N> result{};
+    std::copy(binary.begin(), binary.end(), result.begin());
+    return result;
+}
+
+std::optional<Packet::Header::length_type> findBorderOffset(
+    const void* buffer, Packet::Header::length_type size) {
+    const auto* iter = static_cast<const uint8_t*>(buffer);
+    Packet::Header::length_type offset = 0;
+    for (Packet::Header::length_type i = 0; i < size; ++i) {
+        if (iter[i] == data::JSON_BYTE_BORDER) {
+            LOG(INFO) << "Found JSON_BYTE_BORDER in offset " << i;
+            return i;
+        }
+    }
+    LOG(WARNING) << "JSON_BYTE_BORDER not found in buffer";
+    return std::nullopt;
+}
+
+Packet GenericAckToPacket(
+    const GenericAck& gn, const TgBotSocket::PayloadType payloadType,
+    const TgBotSocket::Packet::Header::session_token_type& token) {
+    LOG(INFO) << "Sending ack: " << std::boolalpha
+              << (gn.result == AckType::SUCCESS);
+    switch (payloadType) {
+        case PayloadType::Binary: {
+            return createPacket(Command::CMD_GENERIC_ACK, &gn,
+                                sizeof(GenericAck),
+                                TgBotSocket::PayloadType::Binary, token);
+        } break;
+        case PayloadType::Json: {
+            return toJSONPacket(gn, token);
+        } break;
+        default:
+            LOG(ERROR) << "Invalid payload type for GenericAck";
+            return {};
+    }
+}
+
+struct TransferFileMeta : SocketFile2DataHelper::Params {
+    static std::optional<TransferFileMeta> fromBuffer(
+        const void* buffer, TgBotSocket::Packet::Header::length_type size,
+        TgBotSocket::PayloadType type) {
+        TransferFileMeta result{};
+        switch (type) {
+            case PayloadType::Binary: {
+                if (size < sizeof(data::FileTransferMeta)) {
+                    DLOG(WARNING) << "Payload size mismatch on UploadFileMeta";
+                    return std::nullopt;
+                }
+                {
+                    const auto* data =
+                        static_cast<const data::FileTransferMeta*>(buffer);
+                    result.filepath = safeParse(data->srcfilepath);
+                    result.destfilepath = safeParse(data->destfilepath);
+                    result.options = data->options;
+                    result.hash = data->sha256_hash;
+                    result.file_size = size - sizeof(data::FileTransferMeta);
+                    result.filebuffer = reinterpret_cast<const uint8_t*>(
+                        static_cast<const char*>(buffer) +
+                        sizeof(data::FileTransferMeta));
+                }
+                return result;
+            }
+            case PayloadType::Json: {
+                const auto offset =
+                    findBorderOffset(buffer, size).value_or(size);
+                std::string json(static_cast<const char*>(buffer), offset);
+                auto _root = parseAndCheck(buffer, size,
+                                           {"srcfilepath", "destfilepath"});
+                if (!_root) {
+                    return std::nullopt;
+                }
+                auto root = _root.value();
+                result.filepath = root["srcfilepath"].asString();
+                result.destfilepath = root["destfilepath"].asString();
+                data::FileTransferMeta::Options options;
+                options.overwrite = root["options"]["overwrite"].asBool();
+                options.hash_ignore = root["options"]["hash_ignore"].asBool();
+                options.dry_run = root["options"]["dry_run"].asBool();
+                if (!options.hash_ignore && !root.isMember("hash")) {
+                    LOG(WARNING)
+                        << "hash_ignore is false, but hash is not provided.";
+                    return std::nullopt;
+                }
+                if (root.isMember("hash")) {
+                    auto parsed = hexDecode<SHA256_DIGEST_LENGTH>(
+                        root["hash"].asString());
+                    if (!parsed) {
+                        return std::nullopt;
+                    }
+                    result.hash = parsed.value();
+                }
+                result.file_size = size - offset;
+                result.filebuffer =
+                    static_cast<const std::uint8_t*>(buffer) + offset;
+                return result;
+            }
+            default:
+                LOG(ERROR) << "Invalid payload type for TransferFileMeta";
                 return std::nullopt;
         }
     }
@@ -445,53 +571,41 @@ GenericAck SocketInterfaceTgBot::handle_ObserveAllChats(
     return GenericAck::ok();
 }
 
-GenericAck SocketInterfaceTgBot::handle_UploadFile(
-    const void* ptr, TgBotSocket::Packet::Header::length_type len) {
-    if (!helper->DataToFile<SocketFile2DataHelper::Pass::UPLOAD_FILE>(ptr,
-                                                                      len)) {
-        return GenericAck(AckType::ERROR_RUNTIME_ERROR, "Failed to write file");
+GenericAck SocketInterfaceTgBot::handle_TransferFile(
+    const void* ptr, TgBotSocket::Packet::Header::length_type len,
+    TgBotSocket::PayloadType type) {
+    const auto f = TransferFileMeta::fromBuffer(ptr, len, type);
+    if (!f) {
+        return GenericAck(AckType::ERROR_INVALID_ARGUMENT,
+                          "Cannot parse UploadFileMeta");
     }
-    return GenericAck::ok();
-}
 
-UploadFileDryCallback SocketInterfaceTgBot::handle_UploadFileDry(
-    const void* ptr, TgBotSocket::Packet::Header::length_type len) {
-    bool ret = false;
-    const auto* f = static_cast<const data::UploadFileMeta*>(ptr);
-    UploadFileDryCallback callback;
-    callback.requestdata = *f;
-
-    ret = helper->DataToFile<SocketFile2DataHelper::Pass::UPLOAD_FILE_DRY>(ptr,
-                                                                           len);
-    if (!ret) {
-        copyTo(callback.error_msg, "Options verification failed");
-        callback.result = AckType::ERROR_COMMAND_IGNORED;
+    if (!helper->ReceiveTransferMeta(*f)) {
+        return GenericAck(AckType::ERROR_COMMAND_IGNORED,
+                          "Options verification failed");
     } else {
-        copyTo(callback.error_msg, "OK");
-        callback.result = AckType::SUCCESS;
+        return GenericAck::ok();
     }
-    return callback;
 }
 
-bool SocketInterfaceTgBot::handle_DownloadFile(
-    const TgBotSocket::Context& ctx, const void* ptr,
-    const TgBotSocket::Packet::Header::session_token_type& token) {
-    const auto* data = static_cast<const data::DownloadFile*>(ptr);
-    SocketFile2DataHelper::DataFromFileParam params;
-    params.filepath = data->filepath.data();
-    params.destfilepath = data->destfilename.data();
-    auto pkt = helper->DataFromFile<SocketFile2DataHelper::Pass::DOWNLOAD_FILE>(
-        params, token);
-    if (!pkt) {
-        LOG(ERROR) << "Failed to prepare download file packet";
-        return false;
+std::optional<Packet> SocketInterfaceTgBot::handle_TransferFileRequest(
+    const void* ptr, TgBotSocket::Packet::Header::length_type len,
+    const TgBotSocket::Packet::Header::session_token_type& token,
+    TgBotSocket::PayloadType type) {
+    auto f = TransferFileMeta::fromBuffer(ptr, len, type);
+    if (!f) {
+        return toJSONPacket(GenericAck(AckType::ERROR_INVALID_ARGUMENT,
+                                       "Cannot parse UploadFileMeta"),
+                            token);
     }
-    ctx.write(pkt.value());
-    return true;
+
+    // Since a request is made, we need to send the file
+    f->options.dry_run = false;
+    
+    return helper->CreateTransferMeta(*f, token, false);
 }
 
-bool SocketInterfaceTgBot::handle_GetUptime(
-    const TgBotSocket::Context& ctx,
+std::optional<Packet> SocketInterfaceTgBot::handle_GetUptime(
     const TgBotSocket::Packet::Header::session_token_type& token,
     TgBotSocket::PayloadType type) {
     auto now = std::chrono::system_clock::now();
@@ -503,9 +617,8 @@ bool SocketInterfaceTgBot::handle_GetUptime(
             copyTo(callback.uptime, fmt::format("Uptime: {:%H:%M:%S}", diff));
             LOG(INFO) << "Sending text back: "
                       << std::quoted(callback.uptime.data());
-            ctx.write(createPacket(Command::CMD_GET_UPTIME_CALLBACK, &callback,
-                                   sizeof(callback), PayloadType::Binary,
-                                   token));
+            return createPacket(Command::CMD_GET_UPTIME_CALLBACK, &callback,
+                                sizeof(callback), PayloadType::Binary, token);
         } break;
         case PayloadType::Json: {
             Json::Value payload;
@@ -513,15 +626,14 @@ bool SocketInterfaceTgBot::handle_GetUptime(
             payload["current_time"] = fmt::format("{}", now);
             payload["uptime"] = fmt::format("{:%Hh %Mm %Ss}", diff);
             LOG(INFO) << "Sending JSON back: " << payload.toStyledString();
-            ctx.write(
-                nodeToPacket(Command::CMD_GET_UPTIME_CALLBACK, payload, token));
+            return nodeToPacket(Command::CMD_GET_UPTIME_CALLBACK, payload,
+                                token);
         } break;
         default:
             LOG(WARNING) << "Unsupported payload type: "
                          << static_cast<int>(type);
-            return false;
     }
-    return true;
+    return std::nullopt;
 }
 
 template <typename DataT>
@@ -584,21 +696,25 @@ void SocketInterfaceTgBot::handle_OpenSession(const TgBotSocket::Context& ctx) {
 
 void SocketInterfaceTgBot::handle_CloseSession(
     const TgBotSocket::Packet::Header::session_token_type& token) {
-    auto it = session_table.find(std::string(token.data(), token.size()));
-    if (it != session_table.end()) {
-        session_table.erase(it);
-        LOG(INFO) << "Session with key " << token.data() << " closed";
-    } else {
-        LOG(WARNING)
-            << "Received close session request for unknown session token: "
-            << token.data();
+    decltype(session_table)::iterator iter;
+    for (iter = session_table.begin(); iter != session_table.end(); ++iter) {
+        if (std::ranges::equal(iter->first, token)) {
+            break;
+        }
     }
+    if (iter == session_table.end()) {
+        LOG(WARNING) << "Received packet with unknown session token";
+        return;
+    }
+    session_table.erase(iter);
+    LOG(INFO) << "Session with key " << std::string(token.data(), token.size())
+              << " closed";
 }
 
 void SocketInterfaceTgBot::handlePacket(const TgBotSocket::Context& ctx,
                                         TgBotSocket::Packet pkt) {
     const void* ptr = pkt.data.get();
-    std::variant<UploadFileDryCallback, GenericAck, bool> ret;
+    std::variant<GenericAck, std::optional<Packet>> ret;
     const auto invalidPacketAck =
         GenericAck(AckType::ERROR_COMMAND_IGNORED, "Invalid packet size");
 
@@ -627,21 +743,17 @@ void SocketInterfaceTgBot::handlePacket(const TgBotSocket::Context& ctx,
                                          pkt.header.data_type);
             break;
         case Command::CMD_GET_UPTIME:
-            ret = handle_GetUptime(ctx, pkt.header.session_token,
+            ret = handle_GetUptime(pkt.header.session_token,
                                    pkt.header.data_type);
             break;
-        case Command::CMD_UPLOAD_FILE:
-            ret = handle_UploadFile(ptr, pkt.header.data_size);
+        case Command::CMD_TRANSFER_FILE:
+            ret = handle_TransferFile(ptr, pkt.header.data_size,
+                                      pkt.header.data_type);
             break;
-        case Command::CMD_UPLOAD_FILE_DRY:
-            if (CHECK_PACKET_SIZE<data::UploadFileMeta>(pkt)) {
-                ret = handle_UploadFileDry(ptr, pkt.header.data_size);
-            } else {
-                ret = UploadFileDryCallback(invalidPacketAck);
-            }
-            break;
-        case Command::CMD_DOWNLOAD_FILE:
-            ret = handle_DownloadFile(ctx, ptr, pkt.header.session_token);
+        case Command::CMD_TRANSFER_FILE_REQUEST:
+            ret = handle_TransferFileRequest(ptr, pkt.header.data_size,
+                                             pkt.header.session_token,
+                                             pkt.header.data_type);
             break;
         default:
             if (CommandHelpers::isClientCommand(pkt.header.cmd)) {
@@ -654,22 +766,14 @@ void SocketInterfaceTgBot::handlePacket(const TgBotSocket::Context& ctx,
     };
     switch (pkt.header.cmd) {
         case Command::CMD_GET_UPTIME:
-        case Command::CMD_DOWNLOAD_FILE: {
+        case Command::CMD_TRANSFER_FILE_REQUEST: {
             // This has its own callback, so we don't need to send ack.
-            bool result = std::get<bool>(ret);
+            auto result = std::get<1>(ret);
             LOG_IF(WARNING, (!result))
                 << fmt::format("Command failed: {}", pkt.header.cmd);
-            break;
-        }
-        case Command::CMD_UPLOAD_FILE_DRY: {
-            const auto result = std::get<UploadFileDryCallback>(ret);
-            auto ackpkt =
-                createPacket(Command::CMD_UPLOAD_FILE_DRY_CALLBACK, &result,
-                             sizeof(UploadFileDryCallback), PayloadType::Binary,
-                             pkt.header.session_token);
-            LOG(INFO) << "Sending CMD_UPLOAD_FILE_DRY ack: " << std::boolalpha
-                      << (result.result == AckType::SUCCESS);
-            ctx.write(ackpkt);
+            if (result) {
+                ctx.write(result.value());
+            }
             break;
         }
         case Command::CMD_WRITE_MSG_TO_CHAT_ID:
@@ -677,7 +781,7 @@ void SocketInterfaceTgBot::handlePacket(const TgBotSocket::Context& ctx,
         case Command::CMD_OBSERVE_CHAT_ID:
         case Command::CMD_SEND_FILE_TO_CHAT_ID:
         case Command::CMD_OBSERVE_ALL_CHATS:
-        case Command::CMD_UPLOAD_FILE: {
+        case Command::CMD_TRANSFER_FILE: {
             GenericAck result = std::get<GenericAck>(ret);
             LOG(INFO) << "Sending ack: " << std::boolalpha
                       << (result.result == AckType::SUCCESS);

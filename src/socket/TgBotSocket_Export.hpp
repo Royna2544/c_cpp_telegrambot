@@ -46,17 +46,14 @@ enum class Command : std::int32_t {
     CMD_SEND_FILE_TO_CHAT_ID,
     CMD_OBSERVE_ALL_CHATS,
     CMD_GET_UPTIME,
-    CMD_UPLOAD_FILE,
-    CMD_DOWNLOAD_FILE,
-    CMD_CLIENT_MAX,
+    CMD_TRANSFER_FILE,
+    CMD_TRANSFER_FILE_REQUEST,
+    CMD_CLIENT_MAX = CMD_TRANSFER_FILE_REQUEST,
 
     // Below are internal commands
     CMD_SERVER_INTERNAL_START = 100,
     CMD_GET_UPTIME_CALLBACK = CMD_SERVER_INTERNAL_START,
     CMD_GENERIC_ACK,
-    CMD_UPLOAD_FILE_DRY,
-    CMD_UPLOAD_FILE_DRY_CALLBACK,
-    CMD_DOWNLOAD_FILE_CALLBACK,
     CMD_OPEN_SESSION,
     CMD_OPEN_SESSION_ACK,
     CMD_CLOSE_SESSION,
@@ -99,7 +96,7 @@ struct alignas(ALIGNMENT) Packet {
         // 11: Remove CMD_DELETE_CONTROLLER_BY_ID, add payload type to header
         // 12: Use OpenSSL's HMAC and AES-GCM algorithm encryption with nounces.
         // Also use CMD_OPEN_SESSION CMD_CLOSE_SESSION for session based
-        // encryption
+        // encryption (WIP for now)
         constexpr static int DATA_VERSION = 12;
         constexpr static int64_t MAGIC_VALUE = MAGIC_VALUE_BASE + DATA_VERSION;
 
@@ -216,10 +213,41 @@ struct alignas(ALIGNMENT) ObserveAllChats {
                    // true/false - Start/Stop observing
 };
 
-struct alignas(ALIGNMENT) UploadFileMeta {
-    PathStringArray destfilepath{};  // Destination file name
+// This border byte is used to distinguish JSON meta and file data
+constexpr unsigned char JSON_BYTE_BORDER = 0xFF;
+
+/**
+ * CMD_UPLOAD_FILE/CMD_DOWNLOAD_FILE data structure.
+ *
+ * JSON schema:
+ *
+ * {
+ *   "destfilepath": string,
+ *   "srcfilepath": string,
+ *   "hash": string (hexadecimal representation, Optional if options.hash_ignore is true),
+ *   "options": (Optional if no options are specified) {
+ *     "overwrite": bool, (Optional, Default=False)
+ *     "hash_ignore": bool, (Optional, Default=False)
+ *    }
+ * }
+ * Note that JSON cannot include bytes. So we use a border at the end of the JSON metadata.
+ * Example:
+ * 
+ * {
+ *   "destfilepath": "/path/to/destination/file.txt",
+ *   "srcfilepath": "/path/to/source/file.txt",
+ *   "hash": "67452400d478e8226a73a440e082f7a746e696c6c65",
+ *   "options": {
+ *     "overwrite": true,
+ *     "hash_ignore": true
+ *   }
+ *   ==BORDER==
+ *   <file bytes>
+ */
+struct alignas(ALIGNMENT) FileTransferMeta {
     PathStringArray srcfilepath{};  // Source file name (This is not used on the
                                     // remote, used if dry=true)
+    PathStringArray destfilepath{};  // Destination file name
     SHA256StringArray sha256_hash{};  // SHA256 hash of the file
 
     // Returns AckType::ERROR_COMMAND_IGNORED on options failure
@@ -233,6 +261,7 @@ struct alignas(ALIGNMENT) UploadFileMeta {
         bool hash_ignore = false;
 
         // If true, just check the hashes and return result.
+        // If this is false, the file must be followed after this struct
         bool dry_run = false;
 
         constexpr bool operator==(const Options& other) const {
@@ -241,26 +270,13 @@ struct alignas(ALIGNMENT) UploadFileMeta {
         }
     } options;
 
-    bool operator==(const UploadFileMeta& other) const {
+    bool operator==(const FileTransferMeta& other) const {
         return arraycmp(destfilepath, other.destfilepath) &&
                arraycmp(srcfilepath, other.srcfilepath) &&
                arraycmp(sha256_hash, sha256_hash) && options == other.options;
     }
 };
 
-struct alignas(ALIGNMENT) UploadFile : public UploadFileMeta {
-    using Options = UploadFileMeta::Options;
-    alignas(ALIGNMENT) uint8_t buf[];  // Buffer
-};
-
-struct alignas(ALIGNMENT) DownloadFileMeta {
-    PathStringArray filepath{};      // Path to file (in remote)
-    PathStringArray destfilename{};  // Destination file name
-};
-
-struct alignas(ALIGNMENT) DownloadFile : DownloadFileMeta {
-    alignas(ALIGNMENT) uint8_t buf[];  // Buffer
-};
 }  // namespace data
 
 namespace callback {
@@ -315,10 +331,6 @@ struct alignas(ALIGNMENT) GenericAck {
     static GenericAck ok() { return GenericAck(AckType::SUCCESS, "OK"); }
 };
 
-struct alignas(ALIGNMENT) UploadFileDryCallback : public GenericAck {
-    data::UploadFileMeta requestdata;
-};
-
 }  // namespace callback
 }  // namespace TgBotSocket
 
@@ -333,13 +345,11 @@ ASSERT_SIZE(WriteMsgToChatId, 264);
 ASSERT_SIZE(ObserveChatId, 16);
 ASSERT_SIZE(SendFileToChatId, 272);
 ASSERT_SIZE(ObserveAllChats, 8);
-ASSERT_SIZE(UploadFile, 552);
-ASSERT_SIZE(DownloadFile, 512);
+ASSERT_SIZE(FileTransferMeta, 552);
 ASSERT_SIZE(Packet::Header, 144);
 }  // namespace TgBotSocket::data
 
 namespace TgBotSocket::callback {
 ASSERT_SIZE(GetUptimeCallback, 24);
 ASSERT_SIZE(GenericAck, 264);
-ASSERT_SIZE(UploadFileDryCallback, 816);
 }  // namespace TgBotSocket::callback

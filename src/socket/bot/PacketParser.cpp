@@ -6,6 +6,7 @@
 #include <openssl/rand.h>
 
 #include <TgBotSocket_Export.hpp>
+#include <chrono>
 #include <cstring>
 #include <optional>
 #include <socket/TgBotCommandMap.hpp>
@@ -275,6 +276,9 @@ bool Socket_API decryptPacket(TgBotSocket::Packet& packet) {
         LOG(ERROR) << "Decryption failed";
         return false;
     }
+    // Update the header data size
+    // TODO: Is this okay?
+    packet.header.data_size = packet.data.size();
     return true;
 }
 
@@ -287,7 +291,12 @@ createPacket(const Command command, const void* data,
     packet.header.magic = Packet::Header::MAGIC_VALUE;
     packet.header.data_type = payloadType;
     packet.header.session_token = sessionToken;
-    packet.header.nonce = std::time(nullptr);
+
+    using namespace std::chrono;
+    packet.header.nonce = duration_cast<milliseconds>(
+        system_clock::now().time_since_epoch()
+    ).count() + rand(); // Add some randomness to the nonce
+
     if (data != nullptr && length > 0) {
         packet.data.resize(length);
         packet.data.assignFrom(data, length);

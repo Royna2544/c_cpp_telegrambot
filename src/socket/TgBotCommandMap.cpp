@@ -25,9 +25,9 @@ constexpr std::array<CommandEntry, static_cast<int>(Command::CMD_CLIENT_MAX)>
                      "Chat ID, FileType enum, FilePath"},
         CommandEntry{Command::CMD_OBSERVE_ALL_CHATS, 1, "Observe_or_not"},
         CommandEntry{Command::CMD_GET_UPTIME, 0, ""},
-        CommandEntry{Command::CMD_UPLOAD_FILE, 2,
+        CommandEntry{Command::CMD_TRANSFER_FILE, 2,
                      "Source File (In local), Dest File (In remote)"},
-        CommandEntry{Command::CMD_DOWNLOAD_FILE, 2,
+        CommandEntry{Command::CMD_TRANSFER_FILE_REQUEST, 2,
                      "Source File (In remote), Dest File (In local)"},
     };
 

@@ -8,6 +8,7 @@
 #include <backends/ClientBackend.hpp>
 #include <bot/FileHelperNew.hpp>
 #include <bot/PacketParser.hpp>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
@@ -94,37 +95,17 @@ void handleCallback(SocketClientWrapper& connector, const Packet& pkt) {
             LOG(INFO) << "Server replied: " << callbackData.uptime.data();
             break;
         }
-        case Command::CMD_DOWNLOAD_FILE_CALLBACK: {
-            helper.DataToFile<SocketFile2DataHelper::Pass::DOWNLOAD_FILE>(
-                pkt.data.get(), pkt.header.data_size);
-            break;
-        }
-        case Command::CMD_UPLOAD_FILE_DRY_CALLBACK: {
-            callback::UploadFileDryCallback callbackData{};
-            pkt.data.assignTo(callbackData);
-            LOG(INFO) << "Response from server: "
-                      << AckTypeToStr(callbackData.result);
-            if (callbackData.result != AckType::SUCCESS) {
-                LOG(ERROR) << "Reason: " << callbackData.error_msg.data();
-            } else {
-                LOG(INFO) << "Recreated client socket";
-                auto params_in = callbackData.requestdata;
-                SocketFile2DataHelper::DataFromFileParam param;
-                param.destfilepath = params_in.destfilepath.data();
-                param.filepath = params_in.srcfilepath.data();
-                param.options = params_in.options;
-                auto newPkt =
-                    helper
-                        .DataFromFile<SocketFile2DataHelper::Pass::UPLOAD_FILE>(
-                            param, pkt.header.session_token);
-                LOG(INFO) << "Sending the actual file content again...";
-                connector->write(newPkt.value());
-                auto it2 =
-                    TgBotSocket::readPacket(connector.chosen_interface());
-                if (it2) {
-                    handleCallback(connector, it2.value());
-                }
-            }
+        case Command::CMD_TRANSFER_FILE: {
+            data::FileTransferMeta meta;
+            pkt.data.assignTo(meta);
+            SocketFile2DataHelper::Params params;
+            params.filepath = meta.srcfilepath.data();
+            params.destfilepath = meta.destfilepath.data();
+            params.options = meta.options;
+            params.hash = meta.sha256_hash;
+            params.file_size = pkt.data.size() - sizeof(meta);
+            params.filebuffer = reinterpret_cast<const uint8_t*>(static_cast<const char *>(pkt.data.get()) + sizeof(meta));
+            helper.ReceiveTransferMeta(params);
             break;
         }
         case Command::CMD_GENERIC_ACK: {
@@ -233,21 +214,14 @@ std::optional<None> parseArgs(char** argv) {
 }
 
 template <>
-std::optional<SocketFile2DataHelper::DataFromFileParam> parseArgs(char** argv) {
-    SocketFile2DataHelper::DataFromFileParam params;
+std::optional<SocketFile2DataHelper::Params> parseArgs(char** argv) {
+    SocketFile2DataHelper::Params params;
     params.filepath = argv[0];
     params.destfilepath = argv[1];
     params.options.hash_ignore = false;  //= true;
     params.options.overwrite = true;
+    params.options.dry_run = false;
     return params;
-}
-
-template <>
-std::optional<data::DownloadFileMeta> parseArgs(char** argv) {
-    data::DownloadFile data{};
-    copyTo(data.filepath, argv[0]);
-    copyTo(data.destfilename, argv[1]);
-    return data;
 }
 
 int main(int argc, char** argv) {
@@ -311,7 +285,9 @@ int main(int argc, char** argv) {
             return EXIT_FAILURE;
         }
         Packet::Header::session_token_type session_token{};
-        std::ranges::copy_n(session_token_str.begin(), Packet::Header::SESSION_TOKEN_LENGTH, session_token.begin());
+        std::ranges::copy_n(session_token_str.begin(),
+                            Packet::Header::SESSION_TOKEN_LENGTH,
+                            session_token.begin());
 
         std::optional<Packet> pkt;
         switch (cmd) {
@@ -319,7 +295,6 @@ int main(int argc, char** argv) {
                 auto args = parseArgs<data::WriteMsgToChatId>(argv);
                 if (!args) {
                     usage(exe, false);
-                    return EXIT_FAILURE;
                 }
                 pkt = createPacket(cmd, &args.value(), sizeof(*args),
                                    PayloadType::Binary, session_token);
@@ -329,7 +304,6 @@ int main(int argc, char** argv) {
                 auto args = parseArgs<data::CtrlSpamBlock>(argv);
                 if (!args) {
                     usage(exe, false);
-                    return EXIT_FAILURE;
                 }
                 pkt = createPacket(cmd, &args.value(), sizeof(*args),
                                    PayloadType::Binary, session_token);
@@ -339,7 +313,6 @@ int main(int argc, char** argv) {
                 auto args = parseArgs<data::ObserveChatId>(argv);
                 if (!args) {
                     usage(exe, false);
-                    return EXIT_FAILURE;
                 }
                 pkt = createPacket(cmd, &args.value(), sizeof(*args),
                                    PayloadType::Binary, session_token);
@@ -349,7 +322,6 @@ int main(int argc, char** argv) {
                 auto args = parseArgs<data::SendFileToChatId>(argv);
                 if (!args) {
                     usage(exe, false);
-                    return EXIT_FAILURE;
                 }
                 pkt = createPacket(cmd, &args.value(), sizeof(*args),
                                    PayloadType::Binary, session_token);
@@ -358,7 +330,6 @@ int main(int argc, char** argv) {
                 auto args = parseArgs<data::ObserveAllChats>(argv);
                 if (!args) {
                     usage(exe, false);
-                    return EXIT_FAILURE;
                 }
                 pkt = createPacket(cmd, &args.value(), sizeof(*args),
                                    PayloadType::Binary, session_token);
@@ -367,34 +338,23 @@ int main(int argc, char** argv) {
                 auto args = parseArgs<None>(argv);
                 if (!args) {
                     usage(exe, false);
-                    return EXIT_FAILURE;
                 }
                 pkt = createPacket(cmd, &args.value(), sizeof(*args),
                                    PayloadType::Binary, session_token);
                 break;
             }
-            case Command::CMD_UPLOAD_FILE: {
+            case Command::CMD_TRANSFER_FILE:
+            case Command::CMD_TRANSFER_FILE_REQUEST: {
                 RealFS realfs;
                 SocketFile2DataHelper helper(&realfs);
-                auto args =
-                    parseArgs<SocketFile2DataHelper::DataFromFileParam>(argv);
+                auto args = parseArgs<SocketFile2DataHelper::Params>(argv);
                 if (!args) {
                     usage(exe, false);
                     return EXIT_FAILURE;
                 }
-                pkt = helper.DataFromFile<
-                    SocketFile2DataHelper::Pass::UPLOAD_FILE_DRY>(
-                    args.value(), session_token);
-                break;
-            }
-            case Command::CMD_DOWNLOAD_FILE: {
-                auto args = parseArgs<data::DownloadFileMeta>(argv);
-                if (!args) {
-                    usage(exe, false);
-                    return EXIT_FAILURE;
-                }
-                pkt = createPacket(cmd, &args.value(), sizeof(*args),
-                                   PayloadType::Binary, session_token);
+                pkt = helper.CreateTransferMeta(
+                    args.value(), session_token,
+                    cmd == Command::CMD_TRANSFER_FILE_REQUEST);
                 break;
             }
             default:

@@ -8,11 +8,9 @@
 #include <trivial_helpers/fruit_inject.hpp>
 
 #include "FileHelperNew.hpp"
-#include "PacketParser.hpp"
 #include "TgBotSocket_Export.hpp"
 
 using TgBotSocket::callback::GenericAck;
-using TgBotSocket::callback::UploadFileDryCallback;
 
 struct SocketInterfaceTgBot : ThreadRunner {
     void handlePacket(const TgBotSocket::Context& ctx, TgBotSocket::Packet pkt);
@@ -59,20 +57,21 @@ struct SocketInterfaceTgBot : ThreadRunner {
     GenericAck handle_ObserveAllChats(
         const void* ptr, TgBotSocket::Packet::Header::length_type len,
         TgBotSocket::PayloadType type);
-    GenericAck handle_UploadFile(const void* ptr,
-                                 TgBotSocket::Packet::Header::length_type len);
-    UploadFileDryCallback handle_UploadFileDry(
-        const void* ptr, TgBotSocket::Packet::Header::length_type len);
+    GenericAck handle_TransferFile(const void* ptr,
+                                   TgBotSocket::Packet::Header::length_type len,
+                                   TgBotSocket::PayloadType type);
 
-    // These have their own ack handlers
-    bool handle_GetUptime(
-        const TgBotSocket::Context& ctx,
+    // These have to create a packet to send back
+    std::optional<TgBotSocket::Packet> handle_TransferFileRequest(
+        const void* ptr, TgBotSocket::Packet::Header::length_type len,
         const TgBotSocket::Packet::Header::session_token_type& token,
         TgBotSocket::PayloadType type);
-    bool handle_DownloadFile(
-        const TgBotSocket::Context& ctx, const void* ptr,
-        const TgBotSocket::Packet::Header::session_token_type& token);
 
+    std::optional<TgBotSocket::Packet> handle_GetUptime(
+        const TgBotSocket::Packet::Header::session_token_type& token,
+        TgBotSocket::PayloadType type);
+
+    // Sessions
     void handle_OpenSession(const TgBotSocket::Context& ctx);
     void handle_CloseSession(
         const TgBotSocket::Packet::Header::session_token_type& token);

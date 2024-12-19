@@ -218,49 +218,47 @@ TEST_F(SocketDataHandlerTest, TestCmdWriteMsgToChatIdINVALID) {
 
 TEST_F(SocketDataHandlerTest, TestCmdUploadFileDryDoesntExist) {
     auto data =
-        TgBotSocket::data::UploadFileMeta{.destfilepath = {"test"},
-                                          .srcfilepath = {"testsrc"},
-                                          .sha256_hash = {"asdqwdsadsad"},
-                                          .options = {
-                                              .overwrite = true,
-                                              .hash_ignore = true,
-                                              .dry_run = true,
-                                          }};
+        TgBotSocket::data::FileTransferMeta{.srcfilepath = {"testsrc"},
+                                            .destfilepath = {"test"},
+                                            .sha256_hash = {"asdqwdsadsad"},
+                                            .options = {
+                                                .overwrite = true,
+                                                .hash_ignore = true,
+                                                .dry_run = true,
+                                            }};
 
     // Set expectations
     TgBotSocket::Packet pkt = TgBotSocket::createPacket(
-        TgBotSocket::Command::CMD_UPLOAD_FILE_DRY, &data, sizeof(data),
+        TgBotSocket::Command::CMD_TRANSFER_FILE, &data, sizeof(data),
         TgBotSocket::PayloadType::Binary, {});
     EXPECT_CALL(*_mockVFS, exists(FSP(data.destfilepath.data())))
         .WillOnce(Return(false));
 
     // Verify result
-    TgBotSocket::callback::UploadFileDryCallback callback;
-    sendAndVerifyHeader<TgBotSocket::callback::UploadFileDryCallback,
-                        TgBotSocket::Command::CMD_UPLOAD_FILE_DRY_CALLBACK>(
-        pkt, &callback);
+    TgBotSocket::callback::GenericAck callback;
+    sendAndVerifyHeader<TgBotSocket::callback::GenericAck,
+                        TgBotSocket::Command::CMD_GENERIC_ACK>(pkt, &callback);
     EXPECT_NE(callback.result,
               TgBotSocket::callback::AckType::ERROR_COMMAND_IGNORED);
-    EXPECT_EQ(callback.requestdata, data);
     verifyAndClear();
 }
 
 TEST_F(SocketDataHandlerTest, TestCmdUploadFileDryExistsHashDoesntMatch) {
     auto data =
-        TgBotSocket::data::UploadFileMeta{.destfilepath = {"test"},
-                                          .srcfilepath = {"testsrc"},
-                                          .sha256_hash = {"asdqwdsadsad"},
-                                          .options = {
-                                              .overwrite = true,
-                                              .hash_ignore = false,
-                                              .dry_run = true,
-                                          }};
+        TgBotSocket::data::FileTransferMeta{.srcfilepath = {"testsrc"},
+                                            .destfilepath = {"test"},
+                                            .sha256_hash = {"asdqwdsadsad"},
+                                            .options = {
+                                                .overwrite = true,
+                                                .hash_ignore = false,
+                                                .dry_run = true,
+                                            }};
     // Prepare file contents
     const auto fileMem = createFileMem();
 
     // Set expectations
     TgBotSocket::Packet pkt = TgBotSocket::createPacket(
-        TgBotSocket::Command::CMD_UPLOAD_FILE_DRY, &data, sizeof(data),
+        TgBotSocket::Command::CMD_TRANSFER_FILE, &data, sizeof(data),
         TgBotSocket::PayloadType::Binary, {});
     EXPECT_CALL(*_mockVFS, exists(FSP(data.destfilepath.data())))
         .WillOnce(Return(true));
@@ -270,53 +268,50 @@ TEST_F(SocketDataHandlerTest, TestCmdUploadFileDryExistsHashDoesntMatch) {
         .WillOnce(testing::SetArgReferee<1>(HashContainer{data.sha256_hash}));
 
     // Verify result
-    TgBotSocket::callback::UploadFileDryCallback callback;
-    sendAndVerifyHeader<TgBotSocket::callback::UploadFileDryCallback,
-                        TgBotSocket::Command::CMD_UPLOAD_FILE_DRY_CALLBACK>(
-        pkt, &callback);
+    TgBotSocket::callback::GenericAck callback;
+    sendAndVerifyHeader<TgBotSocket::callback::GenericAck,
+                        TgBotSocket::Command::CMD_GENERIC_ACK>(pkt, &callback);
     EXPECT_NE(callback.result, TgBotSocket::callback::AckType::SUCCESS);
-    EXPECT_EQ(callback.requestdata, data);
     verifyAndClear();
 }
 
 TEST_F(SocketDataHandlerTest, TestCmdUploadFileDryExistsOptSaidNo) {
     auto data =
-        TgBotSocket::data::UploadFileMeta{.destfilepath = {"test"},
-                                          .srcfilepath = {"testsrc"},
-                                          .sha256_hash = {"asdqwdsadsad"},
-                                          .options = {
-                                              .overwrite = false,
-                                              .hash_ignore = false,
-                                              .dry_run = true,
-                                          }};
+        TgBotSocket::data::FileTransferMeta{.srcfilepath = {"testsrc"},
+                                            .destfilepath = {"test"},
+                                            .sha256_hash = {"asdqwdsadsad"},
+                                            .options = {
+                                                .overwrite = false,
+                                                .hash_ignore = false,
+                                                .dry_run = true,
+                                            }};
     // Prepare file contents
     const auto fileMem = createFileMem();
 
     // Set expectations
     TgBotSocket::Packet pkt = TgBotSocket::createPacket(
-        TgBotSocket::Command::CMD_UPLOAD_FILE_DRY, &data, sizeof(data),
+        TgBotSocket::Command::CMD_TRANSFER_FILE, &data, sizeof(data),
         TgBotSocket::PayloadType::Binary, {});
     EXPECT_CALL(*_mockVFS,
                 exists(std::filesystem::path(data.destfilepath.data())))
         .WillOnce(Return(true));
 
     // Verify result
-    TgBotSocket::callback::UploadFileDryCallback callback;
-    sendAndVerifyHeader<TgBotSocket::callback::UploadFileDryCallback,
-                        TgBotSocket::Command::CMD_UPLOAD_FILE_DRY_CALLBACK>(
-        pkt, &callback);
+    TgBotSocket::callback::GenericAck callback;
+    sendAndVerifyHeader<TgBotSocket::callback::GenericAck,
+                        TgBotSocket::Command::CMD_GENERIC_ACK>(pkt, &callback);
     EXPECT_EQ(callback.result,
               TgBotSocket::callback::AckType::ERROR_COMMAND_IGNORED);
-    EXPECT_EQ(callback.requestdata, data);
     verifyAndClear();
 }
 
 TEST_F(SocketDataHandlerTest, TestCmdUploadFileOK) {
     // Prepare file contents
     const auto filemem = createFileMem();
-    SharedMalloc mem(sizeof(TgBotSocket::data::UploadFileMeta) +
+    SharedMalloc mem(sizeof(TgBotSocket::data::FileTransferMeta) +
                      filemem.size());
-    auto* uploadfile = static_cast<TgBotSocket::data::UploadFile*>(mem.get());
+    auto* uploadfile =
+        static_cast<TgBotSocket::data::FileTransferMeta*>(mem.get());
     uploadfile->srcfilepath = {"sourcefile"};
     uploadfile->destfilepath = {"destinationfile"};
     uploadfile->sha256_hash = {"asdqwdsadsad"};
@@ -324,11 +319,11 @@ TEST_F(SocketDataHandlerTest, TestCmdUploadFileOK) {
     uploadfile->options.overwrite = true;
     uploadfile->options.dry_run = false;
     mem.assignTo(filemem.get(), filemem.size(),
-                 sizeof(TgBotSocket::data::UploadFileMeta));
+                 sizeof(TgBotSocket::data::FileTransferMeta));
 
     // Set expectations
     TgBotSocket::Packet pkt = TgBotSocket::createPacket(
-        TgBotSocket::Command::CMD_UPLOAD_FILE, mem.get(), mem.size(),
+        TgBotSocket::Command::CMD_TRANSFER_FILE, mem.get(), mem.size(),
         TgBotSocket::PayloadType::Binary, {});
     EXPECT_CALL(*_mockVFS, writeFile(FSP(uploadfile->destfilepath.data()), _,
                                      filemem.size()))

@@ -251,7 +251,7 @@ inline F::Result F::open(const std::string_view filename, const Mode mode) {
     external_managed = false;
     handle.reset(std::fopen(filename.data(), constructFileMode(mode).data()));
     if (handle == nullptr) {
-        ABSL_LOG(ERROR) << "Failed to open file: " << filename;
+        ABSL_LOG(ERROR) << "Failed to open file: " << std::quoted(filename);
         return Result::error(Result::Reason::kIOFailure);
     }
     return Result::ok();
