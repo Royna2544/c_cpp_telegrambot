@@ -24,9 +24,34 @@
 
 struct ThreadRunner;
 
+class LatchWithTimeout {
+   public:
+    explicit LatchWithTimeout(std::ptrdiff_t count) : latch(count) {}
+
+    void count_down(std::ptrdiff_t update = 1) {
+        {
+            std::lock_guard<std::mutex> lock(mtx);
+            latch.count_down(update);
+        }
+        cv.notify_all();
+    }
+
+    bool wait_with_timeout(std::chrono::seconds timeout) {
+        std::unique_lock<std::mutex> lock(mtx);
+        return cv.wait_for(lock, timeout, [this] { return latch.try_wait(); });
+    }
+
+    void wait() { latch.wait(); }
+
+   private:
+    std::latch latch;
+    std::condition_variable cv;
+    std::mutex mtx;
+};
+
 class ThreadManager {
    public:
-    APPLE_INJECT(ThreadManager()) : barrier(static_cast<int>(Usage::MAX)) {}
+    APPLE_INJECT(ThreadManager()) : latch(static_cast<int>(Usage::MAX)) {}
 
     enum class Usage {
         SOCKET_THREAD,
@@ -52,7 +77,7 @@ class ThreadManager {
     std::shared_mutex mControllerLock;
     std::unordered_map<Usage, std::unique_ptr<ThreadRunner>> kControllers;
     std::stop_source stopSource;
-    std::latch barrier;
+    LatchWithTimeout latch;
     std::atomic_int launchCount;
 };
 
@@ -119,7 +144,7 @@ struct ThreadRunner {
         ThreadManager::Usage usage;
         std::stop_token stopToken;
         std::atomic_int* launched;
-        std::latch* completeBarrier;
+        LatchWithTimeout* completeLatch;
     } mgr_priv{};
     // After filling the privdata, push the latch
     std::latch initLatch;
@@ -149,7 +174,7 @@ T* ThreadManager::create(Usage usage, Args&&... args) {
     newIt->mgr_priv.size = sizeof(T);
     newIt->mgr_priv.stopToken = stopSource.get_token();
     newIt->mgr_priv.launched = &launchCount;
-    newIt->mgr_priv.completeBarrier = &barrier;
+    newIt->mgr_priv.completeLatch = &latch;
     kControllers[usage] = std::move(newIt);
     // Notify privdata init complete
     kControllers[usage]->initLatch.count_down();

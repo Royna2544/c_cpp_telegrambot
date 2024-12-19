@@ -26,13 +26,14 @@ void ThreadRunner::threadFunction() {
     auto callback = std::make_unique<StopCallBackJust>(mgr_priv.stopToken,
                                                        [this] { onPreStop(); });
     runFunction(mgr_priv.stopToken);
+    --(*mgr_priv.launched);
     if (!mgr_priv.stopToken.stop_requested()) {
         LOG(WARNING) << fmt::format("{} has stopped before stop request",
                                     mgr_priv.usage);
         callback.reset();
+    } else {
+        mgr_priv.completeLatch->count_down();
     }
-    --(*mgr_priv.launched);
-    mgr_priv.completeBarrier->count_down();
     DLOG(INFO) << fmt::format("{} joined the barrier (launched: {})",
                               mgr_priv.usage,
                               load_before_inc_dec(mgr_priv.launched));

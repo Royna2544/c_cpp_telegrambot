@@ -49,17 +49,13 @@ void ThreadManager::destroy() {
     DLOG(INFO) << "Starting ThreadManager::destroy, launchCount="
                << launchCount;
     auto countdown = static_cast<int>(Usage::MAX) - launchCount;
-    barrier.count_down(countdown);
+    latch.count_down(countdown);
     DLOG(INFO) << "Counted down " << countdown << " times...";
     stopSource.request_stop();
     LOG(INFO) << "Requested stop, now waiting...";
 
 #ifdef THREAD_FORCE_KILL_SUPPORTED
-    std::condition_variable condvar;
-    std::mutex mutex;
-    std::unique_lock<std::mutex> lock(mutex);
-    if (!condvar.wait_for(lock, kShutdownDelay,
-                          [this] { return barrier.try_wait(); })) {
+    if (!latch.wait_with_timeout(kShutdownDelay)) {
         LOG(ERROR) << fmt::format(
             "Timed out waiting for threads to finish (waited {})",
             kShutdownDelay);
@@ -70,5 +66,7 @@ void ThreadManager::destroy() {
             }
         }
     }
+#else
+    latch.wait();
 #endif
 }
