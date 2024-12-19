@@ -22,30 +22,6 @@
     exit(exitCode);
 }
 
-std::optional<Json::Value> parseAndCheck(
-    const void* buf, TgBotSocket::Packet::Header::length_type length,
-    const std::initializer_list<const char*> nodes) {
-    Json::Value root;
-    Json::Reader reader;
-    if (!reader.parse(std::string(static_cast<const char*>(buf), length),
-                      root)) {
-        LOG(WARNING) << "Failed to parse json: "
-                     << reader.getFormattedErrorMessages();
-        return std::nullopt;
-    }
-    if (!root.isObject()) {
-        LOG(WARNING) << "Expected an object in json";
-        return std::nullopt;
-    }
-    for (const auto& node : nodes) {
-        if (!root.isMember(node)) {
-            LOG(WARNING) << fmt::format("Missing node '{}' in json", node);
-            return std::nullopt;
-        }
-    }
-    return root;
-}
-
 int main(int argc, char** argv) {
     ChatId chatId = 0;
     TgBotSocket::data::SendFileToChatId data = {};

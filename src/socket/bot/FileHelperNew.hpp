@@ -132,5 +132,6 @@ class Socket_API SocketFile2DataHelper {
     std::optional<TgBotSocket::Packet> CreateTransferMeta(
         const Params& params,
         const TgBotSocket::Packet::Header::session_token_type& session_token,
+        const TgBotSocket::PayloadType type,
         bool isRequest);
 };

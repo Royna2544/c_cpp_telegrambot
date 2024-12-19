@@ -1,6 +1,10 @@
 #include "FileHelperNew.hpp"
 
+#include <absl/log/check.h>
 #include <absl/log/log.h>
+#include <absl/strings/escaping.h>
+#include <json/value.h>
+#include <json/writer.h>
 
 #include <StructF.hpp>
 #include <cstdint>
@@ -112,10 +116,47 @@ bool SocketFile2DataHelper::ReceiveTransferMeta(const Params& params) {
     return true;
 }
 
+namespace {
+
+Json::Value fromMeta(const FileTransferMeta& meta) {
+    Json::Value root;
+    // Below two are guaranteed to be null-terminated
+    root["srcfilepath"] = meta.srcfilepath.data();
+    root["destfilepath"] = meta.destfilepath.data();
+    root["options"]["dry_run"] = meta.options.dry_run;
+    root["options"]["hash_ignore"] = meta.options.hash_ignore;
+    root["options"]["overwrite"] = meta.options.overwrite;
+    if (!meta.options.hash_ignore) {
+        root["hash"] = TgBotSocket::hexEncode(meta.sha256_hash);
+    }
+    return root;
+}
+
+TgBotSocket::Packet fromMeta(
+    const TgBotSocket::Command cmd, const FileTransferMeta& meta,
+    const TgBotSocket::PayloadType& type,
+    const TgBotSocket::Packet::Header::session_token_type& session_token) {
+    switch (type) {
+        case TgBotSocket::PayloadType::Binary: {
+            return TgBotSocket::createPacket(
+                cmd, &meta, sizeof(FileTransferMeta), type, session_token);
+        }
+        case TgBotSocket::PayloadType::Json: {
+            return TgBotSocket::nodeToPacket(cmd, fromMeta(meta),
+                                             session_token);
+        }
+        default:
+            LOG(ERROR) << "Unknown payload type";
+            return {};
+    }
+}
+
+}  // namespace
+
 std::optional<TgBotSocket::Packet> SocketFile2DataHelper::CreateTransferMeta(
     const Params& params,
     const TgBotSocket::Packet::Header::session_token_type& session_token,
-    bool isRequest) {
+    const TgBotSocket::PayloadType type, bool isRequest) {
     FileTransferMeta meta;
     SharedMalloc fileData{};
 
@@ -130,10 +171,8 @@ std::optional<TgBotSocket::Packet> SocketFile2DataHelper::CreateTransferMeta(
     // src/dest meta) If it is dry run, we should read and calculate hash.
     // Otherwise, no need to read the file.
     if (isRequest) {
-        return TgBotSocket::createPacket(
-            TgBotSocket::Command::CMD_TRANSFER_FILE_REQUEST, &meta,
-            sizeof(FileTransferMeta), TgBotSocket::PayloadType::Binary,
-            session_token);
+        return fromMeta(TgBotSocket::Command::CMD_TRANSFER_FILE_REQUEST, meta,
+                        type, session_token);
     } else {
         HashContainer hash{};
 
@@ -150,26 +189,44 @@ std::optional<TgBotSocket::Packet> SocketFile2DataHelper::CreateTransferMeta(
             vfs->SHA256(fileData, hash);
             // Copy hash to the buffer
             meta.sha256_hash = hash.m_data;
-            return TgBotSocket::createPacket(
-                TgBotSocket::Command::CMD_TRANSFER_FILE, &meta,
-                sizeof(FileTransferMeta), TgBotSocket::PayloadType::Binary,
-                session_token);
+            return fromMeta(TgBotSocket::Command::CMD_TRANSFER_FILE, meta, type,
+                            session_token);
         }
         meta.options.hash_ignore = true;
 
         // Create result packet buffer
-        auto resultPointer =
-            SharedMalloc(fileData.size() + sizeof(FileTransferMeta));
+        size_t allocSize = fileData.size() + sizeof(FileTransferMeta);
+        if (type != TgBotSocket::PayloadType::Binary) {
+            allocSize += 1;  // For the border
+        }
+        SharedMalloc resultPointer(allocSize);
 
-        // Copy meta data to the buffer
-        resultPointer.assignFrom(meta);
+        size_t fileOffset = 0;
+        switch (type) {
+            case TgBotSocket::PayloadType::Json: {
+                Json::FastWriter writer;
+                std::string jsonMeta = writer.write(fromMeta(meta));
+                resultPointer.assignFrom(jsonMeta.c_str(), jsonMeta.size());
+                // Copy border to the buffer
+                resultPointer.assignFrom(TgBotSocket::data::JSON_BYTE_BORDER,
+                                         jsonMeta.size());
+                fileOffset = jsonMeta.size() + 1;
+                break;
+            }
+            case TgBotSocket::PayloadType::Binary: {
+                // Copy meta data to the buffer
+                resultPointer.assignFrom(meta);
+                fileOffset = sizeof(FileTransferMeta);
+                break;
+            }
+        }
+        ABSL_ASSERT(fileOffset != 0);
+
         // Copy source file data to the buffer
-        resultPointer.assignFrom(fileData.get(), fileData.size(),
-                                 sizeof(FileTransferMeta));
+        resultPointer.assignFrom(fileData.get(), fileData.size(), fileOffset);
 
         return TgBotSocket::createPacket(
             TgBotSocket::Command::CMD_TRANSFER_FILE, resultPointer.get(),
-            resultPointer.size(), TgBotSocket::PayloadType::Binary,
-            session_token);
+            resultPointer.size(), type, session_token);
     }
 }

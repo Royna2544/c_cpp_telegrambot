@@ -148,7 +148,7 @@ struct SharedMalloc {
      * memory.
      */
     template <typename T>
-    void assignTo(T &ref, const size_t offset) const {
+    void assignTo(T &ref, const size_t offset = 0) const {
         assignTo(&ref, sizeof(T), offset);
     }
 
@@ -165,8 +165,8 @@ struct SharedMalloc {
      */
     template <typename T>
         requires(!std::is_pointer_v<T>)
-    void assignTo(T &ref) const {
-        assignTo(&ref, sizeof(T));
+    void assignTo(T &ref, const size_t offset = 0) const {
+        assignTo(&ref, sizeof(T), offset);
     }
 
     /**
@@ -181,12 +181,12 @@ struct SharedMalloc {
      */
     template <typename T>
         requires(!std::is_pointer_v<T>)
-    void assignFrom(const T &ref) {
+    void assignFrom(const T &ref, const size_t offset = 0) {
         if (sizeof(T) > size()) {
             throw std::out_of_range(
                 "Operation size exceeds allocated memory size");
         }
-        assignFrom(&ref, sizeof(T));
+        assignFrom(&ref, sizeof(T), offset);
     }
 
     /**

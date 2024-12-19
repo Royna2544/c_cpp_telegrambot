@@ -75,54 +75,6 @@ std::string getMIMEString(const ResourceProvider* resource,
 }
 }  // namespace
 
-std::optional<Json::Value> parseAndCheck(
-    const void* buf, TgBotSocket::Packet::Header::length_type length,
-    const std::initializer_list<const char*> nodes) {
-    Json::Value root;
-    Json::Reader reader;
-    if (!reader.parse(std::string(static_cast<const char*>(buf), length),
-                      root)) {
-        LOG(WARNING) << "Failed to parse json: "
-                     << reader.getFormattedErrorMessages();
-        return std::nullopt;
-    }
-    if (!root.isObject()) {
-        LOG(WARNING) << "Expected an object in json";
-        return std::nullopt;
-    }
-    for (const auto& node : nodes) {
-        if (!root.isMember(node)) {
-            LOG(WARNING) << fmt::format("Missing node '{}' in json", node);
-            return std::nullopt;
-        }
-    }
-    return root;
-}
-
-Packet nodeToPacket(const Command& command, const Json::Value& json,
-                    const Packet::Header::session_token_type& session_token) {
-    std::string result;
-    Json::FastWriter writer;
-    result = writer.write(json);
-    auto packet = createPacket(command, result.c_str(), result.size(),
-                               PayloadType::Json, session_token);
-    return packet;
-}
-
-template <size_t N>
-std::string safeParse(const std::array<char, N>& buf) {
-    // Create a larger array to hold the null-terminated string
-    std::array<char, N + 1> safebuf{};
-
-    // Safely copy N characters from buf to safebuf
-    std::ranges::copy_n(buf.begin(), N, safebuf.begin());
-
-    // Null-terminate the new buffer
-    safebuf[N] = '\0';
-
-    return safebuf.data();
-}
-
 Packet toJSONPacket(const GenericAck& ack,
                     const Packet::Header::session_token_type& session_token) {
     Json::Value root;
@@ -310,25 +262,6 @@ struct ObserveAllChats {
         }
     }
 };
-
-template <size_t N>
-std::optional<std::array<std::uint8_t, N>> hexDecode(
-    const absl::string_view hexEncoded) {
-    std::string binary;
-    if (!absl::HexStringToBytes(hexEncoded, &binary)) {
-        LOG(ERROR) << "Invalid hex string, HexStringToBytes failed";
-        return std::nullopt;
-    }
-
-    if (binary.empty() || binary.size() != N) {  // Validate size
-        LOG(ERROR) << "Invalid hex string length or content";
-        return std::nullopt;
-    }
-
-    std::array<std::uint8_t, N> result{};
-    std::copy(binary.begin(), binary.end(), result.begin());
-    return result;
-}
 
 std::optional<Packet::Header::length_type> findBorderOffset(
     const void* buffer, Packet::Header::length_type size) {
@@ -602,7 +535,7 @@ std::optional<Packet> SocketInterfaceTgBot::handle_TransferFileRequest(
     // Since a request is made, we need to send the file
     f->options.dry_run = false;
     
-    return helper->CreateTransferMeta(*f, token, false);
+    return helper->CreateTransferMeta(*f, token, type, false);
 }
 
 std::optional<Packet> SocketInterfaceTgBot::handle_GetUptime(

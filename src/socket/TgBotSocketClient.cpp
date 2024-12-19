@@ -1,5 +1,5 @@
 #include <absl/log/log.h>
-#include <json/json.h>
+#include <openssl/sha.h>
 
 #include <AbslLogInit.hpp>
 #include <ManagedThreads.hpp>
@@ -80,6 +80,20 @@ std::string_view AckTypeToStr(callback::AckType type) {
 
 }  // namespace
 
+std::optional<Packet::Header::length_type> findBorderOffset(
+    const void* buffer, Packet::Header::length_type size) {
+    const auto* iter = static_cast<const uint8_t*>(buffer);
+    Packet::Header::length_type offset = 0;
+    for (Packet::Header::length_type i = 0; i < size; ++i) {
+        if (iter[i] == data::JSON_BYTE_BORDER) {
+            LOG(INFO) << "Found JSON_BYTE_BORDER in offset " << i;
+            return i;
+        }
+    }
+    LOG(WARNING) << "JSON_BYTE_BORDER not found in buffer";
+    return std::nullopt;
+}
+
 void handleCallback(SocketClientWrapper& connector, const Packet& pkt) {
     using callback::AckType;
     using callback::GenericAck;
@@ -96,25 +110,110 @@ void handleCallback(SocketClientWrapper& connector, const Packet& pkt) {
             break;
         }
         case Command::CMD_TRANSFER_FILE: {
-            data::FileTransferMeta meta;
-            pkt.data.assignTo(meta);
-            SocketFile2DataHelper::Params params;
-            params.filepath = meta.srcfilepath.data();
-            params.destfilepath = meta.destfilepath.data();
-            params.options = meta.options;
-            params.hash = meta.sha256_hash;
-            params.file_size = pkt.data.size() - sizeof(meta);
-            params.filebuffer = reinterpret_cast<const uint8_t*>(static_cast<const char *>(pkt.data.get()) + sizeof(meta));
-            helper.ReceiveTransferMeta(params);
+            SocketFile2DataHelper::Params result;
+            switch (pkt.header.data_type) {
+                case PayloadType::Binary: {
+                    if (pkt.data.size() < sizeof(data::FileTransferMeta)) {
+                        DLOG(WARNING)
+                            << "Payload size mismatch on UploadFileMeta";
+                        return;
+                    }
+                    {
+                        const auto* data =
+                            static_cast<const data::FileTransferMeta*>(
+                                pkt.data.get());
+                        result.filepath = safeParse(data->srcfilepath);
+                        result.destfilepath = safeParse(data->destfilepath);
+                        result.options = data->options;
+                        result.hash = data->sha256_hash;
+                        result.file_size =
+                            pkt.data.size() - sizeof(data::FileTransferMeta);
+                        result.filebuffer = reinterpret_cast<const uint8_t*>(
+                            static_cast<const char*>(pkt.data.get()) +
+                            sizeof(data::FileTransferMeta));
+                    }
+                    break;
+                }
+                case PayloadType::Json: {
+                    const auto offset =
+                        findBorderOffset(pkt.data.get(), pkt.data.size())
+                            .value_or(pkt.data.size());
+                    std::string json(static_cast<const char*>(pkt.data.get()),
+                                     offset);
+                    auto _root = parseAndCheck(pkt.data.get(), pkt.data.size(),
+                                               {"srcfilepath", "destfilepath"});
+                    if (!_root) {
+                        return;
+                    }
+                    auto& root = _root.value();
+                    result.filepath = root["srcfilepath"].asString();
+                    result.destfilepath = root["destfilepath"].asString();
+                    data::FileTransferMeta::Options options;
+                    options.overwrite = root["options"]["overwrite"].asBool();
+                    options.hash_ignore =
+                        root["options"]["hash_ignore"].asBool();
+                    options.dry_run = root["options"]["dry_run"].asBool();
+                    if (!options.hash_ignore && !root.isMember("hash")) {
+                        LOG(WARNING) << "hash_ignore is false, but hash is not "
+                                        "provided.";
+                        return;
+                    }
+                    if (root.isMember("hash")) {
+                        auto parsed = hexDecode<SHA256_DIGEST_LENGTH>(
+                            root["hash"].asString());
+                        if (!parsed) {
+                            return;
+                        }
+                        result.hash = parsed.value();
+                    }
+                    result.file_size = pkt.data.size() - offset;
+                    result.filebuffer =
+                        static_cast<const std::uint8_t*>(pkt.data.get()) +
+                        offset;
+                    break;
+                }
+                default:
+                    LOG(ERROR) << "Invalid payload type for TransferFileMeta";
+                    return;
+            }
+            helper.ReceiveTransferMeta(result);
             break;
         }
         case Command::CMD_GENERIC_ACK: {
-            callback::GenericAck callbackData{};
-            pkt.data.assignTo(callbackData);
-            LOG(INFO) << "Response from server: "
-                      << AckTypeToStr(callbackData.result);
-            if (callbackData.result != AckType::SUCCESS) {
-                LOG(ERROR) << "Reason: " << callbackData.error_msg.data();
+            switch (pkt.header.data_type) {
+                case PayloadType::Binary: {
+                    callback::GenericAck callbackData{};
+                    pkt.data.assignTo(callbackData);
+                    LOG(INFO) << "Response from server: "
+                              << AckTypeToStr(callbackData.result);
+                    if (callbackData.result != AckType::SUCCESS) {
+                        LOG(ERROR)
+                            << "Reason: " << callbackData.error_msg.data();
+                    }
+                    break;
+                }
+                case PayloadType::Json: {
+                    auto root = parseAndCheck(pkt.data.get(), pkt.data.size(),
+                                              {"result"});
+                    if (!root) {
+                        LOG(ERROR) << "Invalid json in generic ack";
+                        return;
+                    }
+                    auto result = (*root)["result"].asBool();
+                    if (result) {
+                        LOG(INFO) << "Response from server: Success";
+                    } else {
+                        LOG(ERROR) << "Response from server: Failed";
+                        LOG(ERROR)
+                            << "Reason: " << (*root)["error_msg"].asString();
+                        LOG(ERROR) << "Error type: "
+                                   << (*root)["error_type"].asString();
+                    }
+                    break;
+                }
+                default:
+                    LOG(ERROR) << "Unhandled payload type for generic ack";
+                    break;
             }
             break;
         }
@@ -123,30 +222,6 @@ void handleCallback(SocketClientWrapper& connector, const Packet& pkt) {
                        << static_cast<int>(pkt.header.cmd);
             break;
     }
-}
-
-std::optional<Json::Value> parseAndCheck(
-    const void* buf, TgBotSocket::Packet::Header::length_type length,
-    const std::initializer_list<const char*> nodes) {
-    Json::Value root;
-    Json::Reader reader;
-    if (!reader.parse(std::string(static_cast<const char*>(buf), length),
-                      root)) {
-        LOG(WARNING) << "Failed to parse json: "
-                     << reader.getFormattedErrorMessages();
-        return std::nullopt;
-    }
-    if (!root.isObject()) {
-        LOG(WARNING) << "Expected an object in json";
-        return std::nullopt;
-    }
-    for (const auto& node : nodes) {
-        if (!root.isMember(node)) {
-            LOG(WARNING) << fmt::format("Missing node '{}' in json", node);
-            return std::nullopt;
-        }
-    }
-    return root;
 }
 
 template <typename T>
@@ -277,7 +352,7 @@ int main(int argc, char** argv) {
         }
         auto root = *_root;
         LOG(INFO) << "Opened session. Token: " << root["session_token"]
-                  << " expiration_time: " << root["expiration_time"];
+                  << " Expiration_time: " << root["expiration_time"];
 
         std::string session_token_str = root["session_token"].asString();
         if (session_token_str.size() != Packet::Header::SESSION_TOKEN_LENGTH) {
@@ -353,7 +428,7 @@ int main(int argc, char** argv) {
                     return EXIT_FAILURE;
                 }
                 pkt = helper.CreateTransferMeta(
-                    args.value(), session_token,
+                    args.value(), session_token, PayloadType::Json,
                     cmd == Command::CMD_TRANSFER_FILE_REQUEST);
                 break;
             }

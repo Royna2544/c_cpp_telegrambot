@@ -15,14 +15,14 @@ add_my_library(
     backends/ClientBackend.cpp
     TgBotCommandMap.cpp
   PUBLIC_INC interface
-  LIBS Utils Boost::system OpenSSL::Crypto
+  LIBS Utils Boost::system OpenSSL::Crypto JsonCpp::JsonCpp
   LIBS_WIN32 wsock32 Ws2_32
 )
 
 add_my_executable(
   NAME SocketCli
   SRCS TgBotSocketClient.cpp
-  LIBS Socket JsonCpp::JsonCpp
+  LIBS Socket
   RELATION Socket
 )
 

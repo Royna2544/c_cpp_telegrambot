@@ -293,9 +293,10 @@ createPacket(const Command command, const void* data,
     packet.header.session_token = sessionToken;
 
     using namespace std::chrono;
-    packet.header.nonce = duration_cast<milliseconds>(
-        system_clock::now().time_since_epoch()
-    ).count() + rand(); // Add some randomness to the nonce
+    packet.header.nonce =
+        duration_cast<milliseconds>(system_clock::now().time_since_epoch())
+            .count() +
+        rand();  // Add some randomness to the nonce
 
     if (data != nullptr && length > 0) {
         packet.data.resize(length);
@@ -313,4 +314,40 @@ createPacket(const Command command, const void* data,
     }
     return packet;
 }
+
+std::optional<Json::Value> Socket_API
+parseAndCheck(const void* buf, TgBotSocket::Packet::Header::length_type length,
+              const std::initializer_list<const char*> nodes) {
+    Json::Value root;
+    Json::Reader reader;
+    if (!reader.parse(std::string(static_cast<const char*>(buf), length),
+                      root)) {
+        LOG(WARNING) << "Failed to parse json: "
+                     << reader.getFormattedErrorMessages();
+        return std::nullopt;
+    }
+    if (!root.isObject()) {
+        LOG(WARNING) << "Expected an object in json";
+        return std::nullopt;
+    }
+    for (const auto& node : nodes) {
+        if (!root.isMember(node)) {
+            LOG(WARNING) << fmt::format("Missing node '{}' in json", node);
+            return std::nullopt;
+        }
+    }
+    return root;
+}
+
+Packet Socket_API
+nodeToPacket(const Command& command, const Json::Value& json,
+             const Packet::Header::session_token_type& session_token) {
+    std::string result;
+    Json::FastWriter writer;
+    result = writer.write(json);
+    auto packet = createPacket(command, result.c_str(), result.size(),
+                               PayloadType::Json, session_token);
+    return packet;
+}
+
 }  // namespace TgBotSocket
