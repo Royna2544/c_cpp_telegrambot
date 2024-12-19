@@ -15,6 +15,7 @@ import com.royna.tgbotclient.R
 import com.royna.tgbotclient.databinding.FragmentSendMessageBinding
 import com.royna.tgbotclient.datastore.ChatIDEntry
 import com.royna.tgbotclient.ui.CurrentSettingFragment
+import com.royna.tgbotclient.util.DeviceUtils
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -35,8 +36,8 @@ class TextToChatFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
-
         _binding = FragmentSendMessageBinding.inflate(inflater, container, false)
+
         val root: View = binding.root
 
         val chatIdText: EditText = binding.chatIdText
@@ -105,6 +106,7 @@ class TextToChatFragment : Fragment() {
                 Toast.makeText(context, "Chat Id is empty", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
+            DeviceUtils.hideKeyboard(it)
             textToChatViewModel.send(chatId, text)
         }
         textToChatViewModel.sendResult.observe(viewLifecycleOwner) {

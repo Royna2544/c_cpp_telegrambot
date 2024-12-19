@@ -9,7 +9,6 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.commit
 import androidx.lifecycle.ViewModelProvider
 import com.royna.tgbotclient.R
-import com.royna.tgbotclient.SocketCommandNative
 import com.royna.tgbotclient.databinding.FragmentUptimeBinding
 import com.royna.tgbotclient.ui.CurrentSettingFragment
 
@@ -27,35 +26,23 @@ class UptimeFragment : Fragment() {
         savedInstanceState: Bundle?
     ): View {
         val uptimeViewModel =
-            ViewModelProvider(this).get(UptimeViewModel::class.java)
+            ViewModelProvider(this)[UptimeViewModel::class.java]
 
         _binding = FragmentUptimeBinding.inflate(inflater, container, false)
         val root: View = binding.root
 
         val textView: TextView = binding.uptimeText
-        uptimeViewModel.liveData.observe(viewLifecycleOwner) {
+        uptimeViewModel.uptimeValue.observe(viewLifecycleOwner) {
             textView.text = it
         }
-        binding.uptimeRefreshBtn.setOnClickListener {
-            binding.uptimeRefreshBtn.text = getString(R.string.get_wip)
-            binding.uptimeRefreshBtn.isEnabled = false
-            uptimeViewModel.execute(requireActivity(), object : SocketCommandNative.ICommandCallback {
-                override fun onSuccess(result: Any?) {
-                    update(result as String)
-                }
-
-                override fun onError(error: String) {
-                    update(error)
-                }
-
-                fun update(text: String) {
-                    binding.uptimeRefreshBtn.text = getString(R.string.get)
-                    binding.uptimeRefreshBtn.isEnabled = true
-                    binding.uptimeText.text = text
-                }
-            })
+        uptimeViewModel.fetchInProgress.observe(viewLifecycleOwner) {
+            binding.uptimeRefreshBtn.isEnabled = !it
+            binding.uptimeRefreshBtn.text = if (it) getString(R.string.get_wip) else getString(R.string.get)
         }
-        uptimeViewModel.setLiveData(getString(R.string.get_desc))
+        binding.uptimeRefreshBtn.setOnClickListener {
+            uptimeViewModel.execute()
+        }
+        textView.text = getString(R.string.get_desc)
         return root
     }
 

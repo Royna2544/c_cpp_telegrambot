@@ -2,19 +2,6 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$/../.." vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/app/src/main/cpp/external/openssl" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/app/src/main/cpp/external/openssl/cloudflare-quiche" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/app/src/main/cpp/external/openssl/cloudflare-quiche/quiche/deps/boringssl" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/app/src/main/cpp/external/openssl/fuzz/corpora" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/app/src/main/cpp/external/openssl/gost-engine" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/app/src/main/cpp/external/openssl/gost-engine/libprov" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/app/src/main/cpp/external/openssl/krb5" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/app/src/main/cpp/external/openssl/oqs-provider" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/app/src/main/cpp/external/openssl/pyca-cryptography" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/app/src/main/cpp/external/openssl/python-ecdsa" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/app/src/main/cpp/external/openssl/tlsfuzzer" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/app/src/main/cpp/external/openssl/tlslite-ng" vcs="Git" />
-    <mapping directory="$PROJECT_DIR$/app/src/main/cpp/external/openssl/wycheproof" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/../../src/hash/sha-2" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/../../src/third-party/abseil-cpp" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/../../src/third-party/corrosion" vcs="Git" />

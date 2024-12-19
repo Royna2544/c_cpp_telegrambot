@@ -4,15 +4,12 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.royna.tgbotclient.SocketCommandNative
 import com.royna.tgbotclient.datastore.IChatIDOperations
+import com.royna.tgbotclient.net.SocketContext
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
@@ -37,44 +34,16 @@ class TextToChatViewModel @Inject constructor(private val operation: IChatIDOper
         _messageText.value = messageText
     }
 
-    private val gMainScope = CoroutineScope(Dispatchers.Main)
-    private suspend fun sendAndWait(chatid: Long, message: String) : Unit =
-        suspendCancellableCoroutine { continuation ->
-            SocketCommandNative.sendWriteMessageToChatId(chatid, message,
-                object : SocketCommandNative.ICommandStatusCallback {
-                    override fun onStatusUpdate(status: SocketCommandNative.Status) {
-
-                    }
-
-                    override fun onSuccess(result: Any?) {
-                    continuation.resumeWith(Result.success(Unit))
-                }
-                override fun onError(error: String) {
-                    continuation.resumeWith(Result.failure(RuntimeException(error)))
-                }
-            })
-        }
-
     fun send(chat: Long, message: String) {
-        gMainScope.launch {
-            var success = true
-            try {
-                withContext(Dispatchers.IO) {
-                    sendAndWait(chat, message)
-                }
-            } catch (e: RuntimeException) {
-                success = false
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                SocketContext.getInstance().sendMessage(chat, message)
+            }.onSuccess {
+                _sendResult.value = "Message sent"
+            }.onFailure { e ->
                 _sendResult.value = "Failed: ${e.message}"
             }
-            if (success) {
-                _sendResult.value = "Message sent"
-            }
         }
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        gMainScope.cancel()
     }
 
     fun getAll() = viewModelScope.async {

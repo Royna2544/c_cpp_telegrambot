@@ -1,52 +1,35 @@
 package com.royna.tgbotclient.ui.commands.uptime
 
-import androidx.fragment.app.FragmentActivity
-import com.royna.tgbotclient.R
-import com.royna.tgbotclient.SocketCommandNative
-import com.royna.tgbotclient.SocketCommandNative.getUptime
-import com.royna.tgbotclient.ui.SingleViewModelBase
+import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.royna.tgbotclient.net.SocketContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
-import kotlin.coroutines.resumeWithException
 
-class UptimeViewModel : SingleViewModelBase<String, String>() {
+class UptimeViewModel : ViewModel() {
+    private var _uptimeValue = MutableLiveData<String>()
+    private var _fetchInProgress = MutableLiveData<Boolean>()
 
-    override suspend fun coroutineFunction(activity: FragmentActivity): String = suspendCancellableCoroutine {
-        getUptime(object : SocketCommandNative.ICommandStatusCallback {
-            override fun onStatusUpdate(status: SocketCommandNative.Status) {
+    val uptimeValue: MutableLiveData<String>
+        get() = _uptimeValue
+    val fetchInProgress: MutableLiveData<Boolean>
+        get() = _fetchInProgress
 
-            }
-
-            override fun onSuccess(result: Any?) {
-                if (result is String) {
-                    it.resumeWith(Result.success(result))
-                } else {
-                    it.resumeWithException(AssertionError("Unknown result type"))
-                }
-            }
-
-            override fun onError(error: String) {
-                it.resumeWithException(RuntimeException(error))
-            }
-        })
-    }
-    override fun execute(
-        activity: FragmentActivity,
-        callback: SocketCommandNative.ICommandCallback
-    ) {
-        gMainScope.launch {
+    fun execute() {
+        viewModelScope.launch {
             val result : String
-            _liveData.postValue(activity.getString(R.string.get_wip))
-            try {
-                withContext(Dispatchers.IO) {
-                    result = coroutineFunction(activity)
-                }
-                callback.onSuccess(result)
-            } catch (e: Exception) {
-                callback.onError(e.message.toString())
+            _fetchInProgress.postValue(true)
+            withContext(Dispatchers.IO) {
+                SocketContext.getInstance().getUptime()
+            }.onSuccess {
+                result = it as String
+                _uptimeValue.postValue(result)
+            }.onFailure {
+                _uptimeValue.postValue(it.message)
             }
+            _fetchInProgress.postValue(false)
         }
     }
 }

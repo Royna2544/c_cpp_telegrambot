@@ -5,9 +5,13 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import com.royna.tgbotclient.R
-import com.royna.tgbotclient.SocketCommandNative.getCurrentDestinationInfo
 import com.royna.tgbotclient.databinding.FragmentCurrentSettingChildBinding
+import com.royna.tgbotclient.net.SocketContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class CurrentSettingFragment : Fragment() {
     private var _binding: FragmentCurrentSettingChildBinding? = null
@@ -22,23 +26,37 @@ class CurrentSettingFragment : Fragment() {
         savedInstanceState: Bundle?
     ): View {
         _binding = FragmentCurrentSettingChildBinding.inflate(inflater, container, false)
+
         update()
         return binding.root
     }
 
-    fun update () {
-        val info = getCurrentDestinationInfo()
-        binding.currentIp.text = resources.getString(R.string.ip_address_fmt,
-            info.ipaddr)
-        binding.currentPort.text = resources.getString(R.string.port_fmt,
-            info.port)
-        binding.currentType.text = resources.getString(R.string.address_type_fmt,
-            info.type.name)
+   private fun update() = viewLifecycleOwner.lifecycleScope.launch {
+        withContext(Dispatchers.IO) {
+            val info = SocketContext.getInstance().destination
+            val hostname = info.hostname
+            val port = info.port
+
+             withContext(Dispatchers.Main) {
+                 if (_binding != null) {
+                     synchronized(_binding as Any) {
+                         binding.currentIp.text = resources.getString(
+                             R.string.ip_address_fmt, hostname
+                         )
+                         binding.currentPort.text = resources.getString(
+                             R.string.port_fmt, port
+                         )
+                     }
+                 }
+            }
+        }
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
-        _binding = null
+        synchronized(_binding as Any) {
+            _binding = null
+        }
     }
 
     override fun onResume() {

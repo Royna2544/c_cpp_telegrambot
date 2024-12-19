@@ -22,15 +22,9 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:id="@+id/current_type"
+        android:id="@+id/current_port"
         android:layout_centerHorizontal="true"
         android:layout_below="@id/current_ip"
         android:layout_margin="10dp"/>
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:id="@+id/current_port"
-        android:layout_centerHorizontal="true"
-        android:layout_below="@id/current_type"/>
 </RelativeLayout>

@@ -1,43 +1,51 @@
 package com.royna.tgbotclient.ui.commands.downloadfile
 
-import android.content.Context
 import android.net.Uri
 import android.webkit.MimeTypeMap
 import androidx.documentfile.provider.DocumentFile
 import androidx.fragment.app.FragmentActivity
-import com.royna.tgbotclient.SocketCommandNative
-import com.royna.tgbotclient.ui.DualViewModelBase
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.lifecycleScope
+import com.royna.tgbotclient.net.SocketContext
 import com.royna.tgbotclient.util.FileUtils.copyFromExt
 import com.royna.tgbotclient.util.FileUtils.queryFileName
 import com.royna.tgbotclient.util.Logging
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileInputStream
 import java.io.IOException
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 
-class DownloadFileViewModel : DualViewModelBase<Uri, String, DownloadFileViewModel.Cleanup>() {
-    inner class Cleanup(private val context: Context,
-                        private val tempfile: File,
-                        private val newFileUri: Uri) {
-        fun delete() {
-            tempfile.delete()
-            DocumentFile.fromSingleUri(context, newFileUri)?.delete()
-        }
+class DownloadFileViewModel : ViewModel() {
+    // The URI to write the resulting file
+    private var _outFileUri = MutableLiveData<Uri>()
+    // Source path in the server
+    private val _sourceFilePath = MutableLiveData<String>()
+    // Event when a download succeeded
+    private val _downloadEvent = MutableSharedFlow<String>()
+
+    val downloadEvent: SharedFlow<String>
+        get() = _downloadEvent
+    val outFileURI : LiveData<Uri>
+        get() = _outFileUri
+    val sourceFilePath : LiveData<String>
+        get() = _sourceFilePath
+
+    fun setFileUrl(uri: Uri) {
+        _outFileUri.value = uri
+    }
+    fun setSourceFile(path: String) {
+        _sourceFilePath.value = path
     }
 
-    override suspend fun coroutineFunction(activity: FragmentActivity) = suspendCancellableCoroutine {
-        cancellableContinuation ->
-        val contentUri = liveData.value!!
-        val outFile = File(liveData2.value!!)
-        val tempFile = File(activity.cacheDir, outFile.name)
-        tempFile.delete()
-        outFile.delete()
-
+    private fun openFile(activity: FragmentActivity): Uri {
+        val contentUri = _outFileUri.value!!
+        val outFile = File(_sourceFilePath.value!!)
         val mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(outFile.extension) ?: "application/octet-stream"
         val docFile = DocumentFile.fromTreeUri(activity, contentUri)?.run {
             findFile(outFile.name)?.let {
@@ -48,53 +56,47 @@ class DownloadFileViewModel : DualViewModelBase<Uri, String, DownloadFileViewMod
         }
 
         if (docFile == null) {
-            cancellableContinuation.resumeWithException(RuntimeException("Could not create file"))
-            return@suspendCancellableCoroutine
+            throw RuntimeException("Could not create file in the selected directory. Ensure you have write permissions.")
         }
+        return docFile
+    }
+
+    private suspend fun downloadFile(activity: FragmentActivity) = runCatching {
+        val docFile = openFile(activity)
+        val tempFile = File(activity.cacheDir, docFile.lastPathSegment ?: "tmp.bin")
+        tempFile.delete()
 
         val downloadedFilePath = queryFileName(activity.contentResolver, docFile)!!
         Logging.info("Downloading file as : $downloadedFilePath")
-        var downloadRet = false
-        SocketCommandNative.downloadFile(downloadedFilePath, tempFile.absolutePath,
-            object : SocketCommandNative.ICommandStatusCallback {
-                override fun onStatusUpdate(status: SocketCommandNative.Status) {
-                }
 
-                override fun onSuccess(result: Any?) {
-                    Logging.info ("File uploaded successfully")
-                    downloadRet = true
-                }
-
-                override fun onError(error: String) {
-                    Logging.error ("File upload failed: $error")
-                    cancellableContinuation.resumeWithException(RuntimeException(error))
-                }
-            }
-        )
-        if (!downloadRet) {
-            return@suspendCancellableCoroutine
+        SocketContext.getInstance().downloadFile(downloadedFilePath, tempFile.absolutePath).getOrElse {
+            Logging.error("Failed to download file", it)
+            tempFile.delete()
+            DocumentFile.fromSingleUri(activity, docFile)?.delete()
+            throw it
         }
 
         try {
             activity.contentResolver.openOutputStream(docFile)?.copyFromExt(FileInputStream(tempFile))
         } catch (e: IOException) {
             Logging.error("Failed to copy to destination", e)
-            cancellableContinuation.resumeWithException(
-                RuntimeException("Failed to copy downloaded file to destination"))
-            return@suspendCancellableCoroutine
+            throw e
+        } finally {
+            tempFile.delete()
+            DocumentFile.fromSingleUri(activity, docFile)?.delete()
         }
-        cancellableContinuation.resume(Cleanup(activity, tempFile, docFile))
     }
 
-    override fun execute(activity: FragmentActivity, callback: SocketCommandNative.ICommandCallback) {
-        gMainScope.launch {
-            try {
-                withContext(Dispatchers.IO){
-                    coroutineFunction(activity).delete()
-                }
-                callback.onSuccess(null)
-            } catch (e: RuntimeException) {
-                callback.onError(e.message.toString())
+    fun execute(activity: FragmentActivity) {
+        activity.lifecycleScope.launch {
+            withContext(Dispatchers.IO) {
+                downloadFile(activity)
+            }.onSuccess {
+                Logging.info("File downloaded")
+                _downloadEvent.emit("File downloaded")
+            }.onFailure {
+                Logging.error("Failed to download file", it)
+                _downloadEvent.emit("Failed to download file: ${it.message}")
             }
         }
     }

@@ -5,21 +5,22 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.commit
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.preference.PreferenceManager
-import com.google.android.material.snackbar.Snackbar
 import com.royna.tgbotclient.R
-import com.royna.tgbotclient.SocketCommandNative
-import com.royna.tgbotclient.SocketCommandNative.setUploadFileOptions
-import com.royna.tgbotclient.SocketCommandNative.UploadOption.*
 import com.royna.tgbotclient.databinding.FragmentUploadFileBinding
+import com.royna.tgbotclient.net.SocketContext
 import com.royna.tgbotclient.ui.CurrentSettingFragment
 import com.royna.tgbotclient.util.FileUtils.queryFileName
-import com.royna.tgbotclient.util.Logging
+import kotlinx.coroutines.launch
 
 class UploadFileFragment : Fragment() {
     private var _binding: FragmentUploadFileBinding? = null
@@ -39,7 +40,7 @@ class UploadFileFragment : Fragment() {
         val startForResult: ActivityResultLauncher<Array<String>> =
             registerForActivityResult(ActivityResultContracts.OpenDocument()) {
                 if (it != null) {
-                    vm.setLiveData(it)
+                    vm.setFileUri(it)
                     queryFileName(requireActivity().contentResolver, it)
                         ?.let { filename ->
                             binding.uploadFileView.text = filename
@@ -55,50 +56,49 @@ class UploadFileFragment : Fragment() {
             startForResult.launch(arrayOf("*/*"))
         }
         binding.uploadUploadButton.setOnClickListener {
-            vm.execute(requireActivity(), object : SocketCommandNative.ICommandCallback {
-                override fun onSuccess(result: Any?) {
-                    Snackbar.make(it, "File uploaded", Snackbar.LENGTH_SHORT).show()
-                }
-
-                override fun onError(error: String) {
-                    Snackbar.make(it, "File upload failed: $error", Snackbar.LENGTH_SHORT).show()
-                }
-            })
+            vm.execute(requireActivity())
         }
         binding.uploadUploadButton.isEnabled = false
         val pref = PreferenceManager.getDefaultSharedPreferences(requireContext())
-        fun updateOptionAndPref(option: SocketCommandNative.UploadOption) {
-            setUploadFileOptions(option)
+        fun updateOptionAndPref(option: SocketContext.UploadOption) {
+            SocketContext.getInstance().setUploadFileOptions(option)
             pref.edit().putInt(UploadOptionPref, option.value).apply()
         }
         // Allowance level 1
         binding.uploadOption1.setOnClickListener {
-            updateOptionAndPref(MUST_NOT_EXIST)
+            updateOptionAndPref(SocketContext.UploadOption.MUST_NOT_EXIST)
         }
         // Allowance level 2
         binding.uploadOption2.setOnClickListener {
-            updateOptionAndPref(MUST_NOT_MATCH_CHECKSUM)
+            updateOptionAndPref(SocketContext.UploadOption.MUST_NOT_MATCH_CHECKSUM)
         }
         // Allowance level 3
         binding.uploadOption3.setOnClickListener {
-            updateOptionAndPref(ALWAYS)
+            updateOptionAndPref(SocketContext.UploadOption.ALWAYS)
         }
         val kBindingMap = mapOf(
-            MUST_NOT_EXIST to binding.uploadOption1,
-            MUST_NOT_MATCH_CHECKSUM to binding.uploadOption2,
-            ALWAYS to binding.uploadOption3
+            SocketContext.UploadOption.MUST_NOT_EXIST to binding.uploadOption1,
+            SocketContext.UploadOption.MUST_NOT_MATCH_CHECKSUM to binding.uploadOption2,
+            SocketContext.UploadOption.ALWAYS to binding.uploadOption3
         )
-        pref.getUploadOption(UploadOptionPref, MUST_NOT_EXIST).let { num ->
+        pref.getUploadOption(UploadOptionPref, SocketContext.UploadOption.MUST_NOT_EXIST).let { num ->
             kBindingMap[num]?.isChecked = true
             updateOptionAndPref(num)
+        }
+        lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                vm.uploadResult.collect { message ->
+                    Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show()
+                }
+            }
         }
         return root
     }
 
-    private fun SharedPreferences.getUploadOption(key: String, default: SocketCommandNative.UploadOption):
-            SocketCommandNative.UploadOption {
+    private fun SharedPreferences.getUploadOption(key: String, default: SocketContext.UploadOption):
+            SocketContext.UploadOption {
         return getInt(key, default.value).let {
-            SocketCommandNative.UploadOption.entries.find { ent ->
+            SocketContext.UploadOption.entries.find { ent ->
                 ent.value == it
             }
         } ?: default

@@ -10,8 +10,6 @@ import android.widget.TextView
 import androidx.core.widget.addTextChangedListener
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
-import com.royna.tgbotclient.SocketCommandNative
-import com.royna.tgbotclient.SocketCommandNative.changeDestinationInfo
 import com.royna.tgbotclient.databinding.FragmentHomeBinding
 
 class HomeFragment : Fragment() {

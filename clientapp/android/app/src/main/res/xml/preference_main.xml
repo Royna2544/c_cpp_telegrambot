@@ -14,14 +14,4 @@
             android:inputType="number"/>
     </PreferenceCategory>
 
-    <PreferenceCategory
-        android:title="Network type">
-        <CheckBoxPreference
-            android:title="IPv4"
-            android:key="ipv4"/>
-        <CheckBoxPreference
-            android:title="IPv6"
-            android:key="ipv6"/>
-    </PreferenceCategory>
-
 </androidx.preference.PreferenceScreen>

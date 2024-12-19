@@ -2,25 +2,37 @@ package com.royna.tgbotclient.ui.commands.uploadfile
 
 import android.net.Uri
 import androidx.fragment.app.FragmentActivity
-import com.royna.tgbotclient.SocketCommandNative
-import com.royna.tgbotclient.ui.SingleViewModelBase
+import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.lifecycleScope
+import com.royna.tgbotclient.net.SocketContext
 import com.royna.tgbotclient.util.FileUtils.copyToExt
 import com.royna.tgbotclient.util.FileUtils.getFileExtension
 import com.royna.tgbotclient.util.FileUtils.queryFileName
 import com.royna.tgbotclient.util.Logging
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 
-class UploadFileViewModel : SingleViewModelBase<Uri, Unit>() {
-    override suspend fun coroutineFunction(activity: FragmentActivity) = suspendCancellableCoroutine {
-        cancellableContinuation ->
-        val contentUri = liveData.value!!
+class UploadFileViewModel : ViewModel() {
+    // The Uri of the selected file
+    private val sourceFileUri = MutableLiveData<Uri>()
+    fun setFileUri(uri: Uri) {
+        sourceFileUri.value = uri
+    }
+
+    // The result of the upload
+    private val _uploadResult = MutableSharedFlow<String>()
+    val uploadResult: SharedFlow<String>
+        get() = _uploadResult
+
+
+    private suspend fun uploadFile(activity: FragmentActivity) = runCatching {
+        val contentUri = sourceFileUri.value!!
         val fileExtension = getFileExtension(activity, contentUri)
         val fileName = "temp_file" + if (fileExtension != null) ".$fileExtension" else ""
 
@@ -34,38 +46,25 @@ class UploadFileViewModel : SingleViewModelBase<Uri, Unit>() {
         try {
             activity.contentResolver.openInputStream(contentUri)?.copyToExt(FileOutputStream(tempFile))
         } catch (e: Exception) {
-            e.printStackTrace()
-            cancellableContinuation.resumeWithException(e)
-            return@suspendCancellableCoroutine
+            Logging.error("Failed to copy to destination", e)
+            throw e
         }
 
         val name = queryFileName(activity.contentResolver,contentUri) ?: fileName
         Logging.info("Uploading file as : $name")
-        SocketCommandNative.uploadFile(tempFile.absolutePath, name,
-            object : SocketCommandNative.ICommandStatusCallback {
-                override fun onStatusUpdate(status: SocketCommandNative.Status) {
-                }
-
-                override fun onSuccess(result: Any?) {
-                Logging.info ("File uploaded successfully")
-                cancellableContinuation.resume(Unit)
-            }
-
-            override fun onError(error: String) {
-                Logging.error ("File upload failed: $error")
-                cancellableContinuation.resumeWithException(RuntimeException(error))
-            }
-        })
+        SocketContext.getInstance().uploadFile(tempFile, name).getOrThrow()
     }
-    override fun execute(activity: FragmentActivity, callback: SocketCommandNative.ICommandCallback) {
-        gMainScope.launch {
-            try {
-                withContext(Dispatchers.IO){
-                    coroutineFunction(activity)
-                }
-                callback.onSuccess(null)
-            } catch (e: RuntimeException) {
-                callback.onError(e.message.toString())
+
+    fun execute(activity: FragmentActivity) {
+        activity.lifecycleScope.launch {
+            withContext(Dispatchers.IO){
+                uploadFile(activity)
+            }.onFailure {
+                Logging.error("Failed to upload file", it)
+                _uploadResult.emit("Failed to upload file: ${it.message}")
+            }.onSuccess {
+                Logging.info("File uploaded")
+                _uploadResult.emit("File uploaded")
             }
         }
     }

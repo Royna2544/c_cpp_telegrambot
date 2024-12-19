@@ -38,12 +38,6 @@ android {
     kotlinOptions {
         jvmTarget = "1.8"
     }
-    externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/CMakeLists.txt")
-            version = "3.22.1"
-        }
-    }
     buildFeatures {
         viewBinding = true
         buildConfig = true
@@ -85,6 +79,8 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     implementation(libs.hilt)
     implementation(libs.androidx.junit.ktx)
+    implementation(libs.ktor.network)
+    implementation(libs.google.gson)
 
     ksp(libs.androidx.room.compiler)
     ksp(libs.hilt.compiler)
