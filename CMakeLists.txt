@@ -472,7 +472,7 @@ add_my_library(
     src/global_handlers/ChatObserver.cpp
     src/socket/bot/SocketDataHandler.cpp
     src/socket/bot/SocketInterface.cpp
-  LIBS TgBot DBImpl Socket JsonCpp::JsonCpp
+  LIBS TgBot DBImpl Socket
   STATIC
 )
 
