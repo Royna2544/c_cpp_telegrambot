@@ -232,8 +232,9 @@ std::optional<Packet> readPacket(const TgBotSocket::Context& context) {
                          sizeof(header) - sizeof(magic));
     header.magic = magic;
 
-    LOG(INFO) << fmt::format("Received Packet{{cmd={}, data_type={}}}",
-                             header.cmd, header.data_type);
+    LOG(INFO) << fmt::format(
+        "Received Packet{{cmd={}, data_type={}, data_size={}}}", header.cmd,
+        header.data_type, header.data_size);
 
     TgBotSocket::Packet packet{
         .header = header, .data = {}  // Will be filled in the next step.
