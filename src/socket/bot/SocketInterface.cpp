@@ -35,7 +35,8 @@ void SocketInterfaceTgBot::runFunction(const std::stop_token& token) {
                     handle_OpenSession(ctx);
                     continue;
                 } else if (!verifyHeader(*pkt)) {
-                    continue;
+                    DLOG(INFO) << "Aborting connection";
+                    break;
                 } else if (pkt->header.cmd ==
                            TgBotSocket::Command::CMD_CLOSE_SESSION) {
                     handle_CloseSession(pkt->header.session_token);
