@@ -36,6 +36,7 @@ bool SocketClientWrapper::connect(unsigned short defaultPort,
         backend = std::make_shared<TgBotSocket::Context::Local>();
         LOG(INFO) << "Chose Unix Local socket with path " << addressString;
     }
+    backend->timeout(std::chrono::seconds(5));
     return backend->connect({addressString, port});
 }
 
