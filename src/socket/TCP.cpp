@@ -70,8 +70,8 @@ bool Context::TCP::write(const SharedMalloc& data) const {
             bytes_written += written;
 
             // Log or update progress
-            LOG_EVERY_N_SEC(INFO, 5) << "TCP::write: Sent " << bytes_written
-                                     << " / " << total_size << " bytes.";
+            DLOG_EVERY_N_SEC(INFO, 5) << "TCP::write: Sent " << bytes_written
+                                      << " / " << total_size << " bytes.";
 
             // delay 10ms
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -209,9 +209,8 @@ bool Context::TCP::connect(const RemoteEndpoint& endpoint) {
 
     if (timeout_duration_.count() > 0) {
         // Wait for the connection to complete
-        LOG(INFO) << fmt::format(
-            "Waiting for connection to complete for {}",
-            timeout_duration_);
+        LOG(INFO) << fmt::format("Waiting for connection to complete for {}",
+                                 timeout_duration_);
         cv.wait_for(lk, timeout_duration_,
                     [&] { return connected || io_context.stopped(); });
     } else {
