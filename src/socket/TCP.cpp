@@ -1,6 +1,8 @@
 #include <absl/log/log.h>
+#include <fmt/chrono.h>
 #include <fmt/format.h>
 
+#include <condition_variable>
 #include <string_view>
 
 #include "SocketContext.hpp"
@@ -31,13 +33,28 @@ Context::TCP::TCP(const boost::asio::ip::tcp type, const int port)
       endpoint_(boost::asio::ip::tcp::endpoint(type, port)) {
     LOG(INFO) << fmt::format("TCP::TCP: Protocol {} listening on port {}", type,
                              port);
+
+    _ioThread = std::thread([this]() {
+        auto work = boost::asio::make_work_guard(io_context);
+        io_context.run();
+    });
+}
+
+Context::TCP::~TCP() {
+    if (operator bool()) {
+        close();
+    }
+    io_context.stop();
+    if (_ioThread.joinable()) {
+        _ioThread.join();
+    }
 }
 
 bool Context::TCP::write(const SharedMalloc& data) const {
     try {
         std::size_t total_size = data.size();
         std::size_t bytes_written = 0;
-        const char* data_ptr = (char*)data.get();
+        const char* data_ptr = static_cast<const char*>(data.get());
 
         DLOG(INFO) << "TCP::write:" << data.size() << " bytes requested";
         while (bytes_written < total_size) {
@@ -166,28 +183,57 @@ bool Context::TCP::listen(listener_callback_t listener) {
 }
 
 bool Context::TCP::connect(const RemoteEndpoint& endpoint) {
-    try {
-        // Resolve the address and port
-        boost::asio::ip::tcp::resolver resolver(io_context);
-        auto endpoints =
-            resolver.resolve(endpoint.address, std::to_string(endpoint.port));
+    // Resolve the address and port
+    boost::asio::ip::tcp::resolver resolver(io_context);
+    auto endpoints =
+        resolver.resolve(endpoint.address, std::to_string(endpoint.port));
+    bool connected = false;
 
-        // Attempt to connect to the resolved endpoints
-        boost::asio::connect(socket_, endpoints);
+    // Create a condition variable to wait for the connection to complete
+    std::condition_variable cv;
+    std::mutex m;
+    std::unique_lock<std::mutex> lk(m);
 
-        // Connection successful
-        LOG(INFO) << "Connected to " << endpoint;
-        return true;
-    } catch (const boost::system::system_error& e) {
-        LOG(ERROR) << "TCP::connect: " << e.what();
+    // Attempt to connect to the resolved endpoints
+    boost::asio::async_connect(
+        socket_, endpoints,
+        [&, this](boost::system::error_code ec,
+                  const boost::asio::ip::tcp::endpoint& /*ep*/) {
+            if (ec) {
+                LOG(ERROR) << "Connect error: " << ec.message();
+            } else {
+                connected = true;
+            }
+            cv.notify_all();
+        });
+
+    if (timeout_duration_.count() > 0) {
+        // Wait for the connection to complete
+        LOG(INFO) << fmt::format(
+            "Waiting for connection to complete for {}",
+            timeout_duration_);
+        cv.wait_for(lk, timeout_duration_,
+                    [&] { return connected || io_context.stopped(); });
+    } else {
+        // Wait for the connection to complete
+        cv.wait(lk, [&] { return connected || io_context.stopped(); });
+    }
+
+    if (!connected) {
+        LOG(ERROR) << "Failed to connect to " << endpoint;
         return false;
     }
+
+    // Connection successful
+    LOG(INFO) << "Connected to " << endpoint;
+    return true;
 }
 
 Context::RemoteEndpoint Context::TCP::remoteAddress() const {
     try {
         auto remote_ep = socket_.remote_endpoint();
-        return {.address=remote_ep.address().to_string(), .port=remote_ep.port()};
+        return {.address = remote_ep.address().to_string(),
+                .port = remote_ep.port()};
     } catch (const boost::system::system_error& e) {
         LOG(ERROR) << "TCP::remoteAddress: " << e.what();
         return {};

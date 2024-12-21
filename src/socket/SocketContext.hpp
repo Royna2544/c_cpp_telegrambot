@@ -158,6 +158,7 @@ class Socket_API Context::TCP : public Context {
     bool is_listening_ = false;
     std::chrono::seconds timeout_duration_{};
     constexpr static std::size_t chunk_size = 1024;
+    std::thread _ioThread;
 
    public:
     /**
@@ -170,7 +171,7 @@ class Socket_API Context::TCP : public Context {
     explicit TCP(const boost::asio::ip::tcp type, const int port);
 
     // Virtual destructor.
-    ~TCP() override = default;
+    ~TCP() override;
 
     /**
      * @brief Sends data over the socket connection.
@@ -268,6 +269,7 @@ class Socket_API Context::UDP : public Context {
     mutable boost::asio::ip::udp::endpoint endpoint_;
     bool is_listening_ = false;
     std::chrono::seconds timeout_duration_{};
+    std::thread _ioThread;
     constexpr static int MAX_PACKET_SIZE = 0x10000;
 
    public:
@@ -281,7 +283,7 @@ class Socket_API Context::UDP : public Context {
     explicit UDP(const boost::asio::ip::udp type, const int port);
 
     // Virtual destructor.
-    ~UDP() override = default;
+    ~UDP() override;
 
     /**
      * @brief Sends data over the socket connection.
@@ -380,6 +382,7 @@ class Socket_API Context::Local : public Context {
     boost::asio::local::stream_protocol::endpoint endpoint_;
     bool is_listening_ = false;
     std::chrono::seconds timeout_duration_{};
+    std::thread _ioThread;
 
    public:
     /**
@@ -397,7 +400,7 @@ class Socket_API Context::Local : public Context {
     explicit Local();
 
     // Virtual destructor.
-    ~Local() override = default;
+    ~Local() override;
 
     /**
      * @brief Sends data over the socket connection.

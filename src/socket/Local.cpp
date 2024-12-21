@@ -1,11 +1,19 @@
 #include <absl/log/log.h>
+#include <fmt/chrono.h>
+#include <fmt/format.h>
 
+#include <boost/asio/local/stream_protocol.hpp>
+#include <boost/asio/use_future.hpp>
 #include <filesystem>
 #include <system_error>
 
 #include "SocketContext.hpp"
 
 namespace TgBotSocket {
+
+#ifndef BOOST_ASIO_HAS_LOCAL_SOCKETS
+#error "Local sockets are not supported on this platform."
+#endif
 
 Context::Local::Local(const std::filesystem::path& path)
     : socket_(io_context), acceptor_(io_context), endpoint_(path.string()) {
@@ -14,12 +22,24 @@ Context::Local::Local(const std::filesystem::path& path)
 
     if (std::filesystem::remove(path, ec)) {
         LOG(INFO) << "Removed stale file.";
-    } else if (ec && ec != std::make_error_code(std::errc::no_such_file_or_directory)) {
+    } else if (ec && ec != std::make_error_code(
+                               std::errc::no_such_file_or_directory)) {
         LOG(ERROR) << "Cannot remove stale file: " << ec.message();
     }
+
+    _ioThread = std::thread([this]() {
+        auto work = boost::asio::make_work_guard(io_context);
+        io_context.run();
+    });
 }
 
-Context::Local::Local() : socket_(io_context), acceptor_(io_context) {}
+Context::Local::Local() : socket_(io_context), acceptor_(io_context) {
+    LOG(INFO) << "Local::Local: Path=UNSPECIFIED";
+    _ioThread = std::thread([this]() {
+        auto work = boost::asio::make_work_guard(io_context);
+        io_context.run();
+    });
+}
 
 bool Context::Local::write(const SharedMalloc& data) const {
     try {
@@ -29,6 +49,16 @@ bool Context::Local::write(const SharedMalloc& data) const {
     } catch (const boost::system::system_error& e) {
         LOG(ERROR) << "Local::write: " << e.what();
         return false;
+    }
+}
+
+Context::Local::~Local() {
+    if (operator bool()) {
+        close();
+    }
+    io_context.stop();
+    if (_ioThread.joinable()) {
+        _ioThread.join();
     }
 }
 
@@ -96,7 +126,6 @@ bool Context::Local::listen(listener_callback_t listener) {
                     listen(listener);
                 }
             });
-        io_context.run();
         return true;
     } catch (const boost::system::system_error& e) {
         LOG(ERROR) << "Local::listen: " << e.what();
@@ -105,24 +134,51 @@ bool Context::Local::listen(listener_callback_t listener) {
 }
 
 bool Context::Local::connect(const RemoteEndpoint& endpoint) {
-    try {
-        // Attempt to connect to the resolved endpoints
-        socket_.connect(
-            boost::asio::local::stream_protocol::endpoint(endpoint.address));
+    // Create a condition variable to wait for the connection to complete
+    std::condition_variable cv;
+    std::mutex m;
+    std::unique_lock<std::mutex> lk(m);
+    bool connected = false;
 
-        // Connection successful
-        LOG(INFO) << "Connected to " << endpoint;
-        return true;
-    } catch (const boost::system::system_error& e) {
-        LOG(ERROR) << "Local::connect: " << e.what();
+    // Attempt to connect to the resolved endpoints
+    socket_.async_connect(
+        boost::asio::local::stream_protocol::endpoint(endpoint.address),
+        [&, this](boost::system::error_code ec) {
+            if (ec) {
+                LOG(ERROR) << "Connect error: " << ec.message();
+            } else {
+                DLOG(INFO) << "Connected to " << endpoint.address;
+                connected = true;
+            }
+            cv.notify_all();
+        });
+
+    if (timeout_duration_.count() > 0) {
+        // Wait for the connection to complete
+        LOG(INFO) << fmt::format("Waiting for connection to complete for {}",
+                                 timeout_duration_);
+        cv.wait_for(lk, timeout_duration_,
+                    [&] { return connected || io_context.stopped(); });
+    } else {
+        // Wait for the connection to complete
+        cv.wait(lk, [&] { return connected || io_context.stopped(); });
+    }
+
+    // Port is always 0 for local domain sockets, so we don't need to print it.
+    if (!connected) {
+        LOG(ERROR) << "Failed to connect to " << endpoint.address;
         return false;
     }
+
+    // Connection successful
+    LOG(INFO) << "Connected to " << endpoint.address;
+    return true;
 }
 
 Context::RemoteEndpoint Context::Local::remoteAddress() const {
     // For local sockets, the remote endpoint may not be available
     // We can return the path of the socket
-    return {.address=endpoint_.path(), .port=0};
+    return {.address = endpoint_.path(), .port = 0};
 }
 
 bool Context::Local::abortConnections() {

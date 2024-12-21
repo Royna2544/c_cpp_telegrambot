@@ -25,6 +25,20 @@ Context::UDP::UDP(const boost::asio::ip::udp type, const int port)
       endpoint_(boost::asio::ip::udp::endpoint(type, port)) {
     LOG(INFO) << fmt::format("UDP::UDP: Protocol {} listening on port {}", type,
                              port);
+    _ioThread = std::thread([this]() {
+        auto work = boost::asio::make_work_guard(io_context);
+        io_context.run();
+    });
+}
+
+Context::UDP::~UDP() {
+    if (operator bool()) {
+        close();
+    }
+    io_context.stop();
+    if (_ioThread.joinable()) {
+        _ioThread.join();
+    }
 }
 
 bool Context::UDP::write(const SharedMalloc& data) const {
@@ -87,22 +101,46 @@ bool Context::UDP::listen(listener_callback_t listener) {
 }
 
 bool Context::UDP::connect(const RemoteEndpoint& endpoint) {
-    try {
-        // Resolve the address and port
-        boost::asio::ip::udp::resolver resolver(io_context);
-        auto endpoints =
-            resolver.resolve(endpoint.address, std::to_string(endpoint.port));
+    // Resolve the address and port
+    boost::asio::ip::udp::resolver resolver(io_context);
+    auto endpoints =
+        resolver.resolve(endpoint.address, std::to_string(endpoint.port));
+    bool connected = false;
 
-        // Attempt to connect to the resolved endpoints
-        boost::asio::connect(socket_, endpoints);
+    // Create a condition variable to wait for the connection to complete
+    std::condition_variable cv;
+    std::mutex m;
+    std::unique_lock<std::mutex> lk(m);
 
-        // Connection successful
-        LOG(INFO) << "Connected to " << endpoint;
-        return true;
-    } catch (const boost::system::system_error& e) {
-        LOG(ERROR) << "UDP::connect: " << e.what();
+    // Attempt to connect to the resolved endpoints
+    boost::asio::async_connect(
+        socket_, endpoints,
+        [&, this](boost::system::error_code ec,
+                  const boost::asio::ip::udp::endpoint& /*ep*/) {
+            if (ec) {
+                LOG(ERROR) << "Connect error: " << ec.message();
+            } else {
+                connected = true;
+            }
+            cv.notify_all();
+        });
+    
+    if (timeout_duration_.count() > 0) {
+        // Wait for the connection to complete
+        cv.wait_for(lk, timeout_duration_, [&] { return connected || io_context.stopped(); });
+    } else {
+        // Wait for the connection to complete
+        cv.wait(lk, [&] { return connected || io_context.stopped(); });
+    }
+
+    if (!connected) {
+        LOG(ERROR) << "Failed to connect to " << endpoint;
         return false;
     }
+
+    // Connection successful
+    LOG(INFO) << "Connected to " << endpoint;
+    return true;
 }
 
 Context::RemoteEndpoint Context::UDP::remoteAddress() const {
