@@ -2,6 +2,7 @@ package com.royna.tgbotclient.pm
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -19,13 +20,18 @@ class StoragePermissionPreR : IStoragePermission {
     }
 
     override fun request() {
-        kActivityRequest.launch(kPermissionsRequested.toTypedArray())
+        if (Build.VERSION.SDK_INT > Build.VERSION_CODES.M) {
+            kActivityRequest.launch(kPermissionsRequested.toTypedArray())
+        }
     }
 
     override fun isGranted(activity: AppCompatActivity): Boolean {
-        return kPermissionsRequested.all { permission ->
-            activity.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
+        if (Build.VERSION.SDK_INT > Build.VERSION_CODES.M) {
+            return kPermissionsRequested.all { permission ->
+                activity.checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
+            }
         }
+        return true
     }
 
     private lateinit var kActivityRequest : ActivityResultLauncher<Array<String>>
