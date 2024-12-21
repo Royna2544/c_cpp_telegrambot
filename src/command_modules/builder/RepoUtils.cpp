@@ -159,7 +159,7 @@ void GitBranchSwitcher::dumpDiff(git_diff* diff) {
     }
 }
 
-bool GitBranchSwitcher::operator()() const {
+bool GitBranchSwitcher::check() const {
     int ret = 0;
     git_reference_ptr target_ref;
     git_reference_ptr target_remote_ref;

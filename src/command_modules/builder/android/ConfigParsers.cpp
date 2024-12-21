@@ -722,7 +722,7 @@ bool ConfigParser::LocalManifest::GitPrepare::prepare(
             .desiredUrl = info.url(),
             .checkout = true,
         };
-        if (switcherLocal()) {
+        if (switcherLocal.check()) {
             LOG(INFO) << "Repo is up-to-date.";
         } else {
             LOG(WARNING)

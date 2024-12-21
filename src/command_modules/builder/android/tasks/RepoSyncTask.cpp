@@ -125,7 +125,7 @@ DeferredExit RepoSyncTask::runFunction() {
                                .desiredBranch = rom->branch,
                                .desiredUrl = rom->romInfo->url,
                                .checkout = false};
-    if (!repoDirExists || !switcher()) {
+    if (!repoDirExists || !switcher.check()) {
         ForkAndRunSimple shell(
             fmt::format(initCommand, rom->romInfo->url, rom->branch, 1));
         shell.env[kGitAskPassEnv] = _gitAskPassFile.string();

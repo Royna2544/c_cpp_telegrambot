@@ -93,5 +93,5 @@ struct GitBranchSwitcher {
     static void dumpDiff(git_diff* diff);
 
    public:
-    [[nodiscard]] bool operator()() const;
+    [[nodiscard]] bool check() const;
 };
