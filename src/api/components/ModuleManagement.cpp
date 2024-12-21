@@ -3,6 +3,7 @@
 
 #include "api/CommandModule.hpp"
 #include "api/TgBotApiImpl.hpp"
+#include "tgbot/TgException.h"
 
 CommandModule* TgBotApiImpl::ModulesManagement::operator[](
     const std::string& name) const {
@@ -118,6 +119,10 @@ bool TgBotApiImpl::ModulesManagement::loadFrom(
         _api->getApi().setMyCommands(buffer);
     } catch (const TgBot::TgException& e) {
         LOG(ERROR) << fmt::format("Error updating bot commands list: {}",
+                                  e.what());
+        return false;
+    } catch (const TgBot::NetworkException& e) {
+        LOG(ERROR) << fmt::format("Network error on updating bot commands list: {}",
                                   e.what());
         return false;
     }
