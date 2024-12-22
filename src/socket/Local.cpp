@@ -126,6 +126,7 @@ bool Context::Local::listen(listener_callback_t listener) {
                     listen(listener);
                 }
             });
+        io_context.run();
         return true;
     } catch (const boost::system::system_error& e) {
         LOG(ERROR) << "Local::listen: " << e.what();

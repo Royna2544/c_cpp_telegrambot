@@ -93,6 +93,7 @@ bool Context::UDP::listen(listener_callback_t listener) {
                 listener(*this);
             }
         }
+        io_context.run();
         return true;
     } catch (const boost::system::system_error& e) {
         LOG(ERROR) << "UDP::listen: " << e.what();
