@@ -5,21 +5,14 @@
 #include <absl/strings/str_split.h>
 #include <fmt/core.h>
 #include <git2.h>
-#include <trivial_helpers/_class_helper_macros.h>
 
 #include <filesystem>
 #include <libos/libsighandler.hpp>
 #include <memory>
 #include <trivial_helpers/raii.hpp>
 #include <type_traits>
-#include "BytesConversion.hpp"
 
-struct ScopedLibGit2 {
-    ScopedLibGit2() { git_libgit2_init(); }
-    ~ScopedLibGit2() { git_libgit2_shutdown(); }
-    NO_MOVE_CTOR(ScopedLibGit2);
-    NO_COPY_CTOR(ScopedLibGit2);
-};
+#include "BytesConversion.hpp"
 
 template <typename T>
 struct deleter {
@@ -90,9 +83,14 @@ struct GitPtrWrapper {
         : _ptr(git_wrap<value_type>(ptr)), raw_ptr_(ptr.get()) {}
 
     // aka, value_type**
-    operator T*() { return &raw_ptr_; }
-    operator bool() const { return _ptr; }
-    operator T() { return raw_ptr_; }
+    operator T*() noexcept { return &raw_ptr_; }
+    operator T() noexcept { return raw_ptr_; }
+    bool operator==(std::nullptr_t /*null*/) const noexcept {
+        return raw_ptr_ == nullptr;
+    }
+    bool operator!=(std::nullptr_t /*null*/) const noexcept {
+        return !(*this == nullptr);
+    }
 
    private:
     T raw_ptr_ = nullptr;
@@ -159,28 +157,19 @@ void GitBranchSwitcher::dumpDiff(git_diff* diff) {
     }
 }
 
-bool GitBranchSwitcher::check() const {
-    int ret = 0;
-    git_reference_ptr target_ref;
-    git_reference_ptr target_remote_ref;
-    git_object_ptr treeish;
-    git_commit_ptr commit;
-    git_tree_ptr head_tree;
+struct GitBranchSwitcher::RepoInfoPriv {
     git_tree_ptr target_tree;
-    git_diff_ptr diff;
-    git_remote_ptr remote;
-    git_repository_ptr repo;
-    git_reference_ptr head_ref;
-    const char* current_branch = nullptr;
-    ScopedLibGit2 _;
+    git_remote_ptr remote;                 // Remote data of "origin" remote
+    git_repository_ptr repo;               // Repository information
+    git_reference_ptr head_ref;            // Current HEAD reference
+    git_commit_ptr head_commit;            // The HEAD commit
+    const char* remote_url = nullptr;      // URL of remote origin
+    const char* current_branch = nullptr;  // Name of current branch
+};
 
-    git_diff_options diffopts = GIT_DIFF_OPTIONS_INIT;
-    diffopts.flags = GIT_CHECKOUT_NOTIFY_CONFLICT;
-    git_checkout_options checkout_opts = GIT_CHECKOUT_OPTIONS_INIT;
-    checkout_opts.checkout_strategy = GIT_CHECKOUT_SAFE;
-
-    // We could either get the repo, or the .git directory
-    const auto configPath = gitDirectory / "config";
+void GitBranchSwitcher::removeOffendingConfig() const {
+    const auto configPath = _gitDirectory / "config";
+    int ret;
     if (std::filesystem::exists(configPath)) {
         git_config* config = nullptr;
         DLOG(INFO) << "Config file found: " << configPath.string();
@@ -188,7 +177,6 @@ bool GitBranchSwitcher::check() const {
         if (ret != 0) {
             LOG(WARNING) << "Failed to open config file: "
                          << git_error_last_str();
-            git_config_free(config);
         } else {
             int val = 0;
             ret =
@@ -199,264 +187,218 @@ bool GitBranchSwitcher::check() const {
                                               "extensions.preciousobjects");
                 if (ret != 0) {
                     LOG(ERROR)
-                        << "Failed to delete extensions.preciousobjects: "
+                        << "Failed to delete extensions.preciousobjects : "
                         << git_error_last_str();
                 }
-            } else {
-                LOG(WARNING) << "Failed to get extensions.preciousobjects: "
-                             << git_error_last_str();
             }
             // Manual, to save the file to disk
             git_config_free(config);
         }
     }
+}
 
-    ret = git_repository_open(repo, gitDirectory.c_str());
+bool GitBranchSwitcher::open() {
+    int ret = 0;
+    RepoInfoPriv data{};
+
+    // Init libgit2
+    git_libgit2_init();
+
+    ret = git_repository_open(data.repo, _gitDirectory.c_str());
 
     if (ret != 0) {
         LOG(ERROR) << "Failed to open repository: " << git_error_last_str();
         return false;
     }
 
-    ret = git_remote_lookup(remote, repo, kRemoteRepoName.data());
+    ret = git_remote_lookup(data.remote, data.repo, kRemoteRepoName.data());
     if (ret != 0) {
         LOG(ERROR) << "Failed to lookup remote origin: "
                    << git_error_last_str();
         return false;
     }
 
-    const char* remote_url = git_remote_url(remote);
-    if (remote_url == nullptr) {
+    data.remote_url = git_remote_url(data.remote);
+    if (data.remote_url == nullptr) {
         LOG(ERROR) << "Remote origin URL is null: " << git_error_last_str();
         return false;
     }
-    LOG(INFO) << "Remote origin URL: " << remote_url;
+    LOG(INFO) << "Remote origin URL: " << data.remote_url;
 
-    if (remote_url != desiredUrl) {
-        LOG(INFO) << "Repository URL doesn't match...";
-        return false;
-    }
-
-    ret = git_repository_head(head_ref, repo);
+    ret = git_repository_head(data.head_ref, data.repo);
     if (ret != 0) {
         LOG(ERROR) << "Failed to get HEAD reference: " << git_error_last_str();
         return false;
     }
 
-    struct {
-        // refs/heads/*branch*
-        std::string local;
-        std::string remote;
-    } target_ref_name;
-    target_ref_name.local += "refs/heads/";
-    target_ref_name.local += desiredBranch;
-    target_ref_name.remote += "refs/remotes/";
-    target_ref_name.remote += kRemoteRepoName.data();
-    target_ref_name.remote += "/";
-    target_ref_name.remote += desiredBranch;
-
-    bool fetchOk = true;
-    // Maybe remote has it?
-    ret = git_remote_fetch(remote, nullptr, nullptr, nullptr);
-    if (ret != 0) {
-        LOG(WARNING) << "Failed to fetch remote: " << git_error_last_str();
-        // This is only for updating origin/ refs, not a requirement.
-        fetchOk = false;
-    }
-
-    // Now try to find the branch in the remote
-    ret = git_reference_lookup(target_remote_ref, repo,
-                               target_ref_name.remote.c_str());
-    if (ret != 0) {
-        LOG(ERROR) << "Failed to find the branch "
-                      "in the remote: "
-                   << git_error_last_str();
-        return false;
-    }
-
-    // Optional: Try ff
-    do {
-        git_merge_options merge_opts = GIT_MERGE_OPTIONS_INIT;
-        // Get the remote branch's OID (SHA)
-        git_annotated_commit_ptr remote_commit;
-
-        ret = git_annotated_commit_from_ref(remote_commit, repo,
-                                            target_remote_ref);
-        if (ret != 0) {
-            LOG(WARNING) << "Failed to get remote commit: "
-                         << git_error_last_str();
-            break;
-        }
-        std::array<const git_annotated_commit*, 1> commits = {remote_commit};
-        ret = git_merge(repo, commits.data(), commits.size(), &merge_opts,
-                        &checkout_opts);
-        if (ret != 0) {
-            LOG(WARNING) << "Failed to merge branch: " << git_error_last_str();
-            break;
-        }
-        git_oid target_oid;
-        git_object_ptr target_commit;
-
-        const char* refName = git_reference_name(target_remote_ref);
-
-        // Get the target commit's OID
-        ret = git_reference_name_to_id(&target_oid, repo, refName);
-        if (ret != 0) {
-            LOG(WARNING) << "Failed to resolve remote reference: "
-                         << git_error_last_str();
-            break;
-        }
-
-        // Lookup the target commit
-        ret = git_object_lookup(static_cast<git_object**>(target_commit), repo,
-                                &target_oid, GIT_OBJECT_COMMIT);
-        if (ret != 0) {
-            LOG(WARNING) << "Failed to lookup target commit: "
-                         << git_error_last_str();
-            break;
-        }
-
-        ret = git_checkout_tree(repo, target_commit, &checkout_opts);
-        if (ret != 0) {
-            LOG(WARNING) << "Failed to checkout target commit: "
-                         << git_error_last_str();
-            break;
-        }
-
-        // Update HEAD to the new commit
-        ret = git_repository_set_head(repo, refName);
-
-        if (ret != 0) {
-            LOG(WARNING) << "Failed to update HEAD: " << git_error_last_str();
-            break;
-        }
-
-        LOG(INFO) << "Fast-forward completed successfully.";
-    } while (false);
-
-    current_branch = git_reference_shorthand(head_ref);
-    // Check if the branch is the one we're interested in
-    if (desiredBranch == current_branch) {
-        LOG(INFO) << "Already on the desired branch";
-        return true;
-    } else {
-        LOG(INFO) << "Expected branch: " << desiredBranch
-                  << ", current branch: " << current_branch;
-        if (!checkout) {
-            // You know, we may be on the same sha1 still, check it.
-            git_oid local_head_oid{};
-            git_oid remote_head_oid{};
-            if (git_reference_name_to_id(&local_head_oid, repo, "HEAD") != 0) {
-                LOG(ERROR) << "Failed to resolve local HEAD: "
-                           << git_error_last_str();
-                return false;
-            }
-            if (git_reference_name_to_id(&remote_head_oid, repo,
-                                         target_ref_name.remote.c_str()) != 0) {
-                LOG(ERROR) << "Failed to resolve remote HEAD: "
-                           << git_error_last_str();
-                return false;
-            }
-            if (git_oid_cmp(&local_head_oid, &remote_head_oid) != 0) {
-                LOG(INFO) << "Checkout: false. Done";
-                return false;
-            } else {
-                LOG(INFO) << "Local and remote HEAD are the same";
-                return true;
-            }
-        }
-    }
-    LOG(INFO) << "Switching to branch: " << desiredBranch;
-
-    // Try to find the branch ref in the repository
-    ret = git_reference_lookup(target_ref, repo, target_ref_name.local.c_str());
-    if (ret != 0) {
-        LOG(WARNING) << "Failed to find the branch ref in local: "
-                     << git_error_last_str();
-
-        // Get the commit of the target branch ref
-        ret = git_commit_lookup(commit, repo,
-                                git_reference_target(target_remote_ref));
-        if (ret != 0) {
-            LOG(ERROR) << "Failed to find the commit: " << git_error_last_str();
-            return false;
-        }
-
-        // Create the local branch ref pointing to the commit
-        ret = git_branch_create(target_ref, repo, desiredBranch.c_str(), commit,
-                                0);
-        if (ret != 0) {
-            LOG(ERROR) << "Failed to create branch: " << git_error_last_str();
-            return false;
-        }
-
-        ret =
-            git_branch_set_upstream(target_ref, target_ref_name.remote.c_str());
-        if (ret != 0) {
-            // Not so fatal
-            LOG(WARNING) << "Failed to set upstream: " << git_error_last_str();
-        }
-        target_ref = std::move(target_remote_ref);
-        LOG(INFO) << "Success on looking up remote branch";
-    } else {
-        // Switching to the branch directly
-    }
-
-    ret = git_commit_lookup(commit, repo, git_reference_target(target_ref));
-    if (ret != 0) {
-        LOG(ERROR) << "Failed to find the target ref commit: "
-                   << git_error_last_str();
-        return false;
-    }
-
-    // Create the tree object for the commit
-    ret = git_commit_tree(target_tree, commit);
-    if (ret != 0) {
-        LOG(ERROR) << "Failed to create target ref commit tree: "
-                   << git_error_last_str();
-        return false;
-    }
-
-    // Get the object of the target branch ref
-    ret = git_reference_peel(treeish, target_ref, GIT_OBJECT_TREE);
-    if (ret != 0) {
-        LOG(ERROR) << "Failed to find the branch: " << git_error_last_str();
-        return false;
-    }
-
-    ret = git_diff_index_to_workdir(diff, repo, nullptr, &diffopts);
-    if (ret != 0) {
-        LOG(ERROR) << "Failed to create unstaged diff: "
-                   << git_error_last_str();
-        return false;
-    }
-
-    if (hasDiff(diff)) {
-        LOG(WARNING) << "You have unstaged changes";
-        dumpDiff(diff);
-        LOG(WARNING) << "Please commit your changes before you switch "
-                        "branches. ";
-        LOG(ERROR) << "Done.";
-        return false;
-    }
-    ret = git_commit_lookup(commit, repo, git_reference_target(head_ref));
+    ret = git_commit_lookup(data.head_commit, data.repo,
+                            git_reference_target(data.head_ref));
     if (ret != 0) {
         LOG(ERROR) << "Failed to find the head commit: "
                    << git_error_last_str();
+        return true;
+    }
+
+    data.current_branch = git_reference_shorthand(data.head_ref);
+
+    // Success
+    rdata = std::make_unique<RepoInfoPriv>(std::move(data));
+    cdata = nullptr;
+    return true;
+}
+
+struct GitBranchSwitcher::CheckoutInfoPriv {
+    struct {  // refs/heads/ *branch*
+        std::string local;
+        std::string remote;
+    } target_ref_name;
+    git_reference_ptr target_local_ref;   // The target reference in local
+    git_reference_ptr target_remote_ref;  // The target reference in remote
+    bool fetched = true;
+    git_diff_options diff_opts = GIT_DIFF_OPTIONS_INIT;
+    git_checkout_options checkout_opts = GIT_CHECKOUT_OPTIONS_INIT;
+    const char* remote_refname() const {
+        return target_ref_name.remote.c_str();
+    }
+
+    const char* local_refname() const { return target_ref_name.local.c_str(); }
+
+    static std::string make_local_refname(const std::string_view branch) {
+        return fmt::format("refs/heads/{}", branch);
+    }
+
+    CheckoutInfoPriv(git_repository* repo, git_remote* remote,
+                     std::string_view destBranch) {
+        diff_opts.flags = GIT_CHECKOUT_NOTIFY_CONFLICT;
+        checkout_opts.checkout_strategy = GIT_CHECKOUT_SAFE;
+        // Craft strings
+        target_ref_name.local = make_local_refname(destBranch);
+        target_ref_name.remote =
+            fmt::format("refs/remotes/{}/{}", kRemoteRepoName, destBranch);
+
+        // Now try to find the branch in local first
+        int ret = git_reference_lookup(target_local_ref, repo, local_refname());
+        if (ret != 0) {
+            LOG(WARNING) << "Didn't find local ref: " << git_error_last_str();
+        }
+
+        // If local didn't exist, maybe remote has it?
+        // First update the repo data with fetch.
+        ret = git_remote_fetch(remote, nullptr, nullptr, nullptr);
+        if (ret != 0) {
+            LOG(WARNING) << "Failed to fetch remote: " << git_error_last_str();
+            // This is only for updating origin/ refs, not a requirement.
+            fetched = false;
+        }
+
+        // Now try to find the branch in the remote
+        ret = git_reference_lookup(target_remote_ref, repo, remote_refname());
+        if (ret != 0) {
+            LOG(WARNING) << "Didn't find remote ref: " << git_error_last_str();
+        }
+    }
+};
+
+bool GitBranchSwitcher::fastForwardPull() const {
+    git_merge_options merge_opts = GIT_MERGE_OPTIONS_INIT;
+    git_annotated_commit_ptr remote_commit;
+    git_merge_analysis_t analysis;
+    git_merge_preference_t preference;
+    int ret;
+
+    if (!rdata || !cdata || cdata->target_local_ref == nullptr ||
+        cdata->target_remote_ref == nullptr) {
+        LOG(ERROR) << "Invalid data";
         return false;
+    }
+
+    // Get the remote branch's OID (SHA)
+    ret = git_annotated_commit_from_ref(remote_commit, rdata->repo,
+                                        cdata->target_remote_ref);
+    if (ret != 0) {
+        LOG(WARNING) << "Failed to get remote commit: " << git_error_last_str();
+        return false;
+    }
+
+    const git_annotated_commit* remote_commits[] = {remote_commit};
+    if (git_merge_analysis(&analysis, &preference, rdata->repo, remote_commits,
+                           1) != 0) {
+        LOG(WARNING) << "Failed to analyze merge: " << git_error_last_str();
+        return false;
+    }
+
+    if (!(analysis & GIT_MERGE_ANALYSIS_FASTFORWARD)) {
+        LOG(INFO) << "FastForward not possible";
+        return false;
+    }
+
+    return checkout(cdata->remote_refname());
+}
+
+bool GitBranchSwitcher::isRefnameSame(
+    git_repository* repo,
+    const std::pair<std::string_view, std::string_view>& refnames) {
+    std::pair<git_oid, git_oid> oids{};
+    if (git_reference_name_to_id(&oids.first, repo, refnames.first.data()) !=
+        0) {
+        LOG(ERROR) << "Failed to resolve " << refnames.first << ": "
+                   << git_error_last_str();
+        return false;
+    }
+    if (git_reference_name_to_id(&oids.second, repo, refnames.second.data()) !=
+        0) {
+        LOG(ERROR) << "Failed to resolve " << refnames.second << ": "
+                   << git_error_last_str();
+        return false;
+    }
+    bool isSame = git_oid_cmp(&oids.first, &oids.second) == 0;
+    DLOG(INFO) << fmt::format("{} and {} are {}the same", refnames.first,
+                              refnames.second, isSame ? "" : "not ");
+    return isSame;
+}
+
+bool GitBranchSwitcher::hasUnstagedChanges() const {
+    int ret;
+    git_diff_ptr diff;
+    git_tree_ptr head_tree;
+
+    if (!rdata) {
+        LOG(ERROR) << "Missing RepoDataPriv";
+        return true;
+    }
+
+    if (!cdata) {
+        LOG(ERROR) << "Missing CheckoutDataPriv";
+        return true;
+    }
+
+    ret = git_diff_index_to_workdir(diff, rdata->repo, nullptr,
+                                    &cdata->diff_opts);
+    if (ret != 0) {
+        LOG(ERROR) << "Failed to create unstaged diff: "
+                   << git_error_last_str();
+        return true;
+    }
+    if (hasDiff(diff)) {
+        LOG(WARNING) << "You have unstaged changes";
+        dumpDiff(diff);
+        LOG(WARNING)
+            << "Please commit your changes before you switch branches. ";
+        LOG(ERROR) << "Done.";
+        return true;
     }
 
     // Get the head tree of the repository
-    ret = git_commit_tree(head_tree, commit);
+    ret = git_commit_tree(head_tree, rdata->head_commit);
     if (ret != 0) {
         LOG(ERROR) << "Failed to get commit tree: " << git_error_last_str();
-        return false;
+        return true;
     }
-
-    ret = git_diff_tree_to_index(diff, repo, head_tree, nullptr, &diffopts);
+    ret = git_diff_tree_to_index(diff, rdata->repo, head_tree, nullptr,
+                                 &cdata->diff_opts);
     if (ret != 0) {
         LOG(ERROR) << "Failed to create staged diff: " << git_error_last_str();
-        return false;
+        return true;
     }
     if (hasDiff(diff)) {
         LOG(WARNING) << "You have staged changes";
@@ -464,24 +406,166 @@ bool GitBranchSwitcher::check() const {
         LOG(WARNING) << "Please commit your changes before you switch "
                         "branches. ";
         LOG(ERROR) << "Done.";
+        return true;
+    }
+    return false;
+}
+
+bool GitBranchSwitcher::check(const RepoInfo& info) const {
+    if (!rdata) {
+        DLOG(INFO) << "No rdata";
+        return false;
+    }
+    if (info.url() != rdata->remote_url) {
+        DLOG(INFO) << "Mismatch on URL";
         return false;
     }
 
-    // Checkout the tree of the target branch ref to the repository
-    ret = git_checkout_tree(repo, treeish, &checkout_opts);
-    if (ret != 0) {
-        LOG(ERROR) << "Failed to checkout tree: " << git_error_last_str();
-        return false;
-    }
+    if (rdata->current_branch != info.branch()) {
+        DLOG(INFO) << "Branch mismatch";
 
-    // Set the HEAD to the target branch ref
-    ret = git_repository_set_head(repo, target_ref_name.local.c_str());
-    if (ret != 0) {
-        LOG(ERROR) << "Failed to set HEAD: " << git_error_last_str();
-        return false;
+        return isRefnameSame(
+            rdata->repo,
+            std::make_pair<>("HEAD", CheckoutInfoPriv::make_local_refname(
+
+                                         info.branch())));
     }
-    LOG(INFO) << "Switched to branch: " << desiredBranch;
     return true;
+}
+
+bool GitBranchSwitcher::checkout(const std::string_view refname) const {
+    git_oid target_oid;
+    git_object_ptr target_commit;
+    int ret;
+
+    // Get the target commit's OID
+    ret = git_reference_name_to_id(&target_oid, rdata->repo, refname.data());
+    if (ret != 0) {
+        LOG(WARNING) << "Failed to resolve remote reference: "
+                     << git_error_last_str();
+        return false;
+    }
+
+    // Lookup the target commit
+    ret = git_object_lookup(static_cast<git_object**>(target_commit),
+                            rdata->repo, &target_oid, GIT_OBJECT_COMMIT);
+    if (ret != 0) {
+        LOG(WARNING) << "Failed to lookup target commit: "
+                     << git_error_last_str();
+        return false;
+    }
+
+    ret = git_checkout_tree(rdata->repo, target_commit, &cdata->checkout_opts);
+    if (ret != 0) {
+        LOG(WARNING) << "Failed to checkout target commit: "
+                     << git_error_last_str();
+        return false;
+    }
+
+    // Update HEAD to the new commit
+    ret = git_repository_set_head(rdata->repo, refname.data());
+
+    if (ret != 0) {
+        LOG(WARNING) << "Failed to update HEAD: " << git_error_last_str();
+        return false;
+    }
+
+    ret = git_checkout_head(rdata->repo, &cdata->checkout_opts);
+
+    if (ret != 0) {
+        LOG(WARNING) << "Failed to checkout HEAD: " << git_error_last_str();
+        return false;
+    }
+    return true;
+}
+
+bool GitBranchSwitcher::checkout(const RepoInfo& info) {
+    int ret;
+
+    if (!rdata) {
+        LOG(ERROR) << "No RepoInfoPriv";
+        return false;
+    }
+    if (info.url() != rdata->remote_url) {
+        LOG(WARNING) << "URL mismatch";
+        return false;
+    }
+
+    if (info.branch() == rdata->current_branch) {
+        LOG(INFO) << "Already on " << info.branch();
+        return true;
+    }
+
+    cdata = std::make_unique<CheckoutInfoPriv>(rdata->repo, rdata->remote,
+                                               info.branch());
+
+    // Check if local or remote has the needed ref
+    if (cdata->target_local_ref == nullptr &&
+        cdata->target_remote_ref == nullptr) {
+        LOG(WARNING) << "Didn't find branch named " << info.branch()
+                     << " on either remote and local";
+        return false;
+    }
+
+    if (hasUnstagedChanges()) {
+        return false;
+    }
+    LOG(INFO) << "Switching to branch: " << info.branch();
+
+    // Try to find the branch ref in the repository
+    if (cdata->target_local_ref == nullptr) {
+        git_commit_ptr remote_head_commit;
+        // Get the commit of the target branch ref
+        ret = git_commit_lookup(remote_head_commit, rdata->repo,
+                                git_reference_target(cdata->target_remote_ref));
+        if (ret != 0) {
+            LOG(ERROR) << "Failed to find the commit: " << git_error_last_str();
+            return false;
+        }
+
+        // Create the local branch ref pointing to the commit
+        ret = git_branch_create(cdata->target_local_ref, rdata->repo,
+                                info.branch().c_str(), remote_head_commit, 0);
+        if (ret != 0) {
+            LOG(ERROR) << "Failed to create branch: " << git_error_last_str();
+            return false;
+        }
+        ret = git_branch_set_upstream(cdata->target_local_ref,
+                                      cdata->remote_refname());
+        if (ret != 0) {  // Not so fatal
+            LOG(WARNING) << "Failed to set upstream: " << git_error_last_str();
+        }
+        LOG(INFO) << "Success on looking up remote branch";
+    } else {
+        // Switching to the branch directly
+        fastForwardPull();
+    }
+
+    // Checkout the branch
+    if (!checkout(cdata->local_refname())) {
+        LOG(WARNING) << "Failed to checkout branch";
+        return false;
+    }
+    LOG(INFO) << "Switched to branch: " << info.branch();
+
+    // Update current branch metadata
+    ret = git_repository_head(rdata->head_ref, rdata->repo);
+    if (ret != 0) {
+        LOG(ERROR) << "Failed to update HEAD reference: "
+                   << git_error_last_str();
+        return false;
+    }
+    rdata->current_branch = git_reference_shorthand(rdata->head_ref);
+    return true;
+}
+
+GitBranchSwitcher::GitBranchSwitcher(std::filesystem::path gitDirectory)
+    : _gitDirectory(std::move(gitDirectory)) {}
+
+GitBranchSwitcher::~GitBranchSwitcher() {
+    rdata.reset();
+    cdata.reset();
+    git_libgit2_shutdown();
 }
 
 bool RepoInfo::git_clone(const std::filesystem::path& directory,
@@ -498,7 +582,8 @@ bool RepoInfo::git_clone(const std::filesystem::path& directory,
     gitoptions.fetch_opts.callbacks.transfer_progress =
         +[](const git_indexer_progress* stats, void* payload) -> int {
         LOG_EVERY_N_SEC(INFO, 3) << fmt::format(
-            "Fetch: Objects({}/{}/{}) Deltas({}/{}), Total {:.2f}GB",
+            "Fetch: Objects({}/{}/{}) Deltas({}/{}), Total "
+            "{:.2f}GB",
             stats->received_objects, stats->indexed_objects,
             stats->total_objects, stats->indexed_deltas, stats->total_deltas,
             GigaBytes(stats->received_bytes * boost::units::data::bytes)
@@ -550,7 +635,7 @@ bool RepoInfo::git_clone(const std::filesystem::path& directory,
 #endif
     }
 
-    ScopedLibGit2 _;
+    git_libgit2_init();
     int ret = ::git_clone(repo, url_.c_str(), directory.c_str(), &gitoptions);
     if (ret != 0) {
         const auto* fault = git_error_last();
@@ -558,5 +643,6 @@ bool RepoInfo::git_clone(const std::filesystem::path& directory,
     } else {
         LOG(INFO) << "Git repository cloned successfully";
     }
+    git_libgit2_shutdown();
     return ret == 0;
 }

@@ -121,11 +121,8 @@ DeferredExit RepoSyncTask::runFunction() {
     }
 
     const auto& rom = data.localManifest->rom;
-    GitBranchSwitcher switcher{.gitDirectory = kLocalManifestGitPath,
-                               .desiredBranch = rom->branch,
-                               .desiredUrl = rom->romInfo->url,
-                               .checkout = false};
-    if (!repoDirExists || !switcher.check()) {
+    GitBranchSwitcher switcher{kLocalManifestGitPath};
+    if (!repoDirExists || !(switcher.open() && switcher.check({rom->branch, rom->romInfo->url}))) {
         ForkAndRunSimple shell(
             fmt::format(initCommand, rom->romInfo->url, rom->branch, 1));
         shell.env[kGitAskPassEnv] = _gitAskPassFile.string();

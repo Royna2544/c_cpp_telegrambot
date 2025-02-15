@@ -716,13 +716,8 @@ bool ConfigParser::LocalManifest::GitPrepare::prepare(
         info.git_clone(path);
     } else {
         LOG(INFO) << "Local manifest exists already...";
-        GitBranchSwitcher switcherLocal{
-            .gitDirectory = path,
-            .desiredBranch = info.branch(),
-            .desiredUrl = info.url(),
-            .checkout = true,
-        };
-        if (switcherLocal.check()) {
+        GitBranchSwitcher sl{path};
+        if (sl.open() && sl.checkout(info)) {
             LOG(INFO) << "Repo is up-to-date.";
         } else {
             LOG(WARNING)

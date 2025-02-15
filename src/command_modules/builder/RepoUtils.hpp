@@ -80,18 +80,44 @@ class RepoInfo {
     std::unique_ptr<Callbacks> callback_;
 };
 
-struct GitBranchSwitcher {
-    std::filesystem::path gitDirectory;
-    std::string desiredBranch;
-    std::string desiredUrl;
-    bool checkout = false;
+class GitBranchSwitcher {
+    std::filesystem::path _gitDirectory;
 
-   private:
     static constexpr std::string_view kRemoteRepoName = "origin";
+
     static const char* git_error_last_str();
     static bool hasDiff(git_diff* diff);
     static void dumpDiff(git_diff* diff);
 
+    // Remove extensions.preciousobjects which is
+    // used on Google .repo git and is
+    // unsupported on libgit2
+    void removeOffendingConfig() const;
+    // Check if the working tree has any unstaged things
+    bool hasUnstagedChanges() const;
+    // Try a FF-pull.
+    bool fastForwardPull() const;
+    // Checkout to refname. Incl. HEAD, tree, index.
+    bool checkout(const std::string_view refname) const;
+
+    static bool isRefnameSame(
+        git_repository* repo,
+        const std::pair<std::string_view, std::string_view>& refnames);
+
+    struct RepoInfoPriv;
+    std::unique_ptr<RepoInfoPriv> rdata;
+    struct CheckoutInfoPriv;
+    std::unique_ptr<CheckoutInfoPriv> cdata;
+
    public:
-    [[nodiscard]] bool check() const;
+    // Create a Git branch switcher with given Git Directory
+    explicit GitBranchSwitcher(std::filesystem::path gitDirectory);
+    ~GitBranchSwitcher();
+
+    // Open the git repo if possible.
+    bool open();
+    // Compare the current repo info against RepoInfo
+    [[nodiscard]] bool check(const RepoInfo& info) const;
+    // Actually checkout to the RepoInfo info, and return result
+    bool checkout(const RepoInfo& info);
 };
