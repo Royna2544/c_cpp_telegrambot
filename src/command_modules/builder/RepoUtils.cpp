@@ -302,8 +302,8 @@ struct GitBranchSwitcher::CheckoutInfoPriv {
 bool GitBranchSwitcher::fastForwardPull() const {
     git_merge_options merge_opts = GIT_MERGE_OPTIONS_INIT;
     git_annotated_commit_ptr remote_commit;
-    git_merge_analysis_t analysis;
-    git_merge_preference_t preference;
+    git_merge_analysis_t analysis{};
+    git_merge_preference_t preference{};
     int ret;
 
     if (!rdata || !cdata || cdata->target_local_ref == nullptr ||
@@ -321,14 +321,16 @@ bool GitBranchSwitcher::fastForwardPull() const {
     }
 
     const git_annotated_commit* remote_commits[] = {remote_commit};
-    if (git_merge_analysis(&analysis, &preference, rdata->repo, remote_commits,
-                           1) != 0) {
+    ret = git_merge_analysis(&analysis, &preference, rdata->repo,
+                             remote_commits, 1);
+    if (ret != 0) {
         LOG(WARNING) << "Failed to analyze merge: " << git_error_last_str();
         return false;
     }
 
     if (!(analysis & GIT_MERGE_ANALYSIS_FASTFORWARD)) {
-        LOG(INFO) << "FastForward not possible";
+        LOG(INFO) << "FastForward not possible with " << cdata->remote_refname();
+        DLOG(INFO) << "Analysis returns " << analysis;
         return false;
     }
 
@@ -530,8 +532,13 @@ bool GitBranchSwitcher::checkout(const RepoInfo& info) {
             LOG(ERROR) << "Failed to create branch: " << git_error_last_str();
             return false;
         }
-        ret = git_branch_set_upstream(cdata->target_local_ref,
-                                      cdata->remote_refname());
+        const char* branch_name = nullptr;
+        ret = git_branch_name(&branch_name, cdata->target_remote_ref);
+        if (ret != 0) {
+            LOG(ERROR) << "Failed to create branch: " << git_error_last_str();
+            return false;
+        }
+        ret = git_branch_set_upstream(cdata->target_local_ref, branch_name);
         if (ret != 0) {  // Not so fatal
             LOG(WARNING) << "Failed to set upstream: " << git_error_last_str();
         }
@@ -636,7 +643,8 @@ bool RepoInfo::git_clone(const std::filesystem::path& directory,
     }
 
     git_libgit2_init();
-    int ret = ::git_clone(repo, url_.c_str(), directory.string().c_str(), &gitoptions);
+    int ret = ::git_clone(repo, url_.c_str(), directory.string().c_str(),
+                          &gitoptions);
     if (ret != 0) {
         const auto* fault = git_error_last();
         LOG(ERROR) << "Couldn't clone repo: " << fault->message;
