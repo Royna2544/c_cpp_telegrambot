@@ -52,20 +52,18 @@ DECLARE_COMMAND_HANDLER(spam) {
             fp = [api, message, chatid] {
                 api->sendSticker(
                     chatid,
-                    MediaIds(
-                        message->reply()->get<MessageAttrs::Sticker>()));
+                    MediaIds(message->reply()->get<MessageAttrs::Sticker>()));
             };
         } else if (message->reply()->has<MessageAttrs::Animation>()) {
             fp = [api, message, chatid] {
                 api->sendAnimation(
-                    chatid, MediaIds(message->reply()
-                                         ->get<MessageAttrs::Animation>()));
+                    chatid,
+                    MediaIds(message->reply()->get<MessageAttrs::Animation>()));
             };
         } else if (message->reply()->has<MessageAttrs::ExtraText>()) {
             fp = [api, message, chatid] {
                 api->sendMessage(
-                    chatid,
-                    message->reply()->get<MessageAttrs::ExtraText>());
+                    chatid, message->reply()->get<MessageAttrs::ExtraText>());
             };
         } else {
             api->sendReplyMessage(message->message(),
@@ -106,8 +104,9 @@ extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
     .name = "spam",
     .description = "Spam a given literal or media",
     .function = COMMAND_HANDLER_NAME(spam),
-    .valid_args = {
-        .enabled = true,
-        .counts = DynModule::craftArgCountMask<1, 2>(),
-    },
+    .valid_args =
+        {
+            .enabled = true,
+            .counts = DynModule::craftArgCountMask<1, 2>(),
+        },
 };

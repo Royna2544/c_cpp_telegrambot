@@ -1,9 +1,8 @@
 #include <fmt/format.h>
 
 #include <api/CommandModule.hpp>
+#include <api/StringResLoader.hpp>
 #include <api/TgBotApi.hpp>
-
-#include "StringResLoader.hpp"
 
 DECLARE_COMMAND_HANDLER(cmd) {
     const auto& args = message->get<MessageAttrs::ParsedArgumentsList>();
@@ -25,15 +24,14 @@ DECLARE_COMMAND_HANDLER(cmd) {
         if (ret) {
             result_message =
                 fmt::format("{} {}: {}", command, action,
-                            access(res, Strings::OPERATION_SUCCESSFUL));
+                            res->get(Strings::OPERATION_SUCCESSFUL));
         } else {
-            result_message =
-                fmt::format("{} {}: {}", command, action,
-                            access(res, Strings::OPERATION_FAILURE));
+            result_message = fmt::format("{} {}: {}", command, action,
+                                         res->get(Strings::OPERATION_FAILURE));
         }
     } else {
         result_message =
-            fmt::format("{}: {}", access(res, Strings::UNKNOWN_ACTION), action);
+            fmt::format("{}: {}", res->get(Strings::UNKNOWN_ACTION), action);
     }
     api->sendReplyMessage(message->message(), result_message);
 }
@@ -48,5 +46,4 @@ extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
         .counts = DynModule::craftArgCountMask<2>(),
         .split_type = DynModule::ValidArgs::Split::ByWhitespace,
         .usage = "/cmd <cmdname> <reload/unload>",
-    }
-};
+    }};

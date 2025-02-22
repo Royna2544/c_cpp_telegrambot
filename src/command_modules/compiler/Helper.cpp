@@ -10,11 +10,11 @@
 #include <thread>
 #include <utility>
 
-#include "StringResLoader.hpp"
+#include <api/StringResLoader.hpp>
 #include "popen_wdt.h"
 
 CompilerInTgBotInterface::CompilerInTgBotInterface(
-    TgBotApi::CPtr api, const StringResLoaderBase::LocaleStrings* locale,
+    TgBotApi::CPtr api, const StringResLoader::PerLocaleMap* locale,
     MessageExt::Ptr requestedMessage)
     : botApi(api),
       requestedMessage(std::move(requestedMessage)),
@@ -24,8 +24,8 @@ void CompilerInTgBotInterface::onExecutionStarted(
     const std::string_view& command) {
     timePoint.init();
     output << fmt::format("{}...\n{}: {}",
-                          access(_locale, Strings::WORKING_ON_IT),
-                          access(_locale, Strings::COMMAND_IS), command.data());
+                          _locale->get(Strings::WORKING_ON_IT),
+                          _locale->get(Strings::COMMAND_IS), command.data());
     sentMessage =
         botApi->sendReplyMessage(requestedMessage->message(), output.str());
 }
@@ -34,14 +34,14 @@ void CompilerInTgBotInterface::onExecutionFinished(
     const std::string_view& command, const popen_watchdog_exit_t& exit) {
     const std::string_view type = exit.signal ? "signal" : "exit";
     output << fmt::format("\n{} {}\n{} {} {}\n",
-                          access(_locale, Strings::DONE_TOOK), timePoint.get(),
-                          access(_locale, Strings::PROCESS_EXITED), type,
+                          _locale->get(Strings::DONE_TOOK), timePoint.get(),
+                          _locale->get(Strings::PROCESS_EXITED), type,
                           exit.exitcode);
     botApi->editMessage(sentMessage, output.str());
 }
 
 void CompilerInTgBotInterface::onErrorStatus(absl::Status status) {
-    output << fmt::format("{} {}\n{}", access(_locale, Strings::ERROR_TOOK),
+    output << fmt::format("{} {}\n{}", _locale->get(Strings::ERROR_TOOK),
                           timePoint.get(), status.ToString());
     if (sentMessage) {
         botApi->editMessage(sentMessage, output.str());
@@ -55,7 +55,7 @@ void CompilerInTgBotInterface::onResultReady(const std::string& text) {
         botApi->sendMessage(requestedMessage->get<MessageAttrs::Chat>(), text);
     } else {
         output << fmt::format("\n{}",
-                              access(_locale, Strings::OUTPUT_IS_EMPTY));
+                              _locale->get(Strings::OUTPUT_IS_EMPTY));
         botApi->editMessage(sentMessage, output.str());
     }
 }

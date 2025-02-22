@@ -17,7 +17,7 @@
 #include <ManagedThreads.hpp>
 #include <Random.hpp>
 #include <ResourceManager.hpp>
-#include <StringResLoader.hpp>
+#include <api/StringResLoader.hpp>
 #include <TgBotWebpage.hpp>
 #include <algorithm>
 #include <api/TgBotApiImpl.hpp>
@@ -226,11 +226,9 @@ getConfigManagerComponent() {
         [](CommandLine line) { return ConfigManager(std::move(line)); });
 }
 
-fruit::Component<fruit::Required<CommandLine>, StringResLoader,
-                 StringResLoaderBase>
+fruit::Component<fruit::Required<CommandLine>, StringResLoader>
 getStringResLoaderComponent() {
     return fruit::createComponent()
-        .bind<StringResLoaderBase, StringResLoader>()
         .registerProvider([](CommandLine* cmdline) {
             return StringResLoader(cmdline->getPath(FS::PathType::RESOURCES) /
                                    "strings");
@@ -261,12 +259,12 @@ getResourceProvider() {
 }
 
 fruit::Component<
-    fruit::Required<AuthContext, StringResLoaderBase, Providers, ConfigManager>,
+    fruit::Required<AuthContext, StringResLoader, Providers, ConfigManager>,
     TgBotApiImpl, TgBotApi>
 getTgBotApiImplComponent() {
     return fruit::createComponent()
         .bind<TgBotApi, TgBotApiImpl>()
-        .registerProvider([](AuthContext* auth, StringResLoaderBase* strings,
+        .registerProvider([](AuthContext* auth, StringResLoader* strings,
                              Providers* provider,
                              ConfigManager* config) -> TgBotApiImpl* {
             auto token = config->get(ConfigManager::Configs::TOKEN);

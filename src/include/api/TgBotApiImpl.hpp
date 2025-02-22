@@ -7,7 +7,7 @@
 #include <Authorization.hpp>
 #include <ManagedThreads.hpp>
 #include <ReplyParametersExt.hpp>
-#include <StringResLoader.hpp>
+#include "StringResLoader.hpp"
 #include <filesystem>
 #include <memory>
 #include <string_view>
@@ -47,7 +47,7 @@ class TgBotApiImpl : public TgBotApi {
 
     // Constructor requires a bot token to create a Bot instance.
     TgBotApiImpl(const std::string_view token, AuthContext* auth,
-                 StringResLoaderBase* loader, Providers* providers);
+                 StringResLoader* loader, Providers* providers);
     ~TgBotApiImpl() override;
 
     class ModulesManagement;
@@ -482,7 +482,7 @@ class TgBotApiImpl : public TgBotApi {
     Bot _bot;
 
     AuthContext* _auth;
-    StringResLoaderBase* _loader;
+    StringResLoader* _loader;
     Providers* _provider;
     std::vector<CommandListener*> _listeners;
     IntervalRateLimiter _rateLimiter;

@@ -8,11 +8,10 @@
 #include <GitBuildInfo.hpp>
 #include <api/CommandModule.hpp>
 #include <api/Providers.hpp>
+#include <api/StringResLoader.hpp>
 #include <api/TgBotApi.hpp>
 #include <database/bot/TgBotDatabaseImpl.hpp>
 #include <mutex>
-
-#include "StringResLoader.hpp"
 
 DECLARE_COMMAND_HANDLER(alive) {
     static std::string version;
@@ -39,7 +38,7 @@ DECLARE_COMMAND_HANDLER(alive) {
         } catch (const TgBot::TgException& e) {
             // Fallback to HTML if no GIF
             LOG(ERROR) << fmt::format(
-                "{}: {}", access(res, Strings::ERROR_SENDING_GIF), e.what());
+                "{}: {}", res->get(Strings::ERROR_SENDING_GIF), e.what());
         }
     }
     if (!sentAnimation) {

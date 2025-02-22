@@ -52,5 +52,4 @@ extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
     .description = "Run Python script in-chat",
     .function = COMMAND_HANDLER_NAME(py),
 #endif
-    .valid_args = {}
-};
+    .valid_args = {}};

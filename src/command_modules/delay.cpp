@@ -37,8 +37,5 @@ extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
     .name = "delay",
     .description = "Ping the bot for network delay",
     .function = COMMAND_HANDLER_NAME(delay),
-    .valid_args = {
-        .enabled = true,
-        .counts = DynModule::craftArgCountMask<0>()
-    }
-};
+    .valid_args = {.enabled = true,
+                   .counts = DynModule::craftArgCountMask<0>()}};

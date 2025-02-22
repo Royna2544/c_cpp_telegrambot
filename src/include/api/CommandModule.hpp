@@ -8,7 +8,7 @@
 #include <string_view>
 #include <type_traits>
 
-#include "StringResLoader.hpp"
+#include <api/StringResLoader.hpp>
 #include "api/MessageExt.hpp"
 #include "api/Providers.hpp"
 #include "api/TgBotApi.hpp"
@@ -30,13 +30,13 @@ class CommandModule;
 #define DECLARE_COMMAND_HANDLER(cmd)                   \
     void COMMAND_HANDLER_NAME(cmd)(                    \
         TgBotApi::Ptr api, MessageExt * message,       \
-        const StringResLoaderBase::LocaleStrings* res, \
+        const StringResLoader::PerLocaleMap* res, \
         const Providers* provider)
 
 struct DynModule {
     using command_callback_t = void (*)(
         TgBotApi::Ptr api, MessageExt *,
-        const StringResLoaderBase::LocaleStrings*, const Providers* provider);
+        const StringResLoader::PerLocaleMap*, const Providers* provider);
 
     enum class Flags { None = 0, Enforced = 1 << 0, HideDescription = 1 << 1 };
 

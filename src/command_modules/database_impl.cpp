@@ -9,13 +9,12 @@
 #include <api/CommandModule.hpp>
 #include <api/MessageExt.hpp>
 #include <api/Providers.hpp>
+#include <api/StringResLoader.hpp>
 #include <api/TgBotApi.hpp>
 #include <database/bot/TgBotDatabaseImpl.hpp>
 #include <memory>
 #include <optional>
 #include <string>
-
-#include "StringResLoader.hpp"
 
 using TgBot::ReplyKeyboardRemove;
 
@@ -94,7 +93,7 @@ constexpr std::string_view removefromblacklist = "Remove from blacklist";
 DECLARE_COMMAND_HANDLER(database) {
     if (!message->reply()->exists()) {
         api->sendReplyMessage(message->message(),
-                              access(res, Strings::REPLY_TO_USER_MSG));
+                              res->get(Strings::REPLY_TO_USER_MSG));
         return;
     }
 
@@ -136,7 +135,7 @@ DECLARE_COMMAND_HANDLER(database) {
             }
             auto remove = std::make_shared<ReplyKeyboardRemove>();
             remove->removeKeyboard = true;
-            api->sendReplyMessage(m, access(res, text), remove);
+            api->sendReplyMessage(m, res->get(text), remove);
             return TgBotApi::AnyMessageResult::Deregister;
         }
         return TgBotApi::AnyMessageResult::Handled;
@@ -148,7 +147,7 @@ DECLARE_COMMAND_HANDLER(saveid) {
           message->reply()->any(
               {MessageAttrs::Animation, MessageAttrs::Sticker}))) {
         api->sendReplyMessage(message->message(),
-                              access(res, Strings::REPLY_TO_GIF_OR_STICKER));
+                              res->get(Strings::REPLY_TO_GIF_OR_STICKER));
         return;
     }
     std::optional<std::string> fileId;
@@ -185,11 +184,11 @@ DECLARE_COMMAND_HANDLER(saveid) {
         case DatabaseBase::AddResult::ALREADY_EXISTS:
 
             api->sendReplyMessage(message->message(),
-                                  access(res, Strings::MEDIA_ALREADY_IN_DB));
+                                  res->get(Strings::MEDIA_ALREADY_IN_DB));
             break;
         case DatabaseBase::AddResult::BACKEND_ERROR:
             api->sendReplyMessage(message->message(),
-                                  access(res, Strings::BACKEND_ERROR));
+                                  res->get(Strings::BACKEND_ERROR));
             break;
     }
 }

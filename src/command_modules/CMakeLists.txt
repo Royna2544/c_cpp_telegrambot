@@ -49,7 +49,6 @@ function(command_module)
     set_target_properties(${TGBOT_CMDMODULE_LIBNAME} PROPERTIES PREFIX "lib")
     target_link_libraries(${TGBOT_CMDMODULE_LIBNAME} ${TGBOT_CMDMODULE_LIBS} absl::log fmt::fmt)
     target_include_directories(${TGBOT_CMDMODULE_LIBNAME} PRIVATE
-        $<TARGET_PROPERTY:StringRes,INTERFACE_INCLUDE_DIRECTORIES>
         $<TARGET_PROPERTY:Random,INTERFACE_INCLUDE_DIRECTORIES>
         $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>
         ${CMDMODULE_ROOT_DIR})

@@ -8,7 +8,6 @@
 #include <CommandLine.hpp>
 #include <ConfigManager.hpp>
 #include <GitBuildInfo.hpp>
-#include <StringResLoader.hpp>
 #include <api/CommandModule.hpp>
 #include <api/MessageExt.hpp>
 #include <api/TgBotApi.hpp>
@@ -175,8 +174,8 @@ void TgBotApiImpl::commandHandler(const std::string& command,
         return;
     }
 
-    const auto msgLocale = ext->get_or<MessageAttrs::Locale>(Locale::Default);
-    module->_module->function(this, ext.get(), _loader->at(msgLocale),
+    module->_module->function(this, ext.get(),
+                              _loader->at(ext->get<MessageAttrs::Locale>()),
                               _provider);
 }
 
@@ -556,7 +555,7 @@ bool TgBotApiImpl::answerCallbackQuery_impl(
 }
 
 TgBotApiImpl::TgBotApiImpl(const std::string_view token, AuthContext* auth,
-                           StringResLoaderBase* loader, Providers* providers)
+                           StringResLoader* loader, Providers* providers)
     : _bot(std::string(token),
            std::make_unique<TgBot::CurlHttpClient>(std::chrono::seconds(30))),
       _auth(auth),

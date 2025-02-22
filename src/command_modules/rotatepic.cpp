@@ -2,6 +2,7 @@
 
 #include <TryParseStr.hpp>
 #include <api/CommandModule.hpp>
+#include <api/StringResLoader.hpp>
 #include <api/TgBotApi.hpp>
 #include <cctype>
 #include <filesystem>
@@ -11,7 +12,6 @@
 #include <system_error>
 
 #include "ImagePBase.hpp"
-#include "StringResLoader.hpp"
 #include "api/MessageExt.hpp"
 
 struct ProcessImageParam {
@@ -41,9 +41,8 @@ DECLARE_COMMAND_HANDLER(rotatepic) {
     std::error_code ec;
     auto tmpPath = std::filesystem::temp_directory_path(ec);
     if (ec) {
-        api->sendReplyMessage(
-            message->message(),
-            access(res, Strings::FAILED_TO_DOWNLOAD_FILE));
+        api->sendReplyMessage(message->message(),
+                              res->get(Strings::FAILED_TO_DOWNLOAD_FILE));
         return;
     }
     params.srcPath = tmpPath / kDownloadFile.data();
@@ -62,9 +61,8 @@ DECLARE_COMMAND_HANDLER(rotatepic) {
         const auto stick = replyMessage->get<MessageAttrs::Sticker>();
         if (stick->isAnimated || stick->isVideo) {
 #ifndef IMAGEPROC_HAVE_OPENCV
-            api->sendReplyMessage(
-                message->message(),
-                access(res, Strings::CANNOT_ROTATE_NONSTATIC));
+            api->sendReplyMessage(message->message(),
+                                  res->get(Strings::CANNOT_ROTATE_NONSTATIC));
             return;
 #endif
             mediaType = MediaType::WEBM;
@@ -85,14 +83,14 @@ DECLARE_COMMAND_HANDLER(rotatepic) {
 #endif
     } else {
         api->sendReplyMessage(message->message(),
-                              access(res, Strings::REPLY_TO_A_MEDIA));
+                              res->get(Strings::REPLY_TO_A_MEDIA));
         return;
     }
 
     auto args = message->get<MessageAttrs::ParsedArgumentsList>();
     if (!try_parse(args[0], &rotation)) {
         api->sendReplyMessage(message->message(),
-                              access(res, Strings::INVALID_ANGLE));
+                              res->get(Strings::INVALID_ANGLE));
         return;
     }
     if (args.size() == 2) {
@@ -128,7 +126,7 @@ DECLARE_COMMAND_HANDLER(rotatepic) {
     // Download the sticker file
     if (!api->downloadFile(params.srcPath, fileid)) {
         api->sendReplyMessage(message->message(),
-                              access(res, Strings::FAILED_TO_DOWNLOAD_FILE));
+                              res->get(Strings::FAILED_TO_DOWNLOAD_FILE));
         return;
     }
 
@@ -138,14 +136,14 @@ DECLARE_COMMAND_HANDLER(rotatepic) {
         switch (attr) {
             case MessageAttrs::Photo:
                 api->sendReplyPhoto(message->message(), infile,
-                                    access(res, Strings::ROTATED_PICTURE));
+                                    res->get(Strings::ROTATED_PICTURE));
                 break;
             case MessageAttrs::Sticker:
                 api->sendReplySticker(message->message(), infile);
                 break;
             case MessageAttrs::Animation:
                 api->sendReplyAnimation(message->message(), infile,
-                                        access(res, Strings::ROTATED_PICTURE));
+                                        res->get(Strings::ROTATED_PICTURE));
                 break;
             case MessageAttrs::Video:
                 api->sendReplyVideo(message->message(), infile);
@@ -156,7 +154,7 @@ DECLARE_COMMAND_HANDLER(rotatepic) {
         }
     } else {
         api->sendReplyMessage(message->message(),
-                              access(res, Strings::FAILED_TO_ROTATE_IMAGE));
+                              res->get(Strings::FAILED_TO_ROTATE_IMAGE));
         api->sendReplyMessage(message->message(), ret.message().data());
     }
     std::filesystem::remove(params.srcPath);  // Delete the temporary file
@@ -169,10 +167,11 @@ extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
     .name = "rotatepic",
     .description = "Rotate a sticker/video/photo",
     .function = COMMAND_HANDLER_NAME(rotatepic),
-    .valid_args = {
-        .enabled = true,
-        .counts = DynModule::craftArgCountMask<1,2>(),
-        .split_type = DynModule::ValidArgs::Split::ByWhitespace,
-        .usage = "/rotatepic angle [greyscale|invert]",
-    },
+    .valid_args =
+        {
+            .enabled = true,
+            .counts = DynModule::craftArgCountMask<1, 2>(),
+            .split_type = DynModule::ValidArgs::Split::ByWhitespace,
+            .usage = "/rotatepic angle [greyscale|invert]",
+        },
 };

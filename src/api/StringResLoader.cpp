@@ -1,5 +1,3 @@
-#include "StringResLoader.hpp"
-
 #include <absl/log/log.h>
 #include <absl/strings/ascii.h>
 #include <absl/strings/str_split.h>
@@ -8,6 +6,7 @@
 #include <libxml/tree.h>
 #include <libxml/valid.h>
 
+#include <api/StringResLoader.hpp>
 #include <array>
 #include <filesystem>
 #include <memory>
@@ -21,60 +20,13 @@ struct libxml2_error_ctx {
     std::string message;
 };
 
-namespace {
-void libxml_error_handler(void *ctx, const char *msg, ...) {
-    va_list args;
-    std::array<char, 256> errorBuffer{};
-    va_start(args, msg);
-    vsnprintf(errorBuffer.data(), errorBuffer.size(), msg, args);
-    va_end(args);
-    auto *error_ctx = static_cast<libxml2_error_ctx *>(ctx);
-    error_ctx->code = xmlGetLastError()->code;
-    error_ctx->message += errorBuffer.data();
-}
-}  // namespace
-
-StringResLoader::StringResLoader(std::filesystem::path path)
-    : m_path(std::move(path)) {
-    // Initialize the library and check potential ABI mismatches
-    LIBXML_TEST_VERSION;
-
-    std::error_code ec;
-    // Load XML files from the specified path
-    for (const auto &entry : std::filesystem::directory_iterator(m_path, ec)) {
-        if (entry.is_regular_file() &&
-            entry.path().filename().extension() == ".xml") {
-            DLOG(INFO) << "Parsing XML file: " << entry.path().filename();
-            std::shared_ptr<LocaleStringsImpl> map;
-            try {
-                map =
-                    std::make_shared<LocaleStringsImpl>(entry.path().string());
-            } catch (const LocaleStringsImpl::invalid_xml_error &e) {
-                LOG(ERROR) << "Invalid XML file: " << entry.path();
-                continue;
-            }
-            const auto localeStr = entry.path().filename().stem().string();
-            if (Locale::en_US == localeStr) {
-                localeMap[Locale::en_US] = std::move(map);
-            } else if (Locale::fr_FR == localeStr) {
-                localeMap[Locale::fr_FR] = std::move(map);
-            } else if (Locale::ko_KR == localeStr) {
-                localeMap[Locale::ko_KR] = std::move(map);
-            } else {
-                LOG(WARNING) << "Unknown locale in file: " << entry.path();
-            }
-        }
-    }
-    if (ec) {
-        LOG(ERROR) << "Error reading directory: " << ec.message();
-    }
-}
-
-StringResLoader::~StringResLoader() { xmlCleanupParser(); }
+struct LocaleResData {
+    std::string name;
+    bool isDefault;
+};
 
 struct XmlCharWrapper {
     RAII<xmlChar *>::Value<void> string;
-
     operator ::xmlChar *() const { return string.get(); }
 };
 
@@ -82,7 +34,10 @@ XmlCharWrapper operator""_xmlChar(const char *string, size_t length) {
     return {RAII<xmlChar *>::create<void>(xmlCharStrdup(string), xmlFree)};
 }
 
+using invalid_xml_error = std::exception;
+
 namespace {
+
 Strings getStrings(const std::string_view string) {
 #define fn(x) \
     if (string == #x) return Strings::x;
@@ -90,7 +45,6 @@ Strings getStrings(const std::string_view string) {
 #undef fn
     return {};
 }
-
 std::string_view getStrings(const Strings string) {
     switch (string) {
 #define fn(x)        \
@@ -101,12 +55,27 @@ std::string_view getStrings(const Strings string) {
     }
     return "";
 }
-}  // namespace
 
-LocaleStringsImpl::LocaleStringsImpl(const std::filesystem::path &filename) {
+void libxml_error_handler(void *ctx, const char *msg, ...) {
+    va_list args;
+    std::array<char, 256> errorBuffer{};
+    va_start(args, msg);
+    vsnprintf(errorBuffer.data(), errorBuffer.size(), msg, args);
+    va_end(args);
+    auto *error_ctx = static_cast<libxml2_error_ctx *>(ctx);
+    error_ctx->code = xmlGetLastError()->code;
+    error_ctx->message += errorBuffer.data();
+}
+
+std::pair<LocaleResData, StringResLoader::PerLocaleMapImpl> parseLocaleResource(
+    const std::filesystem::path &filename) {
     auto resourceKey = "resources"_xmlChar;
+    auto localeProp = "locale"_xmlChar;
+    auto defaultProp = "default"_xmlChar;
     auto stringKey = "string"_xmlChar;
     auto nameProp = "name"_xmlChar;
+
+    StringResLoader::PerLocaleMapImpl m_data;
 
     libxml2_error_ctx ctx;
     // Set up error handling
@@ -135,6 +104,22 @@ LocaleStringsImpl::LocaleStringsImpl(const std::filesystem::path &filename) {
         throw invalid_xml_error();
     }
 
+    auto localeAttr = RAII<xmlChar *>::template create<void>(
+        xmlGetProp(rootElement, localeProp), xmlFree);
+    if (!localeAttr) {
+        LOG(ERROR) << "No locale= key in <resources>";
+        throw invalid_xml_error();
+    }
+
+    auto defaultAttr = RAII<xmlChar *>::template create<void>(
+        xmlGetProp(rootElement, defaultProp), xmlFree);
+    bool isDefault = false;
+
+    if (defaultAttr && xmlStrcmp(defaultAttr.get(), "yes"_xmlChar) == 0) {
+        isDefault = true;
+    }
+
+    m_data.reserve(static_cast<int>(Strings::__MAX__));
     for (xmlNodePtr cur = rootElement->children; cur != nullptr;
          cur = cur->next) {
         if (cur->type == XML_ELEMENT_NODE &&
@@ -170,23 +155,56 @@ LocaleStringsImpl::LocaleStringsImpl(const std::filesystem::path &filename) {
         LOG(ERROR) << "Incomplete XML file. Missing strings: " << absent;
         throw invalid_xml_error();
     }
+    return {LocaleResData{reinterpret_cast<const char *>(localeAttr.get()),
+                          isDefault},
+            std::move(m_data)};
 }
 
-std::string_view LocaleStringsImpl::get(const Strings &string) const {
-    if (m_data.contains(string)) {
-        return m_data.at(string);
-    } else {
-        LOG(WARNING) << "String not found: " << getStrings(string);
-        return "unknown";
+}  // namespace
+
+StringResLoader::StringResLoader(std::filesystem::path path)
+    : m_path(std::move(path)) {
+    // Initialize the library and check potential ABI mismatches
+    LIBXML_TEST_VERSION;
+
+    std::error_code ec;
+    // Load XML files from the specified path
+    for (const auto &entry : std::filesystem::directory_iterator(m_path, ec)) {
+        bool isXml = entry.is_regular_file() &&
+                     entry.path().filename().extension() == ".xml";
+        if (!isXml) continue;
+
+        try {
+            auto [locale, map] = parseLocaleResource(entry.path().string());
+            localeMap[locale.name] = std::move(map);
+            if (locale.isDefault) {
+                default_map = &localeMap[locale.name];
+            }
+            LOG(INFO) << "Parsed locale: " << locale.name
+                      << " File: " << entry.path().filename()
+                      << " isDefault: " << locale.isDefault;
+        } catch (const invalid_xml_error &e) {
+            LOG(ERROR) << "Invalid XML file: " << entry.path();
+            continue;
+        }
+    }
+    if (ec) {
+        LOG(ERROR) << "Error reading directory: " << ec.message();
+    }
+    if (!default_map) {
+        LOG(ERROR) << "No default locale set";
+        // TODO: What I can do in this case?
     }
 }
 
-const StringResLoader::LocaleStrings *StringResLoader::at(
-    const Locale key) const {
+StringResLoader::~StringResLoader() { xmlCleanupParser(); }
+
+const StringResLoader::PerLocaleMap *StringResLoader::at(
+    const std::string &key) const {
     if (localeMap.contains(key)) {
-        return localeMap.at(key).get();
+        return &localeMap.at(key);
     } else {
-        LOG(WARNING) << "Locale not found: " << static_cast<int>(key);
-        return &empty;
+        DLOG(WARNING) << "Locale not found: " << key;
+        return default_map;
     }
 }

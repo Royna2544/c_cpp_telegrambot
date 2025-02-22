@@ -1,49 +1,13 @@
 #pragma once
 
-#include <ostream>
+#include <exception>
+#include <filesystem>
+#include <map>
+#include <memory>
+#include <string>
 #include <string_view>
-
-enum class Locale {
-    Default,
-    en_US = Default,
-    fr_FR,
-    ko_KR
-    // Add more locales as needed
-};
-
-inline constexpr bool operator==(const Locale& lhs,
-                                 const std::string_view& rhs) {
-    switch (lhs) {
-        case Locale::en_US:
-            return rhs == "en-US";
-        case Locale::fr_FR:
-            return rhs == "fr-FR";
-        case Locale::ko_KR:
-            return rhs == "ko-KR";
-        default:
-            // Add more cases as needed
-            return false;
-    }
-}
-
-namespace locale {
-
-// This is used for assigning, not comparing.
-inline Locale fromString(const std::string_view locale) {
-    Locale lhs;
-    if (locale == "en") {
-        lhs = Locale::en_US;
-    } else if (locale == "fr") {
-        lhs = Locale::fr_FR;
-    } else if (locale == "ko") {
-        lhs = Locale::ko_KR;
-    } else {
-        lhs = Locale::Default;
-    }
-    return lhs;
-}
-
-}  // namespace locale
+#include <trivial_helpers/fruit_inject.hpp>
+#include <unordered_map>
 
 // clang-format off
 #define MAKE_STRINGS(x)                                                        \
@@ -137,3 +101,42 @@ inline std::ostream& operator<<(std::ostream& os, const Strings string) {
     }
     return os;
 }
+
+class StringResLoader {
+   public:
+    class PerLocaleMap {
+       public:
+        virtual std::string_view get(const Strings key) const = 0;
+    };
+    class PerLocaleMapImpl : public PerLocaleMap {
+        std::unordered_map<Strings, std::string> m_map;
+
+       public:
+        std::string_view get(const Strings key) const override {
+            return m_map.at(key);
+        }
+        void reserve(const decltype(m_map)::size_type size) {
+            m_map.reserve(size);
+        }
+        template <typename... Args>
+        auto emplace(Args&&... args) {
+            return m_map.emplace(args...);
+        }
+        bool contains(Strings key) { return m_map.contains(key); }
+        explicit PerLocaleMapImpl(decltype(m_map) map)
+            : m_map(std::move(map)) {}
+        PerLocaleMapImpl() = default;
+    };
+
+   private:
+    std::unordered_map<std::string, PerLocaleMapImpl> localeMap;
+    PerLocaleMapImpl* default_map = nullptr;
+    std::filesystem::path m_path;
+
+   public:
+    // Load XML files from the specified path.
+    explicit StringResLoader(std::filesystem::path path);
+    ~StringResLoader();
+
+    const PerLocaleMap* at(const std::string& key) const;
+};

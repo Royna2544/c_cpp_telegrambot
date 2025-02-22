@@ -5,7 +5,7 @@
 #include <system_error>
 
 #include "CompilerInTelegram.hpp"
-#include "StringResLoader.hpp"
+#include <api/StringResLoader.hpp>
 
 void CompilerInTgForCCpp::run(MessageExt::Ptr message) {
     std::string extraargs;
@@ -20,13 +20,13 @@ void CompilerInTgForCCpp::run(MessageExt::Ptr message) {
         cmd << params.exe.string() << SPACE << extraargs << SPACE
             << params.outfile.string();
 
-        resultbuf << fmt::format("{}: {}\n", access(_locale, Strings::COMMAND_IS), cmd.str());
+        resultbuf << fmt::format("{}: {}\n", _locale->get(Strings::COMMAND_IS), cmd.str());
         runCommand(cmd.str(), resultbuf);
         resultbuf << std::endl;
 
         std::error_code ec;
         if (std::filesystem::exists(aoutname, ec)) {
-            resultbuf << access(_locale, Strings::RUN_TIME) << ":\n";
+            resultbuf << _locale->get(Strings::RUN_TIME) << ":\n";
             runCommand(aoutname.data(), resultbuf);
             std::filesystem::remove(aoutname);
         }

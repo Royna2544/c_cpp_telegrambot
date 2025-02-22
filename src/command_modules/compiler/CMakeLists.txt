@@ -8,7 +8,6 @@ add_my_library(
         Helper.cpp
     LIBS
         popen_wdt
-        StringRes
         absl::status
         Utils
     PUBLIC_INC

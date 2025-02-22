@@ -14,7 +14,7 @@ class CompilerInTgBotInterface : public CompilerInTg::Interface {
     void onWdtTimeout() override;
 
     explicit CompilerInTgBotInterface(
-        TgBotApi::CPtr api, const StringResLoaderBase::LocaleStrings* locale,
+        TgBotApi::CPtr api, const StringResLoader::PerLocaleMap* locale,
         MessageExt::Ptr requestedMessage);
 
    private:
@@ -23,5 +23,5 @@ class CompilerInTgBotInterface : public CompilerInTg::Interface {
     Message::Ptr sentMessage;
     MilliSecondDP timePoint;
     std::stringstream output;
-    const StringResLoaderBase::LocaleStrings* _locale;
+    const StringResLoader::PerLocaleMap* _locale;
 };

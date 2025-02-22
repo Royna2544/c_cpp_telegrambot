@@ -18,7 +18,7 @@ using std::chrono::high_resolution_clock;
 using std::chrono::milliseconds;
 
 CompilerInTg::CompilerInTg(std::unique_ptr<Interface> interface,
-                           const StringResLoaderBase::LocaleStrings *loader)
+                           const StringResLoader::PerLocaleMap*loader)
     : _interface(std::move(interface)), _locale(loader) {}
 
 void CompilerInTg::runCommand(std::string cmd, std::stringstream &res,

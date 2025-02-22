@@ -6,14 +6,13 @@
 #include <Random.hpp>
 #include <api/CommandModule.hpp>
 #include <api/Providers.hpp>
+#include <api/StringResLoader.hpp>
 #include <api/TgBotApi.hpp>
 #include <chrono>
 #include <mutex>
 #include <optional>
 #include <regex>
 #include <thread>
-
-#include "StringResLoader.hpp"
 
 constexpr std::string_view kZipExtensionSuffix = ".zip";
 constexpr int FLASH_DELAY_MAX_SEC = 5;
@@ -37,29 +36,29 @@ DECLARE_COMMAND_HANDLER(flash) {
         msg = message->get<MessageAttrs::ExtraText>();
     } else {
         api->sendReplyMessage(message->message(),
-                              access(res, Strings::SEND_A_FILE_NAME_TO_FLASH));
+                              res->get(Strings::SEND_A_FILE_NAME_TO_FLASH));
         return;
     }
     pos = provider->random->generate(reasons.size());
     if (msg->find('\n') != std::string::npos) {
         api->sendReplyMessage(message->message(),
-                              access(res, Strings::INVALID_INPUT_NO_NEWLINE));
+                              res->get(Strings::INVALID_INPUT_NO_NEWLINE));
         return;
     }
     std::replace(msg->begin(), msg->end(), ' ', '_');
     if (!absl::EndsWith(msg.value(), kZipExtensionSuffix.data())) {
         msg.value() += kZipExtensionSuffix;
     }
-    ss << fmt::format("{} '{}'...\n", access(res, Strings::FLASHING_ZIP), msg.value());
+    ss << fmt::format("{} '{}'...\n", res->get(Strings::FLASHING_ZIP),
+                      msg.value());
     sentmsg = api->sendReplyMessage(message->message(), ss.str());
 
     std::this_thread::sleep_for(std::chrono::seconds(sleep_secs));
     if (pos != reasons.size()) {
-        ss << fmt::format("{}\n{}: {}",
-                          access(res, Strings::FAILED_SUCCESSFULLY),
-                          access(res, Strings::REASON), reasons[pos]);
+        ss << fmt::format("{}\n{}: {}", res->get(Strings::FAILED_SUCCESSFULLY),
+                          res->get(Strings::REASON), reasons[pos]);
     } else {
-        ss << fmt::format("{} {:.3}%", access(res, Strings::SUCCESS_CHANCE_WAS),
+        ss << fmt::format("{} {:.3}%", res->get(Strings::SUCCESS_CHANCE_WAS),
                           100. / static_cast<int>(reasons.size()));
     }
     api->editMessage(sentmsg, ss.str());
@@ -75,5 +74,4 @@ extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
         .counts = DynModule::craftArgCountMask<1>(),
         .split_type = DynModule::ValidArgs::Split::None,
         .usage = "/flash [filename-to-flash]",
-    }
-};
+    }};

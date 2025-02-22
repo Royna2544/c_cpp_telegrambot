@@ -7,7 +7,7 @@ DECLARE_COMMAND_HANDLER(setowner) {
     if (!impl->getOwnerUserId().has_value()) {
         impl->setOwnerUserId(message->get<MessageAttrs::User>()->id);
         api->sendReplyMessage(message->message(),
-                              access(res, Strings::BOT_OWNER_SET));
+                              res->get(Strings::BOT_OWNER_SET));
     } else {
         LOG(WARNING) << "Your word rejected";
     }

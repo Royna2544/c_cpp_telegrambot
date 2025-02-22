@@ -4,14 +4,14 @@
 #include <fstream>
 
 #include "CompilerInTelegram.hpp"
-#include "StringResLoader.hpp"
+#include <api/StringResLoader.hpp>
 
 // Verify, Parse, Write
 bool CompilerInTgForGeneric::verifyParseWrite(const MessageExt::Ptr& message,
                                               std::string& extraargs) {
     if (!message->reply()->has<MessageAttrs::ExtraText>()) {
         _interface->onErrorStatus(absl::InvalidArgumentError(
-            access(_locale, Strings::REPLY_TO_A_CODE).data()));
+            _locale->get(Strings::REPLY_TO_A_CODE).data()));
         return false;
     }
     if (message->has<MessageAttrs::ExtraText>()) {
@@ -20,7 +20,7 @@ bool CompilerInTgForGeneric::verifyParseWrite(const MessageExt::Ptr& message,
     std::ofstream file(params.outfile);
     if (file.fail()) {
         _interface->onErrorStatus(absl::InternalError(
-            access(_locale, Strings::FAILED_TO_WRITE_FILE).data()));
+            _locale->get(Strings::FAILED_TO_WRITE_FILE).data()));
         return false;
     }
     file << message->reply()->get<MessageAttrs::ExtraText>();

@@ -1,4 +1,4 @@
-<resources>
+<resources locale="en" default="yes">
     <string name="send_bash_command">Send a bash command to run</string>
     <string name="compile_time">Compile time</string>
     <string name="run_time">Run time</string>

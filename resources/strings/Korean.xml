@@ -1,4 +1,4 @@
-<resources>
+<resources locale="ko">
     <string name="send_bash_command">실행할 bash 명령어 전송</string>
     <string name="compile_time">컴파일 시간</string>
     <string name="run_time">실행 시간</string>

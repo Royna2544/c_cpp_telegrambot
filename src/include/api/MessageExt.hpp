@@ -4,7 +4,6 @@
 #include <absl/log/log.h>
 #include <tgbot/types/Message.h>
 
-#include <Localization.hpp>
 #include <algorithm>
 #include <chrono>
 #include <initializer_list>
@@ -138,7 +137,7 @@ struct AttributeType<MessageAttrs::Video> {
 };
 template <>
 struct AttributeType<MessageAttrs::Locale> {
-    using type = Locale;
+    using type = std::string;
 };
 template <>
 struct AttributeType<MessageAttrs::Document> {
@@ -191,10 +190,9 @@ class MessageExt {
         } else if constexpr (attr == MessageAttrs::Video) {
             return _message->video;
         } else if constexpr (attr == MessageAttrs::Locale) {
-            Locale loc{};
+            std::string loc{};
             if (has<MessageAttrs::User>()) {
-                loc = locale::fromString(
-                    get<MessageAttrs::User>()->languageCode.value_or(""));
+                loc = get<MessageAttrs::User>()->languageCode.value_or("");
             }
             return loc;
         } else if constexpr (attr == MessageAttrs::Document) {

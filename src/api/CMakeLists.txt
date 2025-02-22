@@ -1,3 +1,5 @@
+find_package(LibXml2 REQUIRED)
+
 add_my_library(
   NAME Api
   SRCS
@@ -6,7 +8,8 @@ add_my_library(
     CommandModule.cpp
     MessageExt.cpp
     RateLimit.cpp
-  LIBS DBImpl ${CMAKE_DL_LIBS} StringRes TgBot
+    StringResLoader.cpp
+    LIBS DBImpl ${CMAKE_DL_LIBS} TgBot LibXml2::LibXml2
   STATIC
 )
 

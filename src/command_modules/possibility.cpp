@@ -5,6 +5,7 @@
 #include <api/CommandModule.hpp>
 #include <api/Providers.hpp>
 #include <api/TgBotApi.hpp>
+
 #include "api/MessageExt.hpp"
 
 DECLARE_COMMAND_HANDLER(possibility) {
@@ -19,7 +20,7 @@ DECLARE_COMMAND_HANDLER(possibility) {
 
     if (!message->get<MessageAttrs::ParsedArgumentsList>().empty()) {
         api->sendReplyMessage(message->message(),
-                              access(res, Strings::SEND_POSSIBILITIES));
+                              res->get(Strings::SEND_POSSIBILITIES));
         return;
     }
     text = message->get<MessageAttrs::ExtraText>();
@@ -35,15 +36,14 @@ DECLARE_COMMAND_HANDLER(possibility) {
     // Can't get possitibities for 1 element
     if (vec.size() == 1) {
         api->sendReplyMessage(message->message(),
-                              access(res, Strings::GIVE_MORE_THAN_ONE));
+                              res->get(Strings::GIVE_MORE_THAN_ONE));
         return;
     }
     // Shuffle the vector.
     provider->random->shuffle(vec);
     // Start the output stream
-    outStream << fmt::format(
-        "{} {} {}\n", access(res, Strings::TOTAL_ITEMS_PREFIX), vec.size(),
-        access(res, Strings::TOTAL_ITEMS_SUFFIX));
+    outStream << fmt::format("{} {} {}\n", res->get(Strings::TOTAL_ITEMS_PREFIX),
+                             vec.size(), res->get(Strings::TOTAL_ITEMS_SUFFIX));
     // Get the last item and remove it from the vector.
     lastItem = vec.back();
     vec.pop_back();
@@ -86,5 +86,4 @@ extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
         .enabled = true,
         .split_type = DynModule::ValidArgs::Split::ByNewline,
         .usage = "/possibility conditions-by-newline",
-    }
-};
+    }};

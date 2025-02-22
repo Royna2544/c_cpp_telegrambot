@@ -10,7 +10,7 @@ using TgBot::StickerSet;
 DECLARE_COMMAND_HANDLER(randsticker) {
     if (!message->reply()->has<MessageAttrs::Sticker>()) {
         api->sendReplyMessage(message->message(),
-                                  access(res, Strings::REPLY_TO_A_STICKER));
+                              res->get(Strings::REPLY_TO_A_STICKER));
         return;
     }
 
@@ -28,11 +28,11 @@ DECLARE_COMMAND_HANDLER(randsticker) {
     }
     pos = provider->random->generate(stickset->stickers.size() - 1);
     api->sendSticker(message->get<MessageAttrs::Chat>(),
-                         MediaIds(stickset->stickers[pos]));
+                     MediaIds(stickset->stickers[pos]));
 
-    const auto arg =
-        fmt::format("Sticker idx: {} emoji: {}\nFrom pack: \"{}\"", pos + 1,
-                    stickset->stickers[pos]->emoji.value_or("none"), stickset->title);
+    const auto arg = fmt::format(
+        "Sticker idx: {} emoji: {}\nFrom pack: \"{}\"", pos + 1,
+        stickset->stickers[pos]->emoji.value_or("none"), stickset->title);
     api->sendMessage(message->get<MessageAttrs::Chat>(), arg);
 }
 
@@ -41,8 +41,6 @@ extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
     .name = "randsticker",
     .description = "Random sticker from that pack",
     .function = COMMAND_HANDLER_NAME(randsticker),
-    .valid_args = {
-        .enabled = true,
-        .counts = DynModule::craftArgCountMask<0>()
-    },
+    .valid_args = {.enabled = true,
+                   .counts = DynModule::craftArgCountMask<0>()},
 };

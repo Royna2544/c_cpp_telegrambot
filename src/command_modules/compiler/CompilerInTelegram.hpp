@@ -9,7 +9,7 @@
 #include <string>
 #include <utility>
 
-#include "StringResLoader.hpp"
+#include <api/StringResLoader.hpp>
 #include "popen_wdt.h"
 
 using TgBot::Message;
@@ -94,7 +94,7 @@ struct CompilerInTg {
     virtual void run(MessageExt::Ptr message) = 0;
 
     explicit CompilerInTg(std::unique_ptr<Interface> interface,
-                          const StringResLoaderBase::LocaleStrings* loader);
+                          const StringResLoader::PerLocaleMap* loader);
     virtual ~CompilerInTg() = default;
 
     /**
@@ -113,12 +113,12 @@ struct CompilerInTg {
 
    protected:
     std::unique_ptr<Interface> _interface;
-    const StringResLoaderBase::LocaleStrings* _locale;
+    const StringResLoader::PerLocaleMap* _locale;
 };
 
 struct CompilerInTgForBash : CompilerInTg {
     CompilerInTgForBash(std::unique_ptr<Interface> interface,
-                        const StringResLoaderBase::LocaleStrings* _loader,
+                        const StringResLoader::PerLocaleMap* _loader,
                         bool allowhang)
         : CompilerInTg(std::move(interface), _loader), allowhang(allowhang) {}
     ~CompilerInTgForBash() override = default;
@@ -137,7 +137,7 @@ struct CompilerInTgForGeneric : CompilerInTg {
     };
     explicit CompilerInTgForGeneric(
         std::unique_ptr<Interface> interface,
-        const StringResLoaderBase::LocaleStrings* _locale, Params params)
+        const StringResLoader::PerLocaleMap* _locale, Params params)
         : CompilerInTg(std::move(interface), _locale),
           params(std::move(params)) {}
 

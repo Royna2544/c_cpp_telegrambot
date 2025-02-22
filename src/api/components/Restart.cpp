@@ -83,9 +83,8 @@ void TgBotApiImpl::RestartCommand::commandFunction(MessageExt::Ptr message) {
 
     _api->sendReplyMessage(
         message->message(),
-        access(_api->_loader->at(
-                   message->get_or<MessageAttrs::Locale>(Locale::Default)),
-               Strings::RESTARTING_BOT));
+        _api->_loader->at(message->get<MessageAttrs::Locale>())
+            ->get(Strings::RESTARTING_BOT));
 
     execve(argv[0], argv, myEnviron.data());
 }

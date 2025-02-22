@@ -18,7 +18,6 @@ DECLARE_COMMAND_HANDLER(ubash) {
 
 }  // namespace
 
-
 extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
     .flags = DynModule::Flags::Enforced,
 #ifdef cmd_bash_EXPORTS
@@ -31,5 +30,4 @@ extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
     .description = "Run bash commands w/o timeout",
     .function = COMMAND_HANDLER_NAME(ubash),
 #endif
-    .valid_args = {}
-};
+    .valid_args = {}};

@@ -1,4 +1,4 @@
-<resources>
+<resources locale="fr">
     <string name="send_bash_command">Envoyer une commande bash à exécuter</string>
     <string name="compile_time">Temps de compilation</string>
     <string name="run_time">Temps d'exécution</string>

@@ -8,6 +8,6 @@ void CompilerInTgForBash::run(MessageExt::Ptr message) {
         _interface->onResultReady(res.str());
     } else {
         _interface->onErrorStatus(absl::InvalidArgumentError(
-            access(_locale, Strings::SEND_BASH_COMMAND).data()));
+            _locale->get(Strings::SEND_BASH_COMMAND).data()));
     }
 }

@@ -1,9 +1,9 @@
 #include <fmt/core.h>
 
 #include <api/CommandModule.hpp>
+#include <api/StringResLoader.hpp>
 #include <api/TgBotApi.hpp>
 
-#include "StringResLoader.hpp"
 #include "api/MessageExt.hpp"
 
 DECLARE_COMMAND_HANDLER(fileid) {
@@ -22,14 +22,14 @@ DECLARE_COMMAND_HANDLER(fileid) {
             file = reply->get<MessageAttrs::Photo>()->fileId;
             unifile = reply->get<MessageAttrs::Photo>()->fileUniqueId;
         } else {
-            file = unifile = access(res, Strings::UNKNOWN);
+            file = unifile = res->get(Strings::UNKNOWN);
         }
         api->sendReplyMessage<TgBotApi::ParseMode::Markdown>(
             message->message(),
             fmt::format("FileId: `{}`\nFileUniqueId: `{}`", file, unifile));
     } else {
         api->sendReplyMessage(message->message(),
-                                  access(res, Strings::REPLY_TO_A_MEDIA));
+                              res->get(Strings::REPLY_TO_A_MEDIA));
     }
 }
 
@@ -43,5 +43,4 @@ extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
         .counts = DynModule::craftArgCountMask<0>(),
         .split_type = DynModule::ValidArgs::Split::None,
         .usage = "<reply-to-a-media>",
-    }
-};
+    }};
