@@ -173,7 +173,7 @@ void GitBranchSwitcher::removeOffendingConfig() const {
     if (std::filesystem::exists(configPath)) {
         git_config* config = nullptr;
         DLOG(INFO) << "Config file found: " << configPath.string();
-        ret = git_config_open_ondisk(&config, configPath.c_str());
+        ret = git_config_open_ondisk(&config, configPath.string().c_str());
         if (ret != 0) {
             LOG(WARNING) << "Failed to open config file: "
                          << git_error_last_str();
@@ -204,7 +204,7 @@ bool GitBranchSwitcher::open() {
     // Init libgit2
     git_libgit2_init();
 
-    ret = git_repository_open(data.repo, _gitDirectory.c_str());
+    ret = git_repository_open(data.repo, _gitDirectory.string().c_str());
 
     if (ret != 0) {
         LOG(ERROR) << "Failed to open repository: " << git_error_last_str();
@@ -636,7 +636,7 @@ bool RepoInfo::git_clone(const std::filesystem::path& directory,
     }
 
     git_libgit2_init();
-    int ret = ::git_clone(repo, url_.c_str(), directory.c_str(), &gitoptions);
+    int ret = ::git_clone(repo, url_.c_str(), directory.string().c_str(), &gitoptions);
     if (ret != 0) {
         const auto* fault = git_error_last();
         LOG(ERROR) << "Couldn't clone repo: " << fault->message;
