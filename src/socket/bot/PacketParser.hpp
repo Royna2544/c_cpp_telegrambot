@@ -2,6 +2,7 @@
 
 #include <SocketExports.h>
 #include <absl/strings/escaping.h>
+#include <absl/base/config.h>
 #include <json/json.h>
 
 #include <SocketContext.hpp>
@@ -107,11 +108,18 @@ std::optional<std::array<std::uint8_t, N>> hexDecode(
         LOG(ERROR) << "Invalid hex string, empty";
         return std::nullopt;
     }
-    
+
+// Newer version returns a bool with input validity check.
+// Older version doesn't. Introduced in 20240722 LTS
+// See https://github.com/abseil/abseil-cpp/commit/0e289dc594da4b30eb03cb7cb2aa097f5d5f6eb5
+#if ABSL_LTS_RELEASE_VERSION >= 20240722
     if (!absl::HexStringToBytes(hexEncoded, &binary)) {
         LOG(ERROR) << "Invalid hex string, HexStringToBytes failed";
         return std::nullopt;
     }
+#else
+    binary = absl::HexStringToBytes(hexEncoded);
+#endif
 
     if (binary.empty() || binary.size() != N) {  // Validate size
         LOG(ERROR) << "Invalid hex string length or content";
