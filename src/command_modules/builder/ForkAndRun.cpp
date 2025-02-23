@@ -190,8 +190,11 @@ ForkAndRun::Env::ValueEntry ForkAndRun::Env::operator[](
     const std::string_view key) {
     auto ent = map.find(key);
     if (ent == map.end()) {
-        map.emplace(key, "");
-        ent = map.find(key);
+        auto [newent, ret] = map.emplace(key, "");
+        if (!ret) {
+            LOG(WARNING) << "Failed to emplace key: " << key;
+        }
+        ent = newent;
     }
     return {this, &(*ent)};
 }
