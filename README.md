@@ -9,8 +9,6 @@
 
 [![Build TgBot++ Client (Android)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/android_client_test.yml/badge.svg)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/android_client_test.yml)
 
-[![Build TgBot++ Client (Windows)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/windows_client_test.yml/badge.svg)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/windows_client_test.yml)
-
 ## Used languages
 | C | C++ | Kotlin | Javascript | SQLite3 | HTML5 | CSS | SCSS | PHP |
 |-- | --- | ------ | ---------- | --- | ----- | --- | ---- | --- |
