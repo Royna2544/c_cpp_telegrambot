@@ -487,13 +487,11 @@ void init_work(TgBotApi* api, DatabaseBase* database) {
             fmt::format(R"(
 Bot @{} has launched.
 Platform: {}
-Time: [UTC] {}
 Default Shell: {}
 Git commit: {}
 Git commitmsg: {}
 )",
                         *api->getBotUser()->username, buildinfo::OS,
-                        std::chrono::system_clock::now(),
                         POPEN_WDT_DEFAULT_SHELL, buildinfo::git::COMMIT_ID,
                         buildinfo::git::COMMIT_MESSAGE));
     }
