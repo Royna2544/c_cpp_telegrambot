@@ -17,9 +17,9 @@
 #include <ManagedThreads.hpp>
 #include <Random.hpp>
 #include <ResourceManager.hpp>
-#include <api/StringResLoader.hpp>
 #include <TgBotWebpage.hpp>
 #include <algorithm>
+#include <api/StringResLoader.hpp>
 #include <api/TgBotApiImpl.hpp>
 #include <boost/system/system_error.hpp>
 #include <boost/throw_exception.hpp>
@@ -228,11 +228,10 @@ getConfigManagerComponent() {
 
 fruit::Component<fruit::Required<CommandLine>, StringResLoader>
 getStringResLoaderComponent() {
-    return fruit::createComponent()
-        .registerProvider([](CommandLine* cmdline) {
-            return StringResLoader(cmdline->getPath(FS::PathType::RESOURCES) /
-                                   "strings");
-        });
+    return fruit::createComponent().registerProvider([](CommandLine* cmdline) {
+        return StringResLoader(cmdline->getPath(FS::PathType::RESOURCES) /
+                               "strings");
+    });
 }
 
 fruit::Component<fruit::Required<ConfigManager, CommandLine>, TgBotDatabaseImpl,
@@ -463,6 +462,43 @@ struct OptionalComponents {
 
 using std::string_view_literals::operator""sv;
 
+#include <GitBuildInfo.hpp>
+
+#include "command_modules/support/popen_wdt/popen_wdt.h"
+
+void init_work(TgBotApi* api, DatabaseBase* database) {
+    TgBotApi::InlineQuery mediaQuery{
+        "media", "Get media with the name from database", {}, true, false};
+
+    // Add InlineQuery called 'media'
+    api->addInlineQueryKeyboard(
+        std::move(mediaQuery),
+        [database](
+            std::string_view x) -> std::vector<TgBot::InlineQueryResult::Ptr> {
+            return mediaQueryKeyboardFunction(database, x);
+        });
+
+    // Send a launch message to the owner.
+    auto ownerid = database->getOwnerUserId();
+    if (ownerid) {
+        LOG(INFO) << "Sending a launch message to owner...";
+        api->sendMessage(
+            *ownerid,
+            fmt::format(R"(
+Bot @{} has launched.
+Platform: {}
+Time: [UTC] {}
+Default Shell: {}
+Git commit: {}
+Git commitmsg: {}
+)",
+                        *api->getBotUser()->username, buildinfo::OS,
+                        std::chrono::system_clock::now(),
+                        POPEN_WDT_DEFAULT_SHELL, buildinfo::git::COMMIT_ID,
+                        buildinfo::git::COMMIT_MESSAGE));
+    }
+}
+
 int main(int argc, char** argv) {
     MilliSecondDP startupDp;
 
@@ -475,7 +511,7 @@ int main(int argc, char** argv) {
     if (ec) {
         LOG(ERROR) << "Failed to get current cwd: " << ec.message();
 #ifdef _POSIX_C_SOURCE
-        struct stat statbuf {};
+        struct stat statbuf{};
         if (stat(".", &statbuf) < 0) {
             PLOG(ERROR) << "Couldn't stat cwd";
             return EXIT_FAILURE;
@@ -569,16 +605,7 @@ int main(int argc, char** argv) {
     LOG(INFO) << fmt::format("Starting took {}", startupDp.get());
 
     try {
-        api->addInlineQueryKeyboard(
-            TgBotApi::InlineQuery{"media",
-                                  "Get media with the name from database",
-                                  {},
-                                  true,
-                                  false},
-            [database](std::string_view x)
-                -> std::vector<TgBot::InlineQueryResult::Ptr> {
-                return mediaQueryKeyboardFunction(database, x);
-            });
+        init_work(api, database);
     } catch (const TgBot::NetworkException& e) {
         LOG(ERROR) << "Network error: " << e.what();
         return EXIT_FAILURE;

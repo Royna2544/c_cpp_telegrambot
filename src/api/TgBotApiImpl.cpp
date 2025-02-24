@@ -234,7 +234,7 @@ void TgBotApiImpl::startPoll() {
     getApi().deleteWebhook();
 
     getApi().setMyDescription(fmt::format(
-        "A C++ written Telegram bot, sources: {}", git::buildinfo::ORIGIN_URL));
+        "A C++ written Telegram bot, sources: {}", buildinfo::git::ORIGIN_URL));
 
     std::string ownerString;
     if (auto owner = _provider->database->getOwnerUserId(); owner) {
@@ -242,18 +242,8 @@ void TgBotApiImpl::startPoll() {
         ownerString = fmt::format(" Owned by @{}.", *chat->username);
     }
 
-    constexpr std::string_view OS =
-#if defined(_WIN32)
-        "Windows";
-#elif defined(__linux__)
-        "Linux";
-#elif defined(__APPLE__)
-        "macOS";
-#else
-        "unknown platform";
-#endif
     getApi().setMyShortDescription(fmt::format(
-        "C++ Telegram bot.{} I'm currently hosted on {}", ownerString, OS));
+        "C++ Telegram bot.{} I'm currently hosted on {}", ownerString, buildinfo::OS));
 
     auto* longPoll = _bot.createLongPoll(
         {}, {},
