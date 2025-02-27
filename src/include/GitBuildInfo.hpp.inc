@@ -13,6 +13,8 @@ constexpr static std::string_view ORIGIN_URL = "@GIT_ORIGIN_URL@";
 constexpr std::string_view OS =
 #if defined(_WIN32)
     "Windows";
+#elif defined(__ANDROID__)
+    "Android";
 #elif defined(__linux__)
     "Linux";
 #elif defined(__APPLE__)
