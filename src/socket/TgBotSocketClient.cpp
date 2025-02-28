@@ -17,7 +17,7 @@
 
 #include "SocketContext.hpp"
 #include "TgBotCommandMap.hpp"
-#include "Types.h"
+#include "api/typedefs.h"
 
 using namespace TgBotSocket;
 

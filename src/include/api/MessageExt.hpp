@@ -11,7 +11,7 @@
 #include <optional>
 #include <type_traits>
 
-#include "Types.h"
+#include "api/typedefs.h"
 
 using TgBot::Animation;
 using TgBot::Chat;

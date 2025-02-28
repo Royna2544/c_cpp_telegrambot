@@ -1,12 +1,11 @@
 #pragma once
 
-#include <Types.h>
+#include <api/typedefs.h>
 #include <tgbot/tgbot.h>
 #include <trivial_helpers/_class_helper_macros.h>
 
 #include <Authorization.hpp>
 #include <ManagedThreads.hpp>
-#include <ReplyParametersExt.hpp>
 #include "StringResLoader.hpp"
 #include <filesystem>
 #include <memory>

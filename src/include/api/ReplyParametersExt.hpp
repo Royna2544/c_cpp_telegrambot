@@ -4,7 +4,7 @@
 
 #include <memory>
 
-#include "Types.h"
+#include "api/typedefs.h"
 
 // Extension of ReplyParameters
 struct ReplyParametersExt : public TgBot::ReplyParameters {

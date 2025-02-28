@@ -1,13 +1,13 @@
 #pragma once
 
-#include <Types.h>
+#include <api/typedefs.h>
 #include <tgbot/types/Animation.h>
 #include <tgbot/types/Chat.h>
 #include <tgbot/types/PhotoSize.h>
 #include <tgbot/types/Sticker.h>
 #include <tgbot/types/Video.h>
 
-#include <ReplyParametersExt.hpp>
+#include "ReplyParametersExt.hpp"
 #include <string>
 #include <utility>
 

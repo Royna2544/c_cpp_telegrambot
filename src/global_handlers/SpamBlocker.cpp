@@ -10,7 +10,7 @@
 #include <mutex>
 #include <numeric>
 
-#include "Types.h"
+#include "api/typedefs.h"
 
 // Describing a SpamBlockDetector.
 class Matcher {

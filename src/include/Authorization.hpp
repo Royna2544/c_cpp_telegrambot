@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Types.h>
+#include <api/typedefs.h>
 #include <tgbot/types/Message.h>
 
 #include <database/DatabaseBase.hpp>

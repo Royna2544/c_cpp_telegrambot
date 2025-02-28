@@ -6,7 +6,7 @@
 #include <limits>
 #include <string>
 
-#include "Types.h"
+#include "api/typedefs.h"
 
 class RestartFmt {
    public:

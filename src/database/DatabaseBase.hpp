@@ -8,7 +8,7 @@
 #include <string_view>
 #include <vector>
 
-#include "Types.h"
+#include "api/typedefs.h"
 
 struct DBImpl_API DatabaseBase {
     virtual ~DatabaseBase() = default;

@@ -9,7 +9,6 @@
 #include <tgbot/types/Sticker.h>
 #include <tgbot/types/StickerSet.h>
 
-#include <ReplyParametersExt.hpp>
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
@@ -20,7 +19,8 @@
 #include <utility>
 #include <variant>
 
-#include "Types.h"
+#include "ReplyParametersExt.hpp"
+#include "api/typedefs.h"
 #include "Utils.hpp"
 
 using TgBot::Chat;

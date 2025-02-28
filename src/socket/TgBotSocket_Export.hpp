@@ -1,7 +1,7 @@
 #pragma once
 
 // A header export for the TgBot's socket connection
-#include <Types.h>
+#include <api/typedefs.h>
 #include <openssl/evp.h>
 #include <openssl/sha.h>
 

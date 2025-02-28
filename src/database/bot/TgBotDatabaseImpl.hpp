@@ -1,7 +1,7 @@
 #pragma once
 
 #include <DBImplExports.h>
-#include <Types.h>
+#include <api/typedefs.h>
 #include <trivial_helpers/_class_helper_macros.h>
 
 #include <ConfigManager.hpp>
