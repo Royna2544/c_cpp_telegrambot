@@ -91,7 +91,8 @@ void addIndexConfig(po::options_description &desc) {
     constexpr auto config = static_cast<ConfigManager::Configs>(index);
 
     // Handle special cases.
-    if constexpr (config == ConfigManager::Configs::HELP || config == ConfigManager::Configs::MAX) {
+    if constexpr (config == ConfigManager::Configs::HELP ||
+                  config == ConfigManager::Configs::MAX) {
         return;
     }
 
@@ -105,17 +106,18 @@ void addIndexConfig(po::options_description &desc) {
 }
 
 template <size_t... index>
-void addAll(po::options_description &desc, const std::index_sequence<index...> indexs) {
+void addAll(po::options_description &desc,
+            const std::index_sequence<index...> indexs) {
     (addIndexConfig<index>(desc), ...);
 }
 
 struct ConfigBackendBoostPOBase : public ConfigManager::Backend {
     static po::options_description getTgBotOptionsDesc() {
         static po::options_description desc("TgBot++ Configs");
-        static std::once_flag once;
-        std::call_once(once, [] {
+        static bool once = [] {
             addAll(desc, std::make_index_sequence<ConfigManager::CONFIG_MAX>());
-        });
+            return true;
+        }();
         return desc;
     }
 

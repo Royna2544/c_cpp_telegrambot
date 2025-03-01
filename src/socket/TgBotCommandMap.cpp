@@ -48,10 +48,7 @@ bool isInternalCommand(Command cmd) {
 }
 
 std::string getHelpText() {
-    static std::string helptext;
-    static std::once_flag once;
-
-    std::call_once(once, [] {
+    static std::string helptext = [] {
         std::vector<std::string> help;
         help.reserve(kCommandArray.size());
         for (const auto& ent : kCommandArray) {
@@ -65,8 +62,8 @@ std::string getHelpText() {
                     static_cast<int>(ent.cmd), ent.argCount, ent.argHelp));
             }
         }
-        helptext = fmt::format("{}\n", fmt::join(help, "\n"));
-    });
+        return fmt::format("{}\n", fmt::join(help, "\n"));
+    }();
     return helptext;
 }
 

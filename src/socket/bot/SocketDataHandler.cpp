@@ -40,11 +40,10 @@ namespace {
 
 std::string getMIMEString(const ResourceProvider* resource,
                           const std::string& path) {
-    static std::once_flag once;
     static Json::Value doc;
     std::string extension = fs::path(path).extension().string();
 
-    std::call_once(once, [resource] {
+    static bool once = [resource] {
         std::string_view buf;
         buf = resource->get("mimeData.json");
         Json::Reader reader;
@@ -52,7 +51,8 @@ std::string getMIMEString(const ResourceProvider* resource,
             LOG(ERROR) << "Failed to parse mimedata: "
                        << reader.getFormattedErrorMessages();
         }
-    });
+        return true;
+    }();
     if (!extension.empty()) {
         if (doc.empty()) {
             LOG(ERROR) << "Failed to load mimedata";

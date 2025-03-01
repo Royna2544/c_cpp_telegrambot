@@ -37,8 +37,8 @@ enum class ValueType {
 template <>
 struct fmt::formatter<ValueType> : formatter<std::string_view> {
     // parse is inherited from formatter<string_view>.
-    auto format(ValueType c,
-                format_context& ctx) const -> format_context::iterator {
+    auto format(ValueType c, format_context& ctx) const
+        -> format_context::iterator {
         string_view name = "unknown";
         switch (c) {
             case ValueType::nullValue:
@@ -424,16 +424,14 @@ struct ROMLocalManifest {
             std::make_shared<ConfigParser::LocalManifest::GitPrepare>(
                 RepoInfo{std::move(manifest), branchName});
         {
-            static int job_count = 0;
-            static std::once_flag once;
-            std::call_once(once, [&]() {
-                const auto totalMem =
-                    GigaBytes(MemoryInfo().totalMemory);
+            static int job_count = [] {
+                const auto totalMem = GigaBytes(MemoryInfo().totalMemory);
                 LOG(INFO) << "Total memory: " << totalMem;
-                job_count = static_cast<int>(totalMem.value() / 4 - 1);
-                LOG(INFO) << "Using job count: " << job_count
+                int _job_count = static_cast<int>(totalMem.value() / 4 - 1);
+                LOG(INFO) << "Using job count: " << _job_count
                           << " for ROM build";
-            });
+                return _job_count;
+            }();
             localManifest.job_count = job_count;
         }
         for (const auto& romi : rom) {

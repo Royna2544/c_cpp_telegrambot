@@ -27,7 +27,7 @@ struct kernel_rand_engine {
         ssize_t rc = 0;
 
         rc = read(fd, &val, sizeof(val));
-        if (rc < 0) PLOG(ERROR) << "Failed to read data from HWRNG device";
+        PLOG_IF(ERROR, rc < 0) << "Failed to read data from HWRNG device";
         return val;
     }
     kernel_rand_engine() { isSupported(); }
@@ -37,17 +37,11 @@ struct kernel_rand_engine {
     }
 
     bool isSupported() {
-        static bool kSupported = false;
-        static std::once_flag once;
-
-        std::call_once(once, [this] {
+        static bool kSupported = [this] {
             ssize_t ret = 0;
             for (const auto& n : nodes) {
                 fd = open(n.data(), O_RDONLY);
-                if (!isValidFd(fd)) {
-                    PLOG(ERROR)
-                        << "Opening node " << std::quoted(n) << " failed";
-                } else {
+                if (isValidFd(fd)) {
                     // Test read some bytes
                     int data = 0;
                     ret = read(fd, &data, sizeof(data));
@@ -57,13 +51,15 @@ struct kernel_rand_engine {
                     } else {
                         LOG(INFO) << "Device ready, Node: " << std::quoted(n)
                                   << " fd: " << fd;
-                        kSupported = true;
-                        break;
+                        return true;
                     }
+                } else {
+                    PLOG(ERROR)
+                        << "Opening node " << std::quoted(n) << " failed";
                 }
             }
-            LOG(INFO) << "isSupported: " << std::boolalpha << kSupported;
-        });
+            return false;
+        }();
         return kSupported;
     }
 
