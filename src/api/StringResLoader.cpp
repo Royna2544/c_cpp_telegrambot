@@ -67,6 +67,10 @@ void libxml_error_handler(void *ctx, const char *msg, ...) {
     error_ctx->message += errorBuffer.data();
 }
 
+auto hold(xmlChar *buf) {
+    return RAII<xmlChar *>::template create<void>(buf, xmlFree);
+}
+
 std::pair<LocaleResData, StringResLoader::PerLocaleMapImpl> parseLocaleResource(
     const std::filesystem::path &filename) {
     auto resourceKey = "resources"_xmlChar;
@@ -74,6 +78,8 @@ std::pair<LocaleResData, StringResLoader::PerLocaleMapImpl> parseLocaleResource(
     auto defaultProp = "default"_xmlChar;
     auto stringKey = "string"_xmlChar;
     auto nameProp = "name"_xmlChar;
+    constexpr auto STRINGRES_MAX = static_cast<int>(Strings::__MAX__);
+    constexpr auto STRINGRES_MIN = static_cast<int>(Strings::__INVALID__) + 1;
 
     StringResLoader::PerLocaleMapImpl m_data;
 
@@ -104,47 +110,47 @@ std::pair<LocaleResData, StringResLoader::PerLocaleMapImpl> parseLocaleResource(
         throw invalid_xml_error();
     }
 
-    auto localeAttr = RAII<xmlChar *>::template create<void>(
-        xmlGetProp(rootElement, localeProp), xmlFree);
+    auto localeAttr = hold(xmlGetProp(rootElement, localeProp));
     if (!localeAttr) {
         LOG(ERROR) << "No locale= key in <resources>";
         throw invalid_xml_error();
     }
 
-    auto defaultAttr = RAII<xmlChar *>::template create<void>(
-        xmlGetProp(rootElement, defaultProp), xmlFree);
+    auto defaultAttr = hold(xmlGetProp(rootElement, defaultProp));
     bool isDefault = false;
 
     if (defaultAttr && xmlStrcmp(defaultAttr.get(), "yes"_xmlChar) == 0) {
         isDefault = true;
     }
 
-    m_data.reserve(static_cast<int>(Strings::__MAX__));
+    m_data.reserve(STRINGRES_MAX);
     for (xmlNodePtr cur = rootElement->children; cur != nullptr;
          cur = cur->next) {
         if (cur->type == XML_ELEMENT_NODE &&
             xmlStrcmp(cur->name, stringKey) == 0) {
-            auto nameAttr = RAII<xmlChar *>::template create<void>(
-                xmlGetProp(cur, nameProp), xmlFree);
-            auto content = RAII<xmlChar *>::template create<void>(
-                xmlNodeListGetString(doc.get(), cur->children, 1), xmlFree);
+            auto nameAttr = hold(xmlGetProp(cur, nameProp));
+            auto content =
+                hold(xmlNodeListGetString(doc.get(), cur->children, 1));
 
-            if (nameAttr && content) {
-                auto upper = absl::AsciiStrToUpper(
-                    reinterpret_cast<const char *>(nameAttr.get()));
-                auto string = getStrings(upper);
-                if (string == Strings::__INVALID__) {
-                    LOG(WARNING) << "String name not in enumerator: " << upper;
-                    continue;
-                }
-                m_data.emplace(string,
-                               reinterpret_cast<const char *>(content.get()));
+            if (!nameAttr || !content) {
+                continue;
             }
+            const char *nameAttrCStr =
+                reinterpret_cast<const char *>(nameAttr.get());
+            const char *contentCStr =
+                reinterpret_cast<const char *>(content.get());
+            auto upper = absl::AsciiStrToUpper(nameAttrCStr);
+            auto string = getStrings(upper);
+            if (string == Strings::__INVALID__) {
+                LOG(WARNING) << "String name not in enumerator: " << upper;
+                continue;
+            }
+            auto [it, res] = m_data.emplace(string, contentCStr);
+            LOG_IF(WARNING, !res) << "Failed to emplace string " << string;
         }
     }
     int absent = 0;
-    for (int x = static_cast<int>(Strings::__INVALID__) + 1;
-         x < static_cast<int>(Strings::__MAX__); ++x) {
+    for (int x = STRINGRES_MIN; x < STRINGRES_MAX; ++x) {
         if (!m_data.contains(static_cast<Strings>(x))) {
             LOG(WARNING) << "Missing string: "
                          << getStrings(static_cast<Strings>(x));
