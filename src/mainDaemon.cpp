@@ -20,7 +20,7 @@
 
 // Wrapper launcher to create a daemon process from the bot
 int main(const int argc, char** argv) {
-    const std::filesystem::path kLogFile = fmt::format(
+    const static std::filesystem::path kLogFile = fmt::format(
         "log_{:%Y_%m_%d_%H_%M_%S}.txt", std::chrono::system_clock::now());
     TgBot_AbslLogInit();
 
@@ -119,6 +119,7 @@ redo_vfork:
             killpg(pid, signum);
             waitpid(pid, nullptr, 0);
             LOG(INFO) << "Exiting the daemon process";
+            if (getenv("DELETE_LOG_ON_EXIT")) std::filesystem::remove(kLogFile);
             exit(EXIT_SUCCESS);
         };
         (void)signal(SIGINT, handler);
@@ -135,7 +136,8 @@ redo_vfork:
                                          WEXITSTATUS(status));
                 if (WEXITSTATUS(status) ==
                     std::numeric_limits<std::uint8_t>::max()) {
-                    LOG(INFO) << "execve has failed, exiting the daemon process";
+                    LOG(INFO)
+                        << "execve has failed, exiting the daemon process";
                     return EXIT_SUCCESS;
                 }
             } else if (WIFSIGNALED(status)) {
