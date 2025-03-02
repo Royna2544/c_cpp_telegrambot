@@ -5,6 +5,7 @@
 #include <random/Random.hpp>
 #include <trivial_helpers/fruit_inject.hpp>
 
+#include "Authorization.hpp"
 #include "utils/CommandLine.hpp"
 #include "utils/ConfigManager.hpp"
 #include "utils/ResourceManager.hpp"
@@ -27,16 +28,18 @@ class Providers {
     Installable<CommandLine> cmdline{};
     Installable<ConfigManager> config{};
     Installable<ThreadManager> threads{};
+    Installable<AuthContext> auth{};
 
     APPLE_INJECT(Providers(RandomBase *random, ResourceProvider *resource,
                            DatabaseBase *database, CommandLine *cmd,
-                           ConfigManager *configManager,
-                           ThreadManager *thread)) {
+                           ConfigManager *configManager, ThreadManager *thread,
+                           AuthContext *auth)) {
         this->random.instance = random;
         this->resource.instance = resource;
         this->database.instance = database;
         this->cmdline.instance = cmd;
         this->config.instance = configManager;
         this->threads.instance = thread;
+        this->auth.instance = auth;
     }
 };

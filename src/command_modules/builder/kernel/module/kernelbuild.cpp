@@ -600,8 +600,15 @@ DECLARE_COMMAND_HANDLER(kernelbuild) {
     static std::optional<KernelBuildHandler> handler;
     if (!handler) {
         handler.emplace(api, provider->cmdline.get());
-        api->onCallbackQuery("kernelbuild", [](TgBot::CallbackQuery::Ptr ptr) {
+        api->onCallbackQuery("kernelbuild", [api, provider](TgBot::CallbackQuery::Ptr ptr) {
             std::string_view data = ptr->data;
+
+            if (!provider->auth->isAuthorized(ptr->from)) {
+                api->answerCallbackQuery(
+                    ptr->id,
+                    "Sorry son, you are not allowed to touch this keyboard.");
+                return;
+            }
             if (!absl::ConsumePrefix(
                     &data, KernelBuildHandler::kCallbackQueryPrefix)) {
                 return;

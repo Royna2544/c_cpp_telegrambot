@@ -1,9 +1,9 @@
 #include <absl/log/log.h>
 #include <tgbot/TgException.h>
 
+#include <api/Authorization.hpp>
 #include <api/components/OnAnyMessage.hpp>
 #include <future>
-#include "Authorization.hpp"
 
 void TgBotApiImpl::OnAnyMessageImpl::onAnyMessage(
     const TgBotApi::AnyMessageCallback& callback) {
@@ -21,7 +21,8 @@ void TgBotApiImpl::OnAnyMessageImpl::onAnyMessageFunction(
     }
     int index = 0;
     for (const auto& iter : callbacks) {
-        vec.emplace(index++, std::async(std::launch::async, iter, _api, message));
+        vec.emplace(index++,
+                    std::async(std::launch::async, iter, _api, message));
     }
 
     index = 0;

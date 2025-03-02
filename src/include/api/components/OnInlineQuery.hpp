@@ -2,7 +2,7 @@
 #include <mutex>
 #include <map>
 
-#include "Authorization.hpp"
+#include <api/Authorization.hpp>
 
 class TgBotApiImpl::OnInlineQueryImpl : TgBotApiImpl::CommandListener {
     // Protect callbacks

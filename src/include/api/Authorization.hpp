@@ -75,11 +75,11 @@ class AuthContext {
      */
 
     [[nodiscard]] Result isAuthorized(const User::Ptr& user,
-                                      const Flags flags) const;
+                                      const Flags flags = Flags::None) const;
 
     // Overload taking a message instead of user
     [[nodiscard]] Result isAuthorized(const Message::Ptr& message,
-                                      const Flags flags) const;
+                                      const Flags flags = Flags::None) const;
 
     /**
      * @brief Checks if the message is within the allowed time limit.

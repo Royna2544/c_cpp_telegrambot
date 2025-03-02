@@ -1,10 +1,10 @@
-#include <api/typedefs.h>
 #include <absl/strings/ascii.h>
+#include <api/typedefs.h>
 #include <fruit/fruit.h>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include <Authorization.hpp>
+#include <api/Authorization.hpp>
 #include <chrono>
 #include <database/bot/TgBotDatabaseImpl.hpp>
 #include <memory>

@@ -3,8 +3,8 @@
 #include <absl/log/log.h>
 #include <fmt/format.h>
 
-#include <Authorization.hpp>
 #include <algorithm>
+#include <api/Authorization.hpp>
 #include <api/TgBotApi.hpp>
 #include <chrono>
 #include <concepts>
@@ -29,14 +29,14 @@ struct SpamBlockBase {
     // In sSpamDetectDelay delay.
     constexpr static int sSpamDetectThreshold = 5;
     constexpr static std::chrono::seconds sSpamDetectDelay{10};
-    
+
     SpamBlockBase() = default;
     virtual ~SpamBlockBase() = default;
 
     // virtual function, hooks before the message is added.
     // Returns true if the message should be skipped, false otherwise.
     // Dummy version: Returns false.
-    virtual bool shouldBeSkipped(const Message::Ptr & /*msg*/) const {
+    virtual bool shouldBeSkipped(const Message::Ptr& /*msg*/) const {
         return false;
     }
 

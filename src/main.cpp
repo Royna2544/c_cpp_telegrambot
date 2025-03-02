@@ -9,7 +9,6 @@
 #include <fruit/injector.h>
 
 #include <AbslLogInit.hpp>
-#include <Authorization.hpp>
 #include <CommandLine.hpp>
 #include <ConfigManager.hpp>
 #include <DurationPoint.hpp>

@@ -1,7 +1,7 @@
 #include <api/typedefs.h>
 #include <absl/log/log.h>
 
-#include <Authorization.hpp>
+#include <api/Authorization.hpp>
 
 bool AuthContext::isInList(DatabaseBase::ListType type,
                            const UserId user) const {

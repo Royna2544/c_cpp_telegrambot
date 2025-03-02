@@ -4,7 +4,7 @@
 #include <fmt/ranges.h>
 #include <trivial_helpers/_tgbot.h>
 
-#include <Authorization.hpp>
+#include <api/Authorization.hpp>
 #include <CommandLine.hpp>
 #include <ConfigManager.hpp>
 #include <GitBuildInfo.hpp>

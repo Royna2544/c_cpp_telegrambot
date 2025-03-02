@@ -1,23 +1,23 @@
 #pragma once
 
-#include <api/typedefs.h>
 #include <tgbot/tgbot.h>
 #include <trivial_helpers/_class_helper_macros.h>
 
-#include <Authorization.hpp>
 #include <ManagedThreads.hpp>
-#include "StringResLoader.hpp"
 #include <filesystem>
 #include <memory>
 #include <string_view>
 #include <vector>
 
+#include "Authorization.hpp"
 #include "CommandModule.hpp"
 #include "MessageExt.hpp"
 #include "Providers.hpp"
 #include "RateLimit.hpp"
+#include "StringResLoader.hpp"
 #include "TgBotApi.hpp"
-#include "api/components/FileCheck.hpp"
+#include "components/FileCheck.hpp"
+#include "typedefs.h"
 
 using TgBot::Animation;
 using TgBot::Api;

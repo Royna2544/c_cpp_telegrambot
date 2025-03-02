@@ -54,6 +54,7 @@ class ROMBuildQueryHandler {
     Message::Ptr _userMessage;
     TgBotApi::Ptr _api;
     CommandLine* _commandLine;
+    AuthContext* _auth;
     using KeyboardType = TgBot::InlineKeyboardMarkup::Ptr;
 
     struct {
@@ -84,7 +85,7 @@ class ROMBuildQueryHandler {
 
    public:
     ROMBuildQueryHandler(TgBotApi::Ptr api, Message::Ptr userMessage,
-                         CommandLine* line);
+                         CommandLine* line, AuthContext *uath);
 
     void updateSentMessage(Message::Ptr message);
     void start(Message::Ptr userMessage);
@@ -443,10 +444,11 @@ class Upload : public TaskWrapperBase<UploadFileTask> {
 
 ROMBuildQueryHandler::ROMBuildQueryHandler(TgBotApi::Ptr api,
                                            Message::Ptr userMessage,
-                                           CommandLine* line)
+                                           CommandLine* line, AuthContext* auth)
     : _api(api),
       _commandLine(line),
-      parser(line->getPath(FS::PathType::RESOURCES) / "builder" / "android") {
+      parser(line->getPath(FS::PathType::RESOURCES) / "builder" / "android"),
+      _auth(auth) {
     settingsKeyboard =
         createKeyboardWith<Buttons::repo_sync, Buttons::upload,
                            Buttons::pin_message, Buttons::back>();
@@ -785,7 +787,7 @@ void ROMBuildQueryHandler::onCallbackQuery(
         DLOG(INFO) << "Mismatch on message id";
         return;
     }
-    if (query->from->id != _userMessage->from->id) {
+    if (!_auth->isAuthorized(query->from)) {
         _api->answerCallbackQuery(
             query->id,
             "Sorry son, you are not allowed to touch this keyboard.");
@@ -810,7 +812,7 @@ DECLARE_COMMAND_HANDLER(rombuild) {
 
     try {
         handler = std::make_shared<ROMBuildQueryHandler>(
-            api, message->message(), provider->cmdline.get());
+            api, message->message(), provider->cmdline.get(), provider->auth.get());
     } catch (const std::exception& e) {
         LOG(ERROR) << "Failed to create ROMBuildQueryHandler: " << e.what();
         api->sendMessage(message->get<MessageAttrs::Chat>(),
