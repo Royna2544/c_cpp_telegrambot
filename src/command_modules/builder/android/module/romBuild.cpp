@@ -85,7 +85,7 @@ class ROMBuildQueryHandler {
 
    public:
     ROMBuildQueryHandler(TgBotApi::Ptr api, Message::Ptr userMessage,
-                         CommandLine* line, AuthContext* uath);
+                         CommandLine* line, AuthContext *uath);
 
     void updateSentMessage(Message::Ptr message);
     void start(Message::Ptr userMessage);
@@ -657,17 +657,8 @@ void ROMBuildQueryHandler::handle_device(const Query& query) {
     std::ranges::transform(lookup._localManifest, std::back_inserter(roms),
                            [](const auto& manifest) { return manifest->rom; });
 
-    // Sort ROMs
-    std::ranges::sort(roms, [](const auto& a, const auto& b) {
-        return a->toString() < b->toString();
-    });
-
-    // Erase dups
-    auto [be2, en2] = std::ranges::unique(roms, [](const auto& a, const auto& b) {
-        return a->toString() == b->toString();
-    });
-
-    roms.erase(be2, en2);
+    // Very unlikely that there will be duplicates
+    // So, skip this
 
     KeyboardBuilder builder;
     for (const auto& roms : roms) {
@@ -821,8 +812,7 @@ DECLARE_COMMAND_HANDLER(rombuild) {
 
     try {
         handler = std::make_shared<ROMBuildQueryHandler>(
-            api, message->message(), provider->cmdline.get(),
-            provider->auth.get());
+            api, message->message(), provider->cmdline.get(), provider->auth.get());
     } catch (const std::exception& e) {
         LOG(ERROR) << "Failed to create ROMBuildQueryHandler: " << e.what();
         api->sendMessage(message->get<MessageAttrs::Chat>(),
