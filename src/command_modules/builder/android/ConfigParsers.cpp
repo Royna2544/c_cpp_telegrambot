@@ -471,48 +471,45 @@ struct RecoveryManifest {
                                           const DeviceMap& devices,
                                           const ROMsMap& roms) {
         std::vector<return_type> manifests;
-        for (const auto& entry : root) {
-            ConfigParser::LocalManifest localManifest;
-            auto name = "name"_s;
-            auto android_version = "android_version"_d;
-            auto device = "device"_s.setRequired(false);
-            auto recoveryName = "target_recovery"_s;
+        ConfigParser::LocalManifest localManifest;
+        auto name = "name"_s;
+        auto android_version = "android_version"_d;
+        auto device = "device"_s.setRequired(false);
+        auto recoveryName = "target_recovery"_s;
 
-            if (!checkRequirements(root, name, android_version, device,
-                                   recoveryName)) {
-                LOG(INFO) << "Skipping invalid recovery_targets entry: "
-                          << root.toStyledString();
-                return {};
-            }
+        if (!checkRequirements(root, name, android_version, device,
+                               recoveryName)) {
+            LOG(INFO) << "Skipping invalid recovery_targets entry: "
+                      << root.toStyledString();
+            return {};
+        }
 
-            auto [devicesVec, rom] = parseDeviceAndRom(
-                device, root, devices, roms,
-                static_cast<std::string>(recoveryName), android_version);
+        auto [devicesVec, rom] = parseDeviceAndRom(
+            device, root, devices, roms, static_cast<std::string>(recoveryName),
+            android_version);
 
-            auto prepare =
-                std::make_shared<ConfigParser::LocalManifest::WritePrepare>();
-            for (const auto& mapping : ProxyJsonBranch(root, "clone_mapping")) {
-                auto link = "link"_s;
-                auto branch = "branch"_s;
-                auto destination = "destination"_s;
-                if (!checkRequirements(mapping, link, branch, destination)) {
-                    LOG(INFO) << "Skipping invalid clone_mapping entry: "
-                              << mapping.toStyledString();
-                    continue;
-                }
-                prepare->data.emplace_back(link, branch,
-                                           std::filesystem::path(destination));
+        auto prepare =
+            std::make_shared<ConfigParser::LocalManifest::WritePrepare>();
+        for (const auto& mapping : ProxyJsonBranch(root, "clone_mapping")) {
+            auto link = "link"_s;
+            auto branch = "branch"_s;
+            auto destination = "destination"_s;
+            if (!checkRequirements(mapping, link, branch, destination)) {
+                LOG(INFO) << "Skipping invalid clone_mapping entry: "
+                          << mapping.toStyledString();
+                continue;
             }
-            localManifest.name = name;
-            localManifest.preparar = std::move(prepare);
-            localManifest.devices = std::move(devicesVec);
-            localManifest.job_count = std::thread::hardware_concurrency();
-            for (const auto& romi : rom) {
-                localManifest.rom = romi;
-                manifests.emplace_back(
-                    std::make_shared<ConfigParser::LocalManifest>(
-                        localManifest));
-            }
+            prepare->data.emplace_back(link, branch,
+                                       std::filesystem::path(destination));
+        }
+        localManifest.name = name;
+        localManifest.preparar = std::move(prepare);
+        localManifest.devices = std::move(devicesVec);
+        localManifest.job_count = std::thread::hardware_concurrency();
+        for (const auto& romi : rom) {
+            localManifest.rom = romi;
+            manifests.emplace_back(
+                std::make_shared<ConfigParser::LocalManifest>(localManifest));
         }
         return manifests;
     }
