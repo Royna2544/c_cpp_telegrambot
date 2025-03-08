@@ -6,7 +6,7 @@ if (LIBGIT2_HAS_CLONE_DEPTH)
     set(BUILDER_UTILS_LINUX_DEFS LIBGIT2_HAS_CLONE_DEPTH)
 endif()
 
-add_my_library(
+tgbot_library(
     NAME RepoSwitcher
     SRCS RepoUtils.cpp
     DEFS ${BUILDER_UTILS_LINUX_DEFS}
@@ -16,7 +16,7 @@ add_my_library(
     NO_LIBPREFIX
 )
 
-add_my_executable(
+tgbot_exe(
     NAME RepoSwitcherTest
     SRCS RepoSwitcherTest.cpp
     LIBS RepoSwitcher
@@ -36,7 +36,7 @@ if (NOT LibArchive_FOUND OR NOT Boost_FOUND)
     return()
 endif()
 
-add_my_library(
+tgbot_library(
     NAME BuilderUtilsLinux
     SRCS 
         ForkAndRun.cpp

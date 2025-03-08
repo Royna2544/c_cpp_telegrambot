@@ -1,4 +1,4 @@
-add_my_library(
+tgbot_library(
   NAME ApiComponents
   SRCS
     OnAnyMessage.cpp

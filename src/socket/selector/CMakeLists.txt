@@ -14,7 +14,7 @@ else()
   return()
 endif()
 
-add_my_library(
+tgbot_library(
   NAME SocketSelectors
   SRCS ${SELECTOR_SRC_LIST}
 )

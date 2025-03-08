@@ -1,6 +1,6 @@
 find_package(LibXml2 REQUIRED)
 
-add_my_library(
+tgbot_library(
   NAME Api
   SRCS
     Authorization.cpp

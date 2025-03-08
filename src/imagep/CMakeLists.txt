@@ -34,7 +34,7 @@ else()
     message(STATUS "libTgBotImgProc: OpenCV_FOUND ${OpenCV_FOUND}, SanitizerConfig ${SANITIZER_CONFIG}")
 endif()
 
-add_my_library(
+tgbot_library(
     NAME ImgProc
     SRCS 
         ${IMGPROC_SOURCES}

@@ -33,7 +33,7 @@ if (${SQLite3_FOUND})
   list(APPEND DATABASE_DEFS DATABASE_HAVE_SQLITE)
 endif()
 
-add_my_library(
+tgbot_library(
   NAME DBImpl
   SRCS
     ${SQLITE_SRCS}
@@ -50,7 +50,7 @@ add_my_library(
     ${DATABASE_DEFS}
 )
 
-add_my_library(
+tgbot_library(
   NAME DBLoading
   SRCS bot/LoadingDatabase.cpp
   LIBS Utils DBImpl
@@ -58,7 +58,7 @@ add_my_library(
 )
 
 ################# Utility Programs (Database Ctl) ##################
-add_my_executable(
+tgbot_exe(
   NAME DatabaseCtl
   SRCS utils/DatabaseCtrl.cc
   LIBS DBImpl DBLoading Utils
@@ -67,7 +67,7 @@ add_my_executable(
 #####################################################################
 
 ############### Utility Programs (Send Media to chat) ################
-add_my_executable(
+tgbot_exe(
   NAME MediaCli
   SRCS utils/SendMediaToChat.cc
   LIBS 

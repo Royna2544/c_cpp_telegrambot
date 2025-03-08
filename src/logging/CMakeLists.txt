@@ -1,19 +1,19 @@
 if (WIN32) 
-add_my_library(
+tgbot_library(
   NAME LogInit
   SRCS AbslLogInit.cpp
   LIBS absl::log_initialize absl::log_sink_registry
   STATIC
 )
 else()
-add_my_library(
+tgbot_library(
   NAME LogInit
   SRCS AbslLogInit.cpp
   LIBS absl::log_initialize absl::log_sink_registry
 )
 endif()
 
-add_my_executable(
+tgbot_exe(
   NAME logcat
   SRCS LoggingClient.cpp
   LIBS Socket Utils sighandler

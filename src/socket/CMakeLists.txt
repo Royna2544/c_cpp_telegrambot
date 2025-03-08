@@ -3,7 +3,7 @@ add_subdirectory(selector)
 
 find_package(Boost 1.70 CONFIG COMPONENTS system)
 
-add_my_library(
+tgbot_library(
   NAME Socket
   SRCS
     Context.cpp
@@ -19,7 +19,7 @@ add_my_library(
   LIBS_WIN32 wsock32 Ws2_32
 )
 
-add_my_executable(
+tgbot_exe(
   NAME SocketCli
   SRCS TgBotSocketClient.cpp
   LIBS Socket

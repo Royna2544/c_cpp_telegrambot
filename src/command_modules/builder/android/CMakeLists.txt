@@ -2,7 +2,7 @@ find_package(LibXml2 REQUIRED)
 find_package(libgit2 REQUIRED)
 
 ################# Android ROM builder with C++ #################
-add_my_library(
+tgbot_library(
     NAME AndroidBuilder-configparse
     SRCS 
         ConfigParsers.cpp
@@ -14,7 +14,7 @@ add_my_library(
     STATIC
 )
 
-add_my_library(
+tgbot_library(
     NAME AndroidBuilder-cpp
     SRCS 
         tasks/ROMBuildTask.cpp
@@ -28,7 +28,7 @@ add_my_library(
     STATIC
 )
 
-add_my_executable(
+tgbot_exe(
     NAME ConfigParserTest
     SRCS ConfigParserTest.cpp
     LIBS AndroidBuilder-configparse BuilderUtilsLinux

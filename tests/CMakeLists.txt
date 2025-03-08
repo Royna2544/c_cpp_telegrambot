@@ -1,7 +1,7 @@
 ############### Bot functions' Test Arena (googletest) ##############
 ###################### Creates the test target ######################
 
-add_my_executable(
+tgbot_exe(
   NAME main
   SRCS
     TestMain.cpp
@@ -20,7 +20,7 @@ add_my_executable(
   TEST
 )
 
-add_my_executable(
+tgbot_exe(
   NAME database
   SRCS
     TestMain.cpp
@@ -31,7 +31,7 @@ add_my_executable(
   TEST
 )
 
-add_my_executable(
+tgbot_exe(
   NAME regex
   SRCS
     TestMain.cpp
@@ -43,7 +43,7 @@ add_my_executable(
   TEST
 )
 
-add_my_executable(
+tgbot_exe(
   NAME socketdatahandler
   SRCS
     TestMain.cpp
@@ -56,7 +56,7 @@ add_my_executable(
   TEST
 )
 
-add_my_executable(
+tgbot_exe(
   NAME popenwdt
   SRCS
     TestMain.cpp

@@ -211,7 +211,7 @@ configure_file(src/include/GitBuildInfo.hpp.inc ${CMAKE_SOURCE_DIR}/src/include/
 #####################################################################
 
 ################## Declare common macros ####################
-function(add_my_library)
+function(tgbot_library)
   cmake_parse_arguments(TGBOT_LIBRARY
     "NO_LIBPREFIX;STATIC" # Options
     "NAME" # One-value keywords
@@ -283,9 +283,9 @@ function(add_my_library)
   target_compile_definitions(${TGBOT_LIBRARY_NAME} PRIVATE ${GLOBAL_DEFINITIONS})
   target_compile_options(${TGBOT_LIBRARY_NAME} PRIVATE ${GLOBAL_COMPILE_OPTIONS})
   target_include_directories(${TGBOT_LIBRARY_NAME} PRIVATE ${GLOBAL_INCLUDE_DIRS})
-endfunction(add_my_library)
+endfunction(tgbot_library)
 
-function(add_my_executable)
+function(tgbot_exe)
   cmake_parse_arguments(TGBOT_EXE
     "NO_PREFIX;OPTIONAL;TEST" # Options
     "NAME;RELATION" # One-value keywords
@@ -358,7 +358,7 @@ function(add_my_executable)
   target_compile_definitions(${TGBOT_EXE_NAME} PRIVATE ${GLOBAL_DEFINITIONS})
   target_compile_options(${TGBOT_EXE_NAME} PRIVATE ${GLOBAL_COMPILE_OPTIONS})
   target_include_directories(${TGBOT_EXE_NAME} PRIVATE ${GLOBAL_INCLUDE_DIRS})
-endfunction(add_my_executable)
+endfunction(tgbot_exe)
 
 ############################ RUST support ###########################
 if (ENABLE_RUST_SUPPORT)
@@ -456,7 +456,7 @@ else()
   message(STATUS "Disabling tests")
 endif()
 ################### The Bot's main functionaility ###################
-add_my_library(
+tgbot_library(
   NAME Regex
   SRCS
     src/global_handlers/RegEXHandler.cpp
@@ -464,7 +464,7 @@ add_my_library(
   STATIC
 )
 
-add_my_library(
+tgbot_library(
   NAME SocketComponents
   SRCS
     src/global_handlers/SpamBlocker.cpp
@@ -475,7 +475,7 @@ add_my_library(
   STATIC
 )
 
-add_my_library(
+tgbot_library(
   NAME ThreadManager
   SRCS
     src/ManagedThread.cpp
@@ -486,7 +486,7 @@ add_my_library(
 
 ################# The Bot's main launcher (program) #################
 
-add_my_executable(
+tgbot_exe(
   NAME main
   SRCS
     src/main.cpp
@@ -505,7 +505,7 @@ if (WIN32)
 endif()
 
 if (UNIX)
-add_my_executable(
+tgbot_exe(
   NAME maind
   SRCS src/mainDaemon.cpp
   RELATION Main
