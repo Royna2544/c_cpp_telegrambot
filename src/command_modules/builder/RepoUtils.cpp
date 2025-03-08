@@ -168,32 +168,35 @@ struct GitBranchSwitcher::RepoInfoPriv {
 };
 
 void GitBranchSwitcher::removeOffendingConfig() const {
-    const auto configPath = _gitDirectory / "config";
     int ret;
-    if (std::filesystem::exists(configPath)) {
+    std::error_code ec;
+    for (const auto& configPath :
+         {_gitDirectory / "config", _gitDirectory / ".git" / "config"}) {
+        if (!std::filesystem::exists(configPath, ec)) {
+            continue;
+        }
         git_config* config = nullptr;
         DLOG(INFO) << "Config file found: " << configPath.string();
         ret = git_config_open_ondisk(&config, configPath.string().c_str());
         if (ret != 0) {
             LOG(WARNING) << "Failed to open config file: "
                          << git_error_last_str();
-        } else {
-            int val = 0;
-            ret =
-                git_config_get_bool(&val, config, "extensions.preciousObjects");
-            if (ret == 0) {
-                LOG(INFO) << "Removing extensions.preciousobjects...";
-                ret = git_config_delete_entry(config,
-                                              "extensions.preciousobjects");
-                if (ret != 0) {
-                    LOG(ERROR)
-                        << "Failed to delete extensions.preciousobjects : "
-                        << git_error_last_str();
-                }
-            }
-            // Manual, to save the file to disk
-            git_config_free(config);
+            continue;
         }
+        int val = 0;
+        constexpr std::string_view kExtensionName =
+            "extensions.preciousobjects";
+        ret = git_config_get_bool(&val, config, kExtensionName.data());
+        if (ret == 0) {
+            LOG(INFO) << "Removing " << kExtensionName;
+            ret = git_config_delete_entry(config, kExtensionName.data());
+            if (ret != 0) {
+                LOG(ERROR) << "Failed to delete " << kExtensionName << ": "
+                           << git_error_last_str();
+            }
+        }
+        // Manual, to save the file to disk
+        git_config_free(config);
     }
 }
 
@@ -203,6 +206,8 @@ bool GitBranchSwitcher::open() {
 
     // Init libgit2
     git_libgit2_init();
+
+    removeOffendingConfig();
 
     ret = git_repository_open(data.repo, _gitDirectory.string().c_str());
 
@@ -329,7 +334,8 @@ bool GitBranchSwitcher::fastForwardPull() const {
     }
 
     if (!(analysis & GIT_MERGE_ANALYSIS_FASTFORWARD)) {
-        LOG(INFO) << "FastForward not possible with " << cdata->remote_refname();
+        LOG(INFO) << "FastForward not possible with "
+                  << cdata->remote_refname();
         DLOG(INFO) << "Analysis returns " << analysis;
         return false;
     }
