@@ -18,7 +18,7 @@ DECLARE_COMMAND_HANDLER(possibility) {
     Random::ret_type total = 0;
     using map_t = std::pair<std::string, Random::ret_type>;
 
-    if (!message->get<MessageAttrs::ParsedArgumentsList>().empty()) {
+    if (message->get<MessageAttrs::ParsedArgumentsList>().empty()) {
         api->sendReplyMessage(message->message(),
                               res->get(Strings::SEND_POSSIBILITIES));
         return;
@@ -34,7 +34,7 @@ DECLARE_COMMAND_HANDLER(possibility) {
     vec.erase(b, e);
 
     // Can't get possitibities for 1 element
-    if (vec.size() == 1) {
+    if (vec.size() <= 1) {
         api->sendReplyMessage(message->message(),
                               res->get(Strings::GIVE_MORE_THAN_ONE));
         return;
