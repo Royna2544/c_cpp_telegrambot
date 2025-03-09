@@ -43,7 +43,7 @@
 #include <trivial_helpers/fruit_inject.hpp>
 #include <utility>
 #include <vector>
-
+#include "utils/Env.hpp"
 #include "SocketContext.hpp"
 
 class RegexHandlerInterface : public RegexHandler::Interface {
@@ -607,6 +607,9 @@ int main(int argc, char** argv) {
         LOG(ERROR) << "Network error: " << e.what();
         return EXIT_FAILURE;
     }
+
+    CommandLine cmdline{argc, argv};
+    Env()["TGBOT_INSTALL_ROOT"] = cmdline.getPath(FS::PathType::INSTALL_ROOT).string();
 
     while (!SignalHandler::isSignaled()) {
         try {
