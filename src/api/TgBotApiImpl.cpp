@@ -4,10 +4,10 @@
 #include <fmt/ranges.h>
 #include <trivial_helpers/_tgbot.h>
 
-#include <api/Authorization.hpp>
 #include <CommandLine.hpp>
 #include <ConfigManager.hpp>
 #include <GitBuildInfo.hpp>
+#include <api/Authorization.hpp>
 #include <api/CommandModule.hpp>
 #include <api/MessageExt.hpp>
 #include <api/TgBotApi.hpp>
@@ -242,8 +242,9 @@ void TgBotApiImpl::startPoll() {
         ownerString = fmt::format(" Owned by @{}.", *chat->username);
     }
 
-    getApi().setMyShortDescription(fmt::format(
-        "C++ Telegram bot.{} I'm currently hosted on {}", ownerString, buildinfo::OS));
+    getApi().setMyShortDescription(
+        fmt::format("C++ Telegram bot.{} I'm currently hosted on {}",
+                    ownerString, buildinfo::OS));
 
     auto* longPoll = _bot.createLongPoll(
         {}, {},
@@ -324,6 +325,8 @@ Message::Ptr TgBotApiImpl::sendAnimation_impl(
 Message::Ptr TgBotApiImpl::sendSticker_impl(
     ChatId chatId, std::variant<InputFile::Ptr, std::string> sticker,
     ReplyParametersExt::Ptr replyParameters) const {
+    getApi().sendChatAction(chatId, TgBot::Api::ChatAction::choose_sticker,
+                            ReplyParamsToMsgTid{replyParameters});
     try {
         return getApi().sendSticker(chatId, sticker, replyParameters, nullptr,
                                     kDisableNotifications,
@@ -405,6 +408,8 @@ Message::Ptr TgBotApiImpl::sendDocument_impl(
     ChatId chatId, FileOrString document, const std::string_view caption,
     ReplyParametersExt::Ptr replyParameters, GenericReply::Ptr replyMarkup,
     const ParseMode parseMode) const {
+    getApi().sendChatAction(chatId, TgBot::Api::ChatAction::upload_document,
+                            ReplyParamsToMsgTid{replyParameters});
     return getApi().sendDocument(chatId, std::move(document), {}, caption,
                                  replyParameters, replyMarkup, parseMode,
                                  kDisableNotifications, {}, {},
@@ -415,6 +420,8 @@ Message::Ptr TgBotApiImpl::sendPhoto_impl(
     ChatId chatId, FileOrString photo, const std::string_view caption,
     ReplyParametersExt::Ptr replyParameters, GenericReply::Ptr replyMarkup,
     const ParseMode parseMode) const {
+    getApi().sendChatAction(chatId, TgBot::Api::ChatAction::upload_photo,
+                            ReplyParamsToMsgTid{replyParameters});
     return getApi().sendPhoto(chatId, photo, caption, replyParameters,
                               replyMarkup, parseMode, kDisableNotifications, {},
                               ReplyParamsToMsgTid{replyParameters});
@@ -424,6 +431,8 @@ Message::Ptr TgBotApiImpl::sendVideo_impl(
     ChatId chatId, FileOrString video, const std::string_view caption,
     ReplyParametersExt::Ptr replyParameters, GenericReply::Ptr replyMarkup,
     const ParseMode parseMode) const {
+    getApi().sendChatAction(chatId, TgBot::Api::ChatAction::upload_video,
+                            ReplyParamsToMsgTid{replyParameters});
     return getApi().sendVideo(chatId, video, {}, {}, {}, {}, {}, caption,
                               replyParameters, replyMarkup, parseMode,
                               kDisableNotifications, {},
