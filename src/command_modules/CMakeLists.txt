@@ -210,3 +210,8 @@ command_module(
     SRCS copystickers.cpp
     LIBS ImgProc Utils
 )
+
+multi_command_module(
+    PROVIDES up down
+    SRCS updown.cpp
+)
