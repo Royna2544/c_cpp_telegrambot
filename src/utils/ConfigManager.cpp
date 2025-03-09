@@ -136,18 +136,27 @@ struct ConfigBackendBoostPOBase : public ConfigManager::Backend {
 };
 
 struct ConfigBackendFile : public ConfigBackendBoostPOBase {
-    static constexpr std::string_view kTgBotConfigFile = "tgbotserver.ini";
+    static constexpr const char *kTgBotConfigFiles[] = {
+        "tgbotserver." TGBOT_BUILD_TYPE ".ini", "tgbotserver.ini"};
     bool load() override {
         std::filesystem::path home;
-        std::string line;
 
         if (!FS::getHomePath(home)) {
             return false;
         }
-        auto confPath = (home / kTgBotConfigFile.data()).string();
-        std::ifstream ifs(confPath);
+
+        std::ifstream ifs;
+	std::filesystem::path confPath;
+        for (const char *filename : kTgBotConfigFiles) {
+            confPath = home / filename;
+            ifs.open(confPath);
+            if (ifs.fail()) {
+                LOG(WARNING) << "Opening " << confPath << " failed";
+            } else
+                break;
+        }
         if (ifs.fail()) {
-            LOG(ERROR) << "Opening " << confPath << " failed";
+            LOG(ERROR) << "No suitable config file found";
             return false;
         }
         try {
