@@ -21,8 +21,8 @@ class DLWrapper {
    public:
     // Constructors
     explicit DLWrapper(const std::filesystem::path& libPath)
-        : handle(dlopen(libPath.string().c_str(), RTLD_NOW), &dlclose){};
-    DLWrapper() : handle(nullptr, &dlclose){};
+        : handle(dlopen(libPath.string().c_str(), RTLD_NOW), &dlclose) {};
+    DLWrapper() : handle(nullptr, &dlclose) {};
 
     // Operators
     DLWrapper& operator=(std::nullptr_t /*rhs*/) {
@@ -85,6 +85,12 @@ bool CommandModule::load() {
     if (_module == nullptr) {
         LOG(WARNING) << fmt::format("Failed to lookup symbol '{}' in {}",
                                     DYN_COMMAND_SYM_STR, filePath.string());
+        return false;
+    }
+
+    if (_module->name == nullptr || _module->function ==
+            nullptr || _module->description == nullptr) {
+        LOG(ERROR) << "Invalid module: " << filePath;
         return false;
     }
 
