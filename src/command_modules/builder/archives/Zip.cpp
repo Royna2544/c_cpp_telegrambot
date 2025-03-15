@@ -134,6 +134,7 @@ bool Zip::save() {
 bool Zip::extract(const std::filesystem::path& zipfile,
                   const std::filesystem::path& output_dir) {
     struct archive* a = archive_read_new();
+    struct archive* ext = archive_write_disk_new();
     struct archive_entry* entry;
     int r;
 
@@ -146,40 +147,47 @@ bool Zip::extract(const std::filesystem::path& zipfile,
         return false;
     }
 
+    // Set extraction options (preserves ACL, file permissions, timestamps, and
+    // flags)
+    archive_write_disk_set_options(
+        ext, ARCHIVE_EXTRACT_TIME | ARCHIVE_EXTRACT_PERM | ARCHIVE_EXTRACT_ACL |
+                 ARCHIVE_EXTRACT_FFLAGS);
+
     while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
         std::filesystem::path entry_path =
             output_dir / archive_entry_pathname(entry);
+        archive_entry_set_pathname(entry, entry_path.string().c_str());
 
-        if (archive_entry_filetype(entry) == AE_IFDIR) {
-            std::filesystem::create_directories(entry_path);
-        } else {
-            std::filesystem::create_directories(entry_path.parent_path());
-            std::ofstream out_file(entry_path, std::ios::binary);
-            if (!out_file.is_open()) {
-                LOG(ERROR) << "Cannot create file: " << entry_path;
-                archive_read_free(a);
-                return false;
-            }
+        if ((r = archive_write_header(ext, entry)) != ARCHIVE_OK) {
+            LOG(ERROR) << "Failed to write file header: "
+                       << archive_error_string(ext);
+            continue;
+        }
 
-            const void* buff;
-            size_t size;
-            la_int64_t offset;
-            while ((r = archive_read_data_block(a, &buff, &size, &offset)) ==
-                   ARCHIVE_OK) {
-                out_file.write(static_cast<const char*>(buff), size);
-            }
-
-            if (r != ARCHIVE_EOF) {
-                LOG(ERROR) << "Failed to extract file: "
-                           << archive_error_string(a);
-                archive_read_free(a);
+        const void* buff;
+        size_t size;
+        la_int64_t offset;
+        while ((r = archive_read_data_block(a, &buff, &size, &offset)) ==
+               ARCHIVE_OK) {
+            if (archive_write_data_block(ext, buff, size, offset) < 0) {
+                LOG(ERROR) << "Failed to write file data: "
+                           << archive_error_string(ext);
                 return false;
             }
         }
-        archive_read_data_skip(a);
+
+        if (r != ARCHIVE_EOF) {
+            LOG(ERROR) << "Failed to extract file: " << archive_error_string(a);
+            return false;
+        }
+
+        archive_write_finish_entry(ext);
     }
 
     archive_read_close(a);
     archive_read_free(a);
+    archive_write_close(ext);
+    archive_write_free(ext);
+
     return true;
 }
