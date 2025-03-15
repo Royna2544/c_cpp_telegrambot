@@ -30,7 +30,7 @@ function(command_module)
                return()
             endif()
         elseif(TGBOT_CMDMODULE_PLATFORM STREQUAL "Linux")
-            if (NOT LINUX)
+            if (NOT LINUX AND NOT ANDROID)
                 message(STATUS "Command ${TGBOT_CMDMODULE_NAME} is disabled (Not Linux)")
                 return()
             endif()
@@ -47,7 +47,7 @@ function(command_module)
     set(TGBOT_CMDMODULE_LIBNAME ${CMDMODULE_PREFIX}${TGBOT_CMDMODULE_NAME})
     add_library(${TGBOT_CMDMODULE_LIBNAME} SHARED ${TGBOT_CMDMODULE_SRCS})
     set_target_properties(${TGBOT_CMDMODULE_LIBNAME} PROPERTIES PREFIX "lib")
-    target_link_libraries(${TGBOT_CMDMODULE_LIBNAME} ${TGBOT_CMDMODULE_LIBS} absl::log fmt::fmt)
+    target_link_libraries(${TGBOT_CMDMODULE_LIBNAME} ${TGBOT_CMDMODULE_LIBS} absl::log fmt::fmt Api)
     target_include_directories(${TGBOT_CMDMODULE_LIBNAME} PRIVATE
         $<TARGET_PROPERTY:Random,INTERFACE_INCLUDE_DIRECTORIES>
         $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>

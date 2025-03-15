@@ -26,6 +26,7 @@ class Utils_API ConfigManager {
         GITHUB_TOKEN,
         OPTIONAL_COMPONENTS,
         VIRUSTOTAL_API_KEY,
+        BUILDBUDDY_API_KEY,
         MAX
     };
     static constexpr size_t CONFIG_MAX = static_cast<int>(Configs::MAX);
@@ -126,7 +127,13 @@ class Utils_API ConfigManager {
             Entry::ALIAS_NONE,
             Entry::ArgType::STRING,
         },
-    };
+        {
+            Configs::BUILDBUDDY_API_KEY,
+            "BUILDBUDDY_API_KEY",
+            "BuildBuddy API key",
+            Entry::ALIAS_NONE,
+            Entry::ArgType::STRING,
+        }};
 
     struct Backend {
         virtual ~Backend() = default;

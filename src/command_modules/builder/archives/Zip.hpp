@@ -75,4 +75,7 @@ class Zip {
      * @return true if the zip archive was successfully saved, false otherwise.
      */
     bool save();
+
+    static bool extract(const std::filesystem::path& zipfile,
+                        const std::filesystem::path& output_dir);
 };

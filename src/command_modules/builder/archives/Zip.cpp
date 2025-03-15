@@ -41,7 +41,7 @@ bool Zip::addFile(const std::filesystem::path& filepath,
         LOG(ERROR) << "File already added: " << entryname;
         return false;
     }
-    
+
     // Get file size
     std::error_code ec;
     uintmax_t filesize = std::filesystem::file_size(filepath, ec);
@@ -128,5 +128,58 @@ bool Zip::save() {
     }
     archive_write_free(archive);
     archive = nullptr;
+    return true;
+}
+
+bool Zip::extract(const std::filesystem::path& zipfile,
+                  const std::filesystem::path& output_dir) {
+    struct archive* a = archive_read_new();
+    struct archive_entry* entry;
+    int r;
+
+    archive_read_support_format_zip(a);
+    archive_read_support_compression_all(a);
+
+    if ((r = archive_read_open_filename(a, zipfile.string().c_str(), 10240)) !=
+        ARCHIVE_OK) {
+        LOG(ERROR) << "Failed to open ZIP file: " << archive_error_string(a);
+        return false;
+    }
+
+    while (archive_read_next_header(a, &entry) == ARCHIVE_OK) {
+        std::filesystem::path entry_path =
+            output_dir / archive_entry_pathname(entry);
+
+        if (archive_entry_filetype(entry) == AE_IFDIR) {
+            std::filesystem::create_directories(entry_path);
+        } else {
+            std::filesystem::create_directories(entry_path.parent_path());
+            std::ofstream out_file(entry_path, std::ios::binary);
+            if (!out_file.is_open()) {
+                LOG(ERROR) << "Cannot create file: " << entry_path;
+                archive_read_free(a);
+                return false;
+            }
+
+            const void* buff;
+            size_t size;
+            la_int64_t offset;
+            while ((r = archive_read_data_block(a, &buff, &size, &offset)) ==
+                   ARCHIVE_OK) {
+                out_file.write(static_cast<const char*>(buff), size);
+            }
+
+            if (r != ARCHIVE_EOF) {
+                LOG(ERROR) << "Failed to extract file: "
+                           << archive_error_string(a);
+                archive_read_free(a);
+                return false;
+            }
+        }
+        archive_read_data_skip(a);
+    }
+
+    archive_read_close(a);
+    archive_read_free(a);
     return true;
 }

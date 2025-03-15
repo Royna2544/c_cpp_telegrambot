@@ -105,6 +105,13 @@ DeferredExit ROMBuildTask::runFunction() {
     // This is the build user/host config
     shell.env["BUILD_HOSTNAME"] = "build-server";
     shell.env["BUILD_USERNAME"] = "cpp20-tgbot-builder";
+
+    // RBE
+    if (_rbeConfig) {
+        shell.env["RBE_DIR"] = _rbeConfig->reclientDir.string();
+        shell.env["RBE_remote_headers"] =
+            fmt::format("x-buildbuddy-api-key={}", _rbeConfig->api_key);
+    }
     if (!shell.open()) {
         return DeferredExit::generic_fail;
     }
@@ -147,6 +154,9 @@ DeferredExit ROMBuildTask::runFunction() {
     }
 
     shell << "set -e" << ForkAndRunShell::endl;
+    if (_rbeConfig) {
+        shell << ". " << _rbeConfig->baseScript << ForkAndRunShell::endl;
+    }
     shell << ". build/envsetup.sh" << ForkAndRunShell::endl;
     shell << "unset USE_CCACHE" << ForkAndRunShell::endl;
     const auto lunch = [&, this](std::string_view release) {
@@ -276,14 +286,15 @@ void ROMBuildTask::onExit(int exitCode) {
 }
 
 ROMBuildTask::ROMBuildTask(TgBotApi::Ptr api, TgBot::Message::Ptr message,
-                           PerBuildData data)
+                           PerBuildData data, std::optional<RBEConfig> rbecfg)
     : api(api),
       data(std::move(data)),
       message(std::move(message)),
       clock(std::chrono::system_clock::now()),
       startTime(clock),
       smem(std::make_unique<AllocatedShmem>(kShmemROMBuild,
-                                            sizeof(PerBuildData::ResultData))) {
+                                            sizeof(PerBuildData::ResultData))),
+      _rbeConfig(std::move(rbecfg)) {
     auto romBuildArticle(std::make_shared<TgBot::InlineQueryResultArticle>());
     romBuildArticle->title = "Build progress";
     romBuildArticle->description = fmt::format(

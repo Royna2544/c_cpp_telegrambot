@@ -9,6 +9,7 @@ tgbot_library(
         JsonCpp::JsonCpp
         BuilderUtilsLinux
 	CurlDownload
+	Archives
     NO_LIBPREFIX
     STATIC
 )

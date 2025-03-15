@@ -59,6 +59,18 @@ struct FDLogSink : public absl::LogSink {
     pid_t pid_;
 };
 
+#ifdef __x86_64__
+#define ENABLE_PTRACE_HOOK
+#endif
+
+#ifdef ENABLE_PTRACE_HOOK
+
+#include <sys/ptrace.h>
+#include <sys/syscall.h>
+#include <sys/types.h>
+#include <sys/user.h>
+#include <sys/wait.h>
+
 std::string read_string_from_child(pid_t child_pid, unsigned long addr) {
     std::array<char, PATH_MAX> buf{};
     int i = 0;
@@ -107,7 +119,7 @@ DeferredExit ptrace_common_parent(pid_t pid,
 
     // Loop to trace the system calls
     while (true) {
-        struct user_regs_struct regs {};
+        struct user_regs_struct regs{};
         bool blockReq = false;
 
         // Step to the next system call entry or exit
@@ -185,6 +197,16 @@ void ptrace_common_child() {
     // Trigger a stop so the parent can start tracing
     kill(getpid(), SIGSTOP);
 }
+
+#else  // ENABLE_PTRACE_HOOK
+
+static inline DeferredExit ptrace_common_parent(
+    pid_t pid, const std::filesystem::path& /*path*/) {
+    return DeferredExit::generic_fail;
+}
+static inline void ptrace_common_child() {}
+
+#endif  // ENABLE_PTRACE_HOOK
 
 ForkAndRun::Env::ValueEntry ForkAndRun::Env::operator[](
     const std::string_view key) {
@@ -458,6 +480,10 @@ DeferredExit ForkAndRunSimple::execute() {
         rawArgs.emplace_back(arg.data());
     }
     rawArgs.emplace_back(nullptr);
+#ifndef ENABLE_PTRACE_HOOK
+    // TODO: Option-ize
+    constexpr bool kEnablePtraceHook = false;
+#endif
 
     // Execute the program
     pid_t pid = fork();
@@ -465,7 +491,6 @@ DeferredExit ForkAndRunSimple::execute() {
         if constexpr (kEnablePtraceHook) {
             ptrace_common_child();
         }
-
         // Craft envp
         auto [envp, owners] = env.craft();
 
@@ -494,6 +519,10 @@ ForkAndRunShell::ForkAndRunShell(std::string shellName)
 bool ForkAndRunShell::open() {
     LOG(INFO) << "Using shell: " << _shellName;
 
+#ifndef ENABLE_PTRACE_HOOK
+    // TODO: Option-ize
+    constexpr bool kEnablePtraceHook = false;
+#endif
     if (!pipe_.pipe()) {
         PLOG(ERROR) << "Failed to create pipe";
         return false;

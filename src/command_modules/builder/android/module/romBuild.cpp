@@ -23,21 +23,14 @@
 #include <tasks/UploadFileTask.hpp>
 #include <utility>
 
+#include "CurlUtils.hpp"
 #include "ForkAndRun.hpp"
 #include "SystemInfo.hpp"
 #include "support/CwdRestorar.hpp"
 #include "support/KeyBoardBuilder.hpp"
 #include "utils/CommandLine.hpp"
 #include "utils/ConfigManager.hpp"
-
-template <typename Impl>
-concept canCreateWithApi =
-    requires(TgBotApi::Ptr api, Message::Ptr message, PerBuildData data) {
-        Impl{api, message, data};
-    };
-
-template <typename Impl>
-concept canCreateWithData = requires(PerBuildData data) { Impl{data}; };
+#include <Zip.hpp>
 
 using std::string_literals::operator""s;
 
@@ -46,6 +39,7 @@ class ROMBuildQueryHandler {
         bool do_repo_sync = true;
         bool do_upload = true;
         bool didpin = false;
+        bool do_use_rbe = false;
     };
     constexpr static std::string_view kBuildDirectory = "rom_build/";
     constexpr static std::string_view kOutDirectory = "out/";
@@ -55,6 +49,7 @@ class ROMBuildQueryHandler {
     TgBotApi::Ptr _api;
     CommandLine* _commandLine;
     AuthContext* _auth;
+    ConfigManager* _config;
     using KeyboardType = TgBot::InlineKeyboardMarkup::Ptr;
 
     struct {
@@ -85,7 +80,8 @@ class ROMBuildQueryHandler {
 
    public:
     ROMBuildQueryHandler(TgBotApi::Ptr api, Message::Ptr userMessage,
-                         CommandLine* line, AuthContext *uath);
+                         CommandLine* line, AuthContext* uath,
+                         ConfigManager* mgr);
 
     void updateSentMessage(Message::Ptr message);
     void start(Message::Ptr userMessage);
@@ -129,6 +125,8 @@ class ROMBuildQueryHandler {
     void handle_upload(const Query& query);
     // Handle pin message settings
     void handle_pin_message(const Query& query);
+    // Handle use rbe settings
+    void handle_use_rbe(const Query& query);
 
     // Handle back button
     void handle_back(const Query& /*query*/);
@@ -180,6 +178,7 @@ class ROMBuildQueryHandler {
         DECLARE_BUTTON_HANDLER("Confirm", confirm),
         DECLARE_BUTTON_HANDLER("Do upload", upload),
         DECLARE_BUTTON_HANDLER("Pin the build message", pin_message),
+        DECLARE_BUTTON_HANDLER("Use RBE service", use_rbe),
         DECLARE_BUTTON_HANDLER_WITHPREFIX("Clean directories",
                                           clean_directories, "clean_"),
         DECLARE_BUTTON_HANDLER_WITHPREFIX("Select local manifest",
@@ -199,7 +198,8 @@ class ROMBuildQueryHandler {
         confirm,
         upload,
         pin_message,
-        clean_folders
+        use_rbe,
+        clean_folders,
     };
 
     ForkAndRun* current{};
@@ -328,11 +328,11 @@ class TaskWrapperBase {
         RepoSyncTask impl(api, sentMessage, data, std::move(gitAskPassFile));
         return executeCommon(std::move(impl));
     }
-    bool execute()
+    bool execute(std::optional<ROMBuildTask::RBEConfig> cfg)
         requires std::is_same_v<Impl, ROMBuildTask>
     {
         preexecute();
-        ROMBuildTask impl(api, sentMessage, data);
+        ROMBuildTask impl(api, sentMessage, data, std::move(cfg));
         return executeCommon(std::move(impl));
     }
     bool execute(std::filesystem::path scriptDirectory)
@@ -444,14 +444,16 @@ class Upload : public TaskWrapperBase<UploadFileTask> {
 
 ROMBuildQueryHandler::ROMBuildQueryHandler(TgBotApi::Ptr api,
                                            Message::Ptr userMessage,
-                                           CommandLine* line, AuthContext* auth)
+                                           CommandLine* line, AuthContext* auth,
+                                           ConfigManager* config)
     : _api(api),
       _commandLine(line),
       parser(line->getPath(FS::PathType::RESOURCES) / "builder" / "android"),
-      _auth(auth) {
+      _auth(auth),
+      _config(config) {
     settingsKeyboard =
         createKeyboardWith<Buttons::repo_sync, Buttons::upload,
-                           Buttons::pin_message, Buttons::back>();
+                           Buttons::pin_message, Buttons::use_rbe, Buttons::back>();
     mainKeyboard =
         createKeyboardWith<Buttons::build_rom, Buttons::send_system_info,
                            Buttons::settings, Buttons::cancel,
@@ -494,6 +496,12 @@ void ROMBuildQueryHandler::handle_upload(const Query& query) {
     do_upload = !do_upload;
     (void)_api->answerCallbackQuery(query->id,
                                     keyToString("Uploading", do_upload));
+}
+
+void ROMBuildQueryHandler::handle_use_rbe(const Query& query) {
+    do_use_rbe = !do_use_rbe;
+    (void)_api->answerCallbackQuery(query->id,
+                                    keyToString("Use RBE", do_use_rbe));
 }
 
 void ROMBuildQueryHandler::handle_pin_message(const Query& query) {
@@ -546,9 +554,10 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     }
     auto scriptDirectory =
         _commandLine->getPath(FS::PathType::RESOURCES_SCRIPTS);
+    auto buildDirectory =
+        _commandLine->getPath(FS::PathType::INSTALL_ROOT) / kBuildDirectory;
     auto gitAskFile = scriptDirectory / RepoSyncTask::kGitAskPassFile;
-    CwdRestorer cwd(_commandLine->getPath(FS::PathType::INSTALL_ROOT) /
-                    kBuildDirectory);
+    CwdRestorer cwd(buildDirectory);
     if (!cwd) {
         _api->editMessage(sentMessage, "Failed to push cwd");
         return;
@@ -560,8 +569,27 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
             return;
         }
     }
+    std::optional<ROMBuildTask::RBEConfig> config;
+    if (do_use_rbe) {
+        config.emplace();
+        config->baseScript = scriptDirectory / "rbe_env.sh";
+        config->api_key =
+            _config->get(ConfigManager::Configs::BUILDBUDDY_API_KEY)
+                .value_or("");
+        config->reclientDir = buildDirectory / "rbe_cli";
+
+        if (!std::filesystem::exists(config->reclientDir)) {
+            LOG(INFO) << "Downloading reclient...";
+            auto zipFile = buildDirectory / "rbe.zip";
+            CURL_download_file(
+                "https://github.com/xyz-sundram/Releases/releases/download/"
+                "client-linux-amd64/client-linux-amd64.zip",
+                zipFile);
+            Zip::extract(zipFile, config->reclientDir);
+        }
+    }
     Build build(this, per_build, _api, _userMessage);
-    if (!build.execute()) {
+    if (!build.execute(config)) {
         LOG(INFO) << "Build::execute fails...";
         return;
     }
@@ -812,7 +840,8 @@ DECLARE_COMMAND_HANDLER(rombuild) {
 
     try {
         handler = std::make_shared<ROMBuildQueryHandler>(
-            api, message->message(), provider->cmdline.get(), provider->auth.get());
+            api, message->message(), provider->cmdline.get(),
+            provider->auth.get(), provider->config.get());
     } catch (const std::exception& e) {
         LOG(ERROR) << "Failed to create ROMBuildQueryHandler: " << e.what();
         api->sendMessage(message->get<MessageAttrs::Chat>(),

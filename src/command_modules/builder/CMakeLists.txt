@@ -32,16 +32,18 @@ tgbot_library(
     STATIC
 )
 
-if (NOT LINUX OR NOT CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|amd64")
-    message(STATUS "Builder: Unsupported platform (Which is ${CMAKE_SYSTEM_PROCESSOR} on ${CMAKE_SYSTEM_NAME})")
-    return()
-endif()
-
 find_package(LibArchive)
 find_package(Boost CONFIG)
 
 if (NOT LibArchive_FOUND OR NOT Boost_FOUND)
     message(STATUS "Builder: No libarchive or Boost.Unit")
+    return()
+endif()
+
+add_subdirectory(archives)
+
+if (NOT LINUX AND NOT ANDROID)
+    message(STATUS "Builder: Unsupported platform: ${CMAKE_SYSTEM_NAME})")
     return()
 endif()
 
@@ -51,15 +53,12 @@ tgbot_library(
         ForkAndRun.cpp
         Shmem.cpp
         SystemInfo.cpp
-        archives/Zip.cpp
-        archives/Tar.cpp
     LIBS
         LogInit
         SocketSelectors
         sighandler
         progress
     LIBS_STATIC
-        LibArchive::LibArchive
         Boost::boost
         RepoSwitcher
     NO_LIBPREFIX

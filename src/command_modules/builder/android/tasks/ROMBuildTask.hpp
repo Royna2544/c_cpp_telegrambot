@@ -7,13 +7,19 @@
 #include <memory>
 #include <string_view>
 
-#include "Shmem.hpp"
 #include "../../support/KeyBoardBuilder.hpp"
+#include "Shmem.hpp"
 
 struct ROMBuildTask : ForkAndRun {
     static constexpr std::string_view kShmemROMBuild = "shmem_rombuild";
     static constexpr std::string_view kErrorLogFile = "out/error.log";
     static constexpr std::string_view kPreLogFile = "out/preappend.log";
+
+    struct RBEConfig {
+        std::filesystem::path baseScript;
+        std::string api_key;
+        std::filesystem::path reclientDir;
+    };
 
     /**
      * @brief Runs the function that performs the repository synchronization.
@@ -58,7 +64,7 @@ struct ROMBuildTask : ForkAndRun {
      * @param exitCode The exit code of the process.
      */
     void onExit(int exitCode) override;
-    
+
     /**
      * Creates a new ROMBuildTask object.
      *
@@ -66,9 +72,8 @@ struct ROMBuildTask : ForkAndRun {
      * @param message The Telegram message associated with the build task.
      * @param data Per-build configuration and path data.
      */
-    explicit ROMBuildTask(
-        TgBotApi::Ptr api,
-        Message::Ptr message, PerBuildData data);
+    explicit ROMBuildTask(TgBotApi::Ptr api, Message::Ptr message,
+                          PerBuildData data, std::optional<RBEConfig> rbecfg);
     ~ROMBuildTask() override;
 
    private:
@@ -80,5 +85,6 @@ struct ROMBuildTask : ForkAndRun {
     std::chrono::system_clock::time_point startTime;
     TgBot::InputTextMessageContent::Ptr textContent;
     KeyboardBuilder builder;
+    std::optional<RBEConfig> _rbeConfig;
     bool once = false;
 };
