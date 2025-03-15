@@ -270,7 +270,7 @@ class TaskWrapperBase {
         this->data.result = &result;
         backKeyboard =
             KeyboardBuilder()
-                .addKeyboard({{"Back", "back"}, {"Retry", "confirm"}})
+                .addKeyboard({{"Back", "back"}, {"Retry", "confirm"}, {"Tick RepoSync", "repo_sync"}})
                 .get();
         cancelKeyboard =
             KeyboardBuilder().addKeyboard({{"Cancel", "cancel"}}).get();
