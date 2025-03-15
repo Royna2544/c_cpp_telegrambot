@@ -50,7 +50,7 @@ struct RAIILogSink {
     std::unique_ptr<Sink> _sink;
 };
 
-struct FileSinkBase : absl::LogSink {
+struct StdFileSink : absl::LogSink {
     void Send(const absl::LogEntry& entry) override {
         const std::lock_guard<std::mutex> lock(m);
         if (entry.log_severity() < absl::LogSeverity::kError) {
@@ -58,25 +58,35 @@ struct FileSinkBase : absl::LogSink {
                 entry.text_message_with_prefix_and_newline().data());
         }
     }
-    FileSinkBase() = default;
-    ~FileSinkBase() override = default;
+    StdFileSink() : file(StderrF()) {}
+    ~StdFileSink() override = default;
 
-   protected:
+   private:
     std::mutex m;
     F file;
 };
 
-struct LogFileSink : FileSinkBase {
-    explicit LogFileSink(std::string_view filename) {
-        const auto& res = file.open(filename, F::Mode::Write);
+struct LogFileSink : absl::LogSink {
+    explicit LogFileSink(std::filesystem::path filename) {
+        const auto& res = file.open(filename.string(), F::Mode::Write);
         if (!res) {
             LOG(ERROR) << "Couldn't open file " << filename << ": "
                        << res.reason;
             file = nullptr;
         }
+        LOG(INFO) << "File " << filename << " added as logsink";
     }
+
+    void Send(const absl::LogEntry& entry) override {
+        const std::lock_guard<std::mutex> lock(m);
+        (void)file.puts(entry.text_message_with_prefix_and_newline().data());
+    }
+
+    ~LogFileSink() override = default;
+
+   private:
+    std::mutex m;
+    F file;
 };
 
-struct StdFileSink : FileSinkBase {
-    StdFileSink() noexcept { file = std::move(StderrF()); }
-};
+constexpr std::string_view kDefaultLogFile = "tgbot.log";

@@ -215,3 +215,8 @@ multi_command_module(
     PROVIDES up down
     SRCS updown.cpp
 )
+
+command_module(
+    NAME log
+    SRCS log.cpp
+)

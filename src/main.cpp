@@ -43,8 +43,9 @@
 #include <trivial_helpers/fruit_inject.hpp>
 #include <utility>
 #include <vector>
-#include "utils/Env.hpp"
+
 #include "SocketContext.hpp"
+#include "utils/Env.hpp"
 
 class RegexHandlerInterface : public RegexHandler::Interface {
    public:
@@ -535,13 +536,20 @@ int main(int argc, char** argv) {
 
     auto configMgr = injector.get<ConfigManager*>();
 
-    // Initialize logging
+    auto defLogFile =
+        std::filesystem::temp_directory_path(ec) / kDefaultLogFile;
+
+    if (std::filesystem::exists(defLogFile, ec)) {
+        std::filesystem::remove(defLogFile, ec);
+    }
+
+    RAIILogSink<LogFileSink> defFileSink(defLogFile);
+
+    // Initialize conditional logging
     RAIILogSink<LogFileSink> logFileSink;
 
-    LOG(INFO) << "Registered LogSink_stdout";
     if (const auto it = configMgr->get(ConfigManager::Configs::LOG_FILE); it) {
         auto sink = std::make_unique<LogFileSink>(*it);
-        LOG(INFO) << "Register LogSink_file: " << it.value();
         logFileSink = std::move(sink);
     }
 
@@ -609,7 +617,8 @@ int main(int argc, char** argv) {
     }
 
     CommandLine cmdline{argc, argv};
-    Env()["TGBOT_INSTALL_ROOT"] = cmdline.getPath(FS::PathType::INSTALL_ROOT).string();
+    Env()["TGBOT_INSTALL_ROOT"] =
+        cmdline.getPath(FS::PathType::INSTALL_ROOT).string();
 
     while (!SignalHandler::isSignaled()) {
         try {
