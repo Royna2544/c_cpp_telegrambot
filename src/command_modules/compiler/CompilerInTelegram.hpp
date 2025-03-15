@@ -16,9 +16,9 @@ using TgBot::Message;
 
 struct CompilerInTg {
     /**
-     * @brief Abstract interface to handle execution events.
+     * @brief Abstract callback to handle execution events.
      *
-     * This interface defines methods to handle various events
+     * This callback defines methods to handle various events
      * that occur during the execution process, such as when
      * an execution starts, finishes, encounters an error,
      * produces results, or times out.
@@ -88,12 +88,12 @@ struct CompilerInTg {
     };
 
     /**
-     * @brief This functions proivides a common interface for the command
+     * @brief This functions proivides a common callback for the command
      * implementations.
      */
     virtual void run(MessageExt::Ptr message) = 0;
 
-    explicit CompilerInTg(std::unique_ptr<Interface> interface,
+    explicit CompilerInTg(std::unique_ptr<Interface> callback,
                           const StringResLoader::PerLocaleMap* loader);
     virtual ~CompilerInTg() = default;
 
@@ -112,15 +112,15 @@ struct CompilerInTg {
     constexpr static std::string_view EMPTY = "(empty)";
 
    protected:
-    std::unique_ptr<Interface> _interface;
+    std::unique_ptr<Interface> _callback;
     const StringResLoader::PerLocaleMap* _locale;
 };
 
 struct CompilerInTgForBash : CompilerInTg {
-    CompilerInTgForBash(std::unique_ptr<Interface> interface,
+    CompilerInTgForBash(std::unique_ptr<Interface> callback,
                         const StringResLoader::PerLocaleMap* _loader,
                         bool allowhang)
-        : CompilerInTg(std::move(interface), _loader), allowhang(allowhang) {}
+        : CompilerInTg(std::move(callback), _loader), allowhang(allowhang) {}
     ~CompilerInTgForBash() override = default;
     void run(MessageExt::Ptr message) override;
 
@@ -136,9 +136,9 @@ struct CompilerInTgForGeneric : CompilerInTg {
         std::filesystem::path outfile;
     };
     explicit CompilerInTgForGeneric(
-        std::unique_ptr<Interface> interface,
+        std::unique_ptr<Interface> callback,
         const StringResLoader::PerLocaleMap* _locale, Params params)
-        : CompilerInTg(std::move(interface), _locale),
+        : CompilerInTg(std::move(callback), _locale),
           params(std::move(params)) {}
 
     Params params;

@@ -10,7 +10,7 @@
 bool CompilerInTgForGeneric::verifyParseWrite(const MessageExt::Ptr& message,
                                               std::string& extraargs) {
     if (!message->reply()->has<MessageAttrs::ExtraText>()) {
-        _interface->onErrorStatus(absl::InvalidArgumentError(
+        _callback->onErrorStatus(absl::InvalidArgumentError(
             _locale->get(Strings::REPLY_TO_A_CODE).data()));
         return false;
     }
@@ -19,7 +19,7 @@ bool CompilerInTgForGeneric::verifyParseWrite(const MessageExt::Ptr& message,
     }
     std::ofstream file(params.outfile);
     if (file.fail()) {
-        _interface->onErrorStatus(absl::InternalError(
+        _callback->onErrorStatus(absl::InternalError(
             _locale->get(Strings::FAILED_TO_WRITE_FILE).data()));
         return false;
     }
@@ -37,7 +37,7 @@ void CompilerInTgForGeneric::run(MessageExt::Ptr message) {
         cmd << params.exe.string() << SPACE << extargs << SPACE
             << params.outfile.string();
         runCommand(cmd.str(), res);
-        _interface->onResultReady(res.str());
+        _callback->onResultReady(res.str());
         std::filesystem::remove(params.outfile);
     }
 }

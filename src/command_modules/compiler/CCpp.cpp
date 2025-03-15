@@ -31,6 +31,6 @@ void CompilerInTgForCCpp::run(MessageExt::Ptr message) {
             std::filesystem::remove(aoutname);
         }
         std::filesystem::remove(params.outfile);
-        _interface->onResultReady(resultbuf.str());
+        _callback->onResultReady(resultbuf.str());
     }
 }

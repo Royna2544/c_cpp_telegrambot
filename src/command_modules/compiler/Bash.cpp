@@ -5,9 +5,9 @@ void CompilerInTgForBash::run(MessageExt::Ptr message) {
 
     if (message->has<MessageAttrs::ExtraText>()) {
         runCommand(message->get<MessageAttrs::ExtraText>(), res, !allowhang);
-        _interface->onResultReady(res.str());
+        _callback->onResultReady(res.str());
     } else {
-        _interface->onErrorStatus(absl::InvalidArgumentError(
+        _callback->onErrorStatus(absl::InvalidArgumentError(
             _locale->get(Strings::SEND_BASH_COMMAND).data()));
     }
 }

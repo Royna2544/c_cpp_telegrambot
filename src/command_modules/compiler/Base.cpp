@@ -17,9 +17,9 @@ using std::chrono_literals::operator""ms;
 using std::chrono::high_resolution_clock;
 using std::chrono::milliseconds;
 
-CompilerInTg::CompilerInTg(std::unique_ptr<Interface> interface,
+CompilerInTg::CompilerInTg(std::unique_ptr<Interface> callback,
                            const StringResLoader::PerLocaleMap*loader)
-    : _interface(std::move(interface)), _locale(loader) {}
+    : _callback(std::move(callback)), _locale(loader) {}
 
 void CompilerInTg::runCommand(std::string cmd, std::stringstream &res,
                               bool use_wdt) {
@@ -30,12 +30,12 @@ void CompilerInTg::runCommand(std::string cmd, std::stringstream &res,
     popen_watchdog_data_t *p_wdt_data = nullptr;
 
     LOG(INFO) << __func__ << ": +++";
-    _interface->onExecutionStarted(cmd);
+    _callback->onExecutionStarted(cmd);
     LOG(INFO) << fmt::format("Command is: '{}'", cmd);
 
     if (!popen_watchdog_init(&p_wdt_data)) {
         LOG(ERROR) << "popen_watchdog_init failed";
-        _interface->onErrorStatus(
+        _callback->onErrorStatus(
             absl::InternalError("popen_watchdog_init failed"));
         return;
     }
@@ -46,7 +46,7 @@ void CompilerInTg::runCommand(std::string cmd, std::stringstream &res,
     if (!popen_watchdog_start(&p_wdt_data)) {
         LOG(ERROR) << "popen_watchdog_start failed";
         popen_watchdog_destroy(&p_wdt_data);
-        _interface->onErrorStatus(
+        _callback->onErrorStatus(
             absl::InternalError("popen_watchdog_start failed"));
         return;
     }
@@ -63,10 +63,10 @@ void CompilerInTg::runCommand(std::string cmd, std::stringstream &res,
     }
     if (use_wdt) {
         if (popen_watchdog_activated(&p_wdt_data)) {
-            _interface->onWdtTimeout();
+            _callback->onWdtTimeout();
         }
     }
     auto ret = popen_watchdog_destroy(&p_wdt_data);
-    _interface->onExecutionFinished(cmd, ret);
+    _callback->onExecutionFinished(cmd, ret);
     LOG(INFO) << __func__ << ": ---";
 }
