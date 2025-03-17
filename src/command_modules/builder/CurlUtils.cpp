@@ -9,36 +9,18 @@
 #include "BytesConversion.hpp"
 #include "utils/libfs.hpp"
 
-bool CURL_download_file(const std::string_view url,
-                        const std::filesystem::path& where) {
-    std::string result;
-    CURL* curl = nullptr;
-    CURLcode res{};
-
-    LOG(INFO) << "Downloading " << url << " to " << where;
-    curl = curl_easy_init();
+static CURL* CURL_setup_common(const std::string_view url) {
+    CURL* curl = curl_easy_init();
     if (curl == nullptr) {
         LOG(ERROR) << "Cannot initialize curl";
-        return false;
+        return nullptr;
     }
+
     curl_easy_setopt(curl, CURLOPT_URL, url.data());
     // Follow up to 5 redirects
     curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 5L);
     // Enable 302 redirects
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-
-    if (createDirectory(where.parent_path())) {
-        LOG(ERROR) << "Cannot create directory: " << where.parent_path();
-        return false;
-    }
-    F file;
-    if (!file.open(where, F::Mode::WriteBinary)) {
-        LOG(ERROR) << "Cannot open file for writing";
-        return false;
-    }
-    // Write callback
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, fwrite);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, static_cast<FILE*>(file));
 
     // Set progress callback
     curl_easy_setopt(
@@ -52,30 +34,66 @@ bool CURL_download_file(const std::string_view url,
             return 1;  // Continue downloading
         });
     curl_easy_setopt(curl, CURLOPT_XFERINFODATA, nullptr);
-    // Execute it
-    res = curl_easy_perform(curl);
+
+    return curl;
+}
+
+static bool CURL_perform_common(CURL* curl) {
+    CURLcode res = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
     if (res != CURLE_OK) {
-        LOG(ERROR) << curl_easy_strerror(res);
-        LOG(ERROR) << "Cannot download file";
+        LOG(ERROR) << "Cannot download file: " << curl_easy_strerror(res);
         return false;
     }
-    LOG(INFO) << "Wrote downloaded file to " << where;
     return true;
 }
 
+bool CURL_download_file(const std::string_view url,
+                        const std::filesystem::path& where) {
+    LOG(INFO) << "Downloading " << url << " to " << where;
+
+    // Common CURL setup
+    CURL* curl = CURL_setup_common(url);
+    if (curl == nullptr) {
+        LOG(ERROR) << "Cannot setup curl";
+        return false;
+    }
+
+    // Create directory if not exists
+    if (createDirectory(where.parent_path())) {
+        LOG(ERROR) << "Cannot create directory: " << where.parent_path();
+        return false;
+    }
+
+    // Open the file for writing
+    F file;
+    if (!file.open(where, F::Mode::WriteBinary)) {
+        LOG(ERROR) << "Cannot open file for writing";
+        return false;
+    }
+    // Write callback
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, fwrite);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, static_cast<FILE*>(file));
+
+    // Execute it
+    bool result = CURL_perform_common(curl);
+    LOG_IF(INFO, result) << "Download succeeded, wrote to " << where;
+    return result;
+}
+
 std::optional<std::string> CURL_download_memory(const std::string_view url) {
-    CURL* curl = nullptr;
-    CURLcode res{};
     std::string result;
 
     LOG(INFO) << "Downloading " << url << " to memory";
-    curl = curl_easy_init();
+
+    // Common CURL setup
+    CURL* curl = CURL_setup_common(url);
     if (curl == nullptr) {
-        LOG(ERROR) << "Cannot initialize curl";
+        LOG(ERROR) << "Cannot setup curl";
         return std::nullopt;
     }
-    curl_easy_setopt(curl, CURLOPT_URL, url.data());
+
+    // Write callback
     curl_easy_setopt(
         curl, CURLOPT_WRITEFUNCTION,
         +[](void* contents, size_t size, size_t nmemb, void* userp) {
@@ -84,12 +102,12 @@ std::optional<std::string> CURL_download_memory(const std::string_view url) {
             return size * nmemb;
         });
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &result);
-    res = curl_easy_perform(curl);
-    curl_easy_cleanup(curl);
-    if (res != CURLE_OK) {
-        LOG(ERROR) << curl_easy_strerror(res);
-        LOG(ERROR) << "Cannot download from link";
+
+    // Execute it
+    bool exec_result = CURL_perform_common(curl);
+    LOG_IF(INFO, exec_result) << "Download succeeded";
+    if (exec_result)
+        return result;
+    else
         return std::nullopt;
-    }
-    return result;
 }
