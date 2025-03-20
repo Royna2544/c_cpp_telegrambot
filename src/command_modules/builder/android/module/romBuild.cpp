@@ -491,18 +491,21 @@ void ROMBuildQueryHandler::handle_repo_sync(const Query& query) {
     do_repo_sync = !do_repo_sync;
     (void)_api->answerCallbackQuery(query->id,
                                     keyToString("Repo sync", do_repo_sync));
+    handle_settings(query);
 }
 
 void ROMBuildQueryHandler::handle_upload(const Query& query) {
     do_upload = !do_upload;
     (void)_api->answerCallbackQuery(query->id,
                                     keyToString("Uploading", do_upload));
+    handle_settings(query);
 }
 
 void ROMBuildQueryHandler::handle_use_rbe(const Query& query) {
     do_use_rbe = !do_use_rbe;
     (void)_api->answerCallbackQuery(query->id,
                                     keyToString("Use RBE", do_use_rbe));
+    handle_settings(query);
 }
 
 void ROMBuildQueryHandler::handle_pin_message(const Query& query) {
@@ -516,6 +519,7 @@ void ROMBuildQueryHandler::handle_pin_message(const Query& query) {
     }
     didpin = true;
     _api->answerCallbackQuery(query->id, "Pinned message");
+    handle_settings(query);
 }
 
 void ROMBuildQueryHandler::handle_back(const Query& /*query*/) {
@@ -545,7 +549,15 @@ void ROMBuildQueryHandler::handle_send_system_info(const Query& query) {
 }
 
 void ROMBuildQueryHandler::handle_settings(const Query& /*query*/) {
-    _api->editMessage(sentMessage, "Settings", settingsKeyboard);
+    _api->editMessage(sentMessage,
+                      fmt::format(R"(Settings
+
+Pinned: {}
+RepoSync Enabled: {}
+Uploading Enabled: {}
+RBE enabled: {})",
+                                  didpin, do_repo_sync, do_upload, do_use_rbe),
+                      settingsKeyboard);
 }
 
 void ROMBuildQueryHandler::handle_confirm(const Query& query) {
