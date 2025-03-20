@@ -8,6 +8,7 @@
 #include <tgbot/types/ReplyKeyboardRemove.h>
 
 #include <ConfigParsers.hpp>
+#include <Zip.hpp>
 #include <algorithm>
 #include <api/CommandModule.hpp>
 #include <api/TgBotApi.hpp>
@@ -30,7 +31,6 @@
 #include "support/KeyBoardBuilder.hpp"
 #include "utils/CommandLine.hpp"
 #include "utils/ConfigManager.hpp"
-#include <Zip.hpp>
 
 using std::string_literals::operator""s;
 
@@ -268,10 +268,11 @@ class TaskWrapperBase {
           api(api),
           userMessage(std::move(message)) {
         this->data.result = &result;
-        backKeyboard =
-            KeyboardBuilder()
-                .addKeyboard({{"Back", "back"}, {"Retry", "confirm"}, {"Tick RepoSync", "repo_sync"}})
-                .get();
+        backKeyboard = KeyboardBuilder()
+                           .addKeyboard({{"Back", "back"},
+                                         {"Retry", "confirm"},
+                                         {"Tick RepoSync", "repo_sync"}})
+                           .get();
         cancelKeyboard =
             KeyboardBuilder().addKeyboard({{"Cancel", "cancel"}}).get();
     }
@@ -451,9 +452,9 @@ ROMBuildQueryHandler::ROMBuildQueryHandler(TgBotApi::Ptr api,
       parser(line->getPath(FS::PathType::RESOURCES) / "builder" / "android"),
       _auth(auth),
       _config(config) {
-    settingsKeyboard =
-        createKeyboardWith<Buttons::repo_sync, Buttons::upload,
-                           Buttons::pin_message, Buttons::use_rbe, Buttons::back>();
+    settingsKeyboard = createKeyboardWith<Buttons::repo_sync, Buttons::upload,
+                                          Buttons::pin_message,
+                                          Buttons::use_rbe, Buttons::back>();
     mainKeyboard =
         createKeyboardWith<Buttons::build_rom, Buttons::send_system_info,
                            Buttons::settings, Buttons::cancel,
@@ -576,17 +577,24 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
         config->api_key =
             _config->get(ConfigManager::Configs::BUILDBUDDY_API_KEY)
                 .value_or("");
-	LOG_IF(WARNING, config->api_key.empty()) << "Empty API key";
+        LOG_IF(WARNING, config->api_key.empty()) << "Empty API key";
         config->reclientDir = buildDirectory / "rbe_cli";
 
         if (!std::filesystem::exists(config->reclientDir)) {
             LOG(INFO) << "Downloading reclient...";
             auto zipFile = buildDirectory / "rbe.zip";
-            CURL_download_file(
+            bool ret;
+            ret = CURL_download_file(
                 "https://github.com/xyz-sundram/Releases/releases/download/"
                 "client-linux-amd64/client-linux-amd64.zip",
                 zipFile);
-            Zip::extract(zipFile, config->reclientDir);
+            if (!ret) {
+                return;
+            }
+            ret = Zip::extract(zipFile, config->reclientDir);
+            if (!ret) {
+                return;
+            }
         }
     }
     Build build(this, per_build, _api, _userMessage);
