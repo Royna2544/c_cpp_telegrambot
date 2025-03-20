@@ -576,6 +576,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
         config->api_key =
             _config->get(ConfigManager::Configs::BUILDBUDDY_API_KEY)
                 .value_or("");
+	LOG_IF(WARNING, config->api_key.empty()) << "Empty API key";
         config->reclientDir = buildDirectory / "rbe_cli";
 
         if (!std::filesystem::exists(config->reclientDir)) {
