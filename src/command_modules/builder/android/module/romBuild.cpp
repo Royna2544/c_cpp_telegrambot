@@ -474,6 +474,8 @@ void ROMBuildQueryHandler::start(Message::Ptr userMessage) {
     }
     sentMessage = _api->sendMessage(_userMessage->chat, "Will build ROM...",
                                     mainKeyboard);
+    if (didpin)
+        _api->pinMessage(sentMessage);
     per_build.reset();
 }
 
