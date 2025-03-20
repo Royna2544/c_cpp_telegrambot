@@ -808,21 +808,17 @@ void ROMBuildQueryHandler::handle_clean_directories(const Query& query) {
     auto romRootSpace = DiskInfo(romRootDir);
 
     std::error_code ec;
-    entry = "Clean ROM directory";
-    if (!std::filesystem::exists(romRootDir, ec)) {
-        entry += " (Nonexistent)";
+    entry = "Nothing to clean!";
+    if (std::filesystem::exists(romRootDir, ec)) {
+        entry = fmt::format("Current disk space free: {:.2f}GB",
+                            romRootSpace.availableSpace.value()),
+        builder.addKeyboard({"Clean ROM directory", "clean_rom"});
+        if (std::filesystem::exists(romRootDir / kOutDirectory, ec)) {
+            builder.addKeyboard({"Clean ROM build directory", "clean_build"});
+        }
     }
-    builder.addKeyboard({entry, "clean_rom"});
-    entry = "Clean build directory";
-    if (!std::filesystem::exists(romRootDir / kOutDirectory, ec)) {
-        entry += " (Nonexistent)";
-    }
-    builder.addKeyboard({entry, "clean_build"});
     builder.addKeyboard(getButtonOf<Buttons::back>());
-    _api->editMessage(query->message,
-                      fmt::format("Current disk space free: {}GB",
-                                  romRootSpace.availableSpace.value()),
-                      builder.get());
+    _api->editMessage(query->message, entry, builder.get());
 }
 
 void ROMBuildQueryHandler::onCallbackQuery(
