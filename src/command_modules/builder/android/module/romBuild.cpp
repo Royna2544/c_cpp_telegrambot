@@ -515,6 +515,11 @@ void ROMBuildQueryHandler::handle_upload(const Query& query) {
 }
 
 void ROMBuildQueryHandler::handle_use_rbe(const Query& query) {
+    if (!_config->get(ConfigManager::Configs::BUILDBUDDY_API_KEY)) {
+        (void)_api->answerCallbackQuery(
+            query->id, "No BuildBuddy API key set in config!", true);
+        return;
+    }
     do_use_rbe = !do_use_rbe;
     (void)_api->answerCallbackQuery(query->id,
                                     keyToString("Use RBE", do_use_rbe));
