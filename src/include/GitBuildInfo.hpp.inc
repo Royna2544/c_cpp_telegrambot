@@ -19,6 +19,8 @@ constexpr std::string_view OS =
     "Linux";
 #elif defined(__APPLE__)
     "macOS";
+#elif defined(__FreeBSD__)
+    "FreeBSD";
 #else
     "unknown platform";
 #endif
