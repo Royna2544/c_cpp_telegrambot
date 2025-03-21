@@ -120,6 +120,8 @@ class ROMBuildQueryHandler {
 
     // OPTIONS
     // Handle repo sync settings
+    void handle_repo_sync_INTERNAL(const Query& query, bool updateSetting);
+    void handle_repo_sync_only(const Query& query);
     void handle_repo_sync(const Query& query);
     // Handle upload settings
     void handle_upload(const Query& query);
@@ -179,6 +181,7 @@ class ROMBuildQueryHandler {
         DECLARE_BUTTON_HANDLER("Do upload", upload),
         DECLARE_BUTTON_HANDLER("Pin the build message", pin_message),
         DECLARE_BUTTON_HANDLER("Use RBE service", use_rbe),
+        DECLARE_BUTTON_HANDLER("Run repo sync only", repo_sync_only),
         DECLARE_BUTTON_HANDLER_WITHPREFIX("Clean directories",
                                           clean_directories, "clean_"),
         DECLARE_BUTTON_HANDLER_WITHPREFIX("Select local manifest",
@@ -271,7 +274,7 @@ class TaskWrapperBase {
         backKeyboard = KeyboardBuilder()
                            .addKeyboard({{"Back", "back"},
                                          {"Retry", "confirm"},
-                                         {"Tick RepoSync", "repo_sync"}})
+                                         {"Tick RepoSync", "repo_sync_only"}})
                            .get();
         cancelKeyboard =
             KeyboardBuilder().addKeyboard({{"Cancel", "cancel"}}).get();
@@ -474,8 +477,7 @@ void ROMBuildQueryHandler::start(Message::Ptr userMessage) {
     }
     sentMessage = _api->sendMessage(_userMessage->chat, "Will build ROM...",
                                     mainKeyboard);
-    if (didpin)
-        _api->pinMessage(sentMessage);
+    if (didpin) _api->pinMessage(sentMessage);
     per_build.reset();
 }
 
@@ -490,10 +492,19 @@ std::string keyToString(const std::string& key, const bool enabled) {
 }  // namespace
 
 void ROMBuildQueryHandler::handle_repo_sync(const Query& query) {
+    handle_repo_sync_INTERNAL(query, true);
+}
+
+void ROMBuildQueryHandler::handle_repo_sync_only(const Query& query) {
+    handle_repo_sync_INTERNAL(query, false);
+}
+
+void ROMBuildQueryHandler::handle_repo_sync_INTERNAL(const Query& query,
+                                                     bool updatesettings) {
     do_repo_sync = !do_repo_sync;
     (void)_api->answerCallbackQuery(query->id,
                                     keyToString("Repo sync", do_repo_sync));
-    handle_settings(query);
+    if (updatesettings) handle_settings(query);
 }
 
 void ROMBuildQueryHandler::handle_upload(const Query& query) {
