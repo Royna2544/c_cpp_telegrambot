@@ -126,7 +126,7 @@ DeferredExit RepoSyncTask::runFunction() {
     if (repoDirExists) {
         GitBranchSwitcher switcher{".repo/manifests"};
         isSameRepo =
-            switcher.open() && switcher.check({rom->branch, rom->romInfo->url});
+            switcher.open() && switcher.check({rom->romInfo->url, rom->branch});
         LOG_IF(INFO, !isSameRepo)
             << "Re-initializing repo (Different ROM manifest git info)";
     }
