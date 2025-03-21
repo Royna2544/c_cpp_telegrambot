@@ -8,6 +8,7 @@
 #include <TgBotWebpage.hpp>
 #include <iomanip>
 #include <utility>
+#include <fstream>
 
 constexpr bool WEBSERVER_INBOUND_VERBOSE = false;
 
