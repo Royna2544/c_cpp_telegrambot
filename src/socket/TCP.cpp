@@ -27,10 +27,16 @@ struct fmt::formatter<boost::asio::ip::tcp> : formatter<string_view> {
 
 namespace TgBotSocket {
 
-Context::TCP::TCP(const boost::asio::ip::tcp type, const int port)
+#ifndef NDEBUG
+#define bindaddress boost::asio::ip::address::from_string("0.0.0.0")
+#else
+#define bindaddress type
+#endif
+
+Context::TCP::TCP(const boost::asio::ip::tcp type, const uint_least16_t port)
     : socket_(io_context),
       acceptor_(io_context),
-      endpoint_(boost::asio::ip::tcp::endpoint(type, port)) {
+      endpoint_(boost::asio::ip::tcp::endpoint(bindaddress, port)) {
     LOG(INFO) << fmt::format("TCP::TCP: Protocol {} listening on port {}", type,
                              port);
 
@@ -50,17 +56,16 @@ Context::TCP::~TCP() {
     }
 }
 
-bool Context::TCP::write(const SharedMalloc& data) const {
+bool Context::TCP::write(const void* data, const size_t length) const {
     try {
-        std::size_t total_size = data.size();
         std::size_t bytes_written = 0;
-        const char* data_ptr = static_cast<const char*>(data.get());
+        const char* data_ptr = static_cast<const char*>(data);
 
-        DLOG(INFO) << "TCP::write:" << data.size() << " bytes requested";
-        while (bytes_written < total_size) {
+        DLOG(INFO) << "TCP::write:" << length << " bytes requested";
+        while (bytes_written < length) {
             // Calculate the size of the next chunk
             std::size_t write_size = std::min<Packet::Header::length_type>(
-                chunk_size, total_size - bytes_written);
+                chunk_size, length - bytes_written);
 
             // Write the current chunk
             std::size_t written = boost::asio::write(
@@ -71,14 +76,13 @@ bool Context::TCP::write(const SharedMalloc& data) const {
 
             // Log or update progress
             DLOG_EVERY_N_SEC(INFO, 5) << "TCP::write: Sent " << bytes_written
-                                      << " / " << total_size << " bytes.";
+                                      << " / " << length << " bytes.";
 
             // delay 10ms
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
 
-        DLOG(INFO) << "TCP::write: Finished sending " << total_size
-                   << " bytes.";
+        DLOG(INFO) << "TCP::write: Finished sending " << length << " bytes.";
         return true;
 
     } catch (const boost::system::system_error& e) {
@@ -143,13 +147,7 @@ bool Context::TCP::close() const {
     return !ec;
 }
 
-bool Context::TCP::timeout(std::chrono::seconds time) {
-    // Store the timeout duration for use in read/write operations
-    timeout_duration_ = time;
-    return true;
-}
-
-bool Context::TCP::listen(listener_callback_t listener) {
+bool Context::TCP::listen(listener_callback_t listener, bool block) {
     try {
         if (!is_listening_) {
             acceptor_.open(endpoint_.protocol());
@@ -159,7 +157,7 @@ bool Context::TCP::listen(listener_callback_t listener) {
             is_listening_ = true;
         }
         acceptor_.async_accept(
-            socket_, [this, listener](boost::system::error_code ec) {
+            socket_, [this, listener, block](boost::system::error_code ec) {
                 if (ec) {
                     LOG(ERROR) << "Accept error: " << ec.message();
                     return;
@@ -171,10 +169,12 @@ bool Context::TCP::listen(listener_callback_t listener) {
                     // After handling the connection, create a new socket for
                     // the next client
                     socket_ = boost::asio::ip::tcp::socket(io_context);
-                    listen(listener);
+                    listen(listener, block);
                 }
             });
-        io_context.run();
+        if (block) {
+            io_context.run();
+        }
         return true;
     } catch (const boost::system::system_error& e) {
         LOG(ERROR) << "TCP::listen: " << e.what();
@@ -207,16 +207,11 @@ bool Context::TCP::connect(const RemoteEndpoint& endpoint) {
             cv.notify_all();
         });
 
-    if (timeout_duration_.count() > 0) {
-        // Wait for the connection to complete
-        LOG(INFO) << fmt::format("Waiting for connection to complete for {}",
-                                 timeout_duration_);
-        cv.wait_for(lk, timeout_duration_,
-                    [&] { return connected || io_context.stopped(); });
-    } else {
-        // Wait for the connection to complete
-        cv.wait(lk, [&] { return connected || io_context.stopped(); });
-    }
+    // Wait for the connection to complete
+    LOG(INFO) << fmt::format("Waiting for connection to complete for {}",
+                             options.connect_timeout.get());
+    cv.wait_for(lk, options.connect_timeout.get(),
+                [&] { return connected || io_context.stopped(); });
 
     if (!connected) {
         LOG(ERROR) << "Failed to connect to " << endpoint;

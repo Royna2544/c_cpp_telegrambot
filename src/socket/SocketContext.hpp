@@ -13,6 +13,7 @@
 
 #include "SharedMalloc.hpp"
 #include "trivial_helpers/_class_helper_macros.h"
+#include "trivial_helpers/generic_opt.hpp"
 
 using std::chrono_literals::operator""s;
 
@@ -29,10 +30,8 @@ class Socket_API Context {
 
     constexpr static int kTgBotHostPort = 50000;
     constexpr static int kTgBotLogPort = 50001;
+    constexpr static int kTgBotLogTransmitPort = 50002;
 
-    static std::filesystem::path logPath() {
-        return std::filesystem::temp_directory_path() / "tgbot_log.sock";
-    }
     static std::filesystem::path hostPath() {
         return std::filesystem::temp_directory_path() / "tgbot.sock";
     }
@@ -44,16 +43,18 @@ class Socket_API Context {
 
     // A specialized overload to write TgBotSocket::Packet.
     bool write(const TgBotSocket::Packet &packet) const;
+    // Another specialized overload to write SharedMalloc.
+    bool write(const SharedMalloc &data) const;
 
     /**
      * @brief Sends data over the socket connection.
      *
      * This function writes the specified data to the socket.
      *
-     * @param data A `SharedMalloc` object containing the data to be sent.
-     * @return `true` if the data was successfully sent; otherwise, `false`.
+     * @param data A pointer to the data to be sent.
+     * @param length The number of bytes to send.
      */
-    virtual bool write(const SharedMalloc &data) const = 0;
+    virtual bool write(const void *data, const size_t length) const = 0;
 
     /**
      * @brief Reads data from the socket connection.
@@ -78,17 +79,6 @@ class Socket_API Context {
     virtual bool close() const = 0;
 
     /**
-     * @brief Sets a timeout for socket operations.
-     *
-     * Configures the timeout duration for future socket operations such as read
-     * and write.
-     *
-     * @param time The timeout duration as a `std::chrono::seconds` object.
-     * @return `true` if the timeout was successfully set; otherwise, `false`.
-     */
-    virtual bool timeout(std::chrono::seconds time) = 0;
-
-    /**
      * @brief Begins listening for incoming connections.
      *
      * Places the socket into a listening state, allowing it to accept incoming
@@ -96,10 +86,13 @@ class Socket_API Context {
      *
      * @param listener The callback function to be called when connection is
      * established.
+     * @param block If `true`, the function will block.
+     * The blocking behavior has advantage of additional thread launched.
+     *
      * @return `true` if the socket successfully started listening; otherwise,
      * `false`.
      */
-    virtual bool listen(listener_callback_t listener) = 0;
+    virtual bool listen(listener_callback_t listener, bool block = false) = 0;
 
     /**
      * @brief Establishes a connection to a remote endpoint.
@@ -145,6 +138,13 @@ class Socket_API Context {
     // The I/O context.
     boost::asio::io_context io_context;
 
+    struct {
+        template <typename T>
+        using Opt = generic_opt::Option<T>;
+        Opt<std::chrono::seconds> connect_timeout{10};
+        Opt<std::chrono::seconds> io_timeout;
+    } options;
+
     // enum class Role { kNone, kServer, kClient } role;
 };
 
@@ -156,7 +156,6 @@ class Socket_API Context::TCP : public Context {
     boost::asio::ip::tcp::acceptor acceptor_;
     boost::asio::ip::tcp::endpoint endpoint_;
     bool is_listening_ = false;
-    std::chrono::seconds timeout_duration_{};
     constexpr static std::size_t chunk_size = 1024;
     std::thread _ioThread;
 
@@ -168,20 +167,21 @@ class Socket_API Context::TCP : public Context {
      * `boost::asio::ip::tcp::v4()`).
      * @param port The port to use.
      */
-    explicit TCP(const boost::asio::ip::tcp type, const int port);
+    explicit TCP(const boost::asio::ip::tcp type, const uint_least16_t port);
 
     // Virtual destructor.
     ~TCP() override;
+
+    using Context::write;
 
     /**
      * @brief Sends data over the socket connection.
      *
      * This function writes the specified data to the socket.
      *
-     * @param data A `SharedMalloc` object containing the data to be sent.
      * @return `true` if the data was successfully sent; otherwise, `false`.
      */
-    bool write(const SharedMalloc &data) const override;
+    bool write(const void *data, const size_t length) const override;
 
     /**
      * @brief Reads data from the socket connection.
@@ -206,17 +206,6 @@ class Socket_API Context::TCP : public Context {
     bool close() const override;
 
     /**
-     * @brief Sets a timeout for socket operations.
-     *
-     * Configures the timeout duration for future socket operations such as read
-     * and write.
-     *
-     * @param time The timeout duration as a `std::chrono::seconds` object.
-     * @return `true` if the timeout was successfully set; otherwise, `false`.
-     */
-    bool timeout(std::chrono::seconds time) override;
-
-    /**
      * @brief Begins listening for incoming connections.
      *
      * Places the socket into a listening state, allowing it to accept incoming
@@ -225,7 +214,7 @@ class Socket_API Context::TCP : public Context {
      * @return `true` if the socket successfully started listening; otherwise,
      * `false`.
      */
-    bool listen(listener_callback_t listener) override;
+    bool listen(listener_callback_t listener, bool block) override;
 
     /**
      * @brief Establishes a connection to a remote endpoint.
@@ -268,9 +257,17 @@ class Socket_API Context::UDP : public Context {
     mutable boost::asio::ip::udp::socket socket_;
     mutable boost::asio::ip::udp::endpoint endpoint_;
     bool is_listening_ = false;
-    std::chrono::seconds timeout_duration_{};
     std::thread _ioThread;
     constexpr static int MAX_PACKET_SIZE = 0x10000;
+
+    [[nodiscard]] std::optional<SharedMalloc> readNonBlocking(
+        Packet::Header::length_type length) const;
+
+    [[nodiscard]] std::optional<SharedMalloc> readBlocking(
+        Packet::Header::length_type length) const;
+    
+    bool writeBlocking(const void *data, const size_t length) const;
+    bool writeNonBlocking(const void *data, const size_t length) const;
 
    public:
     /**
@@ -280,20 +277,21 @@ class Socket_API Context::UDP : public Context {
      * `boost::asio::ip::tcp::v4()`).
      * @param port The port to use.
      */
-    explicit UDP(const boost::asio::ip::udp type, const int port);
+    explicit UDP(const boost::asio::ip::udp type, const uint_least16_t port);
 
     // Virtual destructor.
     ~UDP() override;
+
+    using Context::write;
 
     /**
      * @brief Sends data over the socket connection.
      *
      * This function writes the specified data to the socket.
      *
-     * @param data A `SharedMalloc` object containing the data to be sent.
      * @return `true` if the data was successfully sent; otherwise, `false`.
      */
-    bool write(const SharedMalloc &data) const override;
+    bool write(const void *data, const size_t length) const override;
 
     /**
      * @brief Reads data from the socket connection.
@@ -318,17 +316,6 @@ class Socket_API Context::UDP : public Context {
     bool close() const override;
 
     /**
-     * @brief Sets a timeout for socket operations.
-     *
-     * Configures the timeout duration for future socket operations such as read
-     * and write.
-     *
-     * @param time The timeout duration as a `std::chrono::seconds` object.
-     * @return `true` if the timeout was successfully set; otherwise, `false`.
-     */
-    bool timeout(std::chrono::seconds time) override;
-
-    /**
      * @brief Begins listening for incoming connections.
      *
      * Places the socket into a listening state, allowing it to accept incoming
@@ -337,7 +324,7 @@ class Socket_API Context::UDP : public Context {
      * @return `true` if the socket successfully started listening; otherwise,
      * `false`.
      */
-    bool listen(listener_callback_t listener) override;
+    bool listen(listener_callback_t listener, bool block) override;
 
     /**
      * @brief Establishes a connection to a remote endpoint.
@@ -381,8 +368,16 @@ class Socket_API Context::Local : public Context {
     mutable boost::asio::local::stream_protocol::acceptor acceptor_;
     boost::asio::local::stream_protocol::endpoint endpoint_;
     bool is_listening_ = false;
-    std::chrono::seconds timeout_duration_{};
     std::thread _ioThread;
+
+    [[nodiscard]] std::optional<SharedMalloc> readNonBlocking(
+        Packet::Header::length_type length) const;
+
+    [[nodiscard]] std::optional<SharedMalloc> readBlocking(
+        Packet::Header::length_type length) const;
+    
+    bool writeBlocking(const void *data, const size_t length) const;
+    bool writeNonBlocking(const void *data, const size_t length) const;
 
    public:
     /**
@@ -402,15 +397,16 @@ class Socket_API Context::Local : public Context {
     // Virtual destructor.
     ~Local() override;
 
+    using Context::write;
+
     /**
      * @brief Sends data over the socket connection.
      *
      * This function writes the specified data to the socket.
      *
-     * @param data A `SharedMalloc` object containing the data to be sent.
      * @return `true` if the data was successfully sent; otherwise, `false`.
      */
-    bool write(const SharedMalloc &data) const override;
+    bool write(const void *data, const size_t length) const override;
 
     /**
      * @brief Reads data from the socket connection.
@@ -435,17 +431,6 @@ class Socket_API Context::Local : public Context {
     bool close() const override;
 
     /**
-     * @brief Sets a timeout for socket operations.
-     *
-     * Configures the timeout duration for future socket operations such as read
-     * and write.
-     *
-     * @param time The timeout duration as a `std::chrono::seconds` object.
-     * @return `true` if the timeout was successfully set; otherwise, `false`.
-     */
-    bool timeout(std::chrono::seconds time) override;
-
-    /**
      * @brief Begins listening for incoming connections.
      *
      * Places the socket into a listening state, allowing it to accept incoming
@@ -454,7 +439,7 @@ class Socket_API Context::Local : public Context {
      * @return `true` if the socket successfully started listening; otherwise,
      * `false`.
      */
-    bool listen(listener_callback_t listener) override;
+    bool listen(listener_callback_t listener, bool block) override;
 
     /**
      * @brief Establishes a connection to a remote endpoint.

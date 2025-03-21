@@ -15,7 +15,7 @@ int main() {
     LogEntry entry{};
 
     if (!wrapper.connect(TgBotSocket::Context::kTgBotLogPort,
-                         TgBotSocket::Context::logPath())) {
+                         {})) {
         LOG(ERROR) << "Failed to create socket and connect";
         return EXIT_FAILURE;
     }

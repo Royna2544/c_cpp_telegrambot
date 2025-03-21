@@ -4,6 +4,7 @@
 
 #include <boost/asio/local/stream_protocol.hpp>
 #include <boost/asio/use_future.hpp>
+#include <boost/system/system_error.hpp>
 #include <filesystem>
 #include <system_error>
 
@@ -41,14 +42,39 @@ Context::Local::Local() : socket_(io_context), acceptor_(io_context) {
     });
 }
 
-bool Context::Local::write(const SharedMalloc& data) const {
+bool Context::Local::writeBlocking(const void* data,
+                                   const size_t length) const {
     try {
-        boost::asio::write(socket_,
-                           boost::asio::buffer(data.get(), data.size()));
+        boost::asio::write(socket_, boost::asio::buffer(data, length));
         return true;
     } catch (const boost::system::system_error& e) {
         LOG(ERROR) << "Local::write: " << e.what();
         return false;
+    }
+}
+
+bool Context::Local::writeNonBlocking(const void* data,
+                                      const size_t length) const {
+    auto ret = boost::asio::async_write(
+        socket_, boost::asio::buffer(data, length), boost::asio::use_future);
+    if (ret.wait_until(std::chrono::system_clock::now() +
+                       options.io_timeout.get()) != std::future_status::ready) {
+        LOG(ERROR) << "Local::write: Timeout";
+        return false;
+    }
+    try {
+        return ret.get() == length;
+    } catch (const boost::system::system_error& ex) {
+        LOG(ERROR) << "Local::read: Error reading: " << ex.what();
+        return false;
+    }
+}
+
+bool Context::Local::write(const void* data, const size_t length) const {
+    if (static_cast<bool>(options.io_timeout)) {
+        return writeNonBlocking(data, length);
+    } else {
+        return writeBlocking(data, length);
     }
 }
 
@@ -90,13 +116,7 @@ bool Context::Local::close() const {
     return !ec;
 }
 
-bool Context::Local::timeout(std::chrono::seconds time) {
-    // Store the timeout duration for potential use in operations
-    timeout_duration_ = time;
-    return true;
-}
-
-bool Context::Local::listen(listener_callback_t listener) {
+bool Context::Local::listen(listener_callback_t listener, bool block) {
     try {
         if (!is_listening_) {
             acceptor_.open();
@@ -110,7 +130,7 @@ bool Context::Local::listen(listener_callback_t listener) {
             is_listening_ = true;
         }
         acceptor_.async_accept(
-            socket_, [this, listener](boost::system::error_code ec) {
+            socket_, [this, listener, block](boost::system::error_code ec) {
                 if (ec) {
                     LOG(ERROR) << "Accept error: " << ec.message();
                     return;
@@ -123,10 +143,12 @@ bool Context::Local::listen(listener_callback_t listener) {
                 if (!io_context.stopped()) {
                     socket_ =
                         boost::asio::local::stream_protocol::socket(io_context);
-                    listen(listener);
+                    listen(listener, block);
                 }
             });
-        io_context.run();
+        if (block) {
+            io_context.run();
+        }
         return true;
     } catch (const boost::system::system_error& e) {
         LOG(ERROR) << "Local::listen: " << e.what();
@@ -154,16 +176,11 @@ bool Context::Local::connect(const RemoteEndpoint& endpoint) {
             cv.notify_all();
         });
 
-    if (timeout_duration_.count() > 0) {
-        // Wait for the connection to complete
-        LOG(INFO) << fmt::format("Waiting for connection to complete for {}",
-                                 timeout_duration_);
-        cv.wait_for(lk, timeout_duration_,
-                    [&] { return connected || io_context.stopped(); });
-    } else {
-        // Wait for the connection to complete
-        cv.wait(lk, [&] { return connected || io_context.stopped(); });
-    }
+    // Wait for the connection to complete
+    LOG(INFO) << fmt::format("Waiting for connection to complete for {}",
+                             options.connect_timeout.get());
+    cv.wait_for(lk, options.connect_timeout.get(),
+                [&] { return connected || io_context.stopped(); });
 
     // Port is always 0 for local domain sockets, so we don't need to print it.
     if (!connected) {

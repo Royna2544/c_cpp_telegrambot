@@ -18,8 +18,13 @@ bool Context::write(const Packet& packet) const {
     return write(data);
 }
 
+bool Context::write(const SharedMalloc& data) const {
+    return write(data.get(), data.size());
+}
+
 constexpr int Context::kTgBotHostPort;
 constexpr int Context::kTgBotLogPort;
+constexpr int Context::kTgBotLogTransmitPort;
 
 Socket_API std::ostream& operator<<(std::ostream& stream, const Context::RemoteEndpoint& endpoint) {
     stream << endpoint.address << ":" << endpoint.port;

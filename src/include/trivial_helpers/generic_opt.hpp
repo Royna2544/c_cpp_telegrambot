@@ -32,6 +32,8 @@ struct Option {
 
     // Function to set the data
     void set(T dataIn) { data = dataIn; }
+    // Function to reset the data
+    void reset() { data.reset(); }
 
     // Function to get the data and reset it if not persistent
     [[nodiscard]] T get() const {

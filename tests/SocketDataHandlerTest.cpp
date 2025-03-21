@@ -72,23 +72,29 @@ class SocketDataHandlerTest : public ::testing::Test {
      */
     template <typename DataT, TgBotSocket::Command retCmd>
     void sendAndVerifyHeader(TgBotSocket::Packet pkt, DataT* out) {
-        SharedMalloc packetData;
+        std::pair<const void*, size_t> packetData;
         TgBotSocket::Packet::Header recv_header;
 
         EXPECT_TRUE(TgBotSocket::decryptPacket(pkt));
-        EXPECT_CALL(*_mockImpl, write(_))
-            .WillOnce(DoAll(SaveArg<0>(&packetData), Return(true)));
+        EXPECT_CALL(*_mockImpl, write(_, _))
+            .WillOnce(DoAll(SaveArg<0>(&packetData.first),
+                            SaveArg<1>(&packetData.second), Return(true)));
         mockInterface->handlePacket(*_mockImpl, std::move(pkt));
 
         // Expect valid packet
-        EXPECT_TRUE(packetData.get());
+        EXPECT_NE(packetData.first, nullptr);
         // Checking packet header
-        EXPECT_NO_FATAL_FAILURE(packetData.assignTo(recv_header));
+        EXPECT_NO_FATAL_FAILURE(memcpy(&recv_header, packetData.first, sizeof(recv_header)));
         EXPECT_EQ(recv_header.cmd, retCmd);
         ASSERT_EQ(recv_header.data_size, sizeof(DataT));
         // Checking packet data
-        EXPECT_NO_FATAL_FAILURE(packetData.assignTo(
-            out, sizeof(DataT), sizeof(TgBotSocket::Packet::Header)));
+        EXPECT_NO_FATAL_FAILURE(
+            memcpy(
+                out,
+                static_cast<const char*>(packetData.first) + sizeof(TgBotSocket::Packet::Header),
+                sizeof(DataT)
+            )
+        );
     }
 
     static void isGenericAck_OK(const TgBotSocket::callback::GenericAck& ack) {

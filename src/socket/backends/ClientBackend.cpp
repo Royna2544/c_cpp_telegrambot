@@ -31,12 +31,15 @@ bool SocketClientWrapper::connect(unsigned short defaultPort,
         backend = std::make_shared<TgBotSocket::Context::TCP>(
             boost::asio::ip::tcp::v6(), port);
         LOG(INFO) << "Chose IPv6 with address " << addressString;
-    } else {
+    } else if (!defaultPath.empty()) {
         addressString = defaultPath.string();
         backend = std::make_shared<TgBotSocket::Context::Local>();
         LOG(INFO) << "Chose Unix Local socket with path " << addressString;
+    } else {
+        LOG(ERROR) << "No address specified";
+        return false;
     }
-    backend->timeout(std::chrono::seconds(5));
+    backend->options.connect_timeout = std::chrono::seconds(5);
     return backend->connect({addressString, port});
 }
 

@@ -46,7 +46,7 @@ void SocketInterfaceTgBot::runFunction(const std::stop_token& token) {
                     handlePacket(ctx, std::move(pkt.value()));
                 }
             }
-        });
+        }, true);
     if (!ret) {
         LOG(ERROR) << "Failed to start listening on socket";
     }
