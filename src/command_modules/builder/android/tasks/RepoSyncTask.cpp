@@ -102,6 +102,7 @@ constexpr std::string_view syncCommand =
 DeferredExit RepoSyncTask::runFunction() {
     std::error_code ec;
     bool repoDirExists = false;
+    bool isSameRepo = false;
 
     // Test if repo can be executed
     if (!ForkAndRun::can_execve("repo")) {
@@ -121,8 +122,15 @@ DeferredExit RepoSyncTask::runFunction() {
     }
 
     const auto& rom = data.localManifest->rom;
-    GitBranchSwitcher switcher{kLocalManifestGitPath};
-    if (!repoDirExists || !(switcher.open() && switcher.check({rom->branch, rom->romInfo->url}))) {
+    LOG_IF(INFO, !repoDirExists) << "Initializing repo (.repo doesn't exist";
+    if (repoDirExists) {
+        GitBranchSwitcher switcher{".repo/manifests"};
+        isSameRepo =
+            switcher.open() && switcher.check({rom->branch, rom->romInfo->url});
+        LOG_IF(INFO, !isSameRepo)
+            << "Re-initializing repo (Different ROM manifest git info)";
+    }
+    if (!repoDirExists || !isSameRepo) {
         ForkAndRunSimple shell(
             fmt::format(initCommand, rom->romInfo->url, rom->branch, 1));
         shell.env[kGitAskPassEnv] = _gitAskPassFile.string();
