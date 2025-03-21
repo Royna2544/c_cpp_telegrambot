@@ -268,16 +268,12 @@ struct GitBranchSwitcher::CheckoutInfoPriv {
 
     const char* local_refname() const { return target_ref_name.local.c_str(); }
 
-    static std::string make_local_refname(const std::string_view branch) {
-        return fmt::format("refs/heads/{}", branch);
-    }
-
     CheckoutInfoPriv(git_repository* repo, git_remote* remote,
                      std::string_view destBranch) {
         diff_opts.flags = GIT_CHECKOUT_NOTIFY_CONFLICT;
         checkout_opts.checkout_strategy = GIT_CHECKOUT_SAFE;
         // Craft strings
-        target_ref_name.local = make_local_refname(destBranch);
+        target_ref_name.local = fmt::format("refs/heads/{}", destBranch);
         target_ref_name.remote =
             fmt::format("refs/remotes/{}/{}", kRemoteRepoName, destBranch);
 
@@ -434,8 +430,8 @@ bool GitBranchSwitcher::check(const RepoInfo& info) const {
 
         return isRefnameSame(
             rdata->repo,
-            std::make_pair<>("HEAD", CheckoutInfoPriv::make_local_refname(
-
+            std::make_pair<>("HEAD",
+                             fmt::format("refs/remotes/{}/{}", kRemoteRepoName,
                                          info.branch())));
     }
     return true;
