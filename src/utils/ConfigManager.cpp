@@ -137,7 +137,7 @@ struct ConfigBackendBoostPOBase : public ConfigManager::Backend {
 
 struct ConfigBackendFile : public ConfigBackendBoostPOBase {
     static constexpr const char *kTgBotConfigFiles[] = {
-        "tgbotserver." TGBOT_BUILD_TYPE ".ini", "tgbotserver.ini"};
+        "tgbotserver." BUILD_TYPE_STR ".ini", "tgbotserver.ini"};
     bool load() override {
         std::filesystem::path home;
 

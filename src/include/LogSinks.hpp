@@ -89,4 +89,4 @@ struct LogFileSink : absl::LogSink {
     F file;
 };
 
-constexpr std::string_view kDefaultLogFile = "tgbot.log";
+constexpr std::string_view kDefaultLogFile = "tgbot." BUILD_TYPE_STR ".log";

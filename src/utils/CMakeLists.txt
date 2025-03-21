@@ -12,5 +12,4 @@ tgbot_library(
     libfs_${TARGET_VARIANT}.cpp
   LIBS Boost::program_options
   LIBS_WIN32 shlwapi
-  DEFS TGBOT_BUILD_TYPE="${CMAKE_BUILD_TYPE}"
 )

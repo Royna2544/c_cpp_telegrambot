@@ -154,6 +154,9 @@ if (NOT MSVC)
   list(APPEND GLOBAL_COMPILE_OPTIONS -Wno-unused-parameter)
 endif()
 
+# Build Type
+list(APPEND GLOBAL_DEFINITIONS BUILD_TYPE_STR="${CMAKE_BUILD_TYPE}")
+
 ##################### Fill in readme with cmake #####################
 string(TIMESTAMP TODAY "%Y-%m-%d %H:%M:%S UTC" UTC)
 

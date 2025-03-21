@@ -20,8 +20,8 @@
 
 // Wrapper launcher to create a daemon process from the bot
 int main(const int argc, char** argv) {
-    const static std::filesystem::path kLogFile = fmt::format(
-        "log_{:%Y_%m_%d_%H_%M_%S}.txt", std::chrono::system_clock::now());
+    const static std::filesystem::path kLogFile =
+        fmt::format("TgBotDaemon_{}_pid_{}.txt", BUILD_TYPE_STR, getpid());
     TgBot_AbslLogInit();
 
     if (argc < 2) {
@@ -102,7 +102,7 @@ redo_vfork:
         _exit(std::numeric_limits<std::uint8_t>::max());
     } else {
         F pidFile;
-        constexpr std::string_view kPidFile = "bot.pid";
+        constexpr std::string_view kPidFile = "tgbot." BUILD_TYPE_STR ".pid";
         if (!pidFile.open(kPidFile, F::Mode::Write)) {
             PLOG(ERROR) << "Failed to open bot.pid";
             return EXIT_FAILURE;
