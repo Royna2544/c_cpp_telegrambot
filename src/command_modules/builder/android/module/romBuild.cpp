@@ -202,6 +202,7 @@ class ROMBuildQueryHandler {
         upload,
         pin_message,
         use_rbe,
+	repo_sync_only,
         clean_folders,
     };
 
