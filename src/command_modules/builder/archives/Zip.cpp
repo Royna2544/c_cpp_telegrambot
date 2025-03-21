@@ -139,7 +139,7 @@ bool Zip::extract(const std::filesystem::path& zipfile,
     int r;
 
     archive_read_support_format_zip(a);
-    archive_read_support_compression_all(a);
+    archive_read_support_filter_all(a);
 
     if ((r = archive_read_open_filename(a, zipfile.string().c_str(), 10240)) !=
         ARCHIVE_OK) {
