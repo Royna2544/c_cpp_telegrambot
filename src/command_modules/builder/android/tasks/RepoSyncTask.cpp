@@ -140,6 +140,8 @@ DeferredExit RepoSyncTask::runFunction() {
             return ret;
         }
         ret.defuse();
+    } else {
+        LOG(INFO) << "Skipping repo init (Already up-to-date)";
     }
     if (!data.localManifest->preparar->prepare(kLocalManifestPath.data())) {
         LOG(ERROR) << "Failed to prepare local manifest";
