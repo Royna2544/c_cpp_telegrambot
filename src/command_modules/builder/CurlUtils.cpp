@@ -60,8 +60,7 @@ bool CURL_download_file(const std::string_view url,
     }
 
     // Create directory if not exists
-    if (createDirectory(where.parent_path())) {
-        LOG(ERROR) << "Cannot create directory: " << where.parent_path();
+    if (!noex_fs::create_directories(where.parent_path())) {
         return false;
     }
 

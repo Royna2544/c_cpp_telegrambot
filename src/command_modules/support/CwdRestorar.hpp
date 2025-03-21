@@ -29,7 +29,7 @@ class CwdRestorer {
         // If we didn't get ENOENT, then nothing we can do here
         if (ec == std::errc::no_such_file_or_directory) {
             // If it was no such file or directory, then we could try to create
-            if (ec = createDirectory(newCwd); ec) {
+            if (!noex_fs::create_directories(newCwd)) {
                 LOG(ERROR) << "Failed to create build directory: "
                            << ec.message();
             }

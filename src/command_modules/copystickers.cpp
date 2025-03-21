@@ -64,7 +64,7 @@ DECLARE_COMMAND_HANDLER(copystickers) {
                               res->get(Strings::STICKER_SET_NOT_FOUND));
         return;
     }
-    if (createDirectory("stickers"_fs)) {
+    if (noex_fs::create_directories("stickers"_fs)) {
         api->sendReplyMessage(message->message(),
                               res->get(Strings::FAILED_TO_CREATE_DIRECTORY));
         return;
