@@ -5,7 +5,7 @@ if (UNIX)
     SelectorPosixSelect.cpp
     SelectorUnix.cpp
   )
-  if(LINUX)
+  if(LINUX OR ANDROID)
     list(APPEND SELECTOR_SRC_LIST
       SelectorLinuxEPoll.cpp
     )
