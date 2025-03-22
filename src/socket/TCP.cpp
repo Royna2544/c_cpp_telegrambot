@@ -5,14 +5,15 @@
 #include <condition_variable>
 #include <string_view>
 
+#include <GitBuildInfo.hpp>
 #include "SocketContext.hpp"
 #include "TgBotSocket_Export.hpp"
 
 template <>
 struct fmt::formatter<boost::asio::ip::tcp> : formatter<string_view> {
     // parse is inherited from formatter<string_view>.
-    auto format(boost::asio::ip::tcp c,
-                format_context& ctx) const -> format_context::iterator {
+    auto format(boost::asio::ip::tcp c, format_context& ctx) const
+        -> format_context::iterator {
         std::string_view name;
         if (c == boost::asio::ip::tcp::v4()) {
             name = "IPv4";
@@ -27,16 +28,20 @@ struct fmt::formatter<boost::asio::ip::tcp> : formatter<string_view> {
 
 namespace TgBotSocket {
 
-#ifndef NDEBUG
-#define bindaddress boost::asio::ip::address::from_string("0.0.0.0")
-#else
-#define bindaddress type
-#endif
+auto getendpoint(const boost::asio::ip::tcp type, const uint_least16_t port) {
+    using endpoint = boost::asio::ip::tcp::endpoint;
+    using boost::asio::ip::address;
+    if constexpr (buildinfo::isReleaseBuild()) {
+        return endpoint(type, port);
+    } else {
+        return endpoint(address::from_string("0.0.0.0"), port);
+    }
+}
 
 Context::TCP::TCP(const boost::asio::ip::tcp type, const uint_least16_t port)
     : socket_(io_context),
       acceptor_(io_context),
-      endpoint_(boost::asio::ip::tcp::endpoint(bindaddress, port)) {
+      endpoint_(getendpoint(type, port)) {
     LOG(INFO) << fmt::format("TCP::TCP: Protocol {} listening on port {}", type,
                              port);
 

@@ -24,4 +24,20 @@ constexpr std::string_view OS =
 #else
     "unknown platform";
 #endif
+
+enum class BuildType { DEBUG, RELEASE };
+
+#ifdef NDEBUG
+constexpr BuildType kBuildType = BuildType::RELEASE;
+#else
+constexpr BuildType kBuildType = BuildType::DEBUG;
+#endif
+
+inline constexpr bool isReleaseBuild() noexcept {
+    return kBuildType == BuildType::RELEASE;
+}
+inline constexpr bool isDebugBuild() noexcept {
+    return kBuildType == BuildType::DEBUG;
+}
+
 }  // namespace buildinfo

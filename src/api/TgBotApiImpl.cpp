@@ -283,14 +283,6 @@ void handleTgBotApiEx(const TgBot::TgException& ex) {
 constexpr bool kDisableNotifications = false;
 }  // namespace
 
-#ifdef NDEBUG
-#define DEBUG_ASSERT_NONNULL_PARAM(param)
-#else
-#include <absl/log/check.h>
-#define DEBUG_ASSERT_NONNULL_PARAM(param) \
-    CHECK((param) != nullptr) << "Parameter " << #param << " is null"
-#endif
-
 Message::Ptr TgBotApiImpl::sendMessage_impl(
     ChatId chatId, const std::string_view text,
     ReplyParametersExt::Ptr replyParameters, GenericReply::Ptr replyMarkup,
@@ -341,7 +333,7 @@ Message::Ptr TgBotApiImpl::editMessage_impl(
     const Message::Ptr& message, const std::string_view newText,
     const TgBot::InlineKeyboardMarkup::Ptr& markup,
     const ParseMode parseMode) const {
-    DEBUG_ASSERT_NONNULL_PARAM(message);
+    DCHECK_NE(message, nullptr);
     try {
         return getApi().editMessageText(newText, message->chat->id,
                                         message->messageId, {}, parseMode,
@@ -359,7 +351,7 @@ Message::Ptr TgBotApiImpl::editMessageMarkup_impl(
             [=, this](auto&& arg) {
                 using T = std::decay_t<decltype(arg)>;
                 if constexpr (std::is_same_v<T, Message::Ptr>) {
-                    DEBUG_ASSERT_NONNULL_PARAM(arg);
+                    DCHECK_NE(arg, nullptr);
                     return getApi().editMessageReplyMarkup(
                         arg->chat->id, arg->messageId, {}, markup);
                 } else if constexpr (std::is_same_v<T, std::string>) {
@@ -388,7 +380,7 @@ MessageId TgBotApiImpl::copyMessage_impl(
 }
 
 void TgBotApiImpl::deleteMessage_impl(const Message::Ptr& message) const {
-    DEBUG_ASSERT_NONNULL_PARAM(message);
+    DCHECK_NE(message, nullptr);
     getApi().deleteMessage(message->chat->id, message->messageId);
 }
 
@@ -400,7 +392,7 @@ void TgBotApiImpl::deleteMessages_impl(
 void TgBotApiImpl::restrictChatMember_impl(
     ChatId chatId, UserId userId, TgBot::ChatPermissions::Ptr permissions,
     std::chrono::system_clock::time_point untilDate) const {
-    DEBUG_ASSERT_NONNULL_PARAM(permissions);
+    DCHECK_NE(permissions, nullptr);
     getApi().restrictChatMember(chatId, userId, permissions, untilDate);
 }
 
@@ -465,7 +457,7 @@ bool TgBotApiImpl::createNewStickerSet_impl(
 File::Ptr TgBotApiImpl::uploadStickerFile_impl(
     std::int64_t userId, InputFile::Ptr sticker,
     const TgBot::Api::StickerFormat stickerFormat) const {
-    DEBUG_ASSERT_NONNULL_PARAM(sticker);
+    DCHECK_NE(sticker, nullptr);
     return getApi().uploadStickerFile(userId, sticker, stickerFormat);
 }
 
@@ -500,27 +492,27 @@ User::Ptr TgBotApiImpl::getBotUser_impl() const {
 }
 
 bool TgBotApiImpl::pinMessage_impl(Message::Ptr message) const {
-    DEBUG_ASSERT_NONNULL_PARAM(message);
+    DCHECK_NE(message, nullptr);
     return getApi().pinChatMessage(message->chat->id, message->messageId,
                                    kDisableNotifications);
 }
 
 bool TgBotApiImpl::unpinMessage_impl(Message::Ptr message) const {
-    DEBUG_ASSERT_NONNULL_PARAM(message);
+    DCHECK_NE(message, nullptr);
     return getApi().unpinChatMessage(message->chat->id, message->messageId);
 }
 
 bool TgBotApiImpl::banChatMember_impl(const Chat::Ptr& chat,
                                       const User::Ptr& user) const {
-    DEBUG_ASSERT_NONNULL_PARAM(chat);
-    DEBUG_ASSERT_NONNULL_PARAM(user);
+    DCHECK_NE(chat, nullptr);
+    DCHECK_NE(user, nullptr);
     return getApi().banChatMember(chat->id, user->id);
 }
 
 bool TgBotApiImpl::unbanChatMember_impl(const Chat::Ptr& chat,
                                         const User::Ptr& user) const {
-    DEBUG_ASSERT_NONNULL_PARAM(chat);
-    DEBUG_ASSERT_NONNULL_PARAM(user);
+    DCHECK_NE(chat, nullptr);
+    DCHECK_NE(user, nullptr);
     return getApi().unbanChatMember(chat->id, user->id);
 }
 

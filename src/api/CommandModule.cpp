@@ -3,6 +3,7 @@
 #include <dlfcn.h>
 #include <fmt/format.h>
 
+#include <GitBuildInfo.hpp>
 #include <api/CommandModule.hpp>
 #include <memory>
 #include <string_view>
@@ -88,27 +89,27 @@ bool CommandModule::load() {
         return false;
     }
 
-    if (_module->name == nullptr || _module->function ==
-            nullptr || _module->description == nullptr) {
+    if (_module->name == nullptr || _module->function == nullptr ||
+        _module->description == nullptr) {
         LOG(ERROR) << "Invalid module: " << filePath;
         return false;
     }
 
-#ifndef NDEBUG
-    Dl_info info{};
-    void* modulePtr = nullptr;
-    if (dlwrapper.info(DYN_COMMAND_SYM_STR, &info)) {
-        modulePtr = info.dli_saddr;
-    } else {
-        LOG(WARNING) << "dladdr failed for " << filePath << ": "
-                     << DLWrapper::error();
-    }
+    if constexpr (buildinfo::isDebugBuild()) {
+        Dl_info info{};
+        void* modulePtr = nullptr;
+        if (dlwrapper.info(DYN_COMMAND_SYM_STR, &info)) {
+            modulePtr = info.dli_saddr;
+        } else {
+            LOG(WARNING) << "dladdr failed for " << filePath << ": "
+                         << DLWrapper::error();
+        }
 
-    DLOG(INFO) << fmt::format("Module {}: enforced: {}, name: {}, fn: {}",
-                              filePath.filename().string(),
-                              _module->isEnforced(), _module->name,
-                              fmt::ptr(modulePtr));
-#endif
+        DLOG(INFO) << fmt::format("Module {}: enforced: {}, name: {}, fn: {}",
+                                  filePath.filename().string(),
+                                  _module->isEnforced(), _module->name,
+                                  fmt::ptr(modulePtr));
+    }
     handle = dlwrapper.underlying();
     return true;
 }
