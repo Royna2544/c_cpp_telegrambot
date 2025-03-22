@@ -639,7 +639,9 @@ bool RepoInfo::git_clone(const std::filesystem::path& directory,
 #ifdef LIBGIT2_HAS_CLONE_DEPTH
         gitoptions.fetch_opts.depth = 1;
 #else
+#ifndef _MSC_VER
 #warning "Shallow clone not supported"
+#endif
         LOG(WARNING) << "Shallow cloning is not supported";
 #endif
     }
