@@ -1,4 +1,5 @@
 find_package(libgit2 REQUIRED)
+find_package(Boost REQUIRED)
 
 include(CheckStructHasMember)
 check_struct_has_member(git_fetch_options depth git2/clone.h LIBGIT2_HAS_CLONE_DEPTH)
@@ -11,7 +12,6 @@ tgbot_library(
     SRCS RepoUtils.cpp
     DEFS ${BUILDER_UTILS_LINUX_DEFS}
     LIBS_STATIC ${LIBGIT2_LIBRARIES}
-    LIBS sighandler
     STATIC
     NO_LIBPREFIX
 )
@@ -23,20 +23,29 @@ tgbot_exe(
     OPTIONAL
 )
 
-find_package(CURL REQUIRED)
+find_package(LibArchive)
+if (WIN32)
+    find_package(Boost CONFIG COMPONENTS units)
+else()
+    find_package(Boost CONFIG)
+endif()
+find_package(CURL)
+
+if (NOT CURL_FOUND OR NOT Boost_FOUND)
+    message(STATUS "Builder: No cURL or Boost.Units")
+    return()
+endif()
 
 tgbot_library(
     NAME CurlDownload
     SRCS CurlUtils.cpp
     LIBS CURL::libcurl
+    LIBS_STATIC Boost::headers
     STATIC
 )
 
-find_package(LibArchive)
-find_package(Boost CONFIG)
-
-if (NOT LibArchive_FOUND OR NOT Boost_FOUND)
-    message(STATUS "Builder: No libarchive or Boost.Unit")
+if (NOT LibArchive_FOUND)
+    message(STATUS "Builder: No libarchive")
     return()
 endif()
 
@@ -59,7 +68,7 @@ tgbot_library(
         sighandler
         progress
     LIBS_STATIC
-        Boost::boost
+        Boost::headers
         RepoSwitcher
     NO_LIBPREFIX
     STATIC
