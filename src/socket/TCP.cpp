@@ -2,10 +2,10 @@
 #include <fmt/chrono.h>
 #include <fmt/format.h>
 
+#include <GitBuildInfo.hpp>
 #include <condition_variable>
 #include <string_view>
 
-#include <GitBuildInfo.hpp>
 #include "SocketContext.hpp"
 #include "TgBotSocket_Export.hpp"
 
@@ -29,12 +29,11 @@ struct fmt::formatter<boost::asio::ip::tcp> : formatter<string_view> {
 namespace TgBotSocket {
 
 auto getendpoint(const boost::asio::ip::tcp type, const uint_least16_t port) {
-    using endpoint = boost::asio::ip::tcp::endpoint;
-    using boost::asio::ip::address;
+    using namespace boost::asio::ip;
     if constexpr (buildinfo::isReleaseBuild()) {
-        return endpoint(type, port);
+        return tcp::endpoint(type, port);
     } else {
-        return endpoint(address::from_string("0.0.0.0"), port);
+        return tcp::endpoint(make_address("0.0.0.0"), port);
     }
 }
 
