@@ -377,14 +377,19 @@ find_package(jsoncpp REQUIRED) # Required by tgbot-cpp anyways...
 find_package(CURL REQUIRED)
 # If we couldn't find protobuf or dirty abseil fix is enabled.
 if (NOT Protobuf_FOUND)
-  # Then we can just include source-abseil
-  message(STATUS "Using abseil-cpp as submodule")
-  set(ABSL_PROPAGATE_CXX_STD ON)
-  set(ABSL_BUILD_TEST_HELPERS OFF)
-  set(ABSL_ENABLE_INSTALL ON)
-  set(BUILD_SHARED_LIBS ON)
-  add_subdirectory(src/third-party/abseil-cpp)
-  unset(BUILD_SHARED_LIBS)
+  if (MSVC)
+    # If MSVC, use vcpkg's absl always.
+    find_package(absl REQUIRED)
+  else()
+    # Then we can just include source-abseil
+    message(STATUS "Using abseil-cpp as submodule")
+    set(ABSL_PROPAGATE_CXX_STD ON)
+    set(ABSL_BUILD_TEST_HELPERS OFF)
+    set(ABSL_ENABLE_INSTALL ON)
+    set(BUILD_SHARED_LIBS ON)
+    add_subdirectory(src/third-party/abseil-cpp)
+    unset(BUILD_SHARED_LIBS)
+  endif()
 else()
   # If there was, then we can cause collision with the system abseil
   find_package(absl REQUIRED)
