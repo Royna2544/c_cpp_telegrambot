@@ -9,7 +9,7 @@
 namespace {
 void verifyKeyboard(const TgBot::GenericReply::Ptr& reply) {
     auto keyboardReply =
-        std::dynamic_pointer_cast<TgBot::ReplyKeyboardMarkup>(reply);
+        std::static_pointer_cast<TgBot::ReplyKeyboardMarkup>(reply);
     ASSERT_TRUE(keyboardReply);
 
     EXPECT_TRUE(keyboardReply->resizeKeyboard.value());
@@ -77,7 +77,7 @@ struct DatabaseCommandTest : public CommandTestBase {
             .WillOnce(DoAll(
                 Invoke([&]() {
                     recievedMessage->text =
-                        std::dynamic_pointer_cast<TgBot::ReplyKeyboardMarkup>(
+                        std::static_pointer_cast<TgBot::ReplyKeyboardMarkup>(
                             keyboard)
                             ->keyboard[X][Y]
                             ->text;
