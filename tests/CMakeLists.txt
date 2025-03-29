@@ -1,6 +1,3 @@
-############### Bot functions' Test Arena (googletest) ##############
-###################### Creates the test target ######################
-
 tgbot_exe(
   NAME main
   SRCS
@@ -8,7 +5,6 @@ tgbot_exe(
     AuthorizationTest.cpp
     commands/CommandModulesTest.cpp
     commands/AliveCmdTest.cpp
-    #commands/BashCmdTest.cpp
     commands/CmdCmdTest.cpp
     commands/DatabaseCmdTest.cpp
     commands/DeleteEchoCmdTest.cpp
