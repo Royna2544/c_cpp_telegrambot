@@ -69,6 +69,9 @@ DeferredExit UploadFileTask::runFunction() {
         scriptFile = _scriptDirectory / "upload.default.bash";
     }
 
+    artifact_info.size = std::filesystem::file_size(zipFilePath, ec);
+    artifact_info.filename = zipFilePath.filename().string();
+
     // Run the upload script.
     LOG(INFO) << "Starting upload";
     ForkAndRunShell shell("bash");
@@ -126,9 +129,14 @@ void UploadFileTask::onExit(int exitCode) {
                 LOG(INFO) << "Script output:\n" << outputString;
             }
         } else {
-            data.result->setMessage(
-                fmt::format("URLs grabbed from upload script output:\n\n{}",
-                            fmt::join(urls, "\n")));
+            data.result->setMessage(fmt::format(R"(FileName: {}
+FileSize: {}
+URL(s) found on upload script output:
+
+{})",
+                                                artifact_info.filename,
+                                                artifact_info.size,
+                                                fmt::join(urls, "\n")));
         }
     } else {
         data.result->value = PerBuildData::Result::ERROR_FATAL;

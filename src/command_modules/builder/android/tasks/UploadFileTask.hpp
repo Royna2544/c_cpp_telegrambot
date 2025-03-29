@@ -53,4 +53,8 @@ struct UploadFileTask : ForkAndRun {
     std::string outputString;
     std::mutex stdout_mutex;
     std::filesystem::path _scriptDirectory;
+    struct {
+        std::uintmax_t size;
+        std::string filename;
+    } artifact_info;
 };

@@ -2,7 +2,9 @@
 #include <absl/strings/match.h>
 #include <absl/strings/str_split.h>
 #include <absl/strings/strip.h>
+#include <fmt/chrono.h>
 #include <fmt/format.h>
+#include <fmt/ranges.h>
 #include <sys/wait.h>
 #include <tgbot/TgException.h>
 #include <tgbot/types/ReplyKeyboardRemove.h>
@@ -202,7 +204,7 @@ class ROMBuildQueryHandler {
         upload,
         pin_message,
         use_rbe,
-	repo_sync_only,
+        repo_sync_only,
         clean_folders,
     };
 
@@ -299,9 +301,8 @@ class TaskWrapperBase {
      * handle any necessary error handling or recovery.
      */
     virtual void onExecuteFailed() {
-        api->editMessage(
-            sentMessage,
-            "The process failed to execute or it didn't update result");
+        api->editMessage(sentMessage, "No valid result set in smem, killed?",
+                         backKeyboard);
     }
 
     /**
@@ -349,21 +350,31 @@ class TaskWrapperBase {
     }
 };
 
-class RepoSync : public TaskWrapperBase<RepoSyncTask> {
-    using TaskWrapperBase<RepoSyncTask>::TaskWrapperBase;
-
-    Message::Ptr onPreExecute() override {
-        constexpr static std::string_view literal = R"(Now syncing...
+namespace {
+std::string showPerBuild(const PerBuildData& data,
+                         const std::string_view banner) {
+    constexpr static std::string_view literal = R"({}
 Device: {}
 ROM: {}
 Manifest: {}
 )";
+    return fmt::format(literal, banner, data.device->toString(),
+                       data.localManifest->rom->toString(),
+                       data.localManifest->name);
+}
+}  // namespace
+
+class RepoSync : public TaskWrapperBase<RepoSyncTask> {
+    using TaskWrapperBase<RepoSyncTask>::TaskWrapperBase;
+
+    Message::Ptr onPreExecute() override {
         return api->sendReplyMessage(
             userMessage,
-            fmt::format(
-                literal, queryHandler->builddata().device->toString(),
-                queryHandler->builddata().localManifest->rom->toString(),
-                queryHandler->builddata().localManifest->name),
+            showPerBuild(
+                queryHandler->builddata(),
+                fmt::format(
+                    "Now syncing... ({}) jobs",
+                    queryHandler->builddata().localManifest->job_count)),
             cancelKeyboard);
     }
 
@@ -589,18 +600,32 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     auto buildDirectory =
         _commandLine->getPath(FS::PathType::INSTALL_ROOT) / kBuildDirectory;
     auto gitAskFile = scriptDirectory / RepoSyncTask::kGitAskPassFile;
+
+    // Push workdir
     CwdRestorer cwd(buildDirectory);
     if (!cwd) {
         _api->editMessage(sentMessage, "Failed to push cwd");
         return;
     }
+
+    // Support time measurement
+    auto rn = [] { return std::chrono::system_clock::now(); };
+    auto timer = rn();
+    auto start = rn();
+    std::vector<std::string> times;
+
+    // RepoSync
     if (do_repo_sync) {
+        timer = rn();
         RepoSync repoSync(this, per_build, _api, _userMessage);
         if (!repoSync.execute(std::move(gitAskFile))) {
             LOG(INFO) << "RepoSync::execute fails...";
             return;
         }
+        times.emplace_back(fmt::format("RepoSync took {}", rn() - timer));
     }
+
+    // Remote Based Execution support
     std::optional<ROMBuildTask::RBEConfig> config;
     if (do_use_rbe) {
         config.emplace();
@@ -628,21 +653,41 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
             }
         }
     }
+
+    // Build
+    timer = rn();
     Build build(this, per_build, _api, _userMessage);
     if (!build.execute(config)) {
         LOG(INFO) << "Build::execute fails...";
         return;
     }
+    times.emplace_back(fmt::format("Build took {}", rn() - timer));
+
+    // Upload
     if (do_upload) {
+        timer = rn();
         Upload upload(this, per_build, _api, _userMessage);
         if (!upload.execute(std::move(scriptDirectory))) {
             LOG(INFO) << "Upload::execute fails...";
             return;
         }
+        times.emplace_back(fmt::format("Uploading took {}", rn() - timer));
     }
+
+    if (times.size() != 1) {
+        times.emplace_back(fmt::format("Total {}", rn() - start));
+    }
+
     // Success
     _api->editMessageMarkup(sentMessage, nullptr);
-    _api->sendMessage(sentMessage->chat, "Build completed");
+    _api->sendMessage(
+        sentMessage->chat,
+        showPerBuild(per_build, fmt::format(R"(Build complete.
+
+{}
+)",
+                                            fmt::join(times, "\n"))));
+
     if (didpin) {
         try {
             _api->unpinMessage(sentMessage);
