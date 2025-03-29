@@ -6,6 +6,7 @@
 #include <cmath>
 #include <filesystem>
 #include <ostream>
+
 #include "BytesConversion.hpp"
 
 struct Percent {
@@ -18,10 +19,12 @@ struct Percent {
 struct CPUInfo {
     CPUInfo();
 
+    static constexpr std::string_view UNKNOWN = "unknown";
+
     long coreCount;
-    std::string cpuVendor;
-    std::string cpuModel;
-    std::string cpuMHz;
+    std::string cpuVendor{UNKNOWN};
+    std::string cpuModel{UNKNOWN};
+    std::string cpuMHz{UNKNOWN};
     Percent usage;
 };
 
