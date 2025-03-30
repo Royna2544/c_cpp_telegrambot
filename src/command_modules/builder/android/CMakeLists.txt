@@ -6,6 +6,7 @@ tgbot_library(
     NAME AndroidBuilder-configparse
     SRCS 
         ConfigParsers.cpp
+        Prepare.cpp
     LIBS
         JsonCpp::JsonCpp
         LibXml2::LibXml2
