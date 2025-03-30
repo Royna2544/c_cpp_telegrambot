@@ -1,5 +1,8 @@
-find_package(libgit2 REQUIRED)
-find_package(Boost REQUIRED)
+find_package(libgit2)
+if (NOT LIBGIT2_FOUND)
+    message(STATUS "Builder: No libgit2")
+    return()
+endif()
 
 include(CheckStructHasMember)
 check_struct_has_member(git_fetch_options depth git2/clone.h LIBGIT2_HAS_CLONE_DEPTH)
