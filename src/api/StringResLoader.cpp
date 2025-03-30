@@ -57,7 +57,7 @@ std::pair<LocaleResData, StringResLoader::PerLocaleMapImpl> parseLocaleResource(
 
     libxml2_error_ctx ctx;
     // Set up error handling
-    xmlSetGenericErrorFunc(&ctx, libxml_error_handler);
+    xmlSetGenericErrorFunc(&ctx, libxml2_error_handler);
 
     // Parse the XML file
     auto doc = RAII<xmlDocPtr>::template create<void>(

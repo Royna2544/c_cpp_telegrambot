@@ -42,7 +42,7 @@ struct libxml2_error_ctx {
     std::string message;
 };
 
-inline void libxml_error_handler(void *ctx, const char *msg, ...) {
+inline void libxml2_error_handler(void *ctx, const char *msg, ...) {
     va_list args;
     std::array<char, 256> errorBuffer{};
     va_start(args, msg);
