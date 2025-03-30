@@ -354,6 +354,7 @@ namespace {
 std::string showPerBuild(const PerBuildData& data,
                          const std::string_view banner) {
     constexpr static std::string_view literal = R"({}
+[Build Target Info]
 Device: {}
 ROM: {}
 Manifest: {}
@@ -613,6 +614,8 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     auto timer = rn();
     auto start = rn();
     std::vector<std::string> times;
+    using std::chrono::round;
+    using std::chrono::seconds;
 
     // RepoSync
     if (do_repo_sync) {
@@ -622,7 +625,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
             LOG(INFO) << "RepoSync::execute fails...";
             return;
         }
-        times.emplace_back(fmt::format("RepoSync took {:%Hh %Mm %Ss}", rn() - timer));
+        times.emplace_back(fmt::format("RepoSync: {:%Hh %Mm %Ss}", round<seconds>(rn() - timer)));
     }
 
     // Remote Based Execution support
@@ -661,7 +664,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
         LOG(INFO) << "Build::execute fails...";
         return;
     }
-    times.emplace_back(fmt::format("Build took {:%Hh %Mm %Ss}", rn() - timer));
+    times.emplace_back(fmt::format("Build: {:%Hh %Mm %Ss}", round<seconds>(rn() - timer)));
 
     // Upload
     if (do_upload) {
@@ -671,11 +674,11 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
             LOG(INFO) << "Upload::execute fails...";
             return;
         }
-        times.emplace_back(fmt::format("Uploading took {:%Hh %Mm %Ss}", rn() - timer));
+        times.emplace_back(fmt::format("Upload: {:%Hh %Mm %Ss}", round<seconds>(rn() - timer)));
     }
 
     if (times.size() != 1) {
-        times.emplace_back(fmt::format("Total {:%Hh %Mm %Ss}", rn() - start));
+        times.emplace_back(fmt::format("Total: {:%Hh %Mm %Ss}", rn() - start));
     }
 
     // Success
@@ -684,6 +687,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
         sentMessage->chat,
         showPerBuild(per_build, fmt::format(R"(Build complete.
 
+[Spent Times]
 {}
 )",
                                             fmt::join(times, "\n"))));

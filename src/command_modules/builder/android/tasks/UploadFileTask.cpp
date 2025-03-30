@@ -142,10 +142,11 @@ void UploadFileTask::onExit(int exitCode) {
                 LOG(INFO) << "Script output:\n" << outputString;
             }
         } else {
-            data.result->setMessage(fmt::format(R"(FileName: {}
+            data.result->setMessage(fmt::format(R"([Uploaded File Info]
+FileName: {}
 FileSize: {}
-URL(s) found on upload script output:
 
+URL(s) found on upload script output:
 {})",
                                                 info.name.data(), info.size,
                                                 fmt::join(urls, "\n")));
