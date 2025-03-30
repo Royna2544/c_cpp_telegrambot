@@ -54,7 +54,7 @@ namespace noex_fs {
 // But allows EEXIST
 inline bool create_directories(const std::filesystem::path& path) {
     std::error_code ec;
-    if (std::filesystem::create_directories(path, ec)) {
+    if (std::filesystem::create_directories(path, ec) || !ec) {
         DLOG(INFO) << "create_directories: " << path << ": ok";
         return true;
     }
