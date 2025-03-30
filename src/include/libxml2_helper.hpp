@@ -7,7 +7,7 @@ class XmlCharWrapper {
     RAII<xmlChar *>::Value<void> string;
 
    public:
-    XmlCharWrapper(xmlChar *buf) : string(buf) {}
+    XmlCharWrapper(xmlChar *buf) : string(buf, xmlFree) {}
     XmlCharWrapper() = default;
 
     operator xmlChar *() const noexcept { return string.get(); }
