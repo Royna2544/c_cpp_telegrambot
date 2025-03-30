@@ -373,7 +373,7 @@ class RepoSync : public TaskWrapperBase<RepoSyncTask> {
             showPerBuild(
                 queryHandler->builddata(),
                 fmt::format(
-                    "Now syncing... ({}) jobs",
+                    "Now syncing... ({} jobs)",
                     queryHandler->builddata().localManifest->job_count)),
             cancelKeyboard);
     }
