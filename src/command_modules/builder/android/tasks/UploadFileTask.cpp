@@ -3,6 +3,7 @@
 #include <fmt/format.h>
 #include <fmt/ranges.h>
 
+#include <array>
 #include <filesystem>
 #include <fstream>
 #include <mutex>
@@ -13,17 +14,22 @@
 
 #include "ConfigParsers.hpp"
 
+struct ArtifactInfo {
+    std::uintmax_t size;
+    std::array<char, 256> name;
+};
+
 DeferredExit UploadFileTask::runFunction() {
     std::unique_ptr<ConnectedShmem> dataShmem;
 
     try {
-        dataShmem = std::make_unique<ConnectedShmem>(
-            kShmemUpload, sizeof(PerBuildData::ResultData));
+        dataShmem = std::make_unique<ConnectedShmem>(kShmemUploadArtifact,
+                                                     sizeof(ArtifactInfo));
     } catch (const syscall_perror& ex) {
         LOG(ERROR) << "Failed to connect to shared memory: " << ex.what();
         return DeferredExit::generic_fail;
     }
-    auto* resultdata = dataShmem->get<PerBuildData::ResultData>();
+    auto* artifactInfo = dataShmem->get<ArtifactInfo>();
 
     // First determine zip file path
     std::filesystem::path zipFilePath;
@@ -69,8 +75,13 @@ DeferredExit UploadFileTask::runFunction() {
         scriptFile = _scriptDirectory / "upload.default.bash";
     }
 
-    artifact_info.size = std::filesystem::file_size(zipFilePath, ec);
-    artifact_info.filename = zipFilePath.filename().string();
+    artifactInfo->size = std::filesystem::file_size(zipFilePath, ec);
+    auto filename = zipFilePath.filename().string();
+    const size_t kNameLen = artifactInfo->name.size() - 1;
+    if (filename.size() > kNameLen) {
+        filename.resize(kNameLen);
+    }
+    std::ranges::copy_n(filename.begin(), kNameLen, artifactInfo->name.begin());
 
     // Run the upload script.
     LOG(INFO) << "Starting upload";
@@ -94,7 +105,9 @@ void UploadFileTask::handleStderrData(ForkAndRun::BufferViewType buffer) {
 
 void UploadFileTask::onExit(int exitCode) {
     LOG(INFO) << "Process exited with code: " << exitCode;
-    std::memcpy(data.result, smem->memory, sizeof(PerBuildData::ResultData));
+
+    ArtifactInfo info;
+    std::memcpy(&info, artifact_smem->memory, sizeof(ArtifactInfo));
     if (exitCode == EXIT_SUCCESS) {
         data.result->value = PerBuildData::Result::SUCCESS;
         const static std::regex sHttpsUrlRegex(
@@ -134,8 +147,7 @@ FileSize: {}
 URL(s) found on upload script output:
 
 {})",
-                                                artifact_info.filename,
-                                                artifact_info.size,
+                                                info.name.data(), info.size,
                                                 fmt::join(urls, "\n")));
         }
     } else {
@@ -146,8 +158,8 @@ URL(s) found on upload script output:
 UploadFileTask::UploadFileTask(PerBuildData data,
                                std::filesystem::path scriptDirectory)
     : data(std::move(data)), _scriptDirectory(std::move(scriptDirectory)) {
-    smem = std::make_unique<AllocatedShmem>(kShmemUpload,
-                                            sizeof(PerBuildData::ResultData));
+    artifact_smem = std::make_unique<AllocatedShmem>(kShmemUploadArtifact,
+                                                     sizeof(ArtifactInfo));
 }
 
 UploadFileTask::~UploadFileTask() = default;

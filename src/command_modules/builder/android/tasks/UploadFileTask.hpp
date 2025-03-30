@@ -7,7 +7,7 @@
 #include "Shmem.hpp"
 
 struct UploadFileTask : ForkAndRun {
-    static constexpr std::string_view kShmemUpload = "shmem_upload";
+    static constexpr std::string_view kShmemUploadArtifact = "shmem_upload_artifact";
 
     /**
      * @brief Runs the function that performs the repository synchronization.
@@ -48,13 +48,9 @@ struct UploadFileTask : ForkAndRun {
     ~UploadFileTask() override;
 
    private:
-    PerBuildData data;
-    std::unique_ptr<AllocatedShmem> smem;
+    PerBuildData data{};
+    std::unique_ptr<AllocatedShmem> artifact_smem;
     std::string outputString;
     std::mutex stdout_mutex;
     std::filesystem::path _scriptDirectory;
-    struct {
-        std::uintmax_t size;
-        std::string filename;
-    } artifact_info;
 };
