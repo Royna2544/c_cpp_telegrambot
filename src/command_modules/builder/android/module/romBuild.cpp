@@ -622,7 +622,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
             LOG(INFO) << "RepoSync::execute fails...";
             return;
         }
-        times.emplace_back(fmt::format("RepoSync took {}", rn() - timer));
+        times.emplace_back(fmt::format("RepoSync took {:%Hh %Mm %Ss}", rn() - timer));
     }
 
     // Remote Based Execution support
@@ -661,7 +661,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
         LOG(INFO) << "Build::execute fails...";
         return;
     }
-    times.emplace_back(fmt::format("Build took {}", rn() - timer));
+    times.emplace_back(fmt::format("Build took {:%Hh %Mm %Ss}", rn() - timer));
 
     // Upload
     if (do_upload) {
@@ -671,11 +671,11 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
             LOG(INFO) << "Upload::execute fails...";
             return;
         }
-        times.emplace_back(fmt::format("Uploading took {}", rn() - timer));
+        times.emplace_back(fmt::format("Uploading took {:%Hh %Mm %Ss}", rn() - timer));
     }
 
     if (times.size() != 1) {
-        times.emplace_back(fmt::format("Total {}", rn() - start));
+        times.emplace_back(fmt::format("Total {:%Hh %Mm %Ss}", rn() - start));
     }
 
     // Success
