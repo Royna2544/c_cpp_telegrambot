@@ -354,6 +354,7 @@ namespace {
 std::string showPerBuild(const PerBuildData& data,
                          const std::string_view banner) {
     constexpr static std::string_view literal = R"({}
+
 [Build Target Info]
 Device: {}
 ROM: {}
@@ -682,7 +683,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     }
 
     if (times.size() != 1) {
-        times.emplace_back(fmt::format("Total: {:%Hh %Mm %Ss}", rn() - start));
+        times.emplace_back(fmt::format("Total: {:%Hh %Mm %Ss}", round<seconds>(rn() - start)));
     }
 
     // Success
@@ -692,8 +693,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
         showPerBuild(per_build, fmt::format(R"(Build complete.
 
 [Spent Times]
-{}
-)",
+{})",
                                             fmt::join(times, "\n"))));
 
     if (didpin) {
