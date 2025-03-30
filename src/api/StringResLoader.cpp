@@ -9,30 +9,17 @@
 #include <api/StringResLoader.hpp>
 #include <array>
 #include <filesystem>
+#include <libxml2_helper.hpp>
 #include <memory>
 #include <string_view>
 #include <system_error>
 #include <trivial_helpers/raii.hpp>
 #include <utility>
 
-struct libxml2_error_ctx {
-    int code{};
-    std::string message;
-};
-
 struct LocaleResData {
     std::string name;
     bool isDefault;
 };
-
-struct XmlCharWrapper {
-    RAII<xmlChar *>::Value<void> string;
-    operator ::xmlChar *() const { return string.get(); }
-};
-
-XmlCharWrapper operator""_xmlChar(const char *string, size_t length) {
-    return {RAII<xmlChar *>::create<void>(xmlCharStrdup(string), xmlFree)};
-}
 
 using invalid_xml_error = std::exception;
 
@@ -54,21 +41,6 @@ std::string_view getStrings(const Strings string) {
 #undef fn
     }
     return "";
-}
-
-void libxml_error_handler(void *ctx, const char *msg, ...) {
-    va_list args;
-    std::array<char, 256> errorBuffer{};
-    va_start(args, msg);
-    vsnprintf(errorBuffer.data(), errorBuffer.size(), msg, args);
-    va_end(args);
-    auto *error_ctx = static_cast<libxml2_error_ctx *>(ctx);
-    error_ctx->code = xmlGetLastError()->code;
-    error_ctx->message += errorBuffer.data();
-}
-
-auto hold(xmlChar *buf) {
-    return RAII<xmlChar *>::template create<void>(buf, xmlFree);
 }
 
 std::pair<LocaleResData, StringResLoader::PerLocaleMapImpl> parseLocaleResource(
@@ -110,42 +82,37 @@ std::pair<LocaleResData, StringResLoader::PerLocaleMapImpl> parseLocaleResource(
         throw invalid_xml_error();
     }
 
-    auto localeAttr = hold(xmlGetProp(rootElement, localeProp));
+    XmlCharWrapper localeAttr = xmlGetProp(rootElement, localeProp);
     if (!localeAttr) {
         LOG(ERROR) << "No locale= key in <resources>";
         throw invalid_xml_error();
     }
 
-    auto defaultAttr = hold(xmlGetProp(rootElement, defaultProp));
+    XmlCharWrapper defaultAttr = xmlGetProp(rootElement, defaultProp);
     bool isDefault = false;
 
-    if (defaultAttr && xmlStrcmp(defaultAttr.get(), "yes"_xmlChar) == 0) {
+    if (defaultAttr == "yes") {
         isDefault = true;
     }
 
     m_data.reserve(STRINGRES_MAX);
     for (xmlNodePtr cur = rootElement->children; cur != nullptr;
          cur = cur->next) {
-        if (cur->type == XML_ELEMENT_NODE &&
-            xmlStrcmp(cur->name, stringKey) == 0) {
-            auto nameAttr = hold(xmlGetProp(cur, nameProp));
-            auto content =
-                hold(xmlNodeListGetString(doc.get(), cur->children, 1));
+        if (cur->type == XML_ELEMENT_NODE && cur->name == stringKey) {
+            XmlCharWrapper nameAttr = xmlGetProp(cur, nameProp);
+            XmlCharWrapper content =
+                xmlNodeListGetString(doc.get(), cur->children, 1);
 
             if (!nameAttr || !content) {
                 continue;
             }
-            const char *nameAttrCStr =
-                reinterpret_cast<const char *>(nameAttr.get());
-            const char *contentCStr =
-                reinterpret_cast<const char *>(content.get());
-            auto upper = absl::AsciiStrToUpper(nameAttrCStr);
+	    auto upper = absl::AsciiStrToUpper(nameAttr.c_str());
             auto string = getStrings(upper);
             if (string == Strings::__INVALID__) {
                 LOG(WARNING) << "String name not in enumerator: " << upper;
                 continue;
             }
-            auto [it, res] = m_data.emplace(string, contentCStr);
+            auto [it, res] = m_data.emplace(string, content.str());
             LOG_IF(WARNING, !res) << "Failed to emplace string " << string;
         }
     }
@@ -161,9 +128,7 @@ std::pair<LocaleResData, StringResLoader::PerLocaleMapImpl> parseLocaleResource(
         LOG(ERROR) << "Incomplete XML file. Missing strings: " << absent;
         throw invalid_xml_error();
     }
-    return {LocaleResData{reinterpret_cast<const char *>(localeAttr.get()),
-                          isDefault},
-            std::move(m_data)};
+    return {LocaleResData{localeAttr.str(), isDefault}, std::move(m_data)};
 }
 
 }  // namespace
