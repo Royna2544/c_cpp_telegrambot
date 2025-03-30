@@ -480,6 +480,10 @@ ROMBuildQueryHandler::ROMBuildQueryHandler(TgBotApi::Ptr api,
 }
 
 void ROMBuildQueryHandler::start(Message::Ptr userMessage) {
+    if (current != nullptr) {
+        _api->sendReplyMessage(userMessage, "No no no. A build is currently running");
+	return;
+    }
     _userMessage = std::move(userMessage);
     if (sentMessage) {
         try {
