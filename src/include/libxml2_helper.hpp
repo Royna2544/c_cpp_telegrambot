@@ -13,14 +13,18 @@ class XmlCharWrapper {
     operator xmlChar *() const noexcept { return string.get(); }
 
     bool operator==(const std::string_view other) const noexcept {
-        if (c_str() == nullptr) return false;
+        if (c_str() == nullptr) {
+            return false;
+        }
         return c_str() == other;
     }
     bool operator==(const XmlCharWrapper &other) const noexcept {
         return operator==(other.string.get());
     }
     bool operator==(const xmlChar *other) const noexcept {
-        if (!string || !other) return false;
+        if (!string || (other == nullptr)) {
+            return false;
+        }
         return xmlStrcmp(string.get(), other) == 0;
     }
     bool operator!=(const XmlCharWrapper &other) const noexcept {
@@ -32,7 +36,7 @@ class XmlCharWrapper {
     std::string str() const { return {c_str()}; }
 };
 
-XmlCharWrapper operator""_xmlChar(const char *string, size_t length) {
+inline XmlCharWrapper operator""_xmlChar(const char *string, size_t length) {
     return {xmlCharStrdup(string)};
 }
 

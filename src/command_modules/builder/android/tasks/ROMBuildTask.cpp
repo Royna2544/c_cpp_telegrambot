@@ -306,8 +306,11 @@ ROMBuildTask::ROMBuildTask(TgBotApi::Ptr api, TgBot::Message::Ptr message,
         TgBotApi::parseModeToStr<TgBotApi::ParseMode::HTML>();
     textContent->messageText = "Not yet ready...";
     api->addInlineQueryKeyboard(
-        TgBotApi::InlineQuery{"rombuild status", "See the ROM build progress",
-                              "rombuild", false, true},
+        TgBotApi::InlineQuery{.name = "rombuild status",
+                              .description = "See the ROM build progress",
+                              .command = "rombuild",
+                              .hasMoreArguments = false,
+                              .enforced = true},
         romBuildArticle);
     builder.addKeyboard({"Cancel", "cancel"});
 }

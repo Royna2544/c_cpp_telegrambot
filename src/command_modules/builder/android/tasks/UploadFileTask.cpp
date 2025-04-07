@@ -15,8 +15,9 @@
 #include "ConfigParsers.hpp"
 
 struct ArtifactInfo {
+    constexpr static int name_size = 256;
     std::uintmax_t size;
-    std::array<char, 256> name;
+    std::array<char, name_size> name;
 };
 
 DeferredExit UploadFileTask::runFunction() {
@@ -77,7 +78,7 @@ DeferredExit UploadFileTask::runFunction() {
 
     artifactInfo->size = std::filesystem::file_size(zipFilePath, ec);
     auto filename = zipFilePath.filename().string();
-    const size_t kNameLen = artifactInfo->name.size() - 1;
+    constexpr size_t kNameLen = ArtifactInfo::name_size - 1;
     if (filename.size() > kNameLen) {
         filename.resize(kNameLen);
     }
@@ -85,7 +86,7 @@ DeferredExit UploadFileTask::runFunction() {
 
     // Run the upload script.
     LOG(INFO) << "Starting upload";
-    ForkAndRunShell shell("bash");
+    ForkAndRunShell shell;
     if (!shell.open()) {
         return DeferredExit::generic_fail;
     }
@@ -106,7 +107,7 @@ void UploadFileTask::handleStderrData(ForkAndRun::BufferViewType buffer) {
 void UploadFileTask::onExit(int exitCode) {
     LOG(INFO) << "Process exited with code: " << exitCode;
 
-    ArtifactInfo info;
+    ArtifactInfo info{};
     std::memcpy(&info, artifact_smem->memory, sizeof(ArtifactInfo));
     if (exitCode == EXIT_SUCCESS) {
         data.result->value = PerBuildData::Result::SUCCESS;

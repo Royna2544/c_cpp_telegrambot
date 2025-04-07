@@ -482,8 +482,9 @@ ROMBuildQueryHandler::ROMBuildQueryHandler(TgBotApi::Ptr api,
 
 void ROMBuildQueryHandler::start(Message::Ptr userMessage) {
     if (current != nullptr) {
-        _api->sendReplyMessage(userMessage, "No no no. A build is currently running");
-	return;
+        _api->sendReplyMessage(userMessage,
+                               "No no no. A build is currently running");
+        return;
     }
     _userMessage = std::move(userMessage);
     if (sentMessage) {
@@ -578,7 +579,7 @@ void ROMBuildQueryHandler::handle_cancel(const Query& query) {
     }
 }
 
-void ROMBuildQueryHandler::handle_send_system_info(const Query& query) {
+void ROMBuildQueryHandler::handle_send_system_info(const Query& /*query*/) {
     std::stringstream ss;
     ss << SystemSummary();
     _api->editMessage(sentMessage, ss.str(), backKeyboard);
@@ -615,22 +616,31 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     }
 
     // Support time measurement
-    auto rn = [] { return std::chrono::system_clock::now(); };
-    auto timer = rn();
-    auto start = rn();
+    const auto now = [] { return std::chrono::system_clock::now(); };
+
+    // Record current time
+    auto timer = now();
+    auto start = now();
+
+    // Calculate elapsed time
+    const auto elapsed = [&timer, &now](const std::string_view topic) {
+        return fmt::format(
+            "{}: {:%Hh %Mm %Ss}", topic,
+            std::chrono::round<std::chrono::seconds>(now() - timer));
+    };
+
     std::vector<std::string> times;
-    using std::chrono::round;
-    using std::chrono::seconds;
+    times.reserve(4);
 
     // RepoSync
     if (do_repo_sync) {
-        timer = rn();
+        timer = now();
         RepoSync repoSync(this, per_build, _api, _userMessage);
         if (!repoSync.execute(std::move(gitAskFile))) {
             LOG(INFO) << "RepoSync::execute fails...";
             return;
         }
-        times.emplace_back(fmt::format("RepoSync: {:%Hh %Mm %Ss}", round<seconds>(rn() - timer)));
+        times.emplace_back(elapsed("RepoSync"));
     }
 
     // Remote Based Execution support
@@ -647,8 +657,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
         if (!std::filesystem::exists(config->reclientDir)) {
             LOG(INFO) << "Downloading reclient...";
             auto zipFile = buildDirectory / "rbe.zip";
-            bool ret;
-            ret = CURL_download_file(
+            bool ret = CURL_download_file(
                 "https://github.com/xyz-sundram/Releases/releases/download/"
                 "client-linux-amd64/client-linux-amd64.zip",
                 zipFile);
@@ -663,27 +672,27 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     }
 
     // Build
-    timer = rn();
+    timer = now();
     Build build(this, per_build, _api, _userMessage);
     if (!build.execute(config)) {
         LOG(INFO) << "Build::execute fails...";
         return;
     }
-    times.emplace_back(fmt::format("Build: {:%Hh %Mm %Ss}", round<seconds>(rn() - timer)));
+    times.emplace_back(elapsed("Build"));
 
     // Upload
     if (do_upload) {
-        timer = rn();
+        timer = now();
         Upload upload(this, per_build, _api, _userMessage);
         if (!upload.execute(std::move(scriptDirectory))) {
             LOG(INFO) << "Upload::execute fails...";
             return;
         }
-        times.emplace_back(fmt::format("Upload: {:%Hh %Mm %Ss}", round<seconds>(rn() - timer)));
+        times.emplace_back(elapsed("Upload"));
     }
 
     if (times.size() != 1) {
-        times.emplace_back(fmt::format("Total: {:%Hh %Mm %Ss}", round<seconds>(rn() - start)));
+        times.emplace_back(elapsed("Total"));
     }
 
     // Success
@@ -795,7 +804,7 @@ void ROMBuildQueryHandler::handle_rom(const Query& query) {
     std::string_view rom = query->data;
     std::vector<std::string> c = absl::StrSplit(rom, '_');
     CHECK_EQ(c.size(), 2);
-    const auto romName = c[0];
+    const auto& romName = c[0];
     // Basically an assert
     const int androidVersion = std::stoi(c[1]);
 

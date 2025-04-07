@@ -3,16 +3,14 @@
 
 #include <filesystem>
 #include <libxml2_helper.hpp>
-#include <vector>
 
 #include "ConfigParsers.hpp"
-#include "RepoUtils.hpp"
 #include "ForkAndRun.hpp"
+#include "RepoUtils.hpp"
 
 namespace {
 
-void initRecurseSubmodules(
-    const std::filesystem::path &xmlFile) {
+void initRecurseSubmodules(const std::filesystem::path &xmlFile) {
     auto trueKey = "true"_xmlChar;
     auto projectKey = "project"_xmlChar;
     auto pathKey = "path"_xmlChar;
@@ -23,7 +21,7 @@ void initRecurseSubmodules(
     xmlSetGenericErrorFunc(&ctx, libxml2_error_handler);
     xmlDoc *doc = xmlReadFile(xmlFile.string().c_str(), nullptr, 0);
 
-    if (!doc) {
+    if (doc == nullptr) {
         LOG(ERROR) << "Failed to parse XML file.";
         xmlCleanupParser();
         return;
@@ -31,20 +29,21 @@ void initRecurseSubmodules(
 
     ForkAndRunShell shell;
     if (!shell.open()) {
-	LOG(ERROR) << "Cannot open shell";
-	return;
+        LOG(ERROR) << "Cannot open shell";
+        return;
     }
 
     xmlNodePtr root = xmlDocGetRootElement(doc);
-    for (xmlNodePtr cur = root->children; cur; cur = cur->next) {
+    for (xmlNodePtr cur = root->children; cur != nullptr; cur = cur->next) {
         if (cur->type == XML_ELEMENT_NODE && cur->name == projectKey) {
             XmlCharWrapper path = xmlGetProp(cur, pathKey);
             XmlCharWrapper recurse = xmlGetProp(cur, submoduleKey);
 
-            if (recurse == "true" && path) {
-                LOG(INFO) << "Init submodules for: "
-                           << path.str();
-                shell << "(cd " << path.str() << "; git submodule update --init)" << ForkAndRunShell::endl;
+            if (recurse == "true" && (path != nullptr)) {
+                LOG(INFO) << "Init submodules for: " << path.str();
+                shell << "(cd " << path.str()
+                      << "; git submodule update --init)"
+                      << ForkAndRunShell::endl;
             }
         }
     }
@@ -76,7 +75,9 @@ bool ConfigParser::LocalManifest::GitPrepare::prepare(
     }
 
     for (const auto &p : std::filesystem::directory_iterator(path)) {
-        if (!p.is_regular_file() || p.path().extension() != ".xml") continue;
+        if (!p.is_regular_file() || p.path().extension() != ".xml") {
+            continue;
+        }
         initRecurseSubmodules(p.path());
     }
     return true;
