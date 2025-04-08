@@ -16,6 +16,19 @@
             ]
         },
         {
+            "name": "Exynos7885-new-eleven",
+            "target_rom": "LineageOS",
+            "android_version": 11,
+            "devices": [
+                "a10",
+                "a20",
+                "a20e",
+                "a30",
+                "a30s",
+                "a40"
+            ]
+        },
+        {
             "name": "Exynos7885-fourteen",
             "target_rom": "*",
             "android_version": 14,
