@@ -1,8 +1,8 @@
 {
     "name": "Eureka Kernel",
     "repo": {
-        "url": "https://github.com/eurekadevelopment/Eureka-Kernel-Exynos7885-Q-R-S",
-        "branch": "R15-Next"
+        "url": "https://github.com/Roynas-Android-Playground/ek-private",
+        "branch": "R24U"
     },
     "arch": "arm64",
     "type": "Image",

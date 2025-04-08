@@ -327,13 +327,12 @@ struct Recovery {
 using DeviceMap = std::unordered_map<std::string, ConfigParser::Device::Ptr>;
 using ROMsMap = std::unordered_map<std::string, ConfigParser::ROMBranch::Ptr>;
 using Devices = std::vector<ConfigParser::Device::Ptr>;
-using ROMs = std::vector<ConfigParser::ROMBranch::Ptr>;
 
-std::pair<Devices, ROMs> parseDeviceAndRom(
+std::pair<Devices, ConfigParser::ROMBranch::Ptr> parseDeviceAndRom(
     const NodeItemType<std::string>& device, const Json::Value& rootNode,
     const DeviceMap& devicesPtr, const ROMsMap& romsPtr,
     const std::string_view target_rom, const int android_version) {
-    ROMs romBranch;
+    ConfigParser::ROMBranch::Ptr romBranch;
     std::vector<std::string> deviceCodenames;
 
     // Parse codenames array
@@ -370,13 +369,7 @@ std::pair<Devices, ROMs> parseDeviceAndRom(
         static_cast<std::string>(target_rom), android_version);
 
     if (romsPtr.contains(key)) {
-        romBranch.emplace_back(romsPtr.at(key));
-    } else if (target_rom == "*") {
-        for (const auto& romEntry : romsPtr) {
-            if (romEntry.second->androidVersion == android_version) {
-                romBranch.emplace_back(romEntry.second);
-            }
-        }
+        romBranch = romsPtr.at(key);
     } else {
         LOG(WARNING) << "No matching ROM for target_rom " << target_rom
                      << " and android_version " << android_version;
@@ -410,7 +403,7 @@ struct ROMLocalManifest {
             device, json, devices, roms, static_cast<std::string>(target_rom),
             android_version);
 
-        if (devicesVec.empty() && rom.empty()) {
+        if (devicesVec.empty() || !rom) {
             LOG(INFO) << "No matching device or ROM for localmanifest-branches "
                       << json.toStyledString();
             return {};
@@ -432,11 +425,9 @@ struct ROMLocalManifest {
             }();
             localManifest.job_count = job_count;
         }
-        for (const auto& romi : rom) {
-            localManifest.rom = romi;
-            result.emplace_back(
-                std::make_shared<ConfigParser::LocalManifest>(localManifest));
-        }
+        localManifest.rom = rom;
+        result.emplace_back(std::make_shared<ConfigParser::LocalManifest>(
+            std::move(localManifest)));
         return result;
     }
     static std::vector<return_type> parse(const Json::Value& root,
@@ -485,6 +476,11 @@ struct RecoveryManifest {
         auto [devicesVec, rom] = parseDeviceAndRom(
             device, root, devices, roms, static_cast<std::string>(recoveryName),
             android_version);
+        if (devicesVec.empty() || !rom) {
+            LOG(INFO) << "No matching device or ROM for localmanifest-branches "
+                      << root.toStyledString();
+            return {};
+        }
 
         auto prepare =
             std::make_shared<ConfigParser::LocalManifest::WritePrepare>();
@@ -504,11 +500,10 @@ struct RecoveryManifest {
         localManifest.preparar = std::move(prepare);
         localManifest.devices = std::move(devicesVec);
         localManifest.job_count = std::thread::hardware_concurrency();
-        for (const auto& romi : rom) {
-            localManifest.rom = romi;
-            manifests.emplace_back(
-                std::make_shared<ConfigParser::LocalManifest>(localManifest));
-        }
+        localManifest.rom = rom;
+        manifests.emplace_back(std::make_shared<ConfigParser::LocalManifest>(
+            std::move(localManifest)));
+
         return manifests;
     }
 };
