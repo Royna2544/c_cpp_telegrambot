@@ -2,6 +2,7 @@
 
 #include <fmt/chrono.h>
 #include <fmt/format.h>
+#include <sys/resource.h>
 #include <tgbot/TgException.h>
 #include <tgbot/types/InlineQueryResultArticle.h>
 #include <trivial_helpers/_tgbot.h>
@@ -68,6 +69,34 @@ std::string findREL(const std::filesystem::path& releaseDir) {
     // Ignore if we failed to open, these paths are only valid in Android 14+
     return {};
 }
+
+bool adjust_rlimit() {
+    // This nofiles is AOSP minimum requirement.
+    constexpr rlim_t kRequiredNoFiles = 16000;
+
+    struct rlimit rm{};
+
+    if (getrlimit(RLIMIT_NOFILE, &rm) != 0) {
+        PLOG(ERROR) << "Failed to get rlimit";
+        // We are not sure, but we can try to continue anyway.
+        return true;
+    }
+    if (rm.rlim_cur >= kRequiredNoFiles) {
+        // We are good, we can continue.
+        return true;
+    }
+    LOG(WARNING) << fmt::format("rlimit cur: {}, max: {}, need at least {}",
+                                rm.rlim_cur, rm.rlim_max, kRequiredNoFiles);
+    rm.rlim_cur = kRequiredNoFiles;
+    rm.rlim_max = std::max(kRequiredNoFiles, rm.rlim_max);
+    if (setrlimit(RLIMIT_NOFILE, &rm) != 0) {
+        PLOG(ERROR) << "Failed to set rlimit";
+        return false;
+    }
+    LOG(INFO) << "Adjusting done";
+    return true;
+}
+
 }  // namespace
 
 DeferredExit ROMBuildTask::runFunction() {
@@ -80,12 +109,25 @@ DeferredExit ROMBuildTask::runFunction() {
         LOG(ERROR) << ex.what();
         return DeferredExit::generic_fail;
     }
+
     auto* resultdata = dataShmem->get<PerBuildData::ResultData>();
     resultdata->value = PerBuildData::Result::ERROR_FATAL;
-    auto vendor = findVendor();
-    if (vendor.empty()) {
+
+    // Check if we can set the rlimit
+    if (!adjust_rlimit()) {
+        LOG(ERROR) << "Failed to set rlimit";
+        resultdata->setMessage("Failed to set rlimit");
         return DeferredExit::generic_fail;
     }
+
+    // Find vendor
+    auto vendor = findVendor();
+    if (vendor.empty()) {
+        resultdata->setMessage("Failed to find vendor");
+        return DeferredExit::generic_fail;
+    }
+
+    // Check ulimit open files
     std::string release;
     {
         std::filesystem::path path;
