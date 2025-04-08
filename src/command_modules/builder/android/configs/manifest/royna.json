@@ -3,8 +3,8 @@
     "url": "https://github.com/Roynas-Android-Playground/local_manifests/",
     "branches": [
         {
-            "name": "Exynos7885-fifteen",
-            "target_rom": "*",
+            "name": "Exynos7885-new-fifteen",
+            "target_rom": "LineageOS",
             "android_version": 15,
             "devices": [
                 "a10",
@@ -16,8 +16,8 @@
             ]
         },
         {
-            "name": "Exynos7885-fourteen",
-            "target_rom": "*",
+            "name": "Exynos7885-new-fourteen",
+            "target_rom": "LineageOS",
             "android_version": 14,
             "devices": [
                 "a10",
@@ -29,8 +29,8 @@
             ]
         },
         {
-            "name": "Exynos7885-thirteen",
-            "target_rom": "*",
+            "name": "Exynos7885-new-thirteen",
+            "target_rom": "LineageOS",
             "android_version": 13,
             "devices": [
                 "a10",
@@ -42,9 +42,87 @@
             ]
         },
         {
-            "name": "Exynos7885-twelve",
-            "target_rom": "*",
+            "name": "Exynos7885-new-twelve",
+            "target_rom": "LineageOS",
             "android_version": 12,
+            "devices": [
+                "a10",
+                "a20",
+                "a20e",
+                "a30",
+                "a30s",
+                "a40"
+            ]
+        },
+        {
+            "name": "Exynos7885-new-eleven",
+            "target_rom": "LineageOS",
+            "android_version": 11,
+            "devices": [
+                "a10",
+                "a20",
+                "a20e",
+                "a30",
+                "a30s",
+                "a40"
+            ]
+        },
+        {
+            "name": "Exynos7885-new-fifteen",
+            "target_rom": "crDroid",
+            "android_version": 15,
+            "devices": [
+                "a10",
+                "a20",
+                "a20e",
+                "a30",
+                "a30s",
+                "a40"
+            ]
+        },
+        {
+            "name": "Exynos7885-new-fourteen",
+            "target_rom": "crDroid",
+            "android_version": 14,
+            "devices": [
+                "a10",
+                "a20",
+                "a20e",
+                "a30",
+                "a30s",
+                "a40"
+            ]
+        },
+        {
+            "name": "Exynos7885-new-thirteen",
+            "target_rom": "crDroid",
+            "android_version": 13,
+            "devices": [
+                "a10",
+                "a20",
+                "a20e",
+                "a30",
+                "a30s",
+                "a40"
+            ]
+        },
+        {
+            "name": "Exynos7885-new-twelve",
+            "target_rom": "crDroid",
+            "android_version": 12,
+            "devices": [
+                "a10",
+                "a20",
+                "a20e",
+                "a30",
+                "a30s",
+                "a40"
+            ]
+        },
+        {
+            "name": "Exynos7885-new-eleven",
+            "target_rom": "crDroid",
+            "android_version": 11,
             "devices": [
                 "a10",
                 "a20",
@@ -61,9 +139,21 @@
             "device": "r3q"
         },
         {
+            "name": "r3q-Evolution-X-vic",
+            "target_rom": "Evolution-X",
+            "android_version": 15,
+            "device": "r3q"
+        },
+        {
             "name": "tb128fu-Evolution-X-udc",
             "target_rom": "Evolution-X",
             "android_version": 14,
+            "device": "tb128fu"
+        },
+        {
+            "name": "tb128fu-Evolution-X-vic",
+            "target_rom": "Evolution-X",
+            "android_version": 15,
             "device": "tb128fu"
         },
         {

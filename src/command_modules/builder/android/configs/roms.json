@@ -48,7 +48,7 @@
         "branches": [
             {
                 "android_version": 15,
-                "branch": "lineage-22.0"
+                "branch": "lineage-22.2"
             },
             {
                 "android_version": 14,
@@ -59,38 +59,43 @@
                 "branch": "lineage-20.0"
             },
             {
+                "android_version": 12,
+                "branch": "lineage-19.1"
+            },
+            {
                 "android_version": 11,
                 "branch": "lineage-18.1"
             }
         ]
     },
     {
-        "name": "RisingDroid",
-        "link": "https://github.com/RisingTechOSS/android",
+        "name": "crDroid",
+        "link": "https://github.com/crdroidandroid/android",
         "target": "bacon",
         "artifact": {
             "matcher": "ZipFilePrefixer",
-            "data": "RisingOS"
-        },
-        "branches": [
-            {
-                "android_version": 14,
-                "branch": "fourteen"
-            }
-        ]
-    },
-    {
-        "name": "HentaiOS",
-        "link": "https://github.com/hentaiOS/platform_manifest",
-        "target": "otapackage",
-        "artifact": {
-            "matcher": "ContainsMatcher",
-            "data": "ota"
+            "data": "crDroidAndroid-"
         },
         "branches": [
             {
                 "android_version": 15,
-                "branch": "Vallhound"
+                "branch": "15.0"
+            },
+            {
+                "android_version": 14,
+                "branch": "14.0"
+            },
+            {
+                "android_version": 13,
+                "branch": "13.0"
+            },
+            {
+                "android_version": 12,
+                "branch": "12.1"
+            },
+            {
+                "android_version": 11,
+                "branch": "11.0"
             }
         ]
     }

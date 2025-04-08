@@ -1,0 +1,13 @@
+{
+    "name": "TWRP - Galaxy A90 5G",
+    "clone_mapping": [
+        {
+            "link": "https://github.com/Roynas-Android-Playground/device_samsung_r3q-twrp",
+            "branch": "master",
+            "destination": "device/samsung/r3q"
+        }
+    ],
+    "android_version": 11,
+    "target_recovery": "TWRP",
+    "device": "r3q"
+}

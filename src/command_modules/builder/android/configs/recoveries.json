@@ -10,6 +10,10 @@
             {
                 "android_version": 11,
                 "branch": "twrp-11"
+            },
+            {
+                "android_version": 12,
+                "branch": "twrp-12.1"
             }
         ]
     }
