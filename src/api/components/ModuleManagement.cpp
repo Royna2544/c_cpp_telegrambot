@@ -14,7 +14,7 @@ CommandModule* TgBotApiImpl::ModulesManagement::operator[](
     return nullptr;
 }
 
-bool TgBotApiImpl::ModulesManagement::operator+=(CommandModule::Ptr module) {
+bool TgBotApiImpl::ModulesManagement::load(CommandModule::Ptr module) {
     std::string moduleName;
 
     // Load the library (dlopen)
@@ -36,11 +36,11 @@ bool TgBotApiImpl::ModulesManagement::operator+=(CommandModule::Ptr module) {
         _handles.emplace(moduleName, std::move(module));
     }
     // Register the command
-    (*this) += moduleName;
+    load(moduleName);
     return true;
 }
 
-bool TgBotApiImpl::ModulesManagement::operator+=(const std::string& name) {
+bool TgBotApiImpl::ModulesManagement::load(const std::string& name) {
     std::lock_guard<std::mutex> lock(mutex);
     if (!_handles.contains(name)) {
         LOG(WARNING) << "Module with name " << name
@@ -68,7 +68,7 @@ bool TgBotApiImpl::ModulesManagement::operator+=(const std::string& name) {
     return true;
 }
 
-bool TgBotApiImpl::ModulesManagement::operator-=(const std::string& name) {
+bool TgBotApiImpl::ModulesManagement::unload(const std::string& name) {
     std::lock_guard<std::mutex> lock(mutex);
     if (!_handles.contains(name)) {
         LOG(WARNING) << "Module with name " << name
@@ -86,7 +86,7 @@ bool TgBotApiImpl::ModulesManagement::operator-=(const std::string& name) {
     return true;
 }
 
-bool TgBotApiImpl::ModulesManagement::loadFrom(
+bool TgBotApiImpl::ModulesManagement::loadAll(
     const std::filesystem::path& directory) {
     std::error_code ec;
 
@@ -95,7 +95,7 @@ bool TgBotApiImpl::ModulesManagement::loadFrom(
         const auto filename = it.path().filename();
         if (filename.string().starts_with(CommandModule::prefix) &&
             filename.extension() == FS::kDylibExtension) {
-            (*this) += std::make_unique<CommandModule>(it);
+            load(std::make_unique<CommandModule>(it));
         }
     }
     if (ec) {
@@ -132,7 +132,7 @@ bool TgBotApiImpl::ModulesManagement::loadFrom(
 TgBotApiImpl::ModulesManagement::ModulesManagement(
     TgBotApiImpl::Ptr api, const std::filesystem::path& modules_dir)
     : _api(api), commandAsync("commands", 2) {
-    loadFrom(modules_dir);
+    loadAll(modules_dir);
 }
 
 
