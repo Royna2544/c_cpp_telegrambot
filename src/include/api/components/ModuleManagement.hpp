@@ -16,13 +16,13 @@ class TgBotApiImpl::ModulesManagement {
     // Check if module by `name' is present.
     CommandModule* operator[](const std::string& name) const;
     // Load module by `name' and add it to the management.
-    bool operator+=(CommandModule::Ptr module);
+    bool load(CommandModule::Ptr module);
     // (Re) load module by `name' from the management modules.
-    bool operator+=(const std::string& name);
+    bool load(const std::string& name);
     // Unload module by `name' from the management modules.
-    bool operator-=(const std::string& name);
-
-    bool loadFrom(const std::filesystem::path& directory);
+    bool unload(const std::string& name);
+    // Load all modules from the directory.
+    bool loadAll(const std::filesystem::path& directory);
 
     explicit ModulesManagement(TgBotApiImpl::Ptr api,
                                const std::filesystem::path& modules_dir);

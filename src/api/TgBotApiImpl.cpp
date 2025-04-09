@@ -190,7 +190,7 @@ bool TgBotApiImpl::unloadCommand(const std::string& command) {
     }
     DLOG(INFO) << "Done notifying";
     // Remove the command from the loader.
-    return (*kModuleLoader) -= command;
+    return kModuleLoader->unload(command);
 }
 
 bool TgBotApiImpl::reloadCommand(const std::string& command) {
@@ -200,7 +200,7 @@ bool TgBotApiImpl::reloadCommand(const std::string& command) {
     }
     DLOG(INFO) << "Done notifying";
     // Reload the command to the loader.
-    return (*kModuleLoader) += command;
+    return kModuleLoader->load(command);
 }
 
 void TgBotApiImpl::onAnyMessage(const AnyMessageCallback& callback) {
