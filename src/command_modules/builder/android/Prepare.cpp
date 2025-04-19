@@ -110,7 +110,8 @@ bool ConfigParser::LocalManifest::WritePrepare::prepare(
     for (const auto &repo : data) {
         xmlNodePtr repoNode =
             xmlNewChild(root, nullptr, BAD_CAST "project", nullptr);
-        auto name = absl::StripPrefix(repo.url(), kGithubUrl);
+	std::string url = repo.url();
+        auto name = absl::StripPrefix(url, kGithubUrl);
         xmlNewProp(repoNode, BAD_CAST "name", BAD_CAST name.data());
         xmlNewProp(repoNode, BAD_CAST "path",
                    BAD_CAST repo.destination.c_str());
