@@ -3,7 +3,7 @@
 	url = https://github.com/Royna2544/tgbot-cpp.git
 [submodule "src/third-party/dlfcn-win32"]
 	path = src/third-party/dlfcn-win32
-	url = https://github.com/Royna2544/dlfcn-win32.git
+	url = https://github.com/dlfcn-win32/dlfcn-win32.git
 [submodule "src/third-party/corrosion"]
 	path = src/third-party/corrosion
 	url = https://github.com/corrosion-rs/corrosion
