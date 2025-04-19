@@ -39,7 +39,17 @@ std::string findVendor() {
 
 std::string findREL(const std::filesystem::path& releaseDir) {
     std::error_code ec;
-    LOG(INFO) << "Trying to find scls in " << releaseDir;
+
+    // Try access to build/release/release_config_map.textproto.
+    // See
+    // https://android.googlesource.com/platform/build/release/+/925b392ae2a5d212904adec6cfebf4d1b8f574d9.
+    if (std::filesystem::exists(releaseDir / "release_config_map.textproto",
+                                ec)) {
+        LOG(INFO) << "Using aosp_current";
+        return "aosp_current";
+    }
+
+    LOG(INFO) << "No aosp_current, Trying to find scls in " << releaseDir;
     // Try the build/release/build_config, scl for Android 14
     for (const auto& it : std::filesystem::directory_iterator(
              releaseDir / "build_config/", ec)) {
@@ -51,6 +61,7 @@ std::string findREL(const std::filesystem::path& releaseDir) {
         }
     }
     LOG(INFO) << "Didn't find any scl, trying textproto...";
+
     // Try build/release/release_configs, textproto, another stuff added on
     // Android 15
     for (const auto& it : std::filesystem::directory_iterator(
