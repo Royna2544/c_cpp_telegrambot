@@ -921,7 +921,12 @@ void ROMBuildQueryHandler::onCallbackQuery(
     }
     for (const auto& handler : buttonHandlers) {
         if (handler.matcher(query)) {
-            handler.handler(query);
+            try {
+                handler.handler(query);
+            } catch (const std::filesystem::filesystem_error& ex) {
+                _api->answerCallbackQuery(
+                    query->id, fmt::format("FSException: {}", ex.what()));
+            }
             return;
         }
     }
