@@ -28,7 +28,8 @@ std::string findVendor() {
     for (const auto& it : std::filesystem::directory_iterator("vendor/")) {
         DLOG(INFO) << "Checking: " << it;
         if (it.is_directory() &&
-            std::filesystem::exists(it.path() / "config" / "common.mk")) {
+	// Android 10+
+            std::filesystem::exists(it.path() / "config" / "BoardConfigSoong.mk")) {
             LOG(INFO) << "Found: " << it;
             return it.path().filename().string();
         }
