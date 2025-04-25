@@ -1,0 +1,24 @@
+{
+    "name": "GrassKernel-tb128fu",
+    "repo": {
+        "url": "https://github.com/Roynas-Android-Playground/kernel_lenovo_tb128fu",
+        "branch": "master"
+    },
+    "arch": "arm64",
+    "type": "Image",
+    "toolchains": {
+        "Clang": true,
+        "LLVM Binutils": true,
+        "LLVM IAS": true
+    },
+    "anykernel": {
+        "enabled": true,
+        "location": "AnyKernel3"
+    },
+    "defconfig": {
+        "scheme": "grass-perf_defconfig",
+        "devices": [
+            "tb128fu"
+        ]
+    }
+}
