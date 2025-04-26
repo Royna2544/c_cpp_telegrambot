@@ -577,10 +577,19 @@ GitBranchSwitcher::~GitBranchSwitcher() {
     git_libgit2_shutdown();
 }
 
+int cred_acquire_cb(git_credential** out, const char* url,
+                    const char* username_from_url, unsigned int allowed_types,
+                    void* payload) {
+    return git_credential_default_new(out);
+}
+
 bool RepoInfo::git_clone(const std::filesystem::path& directory,
                          bool shallow) const {
     git_repository_ptr repo;
     git_clone_options gitoptions = GIT_CLONE_OPTIONS_INIT;
+    git_remote_callbacks callbacks = GIT_REMOTE_CALLBACKS_INIT;
+    callbacks.credentials = cred_acquire_cb;
+    gitoptions.fetch_opts.callbacks = callbacks;
 
     LOG(INFO) << fmt::format(
         "Cloning repository, url: {}, branch: {}, shallow: {}", url_, branch_,
