@@ -143,7 +143,20 @@ DeferredExit RepoSyncTask::runFunction() {
     } else {
         LOG(INFO) << "Skipping repo init (Already up-to-date)";
     }
-    if (!data.localManifest->preparar->prepare(kLocalManifestPath.data())) {
+    bool prepareRet = std::visit(
+        [this](auto&& x) {
+            using T = std::decay_t<decltype(x)>;
+            if constexpr (std::is_same_v<
+                              T, ConfigParser::LocalManifest::GitPrepare>) {
+                return x.prepare(kLocalManifestPath.data(), githubToken);
+            } else if constexpr (std::is_same_v<T, ConfigParser::LocalManifest::
+                                                       WritePrepare>) {
+                return x.prepare(kLocalManifestPath.data());
+            }
+            return false;
+        },
+        data.localManifest->preparar);
+    if (!prepareRet) {
         LOG(ERROR) << "Failed to prepare local manifest";
         return DeferredExit::generic_fail;
     }
@@ -219,8 +232,10 @@ void RepoSyncTask::onSignal(int signalCode) {
 
 RepoSyncTask::RepoSyncTask(TgBotApi::CPtr api, Message::Ptr message,
                            PerBuildData data,
-                           std::filesystem::path gitAskPassFile)
+                           std::filesystem::path gitAskPassFile,
+                           std::optional<std::string> githubToken)
     : data(std::move(data)),
       api(api),
       message(std::move(message)),
-      _gitAskPassFile(std::move(gitAskPassFile)) {}
+      _gitAskPassFile(std::move(gitAskPassFile)),
+      githubToken(std::move(githubToken)) {}

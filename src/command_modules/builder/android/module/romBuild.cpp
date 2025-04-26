@@ -327,11 +327,11 @@ class TaskWrapperBase {
             api->pinMessage(sentMessage);
         }
     }
-    bool execute(std::filesystem::path gitAskPassFile)
+    bool execute(std::filesystem::path gitAskPassFile, std::optional<std::string> githubToken)
         requires std::is_same_v<Impl, RepoSyncTask>
     {
         preexecute();
-        RepoSyncTask impl(api, sentMessage, data, std::move(gitAskPassFile));
+        RepoSyncTask impl(api, sentMessage, data, std::move(gitAskPassFile), std::move(githubToken));
         return executeCommon(std::move(impl));
     }
     bool execute(std::optional<ROMBuildTask::RBEConfig> cfg)
@@ -623,10 +623,10 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     auto start = now();
 
     // Calculate elapsed time
-    const auto elapsed = [&timer, &now](const std::string_view topic) {
+    const auto elapsed = [&now](const std::string_view topic, std::chrono::system_clock::time_point cmp) {
         return fmt::format(
             "{}: {:%Hh %Mm %Ss}", topic,
-            std::chrono::round<std::chrono::seconds>(now() - timer));
+            std::chrono::round<std::chrono::seconds>(now() - cmp));
     };
 
     std::vector<std::string> times;
@@ -636,11 +636,11 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     if (do_repo_sync) {
         timer = now();
         RepoSync repoSync(this, per_build, _api, _userMessage);
-        if (!repoSync.execute(std::move(gitAskFile))) {
+        if (!repoSync.execute(std::move(gitAskFile), _config->get(ConfigManager::Configs::GITHUB_TOKEN))) {
             LOG(INFO) << "RepoSync::execute fails...";
             return;
         }
-        times.emplace_back(elapsed("RepoSync"));
+        times.emplace_back(elapsed("RepoSync", timer));
     }
 
     // Remote Based Execution support
@@ -678,7 +678,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
         LOG(INFO) << "Build::execute fails...";
         return;
     }
-    times.emplace_back(elapsed("Build"));
+    times.emplace_back(elapsed("Build", timer));
 
     // Upload
     if (do_upload) {
@@ -688,11 +688,11 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
             LOG(INFO) << "Upload::execute fails...";
             return;
         }
-        times.emplace_back(elapsed("Upload"));
+        times.emplace_back(elapsed("Upload", timer));
     }
 
     if (times.size() != 1) {
-        times.emplace_back(elapsed("Total"));
+        times.emplace_back(elapsed("Total", start));
     }
 
     // Success

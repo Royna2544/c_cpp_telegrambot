@@ -292,7 +292,6 @@ std::vector<ConfigParser::ROMBranch::Ptr> parseROM(
 
 struct ROM {
     using return_type = ConfigParser::ROMBranch::Ptr;
-    static constexpr bool kReturnVec = true;
     static constexpr Json::ValueType _value = Json::arrayValue;
     static std::vector<return_type> parse(
         const Json::Value& root, ConfigParser::MatcherStorage* storage) {
@@ -309,7 +308,6 @@ struct ROM {
 
 struct Recovery {
     using return_type = ConfigParser::ROMBranch::Ptr;
-    static constexpr bool kReturnVec = true;
     static constexpr Json::ValueType _value = Json::arrayValue;
     static std::vector<return_type> parse(
         const Json::Value& root, ConfigParser::MatcherStorage* storage) {
@@ -380,7 +378,6 @@ std::pair<Devices, ConfigParser::ROMBranch::Ptr> parseDeviceAndRom(
 
 struct ROMLocalManifest {
     using return_type = ConfigParser::LocalManifest::Ptr;
-    static constexpr bool kReturnVec = true;
     static constexpr Json::ValueType _value = Json::objectValue;
     static std::vector<return_type> parseOneLocalManifest(
         const Json::Value& json, const DeviceMap& devices, const ROMsMap& roms,
@@ -411,9 +408,8 @@ struct ROMLocalManifest {
         // Assign to the localmanifest
         localManifest.devices = devicesVec;
         localManifest.name = std::move(name);
-        localManifest.preparar =
-            std::make_shared<ConfigParser::LocalManifest::GitPrepare>(
-                RepoInfo{std::move(manifest), branchName});
+        localManifest.preparar = ConfigParser::LocalManifest::GitPrepare(
+            RepoInfo{std::move(manifest), branchName});
         {
             static int job_count = [] {
                 const auto totalMem = GigaBytes(MemoryInfo().totalMemory);
@@ -482,8 +478,7 @@ struct RecoveryManifest {
             return {};
         }
 
-        auto prepare =
-            std::make_shared<ConfigParser::LocalManifest::WritePrepare>();
+        ConfigParser::LocalManifest::WritePrepare prepare;
         for (const auto& mapping : ProxyJsonBranch(root, "clone_mapping")) {
             auto link = "link"_s;
             auto branch = "branch"_s;
@@ -493,7 +488,7 @@ struct RecoveryManifest {
                           << mapping.toStyledString();
                 continue;
             }
-            prepare->data.emplace_back(link, branch,
+            prepare.data.emplace_back(link, branch,
                                        std::filesystem::path(destination));
         }
         localManifest.name = name;
@@ -510,7 +505,6 @@ struct RecoveryManifest {
 
 struct DeviceNames {
     using return_type = ConfigParser::Device::Ptr;
-    static constexpr bool kReturnVec = false;
     static constexpr Json::ValueType _value = Json::arrayValue;
     static std::vector<return_type> parse(const Json::Value& root) {
         std::vector<return_type> devices;

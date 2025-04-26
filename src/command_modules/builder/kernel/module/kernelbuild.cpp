@@ -49,12 +49,15 @@ class KernelBuildHandler {
 
     Intermidates intermidiates;
     std::filesystem::path kernelDir;
+    std::optional<std::string> gitToken;
 
    public:
     constexpr static std::string_view kOutDirectory = "out";
     constexpr static std::string_view kToolchainDirectory = "toolchain";
     constexpr static std::string_view kCallbackQueryPrefix = "kernel_build_";
-    KernelBuildHandler(TgBotApi::Ptr api, const CommandLine* line) : _api(api) {
+    KernelBuildHandler(TgBotApi::Ptr api, const CommandLine* line,
+                       std::optional<std::string> token)
+        : _api(api), gitToken(std::move(token)) {
         auto jsonDir =
             line->getPath(FS::PathType::RESOURCES) / "builder" / "kernel";
 
@@ -492,7 +495,8 @@ void KernelBuildHandler::handle_continue(TgBot::CallbackQuery::Ptr query) {
                         intermidiates.current->repo_info.branch()));
         LOG(INFO) << "Cloning repository...";
         if (!intermidiates.current->repo_info.git_clone(
-                kernelSourceDir, intermidiates.current->shallow_clone)) {
+                kernelSourceDir, gitToken,
+                intermidiates.current->shallow_clone)) {
             _api->editMessage(query->message, "Failed to clone repository");
             return;
         }
@@ -599,8 +603,11 @@ DeferredExit ForkAndRunKernel::runFunction() {
 DECLARE_COMMAND_HANDLER(kernelbuild) {
     static std::optional<KernelBuildHandler> handler;
     if (!handler) {
-        handler.emplace(api, provider->cmdline.get());
-        api->onCallbackQuery("kernelbuild", [api, provider](TgBot::CallbackQuery::Ptr ptr) {
+        handler.emplace(
+            api, provider->cmdline.get(),
+            provider->config->get(ConfigManager::Configs::GITHUB_TOKEN));
+        api->onCallbackQuery("kernelbuild", [api, provider](
+                                                TgBot::CallbackQuery::Ptr ptr) {
             std::string_view data = ptr->data;
 
             if (!provider->auth->isAuthorized(ptr->from)) {

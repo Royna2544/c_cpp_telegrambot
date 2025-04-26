@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <memory>
 #include <string>
+#include <optional>
 
 // constexpr-qualifable struct
 struct ConstRepoInfo {
@@ -71,7 +72,7 @@ class RepoInfo {
 
     // Git clone repo to a directory
     bool git_clone(const std::filesystem::path& directory,
-                   bool shallow = false) const;
+                   const std::optional<std::string_view> gitToken, bool shallow = false) const;
 
     [[nodiscard]] std::string url() const { return url_; }
     [[nodiscard]] std::string branch() const { return branch_; }

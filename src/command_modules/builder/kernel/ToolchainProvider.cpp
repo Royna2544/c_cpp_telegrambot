@@ -24,7 +24,7 @@ constexpr ConstRepoInfo kGCCARMRepoInfo = {
 
 bool GCCAndroidARMProvider::downloadTo(const std::filesystem::path& path) {
     // Download and extract GCC toolchain for Android ARM
-    return RepoInfo{kGCCARMRepoInfo}.git_clone(path);
+    return RepoInfo{kGCCARMRepoInfo}.git_clone(path, std::nullopt, true);
 }
 
 constexpr ConstRepoInfo kGCCARM64RepoInfo = {
@@ -35,7 +35,7 @@ constexpr ConstRepoInfo kGCCARM64RepoInfo = {
 
 bool GCCAndroidARM64Provider::downloadTo(const std::filesystem::path& path) {
     // Download and extract GCC toolchain for Android ARM64
-    return RepoInfo{kGCCARM64RepoInfo}.git_clone(path);
+    return RepoInfo{kGCCARM64RepoInfo}.git_clone(path, std::nullopt, true);
 }
 
 std::optional<std::string> ClangProvider::getToolchainTarballURL() const {

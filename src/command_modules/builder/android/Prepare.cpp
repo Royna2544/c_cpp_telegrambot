@@ -55,9 +55,9 @@ void initRecurseSubmodules(const std::filesystem::path &xmlFile) {
 }  // namespace
 
 bool ConfigParser::LocalManifest::GitPrepare::prepare(
-    const std::filesystem::path &path) {
+    const std::filesystem::path &path, const std::optional<std::string>& gitToken) {
     if (!std::filesystem::exists(path)) {
-        info.git_clone(path);
+        info.git_clone(path, gitToken);
     } else {
         LOG(INFO) << "Local manifest exists already...";
         GitBranchSwitcher sl{path};
@@ -67,7 +67,7 @@ bool ConfigParser::LocalManifest::GitPrepare::prepare(
             LOG(WARNING)
                 << "Local manifest is not the correct repository, deleting it.";
             std::filesystem::remove_all(path);
-            info.git_clone(path);
+            info.git_clone(path, gitToken);
         }
     }
     if (!std::filesystem::exists(path)) {
@@ -110,7 +110,7 @@ bool ConfigParser::LocalManifest::WritePrepare::prepare(
     for (const auto &repo : data) {
         xmlNodePtr repoNode =
             xmlNewChild(root, nullptr, BAD_CAST "project", nullptr);
-	std::string url = repo.url();
+        std::string url = repo.url();
         auto name = absl::StripPrefix(url, kGithubUrl);
         xmlNewProp(repoNode, BAD_CAST "name", BAD_CAST name.data());
         xmlNewProp(repoNode, BAD_CAST "path",

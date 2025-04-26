@@ -577,72 +577,79 @@ GitBranchSwitcher::~GitBranchSwitcher() {
     git_libgit2_shutdown();
 }
 
-int cred_acquire_cb(git_credential** out, const char* url,
-                    const char* username_from_url, unsigned int allowed_types,
-                    void* payload) {
-    return git_credential_default_new(out);
-}
-
 bool RepoInfo::git_clone(const std::filesystem::path& directory,
+                         const std::optional<std::string_view> gitToken,
                          bool shallow) const {
     git_repository_ptr repo;
     git_clone_options gitoptions = GIT_CLONE_OPTIONS_INIT;
-    git_remote_callbacks callbacks = GIT_REMOTE_CALLBACKS_INIT;
-    callbacks.credentials = cred_acquire_cb;
-    gitoptions.fetch_opts.callbacks = callbacks;
+    std::unique_ptr<char, decltype(&free)> token(nullptr, &free);
+    if (gitToken) {
+        git_remote_callbacks callbacks = GIT_REMOTE_CALLBACKS_INIT;
+        callbacks.credentials = +[](git_credential** out, const char* url,
+                                    const char* username_from_url,
+                                    unsigned int allowed_types, void* payload) {
+            return git_credential_userpass_plaintext_new(
+                out, (const char*)payload, "");
+        };
+        token.reset(strdup(gitToken->data()));
+        callbacks.payload = token.get();
+        gitoptions.fetch_opts.callbacks = callbacks;
+    }
 
     LOG(INFO) << fmt::format(
         "Cloning repository, url: {}, branch: {}, shallow: {}", url_, branch_,
         shallow);
     gitoptions.checkout_branch = branch_.c_str();
 
-    // Git fetch callback
-    gitoptions.fetch_opts.callbacks.transfer_progress =
-        +[](const git_indexer_progress* stats, void* payload) -> int {
-        LOG_EVERY_N_SEC(INFO, 3) << fmt::format(
-            "Fetch: Objects({}/{}/{}) Deltas({}/{}), Total "
-            "{:.2f}GB",
-            stats->received_objects, stats->indexed_objects,
-            stats->total_objects, stats->indexed_deltas, stats->total_deltas,
-            GigaBytes(stats->received_bytes * boost::units::data::bytes)
-                .value());
-        if (payload != nullptr) {
-            auto* callback = static_cast<Callbacks*>(payload);
-            callback->onFetch(stats);
-        }
-        return -static_cast<int>(
-            SignalHandler::isSignaled());  // Continue the transfer.
-    };
-    gitoptions.fetch_opts.callbacks.payload = callback_.get();
-
-    // Update refs callback
-    gitoptions.fetch_opts.callbacks.pack_progress =
-        +[](int stage, uint32_t current, uint32_t total, void* payload) -> int {
-        LOG_EVERY_N_SEC(INFO, 3)
-            << fmt::format("Packing: ({}/{})", current, total);
-
-        if (payload != nullptr) {
-            auto* callback = static_cast<Callbacks*>(payload);
-            callback->onPacking(stage, current, total);
-        }
-        return -static_cast<int>(
-            SignalHandler::isSignaled());  // Continue the transfer.
-    };
-    gitoptions.fetch_opts.callbacks.payload = callback_.get();
-
-    // Git checkout callback
-    gitoptions.checkout_opts.progress_cb =
-        +[](const char* path, size_t completed_steps, size_t total_steps,
-            void* payload) {
+    if (callback_) {
+        // Git fetch callback
+        gitoptions.fetch_opts.callbacks.transfer_progress =
+            +[](const git_indexer_progress* stats, void* payload) -> int {
             LOG_EVERY_N_SEC(INFO, 3) << fmt::format(
-                "Packing: ({}/{}): {}", completed_steps, total_steps,
-                (path != nullptr) ? path : "(null)");
+                "Fetch: Objects({}/{}/{}) Deltas({}/{}), Total "
+                "{:.2f}GB",
+                stats->received_objects, stats->indexed_objects,
+                stats->total_objects, stats->indexed_deltas,
+                stats->total_deltas,
+                GigaBytes(stats->received_bytes * boost::units::data::bytes)
+                    .value());
             if (payload != nullptr) {
                 auto* callback = static_cast<Callbacks*>(payload);
-                callback->onCheckout(path, completed_steps, total_steps);
+                callback->onFetch(stats);
             }
+            return 1;  // Continue the transfer.
         };
-    gitoptions.checkout_opts.progress_payload = callback_.get();
+        gitoptions.fetch_opts.callbacks.payload = callback_.get();
+
+        // Update refs callback
+        gitoptions.fetch_opts.callbacks.pack_progress =
+            +[](int stage, uint32_t current, uint32_t total,
+                void* payload) -> int {
+            LOG_EVERY_N_SEC(INFO, 3)
+                << fmt::format("Packing: ({}/{})", current, total);
+
+            if (payload != nullptr) {
+                auto* callback = static_cast<Callbacks*>(payload);
+                callback->onPacking(stage, current, total);
+            }
+            return 1;  // Continue the transfer.
+        };
+        gitoptions.fetch_opts.callbacks.payload = callback_.get();
+
+        // Git checkout callback
+        gitoptions.checkout_opts.progress_cb =
+            +[](const char* path, size_t completed_steps, size_t total_steps,
+                void* payload) {
+                LOG_EVERY_N_SEC(INFO, 3) << fmt::format(
+                    "Packing: ({}/{}): {}", completed_steps, total_steps,
+                    (path != nullptr) ? path : "(null)");
+                if (payload != nullptr) {
+                    auto* callback = static_cast<Callbacks*>(payload);
+                    callback->onCheckout(path, completed_steps, total_steps);
+                }
+            };
+        gitoptions.checkout_opts.progress_payload = callback_.get();
+    }
 
     if (shallow) {
 #ifdef LIBGIT2_HAS_CLONE_DEPTH
