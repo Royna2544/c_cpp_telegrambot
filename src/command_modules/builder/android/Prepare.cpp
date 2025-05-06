@@ -14,6 +14,7 @@ void initRecurseSubmodules(const std::filesystem::path &xmlFile) {
     auto trueKey = "true"_xmlChar;
     auto projectKey = "project"_xmlChar;
     auto pathKey = "path"_xmlChar;
+    auto nameKey = "name"_xmlChar;
     auto submoduleKey = "recurse_submodules"_xmlChar;
     libxml2_error_ctx ctx;
 
@@ -38,11 +39,12 @@ void initRecurseSubmodules(const std::filesystem::path &xmlFile) {
         if (cur->type == XML_ELEMENT_NODE && cur->name == projectKey) {
             XmlCharWrapper path = xmlGetProp(cur, pathKey);
             XmlCharWrapper recurse = xmlGetProp(cur, submoduleKey);
+            XmlCharWrapper name = xmlGetProp(cur, nameKey);
 
             if (recurse == "true" && (path != nullptr)) {
-                LOG(INFO) << "Init submodules for: " << path.str();
-                shell << "(cd " << path.str()
-                      << "; git submodule update --init)"
+                LOG(INFO) << "Init submodules for: " << name.str();
+                shell << "(repo sync " << name.str() << " && cd " << path.str()
+                      << "&& git submodule update --init)"
                       << ForkAndRunShell::endl;
             }
         }
@@ -55,7 +57,8 @@ void initRecurseSubmodules(const std::filesystem::path &xmlFile) {
 }  // namespace
 
 bool ConfigParser::LocalManifest::GitPrepare::prepare(
-    const std::filesystem::path &path, const std::optional<std::string>& gitToken) {
+    const std::filesystem::path &path,
+    const std::optional<std::string> &gitToken) {
     if (!std::filesystem::exists(path)) {
         info.git_clone(path, gitToken);
     } else {
