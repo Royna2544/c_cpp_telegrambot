@@ -489,7 +489,7 @@ struct RecoveryManifest {
                 continue;
             }
             prepare.data.emplace_back(link, branch,
-                                       std::filesystem::path(destination));
+                                      std::filesystem::path(destination));
         }
         localManifest.name = name;
         localManifest.preparar = std::move(prepare);

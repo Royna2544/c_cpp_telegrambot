@@ -152,6 +152,8 @@ DeferredExit RepoSyncTask::runFunction() {
             } else if constexpr (std::is_same_v<T, ConfigParser::LocalManifest::
                                                        WritePrepare>) {
                 return x.prepare(kLocalManifestPath.data());
+            } else {
+                ABSL_UNREACHABLE();
             }
             return false;
         },

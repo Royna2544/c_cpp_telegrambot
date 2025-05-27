@@ -135,7 +135,8 @@ class ConfigParser {
         struct GitPrepare {
             RepoInfo info;
             explicit GitPrepare(RepoInfo info) : info(std::move(info)) {}
-            bool prepare(const std::filesystem::path &path, const std::optional<std::string>& token);
+            bool prepare(const std::filesystem::path &path,
+                         const std::optional<std::string> &token);
         };
 
         struct WritePrepare {
@@ -151,15 +152,13 @@ class ConfigParser {
             bool prepare(const std::filesystem::path &path);
         };
 
-	struct DummyPrepare {};
-
         using Ptr = std::shared_ptr<LocalManifest>;
         // name of the manifest
         std::string name;
         // associated ROM and its branch
         ROMBranch::Ptr rom;
         // local manifest information
-        std::variant<GitPrepare, WritePrepare, DummyPrepare> preparar{DummyPrepare{}};
+        std::variant<std::monostate, GitPrepare, WritePrepare> preparar;
         // associated devices
         std::vector<Device::Ptr> devices;
         long job_count;  // number of jobs
