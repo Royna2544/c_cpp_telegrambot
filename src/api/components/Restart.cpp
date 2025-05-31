@@ -1,9 +1,12 @@
+#include <absl/log/check.h>
+
 #include <Env.hpp>
 #include <api/MessageExt.hpp>
 #include <api/components/ModuleManagement.hpp>
 #include <api/components/OnAnyMessage.hpp>
 #include <api/components/OnCallbackQuery.hpp>
 #include <api/components/Restart.hpp>
+#include <iomanip>
 #include <restartfmt_parser.hpp>
 
 #ifdef __APPLE__
@@ -55,6 +58,9 @@ void TgBotApiImpl::RestartCommand::commandFunction(MessageExt::Ptr message) {
     std::string restartEnv =
         fmt::format("{}={}", RestartFmt::ENV_VAR_NAME,
                     RestartFmt::Type{message->message()}.to_string());
+    CHECK(restartEnv.size() < RestartFmt::MAX_KNOWN_LENGTH)
+        << "RestartFmt::MAX_KNOWN_LENGTH is violated: for string "
+        << std::quoted(restartEnv);
     strncpy(restartBuf.data(), restartEnv.c_str(), restartEnv.size());
 
     // Append the restart env to the environment buffer
