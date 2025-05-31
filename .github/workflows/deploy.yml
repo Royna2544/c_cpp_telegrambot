@@ -13,7 +13,7 @@ jobs:
 
       - name: Set up dependencies
         run: |
-          bash setup_dependencies_apt.sh
+          bash resources/scripts/setup_dependencies_apt.sh
 
       - name: Build
         run: |
