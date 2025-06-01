@@ -1,0 +1,59 @@
+name: " Bug Report"
+description: Report a bug or unexpected behavior in the C++ Telegram bot
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug in this project. Please fill out the details below to help us resolve it faster.
+
+  - type: input
+    id: version
+    attributes:
+      label: Library Version
+      description: What version of the dependencies (Boost, fmt, etc.) are you using?
+      placeholder: "e.g., Boost 1.83.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: Describe the bug and what you expected to happen.
+      placeholder: "When I send /start, the bot crashes with a segmentation fault..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Help us reproduce the issue by listing exact steps.
+      placeholder: |
+        1. Start the bot
+        2. Send the /start command
+        3. See error output in console
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs or Screenshots
+      description: Paste the crash logs, error messages, or screenshots here (if available).
+      render: shell
+
+  - type: input
+    id: platform
+    attributes:
+      label: Operating System / Platform
+      description: Your OS and compiler info
+      placeholder: "macOS 14.2, Clang 17.0.6 with LLD"
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Anything else that might help us understand the issue better.

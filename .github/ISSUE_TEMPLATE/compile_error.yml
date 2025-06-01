@@ -1,0 +1,64 @@
+name: "🛠️ Compile Error"
+description: Report a compilation failure (build error, missing symbol, etc.)
+title: "[Build Error]: "
+labels: [build, bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If you're running into a compile or link error (e.g., missing symbols, type errors, undefined references), this template will help us help you faster.
+
+  - type: input
+    id: bot-version
+    attributes:
+      label: Bot or Library Version
+      description: What version/tag/commit of the dependencies are you using?
+      placeholder: "e.g., commit `abc1234`, Boost 1.83, Clang 17.0.6"
+    validations:
+      required: true
+
+  - type: textarea
+    id: compiler-info
+    attributes:
+      label: Compiler and Toolchain Info
+      description: What compiler and build system are you using?
+      placeholder: |
+        - Compiler: Clang 17.0.6
+        - Linker: LLD
+        - CMake version: 3.28
+        - Build type: Release with LTO
+        - OS: macOS 14.2
+    validations:
+      required: true
+
+  - type: textarea
+    id: error-message
+    attributes:
+      label: Full Compiler/Linker Error Message
+      description: Paste the **entire** error output. Use triple backticks (```) for formatting.
+      render: shell
+      placeholder: |
+        /usr/bin/ld: undefined symbol: std::exception_ptr::__from_native_exception_pointer
+
+  - type: textarea
+    id: build-commands
+    attributes:
+      label: Build Command(s)
+      description: Paste the exact command or CMake steps you used to compile.
+      placeholder: |
+        mkdir build
+        cmake -DCMAKE_BUILD_TYPE=Release -DTGBOT_ENABLE_TESTING=ON ..
+        cmake --build . --parallel
+
+  - type: textarea
+    id: code-snippet
+    attributes:
+      label: Minimal Code Snippet (Optional)
+      description: Share the smallest code snippet or file that triggers the error.
+      render: cpp
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Include any relevant environment variables, build flags, or unusual setups.

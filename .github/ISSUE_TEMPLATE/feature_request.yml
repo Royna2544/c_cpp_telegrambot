@@ -1,0 +1,49 @@
+name: "✨ Feature Request"
+description: Suggest an idea or enhancement for the C++ Telegram bot
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new idea! Please provide as much context as possible so we can evaluate and prioritize your request.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Feature Summary
+      description: Clearly describe the feature you'd like to see added.
+      placeholder: |
+        Add support for inline keyboard pagination with automatic state handling
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Why is this feature needed?
+      description: Explain your use case or what problem this would solve for you.
+      placeholder: |
+        It’s hard to manage long inline menus without a paging system.
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed Solution or API Design
+      description: Describe how this feature could be implemented or exposed to users.
+      placeholder: |
+        Maybe a helper class `InlinePaginator` that manages callback data + menu state?
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or Workarounds
+      description: Are there any current ways to do this with the existing API?
+      placeholder: |
+        I’m manually tracking callback_data and sending new keyboards, but it’s clunky.
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Any mockups, diagrams, or links that would help explain the request.
