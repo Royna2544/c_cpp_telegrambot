@@ -23,8 +23,8 @@
 - Git library 2 - Used for retrieving git root, etc - [Link](https://github.com/libgit2/libgit2)
 - SQLite3 - Used for one database backend, for whitelist, blacklist saving support
 - Protobuf - Used for another database backend - [Link](https://github.com/protocolbuffers/protobuf)
-- RapidJSON - Used for JSON parsing - [Link](https://github.com/Tencent/rapidjson)
 - TgBot-cpp - Core library for being a Telegram bot - [Link](https://github.com/reo7sp/tgbot-cpp)
+- CppTrace - C++ Backtrace Library - [Link](https://github.com/jeremy-rifkin/cpptrace)
 
 ## Goals
 - There is no goal - I will just add stuff whichever I could and learn those while writing code for it

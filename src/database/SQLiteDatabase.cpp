@@ -5,7 +5,7 @@
 #include <absl/strings/ascii.h>
 #include <fmt/core.h>
 
-#include <StacktracePrint.hpp>
+#include <cpptrace/cpptrace.hpp>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -23,13 +23,6 @@
 #include <variant>
 
 #include "api/typedefs.h"
-
-namespace {
-bool backtracePrint(const std::string_view& entry) {
-    LOG(ERROR) << entry;
-    return entry.find("SQLiteDatabase") != std::string::npos;
-}
-}  // namespace
 
 void SQLiteDatabase::Helper::logInvalidState(
     const std::source_location& location, SQLiteDatabase::Helper::State state) {
@@ -59,7 +52,7 @@ void SQLiteDatabase::Helper::logInvalidState(
     }
     LOG(ERROR) << "Invalid state for " << location.function_name() << ": "
                << stateString;
-    PrintStackTrace(backtracePrint);
+    cpptrace::generate_trace().print();
 }
 
 SQLiteDatabase::Helper::Helper(sqlite3* db,
@@ -207,7 +200,7 @@ bool SQLiteDatabase::Helper::commonExecCheck(
         case State::HAS_ARGUMENTS:
             LOG(WARNING) << location.function_name()
                          << " called with added arguments, but is not bound?";
-            PrintStackTrace(backtracePrint);
+            cpptrace::generate_trace().print();
             bindArguments();
             return true;
         default:

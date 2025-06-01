@@ -19,3 +19,6 @@
 [submodule "src/third-party/googletest"]
 	path = src/third-party/googletest
 	url = https://github.com/google/googletest/
+[submodule "src/third-party/cpptrace"]
+	path = src/third-party/cpptrace
+	url = https://github.com/jeremy-rifkin/cpptrace

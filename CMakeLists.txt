@@ -429,6 +429,9 @@ else()
   )
 endif()
 
+# Used by libzstd in cpptrace
+set(ANDROID_PLATFORM_LEVEL 35)
+
 add_subdirectory(src/api)
 add_subdirectory(src/database)
 add_subdirectory(src/random)
@@ -439,6 +442,7 @@ add_subdirectory(src/utils)
 add_subdirectory(src/web)
 add_subdirectory(src/libos)
 add_subdirectory(src/third-party/tgbot-cpp)
+add_subdirectory(src/third-party/cpptrace)
 add_subdirectory(src/third-party/fruit)
 find_package(Python3 QUIET)
 if (Python3_FOUND)

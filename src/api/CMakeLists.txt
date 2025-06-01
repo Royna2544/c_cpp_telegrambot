@@ -9,7 +9,7 @@ tgbot_library(
     MessageExt.cpp
     RateLimit.cpp
     StringResLoader.cpp
-    LIBS DBImpl ${CMAKE_DL_LIBS} TgBot LibXml2::LibXml2
+    LIBS DBImpl ${CMAKE_DL_LIBS} TgBot LibXml2::LibXml2 cpptrace::cpptrace
   STATIC
 )
 
