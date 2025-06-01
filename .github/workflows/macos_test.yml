@@ -27,7 +27,7 @@ jobs:
           CC: /usr/local/opt/llvm/bin/clang
           CXX: /usr/local/opt/llvm/bin/clang++
         run: |
-          mkdir build
+          export LDFLAGS=-L$(brew --prefix llvm)/lib
           cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release -DTGBOT_ENABLE_TESTING=ON .
           cmake --build build -j4
 
