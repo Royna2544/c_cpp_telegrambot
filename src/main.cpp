@@ -574,6 +574,9 @@ int main(int argc, char** argv) {
             LOG(ERROR) << "API call #getMe returns Unauthorized(401). Exiting...";
             return EXIT_FAILURE;
         }
+    } catch (const TgBot::NetworkException& e) {
+        LOG(ERROR) << "Network error: " << e.what();
+        return EXIT_FAILURE;
     }
 
     auto threadManager = injector.get<ThreadManager*>();
