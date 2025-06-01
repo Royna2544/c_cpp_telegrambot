@@ -565,8 +565,18 @@ int main(int argc, char** argv) {
         return EXIT_FAILURE;
     }
 
-    auto threadManager = injector.get<ThreadManager*>();
     auto api = injector.get<TgBotApi*>();
+
+    try {
+        (void)api->getBotUser();
+    } catch (const TgBot::TgException& ex) {
+        if (ex.errorCode == TgBot::TgException::ErrorCode::Unauthorized) {
+            LOG(ERROR) << "API call #getMe returns Unauthorized(401). Exiting...";
+            return EXIT_FAILURE;
+        }
+    }
+
+    auto threadManager = injector.get<ThreadManager*>();
     auto database = injector.get<DatabaseBase*>();
     auto exHandle = injector.get<TgBotApiExHandler*>();
 
@@ -574,16 +584,6 @@ int main(int argc, char** argv) {
     injector.get<Unused<NetworkLogSink>*>();
     injector.get<Unused<RegexHandler>*>();
     injector.get<WrapPtr<SpamBlockBase>*>();
-
-    try {
-        (void)api->getBotUser();
-    } catch (const TgBot::TgException& ex) {
-        if (ex.errorCode == TgBot::TgException::ErrorCode::Unauthorized) {
-            LOG(ERROR) << "API call #getMe returns 403. Exiting...";
-            threadManager->destroy();
-            return EXIT_FAILURE;
-        }
-    }
 
     OptionalComponents comp{};
     if (auto c = configMgr->get(ConfigManager::Configs::OPTIONAL_COMPONENTS);
