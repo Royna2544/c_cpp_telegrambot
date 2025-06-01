@@ -89,18 +89,18 @@ struct DeferredExit : ExitStatusParser {
 
     // Move operator
     DeferredExit(DeferredExit&& other) noexcept : ExitStatusParser(other) {
-        other.destory = false;
+        other.destroy = false;
     }
     DeferredExit& operator=(DeferredExit&& other) noexcept {
         if (this != &other) {
             ExitStatusParser::operator=(other);
-            other.destory = false;
+            other.destroy = false;
         }
         return *this;
     }
 
-    void defuse() { destory = false; }
-    bool destory = true;
+    void defuse() { destroy = false; }
+    bool destroy = true;
 };
 
 namespace details {

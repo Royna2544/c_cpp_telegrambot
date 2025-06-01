@@ -1,5 +1,5 @@
 Alex is not sleeping
-The system has been destoryed
+The system has been destroyed
 init: service 'recovery' got signal 6
 Rewrite the updater script with c++ and try again
 Kernel version 4.x or 5.x or 6.x is too old, needed at least 7.x

@@ -446,7 +446,7 @@ DeferredExit::DeferredExit(DeferredExit::fail_t /*unused*/)
 DeferredExit::DeferredExit(int status) { update(status); }
 
 DeferredExit::~DeferredExit() {
-    if (!destory) {
+    if (!destroy) {
         return;
     }
 
