@@ -7,6 +7,7 @@
 #include <CommandLine.hpp>
 #include <ConfigManager.hpp>
 #include <GitBuildInfo.hpp>
+#include <StacktracePrint.hpp>
 #include <api/Authorization.hpp>
 #include <api/CommandModule.hpp>
 #include <api/MessageExt.hpp>
@@ -276,8 +277,11 @@ void handleTgBotApiEx(const TgBot::TgException& ex) {
         default:
             break;
     }
-    // Goodbye, if it is not
-    throw;
+    LOG(ERROR) << "TgBotAPI exception: " << ex.what();
+    PrintStackTrace([](const std::string_view& entry) {
+        LOG(ERROR) << entry;
+        return false;
+    });
 }
 
 constexpr bool kDisableNotifications = false;
