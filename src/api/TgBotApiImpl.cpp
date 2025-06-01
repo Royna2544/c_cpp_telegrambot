@@ -7,7 +7,6 @@
 #include <CommandLine.hpp>
 #include <ConfigManager.hpp>
 #include <GitBuildInfo.hpp>
-#include <cpptrace/cpptrace.hpp>
 #include <api/Authorization.hpp>
 #include <api/CommandModule.hpp>
 #include <api/MessageExt.hpp>
@@ -25,6 +24,7 @@
 #include <api/components/UnknownCommand.hpp>
 #include <array>
 #include <chrono>
+#include <cpptrace/cpptrace.hpp>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -240,7 +240,8 @@ void TgBotApiImpl::startPoll() {
     std::string ownerString;
     if (auto owner = _provider->database->getOwnerUserId(); owner) {
         auto chat = getApi().getChat(*owner);
-        ownerString = fmt::format(" Owned by @{}.", *chat->username);
+        if (chat->username)
+            ownerString = fmt::format(" Owned by @{}.", *chat->username);
     }
 
     getApi().setMyShortDescription(
