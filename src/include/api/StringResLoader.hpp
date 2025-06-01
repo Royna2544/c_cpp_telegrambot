@@ -4,6 +4,7 @@
 #include <filesystem>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <trivial_helpers/fruit_inject.hpp>
@@ -130,7 +131,7 @@ class StringResLoader {
 
    private:
     std::unordered_map<std::string, PerLocaleMapImpl> localeMap;
-    PerLocaleMapImpl* default_map = nullptr;
+    std::optional<std::string> default_locale;
     std::filesystem::path m_path;
 
    public:

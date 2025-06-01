@@ -149,7 +149,7 @@ StringResLoader::StringResLoader(std::filesystem::path path)
             auto [locale, map] = parseLocaleResource(entry.path().string());
             localeMap[locale.name] = std::move(map);
             if (locale.isDefault) {
-                default_map = &localeMap[locale.name];
+                default_locale = locale.name;
             }
             LOG(INFO) << "Parsed locale: " << locale.name
                       << " File: " << entry.path().filename()
@@ -162,7 +162,7 @@ StringResLoader::StringResLoader(std::filesystem::path path)
     if (ec) {
         LOG(ERROR) << "Error reading directory: " << ec.message();
     }
-    if (!default_map) {
+    if (!default_locale) {
         LOG(ERROR) << "No default locale set";
         // TODO: What I can do in this case?
     }
@@ -174,8 +174,11 @@ const StringResLoader::PerLocaleMap *StringResLoader::at(
     const std::string &key) const {
     if (localeMap.contains(key)) {
         return &localeMap.at(key);
-    } else {
-        DLOG(WARNING) << "Locale not found: " << key;
-        return default_map;
+    } else if (default_locale) {
+        DLOG_IF(WARNING, !key.empty()) << "Locale not found: " << key;
+        return &localeMap.at(*default_locale);
+    } else [[unlikely]] {
+        LOG(ERROR) << "StringResLoader::at has nothing to return!";
+        return nullptr; // Intended crash
     }
 }
