@@ -19,7 +19,7 @@ preferenceKtx = "1.2.1"
 fragmentKtx = "1.8.7"
 roomCompiler = "2.7.1"
 window = "1.4.0"
-room = "2.6.1"
+room = "2.7.1"
 ksp = "2.0.0-1.0.22"
 junitKtx = "1.2.1"
 
