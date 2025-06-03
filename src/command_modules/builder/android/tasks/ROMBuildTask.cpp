@@ -55,9 +55,9 @@ std::string findREL(const std::filesystem::path& releaseDir) {
     for (const auto& it : std::filesystem::directory_iterator(
              releaseDir / "build_config/", ec)) {
         if (it.path().extension() == ".scl") {
-            auto file = it.path().filename();
+            auto file = it.path().filename().replace_extension().string();
             LOG(INFO) << "Found a valid scl, " << it
-                      << " release_name=" << file.replace_extension();
+                      << " release_name=" << file;
             return file;
         }
     }
