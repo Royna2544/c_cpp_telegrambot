@@ -280,6 +280,7 @@ void handleTgBotApiEx(const TgBot::TgException& ex) {
     }
     LOG(ERROR) << "TgBotAPI exception: " << ex.what();
     cpptrace::generate_trace().print();
+    throw;
 }
 
 constexpr bool kDisableNotifications = false;
