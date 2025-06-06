@@ -111,7 +111,8 @@ struct WriteMsgToChatId {
     std::string message;  // Msg to send
 
     static std::optional<WriteMsgToChatId> fromBuffer(
-        const void* buffer, TgBotSocket::Packet::Header::length_type size,
+        const std::uint8_t* buffer,
+        TgBotSocket::Packet::Header::length_type size,
         TgBotSocket::PayloadType type) {
         WriteMsgToChatId result{};
         switch (type) {
@@ -123,7 +124,7 @@ struct WriteMsgToChatId {
                 }
                 {
                     const auto* data =
-                        static_cast<const data::WriteMsgToChatId*>(buffer);
+                        reinterpret_cast<const data::WriteMsgToChatId*>(buffer);
                     result.chat = data->chat;
                     result.message = safeParse(data->message);
                 }
@@ -150,7 +151,8 @@ struct ObserveChatId {
     bool observe;
 
     static std::optional<ObserveChatId> fromBuffer(
-        const void* buffer, TgBotSocket::Packet::Header::length_type size,
+        const std::uint8_t* buffer,
+        TgBotSocket::Packet::Header::length_type size,
         TgBotSocket::PayloadType type) {
         ObserveChatId result{};
         switch (type) {
@@ -161,7 +163,7 @@ struct ObserveChatId {
                 }
                 {
                     const auto* data =
-                        static_cast<const data::ObserveChatId*>(buffer);
+                        reinterpret_cast<const data::ObserveChatId*>(buffer);
                     result.chat = data->chat;
                     result.observe = data->observe;
                 }
@@ -189,7 +191,8 @@ struct SendFileToChatId {
     std::filesystem::path filePath;        // Path to file (local)
 
     static std::optional<SendFileToChatId> fromBuffer(
-        const void* buffer, TgBotSocket::Packet::Header::length_type size,
+        const std::uint8_t* buffer,
+        TgBotSocket::Packet::Header::length_type size,
         TgBotSocket::PayloadType type) {
         SendFileToChatId result{};
         switch (type) {
@@ -201,7 +204,7 @@ struct SendFileToChatId {
                 }
                 {
                     const auto* data =
-                        static_cast<const data::SendFileToChatId*>(buffer);
+                        reinterpret_cast<const data::SendFileToChatId*>(buffer);
                     result.chat = data->chat;
                     result.fileType = data->fileType;
                     result.filePath = safeParse(data->filePath);
@@ -232,7 +235,8 @@ struct ObserveAllChats {
                    // true/false - Start/Stop observing
 
     static std::optional<ObserveAllChats> fromBuffer(
-        const void* buffer, TgBotSocket::Packet::Header::length_type size,
+        const std::uint8_t* buffer,
+        TgBotSocket::Packet::Header::length_type size,
         TgBotSocket::PayloadType type) {
         ObserveAllChats result{};
         switch (type) {
@@ -245,7 +249,7 @@ struct ObserveAllChats {
                 }
                 {
                     const auto* data =
-                        static_cast<const data::ObserveAllChats*>(buffer);
+                        reinterpret_cast<const data::ObserveAllChats*>(buffer);
                     result.observe = data->observe;
                 }
                 return result;
@@ -266,11 +270,10 @@ struct ObserveAllChats {
 };
 
 std::optional<Packet::Header::length_type> findBorderOffset(
-    const void* buffer, Packet::Header::length_type size) {
-    const auto* iter = static_cast<const uint8_t*>(buffer);
+    const uint8_t* buffer, Packet::Header::length_type size) {
     Packet::Header::length_type offset = 0;
     for (Packet::Header::length_type i = 0; i < size; ++i) {
-        if (iter[i] == data::JSON_BYTE_BORDER) {
+        if (buffer[i] == data::JSON_BYTE_BORDER) {
             LOG(INFO) << "Found JSON_BYTE_BORDER in offset " << i;
             return i;
         }
@@ -301,7 +304,7 @@ Packet GenericAckToPacket(
 
 struct TransferFileMeta : SocketFile2DataHelper::Params {
     static std::optional<TransferFileMeta> fromBuffer(
-        const void* buffer, TgBotSocket::Packet::Header::length_type size,
+        const uint8_t* buffer, TgBotSocket::Packet::Header::length_type size,
         TgBotSocket::PayloadType type) {
         TransferFileMeta result{};
         switch (type) {
@@ -312,22 +315,20 @@ struct TransferFileMeta : SocketFile2DataHelper::Params {
                 }
                 {
                     const auto* data =
-                        static_cast<const data::FileTransferMeta*>(buffer);
+                        reinterpret_cast<const data::FileTransferMeta*>(buffer);
                     result.filepath = safeParse(data->srcfilepath);
                     result.destfilepath = safeParse(data->destfilepath);
                     result.options = data->options;
                     result.hash = data->sha256_hash;
                     result.file_size = size - sizeof(data::FileTransferMeta);
-                    result.filebuffer = reinterpret_cast<const uint8_t*>(
-                        static_cast<const char*>(buffer) +
-                        sizeof(data::FileTransferMeta));
+                    result.filebuffer = buffer + sizeof(data::FileTransferMeta);
                 }
                 return result;
             }
             case PayloadType::Json: {
                 const auto offset =
                     findBorderOffset(buffer, size).value_or(size);
-                std::string json(static_cast<const char*>(buffer), offset);
+                std::string json(reinterpret_cast<const char*>(buffer), offset);
                 auto _root = parseAndCheck(buffer, size,
                                            {"srcfilepath", "destfilepath"});
                 if (!_root) {
@@ -355,8 +356,7 @@ struct TransferFileMeta : SocketFile2DataHelper::Params {
                 }
                 result.options = options;
                 result.file_size = size - offset;
-                result.filebuffer =
-                    static_cast<const std::uint8_t*>(buffer) + offset;
+                result.filebuffer = buffer + offset;
                 return result;
             }
             default:
@@ -367,7 +367,7 @@ struct TransferFileMeta : SocketFile2DataHelper::Params {
 };
 
 GenericAck SocketInterfaceTgBot::handle_WriteMsgToChatId(
-    const void* ptr, TgBotSocket::Packet::Header::length_type len,
+    const std::uint8_t* ptr, TgBotSocket::Packet::Header::length_type len,
     TgBotSocket::PayloadType type) {
     const auto data = WriteMsgToChatId::fromBuffer(ptr, len, type);
     if (!data) {
@@ -382,15 +382,15 @@ GenericAck SocketInterfaceTgBot::handle_WriteMsgToChatId(
     return GenericAck::ok();
 }
 
-GenericAck SocketInterfaceTgBot::handle_CtrlSpamBlock(const void* ptr) {
+GenericAck SocketInterfaceTgBot::handle_CtrlSpamBlock(const std::uint8_t* ptr) {
     const auto* data =
-        static_cast<const TgBotSocket::data::CtrlSpamBlock*>(ptr);
+        reinterpret_cast<const TgBotSocket::data::CtrlSpamBlock*>(ptr);
     spamblock->setConfig(*data);
     return GenericAck::ok();
 }
 
 GenericAck SocketInterfaceTgBot::handle_ObserveChatId(
-    const void* ptr, TgBotSocket::Packet::Header::length_type len,
+    const std::uint8_t* ptr, TgBotSocket::Packet::Header::length_type len,
     TgBotSocket::PayloadType type) {
     auto data = ObserveChatId::fromBuffer(ptr, len, type);
 
@@ -423,7 +423,7 @@ GenericAck SocketInterfaceTgBot::handle_ObserveChatId(
 }
 
 GenericAck SocketInterfaceTgBot::handle_SendFileToChatId(
-    const void* ptr, TgBotSocket::Packet::Header::length_type len,
+    const std::uint8_t* ptr, TgBotSocket::Packet::Header::length_type len,
     TgBotSocket::PayloadType type) {
     const auto data = SendFileToChatId::fromBuffer(ptr, len, type);
     if (!data) {
@@ -497,7 +497,7 @@ GenericAck SocketInterfaceTgBot::handle_SendFileToChatId(
 }
 
 GenericAck SocketInterfaceTgBot::handle_ObserveAllChats(
-    const void* ptr, TgBotSocket::Packet::Header::length_type len,
+    const std::uint8_t* ptr, TgBotSocket::Packet::Header::length_type len,
     TgBotSocket::PayloadType type) {
     auto data = ObserveAllChats::fromBuffer(ptr, len, type);
     if (!data) {
@@ -508,7 +508,7 @@ GenericAck SocketInterfaceTgBot::handle_ObserveAllChats(
 }
 
 GenericAck SocketInterfaceTgBot::handle_TransferFile(
-    const void* ptr, TgBotSocket::Packet::Header::length_type len,
+    const std::uint8_t* ptr, TgBotSocket::Packet::Header::length_type len,
     TgBotSocket::PayloadType type) {
     const auto f = TransferFileMeta::fromBuffer(ptr, len, type);
     if (!f) {
@@ -525,7 +525,7 @@ GenericAck SocketInterfaceTgBot::handle_TransferFile(
 }
 
 std::optional<Packet> SocketInterfaceTgBot::handle_TransferFileRequest(
-    const void* ptr, TgBotSocket::Packet::Header::length_type len,
+    const std::uint8_t* ptr, TgBotSocket::Packet::Header::length_type len,
     const TgBotSocket::Packet::Header::session_token_type& token,
     TgBotSocket::PayloadType type) {
     auto f = TransferFileMeta::fromBuffer(ptr, len, type);
@@ -649,7 +649,7 @@ void SocketInterfaceTgBot::handle_CloseSession(
 
 void SocketInterfaceTgBot::handlePacket(const TgBotSocket::Context& ctx,
                                         TgBotSocket::Packet pkt) {
-    const void* ptr = pkt.data.get();
+    const std::uint8_t* ptr = pkt.data.get();
     std::variant<GenericAck, std::optional<Packet>> ret;
     const auto invalidPacketAck =
         GenericAck(AckType::ERROR_COMMAND_IGNORED, "Invalid packet size");

@@ -45,25 +45,25 @@ struct SocketInterfaceTgBot : ThreadRunner {
 
     // Command handlers
     GenericAck handle_WriteMsgToChatId(
-        const void* ptr, TgBotSocket::Packet::Header::length_type len,
+        const std::uint8_t* ptr, TgBotSocket::Packet::Header::length_type len,
         TgBotSocket::PayloadType type);
     GenericAck handle_SendFileToChatId(
-        const void* ptr, TgBotSocket::Packet::Header::length_type len,
+        const std::uint8_t* ptr, TgBotSocket::Packet::Header::length_type len,
         TgBotSocket::PayloadType type);
-    GenericAck handle_CtrlSpamBlock(const void* ptr);
+    GenericAck handle_CtrlSpamBlock(const std::uint8_t* ptr);
     GenericAck handle_ObserveChatId(
-        const void* ptr, TgBotSocket::Packet::Header::length_type len,
+        const std::uint8_t* ptr, TgBotSocket::Packet::Header::length_type len,
         TgBotSocket::PayloadType type);
     GenericAck handle_ObserveAllChats(
-        const void* ptr, TgBotSocket::Packet::Header::length_type len,
+        const std::uint8_t* ptr, TgBotSocket::Packet::Header::length_type len,
         TgBotSocket::PayloadType type);
-    GenericAck handle_TransferFile(const void* ptr,
+    GenericAck handle_TransferFile(const std::uint8_t* ptr,
                                    TgBotSocket::Packet::Header::length_type len,
                                    TgBotSocket::PayloadType type);
 
     // These have to create a packet to send back
     std::optional<TgBotSocket::Packet> handle_TransferFileRequest(
-        const void* ptr, TgBotSocket::Packet::Header::length_type len,
+        const std::uint8_t* ptr, TgBotSocket::Packet::Header::length_type len,
         const TgBotSocket::Packet::Header::session_token_type& token,
         TgBotSocket::PayloadType type);
 

@@ -46,9 +46,13 @@ enum class Command : std::int32_t {
     CMD_SEND_FILE_TO_CHAT_ID,
     CMD_OBSERVE_ALL_CHATS,
     CMD_GET_UPTIME,
-    CMD_TRANSFER_FILE,
+    CMD_TRANSFER_FILE,  // TODO: Remove
     CMD_TRANSFER_FILE_REQUEST,
-    CMD_CLIENT_MAX = CMD_TRANSFER_FILE_REQUEST,
+    CMD_TRANSFER_FILE_BEGIN,
+    CMD_TRANSFER_FILE_CHUNK,
+    CMD_TRANSFER_FILE_CHUNK_RESPONSE,
+    CMD_TRANSFER_FILE_END,
+    CMD_CLIENT_MAX = CMD_TRANSFER_FILE_END,
 
     // Below are internal commands
     CMD_SERVER_INTERNAL_START = 100,
@@ -60,7 +64,7 @@ enum class Command : std::int32_t {
     CMD_MAX,
 };
 
-enum class PayloadType { Binary, Json };
+enum class PayloadType : int32_t { Binary, Json };
 
 constexpr int MAX_PATH_SIZE = 256;
 constexpr int MAX_MSG_SIZE = 256;
@@ -96,13 +100,14 @@ struct alignas(ALIGNMENT) Packet {
         // 11: Remove CMD_DELETE_CONTROLLER_BY_ID, add payload type to header
         // 12: Use OpenSSL's HMAC and AES-GCM algorithm encryption with nounces.
         // Also use CMD_OPEN_SESSION CMD_CLOSE_SESSION for session based
-        // encryption (WIP for now)
-        constexpr static int DATA_VERSION = 12;
+        // encryption
+        // 13: HMAC covers header as well, move hmac to end of data
+        // (Not Implemented!) CMD_TRANSFER_FILE with sessions and chunk-base
+        constexpr static int DATA_VERSION = 13;
         constexpr static int64_t MAGIC_VALUE = MAGIC_VALUE_BASE + DATA_VERSION;
 
         using length_type = uint32_t;
         using nounce_type = uint64_t;
-        using hmac_type = std::array<uint8_t, EVP_MAX_MD_SIZE>;
 
         // Using AES-GCM
         constexpr static int IV_LENGTH = 12;
@@ -118,13 +123,14 @@ struct alignas(ALIGNMENT) Packet {
         length_type data_size{};      ///< Size of the data in the packet
         session_token_type session_token{};  ///< Session token
         nounce_type nonce{};             ///< Nonce (Epoch timestamp is used)
-        hmac_type hmac{};                ///< HMAC data
         init_vector_type init_vector{};  ///< Initialization vector for AES-GCM
     };
     static_assert(offsetof(Header, magic) == 0);
+    using hmac_type = std::array<uint8_t, SHA256_DIGEST_LENGTH>;
 
     Header header{};
     SharedMalloc data;
+    hmac_type hmac{};
 };
 
 using PathStringArray = std::array<char, MAX_PATH_SIZE>;
@@ -166,7 +172,6 @@ struct alignas(ALIGNMENT) WriteMsgToChatId {
     MessageStringArray message;  // Msg to send
 };
 
-
 /**
  * CMD_OBSERVE_CHAT_ID's data structure
  *
@@ -182,15 +187,14 @@ struct alignas(ALIGNMENT) ObserveChatId {
                    // true/false - Start/Stop observing
 };
 
-
 /**
  * CMD_SEND_FILE_TO_CHAT's data structure
  *
  * JSON schema:
  * {
  *   "chat": int64,
- *   "fileType": TgBotSocket::data::FileType value as int (TODO: Make it string representation),
- *   "filePath": string
+ *   "fileType": TgBotSocket::data::FileType value as int (TODO: Make it string
+ * representation), "filePath": string
  * }
  */
 
@@ -224,15 +228,15 @@ constexpr unsigned char JSON_BYTE_BORDER = 0xFF;
  * {
  *   "destfilepath": string,
  *   "srcfilepath": string,
- *   "hash": string (hexadecimal representation, Optional if options.hash_ignore is true),
- *   "options": (Optional if no options are specified) {
- *     "overwrite": bool, (Optional, Default=False)
- *     "hash_ignore": bool, (Optional, Default=False)
+ *   "hash": string (hexadecimal representation, Optional if options.hash_ignore
+ * is true), "options": (Optional if no options are specified) { "overwrite":
+ * bool, (Optional, Default=False) "hash_ignore": bool, (Optional,
+ * Default=False)
  *    }
  * }
- * Note that JSON cannot include bytes. So we use a border at the end of the JSON metadata.
- * Example:
- * 
+ * Note that JSON cannot include bytes. So we use a border at the end of the
+ * JSON metadata. Example:
+ *
  * {
  *   "destfilepath": "/path/to/destination/file.txt",
  *   "srcfilepath": "/path/to/source/file.txt",
@@ -247,7 +251,7 @@ constexpr unsigned char JSON_BYTE_BORDER = 0xFF;
 struct alignas(ALIGNMENT) FileTransferMeta {
     PathStringArray srcfilepath{};  // Source file name (This is not used on the
                                     // remote, used if dry=true)
-    PathStringArray destfilepath{};  // Destination file name
+    PathStringArray destfilepath{};   // Destination file name
     SHA256StringArray sha256_hash{};  // SHA256 hash of the file
 
     // Returns AckType::ERROR_COMMAND_IGNORED on options failure
@@ -346,7 +350,7 @@ ASSERT_SIZE(ObserveChatId, 16);
 ASSERT_SIZE(SendFileToChatId, 272);
 ASSERT_SIZE(ObserveAllChats, 8);
 ASSERT_SIZE(FileTransferMeta, 552);
-ASSERT_SIZE(Packet::Header, 144);
+ASSERT_SIZE(Packet::Header, 80);
 }  // namespace TgBotSocket::data
 
 namespace TgBotSocket::callback {

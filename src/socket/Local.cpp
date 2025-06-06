@@ -10,6 +10,10 @@
 
 #include "SocketContext.hpp"
 
+#ifdef ENABLE_HEXDUMP
+#include <lib/hexdump.h>
+#endif
+
 namespace TgBotSocket {
 
 #ifndef BOOST_ASIO_HAS_LOCAL_SOCKETS
@@ -42,7 +46,7 @@ Context::Local::Local() : socket_(io_context), acceptor_(io_context) {
     });
 }
 
-bool Context::Local::writeBlocking(const void* data,
+bool Context::Local::writeBlocking(const uint8_t* data,
                                    const size_t length) const {
     try {
         boost::asio::write(socket_, boost::asio::buffer(data, length));
@@ -53,24 +57,30 @@ bool Context::Local::writeBlocking(const void* data,
     }
 }
 
-bool Context::Local::writeNonBlocking(const void* data,
+bool Context::Local::writeNonBlocking(const uint8_t* data,
                                       const size_t length) const {
     auto ret = boost::asio::async_write(
         socket_, boost::asio::buffer(data, length), boost::asio::use_future);
     if (ret.wait_until(std::chrono::system_clock::now() +
                        options.io_timeout.get()) != std::future_status::ready) {
         LOG(ERROR) << "Local::write: Timeout";
+        socket_.cancel();
         return false;
     }
     try {
         return ret.get() == length;
     } catch (const boost::system::system_error& ex) {
-        LOG(ERROR) << "Local::read: Error reading: " << ex.what();
+        LOG(ERROR) << "Local::write: Error writing: " << ex.what();
         return false;
     }
 }
 
-bool Context::Local::write(const void* data, const size_t length) const {
+bool Context::Local::write(const uint8_t* data, const size_t length) const {
+#ifdef ENABLE_HEXDUMP
+    DLOG(INFO) << "Local::write: " << length << " bytes requested at "
+               << std::hex << (uintptr_t)data;
+    hexdump(data, length);
+#endif
     if (static_cast<bool>(options.io_timeout)) {
         return writeNonBlocking(data, length);
     } else {
@@ -88,13 +98,16 @@ Context::Local::~Local() {
     }
 }
 
-std::optional<SharedMalloc> Context::Local::read(
+std::optional<SharedMalloc> Context::Local::readBlocking(
     Packet::Header::length_type length) const {
+    SharedMalloc buffer(length);
     try {
-        SharedMalloc buffer(length);
         size_t bytes_read = boost::asio::read(
             socket_, boost::asio::buffer(buffer.get(), length));
         buffer.resize(bytes_read);
+#ifdef ENABLE_HEXDUMP
+        hexdump(buffer.get(), buffer.size());
+#endif
         return buffer;
     } catch (const boost::system::system_error& e) {
         LOG(ERROR) << "Local::read: " << e.what();
@@ -102,9 +115,51 @@ std::optional<SharedMalloc> Context::Local::read(
     }
 }
 
+std::optional<SharedMalloc> Context::Local::readNonBlocking(
+    Packet::Header::length_type length) const {
+    SharedMalloc buffer(length);
+    auto ret = boost::asio::async_read(
+        socket_, boost::asio::buffer(buffer.get(), length),
+        boost::asio::use_future);
+    if (ret.wait_until(std::chrono::system_clock::now() +
+                       options.io_timeout.get()) != std::future_status::ready) {
+        LOG(ERROR) << "Local::read: Timeout";
+        socket_.cancel();
+        return std::nullopt;
+    }
+    try {
+        auto rc = ret.get();
+        if (rc != length) {
+            LOG(WARNING) << "Local::read: Requested " << length << " but have "
+                         << rc;
+            buffer.resize(rc);
+        }
+#ifdef ENABLE_HEXDUMP
+        hexdump(buffer.get(), buffer.size());
+#endif
+        return buffer;
+    } catch (const boost::system::system_error& ex) {
+        LOG(ERROR) << "Local::read: Error reading: " << ex.what();
+        return std::nullopt;
+    }
+}
+
+std::optional<SharedMalloc> Context::Local::read(
+    Packet::Header::length_type length) const {
+#ifdef ENABLE_HEXDUMP
+    DLOG(INFO) << "Local::read:" << length << " bytes requested";
+#endif
+    if (static_cast<bool>(options.io_timeout)) {
+        return readNonBlocking(length);
+    } else {
+        return readBlocking(length);
+    }
+}
+
 bool Context::Local::close() const {
     boost::system::error_code ec;
     using namespace boost::asio::local;
+    socket_.cancel();
     socket_.shutdown(stream_protocol::socket::shutdown_both, ec);  // NOLINT
     if (ec) {
         LOG(WARNING) << "Cannot shutdown socket: " << ec.message();
@@ -170,7 +225,6 @@ bool Context::Local::connect(const RemoteEndpoint& endpoint) {
             if (ec) {
                 LOG(ERROR) << "Connect error: " << ec.message();
             } else {
-                DLOG(INFO) << "Connected to " << endpoint.address;
                 connected = true;
             }
             cv.notify_all();

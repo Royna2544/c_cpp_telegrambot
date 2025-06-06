@@ -62,6 +62,9 @@ class SocketDataHandlerTest : public ::testing::Test {
     SocketInterfaceTgBot* mockInterface{};
     MockTgBotApi* _mockApi{};
 
+    constexpr static TgBotSocket::Packet::Header::session_token_type
+        defaultToken = {"something"};
+
     /**
      * @brief Send a command packet and verify the header and assigns data to
      * the out parameter.
@@ -72,17 +75,33 @@ class SocketDataHandlerTest : public ::testing::Test {
      */
     template <typename DataT, TgBotSocket::Command retCmd>
     void sendAndVerifyHeader(TgBotSocket::Packet pkt, DataT* out) {
+        std::pair<const void*, size_t> _pktHdr;
         std::pair<const void*, size_t> _pktData;
-        SharedMalloc packetData(sizeof(DataT) +
-                                sizeof(TgBotSocket::Packet::Header));
+        std::pair<const void*, size_t> _pktHmac;
+        SharedMalloc packetData(1024);
         TgBotSocket::Packet::Header recv_header;
 
-        EXPECT_TRUE(TgBotSocket::decryptPacket(pkt));
+	EXPECT_TRUE(TgBotSocket::decryptPacket(pkt));
+
         EXPECT_CALL(*_mockImpl, write(_, _))
+            .WillOnce(DoAll(SaveArg<0>(&_pktHdr.first),
+                            SaveArg<1>(&_pktHdr.second), ::testing::Invoke([&] {
+                                packetData.assignFrom(_pktHdr.first,
+                                                      _pktHdr.second);
+                            }),
+                            Return(true)))
+            .WillOnce(
+                DoAll(SaveArg<0>(&_pktData.first), SaveArg<1>(&_pktData.second),
+                      ::testing::Invoke([&] {
+                          packetData.assignFrom(_pktData.first, _pktData.second,
+                                                _pktHdr.second);
+                      }),
+                      Return(true)))
             .WillOnce(DoAll(
-                SaveArg<0>(&_pktData.first), SaveArg<1>(&_pktData.second),
+                SaveArg<0>(&_pktHmac.first), SaveArg<1>(&_pktHmac.second),
                 ::testing::Invoke([&] {
-                    packetData.assignFrom(_pktData.first, _pktData.second);
+                    packetData.assignFrom(_pktHmac.first, _pktHmac.second,
+                                          _pktHdr.second + _pktData.second);
                 }),
                 Return(true)));
         mockInterface->handlePacket(*_mockImpl, std::move(pkt));
@@ -156,7 +175,7 @@ TEST_F(SocketDataHandlerTest, TestCmdWriteMsgToChatId) {
     };
     TgBotSocket::Packet pkt = TgBotSocket::createPacket(
         TgBotSocket::Command::CMD_WRITE_MSG_TO_CHAT_ID, &data, sizeof(data),
-        TgBotSocket::PayloadType::Binary, {});
+        TgBotSocket::PayloadType::Binary, defaultToken);
     EXPECT_CALL(*_mockApi,
                 sendMessage_impl(testChatId, data.message.data(), IsNull(),
                                  IsNull(), TgBotApi::ParseMode::None));
@@ -177,7 +196,7 @@ TEST_F(SocketDataHandlerTest, TestCmdWriteMsgToChatIdTgBotApiEx) {
     };
     TgBotSocket::Packet pkt = TgBotSocket::createPacket(
         TgBotSocket::Command::CMD_WRITE_MSG_TO_CHAT_ID, &data, sizeof(data),
-        TgBotSocket::PayloadType::Binary, {});
+        TgBotSocket::PayloadType::Binary, defaultToken);
     EXPECT_CALL(*_mockApi,
                 sendMessage_impl(testChatId, data.message.data(), IsNull(),
                                  IsNull(), TgBotApi::ParseMode::None))
@@ -212,7 +231,7 @@ TEST_F(SocketDataHandlerTest, TestCmdWriteMsgToChatIdINVALID) {
 
     TgBotSocket::Packet pkt = TgBotSocket::createPacket(
         TgBotSocket::Command::CMD_WRITE_MSG_TO_CHAT_ID, &data, sizeof(data),
-        TgBotSocket::PayloadType::Binary, {});
+        TgBotSocket::PayloadType::Binary, defaultToken);
     TgBotSocket::callback::GenericAck callbackData{};
     sendAndVerifyHeader<TgBotSocket::callback::GenericAck,
                         TgBotSocket::Command::CMD_GENERIC_ACK>(pkt,
@@ -237,7 +256,7 @@ TEST_F(SocketDataHandlerTest, TestCmdUploadFileDryDoesntExist) {
     // Set expectations
     TgBotSocket::Packet pkt = TgBotSocket::createPacket(
         TgBotSocket::Command::CMD_TRANSFER_FILE, &data, sizeof(data),
-        TgBotSocket::PayloadType::Binary, {});
+        TgBotSocket::PayloadType::Binary, defaultToken);
     EXPECT_CALL(*_mockVFS, exists(FSP(data.destfilepath.data())))
         .WillOnce(Return(false));
 
@@ -266,7 +285,7 @@ TEST_F(SocketDataHandlerTest, TestCmdUploadFileDryExistsHashDoesntMatch) {
     // Set expectations
     TgBotSocket::Packet pkt = TgBotSocket::createPacket(
         TgBotSocket::Command::CMD_TRANSFER_FILE, &data, sizeof(data),
-        TgBotSocket::PayloadType::Binary, {});
+        TgBotSocket::PayloadType::Binary, defaultToken);
     EXPECT_CALL(*_mockVFS, exists(FSP(data.destfilepath.data())))
         .WillOnce(Return(true));
     EXPECT_CALL(*_mockVFS, readFile(FSP(data.destfilepath.data())))
@@ -298,7 +317,7 @@ TEST_F(SocketDataHandlerTest, TestCmdUploadFileDryExistsOptSaidNo) {
     // Set expectations
     TgBotSocket::Packet pkt = TgBotSocket::createPacket(
         TgBotSocket::Command::CMD_TRANSFER_FILE, &data, sizeof(data),
-        TgBotSocket::PayloadType::Binary, {});
+        TgBotSocket::PayloadType::Binary, defaultToken);
     EXPECT_CALL(*_mockVFS,
                 exists(std::filesystem::path(data.destfilepath.data())))
         .WillOnce(Return(true));
@@ -318,7 +337,7 @@ TEST_F(SocketDataHandlerTest, TestCmdUploadFileOK) {
     SharedMalloc mem(sizeof(TgBotSocket::data::FileTransferMeta) +
                      filemem.size());
     auto* uploadfile =
-        static_cast<TgBotSocket::data::FileTransferMeta*>(mem.get());
+        reinterpret_cast<TgBotSocket::data::FileTransferMeta*>(mem.get());
     uploadfile->srcfilepath = {"sourcefile"};
     uploadfile->destfilepath = {"destinationfile"};
     uploadfile->sha256_hash = {"asdqwdsadsad"};
@@ -331,7 +350,7 @@ TEST_F(SocketDataHandlerTest, TestCmdUploadFileOK) {
     // Set expectations
     TgBotSocket::Packet pkt = TgBotSocket::createPacket(
         TgBotSocket::Command::CMD_TRANSFER_FILE, mem.get(), mem.size(),
-        TgBotSocket::PayloadType::Binary, {});
+        TgBotSocket::PayloadType::Binary, defaultToken);
     EXPECT_CALL(*_mockVFS, writeFile(FSP(uploadfile->destfilepath.data()), _,
                                      filemem.size()))
         .WillOnce(Return(true));

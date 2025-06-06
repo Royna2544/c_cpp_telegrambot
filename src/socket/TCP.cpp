@@ -60,10 +60,9 @@ Context::TCP::~TCP() {
     }
 }
 
-bool Context::TCP::write(const void* data, const size_t length) const {
+bool Context::TCP::write(const uint8_t* data, const size_t length) const {
     try {
         std::size_t bytes_written = 0;
-        const char* data_ptr = static_cast<const char*>(data);
 
         DLOG(INFO) << "TCP::write:" << length << " bytes requested";
         while (bytes_written < length) {
@@ -73,8 +72,7 @@ bool Context::TCP::write(const void* data, const size_t length) const {
 
             // Write the current chunk
             std::size_t written = boost::asio::write(
-                socket_,
-                boost::asio::buffer(data_ptr + bytes_written, write_size));
+                socket_, boost::asio::buffer(data + bytes_written, write_size));
 
             bytes_written += written;
 
@@ -97,9 +95,9 @@ bool Context::TCP::write(const void* data, const size_t length) const {
 
 std::optional<SharedMalloc> Context::TCP::read(
     Packet::Header::length_type length) const {
+    SharedMalloc buffer(length);
     try {
-        SharedMalloc buffer(length);
-        char* buffer_ptr = (char*)buffer.get();
+        auto* buffer_ptr = buffer.get();
         size_t bytes_read = 0;
 
         DLOG(INFO) << "TCP::read:" << length << " bytes requested";

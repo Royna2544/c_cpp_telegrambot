@@ -14,13 +14,17 @@
 
 #include "SharedMalloc.hpp"
 
+#ifdef ENABLE_HEXDUMP
+#include <lib/hexdump.h>
+#endif
+
 template <>
 struct fmt::formatter<TgBotSocket::PayloadType> : formatter<std::string_view> {
     using Command = TgBotSocket::Command;
 
     // parse is inherited from formatter<string_view>.
-    auto format(TgBotSocket::PayloadType c,
-                format_context& ctx) const -> format_context::iterator {
+    auto format(TgBotSocket::PayloadType c, format_context& ctx) const
+        -> format_context::iterator {
         string_view name = "unknown";
         switch (c) {
             case TgBotSocket::PayloadType::Binary:
@@ -36,16 +40,72 @@ struct fmt::formatter<TgBotSocket::PayloadType> : formatter<std::string_view> {
 
 namespace {
 
-auto computeHMAC(const SharedMalloc& data,
-                 const TgBotSocket::Packet::Header::session_token_type& key) {
+auto computeHMAC(const TgBotSocket::Packet& packet) {
     // Buffer to store the HMAC result
-    TgBotSocket::Packet::Header::hmac_type hmac_result{};
-    unsigned int hmac_length = 0;
+    TgBotSocket::Packet::hmac_type hmac_result{};
+
+    std::unique_ptr<char, decltype(&free)> sha256(strdup("SHA256"), &free);
+    const OSSL_PARAM params[] = {
+        OSSL_PARAM_utf8_string("digest", sha256.get(), strlen(sha256.get())),
+        OSSL_PARAM_END};
+
+    std::unique_ptr<EVP_MAC, decltype(&EVP_MAC_free)> mac{
+        EVP_MAC_fetch(nullptr, "HMAC", nullptr), &EVP_MAC_free};
+    if (!mac) {
+        LOG(ERROR) << "HMAC unsupported in this openssl";
+
+        return hmac_result;
+    }
 
     // Compute the HMAC
-    HMAC(EVP_sha256(), key.data(), key.size(),
-         static_cast<const std::uint8_t*>(data.get()), data.size(),
-         hmac_result.data(), &hmac_length);
+    std::unique_ptr<EVP_MAC_CTX, decltype(&EVP_MAC_CTX_free)> ctx{
+        EVP_MAC_CTX_new(mac.get()), &EVP_MAC_CTX_free};
+
+    if (!ctx) {
+        LOG(ERROR) << "Cannot alloc ctx";
+        return hmac_result;
+    }
+
+    const auto& key = packet.header.session_token;
+    if (!EVP_MAC_init(ctx.get(), (const std::uint8_t*)key.data(), key.size(),
+                      params)) {
+        LOG(ERROR) << "Cannot init";
+        return hmac_result;
+    }
+
+    // Add header
+    if (!EVP_MAC_update(ctx.get(), (const std::uint8_t*)&packet.header,
+                        sizeof(packet.header))) {
+#ifdef ENABLE_HEXDUMP
+        DLOG(INFO) << "ComputeHMAC - DUMP header";
+        hexdump((const uint8_t*)&packet.header, sizeof(packet.header));
+#endif
+        LOG(ERROR) << "Cannot update #1";
+        return hmac_result;
+    }
+
+    // Add data if exist
+    if (packet.header.data_size != 0) {
+#ifdef ENABLE_HEXDUMP
+        DLOG(INFO) << "ComputeHMAC - DUMP data";
+        hexdump(packet.data.get(), packet.data.size());
+#endif
+        if (!EVP_MAC_update(ctx.get(), packet.data.get(), packet.data.size())) {
+            LOG(ERROR) << "Cannot update #2";
+            return hmac_result;
+        }
+    }
+
+    size_t mac_len;
+    if (!EVP_MAC_final(ctx.get(), hmac_result.data(), &mac_len,
+                       hmac_result.size())) {
+        LOG(ERROR) << "Cannot finalize";
+    }
+
+#ifdef ENABLE_HEXDUMP
+    DLOG(INFO) << "ComputeHMAC - DUMP HMAC result";
+    hexdump((const uint8_t*)hmac_result.data(), 32);
+#endif
     return hmac_result;
 }
 
@@ -82,9 +142,8 @@ SharedMalloc encrypt_payload(
     }
 
     // Encrypt the plaintext
-    auto* loc = static_cast<std::uint8_t*>(encrypted.get());
-    if (EVP_EncryptUpdate(ctx.get(), loc, &len,
-                          static_cast<std::uint8_t*>(payload.get()),
+    auto* loc = encrypted.get();
+    if (EVP_EncryptUpdate(ctx.get(), loc, &len, payload.get(),
                           payload.size()) == 0) {
         LOG(ERROR) << "Error encrypting payload";
         return {};
@@ -109,7 +168,6 @@ SharedMalloc encrypt_payload(
     encrypted_payload_len += Header::TAG_LENGTH;
     encrypted.resize(encrypted_payload_len);
 
-    ctx.reset();
     DLOG(INFO) << "Encrypted payload of size " << encrypted_payload_len
                << " bytes using EVP AES_256";
     return encrypted;
@@ -154,9 +212,7 @@ SharedMalloc decrypt_payload(
     }
 
     // Decrypt the ciphertext
-    if (EVP_DecryptUpdate(ctx.get(),
-                          static_cast<std::uint8_t*>(decrypted.get()), &len,
-                          static_cast<const std::uint8_t*>(encrypted.get()),
+    if (EVP_DecryptUpdate(ctx.get(), decrypted.get(), &len, encrypted.get(),
                           decrypted_size) == 0) {
         LOG(ERROR) << "Failed during EVP_DecryptUpdate";
         return {};
@@ -164,8 +220,7 @@ SharedMalloc decrypt_payload(
     decryped_len += len;
 
     // Set the authentication tag
-    auto* tag_loc =
-        static_cast<std::uint8_t*>(encrypted.get()) + decrypted_size;
+    auto* tag_loc = encrypted.get() + decrypted_size;
     if (EVP_CIPHER_CTX_ctrl(ctx.get(), EVP_CTRL_GCM_SET_TAG, tag_size,
                             tag_loc) == 0) {
         LOG(ERROR) << "Failed to set authentication tag";
@@ -173,7 +228,7 @@ SharedMalloc decrypt_payload(
     }
 
     // Finalize decryption
-    auto* out_loc = static_cast<std::uint8_t*>(decrypted.get()) + decryped_len;
+    auto* out_loc = decrypted.get() + decryped_len;
     if (EVP_DecryptFinal_ex(ctx.get(), out_loc, &len) <= 0) {
         LOG(ERROR) << "Authentication tag mismatch";
         return {};
@@ -182,7 +237,6 @@ SharedMalloc decrypt_payload(
     decryped_len += len;
     decrypted.resize(decryped_len);
 
-    ctx.reset();
     LOG(INFO) << "Decrypted payload successfully, size: " << decryped_len;
     return decrypted;
 }
@@ -192,26 +246,23 @@ SharedMalloc decrypt_payload(
 namespace TgBotSocket {
 
 std::optional<Packet> readPacket(const TgBotSocket::Context& context) {
-    TgBotSocket::Packet::Header header;
-    decltype(header.magic) magic{};
+    TgBotSocket::Packet packet;
 
-    // Read header and check magic value, despite the header size, the magic was
-    // always the first element of the struct.
-    const auto magicData = context.read(sizeof(magic));
-    if (!magicData) {
-        LOG(ERROR) << "While reading magic, failed";
+    const auto headerData = context.read(sizeof(TgBotSocket::Packet::Header));
+    if (!headerData) {
+        LOG(ERROR) << "While reading header, failed";
         return std::nullopt;
     }
-    magicData->assignTo(magic);
+    headerData->assignTo(packet.header);
 
-    auto diff = magic - TgBotSocket::Packet::Header::MAGIC_VALUE_BASE;
+    auto diff =
+        packet.header.magic - TgBotSocket::Packet::Header::MAGIC_VALUE_BASE;
     if (diff != TgBotSocket::Packet::Header::DATA_VERSION) {
         LOG(WARNING) << "Invalid magic value, dropping buffer";
         constexpr int reasonable_datadiff = 5;
         // Only a small difference is worth logging.
         diff = abs(diff);
-        if (diff >= 0 && diff < TgBotSocket::Packet::Header::DATA_VERSION +
-                                    reasonable_datadiff) {
+        if (diff >= 0 && diff < TgBotSocket::Packet::Header::DATA_VERSION) {
             LOG(INFO) << "This packet contains header data version " << diff
                       << ", but we have version "
                       << TgBotSocket::Packet::Header::DATA_VERSION;
@@ -221,37 +272,42 @@ std::optional<Packet> readPacket(const TgBotSocket::Context& context) {
         return std::nullopt;
     }
 
-    // Read rest of the packet header.
-    const auto headerData =
-        context.read(sizeof(TgBotSocket::Packet::Header) - sizeof(magic));
-    if (!headerData) {
-        LOG(ERROR) << "While reading header, failed";
-        return std::nullopt;
-    }
-    headerData->assignTo((decltype(magic)*)&header + 1,
-                         sizeof(header) - sizeof(magic));
-    header.magic = magic;
-
     LOG(INFO) << fmt::format(
-        "Received Packet{{cmd={}, data_type={}, data_size={}}}", header.cmd,
-        header.data_type, header.data_size);
+        "Received Packet{{cmd={}, data_type={}, data_size={}}}",
+        packet.header.cmd, packet.header.data_type, packet.header.data_size);
 
-    TgBotSocket::Packet packet{
-        .header = header, .data = {}  // Will be filled in the next step.
-    };
-
-    packet.header = header;
-    if (packet.header.data_size == 0) {
-        // In this case, no need to fetch or verify data
-        return packet;
+    if (packet.header.data_size != 0) {
+        auto data = context.read(packet.header.data_size);
+        if (!data) {
+            LOG(ERROR) << "While reading data, failed";
+            return std::nullopt;
+        }
+        packet.data = *data;
     }
-    auto data = context.read(header.data_size);
-    if (!data) {
-        LOG(ERROR) << "While reading data, failed";
+
+    auto hmac = context.read(packet.hmac.size());
+    if (!hmac) {
+        LOG(ERROR) << "while reading hmac, failed";
         return std::nullopt;
     }
-    packet.data = *data;
-    if (!decryptPacket(packet)) {
+    hmac->assignTo(packet.hmac);
+
+    if (packet.hmac == Packet::hmac_type{}) {
+        switch (packet.header.cmd) {
+            // till open session ack, we don't know the session key
+            case Command::CMD_OPEN_SESSION:
+            case Command::CMD_OPEN_SESSION_ACK:
+                return packet;  // Pass
+            default:
+                LOG(ERROR) << "Unchecked packet (Not allowed!)";
+                return std::nullopt;
+        }
+    } else if (packet.hmac != computeHMAC(packet)) {
+        LOG(ERROR) << "HMAC mismatch";
+        return std::nullopt;
+    }
+
+    if (packet.header.data_size > 0 && !decryptPacket(packet)) {
         return std::nullopt;
     }
     return packet;
@@ -261,16 +317,6 @@ bool Socket_API decryptPacket(TgBotSocket::Packet& packet) {
     auto& header = packet.header;
     auto& data = packet.data;
 
-    if (header.session_token ==
-        TgBotSocket::Packet::Header::session_token_type{}) {
-        LOG(WARNING)
-            << "No session token provided, decryption will be skipped.";
-        return true;
-    }
-    if (packet.header.hmac != computeHMAC(data, header.session_token)) {
-        LOG(ERROR) << "HMAC mismatch";
-        return false;
-    }
     packet.data =
         decrypt_payload(header.session_token, data, packet.header.init_vector);
     if (!static_cast<bool>(packet.data)) {
@@ -287,7 +333,7 @@ Packet Socket_API
 createPacket(const Command command, const void* data,
              Packet::Header::length_type length, const PayloadType payloadType,
              const Packet::Header::session_token_type& sessionToken) {
-    Packet packet{.header = {}, .data = {}};
+    Packet packet{};
     packet.header.cmd = command;
     packet.header.magic = Packet::Header::MAGIC_VALUE;
     packet.header.data_type = payloadType;
@@ -299,19 +345,23 @@ createPacket(const Command command, const void* data,
             .count() +
         rand();  // Add some randomness to the nonce
 
+    bool hasToken = sessionToken != Packet::Header::session_token_type{};
+
     if (data != nullptr && length > 0) {
         packet.data.resize(length);
         packet.data.assignFrom(data, length);
 
-        if (sessionToken != Packet::Header::session_token_type{}) {
+        if (hasToken) {
             packet.data = encrypt_payload(sessionToken, packet.data,
                                           packet.header.init_vector);
-            packet.header.hmac = computeHMAC(packet.data, sessionToken);
+            packet.header.data_size = packet.data.size();
         } else {
             LOG(WARNING)
                 << "No session token provided, encryption will be skipped";
         }
-        packet.header.data_size = packet.data.size();
+    }
+    if (hasToken) {
+        packet.hmac = computeHMAC(packet);
     }
     return packet;
 }

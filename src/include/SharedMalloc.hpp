@@ -14,11 +14,13 @@
 #endif
 
 struct SharedMalloc {
+    using offset_type = std::ptrdiff_t;
+    using size_type = int;
+    using data_type = std::uint8_t;
+
     struct Parent {
-        explicit Parent(size_t size) : _size(size), _data(malloc(size), free) {
-            if (_data == nullptr) {
-                throw std::bad_alloc();
-            }
+        explicit Parent(size_type size) : _size(0), _data(nullptr, free) {
+            realloc(size);
         }
         explicit Parent() : _data(nullptr, free) {}
 
@@ -26,45 +28,46 @@ struct SharedMalloc {
         NO_COPY_CTOR(Parent);
 
         // alloc allocates a new shared memory block of the specified size
-        void realloc(size_t newSize) {
+        void realloc(size_type newSize) {
             if (newSize == _size) {
                 return;  // No-op
             }
-            if (newSize == 0) {
+            if (newSize <= 0) {
                 _data.reset();  // Free memory and set pointer to nullptr
                 _size = 0;
                 return;
             }
-            void *newMem = nullptr;
+            data_type *newMem = nullptr;
             if (_data == nullptr) {
-                newMem = ::calloc(newSize, 1);
+                newMem = static_cast<data_type *>(
+                    ::calloc(newSize, sizeof(data_type)));
+                if (newMem == nullptr) {
+                    throw std::bad_alloc();
+                }
             } else {
-                void *curmem = _data.release();
-                newMem = ::realloc(curmem, newSize);
+                auto *curmem = _data.release();
+                newMem = static_cast<data_type *>(::realloc(curmem, newSize));
                 if (newMem == nullptr) {
                     _data.reset(curmem);
+                    throw std::bad_alloc();
                 }
-            }
-            if (newMem == nullptr) {
-                throw std::bad_alloc();
             }
             if (newSize > _size) {
                 // Zero-fill the new block
-                char *memoffset = static_cast<char *>(newMem);
-                memset(memoffset + _size, 0, newSize - _size);
+                memset(newMem + _size, 0, newSize - _size);
             }
             _data.reset(newMem);
             _size = newSize;
         }
-        [[nodiscard]] size_t size() const { return _size; }
-        [[nodiscard]] void *data() const { return _data.get(); }
+        [[nodiscard]] size_type size() const { return _size; }
+        [[nodiscard]] data_type *data() const { return _data.get(); }
 
        private:
-        size_t _size{};
-        std::unique_ptr<void, decltype(&free)> _data;
+        size_type _size{};
+        std::unique_ptr<data_type, decltype(&free)> _data;
     };
 
-    explicit SharedMalloc(size_t size) {
+    explicit SharedMalloc(size_type size) {
         if (size == 0) {
             parent = std::make_shared<Parent>();
         } else {
@@ -82,26 +85,30 @@ struct SharedMalloc {
 
     explicit operator bool() const { return parent->size() != 0; }
     bool operator!=(std::nullptr_t value) { return parent.get() != value; }
-    [[nodiscard]] size_t size() const noexcept { return parent->size(); }
     void resize(size_t newSize) const noexcept { parent->realloc(newSize); }
+
+    // trivial accessors
+    [[nodiscard]] auto get() const noexcept { return parent->data(); }
+    [[nodiscard]] auto use_count() const noexcept { return parent.use_count(); }
+    [[nodiscard]] auto size() const noexcept { return parent->size(); }
 
    private:
     // A fortify check.
-    inline void validateBoundsForSize(const size_t newSize) const {
+    inline void validateBoundsForSize(const size_type newSize) const {
         if (newSize > size()) {
             throw std::out_of_range(
                 "Operation size exceeds allocated memory size");
         }
     }
 
-    inline void offsetCheck(const size_t offset) const {
+    inline void offsetCheck(const offset_type offset) const {
         if (offset > size()) {
             throw std::out_of_range("Offset exceeds allocated memory bounds");
         }
     }
 
-    [[nodiscard]] inline char *offsetGet(const size_t offset) const {
-        return static_cast<char *>(get()) + offset;
+    [[nodiscard]] inline auto offsetGet(const offset_type offset) const {
+        return get() + offset;
     }
 
    public:
@@ -117,17 +124,18 @@ struct SharedMalloc {
      * @param ref Pointer to the destination where data will be copied to.
      * @param size Number of bytes to be copied.
      * @param offset Offset from which to start copying from the internal
-     * memory. Default is 0.
+     * memory. Default is 0. Negative values would calculate from end of file.
      * @throws std::out_of_range if the offset or size exceeds the allocated
      * memory.
      * @note This method cannot be used with const pointers. Use `assignFrom`
      * for const pointers.
      */
     template <typename T>
-    void assignTo(T *ref, const size_t size, const size_t offset = 0) const {
+    void assignTo(T *ref, const size_type size, offset_type offset = 0) const {
         static_assert(!std::is_const_v<T>,
                       "Using assignTo with a const pointer, did you mean to "
                       "use assignFrom?");
+        if (offset < 0) offset += this->size();
         offsetCheck(offset);
         validateBoundsForSize(size + offset);
         memcpy(ref, offsetGet(offset), size);
@@ -148,7 +156,7 @@ struct SharedMalloc {
      * memory.
      */
     template <typename T>
-    void assignTo(T &ref, const size_t offset = 0) const {
+    void assignTo(T &ref, const size_type offset = 0) const {
         assignTo(&ref, sizeof(T), offset);
     }
 
@@ -165,7 +173,7 @@ struct SharedMalloc {
      */
     template <typename T>
         requires(!std::is_pointer_v<T>)
-    void assignTo(T &ref, const size_t offset = 0) const {
+    void assignTo(T &ref, const size_type offset = 0) const {
         assignTo(&ref, sizeof(T), offset);
     }
 
@@ -181,11 +189,8 @@ struct SharedMalloc {
      */
     template <typename T>
         requires(!std::is_pointer_v<T>)
-    void assignFrom(const T &ref, const size_t offset = 0) {
-        if (sizeof(T) > size()) {
-            throw std::out_of_range(
-                "Operation size exceeds allocated memory size");
-        }
+    void assignFrom(const T &ref, const size_type offset = 0) {
+        validateBoundsForSize(sizeof(T));
         assignFrom(&ref, sizeof(T), offset);
     }
 
@@ -205,7 +210,9 @@ struct SharedMalloc {
      * memory.
      */
     template <typename T>
-    void assignFrom(const T *ref, const size_t size, const size_t offset = 0) {
+    void assignFrom(const T *ref, const size_type size,
+                    offset_type offset = 0) {
+        if (offset < 0) offset += this->size();
         offsetCheck(offset);
         validateBoundsForSize(size + offset);
         memcpy(offsetGet(offset), ref, size);
@@ -224,17 +231,13 @@ struct SharedMalloc {
      * @throws std::out_of_range if either the startOffset, destOffset, or size
      * exceeds the allocated memory.
      */
-    void move(const size_t startOffset, const size_t destOffset,
-              const size_t size) {
+    void move(const offset_type startOffset, const offset_type destOffset,
+              const size_type size) {
         offsetCheck(startOffset);
         offsetCheck(destOffset);
         validateBoundsForSize(size + destOffset);
         memmove(offsetGet(destOffset), offsetGet(startOffset), size);
     }
-
-    // get returns a shared pointer to the shared memory block
-    [[nodiscard]] void *get() const noexcept { return parent->data(); }
-    [[nodiscard]] long use_count() const noexcept { return parent.use_count(); }
 
     bool operator==(const SharedMalloc &other) const noexcept {
         // Check for self-comparison

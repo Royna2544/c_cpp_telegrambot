@@ -12,6 +12,11 @@ DECLARE_COMMAND_HANDLER(decho) {
         LOG(ERROR) << "Failed to delete message";
         // Cannot use delete echo in thie case.
         return;
+#ifdef __ANDROID__
+    } catch (...) {  // Only Termux acts like this
+        LOG(ERROR) << "Failed to delete message";
+        return;
+#endif
     }
     if (message->has({MessageAttrs::ExtraText}) && message->reply()->exists()) {
         api->copyAndReplyAsMessage(message->message(),

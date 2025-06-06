@@ -81,11 +81,10 @@ std::string_view AckTypeToStr(callback::AckType type) {
 }  // namespace
 
 std::optional<Packet::Header::length_type> findBorderOffset(
-    const void* buffer, Packet::Header::length_type size) {
-    const auto* iter = static_cast<const uint8_t*>(buffer);
+    const std::uint8_t* buffer, Packet::Header::length_type size) {
     Packet::Header::length_type offset = 0;
     for (Packet::Header::length_type i = 0; i < size; ++i) {
-        if (iter[i] == data::JSON_BYTE_BORDER) {
+        if (buffer[i] == data::JSON_BYTE_BORDER) {
             LOG(INFO) << "Found JSON_BYTE_BORDER in offset " << i;
             return i;
         }
@@ -120,7 +119,7 @@ void handleCallback(SocketClientWrapper& connector, const Packet& pkt) {
                     }
                     {
                         const auto* data =
-                            static_cast<const data::FileTransferMeta*>(
+                            reinterpret_cast<const data::FileTransferMeta*>(
                                 pkt.data.get());
                         result.filepath = safeParse(data->srcfilepath);
                         result.destfilepath = safeParse(data->destfilepath);
@@ -128,9 +127,8 @@ void handleCallback(SocketClientWrapper& connector, const Packet& pkt) {
                         result.hash = data->sha256_hash;
                         result.file_size =
                             pkt.data.size() - sizeof(data::FileTransferMeta);
-                        result.filebuffer = reinterpret_cast<const uint8_t*>(
-                            static_cast<const char*>(pkt.data.get()) +
-                            sizeof(data::FileTransferMeta));
+                        result.filebuffer =
+                            pkt.data.get() + sizeof(data::FileTransferMeta);
                     }
                     break;
                 }
@@ -138,8 +136,8 @@ void handleCallback(SocketClientWrapper& connector, const Packet& pkt) {
                     const auto offset =
                         findBorderOffset(pkt.data.get(), pkt.data.size())
                             .value_or(pkt.data.size());
-                    std::string json(static_cast<const char*>(pkt.data.get()),
-                                     offset);
+                    std::string json(
+                        reinterpret_cast<const char*>(pkt.data.get()), offset);
                     auto _root = parseAndCheck(pkt.data.get(), pkt.data.size(),
                                                {"srcfilepath", "destfilepath"});
                     if (!_root) {
@@ -167,9 +165,7 @@ void handleCallback(SocketClientWrapper& connector, const Packet& pkt) {
                         result.hash = parsed.value();
                     }
                     result.file_size = pkt.data.size() - offset;
-                    result.filebuffer =
-                        static_cast<const std::uint8_t*>(pkt.data.get()) +
-                        offset;
+                    result.filebuffer = pkt.data.get() + offset;
                     break;
                 }
                 default:
@@ -279,13 +275,6 @@ std::optional<data::ObserveAllChats> parseArgs(char** argv) {
         return data;
     }
     return std::nullopt;
-}
-
-struct None {};
-
-template <>
-std::optional<None> parseArgs(char** argv) {
-    return None{};
 }
 
 template <>
@@ -410,12 +399,8 @@ int main(int argc, char** argv) {
                                    PayloadType::Binary, session_token);
             } break;
             case Command::CMD_GET_UPTIME: {
-                auto args = parseArgs<None>(argv);
-                if (!args) {
-                    usage(exe, false);
-                }
-                pkt = createPacket(cmd, &args.value(), sizeof(*args),
-                                   PayloadType::Binary, session_token);
+                pkt = createPacket(cmd, nullptr, 0, PayloadType::Binary,
+                                   session_token);
                 break;
             }
             case Command::CMD_TRANSFER_FILE:

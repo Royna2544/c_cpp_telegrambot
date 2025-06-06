@@ -9,8 +9,8 @@
 template <>
 struct fmt::formatter<boost::asio::ip::udp> : formatter<string_view> {
     // parse is inherited from formatter<string_view>.
-    auto format(boost::asio::ip::udp c,
-                format_context& ctx) const -> format_context::iterator {
+    auto format(boost::asio::ip::udp c, format_context& ctx) const
+        -> format_context::iterator {
         std::string_view name;
         if (c == boost::asio::ip::udp::v4()) {
             name = "IPv4";
@@ -47,7 +47,8 @@ Context::UDP::~UDP() {
     }
 }
 
-bool Context::UDP::writeBlocking(const void* data, const size_t length) const {
+bool Context::UDP::writeBlocking(const uint8_t* data,
+                                 const size_t length) const {
     try {
         socket_.send_to(boost::asio::buffer(data, length), endpoint_);
         return true;
@@ -57,7 +58,7 @@ bool Context::UDP::writeBlocking(const void* data, const size_t length) const {
     }
 }
 
-bool Context::UDP::writeNonBlocking(const void* data,
+bool Context::UDP::writeNonBlocking(const uint8_t* data,
                                     const size_t length) const {
     auto bytes_wrote = socket_.async_send_to(
         boost::asio::buffer(data, length), endpoint_, boost::asio::use_future);
@@ -66,6 +67,7 @@ bool Context::UDP::writeNonBlocking(const void* data,
                                options.io_timeout.get()) !=
         std::future_status::ready) {
         LOG(ERROR) << "UDP::write: Timeout";
+        socket_.cancel();
         return false;
     }
 
@@ -77,7 +79,7 @@ bool Context::UDP::writeNonBlocking(const void* data,
     }
 }
 
-bool Context::UDP::write(const void* data, const size_t length) const {
+bool Context::UDP::write(const uint8_t* data, const size_t length) const {
     if (static_cast<bool>(options.io_timeout)) {
         return writeNonBlocking(data, length);
     } else {
@@ -97,6 +99,7 @@ std::optional<SharedMalloc> Context::UDP::readNonBlocking(
                                   options.io_timeout.get()) !=
         std::future_status::ready) {
         LOG(ERROR) << "UDP::read: Timeout";
+        socket_.cancel();
         return std::nullopt;
     }
 
@@ -142,6 +145,7 @@ std::optional<SharedMalloc> Context::UDP::read(
 
 bool Context::UDP::close() const {
     boost::system::error_code ec;
+    socket_.cancel();
     socket_.close(ec);  // NOLINT
     if (ec) {
         LOG(WARNING) << "Cannot close socket: " << ec.message();

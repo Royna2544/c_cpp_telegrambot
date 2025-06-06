@@ -3,6 +3,20 @@ add_subdirectory(selector)
 
 find_package(Boost 1.70 CONFIG COMPONENTS system)
 
+option(SOCKET_ENABLE_HEXDUMP "Enable hex-view of sent-recv packets (extremely verbose)" OFF)
+
+set(SOCKET_HEXDUMP_LIB)
+set(SOCKET_HEXDUMP_DEF)
+if (SOCKET_ENABLE_HEXDUMP AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+set(SOCKET_HEXDUMP_LIB HexDump)
+set(SOCKET_HEXDUMP_DEF ENABLE_HEXDUMP)
+endif()
+
+tgbot_library(
+  NAME HexDump
+  SRCS lib/hexdump.c
+)
+
 tgbot_library(
   NAME Socket
   SRCS
@@ -15,8 +29,9 @@ tgbot_library(
     backends/ClientBackend.cpp
     TgBotCommandMap.cpp
   PUBLIC_INC interface
-  LIBS Utils Boost::system OpenSSL::Crypto JsonCpp::JsonCpp
+  LIBS Utils Boost::system OpenSSL::Crypto JsonCpp::JsonCpp ${SOCKET_HEXDUMP_LIB}
   LIBS_WIN32 wsock32 Ws2_32
+  DEFS ${SOCKET_HEXDUMP_DEF}
 )
 
 tgbot_exe(

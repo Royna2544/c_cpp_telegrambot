@@ -54,7 +54,7 @@ class Socket_API Context {
      * @param data A pointer to the data to be sent.
      * @param length The number of bytes to send.
      */
-    virtual bool write(const void *data, const size_t length) const = 0;
+    virtual bool write(const uint8_t *data, const size_t length) const = 0;
 
     /**
      * @brief Reads data from the socket connection.
@@ -181,7 +181,7 @@ class Socket_API Context::TCP : public Context {
      *
      * @return `true` if the data was successfully sent; otherwise, `false`.
      */
-    bool write(const void *data, const size_t length) const override;
+    bool write(const uint8_t *data, const size_t length) const override;
 
     /**
      * @brief Reads data from the socket connection.
@@ -265,9 +265,9 @@ class Socket_API Context::UDP : public Context {
 
     [[nodiscard]] std::optional<SharedMalloc> readBlocking(
         Packet::Header::length_type length) const;
-    
-    bool writeBlocking(const void *data, const size_t length) const;
-    bool writeNonBlocking(const void *data, const size_t length) const;
+
+    bool writeBlocking(const uint8_t *data, const size_t length) const;
+    bool writeNonBlocking(const uint8_t *data, const size_t length) const;
 
    public:
     /**
@@ -291,7 +291,7 @@ class Socket_API Context::UDP : public Context {
      *
      * @return `true` if the data was successfully sent; otherwise, `false`.
      */
-    bool write(const void *data, const size_t length) const override;
+    bool write(const uint8_t *data, const size_t length) const override;
 
     /**
      * @brief Reads data from the socket connection.
@@ -375,9 +375,9 @@ class Socket_API Context::Local : public Context {
 
     [[nodiscard]] std::optional<SharedMalloc> readBlocking(
         Packet::Header::length_type length) const;
-    
-    bool writeBlocking(const void *data, const size_t length) const;
-    bool writeNonBlocking(const void *data, const size_t length) const;
+
+    bool writeBlocking(const uint8_t *data, const size_t length) const;
+    bool writeNonBlocking(const uint8_t *data, const size_t length) const;
 
    public:
     /**
@@ -406,7 +406,7 @@ class Socket_API Context::Local : public Context {
      *
      * @return `true` if the data was successfully sent; otherwise, `false`.
      */
-    bool write(const void *data, const size_t length) const override;
+    bool write(const uint8_t *data, const size_t length) const override;
 
     /**
      * @brief Reads data from the socket connection.
