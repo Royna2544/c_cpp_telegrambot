@@ -104,7 +104,7 @@ auto computeHMAC(const TgBotSocket::Packet& packet) {
 
 #ifdef ENABLE_HEXDUMP
     DLOG(INFO) << "ComputeHMAC - DUMP HMAC result";
-    hexdump((const uint8_t*)hmac_result.data(), 32);
+    hexdump((const uint8_t*)hmac_result.data(), hmac_result.size());
 #endif
     return hmac_result;
 }
