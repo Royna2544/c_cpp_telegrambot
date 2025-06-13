@@ -126,11 +126,9 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     unset(CMAKE_TRY_COMPILE_TARGET_TYPE)
   endif()
 
-  if (NOT APPLE)
-    # Prefer LLD
-    list(APPEND CMAKE_EXE_LINKER_FLAGS "-fuse-ld=lld")
-    list(APPEND CMAKE_SHARED_LINKER_FLAGS "-fuse-ld=lld")
-  endif()
+  # Prefer LLD
+  list(APPEND CMAKE_EXE_LINKER_FLAGS "-fuse-ld=lld")
+  list(APPEND CMAKE_SHARED_LINKER_FLAGS "-fuse-ld=lld")
 endif()
 
 if (NOT CXX20_JTHREAD_COMPILES)
