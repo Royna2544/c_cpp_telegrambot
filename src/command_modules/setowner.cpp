@@ -13,7 +13,7 @@ DECLARE_COMMAND_HANDLER(setowner) {
     }
 }
 
-extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
+extern "C" DYN_COMMAND_EXPORT const struct DynModule DYN_COMMAND_SYM = {
     .flags = DynModule::Flags::HideDescription,
     .name = "setowner",
     .description = "Set owner of the bot, for once",

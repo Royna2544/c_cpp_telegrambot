@@ -17,7 +17,7 @@ enum class PathType {
 
 }
 
-class Utils_API CommandLine {
+class UTILS_EXPORT CommandLine {
    public:
     using argv_type = char* const*;
     using argc_type = int;

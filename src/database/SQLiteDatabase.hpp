@@ -41,7 +41,7 @@ template <>
 
 }  // namespace detail
 
-struct DBImpl_API SQLiteDatabase : DatabaseBase {
+struct DBIMPL_EXPORT SQLiteDatabase : DatabaseBase {
     enum class InfoType {
         MIN = -1,
         OWNER = 0,
@@ -77,7 +77,7 @@ struct DBImpl_API SQLiteDatabase : DatabaseBase {
      * with parameters. It is designed to simplify the process of preparing and
      * executing SQL statements.
      */
-    class DBImpl_API Helper : public std::enable_shared_from_this<Helper> {
+    class DBIMPL_EXPORT Helper : public std::enable_shared_from_this<Helper> {
        public:
         using ArgTypes = std::variant<int32_t, int64_t, std::string>;
 

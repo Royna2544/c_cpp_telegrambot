@@ -14,7 +14,7 @@
 
 // Abstract manager for config loader
 // Currently have three sources, env and file, cmdline
-class Utils_API ConfigManager {
+class UTILS_EXPORT ConfigManager {
    public:
     enum class Configs {
         TOKEN,
@@ -22,7 +22,6 @@ class Utils_API ConfigManager {
         DATABASE_CFG,
         HELP,
         SOCKET_CFG,
-        SELECTOR_CFG,
         GITHUB_TOKEN,
         OPTIONAL_COMPONENTS,
         VIRUSTOTAL_API_KEY,
@@ -96,13 +95,6 @@ class Utils_API ConfigManager {
             Configs::SOCKET_CFG,
             "SOCKET_CFG",
             "Sockets (ipv4/ipv6/local)",
-            Entry::ALIAS_NONE,
-            Entry::ArgType::STRING,
-        },
-        {
-            Configs::SELECTOR_CFG,
-            "SELECTOR_CFG",
-            "Selectors (poll/epoll/select)",
             Entry::ALIAS_NONE,
             Entry::ArgType::STRING,
         },

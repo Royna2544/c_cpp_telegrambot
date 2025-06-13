@@ -35,7 +35,7 @@ DECLARE_COMMAND_HANDLER(py) {
     py.run(message);
 }
 
-extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
+extern "C" DYN_COMMAND_EXPORT const struct DynModule DYN_COMMAND_SYM = {
     .flags = DynModule::Flags::Enforced,
 #ifdef cmd_c_EXPORTS
     .name = "c",

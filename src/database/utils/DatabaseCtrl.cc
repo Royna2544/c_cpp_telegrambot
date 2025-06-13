@@ -1,6 +1,5 @@
 #include <absl/log/log.h>
 
-#include <AbslLogInit.hpp>
 #include <TryParseStr.hpp>
 #include <cstdlib>
 #include <database/bot/TgBotDatabaseImpl.hpp>
@@ -157,8 +156,7 @@ void executeCommand<Commands::WhiteBlackList>(const CommandData& data) {
 }
 }  // namespace
 
-int main(int argc, char** argv) {
-    TgBot_AbslLogInit();
+int app_main(int argc, char** argv) {
     CommandLine line{argc, argv};
     auto config = std::make_unique<ConfigManager>(line);
     std::vector<std::string_view> args;
@@ -200,4 +198,5 @@ int main(int argc, char** argv) {
     } else {
         LOG(ERROR) << "Unknown command: " << command;
     }
+    return EXIT_SUCCESS;
 }

@@ -14,7 +14,7 @@ using tgbot::proto::Database;
 using tgbot::proto::MediaToName;
 using tgbot::proto::PersonList;
 
-struct DBImpl_API ProtoDatabase : DatabaseBase {
+struct DBIMPL_EXPORT ProtoDatabase : DatabaseBase {
     [[nodiscard]] ListResult addUserToList(ListType type,
                                            UserId user) const override;
     [[nodiscard]] ListResult removeUserFromList(ListType type,

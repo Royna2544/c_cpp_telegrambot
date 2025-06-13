@@ -17,6 +17,7 @@
 #endif
 
 #ifdef _WIN32
+#include <pthread.h>
 #include <windows.h>  // TerminateThread
 
 #define THREAD_FORCE_KILL_SUPPORTED
@@ -28,17 +29,17 @@ void kill_thread(std::thread::native_handle_type handle) {
     pthread_kill(handle, SIGUSR1);
 #endif
 #ifdef _WIN32
-#ifdef _MSC_VER
-    TerminateThread(handle, 0);
-#else /* _MSC_VER */
-    HANDLE hThread =
-        OpenThread(THREAD_TERMINATE, FALSE, static_cast<DWORD>(handle));
-    if (hThread) {
-        TerminateThread(hThread, 0);
-        CloseHandle(hThread);  // Always close the handle after use
+    if constexpr (std::is_same_v<decltype(handle), void*>) {
+        TerminateThread(handle, 0);
+    } else {
+        HANDLE hThread = pthread_getw32threadhandle_np(handle);
+        if (hThread) {
+            TerminateThread(hThread, 0);
+        } else {
+            LOG(ERROR) << "Cannot find thread handle";
+        }
     }
-#endif // _MSC_VER
-#endif // _WIN32
+#endif  // _WIN32
 }
 #endif
 

@@ -9,6 +9,8 @@
 #include <tgbot/TgException.h>
 #include <tgbot/types/ReplyKeyboardRemove.h>
 
+#include <CommandLine.hpp>
+#include <ConfigManager.hpp>
 #include <ConfigParsers.hpp>
 #include <Zip.hpp>
 #include <algorithm>
@@ -29,10 +31,8 @@
 #include "CurlUtils.hpp"
 #include "ForkAndRun.hpp"
 #include "SystemInfo.hpp"
-#include "support/CwdRestorar.hpp"
-#include "support/KeyBoardBuilder.hpp"
-#include "utils/CommandLine.hpp"
-#include "utils/ConfigManager.hpp"
+#include "command_modules/support/CwdRestorar.hpp"
+#include "command_modules/support/KeyBoardBuilder.hpp"
 
 using std::string_literals::operator""s;
 
@@ -327,11 +327,13 @@ class TaskWrapperBase {
             api->pinMessage(sentMessage);
         }
     }
-    bool execute(std::filesystem::path gitAskPassFile, std::optional<std::string> githubToken)
+    bool execute(std::filesystem::path gitAskPassFile,
+                 std::optional<std::string> githubToken)
         requires std::is_same_v<Impl, RepoSyncTask>
     {
         preexecute();
-        RepoSyncTask impl(api, sentMessage, data, std::move(gitAskPassFile), std::move(githubToken));
+        RepoSyncTask impl(api, sentMessage, data, std::move(gitAskPassFile),
+                          std::move(githubToken));
         return executeCommon(std::move(impl));
     }
     bool execute(std::optional<ROMBuildTask::RBEConfig> cfg)
@@ -623,7 +625,8 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     auto start = now();
 
     // Calculate elapsed time
-    const auto elapsed = [&now](const std::string_view topic, std::chrono::system_clock::time_point cmp) {
+    const auto elapsed = [&now](const std::string_view topic,
+                                std::chrono::system_clock::time_point cmp) {
         return fmt::format(
             "{}: {:%Hh %Mm %Ss}", topic,
             std::chrono::round<std::chrono::seconds>(now() - cmp));
@@ -636,7 +639,9 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     if (do_repo_sync) {
         timer = now();
         RepoSync repoSync(this, per_build, _api, _userMessage);
-        if (!repoSync.execute(std::move(gitAskFile), _config->get(ConfigManager::Configs::GITHUB_TOKEN))) {
+        if (!repoSync.execute(
+                std::move(gitAskFile),
+                _config->get(ConfigManager::Configs::GITHUB_TOKEN))) {
             LOG(INFO) << "RepoSync::execute fails...";
             return;
         }
@@ -980,7 +985,7 @@ DECLARE_COMMAND_HANDLER(rombuild) {
     });
 }
 
-extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
+extern "C" DYN_COMMAND_EXPORT const struct DynModule DYN_COMMAND_SYM = {
     .flags = DynModule::Flags::Enforced,
     .name = "rombuild",
     .description = "Build a ROM, I'm lazy",

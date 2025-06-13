@@ -21,8 +21,8 @@ class CommandModule;
 
 #ifdef _WIN32
 #define DYN_COMMAND_EXPORT __declspec(dllexport)
-#else
-#define DYN_COMMAND_EXPORT
+#else //#if __GNUC__ > 4 || defined __clang__ but C++20 codebase.
+#define DYN_COMMAND_EXPORT [[gnu::visibility("default")]]
 #endif
 
 // Command handler helper macros

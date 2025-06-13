@@ -64,7 +64,7 @@ DECLARE_COMMAND_HANDLER(flash) {
     api->editMessage(sentmsg, ss.str());
 }
 
-extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
+extern "C" DYN_COMMAND_EXPORT const struct DynModule DYN_COMMAND_SYM = {
     .flags = DynModule::Flags::None,
     .name = "flash",
     .description = "Flash and get a random result",

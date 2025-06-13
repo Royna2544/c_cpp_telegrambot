@@ -4,9 +4,7 @@
 
 #include "ConfigParsers.hpp"
 
-int main(const int argc, const char** argv) {
-    TgBot_AbslLogInit();
-
+int app_main(int argc, char** argv) {
     std::filesystem::path directory;
     if (argc != 2) {
         LOG(ERROR) << "Please provide a directory path";

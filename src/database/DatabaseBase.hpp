@@ -10,10 +10,10 @@
 
 #include "api/typedefs.h"
 
-struct DBImpl_API DatabaseBase {
+struct DBIMPL_EXPORT DatabaseBase {
     virtual ~DatabaseBase() = default;
     
-    struct DBImpl_API exception : public std::runtime_error {
+    struct DBIMPL_EXPORT exception : public std::runtime_error {
         using std::runtime_error::runtime_error;
     };
 

@@ -12,7 +12,7 @@
 #include <trivial_helpers/fruit_inject.hpp>
 
 // Represents a SHA-256 hash
-struct Socket_API HashContainer {
+struct SOCKET_EXPORT HashContainer {
     TgBotSocket::SHA256StringArray m_data;
 };
 
@@ -24,7 +24,7 @@ inline std::ostream& operator<<(std::ostream& self, const HashContainer& data) {
     return self;
 }
 
-struct Socket_API VFSOperations {
+struct SOCKET_EXPORT VFSOperations {
     virtual ~VFSOperations() = default;
 
     /**
@@ -66,7 +66,7 @@ struct Socket_API VFSOperations {
     virtual void SHA256(const SharedMalloc& memory, HashContainer& data) = 0;
 };
 
-struct Socket_API RealFS : public VFSOperations {
+struct SOCKET_EXPORT RealFS : public VFSOperations {
     ~RealFS() override = default;
     APPLE_INJECT(RealFS()) = default;
 
@@ -109,7 +109,7 @@ struct Socket_API RealFS : public VFSOperations {
     void SHA256(const SharedMalloc& memory, HashContainer& data) override;
 };
 
-class Socket_API SocketFile2DataHelper {
+class SOCKET_EXPORT SocketFile2DataHelper {
     VFSOperations* vfs;
 
    public:

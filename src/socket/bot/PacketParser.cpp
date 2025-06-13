@@ -311,7 +311,7 @@ std::optional<Packet> readPacket(const TgBotSocket::Context& context) {
     return packet;
 }
 
-bool Socket_API decryptPacket(TgBotSocket::Packet& packet) {
+bool SOCKET_EXPORT decryptPacket(TgBotSocket::Packet& packet) {
     auto& header = packet.header;
     auto& data = packet.data;
 
@@ -327,7 +327,7 @@ bool Socket_API decryptPacket(TgBotSocket::Packet& packet) {
     return true;
 }
 
-Packet Socket_API
+Packet SOCKET_EXPORT
 createPacket(const Command command, const void* data,
              Packet::Header::length_type length, const PayloadType payloadType,
              const Packet::Header::session_token_type& sessionToken) {
@@ -364,7 +364,7 @@ createPacket(const Command command, const void* data,
     return packet;
 }
 
-std::optional<Json::Value> Socket_API
+std::optional<Json::Value> SOCKET_EXPORT
 parseAndCheck(const void* buf, TgBotSocket::Packet::Header::length_type length,
               const std::initializer_list<const char*> nodes) {
     Json::Value root;
@@ -388,7 +388,7 @@ parseAndCheck(const void* buf, TgBotSocket::Packet::Header::length_type length,
     return root;
 }
 
-Packet Socket_API
+Packet SOCKET_EXPORT
 nodeToPacket(const Command& command, const Json::Value& json,
              const Packet::Header::session_token_type& session_token) {
     std::string result;

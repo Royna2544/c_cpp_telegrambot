@@ -19,12 +19,12 @@
  * interface for managing bot data. It provides functionality for interacting
  * with different database providers.
  */
-struct DBImpl_API TgBotDatabaseImpl : DatabaseBase {
+struct DBIMPL_EXPORT TgBotDatabaseImpl : DatabaseBase {
     /**
      * @brief Providers is a nested struct that manages different database
      * providers.
      */
-    struct DBImpl_API Providers {
+    struct DBIMPL_EXPORT Providers {
         explicit Providers(CommandLine *cmdline);
 
         /**

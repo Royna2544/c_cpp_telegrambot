@@ -47,7 +47,7 @@ DECLARE_COMMAND_HANDLER(alive) {
     }
 }
 
-extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
+extern "C" DYN_COMMAND_EXPORT const struct DynModule DYN_COMMAND_SYM = {
     .flags = DynModule::Flags::None,
 #ifdef cmd_alive_EXPORTS
     .name = "alive",

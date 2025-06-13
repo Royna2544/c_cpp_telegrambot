@@ -1,7 +1,6 @@
 #include <absl/log/log.h>
 #include <openssl/sha.h>
 
-#include <AbslLogInit.hpp>
 #include <ManagedThreads.hpp>
 #include <ApiDef.hpp>
 #include <TryParseStr.hpp>
@@ -286,11 +285,10 @@ std::optional<SocketFile2DataHelper::Params> parseArgs(char** argv) {
     return params;
 }
 
-int main(int argc, char** argv) {
+int app_main(int argc, char** argv) {
     enum Command cmd {};
     const char* exe = argv[0];
 
-    TgBot_AbslLogInit();
     if (argc == 1) {
         usage(exe, true);
     }

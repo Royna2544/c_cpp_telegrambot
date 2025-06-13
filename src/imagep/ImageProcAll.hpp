@@ -7,7 +7,7 @@
 
 #include "ImagePBase.hpp"
 
-struct ImgProc_API ImageProcessingAll {
+struct IMGPROC_EXPORT ImageProcessingAll {
     bool read(PhotoBase::Target target);
     absl::Status processAndWrite(const std::filesystem::path& filename);
 

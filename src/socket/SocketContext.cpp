@@ -25,7 +25,7 @@ constexpr int Context::kTgBotHostPort;
 constexpr int Context::kTgBotLogPort;
 constexpr int Context::kTgBotLogTransmitPort;
 
-Socket_API std::ostream& operator<<(std::ostream& stream,
+SOCKET_EXPORT std::ostream& operator<<(std::ostream& stream,
                                     const Context::RemoteEndpoint& endpoint) {
     stream << endpoint.address << ":" << endpoint.port;
     return stream;

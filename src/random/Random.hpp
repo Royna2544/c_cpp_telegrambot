@@ -54,7 +54,7 @@ class RandomBase {
     virtual void shuffle(std::vector<std::string>& inArray) const = 0;
 };
 
-class Random_API Random : public RandomBase {
+class RANDOM_EXPORT Random : public RandomBase {
    public:
     /**
      * @brief      Base class for random number generators.

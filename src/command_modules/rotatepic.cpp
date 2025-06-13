@@ -162,7 +162,7 @@ DECLARE_COMMAND_HANDLER(rotatepic) {
 }
 }  // namespace
 
-extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
+extern "C" DYN_COMMAND_EXPORT const struct DynModule DYN_COMMAND_SYM = {
     .flags = DynModule::Flags::None,
     .name = "rotatepic",
     .description = "Rotate a sticker/video/photo",

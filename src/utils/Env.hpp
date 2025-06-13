@@ -12,11 +12,11 @@
 #include <type_traits>
 
 // A C++-like interface for manipulating environment variables.
-class Utils_API Env {
+class UTILS_EXPORT Env {
    public:
     Env() = default;
 
-    class Utils_API ValueEntry {
+    class UTILS_EXPORT ValueEntry {
         std::string _key;
 
        public:

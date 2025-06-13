@@ -1,10 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <AbslLogInit.hpp>
-
-int main(int argc, char** argv) {
+int app_main(int argc, char** argv) {
     testing::InitGoogleTest(&argc, argv);
-    TgBot_AbslLogInit();
-    int ret = RUN_ALL_TESTS();
-    return ret;
+    return RUN_ALL_TESTS();
 }

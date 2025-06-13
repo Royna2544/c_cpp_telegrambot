@@ -14,15 +14,13 @@
 #include <cstdlib>
 #include <filesystem>
 #include <limits>
-#include <logging/AbslLogInit.hpp>
 #include <string_view>
 #include <thread>
 
 // Wrapper launcher to create a daemon process from the bot
-int main(const int argc, char** argv) {
+int app_main(int argc, char** argv) {
     const static std::filesystem::path kLogFile =
         fmt::format("TgBotDaemon_{}_pid_{}.txt", BUILD_TYPE_STR, getpid());
-    TgBot_AbslLogInit();
 
     if (argc < 2) {
         LOG(INFO) << "A wrapper launcher to create a daemon process.";

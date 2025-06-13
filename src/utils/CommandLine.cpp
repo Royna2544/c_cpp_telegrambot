@@ -1,40 +1,35 @@
 #include <absl/log/log.h>
 
+#include <trivial_helpers/log_once.hpp>
 #include <CommandLine.hpp>
 #include <filesystem>
 #include <stdexcept>
 #include <system_error>
 
-#include "Env.hpp"
-#include "absl/strings/str_split.h"
-
 CommandLine::CommandLine(CommandLine::argc_type argc,
                          CommandLine::argv_type argv)
     : _argc(argc), _argv(argv) {
+    std::error_code ec;
     if (_argv == nullptr || _argv[0] == nullptr) {
         LOG(ERROR) << "Invalid argv passed";
         throw std::invalid_argument("Invalid argv passed");
     }
-    exePath = std::filesystem::current_path() / std::filesystem::path(argv[0]);
-    std::error_code ec;
-    exePath = std::filesystem::canonical(exePath, ec);
+
+    LOG_ONCE(INFO) << "Try autodetect exePath";
+    const auto p1 = std::filesystem::current_path() / argv[0];
+    exePath = std::filesystem::canonical(p1, ec);
     if (ec) {
-        LOG(WARNING) << "Cannot fully resolve path";
-#ifdef _WIN32
-        constexpr const char kPathDelimiter = ';';
-#else
-        constexpr const char kPathDelimiter = ':';
-#endif
-        for (const auto& path : absl::StrSplit(Env()["PATH"].get(), kPathDelimiter)) {
-            if (std::filesystem::is_regular_file(std::filesystem::path(path.data()) /
-                                                 argv[0])) {
-                LOG(INFO) << "Found exepath";
-                exePath = std::filesystem::path(path.data()) / argv[0];
-                break;
-            }
+        LOG_ONCE(WARNING) << "Try 1: " << p1 << ": " << ec.message();
+        const auto p2 = std::filesystem::path(INSTALL_PREFIX) / argv[0];
+        exePath = std::filesystem::canonical(p2, ec);
+        if (ec) {
+            LOG_ONCE(WARNING) << "Try 2: " << p2 << ": " << ec.message();
+        } else {
+            LOG_ONCE(INFO) << exePath << ": OK";
         }
+    } else {
+        LOG_ONCE(INFO) << exePath << ": OK";
     }
-    DLOG(INFO) << "exePath: " << exePath;
 }
 
 CommandLine::argv_type CommandLine::argv() const { return _argv; }

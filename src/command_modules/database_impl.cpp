@@ -195,7 +195,7 @@ DECLARE_COMMAND_HANDLER(saveid) {
 
 }  // namespace
 
-extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
+extern "C" DYN_COMMAND_EXPORT const struct DynModule DYN_COMMAND_SYM = {
 #ifdef cmd_database_EXPORTS
     .flags = DynModule::Flags::Enforced,
     .name = "database",

@@ -199,7 +199,7 @@ DECLARE_COMMAND_HANDLER(copystickers) {
     }
 }
 
-extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
+extern "C" DYN_COMMAND_EXPORT const struct DynModule DYN_COMMAND_SYM = {
     .flags = DynModule::Flags::None,
     .name = "copystickers",
     .description = "Copy sticker pack with a remap",

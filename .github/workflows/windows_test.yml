@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        sys: [mingw64, ucrt64] # clang64
+        sys: [mingw64, ucrt64, clang64]
 
 
     name: "🚧 ${{ matrix.sys }}"
@@ -59,7 +59,7 @@ jobs:
     - name: '🚧 Build TgBot++'
       run: |
         mkdir build
-        cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Debug -DTGBOT_ENABLE_TESTING=ON -DBUILD_SHARED_LIBS=ON .
+        cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_TESTING=ON -DBUILD_SHARED_LIBS=ON .
         cmake --build build -j4
 
     - name: Run Tests

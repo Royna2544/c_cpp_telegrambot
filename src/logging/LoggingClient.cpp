@@ -8,9 +8,7 @@
 #include "AbslLogInit.hpp"
 #include "LogcatData.hpp"
 
-int main() {
-    TgBot_AbslLogInit();
-
+int app_main(int, char**) {
     SocketClientWrapper wrapper;
     LogEntry entry{};
 

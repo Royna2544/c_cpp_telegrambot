@@ -22,13 +22,13 @@ jobs:
           brew install boost ninja llvm lld webp libpng libgit2 googletest jsoncpp openssl fmt
           git submodule update --init
 
-      - name: Compile with Apple GCC
+      - name: Compile with HomeBrew Clang
         env: 
           CC: /usr/local/opt/llvm/bin/clang
           CXX: /usr/local/opt/llvm/bin/clang++
         run: |
           mkdir build
-          cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release -DTGBOT_ENABLE_TESTING=ON .
+          cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTING=ON .
           cmake --build build -j4
 
       - name: Run Tests

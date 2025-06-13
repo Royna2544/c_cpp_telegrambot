@@ -14,7 +14,7 @@
  *
  * This interface defines the methods for getting and preloading resources.
  */
-struct Utils_API ResourceProvider {
+struct UTILS_EXPORT ResourceProvider {
     /**
      * @brief Get a resource by its filename.
      *
@@ -38,7 +38,7 @@ struct Utils_API ResourceProvider {
     virtual ~ResourceProvider() = default;
 };
 
-struct Utils_API ResourceManager : ResourceProvider {
+struct UTILS_EXPORT ResourceManager : ResourceProvider {
     [[nodiscard]] std::string_view get(std::filesystem::path filename) const override;
     bool preload(std::filesystem::path p) override;
 

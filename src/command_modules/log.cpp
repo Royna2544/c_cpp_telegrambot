@@ -14,7 +14,7 @@ DECLARE_COMMAND_HANDLER(log) {
     }
 }
 
-extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
+extern "C" DYN_COMMAND_EXPORT const struct DynModule DYN_COMMAND_SYM = {
     .flags = DynModule::Flags::HideDescription | DynModule::Flags::Enforced,
     .name = "log",
     .description = "Get logs",

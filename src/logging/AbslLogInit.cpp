@@ -8,6 +8,7 @@
 static std::optional<StdFileSink> sink;
 
 void TgBot_AbslLogInit() {
+    if (sink) return;
     absl::InitializeLog();
     sink.emplace();
     absl::AddLogSink(&*sink);

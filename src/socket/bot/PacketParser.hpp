@@ -23,7 +23,7 @@ namespace TgBotSocket {
  * @return An optional containing the read packet, or an empty optional if no
  * packet is available.
  */
-std::optional<Packet> Socket_API
+std::optional<Packet> SOCKET_EXPORT
 readPacket(const TgBotSocket::Context& context);
 
 /**
@@ -36,7 +36,7 @@ readPacket(const TgBotSocket::Context& context);
  * @param packet The packet to decrypt
  * @return `true` if the packet was successfully decrypted; otherwise, `false`.
  */
-bool Socket_API decryptPacket(TgBotSocket::Packet& packet);
+bool SOCKET_EXPORT decryptPacket(TgBotSocket::Packet& packet);
 
 /**
  * @brief Creates a packet with the given command and data.
@@ -51,7 +51,7 @@ bool Socket_API decryptPacket(TgBotSocket::Packet& packet);
  * @param sessionToken The session token to set in the packet header.
  * @return The created packet.
  */
-Packet Socket_API
+Packet SOCKET_EXPORT
 createPacket(const Command command, const void* data,
              Packet::Header::length_type length, const PayloadType payloadType,
              const Packet::Header::session_token_type& sessionToken);
@@ -69,7 +69,7 @@ createPacket(const Command command, const void* data,
  *         successful and all specified nodes are present, std::nullopt
  * otherwise.
  */
-std::optional<Json::Value> Socket_API
+std::optional<Json::Value> SOCKET_EXPORT
 parseAndCheck(const void* buf, TgBotSocket::Packet::Header::length_type length,
               const std::initializer_list<const char*> nodes);
 
@@ -81,7 +81,7 @@ parseAndCheck(const void* buf, TgBotSocket::Packet::Header::length_type length,
  * @param session_token The session token to be included in the packet header.
  * @return Packet The resulting packet created from the command and JSON value.
  */
-Packet Socket_API
+Packet SOCKET_EXPORT
 nodeToPacket(const Command& command, const Json::Value& json,
              const Packet::Header::session_token_type& session_token);
 

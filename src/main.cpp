@@ -8,7 +8,6 @@
 #include <fruit/fruit_forward_decls.h>
 #include <fruit/injector.h>
 
-#include <AbslLogInit.hpp>
 #include <CommandLine.hpp>
 #include <ConfigManager.hpp>
 #include <DurationPoint.hpp>
@@ -497,11 +496,8 @@ Git commitmsg: {}
     }
 }
 
-int main(int argc, char** argv) {
+int app_main(int argc, char** argv) {
     MilliSecondDP startupDp;
-
-    // Initialize Abseil logging system
-    TgBot_AbslLogInit();
 
     // Delibrately try to access current directory.
     std::error_code ec;

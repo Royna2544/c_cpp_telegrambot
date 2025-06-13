@@ -10,6 +10,6 @@ tgbot_library(
     CommandLine.cpp
     ResourceManager.cpp
     libfs_${TARGET_VARIANT}.cpp
-  LIBS Boost::program_options
-  LIBS_WIN32 shlwapi
+    LIBS Boost::program_options $<$<BOOL:${WIN32}>:shlwapi>
+    DEFS INSTALL_PREFIX="${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}"
 )

@@ -5,6 +5,7 @@
 #include <fmt/format.h>
 
 #include <StructF.hpp>
+#include <libos/libsighandler.hpp>
 
 #include "BytesConversion.hpp"
 #include "utils/libfs.hpp"
@@ -31,7 +32,7 @@ static CURL* CURL_setup_common(const std::string_view url) {
             auto dltotalByte = MegaBytes(ulnow * boost::units::data::bytes);
             LOG_EVERY_N_SEC(INFO, 5) << fmt::format(
                 "Download: {}MB/{}MB", dlnowByte.value(), dltotalByte.value());
-            return 1;  // Continue downloading
+            return SignalHandler::isSignaled() ? 1 : 0;  // Continue downloading
         });
     curl_easy_setopt(curl, CURLOPT_XFERINFODATA, nullptr);
 

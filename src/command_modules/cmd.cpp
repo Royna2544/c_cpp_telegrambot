@@ -36,7 +36,7 @@ DECLARE_COMMAND_HANDLER(cmd) {
     api->sendReplyMessage(message->message(), result_message);
 }
 
-extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
+extern "C" DYN_COMMAND_EXPORT const struct DynModule DYN_COMMAND_SYM = {
     .flags = DynModule::Flags::Enforced,
     .name = "cmd",
     .description = "unload/reload a command",

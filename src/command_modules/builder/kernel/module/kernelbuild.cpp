@@ -32,8 +32,8 @@
 #include "Diagnosis.hpp"
 #include "ProgressBar.hpp"
 #include "api/TgBotApi.hpp"
-#include "support/CwdRestorar.hpp"
-#include "support/KeyBoardBuilder.hpp"
+#include "command_modules/support/CwdRestorar.hpp"
+#include "command_modules/support/KeyBoardBuilder.hpp"
 
 class KernelBuildHandler {
    public:
@@ -631,7 +631,7 @@ DECLARE_COMMAND_HANDLER(kernelbuild) {
     handler->start(message->message());
 }
 
-extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
+extern "C" DYN_COMMAND_EXPORT const struct DynModule DYN_COMMAND_SYM = {
     .flags = DynModule::Flags::Enforced,
     .name = "kernelbuild",
     .description = "Build a kernel, I'm lazy 2",

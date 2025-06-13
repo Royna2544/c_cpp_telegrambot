@@ -1,7 +1,5 @@
 #pragma once
 
-#include <absl/log/check.h>
-#include <absl/log/log.h>
 #include <tgbot/types/Message.h>
 
 #include <algorithm>
@@ -160,11 +158,7 @@ class MessageExt {
     template <MessageAttrs attr>
     [[nodiscard]] typename internal::message::AttributeType<attr>::type get()
         const {
-        DCHECK(_message);
         if (!has<attr>()) {
-            LOG(WARNING) << "Attribute " << attr
-                         << " not found, use get_or() instead if you are not "
-                            "completely sure it exists.";
             return {};
         }
         if constexpr (attr == MessageAttrs::ExtraText) {
@@ -198,7 +192,6 @@ class MessageExt {
         } else if constexpr (attr == MessageAttrs::Document) {
             return _message->document;
         }
-        CHECK(false) << "Unreachable: " << static_cast<int>(attr);
         return {};
     }
 

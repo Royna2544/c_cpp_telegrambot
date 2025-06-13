@@ -3,7 +3,6 @@
 #include <fmt/format.h>
 #include <json/json.h>
 
-#include <AbslLogInit.hpp>
 #include <TryParseStr.hpp>
 #include <ClientBackend.hpp>
 #include <bot/PacketParser.hpp>
@@ -21,13 +20,12 @@
     exit(exitCode);
 }
 
-int main(int argc, char** argv) {
+int app_main(int argc, char** argv) {
     ChatId chatId = 0;
     TgBotSocket::data::SendFileToChatId data = {};
     const auto _usage = [capture0 = argv[0]](auto&& PH1) {
         usage(capture0, std::forward<decltype(PH1)>(PH1));
     };
-    TgBot_AbslLogInit();
     CommandLine line{argc, argv};
     auto config = std::make_unique<ConfigManager>(line);
 
@@ -118,4 +116,5 @@ int main(int argc, char** argv) {
         DLOG(INFO) << "File sent successfully";
         backend->unload();
     }
+    return EXIT_SUCCESS;
 }

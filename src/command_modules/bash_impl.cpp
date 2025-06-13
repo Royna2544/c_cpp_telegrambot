@@ -18,7 +18,7 @@ DECLARE_COMMAND_HANDLER(ubash) {
 
 }  // namespace
 
-extern "C" const struct DynModule DYN_COMMAND_EXPORT DYN_COMMAND_SYM = {
+extern "C" DYN_COMMAND_EXPORT const struct DynModule DYN_COMMAND_SYM = {
     .flags = DynModule::Flags::Enforced,
 #ifdef cmd_bash_EXPORTS
     .name = "bash",

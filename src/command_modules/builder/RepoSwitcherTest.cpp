@@ -6,8 +6,7 @@
 
 using std::string_view_literals::operator""sv;
 
-int main(int argc, const char** argv) {
-    TgBot_AbslLogInit();
+int app_main(int argc, char** argv) {
     if (argc != 5) {
         fmt::print("Usage: {} <gitDir> <url> <branch> <op>\n", argv[0]);
         return EXIT_FAILURE;
@@ -39,4 +38,5 @@ Op: {}
         return EXIT_FAILURE;
     }
     fmt::print("Result: {}\n", ret);
+    return EXIT_SUCCESS;
 }

@@ -49,7 +49,7 @@ namespace TgBotSocket::CommandHelpers {
  * @param cmd Command to get arg count of
  * @return required arg count of Command
  */
-int Socket_API toCount(Command cmd);
+int SOCKET_EXPORT toCount(Command cmd);
 
 /**
  * @brief Check if given command is a client command
@@ -57,7 +57,7 @@ int Socket_API toCount(Command cmd);
  * @param cmd Command to check
  * @return true if given command is a client command, false otherwise
  */
-bool Socket_API isClientCommand(Command cmd);
+bool SOCKET_EXPORT isClientCommand(Command cmd);
 
 /**
  * @brief Check if given command is an internal command
@@ -65,12 +65,12 @@ bool Socket_API isClientCommand(Command cmd);
  * @param cmd Command to check
  * @return true if given command is an internal command, false otherwise
  */
-bool Socket_API isInternalCommand(Command cmd);
+bool SOCKET_EXPORT isInternalCommand(Command cmd);
 
 /**
  * @brief Get help text for Command
  *
  * @return std::string help text for Command
  */
-std::string Socket_API getHelpText(void);
+std::string SOCKET_EXPORT getHelpText(void);
 }  // namespace TgBotSocket::CommandHelpers
