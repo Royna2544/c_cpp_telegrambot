@@ -6,8 +6,8 @@
 #include <utility>
 
 #include "../CommandMap.hpp"
-#include "PacketParser.hpp"
 #include "ApiDef.hpp"
+#include "PacketParser.hpp"
 
 SocketInterfaceTgBot::SocketInterfaceTgBot(TgBotSocket::Context* _interface,
                                            TgBotApi::Ptr _api,
@@ -20,7 +20,9 @@ SocketInterfaceTgBot::SocketInterfaceTgBot(TgBotSocket::Context* _interface,
       helper(helper),
       observer(observer),
       spamblock(spamblock),
-      resource(resource) {}
+      resource(resource) {
+    _interface->options.io_timeout = std::chrono::seconds(5);
+}
 
 void SocketInterfaceTgBot::runFunction(const std::stop_token& token) {
     bool ret = _interface->listen(
