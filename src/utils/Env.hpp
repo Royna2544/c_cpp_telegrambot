@@ -37,7 +37,7 @@ class Utils_API Env {
                 ref = get();
                 return true;
             }
-            LOG(ERROR) << "assign: " << _key << " not found";
+            DLOG(WARNING) << "env name=" << _key << " is not set";
             return false;
         }
         std::string_view key() const { return _key; }
@@ -84,7 +84,7 @@ inline std::ostream& operator<<(std::ostream& o, const Env::ValueEntry& entry) {
     if (entry.has()) {
         o << entry.get();
     } else {
-        o << "(nonexistent variable " << entry.key() << ")";
+        o << "(not set)";
     }
     return o;
 }

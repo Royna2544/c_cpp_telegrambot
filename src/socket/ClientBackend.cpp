@@ -14,6 +14,12 @@ bool SocketClientWrapper::connect(unsigned short defaultPort,
     bool foundPort = false;
     Env env;
     std::string portStr;
+
+    LOG(INFO) << "Dump env vars";
+    LOG(INFO) << "IPv4_addr: " << env[kIPv4EnvVar];
+    LOG(INFO) << "IPv6_addr: " << env[kIPv6EnvVar];
+    LOG(INFO) << "Port: " << env[kPortEnvVar];
+
     if (env[kPortEnvVar].assign(portStr)) {
         if (try_parse(portStr, &port)) {
             foundPort = true;
