@@ -1,5 +1,4 @@
 find_package(OpenSSL REQUIRED)
-add_subdirectory(selector)
 
 find_package(Boost 1.70 CONFIG COMPONENTS system)
 

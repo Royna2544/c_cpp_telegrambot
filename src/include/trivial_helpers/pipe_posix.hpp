@@ -8,33 +8,6 @@
 
 using pipe_t = std::array<int, 2>;
 
-constexpr int kInvalidFD = -1;
-
-inline bool isValidFd(int fd) { return fd != kInvalidFD; }
-
-inline void closeFd(int&& fd) {
-    int rc = 0;
-
-    if (isValidFd(fd)) {
-        rc = close(fd);
-    }
-
-    PLOG_IF(ERROR, (rc != 0 && errno != EBADF))
-        << "Failed to close fd: " << fd;
-}
-
-inline void closeFd(int& fd) {
-    int rc = 0;
-
-    if (isValidFd(fd)) {
-        rc = close(fd);
-    }
-
-    PLOG_IF(ERROR, (rc != 0 && errno != EBADF))
-        << "Failed to close fd: " << fd;
-    fd = kInvalidFD;
-}
-
 /**
  * @brief A class representing a pipe with two file descriptors.
  *
@@ -62,19 +35,8 @@ struct Pipe {
      *
      * @return True if the pipe is valid, false otherwise.
      */
-    [[nodiscard]] bool isVaild() const {
-        return isValidFd(underlying[0]) && isValidFd(underlying[1]);
-    }
-
-    /**
-     * @brief Invalidates the pipe.
-     *
-     * This method invalidates the pipe by setting both file descriptors to an
-     * invalid value.
-     */
-    void invalidate() {
-        underlying[0] = kInvalidFD;
-        underlying[1] = kInvalidFD;
+    [[nodiscard]] bool vaild() const {
+        return underlying[0] > 0 && underlying[1] > 0;
     }
 
     /**
@@ -84,8 +46,10 @@ struct Pipe {
      * descriptors.
      */
     void close() {
-        closeFd(underlying[0]);
-        closeFd(underlying[1]);
+        ::close(underlying[0]);
+        ::close(underlying[1]);
+        underlying[0] = -1;
+        underlying[1] = -1;
     }
 
     /**
@@ -131,7 +95,7 @@ struct Pipe {
 };
 
 inline std::ostream& operator<<(std::ostream& os, const Pipe& pipe) {
-    os << "Pipe[valid=" << pipe.isVaild() << ", readEnd=" << pipe.readEnd()
+    os << "Pipe[valid=" << pipe.vaild() << ", readEnd=" << pipe.readEnd()
        << ", writeEnd=" << pipe.writeEnd() << "]";
     return os;
 }

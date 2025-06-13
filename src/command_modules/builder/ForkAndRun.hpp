@@ -6,8 +6,8 @@
 #include <absl/strings/ascii.h>
 #include <fmt/format.h>
 #include <sys/types.h>
-#include <trivial_helpers/_FileDescriptor_posix.h>
 #include <trivial_helpers/_class_helper_macros.h>
+#include <trivial_helpers/pipe_posix.hpp>
 #include <unistd.h>
 
 #include <array>
@@ -15,12 +15,13 @@
 #include <functional>
 #include <iostream>
 #include <shared_mutex>
-#include <socket/selector/SelectorPosix.hpp>
 #include <string_view>
 #include <thread>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
+
+#include "PollWrap.hpp"
 
 class ExitStatusParser {
    protected:
@@ -131,7 +132,7 @@ class ForkAndRun {
     /**
      * @brief The size of the buffer used for stdout and stderr.
      */
-    constexpr static int kBufferSize = 1024;
+    constexpr static int kBufferSize = 512;
     using BufferViewType = std::string_view;
     using BufferType = std::array<char, kBufferSize>;
 
@@ -262,7 +263,7 @@ class ForkAndRun {
     };
 
    private:
-    UnixSelector selector;
+    PollSelector selector;
     pid_t childProcessId = -1;
 };
 

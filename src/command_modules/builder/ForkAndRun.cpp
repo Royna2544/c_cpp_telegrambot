@@ -11,7 +11,6 @@
 #include <sys/types.h>
 #include <sys/user.h>
 #include <sys/wait.h>
-#include <trivial_helpers/_FileDescriptor_posix.h>
 #include <unistd.h>
 
 #include <AbslLogInit.hpp>
@@ -321,22 +320,24 @@ bool ForkAndRun::execute() {
         selector.add(
             stdout_pipe.readEnd(),
             [stdout_pipe, this]() {
-                BufferType buf{};
+                BufferType buf;
                 ssize_t bytes_read =
                     read(stdout_pipe.readEnd(), buf.data(), buf.size() - 1);
                 if (bytes_read >= 0) {
-                    handleStdoutData(buf.data());
+                    handleStdoutData(
+                        {buf.data(), static_cast<size_t>(bytes_read)});
                 }
             },
             Selector::Mode::READ);
         selector.add(
             stderr_pipe.readEnd(),
             [stderr_pipe, this]() {
-                BufferType buf{};
+                BufferType buf;
                 ssize_t bytes_read =
                     read(stderr_pipe.readEnd(), buf.data(), buf.size() - 1);
                 if (bytes_read >= 0) {
-                    handleStderrData(buf.data());
+                    handleStderrData(
+                        {buf.data(), static_cast<size_t>(bytes_read)});
                 }
             },
             Selector::Mode::READ);

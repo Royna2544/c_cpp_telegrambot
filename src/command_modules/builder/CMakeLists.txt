@@ -65,9 +65,9 @@ tgbot_library(
         ForkAndRun.cpp
         Shmem.cpp
         SystemInfo.cpp
+        PollWrap.cpp
     LIBS
         LogInit
-        SocketSelectors
         sighandler
         progress
     LIBS_STATIC

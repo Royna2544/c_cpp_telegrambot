@@ -4,14 +4,13 @@
 
 #include <absl/log/check.h>
 #include <absl/log/log.h>
-#include <fcntl.h>
-#include <trivial_helpers/_FileDescriptor_posix.h>
-#include <unistd.h>
 
 #include <array>
 #include <cerrno>
 #include <cstdint>
+#include <fstream>
 #include <iomanip>
+#include <limits>
 #include <mutex>
 
 #define KERNELRAND_MAYBE_SUPPORTED
@@ -19,38 +18,24 @@
 struct kernel_rand_engine {
     using result_type = uint32_t;
 
-    static constexpr result_type min() { return 0; }
-    static constexpr result_type max() { return UINT32_MAX; }
-
-    result_type operator()() const {
-        result_type val = 0;
-        ssize_t rc = 0;
-
-        rc = read(fd, &val, sizeof(val));
-        PLOG_IF(ERROR, rc < 0) << "Failed to read data from HWRNG device";
-        return val;
+    static constexpr result_type min() {
+        return std::numeric_limits<result_type>::min();
     }
+    static constexpr result_type max() {
+        return std::numeric_limits<result_type>::max();
+    }
+
+    result_type operator()() const noexcept { return read().value_or(0); }
+
     kernel_rand_engine() { isSupported(); }
-    ~kernel_rand_engine() { closeFd(fd); }
-    kernel_rand_engine(kernel_rand_engine&& other) noexcept : fd(other.fd) {
-        other.fd = -1;
-    }
 
     bool isSupported() {
         static bool kSupported = [this] {
-            ssize_t ret = 0;
             for (const auto& n : nodes) {
-                fd = open(n.data(), O_RDONLY);
-                if (isValidFd(fd)) {
-                    // Test read some bytes
-                    int data = 0;
-                    ret = read(fd, &data, sizeof(data));
-                    if (ret != sizeof(data)) {
-                        PLOG(ERROR) << "Reading from hwrng device failed";
-                        closeFd(fd);
-                    } else {
-                        LOG(INFO) << "Device ready, Node: " << std::quoted(n)
-                                  << " fd: " << fd;
+                rng.open(n.data(), std::ios::in | std::ios::binary);
+                if (rng) {
+                    if (read()) {
+                        LOG(INFO) << "Device ready, Node: " << std::quoted(n);
                         return true;
                     }
                 } else {
@@ -64,6 +49,17 @@ struct kernel_rand_engine {
     }
 
    private:
+    std::optional<result_type> read() const noexcept {
+        result_type val;
+
+        if (rng.read(reinterpret_cast<char*>(&val), sizeof(val)); !rng) {
+            PLOG(ERROR) << "Failed to read data from HWRNG device";
+            rng.clear();
+            return std::nullopt;
+        }
+        return val;
+    }
+
     static const inline std::array<std::string_view, 2> nodes = {
 #ifdef __linux__
         // Linux 4.16 or below
@@ -74,6 +70,6 @@ struct kernel_rand_engine {
         "/dev/random", "/dev/urandom"
 #endif
     };
-    int fd = kInvalidFD;
+    mutable std::ifstream rng;
 };
 #endif

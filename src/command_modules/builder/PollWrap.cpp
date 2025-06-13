@@ -1,16 +1,16 @@
+#include "PollWrap.hpp"
+
 #include <poll.h>
 #include <sys/poll.h>
-#include <trivial_helpers/_FileDescriptor_posix.h>
 
 #include <memory>
-
-#include "SelectorPosix.hpp"
+#include <trivial_helpers/pipe_posix.hpp>
 
 bool PollSelector::init() { return true; }
 
 bool PollSelector::add(Selector::HandleType fd, OnSelectedCallback callback,
                        Mode mode) {
-    struct pollfd pfd {};
+    struct pollfd pfd{};
 
     if (std::ranges::any_of(pollfds, [fd](const auto &data) {
             return data.poll_fd.fd == fd;
@@ -64,7 +64,7 @@ PollSelector::PollResult PollSelector::poll() {
     for (size_t i = 0; i < fds_len; ++i) {
         pfds[i] = pollfds[i].poll_fd;
     }
-    int rc = ::poll(pfds.get(), pollfds.size(), getMsOrDefault());
+    int rc = ::poll(pfds.get(), pollfds.size(), -1);
     if (rc < 0) {
         PLOG(ERROR) << "Poll failed";
         return PollResult::FAILED;

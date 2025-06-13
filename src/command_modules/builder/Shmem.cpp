@@ -8,15 +8,15 @@
 #include <trivial_helpers/raii.hpp>
 
 #ifdef __BIONIC__
-#include <sys/mman.h>
-#include <sys/syscall.h>
+#include <errno.h>
 #include <fcntl.h>
-#include <unistd.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
-#include <pthread.h>
+#include <sys/mman.h>
+#include <sys/syscall.h>
+#include <unistd.h>
 
 #define MAX_SHM_ENTRIES 128  // Max number of named shared memory objects
 
@@ -30,7 +30,7 @@ static shm_entry_t shm_table[MAX_SHM_ENTRIES];
 static pthread_mutex_t shm_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // Mock shm_open using memfd_create
-int shm_open(const char *name, int oflag, mode_t mode) {
+int shm_open(const char* name, int oflag, mode_t mode) {
     pthread_mutex_lock(&shm_mutex);
 
     // Check if the name already exists
@@ -62,7 +62,7 @@ int shm_open(const char *name, int oflag, mode_t mode) {
 }
 
 // Mock shm_unlink
-int shm_unlink(const char *name) {
+int shm_unlink(const char* name) {
     pthread_mutex_lock(&shm_mutex);
 
     for (int i = 0; i < MAX_SHM_ENTRIES; i++) {
@@ -86,11 +86,12 @@ int shm_unlink(const char *name) {
         shm_table[i].fd = -1;
     }
 }
-#endif // __BIONIC__
+#endif  // __BIONIC__
 
 AllocatedShmem::AllocatedShmem(const std::string_view& path, off_t size) {
     void* ptr = nullptr;
-    int fd = shm_open(path.data(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
+    int fd = shm_open(path.data(), O_CREAT | O_RDWR,
+                      S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP);
     if (fd == -1) {
         PLOG(ERROR) << "shm_open failed";
         throw syscall_perror("shm_open");
