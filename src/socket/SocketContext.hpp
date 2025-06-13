@@ -159,6 +159,14 @@ class Socket_API Context::TCP : public Context {
     constexpr static std::size_t chunk_size = 1024;
     std::thread _ioThread;
 
+    [[nodiscard]] std::optional<SharedMalloc> readNonBlocking(
+        Packet::Header::length_type length) const;
+
+    [[nodiscard]] std::optional<SharedMalloc> readBlocking(
+        Packet::Header::length_type length) const;
+
+    bool writeBlocking(const uint8_t *data, const size_t length) const;
+    bool writeNonBlocking(const uint8_t *data, const size_t length) const;
    public:
     /**
      * @brief Construct TCP socket with a port.
@@ -271,10 +279,10 @@ class Socket_API Context::UDP : public Context {
 
    public:
     /**
-     * @brief Construct TCP socket with a port.
+     * @brief Construct UDP socket with a port.
      *
-     * @param type TCP socket type, IPv4 or IPv6 socket (e.g.,
-     * `boost::asio::ip::tcp::v4()`).
+     * @param type UDP socket type, IPv4 or IPv6 socket (e.g.,
+     * `boost::asio::ip::udp::v4()`).
      * @param port The port to use.
      */
     explicit UDP(const boost::asio::ip::udp type, const uint_least16_t port);

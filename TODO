@@ -1,7 +1,3 @@
-- Handle forked process in forkandrun when the main process exits due to network.
 - Better installer on Windows.
-- dependencies resolving in kernelbuilder
-- optional kernelbuilder
 - SocketDataHandler JSON version test
-- Socket::TCP asyncio
 - Fix SocketDataHandler test

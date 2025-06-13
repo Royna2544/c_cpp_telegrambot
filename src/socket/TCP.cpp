@@ -3,11 +3,13 @@
 #include <fmt/format.h>
 
 #include <GitBuildInfo.hpp>
+#include <boost/asio/use_future.hpp>
 #include <condition_variable>
+#include <future>
 #include <string_view>
 
-#include "SocketContext.hpp"
 #include "ApiDef.hpp"
+#include "SocketContext.hpp"
 
 template <>
 struct fmt::formatter<boost::asio::ip::tcp> : formatter<string_view> {
@@ -60,81 +62,88 @@ Context::TCP::~TCP() {
     }
 }
 
-bool Context::TCP::write(const uint8_t* data, const size_t length) const {
+template <class Future, class Duration>
+bool wait_until_ready(Future& fut, const Duration& d,
+                      boost::asio::ip::tcp::socket& sock,
+                      const std::string& tag) {
+    if (fut.wait_until(std::chrono::steady_clock::now() + d) !=
+        std::future_status::ready) {
+        LOG(ERROR) << tag << ": timeout";
+        boost::system::error_code ec;
+        sock.cancel(ec);
+        return false;
+    }
+    return true;
+}
+
+bool Context::TCP::writeNonBlocking(const uint8_t* data, size_t length) const {
     try {
-        std::size_t bytes_written = 0;
-
-        DLOG(INFO) << "TCP::write:" << length << " bytes requested";
-        while (bytes_written < length) {
-            // Calculate the size of the next chunk
-            std::size_t write_size = std::min<Packet::Header::length_type>(
-                chunk_size, length - bytes_written);
-
-            // Write the current chunk
-            std::size_t written = boost::asio::write(
-                socket_, boost::asio::buffer(data + bytes_written, write_size));
-
-            bytes_written += written;
-
-            // Log or update progress
-            DLOG_EVERY_N_SEC(INFO, 5) << "TCP::write: Sent " << bytes_written
-                                      << " / " << length << " bytes.";
-
-            // delay 10ms
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        }
-
-        DLOG(INFO) << "TCP::write: Finished sending " << length << " bytes.";
-        return true;
-
+        auto fut =
+            boost::asio::async_write(socket_, boost::asio::buffer(data, length),
+                                     boost::asio::use_future);
+        if (!wait_until_ready(fut, options.io_timeout.get(), socket_,
+                              "TCP::write"))
+            return false;
+        const std::size_t bytes = fut.get();
+        return bytes == length;
     } catch (const boost::system::system_error& e) {
         LOG(ERROR) << "TCP::write: " << e.what();
         return false;
     }
 }
 
-std::optional<SharedMalloc> Context::TCP::read(
-    Packet::Header::length_type length) const {
-    SharedMalloc buffer(length);
+bool Context::TCP::writeBlocking(const uint8_t* data, size_t length) const {
     try {
-        auto* buffer_ptr = buffer.get();
-        size_t bytes_read = 0;
+        boost::asio::write(socket_, boost::asio::buffer(data, length));
+        return true;
+    } catch (const boost::system::system_error& e) {
+        LOG(ERROR) << "TCP::write: " << e.what();
+        return false;
+    }
+}
 
-        DLOG(INFO) << "TCP::read:" << length << " bytes requested";
-        while (bytes_read < length) {
-            // Calculate the size of the next chunk to read
-            std::size_t read_size = std::min<Packet::Header::length_type>(
-                chunk_size, length - bytes_read);
+bool Context::TCP::write(const uint8_t* data, size_t length) const {
+    return static_cast<bool>(options.io_timeout)
+               ? writeNonBlocking(data, length)
+               : writeBlocking(data, length);
+}
 
-            // Read the current chunk
-            size_t chunk_bytes = boost::asio::read(
-                socket_,
-                boost::asio::buffer(buffer_ptr + bytes_read, read_size));
+std::optional<SharedMalloc> Context::TCP::readNonBlocking(
+    Packet::Header::length_type length) const {
+    SharedMalloc buf(length);
+    auto fut =
+        boost::asio::async_read(socket_, boost::asio::buffer(buf.get(), length),
+                                boost::asio::use_future);
+    if (!wait_until_ready(fut, options.io_timeout.get(), socket_, "TCP::read"))
+        return std::nullopt;
+    std::size_t bytes = 0;
+    try {
+        bytes = fut.get();
+    } catch (const boost::system::system_error& e) {
+        LOG(ERROR) << "TCP::read: " << e.what();
+        return std::nullopt;
+    }
+    buf.resize(bytes);
+    return buf;
+}
 
-            bytes_read += chunk_bytes;
-
-            // Log or update progress
-            LOG_EVERY_N_SEC(INFO, 5) << "TCP::read: Received " << bytes_read
-                                     << " / " << length << " bytes.";
-
-            if (io_context.stopped()) {
-                break;
-            }
-        }
-
-        // Adjust the buffer size to the actual number of bytes read (if needed)
-        buffer.resize(bytes_read);
-
-        DLOG(INFO) << "TCP::read: Finished receiving " << bytes_read
-                   << " bytes.";
-        return buffer;
-
+std::optional<SharedMalloc> Context::TCP::readBlocking(
+    Packet::Header::length_type length) const {
+    SharedMalloc buf(length);
+    try {
+        boost::asio::read(socket_, boost::asio::buffer(buf.get(), length));
+        return buf;
     } catch (const boost::system::system_error& e) {
         LOG(ERROR) << "TCP::read: " << e.what();
         return std::nullopt;
     }
 }
 
+std::optional<SharedMalloc> Context::TCP::read(
+    Packet::Header::length_type length) const {
+    return static_cast<bool>(options.io_timeout) ? readNonBlocking(length)
+                                                 : readBlocking(length);
+}
 bool Context::TCP::close() const {
     boost::system::error_code ec;
     using namespace boost::asio::ip;
