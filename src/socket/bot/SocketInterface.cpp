@@ -1,13 +1,13 @@
 #include "SocketInterface.hpp"
 
 #include <ManagedThreads.hpp>
-#include <TgBotCommandMap.hpp>
 #include <api/TgBotApi.hpp>
 #include <string_view>
 #include <utility>
 
+#include "../CommandMap.hpp"
 #include "PacketParser.hpp"
-#include "TgBotSocket_Export.hpp"
+#include "ApiDef.hpp"
 
 SocketInterfaceTgBot::SocketInterfaceTgBot(TgBotSocket::Context* _interface,
                                            TgBotApi::Ptr _api,
@@ -23,8 +23,8 @@ SocketInterfaceTgBot::SocketInterfaceTgBot(TgBotSocket::Context* _interface,
       resource(resource) {}
 
 void SocketInterfaceTgBot::runFunction(const std::stop_token& token) {
-    bool ret =
-        _interface->listen([this, token](const TgBotSocket::Context& ctx) {
+    bool ret = _interface->listen(
+        [this, token](const TgBotSocket::Context& ctx) {
             while (!token.stop_requested()) {
                 std::optional<TgBotSocket::Packet> pkt;
                 pkt = readPacket(ctx);
@@ -46,7 +46,8 @@ void SocketInterfaceTgBot::runFunction(const std::stop_token& token) {
                     handlePacket(ctx, std::move(pkt.value()));
                 }
             }
-        }, true);
+        },
+        true);
     if (!ret) {
         LOG(ERROR) << "Failed to start listening on socket";
     }

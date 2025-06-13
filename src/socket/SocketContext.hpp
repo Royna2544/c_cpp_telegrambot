@@ -3,7 +3,7 @@
 #include <SocketExports.h>
 #include <absl/log/log.h>
 
-#include <TgBotSocket_Export.hpp>
+#include <ApiDef.hpp>
 #include <boost/asio.hpp>
 #include <chrono>
 #include <filesystem>

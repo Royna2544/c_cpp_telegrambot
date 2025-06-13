@@ -8,7 +8,7 @@
 
 #include <ManagedThreads.hpp>
 #include <ResourceManager.hpp>
-#include <TgBotSocket_Export.hpp>
+#include <ApiDef.hpp>
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -20,7 +20,7 @@
 #include <initializer_list>
 #include <mutex>
 #include <optional>
-#include <socket/TgBotCommandMap.hpp>
+#include <socket/CommandMap.hpp>
 #include <string>
 #include <string_view>
 #include <trivial_helpers/log_once.hpp>

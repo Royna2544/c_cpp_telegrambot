@@ -7,6 +7,7 @@
 
 #include <SharedMalloc.hpp>
 #include <bot/FileHelperNew.hpp>
+#include <bot/PacketParser.hpp>
 #include <bot/SocketInterface.hpp>
 #include <chrono>
 #include <cstdint>
@@ -14,9 +15,6 @@
 #include <string_view>
 #include <utility>
 
-#include "SocketContext.hpp"
-#include "TgBotSocket_Export.hpp"
-#include "bot/PacketParser.hpp"
 #include "global_handlers/SpamBlock.hpp"
 #include "mocks/DatabaseBase.hpp"
 #include "mocks/ResourceProvider.hpp"
@@ -81,7 +79,7 @@ class SocketDataHandlerTest : public ::testing::Test {
         SharedMalloc packetData(1024);
         TgBotSocket::Packet::Header recv_header;
 
-	EXPECT_TRUE(TgBotSocket::decryptPacket(pkt));
+        EXPECT_TRUE(TgBotSocket::decryptPacket(pkt));
 
         EXPECT_CALL(*_mockImpl, write(_, _))
             .WillOnce(DoAll(SaveArg<0>(&_pktHdr.first),

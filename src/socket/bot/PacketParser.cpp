@@ -5,14 +5,12 @@
 #include <openssl/hmac.h>
 #include <openssl/rand.h>
 
-#include <TgBotSocket_Export.hpp>
+#include <ApiDef.hpp>
 #include <chrono>
 #include <cstring>
 #include <optional>
-#include <socket/TgBotCommandMap.hpp>
+#include "../CommandMap.hpp"
 #include <trivial_helpers/raii.hpp>
-
-#include "SharedMalloc.hpp"
 
 #ifdef ENABLE_HEXDUMP
 #include <lib/hexdump.h>

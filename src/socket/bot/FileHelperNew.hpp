@@ -3,7 +3,7 @@
 #include <SocketExports.h>
 
 #include <SharedMalloc.hpp>
-#include <TgBotSocket_Export.hpp>
+#include <ApiDef.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>

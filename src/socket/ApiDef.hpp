@@ -78,6 +78,8 @@ constexpr int ALIGNMENT = 8;
  * size of the data. The data is then followed by the actual data.
  */
 struct alignas(ALIGNMENT) Packet {
+    using hmac_type = std::array<uint8_t, SHA256_DIGEST_LENGTH>;
+
     /**
      * @brief Header for TgBotCommand Packets
      *
@@ -118,24 +120,20 @@ struct alignas(ALIGNMENT) Packet {
         using init_vector_type = std::array<uint8_t, IV_LENGTH>;
 
         int64_t magic = MAGIC_VALUE;  ///< Magic value to verify the packet
-        Command cmd{};                ///< Command to be executed
-        PayloadType data_type{};      ///< Type of payload in the packet
-        length_type data_size{};      ///< Size of the data in the packet
-        session_token_type session_token{};  ///< Session token
-        nounce_type nonce{};             ///< Nonce (Epoch timestamp is used)
-        init_vector_type init_vector{};  ///< Initialization vector for AES-GCM
-    };
-    static_assert(offsetof(Header, magic) == 0);
-    using hmac_type = std::array<uint8_t, SHA256_DIGEST_LENGTH>;
-
-    Header header{};
+        Command cmd;                  ///< Command to be executed
+        PayloadType data_type;        ///< Type of payload in the packet
+        length_type data_size;        ///< Size of the data in the packet
+        session_token_type session_token;  ///< Session token
+        nounce_type nonce;               ///< Nonce (Epoch timestamp is used)
+        init_vector_type init_vector;    ///< Initialization vector for AES-GCM
+    } header{};
     SharedMalloc data;
     hmac_type hmac{};
 };
 
 using PathStringArray = std::array<char, MAX_PATH_SIZE>;
 using MessageStringArray = std::array<char, MAX_MSG_SIZE>;
-using SHA256StringArray = std::array<unsigned char, SHA256_DIGEST_LENGTH>;
+using SHA256StringArray = std::array<uint8_t, SHA256_DIGEST_LENGTH>;
 
 namespace data {
 
@@ -218,7 +216,7 @@ struct alignas(ALIGNMENT) ObserveAllChats {
 };
 
 // This border byte is used to distinguish JSON meta and file data
-constexpr unsigned char JSON_BYTE_BORDER = 0xFF;
+constexpr uint8_t JSON_BYTE_BORDER = 0xFF;
 
 /**
  * CMD_UPLOAD_FILE/CMD_DOWNLOAD_FILE data structure.

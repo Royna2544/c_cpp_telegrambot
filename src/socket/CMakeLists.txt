@@ -20,14 +20,14 @@ tgbot_library(
 tgbot_library(
   NAME Socket
   SRCS
-    Context.cpp
+    SocketContext.cpp
     Local.cpp
     UDP.cpp
     TCP.cpp
     bot/PacketParser.cpp
     bot/FileHelperNew.cpp
-    backends/ClientBackend.cpp
-    TgBotCommandMap.cpp
+    ClientBackend.cpp
+    CommandMap.cpp
   PUBLIC_INC interface
   LIBS Utils Boost::system OpenSSL::Crypto JsonCpp::JsonCpp ${SOCKET_HEXDUMP_LIB}
   LIBS_WIN32 wsock32 Ws2_32
@@ -36,7 +36,7 @@ tgbot_library(
 
 tgbot_exe(
   NAME SocketCli
-  SRCS TgBotSocketClient.cpp
+  SRCS Client.cpp
   LIBS Socket
   RELATION Socket
 )

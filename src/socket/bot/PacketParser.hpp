@@ -8,7 +8,7 @@
 #include <SocketContext.hpp>
 #include <optional>
 
-#include "TgBotSocket_Export.hpp"
+#include "ApiDef.hpp"
 
 namespace TgBotSocket {
 

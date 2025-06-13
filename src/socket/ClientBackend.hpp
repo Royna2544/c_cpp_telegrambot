@@ -1,7 +1,7 @@
 #pragma once
 
 #include <SocketContext.hpp>
-#include <TgBotSocket_Export.hpp>
+#include <ApiDef.hpp>
 #include <filesystem>
 #include <memory>
 

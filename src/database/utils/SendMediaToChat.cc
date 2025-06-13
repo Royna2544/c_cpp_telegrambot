@@ -5,7 +5,7 @@
 
 #include <AbslLogInit.hpp>
 #include <TryParseStr.hpp>
-#include <backends/ClientBackend.hpp>
+#include <ClientBackend.hpp>
 #include <bot/PacketParser.hpp>
 #include <cstdlib>
 #include <cstring>
@@ -14,7 +14,6 @@
 #include <memory>
 
 #include "ConfigManager.hpp"
-#include "TgBotSocket_Export.hpp"
 
 [[noreturn]] static void usage(const char* argv0, const int exitCode) {
     std::cerr << "Usage: " << argv0 << " <chat(Id/Name)> <medianame>"

@@ -3,9 +3,8 @@
 
 #include <AbslLogInit.hpp>
 #include <ManagedThreads.hpp>
-#include <TgBotSocket_Export.hpp>
+#include <ApiDef.hpp>
 #include <TryParseStr.hpp>
-#include <backends/ClientBackend.hpp>
 #include <bot/FileHelperNew.hpp>
 #include <bot/PacketParser.hpp>
 #include <cstdint>
@@ -15,9 +14,8 @@
 #include <optional>
 #include <string>
 
-#include "SocketContext.hpp"
-#include "TgBotCommandMap.hpp"
-#include "api/typedefs.h"
+#include "CommandMap.hpp"
+#include "ClientBackend.hpp"
 
 using namespace TgBotSocket;
 

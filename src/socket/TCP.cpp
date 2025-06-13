@@ -7,7 +7,7 @@
 #include <string_view>
 
 #include "SocketContext.hpp"
-#include "TgBotSocket_Export.hpp"
+#include "ApiDef.hpp"
 
 template <>
 struct fmt::formatter<boost::asio::ip::tcp> : formatter<string_view> {

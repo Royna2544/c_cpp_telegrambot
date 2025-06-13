@@ -11,7 +11,7 @@
 
 #include "PacketParser.hpp"
 #include "SharedMalloc.hpp"
-#include "TgBotSocket_Export.hpp"
+#include "ApiDef.hpp"
 
 bool RealFS::writeFile(const std::filesystem::path& filename,
                        const uint8_t* startAddr, const size_t size) {
