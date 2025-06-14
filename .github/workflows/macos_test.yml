@@ -11,7 +11,7 @@ on:
     
 jobs:
   build:
-    runs-on: macos-13
+    runs-on: macos-latest
 
     steps:
       - name: Checkout code
@@ -24,8 +24,8 @@ jobs:
 
       - name: Compile with HomeBrew Clang
         env: 
-          CC: /usr/local/opt/llvm/bin/clang
-          CXX: /usr/local/opt/llvm/bin/clang++
+          CC: /opt/homebrew/opt/llvm/bin/clang
+          CXX: /opt/homebrew/opt/llvm/bin/clang++
         run: |
           mkdir build
           cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTING=ON .
