@@ -242,6 +242,14 @@ configure_file(src/include/GitBuildInfo.hpp.inc
 # Optional components group
 add_custom_target(optional_all)
 
+# Library install directory
+include(GNUInstallDirs)
+if(WIN32)
+  set(LIBRARY_INSTALL_DIR ${CMAKE_INSTALL_BINDIR})
+else()
+  set(LIBRARY_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR})
+endif()
+
 # ################# Declare common macros ####################
 # tgbot_common_target(<target-name> TYPE <LIBRARY|EXECUTABLE> SRCS <src1>
 # [<src2> …] [NO_PREFIX] [PUBLIC_INC …] [PRIVATE_INC …] [PUBLIC_LIBS …]
@@ -268,16 +276,21 @@ function(tgbot_common_target TARGET_NAME)
     INTERFACE ${TGBOT_INTERFACE_LIBS})
 
   # Set RPATH for Unix-like systems
-  if (UNIX)
+  if(UNIX)
     # bin/main bin/cli lib/libTgBot.so
-    set_target_properties(${TARGET_NAME} PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
-    set_target_properties(${TARGET_NAME} PROPERTIES INSTALL_RPATH "$ORIGIN/../lib;$ORIGIN/..")
+    set_target_properties(${TARGET_NAME} PROPERTIES INSTALL_RPATH_USE_LINK_PATH
+                                                    TRUE)
+    set_target_properties(${TARGET_NAME} PROPERTIES INSTALL_RPATH
+                                                    "$ORIGIN/../lib;$ORIGIN/..")
   endif()
 
   # Output directory
-  include(GNUInstallDirs)
-  set_target_properties(${TARGET_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_BINDIR})
-  set_target_properties(${TARGET_NAME} PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_LIBDIR})
+  set_target_properties(
+    ${TARGET_NAME} PROPERTIES RUNTIME_OUTPUT_DIRECTORY
+                              ${CMAKE_BINARY_DIR}/${CMAKE_INSTALL_BINDIR})
+  set_target_properties(
+    ${TARGET_NAME} PROPERTIES LIBRARY_OUTPUT_DIRECTORY
+                              ${CMAKE_BINARY_DIR}/${LIBRARY_INSTALL_DIR})
 
   # sanitizers / PIE / LTO
   if(SANITIZER_FLAG)
@@ -321,10 +334,9 @@ function(tgbot_library)
     set_target_properties(${LIB_NAME} PROPERTIES PREFIX "${PROJECT_NAME}_")
   endif()
 
-  if (NOT LIB_NO_HIDE)
-    set_target_properties(${LIB_NAME} PROPERTIES
-      CXX_VISIBILITY_PRESET        hidden
-      VISIBILITY_INLINES_HIDDEN    YES)
+  if(NOT LIB_NO_HIDE)
+    set_target_properties(${LIB_NAME} PROPERTIES CXX_VISIBILITY_PRESET hidden
+                                                 VISIBILITY_INLINES_HIDDEN YES)
   endif()
 
   tgbot_common_target(
@@ -346,7 +358,7 @@ function(tgbot_library)
     include(GenerateExportHeader)
     generate_export_header(${LIB_NAME} BASE_NAME ${LIB_NAME} EXPORT_FILE_NAME
                            "${EXPORTCONF_DIR}/${LIB_NAME}Exports.h")
-    install(TARGETS ${LIB_NAME} DESTINATION ${CMAKE_INSTALL_LIBDIR})
+    install(TARGETS ${LIB_NAME} DESTINATION ${LIBRARY_INSTALL_DIR})
   endif()
 endfunction()
 

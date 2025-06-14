@@ -9,10 +9,6 @@
 #include <stdexcept>
 #include <type_traits>
 
-#ifndef __cpp_concepts
-#define requires(x)
-#endif
-
 struct SharedMalloc {
     using offset_type = std::ptrdiff_t;
     using size_type = int;
@@ -88,9 +84,9 @@ struct SharedMalloc {
     void resize(size_t newSize) const noexcept { parent->realloc(newSize); }
 
     // trivial accessors
-    [[nodiscard]] auto get() const noexcept { return parent->data(); }
-    [[nodiscard]] auto use_count() const noexcept { return parent.use_count(); }
-    [[nodiscard]] auto size() const noexcept { return parent->size(); }
+    [[nodiscard]] data_type* get() const noexcept { return parent->data(); }
+    [[nodiscard]] long use_count() const noexcept { return parent.use_count(); }
+    [[nodiscard]] size_type size() const noexcept { return parent->size(); }
 
    private:
     // A fortify check.
@@ -107,7 +103,7 @@ struct SharedMalloc {
         }
     }
 
-    [[nodiscard]] inline auto offsetGet(const offset_type offset) const {
+    [[nodiscard]] inline data_type* offsetGet(const offset_type offset) const {
         return get() + offset;
     }
 

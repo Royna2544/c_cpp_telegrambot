@@ -1,13 +1,25 @@
-tgbot_library(
-  NAME
-  LogInit
-  SRCS
-  AbslLogInit.cpp
-  LIBS
-  absl::log_initialize
-  absl::log_sink_registry
-  NO_HIDE
-)
+if(WIN32)
+  tgbot_library(
+    NAME
+    LogInit
+    SRCS
+    AbslLogInit.cpp
+    LIBS
+    absl::log_initialize
+    absl::log_sink_registry
+    NO_HIDE
+    STATIC)
+else()
+  tgbot_library(
+    NAME
+    LogInit
+    SRCS
+    AbslLogInit.cpp
+    LIBS
+    absl::log_initialize
+    absl::log_sink_registry
+    NO_HIDE)
+endif()
 
 tgbot_exe(
   NAME
