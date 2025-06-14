@@ -320,14 +320,13 @@ function(tgbot_library)
   set(PUBLIC_LIBS ${LIB_LIBS})
   set(PRIVATE_LIBS absl::log)
 
-  if(NOT LIB_STATIC)
-    list(APPEND LIB_PUBLIC_INC ${EXPORTCONF_DIR})
-  endif()
-
   if(LIB_STATIC)
     add_library(${LIB_NAME} STATIC ${LIB_SRCS})
+    list(APPEND PUBLIC_LIBS ${PRIVATE_LIBS})
+    set(PRIVATE_LIBS)
   else()
     add_library(${LIB_NAME} SHARED ${LIB_SRCS})
+    list(APPEND LIB_PUBLIC_INC ${EXPORTCONF_DIR})
   endif()
 
   if(NOT LIB_NO_LIBPREFIX)
