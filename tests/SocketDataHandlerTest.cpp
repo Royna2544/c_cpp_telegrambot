@@ -28,6 +28,10 @@ using testing::IsNull;
 using testing::Return;
 using testing::SaveArg;
 
+#ifdef ENABLE_HEXDUMP
+#include <lib/hexdump.h>
+#endif
+
 fruit::Component<MockTgBotApi, MockContext, VFSOperationsMock,
                  SocketInterfaceTgBot>
 getSocketComponent() {
@@ -73,46 +77,49 @@ class SocketDataHandlerTest : public ::testing::Test {
      */
     template <typename DataT, TgBotSocket::Command retCmd>
     void sendAndVerifyHeader(TgBotSocket::Packet pkt, DataT* out) {
-        std::pair<const void*, size_t> _pktHdr;
-        std::pair<const void*, size_t> _pktData;
-        std::pair<const void*, size_t> _pktHmac;
         SharedMalloc packetData(1024);
-        TgBotSocket::Packet::Header recv_header;
+        int cur_offset = 0;
+        TgBotSocket::Packet result;
 
         EXPECT_TRUE(TgBotSocket::decryptPacket(pkt));
 
         EXPECT_CALL(*_mockImpl, write(_, _))
-            .WillOnce(DoAll(SaveArg<0>(&_pktHdr.first),
-                            SaveArg<1>(&_pktHdr.second), ::testing::Invoke([&] {
-                                packetData.assignFrom(_pktHdr.first,
-                                                      _pktHdr.second);
-                            }),
-                            Return(true)))
-            .WillOnce(
-                DoAll(SaveArg<0>(&_pktData.first), SaveArg<1>(&_pktData.second),
-                      ::testing::Invoke([&] {
-                          packetData.assignFrom(_pktData.first, _pktData.second,
-                                                _pktHdr.second);
-                      }),
-                      Return(true)))
-            .WillOnce(DoAll(
-                SaveArg<0>(&_pktHmac.first), SaveArg<1>(&_pktHmac.second),
-                ::testing::Invoke([&] {
-                    packetData.assignFrom(_pktHmac.first, _pktHmac.second,
-                                          _pktHdr.second + _pktData.second);
-                }),
-                Return(true)));
+            .WillRepeatedly([&](const uint8_t* data, int len) -> bool {
+                packetData.assignFrom(data, len, cur_offset);
+                cur_offset += len;
+                return true;
+            });
         mockInterface->handlePacket(*_mockImpl, std::move(pkt));
 
         // Expect valid packet
         EXPECT_TRUE(packetData.get());
+
+        /**
+         * 1. Assign sizeof(Header) bytes to result.header
+	 * 2. Resize memory to actual packet len (hdr+dat+hmac)
+         * 3. Assign trailing sizeof(Hmac) bytes to result.hmac
+         * 4. Resize and cut of hmac data
+         * 5. Move payload at offset +sizeof(Header) to offset 0
+         * 6. Resize to data_size finally.
+         */
+        packetData.assignTo(result.header);
+        packetData.resize(result.header.data_size + sizeof(result.header) + sizeof(result.hmac));
+        packetData.assignTo(result.hmac, -sizeof(result.hmac));
+        packetData.resize(packetData.size() - sizeof(result.hmac));
+        packetData.move(sizeof(result.header), 0, result.header.data_size);
+        packetData.resize(result.header.data_size);
+	result.data = std::move(packetData);
+
+        EXPECT_TRUE(TgBotSocket::decryptPacket(result));
+#ifdef ENABLE_HEXDUMP
+        LOG(INFO) << "Dump packet data";
+        hexdump(result.data.get(), result.data.size());
+#endif
         // Checking packet header
-        EXPECT_NO_FATAL_FAILURE(packetData.assignTo(recv_header));
-        EXPECT_EQ(recv_header.cmd, retCmd);
-        ASSERT_EQ(recv_header.data_size, sizeof(DataT));
+        EXPECT_EQ(result.header.cmd, retCmd);
+        ASSERT_EQ(result.header.data_size, sizeof(DataT));
         // Checking packet data
-        EXPECT_NO_FATAL_FAILURE(packetData.assignTo(
-            out, sizeof(DataT), sizeof(TgBotSocket::Packet::Header)));
+        EXPECT_NO_FATAL_FAILURE(result.data.assignTo(out, sizeof(DataT)));
     }
 
     static void isGenericAck_OK(const TgBotSocket::callback::GenericAck& ack) {
@@ -152,7 +159,7 @@ TEST_F(SocketDataHandlerTest, TestCmdGetUptime) {
     // data Unused for GetUptime
     TgBotSocket::Packet pkt =
         TgBotSocket::createPacket(TgBotSocket::Command::CMD_GET_UPTIME, nullptr,
-                                  0, TgBotSocket::PayloadType::Binary, {});
+                                  0, TgBotSocket::PayloadType::Binary, defaultToken);
     TgBotSocket::callback::GetUptimeCallback callbackData{};
 
     sendAndVerifyHeader<TgBotSocket::callback::GetUptimeCallback,

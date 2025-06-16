@@ -268,7 +268,7 @@ function(tgbot_common_target TARGET_NAME)
     PRIVATE ${TGBOT_PRIVATE_INC} ${CMAKE_SOURCE_DIR}/src
             ${CMAKE_SOURCE_DIR}/src/include ${EXPORTCONF_DIR})
 
-  target_compile_definitions(${TARGET_NAME} PRIVATE ${TGBOT_DEFS})
+  target_compile_definitions(${TARGET_NAME} PUBLIC ${TGBOT_DEFS})
   target_link_libraries(
     ${TARGET_NAME}
     PUBLIC ${TGBOT_PUBLIC_LIBS}

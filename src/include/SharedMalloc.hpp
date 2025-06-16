@@ -10,8 +10,8 @@
 #include <type_traits>
 
 struct SharedMalloc {
-    using offset_type = std::ptrdiff_t;
-    using size_type = int;
+    using offset_type = int;
+    using size_type = size_t;
     using data_type = std::uint8_t;
 
     struct Parent {

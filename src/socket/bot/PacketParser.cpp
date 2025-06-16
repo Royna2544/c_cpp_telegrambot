@@ -177,6 +177,11 @@ SharedMalloc decrypt_payload(
     const TgBotSocket::Packet::Header::init_vector_type& iv) {
     constexpr int tag_size = TgBotSocket::Packet::Header::TAG_LENGTH;
 
+    if (encrypted.size() == 0) {
+        // No data
+	return {};
+    }
+
     // Ensure the encrypted size is valid
     if (encrypted.size() < tag_size) {
         LOG(ERROR) << "Encrypted payload size too small to contain tag";
@@ -315,6 +320,12 @@ bool SOCKET_EXPORT decryptPacket(TgBotSocket::Packet& packet) {
     auto& header = packet.header;
     auto& data = packet.data;
 
+    if (packet.header.data_size == 0) {
+        // Nothing to decrypt - no data
+        DLOG(INFO) << "No payload to decrypt";
+        return true;
+    }
+
     packet.data =
         decrypt_payload(header.session_token, data, packet.header.init_vector);
     if (!static_cast<bool>(packet.data)) {
@@ -322,7 +333,6 @@ bool SOCKET_EXPORT decryptPacket(TgBotSocket::Packet& packet) {
         return false;
     }
     // Update the header data size
-    // TODO: Is this okay?
     packet.header.data_size = packet.data.size();
     return true;
 }

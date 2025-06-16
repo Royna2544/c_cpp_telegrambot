@@ -49,6 +49,7 @@ tgbot_exe(
     GTest::gmock
     SocketComponents
     fruit
+    HexDump
   TEST
 )
 

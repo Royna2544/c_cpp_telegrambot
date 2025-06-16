@@ -166,4 +166,6 @@ INSTANTIATE_TEST_SUITE_P(
     ::testing::Values(DBParam{std::make_shared<SQLiteDatabase>(
             getCmdLine().getPath(FS::PathType::RESOURCES_SQL)),
         "SQLiteDatabase"}));
+#else
+#error "No database backend?"
 #endif

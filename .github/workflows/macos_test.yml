@@ -19,7 +19,7 @@ jobs:
 
       - name: Set up dependencies
         run: |
-          brew install boost ninja llvm lld webp libpng libgit2 googletest jsoncpp openssl fmt
+          brew install boost ninja llvm@17 lld webp libpng libgit2 googletest jsoncpp openssl fmt
           git submodule update --init
 
       - name: Compile with HomeBrew Clang
