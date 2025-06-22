@@ -1,0 +1,9 @@
+namespace TgBotSocket.flatc;
+
+table TransferFileChunkResponse {
+  id: string;
+  index: uint;
+  result: bool;
+  reason: string;
+}
+root_type TransferFileChunkResponse;

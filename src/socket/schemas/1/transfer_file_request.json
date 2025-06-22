@@ -1,0 +1,9 @@
+{
+   "destfilepath": "/path/to/destination/file.txt",
+   "srcfilepath": "/path/to/source/file.txt",
+   "hash": "67452400d478e8226a73a440e082f7a746e696c6c65",
+   "options": {
+     "overwrite": true,
+     "hash_ignore": true
+   }
+}

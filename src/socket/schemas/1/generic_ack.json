@@ -1,0 +1,5 @@
+ {
+   "result": false
+   "error_type":"TGAPI_EXCEPTION",
+   "error_msg": "No such chat"
+ }

@@ -1,0 +1,6 @@
+{
+  "id": "uuid-1234",
+  "index": 5,
+  "result": false,
+  "reason": "sha mismatch"
+}

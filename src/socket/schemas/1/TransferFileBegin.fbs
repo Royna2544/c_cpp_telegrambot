@@ -1,0 +1,9 @@
+namespace TgBotSocket.flatc;
+
+table TransferFileBegin {
+  id: string;
+  index: uint;
+  offset: ulong;
+  sha256: string;
+}
+root_type TransferFileBegin;

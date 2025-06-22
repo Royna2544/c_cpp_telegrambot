@@ -1,0 +1,10 @@
+{
+  "id": "uuid-1234",
+  "srcpath": "/home/user/pic.jpg",
+  "destpath": "/srv/upload/pic.jpg",
+  "filesize": 1048576,
+  "chunk_size": 65536,
+  "chunks": 16,
+  "sha256_full": "0d4f…",
+  "options": { "overwrite": false, "hash_ignore": false }
+}

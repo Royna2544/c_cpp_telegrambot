@@ -86,26 +86,10 @@ struct alignas(ALIGNMENT) Packet {
      * Header contains the magic value, command, and the size of the data
      */
     struct alignas(ALIGNMENT) Header {
-        constexpr static int64_t MAGIC_VALUE_BASE = 0xDEADFACE;
+        constexpr static int64_t MAGIC_VALUE_BASE = 0xDEADBEEF;
         // Version number, to be increased on breaking changes
         // 1: Initial version
-        // 2: Added crc32 checks to packet data
-        // 3: Uploadfile has a sha256sum check, std::array conversions
-        // 4: Move CMD_UPLOAD_FILE_DRY to internal namespace
-        // 5: Use the packed attribute for structs
-        // 6: Make CMD_UPLOAD_FILE_DRY_CALLBACK return sperate callback, and add
-        // srcpath to UploadFile
-        // 7: Remove packed attribute, align all as 8 bytes
-        // 8: change checksum to uint64_t
-        // 9: Remove padding objects
-        // 10: Alignments fixing for Python compliance, add INVALID_CMD at 0
-        // 11: Remove CMD_DELETE_CONTROLLER_BY_ID, add payload type to header
-        // 12: Use OpenSSL's HMAC and AES-GCM algorithm encryption with nounces.
-        // Also use CMD_OPEN_SESSION CMD_CLOSE_SESSION for session based
-        // encryption
-        // 13: HMAC covers header as well, move hmac to end of data
-        // (Not Implemented!) CMD_TRANSFER_FILE with sessions and chunk-base
-        constexpr static int DATA_VERSION = 13;
+        constexpr static int DATA_VERSION = 1;
         constexpr static int64_t MAGIC_VALUE = MAGIC_VALUE_BASE + DATA_VERSION;
 
         using length_type = uint32_t;
@@ -126,7 +110,8 @@ struct alignas(ALIGNMENT) Packet {
         session_token_type session_token;  ///< Session token
         nounce_type nonce;               ///< Nonce (Epoch timestamp is used)
         init_vector_type init_vector;    ///< Initialization vector for AES-GCM
-    } header{};
+    };
+    SharedMalloc header;
     SharedMalloc data;
     hmac_type hmac{};
 };

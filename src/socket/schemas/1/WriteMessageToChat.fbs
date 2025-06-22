@@ -1,0 +1,7 @@
+namespace TgBotSocket.flatc;
+
+table WriteMessageToChat {
+  chat: long;
+  message: string;
+}
+root_type WriteMessageToChat;

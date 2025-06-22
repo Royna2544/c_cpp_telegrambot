@@ -1,6 +1,6 @@
-#include <absl/log/log.h>
-
 #include "SocketContext.hpp"
+
+#include <absl/log/log.h>
 
 namespace TgBotSocket {
 
@@ -9,9 +9,11 @@ Context::Context() = default;
 Context::~Context() = default;
 
 bool Context::write(const Packet& packet) const {
-    return write(reinterpret_cast<const uint8_t*>(&packet.header),
-                 sizeof(packet.header)) &&
-           write(packet.data) &&
+    const int32_t header_size = packet.header.size();
+
+    return write(reinterpret_cast<const uint8_t*>(&header_size),
+                 sizeof(header_size)) &&
+           write(packet.header) && write(packet.data) &&
            write(reinterpret_cast<const uint8_t*>(packet.hmac.data()),
                  packet.hmac.size());
 }
@@ -25,8 +27,8 @@ constexpr int Context::kTgBotHostPort;
 constexpr int Context::kTgBotLogPort;
 constexpr int Context::kTgBotLogTransmitPort;
 
-SOCKET_EXPORT std::ostream& operator<<(std::ostream& stream,
-                                    const Context::RemoteEndpoint& endpoint) {
+SOCKET_EXPORT std::ostream& operator<<(
+    std::ostream& stream, const Context::RemoteEndpoint& endpoint) {
     stream << endpoint.address << ":" << endpoint.port;
     return stream;
 }

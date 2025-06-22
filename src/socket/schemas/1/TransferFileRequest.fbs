@@ -1,0 +1,18 @@
+namespace TgBotSocket.flatc;
+
+table TransferFileOptions {
+  overwrite: bool;
+  hash_ignore: bool;
+}
+
+table TransferFileRequest {
+  id: string;
+  srcpath: string;
+  destpath: string;
+  filesize: ulong;
+  chunk_size: uint;
+  chunks: uint;
+  sha256_full: string;
+  options: TransferFileOptions;
+}
+root_type TransferFileRequest;
