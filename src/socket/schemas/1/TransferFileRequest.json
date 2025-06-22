@@ -1,0 +1,7 @@
+{
+  "id": "example",
+  "srcpath": "example",
+  "destpath": "example",
+  "filesize": 1234567890123,
+  "overwrite": true
+}

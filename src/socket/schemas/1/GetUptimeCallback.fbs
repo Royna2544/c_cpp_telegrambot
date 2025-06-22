@@ -1,0 +1,24 @@
+namespace TgBotSocket.flatc;
+
+table TimePoint {
+  year: int;
+  month: int;
+  day: int;
+  hour: int;
+  minute: int;
+  seconds: int;
+}
+
+table TimeDuration {
+  day: int;
+  hour: int;
+  minute: int;
+  seconds: int;
+}
+
+table GetUptimeCallback {
+  uptime: TimeDuration;
+  start_time: TimePoint;
+  current_time: TimePoint;
+}
+root_type GetUptimeCallback;

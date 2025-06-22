@@ -1,0 +1,34 @@
+namespace TgBotSocket.flatc;
+
+enum Command : int32 {
+  CMD_INVALID = 0,
+  CMD_WRITE_MSG_TO_CHAT_ID,
+  CMD_CTRL_SPAMBLOCK,
+  CMD_OBSERVE_CHAT_ID,
+  CMD_SEND_FILE_TO_CHAT_ID,
+  CMD_GET_UPTIME,
+  CMD_TRANSFER_FILE_REQUEST,
+  CMD_TRANSFER_FILE_BEGIN,
+  CMD_TRANSFER_FILE_CHUNK,
+  CMD_TRANSFER_FILE_CHUNK_RESPONSE,
+  CMD_TRANSFER_FILE_END,
+  CMD_GET_UPTIME_CALLBACK = 100,
+  CMD_GENERIC_ACK,
+  CMD_OPEN_SESSION,
+  CMD_OPEN_SESSION_ACK,
+  CMD_CLOSE_SESSION,
+}
+
+enum PayloadType : int32 { Binary = 0, Json = 1 }
+
+table PacketHeader {
+  magic: long;
+  cmd: Command;
+  data_type: PayloadType;
+  data_size: uint;
+  session_token: [ubyte];
+  nonce: ulong;
+  init_vector: [ubyte];
+}
+
+root_type PacketHeader;

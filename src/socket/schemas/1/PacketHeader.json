@@ -1,0 +1,7 @@
+{
+  "magic": 1234567890,
+  "cmd": "CMD_INVALID",
+  "data_type": "magic",
+  "data_size": 123,
+  "nonce": 1234567890123
+}

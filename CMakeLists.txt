@@ -257,8 +257,10 @@ endif()
 function(tgbot_common_target TARGET_NAME)
   # ---------- argument parsing (shared) ----------
   cmake_parse_arguments(
-    TGBOT "NO_PREFIX" "TYPE;RELATION"
-    "SRCS;PUBLIC_INC;PRIVATE_INC;PUBLIC_LIBS;PRIVATE_LIBS;INTERFACE_LIBS;DEFS"
+    TGBOT
+    "NO_PREFIX"
+    "TYPE;RELATION"
+    "SRCS;PUBLIC_INC;PRIVATE_INC;PUBLIC_LIBS;PRIVATE_LIBS;INTERFACE_LIBS;DEFS;DEPENDS"
     ${ARGN})
 
   # ---------- generic properties & tooling ----------
@@ -291,6 +293,9 @@ function(tgbot_common_target TARGET_NAME)
   set_target_properties(
     ${TARGET_NAME} PROPERTIES LIBRARY_OUTPUT_DIRECTORY
                               ${CMAKE_BINARY_DIR}/${LIBRARY_INSTALL_DIR})
+  if(TGBOT_DEPENDS)
+    add_dependencies(${TARGET_NAME} ${TGBOT_DEPENDS})
+  endif()
 
   # sanitizers / PIE / LTO
   if(SANITIZER_FLAG)
@@ -314,7 +319,7 @@ endfunction()
 
 function(tgbot_library)
   cmake_parse_arguments(LIB "NO_LIBPREFIX;STATIC;NO_HIDE" "NAME"
-                        "SRCS;PUBLIC_INC;PRIVATE_INC;DEFS;LIBS" ${ARGN})
+                        "SRCS;PUBLIC_INC;PRIVATE_INC;DEFS;LIBS;DEPENDS" ${ARGN})
 
   # Collect public & private libs exactly once
   set(PUBLIC_LIBS ${LIB_LIBS})
@@ -349,7 +354,9 @@ function(tgbot_library)
     PRIVATE_LIBS
     ${PRIVATE_LIBS}
     DEFS
-    ${LIB_DEFS})
+    ${LIB_DEFS}
+    DEPENDS
+    ${LIB_DEPENDS})
 
   if(NOT LIB_STATIC)
     file(MAKE_DIRECTORY "${EXPORTCONF_DIR}")
@@ -533,6 +540,8 @@ tgbot_library(
   TgBot
   DBImpl
   Socket
+  PRIVATE_INC
+  ${CMAKE_BINARY_DIR}/flatc_gen
   STATIC)
 
 tgbot_library(NAME ThreadManager SRCS src/ManagedThread.cpp

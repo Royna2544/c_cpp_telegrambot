@@ -1,0 +1,10 @@
+namespace TgBotSocket.flatc;
+
+table TransferFileRequest {
+  id: string;
+  srcpath: string;
+  destpath: string;
+  filesize: ulong;
+  overwrite: bool;
+}
+root_type TransferFileRequest;

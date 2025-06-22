@@ -52,8 +52,8 @@ bool SOCKET_EXPORT decryptPacket(TgBotSocket::Packet& packet);
  * @return The created packet.
  */
 Packet SOCKET_EXPORT
-createPacket(const Command command, const void* data,
-             Packet::Header::length_type length, const PayloadType payloadType,
+createPacket(const flatc::Command command, const void* data,
+             Packet::Header::length_type length, const flatc::PayloadType payloadType,
              const Packet::Header::session_token_type& sessionToken);
 
 /**

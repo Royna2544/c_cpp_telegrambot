@@ -1,0 +1,8 @@
+namespace TgBotSocket.flatc;
+
+table TransferFileEnd {
+  id: string;
+  result: bool;
+  message: string;
+}
+root_type TransferFileEnd;

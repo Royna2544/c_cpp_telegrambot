@@ -1,0 +1,17 @@
+namespace TgBotSocket.flatc;
+
+enum FileType : int {
+  Photo,
+  Video,
+  GIF,
+  Document,
+  Dice,
+  Sticker
+}
+
+table SendFileToChat {
+  chat: long;
+  file_type: FileType;
+  file_path: string;
+}
+root_type SendFileToChat;

@@ -1,0 +1,17 @@
+namespace TgBotSocket.flatc;
+
+enum AckType : int {
+  SUCCESS,
+  ERROR_TGAPI_EXCEPTION,
+  ERROR_INVALID_ARGUMENT,
+  ERROR_COMMAND_IGNORED,
+  ERROR_RUNTIME_ERROR,
+  ERROR_CLIENT_ERROR
+}
+
+table GenericAck {
+  result: bool;
+  error_type: AckType;
+  error_msg: string;
+}
+root_type GenericAck;

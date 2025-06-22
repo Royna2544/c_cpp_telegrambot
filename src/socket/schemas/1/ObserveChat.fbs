@@ -1,0 +1,8 @@
+namespace TgBotSocket.flatc;
+
+table ObserveChat {
+  chat: long;
+  observe: bool;
+  observe_all: bool;
+}
+root_type ObserveChat;

@@ -1,6 +1,7 @@
 #include "PacketParser.hpp"
 
 #include <absl/log/log.h>
+#include <flatbuffers/flatbuffers.h>
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
 #include <openssl/rand.h>
@@ -9,8 +10,9 @@
 #include <chrono>
 #include <cstring>
 #include <optional>
-#include "../CommandMap.hpp"
 #include <trivial_helpers/raii.hpp>
+
+#include "../CommandMap.hpp"
 
 #ifdef ENABLE_HEXDUMP
 #include <lib/hexdump.h>
@@ -36,12 +38,12 @@ struct fmt::formatter<TgBotSocket::PayloadType> : formatter<std::string_view> {
     }
 };
 
+using ByteArray = flatbuffers::Vector<uint8_t>;
+
 namespace {
 
-auto computeHMAC(const TgBotSocket::Packet& packet) {
+	std::optional<ByteArray> computeHMAC(const flatc::PacketHeader& packet) {
     // Buffer to store the HMAC result
-    TgBotSocket::Packet::hmac_type hmac_result{};
-
     std::unique_ptr<char, decltype(&free)> sha256(strdup("SHA256"), &free);
     const OSSL_PARAM params[] = {
         OSSL_PARAM_utf8_string("digest", sha256.get(), strlen(sha256.get())),
@@ -52,7 +54,7 @@ auto computeHMAC(const TgBotSocket::Packet& packet) {
     if (!mac) {
         LOG(ERROR) << "HMAC unsupported in this openssl";
 
-        return hmac_result;
+        return std::nullopt;
     }
 
     // Compute the HMAC
@@ -61,14 +63,13 @@ auto computeHMAC(const TgBotSocket::Packet& packet) {
 
     if (!ctx) {
         LOG(ERROR) << "Cannot alloc ctx";
-        return hmac_result;
+        return std::nullopt;
     }
 
-    const auto& key = packet.header.session_token;
-    if (!EVP_MAC_init(ctx.get(), (const std::uint8_t*)key.data(), key.size(),
+    if (!EVP_MAC_init(ctx.get(), packet.session_token()->data(), packet.session_token()->size(),
                       params)) {
         LOG(ERROR) << "Cannot init";
-        return hmac_result;
+        return std::nullopt;
     }
 
     // Add header
@@ -179,7 +180,7 @@ SharedMalloc decrypt_payload(
 
     if (encrypted.size() == 0) {
         // No data
-	return {};
+        return {};
     }
 
     // Ensure the encrypted size is valid
@@ -249,26 +250,45 @@ SharedMalloc decrypt_payload(
 namespace TgBotSocket {
 
 std::optional<Packet> readPacket(const TgBotSocket::Context& context) {
-    TgBotSocket::Packet packet;
+    Packet packet;
+    using flatc::VerifyHeader;
+    using flatc::GetHeader;
 
-    const auto headerData = context.read(sizeof(TgBotSocket::Packet::Header));
+    // Read header length
+    Packet::Header::length_type headerLen;
+    const auto headerLenData = context.read(sizeof(headerLen));
+    if (!headerLenData) {
+        LOG(ERROR) << "While reading header length, failed";
+        return std::nullopt;
+    }
+    headerLenData->assignTo(headerLen);
+
+    // Quick sanity: do we at least hold an entire Header?
+    if (headerLen < sizeof(flatbuffers::uoffset_t) + sizeof(int64_t))
+        return std::nullopt;
+
+    // Read header
+    const auto headerData = context.read(headerLen);
     if (!headerData) {
         LOG(ERROR) << "While reading header, failed";
         return std::nullopt;
     }
-    headerData->assignTo(packet.header);
+    packet.header = std::move(*headerData);
 
-    auto diff =
-        packet.header.magic - TgBotSocket::Packet::Header::MAGIC_VALUE_BASE;
-    if (diff != TgBotSocket::Packet::Header::DATA_VERSION) {
+    flatbuffers::Verifier v(packet.header.get(), packet.header.size());
+    if (!VerifyHeader(v))
+        // generated verifier – O(1) & safe
+        return std::nullopt;
+
+    const Header* hdr = GetHeader(packet.header.get());
+    auto diff = hdr->magic - Packet::Header::MAGIC_VALUE_BASE;
+    if (diff != Packet::Header::DATA_VERSION) {
         LOG(WARNING) << "Invalid magic value, dropping buffer";
-        constexpr int reasonable_datadiff = 5;
-        // Only a small difference is worth logging.
         diff = abs(diff);
-        if (diff >= 0 && diff < TgBotSocket::Packet::Header::DATA_VERSION) {
+        if (diff >= 0 && diff < Packet::Header::DATA_VERSION) {
             LOG(INFO) << "This packet contains header data version " << diff
                       << ", but we have version "
-                      << TgBotSocket::Packet::Header::DATA_VERSION;
+                      << Packet::Header::DATA_VERSION;
         } else {
             LOG(INFO) << "This is probably not a valid packet";
         }
@@ -276,11 +296,11 @@ std::optional<Packet> readPacket(const TgBotSocket::Context& context) {
     }
 
     LOG(INFO) << fmt::format(
-        "Received Packet{{cmd={}, data_type={}, data_size={}}}",
-        packet.header.cmd, packet.header.data_type, packet.header.data_size);
+        "Received Packet{{cmd={}, data_type={}, data_size={}}}", hdr->cmd(),
+        hdr->data_type(), hdr->data_size());
 
-    if (packet.header.data_size != 0) {
-        auto data = context.read(packet.header.data_size);
+    if (hdr->data_size() != 0) {
+        auto data = context.read(hdr->data_size());
         if (!data) {
             LOG(ERROR) << "While reading data, failed";
             return std::nullopt;
@@ -310,24 +330,24 @@ std::optional<Packet> readPacket(const TgBotSocket::Context& context) {
         return std::nullopt;
     }
 
-    if (packet.header.data_size > 0 && !decryptPacket(packet)) {
+    if (hdr->data_size() > 0 && !decryptPacket(packet)) {
         return std::nullopt;
     }
     return packet;
 }
 
 bool SOCKET_EXPORT decryptPacket(TgBotSocket::Packet& packet) {
-    auto& header = packet.header;
+    auto header = flatc::GetHeader(packet.header.get());
     auto& data = packet.data;
 
-    if (packet.header.data_size == 0) {
+    if (header->data_size() == 0) {
         // Nothing to decrypt - no data
         DLOG(INFO) << "No payload to decrypt";
         return true;
     }
 
     packet.data =
-        decrypt_payload(header.session_token, data, packet.header.init_vector);
+        decrypt_payload(header->session_token(), data, header->init_vector());
     if (!static_cast<bool>(packet.data)) {
         LOG(ERROR) << "Decryption failed";
         return false;

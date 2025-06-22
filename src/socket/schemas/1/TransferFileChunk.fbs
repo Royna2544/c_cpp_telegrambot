@@ -1,0 +1,8 @@
+namespace TgBotSocket.flatc;
+
+table TransferFileChunk {
+  id: string;
+  index: uint;
+  offset: ulong;
+}
+root_type TransferFileChunk;

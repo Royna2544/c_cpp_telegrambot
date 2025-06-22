@@ -1,0 +1,8 @@
+namespace TgBotSocket.flatc;
+
+table TransferFileBegin {
+  id: string;
+  chunks: uint;
+  filesize: uint;
+}
+root_type TransferFileBegin;

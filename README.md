@@ -25,6 +25,7 @@
 - Protobuf - Used for another database backend - [Link](https://github.com/protocolbuffers/protobuf)
 - TgBot-cpp - Core library for being a Telegram bot - [Link](https://github.com/reo7sp/tgbot-cpp)
 - CppTrace - C++ Backtrace Library - [Link](https://github.com/jeremy-rifkin/cpptrace)
+- FlatBuffers - Cross-platform serializing library - [Link](https://github.com/google/flatbuffers)
 
 ## Goals
 - There is no goal - I will just add stuff whichever I could and learn those while writing code for it

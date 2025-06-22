@@ -1,0 +1,9 @@
+namespace TgBotSocket.flatc;
+
+table CtrlSpamBlock {
+    enabled: bool;
+    purge:   bool;
+    take_action:  bool;
+}
+
+root_type CtrlSpamBlock;
