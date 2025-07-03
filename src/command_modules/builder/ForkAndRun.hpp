@@ -11,6 +11,7 @@
 #include <unistd.h>
 
 #include <array>
+#include <atomic>
 #include <filesystem>
 #include <functional>
 #include <iostream>
@@ -304,10 +305,10 @@ class ForkAndRunShell {
     pid_t shell_pid_ = -1;
 
     // terminate watcher
-    std::thread terminate_watcher_thread;
+    std::jthread terminate_watcher_thread;
     DeferredExit result;
 
-    bool opened = false;
+    std::atomic_bool opened = false;
 
     void writeString(const std::string_view& args) const;
 

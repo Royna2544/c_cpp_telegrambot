@@ -305,10 +305,7 @@ bool ForkAndRun::execute() {
         int status = 0;
 
         instance = this;
-        auto sig_fun = [](int signum) {
-            LOG(INFO) << "Got signal " << strsignal(signum);
-            instance->cancel();
-        };
+        auto sig_fun = [](int signum) { instance->cancel(); };
         auto old_sig = signal(SIGINT, sig_fun);
         (void)signal(SIGTERM, sig_fun);
 
@@ -323,9 +320,12 @@ bool ForkAndRun::execute() {
                 BufferType buf;
                 ssize_t bytes_read =
                     read(stdout_pipe.readEnd(), buf.data(), buf.size() - 1);
-                if (bytes_read >= 0) {
+                if (bytes_read > 0) {
+                    buf[bytes_read] = 0;
                     handleStdoutData(
                         {buf.data(), static_cast<size_t>(bytes_read)});
+                } else if (bytes_read == 0) {
+                    LOG(INFO) << "Hit EOF on stdout";
                 }
             },
             Selector::Mode::READ);
@@ -335,9 +335,12 @@ bool ForkAndRun::execute() {
                 BufferType buf;
                 ssize_t bytes_read =
                     read(stderr_pipe.readEnd(), buf.data(), buf.size() - 1);
-                if (bytes_read >= 0) {
+                if (bytes_read > 0) {
+                    buf[bytes_read] = 0;
                     handleStderrData(
                         {buf.data(), static_cast<size_t>(bytes_read)});
+                } else if (bytes_read == 0) {
+                    LOG(INFO) << "Hit EOF on stderr";
                 }
             },
             Selector::Mode::READ);
@@ -554,7 +557,7 @@ bool ForkAndRunShell::open() {
         LOG(INFO) << "Shell opened with pid " << shell_pid_;
         ::close(pipe_.readEnd());
         opened = true;
-        terminate_watcher_thread = std::thread([this] {
+        terminate_watcher_thread = std::jthread([this] {
             int status = 0;
             {
                 std::shared_lock<std::shared_mutex> pidLk(pid_mutex_);
@@ -657,7 +660,7 @@ bool ForkAndRun::can_execve(const std::string_view name) {
     std::vector<std::string> path = absl::StrSplit(::Env()["PATH"].get(), ':');
     return std::ranges::any_of(path, [name](const auto& dir) {
         const auto full_path = std::filesystem::path(dir) / name;
-        DLOG(INFO) << "access(" << full_path << ", R_OK | X_OK)";
-        return access(full_path.c_str(), R_OK | X_OK) == 0;
+        DLOG(INFO) << "access(" << full_path << ", R_OK)";
+        return access(full_path.c_str(), R_OK) == 0;
     });
 }
