@@ -3,6 +3,7 @@
 #include <tgbot/tools/StringTools.h>
 
 #include <TryParseStr.hpp>
+#include <algorithm>
 #include <api/CommandModule.hpp>
 #include <api/TgBotApi.hpp>
 #include <functional>
@@ -16,21 +17,17 @@ constexpr auto kSpamDelayTime = std::chrono::milliseconds(700);
 namespace {
 
 void for_count(int count, const std::function<void(void)>& callback) {
-    if (count > MAX_SPAM_COUNT) {
-        count = MAX_SPAM_COUNT;
-    }
     for (int i = 0; i < count; ++i) {
         callback();
         std::this_thread::sleep_for(kSpamDelayTime);
     }
 }
-void try_parse_spamcnt(const std::string& data, int& count) {
-    if (count > MAX_SPAM_COUNT) {
-        count = MAX_SPAM_COUNT;
-    }
-    if (!try_parse(data, &count)) {
-        LOG(WARNING) << "Failed to parse " << std::quoted(data) << " as int";
-        count = 1;
+void try_parse_spamcnt(const std::string_view data, int* count) {
+    if (try_parse(data, count)) {
+        *count = std::clamp(*count, 0, MAX_SPAM_COUNT);
+    } else {
+        LOG(WARNING) << "Failed to parse " << std::quoted(data) << " as int; defaults to 1";
+        *count = 1;
     }
 }
 }  // namespace
@@ -47,7 +44,7 @@ DECLARE_COMMAND_HANDLER(spam) {
         const auto chatid = message->reply()->get<MessageAttrs::Chat>();
 
         spamable = true;
-        try_parse_spamcnt(message->get<MessageAttrs::ExtraText>(), count);
+        try_parse_spamcnt(message->get<MessageAttrs::ExtraText>(), &count);
         if (message->reply()->has<MessageAttrs::Sticker>()) {
             fp = [api, message, chatid] {
                 api->sendSticker(
@@ -78,7 +75,7 @@ DECLARE_COMMAND_HANDLER(spam) {
         commands = absl::StrSplit(message->get<MessageAttrs::ExtraText>(), ' ',
                                   absl::SkipWhitespace());
         if (commands.size() == 2) {
-            try_parse_spamcnt(commands[0], spamData.first);
+            try_parse_spamcnt(commands[0], &spamData.first);
             spamData.second = commands[1];
             fp = [api, message, spamData] {
                 api->sendMessage(message->get<MessageAttrs::Chat>()->id,
