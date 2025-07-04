@@ -490,7 +490,10 @@ bool TgBotApiImpl::downloadFile_impl(const std::filesystem::path& destfilename,
 }
 
 User::Ptr TgBotApiImpl::getBotUser_impl() const {
-    const static auto me = getApi().getMe();
+    const static bool s = [this] {
+        me = getApi().getMe();
+        return true;
+    }();
     return me;
 }
 

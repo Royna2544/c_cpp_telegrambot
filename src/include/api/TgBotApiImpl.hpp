@@ -480,6 +480,8 @@ class TgBotApiImpl : public TgBotApi {
     class Async;
     Bot _bot;
 
+    mutable User::Ptr me; // Just a cache
+
     AuthContext* _auth;
     StringResLoader* _loader;
     Providers* _provider;
