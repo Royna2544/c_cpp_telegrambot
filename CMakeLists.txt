@@ -330,7 +330,11 @@ function(tgbot_library)
   endif()
 
   if(NOT LIB_NO_LIBPREFIX)
-    set_target_properties(${LIB_NAME} PROPERTIES PREFIX "${PROJECT_NAME}_")
+    if (WIN32)
+       set_target_properties(${LIB_NAME} PROPERTIES PREFIX "${CMAKE_SHARED_LIBRARY_PREFIX}Telegram.Bot.")
+    else()
+       set_target_properties(${LIB_NAME} PROPERTIES PREFIX "${CMAKE_SHARED_LIBRARY_PREFIX}Tgbot")
+    endif()
   endif()
 
   if(NOT LIB_NO_HIDE)
