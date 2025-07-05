@@ -1,34 +1,34 @@
 #include <absl/log/log.h>
 
-#include <trivial_helpers/log_once.hpp>
 #include <CommandLine.hpp>
 #include <filesystem>
 #include <stdexcept>
 #include <system_error>
+#include <trivial_helpers/log_once.hpp>
 
 CommandLine::CommandLine(CommandLine::argc_type argc,
                          CommandLine::argv_type argv)
     : _argc(argc), _argv(argv) {
     std::error_code ec;
     if (_argv == nullptr || _argv[0] == nullptr) {
-        LOG(ERROR) << "Invalid argv passed";
+        spdlog::critical("Invalid argv passed");
         throw std::invalid_argument("Invalid argv passed");
     }
 
-    LOG_ONCE(INFO) << "Try autodetect exePath";
+    spdlog::info("Try autodetect exePath");
     const auto p1 = std::filesystem::current_path() / argv[0];
     exePath = std::filesystem::canonical(p1, ec);
     if (ec) {
-        LOG_ONCE(WARNING) << "Try 1: " << p1 << ": " << ec.message();
+        spdlog::info("Try 1: {}: {}", p1, ec.message());
         const auto p2 = std::filesystem::path(INSTALL_PREFIX) / argv[0];
         exePath = std::filesystem::canonical(p2, ec);
         if (ec) {
-            LOG_ONCE(WARNING) << "Try 2: " << p2 << ": " << ec.message();
+            spdlog::info("Try 2: {}: {}", p2, ec.message());
         } else {
-            LOG_ONCE(INFO) << exePath << ": OK";
+            spdlog::info("{}: OK", exePath);
         }
     } else {
-        LOG_ONCE(INFO) << exePath << ": OK";
+        spdlog::info("{}: OK", exePath);
     }
 }
 

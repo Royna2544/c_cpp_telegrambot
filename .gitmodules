@@ -10,9 +10,6 @@
 [submodule "src/third-party/cpp-httplib"]
 	path = src/third-party/cpp-httplib
 	url = https://github.com/yhirose/cpp-httplib
-[submodule "clientapp/android/app/src/main/cpp/abseil-cpp"]
-	path = src/third-party/abseil-cpp
-	url = https://github.com/abseil/abseil-cpp/
 [submodule "src/third-party/fruit"]
 	path = src/third-party/fruit
 	url = https://github.com/google/fruit
@@ -22,3 +19,6 @@
 [submodule "src/third-party/cpptrace"]
 	path = src/third-party/cpptrace
 	url = https://github.com/jeremy-rifkin/cpptrace
+[submodule "src/third-party/spdlog"]
+	path = src/third-party/spdlog
+	url = https://github.com/gabime/spdlog

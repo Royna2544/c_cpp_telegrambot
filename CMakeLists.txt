@@ -272,7 +272,7 @@ function(tgbot_common_target TARGET_NAME)
   target_link_libraries(
     ${TARGET_NAME}
     PUBLIC ${TGBOT_PUBLIC_LIBS}
-    PRIVATE ${TGBOT_PRIVATE_LIBS} fmt::fmt-header-only
+    PRIVATE ${TGBOT_PRIVATE_LIBS} fmt::fmt-header-only spdlog::spdlog_header_only
     INTERFACE ${TGBOT_INTERFACE_LIBS})
 
   # Set RPATH for Unix-like systems
@@ -318,16 +318,16 @@ function(tgbot_library)
 
   # Collect public & private libs exactly once
   set(PUBLIC_LIBS ${LIB_LIBS})
-  set(PRIVATE_LIBS absl::log)
 
   if(LIB_STATIC)
     add_library(${LIB_NAME} STATIC ${LIB_SRCS})
     list(APPEND PUBLIC_LIBS ${PRIVATE_LIBS})
-    set(PRIVATE_LIBS)
   else()
-    add_library(${LIB_NAME} SHARED ${LIB_SRCS})
+    add_library(${LIB_NAME} ${LIB_SRCS})
     list(APPEND LIB_PUBLIC_INC ${EXPORTCONF_DIR})
   endif()
+
+  add_library(Proj::${LIB_NAME} ALIAS ${LIB_NAME})
 
   if(NOT LIB_NO_LIBPREFIX)
     if (WIN32)
@@ -378,7 +378,7 @@ function(tgbot_exe)
 
   if(NOT EXE_NO_MAIN_WRAPPER)
     list(APPEND EXE_SRCS ${CMAKE_SOURCE_DIR}/src/logging/WrapMain.cpp)
-    list(APPEND EXE_LIBS LogInit absl::log)
+    list(APPEND EXE_LIBS LogInit spdlog)
   endif()
 
   if(EXE_OPTIONAL)
@@ -418,33 +418,6 @@ if(ENABLE_RUST_SUPPORT)
   add_subdirectory(src/third-party/corrosion)
   corrosion_import_crate(MANIFEST_PATH src/rust/stringcalc/Cargo.toml)
 endif()
-# ##############################################################################
-
-# ############################ Check lib #############################
-find_package(Protobuf)
-find_package(fmt REQUIRED)
-find_package(jsoncpp REQUIRED) # Required by tgbot-cpp anyways...
-find_package(CURL REQUIRED)
-# If we couldn't find protobuf.
-if(NOT Protobuf_FOUND)
-  if(MSVC)
-    # If MSVC, use vcpkg's absl always.
-    find_package(absl REQUIRED)
-  else()
-    # Then we can just include source-abseil
-    message(STATUS "Using abseil-cpp as submodule")
-    set(ABSL_PROPAGATE_CXX_STD ON)
-    set(ABSL_BUILD_TEST_HELPERS OFF)
-    set(ABSL_ENABLE_INSTALL ON)
-    set(BUILD_SHARED_LIBS ON)
-    add_subdirectory(src/third-party/abseil-cpp)
-    unset(BUILD_SHARED_LIBS)
-  endif()
-else()
-  # If there was, then we can cause collision with the system abseil
-  find_package(absl REQUIRED)
-endif()
-# ##############################################################################
 
 # Configure Ccache if available
 find_program(CCACHE_FOUND ccache)
@@ -477,8 +450,14 @@ else()
   set_target_properties(dl PROPERTIES IMPORTED_LOCATION "${DL}")
 endif()
 
+# Find two required libraries
+find_package(fmt CONFIG REQUIRED)
+find_package(jsoncpp CONFIG REQUIRED)
+
 # Used by libzstd in cpptrace
 set(ANDROID_PLATFORM_LEVEL 35)
+# Use external fmt::fmt-header-only
+set(SPDLOG_FMT_EXTERNAL_HO ON)
 
 add_subdirectory(src/api)
 add_subdirectory(src/database)
@@ -492,6 +471,7 @@ add_subdirectory(src/libos)
 add_subdirectory(src/third-party/tgbot-cpp)
 add_subdirectory(src/third-party/cpptrace)
 add_subdirectory(src/third-party/fruit)
+add_subdirectory(src/third-party/spdlog)
 find_package(Python3 QUIET)
 if(Python3_FOUND)
   message(STATUS "Enabling cpp-httplib compilation")
@@ -521,8 +501,6 @@ tgbot_library(
   Regex
   SRCS
   src/global_handlers/RegEXHandler.cpp
-  LIBS
-  absl::status
   STATIC)
 
 tgbot_library(
@@ -566,7 +544,6 @@ tgbot_exe(
   SocketComponents
   sighandler
   Api
-  ApiComponents
   ThreadManager
   RELATION
   Main)

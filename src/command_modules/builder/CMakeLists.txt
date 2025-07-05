@@ -77,7 +77,6 @@ tgbot_library(
   SystemInfo.cpp
   PollWrap.cpp
   LIBS
-  LogInit
   sighandler
   progress
   Boost::headers

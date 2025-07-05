@@ -1,42 +1,10 @@
-#include "AbslLogInit.hpp"
-#include <absl/log/log.h>
+#include <spdlog/spdlog.h>
 
 extern int app_main(int argc, char** argv);
 int main(int argc, char** argv) {
-   TgBot_AbslLogInit();
-   LOG(INFO) << "Launching " << argv[0] << " with " << argc << " args";
+#ifndef NDEBUG
+   spdlog::set_level(spdlog::level::debug);
+#endif
+   spdlog::info("Launching {} with {} args", argv[0], argc);
    return app_main(argc, argv);
 }
-
-#include <absl/log/internal/log_message.h>
-#include <absl/base/config.h>
-
-namespace absl {
-
-ABSL_NAMESPACE_BEGIN
-
-namespace log_internal {
-
-template LogMessage& LogMessage::operator<<(const char& v);
-template LogMessage& LogMessage::operator<<(const signed char& v);
-template LogMessage& LogMessage::operator<<(const unsigned char& v);
-template LogMessage& LogMessage::operator<<(const short& v);           // NOLINT
-template LogMessage& LogMessage::operator<<(const unsigned short& v);  // NOLINT
-template LogMessage& LogMessage::operator<<(const int& v);
-template LogMessage& LogMessage::operator<<(const unsigned int& v);
-template LogMessage& LogMessage::operator<<(const long& v);           // NOLINT
-template LogMessage& LogMessage::operator<<(const unsigned long& v);  // NOLINT
-template LogMessage& LogMessage::operator<<(const long long& v);      // NOLINT
-template LogMessage& LogMessage::operator<<(
-    const unsigned long long& v);  // NOLINT
-template LogMessage& LogMessage::operator<<(void* const& v);
-template LogMessage& LogMessage::operator<<(const void* const& v);
-template LogMessage& LogMessage::operator<<(const float& v);
-template LogMessage& LogMessage::operator<<(const double& v);
-template LogMessage& LogMessage::operator<<(const bool& v);
-
-}  // namespace log_internal
-
-ABSL_NAMESPACE_END
-
-}  // namespace absl

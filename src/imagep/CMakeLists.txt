@@ -47,6 +47,5 @@ tgbot_library(
   ${OpenCV_INCLUDE_DIRS}
   LIBS
   ${IMGPROC_LIBS}
-  absl::status
   DEFS
   ${IMGPROC_FLAGS})

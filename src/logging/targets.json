@@ -1,0 +1,7 @@
+[{
+   "type": "executable",
+   "name": "logcat",
+   "srcs": [ "LoggingClient.cpp" ],
+   "libraries": ["sighandler", "Utils", "Socket"],
+   "relation": "Socket"
+}]

@@ -13,8 +13,6 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include <AbslLogInit.hpp>
-#include <LogSinks.hpp>
 #include <algorithm>
 #include <array>
 #include <cerrno>
@@ -34,29 +32,6 @@
 
 #include "Shmem.hpp"
 #include "utils/Env.hpp"
-
-struct FDLogSink : public absl::LogSink {
-    void Send(const absl::LogEntry& logSink) override {
-        if (isWritable) {
-            const std::string newLine =
-                fmt::format("SubProcess (PID: {}, TID: {}): {}", pid_, gettid(),
-                            logSink.text_message_with_prefix_and_newline());
-            write(stdout_fd, newLine.c_str(), newLine.size());
-        }
-    }
-    explicit FDLogSink() : stdout_fd(::dup(STDOUT_FILENO)), pid_(getpid()) {
-        if (stdout_fd < 0) {
-            PLOG(ERROR) << "Failed to duplicate stdout";
-            isWritable = false;
-        }
-    }
-    ~FDLogSink() override { ::close(stdout_fd); }
-
-   private:
-    int stdout_fd;
-    bool isWritable = true;
-    pid_t pid_;
-};
 
 #ifdef __x86_64__
 #define ENABLE_PTRACE_HOOK
@@ -277,9 +252,6 @@ bool ForkAndRun::execute() {
             DeferredExit exit;
             {
                 // Switch to subprocess logging
-                TgBot_AbslLogDeInit();
-                RAIILogSink<FDLogSink> logSink;
-
                 dup2(stdout_pipe.writeEnd(), STDOUT_FILENO);
                 dup2(stderr_pipe.writeEnd(), STDERR_FILENO);
                 close(stdout_pipe.readEnd());
