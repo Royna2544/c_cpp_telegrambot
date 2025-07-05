@@ -56,7 +56,6 @@ function(command_module)
   tgbot_common_target(
     ${libname}
     PUBLIC_LIBS
-    Api
     absl::log
     ${CMD_LIBS}
     PRIVATE_INC

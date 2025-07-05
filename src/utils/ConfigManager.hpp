@@ -24,7 +24,6 @@ class UTILS_EXPORT ConfigManager {
         SOCKET_CFG,
         GITHUB_TOKEN,
         OPTIONAL_COMPONENTS,
-        VIRUSTOTAL_API_KEY,
         BUILDBUDDY_API_KEY,
         MAX
     };
@@ -109,13 +108,6 @@ class UTILS_EXPORT ConfigManager {
             Configs::OPTIONAL_COMPONENTS,
             "OPTIONAL_COMPONENTS",
             "Enable optional components (webserver/datacollector)",
-            Entry::ALIAS_NONE,
-            Entry::ArgType::STRING,
-        },
-        {
-            Configs::VIRUSTOTAL_API_KEY,
-            "VIRUSTOTAL_API_KEY",
-            "VirusTotal API key",
             Entry::ALIAS_NONE,
             Entry::ArgType::STRING,
         },

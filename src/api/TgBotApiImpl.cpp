@@ -14,7 +14,6 @@
 #include <api/TgBotApiImpl.hpp>
 #include <api/Utils.hpp>
 #include <api/components/ChatJoinRequest.hpp>
-#include <api/components/FileCheck.hpp>
 #include <api/components/ModuleManagement.hpp>
 #include <api/components/OnAnyMessage.hpp>
 #include <api/components/OnCallbackQuery.hpp>
@@ -582,14 +581,6 @@ TgBotApiImpl::TgBotApiImpl(const std::string_view token, AuthContext* auth,
         this, providers->cmdline->getPath(FS::PathType::CMD_MODULES));
     // Restart command
     restartCommand = std::make_unique<RestartCommand>(this);
-
-    // File Checker using VirusTotal
-    if (auto token =
-            providers->config->get(ConfigManager::Configs::VIRUSTOTAL_API_KEY);
-        token) {
-        LOG(INFO) << "Initalizing VirusTotal based file checker";
-        virusChecker = std::make_unique<FileCheck>(this, token.value());
-    }
 }
 
 TgBotApiImpl::~TgBotApiImpl() = default;

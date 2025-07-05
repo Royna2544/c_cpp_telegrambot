@@ -566,7 +566,6 @@ tgbot_exe(
   SocketComponents
   sighandler
   Api
-  ApiComponents
   ThreadManager
   RELATION
   Main)
