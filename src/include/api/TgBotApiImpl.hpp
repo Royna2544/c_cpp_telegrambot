@@ -16,7 +16,6 @@
 #include "RateLimit.hpp"
 #include "StringResLoader.hpp"
 #include "TgBotApi.hpp"
-#include "components/FileCheck.hpp"
 #include "typedefs.h"
 
 using TgBot::Animation;
@@ -73,8 +72,6 @@ class TgBotApiImpl : public TgBotApi {
     class RestartCommand;
     friend class RestartCommand;
     std::unique_ptr<RestartCommand> restartCommand;
-
-    std::unique_ptr<FileCheck> virusChecker;
 
     // Interface for listening to command unload/reload
     struct CommandListener {
