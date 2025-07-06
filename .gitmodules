@@ -22,3 +22,6 @@
 [submodule "src/third-party/cpptrace"]
 	path = src/third-party/cpptrace
 	url = https://github.com/jeremy-rifkin/cpptrace
+[submodule "src/third-party/sol2"]
+	path = src/third-party/sol2
+	url = https://github.com/ThePhD/sol2

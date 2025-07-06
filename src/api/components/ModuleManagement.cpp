@@ -28,7 +28,7 @@ bool TgBotApiImpl::ModulesManagement::load(CommandModule::Ptr module) {
             LOG(ERROR) << "Failed to load module";
             return false;
         }
-        moduleName = module->_module->name;
+        moduleName = module->info.name;
         if (_handles.contains(moduleName)) {
             LOG(WARNING) << fmt::format("Module with name {} already loaded. REJECT", moduleName);
             return false;
@@ -55,7 +55,7 @@ bool TgBotApiImpl::ModulesManagement::load(const std::string& name) {
     }
 
     auto authflags = AuthContext::Flags::REQUIRE_USER;
-    if (!_handles.at(name)->_module->isEnforced()) {
+    if (!_handles.at(name)->info.isEnforced()) {
         authflags |= AuthContext::Flags::PERMISSIVE;
     }
 
@@ -93,10 +93,15 @@ bool TgBotApiImpl::ModulesManagement::loadAll(
     LOG(INFO) << "Loading commands from " << directory;
     for (const auto& it : std::filesystem::directory_iterator(directory, ec)) {
         const auto filename = it.path().filename();
-        if (filename.string().starts_with(CommandModule::prefix) &&
+        if (filename.string().starts_with(DynCommandModule::prefix) &&
             filename.extension() == FS::kDylibExtension) {
-            load(std::make_unique<CommandModule>(it));
+            load(std::make_unique<DynCommandModule>(it));
         }
+#ifdef HAVE_LUA
+        if (filename.extension() == ".lua") {
+            load(std::make_unique<LuaCommandModule>(it));
+        }
+#endif
     }
     if (ec) {
         LOG(ERROR) << "Failed to iterate through modules: " << ec.message();
@@ -105,11 +110,11 @@ bool TgBotApiImpl::ModulesManagement::loadAll(
     std::vector<TgBot::BotCommand::Ptr> buffer;
     buffer.reserve(_handles.size());
     for (const auto& [name, mod] : _handles) {
-        if (!mod->_module->isHideDescription()) {
+        if (!mod->info.isHideDescription()) {
             auto onecommand = std::make_shared<TgBot::BotCommand>();
-            onecommand->command = mod->_module->name;
-            onecommand->description = mod->_module->description;
-            if (mod->_module->isEnforced()) {
+            onecommand->command = mod->info.name;
+            onecommand->description = mod->info.description;
+            if (mod->info.isEnforced()) {
                 onecommand->description += " (Owner)";
             }
             buffer.emplace_back(onecommand);

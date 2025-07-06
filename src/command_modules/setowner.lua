@@ -2,7 +2,6 @@
 command = {
     name = "setowner",
     description = "Sets the bot owner if not already set",
-    usage = "/setowner",
     permissive = true,
     hide_description = true
 }

@@ -5,6 +5,7 @@ command_module(
   kernelbuild.cpp
   LIBS
   KernelBuilder-cpp
+  AuthApi
   Utils
   PLATFORM
   "Linux")

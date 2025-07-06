@@ -1,5 +1,6 @@
 #pragma once
 
+#include <api/StringResLoader.hpp>
 #include <filesystem>
 #include <functional>
 #include <limits>
@@ -8,7 +9,6 @@
 #include <string_view>
 #include <type_traits>
 
-#include <api/StringResLoader.hpp>
 #include "api/MessageExt.hpp"
 #include "api/Providers.hpp"
 #include "api/TgBotApi.hpp"
@@ -21,22 +21,21 @@ class CommandModule;
 
 #ifdef _WIN32
 #define DYN_COMMAND_EXPORT __declspec(dllexport)
-#else //#if __GNUC__ > 4 || defined __clang__ but C++20 codebase.
+#else  // #if __GNUC__ > 4 || defined __clang__ but C++20 codebase.
 #define DYN_COMMAND_EXPORT [[gnu::visibility("default")]]
 #endif
 
 // Command handler helper macros
 #define COMMAND_HANDLER_NAME(cmd) handle_command_##cmd
-#define DECLARE_COMMAND_HANDLER(cmd)                   \
-    void COMMAND_HANDLER_NAME(cmd)(                    \
-        TgBotApi::Ptr api, MessageExt * message,       \
-        const StringResLoader::PerLocaleMap* res, \
-        const Providers* provider)
+#define DECLARE_COMMAND_HANDLER(cmd)                                         \
+    void COMMAND_HANDLER_NAME(cmd)(TgBotApi::Ptr api, MessageExt * message,  \
+                                   const StringResLoader::PerLocaleMap* res, \
+                                   const Providers* provider)
 
 struct DynModule {
-    using command_callback_t = void (*)(
-        TgBotApi::Ptr api, MessageExt *,
-        const StringResLoader::PerLocaleMap*, const Providers* provider);
+    using command_callback_t = void (*)(TgBotApi::Ptr api, MessageExt*,
+                                        const StringResLoader::PerLocaleMap*,
+                                        const Providers* provider);
 
     enum class Flags { None = 0, Enforced = 1 << 0, HideDescription = 1 << 1 };
 
@@ -82,6 +81,7 @@ struct DynModule {
         using Split = ::SplitMessageText;
         Split split_type;
         // Usage information for the command.
+        // Optional
         const char* usage;
     };
 
@@ -90,10 +90,6 @@ struct DynModule {
     const char* description;
     command_callback_t function;
     ValidArgs valid_args;
-
-    // Trival accessors.
-    [[nodiscard]] bool isEnforced() const;
-    [[nodiscard]] bool isHideDescription() const;
 };
 
 inline bool operator&(const DynModule::Flags& lhs,
@@ -107,16 +103,85 @@ inline constexpr DynModule::Flags operator|(
                                          static_cast<int>(rhs));
 }
 
+// Command Module Base
 class CommandModule {
    public:
     using Ptr = std::unique_ptr<CommandModule>;
     using command_callback_t =
         std::function<std::remove_pointer_t<DynModule::command_callback_t>>;
 
-    static constexpr std::string_view prefix = "libcmd_";
-
     // Module information.
-    DynModule* _module = nullptr;
+    struct Info {
+        std::string name;
+        std::string description;
+        DynModule::Flags flags;
+        command_callback_t function;
+        struct ValidArgs {
+            // Is it enabled?
+            bool enabled;
+            // Int mask to the valid argument counts.
+            DynModule::argcount_mask_t counts;
+            // Split type to obtain arguments.
+            ::SplitMessageText split_type;
+            // Usage information for the command.
+            std::string usage;
+        } valid_args;
+
+        explicit Info(const DynModule* dyn)
+            : name(dyn->name),
+              description(dyn->description),
+              flags(dyn->flags),
+              function(dyn->function) {
+            valid_args.enabled = dyn->valid_args.enabled;
+            if (!valid_args.enabled) {
+                return;
+            }
+
+            valid_args.counts = dyn->valid_args.counts;
+            valid_args.split_type = dyn->valid_args.split_type;
+            if (dyn->valid_args.usage) valid_args.usage = dyn->valid_args.usage;
+        }
+        Info() = default;
+        // Trival accessors.
+        [[nodiscard]] bool isEnforced() const {
+            return flags & DynModule::Flags::Enforced;
+        }
+        [[nodiscard]] bool isHideDescription() const {
+            return flags & DynModule::Flags::HideDescription;
+        }
+    } info;
+
+    /**
+     * @brief Loads the command module from the specified file path.
+     *
+     * This function attempts to load the command module from the given file
+     * path.
+     *
+     * @return true if the command module is successfully loaded; false
+     * otherwise.
+     */
+    virtual bool load() = 0;
+
+    /**
+     * @brief Unloads the command module.
+     *
+     * @return true if the command module is successfully unloaded; false
+     * otherwise.
+     */
+    virtual bool unload() = 0;
+
+    // Trival accessors.
+    [[nodiscard]] virtual bool isLoaded() const = 0;
+
+    virtual ~CommandModule() = default;
+};
+
+// .so based (binary) command module
+class DynCommandModule : public CommandModule {
+   public:
+    using Ptr = std::unique_ptr<DynCommandModule>;
+
+    static constexpr std::string_view prefix = "libcmd_";
 
    private:
     // dlclose RAII handle
@@ -124,9 +189,9 @@ class CommandModule {
     std::filesystem::path filePath;
 
     /**
-     * @brief Constructs a new instance of CommandModule.
+     * @brief Constructs a new instance of DynCommandModule.
      *
-     * This constructor initializes a new CommandModule object with the given
+     * This constructor initializes a new DynCommandModule object with the given
      * file path. The filePath parameter specifies the path to the shared
      * library file containing the command module implementation.
      *
@@ -134,7 +199,7 @@ class CommandModule {
      * command module implementation.
      */
    public:
-    explicit CommandModule(std::filesystem::path filePath);
+    explicit DynCommandModule(std::filesystem::path filePath);
 
     /**
      * @brief Loads the command module from the specified file path.
@@ -147,7 +212,7 @@ class CommandModule {
      * @return true if the command module is successfully loaded; false
      * otherwise.
      */
-    bool load();
+    bool load() override;
 
     /**
      * @brief Unloads the command module.
@@ -158,8 +223,60 @@ class CommandModule {
      * @return true if the command module is successfully unloaded; false
      * otherwise.
      */
-    bool unload();
+    bool unload() override;
 
     // Trival accessors.
-    [[nodiscard]] bool isLoaded() const;
+    [[nodiscard]] bool isLoaded() const override;
+
+    ~DynCommandModule() override = default;
 };
+
+#ifdef HAVE_LUA
+// .lua based command module
+class LuaCommandModule : public CommandModule {
+   public:
+    using Ptr = std::unique_ptr<LuaCommandModule>;
+
+   private:
+    struct Context;
+    std::unique_ptr<Context> _context;
+
+    /**
+     * @brief Constructs a new instance of LuaCommandModule.
+     *
+     * This constructor initializes a new LuaCommandModule object with the given
+     * file path. The filePath parameter specifies the path to the script file
+     * containing the command module implementation.
+     *
+     * @param filePath The path to the script file containing the
+     * command module implementation.
+     */
+   public:
+    explicit LuaCommandModule(std::filesystem::path filePath);
+
+    /**
+     * @brief Loads the command module from the specified file path.
+     *
+     * This function attempts to load the command module from the given file
+     * path. It opens the script file, initializes the
+     * command module.
+     *
+     * @return true if the command module is successfully loaded; false
+     * otherwise.
+     */
+    bool load() override;
+
+    /**
+     * @brief Unloads the command module.
+     *
+     * @return true if the command module is successfully unloaded; false
+     * otherwise.
+     */
+    bool unload() override;
+
+    // Trival accessors.
+    [[nodiscard]] bool isLoaded() const override;
+
+    ~LuaCommandModule() override;
+};
+#endif // defined HAVE_LUA

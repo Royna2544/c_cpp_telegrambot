@@ -37,7 +37,7 @@
 
 #include "tgbot/net/CurlHttpClient.h"
 
-bool TgBotApiImpl::validateValidArgs(const DynModule* module,
+bool TgBotApiImpl::validateValidArgs(const CommandModule::Info* module,
                                      MessageExt::Ptr message) {
     if (!module->valid_args.enabled) {
         return true;  // No validation needed.
@@ -70,7 +70,7 @@ bool TgBotApiImpl::validateValidArgs(const DynModule* module,
             strings.emplace_back(
                 fmt::format("arguments. But got {}.", args.size()));
 
-            if (module->valid_args.usage != nullptr) {
+            if (!module->valid_args.usage.empty()) {
                 strings.emplace_back(
                     fmt::format("Usage: {}", module->valid_args.usage));
             }
@@ -137,8 +137,8 @@ void TgBotApiImpl::commandHandler(const std::string& command,
     const auto* module = (*kModuleLoader)[command];
 
     // Create MessageExt object.
-    SplitMessageText how = module->_module->valid_args.enabled
-                               ? module->_module->valid_args.split_type
+    SplitMessageText how = module->info.valid_args.enabled
+                               ? module->info.valid_args.split_type
                                : SplitMessageText::None;
     auto ext = std::make_unique<MessageExt>(std::move(message), how);
 
@@ -148,14 +148,7 @@ void TgBotApiImpl::commandHandler(const std::string& command,
 
     if (!module->isLoaded()) {
         // Probably unloaded.
-        LOG(INFO) << "Command module is unloaded: " << module->_module->name;
-        return;
-    }
-
-    if (module->_module->function == nullptr) {
-        // Just in case.
-        LOG(ERROR) << "Command module does not have a function: "
-                   << module->_module->name;
+        LOG(INFO) << "Command module is unloaded: " << module->info.name;
         return;
     }
 
@@ -170,11 +163,11 @@ void TgBotApiImpl::commandHandler(const std::string& command,
     }
 
     // Partital offloading to common code.
-    if (!validateValidArgs(module->_module, ext.get())) {
+    if (!validateValidArgs(&module->info, ext.get())) {
         return;
     }
 
-    module->_module->function(this, ext.get(),
+    module->info.function(this, ext.get(),
                               _loader->at(ext->get<MessageAttrs::Locale>()),
                               _provider);
 }

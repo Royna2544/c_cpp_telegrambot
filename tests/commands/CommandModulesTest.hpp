@@ -174,7 +174,7 @@ class CommandTestBase : public CommandModulesTest {
             defaultProvidedMessage->text->size();
     }
     void execute() {
-        module->_module->function(
+        module->info.function(
             botApi,
             std::make_unique<MessageExt>(defaultProvidedMessage,
                                          SplitMessageText::ByWhitespace)

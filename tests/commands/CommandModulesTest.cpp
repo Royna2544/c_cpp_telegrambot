@@ -48,11 +48,11 @@ void CommandModulesTest::TearDown() {
 CommandModule::Ptr CommandModulesTest::loadModule(
     const std::string& name) const {
     std::filesystem::path moduleFileName =
-        fmt::format("{}{}", CommandModule::prefix, name);
+        fmt::format("{}{}", DynCommandModule::prefix, name);
     const auto moduleFilePath = modulePath / moduleFileName / FS::SharedLib;
 
     LOG(INFO) << "Loading module " << std::quoted(name) << " for testing...";
-    auto module = std::make_unique<CommandModule>(moduleFilePath);
+    auto module = std::make_unique<DynCommandModule>(moduleFilePath);
 
     auto ret = module->load();
     EXPECT_TRUE(ret);

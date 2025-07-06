@@ -25,6 +25,7 @@
 - Protobuf - Used for another database backend - [Link](https://github.com/protocolbuffers/protobuf)
 - TgBot-cpp - Core library for being a Telegram bot - [Link](https://github.com/reo7sp/tgbot-cpp)
 - CppTrace - C++ Backtrace Library - [Link](https://github.com/jeremy-rifkin/cpptrace)
+- Sol2 - C++ and Lua integration - [Link](https://github.com/ThePhD/sol2)
 
 ## Goals
 - There is no goal - I will just add stuff whichever I could and learn those while writing code for it
