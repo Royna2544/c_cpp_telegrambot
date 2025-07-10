@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.14)
-project(TgBot++ LANGUAGES CXX C)
+project(TgBot++ LANGUAGES CXX C VERSION 1.0.0)
 
-# CMake 3.25 added LINUX variable
 if(CMAKE_VERSION VERSION_LESS "3.25")
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(LINUX
@@ -336,6 +335,7 @@ function(tgbot_library)
        set_target_properties(${LIB_NAME} PROPERTIES PREFIX "${CMAKE_SHARED_LIBRARY_PREFIX}TgBot")
     endif()
   endif()
+  set_target_properties(${LIB_NAME} PROPERTIES VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR})
 
   if(NOT LIB_NO_HIDE)
     set_target_properties(${LIB_NAME} PROPERTIES CXX_VISIBILITY_PRESET hidden
@@ -593,8 +593,8 @@ install(
 file(COPY resources/ DESTINATION ${CMAKE_BINARY_DIR}/share/${PROJECT_NAME})
 
 # Set CPack configurations
-set(CPACK_PACKAGE_NAME "TgBot++")
-set(CPACK_PACKAGE_VERSION "1.0.0")
+set(CPACK_PACKAGE_NAME "Telegram Bot Server in C++")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "A Telegram bot coded in C++")
 set(CPACK_PACKAGE_CONTACT "support@example.com")
 set(CPACK_GENERATOR "ZIP;TGZ")
