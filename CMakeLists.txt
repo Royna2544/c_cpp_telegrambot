@@ -152,11 +152,6 @@ if(WIN32)
     list(APPEND GLOBAL_DEFINITIONS NOMINMAX)
   endif()
 endif()
-if(NOT MSVC)
-  list(APPEND GLOBAL_COMPILE_OPTIONS
-       -fmacro-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/=)
-  list(APPEND GLOBAL_COMPILE_OPTIONS -Wno-unused-parameter)
-endif()
 
 # Build Type
 list(APPEND GLOBAL_DEFINITIONS BUILD_TYPE_STR="${CMAKE_BUILD_TYPE}")
