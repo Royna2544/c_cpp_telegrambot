@@ -66,9 +66,9 @@ bool LuaCommandModule::load() {
             [provider](const std::string& k, sol::this_state L) -> sol::object {
                 if (k == "owner_id") {
                     auto val = provider->database->getOwnerUserId();
-                    return val ? sol::make_object(L, *val) : sol::nil;
+                    return val ? sol::make_object(L, *val) : sol::lua_nil;
                 }
-                return sol::nil;
+                return sol::lua_nil;
             });
         db.set_function("set", [provider](const std::string& k, sol::object v) {
             if (v.is<int>())
