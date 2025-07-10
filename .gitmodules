@@ -25,3 +25,6 @@
 [submodule "src/third-party/sol2"]
 	path = src/third-party/sol2
 	url = https://github.com/ThePhD/sol2
+[submodule "src/third-party/lua"]
+	path = src/api/liblua
+	url = https://github.com/lua/lua
