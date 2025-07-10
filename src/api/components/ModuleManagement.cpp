@@ -30,7 +30,8 @@ bool TgBotApiImpl::ModulesManagement::load(CommandModule::Ptr module) {
         }
         moduleName = module->info.name;
         if (_handles.contains(moduleName)) {
-            LOG(WARNING) << fmt::format("Module with name {} already loaded. REJECT", moduleName);
+            LOG(WARNING) << fmt::format(
+                "Module with name {} already loaded. REJECT", moduleName);
             return false;
         }
         _handles.emplace(moduleName, std::move(module));
@@ -95,13 +96,14 @@ bool TgBotApiImpl::ModulesManagement::loadAll(
         const auto filename = it.path().filename();
         if (filename.string().starts_with(DynCommandModule::prefix) &&
             filename.extension() == FS::kDylibExtension) {
-            load(std::make_unique<DynCommandModule>(it));
+            if (load(std::make_unique<DynCommandModule>(it))) continue;
         }
 #ifdef HAVE_LUA
         if (filename.extension() == ".lua") {
-            load(std::make_unique<LuaCommandModule>(it));
+            if (load(std::make_unique<LuaCommandModule>(it))) continue;
         }
 #endif
+        LOG(WARNING) << "Cannot load " << filename;
     }
     if (ec) {
         LOG(ERROR) << "Failed to iterate through modules: " << ec.message();
@@ -127,8 +129,8 @@ bool TgBotApiImpl::ModulesManagement::loadAll(
                                   e.what());
         return false;
     } catch (const TgBot::NetworkException& e) {
-        LOG(ERROR) << fmt::format("Network error on updating bot commands list: {}",
-                                  e.what());
+        LOG(ERROR) << fmt::format(
+            "Network error on updating bot commands list: {}", e.what());
         return false;
     }
     return true;
@@ -139,7 +141,6 @@ TgBotApiImpl::ModulesManagement::ModulesManagement(
     : _api(api), commandAsync("commands", 2) {
     loadAll(modules_dir);
 }
-
 
 TgBotApiImpl::ModulesManagement::~ModulesManagement() {
     LOG(INFO) << "Unloading total " << _handles.size() << " modules";
