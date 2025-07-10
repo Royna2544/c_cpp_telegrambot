@@ -333,7 +333,7 @@ function(tgbot_library)
     if (WIN32)
        set_target_properties(${LIB_NAME} PROPERTIES PREFIX "${CMAKE_SHARED_LIBRARY_PREFIX}Telegram.Bot.")
     else()
-       set_target_properties(${LIB_NAME} PROPERTIES PREFIX "${CMAKE_SHARED_LIBRARY_PREFIX}Tgbot")
+       set_target_properties(${LIB_NAME} PROPERTIES PREFIX "${CMAKE_SHARED_LIBRARY_PREFIX}TgBot")
     endif()
   endif()
 
