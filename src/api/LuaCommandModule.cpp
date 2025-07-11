@@ -16,13 +16,74 @@ struct LuaCommandModule::Context {
 
 LuaCommandModule::LuaCommandModule(std::filesystem::path filePath)
     : _context(std::make_unique<Context>()) {
-    _context->lua.open_libraries(sol::lib::base);
     _context->filePath = std::move(filePath);
 }
 
 LuaCommandModule::~LuaCommandModule() = default;
 
+void binds(TgBotApi::Ptr api, MessageExt* message,
+           const StringResLoader::PerLocaleMap* res, const Providers* provider,
+           sol::state_view& lua) {
+    // bind message object
+    /*───────────────────  message table  ───────────────────*/
+    sol::table msg = lua.create_table();
+    msg["chat_id"] = message->get<MessageAttrs::Chat>()->id;
+    msg["message_id"] = message->get<MessageAttrs::MessageId>();
+    msg["date"] = message->message()->date;  // seconds since epoch
+    lua["message"] = msg;
+
+    /*───────────────────  time helpers  ────────────────────*/
+    using namespace std::chrono;
+    lua["now"] = []() -> double {
+        return duration_cast<seconds>(system_clock::now().time_since_epoch())
+            .count();
+    };
+    lua["now_ms"] = []() -> std::uint64_t {
+        return duration_cast<milliseconds>(
+                   steady_clock::now().time_since_epoch())
+            .count();
+    };
+
+    /*───────────────────  bot helpers  ─────────────────────*/
+    lua["reply"] = [api, message, &lua](const std::string& txt) {
+        auto m = api->sendReplyMessage(message->message(), txt);
+
+        sol::table t = lua.create_table();
+        t["chat_id"] = m->chat->id;
+        t["message_id"] = m->messageId;
+        t["date"] = static_cast<double>(m->date);
+        return t;  // returned to Lua
+    };
+
+    lua["edit"] = [api](sol::table m, const std::string& txt) {
+        TgBot::Message::Ptr ph = std::make_shared<TgBot::Message>();
+        ph->chat = std::make_shared<TgBot::Chat>();
+        ph->chat->id = m["chat_id"];
+        ph->messageId = m["message_id"];
+        api->editMessage(ph, txt);
+    };
+
+    // bind db helper
+    sol::table db = lua.create_table();
+    db.set_function(
+        "get",
+        [provider](const std::string& k, sol::this_state L) -> sol::object {
+            if (k == "owner_id") {
+                auto val = provider->database->getOwnerUserId();
+                return val ? sol::make_object(L, *val) : sol::lua_nil;
+            }
+            return sol::lua_nil;
+        });
+    db.set_function("set", [provider](const std::string& k, sol::object v) {
+        if (v.is<int>())
+            if (k == "owner_id")
+                provider->database->setOwnerUserId(v.as<int>());
+    });
+    lua["db"] = db;
+}
+
 bool LuaCommandModule::load() {
+    _context->lua.open_libraries(sol::lib::base, sol::lib::string, sol::lib::os);
     // Load script file
     try {
         _context->lua.script_file(_context->filePath.string());
@@ -55,29 +116,15 @@ bool LuaCommandModule::load() {
 
         if (!c->isLoaded) return;
 
-        lua["reply"] = [api, message](const std::string_view text) {
-            api->sendReplyMessage(message->message(), text);
-        };
+        binds(api, message, res, provider, lua);
 
-        // bind db helper
-        sol::table db = lua.create_table();
-        db.set_function(
-            "get",
-            [provider](const std::string& k, sol::this_state L) -> sol::object {
-                if (k == "owner_id") {
-                    auto val = provider->database->getOwnerUserId();
-                    return val ? sol::make_object(L, *val) : sol::lua_nil;
-                }
-                return sol::lua_nil;
-            });
-        db.set_function("set", [provider](const std::string& k, sol::object v) {
-            if (v.is<int>())
-                if (k == "owner_id")
-                    provider->database->setOwnerUserId(v.as<int>());
-        });
-        lua["db"] = db;
-
-        lua["run"]();
+        try {
+            lua["run"]();
+        } catch (const sol::error& ex) {
+            LOG(ERROR) << ex.what();
+            api->sendReplyMessage(message->message(),
+                                  res->get(Strings::BACKEND_ERROR));
+        }
     };
 
     DLOG(INFO) << "Loaded Lua script: " << _context->filePath;
