@@ -8,8 +8,10 @@ void TgBotApiImpl::Async::emplaceTask(std::string command,
     condVariable.notify_one();
 }
 
-TgBotApiImpl::Async::Async(std::string name, const int count) : _name(std::move(name)) {
-    DLOG(INFO) << fmt::format("Starting AsyncThreads '{}', count: {}", _name, count);
+TgBotApiImpl::Async::Async(std::string name, const int count)
+    : _name(std::move(name)) {
+    DLOG(INFO) << fmt::format("Starting AsyncThreads '{}', count: {}", _name,
+                              count);
     for (int i = 0; i < count; ++i) {
         threads.emplace_back([this]() { threadFunction(); });
     }
@@ -42,8 +44,14 @@ void TgBotApiImpl::Async::threadFunction() {
                 front.second.get();
             } catch (const TgBot::TgException& e) {
                 LOG(ERROR) << fmt::format(
+                    "[AsyncConsumer] While handling command: {}: TgApi "
+                    "Exception: {}",
+                    front.first, e.what());
+            } catch (const std::exception& e) {
+                LOG(ERROR) << fmt::format(
                     "[AsyncConsumer] While handling command: {}: Exception: {}",
                     front.first, e.what());
+            } catch (...) {
             }
         }
     }
