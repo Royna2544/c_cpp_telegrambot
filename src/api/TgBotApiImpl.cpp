@@ -1,16 +1,18 @@
+#include <absl/log/log.h>
 #include <absl/strings/match.h>
 #include <dlfcn.h>
+#include <fmt/chrono.h>
 #include <fmt/format.h>
 #include <fmt/ranges.h>
 #include <trivial_helpers/_tgbot.h>
 
 #include <CommandLine.hpp>
 #include <ConfigManager.hpp>
+#include <DurationPoint.hpp>
 #include <GitBuildInfo.hpp>
 #include <api/Authorization.hpp>
 #include <api/CommandModule.hpp>
 #include <api/MessageExt.hpp>
-#include <api/TgBotApi.hpp>
 #include <api/TgBotApiImpl.hpp>
 #include <api/Utils.hpp>
 #include <api/components/ChatJoinRequest.hpp>
@@ -36,6 +38,26 @@
 #include <utility>
 
 #include "tgbot/net/CurlHttpClient.h"
+
+template <>
+struct fmt::formatter<CommandModule::Info::Type> : formatter<std::string_view> {
+    // parse is inherited from formatter<string_view>.
+    auto format(CommandModule::Info::Type c, format_context& ctx) const
+        -> format_context::iterator {
+        string_view name = "unknown";
+        switch (c) {
+            case CommandModule::Info::Type::SharedLib:
+                name = "SharedLib";
+                break;
+            case CommandModule::Info::Type::Lua:
+                name = "Lua";
+                break;
+            default:
+                break;
+        }
+        return formatter<string_view>::format(name, ctx);
+    }
+};
 
 bool TgBotApiImpl::validateValidArgs(const CommandModule::Info* module,
                                      MessageExt::Ptr message) {
@@ -167,9 +189,14 @@ void TgBotApiImpl::commandHandler(const std::string& command,
         return;
     }
 
+#ifndef NDEBUG
+    MilliSecondDP dp;
+#endif
     module->info.function(this, ext.get(),
-                              _loader->at(ext->get<MessageAttrs::Locale>()),
-                              _provider);
+                          _loader->at(ext->get<MessageAttrs::Locale>()),
+                          _provider);
+    DLOG(INFO) << fmt::format("Executing cmd {} took {} ({})", command, dp.get(),
+                             module->info.module_type);
 }
 
 void TgBotApiImpl::addCommandListener(CommandListener* listener) {

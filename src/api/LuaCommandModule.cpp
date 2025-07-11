@@ -17,6 +17,7 @@ struct LuaCommandModule::Context {
 LuaCommandModule::LuaCommandModule(std::filesystem::path filePath)
     : _context(std::make_unique<Context>()) {
     _context->filePath = std::move(filePath);
+    info.module_type = Info::Type::Lua;
 }
 
 LuaCommandModule::~LuaCommandModule() = default;

@@ -126,12 +126,18 @@ class CommandModule {
             // Usage information for the command.
             std::string usage;
         } valid_args;
+        enum class Type {
+            None,       // Unknown
+            SharedLib,  // .so based traditional
+            Lua         // Lua script
+        } module_type;
 
         explicit Info(const DynModule* dyn)
             : name(dyn->name),
               description(dyn->description),
               flags(dyn->flags),
-              function(dyn->function) {
+              function(dyn->function),
+              module_type(Type::SharedLib) {
             valid_args.enabled = dyn->valid_args.enabled;
             if (!valid_args.enabled) {
                 return;
@@ -142,6 +148,7 @@ class CommandModule {
             if (dyn->valid_args.usage) valid_args.usage = dyn->valid_args.usage;
         }
         Info() = default;
+
         // Trival accessors.
         [[nodiscard]] bool isEnforced() const {
             return flags & DynModule::Flags::Enforced;
@@ -279,4 +286,4 @@ class LuaCommandModule : public CommandModule {
 
     ~LuaCommandModule() override;
 };
-#endif // defined HAVE_LUA
+#endif  // defined HAVE_LUA
