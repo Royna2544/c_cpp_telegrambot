@@ -21,11 +21,15 @@ bool TgBotApiImpl::ModulesManagement::load(CommandModule::Ptr module) {
     {
         std::lock_guard<std::mutex> lock(mutex);
         if (module == nullptr) {
-            LOG(WARNING) << "Invalid module";
+            LOG(WARNING) << "module is null";
             return false;
         }
         if (!module->load()) {
             LOG(ERROR) << "Failed to load module";
+            return false;
+        }
+        if (module->info.name.empty() || module->info.description.empty()) {
+            LOG(ERROR) << "Empty name or description fleid";
             return false;
         }
         moduleName = module->info.name;
