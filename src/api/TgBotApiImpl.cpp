@@ -189,14 +189,14 @@ void TgBotApiImpl::commandHandler(const std::string& command,
         return;
     }
 
-#ifndef NDEBUG
-    MilliSecondDP dp;
-#endif
+    [[maybe_unused]] MilliSecondDP dp;
     module->info.function(this, ext.get(),
                           _loader->at(ext->get<MessageAttrs::Locale>()),
                           _provider);
-    DLOG(INFO) << fmt::format("Executing cmd {} took {} ({})", command, dp.get(),
-                             module->info.module_type);
+    if constexpr (buildinfo::isDebugBuild()) {
+        DLOG(INFO) << fmt::format("Executing cmd {} took {} ({})", command,
+                                  dp.get(), module->info.module_type);
+    }
 }
 
 void TgBotApiImpl::addCommandListener(CommandListener* listener) {
