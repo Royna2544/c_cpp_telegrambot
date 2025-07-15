@@ -1,7 +1,7 @@
 #include <absl/log/log.h>
 #include <tgbot/TgException.h>
 
-#include <api/Authorization.hpp>
+#include <api/AuthContext.hpp>
 #include <api/components/OnAnyMessage.hpp>
 #include <future>
 

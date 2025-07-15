@@ -21,7 +21,7 @@ TgBotApiImpl::RestartCommand::RestartCommand(TgBotApiImpl::Ptr api)
 }
 
 void TgBotApiImpl::RestartCommand::commandFunction(MessageExt::Ptr message) {
-    if (!_api->authorized(message, "restart", AuthContext::Flags::None)) {
+    if (!_api->authorized(message, "restart", AuthContext::AccessLevel::AdminUser)) {
         return;
     }
     if (!_api->isMyCommand(message)) {

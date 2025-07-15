@@ -3,7 +3,7 @@
 #include <trivial_helpers/_std_chrono_templates.h>
 #include <trivial_helpers/_tgbot.h>
 
-#include <api/Authorization.hpp>
+#include <api/AuthContext.hpp>
 #include <algorithm>
 #include <global_handlers/SpamBlock.hpp>
 #include <iterator>

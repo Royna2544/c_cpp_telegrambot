@@ -66,7 +66,7 @@ void SpamBlockManager::onDetected(ChatId chat, UserId user,
 }
 
 bool SpamBlockManager::shouldBeSkipped(const Message::Ptr &message) const {
-    if (_auth->isAuthorized(message, AuthContext::Flags::None)) {
+    if (_auth->isAuthorized(message, AuthContext::AccessLevel::AdminUser)) {
         return true;
     }
 

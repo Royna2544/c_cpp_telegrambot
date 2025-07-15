@@ -4,7 +4,7 @@
 #include <fmt/format.h>
 
 #include <algorithm>
-#include <api/Authorization.hpp>
+#include <api/AuthContext.hpp>
 #include <api/TgBotApi.hpp>
 #include <chrono>
 #include <concepts>

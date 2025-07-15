@@ -10,11 +10,11 @@ void TgBotApiImpl::OnInlineQueryImpl::onInlineQueryFunction(
     if (queryResults.empty()) {
         return;
     }
-    AuthContext::Flags flags = AuthContext::Flags::REQUIRE_USER;
+    AuthContext::AccessLevel flags = AuthContext::AccessLevel::AdminUser;
     bool canDoPrivileged = false;
     canDoPrivileged = _auth->isAuthorized(query->from, flags);
     if (!canDoPrivileged) {
-        flags |= AuthContext::Flags::PERMISSIVE;
+        flags = AuthContext::AccessLevel::User;
         bool canDoNonPrivileged = _auth->isAuthorized(query->from, flags);
         if (!canDoNonPrivileged) {
             return;  // no permission to answer.

@@ -4,7 +4,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include <api/Authorization.hpp>
+#include <api/AuthContext.hpp>
 #include <chrono>
 #include <database/bot/TgBotDatabaseImpl.hpp>
 #include <memory>
@@ -16,10 +16,7 @@ using testing::Return;
 
 struct AuthParam {
     UserId userId{};
-    struct {
-        bool permissive = false;
-        bool requireuser = false;
-    } flags;
+    AuthContext::AccessLevel level{};
     struct {
         bool ret = false;
         AuthContext::Result::Reason reason{};
@@ -49,10 +46,8 @@ std::ostream& operator<<(std::ostream& os, const AuthParam& Authparam) {
             os << "User(" << Authparam.userId << ")";
             break;
     }
-    os << " With flags: " << std::boolalpha;
-    os << "{ permissive: " << Authparam.flags.permissive;
-    os << ", requireuser: " << Authparam.flags.requireuser;
-    os << " }, Expected: ret=" << Authparam.expected.ret;
+    os << " With level: " << Authparam.level;
+    os << ", Expected: ret=" << Authparam.expected.ret;
     os << ", reason=" << Authparam.expected.reason;
     return os;
 }
@@ -61,7 +56,7 @@ fruit::Component<AuthContext, MockDatabase> getAuthComponent() {
     return fruit::createComponent().bind<DatabaseBase, MockDatabase>();
 }
 
-class AuthorizationTest : public ::testing::TestWithParam<AuthParam> {
+class AuthContextTest : public ::testing::TestWithParam<AuthParam> {
    protected:
     void SetUp() override {}
 
@@ -75,7 +70,7 @@ class AuthorizationTest : public ::testing::TestWithParam<AuthParam> {
     }
 
     // The new MockDatabase would be deleted by databaseImpl
-    AuthorizationTest()
+    AuthContextTest()
         : injector(getAuthComponent),
           database(injector.get<MockDatabase*>()),
           auth(injector.get<AuthContext*>()) {}
@@ -85,7 +80,7 @@ class AuthorizationTest : public ::testing::TestWithParam<AuthParam> {
     AuthContext* auth;
 };
 
-TEST_P(AuthorizationTest, expectedForMessagesInTime) {
+TEST_P(AuthContextTest, expectedForMessagesInTime) {
     const auto& Authparam = GetParam();
     auto message = std::make_shared<Message>();
     message->from = std::make_shared<TgBot::User>();
@@ -133,82 +128,65 @@ TEST_P(AuthorizationTest, expectedForMessagesInTime) {
     message->date =
         std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 
-    AuthContext::Flags flags{};
-    if (Authparam.flags.permissive) {
-        flags |= AuthContext::Flags::PERMISSIVE;
-    }
-    if (Authparam.flags.requireuser) {
-        flags |= AuthContext::Flags::REQUIRE_USER;
-    }
-    const auto res = auth->isAuthorized(message, flags);
+    const auto res = auth->isAuthorized(message, Authparam.level);
     if (Authparam.expected.ret) {
         EXPECT_TRUE(res);
-        EXPECT_EQ(res.reason, AuthContext::Result::Reason::OK);
+        EXPECT_EQ(res.result.second, AuthContext::Result::Reason::Ok);
     } else {
         EXPECT_FALSE(res);
-        EXPECT_EQ(res.reason, Authparam.expected.reason);
+        EXPECT_EQ(res.result.second, Authparam.expected.reason);
     }
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    AuthorizationTest, AuthorizationTest,
+    AuthContextTest, AuthContextTest,
     ::testing::Values(
-        // Permissive mode, require user, owner
+        // Owner access #AdminUser
         AuthParam{FAKE_OWNER_ID,
-                  {true, true},
-                  {true, AuthContext::Result::Reason::OK}},
+                  AuthContext::AccessLevel::AdminUser,
+                  {true, AuthContext::Result::Reason::Ok}},
 
-        // Permissive mode, require user, not owner
+        // RandomUser access #User
         AuthParam{FAKE_RANDOM_ID,
-                  {true, true},
-                  {true, AuthContext::Result::Reason::OK}},
+                  AuthContext::AccessLevel::User,
+                  {true, AuthContext::Result::Reason::Ok}},
 
-        // Permissive mode, no require user, owner
+        // Owner access #Unprotected
         AuthParam{FAKE_OWNER_ID,
-                  {true, false},
-                  {true, AuthContext::Result::Reason::OK}},
+                  AuthContext::AccessLevel::Unprotected,
+                  {true, AuthContext::Result::Reason::Ok}},
 
-        // Permissive mode, no require user, not owner
+        // RandomUser access #Unprotected
         AuthParam{FAKE_RANDOM_ID,
-                  {false, false},
-                  {false, AuthContext::Result::Reason::NOT_IN_WHITELIST}},
+                  AuthContext::AccessLevel::Unprotected,
+                  {true, AuthContext::Result::Reason::Ok}},
 
-        // Non-permissive mode, require user, owner
+        // Owner access #AdminUser
         AuthParam{FAKE_OWNER_ID,
-                  {false, true},
-                  {true, AuthContext::Result::Reason::OK}},
+                  AuthContext::AccessLevel::AdminUser,
+                  {true, AuthContext::Result::Reason::Ok}},
 
-        // Non-permissive mode, require user, not owner
+        // RandomUser access #AdminUser
         AuthParam{FAKE_RANDOM_ID,
-                  {false, true},
-                  {false, AuthContext::Result::Reason::NOT_IN_WHITELIST}},
+                  AuthContext::AccessLevel::AdminUser,
+                  {false, AuthContext::Result::Reason::PermissionDenied}},
 
-        // Non-permissive mode, no require user, owner
-        AuthParam{FAKE_OWNER_ID,
-                  {false, false},
-                  {true, AuthContext::Result::Reason::OK}},
-
-        // Non-permissive mode, no require user, not owner
-        AuthParam{FAKE_RANDOM_ID,
-                  {false, false},
-                  {false, AuthContext::Result::Reason::NOT_IN_WHITELIST}},
-
-        // Non-permissive mode, blacklisted user
+        // Blacklist access #User
         AuthParam{FAKE_BLACKLISTED_ID,
-                  {false, true},
-                  {false, AuthContext::Result::Reason::NOT_IN_WHITELIST}},
+                  AuthContext::AccessLevel::User,
+                  {false, AuthContext::Result::Reason::ForbiddenUser}},
 
-        // Permissive mode, whitelisted user
+        // Whitelist access #AdminUser
         AuthParam{FAKE_WHITELISTED_ID,
-                  {true, false},
-                  {true, AuthContext::Result::Reason::OK}},
+                  AuthContext::AccessLevel::AdminUser,
+                  {true, AuthContext::Result::Reason::Ok}},
 
-        // Permissive mode, blacklisted user
+        // Blacklist access #AdminUser
         AuthParam{FAKE_BLACKLISTED_ID,
-                  {true, true},
-                  {false, AuthContext::Result::Reason::BLACKLISTED_USER}},
+                  AuthContext::AccessLevel::AdminUser,
+                  {false, AuthContext::Result::Reason::ForbiddenUser}},
 
-        // Non-ermissive mode, whitelisted user
+        // WhiteList access #User
         AuthParam{FAKE_WHITELISTED_ID,
-                  {false, false},
-                  {true, AuthContext::Result::Reason::OK}}));
+                  AuthContext::AccessLevel::User,
+                  {true, AuthContext::Result::Reason::Ok}}));

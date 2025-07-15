@@ -108,7 +108,7 @@ bool DynCommandModule::load() {
 
         DLOG(INFO) << fmt::format("Module {}: enforced: {}, name: {}, fn: {}",
                                   filePath.filename().string(),
-                                  info.isEnforced(), _module->name,
+                                  info.isPrivileged(), _module->name,
                                   fmt::ptr(modulePtr));
     }
     handle = dlwrapper.underlying();

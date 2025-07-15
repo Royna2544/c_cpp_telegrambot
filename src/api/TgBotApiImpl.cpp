@@ -10,7 +10,7 @@
 #include <ConfigManager.hpp>
 #include <DurationPoint.hpp>
 #include <GitBuildInfo.hpp>
-#include <api/Authorization.hpp>
+#include <api/AuthContext.hpp>
 #include <api/CommandModule.hpp>
 #include <api/MessageExt.hpp>
 #include <api/TgBotApiImpl.hpp>
@@ -117,7 +117,7 @@ bool TgBotApiImpl::isMyCommand(const MessageExt::Ptr& message) const {
 
 bool TgBotApiImpl::authorized(const MessageExt::Ptr& message,
                               const std::string_view commandName,
-                              AuthContext::Flags flags) const {
+                              AuthContext::AccessLevel flags) const {
     const auto authRet = _auth->isAuthorized(message->message(), flags);
     if (authRet) {
         return true;
@@ -126,24 +126,21 @@ bool TgBotApiImpl::authorized(const MessageExt::Ptr& message,
     if (message->has<MessageAttrs::User>()) {
         LOG(INFO) << fmt::format("Unauthorized command {} from {}", commandName,
                                  message->get<MessageAttrs::User>());
-        switch (authRet.reason) {
-            case AuthContext::Result::Reason::UNKNOWN:
+        switch (authRet.result.second) {
+            case AuthContext::Result::Reason::Unknown:
                 LOG(INFO) << "Reason: Unknown";
                 break;
-            case AuthContext::Result::Reason::MESSAGE_TOO_OLD:
+            case AuthContext::Result::Reason::MessageTooOld:
                 LOG(INFO) << "Reason: Message is too old";
                 break;
-            case AuthContext::Result::Reason::BLACKLISTED_USER:
-                LOG(INFO) << "Reason: Blacklisted user";
+            case AuthContext::Result::Reason::ForbiddenUser:
+                LOG(INFO) << "Reason: Forbidden user (Blacklisted)";
                 break;
-            case AuthContext::Result::Reason::GLOBAL_FLAG_OFF:
-                LOG(INFO) << "Reason: Global flag is off";
+            case AuthContext::Result::Reason::PermissionDenied:
+                LOG(INFO) << "Reason: Permission denied (Not in whitelist)";
                 break;
-            case AuthContext::Result::Reason::NOT_IN_WHITELIST:
-                LOG(INFO) << "Reason: Not in whitelist";
-                break;
-            case AuthContext::Result::Reason::REQUIRES_USER:
-                LOG(INFO) << "Reason: Requires user";
+            case AuthContext::Result::Reason::UserIsBot:
+                LOG(INFO) << "Reason: Is a bot";
                 break;
             default:
                 break;
@@ -153,7 +150,7 @@ bool TgBotApiImpl::authorized(const MessageExt::Ptr& message,
 }
 
 void TgBotApiImpl::commandHandler(const std::string& command,
-                                  const AuthContext::Flags authflags,
+                                  const AuthContext::AccessLevel authflags,
                                   Message::Ptr message) {
     // Find the module first.
     const auto* module = (*kModuleLoader)[command];

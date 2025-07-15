@@ -9,7 +9,7 @@
 #include <string_view>
 #include <vector>
 
-#include "Authorization.hpp"
+#include "AuthContext.hpp"
 #include "CommandModule.hpp"
 #include "MessageExt.hpp"
 #include "Providers.hpp"
@@ -437,7 +437,7 @@ class TgBotApiImpl : public TgBotApi {
     bool unloadCommand(const std::string& command) override;
     bool reloadCommand(const std::string& command) override;
     void commandHandler(const std::string& command,
-                        AuthContext::Flags authflags, Message::Ptr message);
+                        AuthContext::AccessLevel authflags, Message::Ptr message);
     bool validateValidArgs(const CommandModule::Info * module, MessageExt::Ptr message);
 
     void addInlineQueryKeyboard(InlineQuery query,
@@ -465,7 +465,7 @@ class TgBotApiImpl : public TgBotApi {
 
     [[nodiscard]] bool authorized(const MessageExt::Ptr& message,
                                   const std::string_view commandName,
-                                  AuthContext::Flags flags) const;
+                                  AuthContext::AccessLevel flags) const;
 
     [[nodiscard]] bool isMyCommand(const MessageExt::Ptr& message) const;
 

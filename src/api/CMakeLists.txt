@@ -18,7 +18,7 @@ endif()
 tgbot_library(
   NAME Api
   SRCS
-    Authorization.cpp
+    AuthContext.cpp
     TgBotApiImpl.cpp
     DynCommandModule.cpp
     ${lua_src}
@@ -48,7 +48,7 @@ tgbot_library(
 
 tgbot_library(
   NAME AuthApi
-  SRCS Authorization.cpp
+  SRCS AuthContext.cpp
   LIBS DBImpl
   PUBLIC_INC $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>
   STATIC

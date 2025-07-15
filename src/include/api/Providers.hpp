@@ -5,7 +5,7 @@
 #include <random/Random.hpp>
 #include <trivial_helpers/fruit_inject.hpp>
 
-#include "Authorization.hpp"
+#include "AuthContext.hpp"
 #include "utils/CommandLine.hpp"
 #include "utils/ConfigManager.hpp"
 #include "utils/ResourceManager.hpp"

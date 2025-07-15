@@ -11,7 +11,7 @@
 
 struct SharedMalloc {
     using offset_type = int;
-    using size_type = size_t;
+    using size_type = long;
     using data_type = std::uint8_t;
 
     struct Parent {

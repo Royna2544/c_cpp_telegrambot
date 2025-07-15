@@ -65,85 +65,6 @@ class RegexHandlerInterface : public RegexHandler::Interface {
     Message::Ptr _message;
 };
 
-struct TgBotApiExHandler {
-    TgBotApi* api{};
-    AuthContext* auth{};
-    DatabaseBase* database{};
-    ThreadManager* thread{};
-    std::optional<SecondDP> exceptionDuration;
-
-    APPLE_INJECT(TgBotApiExHandler(TgBotApi* _api, AuthContext* _auth,
-                                   DatabaseBase* _database,
-                                   ThreadManager* _thread))
-        : api(_api), auth(_auth), database(_database), thread(_thread) {}
-
-    void handle(const TgBot::TgException& e) {
-        LOG(ERROR) << "Telegram API error: " << "{ Message: "
-                   << std::quoted(e.what())
-                   << ", Code: " << static_cast<int32_t>(e.errorCode) << " }";
-        switch (e.errorCode) {
-            // This is probably bot's runtime problem... Yet it isn't fatal. So
-            // skip.
-            case TgBot::TgException::ErrorCode::BadRequest:
-                break;
-            // I don't know what to do with this... Skip
-            case TgBot::TgException::ErrorCode::Internal:
-                return;
-            case TgBot::TgException::ErrorCode::Forbidden:
-                break;
-
-            // For floods, this is recoverable, break out of switch to continue
-            // recovering.
-            case TgBot::TgException::ErrorCode::Flood:
-                LOG(INFO) << "Flood detected, trying to recover";
-                break;
-
-            // These should be token fault, or network.
-            case TgBot::TgException::ErrorCode::Unauthorized:
-            case TgBot::TgException::ErrorCode::NotFound:
-                LOG(FATAL) << "FATAL PROBLEM DETECTED";
-                break;
-            // Only tgbot-cpp library fault can cause this error... Just ignore
-            case TgBot::TgException::ErrorCode::InvalidJson:
-            case TgBot::TgException::ErrorCode::HtmlResponse:
-                LOG(ERROR) << "BUG on tgbot-cpp library";
-                return;
-            case TgBot::TgException::ErrorCode::Conflict:
-                LOG(INFO) << "Conflict detected, shutting down now.";
-                throw e;
-            default:
-                break;
-        }
-
-        const auto ownerid = database->getOwnerUserId();
-        if (ownerid) {
-            try {
-                api->sendMessage(ownerid.value(),
-                                 std::string("Exception occured: ") + e.what());
-            } catch (const TgBot::TgException& e) {
-                LOG(FATAL) << e.what();
-            }
-        }
-        if (exceptionDuration && exceptionDuration->get() < kErrorMaxDuration) {
-            if (ownerid) {
-                api->sendMessage(ownerid.value(), "Recovery failed");
-            }
-            LOG(FATAL) << "Recover failed";
-        }
-        exceptionDuration.emplace();
-        exceptionDuration->init();
-        if (ownerid) {
-            api->sendMessage(ownerid.value(), "Restarting...");
-        }
-        LOG(INFO) << "Re-init";
-        auth->isAuthorized() = false;
-        std::thread([this] {
-            std::this_thread::sleep_for(kErrorRecoveryDelay);
-            auth->isAuthorized() = true;
-        }).detach();
-    }
-};
-
 template <typename T>
 struct Unused {};
 
@@ -372,8 +293,7 @@ getRegexHandlerComponent() {
 fruit::Component<TgBotApi, AuthContext, DatabaseBase, ThreadManager,
                  ConfigManager, Unused<RegexHandler>, Unused<NetworkLogSink>,
                  WrapPtr<SpamBlockBase>, Unused<TgBotWebServer>,
-                 TgBotApiExHandler, SocketComponentFactory_t, SocketChooser,
-                 ChatDataCollector>
+                 SocketComponentFactory_t, SocketChooser, ChatDataCollector>
 getAllComponent(CommandLine cmd) {
     static auto _cmd = std::move(cmd);
     return fruit::createComponent()
@@ -526,8 +446,7 @@ int app_main(int argc, char** argv) {
     fruit::Injector<TgBotApi, AuthContext, DatabaseBase, ThreadManager,
                     ConfigManager, Unused<RegexHandler>, Unused<NetworkLogSink>,
                     WrapPtr<SpamBlockBase>, Unused<TgBotWebServer>,
-                    TgBotApiExHandler, SocketComponentFactory_t, SocketChooser,
-                    ChatDataCollector>
+                    SocketComponentFactory_t, SocketChooser, ChatDataCollector>
         injector(getAllComponent, CommandLine{argc, argv});
 
     auto configMgr = injector.get<ConfigManager*>();
@@ -567,7 +486,8 @@ int app_main(int argc, char** argv) {
         (void)api->getBotUser();
     } catch (const TgBot::TgException& ex) {
         if (ex.errorCode == TgBot::TgException::ErrorCode::Unauthorized) {
-            LOG(ERROR) << "API call #getMe returns Unauthorized(401). Exiting...";
+            LOG(ERROR)
+                << "API call #getMe returns Unauthorized(401). Exiting...";
             return EXIT_FAILURE;
         }
     } catch (const TgBot::NetworkException& e) {
@@ -577,7 +497,6 @@ int app_main(int argc, char** argv) {
 
     auto threadManager = injector.get<ThreadManager*>();
     auto database = injector.get<DatabaseBase*>();
-    auto exHandle = injector.get<TgBotApiExHandler*>();
 
     // Not directly used components
     injector.get<Unused<NetworkLogSink>*>();
@@ -632,8 +551,6 @@ int app_main(int argc, char** argv) {
     while (!SignalHandler::isSignaled()) {
         try {
             api->startPoll();
-        } catch (const TgBot::TgException& e) {
-            exHandle->handle(e);
         } catch (const TgBot::NetworkException& e) {
             LOG(ERROR) << "Network error: " << e.what();
             if (!SignalHandler::isSignaled()) {

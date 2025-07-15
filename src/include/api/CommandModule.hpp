@@ -150,7 +150,7 @@ class CommandModule {
         Info() = default;
 
         // Trival accessors.
-        [[nodiscard]] bool isEnforced() const {
+        [[nodiscard]] bool isPrivileged() const {
             return flags & DynModule::Flags::Enforced;
         }
         [[nodiscard]] bool isHideDescription() const {

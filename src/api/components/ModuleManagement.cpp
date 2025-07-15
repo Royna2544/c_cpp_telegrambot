@@ -59,16 +59,16 @@ bool TgBotApiImpl::ModulesManagement::load(const std::string& name) {
         }
     }
 
-    auto authflags = AuthContext::Flags::REQUIRE_USER;
-    if (!_handles.at(name)->info.isEnforced()) {
-        authflags |= AuthContext::Flags::PERMISSIVE;
+    auto accesslevel = AuthContext::AccessLevel::User;
+    if (_handles.at(name)->info.isPrivileged()) {
+        accesslevel = AuthContext::AccessLevel::AdminUser;
     }
 
-    _api->getEvents().onCommand(name, [this, authflags,
+    _api->getEvents().onCommand(name, [this, accesslevel,
                                        cmd = name](Message::Ptr message) {
         commandAsync.emplaceTask(
             cmd, std::async(std::launch::async, &TgBotApiImpl::commandHandler,
-                            _api, cmd, authflags, std::move(message)));
+                            _api, cmd, accesslevel, std::move(message)));
     });
     return true;
 }
@@ -120,7 +120,7 @@ bool TgBotApiImpl::ModulesManagement::loadAll(
             auto onecommand = std::make_shared<TgBot::BotCommand>();
             onecommand->command = mod->info.name;
             onecommand->description = mod->info.description;
-            if (mod->info.isEnforced()) {
+            if (mod->info.isPrivileged()) {
                 onecommand->description += " (Owner)";
             }
             buffer.emplace_back(onecommand);

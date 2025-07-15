@@ -84,7 +84,8 @@ void binds(TgBotApi::Ptr api, MessageExt* message,
 }
 
 bool LuaCommandModule::load() {
-    _context->lua.open_libraries(sol::lib::base, sol::lib::string, sol::lib::os);
+    _context->lua.open_libraries(sol::lib::base, sol::lib::string,
+                                 sol::lib::os);
     // Load script file
     try {
         _context->lua.script_file(_context->filePath.string());
@@ -93,10 +94,17 @@ bool LuaCommandModule::load() {
         return false;
     }
 
-    // Make bindings
-    sol::table meta = _context->lua["command"];
-    info.name = meta["name"];
-    info.description = meta["description"];
+    // Grab module info
+    sol::table meta;
+
+    try {
+        meta = _context->lua["command"];
+        info.name = meta["name"];
+        info.description = meta["description"];
+    } catch (const sol::error& ex) {
+        LOG(ERROR) << "Missing command.name command.description entries";
+        return false;
+    }
     bool permissive = meta.get_or("permissive", false);
     bool hide_description = meta.get_or("hide_description", false);
 
