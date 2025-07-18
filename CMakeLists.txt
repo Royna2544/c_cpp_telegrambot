@@ -323,7 +323,7 @@ function(tgbot_library)
     list(APPEND LIB_PUBLIC_INC ${EXPORTCONF_DIR})
   endif()
 
-  if(NOT LIB_NO_LIBPREFIX)
+  if(NOT LIB_NO_LIBPREFIX AND NOT LIB_STATIC)
     if (WIN32)
        set_target_properties(${LIB_NAME} PROPERTIES PREFIX "${CMAKE_SHARED_LIBRARY_PREFIX}Telegram.Bot.")
     else()
