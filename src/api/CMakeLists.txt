@@ -53,3 +53,5 @@ tgbot_library(
   PUBLIC_INC $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>
   STATIC
 )
+
+add_subdirectory(components/restartfmt_parser)
