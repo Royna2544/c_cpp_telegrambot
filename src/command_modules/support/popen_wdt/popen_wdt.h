@@ -1,8 +1,8 @@
 #pragma once
 
+#include <limits.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <limits.h>
 
 #ifndef NDEBUG
 #define POPEN_WDT_DEBUG
@@ -39,20 +39,24 @@ extern "C" {
 #endif
 
 typedef struct {
-    popen_watchdog_exit_code_t exitcode; /* exit code of the process, default POPEN_WDT_EXIT_CODE_MAX */
-    bool signal;  /* if the process was signaled, if yes, exitcode is signal num */
+    popen_watchdog_exit_code_t exitcode; /* exit code of the process, default
+                                            POPEN_WDT_EXIT_CODE_MAX */
+    bool signal; /* if the process was signaled, if yes, exitcode is signal num
+                  */
 } popen_watchdog_exit_t;
 
-#define POPEN_WDT_EXIT_INITIALIZER { POPEN_WDT_EXIT_CODE_MAX, false }
+#define POPEN_WDT_EXIT_INITIALIZER {POPEN_WDT_EXIT_CODE_MAX, false}
 
 typedef struct {
     const char *command;     /* command string */
     bool watchdog_enabled;   /* Is watchdog enabled? [in] */
     bool watchdog_activated; /* Result callback, stored true if watchdog did the
                                 work [out] */
-    int sleep_secs;          /* Number of seconds to sleep if watchdog is enabled */
-    void *privdata;          /* Private data pointer */
+    int sleep_secs; /* Number of seconds to sleep if watchdog is enabled */
+    void *privdata; /* Private data pointer */
 } popen_watchdog_data_t;
+
+typedef int64_t popen_watchdog_size_t;
 
 /**
  * @brief initializes the popen watchdog data structure
@@ -88,9 +92,11 @@ bool popen_watchdog_activated(popen_watchdog_data_t **data);
  * @param data A double pointer to the popen watchdog data.
  * @param buf A pointer to the buffer where the read data will be stored.
  * @param size The maximum number of bytes to read from the file pointer.
- * @return true if data was successfully read, false otherwise.
+ * @return Total size of read bytes, fail means negative.
  */
-bool popen_watchdog_read(popen_watchdog_data_t **data, char *buf, int size);
+popen_watchdog_size_t popen_watchdog_read(popen_watchdog_data_t **data,
+                                          char *buf,
+                                          popen_watchdog_size_t size);
 
 /**
  * @brief Cleans up and frees the resources associated with the popen watchdog

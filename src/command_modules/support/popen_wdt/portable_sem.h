@@ -58,8 +58,9 @@ void rk_sema_post(struct rk_sema *s);
 /**
  * @brief Destroys the semaphore and releases any resources associated with it.
  *
- * This function will destroy the semaphore and release any resources associated with it.
- * After calling this function, the semaphore should not be used anymore.
+ * This function will destroy the semaphore and release any resources associated
+ * with it. After calling this function, the semaphore should not be used
+ * anymore.
  *
  * @param s Pointer to the semaphore structure to be destroyed.
  *

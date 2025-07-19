@@ -1,3 +1,4 @@
+#include <Windows.h>
 #include <assert.h>
 #include <locale.h>
 #include <stdbool.h>
@@ -6,7 +7,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <Windows.h>
 #include "popen_wdt.h"
 
 #ifdef POPEN_WDT_DEBUG
@@ -198,8 +198,8 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
     if (!success) {
         // Hmm? We failed? Try to append powershell -c
         // Create command line string
-        (void)snprintf(buffer, sizeof(buffer), POPEN_WDT_DEFAULT_SHELL " -c \"%s\"",
-                       wdt_data->command);
+        (void)snprintf(buffer, sizeof(buffer),
+                       POPEN_WDT_DEFAULT_SHELL " -c \"%s\"", wdt_data->command);
         POPEN_WDT_DBGLOG("New command is: %s", buffer);
 
         // Create process again
@@ -251,8 +251,9 @@ bool popen_watchdog_start(popen_watchdog_data_t** wdt_data_in) {
         }
         pdata.wdt_data.sub_Process = pi.hProcess;
         pdata.wdt_data.sub_Thread = pi.hThread;
-    }    
-    POPEN_WDT_DBGLOG("Process PID: %lu, TID: %lu", pi.dwProcessId, pi.dwThreadId);
+    }
+    POPEN_WDT_DBGLOG("Process PID: %lu, TID: %lu", pi.dwProcessId,
+                     pi.dwThreadId);
     CopyMemory(wdt_data->privdata, &pdata,
                sizeof(struct popen_wdt_windows_priv));
     return true;
@@ -307,7 +308,9 @@ popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t** data) {
     return ret;
 }
 
-bool popen_watchdog_read(popen_watchdog_data_t** data, char* buf, int size) {
+popen_watchdog_size_t popen_watchdog_read(popen_watchdog_data_t** data,
+                                          char* buf,
+                                          popen_watchdog_size_t size) {
     if (!check_data_privdata(data)) {
         return false;
     }
@@ -315,11 +318,10 @@ bool popen_watchdog_read(popen_watchdog_data_t** data, char* buf, int size) {
     OVERLAPPED ol = {0};
     popen_watchdog_data_t* data_ = *data;
     struct popen_wdt_windows_priv* pdata = data_->privdata;
-    DWORD bytesRead = 0;
+    DWORD bytesRead = -1;
     BOOL result = FALSE;
     DWORD waitResult = 0;
     const int one_sec = 1000;
-    BOOL readFileResult = FALSE;
 
     if ((*data)->watchdog_activated) {
         POPEN_WDT_DBGLOG("watchdog_activated: True, return");
@@ -345,7 +347,6 @@ bool popen_watchdog_read(popen_watchdog_data_t** data, char* buf, int size) {
         case WAIT_OBJECT_0:
             if (GetOverlappedResult(pdata->read_hdl, &ol, &bytesRead, FALSE)) {
                 buf[bytesRead] = '\0';  // Null-terminate the string
-                readFileResult = TRUE;
             } else {
                 POPEN_WDT_DBGLOG("GetOverlappedResult failed.");
             }
@@ -358,9 +359,8 @@ bool popen_watchdog_read(popen_watchdog_data_t** data, char* buf, int size) {
                              waitResult);
             break;
     }
-    POPEN_WDT_DBGLOG("Ret: %s, bytesRead: %lu",
-                     readFileResult ? "true" : "false", bytesRead);
-    return readFileResult;
+    POPEN_WDT_DBGLOG("bytesRead: %lu", bytesRead);
+    return bytesRead;
 }
 
 bool popen_watchdog_activated(popen_watchdog_data_t** data) {

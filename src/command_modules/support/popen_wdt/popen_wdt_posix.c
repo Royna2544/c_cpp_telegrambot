@@ -195,7 +195,7 @@ bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
         }
 
         // Close the write end of the pipe
-        close(pipefd_w); 
+        close(pipefd_w);
 
         if (data->watchdog_enabled) {
             struct rk_sema sem;
@@ -287,11 +287,13 @@ popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t **data_in) {
     return ret;
 }
 
-bool popen_watchdog_read(popen_watchdog_data_t **data_in, char *buf, int size) {
-    bool ret = false;
+popen_watchdog_size_t popen_watchdog_read(popen_watchdog_data_t **data_in,
+                                          char *buf,
+                                          popen_watchdog_size_t size) {
     struct pollfd fds;
     popen_watchdog_data_t *data = *data_in;
     struct popen_wdt_posix_priv *pdata = data->privdata;
+    popen_watchdog_size_t ret = -1;
 
     pthread_mutex_lock(&pdata->wdt_mutex);
     int timeout = data->watchdog_enabled ? data->sleep_secs * 1000 : -1;
@@ -319,11 +321,10 @@ bool popen_watchdog_read(popen_watchdog_data_t **data_in, char *buf, int size) {
                 } else {
                     POPEN_WDT_DBGLOG("read %d bytes: %.*s", (int)readBytes,
                                      (int)readBytes, buf);
-                    ret = true;
+                    ret = readBytes;
                 }
             } else if (fds.revents & POLLHUP) {
                 POPEN_WDT_DBGLOG("POLLHUP");
-                ret = false;
             } else {
                 POPEN_WDT_DBGLOG("Poll events: %d", fds.revents);
             }
