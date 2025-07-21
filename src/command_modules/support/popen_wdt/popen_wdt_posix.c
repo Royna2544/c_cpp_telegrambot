@@ -1,3 +1,4 @@
+#include <stdatomic.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
@@ -33,7 +34,7 @@ struct popen_wdt_posix_priv {
     struct rk_sema *startup_sem;
     int status;
     int pipefd_r;  // Subprocess' readfd, write end for the child
-    bool process_is_running;
+    _Atomic bool process_is_running;
 };
 
 static void *watchdog(void *arg) {
@@ -243,8 +244,6 @@ static void popen_watchdog_wait(popen_watchdog_data_t **data_in) {
         POPEN_WDT_DBGLOG("Waiting for watchdog");
         pthread_join(pdata->wdt_thread, NULL);
         POPEN_WDT_DBGLOG("watchdog joined");
-        pthread_cond_destroy(&pdata->condition);
-        POPEN_WDT_DBGLOG("Watchdog exited");
     }
 }
 
