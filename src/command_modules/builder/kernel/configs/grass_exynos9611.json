@@ -37,14 +37,14 @@
         {
             "name": "Device specific",
             "scheme": "vendor/{device}.config",
-            "depends": [],
+            "depends": ["Grass features"],
             "description": "Device specific configs",
             "default_enabled": true
         },
         {
             "name": "AOSP config",
             "scheme": "vendor/aosp.config",
-            "depends": [],
+            "depends": ["Device specific"],
             "description": "Enable AOSP ROMs support",
             "default_enabled": false
         }
