@@ -86,6 +86,9 @@ void binds(TgBotApi::Ptr api, MessageExt* message,
 bool LuaCommandModule::load() {
     _context->lua.open_libraries(sol::lib::base, sol::lib::string,
                                  sol::lib::os);
+    sol::state lua;
+
+    DLOG(INFO) << "Load file: " << _context->filePath.filename();
     // Load script file
     try {
         _context->lua.script_file(_context->filePath.string());
@@ -97,8 +100,13 @@ bool LuaCommandModule::load() {
     // Grab module info
     sol::table meta;
 
+    auto obj = _context->lua["command"];
+    if (!obj.is<sol::table>()) {
+        LOG(ERROR) << "Variable 'command' is not a table";
+        return false;
+    }
+    meta = obj;
     try {
-        meta = _context->lua["command"];
         info.name = meta["name"];
         info.description = meta["description"];
     } catch (const sol::error& ex) {
