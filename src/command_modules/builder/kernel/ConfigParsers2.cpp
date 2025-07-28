@@ -335,6 +335,10 @@ bool KernelConfig::parse(const Json::Value& node) {
     errors = parseEnvMap(node);
     errors = parsePatches(node);
 
+    if (!static_cast<bool>(errors)) {
+        return false;
+    }
+
     DependencyChecker checker(&fragments);
     if (checker.hasDependencyLoop()) {
         LOG(ERROR) << "Dependency loop detected in fragments";
@@ -371,7 +375,7 @@ void KernelConfig::reParse() {
 KernelConfig::KernelConfig(std::filesystem::path jsonFile)
     : _sourceFilePath(std::move(jsonFile)), _file(_sourceFilePath) {
     parse();
-}  
+}
 
 bool DependencyChecker::hasDependencyLoop() {
     std::unordered_set<std::string> visited;
