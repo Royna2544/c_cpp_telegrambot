@@ -44,6 +44,7 @@
 #include <vector>
 
 #include "SocketContext.hpp"
+#include "tgbot/TgException.h"
 #include "utils/Env.hpp"
 
 class RegexHandlerInterface : public RegexHandler::Interface {
@@ -542,6 +543,8 @@ int app_main(int argc, char** argv) {
     } catch (const TgBot::NetworkException& e) {
         LOG(ERROR) << "Network error: " << e.what();
         return EXIT_FAILURE;
+    } catch (const TgBot::TgException& e) {
+        // pass
     }
 
     CommandLine cmdline{argc, argv};
