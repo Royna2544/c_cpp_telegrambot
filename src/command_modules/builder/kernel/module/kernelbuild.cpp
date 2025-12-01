@@ -104,7 +104,7 @@ class KernelBuildHandler {
         _api->sendMessage(message->chat, "Will build kernel...", builder.get());
     }
 
-    void handle_build(TgBot::CallbackQuery::Ptr query) {
+    void handle_build(const TgBot::CallbackQuery::Ptr& query) {
         std::string_view data = query->data;
         if (!absl::ConsumePrefix(&data, kBuildPrefix)) {
             return;
@@ -128,7 +128,7 @@ class KernelBuildHandler {
     }
 
     constexpr static std::string_view kEnablePrefix = "enable_";
-    void handle_select(TgBot::CallbackQuery::Ptr query) {
+    void handle_select(const TgBot::CallbackQuery::Ptr& query) {
         std::string_view data = query->data;
         if (!absl::ConsumePrefix(&data, kSelectPrefix)) {
             return;
@@ -146,7 +146,7 @@ class KernelBuildHandler {
 
     constexpr static std::string_view kContinuePrefix = "continue";
 
-    void handle_select_INTERNAL(TgBot::CallbackQuery::Ptr query) {
+    void handle_select_INTERNAL(const TgBot::CallbackQuery::Ptr& query) {
         KeyboardBuilder builder;
         for (const auto& fragment : intermidiates.current->fragments) {
             bool enabled =
@@ -170,7 +170,7 @@ class KernelBuildHandler {
                           builder.get());
     }
 
-    void handle_enable(TgBot::CallbackQuery::Ptr query) {
+    void handle_enable(const TgBot::CallbackQuery::Ptr& query) {
         std::string_view data = query->data;
         if (!absl::ConsumePrefix(&data, kEnablePrefix)) {
             return;
@@ -185,7 +185,7 @@ class KernelBuildHandler {
         handle_select_INTERNAL(query);
     }
 
-    void handle_continue(TgBot::CallbackQuery::Ptr query);
+    void handle_continue(const TgBot::CallbackQuery::Ptr& query);
 
     template <std::derived_from<toolchains::Provider> T>
     std::optional<Compiler> download(Compiler::Type type) const {
@@ -235,16 +235,16 @@ class KernelBuildHandler {
         std::string_view data = query->data;
         if (absl::ConsumePrefix(&data, kBuildPrefix)) {
             // Call the corresponding function
-            handle_build(std::move(query));
+            handle_build(query);
         } else if (absl::ConsumePrefix(&data, kSelectPrefix)) {
             // Call the corresponding function
-            handle_select(std::move(query));
+            handle_select(query);
         } else if (absl::ConsumePrefix(&data, kEnablePrefix)) {
             // Call the corresponding function
-            handle_enable(std::move(query));
+            handle_enable(query);
         } else if (absl::ConsumePrefix(&data, kContinuePrefix)) {
             // Call the corresponding function
-            handle_continue(std::move(query));
+            handle_continue(query);
         } else {
             LOG(WARNING) << "Unknown query: " << query->data;
         }
@@ -438,9 +438,12 @@ Exit code: {}</blockquote>)",
             TgBotApi::parseModeToStr<TgBotApi::ParseMode::HTML>();
         textContent->messageText = "Not yet ready...";
         api_->addInlineQueryKeyboard(
-            TgBotApi::InlineQuery{kInlineQueryKey.data(),
-                                  "See the Kernel build progress",
-                                  "kernelbuild", false, true},
+            TgBotApi::InlineQuery{
+                .name = kInlineQueryKey.data(),
+                .description = "See the Kernel build progress",
+                .command = "kernelbuild",
+                .hasMoreArguments = false,
+                .enforced = true},
             kernelBuild);
     }
     TgBot::InputTextMessageContent::Ptr textContent;
@@ -472,7 +475,7 @@ Exit code: {}</blockquote>)",
     bool result() const { return *ret; }
 };
 
-void KernelBuildHandler::handle_continue(TgBot::CallbackQuery::Ptr query) {
+void KernelBuildHandler::handle_continue(const TgBot::CallbackQuery::Ptr& query) {
     auto compiler = download_toolchain();
     if (!compiler) {
         _api->editMessage(query->message, "Failed to download toolchain");
