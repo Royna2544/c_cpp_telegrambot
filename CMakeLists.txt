@@ -48,9 +48,7 @@ include(CheckPIESupported)
 check_pie_supported()
 if(CMAKE_CXX_LINK_PIE_SUPPORTED AND CMAKE_C_LINK_PIE_SUPPORTED)
   message(STATUS "Enabling PIE (Position Independent Executable) support")
-  set(PIE_SUPPORTED
-      TRUE
-      CACHE BOOL "Whether PIE is supported")
+  set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 else()
   message(STATUS "PIE (Position Independent Executable) not enabled")
 endif()
@@ -296,10 +294,6 @@ function(tgbot_common_target TARGET_NAME)
   if(SANITIZER_FLAG)
     target_compile_options(${TARGET_NAME} PRIVATE ${SANITIZER_FLAG})
     target_link_options(${TARGET_NAME} PRIVATE ${SANITIZER_FLAG})
-  endif()
-  if(PIE_SUPPORTED)
-    set_target_properties(${TARGET_NAME} PROPERTIES POSITION_INDEPENDENT_CODE
-                                                    ON)
   endif()
   if(LTO_SUPPORTED)
     set_target_properties(${TARGET_NAME} PROPERTIES INTERPROCEDURAL_OPTIMIZATION
