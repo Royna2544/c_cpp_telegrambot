@@ -1,7 +1,5 @@
 #pragma once
 
-#include <absl/strings/string_view.h>
-
 #include <sstream>
 #include <type_traits>
 
@@ -62,19 +60,8 @@ bool try_parse(const std::wstring_view str, T* outval) {
 template <typename Str, typename T>
 bool try_parse(const Str str, T* outval)
     requires(std::is_assignable_v<std::string_view, Str> &&
-             !std::is_same_v<absl::string_view, std::string_view> &&
              !std::is_same_v<Str, std::string_view>)
 {
     return details::string::try_parse<std::string, std::string_view,
-                                      std::stringstream>(str, outval);
-}
-
-// Specialization for absl::string_view, which isn't a std::string_view
-// in some cases
-template <typename T>
-bool try_parse(const absl::string_view str, T* outval)
-    requires(!std::is_same_v<absl::string_view, std::string_view>)
-{
-    return details::string::try_parse<std::string, absl::string_view,
                                       std::stringstream>(str, outval);
 }
