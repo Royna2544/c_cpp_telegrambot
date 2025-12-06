@@ -433,7 +433,7 @@ Exit code: {}</blockquote>)",
         // TODO: Don't hardcode this
         kernelBuild->thumbnailUrl =
             "https://raw.githubusercontent.com/Royna2544/c_cpp_telegrambot/"
-            "refs/heads/master/resources/photo/build.webp";
+            "refs/heads/master/resources/photo/build.jpg";
         textContent->parseMode =
             TgBotApi::parseModeToStr<TgBotApi::ParseMode::HTML>();
         textContent->messageText = "Not yet ready...";
