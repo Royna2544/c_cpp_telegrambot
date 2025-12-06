@@ -65,7 +65,8 @@ jobs:
         run: |
           mkdir build
           cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_TESTING=ON ${{ matrix.flags }} .
-          cmake --build build -j4
+          cmake --build build -j$(nproc)
+          cmake --build build -j$(nproc) --target optional_all
 
       - name: Run Tests
         run: |

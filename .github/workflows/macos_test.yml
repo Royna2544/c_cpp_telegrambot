@@ -28,8 +28,9 @@ jobs:
           CXX: /opt/homebrew/opt/llvm/bin/clang++
         run: |
           mkdir build
-          cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTING=ON .
+          cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTING=ON -DBoost_NO_BOOST_CMAKE=ON .
           cmake --build build -j4
+          cmake --build build -j4 --target optional_all
 
       - name: Run Tests
         run: |

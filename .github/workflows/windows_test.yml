@@ -61,6 +61,7 @@ jobs:
         mkdir build
         cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_TESTING=ON -DBUILD_SHARED_LIBS=ON .
         cmake --build build -j4
+        cmake --build build -j4 --target optional_all
 
     - name: Run Tests
       run: |
