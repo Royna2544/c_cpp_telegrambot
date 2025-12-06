@@ -1,8 +1,8 @@
 {
     "name": "Eureka Kernel",
     "repo": {
-        "url": "https://github.com/Roynas-Android-Playground/ek-private",
-        "branch": "R24U"
+        "url": "https://github.com/Roynas-Android-Playground/kernel_samsung_exynos7885-priv",
+        "branch": "EurekaV2"
     },
     "arch": "arm64",
     "type": "Image",
@@ -16,29 +16,30 @@
         "location": "AnyKernel3"
     },
     "defconfig": {
-        "scheme": "exynos7885-{device}_defconfig",
+        "scheme": "exynos7885_defconfig",
         "devices": [
             "a10",
             "a20",
             "a20e",
             "a30",
             "a30s",
-            "a40"
+            "a40",
+            "jackpotlte"
         ]
     },
     "fragments": [
         {
-            "name": "oneui",
-            "scheme": "oneui.config",
+            "name": "Device Specific",
+            "scheme": "{device}.config",
             "depends": [],
-            "description": "Enable OneUI target support",
-            "default_enabled": false
+            "description": "Enable device target support",
+            "default_enabled": true
         },
         {
-            "name": "oneui2",
-            "scheme": "oneui2.config",
-            "depends": ["oneui"],
-            "description": "Enable OneUI2 target support",
+            "name": "NO KSU",
+            "scheme": "noksu.config",
+            "depends": [],
+            "description": "Disable KSU",
             "default_enabled": false
         }
     ],

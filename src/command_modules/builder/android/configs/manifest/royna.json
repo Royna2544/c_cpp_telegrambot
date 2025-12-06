@@ -3,6 +3,19 @@
     "url": "https://github.com/Roynas-Android-Playground/local_manifests/",
     "branches": [
         {
+            "name": "Exynos7885-new-sixteen",
+            "target_rom": "LineageOS",
+            "android_version": 16,
+            "devices": [
+                "a10",
+                "a20",
+                "a20e",
+                "a30",
+                "a30s",
+                "a40"
+            ]
+        },
+        {
             "name": "Exynos7885-new-fifteen",
             "target_rom": "LineageOS",
             "android_version": 15,
@@ -131,18 +144,6 @@
                 "a30s",
                 "a40"
             ]
-        },
-        {
-            "name": "r3q-Evolution-X-udc",
-            "target_rom": "Evolution-X",
-            "android_version": 14,
-            "device": "r3q"
-        },
-        {
-            "name": "r3q-Evolution-X-vic",
-            "target_rom": "Evolution-X",
-            "android_version": 15,
-            "device": "r3q"
         },
         {
             "name": "tb128fu-Evolution-X-udc",
@@ -154,6 +155,12 @@
             "name": "tb128fu-Evolution-X-vic",
             "target_rom": "Evolution-X",
             "android_version": 15,
+            "device": "tb128fu"
+        },
+        {
+            "name": "tb128fu-Evolution-X-bka",
+            "target_rom": "Evolution-X",
+            "android_version": 16,
             "device": "tb128fu"
         },
         {

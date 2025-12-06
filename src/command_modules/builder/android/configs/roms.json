@@ -1,7 +1,7 @@
 [
     {
         "name": "Evolution-X",
-        "link": "https://github.com/Evolution-XYZ/manifest",
+        "link": "https://github.com/Evolution-X/manifest",
         "target": "evolution",
         "artifact": {
             "matcher": "ZipFilePrefixer",
@@ -15,6 +15,10 @@
             {
                 "android_version": 15,
                 "branch": "vic"
+            },
+            {
+                "android_version": 16,
+                "branch": "bka"
             }
         ]
     },
@@ -29,7 +33,7 @@
         "branches": [
             {
                 "android_version": 15,
-                "branch": "15"
+                "branch": "15.2"
             },
             {
                 "android_version": 14,
@@ -46,6 +50,10 @@
             "data": "lineage-"
         },
         "branches": [
+            {
+                "android_version": 16,
+                "branch": "lineage-23.0"
+            },
             {
                 "android_version": 15,
                 "branch": "lineage-22.2"
@@ -77,6 +85,10 @@
             "data": "crDroidAndroid-"
         },
         "branches": [
+            {
+                "android_version": 16,
+                "branch": "16.0"
+            },
             {
                 "android_version": 15,
                 "branch": "15.0"

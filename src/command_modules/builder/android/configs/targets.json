@@ -20,14 +20,6 @@
         "name": "Galaxy A40"
     },
     {
-        "codename": "m307f",
-        "name": "Galaxy M30s"
-    },
-    {
-        "codename": "r3q",
-        "name": "Galaxy A90 5G"
-    },
-    {
         "codename": "tb128fu",
         "name": "XiaoXin Pad 2022"
     },
@@ -38,17 +30,5 @@
     {
         "codename": "a30s",
         "name": "Galaxy A30s"
-    },
-    {
-        "codename": "lime",
-        "name": "Redmi 9T"
-    },
-    {
-        "codename": "citrus",
-        "name": "POCO M3"
-    },
-    {
-        "codename": "vin8953",
-        "name": "Vsmart Joy 3"
     }
 ]
