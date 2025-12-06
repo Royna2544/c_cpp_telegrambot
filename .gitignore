@@ -10,20 +10,18 @@ compile_commands.json
 CTestTestfile.cmake
 _deps
 
-# Exe
-TgBot++*
-libTgBot*.a
-libTgBot*.so
-
 # Generated
 resources/scripts/git-askpass.sh
 resources/about.html
 src/include/GitBuildInfo.hpp
 __pycache__
 
-# Visual studio code
+# Visual Studio Code
 build/
 .vscode/
 .cache/
 .vs/
 CMakeSettings.json
+
+# Visual studio
+out/
