@@ -107,7 +107,7 @@ bool TgBotApiImpl::ModulesManagement::loadAll(
             if (load(std::make_unique<LuaCommandModule>(it))) continue;
         }
 #endif
-        LOG(WARNING) << "Cannot load " << filename;
+        DLOG(WARNING) << "Not loading " << filename;
     }
     if (ec) {
         LOG(ERROR) << "Failed to iterate through modules: " << ec.message();
