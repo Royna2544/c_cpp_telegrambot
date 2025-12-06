@@ -626,18 +626,11 @@ bool ConfigParser::merge() {
     recoveries.clear();
 
     // Now, clean the unreferenced device/roms
-    for (auto it = deviceMap.begin(); it != deviceMap.end(); ++it) {
-        if (it->second.unique()) {
-            DLOG(INFO) << "Removing device " << it->second->toString();
-            it = deviceMap.erase(it);
-        }
-    }
-    for (auto it = romBranchMap.begin(); it != romBranchMap.end(); ++it) {
-        if (it->second.unique()) {
-            DLOG(INFO) << "Removing rom " << it->second->toString();
-            it = romBranchMap.erase(it);
-        }
-    }
+    std::erase_if(deviceMap,
+                  [](const auto& pair) { return pair.second.unique(); });
+    std::erase_if(romBranchMap,
+                  [](const auto& pair) { return pair.second.unique(); });
+
     // Return the localManifests vector
     return !parsedManifests.empty();
 }
