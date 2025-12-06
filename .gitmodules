@@ -28,3 +28,6 @@
 [submodule "src/third-party/lua"]
 	path = src/api/liblua
 	url = https://github.com/lua/lua
+[submodule "src/command_modules/llm/llama.cpp"]
+	path = src/command_modules/llm/llama.cpp
+	url = https://github.com/ggml-org/llama.cpp

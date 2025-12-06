@@ -209,3 +209,14 @@ command_module(
 multi_command_module(PROVIDES up down SRCS updown.cpp)
 
 command_module(NAME log SRCS log.cpp)
+
+option(ENABLE_LLM "Enable LLM command module" OFF)
+
+if (ENABLE_LLM)
+  set(GGML_CUDA ON)
+  add_subdirectory(llm/llama.cpp)
+  if (MSVC)
+    target_compile_options(llama PUBLIC /Zc:char8_t-)
+  endif()
+  command_module(NAME ask SRCS ask.cpp llm/LLMCore.cpp LIBS llama)
+endif()
