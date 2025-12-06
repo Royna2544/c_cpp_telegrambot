@@ -49,7 +49,7 @@ tgbot_exe(
     GTest::gmock
     SocketComponents
     fruit
-    HexDump
+    $<$<BOOL:${SOCKET_ENABLE_HEXDUMP}>:HexDump>
   TEST
 )
 
