@@ -3,8 +3,8 @@
 #include <absl/log/log.h>
 
 #include <algorithm>
-#include <iostream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "llama.h"
@@ -15,10 +15,11 @@ struct LLMCore::Model::Impl {
     llama_sampler* sampler = nullptr;
     llama_batch batch{};
     int n_past = 0;
+    int seq_id = 0;
 };
 
 LLMCore::Model::Model() { impl_ = std::make_unique<Impl>(); }
-LLMCore::Model::~Model() {}
+LLMCore::Model::~Model() { cleanup(); }
 
 bool LLMCore::Model::load(const std::filesystem::path& modelPath,
                           int n_gpu_layers, int n_ctx, int n_batch) {
@@ -35,12 +36,12 @@ bool LLMCore::Model::load(const std::filesystem::path& modelPath,
 
     impl_->model =
         llama_model_load_from_file(modelPath.string().c_str(), model_params);
-    if (!impl_->model) {
+    if (impl_->model == nullptr) {
         LOG(ERROR) << "Failed to load model from " << modelPath.string();
         return false;
     }
     impl_->ctx = llama_init_from_model(impl_->model, ctx_params);
-    if (!impl_->ctx) {
+    if (impl_->ctx == nullptr) {
         LOG(ERROR) << "Failed to create context for model at "
                    << modelPath.string();
         llama_model_free(impl_->model);
@@ -71,9 +72,11 @@ LLMCore::Model::Info LLMCore::Model::info() const {
     auto get_meta = [&](const char* key) -> std::string {
         // First call with null buffer to get length
         int len = llama_model_meta_val_str(model, key, nullptr, 0);
-        if (len < 0) return "N/A";
+        if (len < 0) {
+            return "N/A";
+        }
         std::string buffer(len + 1, '\0');
-        llama_model_meta_val_str(model, key, &buffer[0], len + 1);
+        llama_model_meta_val_str(model, key, buffer.data(), len + 1);
         return buffer;
     };
 
@@ -85,17 +88,19 @@ LLMCore::Model::Info LLMCore::Model::info() const {
 }
 
 void LLMCore::Model::cleanup() {
-    if (impl_->ctx) {
+    if (impl_->ctx != nullptr) {
         llama_batch_free(impl_->batch);
         llama_sampler_free(impl_->sampler);
         llama_free(impl_->ctx);
         impl_->ctx = nullptr;
     }
-    if (impl_->model) {
+    if (impl_->model != nullptr) {
         llama_model_free(impl_->model);
         impl_->model = nullptr;
     }
 }
+
+namespace {
 
 // 1. Helper to "clear" a batch (reset counters)
 void llama_batch_clear(llama_batch& batch) { batch.n_tokens = 0; }
@@ -132,64 +137,70 @@ std::vector<llama_token> tokenize(const llama_model* model,
     return tokens;
 }
 
-LLMCore::LLMCore() { 
+}  // namespace
+
+LLMCore::LLMCore() {
     DLOG(INFO) << "LLMCore Constructor called";
     llama_backend_init();
 }
 
-LLMCore::~LLMCore() { 
+LLMCore::~LLMCore() {
     DLOG(INFO) << "LLMCore Destructor called";
     llama_backend_free();
 }
 
-std::optional<LLMCore::Model::Response> LLMCore::query(const Model* model, const std::string_view prompt, int max_tokens) {
+constexpr const char* SYSTEM_PROMPT =
+    R"(You are Miku, a helpful and friendly AI assistant deployed on Telegram.
+
+### Core Instructions
+1. **Mandatory Greeting**: You must start *every* response with the exact phrase: "Hello, I am your Miku!".
+2. **Language**: Respond strictly in English.
+
+### Formatting Rules for Telegram
+1. **Code Blocks**: Always use triple backticks with a language identifier for code (e.g., ```python). This is essential for Telegram's "click to copy" feature.
+2. **Readability**: 
+   - Telegram messages are often read on narrow mobile screens. Keep paragraphs short.
+   - Use lists (bullet points) instead of complex tables, as tables often break on mobile devices.
+   - Use **bold** for emphasis, but avoid excessive formatting.
+3. **Length Constraints**: 
+   - Telegram has a hard limit of 4096 characters per message. 
+   - Be concise. If a detailed answer requires more length, break it down or ask the user if they want the rest in a second message.
+
+### Persona
+- Be helpful, polite, and efficient.)";
+std::optional<LLMCore::Model::Response> LLMCore::query(
+    const Model* model, const std::string_view prompt, int max_tokens) {
+
     auto start_time = std::chrono::steady_clock::now();
     LOG(INFO) << "LLMCore::query called with prompt: " << prompt;
 
-    // 1. Define the messages (System + User)
-    std::vector<llama_chat_message> messages;
-    // System Message
-    messages.push_back(
-        {"system",
-         "You are a helpful Telegram chatbot named Miku. Always start with "
-         "'Hello, I am your Miku!' and reply with English only. Use ```code``` format for codes."});
-
-    // User Message
-    std::string user_prompt = std::string(prompt);
-    messages.push_back({"user", user_prompt.c_str()});
-
-    // 2. Calculate required buffer size for the formatted template
-    // We pass nullptr first to get the length
-    int new_len = llama_chat_apply_template(
-        R"([SYSTEM_PROMPT]{{system_message}}[/SYSTEM_PROMPT]
-[INST]{{prompt}}[/INST]
-{{assistant_message}})",        // template
-        messages.data(),  // messages
-        messages.size(),  // number of messages
-        true,             // add_assistent_prefix (trigger generation)
-        nullptr,          // output buffer
-        0                 // buffer size
-    );
-
-    if (new_len < 0) {
-        LOG(ERROR) << "Failed to apply chat template";
-        return std::nullopt;
+    // -----------------------
+    // 1. Context length check
+    // -----------------------
+    const auto n_ctx = llama_n_ctx(model->impl_->ctx);
+    if (model->impl_->n_past + max_tokens > n_ctx) {
+        LOG(WARNING) << "Context overflow likely. Resetting KV cache.";
+        // llama_kv_cache_clear(model->impl_->ctx);     // <-- correct way
+        model->impl_->n_past = 0;
     }
-    // 3. Allocate buffer and apply template again to fill it
-    std::string formatted_prompt(new_len + 1, '\0');
-    llama_chat_apply_template(
-        nullptr,          // template (nullptr = use model default)
-        messages.data(),  // messages
-        messages.size(),  // number of messages
-        true
-        ,                // add_assistent_prefix (trigger generation)
-        &formatted_prompt[0],  // output buffer
-        formatted_prompt.size()  // buffer size
-    );
+
+    // -----------------------
+    // 2. Construct Chat Prompt (Mistral format)
+    // -----------------------
+    std::string system = SYSTEM_PROMPT;
+
+    std::string formatted_prompt = 
+        "<s>[INST] " + 
+        system + 
+        "\n" + 
+        std::string(prompt) + 
+        " [/INST]";
 
     LOG(INFO) << "Formatted prompt: " << std::quoted(formatted_prompt);
 
-    // Tokenize Prompt
+    // -----------------------
+    // 3. Tokenize (do NOT add BOS manually)
+    // -----------------------
     std::vector<llama_token> tokens =
         tokenize(model->impl_->model, formatted_prompt);
 
@@ -200,78 +211,97 @@ std::optional<LLMCore::Model::Response> LLMCore::query(const Model* model, const
 
     LOG(INFO) << "Tokenized prompt into " << tokens.size() << " tokens.";
 
-
-    // Load Prompt
+    // -----------------------
+    // 4. Load prompt tokens
+    // -----------------------
+    llama_batch_clear(model->impl_->batch);
     for (size_t i = 0; i < tokens.size(); i++) {
-        llama_batch_add(model->impl_->batch, tokens[i], i, {0},
-                        (i == tokens.size() - 1));
+        llama_batch_add(
+            model->impl_->batch,
+            tokens[i],
+            model->impl_->n_past + i,
+            {model->impl_->seq_id},
+            (i == tokens.size() - 1)
+        );
     }
 
-    // Decode Prompt
+    // Decode
     if (llama_decode(model->impl_->ctx, model->impl_->batch) != 0) {
         LOG(ERROR) << "Decode failed for prompt";
         return std::nullopt;
     }
-    model->impl_->n_past += model->impl_->batch.n_tokens;  // Update n_past
 
-    // Generate Response
-    // --- MAIN LOOP ---
+    model->impl_->n_past += model->impl_->batch.n_tokens;
+
+    // -----------------------
+    // 5. Generation Loop
+    // -----------------------
     std::stringstream response_stream;
 
     for (int i = 0; i < max_tokens; i++) {
-        // Sample next token
-        llama_token new_token_id =
-            llama_sampler_sample(model->impl_->sampler, model->impl_->ctx, -1);
+
+        llama_token tok = llama_sampler_sample(
+            model->impl_->sampler,
+            model->impl_->ctx,
+            -1
+        );
+
         const llama_vocab* vocab = llama_model_get_vocab(model->impl_->model);
 
-        // Check for End of Text
-        if (llama_vocab_is_eog(vocab, new_token_id)) {
-            DLOG(INFO) << "EoG token generated, stopping.";
+        if (llama_vocab_is_eog(vocab, tok)) {
+            LOG(INFO) << "EoG token generated, stopping.";
             break;
         }
 
-        // Print token
-        std::array<char, 256> buf{};
-        int n = llama_token_to_piece(vocab, new_token_id, buf.data(),
-                                     buf.size() - 1, /*lstrip*/ 0,
-                                     /*special*/ true);
-        if (n >= 0) {
-            DLOG(INFO) << "Generated token: " << std::string(buf.data(), n);
+        // decode piece
+        std::array<char, 4096> buf{};
+        int n = llama_token_to_piece(vocab, tok, buf.data(), buf.size()-1, 0, true);
+
+        if (n > 0) {
             response_stream.write(buf.data(), n);
         }
 
-        // Prepare next batch (1 token)
+        // prepare for next step
         llama_batch_clear(model->impl_->batch);
-        llama_batch_add(model->impl_->batch, new_token_id, model->impl_->n_past,
-                        {0}, true);
+        llama_batch_add(model->impl_->batch, tok, model->impl_->n_past,
+                        {model->impl_->seq_id}, true);
 
-        // Decode
         if (llama_decode(model->impl_->ctx, model->impl_->batch) != 0) {
-            LOG(ERROR) << "Decode failed during generation.";
+            LOG(ERROR) << "Decode failed during generation";
             break;
         }
+
         model->impl_->n_past += 1;
     }
 
-    LOG(INFO) << "Generation completed.";
-
-    // Do the spliting of thought and answer here
     std::string response_text = response_stream.str();
-    // Format is <think>Thought: ... </think>Answer. So we split by "</think>"
-    size_t thought_end = response_text.find("</think>");
+    LOG(INFO) << "Raw response: " << response_text;
+
+    // -----------------------
+    // 6. Extract <|start|>assistant<|channel|>final<|message|>...
+    // .
+    // -----------------------
     std::string thought, answer;
-    if (thought_end != std::string::npos) {
-        thought = response_text.substr(0, thought_end);
-        answer = response_text.substr(thought_end + 8);  // 8 = length
+
+    constexpr std::string_view thought_tag_start = "<|start|>assistant<|channel|>final<|message|>";
+    auto pos = response_text.rfind(thought_tag_start);
+    if (pos != std::string::npos) {
+        answer = response_text.substr(pos + thought_tag_start.length());
     } else {
-        thought = response_text;
-        answer = "N/A";
+        // Fallback: treat entire response as answer
+        thought = "";
+        answer = response_text;
     }
 
+    // -----------------------
+    // 7. Return
+    // -----------------------
     auto end_time = std::chrono::steady_clock::now();
-    Model::Response response;
-    response.thought = std::move(thought);
-    response.answer = std::move(answer);
-    response.duration = end_time - start_time;
-    return response;
+
+    Model::Response r;
+    r.thought   = std::move(thought);
+    r.answer    = std::move(answer);
+    r.duration  = end_time - start_time;
+
+    return r;
 }
