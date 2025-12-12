@@ -75,7 +75,7 @@ jobs:
           CC: ${{ matrix.real_cc }}
           CXX: ${{ matrix.real_cxx }}
         run: |
-          cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=${{ steps.runvcpkg.outputs.RUNVCPKG_VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake -DENABLE_TESTING=ON 
+          cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=./vcpkg/scripts/buildsystems/vcpkg.cmake -DENABLE_TESTING=ON 
           cmake --build build 
           cmake --build build --target optional_all
 
