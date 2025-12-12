@@ -1,4 +1,4 @@
-name: Build TgBot++ (macOS)
+﻿name: Build TgBot++ (macOS)
 
 on:
   push:
@@ -12,28 +12,36 @@ on:
 jobs:
   build:
     runs-on: macos-latest
-
+    env:
+      # 1. Force vcpkg to use GitHub Actions Cache as the storage backend
+      VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4.1.7
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
 
-      - name: Set up dependencies
-        run: |
-          brew install boost ninja llvm@17 lld webp libpng libgit2 googletest jsoncpp openssl fmt
-          git submodule update --init
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
 
-      - name: Compile with HomeBrew Clang
-        env: 
-          CC: /opt/homebrew/opt/llvm/bin/clang
-          CXX: /opt/homebrew/opt/llvm/bin/clang++
+      # 2. Setup vcpkg (automatically handles bootstrapping and caching)
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          # Just point to your vcpkg.json location
+          vcpkgJsonGlob: 'vcpkg.json'
+          
+      # 3. Build your project using CMake
+      - name: '🚧 Build TgBot++'
         run: |
-          mkdir build
-          cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Release -DENABLE_TESTING=ON -DBoost_NO_BOOST_CMAKE=ON .
-          cmake --build build -j4
-          cmake --build build -j4 --target optional_all
+          cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=${{ steps.runvcpkg.outputs.RUNVCPKG_VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake -DENABLE_TESTING=ON 
+          cmake --build build 
+          cmake --build build --target optional_all
 
       - name: Run Tests
         run: |
-            cd build
-            ctest --output-on-failure --timeout 30
-  
+          cd build
+          ctest --output-on-failure --timeout 30

@@ -12,58 +12,36 @@ on:
 jobs:
   build:
     runs-on: windows-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        sys: [mingw64, ucrt64, clang64]
-
-
-    name: "🚧 ${{ matrix.sys }}"
-    defaults:
-      run:
-        shell: msys2 {0}
+    env:
+      # 1. Force vcpkg to use GitHub Actions Cache as the storage backend
+      VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+    
     steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
 
-    - name: '🧰 Checkout'
-      uses: actions/checkout@v3.5.3
-      with:
-        fetch-depth: 0
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
 
-    - name: 'Setup MSYS2'
-      uses: msys2/setup-msys2@v2.22.0
-      with:
-        msystem: ${{matrix.sys}}
-        update: true
-        install: >-
-          git
-          make
-        pacboy: >-
-          toolchain:p
-          cmake:p
-          ninja:p
-          boost:p
-          pcre:p
-          libxml2:p
-          libpng:p
-          libwebp:p
-          libjpeg:p
-          opencv:p
-          libgit2:p
-          gtest:p
-          fmt:p
+      # 2. Setup vcpkg (automatically handles bootstrapping and caching)
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          # Just point to your vcpkg.json location
+          vcpkgJsonGlob: 'vcpkg.json'
 
-    - name: 'Setup submodule'
-      run: |
-        git submodule update --init
+      # 3. Build your project using CMake
+      - name: '🚧 Build TgBot++'
+        run: |
+          cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=${{ steps.runvcpkg.outputs.RUNVCPKG_VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake -DENABLE_TESTING=ON 
+          cmake --build build 
+          cmake --build build --target optional_all
 
-    - name: '🚧 Build TgBot++'
-      run: |
-        mkdir build
-        cmake -G Ninja -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_TESTING=ON -DBUILD_SHARED_LIBS=ON .
-        cmake --build build -j4
-        cmake --build build -j4 --target optional_all
-
-    - name: Run Tests
-      run: |
+      - name: Run Tests
+        run: |
           cd build
           ctest --output-on-failure --timeout 30

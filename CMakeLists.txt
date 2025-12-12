@@ -20,8 +20,6 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake")
 
 # ############################# OPTIONS ##############################
 option(ENABLE_RUST_SUPPORT "Enable rust support" OFF)
-option(SANITIZER_CONFIG "Sanitizers config for debug builds (ASan, TSan, etc)"
-       "ASan")
 option(BUILD_SHARED_LIBS "Build some dependent libraries as shared" OFF)
 option(ENABLE_TESTING "Enable testing" OFF)
 # ##############################################################################
@@ -51,49 +49,6 @@ if(CMAKE_CXX_LINK_PIE_SUPPORTED AND CMAKE_C_LINK_PIE_SUPPORTED)
   set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 else()
   message(STATUS "PIE (Position Independent Executable) not enabled")
-endif()
-
-# Sanitizers configuration
-set(SANITIZER_FLAG)
-
-if(NOT SANITIZER_CONFIG)
-  message(STATUS "No sanitizers enabled")
-elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
-  message(STATUS "Disabling sanitizers as release build")
-  # MSYS2 is special - They don't have any sanitizers
-elseif(MINGW OR MSYS)
-  message(STATUS "MSYS2 detected - Disabling sanitizers")
-elseif(SANITIZER_CONFIG STREQUAL "ASan")
-  message(STATUS "Address sanitizer enabled")
-  if(APPLE) # On apple, leak sanitizer is not implemented
-    set(SANITIZER_FLAG "-fsanitize=address")
-  elseif(MSVC)
-    set(SANITIZER_FLAG "/fsanitize=address")
-  else()
-    set(SANITIZER_FLAG "-fsanitize=address,leak")
-  endif()
-elseif(SANITIZER_CONFIG STREQUAL "UBSan")
-  if(MSVC)
-    set(SANITIZER_FLAG "/fsanitize=undefined")
-  else()
-    set(SANITIZER_FLAG "-fsanitize=undefined")
-  endif()
-elseif(SANITIZER_CONFIG STREQUAL "TSan")
-  message(STATUS "Thread sanitizer enabled")
-  if(MSVC)
-    set(SANITIZER_FLAG "/fsanitize=thread")
-  else()
-    set(SANITIZER_FLAG "-fsanitize=thread")
-  endif()
-elseif(SANITIZER_CONFIG STREQUAL "MSan")
-  if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    message(STATUS "Memory sanitizer enabled")
-    set(SANITIZER_FLAG "-fsanitize=memory")
-  else()
-    message(WARNING "Memory sanitizer is only supported with Clang")
-  endif()
-else()
-  message(WARNING "Unknown sanitizer configuration: ${SANITIZER_CONFIG}")
 endif()
 
 # Compiler specific settings
@@ -415,32 +370,17 @@ if(ENABLE_RUST_SUPPORT)
 endif()
 # ##############################################################################
 
-# ############################ Check lib #############################
+# ############################ Check lib (TODO: Make these optional) #############################
 find_package(Protobuf)
 find_package(fmt REQUIRED)
 find_package(jsoncpp REQUIRED) # Required by tgbot-cpp anyways...
 find_package(CURL REQUIRED)
-# If we couldn't find protobuf.
-if(NOT Protobuf_FOUND)
-  if(MSVC)
-    # If MSVC, use vcpkg's absl always.
-    find_package(absl REQUIRED)
-  else()
-    # Then we can just include source-abseil
-    message(STATUS "Using abseil-cpp as submodule")
-    set(ABSL_PROPAGATE_CXX_STD ON)
-    set(ABSL_BUILD_TEST_HELPERS OFF)
-    set(ABSL_ENABLE_INSTALL ON)
-    set(ABSL_BUILD_MONOLITHIC_SHARED_LIBS ON)
-    set(BUILD_SHARED_LIBS_backup ${BUILD_SHARED_LIBS})
-    set(BUILD_SHARED_LIBS ON)
-    add_subdirectory(src/third-party/abseil-cpp)
-    set(BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS_backup})
-  endif()
-else()
-  # If there was, then we can cause collision with the system abseil
-  find_package(absl REQUIRED)
-endif()
+find_package(cpptrace REQUIRED)
+find_package(absl REQUIRED)
+find_package(httplib REQUIRED)
+find_package(sol2 REQUIRED)
+find_package(fruit REQUIRED)
+find_package(dlfcn-win32 REQUIRED) # For Windows compatibility
 # ##############################################################################
 
 # Configure Ccache if available
@@ -464,8 +404,7 @@ endif()
 # ####################### Include subprojects ######################
 # dlfcn (libdl)
 if(WIN32)
-  add_subdirectory(src/third-party/dlfcn-win32)
-  set(CMAKE_DL_LIBS dl)
+  set(CMAKE_DL_LIBS dlfcn-win32::dl)
 elseif(ANDROID)
   set(CMAKE_DL_LIBS)
 else()
@@ -473,9 +412,6 @@ else()
   add_library(dl SHARED IMPORTED)
   set_target_properties(dl PROPERTIES IMPORTED_LOCATION "${DL}")
 endif()
-
-# Used by libzstd in cpptrace
-set(ANDROID_PLATFORM_LEVEL 35)
 
 add_subdirectory(src/api)
 add_subdirectory(src/database)
@@ -487,27 +423,10 @@ add_subdirectory(src/utils)
 add_subdirectory(src/web)
 add_subdirectory(src/libos)
 add_subdirectory(src/third-party/tgbot-cpp)
-add_subdirectory(src/third-party/cpptrace)
-add_subdirectory(src/third-party/fruit)
-add_subdirectory(src/third-party/sol2)
-find_package(Python3 QUIET)
-if(Python3_FOUND)
-  message(STATUS "Enabling cpp-httplib compilation")
-  set(HTTPLIB_COMPILE ON)
-endif()
-add_subdirectory(src/third-party/cpp-httplib)
 
 # Tests
 if(ENABLE_TESTING)
-  if(MSVC)
-    # Always use source built googletest for MSVC
-    # https://github.com/google/googletest/issues/4357
-    set(gtest_force_shared_crt TRUE)
-    set(INSTALL_GTEST FALSE)
-    add_subdirectory(src/third-party/googletest)
-  else()
-    find_package(GTest REQUIRED)
-  endif()
+  find_package(GTest REQUIRED)
   enable_testing()
   add_subdirectory(tests)
 else()

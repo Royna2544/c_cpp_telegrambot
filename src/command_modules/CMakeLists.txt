@@ -210,7 +210,7 @@ multi_command_module(PROVIDES up down SRCS updown.cpp)
 
 command_module(NAME log SRCS log.cpp)
 
-option(ENABLE_LLM "Enable LLM command module" OFF)
+option(ENABLE_LLM "Enable LLM command module, requires CUDA toolkit and NVIDIA GPU" OFF)
 
 if (ENABLE_LLM)
   set(GGML_CUDA ON)

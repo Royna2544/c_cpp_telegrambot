@@ -16,6 +16,18 @@
     "sqlite3",
     "jsoncpp",
     "openssl",
-    "zlib"
+    "zlib",
+    "cpp-httplib",
+    "fruit",
+    {
+      "name": "dlfcn-win32",
+      "platform": "windows"
+    },
+    "cpptrace",
+    "abseil",
+    "protobuf",
+    "gtest",
+    "sol2",
+    "libarchive"
   ]
 }
