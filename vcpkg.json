@@ -1,6 +1,13 @@
 {
   "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
+  "name": "telegram-bot-cpp",
+  "version-string": "1.0.0",
+  "builtin-baseline": "ee12231b20c95013c6638d845d04c91559a1d1ff",
   "dependencies": [
+    {
+      "name": "dlfcn-win32",
+      "platform": "windows"
+    },
     "boost-asio",
     "boost-system",
     "boost-program-options",
@@ -19,10 +26,6 @@
     "zlib",
     "cpp-httplib",
     "fruit",
-    {
-      "name": "dlfcn-win32",
-      "platform": "windows"
-    },
     "cpptrace",
     "abseil",
     "protobuf",
