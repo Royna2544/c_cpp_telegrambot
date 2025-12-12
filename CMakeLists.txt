@@ -380,7 +380,6 @@ find_package(absl REQUIRED)
 find_package(httplib REQUIRED)
 find_package(sol2 REQUIRED)
 find_package(fruit REQUIRED)
-find_package(dlfcn-win32 REQUIRED) # For Windows compatibility
 # ##############################################################################
 
 # Configure Ccache if available
@@ -404,6 +403,7 @@ endif()
 # ####################### Include subprojects ######################
 # dlfcn (libdl)
 if(WIN32)
+  find_package(dlfcn-win32 REQUIRED)
   set(CMAKE_DL_LIBS dlfcn-win32::dl)
 elseif(ANDROID)
   set(CMAKE_DL_LIBS)
