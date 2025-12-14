@@ -493,7 +493,13 @@ install(
   FILES_MATCHING
   PATTERN "*"
   PATTERN "*.in" EXCLUDE)
+install(
+  DIRECTORY www/
+  DESTINATION share/${PROJECT_NAME}/www
+)
+
 file(COPY resources/ DESTINATION ${CMAKE_BINARY_DIR}/share/${PROJECT_NAME})
+file(COPY www/ DESTINATION ${CMAKE_BINARY_DIR}/share/${PROJECT_NAME}/www)
 
 # Set CPack configurations
 set(CPACK_PACKAGE_NAME "Telegram Bot Server in C++")

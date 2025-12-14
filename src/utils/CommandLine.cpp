@@ -60,7 +60,7 @@ std::filesystem::path CommandLine::getPath(FS::PathType type) const {
         case FS::PathType::RESOURCES_SQL:
             return getPath(FS::PathType::RESOURCES) / "sql";
         case FS::PathType::RESOURCES_WEBPAGE:
-            return buf.parent_path() / "www";
+            return getPath(FS::PathType::RESOURCES) / "www";
         case FS::PathType::RESOURCES_SCRIPTS:
             return getPath(FS::PathType::RESOURCES) / "scripts";
         case FS::PathType::CMD_MODULES:

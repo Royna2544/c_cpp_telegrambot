@@ -42,7 +42,7 @@ void TgBotWebServerBase::startServer() {
     auto ret = svr.set_mount_point(Constants::kWebRootNode.data(),
                                    webServerRootPath.string());
     if (!ret) {
-        LOG(ERROR) << "Failed to switch mount point";
+        LOG(ERROR) << "Failed to switch mount point to " << webServerRootPath;
         return;
     } else {
         LOG(INFO) << "Web page mount point: " << webServerRootPath.string()
