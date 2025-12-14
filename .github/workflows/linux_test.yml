@@ -75,7 +75,7 @@ jobs:
           CC: ${{ matrix.real_cc }}
           CXX: ${{ matrix.real_cxx }}
         run: |
-          sudo apt install autoconf autoconf-archive automake libtool libxrandr-dev libx11-dev libxft-dev libxext-dev
+          sudo apt install autoconf autoconf-archive automake libtool libxrandr-dev libx11-dev libxft-dev libxext-dev libltdl-dev
           cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake -DENABLE_TESTING=ON 
           cmake --build build 
           cmake --build build --target optional_all
