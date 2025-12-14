@@ -3,7 +3,7 @@
 ## Status
 [![Build TgBot++ (Linux)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/linux_test.yml/badge.svg)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/linux_test.yml)
 
-[![Build TgBot++ (macOS)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/macos_test.yml/badge.svg?event=push)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/macos_test.yml)
+[![Build TgBot++ (macOS)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/macos_test.yml/badge.svg)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/macos_test.yml)
 
 [![Build TgBot++ (Windows)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/windows_test.yml/badge.svg)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/windows_test.yml)
 
@@ -30,3 +30,20 @@
 
 ## TODOs
 - See TODO file, though its not really updated
+
+## Cmake options
+# CMake options has a common prefix of 'TGBOTCPP_'
+- TGBOTCPP_BUILD_TESTS: Build the test suite (default: ON)
+- TGBOTCPP_RUST_MODULES: Enable and build command modules written with Rust language (default: OFF)
+- TGBOTCPP_LUA_MODULES: Enable support for command module written with Lua language (default: ON)
+- TGBOTCPP_LLM_SUPPORT: Enable support for LLM framework (Requires compatible hardware, e.g. NVIDIA GPU) (default: OFF)
+- TGBOTCPP_SOCKET_PACKET_VERBOSE: Enable verbose hex-view level logging for socket packets (default: OFF)
+
+## Config file options
+- TOKEN: Telegram bot token
+- LOG_FILE: Log file path
+- DATABASE_CFG: Database configuration. Format: "type:filename", where type is one of "sqlite" or "protobuf", and filename is the database file path.
+- SOCKET_CFG: Export network-socket based API configuration. Choose between "ipv4", "ipv6". Omitting this option disables the socket API.
+- GITHUB_TOKEN: Github token (Used for private repo access).
+- OPTIONAL_COMPONENTS: Enable optional components. Comma-separated list of components to enable. Supported components: "webserver", "datacollector".
+- BUILDBUDDY_API_KEY: BuildBuddy API key for Android RBE.

@@ -19,9 +19,9 @@ endif()
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake")
 
 # ############################# OPTIONS ##############################
-option(ENABLE_RUST_SUPPORT "Enable rust support" OFF)
+option(TGBOTCPP_RUST_MODULES "TgBot-Cpp: Enable rust support" OFF)
+option(TGBOTCPP_BUILD_TESTS "TgBot-Cpp: Build the test suite" OFF)
 option(BUILD_SHARED_LIBS "Build some dependent libraries as shared" OFF)
-option(ENABLE_TESTING "Enable testing" OFF)
 # ##############################################################################
 
 # ##############################################################################
@@ -245,14 +245,9 @@ function(tgbot_common_target TARGET_NAME)
     ${TARGET_NAME} PROPERTIES LIBRARY_OUTPUT_DIRECTORY
                               ${CMAKE_BINARY_DIR}/${LIBRARY_INSTALL_DIR})
 
-  # sanitizers / PIE / LTO
-  if(SANITIZER_FLAG)
-    target_compile_options(${TARGET_NAME} PRIVATE ${SANITIZER_FLAG})
-    target_link_options(${TARGET_NAME} PRIVATE ${SANITIZER_FLAG})
-  endif()
-  if(LTO_SUPPORTED)
-    set_target_properties(${TARGET_NAME} PROPERTIES INTERPROCEDURAL_OPTIMIZATION
-                                                    ON)
+  # LTO
+  if (LTO_SUPPORTED)
+    set_target_properties(${TARGET_NAME} PROPERTIES INTERPROCEDURAL_OPTIMIZATION ON)
   endif()
 
   # Global variables
@@ -331,7 +326,7 @@ function(tgbot_exe)
     list(APPEND EXE_LIBS LogInit absl::log)
   endif()
 
-  if(EXE_OPTIONAL)
+  if (EXE_OPTIONAL)
     add_executable(${TARGET_NAME} EXCLUDE_FROM_ALL ${EXE_SRCS})
     add_dependencies(optional_all ${TARGET_NAME})
   else()
@@ -343,13 +338,7 @@ function(tgbot_exe)
 
   tgbot_common_target(${TARGET_NAME} PUBLIC_LIBS ${EXE_LIBS})
 
-  if(EXE_TEST)
-    if(MSVC AND BUILD_SHARED_LIBS)
-      # https://github.com/google/googletest/issues/292
-      target_compile_definitions(${TARGET_NAME}
-                                 PRIVATE GTEST_LINKED_AS_SHARED_LIBRARY)
-    endif()
-
+  if (EXE_TEST)
     # ---------- extra test registration ----------
     add_test(NAME TestSuite_${TARGET_NAME} COMMAND ${TARGET_NAME})
   elseif(NOT EXE_OPTIONAL)
@@ -364,7 +353,7 @@ function(tgbot_exe)
 endfunction()
 
 # ########################### RUST support ###########################
-if(ENABLE_RUST_SUPPORT)
+if (TGBOTCPP_RUST_MODULES)
   add_subdirectory(src/third-party/corrosion)
   corrosion_import_crate(MANIFEST_PATH src/rust/stringcalc/Cargo.toml)
 endif()
@@ -425,7 +414,7 @@ add_subdirectory(src/libos)
 add_subdirectory(src/third-party/tgbot-cpp)
 
 # Tests
-if(ENABLE_TESTING)
+if (TGBOTCPP_BUILD_TESTS)
   find_package(GTest REQUIRED)
   enable_testing()
   add_subdirectory(tests)

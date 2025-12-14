@@ -2,17 +2,16 @@ find_package(OpenSSL REQUIRED)
 
 find_package(Boost 1.70 CONFIG COMPONENTS system)
 
-option(SOCKET_ENABLE_HEXDUMP
-       "Enable hex-view of sent-recv packets (extremely verbose)" OFF)
+option(TGBOTCPP_SOCKET_PACKET_VERBOSE "TgBot-Cpp: Enable verbose hex-view level logging for socket packets" OFF)
 
 set(SOCKET_HEXDUMP_LIB)
 set(SOCKET_HEXDUMP_DEF)
-if(SOCKET_ENABLE_HEXDUMP AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+if(TGBOTCPP_SOCKET_PACKET_VERBOSE AND CMAKE_BUILD_TYPE STREQUAL "Debug")
   set(SOCKET_HEXDUMP_LIB HexDump)
   set(SOCKET_HEXDUMP_DEF ENABLE_HEXDUMP)
 endif()
 
-tgbot_library(NAME HexDump SRCS lib/hexdump.c)
+tgbot_library(NAME HexDump SRCS lib/hexdump.c STATIC)
 
 tgbot_library(
   NAME
