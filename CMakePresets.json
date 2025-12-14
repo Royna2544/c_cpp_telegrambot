@@ -44,7 +44,7 @@
         "CMAKE_TOOLCHAIN_FILE": "C:\\Users\\royna\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake",
         "ENABLE_TESTING": true,
         "BUILD_SHARED_LIBS": false,
-        "ENABLE_LLM": true
+        "ENABLE_LLM": false
       },
       "condition": {
         "type": "equals",
