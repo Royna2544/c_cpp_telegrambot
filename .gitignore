@@ -25,3 +25,4 @@ CMakeSettings.json
 
 # Visual studio
 out/
+/vcpkg_installed
