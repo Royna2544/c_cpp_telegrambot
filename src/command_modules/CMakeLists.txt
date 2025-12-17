@@ -212,7 +212,7 @@ command_module(NAME log SRCS log.cpp)
 
 option(ENABLE_LLM "Enable LLM command module, requires CUDA toolkit and NVIDIA GPU" OFF)
 
-if (ENABLE_LLM)
+if (TGBOTCPP_LLM_SUPPORT)
   set(GGML_CUDA ON)
   add_subdirectory(llm/llama.cpp)
   if (MSVC)

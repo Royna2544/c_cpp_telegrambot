@@ -8,7 +8,7 @@
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "installDir": "${sourceDir}/out/install/${presetName}",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "CMAKE_TOOLCHAIN_FILE": "/home/royna/vcpkg/scripts/buildsystems/vcpkg.cmake" },
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" },
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
@@ -41,10 +41,10 @@
       "cacheVariables": {
         "CMAKE_C_COMPILER": "cl.exe",
         "CMAKE_CXX_COMPILER": "cl.exe",
-        "CMAKE_TOOLCHAIN_FILE": "C:\\Users\\royna\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake",
-        "ENABLE_TESTING": true,
+        "CMAKE_TOOLCHAIN_FILE": "F:\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake",
+        "TGBOTCPP_BUILD_TESTS": true,
         "BUILD_SHARED_LIBS": false,
-        "ENABLE_LLM": false
+        "TGBOTCPP_LLM_SUPPORT": false
       },
       "condition": {
         "type": "equals",
