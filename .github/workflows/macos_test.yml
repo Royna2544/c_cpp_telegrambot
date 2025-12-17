@@ -33,9 +33,15 @@ jobs:
         with:
           # Just point to your vcpkg.json location
           vcpkgJsonGlob: 'vcpkg.json'
-          
+
+      - name: Set up dependencies
+        run: brew install llvm    
+
       # 3. Build your project using CMake
       - name: '🚧 Build TgBot++'
+        env: 
+          CC: /opt/homebrew/opt/llvm/bin/clang
+          CXX: /opt/homebrew/opt/llvm/bin/clang++
         run: |
           cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake -DENABLE_TESTING=ON 
           cmake --build build 
