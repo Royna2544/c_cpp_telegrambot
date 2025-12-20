@@ -2,7 +2,7 @@
 
 #include <absl/status/status.h>
 
-#include <expected_cpp20>
+#include <expected>
 #include <memory>
 #include <regex>
 #include <string>
@@ -29,7 +29,7 @@ class RegexCommand {
         None,  // Regex didn't match, so just ignore.
     };
 
-    using Result = std_cpp20::expected<std::string, RegexCommand::Error>;
+    using Result = std::expected<std::string, RegexCommand::Error>;
 
     /**
      * @brief Returns a brief description of the command.
