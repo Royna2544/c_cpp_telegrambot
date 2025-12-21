@@ -101,7 +101,7 @@ auto computeHMAC(const TgBotSocket::Packet& packet) {
     }
 
 #ifdef ENABLE_HEXDUMP
-    DLOG(INFO) << "ComputeHMAC - DUMP HMAC result";
+    DLOG(INFO) << "ComputeHMAC - DUMP computed HMAC result";
     hexdump((const uint8_t*)hmac_result.data(), hmac_result.size());
 #endif
     return hmac_result;
@@ -306,6 +306,10 @@ std::optional<Packet> readPacket(const TgBotSocket::Context& context) {
                 return std::nullopt;
         }
     } else if (packet.hmac != computeHMAC(packet)) {
+#ifdef ENABLE_HEXDUMP
+        DLOG(INFO) << "ComputeHMAC - DUMP expected HMAC result";
+        hexdump((const uint8_t*)packet.hmac.data(), packet.hmac.size());
+#endif
         LOG(ERROR) << "HMAC mismatch";
         return std::nullopt;
     }
