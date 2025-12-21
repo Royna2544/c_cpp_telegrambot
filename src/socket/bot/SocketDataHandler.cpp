@@ -81,7 +81,7 @@ Packet toJSONPacket(const GenericAck& ack,
     root["result"] = ack.result == AckType::SUCCESS;
     if (ack.result != AckType::SUCCESS) {
         root["error_msg"] = safeParse(ack.error_msg);
-        switch (ack.result) {
+        switch (ack.result.operator TgBotSocket::callback::AckType()) {
             case AckType::ERROR_CLIENT_ERROR:
                 root["error_type"] = "CLIENT_ERROR";
                 break;
@@ -654,7 +654,7 @@ void SocketInterfaceTgBot::handlePacket(const TgBotSocket::Context& ctx,
     const auto invalidPacketAck =
         GenericAck(AckType::ERROR_COMMAND_IGNORED, "Invalid packet size");
 
-    switch (pkt.header.cmd) {
+    switch (pkt.header.cmd.operator Command()) {
         case Command::CMD_WRITE_MSG_TO_CHAT_ID:
             ret = handle_WriteMsgToChatId(ptr, pkt.header.data_size,
                                           pkt.header.data_type);
@@ -700,7 +700,7 @@ void SocketInterfaceTgBot::handlePacket(const TgBotSocket::Context& ctx,
             }
             return;
     };
-    switch (pkt.header.cmd) {
+    switch (pkt.header.cmd.operator TgBotSocket::Command()) {
         case Command::CMD_GET_UPTIME:
         case Command::CMD_TRANSFER_FILE_REQUEST: {
             // This has its own callback, so we don't need to send ack.
@@ -724,7 +724,7 @@ void SocketInterfaceTgBot::handlePacket(const TgBotSocket::Context& ctx,
             GenericAck result = std::get<GenericAck>(ret);
             LOG(INFO) << "Sending ack: " << std::boolalpha
                       << (result.result == AckType::SUCCESS);
-            switch (pkt.header.data_type) {
+            switch (pkt.header.data_type.operator TgBotSocket::PayloadType()) {
                 case PayloadType::Binary: {
                     auto ackpkt = createPacket(Command::CMD_GENERIC_ACK,
                                                &result, sizeof(GenericAck),

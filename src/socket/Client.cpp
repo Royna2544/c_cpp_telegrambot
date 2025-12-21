@@ -41,7 +41,7 @@ bool verifyArgsCount(Command cmd, int argc) {
 }
 
 template <class C>
-bool parseOneEnum(C* res, C max, const char* str, const char* name) {
+bool parseOneEnum(ByteHelper<C>* res, C max, const char* str, const char* name) {
     int parsed{};
     if (try_parse(str, &parsed)) {
         if (parsed >= 0 && parsed < static_cast<int>(max)) {
@@ -98,7 +98,7 @@ void handleCallback(SocketClientWrapper& connector, const Packet& pkt) {
     RealFS real;
     SocketFile2DataHelper helper(&real);
 
-    switch (pkt.header.cmd) {
+    switch (pkt.header.cmd.operator TgBotSocket::Command()) {
         case Command::CMD_GET_UPTIME_CALLBACK: {
             callback::GetUptimeCallback callbackData = {};
             pkt.data.assignTo(callbackData);
@@ -107,7 +107,7 @@ void handleCallback(SocketClientWrapper& connector, const Packet& pkt) {
         }
         case Command::CMD_TRANSFER_FILE: {
             SocketFile2DataHelper::Params result;
-            switch (pkt.header.data_type) {
+            switch (pkt.header.data_type.operator TgBotSocket::PayloadType()) {
                 case PayloadType::Binary: {
                     if (pkt.data.size() < sizeof(data::FileTransferMeta)) {
                         DLOG(WARNING)
@@ -173,7 +173,7 @@ void handleCallback(SocketClientWrapper& connector, const Packet& pkt) {
             break;
         }
         case Command::CMD_GENERIC_ACK: {
-            switch (pkt.header.data_type) {
+            switch (pkt.header.data_type.operator TgBotSocket::PayloadType()) {
                 case PayloadType::Binary: {
                     callback::GenericAck callbackData{};
                     pkt.data.assignTo(callbackData);
@@ -223,16 +223,18 @@ std::optional<T> parseArgs(char** argv) = delete;
 template <>
 std::optional<data::WriteMsgToChatId> parseArgs(char** argv) {
     data::WriteMsgToChatId data{};
-    if (!try_parse(argv[0], &data.chat)) {
+    decltype(data.chat)::type chat;
+    if (!try_parse(argv[0], &chat)) {
         return std::nullopt;
     }
+    data.chat = chat;
     copyTo(data.message, argv[1]);
     return data;
 }
 
 template <>
 std::optional<data::CtrlSpamBlock> parseArgs(char** argv) {
-    data::CtrlSpamBlock data;
+    ByteHelper<data::CtrlSpamBlock> data;
     if (parseOneEnum(&data, data::CtrlSpamBlock::MAX, argv[0], "spamblock")) {
         return data;
     }
@@ -242,7 +244,9 @@ std::optional<data::CtrlSpamBlock> parseArgs(char** argv) {
 template <>
 std::optional<data::ObserveChatId> parseArgs(char** argv) {
     data::ObserveChatId data{};
-    if (try_parse(argv[0], &data.chat) && try_parse(argv[1], &data.observe)) {
+    decltype(data.chat)::type chat;
+    if (try_parse(argv[0], &chat) && try_parse(argv[1], &data.observe)) {
+        data.chat = chat;
         return data;
     }
     return std::nullopt;
@@ -252,7 +256,7 @@ template <>
 std::optional<data::SendFileToChatId> parseArgs(char** argv) {
     data::SendFileToChatId data{};
     ChatId id;
-    data::FileType fileType;
+    ByteHelper<data::FileType> fileType;
     if (try_parse(argv[0], &id) &&
         parseOneEnum(&fileType, data::FileType::TYPE_MAX, argv[1], "type")) {
         data.chat = id;
@@ -286,7 +290,7 @@ std::optional<SocketFile2DataHelper::Params> parseArgs(char** argv) {
 }
 
 int app_main(int argc, char** argv) {
-    enum Command cmd {};
+    ByteHelper<Command> cmd {};
     const char* exe = argv[0];
 
     if (argc == 1) {
@@ -350,7 +354,7 @@ int app_main(int argc, char** argv) {
                             session_token.begin());
 
         std::optional<Packet> pkt;
-        switch (cmd) {
+        switch (cmd.operator TgBotSocket::Command()) {
             case Command::CMD_WRITE_MSG_TO_CHAT_ID: {
                 auto args = parseArgs<data::WriteMsgToChatId>(argv);
                 if (!args) {

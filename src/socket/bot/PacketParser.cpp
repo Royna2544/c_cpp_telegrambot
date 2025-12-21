@@ -296,7 +296,7 @@ std::optional<Packet> readPacket(const TgBotSocket::Context& context) {
     hmac->assignTo(packet.hmac);
 
     if (packet.hmac == Packet::hmac_type{}) {
-        switch (packet.header.cmd) {
+        switch (packet.header.cmd.operator TgBotSocket::Command()) {
             // till open session ack, we don't know the session key
             case Command::CMD_OPEN_SESSION:
             case Command::CMD_OPEN_SESSION_ACK:

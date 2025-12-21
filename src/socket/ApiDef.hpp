@@ -7,10 +7,12 @@
 
 #include <SharedMalloc.hpp>
 #include <array>
+#include <bit>
 #include <cstdint>
 #include <cstring>
 #include <string>
 #include <type_traits>
+#include <fmt/format.h>
 
 template <typename T, size_t size>
 inline bool arraycmp(const std::array<T, size>& lhs,
@@ -35,6 +37,72 @@ inline void copyTo(std::array<char, size>& arr_in,
     copyTo(arr_in, buf.data());
     arr_in[size - 1] = '\0';
 }
+
+// Helper to safely extract underlying type ONLY if it's an enum
+template <typename T, bool IsEnum = std::is_enum_v<T>>
+struct SafeUnderlying {
+    using type = T;
+};
+
+template <typename T>
+struct SafeUnderlying<T, true> {
+    using type = std::underlying_type_t<T>;
+};
+
+template <typename Underlying>
+struct ByteHelper {
+    Underlying value;
+    using type = Underlying;
+
+    // Helper to get the integer type (works for ints and enums)
+    using IntType = typename SafeUnderlying<Underlying>::type;
+
+    constexpr operator Underlying() const {
+        if constexpr (std::endian::native == std::endian::little)
+            // Cast to integer, swap, then cast back
+            return static_cast<Underlying>(
+                std::byteswap(static_cast<IntType>(value)));
+        else
+            return value;
+    }
+
+    constexpr operator IntType() const 
+        requires (!std::is_same_v<Underlying, IntType>) {
+        if constexpr (std::endian::native == std::endian::little)
+            // Cast to integer, swap
+            return std::byteswap(static_cast<IntType>(value));
+        else
+            return static_cast<IntType>(value);
+    }
+
+    constexpr ByteHelper(Underlying v) {
+        if constexpr (std::endian::native == std::endian::little)
+            value =
+                static_cast<Underlying>(std::byteswap(static_cast<IntType>(v)));
+        else
+            value = v;
+    }
+
+    ByteHelper() = default;
+
+    // Allow assignment operator for convenience
+    ByteHelper& operator=(Underlying v) {
+        *this = ByteHelper(v);
+        return *this;
+    }
+};
+
+template <typename T>
+struct fmt::formatter<ByteHelper<T>> : fmt::formatter<T> {
+    // 'parse' is inherited from base, so we only need to implement 'format'
+
+    template <typename FormatContext>
+    auto format(const ByteHelper<T>& wrapper, FormatContext& ctx) const {
+        // static_cast invokes the conversion operator we defined earlier
+        // which handles the endian swap automatically.
+        return fmt::formatter<T>::format(static_cast<T>(wrapper), ctx);
+    }
+};
 
 namespace TgBotSocket {
 
@@ -87,6 +155,7 @@ struct alignas(ALIGNMENT) Packet {
      */
     struct alignas(ALIGNMENT) Header {
         constexpr static int64_t MAGIC_VALUE_BASE = 0xDEADFACE;
+
         // Version number, to be increased on breaking changes
         // 1: Initial version
         // 2: Added crc32 checks to packet data
@@ -119,12 +188,12 @@ struct alignas(ALIGNMENT) Packet {
         using session_token_type = std::array<char, SESSION_TOKEN_LENGTH>;
         using init_vector_type = std::array<uint8_t, IV_LENGTH>;
 
-        int64_t magic = MAGIC_VALUE;  ///< Magic value to verify the packet
-        Command cmd;                  ///< Command to be executed
-        PayloadType data_type;        ///< Type of payload in the packet
-        length_type data_size;        ///< Size of the data in the packet
+        ByteHelper<int64_t> magic =  MAGIC_VALUE;  ///< Magic value to verify the packet
+        ByteHelper<Command> cmd;        ///< Command to be executed
+        ByteHelper<PayloadType> data_type;   ///< Type of payload in the packet
+        ByteHelper<length_type> data_size;    ///< Size of the data in the packet
         session_token_type session_token;  ///< Session token
-        nounce_type nonce;               ///< Nonce (Epoch timestamp is used)
+        ByteHelper<nounce_type> nonce;   ///< Nonce (Epoch timestamp is used)
         init_vector_type init_vector;    ///< Initialization vector for AES-GCM
     } header{};
     SharedMalloc data;
@@ -166,7 +235,7 @@ enum class CtrlSpamBlock {
  * }
  */
 struct alignas(ALIGNMENT) WriteMsgToChatId {
-    ChatId chat;                 // destination chatid
+    ByteHelper<ChatId> chat;     // destination chatid
     MessageStringArray message;  // Msg to send
 };
 
@@ -180,7 +249,7 @@ struct alignas(ALIGNMENT) WriteMsgToChatId {
  * }
  */
 struct alignas(ALIGNMENT) ObserveChatId {
-    ChatId chat;
+    ByteHelper<ChatId> chat;
     bool observe;  // new state for given ChatId,
                    // true/false - Start/Stop observing
 };
@@ -197,8 +266,8 @@ struct alignas(ALIGNMENT) ObserveChatId {
  */
 
 struct alignas(ALIGNMENT) SendFileToChatId {
-    ChatId chat;                                  // Destination ChatId
-    FileType fileType;                            // File type for file
+    ByteHelper<ChatId> chat;                      // Destination ChatId
+    ByteHelper<FileType> fileType;                  // File type for file
     alignas(ALIGNMENT) PathStringArray filePath;  // Path to file (local)
 };
 
@@ -318,7 +387,7 @@ enum class AckType {
  */
 
 struct alignas(ALIGNMENT) GenericAck {
-    AckType result{};  // result type
+    ByteHelper<AckType> result{};  // result type
     // Error message, only valid when result type is not SUCCESS
     alignas(ALIGNMENT) MessageStringArray error_msg{};
 
