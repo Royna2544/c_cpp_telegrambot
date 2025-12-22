@@ -4,7 +4,7 @@
 #include <fmt/format.h>
 
 #include <cctype>
-#include <expected>
+#include <expected_cpp20>
 #include <global_handlers/RegEXHandler.hpp>
 #include <iomanip>
 #include <optional>
@@ -25,10 +25,10 @@ using std::regex_constants::match_not_null;
             return process(source, match);
         } catch (const std::regex_error& e) {
             LOG(ERROR) << "Invalid regex: " << e.what();
-            return std::unexpected{Error::InvalidRegex};
+            return std_cpp20::unexpected{Error::InvalidRegex};
         }
     }
-    return std::unexpected{Error::None};
+    return std_cpp20::unexpected{Error::None};
 }
 
 struct ReplaceCommand : public RegexCommand {
@@ -75,13 +75,13 @@ struct ReplaceCommand : public RegexCommand {
                     replaceIndex = value;
                 } else {
                     LOG(ERROR) << "Invalid regex option: " << option;
-                    return std::unexpected(Error::InvalidRegexOption);
+                    return std_cpp20::unexpected(Error::InvalidRegexOption);
                 }
             }
 
             // Error if both global and specific index are set
             if ((kRegexMatchFlags & format_first_only) == 0 && replaceIndex) {
-                return std::unexpected(
+                return std_cpp20::unexpected(
                     Error::GlobalFlagAndMatchIndexInvalid);
             }
         }
@@ -115,7 +115,7 @@ struct ReplaceCommand : public RegexCommand {
             if (!replaced) {
                 LOG(INFO) << "Found " << count
                           << " matches, been told to replace " << *replaceIndex;
-                return std::unexpected(Error::InvalidRegexMatchIndex);
+                return std_cpp20::unexpected(Error::InvalidRegexMatchIndex);
             }
             // Append the remainder
             result += std::string(last_pos, source.end());
