@@ -19,7 +19,7 @@ jobs:
           - cc: GCC
             real_cc: gcc
             real_cxx: g++
-            flags: -DENABLE_RUST_SUPPORT=ON
+            flags: -DTGBOTCPP_RUST_MODULES=ON
             str: (Rust)
 
           - cc: GCC
@@ -31,7 +31,7 @@ jobs:
           - cc: Clang
             real_cc: clang-18
             real_cxx: clang++-18
-            flags: -DENABLE_RUST_SUPPORT=ON
+            flags: -DTGBOTCPP_RUST_MODULES=ON
             str: (Rust)
 
           - cc: Clang
@@ -75,8 +75,9 @@ jobs:
           CC: ${{ matrix.real_cc }}
           CXX: ${{ matrix.real_cxx }}
         run: |
+          sudo apt update
           sudo apt install autoconf autoconf-archive automake libtool libxrandr-dev libx11-dev libxft-dev libxext-dev libltdl-dev libxi-dev libxtst-dev x11-xserver-utils gi-docgen
-          cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake -DENABLE_TESTING=ON 
+          cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake -DTGBOTCPP_BUILD_TESTS=ON 
           cmake --build build 
           cmake --build build --target optional_all
 
