@@ -18,7 +18,7 @@
             },
             {
                 "android_version": 16,
-                "branch": "bka"
+                "branch": "bq1"
             }
         ]
     },
@@ -52,7 +52,7 @@
         "branches": [
             {
                 "android_version": 16,
-                "branch": "lineage-23.0"
+                "branch": "lineage-23.2"
             },
             {
                 "android_version": 15,
