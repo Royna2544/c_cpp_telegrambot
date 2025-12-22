@@ -167,6 +167,54 @@ struct GitBranchSwitcher::RepoInfoPriv {
     const char* current_branch = nullptr;  // Name of current branch
 };
 
+struct GitBranchSwitcher::CheckoutInfoPriv {
+    struct {  // refs/heads/ *branch*
+        std::string local;
+        std::string remote;
+    } target_ref_name;
+    git_reference_ptr target_local_ref;   // The target reference in local
+    git_reference_ptr target_remote_ref;  // The target reference in remote
+    bool fetched = true;
+    git_diff_options diff_opts = GIT_DIFF_OPTIONS_INIT;
+    git_checkout_options checkout_opts = GIT_CHECKOUT_OPTIONS_INIT;
+    const char* remote_refname() const {
+        return target_ref_name.remote.c_str();
+    }
+
+    const char* local_refname() const { return target_ref_name.local.c_str(); }
+
+    CheckoutInfoPriv(git_repository* repo, git_remote* remote,
+                     std::string_view destBranch) {
+        diff_opts.flags = GIT_CHECKOUT_NOTIFY_CONFLICT;
+        checkout_opts.checkout_strategy = GIT_CHECKOUT_SAFE;
+        // Craft strings
+        target_ref_name.local = fmt::format("refs/heads/{}", destBranch);
+        target_ref_name.remote =
+            fmt::format("refs/remotes/{}/{}", kRemoteRepoName, destBranch);
+
+        // Now try to find the branch in local first
+        int ret = git_reference_lookup(target_local_ref, repo, local_refname());
+        if (ret != 0) {
+            LOG(WARNING) << "Didn't find local ref: " << git_error_last_str();
+        }
+
+        // If local didn't exist, maybe remote has it?
+        // First update the repo data with fetch.
+        ret = git_remote_fetch(remote, nullptr, nullptr, nullptr);
+        if (ret != 0) {
+            LOG(WARNING) << "Failed to fetch remote: " << git_error_last_str();
+            // This is only for updating origin/ refs, not a requirement.
+            fetched = false;
+        }
+
+        // Now try to find the branch in the remote
+        ret = git_reference_lookup(target_remote_ref, repo, remote_refname());
+        if (ret != 0) {
+            LOG(WARNING) << "Didn't find remote ref: " << git_error_last_str();
+        }
+    }
+};
+
 void GitBranchSwitcher::removeOffendingConfig() const {
     int ret;
     std::error_code ec;
@@ -251,54 +299,6 @@ bool GitBranchSwitcher::open() {
     cdata = nullptr;
     return true;
 }
-
-struct GitBranchSwitcher::CheckoutInfoPriv {
-    struct {  // refs/heads/ *branch*
-        std::string local;
-        std::string remote;
-    } target_ref_name;
-    git_reference_ptr target_local_ref;   // The target reference in local
-    git_reference_ptr target_remote_ref;  // The target reference in remote
-    bool fetched = true;
-    git_diff_options diff_opts = GIT_DIFF_OPTIONS_INIT;
-    git_checkout_options checkout_opts = GIT_CHECKOUT_OPTIONS_INIT;
-    const char* remote_refname() const {
-        return target_ref_name.remote.c_str();
-    }
-
-    const char* local_refname() const { return target_ref_name.local.c_str(); }
-
-    CheckoutInfoPriv(git_repository* repo, git_remote* remote,
-                     std::string_view destBranch) {
-        diff_opts.flags = GIT_CHECKOUT_NOTIFY_CONFLICT;
-        checkout_opts.checkout_strategy = GIT_CHECKOUT_SAFE;
-        // Craft strings
-        target_ref_name.local = fmt::format("refs/heads/{}", destBranch);
-        target_ref_name.remote =
-            fmt::format("refs/remotes/{}/{}", kRemoteRepoName, destBranch);
-
-        // Now try to find the branch in local first
-        int ret = git_reference_lookup(target_local_ref, repo, local_refname());
-        if (ret != 0) {
-            LOG(WARNING) << "Didn't find local ref: " << git_error_last_str();
-        }
-
-        // If local didn't exist, maybe remote has it?
-        // First update the repo data with fetch.
-        ret = git_remote_fetch(remote, nullptr, nullptr, nullptr);
-        if (ret != 0) {
-            LOG(WARNING) << "Failed to fetch remote: " << git_error_last_str();
-            // This is only for updating origin/ refs, not a requirement.
-            fetched = false;
-        }
-
-        // Now try to find the branch in the remote
-        ret = git_reference_lookup(target_remote_ref, repo, remote_refname());
-        if (ret != 0) {
-            LOG(WARNING) << "Didn't find remote ref: " << git_error_last_str();
-        }
-    }
-};
 
 bool GitBranchSwitcher::fastForwardPull() const {
     git_merge_options merge_opts = GIT_MERGE_OPTIONS_INIT;
