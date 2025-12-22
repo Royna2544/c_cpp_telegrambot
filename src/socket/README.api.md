@@ -158,6 +158,7 @@ Effect: Server removes session from table, token becomes invalid
 | Messaging | CMD_WRITE_MSG_TO_CHAT_ID |
 | Chat Control | CMD_OBSERVE_CHAT_ID, CMD_OBSERVE_ALL_CHATS |
 | File Transfer | CMD_SEND_FILE_TO_CHAT_ID, CMD_TRANSFER_FILE, CMD_TRANSFER_FILE_REQUEST |
+| Chunked Transfer | CMD_TRANSFER_FILE_BEGIN, CMD_TRANSFER_FILE_CHUNK, CMD_TRANSFER_FILE_CHUNK_RESPONSE, CMD_TRANSFER_FILE_END |
 | System | CMD_GET_UPTIME, CMD_CTRL_SPAMBLOCK |
 | Callbacks | CMD_GET_UPTIME_CALLBACK, CMD_GENERIC_ACK |
 
@@ -176,10 +177,6 @@ Effect: Server removes session from table, token becomes invalid
 | 6 | CMD_GET_UPTIME | Query server uptime |
 | 7 | CMD_TRANSFER_FILE | Transfer file with verification |
 | 8 | CMD_TRANSFER_FILE_REQUEST | Request file from server |
-| 9 | CMD_TRANSFER_FILE_BEGIN | Start chunked transfer session |
-| 10 | CMD_TRANSFER_FILE_CHUNK | Send file chunk |
-| 11 | CMD_TRANSFER_FILE_CHUNK_RESPONSE | Acknowledge chunk receipt |
-| 12 | CMD_TRANSFER_FILE_END | Complete transfer session |
 
 **Server Internal Commands (100+)**
 
@@ -190,6 +187,12 @@ Effect: Server removes session from table, token becomes invalid
 | 102 | CMD_OPEN_SESSION | Session establishment request |
 | 103 | CMD_OPEN_SESSION_ACK | Session establishment response |
 | 104 | CMD_CLOSE_SESSION | Session termination request |
+| 105 | CMD_TRANSFER_FILE_BEGIN | Start chunked transfer session |
+| 106 | CMD_TRANSFER_FILE_CHUNK | Send file chunk in multi-part transfer |
+| 107 | CMD_TRANSFER_FILE_CHUNK_RESPONSE | Acknowledge chunk receipt |
+| 108 | CMD_TRANSFER_FILE_END | Complete chunked transfer session |
+
+**Note**: Chunked transfer commands (105-108) are internal protocol commands used by the server for managing large file transfers. Clients should use CMD_TRANSFER_FILE or CMD_TRANSFER_FILE_REQUEST instead.
 
 ---
 
@@ -346,7 +349,7 @@ Total struct size: 552 bytes. File data follows immediately after struct (if not
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | srcfilepath | string | Yes | Source file path |
-| destfilepath | string | Yes | Destination file path |
+| destfilepath | string | Yes | Destination path |
 | hash | string | Conditional | Hex-encoded SHA256 (required if hash_ignore=false) |
 | options.overwrite | boolean | No | Allow overwriting (default: false) |
 | options.hash_ignore | boolean | No | Skip hash check (default: false) |
@@ -702,22 +705,28 @@ All binary structures must match exact sizes due to direct memory mapping. Compi
 
 ### Protocol Constants
 
-**String Sizes**
+**String Sizes** (from `api/CoreTypes.hpp`)
 
 - MAX_PATH_SIZE: 256 bytes for file paths
 - MAX_MSG_SIZE: 256 bytes for message text
 
-**Alignment**
+**Alignment** (from `api/CoreTypes.hpp`)
 
 - ALIGNMENT: 8 bytes for all structures
 
-**Cryptography**
+**Cryptography** (from `api/CoreTypes.hpp::Crypto`)
 
 - IV_LENGTH: 12 bytes for AES-GCM initialization vector
 - TAG_LENGTH: 16 bytes for GCM authentication tag
 - SESSION_TOKEN_LENGTH: 32 bytes for session key
 
-**Special Markers**
+**Protocol Version** (from `api/CoreTypes.hpp::Protocol`)
+
+- MAGIC_VALUE_BASE: 0xDEADFACE
+- DATA_VERSION: 13
+- MAGIC_VALUE: 0xDEADFADB (MAGIC_VALUE_BASE + DATA_VERSION)
+
+**Special Markers** (from `api/DataStructures.hpp`)
 
 - JSON_BYTE_BORDER: 0xFF byte separating JSON metadata from binary file data
 
@@ -807,7 +816,7 @@ Description: Telegram Bot API methods and types used by server
 
 **Document Information**
 
-- Document Version: 1.0
+- Document Version: 1.1
 - Last Updated: December 22, 2024
 - Protocol Version: 13
 - Compatibility: C++23, C++17

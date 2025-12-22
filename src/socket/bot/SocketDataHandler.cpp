@@ -611,7 +611,7 @@ bool SocketInterfaceTgBot::verifyHeader(const Packet& packet) {
 
 void SocketInterfaceTgBot::handle_OpenSession(const TgBotSocket::Context& ctx) {
     auto key = StringTools::generateRandomString(
-        TgBotSocket::Packet::Header::SESSION_TOKEN_LENGTH);
+        TgBotSocket::Crypto::SESSION_TOKEN_LENGTH);
     Packet::Header::nounce_type last_nounce{};
     auto tp = std::chrono::system_clock::now() + std::chrono::hours(1);
 
@@ -623,7 +623,7 @@ void SocketInterfaceTgBot::handle_OpenSession(const TgBotSocket::Context& ctx) {
     response["expiration_time"] = fmt::format("{:%Y-%m-%d %H:%M:%S}", tp);
 
     Packet::Header::session_token_type session_token;
-    std::ranges::copy_n(key.begin(), Packet::Header::SESSION_TOKEN_LENGTH,
+    std::ranges::copy_n(key.begin(), Crypto::SESSION_TOKEN_LENGTH,
                         session_token.begin());
 
     ctx.write(

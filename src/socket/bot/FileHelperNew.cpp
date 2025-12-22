@@ -101,7 +101,7 @@ bool SocketFile2DataHelper::ReceiveTransferMeta(const Params& params) {
         }
 
         vfs->SHA256(result.value(), hash);
-        if (arraycmp(hash.m_data, params.hash)) {
+        if (TgBotSocket::arraycmp(hash.m_data, params.hash)) {
             LOG(WARNING) << "File hash matches, Should I ignore? "
                          << std::boolalpha << params.options.hash_ignore;
             if (!params.options.hash_ignore) {
@@ -163,9 +163,9 @@ std::optional<TgBotSocket::Packet> SocketFile2DataHelper::CreateTransferMeta(
     // Copy options to the buffer
     meta.options = params.options;
     // Copy destination file name info to the buffer
-    copyTo(meta.destfilepath, params.destfilepath.string());
+    TgBotSocket::copyTo(meta.destfilepath, params.destfilepath.string());
     // Copy source file name info to the buffer
-    copyTo(meta.srcfilepath, params.filepath.string());
+    TgBotSocket::copyTo(meta.srcfilepath, params.filepath.string());
 
     // If it is a request, we don't need to read the file (Just need to contain
     // src/dest meta) If it is dry run, we should read and calculate hash.

@@ -111,11 +111,12 @@ SharedMalloc encrypt_payload(
     const TgBotSocket::Packet::Header::session_token_type key,
     const SharedMalloc& payload,
     TgBotSocket::Packet::Header::init_vector_type& iv) {
-    using Header = TgBotSocket::Packet::Header;
+    using namespace TgBotSocket;
+    
     // Generate random IV
-    RAND_bytes(iv.data(), Header::IV_LENGTH);
+    RAND_bytes(iv.data(), Crypto::IV_LENGTH);
 
-    SharedMalloc encrypted(payload.size() + Header::TAG_LENGTH);
+    SharedMalloc encrypted(payload.size() + Crypto::TAG_LENGTH);
     int len = 0;
     int encrypted_payload_len = 0;
 
@@ -157,13 +158,13 @@ SharedMalloc encrypt_payload(
     encrypted_payload_len += len;
 
     // Get the authentication tag and append it
-    if (EVP_CIPHER_CTX_ctrl(ctx.get(), EVP_CTRL_GCM_GET_TAG, Header::TAG_LENGTH,
+    if (EVP_CIPHER_CTX_ctrl(ctx.get(), EVP_CTRL_GCM_GET_TAG, Crypto::TAG_LENGTH,
                             loc + encrypted_payload_len) == 0) {
         LOG(ERROR) << "Error getting authentication tag";
         return {};
     }
 
-    encrypted_payload_len += Header::TAG_LENGTH;
+    encrypted_payload_len += Crypto::TAG_LENGTH;
     encrypted.resize(encrypted_payload_len);
 
     DLOG(INFO) << "Encrypted payload of size " << encrypted_payload_len
@@ -175,11 +176,12 @@ SharedMalloc decrypt_payload(
     const TgBotSocket::Packet::Header::session_token_type& key,
     const SharedMalloc& encrypted,
     const TgBotSocket::Packet::Header::init_vector_type& iv) {
-    constexpr int tag_size = TgBotSocket::Packet::Header::TAG_LENGTH;
+    using namespace TgBotSocket;
+    constexpr int tag_size = Crypto::TAG_LENGTH;
 
     if (encrypted.size() == 0) {
         // No data
-	return {};
+        return {};
     }
 
     // Ensure the encrypted size is valid
@@ -258,17 +260,15 @@ std::optional<Packet> readPacket(const TgBotSocket::Context& context) {
     }
     headerData->assignTo(packet.header);
 
-    auto diff =
-        packet.header.magic - TgBotSocket::Packet::Header::MAGIC_VALUE_BASE;
-    if (diff != TgBotSocket::Packet::Header::DATA_VERSION) {
+    auto diff = packet.header.magic - Protocol::MAGIC_VALUE_BASE;
+    if (diff != Protocol::DATA_VERSION) {
         LOG(WARNING) << "Invalid magic value, dropping buffer";
         constexpr int reasonable_datadiff = 5;
         // Only a small difference is worth logging.
-        diff = abs(diff);
-        if (diff >= 0 && diff < TgBotSocket::Packet::Header::DATA_VERSION) {
+        diff = ::std::abs(diff);
+        if (diff >= 0 && diff < Protocol::DATA_VERSION) {
             LOG(INFO) << "This packet contains header data version " << diff
-                      << ", but we have version "
-                      << TgBotSocket::Packet::Header::DATA_VERSION;
+                      << ", but we have version " << Protocol::DATA_VERSION;
         } else {
             LOG(INFO) << "This is probably not a valid packet";
         }
@@ -347,15 +347,15 @@ createPacket(const Command command, const void* data,
              const Packet::Header::session_token_type& sessionToken) {
     Packet packet{};
     packet.header.cmd = command;
-    packet.header.magic = Packet::Header::MAGIC_VALUE;
+    packet.header.magic = Protocol::MAGIC_VALUE;
     packet.header.data_type = payloadType;
     packet.header.session_token = sessionToken;
 
-    using namespace std::chrono;
     packet.header.nonce =
-        duration_cast<milliseconds>(system_clock::now().time_since_epoch())
+        ::std::chrono::duration_cast<::std::chrono::milliseconds>(
+            ::std::chrono::system_clock::now().time_since_epoch())
             .count() +
-        rand();  // Add some randomness to the nonce
+        ::std::rand();  // Add some randomness to the nonce
 
     bool hasToken = sessionToken != Packet::Header::session_token_type{};
 
