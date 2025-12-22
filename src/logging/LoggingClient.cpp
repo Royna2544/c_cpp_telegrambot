@@ -9,7 +9,7 @@
 #include "LogcatData.hpp"
 
 int app_main(int, char**) {
-    SocketClientWrapper wrapper;
+    TgBotSocket::SocketClientWrapper wrapper;
     LogEntry entry{};
 
     if (!wrapper.connect(TgBotSocket::Context::kTgBotLogPort,

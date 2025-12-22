@@ -57,11 +57,11 @@ int app_main(int argc, char** argv) {
         LOG(INFO) << "Found, sending (fileid " << info->mediaId << ") to chat "
                   << chatId;
     }
-    copyTo(data.filePath, info->mediaId);
+    TgBotSocket::copyTo(data.filePath, info->mediaId);
     data.chat = chatId;
     data.fileType = TgBotSocket::data::FileType::TYPE_DOCUMENT;
 
-    SocketClientWrapper wrapper;
+    TgBotSocket::SocketClientWrapper wrapper;
     if (wrapper.connect(TgBotSocket::Context::kTgBotHostPort,
                         TgBotSocket::Context::hostPath())) {
         using namespace TgBotSocket;
