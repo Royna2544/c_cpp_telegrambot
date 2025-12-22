@@ -220,3 +220,18 @@ if (TGBOTCPP_LLM_SUPPORT)
   endif()
   command_module(NAME ask SRCS ask.cpp llm/LLMCore.cpp LIBS llama)
 endif()
+
+if (TGBOTCPP_LUA_MODULES)
+  file(GLOB LUA_SCRIPTS "${CMAKE_CURRENT_SOURCE_DIR}/*.lua")
+  
+  if(LUA_SCRIPTS)
+    message(STATUS "Found Lua scripts: ${LUA_SCRIPTS}")
+    install(
+      FILES ${LUA_SCRIPTS}
+      DESTINATION lib/modules
+      COMPONENT CommandModules
+    )
+  else()
+    message(WARNING "TGBOTCPP_LUA_MODULES enabled but no .lua files found in ${CMAKE_CURRENT_SOURCE_DIR}")
+  endif()
+endif()

@@ -1,11 +1,11 @@
 find_package(LibXml2 REQUIRED)
 
-option(ENABLE_LUA_COMMANDS "Enable Lua-based modules" ON)
+option(TGBOTCPP_LUA_MODULES "Enable Lua-based modules" ON)
 
 set(lua_src)
 set(lua_libs)
 set(lua_def)
-if (ENABLE_LUA_COMMANDS)
+if (TGBOTCPP_LUA_MODULES)
   message(STATUS "Enabling LuaCommandModule")
   add_library(tglua STATIC liblua/onelua.c)
   target_compile_definitions(tglua PRIVATE MAKE_LIB)
