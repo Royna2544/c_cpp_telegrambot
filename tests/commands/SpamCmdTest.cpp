@@ -53,8 +53,8 @@ TEST_F(SpamCommandTest, ReplyToSticker) {
     sticker->fileId = "sticker_id";
     defaultProvidedMessage->replyToMessage->sticker = sticker;
     
-    // Expect 2 sendSticker calls
-    EXPECT_CALL(*botApi, sendSticker_impl(TEST_CHAT_ID, _, _, _))
+    // Expect 2 sendSticker calls with 3 parameters each
+    EXPECT_CALL(*botApi, sendSticker_impl(TEST_CHAT_ID, _, _))
         .Times(2);
     
     execute();
@@ -68,7 +68,7 @@ TEST_F(SpamCommandTest, ReplyToAnimation) {
     animation->fileId = "anim_id";
     defaultProvidedMessage->replyToMessage->animation = animation;
     
-    // Expect 2 sendAnimation calls
+    // Expect 2 sendAnimation calls with 6 parameters each
     EXPECT_CALL(*botApi, sendAnimation_impl(TEST_CHAT_ID, _, _, _, _, _))
         .Times(2);
     
