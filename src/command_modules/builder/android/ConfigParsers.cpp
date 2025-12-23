@@ -106,7 +106,7 @@ struct NodeItemType {
     }
 
     template <typename... Args>
-    friend bool checkRequirements(const Json::Value& value,
+    friend bool checkRequirements(const nlohmann::json& value,
                                   NodeItemType<Args>&... args);
 };
 
@@ -171,11 +171,11 @@ bool checkRequirements(const nlohmann::json& value, NodeItemType<Args>&... args)
 /**
  * @brief Proxy class for handling JSON objects and providing iterator access.
  *
- * This class wraps a Json::Value object and provides iterator access to its
+ * This class wraps a nlohmann::json object and provides iterator access to its
  * members. It also performs basic validation to ensure that the root value is
  * an object.
  *
- * @param root The Json::Value object to be wrapped.
+ * @param root The nlohmann::json object to be wrapped.
  */
 class ProxyJsonBranch {
    public:

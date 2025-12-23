@@ -38,7 +38,7 @@ std::optional<Packet::Header::session_token_type> SessionManager::openSession() 
     LOG(INFO) << "Opened session. Token: " << root["session_token"]
               << " Expiration_time: " << root["expiration_time"];
 
-    std::string session_token_str = root["session_token"].asString();
+    std::string session_token_str = root["session_token"].get<std::string>();
     if (session_token_str.size() != Crypto::SESSION_TOKEN_LENGTH) {
         LOG(ERROR) << "Invalid session token length";
         return std::nullopt;

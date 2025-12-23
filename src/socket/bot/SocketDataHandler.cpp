@@ -335,20 +335,20 @@ struct TransferFileMeta : SocketFile2DataHelper::Params {
                     return std::nullopt;
                 }
                 auto& root = _root.value();
-                result.filepath = root["srcfilepath"].asString();
-                result.destfilepath = root["destfilepath"].asString();
+                result.filepath = root["srcfilepath"].get<std::string>();
+                result.destfilepath = root["destfilepath"].get<std::string>();
                 data::FileTransferMeta::Options options;
-                options.overwrite = root["options"]["overwrite"].asBool();
-                options.hash_ignore = root["options"]["hash_ignore"].asBool();
-                options.dry_run = root["options"]["dry_run"].asBool();
-                if (!options.hash_ignore && !root.isMember("hash")) {
+                options.overwrite = root["options"]["overwrite"].get<bool>();
+                options.hash_ignore = root["options"]["hash_ignore"].get<bool>();
+                options.dry_run = root["options"]["dry_run"].get<bool>();
+                if (!options.hash_ignore && !root.contains("hash")) {
                     LOG(WARNING)
                         << "hash_ignore is false, but hash is not provided.";
                     return std::nullopt;
                 }
-                if (root.isMember("hash")) {
+                if (root.contains("hash")) {
                     auto parsed = hexDecode<SHA256_DIGEST_LENGTH>(
-                        root["hash"].asString());
+                        root["hash"].get<std::string>());
                     if (!parsed) {
                         return std::nullopt;
                     }
@@ -557,11 +557,11 @@ std::optional<Packet> SocketInterfaceTgBot::handle_GetUptime(
                                 sizeof(callback), PayloadType::Binary, token);
         } break;
         case PayloadType::Json: {
-            Json::Value payload;
+            nlohmann::json payload;
             payload["start_time"] = fmt::format("{}", startTp);
             payload["current_time"] = fmt::format("{}", now);
             payload["uptime"] = fmt::format("{:%Hh %Mm %Ss}", diff);
-            LOG(INFO) << "Sending JSON back: " << payload.toStyledString();
+            LOG(INFO) << "Sending JSON back: " << payload.dump(2);
             return nodeToPacket(Command::CMD_GET_UPTIME_CALLBACK, payload,
                                 token);
         } break;
@@ -618,7 +618,7 @@ void SocketInterfaceTgBot::handle_OpenSession(const TgBotSocket::Context& ctx) {
     LOG(INFO) << "Created new session with key: " << std::quoted(key);
     session_table.emplace(key, Session(key, last_nounce, tp));
 
-    Json::Value response;
+    nlohmann::json response;
     response["session_token"] = key;
     response["expiration_time"] = fmt::format("{:%Y-%m-%d %H:%M:%S}", tp);
 

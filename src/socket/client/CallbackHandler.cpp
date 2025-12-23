@@ -1,6 +1,7 @@
 #include "CallbackHandler.hpp"
 
 #include <absl/log/log.h>
+#include <nlohmann/json.hpp>
 #include <bot/FileHelperNew.hpp>
 #include <bot/PacketParser.hpp>
 #include <openssl/sha.h>
@@ -74,21 +75,21 @@ void CallbackHandler::handleTransferFile(const Packet& pkt) {
                 return;
             }
             auto& root = _root.value();
-            result.filepath = root["srcfilepath"].asString();
-            result.destfilepath = root["destfilepath"].asString();
+            result.filepath = root["srcfilepath"].get<std::string>();
+            result.destfilepath = root["destfilepath"].get<std::string>();
             
             data::FileTransferMeta::Options options;
-            options.overwrite = root["options"]["overwrite"].asBool();
-            options.hash_ignore = root["options"]["hash_ignore"].asBool();
-            options.dry_run = root["options"]["dry_run"].asBool();
+            options.overwrite = root["options"]["overwrite"].get<bool>();
+            options.hash_ignore = root["options"]["hash_ignore"].get<bool>();
+            options.dry_run = root["options"]["dry_run"].get<bool>();
             
-            if (!options.hash_ignore && !root.isMember("hash")) {
+            if (!options.hash_ignore && !root.contains("hash")) {
                 LOG(WARNING) << "hash_ignore is false, but hash is not provided.";
                 return;
             }
             
-            if (root.isMember("hash")) {
-                auto parsed = hexDecode<SHA256_DIGEST_LENGTH>(root["hash"].asString());
+            if (root.contains("hash")) {
+                auto parsed = hexDecode<SHA256_DIGEST_LENGTH>(root["hash"].get<std::string>());
                 if (!parsed) {
                     return;
                 }
@@ -128,13 +129,13 @@ void CallbackHandler::handleGenericAck(const Packet& pkt) {
                 return;
             }
             
-            auto result = (*root)["result"].asBool();
+            auto result = (*root)["result"].get<bool>();
             if (result) {
                 LOG(INFO) << "Response from server: Success";
             } else {
                 LOG(ERROR) << "Response from server: Failed";
-                LOG(ERROR) << "Reason: " << (*root)["error_msg"].asString();
-                LOG(ERROR) << "Error type: " << (*root)["error_type"].asString();
+                LOG(ERROR) << "Reason: " << (*root)["error_msg"].get<std::string>();
+                LOG(ERROR) << "Error type: " << (*root)["error_type"].get<std::string>();
             }
             break;
         }
