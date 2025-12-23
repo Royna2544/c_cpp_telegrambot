@@ -281,7 +281,7 @@ bool ForkAndRun::execute() {
             DeferredExit exit;
             {
                 // Switch to subprocess logging
-                TgBot_AbslLogDeInit();
+                TgBot_SpdlogDeInit();
                 RAIILogSink<FDLogSink> logSink;
 
                 dup2(stdout_pipe.writeEnd(), STDOUT_FILENO);

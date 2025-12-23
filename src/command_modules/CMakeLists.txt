@@ -56,7 +56,7 @@ function(command_module)
   tgbot_common_target(
     ${libname}
     PUBLIC_LIBS
-    absl::log
+    spdlog::spdlog
     ${CMD_LIBS}
     PRIVATE_INC
     $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>

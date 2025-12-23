@@ -10,6 +10,7 @@
 #include <sstream>
 #include <cstdlib>
 #include <cstring>
+#include <atomic>
 
 // Helper class to support stream-style logging with spdlog
 namespace detail {
@@ -58,6 +59,65 @@ namespace detail {
             }
         }
     };
+    
+    // Helper for LOG_FIRST_N
+    template<typename Level>
+    class LogFirstNStream {
+        std::ostringstream oss;
+        Level level;
+        std::atomic<int>* counter;
+        int n;
+        bool should_log;
+        
+    public:
+        LogFirstNStream(Level l, std::atomic<int>* cnt, int n_val) 
+            : level(l), counter(cnt), n(n_val) {
+            int current = counter->fetch_add(1, std::memory_order_relaxed);
+            should_log = (current < n);
+        }
+        
+        template<typename T>
+        LogFirstNStream& operator<<(const T& value) {
+            if (should_log) {
+                oss << value;
+            }
+            return *this;
+        }
+        
+        LogFirstNStream& operator<<(std::ostream& (*manip)(std::ostream&)) {
+            if (should_log) {
+                manip(oss);
+            }
+            return *this;
+        }
+        
+        ~LogFirstNStream() {
+            if (should_log) {
+                const std::string msg = oss.str();
+                if (!msg.empty()) {
+                    switch(level) {
+                        case spdlog::level::info:
+                            spdlog::info("{}", msg);
+                            break;
+                        case spdlog::level::warn:
+                            spdlog::warn("{}", msg);
+                            break;
+                        case spdlog::level::err:
+                            spdlog::error("{}", msg);
+                            break;
+                        case spdlog::level::critical:
+                            spdlog::critical("{}", msg);
+                            break;
+                        case spdlog::level::debug:
+                            spdlog::debug("{}", msg);
+                            break;
+                        default:
+                            spdlog::info("{}", msg);
+                    }
+                }
+            }
+        }
+    };
 }
 
 // Map LOG macros to support stream-style logging
@@ -72,6 +132,11 @@ namespace detail {
 
 // Map PLOG (log with errno) - logs the error and then continues with stream
 #define PLOG(severity) ::detail::LogStream<spdlog::level::level_enum>(spdlog::level::severity) << std::strerror(errno) << ": "
+
+// Map LOG_FIRST_N macro
+#define LOG_FIRST_N(severity, n) \
+  static std::atomic<int> LOG_FIRST_N_COUNTER_##__LINE__{0}; \
+  ::detail::LogFirstNStream<spdlog::level::level_enum>(spdlog::level::severity, &LOG_FIRST_N_COUNTER_##__LINE__, n)
 
 // Map CHECK macros to assertions with logging
 #define CHECK(condition) \
