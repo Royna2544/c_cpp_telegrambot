@@ -11,7 +11,7 @@ class LogCommandTest : public CommandTestBase {
 TEST_F(LogCommandTest, SendsLogFile) {
     setCommandExtArgs();
     
-    // Expect sendDocument to be called
-    EXPECT_CALL(*botApi, sendDocument_impl(TEST_CHAT_ID, _, _, _));
+    // Expect sendDocument to be called with all 6 parameters
+    EXPECT_CALL(*botApi, sendDocument_impl(TEST_CHAT_ID, _, _, _, _, _));
     execute();
 }
