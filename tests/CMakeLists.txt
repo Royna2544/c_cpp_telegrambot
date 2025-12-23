@@ -7,7 +7,17 @@ tgbot_exe(
     commands/AliveCmdTest.cpp
     commands/CmdCmdTest.cpp
     commands/DatabaseCmdTest.cpp
+    commands/DecideCmdTest.cpp
+    commands/DelayCmdTest.cpp
     commands/DeleteEchoCmdTest.cpp
+    commands/FileIdCmdTest.cpp
+    commands/FlashCmdTest.cpp
+    commands/LogCmdTest.cpp
+    commands/PossibilityCmdTest.cpp
+    commands/RandStickerCmdTest.cpp
+    commands/SpamCmdTest.cpp
+    commands/StringCalcCmdTest.cpp
+    commands/UpDownCmdTest.cpp
   LIBS
     GTest::gtest
     GTest::gmock
