@@ -36,8 +36,8 @@ TEST_F(DecideCommandTest, DecisionMade) {
     EXPECT_CALL(*botApi, setMessageReaction_impl(_, _, _))
         .Times(1);
     
-    // Mock random number generation (two parameters: min, max)
-    ON_CALL(*random, generate(_, _))
+    // Mock random number generation
+    ON_CALL(*random, generate(_))
         .WillByDefault(Return(5));
     
     execute();

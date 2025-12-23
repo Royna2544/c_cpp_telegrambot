@@ -50,23 +50,21 @@ class DownCommandTest : public CommandTestBase {
 };
 
 TEST_F(DownCommandTest, NoReplyToDocument) {
-    auto tempPath = std::filesystem::temp_directory_path() / "output.txt";
-    setCommandExtArgs({tempPath.string()});
+    setCommandExtArgs({"/tmp/output.txt"});
     
     willSendReplyMessage(HasSubstr("Reply to a document"));
     execute();
 }
 
 TEST_F(DownCommandTest, ReplyToDocumentSuccess) {
-    auto tempPath = std::filesystem::temp_directory_path() / "output.txt";
-    setCommandExtArgs({tempPath.string()});
+    setCommandExtArgs({"/tmp/output.txt"});
     
     defaultProvidedMessage->replyToMessage = createDefaultMessage();
     auto document = std::make_shared<TgBot::Document>();
     document->fileId = "doc_file_id";
     defaultProvidedMessage->replyToMessage->document = document;
     
-    EXPECT_CALL(*botApi, downloadFile(tempPath.string(), "doc_file_id"))
+    EXPECT_CALL(*botApi, downloadFile("/tmp/output.txt", "doc_file_id"))
         .WillOnce(Return(true));
     
     willSendReplyMessage(HasSubstr("Success"));
@@ -74,15 +72,14 @@ TEST_F(DownCommandTest, ReplyToDocumentSuccess) {
 }
 
 TEST_F(DownCommandTest, ReplyToDocumentFailure) {
-    auto tempPath = std::filesystem::temp_directory_path() / "output.txt";
-    setCommandExtArgs({tempPath.string()});
+    setCommandExtArgs({"/tmp/output.txt"});
     
     defaultProvidedMessage->replyToMessage = createDefaultMessage();
     auto document = std::make_shared<TgBot::Document>();
     document->fileId = "doc_file_id";
     defaultProvidedMessage->replyToMessage->document = document;
     
-    EXPECT_CALL(*botApi, downloadFile(tempPath.string(), "doc_file_id"))
+    EXPECT_CALL(*botApi, downloadFile("/tmp/output.txt", "doc_file_id"))
         .WillOnce(Return(false));
     
     willSendReplyMessage(HasSubstr("Failed to download"));

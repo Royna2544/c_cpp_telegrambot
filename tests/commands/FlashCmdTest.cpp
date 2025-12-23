@@ -43,8 +43,8 @@ TEST_F(FlashCommandTest, ValidFileName) {
     ON_CALL(*resource, get("flash.txt"))
         .WillByDefault(Return("reason1\nreason2\nreason3"));
     
-    // Mock random for delay and reason selection (two parameters: min, max)
-    ON_CALL(*random, generate(_, _))
+    // Mock random for delay and reason selection
+    ON_CALL(*random, generate(_))
         .WillByDefault(Return(1));
     
     auto sentMsg = willSendReplyMessage(HasSubstr("Flashing"));
