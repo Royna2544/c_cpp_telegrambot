@@ -1,5 +1,6 @@
 find_package(libgit2)
-if(NOT LIBGIT2_FOUND)
+
+if(NOT libgit2_FOUND)
   message(STATUS "Builder: No libgit2")
   return()
 endif()
@@ -19,7 +20,7 @@ tgbot_library(
   DEFS
   ${BUILDER_UTILS_LINUX_DEFS}
   LIBS
-  ${LIBGIT2_LIBRARIES}
+  libgit2::libgit2package
   STATIC
   NO_LIBPREFIX)
 
