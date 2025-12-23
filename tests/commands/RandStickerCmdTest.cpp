@@ -42,7 +42,8 @@ TEST_F(RandStickerCommandTest, ReplyToStickerWithSet) {
     EXPECT_CALL(*botApi, getStickerSet_impl("test_pack"))
         .WillOnce(Return(stickerSet));
     
-    ON_CALL(*random, generate(_))
+    // Mock random generation (two parameters: min, max)
+    ON_CALL(*random, generate(_, _))
         .WillByDefault(Return(0));
     
     EXPECT_CALL(*botApi, sendSticker_impl(TEST_CHAT_ID, _, _));
