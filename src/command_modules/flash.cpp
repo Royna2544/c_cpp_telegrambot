@@ -1,3 +1,4 @@
+#include <absl/log/log.h>
 #include <absl/strings/match.h>
 #include <absl/strings/str_replace.h>
 #include <absl/strings/str_split.h>
@@ -33,8 +34,7 @@ DECLARE_COMMAND_HANDLER(flash) {
     });
 
     if (reasons.empty()) {
-        api->sendReplyMessage(message->message(),
-                              res->get(Strings::COMMAND_DISABLED_CONTACT_OWNER));
+        LOG(ERROR) << "Flash command: reasons list is empty, cannot proceed";
         return;
     }
 
