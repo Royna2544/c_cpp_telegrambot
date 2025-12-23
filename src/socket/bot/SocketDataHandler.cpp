@@ -43,7 +43,7 @@ std::string getMIMEString(const ResourceProvider* resource,
     static nlohmann::json doc;
     std::string extension = fs::path(path).extension().string();
 
-    static bool once = [resource, &doc] {
+    static bool once = [resource] {
         std::string_view buf;
         buf = resource->get("mimeData.json");
         try {
