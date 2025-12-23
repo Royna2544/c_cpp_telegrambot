@@ -5,6 +5,7 @@ tgbot_exe(
     AuthorizationTest.cpp
     commands/CommandModulesTest.cpp
     commands/AliveCmdTest.cpp
+    commands/AllCommandModulesTest.cpp
     commands/CmdCmdTest.cpp
     commands/DatabaseCmdTest.cpp
     commands/DeleteEchoCmdTest.cpp
