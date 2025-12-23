@@ -31,7 +31,7 @@ TEST_F(UpDownCommandTest, UploadExistingFile) {
     
     setCommandExtArgs({tempFile.string()});
     
-    EXPECT_CALL(*botApi, sendDocument_impl(TEST_CHAT_ID, _, _, _, _, _));
+    EXPECT_CALL(*botApi, sendDocument_impl(TEST_CHAT_ID, _, _, _, _));
     execute();
     
     // Cleanup

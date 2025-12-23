@@ -39,13 +39,13 @@ TEST_F(RandStickerCommandTest, ReplyToStickerWithSet) {
     sticker2->emoji = "😂";
     stickerSet->stickers = {sticker1, sticker2};
     
-    EXPECT_CALL(*botApi, getStickerSet_impl("test_pack"))
+    EXPECT_CALL(*botApi, getStickerSet("test_pack"))
         .WillOnce(Return(stickerSet));
     
     ON_CALL(*random, generate(_))
         .WillByDefault(Return(0));
     
-    EXPECT_CALL(*botApi, sendSticker_impl(TEST_CHAT_ID, _, _));
+    EXPECT_CALL(*botApi, sendSticker_impl(TEST_CHAT_ID, _, _, _));
     EXPECT_CALL(*botApi, sendMessage_impl(TEST_CHAT_ID, _, _, _, _));
     
     execute();
