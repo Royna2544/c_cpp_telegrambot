@@ -1,7 +1,7 @@
 #include "ConfigParsers.hpp"
 
 #include <fmt/format.h>
-#include <json/json.h>
+#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <filesystem>
@@ -23,13 +23,13 @@
 #include "SystemInfo.hpp"
 
 enum class ValueType {
-    nullValue = Json::nullValue,
-    intValue = Json::intValue,
-    uintValue = Json::uintValue,
-    realValue = Json::realValue,
-    stringValue = Json::stringValue,
-    arrayValue = Json::arrayValue,
-    objectValue = Json::objectValue
+    nullValue = 0,
+    intValue = 1,
+    uintValue = 2,
+    realValue = 3,
+    stringValue = 4,
+    arrayValue = 5,
+    objectValue = 6
 };
 
 template <>
@@ -119,19 +119,19 @@ NodeItemType<int> operator""_d(const char* str, unsigned long /*unused*/) {
 }
 
 template <typename... Args>
-bool checkRequirements(const Json::Value& value, NodeItemType<Args>&... args) {
+bool checkRequirements(const nlohmann::json& value, NodeItemType<Args>&... args) {
     static_assert(sizeof...(args) > 0,
                   "At least one argument required for checkRequirements");
 
-    if (!value.isObject()) {
+    if (!value.is_object()) {
         LOG(ERROR) << fmt::format("Expected object, found: {}",
-                                  static_cast<ValueType>(value.type()));
+                                  static_cast<int>(value.type()));
         return false;
     }
 
     bool allRequiredMet = true;
-    (([&allRequiredMet, value, &args] {
-         if (!value.isMember(args.name)) {
+    (([&allRequiredMet, &value, &args] {
+         if (!value.contains(args.name)) {
              if (args.hasDefaultValue) {
                  LOG(INFO) << "Using default value for field: " << args.name;
              } else if (args.required) {
@@ -144,21 +144,21 @@ bool checkRequirements(const Json::Value& value, NodeItemType<Args>&... args) {
              if constexpr (std::is_same_v<
                                typename std::decay_t<decltype(args)>::type,
                                int>) {
-                 if (!node.isInt()) {
+                 if (!node.is_number_integer()) {
                      LOG(ERROR) << "Expected integer for field: " << args.name;
                      allRequiredMet = false;
                  } else {
-                     args.setValue(node.asInt());
+                     args.setValue(node.get<int>());
                  }
              }
              if constexpr (std::is_same_v<
                                typename std::decay_t<decltype(args)>::type,
                                std::string>) {
-                 if (!node.isString()) {
+                 if (!node.is_string()) {
                      LOG(ERROR) << "Expected string for field: " << args.name;
                      allRequiredMet = false;
                  } else {
-                     args.setValue(node.asString());
+                     args.setValue(node.get<std::string>());
                  }
              }
          }
@@ -185,7 +185,7 @@ class ProxyJsonBranch {
      *
      * @return An iterator pointing to the beginning of the wrapped JSON object.
      */
-    [[nodiscard]] Json::Value::const_iterator begin() const {
+    [[nodiscard]] nlohmann::json::const_iterator begin() const {
         return isValidObject ? root_.begin() : root_.end();
     }
 
@@ -195,7 +195,7 @@ class ProxyJsonBranch {
      *
      * @return An iterator pointing to the end of the wrapped JSON object.
      */
-    [[nodiscard]] Json::Value::const_iterator end() const {
+    [[nodiscard]] nlohmann::json::const_iterator end() const {
         return root_.end();
     }
 
@@ -203,39 +203,34 @@ class ProxyJsonBranch {
      * @brief Constructor for ProxyJsonBranch.
      *
      * Constructs a ProxyJsonBranch object and performs basic validation on the
-     * provided Json::Value object. If the root value is not an array, it logs
+     * provided nlohmann::json object. If the root value is not an array, it logs
      * an error message.
      *
-     * @param root The Json::Value object to be wrapped.
+     * @param root The nlohmann::json object to be wrapped.
      */
-    explicit ProxyJsonBranch(Json::Value root, const std::string& name)
-        : root_(root[name]), isValidObject(root_.isArray()) {
+    explicit ProxyJsonBranch(const nlohmann::json& root, const std::string& name)
+        : root_(root.contains(name) ? root[name] : nlohmann::json()), 
+          isValidObject(root_.is_array()) {
         if (!isValidObject) {
             LOG(ERROR) << fmt::format(
-                "Expected object, found: {} while accessing property '{}'",
-                static_cast<ValueType>(root_.type()), name);
-            switch (root_.type()) {
-                case Json::ValueType::nullValue:
-                    LOG(WARNING) << "Note: Root value is not an object, means "
-                                    "it is nonexistent in the tree.";
-                    break;
-                default:
-                    // TODO: Add more helper messages for different
-                    // Json::ValueType
-                    break;
+                "Expected array, found: {} while accessing property '{}'",
+                static_cast<int>(root_.type()), name);
+            if (root_.is_null()) {
+                LOG(WARNING) << "Note: Root value is not an array, means "
+                                "it is nonexistent in the tree.";
             }
         }
     }
 
    private:
-    Json::Value root_;
+    nlohmann::json root_;
     bool isValidObject;
 };
 
 namespace ParseFiles {
 
 std::vector<ConfigParser::ROMBranch::Ptr> parseROM(
-    Json::Value entry, const std::string& default_target,
+    const nlohmann::json& entry, const std::string& default_target,
     ConfigParser::MatcherStorage* storage) {
     auto romInfo = std::make_shared<ConfigParser::ROMInfo>();
     auto ROMName = "name"_s;
@@ -244,10 +239,10 @@ std::vector<ConfigParser::ROMBranch::Ptr> parseROM(
     std::vector<ConfigParser::ROMBranch::Ptr> romBranches;
 
     if (!checkRequirements(entry, ROMName, ROMLink, ROMTarget)) {
-        LOG(INFO) << "Skipping invalid roms entry: " << entry.toStyledString();
+        LOG(INFO) << "Skipping invalid roms entry: " << entry.dump();
         return {};
     }
-    if (!entry.isMember("artifact")) {
+    if (!entry.contains("artifact")) {
         LOG(INFO) << fmt::format("Artifact entry not found for '{}'.",
                                  static_cast<std::string>(ROMName));
     } else {
@@ -255,7 +250,7 @@ std::vector<ConfigParser::ROMBranch::Ptr> parseROM(
         auto data = "data"_s;
         if (!checkRequirements(entry["artifact"], matcher, data)) {
             LOG(INFO) << "Skipping invalid artifact entry: "
-                      << entry.toStyledString();
+                      << entry.dump();
             return {};
         }
         romInfo->artifact = storage->get(matcher);
@@ -277,7 +272,7 @@ std::vector<ConfigParser::ROMBranch::Ptr> parseROM(
         auto branch = "branch"_s;
         if (!checkRequirements(branchEntry, androidVersion, branch)) {
             LOG(INFO) << "Skipping invalid roms-branches entry: "
-                      << entry.toStyledString();
+                      << entry.dump();
             continue;
         }
         ConfigParser::ROMBranch rombranch;
@@ -292,9 +287,9 @@ std::vector<ConfigParser::ROMBranch::Ptr> parseROM(
 
 struct ROM {
     using return_type = ConfigParser::ROMBranch::Ptr;
-    static constexpr Json::ValueType _value = Json::arrayValue;
+    static constexpr auto _value = nlohmann::json::value_t::array;
     static std::vector<return_type> parse(
-        const Json::Value& root, ConfigParser::MatcherStorage* storage) {
+        const nlohmann::json& root, ConfigParser::MatcherStorage* storage) {
         std::vector<return_type> result;
         for (const auto& entry : root) {
             auto res = parseROM(entry, "bacon", storage);
@@ -308,9 +303,9 @@ struct ROM {
 
 struct Recovery {
     using return_type = ConfigParser::ROMBranch::Ptr;
-    static constexpr Json::ValueType _value = Json::arrayValue;
+    static constexpr auto _value = nlohmann::json::value_t::array;
     static std::vector<return_type> parse(
-        const Json::Value& root, ConfigParser::MatcherStorage* storage) {
+        const nlohmann::json& root, ConfigParser::MatcherStorage* storage) {
         std::vector<return_type> result;
         for (const auto& entry : root) {
             auto res = parseROM(entry, "recoveryimage", storage);
@@ -327,7 +322,7 @@ using ROMsMap = std::unordered_map<std::string, ConfigParser::ROMBranch::Ptr>;
 using Devices = std::vector<ConfigParser::Device::Ptr>;
 
 std::pair<Devices, ConfigParser::ROMBranch::Ptr> parseDeviceAndRom(
-    const NodeItemType<std::string>& device, const Json::Value& rootNode,
+    const NodeItemType<std::string>& device, const nlohmann::json& rootNode,
     const DeviceMap& devicesPtr, const ROMsMap& romsPtr,
     const std::string_view target_rom, const int android_version) {
     ConfigParser::ROMBranch::Ptr romBranch;
@@ -338,7 +333,7 @@ std::pair<Devices, ConfigParser::ROMBranch::Ptr> parseDeviceAndRom(
         deviceCodenames.emplace_back(device);
     } else {
         for (const auto& deviceEntry : ProxyJsonBranch(rootNode, "devices")) {
-            deviceCodenames.emplace_back(deviceEntry.asString());
+            deviceCodenames.emplace_back(deviceEntry.get<std::string>());
         }
     }
     if (deviceCodenames.empty()) {
@@ -378,9 +373,9 @@ std::pair<Devices, ConfigParser::ROMBranch::Ptr> parseDeviceAndRom(
 
 struct ROMLocalManifest {
     using return_type = ConfigParser::LocalManifest::Ptr;
-    static constexpr Json::ValueType _value = Json::objectValue;
+    static constexpr auto _value = nlohmann::json::value_t::object;
     static std::vector<return_type> parseOneLocalManifest(
-        const Json::Value& json, const DeviceMap& devices, const ROMsMap& roms,
+        const nlohmann::json& json, const DeviceMap& devices, const ROMsMap& roms,
         std::string name, std::string manifest) {
         ConfigParser::LocalManifest localManifest;
         std::vector<return_type> result;
@@ -392,7 +387,7 @@ struct ROMLocalManifest {
         if (!checkRequirements(json, target_rom, branchName, android_version,
                                device)) {
             LOG(INFO) << "Skipping invalid localmanifest-branches entry: "
-                      << json.toStyledString();
+                      << json.dump();
             return {};
         }
 
@@ -402,7 +397,7 @@ struct ROMLocalManifest {
 
         if (devicesVec.empty() || !rom) {
             LOG(INFO) << "No matching device or ROM for localmanifest-branches "
-                      << json.toStyledString();
+                      << json.dump();
             return {};
         }
         // Assign to the localmanifest
@@ -426,14 +421,14 @@ struct ROMLocalManifest {
             std::move(localManifest)));
         return result;
     }
-    static std::vector<return_type> parse(const Json::Value& root,
+    static std::vector<return_type> parse(const nlohmann::json& root,
                                           const DeviceMap& devices,
                                           const ROMsMap& roms) {
         auto name = "name"_s;
         auto manifest = "url"_s;
         if (!checkRequirements(root, name, manifest)) {
             LOG(INFO) << "Skipping invalid localmanifest entry: "
-                      << root.toStyledString();
+                      << root.dump();
             return {};
         }
         std::vector<return_type> returnVec;
@@ -451,8 +446,8 @@ struct ROMLocalManifest {
 
 struct RecoveryManifest {
     using return_type = ConfigParser::LocalManifest::Ptr;
-    static constexpr Json::ValueType _value = Json::objectValue;
-    static std::vector<return_type> parse(const Json::Value& root,
+    static constexpr auto _value = nlohmann::json::value_t::object;
+    static std::vector<return_type> parse(const nlohmann::json& root,
                                           const DeviceMap& devices,
                                           const ROMsMap& roms) {
         std::vector<return_type> manifests;
@@ -465,7 +460,7 @@ struct RecoveryManifest {
         if (!checkRequirements(root, name, android_version, device,
                                recoveryName)) {
             LOG(INFO) << "Skipping invalid recovery_targets entry: "
-                      << root.toStyledString();
+                      << root.dump();
             return {};
         }
 
@@ -474,7 +469,7 @@ struct RecoveryManifest {
             android_version);
         if (devicesVec.empty() || !rom) {
             LOG(INFO) << "No matching device or ROM for localmanifest-branches "
-                      << root.toStyledString();
+                      << root.dump();
             return {};
         }
 
@@ -485,7 +480,7 @@ struct RecoveryManifest {
             auto destination = "destination"_s;
             if (!checkRequirements(mapping, link, branch, destination)) {
                 LOG(INFO) << "Skipping invalid clone_mapping entry: "
-                          << mapping.toStyledString();
+                          << mapping.dump();
                 continue;
             }
             prepare.data.emplace_back(link, branch,
@@ -505,8 +500,8 @@ struct RecoveryManifest {
 
 struct DeviceNames {
     using return_type = ConfigParser::Device::Ptr;
-    static constexpr Json::ValueType _value = Json::arrayValue;
-    static std::vector<return_type> parse(const Json::Value& root) {
+    static constexpr auto _value = nlohmann::json::value_t::array;
+    static std::vector<return_type> parse(const nlohmann::json& root) {
         std::vector<return_type> devices;
         for (const auto& entry : root) {
             auto codename = "codename"_s;
@@ -514,7 +509,7 @@ struct DeviceNames {
 
             if (!checkRequirements(entry, codename, name)) {
                 LOG(INFO) << "Skipping invalid target entry: "
-                          << entry.toStyledString();
+                          << entry.dump();
                 return {};
             }
             auto device = std::make_shared<ConfigParser::Device>();
@@ -530,8 +525,7 @@ struct DeviceNames {
 template <typename T, typename... Args>
 std::vector<typename T::return_type> parse(
     const std::filesystem::path& jsonFile, Args&&... args) {
-    Json::Value value;
-    Json::Reader reader;
+    nlohmann::json value;
 
     std::ifstream file(jsonFile);
     if (!file.is_open()) {
@@ -540,18 +534,17 @@ std::vector<typename T::return_type> parse(
         return {};
     }
 
-    std::string doc{std::istreambuf_iterator<char>(file),
-                    std::istreambuf_iterator<char>{}};
-    if (!reader.parse(doc, value)) {
+    try {
+        file >> value;
+    } catch (const nlohmann::json::parse_error& e) {
         LOG(ERROR) << fmt::format("Failed to parse {}: {}",
-                                  jsonFile.filename().string(),
-                                  reader.getFormattedErrorMessages());
+                                  jsonFile.filename().string(), e.what());
         return {};
     }
     if (value.type() != T::_value) {
         LOG(ERROR) << fmt::format(
-            "Expected {} for {} (actual {})", static_cast<ValueType>(T::_value),
-            jsonFile.filename().string(), static_cast<ValueType>(value.type()));
+            "Expected {} for {} (actual {})", static_cast<int>(T::_value),
+            jsonFile.filename().string(), static_cast<int>(value.type()));
         return {};
     }
     return T::parse(value, std::forward<Args&&>(args)...);

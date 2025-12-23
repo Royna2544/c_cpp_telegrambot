@@ -3,7 +3,7 @@
 #include <SocketExports.h>
 #include <absl/strings/escaping.h>
 #include <absl/base/config.h>
-#include <json/json.h>
+#include <nlohmann/json.hpp>
 
 #include <SocketContext.hpp>
 #include <optional>
@@ -65,11 +65,11 @@ createPacket(const Command command, const void* data,
  * @param buf Pointer to the buffer containing the JSON data.
  * @param length Length of the buffer.
  * @param nodes List of JSON node names to check for in the parsed JSON object.
- * @return std::optional<Json::Value> The parsed JSON object if parsing is
+ * @return std::optional<nlohmann::json> The parsed JSON object if parsing is
  *         successful and all specified nodes are present, std::nullopt
  * otherwise.
  */
-std::optional<Json::Value> SOCKET_EXPORT
+std::optional<nlohmann::json> SOCKET_EXPORT
 parseAndCheck(const void* buf, TgBotSocket::Packet::Header::length_type length,
               const std::initializer_list<const char*> nodes);
 
@@ -82,7 +82,7 @@ parseAndCheck(const void* buf, TgBotSocket::Packet::Header::length_type length,
  * @return Packet The resulting packet created from the command and JSON value.
  */
 Packet SOCKET_EXPORT
-nodeToPacket(const Command& command, const Json::Value& json,
+nodeToPacket(const Command& command, const nlohmann::json& json,
              const Packet::Header::session_token_type& session_token);
 
 template <size_t N>

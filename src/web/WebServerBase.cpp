@@ -3,7 +3,7 @@
 // #undef CPPHTTPLIB_BROTLI_SUPPORT
 
 #include <absl/log/log.h>
-#include <json/json.h>
+#include <nlohmann/json.hpp>
 
 #include <TgBotWebpage.hpp>
 #include <iomanip>
@@ -94,16 +94,20 @@ void TgBotWebServerBase::Callbacks::handleAPIVotes(const httplib::Request &req,
     constexpr std::string_view kContentTypeJson = "application/json";
     if (req.has_header(kContentType.data()) &&
         req.get_header_value(kContentType.data()) == kContentTypeJson) {
-        Json::Value document{};
-        Json::Reader reader;
+        nlohmann::json document{};
         std::string maybeVote;
 
-        if (!reader.parse(req.body, document)) {
-            LOG(ERROR) << "Failed to parse JSON";
+        try {
+            document = nlohmann::json::parse(req.body);
+        } catch (const nlohmann::json::parse_error& e) {
+            LOG(ERROR) << "Failed to parse JSON: " << e.what();
             res.status = httplib::StatusCode::BadRequest_400;
             return;
         }
-        maybeVote = document[Constants::kAPIVotesKey.data()].asString();
+        if (document.contains(Constants::kAPIVotesKey.data()) &&
+            document[Constants::kAPIVotesKey.data()].is_string()) {
+            maybeVote = document[Constants::kAPIVotesKey.data()].get<std::string>();
+        }
         if (maybeVote.empty()) {
             LOG(ERROR) << "Invalid API request: Missing vote value";
             res.status = httplib::StatusCode::BadRequest_400;

@@ -378,23 +378,22 @@ createPacket(const Command command, const void* data,
     return packet;
 }
 
-std::optional<Json::Value> SOCKET_EXPORT
+std::optional<nlohmann::json> SOCKET_EXPORT
 parseAndCheck(const void* buf, TgBotSocket::Packet::Header::length_type length,
               const std::initializer_list<const char*> nodes) {
-    Json::Value root;
-    Json::Reader reader;
-    if (!reader.parse(std::string(static_cast<const char*>(buf), length),
-                      root)) {
-        LOG(WARNING) << "Failed to parse json: "
-                     << reader.getFormattedErrorMessages();
+    nlohmann::json root;
+    try {
+        root = nlohmann::json::parse(std::string(static_cast<const char*>(buf), length));
+    } catch (const nlohmann::json::parse_error& e) {
+        LOG(WARNING) << "Failed to parse json: " << e.what();
         return std::nullopt;
     }
-    if (!root.isObject()) {
+    if (!root.is_object()) {
         LOG(WARNING) << "Expected an object in json";
         return std::nullopt;
     }
     for (const auto& node : nodes) {
-        if (!root.isMember(node)) {
+        if (!root.contains(node)) {
             LOG(WARNING) << fmt::format("Missing node '{}' in json", node);
             return std::nullopt;
         }
@@ -403,11 +402,9 @@ parseAndCheck(const void* buf, TgBotSocket::Packet::Header::length_type length,
 }
 
 Packet SOCKET_EXPORT
-nodeToPacket(const Command& command, const Json::Value& json,
+nodeToPacket(const Command& command, const nlohmann::json& json,
              const Packet::Header::session_token_type& session_token) {
-    std::string result;
-    Json::FastWriter writer;
-    result = writer.write(json);
+    std::string result = json.dump();
     auto packet = createPacket(command, result.c_str(), result.size(),
                                PayloadType::Json, session_token);
     return packet;

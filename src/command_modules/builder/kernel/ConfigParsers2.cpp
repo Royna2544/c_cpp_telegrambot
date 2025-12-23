@@ -13,7 +13,6 @@
 
 #include "FileWithTimestamp.hpp"
 #include "RepoUtils.hpp"
-#include "json/reader.h"
 
 // vector
 template <typename T>
@@ -44,9 +43,9 @@ enum class Optionality {
 
 template <typename T, Optionality opt = Optionality::REQUIRED>
     requires(!is_vector_v<T>)
-bool get(const Json::Value& value, const std::string_view name, T* result) {
-    if (value.isMember(name.data())) {
-        *result = value[name.data()].as<T>();
+bool get(const nlohmann::json& value, const std::string_view name, T* result) {
+    if (value.contains(name.data())) {
+        *result = value[name.data()].get<T>();
         DLOG(INFO) << name << "=" << *result;
     } else if constexpr (opt == Optionality::OPTIONAL) {
         return true;  // Field not present, use default value
@@ -60,12 +59,12 @@ bool get(const Json::Value& value, const std::string_view name, T* result) {
 // Overload: Vector types fixup
 template <typename T, Optionality opt = Optionality::REQUIRED>
     requires is_vector_v<T>
-bool get(const Json::Value& value, const std::string_view name, T* result) {
-    if (value.isMember(name.data())) {
+bool get(const nlohmann::json& value, const std::string_view name, T* result) {
+    if (value.contains(name.data())) {
         for (const auto& entry : value[name.data()]) {
             using Elem = fixup_to<typename is_vector<T>::type>::type;
-            result->emplace_back(entry.as<Elem>());
-            DLOG(INFO) << name << "+=" << entry.as<Elem>();
+            result->emplace_back(entry.get<Elem>());
+            DLOG(INFO) << name << "+=" << entry.get<Elem>();
         }
     } else if constexpr (opt == Optionality::OPTIONAL) {
         return true;  // Field not present, use default value
@@ -78,9 +77,9 @@ bool get(const Json::Value& value, const std::string_view name, T* result) {
 
 template <typename T>
     requires(!fixup_to<T>::fix_required)
-bool get(const Json::Value& value, const std::string_view treename,
+bool get(const nlohmann::json& value, const std::string_view treename,
          const std::string_view name, T* result) {
-    if (value.isMember(treename.data())) {
+    if (value.contains(treename.data())) {
         return get<T>(value[treename.data()], name, result);
     } else {
         LOG(ERROR) << "Missing required node: " << name;
@@ -92,7 +91,7 @@ bool get(const Json::Value& value, const std::string_view treename,
 // Overload: With fixup
 template <typename T>
     requires fixup_to<T>::fix_required
-bool get(const Json::Value& value, const std::string_view treename,
+bool get(const nlohmann::json& value, const std::string_view treename,
          const std::string_view name, T* result) {
     typename fixup_to<T>::type _result;
     if (get<typename fixup_to<T>::type>(value, treename, name, &_result)) {
@@ -149,7 +148,7 @@ struct FileAppender : public KernelConfig::Patcher {
     constexpr static std::string_view NAME = "FileAppender";
 };
 
-bool KernelConfig::parseName(const Json::Value& node) {
+bool KernelConfig::parseName(const nlohmann::json& node) {
     StackingError errors;
     errors = get(node, "name", &name);
     underscored_name = absl::StrReplaceAll(name, {
@@ -161,7 +160,7 @@ bool KernelConfig::parseName(const Json::Value& node) {
     return static_cast<bool>(errors);
 }
 
-bool KernelConfig::parseRepoInfo(const Json::Value& node) {
+bool KernelConfig::parseRepoInfo(const nlohmann::json& node) {
     StackingError errors;
     std::string url, branch;
     errors = get(node, "repo", "url", &url);
@@ -172,7 +171,7 @@ bool KernelConfig::parseRepoInfo(const Json::Value& node) {
     return static_cast<bool>(errors);
 }
 
-bool KernelConfig::parseArch(const Json::Value& node) {
+bool KernelConfig::parseArch(const nlohmann::json& node) {
     StackingError errors;
     std::string archStr;
     errors = get(node, "arch", &archStr);
@@ -191,7 +190,7 @@ bool KernelConfig::parseArch(const Json::Value& node) {
     return static_cast<bool>(errors);
 }
 
-bool KernelConfig::parseType(const Json::Value& node) {
+bool KernelConfig::parseType(const nlohmann::json& node) {
     StackingError errors;
     std::string typeStr;
     errors = get(node, "type", &typeStr);
@@ -208,7 +207,7 @@ bool KernelConfig::parseType(const Json::Value& node) {
     return static_cast<bool>(errors);
 }
 
-bool KernelConfig::parseClangSupport(const Json::Value& node) {
+bool KernelConfig::parseClangSupport(const nlohmann::json& node) {
     StackingError errors;
     bool supported = false;
     errors = get(node, "toolchains", "Clang", &supported);
@@ -231,8 +230,8 @@ bool KernelConfig::parseClangSupport(const Json::Value& node) {
     return static_cast<bool>(errors);
 }
 
-bool KernelConfig::parseAnyKernel(const Json::Value& node) {
-    if (!node.isMember("anykernel")) {
+bool KernelConfig::parseAnyKernel(const nlohmann::json& node) {
+    if (!node.contains("anykernel")) {
         DLOG(INFO) << "No anykernel info provided";
         return true;
     }
@@ -244,14 +243,14 @@ bool KernelConfig::parseAnyKernel(const Json::Value& node) {
     }
     return static_cast<bool>(errors);
 }
-bool KernelConfig::parseDefconfig(const Json::Value& node) {
+bool KernelConfig::parseDefconfig(const nlohmann::json& node) {
     StackingError errors;
     errors = get(node, "defconfig", "scheme", &defconfig.scheme);
     errors = get(node, "defconfig", "devices", &defconfig.devices);
     return static_cast<bool>(errors);
 }
-bool KernelConfig::parseFragments(const Json::Value& node) {
-    if (!node.isMember("fragments")) {
+bool KernelConfig::parseFragments(const nlohmann::json& node) {
+    if (!node.contains("fragments")) {
         DLOG(INFO) << "No fragments provided";
         return true;
     }
@@ -272,8 +271,8 @@ bool KernelConfig::parseFragments(const Json::Value& node) {
     }
     return true;
 }
-bool KernelConfig::parseEnvMap(const Json::Value& node) {
-    if (!node.isMember("env")) {
+bool KernelConfig::parseEnvMap(const nlohmann::json& node) {
+    if (!node.contains("env")) {
         DLOG(INFO) << "No environment variables provided";
         return true;
     }
@@ -292,8 +291,8 @@ bool KernelConfig::parseEnvMap(const Json::Value& node) {
     return true;
 }
 
-bool KernelConfig::parsePatches(const Json::Value& node) {
-    if (!node.isMember("patch")) {
+bool KernelConfig::parsePatches(const nlohmann::json& node) {
+    if (!node.contains("patch")) {
         DLOG(INFO) << "No patches provided";
         return true;
     }
@@ -322,7 +321,7 @@ bool KernelConfig::parsePatches(const Json::Value& node) {
     return true;
 }
 
-bool KernelConfig::parse(const Json::Value& node) {
+bool KernelConfig::parse(const nlohmann::json& node) {
     StackingError errors;
     errors = parseName(node);
     errors = parseRepoInfo(node);
@@ -349,15 +348,16 @@ bool KernelConfig::parse(const Json::Value& node) {
 }
 
 void KernelConfig::parse() {
-    Json::Value root;
+    nlohmann::json root;
     std::ifstream ifs(_sourceFilePath);
     std::string filePath = _sourceFilePath.filename().string();
     if (!ifs.is_open()) {
         throw std::runtime_error("Failed to open JSON file: " + filePath);
     }
-    Json::Reader reader;
-    if (!reader.parse(ifs, root, false)) {
-        throw std::runtime_error("Failed to parse JSON file: " + filePath);
+    try {
+        ifs >> root;
+    } catch (const nlohmann::json::parse_error& e) {
+        throw std::runtime_error("Failed to parse JSON file: " + filePath + ": " + e.what());
     }
     if (!parse(root)) {
         throw std::runtime_error("Failed to parse JSON file: " + filePath);

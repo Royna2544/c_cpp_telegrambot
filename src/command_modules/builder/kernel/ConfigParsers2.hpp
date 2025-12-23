@@ -1,7 +1,7 @@
 #pragma once
 
 #include <fmt/core.h>
-#include <json/value.h>
+#include <nlohmann/json.hpp>
 
 #include <filesystem>
 #include <map>
@@ -66,17 +66,17 @@ struct KernelConfig {
     void reParse();
 
    private:
-    bool parseName(const Json::Value& node);
-    bool parseRepoInfo(const Json::Value& node);
-    bool parseArch(const Json::Value& node);
-    bool parseType(const Json::Value& node);
-    bool parseClangSupport(const Json::Value& node);
-    bool parseAnyKernel(const Json::Value& node);
-    bool parseDefconfig(const Json::Value& node);
-    bool parseFragments(const Json::Value& node);
-    bool parseEnvMap(const Json::Value& node);
-    bool parsePatches(const Json::Value& node);
-    bool parse(const Json::Value& node);
+    bool parseName(const nlohmann::json& node);
+    bool parseRepoInfo(const nlohmann::json& node);
+    bool parseArch(const nlohmann::json& node);
+    bool parseType(const nlohmann::json& node);
+    bool parseClangSupport(const nlohmann::json& node);
+    bool parseAnyKernel(const nlohmann::json& node);
+    bool parseDefconfig(const nlohmann::json& node);
+    bool parseFragments(const nlohmann::json& node);
+    bool parseEnvMap(const nlohmann::json& node);
+    bool parsePatches(const nlohmann::json& node);
+    bool parse(const nlohmann::json& node);
     void parse();
     std::filesystem::path _sourceFilePath;
     FileWithTimestamp _file;

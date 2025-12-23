@@ -362,7 +362,7 @@ endif()
 # ############################ Check lib (TODO: Make these optional) #############################
 find_package(Protobuf)
 find_package(fmt REQUIRED)
-find_package(jsoncpp REQUIRED) # Required by tgbot-cpp anyways...
+find_package(nlohmann_json REQUIRED)
 find_package(CURL REQUIRED)
 find_package(cpptrace REQUIRED)
 find_package(absl REQUIRED)

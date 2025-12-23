@@ -1,6 +1,6 @@
 #include <absl/strings/escaping.h>
 #include <fmt/chrono.h>
-#include <json/json.h>
+#include <nlohmann/json.hpp>
 #include <openssl/sha.h>
 #include <tgbot/TgException.h>
 #include <tgbot/tools/StringTools.h>
@@ -40,16 +40,16 @@ namespace {
 
 std::string getMIMEString(const ResourceProvider* resource,
                           const std::string& path) {
-    static Json::Value doc;
+    static nlohmann::json doc;
     std::string extension = fs::path(path).extension().string();
 
-    static bool once = [resource] {
+    static bool once = [resource, &doc] {
         std::string_view buf;
         buf = resource->get("mimeData.json");
-        Json::Reader reader;
-        if (!reader.parse(buf.data(), doc)) {
-            LOG(ERROR) << "Failed to parse mimedata: "
-                       << reader.getFormattedErrorMessages();
+        try {
+            doc = nlohmann::json::parse(buf);
+        } catch (const nlohmann::json::parse_error& e) {
+            LOG(ERROR) << "Failed to parse mimedata: " << e.what();
         }
         return true;
     }();
@@ -60,12 +60,12 @@ std::string getMIMEString(const ResourceProvider* resource,
         }
         // Look for MIME type in json file.
         for (const auto& elem : doc) {
-            if (!elem.isMember("types")) {
+            if (!elem.contains("types")) {
                 continue;
             }
             for (const auto& ex : elem["types"]) {
-                if (ex.asString() == extension) {
-                    return elem["name"].asString();
+                if (ex.get<std::string>() == extension) {
+                    return elem["name"].get<std::string>();
                 }
             }
         }
@@ -77,7 +77,7 @@ std::string getMIMEString(const ResourceProvider* resource,
 
 Packet toJSONPacket(const GenericAck& ack,
                     const Packet::Header::session_token_type& session_token) {
-    Json::Value root;
+    nlohmann::json root;
     root["result"] = ack.result == AckType::SUCCESS;
     if (ack.result != AckType::SUCCESS) {
         root["error_msg"] = safeParse(ack.error_msg);
@@ -135,8 +135,8 @@ struct WriteMsgToChatId {
                     return std::nullopt;
                 }
                 auto& root = _root.value();
-                result.chat = root["chat"].as<ChatId>();
-                result.message = root["message"].asString();
+                result.chat = root["chat"].get<ChatId>();
+                result.message = root["message"].get<std::string>();
                 return result;
             }
             default:
@@ -174,8 +174,8 @@ struct ObserveChatId {
                     return std::nullopt;
                 }
                 auto& root = _root.value();
-                result.chat = root["chat"].as<ChatId>();
-                result.observe = root["observe"].asBool();
+                result.chat = root["chat"].get<ChatId>();
+                result.observe = root["observe"].get<bool>();
                 return result;
             }
             default:
@@ -217,10 +217,10 @@ struct SendFileToChatId {
                     return std::nullopt;
                 }
                 auto& root = _root.value();
-                result.chat = root["chat"].as<ChatId>();
+                result.chat = root["chat"].get<ChatId>();
                 result.fileType = static_cast<TgBotSocket::data::FileType>(
-                    root["fileType"].asInt());
-                result.filePath = root["filePath"].asString();
+                    root["fileType"].get<int>());
+                result.filePath = root["filePath"].get<std::string>();
                 return result;
             }
             default:
@@ -259,7 +259,7 @@ struct ObserveAllChats {
                     return std::nullopt;
                 }
                 auto& root = _root.value();
-                result.observe = root["observe"].asBool();
+                result.observe = root["observe"].get<bool>();
                 return result;
             }
             default:
