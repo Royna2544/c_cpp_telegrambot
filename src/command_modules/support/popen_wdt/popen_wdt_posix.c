@@ -229,6 +229,7 @@ static void popen_watchdog_wait(popen_watchdog_data_t **data_in) {
 
     pthread_mutex_lock(&pdata->wdt_mutex);
     if (!pdata->process_is_running) {
+        pthread_mutex_unlock(&pdata->wdt_mutex);
         return;
     }
     pthread_mutex_unlock(&pdata->wdt_mutex);
