@@ -222,10 +222,13 @@ bool Context::Local::connect(const RemoteEndpoint& endpoint) {
     socket_.async_connect(
         boost::asio::local::stream_protocol::endpoint(endpoint.address),
         [&, this](boost::system::error_code ec) {
-            if (ec) {
-                LOG(ERROR) << "Connect error: " << ec.message();
-            } else {
-                connected = true;
+            {
+                std::unique_lock<std::mutex> lock(m);
+                if (ec) {
+                    LOG(ERROR) << "Connect error: " << ec.message();
+                } else {
+                    connected = true;
+                }
             }
             cv.notify_all();
         });

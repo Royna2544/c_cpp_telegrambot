@@ -210,10 +210,13 @@ bool Context::TCP::connect(const RemoteEndpoint& endpoint) {
         socket_, endpoints,
         [&, this](boost::system::error_code ec,
                   const boost::asio::ip::tcp::endpoint& /*ep*/) {
-            if (ec) {
-                LOG(ERROR) << "Connect error: " << ec.message();
-            } else {
-                connected = true;
+            {
+                std::unique_lock<std::mutex> lock(m);
+                if (ec) {
+                    LOG(ERROR) << "Connect error: " << ec.message();
+                } else {
+                    connected = true;
+                }
             }
             cv.notify_all();
         });

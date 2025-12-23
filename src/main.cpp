@@ -362,8 +362,8 @@ std::vector<TgBot::InlineQueryResult::Ptr> mediaQueryKeyboardFunction(
 }
 
 struct OptionalComponents {
-    bool webServer;
-    bool dataCollector;
+    bool webServer = false;
+    bool dataCollector = false;
 
     void fromString(const absl::string_view configString) {
         std::vector<std::string> enabledComp =
