@@ -1,7 +1,7 @@
 #pragma once
 
 #include <UtilsExports.h>
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 
 #include <filesystem>
 #include <functional>

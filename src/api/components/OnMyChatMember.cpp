@@ -1,4 +1,4 @@
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 #include <trivial_helpers/_tgbot.h>
 
 #include <api/components/OnMyChatMember.hpp>

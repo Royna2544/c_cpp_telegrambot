@@ -6,8 +6,8 @@
 // clang-format on
 #include "ImageTypeJPEG.hpp"
 
-#include <absl/log/check.h>
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
+#include <AbslLogCompat.hpp>
 
 #include <StructF.hpp>
 #include <array>

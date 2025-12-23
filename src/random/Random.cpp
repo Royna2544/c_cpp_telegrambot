@@ -1,6 +1,6 @@
 #include "Random.hpp"
 
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 
 #include <cassert>
 #include <memory>

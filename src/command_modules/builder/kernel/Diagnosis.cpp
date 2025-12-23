@@ -1,6 +1,6 @@
 #include "Diagnosis.hpp"
 
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 
 #include <regex>
 

@@ -1,8 +1,8 @@
 #pragma once
 
 // Helper class to fork and run a subprocess with stdout/err
-#include <absl/log/log_entry.h>
-#include <absl/log/log_sink.h>
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/base_sink.h>
 #include <absl/strings/ascii.h>
 #include <fmt/format.h>
 #include <sys/types.h>

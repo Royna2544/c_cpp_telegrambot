@@ -1,4 +1,4 @@
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 #include <tgbot/TgException.h>
 
 #include <api/AuthContext.hpp>

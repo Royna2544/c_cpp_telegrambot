@@ -1,6 +1,6 @@
 #include "RepoUtils.hpp"
 
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 #include <absl/strings/str_replace.h>
 #include <absl/strings/str_split.h>
 #include <fmt/core.h>

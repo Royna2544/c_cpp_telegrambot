@@ -2,7 +2,7 @@
 // #undef CPPHTTPLIB_ZLIB_SUPPORT
 // #undef CPPHTTPLIB_BROTLI_SUPPORT
 
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 #include <nlohmann/json.hpp>
 
 #include <TgBotWebpage.hpp>

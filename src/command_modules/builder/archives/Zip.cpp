@@ -1,6 +1,6 @@
 #include "Zip.hpp"
 
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 #include <fmt/core.h>
 
 #include <filesystem>

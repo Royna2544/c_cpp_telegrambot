@@ -1,5 +1,5 @@
 #pragma once
 
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 
 #define LOG_ONCE(level) LOG_FIRST_N(level, 1)

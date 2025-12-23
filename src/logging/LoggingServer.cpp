@@ -1,9 +1,9 @@
 #include "LoggingServer.hpp"
 
-#include <absl/log/log_entry.h>
-#include <absl/log/log_sink.h>
-#include <absl/log/log_sink_registry.h>
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/base_sink.h>
 
+#include <AbslLogCompat.hpp>
 #include <ManagedThreads.hpp>
 #include <SharedMalloc.hpp>
 #include <algorithm>
@@ -14,19 +14,27 @@
 #include "LogcatData.hpp"
 #include "SocketContext.hpp"
 
-void NetworkLogSink::LogSinkImpl::Send(const absl::LogEntry& entry) {
+void NetworkLogSink::LogSinkImpl::sink_it_(const spdlog::details::log_msg& msg) {
     if (_stop.stop_requested()) {
         return;
     }
     LogEntry le{};
-    le.severity = entry.log_severity();
-    std::ranges::copy_n(entry.text_message().begin(), MAX_LOGMSG_SIZE - 1, le.message.begin());
+    le.severity = msg.level;
+    
+    // Format the message using the formatter
+    spdlog::memory_buf_t formatted;
+    formatter_->format(msg, formatted);
+    std::string formatted_str = fmt::to_string(formatted);
+    
+    std::ranges::copy_n(formatted_str.begin(), 
+                       std::min(formatted_str.size(), static_cast<size_t>(MAX_LOGMSG_SIZE - 1)), 
+                       le.message.begin());
     SharedMalloc logData(le);
     bool ret = false;
     if (context != nullptr) {
         ret = context->write(logData);
         if (!ret) {
-            LOG(ERROR) << "Failed to send log data to client";
+            SPDLOG_ERROR("Failed to send log data to client");
             _stop.request_stop();
         }
     }

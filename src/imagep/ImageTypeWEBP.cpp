@@ -1,7 +1,7 @@
 #include "ImageTypeWEBP.hpp"
 
-#include <absl/log/check.h>
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
+#include <AbslLogCompat.hpp>
 #include <absl/status/status.h>
 #include <webp/decode.h>
 #include <webp/encode.h>

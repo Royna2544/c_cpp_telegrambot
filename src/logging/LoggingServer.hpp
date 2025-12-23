@@ -1,7 +1,7 @@
 #pragma once
 
-#include <absl/log/log_entry.h>
-#include <absl/log/log_sink.h>
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/base_sink.h>
 
 #include <ManagedThreads.hpp>
 #include <future>
@@ -13,8 +13,9 @@
 #include "SocketContext.hpp"
 
 struct NetworkLogSink : public ThreadRunner {
-    class LogSinkImpl : public absl::LogSink {
-        void Send(const absl::LogEntry& entry) override;
+    class LogSinkImpl : public spdlog::sinks::base_sink<std::mutex> {
+        void sink_it_(const spdlog::details::log_msg& msg) override;
+        void flush_() override {}
         const TgBotSocket::Context* context = nullptr;
         std::stop_source _stop;
 

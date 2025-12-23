@@ -1,5 +1,4 @@
-#include <absl/log/log.h>
-#include <absl/log/log_sink_registry.h>
+#include <AbslLogCompat.hpp>
 #include <absl/strings/match.h>
 #include <absl/strings/str_split.h>
 #include <fmt/chrono.h>

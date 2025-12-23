@@ -1,4 +1,4 @@
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 #include <fcntl.h>
 #include <fmt/chrono.h>
 #include <fmt/format.h>

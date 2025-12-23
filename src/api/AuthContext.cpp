@@ -1,4 +1,4 @@
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 #include <api/typedefs.h>
 
 #include <api/AuthContext.hpp>

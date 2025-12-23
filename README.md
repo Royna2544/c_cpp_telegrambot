@@ -14,7 +14,7 @@
 | popen_wdt lib | main C++ code | Android socket client app | Webpage | Database support | Webpage | Webpage | Webpage | Webpage |
 
 ## Used external libraries
-- Abseil C++ common library - Used for logging - [Link](https://github.com/abseil/abseil-cpp)
+- spdlog - Fast C++ logging library - Used for logging - [Link](https://github.com/gabime/spdlog)
 - C++ HTTP library - Used for website server support - [Link](https://github.com/yhirose/cpp-httplib)
 - dlfcn Win32 support - Used for runtime loader for commands - [Link](https://github.com/dlfcn-win32/dlfcn-win32)
 - GTest - Test framework for C++ codes - [Link](https://github.com/google/googletest)

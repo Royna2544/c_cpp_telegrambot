@@ -1,6 +1,6 @@
 #include "SessionManager.hpp"
 
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 #include <bot/PacketParser.hpp>
 #include <algorithm>
 

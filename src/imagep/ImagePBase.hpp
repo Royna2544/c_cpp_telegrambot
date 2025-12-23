@@ -1,6 +1,6 @@
 #pragma once
 
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 #include <absl/status/status.h>
 
 #include <filesystem>

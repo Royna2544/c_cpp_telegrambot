@@ -1,8 +1,7 @@
 #include "ForkAndRun.hpp"
 
-#include <absl/log/log.h>
-#include <absl/log/log_sink.h>
-#include <absl/log/log_sink_registry.h>
+#include <AbslLogCompat.hpp>
+#include <spdlog/sinks/base_sink.h>
 #include <absl/strings/match.h>
 #include <absl/strings/str_split.h>
 #include <absl/strings/strip.h>
@@ -13,7 +12,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include <AbslLogInit.hpp>
+#include <SpdlogInit.hpp>
 #include <LogSinks.hpp>
 #include <algorithm>
 #include <array>
@@ -35,18 +34,23 @@
 #include "Shmem.hpp"
 #include "utils/Env.hpp"
 
-struct FDLogSink : public absl::LogSink {
-    void Send(const absl::LogEntry& logSink) override {
+struct FDLogSink : public spdlog::sinks::base_sink<std::mutex> {
+    void sink_it_(const spdlog::details::log_msg& msg) override {
         if (isWritable) {
+            spdlog::memory_buf_t formatted;
+            formatter_->format(msg, formatted);
             const std::string newLine =
                 fmt::format("SubProcess (PID: {}, TID: {}): {}", pid_, gettid(),
-                            logSink.text_message_with_prefix_and_newline());
+                            fmt::to_string(formatted));
             write(stdout_fd, newLine.c_str(), newLine.size());
         }
     }
+    
+    void flush_() override {}
+    
     explicit FDLogSink() : stdout_fd(::dup(STDOUT_FILENO)), pid_(getpid()) {
         if (stdout_fd < 0) {
-            PLOG(ERROR) << "Failed to duplicate stdout";
+            SPDLOG_ERROR("Failed to duplicate stdout: {}", strerror(errno));
             isWritable = false;
         }
     }

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <absl/log/absl_log.h>
+#include <AbslLogCompat.hpp>
 
 #include <cstddef>
 #include <cstdint>
@@ -251,7 +251,7 @@ inline F::Result F::open(const std::string_view filename, const Mode mode) {
     external_managed = false;
     handle.reset(std::fopen(filename.data(), constructFileMode(mode).data()));
     if (handle == nullptr) {
-        ABSL_LOG(ERROR) << "Failed to open file: " << std::quoted(filename);
+        SPDLOG_ERROR("Failed to open file: {}", filename);
         return Result::error(Result::Reason::kIOFailure);
     }
     return Result::ok();
@@ -260,7 +260,7 @@ inline F::Result F::open(const std::string_view filename, const Mode mode) {
 inline F::Result F::write(const void* __restrict ptr, size_t size,
                    size_t nBytes) const {
     if (handle == nullptr) {
-        ABSL_LOG(ERROR) << "File handle is null";
+        SPDLOG_ERROR("File handle is null");
         return Result::error(Result::Reason::kHandleNull);
     }
     return Result::ok_or(std::fwrite(ptr, size, nBytes, handle.get()) == nBytes,
@@ -269,7 +269,7 @@ inline F::Result F::write(const void* __restrict ptr, size_t size,
 
 inline F::Result F::read(void* ptr, size_t size, size_t nBytes) const {
     if (handle == nullptr) {
-        ABSL_LOG(ERROR) << "File handle is null";
+        SPDLOG_ERROR("File handle is null");
         return Result::error(Result::Reason::kHandleNull);
     }
     return Result::ok_or(std::fread(ptr, size, nBytes, handle.get()) == nBytes,
@@ -278,7 +278,7 @@ inline F::Result F::read(void* ptr, size_t size, size_t nBytes) const {
 
 inline F::Result F::puts(const std::string_view text) const {
     if (handle == nullptr) {
-        ABSL_LOG(ERROR) << "File handle is null";
+        SPDLOG_ERROR("File handle is null");
         return Result::error(Result::Reason::kHandleNull);
     }
     return Result::ok_or(std::fputs(text.data(), handle.get()) != EOF,
@@ -287,7 +287,7 @@ inline F::Result F::puts(const std::string_view text) const {
 
 inline F::Result F::putc(const char c) const {
     if (handle == nullptr) {
-        ABSL_LOG(ERROR) << "File handle is null";
+        SPDLOG_ERROR("File handle is null");
         return Result::error(Result::Reason::kHandleNull);
     }
     return Result::ok_or(std::fputc(c, handle.get()) != EOF,
@@ -303,21 +303,21 @@ inline void F::close() {
 
 inline long F::size() const {
     if (handle == nullptr) {
-        ABSL_LOG(ERROR) << "File handle is null";
+        SPDLOG_ERROR("File handle is null");
         return INVALID_SIZE;
     }
     long current = ftell(handle.get());
     if (current == -1) {
-        ABSL_LOG(ERROR) << "Failed to get current position in file";
+        SPDLOG_ERROR("Failed to get current position in file");
         return INVALID_SIZE;
     }
     long size = fseek(handle.get(), 0, SEEK_END);
     if (size == -1) {
-        ABSL_LOG(ERROR) << "Failed to seek to end of file";
+        SPDLOG_ERROR("Failed to seek to end of file");
         return INVALID_SIZE;
     }
     if (fseek(handle.get(), current, SEEK_SET) == -1) {
-        ABSL_LOG(ERROR) << "Failed to seek back to current position in file";
+        SPDLOG_ERROR("Failed to seek back to current position in file");
         return INVALID_SIZE;
     }
     return size;
@@ -338,7 +338,7 @@ inline std::string_view F::constructFileMode(const Mode mode) {
         case Mode::AppendBinary:
             return "ab";
         default:
-            ABSL_LOG(ERROR) << "Invalid file mode: " << static_cast<int>(mode);
+            SPDLOG_ERROR("Invalid file mode: {}", static_cast<int>(mode));
             return "";
     }
 }

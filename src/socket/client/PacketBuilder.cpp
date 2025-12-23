@@ -1,7 +1,7 @@
 #include "PacketBuilder.hpp"
 #include "CommandParser.hpp"
 
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 #include <api/Commands.hpp>
 
 // fmt::formatter specialization for Command enum

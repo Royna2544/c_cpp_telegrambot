@@ -262,7 +262,7 @@ function(tgbot_library)
 
   # Collect public & private libs exactly once
   set(PUBLIC_LIBS ${LIB_LIBS})
-  set(PRIVATE_LIBS absl::log)
+  set(PRIVATE_LIBS spdlog::spdlog)
 
   if(LIB_STATIC)
     add_library(${LIB_NAME} STATIC ${LIB_SRCS})
@@ -323,7 +323,7 @@ function(tgbot_exe)
 
   if(NOT EXE_NO_MAIN_WRAPPER)
     list(APPEND EXE_SRCS ${CMAKE_SOURCE_DIR}/src/logging/WrapMain.cpp)
-    list(APPEND EXE_LIBS LogInit absl::log)
+    list(APPEND EXE_LIBS LogInit spdlog::spdlog)
   endif()
 
   if (EXE_OPTIONAL)
@@ -365,7 +365,7 @@ find_package(fmt REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(CURL REQUIRED)
 find_package(cpptrace REQUIRED)
-find_package(absl REQUIRED)
+find_package(spdlog REQUIRED)
 find_package(httplib REQUIRED)
 find_package(sol2 REQUIRED)
 find_package(fruit REQUIRED)
@@ -427,8 +427,6 @@ tgbot_library(
   Regex
   SRCS
   src/global_handlers/RegEXHandler.cpp
-  LIBS
-  absl::status
   STATIC)
 
 tgbot_library(

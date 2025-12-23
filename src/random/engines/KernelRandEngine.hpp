@@ -2,8 +2,8 @@
 
 #if defined __APPLE__ || defined __linux__
 
-#include <absl/log/check.h>
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
+#include <AbslLogCompat.hpp>
 
 #include <array>
 #include <cerrno>

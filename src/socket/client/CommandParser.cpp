@@ -1,7 +1,7 @@
 #include "CommandParser.hpp"
 
 #include <TryParseStr.hpp>
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 #include <bot/FileHelperNew.hpp>
 
 namespace TgBotSocket::Client {

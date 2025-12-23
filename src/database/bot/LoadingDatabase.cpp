@@ -1,4 +1,4 @@
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 #include <absl/strings/str_split.h>
 
 #include <ConfigManager.hpp>

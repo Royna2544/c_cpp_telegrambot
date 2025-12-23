@@ -1,4 +1,4 @@
-#include <absl/log/check.h>
+#include <AbslLogCompat.hpp>
 #include <fmt/format.h>
 #include <fmt/ranges.h>
 #include <tgbot/types/KeyboardButton.h>

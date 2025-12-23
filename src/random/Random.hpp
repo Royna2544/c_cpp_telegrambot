@@ -1,7 +1,7 @@
 #pragma once
 
 #include <RandomExports.h>
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 
 #include <algorithm>
 #include <memory>

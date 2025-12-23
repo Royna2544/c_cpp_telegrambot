@@ -1,7 +1,7 @@
 #pragma once
 
 #include <UtilsExports.h>
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 #include <absl/strings/str_cat.h>
 #include <trivial_helpers/_class_helper_macros.h>
 

@@ -1,6 +1,6 @@
 #include "Shmem.hpp"
 
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 #include <fcntl.h>
 #include <fmt/core.h>
 #include <sys/mman.h>

@@ -1,4 +1,4 @@
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 #include <absl/strings/ascii.h>
 #include <fmt/format.h>
 

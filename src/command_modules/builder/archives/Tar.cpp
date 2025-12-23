@@ -1,6 +1,6 @@
 #include "Tar.hpp"
 
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 #include <archive.h>
 #include <archive_entry.h>
 #include <fmt/format.h>

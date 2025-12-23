@@ -1,6 +1,6 @@
 #include "CurlUtils.hpp"
 
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 #include <curl/curl.h>
 #include <fmt/format.h>
 

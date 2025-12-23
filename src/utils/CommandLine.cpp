@@ -1,4 +1,4 @@
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 
 #include <trivial_helpers/log_once.hpp>
 #include <CommandLine.hpp>

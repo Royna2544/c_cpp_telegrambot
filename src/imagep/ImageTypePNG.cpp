@@ -1,6 +1,6 @@
 #include "ImageTypePNG.hpp"
 
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 #include <absl/status/status.h>
 #include <png.h>
 #include <pngconf.h>

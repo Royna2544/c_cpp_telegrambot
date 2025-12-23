@@ -1,6 +1,6 @@
 #include "ConfigParsers2.hpp"
 
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 #include <absl/strings/match.h>
 #include <absl/strings/str_replace.h>
 

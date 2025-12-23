@@ -1,7 +1,7 @@
 #include "ProtobufDatabase.hpp"
 
-#include <absl/log/check.h>
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
+#include <AbslLogCompat.hpp>
 #include <absl/strings/match.h>
 #include <fmt/format.h>
 #include <fmt/ranges.h>

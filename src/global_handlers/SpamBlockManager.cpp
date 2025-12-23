@@ -1,4 +1,4 @@
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 #include <tgbot/TgException.h>
 #include <trivial_helpers/_std_chrono_templates.h>
 #include <trivial_helpers/_tgbot.h>

@@ -1,6 +1,6 @@
 #include "ToolchainProvider.hpp"
 
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 #include <absl/meta/type_traits.h>
 #include <absl/strings/ascii.h>
 

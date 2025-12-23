@@ -1,7 +1,7 @@
 #pragma once
 
 #include <filesystem>
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 #include "utils/libfs.hpp"
 
 class CwdRestorer {

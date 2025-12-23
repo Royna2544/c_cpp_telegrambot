@@ -1,5 +1,5 @@
 #include <api/typedefs.h>
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 #include <fmt/format.h>
 #include <nlohmann/json.hpp>
 

@@ -1,6 +1,6 @@
 #include "CallbackHandler.hpp"
 
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 #include <nlohmann/json.hpp>
 #include <bot/FileHelperNew.hpp>
 #include <bot/PacketParser.hpp>

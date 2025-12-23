@@ -1,7 +1,7 @@
 #pragma once
 
 #include <SocketExports.h>
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 
 #include <ApiDef.hpp>
 #include <boost/asio.hpp>

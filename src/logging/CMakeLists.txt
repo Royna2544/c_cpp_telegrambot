@@ -3,10 +3,9 @@ if(WIN32)
     NAME
     LogInit
     SRCS
-    AbslLogInit.cpp
+    SpdlogInit.cpp
     LIBS
-    absl::log_initialize
-    absl::log_sink_registry
+    spdlog::spdlog
     NO_HIDE
     STATIC)
 else()
@@ -14,10 +13,9 @@ else()
     NAME
     LogInit
     SRCS
-    AbslLogInit.cpp
+    SpdlogInit.cpp
     LIBS
-    absl::log_initialize
-    absl::log_sink_registry
+    spdlog::spdlog
     NO_HIDE)
 endif()
 

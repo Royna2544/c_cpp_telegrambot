@@ -1,4 +1,4 @@
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 
 #include <ConfigParsers.hpp>
 #include <cstdlib>

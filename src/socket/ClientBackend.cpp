@@ -1,7 +1,7 @@
 #include "ClientBackend.hpp"
 
 #include <TryParseStr.hpp>
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 #include <boost/asio/ip/tcp.hpp>
 
 #include "Env.hpp"

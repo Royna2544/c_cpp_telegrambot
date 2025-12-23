@@ -1,6 +1,6 @@
 #include "PacketParser.hpp"
 
-#include <absl/log/log.h>
+#include <AbslLogCompat.hpp>
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
 #include <openssl/rand.h>

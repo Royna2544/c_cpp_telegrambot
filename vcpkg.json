@@ -27,7 +27,7 @@
     "cpp-httplib",
     "fruit",
     "cpptrace",
-    "abseil",
+    "spdlog",
     "protobuf",
     "gtest",
     "sol2",

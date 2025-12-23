@@ -1,4 +1,4 @@
-#include <absl/log/check.h>
+#include <AbslLogCompat.hpp>
 
 #include <Env.hpp>
 #include <api/MessageExt.hpp>

@@ -1,45 +1,50 @@
 #pragma once
 
-#include <absl/base/log_severity.h>
-#include <absl/log/log.h>
-#include <absl/log/log_sink.h>
-#include <absl/log/log_sink_registry.h>
+#include <spdlog/spdlog.h>
+#include <spdlog/sinks/base_sink.h>
 #include <trivial_helpers/_class_helper_macros.h>
 
 #include <StructF.hpp>
+#include <AbslLogCompat.hpp>
 #include <concepts>
+#include <filesystem>
 #include <memory>
 #include <mutex>
 #include <type_traits>
 
-template <std::derived_from<absl::LogSink> Sink>
+template <typename Mutex>
+using base_sink = spdlog::sinks::base_sink<Mutex>;
+
+template <std::derived_from<base_sink<std::mutex>> Sink>
 struct RAIILogSink {
     explicit RAIILogSink()
         requires std::is_default_constructible_v<Sink>
-        : _sink(std::make_unique<Sink>()) {
-        absl::AddLogSink(_sink.get());
+        : _sink(std::make_shared<Sink>()) {
+        spdlog::default_logger()->sinks().push_back(_sink);
     }
     template <typename... Args>
     explicit RAIILogSink(Args&&... args)
         requires std::is_constructible_v<Sink, Args...> &&
                  (sizeof...(Args) != 0)
-        : _sink(std::make_unique<Sink>(args...)) {
-        absl::AddLogSink(_sink.get());
+        : _sink(std::make_shared<Sink>(args...)) {
+        spdlog::default_logger()->sinks().push_back(_sink);
     }
     RAIILogSink() = default;
     ~RAIILogSink() {
         if (_sink) {
-            absl::RemoveLogSink(_sink.get());
+            auto& sinks = spdlog::default_logger()->sinks();
+            sinks.erase(std::remove(sinks.begin(), sinks.end(), _sink), sinks.end());
         }
     }
 
-    RAIILogSink& operator=(std::unique_ptr<Sink>&& sink) & {
+    RAIILogSink& operator=(std::shared_ptr<Sink>&& sink) & {
         if (_sink) {
-            absl::RemoveLogSink(_sink.get());
+            auto& sinks = spdlog::default_logger()->sinks();
+            sinks.erase(std::remove(sinks.begin(), sinks.end(), _sink), sinks.end());
         }
         _sink = std::move(sink);
         if (_sink) {
-            absl::AddLogSink(_sink.get());
+            spdlog::default_logger()->sinks().push_back(_sink);
         }
         return *this;
     }
@@ -47,45 +52,52 @@ struct RAIILogSink {
     NO_COPY_CTOR(RAIILogSink);
 
    private:
-    std::unique_ptr<Sink> _sink;
+    std::shared_ptr<Sink> _sink;
 };
 
-struct StdFileSink : absl::LogSink {
-    void Send(const absl::LogEntry& entry) override {
-        const std::lock_guard<std::mutex> lock(m);
-        if (entry.log_severity() < absl::LogSeverity::kError) {
-            (void)file.puts(
-                entry.text_message_with_prefix_and_newline().data());
+struct StdFileSink : base_sink<std::mutex> {
+    void sink_it_(const spdlog::details::log_msg& msg) override {
+        if (msg.level < spdlog::level::err) {
+            spdlog::memory_buf_t formatted;
+            base_sink<std::mutex>::formatter_->format(msg, formatted);
+            (void)file.puts(fmt::to_string(formatted).c_str());
         }
     }
+    
+    void flush_() override {
+        // F class handles flushing internally
+    }
+    
     StdFileSink() : file(StderrF()) {}
     ~StdFileSink() override = default;
 
    private:
-    std::mutex m;
     F file;
 };
 
-struct LogFileSink : absl::LogSink {
+struct LogFileSink : base_sink<std::mutex> {
     explicit LogFileSink(std::filesystem::path filename) {
         const auto& res = file.open(filename.string(), F::Mode::Write);
         if (!res) {
-            LOG(ERROR) << "Couldn't open file " << filename << ": "
-                       << res.reason;
+            SPDLOG_ERROR("Couldn't open file {}: {}", filename.string(), res.reason);
             file = nullptr;
         }
-        LOG(INFO) << "File " << filename << " added as logsink";
+        SPDLOG_INFO("File {} added as logsink", filename.string());
     }
 
-    void Send(const absl::LogEntry& entry) override {
-        const std::lock_guard<std::mutex> lock(m);
-        (void)file.puts(entry.text_message_with_prefix_and_newline().data());
+    void sink_it_(const spdlog::details::log_msg& msg) override {
+        spdlog::memory_buf_t formatted;
+        base_sink<std::mutex>::formatter_->format(msg, formatted);
+        (void)file.puts(fmt::to_string(formatted).c_str());
+    }
+    
+    void flush_() override {
+        // F class handles flushing internally
     }
 
     ~LogFileSink() override = default;
 
    private:
-    std::mutex m;
     F file;
 };
 
