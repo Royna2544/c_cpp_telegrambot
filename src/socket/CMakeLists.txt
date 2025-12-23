@@ -29,7 +29,7 @@ tgbot_library(
   Utils
   Boost::system
   OpenSSL::Crypto
-  JsonCpp::JsonCpp
+  nlohmann_json::nlohmann_json
   ${SOCKET_HEXDUMP_LIB}
   $<$<BOOL:${WIN32}>:wsock32
   Ws2_32>

@@ -85,7 +85,7 @@ tgbot_exe(
   DBImpl
   Socket
   DBLoading
-  JsonCpp::JsonCpp
+  nlohmann_json::nlohmann_json
   RELATION
   Socket)
 # ##############################################################################

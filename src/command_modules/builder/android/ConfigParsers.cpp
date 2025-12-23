@@ -125,7 +125,7 @@ bool checkRequirements(const nlohmann::json& value, NodeItemType<Args>&... args)
 
     if (!value.is_object()) {
         LOG(ERROR) << fmt::format("Expected object, found: {}",
-                                  static_cast<int>(value.type()));
+                                  value.type_name());
         return false;
     }
 
@@ -209,15 +209,15 @@ class ProxyJsonBranch {
      * @param root The nlohmann::json object to be wrapped.
      */
     explicit ProxyJsonBranch(const nlohmann::json& root, const std::string& name)
-        : root_(root.contains(name) ? root[name] : nlohmann::json()), 
-          isValidObject(root_.is_array()) {
+        : root_(root.contains(name) && root[name].is_array() ? root[name] : nlohmann::json::array()), 
+          isValidObject(root.contains(name) && root[name].is_array()) {
         if (!isValidObject) {
-            LOG(ERROR) << fmt::format(
-                "Expected array, found: {} while accessing property '{}'",
-                static_cast<int>(root_.type()), name);
-            if (root_.is_null()) {
-                LOG(WARNING) << "Note: Root value is not an array, means "
-                                "it is nonexistent in the tree.";
+            if (!root.contains(name)) {
+                LOG(WARNING) << "Property '" << name << "' does not exist in JSON object";
+            } else {
+                LOG(ERROR) << fmt::format(
+                    "Expected array for property '{}', but got: {}",
+                    name, root[name].type_name());
             }
         }
     }
@@ -543,8 +543,10 @@ std::vector<typename T::return_type> parse(
     }
     if (value.type() != T::_value) {
         LOG(ERROR) << fmt::format(
-            "Expected {} for {} (actual {})", static_cast<int>(T::_value),
-            jsonFile.filename().string(), static_cast<int>(value.type()));
+            "Expected {} for {} (actual {})", 
+            nlohmann::json(T::_value).type_name(),
+            jsonFile.filename().string(), 
+            value.type_name());
         return {};
     }
     return T::parse(value, std::forward<Args&&>(args)...);
