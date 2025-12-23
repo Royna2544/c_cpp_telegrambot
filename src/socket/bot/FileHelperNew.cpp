@@ -3,8 +3,7 @@
 #include <absl/log/check.h>
 #include <absl/log/log.h>
 #include <absl/strings/escaping.h>
-#include <json/value.h>
-#include <json/writer.h>
+#include <nlohmann/json.hpp>
 
 #include <StructF.hpp>
 #include <cstdint>
@@ -118,8 +117,8 @@ bool SocketFile2DataHelper::ReceiveTransferMeta(const Params& params) {
 
 namespace {
 
-Json::Value fromMeta(const FileTransferMeta& meta) {
-    Json::Value root;
+nlohmann::json fromMeta(const FileTransferMeta& meta) {
+    nlohmann::json root;
     // Below two are guaranteed to be null-terminated
     root["srcfilepath"] = meta.srcfilepath.data();
     root["destfilepath"] = meta.destfilepath.data();
@@ -204,8 +203,7 @@ std::optional<TgBotSocket::Packet> SocketFile2DataHelper::CreateTransferMeta(
         size_t fileOffset = 0;
         switch (type) {
             case TgBotSocket::PayloadType::Json: {
-                Json::FastWriter writer;
-                std::string jsonMeta = writer.write(fromMeta(meta));
+                std::string jsonMeta = fromMeta(meta).dump();
                 resultPointer.assignFrom(jsonMeta.c_str(), jsonMeta.size());
                 // Copy border to the buffer
                 resultPointer.assignFrom(TgBotSocket::data::JSON_BYTE_BORDER,

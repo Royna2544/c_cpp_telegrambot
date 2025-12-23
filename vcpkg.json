@@ -21,7 +21,7 @@
     "opencv4",
     "fmt",
     "sqlite3",
-    "jsoncpp",
+    "nlohmann-json",
     "openssl",
     "zlib",
     "cpp-httplib",

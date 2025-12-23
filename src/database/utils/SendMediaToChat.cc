@@ -1,7 +1,7 @@
 #include <api/typedefs.h>
 #include <absl/log/log.h>
 #include <fmt/format.h>
-#include <json/json.h>
+#include <nlohmann/json.hpp>
 
 #include <TryParseStr.hpp>
 #include <ClientBackend.hpp>
@@ -88,7 +88,7 @@ int app_main(int argc, char** argv) {
         LOG(INFO) << "Opened session. Token: " << root["session_token"]
                   << " expiration_time: " << root["expiration_time"];
 
-        std::string session_token_str = root["session_token"].asString();
+        std::string session_token_str = root["session_token"].get<std::string>();
         Packet::Header::session_token_type session_token{};
         copyTo(session_token, session_token_str);
         auto pkt =
