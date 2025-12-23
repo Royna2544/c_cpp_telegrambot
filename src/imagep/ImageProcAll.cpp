@@ -1,5 +1,6 @@
 #include "ImageProcAll.hpp"
 
+#include <AbslLogCompat.hpp>
 #include <absl/status/status.h>
 
 #include <filesystem>

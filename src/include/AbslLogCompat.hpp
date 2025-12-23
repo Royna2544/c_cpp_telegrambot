@@ -3,20 +3,75 @@
 /**
  * Compatibility layer for transitioning from Abseil logging to spdlog
  * This header provides macros that map Abseil logging calls to spdlog equivalents
+ * Supports both stream-style (<<) and format-style logging
  */
 
 #include <spdlog/spdlog.h>
+#include <sstream>
 #include <cstdlib>
+#include <cstring>
 
-// Map LOG macros to spdlog equivalents
-#define LOG(severity) SPDLOG_##severity
+// Helper class to support stream-style logging with spdlog
+namespace detail {
+    template<typename Level>
+    class LogStream {
+        std::ostringstream oss;
+        Level level;
+        
+    public:
+        explicit LogStream(Level l) : level(l) {}
+        
+        template<typename T>
+        LogStream& operator<<(const T& value) {
+            oss << value;
+            return *this;
+        }
+        
+        // Special handling for manipulators like std::endl
+        LogStream& operator<<(std::ostream& (*manip)(std::ostream&)) {
+            manip(oss);
+            return *this;
+        }
+        
+        ~LogStream() {
+            const std::string msg = oss.str();
+            if (!msg.empty()) {
+                switch(level) {
+                    case spdlog::level::info:
+                        spdlog::info("{}", msg);
+                        break;
+                    case spdlog::level::warn:
+                        spdlog::warn("{}", msg);
+                        break;
+                    case spdlog::level::err:
+                        spdlog::error("{}", msg);
+                        break;
+                    case spdlog::level::critical:
+                        spdlog::critical("{}", msg);
+                        break;
+                    case spdlog::level::debug:
+                        spdlog::debug("{}", msg);
+                        break;
+                    default:
+                        spdlog::info("{}", msg);
+                }
+            }
+        }
+    };
+}
+
+// Map LOG macros to support stream-style logging
+#define LOG(severity) ::detail::LogStream<spdlog::level::level_enum>(spdlog::level::severity)
 
 // Map DLOG (debug log) macros
 #ifdef NDEBUG
-  #define DLOG(severity) if (false) SPDLOG_##severity
+  #define DLOG(severity) if (false) ::detail::LogStream<spdlog::level::level_enum>(spdlog::level::severity)
 #else
-  #define DLOG(severity) SPDLOG_##severity
+  #define DLOG(severity) ::detail::LogStream<spdlog::level::level_enum>(spdlog::level::severity)
 #endif
+
+// Map PLOG (log with errno) - logs the error and then continues with stream
+#define PLOG(severity) ::detail::LogStream<spdlog::level::level_enum>(spdlog::level::severity) << std::strerror(errno) << ": "
 
 // Map CHECK macros to assertions with logging
 #define CHECK(condition) \
@@ -32,8 +87,9 @@
 #define CHECK_GT(a, b) CHECK((a) > (b))
 #define CHECK_GE(a, b) CHECK((a) >= (b))
 
-// Map severity levels to spdlog
+// Map severity levels - these are used as parameters to LOG() macro
 #define INFO info
 #define WARNING warn
-#define ERROR error
+#define ERROR err
 #define FATAL critical
+

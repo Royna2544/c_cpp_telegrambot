@@ -1,5 +1,6 @@
 #include "ImageProcOpenCV.hpp"
 
+#include <AbslLogCompat.hpp>
 #include <absl/status/status.h>
 #include <fmt/format.h>
 

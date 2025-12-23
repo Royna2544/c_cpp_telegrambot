@@ -1,6 +1,7 @@
 #include <fmt/chrono.h>
 #include <fmt/format.h>
 
+#include <AbslLogCompat.hpp>
 #include <DurationPoint.hpp>
 #include <ManagedThreads.hpp>
 #include <chrono>
