@@ -9,7 +9,7 @@ tgbot_library(
   ConfigParsers.cpp
   Prepare.cpp
   LIBS
-  JsonCpp::JsonCpp
+  nlohmann_json::nlohmann_json
   LibXml2::LibXml2
   BuilderUtilsLinux
   NO_LIBPREFIX

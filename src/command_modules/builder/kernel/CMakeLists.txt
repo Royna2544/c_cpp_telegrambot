@@ -7,7 +7,7 @@ tgbot_library(
   Diagnosis.cpp
   ToolchainProvider.cpp
   LIBS
-  JsonCpp::JsonCpp
+  nlohmann_json::nlohmann_json
   BuilderUtilsLinux
   CurlDownload
   Archives

@@ -22,16 +22,6 @@
 #include "BytesConversion.hpp"
 #include "SystemInfo.hpp"
 
-enum class ValueType {
-    nullValue = 0,
-    intValue = 1,
-    uintValue = 2,
-    realValue = 3,
-    stringValue = 4,
-    arrayValue = 5,
-    objectValue = 6
-};
-
 template <>
 struct fmt::formatter<ValueType> : formatter<std::string_view> {
     // parse is inherited from formatter<string_view>.
