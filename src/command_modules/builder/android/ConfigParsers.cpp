@@ -22,39 +22,6 @@
 #include "BytesConversion.hpp"
 #include "SystemInfo.hpp"
 
-template <>
-struct fmt::formatter<ValueType> : formatter<std::string_view> {
-    // parse is inherited from formatter<string_view>.
-    auto format(ValueType c, format_context& ctx) const
-        -> format_context::iterator {
-        string_view name = "unknown";
-        switch (c) {
-            case ValueType::nullValue:
-                name = "nullValue";
-                break;
-            case ValueType::intValue:
-                name = "intValue";
-                break;
-            case ValueType::uintValue:
-                name = "uintValue";
-                break;
-            case ValueType::realValue:
-                name = "realValue";
-                break;
-            case ValueType::stringValue:
-                name = "stringValue";
-                break;
-            case ValueType::arrayValue:
-                name = "arrayValue";
-                break;
-            case ValueType::objectValue:
-                name = "objectValue";
-                break;
-        }
-        return formatter<string_view>::format(name, ctx);
-    }
-};
-
 // Repesent a type and name string
 template <typename T>
 struct NodeItemType {
@@ -138,7 +105,7 @@ bool checkRequirements(const nlohmann::json& value, NodeItemType<Args>&... args)
                      LOG(ERROR) << "Expected integer for field: " << args.name;
                      allRequiredMet = false;
                  } else {
-                     args.setValue(node.get<int>());
+                     args.setValue(node.template get<int>());
                  }
              }
              if constexpr (std::is_same_v<
@@ -148,7 +115,7 @@ bool checkRequirements(const nlohmann::json& value, NodeItemType<Args>&... args)
                      LOG(ERROR) << "Expected string for field: " << args.name;
                      allRequiredMet = false;
                  } else {
-                     args.setValue(node.get<std::string>());
+                     args.setValue(node.template get<std::string>());
                  }
              }
          }

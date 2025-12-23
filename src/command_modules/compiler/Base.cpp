@@ -50,7 +50,7 @@ void CompilerInTg::runCommand(std::string cmd, std::stringstream &res,
             absl::InternalError("popen_watchdog_start failed"));
         return;
     }
-    while (popen_watchdog_read(&p_wdt_data, buf.data(), buf.size() - 1)) {
+    while (popen_watchdog_read(&p_wdt_data, buf.data(), buf.size() - 1) >= 0) {
         if (buf_len < BASH_MAX_BUF) {
             res << buf.data();
             buf_len += strlen(buf.data());

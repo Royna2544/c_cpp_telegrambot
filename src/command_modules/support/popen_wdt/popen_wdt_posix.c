@@ -325,6 +325,7 @@ popen_watchdog_size_t popen_watchdog_read(popen_watchdog_data_t **data_in,
                 }
             } else if (fds.revents & POLLHUP) {
                 POPEN_WDT_DBGLOG("POLLHUP");
+                return -1;
             } else {
                 POPEN_WDT_DBGLOG("Poll events: %d", fds.revents);
             }
