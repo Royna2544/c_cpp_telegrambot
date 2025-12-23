@@ -38,8 +38,8 @@ TEST_F(PossibilityCommandTest, MultipleItems) {
     setCommandExtArgs();
     defaultProvidedMessage->text = "/possibility item1\nitem2\nitem3";
     
-    // Mock random generation
-    ON_CALL(*random, generate(_))
+    // Mock random generation (two parameters: min, max)
+    ON_CALL(*random, generate(_, _))
         .WillByDefault(Return(25));
     EXPECT_CALL(*random, shuffle(_));
     
