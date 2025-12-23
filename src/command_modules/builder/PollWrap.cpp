@@ -80,7 +80,7 @@ PollSelector::PollResult PollSelector::poll() {
         LOG(WARNING) << #x << " is set"; \
     }
 
-    for (int i = 0; i < pollfds.size(); ++i) {
+    for (size_t i = 0; i < pollfds.size(); ++i) {
         const auto revents = pfds[i].revents;
         if constexpr (kPollDebug) {
             DLOG(INFO) << "My fd: " << pollfds[i].poll_fd.fd;

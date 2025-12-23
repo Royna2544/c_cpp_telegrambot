@@ -56,7 +56,7 @@ struct ByteHelper {
             value = v;
     }
 
-    ByteHelper() = default;
+    ByteHelper() : value{} {}
 
     ByteHelper& operator=(Underlying v) {
         *this = ByteHelper(v);
