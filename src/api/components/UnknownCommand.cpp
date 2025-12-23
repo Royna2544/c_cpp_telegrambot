@@ -8,6 +8,8 @@ TgBotApiImpl::OnUnknownCommandImpl::OnUnknownCommandImpl(
             api->getBotUser()->username) {
             return;  // ignore, unless explicitly targetted this bot.
         }
-        LOG(INFO) << "Unknown command: " << message->text.value();
+        if (message->text) {
+            LOG(INFO) << "Unknown command: " << message->text.value();
+        }
     });
 }
