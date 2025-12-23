@@ -12,7 +12,7 @@
 - Command modules greatly expanded (builder tasks for Android/kernel archives, compiler helpers, LLM/support modules), moving away from the old `lib`/`modules` layout.
 - Socket subsystem extended with client PacketBuilder/SessionManager, Local/TCP/UDP contexts, and hexdump helpers.
 - Utilities refactored: new ConfigManager, Env/ResourceManager, CommandLine helpers; legacy config/libutils files removed.
-- Database/API adjustments: restartfmt parser components added; database utilities/backends reshaped; proto artifacts trimmed (`proto` helpers removed, `tgbot.pb` cleared).
+- Database/API adjustments: restart-format parser components added; database utilities/backends reshaped; proto artifacts trimmed (`proto` helpers removed, `tgbot.pb` cleared).
 - Web server base received updates alongside new helper wiring.
 
 ## Testing
