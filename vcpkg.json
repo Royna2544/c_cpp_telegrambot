@@ -31,6 +31,7 @@
     "protobuf",
     "gtest",
     "sol2",
-    "libarchive"
+    "libarchive",
+    "nlohmann-json"
   ]
 }
