@@ -290,6 +290,8 @@ void handleTgBotApiEx(const TgBot::TgException& ex) {
                 LOG(WARNING) << "Capturing message not modified.";
                 return;
             }
+            // Intentional fallthrough for other BadRequest errors
+            [[fallthrough]];
         }
         default:
             break;

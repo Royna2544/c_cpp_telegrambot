@@ -32,6 +32,12 @@ DECLARE_COMMAND_HANDLER(flash) {
         reasons = absl::StrSplit(buf, '\n');
     });
 
+    if (reasons.empty()) {
+        api->sendReplyMessage(message->message(),
+                              res->get(Strings::COMMAND_DISABLED_CONTACT_OWNER));
+        return;
+    }
+
     if (message->has<MessageAttrs::ExtraText>()) {
         msg = message->get<MessageAttrs::ExtraText>();
     } else {
