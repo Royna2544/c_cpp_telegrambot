@@ -30,12 +30,16 @@ TgBot++ is a Telegram bot implementation written in C++ and C, primarily used fo
   ```
 
 ## CMake Options
-All CMake options have the prefix `TGBOTCPP_`:
+The project uses several CMake options to control features:
+
+**Main Options** (defined in root CMakeLists.txt):
 - `TGBOTCPP_BUILD_TESTS`: Build the test suite (default: OFF)
 - `TGBOTCPP_RUST_MODULES`: Enable Rust language command modules (default: OFF)
-- `TGBOTCPP_LUA_MODULES`: Enable Lua language command modules (default: ON)
-- `TGBOTCPP_LLM_SUPPORT`: Enable LLM framework support (requires compatible hardware) (default: OFF)
-- `TGBOTCPP_SOCKET_PACKET_VERBOSE`: Enable verbose hex-view logging for socket packets (default: OFF)
+
+**Module-Specific Options** (defined in subdirectories):
+- `TGBOTCPP_LUA_MODULES`: Enable Lua language command modules (default: ON, defined in src/api/CMakeLists.txt)
+- `TGBOTCPP_SOCKET_PACKET_VERBOSE`: Enable verbose hex-view logging for socket packets (default: OFF, defined in src/socket/CMakeLists.txt)
+- `ENABLE_LLM`: Enable LLM command module (requires CUDA toolkit and NVIDIA GPU) (default: OFF, defined in src/command_modules/CMakeLists.txt)
 
 ## Language Standards
 - **C++**: C++23 standard (required)
