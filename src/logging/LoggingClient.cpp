@@ -18,19 +18,28 @@ int app_main(int, char**) {
         return EXIT_FAILURE;
     }
 
+    // Set IO timeout to allow checking for signals periodically
+    wrapper->options.io_timeout = std::chrono::seconds(1);
+
     SignalHandler::install();
 
-    LOG(INFO) << "Now waiting to read from the server's logs";
+    LOG(INFO) << "Now waiting to read from the server's logs (Press Ctrl-C to exit)";
 
     while (!SignalHandler::isSignaled()) {
         auto data = wrapper->read(sizeof(LogEntry));
         if (!data) {
-            return EXIT_FAILURE;
+            // Check if we're signaled before treating this as a fatal error
+            if (SignalHandler::isSignaled()) {
+                LOG(INFO) << "Received signal, exiting gracefully";
+                break;
+            }
+            // Read failed but not due to signal - continue trying
+            continue;
         }
         data->assignTo(entry);
         if (entry.magic != LOGMSG_MAGIC) {
             LOG(ERROR) << "Invalid magic number";
-            return EXIT_FAILURE;
+            continue;  // Don't exit, just skip this entry
         }
         LOG(INFO) << entry.severity << " " << entry.message.data();
     }
