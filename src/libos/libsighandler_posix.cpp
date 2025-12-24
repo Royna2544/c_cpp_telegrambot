@@ -28,4 +28,6 @@ void SignalHandler::uninstall() {
     if (signal(SIGUSR1, SIG_DFL) == SIG_ERR) {
         PLOG(ERROR) << "Failed to restore SIGUSR1";
     }
+    // Reset the signal flag
+    kUnderSignal = false;
 }
