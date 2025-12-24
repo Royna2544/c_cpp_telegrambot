@@ -42,7 +42,7 @@ void NetworkLogSink::runFunction(const std::stop_token& token) {
         std::condition_variable condVariable;
 
         condVariable.wait(lock, [&token, &sink_token] {
-            return !token.stop_requested() && !sink_token.stop_requested();
+            return token.stop_requested() || sink_token.stop_requested();
         });
     });
 }
