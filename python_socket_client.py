@@ -92,8 +92,8 @@ class ParsedPacket:
 class PacketCodec:
     """Encode/decode TgBot socket packets in Python."""
 
-    # Struct '>qiiI32sQ12s8s' (network order via ByteHelper): magic(q), cmd(i), data_type(i), data_size(I), session_token(32s), nonce(Q), iv(12s), padding(8s)
-    header_struct = struct.Struct(">qiiI32sQ12s8s")
+    # Struct '<qiiI32sQ12s8s' (little-endian wire format from ByteHelper): magic(q), cmd(i), data_type(i), data_size(I), session_token(32s), nonce(Q), iv(12s), padding(8s)
+    header_struct = struct.Struct("<qiiI32sQ12s8s")
 
     @classmethod
     def build_packet(
