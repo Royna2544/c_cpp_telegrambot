@@ -37,7 +37,6 @@ Context::UDP::UDP(const boost::asio::ip::udp type, const uint_least16_t port)
         io_context.run();
     });
     socket_.open(type);
-    socket_.bind(endpoint_);
 }
 
 Context::UDP::~UDP() {
@@ -172,6 +171,16 @@ bool Context::UDP::listen(listener_callback_t listener, bool block) {
     // For UDP, we wait for the first packet to establish the endpoint
     // Then call the listener callback to start the logging sink
     LOG(INFO) << "UDP::listen: Waiting for first packet to establish endpoint";
+    
+    // Bind the socket to the endpoint (server side only)
+    try {
+        socket_.bind(endpoint_);
+        LOG(INFO) << "UDP::listen: Bound to " << endpoint_.address().to_string() 
+                  << ":" << endpoint_.port();
+    } catch (const boost::system::system_error& e) {
+        LOG(ERROR) << "UDP::listen: Failed to bind socket: " << e.what();
+        return false;
+    }
     
     // Start an async receive operation to wait for the first packet
     // Use a shared pointer for the endpoint to keep it alive
