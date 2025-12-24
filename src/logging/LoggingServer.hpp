@@ -8,9 +8,7 @@
 #include <memory>
 #include <mutex>
 #include <stop_token>
-#include <thread>
 #include <utility>
-#include <vector>
 
 #include "SocketContext.hpp"
 
@@ -34,9 +32,5 @@ struct NetworkLogSink : public ThreadRunner {
     explicit NetworkLogSink(TgBotSocket::Context* context);
 
    private:
-    void handleClient(const TgBotSocket::Context& c, std::stop_token token);
-    
     TgBotSocket::Context* context = nullptr;
-    std::vector<std::jthread> client_threads;
-    std::mutex threads_mutex;
 };
