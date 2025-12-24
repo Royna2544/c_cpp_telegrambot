@@ -53,6 +53,7 @@ Context::UDP::~UDP() {
 bool Context::UDP::writeBlocking(const uint8_t* data,
                                  const size_t length) const {
     try {
+        std::lock_guard<std::mutex> lock(endpoint_mutex_);
         socket_.send_to(boost::asio::buffer(data, length), endpoint_);
         return true;
     } catch (const boost::system::system_error& e) {
@@ -63,8 +64,13 @@ bool Context::UDP::writeBlocking(const uint8_t* data,
 
 bool Context::UDP::writeNonBlocking(const uint8_t* data,
                                     const size_t length) const {
+    boost::asio::ip::udp::endpoint ep;
+    {
+        std::lock_guard<std::mutex> lock(endpoint_mutex_);
+        ep = endpoint_;
+    }
     auto bytes_wrote = socket_.async_send_to(
-        boost::asio::buffer(data, length), endpoint_, boost::asio::use_future);
+        boost::asio::buffer(data, length), ep, boost::asio::use_future);
 
     if (bytes_wrote.wait_until(std::chrono::system_clock::now() +
                                options.io_timeout.get()) !=
@@ -116,7 +122,10 @@ std::optional<SharedMalloc> Context::UDP::readNonBlocking(
     }
     buffer.resize(bytes_read);
     // Update the endpoint to the sender's address
-    endpoint_ = sender_endpoint;
+    {
+        std::lock_guard<std::mutex> lock(endpoint_mutex_);
+        endpoint_ = sender_endpoint;
+    }
     return buffer;
 }
 
@@ -129,7 +138,10 @@ std::optional<SharedMalloc> Context::UDP::readBlocking(
             boost::asio::buffer(buffer.get(), length), sender_endpoint);
         buffer.resize(bytes_received);
         // Update the endpoint to the sender's address
-        endpoint_ = sender_endpoint;
+        {
+            std::lock_guard<std::mutex> lock(endpoint_mutex_);
+            endpoint_ = sender_endpoint;
+        }
         return buffer;
     } catch (const boost::system::system_error& e) {
         LOG(ERROR) << "UDP::read: " << e.what();
@@ -175,7 +187,10 @@ bool Context::UDP::listen(listener_callback_t listener, bool block) {
             }
             
             // Update endpoint to the client's address
-            endpoint_ = *sender_endpoint;
+            {
+                std::lock_guard<std::mutex> lock(endpoint_mutex_);
+                endpoint_ = *sender_endpoint;
+            }
             LOG(INFO) << "UDP::listen: Received first packet from " << remoteAddress();
             
             // Call the listener callback to start the logging sink
