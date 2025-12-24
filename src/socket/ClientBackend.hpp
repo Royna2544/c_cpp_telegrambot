@@ -14,7 +14,9 @@ namespace TgBotSocket {
 enum class ConnectionType {
     IPv4,
     IPv6,
-    UnixLocal
+    UnixLocal,
+    UDP_IPv4,
+    UDP_IPv6
 };
 
 /**
@@ -69,6 +71,9 @@ public:
     constexpr static ::std::string_view kIPv4EnvVar = "IPV4_ADDRESS";
     constexpr static ::std::string_view kIPv6EnvVar = "IPV6_ADDRESS";
     constexpr static ::std::string_view kPortEnvVar = "PORT_NUM";
+    constexpr static ::std::string_view kUDPIPv4EnvVar = "UDP_IPV4_ADDRESS";
+    constexpr static ::std::string_view kUDPIPv6EnvVar = "UDP_IPV6_ADDRESS";
+    constexpr static ::std::string_view kUseUDPEnvVar = "USE_UDP";
 
 private:
     /**

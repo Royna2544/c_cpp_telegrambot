@@ -3,6 +3,7 @@
 #include <TryParseStr.hpp>
 #include <absl/log/log.h>
 #include <boost/asio/ip/tcp.hpp>
+#include <boost/asio/ip/udp.hpp>
 
 #include "Env.hpp"
 
@@ -45,6 +46,14 @@ void logConnectionAttempt(const ConnectionConfig& config) {
         case ConnectionType::UnixLocal:
             LOG(INFO) << "Connecting to Unix socket: " << config.path;
             break;
+        case ConnectionType::UDP_IPv4:
+            LOG(INFO) << "Connecting to UDP IPv4: " << config.address 
+                      << ":" << config.port;
+            break;
+        case ConnectionType::UDP_IPv6:
+            LOG(INFO) << "Connecting to UDP IPv6: [" << config.address 
+                      << "]:" << config.port;
+            break;
     }
 }
 
@@ -60,20 +69,40 @@ void logConnectionAttempt(const ConnectionConfig& config) {
     DLOG(INFO) << "Environment variables:";
     DLOG(INFO) << "  IPv4_ADDRESS: " << env[kIPv4EnvVar];
     DLOG(INFO) << "  IPv6_ADDRESS: " << env[kIPv6EnvVar];
+    DLOG(INFO) << "  UDP_IPV4_ADDRESS: " << env[kUDPIPv4EnvVar];
+    DLOG(INFO) << "  UDP_IPV6_ADDRESS: " << env[kUDPIPv6EnvVar];
     DLOG(INFO) << "  PORT_NUM: " << env[kPortEnvVar];
+    DLOG(INFO) << "  USE_UDP: " << env[kUseUDPEnvVar];
 
     const ::std::uint16_t port = getPortFromEnv(env, defaultPort);
 
     ConnectionConfig config;
     config.port = port;
 
-    // Try IPv4 first
+    // Check for UDP flag
+    ::std::string useUDP;
+    bool isUDP = env[kUseUDPEnvVar].assign(useUDP) && 
+                 (useUDP == "1" || useUDP == "true" || useUDP == "yes");
+
+    // Try UDP IPv4 first if UDP is enabled
+    if (isUDP && env[kUDPIPv4EnvVar].assign(config.address)) {
+        config.type = ConnectionType::UDP_IPv4;
+        return config;
+    }
+
+    // Try UDP IPv6 if UDP is enabled
+    if (isUDP && env[kUDPIPv6EnvVar].assign(config.address)) {
+        config.type = ConnectionType::UDP_IPv6;
+        return config;
+    }
+
+    // Try TCP IPv4
     if (env[kIPv4EnvVar].assign(config.address)) {
         config.type = ConnectionType::IPv4;
         return config;
     }
 
-    // Try IPv6
+    // Try TCP IPv6
     if (env[kIPv6EnvVar].assign(config.address)) {
         config.type = ConnectionType::IPv6;
         return config;
@@ -109,6 +138,16 @@ void logConnectionAttempt(const ConnectionConfig& config) {
 
         case ConnectionType::UnixLocal:
             ctx = ::std::make_shared<Context::Local>();
+            break;
+
+        case ConnectionType::UDP_IPv4:
+            ctx = ::std::make_shared<Context::UDP>(
+                boost::asio::ip::udp::v4(), config.port);
+            break;
+
+        case ConnectionType::UDP_IPv6:
+            ctx = ::std::make_shared<Context::UDP>(
+                boost::asio::ip::udp::v6(), config.port);
             break;
     }
 
