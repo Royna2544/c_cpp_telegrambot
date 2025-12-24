@@ -159,7 +159,6 @@ class SOCKET_EXPORT Context::TCP : public Context {
     bool is_listening_ = false;
     constexpr static std::size_t chunk_size = 1024;
     std::thread _ioThread;
-    std::optional<boost::asio::executor_work_guard<boost::asio::io_context::executor_type>> work_guard_;
 
     [[nodiscard]] std::optional<SharedMalloc> readNonBlocking(
         Packet::Header::length_type length) const;
@@ -269,7 +268,6 @@ class SOCKET_EXPORT Context::UDP : public Context {
     mutable std::mutex endpoint_mutex_;
     bool is_listening_ = false;
     std::thread _ioThread;
-    std::optional<boost::asio::executor_work_guard<boost::asio::io_context::executor_type>> work_guard_;
     constexpr static int MAX_PACKET_SIZE = 0x10000;
 
     [[nodiscard]] std::optional<SharedMalloc> readNonBlocking(

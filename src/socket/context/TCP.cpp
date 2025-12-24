@@ -46,8 +46,8 @@ Context::TCP::TCP(const boost::asio::ip::tcp type, const uint_least16_t port)
     LOG(INFO) << fmt::format("TCP::TCP: Protocol {} listening on port {}", type,
                              port);
 
-    work_guard_.emplace(boost::asio::make_work_guard(io_context));
     _ioThread = std::thread([this]() {
+        auto work = boost::asio::make_work_guard(io_context);
         io_context.run();
     });
 }
@@ -56,8 +56,6 @@ Context::TCP::~TCP() {
     if (operator bool()) {
         close();
     }
-    // Reset the work guard to allow io_context to finish
-    work_guard_.reset();
     io_context.stop();
     if (_ioThread.joinable()) {
         _ioThread.join();
