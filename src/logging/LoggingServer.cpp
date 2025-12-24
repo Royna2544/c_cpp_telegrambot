@@ -44,7 +44,7 @@ void NetworkLogSink::runFunction(const std::stop_token& token) {
         condVariable.wait(lock, [&token, &sink_token] {
             return !token.stop_requested() && !sink_token.stop_requested();
         });
-    });
+    }, true);
 }
 
 void NetworkLogSink::onPreStop() { context->abortConnections(); }
