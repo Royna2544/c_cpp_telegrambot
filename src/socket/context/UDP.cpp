@@ -225,6 +225,15 @@ bool Context::UDP::connect(const RemoteEndpoint& endpoint) {
 
     // Connection successful
     LOG(INFO) << "Connected to " << endpoint;
+    
+    // For UDP, send a handshake packet to trigger the server's listen callback
+    uint8_t handshake = 0;
+    if (!write(&handshake, sizeof(handshake))) {
+        LOG(ERROR) << "Failed to send handshake packet";
+        return false;
+    }
+    LOG(INFO) << "Sent handshake packet to server";
+    
     return true;
 }
 
