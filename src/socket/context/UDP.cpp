@@ -1,6 +1,7 @@
 #include <fmt/format.h>
 
 #include <array>
+#include <memory>
 #include <boost/asio/use_future.hpp>
 #include <boost/system/system_error.hpp>
 #include <future>
@@ -161,80 +162,67 @@ bool Context::UDP::listen(listener_callback_t listener, bool block) {
     LOG(INFO) << "UDP::listen: Waiting for first packet to establish endpoint";
     
     // Start an async receive operation to wait for the first packet
-    boost::asio::ip::udp::endpoint sender_endpoint;
+    // Use a shared pointer for the endpoint to keep it alive
+    auto sender_endpoint = std::make_shared<boost::asio::ip::udp::endpoint>();
     auto buffer = std::make_shared<std::array<uint8_t, 1>>();
     
     socket_.async_receive_from(
-        boost::asio::buffer(*buffer), sender_endpoint,
-        [this, listener, sender_endpoint](boost::system::error_code ec, std::size_t /*bytes_received*/) mutable {
+        boost::asio::buffer(*buffer), *sender_endpoint,
+        [this, listener, sender_endpoint](boost::system::error_code ec, std::size_t /*bytes_received*/) {
             if (ec) {
                 LOG(ERROR) << "UDP::listen: Error receiving first packet: " << ec.message();
                 return;
             }
             
             // Update endpoint to the client's address
-            endpoint_ = sender_endpoint;
+            endpoint_ = *sender_endpoint;
             LOG(INFO) << "UDP::listen: Received first packet from " << remoteAddress();
             
             // Call the listener callback to start the logging sink
             listener(*this);
         });
     
+    // Note: Don't call io_context.run() here as it's already running in the constructor's thread
+    // The block parameter is ignored for UDP as the io_context is managed by the constructor
     if (block) {
-        io_context.run();
+        LOG(WARNING) << "UDP::listen: block=true is ignored; io_context already running in background";
     }
     return true;
 }
 
 bool Context::UDP::connect(const RemoteEndpoint& endpoint) {
-    // Resolve the address and port
-    boost::asio::ip::udp::resolver resolver(io_context);
-    auto endpoints =
-        resolver.resolve(endpoint.address, std::to_string(endpoint.port));
-    bool connected = false;
-
-    // Create a condition variable to wait for the connection to complete
-    std::condition_variable cv;
-    std::mutex m;
-    std::unique_lock<std::mutex> lk(m);
-
-    // Attempt to connect to the resolved endpoints
-    boost::asio::async_connect(
-        socket_, endpoints,
-        [&, this](boost::system::error_code ec,
-                  const boost::asio::ip::udp::endpoint& /*ep*/) {
-            {
-                std::unique_lock<std::mutex> lock(m);
-                if (ec) {
-                    LOG(ERROR) << "Connect error: " << ec.message();
-                } else {
-                    connected = true;
-                }
-            }
-            cv.notify_all();
-        });
-
-    // Wait for the connection to complete
-    cv.wait_for(lk, options.connect_timeout.get(),
-                [&] { return connected || io_context.stopped(); });
-
-    if (!connected) {
-        LOG(ERROR) << "Failed to connect to " << endpoint;
+    try {
+        // Resolve the address and port
+        boost::asio::ip::udp::resolver resolver(io_context);
+        auto resolved_endpoints =
+            resolver.resolve(endpoint.address, std::to_string(endpoint.port));
+        
+        // For UDP, we use socket.connect() to set the default remote endpoint
+        // This is different from TCP - it doesn't establish a connection
+        if (resolved_endpoints.empty()) {
+            LOG(ERROR) << "Failed to resolve endpoint: " << endpoint;
+            return false;
+        }
+        
+        // Use the first resolved endpoint
+        endpoint_ = *resolved_endpoints.begin();
+        socket_.connect(endpoint_);
+        
+        LOG(INFO) << "Connected to " << endpoint;
+        
+        // For UDP, send a handshake packet to trigger the server's listen callback
+        uint8_t handshake = 0;
+        if (!write(&handshake, sizeof(handshake))) {
+            LOG(ERROR) << "Failed to send handshake packet";
+            return false;
+        }
+        LOG(INFO) << "Sent handshake packet to server";
+        
+        return true;
+    } catch (const boost::system::system_error& e) {
+        LOG(ERROR) << "Connect error: " << e.what();
         return false;
     }
-
-    // Connection successful
-    LOG(INFO) << "Connected to " << endpoint;
-    
-    // For UDP, send a handshake packet to trigger the server's listen callback
-    uint8_t handshake = 0;
-    if (!write(&handshake, sizeof(handshake))) {
-        LOG(ERROR) << "Failed to send handshake packet";
-        return false;
-    }
-    LOG(INFO) << "Sent handshake packet to server";
-    
-    return true;
 }
 
 Context::RemoteEndpoint Context::UDP::remoteAddress() const {
