@@ -31,7 +31,7 @@ For additional configuration options, see the main README.md file.
 Copy the template service file and customize it:
 
 ```bash
-sudo cp resources/tgbot.service /etc/systemd/system/
+sudo cp resources/systemd_install/tgbot.service /etc/systemd/system/
 sudo nano /etc/systemd/system/tgbot.service
 ```
 
