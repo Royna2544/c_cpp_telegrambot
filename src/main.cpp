@@ -130,6 +130,20 @@ struct SocketChooser {
             logging = std::make_shared<TgBotSocket::Context::TCP>(
                 boost::asio::ip::tcp::v6(),
                 TgBotSocket::Context::kTgBotLogPort);
+        } else if (*value == "udp_ipv4") {
+            external = std::make_shared<TgBotSocket::Context::TCP>(
+                boost::asio::ip::tcp::v4(),
+                TgBotSocket::Context::kTgBotHostPort);
+            logging = std::make_shared<TgBotSocket::Context::UDP>(
+                boost::asio::ip::udp::v4(),
+                TgBotSocket::Context::kTgBotLogPort);
+        } else if (*value == "udp_ipv6") {
+            external = std::make_shared<TgBotSocket::Context::TCP>(
+                boost::asio::ip::tcp::v6(),
+                TgBotSocket::Context::kTgBotHostPort);
+            logging = std::make_shared<TgBotSocket::Context::UDP>(
+                boost::asio::ip::udp::v6(),
+                TgBotSocket::Context::kTgBotLogPort);
         } else {
             LOG(ERROR) << "Invalid socket backend specified: " << *value;
             return;
