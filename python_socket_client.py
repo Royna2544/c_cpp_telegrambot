@@ -21,8 +21,20 @@ import struct
 import threading
 import time
 from dataclasses import dataclass
+import errno
 from hashlib import sha256
-from tkinter import END, BOTH, LEFT, RIGHT, BooleanVar, DISABLED, NORMAL, StringVar, Tk, ttk, messagebox
+from typing import Any
+from tkinter import (
+    BooleanVar,
+    BOTH,
+    DISABLED,
+    END,
+    NORMAL,
+    StringVar,
+    Tk,
+    messagebox,
+    ttk,
+)
 from tkinter.scrolledtext import ScrolledText
 
 try:
@@ -80,6 +92,7 @@ class ParsedPacket:
 class PacketCodec:
     """Encode/decode TgBot socket packets in Python."""
 
+    # Struct '>qiiI32sQ12s8s' (network order via ByteHelper): magic(q), cmd(i), data_type(i), data_size(I), session_token(32s), nonce(Q), iv(12s), padding(8s)
     header_struct = struct.Struct(">qiiI32sQ12s8s")
 
     @classmethod
@@ -93,9 +106,9 @@ class PacketCodec:
         token = (session_token or b"")[:SESSION_TOKEN_LENGTH].ljust(
             SESSION_TOKEN_LENGTH, b"\x00"
         )
-        has_token = any(token)
+        token_present = token != b"\x00" * SESSION_TOKEN_LENGTH
 
-        if payload and has_token:
+        if payload and token_present:
             iv = os.urandom(IV_LENGTH)
             cipher = AESGCM(token)
             encrypted_payload = cipher.encrypt(iv, payload, None)
@@ -114,7 +127,7 @@ class PacketCodec:
             b"\x00" * 8,  # padding to 80 bytes
         )
 
-        if has_token:
+        if token_present:
             digest = hmac.new(token, header + encrypted_payload, sha256).digest()
         else:
             digest = b"\x00" * HMAC_LENGTH
@@ -141,15 +154,15 @@ class PacketCodec:
         payload = _recv_exact(sock, data_size) if data_size else b""
         hmac_bytes = _recv_exact(sock, HMAC_LENGTH)
 
-        has_token = any(token)
-        if has_token:
+        token_present = token != b"\x00" * SESSION_TOKEN_LENGTH
+        if token_present:
             expected = hmac.new(token, header_bytes + payload, sha256).digest()
             if hmac_bytes != expected:
                 raise ValueError("HMAC verification failed")
-        elif hmac_bytes.strip(b"\x00"):
+        elif hmac_bytes != b"\x00" * HMAC_LENGTH:
             raise ValueError("Unexpected HMAC bytes without a session token")
 
-        if payload:
+        if payload and token_present:
             cipher = AESGCM(token)
             payload = cipher.decrypt(iv, payload, None)
 
@@ -168,7 +181,7 @@ class SocketClient:
         self.sock = socket.create_connection((host, port), timeout=5)
         self.sock.settimeout(5)
 
-    def open_session(self) -> dict[str, str]:
+    def open_session(self) -> dict[str, Any]:
         if not self.sock:
             raise ConnectionError("Not connected")
         packet = PacketCodec.build_packet(CMD_OPEN_SESSION, b"", PAYLOAD_TYPE_BINARY, None)
@@ -202,8 +215,9 @@ class SocketClient:
         if self.sock:
             try:
                 self.sock.shutdown(socket.SHUT_RDWR)
-            except OSError:
-                pass
+            except OSError as exc:
+                if exc.errno not in (errno.ENOTCONN, errno.EBADF, errno.ENOTSOCK):
+                    raise
             self.sock.close()
         self.sock = None
         self.session_token = None
@@ -293,7 +307,7 @@ class SocketClientUI:
             info = self.client.open_session()
             self.session_active.set(True)
             self._log(f"Session opened. Expires at {info.get('expiration_time', '')}")
-        except Exception as exc:  # noqa: BLE001 - surface to UI
+        except (ValueError, ConnectionError, OSError, socket.error) as exc:
             messagebox.showerror("Open Session Failed", str(exc))
             self._log(f"Failed to open session: {exc}")
         finally:
@@ -305,7 +319,7 @@ class SocketClientUI:
         try:
             self.client.close_session()
             self._log("Session closed")
-        except Exception as exc:  # noqa: BLE001
+        except (ValueError, ConnectionError, OSError, socket.error) as exc:
             self._log(f"Close session error: {exc}")
         finally:
             self.session_active.set(False)
@@ -323,7 +337,7 @@ class SocketClientUI:
             else:
                 payload_text = response.payload.hex()
             self._log(f"Sent message command, got cmd {response.cmd} payload: {payload_text}")
-        except Exception as exc:  # noqa: BLE001
+        except (ValueError, ConnectionError, OSError, socket.error) as exc:
             messagebox.showerror("Send Failed", str(exc))
             self._log(f"Send failed: {exc}")
         finally:
