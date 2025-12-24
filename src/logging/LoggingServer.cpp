@@ -20,7 +20,9 @@ void NetworkLogSink::LogSinkImpl::Send(const absl::LogEntry& entry) {
     }
     LogEntry le{};
     le.severity = entry.log_severity();
-    std::ranges::copy_n(entry.text_message().begin(), MAX_LOGMSG_SIZE - 1, le.message.begin());
+    const auto& text = entry.text_message();
+    const size_t copy_size = std::min(text.size(), static_cast<size_t>(MAX_LOGMSG_SIZE - 1));
+    std::ranges::copy_n(text.begin(), copy_size, le.message.begin());
     SharedMalloc logData(le);
     bool ret = false;
     if (context != nullptr) {
