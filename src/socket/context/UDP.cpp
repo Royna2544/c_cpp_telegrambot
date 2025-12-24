@@ -206,8 +206,10 @@ bool Context::UDP::listen(listener_callback_t listener, bool block) {
             listener(*this);
         });
     
+    // Note: Don't call io_context.run() here as it's already running in the constructor's thread
+    // The block parameter is ignored for UDP as the io_context is managed by the constructor
     if (block) {
-        io_context.run();
+        LOG(WARNING) << "UDP::listen: block=true is ignored; io_context already running in background";
     }
     return true;
 }
