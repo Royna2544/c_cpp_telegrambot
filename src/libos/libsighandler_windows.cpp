@@ -22,4 +22,6 @@ void SignalHandler::install() {
 
 void SignalHandler::uninstall() {
     SetConsoleCtrlHandler(CtrlHandler, FALSE);
+    // Reset the signal flag
+    kUnderSignal = false;
 }
