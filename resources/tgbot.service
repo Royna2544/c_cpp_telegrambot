@@ -1,0 +1,21 @@
+[Unit]
+Description=TgBot++ Telegram Bot Service
+After=network.target
+Documentation=https://github.com/Royna2544/c_cpp_telegrambot
+
+[Service]
+Type=simple
+User=<USER>
+WorkingDirectory=<WORKING_DIRECTORY>
+ExecStart=<EXECUTABLE_PATH> <CONFIG_FILE_PATH>
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
