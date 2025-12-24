@@ -14,10 +14,10 @@
 | popen_wdt lib | main C++ code | Android socket client app | Webpage | Database support | Webpage | Webpage | Webpage | Webpage |
 
 ### Python Tkinter Socket Client
-A minimal desktop client is available at `python_socket_client.py` for sending commands to the socket API.  
+A minimal desktop client is available at `src/socket/python_client/client.py` for sending commands to the socket API.  
 Usage:
 1. Install dependency: `pip install cryptography`
-2. Run: `python python_socket_client.py`
+2. Run: `python src/socket/python_client/client.py`
 
 ## Used external libraries
 - Abseil C++ common library - Used for logging - [Link](https://github.com/abseil/abseil-cpp)
