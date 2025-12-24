@@ -35,6 +35,7 @@ Context::UDP::UDP(const boost::asio::ip::udp type, const uint_least16_t port)
         io_context.run();
     });
     socket_.open(type);
+    socket_.bind(endpoint_);
 }
 
 Context::UDP::~UDP() {
