@@ -69,8 +69,6 @@ void logConnectionAttempt(const ConnectionConfig& config) {
     DLOG(INFO) << "Environment variables:";
     DLOG(INFO) << "  IPv4_ADDRESS: " << env[kIPv4EnvVar];
     DLOG(INFO) << "  IPv6_ADDRESS: " << env[kIPv6EnvVar];
-    DLOG(INFO) << "  UDP_IPV4_ADDRESS: " << env[kUDPIPv4EnvVar];
-    DLOG(INFO) << "  UDP_IPV6_ADDRESS: " << env[kUDPIPv6EnvVar];
     DLOG(INFO) << "  PORT_NUM: " << env[kPortEnvVar];
     DLOG(INFO) << "  USE_UDP: " << env[kUseUDPEnvVar];
 
@@ -84,27 +82,15 @@ void logConnectionAttempt(const ConnectionConfig& config) {
     bool isUDP = env[kUseUDPEnvVar].assign(useUDP) && 
                  (useUDP == "1" || useUDP == "true" || useUDP == "yes");
 
-    // Try UDP IPv4 first if UDP is enabled
-    if (isUDP && env[kUDPIPv4EnvVar].assign(config.address)) {
-        config.type = ConnectionType::UDP_IPv4;
-        return config;
-    }
-
-    // Try UDP IPv6 if UDP is enabled
-    if (isUDP && env[kUDPIPv6EnvVar].assign(config.address)) {
-        config.type = ConnectionType::UDP_IPv6;
-        return config;
-    }
-
-    // Try TCP IPv4
+    // Try IPv4 (TCP or UDP based on USE_UDP flag)
     if (env[kIPv4EnvVar].assign(config.address)) {
-        config.type = ConnectionType::IPv4;
+        config.type = isUDP ? ConnectionType::UDP_IPv4 : ConnectionType::IPv4;
         return config;
     }
 
-    // Try TCP IPv6
+    // Try IPv6 (TCP or UDP based on USE_UDP flag)
     if (env[kIPv6EnvVar].assign(config.address)) {
-        config.type = ConnectionType::IPv6;
+        config.type = isUDP ? ConnectionType::UDP_IPv6 : ConnectionType::IPv6;
         return config;
     }
 

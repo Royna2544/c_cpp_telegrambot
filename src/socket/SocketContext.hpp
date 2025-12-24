@@ -8,6 +8,7 @@
 #include <chrono>
 #include <filesystem>
 #include <functional>
+#include <mutex>
 #include <optional>
 #include <ostream>
 
@@ -264,6 +265,7 @@ class SOCKET_EXPORT Context::TCP : public Context {
 class SOCKET_EXPORT Context::UDP : public Context {
     mutable boost::asio::ip::udp::socket socket_;
     mutable boost::asio::ip::udp::endpoint endpoint_;
+    mutable std::mutex endpoint_mutex_;
     bool is_listening_ = false;
     std::thread _ioThread;
     constexpr static int MAX_PACKET_SIZE = 0x10000;
