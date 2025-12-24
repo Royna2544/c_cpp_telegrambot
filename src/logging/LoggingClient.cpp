@@ -23,23 +23,21 @@ int app_main(int, char**) {
 
     SignalHandler::install();
 
-    LOG(INFO) << "Now waiting to read from the server's logs (Press Ctrl-C to exit)";
+    LOG(INFO) << "Now waiting to read from the server's logs";
 
     while (!SignalHandler::isSignaled()) {
         auto data = wrapper->read(sizeof(LogEntry));
         if (!data) {
-            // Check if we're signaled before treating this as a fatal error
+            // Timeout or error - check if we should exit
             if (SignalHandler::isSignaled()) {
-                LOG(INFO) << "Received signal, exiting gracefully";
                 break;
             }
-            // Read failed but not due to signal - continue trying
             continue;
         }
         data->assignTo(entry);
         if (entry.magic != LOGMSG_MAGIC) {
             LOG(ERROR) << "Invalid magic number";
-            continue;  // Don't exit, just skip this entry
+            return EXIT_FAILURE;
         }
         LOG(INFO) << entry.severity << " " << entry.message.data();
     }
