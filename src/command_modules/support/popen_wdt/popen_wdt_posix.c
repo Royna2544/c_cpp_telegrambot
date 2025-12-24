@@ -287,13 +287,13 @@ popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t **data_in) {
     return ret;
 }
 
-popen_watchdog_size_t popen_watchdog_read(popen_watchdog_data_t **data_in,
+popen_watchdog_ssize_t popen_watchdog_read(popen_watchdog_data_t **data_in,
                                           char *buf,
-                                          popen_watchdog_size_t size) {
+                                          popen_watchdog_ssize_t size) {
     struct pollfd fds;
     popen_watchdog_data_t *data = *data_in;
     struct popen_wdt_posix_priv *pdata = data->privdata;
-    popen_watchdog_size_t ret = -1;
+    popen_watchdog_ssize_t ret = -1;
 
     pthread_mutex_lock(&pdata->wdt_mutex);
     int timeout = data->watchdog_enabled ? data->sleep_secs * 1000 : -1;

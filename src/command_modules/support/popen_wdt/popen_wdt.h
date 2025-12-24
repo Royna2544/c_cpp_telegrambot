@@ -56,7 +56,7 @@ typedef struct {
     void *privdata; /* Private data pointer */
 } popen_watchdog_data_t;
 
-typedef int64_t popen_watchdog_size_t;
+typedef int64_t popen_watchdog_ssize_t;
 
 /**
  * @brief initializes the popen watchdog data structure
@@ -94,9 +94,9 @@ bool popen_watchdog_activated(popen_watchdog_data_t **data);
  * @param size The maximum number of bytes to read from the file pointer.
  * @return Total size of read bytes, fail means negative.
  */
-popen_watchdog_size_t popen_watchdog_read(popen_watchdog_data_t **data,
+popen_watchdog_ssize_t popen_watchdog_read(popen_watchdog_data_t **data,
                                           char *buf,
-                                          popen_watchdog_size_t size);
+                                          popen_watchdog_ssize_t size);
 
 /**
  * @brief Cleans up and frees the resources associated with the popen watchdog

@@ -308,9 +308,9 @@ popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t** data) {
     return ret;
 }
 
-popen_watchdog_size_t popen_watchdog_read(popen_watchdog_data_t** data,
+popen_watchdog_ssize_t popen_watchdog_read(popen_watchdog_data_t** data,
                                           char* buf,
-                                          popen_watchdog_size_t size) {
+                                          popen_watchdog_ssize_t size) {
     if (!check_data_privdata(data)) {
         return false;
     }
@@ -325,19 +325,19 @@ popen_watchdog_size_t popen_watchdog_read(popen_watchdog_data_t** data,
 
     if ((*data)->watchdog_activated) {
         POPEN_WDT_DBGLOG("watchdog_activated: True, return");
-        return false;
+        return -1;
     }
     ol.hEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
     if (ol.hEvent == NULL) {
         POPEN_WDT_DBGLOG("CreateEvent failed");
-        return false;
+        return -1;
     }
     POPEN_WDT_DBGLOG("ReadFile is being called");
     result = ReadFile(pdata->read_hdl, buf, size, &bytesRead, &ol);
     if (!result && GetLastError() != ERROR_IO_PENDING) {
         POPEN_WDT_DBGLOG("ReadFile failed");
         CloseHandle(ol.hEvent);
-        return false;
+        return -1;
     }
     HANDLE handles[] = {ol.hEvent, pdata->wdt_data.sub_Process};
     waitResult = WaitForMultipleObjects(
