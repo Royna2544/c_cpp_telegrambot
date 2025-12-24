@@ -3,6 +3,7 @@
 
 #include <ClientBackend.hpp>
 #include <cstdlib>
+#include <iostream>
 #include <libos/libsighandler.hpp>
 
 #include "AbslLogInit.hpp"
@@ -23,14 +24,32 @@ int app_main(int, char**) {
 
     SignalHandler::install();
 
-    LOG(INFO) << "Now waiting to read from the server's logs";
+    LOG(INFO) << "Now waiting to read from the server's logs (Press Ctrl-C to exit)";
 
-    while (!SignalHandler::isSignaled()) {
+    while (true) {
         auto data = wrapper->read(sizeof(LogEntry));
         if (!data) {
             // Timeout or error - check if we should exit
             if (SignalHandler::isSignaled()) {
-                break;
+                // Ask user if they want to exit
+                std::cout << "\nReceived interrupt signal. Do you want to exit? (y/n): ";
+                std::cout.flush();
+                
+                char response;
+                if (std::cin >> response) {
+                    if (response == 'y' || response == 'Y') {
+                        LOG(INFO) << "Exiting as requested by user";
+                        break;
+                    } else {
+                        LOG(INFO) << "Continuing to wait for logs...";
+                        // Reinstall signal handler to reset the flag
+                        SignalHandler::uninstall();
+                        SignalHandler::install();
+                    }
+                } else {
+                    // Input failed, assume exit
+                    break;
+                }
             }
             continue;
         }
