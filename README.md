@@ -13,6 +13,12 @@
 | <img src="www/resources/devicons/c-original.svg" title="C"  alt="C" width="55" height="55"/>|<img src="www/resources/devicons/cplusplus-original.svg" title="C++"  alt="C++" width="55" height="55"/>|<img src="www/resources/devicons/kotlin-original.svg" title="Kotlin"  alt="Kotlin" width="55" height="55"/>|<img src="www/resources/devicons/javascript-original.svg" title="Javascript" alt="Javascript" width="55" height="55"/>|<img src="https://github.com/devicons/devicon/blob/master/icons/sqlite/sqlite-original.svg" title="SQLite"  alt="SQLite" width="55" height="55"/>|<img src="https://github.com/devicons/devicon/blob/master/icons/html5/html5-original.svg" title="HTML5"  alt="HTML5" width="55" height="55"/>|<img src="https://github.com/devicons/devicon/blob/master/icons/css3/css3-original.svg" title="CSS"  alt="CSS" width="55" height="55"/>|<img src="www/resources/devicons/sass-original.svg" title="SCSS"  alt="SCSS" width="55" height="55"/>| <img src="www/resources/devicons/php-original.svg" title="PHP"  alt="PHP" width="55" height="55"/>|
 | popen_wdt lib | main C++ code | Android socket client app | Webpage | Database support | Webpage | Webpage | Webpage | Webpage |
 
+### Python Tkinter Socket Client
+A minimal desktop client is available at `python_socket_client.py` for sending commands to the socket API.  
+Usage:
+1. Install dependency: `pip install cryptography`
+2. Run: `python python_socket_client.py`
+
 ## Used external libraries
 - Abseil C++ common library - Used for logging - [Link](https://github.com/abseil/abseil-cpp)
 - C++ HTTP library - Used for website server support - [Link](https://github.com/yhirose/cpp-httplib)
