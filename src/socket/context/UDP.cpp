@@ -1,5 +1,6 @@
 #include <fmt/format.h>
 
+#include <array>
 #include <boost/asio/use_future.hpp>
 #include <boost/system/system_error.hpp>
 #include <future>
@@ -154,9 +155,31 @@ bool Context::UDP::close() const {
     return !ec;
 }
 
-bool Context::UDP::listen(listener_callback_t /*listener*/, bool block) {
-    // This is actually a noop. UDP is connectionless and does not listen.
-    LOG(WARNING) << "UDP::listen is a noop.";
+bool Context::UDP::listen(listener_callback_t listener, bool block) {
+    // For UDP, we wait for the first packet to establish the endpoint
+    // Then call the listener callback to start the logging sink
+    LOG(INFO) << "UDP::listen: Waiting for first packet to establish endpoint";
+    
+    // Start an async receive operation to wait for the first packet
+    boost::asio::ip::udp::endpoint sender_endpoint;
+    auto buffer = std::make_shared<std::array<uint8_t, 1>>();
+    
+    socket_.async_receive_from(
+        boost::asio::buffer(*buffer), sender_endpoint,
+        [this, listener, sender_endpoint](boost::system::error_code ec, std::size_t /*bytes_received*/) mutable {
+            if (ec) {
+                LOG(ERROR) << "UDP::listen: Error receiving first packet: " << ec.message();
+                return;
+            }
+            
+            // Update endpoint to the client's address
+            endpoint_ = sender_endpoint;
+            LOG(INFO) << "UDP::listen: Received first packet from " << remoteAddress();
+            
+            // Call the listener callback to start the logging sink
+            listener(*this);
+        });
+    
     if (block) {
         io_context.run();
     }
