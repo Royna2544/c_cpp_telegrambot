@@ -220,8 +220,11 @@ bool Context::UDP::connect(const RemoteEndpoint& endpoint) {
         }
         
         // Use the first resolved endpoint
-        endpoint_ = *resolved_endpoints.begin();
-        socket_.connect(endpoint_);
+        {
+            std::lock_guard<std::mutex> lock(endpoint_mutex_);
+            endpoint_ = *resolved_endpoints.begin();
+            socket_.connect(endpoint_);
+        }
         
         LOG(INFO) << "Connected to " << endpoint;
         
@@ -242,6 +245,7 @@ bool Context::UDP::connect(const RemoteEndpoint& endpoint) {
 
 Context::RemoteEndpoint Context::UDP::remoteAddress() const {
     try {
+        std::lock_guard<std::mutex> lock(endpoint_mutex_);
         return {.address = endpoint_.address().to_string(),
                 .port = endpoint_.port()};
     } catch (const boost::system::system_error& e) {
