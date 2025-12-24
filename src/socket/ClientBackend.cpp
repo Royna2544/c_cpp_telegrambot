@@ -34,25 +34,18 @@ namespace {
  * @brief Log connection attempt details
  */
 void logConnectionAttempt(const ConnectionConfig& config) {
+    const char* protocol = config.use_udp ? "UDP" : "TCP";
     switch (config.type) {
         case ConnectionType::IPv4:
-            LOG(INFO) << "Connecting to IPv4: " << config.address 
+            LOG(INFO) << "Connecting to " << protocol << " IPv4: " << config.address 
                       << ":" << config.port;
             break;
         case ConnectionType::IPv6:
-            LOG(INFO) << "Connecting to IPv6: [" << config.address 
+            LOG(INFO) << "Connecting to " << protocol << " IPv6: [" << config.address 
                       << "]:" << config.port;
             break;
         case ConnectionType::UnixLocal:
             LOG(INFO) << "Connecting to Unix socket: " << config.path;
-            break;
-        case ConnectionType::UDP_IPv4:
-            LOG(INFO) << "Connecting to UDP IPv4: " << config.address 
-                      << ":" << config.port;
-            break;
-        case ConnectionType::UDP_IPv6:
-            LOG(INFO) << "Connecting to UDP IPv6: [" << config.address 
-                      << "]:" << config.port;
             break;
     }
 }
@@ -79,18 +72,18 @@ void logConnectionAttempt(const ConnectionConfig& config) {
 
     // Check for UDP flag
     ::std::string useUDP;
-    bool isUDP = env[kUseUDPEnvVar].assign(useUDP) && 
-                 (useUDP == "1" || useUDP == "true" || useUDP == "yes");
+    config.use_udp = env[kUseUDPEnvVar].assign(useUDP) && 
+                     (useUDP == "1" || useUDP == "true" || useUDP == "yes");
 
-    // Try IPv4 (TCP or UDP based on USE_UDP flag)
+    // Try IPv4
     if (env[kIPv4EnvVar].assign(config.address)) {
-        config.type = isUDP ? ConnectionType::UDP_IPv4 : ConnectionType::IPv4;
+        config.type = ConnectionType::IPv4;
         return config;
     }
 
-    // Try IPv6 (TCP or UDP based on USE_UDP flag)
+    // Try IPv6
     if (env[kIPv6EnvVar].assign(config.address)) {
-        config.type = isUDP ? ConnectionType::UDP_IPv6 : ConnectionType::IPv6;
+        config.type = ConnectionType::IPv6;
         return config;
     }
 
@@ -113,27 +106,27 @@ void logConnectionAttempt(const ConnectionConfig& config) {
 
     switch (config.type) {
         case ConnectionType::IPv4:
-            ctx = ::std::make_shared<Context::TCP>(
-                boost::asio::ip::tcp::v4(), config.port);
+            if (config.use_udp) {
+                ctx = ::std::make_shared<Context::UDP>(
+                    boost::asio::ip::udp::v4(), config.port);
+            } else {
+                ctx = ::std::make_shared<Context::TCP>(
+                    boost::asio::ip::tcp::v4(), config.port);
+            }
             break;
 
         case ConnectionType::IPv6:
-            ctx = ::std::make_shared<Context::TCP>(
-                boost::asio::ip::tcp::v6(), config.port);
+            if (config.use_udp) {
+                ctx = ::std::make_shared<Context::UDP>(
+                    boost::asio::ip::udp::v6(), config.port);
+            } else {
+                ctx = ::std::make_shared<Context::TCP>(
+                    boost::asio::ip::tcp::v6(), config.port);
+            }
             break;
 
         case ConnectionType::UnixLocal:
             ctx = ::std::make_shared<Context::Local>();
-            break;
-
-        case ConnectionType::UDP_IPv4:
-            ctx = ::std::make_shared<Context::UDP>(
-                boost::asio::ip::udp::v4(), config.port);
-            break;
-
-        case ConnectionType::UDP_IPv6:
-            ctx = ::std::make_shared<Context::UDP>(
-                boost::asio::ip::udp::v6(), config.port);
             break;
     }
 

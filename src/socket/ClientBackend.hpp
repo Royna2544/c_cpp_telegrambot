@@ -14,9 +14,7 @@ namespace TgBotSocket {
 enum class ConnectionType {
     IPv4,
     IPv6,
-    UnixLocal,
-    UDP_IPv4,
-    UDP_IPv6
+    UnixLocal
 };
 
 /**
@@ -27,6 +25,7 @@ struct ConnectionConfig {
     ::std::string address;
     ::std::uint16_t port;
     ::std::filesystem::path path;
+    bool use_udp = false;  // Flag to indicate UDP vs TCP
 };
 
 /**
