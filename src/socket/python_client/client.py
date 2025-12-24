@@ -92,35 +92,7 @@ class ParsedPacket:
 class PacketCodec:
     """Encode/decode TgBot socket packets in Python."""
 
-    _header_struct_be = struct.Struct(">qiiI32sQ12s8s")
-    _header_struct_le = struct.Struct("<qiiI32sQ12s8s")
-
-    @classmethod
-    def _struct_for_endian(cls, endian: str) -> struct.Struct:
-        if endian == ">":
-            return cls._header_struct_be
-        if endian == "<":
-            return cls._header_struct_le
-        raise ValueError("endian must be '>' or '<'")
-
-    @classmethod
-    def _unpack_header(cls, header_bytes: bytes) -> tuple[tuple, struct.Struct, str]:
-        # Try big-endian first (per request), then fall back to little-endian
-        for endian in (">", "<"):
-            header_struct = cls._struct_for_endian(endian)
-            (
-                magic,
-                cmd,
-                data_type,
-                data_size,
-                token,
-                nonce,
-                iv,
-                padding,
-            ) = header_struct.unpack(header_bytes)
-            if magic == MAGIC_VALUE:
-                return (magic, cmd, data_type, data_size, token, nonce, iv, padding), header_struct, endian
-        raise ValueError("Unexpected magic value in header")
+    _header_struct = struct.Struct(">qiiI32sQ12s8s")
 
     @classmethod
     def build_packet(
@@ -129,7 +101,6 @@ class PacketCodec:
         payload: bytes,
         payload_type: int,
         session_token: bytes | None,
-        endian: str = ">",
     ) -> bytes:
         token = (session_token or b"")[:SESSION_TOKEN_LENGTH].ljust(
             SESSION_TOKEN_LENGTH, b"\x00"
@@ -144,9 +115,7 @@ class PacketCodec:
             iv = b"\x00" * IV_LENGTH
             encrypted_payload = payload
 
-        header_struct = cls._struct_for_endian(endian)
-
-        header = header_struct.pack(
+        header = cls._header_struct.pack(
             MAGIC_VALUE,
             cmd,
             payload_type,
@@ -176,7 +145,10 @@ class PacketCodec:
             nonce,
             iv,
             _padding,
-        ), header_struct, endian = cls._unpack_header(header_bytes)
+        ) = cls._header_struct.unpack(header_bytes)
+
+        if magic != MAGIC_VALUE:
+            raise ValueError(f"Unexpected magic value: {hex(magic)}")
 
         payload = _recv_exact(sock, data_size) if data_size else b""
         hmac_bytes = _recv_exact(sock, HMAC_LENGTH)
@@ -204,8 +176,8 @@ class SocketClient:
         self.session_token: bytes | None = None
         self._host: str | None = None
         self._port: int | None = None
-        # Try big-endian first (per request), then fall back to little-endian automatically.
-        self.preferred_endians: tuple[str, str] = (">", "<")
+        # Wire format uses big-endian per request.
+        self.endian: str = ">"
 
     def connect(self, host: str, port: int) -> None:
         self.close()
@@ -216,27 +188,14 @@ class SocketClient:
     def open_session(self) -> dict[str, Any]:
         if not self.sock:
             raise ConnectionError("Not connected")
-        last_exc: Exception | None = None
-        for idx, endian in enumerate(self.preferred_endians):
-            try:
-                packet = PacketCodec.build_packet(
-                    CMD_OPEN_SESSION, b"", PAYLOAD_TYPE_BINARY, None, endian=endian
-                )
-                self.sock.sendall(packet)
-                response = PacketCodec.read_packet(self.sock)
-                if response.cmd != CMD_OPEN_SESSION_ACK:
-                    raise ValueError(f"Unexpected command {response.cmd} while opening session")
-                info = json.loads(response.payload.decode("utf-8"))
-                self.session_token = response.session_token
-                return info
-            except Exception as exc:  # noqa: BLE001
-                last_exc = exc
-                # Attempt reconnect and retry with next endian if available
-                if idx < len(self.preferred_endians) - 1 and self._host and self._port:
-                    self.close()
-                    self.connect(self._host, self._port)
-        assert last_exc is not None
-        raise last_exc
+        packet = PacketCodec.build_packet(CMD_OPEN_SESSION, b"", PAYLOAD_TYPE_BINARY, None)
+        self.sock.sendall(packet)
+        response = PacketCodec.read_packet(self.sock)
+        if response.cmd != CMD_OPEN_SESSION_ACK:
+            raise ValueError(f"Unexpected command {response.cmd} while opening session")
+        info = json.loads(response.payload.decode("utf-8"))
+        self.session_token = response.session_token
+        return info
 
     def send_message(self, chat_id: int, message: str) -> ParsedPacket:
         if not self.sock or not self.session_token:
