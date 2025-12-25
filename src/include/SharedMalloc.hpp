@@ -10,8 +10,8 @@
 #include <type_traits>
 
 struct SharedMalloc {
-    using offset_type = int;
-    using size_type = long;
+    using offset_type = std::ptrdiff_t;  // Changed from int for large file offsets
+    using size_type = std::size_t;       // Changed from long to support files > 2GB
     using data_type = std::uint8_t;
 
     struct Parent {
@@ -28,7 +28,7 @@ struct SharedMalloc {
             if (newSize == _size) {
                 return;  // No-op
             }
-            if (newSize <= 0) {
+            if (newSize == 0) {  // Changed from <= 0 since size_type is unsigned
                 _data.reset();  // Free memory and set pointer to nullptr
                 _size = 0;
                 return;
@@ -98,7 +98,7 @@ struct SharedMalloc {
     }
 
     inline void offsetCheck(const offset_type offset) const {
-        if (offset > size()) {
+        if (offset > static_cast<offset_type>(size())) {  // Added cast for comparison
             throw std::out_of_range("Offset exceeds allocated memory bounds");
         }
     }
@@ -131,7 +131,7 @@ struct SharedMalloc {
         static_assert(!std::is_const_v<T>,
                       "Using assignTo with a const pointer, did you mean to "
                       "use assignFrom?");
-        if (offset < 0) offset += this->size();
+        if (offset < 0) offset += static_cast<offset_type>(this->size());
         offsetCheck(offset);
         validateBoundsForSize(size + offset);
         memcpy(ref, offsetGet(offset), size);
@@ -208,7 +208,7 @@ struct SharedMalloc {
     template <typename T>
     void assignFrom(const T *ref, const size_type size,
                     offset_type offset = 0) {
-        if (offset < 0) offset += this->size();
+        if (offset < 0) offset += static_cast<offset_type>(this->size());
         offsetCheck(offset);
         validateBoundsForSize(size + offset);
         memcpy(offsetGet(offset), ref, size);
