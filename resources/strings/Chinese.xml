@@ -1,0 +1,93 @@
+<resources locale="zh">
+    <string name="send_bash_command">发送要运行的bash命令</string>
+    <string name="compile_time">编译时间</string>
+    <string name="run_time">运行时间</string>
+    <string name="working_on_it">正在处理...</string>
+    <string name="command_is">命令是</string>
+    <string name="need_a_nonempty_reply_message">需要一条包含非空文本的回复消息</string>
+    <string name="example">示例</string>
+    <string name="unknown_action">未知操作</string>
+    <string name="operation_successful">操作成功</string>
+    <string name="operation_failure">操作失败</string>
+    <string name="unknown">未知</string>
+
+    <!-- Saveid cmd -->
+    <string name="media_already_in_db">媒体已在数据库中</string>
+    <string name="send_a_name_to_save">发送要保存的名称</string>
+
+    <string name="process_exited">进程退出，返回值为</string>
+    <string name="done_took">完成。执行时间</string>
+    <string name="error_took">发生错误。执行时间</string>
+    <string name="output_is_empty">输出为空</string>
+
+    <!-- decide cmd -->
+    <string name="deciding">决定中</string>
+    <string name="yes">是</string>
+    <string name="no">否</string>
+    <string name="so_yes">所以，是</string>
+    <string name="so_idk">所以，不知道</string>
+    <string name="so_no">所以，否</string>
+    <string name="short_circuited_to_the_answer">直接跳转到答案</string>
+
+    <!-- possibility cmd -->
+    <string name="send_possibilities">发送可用条件，用换行符分隔</string>
+    <string name="total_items_prefix">总共</string>
+    <string name="total_items_suffix">项</string>
+    <string name="give_more_than_one">给出多个选择</string>
+
+    <!-- copystickers cmd -->
+    <string name="starting_conversion">开始转换</string>
+    <string name="conversion_in_progress">转换进行中</string>
+    <string name="creating_new_sticker_set">正在创建新的贴纸集</string>
+    <string name="sticker_pack_created">贴纸包已创建</string>
+    <string name="failed_to_create_new_sticker_set">创建新贴纸集失败</string>
+    <string name="animated_stickers_not_supported">不支持动画贴纸</string>
+
+    <!-- setowner cmd -->
+    <string name="bot_owner_set">机器人所有者已设置</string>
+    
+    <!-- flash cmd -->
+    <string name="flashing_zip">正在刷入zip文件</string>
+    <string name="send_a_file_name_to_flash">发送要刷入的文件名</string>
+    <string name="invalid_input_no_newline">无效输入：文件名不应包含换行符</string>
+    <string name="failed_successfully">成功地失败了！</string>
+    <string name="reason">原因</string>
+    <string name="success_chance_was">成功！概率是</string>
+
+    <!-- restart cmd -->
+    <string name="restarting_bot">正在重启机器人实例...</string>
+
+    <!-- rotatepic cmd -->
+    <string name="cannot_rotate_nonstatic">无法旋转非静态贴纸</string>
+    <string name="invalid_angle">提供的角度无效</string>
+    <string name="rotated_picture">已旋转图片</string>
+    <string name="failed_to_rotate_image">旋转图片失败</string>
+
+    <!-- Database -->
+    <string name="user_added">用户已添加到列表</string>
+    <string name="user_removed">用户已从列表中删除</string>
+    <string name="user_already_in_list">用户已在列表中</string>
+    <string name="user_already_in_other_list">用户已在其他列表中</string>
+    <string name="user_not_in_list">用户不在列表中</string>
+
+    <!-- Reply to -->
+    <string name="reply_to_a_sticker">回复贴纸</string>
+    <string name="reply_to_user_msg">回复用户的消息</string>
+    <string name="reply_to_gif_or_sticker">回复GIF或贴纸</string>
+    <string name="reply_to_a_code">回复包含代码文本的消息</string>
+    <string name="reply_to_a_media">回复媒体</string>
+
+    <!-- Fails and errors -->
+    <string name="failed_to_write_file">写入文件失败</string>
+    <string name="failed_to_create_directory">创建目录失败</string>
+    <string name="failed_to_parse_input">解析输入失败</string>
+    <string name="failed_to_download_file">下载文件失败</string>
+    <string name="failed_to_read_file">读取文件失败</string>
+    <string name="failed_to_upload_file">上传文件失败</string>
+
+    <string name="error_sending_gif">发送GIF错误</string>
+    <string name="backend_error">后端错误</string>
+    <string name="unknown_error">未知错误</string>
+    <string name="invalid_args_passed">传递了无效参数</string>
+    <string name="sticker_set_not_found">未找到贴纸集</string>
+</resources>
