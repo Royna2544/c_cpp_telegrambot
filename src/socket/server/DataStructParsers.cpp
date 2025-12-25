@@ -181,9 +181,8 @@ std::optional<TransferFileMeta> TransferFileMeta::fromBuffer(
         }
         case PayloadType::Json: {
             const auto offset = findBorderOffset(buffer, size).value_or(size);
-            std::string json(reinterpret_cast<const char*>(buffer), offset);
             auto _root =
-                parseAndCheck(buffer, size, {"srcfilepath", "destfilepath"});
+                parseAndCheck(buffer, offset, {"srcfilepath", "destfilepath"});
             if (!_root) {
                 return std::nullopt;
             }
@@ -208,8 +207,8 @@ std::optional<TransferFileMeta> TransferFileMeta::fromBuffer(
                 result.hash = parsed.value();
             }
             result.options = options;
-            result.file_size = size - offset;
-            result.filebuffer = buffer + offset;
+            result.file_size = size - offset - 1;
+            result.filebuffer = buffer + offset + 1;
             return result;
         }
         default:
