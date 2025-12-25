@@ -100,8 +100,8 @@ void CallbackHandler::handleTransferFile(const Packet& pkt,
             }
             
             result.options = options;
-            result.file_size = pkt.data.size() - offset;
-            result.filebuffer = pkt.data.get() + offset;
+            result.file_size = pkt.data.size() - offset - 1;
+            result.filebuffer = pkt.data.get() + offset + 1;
             break;
         }
         default:
