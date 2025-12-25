@@ -1,11 +1,11 @@
 #pragma once
 
-#include <ApiDef.hpp>
+#include <socket/api/DataStructures.hpp>
 #include <cstdint>
 #include <filesystem>
 #include <optional>
 
-#include "FileHelperNew.hpp"
+#include <shared/FileHelperNew.hpp>
 
 namespace TgBotSocket {
 

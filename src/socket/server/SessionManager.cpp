@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <chrono>
 
-#include "PacketParser.hpp"
+#include <shared/PacketParser.hpp>
 #include "SocketInterface.hpp"
 
 using namespace TgBotSocket;

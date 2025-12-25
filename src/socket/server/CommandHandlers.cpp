@@ -9,7 +9,7 @@
 #include <fstream>
 
 #include "DataStructParsers.hpp"
-#include "PacketParser.hpp"
+#include <shared/PacketParser.hpp>
 #include "PacketUtils.hpp"
 #include "SocketInterface.hpp"
 

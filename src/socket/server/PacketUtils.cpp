@@ -8,8 +8,9 @@
 #include <ResourceManager.hpp>
 #include <filesystem>
 
-#include "CommandMap.hpp"
-#include "PacketParser.hpp"
+#include <socket/CommandMap.hpp>
+#include <socket/shared/PacketParser.hpp>
+#include <socket/api/DataStructures.hpp>
 
 namespace fs = std::filesystem;
 using namespace TgBotSocket;

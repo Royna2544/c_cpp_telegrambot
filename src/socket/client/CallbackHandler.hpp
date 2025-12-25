@@ -1,6 +1,6 @@
 #pragma once
 
-#include <ApiDef.hpp>
+#include <socket/api/Callbacks.hpp>
 #include <optional>
 
 namespace TgBotSocket::Client {

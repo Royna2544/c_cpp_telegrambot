@@ -5,10 +5,8 @@
 #include <absl/base/config.h>
 #include <nlohmann/json.hpp>
 
-#include <SocketContext.hpp>
+#include "../SocketContext.hpp"
 #include <optional>
-
-#include "ApiDef.hpp"
 
 namespace TgBotSocket {
 

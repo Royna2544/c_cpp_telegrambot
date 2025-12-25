@@ -7,8 +7,8 @@
 #include <stop_token>
 #include <trivial_helpers/fruit_inject.hpp>
 
-#include "FileHelperNew.hpp"
-#include "ApiDef.hpp"
+#include <socket/shared/FileHelperNew.hpp>
+#include <socket/api/Callbacks.hpp>
 
 using TgBotSocket::callback::GenericAck;
 

@@ -1,7 +1,6 @@
 #pragma once
 
-#include <SocketContext.hpp>
-#include <ApiDef.hpp>
+#include "../SocketContext.hpp"
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -31,7 +30,7 @@ struct ConnectionConfig {
 /**
  * @brief Socket client wrapper with connection management
  */
-class SOCKET_EXPORT SocketClientWrapper {
+class SocketClientWrapper {
 public:
     SocketClientWrapper() = default;
 

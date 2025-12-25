@@ -6,9 +6,9 @@
 #include <tgbot/TgException.h>
 
 #include <SharedMalloc.hpp>
-#include <bot/FileHelperNew.hpp>
-#include <bot/PacketParser.hpp>
-#include <bot/SocketInterface.hpp>
+#include <shared/FileHelperNew.hpp>
+#include <shared/PacketParser.hpp>
+#include <server/SocketInterface.hpp>
 #include <chrono>
 #include <cstdint>
 #include <filesystem>

@@ -4,8 +4,11 @@
 #include <nlohmann/json.hpp>
 
 #include <TryParseStr.hpp>
-#include <ClientBackend.hpp>
-#include <bot/PacketParser.hpp>
+#include <socket/client/ClientBackend.hpp>
+#include <socket/shared/PacketParser.hpp>
+#include <socket/api/DataStructures.hpp>
+#include <socket/api/Callbacks.hpp>
+#include <utils/CommandLine.hpp>
 #include <cstdlib>
 #include <cstring>
 #include <database/bot/TgBotDatabaseImpl.hpp>
@@ -84,7 +87,7 @@ int app_main(int argc, char** argv) {
             LOG(ERROR) << "Invalid open session ack json";
             return EXIT_FAILURE;
         }
-        auto root = *_root;
+        auto& root = *_root;
         LOG(INFO) << "Opened session. Token: " << root["session_token"]
                   << " expiration_time: " << root["expiration_time"];
 

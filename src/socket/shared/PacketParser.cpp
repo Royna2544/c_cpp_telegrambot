@@ -5,7 +5,7 @@
 #include <openssl/hmac.h>
 #include <openssl/rand.h>
 
-#include <ApiDef.hpp>
+#include <socket/api/CoreTypes.hpp>
 #include <chrono>
 #include <cstring>
 #include <optional>

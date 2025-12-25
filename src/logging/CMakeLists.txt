@@ -27,7 +27,7 @@ tgbot_exe(
   SRCS
   LoggingClient.cpp
   LIBS
-  Socket
+  SocketClient
   Utils
   sighandler
   RELATION

@@ -2,8 +2,8 @@
 
 #include <absl/log/log.h>
 #include <nlohmann/json.hpp>
-#include <bot/FileHelperNew.hpp>
-#include <bot/PacketParser.hpp>
+#include <shared/FileHelperNew.hpp>
+#include <shared/PacketParser.hpp>
 #include <openssl/sha.h>
 
 namespace TgBotSocket::Client {

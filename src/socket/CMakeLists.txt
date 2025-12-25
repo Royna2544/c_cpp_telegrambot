@@ -14,43 +14,45 @@ endif()
 tgbot_library(NAME HexDump SRCS lib/hexdump.c STATIC)
 
 tgbot_library(
-  NAME
-  Socket
+  NAME Socket
   SRCS
-  SocketContext.cpp
-  context/Local.cpp
-  context/UDP.cpp
-  context/TCP.cpp
-  bot/PacketParser.cpp
-  bot/FileHelperNew.cpp
-  ClientBackend.cpp
-  CommandMap.cpp
+    SocketContext.cpp
+    context/Local.cpp
+    context/UDP.cpp
+    context/TCP.cpp
+    shared/PacketParser.cpp
+    shared/FileHelperNew.cpp
+    CommandMap.cpp
   LIBS
-  Utils
-  Boost::system
-  OpenSSL::Crypto
-  nlohmann_json::nlohmann_json
-  ${SOCKET_HEXDUMP_LIB}
-  $<$<BOOL:${WIN32}>:wsock32
-  Ws2_32>
+    Utils
+    Boost::system
+    OpenSSL::Crypto
+    nlohmann_json::nlohmann_json
+    ${SOCKET_HEXDUMP_LIB}
+    $<$<BOOL:${WIN32}>:wsock32 Ws2_32>
   DEFS
-  ${SOCKET_HEXDUMP_DEF})
+    ${SOCKET_HEXDUMP_DEF})
+  
+tgbot_library(
+  NAME SocketClient
+  SRCS client/ClientBackend.cpp
+  LIBS Socket
+  STATIC
+)
 
 tgbot_exe(
-  NAME
-  SocketCli
+  NAME SocketCli
   SRCS
-  client/CallbackHandler.cpp
-  client/CommandParser.cpp
-  client/PacketBuilder.cpp
-  client/SessionManager.cpp
-  client/main.cpp
-  LIBS
-  Socket
-  RELATION
-  Socket)
+    client/CallbackHandler.cpp
+    client/CommandParser.cpp
+    client/PacketBuilder.cpp
+    client/SessionManager.cpp
+    client/main.cpp
+  LIBS SocketClient
+  RELATION Socket
+)
 
-  # Add API headers as interface library
+# Add API headers as interface library
 add_library(socket_api INTERFACE)
 
 target_include_directories(socket_api INTERFACE
@@ -61,7 +63,6 @@ target_sources(socket_api INTERFACE
   FILE_SET HEADERS
   BASE_DIRS ${CMAKE_CURRENT_SOURCE_DIR}
   FILES
-  ApiDef.hpp
   api/CoreTypes.hpp
   api/ByteHelper.hpp
   api/Utilities.hpp

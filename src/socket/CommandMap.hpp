@@ -5,7 +5,7 @@
 #include <string>
 
 #include <SocketExports.h>
-#include "ApiDef.hpp"
+#include <socket/api/Commands.hpp>
 
 template <>
 struct fmt::formatter<TgBotSocket::Command> : formatter<std::string_view> {

@@ -4,7 +4,7 @@
 #include <absl/strings/escaping.h>
 #include <openssl/sha.h>
 
-#include "PacketParser.hpp"
+#include <shared/PacketParser.hpp>
 
 namespace TgBotSocket {
 

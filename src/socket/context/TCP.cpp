@@ -8,7 +8,7 @@
 #include <future>
 #include <string_view>
 
-#include "ApiDef.hpp"
+#include <socket/api/Callbacks.hpp>
 #include "../SocketContext.hpp"
 
 template <>

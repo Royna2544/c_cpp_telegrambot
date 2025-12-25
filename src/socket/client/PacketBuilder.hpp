@@ -1,8 +1,7 @@
 #pragma once
 
-#include <ApiDef.hpp>
-#include <bot/FileHelperNew.hpp>
-#include <bot/PacketParser.hpp>
+#include <shared/FileHelperNew.hpp>
+#include <shared/PacketParser.hpp>
 #include <optional>
 
 namespace TgBotSocket::Client {

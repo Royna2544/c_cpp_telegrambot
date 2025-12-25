@@ -3,7 +3,7 @@
 #include <SocketExports.h>
 
 #include <SharedMalloc.hpp>
-#include <ApiDef.hpp>
+#include <socket/api/DataStructures.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>

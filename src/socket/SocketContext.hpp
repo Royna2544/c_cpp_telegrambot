@@ -2,8 +2,8 @@
 
 #include <SocketExports.h>
 #include <absl/log/log.h>
+#include <socket/api/Packet.hpp>
 
-#include <ApiDef.hpp>
 #include <boost/asio.hpp>
 #include <chrono>
 #include <filesystem>

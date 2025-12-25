@@ -437,12 +437,12 @@ tgbot_library(
   SRCS
   src/global_handlers/SpamBlocker.cpp
   src/global_handlers/ChatObserver.cpp
-  src/socket/bot/PacketUtils.cpp
-  src/socket/bot/DataStructParsers.cpp
-  src/socket/bot/CommandHandlers.cpp
-  src/socket/bot/SessionManager.cpp
-  src/socket/bot/PacketDispatcher.cpp
-  src/socket/bot/SocketInterface.cpp
+  src/socket/server/PacketUtils.cpp
+  src/socket/server/DataStructParsers.cpp
+  src/socket/server/CommandHandlers.cpp
+  src/socket/server/SessionManager.cpp
+  src/socket/server/PacketDispatcher.cpp
+  src/socket/server/SocketInterface.cpp
   LIBS
   TgBot
   DBImpl

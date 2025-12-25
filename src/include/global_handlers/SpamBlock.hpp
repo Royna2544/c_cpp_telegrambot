@@ -10,7 +10,7 @@
 #include <concepts>
 #include <cstddef>
 #include <mutex>
-#include <socket/ApiDef.hpp>
+#include <socket/api/DataStructures.hpp>
 #include <unordered_map>
 
 using TgBot::Chat;

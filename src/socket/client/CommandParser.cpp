@@ -2,7 +2,7 @@
 
 #include <TryParseStr.hpp>
 #include <absl/log/log.h>
-#include <bot/FileHelperNew.hpp>
+#include <shared/FileHelperNew.hpp>
 
 namespace TgBotSocket::Client {
 

@@ -21,8 +21,8 @@
 #include <api/TgBotApiImpl.hpp>
 #include <boost/system/system_error.hpp>
 #include <boost/throw_exception.hpp>
-#include <bot/FileHelperNew.hpp>
-#include <bot/SocketInterface.hpp>
+#include <socket/shared/FileHelperNew.hpp>
+#include <socket/server/SocketInterface.hpp>
 #include <cstdint>
 #include <cstdlib>
 #include <database/bot/TgBotDatabaseImpl.hpp>

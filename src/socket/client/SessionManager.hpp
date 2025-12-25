@@ -1,7 +1,6 @@
 #pragma once
 
-#include <ApiDef.hpp>
-#include <ClientBackend.hpp>
+#include <client/ClientBackend.hpp>
 #include <optional>
 
 namespace TgBotSocket::Client {

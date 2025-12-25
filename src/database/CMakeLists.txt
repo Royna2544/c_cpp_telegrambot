@@ -83,7 +83,7 @@ tgbot_exe(
   utils/SendMediaToChat.cc
   LIBS
   DBImpl
-  Socket
+  SocketClient
   DBLoading
   nlohmann_json::nlohmann_json
   RELATION

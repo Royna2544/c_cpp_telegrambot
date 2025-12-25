@@ -4,7 +4,7 @@
 #include <variant>
 
 #include "DataStructParsers.hpp"
-#include "PacketParser.hpp"
+#include <shared/PacketParser.hpp>
 #include "PacketUtils.hpp"
 #include "SocketInterface.hpp"
 #include "CommandMap.hpp"

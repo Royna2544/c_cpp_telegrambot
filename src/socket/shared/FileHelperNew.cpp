@@ -10,7 +10,6 @@
 
 #include "PacketParser.hpp"
 #include "SharedMalloc.hpp"
-#include "ApiDef.hpp"
 
 bool RealFS::writeFile(const std::filesystem::path& filename,
                        const uint8_t* startAddr, const size_t size) {

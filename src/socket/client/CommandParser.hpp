@@ -1,10 +1,9 @@
 #pragma once
 
-#include <ApiDef.hpp>
 #include <optional>
 #include <string_view>
 
-#include <bot/FileHelperNew.hpp>
+#include <shared/FileHelperNew.hpp>
 
 namespace TgBotSocket::Client {
 

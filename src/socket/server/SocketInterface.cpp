@@ -5,9 +5,8 @@
 #include <string_view>
 #include <utility>
 
-#include "../CommandMap.hpp"
-#include "ApiDef.hpp"
-#include "PacketParser.hpp"
+#include "CommandMap.hpp"
+#include <shared/PacketParser.hpp>
 
 SocketInterfaceTgBot::SocketInterfaceTgBot(TgBotSocket::Context* _interface,
                                            TgBotApi::Ptr _api,

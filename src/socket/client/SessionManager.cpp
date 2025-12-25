@@ -1,7 +1,7 @@
 #include "SessionManager.hpp"
 
 #include <absl/log/log.h>
-#include <bot/PacketParser.hpp>
+#include <shared/PacketParser.hpp>
 #include <algorithm>
 
 namespace TgBotSocket::Client {
