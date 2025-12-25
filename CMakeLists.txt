@@ -437,7 +437,11 @@ tgbot_library(
   SRCS
   src/global_handlers/SpamBlocker.cpp
   src/global_handlers/ChatObserver.cpp
-  src/socket/bot/SocketDataHandler.cpp
+  src/socket/bot/PacketUtils.cpp
+  src/socket/bot/DataStructParsers.cpp
+  src/socket/bot/CommandHandlers.cpp
+  src/socket/bot/SessionManager.cpp
+  src/socket/bot/PacketDispatcher.cpp
   src/socket/bot/SocketInterface.cpp
   LIBS
   TgBot
