@@ -291,6 +291,13 @@ bool ForkAndRun::execute() {
                 // Set the process group to the current process ID
                 setpgrp();
 
+                // Set scheduling policy to SCHED_BATCH
+                struct sched_param sch_params;
+                sch_params.sched_priority = 0;
+                if (sched_setscheduler(0, SCHED_BATCH, &sch_params) != 0) {
+                    PLOG(WARNING) << "Failed to set SCHED_BATCH";
+                }
+                
                 // Run the function.
                 exit = runFunction();
             }
