@@ -72,7 +72,7 @@ void CallbackHandler::handleTransferFile(const Packet& pkt,
         case PayloadType::Json: {
             const auto offset = findBorderOffset(pkt.data.get(), pkt.data.size())
                                     .value_or(pkt.data.size());
-            auto _root = parseAndCheck(pkt.data.get(), pkt.data.size(),
+            auto _root = parseAndCheck(pkt.data.get(), offset,
                                        {"srcfilepath", "destfilepath"});
             if (!_root) {
                 return;
