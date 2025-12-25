@@ -6,6 +6,7 @@
 
 #include "ClientBackend.hpp"
 #include "client/CallbackHandler.hpp"
+#include "client/ChunkedTransferClient.hpp"
 #include "client/CommandParser.hpp"
 #include "client/PacketBuilder.hpp"
 #include "client/SessionManager.hpp"
@@ -96,7 +97,13 @@ int app_main(int argc, char** argv) {
     // Read and handle response
     auto response = readPacket(backend.chosen_interface());
     if (response) {
-        CallbackHandler::handle(response.value());
+        // Check if server wants to use chunked transfer
+        if (response->header.cmd == Command::CMD_TRANSFER_FILE_BEGIN) {
+            LOG(INFO) << "Server initiated chunked transfer";
+            CallbackHandler::handle(response.value(), &backend, &*session_token);
+        } else {
+            CallbackHandler::handle(response.value());
+        }
     }
 
     // Close session

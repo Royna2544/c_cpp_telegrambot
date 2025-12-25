@@ -1,4 +1,5 @@
 #include "CallbackHandler.hpp"
+#include "ChunkedTransferClient.hpp"
 
 #include <absl/log/log.h>
 #include <nlohmann/json.hpp>
@@ -45,7 +46,9 @@ void CallbackHandler::handleUptimeCallback(const Packet& pkt) {
     LOG(INFO) << "Server replied: " << callbackData.uptime.data();
 }
 
-void CallbackHandler::handleTransferFile(const Packet& pkt) {
+void CallbackHandler::handleTransferFile(const Packet& pkt,
+                                         SocketClientWrapper* backend,
+                                         const Packet::Header::session_token_type* token) {
     RealFS real;
     SocketFile2DataHelper helper(&real);
     SocketFile2DataHelper::Params result;
@@ -109,6 +112,22 @@ void CallbackHandler::handleTransferFile(const Packet& pkt) {
     helper.ReceiveTransferMeta(result);
 }
 
+void CallbackHandler::handleTransferFileBegin(
+    const Packet& pkt, SocketClientWrapper* backend,
+    const Packet::Header::session_token_type* token) {
+    if (!backend || !token) {
+        LOG(ERROR) << "Cannot handle chunked transfer without backend/token";
+        return;
+    }
+
+    LOG(INFO) << "Received CMD_TRANSFER_FILE_BEGIN, starting chunked receive";
+    ChunkedTransferClient chunked_client(*backend);
+    
+    if (!chunked_client.receiveFileChunked(pkt, *token)) {
+        LOG(ERROR) << "Chunked file receive failed";
+    }
+}
+
 void CallbackHandler::handleGenericAck(const Packet& pkt) {
     using callback::AckType;
     
@@ -145,13 +164,17 @@ void CallbackHandler::handleGenericAck(const Packet& pkt) {
     }
 }
 
-void CallbackHandler::handle(const Packet& pkt) {
+void CallbackHandler::handle(const Packet& pkt, SocketClientWrapper* backend,
+                              const Packet::Header::session_token_type* token) {
     switch (pkt.header.cmd.operator TgBotSocket::Command()) {
         case Command::CMD_GET_UPTIME_CALLBACK:
             handleUptimeCallback(pkt);
             break;
         case Command::CMD_TRANSFER_FILE:
-            handleTransferFile(pkt);
+            handleTransferFile(pkt, backend, token);
+            break;
+        case Command::CMD_TRANSFER_FILE_BEGIN:
+            handleTransferFileBegin(pkt, backend, token);
             break;
         case Command::CMD_GENERIC_ACK:
             handleGenericAck(pkt);

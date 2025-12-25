@@ -109,4 +109,48 @@ struct alignas(Limits::ALIGNMENT) FileTransferMeta {
     }
 };
 
+/**
+ * @brief Chunked file transfer session begin
+ * 
+ * JSON schema: { "destfilepath": string, "total_size": uint64, "chunk_size": uint32, "sha256_hash": string }
+ */
+struct alignas(Limits::ALIGNMENT) FileTransferBegin {
+    PathStringArray destfilepath{};
+    ByteHelper<uint64_t> total_size;
+    ByteHelper<uint32_t> chunk_size;
+    SHA256StringArray sha256_hash{};
+};
+
+/**
+ * @brief Chunked file transfer chunk data
+ * 
+ * JSON schema: { "chunk_index": uint32, "chunk_data_size": uint32 } + raw bytes
+ * Binary: struct + raw chunk bytes
+ */
+struct alignas(Limits::ALIGNMENT) FileTransferChunk {
+    ByteHelper<uint32_t> chunk_index;
+    ByteHelper<uint32_t> chunk_data_size;
+    // Followed by chunk_data_size bytes of actual data
+};
+
+/**
+ * @brief Chunked file transfer chunk response
+ * 
+ * JSON schema: { "chunk_index": uint32, "success": bool, "error_msg": string }
+ */
+struct alignas(Limits::ALIGNMENT) FileTransferChunkResponse {
+    ByteHelper<uint32_t> chunk_index;
+    bool success;
+    alignas(Limits::ALIGNMENT) MessageStringArray error_msg{};
+};
+
+/**
+ * @brief Chunked file transfer session end
+ * 
+ * JSON schema: { "verify_hash": bool }
+ */
+struct alignas(Limits::ALIGNMENT) FileTransferEnd {
+    bool verify_hash;
+};
+
 }  // namespace TgBotSocket::data

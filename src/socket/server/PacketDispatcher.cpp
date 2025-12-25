@@ -4,10 +4,10 @@
 #include <variant>
 
 #include "DataStructParsers.hpp"
-#include <shared/PacketParser.hpp>
+#include <socket/shared/PacketParser.hpp>
+#include <socket/CommandMap.hpp>
 #include "PacketUtils.hpp"
 #include "SocketInterface.hpp"
-#include "CommandMap.hpp"
 
 using namespace TgBotSocket;
 using namespace TgBotSocket::callback;
@@ -56,6 +56,21 @@ void SocketInterfaceTgBot::handlePacket(const TgBotSocket::Context& ctx,
                                              pkt.header.session_token,
                                              pkt.header.data_type);
             break;
+        case Command::CMD_TRANSFER_FILE_BEGIN:
+            ret = handle_TransferFileBegin(ptr, pkt.header.data_size,
+                                           pkt.header.session_token,
+                                           pkt.header.data_type);
+            break;
+        case Command::CMD_TRANSFER_FILE_CHUNK:
+            ret = handle_TransferFileChunk(ptr, pkt.header.data_size,
+                                           pkt.header.session_token,
+                                           pkt.header.data_type);
+            break;
+        case Command::CMD_TRANSFER_FILE_END:
+            ret = handle_TransferFileEnd(ptr, pkt.header.data_size,
+                                         pkt.header.session_token,
+                                         pkt.header.data_type);
+            break;
         default:
             if (CommandHelpers::isClientCommand(pkt.header.cmd)) {
                 LOG(ERROR) << fmt::format("Unhandled cmd: {}", pkt.header.cmd);
@@ -67,8 +82,9 @@ void SocketInterfaceTgBot::handlePacket(const TgBotSocket::Context& ctx,
     };
     switch (pkt.header.cmd.operator TgBotSocket::Command()) {
         case Command::CMD_GET_UPTIME:
-        case Command::CMD_TRANSFER_FILE_REQUEST: {
-            // This has its own callback, so we don't need to send ack.
+        case Command::CMD_TRANSFER_FILE_REQUEST:
+        case Command::CMD_TRANSFER_FILE_CHUNK: {
+            // These have their own callbacks, so we don't need to send generic ack.
             auto result = std::get<1>(ret);
             LOG_IF(WARNING, (!result))
                 << fmt::format("Command failed: {}", pkt.header.cmd);
@@ -85,7 +101,9 @@ void SocketInterfaceTgBot::handlePacket(const TgBotSocket::Context& ctx,
         case Command::CMD_OBSERVE_CHAT_ID:
         case Command::CMD_SEND_FILE_TO_CHAT_ID:
         case Command::CMD_OBSERVE_ALL_CHATS:
-        case Command::CMD_TRANSFER_FILE: {
+        case Command::CMD_TRANSFER_FILE:
+        case Command::CMD_TRANSFER_FILE_BEGIN:
+        case Command::CMD_TRANSFER_FILE_END: {
             GenericAck result = std::get<GenericAck>(ret);
             LOG(INFO) << "Sending ack: " << std::boolalpha
                       << (result.result == AckType::SUCCESS);

@@ -218,4 +218,128 @@ std::optional<TransferFileMeta> TransferFileMeta::fromBuffer(
     }
 }
 
+std::optional<FileTransferBegin> FileTransferBegin::fromBuffer(
+    const uint8_t* buffer, TgBotSocket::Packet::Header::length_type size,
+    TgBotSocket::PayloadType type) {
+    FileTransferBegin result{};
+    switch (type) {
+        case PayloadType::Binary:
+            if (size != sizeof(data::FileTransferBegin)) {
+                DLOG(WARNING) << "Payload size mismatch on FileTransferBegin";
+                return std::nullopt;
+            }
+            {
+                const auto* data =
+                    reinterpret_cast<const data::FileTransferBegin*>(buffer);
+                result.destfilepath = safeParse(data->destfilepath);
+                result.total_size = data->total_size;
+                result.chunk_size = data->chunk_size;
+                std::ranges::copy(data->sha256_hash, result.sha256_hash.begin());
+            }
+            return result;
+        case PayloadType::Json: {
+            auto _root = parseAndCheck(buffer, size,
+                                       {"destfilepath", "total_size", "chunk_size", "sha256_hash"});
+            if (!_root) {
+                return std::nullopt;
+            }
+            auto& root = _root.value();
+            result.destfilepath = root["destfilepath"].get<std::string>();
+            result.total_size = root["total_size"].get<uint64_t>();
+            result.chunk_size = root["chunk_size"].get<uint32_t>();
+            
+            auto parsed = hexDecode<32>(root["sha256_hash"].get<std::string>());
+            if (!parsed) {
+                LOG(ERROR) << "Failed to decode SHA256 hash";
+                return std::nullopt;
+            }
+            result.sha256_hash = parsed.value();
+            return result;
+        }
+        default:
+            LOG(ERROR) << "Invalid payload type for FileTransferBegin";
+            return std::nullopt;
+    }
+}
+
+std::optional<FileTransferChunk> FileTransferChunk::fromBuffer(
+    const uint8_t* buffer, TgBotSocket::Packet::Header::length_type size,
+    TgBotSocket::PayloadType type) {
+    FileTransferChunk result{};
+    switch (type) {
+        case PayloadType::Binary:
+            if (size < sizeof(data::FileTransferChunk)) {
+                DLOG(WARNING) << "Payload size mismatch on FileTransferChunk";
+                return std::nullopt;
+            }
+            {
+                const auto* data =
+                    reinterpret_cast<const data::FileTransferChunk*>(buffer);
+                result.chunk_index = data->chunk_index;
+                result.chunk_data_size = data->chunk_data_size;
+                result.chunk_data = buffer + sizeof(data::FileTransferChunk);
+                
+                // Verify we have enough data
+                if (size < sizeof(data::FileTransferChunk) + result.chunk_data_size) {
+                    LOG(ERROR) << "Chunk data size mismatch";
+                    return std::nullopt;
+                }
+            }
+            return result;
+        case PayloadType::Json: {
+            const auto offset = findBorderOffset(buffer, size).value_or(size);
+            auto _root = parseAndCheck(buffer, offset,
+                                       {"chunk_index", "chunk_data_size"});
+            if (!_root) {
+                return std::nullopt;
+            }
+            auto& root = _root.value();
+            result.chunk_index = root["chunk_index"].get<uint32_t>();
+            result.chunk_data_size = root["chunk_data_size"].get<uint32_t>();
+            result.chunk_data = buffer + offset;
+            
+            // Verify we have enough data
+            if (size < offset + result.chunk_data_size) {
+                LOG(ERROR) << "Chunk data size mismatch";
+                return std::nullopt;
+            }
+            return result;
+        }
+        default:
+            LOG(ERROR) << "Invalid payload type for FileTransferChunk";
+            return std::nullopt;
+    }
+}
+
+std::optional<FileTransferEnd> FileTransferEnd::fromBuffer(
+    const uint8_t* buffer, TgBotSocket::Packet::Header::length_type size,
+    TgBotSocket::PayloadType type) {
+    FileTransferEnd result{};
+    switch (type) {
+        case PayloadType::Binary:
+            if (size != sizeof(data::FileTransferEnd)) {
+                DLOG(WARNING) << "Payload size mismatch on FileTransferEnd";
+                return std::nullopt;
+            }
+            {
+                const auto* data =
+                    reinterpret_cast<const data::FileTransferEnd*>(buffer);
+                result.verify_hash = data->verify_hash;
+            }
+            return result;
+        case PayloadType::Json: {
+            auto _root = parseAndCheck(buffer, size, {"verify_hash"});
+            if (!_root) {
+                return std::nullopt;
+            }
+            auto& root = _root.value();
+            result.verify_hash = root["verify_hash"].get<bool>();
+            return result;
+        }
+        default:
+            LOG(ERROR) << "Invalid payload type for FileTransferEnd";
+            return std::nullopt;
+    }
+}
+
 }  // namespace TgBotSocket

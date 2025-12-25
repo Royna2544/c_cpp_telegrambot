@@ -29,6 +29,12 @@ ASSERT_SIZE(data::SendFileToChatId, 272);
 ASSERT_SIZE(data::ObserveAllChats, 8);
 ASSERT_SIZE(data::FileTransferMeta, 552);
 
+// Chunked transfer structures
+ASSERT_SIZE(data::FileTransferBegin, 304);
+ASSERT_SIZE(data::FileTransferChunk, 16);
+ASSERT_SIZE(data::FileTransferChunkResponse, 264);
+ASSERT_SIZE(data::FileTransferEnd, 8);
+
 // Callback structures
 ASSERT_SIZE(callback::GetUptimeCallback, 24);
 ASSERT_SIZE(callback::GenericAck, 264);

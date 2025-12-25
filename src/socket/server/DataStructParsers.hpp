@@ -51,6 +51,35 @@ struct TransferFileMeta : SocketFile2DataHelper::Params {
         PayloadType type);
 };
 
+struct FileTransferBegin {
+    std::filesystem::path destfilepath;
+    uint64_t total_size;
+    uint32_t chunk_size;
+    std::array<uint8_t, 32> sha256_hash;
+
+    static std::optional<FileTransferBegin> fromBuffer(
+        const uint8_t* buffer, Packet::Header::length_type size,
+        PayloadType type);
+};
+
+struct FileTransferChunk {
+    uint32_t chunk_index;
+    uint32_t chunk_data_size;
+    const uint8_t* chunk_data;  // Pointer to chunk data in buffer
+
+    static std::optional<FileTransferChunk> fromBuffer(
+        const uint8_t* buffer, Packet::Header::length_type size,
+        PayloadType type);
+};
+
+struct FileTransferEnd {
+    bool verify_hash;
+
+    static std::optional<FileTransferEnd> fromBuffer(
+        const uint8_t* buffer, Packet::Header::length_type size,
+        PayloadType type);
+};
+
 /**
  * @brief Finds the JSON byte border offset in a buffer.
  *

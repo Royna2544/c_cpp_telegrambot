@@ -47,10 +47,10 @@ tgbot_exe(
     client/CommandParser.cpp
     client/PacketBuilder.cpp
     client/SessionManager.cpp
+    client/ChunkedTransferClient.cpp
     client/main.cpp
   LIBS SocketClient
-  RELATION Socket
-)
+  RELATION Socket)
 
 # Add API headers as interface library
 add_library(socket_api INTERFACE)
