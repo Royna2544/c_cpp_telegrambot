@@ -5,55 +5,18 @@
 #include <string>
 #include <vector>
 
-#ifdef _WIN32
-#include <windows.h>
-#elif defined(__APPLE__)
-#include <mach-o/dyld.h>
-#include <limits.h>
-#endif
-
-// Helper function to find the strings directory
-std::filesystem::path findStringsDirectory() {
-    // Resources are installed to <binary_dir>/../share/TgBot++/strings
-    // This matches the pattern used by CommandLine::getPath(FS::PathType::RESOURCES)
-    
-    std::error_code ec;
-    std::filesystem::path base_path;
-    
-#ifdef _WIN32
-    // On Windows, get the module filename
-    wchar_t path[MAX_PATH];
-    GetModuleFileNameW(NULL, path, MAX_PATH);
-    base_path = std::filesystem::path(path).parent_path();
-#elif defined(__linux__)
-    // On Linux, read the symlink
-    base_path = std::filesystem::read_symlink("/proc/self/exe", ec).parent_path();
-    if (ec) {
-        base_path = std::filesystem::current_path();
-    }
-#elif defined(__APPLE__)
-    // On macOS, use _NSGetExecutablePath
-    char path[PATH_MAX];
-    uint32_t size = PATH_MAX;
-    if (_NSGetExecutablePath(path, &size) == 0) {
-        base_path = std::filesystem::path(path).parent_path();
-    } else {
-        base_path = std::filesystem::current_path();
-    }
-#else
-    base_path = std::filesystem::current_path();
-#endif
-
-    // From the executable directory, go to parent and then share/TgBot++/strings
-    return base_path.parent_path() / "share" / "TgBot++" / "strings";
-}
+#include "CommandLine.hpp"
+#include "GetCommandLine.hpp"
 
 class StringResLoaderTest : public ::testing::Test {
    protected:
     std::filesystem::path strings_path;
 
     void SetUp() override {
-        strings_path = findStringsDirectory();
+        // Use CommandLine class to get the proper resource path
+        // This matches the pattern used in production code
+        auto cmdLine = getCmdLine();
+        strings_path = cmdLine.getPath(FS::PathType::RESOURCES) / "strings";
         
         ASSERT_TRUE(std::filesystem::exists(strings_path))
             << "Strings directory not found at: " << strings_path.string();
