@@ -1,0 +1,93 @@
+<resources locale="pt">
+    <string name="send_bash_command">Enviar um comando bash para executar</string>
+    <string name="compile_time">Tempo de compilação</string>
+    <string name="run_time">Tempo de execução</string>
+    <string name="working_on_it">Trabalhando nisso...</string>
+    <string name="command_is">O comando é</string>
+    <string name="need_a_nonempty_reply_message">Precisa de uma mensagem de resposta com texto não vazio</string>
+    <string name="example">Exemplo</string>
+    <string name="unknown_action">Ação desconhecida</string>
+    <string name="operation_successful">Operação bem-sucedida</string>
+    <string name="operation_failure">Operação falhou</string>
+    <string name="unknown">Desconhecido</string>
+
+    <!-- Saveid cmd -->
+    <string name="media_already_in_db">Mídia já está no banco de dados</string>
+    <string name="send_a_name_to_save">Enviar um nome para salvar</string>
+
+    <string name="process_exited">Processo encerrou com</string>
+    <string name="done_took">Concluído. A execução levou</string>
+    <string name="error_took">Erro ocorreu. A execução levou</string>
+    <string name="output_is_empty">A saída está vazia</string>
+
+    <!-- decide cmd -->
+    <string name="deciding">Decidindo</string>
+    <string name="yes">Sim</string>
+    <string name="no">Não</string>
+    <string name="so_yes">Então, sim</string>
+    <string name="so_idk">Então, não sei</string>
+    <string name="so_no">Então, não</string>
+    <string name="short_circuited_to_the_answer">Curto-circuitado para a resposta</string>
+
+    <!-- possibility cmd -->
+    <string name="send_possibilities">Enviar condições disponíveis separadas por nova linha</string>
+    <string name="total_items_prefix">Total</string>
+    <string name="total_items_suffix">itens</string>
+    <string name="give_more_than_one">Dar mais de uma escolha</string>
+
+    <!-- copystickers cmd -->
+    <string name="starting_conversion">Iniciando conversão</string>
+    <string name="conversion_in_progress">Conversão em andamento</string>
+    <string name="creating_new_sticker_set">Criando novo conjunto de figurinhas</string>
+    <string name="sticker_pack_created">Pacote de figurinhas criado</string>
+    <string name="failed_to_create_new_sticker_set">Falha ao criar novo conjunto de figurinhas</string>
+    <string name="animated_stickers_not_supported">Figurinhas animadas não são suportadas</string>
+
+    <!-- setowner cmd -->
+    <string name="bot_owner_set">Proprietário do bot foi definido</string>
+    
+    <!-- flash cmd -->
+    <string name="flashing_zip">Gravando arquivo zip</string>
+    <string name="send_a_file_name_to_flash">Enviar um nome de arquivo para gravar</string>
+    <string name="invalid_input_no_newline">Entrada inválida: nomes de arquivo não devem incluir quebras de linha</string>
+    <string name="failed_successfully">Falhou com sucesso!</string>
+    <string name="reason">Razão</string>
+    <string name="success_chance_was">Sucesso! A chance foi</string>
+
+    <!-- restart cmd -->
+    <string name="restarting_bot">Reiniciando instância do bot...</string>
+
+    <!-- rotatepic cmd -->
+    <string name="cannot_rotate_nonstatic">Não é possível girar figurinha que não é estática</string>
+    <string name="invalid_angle">Ângulo inválido fornecido</string>
+    <string name="rotated_picture">Imagem girada</string>
+    <string name="failed_to_rotate_image">Falha ao girar imagem</string>
+
+    <!-- Database -->
+    <string name="user_added">Usuário adicionado à lista</string>
+    <string name="user_removed">Usuário removido da lista</string>
+    <string name="user_already_in_list">Usuário já está na lista</string>
+    <string name="user_already_in_other_list">Usuário já está em outra lista</string>
+    <string name="user_not_in_list">Usuário não está na lista</string>
+
+    <!-- Reply to -->
+    <string name="reply_to_a_sticker">Responder a uma figurinha</string>
+    <string name="reply_to_user_msg">Responder à mensagem de um usuário</string>
+    <string name="reply_to_gif_or_sticker">Responder a um GIF ou figurinha</string>
+    <string name="reply_to_a_code">Responder a uma mensagem com código como texto</string>
+    <string name="reply_to_a_media">Responder a uma mídia</string>
+
+    <!-- Fails and errors -->
+    <string name="failed_to_write_file">Falha ao escrever arquivo</string>
+    <string name="failed_to_create_directory">Falha ao criar diretório</string>
+    <string name="failed_to_parse_input">Falha ao analisar entrada</string>
+    <string name="failed_to_download_file">Falha ao baixar arquivo</string>
+    <string name="failed_to_read_file">Falha ao ler arquivo</string>
+    <string name="failed_to_upload_file">Falha ao enviar arquivo</string>
+
+    <string name="error_sending_gif">Erro ao enviar GIF</string>
+    <string name="backend_error">Erro do backend</string>
+    <string name="unknown_error">Erro desconhecido</string>
+    <string name="invalid_args_passed">Argumentos inválidos fornecidos</string>
+    <string name="sticker_set_not_found">Conjunto de figurinhas não encontrado</string>
+</resources>

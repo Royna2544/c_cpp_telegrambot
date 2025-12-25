@@ -1,0 +1,93 @@
+<resources locale="ja">
+    <string name="send_bash_command">実行するbashコマンドを送信してください</string>
+    <string name="compile_time">コンパイル時間</string>
+    <string name="run_time">実行時間</string>
+    <string name="working_on_it">処理中...</string>
+    <string name="command_is">コマンドは</string>
+    <string name="need_a_nonempty_reply_message">空でないテキストを含む返信メッセージが必要です</string>
+    <string name="example">例</string>
+    <string name="unknown_action">不明なアクション</string>
+    <string name="operation_successful">操作成功</string>
+    <string name="operation_failure">操作失敗</string>
+    <string name="unknown">不明</string>
+
+    <!-- Saveid cmd -->
+    <string name="media_already_in_db">メディアは既にデータベースにあります</string>
+    <string name="send_a_name_to_save">保存する名前を送信してください</string>
+
+    <string name="process_exited">プロセスは次の値で終了しました</string>
+    <string name="done_took">完了。実行時間</string>
+    <string name="error_took">エラーが発生しました。実行時間</string>
+    <string name="output_is_empty">出力が空です</string>
+
+    <!-- decide cmd -->
+    <string name="deciding">決定中</string>
+    <string name="yes">はい</string>
+    <string name="no">いいえ</string>
+    <string name="so_yes">したがって、はい</string>
+    <string name="so_idk">したがって、わかりません</string>
+    <string name="so_no">したがって、いいえ</string>
+    <string name="short_circuited_to_the_answer">答えにショートカット</string>
+
+    <!-- possibility cmd -->
+    <string name="send_possibilities">改行で区切られた利用可能な条件を送信してください</string>
+    <string name="total_items_prefix">合計</string>
+    <string name="total_items_suffix">項目</string>
+    <string name="give_more_than_one">複数の選択肢を指定してください</string>
+
+    <!-- copystickers cmd -->
+    <string name="starting_conversion">変換を開始</string>
+    <string name="conversion_in_progress">変換進行中</string>
+    <string name="creating_new_sticker_set">新しいステッカーセットを作成中</string>
+    <string name="sticker_pack_created">ステッカーパックが作成されました</string>
+    <string name="failed_to_create_new_sticker_set">新しいステッカーセットの作成に失敗しました</string>
+    <string name="animated_stickers_not_supported">アニメーションステッカーはサポートされていません</string>
+
+    <!-- setowner cmd -->
+    <string name="bot_owner_set">ボットの所有者が設定されました</string>
+    
+    <!-- flash cmd -->
+    <string name="flashing_zip">zipファイルをフラッシュ中</string>
+    <string name="send_a_file_name_to_flash">フラッシュするファイル名を送信してください</string>
+    <string name="invalid_input_no_newline">無効な入力：ファイル名に改行を含めてはいけません</string>
+    <string name="failed_successfully">見事に失敗しました！</string>
+    <string name="reason">理由</string>
+    <string name="success_chance_was">成功！確率は</string>
+
+    <!-- restart cmd -->
+    <string name="restarting_bot">ボットインスタンスを再起動中...</string>
+
+    <!-- rotatepic cmd -->
+    <string name="cannot_rotate_nonstatic">静的でないステッカーは回転できません</string>
+    <string name="invalid_angle">無効な角度が指定されました</string>
+    <string name="rotated_picture">回転した画像</string>
+    <string name="failed_to_rotate_image">画像の回転に失敗しました</string>
+
+    <!-- Database -->
+    <string name="user_added">ユーザーがリストに追加されました</string>
+    <string name="user_removed">ユーザーがリストから削除されました</string>
+    <string name="user_already_in_list">ユーザーは既にリストにあります</string>
+    <string name="user_already_in_other_list">ユーザーは既に別のリストにあります</string>
+    <string name="user_not_in_list">ユーザーはリストにありません</string>
+
+    <!-- Reply to -->
+    <string name="reply_to_a_sticker">ステッカーに返信してください</string>
+    <string name="reply_to_user_msg">ユーザーのメッセージに返信してください</string>
+    <string name="reply_to_gif_or_sticker">GIFまたはステッカーに返信してください</string>
+    <string name="reply_to_a_code">コードをテキストとして含むメッセージに返信してください</string>
+    <string name="reply_to_a_media">メディアに返信してください</string>
+
+    <!-- Fails and errors -->
+    <string name="failed_to_write_file">ファイルの書き込みに失敗しました</string>
+    <string name="failed_to_create_directory">ディレクトリの作成に失敗しました</string>
+    <string name="failed_to_parse_input">入力の解析に失敗しました</string>
+    <string name="failed_to_download_file">ファイルのダウンロードに失敗しました</string>
+    <string name="failed_to_read_file">ファイルの読み取りに失敗しました</string>
+    <string name="failed_to_upload_file">ファイルのアップロードに失敗しました</string>
+
+    <string name="error_sending_gif">GIFの送信エラー</string>
+    <string name="backend_error">バックエンドエラー</string>
+    <string name="unknown_error">不明なエラー</string>
+    <string name="invalid_args_passed">無効な引数が渡されました</string>
+    <string name="sticker_set_not_found">ステッカーセットが見つかりません</string>
+</resources>

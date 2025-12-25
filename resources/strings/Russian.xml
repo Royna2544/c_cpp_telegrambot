@@ -1,0 +1,93 @@
+<resources locale="ru">
+    <string name="send_bash_command">Отправить bash-команду для выполнения</string>
+    <string name="compile_time">Время компиляции</string>
+    <string name="run_time">Время выполнения</string>
+    <string name="working_on_it">Работаю над этим...</string>
+    <string name="command_is">Команда</string>
+    <string name="need_a_nonempty_reply_message">Требуется ответное сообщение с непустым текстом</string>
+    <string name="example">Пример</string>
+    <string name="unknown_action">Неизвестное действие</string>
+    <string name="operation_successful">Операция выполнена успешно</string>
+    <string name="operation_failure">Операция не удалась</string>
+    <string name="unknown">Неизвестно</string>
+
+    <!-- Saveid cmd -->
+    <string name="media_already_in_db">Медиа уже есть в базе данных</string>
+    <string name="send_a_name_to_save">Отправьте имя для сохранения</string>
+
+    <string name="process_exited">Процесс завершился с кодом</string>
+    <string name="done_took">Готово. Выполнение заняло</string>
+    <string name="error_took">Произошла ошибка. Выполнение заняло</string>
+    <string name="output_is_empty">Вывод пуст</string>
+
+    <!-- decide cmd -->
+    <string name="deciding">Решаю</string>
+    <string name="yes">Да</string>
+    <string name="no">Нет</string>
+    <string name="so_yes">Итак, да</string>
+    <string name="so_idk">Итак, не знаю</string>
+    <string name="so_no">Итак, нет</string>
+    <string name="short_circuited_to_the_answer">Короткое замыкание на ответ</string>
+
+    <!-- possibility cmd -->
+    <string name="send_possibilities">Отправьте доступные условия, разделенные новой строкой</string>
+    <string name="total_items_prefix">Всего</string>
+    <string name="total_items_suffix">элементов</string>
+    <string name="give_more_than_one">Дайте более одного варианта</string>
+
+    <!-- copystickers cmd -->
+    <string name="starting_conversion">Начало конвертации</string>
+    <string name="conversion_in_progress">Конвертация в процессе</string>
+    <string name="creating_new_sticker_set">Создание нового набора стикеров</string>
+    <string name="sticker_pack_created">Набор стикеров создан</string>
+    <string name="failed_to_create_new_sticker_set">Не удалось создать новый набор стикеров</string>
+    <string name="animated_stickers_not_supported">Анимированные стикеры не поддерживаются</string>
+
+    <!-- setowner cmd -->
+    <string name="bot_owner_set">Владелец бота установлен</string>
+    
+    <!-- flash cmd -->
+    <string name="flashing_zip">Прошивка zip-файла</string>
+    <string name="send_a_file_name_to_flash">Отправьте имя файла для прошивки</string>
+    <string name="invalid_input_no_newline">Недопустимый ввод: имена файлов не должны содержать переносы строк</string>
+    <string name="failed_successfully">Успешно провалено!</string>
+    <string name="reason">Причина</string>
+    <string name="success_chance_was">Успех! Вероятность была</string>
+
+    <!-- restart cmd -->
+    <string name="restarting_bot">Перезапуск экземпляра бота...</string>
+
+    <!-- rotatepic cmd -->
+    <string name="cannot_rotate_nonstatic">Невозможно повернуть нестатический стикер</string>
+    <string name="invalid_angle">Указан недопустимый угол</string>
+    <string name="rotated_picture">Повернутое изображение</string>
+    <string name="failed_to_rotate_image">Не удалось повернуть изображение</string>
+
+    <!-- Database -->
+    <string name="user_added">Пользователь добавлен в список</string>
+    <string name="user_removed">Пользователь удален из списка</string>
+    <string name="user_already_in_list">Пользователь уже в списке</string>
+    <string name="user_already_in_other_list">Пользователь уже в другом списке</string>
+    <string name="user_not_in_list">Пользователя нет в списке</string>
+
+    <!-- Reply to -->
+    <string name="reply_to_a_sticker">Ответьте на стикер</string>
+    <string name="reply_to_user_msg">Ответьте на сообщение пользователя</string>
+    <string name="reply_to_gif_or_sticker">Ответьте на GIF или стикер</string>
+    <string name="reply_to_a_code">Ответьте на сообщение с кодом в виде текста</string>
+    <string name="reply_to_a_media">Ответьте на медиа</string>
+
+    <!-- Fails and errors -->
+    <string name="failed_to_write_file">Не удалось записать файл</string>
+    <string name="failed_to_create_directory">Не удалось создать каталог</string>
+    <string name="failed_to_parse_input">Не удалось разобрать входные данные</string>
+    <string name="failed_to_download_file">Не удалось загрузить файл</string>
+    <string name="failed_to_read_file">Не удалось прочитать файл</string>
+    <string name="failed_to_upload_file">Не удалось загрузить файл</string>
+
+    <string name="error_sending_gif">Ошибка отправки GIF</string>
+    <string name="backend_error">Ошибка бэкенда</string>
+    <string name="unknown_error">Неизвестная ошибка</string>
+    <string name="invalid_args_passed">Переданы недопустимые аргументы</string>
+    <string name="sticker_set_not_found">Набор стикеров не найден</string>
+</resources>
