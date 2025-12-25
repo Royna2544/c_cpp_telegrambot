@@ -63,3 +63,14 @@ tgbot_exe(
     popen_wdt
   TEST
 )
+
+tgbot_exe(
+  NAME stringresloader
+  SRCS
+    TestMain.cpp
+    StringResLoaderTest.cpp
+  LIBS
+    GTest::gtest
+    Api
+  TEST
+)
