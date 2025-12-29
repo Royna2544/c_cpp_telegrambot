@@ -52,9 +52,8 @@ jobs:
         uses: github/codeql-action/init@v3
         with:
           languages: ${{ matrix.language }}
-          # Specify CodeQL query suites to use
-          # You can use 'security-extended' or 'security-and-quality' for more comprehensive analysis
-          queries: security-extended
+          # Use custom configuration file
+          config-file: ./.github/codeql/codeql-config.yml
 
       # Build C++ code (only for c-cpp language)
       - name: Setup vcpkg (C++ only)
