@@ -3,7 +3,7 @@
 #include <api/typedefs.h>
 #include <tgbot/types/Message.h>
 #include <mutex>
-#include <vector>
+#include <unordered_set>
 #include "api/TgBotApi.hpp"
 #include "trivial_helpers/fruit_inject.hpp"
 
@@ -12,7 +12,7 @@ using TgBot::User;
 
 class ChatObserver {
     // Global ChatId list to observe
-    std::vector<ChatId> observedChatIds;
+    std::unordered_set<ChatId> observedChatIds;
     bool observeAllChats{};
     mutable std::mutex m;
 
