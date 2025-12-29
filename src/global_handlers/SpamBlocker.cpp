@@ -55,11 +55,7 @@ class SameMessageMatcher : public Matcher {
         std::unordered_map<std::string, int> kSameMessageMap;
         for (const auto &elem : entry->second) {
             const auto &[id, content] = elem;
-            if (!kSameMessageMap.contains(content)) {
-                kSameMessageMap[content] = 1;
-            } else {
-                ++kSameMessageMap[content];
-            }
+            ++kSameMessageMap[content];
         }
         return std::ranges::max_element(kSameMessageMap,
                                         [](const auto &smsg, const auto &rmsg) {

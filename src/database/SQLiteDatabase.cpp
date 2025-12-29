@@ -20,9 +20,23 @@
 #include <string_view>
 #include <system_error>
 #include <type_traits>
+#include <unordered_map>
 #include <variant>
 
 #include "api/typedefs.h"
+
+namespace {
+// Hash function for std::pair to use with unordered_map
+struct PairHash {
+    template <typename T1, typename T2>
+    std::size_t operator()(const std::pair<T1, T2>& p) const {
+        auto h1 = std::hash<T1>{}(p.first);
+        auto h2 = std::hash<T2>{}(p.second);
+        // Combine hashes using XOR and bit shifting
+        return h1 ^ (h2 << 1);
+    }
+};
+}  // namespace
 
 void SQLiteDatabase::Helper::logInvalidState(
     const std::source_location& location, SQLiteDatabase::Helper::State state) {
@@ -585,38 +599,40 @@ SQLiteDatabase::AddResult SQLiteDatabase::addMediaInfo(
 
 std::vector<SQLiteDatabase::MediaInfo> SQLiteDatabase::getAllMediaInfos()
     const {
-    using MergeMap = std::map<std::pair<std::string, std::string>,
-                              std::pair<std::vector<std::string>, MediaType>>;
+    using MergeMap = std::unordered_map<std::pair<std::string, std::string>,
+                              std::pair<std::vector<std::string>, MediaType>,
+                              PairHash>;
     MergeMap map;
-    std::vector<MediaInfo> result;
 
     auto helper =
         Helper::create(db, _sqlScriptsPath, Helper::kFindAllMediaMapFile);
     if (!helper->prepare()) {
-        return result;
+        return {};
     }
+    
+    // Directly build the map from database rows
     while (auto rows = helper->execAndGetRow()) {
-        MediaInfo info;
-        info.mediaId = rows->get<std::string>(0);
-        info.mediaUniqueId = rows->get<std::string>(1);
-        info.names.emplace_back(rows->get<std::string>(2));
-        info.mediaType = static_cast<MediaType>(rows->get<int>(3));
-        result.emplace_back(info);
+        std::string mediaId = rows->get<std::string>(0);
+        std::string mediaUniqueId = rows->get<std::string>(1);
+        std::string name = rows->get<std::string>(2);
+        MediaType mediaType = static_cast<MediaType>(rows->get<int>(3));
+        
+        auto key = std::make_pair(std::move(mediaUniqueId), std::move(mediaId));
+        auto& entry = map[key];
+        entry.first.emplace_back(std::move(name));
+        entry.second = mediaType;
     }
-    for (const auto& info : result) {
-        auto key = std::make_pair(info.mediaUniqueId, info.mediaId);
-        map[key].first.insert(map[key].first.end(), info.names.begin(),
-                              info.names.end());
-        map[key].second = info.mediaType;
-    }
-    result.clear();
-    for (const auto& pair : map) {
+    
+    // Convert map to result vector
+    std::vector<MediaInfo> result;
+    result.reserve(map.size());
+    for (auto& pair : map) {
         MediaInfo info;
-        info.mediaId = pair.first.second;
-        info.mediaUniqueId = pair.first.first;
-        info.names = pair.second.first;
+        info.mediaId = std::move(pair.first.second);
+        info.mediaUniqueId = std::move(pair.first.first);
+        info.names = std::move(pair.second.first);
         info.mediaType = pair.second.second;
-        result.emplace_back(info);
+        result.emplace_back(std::move(info));
     }
     return result;
 }
