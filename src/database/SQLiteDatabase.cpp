@@ -32,8 +32,8 @@ struct PairHash {
     std::size_t operator()(const std::pair<T1, T2>& p) const {
         auto h1 = std::hash<T1>{}(p.first);
         auto h2 = std::hash<T2>{}(p.second);
-        // Combine hashes using XOR and bit shifting
-        return h1 ^ (h2 << 1);
+        // Use boost::hash_combine formula for better hash distribution
+        return h1 ^ (h2 + 0x9e3779b9 + (h1 << 6) + (h1 >> 2));
     }
 };
 }  // namespace
