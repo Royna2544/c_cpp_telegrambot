@@ -102,8 +102,7 @@ struct ReplaceCommand : public RegexCommand {
             bool replaced = false;
 
             for (auto it = match; it != match_end; ++it) {
-                result.write(&*last_pos, 
-                    std::distance(last_pos, it->prefix().second));  // Append unmatched part
+                result << std::string(last_pos, it->prefix().second);  // Append unmatched part
                 if (++count == *replaceIndex) {
                     result << replacement;  // Add the replacement
                     replaced = true;
@@ -119,7 +118,7 @@ struct ReplaceCommand : public RegexCommand {
                 return std_cpp20::unexpected(Error::InvalidRegexMatchIndex);
             }
             // Append the remainder
-            result.write(&*last_pos, std::distance(last_pos, source.end()));
+            result << std::string(last_pos, source.end());
 
             return result.str();
         }
