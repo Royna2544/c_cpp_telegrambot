@@ -1,0 +1,28 @@
+name: "CodeQL Config"
+
+# Paths to exclude from analysis
+paths-ignore:
+  - 'build/**'
+  - 'vcpkg_installed/**'
+  - '_deps/**'
+  - '**/*.min.js'
+  - '**/*.min.css'
+  - '**/node_modules/**'
+  - '**/vendor/**'
+  - 'tests/mocks/**'
+
+# Paths to include in analysis (optional - by default all paths are included)
+paths:
+  - 'src/**'
+  - 'tests/**'
+  - 'www/**'
+  - 'resources/**'
+
+# Query suites and packs
+queries:
+  - uses: security-extended
+
+# Disable queries that might cause false positives
+# You can add specific query IDs here if needed
+# disable-queries:
+#   - cpp/unused-local-variable
