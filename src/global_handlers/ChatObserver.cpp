@@ -1,7 +1,6 @@
 #include <absl/log/log.h>
 #include <trivial_helpers/_tgbot.h>
 
-#include <algorithm>
 #include <global_handlers/ChatObserver.hpp>
 #include <mutex>
 
@@ -48,7 +47,7 @@ void ChatObserver::process(const Message::Ptr& msg) {
     auto from = msg->from;
     if (from && chat) {
         std::lock_guard<std::mutex> _(m);
-        auto it = std::ranges::find(observedChatIds, chat->id);
+        auto it = observedChatIds.find(chat->id);
         if (it != observedChatIds.end()) {
             if (chat->type != Chat::Type::Supergroup) {
                 LOG(WARNING) << "Removing chat '" << chat->title.value()
@@ -63,20 +62,17 @@ void ChatObserver::process(const Message::Ptr& msg) {
 
 bool ChatObserver::startObserving(ChatId chatId) {
     std::lock_guard<std::mutex> _(m);
-    if (std::ranges::find(observedChatIds, chatId) == observedChatIds.end()) {
-        observedChatIds.push_back(chatId);
-        return true;
-    } else {
+    auto [it, inserted] = observedChatIds.insert(chatId);
+    if (!inserted) {
         LOG(WARNING) << "Already observing chat '" << chatId << "'";
         return false;
     }
+    return true;
 }
 
 bool ChatObserver::stopObserving(ChatId chatId) {
     std::lock_guard<std::mutex> _(m);
-    auto it = std::ranges::find(observedChatIds, chatId);
-    if (it != observedChatIds.end()) {
-        observedChatIds.erase(it);
+    if (observedChatIds.erase(chatId) > 0) {
         return true;
     } else {
         LOG(WARNING) << "Not observing chat '" << chatId << "'";

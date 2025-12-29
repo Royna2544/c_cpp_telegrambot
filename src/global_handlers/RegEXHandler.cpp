@@ -9,6 +9,7 @@
 #include <iomanip>
 #include <optional>
 #include <regex>
+#include <sstream>
 #include <string>
 
 using std::regex_constants::ECMAScript;
@@ -94,20 +95,20 @@ struct ReplaceCommand : public RegexCommand {
             auto match_end = std::sregex_iterator();
 
             int count = 0;
-            std::string result;
+            std::ostringstream result;
             // Track the last position
             std::string::const_iterator last_pos = source.begin();
 
             bool replaced = false;
 
             for (auto it = match; it != match_end; ++it) {
-                result += std::string(
-                    last_pos, it->prefix().second);  // Append unmatched part
+                result.write(&*last_pos, 
+                    std::distance(last_pos, it->prefix().second));  // Append unmatched part
                 if (++count == *replaceIndex) {
-                    result += replacement;  // Add the replacement
+                    result << replacement;  // Add the replacement
                     replaced = true;
                 } else {
-                    result += it->str();  // No replacement, keep the match
+                    result << it->str();  // No replacement, keep the match
                 }
                 last_pos = it->suffix().first;  // Update the last position
             }
@@ -118,9 +119,9 @@ struct ReplaceCommand : public RegexCommand {
                 return std_cpp20::unexpected(Error::InvalidRegexMatchIndex);
             }
             // Append the remainder
-            result += std::string(last_pos, source.end());
+            result.write(&*last_pos, std::distance(last_pos, source.end()));
 
-            return result;
+            return result.str();
         }
 
         DLOG(INFO) << fmt::format(
@@ -152,15 +153,15 @@ struct DeleteCommand : public RegexCommand {
         std::regex reg(pattern);  // Compile the regex
 
         // Use regex iterator to filter lines that do not match the pattern
-        std::string result;
+        std::ostringstream result;
         std::istringstream stream(source);
         std::string line;
         while (std::getline(stream, line)) {
             if (!std::regex_search(line, reg)) {
-                result += line + "\n";  // Append non-matching lines
+                result << line << '\n';  // Append non-matching lines
             }
         }
-        return result;
+        return result.str();
     }
 };
 
