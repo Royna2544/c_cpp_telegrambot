@@ -11,29 +11,19 @@
 
 #include "AuthContext.hpp"
 #include "CommandModule.hpp"
-#include "MessageExt.hpp"
 #include "Providers.hpp"
 #include "RateLimit.hpp"
 #include "StringResLoader.hpp"
 #include "TgBotApi.hpp"
+#include "TgBotTranslator.hpp"
+#include "types/Message.hpp"
 #include "typedefs.h"
 
-using TgBot::Animation;
 using TgBot::Api;
 using TgBot::Bot;
 using TgBot::BotCommand;
-using TgBot::Chat;
-using TgBot::ChatPermissions;
 using TgBot::EventBroadcaster;
-using TgBot::File;
-using TgBot::GenericReply;
-using TgBot::InputFile;
-using TgBot::InputSticker;
-using TgBot::Message;
-using TgBot::Sticker;
-using TgBot::StickerSet;
 using TgBot::TgLongPoll;
-using TgBot::User;
 
 // A class to effectively wrap TgBot::Api to stable interface
 // This class owns the Bot instance, and users of this code cannot directly
@@ -437,8 +427,8 @@ class TgBotApiImpl : public TgBotApi {
     bool unloadCommand(const std::string& command) override;
     bool reloadCommand(const std::string& command) override;
     void commandHandler(const std::string& command,
-                        AuthContext::AccessLevel authflags, Message::Ptr message);
-    bool validateValidArgs(const CommandModule::Info * module, MessageExt::Ptr message);
+                        AuthContext::AccessLevel authflags, TgBot::Message::Ptr message);
+    bool validateValidArgs(const CommandModule::Info * module, tgbot_api::Message* message);
 
     void addInlineQueryKeyboard(InlineQuery query,
                                 TgBot::InlineQueryResult::Ptr result) override;
@@ -463,11 +453,11 @@ class TgBotApiImpl : public TgBotApi {
     [[nodiscard]] EventBroadcaster& getEvents() { return _bot.getEvents(); }
     [[nodiscard]] const Api& getApi() const { return _bot.getApi(); }
 
-    [[nodiscard]] bool authorized(const MessageExt::Ptr& message,
+    [[nodiscard]] bool authorized(tgbot_api::Message* message,
                                   const std::string_view commandName,
                                   AuthContext::AccessLevel flags) const;
 
-    [[nodiscard]] bool isMyCommand(const MessageExt::Ptr& message) const;
+    [[nodiscard]] bool isMyCommand(tgbot_api::Message* message) const;
 
     class Async;
     Bot _bot;

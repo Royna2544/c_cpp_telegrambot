@@ -12,8 +12,8 @@
 #include <GitBuildInfo.hpp>
 #include <api/AuthContext.hpp>
 #include <api/CommandModule.hpp>
-#include <api/MessageExt.hpp>
 #include <api/TgBotApiImpl.hpp>
+#include <api/TgBotTranslator.hpp>
 #include <api/Utils.hpp>
 #include <api/components/ChatJoinRequest.hpp>
 #include <api/components/ModuleManagement.hpp>
@@ -23,6 +23,7 @@
 #include <api/components/OnMyChatMember.hpp>
 #include <api/components/Restart.hpp>
 #include <api/components/UnknownCommand.hpp>
+#include <api/types/Message.hpp>
 #include <array>
 #include <chrono>
 #include <cpptrace/cpptrace.hpp>
@@ -60,7 +61,7 @@ struct fmt::formatter<CommandModule::Info::Type> : formatter<std::string_view> {
 };
 
 bool TgBotApiImpl::validateValidArgs(const CommandModule::Info* module,
-                                     MessageExt::Ptr message) {
+                                     tgbot_api::Message* message) {
     if (!module->valid_args.enabled) {
         return true;  // No validation needed.
     }
@@ -68,7 +69,7 @@ bool TgBotApiImpl::validateValidArgs(const CommandModule::Info* module,
 
     // Try to split them.
     const std::vector<std::string>& args =
-        message->get<MessageAttrs::ParsedArgumentsList>();
+        message->get<tgbot_api::MessageAttrs::ParsedArgumentsList>();
 
     if (check_argc) {
         std::set<int> valid_argc =
@@ -96,7 +97,9 @@ bool TgBotApiImpl::validateValidArgs(const CommandModule::Info* module,
                 strings.emplace_back(
                     fmt::format("Usage: {}", module->valid_args.usage));
             }
-            sendReplyMessage(message->message(),
+            // Convert to TgBot::Message for sendReplyMessage
+            auto tgMsg = TgBotTranslator::toTgBot(message);
+            sendReplyMessage(tgMsg,
                              fmt::format("{}", fmt::join(strings, " ")));
             return false;
         }
@@ -105,8 +108,8 @@ bool TgBotApiImpl::validateValidArgs(const CommandModule::Info* module,
     return true;
 }
 
-bool TgBotApiImpl::isMyCommand(const MessageExt::Ptr& message) const {
-    const auto botCommand = message->get<MessageAttrs::BotCommand>();
+bool TgBotApiImpl::isMyCommand(tgbot_api::Message* message) const {
+    const auto botCommand = message->get<tgbot_api::MessageAttrs::BotCommand>();
     const auto target = botCommand.target;
     if (target != getBotUser()->username && !target.empty()) {
         DLOG(INFO) << "Ignore mismatched target: " << std::quoted(target);
@@ -115,17 +118,17 @@ bool TgBotApiImpl::isMyCommand(const MessageExt::Ptr& message) const {
     return true;
 }
 
-bool TgBotApiImpl::authorized(const MessageExt::Ptr& message,
+bool TgBotApiImpl::authorized(tgbot_api::Message* message,
                               const std::string_view commandName,
                               AuthContext::AccessLevel flags) const {
-    const auto authRet = _auth->isAuthorized(message->message(), flags);
+    const auto authRet = _auth->isAuthorized(message, flags);
     if (authRet) {
         return true;
     }
     // Unauthorized user, don't run the command.
-    if (message->has<MessageAttrs::User>()) {
+    if (message->has<tgbot_api::MessageAttrs::User>()) {
         LOG(INFO) << fmt::format("Unauthorized command {} from {}", commandName,
-                                 message->get<MessageAttrs::User>());
+                                 message->get<tgbot_api::MessageAttrs::User>());
         switch (authRet.result.second) {
             case AuthContext::Result::Reason::Unknown:
                 LOG(INFO) << "Reason: Unknown";
@@ -151,49 +154,55 @@ bool TgBotApiImpl::authorized(const MessageExt::Ptr& message,
 
 void TgBotApiImpl::commandHandler(const std::string& command,
                                   const AuthContext::AccessLevel authflags,
-                                  Message::Ptr message) {
+                                  TgBot::Message::Ptr message) {
     // Find the module first.
     const auto* module = (*kModuleLoader)[command];
 
-    // Create MessageExt object.
-    SplitMessageText how = module->info.valid_args.enabled
+    // Convert TgBot::Message to tgbot_api::Message
+    tgbot_api::SplitMessageText how = module->info.valid_args.enabled
                                ? module->info.valid_args.split_type
-                               : SplitMessageText::None;
-    auto ext = std::make_unique<MessageExt>(std::move(message), how);
+                               : tgbot_api::SplitMessageText::None;
+    auto ext = TgBotTranslator::fromTgBot(message, how);
 
-    if (!isMyCommand(ext.get())) {
+    if (!isMyCommand(ext)) {
+        delete ext;  // Clean up
         return;
     }
 
     if (!module->isLoaded()) {
         // Probably unloaded.
         LOG(INFO) << "Command module is unloaded: " << module->info.name;
+        delete ext;  // Clean up
         return;
     }
 
-    if (!authorized(ext.get(), command, authflags)) {
+    if (!authorized(ext, command, authflags)) {
+        delete ext;  // Clean up
         return;
     }
 
     if (!_rateLimiter.check()) {
         LOG(INFO) << fmt::format("Ratelimiting user {}",
-                                 ext->get<MessageAttrs::User>());
+                                 ext->get<tgbot_api::MessageAttrs::User>());
+        delete ext;  // Clean up
         return;
     }
 
     // Partital offloading to common code.
-    if (!validateValidArgs(&module->info, ext.get())) {
+    if (!validateValidArgs(&module->info, ext)) {
+        delete ext;  // Clean up
         return;
     }
 
     [[maybe_unused]] MilliSecondDP dp;
-    module->info.function(this, ext.get(),
-                          _loader->at(ext->get<MessageAttrs::Locale>()),
+    module->info.function(this, ext,
+                          _loader->at(ext->get<tgbot_api::MessageAttrs::Locale>()),
                           _provider);
     if constexpr (buildinfo::isDebugBuild()) {
         DLOG(INFO) << fmt::format("Executing cmd {} took {} ({})", command,
                                   dp.get(), module->info.module_type);
     }
+    delete ext;  // Clean up after command execution
 }
 
 void TgBotApiImpl::addCommandListener(CommandListener* listener) {
