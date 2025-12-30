@@ -1,11 +1,8 @@
 #pragma once
 
 #include <api/typedefs.h>
-#include <tgbot/types/Animation.h>
-#include <tgbot/types/Chat.h>
-#include <tgbot/types/PhotoSize.h>
-#include <tgbot/types/Sticker.h>
-#include <tgbot/types/Video.h>
+#include <api/types/Chat.hpp>
+#include <api/types/Media.hpp>
 
 #include "ReplyParametersExt.hpp"
 #include <string>
@@ -23,33 +20,33 @@ struct MediaIds {
     std::string uniqueid;  //!< The Telegram media unique ID.
 
     /**
-     * @brief Constructs a MediaIds object from a TgBot::Animation object.
+     * @brief Constructs a MediaIds object from an Animation object.
      *
-     * @param animation The TgBot::Animation object from which to extract the
+     * @param animation The Animation object from which to extract the
      * media ID and unique ID.
      */
-    explicit MediaIds(const TgBot::Animation::Ptr& animation)
+    explicit MediaIds(const tgbot_api::Animation::Ptr& animation)
         : id(animation->fileId), uniqueid(animation->fileUniqueId) {}
 
     /**
-     * @brief Constructs a MediaIds object from a TgBot::PhotoSize object.
+     * @brief Constructs a MediaIds object from a PhotoSize object.
      *
-     * @param photo The TgBot::PhotoSize object from which to extract the
+     * @param photo The PhotoSize object from which to extract the
      * media ID and unique ID.
      */
-    explicit MediaIds(const TgBot::PhotoSize::Ptr& photo)
+    explicit MediaIds(const tgbot_api::PhotoSize::Ptr& photo)
         : id(photo->fileId), uniqueid(photo->fileUniqueId) {}
 
     /**
-     * @brief Constructs a MediaIds object from a TgBot::Video object.
+     * @brief Constructs a MediaIds object from a Video object.
      *
-     * @param video The TgBot::Video object from which to extract the
+     * @param video The Video object from which to extract the
      * media ID and unique ID.
      */
-    explicit MediaIds(const TgBot::Video::Ptr& video)
+    explicit MediaIds(const tgbot_api::Video::Ptr& video)
         : id(video->fileId), uniqueid(video->fileUniqueId) {}
 
-    explicit MediaIds(const TgBot::Sticker::Ptr& sticker)
+    explicit MediaIds(const tgbot_api::Sticker::Ptr& sticker)
         : id(sticker->fileId), uniqueid(sticker->fileUniqueId) {}
 
     /**
@@ -88,7 +85,7 @@ struct MediaIds {
 // Helper to remove duplicate overloads for ChatId and MessageTypes
 struct ChatIds {
     ChatIds(ChatId id) : _id(id) {}
-    ChatIds(const TgBot::Chat::Ptr& chat) : _id(chat->id) {}
+    ChatIds(const tgbot_api::Chat::Ptr& chat) : _id(chat->id) {}
     operator ChatId() const { return _id; }
     ChatId _id;
 };
