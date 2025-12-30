@@ -51,8 +51,8 @@ class InlineQueryResult;
 class ChatPermissions;
 class ReactionType;
 
-// Shared pointer typedefs for convenience
+// Pointer typedefs for convenience
 template <typename T>
-using Ptr = std::shared_ptr<T>;
+using Ptr = T*;
 
 }  // namespace tgbot_api

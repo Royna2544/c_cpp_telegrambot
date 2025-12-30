@@ -8,7 +8,7 @@
 // Extension of ReplyParameters for our project
 class ReplyParametersExt : public tgbot_api::ReplyParameters {
    public:
-    using Ptr = std::shared_ptr<ReplyParametersExt>;
+    using Ptr = ReplyParametersExt*;
 
     [[nodiscard]] bool hasThreadId() const {
         return messageThreadId.has_value();

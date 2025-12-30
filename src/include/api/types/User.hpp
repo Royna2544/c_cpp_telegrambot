@@ -9,7 +9,7 @@ namespace tgbot_api {
  */
 class User {
    public:
-    using Ptr = std::shared_ptr<User>;
+    using Ptr = User*;
 
     /**
      * @brief Unique identifier for this user or bot.

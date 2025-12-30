@@ -9,7 +9,7 @@ namespace tgbot_api {
  */
 class Chat {
    public:
-    using Ptr = std::shared_ptr<Chat>;
+    using Ptr = Chat*;
 
     /**
      * @brief Enum of possible types of a chat.

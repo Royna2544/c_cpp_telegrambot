@@ -10,7 +10,7 @@ namespace tgbot_api {
  */
 class Animation {
    public:
-    using Ptr = std::shared_ptr<Animation>;
+    using Ptr = Animation*;
 
     std::string fileId;
     std::string fileUniqueId;
@@ -28,7 +28,7 @@ class Animation {
  */
 class PhotoSize {
    public:
-    using Ptr = std::shared_ptr<PhotoSize>;
+    using Ptr = PhotoSize*;
 
     std::string fileId;
     std::string fileUniqueId;
@@ -42,7 +42,7 @@ class PhotoSize {
  */
 class Sticker {
    public:
-    using Ptr = std::shared_ptr<Sticker>;
+    using Ptr = Sticker*;
 
     enum class Type { Regular, Mask, CustomEmoji };
 
@@ -63,7 +63,7 @@ class Sticker {
  */
 class Video {
    public:
-    using Ptr = std::shared_ptr<Video>;
+    using Ptr = Video*;
 
     std::string fileId;
     std::string fileUniqueId;
@@ -80,7 +80,7 @@ class Video {
  */
 class Document {
    public:
-    using Ptr = std::shared_ptr<Document>;
+    using Ptr = Document*;
 
     std::string fileId;
     std::string fileUniqueId;
@@ -94,7 +94,7 @@ class Document {
  */
 class File {
    public:
-    using Ptr = std::shared_ptr<File>;
+    using Ptr = File*;
 
     std::string fileId;
     std::string fileUniqueId;
@@ -107,7 +107,7 @@ class File {
  */
 class MessageEntity {
    public:
-    using Ptr = std::shared_ptr<MessageEntity>;
+    using Ptr = MessageEntity*;
 
     struct Type {
         static constexpr const char* Mention = "mention";

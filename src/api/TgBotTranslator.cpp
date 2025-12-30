@@ -13,7 +13,7 @@ tgbot_api::User::Ptr fromTgBot(const TgBot::User::Ptr& tgUser) {
         return nullptr;
     }
 
-    auto apiUser = std::make_shared<tgbot_api::User>();
+    auto apiUser = new tgbot_api::User();
     apiUser->id = tgUser->id;
     apiUser->isBot = tgUser->isBot;
     apiUser->firstName = tgUser->firstName;
@@ -49,7 +49,7 @@ tgbot_api::Chat::Ptr fromTgBot(const TgBot::Chat::Ptr& tgChat) {
         return nullptr;
     }
 
-    auto apiChat = std::make_shared<tgbot_api::Chat>();
+    auto apiChat = new tgbot_api::Chat();
     apiChat->id = tgChat->id;
     apiChat->type = fromTgBot(tgChat->type);
     apiChat->title = tgChat->title;
@@ -67,7 +67,7 @@ tgbot_api::MessageEntity::Ptr fromTgBot(
         return nullptr;
     }
 
-    auto apiEntity = std::make_shared<tgbot_api::MessageEntity>();
+    auto apiEntity = new tgbot_api::MessageEntity();
     apiEntity->type = tgEntity->type;
     apiEntity->offset = tgEntity->offset;
     apiEntity->length = tgEntity->length;
@@ -84,7 +84,7 @@ tgbot_api::Animation::Ptr fromTgBot(const TgBot::Animation::Ptr& tgAnimation) {
         return nullptr;
     }
 
-    auto apiAnimation = std::make_shared<tgbot_api::Animation>();
+    auto apiAnimation = new tgbot_api::Animation();
     apiAnimation->fileId = tgAnimation->fileId;
     apiAnimation->fileUniqueId = tgAnimation->fileUniqueId;
     apiAnimation->width = tgAnimation->width;
@@ -102,7 +102,7 @@ tgbot_api::PhotoSize::Ptr fromTgBot(const TgBot::PhotoSize::Ptr& tgPhoto) {
         return nullptr;
     }
 
-    auto apiPhoto = std::make_shared<tgbot_api::PhotoSize>();
+    auto apiPhoto = new tgbot_api::PhotoSize();
     apiPhoto->fileId = tgPhoto->fileId;
     apiPhoto->fileUniqueId = tgPhoto->fileUniqueId;
     apiPhoto->width = tgPhoto->width;
@@ -129,7 +129,7 @@ tgbot_api::Sticker::Ptr fromTgBot(const TgBot::Sticker::Ptr& tgSticker) {
         return nullptr;
     }
 
-    auto apiSticker = std::make_shared<tgbot_api::Sticker>();
+    auto apiSticker = new tgbot_api::Sticker();
     apiSticker->fileId = tgSticker->fileId;
     apiSticker->fileUniqueId = tgSticker->fileUniqueId;
     apiSticker->type = fromTgBot(tgSticker->type);
@@ -149,7 +149,7 @@ tgbot_api::Video::Ptr fromTgBot(const TgBot::Video::Ptr& tgVideo) {
         return nullptr;
     }
 
-    auto apiVideo = std::make_shared<tgbot_api::Video>();
+    auto apiVideo = new tgbot_api::Video();
     apiVideo->fileId = tgVideo->fileId;
     apiVideo->fileUniqueId = tgVideo->fileUniqueId;
     apiVideo->width = tgVideo->width;
@@ -167,7 +167,7 @@ tgbot_api::Document::Ptr fromTgBot(const TgBot::Document::Ptr& tgDocument) {
         return nullptr;
     }
 
-    auto apiDocument = std::make_shared<tgbot_api::Document>();
+    auto apiDocument = new tgbot_api::Document();
     apiDocument->fileId = tgDocument->fileId;
     apiDocument->fileUniqueId = tgDocument->fileUniqueId;
     apiDocument->fileName = tgDocument->fileName;
@@ -182,7 +182,7 @@ tgbot_api::File::Ptr fromTgBot(const TgBot::File::Ptr& tgFile) {
         return nullptr;
     }
 
-    auto apiFile = std::make_shared<tgbot_api::File>();
+    auto apiFile = new tgbot_api::File();
     apiFile->fileId = tgFile->fileId;
     apiFile->fileUniqueId = tgFile->fileUniqueId;
     apiFile->fileSize = tgFile->fileSize;
@@ -197,7 +197,7 @@ tgbot_api::Message::Ptr fromTgBot(const TgBot::Message::Ptr& tgMessage,
         return nullptr;
     }
 
-    auto apiMessage = std::make_shared<tgbot_api::Message>();
+    auto apiMessage = new tgbot_api::Message();
 
     // Basic fields
     apiMessage->messageId = tgMessage->messageId;
@@ -242,7 +242,7 @@ tgbot_api::StickerSet::Ptr fromTgBot(const TgBot::StickerSet::Ptr& tgSet) {
         return nullptr;
     }
 
-    auto apiSet = std::make_shared<tgbot_api::StickerSet>();
+    auto apiSet = new tgbot_api::StickerSet();
     apiSet->name = tgSet->name;
     apiSet->title = tgSet->title;
     apiSet->stickerType = fromTgBot(tgSet->stickerType);
@@ -263,7 +263,7 @@ TgBot::User::Ptr toTgBot(const tgbot_api::User::Ptr& apiUser) {
         return nullptr;
     }
 
-    auto tgUser = std::make_shared<TgBot::User>();
+    auto tgUser = new TgBot::User();
     tgUser->id = apiUser->id;
     tgUser->isBot = apiUser->isBot;
     tgUser->firstName = apiUser->firstName;
@@ -299,7 +299,7 @@ TgBot::Chat::Ptr toTgBot(const tgbot_api::Chat::Ptr& apiChat) {
         return nullptr;
     }
 
-    auto tgChat = std::make_shared<TgBot::Chat>();
+    auto tgChat = new TgBot::Chat();
     tgChat->id = apiChat->id;
     tgChat->type = toTgBot(apiChat->type);
     tgChat->title = apiChat->title;
@@ -316,7 +316,7 @@ TgBot::Message::Ptr toTgBot(const tgbot_api::Message::Ptr& apiMessage) {
         return nullptr;
     }
 
-    auto tgMessage = std::make_shared<TgBot::Message>();
+    auto tgMessage = new TgBot::Message();
     tgMessage->messageId = apiMessage->messageId;
     tgMessage->messageThreadId = apiMessage->messageThreadId;
     tgMessage->from = toTgBot(apiMessage->from);
@@ -334,7 +334,7 @@ TgBot::InputFile::Ptr toTgBot(const tgbot_api::InputFile::Ptr& apiInputFile) {
         return nullptr;
     }
 
-    auto tgInputFile = std::make_shared<TgBot::InputFile>();
+    auto tgInputFile = new TgBot::InputFile();
     tgInputFile->data = apiInputFile->data;
     tgInputFile->mimeType = apiInputFile->mimeType;
     tgInputFile->fileName = apiInputFile->fileName;
@@ -348,7 +348,7 @@ TgBot::InputSticker::Ptr toTgBot(
         return nullptr;
     }
 
-    auto tgInputSticker = std::make_shared<TgBot::InputSticker>();
+    auto tgInputSticker = new TgBot::InputSticker();
     tgInputSticker->sticker = toTgBot(apiInputSticker->sticker);
     tgInputSticker->format = apiInputSticker->format;
     tgInputSticker->emojiList = apiInputSticker->emojiList;
@@ -362,7 +362,7 @@ TgBot::ReplyParameters::Ptr toTgBot(
         return nullptr;
     }
 
-    auto tgReplyParams = std::make_shared<TgBot::ReplyParameters>();
+    auto tgReplyParams = new TgBot::ReplyParameters();
     tgReplyParams->messageId = apiReplyParams->messageId;
     tgReplyParams->allowSendingWithoutReply =
         apiReplyParams->allowSendingWithoutReply;
@@ -386,7 +386,7 @@ TgBot::GenericReply::Ptr toTgBot(
     if (auto replyKb =
             std::dynamic_pointer_cast<tgbot_api::ReplyKeyboardMarkup>(
                 apiReply)) {
-        auto tgReplyKb = std::make_shared<TgBot::ReplyKeyboardMarkup>();
+        auto tgReplyKb = new TgBot::ReplyKeyboardMarkup();
         // Convert keyboard buttons (simplified)
         return tgReplyKb;
     }
@@ -394,7 +394,7 @@ TgBot::GenericReply::Ptr toTgBot(
     if (auto removeKb =
             std::dynamic_pointer_cast<tgbot_api::ReplyKeyboardRemove>(
                 apiReply)) {
-        auto tgRemoveKb = std::make_shared<TgBot::ReplyKeyboardRemove>();
+        auto tgRemoveKb = new TgBot::ReplyKeyboardRemove();
         tgRemoveKb->removeKeyboard = removeKb->removeKeyboard;
         tgRemoveKb->selective = removeKb->selective;
         return tgRemoveKb;
@@ -402,7 +402,7 @@ TgBot::GenericReply::Ptr toTgBot(
 
     if (auto forceReply =
             std::dynamic_pointer_cast<tgbot_api::ForceReply>(apiReply)) {
-        auto tgForceReply = std::make_shared<TgBot::ForceReply>();
+        auto tgForceReply = new TgBot::ForceReply();
         tgForceReply->forceReply = forceReply->forceReply;
         tgForceReply->inputFieldPlaceholder =
             forceReply->inputFieldPlaceholder;
@@ -419,7 +419,7 @@ TgBot::ChatPermissions::Ptr toTgBot(
         return nullptr;
     }
 
-    auto tgPermissions = std::make_shared<TgBot::ChatPermissions>();
+    auto tgPermissions = new TgBot::ChatPermissions();
     tgPermissions->canSendMessages = apiPermissions->canSendMessages;
     tgPermissions->canSendAudios = apiPermissions->canSendAudios;
     tgPermissions->canSendDocuments = apiPermissions->canSendDocuments;
@@ -445,12 +445,12 @@ TgBot::InlineKeyboardMarkup::Ptr toTgBot(
         return nullptr;
     }
 
-    auto tgMarkup = std::make_shared<TgBot::InlineKeyboardMarkup>();
+    auto tgMarkup = new TgBot::InlineKeyboardMarkup();
 
     for (const auto& row : apiMarkup->inlineKeyboard) {
         std::vector<TgBot::InlineKeyboardButton::Ptr> tgRow;
         for (const auto& button : row) {
-            auto tgButton = std::make_shared<TgBot::InlineKeyboardButton>();
+            auto tgButton = new TgBot::InlineKeyboardButton();
             tgButton->text = button->text;
             tgButton->url = button->url;
             tgButton->callbackData = button->callbackData;
@@ -469,7 +469,7 @@ TgBot::ReactionType::Ptr toTgBot(
     if (!apiReaction) {
         return nullptr;
     }
-    return std::make_shared<TgBot::ReactionType>();
+    return new TgBot::ReactionType();
 }
 
 std::vector<TgBot::ReactionType::Ptr> toTgBot(

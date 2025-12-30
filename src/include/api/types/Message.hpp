@@ -150,7 +150,7 @@ struct AttributeType<MessageAttrs::Document> {
  */
 class Message {
    public:
-    using Ptr = std::shared_ptr<Message>;
+    using Ptr = Message*;
     using AttrList = std::initializer_list<MessageAttrs>;
     template <typename T>
     using MakeCRef = std::add_lvalue_reference_t<std::add_const_t<T>>;
@@ -158,26 +158,26 @@ class Message {
     // Standard Telegram message fields
     MessageId messageId{};
     std::optional<MessageThreadId> messageThreadId;
-    User::Ptr from;
-    Chat::Ptr senderChat;
+    User::Ptr from{nullptr};
+    Chat::Ptr senderChat{nullptr};
     ChatId chat_id{};  // Denormalized for convenience
     std::int32_t date{};
-    Chat::Ptr chat;
+    Chat::Ptr chat{nullptr};
     std::optional<std::string> text;
     std::vector<MessageEntity::Ptr> entities;
     std::vector<PhotoSize::Ptr> photo;
-    Animation::Ptr animation;
-    Document::Ptr document;
-    Sticker::Ptr sticker;
-    Video::Ptr video;
-    Message::Ptr replyToMessage;
+    Animation::Ptr animation{nullptr};
+    Document::Ptr document{nullptr};
+    Sticker::Ptr sticker{nullptr};
+    Video::Ptr video{nullptr};
+    Message::Ptr replyToMessage{nullptr};
     std::optional<bool> isTopicMessage;
 
     // Extended parsing fields
     std::optional<internal::message::BotCommand> command;
     std::string extraArgs;
     std::vector<std::string> arguments;
-    std::shared_ptr<Message> parsedReplyMessage;
+    Message::Ptr parsedReplyMessage{nullptr};
 
     /**
      * @brief Constructs a Message from basic fields

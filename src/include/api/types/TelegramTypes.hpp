@@ -33,7 +33,7 @@ enum class StickerFormat {
  */
 class InputFile {
    public:
-    using Ptr = std::shared_ptr<InputFile>;
+    using Ptr = InputFile*;
 
     std::string data;
     std::string mimeType;
@@ -51,7 +51,7 @@ class InputFile {
  */
 class InputSticker {
    public:
-    using Ptr = std::shared_ptr<InputSticker>;
+    using Ptr = InputSticker*;
 
     InputFile::Ptr sticker;
     std::string format;
@@ -63,7 +63,7 @@ class InputSticker {
  */
 class StickerSet {
    public:
-    using Ptr = std::shared_ptr<StickerSet>;
+    using Ptr = StickerSet*;
 
     std::string name;
     std::string title;
@@ -76,7 +76,7 @@ class StickerSet {
  */
 class GenericReply {
    public:
-    using Ptr = std::shared_ptr<GenericReply>;
+    using Ptr = GenericReply*;
     virtual ~GenericReply() = default;
 };
 
@@ -85,7 +85,7 @@ class GenericReply {
  */
 class InlineKeyboardButton {
    public:
-    using Ptr = std::shared_ptr<InlineKeyboardButton>;
+    using Ptr = InlineKeyboardButton*;
 
     std::string text;
     std::optional<std::string> url;
@@ -98,7 +98,7 @@ class InlineKeyboardButton {
  */
 class InlineKeyboardMarkup : public GenericReply {
    public:
-    using Ptr = std::shared_ptr<InlineKeyboardMarkup>;
+    using Ptr = InlineKeyboardMarkup*;
 
     std::vector<std::vector<InlineKeyboardButton::Ptr>> inlineKeyboard;
 };
@@ -108,7 +108,7 @@ class InlineKeyboardMarkup : public GenericReply {
  */
 class KeyboardButton {
    public:
-    using Ptr = std::shared_ptr<KeyboardButton>;
+    using Ptr = KeyboardButton*;
 
     std::string text;
     std::optional<bool> requestContact;
@@ -120,7 +120,7 @@ class KeyboardButton {
  */
 class ReplyKeyboardMarkup : public GenericReply {
    public:
-    using Ptr = std::shared_ptr<ReplyKeyboardMarkup>;
+    using Ptr = ReplyKeyboardMarkup*;
 
     std::vector<std::vector<KeyboardButton::Ptr>> keyboard;
     std::optional<bool> resizeKeyboard;
@@ -134,7 +134,7 @@ class ReplyKeyboardMarkup : public GenericReply {
  */
 class ReplyKeyboardRemove : public GenericReply {
    public:
-    using Ptr = std::shared_ptr<ReplyKeyboardRemove>;
+    using Ptr = ReplyKeyboardRemove*;
 
     bool removeKeyboard{true};
     std::optional<bool> selective;
@@ -146,7 +146,7 @@ class ReplyKeyboardRemove : public GenericReply {
  */
 class ForceReply : public GenericReply {
    public:
-    using Ptr = std::shared_ptr<ForceReply>;
+    using Ptr = ForceReply*;
 
     bool forceReply{true};
     std::optional<std::string> inputFieldPlaceholder;
@@ -158,7 +158,7 @@ class ForceReply : public GenericReply {
  */
 class ReplyParameters {
    public:
-    using Ptr = std::shared_ptr<ReplyParameters>;
+    using Ptr = ReplyParameters*;
 
     MessageId messageId{};
     std::optional<MessageThreadId> messageThreadId;
@@ -170,7 +170,7 @@ class ReplyParameters {
  */
 class ChatPermissions {
    public:
-    using Ptr = std::shared_ptr<ChatPermissions>;
+    using Ptr = ChatPermissions*;
 
     std::optional<bool> canSendMessages;
     std::optional<bool> canSendAudios;
@@ -193,7 +193,7 @@ class ChatPermissions {
  */
 class ReactionType {
    public:
-    using Ptr = std::shared_ptr<ReactionType>;
+    using Ptr = ReactionType*;
     virtual ~ReactionType() = default;
 };
 
@@ -202,7 +202,7 @@ class ReactionType {
  */
 class InlineQueryResult {
    public:
-    using Ptr = std::shared_ptr<InlineQueryResult>;
+    using Ptr = InlineQueryResult*;
     virtual ~InlineQueryResult() = default;
 
     std::string type;
