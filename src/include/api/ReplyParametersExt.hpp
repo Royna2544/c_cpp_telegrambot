@@ -1,16 +1,14 @@
 #pragma once
 
-#include <tgbot/types/ReplyParameters.h>
-
 #include <memory>
 
 #include "api/typedefs.h"
+#include "api/types/TelegramTypes.hpp"
 
-// Extension of ReplyParameters
-struct ReplyParametersExt : public TgBot::ReplyParameters {
+// Extension of ReplyParameters for our project
+class ReplyParametersExt : public tgbot_api::ReplyParameters {
+   public:
     using Ptr = std::shared_ptr<ReplyParametersExt>;
-
-    std::optional<MessageThreadId> messageThreadId;
 
     [[nodiscard]] bool hasThreadId() const {
         return messageThreadId.has_value();

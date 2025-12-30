@@ -10,6 +10,25 @@
 namespace tgbot_api {
 
 /**
+ * @brief Parse modes for message formatting
+ */
+enum class ParseMode {
+    None,
+    Markdown,
+    MarkdownV2,
+    HTML
+};
+
+/**
+ * @brief Sticker formats
+ */
+enum class StickerFormat {
+    Static,
+    Animated,
+    Video
+};
+
+/**
  * @brief This object represents the contents of a file to be uploaded.
  */
 class InputFile {
