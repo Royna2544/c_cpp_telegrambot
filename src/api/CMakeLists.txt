@@ -25,6 +25,8 @@ tgbot_library(
     MessageExt.cpp
     RateLimit.cpp
     StringResLoader.cpp
+    TgBotTranslator.cpp
+    types/Message.cpp
     components/Async.cpp
     components/ChatJoinRequest.cpp
     components/ModuleManagement.cpp
