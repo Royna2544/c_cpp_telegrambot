@@ -83,6 +83,15 @@ struct SharedMalloc {
     bool operator!=(std::nullptr_t value) { return parent.get() != value; }
     void resize(size_t newSize) const noexcept { parent->realloc(newSize); }
 
+    template <typename T>
+    T* getAs() const {
+        if (sizeof(T) > size()) {
+            throw std::out_of_range(
+                "Requested type size exceeds allocated memory size");
+        }
+        return reinterpret_cast<T*>(get());
+    }
+
     // trivial accessors
     [[nodiscard]] data_type* get() const noexcept { return parent->data(); }
     [[nodiscard]] long use_count() const noexcept { return parent.use_count(); }
@@ -255,3 +264,11 @@ struct SharedMalloc {
    private:
     std::shared_ptr<Parent> parent;
 };
+
+template <typename T, typename... Args>
+  requires std::is_class_v<T>
+SharedMalloc MakeSharedMallocFrom(Args&&... args) {
+    auto sm = SharedMalloc(sizeof(T));
+    new (sm.get()) T(std::forward<Args>(args)...);
+    return sm;
+}
