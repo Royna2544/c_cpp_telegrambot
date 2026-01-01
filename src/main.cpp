@@ -419,6 +419,13 @@ Git commitmsg: {}
     }
 }
 
+constexpr int TGBOT_EXITCODE_OK = 0;
+constexpr int TGBOT_EXITCODE_GENERIC = 1;
+constexpr int TGBOT_EXITCODE_CONFIG = 2;
+constexpr int TGBOT_EXITCODE_NETWORK = 3;
+constexpr int TGBOT_EXITCODE_TELEGRAM_API = 4;
+constexpr int TGBOT_EXITCODE_OS = 5;
+
 int app_main(int argc, char** argv) {
     MilliSecondDP startupDp;
 
@@ -431,7 +438,7 @@ int app_main(int argc, char** argv) {
         struct stat statbuf{};
         if (stat(".", &statbuf) < 0) {
             PLOG(ERROR) << "Couldn't stat cwd";
-            return EXIT_FAILURE;
+            return TGBOT_EXITCODE_OS;
         }
         LOG(INFO) << "Current directory: Inode=" << statbuf.st_ino
                   << " NLink=" << statbuf.st_nlink;
@@ -439,7 +446,7 @@ int app_main(int argc, char** argv) {
             LOG(INFO) << "This directory is deleted.";
         }
 #endif
-        return EXIT_FAILURE;
+        return TGBOT_EXITCODE_OS;
     }
 
     // Install signal handlers
@@ -458,6 +465,7 @@ int app_main(int argc, char** argv) {
         std::filesystem::temp_directory_path(ec) / kDefaultLogFile;
 
     if (std::filesystem::exists(defLogFile, ec)) {
+        LOG(INFO) << "Removing old default log file: " << defLogFile;
         std::filesystem::remove(defLogFile, ec);
     }
 
@@ -474,13 +482,13 @@ int app_main(int argc, char** argv) {
     // Print help and return if help option is set
     if (configMgr->get(ConfigManager::Configs::HELP)) {
         ConfigManager::serializeHelpToOStream(std::cout);
-        return EXIT_SUCCESS;
+        return TGBOT_EXITCODE_OK;
     }
 
     // Pre-obtain token, so we won't have to catch exceptions below
     if (!configMgr->get(ConfigManager::Configs::TOKEN)) {
         LOG(ERROR) << "TOKEN is not set, but is required";
-        return EXIT_FAILURE;
+        return TGBOT_EXITCODE_CONFIG;
     }
 
     auto api = injector.get<TgBotApi*>();
@@ -491,15 +499,26 @@ int app_main(int argc, char** argv) {
         if (ex.errorCode == TgBot::TgException::ErrorCode::Unauthorized) {
             LOG(ERROR)
                 << "API call #getMe returns Unauthorized(401). Exiting...";
-            return EXIT_FAILURE;
+            return TGBOT_EXITCODE_TELEGRAM_API;
         }
     } catch (const TgBot::NetworkException& e) {
         LOG(ERROR) << "Network error: " << e.what();
-        return EXIT_FAILURE;
+        return TGBOT_EXITCODE_NETWORK;
+    }
+
+    auto database = injector.get<DatabaseBase*>();
+
+    // Perform init_work after database but before threadmanager.
+    try {
+        init_work(api, database);
+    } catch (const TgBot::NetworkException& e) {
+        LOG(ERROR) << "Network error: " << e.what();
+        return TGBOT_EXITCODE_NETWORK;
+    } catch (const TgBot::TgException& e) {
+        // pass
     }
 
     auto threadManager = injector.get<ThreadManager*>();
-    auto database = injector.get<DatabaseBase*>();
 
     // Not directly used components
     injector.get<Unused<NetworkLogSink>*>();
@@ -540,17 +559,8 @@ int app_main(int argc, char** argv) {
     LOG(INFO) << "Subsystems initialized, bot started: " << argv[0];
     LOG(INFO) << fmt::format("Starting took {}", startupDp.get());
 
-    try {
-        init_work(api, database);
-    } catch (const TgBot::NetworkException& e) {
-        LOG(ERROR) << "Network error: " << e.what();
-        return EXIT_FAILURE;
-    } catch (const TgBot::TgException& e) {
-        // pass
-    }
-
     CommandLine cmdline{argc, argv};
-    int exitCode = EXIT_SUCCESS;
+    int exitCode = TGBOT_EXITCODE_OK;
     Env()["TGBOT_INSTALL_ROOT"] = 
         CommandLine{argc, argv}.getPath(FS::PathType::INSTALL_ROOT).string();
 
@@ -559,11 +569,11 @@ int app_main(int argc, char** argv) {
             api->startPoll();
         } catch (const TgBot::NetworkException& e) {
             LOG(ERROR) << "Network error: " << e.what();
-            exitCode = EXIT_FAILURE;
+            exitCode = TGBOT_EXITCODE_NETWORK;
             break;
         } catch (const std::exception& e) {
             LOG(ERROR) << "Uncaught Exception: " << e.what();
-            exitCode = EXIT_FAILURE;
+            exitCode = TGBOT_EXITCODE_GENERIC;
             break;
         }
     }
