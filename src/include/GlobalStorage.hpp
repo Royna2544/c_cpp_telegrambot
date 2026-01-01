@@ -20,7 +20,12 @@ class GlobalStorage {
 
     // Remove a storage object by key.
     void removeStorage(const std::string& key) { storage_map_.erase(key); }
-
+    
+    // Check if a storage object exists by key.
+    bool hasStorage(const std::string& key) const {
+        return storage_map_.find(key) != storage_map_.end();
+    }
+    
     // Clear all storage objects.
     void clearAll() { storage_map_.clear(); }
 
