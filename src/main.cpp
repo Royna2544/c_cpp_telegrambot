@@ -419,12 +419,13 @@ Git commitmsg: {}
     }
 }
 
+// Constants for exit codes (similar to sysexits.h)
 constexpr int TGBOT_EXITCODE_OK = 0;
 constexpr int TGBOT_EXITCODE_GENERIC = 1;
-constexpr int TGBOT_EXITCODE_CONFIG = 2;
-constexpr int TGBOT_EXITCODE_NETWORK = 3;
-constexpr int TGBOT_EXITCODE_TELEGRAM_API = 4;
-constexpr int TGBOT_EXITCODE_OS = 5;
+constexpr int TGBOT_EXITCODE_CONFIG = 78;        // EX_CONFIG
+constexpr int TGBOT_EXITCODE_NETWORK = 75;       // EX_TEMPFAIL
+constexpr int TGBOT_EXITCODE_TELEGRAM_API = 76;  // EX_PROTOCOL
+constexpr int TGBOT_EXITCODE_OS = 71;            // EX_OSERR
 
 int app_main(int argc, char** argv) {
     MilliSecondDP startupDp;
