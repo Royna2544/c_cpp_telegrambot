@@ -16,7 +16,6 @@ jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 60
     permissions:
       # Required for all workflows
       security-events: write
