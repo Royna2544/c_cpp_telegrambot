@@ -296,7 +296,7 @@ std::optional<LLMCore::Model::Response> LLMCore::query(
     // The marker that splits Thought from Answer
     // Note: We search for "final<|message|>" because that's the specific tag
     // this architecture uses to switch modes.
-    constexpr std::string_view split_marker = "final<|message|>";
+    constexpr std::string_view split_marker = "<|end|><|start|>assistant<|channel|>final<|message|>";
 
     auto pos = response_text.find(split_marker);
 
