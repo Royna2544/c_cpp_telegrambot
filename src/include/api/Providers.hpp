@@ -9,6 +9,7 @@
 #include "utils/CommandLine.hpp"
 #include "utils/ConfigManager.hpp"
 #include "utils/ResourceManager.hpp"
+#include "GlobalStorage.hpp"
 
 // Providers to supply DI
 class Providers {
@@ -29,11 +30,12 @@ class Providers {
     Installable<ConfigManager> config{};
     Installable<ThreadManager> threads{};
     Installable<AuthContext> auth{};
+    Installable<GlobalStorage> globalStorage{};
 
     APPLE_INJECT(Providers(RandomBase *random, ResourceProvider *resource,
                            DatabaseBase *database, CommandLine *cmd,
                            ConfigManager *configManager, ThreadManager *thread,
-                           AuthContext *auth)) {
+                           AuthContext *auth, GlobalStorage *globalStorage)) {
         this->random.instance = random;
         this->resource.instance = resource;
         this->database.instance = database;
@@ -41,5 +43,6 @@ class Providers {
         this->config.instance = configManager;
         this->threads.instance = thread;
         this->auth.instance = auth;
+        this->globalStorage.instance = globalStorage;
     }
 };
