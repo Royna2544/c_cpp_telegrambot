@@ -551,8 +551,8 @@ int app_main(int argc, char** argv) {
 
     CommandLine cmdline{argc, argv};
     int exitCode = EXIT_SUCCESS;
-    Env()["TGBOT_INSTALL_ROOT"] =
-        cmdline.getPath(FS::PathType::INSTALL_ROOT).string();
+    Env()["TGBOT_INSTALL_ROOT"] = 
+        CommandLine{argc, argv}.getPath(FS::PathType::INSTALL_ROOT).string();
 
     while (!SignalHandler::isSignaled()) {
         try {
