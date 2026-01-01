@@ -550,6 +550,7 @@ int app_main(int argc, char** argv) {
     }
 
     CommandLine cmdline{argc, argv};
+    int exitCode = EXIT_SUCCESS;
     Env()["TGBOT_INSTALL_ROOT"] =
         cmdline.getPath(FS::PathType::INSTALL_ROOT).string();
 
@@ -558,12 +559,11 @@ int app_main(int argc, char** argv) {
             api->startPoll();
         } catch (const TgBot::NetworkException& e) {
             LOG(ERROR) << "Network error: " << e.what();
-            if (!SignalHandler::isSignaled()) {
-                LOG(INFO) << "Sleeping for a minute...";
-                std::this_thread::sleep_for(std::chrono::minutes(1));
-            }
+            exitCode = EXIT_FAILURE;
+            break;
         } catch (const std::exception& e) {
             LOG(ERROR) << "Uncaught Exception: " << e.what();
+            exitCode = EXIT_FAILURE;
             break;
         }
     }
@@ -571,5 +571,5 @@ int app_main(int argc, char** argv) {
     LOG(INFO) << fmt::format(
         "{} : exiting now...",
         std::filesystem::path(argv[0]).filename().string());
-    return EXIT_SUCCESS;
+    return exitCode;
 }
