@@ -48,12 +48,26 @@ bool LLMCore::Model::load(const std::filesystem::path& modelPath,
         impl_->model = nullptr;
         return false;
     }
-
-    // Initialize Sampler (Greedy)
     auto sparams = llama_sampler_chain_default_params();
     impl_->sampler = llama_sampler_chain_init(sparams);
-    llama_sampler_chain_add(impl_->sampler, llama_sampler_init_greedy());
 
+    // 1. Add Repetition Penalties (Prevents "We... We... We...")
+    //    penalty_last_n: 64 (look back 64 tokens)
+    //    penalty_repeat: 1.1 (punish repeats)
+    //    penalty_freq:   0.0
+    //    penalty_present: 0.0
+    llama_sampler_chain_add(impl_->sampler,
+                            llama_sampler_init_penalties(64, 1.1f, 0.0f, 0.0f));
+
+    // 2. Add Top-K (Limits vocabulary to top K probable tokens)
+    llama_sampler_chain_add(impl_->sampler, llama_sampler_init_top_k(40));
+
+    // 3. Add Top-P (Nucleus sampling)
+    llama_sampler_chain_add(impl_->sampler, llama_sampler_init_top_p(0.95f, 1));
+
+    // 4. Add Temperature (Controls creativity/randomness)
+    //    seed: -1 (random) or specific number for reproducibility
+    llama_sampler_chain_add(impl_->sampler, llama_sampler_init_dist(1234));
     // Prepare Batch
     impl_->batch = llama_batch_init(n_batch, 0, 1);
 
@@ -152,6 +166,9 @@ LLMCore::~LLMCore() {
 constexpr const char* SYSTEM_PROMPT =
     R"(You are Miku, a helpful and friendly AI assistant deployed on Telegram.
 
+You do not need to analyze safety policies for harmless questions.
+Always answer directly and helpfully. Limit your responses to be minimal.
+
 ### Core Instructions
 1. **Mandatory Greeting**: You must start *every* response with the exact phrase: "Hello, I am your Miku!".
 2. **Language**: Respond strictly in English.
@@ -170,7 +187,6 @@ constexpr const char* SYSTEM_PROMPT =
 - Be helpful, polite, and efficient.)";
 std::optional<LLMCore::Model::Response> LLMCore::query(
     const Model* model, const std::string_view prompt, int max_tokens) {
-
     auto start_time = std::chrono::steady_clock::now();
     LOG(INFO) << "LLMCore::query called with prompt: " << prompt;
 
@@ -180,7 +196,6 @@ std::optional<LLMCore::Model::Response> LLMCore::query(
     const auto n_ctx = llama_n_ctx(model->impl_->ctx);
     if (model->impl_->n_past + max_tokens > n_ctx) {
         LOG(WARNING) << "Context overflow likely. Resetting KV cache.";
-        // llama_kv_cache_clear(model->impl_->ctx);     // <-- correct way
         model->impl_->n_past = 0;
     }
 
@@ -189,12 +204,14 @@ std::optional<LLMCore::Model::Response> LLMCore::query(
     // -----------------------
     std::string system = SYSTEM_PROMPT;
 
-    std::string formatted_prompt = 
-        "<s>[INST] " + 
-        system + 
-        "\n" + 
-        std::string(prompt) + 
-        " [/INST]";
+    // The Harmony format structure:
+    // <|start|>system<|message|> ... <|end|>
+    // <|start|>user<|message|> ... <|end|>
+    // <|start|>assistant<|channel|>
+    std::string formatted_prompt = "<|start|>system<|message|>" + system +
+                                   "<|end|>" + "<|start|>user<|message|>" +
+                                   std::string(prompt) + "<|end|>" +
+                                   "<|start|>assistant<|channel|>";
 
     LOG(INFO) << "Formatted prompt: " << std::quoted(formatted_prompt);
 
@@ -216,13 +233,9 @@ std::optional<LLMCore::Model::Response> LLMCore::query(
     // -----------------------
     llama_batch_clear(model->impl_->batch);
     for (size_t i = 0; i < tokens.size(); i++) {
-        llama_batch_add(
-            model->impl_->batch,
-            tokens[i],
-            model->impl_->n_past + i,
-            {model->impl_->seq_id},
-            (i == tokens.size() - 1)
-        );
+        llama_batch_add(model->impl_->batch, tokens[i],
+                        model->impl_->n_past + i, {model->impl_->seq_id},
+                        (i == tokens.size() - 1));
     }
 
     // Decode
@@ -239,12 +252,10 @@ std::optional<LLMCore::Model::Response> LLMCore::query(
     std::stringstream response_stream;
 
     for (int i = 0; i < max_tokens; i++) {
+        llama_token tok =
+            llama_sampler_sample(model->impl_->sampler, model->impl_->ctx, -1);
 
-        llama_token tok = llama_sampler_sample(
-            model->impl_->sampler,
-            model->impl_->ctx,
-            -1
-        );
+        llama_sampler_accept(model->impl_->sampler, tok);
 
         const llama_vocab* vocab = llama_model_get_vocab(model->impl_->model);
 
@@ -255,7 +266,8 @@ std::optional<LLMCore::Model::Response> LLMCore::query(
 
         // decode piece
         std::array<char, 4096> buf{};
-        int n = llama_token_to_piece(vocab, tok, buf.data(), buf.size()-1, 0, true);
+        int n = llama_token_to_piece(vocab, tok, buf.data(), buf.size() - 1, 0,
+                                     true);
 
         if (n > 0) {
             response_stream.write(buf.data(), n);
@@ -276,21 +288,43 @@ std::optional<LLMCore::Model::Response> LLMCore::query(
 
     std::string response_text = response_stream.str();
     LOG(INFO) << "Raw response: " << response_text;
-
     // -----------------------
-    // 6. Extract <|start|>assistant<|channel|>final<|message|>...
-    // .
+    // 6. Extract Harmony Format (Reasoning vs Final)
     // -----------------------
     std::string thought, answer;
 
-    constexpr std::string_view thought_tag_start = "<|start|>assistant<|channel|>final<|message|>";
-    auto pos = response_text.rfind(thought_tag_start);
+    // The marker that splits Thought from Answer
+    // Note: We search for "final<|message|>" because that's the specific tag
+    // this architecture uses to switch modes.
+    constexpr std::string_view split_marker = "final<|message|>";
+
+    auto pos = response_text.find(split_marker);
+
     if (pos != std::string::npos) {
-        answer = response_text.substr(pos + thought_tag_start.length());
+        // FOUND: The model finished thinking and gave an answer.
+
+        // 1. Extract Thought (everything before the marker)
+        thought = response_text.substr(0, pos);
+
+        // 2. Extract Answer (everything after the marker)
+        answer = response_text.substr(pos + split_marker.length());
+
+        // Optional: Clean up the "analysis<|message|>" tag from the start of
+        // thought
+        std::string_view analysis_start = "analysis<|message|>";
+        if (thought.find(analysis_start) == 0) {
+            thought.erase(0, analysis_start.length());
+        }
+
     } else {
-        // Fallback: treat entire response as answer
-        thought = "";
-        answer = response_text;
+        // NOT FOUND: The model stopped early (hit max_tokens) or failed.
+
+        // In this case, we assume everything generated so far is just
+        // "Thought".
+        thought = response_text;
+        answer =
+            "[Error: Model hit max_tokens limit while thinking. Increase "
+            "max_tokens.]";
     }
 
     // -----------------------
@@ -299,9 +333,9 @@ std::optional<LLMCore::Model::Response> LLMCore::query(
     auto end_time = std::chrono::steady_clock::now();
 
     Model::Response r;
-    r.thought   = std::move(thought);
-    r.answer    = std::move(answer);
-    r.duration  = end_time - start_time;
+    r.thought = std::move(thought);
+    r.answer = std::move(answer);
+    r.duration = end_time - start_time;
 
     return r;
 }

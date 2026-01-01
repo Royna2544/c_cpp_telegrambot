@@ -18,7 +18,7 @@ DECLARE_COMMAND_HANDLER(ask) {
                                       "Processing your query, please wait...");
     api->editMessage(sent, "Initializing LLM core, please wait...");
     if (!model.load("/mnt/c/Users/royna/Documents/"
-                    "OpenAI-20B-NEOPlus-Uncensored-IQ4_NL.gguf")) {
+                    "gpt-oss-20b-Q5_K_M.gguf")) {
         LOG(ERROR) << "Failed to initialize LLM core.";
         api->editMessage(sent, "Error: Unable to initialize LLM core.");
         return;
