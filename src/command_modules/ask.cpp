@@ -26,6 +26,21 @@ DECLARE_COMMAND_HANDLER(ask) {
     if (provider->globalStorage->hasStorage(kLLMStorageKey)) {
         instance = provider->globalStorage->getStorage(kLLMStorageKey)
                        .getAs<LLMCoreInstance>();
+        
+        if (!message->has<MessageAttrs::ExtraText>()) {
+            auto info = instance->model.info();
+            api->editMessage(
+                sent,
+                fmt::format(R"(Model Information:
+Name: {}
+Architecture: {}
+Description: {}
+Parameter Count: {}
+File Size: {} bytes)",
+                            info.name, info.architecture, info.description,
+                            info.parameterCount, info.fileSizeBytes));
+            return;
+        }
     } else {
         provider->globalStorage->getStorage(kLLMStorageKey) =
             MakeSharedMallocFrom<LLMCoreInstance>();
@@ -41,6 +56,13 @@ DECLARE_COMMAND_HANDLER(ask) {
             provider->globalStorage->removeStorage(kLLMStorageKey);
             return;
         }
+    }
+
+    if (!message->has<MessageAttrs::ExtraText>()) {
+        api->editMessage(
+            sent,
+            "Please provide a query after the command to ask the LLM.");
+        return;
     }
 
     std::string query = message->get<MessageAttrs::ExtraText>();
