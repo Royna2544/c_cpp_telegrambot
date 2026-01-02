@@ -9,7 +9,7 @@
 #include <string_view>
 #include <type_traits>
 
-#include "api/MessageExt.hpp"
+#include "api/types/Message.hpp"
 #include "api/Providers.hpp"
 #include "api/TgBotApi.hpp"
 
@@ -28,12 +28,12 @@ class CommandModule;
 // Command handler helper macros
 #define COMMAND_HANDLER_NAME(cmd) handle_command_##cmd
 #define DECLARE_COMMAND_HANDLER(cmd)                                         \
-    void COMMAND_HANDLER_NAME(cmd)(TgBotApi::Ptr api, MessageExt * message,  \
+    void COMMAND_HANDLER_NAME(cmd)(TgBotApi::Ptr api, tgbot_api::Message * message,  \
                                    const StringResLoader::PerLocaleMap* res, \
                                    const Providers* provider)
 
 struct DynModule {
-    using command_callback_t = void (*)(TgBotApi::Ptr api, MessageExt*,
+    using command_callback_t = void (*)(TgBotApi::Ptr api, tgbot_api::Message*,
                                         const StringResLoader::PerLocaleMap*,
                                         const Providers* provider);
 
@@ -78,7 +78,7 @@ struct DynModule {
         // Int mask to the valid argument counts.
         argcount_mask_t counts;
         // Split type to obtain arguments.
-        using Split = ::SplitMessageText;
+        using Split = tgbot_api::SplitMessageText;
         Split split_type;
         // Usage information for the command.
         // Optional
@@ -122,7 +122,7 @@ class CommandModule {
             // Int mask to the valid argument counts.
             DynModule::argcount_mask_t counts;
             // Split type to obtain arguments.
-            ::SplitMessageText split_type;
+            tgbot_api::SplitMessageText split_type;
             // Usage information for the command.
             std::string usage;
         } valid_args;

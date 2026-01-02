@@ -1,15 +1,16 @@
 #pragma once
 
 #include <api/typedefs.h>
-#include <tgbot/types/Message.h>
+#include <api/types/Message.hpp>
+#include <api/types/User.hpp>
 
 #include <chrono>
 #include <database/DatabaseBase.hpp>
 
 #include "trivial_helpers/fruit_inject.hpp"
 
-using TgBot::Message;
-using TgBot::User;
+using tgbot_api::Message;
+using tgbot_api::User;
 
 class AuthContext {
    public:

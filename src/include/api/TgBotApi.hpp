@@ -3,11 +3,6 @@
 #include <tgbot/Api.h>
 #include <tgbot/EventBroadcaster.h>
 #include <tgbot/types/InlineQueryResult.h>
-#include <tgbot/types/InputFile.h>
-#include <tgbot/types/InputSticker.h>
-#include <tgbot/types/Message.h>
-#include <tgbot/types/Sticker.h>
-#include <tgbot/types/StickerSet.h>
 
 #include <chrono>
 #include <cstdint>
@@ -21,18 +16,24 @@
 
 #include "ReplyParametersExt.hpp"
 #include "api/typedefs.h"
+#include "api/types/Chat.hpp"
+#include "api/types/Media.hpp"
+#include "api/types/Message.hpp"
+#include "api/types/TelegramTypes.hpp"
+#include "api/types/User.hpp"
 #include "Utils.hpp"
 
-using TgBot::Chat;
-using TgBot::File;
-using TgBot::GenericReply;
-using TgBot::InputFile;
-using TgBot::InputSticker;
-using TgBot::Message;
-using TgBot::ReactionType;
-using TgBot::Sticker;
-using TgBot::StickerSet;
-using TgBot::User;
+// Use project types
+using tgbot_api::Chat;
+using tgbot_api::File;
+using tgbot_api::GenericReply;
+using tgbot_api::InputFile;
+using tgbot_api::InputSticker;
+using tgbot_api::Message;
+using tgbot_api::ReactionType;
+using tgbot_api::Sticker;
+using tgbot_api::StickerSet;
+using tgbot_api::User;
 
 // Base interface for operations involving TgBot...
 class TgBotApi {
@@ -170,7 +171,7 @@ class TgBotApi {
      */
     virtual Message::Ptr editMessage_impl(
         const Message::Ptr& message, const std::string_view newText,
-        const TgBot::InlineKeyboardMarkup::Ptr& markup,
+        const tgbot_api::InlineKeyboardMarkup::Ptr& markup,
         const TgBot::Api::ParseMode parseMode) const = 0;
 
     /**
@@ -484,7 +485,7 @@ class TgBotApi {
 
    public:
     // Convience wrappers over real API
-    using ParseMode = TgBot::Api::ParseMode;
+    using ParseMode = tgbot_api::ParseMode;
 
     template <ParseMode mode>
     static consteval std::string_view parseModeToStr() {
@@ -503,9 +504,9 @@ class TgBotApi {
     /**
      * @brief Sends a reply message to the specified message.
      *
-     * This function uses the TgBot::Api::sendMessage method to send a reply
-     * message to the given `replyToMessage`. The function creates a
-     * `ReplyParameters` object to specify the reply message's ID and chat ID.
+     * This function sends a reply message to the given `replyToMessage`.
+     * The function creates a `ReplyParameters` object to specify the reply
+     * message's ID and chat ID.
      *
      * @param replyToMessage The message to which the reply will be sent.
      * @param message The text content of the reply message.
@@ -622,7 +623,7 @@ class TgBotApi {
     template <ParseMode mode = ParseMode::None>
     Message::Ptr editMessage(
         const Message::Ptr& message, const std::string_view newText,
-        const TgBot::InlineKeyboardMarkup::Ptr& markup = nullptr) const {
+        const tgbot_api::InlineKeyboardMarkup::Ptr& markup = nullptr) const {
         return editMessage_impl(message, newText, markup, mode);
     }
 
