@@ -569,7 +569,6 @@ int app_main(int argc, char** argv) {
     int retryCount = 0;
     constexpr int kMaxRetries = 3;
     constexpr int kBaseBackoffSeconds = 5;
-    constexpr int kMaxBackoffSeconds = 30;
 
     while (!SignalHandler::isSignaled()) {
         try {
@@ -584,23 +583,20 @@ int app_main(int argc, char** argv) {
                 exitCode = TGBOT_EXITCODE_NETWORK;
                 break;
             }
-            // Linear backoff with cap (5s, 10s, 15s intervals)
+            // Linear backoff (5s, 10s, 15s intervals)
             // This provides a gradual increase suitable for transient network issues
-            auto backoffSeconds = std::min(kMaxBackoffSeconds, 
-                                          kBaseBackoffSeconds * retryCount);
+            auto backoffSeconds = kBaseBackoffSeconds * retryCount;
             LOG(WARNING) << fmt::format(
                 "Retrying in {}s (attempt {}/{})", 
                 backoffSeconds, retryCount, kMaxRetries);
             
             // Sleep with periodic shutdown signal checks for responsive exit
-            for (int i = 0; i < backoffSeconds && !SignalHandler::isSignaled(); ++i) {
+            for (int i = 0; i < backoffSeconds; ++i) {
+                if (SignalHandler::isSignaled()) {
+                    LOG(INFO) << "Shutdown signal received during retry backoff";
+                    goto exit_retry_loop;
+                }
                 std::this_thread::sleep_for(std::chrono::seconds(1));
-            }
-            
-            // Exit immediately if shutdown signal received during backoff
-            if (SignalHandler::isSignaled()) {
-                LOG(INFO) << "Shutdown signal received during retry backoff";
-                break;
             }
         } catch (const std::exception& e) {
             LOG(ERROR) << "Uncaught Exception: " << e.what();
@@ -608,6 +604,7 @@ int app_main(int argc, char** argv) {
             break;
         }
     }
+exit_retry_loop:
     threadManager->destroy();
     LOG(INFO) << fmt::format(
         "{} : exiting now...",
