@@ -565,13 +565,32 @@ int app_main(int argc, char** argv) {
     Env()["TGBOT_INSTALL_ROOT"] = 
         CommandLine{argc, argv}.getPath(FS::PathType::INSTALL_ROOT).string();
 
+    // Retry configuration for network errors
+    int retryCount = 0;
+    constexpr int kMaxRetries = 3;
+    constexpr int kBaseBackoffSeconds = 5;
+    constexpr int kMaxBackoffSeconds = 30;
+
     while (!SignalHandler::isSignaled()) {
         try {
             api->startPoll();
+            retryCount = 0;  // Reset retry count on successful poll
         } catch (const TgBot::NetworkException& e) {
             LOG(ERROR) << "Network error: " << e.what();
-            exitCode = TGBOT_EXITCODE_NETWORK;
-            break;
+            if (++retryCount >= kMaxRetries) {
+                LOG(ERROR) << fmt::format(
+                    "Max retries ({}) reached for network errors, exiting...",
+                    kMaxRetries);
+                exitCode = TGBOT_EXITCODE_NETWORK;
+                break;
+            }
+            // Exponential backoff with cap
+            auto backoffSeconds = std::min(kMaxBackoffSeconds, 
+                                          kBaseBackoffSeconds * retryCount);
+            LOG(WARNING) << fmt::format(
+                "Retrying in {}s (attempt {}/{})", 
+                backoffSeconds, retryCount, kMaxRetries);
+            std::this_thread::sleep_for(std::chrono::seconds(backoffSeconds));
         } catch (const std::exception& e) {
             LOG(ERROR) << "Uncaught Exception: " << e.what();
             exitCode = TGBOT_EXITCODE_GENERIC;
