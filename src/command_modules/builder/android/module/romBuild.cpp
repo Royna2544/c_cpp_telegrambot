@@ -20,6 +20,7 @@
 #include <filesystem>
 #include <initializer_list>
 #include <iterator>
+#include <libos/libsighandler.hpp>
 #include <memory>
 #include <string>
 #include <system_error>
@@ -213,6 +214,15 @@ class ROMBuildQueryHandler {
    public:
     void setCurrentForkAndRun(ForkAndRun* forkAndRun) { current = forkAndRun; }
     void onCallbackQuery(TgBot::CallbackQuery::Ptr query) const;
+    
+    // Shutdown method to cancel any running tasks
+    void shutdown() {
+        if (current != nullptr) {
+            LOG(WARNING) << "Cancelling running build task during shutdown";
+            current->cancel();
+            current = nullptr;
+        }
+    }
 };
 
 template <typename Impl>
@@ -604,6 +614,15 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     if (didpin) {
         _api->unpinMessage(sentMessage);
     }
+    
+    // Check if system is shutting down before starting build
+    if (SignalHandler::isSignaled()) {
+        LOG(WARNING) << "Received shutdown signal, cancelling build";
+        _api->editMessage(sentMessage, "Build cancelled: System shutting down", 
+                         backKeyboard);
+        return;
+    }
+    
     auto scriptDirectory =
         _commandLine->getPath(FS::PathType::RESOURCES_SCRIPTS);
     auto buildDirectory =
@@ -637,6 +656,11 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
 
     // RepoSync
     if (do_repo_sync) {
+        if (SignalHandler::isSignaled()) {
+            LOG(WARNING) << "Received shutdown signal before repo sync";
+            _api->editMessage(sentMessage, "Build cancelled: System shutting down");
+            return;
+        }
         timer = now();
         RepoSync repoSync(this, per_build, _api, _userMessage);
         if (!repoSync.execute(
@@ -651,6 +675,11 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     // Remote Based Execution support
     std::optional<ROMBuildTask::RBEConfig> config;
     if (do_use_rbe) {
+        if (SignalHandler::isSignaled()) {
+            LOG(WARNING) << "Received shutdown signal before RBE setup";
+            _api->editMessage(sentMessage, "Build cancelled: System shutting down");
+            return;
+        }
         config.emplace();
         config->baseScript = scriptDirectory / "rbe_env.sh";
         config->api_key =
@@ -677,6 +706,11 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     }
 
     // Build
+    if (SignalHandler::isSignaled()) {
+        LOG(WARNING) << "Received shutdown signal before build";
+        _api->editMessage(sentMessage, "Build cancelled: System shutting down");
+        return;
+    }
     timer = now();
     Build build(this, per_build, _api, _userMessage);
     if (!build.execute(config)) {
@@ -687,6 +721,11 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
 
     // Upload
     if (do_upload) {
+        if (SignalHandler::isSignaled()) {
+            LOG(WARNING) << "Received shutdown signal before upload";
+            _api->editMessage(sentMessage, "Build cancelled: System shutting down");
+            return;
+        }
         timer = now();
         Upload upload(this, per_build, _api, _userMessage);
         if (!upload.execute(std::move(scriptDirectory))) {
