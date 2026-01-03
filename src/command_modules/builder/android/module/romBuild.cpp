@@ -662,9 +662,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
         if (!std::filesystem::exists(config->reclientDir)) {
             LOG(INFO) << "Downloading reclient...";
             auto zipFile = buildDirectory / "rbe.zip";
-            bool ret = CURL_download_file(
-                "https://github.com/xyz-sundram/Releases/releases/download/"
-                "client-linux-amd64/client-linux-amd64.zip",
+            bool ret = CURL_download_file("https://chrome-infra-packages.appspot.com/dl/infra/rbe/client/linux-amd64/+/stable",
                 zipFile);
             if (!ret) {
                 return;
