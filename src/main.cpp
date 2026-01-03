@@ -584,13 +584,24 @@ int app_main(int argc, char** argv) {
                 exitCode = TGBOT_EXITCODE_NETWORK;
                 break;
             }
-            // Exponential backoff with cap
+            // Linear backoff with cap (5s, 10s, 15s intervals)
+            // This provides a gradual increase suitable for transient network issues
             auto backoffSeconds = std::min(kMaxBackoffSeconds, 
                                           kBaseBackoffSeconds * retryCount);
             LOG(WARNING) << fmt::format(
                 "Retrying in {}s (attempt {}/{})", 
                 backoffSeconds, retryCount, kMaxRetries);
-            std::this_thread::sleep_for(std::chrono::seconds(backoffSeconds));
+            
+            // Sleep with periodic shutdown signal checks for responsive exit
+            for (int i = 0; i < backoffSeconds && !SignalHandler::isSignaled(); ++i) {
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+            }
+            
+            // Exit immediately if shutdown signal received during backoff
+            if (SignalHandler::isSignaled()) {
+                LOG(INFO) << "Shutdown signal received during retry backoff";
+                break;
+            }
         } catch (const std::exception& e) {
             LOG(ERROR) << "Uncaught Exception: " << e.what();
             exitCode = TGBOT_EXITCODE_GENERIC;
