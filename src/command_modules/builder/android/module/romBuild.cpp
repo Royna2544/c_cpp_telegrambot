@@ -223,6 +223,19 @@ class ROMBuildQueryHandler {
             current = nullptr;
         }
     }
+    
+   private:
+    // Helper method to check for shutdown signal and notify user
+    bool checkShutdownSignal(const std::string_view context) {
+        if (SignalHandler::isSignaled()) {
+            LOG(WARNING) << "Received shutdown signal during " << context;
+            _api->editMessage(sentMessage, 
+                             "Build cancelled: System shutting down", 
+                             backKeyboard);
+            return true;
+        }
+        return false;
+    }
 };
 
 template <typename Impl>
@@ -616,10 +629,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     }
     
     // Check if system is shutting down before starting build
-    if (SignalHandler::isSignaled()) {
-        LOG(WARNING) << "Received shutdown signal, cancelling build";
-        _api->editMessage(sentMessage, "Build cancelled: System shutting down", 
-                         backKeyboard);
+    if (checkShutdownSignal("build confirmation")) {
         return;
     }
     
@@ -656,9 +666,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
 
     // RepoSync
     if (do_repo_sync) {
-        if (SignalHandler::isSignaled()) {
-            LOG(WARNING) << "Received shutdown signal before repo sync";
-            _api->editMessage(sentMessage, "Build cancelled: System shutting down");
+        if (checkShutdownSignal("repo sync")) {
             return;
         }
         timer = now();
@@ -675,9 +683,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     // Remote Based Execution support
     std::optional<ROMBuildTask::RBEConfig> config;
     if (do_use_rbe) {
-        if (SignalHandler::isSignaled()) {
-            LOG(WARNING) << "Received shutdown signal before RBE setup";
-            _api->editMessage(sentMessage, "Build cancelled: System shutting down");
+        if (checkShutdownSignal("RBE setup")) {
             return;
         }
         config.emplace();
@@ -706,9 +712,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     }
 
     // Build
-    if (SignalHandler::isSignaled()) {
-        LOG(WARNING) << "Received shutdown signal before build";
-        _api->editMessage(sentMessage, "Build cancelled: System shutting down");
+    if (checkShutdownSignal("build")) {
         return;
     }
     timer = now();
@@ -721,9 +725,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
 
     // Upload
     if (do_upload) {
-        if (SignalHandler::isSignaled()) {
-            LOG(WARNING) << "Received shutdown signal before upload";
-            _api->editMessage(sentMessage, "Build cancelled: System shutting down");
+        if (checkShutdownSignal("upload")) {
             return;
         }
         timer = now();
