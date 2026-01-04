@@ -76,7 +76,7 @@ jobs:
           CXX: ${{ matrix.real_cxx }}
         run: |
           sudo apt update
-          sudo apt install autoconf autoconf-archive automake libtool libxrandr-dev libx11-dev libxft-dev libxext-dev libltdl-dev libxi-dev libxtst-dev x11-xserver-utils gi-docgen
+          sudo apt install autoconf autoconf-archive automake libtool libxrandr-dev libx11-dev libxft-dev libxext-dev libltdl-dev libxi-dev libxtst-dev x11-xserver-utils gi-docgen nasm
           cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake -DTGBOTCPP_BUILD_TESTS=ON 
           cmake --build build 
           cmake --build build --target optional_all

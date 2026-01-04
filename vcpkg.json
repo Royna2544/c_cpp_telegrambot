@@ -8,6 +8,12 @@
       "name": "dlfcn-win32",
       "platform": "windows"
     },
+    {
+      "name": "opencv4",
+      "features": [
+        "ffmpeg"
+      ]
+    },
     "boost-asio",
     "boost-system",
     "boost-program-options",
@@ -18,15 +24,12 @@
     "libpng",
     "libwebp",
     "libjpeg-turbo",
-    "opencv4",
     "fmt",
     "sqlite3",
     "nlohmann-json",
     "openssl",
     "zlib",
-    "cpp-httplib",
     "fruit",
-    "cpptrace",
     "abseil",
     "protobuf",
     "gtest",

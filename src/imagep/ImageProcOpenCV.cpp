@@ -103,7 +103,7 @@ OpenCVImage::TinyStatus OpenCVImage::Image::read(
 
 OpenCVImage::TinyStatus OpenCVImage::Video::read(
     const std::filesystem::path& file) {
-    handle = cv::VideoCapture(file.string(), cv::CAP_FFMPEG);
+    handle = cv::VideoCapture(file.string());
     if (!handle.isOpened()) {
         return {Status::kInternalError,
                 "Error opening video file: " + file.filename().string()};

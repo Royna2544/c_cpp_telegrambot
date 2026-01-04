@@ -46,3 +46,8 @@ tgbot_library(
   DEFS
   ${IMGPROC_FLAGS}
 )
+
+# https://stackoverflow.com/a/46515541
+if (CMAKE_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  target_link_options(ImgProc PRIVATE -Wl,-Bsymbolic)
+endif()
