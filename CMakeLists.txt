@@ -493,7 +493,7 @@ tgbot_exe(
   Regex
   SocketComponents
   sighandler
-  Api
+  ApiImpl
   ThreadManager
   RELATION
   Main)

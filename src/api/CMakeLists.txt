@@ -31,12 +31,26 @@ tgbot_library(
   NAME Api
   SRCS
     AuthContext.cpp
-    TgBotApiImpl.cpp
     DynCommandModule.cpp
     ${lua_src}
     MessageExt.cpp
     RateLimit.cpp
     StringResLoader.cpp
+  LIBS
+    TgBot # TODO: This will be removed after refactoring
+    DBImpl # Authorization
+    ${CMAKE_DL_LIBS} # CommandModule
+    restartfmt_parser # RestartCommand
+    LibXml2::LibXml2 # StringResLoader
+    ${lua_libs}
+  DEFS ${lua_def}
+  STATIC
+)
+
+tgbot_library(
+  NAME ApiImpl
+  SRCS 
+    TgBotApiImpl.cpp
     components/Async.cpp
     components/ChatJoinRequest.cpp
     components/ModuleManagement.cpp
@@ -46,15 +60,8 @@ tgbot_library(
     components/OnMyChatMember.cpp
     components/Restart.cpp
     components/UnknownCommand.cpp
-  LIBS
-    TgBot
-    DBImpl # Authorization
-    ${CMAKE_DL_LIBS} # CommandModule
-    restartfmt_parser # RestartCommand
-    LibXml2::LibXml2 # StringResLoader
-    ${cpptrace_libs} # TgBotApiImpl's backtrace
-    ${lua_libs}
-  DEFS ${lua_def} ${cpptrace_def}
+  LIBS TgBot DBImpl ${cpptrace_libs} Api
+  DEFS ${cpptrace_def}
   STATIC
 )
 
