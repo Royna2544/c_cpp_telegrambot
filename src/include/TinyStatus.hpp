@@ -35,8 +35,6 @@ class TinyStatus {
     [[nodiscard]] static TinyStatus ok() { return TinyStatus(Status::kOk); }
 };
 
-}  // namespace tinystatus
-
 inline std::ostream& operator<<(std::ostream& os, const tinystatus::Status s) {
     switch (s) {
         case tinystatus::Status::kOk:
@@ -69,3 +67,4 @@ inline std::ostream& operator<<(std::ostream& os,
     }
     return os;
 }
+}  // namespace tinystatus
