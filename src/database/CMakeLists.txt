@@ -28,10 +28,20 @@ else()
   endforeach()
 endif()
 
-if(${SQLite3_FOUND})
+# Optional: cpptrace for backtraces
+find_package(cpptrace)
+set(cpptrace_def)
+set(cpptrace_libs)
+if (cpptrace_FOUND)
+  message(STATUS "Enabling cpptrace for backtraces in TgBotApiImpl")
+  set(cpptrace_def TGBOTCPP_ENABLE_CPPTRACE)
+  set(cpptrace_libs cpptrace::cpptrace)
+endif()
+
+if(SQLite3_FOUND)
   set(SQLITE_SRCS SQLiteDatabase.cpp)
-  list(APPEND DATABASE_LIBS SQLite::SQLite3 cpptrace::cpptrace)
-  list(APPEND DATABASE_DEFS DATABASE_HAVE_SQLITE)
+  list(APPEND DATABASE_LIBS SQLite::SQLite3 ${cpptrace_libs})
+  list(APPEND DATABASE_DEFS DATABASE_HAVE_SQLITE ${cpptrace_def})
 endif()
 
 tgbot_library(

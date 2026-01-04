@@ -13,9 +13,7 @@
 #include <DurationPoint.hpp>
 #include <LogSinks.hpp>
 #include <ManagedThreads.hpp>
-#include <Random.hpp>
 #include <ResourceManager.hpp>
-#include <TgBotWebpage.hpp>
 #include <algorithm>
 #include <api/StringResLoader.hpp>
 #include <api/TgBotApiImpl.hpp>
@@ -46,6 +44,10 @@
 #include "SocketContext.hpp"
 #include "tgbot/TgException.h"
 #include "utils/Env.hpp"
+
+#ifdef TGBOTCPP_ENABLE_WEBSERVER
+#include <TgBotWebpage.hpp>
+#endif
 
 class RegexHandlerInterface : public RegexHandler::Interface {
    public:
@@ -200,6 +202,7 @@ getTgBotApiImplComponent() {
         });
 }
 
+#ifdef TGBOTCPP_ENABLE_WEBSERVER
 fruit::Component<fruit::Required<ThreadManager, CommandLine>,
                  Unused<TgBotWebServer>>
 getWebServerComponent() {
@@ -216,6 +219,7 @@ getWebServerComponent() {
             return {};
         });
 }
+#endif
 
 fruit::Component<fruit::Required<ThreadManager, TgBotApi, AuthContext>,
                  WrapPtr<SpamBlockBase>>
@@ -295,12 +299,17 @@ getRegexHandlerComponent() {
 
 fruit::Component<TgBotApi, AuthContext, DatabaseBase, ThreadManager,
                  ConfigManager, Unused<RegexHandler>, Unused<NetworkLogSink>,
-                 WrapPtr<SpamBlockBase>, Unused<TgBotWebServer>,
+                 WrapPtr<SpamBlockBase>, 
+#ifdef TGBOTCPP_ENABLE_WEBSERVER
+                 Unused<TgBotWebServer>,
+#endif
                  SocketComponentFactory_t, SocketChooser, ChatDataCollector>
 getAllComponent(CommandLine cmd) {
     static auto _cmd = std::move(cmd);
     return fruit::createComponent()
+#ifdef TGBOTCPP_ENABLE_WEBSERVER
         .bind<TgBotWebServerBase, TgBotWebServer>()
+#endif
         .bind<VFSOperations, RealFS>()
         .bind<RandomBase, Random>()
         .install(getDatabaseComponent)
@@ -308,7 +317,9 @@ getAllComponent(CommandLine cmd) {
         .install(getRegexHandlerComponent)
         .install(getNetworkLogSinkComponent)
         .install(getSpamBlockComponent)
+#ifdef TGBOTCPP_ENABLE_WEBSERVER
         .install(getWebServerComponent)
+#endif
         .install(getStringResLoaderComponent)
         .install(getSocketInterfaceComponent)
         .install(getResourceProvider)
@@ -456,7 +467,10 @@ int app_main(int argc, char** argv) {
     // Initialize dependencies
     fruit::Injector<TgBotApi, AuthContext, DatabaseBase, ThreadManager,
                     ConfigManager, Unused<RegexHandler>, Unused<NetworkLogSink>,
-                    WrapPtr<SpamBlockBase>, Unused<TgBotWebServer>,
+                    WrapPtr<SpamBlockBase>, 
+#ifdef TGBOTCPP_ENABLE_WEBSERVER
+                    Unused<TgBotWebServer>,
+#endif
                     SocketComponentFactory_t, SocketChooser, ChatDataCollector>
         injector(getAllComponent, CommandLine{argc, argv});
 
@@ -531,11 +545,13 @@ int app_main(int argc, char** argv) {
         c) {
         comp.fromString(c.value());
     }
+#ifdef TGBOTCPP_ENABLE_WEBSERVER
     if (comp.webServer) {
         injector.get<Unused<TgBotWebServer>*>();
     } else {
         DLOG(INFO) << "Skip TgBotWebServer init";
     }
+#endif
     if (comp.dataCollector) {
         injector.get<ChatDataCollector*>();
     } else {

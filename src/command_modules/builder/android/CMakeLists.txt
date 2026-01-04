@@ -1,5 +1,9 @@
 find_package(LibXml2 REQUIRED)
-find_package(libgit2 REQUIRED)
+find_package(libgit2)
+
+if (NOT libgit2_FOUND)
+  message(FATAL_ERROR "libgit2 is required to build the Android ROM builder module.")
+endif()
 
 # ################ Android ROM builder with C++ #################
 tgbot_library(

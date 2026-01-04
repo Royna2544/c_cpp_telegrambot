@@ -2,10 +2,12 @@ find_package(LibXml2 REQUIRED)
 
 option(TGBOTCPP_LUA_MODULES "Enable Lua-based modules" ON)
 
+# Enable LuaCommandModule if sol2 is found
+find_package(sol2)
 set(lua_src)
 set(lua_libs)
 set(lua_def)
-if (TGBOTCPP_LUA_MODULES)
+if (TGBOTCPP_LUA_MODULES AND sol2_FOUND)
   message(STATUS "Enabling LuaCommandModule")
   add_library(tglua STATIC liblua/onelua.c)
   target_compile_definitions(tglua PRIVATE MAKE_LIB)
@@ -13,6 +15,16 @@ if (TGBOTCPP_LUA_MODULES)
   set(lua_src LuaCommandModule.cpp)
   set(lua_libs sol2::sol2 tglua)
   set(lua_def HAVE_LUA)
+endif()
+
+# Optional: cpptrace for backtraces
+find_package(cpptrace)
+set(cpptrace_def)
+set(cpptrace_libs)
+if (cpptrace_FOUND)
+  message(STATUS "Enabling cpptrace for backtraces in TgBotApiImpl")
+  set(cpptrace_def TGBOTCPP_ENABLE_CPPTRACE)
+  set(cpptrace_libs cpptrace::cpptrace)
 endif()
 
 tgbot_library(
@@ -40,9 +52,9 @@ tgbot_library(
     ${CMAKE_DL_LIBS} # CommandModule
     restartfmt_parser # RestartCommand
     LibXml2::LibXml2 # StringResLoader
-    cpptrace::cpptrace # TgBotApiImpl's backtrace
+    ${cpptrace_libs} # TgBotApiImpl's backtrace
     ${lua_libs}
-  DEFS ${lua_def}
+  DEFS ${lua_def} ${cpptrace_def}
   STATIC
 )
 

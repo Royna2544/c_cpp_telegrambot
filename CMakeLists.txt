@@ -39,6 +39,7 @@ set(X_VCPKG_APPLOCAL_DEPS_INSTALL
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # ##############################################################################
 
 # Check PIE support
@@ -312,7 +313,7 @@ endfunction()
 
 function(tgbot_exe)
   cmake_parse_arguments(EXE "NO_PREFIX;OPTIONAL;TEST;NO_MAIN_WRAPPER"
-                        "NAME;RELATION" "SRCS;LIBS" ${ARGN})
+                        "NAME;RELATION" "SRCS;LIBS;DEFS" ${ARGN})
 
   # Tests get "test_" prefix
   if(EXE_TEST)
@@ -336,7 +337,7 @@ function(tgbot_exe)
     set_target_properties(${TARGET_NAME} PROPERTIES PREFIX "${PROJECT_NAME}_")
   endif()
 
-  tgbot_common_target(${TARGET_NAME} PUBLIC_LIBS ${EXE_LIBS})
+  tgbot_common_target(${TARGET_NAME} PUBLIC_LIBS ${EXE_LIBS} DEFS ${EXE_DEFS})
 
   if (EXE_TEST)
     # ---------- extra test registration ----------
@@ -360,16 +361,17 @@ endif()
 # ##############################################################################
 
 # ############################ Check lib (TODO: Make these optional) #############################
-find_package(Protobuf)
 find_package(fmt REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(CURL REQUIRED)
-find_package(cpptrace REQUIRED)
 find_package(absl REQUIRED)
-find_package(httplib REQUIRED)
-find_package(sol2 REQUIRED)
+find_package(Protobuf)
 find_package(fruit REQUIRED)
 # ##############################################################################
+
+if (fmt_VERSION VERSION_LESS 10.0.0)
+   message(FATAL_ERROR "fmt version >= 10.0.0 is required")
+endif()
 
 # Configure Ccache if available
 find_program(CCACHE_FOUND ccache)
@@ -409,7 +411,6 @@ add_subdirectory(src/imagep)
 add_subdirectory(src/logging)
 add_subdirectory(src/socket)
 add_subdirectory(src/utils)
-add_subdirectory(src/web)
 add_subdirectory(src/libos)
 add_subdirectory(src/third-party/tgbot-cpp)
 
@@ -453,8 +454,24 @@ tgbot_library(NAME ThreadManager SRCS src/ManagedThread.cpp
               src/ThreadManager.cpp STATIC)
 # ##############################################################################
 
-# ################ The Bot's main launcher (program) #################
+# Optional httplib webserver
+set(httplib_def)
+set(httplib_srcs)
+set(httplib_libs)
+find_package(httplib)
+if(httplib_FOUND)
+  set(httplib_def TGBOTCPP_ENABLE_WEBSERVER)
+  set(httplib_srcs src/web/TgBotWebServer.cpp)
+  set(httplib_libs Web)
+  add_subdirectory(src/web)
+  install(
+    DIRECTORY www/
+    DESTINATION share/${PROJECT_NAME}/www
+  )
+  message(STATUS "Found httplib, enabling webserver support")
+endif()
 
+# ################ The Bot's main launcher (program) #################
 tgbot_exe(
   NAME
   main
@@ -462,14 +479,15 @@ tgbot_exe(
   src/main.cpp
   src/global_handlers/SpamBlockManager.cpp
   src/ml/ChatDataCollector.cpp
-  src/web/TgBotWebServer.cpp
   src/logging/LoggingServer.cpp
+  ${httplib_srcs}
+  DEFS
+  ${httplib_def}
   LIBS
   DBLoading
   fruit
-  TgBot
   Utils
-  Web
+  ${httplib_libs}
   Random
   restartfmt_parser
   Regex
@@ -497,10 +515,6 @@ install(
   FILES_MATCHING
   PATTERN "*"
   PATTERN "*.in" EXCLUDE)
-install(
-  DIRECTORY www/
-  DESTINATION share/${PROJECT_NAME}/www
-)
 
 file(COPY resources/ DESTINATION ${CMAKE_BINARY_DIR}/share/${PROJECT_NAME})
 file(COPY www/ DESTINATION ${CMAKE_BINARY_DIR}/share/${PROJECT_NAME}/www)
