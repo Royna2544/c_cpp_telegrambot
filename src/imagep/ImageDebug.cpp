@@ -7,11 +7,12 @@
 DebugImage::TinyStatus DebugImage::read(const std::filesystem::path& filename,
                                         Target /*target*/) {
     LOG(WARNING) << "Entering DebugImage::read";
-    LOG(INFO) << "I will copy the file to " << filename << ".debug_output";
+
+    auto newfile = "DebugImageCopy_" + filename.filename().string();
+    LOG(INFO) << "I will copy the file to " << newfile;
     std::error_code ec;
     std::filesystem::path outputPath =
-        std::filesystem::temp_directory_path(ec) /
-        (filename.filename().string() + ".debug_output");
+        std::filesystem::temp_directory_path(ec) / newfile;
     if (ec) {
         LOG(ERROR) << "Failed to get temporary directory: " << ec.message();
         return {DebugImage::Status::kInternalError,
