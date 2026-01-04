@@ -33,6 +33,7 @@ DebugImage::TinyStatus DebugImage::read(const std::filesystem::path& filename,
 
 DebugImage::TinyStatus DebugImage::processAndWrite(
     const std::filesystem::path& /*filename*/) {
-    LOG(INFO) << "DebugImage::processAndWrite: Noop";
-    return DebugImage::TinyStatus::ok();
+    LOG(INFO) << "DebugImage::processAndWrite: Always fails";
+    return DebugImage::TinyStatus{DebugImage::Status::kInternalError,
+                                  "Not implemented"};
 }
