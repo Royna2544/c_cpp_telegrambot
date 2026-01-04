@@ -1,6 +1,6 @@
 set -e
 
-LATEST_ABSEIL_CPP_LTS=20250127.1
+LATEST_ABSEIL_CPP_LTS=20250814.1
 
 git clone https://github.com/abseil/abseil-cpp abseil-cpp --tags
 trap "rm -rf abseil-cpp" EXIT INT
