@@ -110,36 +110,3 @@ inline std::ostream& operator<<(std::ostream& os, const PhotoBase::Target t) {
     }
     return os;
 }
-
-inline std::ostream& operator<<(std::ostream& os, const PhotoBase::Status s) {
-    switch (s) {
-        case PhotoBase::Status::kOk:
-            return os << "OK";
-        case PhotoBase::Status::kInvalidImage:
-            return os << "Invalid Image";
-        case PhotoBase::Status::kInvalidArgument:
-            return os << "Invalid Argument";
-        case PhotoBase::Status::kReadError:
-            return os << "Read Error";
-        case PhotoBase::Status::kWriteError:
-            return os << "Write Error";
-        case PhotoBase::Status::kProcessingError:
-            return os << "Processing Error";
-        case PhotoBase::Status::kInternalError:
-            return os << "Internal Error";
-        case PhotoBase::Status::kUnimplemented:
-            return os << "Unimplemented";
-        case PhotoBase::Status::kUnknown:
-            return os << "Unknown";
-    }
-    return os;
-}
-
-inline std::ostream& operator<<(std::ostream& os,
-                                const PhotoBase::TinyStatus& ts) {
-    os << ts.status();
-    if (!ts.getMessage().empty()) {
-        os << " (" << ts.getMessage() << ")";
-    }
-    return os;
-}
