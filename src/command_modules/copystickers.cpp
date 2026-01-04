@@ -132,7 +132,7 @@ DECLARE_COMMAND_HANDLER(copystickers) {
         }
         imageProc.options.greyscale = true;
         auto ret = imageProc.processAndWrite(sticker.filePath);
-        if (!ret.ok()) {
+        if (!ret.isOk()) {
             api->sendReplyMessage(message->message(),
                                   res->get(Strings::FAILED_TO_WRITE_FILE));
             return;

@@ -1,7 +1,5 @@
 #pragma once
 
-#include <absl/status/status.h>
-
 #include <filesystem>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/videoio.hpp>
@@ -19,37 +17,36 @@ class OpenCVImage : public PhotoBase {
     OpenCVImage() noexcept = default;
     ~OpenCVImage() override = default;
 
-    absl::Status read(const std::filesystem::path& filename,
-                      Target flags) override;
-    absl::Status processAndWrite(
-        const std::filesystem::path& filename) override;
-    std::string version() const override;
+    TinyStatus read(const std::filesystem::path& filename,
+                    Target flags) override;
+    TinyStatus processAndWrite(const std::filesystem::path& filename) override;
+    [[nodiscard]] std::string version() const override;
 
    private:
     struct ComponentBase {
         virtual ~ComponentBase() = default;
-        virtual absl::Status read(const std::filesystem::path& file) = 0;
-        virtual absl::Status procAndW(
-            const Options* opt, const std::filesystem::path& dest) = 0;
+        virtual TinyStatus read(const std::filesystem::path& file) = 0;
+        virtual TinyStatus procAndW(const Options* opt,
+                                    const std::filesystem::path& dest) = 0;
     };
-    
+
     struct Image : public ComponentBase {
         cv::Mat handle;
 
-        absl::Status read(const std::filesystem::path& file) override;
+        TinyStatus read(const std::filesystem::path& file) override;
         static void rotate(cv::Mat& mat, int angle);
         static void greyscale(cv::Mat& mat);
         static void invert(cv::Mat& mat);
 
-        absl::Status procAndW(const Options* opt,
-                              const std::filesystem::path& dest) override;
+        TinyStatus procAndW(const Options* opt,
+                            const std::filesystem::path& dest) override;
     };
     struct Video : public ComponentBase {
         cv::VideoCapture handle;
 
-        absl::Status read(const std::filesystem::path& file) override;
-        absl::Status procAndW(const Options* opt,
-                              const std::filesystem::path& filename) override;
+        TinyStatus read(const std::filesystem::path& file) override;
+        TinyStatus procAndW(const Options* opt,
+                            const std::filesystem::path& filename) override;
     };
     std::unique_ptr<ComponentBase> component;
 };

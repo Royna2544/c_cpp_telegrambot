@@ -1,7 +1,6 @@
 #pragma once
 
 #include <ImgProcExports.h>
-#include <absl/status/status.h>
 
 #include <memory>
 
@@ -9,7 +8,8 @@
 
 struct IMGPROC_EXPORT ImageProcessingAll {
     bool read(PhotoBase::Target target);
-    absl::Status processAndWrite(const std::filesystem::path& filename);
+    PhotoBase::TinyStatus processAndWrite(
+        const std::filesystem::path& filename);
 
     explicit ImageProcessingAll(std::filesystem::path filename);
     PhotoBase::Options options;

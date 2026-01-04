@@ -1,6 +1,5 @@
 #include "ImageProcOpenCV.hpp"
 
-#include <absl/status/status.h>
 #include <fmt/format.h>
 
 #include <filesystem>
@@ -11,8 +10,8 @@
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/videoio.hpp>
 
-absl::Status OpenCVImage::read(const std::filesystem::path& filename,
-                               const Target flags) {
+OpenCVImage::TinyStatus OpenCVImage::read(const std::filesystem::path& filename,
+                                          const Target flags) {
     switch (flags) {
         case PhotoBase::Target::kPhoto: {
             component = std::make_unique<Image>();
@@ -23,9 +22,9 @@ absl::Status OpenCVImage::read(const std::filesystem::path& filename,
             return component->read(filename);
         }
         case PhotoBase::Target::kNone:
-            return absl::UnavailableError("Invalid target type");
+            break;
     }
-    return absl::InvalidArgumentError("Invalid target type");
+    return {Status::kInvalidArgument, "Invalid target type"};
 }
 
 void OpenCVImage::Image::rotate(cv::Mat& mat, int angle) {
@@ -41,8 +40,8 @@ void OpenCVImage::Image::rotate(cv::Mat& mat, int angle) {
     cv::Rect bbox = cv::RotatedRect(center, mat.size(), angle).boundingRect();
 
     // Adjust rotation matrix for translation to keep the image centered
-    rotation_matrix.at<double>(0, 2) += bbox.width / 2.0 - center.x;
-    rotation_matrix.at<double>(1, 2) += bbox.height / 2.0 - center.y;
+    rotation_matrix.at<double>(0, 2) += (bbox.width / 2.0) - center.x;
+    rotation_matrix.at<double>(1, 2) += (bbox.height / 2.0) - center.y;
 
     // Apply the rotation with adjusted matrix and bounding box size
     cv::Mat rotated_image;
@@ -91,31 +90,33 @@ void OpenCVImage::Image::invert(cv::Mat& mat) {
     mat = inverted_image;
 }
 
-absl::Status OpenCVImage::Image::read(const std::filesystem::path& file) {
+OpenCVImage::TinyStatus OpenCVImage::Image::read(
+    const std::filesystem::path& file) {
     handle = cv::imread(file.string(), cv::IMREAD_UNCHANGED);
     if (handle.empty()) {
-        return absl::InternalError("Error opening image: " +
-                                   file.filename().string());
+        return {Status::kInternalError,
+                "Error opening image: " + file.filename().string()};
     }
     LOG(INFO) << "Image dimensions: " << handle.cols << "x" << handle.rows;
-    return absl::OkStatus();
+    return {Status::kOk, "Image read successfully"};
 }
 
-absl::Status OpenCVImage::Video::read(const std::filesystem::path& file) {
+OpenCVImage::TinyStatus OpenCVImage::Video::read(
+    const std::filesystem::path& file) {
     handle = cv::VideoCapture(file.string(), cv::CAP_FFMPEG);
     if (!handle.isOpened()) {
-        return absl::InternalError("Error opening video file: " +
-                                   file.filename().string());
+        return {Status::kInternalError,
+                "Error opening video file: " + file.filename().string()};
     }
     LOG(INFO) << "Video dimensions: " << handle.get(cv::CAP_PROP_FRAME_WIDTH)
               << "x" << handle.get(cv::CAP_PROP_FRAME_HEIGHT);
-    return absl::OkStatus();
+    return {Status::kOk, "Video read successfully"};
 }
 
-absl::Status OpenCVImage::Video::procAndW(const Options* opt,
-                                          const std::filesystem::path& dest) {
+OpenCVImage::TinyStatus OpenCVImage::Video::procAndW(
+    const Options* opt, const std::filesystem::path& dest) {
     if (!handle.isOpened()) {
-        return absl::NotFoundError("No video data to rotate");
+        return {Status::kInternalError, "No video data to rotate"};
     }
 
     // Get original video properties
@@ -131,8 +132,8 @@ absl::Status OpenCVImage::Video::procAndW(const Options* opt,
     } else if (dest.extension() == ".webm") {
         fourcc = cv::VideoWriter::fourcc('V', 'P', '8', '0');
     } else {
-        return absl::InvalidArgumentError("Unsupported output file format: " +
-                                          dest.extension().string());
+        return {Status::kInvalidArgument,
+                "Unsupported output file format: " + dest.extension().string()};
     }
 
     // Set up VideoWriter
@@ -141,8 +142,8 @@ absl::Status OpenCVImage::Video::procAndW(const Options* opt,
                            !opt->greyscale.get());
 
     if (!writer.isOpened()) {
-        return absl::InternalError("Failed to open the output video file: " +
-                                   dest.filename().string());
+        return {Status::kWriteError, "Failed to open the output video file: " +
+                                         dest.filename().string()};
     }
 
     // Rotate each frame and write it to the output video
@@ -182,13 +183,13 @@ absl::Status OpenCVImage::Video::procAndW(const Options* opt,
             writer << frame;
         }
     }
-    return absl::OkStatus();
+    return {Status::kOk, "Video processed and written successfully"};
 }
 
-absl::Status OpenCVImage::Image::procAndW(const Options* opt,
-                                          const std::filesystem::path& dest) {
+OpenCVImage::TinyStatus OpenCVImage::Image::procAndW(
+    const Options* opt, const std::filesystem::path& dest) {
     if (handle.empty()) {
-        return absl::NotFoundError("No image data to process");
+        return {Status::kInternalError, "No image data to process"};
     }
 
     // Convert the image to grayscale if required
@@ -205,19 +206,19 @@ absl::Status OpenCVImage::Image::procAndW(const Options* opt,
     // Write the processed image to the output file
     try {
         if (!cv::imwrite(dest.string(), handle)) {
-            return absl::InternalError("Failed to write image to: " +
-                                       dest.string());
+            return {Status::kWriteError,
+                    "Failed to write image to: " + dest.string()};
         }
     } catch (const cv::Exception& ex) {
-        return absl::InternalError("Error writing image");
+        return {Status::kWriteError, "Error writing image"};
     }
-    return absl::OkStatus();
+    return {Status::kOk, "Image processed and written successfully"};
 }
 
-absl::Status OpenCVImage::processAndWrite(
+OpenCVImage::TinyStatus OpenCVImage::processAndWrite(
     const std::filesystem::path& filename) {
     if (!component) {
-        return absl::NotFoundError("No image or video component loaded");
+        return {Status::kInternalError, "No image or video component loaded"};
     }
     return component->procAndW(&options, filename);
 }

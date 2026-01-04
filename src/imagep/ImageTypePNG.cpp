@@ -1,7 +1,6 @@
 #include "ImageTypePNG.hpp"
 
 #include <absl/log/log.h>
-#include <absl/status/status.h>
 #include <png.h>
 #include <pngconf.h>
 
@@ -28,10 +27,11 @@ void absl_error_fn(png_structp png_ptr, png_const_charp error_message) {
 }
 }  // namespace
 
-absl::Status PngImage::read(const std::filesystem::path& filename,
-                            const Target target) {
+PhotoBase::TinyStatus PngImage::read(const std::filesystem::path& filename,
+                                     const Target target) {
     if (target != Target::kPhoto) {
-        return absl::InvalidArgumentError("Invalid target for PNG image");
+        return {PhotoBase::Status::kInvalidArgument,
+                "Invalid target for PNG image"};
     }
 
     F fp;
@@ -39,29 +39,33 @@ absl::Status PngImage::read(const std::filesystem::path& filename,
     png_infop info = nullptr;
 
     if (contains_data) {
-        return absl::InvalidArgumentError("Already contains data");
+        return {PhotoBase::Status::kInvalidArgument, "Already contains data"};
     }
 
     if (!fp.open(filename, F::Mode::ReadBinary)) {
-        return absl::InternalError("Can't open file for reading");
+        return {PhotoBase::Status::kInternalError,
+                "Can't open file for reading"};
     }
 
     png = png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr,
                                  nullptr);
     if (png == nullptr) {
-        return absl::InternalError("png_create_read_struct failed");
+        return {PhotoBase::Status::kInternalError,
+                "png_create_read_struct failed"};
     }
 
     info = png_create_info_struct(png);
     if (info == nullptr) {
-        return absl::InternalError("png_create_info_struct failed");
+        return {PhotoBase::Status::kInternalError,
+                "png_create_info_struct failed"};
     }
 
     png_set_error_fn(png, nullptr, absl_error_fn, absl_warn_fn);
 
     if (setjmp(png_jmpbuf(png))) {
         png_destroy_read_struct(&png, &info, nullptr);
-        return absl::InternalError("Error during reading image header");
+        return {PhotoBase::Status::kInternalError,
+                "Error during reading image header"};
     }
 
     png_init_io(png, fp);
@@ -74,7 +78,8 @@ absl::Status PngImage::read(const std::filesystem::path& filename,
 
     if (setjmp(png_jmpbuf(png))) {
         png_destroy_read_struct(&png, &info, nullptr);
-        return absl::InternalError("Error during updating image information");
+        return {PhotoBase::Status::kInternalError,
+                "Error during updating image information"};
     }
     if (bit_depth == 16) {
         png_set_strip_16(png);
@@ -105,7 +110,7 @@ absl::Status PngImage::read(const std::filesystem::path& filename,
     png_destroy_read_struct(&png, &info, nullptr);
 
     contains_data = true;
-    return absl::OkStatus();
+    return TinyStatus::ok();
 }
 
 void PngImage::greyscale() {
@@ -150,9 +155,9 @@ void PngImage::rotate_image_impl(png_uint_32 new_width, png_uint_32 new_height,
     }
 }
 
-absl::Status PngImage::rotate(int angle) {
+PhotoBase::TinyStatus PngImage::rotate(int angle) {
     if (!contains_data) {
-        return absl::UnavailableError("No image data to rotate");
+        return {PhotoBase::Status::kInvalidArgument, "No image data to rotate"};
     }
 
     switch (angle) {
@@ -185,13 +190,13 @@ absl::Status PngImage::rotate(int angle) {
             break;
         case kAngleMin:
             // Noop
-            return absl::OkStatus();
+            return TinyStatus::ok();
         default:
             LOG(WARNING) << "libPNG cannot handle angle: " << angle;
-            return absl::UnimplementedError("Cannot handle angle");
+            return {PhotoBase::Status::kUnimplemented, "Cannot handle angle"};
     }
     LOG(INFO) << "New dimensions: " << width << "x" << height;
-    return absl::OkStatus();
+    return TinyStatus::ok();
 }
 
 void PngImage::invert() {
@@ -211,20 +216,21 @@ void PngImage::invert() {
     }
 }
 
-absl::Status PngImage::processAndWrite(const std::filesystem::path& filename) {
+PhotoBase::TinyStatus PngImage::processAndWrite(
+    const std::filesystem::path& filename) {
     F fp;
     png_structp png = nullptr;
     png_infop info = nullptr;
 
     if (!contains_data) {
-        return absl::NotFoundError("No image data to write");
+        return {PhotoBase::Status::kInvalidArgument, "No image data to write"};
     }
-    
+
     if (options.greyscale.get()) {
         greyscale();
     }
     auto err = rotate(options.rotate_angle.get());
-    if (!err.ok()) {
+    if (!err.isOk()) {
         return err;
     }
     if (options.invert_color.get()) {
@@ -232,30 +238,33 @@ absl::Status PngImage::processAndWrite(const std::filesystem::path& filename) {
     }
 
     if (!fp.open(filename, F::Mode::WriteBinary)) {
-        return absl::InternalError("Can't open file for writing: " + filename.string());
+        return {PhotoBase::Status::kWriteError,
+                "Can't open file for writing: " + filename.string()};
     }
 
     png = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr,
                                   nullptr);
     if (png == nullptr) {
-        return absl::InternalError("png_create_write_struct failed");
+        return {PhotoBase::Status::kInternalError,
+                "png_create_write_struct failed"};
     }
 
     info = png_create_info_struct(png);
     if (info == nullptr) {
-        return absl::InternalError("png_create_info_struct failed");
+        return {PhotoBase::Status::kInternalError,
+                "png_create_info_struct failed"};
     }
 
     if (setjmp(png_jmpbuf(png))) {
         png_destroy_write_struct(&png, &info);
-        return absl::InternalError("Error during init_io");
+        return {PhotoBase::Status::kInternalError, "Error during init_io"};
     }
 
     png_init_io(png, fp);
 
     if (setjmp(png_jmpbuf(png))) {
         png_destroy_write_struct(&png, &info);
-        return absl::InternalError("Error during writing header");
+        return {PhotoBase::Status::kWriteError, "Error during writing header"};
     }
 
     png_set_IHDR(png, info, width, height, bit_depth, color_type,
@@ -265,14 +274,14 @@ absl::Status PngImage::processAndWrite(const std::filesystem::path& filename) {
 
     if (setjmp(png_jmpbuf(png))) {
         png_destroy_write_struct(&png, &info);
-        return absl::InternalError("Error during writing bytes");
+        return {PhotoBase::Status::kWriteError, "Error during writing bytes"};
     }
 
     png_write_image(png, refmem.data());
 
     if (setjmp(png_jmpbuf(png))) {
         png_destroy_write_struct(&png, &info);
-        return absl::InternalError("Error during end of write");
+        return {PhotoBase::Status::kWriteError, "Error during end of write"};
     }
 
     png_write_end(png, nullptr);
@@ -280,7 +289,9 @@ absl::Status PngImage::processAndWrite(const std::filesystem::path& filename) {
     png_destroy_write_struct(&png, &info);
 
     contains_data = false;
-    return absl::OkStatus();
+    return TinyStatus::ok();
 }
 
-std::string PngImage::version() const { return "libPNG version " PNG_LIBPNG_VER_STRING; }
+std::string PngImage::version() const {
+    return "libPNG version " PNG_LIBPNG_VER_STRING;
+}

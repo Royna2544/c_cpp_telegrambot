@@ -1,7 +1,5 @@
 #include "ImageProcAll.hpp"
 
-#include <absl/status/status.h>
-
 #include <filesystem>
 
 #ifdef IMAGEPROC_HAVE_OPENCV
@@ -16,6 +14,7 @@
 #ifdef IMAGEPROC_HAVE_LIBWEBP
 #include "ImageTypeWEBP.hpp"
 #endif
+#include "ImageDebug.hpp"
 
 ImageProcessingAll::ImageProcessingAll(std::filesystem::path filename)
     : _filename(std::move(filename)) {
@@ -31,6 +30,9 @@ ImageProcessingAll::ImageProcessingAll(std::filesystem::path filename)
 #ifdef IMAGEPROC_HAVE_LIBWEBP
     impls.emplace_back(std::make_unique<WebPImage>());
 #endif
+#ifndef NDEBUG
+    impls.emplace_back(std::make_unique<DebugImage>());
+#endif
 }
 
 bool ImageProcessingAll::read(PhotoBase::Target target) {
@@ -38,7 +40,7 @@ bool ImageProcessingAll::read(PhotoBase::Target target) {
     for (auto& impl : impls) {
         DLOG(INFO) << "Trying to read with impl: " << impl->version();
         auto ret = impl->read(_filename, target);
-        if (ret.ok()) {
+        if (ret.isOk()) {
             // We found the backend suitable. Select one and dealloc others.
             _impl = std::move(impl);
             impls.clear();
@@ -52,17 +54,18 @@ bool ImageProcessingAll::read(PhotoBase::Target target) {
     return false;
 }
 
-absl::Status ImageProcessingAll::processAndWrite(
+DebugImage::TinyStatus ImageProcessingAll::processAndWrite(
     const std::filesystem::path& filename) {
     if (!_impl) {
         LOG(ERROR) << "No backend selected for writing";
-        return absl::UnavailableError("No backend selected for writing");
+        return {DebugImage::Status::kInternalError,
+                "No backend selected for writing"};
     }
     DLOG(INFO) << "Passing options to backend";
     _impl->options = options;
     DLOG(INFO) << "Calling impl->processAndWrite with filename: " << filename;
-    auto ret =  _impl->processAndWrite(filename);
-    if (!ret.ok()) {
+    auto ret = _impl->processAndWrite(filename);
+    if (!ret.isOk()) {
         LOG(ERROR) << "impl->processAndWrite returned: " << ret;
     }
     return ret;

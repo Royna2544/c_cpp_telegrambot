@@ -1,6 +1,5 @@
 #pragma once
 
-#include <absl/status/status.h>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -23,7 +22,8 @@ class WebPImage : public PhotoBase {
      *
      * @return True if the image is successfully read, false otherwise.
      */
-    absl::Status read(const std::filesystem::path& filename, const Target target) override;
+    TinyStatus read(const std::filesystem::path& filename,
+                    const Target target) override;
 
     /**
      * @brief Writes the image to the specified file path.
@@ -35,9 +35,9 @@ class WebPImage : public PhotoBase {
      *
      * @return True if the image is successfully written, false otherwise.
      */
-    absl::Status processAndWrite(const std::filesystem::path& filename) override;
+    TinyStatus processAndWrite(const std::filesystem::path& filename) override;
 
-    std::string version() const override;
+    [[nodiscard]] std::string version() const override;
 
    private:
     /**
@@ -51,7 +51,7 @@ class WebPImage : public PhotoBase {
      * @return A Result object indicating the success or failure of the
      * operation.
      */
-    absl::Status rotate(int angle);
+    TinyStatus rotate(int angle);
 
     /**
      * @brief Converts the image to grayscale.

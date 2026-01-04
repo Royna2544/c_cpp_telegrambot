@@ -1,5 +1,3 @@
-#include <absl/status/status.h>
-
 #include <TryParseStr.hpp>
 #include <api/CommandModule.hpp>
 #include <api/StringResLoader.hpp>
@@ -23,13 +21,15 @@ struct ProcessImageParam {
 };
 
 namespace {
-absl::Status processFile(ProcessImageParam& param) {
+
+PhotoBase::TinyStatus processFile(ProcessImageParam& param) {
     ImageProcessingAll procAll(param.srcPath);
     if (procAll.read(param.target)) {
         procAll.options = param.options;
         return procAll.processAndWrite(param.destPath);
     }
-    return absl::InternalError("No backend suitable for reading");
+    return {PhotoBase::Status::kInternalError,
+            "No backend suitable for reading"};
 }
 
 constexpr std::string_view kDownloadFile = "inpic";
@@ -130,7 +130,7 @@ DECLARE_COMMAND_HANDLER(rotatepic) {
         return;
     }
 
-    if (auto ret = processFile(params); ret.ok()) {
+    if (auto ret = processFile(params); ret.isOk()) {
         const auto infile = TgBot::InputFile::fromFile(params.destPath.string(),
                                                        params.mimeType);
         switch (attr) {
@@ -155,7 +155,7 @@ DECLARE_COMMAND_HANDLER(rotatepic) {
     } else {
         api->sendReplyMessage(message->message(),
                               res->get(Strings::FAILED_TO_ROTATE_IMAGE));
-        api->sendReplyMessage(message->message(), ret.message().data());
+        api->sendReplyMessage(message->message(), ret.getMessage());
     }
     std::filesystem::remove(params.srcPath);  // Delete the temporary file
     std::filesystem::remove(params.destPath);

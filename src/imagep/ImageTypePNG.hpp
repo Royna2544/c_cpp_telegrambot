@@ -1,12 +1,11 @@
 #pragma once
 
-#include <absl/status/status.h>
 #include <png.h>
 #include <pngconf.h>
 
+#include <SharedMalloc.hpp>
 #include <cstddef>
 #include <filesystem>
-#include <SharedMalloc.hpp>
 #include <vector>
 
 #include "ImagePBase.hpp"
@@ -41,7 +40,8 @@ struct PngImage : PhotoBase {
      *
      * @return True if the image was successfully read, false otherwise.
      */
-    absl::Status read(const std::filesystem::path& filename, const Target target) override;
+    TinyStatus read(const std::filesystem::path& filename,
+                    const Target target) override;
 
     /**
      * @brief Writes the image to the specified file path.
@@ -51,10 +51,10 @@ struct PngImage : PhotoBase {
      * @return A Result object that indicates whether the writing operation was
      * successful.
      */
-    absl::Status processAndWrite(const std::filesystem::path& filename) override;
+    TinyStatus processAndWrite(const std::filesystem::path& filename) override;
 
-    std::string version() const override;
-    
+    [[nodiscard]] std::string version() const override;
+
    private:
     using transform_fn_t =
         std::function<void(png_uint_32 src_width, png_uint_32 src_height,
@@ -74,5 +74,5 @@ struct PngImage : PhotoBase {
 
     void greyscale();
     void invert();
-    absl::Status rotate(int angle);
+    TinyStatus rotate(int angle);
 };

@@ -1,7 +1,6 @@
 // clang-format off
 #include <cstdio>
 #include <cstddef>
-#include <absl/status/status.h>
 #include <jpeglib.h>
 // clang-format on
 #include "ImageTypeJPEG.hpp"
@@ -15,6 +14,8 @@
 #include <cstring>
 #include <limits>
 #include <memory>
+
+#include "ImagePBase.hpp"
 
 struct jpegimg_error_mgr {
     jpeg_error_mgr pub;
@@ -36,17 +37,18 @@ jpegimg_output_message(j_common_ptr cinfo) {
     LOG(ERROR) << "libjpeg: " << buffer.data();
 }
 
-absl::Status JPEGImage::read(const std::filesystem::path& filename,
-                             const Target target) {
+JPEGImage::TinyStatus JPEGImage::read(const std::filesystem::path& filename,
+                                      const Target target) {
     if (target != Target::kPhoto) {
         LOG(ERROR) << "Invalid target for JPEG image";
-        return absl::InvalidArgumentError("Invalid target for JPEG image");
+        return {PhotoBase::Status::kInvalidArgument,
+                "Invalid target for JPEG image"};
     }
 
     F infile;
     if (!infile.open(filename, F::Mode::ReadBinary)) {
         LOG(ERROR) << "Error opening file: " << filename;
-        return absl::InternalError("Error opening file");
+        return {PhotoBase::Status::kInternalError, "Error opening file"};
     }
 
     jpeg_decompress_struct cinfo{};
@@ -58,7 +60,8 @@ absl::Status JPEGImage::read(const std::filesystem::path& filename,
 
     if (setjmp(jerr.setjmpbuf)) {
         LOG(ERROR) << "Error creating decompress struct";
-        return absl::InternalError("Error creating decompress struct");
+        return {PhotoBase::Status::kInternalError,
+                "Error creating decompress struct"};
     }
 
     jpeg_create_decompress(&cinfo);
@@ -66,7 +69,8 @@ absl::Status JPEGImage::read(const std::filesystem::path& filename,
     if (setjmp(jerr.setjmpbuf)) {
         LOG(ERROR) << "Error decompressing JPEG file";
         jpeg_destroy_decompress(&cinfo);
-        return absl::InternalError("Error decompressing JPEG file");
+        return {PhotoBase::Status::kInternalError,
+                "Error decompressing JPEG file"};
     }
 
     jpeg_stdio_src(&cinfo, infile);
@@ -90,10 +94,10 @@ absl::Status JPEGImage::read(const std::filesystem::path& filename,
     jpeg_finish_decompress(&cinfo);
     jpeg_destroy_decompress(&cinfo);
 
-    return absl::OkStatus();
+    return {PhotoBase::Status::kOk, "Success"};
 }
 
-absl::Status JPEGImage::rotate(int angle) {
+JPEGImage::TinyStatus JPEGImage::rotate(int angle) {
     size_t new_width = 0;
     size_t new_height = 0;
     std::unique_ptr<unsigned char[]> new_image_data = nullptr;
@@ -110,10 +114,10 @@ absl::Status JPEGImage::rotate(int angle) {
             break;
         case kAngleMin:
             // No-op
-            return absl::OkStatus();
+            return {PhotoBase::Status::kOk, "Success"};
         default:
             LOG(WARNING) << "libJPEG cannot handle angle: " << angle;
-            return absl::UnimplementedError("Unsupported angle");
+            return {PhotoBase::Status::kUnimplemented, "Unsupported angle"};
     }
 
     new_image_data = std::make_unique<unsigned char[]>(new_width * new_height *
@@ -123,23 +127,23 @@ absl::Status JPEGImage::rotate(int angle) {
             for (int c = 0; c < num_channels; ++c) {
                 switch (angle) {
                     case kAngle90:
-                        new_image_data[(x * new_width + (new_width - y - 1)) *
-                                           num_channels +
+                        new_image_data[((x * new_width + (new_width - y - 1)) *
+                                        num_channels) +
                                        c] =
-                            image_data[(y * width + x) * num_channels + c];
+                            image_data[((y * width + x) * num_channels) + c];
                         break;
                     case kAngle180:
-                        new_image_data[((new_height - y - 1) * new_width +
-                                        (new_width - x - 1)) *
-                                           num_channels +
+                        new_image_data[(((new_height - y - 1) * new_width +
+                                         (new_width - x - 1)) *
+                                        num_channels) +
                                        c] =
-                            image_data[(y * width + x) * num_channels + c];
+                            image_data[((y * width + x) * num_channels) + c];
                         break;
                     case kAngle270:
-                        new_image_data[((new_height - x - 1) * new_width + y) *
-                                           num_channels +
+                        new_image_data[(((new_height - x - 1) * new_width + y) *
+                                        num_channels) +
                                        c] =
-                            image_data[(y * width + x) * num_channels + c];
+                            image_data[((y * width + x) * num_channels) + c];
                         break;
                     default:
                         CHECK(false);
@@ -151,7 +155,7 @@ absl::Status JPEGImage::rotate(int angle) {
     image_data = std::move(new_image_data);
     width = new_width;
     height = new_height;
-    return absl::OkStatus();
+    return TinyStatus::ok();
 }
 
 void JPEGImage::greyscale() {
@@ -163,9 +167,9 @@ void JPEGImage::greyscale() {
     }
 
     for (size_t i = 0; i < width * height * num_channels; i += num_channels) {
-        const auto grey = static_cast<unsigned char>(0.299 * image_data[i] +
-                                                     0.587 * image_data[i + 1] +
-                                                     0.114 * image_data[i + 2]);
+        const auto grey = static_cast<unsigned char>(
+            (0.299 * image_data[i]) + (0.587 * image_data[i + 1]) +
+            (0.114 * image_data[i + 2]));
         image_data[i] = image_data[i + 1] = image_data[i + 2] = grey;
     }
 }
@@ -176,14 +180,15 @@ void JPEGImage::invert() {
     }
 }
 
-absl::Status JPEGImage::processAndWrite(const std::filesystem::path& filename) {
+JPEGImage::TinyStatus JPEGImage::processAndWrite(
+    const std::filesystem::path& filename) {
     F outfile;
 
     if (options.greyscale.get()) {
         greyscale();
     }
     auto err = rotate(options.rotate_angle.get());
-    if (!err.ok()) {
+    if (!err.isOk()) {
         return err;
     }
     if (options.invert_color.get()) {
@@ -192,7 +197,7 @@ absl::Status JPEGImage::processAndWrite(const std::filesystem::path& filename) {
 
     if (!outfile.open(filename, F::Mode::WriteBinary)) {
         LOG(ERROR) << "Error opening file: " << filename;
-        return absl::InternalError("Error opening file");
+        return {PhotoBase::Status::kInternalError, "Error opening file"};
     }
 
     jpeg_compress_struct cinfo{};
@@ -222,7 +227,7 @@ absl::Status JPEGImage::processAndWrite(const std::filesystem::path& filename) {
     jpeg_finish_compress(&cinfo);
     jpeg_destroy_compress(&cinfo);
 
-    return absl::OkStatus();
+    return TinyStatus::ok();
 }
 
 #define _STR(x) #x

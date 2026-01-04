@@ -2,7 +2,6 @@
 
 #include <absl/log/check.h>
 #include <absl/log/log.h>
-#include <absl/status/status.h>
 #include <webp/decode.h>
 #include <webp/encode.h>
 #include <webp/types.h>
@@ -12,34 +11,36 @@
 #include <cstdint>
 #include <memory>
 
-absl::Status WebPImage::read(const std::filesystem::path& filename,
-                             const Target target) {
+PhotoBase::TinyStatus WebPImage::read(const std::filesystem::path& filename,
+                                      const Target target) {
     int width = 0;
     int height = 0;
     uint8_t* decoded_data = nullptr;
     F file;
 
     if (target != Target::kPhoto) {
-        return absl::InvalidArgumentError("Invalid target for WebP image");
+        return {PhotoBase::Status::kInvalidArgument,
+                "Invalid target for WebP image"};
     }
 
     // Open the file for reading in binary mode
     if (!file.open(filename, F::Mode::ReadBinary)) {
-        return absl::InternalError("Can't open file for reading");
+        return {PhotoBase::Status::kReadError, "Can't open file for reading"};
     }
 
     const auto file_size = file.size();
 
     auto data = std::make_unique_for_overwrite<uint8_t[]>(file_size);
     if (!file.read(data.get(), 1, file_size)) {
-        return absl::InternalError("Failed to read from file");
+        return {PhotoBase::Status::kReadError, "Failed to read from file"};
     }
     file.close();
 
     decoded_data = WebPDecodeRGBA(data.get(), file_size, &width, &height);
 
     if (decoded_data == nullptr) {
-        return absl::InternalError("Couldn't decode image data");
+        return {PhotoBase::Status::kInternalError,
+                "Couldn't decode image data"};
     }
 
     width_ = width;
@@ -49,12 +50,12 @@ absl::Status WebPImage::read(const std::filesystem::path& filename,
     memcpy(data_.get(), decoded_data, bufferSize);
     WebPFree(decoded_data);
 
-    return absl::OkStatus();
+    return PhotoBase::TinyStatus::ok();
 }
 
-absl::Status WebPImage::rotate(int angle) {
+PhotoBase::TinyStatus WebPImage::rotate(int angle) {
     if (data_ == nullptr) {
-        return absl::NotFoundError("No image data to rotate");
+        return {PhotoBase::Status::kInvalidArgument, "No image data to rotate"};
     }
 
     webpimage_size_t rotated_width = 0;
@@ -73,10 +74,10 @@ absl::Status WebPImage::rotate(int angle) {
             break;
         case kAngleMin:
             // noop
-            return absl::OkStatus();
+            return PhotoBase::TinyStatus::ok();
         default:
             LOG(WARNING) << "libWEBP cannot handle angle: " << angle;
-            return absl::UnimplementedError("Cannot handle angle");
+            return {PhotoBase::Status::kUnimplemented, "Cannot handle angle"};
     }
 
     const size_t rotated_width_long = rotated_width;
@@ -111,7 +112,7 @@ absl::Status WebPImage::rotate(int angle) {
     data_ = std::move(rotated_data);
     width_ = rotated_width;
     height_ = rotated_height;
-    return absl::OkStatus();
+    return PhotoBase::TinyStatus::ok();
 }
 
 void WebPImage::greyscale() {
@@ -129,7 +130,6 @@ void WebPImage::greyscale() {
     }
 }
 
-
 void WebPImage::invert() {
     if (data_ == nullptr) {
         LOG(ERROR) << "No image data to invert";
@@ -138,21 +138,24 @@ void WebPImage::invert() {
 
     for (size_t i = 0; i < static_cast<size_t>(width_) * height_; ++i) {
         data_[i * 4] = std::numeric_limits<uint8_t>::max() - data_[i * 4];
-        data_[i * 4 + 1] = std::numeric_limits<uint8_t>::max() - data_[i * 4 + 1];
-        data_[i * 4 + 2] = std::numeric_limits<uint8_t>::max() - data_[i * 4 + 2];
+        data_[i * 4 + 1] =
+            std::numeric_limits<uint8_t>::max() - data_[i * 4 + 1];
+        data_[i * 4 + 2] =
+            std::numeric_limits<uint8_t>::max() - data_[i * 4 + 2];
     }
 }
 
-absl::Status WebPImage::processAndWrite(const std::filesystem::path& filename) {
+PhotoBase::TinyStatus WebPImage::processAndWrite(
+    const std::filesystem::path& filename) {
     if (data_ == nullptr) {
-        return absl::NotFoundError("No image data to write");
+        return {PhotoBase::Status::kInvalidArgument, "No image data to write"};
     }
 
     if (options.greyscale.get()) {
         greyscale();
     }
     auto err = rotate(options.rotate_angle.get());
-    if (!err.ok()) {
+    if (!err.isOk()) {
         return err;
     }
     if (options.invert_color.get()) {
@@ -161,7 +164,8 @@ absl::Status WebPImage::processAndWrite(const std::filesystem::path& filename) {
 
     F file;
     if (!file.open(filename, F::Mode::WriteBinary)) {
-        return absl::InternalError("Can't open file: " + filename.string());
+        return {PhotoBase::Status::kWriteError,
+                "Can't open file: " + filename.string()};
     }
 
     int stride = width_ * 4;
@@ -171,17 +175,18 @@ absl::Status WebPImage::processAndWrite(const std::filesystem::path& filename) {
     output_size =
         WebPEncodeRGBA(data_.get(), width_, height_, stride, QUALITY, &output);
     if (output_size == 0) {
-        return absl::InternalError("Failed to encode WebP image");
+        return {PhotoBase::Status::kInternalError,
+                "Failed to encode WebP image"};
     }
 
     if (!file.write(output, 1, output_size)) {
-        return absl::InternalError("Failed to write to file");
+        return {PhotoBase::Status::kWriteError, "Failed to write to file"};
     }
     file.close();
     WebPFree(output);
 
     LOG(INFO) << "New WebP image written to " << filename;
-    return absl::OkStatus();
+    return PhotoBase::TinyStatus::ok();
 }
 
 std::string WebPImage::version() const {

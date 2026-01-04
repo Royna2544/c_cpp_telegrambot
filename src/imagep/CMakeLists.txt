@@ -25,16 +25,11 @@ if(PNG_FOUND)
   list(APPEND IMGPROC_LIBS PNG::PNG)
   message(STATUS "libTgBotImgProc: libPNG Present")
 endif()
-if(OpenCV_FOUND AND NOT SANITIZER_CONFIG STREQUAL "ASan")
+if(OpenCV_FOUND)
   list(APPEND IMGPROC_FLAGS -DIMAGEPROC_HAVE_OPENCV)
   list(APPEND IMGPROC_SOURCES ImageProcOpenCV.cpp)
   list(APPEND IMGPROC_LIBS ${OpenCV_LIBS})
   message(STATUS "libTgBotImgProc: OpenCV Present")
-else()
-  message(
-    STATUS
-      "libTgBotImgProc: OpenCV_FOUND ${OpenCV_FOUND}, SanitizerConfig ${SANITIZER_CONFIG}"
-  )
 endif()
 
 tgbot_library(
@@ -42,11 +37,12 @@ tgbot_library(
   ImgProc
   SRCS
   ${IMGPROC_SOURCES}
+  ImageDebug.cpp
   ImageProcAll.cpp
   PRIVATE_INC
   ${OpenCV_INCLUDE_DIRS}
   LIBS
   ${IMGPROC_LIBS}
-  absl::status
   DEFS
-  ${IMGPROC_FLAGS})
+  ${IMGPROC_FLAGS}
+)

@@ -1,9 +1,10 @@
 #pragma once
 
 #include <absl/log/log.h>
-#include <absl/status/status.h>
 
 #include <filesystem>
+#include <stdexcept>
+#include <string>
 #include <trivial_helpers/generic_opt.hpp>
 
 template <int Min, int Max>
@@ -35,6 +36,37 @@ struct PhotoBase {
     static constexpr int kAngle270 = 270;
     static constexpr int kAngleMax = 360;
 
+    enum class Status {
+        kOk,
+        kInvalidImage,
+        kInvalidArgument,
+        kReadError,
+        kWriteError,
+        kProcessingError,
+        kInternalError,
+        kUnimplemented,
+        kUnknown,
+    };
+
+    class TinyStatus {
+        Status error;
+        std::string message;
+
+       public:
+        explicit TinyStatus(Status s) : error(s) {}
+        TinyStatus(Status s, std::string msg)
+            : error(s), message(std::move(msg)) {}
+        explicit operator Status() const { return error; }
+
+        // Accessor methods
+        [[nodiscard]] bool isOk() const { return error == Status::kOk; }
+        [[nodiscard]] Status status() const { return error; }
+        [[nodiscard]] const std::string& getMessage() const { return message; }
+
+        // Factory method for OK status
+        [[nodiscard]] static TinyStatus ok() { return TinyStatus(Status::kOk); }
+    };
+
     enum class Target {
         kNone,
         kVideo,
@@ -57,8 +89,8 @@ struct PhotoBase {
      * @param[in] target Target specification for the image reading process.
      * @return The result of the read operation
      */
-    virtual absl::Status read(const std::filesystem::path& filename,
-                              Target target = Target::kNone) = 0;
+    virtual TinyStatus read(const std::filesystem::path& filename,
+                            Target target = Target::kNone) = 0;
 
     /**
      * @brief Processes and writes the image to the specified file.
@@ -68,22 +100,23 @@ struct PhotoBase {
      * rotation, greyscale conversion, color inversion, and destination file
      * path.
      *
-     * @param[in] filename The path to the output image file. If the destination
-     * option is set, this parameter is ignored.
+     * @param[in] filename The path to the output image file.
      *
-     * @return An absl::Status indicating the success or failure of the
+     * @return A TinyStatus indicating the success or failure of the
      * operation.
-     * - absl::StatusCode::kOk: The operation was successful.
-     * - absl::StatusCode::kInvalidArgument: Invalid input parameters.
-     * - absl::StatusCode::kFailedPrecondition: The image is not valid or cannot
+     * - Status::kOk: The operation was successful.
+     * - Status::kWriteError: Failed to write the image to the specified file.
+     * - Status::kReadError: Failed to read the image from the source file.
+     * - Status::kInvalidArgument: Invalid input parameters.
+     * - Status::kProcessingError: The image is not valid or cannot
      * be processed.
-     * - absl::StatusCode::kUnknown: An unknown error occurred during the
+     * - Status::kUnknown: An unknown error occurred during the
      * operation.
      *
      * @note The function does not handle cases where the image is not valid or
      *       cannot be processed.
      */
-    virtual absl::Status processAndWrite(
+    virtual TinyStatus processAndWrite(
         const std::filesystem::path& filename) = 0;
 
     /**
@@ -102,6 +135,39 @@ inline std::ostream& operator<<(std::ostream& os, const PhotoBase::Target t) {
             return os << "video";
         case PhotoBase::Target::kPhoto:
             return os << "photo";
+    }
+    return os;
+}
+
+inline std::ostream& operator<<(std::ostream& os, const PhotoBase::Status s) {
+    switch (s) {
+        case PhotoBase::Status::kOk:
+            return os << "OK";
+        case PhotoBase::Status::kInvalidImage:
+            return os << "Invalid Image";
+        case PhotoBase::Status::kInvalidArgument:
+            return os << "Invalid Argument";
+        case PhotoBase::Status::kReadError:
+            return os << "Read Error";
+        case PhotoBase::Status::kWriteError:
+            return os << "Write Error";
+        case PhotoBase::Status::kProcessingError:
+            return os << "Processing Error";
+        case PhotoBase::Status::kInternalError:
+            return os << "Internal Error";
+        case PhotoBase::Status::kUnimplemented:
+            return os << "Unimplemented";
+        case PhotoBase::Status::kUnknown:
+            return os << "Unknown";
+    }
+    return os;
+}
+
+inline std::ostream& operator<<(std::ostream& os,
+                                const PhotoBase::TinyStatus& ts) {
+    os << ts.status();
+    if (!ts.getMessage().empty()) {
+        os << " (" << ts.getMessage() << ")";
     }
     return os;
 }
