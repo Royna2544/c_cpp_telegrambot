@@ -95,7 +95,7 @@
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "installDir": "${sourceDir}/out/install/${presetName}",
       "toolchainFile": "/home/royna/vcpkg/scripts/buildsystems/vcpkg.cmake",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" },
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "TGBOTCPP_LLM_SUPPORT" :true },
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
