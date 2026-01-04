@@ -9,7 +9,6 @@ tgbot_library(
   Helper.cpp
   LIBS
   popen_wdt
-  absl::status
   Utils
   PUBLIC_INC
   ${CMAKE_CURRENT_BINARY_DIR}

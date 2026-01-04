@@ -10,7 +10,6 @@
 #include <utility>
 
 #include "CompilerInTelegram.hpp"
-#include "absl/status/status.h"
 #include "popen_wdt.h"
 
 using std::chrono_literals::operator""ms;
@@ -18,16 +17,16 @@ using std::chrono::high_resolution_clock;
 using std::chrono::milliseconds;
 
 CompilerInTg::CompilerInTg(std::unique_ptr<Interface> callback,
-                           const StringResLoader::PerLocaleMap*loader)
+                           const StringResLoader::PerLocaleMap* loader)
     : _callback(std::move(callback)), _locale(loader) {}
 
-void CompilerInTg::runCommand(std::string cmd, std::stringstream &res,
+void CompilerInTg::runCommand(std::string cmd, std::stringstream& res,
                               bool use_wdt) {
     bool hasmore = false;
     int count = 0;
     std::array<char, BASH_READ_BUF> buf = {};
     size_t buf_len = 0;
-    popen_watchdog_data_t *p_wdt_data = nullptr;
+    popen_watchdog_data_t* p_wdt_data = nullptr;
 
     LOG(INFO) << __func__ << ": +++";
     _callback->onExecutionStarted(cmd);
@@ -35,8 +34,8 @@ void CompilerInTg::runCommand(std::string cmd, std::stringstream &res,
 
     if (!popen_watchdog_init(&p_wdt_data)) {
         LOG(ERROR) << "popen_watchdog_init failed";
-        _callback->onErrorStatus(
-            absl::InternalError("popen_watchdog_init failed"));
+        _callback->onErrorStatus(tinystatus::TinyStatus(
+            tinystatus::Status::kInternalError, "popen_watchdog_init failed"));
         return;
     }
     p_wdt_data->command = cmd.c_str();
@@ -46,8 +45,8 @@ void CompilerInTg::runCommand(std::string cmd, std::stringstream &res,
     if (!popen_watchdog_start(&p_wdt_data)) {
         LOG(ERROR) << "popen_watchdog_start failed";
         popen_watchdog_destroy(&p_wdt_data);
-        _callback->onErrorStatus(
-            absl::InternalError("popen_watchdog_start failed"));
+        _callback->onErrorStatus(tinystatus::TinyStatus(
+            tinystatus::Status::kInternalError, "popen_watchdog_start failed"));
         return;
     }
     while (popen_watchdog_read(&p_wdt_data, buf.data(), buf.size() - 1) >= 0) {

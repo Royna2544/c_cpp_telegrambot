@@ -1,4 +1,5 @@
 #include "CompilerInTelegram.hpp"
+#include "TinyStatus.hpp"
 
 void CompilerInTgForBash::run(MessageExt::Ptr message) {
     std::stringstream res;
@@ -7,7 +8,8 @@ void CompilerInTgForBash::run(MessageExt::Ptr message) {
         runCommand(message->get<MessageAttrs::ExtraText>(), res, !allowhang);
         _callback->onResultReady(res.str());
     } else {
-        _callback->onErrorStatus(absl::InvalidArgumentError(
+        _callback->onErrorStatus(tinystatus::TinyStatus(
+            tinystatus::Status::kInvalidArgument,
             _locale->get(Strings::SEND_BASH_COMMAND).data()));
     }
 }

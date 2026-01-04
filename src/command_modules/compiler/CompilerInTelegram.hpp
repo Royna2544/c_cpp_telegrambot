@@ -1,15 +1,14 @@
 #pragma once
 
-#include <absl/status/status.h>
-
+#include <TinyStatus.hpp>
 #include <api/MessageExt.hpp>
+#include <api/StringResLoader.hpp>
 #include <filesystem>
 #include <memory>
 #include <sstream>
 #include <string>
 #include <utility>
 
-#include <api/StringResLoader.hpp>
 #include "popen_wdt.h"
 
 using TgBot::Message;
@@ -34,6 +33,9 @@ struct CompilerInTg {
      *   - `onExecutionStarted()` → `onErrorStatus()`
      */
     struct Interface {
+        using TinyStatus = tinystatus::TinyStatus;
+        using Status = tinystatus::Status;
+
         /**
          * @brief Virtual destructor.
          *
@@ -64,11 +66,11 @@ struct CompilerInTg {
         /**
          * @brief Called when an error status occurs during execution.
          *
-         * @param status An absl::Status object representing the error
+         * @param status A TinyStatus object representing the error
          * encountered. Provides details of the error, including code and
          * message.
          */
-        virtual void onErrorStatus(absl::Status status) = 0;
+        virtual void onErrorStatus(TinyStatus status) = 0;
 
         /**
          * @brief Called when the result of the execution is ready.

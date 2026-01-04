@@ -1,16 +1,16 @@
-#include <absl/status/status.h>
-
+#include <api/StringResLoader.hpp>
 #include <filesystem>
 #include <fstream>
 
 #include "CompilerInTelegram.hpp"
-#include <api/StringResLoader.hpp>
+#include "TinyStatus.hpp"
 
 // Verify, Parse, Write
 bool CompilerInTgForGeneric::verifyParseWrite(const MessageExt::Ptr& message,
                                               std::string& extraargs) {
     if (!message->reply()->has<MessageAttrs::ExtraText>()) {
-        _callback->onErrorStatus(absl::InvalidArgumentError(
+        _callback->onErrorStatus(tinystatus::TinyStatus(
+            tinystatus::Status::kInvalidArgument,
             _locale->get(Strings::REPLY_TO_A_CODE).data()));
         return false;
     }
@@ -19,7 +19,8 @@ bool CompilerInTgForGeneric::verifyParseWrite(const MessageExt::Ptr& message,
     }
     std::ofstream file(params.outfile);
     if (file.fail()) {
-        _callback->onErrorStatus(absl::InternalError(
+        _callback->onErrorStatus(tinystatus::TinyStatus(
+            tinystatus::Status::kWriteError,
             _locale->get(Strings::FAILED_TO_WRITE_FILE).data()));
         return false;
     }
