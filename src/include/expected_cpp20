@@ -10,7 +10,7 @@
 #define __cpp_lib_expected 202211L
 
 // Let's say, a compat interface.
-namespace std_cpp20 {
+namespace compat {
 
 // Definition of `bad_expected_access`
 template <class E>
@@ -334,4 +334,4 @@ class expected {
 template <class E>
 unexpected(E) -> unexpected<E>;
 
-}  // namespace std_cpp20
+}  // namespace compat

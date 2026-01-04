@@ -26,10 +26,10 @@ using std::regex_constants::match_not_null;
             return process(source, match);
         } catch (const std::regex_error& e) {
             LOG(ERROR) << "Invalid regex: " << e.what();
-            return std_cpp20::unexpected{Error::InvalidRegex};
+            return compat::unexpected{Error::InvalidRegex};
         }
     }
-    return std_cpp20::unexpected{Error::None};
+    return compat::unexpected{Error::None};
 }
 
 struct ReplaceCommand : public RegexCommand {
@@ -76,13 +76,13 @@ struct ReplaceCommand : public RegexCommand {
                     replaceIndex = value;
                 } else {
                     LOG(ERROR) << "Invalid regex option: " << option;
-                    return std_cpp20::unexpected(Error::InvalidRegexOption);
+                    return compat::unexpected(Error::InvalidRegexOption);
                 }
             }
 
             // Error if both global and specific index are set
             if ((kRegexMatchFlags & format_first_only) == 0 && replaceIndex) {
-                return std_cpp20::unexpected(
+                return compat::unexpected(
                     Error::GlobalFlagAndMatchIndexInvalid);
             }
         }
@@ -115,7 +115,7 @@ struct ReplaceCommand : public RegexCommand {
             if (!replaced) {
                 LOG(INFO) << "Found " << count
                           << " matches, been told to replace " << *replaceIndex;
-                return std_cpp20::unexpected(Error::InvalidRegexMatchIndex);
+                return compat::unexpected(Error::InvalidRegexMatchIndex);
             }
             // Append the remainder
             result << std::string(last_pos, source.end());

@@ -29,7 +29,7 @@ class RegexCommand {
         None,  // Regex didn't match, so just ignore.
     };
 
-    using Result = std_cpp20::expected<std::string, RegexCommand::Error>;
+    using Result = compat::expected<std::string, RegexCommand::Error>;
 
     /**
      * @brief Returns a brief description of the command.
