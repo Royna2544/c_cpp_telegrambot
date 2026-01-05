@@ -6,11 +6,13 @@
 #include <memory>
 #include <string_view>
 
+#include "TinyStatus.hpp"
+
 using testing::_;
 
 struct RegexHandlerMockInterface : public RegexHandler::Interface {
     MOCK_METHOD(void, onSuccess, (const std::string&), (override));
-    MOCK_METHOD(void, onError, (const absl::Status&), (override));
+    MOCK_METHOD(void, onError, (const tinystatus::TinyStatus&), (override));
 };
 
 struct Params {
@@ -51,7 +53,7 @@ TEST_P(RegexHandlerTestSuccess, TestBody) {
 
 TEST_P(RegexHandlerTestFail, TestBody) {
     const auto& param = GetParam();
-    absl::Status status;
+    tinystatus::TinyStatus status;
 
     // Expect failure
     EXPECT_CALL(*mock, onSuccess(_)).Times(0);
@@ -59,7 +61,7 @@ TEST_P(RegexHandlerTestFail, TestBody) {
     EXPECT_CALL(*mock, onError(_)).WillOnce(testing::SaveArg<0>(&status));
 
     handler.execute(mock, param.sourceText.data(), param.regexCommand.data());
-    EXPECT_EQ(status.code(), absl::StatusCode::kInvalidArgument);
+    EXPECT_EQ(status.status(), tinystatus::Status::kInvalidArgument);
     clearVerification();
 }
 

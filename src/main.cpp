@@ -51,10 +51,10 @@
 
 class RegexHandlerInterface : public RegexHandler::Interface {
    public:
-    void onError(const absl::Status& status) override {
+    void onError(const tinystatus::TinyStatus& status) override {
         _api->sendReplyMessage(
             _message,
-            "RegexHandler has encountered an error: " + status.ToString());
+            "RegexHandler has encountered an error: " + status.getMessage());
     }
     void onSuccess(const std::string& result) override {
         _api->sendReplyMessage(_message->replyToMessage, result);

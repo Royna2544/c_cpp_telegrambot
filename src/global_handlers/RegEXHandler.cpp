@@ -12,6 +12,8 @@
 #include <sstream>
 #include <string>
 
+#include "TinyStatus.hpp"
+
 using std::regex_constants::ECMAScript;
 using std::regex_constants::format_first_only;
 using std::regex_constants::format_sed;
@@ -68,8 +70,9 @@ struct ReplaceCommand : public RegexCommand {
                     ++i;
                 } else if (absl::ascii_isdigit(option)) {
                     int value = 0;
-                    while (i < options.length() && absl::ascii_isdigit(options[i])) {
-                        value = value * 10 + (options[i] - '0');
+                    while (i < options.length() &&
+                           absl::ascii_isdigit(options[i])) {
+                        value = (value * 10) + (options[i] - '0');
                         ++i;
                     }
                     DLOG(INFO) << "Replace Index Value: " << value;
@@ -102,7 +105,8 @@ struct ReplaceCommand : public RegexCommand {
             bool replaced = false;
 
             for (auto it = match; it != match_end; ++it) {
-                result << std::string(last_pos, it->prefix().second);  // Append unmatched part
+                result << std::string(
+                    last_pos, it->prefix().second);  // Append unmatched part
                 if (++count == *replaceIndex) {
                     result << replacement;  // Add the replacement
                     replaced = true;
@@ -124,8 +128,8 @@ struct ReplaceCommand : public RegexCommand {
         }
 
         DLOG(INFO) << fmt::format(
-            "Replace with RegEX: '{}', target: '{}', Opt: global={} icase={}", target,
-            replacement, (kRegexMatchFlags & format_first_only) == 0,
+            "Replace with RegEX: '{}', target: '{}', Opt: global={} icase={}",
+            target, replacement, (kRegexMatchFlags & format_first_only) == 0,
             (kRegexFlags & icase) == 0);
 
         // Global replacement or case-insensitive
@@ -177,9 +181,7 @@ void RegexHandler::execute(const std::shared_ptr<Interface>& callback,
     std::lock_guard<std::mutex> lock(_mutex);
 
     if (_handlers.empty()) {
-        // No registered regex commands, notify the callback with an empty
-        // result
-        callback->onError(absl::InternalError("No registered regex commands"));
+        // No registered regex commands, just return.
         return;
     }
     for (const auto& handler : _handlers) {
@@ -189,30 +191,35 @@ void RegexHandler::execute(const std::shared_ptr<Interface>& callback,
         } else {
             switch (ret.error()) {
                 case RegexCommand::Error::InvalidRegexOption:
-                    callback->onError(absl::InvalidArgumentError(
+                    callback->onError(tinystatus::TinyStatus(
+                        tinystatus::Status::kInvalidArgument,
                         "Invalid regex option in command: " + regexCommand));
                     return;
                 case RegexCommand::Error::GlobalFlagAndMatchIndexInvalid:
-                    callback->onError(absl::InvalidArgumentError(
+                    callback->onError(tinystatus::TinyStatus(
+                        tinystatus::Status::kInvalidArgument,
                         "Global flag and match index are not compatible: " +
-                        regexCommand));
+                            regexCommand));
                     return;
                 case RegexCommand::Error::InvalidRegexMatchIndex:
-                    callback->onError(absl::InvalidArgumentError(
+                    callback->onError(tinystatus::TinyStatus(
+                        tinystatus::Status::kInvalidArgument,
                         "Invalid regex match index: " + regexCommand));
                     return;
                 case RegexCommand::Error::InvalidRegex:
-                    callback->onError(absl::InvalidArgumentError(
+                    callback->onError(tinystatus::TinyStatus(
+                        tinystatus::Status::kInvalidArgument,
                         "Invalid regex: " + regexCommand));
                     return;
                 case RegexCommand::Error::None:
                     // No error, just continue to the next handler
                     break;
                 default:
-                    callback->onError(absl::InternalError(
+                    callback->onError(tinystatus::TinyStatus(
+                        tinystatus::Status::kInternalError,
                         "An unexpected error occurred while processing "
                         "regex command: " +
-                        regexCommand));
+                            regexCommand));
                     return;
             }
         }

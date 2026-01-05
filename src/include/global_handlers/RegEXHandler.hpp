@@ -4,9 +4,11 @@
 
 #include <expected_cpp20>
 #include <memory>
+#include <mutex>
 #include <regex>
 #include <string>
-#include <mutex>
+
+#include "TinyStatus.hpp"
 
 /**
  * @brief Interface for a regex command.
@@ -25,8 +27,8 @@ class RegexCommand {
         InvalidRegexOption,      // Unknown regex option.
         // Using a global flag and a match index doesn't make sense.
         GlobalFlagAndMatchIndexInvalid,
-        InvalidRegex, // Regex command itself is invalid
-        None,  // Regex didn't match, so just ignore.
+        InvalidRegex,  // Regex command itself is invalid
+        None,          // Regex didn't match, so just ignore.
     };
 
     using Result = compat::expected<std::string, RegexCommand::Error>;
@@ -37,7 +39,7 @@ class RegexCommand {
      * @return A brief description of the command.
      */
     [[nodiscard]] virtual std::string_view description() const = 0;
-    
+
    protected:
     /**
      * @brief Returns the regex pattern for the command.
@@ -45,7 +47,6 @@ class RegexCommand {
      * @return The regex pattern for the command.
      */
     [[nodiscard]] virtual std::regex command_regex() const = 0;
-
 
     /**
      * @brief Processes the command using the given source and command strings.
@@ -70,7 +71,7 @@ struct RegexHandler {
     struct Interface {
         virtual ~Interface() = default;
         // Called when regex processing is complete. Error or success
-        virtual void onError(const absl::Status& status) = 0;
+        virtual void onError(const tinystatus::TinyStatus& status) = 0;
         virtual void onSuccess(const std::string& result) = 0;
     };
 

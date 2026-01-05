@@ -22,6 +22,7 @@ class TinyStatus {
     std::string message;
 
    public:
+    TinyStatus() = default;
     explicit TinyStatus(Status s) : error(s) {}
     TinyStatus(Status s, std::string msg) : error(s), message(std::move(msg)) {}
     explicit operator Status() const { return error; }

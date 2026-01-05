@@ -428,8 +428,6 @@ tgbot_library(
   Regex
   SRCS
   src/global_handlers/RegEXHandler.cpp
-  LIBS
-  absl::status
   STATIC)
 
 tgbot_library(
