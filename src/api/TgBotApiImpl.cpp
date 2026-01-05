@@ -25,7 +25,6 @@
 #include <api/components/UnknownCommand.hpp>
 #include <array>
 #include <chrono>
-#include <cpptrace/cpptrace.hpp>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -38,6 +37,10 @@
 #include <utility>
 
 #include "tgbot/net/CurlHttpClient.h"
+
+#ifdef TGBOTCPP_ENABLE_CPPTRACE
+#include <cpptrace/cpptrace.hpp>
+#endif
 
 template <>
 struct fmt::formatter<CommandModule::Info::Type> : formatter<std::string_view> {
@@ -297,7 +300,9 @@ void handleTgBotApiEx(const TgBot::TgException& ex) {
             break;
     }
     LOG(ERROR) << "TgBotAPI exception: " << ex.what();
+#ifdef TGBOTCPP_ENABLE_CPPTRACE
     cpptrace::generate_trace().print();
+#endif
     throw;
 }
 

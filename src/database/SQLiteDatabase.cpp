@@ -5,7 +5,6 @@
 #include <absl/strings/ascii.h>
 #include <fmt/core.h>
 
-#include <cpptrace/cpptrace.hpp>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -24,6 +23,10 @@
 #include <variant>
 
 #include "api/typedefs.h"
+
+#ifdef TGBOTCPP_ENABLE_CPPTRACE  
+#include <cpptrace/cpptrace.hpp>
+#endif
 
 namespace {
 // Hash function for std::pair to use with unordered_map
@@ -66,7 +69,9 @@ void SQLiteDatabase::Helper::logInvalidState(
     }
     LOG(ERROR) << "Invalid state for " << location.function_name() << ": "
                << stateString;
+#ifdef TGBOTCPP_ENABLE_CPPTRACE  
     cpptrace::generate_trace().print();
+#endif
 }
 
 SQLiteDatabase::Helper::Helper(sqlite3* db,
@@ -214,7 +219,9 @@ bool SQLiteDatabase::Helper::commonExecCheck(
         case State::HAS_ARGUMENTS:
             LOG(WARNING) << location.function_name()
                          << " called with added arguments, but is not bound?";
+#ifdef TGBOTCPP_ENABLE_CPPTRACE  
             cpptrace::generate_trace().print();
+#endif
             bindArguments();
             return true;
         default:
