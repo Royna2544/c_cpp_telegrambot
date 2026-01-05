@@ -19,8 +19,6 @@
 #include <api/TgBotApiImpl.hpp>
 #include <boost/system/system_error.hpp>
 #include <boost/throw_exception.hpp>
-#include <socket/shared/FileHelperNew.hpp>
-#include <socket/server/SocketInterface.hpp>
 #include <cstdint>
 #include <cstdlib>
 #include <database/bot/TgBotDatabaseImpl.hpp>
@@ -35,6 +33,8 @@
 #include <memory>
 #include <ml/ChatDataCollector.hpp>
 #include <restartfmt_parser.hpp>
+#include <socket/server/SocketInterface.hpp>
+#include <socket/shared/FileHelperNew.hpp>
 #include <stdexcept>
 #include <thread>
 #include <trivial_helpers/fruit_inject.hpp>
@@ -204,8 +204,7 @@ getTgBotApiImplComponent() {
 
 #ifdef TGBOTCPP_ENABLE_WEBSERVER
 fruit::Component<fruit::Required<ThreadManager, CommandLine>,
-                 Unused<TgBotWebServer>>
-getWebServerComponent() {
+                 Unused<TgBotWebServer>> getWebServerComponent() {
     return fruit::createComponent()
         .bind<TgBotWebServerBase, TgBotWebServer>()
         .registerProvider([](ThreadManager* threadManager,
@@ -222,8 +221,7 @@ getWebServerComponent() {
 #endif
 
 fruit::Component<fruit::Required<ThreadManager, TgBotApi, AuthContext>,
-                 WrapPtr<SpamBlockBase>>
-getSpamBlockComponent() {
+                 WrapPtr<SpamBlockBase>> getSpamBlockComponent() {
     return fruit::createComponent().registerProvider(
         [](ThreadManager* thread, TgBotApi::Ptr api,
            AuthContext* auth) -> WrapPtr<SpamBlockBase> {
@@ -299,7 +297,7 @@ getRegexHandlerComponent() {
 
 fruit::Component<TgBotApi, AuthContext, DatabaseBase, ThreadManager,
                  ConfigManager, Unused<RegexHandler>, Unused<NetworkLogSink>,
-                 WrapPtr<SpamBlockBase>, 
+                 WrapPtr<SpamBlockBase>,
 #ifdef TGBOTCPP_ENABLE_WEBSERVER
                  Unused<TgBotWebServer>,
 #endif
@@ -467,7 +465,7 @@ int app_main(int argc, char** argv) {
     // Initialize dependencies
     fruit::Injector<TgBotApi, AuthContext, DatabaseBase, ThreadManager,
                     ConfigManager, Unused<RegexHandler>, Unused<NetworkLogSink>,
-                    WrapPtr<SpamBlockBase>, 
+                    WrapPtr<SpamBlockBase>,
 #ifdef TGBOTCPP_ENABLE_WEBSERVER
                     Unused<TgBotWebServer>,
 #endif
@@ -578,12 +576,12 @@ int app_main(int argc, char** argv) {
 
     CommandLine cmdline{argc, argv};
     int exitCode = TGBOT_EXITCODE_OK;
-    Env()["TGBOT_INSTALL_ROOT"] = 
+    Env()["TGBOT_INSTALL_ROOT"] =
         CommandLine{argc, argv}.getPath(FS::PathType::INSTALL_ROOT).string();
 
     // Retry configuration for network errors
     int retryCount = 0;
-    constexpr int kMaxRetries = 3;
+    constexpr int kMaxRetries = 10;
     constexpr int kBaseBackoffSeconds = 5;
 
     while (!SignalHandler::isSignaled()) {
@@ -599,17 +597,19 @@ int app_main(int argc, char** argv) {
                 exitCode = TGBOT_EXITCODE_NETWORK;
                 break;
             }
-            // Linear backoff (5s, 10s, 15s intervals)
-            // This provides a gradual increase suitable for transient network issues
+            // Linear backoff (5s, 10s, 15s, ... intervals)
+            // This provides a gradual increase suitable for transient network
+            // issues
             auto backoffSeconds = kBaseBackoffSeconds * retryCount;
-            LOG(WARNING) << fmt::format(
-                "Retrying in {}s (attempt {}/{})", 
-                backoffSeconds, retryCount, kMaxRetries);
-            
+            LOG(WARNING) << fmt::format("Retrying in {}s (attempt {}/{})",
+                                        backoffSeconds, retryCount,
+                                        kMaxRetries);
+
             // Sleep with periodic shutdown signal checks for responsive exit
             for (int i = 0; i < backoffSeconds; ++i) {
                 if (SignalHandler::isSignaled()) {
-                    LOG(INFO) << "Shutdown signal received during retry backoff";
+                    LOG(INFO)
+                        << "Shutdown signal received during retry backoff";
                     goto exit_retry_loop;
                 }
                 std::this_thread::sleep_for(std::chrono::seconds(1));
