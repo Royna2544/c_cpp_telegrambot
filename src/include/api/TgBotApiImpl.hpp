@@ -14,6 +14,7 @@
 #include "MessageExt.hpp"
 #include "Providers.hpp"
 #include "RateLimit.hpp"
+#include "RefLock.hpp"
 #include "StringResLoader.hpp"
 #include "TgBotApi.hpp"
 #include "typedefs.h"
@@ -45,7 +46,8 @@ class TgBotApiImpl : public TgBotApi {
 
     // Constructor requires a bot token to create a Bot instance.
     TgBotApiImpl(const std::string_view token, AuthContext* auth,
-                 StringResLoader* loader, Providers* providers);
+                 StringResLoader* loader, Providers* providers,
+                 RefLock* refLock);
     ~TgBotApiImpl() override;
 
     class ModulesManagement;
@@ -437,8 +439,10 @@ class TgBotApiImpl : public TgBotApi {
     bool unloadCommand(const std::string& command) override;
     bool reloadCommand(const std::string& command) override;
     void commandHandler(const std::string& command,
-                        AuthContext::AccessLevel authflags, Message::Ptr message);
-    bool validateValidArgs(const CommandModule::Info * module, MessageExt::Ptr message);
+                        AuthContext::AccessLevel authflags,
+                        Message::Ptr message);
+    bool validateValidArgs(const CommandModule::Info* module,
+                           MessageExt::Ptr message);
 
     void addInlineQueryKeyboard(InlineQuery query,
                                 TgBot::InlineQueryResult::Ptr result) override;
@@ -472,11 +476,12 @@ class TgBotApiImpl : public TgBotApi {
     class Async;
     Bot _bot;
 
-    mutable User::Ptr me; // Just a cache
+    mutable User::Ptr me;  // Just a cache
 
     AuthContext* _auth;
     StringResLoader* _loader;
     Providers* _provider;
     std::vector<CommandListener*> _listeners;
     IntervalRateLimiter _rateLimiter;
+    RefLock* _refLock;
 };

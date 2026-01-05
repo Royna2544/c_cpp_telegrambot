@@ -182,15 +182,15 @@ getResourceProvider() {
         });
 }
 
-fruit::Component<
-    fruit::Required<AuthContext, StringResLoader, Providers, ConfigManager>,
-    TgBotApiImpl, TgBotApi>
+fruit::Component<fruit::Required<AuthContext, StringResLoader, Providers,
+                                 ConfigManager, RefLock>,
+                 TgBotApiImpl, TgBotApi>
 getTgBotApiImplComponent() {
     return fruit::createComponent()
         .bind<TgBotApi, TgBotApiImpl>()
         .registerProvider([](AuthContext* auth, StringResLoader* strings,
-                             Providers* provider,
-                             ConfigManager* config) -> TgBotApiImpl* {
+                             Providers* provider, ConfigManager* config,
+                             RefLock* refLock) -> TgBotApiImpl* {
             auto token = config->get(ConfigManager::Configs::TOKEN);
             if (!token) {
                 LOG(ERROR) << "Failed to get TOKEN variable";
@@ -198,7 +198,8 @@ getTgBotApiImplComponent() {
             }
 
             // Initialize TgBotWrapper instance with provided token
-            return new TgBotApiImpl{token.value(), auth, strings, provider};
+            return new TgBotApiImpl{token.value(), auth, strings, provider,
+                                    refLock};
         });
 }
 
@@ -297,7 +298,7 @@ getRegexHandlerComponent() {
 
 fruit::Component<TgBotApi, AuthContext, DatabaseBase, ThreadManager,
                  ConfigManager, Unused<RegexHandler>, Unused<NetworkLogSink>,
-                 WrapPtr<SpamBlockBase>,
+                 WrapPtr<SpamBlockBase>, RefLock,
 #ifdef TGBOTCPP_ENABLE_WEBSERVER
                  Unused<TgBotWebServer>,
 #endif
@@ -465,7 +466,7 @@ int app_main(int argc, char** argv) {
     // Initialize dependencies
     fruit::Injector<TgBotApi, AuthContext, DatabaseBase, ThreadManager,
                     ConfigManager, Unused<RegexHandler>, Unused<NetworkLogSink>,
-                    WrapPtr<SpamBlockBase>,
+                    WrapPtr<SpamBlockBase>, RefLock,
 #ifdef TGBOTCPP_ENABLE_WEBSERVER
                     Unused<TgBotWebServer>,
 #endif
@@ -574,10 +575,13 @@ int app_main(int argc, char** argv) {
     LOG(INFO) << "Subsystems initialized, bot started: " << argv[0];
     LOG(INFO) << fmt::format("Starting took {}", startupDp.get());
 
+    // Export environment variable for install root
     CommandLine cmdline{argc, argv};
     int exitCode = TGBOT_EXITCODE_OK;
     Env()["TGBOT_INSTALL_ROOT"] =
         CommandLine{argc, argv}.getPath(FS::PathType::INSTALL_ROOT).string();
+
+    auto refLock = injector.get<RefLock*>();
 
     // Retry configuration for network errors
     int retryCount = 0;
@@ -622,6 +626,12 @@ int app_main(int argc, char** argv) {
     }
 exit_retry_loop:
     threadManager->destroy();
+
+    {
+        auto lock = refLock->acquireExclusive();
+        LOG(INFO) << "All threads, modules have been stopped.";
+    }
+
     LOG(INFO) << fmt::format(
         "{} : exiting now...",
         std::filesystem::path(argv[0]).filename().string());

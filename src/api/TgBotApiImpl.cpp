@@ -36,6 +36,7 @@
 #include <thread>
 #include <utility>
 
+#include "RefLock.hpp"
 #include "tgbot/net/CurlHttpClient.h"
 
 #ifdef TGBOTCPP_ENABLE_CPPTRACE
@@ -155,6 +156,8 @@ bool TgBotApiImpl::authorized(const MessageExt::Ptr& message,
 void TgBotApiImpl::commandHandler(const std::string& command,
                                   const AuthContext::AccessLevel authflags,
                                   Message::Ptr message) {
+    auto lock = _refLock->acquireShared();
+
     // Find the module first.
     const auto* module = (*kModuleLoader)[command];
 
@@ -574,13 +577,15 @@ bool TgBotApiImpl::answerCallbackQuery_impl(
 }
 
 TgBotApiImpl::TgBotApiImpl(const std::string_view token, AuthContext* auth,
-                           StringResLoader* loader, Providers* providers)
+                           StringResLoader* loader, Providers* providers,
+                           RefLock* refLock)
     : _bot(std::string(token),
            std::make_unique<TgBot::CurlHttpClient>(std::chrono::seconds(30))),
       _auth(auth),
       _loader(loader),
       _provider(providers),
-      _rateLimiter(2, std::chrono::seconds(3)) {
+      _rateLimiter(2, std::chrono::seconds(3)),
+      _refLock(refLock) {
     globalLinkOptions = std::make_shared<TgBot::LinkPreviewOptions>();
     globalLinkOptions->isDisabled = true;
     // Register -> onUnknownCommand
