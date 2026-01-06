@@ -15,8 +15,8 @@
 template <>
 struct fmt::formatter<tgbot::proto::MediaType> : formatter<string_view> {
     // parse is inherited from formatter<string_view>.
-    auto format(tgbot::proto::MediaType c,
-                format_context &ctx) const -> format_context::iterator {
+    auto format(tgbot::proto::MediaType c, format_context& ctx) const
+        -> format_context::iterator {
         string_view name = "unknown";
         switch (c) {
             case tgbot::proto::MediaType::VIDEO:
@@ -65,7 +65,7 @@ ProtoDatabase::ListResult ProtoDatabase::addUserToList(ListType type,
     if (findByUid(otherList.id(), user)) {
         return ListResult::ALREADY_IN_OTHER_LIST;
     }
-    auto *const myList = getMutablePersonList(type);
+    auto* const myList = getMutablePersonList(type);
     if (findByUid(myList->id(), user)) {
         return ListResult::ALREADY_IN_LIST;
     }
@@ -75,10 +75,10 @@ ProtoDatabase::ListResult ProtoDatabase::addUserToList(ListType type,
 
 ProtoDatabase::ListResult ProtoDatabase::removeUserFromList(ListType type,
                                                             UserId user) const {
-    auto *const myList = getMutablePersonList(type);
+    auto* const myList = getMutablePersonList(type);
     auto loc = findByUid(myList->id(), user);
     if (loc.has_value()) {
-        auto *list = myList->mutable_id();
+        auto* list = myList->mutable_id();
         list->erase(list->begin() + loc.value());
         return ListResult::OK;
     }
@@ -171,13 +171,13 @@ std::optional<UserId> ProtoDatabase::getOwnerUserId() const {
     return dbinfo->object.ownerid();
 }
 
-void ProtoDatabase::dumpList(std::ostream &os, const PersonList &list,
-                             const char *name) {
+void ProtoDatabase::dumpList(std::ostream& os, const PersonList& list,
+                             const char* name) {
     os << fmt::format("Dump of {}\nSize: {}\n{}", name, list.id_size(),
                       fmt::join(list.id(), "\n"));
 }
 
-const PersonList &ProtoDatabase::getPersonList(
+const PersonList& ProtoDatabase::getPersonList(
     ProtoDatabase::ListType type) const {
     switch (type) {
         case DatabaseBase::ListType::WHITELIST:
@@ -188,7 +188,7 @@ const PersonList &ProtoDatabase::getPersonList(
     CHECK(false) << "unreachable";
 }
 
-PersonList *ProtoDatabase::getMutablePersonList(ListType type) const {
+PersonList* ProtoDatabase::getMutablePersonList(ListType type) const {
     switch (type) {
         case DatabaseBase::ListType::WHITELIST:
             return dbinfo->object.mutable_whitelist();
@@ -198,7 +198,7 @@ PersonList *ProtoDatabase::getMutablePersonList(ListType type) const {
     CHECK(false) << "unreachable";
 }
 
-const PersonList &ProtoDatabase::getOtherPersonList(
+const PersonList& ProtoDatabase::getOtherPersonList(
     ProtoDatabase::ListType type) const {
     switch (type) {
         case DatabaseBase::ListType::WHITELIST:
@@ -212,9 +212,9 @@ const PersonList &ProtoDatabase::getOtherPersonList(
 std::optional<ProtoDatabase::MediaInfo> ProtoDatabase::queryMediaInfo(
     std::string str) const {
     std::optional<tgbot::proto::MediaToName> it;
-    const auto &obj = dbinfo->object;
-    for (const auto &mediaEntriesIt : obj.mediatonames()) {
-        for (const auto &name : mediaEntriesIt.names()) {
+    const auto& obj = dbinfo->object;
+    for (const auto& mediaEntriesIt : obj.mediatonames()) {
+        for (const auto& name : mediaEntriesIt.names()) {
             if (absl::EqualsIgnoreCase(name, str)) {
                 it = mediaEntriesIt;
                 break;
@@ -232,20 +232,20 @@ std::optional<ProtoDatabase::MediaInfo> ProtoDatabase::queryMediaInfo(
 }
 
 ProtoDatabase::AddResult ProtoDatabase::addMediaInfo(
-    const MediaInfo &info) const {
-    auto *const mediaEntries = dbinfo->object.mutable_mediatonames();
-    for (const auto &elem : *mediaEntries) {
+    const MediaInfo& info) const {
+    auto* const mediaEntries = dbinfo->object.mutable_mediatonames();
+    for (const auto& elem : *mediaEntries) {
         if (elem.telegrammediauniqueid() == info.mediaUniqueId) {
             return AddResult::ALREADY_EXISTS;
         }
     }
-    auto *const mediaEntry = mediaEntries->Add();
+    auto* const mediaEntry = mediaEntries->Add();
     mediaEntry->set_telegrammediaid(info.mediaId);
     mediaEntry->set_telegrammediauniqueid(info.mediaUniqueId);
     mediaEntry->set_mediatype(
         static_cast<tgbot::proto::MediaType>(info.mediaType));
-    auto *const mediaNames = mediaEntry->mutable_names();
-    for (const auto &name : info.names) {
+    auto* const mediaNames = mediaEntry->mutable_names();
+    for (const auto& name : info.names) {
         *mediaNames->Add() = name;
     }
     return AddResult::OK;
@@ -253,12 +253,12 @@ ProtoDatabase::AddResult ProtoDatabase::addMediaInfo(
 
 std::vector<ProtoDatabase::MediaInfo> ProtoDatabase::getAllMediaInfos() const {
     std::vector<MediaInfo> result;
-    for (const auto &mediaEntriesIt : dbinfo->object.mediatonames()) {
+    for (const auto& mediaEntriesIt : dbinfo->object.mediatonames()) {
         MediaInfo info;
         info.mediaId = mediaEntriesIt.telegrammediaid();
         info.mediaUniqueId = mediaEntriesIt.telegrammediauniqueid();
         info.mediaType = static_cast<MediaType>(mediaEntriesIt.mediatype());
-        for (const auto &name : mediaEntriesIt.names()) {
+        for (const auto& name : mediaEntriesIt.names()) {
             info.names.emplace_back(name);
         }
         result.emplace_back(info);
@@ -266,12 +266,12 @@ std::vector<ProtoDatabase::MediaInfo> ProtoDatabase::getAllMediaInfos() const {
     return result;
 }
 
-std::ostream &ProtoDatabase::dump(std::ostream &os) const {
+std::ostream& ProtoDatabase::dump(std::ostream& os) const {
     if (!dbinfo.has_value()) {
         os << "Database not loaded!";
         return os;
     }
-    const auto &db = dbinfo->object;
+    const auto& db = dbinfo->object;
 
     os << fmt::format("Dump of database file: {}\nOwner ID: {}\n",
                       dbinfo->path.string(),
@@ -286,7 +286,7 @@ std::ostream &ProtoDatabase::dump(std::ostream &os) const {
 
     int count = 0;
     os << fmt::format("\nMediaNames Dump: (Size {})\n", db.mediatonames_size());
-    for (auto const &medias : *getMediaToName()) {
+    for (auto const& medias : *getMediaToName()) {
         os << fmt::format("- Entry {}:\n", count++);
         if (medias.has_telegrammediaid()) {
             os << fmt::format("\tMedia FileId: {}\n", medias.telegrammediaid());
@@ -304,8 +304,8 @@ std::ostream &ProtoDatabase::dump(std::ostream &os) const {
     os << fmt::format("\nChatNames Dump: (Size {})\n",
                       dbinfo->object.chattonames_size());
     count = 0;
-    for (const auto &chat : db.chattonames()) {
-        os << fmt::format("- Entry {}:\n", count);
+    for (const auto& chat : db.chattonames()) {
+        os << fmt::format("- Entry {}:\n", count++);
         if (chat.has_telegramchatid()) {
             os << fmt::format("\tChat Id: {}\n", chat.telegramchatid());
         }
@@ -330,13 +330,13 @@ void ProtoDatabase::setOwnerUserId(UserId userId) const {
 
 [[nodiscard]] ProtoDatabase::AddResult ProtoDatabase::addChatInfo(
     const ChatId chatid, const std::string_view name) const {
-    auto *const chats = dbinfo->object.mutable_chattonames();
-    for (const auto &chat : *chats) {
+    auto* const chats = dbinfo->object.mutable_chattonames();
+    for (const auto& chat : *chats) {
         if (chat.telegramchatid() == chatid) {
             return AddResult::ALREADY_EXISTS;
         }
     }
-    auto *const chat = chats->Add();
+    auto* const chat = chats->Add();
     chat->set_telegramchatid(chatid);
     chat->set_name(name.data());
     return AddResult::OK;
@@ -344,9 +344,9 @@ void ProtoDatabase::setOwnerUserId(UserId userId) const {
 
 [[nodiscard]] std::optional<ChatId> ProtoDatabase::getChatId(
     const std::string_view name) const {
-    const auto &obj = dbinfo->object;
-    for (const auto &chat : obj.chattonames()) {
-        if (absl::EqualsIgnoreCase(chat.name(), name.data())) {
+    const auto& obj = dbinfo->object;
+    for (const auto& chat : obj.chattonames()) {
+        if (absl::EqualsIgnoreCase(chat.name(), name)) {
             return chat.telegramchatid();
         }
     }

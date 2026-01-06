@@ -24,7 +24,7 @@
 
 #include "api/typedefs.h"
 
-#ifdef TGBOTCPP_ENABLE_CPPTRACE  
+#ifdef TGBOTCPP_ENABLE_CPPTRACE
 #include <cpptrace/cpptrace.hpp>
 #endif
 
@@ -69,7 +69,7 @@ void SQLiteDatabase::Helper::logInvalidState(
     }
     LOG(ERROR) << "Invalid state for " << location.function_name() << ": "
                << stateString;
-#ifdef TGBOTCPP_ENABLE_CPPTRACE  
+#ifdef TGBOTCPP_ENABLE_CPPTRACE
     cpptrace::generate_trace().print();
 #endif
 }
@@ -82,7 +82,8 @@ SQLiteDatabase::Helper::Helper(sqlite3* db,
     int ret = 0;
 
     if (!sqlFile.is_open()) {
-        throw exception(fmt::format("Could not open SQL script file: {}", filename));
+        throw exception(
+            fmt::format("Could not open SQL script file: {}", filename));
     }
     scriptContent = std::string((std::istreambuf_iterator<char>(sqlFile)),
                                 std::istreambuf_iterator<char>());
@@ -219,7 +220,7 @@ bool SQLiteDatabase::Helper::commonExecCheck(
         case State::HAS_ARGUMENTS:
             LOG(WARNING) << location.function_name()
                          << " called with added arguments, but is not bound?";
-#ifdef TGBOTCPP_ENABLE_CPPTRACE  
+#ifdef TGBOTCPP_ENABLE_CPPTRACE
             cpptrace::generate_trace().print();
 #endif
             bindArguments();
@@ -339,8 +340,7 @@ SQLiteDatabase::ListResult SQLiteDatabase::removeUserFromList(
             return res;
     }
 
-    auto helper =
-        Helper::create(db, _sqlScriptsPath, Helper::kRemoveUserFile.data());
+    auto helper = Helper::create(db, _sqlScriptsPath, Helper::kRemoveUserFile);
     if (!helper->prepare()) {
         return ListResult::BACKEND_ERROR;
     }
@@ -363,8 +363,7 @@ SQLiteDatabase::ListResult SQLiteDatabase::removeUserFromList(
     ListResult result = ListResult::BACKEND_ERROR;
     std::optional<Helper::Row> row;
 
-    auto helper =
-        Helper::create(db, _sqlScriptsPath, Helper::kFindUserFile.data());
+    auto helper = Helper::create(db, _sqlScriptsPath, Helper::kFindUserFile);
     if (!helper->prepare()) {
         return result;
     }
@@ -395,11 +394,14 @@ bool SQLiteDatabase::load(std::filesystem::path filepath) {
         return false;
     }
 
-    bool existed = std::filesystem::exists(filepath, ec);
-    if (ec) {
-        LOG(ERROR) << "Failed to check if file exists: " << filepath << ": "
-                   << ec.message();
-        return false;
+    bool existed = false;
+    if (filepath != kInMemoryDatabase) {
+        existed = std::filesystem::exists(filepath, ec);
+        if (ec) {
+            LOG(ERROR) << "Failed to check if file exists: " << filepath << ": "
+                       << ec.message();
+            return false;
+        }
     }
 
     ret = sqlite3_open(filepath.string().c_str(), &db);
@@ -411,8 +413,8 @@ bool SQLiteDatabase::load(std::filesystem::path filepath) {
     // Check if the database exists and initialize it if necessary.
     if (!existed || filepath == kInMemoryDatabase) {
         LOG(INFO) << "Running initialization script...";
-        const auto helper = Helper::create(db, _sqlScriptsPath,
-                                           Helper::kCreateDatabaseFile.data());
+        const auto helper =
+            Helper::create(db, _sqlScriptsPath, Helper::kCreateDatabaseFile);
         if (!helper->executeAsScript()) {
             throw std::runtime_error("Error initializing database");
         }
@@ -560,9 +562,24 @@ SQLiteDatabase::AddResult SQLiteDatabase::addMediaInfo(
         .addArgument(info.mediaId)
         .bindArguments();
     if (!insertMediaHelper->execute()) {
-        // This is most likely at a fault at unique constraint violation.
-        // TODO: Undo the media names adding here.
-        // In this case, we return ALREADY_EXISTS
+        // Undo the insertions of names
+        LOG(ERROR) << "Failed to insert the media id, rolling back...";
+        for (const auto& info : updates) {
+            if (info.update == UpdateInfo::Op::INSERT) {
+                const auto name = std::get<std::string>(info.data);
+                auto deleteHelper = Helper::create(
+                    db, _sqlScriptsPath, Helper::kDeleteMediaNameFile);
+                if (!deleteHelper->prepare()) {
+                    continue;
+                }
+                deleteHelper->addArgument(name);
+                deleteHelper->bindArguments();
+                if (!deleteHelper->execute()) {
+                    LOG(ERROR)
+                        << "Failed to undo inserted media name: " << name;
+                }
+            }
+        }
         return AddResult::ALREADY_EXISTS;
     }
 
@@ -606,9 +623,10 @@ SQLiteDatabase::AddResult SQLiteDatabase::addMediaInfo(
 
 std::vector<SQLiteDatabase::MediaInfo> SQLiteDatabase::getAllMediaInfos()
     const {
-    using MergeMap = std::unordered_map<std::pair<std::string, std::string>,
-                              std::pair<std::vector<std::string>, MediaType>,
-                              PairHash>;
+    using MergeMap =
+        std::unordered_map<std::pair<std::string, std::string>,
+                           std::pair<std::vector<std::string>, MediaType>,
+                           PairHash>;
     MergeMap map;
 
     auto helper =
@@ -616,27 +634,27 @@ std::vector<SQLiteDatabase::MediaInfo> SQLiteDatabase::getAllMediaInfos()
     if (!helper->prepare()) {
         return {};
     }
-    
+
     // Directly build the map from database rows
     while (auto rows = helper->execAndGetRow()) {
-        std::string mediaId = rows->get<std::string>(0);
-        std::string mediaUniqueId = rows->get<std::string>(1);
-        std::string name = rows->get<std::string>(2);
-        MediaType mediaType = static_cast<MediaType>(rows->get<int>(3));
-        
+        auto mediaId = rows->get<std::string>(0);
+        auto mediaUniqueId = rows->get<std::string>(1);
+        auto name = rows->get<std::string>(2);
+        auto mediaType = static_cast<MediaType>(rows->get<int>(3));
+
         auto key = std::make_pair(std::move(mediaUniqueId), std::move(mediaId));
         auto& entry = map[key];
         entry.first.emplace_back(std::move(name));
         entry.second = mediaType;
     }
-    
+
     // Convert map to result vector
     std::vector<MediaInfo> result;
     result.reserve(map.size());
     for (auto& pair : map) {
         MediaInfo info;
-        info.mediaId = std::move(pair.first.second);
-        info.mediaUniqueId = std::move(pair.first.first);
+        info.mediaId = pair.first.second;
+        info.mediaUniqueId = pair.first.first;
         info.names = std::move(pair.second.first);
         info.mediaType = pair.second.second;
         result.emplace_back(std::move(info));
@@ -675,7 +693,7 @@ std::ostream& SQLiteDatabase::dump(std::ostream& ofs) const {
     }
 
     ss << "====================== Dump of database ======================"
-       << std::endl;
+       << '\n';
 
     // Because of the race condition with logging, use stringstream and output
     // later.
@@ -709,53 +727,53 @@ std::ostream& SQLiteDatabase::dump(std::ostream& ofs) const {
                 case InfoType::MAX:
                     break;
             };
-            ss << std::endl;
+            ss << '\n';
         }
     } else {
-        ss << "!!! Failed to dump usermap database" << std::endl;
+        ss << "!!! Failed to dump usermap database" << '\n';
     }
-    ss << std::endl;
+    ss << '\n';
 
     // Dump media database
     if (helper = helper->getNextStatement(); helper && helper->prepare()) {
         std::optional<Helper::Row> row;
         bool any = false;
         while ((row = helper->execAndGetRow())) {
-            ss << "MediaId: " << row->get<std::string>(0) << std::endl;
-            ss << "MediaUniqueId: " << row->get<std::string>(1) << std::endl;
-            ss << "MediaName: " << row->get<std::string>(2) << std::endl;
+            ss << "MediaId: " << row->get<std::string>(0) << '\n';
+            ss << "MediaUniqueId: " << row->get<std::string>(1) << '\n';
+            ss << "MediaName: " << row->get<std::string>(2) << '\n';
             ss << "MediaType: " << static_cast<MediaType>(row->get<int>(3))
-               << std::endl;
-            ss << std::endl;
+               << '\n';
+            ss << '\n';
             any = true;
         }
         if (!any) {
-            ss << "!!! No media entries in the database" << std::endl;
+            ss << "!!! No media entries in the database" << '\n';
         }
     } else {
-        ss << "!!! Failed to dump media database" << std::endl;
+        ss << "!!! Failed to dump media database" << '\n';
     }
-    ss << std::endl;
+    ss << '\n';
 
     // Dump chatid database
     if (helper = helper->getNextStatement(); helper && helper->prepare()) {
         std::optional<Helper::Row> row;
         bool any = false;
         while ((row = helper->execAndGetRow())) {
-            ss << "ChatId: " << row->get<ChatId>(0) << std::endl;
-            ss << "ChatName: " << row->get<std::string>(1) << std::endl;
-            ss << std::endl;
+            ss << "ChatId: " << row->get<ChatId>(0) << '\n';
+            ss << "ChatName: " << row->get<std::string>(1) << '\n';
+            ss << '\n';
             any = true;
         }
         if (!any) {
-            ss << "!!! No chatid entries in the database" << std::endl;
+            ss << "!!! No chatid entries in the database" << '\n';
         }
     } else {
-        ss << "!!! Failed to dump chatid database" << std::endl;
+        ss << "!!! Failed to dump chatid database" << '\n';
     }
 
     ss << "========================= End of dump ========================"
-       << std::endl;
+       << '\n';
     ofs << ss.str();
     return ofs;
 }

@@ -1,0 +1,1 @@
+DELETE FROM medianame WHERE name = (?)

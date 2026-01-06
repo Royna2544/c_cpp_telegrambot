@@ -18,25 +18,25 @@
 namespace detail {
 
 template <typename T>
-inline T get(const int index, sqlite3_stmt *stmt) = delete;
+inline T get(const int index, sqlite3_stmt* stmt) = delete;
 
 template <>
-[[nodiscard]] inline int32_t get(const int index, sqlite3_stmt *stmt) {
+[[nodiscard]] inline int32_t get(const int index, sqlite3_stmt* stmt) {
     return sqlite3_column_int(stmt, index);
 }
 
 template <>
-[[nodiscard]] inline int64_t get(const int index, sqlite3_stmt *stmt) {
+[[nodiscard]] inline int64_t get(const int index, sqlite3_stmt* stmt) {
     return sqlite3_column_int64(stmt, index);
 }
 
 template <>
-[[nodiscard]] inline std::string get(const int index, sqlite3_stmt *stmt) {
-    const auto *buffer = sqlite3_column_text(stmt, index);
+[[nodiscard]] inline std::string get(const int index, sqlite3_stmt* stmt) {
+    const auto* buffer = sqlite3_column_text(stmt, index);
     if (buffer == nullptr) {
         return {};
     }
-    return reinterpret_cast<const char *>(buffer);
+    return reinterpret_cast<const char*>(buffer);
 }
 
 }  // namespace detail
@@ -51,7 +51,7 @@ struct DBIMPL_EXPORT SQLiteDatabase : DatabaseBase {
     };
 
     explicit SQLiteDatabase(std::filesystem::path sqlScriptDirectory);
-    
+
     [[nodiscard]] ListResult addUserToList(ListType type,
                                            UserId user) const override;
     [[nodiscard]] ListResult removeUserFromList(ListType type,
@@ -63,10 +63,10 @@ struct DBIMPL_EXPORT SQLiteDatabase : DatabaseBase {
     [[nodiscard]] std::optional<UserId> getOwnerUserId() const override;
     [[nodiscard]] std::optional<MediaInfo> queryMediaInfo(
         std::string str) const override;
-    [[nodiscard]] AddResult addMediaInfo(const MediaInfo &info) const override;
+    [[nodiscard]] AddResult addMediaInfo(const MediaInfo& info) const override;
     [[nodiscard]] std::vector<MediaInfo> getAllMediaInfos() const override;
     void setOwnerUserId(UserId userId) const override;
-    std::ostream &dump(std::ostream &ofs) const override;
+    std::ostream& dump(std::ostream& ofs) const override;
     [[nodiscard]] AddResult addChatInfo(
         const ChatId chatid, const std::string_view name) const override;
     [[nodiscard]] std::optional<ChatId> getChatId(
@@ -106,6 +106,8 @@ struct DBIMPL_EXPORT SQLiteDatabase : DatabaseBase {
         static constexpr std::string_view kFindChatIdFile = "findChatId.sql";
         static constexpr std::string_view kFindAllMediaMapFile =
             "findAllMediaMap.sql";
+        static constexpr std::string_view kDeleteMediaNameFile =
+            "deleteMediaName.sql";
 
         struct Row {
             template <typename T>
@@ -113,7 +115,7 @@ struct DBIMPL_EXPORT SQLiteDatabase : DatabaseBase {
                 return detail::get<T>(index, stmt);
             }
 
-            explicit Row(std::shared_ptr<Helper> inst, sqlite3_stmt *stmt)
+            explicit Row(std::shared_ptr<Helper> inst, sqlite3_stmt* stmt)
                 : _inst(std::move(inst)), stmt(stmt) {}
 
            private:
@@ -121,7 +123,7 @@ struct DBIMPL_EXPORT SQLiteDatabase : DatabaseBase {
             // As if Helper class went out of scope, stmt is free'd
             // which is not what we want as this class would be undefined
             std::shared_ptr<Helper> _inst;
-            sqlite3_stmt *stmt;
+            sqlite3_stmt* stmt;
         };
 
         ~Helper();
@@ -153,7 +155,7 @@ struct DBIMPL_EXPORT SQLiteDatabase : DatabaseBase {
          * int64_t, or std::string.
          * @return A reference to the current Helper object.
          */
-        Helper &addArgument(const ArgTypes& value);
+        Helper& addArgument(const ArgTypes& value);
 
         /**
          * @brief Binds the arguments to the SQL statement.
@@ -203,8 +205,8 @@ struct DBIMPL_EXPORT SQLiteDatabase : DatabaseBase {
         std::shared_ptr<Helper> getNextStatement();
 
         static std::shared_ptr<Helper> create(
-            sqlite3 *db, const std::filesystem::path &scriptDirectory,
-            const std::string_view &filename) {
+            sqlite3* db, const std::filesystem::path& scriptDirectory,
+            const std::string_view& filename) {
             return std::make_shared<Helper>(
                 Helper(db, scriptDirectory, filename));
         }
@@ -219,11 +221,11 @@ struct DBIMPL_EXPORT SQLiteDatabase : DatabaseBase {
          * @param filename The name of the SQL script file to be executed.
          * @throws std::runtime_error if the SQL script file cannot be loaded..
          */
-        explicit Helper(sqlite3 *db, const std::filesystem::path &sqlScriptPath,
-                        const std::string_view &filename);
+        explicit Helper(sqlite3* db, const std::filesystem::path& sqlScriptPath,
+                        const std::string_view& filename);
 
         // Used for methods that have multiple statements
-        explicit Helper(sqlite3 *db, std::string content);
+        explicit Helper(sqlite3* db, std::string content);
 
         /**
          * Structure to hold an argument for the SQL statement.
@@ -266,7 +268,7 @@ struct DBIMPL_EXPORT SQLiteDatabase : DatabaseBase {
          * detected.
          * @param state The invalid state of the SQLiteDatabase::Helper.
          */
-        static void logInvalidState(const std::source_location &location,
+        static void logInvalidState(const std::source_location& location,
                                     State state);
 
         /**
@@ -281,7 +283,7 @@ struct DBIMPL_EXPORT SQLiteDatabase : DatabaseBase {
          * @return True if the SQL statement could continue execution, false
          * otherwise
          */
-        bool commonExecCheck(const std::source_location &location);
+        bool commonExecCheck(const std::source_location& location);
 
         std::string scriptContent;
         std::string scriptContentUnparsed;
@@ -289,14 +291,14 @@ struct DBIMPL_EXPORT SQLiteDatabase : DatabaseBase {
         // Vector to store the arguments.
         std::vector<Argument> arguments;
         // Pointer to the SQLite database.
-        sqlite3 *db;
-        sqlite3_stmt *stmt = nullptr;
+        sqlite3* db;
+        sqlite3_stmt* stmt = nullptr;
     };
 
    private:
     [[nodiscard]] ListResult addUserToList(InfoType type, UserId user) const;
     [[nodiscard]] ListResult checkUserInList(InfoType type, UserId user) const;
     static InfoType toInfoType(ListType type);
-    sqlite3 *db = nullptr;
+    sqlite3* db = nullptr;
     std::filesystem::path _sqlScriptsPath;
 };
