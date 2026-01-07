@@ -10,9 +10,9 @@
 #include <system_error>
 #include <utils/libfs.hpp>
 
+#include "CurlUtils.hpp"
 #include "RepoUtils.hpp"
 #include "SystemInfo.hpp"
-#include "CurlUtils.hpp"
 
 namespace toolchains {
 
@@ -38,14 +38,6 @@ bool GCCAndroidARM64Provider::downloadTo(const std::filesystem::path& path) {
     return RepoInfo{kGCCARM64RepoInfo}.git_clone(path, std::nullopt, true);
 }
 
-std::optional<std::string> ClangProvider::getToolchainTarballURL() const {
-    // Download URL from site
-    constexpr std::string_view kToolchainLink =
-        "https://raw.githubusercontent.com/XSans0/WeebX-Clang/main/main/"
-        "link.txt";
-    return CURL_download_memory(kToolchainLink);
-}
-
 bool ClangProvider::downloadTarball(const std::string_view url,
                                     const std::filesystem::path& where) const {
     return CURL_download_file(url, where);
@@ -60,13 +52,11 @@ bool ClangProvider::downloadTo(const std::filesystem::path& path) {
             LOG(ERROR) << "Cannot check existence of toolchain tarball";
             return false;
         }
-        if (auto _res = getToolchainTarballURL(); _res) {
-            std::string url = *_res;
-            absl::StripTrailingAsciiWhitespace(&url);
-            if (!downloadTarball(url, kToolchainTarballPath)) {
-                return false;
-            }
-        } else {
+        std::string url =
+            "https://android.googlesource.com/platform/prebuilts/clang/host/"
+            "linux-x86/+archive/refs/tags/android-16.0.0_r4/"
+            "clang-r547379.tar.gz";
+        if (!downloadTarball(url, kToolchainTarballPath)) {
             return false;
         }
     } else {
