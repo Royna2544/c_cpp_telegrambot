@@ -5,8 +5,8 @@
 
 #include <filesystem>
 #include <memory>
-#include <string>
 #include <optional>
+#include <string>
 
 // constexpr-qualifable struct
 struct ConstRepoInfo {
@@ -70,9 +70,14 @@ class RepoInfo {
     template <typename Callback>
     RepoInfo() : callback_(std::make_unique<Callback>()) {}
 
+    void setCallback(std::unique_ptr<Callbacks> callback) {
+        callback_ = std::move(callback);
+    }
+
     // Git clone repo to a directory
     bool git_clone(const std::filesystem::path& directory,
-                   const std::optional<std::string_view> gitToken, bool shallow = false) const;
+                   const std::optional<std::string_view> gitToken,
+                   bool shallow = false) const;
 
     [[nodiscard]] std::string url() const { return url_; }
     [[nodiscard]] std::string branch() const { return branch_; }

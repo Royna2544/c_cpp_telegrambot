@@ -110,10 +110,22 @@ class KernelBuildHandler {
             return;
         }
         std::string_view kernelName = data;
+
         for (auto& config : configs) {
             if (config.name == kernelName) {
                 intermidiates.current = &config;
                 KeyboardBuilder builder;
+
+                if (intermidiates.current->defconfig.devices.size() == 1) {
+                    // Only one device, skip selection
+                    intermidiates.device =
+                        intermidiates.current->defconfig.devices[0];
+                    query->data =
+                        absl::StrCat(kCallbackQueryPrefix, kSelectPrefix,
+                                     intermidiates.device);
+                    handle_select(query);
+                    return;
+                }
                 for (const auto& device :
                      intermidiates.current->defconfig.devices) {
                     builder.addKeyboard(
@@ -135,6 +147,13 @@ class KernelBuildHandler {
         }
         std::string_view device = data;
         intermidiates.device = device;
+
+        if (intermidiates.current->fragments.size() == 0) {
+            // No fragments, skip selection
+            query->data = absl::StrCat(kCallbackQueryPrefix, kContinuePrefix);
+            handle_continue(query);
+            return;
+        }
 
         KeyboardBuilder builder;
         for (const auto& fragment : intermidiates.current->fragments) {
@@ -475,7 +494,9 @@ Exit code: {}</blockquote>)",
     bool result() const { return *ret; }
 };
 
-void KernelBuildHandler::handle_continue(const TgBot::CallbackQuery::Ptr& query) {
+void KernelBuildHandler::handle_continue(
+    const TgBot::CallbackQuery::Ptr& query) {
+    _api->editMessage(query->message, "Downloading toolchain...");
     auto compiler = download_toolchain();
     if (!compiler) {
         _api->editMessage(query->message, "Failed to download toolchain");
@@ -487,8 +508,10 @@ void KernelBuildHandler::handle_continue(const TgBot::CallbackQuery::Ptr& query)
         kernelDir / intermidiates.current->underscored_name;
     if (!std::filesystem::exists(kernelSourceDir, ec)) {
         if (ec) {
-            LOG(ERROR) << "Failed to check repository: " << ec.message();
-            _api->editMessage(query->message, "Failed to check repository");
+            LOG(ERROR) << "Failed to check repository existence: "
+                       << ec.message();
+            _api->editMessage(query->message,
+                              "Failed to check repository existence");
             return;
         }
         _api->editMessage(

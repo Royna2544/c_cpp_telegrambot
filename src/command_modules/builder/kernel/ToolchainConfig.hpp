@@ -27,10 +27,9 @@ struct ToolchainConfig {
                     {"OBJDUMP", "llvm-objdump"},
                 };
             case KernelConfig::ClangSupport::FullLLVMWithIAS:
-                return {{"LLVM", "1"}};
-                // TODO: LLVM_IAS?
-            default: [[unlikely]]
-                return {};
+                return {{"LLVM", "1"}, {"LLVM_IAS", "1"}};
+            default:
+                [[unlikely]] return {};
         }
     }
 };
