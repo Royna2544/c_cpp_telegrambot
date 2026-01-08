@@ -23,9 +23,9 @@ static CURL* CURL_setup_common(const std::string_view url) {
     // Enable 302 redirects
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
-    // Set timeout: 30 seconds for connection, 5 minutes for total operation
+    // Set timeout: 30 seconds for connection, 30 minutes for total operation
     curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 30L);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 300L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 1800L);
     // Set low speed limit: abort if speed < 1KB/s for 30 seconds
     curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 1024L);
     curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 30L);
@@ -33,15 +33,17 @@ static CURL* CURL_setup_common(const std::string_view url) {
     // Set progress callback
     curl_easy_setopt(
         curl, CURLOPT_XFERINFOFUNCTION,
-        +[](void* /*clientp*/, curl_off_t /*dltotal*/, curl_off_t dlnow,
-            curl_off_t /*ultotal*/, curl_off_t ulnow) -> int {
+        +[](void* /*clientp*/, curl_off_t dltotal, curl_off_t dlnow,
+            curl_off_t /*ultotal*/, curl_off_t /*ulnow*/) -> int {
             auto dlnowByte = MegaBytes(dlnow * boost::units::data::bytes);
-            auto dltotalByte = MegaBytes(ulnow * boost::units::data::bytes);
+            auto dltotalByte = MegaBytes(dltotal * boost::units::data::bytes);
             LOG_EVERY_N_SEC(INFO, 5) << fmt::format(
                 "Download: {}MB/{}MB", dlnowByte.value(), dltotalByte.value());
             return SignalHandler::isSignaled() ? 1 : 0;  // Continue downloading
         });
     curl_easy_setopt(curl, CURLOPT_XFERINFODATA, nullptr);
+    // Enble progress callbacks
+    curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
 
     return curl;
 }
