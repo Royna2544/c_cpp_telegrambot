@@ -31,6 +31,7 @@
 
 #include "Diagnosis.hpp"
 #include "ProgressBar.hpp"
+#include "api/AuthContext.hpp"
 #include "api/TgBotApi.hpp"
 #include "command_modules/support/CwdRestorar.hpp"
 #include "command_modules/support/KeyBoardBuilder.hpp"
@@ -45,6 +46,7 @@ class KernelBuildHandler {
 
    private:
     TgBotApi::Ptr _api;
+    const AuthContext* _auth;
     std::vector<KernelConfig> configs;
 
     Intermidates intermidiates;
@@ -56,8 +58,9 @@ class KernelBuildHandler {
     constexpr static std::string_view kToolchainDirectory = "toolchain";
     constexpr static std::string_view kCallbackQueryPrefix = "kernel_build_";
     KernelBuildHandler(TgBotApi::Ptr api, const CommandLine* line,
+                       const AuthContext* auth,
                        std::optional<std::string> token)
-        : _api(api), gitToken(std::move(token)) {
+        : _api(api), _auth(auth), gitToken(std::move(token)) {
         auto jsonDir =
             line->getPath(FS::PathType::RESOURCES) / "builder" / "kernel";
 
@@ -121,8 +124,8 @@ class KernelBuildHandler {
                     intermidiates.device =
                         intermidiates.current->defconfig.devices[0];
                     query->data =
-                        absl::StrCat(kCallbackQueryPrefix, kSelectPrefix,
-                                     intermidiates.device);
+                        absl::StrCat(kSelectPrefix, intermidiates.device);
+                    DLOG(INFO) << "Only one device, skipping selection";
                     handle_select(query);
                     return;
                 }
@@ -150,7 +153,8 @@ class KernelBuildHandler {
 
         if (intermidiates.current->fragments.size() == 0) {
             // No fragments, skip selection
-            query->data = absl::StrCat(kCallbackQueryPrefix, kContinuePrefix);
+            query->data = kContinuePrefix;
+            DLOG(INFO) << "No fragments, skipping selection";
             handle_continue(query);
             return;
         }
@@ -252,6 +256,14 @@ class KernelBuildHandler {
 
     void handleCallbackQuery(TgBot::CallbackQuery::Ptr query) {
         std::string_view data = query->data;
+
+        if (!_auth->isAuthorized(query->from)) {
+            _api->answerCallbackQuery(
+                query->id,
+                "Sorry son, you are not allowed to touch this keyboard.");
+            return;
+        }
+
         if (absl::ConsumePrefix(&data, kBuildPrefix)) {
             // Call the corresponding function
             handle_build(query);
@@ -630,7 +642,7 @@ DECLARE_COMMAND_HANDLER(kernelbuild) {
     static std::optional<KernelBuildHandler> handler;
     if (!handler) {
         handler.emplace(
-            api, provider->cmdline.get(),
+            api, provider->cmdline.get(), provider->auth.get(),
             provider->config->get(ConfigManager::Configs::GITHUB_TOKEN));
         api->onCallbackQuery("kernelbuild", [api, provider](
                                                 TgBot::CallbackQuery::Ptr ptr) {
