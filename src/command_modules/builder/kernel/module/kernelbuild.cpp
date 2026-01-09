@@ -372,11 +372,11 @@ Exit code: {}</blockquote>)",
         std::string line;
         while (std::getline(output_, line)) {
             Diagnosis diag(line);
-            if (diag.valid) {
+            if (static_cast<bool>(diag)) {
                 LOG(INFO) << diag.file_path << " has warning " << diag.message;
             }
             UndefinedSym sym(line);
-            if (sym.valid) {
+            if (static_cast<bool>(sym)) {
                 LOG(INFO) << "undefined symbol " << sym.symbol;
             }
         }
