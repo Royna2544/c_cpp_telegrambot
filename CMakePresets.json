@@ -125,6 +125,24 @@
         "lhs": "${hostSystemName}",
         "rhs": "Linux"
       }
+    },
+    {
+      "name": "wsl-release-gcc",
+      "displayName": "WSL GCC Release",
+      "description": "Target the Windows Subsystem for Linux (WSL) using GCC. (Release)",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "installDir": "${sourceDir}/out/install/${presetName}",
+      "toolchainFile": "/home/royna/vcpkg/scripts/buildsystems/vcpkg.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "TGBOTCPP_LLM_SUPPORT": true,
+        "TGBOTCPP_BUILD_TESTS": true
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
     }
   ]
 }
