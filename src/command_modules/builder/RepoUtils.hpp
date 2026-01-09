@@ -121,8 +121,6 @@ class GitBranchSwitcher {
 
     static constexpr std::string_view kRemoteRepoName = "origin";
 
-    static const char* git_error_last_str();
-
     // Remove extensions.preciousobjects which is
     // used on Google .repo git and is
     // unsupported on libgit2
