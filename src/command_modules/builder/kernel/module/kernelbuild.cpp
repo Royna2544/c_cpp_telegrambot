@@ -254,7 +254,7 @@ class KernelBuildHandler {
         return std::nullopt;
     }
 
-    void handleCallbackQuery(TgBot::CallbackQuery::Ptr query) {
+    void handleCallbackQuery(const TgBot::CallbackQuery::Ptr& query) {
         std::string_view data = query->data;
 
         if (!_auth->isAuthorized(query->from)) {
