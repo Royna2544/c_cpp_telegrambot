@@ -5,10 +5,12 @@
 #include <absl/strings/str_split.h>
 #include <fmt/core.h>
 #include <git2.h>
+#include <git2/errors.h>
 
 #include <filesystem>
 #include <libos/libsighandler.hpp>
 #include <memory>
+#include <string_view>
 #include <trivial_helpers/raii.hpp>
 #include <type_traits>
 
@@ -106,14 +108,12 @@ using git_object_ptr = GitPtrWrapper<git_object*>;
 using git_remote_ptr = GitPtrWrapper<git_remote*>;
 using git_diff_ptr = GitPtrWrapper<git_diff*>;
 
-const char* GitBranchSwitcher::git_error_last_str() {
-    return git_error_last()->message;
-}
-bool GitBranchSwitcher::hasDiff(git_diff* diff) {
-    return git_diff_num_deltas(diff) != 0;
-}
+namespace {
+const char* git_error_last_str() { return git_error_last()->message; }
 
-void GitBranchSwitcher::dumpDiff(git_diff* diff) {
+bool hasDiff(git_diff* diff) { return git_diff_num_deltas(diff) != 0; }
+
+void dumpDiff(git_diff* diff) {
     if (!hasDiff(diff)) {
         return;
     }
@@ -157,6 +157,30 @@ void GitBranchSwitcher::dumpDiff(git_diff* diff) {
     }
 }
 
+bool isRefnameSame(
+    git_repository* repo,
+    const std::pair<std::string_view, std::string_view>& refnames) {
+    std::pair<git_oid, git_oid> oids{};
+    if (git_reference_name_to_id(&oids.first, repo, refnames.first.data()) !=
+        0) {
+        LOG(ERROR) << "Failed to resolve " << refnames.first << ": "
+                   << git_error_last_str();
+        return false;
+    }
+    if (git_reference_name_to_id(&oids.second, repo, refnames.second.data()) !=
+        0) {
+        LOG(ERROR) << "Failed to resolve " << refnames.second << ": "
+                   << git_error_last_str();
+        return false;
+    }
+    bool isSame = git_oid_cmp(&oids.first, &oids.second) == 0;
+    DLOG(INFO) << fmt::format("{} and {} are {}the same", refnames.first,
+                              refnames.second, isSame ? "" : "not ");
+    return isSame;
+}
+
+}  // namespace
+
 struct GitBranchSwitcher::RepoInfoPriv {
     git_tree_ptr target_tree;
     git_remote_ptr remote;                 // Remote data of "origin" remote
@@ -177,6 +201,7 @@ struct GitBranchSwitcher::CheckoutInfoPriv {
     bool fetched = true;
     git_diff_options diff_opts = GIT_DIFF_OPTIONS_INIT;
     git_checkout_options checkout_opts = GIT_CHECKOUT_OPTIONS_INIT;
+
     const char* remote_refname() const {
         return target_ref_name.remote.c_str();
     }
@@ -337,28 +362,6 @@ bool GitBranchSwitcher::fastForwardPull() const {
     }
 
     return checkout(cdata->remote_refname());
-}
-
-bool GitBranchSwitcher::isRefnameSame(
-    git_repository* repo,
-    const std::pair<std::string_view, std::string_view>& refnames) {
-    std::pair<git_oid, git_oid> oids{};
-    if (git_reference_name_to_id(&oids.first, repo, refnames.first.data()) !=
-        0) {
-        LOG(ERROR) << "Failed to resolve " << refnames.first << ": "
-                   << git_error_last_str();
-        return false;
-    }
-    if (git_reference_name_to_id(&oids.second, repo, refnames.second.data()) !=
-        0) {
-        LOG(ERROR) << "Failed to resolve " << refnames.second << ": "
-                   << git_error_last_str();
-        return false;
-    }
-    bool isSame = git_oid_cmp(&oids.first, &oids.second) == 0;
-    DLOG(INFO) << fmt::format("{} and {} are {}the same", refnames.first,
-                              refnames.second, isSame ? "" : "not ");
-    return isSame;
 }
 
 bool GitBranchSwitcher::hasUnstagedChanges() const {
@@ -582,18 +585,37 @@ bool RepoInfo::git_clone(const std::filesystem::path& directory,
                          bool shallow) const {
     git_repository_ptr repo;
     git_clone_options gitoptions = GIT_CLONE_OPTIONS_INIT;
-    std::unique_ptr<char, decltype(&free)> token(nullptr, &free);
+    git_remote_callbacks callbacks = GIT_REMOTE_CALLBACKS_INIT;
+    struct Payload {
+        std::unique_ptr<char, decltype(&free)> token;
+        ProgressNotifier* callback = nullptr;
+    } payload{
+        .token = {nullptr, &free},
+        .callback = callback_.get(),
+    };
+
     if (gitToken) {
-        git_remote_callbacks callbacks = GIT_REMOTE_CALLBACKS_INIT;
-        callbacks.credentials = +[](git_credential** out, const char* url,
-                                    const char* username_from_url,
-                                    unsigned int allowed_types, void* payload) {
-            return git_credential_userpass_plaintext_new(
-                out, (const char*)payload, "");
+        callbacks.credentials = +[](git_credential** out,
+                                    const char* url_from_git,
+                                    const char* /*username_from_url*/,
+                                    unsigned int /*allowed_types*/,
+                                    void* payload) {
+            auto url = std::string_view(url_from_git);
+            const char* token = static_cast<Payload*>(payload)->token.get();
+
+            if (url.find("github.com") != std::string_view::npos) {
+                // Github allows id:token,pw:empty to authenticate. hence we do
+                // like this.
+                return git_credential_userpass_plaintext_new(out, token, "");
+            } else if (url.starts_with("ssh://")) {
+                // SSH URL, use ssh key from agent
+                return git_credential_ssh_key_from_agent(out, "git");
+            } else {
+                // For others, passthrough.
+                return static_cast<int>(GIT_PASSTHROUGH);
+            }
         };
-        token.reset(strdup(gitToken->data()));
-        callbacks.payload = token.get();
-        gitoptions.fetch_opts.callbacks = callbacks;
+        payload.token.reset(strdup(gitToken->data()));
     }
 
     LOG(INFO) << fmt::format(
@@ -613,13 +635,21 @@ bool RepoInfo::git_clone(const std::filesystem::path& directory,
                 stats->total_deltas,
                 GigaBytes(stats->received_bytes * boost::units::data::bytes)
                     .value());
+
+            ProgressNotifier::TransferStats progress_stats{};
+            progress_stats.received_objects = stats->received_objects;
+            progress_stats.indexed_objects = stats->indexed_objects;
+            progress_stats.total_objects = stats->total_objects;
+            progress_stats.indexed_deltas = stats->indexed_deltas;
+            progress_stats.total_deltas = stats->total_deltas;
+            progress_stats.received_bytes = stats->received_bytes;
+
             if (payload != nullptr) {
-                auto* callback = static_cast<Callbacks*>(payload);
-                callback->onFetch(stats);
+                auto* callback = static_cast<Payload*>(payload)->callback;
+                callback->onFetch(&progress_stats);
             }
             return 1;  // Continue the transfer.
         };
-        gitoptions.fetch_opts.callbacks.payload = callback_.get();
 
         // Update refs callback
         gitoptions.fetch_opts.callbacks.pack_progress =
@@ -628,13 +658,26 @@ bool RepoInfo::git_clone(const std::filesystem::path& directory,
             LOG_EVERY_N_SEC(INFO, 3)
                 << fmt::format("Packing: ({}/{})", current, total);
 
+            ProgressNotifier::PackBuilderStage stage_enum{};
+            switch (stage) {
+                case GIT_PACKBUILDER_ADDING_OBJECTS:
+                    stage_enum =
+                        ProgressNotifier::PackBuilderStage::ADDING_OBJECTS;
+                    break;
+                case GIT_PACKBUILDER_DELTAFICATION:
+                    stage_enum =
+                        ProgressNotifier::PackBuilderStage::DELTAFICATION;
+                    break;
+                default:
+                    break;
+            }
+
             if (payload != nullptr) {
-                auto* callback = static_cast<Callbacks*>(payload);
-                callback->onPacking(stage, current, total);
+                auto* callback = static_cast<Payload*>(payload)->callback;
+                callback->onPacking(stage_enum, current, total);
             }
             return 1;  // Continue the transfer.
         };
-        gitoptions.fetch_opts.callbacks.payload = callback_.get();
 
         // Git checkout callback
         gitoptions.checkout_opts.progress_cb =
@@ -644,12 +687,15 @@ bool RepoInfo::git_clone(const std::filesystem::path& directory,
                     "Packing: ({}/{}): {}", completed_steps, total_steps,
                     (path != nullptr) ? path : "(null)");
                 if (payload != nullptr) {
-                    auto* callback = static_cast<Callbacks*>(payload);
+                    auto* callback = static_cast<Payload*>(payload)->callback;
                     callback->onCheckout(path, completed_steps, total_steps);
                 }
             };
-        gitoptions.checkout_opts.progress_payload = callback_.get();
     }
+
+    callbacks.payload = &payload;
+    gitoptions.fetch_opts.callbacks = callbacks;
+    gitoptions.checkout_opts.progress_payload = callback_.get();
 
     if (shallow) {
 #ifdef LIBGIT2_HAS_CLONE_DEPTH

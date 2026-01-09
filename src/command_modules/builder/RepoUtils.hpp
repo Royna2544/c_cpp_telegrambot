@@ -1,8 +1,6 @@
 #pragma once
 
-#include <git2.h>
-#include <git2/deprecated.h>
-
+#include <cstdint>
 #include <filesystem>
 #include <memory>
 #include <optional>
@@ -26,28 +24,60 @@ class RepoInfo {
      * These methods are intended to be overridden in derived classes to provide
      * custom behavior.
      */
-    class Callbacks {
+    class ProgressNotifier {
        public:
-        virtual ~Callbacks() = default;
+        virtual ~ProgressNotifier() = default;
+
+        /**
+         * This structure is used to provide callers information about the
+         * progress of indexing a packfile, either directly or part of a
+         * fetch or clone that downloads a packfile.
+         */
+        struct TransferStats {
+            /** number of objects in the packfile being indexed */
+            unsigned int total_objects;
+
+            /** received objects that have been hashed */
+            unsigned int indexed_objects;
+
+            /** received_objects: objects which have been downloaded */
+            unsigned int received_objects;
+
+            /** number of deltas in the packfile being indexed */
+            unsigned int total_deltas;
+
+            /** received deltas that have been indexed */
+            unsigned int indexed_deltas;
+
+            /** size of the packfile received up to now */
+            size_t received_bytes;
+        };
+
+        enum class PackBuilderStage : std::uint8_t {
+            UNKNOWN,
+            ADDING_OBJECTS,
+            DELTAFICATION
+        };
 
         /**
          * @brief Called during fetch operations to provide progress
          * information.
          *
-         * @param stats A pointer to a `git_transfer_progress` structure
+         * @param stats A pointer to a `TransferStats` structure
          * containing fetch statistics.
          */
-        virtual void onFetch(const git_transfer_progress* stats) {}
+        virtual void onFetch(const TransferStats* stats) {}
 
         /**
          * @brief Called during indexing operations to provide progress
          * information.
          *
-         * @param stage The current indexing stage. (GIT_PACKBUILDER_STAGE_*)
+         * @param stage The current indexing stage. (PackBuilderStage::*)
          * @param current The current indexing progress.
          * @param total The total indexing progress.
          */
-        virtual void onPacking(int stage, uint32_t current, uint32_t total) {}
+        virtual void onPacking(PackBuilderStage stage, uint32_t current,
+                               uint32_t total) {}
 
         /**
          * @brief Called during checkout operations to provide progress
@@ -70,7 +100,7 @@ class RepoInfo {
     template <typename Callback>
     RepoInfo() : callback_(std::make_unique<Callback>()) {}
 
-    void setCallback(std::unique_ptr<Callbacks> callback) {
+    void setCallback(std::unique_ptr<ProgressNotifier> callback) {
         callback_ = std::move(callback);
     }
 
@@ -83,7 +113,7 @@ class RepoInfo {
     [[nodiscard]] std::string branch() const { return branch_; }
 
    private:
-    std::unique_ptr<Callbacks> callback_;
+    std::unique_ptr<ProgressNotifier> callback_;
 };
 
 class GitBranchSwitcher {
@@ -92,8 +122,6 @@ class GitBranchSwitcher {
     static constexpr std::string_view kRemoteRepoName = "origin";
 
     static const char* git_error_last_str();
-    static bool hasDiff(git_diff* diff);
-    static void dumpDiff(git_diff* diff);
 
     // Remove extensions.preciousobjects which is
     // used on Google .repo git and is
@@ -105,10 +133,6 @@ class GitBranchSwitcher {
     bool fastForwardPull() const;
     // Checkout to refname. Incl. HEAD, tree, index.
     bool checkout(const std::string_view refname) const;
-
-    static bool isRefnameSame(
-        git_repository* repo,
-        const std::pair<std::string_view, std::string_view>& refnames);
 
     struct RepoInfoPriv;
     std::unique_ptr<RepoInfoPriv> rdata;
