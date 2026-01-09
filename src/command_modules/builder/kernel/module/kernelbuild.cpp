@@ -565,10 +565,13 @@ void KernelBuildHandler::handle_continue(
     if (!kernel.execute()) {
         _api->editMessage(query->message, "Failed to execute build");
     }
+    LOG(INFO) << "Build finished!";
     if (kernel.result() && intermidiates.current->anyKernel.enabled) {
         auto zipname = fmt::format(
             "{}_{}_{:%F}.zip", intermidiates.current->underscored_name,
             intermidiates.device, std::chrono::system_clock::now());
+
+        LOG(INFO) << "Creating zip: " << zipname;
         Zip zip(zipname);
         zip.addDir(kernelSourceDir /
                        intermidiates.current->anyKernel.relative_directory,
@@ -578,6 +581,7 @@ void KernelBuildHandler::handle_continue(
                         intermidiates.current->type,
                     fmt::format("{}", intermidiates.current->type));
         zip.save();
+        LOG(INFO) << "Sending zip: " << zipname;
         _api->sendDocument(query->message->chat,
                            TgBot::InputFile::fromFile(zipname, "archive/zip"));
     }
