@@ -214,7 +214,7 @@ class ROMBuildQueryHandler {
    public:
     void setCurrentForkAndRun(ForkAndRun* forkAndRun) { current = forkAndRun; }
     void onCallbackQuery(TgBot::CallbackQuery::Ptr query) const;
-    
+
     // Shutdown method to cancel any running tasks
     void shutdown() {
         if (current != nullptr) {
@@ -223,15 +223,15 @@ class ROMBuildQueryHandler {
             current = nullptr;
         }
     }
-    
+
    private:
     // Helper method to check for shutdown signal and notify user
     bool checkShutdownSignal(const std::string_view context) {
         if (SignalHandler::isSignaled()) {
             LOG(WARNING) << "Received shutdown signal during " << context;
-            _api->editMessage(sentMessage, 
-                             "Build cancelled: System shutting down", 
-                             backKeyboard);
+            _api->editMessage(sentMessage,
+                              "Build cancelled: System shutting down",
+                              backKeyboard);
             return true;
         }
         return false;
@@ -627,12 +627,12 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     if (didpin) {
         _api->unpinMessage(sentMessage);
     }
-    
+
     // Check if system is shutting down before starting build
     if (checkShutdownSignal("build confirmation")) {
         return;
     }
-    
+
     auto scriptDirectory =
         _commandLine->getPath(FS::PathType::RESOURCES_SCRIPTS);
     auto buildDirectory =
@@ -683,6 +683,9 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     // Remote Based Execution support
     std::optional<ROMBuildTask::RBEConfig> config;
     if (do_use_rbe) {
+        constexpr std::string_view kRBEClientURL =
+            "https://chrome-infra-packages.appspot.com/dl/infra/rbe/client/"
+            "linux-amd64/+/stable";
         if (checkShutdownSignal("RBE setup")) {
             return;
         }
@@ -697,13 +700,14 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
         if (!std::filesystem::exists(config->reclientDir)) {
             LOG(INFO) << "Downloading reclient...";
             auto zipFile = buildDirectory / "rbe.zip";
-            bool ret = CURL_download_file("https://chrome-infra-packages.appspot.com/dl/infra/rbe/client/linux-amd64/+/stable",
-                zipFile);
+            bool ret = CurlUtils::download_file(kRBEClientURL, zipFile);
             if (!ret) {
+                LOG(ERROR) << "Failed to download RBE client";
                 return;
             }
             ret = Zip::extract(zipFile, config->reclientDir);
             if (!ret) {
+                LOG(ERROR) << "Failed to extract RBE client";
                 return;
             }
         }

@@ -66,10 +66,6 @@ struct ClangProvider : public Provider {
     static constexpr std::string_view dirname = "clang";
 
     bool downloadTo(const std::filesystem::path& path) override;
-
-   private:
-    bool downloadTarball(const std::string_view url,
-                         const std::filesystem::path& where) const;
 };
 
 }  // namespace toolchains

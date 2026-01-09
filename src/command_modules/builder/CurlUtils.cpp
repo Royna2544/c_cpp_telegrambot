@@ -6,11 +6,15 @@
 
 #include <StructF.hpp>
 #include <libos/libsighandler.hpp>
+#include <utility>
 
 #include "BytesConversion.hpp"
 #include "utils/libfs.hpp"
 
-static CURL* CURL_setup_common(const std::string_view url) {
+namespace {
+
+static CURL* CURL_setup_common(const std::string_view url,
+                               CurlUtils::CancelChecker cancel_checker) {
     CURL* curl = curl_easy_init();
     if (curl == nullptr) {
         LOG(ERROR) << "Cannot initialize curl";
@@ -33,15 +37,20 @@ static CURL* CURL_setup_common(const std::string_view url) {
     // Set progress callback
     curl_easy_setopt(
         curl, CURLOPT_XFERINFOFUNCTION,
-        +[](void* /*clientp*/, curl_off_t dltotal, curl_off_t dlnow,
-            curl_off_t /*ultotal*/, curl_off_t /*ulnow*/) -> int {
+        +[](void* clientp, curl_off_t dltotal, curl_off_t dlnow,
+            curl_off_t ultotal, curl_off_t ulnow) -> int {
             auto dlnowByte = MegaBytes(dlnow * boost::units::data::bytes);
             auto dltotalByte = MegaBytes(dltotal * boost::units::data::bytes);
+            auto ulnowByte = MegaBytes(ulnow * boost::units::data::bytes);
+            auto ultotalByte = MegaBytes(ultotal * boost::units::data::bytes);
+            auto cancel_checker =
+                static_cast<std::function<bool(void)>*>(clientp);
             LOG_EVERY_N_SEC(INFO, 5) << fmt::format(
-                "Download: {}MB/{}MB", dlnowByte.value(), dltotalByte.value());
-            return SignalHandler::isSignaled() ? 1 : 0;  // Continue downloading
+                "Download: {}MB/{}MB, Upload: {}MB/{}MB", dlnowByte.value(),
+                dltotalByte.value(), ulnowByte.value(), ultotalByte.value());
+            return *cancel_checker && (*cancel_checker)() ? 0 : 1;
         });
-    curl_easy_setopt(curl, CURLOPT_XFERINFODATA, nullptr);
+    curl_easy_setopt(curl, CURLOPT_XFERINFODATA, &cancel_checker);
     // Enble progress callbacks
     curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
 
@@ -58,12 +67,17 @@ static bool CURL_perform_common(CURL* curl) {
     return true;
 }
 
-bool CURL_download_file(const std::string_view url,
-                        const std::filesystem::path& where) {
+}  // namespace
+
+namespace CurlUtils {
+
+bool download_file(const std::string_view url,
+                   const std::filesystem::path& where,
+                   CurlUtils::CancelChecker cancel_checker) {
     LOG(INFO) << "Downloading " << url << " to " << where;
 
     // Common CURL setup
-    CURL* curl = CURL_setup_common(url);
+    CURL* curl = CURL_setup_common(url, std::move(cancel_checker));
     if (curl == nullptr) {
         LOG(ERROR) << "Cannot setup curl";
         return false;
@@ -90,13 +104,14 @@ bool CURL_download_file(const std::string_view url,
     return result;
 }
 
-std::optional<std::string> CURL_download_memory(const std::string_view url) {
+std::optional<std::string> download_memory(
+    const std::string_view url, CurlUtils::CancelChecker cancel_checker) {
     std::string result;
 
     LOG(INFO) << "Downloading " << url << " to memory";
 
     // Common CURL setup
-    CURL* curl = CURL_setup_common(url);
+    CURL* curl = CURL_setup_common(url, std::move(cancel_checker));
     if (curl == nullptr) {
         LOG(ERROR) << "Cannot setup curl";
         return std::nullopt;
@@ -108,6 +123,9 @@ std::optional<std::string> CURL_download_memory(const std::string_view url) {
         +[](void* contents, size_t size, size_t nmemb, void* userp) {
             std::string s(static_cast<char*>(contents), size * nmemb);
             *static_cast<std::string*>(userp) += s;
+            LOG_EVERY_N_SEC(INFO, 5)
+                << fmt::format("Downloaded {} bytes so far",
+                               static_cast<std::string*>(userp)->size());
             return size * nmemb;
         });
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &result);
@@ -120,3 +138,4 @@ std::optional<std::string> CURL_download_memory(const std::string_view url) {
     else
         return std::nullopt;
 }
+}  // namespace CurlUtils
