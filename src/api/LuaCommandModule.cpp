@@ -22,15 +22,16 @@ LuaCommandModule::LuaCommandModule(std::filesystem::path filePath)
 
 LuaCommandModule::~LuaCommandModule() = default;
 
-void binds(TgBotApi::Ptr api, MessageExt* message,
+void binds(TgBotApi::Ptr api, api::types::ParsedMessage* message,
            const StringResLoader::PerLocaleMap* res, const Providers* provider,
            sol::state_view& lua) {
     // bind message object
     /*───────────────────  message table  ───────────────────*/
     sol::table msg = lua.create_table();
-    msg["chat_id"] = message->get<MessageAttrs::Chat>()->id;
-    msg["message_id"] = message->get<MessageAttrs::MessageId>();
-    msg["date"] = message->message()->date;  // seconds since epoch
+    msg["chat_id"] = message->get<api::types::ParsedMessage::Attrs::Chat>().id;
+    msg["message_id"] =
+        message->get<api::types::ParsedMessage::Attrs::MessageId>();
+    msg["date"] = message->date;  // seconds since epoch
     lua["message"] = msg;
 
     /*───────────────────  time helpers  ────────────────────*/
@@ -47,21 +48,20 @@ void binds(TgBotApi::Ptr api, MessageExt* message,
 
     /*───────────────────  bot helpers  ─────────────────────*/
     lua["reply"] = [api, message, &lua](const std::string& txt) {
-        auto m = api->sendReplyMessage(message->message(), txt);
+        auto m = api->sendReplyMessage(*message, txt);
 
         sol::table t = lua.create_table();
-        t["chat_id"] = m->chat->id;
+        t["chat_id"] = m->chat.id;
         t["message_id"] = m->messageId;
         t["date"] = static_cast<double>(m->date);
         return t;  // returned to Lua
     };
 
     lua["edit"] = [api](sol::table m, const std::string& txt) {
-        TgBot::Message::Ptr ph = std::make_shared<TgBot::Message>();
-        ph->chat = std::make_shared<TgBot::Chat>();
-        ph->chat->id = m["chat_id"];
-        ph->messageId = m["message_id"];
-        api->editMessage(ph, txt);
+        api::types::Message message;
+        message.chat.id = m["chat_id"];
+        message.messageId = m["message_id"];
+        api->editMessage(message, txt);
     };
 
     // bind db helper
@@ -126,21 +126,20 @@ bool LuaCommandModule::load() {
     info.flags = flags;
 
     info.function = [c = _context.get()](
-                        TgBotApi::Ptr api, MessageExt* message,
+                        TgBotApi::Ptr api, api::types::ParsedMessage message,
                         const StringResLoader::PerLocaleMap* res,
                         const Providers* provider) {
         sol::state_view lua = c->lua;
 
         if (!c->isLoaded) return;
 
-        binds(api, message, res, provider, lua);
+        binds(api, &message, res, provider, lua);
 
         try {
             lua["run"]();
         } catch (const sol::error& ex) {
             LOG(ERROR) << ex.what();
-            api->sendReplyMessage(message->message(),
-                                  res->get(Strings::BACKEND_ERROR));
+            api->sendReplyMessage(message, res->get(Strings::BACKEND_ERROR));
         }
     };
 

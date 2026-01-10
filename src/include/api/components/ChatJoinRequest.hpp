@@ -1,9 +1,9 @@
 #include <api/TgBotApiImpl.hpp>
 
-#include "tgbot/types/CallbackQuery.h"
+#include <api/types/CallbackQuery.hpp>
 
 class TgBotApiImpl::ChatJoinRequestImpl {
-    std::vector<std::pair<Message::Ptr, TgBot::ChatJoinRequest::Ptr>> joinReqs;
+    std::vector<std::pair<api::types::Message, TgBot::ChatJoinRequest::Ptr>> joinReqs;
     TgBot::InlineKeyboardMarkup::Ptr templateMarkup;
     TgBotApiImpl::Ptr _api;
     std::mutex mutex;

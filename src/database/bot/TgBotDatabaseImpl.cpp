@@ -1,6 +1,5 @@
 #include "TgBotDatabaseImpl.hpp"
 
-#include <api/typedefs.h>
 #include <absl/log/log.h>
 #include <fmt/format.h>
 
@@ -74,7 +73,7 @@ bool TgBotDatabaseImpl::unload() {
 bool TgBotDatabaseImpl::isLoaded() const { return loaded; }
 
 DatabaseBase::ListResult TgBotDatabaseImpl::addUserToList(
-    DatabaseBase::ListType type, UserId user) const {
+    DatabaseBase::ListType type, api::types::User::id_type user) const {
     if (!isLoaded()) {
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return DatabaseBase::ListResult::BACKEND_ERROR;
@@ -88,7 +87,7 @@ DatabaseBase::ListResult TgBotDatabaseImpl::addUserToList(
 }
 
 DatabaseBase::ListResult TgBotDatabaseImpl::removeUserFromList(
-    DatabaseBase::ListType type, UserId user) const {
+    DatabaseBase::ListType type, api::types::User::id_type user) const {
     if (!isLoaded()) {
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return DatabaseBase::ListResult::BACKEND_ERROR;
@@ -102,7 +101,7 @@ DatabaseBase::ListResult TgBotDatabaseImpl::removeUserFromList(
 }
 
 DatabaseBase::ListResult TgBotDatabaseImpl::checkUserInList(
-    DatabaseBase::ListType type, UserId user) const {
+    DatabaseBase::ListType type, api::types::User::id_type user) const {
     if (!isLoaded()) {
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return DatabaseBase::ListResult::BACKEND_ERROR;
@@ -115,7 +114,7 @@ DatabaseBase::ListResult TgBotDatabaseImpl::checkUserInList(
     }
 }
 
-std::optional<UserId> TgBotDatabaseImpl::getOwnerUserId() const {
+std::optional<api::types::User::id_type> TgBotDatabaseImpl::getOwnerUserId() const {
     if (!isLoaded()) {
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return std::nullopt;
@@ -183,7 +182,8 @@ std::ostream& TgBotDatabaseImpl::dump(std::ostream& ofs) const {
     }
 }
 
-void TgBotDatabaseImpl::setOwnerUserId(const UserId user) const {
+void TgBotDatabaseImpl::setOwnerUserId(
+    const api::types::User::id_type user) const {
     if (!isLoaded()) {
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return;
@@ -196,7 +196,7 @@ void TgBotDatabaseImpl::setOwnerUserId(const UserId user) const {
 }
 
 TgBotDatabaseImpl::AddResult TgBotDatabaseImpl::addChatInfo(
-    const ChatId chatid, const std::string_view name) const {
+    const api::types::Chat::id_type chatid, const std::string_view name) const {
     if (!isLoaded()) {
         LOG(ERROR) << __func__ << ": No-op due to missing database";
         return AddResult::BACKEND_ERROR;
@@ -209,7 +209,7 @@ TgBotDatabaseImpl::AddResult TgBotDatabaseImpl::addChatInfo(
     }
 }
 
-std::optional<ChatId> TgBotDatabaseImpl::getChatId(
+std::optional<api::types::Chat::id_type> TgBotDatabaseImpl::getChatId(
     const std::string_view name) const {
     if (!isLoaded()) {
         LOG(ERROR) << __func__ << ": No-op due to missing database";

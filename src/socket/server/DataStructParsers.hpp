@@ -10,7 +10,7 @@
 namespace TgBotSocket {
 
 struct WriteMsgToChatId {
-    ChatId chat;
+    api::types::Chat::id_type chat;
     std::string message;
 
     static std::optional<WriteMsgToChatId> fromBuffer(
@@ -19,7 +19,7 @@ struct WriteMsgToChatId {
 };
 
 struct ObserveChatId {
-    ChatId chat;
+    api::types::Chat::id_type chat;
     bool observe;
 
     static std::optional<ObserveChatId> fromBuffer(
@@ -28,7 +28,7 @@ struct ObserveChatId {
 };
 
 struct SendFileToChatId {
-    ChatId chat;
+    api::types::Chat::id_type chat;
     TgBotSocket::data::FileType fileType;
     std::filesystem::path filePath;
 

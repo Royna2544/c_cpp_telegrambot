@@ -33,7 +33,6 @@ command_module(
   Utils
   CurlDownload
   BuilderUtilsLinux
-  TgBot
   AuthApi
   PLATFORM
   "Linux")

@@ -5,7 +5,7 @@
 #include <absl/strings/str_split.h>
 #include <absl/strings/strip.h>
 #include <fmt/format.h>
-#include <tgbot/TgException.h>
+#include <api/types/ApiException.hpp>
 
 #include <TryParseStr.hpp>
 #include <stdexcept>
@@ -28,10 +28,10 @@ RestartFmt::Type::Type(const absl::string_view string) {
     }
 }
 
-RestartFmt::Type::Type(const Message::Ptr& message)
-    : chat_id(message->chat->id),
-      message_id(message->messageId),
-      message_thread_id(message->messageThreadId.value_or(0)) {}
+RestartFmt::Type::Type(const api::types::ParsedMessage& message)
+    : chat_id(message.chat.id),
+      message_id(message.messageId),
+      message_thread_id(message.messageThreadId.value_or(0)) {}
 
 bool RestartFmt::Type::operator==(const Type& other) const {
     return chat_id == other.chat_id && message_id == other.message_id &&
@@ -61,14 +61,15 @@ bool RestartFmt::checkEnvAndVerifyRestart(TgBotApi::CPtr api) {
         LOG(ERROR) << "Invalid format for RESTART=" << value << ": "
                    << ex.what();
         return false;
-    } catch (const TgBot::TgException& ex) {
+    } catch (const api::types::ApiException& ex) {
         LOG(ERROR) << "Failed to send message: " << ex.what();
         return false;
     }
     return true;
 }
 
-bool RestartFmt::isRestartedByThisMessage(const MessageExt::Ptr& message) {
+bool RestartFmt::isRestartedByThisMessage(
+    const api::types::ParsedMessage& message) {
     auto env = Env()[ENV_VAR_NAME];
     if (!env.has()) {
         DLOG(INFO) << fmt::format("ENV_VAR {} is not set", ENV_VAR_NAME);
@@ -76,7 +77,7 @@ bool RestartFmt::isRestartedByThisMessage(const MessageExt::Ptr& message) {
     }
     std::string value = env.get();
     DLOG(INFO) << fmt::format("GETENV {}: is set to {}", ENV_VAR_NAME, value);
-    if (Type{message->message()} == Type{value}) {
+    if (Type{message} == Type{value}) {
         DLOG(INFO) << "bot is restarted by this message";
         return true;
     }

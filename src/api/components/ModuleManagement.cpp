@@ -1,9 +1,10 @@
 #include <api/components/ModuleManagement.hpp>
 #include <libfs.hpp>
 
-#include "api/CommandModule.hpp"
-#include "api/TgBotApiImpl.hpp"
-#include "tgbot/TgException.h"
+#include <api/CommandModule.hpp>
+#include <api/TgBotApiImpl.hpp>
+#include <api/types/ApiException.hpp>
+#include <api/types/BotCommand.hpp>
 
 CommandModule* TgBotApiImpl::ModulesManagement::operator[](
     const std::string& name) const {
@@ -64,8 +65,7 @@ bool TgBotApiImpl::ModulesManagement::load(const std::string& name) {
         accesslevel = AuthContext::AccessLevel::AdminUser;
     }
 
-    _api->getEvents().onCommand(name, [this, accesslevel,
-                                       cmd = name](Message::Ptr message) {
+    _api->registerCommandListener(name, [this, accesslevel, cmd = name](api::types::Message message) {
         commandAsync.emplaceTask(
             cmd, std::async(std::launch::async, &TgBotApiImpl::commandHandler,
                             _api, cmd, accesslevel, std::move(message)));
@@ -87,7 +87,7 @@ bool TgBotApiImpl::ModulesManagement::unload(const std::string& name) {
         }
     }
     // Erase command handler
-    _api->getEvents().onCommand(name, {});
+    _api->registerCommandListener(name, {});
     return true;
 }
 
@@ -113,17 +113,14 @@ bool TgBotApiImpl::ModulesManagement::loadAll(
         LOG(ERROR) << "Failed to iterate through modules: " << ec.message();
         return false;
     }
-    std::vector<TgBot::BotCommand::Ptr> buffer;
+    std::vector<api::types::BotCommand> buffer;
     buffer.reserve(_handles.size());
     for (const auto& [name, mod] : _handles) {
         if (!mod->info.isHideDescription()) {
-            auto onecommand = std::make_shared<TgBot::BotCommand>();
-            onecommand->command = mod->info.name;
-            onecommand->description = mod->info.description;
-            if (mod->info.isPrivileged()) {
-                onecommand->description += " (Owner)";
-            }
-            buffer.emplace_back(onecommand);
+            buffer.emplace_back(api::types::BotCommand{
+                .command = mod->info.name,
+                .description = mod->info.description,
+            });
         }
     }
     try {

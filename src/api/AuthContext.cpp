@@ -1,10 +1,9 @@
 #include <absl/log/log.h>
-#include <api/typedefs.h>
 
 #include <api/AuthContext.hpp>
 
 bool AuthContext::isInList(DatabaseBase::ListType type,
-                           const UserId user) const {
+                           const api::types::User::id_type user) const {
     switch (_impl->checkUserInList(type, user)) {
         case DatabaseBase::ListResult::OK:
             return true;
@@ -20,18 +19,18 @@ bool AuthContext::isInList(DatabaseBase::ListType type,
     }
 }
 
-AuthContext::Result AuthContext::isAuthorized(const Message::Ptr& message,
+AuthContext::Result AuthContext::isAuthorized(const api::types::Message& message,
                                               const AccessLevel flags) const {
     if (isUnderTimeLimit(message)) {
-        return isAuthorized(message->from, flags);
+        return isAuthorized(message.from, flags);
     } else {
         return {false, Result::Reason::MessageTooOld};
     }
 }
 
-AuthContext::Result AuthContext::isAuthorized(const User::Ptr& user,
-                                              const AccessLevel flags) const {
-    std::optional<UserId> id;
+AuthContext::Result AuthContext::isAuthorized(
+    const std::optional<api::types::User>& user, const AccessLevel flags) const {
+    std::optional<api::types::User::id_type> id;
     if (user && !user->isBot) {
         // Obtain id
         id = user->id;
@@ -67,8 +66,8 @@ AuthContext::Result AuthContext::isAuthorized(const User::Ptr& user,
     }
 }
 
-bool AuthContext::isUnderTimeLimit(const Message::Ptr& msg) noexcept {
-    return isUnderTimeLimit(msg->date);
+bool AuthContext::isUnderTimeLimit(const api::types::Message& msg) noexcept {
+    return isUnderTimeLimit(msg.date);
 }
 
 bool AuthContext::isUnderTimeLimit(const time_t time) noexcept {

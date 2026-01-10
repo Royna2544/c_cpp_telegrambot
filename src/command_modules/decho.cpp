@@ -1,15 +1,15 @@
 #include <absl/log/log.h>
-#include <tgbot/TgException.h>
+#include <api/types/ApiException.hpp>
 
 #include <api/CommandModule.hpp>
-#include <api/MessageExt.hpp>
+#include <api/types/ParsedMessage.hpp>
 #include <api/TgBotApi.hpp>
 
 DECLARE_COMMAND_HANDLER(decho) {
     try {
-        api->deleteMessage(message->message());
-    } catch (const TgBot::TgException &) {
-        LOG(ERROR) << "Failed to delete message";
+        api->deleteMessage(message);
+    } catch (const api::types::ApiException &e) {
+        LOG(ERROR) << "Failed to delete message: " << e.what();
         // Cannot use delete echo in thie case.
         return;
 #ifdef __ANDROID__
@@ -18,14 +18,14 @@ DECLARE_COMMAND_HANDLER(decho) {
         return;
 #endif
     }
-    if (message->has({MessageAttrs::ExtraText}) && message->reply()->exists()) {
-        api->copyAndReplyAsMessage(message->message(),
-                                   message->reply()->message());
-    } else if (message->reply()->exists()) {
-        api->copyAndReplyAsMessage(message->reply()->message());
-    } else if (message->has<MessageAttrs::ExtraText>()) {
-        api->sendMessage(message->get<MessageAttrs::Chat>(),
-                         message->get<MessageAttrs::ExtraText>());
+    if (message.has({api::types::ParsedMessage::Attrs::ExtraText}) && message.replyToMessage.has_value()) {
+        api->copyAndReplyAsMessage(message,
+                                   message.replyToMessage.value());
+    } else if (message.replyToMessage.has_value()) {
+        api->copyAndReplyAsMessage(message.replyToMessage.value());
+    } else if (message.has<api::types::ParsedMessage::Attrs::ExtraText>()) {
+        api->sendMessage(message.get<api::types::ParsedMessage::Attrs::Chat>(),
+            message.get<api::types::ParsedMessage::Attrs::ExtraText>());
     }
 }
 
@@ -38,7 +38,7 @@ extern "C" DYN_COMMAND_EXPORT const struct DynModule DYN_COMMAND_SYM = {
         {
             .enabled = true,
             .counts = DynModule::craftArgCountMask<0, 1>(),
-            .split_type = DynModule::ValidArgs::Split::None,
+            .split_type = DynModule::ValidArgs::SplitMethod::None,
             .usage = "/decho [something-to-echo]",
         },
 };

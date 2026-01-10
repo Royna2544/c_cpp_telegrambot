@@ -1,6 +1,3 @@
-[submodule "src/third-party/tgbot-cpp"]
-	path = src/third-party/tgbot-cpp
-	url = https://github.com/Royna2544/tgbot-cpp.git
 [submodule "src/third-party/corrosion"]
 	path = src/third-party/corrosion
 	url = https://github.com/corrosion-rs/corrosion
@@ -10,3 +7,9 @@
 [submodule "llama.cpp"]
 	path = src/command_modules/llm/llama.cpp
 	url = https://github.com/ggml-org/llama.cpp
+[submodule "src/third-party/strutil"]
+	path = src/third-party/strutil
+	url = https://github.com/tgalaj/strutil
+[submodule "src/third-party/tgbotxx"]
+	path = src/third-party/tgbotxx
+	url = https://github.com/baderouaich/tgbotxx/

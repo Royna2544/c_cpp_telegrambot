@@ -20,20 +20,21 @@ class TgBotApiImpl::OnMyChatMemberImpl {
     struct Reporter {
         virtual ~Reporter() = default;
 
-        virtual void onStatusChange(const Chat::Ptr& chat,
+        virtual void onStatusChange(const api::types::Chat& chat,
                                     const BotState oldStatus,
                                     const BotState newStatus) = 0;
     };
 
     class MessageReport : public Reporter {
         TgBotApiImpl::Ptr _api;
-        UserId _ownerId;
+        api::types::User::id_type _ownerId;
 
        public:
-        MessageReport(TgBotApiImpl::Ptr api, const UserId ownerId);
+        MessageReport(TgBotApiImpl::Ptr api, const api::types::User::id_type ownerId);
         ~MessageReport() override = default;
 
-        void onStatusChange(const Chat::Ptr& chat, const BotState oldStatus,
+        void onStatusChange(const api::types::Chat& chat,
+                            const BotState oldStatus,
                             const BotState newStatus) override;
     };
     class LoggingReport : public Reporter {
@@ -41,7 +42,8 @@ class TgBotApiImpl::OnMyChatMemberImpl {
         LoggingReport() = default;
         ~LoggingReport() override = default;
 
-        void onStatusChange(const Chat::Ptr& chat, const BotState oldStatus,
+        void onStatusChange(const api::types::Chat& chat,
+                            const BotState oldStatus,
                             const BotState newStatus) override;
     };
 

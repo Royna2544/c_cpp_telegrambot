@@ -4,7 +4,6 @@
 #include <fmt/chrono.h>
 #include <fmt/format.h>
 #include <fmt/ranges.h>
-#include <trivial_helpers/_tgbot.h>
 
 #include <CommandLine.hpp>
 #include <ConfigManager.hpp>
@@ -12,7 +11,8 @@
 #include <GitBuildInfo.hpp>
 #include <api/AuthContext.hpp>
 #include <api/CommandModule.hpp>
-#include <api/MessageExt.hpp>
+#include <api/types/FormatHelper.hpp>
+#include <api/types/ApiException.hpp>
 #include <api/TgBotApiImpl.hpp>
 #include <api/Utils.hpp>
 #include <api/components/ChatJoinRequest.hpp>
@@ -36,8 +36,9 @@
 #include <thread>
 #include <utility>
 
+#include <tgbotxx/Api.hpp>
+#include <tgbotxx/tgbotxx.hpp>
 #include "RefLock.hpp"
-#include "tgbot/net/CurlHttpClient.h"
 
 #ifdef TGBOTCPP_ENABLE_CPPTRACE
 #include <cpptrace/cpptrace.hpp>
@@ -64,7 +65,7 @@ struct fmt::formatter<CommandModule::Info::Type> : formatter<std::string_view> {
 };
 
 bool TgBotApiImpl::validateValidArgs(const CommandModule::Info* module,
-                                     MessageExt::Ptr message) {
+                                     api::types::ParsedMessage* message) {
     if (!module->valid_args.enabled) {
         return true;  // No validation needed.
     }
@@ -72,7 +73,7 @@ bool TgBotApiImpl::validateValidArgs(const CommandModule::Info* module,
 
     // Try to split them.
     const std::vector<std::string>& args =
-        message->get<MessageAttrs::ParsedArgumentsList>();
+        message->get<api::types::ParsedMessage::Attrs::ParsedArgumentsList>();
 
     if (check_argc) {
         std::set<int> valid_argc =
@@ -100,8 +101,7 @@ bool TgBotApiImpl::validateValidArgs(const CommandModule::Info* module,
                 strings.emplace_back(
                     fmt::format("Usage: {}", module->valid_args.usage));
             }
-            sendReplyMessage(message->message(),
-                             fmt::format("{}", fmt::join(strings, " ")));
+            sendReplyMessage(*message, fmt::format("{}", fmt::join(strings, " ")));
             return false;
         }
     }
@@ -109,8 +109,9 @@ bool TgBotApiImpl::validateValidArgs(const CommandModule::Info* module,
     return true;
 }
 
-bool TgBotApiImpl::isMyCommand(const MessageExt::Ptr& message) const {
-    const auto botCommand = message->get<MessageAttrs::BotCommand>();
+bool TgBotApiImpl::isMyCommand(const api::types::ParsedMessage* message) const {
+    const auto botCommand =
+        message->get<api::types::ParsedMessage::Attrs::BotCommand>();
     const auto target = botCommand.target;
     if (target != getBotUser()->username && !target.empty()) {
         DLOG(INFO) << "Ignore mismatched target: " << std::quoted(target);
@@ -119,17 +120,17 @@ bool TgBotApiImpl::isMyCommand(const MessageExt::Ptr& message) const {
     return true;
 }
 
-bool TgBotApiImpl::authorized(const MessageExt::Ptr& message,
+bool TgBotApiImpl::authorized(const api::types::ParsedMessage* message,
                               const std::string_view commandName,
                               AuthContext::AccessLevel flags) const {
-    const auto authRet = _auth->isAuthorized(message->message(), flags);
+    const auto authRet = _auth->isAuthorized(*message, flags);
     if (authRet) {
         return true;
     }
     // Unauthorized user, don't run the command.
-    if (message->has<MessageAttrs::User>()) {
+    if (message->has<api::types::ParsedMessage::Attrs::User>()) {
         LOG(INFO) << fmt::format("Unauthorized command {} from {}", commandName,
-                                 message->get<MessageAttrs::User>());
+            message->get<api::types::ParsedMessage::Attrs::User>());
         switch (authRet.result.second) {
             case AuthContext::Result::Reason::Unknown:
                 LOG(INFO) << "Reason: Unknown";
@@ -155,19 +156,17 @@ bool TgBotApiImpl::authorized(const MessageExt::Ptr& message,
 
 void TgBotApiImpl::commandHandler(const std::string& command,
                                   const AuthContext::AccessLevel authflags,
-                                  Message::Ptr message) {
+                                  api::types::Message message) {
     auto lock = _refLock->acquireShared();
-
     // Find the module first.
     const auto* module = (*kModuleLoader)[command];
 
     // Create MessageExt object.
-    SplitMessageText how = module->info.valid_args.enabled
-                               ? module->info.valid_args.split_type
-                               : SplitMessageText::None;
-    auto ext = std::make_unique<MessageExt>(std::move(message), how);
+    api::types::ParsedMessage::SplitMethod how = module->info.valid_args.enabled
+        ? module->info.valid_args.split_type : api::types::ParsedMessage::SplitMethod::None;
+    api::types::ParsedMessage ext(std::move(message), how);
 
-    if (!isMyCommand(ext.get())) {
+    if (!isMyCommand(&ext)) {
         return;
     }
 
@@ -177,24 +176,24 @@ void TgBotApiImpl::commandHandler(const std::string& command,
         return;
     }
 
-    if (!authorized(ext.get(), command, authflags)) {
+    if (!authorized(&ext, command, authflags)) {
         return;
     }
 
     if (!_rateLimiter.check()) {
         LOG(INFO) << fmt::format("Ratelimiting user {}",
-                                 ext->get<MessageAttrs::User>());
+            ext.get<api::types::ParsedMessage::Attrs::User>());
         return;
     }
 
     // Partital offloading to common code.
-    if (!validateValidArgs(&module->info, ext.get())) {
+    if (!validateValidArgs(&module->info, &ext)) {
         return;
     }
 
     [[maybe_unused]] MilliSecondDP dp;
-    module->info.function(this, ext.get(),
-                          _loader->at(ext->get<MessageAttrs::Locale>()),
+    module->info.function(this, ext,
+        _loader->at(ext.get<api::types::ParsedMessage::Attrs::Locale>()),
                           _provider);
     if constexpr (buildinfo::isDebugBuild()) {
         DLOG(INFO) << fmt::format("Executing cmd {} took {} ({})", command,
@@ -231,14 +230,13 @@ void TgBotApiImpl::onAnyMessage(const AnyMessageCallback& callback) {
 }
 
 void TgBotApiImpl::onCallbackQuery(
-    std::string command,
-    TgBot::EventBroadcaster::CallbackQueryListener listener) {
+    std::string command, CallbackQueryCallback listener) {
     onCallbackQueryImpl->onCallbackQuery(std::move(command),
                                          std::move(listener));
 }
 
 void TgBotApiImpl::addInlineQueryKeyboard(
-    InlineQuery query, TgBot::InlineQueryResult::Ptr result) {
+    InlineQuery query, api::types::InlineQueryResult result) {
     onInlineQueryImpl->add(std::move(query), std::move(result));
 }
 
@@ -253,41 +251,52 @@ void TgBotApiImpl::removeInlineQueryKeyboard(const std::string_view key) {
 
 void TgBotApiImpl::startPoll() {
     LOG(INFO) << "Bot username: " << getBotUser()->username.value();
-    // Deleting webhook
-    getApi().deleteWebhook();
 
-    getApi().setMyDescription(fmt::format(
+    // Deleting webhook
+    bool result;
+    
+    result = api()->deleteWebhook(false);
+    if (result) {
+        DLOG(INFO) << "Successfully deleted webhook.";
+    } else {
+        DLOG(WARNING) << "Failed to delete webhook.";
+    }
+
+    result = api()->setMyDescription(fmt::format(
         "A C++ written Telegram bot, sources: {}", buildinfo::git::ORIGIN_URL));
+
+    if (result) {
+        DLOG(INFO) << "Successfully set bot description.";
+    } else {
+        DLOG(WARNING) << "Failed to set bot description.";
+    }
 
     std::string ownerString;
     if (auto owner = _provider->database->getOwnerUserId(); owner) {
-        auto chat = getApi().getChat(*owner);
-        if (chat->username)
-            ownerString = fmt::format(" Owned by @{}.", *chat->username);
+        auto chat = api()->getChat(*owner);
+        if (!chat->username.empty())
+            ownerString = fmt::format(" Owned by @{}.", chat->username);
     }
 
-    getApi().setMyShortDescription(
+    result = api()->setMyShortDescription(
         fmt::format("C++ Telegram bot.{} I'm currently hosted on {}",
                     ownerString, buildinfo::OS));
-
-    auto* longPoll = _bot.createLongPoll(
-        {}, {},
-        TgBot::Update::Types::message | TgBot::Update::Types::inline_query |
-            TgBot::Update::Types::callback_query |
-            TgBot::Update::Types::my_chat_member |
-            TgBot::Update::Types::chat_member |
-            TgBot::Update::Types::chat_join_request);
+    if (result) {
+        DLOG(INFO) << "Successfully set bot short description.";
+    } else {
+        DLOG(WARNING) << "Failed to set bot short description.";
+    }
 
     // Start the long poll loop.
     while (!SignalHandler::isSignaled()) {
-        longPoll->start();
+        start();
     }
 }
 
 namespace {
-void handleTgBotApiEx(const TgBot::TgException& ex) {
-    switch (ex.errorCode) {
-        case TgBot::TgException::ErrorCode::BadRequest: {
+void handleTgBotApiEx(const tgbotxx::Exception& ex) {
+    switch (ex.errorCode()) {
+        case tgbotxx::ErrorCode::BAD_REQUEST: {
             if (absl::StrContains(ex.what(), "FORUM_CLOSED")) {
                 LOG(WARNING) << "Forum closed. Skipping message.";
                 return;
@@ -306,18 +315,18 @@ void handleTgBotApiEx(const TgBot::TgException& ex) {
 #ifdef TGBOTCPP_ENABLE_CPPTRACE
     cpptrace::generate_trace().print();
 #endif
-    throw;
+    throw api::types::ApiException(ex.what());
 }
 
 constexpr bool kDisableNotifications = false;
 }  // namespace
 
-Message::Ptr TgBotApiImpl::sendMessage_impl(
-    ChatId chatId, const std::string_view text,
-    ReplyParametersExt::Ptr replyParameters, GenericReply::Ptr replyMarkup,
-    const TgBot::Api::ParseMode parseMode) const {
+std::optional<api::types::Message> TgBotApiImpl::sendMessage_impl(
+    api::types::Chat::id_type chatId, const std::string_view text,
+    std::optional<api::types::ReplyParameters> replyParameters, std::optional<api::types::GenericReply> replyMarkup,
+    const ParseMode parseMode) const {
     try {
-        return getApi().sendMessage(chatId, text, globalLinkOptions,
+        return getApi()->sendMessage(chatId, text, globalLinkOptions,
                                     replyParameters, std::move(replyMarkup),
                                     parseMode, kDisableNotifications, {},
                                     ReplyParamsToMsgTid{replyParameters});
@@ -328,12 +337,12 @@ Message::Ptr TgBotApiImpl::sendMessage_impl(
     }
 }
 
-Message::Ptr TgBotApiImpl::sendAnimation_impl(
-    ChatId chatId, std::variant<InputFile::Ptr, std::string> animation,
-    const std::string_view caption, ReplyParametersExt::Ptr replyParameters,
-    GenericReply::Ptr replyMarkup, const ParseMode parseMode) const {
+std::optional<api::types::Message> TgBotApiImpl::sendAnimation_impl(
+    api::types::Chat::id_type chatId, std::variant<InputFile::Ptr, std::string> animation,
+    const std::string_view caption, std::optional<api::types::ReplyParameters> replyParameters,
+    std::optional<api::types::GenericReply> replyMarkup, const ParseMode parseMode) const {
     try {
-        return getApi().sendAnimation(chatId, animation, {}, {}, {}, {},
+        return api()->sendAnimation(chatId, animation, {}, {}, {}, {},
                                       caption, replyParameters, replyMarkup,
                                       parseMode, kDisableNotifications, {},
                                       ReplyParamsToMsgTid{replyParameters});
@@ -343,13 +352,13 @@ Message::Ptr TgBotApiImpl::sendAnimation_impl(
     }
 }
 
-Message::Ptr TgBotApiImpl::sendSticker_impl(
-    ChatId chatId, std::variant<InputFile::Ptr, std::string> sticker,
-    ReplyParametersExt::Ptr replyParameters) const {
-    getApi().sendChatAction(chatId, TgBot::Api::ChatAction::choose_sticker,
+std::optional<api::types::Message> TgBotApiImpl::sendSticker_impl(
+    api::types::Chat::id_type chatId, std::variant<InputFile::Ptr, std::string> sticker,
+    std::optional<api::types::ReplyParameters> replyParameters) const {
+    api()->sendChatAction(chatId, TgBot::Api::ChatAction::choose_sticker,
                             ReplyParamsToMsgTid{replyParameters});
     try {
-        return getApi().sendSticker(chatId, sticker, replyParameters, nullptr,
+        return api()->sendSticker(chatId, sticker, replyParameters, nullptr,
                                     kDisableNotifications,
                                     ReplyParamsToMsgTid{replyParameters});
     } catch (const TgBot::TgException& ex) {
@@ -358,13 +367,13 @@ Message::Ptr TgBotApiImpl::sendSticker_impl(
     }
 }
 
-Message::Ptr TgBotApiImpl::editMessage_impl(
-    const Message::Ptr& message, const std::string_view newText,
+std::optional<api::types::Message> TgBotApiImpl::editMessage_impl(
+    const std::optional<api::types::Message>& message, const std::string_view newText,
     const TgBot::InlineKeyboardMarkup::Ptr& markup,
     const ParseMode parseMode) const {
     DCHECK_NE(message, nullptr);
     try {
-        return getApi().editMessageText(newText, message->chat->id,
+        return api()->editMessageText(newText, message->chat->id,
                                         message->messageId, {}, parseMode,
                                         globalLinkOptions, markup);
     } catch (const TgBot::TgException& ex) {
@@ -373,21 +382,21 @@ Message::Ptr TgBotApiImpl::editMessage_impl(
     }
 }
 
-Message::Ptr TgBotApiImpl::editMessageMarkup_impl(
-    const StringOrMessage& message, const GenericReply::Ptr& markup) const {
+std::optional<api::types::Message> TgBotApiImpl::editMessageMarkup_impl(
+    const StringOrMessage& message, const std::optional<api::types::GenericReply>& markup) const {
     try {
         return std::visit(
             [=, this](auto&& arg) {
                 using T = std::decay_t<decltype(arg)>;
-                if constexpr (std::is_same_v<T, Message::Ptr>) {
+                if constexpr (std::is_same_v<T, std::optional<api::types::Message>>) {
                     DCHECK_NE(arg, nullptr);
-                    return getApi().editMessageReplyMarkup(
+                    return api()->editMessageReplyMarkup(
                         arg->chat->id, arg->messageId, {}, markup);
                 } else if constexpr (std::is_same_v<T, std::string>) {
-                    return getApi().editMessageReplyMarkup({}, {}, arg, markup);
+                    return api()->editMessageReplyMarkup({}, {}, arg, markup);
                 }
                 LOG(WARNING) << "No-op editMessageReplyMarkup";
-                return Message::Ptr();
+                return std::optional<api::types::Message>();
             },
             message);
     } catch (const TgBot::TgException& ex) {
@@ -397,9 +406,9 @@ Message::Ptr TgBotApiImpl::editMessageMarkup_impl(
 }
 
 MessageId TgBotApiImpl::copyMessage_impl(
-    ChatId fromChatId, MessageId messageId,
-    ReplyParametersExt::Ptr replyParameters) const {
-    const auto ret = getApi().copyMessage(
+    api::types::Chat::id_type fromChatId, MessageId messageId,
+    std::optional<api::types::ReplyParameters> replyParameters) const {
+    const auto ret = api()->copyMessage(
         fromChatId, fromChatId, messageId, {}, {}, {}, kDisableNotifications,
         replyParameters, nullptr, {}, ReplyParamsToMsgTid{replyParameters});
     if (ret) {
@@ -408,70 +417,70 @@ MessageId TgBotApiImpl::copyMessage_impl(
     return 0;
 }
 
-void TgBotApiImpl::deleteMessage_impl(const Message::Ptr& message) const {
+void TgBotApiImpl::deleteMessage_impl(const std::optional<api::types::Message>& message) const {
     DCHECK_NE(message, nullptr);
-    getApi().deleteMessage(message->chat->id, message->messageId);
+    api()->deleteMessage(message->chat->id, message->messageId);
 }
 
 void TgBotApiImpl::deleteMessages_impl(
-    ChatId chatId, const std::vector<MessageId>& messageIds) const {
-    getApi().deleteMessages(chatId, messageIds);
+    api::types::Chat::id_type chatId, const std::vector<MessageId>& messageIds) const {
+    api()->deleteMessages(chatId, messageIds);
 }
 
 void TgBotApiImpl::restrictChatMember_impl(
-    ChatId chatId, UserId userId, TgBot::ChatPermissions::Ptr permissions,
+    api::types::Chat::id_type chatId, UserId userId, TgBot::ChatPermissions::Ptr permissions,
     std::chrono::system_clock::time_point untilDate) const {
     DCHECK_NE(permissions, nullptr);
-    getApi().restrictChatMember(chatId, userId, permissions, untilDate);
+    api()->restrictChatMember(chatId, userId, permissions, untilDate);
 }
 
-Message::Ptr TgBotApiImpl::sendDocument_impl(
-    ChatId chatId, FileOrString document, const std::string_view caption,
-    ReplyParametersExt::Ptr replyParameters, GenericReply::Ptr replyMarkup,
+std::optional<api::types::Message> TgBotApiImpl::sendDocument_impl(
+    api::types::Chat::id_type chatId, FileOrString document, const std::string_view caption,
+    std::optional<api::types::ReplyParameters> replyParameters, std::optional<api::types::GenericReply> replyMarkup,
     const ParseMode parseMode) const {
-    getApi().sendChatAction(chatId, TgBot::Api::ChatAction::upload_document,
+    api()->sendChatAction(chatId, TgBot::Api::ChatAction::upload_document,
                             ReplyParamsToMsgTid{replyParameters});
-    return getApi().sendDocument(chatId, std::move(document), {}, caption,
+    return api()->sendDocument(chatId, std::move(document), {}, caption,
                                  replyParameters, replyMarkup, parseMode,
                                  kDisableNotifications, {}, {},
                                  ReplyParamsToMsgTid{replyParameters});
 }
 
-Message::Ptr TgBotApiImpl::sendPhoto_impl(
-    ChatId chatId, FileOrString photo, const std::string_view caption,
-    ReplyParametersExt::Ptr replyParameters, GenericReply::Ptr replyMarkup,
+std::optional<api::types::Message> TgBotApiImpl::sendPhoto_impl(
+    api::types::Chat::id_type chatId, FileOrString photo, const std::string_view caption,
+    std::optional<api::types::ReplyParameters> replyParameters, std::optional<api::types::GenericReply> replyMarkup,
     const ParseMode parseMode) const {
-    getApi().sendChatAction(chatId, TgBot::Api::ChatAction::upload_photo,
+    api()->sendChatAction(chatId, TgBot::Api::ChatAction::upload_photo,
                             ReplyParamsToMsgTid{replyParameters});
-    return getApi().sendPhoto(chatId, photo, caption, replyParameters,
+    return api()->sendPhoto(chatId, photo, caption, replyParameters,
                               replyMarkup, parseMode, kDisableNotifications, {},
                               ReplyParamsToMsgTid{replyParameters});
 }
 
-Message::Ptr TgBotApiImpl::sendVideo_impl(
-    ChatId chatId, FileOrString video, const std::string_view caption,
-    ReplyParametersExt::Ptr replyParameters, GenericReply::Ptr replyMarkup,
+std::optional<api::types::Message> TgBotApiImpl::sendVideo_impl(
+    api::types::Chat::id_type chatId, FileOrString video, const std::string_view caption,
+    std::optional<api::types::ReplyParameters> replyParameters, std::optional<api::types::GenericReply> replyMarkup,
     const ParseMode parseMode) const {
-    getApi().sendChatAction(chatId, TgBot::Api::ChatAction::upload_video,
+    api()->sendChatAction(chatId, TgBot::Api::ChatAction::upload_video,
                             ReplyParamsToMsgTid{replyParameters});
-    return getApi().sendVideo(chatId, video, {}, {}, {}, {}, {}, caption,
+    return api()->sendVideo(chatId, video, {}, {}, {}, {}, {}, caption,
                               replyParameters, replyMarkup, parseMode,
                               kDisableNotifications, {},
                               ReplyParamsToMsgTid{replyParameters});
 }
 
-Message::Ptr TgBotApiImpl::sendDice_impl(ChatId chatId) const {
+std::optional<api::types::Message> TgBotApiImpl::sendDice_impl(api::types::Chat::id_type chatId) const {
     static constexpr std::array<std::string_view, 6> dices = {"🎲", "🎯", "🏀",
                                                               "⚽", "🎳", "🎰"};
 
-    return getApi().sendDice(
+    return api()->sendDice(
         chatId, kDisableNotifications, nullptr, nullptr,
         dices[_provider->random->generate(dices.size() - 1)]);
 }
 
 StickerSet::Ptr TgBotApiImpl::getStickerSet_impl(
     const std::string_view setName) const {
-    return getApi().getStickerSet(setName);
+    return api()->getStickerSet(setName);
 }
 
 bool TgBotApiImpl::createNewStickerSet_impl(
@@ -479,7 +488,7 @@ bool TgBotApiImpl::createNewStickerSet_impl(
     const std::string_view title,
     const std::vector<InputSticker::Ptr>& stickers,
     Sticker::Type stickerType) const {
-    return getApi().createNewStickerSet(userId, name, title, stickers,
+    return api()->createNewStickerSet(userId, name, title, stickers,
                                         stickerType);
 }
 
@@ -487,12 +496,12 @@ File::Ptr TgBotApiImpl::uploadStickerFile_impl(
     std::int64_t userId, InputFile::Ptr sticker,
     const TgBot::Api::StickerFormat stickerFormat) const {
     DCHECK_NE(sticker, nullptr);
-    return getApi().uploadStickerFile(userId, sticker, stickerFormat);
+    return api()->uploadStickerFile(userId, sticker, stickerFormat);
 }
 
 bool TgBotApiImpl::downloadFile_impl(const std::filesystem::path& destfilename,
                                      const std::string_view fileid) const {
-    const auto file = getApi().getFile(fileid);
+    const auto file = api()->getFile(fileid);
     if (!file) {
         LOG(INFO) << "File " << fileid << " not found in Telegram servers.";
         return false;
@@ -502,7 +511,7 @@ bool TgBotApiImpl::downloadFile_impl(const std::filesystem::path& destfilename,
         return false;
     }
     // Download the file
-    std::string buffer = getApi().downloadFile(*file->filePath);
+    std::string buffer = api()->downloadFile(*file->filePath);
     // Save the file to a file on disk
     std::fstream ofs(destfilename, std::ios::binary | std::ios::out);
     if (!ofs.is_open()) {
@@ -517,39 +526,39 @@ bool TgBotApiImpl::downloadFile_impl(const std::filesystem::path& destfilename,
 
 User::Ptr TgBotApiImpl::getBotUser_impl() const {
     const static bool s = [this] {
-        me = getApi().getMe();
+        me = api()->getMe();
         return true;
     }();
     return me;
 }
 
-bool TgBotApiImpl::pinMessage_impl(Message::Ptr message) const {
+bool TgBotApiImpl::pinMessage_impl(std::optional<api::types::Message> message) const {
     DCHECK_NE(message, nullptr);
-    return getApi().pinChatMessage(message->chat->id, message->messageId,
+    return api()->pinChatMessage(message->chat->id, message->messageId,
                                    kDisableNotifications);
 }
 
-bool TgBotApiImpl::unpinMessage_impl(Message::Ptr message) const {
+bool TgBotApiImpl::unpinMessage_impl(std::optional<api::types::Message> message) const {
     DCHECK_NE(message, nullptr);
-    return getApi().unpinChatMessage(message->chat->id, message->messageId);
+    return api()->unpinChatMessage(message->chat->id, message->messageId);
 }
 
 bool TgBotApiImpl::banChatMember_impl(const Chat::Ptr& chat,
                                       const User::Ptr& user) const {
     DCHECK_NE(chat, nullptr);
     DCHECK_NE(user, nullptr);
-    return getApi().banChatMember(chat->id, user->id);
+    return api()->banChatMember(chat->id, user->id);
 }
 
 bool TgBotApiImpl::unbanChatMember_impl(const Chat::Ptr& chat,
                                         const User::Ptr& user) const {
     DCHECK_NE(chat, nullptr);
     DCHECK_NE(user, nullptr);
-    return getApi().unbanChatMember(chat->id, user->id);
+    return api()->unbanChatMember(chat->id, user->id);
 }
 
-User::Ptr TgBotApiImpl::getChatMember_impl(ChatId chat, UserId user) const {
-    const auto member = getApi().getChatMember(chat, user);
+User::Ptr TgBotApiImpl::getChatMember_impl(api::types::Chat::id_type chat, UserId user) const {
+    const auto member = api()->getChatMember(chat, user);
     if (!member) {
         LOG(WARNING) << "ChatMember is null.";
         return {};
@@ -560,14 +569,14 @@ User::Ptr TgBotApiImpl::getChatMember_impl(ChatId chat, UserId user) const {
 void TgBotApiImpl::setDescriptions_impl(
     const std::string_view description,
     const std::string_view shortDescription) const {
-    getApi().setMyDescription(description);
-    getApi().setMyShortDescription(shortDescription);
+    api()->setMyDescription(description);
+    api()->setMyShortDescription(shortDescription);
 }
 
 bool TgBotApiImpl::setMessageReaction_impl(
-    const ChatId chatid, const MessageId message,
+    const api::types::Chat::id_type chatid, const MessageId message,
     const std::vector<ReactionType::Ptr>& reaction, bool isBig) const {
-    return getApi().setMessageReaction(chatid, message, reaction, isBig);
+    return api()->setMessageReaction(chatid, message, reaction, isBig);
 }
 
 bool TgBotApiImpl::answerCallbackQuery_impl(
@@ -577,17 +586,14 @@ bool TgBotApiImpl::answerCallbackQuery_impl(
 }
 
 TgBotApiImpl::TgBotApiImpl(const std::string_view token, AuthContext* auth,
-                           StringResLoader* loader, Providers* providers,
-                           RefLock* refLock)
-    : _bot(std::string(token),
-           std::make_unique<TgBot::CurlHttpClient>(std::chrono::seconds(30))),
+                           StringResLoader* loader, Providers* providers, RefLock* refLock)
+    : _agent(std::string(token)),
       _auth(auth),
       _loader(loader),
       _provider(providers),
       _rateLimiter(2, std::chrono::seconds(3)),
       _refLock(refLock) {
-    globalLinkOptions = std::make_shared<TgBot::LinkPreviewOptions>();
-    globalLinkOptions->isDisabled = true;
+    globalLinkOption.isDisabled = true;
     // Register -> onUnknownCommand
     onUnknownCommandImpl =
         std::make_unique<TgBotApiImpl::OnUnknownCommandImpl>(this);

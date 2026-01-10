@@ -12,7 +12,6 @@ tgbot_library(
   Utils
   PUBLIC_INC
   ${CMAKE_CURRENT_BINARY_DIR}
-  $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>
   STATIC)
 
 find_package(Python3 COMPONENTS Interpreter)

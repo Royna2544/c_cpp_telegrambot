@@ -1,3 +1,4 @@
 - Better installer on Windows.
 - SocketDataHandler JSON version test
 - Fix SocketDataHandler test
+- Cloud AI support (e.g., Gemini, Claude)

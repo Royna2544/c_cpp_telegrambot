@@ -2,7 +2,7 @@
 #include <absl/strings/str_replace.h>
 #include <absl/strings/str_split.h>
 #include <fmt/format.h>
-#include <tgbot/TgException.h>
+#include <api/types/ApiException.hpp>
 #include <trivial_helpers/_tgbot.h>
 
 #include <GitBuildInfo.hpp>

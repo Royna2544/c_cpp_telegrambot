@@ -1,7 +1,6 @@
 #pragma once
 
 #include <DBImplExports.h>
-#include <api/typedefs.h>
 #include <trivial_helpers/_class_helper_macros.h>
 
 #include <ConfigManager.hpp>
@@ -68,22 +67,22 @@ struct DBIMPL_EXPORT TgBotDatabaseImpl : DatabaseBase {
     // Wrappers
     [[nodiscard]] bool isLoaded() const;
     [[nodiscard]] DatabaseBase::ListResult addUserToList(
-        DatabaseBase::ListType type, UserId user) const override;
+        DatabaseBase::ListType type, api::types::User::id_type user) const override;
     [[nodiscard]] DatabaseBase::ListResult removeUserFromList(
-        DatabaseBase::ListType type, UserId user) const override;
+        DatabaseBase::ListType type, api::types::User::id_type user) const override;
     [[nodiscard]] DatabaseBase::ListResult checkUserInList(
-        DatabaseBase::ListType type, UserId user) const override;
-    [[nodiscard]] std::optional<UserId> getOwnerUserId() const override;
+        DatabaseBase::ListType type, api::types::User::id_type user) const override;
+    [[nodiscard]] std::optional<api::types::User::id_type> getOwnerUserId() const override;
     [[nodiscard]] std::optional<DatabaseBase::MediaInfo> queryMediaInfo(
         std::string str) const override;
     [[nodiscard]] AddResult addMediaInfo(
         const DatabaseBase::MediaInfo &info) const override;
     [[nodiscard]] std::vector<MediaInfo> getAllMediaInfos() const override;
     std::ostream &dump(std::ostream &ofs) const override;
-    void setOwnerUserId(UserId userid) const override;
+    void setOwnerUserId(api::types::User::id_type userId) const override;
     [[nodiscard]] AddResult addChatInfo(
-        const ChatId chatid, const std::string_view name) const override;
-    [[nodiscard]] std::optional<ChatId> getChatId(
+        const api::types::Chat::id_type chatid, const std::string_view name) const override;
+    [[nodiscard]] std::optional<api::types::Chat::id_type> getChatId(
         const std::string_view name) const override;
 
     // Load database from file
