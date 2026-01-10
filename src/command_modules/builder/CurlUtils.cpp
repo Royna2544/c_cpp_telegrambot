@@ -14,7 +14,7 @@
 namespace {
 
 static CURL* CURL_setup_common(const std::string_view url,
-                               CurlUtils::CancelChecker cancel_checker) {
+                               CurlUtils::CancelChecker& cancel_checker) {
     CURL* curl = curl_easy_init();
     if (curl == nullptr) {
         LOG(ERROR) << "Cannot initialize curl";
@@ -44,11 +44,23 @@ static CURL* CURL_setup_common(const std::string_view url,
             auto ulnowByte = MegaBytes(ulnow * boost::units::data::bytes);
             auto ultotalByte = MegaBytes(ultotal * boost::units::data::bytes);
             auto cancel_checker =
-                static_cast<std::function<bool(void)>*>(clientp);
+                static_cast<CurlUtils::CancelChecker*>(clientp);
             LOG_EVERY_N_SEC(INFO, 5) << fmt::format(
                 "Download: {}MB/{}MB, Upload: {}MB/{}MB", dlnowByte.value(),
                 dltotalByte.value(), ulnowByte.value(), ultotalByte.value());
-            return *cancel_checker && (*cancel_checker)() ? 0 : 1;
+
+            constexpr int CURL_STOP = 1;
+            constexpr int CURL_CONTINUE = 0;
+
+            if (cancel_checker == nullptr) {
+                // No cancel checker, continue
+                return CURL_CONTINUE;
+            } else {
+                // Call the cancel checker to see if we need to cancel
+                bool rc = (*cancel_checker)();
+                // If rc is true, we need to cancel.
+                return rc ? CURL_STOP : CURL_CONTINUE;
+            }
         });
     curl_easy_setopt(curl, CURLOPT_XFERINFODATA, &cancel_checker);
     // Enble progress callbacks
@@ -77,7 +89,7 @@ bool download_file(const std::string_view url,
     LOG(INFO) << "Downloading " << url << " to " << where;
 
     // Common CURL setup
-    CURL* curl = CURL_setup_common(url, std::move(cancel_checker));
+    CURL* curl = CURL_setup_common(url, cancel_checker);
     if (curl == nullptr) {
         LOG(ERROR) << "Cannot setup curl";
         return false;
@@ -111,7 +123,7 @@ std::optional<std::string> download_memory(
     LOG(INFO) << "Downloading " << url << " to memory";
 
     // Common CURL setup
-    CURL* curl = CURL_setup_common(url, std::move(cancel_checker));
+    CURL* curl = CURL_setup_common(url, cancel_checker);
     if (curl == nullptr) {
         LOG(ERROR) << "Cannot setup curl";
         return std::nullopt;
