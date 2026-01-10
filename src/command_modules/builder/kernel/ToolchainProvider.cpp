@@ -52,7 +52,7 @@ bool ClangProvider::downloadTo(const std::filesystem::path& path) {
     std::filesystem::path kToolchainTarballPath = path / "clang.tar.gz";
     std::error_code ec;
 
-    if (!std::filesystem::is_regular_file(kToolchainTarballPath, ec)) {
+    if (!std::filesystem::exists(kToolchainTarballPath, ec)) {
         if (ec) {
             LOG(ERROR) << "Cannot check existence of toolchain tarball";
             return false;
