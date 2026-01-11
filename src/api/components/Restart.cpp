@@ -9,9 +9,9 @@
 #include <iomanip>
 #include <restartfmt_parser.hpp>
 
-#ifdef __APPLE__
-extern char **environ;
-#endif  // __APPLE__
+#if defined(__APPLE__) || defined(__FreeBSD__)
+extern char** environ;
+#endif  // __APPLE__ || __FreeBSD__
 
 TgBotApiImpl::RestartCommand::RestartCommand(TgBotApiImpl::Ptr api)
     : _api(api) {
@@ -21,7 +21,8 @@ TgBotApiImpl::RestartCommand::RestartCommand(TgBotApiImpl::Ptr api)
 }
 
 void TgBotApiImpl::RestartCommand::commandFunction(MessageExt::Ptr message) {
-    if (!_api->authorized(message, "restart", AuthContext::AccessLevel::AdminUser)) {
+    if (!_api->authorized(message, "restart",
+                          AuthContext::AccessLevel::AdminUser)) {
         return;
     }
     if (!_api->isMyCommand(message)) {
@@ -34,16 +35,16 @@ void TgBotApiImpl::RestartCommand::commandFunction(MessageExt::Ptr message) {
 
     // typical chatid:int32_max
     int count = 0;
-    std::vector<char *> myEnviron;
+    std::vector<char*> myEnviron;
 
     // Get the size of environment buffer
     for (; environ[count] != nullptr; ++count);
     // Get ready to insert 1 more to the environment buffer
     myEnviron.resize(count + 2);
     // Copy the environment buffer to the new buffer
-    memcpy(myEnviron.data(), environ, count * sizeof(char *));
+    memcpy(myEnviron.data(), environ, count * sizeof(char*));
     // Check if the environ RESTART exists already
-    auto [be, en] = std::ranges::remove_if(myEnviron, [](const char *env) {
+    auto [be, en] = std::ranges::remove_if(myEnviron, [](const char* env) {
         return env != nullptr
                    ? std::string_view(env).starts_with(RestartFmt::ENV_VAR_NAME)
                    : false;
@@ -68,8 +69,8 @@ void TgBotApiImpl::RestartCommand::commandFunction(MessageExt::Ptr message) {
     myEnviron[count + 1] = nullptr;
 
     // Copy the command line used to launch the bot
-    auto *const argv = _api->_provider->cmdline->argv();
-    auto *const exe = argv[0];
+    auto* const argv = _api->_provider->cmdline->argv();
+    auto* const exe = argv[0];
 
     // Stop threads
     DLOG(INFO) << "Stopping running threads...";
