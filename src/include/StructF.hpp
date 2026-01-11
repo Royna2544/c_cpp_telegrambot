@@ -10,18 +10,18 @@
 #include <string_view>
 
 struct F {
+    using size_type = long;
+
     // Constructor for FILE* managed by *this
     F() : handle(nullptr, &fclose), external_managed(false) {}
     // Constructor for externally managed FILE*
     explicit F(FILE* handle)
         : handle(handle, [](FILE*) { return 0; }), external_managed(true) {}
-    
-    operator FILE*() const {
-        return handle.get();
-    }
+
+    operator FILE*() const { return handle.get(); }
     // Do not allow implicit cast to bool. Which is implied by operator FILE*
     operator bool() const = delete;
-    
+
     // No copy constructor
     F(const F&) = delete;
     F& operator=(const F&) = delete;
@@ -94,8 +94,12 @@ struct F {
 
         operator bool() const { return success; }
 
-        static Result ok() { return Result{true, Reason::kNone}; }
-        static Result error(Reason reason) { return Result{false, reason}; }
+        static Result ok() {
+            return Result{.success = true, .reason = Reason::kNone};
+        }
+        static Result error(Reason reason) {
+            return Result{.success = false, .reason = reason};
+        }
         static Result ok_or(const bool cond, const Reason ifFailed) {
             return cond ? Result::ok() : Result::error(ifFailed);
         }
@@ -119,19 +123,21 @@ struct F {
     [[nodiscard]] Result open(const std::string_view filename, const Mode mode);
 
     // Overload!
-    [[nodiscard]] Result open(const std::filesystem::path& filename, const Mode mode) {
+    [[nodiscard]] Result open(const std::filesystem::path& filename,
+                              const Mode mode) {
         // Calls the string overload
         return open(filename.string(), mode);
     }
 
-    // Explicit overload to std::string (Which can be converted to both fs::path and string_view)
+    // Explicit overload to std::string (Which can be converted to both fs::path
+    // and string_view)
     [[nodiscard]] Result open(const std::string& filename, const Mode mode) {
         const std::string_view fileView = filename;
         // Calls the string_view overload
         return open(fileView, mode);
     }
 
-    [[nodiscard]] Result open(const char *filename, const Mode mode) {
+    [[nodiscard]] Result open(const char* filename, const Mode mode) {
         return open(std::string_view(filename), mode);
     }
 
@@ -211,27 +217,28 @@ struct F {
      * externally managed (i.e., `stdout`, `stderr`). If the file is externally
      * managed, it will not be closed.
      */
-    void close();
+    Result close();
 
     /**
      * @brief Calculates the file size of the underlying fp.
      *
      * Calculates and returns the size of the file in bytes.
      */
-    [[nodiscard]] long size() const;
+    [[nodiscard]] size_type size() const;
 
     // Represents the invalid file size returned by size().
-    constexpr static long INVALID_SIZE = -1;
+    constexpr static size_type INVALID_SIZE = -1;
 
    private:
-    using HANDLE = std::unique_ptr<FILE, int(*)(FILE*)>;
+    using HANDLE = std::unique_ptr<FILE, int (*)(FILE*)>;
     HANDLE handle;
     bool external_managed;
 
     static std::string_view constructFileMode(const Mode mode);
 };
 
-inline std::ostream& operator<<(std::ostream& self, const F::Result::Reason& reason) {
+inline std::ostream& operator<<(std::ostream& self,
+                                const F::Result::Reason& reason) {
     switch (reason) {
         case F::Result::Reason::kNone:
             return self << "kNone";
@@ -244,11 +251,10 @@ inline std::ostream& operator<<(std::ostream& self, const F::Result::Reason& rea
 }
 
 inline F::Result F::open(const std::string_view filename, const Mode mode) {
-    if (handle && !external_managed) {
-        (void)fclose(handle.release());
+    Result closeRes = close();
+    if (!closeRes) {
+        return closeRes;
     }
-    // External managed is false because we are opening new.
-    external_managed = false;
     handle.reset(std::fopen(filename.data(), constructFileMode(mode).data()));
     if (handle == nullptr) {
         ABSL_LOG(ERROR) << "Failed to open file: " << std::quoted(filename);
@@ -258,7 +264,7 @@ inline F::Result F::open(const std::string_view filename, const Mode mode) {
 }
 
 inline F::Result F::write(const void* __restrict ptr, size_t size,
-                   size_t nBytes) const {
+                          size_t nBytes) const {
     if (handle == nullptr) {
         ABSL_LOG(ERROR) << "File handle is null";
         return Result::error(Result::Reason::kHandleNull);
@@ -294,14 +300,19 @@ inline F::Result F::putc(const char c) const {
                          Result::Reason::kIOFailure);
 }
 
-inline void F::close() {
+inline F::Result F::close() {
     if (handle && !external_managed) {
-        fclose(handle.release());
+        if (fclose(handle.release()) != 0) {
+            ABSL_LOG(ERROR) << "Failed to close file";
+            return Result::error(Result::Reason::kIOFailure);
+        }
     }
     handle.reset();
+    external_managed = false;
+    return Result::ok();
 }
 
-inline long F::size() const {
+inline F::size_type F::size() const {
     if (handle == nullptr) {
         ABSL_LOG(ERROR) << "File handle is null";
         return INVALID_SIZE;
@@ -311,7 +322,7 @@ inline long F::size() const {
         ABSL_LOG(ERROR) << "Failed to get current position in file";
         return INVALID_SIZE;
     }
-    long size = fseek(handle.get(), 0, SEEK_END);
+    F::size_type size = fseek(handle.get(), 0, SEEK_END);
     if (size == -1) {
         ABSL_LOG(ERROR) << "Failed to seek to end of file";
         return INVALID_SIZE;
