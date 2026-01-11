@@ -22,7 +22,7 @@ typedef uint8_t popen_watchdog_exit_code_t;
 #define POPEN_WDT_DEFAULT_SHELL "powershell.exe"
 #elif __APPLE__
 #define POPEN_WDT_DEFAULT_SHELL "zsh"
-#elif defined _POSIX_C_SOURCE || defined __ANDROID__
+#elif defined _POSIX_C_SOURCE
 #define POPEN_WDT_DEFAULT_SHELL "bash"
 #else
 #error "Unsupported platform"
@@ -48,12 +48,12 @@ typedef struct {
 #define POPEN_WDT_EXIT_INITIALIZER {POPEN_WDT_EXIT_CODE_MAX, false}
 
 typedef struct {
-    const char *command;     /* command string */
+    const char* command;     /* command string */
     bool watchdog_enabled;   /* Is watchdog enabled? [in] */
     bool watchdog_activated; /* Result callback, stored true if watchdog did the
                                 work [out] */
     int sleep_secs; /* Number of seconds to sleep if watchdog is enabled */
-    void *privdata; /* Private data pointer */
+    void* privdata; /* Private data pointer */
 } popen_watchdog_data_t;
 
 typedef int64_t popen_watchdog_ssize_t;
@@ -64,7 +64,7 @@ typedef int64_t popen_watchdog_ssize_t;
  * @param data the data structure to initialize
  * @return if the initialization succeeded
  */
-bool popen_watchdog_init(popen_watchdog_data_t **data);
+bool popen_watchdog_init(popen_watchdog_data_t** data);
 
 /**
  * @brief starts the popen watchdog, which monitors the given command and kills
@@ -73,7 +73,7 @@ bool popen_watchdog_init(popen_watchdog_data_t **data);
  * @param data the data structure containing the command to monitor
  * @return true if the watchdog was successfully started, false otherwise
  */
-bool popen_watchdog_start(popen_watchdog_data_t **data);
+bool popen_watchdog_start(popen_watchdog_data_t** data);
 
 /**
  * @brief Checks if the watchdog has been activated for the given popen data.
@@ -81,7 +81,7 @@ bool popen_watchdog_start(popen_watchdog_data_t **data);
  * @param data The data structure containing the popen information.
  * @return true if the watchdog activated, false otherwise.
  */
-bool popen_watchdog_activated(popen_watchdog_data_t **data);
+bool popen_watchdog_activated(popen_watchdog_data_t** data);
 
 /**
  * @brief Reads data from the file pointer associated with the popen watchdog.
@@ -94,9 +94,9 @@ bool popen_watchdog_activated(popen_watchdog_data_t **data);
  * @param size The maximum number of bytes to read from the file pointer.
  * @return Total size of read bytes, fail means negative.
  */
-popen_watchdog_ssize_t popen_watchdog_read(popen_watchdog_data_t **data,
-                                          char *buf,
-                                          popen_watchdog_ssize_t size);
+popen_watchdog_ssize_t popen_watchdog_read(popen_watchdog_data_t** data,
+                                           char* buf,
+                                           popen_watchdog_ssize_t size);
 
 /**
  * @brief Cleans up and frees the resources associated with the popen watchdog
@@ -111,7 +111,7 @@ popen_watchdog_ssize_t popen_watchdog_read(popen_watchdog_data_t **data,
  * @return The exit status of the process. If the process was signaled, the
  * exit status will be the signum.
  */
-popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t **data);
+popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t** data);
 
 #ifdef __cplusplus
 }

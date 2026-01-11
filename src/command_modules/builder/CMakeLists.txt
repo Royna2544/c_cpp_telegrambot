@@ -64,8 +64,8 @@ endif()
 
 add_subdirectory(archives)
 
-if(NOT LINUX AND NOT ANDROID)
-  message(STATUS "Builder: Unsupported platform: ${CMAKE_SYSTEM_NAME})")
+if(NOT LINUX)
+  message(STATUS "Builder: Unsupported platform: <${CMAKE_SYSTEM_NAME}>")
   return()
 endif()
 
