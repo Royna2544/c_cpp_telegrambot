@@ -52,7 +52,7 @@ static CURL* CURL_setup_common(const std::string_view url,
             constexpr int CURL_STOP = 1;
             constexpr int CURL_CONTINUE = 0;
 
-            if (cancel_checker == nullptr) {
+            if (*cancel_checker == nullptr) {
                 // No cancel checker, continue
                 return CURL_CONTINUE;
             } else {
