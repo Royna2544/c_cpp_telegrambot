@@ -52,6 +52,7 @@ static CURL* CURL_setup_common(const std::string_view url,
             constexpr int CURL_STOP = 1;
             constexpr int CURL_CONTINUE = 0;
 
+            assert(cancel_checker != nullptr);
             if (*cancel_checker == nullptr) {
                 // No cancel checker, continue
                 return CURL_CONTINUE;
@@ -69,7 +70,7 @@ static CURL* CURL_setup_common(const std::string_view url,
     return curl;
 }
 
-static bool CURL_perform_common(CURL* curl) {
+bool CURL_perform_common(CURL* curl) {
     CURLcode res = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
     if (res != CURLE_OK) {
