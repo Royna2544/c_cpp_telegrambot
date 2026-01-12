@@ -26,27 +26,19 @@ ChatDataCollector::Data::Data(const Message::Ptr& message) {
     timestamp = message->date;
 }
 
-ChatDataCollector::ChatDataCollector(TgBotApi::Ptr api) {
-    api->onAnyMessage([this](TgBotApi::CPtr api, const Message::Ptr& message) {
-        onMessage(message);
-        return TgBotApi::AnyMessageResult::Handled;
-    });
+void ChatDataCollector::onMessage(const Message::Ptr& message) {
+    chatDataFile << Data(message);
 }
 
-ChatDataCollector::~ChatDataCollector() {
+ChatDataCollector::ChatDataCollector(TgBotApi::Ptr api) {
     bool existed = false;
     constexpr std::string_view kChatDataFile = "chat_data.csv";
 
-    if (chatData.empty()) {
-        LOG(INFO) << "No chat data collected, skipping chat data writing";
-        return;
-    }
     // Write chat data to chat_data.csv
     if (std::filesystem::exists(kChatDataFile)) {
         // Then skip writing header
         existed = true;
     }
-    std::ofstream chatDataFile;
     if (existed) {
         chatDataFile.open(kChatDataFile.data(), std::ios::app);
     } else {
@@ -55,9 +47,11 @@ ChatDataCollector::~ChatDataCollector() {
     if (!existed) {
         chatDataFile << "chat_id,user_id,timestamp,message_type\n";
     }
-    for (const auto& data : chatData) {
-        chatDataFile << data;
-    }
-    LOG(INFO) << "Chat data collected and saved to chat_data.csv: "
-              << chatData.size() << " entries";
+    api->onAnyMessage(
+        [this](TgBotApi::CPtr /*api*/, const Message::Ptr& message) {
+            onMessage(message);
+            return TgBotApi::AnyMessageResult::Handled;
+        });
 }
+
+ChatDataCollector::~ChatDataCollector() = default;

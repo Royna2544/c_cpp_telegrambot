@@ -2,6 +2,7 @@
 
 #include <api/TgBotApi.hpp>
 #include <ctime>
+#include <fstream>
 #include <trivial_helpers/fruit_inject.hpp>
 
 // Collects user data to a CSV
@@ -25,15 +26,13 @@ class ChatDataCollector {
         explicit Data(const Message::Ptr& message);
     };
 
-    void onMessage(const Message::Ptr& message) {
-        chatData.emplace_back(message);
-    }
+    void onMessage(const Message::Ptr& message);
 
     APPLE_EXPLICIT_INJECT(ChatDataCollector(TgBotApi::Ptr api));
     ~ChatDataCollector();
 
    private:
-    std::vector<Data> chatData;
+    std::ofstream chatDataFile;
 };
 
 inline std::ostream& operator<<(std::ostream& os, ChatDataCollector::Data d) {
