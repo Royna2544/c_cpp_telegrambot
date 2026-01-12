@@ -12,7 +12,8 @@
       "name": "opencv4",
       "features": [
         "ffmpeg"
-      ]
+      ],
+      "platform": "!(arm64 | arm)"
     },
     "boost-asio",
     "boost-system",
