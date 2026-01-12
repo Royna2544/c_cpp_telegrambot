@@ -27,6 +27,7 @@ ChatDataCollector::Data::Data(const Message::Ptr& message) {
 }
 
 void ChatDataCollector::onMessage(const Message::Ptr& message) {
+    std::lock_guard<std::mutex> lock(mutex_);
     chatDataFile << Data(message);
 }
 
