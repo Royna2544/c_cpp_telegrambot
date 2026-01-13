@@ -46,6 +46,8 @@ void TgBotApiImpl::ChatJoinRequestImpl::onCallbackQueryFunction(
             _api->answerCallbackQuery(query->id,
                                       "Sorry, you are not allowed to");
         }
+        LOG(INFO) << fmt::format("Accepting internal {} by user {}",
+                                 query->data, query->from);
         const auto& request = reqIt->second;
         if (!absl::ConsumePrefix(&queryData,
                                  fmt::format("{}_", request->date))) {
@@ -53,26 +55,32 @@ void TgBotApiImpl::ChatJoinRequestImpl::onCallbackQueryFunction(
                        << ". Parsed item: " << queryData;
             return;
         }
+        std::string result;
         if (queryData == "approve") {
             LOG(INFO) << fmt::format("Approving {} in chat {}", request->from,
                                      request->chat);
             _api->getApi().approveChatJoinRequest(request->chat->id,
                                                   request->from->id);
             _api->getApi().answerCallbackQuery(query->id, "Approved user");
+            result = fmt::format("Approved user {} by {}", request->from,
+                                 query->from);
         } else if (queryData == "disapprove") {
             LOG(INFO) << fmt::format("Unapproving {} in chat {}", request->from,
                                      request->chat);
             _api->getApi().declineChatJoinRequest(request->chat->id,
                                                   request->from->id);
             _api->getApi().answerCallbackQuery(query->id, "Disapproved user");
+
+            result = fmt::format("Disapproved user {} by {}", request->from,
+                                 query->from);
         } else {
             LOG(ERROR) << "Invalid payload: " << query->data
                        << ". Parsed item: " << queryData;
             _api->getApi().answerCallbackQuery(query->id,
                                                "Error occurred while parsing");
+            return;
         }
-        // Delete the message after handling the callback query.
-        _api->deleteMessage(reqIt->first);
+        _api->editMessage(reqIt->first, result);
         // Erase the request from the list after handling it.
         joinReqs.erase(reqIt);
     }
@@ -88,8 +96,9 @@ void TgBotApiImpl::ChatJoinRequestImpl::onChatMemberFunction(
     };
     std::ranges::for_each(joinReqs, [pred, this, update](const auto& request) {
         if (pred(request)) {
-            LOG(INFO) << fmt::format("Handling accepted user {} by {}",
-                                     update->newChatMember->user, update->from);
+            LOG(INFO) << fmt::format(
+                "Handling externally accepted user {} by {}",
+                update->newChatMember->user, update->from);
             _api->deleteMessage(request.first);
         }
     });
