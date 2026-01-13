@@ -363,7 +363,6 @@ endif()
 # ############################ Check lib (TODO: Make these optional) #############################
 find_package(fmt REQUIRED)
 find_package(nlohmann_json REQUIRED)
-find_package(CURL REQUIRED)
 find_package(absl REQUIRED)
 find_package(Protobuf)
 find_package(fruit REQUIRED)
