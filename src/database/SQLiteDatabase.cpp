@@ -455,6 +455,7 @@ std::optional<SQLiteDatabase::MediaInfo> SQLiteDatabase::queryMediaInfo(
     if (row) {
         info.mediaId = row->get<std::string>(0);
         info.mediaUniqueId = row->get<std::string>(1);
+        info.mediaType = static_cast<MediaType>(row->get<int>(2));
     } else {
         LOG(ERROR) << "Didn't find media info for name: " << str;
         return std::nullopt;
@@ -481,6 +482,22 @@ SQLiteDatabase::AddResult SQLiteDatabase::addMediaInfo(
         LOG(ERROR) << "Zero-length names specified";
         // No names to insert, so no need to run the query
         return AddResult::BACKEND_ERROR;
+    }
+
+    // Insert the media info into the database
+    auto insertMediaHelper =
+        Helper::create(db, _sqlScriptsPath, Helper::kInsertMediaIdFile);
+
+    if (!insertMediaHelper->prepare()) {
+        return AddResult::BACKEND_ERROR;
+    }
+    insertMediaHelper->addArgument(info.mediaUniqueId)
+        .addArgument(info.mediaId)
+        .bindArguments();
+    if (!insertMediaHelper->execute()) {
+        LOG(ERROR) << "Could not insert media id: Possible unique constraint "
+                      "violation.";
+        return AddResult::ALREADY_EXISTS;
     }
 
     // Determine stuff to insert, and the ones that already exist
@@ -551,38 +568,6 @@ SQLiteDatabase::AddResult SQLiteDatabase::addMediaInfo(
         }
     }
 
-    // Insert the media info into the database
-    auto insertMediaHelper =
-        Helper::create(db, _sqlScriptsPath, Helper::kInsertMediaIdFile);
-
-    if (!insertMediaHelper->prepare()) {
-        return AddResult::BACKEND_ERROR;
-    }
-    insertMediaHelper->addArgument(info.mediaUniqueId)
-        .addArgument(info.mediaId)
-        .bindArguments();
-    if (!insertMediaHelper->execute()) {
-        // Undo the insertions of names
-        LOG(ERROR) << "Failed to insert the media id, rolling back...";
-        for (const auto& info : updates) {
-            if (info.update == UpdateInfo::Op::INSERT) {
-                const auto name = std::get<std::string>(info.data);
-                auto deleteHelper = Helper::create(
-                    db, _sqlScriptsPath, Helper::kDeleteMediaNameFile);
-                if (!deleteHelper->prepare()) {
-                    continue;
-                }
-                deleteHelper->addArgument(name);
-                deleteHelper->bindArguments();
-                if (!deleteHelper->execute()) {
-                    LOG(ERROR)
-                        << "Failed to undo inserted media name: " << name;
-                }
-            }
-        }
-        return AddResult::ALREADY_EXISTS;
-    }
-
     // Get the inserted media index
     auto findMediaIdHelper =
         Helper::create(db, _sqlScriptsPath, Helper::kFindMediaIdFile);
@@ -615,6 +600,7 @@ SQLiteDatabase::AddResult SQLiteDatabase::addMediaInfo(
 
         if (!insertMediaMapHelper->execute()) {
             LOG(ERROR) << "Failed to insert the final media map";
+            // Cleanup?
             return AddResult::BACKEND_ERROR;
         }
     }
