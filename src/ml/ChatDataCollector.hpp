@@ -22,6 +22,11 @@ class ChatDataCollector {
             GIF,
             ETC
         } msgType{};
+        bool isEdited{false};
+        bool isForwarded{false};
+        UserId replyToUserId{0};
+        MessageId messageid;
+        MessageId replyToMessageId{0};
 
         Data() = default;
         explicit Data(const Message::Ptr& message);
@@ -39,6 +44,8 @@ class ChatDataCollector {
 
 inline std::ostream& operator<<(std::ostream& os, ChatDataCollector::Data d) {
     os << d.chatId << "," << d.userId << "," << d.timestamp << ","
-       << static_cast<int>(d.msgType) << "\n";
+       << static_cast<int>(d.msgType) << "," << static_cast<int>(d.isEdited)
+       << "," << static_cast<int>(d.isForwarded) << "," << d.replyToUserId
+       << "," << d.messageid << "," << d.replyToMessageId << "\n";
     return os;
 }
