@@ -45,6 +45,7 @@ void TgBotApiImpl::ChatJoinRequestImpl::onCallbackQueryFunction(
             user && user->status != TgBot::ChatMemberAdministrator::STATUS) {
             _api->answerCallbackQuery(query->id,
                                       "Sorry, you are not allowed to");
+            return;
         }
         LOG(INFO) << fmt::format("Accepting internal {} by user {}",
                                  query->data, query->from);
@@ -65,7 +66,7 @@ void TgBotApiImpl::ChatJoinRequestImpl::onCallbackQueryFunction(
             result = fmt::format("Approved user {} by {}", request->from,
                                  query->from);
         } else if (queryData == "disapprove") {
-            LOG(INFO) << fmt::format("Unapproving {} in chat {}", request->from,
+            LOG(INFO) << fmt::format("Disapproved {} in chat {}", request->from,
                                      request->chat);
             _api->getApi().declineChatJoinRequest(request->chat->id,
                                                   request->from->id);
