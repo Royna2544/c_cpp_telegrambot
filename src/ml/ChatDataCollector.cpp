@@ -12,12 +12,12 @@ ChatDataCollector::Data::Data(const Message::Ptr& message) {
         msgType = Data::MsgType::PHOTO;
     } else if (message->video) {
         msgType = Data::MsgType::VIDEO;
-    } else if (message->document) {
-        msgType = Data::MsgType::DOCUMENT;
     } else if (message->sticker) {
         msgType = Data::MsgType::STICKER;
     } else if (message->animation) {
         msgType = Data::MsgType::GIF;
+    } else if (message->document) {
+        msgType = Data::MsgType::DOCUMENT;
     } else {
         msgType = Data::MsgType::ETC;
     }
