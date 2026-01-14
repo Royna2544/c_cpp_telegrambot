@@ -6,18 +6,6 @@
 #include <api/TgBotApi.hpp>
 
 DECLARE_COMMAND_HANDLER(decho) {
-    try {
-        api->deleteMessage(message->message());
-    } catch (const TgBot::TgException &) {
-        LOG(ERROR) << "Failed to delete message";
-        // Cannot use delete echo in thie case.
-        return;
-#ifdef __ANDROID__
-    } catch (...) {  // Only Termux acts like this
-        LOG(ERROR) << "Failed to delete message";
-        return;
-#endif
-    }
     if (message->has({MessageAttrs::ExtraText}) && message->reply()->exists()) {
         api->copyAndReplyAsMessage(message->message(),
                                    message->reply()->message());
@@ -26,6 +14,18 @@ DECLARE_COMMAND_HANDLER(decho) {
     } else if (message->has<MessageAttrs::ExtraText>()) {
         api->sendMessage(message->get<MessageAttrs::Chat>(),
                          message->get<MessageAttrs::ExtraText>());
+    }
+    try {
+        api->deleteMessage(message->message());
+    } catch (const TgBot::TgException&) {
+        LOG(ERROR) << "Failed to delete message";
+        // Cannot use delete echo in thie case.
+        return;
+#ifdef __ANDROID__
+    } catch (...) {  // Only Termux acts like this
+        LOG(ERROR) << "Failed to delete message";
+        return;
+#endif
     }
 }
 
