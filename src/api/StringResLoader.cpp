@@ -44,7 +44,7 @@ std::string_view getStrings(const Strings string) {
 }
 
 std::pair<LocaleResData, StringResLoader::PerLocaleMapImpl> parseLocaleResource(
-    const std::filesystem::path &filename) {
+    const std::filesystem::path& filename) {
     auto resourceKey = "resources"_xmlChar;
     auto localeProp = "locale"_xmlChar;
     auto defaultProp = "default"_xmlChar;
@@ -65,11 +65,7 @@ std::pair<LocaleResData, StringResLoader::PerLocaleMapImpl> parseLocaleResource(
     if (doc == nullptr) {
         LOG(ERROR) << fmt::format("Could not parse file {} (code: {})",
                                   filename.string(), ctx.code);
-        std::vector<std::string> errors =
-            absl::StrSplit(ctx.message, '\n', absl::SkipEmpty());
-        for (const auto &error : errors) {
-            LOG(ERROR) << "libxml2 messages: " << error;
-        };
+        LOG(ERROR) << "libxml2 error:\n" << ctx.message;
         throw invalid_xml_error();
     }
 
@@ -106,7 +102,7 @@ std::pair<LocaleResData, StringResLoader::PerLocaleMapImpl> parseLocaleResource(
             if (!nameAttr || !content) {
                 continue;
             }
-	    auto upper = absl::AsciiStrToUpper(nameAttr.c_str());
+            auto upper = absl::AsciiStrToUpper(nameAttr.c_str());
             auto string = getStrings(upper);
             if (string == Strings::__INVALID__) {
                 LOG(WARNING) << "String name not in enumerator: " << upper;
@@ -140,7 +136,7 @@ StringResLoader::StringResLoader(std::filesystem::path path)
 
     std::error_code ec;
     // Load XML files from the specified path
-    for (const auto &entry : std::filesystem::directory_iterator(m_path, ec)) {
+    for (const auto& entry : std::filesystem::directory_iterator(m_path, ec)) {
         bool isXml = entry.is_regular_file() &&
                      entry.path().filename().extension() == ".xml";
         if (!isXml) continue;
@@ -154,7 +150,7 @@ StringResLoader::StringResLoader(std::filesystem::path path)
             LOG(INFO) << "Parsed locale: " << locale.name
                       << " File: " << entry.path().filename()
                       << " isDefault: " << locale.isDefault;
-        } catch (const invalid_xml_error &e) {
+        } catch (const invalid_xml_error& e) {
             LOG(ERROR) << "Invalid XML file: " << entry.path();
             continue;
         }
@@ -170,8 +166,8 @@ StringResLoader::StringResLoader(std::filesystem::path path)
 
 StringResLoader::~StringResLoader() { xmlCleanupParser(); }
 
-const StringResLoader::PerLocaleMap *StringResLoader::at(
-    const std::string &key) const {
+const StringResLoader::PerLocaleMap* StringResLoader::at(
+    const std::string& key) const {
     if (localeMap.contains(key)) {
         return &localeMap.at(key);
     } else if (default_locale) {
@@ -179,6 +175,6 @@ const StringResLoader::PerLocaleMap *StringResLoader::at(
         return &localeMap.at(*default_locale);
     } else [[unlikely]] {
         LOG(ERROR) << "StringResLoader::at has nothing to return!";
-        return nullptr; // Intended crash
+        return nullptr;  // Intended crash
     }
 }
