@@ -16,12 +16,14 @@
 
 void NetworkLogSink::LogSinkImpl::Send(const absl::LogEntry& entry) {
     if (_stop.stop_requested()) {
+        LOG(INFO) << "LogSinkImpl::Send: Stop requested, not sending log";
         return;
     }
     LogEntry le{};
     le.severity = entry.log_severity();
     const auto& text = entry.text_message();
-    const size_t copy_size = std::min(text.size(), static_cast<size_t>(MAX_LOGMSG_SIZE - 1));
+    const size_t copy_size =
+        std::min(text.size(), static_cast<size_t>(MAX_LOGMSG_SIZE - 1));
     std::ranges::copy_n(text.begin(), copy_size, le.message.begin());
     SharedMalloc logData(le);
     bool ret = false;
@@ -35,21 +37,30 @@ void NetworkLogSink::LogSinkImpl::Send(const absl::LogEntry& entry) {
 }
 
 void NetworkLogSink::runFunction(const std::stop_token& token) {
-    context->listen([token](const TgBotSocket::Context& c) {
-        std::stop_source source;
-        std::stop_token sink_token = source.get_token();
-        RAIILogSink<LogSinkImpl> sink(&c, source);
-        std::mutex mutex;
-        std::unique_lock<std::mutex> lock(mutex);
-        std::condition_variable condVariable;
+    std::stop_source listen_source;
+    std::stop_token listen_token = listen_source.get_token();
 
-        condVariable.wait(lock, [&token, &sink_token] {
-            return token.stop_requested() || sink_token.stop_requested();
-        });
-    });
+    // Wait for main shutdown signal
+    std::unique_lock lock(m);
+
+    context->listen(
+        [token, listen_source, this, &lock](const TgBotSocket::Context& c) {
+            std::stop_source sink_source;
+            RAIILogSink<LogSinkImpl> sink(&c, sink_source);
+
+            // Wait until either main thread or sink requests stop
+            cv.wait(lock, [&token, &sink_source] {
+                return token.stop_requested() ||
+                       sink_source.get_token().stop_requested();
+            });
+        },
+        true);
 }
 
-void NetworkLogSink::onPreStop() { context->abortConnections(); }
+void NetworkLogSink::onPreStop() {
+    context->abortConnections();
+    cv.notify_all();
+}
 
 NetworkLogSink::NetworkLogSink(TgBotSocket::Context* context)
     : context(context) {

@@ -22,7 +22,7 @@ struct NetworkLogSink : public ThreadRunner {
         // Requires an accepted socket.
         explicit LogSinkImpl(const TgBotSocket::Context* context,
                              std::stop_source source)
-            : context(context), _stop(std::move(source)){};
+            : context(context), _stop(std::move(source)) {};
     };
 
     void runFunction(const std::stop_token& token) override;
@@ -33,4 +33,8 @@ struct NetworkLogSink : public ThreadRunner {
 
    private:
     TgBotSocket::Context* context = nullptr;
+
+    // Used to wait for stop signal
+    std::condition_variable cv;
+    std::mutex m;
 };
