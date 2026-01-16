@@ -9,7 +9,7 @@ constexpr std::string_view kDechoDeletePossibleMapKey = "decho_delete_possible";
 
 DECLARE_COMMAND_HANDLER(decho) {
     if (message->has({MessageAttrs::ExtraText}) && message->reply()->exists()) {
-        api->sendReplyMessage(message->message(),
+        api->sendReplyMessage(message->reply()->message(),
                               message->get<MessageAttrs::ExtraText>());
     } else if (message->reply()->exists()) {
         api->copyAndReplyAsMessage(message->reply()->message());
