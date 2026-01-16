@@ -548,9 +548,6 @@ bool GitBranchSwitcher::checkout(const RepoInfo& info) {
             LOG(WARNING) << "Failed to set upstream: " << git_error_last_str();
         }
         LOG(INFO) << "Success on looking up remote branch";
-    } else {
-        // Switching to the branch directly
-        fastForwardPull();
     }
 
     // Checkout the branch
@@ -559,6 +556,9 @@ bool GitBranchSwitcher::checkout(const RepoInfo& info) {
         return false;
     }
     LOG(INFO) << "Switched to branch: " << info.branch();
+
+    LOG_IF(INFO, fastForwardPull())
+        << "Fast-forwarded to the latest commit on " << cdata->remote_refname();
 
     // Update current branch metadata
     ret = git_repository_head(rdata->head_ref, rdata->repo);

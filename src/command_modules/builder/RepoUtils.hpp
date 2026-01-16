@@ -125,10 +125,6 @@ class GitBranchSwitcher {
     // used on Google .repo git and is
     // unsupported on libgit2
     void removeOffendingConfig() const;
-    // Check if the working tree has any unstaged things
-    bool hasUnstagedChanges() const;
-    // Try a FF-pull.
-    bool fastForwardPull() const;
     // Checkout to refname. Incl. HEAD, tree, index.
     bool checkout(const std::string_view refname) const;
 
@@ -148,4 +144,8 @@ class GitBranchSwitcher {
     [[nodiscard]] bool check(const RepoInfo& info) const;
     // Actually checkout to the RepoInfo info, and return result
     bool checkout(const RepoInfo& info);
+    // Check if the working tree has any unstaged things
+    [[nodiscard]] bool hasUnstagedChanges() const;
+    // Try a FF-pull.
+    [[nodiscard]] bool fastForwardPull() const;
 };

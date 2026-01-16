@@ -31,6 +31,7 @@
 
 #include "Diagnosis.hpp"
 #include "ProgressBar.hpp"
+#include "RepoUtils.hpp"
 #include "api/AuthContext.hpp"
 #include "api/TgBotApi.hpp"
 #include "command_modules/support/CwdRestorar.hpp"
@@ -551,6 +552,16 @@ void KernelBuildHandler::handle_continue(
             LOG(WARNING) << "Cannot push cwd to source directory";
             return;
         }
+    } else {
+        GitBranchSwitcher switcher(kernelSourceDir);
+        if (!switcher.open()) {
+            _api->editMessage(query->message, "Failed to open repository");
+            return;
+        }
+        switcher.checkout(intermidiates.current->repo_info);
+        bool ret = switcher.fastForwardPull();
+        LOG_IF(INFO, ret) << "Fast-forward pull succeeded.";
+        LOG_IF(INFO, !ret) << "Fast-forward pull skipped or failed.";
     }
 
     if (!link(compiler->path(), kernelSourceDir / kToolchainDirectory)) {

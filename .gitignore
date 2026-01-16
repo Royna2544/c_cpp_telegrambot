@@ -17,7 +17,7 @@ src/include/GitBuildInfo.hpp
 __pycache__
 
 # Visual Studio Code
-build*/
+/build*/
 .vscode/
 .cache/
 .vs/
