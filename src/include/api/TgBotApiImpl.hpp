@@ -17,6 +17,7 @@
 #include "RefLock.hpp"
 #include "StringResLoader.hpp"
 #include "TgBotApi.hpp"
+#include "tgbot/types/ChatMember.h"
 #include "typedefs.h"
 
 using TgBot::Animation;
@@ -403,7 +404,8 @@ class TgBotApiImpl : public TgBotApi {
      *
      * @return A shared pointer to a User object representing the chat member.
      */
-    User::Ptr getChatMember_impl(ChatId chat, UserId user) const override;
+    TgBot::ChatMember::Ptr getChatMember_impl(ChatId chat,
+                                              UserId user) const override;
 
     /**
      * @brief Sets the descriptions of a chat.

@@ -38,6 +38,7 @@
 
 #include "RefLock.hpp"
 #include "tgbot/net/CurlHttpClient.h"
+#include "tgbot/types/ChatMember.h"
 
 #ifdef TGBOTCPP_ENABLE_CPPTRACE
 #include <cpptrace/cpptrace.hpp>
@@ -553,13 +554,9 @@ bool TgBotApiImpl::unbanChatMember_impl(const Chat::Ptr& chat,
     return getApi().unbanChatMember(chat->id, user->id);
 }
 
-User::Ptr TgBotApiImpl::getChatMember_impl(ChatId chat, UserId user) const {
-    const auto member = getApi().getChatMember(chat, user);
-    if (!member) {
-        LOG(WARNING) << "ChatMember is null.";
-        return {};
-    }
-    return member->user;
+TgBot::ChatMember::Ptr TgBotApiImpl::getChatMember_impl(ChatId chat,
+                                                        UserId user) const {
+    return getApi().getChatMember(chat, user);
 }
 
 void TgBotApiImpl::setDescriptions_impl(

@@ -1,13 +1,32 @@
 #include <absl/log/log.h>
 #include <tgbot/TgException.h>
+#include <trivial_helpers/_tgbot.h>
 
 #include <api/CommandModule.hpp>
 #include <api/MessageExt.hpp>
 #include <api/TgBotApi.hpp>
+#include <memory>
 
-constexpr std::string_view kDechoDeletePossibleMapKey = "decho_delete_possible";
+#include "tgbot/types/ChatMemberAdministrator.h"
 
 DECLARE_COMMAND_HANDLER(decho) {
+    auto chmember = api->getChatMember(message->get<MessageAttrs::Chat>()->id,
+                                       api->getBotUser()->id);
+    if (chmember->status != TgBot::ChatMemberAdministrator::STATUS) {
+        LOG(WARNING) << fmt::format(
+            "Bot is not admin in the chat {}, cannot use decho.",
+            message->get<MessageAttrs::Chat>());
+        return;
+    }
+
+    if (!std::static_pointer_cast<TgBot::ChatMemberAdministrator>(chmember)
+             ->canDeleteMessages) {
+        LOG(WARNING) << fmt::format(
+            "Bot does not have delete messages permission in chat {}, "
+            "cannot use decho.",
+            message->get<MessageAttrs::Chat>());
+        return;
+    }
     if (message->has({MessageAttrs::ExtraText}) && message->reply()->exists()) {
         api->sendReplyMessage(message->reply()->message(),
                               message->get<MessageAttrs::ExtraText>());
@@ -20,8 +39,8 @@ DECLARE_COMMAND_HANDLER(decho) {
     try {
         api->deleteMessage(message->message());
     } catch (const TgBot::TgException&) {
+        // Why would this really happen?
         LOG(ERROR) << "Failed to delete message";
-        // Cannot use delete echo in thie case.
         return;
 #ifdef __ANDROID__
     } catch (...) {  // Only Termux acts like this

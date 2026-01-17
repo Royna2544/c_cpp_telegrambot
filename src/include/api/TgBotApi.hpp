@@ -22,6 +22,7 @@
 #include "ReplyParametersExt.hpp"
 #include "Utils.hpp"
 #include "api/typedefs.h"
+#include "tgbot/types/ChatMember.h"
 
 using TgBot::Chat;
 using TgBot::File;
@@ -431,8 +432,9 @@ class TgBotApi {
      * @param chat The chat id of the chat.
      * @param userId The user id of the user.
      */
-    virtual User::Ptr getChatMember_impl(const ChatId chat,
-                                         const UserId userId) const = 0;
+    virtual TgBot::ChatMember::Ptr getChatMember_impl(
+        const ChatId chat, const UserId userId) const = 0;
+
     /**
      * @brief Sets the descriptions for a chat.
      *
@@ -759,7 +761,8 @@ class TgBotApi {
     inline bool unbanChatMember(const Chat::Ptr& chat, const User::Ptr& user) {
         return unbanChatMember_impl(chat, user);
     }
-    inline User::Ptr getChatMember(const ChatId chat, const UserId user) {
+    inline TgBot::ChatMember::Ptr getChatMember(const ChatId chat,
+                                                const UserId user) {
         return getChatMember_impl(chat, user);
     }
 

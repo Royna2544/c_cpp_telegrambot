@@ -4,6 +4,8 @@
 
 #include <api/TgBotApi.hpp>
 
+#include "tgbot/types/ChatMember.h"
+
 class MockTgBotApi : public TgBotApi {
    public:
     APPLE_INJECT(MockTgBotApi()) = default;
@@ -114,8 +116,8 @@ class MockTgBotApi : public TgBotApi {
     MOCK_METHOD(bool, unbanChatMember_impl,
                 (const Chat::Ptr& chat, const User::Ptr& user),
                 (const override));
-    MOCK_METHOD(User::Ptr, getChatMember_impl, (const ChatId, const UserId),
-                (const override));
+    MOCK_METHOD(TgBot::ChatMember::Ptr, getChatMember_impl,
+                (const ChatId, const UserId), (const override));
     MOCK_METHOD(void, setDescriptions_impl,
                 (const std::string_view description,
                  const std::string_view shortDescription),
