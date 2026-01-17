@@ -1,16 +1,21 @@
-#include <api/TgBotApiImpl.hpp>
+#pragma once
 
-#include "tgbot/types/CallbackQuery.h"
+#include <api/TgBotApiImpl.hpp>
+#include <api/types/CallbackQuery.hpp>
+#include <api/types/ChatJoinRequest.hpp>
+#include <api/types/ChatMembers.hpp>
+#include <api/types/Message.hpp>
 
 class TgBotApiImpl::ChatJoinRequestImpl {
-    std::vector<std::pair<Message::Ptr, TgBot::ChatJoinRequest::Ptr>> joinReqs;
-    TgBot::InlineKeyboardMarkup::Ptr templateMarkup;
+    std::vector<std::pair<api::types::Message, api::types::ChatJoinRequest>>
+        joinReqs;
+    std::optional<api::types::InlineKeyboardMarkup> templateMarkup;
     TgBotApiImpl::Ptr _api;
     std::mutex mutex;
 
-    void onChatJoinRequestFunction(TgBot::ChatJoinRequest::Ptr ptr);
-    void onCallbackQueryFunction(const TgBot::CallbackQuery::Ptr& query);
-    void onChatMemberFunction(const TgBot::ChatMemberUpdated::Ptr& update);
+    void onChatJoinRequestFunction(api::types::ChatJoinRequest ptr);
+    void onCallbackQueryFunction(const api::types::CallbackQuery& query);
+    void onChatMemberFunction(const api::types::ChatMemberUpdated& update);
 
    public:
     explicit ChatJoinRequestImpl(TgBotApiImpl::Ptr api);

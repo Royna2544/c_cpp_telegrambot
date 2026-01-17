@@ -2,10 +2,11 @@
 #include <fmt/format.h>
 #include <fmt/chrono.h>
 #include <nlohmann/json.hpp>
-#include <tgbot/tools/StringTools.h>
 
 #include <algorithm>
 #include <chrono>
+#include <iomanip>
+#include <random>
 
 #include <shared/PacketParser.hpp>
 #include "SocketInterface.hpp"
@@ -37,10 +38,27 @@ bool SocketInterfaceTgBot::verifyHeader(const Packet& packet) {
     return true;
 }
 
+namespace {
+
+std::string generateRandomString(std::size_t length) {
+    static constexpr std::string_view chars =
+        "qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM1234567890-=[]\\',"
+        "./!@#$%^&*()_+{}|:\"<>?`~";
+    std::string result;
+
+    result.reserve(length);
+    std::generate_n(std::back_inserter(result), length, [&] {
+        std::mt19937 gen(std::random_device{}());
+        return chars[std::uniform_int_distribution<std::size_t>(
+            0, chars.size() - 1)(gen)];
+    });
+    return result;
+}
+}
+
 void SocketInterfaceTgBot::handle_OpenSession(
     const TgBotSocket::Context& ctx) {
-    auto key = StringTools::generateRandomString(
-        TgBotSocket::Crypto::SESSION_TOKEN_LENGTH);
+    auto key = generateRandomString(TgBotSocket::Crypto::SESSION_TOKEN_LENGTH);
     Packet::Header::nounce_type last_nounce{};
     auto tp = std::chrono::system_clock::now() + std::chrono::hours(1);
 

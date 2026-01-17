@@ -1,45 +1,27 @@
 #pragma once
 
-#include <tgbot/tgbot.h>
 #include <trivial_helpers/_class_helper_macros.h>
 
 #include <ManagedThreads.hpp>
+#include <api/types/LinkPreviewOptions.hpp>
 #include <filesystem>
 #include <memory>
 #include <string_view>
+#include <tgbotxx/Bot.hpp>
 #include <vector>
 
 #include "AuthContext.hpp"
 #include "CommandModule.hpp"
-#include "MessageExt.hpp"
 #include "Providers.hpp"
 #include "RateLimit.hpp"
 #include "RefLock.hpp"
 #include "StringResLoader.hpp"
 #include "TgBotApi.hpp"
-#include "typedefs.h"
-
-using TgBot::Animation;
-using TgBot::Api;
-using TgBot::Bot;
-using TgBot::BotCommand;
-using TgBot::Chat;
-using TgBot::ChatPermissions;
-using TgBot::EventBroadcaster;
-using TgBot::File;
-using TgBot::GenericReply;
-using TgBot::InputFile;
-using TgBot::InputSticker;
-using TgBot::Message;
-using TgBot::Sticker;
-using TgBot::StickerSet;
-using TgBot::TgLongPoll;
-using TgBot::User;
 
 // A class to effectively wrap TgBot::Api to stable interface
 // This class owns the Bot instance, and users of this code cannot directly
 // access it.
-class TgBotApiImpl : public TgBotApi {
+class TgBotApiImpl : public TgBotApi, tgbotxx::Bot {
    public:
     using Ptr = std::add_pointer_t<TgBotApiImpl>;
     using CPtr = std::add_pointer_t<std::add_const_t<TgBotApiImpl>>;
@@ -77,7 +59,7 @@ class TgBotApiImpl : public TgBotApi {
 
     // Interface for listening to command unload/reload
     struct CommandListener {
-        virtual ~CommandListener() = default;
+        ~CommandListener() = default;
         virtual void onUnload(const std::string_view name) = 0;
         virtual void onReload(const std::string_view name) = 0;
     };
@@ -91,347 +73,493 @@ class TgBotApiImpl : public TgBotApi {
 
    private:
     /**
-     * @brief Sends a message to a chat.
+     * @brief Sends a text message to the specified chat.
      *
-     * @param chatId The unique identifier for the target chat (could be
-     * a user or a group chat).
+     * This function sends a text message to the chat with the given `chatId`.
+     * The message content is specified by the `text` parameter.
+     *
+     * @param chatId The ID of the chat to which the message will be sent.
      * @param text The content of the message to be sent.
-     * @param replyParameters Optional. Parameters for replying to a
-     * message, such as timeouts.
-     * @param replyMarkup Optional. Inline keyboard markup for replies.
-     * @param parseMode Optional. Defines the parsing mode for the
-     * message (e.g., HTML, Markdown).
+     * @param replyParameters (Optional) Reply parameters for the message.
+     * @param replyMarkup (Optional) An inline keyboard markup or generic reply
+     * markup to be added to the message.
+     * @param parseMode (Optional) The parse mode for the text. Default is None.
      *
-     * @return A shared pointer to a Message object representing the
-     * sent message.
+     * @return An optional Message object representing the sent message.
      */
-    Message::Ptr sendMessage_impl(
-        ChatId chatId, const std::string_view text,
-        ReplyParametersExt::Ptr replyParameters, GenericReply::Ptr replyMarkup,
-        const TgBot::Api::ParseMode parseMode) const override;
+    std::optional<api::types::Message> sendMessage_impl(
+        api::types::Chat::id_type chatId, const std::string_view text,
+        std::optional<api::types::ReplyParameters> replyParameters =
+            std::nullopt,
+        std::optional<api::types::GenericReply> replyMarkup = std::nullopt,
+        const ParseMode parseMode = {}) const override;
 
     /**
-     * @brief Sends an animation (GIF or video) to a chat.
+     * @brief Sends an animation (GIF or video without sound) to the specified
+     * chat.
      *
-     * @param chatId The unique identifier for the target chat.
-     * @param animation The animation to be sent. Can be either a file or a URL.
-     * @param caption Optional. A caption for the animation.
-     * @param replyParameters Optional. Parameters for replying to a message.
-     * @param replyMarkup Optional. Inline keyboard markup for replies.
-     * @param parseMode Optional. Defines the parsing mode for the caption.
+     * This function sends an animation to the chat with the given `chatId`.
+     * The animation content is specified by the `animation` parameter.
      *
-     * @return A shared pointer to a Message object representing the sent
-     * animation.
+     * @param chatId The ID of the chat to which the animation will be sent.
+     * @param animation The content of the animation to be sent (file or file
+     * ID).
+     * @param caption (Optional) The caption for the animation.
+     * @param replyParameters (Optional) Reply parameters for the message.
+     * @param replyMarkup (Optional) An inline keyboard markup or generic reply
+     * markup to be added to the message.
+     * @param parseMode (Optional) The parse mode for the caption. Default is
+     * None.
+     *
+     * @return An optional Message object representing the sent animation
+     * message.
      */
-    Message::Ptr sendAnimation_impl(
-        ChatId chatId, std::variant<InputFile::Ptr, std::string> animation,
-        const std::string_view caption,
-        ReplyParametersExt::Ptr replyParameters = nullptr,
-        GenericReply::Ptr replyMarkup = nullptr,
-        const TgBot::Api::ParseMode parseMode = {}) const override;
+    std::optional<api::types::Message> sendAnimation_impl(
+        api::types::Chat::id_type chatId, FileOrString animation,
+        const std::string_view caption = {},
+        std::optional<api::types::ReplyParameters> replyParameters =
+            std::nullopt,
+        std::optional<api::types::GenericReply> replyMarkup = std::nullopt,
+        const ParseMode parseMode = {}) const override;
 
     /**
-     * @brief Sends a sticker to a chat.
+     * @brief Sends a sticker to the specified chat.
      *
-     * @param chatId The unique identifier for the target chat.
-     * @param sticker The sticker to be sent, either as a file or a URL.
-     * @param replyParameters Optional. Parameters for replying to a message.
+     * This function sends a sticker to the chat with the given `chatId`.
+     * The sticker content is specified by the `sticker` parameter.
      *
-     * @return A shared pointer to a Message object representing the sent
-     * sticker.
+     * @param chatId The ID of the chat to which the sticker will be sent.
+     * @param sticker The content of the sticker to be sent (file or file ID).
+     * @param replyParameters (Optional) Reply parameters for the message.
+     *
+     * @return An optional Message object representing the sent sticker message.
      */
-    Message::Ptr sendSticker_impl(
-        ChatId chatId, std::variant<InputFile::Ptr, std::string> sticker,
-        ReplyParametersExt::Ptr replyParameters) const override;
+    std::optional<api::types::Message> sendSticker_impl(
+        api::types::Chat::id_type chatId, FileOrString sticker,
+        std::optional<api::types::ReplyParameters> replyParameters =
+            std::nullopt) const override;
 
     /**
-     * @brief Edits a message with new text and an optional inline keyboard.
+     * @brief Creates a new sticker set.
      *
-     * @param message A shared pointer to the message to be edited.
+     * This function creates a new sticker set with the given parameters.
+     *
+     * @param userId The ID of the user who will own the sticker set.
+     * @param name The name of the sticker set.
+     * @param title The title of the sticker set.
+     * @param stickers The vector of InputSticker objects representing the
+     * stickers in the set.
+     * @param stickerType The type of the stickers in the set.
+     *
+     * @return True if the sticker set was created successfully, false
+     * otherwise.
+     */
+    bool createNewStickerSet_impl(
+        std::int64_t userId, const std::string_view name,
+        const std::string_view title,
+        const std::vector<api::types::InputSticker>& stickers,
+        StickerType stickerType) const override;
+
+    /**
+     * @brief Uploads a sticker file.
+     *
+     * This function uploads a sticker file for later use in sticker sets.
+     *
+     * @param userId The ID of the user who will own the sticker file.
+     * @param sticker The sticker file to be uploaded.
+     * @param stickerFormat The format of the sticker file.
+     *
+     * @return An optional File object representing the uploaded sticker file.
+     */
+    std::optional<api::types::File> uploadStickerFile_impl(
+        std::int64_t userId, api::types::InputFile sticker,
+        const StickerFormat stickerFormat) const override;
+
+    /**
+     * @brief Edits a sent message's text and markup.
+     *
+     * This function edits a previously sent message with new text and inline
+     * keyboard markup.
+     *
+     * @param message The message to be edited.
      * @param newText The new text for the message.
-     * @param markup The inline keyboard markup for the edited message.
-     * @param parseMode Defines the parsing mode for the new text (e.g., HTML,
-     * Markdown).
+     * @param markup The new inline keyboard markup for the message.
+     * @param parseMode (Optional) The parse mode for the new text. Default is
+     * None.
      *
-     * @return A shared pointer to the edited Message object.
+     * @return An optional Message object representing the edited message.
      */
-    Message::Ptr editMessage_impl(
-        const Message::Ptr& message, const std::string_view newText,
-        const TgBot::InlineKeyboardMarkup::Ptr& markup,
-        const TgBot::Api::ParseMode parseMode) const override;
+    std::optional<api::types::Message> editMessage_impl(
+        const std::optional<api::types::Message>& message,
+        const std::string_view newText,
+        const std::optional<api::types::InlineKeyboardMarkup> markup,
+        const ParseMode parseMode) const override;
 
     /**
-     * @brief Edits the inline keyboard markup of a message.
+     * @brief Edits a sent message's inline keyboard markup only.
      *
-     * @param message The message or string identifier to edit.
-     * @param markup The new inline keyboard markup.
+     * This function edits the inline keyboard of a previously sent message
+     * without changing the text.
      *
-     * @return A shared pointer to the updated Message object.
+     * @param message The message to be edited (inline message ID or Message
+     * object).
+     * @param markup The new inline keyboard markup for the message.
+     *
+     * @return An optional Message object representing the edited message.
      */
-    Message::Ptr editMessageMarkup_impl(
+    std::optional<api::types::Message> editMessageMarkup_impl(
         const StringOrMessage& message,
-        const GenericReply::Ptr& markup) const override;
+        const api::types::GenericReply& markup) const override;
 
     /**
-     * @brief Copies a message to another chat.
+     * @brief Copies a message from one chat to the same or another chat.
      *
-     * @param fromChatId The unique identifier for the source chat.
-     * @param messageId The ID of the message to copy.
-     * @param replyParameters Optional. Parameters for replying to a message.
+     * This function copies a message identified by `messageId` from the chat
+     * with `fromChatId`. The copied message can optionally be sent as a reply.
      *
-     * @return The ID of the copied message.
+     * @param fromChatId The ID of the chat from which the message will be
+     * copied.
+     * @param messageId The ID of the message to be copied.
+     * @param replyParameters (Optional) Reply parameters for the copied
+     * message.
+     *
+     * @return The message ID of the copied message.
      */
-    MessageId copyMessage_impl(
-        ChatId fromChatId, MessageId messageId,
-        ReplyParametersExt::Ptr replyParameters = nullptr) const override;
+    api::types::Message::messageId_type copyMessage_impl(
+        api::types::Chat::id_type fromChatId,
+        api::types::Message::messageId_type messageId,
+        std::optional<api::types::ReplyParameters> replyParameters =
+            std::nullopt) const override;
 
     /**
-     * @brief Answers a callback query from an inline keyboard.
+     * @brief Answers a callback query from an inline keyboard button.
      *
-     * @param callbackQueryId The ID of the callback query to answer.
-     * @param text Optional. Text to be displayed in the callback answer.
-     * @param showAlert Optional. If true, an alert is shown to the user.
+     * This function sends a response to a callback query triggered by an
+     * inline keyboard button press.
      *
-     * @return True if the callback query was answered successfully, otherwise
-     * false.
+     * @param callbackQueryId The ID of the callback query to be answered.
+     * @param text (Optional) The text to be sent in the callback query answer.
+     * @param showAlert (Optional) Whether to show an alert to the user. Default
+     * is false.
+     *
+     * @return True if the callback query was answered successfully, false
+     * otherwise.
      */
     bool answerCallbackQuery_impl(const std::string_view callbackQueryId,
                                   const std::string_view text = {},
                                   bool showAlert = false) const override;
 
     /**
-     * @brief Deletes a message from a chat.
+     * @brief Deletes a sent message.
      *
-     * @param message A shared pointer to the message to delete.
+     * This function deletes a previously sent message from the chat.
+     *
+     * @param message The message to be deleted.
      */
-    void deleteMessage_impl(const Message::Ptr& message) const override;
+    void deleteMessage_impl(
+        const std::optional<api::types::Message>& message) const override;
 
     /**
-     * @brief Deletes a range of messages from a chat.
+     * @brief Deletes multiple messages in a chat.
      *
-     * @param chatId The unique identifier for the target chat.
-     * @param messageIds A vector of message IDs to be deleted.
+     * This function deletes multiple messages in bulk from the specified chat.
+     *
+     * @param chatId The ID of the chat from which the messages will be deleted.
+     * @param messageIds The vector of message IDs to be deleted.
      */
     void deleteMessages_impl(
-        ChatId chatId, const std::vector<MessageId>& messageIds) const override;
+        api::types::Chat::id_type chatId,
+        const std::vector<api::types::Message::messageId_type>& messageIds)
+        const override;
 
     /**
-     * @brief Mutes a chat member by restricting their permissions.
+     * @brief Restricts a chat member's permissions.
      *
-     * @param chatId The unique identifier for the target chat.
-     * @param userId The unique identifier for the user to restrict.
-     * @param permissions A shared pointer to the chat permissions object.
-     * @param untilDate The date until the restrictions apply (in Unix timestamp
-     * format).
+     * This function restricts or mutes a chat member by setting new
+     * permissions.
+     *
+     * @param chatId The ID of the chat.
+     * @param userId The ID of the user to be restricted.
+     * @param permissions The new permissions for the restricted user.
+     * @param untilDate (Optional) The timestamp until the user will be
+     * restricted. If not specified, the restriction is permanent.
      */
     void restrictChatMember_impl(
-        ChatId chatId, UserId userId, TgBot::ChatPermissions::Ptr permissions,
-        std::chrono::system_clock::time_point untilDate) const override;
+        api::types::Chat::id_type chatId, api::types::User::id_type userId,
+        api::types::ChatPermissions permissions,
+        std::chrono::system_clock::time_point untilDate = {}) const override;
 
     /**
-     * @brief Sends a document (file) to a chat.
+     * @brief Sends a document file to the specified chat.
      *
-     * @param chatId The unique identifier for the target chat.
-     * @param document The document to be sent, either as a file or a URL.
-     * @param caption Optional. A caption for the document.
-     * @param replyParameters Optional. Parameters for replying to a message.
-     * @param replyMarkup Optional. Inline keyboard markup for replies.
-     * @param parseMode Optional. Defines the parsing mode for the caption.
+     * This function sends a document file to the chat with the given
+     * parameters.
      *
-     * @return A shared pointer to a Message object representing the sent
-     * document.
+     * @param chatId The ID of the chat to which the document will be sent.
+     * @param document The content of the document to be sent (file or file ID).
+     * @param caption (Optional) The caption for the document.
+     * @param replyParameters (Optional) Reply parameters for the message.
+     * @param replyMarkup (Optional) An inline keyboard markup or generic reply
+     * markup to be added to the message.
+     * @param parseMode (Optional) The parse mode for the caption. Default is
+     * None.
+     *
+     * @return An optional Message object representing the sent document
+     * message.
      */
-    Message::Ptr sendDocument_impl(
-        ChatId chatId, FileOrString document, const std::string_view caption,
-        ReplyParametersExt::Ptr replyParameters = nullptr,
-        GenericReply::Ptr replyMarkup = nullptr,
-        const TgBot::Api::ParseMode parseMode = {}) const override;
+    std::optional<api::types::Message> sendDocument_impl(
+        api::types::Chat::id_type chatId, FileOrString document,
+        const std::string_view caption = {},
+        std::optional<api::types::ReplyParameters> replyParameters =
+            std::nullopt,
+        std::optional<api::types::GenericReply> replyMarkup = std::nullopt,
+        const ParseMode parseMode = {}) const override;
 
     /**
-     * @brief Sends a photo to a chat.
+     * @brief Sends a photo to the specified chat.
      *
-     * @param chatId The unique identifier for the target chat.
-     * @param photo The photo to be sent, either as a file or a URL.
-     * @param caption Optional. A caption for the photo.
-     * @param replyParameters Optional. Parameters for replying to a message.
-     * @param replyMarkup Optional. Inline keyboard markup for replies.
-     * @param parseMode Optional. Defines the parsing mode for the caption.
+     * This function sends a photo to the chat with the given parameters.
      *
-     * @return A shared pointer to a Message object representing the sent photo.
+     * @param chatId The ID of the chat to which the photo will be sent.
+     * @param photo The content of the photo to be sent (file or file ID).
+     * @param caption (Optional) The caption for the photo.
+     * @param replyParameters (Optional) Reply parameters for the message.
+     * @param replyMarkup (Optional) An inline keyboard markup or generic reply
+     * markup to be added to the message.
+     * @param parseMode (Optional) The parse mode for the caption. Default is
+     * None.
+     *
+     * @return An optional Message object representing the sent photo message.
      */
-    Message::Ptr sendPhoto_impl(
-        ChatId chatId, FileOrString photo, const std::string_view caption,
-        ReplyParametersExt::Ptr replyParameters = nullptr,
-        GenericReply::Ptr replyMarkup = nullptr,
-        const TgBot::Api::ParseMode parseMode = {}) const override;
+    std::optional<api::types::Message> sendPhoto_impl(
+        api::types::Chat::id_type chatId, FileOrString photo,
+        const std::string_view caption = {},
+        std::optional<api::types::ReplyParameters> replyParameters =
+            std::nullopt,
+        std::optional<api::types::GenericReply> replyMarkup = std::nullopt,
+        const ParseMode parseMode = {}) const override;
 
     /**
-     * @brief Sends a video to a chat.
+     * @brief Sends a video to the specified chat.
      *
-     * @param chatId The unique identifier for the target chat.
-     * @param video The video to be sent, either as a file or a URL.
-     * @param caption Optional. A caption for the video.
-     * @param replyParameters Optional. Parameters for replying to a message.
-     * @param replyMarkup Optional. Inline keyboard markup for replies.
-     * @param parseMode Optional. Defines the parsing mode for the caption.
+     * This function sends a video to the chat with the given parameters.
      *
-     * @return A shared pointer to a Message object representing the sent video.
+     * @param chatId The ID of the chat to which the video will be sent.
+     * @param video The content of the video to be sent (file or file ID).
+     * @param caption (Optional) The caption for the video.
+     * @param replyParameters (Optional) Reply parameters for the message.
+     * @param replyMarkup (Optional) An inline keyboard markup or generic reply
+     * markup to be added to the message.
+     * @param parseMode (Optional) The parse mode for the caption. Default is
+     * None.
+     *
+     * @return An optional Message object representing the sent video message.
      */
-    Message::Ptr sendVideo_impl(
-        ChatId chatId, FileOrString video, const std::string_view caption,
-        ReplyParametersExt::Ptr replyParameters = nullptr,
-        GenericReply::Ptr replyMarkup = nullptr,
-        const TgBot::Api::ParseMode parseMode = {}) const override;
+    std::optional<api::types::Message> sendVideo_impl(
+        api::types::Chat::id_type chatId, FileOrString video,
+        const std::string_view caption = {},
+        std::optional<api::types::ReplyParameters> replyParameters =
+            std::nullopt,
+        std::optional<api::types::GenericReply> replyMarkup = std::nullopt,
+        const ParseMode parseMode = {}) const override;
 
     /**
-     * @brief Sends a dice roll to a chat.
+     * @brief Sends a dice emoji to the specified chat.
      *
-     * @param chatId The unique identifier for the target chat.
+     * This function sends an animated emoji that displays a random value
+     * (dice, darts, basketball, etc.).
      *
-     * @return A shared pointer to a Message object representing the sent dice
-     * roll.
+     * @param chatId The ID of the chat to which the dice will be sent.
+     *
+     * @return An optional Message object representing the sent dice message.
      */
-    Message::Ptr sendDice_impl(ChatId chatId) const override;
+    std::optional<api::types::Message> sendDice_impl(
+        api::types::Chat::id_type chatId) const override;
 
     /**
-     * @brief Retrieves a sticker set by its name.
+     * @brief Retrieves information about a sticker set.
      *
-     * @param setName The name of the sticker set.
+     * This function gets a sticker set by its name.
      *
-     * @return A shared pointer to a StickerSet object representing the
-     * requested set.
+     * @param setName The name of the sticker set to be retrieved.
+     *
+     * @return A StickerSet object containing information about the sticker set.
      */
-    StickerSet::Ptr getStickerSet_impl(
+    api::types::StickerSet getStickerSet_impl(
         const std::string_view setName) const override;
 
     /**
-     * @brief Creates a new sticker set for a user.
+     * @brief Downloads a file from Telegram servers.
      *
-     * @param userId The unique identifier of the user creating the set.
-     * @param name The name of the new sticker set.
-     * @param title The title of the new sticker set.
-     * @param stickers A vector of stickers to be included in the set.
-     * @param stickerType The type of stickers in the set.
+     * This function downloads a file identified by its file ID and saves it
+     * to the specified destination.
      *
-     * @return True if the sticker set was created successfully, otherwise
-     * false.
+     * @param destFilename The destination filesystem path for the downloaded
+     * file.
+     * @param fileId The Telegram file ID of the file to be downloaded.
+     *
+     * @return True if the file was downloaded successfully, false otherwise.
      */
-    bool createNewStickerSet_impl(
-        UserId userId, const std::string_view name,
-        const std::string_view title,
-        const std::vector<InputSticker::Ptr>& stickers,
-        Sticker::Type stickerType) const override;
+    bool downloadFile_impl(const std::filesystem::path& destFilename,
+                           const std::string_view fileId) const override;
 
     /**
-     * @brief Uploads a sticker file for a user.
+     * @brief Retrieves information about the bot user.
      *
-     * @param userId The unique identifier of the user owning the sticker.
-     * @param sticker The sticker file to upload.
-     * @param stickerFormat The format of the sticker file.
+     * This function gets the bot's own user information.
      *
-     * @return A shared pointer to a File object representing the uploaded
-     * sticker.
+     * @return An optional User object representing the bot user.
      */
-    File::Ptr uploadStickerFile_impl(
-        UserId userId, InputFile::Ptr sticker,
-        const TgBot::Api::StickerFormat stickerFormat) const override;
-
-    /**
-     * @brief Downloads a file from the Telegram server.
-     *
-     * @param destfilename The destination file path where the file will be
-     * saved.
-     * @param fileid The ID of the file to be downloaded.
-     *
-     * @return True if the file was downloaded successfully, otherwise false.
-     */
-    bool downloadFile_impl(const std::filesystem::path& destfilename,
-                           const std::string_view fileid) const override;
-
-    /**
-     * @brief Retrieves the bot's user object.
-     *
-     * @return A shared pointer to the bot's User object.
-     */
-    User::Ptr getBotUser_impl() const override;
+    std::optional<api::types::User> getBotUser_impl() const override;
 
     /**
      * @brief Pins a message in a chat.
      *
-     * @param message A shared pointer to the message to pin.
+     * This function pins a message in the specified chat, making it visible
+     * at the top of the chat.
      *
-     * @return True if the message was pinned successfully, otherwise false.
+     * @param message The message to be pinned.
+     *
+     * @return True if the message was pinned successfully, false otherwise.
      */
-    bool pinMessage_impl(Message::Ptr message) const override;
+    bool pinMessage_impl(
+        std::optional<api::types::Message> message) const override;
 
     /**
      * @brief Unpins a message in a chat.
      *
-     * @param message A shared pointer to the message to unpin.
+     * This function removes the pinned status from a previously pinned message.
      *
-     * @return True if the message was unpinned successfully, otherwise false.
+     * @param message The message to be unpinned.
+     *
+     * @return True if the message was unpinned successfully, false otherwise.
      */
-    bool unpinMessage_impl(Message::Ptr message) const override;
+    bool unpinMessage_impl(
+        std::optional<api::types::Message> message) const override;
 
     /**
-     * @brief Bans a user from a chat.
+     * @brief Bans a chat member from a chat.
      *
-     * @param chat The chat where the user should be banned.
-     * @param user The user to ban.
+     * This function bans a user from a chat, preventing them from rejoining.
      *
-     * @return True if the user was banned successfully, otherwise false.
+     * @param chat The chat from which the user will be banned.
+     * @param user The user to be banned.
+     *
+     * @return True if the chat member was banned successfully, false otherwise.
      */
-    bool banChatMember_impl(const Chat::Ptr& chat,
-                            const User::Ptr& user) const override;
+    bool banChatMember_impl(
+        const api::types::Chat& chat,
+        const std::optional<api::types::User>& user) const override;
 
     /**
-     * @brief Unbans a user in a chat.
+     * @brief Unbans a previously banned chat member.
      *
-     * @param chat The chat where the user should be unbanned.
-     * @param user The user to unban.
+     * This function removes the ban from a user, allowing them to rejoin the
+     * chat.
      *
-     * @return True if the user was unbanned successfully, otherwise false.
+     * @param chat The chat from which the user will be unbanned.
+     * @param user The user to be unbanned.
+     *
+     * @return True if the chat member was unbanned successfully, false
+     * otherwise.
      */
-    bool unbanChatMember_impl(const Chat::Ptr& chat,
-                              const User::Ptr& user) const override;
+    bool unbanChatMember_impl(
+        const api::types::Chat& chat,
+        const std::optional<api::types::User>& user) const override;
 
     /**
      * @brief Retrieves information about a chat member.
      *
-     * @param chat The unique identifier for the target chat.
-     * @param user The unique identifier for the target user.
+     * This function gets information about a specific user in a chat.
      *
-     * @return A shared pointer to a User object representing the chat member.
+     * @param chat The chat ID.
+     * @param userId The user ID.
+     *
+     * @return An optional User object representing the chat member.
      */
-    User::Ptr getChatMember_impl(ChatId chat, UserId user) const override;
+    std::optional<api::types::User> getChatMember_impl(
+        const api::types::Chat::id_type chat,
+        const api::types::User::id_type userId) const override;
 
     /**
-     * @brief Sets the descriptions of a chat.
+     * @brief Sets the bot's description texts.
      *
-     * @param description The long description of the chat.
-     * @param shortDescription The short description of the chat.
+     * This function sets both the long and short descriptions for the bot.
+     *
+     * @param description The long description of the bot, which may contain
+     * markdown or HTML formatting.
+     * @param shortDescription A short description of the bot, typically shown
+     * in bot lists or previews.
+     *
+     * @note The descriptions provide context or information about the bot to
+     * users.
      */
     void setDescriptions_impl(
-        const std::string_view description,
-        const std::string_view shortDescription) const override;
+        const std::optional<std::string_view> description,
+        const std::optional<std::string_view> shortDescription) const override;
 
     /**
-     * @brief Sets a reaction to a message.
+     * @brief Sets reactions to a message in a chat.
      *
-     * @param chatid The unique identifier for the target chat.
-     * @param message The unique identifier for the target message.
-     * @param reaction A list of reaction types to apply to the message.
-     * @param isBig Optional. If true, the reaction is displayed as a larger
-     * icon.
+     * This function adds one or more reactions (emoji) to a specific message.
      *
-     * @return True if the reaction was set successfully, otherwise false.
+     * @param chatId The unique identifier of the chat where the message
+     * resides.
+     * @param messageId The unique identifier of the message to which reactions
+     * are being added.
+     * @param reaction A vector of reaction types (e.g., emoji or custom
+     * reactions) to apply to the message.
+     * @param isBig Whether the reaction should be displayed in a larger size.
+     *
+     * @return True if the reactions were successfully set, false otherwise.
+     *
+     * @note Reactions are visual indicators for users to show their response
+     * to a message.
      */
-    bool setMessageReaction_impl(const ChatId chatid, const MessageId message,
-                                 const std::vector<ReactionType::Ptr>& reaction,
-                                 bool isBig) const override;
+    bool setMessageReaction_impl(
+        api::types::Chat::id_type chatId,
+        api::types::Message::messageId_type messageId,
+        const std::vector<api::types::ReactionType>& reaction,
+        bool isBig) const override;
+
+    /**
+     * @brief Use this method to set a custom title for an administrator in a
+     * supergroup promoted by the bot.
+     *
+     * @param chatId Unique identifier for the target chat or username of the
+     * target supergroup (in the format @supergroupusername)
+     * @param userId Unique identifier of the target user
+     * @param customTitle New custom title for the administrator; 0-16
+     * characters, emoji are not allowed
+     *
+     * @return Returns True on success.
+     */
+    bool setChatAdministratorCustomTitle(
+        api::types::Chat::id_type chatId, api::types::User::id_type userId,
+        const std::string_view customTitle) const override;
+
+    /**
+     * @brief Sets the list of the bot's commands.
+     *
+     * @param commands A vector of BotCommand objects representing the bot's
+     * commands.
+     * @return True if the commands were successfully set, false otherwise.
+     */
+    bool setMyCommands_impl(
+        const std::vector<api::types::BotCommand>& commands) const override;
+
+    /**
+     * @brief Retrieves information about a chat.
+     *
+     * @param chatId The unique identifier of the chat to retrieve.
+     *
+     * @return An optional Chat object representing the chat information.
+     */
+    std::optional<api::types::Chat> getChat_impl(
+        api::types::Chat::id_type chatId) const override;
 
     // A global link preview options
-    TgBot::LinkPreviewOptions::Ptr globalLinkOptions;
+    api::types::LinkPreviewOptions globalLinkOptions;
 
    public:
     void startPoll() override;
@@ -440,12 +568,12 @@ class TgBotApiImpl : public TgBotApi {
     bool reloadCommand(const std::string& command) override;
     void commandHandler(const std::string& command,
                         AuthContext::AccessLevel authflags,
-                        Message::Ptr message);
+                        api::types::Message message);
     bool validateValidArgs(const CommandModule::Info* module,
-                           MessageExt::Ptr message);
+                           api::types::ParsedMessage* message);
 
     void addInlineQueryKeyboard(InlineQuery query,
-                                TgBot::InlineQueryResult::Ptr result) override;
+                                api::types::InlineQueryResult result) override;
     void addInlineQueryKeyboard(InlineQuery query,
                                 InlineCallback result) override;
     void removeInlineQueryKeyboard(const std::string_view key) override;
@@ -459,24 +587,20 @@ class TgBotApiImpl : public TgBotApi {
      */
     void onAnyMessage(const AnyMessageCallback& callback) override;
 
-    void onCallbackQuery(
-        std::string command,
-        TgBot::EventBroadcaster::CallbackQueryListener listener) override;
+    void onCallbackQuery(std::string command,
+                         CallbackQueryCallback listener) override;
 
    private:
-    [[nodiscard]] EventBroadcaster& getEvents() { return _bot.getEvents(); }
-    [[nodiscard]] const Api& getApi() const { return _bot.getApi(); }
-
-    [[nodiscard]] bool authorized(const MessageExt::Ptr& message,
+    [[nodiscard]] bool authorized(const api::types::ParsedMessage* message,
                                   const std::string_view commandName,
                                   AuthContext::AccessLevel flags) const;
 
-    [[nodiscard]] bool isMyCommand(const MessageExt::Ptr& message) const;
+    [[nodiscard]] bool isMyCommand(
+        const api::types::ParsedMessage* message) const;
 
     class Async;
-    Bot _bot;
 
-    mutable User::Ptr me;  // Just a cache
+    mutable api::types::User me;  // Just a cache
 
     AuthContext* _auth;
     StringResLoader* _loader;

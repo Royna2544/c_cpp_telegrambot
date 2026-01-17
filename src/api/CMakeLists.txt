@@ -33,11 +33,9 @@ tgbot_library(
     AuthContext.cpp
     DynCommandModule.cpp
     ${lua_src}
-    MessageExt.cpp
     RateLimit.cpp
     StringResLoader.cpp
   LIBS
-    TgBot # TODO: This will be removed after refactoring
     DBImpl # Authorization
     ${CMAKE_DL_LIBS} # CommandModule
     restartfmt_parser # RestartCommand
@@ -60,7 +58,7 @@ tgbot_library(
     components/OnMyChatMember.cpp
     components/Restart.cpp
     components/UnknownCommand.cpp
-  LIBS TgBot DBImpl ${cpptrace_libs} Api
+  LIBS tgbotxx DBImpl ${cpptrace_libs} Api
   DEFS ${cpptrace_def}
   STATIC
 )
@@ -69,7 +67,6 @@ tgbot_library(
   NAME AuthApi
   SRCS AuthContext.cpp
   LIBS DBImpl
-  PUBLIC_INC $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>
   STATIC
 )
 

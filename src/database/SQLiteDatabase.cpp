@@ -22,9 +22,7 @@
 #include <unordered_map>
 #include <variant>
 
-#include "api/typedefs.h"
-
-#ifdef TGBOTCPP_ENABLE_CPPTRACE
+#ifdef TGBOTCPP_ENABLE_CPPTRACE  
 #include <cpptrace/cpptrace.hpp>
 #endif
 
@@ -286,7 +284,7 @@ SQLiteDatabase::Helper::getNextStatement() {
 }
 
 SQLiteDatabase::ListResult SQLiteDatabase::addUserToList(InfoType type,
-                                                         UserId user) const {
+                                                         api::types::User::id_type user) const {
     ListResult res{};
 
     res = checkUserInList(type, user);
@@ -318,12 +316,12 @@ SQLiteDatabase::ListResult SQLiteDatabase::addUserToList(InfoType type,
 }
 
 SQLiteDatabase::ListResult SQLiteDatabase::addUserToList(ListType type,
-                                                         UserId user) const {
+                                                         api::types::User::id_type user) const {
     return addUserToList(toInfoType(type), user);
 }
 
 SQLiteDatabase::ListResult SQLiteDatabase::removeUserFromList(
-    ListType type, UserId user) const {
+    ListType type, api::types::User::id_type user) const {
     ListResult res{};
 
     res = checkUserInList(type, user);
@@ -354,12 +352,12 @@ SQLiteDatabase::ListResult SQLiteDatabase::removeUserFromList(
 }
 
 [[nodiscard]] DatabaseBase::ListResult SQLiteDatabase::checkUserInList(
-    ListType type, UserId user) const {
+    ListType type, api::types::User::id_type user) const {
     return checkUserInList(toInfoType(type), user);
 }
 
 [[nodiscard]] DatabaseBase::ListResult SQLiteDatabase::checkUserInList(
-    InfoType type, UserId user) const {
+    InfoType type, api::types::User::id_type user) const {
     ListResult result = ListResult::BACKEND_ERROR;
     std::optional<Helper::Row> row;
 
@@ -648,7 +646,7 @@ std::vector<SQLiteDatabase::MediaInfo> SQLiteDatabase::getAllMediaInfos()
     return result;
 }
 
-std::optional<UserId> SQLiteDatabase::getOwnerUserId() const {
+std::optional<api::types::User::id_type> SQLiteDatabase::getOwnerUserId() const {
     auto helper = Helper::create(db, _sqlScriptsPath, Helper::kFindOwnerFile);
     if (!helper->prepare()) {
         return std::nullopt;
@@ -657,7 +655,7 @@ std::optional<UserId> SQLiteDatabase::getOwnerUserId() const {
     if (!row) {
         return std::nullopt;
     }
-    return row->get<UserId>(0);
+    return row->get<api::types::User::id_type>(0);
 }
 
 SQLiteDatabase::InfoType SQLiteDatabase::toInfoType(ListType type) {
@@ -690,7 +688,7 @@ std::ostream& SQLiteDatabase::dump(std::ostream& ofs) const {
     if (helper->prepare()) {
         std::optional<Helper::Row> row;
         while ((row = helper->execAndGetRow())) {
-            ss << "UserId: " << row->get<UserId>(0);
+            ss << "api::types::User::id_type: " << row->get<api::types::User::id_type>(0);
             int type = row->get<int>(1);
             if (type <= static_cast<int>(InfoType::MIN) ||
                 type >= static_cast<int>(InfoType::MAX)) {
@@ -746,9 +744,9 @@ std::ostream& SQLiteDatabase::dump(std::ostream& ofs) const {
         std::optional<Helper::Row> row;
         bool any = false;
         while ((row = helper->execAndGetRow())) {
-            ss << "ChatId: " << row->get<ChatId>(0) << '\n';
+            ss << "api::types::Chat::id_type: " << row->get<api::types::Chat::id_type>(0) << '\n';
             ss << "ChatName: " << row->get<std::string>(1) << '\n';
-            ss << '\n';
+            ss << std::endl;
             any = true;
         }
         if (!any) {
@@ -764,7 +762,7 @@ std::ostream& SQLiteDatabase::dump(std::ostream& ofs) const {
     return ofs;
 }
 
-void SQLiteDatabase::setOwnerUserId(UserId userId) const {
+void SQLiteDatabase::setOwnerUserId(api::types::User::id_type userId) const {
     switch (addUserToList(InfoType::OWNER, userId)) {
         case DatabaseBase::ListResult::OK:
             LOG(INFO) << "Owner set to " << userId;
@@ -783,7 +781,7 @@ void SQLiteDatabase::setOwnerUserId(UserId userId) const {
 }
 
 SQLiteDatabase::AddResult SQLiteDatabase::addChatInfo(
-    const ChatId chatid, const std::string_view name) const {
+    const api::types::Chat::id_type chatid, const std::string_view name) const {
     if (getChatId(name)) {
         return AddResult::ALREADY_EXISTS;
     }
@@ -802,7 +800,7 @@ SQLiteDatabase::AddResult SQLiteDatabase::addChatInfo(
     }
 }
 
-std::optional<ChatId> SQLiteDatabase::getChatId(
+std::optional<api::types::Chat::id_type> SQLiteDatabase::getChatId(
     const std::string_view name) const {
     auto helper = Helper::create(db, _sqlScriptsPath, Helper::kFindChatIdFile);
     if (!helper->prepare()) {
@@ -815,7 +813,7 @@ std::optional<ChatId> SQLiteDatabase::getChatId(
     if (!row) {
         return std::nullopt;
     }
-    return row->get<ChatId>(0);
+    return row->get<api::types::Chat::id_type>(0);
 }
 
 SQLiteDatabase::SQLiteDatabase(std::filesystem::path sqlScriptDirectory)

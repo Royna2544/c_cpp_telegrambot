@@ -1,7 +1,6 @@
 #include <absl/log/log.h>
 #include <fmt/chrono.h>
-#include <tgbot/TgException.h>
-#include <tgbot/tools/StringTools.h>
+#include <api/types/ApiException.hpp>
 #include <trivial_helpers/_std_chrono_templates.h>
 
 #include <algorithm>
@@ -13,7 +12,6 @@
 #include "PacketUtils.hpp"
 #include "SocketInterface.hpp"
 
-using TgBot::InputFile;
 using namespace TgBotSocket;
 using namespace TgBotSocket::callback;
 
@@ -26,7 +24,7 @@ GenericAck SocketInterfaceTgBot::handle_WriteMsgToChatId(
     }
     try {
         api->sendMessage(data->chat, data->message);
-    } catch (const TgBot::TgException& e) {
+    } catch (const api::types::ApiException& e) {
         LOG(ERROR) << "Exception at handler: " << e.what();
         return GenericAck(AckType::ERROR_TGAPI_EXCEPTION, e.what());
     }
@@ -85,31 +83,36 @@ GenericAck SocketInterfaceTgBot::handle_SendFileToChatId(
     if (data->filePath.empty()) {
         return GenericAck(AckType::ERROR_INVALID_ARGUMENT, "No file provided");
     }
-    std::function<Message::Ptr(ChatId, const TgBotApi::FileOrMedia&)> fn;
+    std::function<std::optional<api::types::Message>(api::types::Chat::id_type, const TgBotApi::FileOrMedia&)> fn;
     switch (data->fileType) {
         using FileType = TgBotSocket::data::FileType;
         case FileType::TYPE_PHOTO:
-            fn = [this](ChatId id, const TgBotApi::FileOrMedia& file) {
+            fn = [this](api::types::Chat::id_type id,
+                        const TgBotApi::FileOrMedia& file) {
                 return api->sendPhoto(id, file);
             };
             break;
         case FileType::TYPE_VIDEO:
-            fn = [this](ChatId id, const TgBotApi::FileOrMedia& file) {
+            fn = [this](api::types::Chat::id_type id,
+                        const TgBotApi::FileOrMedia& file) {
                 return api->sendVideo(id, file);
             };
             break;
         case FileType::TYPE_GIF:
-            fn = [this](ChatId id, const TgBotApi::FileOrMedia& file) {
+            fn = [this](api::types::Chat::id_type id,
+                        const TgBotApi::FileOrMedia& file) {
                 return api->sendAnimation(id, file);
             };
             break;
         case FileType::TYPE_DOCUMENT:
-            fn = [this](ChatId id, const TgBotApi::FileOrMedia& file) {
+            fn = [this](api::types::Chat::id_type id,
+                        const TgBotApi::FileOrMedia& file) {
                 return api->sendDocument(id, file);
             };
             break;
         case FileType::TYPE_STICKER:
-            fn = [this](ChatId id, const TgBotApi::FileOrMedia& file) {
+            fn = [this](api::types::Chat::id_type id,
+                        const TgBotApi::FileOrMedia& file) {
                 return api->sendSticker(id, file);
             };
             break;
@@ -118,20 +121,13 @@ GenericAck SocketInterfaceTgBot::handle_SendFileToChatId(
             return GenericAck::ok();
         }
         default:
-            fn = [data](ChatId, const TgBotApi::FileOrMedia&) {
-                throw TgBot::TgException(
-                    "Invalid file type: " +
-                        std::to_string(static_cast<int>(data->fileType)),
-                    TgBot::TgException::ErrorCode::Undefined);
-                return nullptr;
-            };
             break;
     }
     DLOG(INFO) << "Sending " << file << " to " << data->chat;
     // Try to send as local file first
     try {
         fn(data->chat,
-           InputFile::fromFile(file, getMIMEType(resource, file)));
+           api::types::InputFile(file, getMIMEType(resource, file)));
     } catch (const std::ifstream::failure& e) {
         LOG(INFO) << "Failed to send '" << file
                   << "' as local file, trying as Telegram "
@@ -140,7 +136,7 @@ GenericAck SocketInterfaceTgBot::handle_SendFileToChatId(
         ids.id = file;
         try {
             fn(data->chat, ids);
-        } catch (const TgBot::TgException& e) {
+        } catch (const api::types::ApiException& e) {
             LOG(ERROR) << "Exception at handler, " << e.what();
             return GenericAck(AckType::ERROR_TGAPI_EXCEPTION, e.what());
         }

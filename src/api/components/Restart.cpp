@@ -1,7 +1,6 @@
 #include <absl/log/check.h>
 
 #include <Env.hpp>
-#include <api/MessageExt.hpp>
 #include <api/components/ModuleManagement.hpp>
 #include <api/components/OnAnyMessage.hpp>
 #include <api/components/OnCallbackQuery.hpp>
@@ -15,17 +14,20 @@ extern char** environ;
 
 TgBotApiImpl::RestartCommand::RestartCommand(TgBotApiImpl::Ptr api)
     : _api(api) {
-    api->getEvents().onCommand("restart", [this](Message::Ptr message) {
-        commandFunction(std::make_unique<MessageExt>(std::move(message)).get());
-    });
+    api->getEvents().onCommand(
+        "restart", [this](api::types::ParsedMessage message) {
+            commandFunction(
+                std::make_unique<MessageExt>(std::move(message)).get());
+        });
 }
 
-void TgBotApiImpl::RestartCommand::commandFunction(MessageExt::Ptr message) {
-    if (!_api->authorized(message, "restart",
+void TgBotApiImpl::RestartCommand::commandFunction(
+    api::types::ParsedMessage message) {
+    if (!_api->authorized(&message, "restart",
                           AuthContext::AccessLevel::AdminUser)) {
         return;
     }
-    if (!_api->isMyCommand(message)) {
+    if (!_api->isMyCommand(&message)) {
         return;
     }
     if (RestartFmt::isRestartedByThisMessage(message)) {
@@ -56,9 +58,8 @@ void TgBotApiImpl::RestartCommand::commandFunction(MessageExt::Ptr message) {
     }
 
     std::array<char, RestartFmt::MAX_KNOWN_LENGTH> restartBuf = {0};
-    std::string restartEnv =
-        fmt::format("{}={}", RestartFmt::ENV_VAR_NAME,
-                    RestartFmt::Type{message->message()}.to_string());
+    std::string restartEnv = fmt::format("{}={}", RestartFmt::ENV_VAR_NAME,
+                                         RestartFmt::Type{message}.to_string());
     CHECK(restartEnv.size() < RestartFmt::MAX_KNOWN_LENGTH)
         << "RestartFmt::MAX_KNOWN_LENGTH is violated: for string "
         << std::quoted(restartEnv);

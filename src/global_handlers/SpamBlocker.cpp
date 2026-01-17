@@ -1,7 +1,7 @@
 #include <absl/log/log.h>
-#include <tgbot/TgException.h>
+#include <api/types/ApiException.hpp>
 #include <trivial_helpers/_std_chrono_templates.h>
-#include <trivial_helpers/_tgbot.h>
+#include <api/types/FormatHelper.hpp>
 
 #include <api/AuthContext.hpp>
 #include <algorithm>
@@ -9,8 +9,6 @@
 #include <iterator>
 #include <mutex>
 #include <numeric>
-
-#include "api/typedefs.h"
 
 // Describing a SpamBlockDetector.
 class Matcher {
@@ -75,8 +73,9 @@ class MessageCountMatcher : public Matcher {
     }
 };
 
-void SpamBlockBase::onDetected(ChatId chat, UserId user,
-                               std::vector<MessageId> /*messageIds*/) const {
+void SpamBlockBase::onDetected(
+    api::types::Chat::id_type chat, api::types::User::id_type user,
+    std::vector<api::types::Message::messageId_type> messageIds) const {
     LOG(INFO) << fmt::format("Spam detected for chat {}, by user {}",
                              chat_map.at(chat), user_map.at(user));
 }
@@ -127,7 +126,7 @@ void SpamBlockBase::consumeAndDetect() {
             // Run detection
             for (auto it = per_chat_map.cbegin(); it != per_chat_map.cend();
                  it++) {
-                std::vector<MessageId> msgids;
+                std::vector<api::types::Message::messageId_type> msgids;
                 std::ranges::transform(it->second, std::back_inserter(msgids),
                                        [](const auto &x) { return x.first; });
                 if (Matcher::detect<MessageCountMatcher>(it) ||
@@ -141,7 +140,7 @@ void SpamBlockBase::consumeAndDetect() {
     chat_messages_count = 0;
 }
 
-void SpamBlockBase::addMessage(const Message::Ptr &message) {
+void SpamBlockBase::addMessage(const api::types::Message &message) {
     // Always ignore when spamblock is off
     if (_config == Config::OFF) {
         return;
@@ -154,28 +153,28 @@ void SpamBlockBase::addMessage(const Message::Ptr &message) {
 
     // We cares GIF, sticker, text spams only, or if it isn't fowarded msg
     // A required check.
-    if ((!message->animation && !message->text && !message->sticker) ||
-        message->forwardOrigin) {
+    if ((!message.animation && !message.text && !message.sticker) ||
+        message.forwardOrigin || !message.from) {
         return;
     }
 
     std::string messageData;
-    if (message->text) {
-        messageData = *message->text;
-    } else if (message->animation) {
-        messageData = message->animation->fileUniqueId;
-    } else if (message->sticker) {
-        messageData = message->sticker->fileUniqueId;
+    if (message.text) {
+        messageData = *message.text;
+    } else if (message.animation) {
+        messageData = message.animation->fileUniqueId;
+    } else if (message.sticker) {
+        messageData = message.sticker->fileUniqueId;
     }
 
-    ChatId chatId = message->chat->id;
-    UserId userId = message->from->id;
-    MessageId messageId = message->messageId;
+    auto chatId = message.chat.id;
+    auto userId = message.from->id;
+    auto messageId = message.messageId;
     {
         const std::lock_guard<std::mutex> _(mutex);
         chat_messages_data[chatId][userId].emplace_back(messageId, messageData);
-        chat_map[chatId] = message->chat;
-        user_map[userId] = message->from;
+        chat_map[chatId] = message.chat;
+        user_map[userId] = *message.from;
         chat_messages_count++;
         onMessageAdded(chat_messages_count);
     }

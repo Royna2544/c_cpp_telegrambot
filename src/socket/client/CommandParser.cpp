@@ -58,7 +58,7 @@ std::optional<data::ObserveChatId> CommandParser::parseObserveChat(char** argv) 
 
 std::optional<data::SendFileToChatId> CommandParser::parseSendFile(char** argv) {
     data::SendFileToChatId data{};
-    ChatId id;
+    api::types::Chat::id_type id;
     ByteHelper<data::FileType> fileType;
     if (try_parse(argv[0], &id) &&
         parseEnum(&fileType, data::FileType::TYPE_MAX, argv[1], "type")) {

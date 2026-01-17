@@ -5,7 +5,7 @@
 #include "Packet.hpp"
 #include "Utilities.hpp"
 
-#include <api/typedefs.h>
+#include <api/types/Chat.hpp>
 
 namespace TgBotSocket::data {
 
@@ -44,7 +44,7 @@ constexpr uint8_t JSON_BYTE_BORDER = 0xFF;
  * JSON schema: { "chat": int64, "message": string }
  */
 struct alignas(Limits::ALIGNMENT) WriteMsgToChatId {
-    ByteHelper<ChatId> chat;
+    ByteHelper<api::types::Chat::id_type> chat;
     MessageStringArray message;
 };
 
@@ -54,7 +54,7 @@ struct alignas(Limits::ALIGNMENT) WriteMsgToChatId {
  * JSON schema: { "chat": int64, "observe": bool }
  */
 struct alignas(Limits::ALIGNMENT) ObserveChatId {
-    ByteHelper<ChatId> chat;
+    ByteHelper<api::types::Chat::id_type> chat;
     bool observe;
 };
 
@@ -64,7 +64,7 @@ struct alignas(Limits::ALIGNMENT) ObserveChatId {
  * JSON schema: { "chat": int64, "fileType": int, "filePath": string }
  */
 struct alignas(Limits::ALIGNMENT) SendFileToChatId {
-    ByteHelper<ChatId> chat;
+    ByteHelper<api::types::Chat::id_type> chat;
     ByteHelper<FileType> fileType;
     alignas(Limits::ALIGNMENT) PathStringArray filePath;
 };

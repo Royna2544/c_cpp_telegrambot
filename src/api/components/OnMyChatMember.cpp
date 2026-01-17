@@ -1,13 +1,13 @@
 #include <absl/log/log.h>
-#include <trivial_helpers/_tgbot.h>
 
 #include <api/components/OnMyChatMember.hpp>
 
-#include "tgbot/types/ChatMemberAdministrator.h"
-#include "tgbot/types/ChatMemberBanned.h"
-#include "tgbot/types/ChatMemberLeft.h"
-#include "tgbot/types/ChatMemberMember.h"
-#include "tgbot/types/ChatMemberRestricted.h"
+#include <api/types/FormatHelper.hpp>
+#include "api/types/ChatMemberAdministrator.hpp"
+#include "api/types/ChatMemberBanned.hpp"
+#include "api/types/ChatMemberLeft.hpp"
+#include "api/types/ChatMemberMember.hpp"
+#include "api/types/ChatMemberRestricted.hpp"
 
 template <>
 struct fmt::formatter<TgBotApiImpl::OnMyChatMemberImpl::BotState>

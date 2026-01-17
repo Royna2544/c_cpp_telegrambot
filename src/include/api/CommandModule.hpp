@@ -1,6 +1,5 @@
 #pragma once
 
-#include <api/StringResLoader.hpp>
 #include <filesystem>
 #include <functional>
 #include <limits>
@@ -9,7 +8,8 @@
 #include <string_view>
 #include <type_traits>
 
-#include "api/MessageExt.hpp"
+#include <api/StringResLoader.hpp>
+#include <api/types/ParsedMessage.hpp>
 #include "api/Providers.hpp"
 #include "api/TgBotApi.hpp"
 
@@ -27,13 +27,14 @@ class CommandModule;
 
 // Command handler helper macros
 #define COMMAND_HANDLER_NAME(cmd) handle_command_##cmd
-#define DECLARE_COMMAND_HANDLER(cmd)                                         \
-    void COMMAND_HANDLER_NAME(cmd)(TgBotApi::Ptr api, MessageExt * message,  \
-                                   const StringResLoader::PerLocaleMap* res, \
-                                   const Providers* provider)
+#define DECLARE_COMMAND_HANDLER(cmd)                            \
+    void COMMAND_HANDLER_NAME(cmd)(                             \
+        TgBotApi::Ptr api, api::types::ParsedMessage message,  \
+        const StringResLoader::PerLocaleMap* res,               \
+        const Providers* provider)
 
 struct DynModule {
-    using command_callback_t = void (*)(TgBotApi::Ptr api, MessageExt*,
+    using command_callback_t = void (*)(TgBotApi::Ptr api, api::types::ParsedMessage,
                                         const StringResLoader::PerLocaleMap*,
                                         const Providers* provider);
 
@@ -73,13 +74,14 @@ struct DynModule {
     }
 
     struct ValidArgs {
+        using SplitMethod = api::types::internal::SplitMethod;
+
         // Is it enabled?
         bool enabled;
         // Int mask to the valid argument counts.
         argcount_mask_t counts;
         // Split type to obtain arguments.
-        using Split = ::SplitMessageText;
-        Split split_type;
+        SplitMethod split_type;
         // Usage information for the command.
         // Optional
         const char* usage;
@@ -122,7 +124,7 @@ class CommandModule {
             // Int mask to the valid argument counts.
             DynModule::argcount_mask_t counts;
             // Split type to obtain arguments.
-            ::SplitMessageText split_type;
+            api::types::ParsedMessage::SplitMethod split_type;
             // Usage information for the command.
             std::string usage;
         } valid_args;

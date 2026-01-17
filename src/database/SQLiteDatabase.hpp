@@ -53,23 +53,23 @@ struct DBIMPL_EXPORT SQLiteDatabase : DatabaseBase {
     explicit SQLiteDatabase(std::filesystem::path sqlScriptDirectory);
 
     [[nodiscard]] ListResult addUserToList(ListType type,
-                                           UserId user) const override;
+                                           api::types::User::id_type user) const override;
     [[nodiscard]] ListResult removeUserFromList(ListType type,
-                                                UserId user) const override;
+                                                api::types::User::id_type user) const override;
     [[nodiscard]] ListResult checkUserInList(ListType type,
-                                             UserId user) const override;
+                                             api::types::User::id_type user) const override;
     bool load(std::filesystem::path filepath) override;
     bool unload() override;
-    [[nodiscard]] std::optional<UserId> getOwnerUserId() const override;
+    [[nodiscard]] std::optional<api::types::User::id_type> getOwnerUserId() const override;
     [[nodiscard]] std::optional<MediaInfo> queryMediaInfo(
         std::string str) const override;
     [[nodiscard]] AddResult addMediaInfo(const MediaInfo& info) const override;
     [[nodiscard]] std::vector<MediaInfo> getAllMediaInfos() const override;
-    void setOwnerUserId(UserId userId) const override;
-    std::ostream& dump(std::ostream& ofs) const override;
+    void setOwnerUserId(api::types::User::id_type userId) const override;
+    std::ostream &dump(std::ostream &ofs) const override;
     [[nodiscard]] AddResult addChatInfo(
-        const ChatId chatid, const std::string_view name) const override;
-    [[nodiscard]] std::optional<ChatId> getChatId(
+        const api::types::Chat::id_type chatid, const std::string_view name) const override;
+    [[nodiscard]] std::optional<api::types::Chat::id_type> getChatId(
         const std::string_view name) const override;
 
     /**
@@ -296,8 +296,8 @@ struct DBIMPL_EXPORT SQLiteDatabase : DatabaseBase {
     };
 
    private:
-    [[nodiscard]] ListResult addUserToList(InfoType type, UserId user) const;
-    [[nodiscard]] ListResult checkUserInList(InfoType type, UserId user) const;
+    [[nodiscard]] ListResult addUserToList(InfoType type, api::types::User::id_type user) const;
+    [[nodiscard]] ListResult checkUserInList(InfoType type, api::types::User::id_type user) const;
     static InfoType toInfoType(ListType type);
     sqlite3* db = nullptr;
     std::filesystem::path _sqlScriptsPath;

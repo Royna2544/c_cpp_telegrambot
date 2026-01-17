@@ -5,6 +5,4 @@ tgbot_library(
   restartfmt_parser.cpp
   LIBS
   absl::strings
-  STATIC
-  PRIVATE_INC
-  $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>)
+  STATIC)

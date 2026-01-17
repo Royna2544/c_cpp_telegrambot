@@ -1,3 +1,5 @@
+#pragma once
+
 #include <api/TgBotApiImpl.hpp>
 #include <mutex>
 #include <map>
@@ -11,7 +13,7 @@ class TgBotApiImpl::OnInlineQueryImpl : TgBotApiImpl::CommandListener {
     AuthContext* _auth;
     TgBotApiImpl::Ptr _api;
 
-    void onInlineQueryFunction(TgBot::InlineQuery::Ptr query);
+    void onInlineQueryFunction(api::types::InlineQuery query);
 
     void onUnload(const std::string_view command) override;
     void onReload(const std::string_view command) override;
@@ -19,7 +21,7 @@ class TgBotApiImpl::OnInlineQueryImpl : TgBotApiImpl::CommandListener {
    public:
     OnInlineQueryImpl(AuthContext* auth, TgBotApiImpl::Ptr api);
 
-    void add(InlineQuery query, TgBot::InlineQueryResult::Ptr result) {
+    void add(InlineQuery query, api::types::InlineQueryResult result) {
         const std::lock_guard _(mutex);
         queryResults[std::move(query)] =
             [result = std::move(result)](const std::string_view /*unused*/) {

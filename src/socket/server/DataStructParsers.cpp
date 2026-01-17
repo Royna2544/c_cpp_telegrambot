@@ -31,7 +31,7 @@ std::optional<WriteMsgToChatId> WriteMsgToChatId::fromBuffer(
                 return std::nullopt;
             }
             auto& root = _root.value();
-            result.chat = root["chat"].get<ChatId>();
+            result.chat = root["chat"].get<api::types::Chat::id_type>();
             result.message = root["message"].get<std::string>();
             return result;
         }
@@ -64,7 +64,7 @@ std::optional<ObserveChatId> ObserveChatId::fromBuffer(
                 return std::nullopt;
             }
             auto& root = _root.value();
-            result.chat = root["chat"].get<ChatId>();
+            result.chat = root["chat"].get<api::types::Chat::id_type>();
             result.observe = root["observe"].get<bool>();
             return result;
         }
@@ -99,7 +99,7 @@ std::optional<SendFileToChatId> SendFileToChatId::fromBuffer(
                 return std::nullopt;
             }
             auto& root = _root.value();
-            result.chat = root["chat"].get<ChatId>();
+            result.chat = root["chat"].get<api::types::Chat::id_type>();
             result.fileType = static_cast<TgBotSocket::data::FileType>(
                 root["fileType"].get<int>());
             result.filePath = root["filePath"].get<std::string>();

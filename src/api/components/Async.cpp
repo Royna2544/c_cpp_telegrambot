@@ -1,5 +1,6 @@
 #include <api/TgBotApiImpl.hpp>
 #include <api/components/Async.hpp>
+#include <api/types/ApiException.hpp>
 
 void TgBotApiImpl::Async::emplaceTask(std::string command,
                                       std::future<void> future) {
@@ -42,7 +43,7 @@ void TgBotApiImpl::Async::threadFunction() {
             try {
                 // Wait for the task to complete
                 front.second.get();
-            } catch (const TgBot::TgException& e) {
+            } catch (const api::types::ApiException& e) {
                 LOG(ERROR) << fmt::format(
                     "[AsyncConsumer] While handling command: {}: TgApi "
                     "Exception: {}",

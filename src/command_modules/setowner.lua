@@ -1,6 +1,6 @@
 -- Define metadata
 command = {
-    name = "setowner",
+    name = "setowner_lua",
     description = "Sets the bot owner if not already set",
     permissive = true,
     hide_description = true

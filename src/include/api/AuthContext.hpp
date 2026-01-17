@@ -1,15 +1,12 @@
 #pragma once
 
-#include <api/typedefs.h>
-#include <tgbot/types/Message.h>
+#include <api/types/User.hpp>
+#include <api/types/Message.hpp>
 
 #include <chrono>
 #include <database/DatabaseBase.hpp>
 
 #include "trivial_helpers/fruit_inject.hpp"
-
-using TgBot::Message;
-using TgBot::User;
 
 class AuthContext {
    public:
@@ -71,12 +68,12 @@ class AuthContext {
      */
 
     [[nodiscard]] Result isAuthorized(
-        const User::Ptr& user,
+        const std::optional<api::types::User>& user,
         const AccessLevel flags = AccessLevel::Unprotected) const;
 
     // Overload taking a message instead of user
     [[nodiscard]] Result isAuthorized(
-        const Message::Ptr& message,
+        const api::types::Message& message,
         const AccessLevel flags = AccessLevel::Unprotected) const;
 
     /**
@@ -92,12 +89,12 @@ class AuthContext {
      * @return True if the message is within the allowed time limit, false
      * otherwise.
      */
-    static bool isUnderTimeLimit(const Message::Ptr& msg) noexcept;
+    static bool isUnderTimeLimit(const api::types::Message& msg) noexcept;
     // Overload taking a time_t
     static bool isUnderTimeLimit(const time_t time) noexcept;
 
     [[nodiscard]] bool isInList(DatabaseBase::ListType type,
-                                const UserId user) const;
+                                const api::types::User::id_type user) const;
 
    private:
     DatabaseBase* _impl;

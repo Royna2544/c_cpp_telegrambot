@@ -8,5 +8,5 @@ class TgBotApiImpl::RestartCommand {
    public:
     explicit RestartCommand(TgBotApiImpl::Ptr api);
 
-    void commandFunction(MessageExt::Ptr message);
+    void commandFunction(api::types::ParsedMessage message);
 };

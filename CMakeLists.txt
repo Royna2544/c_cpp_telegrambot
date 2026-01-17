@@ -226,7 +226,7 @@ function(tgbot_common_target TARGET_NAME)
   target_link_libraries(
     ${TARGET_NAME}
     PUBLIC ${TGBOT_PUBLIC_LIBS}
-    PRIVATE ${TGBOT_PRIVATE_LIBS} fmt::fmt-header-only
+    PRIVATE ${TGBOT_PRIVATE_LIBS} fmt::fmt-header-only strutil
     INTERFACE ${TGBOT_INTERFACE_LIBS})
 
   # Set RPATH for Unix-like systems
@@ -405,7 +405,16 @@ add_subdirectory(src/logging)
 add_subdirectory(src/socket)
 add_subdirectory(src/utils)
 add_subdirectory(src/libos)
-add_subdirectory(src/third-party/tgbot-cpp)
+add_subdirectory(src/third-party/tgbotxx)
+
+# Import strutil
+add_library(strutil INTERFACE)
+target_sources(strutil INTERFACE 
+    src/third-party/strutil/strutil.h
+)
+target_include_directories(strutil INTERFACE 
+    src/third-party/strutil
+)
 
 # Tests
 if (TGBOTCPP_BUILD_TESTS)
@@ -436,7 +445,6 @@ tgbot_library(
   src/socket/server/PacketDispatcher.cpp
   src/socket/server/SocketInterface.cpp
   LIBS
-  TgBot
   DBImpl
   Socket
   STATIC)

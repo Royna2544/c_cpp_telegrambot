@@ -1,13 +1,12 @@
 #pragma once
 
-#include <api/typedefs.h>
-#include <tgbot/types/Animation.h>
-#include <tgbot/types/Chat.h>
-#include <tgbot/types/PhotoSize.h>
-#include <tgbot/types/Sticker.h>
-#include <tgbot/types/Video.h>
+#include <api/types/Animation.hpp>
+#include <api/types/Chat.hpp>
+#include <api/types/PhotoSize.hpp>
+#include <api/types/Sticker.hpp>
+#include <api/types/Video.hpp>
+#include <api/types/ReplyParameters.hpp>
 
-#include "ReplyParametersExt.hpp"
 #include <string>
 #include <utility>
 
@@ -23,34 +22,34 @@ struct MediaIds {
     std::string uniqueid;  //!< The Telegram media unique ID.
 
     /**
-     * @brief Constructs a MediaIds object from a TgBot::Animation object.
+     * @brief Constructs a MediaIds object from a api::types::Animation object.
      *
-     * @param animation The TgBot::Animation object from which to extract the
+     * @param animation The api::types::Animation object from which to extract the
      * media ID and unique ID.
      */
-    explicit MediaIds(const TgBot::Animation::Ptr& animation)
-        : id(animation->fileId), uniqueid(animation->fileUniqueId) {}
+    explicit MediaIds(const api::types::Animation& animation)
+        : id(animation.fileId), uniqueid(animation.fileUniqueId) {}
 
     /**
-     * @brief Constructs a MediaIds object from a TgBot::PhotoSize object.
+     * @brief Constructs a MediaIds object from a api::types::PhotoSize object.
      *
-     * @param photo The TgBot::PhotoSize object from which to extract the
+     * @param photo The api::types::PhotoSize object from which to extract the
      * media ID and unique ID.
      */
-    explicit MediaIds(const TgBot::PhotoSize::Ptr& photo)
-        : id(photo->fileId), uniqueid(photo->fileUniqueId) {}
+    explicit MediaIds(const api::types::PhotoSize& photo)
+        : id(photo.fileId), uniqueid(photo.fileUniqueId) {}
 
     /**
-     * @brief Constructs a MediaIds object from a TgBot::Video object.
+     * @brief Constructs a MediaIds object from a api::types::Video object.
      *
-     * @param video The TgBot::Video object from which to extract the
+     * @param video The api::types::Video object from which to extract the
      * media ID and unique ID.
      */
-    explicit MediaIds(const TgBot::Video::Ptr& video)
-        : id(video->fileId), uniqueid(video->fileUniqueId) {}
+    explicit MediaIds(const api::types::Video& video)
+        : id(video.fileId), uniqueid(video.fileUniqueId) {}
 
-    explicit MediaIds(const TgBot::Sticker::Ptr& sticker)
-        : id(sticker->fileId), uniqueid(sticker->fileUniqueId) {}
+    explicit MediaIds(const api::types::Sticker& sticker)
+        : id(sticker.fileId), uniqueid(sticker.fileUniqueId) {}
 
     /**
      * @brief Default constructor. Initializes the media ID and unique ID to
@@ -87,20 +86,20 @@ struct MediaIds {
 
 // Helper to remove duplicate overloads for ChatId and MessageTypes
 struct ChatIds {
-    ChatIds(ChatId id) : _id(id) {}
-    ChatIds(const TgBot::Chat::Ptr& chat) : _id(chat->id) {}
-    operator ChatId() const { return _id; }
-    ChatId _id;
+    ChatIds(api::types::Chat::id_type id) : _id(id) {}
+    ChatIds(const api::types::Chat& chat) : _id(chat.id) {}
+    operator api::types::Chat::id_type() const { return _id; }
+    api::types::Chat::id_type _id;
 };
 
 struct ReplyParamsToMsgTid {
     explicit ReplyParamsToMsgTid(
-        const ReplyParametersExt::Ptr& replyParameters) {
+        const std::optional<api::types::ReplyParameters>& replyParameters) {
         if (replyParameters && replyParameters->messageThreadId) {
             tid = replyParameters->messageThreadId;
         }
     }
-    operator std::optional<MessageThreadId>() const { return tid; }
+    operator std::optional<api::types::Message::messageThreadId_type>() const { return tid; }
 
-    std::optional<MessageThreadId> tid;
+    std::optional<api::types::Message::messageThreadId_type> tid;
 };

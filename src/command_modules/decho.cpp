@@ -1,9 +1,9 @@
 #include <absl/log/log.h>
-#include <tgbot/TgException.h>
 
 #include <api/CommandModule.hpp>
-#include <api/MessageExt.hpp>
 #include <api/TgBotApi.hpp>
+#include <api/types/ApiException.hpp>
+#include <api/types/ParsedMessage.hpp>
 
 constexpr std::string_view kDechoDeletePossibleMapKey = "decho_delete_possible";
 
@@ -18,9 +18,9 @@ DECLARE_COMMAND_HANDLER(decho) {
                          message->get<MessageAttrs::ExtraText>());
     }
     try {
-        api->deleteMessage(message->message());
-    } catch (const TgBot::TgException&) {
-        LOG(ERROR) << "Failed to delete message";
+        api->deleteMessage(message);
+    } catch (const api::types::ApiException& e) {
+        LOG(ERROR) << "Failed to delete message: " << e.what();
         // Cannot use delete echo in thie case.
         return;
 #ifdef __ANDROID__
@@ -40,7 +40,7 @@ extern "C" DYN_COMMAND_EXPORT const struct DynModule DYN_COMMAND_SYM = {
         {
             .enabled = true,
             .counts = DynModule::craftArgCountMask<0, 1>(),
-            .split_type = DynModule::ValidArgs::Split::None,
+            .split_type = DynModule::ValidArgs::SplitMethod::None,
             .usage = "/decho [something-to-echo]",
         },
 };

@@ -48,8 +48,8 @@ struct fmt::formatter<tgbot::proto::MediaType> : formatter<string_view> {
 
 using namespace tgbot::proto;
 
-std::optional<int> ProtoDatabase::findByUid(const RepeatedField<UserId> list,
-                                            const UserId uid) {
+std::optional<int> ProtoDatabase::findByUid(const RepeatedField<api::types::User::id_type> list,
+                                            const api::types::User::id_type uid) {
     for (auto it = list.begin(); it != list.end(); ++it) {
         auto distance = std::distance(list.begin(), it);
         if (list.Get(distance) == uid) {
@@ -60,7 +60,7 @@ std::optional<int> ProtoDatabase::findByUid(const RepeatedField<UserId> list,
 }
 
 ProtoDatabase::ListResult ProtoDatabase::addUserToList(ListType type,
-                                                       UserId user) const {
+                                                       api::types::User::id_type user) const {
     auto const otherList = getOtherPersonList(type);
     if (findByUid(otherList.id(), user)) {
         return ListResult::ALREADY_IN_OTHER_LIST;
@@ -74,8 +74,8 @@ ProtoDatabase::ListResult ProtoDatabase::addUserToList(ListType type,
 }
 
 ProtoDatabase::ListResult ProtoDatabase::removeUserFromList(ListType type,
-                                                            UserId user) const {
-    auto* const myList = getMutablePersonList(type);
+                                                            api::types::User::id_type user) const {
+    auto *const myList = getMutablePersonList(type);
     auto loc = findByUid(myList->id(), user);
     if (loc.has_value()) {
         auto* list = myList->mutable_id();
@@ -86,7 +86,7 @@ ProtoDatabase::ListResult ProtoDatabase::removeUserFromList(ListType type,
 }
 
 [[nodiscard]] DatabaseBase::ListResult ProtoDatabase::checkUserInList(
-    ListType type, UserId user) const {
+    ListType type, api::types::User::id_type user) const {
     auto const myList = getPersonList(type);
     auto loc = findByUid(myList.id(), user);
     if (loc.has_value()) {
@@ -158,7 +158,7 @@ bool ProtoDatabase::unload() {
     return true;
 }
 
-std::optional<UserId> ProtoDatabase::getOwnerUserId() const {
+std::optional<api::types::User::id_type> ProtoDatabase::getOwnerUserId() const {
     if (!dbinfo.has_value()) {
         LOG_ONCE(WARNING)
             << "Database not loaded! Cannot determine owner user id!";
@@ -316,7 +316,7 @@ std::ostream& ProtoDatabase::dump(std::ostream& os) const {
     return os;
 }
 
-void ProtoDatabase::setOwnerUserId(UserId userId) const {
+void ProtoDatabase::setOwnerUserId(api::types::User::id_type userId) const {
     if (!dbinfo.has_value()) {
         LOG(WARNING) << "Database not loaded! Cannot set owner user id!";
         return;
@@ -329,9 +329,9 @@ void ProtoDatabase::setOwnerUserId(UserId userId) const {
 }
 
 [[nodiscard]] ProtoDatabase::AddResult ProtoDatabase::addChatInfo(
-    const ChatId chatid, const std::string_view name) const {
-    auto* const chats = dbinfo->object.mutable_chattonames();
-    for (const auto& chat : *chats) {
+    const api::types::Chat::id_type chatid, const std::string_view name) const {
+    auto *const chats = dbinfo->object.mutable_chattonames();
+    for (const auto &chat : *chats) {
         if (chat.telegramchatid() == chatid) {
             return AddResult::ALREADY_EXISTS;
         }
@@ -342,7 +342,7 @@ void ProtoDatabase::setOwnerUserId(UserId userId) const {
     return AddResult::OK;
 }
 
-[[nodiscard]] std::optional<ChatId> ProtoDatabase::getChatId(
+[[nodiscard]] std::optional<api::types::Chat::id_type> ProtoDatabase::getChatId(
     const std::string_view name) const {
     const auto& obj = dbinfo->object;
     for (const auto& chat : obj.chattonames()) {

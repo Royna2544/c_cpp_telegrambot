@@ -53,14 +53,7 @@ function(command_module)
 
   add_library(${libname} SHARED ${CMD_SRCS})
 
-  tgbot_common_target(
-    ${libname}
-    PUBLIC_LIBS
-    absl::log
-    ${CMD_LIBS}
-    PRIVATE_INC
-    $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>
-    $<TARGET_PROPERTY:Random,INTERFACE_INCLUDE_DIRECTORIES>)
+  tgbot_common_target(${libname} PUBLIC_LIBS absl::log Random ${CMD_LIBS})
 
   # force the Unix-style “lib” prefix even on Windows
   set_target_properties(${libname} PROPERTIES PREFIX "lib")
@@ -165,22 +158,21 @@ multi_command_module(
   SRCS
   database_impl.cpp
   LIBS
-  DBImpl
-  Random)
+  DBImpl)
 
 command_module(NAME decho SRCS decho.cpp)
 
-command_module(NAME decide SRCS decide.cpp LIBS Random)
+command_module(NAME decide SRCS decide.cpp)
 
 command_module(NAME delay SRCS delay.cpp)
 
 command_module(NAME fileid SRCS fileid.cpp)
 
-command_module(NAME flash SRCS flash.cpp LIBS Random)
+command_module(NAME flash SRCS flash.cpp)
 
-command_module(NAME possibility SRCS possibility.cpp LIBS Random)
+command_module(NAME possibility SRCS possibility.cpp)
 
-command_module(NAME randsticker SRCS randsticker.cpp LIBS Random)
+command_module(NAME randsticker SRCS randsticker.cpp)
 
 command_module(NAME rotatepic SRCS rotatepic.cpp LIBS ImgProc)
 

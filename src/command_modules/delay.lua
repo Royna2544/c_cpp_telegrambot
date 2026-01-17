@@ -1,5 +1,5 @@
 command = {
-    name        = "delay",
+    name        = "delay_lua",
     description = "Ping the bot and show network delay"
 }
 

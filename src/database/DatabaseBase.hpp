@@ -8,7 +8,8 @@
 #include <string_view>
 #include <vector>
 
-#include "api/typedefs.h"
+#include <api/types/User.hpp>
+#include <api/types/Chat.hpp>
 
 struct DBIMPL_EXPORT DatabaseBase {
     virtual ~DatabaseBase() = default;
@@ -55,7 +56,7 @@ struct DBIMPL_EXPORT DatabaseBase {
      * BACKEND_ERROR
      */
     [[nodiscard]] virtual ListResult addUserToList(ListType type,
-                                                   UserId user) const = 0;
+                                                   api::types::User::id_type user) const = 0;
 
     /**
      * @brief Remove a user from the database list
@@ -66,7 +67,7 @@ struct DBIMPL_EXPORT DatabaseBase {
      * Possible values are OK, NOT_IN_LIST, ALREADY_IN_OTHER_LIST, BACKEND_ERROR
      */
     [[nodiscard]] virtual ListResult removeUserFromList(ListType type,
-                                                        UserId user) const = 0;
+                                                        api::types::User::id_type user) const = 0;
 
     /**
      * @brief Check if a user is in a list
@@ -77,7 +78,7 @@ struct DBIMPL_EXPORT DatabaseBase {
      * Possible values are OK, NOT_IN_LIST, ALREADY_IN_OTHER_LIST, BACKEND_ERROR
      */
     [[nodiscard]] virtual ListResult checkUserInList(ListType type,
-                                                     UserId user) const = 0;
+                                                     api::types::User::id_type user) const = 0;
 
     /**
      * @brief Load the database from a file.
@@ -104,16 +105,16 @@ struct DBIMPL_EXPORT DatabaseBase {
      *
      * @return the user id of the owner of the database
      */
-    [[nodiscard]] virtual std::optional<UserId> getOwnerUserId() const = 0;
+    [[nodiscard]] virtual std::optional<api::types::User::id_type> getOwnerUserId() const = 0;
 
     /**
      * @brief Set the user id of the owner of the database
      *
-     * @param userId the user id of the owner of the database
+     * @param api::types::User::id_type the user id of the owner of the database
      *
      * This may be called once. Subsequent calls will be rejected
      */
-    virtual void setOwnerUserId(UserId userId) const = 0;
+    virtual void setOwnerUserId(api::types::User::id_type useroid) const = 0;
 
     /**
      * @brief Query the database for media info
@@ -165,7 +166,7 @@ struct DBIMPL_EXPORT DatabaseBase {
      * @note The chat id and name should be unique within the database.
      */
     [[nodiscard]] virtual AddResult addChatInfo(
-        const ChatId chatid, const std::string_view name) const = 0;
+        const api::types::Chat::id_type chatid, const std::string_view name) const = 0;
 
     /**
      * @brief Get the chat id associated with a given chat name
@@ -178,7 +179,7 @@ struct DBIMPL_EXPORT DatabaseBase {
      * @return The chat id associated with the given chat name. If the chat name
      * does not exist, the function should return std::nullopt.
      */
-    [[nodiscard]] virtual std::optional<ChatId> getChatId(
+    [[nodiscard]] virtual std::optional<api::types::Chat::id_type> getChatId(
         const std::string_view name) const = 0;
 
     /**
