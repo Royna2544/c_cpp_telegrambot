@@ -237,6 +237,11 @@ void TgBotApiImpl::onCallbackQuery(
                                          std::move(listener));
 }
 
+void TgBotApiImpl::onEditedMessage(
+    TgBot::EventBroadcaster::MessageListener listener) {
+    getEvents().onEditedMessage(listener);
+}
+
 void TgBotApiImpl::addInlineQueryKeyboard(
     InlineQuery query, TgBot::InlineQueryResult::Ptr result) {
     onInlineQueryImpl->add(std::move(query), std::move(result));

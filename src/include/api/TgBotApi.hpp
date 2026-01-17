@@ -20,8 +20,8 @@
 #include <variant>
 
 #include "ReplyParametersExt.hpp"
-#include "api/typedefs.h"
 #include "Utils.hpp"
+#include "api/typedefs.h"
 
 using TgBot::Chat;
 using TgBot::File;
@@ -807,6 +807,11 @@ class TgBotApi {
         // Dummy implementation
     }
 
+    virtual void onEditedMessage(
+        TgBot::EventBroadcaster::MessageListener listener) {
+        // Dummy implementation
+    }
+
     struct InlineQuery {
         // name of the query, the prefix
         std::string name;
@@ -844,7 +849,7 @@ class TgBotApi {
         MessageId messageId = messageToReply->messageId;
         std::optional<MessageThreadId> threadId;
         if (messageToReply->isTopicMessage.value_or(false)) {
-            threadId = *messageToReply->messageThreadId;
+            threadId = messageToReply->messageThreadId;
         }
         return createReplyParameters(messageId, threadId);
     }

@@ -463,6 +463,9 @@ class TgBotApiImpl : public TgBotApi {
         std::string command,
         TgBot::EventBroadcaster::CallbackQueryListener listener) override;
 
+    void onEditedMessage(
+        TgBot::EventBroadcaster::MessageListener listener) override;
+
    private:
     [[nodiscard]] EventBroadcaster& getEvents() { return _bot.getEvents(); }
     [[nodiscard]] const Api& getApi() const { return _bot.getApi(); }

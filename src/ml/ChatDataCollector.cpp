@@ -62,6 +62,10 @@ ChatDataCollector::ChatDataCollector(TgBotApi::Ptr api) {
             onMessage(message);
             return TgBotApi::AnyMessageResult::Handled;
         });
+    api->onEditedMessage([this](const Message::Ptr& message) {
+        onMessage(message);
+        return TgBotApi::AnyMessageResult::Handled;
+    });
 }
 
 ChatDataCollector::~ChatDataCollector() = default;
