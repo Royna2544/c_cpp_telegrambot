@@ -17,6 +17,7 @@
 #include "RefLock.hpp"
 #include "StringResLoader.hpp"
 #include "TgBotApi.hpp"
+#include "tgbot/net/TgLongPoll.h"
 #include "tgbot/types/ChatMember.h"
 #include "typedefs.h"
 
@@ -489,4 +490,5 @@ class TgBotApiImpl : public TgBotApi {
     std::vector<CommandListener*> _listeners;
     IntervalRateLimiter _rateLimiter;
     RefLock* _refLock;
+    TgLongPoll* _longPoll;
 };

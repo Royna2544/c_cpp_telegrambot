@@ -257,38 +257,7 @@ void TgBotApiImpl::removeInlineQueryKeyboard(const std::string_view key) {
     onInlineQueryImpl->remove(key);
 }
 
-void TgBotApiImpl::startPoll() {
-    LOG(INFO) << "Bot username: " << getBotUser()->username.value();
-    // Deleting webhook
-    getApi().deleteWebhook();
-
-    getApi().setMyDescription(fmt::format(
-        "A C++ written Telegram bot, sources: {}", buildinfo::git::ORIGIN_URL));
-
-    std::string ownerString;
-    if (auto owner = _provider->database->getOwnerUserId(); owner) {
-        auto chat = getApi().getChat(*owner);
-        if (chat->username)
-            ownerString = fmt::format(" Owned by @{}.", *chat->username);
-    }
-
-    getApi().setMyShortDescription(
-        fmt::format("C++ Telegram bot.{} I'm currently hosted on {}",
-                    ownerString, buildinfo::OS));
-
-    auto* longPoll = _bot.createLongPoll(
-        {}, {},
-        TgBot::Update::Types::message | TgBot::Update::Types::inline_query |
-            TgBot::Update::Types::callback_query |
-            TgBot::Update::Types::my_chat_member |
-            TgBot::Update::Types::chat_member |
-            TgBot::Update::Types::chat_join_request);
-
-    // Start the long poll loop.
-    while (!SignalHandler::isSignaled()) {
-        longPoll->start();
-    }
-}
+void TgBotApiImpl::startPoll() { _longPoll->start(); }
 
 namespace {
 void handleTgBotApiEx(const TgBot::TgException& ex) {
@@ -612,6 +581,35 @@ TgBotApiImpl::TgBotApiImpl(const std::string_view token, AuthContext* auth,
         this, providers->cmdline->getPath(FS::PathType::CMD_MODULES));
     // Restart command
     restartCommand = std::make_unique<RestartCommand>(this);
+
+    // Log bot info
+    LOG(INFO) << "TgBotApiImpl::Ctor BOT username: "
+              << getBotUser()->username.value();
+
+    // Set bot description
+    getApi().setMyDescription(fmt::format(
+        "A C++ written Telegram bot, sources: {}", buildinfo::git::ORIGIN_URL));
+
+    std::string ownerString;
+    if (auto owner = _provider->database->getOwnerUserId(); owner) {
+        auto chat = getApi().getChat(*owner);
+        if (chat->username)
+            ownerString = fmt::format(" Owned by @{}.", *chat->username);
+    }
+
+    // Set bot short description
+    getApi().setMyShortDescription(
+        fmt::format("C++ Telegram bot.{} I'm currently hosted on {}",
+                    ownerString, buildinfo::OS));
+
+    // Create long poll instance
+    _longPoll = _bot.createLongPoll(
+        {}, {},
+        TgBot::Update::Types::message | TgBot::Update::Types::inline_query |
+            TgBot::Update::Types::callback_query |
+            TgBot::Update::Types::my_chat_member |
+            TgBot::Update::Types::chat_member |
+            TgBot::Update::Types::chat_join_request);
 }
 
 TgBotApiImpl::~TgBotApiImpl() = default;
