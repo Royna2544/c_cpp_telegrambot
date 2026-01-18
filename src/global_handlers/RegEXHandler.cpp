@@ -143,7 +143,7 @@ void RegexHandler::execute(const std::shared_ptr<Interface>& callback,
 struct ReplaceCommand : public RegexCommand {
     [[nodiscard]] std::regex command_regex() const override {
         static std::regex regex(
-            R"(^s\/((?:[^\/\\]|\\.)+)\/((?:[^\/\\]|\\.)+)(\/)?(([gi\d]+))?$)");
+            R"(^s\/((?:[^\/\\]|\\.)+)\/((?:[^\/\\]|\\.)*)(\/)?(.*)?$)");
         return regex;
     }
 
@@ -153,25 +153,23 @@ struct ReplaceCommand : public RegexCommand {
 
     [[nodiscard]] RegexCommand::Result process(
         const std::string& source, const std::smatch command) const override {
-        bool hasOptions = command.size() == 6;
+        bool hasOptions = command.size() >= 5;
         const auto& target = command[1].str();
         const auto& replacement = command[2].str();
+        const auto& options = command[4].str();
 
         // Assume 'g' flag is set by default.
         auto kRegexMatchFlags = format_sed | match_not_null | format_first_only;
         auto kRegexFlags = ECMAScript;
         std::optional<int> replaceIndex;
 
-        if (hasOptions) {
-            const auto& options = command[5].str();
+        if (!options.empty()) {
             for (size_t i = 0; i < options.length();) {
                 char option = options[i];
                 if (option == 'g') {
-                    // Global replacement
-                    kRegexMatchFlags &= ~format_first_only;
+                    kRegexMatchFlags &= ~format_first_only;  // Enable global
                     ++i;
                 } else if (option == 'i') {
-                    // Case-insensitive
                     kRegexFlags |= icase;
                     ++i;
                 } else if (absl::ascii_isdigit(option)) {
@@ -181,55 +179,47 @@ struct ReplaceCommand : public RegexCommand {
                         value = (value * 10) + (options[i] - '0');
                         ++i;
                     }
-                    DLOG(INFO) << "Replace Index Value: " << value;
                     replaceIndex = value;
                 } else {
+                    // Now this error can actually be reached!
                     LOG(ERROR) << "Invalid regex option: " << option;
                     return compat::unexpected(Error::InvalidRegexOption);
                 }
             }
 
-            // Error if both global and specific index are set
             if ((kRegexMatchFlags & format_first_only) == 0 && replaceIndex) {
                 return compat::unexpected(
                     Error::GlobalFlagAndMatchIndexInvalid);
             }
         }
-
         if (replaceIndex) {
-            // Perform replacement at a specific match index
             std::regex reg(target, kRegexFlags);
             auto match =
                 std::sregex_iterator(source.begin(), source.end(), reg);
             auto match_end = std::sregex_iterator();
-
             int count = 0;
             std::ostringstream result;
-            // Track the last position
             std::string::const_iterator last_pos = source.begin();
-
             bool replaced = false;
 
             for (auto it = match; it != match_end; ++it) {
-                result << std::string(
-                    last_pos, it->prefix().second);  // Append unmatched part
+                result << std::string(last_pos, it->prefix().second);
                 if (++count == *replaceIndex) {
-                    result << replacement;  // Add the replacement
+                    // Manually handle backreferences if needed, or simple
+                    // string replace For simplicity in index-mode, we often
+                    // just insert replacement string To fully support sed-style
+                    // & in indexed mode requires extra work. For now, simple
+                    // insertion:
+                    result << replacement;
                     replaced = true;
                 } else {
-                    result << it->str();  // No replacement, keep the match
+                    result << it->str();
                 }
-                last_pos = it->suffix().first;  // Update the last position
+                last_pos = it->suffix().first;
             }
-
-            if (!replaced) {
-                LOG(INFO) << "Found " << count
-                          << " matches, been told to replace " << *replaceIndex;
+            if (!replaced)
                 return compat::unexpected(Error::InvalidRegexMatchIndex);
-            }
-            // Append the remainder
             result << std::string(last_pos, source.end());
-
             return result.str();
         }
 
