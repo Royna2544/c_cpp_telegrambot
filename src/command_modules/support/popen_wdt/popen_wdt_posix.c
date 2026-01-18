@@ -1,8 +1,8 @@
-#include <stdatomic.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
 #include <signal.h>
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -31,20 +31,26 @@ struct popen_wdt_posix_priv {
     pid_t childprocess_pid;
     pthread_cond_t condition;
     pthread_mutex_t wdt_mutex;
-    struct rk_sema *startup_sem;
+    struct rk_sema* startup_sem;
     int status;
     int pipefd_r;  // Subprocess' readfd, write end for the child
     _Atomic bool process_is_running;
 };
 
-static void *watchdog(void *arg) {
+// Helper to add seconds to timespec safely
+static void timespec_add_sec(struct timespec* ts, int seconds) {
+    ts->tv_sec += seconds;
+    // No need to handle nsec overflow here as we are adding whole seconds
+}
+
+static void* watchdog(void* arg) {
     POPEN_WDT_DBGLOG("++");
-    popen_watchdog_data_t *data = (popen_watchdog_data_t *)arg;
-    struct popen_wdt_posix_priv *pdata = data->privdata;
+    popen_watchdog_data_t* data = (popen_watchdog_data_t*)arg;
+    struct popen_wdt_posix_priv* pdata = data->privdata;
 
     struct timespec ts = {};
-    clock_gettime(CLOCK_REALTIME, &ts);
-    ts.tv_sec += data->sleep_secs;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    timespec_add_sec(&ts, data->sleep_secs);
 
     POPEN_WDT_DBGLOG("Posting semaphore");
     rk_sema_post(pdata->startup_sem);
@@ -82,9 +88,9 @@ static void *watchdog(void *arg) {
     return NULL;
 }
 
-static void cleanup_resources(struct popen_wdt_posix_priv *pdata,
-                              popen_watchdog_data_t *data, int *pipefd,
-                              int *writefd) {
+static void cleanup_resources(struct popen_wdt_posix_priv* pdata,
+                              popen_watchdog_data_t* data, int* pipefd,
+                              int* writefd) {
     if (pipefd) {
         close(pipefd[0]);
         close(pipefd[1]);
@@ -106,9 +112,9 @@ static void cleanup_resources(struct popen_wdt_posix_priv *pdata,
     }
 }
 
-bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
-    popen_watchdog_data_t *data = NULL;
-    struct popen_wdt_posix_priv *pdata = NULL;
+bool popen_watchdog_start(popen_watchdog_data_t** data_in) {
+    popen_watchdog_data_t* data = NULL;
+    struct popen_wdt_posix_priv* pdata = NULL;
     int pipefd[2];
     int writefd[2];
 
@@ -223,9 +229,9 @@ bool popen_watchdog_start(popen_watchdog_data_t **data_in) {
     return true;
 }
 
-static void popen_watchdog_wait(popen_watchdog_data_t **data_in) {
-    popen_watchdog_data_t *data = *data_in;
-    struct popen_wdt_posix_priv *pdata = data->privdata;
+static void popen_watchdog_wait(popen_watchdog_data_t** data_in) {
+    popen_watchdog_data_t* data = *data_in;
+    struct popen_wdt_posix_priv* pdata = data->privdata;
 
     pthread_mutex_lock(&pdata->wdt_mutex);
     if (!pdata->process_is_running) {
@@ -248,14 +254,14 @@ static void popen_watchdog_wait(popen_watchdog_data_t **data_in) {
     }
 }
 
-popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t **data_in) {
+popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t** data_in) {
     popen_watchdog_exit_t ret = POPEN_WDT_EXIT_INITIALIZER;
 
     if (!data_in || !(*data_in)) {
         return ret;
     }
-    popen_watchdog_data_t *data = *data_in;
-    struct popen_wdt_posix_priv *pdata = data->privdata;
+    popen_watchdog_data_t* data = *data_in;
+    struct popen_wdt_posix_priv* pdata = data->privdata;
 
     if (pdata == NULL) {
         cleanup_resources(pdata, data, NULL, NULL);
@@ -287,12 +293,12 @@ popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t **data_in) {
     return ret;
 }
 
-popen_watchdog_ssize_t popen_watchdog_read(popen_watchdog_data_t **data_in,
-                                          char *buf,
-                                          popen_watchdog_ssize_t size) {
+popen_watchdog_ssize_t popen_watchdog_read(popen_watchdog_data_t** data_in,
+                                           char* buf,
+                                           popen_watchdog_ssize_t size) {
     struct pollfd fds;
-    popen_watchdog_data_t *data = *data_in;
-    struct popen_wdt_posix_priv *pdata = data->privdata;
+    popen_watchdog_data_t* data = *data_in;
+    struct popen_wdt_posix_priv* pdata = data->privdata;
     popen_watchdog_ssize_t ret = -1;
 
     pthread_mutex_lock(&pdata->wdt_mutex);
@@ -334,10 +340,10 @@ popen_watchdog_ssize_t popen_watchdog_read(popen_watchdog_data_t **data_in,
     return ret;
 }
 
-bool popen_watchdog_activated(popen_watchdog_data_t **data_in) {
+bool popen_watchdog_activated(popen_watchdog_data_t** data_in) {
     bool ret = false;
-    popen_watchdog_data_t *data = *data_in;
-    struct popen_wdt_posix_priv *pdata = data->privdata;
+    popen_watchdog_data_t* data = *data_in;
+    struct popen_wdt_posix_priv* pdata = data->privdata;
 
     if (data->watchdog_enabled) {
         popen_watchdog_wait(data_in);
