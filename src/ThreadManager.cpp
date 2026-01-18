@@ -30,8 +30,8 @@ void kill_thread(std::thread::native_handle_type handle) {
 #ifdef _WIN32
 #ifdef _MSC_VER
     TerminateThread(handle, 0);
-#endif // _MSC_VER
-#endif // _WIN32
+#endif  // _MSC_VER
+#endif  // _WIN32
 }
 #endif
 
@@ -60,6 +60,7 @@ void ThreadManager::destroy() {
         }
     }
 #else
+    LOG(INFO) << "Waiting indefinitely for threads to finish...";
     latch.wait();
 #endif
 }
