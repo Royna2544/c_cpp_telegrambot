@@ -31,10 +31,36 @@ ChatDataCollector::Data::Data(const Message::Ptr& message) {
     messageid = message->messageId;
     replyToMessageId =
         message->replyToMessage ? message->replyToMessage->messageId : 0;
+    replyToChatId =
+        message->replyToMessage ? message->replyToMessage->chat->id : 0;
+    threadId = message->messageThreadId.has_value()
+                   ? message->messageThreadId.value()
+                   : 0;
 }
 
 void ChatDataCollector::onMessage(const Message::Ptr& message) {
     std::lock_guard<std::mutex> lock(mutex_);
+    if (message->isAutomaticForward) {
+        return;  // Skip automatic forwards from channel
+    }
+    if (message->from->isBot) {
+        return;  // Skip messages from bots
+    }
+    if (!message->newChatMembers.empty() || message->leftChatMember ||
+        message->groupChatCreated || message->pinnedMessage) {
+        return;  // Skip join/leave messages
+    }
+    if (message->senderChat &&
+        message->senderChat->type == Chat::Type::Channel) {
+        return;  // Skip messages sent on behalf of a channel
+    }
+    constexpr UserId kExcludedUserId = 777000;  // Telegram official account
+    if (message->from->id == kExcludedUserId) {
+        return;  // Skip messages from Telegram official account
+    }
+    if (message->chat->type != Chat::Type::Supergroup) {
+        return;  // Only collect from supergroups
+    }
     chatDataFile << Data(message);
 }
 
@@ -53,19 +79,17 @@ ChatDataCollector::ChatDataCollector(TgBotApi::Ptr api) {
         chatDataFile.open(kChatDataFile.data());
     }
     if (!existed) {
-        chatDataFile
-            << "chat_id,user_id,timestamp,message_type,is_edited,is_"
-               "forwarded,reply_to_user_id,message_id,reply_to_message_id\n";
+        chatDataFile << "chat_id,user_id,timestamp,message_type,is_edited,is_"
+                        "forwarded,reply_to_user_id,message_id,reply_to_"
+                        "message_id,reply_to_chat_id,thread_id\n";
     }
     api->onAnyMessage(
         [this](TgBotApi::CPtr /*api*/, const Message::Ptr& message) {
             onMessage(message);
             return TgBotApi::AnyMessageResult::Handled;
         });
-    api->onEditedMessage([this](const Message::Ptr& message) {
-        onMessage(message);
-        return TgBotApi::AnyMessageResult::Handled;
-    });
+    api->onEditedMessage(
+        [this](const Message::Ptr& message) { onMessage(message); });
 }
 
 ChatDataCollector::~ChatDataCollector() = default;
