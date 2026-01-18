@@ -36,6 +36,7 @@ ChatDataCollector::Data::Data(const Message::Ptr& message) {
     threadId = message->messageThreadId.has_value()
                    ? message->messageThreadId.value()
                    : 0;
+    is_premium = message->from->isPremium && message->from->isPremium.value();
 }
 
 void ChatDataCollector::onMessage(const Message::Ptr& message) {
@@ -81,7 +82,7 @@ ChatDataCollector::ChatDataCollector(TgBotApi::Ptr api) {
     if (!existed) {
         chatDataFile << "chat_id,user_id,timestamp,message_type,is_edited,is_"
                         "forwarded,reply_to_user_id,message_id,reply_to_"
-                        "message_id,reply_to_chat_id,thread_id\n";
+                        "message_id,reply_to_chat_id,thread_id,is_premium\n";
     }
     api->onAnyMessage(
         [this](TgBotApi::CPtr /*api*/, const Message::Ptr& message) {

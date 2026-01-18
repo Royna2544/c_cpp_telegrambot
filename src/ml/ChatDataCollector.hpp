@@ -29,6 +29,7 @@ class ChatDataCollector {
         MessageId replyToMessageId{0};
         ChatId replyToChatId{0};
         MessageThreadId threadId{0};
+        bool is_premium{false};
 
         Data() = default;
         explicit Data(const Message::Ptr& message);
@@ -49,6 +50,7 @@ inline std::ostream& operator<<(std::ostream& os, ChatDataCollector::Data d) {
        << static_cast<int>(d.msgType) << "," << static_cast<int>(d.isEdited)
        << "," << static_cast<int>(d.isForwarded) << "," << d.replyToUserId
        << "," << d.messageid << "," << d.replyToMessageId << ","
-       << d.replyToChatId << "," << d.threadId << "\n";
+       << d.replyToChatId << "," << d.threadId << ","
+       << static_cast<int>(d.is_premium) << "\n";
     return os;
 }
