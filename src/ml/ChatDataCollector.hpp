@@ -3,6 +3,7 @@
 #include <api/TgBotApi.hpp>
 #include <ctime>
 #include <fstream>
+#include <map>
 #include <mutex>
 #include <trivial_helpers/fruit_inject.hpp>
 
@@ -43,6 +44,8 @@ class ChatDataCollector {
    private:
     std::ofstream chatDataFile;
     std::mutex mutex_;
+    std::map<UserId, TgBot::User::Ptr> userDict_;
+    std::map<ChatId, TgBot::Chat::Ptr> chatDict_;
 };
 
 inline std::ostream& operator<<(std::ostream& os, ChatDataCollector::Data d) {

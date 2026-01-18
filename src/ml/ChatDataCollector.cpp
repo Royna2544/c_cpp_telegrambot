@@ -1,6 +1,7 @@
 #include "ChatDataCollector.hpp"
 
 #include <absl/log/log.h>
+#include <fmt/format.h>
 
 #include <filesystem>
 #include <fstream>
@@ -93,4 +94,22 @@ ChatDataCollector::ChatDataCollector(TgBotApi::Ptr api) {
         [this](const Message::Ptr& message) { onMessage(message); });
 }
 
-ChatDataCollector::~ChatDataCollector() = default;
+ChatDataCollector::~ChatDataCollector() {
+    // Write user dict
+    std::ofstream userDictFile("user_dict.csv");
+    userDictFile << "user_id,first_name,last_name,username,is_premium\n";
+    for (const auto& [userId, userPtr] : userDict_) {
+        userDictFile << fmt::format(
+            "{},{},{},{},{}\n", userId, userPtr->firstName,
+            userPtr->lastName.value_or(""), userPtr->username.value_or(""),
+            userPtr->isPremium && *userPtr->isPremium ? "1" : "0");
+    }
+
+    // Write chat dict
+    std::ofstream chatDictFile("chat_dict.csv");
+    chatDictFile << "chat_id,chat_title\n";
+    for (const auto& [chatId, chatPtr] : chatDict_) {
+        chatDictFile << fmt::format("{},{}\n", chatId,
+                                    chatPtr->title.value_or(""));
+    }
+}
