@@ -2,6 +2,7 @@
 #include <fcntl.h>
 #include <fmt/chrono.h>
 #include <fmt/format.h>
+#include <spawn.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -30,7 +31,8 @@ int app_main(int argc, char** argv) {
     }
 
     if (access(argv[1], R_OK | X_OK) != 0) {
-        PLOG(ERROR) << "Bot executable not found or not executable.";
+        PLOG(ERROR) << "Bot executable not found or not executable: "
+                    << argv[1];
         return EXIT_FAILURE;
     }
 
@@ -58,7 +60,7 @@ int app_main(int argc, char** argv) {
         // This means the file already exists.
         std::filesystem::remove(kLogFile);
     }
-    logFile_fd = open(kLogFile.c_str(), O_CREAT | O_WRONLY, 0644);
+    logFile_fd = open(kLogFile.c_str(), O_CREAT | O_WRONLY, S_IREAD | S_IWRITE);
     if (logFile_fd < 0) {
         PLOG(ERROR) << "Open bot.log failed";
         return EXIT_FAILURE;
@@ -82,23 +84,22 @@ int app_main(int argc, char** argv) {
     }
     // Increment argv to skip the first element
     argv++;
-redo_vfork:
-    // Second fork to prevent the daemon from acquiring a terminal
-    pid = vfork();
-    if (pid < 0) {
-        PLOG(ERROR) << "Second vfork failed";
-        return EXIT_FAILURE;
-    }
 
-    if (pid == 0) {
-        // Set the process group ID to the same as the process ID
-        setpgid(0, 0);
-        // Execute the bot executable with the provided arguments
-        LOG(INFO) << "Executing the child process, " << argv[0] << " with pid "
-                  << getpid();
-        execvp(argv[0], argv);  // Pass the modified argv to execvp
-        _exit(std::numeric_limits<std::uint8_t>::max());
-    } else {
+    while (true) {
+        // Second fork to prevent the daemon from acquiring a terminal
+        posix_spawnattr_t attr;
+        posix_spawnattr_init(&attr);
+        posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETPGROUP);
+        posix_spawnattr_setpgroup(&attr, 0);
+        int ret = posix_spawnp(&pid, argv[0], nullptr, &attr, argv, environ);
+        if (ret != 0) {
+            PLOG(ERROR) << "posix_spawnp failed";
+            return EXIT_FAILURE;
+        }
+        posix_spawnattr_destroy(&attr);
+        LOG(INFO) << fmt::format("Spawned bot process with PID: {}", pid);
+
+        // Write the pid to a file
         F pidFile;
         constexpr std::string_view kPidFile = "tgbot." BUILD_TYPE_STR ".pid";
         if (!pidFile.open(kPidFile, F::Mode::Write)) {
@@ -152,7 +153,7 @@ redo_vfork:
             return EXIT_SUCCESS;
         }
         std::filesystem::remove(
-            kPidFile);    // Remove the pid file after termination
-        goto redo_vfork;  // Restart the daemon process loop
-    }
+            kPidFile);  // Remove the pid file after termination
+        LOG(INFO) << "Restarting the bot process";
+    }  // End of while loop
 }
