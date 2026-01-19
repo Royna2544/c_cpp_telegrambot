@@ -283,7 +283,18 @@ popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t** data_in) {
     }
 
     pthread_mutex_lock(&pdata->wdt_mutex);
-    if (waitpid(pdata->childprocess_pid, &pdata->status, 0) < 0) {
+    pdata->process_is_running = false;
+    pthread_cond_signal(&pdata->condition);
+    pthread_mutex_unlock(&pdata->wdt_mutex);
+
+    if (data->watchdog_enabled) {
+        POPEN_WDT_DBGLOG("Waiting for watchdog thread to finish");
+        pthread_join(pdata->wdt_thread, NULL);
+        POPEN_WDT_DBGLOG("Watchdog thread finished");
+    }
+
+    if (waitpid(pdata->childprocess_pid, &pdata->status, 0) < 0 &&
+        errno != ECHILD) {
         POPEN_WDT_DBGLOG("Failed to wait for child process");
     }
     int status = pdata->status;
