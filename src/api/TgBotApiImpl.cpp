@@ -609,7 +609,8 @@ TgBotApiImpl::TgBotApiImpl(const std::string_view token, AuthContext* auth,
             TgBot::Update::Types::callback_query |
             TgBot::Update::Types::my_chat_member |
             TgBot::Update::Types::chat_member |
-            TgBot::Update::Types::chat_join_request);
+            TgBot::Update::Types::chat_join_request |
+            TgBot::Update::Types::edited_message);
 }
 
 TgBotApiImpl::~TgBotApiImpl() = default;

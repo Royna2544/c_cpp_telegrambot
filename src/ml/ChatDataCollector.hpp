@@ -26,11 +26,13 @@ class ChatDataCollector {
         bool isEdited{false};
         bool isForwarded{false};
         UserId replyToUserId{0};
-        MessageId messageid;
+        MessageId messageid{0};
         MessageId replyToMessageId{0};
         ChatId replyToChatId{0};
         MessageThreadId threadId{0};
         bool is_premium{false};
+        size_t textLength{0};
+        size_t wordCount{0};
 
         Data() = default;
         explicit Data(const Message::Ptr& message);
@@ -54,6 +56,7 @@ inline std::ostream& operator<<(std::ostream& os, ChatDataCollector::Data d) {
        << "," << static_cast<int>(d.isForwarded) << "," << d.replyToUserId
        << "," << d.messageid << "," << d.replyToMessageId << ","
        << d.replyToChatId << "," << d.threadId << ","
-       << static_cast<int>(d.is_premium) << "\n";
+       << static_cast<int>(d.is_premium) << "," << d.textLength << ","
+       << d.wordCount << "\n";
     return os;
 }

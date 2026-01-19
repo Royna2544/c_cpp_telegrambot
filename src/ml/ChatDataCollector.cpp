@@ -1,6 +1,7 @@
 #include "ChatDataCollector.hpp"
 
 #include <absl/log/log.h>
+#include <absl/strings/str_split.h>
 #include <fmt/format.h>
 
 #include <filesystem>
@@ -38,10 +39,22 @@ ChatDataCollector::Data::Data(const Message::Ptr& message) {
                    ? message->messageThreadId.value()
                    : 0;
     is_premium = message->from->isPremium && message->from->isPremium.value();
+    std::string text;
+    if (message->text) {
+        text = *message->text;
+    } else if (message->caption) {
+        text = *message->caption;
+    }
+    textLength = text.size();
+    std::vector<std::string> words = absl::StrSplit(text, ' ');
+    wordCount = words.size();
 }
 
 void ChatDataCollector::onMessage(const Message::Ptr& message) {
     std::lock_guard<std::mutex> lock(mutex_);
+    if (!message->from || !message->chat) {
+        return;  // Skip messages with no sender or chat
+    }
     if (message->isAutomaticForward) {
         return;  // Skip automatic forwards from channel
     }
@@ -64,6 +77,11 @@ void ChatDataCollector::onMessage(const Message::Ptr& message) {
         return;  // Only collect from supergroups
     }
     chatDataFile << Data(message);
+
+    // Update user dict
+    userDict_[message->from->id] = message->from;
+    // Update chat dict
+    chatDict_[message->chat->id] = message->chat;
 }
 
 ChatDataCollector::ChatDataCollector(TgBotApi::Ptr api) {
@@ -83,7 +101,8 @@ ChatDataCollector::ChatDataCollector(TgBotApi::Ptr api) {
     if (!existed) {
         chatDataFile << "chat_id,user_id,timestamp,message_type,is_edited,is_"
                         "forwarded,reply_to_user_id,message_id,reply_to_"
-                        "message_id,reply_to_chat_id,thread_id,is_premium\n";
+                        "message_id,reply_to_chat_id,thread_id,is_premium,text_"
+                        "length,word_count\n";
     }
     api->onAnyMessage(
         [this](TgBotApi::CPtr /*api*/, const Message::Ptr& message) {
