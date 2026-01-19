@@ -58,9 +58,6 @@ DECLARE_COMMAND_HANDLER(decide) {
         api->setMessageReaction(message->message(), {like}, true);
     } else if (yesno == 0) {
         msgtxt << res->get(Strings::SO_IDK);
-        auto neutral = std::make_shared<TgBot::ReactionTypeEmoji>();
-        neutral->emoji = "🤷‍♂";
-        api->setMessageReaction(message->message(), {neutral}, true);
     } else {
         msgtxt << res->get(Strings::SO_NO);
         auto dislike = std::make_shared<TgBot::ReactionTypeEmoji>();
