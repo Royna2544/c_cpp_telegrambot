@@ -76,6 +76,9 @@ class TgBotApiImpl : public TgBotApi {
     class RestartCommand;
     friend class RestartCommand;
     std::unique_ptr<RestartCommand> restartCommand;
+    class ReactionsProvider;
+    friend class ReactionsProvider;
+    std::unique_ptr<ReactionsProvider> reactionsProvider;
 
     // Interface for listening to command unload/reload
     struct CommandListener {

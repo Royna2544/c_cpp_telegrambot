@@ -60,6 +60,7 @@ tgbot_library(
     components/OnMyChatMember.cpp
     components/Restart.cpp
     components/UnknownCommand.cpp
+    components/ReactionsProvider.cpp
   LIBS TgBot DBImpl ${cpptrace_libs} Api
   DEFS ${cpptrace_def}
   STATIC

@@ -21,6 +21,7 @@
 #include <api/components/OnCallbackQuery.hpp>
 #include <api/components/OnInlineQuery.hpp>
 #include <api/components/OnMyChatMember.hpp>
+#include <api/components/ReactionsProvider.hpp>
 #include <api/components/Restart.hpp>
 #include <api/components/UnknownCommand.hpp>
 #include <array>
@@ -581,6 +582,8 @@ TgBotApiImpl::TgBotApiImpl(const std::string_view token, AuthContext* auth,
         this, providers->cmdline->getPath(FS::PathType::CMD_MODULES));
     // Restart command
     restartCommand = std::make_unique<RestartCommand>(this);
+    // Reactions provider
+    reactionsProvider = std::make_unique<ReactionsProvider>(this);
 
     // Log bot info
     LOG(INFO) << "TgBotApiImpl::Ctor BOT username: "
