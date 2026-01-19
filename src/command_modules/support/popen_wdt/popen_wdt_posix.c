@@ -205,12 +205,26 @@ bool popen_watchdog_start(popen_watchdog_data_t** data_in) {
         close(pipefd_w);
 
         if (data->watchdog_enabled) {
+            POPEN_WDT_DBGLOG("Watchdog is enabled");
+
+            // Initialize semaphore
             struct rk_sema sem;
             rk_sema_init(&sem, 0);
             pdata->startup_sem = &sem;
 
-            POPEN_WDT_DBGLOG("Watchdog is enabled");
-            pthread_cond_init(&pdata->condition, NULL);
+            // Initialize condition variable
+            pthread_condattr_t cond_attr;
+            pthread_condattr_init(&cond_attr);
+            pthread_condattr_setclock(&cond_attr, CLOCK_MONOTONIC);
+            if (pthread_cond_init(&pdata->condition, &cond_attr)) {
+                POPEN_WDT_DBGLOG("Failed to initialize condition variable");
+                cleanup_resources(pdata, data, pipefd, writefd);
+                *data_in = NULL;
+                return false;
+            }
+            pthread_condattr_destroy(&cond_attr);
+
+            // Create the watchdog thread
             if (pthread_create(&pdata->wdt_thread, NULL, &watchdog, data)) {
                 POPEN_WDT_DBGLOG("Failed to create watchdog thread");
                 cleanup_resources(pdata, data, pipefd, writefd);
