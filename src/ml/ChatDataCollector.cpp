@@ -104,6 +104,50 @@ ChatDataCollector::ChatDataCollector(TgBotApi::Ptr api) {
                         "message_id,reply_to_chat_id,thread_id,is_premium,text_"
                         "length,word_count\n";
     }
+
+    if (std::filesystem::exists("user_dict.csv")) {
+        // Load existing user dict
+        std::ifstream userDictFile("user_dict.csv");
+        std::string line;
+        std::getline(userDictFile, line);  // Skip header
+        while (std::getline(userDictFile, line)) {
+            std::vector<std::string> parts = absl::StrSplit(line, ',');
+            if (parts.size() < 5) {
+                continue;  // Malformed line
+            }
+            User::Ptr user = std::make_shared<User>();
+            user->id = std::stoll(parts[0]);
+            user->firstName = parts[1];
+            if (!parts[2].empty()) {
+                user->lastName = parts[2];
+            }
+            if (!parts[3].empty()) {
+                user->username = parts[3];
+            }
+            user->isPremium = (parts[4] == "1");
+            userDict_[user->id] = user;
+        }
+    }
+
+    if (std::filesystem::exists("chat_dict.csv")) {
+        // Load existing chat dict
+        std::ifstream chatDictFile("chat_dict.csv");
+        std::string line;
+        std::getline(chatDictFile, line);  // Skip header
+        while (std::getline(chatDictFile, line)) {
+            std::vector<std::string> parts = absl::StrSplit(line, ',');
+            if (parts.size() < 2) {
+                continue;  // Malformed line
+            }
+            Chat::Ptr chat = std::make_shared<Chat>();
+            chat->id = std::stoll(parts[0]);
+            if (!parts[1].empty()) {
+                chat->title = parts[1];
+            }
+            chatDict_[chat->id] = chat;
+        }
+    }
+
     api->onAnyMessage(
         [this](TgBotApi::CPtr /*api*/, const Message::Ptr& message) {
             onMessage(message);
