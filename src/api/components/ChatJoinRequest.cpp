@@ -17,6 +17,8 @@ void TgBotApiImpl::ChatJoinRequestImpl::onChatJoinRequestFunction(
         fmt::format("chatjoin_{}_approve", ptr->date);
     templateMarkup->inlineKeyboard.at(0).at(1)->callbackData =
         fmt::format("chatjoin_{}_disapprove", ptr->date);
+    templateMarkup->inlineKeyboard.at(1).at(0)->callbackData =
+        fmt::format("chatjoin_{}_ban", ptr->date);
     std::string bio;
     if (ptr->bio) {
         bio = fmt::format("\nTheir Bio: '{}'", ptr->bio.value());
@@ -74,6 +76,13 @@ void TgBotApiImpl::ChatJoinRequestImpl::onCallbackQueryFunction(
 
             result = fmt::format("Disapproved user {} by {}", request->from,
                                  query->from);
+        } else if (queryData == "ban") {
+            LOG(INFO) << fmt::format("Banning {} in chat {}", request->from,
+                                     request->chat);
+            _api->getApi().banChatMember(request->chat->id, request->from->id);
+            _api->getApi().answerCallbackQuery(query->id, "Banned user");
+            result =
+                fmt::format("Banned user {} by {}", request->from, query->from);
         } else {
             LOG(ERROR) << "Invalid payload: " << query->data
                        << ". Parsed item: " << queryData;
@@ -112,14 +121,18 @@ TgBotApiImpl::ChatJoinRequestImpl::ChatJoinRequestImpl(TgBotApiImpl::Ptr api)
     : _api(api) {
     // Create keyboard with common markup content
     templateMarkup = std::make_shared<TgBot::InlineKeyboardMarkup>();
-    templateMarkup->inlineKeyboard.resize(1);
+    templateMarkup->inlineKeyboard.resize(2);
     templateMarkup->inlineKeyboard.at(0).resize(2);
     templateMarkup->inlineKeyboard.at(0).at(0) =
         std::make_shared<TgBot::InlineKeyboardButton>();
     templateMarkup->inlineKeyboard.at(0).at(0)->text = "✅ Approve user";
     templateMarkup->inlineKeyboard.at(0).at(1) =
         std::make_shared<TgBot::InlineKeyboardButton>();
-    templateMarkup->inlineKeyboard.at(0).at(1)->text = "❌ Kick user";
+    templateMarkup->inlineKeyboard.at(0).at(1)->text = "❌ Disapprove user";
+    templateMarkup->inlineKeyboard.at(1).resize(1);
+    templateMarkup->inlineKeyboard.at(1).at(0) =
+        std::make_shared<TgBot::InlineKeyboardButton>();
+    templateMarkup->inlineKeyboard.at(1).at(0)->text = "❗️ Ban user";
 
     _api->getEvents().onChatJoinRequest(
         [this](TgBot::ChatJoinRequest::Ptr query) {
