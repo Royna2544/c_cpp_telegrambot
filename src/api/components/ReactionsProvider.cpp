@@ -70,6 +70,11 @@ void apply<FilterText>(std::vector<TgBot::ReactionType::Ptr>& reactions,
 TgBotApi::AnyMessageResult
 TgBotApiImpl::ReactionsProvider::onAnyMessageFunction(Message::Ptr message) {
     std::vector<TgBot::ReactionType::Ptr> reactions;
+    apply<FilterFilename>(reactions, message,
+                          FilterFilename{.emoji = "😱", .match = "last_kmsg"});
+    apply<FilterText>(
+        reactions, message,
+        FilterText{.emoji = "🥰", .match = std::regex("[a-z]lex")});
     if (!reactions.empty()) {
         _apiImpl->setMessageReaction(message, reactions, false);
     }
