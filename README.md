@@ -38,7 +38,7 @@
 - TGBOTCPP_BUILD_TESTS: Build the test suite (default: OFF)
 - TGBOTCPP_RUST_MODULES: Enable and build command modules written with Rust language (default: OFF)
 - TGBOTCPP_LUA_MODULES: Enable support for command module written with Lua language (default: ON)
-- TGBOTCPP_LLM_SUPPORT: Enable support for LLM framework (Requires compatible hardware, e.g. NVIDIA GPU) (default: OFF)
+- TGBOTCPP_ENABLE_LOCAL_LLM: Enable support for local LLM framework (Requires compatible hardware, e.g. NVIDIA GPU) (default: OFF)
 - TGBOTCPP_SOCKET_PACKET_VERBOSE: Enable verbose hex-view level logging for socket packets (default: OFF)
 
 ## Config file options

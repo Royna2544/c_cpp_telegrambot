@@ -151,4 +151,53 @@ std::optional<std::string> download_memory(
     else
         return std::nullopt;
 }
+
+std::optional<std::string> send_json_get_reply(const std::string_view url,
+                                               std::string json) {
+    std::string result;
+
+    LOG(INFO) << "Sending JSON to " << url;
+
+    // Common CURL setup
+    CurlUtils::CancelChecker cancel_checker = nullptr;
+    CURL* curl = CURL_setup_common(url, cancel_checker);
+    if (curl == nullptr) {
+        LOG(ERROR) << "Cannot setup curl";
+        return {};
+    }
+
+    // Set timeout for connection, lower than default
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);
+
+    struct curl_slist* headers = nullptr;
+    headers = curl_slist_append(headers, "Content-Type: application/json");
+    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+
+    // Set POST data
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json.data());
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, json.size());
+
+    // Write callback
+    curl_easy_setopt(
+        curl, CURLOPT_WRITEFUNCTION,
+        +[](void* contents, size_t size, size_t nmemb, void* userp) {
+            std::string s(static_cast<char*>(contents), size * nmemb);
+            *static_cast<std::string*>(userp) += s;
+            LOG_EVERY_N_SEC(INFO, 5)
+                << fmt::format("Received {} bytes so far",
+                               static_cast<std::string*>(userp)->size());
+            return size * nmemb;
+        });
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &result);
+
+    // Execute it
+    bool exec_result = CURL_perform_common(curl);
+    curl_slist_free_all(headers);
+    LOG_IF(INFO, exec_result) << "Request succeeded";
+    if (exec_result)
+        return result;
+    else
+        return {};
+}
+
 }  // namespace CurlUtils

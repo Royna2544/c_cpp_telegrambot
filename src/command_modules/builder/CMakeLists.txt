@@ -1,7 +1,3 @@
-if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)" OR ANDROID)
-    message(STATUS "Builder: Not AMD64 or is Android")
-    return()
-endif()
 
 find_package(libgit2)
 
@@ -69,8 +65,8 @@ endif()
 
 add_subdirectory(archives)
 
-if(NOT LINUX AND NOT ANDROID)
-  message(STATUS "Builder: Unsupported platform: ${CMAKE_SYSTEM_NAME})")
+if(NOT LINUX OR NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)")
+  message(STATUS "Builder: Unsupported platform: (${CMAKE_SYSTEM_NAME})")
   return()
 endif()
 

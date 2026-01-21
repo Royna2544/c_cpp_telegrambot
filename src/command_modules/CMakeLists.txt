@@ -14,7 +14,7 @@ function(command_module)
     CMD
     "RUST" # options
     "NAME;PLATFORM;PACKAGE" # one-value keywords
-    "SRCS;LIBS" # multi-value keywords
+    "SRCS;LIBS;DEFS" # multi-value keywords
     ${ARGN})
 
   # ---------- validation / feature gates ----------
@@ -60,7 +60,9 @@ function(command_module)
     ${CMD_LIBS}
     PRIVATE_INC
     $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>
-    $<TARGET_PROPERTY:Random,INTERFACE_INCLUDE_DIRECTORIES>)
+    $<TARGET_PROPERTY:Random,INTERFACE_INCLUDE_DIRECTORIES>
+    DEFS
+    ${CMD_DEFS})
 
   # force the Unix-style “lib” prefix even on Windows
   set_target_properties(${libname} PROPERTIES PREFIX "lib")
@@ -210,15 +212,17 @@ multi_command_module(PROVIDES up down SRCS updown.cpp)
 
 command_module(NAME log SRCS log.cpp)
 
-option(ENABLE_LLM "Enable LLM command module, requires CUDA toolkit and NVIDIA GPU" OFF)
+option(TGBOTCPP_ENABLE_LOCAL_LLM "Enable LLM local module, requires CUDA toolkit and NVIDIA GPU" OFF)
 
-if (TGBOTCPP_LLM_SUPPORT)
+if (TGBOTCPP_ENABLE_LOCAL_LLM)
   set(GGML_CUDA ON)
   add_subdirectory(llm/llama.cpp)
   if (MSVC)
     target_compile_options(llama PUBLIC /Zc:char8_t-)
   endif()
-  command_module(NAME ask SRCS ask.cpp llm/LLMCore.cpp LIBS llama)
+  command_module(NAME ask SRCS ask.cpp llm/LLMCore.cpp LIBS llama CurlDownload DEFS ASK_ENABLE_LOCAL_LLM)
+else()
+  command_module(NAME ask SRCS ask.cpp LIBS CurlDownload)
 endif()
 
 if (TGBOTCPP_LUA_MODULES)

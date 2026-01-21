@@ -33,4 +33,14 @@ extern bool download_file(const std::string_view url,
 extern std::optional<std::string> download_memory(
     const std::string_view url, CancelChecker cancel_checker = nullptr);
 
+/**
+ * Send a JSON string via HTTP POST to a URL and get the reply.
+ * @param url The URL to send the JSON to.
+ * @param json The JSON string to send.
+ * @return The reply from the server as a string. Returns std::nullopt on
+ * failure.
+ */
+extern std::optional<std::string> send_json_get_reply(
+    const std::string_view url, std::string json);
+
 }  // namespace CurlUtils

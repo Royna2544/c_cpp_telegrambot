@@ -25,6 +25,7 @@ class UTILS_EXPORT ConfigManager {
         GITHUB_TOKEN,
         OPTIONAL_COMPONENTS,
         BUILDBUDDY_API_KEY,
+        LLMCONFIG,
         MAX
     };
     static constexpr size_t CONFIG_MAX = static_cast<int>(Configs::MAX);
@@ -63,60 +64,77 @@ class UTILS_EXPORT ConfigManager {
 
     static constexpr std::array<Entry, CONFIG_MAX> kConfigMap = {
         Entry{
-            Configs::TOKEN,
-            "TOKEN",
-            "Telegram bot token",
-            't',
-            Entry::ArgType::STRING,
+            .config = Configs::TOKEN,
+            .name = "TOKEN",
+            .description = "Telegram bot token",
+            .alias = 't',
+            .type = Entry::ArgType::STRING,
         },
         {
-            Configs::LOG_FILE,
-            "LOG_FILE",
-            "Log file path",
-            'f',
-            Entry::ArgType::STRING,
+            .config = Configs::LOG_FILE,
+            .name = "LOG_FILE",
+            .description = "Log file path",
+            .alias = 'f',
+            .type = Entry::ArgType::STRING,
         },
         {
-            Configs::DATABASE_CFG,
-            "DATABASE_CFG",
-            "Database configuration",
-            'd',
-            Entry::ArgType::STRING,
+            .config = Configs::DATABASE_CFG,
+            .name = "DATABASE_CFG",
+            .description = "Database configuration",
+            .alias = 'd',
+            .type = Entry::ArgType::STRING,
         },
         {
-            Configs::HELP,
-            "HELP",
-            "Display help information",
-            'h',
-            Entry::ArgType::NONE,
+            .config = Configs::HELP,
+            .name = "HELP",
+            .description = "Display help information",
+            .alias = 'h',
+            .type = Entry::ArgType::NONE,
         },
         {
-            Configs::SOCKET_CFG,
-            "SOCKET_CFG",
-            "Sockets (ipv4/ipv6/local)",
-            Entry::ALIAS_NONE,
-            Entry::ArgType::STRING,
+            .config = Configs::SOCKET_CFG,
+            .name = "SOCKET_CFG",
+            .description = "Sockets (ipv4/ipv6)",
+            .alias = Entry::ALIAS_NONE,
+            .type = Entry::ArgType::STRING,
         },
         {
-            Configs::GITHUB_TOKEN,
-            "GITHUB_TOKEN",
-            "Github token",
-            Entry::ALIAS_NONE,
-            Entry::ArgType::STRING,
+            .config = Configs::GITHUB_TOKEN,
+            .name = "GITHUB_TOKEN",
+            .description = "Github token",
+            .alias = Entry::ALIAS_NONE,
+            .type = Entry::ArgType::STRING,
         },
         {
-            Configs::OPTIONAL_COMPONENTS,
-            "OPTIONAL_COMPONENTS",
-            "Enable optional components (webserver/datacollector)",
-            Entry::ALIAS_NONE,
-            Entry::ArgType::STRING,
+            .config = Configs::OPTIONAL_COMPONENTS,
+            .name = "OPTIONAL_COMPONENTS",
+            .description =
+                "Enable optional components (webserver/datacollector)",
+            .alias = Entry::ALIAS_NONE,
+            .type = Entry::ArgType::STRING,
         },
         {
-            Configs::BUILDBUDDY_API_KEY,
-            "BUILDBUDDY_API_KEY",
-            "BuildBuddy API key",
-            Entry::ALIAS_NONE,
-            Entry::ArgType::STRING,
+            .config = Configs::BUILDBUDDY_API_KEY,
+            .name = "BUILDBUDDY_API_KEY",
+            .description = "BuildBuddy API key",
+            .alias = Entry::ALIAS_NONE,
+            .type = Entry::ArgType::STRING,
+        },
+        {
+            .config = Configs::LLMCONFIG,
+            .name = "LLMCONFIG",
+            /*
+             * LLM configuration format:
+             * 1. local:filepath - for local LLM models
+             * Example: local:/path/to/model.gguf. Supported models are the ones
+             * that llama.cpp supports.
+             * 2. localnet:urlendpoint - for LLM models served over network
+             * Example: localnet:http://localhost:8000/api/v1/chat/completions
+             */
+            .description =
+                "LLM configuration. (local/localnet):(filepath/urlendpoint)",
+            .alias = Entry::ALIAS_NONE,
+            .type = Entry::ArgType::STRING,
         }};
 
     struct Backend {
