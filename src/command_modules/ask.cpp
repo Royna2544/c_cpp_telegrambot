@@ -1,4 +1,5 @@
 #include <absl/log/log.h>
+#include <absl/strings/str_split.h>
 #include <fmt/chrono.h>
 #include <fmt/format.h>
 #include <tgbot/TgException.h>
@@ -99,7 +100,8 @@ constexpr float kTemperature = 0.7F;
 static void localnetmodelhandler(TgBotApi::Ptr api, MessageExt* message,
                                  const StringResLoader::PerLocaleMap* res,
                                  const Providers* provider,
-                                 const std::string_view url) {
+                                 const std::string_view url,
+                                 const std::string_view authkey = "") {
     auto sent = api->sendReplyMessage(message->message(),
                                       "Processing your query, please wait...");
     if (!message->has<MessageAttrs::ExtraText>()) {
@@ -156,32 +158,31 @@ DECLARE_COMMAND_HANDLER(ask) {
 
     std::string config = *mgr->get(ConfigManager::Configs::LLMCONFIG);
 
-    std::pair<std::string, std::string> parsedConfig;
-    size_t delimiterPos = config.find(':');
-    if (delimiterPos != std::string::npos) {
-        parsedConfig.first = config.substr(0, delimiterPos);
-        parsedConfig.second = config.substr(delimiterPos + 1);
-    } else {
-        LOG(ERROR)
-            << "Invalid LLM configuration format: Cannot find delimiter: "
-            << config;
-        return;
+    std::vector<std::string> parsedConfig;
+    parsedConfig = absl::StrSplit(config, ',');
+    if (parsedConfig.size() < 2 || parsedConfig.size() > 3) {
+        LOG(ERROR) << "Invalid LLM configuration format: " << config;
     }
 
-    LOG(INFO) << "LLM Configuration - Type: " << parsedConfig.first
-              << ", Path/URL: " << parsedConfig.second;
+    LOG(INFO) << "LLM Configuration - Type: " << parsedConfig[0]
+              << ", Path/URL: " << parsedConfig[1];
 
-    if (parsedConfig.first == "local") {
+    if (parsedConfig[0] == "local") {
 #ifdef ASK_ENABLE_LOCAL_LLM
-        localmodelhandler(api, message, res, provider, parsedConfig.second);
+        localmodelhandler(api, message, res, provider, parsedConfig[1]);
 #else
         LOG(ERROR) << "Local LLM support is not enabled in this build.";
 #endif
-    } else if (parsedConfig.first == "localnet") {
-        localnetmodelhandler(api, message, res, provider, parsedConfig.second);
+    } else if (parsedConfig[0] == "localnet") {
+        if (parsedConfig.size() == 3) {
+            LOG(INFO) << "Using authkey for localnet LLM.";
+            localnetmodelhandler(api, message, res, provider, parsedConfig[1],
+                                 parsedConfig[2]);
+        } else {
+            localnetmodelhandler(api, message, res, provider, parsedConfig[1]);
+        }
     } else {
-        LOG(ERROR) << "Unsupported LLM configuration type: "
-                   << parsedConfig.first;
+        LOG(ERROR) << "Unsupported LLM configuration type: " << parsedConfig[0];
     }
 }
 

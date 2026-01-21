@@ -37,10 +37,12 @@ extern std::optional<std::string> download_memory(
  * Send a JSON string via HTTP POST to a URL and get the reply.
  * @param url The URL to send the JSON to.
  * @param json The JSON string to send.
+ * @param authkey Optional authorization key to include in the request.
  * @return The reply from the server as a string. Returns std::nullopt on
  * failure.
  */
 extern std::optional<std::string> send_json_get_reply(
-    const std::string_view url, std::string json);
+    const std::string_view url, std::string json,
+    const std::string_view authkey = "");
 
 }  // namespace CurlUtils

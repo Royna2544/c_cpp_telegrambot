@@ -153,7 +153,8 @@ std::optional<std::string> download_memory(
 }
 
 std::optional<std::string> send_json_get_reply(const std::string_view url,
-                                               std::string json) {
+                                               std::string json,
+                                               const std::string_view authkey) {
     std::string result;
 
     LOG(INFO) << "Sending JSON to " << url;
@@ -171,6 +172,11 @@ std::optional<std::string> send_json_get_reply(const std::string_view url,
 
     struct curl_slist* headers = nullptr;
     headers = curl_slist_append(headers, "Content-Type: application/json");
+    if (!authkey.empty()) {
+        std::string auth_header =
+            "Authorization: Bearer " + std::string(authkey);
+        headers = curl_slist_append(headers, auth_header.c_str());
+    }
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 
     // Set POST data
