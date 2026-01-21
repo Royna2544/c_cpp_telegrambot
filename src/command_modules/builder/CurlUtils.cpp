@@ -118,16 +118,29 @@ bool download_file(const std::string_view url,
 }
 
 std::optional<std::string> download_memory(
-    const std::string_view url, CurlUtils::CancelChecker cancel_checker) {
+    const std::string_view url, CurlUtils::CancelChecker cancel_checker,
+    const std::string_view authkey) {
     std::string result;
 
     LOG(INFO) << "Downloading " << url << " to memory";
+    if (!authkey.empty()) {
+        LOG(INFO) << "Using authorization key for download";
+    }
 
     // Common CURL setup
     CURL* curl = CURL_setup_common(url, cancel_checker);
     if (curl == nullptr) {
         LOG(ERROR) << "Cannot setup curl";
         return std::nullopt;
+    }
+
+    // Set authorization header if provided
+    struct curl_slist* headers = nullptr;
+    if (!authkey.empty()) {
+        std::string auth_header =
+            "Authorization: Bearer " + std::string(authkey);
+        headers = curl_slist_append(headers, auth_header.c_str());
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     }
 
     // Write callback
@@ -145,11 +158,15 @@ std::optional<std::string> download_memory(
 
     // Execute it
     bool exec_result = CURL_perform_common(curl);
+    if (headers != nullptr) {
+        curl_slist_free_all(headers);
+    }
     LOG_IF(INFO, exec_result) << "Download succeeded";
-    if (exec_result)
+    if (exec_result) {
         return result;
-    else
+    } else {
         return std::nullopt;
+    }
 }
 
 std::optional<std::string> send_json_get_reply(const std::string_view url,
@@ -168,7 +185,7 @@ std::optional<std::string> send_json_get_reply(const std::string_view url,
     }
 
     // Set timeout for connection, lower than default
-    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 5L);
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 15L);
 
     struct curl_slist* headers = nullptr;
     headers = curl_slist_append(headers, "Content-Type: application/json");

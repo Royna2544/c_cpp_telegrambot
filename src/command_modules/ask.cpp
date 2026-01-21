@@ -9,8 +9,10 @@
 #include <api/TgBotApi.hpp>
 #include <filesystem>
 #include <nlohmann/json.hpp>
+#include <string_view>
 
 #include "CurlUtils.hpp"
+#include "llm/OpenAI_api.hpp"
 #include "llm/SYSTEM_PROMPT.hpp"
 #include "utils/ConfigManager.hpp"
 
@@ -112,27 +114,65 @@ static void localnetmodelhandler(TgBotApi::Ptr api, MessageExt* message,
 
     std::string query = message->get<MessageAttrs::ExtraText>();
 
-    nlohmann::json payload = {
-        {"model", "local-model"},
-        {"messages",
-         {{{"role", "system"}, {"content", SYSTEM_PROMPT}},
-          {{"role", "user"}, {"content", query}}}},
-        {"temperature", kTemperature}};
+    // GET /api/models to check server availability
+    std::optional<std::string> modelsResponse;
+    if (modelsResponse = CurlUtils::download_memory(
+            std::string(url) + openai::kOpenAI_API_Models_Endpoint, nullptr,
+            authkey);
+        !modelsResponse) {
+        LOG(ERROR) << "Failed to connect to LLM server at " << url;
+        api->editMessage(sent,
+                         "Error: Failed to connect to LLM server at the "
+                         "configured URL.");
+        return;
+    }
+    openai::ModelResponse modelResponse;
+    try {
+        modelResponse =
+            nlohmann::json::parse(*modelsResponse).get<openai::ModelResponse>();
+    } catch (const std::exception& e) {
+        LOG(ERROR) << "Failed to parse models response from LLM server: "
+                   << e.what();
+        api->editMessage(
+            sent, "Error: Failed to parse models response from LLM server.");
+        return;
+    }
+    LOG(INFO) << "LLM Server Models Available:";
+    for (const auto& model : modelResponse.data) {
+        LOG(INFO) << " - " << model.id << " (owned by " << model.owned_by
+                  << ")";
+    }
+    if (modelResponse.data.empty()) {
+        LOG(ERROR) << "No models available from LLM server.";
+        api->editMessage(sent, "Error: No models available from LLM server.");
+        return;
+    }
 
-    if (auto rc = CurlUtils::send_json_get_reply(url, payload.dump()); rc) {
+    // TODO: Extraction logic, for now use index 0
+    openai::ChatRequest chatRequest;
+    chatRequest.model = modelResponse.data[0].id;
+    LOG(INFO) << "Using model " << chatRequest.model << " for query.";
+    chatRequest.temperature = kTemperature;
+    chatRequest.messages = {openai::Message::System(SYSTEM_PROMPT),
+                            openai::Message::User(query)};
+
+    nlohmann::json payload = chatRequest;
+
+    if (auto rc = CurlUtils::send_json_get_reply(
+            std::string(url) + openai::kOpenAI_API_ChatCompletions_Endpoint,
+            payload.dump(), authkey);
+        rc) {
         try {
-            auto j = nlohmann::json::parse(*rc);
-            if (j.contains("choices") && j["choices"].is_array() &&
-                !j["choices"].empty()) {
-                std::string answer =
-                    j["choices"][0]["message"]["content"].get<std::string>();
-                api->editMessage(sent, fmt::format("Answer: {}", answer));
-            } else {
-                LOG(ERROR) << "Invalid response format from LLM server: "
-                           << *rc;
+            openai::ChatResponse chatResponse =
+                nlohmann::json::parse(*rc).get<openai::ChatResponse>();
+            if (chatResponse.choices.empty()) {
+                LOG(ERROR) << "LLM server returned empty choices.";
                 api->editMessage(
-                    sent, "Error: Invalid response format from LLM server.");
+                    sent,
+                    "Error: LLM server returned empty choices in response.");
+                return;
             }
+            api->editMessage(sent, chatResponse.choices[0].message.content);
         } catch (const std::exception& e) {
             LOG(ERROR) << "Failed to parse LLM server response: " << e.what();
             api->editMessage(sent,

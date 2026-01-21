@@ -27,11 +27,13 @@ extern bool download_file(const std::string_view url,
  * Download data from a URL into memory.
  * @param url The URL to download from.
  * @param cancel_checker Optional callback to check for cancellation.
+ * @param authkey Optional authorization key to include in the request.
  * @return An optional string containing the downloaded data on success,
  *         or std::nullopt on failure.
  */
 extern std::optional<std::string> download_memory(
-    const std::string_view url, CancelChecker cancel_checker = nullptr);
+    const std::string_view url, CancelChecker cancel_checker = nullptr,
+    const std::string_view authkey = "");
 
 /**
  * Send a JSON string via HTTP POST to a URL and get the reply.
