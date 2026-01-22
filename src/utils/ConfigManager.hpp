@@ -129,9 +129,10 @@ class UTILS_EXPORT ConfigManager {
              * Example: local,/path/to/model.gguf. Supported models are the ones
              * that llama.cpp supports.
              * 2. localnet,urlendpoint - for LLM models served over network
-             * Example: localnet,http://localhost:8000/api/v1/chat/completions
+             * Example: localnet,http://localhost:8000/api/v1/
              * Include authkey if needed:
-             * localnet,http://localhost:8000/api/v1/chat/completions,mysecretkey
+             * It will be sent as Bearer token in Authorization header.
+             * localnet,http://localhost:8000/api/v1/,mysecretkey
              */
             .description = "LLM configuration. "
                            "(local/localnet),(filepath/urlendpoint)(,authkey)",

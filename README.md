@@ -49,3 +49,4 @@
 - GITHUB_TOKEN: Github token (Used for private repo access).
 - OPTIONAL_COMPONENTS: Enable optional components. Comma-separated list of components to enable. Supported components: "webserver", "datacollector".
 - BUILDBUDDY_API_KEY: BuildBuddy API key for Android RBE.
+- LLMCONFIG: LLM configuration. (local/localnet),(filepath/urlendpoint)(,authkey)
