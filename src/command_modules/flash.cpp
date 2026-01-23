@@ -17,6 +17,7 @@
 
 constexpr std::string_view kZipExtensionSuffix = ".zip";
 constexpr int FLASH_DELAY_MAX_SEC = 5;
+constexpr float SUCCESS_CHANCE = 0.1F;
 
 DECLARE_COMMAND_HANDLER(flash) {
     static std::vector<std::string> reasons;
@@ -45,7 +46,7 @@ DECLARE_COMMAND_HANDLER(flash) {
                               res->get(Strings::SEND_A_FILE_NAME_TO_FLASH));
         return;
     }
-    pos = provider->random->generate(reasons.size());
+    pos = provider->random->generate(reasons.size() - 1);
     if (msg->find('\n') != std::string::npos) {
         api->sendReplyMessage(message->message(),
                               res->get(Strings::INVALID_INPUT_NO_NEWLINE));
@@ -60,12 +61,18 @@ DECLARE_COMMAND_HANDLER(flash) {
     sentmsg = api->sendReplyMessage(message->message(), ss.str());
 
     std::this_thread::sleep_for(std::chrono::seconds(sleep_secs));
-    if (pos != reasons.size()) {
+
+    // Use a pseudo-random chance to "succeed" even if we picked a failure
+    // reason
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::bernoulli_distribution d(SUCCESS_CHANCE);
+    if (!d(gen)) {
         ss << fmt::format("{}\n{}: {}", res->get(Strings::FAILED_SUCCESSFULLY),
                           res->get(Strings::REASON), reasons[pos]);
     } else {
         ss << fmt::format("{} {:.3}%", res->get(Strings::SUCCESS_CHANCE_WAS),
-                          100. / static_cast<int>(reasons.size()));
+                          SUCCESS_CHANCE * 100);
     }
     api->editMessage(sentmsg, ss.str());
 }

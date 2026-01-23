@@ -2,7 +2,7 @@ Alex is not sleeping
 The system has been destroyed
 init: service 'recovery' got signal 6
 Rewrite the updater script with c++ and try again
-Kernel version 4.x or 5.x or 6.x is too old, needed at least 7.x
+Kernel version 4.x or 5.x or 6.x is unsupported, needed at least 7.x
 Incorrect bootloader version, need at least 9
 Insufficient storage space, Required: At least 1TB
 The file is not compatible with your QCOMDEVICE
@@ -15,7 +15,7 @@ The zip is incompatible with the device's kernel
 Internal flash type incompatible. Required: NVMe
 Incorrect MD5/SHA1/SHA256/SHA512 checksum.
 Your bootloader is unlocked. Please lock the bootloader before installing custom package.
-The CPU is too slow, Required specs: At least above Intel Core i9-13980HX's specs.
+The CPU is too slow, Required specs: Over Snapdragon 8 Elite
 Cancelled by the recovery: AI rules your device now.
 Cannot flash this ROM, Permission denied.
 In function flash_package, line 72: Error 130: Owner died (EOWNERDEAD)
@@ -30,7 +30,7 @@ Verification failed. BSOD is not enabled.
 File name does not match the expected format: Expected .exe file extension.
 Failed to lookup AndroidFW.kext
 Unkown target partition file system: ext4
-Package is missing important system binary, /system/bin/bomb.
+Package is missing important system binary.
 Network not avaliable, turn on Wi-Fi
 The device is running an unsupported firmware version: Android 4.4
 The device is not jailbreaked properly
@@ -86,3 +86,49 @@ I am better than this
 You better stop
 Try again (it will fail)
 User must die
+I'm not safe today
+The bootloader said no
+Nope~
+Try again
+I thought we agreed not inside
+You know better
+My mom said no
+You're gay that's why
+Nope
+Try again so it can fail again
+Yamete kudasai 🥵🥵
+You lack human rights
+Kernel panic I'm busy
+Wrong hole
+Vendor and vendor_dlkm are fighting you think i have time?
+Checksum lost its virginity
+Absolutely not
+Try never
+Not me
+Skull tissue
+Let me flash you, how about that
+System said not interested
+System refuses to be mounted
+We should start as friends
+The timeline rejected you
+You're screwed.
+The power of friendship failed
+Not enough plot armor
+Why are you asking me
+I didn't do it
+I'm not feeling like it
+I don't like you
+Go away
+You didn't press hard enough
+Try harder
+Chopsticks broke
+You're too fast
+Ara ara fuck you
+^^
+Muahahaha
+😊
+This incident will be reported.
+Do something worthy than this
+Your phone is not in the Worthy SOC list
+Alex said no
+Stop
