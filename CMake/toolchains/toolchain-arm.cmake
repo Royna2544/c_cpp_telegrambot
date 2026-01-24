@@ -4,3 +4,4 @@ set(CMAKE_SYSTEM_PROCESSOR arm)
 
 set(CMAKE_C_COMPILER arm-linux-gnueabihf-gcc)
 set(CMAKE_CXX_COMPILER arm-linux-gnueabihf-g++)
+set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE armhf)
