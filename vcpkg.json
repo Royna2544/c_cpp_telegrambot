@@ -62,6 +62,18 @@
         "libgit2",
         "libarchive"
       ]
+    },
+    "web": {
+      "description": "Web Server Support",
+      "dependencies": [
+        "cpp-httplib"
+      ]
+    },
+    "backtrace": {
+      "description": "Backtrace Support",
+      "dependencies": [
+        "cpptrace"
+      ]
     }
   },
   "default-features": [
@@ -69,6 +81,7 @@
     "database",
     "luamodules",
     "testing",
-    "builder"
+    "builder",
+    "backtrace"
   ]
 }
