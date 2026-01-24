@@ -2,40 +2,73 @@
   "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg-tool/main/docs/vcpkg.schema.json",
   "name": "telegram-bot-cpp",
   "version-string": "1.0.0",
-  "builtin-baseline": "ee12231b20c95013c6638d845d04c91559a1d1ff",
+  "builtin-baseline": "66c0373dc7fca549e5803087b9487edfe3aca0a1",
   "dependencies": [
     {
       "name": "dlfcn-win32",
       "platform": "windows"
     },
-    {
-      "name": "opencv4",
-      "features": [
-        "ffmpeg"
-      ],
-      "platform": "!(arm64 | arm)"
-    },
     "boost-asio",
     "boost-system",
     "boost-program-options",
-    "boost-units",
     "curl",
     "libxml2",
-    "libgit2",
-    "libpng",
-    "libwebp",
-    "libjpeg-turbo",
     "fmt",
-    "sqlite3",
     "nlohmann-json",
     "openssl",
     "zlib",
     "fruit",
-    "abseil",
-    "protobuf",
-    "gtest",
-    "sol2",
-    "libarchive",
-    "nlohmann-json"
+    "abseil"
+  ],
+  "features": {
+    "image": {
+      "description": "Libraries for Image Processing",
+      "dependencies": [
+        "libpng",
+        "libwebp",
+        "libjpeg-turbo",
+        {
+          "name": "opencv4",
+          "features": [
+            "ffmpeg"
+          ],
+          "platform": "!(arm64 | arm)"
+        }
+      ]
+    },
+    "database": {
+      "description": "Database Support",
+      "dependencies": [
+        "sqlite3",
+        "protobuf"
+      ]
+    },
+    "luamodules": {
+      "description": "Lua Modules Support",
+      "dependencies": [
+        "sol2"
+      ]
+    },
+    "testing": {
+      "description": "Testing Framework",
+      "dependencies": [
+        "gtest"
+      ]
+    },
+    "builder": {
+      "description": "Builder Module",
+      "dependencies": [
+        "boost-units",
+        "libgit2",
+        "libarchive"
+      ]
+    }
+  },
+  "default-features": [
+    "image",
+    "database",
+    "luamodules",
+    "testing",
+    "builder"
   ]
 }
