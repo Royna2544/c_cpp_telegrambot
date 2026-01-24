@@ -538,9 +538,8 @@ if (LINUX)
   list(APPEND CPACK_GENERATOR DEB)
   set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Soo Hwan Na <roynatech@gmail.com>")
   set(CPACK_DEBIAN_PACKAGE_SECTION "utils")
-  set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.29), libstdc++6 (>= 8)")
+  set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6, libstdc++6")
   set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
-  set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
 endif()
 
 # Include CPack
