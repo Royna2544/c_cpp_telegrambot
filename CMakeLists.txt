@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.14)
-project(TgBot++ LANGUAGES CXX C VERSION 1.0.0)
+project(Glider LANGUAGES CXX C VERSION 1.0.0)
 
 if(CMAKE_VERSION VERSION_LESS "3.25")
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -511,10 +511,10 @@ file(COPY resources/ DESTINATION ${CMAKE_BINARY_DIR}/share/${PROJECT_NAME})
 file(COPY www/ DESTINATION ${CMAKE_BINARY_DIR}/share/${PROJECT_NAME}/www)
 
 # Set CPack configurations
-set(CPACK_PACKAGE_NAME "Telegram Bot Server in C++")
+set(CPACK_PACKAGE_NAME "${PROJECT_NAME}")
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "A Telegram bot coded in C++")
-set(CPACK_PACKAGE_CONTACT "support@example.com")
+set(CPACK_PACKAGE_CONTACT "roynatech@gmail.com")
 set(CPACK_GENERATOR "ZIP;TGZ")
 set(CPACK_PACKAGE_INSTALL_DIRECTORY "TgBot C++ server ${CPACK_PACKAGE_VERSION}")
 
@@ -524,13 +524,23 @@ if(WIN32)
   set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
   set(CPACK_NSIS_MUI_ICON ${CMAKE_SOURCE_DIR}/resources/photo/icon.ico)
   set(CPACK_NSIS_MUI_UNIICON ${CMAKE_SOURCE_DIR}/resources/photo/uninstall.ico)
-  set(CPACK_NSIS_DISPLAY_NAME "Telegram Bot Server")
-  set(CPACK_NSIS_WELCOME_TITLE "Welcome! Actually, no")
+  set(CPACK_NSIS_DISPLAY_NAME "The Glider Project")
+  set(CPACK_NSIS_WELCOME_TITLE "Welcome to The Glider Project Installer")
   set(CPACK_NSIS_BRANDING_TEXT "Created with CMake ${CMAKE_VERSION}")
   set(CPACK_NSIS_IGNORE_LICENSE_PAGE ON)
   set(CPACK_NSIS_INSTALLED_ICON_NAME
       "${CMAKE_BINARY_DIR}/bin/${PROJECT_NAME}_main.exe")
   set(CPACK_NSIS_MANIFEST_DPI_AWARE TRUE)
+endif()
+
+if (LINUX)
+  # DEB
+  list(APPEND CPACK_GENERATOR DEB)
+  set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Soo Hwan Na <roynatech@gmail.com>")
+  set(CPACK_DEBIAN_PACKAGE_SECTION "utils")
+  set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.29), libstdc++6 (>= 8)")
+  set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
+  set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
 endif()
 
 # Include CPack

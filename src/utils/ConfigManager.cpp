@@ -113,7 +113,7 @@ void addAll(po::options_description &desc,
 
 struct ConfigBackendBoostPOBase : public ConfigManager::Backend {
     static po::options_description getTgBotOptionsDesc() {
-        static po::options_description desc("TgBot++ Configs");
+        static po::options_description desc("Glider Configs");
         static bool once = [] {
             addAll(desc, std::make_index_sequence<ConfigManager::CONFIG_MAX>());
             return true;

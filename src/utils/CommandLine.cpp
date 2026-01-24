@@ -56,7 +56,7 @@ std::filesystem::path CommandLine::getPath(FS::PathType type) const {
         case FS::PathType::INSTALL_ROOT:
             return buf.parent_path();
         case FS::PathType::RESOURCES:
-            return buf.parent_path() / "share" / "TgBot++";
+            return buf.parent_path() / "share" / "Glider";
         case FS::PathType::RESOURCES_SQL:
             return getPath(FS::PathType::RESOURCES) / "sql";
         case FS::PathType::RESOURCES_WEBPAGE:

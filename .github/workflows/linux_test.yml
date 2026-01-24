@@ -1,4 +1,4 @@
-name: Build TgBot++ (Linux)
+name: Build Glider (Linux)
 
 on:
   push:
@@ -70,7 +70,7 @@ jobs:
           sudo bash ./llvm.sh
 
       # 3. Build your project using CMake
-      - name: '🚧 Build TgBot++'
+      - name: '🚧 Build Glider'
         env:
           CC: ${{ matrix.real_cc }}
           CXX: ${{ matrix.real_cxx }}

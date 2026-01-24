@@ -1,7 +1,7 @@
-# GitHub Copilot Instructions for TgBot++
+# GitHub Copilot Instructions for Glider
 
 ## Project Overview
-TgBot++ is a Telegram bot implementation written in C++ and C, primarily used for learning purposes and personal use. The project uses modern C++20/C++23 standards and integrates with the Telegram Bot API.
+Glider is a Telegram bot implementation written in C++ and C, primarily used for learning purposes and personal use. The project uses modern C++20/C++23 standards and integrates with the Telegram Bot API.
 
 ## Repository Structure
 - **src/**: Main source code directory

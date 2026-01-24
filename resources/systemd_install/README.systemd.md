@@ -1,10 +1,10 @@
-# Systemd Service Setup for TgBot++
+# Systemd Service Setup for Glider
 
-This guide explains how to set up TgBot++ as a systemd service on Linux systems.
+This guide explains how to set up Glider as a systemd service on Linux systems.
 
 ## Prerequisites
 
-- TgBot++ compiled and installed on your system
+- Glider compiled and installed on your system
 - Configuration file set up (see Configuration section below)
 - Root or sudo access to install system services
 
@@ -49,20 +49,20 @@ Replace the following placeholders in `/etc/systemd/system/tgbot.service`:
   WorkingDirectory=/home/tgbot
   ```
 
-- `<EXECUTABLE_PATH>`: The full path to the TgBot++ executable
+- `<EXECUTABLE_PATH>`: The full path to the Glider executable
   ```ini
-  ExecStart=/usr/local/bin/TgBot++_main
+  ExecStart=/usr/local/bin/Glider_main
   ```
   or if using the daemon version:
   ```ini
-  ExecStart=/usr/local/bin/TgBot++_maind
+  ExecStart=/usr/local/bin/Glider_maind
   ```
 
 **Example of a complete service file:**
 
 ```ini
 [Unit]
-Description=TgBot++ Telegram Bot Service
+Description=Glider Telegram Bot Service
 After=network.target
 Documentation=https://github.com/Royna2544/c_cpp_telegrambot
 
@@ -70,7 +70,7 @@ Documentation=https://github.com/Royna2544/c_cpp_telegrambot
 Type=simple
 User=tgbot
 WorkingDirectory=/home/tgbot
-ExecStart=/usr/local/bin/TgBot++_main
+ExecStart=/usr/local/bin/Glider_main
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal
@@ -168,7 +168,7 @@ sudo systemctl disable tgbot.service
 
 4. Test running the bot manually as the service user:
    ```bash
-   sudo -u tgbot /usr/local/bin/TgBot++_main
+   sudo -u tgbot /usr/local/bin/Glider_main
    ```
 
 ### Permission Issues
@@ -210,7 +210,7 @@ Add an `EnvironmentFile` directive:
 ```ini
 [Service]
 EnvironmentFile=/etc/tgbot/environment
-ExecStart=/usr/local/bin/TgBot++_main
+ExecStart=/usr/local/bin/Glider_main
 ```
 
 And create `/etc/tgbot/environment`:
@@ -224,7 +224,7 @@ LOG_FILE=/var/log/tgbot/bot.log
 Modify the `ExecStart` line to include arguments:
 
 ```ini
-ExecStart=/usr/local/bin/TgBot++_main --TOKEN your_token_here
+ExecStart=/usr/local/bin/Glider_main --TOKEN your_token_here
 ```
 
 Note: Command-line arguments with sensitive data (like tokens) will be visible in process listings.

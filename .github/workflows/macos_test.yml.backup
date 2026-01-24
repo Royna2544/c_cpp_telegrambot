@@ -1,4 +1,4 @@
-﻿name: Build TgBot++ (macOS)
+﻿name: Build Glider (macOS)
 
 on:
   push:
@@ -38,7 +38,7 @@ jobs:
         run: brew install llvm    
 
       # 3. Build your project using CMake
-      - name: '🚧 Build TgBot++'
+      - name: '🚧 Build Glider'
         env: 
           CC: /opt/homebrew/opt/llvm/bin/clang
           CXX: /opt/homebrew/opt/llvm/bin/clang++

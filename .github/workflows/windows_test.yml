@@ -1,4 +1,4 @@
-name: Build TgBot++ (Windows)
+name: Build Glider (Windows)
 
 on:
   push:
@@ -35,7 +35,7 @@ jobs:
           vcpkgJsonGlob: 'vcpkg.json'
 
       # 3. Build your project using CMake
-      - name: '🚧 Build TgBot++'
+      - name: '🚧 Build Glider'
         run: |
           cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" -DTGBOTCPP_BUILD_TESTS=ON 
           cmake --build build 

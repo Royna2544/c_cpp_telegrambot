@@ -1,11 +1,11 @@
 # A Telegram bot, mostly used by my own uses and learning purposes
 
 ## Status
-[![Build TgBot++ (Linux)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/linux_test.yml/badge.svg)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/linux_test.yml)
+[![Build Glider (Linux)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/linux_test.yml/badge.svg)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/linux_test.yml)
 
-[![Build TgBot++ (macOS)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/macos_test.yml/badge.svg)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/macos_test.yml)
+[![Build Glider (macOS)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/macos_test.yml/badge.svg)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/macos_test.yml)
 
-[![Build TgBot++ (Windows)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/windows_test.yml/badge.svg)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/windows_test.yml)
+[![Build Glider (Windows)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/windows_test.yml/badge.svg)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/windows_test.yml)
 
 [![CodeQL Analysis](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/codeql.yml/badge.svg)](https://github.com/Royna2544/c_cpp_telegrambot/actions/workflows/codeql.yml)
 
