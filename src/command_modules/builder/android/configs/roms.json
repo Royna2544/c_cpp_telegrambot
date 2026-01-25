@@ -18,7 +18,22 @@
             },
             {
                 "android_version": 16,
-                "branch": "bq1"
+                "branch": "bq2"
+            }
+        ]
+    },
+    {
+        "name": "DerpFestNew",
+        "link": "https://github.com/DerpFest-AOSP/android_manifest",
+        "target": "derp",
+        "artifact": {
+            "matcher": "ZipFilePrefixer",
+            "data": "DerpFest"
+        },
+        "branches": [
+            {
+                "android_version": 16,
+                "branch": "16-priv"
             }
         ]
     },
