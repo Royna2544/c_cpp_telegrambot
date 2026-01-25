@@ -1,10 +1,12 @@
 #include <absl/log/log.h>
 
-#include <trivial_helpers/log_once.hpp>
 #include <CommandLine.hpp>
 #include <filesystem>
 #include <stdexcept>
 #include <system_error>
+#include <trivial_helpers/log_once.hpp>
+
+#include "Env.hpp"
 
 CommandLine::CommandLine(CommandLine::argc_type argc,
                          CommandLine::argv_type argv)
@@ -24,6 +26,17 @@ CommandLine::CommandLine(CommandLine::argc_type argc,
         exePath = std::filesystem::canonical(p2, ec);
         if (ec) {
             LOG_ONCE(WARNING) << "Try 2: " << p2 << ": " << ec.message();
+            if (Env()["GLIDER_ROOT"].has()) {
+                const auto p3 =
+                    std::filesystem::path(Env()["GLIDER_ROOT"].get()) / argv[0];
+                exePath = std::filesystem::canonical(p3, ec);
+                if (ec) {
+                    LOG_ONCE(ERROR) << "Try 3: " << p3 << ": " << ec.message();
+                    LOG_ONCE(ERROR) << "Failed...";
+                } else {
+                    LOG_ONCE(INFO) << exePath << ": OK";
+                }
+            }
         } else {
             LOG_ONCE(INFO) << exePath << ": OK";
         }
