@@ -235,7 +235,7 @@ ConfigManager::ConfigManager(CommandLine line) {
 }
 
 std::optional<std::string> ConfigManager::get(Configs config) const {
-    const auto* it = std::ranges::find_if(
+    const auto it = std::ranges::find_if(
         kConfigMap,
         [config](const Entry& entry) { return entry.config == config; });
     const std::string name =
