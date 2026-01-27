@@ -29,6 +29,7 @@
 #include <unordered_map>
 #include <utility>
 
+#include "ConfigManager.hpp"
 #include "Diagnosis.hpp"
 #include "ProgressBar.hpp"
 #include "RepoUtils.hpp"
@@ -59,9 +60,10 @@ class KernelBuildHandler {
     constexpr static std::string_view kToolchainDirectory = "toolchain";
     constexpr static std::string_view kCallbackQueryPrefix = "kernel_build_";
     KernelBuildHandler(TgBotApi::Ptr api, const CommandLine* line,
-                       const AuthContext* auth,
-                       std::optional<std::string> token)
-        : _api(api), _auth(auth), gitToken(std::move(token)) {
+                       const AuthContext* auth, const ConfigManager* cfgmgr)
+        : _api(api),
+          _auth(auth),
+          gitToken(cfgmgr->get(ConfigManager::Configs::GITHUB_TOKEN)) {
         auto jsonDir =
             line->getPath(FS::PathType::RESOURCES) / "builder" / "kernel";
 
@@ -80,7 +82,14 @@ class KernelBuildHandler {
             LOG(ERROR) << "Failed to opendir for kernel configurations: "
                        << ec.message();
         }
-        kernelDir = line->getPath(FS::PathType::INSTALL_ROOT) / "kernel_build";
+        if (auto it =
+                cfgmgr->get(ConfigManager::Configs::FILEPATH_KERNEL_BUILD);
+            it) {
+            kernelDir = *it;
+        } else {
+            kernelDir =
+                line->getPath(FS::PathType::INSTALL_ROOT) / "kernel_build";
+        }
     }
 
     constexpr static std::string_view kBuildPrefix = "build_";
@@ -656,11 +665,11 @@ DeferredExit ForkAndRunKernel::runFunction() {
 DECLARE_COMMAND_HANDLER(kernelbuild) {
     static std::optional<KernelBuildHandler> handler;
     if (!handler) {
-        handler.emplace(
-            api, provider->cmdline.get(), provider->auth.get(),
-            provider->config->get(ConfigManager::Configs::GITHUB_TOKEN));
+        handler.emplace(api, provider->cmdline.get(), provider->auth.get(),
+                        provider->config.get());
         api->onCallbackQuery("kernelbuild", [api, provider](
-                                                TgBot::CallbackQuery::Ptr ptr) {
+                                                const TgBot::CallbackQuery::Ptr&
+                                                    ptr) {
             std::string_view data = ptr->data;
 
             if (!provider->auth->isAuthorized(ptr->from)) {
@@ -675,7 +684,7 @@ DECLARE_COMMAND_HANDLER(kernelbuild) {
             }
             ptr->data = data;
             try {
-                handler->handleCallbackQuery(std::move(ptr));
+                handler->handleCallbackQuery(ptr);
             } catch (const std::exception& ex) {
                 LOG(ERROR) << "Error handling callback query: " << ex.what();
             }

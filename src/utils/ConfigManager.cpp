@@ -10,10 +10,8 @@
 #include <iostream>
 #include <libfs.hpp>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <ostream>
-#include <stdexcept>
 #include <string_view>
 #include <type_traits>
 #include <utility>
@@ -21,14 +19,17 @@
 #include "CommandLine.hpp"
 #include "Env.hpp"
 
+const char* const sectionMain = "Main";
+const char* const sectionFilePath = "FilePath";
+
 namespace po = boost::program_options;
 
 template <typename T, ConfigManager::Configs config>
-void AddOption(po::options_description &desc) {
-    auto index = std::ranges::find_if(ConfigManager::kConfigMap,
-                                      [](const ConfigManager::Entry &entry) {
-                                          return entry.config == config;
-                                      });
+void AddOption(po::options_description& desc) {
+    constexpr auto index = std::ranges::find_if(
+        ConfigManager::kConfigMap, [](const ConfigManager::Entry& entry) {
+            return entry.config == config;
+        });
     if constexpr (std::is_same_v<T, void>) {
         if (index->alias != ConfigManager::Entry::ALIAS_NONE) {
             desc.add_options()(
@@ -38,12 +39,23 @@ void AddOption(po::options_description &desc) {
             desc.add_options()(index->name.data(), index->description.data());
         }
     } else {
+        static_assert(index->belongsTo != nullptr,
+                      "Config entries with arguments must belong to a section");
+        static_assert(index->belongsTo == &sectionMain ||
+                          index->belongsTo == &sectionFilePath,
+                      "Config entries must belong to a valid section");
+        const char* sectionName = nullptr;
+        if (index->belongsTo == &sectionMain) {
+            sectionName = sectionMain;
+        } else if (index->belongsTo == &sectionFilePath) {
+            sectionName = sectionFilePath;
+        }
+        std::string name = fmt::format("{}.{}", sectionName, index->name);
         if (index->alias != ConfigManager::Entry::ALIAS_NONE) {
-            desc.add_options()(
-                fmt::format("{},{}", index->name, index->alias).c_str(),
-                po::value<T>(), index->description.data());
+            desc.add_options()(fmt::format("{},{}", name, index->alias).c_str(),
+                               po::value<T>(), index->description.data());
         } else {
-            desc.add_options()(index->name.data(), po::value<T>(),
+            desc.add_options()(name.c_str(), po::value<T>(),
                                index->description.data());
         }
     }
@@ -81,13 +93,13 @@ template <ConfigManager::Configs config>
 void verifyUniqueConfig() {
     constexpr auto count = std::ranges::count_if(
         ConfigManager::kConfigMap,
-        [](const auto &entry) { return entry.config == config; });
+        [](const auto& entry) { return entry.config == config; });
     static_assert(count == 1,
                   "kConfigMap must and only contain one of each configs");
 }
 
 template <size_t index>
-void addIndexConfig(po::options_description &desc) {
+void addIndexConfig(po::options_description& desc) {
     constexpr auto config = static_cast<ConfigManager::Configs>(index);
 
     // Handle special cases.
@@ -97,7 +109,7 @@ void addIndexConfig(po::options_description &desc) {
     }
 
     constexpr auto argtype =
-        std::ranges::find_if(ConfigManager::kConfigMap, [](const auto &entry) {
+        std::ranges::find_if(ConfigManager::kConfigMap, [](const auto& entry) {
             return entry.config == config;
         })->type;
     verifyUniqueConfig<config>();
@@ -106,7 +118,7 @@ void addIndexConfig(po::options_description &desc) {
 }
 
 template <size_t... index>
-void addAll(po::options_description &desc,
+void addAll(po::options_description& desc,
             const std::index_sequence<index...> indexs) {
     (addIndexConfig<index>(desc), ...);
 }
@@ -136,7 +148,7 @@ struct ConfigBackendBoostPOBase : public ConfigManager::Backend {
 };
 
 struct ConfigBackendFile : public ConfigBackendBoostPOBase {
-    static constexpr const char *kTgBotConfigFiles[] = {
+    static constexpr const char* kTgBotConfigFiles[] = {
         "tgbotserver." BUILD_TYPE_STR ".ini", "tgbotserver.ini"};
     bool load() override {
         std::filesystem::path home;
@@ -146,8 +158,8 @@ struct ConfigBackendFile : public ConfigBackendBoostPOBase {
         }
 
         std::ifstream ifs;
-	std::filesystem::path confPath;
-        for (const char *filename : kTgBotConfigFiles) {
+        std::filesystem::path confPath;
+        for (const char* filename : kTgBotConfigFiles) {
             confPath = home / filename;
             ifs.open(confPath);
             if (ifs.fail()) {
@@ -161,7 +173,7 @@ struct ConfigBackendFile : public ConfigBackendBoostPOBase {
         }
         try {
             po::store(po::parse_config_file(ifs, getTgBotOptionsDesc()), mp);
-        } catch (const boost::program_options::error &e) {
+        } catch (const boost::program_options::error& e) {
             LOG(ERROR) << "File backend failed to parse: " << e.what();
             return false;
         }
@@ -191,7 +203,7 @@ struct ConfigBackendCmdline : public ConfigBackendBoostPOBase {
             po::store(po::parse_command_line(_line.argc(), _line.argv(),
                                              getTgBotOptionsDesc()),
                       mp);
-        } catch (const boost::program_options::error &e) {
+        } catch (const boost::program_options::error& e) {
             LOG(ERROR) << "Cmdline backend failed to parse: " << e.what();
             return false;
         }
@@ -222,17 +234,20 @@ ConfigManager::ConfigManager(CommandLine line) {
     DLOG(INFO) << "Loaded " << storage.size() << " config sources";
 }
 
-std::optional<std::string> ConfigManager::get(Configs config) {
-    std::string_view name =
-        std::ranges::find_if(kConfigMap, [config](const Entry &entry) {
-            return entry.config == config;
-        })->name;
+std::optional<std::string> ConfigManager::get(Configs config) const {
+    const auto* it = std::ranges::find_if(
+        kConfigMap,
+        [config](const Entry& entry) { return entry.config == config; });
+    const std::string name =
+        it->belongsTo ? fmt::format("{}.{}", *(it->belongsTo), it->name)
+                      : std::string(it->name);
 
-    for (const auto &bit : storage) {
+    for (const auto& bit : storage) {
         if (!bit) {
             continue;
         }
-        const auto &result = bit->get(name);
+
+        const auto& result = bit->get(name);
         if (result.has_value()) {
             DLOG(INFO) << fmt::format("Used '{}' backend for variable {}",
                                       bit->name(), name);
@@ -240,9 +255,11 @@ std::optional<std::string> ConfigManager::get(Configs config) {
         }
     }
 
+    LOG(WARNING) << fmt::format("Config {} not found in any backend", name);
+
     return std::nullopt;
 }
 
-void ConfigManager::serializeHelpToOStream(std::ostream &out) {
+void ConfigManager::serializeHelpToOStream(std::ostream& out) {
     out << ConfigBackendCmdline::getTgBotOptionsDesc() << std::endl;
 }

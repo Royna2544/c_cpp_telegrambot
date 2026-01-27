@@ -67,6 +67,15 @@ class ROMBuildQueryHandler {
     enum class Buttons;
     ConfigParser parser;
 
+    std::filesystem::path _getRomBuildPath() const {
+        if (auto it = _config->get(ConfigManager::Configs::FILEPATH_ROM_BUILD);
+            it) {
+            return *it;
+        }
+        return _commandLine->getPath(FS::PathType::INSTALL_ROOT) /
+               kBuildDirectory;
+    }
+
     // Create keyboard given buttons enum and x length
     template <Buttons... N>
     KeyboardType createKeyboardWith(int x = 1) {
@@ -635,8 +644,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
 
     auto scriptDirectory =
         _commandLine->getPath(FS::PathType::RESOURCES_SCRIPTS);
-    auto buildDirectory =
-        _commandLine->getPath(FS::PathType::INSTALL_ROOT) / kBuildDirectory;
+    auto buildDirectory = _getRomBuildPath();
     auto gitAskFile = scriptDirectory / RepoSyncTask::kGitAskPassFile;
 
     // Push workdir
@@ -919,8 +927,7 @@ void ROMBuildQueryHandler::handle_clean_directories(const Query& query) {
 
     std::string_view type = query->data;
     absl::ConsumePrefix(&type, "clean_");
-    auto romRootDir =
-        _commandLine->getPath(FS::PathType::INSTALL_ROOT) / kBuildDirectory;
+    auto romRootDir = _getRomBuildPath();
     if (type == "rom") {
         LOG(INFO) << "Cleaning directory " << romRootDir;
         _api->answerCallbackQuery(query->id,
