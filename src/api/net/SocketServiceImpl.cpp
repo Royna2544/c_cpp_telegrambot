@@ -434,7 +434,10 @@ Status SocketServiceImpl::Service::endFileTransfer(
     if (request->is_upload()) {
         // Move temporary file to final destination
         try {
-            std::filesystem::rename(entry.filePath, request->file_path());
+            std::filesystem::copy_file(entry.filePath, request->file_path());
+            std::filesystem::remove(entry.filePath);
+            LOG(INFO) << "File uploaded successfully to: "
+                      << request->file_path();
         } catch (const std::filesystem::filesystem_error& e) {
             response->set_code(GenericResponseCode::ErrorCommandIgnored);
             response->set_message(
