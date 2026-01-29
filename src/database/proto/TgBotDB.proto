@@ -1,6 +1,6 @@
-syntax = "proto2";
+syntax = "proto3";
 
-package tgbot.proto;
+package glider.proto.database;
 
 message PersonList {
   repeated int64 id = 1;
@@ -11,7 +11,7 @@ enum MediaType {
   PHOTO = 1;
   VIDEO = 2;
   AUDIO = 3;
-  // DOCUMENT = 4;
+  DOCUMENT = 4;
   STICKER = 5;
   GIF = 6;
 }

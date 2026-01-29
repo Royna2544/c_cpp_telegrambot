@@ -13,29 +13,33 @@
 #include "TgBotDB.pb.h"
 
 template <>
-struct fmt::formatter<tgbot::proto::MediaType> : formatter<string_view> {
+struct fmt::formatter<glider::proto::database::MediaType>
+    : formatter<string_view> {
     // parse is inherited from formatter<string_view>.
-    auto format(tgbot::proto::MediaType c, format_context& ctx) const
+    auto format(glider::proto::database::MediaType c, format_context& ctx) const
         -> format_context::iterator {
         string_view name = "unknown";
         switch (c) {
-            case tgbot::proto::MediaType::VIDEO:
+            case glider::proto::database::MediaType::VIDEO:
                 name = "VIDEO";
                 break;
-            case tgbot::proto::MediaType::AUDIO:
+            case glider::proto::database::MediaType::AUDIO:
                 name = "AUDIO";
                 break;
-            case tgbot::proto::MediaType::STICKER:
+            case glider::proto::database::MediaType::STICKER:
                 name = "STICKER";
                 break;
-            case tgbot::proto::MediaType::UNKNOWN:
+            case glider::proto::database::MediaType::UNKNOWN:
                 name = "UNKNOWN";
                 break;
-            case tgbot::proto::MediaType::PHOTO:
+            case glider::proto::database::MediaType::PHOTO:
                 name = "PHOTO";
                 break;
-            case tgbot::proto::MediaType::GIF:
+            case glider::proto::database::MediaType::GIF:
                 name = "GIF";
+                break;
+            case glider::proto::database::MediaType::DOCUMENT:
+                name = "DOCUMENT";
                 break;
             default:
                 LOG(ERROR) << "Unknown media type: " << static_cast<int>(c);
@@ -46,7 +50,7 @@ struct fmt::formatter<tgbot::proto::MediaType> : formatter<string_view> {
     }
 };
 
-using namespace tgbot::proto;
+using namespace glider::proto::database;
 
 std::optional<int> ProtoDatabase::findByUid(const RepeatedField<UserId> list,
                                             const UserId uid) {
@@ -211,7 +215,7 @@ const PersonList& ProtoDatabase::getOtherPersonList(
 
 std::optional<ProtoDatabase::MediaInfo> ProtoDatabase::queryMediaInfo(
     std::string str) const {
-    std::optional<tgbot::proto::MediaToName> it;
+    std::optional<glider::proto::database::MediaToName> it;
     const auto& obj = dbinfo->object;
     for (const auto& mediaEntriesIt : obj.mediatonames()) {
         for (const auto& name : mediaEntriesIt.names()) {
@@ -243,7 +247,7 @@ ProtoDatabase::AddResult ProtoDatabase::addMediaInfo(
     mediaEntry->set_telegrammediaid(info.mediaId);
     mediaEntry->set_telegrammediauniqueid(info.mediaUniqueId);
     mediaEntry->set_mediatype(
-        static_cast<tgbot::proto::MediaType>(info.mediaType));
+        static_cast<glider::proto::database::MediaType>(info.mediaType));
     auto* const mediaNames = mediaEntry->mutable_names();
     for (const auto& name : info.names) {
         *mediaNames->Add() = name;
