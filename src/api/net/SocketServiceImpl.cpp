@@ -1,10 +1,10 @@
 #include "SocketServiceImpl.hpp"
 
-#include <../third-party/uuid_v4/uuid_v4.h>
 #include <absl/log/log.h>
 #include <fmt/format.h>
 #include <grpcpp/grpcpp.h>
 #include <grpcpp/server_builder.h>
+#include <uuid.h>
 
 #include <GitBuildInfo.hpp>
 #include <chrono>
@@ -12,6 +12,7 @@
 #include <filesystem>
 #include <fstream>
 #include <mutex>
+#include <random>
 #include <string_view>
 #include <system_error>
 
@@ -241,15 +242,16 @@ Status SocketServiceImpl::Service::requestFileTransfer(
               << (request->is_upload() ? " (upload)" : " (download)");
 
     // 1. Create UUID for the transfer
-    UUIDv4::UUIDGenerator<std::mt19937_64> uuidGenerator;
-    UUIDv4::UUID uuid = uuidGenerator.getUUID();
-    response->set_uuid(uuid.str());
+    std::mt19937 rng(std::random_device{}());
+    uuids::uuid uuid = uuids::uuid_random_generator{rng}();
+    response->set_uuid(uuids::to_string(uuid));
     // 2. Create file stream and store in activeTransfers_
     TranferEntry entry;
 
-    if (activeTransfers_.contains(uuid.str())) {
+    if (activeTransfers_.contains(uuids::to_string(uuid))) {
         response->set_accepted(false);
-        LOG(ERROR) << "File transfer with UUID already exists: " << uuid.str();
+        LOG(ERROR) << "File transfer with UUID already exists: "
+                   << uuids::to_string(uuid);
         return Status::OK;
     }
 
@@ -267,7 +269,7 @@ Status SocketServiceImpl::Service::requestFileTransfer(
 
         // For upload, we create a temporary file to store incoming data
         entry.filePath = std::filesystem::temp_directory_path() /
-                         fmt::format("upload_{}.tmp", uuid.str());
+                         fmt::format("upload_{}.tmp", uuids::to_string(uuid));
 
         entry.totalSize = request->file_size();
         std::filesystem::resize_file(entry.filePath, entry.totalSize, ec);
@@ -300,7 +302,7 @@ Status SocketServiceImpl::Service::requestFileTransfer(
         response->set_file_size(entry.totalSize);
         response->set_chunk_count(entry.chunk_count);
     }
-    activeTransfers_.emplace(uuid.str(), std::move(entry));
+    activeTransfers_.emplace(uuids::to_string(uuid), std::move(entry));
     response->set_accepted(true);
     return Status::OK;
 }

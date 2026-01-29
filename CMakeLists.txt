@@ -404,7 +404,7 @@ add_subdirectory(src/imagep)
 add_subdirectory(src/logging)
 add_subdirectory(src/utils)
 add_subdirectory(src/libos)
-add_subdirectory(src/third-party/uuid_v4)
+add_subdirectory(src/third-party/stduuid)
 add_subdirectory(src/third-party/tgbot-cpp)
 
 # Tests
