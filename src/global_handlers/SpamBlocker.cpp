@@ -3,8 +3,8 @@
 #include <trivial_helpers/_std_chrono_templates.h>
 #include <trivial_helpers/_tgbot.h>
 
-#include <api/AuthContext.hpp>
 #include <algorithm>
+#include <api/AuthContext.hpp>
 #include <global_handlers/SpamBlock.hpp>
 #include <iterator>
 #include <mutex>
@@ -53,12 +53,12 @@ class SameMessageMatcher : public Matcher {
     static int count(
         const SpamBlockBase::UserMessagesMap::const_iterator entry) {
         std::unordered_map<std::string, int> kSameMessageMap;
-        for (const auto &elem : entry->second) {
-            const auto &[id, content] = elem;
+        for (const auto& elem : entry->second) {
+            const auto& [id, content] = elem;
             ++kSameMessageMap[content];
         }
         return std::ranges::max_element(kSameMessageMap,
-                                        [](const auto &smsg, const auto &rmsg) {
+                                        [](const auto& smsg, const auto& rmsg) {
                                             return smsg.second > rmsg.second;
                                         })
             ->second;
@@ -84,20 +84,20 @@ void SpamBlockBase::onDetected(ChatId chat, UserId user,
 template <>
 struct fmt::formatter<SpamBlockBase::Config> : formatter<std::string_view> {
     // parse is inherited from formatter<string_view>.
-    auto format(SpamBlockBase::Config c,
-                format_context &ctx) const -> format_context::iterator {
+    auto format(SpamBlockBase::Config c, format_context& ctx) const
+        -> format_context::iterator {
         std::string_view name = "unknown";
         switch (c) {
-            case TgBotSocket::data::CtrlSpamBlock::OFF:
+            case SpamBlockBase::Config::OFF:
                 name = "OFF";
                 break;
-            case TgBotSocket::data::CtrlSpamBlock::LOGGING_ONLY:
+            case SpamBlockBase::Config::LOGGING_ONLY:
                 name = "LOGGING_ONLY";
                 break;
-            case TgBotSocket::data::CtrlSpamBlock::PURGE:
+            case SpamBlockBase::Config::PURGE:
                 name = "PURGE";
                 break;
-            case TgBotSocket::data::CtrlSpamBlock::PURGE_AND_MUTE:
+            case SpamBlockBase::Config::PURGE_AND_MUTE:
                 name = "PURGE_AND_MUTE";
                 break;
             default:
@@ -114,14 +114,14 @@ void SpamBlockBase::setConfig(Config config) {
 
 void SpamBlockBase::consumeAndDetect() {
     const std::lock_guard<std::mutex> _(mutex);
-    for (const auto &[chat, per_chat_map] : chat_messages_data) {
+    for (const auto& [chat, per_chat_map] : chat_messages_data) {
         int count =
             std::accumulate(per_chat_map.begin(), per_chat_map.end(), 0,
-                            [](const int /*index*/, const auto &messages) {
+                            [](const int /*index*/, const auto& messages) {
                                 return messages.second.size();
                             });
         if (count >= sSpamDetectThreshold) {
-            const auto &chatPtr = chat_map.at(chat);
+            const auto& chatPtr = chat_map.at(chat);
             LOG(INFO) << fmt::format(
                 "Launching spam detection in {}: Detected {}.", chatPtr, count);
             // Run detection
@@ -129,7 +129,7 @@ void SpamBlockBase::consumeAndDetect() {
                  it++) {
                 std::vector<MessageId> msgids;
                 std::ranges::transform(it->second, std::back_inserter(msgids),
-                                       [](const auto &x) { return x.first; });
+                                       [](const auto& x) { return x.first; });
                 if (Matcher::detect<MessageCountMatcher>(it) ||
                     Matcher::detect<SameMessageMatcher>(it)) {
                     onDetected(chat, it->first, msgids);
@@ -141,7 +141,7 @@ void SpamBlockBase::consumeAndDetect() {
     chat_messages_count = 0;
 }
 
-void SpamBlockBase::addMessage(const Message::Ptr &message) {
+void SpamBlockBase::addMessage(const Message::Ptr& message) {
     // Always ignore when spamblock is off
     if (_config == Config::OFF) {
         return;

@@ -402,9 +402,9 @@ add_subdirectory(src/database)
 add_subdirectory(src/random)
 add_subdirectory(src/imagep)
 add_subdirectory(src/logging)
-add_subdirectory(src/socket)
 add_subdirectory(src/utils)
 add_subdirectory(src/libos)
+add_subdirectory(src/third-party/uuid_v4)
 add_subdirectory(src/third-party/tgbot-cpp)
 
 # Tests
@@ -421,24 +421,6 @@ tgbot_library(
   Regex
   SRCS
   src/global_handlers/RegEXHandler.cpp
-  STATIC)
-
-tgbot_library(
-  NAME
-  SocketComponents
-  SRCS
-  src/global_handlers/SpamBlocker.cpp
-  src/global_handlers/ChatObserver.cpp
-  src/socket/server/PacketUtils.cpp
-  src/socket/server/DataStructParsers.cpp
-  src/socket/server/CommandHandlers.cpp
-  src/socket/server/SessionManager.cpp
-  src/socket/server/PacketDispatcher.cpp
-  src/socket/server/SocketInterface.cpp
-  LIBS
-  TgBot
-  DBImpl
-  Socket
   STATIC)
 
 tgbot_library(NAME ThreadManager SRCS src/ManagedThread.cpp
@@ -468,6 +450,7 @@ tgbot_exe(
   main
   SRCS
   src/main.cpp
+  src/global_handlers/SpamBlocker.cpp
   src/global_handlers/SpamBlockManager.cpp
   src/ml/ChatDataCollector.cpp
   src/logging/LoggingServer.cpp
@@ -482,10 +465,11 @@ tgbot_exe(
   Random
   restartfmt_parser
   Regex
-  SocketComponents
+  SocketService
   sighandler
   ApiImpl
   ThreadManager
+  LogServiceProto
   RELATION
   Main)
 

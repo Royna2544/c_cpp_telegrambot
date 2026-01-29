@@ -21,13 +21,16 @@ else()
     NO_HIDE)
 endif()
 
+include(gRPCGenerate)
+grpc_generate(Log)
+
 tgbot_exe(
   NAME
   logcat
   SRCS
   LoggingClient.cpp
   LIBS
-  SocketClient
+  LogServiceProto
   Utils
   sighandler
   RELATION

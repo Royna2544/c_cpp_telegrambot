@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package tgbot.proto.logging;
+
+import "google/protobuf/empty.proto";
+
+enum LogSeverity {
+  Info = 0;
+  Warning = 1;
+  Error = 2;
+  Fatal = 3;
+};
+
+message LogData {
+  LogSeverity severity = 1;
+  string message = 2;
+  int64 timestamp = 3;
+}
+
+service LoggingService {
+  rpc getLogs (google.protobuf.Empty) returns (stream LogData);
+}

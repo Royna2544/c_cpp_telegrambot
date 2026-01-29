@@ -1,0 +1,195 @@
+syntax = "proto3";
+
+package tgbot.proto.socket;
+
+import "google/protobuf/empty.proto";
+
+// Better sync with tgbot.proto.database.MediaType
+enum FileType {
+  UNKNOWN = 0;
+  PHOTO = 1;
+  VIDEO = 2;
+  AUDIO = 3;
+  DOCUMENT = 4;
+  STICKER = 5;
+  GIF = 6;
+  DICE = 99;
+}
+
+/*
+ * Request message for sending a message
+ *
+ * chat_id: Identifier of the chat to send the message to (Required)
+ * text: Text content of the message, becomes a caption if a file is attached (Optional)
+ * file_type: Type of the file being sent, default DOCUMENT. (Optional)
+ * file_source.file_data: Raw byte data of the file to be sent (Optional)
+ * file_source.file_path: Path to the file on the server to be sent (Optional)
+ * file_source.file_id: File ID of an existing file on Telegram servers to be sent (Optional)
+ * Note: Either file_source.file_data or file_source.file_path or file_source.file_id should be provided for file attachments (i.e. file_type is provided).
+ * Else, will be rejected.
+ */
+message SendMessageRequest {
+    int64 chat_id = 1;
+    optional string text = 2;
+    optional FileType file_type = 3;
+    oneof file_source {
+        bytes file_data = 4;    // Small files (<4MB) sent directly
+        string file_path = 5;   // Path on the server
+        string file_id = 6;     // File ID of an existing file on Telegram servers
+    }
+}
+
+/*
+ * Spam blocking configuration modes
+ */
+enum SpamBlockingModes {
+    Disabled = 0;
+    LoggingOnly = 1;
+    Purge = 2;
+    PurgeAndMute = 3;
+}
+
+message SpamBlockingConfig {
+    SpamBlockingModes mode = 1;
+}
+
+// Responses
+
+/*
+ * Generic response codes for various operations
+ */
+enum GenericResponseCode {
+    Success = 0;
+    TelegramApiException = 1;
+    ErrorInvalidArgument = 2;
+    ErrorCommandIgnored = 3;
+    ErrorRuntimeError = 4;
+    ErrorClientError = 5;
+}
+
+enum ChecksumAlgorithm {
+    None = 0;
+    MD5 = 1;
+    SHA1 = 2;
+    SHA256 = 3;
+}
+
+/*
+ * Request message for initiating a file transfer
+ *
+ * file_name: Name of the file to be transferred in the remote / to be saved on the remote (Required)
+ * file_checksum_algorithm: Algorithm used for checksum calculation (Optional)
+ * file_checksum: Checksum of the file to verify if the same file is present compared to one
+ *                requesting to be sent. (Optional, required if file_checksum_algorithm is set)
+ * overwrite_existing: Flag indicating whether to overwrite existing files. By default, files are not overwritten. (Optional)
+ * uuid: Unique identifier for the file transfer session. Required in #endFileTransfer. Not in anywhere else (Optional)
+ * is_upload: Flag indicating whether the request is for uploading (true) or downloading (false) a file. (Required)
+ * file_size: Size of the file to be transferred in bytes. Required for upload requests. (Optional)
+ */
+message FileTransferRequest {
+    string file_path = 1;
+    optional ChecksumAlgorithm file_checksum_algorithm = 2;
+    optional bytes file_checksum = 3;
+    optional bool overwrite_existing = 4;
+    optional string uuid = 5;
+    bool is_upload = 6;
+    uint64 file_size = 7;
+}
+
+/*
+ * Request message for requesting a specific file chunk
+ *
+ * uuid: Unique identifier for the file transfer session (Required)
+ * chunk_idx: Index of the chunk being requested (Required if it is used for #requestFileTransfer, ignored on #endFileTransfer)
+ */
+message FileChunkRequest {
+    optional string uuid = 1;
+    optional int32 chunk_idx = 2;
+}
+
+/*
+ * Generic response message structure
+ */
+message GenericResponse {
+    optional GenericResponseCode code = 2;
+    optional string message = 3;
+}
+
+/**
+ * Response message for file transfer requests
+ *
+ * accepted: Indicates if the file transfer request was accepted (Required)
+ * file_size: Size of the file to be transferred in bytes (Omitted if not accepted)
+ * chunk_count: Number of chunks decided by server for transferring the file (Omitted if not accepted)
+ * uuid: Unique identifier for the file transfer session. Use it on #requestFileChunk (Omitted if not accepted)
+ * reject_message: Message indicating the reason for rejection (Omitted if accepted)
+ */
+message FileTransferResponse {
+    optional bool accepted = 1;
+    optional int64 file_size = 2;
+    optional int32 chunk_count = 3;
+    optional string uuid = 4;
+    optional string reject_message = 5;
+}
+
+/*
+ * Represents a file chunk being transferred
+ *
+ * uuid: Unique identifier for the file transfer session (Required)
+ * chunk_idx: Index of the chunk being returned (Required)
+ * chunk_data: Raw byte data of the requested file chunk (Required)
+ * chunk_offset: Offset of the chunk in the overall file (Required)
+ */
+message FileChunk {
+    string uuid = 1;
+    int32 chunk_idx = 2;
+    bytes chunk_data = 3;
+    int64 chunk_offset = 4;
+}
+
+/*
+ * Response message for file chunk requests
+ *
+ * success: Indicates if the chunk request was successful (Required)
+ * retry: Indicates if the sender should retry the request (Optional, default false)
+ * chunk: The requested file chunk (Omitted if not successful or upload is true)
+ */
+message FileChunkResponse {
+    optional bool success = 1;
+    optional bool retry = 2;
+    optional FileChunk chunk = 3;
+}
+
+// d h:m:s format uptime representation
+message Uptime {
+    int32 days = 1;
+    int32 hours = 2;
+    int32 minutes = 3;
+    int32 seconds = 4;
+}
+
+message BotInfo {
+    Uptime uptime = 1;
+    string username = 2;
+    int64 user_id = 3;
+    string operating_system = 4;
+}
+
+service SocketService {
+    // Sends a message to a specified chat
+    rpc sendMessage (SendMessageRequest) returns (GenericResponse);
+
+    // Sets the spam blocking configuration
+    rpc setSpamBlockingConfig (SpamBlockingConfig) returns (GenericResponse);
+    rpc getSpamBlockingConfig (google.protobuf.Empty) returns (SpamBlockingConfig);
+
+    // FileTransfer related RPCs
+    rpc requestFileTransfer (FileTransferRequest) returns (FileTransferResponse);
+    rpc downloadFileLoop (stream FileChunkRequest) returns (stream FileChunkResponse);
+    rpc uploadFileLoop (stream FileChunk) returns (stream FileChunkResponse);
+    rpc endFileTransfer (FileTransferRequest) returns (GenericResponse);
+
+    // Health check RPC
+    rpc ping (google.protobuf.Empty) returns (google.protobuf.Empty);
+    rpc info (google.protobuf.Empty) returns (BotInfo);
+}

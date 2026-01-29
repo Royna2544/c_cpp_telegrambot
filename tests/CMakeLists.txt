@@ -40,20 +40,6 @@ tgbot_exe(
 )
 
 tgbot_exe(
-  NAME socketdatahandler
-  SRCS
-    TestMain.cpp
-    SocketDataHandlerTest.cpp
-  LIBS
-    GTest::gtest
-    GTest::gmock
-    SocketComponents
-    fruit
-    $<$<BOOL:${TGBOTCPP_SOCKET_PACKET_VERBOSE}>:HexDump>
-  TEST
-)
-
-tgbot_exe(
   NAME popenwdt
   SRCS
     TestMain.cpp

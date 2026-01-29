@@ -10,31 +10,17 @@
 #include <stop_token>
 #include <utility>
 
-#include "SocketContext.hpp"
-
 struct NetworkLogSink : public ThreadRunner {
-    class LogSinkImpl : public absl::LogSink {
-        void Send(const absl::LogEntry& entry) override;
-        const TgBotSocket::Context* context = nullptr;
-        std::stop_source _stop;
-
-       public:
-        // Requires an accepted socket.
-        explicit LogSinkImpl(const TgBotSocket::Context* context,
-                             std::stop_source source)
-            : context(context), _stop(std::move(source)) {};
-    };
+    struct Impl;
 
     void runFunction(const std::stop_token& token) override;
 
     void onPreStop() override;
 
-    explicit NetworkLogSink(TgBotSocket::Context* context);
+    explicit NetworkLogSink(std::string url);
+    ~NetworkLogSink() override;
 
    private:
-    TgBotSocket::Context* context = nullptr;
-
-    // Used to wait for stop signal
-    std::condition_variable cv;
-    std::mutex m;
+    std::unique_ptr<Impl> impl;
+    std::string url;
 };

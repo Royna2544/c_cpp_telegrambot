@@ -16,6 +16,7 @@
 // Dummy externs to distinguish sections in config files
 extern const char* const sectionMain;
 extern const char* const sectionFilePath;
+extern const char* const sectionNetwork;
 
 // Abstract manager for config loader
 // Currently have three sources, env and file, cmdline
@@ -26,13 +27,16 @@ class UTILS_EXPORT ConfigManager {
         LOG_FILE,
         DATABASE_CFG,
         HELP,
-        SOCKET_CFG,
+        SOCKET_URL_PRIMARY,
+        SOCKET_URL_SECONDARY,
+        SOCKET_URL_LOGGING,
         GITHUB_TOKEN,
         OPTIONAL_COMPONENTS,
         BUILDBUDDY_API_KEY,
         LLMCONFIG,
         FILEPATH_ROM_BUILD,
         FILEPATH_KERNEL_BUILD,
+        TELEGRAM_API_SERVER,
         MAX
     };
     static constexpr size_t CONFIG_MAX = static_cast<int>(Configs::MAX);
@@ -104,16 +108,32 @@ class UTILS_EXPORT ConfigManager {
             .belongsTo = nullptr,
         },
         {
-            .config = Configs::SOCKET_CFG,
-            .name = "SocketCfg",
-            .description = "Sockets (ipv4/ipv6)",
+            .config = Configs::SOCKET_URL_PRIMARY,
+            .name = "PrimaryUrl",
+            .description = "Primary socket URL",
             .alias = Entry::ALIAS_NONE,
             .type = Entry::ArgType::STRING,
-            .belongsTo = &sectionMain,
+            .belongsTo = &sectionNetwork,
+        },
+        {
+            .config = Configs::SOCKET_URL_SECONDARY,
+            .name = "SecondaryUrl",
+            .description = "Secondary socket URL",
+            .alias = Entry::ALIAS_NONE,
+            .type = Entry::ArgType::STRING,
+            .belongsTo = &sectionNetwork,
+        },
+        {
+            .config = Configs::SOCKET_URL_LOGGING,
+            .name = "LoggingUrl",
+            .description = "Logging socket URL",
+            .alias = Entry::ALIAS_NONE,
+            .type = Entry::ArgType::STRING,
+            .belongsTo = &sectionNetwork,
         },
         {
             .config = Configs::GITHUB_TOKEN,
-            .name = "GithubToken",
+            .name = "GitHubToken",
             .description = "Github token",
             .alias = Entry::ALIAS_NONE,
             .type = Entry::ArgType::STRING,
@@ -172,7 +192,14 @@ class UTILS_EXPORT ConfigManager {
             .type = Entry::ArgType::STRING,
             .belongsTo = &sectionFilePath,
         },
-    };
+        {
+            .config = Configs::TELEGRAM_API_SERVER,
+            .name = "ApiServer",
+            .description = "Custom Telegram API server URL",
+            .alias = Entry::ALIAS_NONE,
+            .type = Entry::ArgType::STRING,
+            .belongsTo = &sectionMain,
+        }};
 
     struct Backend {
         virtual ~Backend() = default;

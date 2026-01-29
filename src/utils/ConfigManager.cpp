@@ -21,6 +21,7 @@
 
 const char* const sectionMain = "Main";
 const char* const sectionFilePath = "FilePath";
+const char* const sectionNetwork = "Network";
 
 namespace po = boost::program_options;
 
@@ -41,14 +42,13 @@ void AddOption(po::options_description& desc) {
     } else {
         static_assert(index->belongsTo != nullptr,
                       "Config entries with arguments must belong to a section");
-        static_assert(index->belongsTo == &sectionMain ||
-                          index->belongsTo == &sectionFilePath,
-                      "Config entries must belong to a valid section");
         const char* sectionName = nullptr;
         if (index->belongsTo == &sectionMain) {
             sectionName = sectionMain;
         } else if (index->belongsTo == &sectionFilePath) {
             sectionName = sectionFilePath;
+        } else if (index->belongsTo == &sectionNetwork) {
+            sectionName = sectionNetwork;
         }
         std::string name = fmt::format("{}.{}", sectionName, index->name);
         if (index->alias != ConfigManager::Entry::ALIAS_NONE) {

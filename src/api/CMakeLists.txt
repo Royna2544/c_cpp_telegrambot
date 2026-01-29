@@ -75,3 +75,4 @@ tgbot_library(
 )
 
 add_subdirectory(components/restartfmt_parser)
+add_subdirectory(net)

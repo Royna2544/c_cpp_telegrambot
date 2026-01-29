@@ -39,14 +39,22 @@
 - TGBOTCPP_RUST_MODULES: Enable and build command modules written with Rust language (default: OFF)
 - TGBOTCPP_LUA_MODULES: Enable support for command module written with Lua language (default: ON)
 - TGBOTCPP_ENABLE_LOCAL_LLM: Enable support for local LLM framework (Requires compatible hardware, e.g. NVIDIA GPU) (default: OFF)
-- TGBOTCPP_SOCKET_PACKET_VERBOSE: Enable verbose hex-view level logging for socket packets (default: OFF)
 
 ## Config file options
-- TOKEN: Telegram bot token
-- LOG_FILE: Log file path
-- DATABASE_CFG: Database configuration. Format: "type:filename", where type is one of "sqlite" or "protobuf", and filename is the database file path.
-- SOCKET_CFG: Export network-socket based API configuration. Choose between "ipv4", "ipv6". Omitting this option disables the socket API.
-- GITHUB_TOKEN: Github token (Used for private repo access).
-- OPTIONAL_COMPONENTS: Enable optional components. Comma-separated list of components to enable. Supported components: "webserver", "datacollector".
-- BUILDBUDDY_API_KEY: BuildBuddy API key for Android RBE.
-- LLMCONFIG: LLM configuration. (local/localnet),(filepath/urlendpoint)(,authkey)
+### Section Main
+- Token: Telegram bot token
+- LogFile: Log file path
+- DatabaseCfg: Database configuration. Format: "type:filename", where type is one of "sqlite" or "protobuf", and filename is the database file path.
+- GitHubToken: Github token (Used for private repo access).
+- OptionalComponents: Enable optional components. Comma-separated list of components to enable. Supported components: "webserver", "datacollector".
+- BuildBuddyApiKey: BuildBuddy API key for Android RBE.
+- LLMConfig: LLM configuration. (local/localnet),(filepath/urlendpoint)(,authkey)
+
+### Section Network
+- PrimaryUrl: Primary socket url that is binded to. e.g. 192.168.0.X:239 or unix://path/to/file
+- SecondaryUrl: Secondary socket url.
+- LoggingUrl: Logging service socket url.
+
+### Section FilePath
+- ROMBuild: Path to use for ROMBuild module
+- KernelBuild: Path to use for KernelBuild module

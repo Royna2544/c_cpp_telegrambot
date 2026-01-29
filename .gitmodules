@@ -10,3 +10,6 @@
 [submodule "llama.cpp"]
 	path = src/command_modules/llm/llama.cpp
 	url = https://github.com/ggml-org/llama.cpp
+[submodule "src/third-party/uuid_v4"]
+	path = src/third-party/uuid_v4
+	url = https://github.com/crashoz/uuid_v4

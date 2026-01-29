@@ -10,7 +10,6 @@
 #include <concepts>
 #include <cstddef>
 #include <mutex>
-#include <socket/api/DataStructures.hpp>
 #include <unordered_map>
 
 using TgBot::Chat;
@@ -23,7 +22,15 @@ struct SpamBlockBase {
     using UserMessagesMap =
         std::unordered_map<UserId,
                            std::vector<std::pair<MessageId, std::string>>>;
-    using Config = TgBotSocket::data::CtrlSpamBlock;
+    /**
+     * @brief Spam blocking control modes
+     */
+    enum class Config : uint8_t {
+        OFF = 0,             ///< Disabled
+        LOGGING_ONLY = 1,    ///< Log only, no action
+        PURGE = 2,           ///< Delete messages only
+        PURGE_AND_MUTE = 3,  ///< Delete and mute sender
+    };
 
     // Triggered when a chat has more than sSpamDetectThreshold messages
     // In sSpamDetectDelay delay.

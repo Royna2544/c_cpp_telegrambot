@@ -1,39 +1,34 @@
-#include <api/typedefs.h>
 #include <absl/log/log.h>
+#include <api/typedefs.h>
 #include <fmt/format.h>
-#include <nlohmann/json.hpp>
+#include <grpcpp/create_channel.h>
 
 #include <TryParseStr.hpp>
-#include <socket/client/ClientBackend.hpp>
-#include <socket/shared/PacketParser.hpp>
-#include <socket/api/DataStructures.hpp>
-#include <socket/api/Callbacks.hpp>
-#include <utils/CommandLine.hpp>
 #include <cstdlib>
 #include <cstring>
 #include <database/bot/TgBotDatabaseImpl.hpp>
 #include <iostream>
 #include <memory>
+#include <nlohmann/json.hpp>
+#include <string_view>
+#include <utils/CommandLine.hpp>
 
 #include "ConfigManager.hpp"
+#include "Socket_service.grpc.pb.h"
 
 [[noreturn]] static void usage(const char* argv0, const int exitCode) {
-    std::cerr << "Usage: " << argv0 << " <chat(Id/Name)> <medianame>"
-              << std::endl;
+    std::cerr << "Usage: " << argv0
+              << " <chat(Id/Name)> <medianame> <connect url>" << std::endl;
     exit(exitCode);
 }
 
 int app_main(int argc, char** argv) {
     ChatId chatId = 0;
-    TgBotSocket::data::SendFileToChatId data = {};
-    const auto _usage = [capture0 = argv[0]](auto&& PH1) {
-        usage(capture0, std::forward<decltype(PH1)>(PH1));
-    };
     CommandLine line{argc, argv};
     auto config = std::make_unique<ConfigManager>(line);
 
-    if (argc != 3) {
-        _usage(EXIT_SUCCESS);
+    if (argc != 4) {
+        usage(argv[0], EXIT_FAILURE);
     }
     auto backend = std::make_unique<TgBotDatabaseImpl>();
     TgBotDatabaseImpl_load(config.get(), backend.get(), &line);
@@ -48,7 +43,7 @@ int app_main(int argc, char** argv) {
             chatId = *id;
         } else {
             LOG(ERROR) << "Failed to find chat ID for name '" << argv[1] << "'";
-            _usage(EXIT_FAILURE);
+            usage(argv[0], EXIT_FAILURE);
         }
     }
     auto info = backend->queryMediaInfo(argv[2]);
@@ -60,64 +55,29 @@ int app_main(int argc, char** argv) {
         LOG(INFO) << "Found, sending (fileid " << info->mediaId << ") to chat "
                   << chatId;
     }
-    TgBotSocket::copyTo(data.filePath, info->mediaId);
-    data.chat = chatId;
-    data.fileType = TgBotSocket::data::FileType::TYPE_DOCUMENT;
+    tgbot::proto::socket::SendMessageRequest request;
+    request.mutable_file_id()->assign(info->mediaId);
+    request.set_chat_id(chatId);
+    request.set_file_type(static_cast<tgbot::proto::socket::FileType>(
+        static_cast<int>(info->mediaType)));
 
-    TgBotSocket::SocketClientWrapper wrapper;
-    if (wrapper.connect(TgBotSocket::Context::kTgBotHostPort,
-                        TgBotSocket::Context::hostPath())) {
-        using namespace TgBotSocket;
-        DLOG(INFO) << "Connected to server";
-        Packet openSession = createPacket(Command::CMD_OPEN_SESSION, nullptr, 0,
-                                          PayloadType::Binary, {});
-        wrapper->write(openSession);
-        DLOG(INFO) << "Wrote open session packet";
-        auto openSessionAck =
-            TgBotSocket::readPacket(wrapper.chosen_interface());
-        if (!openSessionAck ||
-            openSessionAck->header.cmd != Command::CMD_OPEN_SESSION_ACK) {
-            LOG(ERROR) << "Failed to open session";
-            return EXIT_FAILURE;
-        }
-        auto _root = parseAndCheck(openSessionAck->data.get(),
-                                   openSessionAck->data.size(),
-                                   {"session_token", "expiration_time"});
-        if (!_root) {
-            LOG(ERROR) << "Invalid open session ack json";
-            return EXIT_FAILURE;
-        }
-        auto& root = *_root;
-        LOG(INFO) << "Opened session. Token: " << root["session_token"]
-                  << " expiration_time: " << root["expiration_time"];
-
-        std::string session_token_str = root["session_token"].get<std::string>();
-        Packet::Header::session_token_type session_token{};
-        copyTo(session_token, session_token_str);
-        auto pkt =
-            createPacket(TgBotSocket::Command::CMD_SEND_FILE_TO_CHAT_ID, &data,
-                         sizeof(data), PayloadType::Binary, session_token);
-        if (!wrapper->write(pkt)) {
-            LOG(ERROR) << "Failed to write send file to chat id packet";
-            backend->unload();
-            return EXIT_FAILURE;
-        }
-        auto result = TgBotSocket::readPacket(wrapper.chosen_interface());
-        if (!result || result->header.cmd != Command::CMD_GENERIC_ACK) {
-            LOG(ERROR) << "Failed to send file to chat id";
-            backend->unload();
-            return EXIT_FAILURE;
-        }
-        TgBotSocket::callback::GenericAck genericAck;
-        result->data.assignTo(genericAck);
-        if (genericAck.result != TgBotSocket::callback::AckType::SUCCESS) {
-            LOG(ERROR) << "Failed to send file to chat id: "
-                       << genericAck.error_msg.data();
-            backend->unload();
-            return EXIT_FAILURE;
-        }
-        DLOG(INFO) << "File sent successfully";
+    auto channel =
+        grpc::CreateChannel(argv[3], grpc::InsecureChannelCredentials());
+    auto stub = tgbot::proto::socket::SocketService::NewStub(channel);
+    grpc::ClientContext context;
+    tgbot::proto::socket::GenericResponse response;
+    auto status = stub->sendMessage(&context, request, &response);
+    if (!status.ok()) {
+        LOG(ERROR) << "gRPC call failed: " << status.error_message();
         backend->unload();
+        return EXIT_FAILURE;
     }
+    if (response.code() != tgbot::proto::socket::GenericResponseCode::Success) {
+        LOG(ERROR) << "Failed to send media to chat: " << response.message();
+        backend->unload();
+        return EXIT_FAILURE;
+    }
+    LOG(INFO) << "Media sent successfully to chat " << chatId;
+    backend->unload();
     return EXIT_SUCCESS;
 }
