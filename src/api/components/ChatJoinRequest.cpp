@@ -68,21 +68,24 @@ void TgBotApiImpl::ChatJoinRequestImpl::onCallbackQueryFunction(
             result = fmt::format("Approved user {} by {}", request->from,
                                  query->from);
         } else if (queryData == "disapprove") {
-            LOG(INFO) << fmt::format("Disapproved {} in chat {}", request->from,
+            LOG(INFO) << fmt::format("Declining {} in chat {}", request->from,
                                      request->chat);
             _api->getApi().declineChatJoinRequest(request->chat->id,
                                                   request->from->id);
-            _api->getApi().answerCallbackQuery(query->id, "Disapproved user");
+            _api->getApi().answerCallbackQuery(query->id, "Declined user");
 
-            result = fmt::format("Disapproved user {} by {}", request->from,
+            result = fmt::format("Declined user {} by {}", request->from,
                                  query->from);
         } else if (queryData == "ban") {
-            LOG(INFO) << fmt::format("Banning {} in chat {}", request->from,
-                                     request->chat);
+            LOG(INFO) << fmt::format("Declining and Banning {} in chat {}",
+                                     request->from, request->chat);
+            // declineChatJoinRequest is not implied by banChatMember somehow...
+            _api->getApi().declineChatJoinRequest(request->chat->id,
+                                                  request->from->id);
             _api->getApi().banChatMember(request->chat->id, request->from->id);
             _api->getApi().answerCallbackQuery(query->id, "Banned user");
-            result =
-                fmt::format("Banned user {} by {}", request->from, query->from);
+            result = fmt::format("Declined and banned user {} by {}",
+                                 request->from, query->from);
         } else {
             LOG(ERROR) << "Invalid payload: " << query->data
                        << ". Parsed item: " << queryData;
@@ -128,7 +131,7 @@ TgBotApiImpl::ChatJoinRequestImpl::ChatJoinRequestImpl(TgBotApiImpl::Ptr api)
     templateMarkup->inlineKeyboard.at(0).at(0)->text = "✅ Approve user";
     templateMarkup->inlineKeyboard.at(0).at(1) =
         std::make_shared<TgBot::InlineKeyboardButton>();
-    templateMarkup->inlineKeyboard.at(0).at(1)->text = "❌ Disapprove user";
+    templateMarkup->inlineKeyboard.at(0).at(1)->text = "❌ Decline user";
     templateMarkup->inlineKeyboard.at(1).resize(1);
     templateMarkup->inlineKeyboard.at(1).at(0) =
         std::make_shared<TgBot::InlineKeyboardButton>();
