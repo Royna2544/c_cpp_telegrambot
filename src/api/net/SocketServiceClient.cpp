@@ -260,8 +260,8 @@ class BotClient {
 };
 
 int app_main(int argc, char** argv) {
-    if (argc < 2) {
-        std::cerr << "Usage: ./client <command> [args...]\n"
+    if (argc < 3) {
+        std::cerr << "Usage: ./client <dest> <command> [args...]\n"
                   << "Commands:\n"
                   << "  send_message <chat_id> <text> [file_path]\n"
                   << "  spam_config <0-3>\n"
@@ -273,9 +273,11 @@ int app_main(int argc, char** argv) {
 
     // Connect to server
     auto channel =
-        grpc::CreateChannel(SERVER_ADDRESS, grpc::InsecureChannelCredentials());
+        grpc::CreateChannel(argv[1], grpc::InsecureChannelCredentials());
     BotClient client(channel);
 
+    argc--;
+    argv++;
     std::string command = argv[1];
 
     try {
