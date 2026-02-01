@@ -3,14 +3,14 @@
     "repo": {
         "url": "https://github.com/microsoft/WSL2-Linux-Kernel",
         "branch": "linux-msft-wsl-6.6.y",
-        "shallow" : true
+        "shallow": true
     },
     "arch": "x86_64",
     "type": "Image",
     "toolchains": {
-        "Clang": true,
-        "LLVM Binutils": true,
-        "LLVM IAS": true
+        "clang": true,
+        "llvm_binutils": true,
+        "llvm_ias": true
     },
     "anykernel": {
         "enabled": false

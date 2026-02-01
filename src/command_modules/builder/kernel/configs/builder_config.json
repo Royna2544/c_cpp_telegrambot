@@ -1,0 +1,32 @@
+{
+    "toolchains": [
+        {
+            "compiler": "gcc",
+            "compiler_version": 4.9,
+            "compiler_triple": "arm-linux-androideabi",
+            "name": "gcc-4.9-arm-android",
+            "arch": "arm",
+            "type": "git",
+            "url": "https://github.com/Roynas-Android-Playground/android_prebuilts_gcc_linux-x86_arm_arm-linux-androideabi-4.9",
+            "branch": "lineage-19.1"
+        },
+        {
+            "compiler": "gcc",
+            "compiler_version": 4.9,
+            "compiler_triple": "aarch64-linux-android",
+            "arch": "arm64",
+            "name": "gcc-4.9-arm64-android",
+            "type": "git",
+            "url": "https://github.com/Roynas-Android-Playground/android_prebuilts_gcc_linux-x86_aarch64_aarch64-linux-android-4.9",
+            "branch": "lineage-19.1"
+        },
+        {
+            "compiler": "clang",
+            "compiler_version": 20,
+            "arch": "any",
+            "name": "clang-20-android",
+            "type": "tarball",
+            "url": "https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/tags/android-16.0.0_r4/clang-r547379.tar.gz"
+        }
+    ]
+}

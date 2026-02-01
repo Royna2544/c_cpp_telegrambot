@@ -7,9 +7,9 @@
     "arch": "arm64",
     "type": "Image",
     "toolchains": {
-        "Clang": true,
-        "LLVM Binutils": true,
-        "LLVM IAS": true
+        "clang": true,
+        "llvm_binutils": true,
+        "llvm_ias": true
     },
     "anykernel": {
         "enabled": true,

@@ -1,0 +1,82 @@
+syntax = "proto3";
+
+package tgbot.builder.linuxkernel;
+
+import "google/protobuf/empty.proto";
+
+// Request and response messages for adding and updating kernel build configurations
+message Config {
+    string name = 1;
+    string json_content = 2;
+}
+
+message ConfigResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+// Request message for preparing a kernel build (In this case, we are making defconfig)
+// name: What kernel to build?
+// device_name: Which device configuration to use? (e.g. phone)
+// config_fragments: Additional configuration fragments' names to apply on top of the base configuration (e.g. some, as)
+// clone_depth: Depth for cloning the kernel source repository (0 for full clone)
+// 
+message BuildPrepareRequest {
+    string name = 1;
+    string device_name = 2;
+    repeated string config_fragments = 3;
+    int32 clone_depth = 5;
+}
+
+enum ProgressStatus {
+    NONE = 0;
+    PENDING = 1;
+    IN_PROGRESS_CONFIGURE = 2;
+    IN_PROGRESS_DOWNLOAD = 3;
+    IN_PROGRESS_BUILD = 4;
+    SUCCESS = 5;
+    FAILED = 6;
+}
+
+// Status message for the result of preparing a kernel build
+// status: Current status of the preparation process
+// output: Any output messages from the preparation process
+// build_id: Optional ID of the prepared build (if status is SUCCESS)
+message BuildStatus {
+    ProgressStatus status = 1;
+    string output = 2;
+    optional int32 build_id = 3;
+}
+
+// Request message for initiating the actual kernel build
+// build_id: ID of the prepared build to execute
+message BuildRequest {
+    int32 build_id = 1;
+}
+
+message ArtifactChunk {
+    oneof content {
+        ArtifactMetadata metadata = 1;
+        bytes data = 2;
+    }
+}
+
+message ArtifactMetadata {
+    string filename = 1;
+    uint64 total_size = 2;
+}
+
+// Service for building Linux kernels
+service LinuxKernelBuildService {
+    // Configuration management RPCs
+    rpc addConfig (Config) returns (ConfigResponse);
+    rpc updateConfig (Config) returns (ConfigResponse);
+    rpc listConfigs (google.protobuf.Empty) returns (stream Config);
+    rpc deleteConfig (Config) returns (ConfigResponse);
+
+    // Build process RPCs
+    rpc prepareBuild (BuildPrepareRequest) returns (stream BuildStatus);
+    rpc doBuild(BuildRequest) returns (stream BuildStatus);
+    rpc cancelBuild (BuildRequest) returns (BuildStatus);
+    rpc getArtifact (BuildRequest) returns (stream ArtifactChunk);
+}
