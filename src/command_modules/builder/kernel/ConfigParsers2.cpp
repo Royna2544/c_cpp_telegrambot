@@ -11,9 +11,6 @@
 #include <type_traits>
 #include <vector>
 
-#include "FileWithTimestamp.hpp"
-#include "RepoUtils.hpp"
-
 // vector
 template <typename T>
 struct is_vector : std::false_type {};
@@ -210,14 +207,14 @@ bool KernelConfig::parseType(const nlohmann::json& node) {
 bool KernelConfig::parseClangSupport(const nlohmann::json& node) {
     StackingError errors;
     bool supported = false;
-    errors = get(node, "toolchains", "Clang", &supported);
+    errors = get(node, "toolchains", "clang", &supported);
 
     if (!supported) {
         clang = ClangSupport::None;
     } else {
-        errors = get(node, "toolchains", "LLVM Binutils", &supported);
+        errors = get(node, "toolchains", "llvm_binutils", &supported);
         if (supported) {
-            errors = get(node, "toolchains", "LLVM IAS", &supported);
+            errors = get(node, "toolchains", "llvm_ias", &supported);
             if (supported) {
                 clang = ClangSupport::FullLLVMWithIAS;
             } else {
@@ -355,21 +352,27 @@ void KernelConfig::parse() {
         throw std::runtime_error("Failed to open JSON file: " + filePath);
     }
     try {
-        ifs >> root;
+        fileContentCache = std::string(std::istreambuf_iterator<char>(ifs),
+                                       std::istreambuf_iterator<char>());
+        root = nlohmann::json::parse(fileContentCache);
     } catch (const nlohmann::json::parse_error& e) {
-        throw std::runtime_error("Failed to parse JSON file: " + filePath + ": " + e.what());
+        throw std::runtime_error("Failed to parse JSON file: " + filePath +
+                                 ": " + e.what());
     }
     if (!parse(root)) {
         throw std::runtime_error("Failed to parse JSON file: " + filePath);
     }
 }
 
-void KernelConfig::reParse() {
+std::string KernelConfig::toJsonString() const { return fileContentCache; }
+
+bool KernelConfig::reParse() {
     if (!_file.updated()) {
-        return;
+        return false;
     }
     LOG(INFO) << "File has been updated: " << _sourceFilePath.filename();
     parse();
+    return true;
 }
 
 KernelConfig::KernelConfig(std::filesystem::path jsonFile)

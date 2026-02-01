@@ -23,6 +23,19 @@ pub enum Architecture {
     X86_64,
 }
 
+impl std::fmt::Display for Architecture {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let arch_str = match self {
+            Architecture::Any => "any",
+            Architecture::ARM => "arm",
+            Architecture::ARM64 => "arm64",
+            Architecture::X86 => "x86",
+            Architecture::X86_64 => "x86_64",
+        };
+        write!(f, "{}", arch_str)
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(rename_all = "lowercase")]
 pub enum Source {

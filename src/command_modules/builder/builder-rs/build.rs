@@ -9,6 +9,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "#[serde(rename_all = \"lowercase\")]",
         )
         .file_descriptor_set_path(std::env::var("OUT_DIR").unwrap() + "/descriptor.bin")
-        .compile_protos(&["../proto/LinuxKernelBuildService.proto"], &["../proto"])?;
+        .compile_protos(
+            &["../kernel/proto/LinuxKernelBuild_service.proto"],
+            &["../kernel/proto"],
+        )?;
     Ok(())
 }

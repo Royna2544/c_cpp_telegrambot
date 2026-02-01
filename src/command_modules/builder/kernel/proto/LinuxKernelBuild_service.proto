@@ -20,12 +20,14 @@ message ConfigResponse {
 // device_name: Which device configuration to use? (e.g. phone)
 // config_fragments: Additional configuration fragments' names to apply on top of the base configuration (e.g. some, as)
 // clone_depth: Depth for cloning the kernel source repository (0 for full clone)
+// github_token: Optional GitHub token for accessing private repositories
 // 
 message BuildPrepareRequest {
     string name = 1;
     string device_name = 2;
     repeated string config_fragments = 3;
-    int32 clone_depth = 5;
+    optional int32 clone_depth = 5;
+    optional string github_token = 6;
 }
 
 enum ProgressStatus {

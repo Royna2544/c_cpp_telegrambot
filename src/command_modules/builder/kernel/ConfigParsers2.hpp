@@ -1,18 +1,18 @@
 #pragma once
 
 #include <fmt/core.h>
-#include <nlohmann/json.hpp>
 
 #include <filesystem>
 #include <map>
+#include <nlohmann/json.hpp>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
 
+#include "../FileWithTimestamp.hpp"
 #include "../RepoUtils.hpp"
-#include "FileWithTimestamp.hpp"
 
 struct KernelConfig {
     std::string name;
@@ -63,7 +63,8 @@ struct KernelConfig {
     std::vector<std::unique_ptr<Patcher>> patches;
 
     explicit KernelConfig(std::filesystem::path jsonFile);
-    void reParse();
+    bool reParse();
+    std::string toJsonString() const;
 
    private:
     bool parseName(const nlohmann::json& node);
@@ -79,14 +80,15 @@ struct KernelConfig {
     bool parse(const nlohmann::json& node);
     void parse();
     std::filesystem::path _sourceFilePath;
+    std::string fileContentCache;
     FileWithTimestamp _file;
 };
 
 template <>
 struct fmt::formatter<KernelConfig::Arch> : formatter<string_view> {
     // parse is inherited from formatter<string_view>.
-    auto format(KernelConfig::Arch c,
-                format_context& ctx) const -> format_context::iterator {
+    auto format(KernelConfig::Arch c, format_context& ctx) const
+        -> format_context::iterator {
         string_view name = "unknown";
         switch (c) {
             case KernelConfig::Arch::ARM:
@@ -111,8 +113,8 @@ struct fmt::formatter<KernelConfig::Arch> : formatter<string_view> {
 template <>
 struct fmt::formatter<KernelConfig::Type> : formatter<string_view> {
     // parse is inherited from formatter<string_view>.
-    auto format(KernelConfig::Type c,
-                format_context& ctx) const -> format_context::iterator {
+    auto format(KernelConfig::Type c, format_context& ctx) const
+        -> format_context::iterator {
         string_view name = "unknown";
         switch (c) {
             case KernelConfig::Type::Image:

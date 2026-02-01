@@ -1,0 +1,472 @@
+#include <absl/strings/str_cat.h>
+#include <absl/strings/str_replace.h>
+#include <absl/strings/str_split.h>
+#include <absl/strings/strip.h>
+#include <fmt/chrono.h>
+#include <fmt/ranges.h>
+#include <grpcpp/create_channel.h>
+#include <grpcpp/security/credentials.h>
+#include <tgbot/TgException.h>
+#include <tgbot/types/InlineQueryResultArticle.h>
+#include <tgbot/types/InputFile.h>
+#include <tgbot/types/InputTextMessageContent.h>
+#include <trivial_helpers/_tgbot.h>
+
+#include <ConfigParsers2.hpp>
+#include <api/CommandModule.hpp>
+#include <api/MessageExt.hpp>
+#include <chrono>
+#include <concepts>
+#include <cstdlib>
+#include <filesystem>
+#include <mutex>
+#include <system_error>
+#include <thread>
+#include <unordered_map>
+#include <utility>
+
+#include "../ProgressBar.hpp"
+#include "ConfigManager.hpp"
+#include "LinuxKernelBuild_service.grpc.pb.h"
+#include "LinuxKernelBuild_service.pb.h"
+#include "api/AuthContext.hpp"
+#include "api/TgBotApi.hpp"
+#include "command_modules/support/CwdRestorar.hpp"
+#include "command_modules/support/KeyBoardBuilder.hpp"
+
+class KernelBuildHandler {
+   public:
+    struct Intermidates {
+        KernelConfig* current{};
+        std::string device;
+        std::unordered_map<std::string, bool> fragment_preference;
+    };
+
+   private:
+    TgBotApi::Ptr _api;
+    const AuthContext* _auth;
+    std::vector<KernelConfig> configs;
+
+    Intermidates intermidiates;
+    std::filesystem::path kernelDir;
+    std::optional<std::string> gitToken;
+
+    // gRPC channel
+    std::shared_ptr<grpc::Channel> channel;
+    std::unique_ptr<tgbot::builder::linuxkernel::LinuxKernelBuildService::Stub>
+        stub;
+
+   public:
+    constexpr static std::string_view kOutDirectory = "out";
+    constexpr static std::string_view kToolchainDirectory = "toolchain";
+    constexpr static std::string_view kCallbackQueryPrefix = "kernel_build_";
+    KernelBuildHandler(TgBotApi::Ptr api, const CommandLine* line,
+                       const AuthContext* auth, const ConfigManager* cfgmgr)
+        : _api(api),
+          _auth(auth),
+          gitToken(cfgmgr->get(ConfigManager::Configs::GITHUB_TOKEN)) {
+        auto jsonDir =
+            line->getPath(FS::PathType::RESOURCES) / "builder" / "kernel";
+
+        std::error_code ec;
+        for (const auto it : std::filesystem::directory_iterator(jsonDir, ec)) {
+            if (it.path().extension() == ".json") {
+                try {
+                    configs.emplace_back(it.path());
+                } catch (const std::exception& ex) {
+                    LOG(ERROR) << ex.what();
+                    continue;
+                }
+            }
+        }
+        if (ec) {
+            LOG(ERROR) << "Failed to opendir for kernel configurations: "
+                       << ec.message();
+        }
+        if (auto it =
+                cfgmgr->get(ConfigManager::Configs::FILEPATH_KERNEL_BUILD);
+            it) {
+            kernelDir = *it;
+        } else {
+            kernelDir =
+                line->getPath(FS::PathType::INSTALL_ROOT) / "kernel_build";
+        }
+
+        channel = grpc::CreateChannel(
+            cfgmgr->get(ConfigManager::Configs::KERNELBUILD_SERVER)
+                .value_or("localhost:50051"),
+            grpc::InsecureChannelCredentials());
+        stub = tgbot::builder::linuxkernel::LinuxKernelBuildService::NewStub(
+            channel);
+    }
+
+    constexpr static std::string_view kBuildPrefix = "build_";
+    constexpr static std::string_view kSelectPrefix = "select_";
+    void start(const Message::Ptr& message) {
+        intermidiates = Intermidates{};
+        if (configs.empty()) {
+            _api->sendMessage(message->chat, "No kernel configurations found.");
+            return;
+        }
+        for (auto& config : configs) {
+            // Reload config if needed.
+            try {
+                bool updated = config.reParse();
+                grpc::ClientContext grpcContext;
+                if (updated) {
+                    // Notify gRPC server about config update
+                    ::tgbot::builder::linuxkernel::ConfigResponse response;
+                    auto request = ::tgbot::builder::linuxkernel::Config();
+                    request.set_name(config.name);
+                    request.set_json_content(config.toJsonString());
+                    stub->updateConfig(&grpcContext, request, &response);
+                    if (!response.success()) {
+                        LOG(ERROR) << "Failed to notify gRPC server about "
+                                      "config update: "
+                                   << response.message();
+                    } else {
+                        LOG(INFO) << "Reloaded config: " << config.name;
+                    }
+                }
+            } catch (const std::exception& e) {
+                LOG(ERROR) << "Failed to reload: " << e.what();
+                continue;
+            }
+        }
+        KeyboardBuilder builder;
+        for (const auto& config : configs) {
+            builder.addKeyboard(std::make_pair(
+                "Build " + config.name,
+                absl::StrCat(kCallbackQueryPrefix, kBuildPrefix, config.name)));
+        }
+        _api->sendMessage(message->chat, "Will build kernel...", builder.get());
+    }
+
+    void handle_build(const TgBot::CallbackQuery::Ptr& query) {
+        std::string_view data = query->data;
+        if (!absl::ConsumePrefix(&data, kBuildPrefix)) {
+            return;
+        }
+        std::string_view kernelName = data;
+
+        for (auto& config : configs) {
+            if (config.name == kernelName) {
+                intermidiates.current = &config;
+                KeyboardBuilder builder;
+
+                if (intermidiates.current->defconfig.devices.size() == 1) {
+                    // Only one device, skip selection
+                    intermidiates.device =
+                        intermidiates.current->defconfig.devices[0];
+                    query->data =
+                        absl::StrCat(kSelectPrefix, intermidiates.device);
+                    DLOG(INFO) << "Only one device, skipping selection";
+                    handle_select(query);
+                    return;
+                }
+                for (const auto& device :
+                     intermidiates.current->defconfig.devices) {
+                    builder.addKeyboard(
+                        std::make_pair("Select " + device,
+                                       absl::StrCat(kCallbackQueryPrefix,
+                                                    kSelectPrefix, device)));
+                }
+                _api->editMessage(query->message, "Select device to build",
+                                  builder.get());
+            }
+        }
+    }
+
+    constexpr static std::string_view kEnablePrefix = "enable_";
+    void handle_select(const TgBot::CallbackQuery::Ptr& query) {
+        std::string_view data = query->data;
+        if (!absl::ConsumePrefix(&data, kSelectPrefix)) {
+            return;
+        }
+        std::string_view device = data;
+        intermidiates.device = device;
+
+        if (intermidiates.current->fragments.size() == 0) {
+            // No fragments, skip selection
+            query->data = kContinuePrefix;
+            DLOG(INFO) << "No fragments, skipping selection";
+            handle_continue(query);
+            return;
+        }
+
+        KeyboardBuilder builder;
+        for (const auto& fragment : intermidiates.current->fragments) {
+            intermidiates.fragment_preference[fragment.second.name] =
+                fragment.second.default_enabled;
+        }
+        handle_select_INTERNAL(query);
+    }
+
+    constexpr static std::string_view kContinuePrefix = "continue";
+
+    void handle_select_INTERNAL(const TgBot::CallbackQuery::Ptr& query) {
+        KeyboardBuilder builder;
+        for (const auto& fragment : intermidiates.current->fragments) {
+            bool enabled =
+                intermidiates.fragment_preference[std::string(fragment.first)];
+            std::string string;
+            if (enabled) {
+                string = fragment.first + " (Enabled)";
+            } else {
+                string = fragment.first + " (Disabled)";
+            }
+            builder.addKeyboard(std::make_pair(
+                string, absl::StrCat(kCallbackQueryPrefix, kEnablePrefix,
+                                     fragment.second.name)));
+        }
+        builder.addKeyboard(std::pair{
+            "Done", absl::StrCat(kCallbackQueryPrefix, kContinuePrefix)});
+
+        _api->editMessage(query->message,
+                          fmt::format("Device: {}\n\nFragments selection",
+                                      intermidiates.device),
+                          builder.get());
+    }
+
+    void handle_enable(const TgBot::CallbackQuery::Ptr& query) {
+        std::string_view data = query->data;
+        if (!absl::ConsumePrefix(&data, kEnablePrefix)) {
+            return;
+        }
+        std::string fragmentName(data);
+        intermidiates.fragment_preference[fragmentName] =
+            !intermidiates.fragment_preference[fragmentName];
+        _api->answerCallbackQuery(
+            query->id,
+            fmt::format("{}: Now enabled is {}", fragmentName,
+                        intermidiates.fragment_preference[fragmentName]));
+        handle_select_INTERNAL(query);
+    }
+
+    void handle_continue(const TgBot::CallbackQuery::Ptr& query);
+
+    void handleCallbackQuery(const TgBot::CallbackQuery::Ptr& query) {
+        std::string_view data = query->data;
+
+        if (!_auth->isAuthorized(query->from)) {
+            _api->answerCallbackQuery(
+                query->id,
+                "Sorry son, you are not allowed to touch this keyboard.");
+            return;
+        }
+
+        if (absl::ConsumePrefix(&data, kBuildPrefix)) {
+            // Call the corresponding function
+            handle_build(query);
+        } else if (absl::ConsumePrefix(&data, kSelectPrefix)) {
+            // Call the corresponding function
+            handle_select(query);
+        } else if (absl::ConsumePrefix(&data, kEnablePrefix)) {
+            // Call the corresponding function
+            handle_enable(query);
+        } else if (absl::ConsumePrefix(&data, kContinuePrefix)) {
+            // Call the corresponding function
+            handle_continue(query);
+        } else {
+            LOG(WARNING) << "Unknown query: " << query->data;
+        }
+    }
+
+    static bool link(const std::filesystem::path& path,
+                     const std::filesystem::path& created) {
+        std::error_code ec;
+        std::filesystem::remove(created, ec);
+        if (ec) {
+            LOG(ERROR) << "Failed to remove existing file: " << ec.message();
+            return false;
+        }
+        std::filesystem::create_directory_symlink(path, created, ec);
+        LOG(INFO) << "Create symlink: " << path << " to " << created;
+        if (ec) {
+            LOG(ERROR) << "Failed to create symlink: " << ec.message();
+            return false;
+        }
+        return true;
+    }
+};
+
+void KernelBuildHandler::handle_continue(
+    const TgBot::CallbackQuery::Ptr& query) {
+    // Start the build process
+    _api->editMessage(query->message, "Starting build...");
+    // Prepare gRPC request
+    ::tgbot::builder::linuxkernel::BuildPrepareRequest request;
+    request.set_name(intermidiates.current->name);
+    request.set_device_name(intermidiates.device);
+    for (const auto& [fragment, enabled] : intermidiates.fragment_preference) {
+        if (enabled) {
+            *request.add_config_fragments() = fragment;
+        }
+    }
+    request.set_clone_depth(1);
+    if (gitToken) {
+        request.set_github_token(*gitToken);
+    }
+
+    auto rn = std::chrono::system_clock::now();
+    constexpr auto interval = std::chrono::seconds(5);
+
+    // Make defconfig
+    LOG(INFO) << "Preparing build for kernel: " << intermidiates.current->name;
+
+    ::tgbot::builder::linuxkernel::BuildStatus response;
+    grpc::ClientContext grpcContext;
+    auto status = stub->prepareBuild(&grpcContext, request);
+    while (status->Read(&response)) {
+        {
+            auto now = std::chrono::system_clock::now();
+            if (now - rn < interval) {
+                continue;
+            }
+            rn = now;
+        }
+        LOG(INFO) << "Build Status: "
+                  << ::tgbot::builder::linuxkernel::ProgressStatus_Name(
+                         response.status())
+                  << ", Message: " << response.output();
+        _api->editMessage(
+            query->message,
+            fmt::format("Build Status: {}\nMessage: {}",
+                        ::tgbot::builder::linuxkernel::ProgressStatus_Name(
+                            response.status()),
+                        response.output()));
+    }
+    auto status_finish = status->Finish();
+    if (!status_finish.ok()) {
+        _api->editMessage(query->message, "Prepare failed due to gRPC error.");
+        LOG(ERROR) << "Prepare failed due to gRPC error. Error message: "
+                   << status_finish.error_message();
+        return;
+    } else {
+        _api->editMessage(query->message, "Build process prepared.");
+    }
+    if (response.status() !=
+        tgbot::builder::linuxkernel::ProgressStatus::SUCCESS) {
+        _api->editMessage(query->message,
+                          "Prepare failed: " + response.output());
+        LOG(ERROR) << "Prepare failed: " << response.output();
+        return;
+    }
+
+    // Start actual build
+    tgbot::builder::linuxkernel::BuildRequest buildRequest;
+    buildRequest.set_build_id(response.build_id());
+    grpc::ClientContext grpcContext_v2;
+    auto finalResponse = stub->doBuild(&grpcContext_v2, buildRequest);
+    while (finalResponse->Read(&response)) {
+        {
+            auto now = std::chrono::system_clock::now();
+            if (now - rn < interval) {
+                continue;
+            }
+            rn = now;
+        }
+        _api->editMessage(
+            query->message,
+            fmt::format("Build Status: {}\nMessage: {}",
+                        ::tgbot::builder::linuxkernel::ProgressStatus_Name(
+                            response.status()),
+                        response.output()));
+    }
+    auto finish_v2 = finalResponse->Finish();
+    if (!finish_v2.ok()) {
+        _api->editMessage(query->message, "Build failed due to gRPC error.");
+        LOG(ERROR) << "Build failed due to gRPC error. Error message: "
+                   << finish_v2.error_message();
+        return;
+    } else {
+        _api->editMessage(query->message, "Build process completed.");
+    }
+    if (response.status() !=
+        tgbot::builder::linuxkernel::ProgressStatus::SUCCESS) {
+        _api->editMessage(query->message, "Build failed: " + response.output());
+        LOG(ERROR) << "Build failed: " << response.output();
+        return;
+    }
+
+    auto artifactRequest = buildRequest;
+    tgbot::builder::linuxkernel::ArtifactChunk response_v2;
+    tgbot::builder::linuxkernel::ArtifactMetadata artifactMetadata;
+    grpc::ClientContext artifactContext;
+    auto artifactResponse =
+        stub->getArtifact(&artifactContext, artifactRequest);
+    std::ofstream outputFile;
+    while (artifactResponse->Read(&response_v2)) {
+        if (!outputFile.is_open()) {
+            artifactMetadata = response_v2.metadata();
+            LOG(INFO) << "Receiving artifact: " << artifactMetadata.filename()
+                      << ", size: " << artifactMetadata.total_size();
+            outputFile.open(kernelDir / artifactMetadata.filename(),
+                            std::ios::binary);
+            if (!outputFile.is_open()) {
+                LOG(ERROR) << "Failed to open output file: "
+                           << kernelDir / artifactMetadata.filename();
+                _api->editMessage(query->message,
+                                  "Failed to open output file for writing.");
+                return;
+            }
+        }
+        outputFile.write(response_v2.data().data(), response_v2.data().size());
+    }
+    outputFile.close();
+    auto finish_v3 = artifactResponse->Finish();
+    if (!finish_v3.ok()) {
+        _api->editMessage(query->message, "Failed to retrieve artifact.");
+        LOG(ERROR) << "Failed to retrieve artifact. Error message: "
+                   << finish_v3.error_message();
+        return;
+    } else {
+        _api->editMessage(query->message, "Artifact retrieved successfully.");
+    }
+
+    LOG(INFO) << "Artifact " << artifactMetadata.filename()
+              << " received successfully.";
+    _api->sendDocument(
+        query->message->chat,
+        InputFile::fromFile(kernelDir / artifactMetadata.filename(),
+                            "application/octet-stream"));
+}
+
+// Define the command handler function
+DECLARE_COMMAND_HANDLER(kernelbuild) {
+    static std::optional<KernelBuildHandler> handler;
+    if (!handler) {
+        handler.emplace(api, provider->cmdline.get(), provider->auth.get(),
+                        provider->config.get());
+        api->onCallbackQuery("kernelbuild", [api, provider](
+                                                const TgBot::CallbackQuery::Ptr&
+                                                    ptr) {
+            std::string_view data = ptr->data;
+
+            if (!provider->auth->isAuthorized(ptr->from)) {
+                api->answerCallbackQuery(
+                    ptr->id,
+                    "Sorry son, you are not allowed to touch this keyboard.");
+                return;
+            }
+            if (!absl::ConsumePrefix(
+                    &data, KernelBuildHandler::kCallbackQueryPrefix)) {
+                return;
+            }
+            ptr->data = data;
+            try {
+                handler->handleCallbackQuery(ptr);
+            } catch (const std::exception& ex) {
+                LOG(ERROR) << "Error handling callback query: " << ex.what();
+            }
+        });
+    }
+    handler->start(message->message());
+}
+
+extern "C" DYN_COMMAND_EXPORT const struct DynModule DYN_COMMAND_SYM = {
+    .flags = DynModule::Flags::Enforced,
+    .name = "kernelbuild",
+    .description = "Build a kernel, I'm lazy 2",
+    .function = COMMAND_HANDLER_NAME(kernelbuild),
+};

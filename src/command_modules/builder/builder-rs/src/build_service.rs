@@ -34,6 +34,7 @@ use std::process::Stdio;
 use std::sync::Arc;
 use std::thread::available_parallelism;
 use tar::Archive;
+use tokio::fs;
 use tokio::fs::File as TokioFile;
 use tokio::io::AsyncWriteExt;
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -154,7 +155,13 @@ impl BuildService {
                 ))
             })?;
             let path = entry.path();
-            if path.is_file() && !path.starts_with(".") {
+            if path.is_file()
+                && !path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .starts_with(".")
+            {
                 let name = path
                     .strip_prefix(&target_dir)
                     .map_err(|e| {
@@ -204,27 +211,52 @@ impl BuildService {
         tx: mpsc::Sender<Result<BuildStatus, Status>>, // Where to send logs
         build_id: Option<i32>, // To tag the logs
         mut kill_rx: Option<mpsc::Receiver<()>>, // Optional Kill Switch
+        log_path: Option<PathBuf>, // Optional log file path to also write logs to
     ) -> Result<bool, Status> {
         // Returns true if success, false if failed/cancelled
 
-        // 1. Setup Pipes
+        let file_handle = if let Some(path) = log_path {
+            // Create file (overwrite if exists).
+            // We wrap in Arc<Mutex> so both stdout/stderr tasks can write to it.
+            let file = tokio::fs::File::create(&path)
+                .await
+                .map_err(|e| Status::internal(format!("Failed to create log file: {}", e)))?;
+            Some(Arc::new(Mutex::new(file)))
+        } else {
+            None
+        };
+        // 2. Setup Pipes
         command.stdout(Stdio::piped());
         command.stderr(Stdio::piped());
 
-        // 2. Spawn
+        // 3. Spawn Process
         let mut child = command
             .spawn()
             .map_err(|e| Status::internal(e.to_string()))?;
         let stdout = child.stdout.take().expect("stdout missing");
         let stderr = child.stderr.take().expect("stderr missing");
 
-        // 3. Log Streamers (Same as before)
+        // 4. Log Streamers
         let tx_out = tx.clone();
         let tx_err = tx.clone();
 
+        // Clone file handles for the tasks
+        let file_out = file_handle.clone();
+        let file_err = file_handle.clone();
+
+        // --- Task A: Stdout ---
         let out_handle = tokio::spawn(async move {
             let mut reader = BufReader::new(stdout).lines();
             while let Ok(Some(line)) = reader.next_line().await {
+                // A. Write to File (if enabled)
+                if let Some(f_arc) = &file_out {
+                    // Lock, Write, Newline, Ignore errors
+                    let mut f = f_arc.lock().await;
+                    let _ = f.write_all(line.as_bytes()).await;
+                    let _ = f.write_all(b"\n").await;
+                }
+
+                // B. Send to gRPC
                 let _ = tx_out
                     .send(Ok(BuildStatus {
                         status: ProgressStatus::InProgressBuild.into(),
@@ -235,9 +267,17 @@ impl BuildService {
             }
         });
 
+        // --- Task B: Stderr ---
         let err_handle = tokio::spawn(async move {
             let mut reader = BufReader::new(stderr).lines();
             while let Ok(Some(line)) = reader.next_line().await {
+                // A. Write to File (if enabled)
+                if let Some(f_arc) = &file_err {
+                    let mut f = f_arc.lock().await;
+                    let _ = f.write_all(format!("ERR: {}\n", line).as_bytes()).await;
+                }
+
+                // B. Send to gRPC
                 let _ = tx_err
                     .send(Ok(BuildStatus {
                         status: ProgressStatus::InProgressBuild.into(),
@@ -248,7 +288,7 @@ impl BuildService {
             }
         });
 
-        // 4. The "Select" Logic (Wait vs Kill)
+        // 5. Wait for Exit or Kill (Select Logic)
         let success = if let Some(rx) = &mut kill_rx {
             tokio::select! {
                 res = child.wait() => res.map(|s| s.success()).unwrap_or(false),
@@ -259,17 +299,23 @@ impl BuildService {
                         output: "Build cancelled.".into(),
                         build_id,
                     })).await;
-                    false // Cancelled counts as failure
+                    // Optional: Log cancellation to file
+                    if let Some(f_arc) = &file_handle {
+                        let mut f = f_arc.lock().await;
+                        let _ = f.write_all(b"\n--- BUILD CANCELLED ---\n").await;
+                    }
+                    false
                 }
             }
         } else {
-            // No kill switch provided (e.g. for simple commands)
             child.wait().await.map(|s| s.success()).unwrap_or(false)
         };
 
         // Clean up
         let _ = out_handle.await;
         let _ = err_handle.await;
+
+        // File closes automatically when 'file_handle' Arc drops here
 
         Ok(success)
     }
@@ -439,6 +485,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
         let config_handle = self.kernel_configs.clone();
         let builder_config = self.builder_config.clone();
         let outdir = self.output_directory.clone();
+        let tmp_dir = self.temp_directory.clone();
         let contexts_handle = self.contexts.clone();
         let build_id_handle = self.id.clone();
         let per_build_statuses = self.build_statuses.clone();
@@ -826,8 +873,18 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                     let config = git2::Config::open_default().unwrap();
                     let username = username_from_url.unwrap_or("git");
                     if url.starts_with("ssh://") {
+                        debug!("SSH URL detected for authentication.");
                         return git2::Cred::ssh_key_from_agent(username);
                     }
+                    if url.contains("github.com") {
+                        debug!("GitHub URL detected for authentication.");
+                        if let Some(token) = &req.github_token {
+                        info!("Using provided GitHub token for authentication.");
+                            let token_str = token.as_str();
+                            return git2::Cred::userpass_plaintext(token_str, "");
+                        }
+                    }
+                    debug!("Using credential helper for authentication.");
                     return git2::Cred::credential_helper(&config, url, Some(username));
                 });
 
@@ -840,7 +897,10 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                     .unwrap();
 
                 let mut fetch_options = FetchOptions::new();
-                fetch_options.depth(req.clone_depth);
+                if let Some(depth)  = req.clone_depth {
+                    info!("Using clone depth: {}", depth);
+                    fetch_options.depth(depth);
+                }
                 fetch_options.remote_callbacks(callbacks);
 
                 let mut builder = RepoBuilder::new();
@@ -875,6 +935,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             match res {
                 Ok(inner_res) => {
                     if let Err(e) = inner_res {
+                        report!(Failed, format!("Git clone task failed: {}", e));
                         return Err(e);
                     }
                 }
@@ -914,10 +975,16 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             }
 
             debug!("Running make defconfig in directory: {:?}", &source_dir);
-            let success = BuildService::run_command_with_logs(proc, tx.clone(), None, None).await?;
+            let log_file = tmp_dir.join(format!("output-prepare-{}.log", &config.name));
+            info!("Defconfig log file will be at: {:?}", &log_file);
+            let success =
+                BuildService::run_command_with_logs(proc, tx.clone(), None, None, Some(log_file))
+                    .await?;
 
             if !success {
-                return Err(Status::internal("Build defconfig failed."));
+                return Err(Status::internal(
+                    "Build defconfig failed. Logs should show details.",
+                ));
             }
 
             report!(
@@ -984,9 +1051,11 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                 }))
                 .await
                 .unwrap();
+                info!("Build Status - {:?}: {}", ProgressStatus::$status, $msg);
             };
         }
 
+        report!(Pending, "Starting build process, validating build ID...");
         // Validate build ID
         let peridstat = self.build_statuses.clone();
         if !Self::is_valid_build_id(&peridstat, req.build_id).await {
@@ -995,7 +1064,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                 req.build_id
             )));
         }
-        if !Self::is_build_finished(&peridstat, req.build_id).await {
+        if Self::is_build_finished(&peridstat, req.build_id).await {
             return Err(Status::failed_precondition(format!(
                 "Build ID {} is not in a pending state. (Already finished?)",
                 req.build_id
@@ -1021,6 +1090,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
         };
         let peridstat = self.build_statuses.clone();
         let toolchain_dir = context.toolchain_dir.clone();
+        let tmp_dir = self.temp_directory.clone();
         let contexts_clone = self.contexts.clone();
         let toolchain = context.toolchain.clone();
 
@@ -1053,6 +1123,8 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                 info!("Setting environment variable for make: {}={}", name, value);
                 proc.env(name.clone(), value.clone());
             }
+            let log_file = tmp_dir.join(format!("output-build-{}.log", &context.config.name));
+            info!("Build log file will be at: {:?}", &log_file);
 
             debug!("Running make in directory: {:?}", &context.work_dir);
 
@@ -1061,13 +1133,38 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                 tx.clone(),
                 Some(req.build_id),
                 Some(rx_kill),
+                Some(log_file),
             )
             .await?;
 
             if !success {
-                return Err(Status::internal("Build failed or cancelled"));
+                return Err(Status::internal(
+                    "Build failed or cancelled, see logs for details.",
+                ));
+            }
+            report!(InProgressBuild, "Build succeeded.");
+            let kernel_image = context
+                .work_dir
+                .join("out")
+                .join("arch")
+                .join(context.config.arch.to_string())
+                .join("boot")
+                .join(&context.config.image_type);
+            let mut artifact = kernel_image.clone();
+
+            // Check if kernel image exists
+            if !artifact.exists() {
+                return Err(Status::internal(format!(
+                    "Expected kernel image not found at {:?}",
+                    &kernel_image
+                )));
             }
 
+            report!(
+                InProgressBuild,
+                format!("Kernel image located at {:?}", &kernel_image)
+            );
+            // Package with AnyKernel if configured
             if let Some(anykernel) = &context.config.anykernel
                 && anykernel.enabled
             {
@@ -1089,6 +1186,19 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                             anykernel_dir
                         )));
                     }
+
+                    // Copy kernel image into AnyKernel directory
+                    let dest_image_path =
+                        anykernel_dir.join(PathBuf::from(&context.config.image_type));
+                    fs::copy(&kernel_image, &dest_image_path)
+                        .await
+                        .map_err(|e| {
+                            Status::internal(format!(
+                                "Failed to copy kernel image to AnyKernel directory: {}",
+                                e
+                            ))
+                        })?;
+
                     let date = Local::now();
                     let formatted_date = format!("{}", date.format("%Y-%m-%d_%H-%M-%S"));
                     let zip_file_path = context.work_dir.join(format!(
@@ -1102,12 +1212,23 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                     );
                     Self::zip_dir_with_filename(&zip_file_path, &anykernel_dir).await?;
                     report!(InProgressBuild, "AnyKernel packaging complete.");
-                    // Grab context
-                    let mut contexts = contexts_clone.lock().await;
-                    if let Some(ctx) = contexts.iter_mut().find(|c| c.id == req.build_id) {
-                        ctx.artifact_path = Some(zip_file_path);
-                    }
+
+                    // Delete the copied kernel image from AnyKernel directory
+                    fs::remove_file(&dest_image_path).await.map_err(|e| {
+                        Status::internal(format!(
+                            "Failed to clean up kernel image from AnyKernel directory: {}",
+                            e
+                        ))
+                    })?;
+
+                    artifact = zip_file_path;
                 }
+            } else {
+                // Upload kernel image directly
+            }
+            let mut contexts = contexts_clone.lock().await;
+            if let Some(ctx) = contexts.iter_mut().find(|c| c.id == req.build_id) {
+                ctx.artifact_path = Some(artifact);
             }
 
             report!(Success, "Build complete. Dropping build context.");
@@ -1236,6 +1357,10 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                 }
             };
 
+            info!(
+                "Streaming artifact for build ID {} from path {:?}",
+                req.build_id, artifact_path
+            );
             // First send metadata chunk
             let artifact_meta = ArtifactMetadata {
                 filename: artifact_path
@@ -1255,8 +1380,10 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             };
             if tx.send(Ok(meta_chunk)).await.is_err() {
                 // Client disconnected
+                error!("Client disconnected before receiving metadata chunk.");
                 return;
             }
+            info!("Sent artifact metadata for build ID {}", req.build_id);
 
             // Stream the artifact file in chunks
             let mut file = match File::open(&artifact_path) {
@@ -1283,6 +1410,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                         };
                         if tx.send(Ok(chunk)).await.is_err() {
                             // Client disconnected
+                            error!("Client disconnected while streaming artifact data.");
                             break;
                         }
                     }

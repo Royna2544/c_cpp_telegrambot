@@ -37,6 +37,7 @@ class UTILS_EXPORT ConfigManager {
         FILEPATH_ROM_BUILD,
         FILEPATH_KERNEL_BUILD,
         TELEGRAM_API_SERVER,
+        KERNELBUILD_SERVER,
         MAX
     };
     static constexpr size_t CONFIG_MAX = static_cast<int>(Configs::MAX);
@@ -109,7 +110,7 @@ class UTILS_EXPORT ConfigManager {
         },
         {
             .config = Configs::SOCKET_URL_PRIMARY,
-            .name = "PrimaryUrl",
+            .name = "SocketPrimaryUrl",
             .description = "Primary socket URL",
             .alias = Entry::ALIAS_NONE,
             .type = Entry::ArgType::STRING,
@@ -117,7 +118,7 @@ class UTILS_EXPORT ConfigManager {
         },
         {
             .config = Configs::SOCKET_URL_SECONDARY,
-            .name = "SecondaryUrl",
+            .name = "SocketSecondaryUrl",
             .description = "Secondary socket URL",
             .alias = Entry::ALIAS_NONE,
             .type = Entry::ArgType::STRING,
@@ -125,7 +126,7 @@ class UTILS_EXPORT ConfigManager {
         },
         {
             .config = Configs::SOCKET_URL_LOGGING,
-            .name = "LoggingUrl",
+            .name = "LoggingSocketUrl",
             .description = "Logging socket URL",
             .alias = Entry::ALIAS_NONE,
             .type = Entry::ArgType::STRING,
@@ -134,7 +135,7 @@ class UTILS_EXPORT ConfigManager {
         {
             .config = Configs::GITHUB_TOKEN,
             .name = "GitHubToken",
-            .description = "Github token",
+            .description = "GitHub token",
             .alias = Entry::ALIAS_NONE,
             .type = Entry::ArgType::STRING,
             .belongsTo = &sectionMain,
@@ -198,7 +199,15 @@ class UTILS_EXPORT ConfigManager {
             .description = "Custom Telegram API server URL",
             .alias = Entry::ALIAS_NONE,
             .type = Entry::ArgType::STRING,
-            .belongsTo = &sectionMain,
+            .belongsTo = &sectionNetwork,
+        },
+        {
+            .config = Configs::KERNELBUILD_SERVER,
+            .name = "KernelBuildServer",
+            .description = "Kernel Build gRPC server address",
+            .alias = Entry::ALIAS_NONE,
+            .type = Entry::ArgType::STRING,
+            .belongsTo = &sectionNetwork,
         }};
 
     struct Backend {

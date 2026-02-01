@@ -1,20 +1,22 @@
-tgbot_library(
-  NAME
-  KernelBuilder-cpp
-  SRCS
-  ConfigParsers2.cpp
-  Compiler.cpp
-  Diagnosis.cpp
-  ToolchainProvider.cpp
-  LIBS
-  nlohmann_json::nlohmann_json
-  BuilderUtilsLinux
-  CurlDownload
-  Archives
-  NO_LIBPREFIX
-  STATIC)
 
 install(DIRECTORY configs/ DESTINATION share/${PROJECT_NAME}/builder/kernel)
 file(COPY configs/
      DESTINATION ${CMAKE_BINARY_DIR}/share/${PROJECT_NAME}/builder/kernel)
+include(gRPCGenerate)
+grpc_generate(LinuxKernelBuild)
+
+command_module(
+  NAME
+  kernelbuild
+  SRCS
+  kernelbuild.cpp
+  ConfigParsers2.cpp
+  LIBS
+  AuthApi
+  nlohmann_json::nlohmann_json
+  Utils
+  progress
+  LinuxKernelBuildServiceProto
+)
+
 add_subdirectory(module)
