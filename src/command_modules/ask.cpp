@@ -188,7 +188,8 @@ static void localnetmodelhandler(TgBotApi::Ptr api, MessageExt* message,
 DECLARE_COMMAND_HANDLER(ask) {
     auto mgr = provider->config.get();
 
-    if (!mgr->get(ConfigManager::Configs::LLMCONFIG)) {
+    if (!mgr->get(ConfigManager::Configs::LLM_TYPE) ||
+        !mgr->get(ConfigManager::Configs::LLM_LOCATION)) {
         api->sendMessage(
             message->get<MessageAttrs::Chat>(),
             "LLM functionality is not configured. Please set up the LLM "
@@ -196,33 +197,29 @@ DECLARE_COMMAND_HANDLER(ask) {
         return;
     }
 
-    std::string config = *mgr->get(ConfigManager::Configs::LLMCONFIG);
+    std::string type = *mgr->get(ConfigManager::Configs::LLM_TYPE);
+    std::string location = *mgr->get(ConfigManager::Configs::LLM_LOCATION);
+    auto authkey = mgr->get(ConfigManager::Configs::LLM_AUTHKEY);
 
-    std::vector<std::string> parsedConfig;
-    parsedConfig = absl::StrSplit(config, ',');
-    if (parsedConfig.size() < 2 || parsedConfig.size() > 3) {
-        LOG(ERROR) << "Invalid LLM configuration format: " << config;
-    }
+    LOG(INFO) << "LLM Configuration - Type: " << type
+              << ", Path/URL: " << location;
 
-    LOG(INFO) << "LLM Configuration - Type: " << parsedConfig[0]
-              << ", Path/URL: " << parsedConfig[1];
-
-    if (parsedConfig[0] == "local") {
+    if (type == "local") {
 #ifdef ASK_ENABLE_LOCAL_LLM
-        localmodelhandler(api, message, res, provider, parsedConfig[1]);
+        localmodelhandler(api, message, res, provider, location);
 #else
         LOG(ERROR) << "Local LLM support is not enabled in this build.";
 #endif
-    } else if (parsedConfig[0] == "localnet") {
-        if (parsedConfig.size() == 3) {
+    } else if (type == "localnet") {
+        if (authkey) {
             LOG(INFO) << "Using authkey for localnet LLM.";
-            localnetmodelhandler(api, message, res, provider, parsedConfig[1],
-                                 parsedConfig[2]);
+            localnetmodelhandler(api, message, res, provider, location,
+                                 *authkey);
         } else {
-            localnetmodelhandler(api, message, res, provider, parsedConfig[1]);
+            localnetmodelhandler(api, message, res, provider, location);
         }
     } else {
-        LOG(ERROR) << "Unsupported LLM configuration type: " << parsedConfig[0];
+        LOG(ERROR) << "Unsupported LLM configuration type: " << type;
     }
 }
 

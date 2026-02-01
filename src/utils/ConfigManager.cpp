@@ -22,6 +22,8 @@
 const char* const sectionMain = "Main";
 const char* const sectionFilePath = "FilePath";
 const char* const sectionNetwork = "Network";
+const char* const sectionDatabase = "Database";
+const char* const sectionLLM = "LLM";
 
 namespace po = boost::program_options;
 
@@ -49,6 +51,10 @@ void AddOption(po::options_description& desc) {
             sectionName = sectionFilePath;
         } else if (index->belongsTo == &sectionNetwork) {
             sectionName = sectionNetwork;
+        } else if (index->belongsTo == &sectionDatabase) {
+            sectionName = sectionDatabase;
+        } else if (index->belongsTo == &sectionLLM) {
+            sectionName = sectionLLM;
         }
         std::string name = fmt::format("{}.{}", sectionName, index->name);
         if (index->alias != ConfigManager::Entry::ALIAS_NONE) {

@@ -7,21 +7,15 @@
 #include "CommandLine.hpp"
 #include "DatabaseBase.hpp"
 
-bool TgBotDatabaseImpl_load(ConfigManager* configmgr,
-                            TgBotDatabaseImpl* dbimpl,
+bool TgBotDatabaseImpl_load(ConfigManager* configmgr, TgBotDatabaseImpl* dbimpl,
                             CommandLine* cmdline) {
-    const auto dbConf = configmgr->get(ConfigManager::Configs::DATABASE_CFG);
+    const auto dbType = configmgr->get(ConfigManager::Configs::DATABASE_TYPE);
     bool loaded = false;
     TgBotDatabaseImpl::Providers provider(cmdline);
-    std::pair<std::string, std::string> configPair;
     bool configValid = false;
 
-    if (dbConf) {
-        // Expected format: <backend>:<filename>
-        // Example: sqlite:database.db
-        configPair = absl::StrSplit(dbConf.value(), ",");
-
-        if (!provider.chooseProvider(configPair.first)) {
+    if (dbType) {
+        if (!provider.chooseProvider(*dbType)) {
             LOG(ERROR) << "Failed to choose provider";
         } else {
             configValid = true;
@@ -34,9 +28,18 @@ bool TgBotDatabaseImpl_load(ConfigManager* configmgr,
         LOG(ERROR) << "No available database providers";
         return false;
     }
+
+    const auto dbPath =
+        configmgr->get(ConfigManager::Configs::DATABASE_FILEPATH);
+    if (dbPath) {
+        configValid = true;
+    }
+
     std::filesystem::path filenameStr =
-        configValid ? configPair.second : DatabaseBase::kInMemoryDatabase;
+        configValid ? *dbPath : DatabaseBase::kInMemoryDatabase;
     dbimpl->setImpl(std::move(provider));
+    LOG(INFO) << "TgbotDatabaseImpl_load: Loading database from "
+              << filenameStr.string();
     loaded = dbimpl->load(filenameStr);
     if (!loaded) {
         LOG(ERROR) << "Failed to load database";

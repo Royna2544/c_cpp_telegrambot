@@ -17,6 +17,8 @@
 extern const char* const sectionMain;
 extern const char* const sectionFilePath;
 extern const char* const sectionNetwork;
+extern const char* const sectionDatabase;
+extern const char* const sectionLLM;
 
 // Abstract manager for config loader
 // Currently have three sources, env and file, cmdline
@@ -25,7 +27,8 @@ class UTILS_EXPORT ConfigManager {
     enum class Configs {
         TOKEN,
         LOG_FILE,
-        DATABASE_CFG,
+        DATABASE_FILEPATH,
+        DATABASE_TYPE,
         HELP,
         SOCKET_URL_PRIMARY,
         SOCKET_URL_SECONDARY,
@@ -33,7 +36,9 @@ class UTILS_EXPORT ConfigManager {
         GITHUB_TOKEN,
         OPTIONAL_COMPONENTS,
         BUILDBUDDY_API_KEY,
-        LLMCONFIG,
+        LLM_TYPE,
+        LLM_LOCATION,
+        LLM_AUTHKEY,
         FILEPATH_ROM_BUILD,
         FILEPATH_KERNEL_BUILD,
         TELEGRAM_API_SERVER,
@@ -93,12 +98,20 @@ class UTILS_EXPORT ConfigManager {
             .belongsTo = &sectionMain,
         },
         {
-            .config = Configs::DATABASE_CFG,
-            .name = "DatabaseCfg",
-            .description = "Database configuration",
+            .config = Configs::DATABASE_FILEPATH,
+            .name = "FilePath",
+            .description = "Database file path",
             .alias = 'd',
             .type = Entry::ArgType::STRING,
-            .belongsTo = &sectionMain,
+            .belongsTo = &sectionDatabase,
+        },
+        {
+            .config = Configs::DATABASE_TYPE,
+            .name = "Type",
+            .description = "Database type",
+            .alias = Entry::ALIAS_NONE,
+            .type = Entry::ArgType::STRING,
+            .belongsTo = &sectionDatabase,
         },
         {
             .config = Configs::HELP,
@@ -158,24 +171,28 @@ class UTILS_EXPORT ConfigManager {
             .belongsTo = &sectionMain,
         },
         {
-            .config = Configs::LLMCONFIG,
-            .name = "LLMConfig",
-            /*
-             * LLM configuration format:
-             * 1. local,filepath - for local LLM models
-             * Example: local,/path/to/model.gguf. Supported models are the ones
-             * that llama.cpp supports.
-             * 2. localnet,urlendpoint - for LLM models served over network
-             * Example: localnet,http://localhost:8000/api/v1/
-             * Include authkey if needed:
-             * It will be sent as Bearer token in Authorization header.
-             * localnet,http://localhost:8000/api/v1/,mysecretkey
-             */
-            .description = "LLM configuration. "
-                           "(local/localnet),(filepath/urlendpoint)(,authkey)",
+            .config = Configs::LLM_TYPE,
+            .name = "BackendType",
+            .description = "LLM backend type (local, localnet)",
             .alias = Entry::ALIAS_NONE,
             .type = Entry::ArgType::STRING,
-            .belongsTo = &sectionMain,
+            .belongsTo = &sectionLLM,
+        },
+        {
+            .config = Configs::LLM_LOCATION,
+            .name = "ModelLocation",
+            .description = "LLM location (file path or network address)",
+            .alias = Entry::ALIAS_NONE,
+            .type = Entry::ArgType::STRING,
+            .belongsTo = &sectionLLM,
+        },
+        {
+            .config = Configs::LLM_AUTHKEY,
+            .name = "AuthKey",
+            .description = "LLM authentication key (if required)",
+            .alias = Entry::ALIAS_NONE,
+            .type = Entry::ArgType::STRING,
+            .belongsTo = &sectionLLM,
         },
         {
             .config = Configs::FILEPATH_ROM_BUILD,
