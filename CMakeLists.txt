@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.14)
-project(Glider LANGUAGES CXX C VERSION 1.1.0 DESCRIPTION "A Telegram bot coded in C++")
+project(Glider LANGUAGES CXX C VERSION 1.2.0 DESCRIPTION "A Telegram bot coded in C++")
 
 if(CMAKE_VERSION VERSION_LESS "3.25")
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
