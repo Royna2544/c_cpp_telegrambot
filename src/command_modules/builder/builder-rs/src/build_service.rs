@@ -20,6 +20,7 @@ use crate::kernel_config::KernelConfig;
 use chrono::Local;
 use flate2::read::GzDecoder; // For .tar.gz
 use futures_util::StreamExt;
+use futures_util::future::Map;
 use git2::FetchOptions;
 use git2::Repository;
 use git2::build;
@@ -112,6 +113,81 @@ impl BuildService {
         if let Some(entry) = statuses.iter_mut().find(|s| s.build_id == build_id) {
             entry.finished = true;
         }
+    }
+
+    pub async fn run_command_with_logs(
+        mut command: Command, // The configured tokio::process::Command
+        tx: mpsc::Sender<Result<BuildStatus, Status>>, // Where to send logs
+        build_id: Option<i32>, // To tag the logs
+        mut kill_rx: Option<mpsc::Receiver<()>>, // Optional Kill Switch
+    ) -> Result<bool, Status> {
+        // Returns true if success, false if failed/cancelled
+
+        // 1. Setup Pipes
+        command.stdout(Stdio::piped());
+        command.stderr(Stdio::piped());
+
+        // 2. Spawn
+        let mut child = command
+            .spawn()
+            .map_err(|e| Status::internal(e.to_string()))?;
+        let stdout = child.stdout.take().expect("stdout missing");
+        let stderr = child.stderr.take().expect("stderr missing");
+
+        // 3. Log Streamers (Same as before)
+        let tx_out = tx.clone();
+        let tx_err = tx.clone();
+
+        let out_handle = tokio::spawn(async move {
+            let mut reader = BufReader::new(stdout).lines();
+            while let Ok(Some(line)) = reader.next_line().await {
+                let _ = tx_out
+                    .send(Ok(BuildStatus {
+                        status: ProgressStatus::InProgressBuild.into(),
+                        output: format!("stdout: {}", line),
+                        build_id,
+                    }))
+                    .await;
+            }
+        });
+
+        let err_handle = tokio::spawn(async move {
+            let mut reader = BufReader::new(stderr).lines();
+            while let Ok(Some(line)) = reader.next_line().await {
+                let _ = tx_err
+                    .send(Ok(BuildStatus {
+                        status: ProgressStatus::InProgressBuild.into(),
+                        output: format!("stderr: {}", line),
+                        build_id,
+                    }))
+                    .await;
+            }
+        });
+
+        // 4. The "Select" Logic (Wait vs Kill)
+        let success = if let Some(rx) = &mut kill_rx {
+            tokio::select! {
+                res = child.wait() => res.map(|s| s.success()).unwrap_or(false),
+                _ = rx.recv() => {
+                    let _ = child.kill().await;
+                    let _ = tx.send(Ok(BuildStatus {
+                        status: ProgressStatus::Failed.into(),
+                        output: "Build cancelled.".into(),
+                        build_id,
+                    })).await;
+                    false // Cancelled counts as failure
+                }
+            }
+        } else {
+            // No kill switch provided (e.g. for simple commands)
+            child.wait().await.map(|s| s.success()).unwrap_or(false)
+        };
+
+        // Clean up
+        let _ = out_handle.await;
+        let _ = err_handle.await;
+
+        Ok(success)
     }
 }
 
@@ -734,26 +810,27 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                 .arg("O=out")
                 .arg(&defconfig_name);
 
-            match config.arch {
-                Architecture::ARM => {
-                    proc.arg("ARCH=arm");
-                    proc.arg("CROSS_COMPILE=arm-linux-gnueabi-");
-                }
-                Architecture::ARM64 => {
-                    proc.arg("ARCH=arm64");
-                    proc.arg("CROSS_COMPILE=aarch64-linux-gnu-");
-                }
-                Architecture::X86 => {
-                    proc.arg("ARCH=x86");
-                    proc.arg("CROSS_COMPILE=x86_64-linux-gnu-");
-                }
-                Architecture::X86_64 => {
-                    proc.arg("ARCH=x86");
-                    proc.arg("CROSS_COMPILE=x86_64-linux-gnu-");
-                }
-                _ => {
-                    error!("Unsupported architecture for make: {:?}", config.arch);
-                }
+            let cross_compile_default = match config.arch {
+                Architecture::ARM => "arm-linux-gnueabi-",
+                Architecture::ARM64 => "aarch64-linux-gnu-",
+                Architecture::X86 => "x86_64-linux-gnu-",
+                Architecture::X86_64 => "x86_64-linux-gnu-",
+                _ => "",
+            };
+            let arch_default = match config.arch {
+                Architecture::ARM => "arm",
+                Architecture::ARM64 => "arm64",
+                Architecture::X86 => "x86",
+                Architecture::X86_64 => "x86",
+                _ => "",
+            };
+            if let Some(triple) = &toolchain.compiler_triple {
+                proc.arg(format!("CROSS_COMPILE={}{}", triple, "-"));
+            } else if !cross_compile_default.is_empty() {
+                proc.arg(format!("CROSS_COMPILE={}", cross_compile_default));
+            }
+            if !arch_default.is_empty() {
+                proc.arg(format!("ARCH={}", arch_default));
             }
 
             if config.toolchains.clang {
@@ -821,80 +898,12 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             proc.env(path.name, path.value);
 
             debug!("Running make defconfig in directory: {:?}", &source_dir);
+            let success = BuildService::run_command_with_logs(proc, tx.clone(), None, None).await?;
 
-            // 1. SETUP THE PROCESS
-            proc.stdout(Stdio::piped());
-            proc.stderr(Stdio::piped()); // Capture stderr too (make often prints info here)
-
-            // 2. SPAWN THE PROCESS
-            // We use spawn() instead of status() so we can interact with it while it runs.
-            let mut child = proc
-                .spawn()
-                .map_err(|e| Status::internal(format!("Failed to spawn make: {}", e)))?;
-
-            // 3. GRAB THE HANDLES
-            // We take ownership of the pipes. If we don't, they close immediately.
-            let stdout = child.stdout.take().expect("stdout not piped");
-            let stderr = child.stderr.take().expect("stderr not piped");
-
-            // 4. START LOG STREAMERS
-            // We spawn two background tasks to read logs so they don't block each other.
-            let tx_out = tx.clone();
-            let tx_err = tx.clone();
-
-            // Task A: Forward Stdout
-            let out_handle = tokio::spawn(async move {
-                let mut reader = BufReader::new(stdout).lines();
-                while let Ok(Some(line)) = reader.next_line().await {
-                    // We cannot use 'report!' here easily because of 'break',
-                    // so we manually send.
-                    let msg = BuildStatus {
-                        status: ProgressStatus::InProgressBuild.into(),
-                        output: format!("stdout: {}", line),
-                        build_id: None,
-                    };
-                    // If client disconnects, stop reading
-                    if tx_out.send(Ok(msg)).await.is_err() {
-                        break;
-                    }
-                }
-            });
-
-            // Task B: Forward Stderr (Merged into the same stream)
-            let err_handle = tokio::spawn(async move {
-                let mut reader = BufReader::new(stderr).lines();
-                while let Ok(Some(line)) = reader.next_line().await {
-                    let msg = BuildStatus {
-                        status: ProgressStatus::InProgressBuild.into(),
-                        output: format!("stderr: {}", line),
-                        build_id: None,
-                    };
-                    if tx_err.send(Ok(msg)).await.is_err() {
-                        break;
-                    }
-                }
-            });
-
-            // 5. WAIT FOR COMPLETION
-            // Wait for the process to exit...
-            let status = child
-                .wait()
-                .await
-                .map_err(|e| Status::internal(e.to_string()))?;
-
-            // ...AND wait for the logs to finish flushing.
-            // If we don't await these, we might lose the last few lines of logs.
-            let _ = out_handle.await;
-            let _ = err_handle.await;
-
-            // 6. CHECK FINAL STATUS
-            if !status.success() {
-                report!(
-                    Failed,
-                    format!("make defconfig failed with status: {:?}", status)
-                );
-                return Err(Status::internal("make defconfig failed"));
+            if !success {
+                return Err(Status::internal("Build defconfig failed."));
             }
+
             report!(
                 InProgressConfigure,
                 "make defconfig completed successfully."
@@ -1085,111 +1094,16 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
 
             debug!("Running make in directory: {:?}", &context.work_dir);
 
-            // 1. SETUP THE PROCESS
-            proc.stdout(Stdio::piped());
-            proc.stderr(Stdio::piped()); // Capture stderr too (make often prints info here)
+            let success = BuildService::run_command_with_logs(
+                proc,
+                tx.clone(),
+                Some(req.build_id),
+                Some(rx_kill),
+            )
+            .await?;
 
-            // 2. SPAWN THE PROCESS
-            // We use spawn() instead of status() so we can interact with it while it runs.
-            let mut child = proc
-                .spawn()
-                .map_err(|e| Status::internal(format!("Failed to spawn make: {}", e)))?;
-
-            // 3. GRAB THE HANDLES
-            // We take ownership of the pipes. If we don't, they close immediately.
-            let stdout = child.stdout.take().expect("stdout not piped");
-            let stderr = child.stderr.take().expect("stderr not piped");
-
-            // 4. START LOG STREAMERS
-            // We spawn two background tasks to read logs so they don't block each other.
-            let tx_out = tx.clone();
-            let tx_err = tx.clone();
-
-            // Task A: Forward Stdout
-            let out_handle = tokio::spawn(async move {
-                let mut reader = BufReader::new(stdout).lines();
-                while let Ok(Some(line)) = reader.next_line().await {
-                    // We cannot use 'report!' here easily because of 'break',
-                    // so we manually send.
-                    let msg = BuildStatus {
-                        status: ProgressStatus::InProgressBuild.into(),
-                        output: format!("stdout: {}", line),
-                        build_id: Some(req.build_id),
-                    };
-                    // If client disconnects, stop reading
-                    if tx_out.send(Ok(msg)).await.is_err() {
-                        break;
-                    }
-                }
-            });
-
-            // Task B: Forward Stderr (Merged into the same stream)
-            let err_handle = tokio::spawn(async move {
-                let mut reader = BufReader::new(stderr).lines();
-                while let Ok(Some(line)) = reader.next_line().await {
-                    let msg = BuildStatus {
-                        status: ProgressStatus::InProgressBuild.into(),
-                        output: format!("stderr: {}", line),
-                        build_id: Some(req.build_id),
-                    };
-                    if tx_err.send(Ok(msg)).await.is_err() {
-                        break;
-                    }
-                }
-            });
-
-            report!(InProgressBuild, "Build in progress...");
-
-            // 5. WAIT FOR COMPLETION
-            // Wait for the process to exit...
-            let status_result = tokio::select! {
-                // Option A: The process finishes naturally
-                res = child.wait() => {
-                    res
-                }
-                // Option B: We receive the kill signal
-                _ = rx_kill.recv() => {
-                    report!(Failed, "Kill signal received. Terminating build process...");
-
-                    // Kill the process safely
-                    if let Err(e) = child.kill().await {
-                        error!("Failed to kill process: {}", e);
-                    }
-
-                    // Clean up logging tasks
-                    let _ = out_handle.await;
-                    let _ = err_handle.await;
-
-                    report!(Failed, "Build cancelled by user.");
-
-                    // Mark as finished locally so we stop tracking it
-                     let mut per_build_statuses_lock = peridstat.lock().await;
-                    if let Some(entry) = per_build_statuses_lock.iter_mut().find(|s| s.build_id == req.build_id) {
-                        entry.finished = true;
-                    }
-                    return Ok(()); // Exit the task immediately
-                }
-            };
-            let status = match status_result {
-                Ok(s) => s,
-                Err(e) => {
-                    report!(Failed, format!("Failed to wait for make process: {}", e));
-                    return Err(Status::internal(format!(
-                        "Failed to wait for make process: {}",
-                        e
-                    )));
-                }
-            };
-
-            // ...AND wait for the logs to finish flushing.
-            // If we don't await these, we might lose the last few lines of logs.
-            let _ = out_handle.await;
-            let _ = err_handle.await;
-
-            // 6. CHECK FINAL STATUS
-            if !status.success() {
-                report!(Failed, format!("make failed with status: {:?}", status));
-                return Err(Status::internal("make failed"));
+            if !success {
+                return Err(Status::internal("Build failed or cancelled"));
             }
 
             if let Some(anykernel) = &context.config.anykernel
