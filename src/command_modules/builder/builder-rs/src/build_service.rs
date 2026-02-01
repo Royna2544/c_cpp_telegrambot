@@ -89,6 +89,8 @@ pub struct BuildService {
     pub temp_directory: PathBuf,
     pub output_directory: PathBuf,
 }
+type WrappedBuildStatus = Arc<Mutex<Vec<PerBuildIdStatus>>>;
+type WrappedContexts = Arc<Mutex<Vec<BuildContext>>>;
 
 impl BuildService {
     pub fn new(
@@ -108,25 +110,34 @@ impl BuildService {
         }
     }
 
-    pub fn inc_build_id(&self) -> i32 {
-        let mut id_lock = self.id.blocking_lock();
-        *id_lock += 1;
-        self.build_statuses.blocking_lock().push(PerBuildIdStatus {
-            build_id: *id_lock,
-            finished: false,
-            suceeded: false,
-        });
-        *id_lock
-    }
-
-    pub fn mark_build_finished(&self, build_id: i32) {
-        let mut statuses = self.build_statuses.blocking_lock();
+    async fn mark_build_finished(peridstat: &WrappedBuildStatus, build_id: i32) {
+        let mut statuses = peridstat.lock().await;
         if let Some(entry) = statuses.iter_mut().find(|s| s.build_id == build_id) {
             entry.finished = true;
         }
     }
 
-    pub async fn run_command_with_logs(
+    async fn is_build_finished(peridstat: &WrappedBuildStatus, build_id: i32) -> bool {
+        let statuses = peridstat.lock().await;
+        if let Some(entry) = statuses.iter().find(|s| s.build_id == build_id) {
+            entry.finished
+        } else {
+            false
+        }
+    }
+
+    async fn is_valid_build_id(peridstat: &WrappedBuildStatus, build_id: i32) -> bool {
+        let statuses = peridstat.lock().await;
+        statuses.iter().any(|s| s.build_id == build_id)
+    }
+
+    async fn inc_and_get_build_id(id_lock: &Arc<Mutex<i32>>) -> i32 {
+        let mut id_guard = id_lock.lock().await;
+        *id_guard += 1;
+        *id_guard
+    }
+
+    async fn run_command_with_logs(
         mut command: Command, // The configured tokio::process::Command
         tx: mpsc::Sender<Result<BuildStatus, Status>>, // Where to send logs
         build_id: Option<i32>, // To tag the logs
@@ -852,11 +863,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                 "make defconfig completed successfully."
             );
 
-            let mut build_id_lock = build_id_handle.lock().await;
-            *build_id_lock += 1;
-            let current_id = *build_id_lock;
-            drop(build_id_lock);
-
+            let current_id = Self::inc_and_get_build_id(&build_id_handle).await;
             let entry = BuildContext {
                 id: current_id,
                 work_dir: source_dir,
@@ -919,22 +926,19 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
         }
 
         // Validate build ID
-        let peridstat = self.build_statuses.lock().await;
-        let build_status_entry = peridstat.iter().find(|s| s.build_id == req.build_id);
-        if build_status_entry.is_none() {
+        let peridstat = self.build_statuses.clone();
+        if !Self::is_valid_build_id(&peridstat, req.build_id).await {
             return Err(Status::not_found(format!(
                 "No build found with ID: {}",
                 req.build_id
             )));
         }
-        let build_status_entry = build_status_entry.unwrap();
-        if build_status_entry.finished {
+        if !Self::is_build_finished(&peridstat, req.build_id).await {
             return Err(Status::failed_precondition(format!(
-                "Build with ID {} is already finished.",
+                "Build ID {} is not in a pending state. (Already finished?)",
                 req.build_id
             )));
         }
-        drop(peridstat);
 
         let context = {
             let contexts = self.contexts.lock().await;
@@ -1034,7 +1038,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
 
                     report!(
                         InProgressBuild,
-                        format!("CreateZipFile {:?}", &zip_file_path)
+                        format!("CreateZipFile {}", &zip_file_path.to_path_buf().display())
                     );
 
                     let options = FileOptions::<()>::default()
@@ -1109,13 +1113,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             report!(Success, "Build complete. Dropping build context.");
 
             // Mark build as finished
-            let mut per_build_statuses_lock = peridstat.lock().await;
-            if let Some(entry) = per_build_statuses_lock
-                .iter_mut()
-                .find(|s| s.build_id == req.build_id)
-            {
-                entry.finished = true;
-            }
+            Self::mark_build_finished(&peridstat, req.build_id).await;
             Ok(())
         });
         let stream = ReceiverStream::new(rx);
@@ -1130,19 +1128,19 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
         let req = request.into_inner();
 
         // 0. Check if finishied already
-        let per_build_statuses = self.build_statuses.lock().await;
-        if let Some(entry) = per_build_statuses
-            .iter()
-            .find(|s| s.build_id == req.build_id)
-        {
-            if entry.finished {
-                return Err(Status::failed_precondition(format!(
-                    "Build with ID {} is already finished.",
-                    req.build_id
-                )));
-            }
+        let per_build_statuses = self.build_statuses.clone();
+        if !Self::is_valid_build_id(&per_build_statuses, req.build_id).await {
+            return Err(Status::not_found(format!(
+                "No build found with ID: {}",
+                req.build_id
+            )));
         }
-        drop(per_build_statuses);
+        if !Self::is_build_finished(&per_build_statuses, req.build_id).await {
+            return Err(Status::failed_precondition(format!(
+                "Build ID {} is not in a pending state. (Already finished?)",
+                req.build_id
+            )));
+        }
 
         // 1. Get the Kill Signal Sender
         let contexts = self.contexts.lock().await;
@@ -1199,31 +1197,31 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
     > {
         debug!("get_artifact called");
 
+        if !Self::is_valid_build_id(&self.build_statuses, request.get_ref().build_id).await {
+            return Err(Status::not_found(format!(
+                "No build found with ID: {}",
+                request.get_ref().build_id
+            )));
+        }
+        let peridstat = self.build_statuses.clone();
+        if !Self::is_build_finished(&peridstat, request.get_ref().build_id).await {
+            return Err(Status::failed_precondition(format!(
+                "Build ID {} is not in a pending state. (Already finished?)",
+                request.get_ref().build_id
+            )));
+        }
+        let context = {
+            let contexts = self.contexts.lock().await;
+            let ctx = contexts
+                .iter()
+                .find(|c| c.id == request.get_ref().build_id)
+                .unwrap();
+            ctx.clone()
+        };
+
         let req = request.into_inner();
         let (tx, rx) = mpsc::channel(100);
-        let contexts_handle = self.contexts.clone();
         tokio::spawn(async move {
-            // Find the build context
-            let context = {
-                let contexts = contexts_handle.lock().await;
-                let ctx = contexts.iter().find(|c| c.id == req.build_id);
-                match ctx {
-                    Some(c) => {
-                        let cloned = c.clone();
-                        drop(contexts);
-                        cloned
-                    }
-                    None => {
-                        let _ = tx
-                            .send(Err(Status::not_found(format!(
-                                "No build context found for ID: {}",
-                                req.build_id
-                            ))))
-                            .await;
-                        return;
-                    }
-                }
-            };
             // Check if artifact exists
             let artifact_path = match &context.artifact_path {
                 Some(p) => p.clone(),

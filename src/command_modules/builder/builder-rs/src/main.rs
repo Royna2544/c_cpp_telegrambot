@@ -14,6 +14,7 @@ use tracing::{debug, error, info, instrument, warn};
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct KernelBuilderArgs {
+    bind_address: String,
     json_directory: String,
     output_directory: String,
     temp_directory: String,
@@ -75,6 +76,8 @@ async fn main() {
 
     let args = KernelBuilderArgs::parse();
 
+    info!("Starting Linux Kernel Builder Service");
+    info!("Bind Address: {}", args.bind_address);
     info!("JSON Directory: {}", args.json_directory);
     info!("Output Directory: {}", args.output_directory);
     info!("Temp Directory: {}", args.temp_directory);
