@@ -101,4 +101,33 @@ impl Toolchain {
         debug!("First line of version output: {}", first_line);
         Some(first_line.to_string())
     }
+
+    pub fn build_args(&self, arch: &Architecture) -> Vec<String> {
+        let mut args = Vec::new();
+
+        let cross_compile_default = match arch {
+            Architecture::ARM => "arm-linux-gnueabi-",
+            Architecture::ARM64 => "aarch64-linux-gnu-",
+            Architecture::X86 => "x86_64-linux-gnu-",
+            Architecture::X86_64 => "x86_64-linux-gnu-",
+            _ => "",
+        };
+        let arch_default = match arch {
+            Architecture::ARM => "arm",
+            Architecture::ARM64 => "arm64",
+            Architecture::X86 => "x86",
+            Architecture::X86_64 => "x86",
+            _ => "",
+        };
+        if let Some(triple) = &self.compiler_triple {
+            args.push(format!("CROSS_COMPILE={}{}", triple, "-"));
+        } else if !cross_compile_default.is_empty() {
+            args.push(format!("CROSS_COMPILE={}", cross_compile_default));
+        }
+        if !arch_default.is_empty() {
+            args.push(format!("ARCH={}", arch_default));
+        }
+
+        args
+    }
 }

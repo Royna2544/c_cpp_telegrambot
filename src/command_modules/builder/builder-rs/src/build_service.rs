@@ -13,6 +13,7 @@ use crate::build_service::grpc_pb::ProgressStatus;
 pub use crate::build_service::grpc_pb::linux_kernel_build_service_server;
 use crate::builder_config;
 use crate::builder_config::Architecture;
+use crate::builder_config::Toolchain;
 use crate::builder_config::{BuilderConfig, CompilerType};
 use crate::kernel_config;
 use crate::kernel_config::EnvVar;
@@ -20,12 +21,9 @@ use crate::kernel_config::KernelConfig;
 use chrono::Local;
 use flate2::read::GzDecoder; // For .tar.gz
 use futures_util::StreamExt;
-use futures_util::future::Map;
 use git2::FetchOptions;
 use git2::Repository;
-use git2::build;
 use git2::build::RepoBuilder;
-use std::fmt::Debug;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
@@ -57,17 +55,29 @@ use zip::write::FileOptions;
 #[derive(Clone)]
 pub struct BuildContext {
     id: i32,
+    // Associated kernel config
     config: KernelConfig,
+    // Associated toolchain entry
+    toolchain: Toolchain,
+    // Directory where the build is taking place
     work_dir: PathBuf,
+    // Directory where toolchain is located
     toolchain_dir: PathBuf,
+    // Target device name
     device_name: String,
+    // Optional path to store the built artifact
+    // If success, this stores the artifact (Whether it is .zip or raw kernel image)
+    // If failure, this contains build logs
+    // If cancelled, this is None
     artifact_path: Option<PathBuf>,
+    // Optional kill signal sender
     pub kill_signal: Option<tokio::sync::mpsc::Sender<()>>,
 }
 
 struct PerBuildIdStatus {
     build_id: i32,
     finished: bool,
+    suceeded: bool,
 }
 
 pub struct BuildService {
@@ -104,6 +114,7 @@ impl BuildService {
         self.build_statuses.blocking_lock().push(PerBuildIdStatus {
             build_id: *id_lock,
             finished: false,
+            suceeded: false,
         });
         *id_lock
     }
@@ -810,65 +821,11 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                 .arg("O=out")
                 .arg(&defconfig_name);
 
-            let cross_compile_default = match config.arch {
-                Architecture::ARM => "arm-linux-gnueabi-",
-                Architecture::ARM64 => "aarch64-linux-gnu-",
-                Architecture::X86 => "x86_64-linux-gnu-",
-                Architecture::X86_64 => "x86_64-linux-gnu-",
-                _ => "",
-            };
-            let arch_default = match config.arch {
-                Architecture::ARM => "arm",
-                Architecture::ARM64 => "arm64",
-                Architecture::X86 => "x86",
-                Architecture::X86_64 => "x86",
-                _ => "",
-            };
-            if let Some(triple) = &toolchain.compiler_triple {
-                proc.arg(format!("CROSS_COMPILE={}{}", triple, "-"));
-            } else if !cross_compile_default.is_empty() {
-                proc.arg(format!("CROSS_COMPILE={}", cross_compile_default));
+            for arg in toolchain.build_args(&config.arch) {
+                proc.arg(arg);
             }
-            if !arch_default.is_empty() {
-                proc.arg(format!("ARCH={}", arch_default));
-            }
-
-            if config.toolchains.clang {
-                if config.toolchains.llvm_ias {
-                    proc.arg("LLVM=1");
-                    proc.arg("LLVM_IAS=1");
-                } else if config.toolchains.llvm_binutils {
-                    proc.arg("CC=clang");
-                    proc.arg("LD=ld.lld");
-                    proc.arg("AR=llvm-ar");
-                    proc.arg("NM=llvm-nm");
-                    proc.arg("OBJCOPY=llvm-objcopy");
-                    proc.arg("OBJDUMP=llvm-objdump");
-                    proc.arg("STRIP=llvm-strip");
-                } else {
-                    proc.arg("CC=clang");
-                }
-            }
-
-            match config.arch {
-                Architecture::ARM => {
-                    proc.arg("ARCH=arm");
-                }
-                Architecture::ARM64 => {
-                    proc.arg("ARCH=arm64");
-                }
-                Architecture::X86 => {
-                    proc.arg("ARCH=x86");
-                }
-                Architecture::X86_64 => {
-                    proc.arg("ARCH=x86");
-                }
-                _ => {
-                    error!(
-                        "Unsupported architecture for make defconfig: {:?}",
-                        config.arch
-                    );
-                }
+            for arg in &config.build_args() {
+                proc.arg(arg);
             }
 
             for fragment in &req.config_fragments {
@@ -878,24 +835,10 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                 }
             }
 
-            for env_var in &config.env {
-                info!(
-                    "Setting environment variable for make defconfig: {}={}",
-                    env_var.name, env_var.value
-                );
-                proc.env(env_var.name.clone(), env_var.value.clone());
+            for (name, value) in config.env_vars(toolchain_dir.clone()) {
+                info!("Setting environment variable for make: {}={}", name, value);
+                proc.env(name.clone(), value.clone());
             }
-
-            // Ensure toolchain bin is in PATH
-            let path = EnvVar {
-                name: "PATH".into(),
-                value: format!(
-                    "{}:{}",
-                    toolchain_dir.join("bin").to_string_lossy(),
-                    std::env::var("PATH").unwrap_or_default()
-                ),
-            };
-            proc.env(path.name, path.value);
 
             debug!("Running make defconfig in directory: {:?}", &source_dir);
             let success = BuildService::run_command_with_logs(proc, tx.clone(), None, None).await?;
@@ -908,7 +851,6 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                 InProgressConfigure,
                 "make defconfig completed successfully."
             );
-            report!(Success, "Configuration complete.");
 
             let mut build_id_lock = build_id_handle.lock().await;
             *build_id_lock += 1;
@@ -918,9 +860,10 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             let entry = BuildContext {
                 id: current_id,
                 work_dir: source_dir,
-                config,
-                toolchain_dir,
+                config: config,
+                toolchain_dir: toolchain_dir,
                 device_name: req.device_name,
+                toolchain: toolchain.clone(),
                 artifact_path: None,
                 kill_signal: None,
             };
@@ -932,6 +875,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             per_build_statuses_lock.push(PerBuildIdStatus {
                 build_id: current_id,
                 finished: false,
+                suceeded: success,
             });
             drop(per_build_statuses_lock);
 
@@ -1012,8 +956,9 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
         let peridstat = self.build_statuses.clone();
         let toolchain_dir = context.toolchain_dir.clone();
         let contexts_clone = self.contexts.clone();
+        let toolchain = context.toolchain.clone();
 
-        let (tx_kill, mut rx_kill) = mpsc::channel(1);
+        let (tx_kill, rx_kill) = mpsc::channel(1);
 
         // 2. Store the trigger (tx_kill) in the context so cancel_build can find it
         {
@@ -1031,66 +976,17 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                 .arg(format!("-j{}", available_parallelism().unwrap().get()))
                 .arg("O=out");
 
-            match context.config.arch {
-                Architecture::ARM => {
-                    proc.arg("ARCH=arm");
-                    proc.arg("CROSS_COMPILE=arm-linux-gnueabi-");
-                }
-                Architecture::ARM64 => {
-                    proc.arg("ARCH=arm64");
-                    proc.arg("CROSS_COMPILE=aarch64-linux-gnu-");
-                }
-                Architecture::X86 => {
-                    proc.arg("ARCH=x86");
-                    proc.arg("CROSS_COMPILE=x86_64-linux-gnu-");
-                }
-                Architecture::X86_64 => {
-                    proc.arg("ARCH=x86");
-                    proc.arg("CROSS_COMPILE=x86_64-linux-gnu-");
-                }
-                _ => {
-                    error!(
-                        "Unsupported architecture for make: {:?}",
-                        context.config.arch
-                    );
-                }
+            for arg in toolchain.build_args(&context.config.arch) {
+                proc.arg(arg);
+            }
+            for arg in &context.config.build_args() {
+                proc.arg(arg);
             }
 
-            if context.config.toolchains.clang {
-                if context.config.toolchains.llvm_ias {
-                    proc.arg("LLVM=1");
-                    proc.arg("LLVM_IAS=1");
-                } else if context.config.toolchains.llvm_binutils {
-                    proc.arg("CC=clang");
-                    proc.arg("LD=ld.lld");
-                    proc.arg("AR=llvm-ar");
-                    proc.arg("NM=llvm-nm");
-                    proc.arg("OBJCOPY=llvm-objcopy");
-                    proc.arg("OBJDUMP=llvm-objdump");
-                    proc.arg("STRIP=llvm-strip");
-                } else {
-                    proc.arg("CC=clang");
-                }
+            for (name, value) in context.config.env_vars(toolchain_dir.clone()) {
+                info!("Setting environment variable for make: {}={}", name, value);
+                proc.env(name.clone(), value.clone());
             }
-
-            for env_var in &context.config.env {
-                info!(
-                    "Setting environment variable for make: {}={}",
-                    env_var.name, env_var.value
-                );
-                proc.env(env_var.name.clone(), env_var.value.clone());
-            }
-
-            // Ensure toolchain bin is in PATH
-            let path = EnvVar {
-                name: "PATH".into(),
-                value: format!(
-                    "{}:{}",
-                    toolchain_dir.join("bin").to_string_lossy(),
-                    std::env::var("PATH").unwrap_or_default()
-                ),
-            };
-            proc.env(path.name, path.value);
 
             debug!("Running make in directory: {:?}", &context.work_dir);
 

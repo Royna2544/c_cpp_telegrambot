@@ -1,5 +1,8 @@
+use std::path::PathBuf;
+
 use crate::builder_config::Architecture;
 use serde::{Deserialize, Serialize};
+use tracing::{error, info};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Repo {
@@ -68,4 +71,72 @@ pub struct KernelConfig {
 
     #[serde(default)]
     pub env: Vec<EnvVar>,
+}
+
+impl KernelConfig {
+    pub fn supports_arch(&self, arch: &Architecture) -> bool {
+        self.arch == *arch || self.arch == Architecture::Any
+    }
+
+    // Construct build arguments based on the kernel config
+    pub fn build_args(&self) -> Vec<String> {
+        let mut args: Vec<String> = Vec::new();
+
+        if !self.supports_arch(&self.arch) {
+            error!(
+                "KernelConfig {} does not support architecture {:?}",
+                self.name, self.arch
+            );
+            return args;
+        }
+
+        // Set architecture
+        args.push(format!(
+            "ARCH={}",
+            match self.arch {
+                Architecture::ARM => "arm",
+                Architecture::ARM64 => "arm64",
+                Architecture::X86 => "x86",
+                Architecture::X86_64 => "x86_64",
+                Architecture::Any => "",
+            }
+        ));
+
+        // Set compiler options (LLVM/Clang)
+        if self.toolchains.clang {
+            if self.toolchains.llvm_ias {
+                args.push("LLVM=1".to_string());
+                args.push("LLVM_IAS=1".to_string());
+            } else if self.toolchains.llvm_binutils {
+                args.push("CC=clang".to_string());
+                args.push("LD=ld.lld".to_string());
+                args.push("AR=llvm-ar".to_string());
+                args.push("NM=llvm-nm".to_string());
+                args.push("OBJCOPY=llvm-objcopy".to_string());
+                args.push("OBJDUMP=llvm-objdump".to_string());
+                args.push("STRIP=llvm-strip".to_string());
+            } else {
+                args.push("CC=clang".to_string());
+            }
+        }
+
+        args
+    }
+
+    pub fn env_vars(&self, toolchain_dir: PathBuf) -> Vec<(String, String)> {
+        let path = EnvVar {
+            name: "PATH".into(),
+            value: format!(
+                "{}:{}",
+                toolchain_dir.join("bin").to_string_lossy(),
+                std::env::var("PATH").unwrap_or_default()
+            ),
+        };
+        self.env
+            .iter()
+            .map(|var| (var.name.clone(), var.value.clone()))
+            .into_iter()
+            .chain(std::iter::once((path.name, path.value)))
+            .collect()
+    }
 }
