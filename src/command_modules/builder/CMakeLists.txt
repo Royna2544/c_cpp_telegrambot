@@ -1,3 +1,4 @@
+add_subdirectory(kernel)
 
 find_package(libgit2)
 
@@ -88,4 +89,3 @@ tgbot_library(
   STATIC)
 
 add_subdirectory(android)
-add_subdirectory(kernel)
