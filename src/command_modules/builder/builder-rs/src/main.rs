@@ -14,10 +14,14 @@ use tracing::{debug, error, info, instrument, warn};
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct KernelBuilderArgs {
-    bind_address: String,
-    json_directory: String,
-    output_directory: String,
-    temp_directory: String,
+    #[arg(long)]
+    bind_addr: String,
+    #[arg(long)]
+    json_dir: String,
+    #[arg(long)]
+    output_dir: String,
+    #[arg(long)]
+    temp_dir: String,
 }
 
 // builder_config.json is a reserved filename for internal builder configs
@@ -72,17 +76,21 @@ pub fn parse_builder_config(json_directory: &str) -> Option<builder_config::Buil
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt::init();
+    tracing_subscriber::fmt()
+        .with_file(true)
+        .with_line_number(true)
+        .with_target(false)
+        .init();
 
     let args = KernelBuilderArgs::parse();
 
     info!("Starting Linux Kernel Builder Service");
-    info!("Bind Address: {}", args.bind_address);
-    info!("JSON Directory: {}", args.json_directory);
-    info!("Output Directory: {}", args.output_directory);
-    info!("Temp Directory: {}", args.temp_directory);
+    info!("Bind Address: {}", args.bind_addr);
+    info!("JSON Directory: {}", args.json_dir);
+    info!("Output Directory: {}", args.output_dir);
+    info!("Temp Directory: {}", args.temp_dir);
 
-    let configs = parse_kernel_config(&args.json_directory);
+    let configs = parse_kernel_config(&args.json_dir);
     if configs.is_empty() {
         warn!("No valid kernel configurations found in the specified directory.");
         warn!("Exiting due to lack of configurations.");
@@ -90,18 +98,18 @@ async fn main() {
     } else {
         info!("Loaded {} kernel configurations.", configs.len());
     }
-    match parse_builder_config(&args.json_directory) {
+    match parse_builder_config(&args.json_dir) {
         Some(builder_config) => {
             // 1. Define the address to listen on
-            let addr = "0.0.0.0:50051".parse().unwrap();
+            let addr = args.bind_addr.parse().unwrap();
             info!("Linux Kernel Builder listening on {}", addr);
 
             // 2. Initialize Build Service
             let build_service = BuildService::new(
                 configs,
                 builder_config,
-                PathBuf::from(args.temp_directory),
-                PathBuf::from(args.output_directory),
+                PathBuf::from(args.temp_dir),
+                PathBuf::from(args.output_dir),
             );
 
             // 3. Build and Run the Server

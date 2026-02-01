@@ -137,6 +137,68 @@ impl BuildService {
         *id_guard
     }
 
+    async fn zip_dir_with_filename(
+        archive_file_path: &Path,
+        target_dir: &Path,
+    ) -> Result<(), Status> {
+        let file = File::create(&archive_file_path)?;
+        let mut zip = ZipWriter::new(file);
+
+        let options = FileOptions::<()>::default().compression_method(CompressionMethod::Deflated);
+
+        for entry in walkdir::WalkDir::new(&target_dir) {
+            let entry = entry.map_err(|e| {
+                Status::internal(format!(
+                    "Failed to read entry in target directory {:?}: {}",
+                    target_dir, e
+                ))
+            })?;
+            let path = entry.path();
+            if path.is_file() && !path.starts_with(".") {
+                let name = path
+                    .strip_prefix(&target_dir)
+                    .map_err(|e| {
+                        Status::internal(format!(
+                            "Failed to get relative path for {:?}: {}",
+                            path, e
+                        ))
+                    })?
+                    .to_string_lossy()
+                    .to_string();
+                if std::fs::File::open(&path)?
+                    .metadata()
+                    .map_err(|e| {
+                        Status::internal(format!(
+                            "Failed to get metadata for file {:?}: {}",
+                            path, e
+                        ))
+                    })?
+                    .len()
+                    == 0
+                {
+                    debug!(
+                        "Skipping zero-length file in target directory zip: {:?}",
+                        path
+                    );
+                    continue;
+                }
+                zip.start_file(name, options).map_err(|e| {
+                    Status::internal(format!("Failed to add file to zip {:?}: {}", path, e))
+                })?;
+                let mut f = std::fs::File::open(&path).map_err(|e| {
+                    Status::internal(format!("Failed to open file {:?} for zipping: {}", path, e))
+                })?;
+                std::io::copy(&mut f, &mut zip).map_err(|e| {
+                    Status::internal(format!("Failed to copy file {:?} into zip: {}", path, e))
+                })?;
+                debug!("Added file to target directory zip: {:?}", path);
+            }
+        }
+        zip.finish()
+            .map_err(|e| Status::internal(format!("Failed to finalize zip file: {}", e)))?;
+        Ok(())
+    }
+
     async fn run_command_with_logs(
         mut command: Command, // The configured tokio::process::Command
         tx: mpsc::Sender<Result<BuildStatus, Status>>, // Where to send logs
@@ -1031,76 +1093,14 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                     let formatted_date = format!("{}", date.format("%Y-%m-%d_%H-%M-%S"));
                     let zip_file_path = context.work_dir.join(format!(
                         "{}_{}-{}.zip",
-                        context.config.name, req.build_id, formatted_date
+                        context.config.name, context.device_name, formatted_date
                     ));
-                    let file = File::create(&zip_file_path)?;
-                    let mut zip = ZipWriter::new(file);
 
                     report!(
                         InProgressBuild,
                         format!("CreateZipFile {}", &zip_file_path.to_path_buf().display())
                     );
-
-                    let options = FileOptions::<()>::default()
-                        .compression_method(CompressionMethod::Deflated);
-
-                    for entry in walkdir::WalkDir::new(&anykernel_dir) {
-                        let entry = entry.map_err(|e| {
-                            Status::internal(format!(
-                                "Failed to read entry in AnyKernel directory {:?}: {}",
-                                anykernel_dir, e
-                            ))
-                        })?;
-                        let path = entry.path();
-                        if path.is_file() && !path.starts_with(".") {
-                            let name = path
-                                .strip_prefix(&anykernel_dir)
-                                .map_err(|e| {
-                                    Status::internal(format!(
-                                        "Failed to get relative path for {:?}: {}",
-                                        path, e
-                                    ))
-                                })?
-                                .to_string_lossy()
-                                .to_string();
-                            if std::fs::File::open(&path)?
-                                .metadata()
-                                .map_err(|e| {
-                                    Status::internal(format!(
-                                        "Failed to get metadata for file {:?}: {}",
-                                        path, e
-                                    ))
-                                })?
-                                .len()
-                                == 0
-                            {
-                                debug!("Skipping zero-length file in AnyKernel zip: {:?}", path);
-                                continue;
-                            }
-                            zip.start_file(name, options).map_err(|e| {
-                                Status::internal(format!(
-                                    "Failed to add file to zip {:?}: {}",
-                                    path, e
-                                ))
-                            })?;
-                            let mut f = std::fs::File::open(&path).map_err(|e| {
-                                Status::internal(format!(
-                                    "Failed to open file {:?} for zipping: {}",
-                                    path, e
-                                ))
-                            })?;
-                            std::io::copy(&mut f, &mut zip).map_err(|e| {
-                                Status::internal(format!(
-                                    "Failed to copy file {:?} into zip: {}",
-                                    path, e
-                                ))
-                            })?;
-                            debug!("Added file to AnyKernel zip: {:?}", path);
-                        }
-                    }
-                    zip.finish().map_err(|e| {
-                        Status::internal(format!("Failed to finalize zip file: {}", e))
-                    })?;
+                    Self::zip_dir_with_filename(&zip_file_path, &anykernel_dir).await?;
                     report!(InProgressBuild, "AnyKernel packaging complete.");
                     // Grab context
                     let mut contexts = contexts_clone.lock().await;
