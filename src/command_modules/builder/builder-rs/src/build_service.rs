@@ -111,10 +111,22 @@ impl BuildService {
         }
     }
 
-    async fn mark_build_finished(peridstat: &WrappedBuildStatus, build_id: i32) {
+    async fn add_artifact_path_to_context(
+        contexts: &WrappedContexts,
+        build_id: i32,
+        archive_file_path: &Path,
+    ) {
+        let mut ctxs = contexts.lock().await;
+        if let Some(ctx) = ctxs.iter_mut().find(|c| c.id == build_id) {
+            ctx.artifact_path = Some(archive_file_path.to_path_buf());
+        }
+    }
+
+    async fn mark_build_finished(peridstat: &WrappedBuildStatus, build_id: i32, success: bool) {
         let mut statuses = peridstat.lock().await;
         if let Some(entry) = statuses.iter_mut().find(|s| s.build_id == build_id) {
             entry.finished = true;
+            entry.suceeded = success;
         }
     }
 
@@ -741,13 +753,12 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
 
             // Now let us clone the kernel source...
             let tx_for_git = tx.clone();
-            let source_dir = outdir.join(&config.name);
+            let source_dir = outdir.join(&config.name.replace(' ', "_").replace(':', "_"));
             let source_dir_clone = source_dir.clone();
             let config_branch = config.repo.branch.clone();
             let config_url = config.repo.url.clone();
             let res = tokio::task::spawn_blocking(move || {
                 let tx_for_inner = tx_for_git.clone();
-                let mut callbacks = git2::RemoteCallbacks::new();
 
                 let repo = git2::Repository::open(&source_dir_clone).ok(); // Check if already cloned
                 // Repo opens successfully, check if URL matches
@@ -775,20 +786,20 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                         }
                     }
                     // Check if branch matches
-                        if let Ok(head_ref) = r.head() {
-                            if let Some(name) = head_ref.shorthand() {
-                                if name != config_branch {
-                                    tx_for_inner
-                                        .blocking_send(Ok(BuildStatus {
-                                            status: ProgressStatus::InProgressDownload.into(),
-                                            output: "Existing repository branch does not match config, trying to check out the correct branch.".into(),
-                                            build_id: None,
-                                        }))
-                                        .unwrap();
-                                    r.set_head(&format!("refs/heads/{}", config_branch)).map_err(|e| {
-                                        Status::internal(format!(
-                                            "Failed to set head to branch {}: {}",
-                                            config_branch, e
+                    if let Ok(head_ref) = r.head() {
+                        if let Some(name) = head_ref.shorthand() {
+                        if name != config_branch {
+                            tx_for_inner
+                                .blocking_send(Ok(BuildStatus {
+                                    status: ProgressStatus::InProgressDownload.into(),
+                                    output: "Existing repository branch does not match config, trying to check out the correct branch.".into(),
+                                    build_id: None,
+                                }))
+                                .unwrap();
+                            r.set_head(&format!("refs/heads/{}", config_branch)).map_err(|e| {
+                                Status::internal(format!(
+                                    "Failed to set head to branch {}: {}",
+                                    config_branch, e
                                         ))
                                     })?;
                                     r.checkout_head(None).map_err(|e| {
@@ -804,7 +815,6 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
 
                     // Do a fast-forward pull to update the repo
                     let mut fo = git2::FetchOptions::new();
-                    fo.remote_callbacks(callbacks);
                     let mut remote = r.find_remote("origin").map_err(|e| {
                         Status::internal(format!("Failed to find remote 'origin': {}", e))
                     })?;
@@ -847,6 +857,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
 
                 let mut last_update = Instant::now();
                 let update_interval = Duration::from_secs(5);
+                let mut callbacks = git2::RemoteCallbacks::new();
 
                 // Set up the progress callback
                 callbacks.transfer_progress(move |stats| {
@@ -907,6 +918,17 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                 builder.fetch_options(fetch_options);
                 builder.branch(&config_branch);
 
+                tx_for_git
+                    .blocking_send(Ok(BuildStatus {
+                        status: ProgressStatus::InProgressDownload.into(),
+                        output: format!(
+                            "Cloning branch '{}' from '{}' into {}...",
+                            config_branch, config_url, source_dir_clone.display()
+                        ),
+                        build_id: None,
+                    }))
+                    .unwrap();
+
                 let resu = builder.clone(&config_url, &source_dir_clone);
                 let repo = match resu {
                     Ok(r) => r,
@@ -921,6 +943,14 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                         return Err(Status::internal(format!("Git clone failed: {}", e)));
                     }
                 };
+                    tx_for_git
+                        .blocking_send(Ok(BuildStatus {
+                            status: ProgressStatus::InProgressDownload.into(),
+                            output: "Git clone completed, updating submodules...".into(),
+                            build_id: None,
+                        }))
+                        .unwrap();
+
                 for mut submodule in repo
                     .submodules()
                     .map_err(|e| Status::internal(e.to_string()))?
@@ -929,6 +959,14 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                         .update(true, None)
                         .map_err(|e| Status::internal(format!("Submodule error: {}", e)))?;
                 }
+
+                tx_for_git
+                    .blocking_send(Ok(BuildStatus {
+                        status: ProgressStatus::InProgressDownload.into(),
+                        output: "Kernel source cloned successfully.".into(),
+                        build_id: None,
+                    }))
+                    .unwrap();
                 Ok(())
             })
             .await;
@@ -1133,11 +1171,13 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                 tx.clone(),
                 Some(req.build_id),
                 Some(rx_kill),
-                Some(log_file),
+                Some(log_file.clone()),
             )
             .await?;
 
             if !success {
+                Self::add_artifact_path_to_context(&contexts_clone, req.build_id, &log_file).await;
+                Self::mark_build_finished(&peridstat, req.build_id, false).await;
                 return Err(Status::internal(
                     "Build failed or cancelled, see logs for details.",
                 ));
@@ -1154,6 +1194,8 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
 
             // Check if kernel image exists
             if !artifact.exists() {
+                Self::add_artifact_path_to_context(&contexts_clone, req.build_id, &log_file).await;
+                Self::mark_build_finished(&peridstat, req.build_id, false).await;
                 return Err(Status::internal(format!(
                     "Expected kernel image not found at {:?}",
                     &kernel_image
@@ -1177,6 +1219,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                 } else {
                     let anykernel_dir = context.work_dir.join(anykernel.location.as_ref().unwrap());
                     if !anykernel_dir.exists() {
+                        Self::mark_build_finished(&peridstat, req.build_id, false).await;
                         report!(
                             Failed,
                             format!("AnyKernel directory {:?} does not exist.", anykernel_dir)
@@ -1226,15 +1269,12 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             } else {
                 // Upload kernel image directly
             }
-            let mut contexts = contexts_clone.lock().await;
-            if let Some(ctx) = contexts.iter_mut().find(|c| c.id == req.build_id) {
-                ctx.artifact_path = Some(artifact);
-            }
 
             report!(Success, "Build complete. Dropping build context.");
+            Self::add_artifact_path_to_context(&contexts_clone, req.build_id, &artifact).await;
 
             // Mark build as finished
-            Self::mark_build_finished(&peridstat, req.build_id).await;
+            Self::mark_build_finished(&peridstat, req.build_id, true).await;
             Ok(())
         });
         let stream = ReceiverStream::new(rx);

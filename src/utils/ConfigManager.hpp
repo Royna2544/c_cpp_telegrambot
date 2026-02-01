@@ -110,7 +110,7 @@ class UTILS_EXPORT ConfigManager {
         },
         {
             .config = Configs::SOCKET_URL_PRIMARY,
-            .name = "SocketPrimaryUrl",
+            .name = "PrimarySocketUrl",
             .description = "Primary socket URL",
             .alias = Entry::ALIAS_NONE,
             .type = Entry::ArgType::STRING,
@@ -118,7 +118,7 @@ class UTILS_EXPORT ConfigManager {
         },
         {
             .config = Configs::SOCKET_URL_SECONDARY,
-            .name = "SocketSecondaryUrl",
+            .name = "SecondarySocketUrl",
             .description = "Secondary socket URL",
             .alias = Entry::ALIAS_NONE,
             .type = Entry::ArgType::STRING,
