@@ -1,0 +1,22 @@
+{
+    "name": "Grand Kernel",
+    "repo": {
+        "url": "https://github.com/Roynas-Android-Playground/kernel_samsung_baffinvektt",
+        "branch": "lineage-18.1"
+    },
+    "arch": "arm",
+    "type": "Image",
+    "toolchains": {
+        "clang": false
+    },
+    "anykernel": {
+        "enabled": false
+    },
+    "defconfig": {
+        "scheme": "noperf_defconfig",
+        "devices": [
+            "baffinvektt"
+        ]
+    },
+    "fragments": []
+}

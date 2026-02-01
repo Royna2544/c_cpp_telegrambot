@@ -41,7 +41,9 @@ pub struct EnvVar {
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct LLVMSupport {
     pub clang: bool,
+    #[serde(default)]
     pub llvm_binutils: bool,
+    #[serde(default)]
     pub llvm_ias: bool,
 }
 

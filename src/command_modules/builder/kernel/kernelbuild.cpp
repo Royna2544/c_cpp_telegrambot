@@ -378,7 +378,6 @@ void KernelBuildHandler::handle_continue(
         _api->editMessage(query->message, "Build failed due to gRPC error.");
         LOG(ERROR) << "Build failed due to gRPC error. Error message: "
                    << finish_v2.error_message();
-        return;
     } else {
         _api->editMessage(query->message, "Build process completed.");
     }
@@ -386,7 +385,6 @@ void KernelBuildHandler::handle_continue(
         tgbot::builder::linuxkernel::ProgressStatus::SUCCESS) {
         _api->editMessage(query->message, "Build failed: " + response.output());
         LOG(ERROR) << "Build failed: " << response.output();
-        return;
     }
 
     auto artifactRequest = buildRequest;

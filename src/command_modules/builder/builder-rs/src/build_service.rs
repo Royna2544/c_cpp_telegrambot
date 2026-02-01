@@ -100,7 +100,19 @@ impl BuildService {
         temp_directory: PathBuf,
         output_directory: PathBuf,
     ) -> Self {
-        BuildService {
+        info!(
+            "BuildService initialized with {} kernel configs.",
+            &kernel_configs.len()
+        );
+        info!(
+            "Names: {:?}",
+            kernel_configs
+                .iter()
+                .map(|c| &c.name)
+                .collect::<Vec<&String>>()
+        );
+
+        let v = BuildService {
             kernel_configs: Arc::new(Mutex::new(kernel_configs)),
             contexts: Arc::new(Mutex::new(Vec::new())),
             id: Arc::new(Mutex::new(0)),
@@ -108,7 +120,8 @@ impl BuildService {
             builder_config,
             temp_directory,
             output_directory,
-        }
+        };
+        v
     }
 
     async fn add_artifact_path_to_context(
@@ -967,6 +980,14 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                         build_id: None,
                     }))
                     .unwrap();
+
+                // Old kernel version requires manual creation of out folder
+                std::fs::create_dir(&source_dir_clone.join("out")).map_err(|e| {
+                    Status::internal(format!(
+                        "Failed to create 'out' directory for old kernel: {}",
+                        e
+                    ))
+                })?;
                 Ok(())
             })
             .await;
