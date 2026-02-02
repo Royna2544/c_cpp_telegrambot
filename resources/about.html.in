@@ -1,12 +1,11 @@
 Hi! I'm <a href="https://t.me/_botusername_">_botname_</a>
 <blockquote><b>ABOUT</b>:
-- Telegram bot for fun
-- Proudly backed by C/C++
-- Spam purge feature
-- Regex command support
-- Runs on Windows (MSYS2/MSVC), macOS, Linux, Android (Termux), BSD-like systems
-- Exports a network control interface with IPv4 and IPv6
-- Client apps supported for Win32/Android</blockquote>
+- Rich command system with various utilities and tools accessible through simple Telegram messages.
+- Compile and execute code snippets directly in Telegram - supports multiple programming languages.
+- Send images to the bot for manipulation, editing, and various image-related operations.
+- Get cryptographically secure random numbers using hardware-based RNG for fair results.
+- Chat with integrated Large Language Models for intelligent conversations and assistance.
+- Written in high-performance C++ for quick responses and stable operation 24/7.</blockquote>
 <blockquote><b>BUILD INFO</b>:
 - Host OS: @CMAKE_SYSTEM_NAME@
 - C Compiler: @CMAKE_C_COMPILER@ v@CMAKE_C_COMPILER_VERSION@
