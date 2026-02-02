@@ -1,5 +1,8 @@
 add_subdirectory(kernel)
 
+include(gRPCGenerate)
+grpc_generate(SystemMonitor)
+
 find_package(libgit2)
 
 if(NOT libgit2_FOUND)

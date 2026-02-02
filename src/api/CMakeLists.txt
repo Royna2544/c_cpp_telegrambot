@@ -74,5 +74,11 @@ tgbot_library(
   STATIC
 )
 
+tgbot_library(
+  NAME RateLimitApi
+  SRCS RateLimit.cpp
+  STATIC
+)
+
 add_subdirectory(components/restartfmt_parser)
 add_subdirectory(net)

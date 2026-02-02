@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package tgbot.builder.system_monitor;
+
+import "google/protobuf/empty.proto";
+
+message SystemStats {
+  float cpu_usage_percent = 1;      // Global CPU load (0.0 to 100.0)
+  uint64 memory_total_mb = 2;       // Total RAM in MB
+  uint64 memory_used_mb = 3;        // Used RAM in MB
+  uint64 uptime_seconds = 4;        // System uptime
+}
+
+message SystemInfo {
+  string os_name = 1;               // Operating System name
+  string os_version = 2;            // Operating System version
+  string kernel_version = 3;        // Kernel version
+  string cpu_name = 4;              // CPU model/name
+  uint32 cpu_cores = 5;             // Number of CPU cores
+  uint64 memory_total_mb = 6;       // Total RAM in MB
+  string hostname = 7;              // System hostname
+  optional int32 disk_total_gb = 8;    // Total disk space in GB (if available)
+  optional int32 disk_used_gb = 9;     // Used disk space in GB (if available)
+}
+
+message SystemStatsResponse {
+  SystemInfo info = 1;              // Static system information
+  SystemStats stats = 2;            // Dynamic system statistics
+}
+
+message GetStatsRequest {
+   optional string disk_path = 1;   // Path to check disk usage (e.g., "/")
+};
+
+message WatchStatsRequest {
+  optional string disk_path = 1;             // Path to check disk usage (e.g., "/")
+  optional uint32 interval_seconds = 2;      // Interval between stats updates
+};
+
+service SystemMonitorService {
+  // Get a single snapshot of the current system state
+  rpc GetStats (GetStatsRequest) returns (SystemStats);
+
+  // Subscribe to live updates (e.g., every 2 seconds)
+  rpc WatchStats (WatchStatsRequest) returns (stream SystemStats);
+
+  // Get static system information
+  rpc GetSystemInfo (google.protobuf.Empty) returns (SystemInfo);
+}

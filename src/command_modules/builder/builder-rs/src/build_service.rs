@@ -46,6 +46,7 @@ use tokio::time::Instant;
 use tokio_stream::Stream;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
+use tracing::Instrument;
 use tracing::{debug, error, info, instrument, warn};
 use tracing_subscriber::field::debug;
 use zip::CompressionMethod;
@@ -514,6 +515,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
         let contexts_handle = self.contexts.clone();
         let build_id_handle = self.id.clone();
         let per_build_statuses = self.build_statuses.clone();
+        let tx_for_final = tx.clone();
 
         macro_rules! report {
             ($status:ident, $msg:expr) => {
@@ -529,7 +531,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             };
         }
 
-        let _ = tokio::spawn(async move {
+        let spawnres = tokio::spawn(async move {
             report!(
                 Pending,
                 "Starting build preparation, awaiting to acquire lock..."
@@ -704,10 +706,16 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                             InProgressDownload,
                             format!(
                                 "Will clone: {:?}-{:?} toolchain from Git.",
-                                toolchain.url, toolchain.branch
+                                toolchain.url,
+                                toolchain.branch.as_ref().unwrap()
                             )
                         );
-                        Repository::clone(&toolchain.url, toolchain_dir.clone())
+                        let mut repo_builder = RepoBuilder::new();
+                        if let Some(branch) = &toolchain.branch {
+                            repo_builder.branch(branch);
+                        }
+                        repo_builder
+                            .clone(&toolchain.url, &toolchain_dir)
                             .map_err(|e| Status::internal(format!("Git clone failed: {}", e)))?;
                     }
                     builder_config::Source::Tarball => {
@@ -768,6 +776,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             let tx_for_git = tx.clone();
             let source_dir = outdir.join(&config.name.replace(' ', "_").replace(':', "_"));
             let source_dir_clone = source_dir.clone();
+            let source_dir_clone2 = source_dir.clone();
             let config_branch = config.repo.branch.clone();
             let config_url = config.repo.url.clone();
             let res = tokio::task::spawn_blocking(move || {
@@ -980,14 +989,6 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                         build_id: None,
                     }))
                     .unwrap();
-
-                // Old kernel version requires manual creation of out folder
-                std::fs::create_dir(&source_dir_clone.join("out")).map_err(|e| {
-                    Status::internal(format!(
-                        "Failed to create 'out' directory for old kernel: {}",
-                        e
-                    ))
-                })?;
                 Ok(())
             })
             .await;
@@ -1031,6 +1032,23 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             for (name, value) in config.env_vars(toolchain_dir.clone()) {
                 info!("Setting environment variable for make: {}={}", name, value);
                 proc.env(name.clone(), value.clone());
+            }
+
+            // Old kernel version requires manual creation of out folder
+            let out_path = source_dir_clone2.join("out");
+            if out_path.is_dir() {
+                info!(
+                    "Output directory {:?} already exists, skipping creation.",
+                    out_path
+                );
+            } else {
+                info!(
+                    "Output directory {:?} does not exist, creating...",
+                    out_path
+                );
+                std::fs::create_dir(out_path).map_err(|e| {
+                    Status::internal(format!("Failed to create 'out' directory: {}", e))
+                })?;
             }
 
             debug!("Running make defconfig in directory: {:?}", &source_dir);
@@ -1086,6 +1104,36 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             .unwrap();
             Ok(())
         });
+
+        tokio::spawn(async move {
+            match spawnres.await {
+                Ok(inner_res) => {
+                    if let Err(e) = inner_res {
+                        tx_for_final
+                            .send(Ok(BuildStatus {
+                                status: ProgressStatus::Failed.into(),
+                                output: format!("Build preparation task failed: {}", e).into(),
+                                build_id: None,
+                            }))
+                            .await
+                            .unwrap();
+                    } else {
+                        debug!("Build preparation task completed successfully.");
+                    }
+                }
+                Err(e) => {
+                    tx_for_final
+                        .send(Ok(BuildStatus {
+                            status: ProgressStatus::Failed.into(),
+                            output: format!("Build preparation task failed to join: {}", e).into(),
+                            build_id: None,
+                        }))
+                        .await
+                        .unwrap();
+                }
+            }
+        });
+
         let stream = ReceiverStream::new(rx);
         Ok(tonic::Response::new(
             Box::pin(stream) as Self::prepareBuildStream
@@ -1103,13 +1151,19 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
         macro_rules! report {
             ($status:ident, $msg:expr) => {
                 // We capture 'tx' from the surrounding scope automatically
-                tx.send(Ok(BuildStatus {
-                    status: ProgressStatus::$status.into(),
-                    output: $msg.into(),
-                    build_id: Some(req.build_id),
-                }))
-                .await
-                .unwrap();
+                let rs = tx
+                    .send(Ok(BuildStatus {
+                        status: ProgressStatus::$status.into(),
+                        output: $msg.into(),
+                        build_id: Some(req.build_id),
+                    }))
+                    .await;
+                if rs.is_err() {
+                    error!(
+                        "Failed to send build status update for build ID {}",
+                        req.build_id
+                    );
+                }
                 info!("Build Status - {:?}: {}", ProgressStatus::$status, $msg);
             };
         }
@@ -1163,7 +1217,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             }
         }
 
-        tokio::spawn(async move {
+        let spawnres = tokio::spawn(async move {
             report!(Pending, "Build started...");
 
             let mut proc = Command::new("make");
@@ -1184,7 +1238,6 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             }
             let log_file = tmp_dir.join(format!("output-build-{}.log", &context.config.name));
             info!("Build log file will be at: {:?}", &log_file);
-
             debug!("Running make in directory: {:?}", &context.work_dir);
 
             let success = BuildService::run_command_with_logs(
@@ -1298,6 +1351,26 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             Self::mark_build_finished(&peridstat, req.build_id, true).await;
             Ok(())
         });
+
+        let span = tracing::info_span!("build_watcher", build_id = req.build_id);
+        tokio::spawn(
+            async move {
+                match spawnres.await {
+                    Ok(inner_res) => {
+                        if let Err(e) = inner_res {
+                            error!("Build task failed: {}", e);
+                        } else {
+                            info!("Build task completed successfully.");
+                        }
+                    }
+                    Err(e) => {
+                        error!("Build task failed to join: {}", e);
+                    }
+                }
+            }
+            .instrument(span),
+        );
+
         let stream = ReceiverStream::new(rx);
         Ok(tonic::Response::new(Box::pin(stream) as Self::doBuildStream))
     }
@@ -1403,7 +1476,8 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
 
         let req = request.into_inner();
         let (tx, rx) = mpsc::channel(100);
-        tokio::spawn(async move {
+        let tx_clone = tx.clone();
+        let spawnres = tokio::spawn(async move {
             // Check if artifact exists
             let artifact_path = match &context.artifact_path {
                 Some(p) => p.clone(),
@@ -1487,6 +1561,21 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                 }
             }
         });
+
+        tokio::spawn(async move {
+            match spawnres.await {
+                Ok(_) => {
+                    info!("Completed streaming artifact for build ID {}", req.build_id);
+                }
+                Err(e) => {
+                    error!(
+                        "Artifact streaming task failed to join for build ID {}: {}",
+                        req.build_id, e
+                    );
+                }
+            }
+        });
+
         let stream = ReceiverStream::new(rx);
         Ok(tonic::Response::new(
             Box::pin(stream) as Self::getArtifactStream

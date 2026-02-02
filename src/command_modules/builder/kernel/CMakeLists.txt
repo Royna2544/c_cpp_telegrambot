@@ -17,6 +17,6 @@ command_module(
   Utils
   progress
   LinuxKernelBuildServiceProto
+  SystemMonitorServiceProto
+  RateLimitApi
 )
-
-add_subdirectory(module)

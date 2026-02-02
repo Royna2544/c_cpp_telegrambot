@@ -1,3 +1,5 @@
+use tonic_prost_build::compile_protos;
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     tonic_prost_build::configure()
         .type_attribute(
@@ -10,8 +12,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .file_descriptor_set_path(std::env::var("OUT_DIR").unwrap() + "/descriptor.bin")
         .compile_protos(
-            &["../kernel/proto/LinuxKernelBuild_service.proto"],
-            &["../kernel/proto"],
+            &[
+                "../kernel/proto/LinuxKernelBuild_service.proto",
+                "../proto/SystemMonitor_service.proto",
+            ],
+            &["../kernel/proto", "../proto"],
         )?;
     Ok(())
 }

@@ -1,15 +1,17 @@
+use crate::build_service::linux_kernel_build_service_server::LinuxKernelBuildServiceServer;
+use crate::build_service::{BuildService, FILE_DESCRIPTOR_SET};
 use clap::Parser;
+use kernel_config::KernelConfig;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use tonic::transport::Server;
+use tracing::{debug, error, info, warn};
+
 mod build_service;
 mod builder_config;
 mod kernel_config;
-use crate::build_service::linux_kernel_build_service_server::LinuxKernelBuildServiceServer;
-use crate::build_service::{BuildService, FILE_DESCRIPTOR_SET};
-use kernel_config::KernelConfig;
-use std::path::PathBuf;
-use tracing::{debug, error, info, instrument, warn};
+mod system_monitor;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -101,16 +103,44 @@ async fn main() {
     match parse_builder_config(&args.json_dir) {
         Some(builder_config) => {
             // 1. Define the address to listen on
-            let addr = args.bind_addr.parse().unwrap();
+            let addr = args.bind_addr.parse().expect("Invalid bind address");
             info!("Linux Kernel Builder listening on {}", addr);
 
+            let temp_dir = PathBuf::from(&args.temp_dir);
+            let output_dir = PathBuf::from(&args.output_dir);
+            let canonical_temp: PathBuf;
+            let canonical_output: PathBuf;
+
+            match std::fs::canonicalize(temp_dir) {
+                Ok(t) => {
+                    info!("Using canonical temp directory: {:?}", t);
+                    canonical_temp = t;
+                }
+                Err(e) => {
+                    error!("Exiting due to invalid temp directory. Error: {}", e);
+                    return;
+                }
+            }
+
+            match std::fs::canonicalize(output_dir) {
+                Ok(t) => {
+                    info!("Using canonical output directory: {:?}", t);
+                    canonical_output = t;
+                }
+                Err(e) => {
+                    error!("Exiting due to invalid output directory. Error: {}", e);
+                    return;
+                }
+            }
+
             // 2. Initialize Build Service
-            let build_service = BuildService::new(
-                configs,
-                builder_config,
-                PathBuf::from(args.temp_dir),
-                PathBuf::from(args.output_dir),
-            );
+            let build_service =
+                BuildService::new(configs, builder_config, canonical_temp, canonical_output);
+
+            // 3. Initialize System Monitor Service
+            let system_monitor = system_monitor::MonitorService::new();
+            let monitor_service =
+                system_monitor::grpc_monitor::system_monitor_service_server::SystemMonitorServiceServer::new(system_monitor);
 
             // 3. Build and Run the Server
             Server::builder()
@@ -121,6 +151,7 @@ async fn main() {
                         .expect("Failed to build reflection service"),
                 )
                 .add_service(LinuxKernelBuildServiceServer::new(build_service))
+                .add_service(monitor_service)
                 .serve(addr)
                 .await
                 .unwrap();
