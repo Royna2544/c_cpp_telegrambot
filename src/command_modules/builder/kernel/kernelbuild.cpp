@@ -361,9 +361,6 @@ bool KernelBuildHandler::handle_prepare(const TgBot::CallbackQuery::Ptr& query,
 
     auto status = stub->prepareBuild(&grpcContext, request);
     while (status->Read(&response)) {
-        LOG(INFO) << "Build Status: " << ProgressStatus_Name(response.status())
-                  << ", Message: " << response.output();
-
         *build_id = response.build_id();
         if (!rateLimiter.check()) {
             continue;  // Skip update if within rate limit
@@ -425,8 +422,6 @@ bool KernelBuildHandler::handle_build_process(
 
     BuildStatus response;
     while (finalResponse->Read(&response)) {
-        LOG(INFO) << "Build Status: " << ProgressStatus_Name(response.status())
-                  << ", Message: " << response.output();
         if (!rateLimiter.check()) {
             continue;  // Skip update if within rate limit
         }
