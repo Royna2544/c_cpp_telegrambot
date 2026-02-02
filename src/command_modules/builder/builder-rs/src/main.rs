@@ -1,6 +1,7 @@
 use crate::kernelbuild::build_service::linux_kernel_build_service_server::LinuxKernelBuildServiceServer;
 use crate::kernelbuild::build_service::{BuildService, FILE_DESCRIPTOR_SET};
 use crate::kernelbuild::kernel_config::KernelConfig;
+use crate::system_monitor::grpc_monitor::system_monitor_service_server::SystemMonitorServiceServer;
 use clap::Parser;
 use std::path::PathBuf;
 use tonic::transport::Server;
@@ -23,7 +24,7 @@ struct KernelBuilderArgs {
 }
 
 // builder_config.json is a reserved filename for internal builder configs
-pub fn parse_kernel_config(json_dir: &str) -> Vec<KernelConfig> {
+fn parse_kernel_config(json_dir: &str) -> Vec<KernelConfig> {
     let mut configs: Vec<KernelConfig> = Vec::new();
     let entries = std::fs::read_dir(&json_dir).expect("Failed to read JSON directory");
     for entry in entries {
@@ -56,7 +57,7 @@ pub fn parse_kernel_config(json_dir: &str) -> Vec<KernelConfig> {
     configs
 }
 
-pub fn parse_builder_config(
+fn parse_builder_config(
     json_directory: &str,
 ) -> Option<crate::kernelbuild::builder_config::BuilderConfig> {
     let path = std::path::Path::new(json_directory).join("builder_config.json");
@@ -137,8 +138,7 @@ async fn main() {
 
             // 3. Initialize System Monitor Service
             let system_monitor = system_monitor::MonitorService::new();
-            let monitor_service =
-                system_monitor::grpc_monitor::system_monitor_service_server::SystemMonitorServiceServer::new(system_monitor);
+            let monitor_service = SystemMonitorServiceServer::new(system_monitor);
 
             // 3. Build and Run the Server
             Server::builder()

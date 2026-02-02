@@ -12,7 +12,7 @@ use tonic::{Request, Response, Status};
 pub mod grpc_monitor {
     include!(concat!(env!("OUT_DIR"), "/tgbot.builder.system_monitor.rs"));
 }
-use grpc_monitor::{GetStatsRequest, SystemInfo, WatchStatsRequest};
+use grpc_monitor::{GetSystemInfoRequest, SystemInfo, WatchStatsRequest};
 use grpc_monitor::{SystemStats, system_monitor_service_server::SystemMonitorService};
 
 pub struct MonitorService {
@@ -55,7 +55,10 @@ impl MonitorService {
         let os_name = System::name().unwrap_or_default();
         let os_version = System::os_version().unwrap_or_default();
         let kernel_version = System::kernel_version().unwrap_or_default();
-        let cpu_name = sys.global_cpu_info().brand().to_string();
+        let cpu_name = sys
+            .cpus()
+            .first()
+            .map_or("Unknown".to_string(), |cpu| cpu.brand().to_string());
         let cpu_cores = sys.cpus().len() as u32;
         let total_mem = sys.total_memory() / 1024 / 1024;
         let hostname = System::host_name().unwrap_or_default();
@@ -94,10 +97,7 @@ impl SystemMonitorService for MonitorService {
     type WatchStatsStream =
         Pin<Box<dyn Stream<Item = Result<SystemStats, Status>> + Send + 'static>>;
 
-    async fn get_stats(
-        &self,
-        _request: Request<GetStatsRequest>,
-    ) -> Result<Response<SystemStats>, Status> {
+    async fn get_stats(&self, _request: Request<()>) -> Result<Response<SystemStats>, Status> {
         let mut sys = self.sys.lock().await;
         let stats = Self::collect_stats(&mut sys).await;
         Ok(Response::new(stats))
@@ -133,9 +133,12 @@ impl SystemMonitorService for MonitorService {
         Ok(Response::new(Box::pin(ReceiverStream::new(rx))))
     }
 
-    async fn get_system_info(&self, _request: Request<()>) -> Result<Response<SystemInfo>, Status> {
+    async fn get_system_info(
+        &self,
+        _request: Request<GetSystemInfoRequest>,
+    ) -> Result<Response<SystemInfo>, Status> {
         let sys = self.sys.lock().await;
-        let info = Self::collect_info(&sys, None).await;
+        let info = Self::collect_info(&sys, _request.get_ref().disk_path.as_deref()).await;
         Ok(Response::new(info))
     }
 }

@@ -5,7 +5,7 @@
         "branch": "lineage-18.1"
     },
     "arch": "arm",
-    "type": "Image",
+    "type": "zImage",
     "toolchains": {
         "clang": false
     },
