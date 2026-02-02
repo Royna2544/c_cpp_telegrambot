@@ -125,22 +125,11 @@ impl Toolchain {
             Architecture::X86_64 => "x86_64-linux-gnu-",
             _ => "",
         };
-        let arch_default = match arch {
-            Architecture::ARM => "arm",
-            Architecture::ARM64 => "arm64",
-            Architecture::X86 => "x86",
-            Architecture::X86_64 => "x86",
-            _ => "",
-        };
         if let Some(triple) = &self.compiler_triple {
             args.push(format!("CROSS_COMPILE={}{}", triple, "-"));
         } else if !cross_compile_default.is_empty() {
             args.push(format!("CROSS_COMPILE={}", cross_compile_default));
         }
-        if !arch_default.is_empty() {
-            args.push(format!("ARCH={}", arch_default));
-        }
-
         args
     }
 }

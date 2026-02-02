@@ -1,5 +1,3 @@
-use tonic_prost_build::compile_protos;
-
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     tonic_prost_build::configure()
         .type_attribute(
@@ -15,8 +13,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &[
                 "../kernel/proto/LinuxKernelBuild_service.proto",
                 "../proto/SystemMonitor_service.proto",
+                "../android/proto/ROMBuild_service.proto",
             ],
-            &["../kernel/proto", "../proto"],
+            &["../kernel/proto", "../proto", "../android/proto"],
         )?;
     Ok(())
 }

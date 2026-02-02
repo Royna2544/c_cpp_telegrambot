@@ -526,7 +526,7 @@ void KernelBuildHandler::handle_continue(
     intermidiates.build_id.store(build_id);
     // Start actual build
     if (!handle_build_process(query, build_id)) {
-        return;
+        // return;
     }
     // Download artifact
     std::filesystem::path artifactPath;

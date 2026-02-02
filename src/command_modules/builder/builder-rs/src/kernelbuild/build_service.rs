@@ -321,7 +321,18 @@ impl BuildService {
         // 5. Wait for Exit or Kill (Select Logic)
         let success = if let Some(rx) = &mut kill_rx {
             tokio::select! {
-                res = child.wait() => res.map(|s| s.success()).unwrap_or(false),
+                res = child.wait() => {
+                    match res {
+                        Ok(status) => {
+                            info!("Process exited with status: {:?}", status);
+                            status.success()
+                        }
+                        Err(e) => {
+                            error!("Failed to wait for process: {}", e);
+                            false
+                        }
+                    }
+                },
                 _ = rx.recv() => {
                     #[cfg(unix)]
                     {
@@ -866,6 +877,28 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
 
                     // Do a fast-forward pull to update the repo
                     let mut fo = git2::FetchOptions::new();
+                    let mut ro = git2::RemoteCallbacks::new();
+                    
+                ro.credentials(|url, username_from_url, _allowed_types| {
+                    let config = git2::Config::open_default().unwrap();
+                    let username = username_from_url.unwrap_or("git");
+                    if url.starts_with("ssh://") {
+                        debug!("SSH URL detected for authentication.");
+                        return git2::Cred::ssh_key_from_agent(username);
+                    }
+                    if url.contains("github.com") {
+                        debug!("GitHub URL detected for authentication.");
+                        if let Some(token) = &req.github_token {
+                        info!("Using provided GitHub token for authentication.");
+                            let token_str = token.as_str();
+                            return git2::Cred::userpass_plaintext(token_str, "");
+                        }
+                    }
+                    debug!("Using credential helper for authentication.");
+                    return git2::Cred::credential_helper(&config, url, Some(username));
+                });
+
+                    fo.remote_callbacks(ro);
                     let mut remote = r.find_remote("origin").map_err(|e| {
                         Status::internal(format!("Failed to find remote 'origin': {}", e))
                     })?;
@@ -1053,8 +1086,9 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
 
             for fragment in &req.config_fragments {
                 if let Some(frag) = config.fragments.iter().find(|f| f.name == *fragment) {
+                    let fragname = frag.scheme.clone().replace("{device}", &req.device_name);
                     info!("Adding fragment to make defconfig: {}", frag.name);
-                    proc.arg(frag.name.clone());
+                    proc.arg(fragname);
                 }
             }
 
