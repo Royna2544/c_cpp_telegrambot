@@ -1,8 +1,0 @@
-syntax = "proto3";
-
-package tgbot.builder.android;
-
-// Service for building Android ROMs
-service ROMBuildService {
-    
-}
