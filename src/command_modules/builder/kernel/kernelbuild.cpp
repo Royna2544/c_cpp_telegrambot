@@ -375,11 +375,9 @@ bool KernelBuildHandler::handle_prepare(const TgBot::CallbackQuery::Ptr& query,
 <blockquote>Start Time: {} (GMT)
 Time Spent: {:%M minutes %S seconds}
 Kernel Name: {}</blockquote>
-
 <blockquote>📱 <b>Device</b>: {}
 💻 <b>CPU</b>: {:.2f}%
 💾 <b>Memory</b>: {}MB / {}MB</blockquote>
-
 <blockquote>{}</blockquote>)",
             intermidiates.start_time,
             std::chrono::system_clock::now() - intermidiates.start_time,
@@ -436,11 +434,9 @@ bool KernelBuildHandler::handle_build_process(
 <blockquote>Start Time: {} (GMT)
 Time Spent: {:%M minutes %S seconds}
 Kernel Name: {}</blockquote>
-
 <blockquote>📱 <b>Device</b>: {}
 💻 <b>CPU</b>: {:.2f}%
 💾 <b>Memory</b>: {}MB / {}MB</blockquote>
-
 <blockquote>{}</blockquote>)",
             intermidiates.start_time,
             std::chrono::system_clock::now() - intermidiates.start_time,
