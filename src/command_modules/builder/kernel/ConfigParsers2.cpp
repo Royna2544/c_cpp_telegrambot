@@ -197,6 +197,10 @@ bool KernelConfig::parseType(const nlohmann::json& node) {
         type = Type::Image_gz;
     } else if (typeStr == "Image.gz-dtb") {
         type = Type::Image_gz_dtb;
+    } else if (typeStr == "zImage") {
+        type = Type::zImage;
+    } else if (typeStr == "zImage-dtb") {
+        type = Type::zImage_dtb;
     } else {
         LOG(ERROR) << "Invalid kernel type: " + typeStr;
         return false;

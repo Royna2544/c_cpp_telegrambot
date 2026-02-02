@@ -27,6 +27,9 @@ chrono = "0.4"
 walkdir = "2"
 sysinfo = "0.30"
 
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.27", features = ["signal"] }
+
 [build-dependencies]
 tonic-build = "0.14"
 prost-build = "0.14.3"

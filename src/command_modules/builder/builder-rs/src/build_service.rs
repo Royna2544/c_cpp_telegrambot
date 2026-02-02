@@ -24,8 +24,14 @@ use futures_util::StreamExt;
 use git2::FetchOptions;
 use git2::Repository;
 use git2::build::RepoBuilder;
+#[cfg(unix)]
+use nix::sys::signal::{self, Signal};
+#[cfg(unix)]
+use nix::unistd::Pid;
 use std::fs::File;
 use std::io::Read;
+#[cfg(unix)]
+use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::pin::Pin;
@@ -52,7 +58,7 @@ use tracing_subscriber::field::debug;
 use zip::CompressionMethod;
 use zip::ZipArchive;
 use zip::ZipWriter;
-use zip::write::FileOptions;
+use zip::write::FileOptions; // for .process_group()
 
 #[derive(Clone)]
 pub struct BuildContext {
@@ -251,6 +257,9 @@ impl BuildService {
         } else {
             None
         };
+
+        #[cfg(unix)]
+        command.process_group(0);
         // 2. Setup Pipes
         command.stdout(Stdio::piped());
         command.stderr(Stdio::piped());
@@ -319,7 +328,23 @@ impl BuildService {
             tokio::select! {
                 res = child.wait() => res.map(|s| s.success()).unwrap_or(false),
                 _ = rx.recv() => {
-                    let _ = child.kill().await;
+                    #[cfg(unix)]
+                    {
+                        if let Some(pid) = child.id() {
+                            // Cast u32 -> i32 for the negative PID trick
+                            let _ = signal::kill(Pid::from_raw(-(pid as i32)), Signal::SIGINT);
+                        }
+                    }
+                    #[cfg(not(unix))]
+                    {
+                            let _ = child.kill().await;
+                    }
+
+                    // Abort log tasks
+                    out_handle.abort();
+                    err_handle.abort();
+
+                    // Notify cancellation
                     let _ = tx.send(Ok(BuildStatus {
                         status: ProgressStatus::Failed.into(),
                         output: "Build cancelled.".into(),
@@ -1390,7 +1415,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                 req.build_id
             )));
         }
-        if !Self::is_build_finished(&per_build_statuses, req.build_id).await {
+        if Self::is_build_finished(&per_build_statuses, req.build_id).await {
             return Err(Status::failed_precondition(format!(
                 "Build ID {} is not in a pending state. (Already finished?)",
                 req.build_id

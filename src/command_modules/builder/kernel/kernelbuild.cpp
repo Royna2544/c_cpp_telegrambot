@@ -32,6 +32,7 @@
 #include "api/RateLimit.hpp"
 #include "api/TgBotApi.hpp"
 #include "command_modules/support/KeyBoardBuilder.hpp"
+#include "tgbot/types/InlineKeyboardMarkup.h"
 
 using tgbot::builder::linuxkernel::LinuxKernelBuildService;
 using tgbot::builder::system_monitor::SystemMonitorService;
@@ -43,6 +44,24 @@ class KernelBuildHandler {
         std::string device;
         std::unordered_map<std::string, bool> fragment_preference;
         std::chrono::system_clock::time_point start_time;
+        std::atomic_int build_id{0};
+
+        Intermidates() = default;
+        Intermidates& operator=(Intermidates&& other) noexcept {
+            if (this != &other) {
+                current = other.current;
+                device = std::move(other.device);
+                fragment_preference = std::move(other.fragment_preference);
+                start_time = other.start_time;
+                build_id.store(other.build_id.load());
+            }
+            return *this;
+        }
+        Intermidates(const Intermidates& other) = delete;
+        Intermidates& operator=(const Intermidates& other) = delete;
+        Intermidates(Intermidates&& other) noexcept {
+            *this = std::move(other);
+        }
     };
 
    private:
@@ -58,6 +77,15 @@ class KernelBuildHandler {
     std::shared_ptr<grpc::Channel> channel;
     std::unique_ptr<LinuxKernelBuildService::Stub> stub;
     std::unique_ptr<SystemMonitorService::Stub> systemMonitorStub;
+
+    TgBot::InlineKeyboardMarkup::Ptr makeCancelKeyboard() {
+        KeyboardBuilder builder;
+        builder.addKeyboard(std::make_pair(
+            "Cancel Build",
+            absl::StrCat(KernelBuildHandler::kCallbackQueryPrefix, "cancel_",
+                         intermidiates.build_id.load())));
+        return builder.get();
+    }
 
    public:
     constexpr static std::string_view kOutDirectory = "out";
@@ -105,7 +133,7 @@ class KernelBuildHandler {
     constexpr static std::string_view kBuildPrefix = "build_";
     constexpr static std::string_view kSelectPrefix = "select_";
     void start(const Message::Ptr& message) {
-        intermidiates = Intermidates{};
+        intermidiates = {};
         if (configs.empty()) {
             _api->sendMessage(message->chat, "No kernel configurations found.");
             return;
@@ -249,6 +277,25 @@ class KernelBuildHandler {
     bool handle_prepare(const TgBot::CallbackQuery::Ptr& query, int* build_id);
     bool handle_build_process(const TgBot::CallbackQuery::Ptr& query,
                               int build_id);
+
+    void handle_cancel(const TgBot::CallbackQuery::Ptr& query) {
+        grpc::ClientContext context;
+        tgbot::builder::linuxkernel::BuildRequest req;
+        tgbot::builder::linuxkernel::BuildStatus resp;
+        req.set_build_id(intermidiates.build_id.load());
+        auto status = stub->cancelBuild(&context, req, &resp);
+        if (!status.ok()) {
+            LOG(ERROR) << "gRPC error when cancelling build: "
+                       << status.error_message();
+            _api->answerCallbackQuery(
+                query->id,
+                "gRPC error when cancelling build: " + status.error_message());
+            return;
+        }
+        _api->editMessage(query->message, "Build cancelled.");
+        _api->answerCallbackQuery(query->id, "Build cancelled!");
+    }
+
     bool handle_artifact_download(const TgBot::CallbackQuery::Ptr& query,
                                   int build_id, std::filesystem::path* outPath);
 
@@ -274,6 +321,9 @@ class KernelBuildHandler {
         } else if (absl::ConsumePrefix(&data, kContinuePrefix)) {
             // Call the corresponding function
             handle_continue(query);
+        } else if (absl::ConsumePrefix(&data, "cancel_")) {
+            // Call the corresponding function
+            handle_cancel(query);
         } else {
             LOG(WARNING) << "Unknown query: " << query->data;
         }
@@ -339,8 +389,7 @@ Kernel Name: {}</blockquote>
             intermidiates.current->name, intermidiates.device,
             info.cpu_usage_percent(), info.memory_used_mb(),
             info.memory_total_mb(), response.output());
-        _api->editMessage<TgBotApi::ParseMode::HTML>(query->message, fmted_msg,
-                                                     nullptr);
+        _api->editMessage<TgBotApi::ParseMode::HTML>(query->message, fmted_msg);
     }
     auto status_finish = status->Finish();
     if (!status_finish.ok()) {
@@ -404,7 +453,7 @@ Kernel Name: {}</blockquote>
             info.cpu_usage_percent(), info.memory_used_mb(),
             info.memory_total_mb(), response.output());
         _api->editMessage<TgBotApi::ParseMode::HTML>(query->message, fmted_msg,
-                                                     nullptr);
+                                                     makeCancelKeyboard());
     }
     auto finish_v2 = finalResponse->Finish();
     if (!finish_v2.ok()) {
@@ -479,6 +528,7 @@ void KernelBuildHandler::handle_continue(
         return;
     }
     LOG(INFO) << "Prepared build with ID: " << build_id;
+    intermidiates.build_id.store(build_id);
     // Start actual build
     if (!handle_build_process(query, build_id)) {
         return;

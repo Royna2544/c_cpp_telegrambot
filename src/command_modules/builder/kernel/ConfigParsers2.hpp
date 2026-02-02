@@ -2,6 +2,7 @@
 
 #include <fmt/core.h>
 
+#include <cstdint>
 #include <filesystem>
 #include <map>
 #include <nlohmann/json.hpp>
@@ -19,13 +20,21 @@ struct KernelConfig {
     std::string underscored_name;
     RepoInfo repo_info;
     bool shallow_clone = false;
-    enum class Arch { ARM = 1, ARM64, X86, X86_64, MAX = X86_64 } arch{};
-    enum class Type {
+    enum class Arch : std::uint8_t {
+        ARM = 1,
+        ARM64,
+        X86,
+        X86_64,
+        MAX = X86_64
+    } arch{};
+    enum class Type : std::uint8_t {
+        zImage,
+        zImage_dtb,
         Image,
         Image_gz,
         Image_gz_dtb,
     } type{};
-    enum class ClangSupport {
+    enum class ClangSupport : std::uint8_t {
         None,            // GCC only supported
         Clang,           // GNU binutils with CC=clang
         FullLLVM,        // Fully compilable with LLVM
