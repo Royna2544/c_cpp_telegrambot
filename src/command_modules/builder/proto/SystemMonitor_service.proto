@@ -23,11 +23,6 @@ message SystemInfo {
   optional int32 disk_used_gb = 9;     // Used disk space in GB (if available)
 }
 
-message SystemStatsResponse {
-  SystemInfo info = 1;              // Static system information
-  SystemStats stats = 2;            // Dynamic system statistics
-}
-
 message GetStatsRequest {
    optional string disk_path = 1;   // Path to check disk usage (e.g., "/")
 };

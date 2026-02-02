@@ -2,28 +2,24 @@ mod grpc_pb {
     include!(concat!(env!("OUT_DIR"), "/tgbot.builder.linuxkernel.rs"));
 }
 pub const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("descriptor");
-use crate::build_service::grpc_pb::ArtifactChunk;
-use crate::build_service::grpc_pb::ArtifactMetadata;
-use crate::build_service::grpc_pb::BuildPrepareRequest;
-use crate::build_service::grpc_pb::BuildRequest;
-use crate::build_service::grpc_pb::BuildStatus;
-use crate::build_service::grpc_pb::Config;
-use crate::build_service::grpc_pb::ConfigResponse;
-use crate::build_service::grpc_pb::ProgressStatus;
-pub use crate::build_service::grpc_pb::linux_kernel_build_service_server;
-use crate::builder_config;
-use crate::builder_config::Architecture;
-use crate::builder_config::Toolchain;
-use crate::builder_config::{BuilderConfig, CompilerType};
-use crate::kernel_config;
-use crate::kernel_config::EnvVar;
-use crate::kernel_config::KernelConfig;
+use super::builder_config::Toolchain;
+use super::builder_config::{BuilderConfig, CompilerType};
+use super::kernel_config::KernelConfig;
+use crate::kernelbuild::builder_config;
 use chrono::Local;
 use flate2::read::GzDecoder; // For .tar.gz
 use futures_util::StreamExt;
 use git2::FetchOptions;
-use git2::Repository;
 use git2::build::RepoBuilder;
+use grpc_pb::ArtifactChunk;
+use grpc_pb::ArtifactMetadata;
+use grpc_pb::BuildPrepareRequest;
+use grpc_pb::BuildRequest;
+use grpc_pb::BuildStatus;
+use grpc_pb::Config;
+use grpc_pb::ConfigResponse;
+use grpc_pb::ProgressStatus;
+pub use grpc_pb::linux_kernel_build_service_server;
 #[cfg(unix)]
 use nix::sys::signal::{self, Signal};
 #[cfg(unix)]
@@ -31,11 +27,9 @@ use nix::unistd::Pid;
 use std::fs::File;
 use std::io::Read;
 #[cfg(unix)]
-use std::os::unix::process::CommandExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::pin::Pin;
-use std::process::ExitStatus;
 use std::process::Stdio;
 use std::sync::Arc;
 use std::thread::available_parallelism;
@@ -54,9 +48,7 @@ use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use tracing::Instrument;
 use tracing::{debug, error, info, instrument, warn};
-use tracing_subscriber::field::debug;
 use zip::CompressionMethod;
-use zip::ZipArchive;
 use zip::ZipWriter;
 use zip::write::FileOptions; // for .process_group()
 
@@ -79,7 +71,7 @@ pub struct BuildContext {
     // If cancelled, this is None
     artifact_path: Option<PathBuf>,
     // Optional kill signal sender
-    pub kill_signal: Option<tokio::sync::mpsc::Sender<()>>,
+    kill_signal: Option<tokio::sync::mpsc::Sender<()>>,
 }
 
 struct PerBuildIdStatus {
@@ -89,13 +81,13 @@ struct PerBuildIdStatus {
 }
 
 pub struct BuildService {
-    pub kernel_configs: Arc<Mutex<Vec<KernelConfig>>>,
+    kernel_configs: Arc<Mutex<Vec<KernelConfig>>>,
     contexts: Arc<Mutex<Vec<BuildContext>>>,
     id: Arc<Mutex<i32>>,
     build_statuses: Arc<Mutex<Vec<PerBuildIdStatus>>>,
-    pub builder_config: BuilderConfig,
-    pub temp_directory: PathBuf,
-    pub output_directory: PathBuf,
+    builder_config: BuilderConfig,
+    temp_directory: PathBuf,
+    output_directory: PathBuf,
 }
 type WrappedBuildStatus = Arc<Mutex<Vec<PerBuildIdStatus>>>;
 type WrappedContexts = Arc<Mutex<Vec<BuildContext>>>;
@@ -271,6 +263,9 @@ impl BuildService {
         let stdout = child.stdout.take().expect("stdout missing");
         let stderr = child.stderr.take().expect("stderr missing");
 
+        info!("Spawned command: {:?}", command);
+        info!("Spawned process with PID: {:?}", child.id());
+
         // 4. Log Streamers
         let tx_out = tx.clone();
         let tx_err = tx.clone();
@@ -359,7 +354,16 @@ impl BuildService {
                 }
             }
         } else {
-            child.wait().await.map(|s| s.success()).unwrap_or(false)
+            match child.wait().await {
+                Ok(status) => {
+                    info!("Process exited with status: {:?}", status);
+                    status.success()
+                }
+                Err(e) => {
+                    error!("Failed to wait for process: {}", e);
+                    false
+                }
+            }
         };
 
         // Clean up

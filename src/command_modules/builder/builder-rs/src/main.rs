@@ -1,16 +1,12 @@
-use crate::build_service::linux_kernel_build_service_server::LinuxKernelBuildServiceServer;
-use crate::build_service::{BuildService, FILE_DESCRIPTOR_SET};
+use crate::kernelbuild::build_service::linux_kernel_build_service_server::LinuxKernelBuildServiceServer;
+use crate::kernelbuild::build_service::{BuildService, FILE_DESCRIPTOR_SET};
+use crate::kernelbuild::kernel_config::KernelConfig;
 use clap::Parser;
-use kernel_config::KernelConfig;
 use std::path::PathBuf;
-use std::sync::Arc;
-use tokio::sync::Mutex;
 use tonic::transport::Server;
 use tracing::{debug, error, info, warn};
 
-mod build_service;
-mod builder_config;
-mod kernel_config;
+mod kernelbuild;
 mod system_monitor;
 
 #[derive(Parser, Debug)]
@@ -60,7 +56,9 @@ pub fn parse_kernel_config(json_dir: &str) -> Vec<KernelConfig> {
     configs
 }
 
-pub fn parse_builder_config(json_directory: &str) -> Option<builder_config::BuilderConfig> {
+pub fn parse_builder_config(
+    json_directory: &str,
+) -> Option<crate::kernelbuild::builder_config::BuilderConfig> {
     let path = std::path::Path::new(json_directory).join("builder_config.json");
     let file = std::fs::File::open(&path).ok()?;
     let reader = std::io::BufReader::new(file);

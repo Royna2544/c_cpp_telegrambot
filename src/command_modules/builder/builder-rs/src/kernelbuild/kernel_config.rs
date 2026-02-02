@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use crate::builder_config::Architecture;
+use crate::kernelbuild::builder_config::Architecture;
 use serde::{Deserialize, Serialize};
 use tracing::{error, info};
 
