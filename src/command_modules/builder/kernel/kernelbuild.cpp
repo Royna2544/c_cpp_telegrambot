@@ -4,6 +4,7 @@
 #include <absl/strings/strip.h>
 #include <fmt/chrono.h>
 #include <fmt/ranges.h>
+#include <google/protobuf/empty.pb.h>
 #include <grpcpp/client_context.h>
 #include <grpcpp/create_channel.h>
 #include <grpcpp/security/credentials.h>
@@ -70,7 +71,6 @@ class KernelBuildHandler {
     std::vector<KernelConfig> configs;
 
     Intermidates intermidiates;
-    std::filesystem::path kernelDir;
     std::optional<std::string> gitToken;
 
     // gRPC channel
@@ -113,14 +113,6 @@ class KernelBuildHandler {
         if (ec) {
             LOG(ERROR) << "Failed to opendir for kernel configurations: "
                        << ec.message();
-        }
-        if (auto it =
-                cfgmgr->get(ConfigManager::Configs::FILEPATH_KERNEL_BUILD);
-            it) {
-            kernelDir = *it;
-        } else {
-            kernelDir =
-                line->getPath(FS::PathType::INSTALL_ROOT) / "kernel_build";
         }
 
         channel = grpc::CreateChannel(
@@ -367,9 +359,8 @@ bool KernelBuildHandler::handle_prepare(const TgBot::CallbackQuery::Ptr& query,
         }
         grpc::ClientContext monitorContext;
         tgbot::builder::system_monitor::SystemStats info;
-        auto info_status = systemMonitorStub->GetStats(
-            &monitorContext, tgbot::builder::system_monitor::GetStatsRequest{},
-            &info);
+        auto info_status =
+            systemMonitorStub->GetStats(&monitorContext, {}, &info);
         auto fmted_msg = fmt::format(
             R"(
 <blockquote>Start Time: {} (GMT)
@@ -427,8 +418,7 @@ bool KernelBuildHandler::handle_build_process(
         grpc::ClientContext monitorContext;
         tgbot::builder::system_monitor::SystemStats info;
         auto info_status = systemMonitorStub->GetStats(
-            &monitorContext, tgbot::builder::system_monitor::GetStatsRequest{},
-            &info);
+            &monitorContext, ::google::protobuf::Empty{}, &info);
         auto fmted_msg = fmt::format(
             R"(
 <blockquote>Start Time: {} (GMT)
@@ -481,11 +471,10 @@ bool KernelBuildHandler::handle_artifact_download(
             artifactMetadata = response_v2.metadata();
             LOG(INFO) << "Receiving artifact: " << artifactMetadata.filename()
                       << ", size: " << artifactMetadata.total_size();
-            outputFile.open(kernelDir / artifactMetadata.filename(),
-                            std::ios::binary);
+            outputFile.open(artifactMetadata.filename(), std::ios::binary);
             if (!outputFile.is_open()) {
                 LOG(ERROR) << "Failed to open output file: "
-                           << kernelDir / artifactMetadata.filename();
+                           << artifactMetadata.filename();
                 _api->editMessage(query->message,
                                   "Failed to open output file for writing.");
                 return false;
@@ -506,7 +495,7 @@ bool KernelBuildHandler::handle_artifact_download(
 
     LOG(INFO) << "Artifact " << artifactMetadata.filename()
               << " received successfully.";
-    *outPath = kernelDir / artifactMetadata.filename();
+    *outPath = artifactMetadata.filename();
     return true;
 }
 
@@ -529,9 +518,13 @@ void KernelBuildHandler::handle_continue(
     if (!handle_artifact_download(query, build_id, &artifactPath)) {
         return;
     }
-    _api->sendDocument(
+    auto success = _api->sendDocument(
         query->message->chat,
         InputFile::fromFile(artifactPath, "application/octet-stream"));
+    if (success) {
+        std::error_code ec;
+        std::filesystem::remove(artifactPath, ec);
+    }
 }
 
 // Define the command handler function
