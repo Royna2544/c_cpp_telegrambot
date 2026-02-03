@@ -174,7 +174,7 @@ static void localnetmodelhandler(TgBotApi::Ptr api, MessageExt* message,
         .id = "mcp/playwright",
     });
     chatRequest.integrations = plugins;
-    chatRequest.context_length = 16000;
+    chatRequest.context_length = 64000;
     chatRequest.reasoning = LMStudioApi::Reasoning::medium;
     if (!response_key.empty()) {
         chatRequest.previous_response_id = response_key;
