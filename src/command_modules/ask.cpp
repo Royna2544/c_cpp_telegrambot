@@ -212,7 +212,8 @@ static void localnetmodelhandler(TgBotApi::Ptr api, MessageExt* message,
                 return;
             }
             response_key = chatResponse.response_id.value_or("");
-            api->editMessage(sent, it->content);
+            api->editMessage<TgBotApi::ParseMode::MarkdownV2>(sent,
+                                                              it->content);
         } catch (const std::exception& e) {
             LOG(ERROR) << "Failed to parse LLM server response: " << e.what();
             api->editMessage(sent,
