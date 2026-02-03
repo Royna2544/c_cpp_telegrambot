@@ -1,10 +1,23 @@
 use std::fmt::format;
+use std::path::Path;
 use std::path::PathBuf;
+use std::time::Duration;
+use tokio::io::AsyncReadExt;
 
 use serde::Deserialize;
 use serde::Serialize;
+use tar::Archive;
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
+use tokio::time::Instant;
+use tokio_stream::StreamExt;
+use tonic::Status;
 use tracing::debug;
 use tracing::error;
+use tracing::info;
+
+use crate::git_repo::GitRepo;
+use tokio::fs::File as TokioFile;
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
 #[serde(rename_all = "lowercase")]
@@ -75,15 +88,6 @@ pub struct BuilderConfig {
     pub toolchains: Vec<Toolchain>,
 }
 
-impl BuilderConfig {
-    pub fn get_toolchains_for_arch(&self, arch: &Architecture) -> Vec<&Toolchain> {
-        self.toolchains
-            .iter()
-            .filter(|tc| &tc.arch == arch)
-            .collect()
-    }
-}
-
 impl Toolchain {
     pub fn exe_name(&self) -> String {
         match self.compiler {
@@ -131,5 +135,121 @@ impl Toolchain {
             args.push(format!("CROSS_COMPILE={}", cross_compile_default));
         }
         args
+    }
+
+    async fn download_file<F, Fut>(
+        url: &str,
+        dest: &Path,
+        progress: F,
+    ) -> Result<(), Box<dyn std::error::Error>>
+    where
+        F: Fn(u64, u64) -> Fut,
+        Fut: Future<Output = ()>,
+    {
+        let response = reqwest::get(url).await?;
+
+        let mut downloaded_size = 0;
+
+        // 1. Create the file
+        let mut file = TokioFile::create(dest).await?;
+
+        // 2. Stream the content
+        let mut stream = response.bytes_stream();
+
+        let mut last_update = Instant::now();
+        let update_interval = Duration::from_secs(5);
+
+        while let Some(item) = stream.next().await {
+            let chunk = item?;
+            if last_update.elapsed() >= update_interval || downloaded_size == 0 {
+                progress(chunk.len() as u64, downloaded_size).await;
+                last_update = Instant::now();
+            }
+            downloaded_size += chunk.len() as u64;
+            file.write_all(&chunk).await?;
+        }
+
+        Ok(())
+    }
+
+    fn extract_tar_gz(
+        tar_gz_path: &Path,
+        dest_dir: &Path,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        debug!(
+            "Extracting tarball {} to {}",
+            tar_gz_path.display(),
+            dest_dir.display()
+        );
+        let tar_gz = std::fs::File::open(tar_gz_path)?;
+        let decompressor = flate2::read::GzDecoder::new(tar_gz);
+        let mut archive = Archive::new(decompressor);
+        archive.unpack(dest_dir)?;
+        debug!(
+            "Extracted tarball {} to {}",
+            tar_gz_path.display(),
+            dest_dir.display()
+        );
+        Ok(())
+    }
+
+    pub async fn clone_to_dir(&self, dest_path: &PathBuf) -> Result<(), Status> {
+        if std::path::Path::new(&dest_path).exists() {
+        } else {
+            if let Err(e) = std::fs::create_dir_all(&dest_path) {
+                info!("Failed to create directory {}: {}", dest_path.display(), e);
+            }
+        }
+        match &self.source_type {
+            Source::Git => {
+                info!(
+                    "Cloning toolchain {} from {} with branch {:?}",
+                    self.name, self.url, self.branch
+                );
+                match GitRepo::clone(
+                    &self.url,
+                    self.branch.as_deref().unwrap_or("master"),
+                    Some(1),
+                    dest_path,
+                    None,
+                    &None,
+                ) {
+                    Ok(_) => {
+                        info!(
+                            "Successfully cloned toolchain {} into {}",
+                            self.name,
+                            dest_path.display()
+                        );
+                        Ok(())
+                    }
+                    Err(e) => {
+                        return Err(Status::internal(format!(
+                            "Failed to initialize git repo: {}",
+                            e
+                        )));
+                    }
+                }
+            }
+            Source::Tarball => {
+                info!("Downloading toolchain {} from {}", self.name, self.url);
+                let dest_file = dest_path.join(format!("{}.tar.gz", &self.name));
+                Self::download_file(&self.url, &dest_file, async |current, total| {
+                    info!(
+                        "Downloading toolchain... Total downloaded {} KB",
+                        total / 1024
+                    );
+                })
+                .await
+                .map_err(|e| Status::internal(format!("Download failed: {}", e)))?;
+
+                Self::extract_tar_gz(&dest_file, &dest_path)
+                    .map_err(|e| Status::internal(format!("Extraction failed: {}", e)))?;
+                info!(
+                    "Successfully downloaded and extracted toolchain {}",
+                    self.name
+                );
+                Ok(())
+            }
+        }
     }
 }

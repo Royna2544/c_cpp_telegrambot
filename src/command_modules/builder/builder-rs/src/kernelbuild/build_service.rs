@@ -5,12 +5,10 @@ pub const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("desc
 use super::builder_config::Toolchain;
 use super::builder_config::{BuilderConfig, CompilerType};
 use super::kernel_config::KernelConfig;
+use crate::git_repo::GitRepo;
 use crate::kernelbuild::builder_config;
 use chrono::Local;
-use flate2::read::GzDecoder; // For .tar.gz
-use futures_util::StreamExt;
 use git2::FetchOptions;
-use git2::build::RepoBuilder;
 use grpc_pb::ArtifactChunk;
 use grpc_pb::ArtifactMetadata;
 use grpc_pb::BuildPrepareRequest;
@@ -26,23 +24,18 @@ use nix::sys::signal::{self, Signal};
 use nix::unistd::Pid;
 use std::fs::File;
 use std::io::Read;
-#[cfg(unix)]
 use std::path::Path;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::process::Stdio;
 use std::sync::Arc;
 use std::thread::available_parallelism;
-use tar::Archive;
 use tokio::fs;
-use tokio::fs::File as TokioFile;
 use tokio::io::AsyncWriteExt;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 use tokio::sync::Mutex;
 use tokio::sync::mpsc;
-use tokio::time::Duration;
-use tokio::time::Instant;
 use tokio_stream::Stream;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
@@ -263,7 +256,25 @@ impl BuildService {
         let stdout = child.stdout.take().expect("stdout missing");
         let stderr = child.stderr.take().expect("stderr missing");
 
-        info!("Spawned command: {:?}", command);
+        let mut args = command
+            .as_std()
+            .get_args()
+            .map(|s| s.to_string_lossy().to_string())
+            .collect::<Vec<_>>();
+        let argv0 = command.as_std().get_program().to_string_lossy().to_string();
+        args = args
+            .into_iter()
+            .chain(std::iter::once(argv0))
+            .rev()
+            .collect::<Vec<_>>();
+        let wd = command
+            .as_std()
+            .get_current_dir()
+            .unwrap_or_else(|| Path::new("<unknown>").into())
+            .display()
+            .to_string();
+
+        info!("Spawned command: args: [{}], wd: {}", args.join(" "), wd);
         info!("Spawned process with PID: {:?}", child.id());
 
         // 4. Log Streamers
@@ -387,52 +398,56 @@ impl BuildService {
     }
 }
 
-async fn download_file<F, Fut>(
-    url: &str,
-    dest: &Path,
-    progress: F,
-) -> Result<(), Box<dyn std::error::Error>>
-where
-    F: Fn(u64, u64) -> Fut,
-    Fut: Future<Output = ()>,
-{
-    let response = reqwest::get(url).await?;
-
-    let mut downloaded_size = 0;
-
-    // 1. Create the file
-    let mut file = TokioFile::create(dest).await?;
-
-    // 2. Stream the content
-    let mut stream = response.bytes_stream();
-
-    let mut last_update = Instant::now();
-    let update_interval = Duration::from_secs(5);
-
-    while let Some(item) = stream.next().await {
-        let chunk = item?;
-        if last_update.elapsed() >= update_interval || downloaded_size == 0 {
-            progress(chunk.len() as u64, downloaded_size).await;
-            last_update = Instant::now();
-        }
-        downloaded_size += chunk.len() as u64;
-        file.write_all(&chunk).await?;
+fn log_who_asked_me(method: &str, request: &Request<impl std::fmt::Debug>) {
+    if let Some(peer_addr) = request.remote_addr() {
+        info!(
+            "{} Request received from peer address: {}",
+            method, peer_addr
+        );
+    } else {
+        info!("{} Request received from unknown client", method);
     }
-
-    Ok(())
 }
 
-pub fn extract_tar_gz(archive_path: &Path, dest: &Path) -> Result<(), std::io::Error> {
-    info!("Extracting {:?} to {:?}...", archive_path, dest);
+macro_rules! report {
+    ($tx:expr, $status:ident, $msg:expr) => {
+        info!("Build Status - {:?}: {}", ProgressStatus::$status, $msg);
+        // We capture 'tx' from the surrounding scope automatically
+        $tx.send(Ok(BuildStatus {
+            status: ProgressStatus::$status.into(),
+            output: $msg.into(),
+            build_id: None,
+        }))
+        .await
+        .unwrap();
+    };
+}
 
-    let tar_gz = File::open(archive_path)?;
-    let tar = GzDecoder::new(tar_gz);
-    let mut archive = Archive::new(tar);
+macro_rules! report_blk {
+    ($tx:expr, $status:ident, $msg:expr) => {
+        info!("Build Status - {:?}: {}", ProgressStatus::$status, $msg);
+        // We capture 'tx' from the surrounding scope automatically
+        $tx.blocking_send(Ok(BuildStatus {
+            status: ProgressStatus::$status.into(),
+            output: $msg.into(),
+            build_id: None,
+        }))
+        .unwrap();
+    };
+}
 
-    // This is equivalent to 'tar -xf archive.tar.gz -C dest'
-    archive.unpack(dest)?;
-
-    Ok(())
+macro_rules! report_build_id {
+    ($tx:expr, $build_id:expr, $status:ident, $msg:expr) => {
+        // We capture 'tx' from the surrounding scope automatically
+        $tx.send(Ok(BuildStatus {
+            status: ProgressStatus::$status.into(),
+            output: $msg.into(),
+            build_id: Some($build_id),
+        }))
+        .await
+        .unwrap();
+        info!("Build Status - {:?}: {}", ProgressStatus::$status, $msg);
+    };
 }
 
 #[tonic::async_trait]
@@ -450,7 +465,8 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
         &self,
         request: Request<Config>,
     ) -> Result<Response<ConfigResponse>, Status> {
-        debug!("add_config called");
+        log_who_asked_me("add_config", &request);
+
         let req = request.into_inner();
 
         // 1. Validate JSON (The only "work" Rust does)
@@ -473,7 +489,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
         &self,
         request: Request<Config>,
     ) -> Result<Response<ConfigResponse>, Status> {
-        debug!("update_config called");
+        log_who_asked_me("update_config", &request);
         let req = request.into_inner();
 
         // 1. Validate JSON
@@ -499,7 +515,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
         &self,
         request: tonic::Request<()>,
     ) -> std::result::Result<tonic::Response<Self::listConfigsStream>, tonic::Status> {
-        debug!("list_configs called");
+        log_who_asked_me("list_configs", &request);
 
         let configs = self.kernel_configs.lock().await;
         debug!("Number of configs: {}", configs.len());
@@ -522,7 +538,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
         &self,
         request: Request<Config>,
     ) -> Result<Response<ConfigResponse>, Status> {
-        debug!("delete_config called");
+        log_who_asked_me("delete_config", &request);
         let req = request.into_inner();
 
         // 1. Remove config from memory
@@ -544,7 +560,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
         &self,
         request: Request<BuildPrepareRequest>,
     ) -> std::result::Result<tonic::Response<Self::prepareBuildStream>, tonic::Status> {
-        debug!("prepare_build called");
+        log_who_asked_me("prepare_build", &request);
 
         // Create a channel for streaming responses
         let (tx, rx) = mpsc::channel(100);
@@ -557,22 +573,9 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
         let per_build_statuses = self.build_statuses.clone();
         let tx_for_final = tx.clone();
 
-        macro_rules! report {
-            ($status:ident, $msg:expr) => {
-                info!("Build Status - {:?}: {}", ProgressStatus::$status, $msg);
-                // We capture 'tx' from the surrounding scope automatically
-                tx.send(Ok(BuildStatus {
-                    status: ProgressStatus::$status.into(),
-                    output: $msg.into(),
-                    build_id: None,
-                }))
-                .await
-                .unwrap();
-            };
-        }
-
-        let spawnres = tokio::spawn(async move {
+        let spawnres: tokio::task::JoinHandle<Result<(), Status>> = tokio::spawn(async move {
             report!(
+                tx,
                 Pending,
                 "Starting build preparation, awaiting to acquire lock..."
             );
@@ -582,6 +585,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             let configs = config_handle.lock().await;
 
             report!(
+                tx,
                 InProgressConfigure,
                 "Lock acquired, searching for config..."
             );
@@ -594,15 +598,20 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                     new
                 }
                 None => {
-                    report!(Failed, format!("Config not found by name: {}", req.name));
-                    return Err(Status::not_found(format!(
-                        "Config not found by name: {}",
-                        req.name
-                    )));
+                    report!(
+                        tx,
+                        Failed,
+                        format!("Config not found by name: {}", req.name)
+                    );
+                    return Ok(());
                 }
             };
 
-            report!(InProgressConfigure, "Config found, validating device...");
+            report!(
+                tx,
+                InProgressConfigure,
+                "Config found, validating device..."
+            );
 
             // Find requested device
             let device_entry = config
@@ -611,14 +620,12 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                 .iter()
                 .find(|d| *d == &req.device_name);
             if device_entry.is_none() {
-                report!(Failed, format!("Device {} not found", req.device_name));
-                return Err(Status::not_found(format!(
-                    "Device {} not found in config",
-                    req.device_name
-                )));
+                report!(tx, Failed, format!("Device {} not found", req.device_name));
+                return Ok(());
             }
 
             report!(
+                tx,
                 InProgressConfigure,
                 "Device validated, checking fragments..."
             );
@@ -626,15 +633,13 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             // Verify config fragments are known to us.
             for fragment in &req.config_fragments {
                 if !config.fragments.iter().any(|f| f.name == *fragment) {
-                    report!(Failed, format!("Unknown fragment: {}", *fragment));
-                    return Err(Status::failed_precondition(format!(
-                        "Unknown fragment: {}",
-                        *fragment
-                    )));
+                    report!(tx, Failed, format!("Unknown fragment: {}", *fragment));
+                    return Ok(());
                 }
             }
 
             report!(
+                tx,
                 InProgressConfigure,
                 "Fragments validated, checking toolchain support..."
             );
@@ -651,16 +656,14 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                     tc
                 } else {
                     report!(
+                        tx,
                         Failed,
                         format!(
                             "No suitable GCC toolchain found for architecture {:?}",
                             config.arch
                         )
                     );
-                    return Err(Status::failed_precondition(format!(
-                        "No suitable GCC toolchain found for architecture {:?}",
-                        config.arch
-                    )));
+                    return Ok(());
                 }
             } else {
                 // Look for any Clang toolchain
@@ -672,23 +675,23 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                     tc
                 } else {
                     report!(
+                        tx,
                         Failed,
                         format!(
                             "No suitable Clang toolchain found for architecture {:?}",
                             config.arch
                         )
                     );
-                    return Err(Status::failed_precondition(format!(
-                        "No suitable Clang toolchain found for architecture {:?}",
-                        config.arch
-                    )));
+                    return Ok(());
                 }
             };
 
+            // Try to use exisiting toolchain dir or clone if missing
             let toolchain_dir = outdir.join(toolchain.name.clone());
             let toolchain_found = match toolchain.exec_and_get_version(&toolchain_dir) {
                 Some(ver) => {
                     report!(
+                        tx,
                         InProgressConfigure,
                         format!("Toolchain {:?} found with version: {}", toolchain.name, ver)
                     );
@@ -696,102 +699,40 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                 }
                 None => {
                     report!(
+                        tx,
                         InProgressConfigure,
                         format!("Toolchain {:?} not found or invalid.", toolchain.name)
                     );
                     false
                 }
             };
+
+            // Clone toolchain if not found
             if !toolchain_found {
-                if std::path::Path::new(&toolchain_dir).exists() {
-                    report!(
-                        InProgressConfigure,
-                        format!(
-                            "Output directory {:?} exists, but toolchain not found inside. Removing...",
-                            toolchain_dir
-                        )
-                    );
-                    std::fs::remove_dir_all(&toolchain_dir).map_err(|e| {
-                        Status::internal(format!(
-                            "Failed to remove incomplete toolchain directory {:?}: {}",
-                            toolchain_dir, e
-                        ))
-                    })?;
-                } else {
-                    report!(
-                        InProgressConfigure,
-                        format!(
-                            "Output directory {:?} does not exist, creating...",
-                            toolchain_dir
-                        )
-                    );
-
-                    if let Err(e) = std::fs::create_dir_all(&toolchain_dir) {
+                report!(
+                    tx,
+                    InProgressConfigure,
+                    format!("Cloning toolchain {:?}...", toolchain.name)
+                );
+                match toolchain.clone_to_dir(&toolchain_dir).await {
+                    Ok(_) => {}
+                    Err(e) => {
                         report!(
+                            tx,
                             Failed,
-                            format!(
-                                "Failed to create output directory {:?}: {}",
-                                toolchain_dir, e
-                            )
+                            format!("Failed to clone toolchain {:?}: {}", toolchain.name, e)
                         );
-                        return Err(Status::internal(format!(
-                            "Failed to create output directory {:?}: {}",
-                            toolchain_dir, e
-                        )));
+                        return Ok(());
                     }
                 }
-                match toolchain.source_type {
-                    builder_config::Source::Git => {
-                        report!(
-                            InProgressDownload,
-                            format!(
-                                "Will clone: {:?}-{:?} toolchain from Git.",
-                                toolchain.url,
-                                toolchain.branch.as_ref().unwrap()
-                            )
-                        );
-                        let mut repo_builder = RepoBuilder::new();
-                        if let Some(branch) = &toolchain.branch {
-                            repo_builder.branch(branch);
-                        }
-                        repo_builder
-                            .clone(&toolchain.url, &toolchain_dir)
-                            .map_err(|e| Status::internal(format!("Git clone failed: {}", e)))?;
-                    }
-                    builder_config::Source::Tarball => {
-                        report!(
-                            InProgressDownload,
-                            format!(
-                                "Will use: {:?} toolchain from tarball binaries.",
-                                toolchain.url
-                            )
-                        );
-                        let dest_path = toolchain_dir.join(format!("{}.tar.gz", toolchain.name));
-                        download_file(&toolchain.url, &dest_path, async |current, total| {
-                            report!(
-                                InProgressDownload,
-                                format!(
-                                    "Downloading toolchain... Total downloaded {} KB",
-                                    total / 1024
-                                )
-                            );
-                        })
-                        .await
-                        .map_err(|e| Status::internal(format!("Download failed: {}", e)))?;
-
-                        report!(
-                            InProgressDownload,
-                            format!("Download complete, extracting toolchain...")
-                        );
-
-                        extract_tar_gz(&dest_path, &toolchain_dir)
-                            .map_err(|e| Status::internal(format!("Extraction failed: {}", e)))?;
-
-                        report!(InProgressDownload, format!("Extraction complete."));
-                    }
-                }
+                report!(
+                    tx,
+                    InProgressConfigure,
+                    format!("Toolchain {:?} cloned successfully.", toolchain.name)
+                );
             } else {
                 report!(
+                    tx,
                     InProgressConfigure,
                     format!(
                         "Toolchain directory {:?} exists, skipping download.",
@@ -810,7 +751,11 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                     ))
                 })?;
 
-            report!(InProgressDownload, "Preparing to clone kernel source...");
+            report!(
+                tx,
+                InProgressDownload,
+                "Preparing to clone kernel source..."
+            );
 
             // Now let us clone the kernel source...
             let tx_for_git = tx.clone();
@@ -819,255 +764,153 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             let source_dir_clone2 = source_dir.clone();
             let config_branch = config.repo.branch.clone();
             let config_url = config.repo.url.clone();
-            let res = tokio::task::spawn_blocking(move || {
-                let tx_for_inner = tx_for_git.clone();
-
-                let repo = git2::Repository::open(&source_dir_clone).ok(); // Check if already cloned
-                // Repo opens successfully, check if URL matches
-                if let Some(r) = repo {
-                    // Lookup origin remote
-                    if let Ok(remote) = r.find_remote("origin") {
-                        // Check URL
-                        if let Some(url) = remote.url() {
-                            // If URL does not match, reclone
-                            if url != config_url {
-                                tx_for_inner
-                                    .blocking_send(Ok(BuildStatus {
-                                        status: ProgressStatus::InProgressDownload.into(),
-                                        output: "Existing repository URL does not match config, recloning.".into(),
-                                        build_id: None,
-                                    }))
-                                    .unwrap();
-                                std::fs::remove_dir_all(&source_dir_clone).map_err(|e| {
-                                    Status::internal(format!(
-                                        "Failed to remove mismatched repo directory: {}",
-                                        e
-                                    ))
-                                })?;
-                            }
-                        }
-                    }
-                    // Check if branch matches
-                    if let Ok(head_ref) = r.head() {
-                        if let Some(name) = head_ref.shorthand() {
-                        if name != config_branch {
-                            tx_for_inner
-                                .blocking_send(Ok(BuildStatus {
-                                    status: ProgressStatus::InProgressDownload.into(),
-                                    output: "Existing repository branch does not match config, trying to check out the correct branch.".into(),
-                                    build_id: None,
-                                }))
-                                .unwrap();
-                            r.set_head(&format!("refs/heads/{}", config_branch)).map_err(|e| {
-                                Status::internal(format!(
-                                    "Failed to set head to branch {}: {}",
-                                    config_branch, e
-                                        ))
-                                    })?;
-                                    r.checkout_head(None).map_err(|e| {
-                                        Status::internal(format!(
-                                            "Failed to checkout branch {}: {}",
-                                            config_branch, e
-                                        ))
-                                    })?;
+            let res: Result<Result<(), Status>, tokio::task::JoinError> =
+                tokio::task::spawn_blocking(move || {
+                    let tx_for_inner = tx_for_git.clone();
+                    let tx_for_callback = tx_for_git.clone();
+                    // Open repo...
+                    let repo = GitRepo::new(
+                        &source_dir_clone2,
+                        "origin",
+                        req.github_token.clone(),
+                        Some(Box::new(move |stats| {
+                            report_blk!(
+                                tx_for_callback,
+                                InProgressDownload,
+                                format!(
+                                    "[GIT OPERATION]: {}/{} objects received",
+                                    stats.received_objects(),
+                                    stats.total_objects()
+                                )
+                            );
+                        })),
+                    );
+                    // Check url match and branch...
+                    if let Ok(existing_repo) = repo {
+                        match existing_repo.get_remote_url() {
+                            Ok(url) => {
+                                if url == config_url {
+                                    report_blk!(
+                                        tx_for_inner,
+                                        InProgressDownload,
+                                        "Existing repository URL matches config, skipping checkout."
+                                    );
+                                } else {
+                                    // Try to checkout the correct branch
+                                    if let Err(e) = existing_repo.checkout_branch(&config_branch) {
+                                        report_blk!(
+                                            tx_for_inner,
+                                            InProgressDownload,
+                                            format!(
+                                                "Failed to checkout branch {}. Error: {}",
+                                                config_branch, e
+                                            )
+                                        );
+                                        return Ok(());
+                                    } else {
+                                        report_blk!(
+                                            tx_for_inner,
+                                            InProgressDownload,
+                                            format!(
+                                                "Checked out branch {} successfully.",
+                                                config_branch
+                                            )
+                                        );
+                                    }
                                 }
                             }
-
-                    }
-
-                    // Do a fast-forward pull to update the repo
-                    let mut fo = git2::FetchOptions::new();
-                    let mut ro = git2::RemoteCallbacks::new();
-                    
-                ro.credentials(|url, username_from_url, _allowed_types| {
-                    let config = git2::Config::open_default().unwrap();
-                    let username = username_from_url.unwrap_or("git");
-                    if url.starts_with("ssh://") {
-                        debug!("SSH URL detected for authentication.");
-                        return git2::Cred::ssh_key_from_agent(username);
-                    }
-                    if url.contains("github.com") {
-                        debug!("GitHub URL detected for authentication.");
-                        if let Some(token) = &req.github_token {
-                        info!("Using provided GitHub token for authentication.");
-                            let token_str = token.as_str();
-                            return git2::Cred::userpass_plaintext(token_str, "");
+                            Err(e) => {
+                                report_blk!(
+                                    tx_for_inner,
+                                    Failed,
+                                    "Failed to get existing repository URL, aborting."
+                                );
+                                return Ok(());
+                            }
                         }
-                    }
-                    debug!("Using credential helper for authentication.");
-                    return git2::Cred::credential_helper(&config, url, Some(username));
-                });
 
-                    fo.remote_callbacks(ro);
-                    let mut remote = r.find_remote("origin").map_err(|e| {
-                        Status::internal(format!("Failed to find remote 'origin': {}", e))
-                    })?;
-                    remote.fetch(&[&config_branch], Some(&mut fo), None).map_err(|e| {
-                        Status::internal(format!("Failed to fetch updates: {}", e))
-                    })?;
-                    let fetch_head = r.find_reference("FETCH_HEAD").map_err(|e| {
-                        Status::internal(format!("Failed to find FETCH_HEAD: {}", e))
-                    })?;
-                    let fetch_commit = r.reference_to_annotated_commit(&fetch_head).map_err(|e| {
-                        Status::internal(format!("Failed to get annotated commit: {}", e))
-                    })?;
-                    let analysis = r.merge_analysis(&[&fetch_commit]).map_err(|e| {
-                        Status::internal(format!("Merge analysis failed: {}", e))
-                    })?;
-                    if analysis.0.is_fast_forward() {
-                        let refname = format!("refs/heads/{}", config_branch);
-                        let mut rhead = r.find_reference(&refname).map_err(|e| {
-                            Status::internal(format!("Failed to find reference {}: {}", refname, e))
-                        })?;
-                        rhead.set_target(fetch_commit.id(), "Fast-Forward").map_err(|e| {
-                            Status::internal(format!(
-                                "Failed to set reference target: {}",
-                                e
-                            ))
-                        })?;
-                        r.checkout_head(None).map_err(|e| {
-                            Status::internal(format!("Failed to checkout HEAD: {}", e))
-                        })?;
-                    }
-                    tx_for_inner
-                        .blocking_send(Ok(BuildStatus {
-                            status: ProgressStatus::InProgressDownload.into(),
-                            output: "Kernel source already cloned, skipping.".into(),
-                            build_id: None,
-                        }))
-                        .unwrap();
-                    return Ok(());
-                }
-
-                let mut last_update = Instant::now();
-                let update_interval = Duration::from_secs(5);
-                let mut callbacks = git2::RemoteCallbacks::new();
-
-                // Set up the progress callback
-                callbacks.transfer_progress(move |stats| {
-                    if last_update.elapsed() < update_interval {
-                        return true;
-                    }
-                    last_update = Instant::now();
-                    tx_for_inner
-                        .blocking_send(Ok(BuildStatus {
-                            status: ProgressStatus::InProgressDownload.into(),
-                            output: format!(
-                                "Cloning kernel source: {}/{} objects received",
-                                stats.received_objects(),
-                                stats.total_objects()
-                            ),
-                            build_id: None,
-                        }))
-                        .unwrap();
-
-                    true // return true to continue download
-                });
-
-                callbacks.credentials(|url, username_from_url, _allowed_types| {
-                    let config = git2::Config::open_default().unwrap();
-                    let username = username_from_url.unwrap_or("git");
-                    if url.starts_with("ssh://") {
-                        debug!("SSH URL detected for authentication.");
-                        return git2::Cred::ssh_key_from_agent(username);
-                    }
-                    if url.contains("github.com") {
-                        debug!("GitHub URL detected for authentication.");
-                        if let Some(token) = &req.github_token {
-                        info!("Using provided GitHub token for authentication.");
-                            let token_str = token.as_str();
-                            return git2::Cred::userpass_plaintext(token_str, "");
+                        // Try to fast-forward
+                        match existing_repo.fast_forward() {
+                            Ok(_) => {
+                                report_blk!(
+                                    tx_for_inner,
+                                    InProgressDownload,
+                                    "Repository fast-forwarded successfully."
+                                );
+                            }
+                            Err(e) => {
+                                report_blk!(
+                                    tx_for_inner,
+                                    Failed,
+                                    format!("Failed to fast-forward repository. Error: {}", e)
+                                );
+                            }
                         }
+                        Ok(())
+                    } else {
+                        let tx_for_callback = tx_for_git.clone();
+                        match GitRepo::clone(
+                            &config_url,
+                            &config_branch,
+                            None,
+                            &source_dir_clone,
+                            req.github_token.clone(),
+                            &Some(Box::new(move |stats| {
+                                report_blk!(
+                                    tx_for_callback,
+                                    InProgressDownload,
+                                    format!(
+                                        "[GIT OPERATION]: {}/{} objects received",
+                                        stats.received_objects(),
+                                        stats.total_objects()
+                                    )
+                                );
+                            })),
+                        ) {
+                            Ok(_) => {
+                                report_blk!(
+                                    tx_for_inner,
+                                    InProgressDownload,
+                                    "Repository cloned successfully."
+                                );
+                            }
+                            Err(e) => {
+                                report_blk!(
+                                    tx_for_inner,
+                                    Failed,
+                                    format!("Failed to clone repository. Error: {}", e)
+                                );
+                                return Ok(());
+                            }
+                        }
+
+                        report_blk!(
+                            tx_for_inner,
+                            InProgressDownload,
+                            "Kernel source cloned successfully."
+                        );
+                        Ok(())
                     }
-                    debug!("Using credential helper for authentication.");
-                    return git2::Cred::credential_helper(&config, url, Some(username));
-                });
-
-                tx_for_git
-                    .blocking_send(Ok(BuildStatus {
-                        status: ProgressStatus::InProgressDownload.into(),
-                        output: "Starting kernel source clone...".into(),
-                        build_id: None,
-                    }))
-                    .unwrap();
-
-                let mut fetch_options = FetchOptions::new();
-                if let Some(depth)  = req.clone_depth {
-                    info!("Using clone depth: {}", depth);
-                    fetch_options.depth(depth);
-                }
-                fetch_options.remote_callbacks(callbacks);
-
-                let mut builder = RepoBuilder::new();
-                builder.fetch_options(fetch_options);
-                builder.branch(&config_branch);
-
-                tx_for_git
-                    .blocking_send(Ok(BuildStatus {
-                        status: ProgressStatus::InProgressDownload.into(),
-                        output: format!(
-                            "Cloning branch '{}' from '{}' into {}...",
-                            config_branch, config_url, source_dir_clone.display()
-                        ),
-                        build_id: None,
-                    }))
-                    .unwrap();
-
-                let resu = builder.clone(&config_url, &source_dir_clone);
-                let repo = match resu {
-                    Ok(r) => r,
-                    Err(e) => {
-                        tx_for_git
-                            .blocking_send(Ok(BuildStatus {
-                                status: ProgressStatus::Failed.into(),
-                                output: format!("Git clone failed: {}", e),
-                                build_id: None,
-                            }))
-                            .unwrap();
-                        return Err(Status::internal(format!("Git clone failed: {}", e)));
-                    }
-                };
-                    tx_for_git
-                        .blocking_send(Ok(BuildStatus {
-                            status: ProgressStatus::InProgressDownload.into(),
-                            output: "Git clone completed, updating submodules...".into(),
-                            build_id: None,
-                        }))
-                        .unwrap();
-
-                for mut submodule in repo
-                    .submodules()
-                    .map_err(|e| Status::internal(e.to_string()))?
-                {
-                    submodule
-                        .update(true, None)
-                        .map_err(|e| Status::internal(format!("Submodule error: {}", e)))?;
-                }
-
-                tx_for_git
-                    .blocking_send(Ok(BuildStatus {
-                        status: ProgressStatus::InProgressDownload.into(),
-                        output: "Kernel source cloned successfully.".into(),
-                        build_id: None,
-                    }))
-                    .unwrap();
-                Ok(())
-            })
-            .await;
+                })
+                .await;
             match res {
                 Ok(inner_res) => {
                     if let Err(e) = inner_res {
-                        report!(Failed, format!("Git clone task failed: {}", e));
-                        return Err(e);
+                        report!(tx, Failed, format!("Git clone task failed: {}", e));
+                        return Ok(());
                     }
                 }
                 Err(e) => {
-                    report!(Failed, format!("Git clone task failed: {}", e));
-                    return Err(Status::internal(format!("Git clone task failed: {}", e)));
+                    report!(tx, Failed, format!("Git clone task failed: {}", e));
+                    return Ok(());
                 }
             }
-            report!(InProgressConfigure, "Kernel source cloned successfully.");
-            report!(InProgressConfigure, "Now will make defconfig...");
+            report!(
+                tx,
+                InProgressConfigure,
+                "Kernel source cloned successfully."
+            );
+            report!(tx, InProgressConfigure, "Now will make defconfig...");
 
             let mut defconfig_name = config.defconfig.scheme.clone();
             defconfig_name = defconfig_name.replace("{device}", &req.device_name);
@@ -1098,7 +941,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             }
 
             // Old kernel version requires manual creation of out folder
-            let out_path = source_dir_clone2.join("out");
+            let out_path = source_dir.join("out");
             if out_path.is_dir() {
                 info!(
                     "Output directory {:?} already exists, skipping creation.",
@@ -1122,12 +965,12 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                     .await?;
 
             if !success {
-                return Err(Status::internal(
-                    "Build defconfig failed. Logs should show details.",
-                ));
+                report!(tx, Failed, "make defconfig failed.");
+                return Ok(());
             }
 
             report!(
+                tx,
                 InProgressConfigure,
                 "make defconfig completed successfully."
             );
@@ -1172,27 +1015,21 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             match spawnres.await {
                 Ok(inner_res) => {
                     if let Err(e) = inner_res {
-                        tx_for_final
-                            .send(Ok(BuildStatus {
-                                status: ProgressStatus::Failed.into(),
-                                output: format!("Build preparation task failed: {}", e).into(),
-                                build_id: None,
-                            }))
-                            .await
-                            .unwrap();
+                        report!(
+                            tx_for_final,
+                            Failed,
+                            format!("Build preparation task failed: {}", e)
+                        );
                     } else {
-                        debug!("Build preparation task completed successfully.");
+                        info!("Build preparation task completed successfully.");
                     }
                 }
                 Err(e) => {
-                    tx_for_final
-                        .send(Ok(BuildStatus {
-                            status: ProgressStatus::Failed.into(),
-                            output: format!("Build preparation task failed to join: {}", e).into(),
-                            build_id: None,
-                        }))
-                        .await
-                        .unwrap();
+                    report!(
+                        tx_for_final,
+                        Failed,
+                        format!("Build preparation task failed: {}", e)
+                    );
                 }
             }
         });
@@ -1207,40 +1044,42 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
         &self,
         request: Request<BuildRequest>,
     ) -> std::result::Result<tonic::Response<Self::doBuildStream>, tonic::Status> {
-        debug!("do_build called");
+        log_who_asked_me("do_build", &request);
 
         let (tx, rx) = mpsc::channel(100);
         let req = request.into_inner();
-        macro_rules! report {
-            ($status:ident, $msg:expr) => {
-                // We capture 'tx' from the surrounding scope automatically
-                let rs = tx
-                    .send(Ok(BuildStatus {
-                        status: ProgressStatus::$status.into(),
-                        output: $msg.into(),
-                        build_id: Some(req.build_id),
-                    }))
-                    .await;
-                if rs.is_err() {
-                    error!(
-                        "Failed to send build status update for build ID {}",
-                        req.build_id
-                    );
-                }
-                info!("Build Status - {:?}: {}", ProgressStatus::$status, $msg);
-            };
-        }
 
-        report!(Pending, "Starting build process, validating build ID...");
+        report_build_id!(
+            tx,
+            req.build_id,
+            Pending,
+            "Starting build process, validating build ID..."
+        );
+
         // Validate build ID
         let peridstat = self.build_statuses.clone();
         if !Self::is_valid_build_id(&peridstat, req.build_id).await {
+            report_build_id!(
+                tx,
+                req.build_id,
+                Failed,
+                format!("No build found with ID: {}", req.build_id)
+            );
             return Err(Status::not_found(format!(
                 "No build found with ID: {}",
                 req.build_id
             )));
         }
         if Self::is_build_finished(&peridstat, req.build_id).await {
+            report_build_id!(
+                tx,
+                req.build_id,
+                Failed,
+                format!(
+                    "Build ID {} is not in a pending state. (Already finished?)",
+                    req.build_id
+                )
+            );
             return Err(Status::failed_precondition(format!(
                 "Build ID {} is not in a pending state. (Already finished?)",
                 req.build_id
@@ -1257,6 +1096,12 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                     cloned
                 }
                 None => {
+                    report_build_id!(
+                        tx,
+                        req.build_id,
+                        Failed,
+                        format!("No build context found for ID: {}", req.build_id)
+                    );
                     return Err(Status::not_found(format!(
                         "No build context found for ID: {}",
                         req.build_id
@@ -1280,8 +1125,9 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             }
         }
 
-        let spawnres = tokio::spawn(async move {
-            report!(Pending, "Build started...");
+        let span = tracing::info_span!("build_watcher", build_id = req.build_id);
+        let spawnres: tokio::task::JoinHandle<Result<(), Status>> = tokio::spawn(async move {
+            report_build_id!(tx, req.build_id, Pending, "Build started...");
 
             let mut proc = Command::new("make");
             proc.current_dir(&context.work_dir)
@@ -1315,11 +1161,11 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             if !success {
                 Self::add_artifact_path_to_context(&contexts_clone, req.build_id, &log_file).await;
                 Self::mark_build_finished(&peridstat, req.build_id, false).await;
-                return Err(Status::internal(
-                    "Build failed or cancelled, see logs for details.",
-                ));
+                info!("Build ID {} failed.", req.build_id);
+                report_build_id!(tx, req.build_id, Failed, "Build failed.");
+                return Ok(());
             }
-            report!(InProgressBuild, "Build succeeded.");
+            report_build_id!(tx, req.build_id, InProgressBuild, "Build succeeded.");
             let kernel_image = context
                 .work_dir
                 .join("out")
@@ -1333,13 +1179,18 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             if !artifact.exists() {
                 Self::add_artifact_path_to_context(&contexts_clone, req.build_id, &log_file).await;
                 Self::mark_build_finished(&peridstat, req.build_id, false).await;
-                return Err(Status::internal(format!(
-                    "Expected kernel image not found at {:?}",
-                    &kernel_image
-                )));
+                report_build_id!(
+                    tx,
+                    req.build_id,
+                    Failed,
+                    format!("Expected kernel image not found at {:?}", &kernel_image)
+                );
+                return Ok(());
             }
 
-            report!(
+            report_build_id!(
+                tx,
+                req.build_id,
                 InProgressBuild,
                 format!("Kernel image located at {:?}", &kernel_image)
             );
@@ -1347,9 +1198,16 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             if let Some(anykernel) = &context.config.anykernel
                 && anykernel.enabled
             {
-                report!(InProgressBuild, "Packaging with AnyKernel...");
+                report_build_id!(
+                    tx,
+                    req.build_id,
+                    InProgressBuild,
+                    "Packaging with AnyKernel..."
+                );
                 if anykernel.location.is_none() {
-                    report!(
+                    report_build_id!(
+                        tx,
+                        req.build_id,
                         InProgressBuild,
                         "AnyKernel packaging config is invalid, skipping."
                     );
@@ -1357,27 +1215,34 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                     let anykernel_dir = context.work_dir.join(anykernel.location.as_ref().unwrap());
                     if !anykernel_dir.exists() {
                         Self::mark_build_finished(&peridstat, req.build_id, false).await;
-                        report!(
+                        report_build_id!(
+                            tx,
+                            req.build_id,
                             Failed,
                             format!("AnyKernel directory {:?} does not exist.", anykernel_dir)
                         );
-                        return Err(Status::internal(format!(
-                            "AnyKernel directory {:?} does not exist.",
-                            anykernel_dir
-                        )));
+                        return Ok(());
                     }
 
                     // Copy kernel image into AnyKernel directory
                     let dest_image_path =
                         anykernel_dir.join(PathBuf::from(&context.config.image_type));
-                    fs::copy(&kernel_image, &dest_image_path)
-                        .await
-                        .map_err(|e| {
-                            Status::internal(format!(
-                                "Failed to copy kernel image to AnyKernel directory: {}",
-                                e
-                            ))
-                        })?;
+                    match fs::copy(&kernel_image, &dest_image_path)
+                        .await {
+                        Ok(_) => {}
+                        Err(e) => {
+                            report_build_id!(
+                                tx,
+                                req.build_id,
+                                Failed,
+                                format!(
+                                    "Failed to copy kernel image to AnyKernel directory: {}",
+                                    e
+                                )
+                            );
+                            return Ok(());
+                        }
+                    }
 
                     let date = Local::now();
                     let formatted_date = format!("{}", date.format("%Y-%m-%d_%H-%M-%S"));
@@ -1386,36 +1251,50 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                         context.config.name, context.device_name, formatted_date
                     ));
 
-                    report!(
+                    report_build_id!(
+                        tx,
+                        req.build_id,
                         InProgressBuild,
                         format!("CreateZipFile {}", &zip_file_path.to_path_buf().display())
                     );
                     Self::zip_dir_with_filename(&zip_file_path, &anykernel_dir).await?;
-                    report!(InProgressBuild, "AnyKernel packaging complete.");
+                    report_build_id!(
+                        tx,
+                        req.build_id,
+                        InProgressBuild,
+                        "AnyKernel packaging complete."
+                    );
 
                     // Delete the copied kernel image from AnyKernel directory
-                    fs::remove_file(&dest_image_path).await.map_err(|e| {
-                        Status::internal(format!(
-                            "Failed to clean up kernel image from AnyKernel directory: {}",
-                            e
-                        ))
-                    })?;
-
+                    match fs::remove_file(&dest_image_path).await {
+                        Ok(_) => {}
+                        Err(e) => {
+                            warn!(
+                                "Failed to delete temporary kernel image from AnyKernel directory: {}",
+                                e
+                            );
+                        }
+                    };
                     artifact = zip_file_path;
                 }
             } else {
                 // Upload kernel image directly
             }
 
-            report!(Success, "Build complete. Dropping build context.");
+            report_build_id!(
+                tx,
+                req.build_id,
+                Success,
+                "Build complete. Dropping build context."
+            );
             Self::add_artifact_path_to_context(&contexts_clone, req.build_id, &artifact).await;
 
             // Mark build as finished
             Self::mark_build_finished(&peridstat, req.build_id, true).await;
             Ok(())
-        });
+        }.instrument(span));
 
-        let span = tracing::info_span!("build_watcher", build_id = req.build_id);
+        let span = tracing::info_span!("build_task", build_id = req.build_id);
         tokio::spawn(
             async move {
                 match spawnres.await {
@@ -1442,7 +1321,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
         &self,
         request: Request<BuildRequest>,
     ) -> Result<Response<BuildStatus>, Status> {
-        debug!("cancel_build called");
+        log_who_asked_me("cancel_build", &request);
         let req = request.into_inner();
 
         // 0. Check if finishied already
@@ -1486,7 +1365,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                 drop(per_build_statuses_lock);
 
                 Ok(Response::new(BuildStatus {
-                    status: ProgressStatus::Failed.into(), // or Cancelled if you have that enum
+                    status: ProgressStatus::Failed.into(),
                     output: format!("Cancellation signal sent for Build ID {}", req.build_id),
                     build_id: Some(req.build_id),
                 }))
@@ -1513,7 +1392,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
         >,
         tonic::Status,
     > {
-        debug!("get_artifact called");
+        log_who_asked_me("get_artifact", &request);
 
         if !Self::is_valid_build_id(&self.build_statuses, request.get_ref().build_id).await {
             return Err(Status::not_found(format!(
@@ -1539,7 +1418,6 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
 
         let req = request.into_inner();
         let (tx, rx) = mpsc::channel(100);
-        let tx_clone = tx.clone();
         let spawnres = tokio::spawn(async move {
             // Check if artifact exists
             let artifact_path = match &context.artifact_path {

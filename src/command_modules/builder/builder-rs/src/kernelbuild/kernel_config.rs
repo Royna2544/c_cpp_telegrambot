@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crate::kernelbuild::builder_config::Architecture;
 use serde::{Deserialize, Serialize};
-use tracing::{error, info};
+use tracing::error;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Repo {

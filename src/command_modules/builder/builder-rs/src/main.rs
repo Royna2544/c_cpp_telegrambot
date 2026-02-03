@@ -7,7 +7,9 @@ use std::path::PathBuf;
 use tonic::transport::Server;
 use tracing::{debug, error, info, warn};
 
+mod git_repo;
 mod kernelbuild;
+mod ratelimit;
 mod system_monitor;
 
 #[derive(Parser, Debug)]
@@ -26,9 +28,26 @@ struct KernelBuilderArgs {
 // builder_config.json is a reserved filename for internal builder configs
 fn parse_kernel_config(json_dir: &str) -> Vec<KernelConfig> {
     let mut configs: Vec<KernelConfig> = Vec::new();
-    let entries = std::fs::read_dir(&json_dir).expect("Failed to read JSON directory");
+    let entries: std::fs::ReadDir;
+    match std::fs::read_dir(&json_dir) {
+        Err(e) => {
+            error!(
+                "Failed to read JSON directory {}: {}",
+                json_dir,
+                e.to_string()
+            );
+            return configs;
+        }
+        Ok(value) => entries = value,
+    }
     for entry in entries {
-        let entry = entry.expect("Failed to read directory entry");
+        let entry = match entry {
+            Err(e) => {
+                error!("Failed to read directory entry: {}", e);
+                continue;
+            }
+            Ok(val) => val,
+        };
         let path = entry.path();
         if path.extension().and_then(|s| s.to_str()) == Some("json") {
             info!("Processing file: {:?}", path);
@@ -127,8 +146,25 @@ async fn main() {
                     canonical_output = t;
                 }
                 Err(e) => {
-                    error!("Exiting due to invalid output directory. Error: {}", e);
-                    return;
+                    warn!(
+                        "Output directory {:?} does not exist. Attempting to create it.",
+                        args.output_dir
+                    );
+                    match std::fs::create_dir_all(&args.output_dir) {
+                        Ok(_) => {
+                            info!("Created output directory: {}", args.output_dir.as_str());
+                            canonical_output = std::fs::canonicalize(&args.output_dir).unwrap();
+                        }
+                        Err(e) => {
+                            error!(
+                                "Failed to create output directory {}: {}",
+                                args.output_dir.as_str(),
+                                e
+                            );
+                            error!("Exiting due to invalid output directory.");
+                            return;
+                        }
+                    }
                 }
             }
 
