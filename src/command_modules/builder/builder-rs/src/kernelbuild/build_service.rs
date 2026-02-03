@@ -1,7 +1,6 @@
 mod grpc_pb {
     include!(concat!(env!("OUT_DIR"), "/tgbot.builder.linuxkernel.rs"));
 }
-pub const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("descriptor");
 use super::builder_config::Toolchain;
 use super::builder_config::{BuilderConfig, CompilerType};
 use super::kernel_config::KernelConfig;

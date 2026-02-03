@@ -38,7 +38,3 @@ tonic-prost-build = "0.14"
 [[bin]]
 name = "kernel_builder"
 path = "src/main.rs"
-
-[lib]
-name = "system_monitor"
-path = "src/system_monitor.rs"

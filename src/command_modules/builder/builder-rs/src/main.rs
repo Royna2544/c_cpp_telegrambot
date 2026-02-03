@@ -1,15 +1,21 @@
 use crate::kernelbuild::build_service::linux_kernel_build_service_server::LinuxKernelBuildServiceServer;
-use crate::kernelbuild::build_service::{BuildService, FILE_DESCRIPTOR_SET};
 use crate::kernelbuild::kernel_config::KernelConfig;
+use crate::rombuild::build_service::BuildService as ROMBuildService;
 use crate::system_monitor::grpc_monitor::system_monitor_service_server::SystemMonitorServiceServer;
+use crate::{
+    kernelbuild::build_service::BuildService, rombuild::build_service::RomBuildServiceServer,
+};
 use clap::Parser;
 use std::path::PathBuf;
 use tonic::transport::Server;
 use tracing::{debug, error, info, warn};
 
+const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("descriptor");
+
 mod git_repo;
 mod kernelbuild;
 mod ratelimit;
+mod rombuild;
 mod system_monitor;
 
 #[derive(Parser, Debug)]
@@ -171,6 +177,7 @@ async fn main() {
             // 2. Initialize Build Service
             let build_service =
                 BuildService::new(configs, builder_config, canonical_temp, canonical_output);
+            let android_build_service = ROMBuildService::new();
 
             // 3. Initialize System Monitor Service
             let system_monitor = system_monitor::MonitorService::new();
@@ -185,6 +192,7 @@ async fn main() {
                         .expect("Failed to build reflection service"),
                 )
                 .add_service(LinuxKernelBuildServiceServer::new(build_service))
+                .add_service(RomBuildServiceServer::new(android_build_service))
                 .add_service(monitor_service)
                 .serve(addr)
                 .await
