@@ -4,6 +4,7 @@
 #include <fmt/format.h>
 #include <tgbot/TgException.h>
 
+#include <algorithm>
 #include <api/CommandModule.hpp>
 #include <api/MessageExt.hpp>
 #include <api/TgBotApi.hpp>
@@ -12,7 +13,7 @@
 #include <string_view>
 
 #include "CurlUtils.hpp"
-#include "llm/OpenAI_api.hpp"
+#include "llm/LMStudioApi.hpp"
 #include "llm/SYSTEM_PROMPT.hpp"
 #include "utils/ConfigManager.hpp"
 
@@ -117,8 +118,7 @@ static void localnetmodelhandler(TgBotApi::Ptr api, MessageExt* message,
     // GET /api/models to check server availability
     std::optional<std::string> modelsResponse;
     if (modelsResponse = CurlUtils::download_memory(
-            std::string(url) + openai::kOpenAI_API_Models_Endpoint, nullptr,
-            authkey);
+            std::string(url) + LMStudioApi::kModelsEndpoint, nullptr, authkey);
         !modelsResponse) {
         LOG(ERROR) << "Failed to connect to LLM server at " << url;
         api->editMessage(sent,
@@ -126,53 +126,93 @@ static void localnetmodelhandler(TgBotApi::Ptr api, MessageExt* message,
                          "configured URL.");
         return;
     }
-    openai::ModelResponse modelResponse;
+    LMStudioApi::ModelResponse modelResponse;
     try {
-        modelResponse =
-            nlohmann::json::parse(*modelsResponse).get<openai::ModelResponse>();
+        modelResponse = nlohmann::json::parse(*modelsResponse)
+                            .get<LMStudioApi::ModelResponse>();
     } catch (const std::exception& e) {
         LOG(ERROR) << "Failed to parse models response from LLM server: "
                    << e.what();
+        LOG(ERROR) << "Response content: " << *modelsResponse;
         api->editMessage(
             sent, "Error: Failed to parse models response from LLM server.");
         return;
     }
     LOG(INFO) << "LLM Server Models Available:";
-    for (const auto& model : modelResponse.data) {
-        LOG(INFO) << " - " << model.id << " (owned by " << model.owned_by
+    for (const auto& model : modelResponse.models) {
+        LOG(INFO) << " - " << model.key << " (owned by " << model.publisher
                   << ")";
     }
-    if (modelResponse.data.empty()) {
+    if (modelResponse.models.empty()) {
         LOG(ERROR) << "No models available from LLM server.";
         api->editMessage(sent, "Error: No models available from LLM server.");
         return;
     }
 
     // TODO: Extraction logic, for now use index 0
-    openai::ChatRequest chatRequest;
-    chatRequest.model = modelResponse.data[0].id;
+    LMStudioApi::ChatRequest chatRequest;
+    auto that = std::ranges::find_if(
+        modelResponse.models, [](const LMStudioApi::Model& m) {
+            return m.type == LMStudioApi::LLMType::llm;
+        });
+
+    static std::string response_key;
+    if (that == modelResponse.models.end()) {
+        LOG(ERROR) << "No LLM type models available from LLM server.";
+        api->editMessage(
+            sent, "Error: No LLM type models available from LLM server.");
+        return;
+    }
+    chatRequest.model = that->key;
     LOG(INFO) << "Using model " << chatRequest.model << " for query.";
-    chatRequest.temperature = kTemperature;
-    chatRequest.messages = {openai::Message::System(SYSTEM_PROMPT),
-                            openai::Message::User(query)};
+    chatRequest.temperature = 0.2f;
+    chatRequest.system_prompt = SYSTEM_PROMPT;
+    chatRequest.input = query;
+    std::vector<LMStudioApi::ChatRequest::Plugin> plugins{};
+    plugins.emplace_back(LMStudioApi::ChatRequest::Plugin{
+        .type = "plugin",
+        .id = "mcp/playwright",
+    });
+    chatRequest.integrations = plugins;
+    chatRequest.context_length = 16000;
+    chatRequest.reasoning = LMStudioApi::Reasoning::medium;
+    if (!response_key.empty()) {
+        chatRequest.previous_response_id = response_key;
+    }
 
     nlohmann::json payload = chatRequest;
 
     if (auto rc = CurlUtils::send_json_get_reply(
-            std::string(url) + openai::kOpenAI_API_ChatCompletions_Endpoint,
-            payload.dump(), authkey);
+            std::string(url) + LMStudioApi::kChatEndpoint, payload.dump(),
+            authkey);
         rc) {
         try {
-            openai::ChatResponse chatResponse =
-                nlohmann::json::parse(*rc).get<openai::ChatResponse>();
-            if (chatResponse.choices.empty()) {
-                LOG(ERROR) << "LLM server returned empty choices.";
+            LMStudioApi::ChatResponse chatResponse =
+                nlohmann::json::parse(*rc).get<LMStudioApi::ChatResponse>();
+            if (chatResponse.output.empty()) {
+                LOG(ERROR) << "LLM server returned empty outputs.";
+                LOG(ERROR) << "Response content: " << *rc;
                 api->editMessage(
                     sent,
-                    "Error: LLM server returned empty choices in response.");
+                    "Error: LLM server returned empty outputs in response.");
                 return;
             }
-            api->editMessage(sent, chatResponse.choices[0].message.content);
+            auto it = std::ranges::find_if(
+                chatResponse.output,
+                [](const LMStudioApi::ChatResponse::Output& output) {
+                    return output.type == "message";
+                });
+            if (it == chatResponse.output.end()) {
+                LOG(ERROR)
+                    << "LLM server response has no 'message' type output.";
+                LOG(ERROR) << "Response content: " << *rc;
+                api->editMessage(
+                    sent,
+                    "Error: LLM server response has no 'message' type output.");
+                return;
+            }
+            response_key = chatResponse.response_id.value_or("");
+            api->editMessage(sent, it->content);
         } catch (const std::exception& e) {
             LOG(ERROR) << "Failed to parse LLM server response: " << e.what();
             api->editMessage(sent,

@@ -27,13 +27,6 @@ static CURL* CURL_setup_common(const std::string_view url,
     // Enable 302 redirects
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
-    // Set timeout: 30 seconds for connection, 30 minutes for total operation
-    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 30L);
-    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 1800L);
-    // Set low speed limit: abort if speed < 1KB/s for 30 seconds
-    curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 1024L);
-    curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 30L);
-
     // Set progress callback
     curl_easy_setopt(
         curl, CURLOPT_XFERINFOFUNCTION,
