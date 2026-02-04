@@ -48,8 +48,7 @@ impl GitRepo {
         // logic: accepts value 'p', passes ref '&p' to inner callback
         move |p| {
             if ratelimit.check() {
-                callback(&p)
-            } else {
+                callback(&p);
                 info!(
                     "[git stats] rx:{}/t:{} objects (idx:{})",
                     p.received_objects(),
