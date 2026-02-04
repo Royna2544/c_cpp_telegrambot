@@ -4,11 +4,12 @@
 #include <api/RateLimit.hpp>
 
 bool IntervalRateLimiter::check() {
-    DLOG(INFO) << fmt::format("count: {}, timestamp: {}", count_.load(), timestamp_.load());
+    DLOG_EVERY_N_SEC(INFO, 5) << fmt::format("count: {}, timestamp: {}",
+                                             count_.load(), timestamp_.load());
     auto origCount = count_.fetch_add(1, std::memory_order_acq_rel);
     if (origCount < maxPerInterval_) {
         // We did not hit the rate limit cap.
-        DLOG(INFO) << "FastPath: Allowed";
+        DLOG_EVERY_N_SEC(INFO, 5) << "FastPath: Allowed";
         return true;
     }
     return checkSlow();
@@ -18,7 +19,8 @@ bool IntervalRateLimiter::checkSlow() {
     auto ts = timestamp_.load();
     auto now = clock::now().time_since_epoch().count();
     if (now < (ts + interval_.count())) {
-        DLOG(INFO) << "SlowPath: RateLimited - interval not passed";
+        DLOG_EVERY_N_SEC(INFO, 5)
+            << "SlowPath: RateLimited - interval not passed";
         // We fell into the previous interval.
         return false;
     }
@@ -27,7 +29,8 @@ bool IntervalRateLimiter::checkSlow() {
         // We raced with another thread that reset the timestamp.
         // We treat this as if we fell into the previous interval, and so we
         // rate-limit ourself.
-        DLOG(INFO) << "SlowPath: RateLimited - reset timestamp race";
+        DLOG_EVERY_N_SEC(INFO, 5)
+            << "SlowPath: RateLimited - reset timestamp race";
         return false;
     }
 
@@ -45,7 +48,7 @@ bool IntervalRateLimiter::checkSlow() {
     // In the future, if we wanted to return the number of dropped events we
     // could use (count_.exchange(0) - maxPerInterval_) here.
     count_.store(1, std::memory_order_release);
-    DLOG(INFO) << "SlowPath: Allowed";
+    DLOG_EVERY_N_SEC(INFO, 5) << "SlowPath: Allowed";
     // We passed the check.
     return true;
 }
