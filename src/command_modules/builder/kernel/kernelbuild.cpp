@@ -25,6 +25,7 @@
 #include <utility>
 
 #include "ConfigManager.hpp"
+#include "HealthCheck_service.grpc.pb.h"
 #include "LinuxKernelBuild_service.grpc.pb.h"
 #include "LinuxKernelBuild_service.pb.h"
 #include "SystemMonitor_service.grpc.pb.h"
@@ -74,9 +75,10 @@ class KernelBuildHandler {
     std::optional<std::string> gitToken;
 
     // gRPC channel
-    std::shared_ptr<grpc::Channel> channel;
     std::unique_ptr<LinuxKernelBuildService::Stub> stub;
     std::unique_ptr<SystemMonitorService::Stub> systemMonitorStub;
+    std::unique_ptr<tgbot::builder::healthcheck::HealthCheckService::Stub>
+        healthStub;
 
     TgBot::InlineKeyboardMarkup::Ptr makeCancelKeyboard() {
         KeyboardBuilder builder;
@@ -115,11 +117,25 @@ class KernelBuildHandler {
                        << ec.message();
         }
 
-        channel = grpc::CreateChannel(
+        auto channel = grpc::CreateChannel(
             *cfgmgr->get(ConfigManager::Configs::KERNELBUILD_SERVER),
             grpc::InsecureChannelCredentials());
         stub = LinuxKernelBuildService::NewStub(channel);
         systemMonitorStub = SystemMonitorService::NewStub(channel);
+        healthStub =
+            tgbot::builder::healthcheck::HealthCheckService::NewStub(channel);
+
+        LOG(INFO) << "Connecting to HealthCheckService...";
+        grpc::ClientContext context;
+        google::protobuf::Empty request;
+        google::protobuf::Empty response;
+        auto rc = healthStub->ping(&context, request, &response);
+        if (!rc.ok()) {
+            throw std::runtime_error(
+                "Failed to connect to HealthCheckService: " +
+                rc.error_message());
+        }
+        LOG(INFO) << "Connected to remote successfully";
     }
 
     constexpr static std::string_view kBuildPrefix = "build_";
@@ -529,7 +545,7 @@ void KernelBuildHandler::handle_continue(
 
 // Define the command handler function
 DECLARE_COMMAND_HANDLER(kernelbuild) {
-    static std::optional<KernelBuildHandler> handler;
+    static std::shared_ptr<KernelBuildHandler> handler;
     if (!provider->config->get(ConfigManager::Configs::KERNELBUILD_SERVER)) {
         api->sendMessage(
             message->get<MessageAttrs::Chat>(),
@@ -537,8 +553,9 @@ DECLARE_COMMAND_HANDLER(kernelbuild) {
         return;
     }
     if (!handler) {
-        handler.emplace(api, provider->cmdline.get(), provider->auth.get(),
-                        provider->config.get());
+        handler = std::make_shared<KernelBuildHandler>(
+            api, provider->cmdline.get(), provider->auth.get(),
+            provider->config.get());
         api->onCallbackQuery("kernelbuild", [api, provider](
                                                 const TgBot::CallbackQuery::Ptr&
                                                     ptr) {

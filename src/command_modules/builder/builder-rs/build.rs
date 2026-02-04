@@ -13,6 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &[
                 "../kernel/proto/LinuxKernelBuild_service.proto",
                 "../proto/SystemMonitor_service.proto",
+                "../proto/HealthCheck_service.proto",
                 "../android/proto/ROMBuild_service.proto",
             ],
             &["../kernel/proto", "../proto", "../android/proto"],

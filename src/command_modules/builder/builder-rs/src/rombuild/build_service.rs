@@ -4,31 +4,34 @@ mod grpc_pb {
 
 pub use crate::rombuild::build_service::grpc_pb::rom_build_service_server::RomBuildServiceServer;
 use crate::rombuild::build_service::grpc_pb::{
-    BuildAction, BuildLogEntry, BuildRequest, BuildSubmission, CleanDirectoryRequest, Settings,
-    rom_build_service_server,
+    BuildAction, BuildLogEntry, BuildRequest, BuildSubmission, CleanDirectoryRequest,
+    CleanDirectoryType, Settings, rom_build_service_server,
 };
 
 use futures_util::Stream;
-use std::{pin::Pin, sync::Arc};
+use std::{path::PathBuf, pin::Pin, sync::Arc};
 use tokio::sync::Mutex;
 use tonic::{Request, async_trait};
 use tracing::info;
 
 pub struct BuildService {
     settings: Arc<Mutex<Settings>>,
+    build_dir: PathBuf,
 }
 
 impl BuildService {
-    pub fn new() -> Self {
+    pub fn new(build_dir: PathBuf) -> Self {
         let settings = Settings {
             do_repo_sync: Some(true),
             do_clean_build: Some(false),
             use_ccache: Some(false),
             use_rbe_service: Some(false),
             rbe_api_token: None,
+            do_upload: Some(false),
         };
         BuildService {
             settings: Arc::new(Mutex::new(settings)),
+            build_dir,
         }
     }
 }
@@ -88,6 +91,10 @@ impl rom_build_service_server::RomBuildService for BuildService {
             info!("Setting rbe_api_token");
             settings.rbe_api_token = req.rbe_api_token;
         }
+        if req.do_upload.is_some() {
+            info!("Setting do_upload to {}", req.do_upload.unwrap());
+            settings.do_upload = req.do_upload;
+        }
         Ok(tonic::Response::new(()))
     }
 
@@ -97,8 +104,17 @@ impl rom_build_service_server::RomBuildService for BuildService {
         request: tonic::Request<CleanDirectoryRequest>,
     ) -> std::result::Result<tonic::Response<()>, tonic::Status> {
         log_who_asked_me("clean_directory", &request);
-        info!("Cleaning directory: {}", request.get_ref().directory_path);
-        std::fs::remove_dir_all(&request.into_inner().directory_path)
+        let req = request.into_inner();
+        let clean_dir = match &req
+            .directory_type
+            .try_into()
+            .map_err(|_| tonic::Status::invalid_argument("Invalid directory type"))?
+        {
+            CleanDirectoryType::RomDirectory => self.build_dir.clone(),
+            CleanDirectoryType::BuildDirectory => self.build_dir.join("out"),
+        };
+        info!("Cleaning directory: {}", req.directory_type);
+        std::fs::remove_dir_all(&clean_dir)
             .map_err(|e| tonic::Status::internal(format!("Failed to clean directory: {}", e)))?;
         Ok(tonic::Response::new(()))
     }
@@ -108,26 +124,33 @@ impl rom_build_service_server::RomBuildService for BuildService {
         &self,
         request: tonic::Request<BuildRequest>,
     ) -> std::result::Result<tonic::Response<BuildSubmission>, tonic::Status> {
+        log_who_asked_me("start_build", &request);
         unimplemented!();
     }
+
     /// Logs streaming for a build in progress
     async fn stream_logs(
         &self,
         request: tonic::Request<BuildAction>,
     ) -> std::result::Result<tonic::Response<Self::StreamLogsStream>, tonic::Status> {
+        log_who_asked_me("stream_logs", &request);
         unimplemented!();
     }
+
     /// Cancel a build in progress
     async fn cancel_build(
         &self,
         request: tonic::Request<BuildAction>,
     ) -> std::result::Result<tonic::Response<()>, tonic::Status> {
+        log_who_asked_me("cancel_build", &request);
         unimplemented!();
     }
+
     async fn get_status(
         &self,
         request: tonic::Request<BuildAction>,
     ) -> std::result::Result<tonic::Response<BuildSubmission>, tonic::Status> {
+        log_who_asked_me("get_status", &request);
         unimplemented!();
     }
 }

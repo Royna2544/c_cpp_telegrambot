@@ -20,7 +20,6 @@
 #include "Env.hpp"
 
 const char* const sectionMain = "Main";
-const char* const sectionFilePath = "FilePath";
 const char* const sectionNetwork = "Network";
 const char* const sectionDatabase = "Database";
 const char* const sectionLLM = "LLM";
@@ -47,8 +46,6 @@ void AddOption(po::options_description& desc) {
         const char* sectionName = nullptr;
         if (index->belongsTo == &sectionMain) {
             sectionName = sectionMain;
-        } else if (index->belongsTo == &sectionFilePath) {
-            sectionName = sectionFilePath;
         } else if (index->belongsTo == &sectionNetwork) {
             sectionName = sectionNetwork;
         } else if (index->belongsTo == &sectionDatabase) {

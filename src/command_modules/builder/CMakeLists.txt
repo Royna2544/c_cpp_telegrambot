@@ -2,52 +2,13 @@ add_subdirectory(kernel)
 
 include(gRPCGenerate)
 grpc_generate(SystemMonitor)
+grpc_generate(HealthCheck)
+add_subdirectory(android)
 
-find_package(libgit2)
-
-if(NOT libgit2_FOUND)
-  message(STATUS "Builder: No libgit2")
-  return()
-endif()
-
-include(CheckStructHasMember)
-check_struct_has_member(git_fetch_options depth git2/clone.h
-                        LIBGIT2_HAS_CLONE_DEPTH)
-if(LIBGIT2_HAS_CLONE_DEPTH)
-  set(BUILDER_UTILS_LINUX_DEFS LIBGIT2_HAS_CLONE_DEPTH)
-endif()
-
-tgbot_library(
-  NAME
-  RepoSwitcher
-  SRCS
-  RepoUtils.cpp
-  DEFS
-  ${BUILDER_UTILS_LINUX_DEFS}
-  LIBS
-  libgit2::libgit2package
-  STATIC
-  NO_LIBPREFIX)
-
-tgbot_exe(
-  NAME
-  RepoSwitcherTest
-  SRCS
-  RepoSwitcherTest.cpp
-  LIBS
-  RepoSwitcher
-  OPTIONAL)
-
-find_package(LibArchive)
-if(WIN32)
-  find_package(Boost CONFIG COMPONENTS units)
-else()
-  find_package(Boost CONFIG)
-endif()
 find_package(CURL)
 
-if(NOT CURL_FOUND OR NOT Boost_FOUND)
-  message(STATUS "Builder: No cURL or Boost.Units")
+if(NOT CURL_FOUND)
+  message(STATUS "Builder: No cURL")
   return()
 endif()
 
@@ -58,37 +19,6 @@ tgbot_library(
   CurlUtils.cpp
   LIBS
   CURL::libcurl
-  Boost::headers
   sighandler
   STATIC)
 
-if(NOT LibArchive_FOUND)
-  message(STATUS "Builder: No libarchive")
-  return()
-endif()
-
-add_subdirectory(archives)
-
-if(NOT LINUX OR NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)")
-  message(STATUS "Builder: Unsupported platform: (${CMAKE_SYSTEM_NAME})")
-  return()
-endif()
-
-tgbot_library(
-  NAME
-  BuilderUtilsLinux
-  SRCS
-  ForkAndRun.cpp
-  Shmem.cpp
-  SystemInfo.cpp
-  PollWrap.cpp
-  LIBS
-  LogInit
-  sighandler
-  progress
-  Boost::headers
-  RepoSwitcher
-  NO_LIBPREFIX
-  STATIC)
-
-add_subdirectory(android)

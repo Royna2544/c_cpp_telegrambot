@@ -13,7 +13,11 @@
 #include <vector>
 
 #include "../FileWithTimestamp.hpp"
-#include "../RepoUtils.hpp"
+
+struct RepoInfo {
+    std::string url;
+    std::string branch;
+};
 
 struct KernelConfig {
     std::string name;
@@ -21,7 +25,7 @@ struct KernelConfig {
     RepoInfo repo_info;
     bool shallow_clone = false;
     enum class Arch : std::uint8_t {
-        ARM = 1,
+        ARM,
         ARM64,
         X86,
         X86_64,
@@ -58,19 +62,6 @@ struct KernelConfig {
     std::unordered_map<std::string, Fragments> fragments;
     std::unordered_map<std::string, std::string> envMap;
 
-    class Patcher {
-       protected:
-        std::string data1;
-        std::string data2;
-
-       public:
-        virtual ~Patcher() = default;
-        virtual bool apply() = 0;
-        Patcher(std::string data1, std::string data2)
-            : data1(std::move(data1)), data2(std::move(data2)) {}
-    };
-    std::vector<std::unique_ptr<Patcher>> patches;
-
     explicit KernelConfig(std::filesystem::path jsonFile);
     bool reParse();
     std::string toJsonString() const;
@@ -85,7 +76,6 @@ struct KernelConfig {
     bool parseDefconfig(const nlohmann::json& node);
     bool parseFragments(const nlohmann::json& node);
     bool parseEnvMap(const nlohmann::json& node);
-    bool parsePatches(const nlohmann::json& node);
     bool parse(const nlohmann::json& node);
     void parse();
     std::filesystem::path _sourceFilePath;

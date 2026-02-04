@@ -18,5 +18,6 @@ command_module(
   progress
   LinuxKernelBuildServiceProto
   SystemMonitorServiceProto
+  HealthCheckServiceProto
   RateLimitApi
 )

@@ -5,14 +5,14 @@
 #include <fmt/chrono.h>
 #include <fmt/format.h>
 #include <fmt/ranges.h>
+#include <grpcpp/client_context.h>
+#include <grpcpp/create_channel.h>
 #include <sys/wait.h>
 #include <tgbot/TgException.h>
 #include <tgbot/types/ReplyKeyboardRemove.h>
 
 #include <CommandLine.hpp>
 #include <ConfigManager.hpp>
-#include <ConfigParsers.hpp>
-#include <Zip.hpp>
 #include <algorithm>
 #include <api/CommandModule.hpp>
 #include <api/TgBotApi.hpp>
@@ -24,18 +24,17 @@
 #include <memory>
 #include <string>
 #include <system_error>
-#include <tasks/ROMBuildTask.hpp>
-#include <tasks/RepoSyncTask.hpp>
-#include <tasks/UploadFileTask.hpp>
 #include <utility>
 
-#include "CurlUtils.hpp"
-#include "ForkAndRun.hpp"
-#include "SystemInfo.hpp"
+#include "ConfigParsers.hpp"
+#include "HealthCheck_service.grpc.pb.h"
+#include "ROMBuild_service.grpc.pb.h"
+#include "SystemMonitor_service.grpc.pb.h"
 #include "command_modules/support/CwdRestorar.hpp"
 #include "command_modules/support/KeyBoardBuilder.hpp"
 
 using std::string_literals::operator""s;
+using namespace tgbot::builder;
 
 class ROMBuildQueryHandler {
     struct {
@@ -66,15 +65,6 @@ class ROMBuildQueryHandler {
 
     enum class Buttons;
     ConfigParser parser;
-
-    std::filesystem::path _getRomBuildPath() const {
-        if (auto it = _config->get(ConfigManager::Configs::FILEPATH_ROM_BUILD);
-            it) {
-            return *it;
-        }
-        return _commandLine->getPath(FS::PathType::INSTALL_ROOT) /
-               kBuildDirectory;
-    }
 
     // Create keyboard given buttons enum and x length
     template <Buttons... N>
@@ -218,169 +208,54 @@ class ROMBuildQueryHandler {
         clean_folders,
     };
 
-    ForkAndRun* current{};
+    std::unique_ptr<android::ROMBuildService::Stub> buildStub_;
+    std::unique_ptr<system_monitor::SystemMonitorService::Stub> monitorStub_;
+    std::unique_ptr<healthcheck::HealthCheckService::Stub> healthStub_;
+
+    class {
+        std::mutex m;
+        std::string id;
+        bool isRunning = false;
+
+       public:
+        void start(const std::string& buildId) {
+            const std::lock_guard<std::mutex> lock(m);
+            id = buildId;
+            isRunning = true;
+        }
+        void finish() {
+            const std::lock_guard<std::mutex> lock(m);
+            isRunning = false;
+        }
+        bool running() {
+            const std::lock_guard<std::mutex> lock(m);
+            return isRunning;
+        }
+        std::string getId() {
+            const std::lock_guard<std::mutex> lock(m);
+            return id;
+        }
+        void setId(const std::string& buildId) {
+            const std::lock_guard<std::mutex> lock(m);
+            id = buildId;
+        }
+    } build;
 
    public:
-    void setCurrentForkAndRun(ForkAndRun* forkAndRun) { current = forkAndRun; }
     void onCallbackQuery(TgBot::CallbackQuery::Ptr query) const;
 
     // Shutdown method to cancel any running tasks
     void shutdown() {
-        if (current != nullptr) {
-            LOG(WARNING) << "Cancelling running build task during shutdown";
-            current->cancel();
-            current = nullptr;
-        }
-    }
-
-   private:
-    // Helper method to check for shutdown signal and notify user
-    bool checkShutdownSignal(const std::string_view context) {
-        if (SignalHandler::isSignaled()) {
-            LOG(WARNING) << "Received shutdown signal during " << context;
-            _api->editMessage(sentMessage,
-                              "Build cancelled: System shutting down",
-                              backKeyboard);
-            return true;
-        }
-        return false;
-    }
-};
-
-template <typename Impl>
-class TaskWrapperBase {
-    PerBuildData::ResultData result{};
-    PerBuildData data{};
-
-   protected:
-    TgBotApi::Ptr api;
-    Message::Ptr userMessage;  // User's message
-    Message::Ptr sentMessage;  // Message sent by the bot
-    TgBot::InlineKeyboardMarkup::Ptr backKeyboard;
-    TgBot::InlineKeyboardMarkup::Ptr cancelKeyboard;
-    ROMBuildQueryHandler* queryHandler;
-
-    bool executeCommon(Impl&& impl) {
-        queryHandler->setCurrentForkAndRun(&impl);
-        do {
-            bool execRes = impl.execute();
-            if (!execRes || result.value == PerBuildData::Result::NONE) {
-                LOG(ERROR) << "The process failed to execute or it didn't "
-                              "update result";
-                queryHandler->setCurrentForkAndRun(nullptr);
-                onExecuteFailed();
-                return false;
-            }
-        } while (result.value == PerBuildData::Result::ERROR_NONFATAL);
-        onExecuteFinished(result);
-        queryHandler->setCurrentForkAndRun(nullptr);
-
-        return result.value == PerBuildData::Result::SUCCESS;
-    }
-
-    void sendFile(const std::string_view filename, bool withReply = false) {
-        std::error_code ec;
-        if (std::filesystem::file_size(filename, ec) != 0U) {
-            if (ec) {
-                DLOG(INFO) << "Nonexistent file: " << filename;
-                return;
-            }
-            auto file = TgBot::InputFile::fromFile(filename, "text/plain");
-            if (withReply) {
-                api->sendReplyDocument(sentMessage, file);
-            } else {
-                api->sendDocument(sentMessage->chat->id, file);
-            }
-            if (!std::filesystem::remove(filename, ec)) {
-                LOG(ERROR) << "Failed to remove error log file: "
-                           << ec.message();
+        if (buildStub_) {
+            tgbot::builder::android::BuildAction action;
+            grpc::ClientContext context;
+            action.set_build_id(build.getId());
+            auto rc = buildStub_->CancelBuild(&context, action, nullptr);
+            if (!rc.ok()) {
+                LOG(ERROR) << "Failed to send cancel build request: "
+                           << rc.error_message();
             }
         }
-    }
-
-   public:
-    TaskWrapperBase(ROMBuildQueryHandler* handler, PerBuildData data,
-                    TgBotApi::Ptr api, Message::Ptr message)
-        : queryHandler(handler),
-          data(std::move(data)),
-          api(api),
-          userMessage(std::move(message)) {
-        this->data.result = &result;
-        backKeyboard = KeyboardBuilder()
-                           .addKeyboard({{"Back", "back"},
-                                         {"Retry", "confirm"},
-                                         {"Tick RepoSync", "repo_sync_only"}})
-                           .get();
-        cancelKeyboard =
-            KeyboardBuilder().addKeyboard({{"Cancel", "cancel"}}).get();
-    }
-    ~TaskWrapperBase() {
-        if (sentMessage && queryHandler->pinned()) {
-            api->unpinMessage(sentMessage);
-        }
-    }
-
-    /**
-     * @brief Virtual function to be called before the execution of the build
-     * process. This function can be overridden in derived classes to perform
-     * any necessary pre-execution tasks.
-     */
-    virtual Message::Ptr onPreExecute() = 0;
-
-    /**
-     * @brief Virtual function to be called when the execution of the build
-     * process fails. This function can be overridden in derived classes to
-     * handle any necessary error handling or recovery.
-     */
-    virtual void onExecuteFailed() {
-        api->editMessage(sentMessage, "No valid result set in smem, killed?",
-                         backKeyboard);
-    }
-
-    /**
-     * @brief Virtual function to be called when the execution of the build
-     * process finishes. This function can be overridden in derived classes to
-     * perform any necessary post-execution tasks.
-     *
-     * @param result The result of the build process. result.value can be one of
-     * the following:
-     * - PerBuildData::Result::SUCCESS: The build process completed
-     * successfully.
-     * - PerBuildData::Result::ERROR_FATAL: The build process failed.
-     */
-    virtual void onExecuteFinished(PerBuildData::ResultData result) {}
-
-    void preexecute() {
-        if (sentMessage && queryHandler->pinned()) {
-            api->unpinMessage(sentMessage);
-        }
-        queryHandler->updateSentMessage(sentMessage = onPreExecute());
-        if (queryHandler->pinned()) {
-            api->pinMessage(sentMessage);
-        }
-    }
-    bool execute(std::filesystem::path gitAskPassFile,
-                 std::optional<std::string> githubToken)
-        requires std::is_same_v<Impl, RepoSyncTask>
-    {
-        preexecute();
-        RepoSyncTask impl(api, sentMessage, data, std::move(gitAskPassFile),
-                          std::move(githubToken));
-        return executeCommon(std::move(impl));
-    }
-    bool execute(std::optional<ROMBuildTask::RBEConfig> cfg)
-        requires std::is_same_v<Impl, ROMBuildTask>
-    {
-        preexecute();
-        ROMBuildTask impl(api, sentMessage, data, std::move(cfg));
-        return executeCommon(std::move(impl));
-    }
-    bool execute(std::filesystem::path scriptDirectory)
-        requires std::is_same_v<Impl, UploadFileTask>
-    {
-        preexecute();
-        UploadFileTask impl(data, std::move(scriptDirectory));
-        return executeCommon(std::move(impl));
     }
 };
 
@@ -400,100 +275,6 @@ Manifest: {}
 }
 }  // namespace
 
-class RepoSync : public TaskWrapperBase<RepoSyncTask> {
-    using TaskWrapperBase<RepoSyncTask>::TaskWrapperBase;
-
-    Message::Ptr onPreExecute() override {
-        return api->sendReplyMessage(
-            userMessage,
-            showPerBuild(
-                queryHandler->builddata(),
-                fmt::format(
-                    "Now syncing... ({} jobs)",
-                    queryHandler->builddata().localManifest->job_count)),
-            cancelKeyboard);
-    }
-
-    void onExecuteFinished(PerBuildData::ResultData result) override {
-        if (result.value == PerBuildData::Result::SUCCESS) {
-            api->editMessage(sentMessage, "Repo sync completed successfully");
-        } else {
-            const auto msg =
-                api->editMessage(sentMessage, "Repo sync failed", backKeyboard);
-            queryHandler->updateSentMessage(msg);
-        }
-    }
-
-   public:
-    virtual ~RepoSync() = default;
-};
-
-class Build : public TaskWrapperBase<ROMBuildTask> {
-    using TaskWrapperBase<ROMBuildTask>::TaskWrapperBase;
-
-    Message::Ptr onPreExecute() override {
-        return api->sendReplyMessage(userMessage, "Now starting build...",
-                                     cancelKeyboard);
-    }
-
-    void onExecuteFinished(PerBuildData::ResultData result) override {
-        std::error_code ec;
-
-        switch (result.value) {
-            case PerBuildData::Result::ERROR_FATAL: {
-                LOG(ERROR) << "Failed to build ROM";
-                std::string message = result.getMessage();
-                if (message.empty()) {
-                    message = "Failed to build ROM";
-                } else {
-                    message = fmt::format("Build failed:\n{}", message);
-                }
-                const auto msg =
-                    api->editMessage(sentMessage, message, backKeyboard);
-                queryHandler->updateSentMessage(msg);
-                for (const auto& file :
-                     {ROMBuildTask::kErrorLogFile, ROMBuildTask::kPreLogFile}) {
-                    sendFile(file, true);
-                }
-            } break;
-            case PerBuildData::Result::SUCCESS:
-                api->editMessage(sentMessage, "Build completed successfully");
-                break;
-            case PerBuildData::Result::NONE:
-                // To reach here, only if the subprocess was killed, is this
-                // value possible.
-                api->editMessage(sentMessage, "FATAL ERROR");
-                break;
-            case PerBuildData::Result::ERROR_NONFATAL:
-                break;
-        }
-    }
-
-   public:
-    virtual ~Build() = default;
-};
-
-class Upload : public TaskWrapperBase<UploadFileTask> {
-    using TaskWrapperBase<UploadFileTask>::TaskWrapperBase;
-
-    Message::Ptr onPreExecute() override {
-        return api->sendReplyMessage(userMessage, "Now uploading...",
-                                     cancelKeyboard);
-    }
-    void onExecuteFinished(PerBuildData::ResultData result) override {
-        std::string resultText = result.getMessage();
-        if (resultText.empty()) {
-            resultText = "(Empty result)";
-        }
-        const auto msg =
-            api->editMessage(sentMessage, resultText, backKeyboard);
-        queryHandler->updateSentMessage(msg);
-    }
-
-   public:
-    virtual ~Upload() = default;
-};
-
 ROMBuildQueryHandler::ROMBuildQueryHandler(TgBotApi::Ptr api,
                                            Message::Ptr userMessage,
                                            CommandLine* line, AuthContext* auth,
@@ -511,11 +292,27 @@ ROMBuildQueryHandler::ROMBuildQueryHandler(TgBotApi::Ptr api,
                            Buttons::settings, Buttons::cancel,
                            Buttons::clean_folders>(2);
     backKeyboard = createKeyboardWith<Buttons::back>();
+    auto channel = grpc::CreateChannel(
+        *_config->get(ConfigManager::Configs::KERNELBUILD_SERVER),
+        grpc::InsecureChannelCredentials());
+    buildStub_ = android::ROMBuildService::NewStub(channel);
+    monitorStub_ = system_monitor::SystemMonitorService::NewStub(channel);
+    healthStub_ = healthcheck::HealthCheckService::NewStub(channel);
+
+    // Test connection
+    grpc::ClientContext context;
+    google::protobuf::Empty request;
+    google::protobuf::Empty response;
+    auto rc = healthStub_->ping(&context, request, &response);
+    if (!rc.ok()) {
+        LOG(INFO) << "Health check failed: " << rc.error_message();
+        throw std::runtime_error("Failed to connect to builder server");
+    }
     start(std::move(userMessage));
 }
 
 void ROMBuildQueryHandler::start(Message::Ptr userMessage) {
-    if (current != nullptr) {
+    if (build.running()) {
         _api->sendReplyMessage(userMessage,
                                "No no no. A build is currently running");
         return;
@@ -601,9 +398,8 @@ void ROMBuildQueryHandler::handle_back(const Query& /*query*/) {
 }
 
 void ROMBuildQueryHandler::handle_cancel(const Query& query) {
-    if (current != nullptr) {
-        current->cancel();
-        current = nullptr;
+    if (build.running()) {
+        shutdown();
         LOG(INFO) << "User cancelled build";
         handle_back(query);
         _api->answerCallbackQuery(query->id, "Task successfully cancelled!");
@@ -614,12 +410,48 @@ void ROMBuildQueryHandler::handle_cancel(const Query& query) {
 }
 
 void ROMBuildQueryHandler::handle_send_system_info(const Query& /*query*/) {
-    std::stringstream ss;
-    ss << SystemSummary();
-    _api->editMessage(sentMessage, ss.str(), backKeyboard);
+    grpc::ClientContext context;
+    tgbot::builder::system_monitor::GetSystemInfoRequest request;
+    request.set_disk_path("/");
+    tgbot::builder::system_monitor::SystemInfo response;
+    auto rc = monitorStub_->GetSystemInfo(&context, request, &response);
+    if (!rc.ok()) {
+        LOG(ERROR) << "Failed to get system info: " << rc.error_message();
+        _api->editMessage(sentMessage, "Failed to get system info",
+                          backKeyboard);
+        return;
+    }
+    _api->editMessage(
+        sentMessage,
+        fmt::format(R"(
+System Information:
+OS: Name={} Version={} KernelVersion={}
+CPU: {} ({} cores)
+RAM: {} MB
+Disk Usage (Of /): {} GB / {} GB total)",
+                    response.os_name(), response.os_version(),
+                    response.kernel_version(), response.cpu_name(),
+                    response.cpu_cores(), response.memory_total_mb(),
+                    response.disk_used_gb(), response.disk_total_gb()),
+        backKeyboard);
 }
 
 void ROMBuildQueryHandler::handle_settings(const Query& /*query*/) {
+    grpc::ClientContext context;
+    tgbot::builder::android::Settings request;
+    request.set_use_rbe_service(do_use_rbe);
+    request.set_do_repo_sync(do_repo_sync);
+    request.set_do_upload(do_upload);
+    request.set_use_ccache(false);
+    request.set_do_clean_build(false);
+    ::google::protobuf::Empty response;
+    auto rc = buildStub_->SetSettings(&context, request, &response);
+    if (!rc.ok()) {
+        LOG(ERROR) << "Failed to set settings: " << rc.error_message();
+        _api->editMessage(sentMessage, "Failed to set settings", backKeyboard);
+        return;
+    }
+
     _api->editMessage(sentMessage,
                       fmt::format(R"(Settings
 
@@ -637,129 +469,16 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
         _api->unpinMessage(sentMessage);
     }
 
-    // Check if system is shutting down before starting build
-    if (checkShutdownSignal("build confirmation")) {
-        return;
-    }
-
-    auto scriptDirectory =
-        _commandLine->getPath(FS::PathType::RESOURCES_SCRIPTS);
-    auto buildDirectory = _getRomBuildPath();
-    auto gitAskFile = scriptDirectory / RepoSyncTask::kGitAskPassFile;
-
-    // Push workdir
-    CwdRestorer cwd(buildDirectory);
-    if (!cwd) {
-        _api->editMessage(sentMessage, "Failed to push cwd");
-        return;
-    }
-
-    // Support time measurement
-    const auto now = [] { return std::chrono::system_clock::now(); };
-
-    // Record current time
-    auto timer = now();
-    auto start = now();
-
-    // Calculate elapsed time
-    const auto elapsed = [&now](const std::string_view topic,
-                                std::chrono::system_clock::time_point cmp) {
-        return fmt::format(
-            "{}: {:%Hh %Mm %Ss}", topic,
-            std::chrono::round<std::chrono::seconds>(now() - cmp));
-    };
-
-    std::vector<std::string> times;
-    times.reserve(4);
-
-    // RepoSync
-    if (do_repo_sync) {
-        if (checkShutdownSignal("repo sync")) {
-            return;
-        }
-        timer = now();
-        RepoSync repoSync(this, per_build, _api, _userMessage);
-        if (!repoSync.execute(
-                std::move(gitAskFile),
-                _config->get(ConfigManager::Configs::GITHUB_TOKEN))) {
-            LOG(INFO) << "RepoSync::execute fails...";
-            return;
-        }
-        times.emplace_back(elapsed("RepoSync", timer));
-    }
-
-    // Remote Based Execution support
-    std::optional<ROMBuildTask::RBEConfig> config;
-    if (do_use_rbe) {
-        constexpr std::string_view kRBEClientURL =
-            "https://chrome-infra-packages.appspot.com/dl/infra/rbe/client/"
-            "linux-amd64/+/stable";
-        if (checkShutdownSignal("RBE setup")) {
-            return;
-        }
-        config.emplace();
-        config->baseScript = scriptDirectory / "rbe_env.sh";
-        config->api_key =
-            _config->get(ConfigManager::Configs::BUILDBUDDY_API_KEY)
-                .value_or("");
-        LOG_IF(WARNING, config->api_key.empty()) << "Empty API key";
-        config->reclientDir = buildDirectory / "rbe_cli";
-
-        if (!std::filesystem::exists(config->reclientDir)) {
-            LOG(INFO) << "Downloading reclient...";
-            auto zipFile = buildDirectory / "rbe.zip";
-            bool ret = CurlUtils::download_file(kRBEClientURL, zipFile);
-            if (!ret) {
-                LOG(ERROR) << "Failed to download RBE client";
-                return;
-            }
-            ret = Zip::extract(zipFile, config->reclientDir);
-            if (!ret) {
-                LOG(ERROR) << "Failed to extract RBE client";
-                return;
-            }
-        }
-    }
-
-    // Build
-    if (checkShutdownSignal("build")) {
-        return;
-    }
-    timer = now();
-    Build build(this, per_build, _api, _userMessage);
-    if (!build.execute(config)) {
-        LOG(INFO) << "Build::execute fails...";
-        return;
-    }
-    times.emplace_back(elapsed("Build", timer));
-
-    // Upload
-    if (do_upload) {
-        if (checkShutdownSignal("upload")) {
-            return;
-        }
-        timer = now();
-        Upload upload(this, per_build, _api, _userMessage);
-        if (!upload.execute(std::move(scriptDirectory))) {
-            LOG(INFO) << "Upload::execute fails...";
-            return;
-        }
-        times.emplace_back(elapsed("Upload", timer));
-    }
-
-    if (times.size() != 1) {
-        times.emplace_back(elapsed("Total", start));
-    }
+    // Start build
+    grpc::ClientContext context;
+    tgbot::builder::android::BuildRequest request;
+    buildStub_->StartBuild(&context, request, nullptr);
 
     // Success
     _api->editMessageMarkup(sentMessage, nullptr);
     _api->sendMessage(
         sentMessage->chat,
-        showPerBuild(per_build, fmt::format(R"(Build complete.
-
-[Spent Times]
-{})",
-                                            fmt::join(times, "\n"))));
+        showPerBuild(per_build, fmt::format(R"(Build complete!)")));
 
     if (didpin) {
         try {
@@ -927,19 +646,17 @@ void ROMBuildQueryHandler::handle_clean_directories(const Query& query) {
 
     std::string_view type = query->data;
     absl::ConsumePrefix(&type, "clean_");
-    auto romRootDir = _getRomBuildPath();
     if (type == "rom") {
-        LOG(INFO) << "Cleaning directory " << romRootDir;
+        LOG(INFO) << "Cleaning directory ";
         _api->answerCallbackQuery(query->id,
                                   "Wait... cleaning may take some time...");
-        std::filesystem::remove_all(romRootDir);
     } else if (type == "build") {
-        LOG(INFO) << "Cleaning directory " << romRootDir / kOutDirectory;
+        LOG(INFO) << "Cleaning directory ";
         _api->answerCallbackQuery(query->id,
                                   "Wait... cleaning may take some time...");
-        std::filesystem::remove_all(romRootDir / kOutDirectory);
     }
 
+    /*
     std::string entry;
     auto romRootSpace = DiskInfo(romRootDir);
 
@@ -947,7 +664,7 @@ void ROMBuildQueryHandler::handle_clean_directories(const Query& query) {
     entry = "Nothing to clean!";
     if (std::filesystem::exists(romRootDir, ec)) {
         entry = fmt::format("Current disk space free: {:.2f}GB",
-                            romRootSpace.availableSpace.value()),
+                            romRootSpace.availableSpace.value());
         builder.addKeyboard({"Clean ROM directory", "clean_rom"});
         if (std::filesystem::exists(romRootDir / kOutDirectory, ec)) {
             builder.addKeyboard({"Clean ROM build directory", "clean_build"});
@@ -955,6 +672,7 @@ void ROMBuildQueryHandler::handle_clean_directories(const Query& query) {
     }
     builder.addKeyboard(getButtonOf<Buttons::back>());
     _api->editMessage(query->message, entry, builder.get());
+    */
 }
 
 void ROMBuildQueryHandler::onCallbackQuery(
@@ -1005,25 +723,6 @@ DECLARE_COMMAND_HANDLER(rombuild) {
         api->sendMessage(message->get<MessageAttrs::Chat>(),
                          "Failed to initialize ROM build: "s + e.what());
         return;
-    }
-
-    auto gitAskPass =
-        provider->cmdline->getPath(FS::PathType::RESOURCES_SCRIPTS) /
-        RepoSyncTask::kGitAskPassFile;
-    if (auto token =
-            provider->config->get(ConfigManager::Configs::GITHUB_TOKEN)) {
-        LOG(INFO) << "Create and write git-askpass file";
-        std::ofstream ofs(gitAskPass);
-        ofs << "echo " << *token << std::endl;
-        ofs.close();
-        std::error_code ec;
-        std::filesystem::permissions(gitAskPass,
-                                     std::filesystem::perms::owner_all, ec);
-        if (ec) {
-            LOG(ERROR) << "Failed to set permissions for git-askpass file: "
-                       << ec.message();
-            std::filesystem::remove(gitAskPass, ec);
-        }
     }
 
     api->onCallbackQuery("rombuild", [](TgBot::CallbackQuery::Ptr query) {

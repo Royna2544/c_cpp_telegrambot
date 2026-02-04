@@ -1,9 +1,0 @@
-tgbot_library(
-  NAME
-  Archives
-  SRCS
-  Tar.cpp
-  Zip.cpp
-  LIBS
-  LibArchive::LibArchive
-  STATIC)

@@ -3,17 +3,19 @@
 #include <absl/log/log.h>
 #include <fmt/format.h>
 
-#include <map>
+#include <filesystem>
 #include <memory>
 #include <ostream>
-#include <set>
 #include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
 #include <variant>
 
-#include "../RepoUtils.hpp"
+struct RepoInfo {
+    std::string url;
+    std::string branch;
+};
 
 class ConfigParser {
    public:
@@ -35,7 +37,7 @@ class ConfigParser {
                                  const bool debug = false) const {
             return matcher_(filename, data_, debug);
         }
-        bool operator==(const ArtifactMatcher &other) const {
+        bool operator==(const ArtifactMatcher& other) const {
             return name_ == other.name_;
         }
         void setData(std::string data) { data_ = std::move(data); }
@@ -44,12 +46,12 @@ class ConfigParser {
     // Artifact matcher
     struct MatcherStorage {
         std::unordered_map<std::string, ArtifactMatcher::Ptr> artifactMatchers;
-        void add(const std::string &name,
-                 const ArtifactMatcher::MatcherType &fn) {
+        void add(const std::string& name,
+                 const ArtifactMatcher::MatcherType& fn) {
             artifactMatchers[name] =
                 std::make_shared<ArtifactMatcher>(fn, name);
         }
-        ArtifactMatcher::Ptr get(const std::string &name) const {
+        ArtifactMatcher::Ptr get(const std::string& name) const {
             if (!artifactMatchers.contains(name)) {
                 LOG(INFO) << fmt::format("No artifact matcher found for '{}'",
                                          name);
@@ -68,7 +70,7 @@ class ConfigParser {
         std::string target;             // build target to build a ROM
         ArtifactMatcher::Ptr artifact;  // matcher for the out artifact
 
-        bool operator==(const ROMInfo &other) const = default;
+        bool operator==(const ROMInfo& other) const = default;
     };
 
     struct ROMBranch {
@@ -98,7 +100,7 @@ class ConfigParser {
             return makeKey(romInfo->name, androidVersion);
         }
 
-        bool operator==(const ROMBranch &other) const {
+        bool operator==(const ROMBranch& other) const {
             return branch == other.branch &&
                    androidVersion == other.androidVersion &&
                    *romInfo == *other.romInfo;
@@ -126,42 +128,19 @@ class ConfigParser {
             return marketName + " (" + codename + ")";
         }
 
-        bool operator==(const Device &other) const {
+        bool operator==(const Device& other) const {
             return codename == other.codename;
         }
     };
 
     struct LocalManifest {
-        struct GitPrepare {
-            RepoInfo info;
-            explicit GitPrepare(RepoInfo info) : info(std::move(info)) {}
-            bool prepare(const std::filesystem::path &path,
-                         const std::optional<std::string> &token);
-        };
-
-        struct WritePrepare {
-            struct Data : RepoInfo {
-                std::filesystem::path destination;
-
-                explicit Data(std::string url, std::string branch,
-                              std::filesystem::path destination)
-                    : RepoInfo(std::move(url), std::move(branch)),
-                      destination(std::move(destination)) {}
-            };
-            std::vector<Data> data;
-            bool prepare(const std::filesystem::path &path);
-        };
-
         using Ptr = std::shared_ptr<LocalManifest>;
         // name of the manifest
         std::string name;
         // associated ROM and its branch
         ROMBranch::Ptr rom;
-        // local manifest information
-        std::variant<std::monostate, GitPrepare, WritePrepare> preparar;
         // associated devices
         std::vector<Device::Ptr> devices;
-        long job_count;  // number of jobs
     };
 
     explicit ConfigParser(std::filesystem::path jsonFileDir);
@@ -204,7 +183,7 @@ struct PerBuildData {
         static constexpr int MSG_SIZE = 512;
         Result value = Result::NONE;
         std::array<char, MSG_SIZE> msg{};
-        void setMessage(const std::string &message) {
+        void setMessage(const std::string& message) {
             LOG_IF(WARNING, message.size() > msg.size())
                 << "Message size is " << message.size()
                 << " bytes, which exceeds limit";
@@ -213,11 +192,11 @@ struct PerBuildData {
         [[nodiscard]] std::string getMessage() const noexcept {
             return msg.data();
         }
-    } *result;
+    }* result;
 };
 
-inline std::ostream &operator<<(std::ostream &os,
-                                const PerBuildData::Variant &variant) {
+inline std::ostream& operator<<(std::ostream& os,
+                                const PerBuildData::Variant& variant) {
     switch (variant) {
         case PerBuildData::Variant::kUser:
             return os << "User";

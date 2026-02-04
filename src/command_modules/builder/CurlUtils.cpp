@@ -8,13 +8,13 @@
 #include <libos/libsighandler.hpp>
 #include <utility>
 
-#include "BytesConversion.hpp"
 #include "utils/libfs.hpp"
 
 namespace {
 
 static CURL* CURL_setup_common(const std::string_view url,
-                               CurlUtils::CancelChecker& cancel_checker) {
+                               CurlUtils::CancelChecker& cancel_checker,
+                               bool timeout = true) {
     CURL* curl = curl_easy_init();
     if (curl == nullptr) {
         LOG(ERROR) << "Cannot initialize curl";
@@ -27,20 +27,29 @@ static CURL* CURL_setup_common(const std::string_view url,
     // Enable 302 redirects
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
+    constexpr auto megabyte = 1024L * 1024L;
+
+    if (timeout) {
+        // Set connect timeout: 30s
+        curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 30L);
+        // Set overall timeout: 300s
+        curl_easy_setopt(curl, CURLOPT_TIMEOUT, 300L);
+        // Set low speed limit: 1KB/s
+        curl_easy_setopt(curl, CURLOPT_LOW_SPEED_LIMIT, 1024L);
+        // Set low speed time: 30s
+        curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 30L);
+    }
+
     // Set progress callback
     curl_easy_setopt(
         curl, CURLOPT_XFERINFOFUNCTION,
         +[](void* clientp, curl_off_t dltotal, curl_off_t dlnow,
             curl_off_t ultotal, curl_off_t ulnow) -> int {
-            auto dlnowByte = MegaBytes(dlnow * boost::units::data::bytes);
-            auto dltotalByte = MegaBytes(dltotal * boost::units::data::bytes);
-            auto ulnowByte = MegaBytes(ulnow * boost::units::data::bytes);
-            auto ultotalByte = MegaBytes(ultotal * boost::units::data::bytes);
             auto cancel_checker =
                 static_cast<CurlUtils::CancelChecker*>(clientp);
             LOG_EVERY_N_SEC(INFO, 5) << fmt::format(
-                "Download: {}MB/{}MB, Upload: {}MB/{}MB", dlnowByte.value(),
-                dltotalByte.value(), ulnowByte.value(), ultotalByte.value());
+                "Download: {}MB/{}MB, Upload: {}MB/{}MB", dlnow / megabyte,
+                dltotal / megabyte, ulnow / megabyte, ultotal / megabyte);
 
             constexpr int CURL_STOP = 1;
             constexpr int CURL_CONTINUE = 0;
@@ -171,7 +180,8 @@ std::optional<std::string> send_json_get_reply(const std::string_view url,
 
     // Common CURL setup
     CurlUtils::CancelChecker cancel_checker = nullptr;
-    CURL* curl = CURL_setup_common(url, cancel_checker);
+    // Disable timeout for LLM.
+    CURL* curl = CURL_setup_common(url, cancel_checker, false);
     if (curl == nullptr) {
         LOG(ERROR) << "Cannot setup curl";
         return {};

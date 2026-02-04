@@ -15,7 +15,6 @@
 
 // Dummy externs to distinguish sections in config files
 extern const char* const sectionMain;
-extern const char* const sectionFilePath;
 extern const char* const sectionNetwork;
 extern const char* const sectionDatabase;
 extern const char* const sectionLLM;
@@ -39,8 +38,6 @@ class UTILS_EXPORT ConfigManager {
         LLM_TYPE,
         LLM_LOCATION,
         LLM_AUTHKEY,
-        FILEPATH_ROM_BUILD,
-        FILEPATH_KERNEL_BUILD,
         TELEGRAM_API_SERVER,
         KERNELBUILD_SERVER,
         MAX
@@ -193,22 +190,6 @@ class UTILS_EXPORT ConfigManager {
             .alias = Entry::ALIAS_NONE,
             .type = Entry::ArgType::STRING,
             .belongsTo = &sectionLLM,
-        },
-        {
-            .config = Configs::FILEPATH_ROM_BUILD,
-            .name = "ROMBuild",
-            .description = "Directory to the ROM build",
-            .alias = Entry::ALIAS_NONE,
-            .type = Entry::ArgType::STRING,
-            .belongsTo = &sectionFilePath,
-        },
-        {
-            .config = Configs::FILEPATH_KERNEL_BUILD,
-            .name = "KernelBuild",
-            .description = "Directory to the Kernel build",
-            .alias = Entry::ALIAS_NONE,
-            .type = Entry::ArgType::STRING,
-            .belongsTo = &sectionFilePath,
         },
         {
             .config = Configs::TELEGRAM_API_SERVER,

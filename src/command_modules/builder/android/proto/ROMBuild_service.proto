@@ -5,48 +5,81 @@ package tgbot.builder.android;
 import "google/protobuf/empty.proto";
 
 // Settings for Android ROM builds
+// do_repo_sync: Whether to sync the repo before building
+// do_clean_build: Whether to perform a clean build
+// use_ccache: Whether to use ccache for builds
+// use_rbe_service: Whether to use Remote Build Execution service
+// rbe_api_token: API token for RBE service authentication, if not set, RBE will not be used.
+// do_upload: Whether to upload the built ROM after completion
 message Settings {
     optional bool do_repo_sync = 1;
     optional bool do_clean_build = 2;
     optional bool use_ccache = 3;
     optional bool use_rbe_service = 4;
     optional string rbe_api_token = 5;
+    optional bool do_upload = 6;
 }
 
+enum CleanDirectoryType {
+    ROMDirectory = 0;
+    BuildDirectory = 1;
+}
+
+// Request to clean a directory
 message CleanDirectoryRequest {
-    string directory_path = 1;
+    CleanDirectoryType directory_type = 1;
 }
 
+// Build variants for Android ROMs
 enum BuildVariant {
-    Unspecified = 0;
-    User = 1;
-    UserDebug = 2;
-    Eng = 3;
+    User = 0;
+    UserDebug = 1;
+    Eng = 2;
 }
 
+// Request to start a new ROM build
+// config_name: Name of the build configuration to use
+// target_device: Device codename (e.g., "sailfish")
+// rom_name: Name of the ROM (e.g., "LineageOS")
+// rom_android_version: Android version (e.g., "11", "12")
+// build_variant: Build variant (User, UserDebug, Eng)
+// parallel_jobs: Number of parallel jobs for the build (optional), defaults to system CPU cores if not set.
 message BuildRequest {
     string config_name = 1;
     string target_device = 2;
     string rom_name = 3;
     string rom_android_version = 4;
     BuildVariant build_variant = 5;
+    optional int32 parallel_jobs = 6;
 }
 
+// Result of a build operation
+// success: Whether the build was successful
+// artifact_path: Path to the built ROM artifact if successful
 message BuildResult {
     bool success = 1;
     string artifact_path = 2;
 }
 
+// Log entry for build process
+// message: Log message
+// timestamp: Unix timestamp of the log entry
+// is_finished: Whether this log entry indicates the build has finished
 message BuildLogEntry {
     string message = 1;
     int64 timestamp = 2;
     bool is_finished = 3;
 }
 
+// Action referencing a specific build by ID
 message BuildAction {
     string build_id = 1; // Used for logs, status, cancellation
 }
 
+// Response for build submission
+// build_id: Unique ID for the submitted build
+// accepted: Whether the build request was accepted
+// status_message: Additional status information
 message BuildSubmission {
     string build_id = 1; 
     bool accepted = 2;

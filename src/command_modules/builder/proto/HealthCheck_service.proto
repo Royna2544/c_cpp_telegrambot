@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package tgbot.builder.healthcheck;
+
+import "google/protobuf/empty.proto";
+
+service HealthCheckService {
+   rpc ping(google.protobuf.Empty) returns (google.protobuf.Empty);
+}

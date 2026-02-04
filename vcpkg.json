@@ -16,8 +16,6 @@
     "libxml2",
     "fmt",
     "nlohmann-json",
-    "openssl",
-    "zlib",
     "fruit",
     "abseil"
   ],

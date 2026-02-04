@@ -3,7 +3,8 @@ use crate::kernelbuild::kernel_config::KernelConfig;
 use crate::rombuild::build_service::BuildService as ROMBuildService;
 use crate::system_monitor::grpc_monitor::system_monitor_service_server::SystemMonitorServiceServer;
 use crate::{
-    kernelbuild::build_service::BuildService, rombuild::build_service::RomBuildServiceServer,
+    health::HealthCheckServiceServer, kernelbuild::build_service::BuildService,
+    rombuild::build_service::RomBuildServiceServer,
 };
 use clap::Parser;
 use std::path::PathBuf;
@@ -13,6 +14,7 @@ use tracing::{debug, error, info, warn};
 const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("descriptor");
 
 mod git_repo;
+mod health;
 mod kernelbuild;
 mod ratelimit;
 mod rombuild;
@@ -24,11 +26,15 @@ struct KernelBuilderArgs {
     #[arg(long)]
     bind_addr: String,
     #[arg(long)]
-    json_dir: String,
-    #[arg(long)]
-    output_dir: String,
-    #[arg(long)]
     temp_dir: String,
+    #[arg(long)]
+    kernelbuild_json_dir: String,
+    #[arg(long)]
+    kernelbuild_output_dir: String,
+    #[arg(long)]
+    rombuild_json_dir: String,
+    #[arg(long)]
+    rombuild_output_dir: String,
 }
 
 // builder_config.json is a reserved filename for internal builder configs
@@ -100,6 +106,45 @@ fn parse_builder_config(
     }
 }
 
+fn make_canonical_path(path: &PathBuf) -> Option<PathBuf> {
+    match std::fs::canonicalize(path) {
+        Ok(canonical) => Some(canonical),
+        Err(e) => {
+            error!("Failed to canonicalize path {}: {}", path.display(), e);
+            None
+        }
+    }
+}
+
+fn make_canonical_path_mkdirs(path: &PathBuf) -> Option<PathBuf> {
+    match std::fs::canonicalize(path) {
+        Ok(canonical) => Some(canonical),
+        Err(e) => {
+            warn!(
+                "Path {} does not exist. Attempting to create it.",
+                path.display()
+            );
+            match std::fs::create_dir_all(path) {
+                Ok(_) => match std::fs::canonicalize(path) {
+                    Ok(canonical) => Some(canonical),
+                    Err(e) => {
+                        error!(
+                            "Failed to canonicalize path {} after creation: {}",
+                            path.display(),
+                            e
+                        );
+                        None
+                    }
+                },
+                Err(e) => {
+                    error!("Failed to create directory {}: {}", path.display(), e);
+                    None
+                }
+            }
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt()
@@ -110,13 +155,18 @@ async fn main() {
 
     let args = KernelBuilderArgs::parse();
 
-    info!("Starting Linux Kernel Builder Service");
+    info!("Starting Linux Kernel+Android ROM Builder Service");
     info!("Bind Address: {}", args.bind_addr);
-    info!("JSON Directory: {}", args.json_dir);
-    info!("Output Directory: {}", args.output_dir);
+    info!("KernelBuild JSON Directory: {}", args.kernelbuild_json_dir);
+    info!(
+        "KernelBuild Output Directory: {}",
+        args.kernelbuild_output_dir
+    );
+    info!("ROMBuild JSON Directory: {}", args.rombuild_json_dir);
+    info!("ROMBuild Output Directory: {}", args.rombuild_output_dir);
     info!("Temp Directory: {}", args.temp_dir);
 
-    let configs = parse_kernel_config(&args.json_dir);
+    let configs = parse_kernel_config(&args.kernelbuild_json_dir);
     if configs.is_empty() {
         warn!("No valid kernel configurations found in the specified directory.");
         warn!("Exiting due to lack of configurations.");
@@ -124,64 +174,59 @@ async fn main() {
     } else {
         info!("Loaded {} kernel configurations.", configs.len());
     }
-    match parse_builder_config(&args.json_dir) {
+    match parse_builder_config(&args.kernelbuild_json_dir) {
         Some(builder_config) => {
             // 1. Define the address to listen on
             let addr = args.bind_addr.parse().expect("Invalid bind address");
-            info!("Linux Kernel Builder listening on {}", addr);
+            info!("Linux Kernel+Android ROM Builder listening on {}", addr);
 
             let temp_dir = PathBuf::from(&args.temp_dir);
-            let output_dir = PathBuf::from(&args.output_dir);
+            let output_dir = PathBuf::from(&args.kernelbuild_output_dir);
+            let rombuild_output_dir = PathBuf::from(&args.rombuild_output_dir);
             let canonical_temp: PathBuf;
             let canonical_output: PathBuf;
+            let canonical_rombuild_output: PathBuf;
 
-            match std::fs::canonicalize(temp_dir) {
-                Ok(t) => {
+            match make_canonical_path(&temp_dir) {
+                Some(t) => {
                     info!("Using canonical temp directory: {:?}", t);
                     canonical_temp = t;
                 }
-                Err(e) => {
-                    error!("Exiting due to invalid temp directory. Error: {}", e);
+                None => {
                     return;
                 }
             }
 
-            match std::fs::canonicalize(output_dir) {
-                Ok(t) => {
-                    info!("Using canonical output directory: {:?}", t);
-                    canonical_output = t;
+            match make_canonical_path_mkdirs(&output_dir) {
+                Some(o) => {
+                    info!("Using canonical output directory: {:?}", o);
+                    canonical_output = o;
                 }
-                Err(e) => {
-                    warn!(
-                        "Output directory {:?} does not exist. Attempting to create it.",
-                        args.output_dir
-                    );
-                    match std::fs::create_dir_all(&args.output_dir) {
-                        Ok(_) => {
-                            info!("Created output directory: {}", args.output_dir.as_str());
-                            canonical_output = std::fs::canonicalize(&args.output_dir).unwrap();
-                        }
-                        Err(e) => {
-                            error!(
-                                "Failed to create output directory {}: {}",
-                                args.output_dir.as_str(),
-                                e
-                            );
-                            error!("Exiting due to invalid output directory.");
-                            return;
-                        }
-                    }
+                None => {
+                    return;
+                }
+            }
+
+            match make_canonical_path_mkdirs(&rombuild_output_dir) {
+                Some(r) => {
+                    info!("Using canonical ROM build output directory: {:?}", r);
+                    canonical_rombuild_output = r;
+                }
+                None => {
+                    return;
                 }
             }
 
             // 2. Initialize Build Service
             let build_service =
                 BuildService::new(configs, builder_config, canonical_temp, canonical_output);
-            let android_build_service = ROMBuildService::new();
+            let android_build_service = ROMBuildService::new(canonical_rombuild_output);
 
             // 3. Initialize System Monitor Service
             let system_monitor = system_monitor::MonitorService::new();
-            let monitor_service = SystemMonitorServiceServer::new(system_monitor);
+
+            // 4. Initialize Health Check Service
+            let health_service = health::HealthServiceImpl::new();
 
             // 3. Build and Run the Server
             Server::builder()
@@ -193,7 +238,8 @@ async fn main() {
                 )
                 .add_service(LinuxKernelBuildServiceServer::new(build_service))
                 .add_service(RomBuildServiceServer::new(android_build_service))
-                .add_service(monitor_service)
+                .add_service(HealthCheckServiceServer::new(health_service))
+                .add_service(SystemMonitorServiceServer::new(system_monitor))
                 .serve(addr)
                 .await
                 .unwrap();

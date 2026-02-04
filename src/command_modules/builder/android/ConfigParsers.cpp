@@ -1,26 +1,21 @@
 #include "ConfigParsers.hpp"
 
 #include <fmt/format.h>
-#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <memory>
-#include <mutex>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <stdexcept>
 #include <string_view>
 #include <system_error>
-#include <thread>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
-
-#include "BytesConversion.hpp"
-#include "SystemInfo.hpp"
 
 // Repesent a type and name string
 template <typename T>
@@ -76,7 +71,8 @@ NodeItemType<int> operator""_d(const char* str, unsigned long /*unused*/) {
 }
 
 template <typename... Args>
-bool checkRequirements(const nlohmann::json& value, NodeItemType<Args>&... args) {
+bool checkRequirements(const nlohmann::json& value,
+                       NodeItemType<Args>&... args) {
     static_assert(sizeof...(args) > 0,
                   "At least one argument required for checkRequirements");
 
@@ -160,21 +156,25 @@ class ProxyJsonBranch {
      * @brief Constructor for ProxyJsonBranch.
      *
      * Constructs a ProxyJsonBranch object and performs basic validation on the
-     * provided nlohmann::json object. If the root value is not an array, it logs
-     * an error message.
+     * provided nlohmann::json object. If the root value is not an array, it
+     * logs an error message.
      *
      * @param root The nlohmann::json object to be wrapped.
      */
-    explicit ProxyJsonBranch(const nlohmann::json& root, const std::string& name)
-        : root_(root.contains(name) && root[name].is_array() ? root[name] : nlohmann::json::array()), 
+    explicit ProxyJsonBranch(const nlohmann::json& root,
+                             const std::string& name)
+        : root_(root.contains(name) && root[name].is_array()
+                    ? root[name]
+                    : nlohmann::json::array()),
           isValidObject(root.contains(name) && root[name].is_array()) {
         if (!isValidObject) {
             if (!root.contains(name)) {
-                LOG(WARNING) << "Property '" << name << "' does not exist in JSON object";
+                LOG(WARNING) << "Property '" << name
+                             << "' does not exist in JSON object";
             } else {
                 LOG(ERROR) << fmt::format(
-                    "Expected array for property '{}', but got: {}",
-                    name, root[name].type_name());
+                    "Expected array for property '{}', but got: {}", name,
+                    root[name].type_name());
             }
         }
     }
@@ -206,8 +206,7 @@ std::vector<ConfigParser::ROMBranch::Ptr> parseROM(
         auto matcher = "matcher"_s;
         auto data = "data"_s;
         if (!checkRequirements(entry["artifact"], matcher, data)) {
-            LOG(INFO) << "Skipping invalid artifact entry: "
-                      << entry.dump();
+            LOG(INFO) << "Skipping invalid artifact entry: " << entry.dump();
             return {};
         }
         romInfo->artifact = storage->get(matcher);
@@ -332,8 +331,8 @@ struct ROMLocalManifest {
     using return_type = ConfigParser::LocalManifest::Ptr;
     static constexpr auto _value = nlohmann::json::value_t::object;
     static std::vector<return_type> parseOneLocalManifest(
-        const nlohmann::json& json, const DeviceMap& devices, const ROMsMap& roms,
-        std::string name, std::string manifest) {
+        const nlohmann::json& json, const DeviceMap& devices,
+        const ROMsMap& roms, std::string name, std::string manifest) {
         ConfigParser::LocalManifest localManifest;
         std::vector<return_type> result;
         auto branchName = "name"_s;
@@ -360,19 +359,6 @@ struct ROMLocalManifest {
         // Assign to the localmanifest
         localManifest.devices = devicesVec;
         localManifest.name = std::move(name);
-        localManifest.preparar = ConfigParser::LocalManifest::GitPrepare(
-            RepoInfo{std::move(manifest), branchName});
-        {
-            static int job_count = [] {
-                const auto totalMem = GigaBytes(MemoryInfo().totalMemory);
-                LOG(INFO) << "Total memory: " << totalMem;
-                int _job_count = static_cast<int>(totalMem.value() / 4 - 1);
-                LOG(INFO) << "Using job count: " << _job_count
-                          << " for ROM build";
-                return _job_count;
-            }();
-            localManifest.job_count = job_count;
-        }
         localManifest.rom = rom;
         result.emplace_back(std::make_shared<ConfigParser::LocalManifest>(
             std::move(localManifest)));
@@ -430,23 +416,8 @@ struct RecoveryManifest {
             return {};
         }
 
-        ConfigParser::LocalManifest::WritePrepare prepare;
-        for (const auto& mapping : ProxyJsonBranch(root, "clone_mapping")) {
-            auto link = "link"_s;
-            auto branch = "branch"_s;
-            auto destination = "destination"_s;
-            if (!checkRequirements(mapping, link, branch, destination)) {
-                LOG(INFO) << "Skipping invalid clone_mapping entry: "
-                          << mapping.dump();
-                continue;
-            }
-            prepare.data.emplace_back(link, branch,
-                                      std::filesystem::path(destination));
-        }
         localManifest.name = name;
-        localManifest.preparar = std::move(prepare);
         localManifest.devices = std::move(devicesVec);
-        localManifest.job_count = std::thread::hardware_concurrency();
         localManifest.rom = rom;
         manifests.emplace_back(std::make_shared<ConfigParser::LocalManifest>(
             std::move(localManifest)));
@@ -465,8 +436,7 @@ struct DeviceNames {
             auto name = "name"_s;
 
             if (!checkRequirements(entry, codename, name)) {
-                LOG(INFO) << "Skipping invalid target entry: "
-                          << entry.dump();
+                LOG(INFO) << "Skipping invalid target entry: " << entry.dump();
                 return {};
             }
             auto device = std::make_shared<ConfigParser::Device>();
@@ -499,11 +469,10 @@ std::vector<typename T::return_type> parse(
         return {};
     }
     if (value.type() != T::_value) {
-        LOG(ERROR) << fmt::format(
-            "Expected {} for {} (actual {})", 
-            nlohmann::json(T::_value).type_name(),
-            jsonFile.filename().string(), 
-            value.type_name());
+        LOG(ERROR) << fmt::format("Expected {} for {} (actual {})",
+                                  nlohmann::json(T::_value).type_name(),
+                                  jsonFile.filename().string(),
+                                  value.type_name());
         return {};
     }
     return T::parse(value, std::forward<Args&&>(args)...);

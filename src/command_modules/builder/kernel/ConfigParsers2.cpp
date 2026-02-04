@@ -115,36 +115,6 @@ struct StackingError {
     }
 };
 
-struct FileCopyPatcher : public KernelConfig::Patcher {
-    bool apply() override {
-        std::error_code ec;
-        LOG(INFO) << "Copying " << data1 << " to " << data2;
-        std::filesystem::copy_file(data1, data2, ec);
-        if (ec) {
-            LOG(ERROR) << "Failed to copy file: " << ec.message();
-            return false;
-        }
-        return true;
-    }
-    using KernelConfig::Patcher::Patcher;
-    constexpr static std::string_view NAME = "FileCopier";
-};
-
-struct FileAppender : public KernelConfig::Patcher {
-    bool apply() override {
-        std::ofstream output(data2.data(), std::ios_base::app);
-        if (!output) {
-            LOG(ERROR) << "Failed to open output file for appending";
-            return false;
-        }
-        output << data1 << "\n";
-        output.close();
-        return true;
-    }
-    using KernelConfig::Patcher::Patcher;
-    constexpr static std::string_view NAME = "FileAppender";
-};
-
 bool KernelConfig::parseName(const nlohmann::json& node) {
     StackingError errors;
     errors = get(node, "name", &name);
@@ -292,36 +262,6 @@ bool KernelConfig::parseEnvMap(const nlohmann::json& node) {
     return true;
 }
 
-bool KernelConfig::parsePatches(const nlohmann::json& node) {
-    if (!node.contains("patch")) {
-        DLOG(INFO) << "No patches provided";
-        return true;
-    }
-    for (const auto& patch : node["patch"]) {
-        std::string handler;
-        std::pair<std::string, std::string> data;
-        StackingError int_errors;
-        int_errors = get(patch, "handler", &handler);
-        int_errors = get(patch, "data1", &data.first);
-        int_errors = get(patch, "data2", &data.second);
-        if (!static_cast<bool>(int_errors)) {
-            LOG(ERROR) << "Failed to parse patch data";
-            return false;
-        }
-        if (handler == FileCopyPatcher::NAME) {
-            patches.emplace_back(
-                std::make_unique<FileCopyPatcher>(data.first, data.second));
-        } else if (handler == FileAppender::NAME) {
-            patches.emplace_back(
-                std::make_unique<FileAppender>(data.first, data.second));
-        } else {
-            LOG(ERROR) << "Unknown patch handler: " << handler;
-            return false;
-        }
-    }
-    return true;
-}
-
 bool KernelConfig::parse(const nlohmann::json& node) {
     StackingError errors;
     errors = parseName(node);
@@ -333,7 +273,6 @@ bool KernelConfig::parse(const nlohmann::json& node) {
     errors = parseDefconfig(node);
     errors = parseFragments(node);
     errors = parseEnvMap(node);
-    errors = parsePatches(node);
 
     if (!static_cast<bool>(errors)) {
         return false;
