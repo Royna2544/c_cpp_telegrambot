@@ -97,8 +97,8 @@ inline bool operator&(const DynModule::Flags& lhs,
     return (static_cast<int>(lhs) & static_cast<int>(rhs)) != 0;
 }
 
-inline constexpr DynModule::Flags operator|(
-    const DynModule::Flags& lhs, const DynModule::Flags& rhs) noexcept {
+constexpr DynModule::Flags operator|(const DynModule::Flags& lhs,
+                                     const DynModule::Flags& rhs) noexcept {
     return static_cast<DynModule::Flags>(static_cast<int>(lhs) |
                                          static_cast<int>(rhs));
 }
@@ -287,3 +287,27 @@ class LuaCommandModule : public CommandModule {
     ~LuaCommandModule() override;
 };
 #endif  // defined HAVE_LUA
+
+class BuiltinCommandModule : public CommandModule {
+   public:
+    using Ptr = std::unique_ptr<BuiltinCommandModule>;
+
+   private:
+    bool loaded{};
+
+   public:
+    explicit BuiltinCommandModule(const DynModule* dyn) { info = Info(dyn); }
+
+    bool load() override {
+        loaded = true;
+        return true;
+    }
+
+    bool unload() override {
+        loaded = false;
+        return true;
+    }
+
+    // Trival accessors.
+    [[nodiscard]] bool isLoaded() const override { return loaded; }
+};

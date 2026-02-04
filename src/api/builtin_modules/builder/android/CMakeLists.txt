@@ -12,20 +12,6 @@ tgbot_library(
 include(gRPCGenerate)
 grpc_generate(ROMBuild)
 
-command_module(
-  NAME
-  rombuild
-  SRCS
-  module/romBuild.cpp
-  LIBS
-  AndroidBuilder-configparse
-  Utils
-  TgBot
-  AuthApi
-  ROMBuildServiceProto
-  SystemMonitorServiceProto
-  HealthCheckServiceProto)
-
 tgbot_exe(
   NAME
   ConfigParserTest

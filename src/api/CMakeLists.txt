@@ -47,6 +47,40 @@ tgbot_library(
   STATIC
 )
 
+# Builtin modules
+add_subdirectory(builtin_modules/builder)
+tgbot_library(
+  NAME builtin_module_RomBuild
+  SRCS
+    builtin_modules/builder/android/romBuild.cpp
+  LIBS  
+    AndroidBuilder-configparse
+    Utils
+    TgBot
+    AuthApi
+    ROMBuildServiceProto
+    SystemMonitorServiceProto
+    HealthCheckServiceProto
+  STATIC
+)
+
+tgbot_library(
+  NAME builtin_module_KernelBuild
+  SRCS
+    builtin_modules/builder/kernel/kernelbuild.cpp
+    builtin_modules/builder/kernel/ConfigParsers2.cpp
+  LIBS  
+    AuthApi
+    nlohmann_json::nlohmann_json
+    Utils
+    progress
+    LinuxKernelBuildServiceProto
+    SystemMonitorServiceProto
+    HealthCheckServiceProto
+    RateLimitApi
+  STATIC
+)
+
 tgbot_library(
   NAME ApiImpl
   SRCS 
@@ -61,7 +95,7 @@ tgbot_library(
     components/Restart.cpp
     components/UnknownCommand.cpp
     components/ReactionsProvider.cpp
-  LIBS TgBot DBImpl ${cpptrace_libs} Api
+  LIBS TgBot DBImpl ${cpptrace_libs} Api builtin_module_KernelBuild builtin_module_RomBuild
   DEFS ${cpptrace_def}
   STATIC
 )

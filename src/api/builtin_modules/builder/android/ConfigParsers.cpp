@@ -547,10 +547,12 @@ bool ConfigParser::merge() {
     recoveries.clear();
 
     // Now, clean the unreferenced device/roms
-    std::erase_if(deviceMap,
-                  [](const auto& pair) { return pair.second.unique(); });
-    std::erase_if(romBranchMap,
-                  [](const auto& pair) { return pair.second.unique(); });
+    std::erase_if(deviceMap, [](const auto& pair) {
+        return pair.second.use_count() == 1;
+    });
+    std::erase_if(romBranchMap, [](const auto& pair) {
+        return pair.second.use_count() == 1;
+    });
 
     // Return the localManifests vector
     return !parsedManifests.empty();

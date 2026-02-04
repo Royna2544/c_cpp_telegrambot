@@ -117,7 +117,6 @@ endfunction()
 
 add_subdirectory(support)
 add_subdirectory(compiler)
-add_subdirectory(builder)
 
 multi_command_module(
   PROVIDES

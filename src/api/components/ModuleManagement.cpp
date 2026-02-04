@@ -113,6 +113,13 @@ bool TgBotApiImpl::ModulesManagement::loadAll(
         LOG(ERROR) << "Failed to iterate through modules: " << ec.message();
         return false;
     }
+
+    extern const struct DynModule cmd_kernelbuild;
+    extern const struct DynModule cmd_rombuild;
+    load(std::make_unique<BuiltinCommandModule>(&cmd_kernelbuild));
+    load(std::make_unique<BuiltinCommandModule>(&cmd_rombuild));
+
+    // Update BotCommandList
     std::vector<TgBot::BotCommand::Ptr> buffer;
     buffer.reserve(_handles.size());
     for (const auto& [name, mod] : _handles) {

@@ -7,7 +7,6 @@
 #include <fmt/ranges.h>
 #include <grpcpp/client_context.h>
 #include <grpcpp/create_channel.h>
-#include <sys/wait.h>
 #include <tgbot/TgException.h>
 #include <tgbot/types/ReplyKeyboardRemove.h>
 
@@ -734,7 +733,7 @@ DECLARE_COMMAND_HANDLER(rombuild) {
     });
 }
 
-extern "C" DYN_COMMAND_EXPORT const struct DynModule DYN_COMMAND_SYM = {
+extern const struct DynModule cmd_rombuild = {
     .flags = DynModule::Flags::Enforced,
     .name = "rombuild",
     .description = "Build a ROM, I'm lazy",

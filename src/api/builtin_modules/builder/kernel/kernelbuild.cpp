@@ -14,7 +14,6 @@
 #include <tgbot/types/InputTextMessageContent.h>
 #include <trivial_helpers/_tgbot.h>
 
-#include <ConfigParsers2.hpp>
 #include <api/CommandModule.hpp>
 #include <api/MessageExt.hpp>
 #include <chrono>
@@ -25,6 +24,7 @@
 #include <utility>
 
 #include "ConfigManager.hpp"
+#include "ConfigParsers2.hpp"
 #include "HealthCheck_service.grpc.pb.h"
 #include "LinuxKernelBuild_service.grpc.pb.h"
 #include "LinuxKernelBuild_service.pb.h"
@@ -582,7 +582,7 @@ DECLARE_COMMAND_HANDLER(kernelbuild) {
     handler->start(message->message());
 }
 
-extern "C" DYN_COMMAND_EXPORT const struct DynModule DYN_COMMAND_SYM = {
+extern const struct DynModule cmd_kernelbuild = {
     .flags = DynModule::Flags::Enforced,
     .name = "kernelbuild",
     .description = "Build a kernel, I'm lazy 2",
