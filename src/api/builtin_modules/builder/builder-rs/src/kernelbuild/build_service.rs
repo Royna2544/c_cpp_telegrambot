@@ -847,24 +847,13 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                         }
                         Ok(())
                     } else {
-                        let tx_for_callback = tx_for_git.clone();
                         match GitRepo::clone(
                             &config_url,
                             &config_branch,
                             None,
                             &source_dir_clone,
                             req.github_token.clone(),
-                            &Some(Box::new(move |stats| {
-                                report_blk!(
-                                    tx_for_callback,
-                                    InProgressDownload,
-                                    format!(
-                                        "[GIT OPERATION]: {}/{} objects received",
-                                        stats.received_objects(),
-                                        stats.total_objects()
-                                    )
-                                );
-                            })),
+                            &None,
                         ) {
                             Ok(_) => {
                                 report_blk!(
