@@ -141,11 +141,19 @@ std::optional<TgBotApi::FileOrMedia> makeFileOrMedia(
     }
     return fileOrMedia;
 }
+
+void LogWhoCalledMe(ServerContext* context, const std::string& methodName) {
+    auto peer = context->peer();
+    LOG(INFO) << "Method " << methodName << " called by " << peer;
+}
+
 }  // namespace
 
 Status SocketServiceImpl::Service::sendMessage(
     ServerContext* context, const SendMessageRequest* request,
     GenericResponse* response) {
+    LogWhoCalledMe(context, "sendMessage");
+
     // 1. Check if file_type,text is present
     bool hasFileType = request->has_file_type();
     bool hasText = request->has_text();
@@ -219,6 +227,8 @@ Status SocketServiceImpl::Service::sendMessage(
 Status SocketServiceImpl::Service::setSpamBlockingConfig(
     ServerContext* context, const SpamBlockingConfig* request,
     GenericResponse* response) {
+    LogWhoCalledMe(context, "setSpamBlockingConfig");
+
     LOG(INFO) << "Setting spam blocking config mode";
     spamBlock_->setConfig(static_cast<SpamBlockBase::Config>(request->mode()));
     response->set_code(GenericResponseCode::Success);
@@ -229,6 +239,8 @@ Status SocketServiceImpl::Service::setSpamBlockingConfig(
 Status SocketServiceImpl::Service::getSpamBlockingConfig(
     ServerContext* context, const ::google::protobuf::Empty* /*request*/,
     SpamBlockingConfig* response) {
+    LogWhoCalledMe(context, "getSpamBlockingConfig");
+
     SpamBlockBase::Config config = spamBlock_->getConfig();
     response->set_mode(static_cast<SpamBlockingModes>(config));
     return Status::OK;
@@ -237,6 +249,8 @@ Status SocketServiceImpl::Service::getSpamBlockingConfig(
 Status SocketServiceImpl::Service::requestFileTransfer(
     ServerContext* context, const FileTransferRequest* request,
     FileTransferResponse* response) {
+    LogWhoCalledMe(context, "requestFileTransfer");
+
     LOG(INFO) << "Received file transfer request for path: "
               << request->file_path()
               << (request->is_upload() ? " (upload)" : " (download)");
@@ -312,6 +326,9 @@ Status SocketServiceImpl::Service::downloadFileLoop(
     ::grpc::ServerReaderWriter<FileChunkResponse, FileChunkRequest>* stream) {
     FileChunkRequest msg;
     constexpr std::uintmax_t CHUNK_SIZE = 64 * 1024;  // 64 KB
+
+    LogWhoCalledMe(context, "downloadFileLoop");
+
     while (stream->Read(&msg)) {
         if (!activeTransfers_.contains(msg.uuid())) {
             // Invalid UUID
@@ -372,6 +389,7 @@ Status SocketServiceImpl::Service::uploadFileLoop(
     ::grpc::ServerReaderWriter<FileChunkResponse, FileChunk>* stream) {
     FileChunk msg;
 
+    LogWhoCalledMe(context, "uploadFileLoop");
     while (stream->Read(&msg)) {
         if (!activeTransfers_.contains(msg.uuid())) {
             // Invalid UUID
@@ -421,6 +439,7 @@ Status SocketServiceImpl::Service::uploadFileLoop(
 Status SocketServiceImpl::Service::endFileTransfer(
     ServerContext* context, const FileTransferRequest* request,
     GenericResponse* response) {
+    LogWhoCalledMe(context, "endFileTransfer");
     auto it = activeTransfers_.find(request->uuid());
     if (it == activeTransfers_.end()) {
         response->set_code(GenericResponseCode::ErrorCommandIgnored);
@@ -460,6 +479,7 @@ Status SocketServiceImpl::Service::endFileTransfer(
 Status SocketServiceImpl::Service::ping(
     ServerContext* context, const ::google::protobuf::Empty* /*request*/,
     ::google::protobuf::Empty* /*response*/) {
+    LogWhoCalledMe(context, "ping");
     LOG(INFO) << "Pong!";
     return Status::OK;
 }
@@ -467,6 +487,8 @@ Status SocketServiceImpl::Service::ping(
 Status SocketServiceImpl::Service::info(
     ServerContext* context, const ::google::protobuf::Empty* /*request*/,
     BotInfo* response) {
+    LogWhoCalledMe(context, "info");
+
     auto botInfo = api_->getBotUser();
     response->set_user_id(botInfo->id);
     if (botInfo->username.has_value()) {
