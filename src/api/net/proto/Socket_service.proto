@@ -100,7 +100,7 @@ message FileTransferRequest {
  * Request message for requesting a specific file chunk
  *
  * uuid: Unique identifier for the file transfer session (Required)
- * chunk_idx: Index of the chunk being requested (Required if it is used for #requestFileTransfer, ignored on #endFileTransfer)
+ * chunk_idx: Index of the chunk being requested (Required)
  */
 message FileChunkRequest {
     optional string uuid = 1;
