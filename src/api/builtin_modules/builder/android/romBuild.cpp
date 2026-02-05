@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <api/CommandModule.hpp>
 #include <api/TgBotApi.hpp>
+#include <chrono>
 #include <cstdlib>
 #include <filesystem>
 #include <initializer_list>
@@ -490,6 +491,8 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     request.set_build_variant(static_cast<android::BuildVariant>(
         static_cast<int>(per_build.variant)));
 
+    std::chrono::system_clock::time_point start =
+        std::chrono::system_clock::now();
     auto ret = buildStub_->StartBuild(&context, request, &buildSubmission);
     if (!ret.ok()) {
         LOG(ERROR) << "Failed to start build: " << ret.error_message();
@@ -497,6 +500,22 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
         return;
     }
     LOG(INFO) << "Started build with ID: " << buildSubmission.build_id();
+
+    std::string_view variant;
+    switch (per_build.variant) {
+        case PerBuildData::Variant::kUser:
+            variant = "user";
+            break;
+        case PerBuildData::Variant::kUserDebug:
+            variant = "userdebug";
+            break;
+        case PerBuildData::Variant::kEng:
+            variant = "eng";
+            break;
+        default:
+            variant = "unknown";
+            break;
+    };
 
     grpc::ClientContext logContext;
     android::BuildAction logRequest;
@@ -514,7 +533,53 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
         if (!rateLimiter.check()) {
             continue;  // Skip update if within rate limit
         }
-        _api->editMessage(sentMessage, fmt::format("{}", logEntry.message()));
+
+        grpc::ClientContext statsContext;
+        tgbot::builder::system_monitor::SystemStats statsResponse;
+        if (!monitorStub_->GetStats(&statsContext, {}, &statsResponse).ok()) {
+            LOG(ERROR) << "Failed to get system stats";
+            continue;
+        }
+        system_monitor::GetSystemInfoRequest infoRequest;
+        infoRequest.set_disk_path("/");
+        grpc::ClientContext infoContext;
+        tgbot::builder::system_monitor::SystemInfo infoResponse;
+        if (!monitorStub_
+                 ->GetSystemInfo(&infoContext, infoRequest, &infoResponse)
+                 .ok()) {
+            LOG(ERROR) << "Failed to get system info";
+            continue;
+        }
+
+        auto buildInfoBuffer = fmt::format(
+            R"(
+<blockquote>▶️ <b>Start time</b>: {} [GMT]
+🕐 <b>Time spent</b>: {:%H hours %M minutes %S seconds}
+🔄 <b>Last updated on</b>: {} [GMT]</blockquote>
+<blockquote>🎯 <b>Target ROM</b>: {}
+🏷 <b>Target branch</b>: {}
+📱 <b>Device</b>: {}
+🧬 <b>Build variant</b>: {}
+💻 <b>CPU name</b>: {}
+💻 <b>CPU</b>: Usage {}%
+💾 <b>Memory</b>: Used {}MB, Total {}MB
+💾 <b>Disk</b>: Used {}GB, Total {}GB
+❗️ <b>Job count</b>: {}</blockquote>
+<blockquote>💬 <b>Log message</b>:
+{}</blockquote>)",
+            fmt::format("{:%Y-%m-%d %H:%M:%S}", start),
+            std::chrono::system_clock::now() - start,
+            fmt::format(
+                "{:%Y-%m-%d %H:%M:%S}",
+                std::chrono::system_clock::from_time_t(logEntry.timestamp())),
+            per_build.localManifest->rom->romInfo->name,
+            per_build.localManifest->rom->branch, per_build.device->codename,
+            variant, infoResponse.cpu_name(), statsResponse.cpu_usage_percent(),
+            statsResponse.memory_used_mb(), statsResponse.memory_total_mb(),
+            infoResponse.disk_used_gb(), infoResponse.disk_total_gb(),
+            std::thread::hardware_concurrency(), logEntry.message());
+        _api->editMessage<TgBotApi::ParseMode::HTML>(sentMessage,
+                                                     buildInfoBuffer);
     }
 
     // Success
@@ -792,8 +857,9 @@ void ROMBuildQueryHandler::handle_clean_directories(const Query& query) {
                               backKeyboard);
             return;
         }
-        entry = fmt::format("Current disk space free: {}GB",
-                            romRootSpace.disk_used_gb());
+        entry = fmt::format("Current disk space used: {}GB, total: {}GB",
+                            romRootSpace.disk_used_gb(),
+                            romRootSpace.disk_total_gb());
 
         grpc::ClientContext contextDirectoryExists;
         if (auto res = buildStub_->DirectoryExists(

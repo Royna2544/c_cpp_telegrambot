@@ -7,7 +7,7 @@
             "path": "device/lenovo/TB128FU"
         }
     ],
-    "android_version": 12,
+    "android_version": 12.1,
     "target_recovery": "TWRP",
     "device": "TB128FU",
     "use_regex": false
