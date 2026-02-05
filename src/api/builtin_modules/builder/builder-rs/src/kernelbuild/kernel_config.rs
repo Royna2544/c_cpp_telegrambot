@@ -134,11 +134,21 @@ impl KernelConfig {
                 std::env::var("PATH").unwrap_or_default()
             ),
         };
+        let build_user = EnvVar {
+            name: "KBUILD_BUILD_USER".into(),
+            value: "builder-rs".into(),
+        };
+        let build_host = EnvVar {
+            name: "KBUILD_BUILD_HOST".into(),
+            value: "builder-rs-host".into(),
+        };
         self.env
             .iter()
             .map(|var| (var.name.clone(), var.value.clone()))
             .into_iter()
             .chain(std::iter::once((path.name, path.value)))
+            .chain(std::iter::once((build_user.name, build_user.value)))
+            .chain(std::iter::once((build_host.name, build_host.value)))
             .collect()
     }
 }
