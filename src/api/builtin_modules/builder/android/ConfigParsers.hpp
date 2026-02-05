@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <variant>
 
@@ -19,91 +20,44 @@ struct RepoInfo {
 
 class ConfigParser {
    public:
-    struct ArtifactMatcher {
-        using Ptr = std::shared_ptr<ArtifactMatcher>;
-        using MatcherType =
-            std::function<bool(const std::string_view filename,
-                               const std::string_view data, const bool debug)>;
-        ArtifactMatcher(MatcherType matcher, std::string name)
-            : matcher_(std::move(matcher)), name_(std::move(name)) {}
-
-       private:
-        MatcherType matcher_;
-        std::string name_;
-        std::string data_;
-
-       public:
-        [[nodiscard]] bool match(std::string_view filename,
-                                 const bool debug = false) const {
-            return matcher_(filename, data_, debug);
-        }
-        bool operator==(const ArtifactMatcher& other) const {
-            return name_ == other.name_;
-        }
-        void setData(std::string data) { data_ = std::move(data); }
-    };
-
-    // Artifact matcher
-    struct MatcherStorage {
-        std::unordered_map<std::string, ArtifactMatcher::Ptr> artifactMatchers;
-        void add(const std::string& name,
-                 const ArtifactMatcher::MatcherType& fn) {
-            artifactMatchers[name] =
-                std::make_shared<ArtifactMatcher>(fn, name);
-        }
-        ArtifactMatcher::Ptr get(const std::string& name) const {
-            if (!artifactMatchers.contains(name)) {
-                LOG(INFO) << fmt::format("No artifact matcher found for '{}'",
-                                         name);
-                return nullptr;
-            }
-            return std::make_shared<ArtifactMatcher>(
-                *artifactMatchers.at(name));
-        }
-    };
-
     struct ROMInfo {
         using Ptr = std::shared_ptr<ROMInfo>;
 
-        std::string name;               // name of the ROM
-        std::string url;                // URL of the ROM repo
-        std::string target;             // build target to build a ROM
-        ArtifactMatcher::Ptr artifact;  // matcher for the out artifact
+        std::string name;    // name of the ROM
+        std::string url;     // URL of the ROM repo
+        std::string target;  // build target to build a ROM
+        struct Artifact {
+            std::string matcher;
+            std::string data;
+        } artifact;
 
         bool operator==(const ROMInfo& other) const = default;
+    };
+
+    struct AndroidVersion {
+        using Ptr = std::shared_ptr<AndroidVersion>;
+        float version;
+        std::string name;
     };
 
     struct ROMBranch {
         using Ptr = std::shared_ptr<ROMBranch>;
 
-        std::string branch;  // branch of the repo
-        int androidVersion;  // android version of the branch
+        std::string branch;                  // branch of the repo
+        AndroidVersion::Ptr androidVersion;  // android version of the branch
 
         ROMInfo::Ptr romInfo;  // associated ROMInfo
 
         // Returns a string representation of the ROM branch
-        [[nodiscard]] std::string toString() const {
-            if (!romInfo) {
-                return {};
-            }
-            return fmt::format("{} (Android {})", romInfo->name,
-                               androidVersion);
-        }
         [[nodiscard]] static std::string makeKey(std::string_view name,
-                                                 const int androidVersion) {
+                                                 const float androidVersion) {
             return fmt::format("{}-{}", name, androidVersion);
         }
         [[nodiscard]] std::string makeKey() const {
             if (!romInfo) {
                 throw std::logic_error("No rom info available");
             }
-            return makeKey(romInfo->name, androidVersion);
-        }
-
-        bool operator==(const ROMBranch& other) const {
-            return branch == other.branch &&
-                   androidVersion == other.androidVersion &&
-                   *romInfo == *other.romInfo;
+            return makeKey(romInfo->name, androidVersion->version);
         }
     };
 
@@ -155,8 +109,8 @@ class ConfigParser {
     std::vector<LocalManifest::Ptr> parsedManifests;
     std::unordered_map<std::string, Device::Ptr> deviceMap;
     std::unordered_map<std::string, ROMBranch::Ptr> romBranchMap;
+    std::unordered_map<float, AndroidVersion::Ptr> androidVersionMap;
     std::filesystem::path _jsonFileDir;
-    MatcherStorage storage;
 };
 
 struct PerBuildData {

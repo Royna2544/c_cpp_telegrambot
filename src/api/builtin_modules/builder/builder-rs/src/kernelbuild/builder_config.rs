@@ -17,6 +17,7 @@ use tracing::error;
 use tracing::info;
 
 use crate::git_repo::GitRepo;
+use crate::util::new_impl;
 use tokio::fs::File as TokioFile;
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Clone)]
@@ -251,5 +252,11 @@ impl Toolchain {
                 Ok(())
             }
         }
+    }
+}
+
+impl BuilderConfig {
+    pub fn new(json_file: &PathBuf) -> Result<BuilderConfig, ()> {
+        new_impl(json_file)
     }
 }

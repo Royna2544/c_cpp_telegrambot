@@ -2,480 +2,189 @@
 
 #include <fmt/format.h>
 
-#include <algorithm>
 #include <filesystem>
 #include <fstream>
-#include <iterator>
 #include <memory>
+#include <nlohmann/detail/macro_scope.hpp>
 #include <nlohmann/json.hpp>
-#include <optional>
-#include <stdexcept>
-#include <string_view>
+#include <nlohmann/json_fwd.hpp>
+#include <regex>
+#include <string>
 #include <system_error>
-#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
-// Repesent a type and name string
-template <typename T>
-struct NodeItemType {
-    using type = std::decay_t<T>;
-
-   private:
-    std::string name;
-    bool required = true;
-    std::optional<T> value_;
-    bool hasDefaultValue = false;
-
-   public:
-    NodeItemType(std::string name) : name(std::move(name)) {}
-    NodeItemType& setRequired(bool required) {
-        this->required = required;
-        return *this;
-    }
-    NodeItemType& setDefaultValue(const T& defaultValue) {
-        value_ = defaultValue;
-        hasDefaultValue = true;
-        required = false;
-        return *this;
-    }
-
-    NodeItemType& setValue(const T& value) {
-        static_assert(std::is_same_v<T, std::decay_t<T>>,
-                      "Value type must match node type");
-        value_ = value;
-        return *this;
-    }
-    operator T() const {
-        if (!hasValue()) {
-            throw std::invalid_argument("Value must have value to get");
-        }
-        return value_.value();
-    }
-    [[nodiscard]] bool hasValue() const {
-        return hasDefaultValue || value_ != std::nullopt;
-    }
-
-    template <typename... Args>
-    friend bool checkRequirements(const nlohmann::json& value,
-                                  NodeItemType<Args>&... args);
-};
-
-NodeItemType<std::string> operator""_s(const char* str,
-                                       unsigned long /*unused*/) {
-    return {str};
-}
-NodeItemType<int> operator""_d(const char* str, unsigned long /*unused*/) {
-    return {str};
-}
-
-template <typename... Args>
-bool checkRequirements(const nlohmann::json& value,
-                       NodeItemType<Args>&... args) {
-    static_assert(sizeof...(args) > 0,
-                  "At least one argument required for checkRequirements");
-
-    if (!value.is_object()) {
-        LOG(ERROR) << fmt::format("Expected object, found: {}",
-                                  value.type_name());
-        return false;
-    }
-
-    bool allRequiredMet = true;
-    (([&allRequiredMet, &value, &args] {
-         if (!value.contains(args.name)) {
-             if (args.hasDefaultValue) {
-                 LOG(INFO) << "Using default value for field: " << args.name;
-             } else if (args.required) {
-                 allRequiredMet = false;
-                 LOG(WARNING) << "Missing field: " << args.name;
-                 return;
-             }
-         } else {
-             const auto& node = value[args.name];
-             if constexpr (std::is_same_v<
-                               typename std::decay_t<decltype(args)>::type,
-                               int>) {
-                 if (!node.is_number_integer()) {
-                     LOG(ERROR) << "Expected integer for field: " << args.name;
-                     allRequiredMet = false;
-                 } else {
-                     args.setValue(node.template get<int>());
-                 }
-             }
-             if constexpr (std::is_same_v<
-                               typename std::decay_t<decltype(args)>::type,
-                               std::string>) {
-                 if (!node.is_string()) {
-                     LOG(ERROR) << "Expected string for field: " << args.name;
-                     allRequiredMet = false;
-                 } else {
-                     args.setValue(node.template get<std::string>());
-                 }
-             }
-         }
-     })(),
-     ...);
-
-    return allRequiredMet;
-}
-
-/**
- * @brief Proxy class for handling JSON objects and providing iterator access.
- *
- * This class wraps a nlohmann::json object and provides iterator access to its
- * members. It also performs basic validation to ensure that the root value is
- * an object.
- *
- * @param root The nlohmann::json object to be wrapped.
- */
-class ProxyJsonBranch {
-   public:
-    /**
-     * @brief Returns an iterator pointing to the beginning of the wrapped JSON
-     * object.
-     *
-     * @return An iterator pointing to the beginning of the wrapped JSON object.
-     */
-    [[nodiscard]] nlohmann::json::const_iterator begin() const {
-        return isValidObject ? root_.begin() : root_.end();
-    }
-
-    /**
-     * @brief Returns an iterator pointing to the end of the wrapped JSON
-     * object.
-     *
-     * @return An iterator pointing to the end of the wrapped JSON object.
-     */
-    [[nodiscard]] nlohmann::json::const_iterator end() const {
-        return root_.end();
-    }
-
-    /**
-     * @brief Constructor for ProxyJsonBranch.
-     *
-     * Constructs a ProxyJsonBranch object and performs basic validation on the
-     * provided nlohmann::json object. If the root value is not an array, it
-     * logs an error message.
-     *
-     * @param root The nlohmann::json object to be wrapped.
-     */
-    explicit ProxyJsonBranch(const nlohmann::json& root,
-                             const std::string& name)
-        : root_(root.contains(name) && root[name].is_array()
-                    ? root[name]
-                    : nlohmann::json::array()),
-          isValidObject(root.contains(name) && root[name].is_array()) {
-        if (!isValidObject) {
-            if (!root.contains(name)) {
-                LOG(WARNING) << "Property '" << name
-                             << "' does not exist in JSON object";
-            } else {
-                LOG(ERROR) << fmt::format(
-                    "Expected array for property '{}', but got: {}", name,
-                    root[name].type_name());
-            }
-        }
-    }
-
-   private:
-    nlohmann::json root_;
-    bool isValidObject;
-};
-
 namespace ParseFiles {
 
-std::vector<ConfigParser::ROMBranch::Ptr> parseROM(
-    const nlohmann::json& entry, const std::string& default_target,
-    ConfigParser::MatcherStorage* storage) {
-    auto romInfo = std::make_shared<ConfigParser::ROMInfo>();
-    auto ROMName = "name"_s;
-    auto ROMLink = "link"_s;
-    auto ROMTarget = "target"_s.setDefaultValue(default_target);
-    std::vector<ConfigParser::ROMBranch::Ptr> romBranches;
+// roms.json
+struct ROM {
+    std::string name;
+    std::string link;
+    std::string target;
 
-    if (!checkRequirements(entry, ROMName, ROMLink, ROMTarget)) {
-        LOG(INFO) << "Skipping invalid roms entry: " << entry.dump();
-        return {};
-    }
-    if (!entry.contains("artifact")) {
-        LOG(INFO) << fmt::format("Artifact entry not found for '{}'.",
-                                 static_cast<std::string>(ROMName));
-    } else {
-        auto matcher = "matcher"_s;
-        auto data = "data"_s;
-        if (!checkRequirements(entry["artifact"], matcher, data)) {
-            LOG(INFO) << "Skipping invalid artifact entry: " << entry.dump();
-            return {};
-        }
-        romInfo->artifact = storage->get(matcher);
-        if (!romInfo->artifact) {
-            LOG(INFO) << "No matching ArtifactMatcher for name "
-                      << static_cast<std::string>(matcher);
-            return {};
-        }
-        romInfo->artifact->setData(data);
-    }
+    struct Artifact {
+        std::string matcher;
+        std::string data;
+    } artifact;
 
-    romInfo->name = ROMName;
-    romInfo->url = ROMLink;
-    romInfo->target = ROMTarget;
-    DLOG(INFO) << "Parsed ROM: " << romInfo->name;
+    struct Branches {
+        float android_version;
+        std::string branch;
+    };
+    std::vector<Branches> branches;
+};
+using ROMs = std::vector<ROM>;
 
-    for (const auto& branchEntry : ProxyJsonBranch(entry, "branches")) {
-        auto androidVersion = "android_version"_d;
-        auto branch = "branch"_s;
-        if (!checkRequirements(branchEntry, androidVersion, branch)) {
-            LOG(INFO) << "Skipping invalid roms-branches entry: "
-                      << entry.dump();
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ROM::Artifact, matcher, data);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ROM::Branches, android_version, branch);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ROM, name, link, target, artifact, branches);
+
+// targets.json
+struct Device {
+    std::string codename;
+    std::string name;
+    std::string manufacturer;
+};
+using Targets = std::vector<Device>;
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Device, codename, name, manufacturer);
+
+// versions.json
+struct Version {
+    float version;
+    std::string codename_short;
+    std::string codename;
+};
+using Versions = std::vector<Version>;
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Version, version, codename_short, codename);
+
+struct Manifest {
+    std::string name;
+    std::string url;
+    struct Branches {
+        std::string name;
+        std::string target_rom;
+        float android_version;
+        std::string device;
+        bool use_regex = false;
+    };
+    std::vector<Branches> branches;
+};
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Manifest::Branches, name, target_rom,
+                                   android_version, device, use_regex);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Manifest, name, url, branches);
+
+// recoveries.json
+struct RecoveryManifest {
+    std::string name;
+    struct CloneMapping {
+        std::string repo;
+        std::string branch;
+        std::string path;
+    };
+    std::vector<CloneMapping> clone_mappings;
+    float android_version;
+    std::string target_recovery;
+    std::string device;
+    bool use_regex = false;
+};
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(RecoveryManifest::CloneMapping, repo, branch,
+                                   path);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(RecoveryManifest, name, clone_mappings,
+                                   android_version, target_recovery, device,
+                                   use_regex);
+
+std::vector<ConfigParser::LocalManifest::Ptr> parse_manifest(
+    const Manifest& manifest,
+    const std::unordered_map<std::string, ConfigParser::Device::Ptr>& deviceMap,
+    const std::unordered_map<std::string, ConfigParser::ROMBranch::Ptr>&
+        romBranchMap) {
+    std::vector<ConfigParser::LocalManifest::Ptr> manifests;
+    for (const auto& branch : manifest.branches) {
+        auto romKey = ConfigParser::ROMBranch::makeKey(branch.target_rom,
+                                                       branch.android_version);
+        auto romIt = romBranchMap.find(romKey);
+        if (romIt == romBranchMap.end()) {
+            LOG(WARNING) << fmt::format(
+                "ROM branch not found for manifest {}: "
+                "ROM {} Android version {}",
+                manifest.name, branch.target_rom, branch.android_version);
             continue;
         }
-        ConfigParser::ROMBranch rombranch;
-        rombranch.branch = branch;
-        rombranch.androidVersion = androidVersion;
-        rombranch.romInfo = romInfo;
-        romBranches.emplace_back(
-            std::make_shared<ConfigParser::ROMBranch>(rombranch));
+        auto localManifest = std::make_shared<ConfigParser::LocalManifest>();
+        localManifest->name = manifest.name;
+        localManifest->rom = romIt->second;
+        for (const auto& device : deviceMap) {
+            if (branch.use_regex) {
+                try {
+                    if (!std::regex_match(device.first,
+                                          std::regex(branch.device))) {
+                        continue;
+                    }
+                } catch (const std::regex_error& e) {
+                    LOG(ERROR)
+                        << fmt::format("Invalid regex '{}' in manifest {}: {}",
+                                       branch.device, manifest.name, e.what());
+                    continue;
+                }
+            } else {
+                if (device.first != branch.device) {
+                    continue;
+                }
+            }
+            localManifest->devices.push_back(device.second);
+        }
+        manifests.push_back(localManifest);
     }
-    return romBranches;
+    return manifests;
 }
 
-struct ROM {
-    using return_type = ConfigParser::ROMBranch::Ptr;
-    static constexpr auto _value = nlohmann::json::value_t::array;
-    static std::vector<return_type> parse(
-        const nlohmann::json& root, ConfigParser::MatcherStorage* storage) {
-        std::vector<return_type> result;
-        for (const auto& entry : root) {
-            auto res = parseROM(entry, "bacon", storage);
-            if (!res.empty()) {
-                result.insert(result.end(), res.begin(), res.end());
+std::vector<ConfigParser::LocalManifest::Ptr> parse_recoverymanifest(
+    const RecoveryManifest& manifest,
+    const std::unordered_map<std::string, ConfigParser::Device::Ptr>& deviceMap,
+    const std::unordered_map<std::string, ConfigParser::ROMBranch::Ptr>&
+        romBranchMap) {
+    std::vector<ConfigParser::LocalManifest::Ptr> manifests;
+    // I just need to let c++ side know about recovery ROMs
+    for (const auto& device : deviceMap) {
+        if (manifest.use_regex) {
+            try {
+                if (!std::regex_match(device.first,
+                                      std::regex(manifest.device))) {
+                    continue;
+                }
+            } catch (const std::regex_error& e) {
+                LOG(ERROR) << fmt::format(
+                    "Invalid regex '{}' in recovery manifest {}: {}",
+                    manifest.device, manifest.name, e.what());
+                continue;
+            }
+        } else {
+            if (device.first != manifest.device) {
+                continue;
             }
         }
-        return result;
-    }
-};
-
-struct Recovery {
-    using return_type = ConfigParser::ROMBranch::Ptr;
-    static constexpr auto _value = nlohmann::json::value_t::array;
-    static std::vector<return_type> parse(
-        const nlohmann::json& root, ConfigParser::MatcherStorage* storage) {
-        std::vector<return_type> result;
-        for (const auto& entry : root) {
-            auto res = parseROM(entry, "recoveryimage", storage);
-            if (!res.empty()) {
-                result.insert(result.end(), res.begin(), res.end());
-            }
+        auto romKey = ConfigParser::ROMBranch::makeKey(
+            manifest.target_recovery, manifest.android_version);
+        auto romIt = romBranchMap.find(romKey);
+        if (romIt == romBranchMap.end()) {
+            LOG(WARNING) << fmt::format(
+                "ROM branch not found for recovery manifest {}: "
+                "ROM {} Android version {}",
+                manifest.name, manifest.target_recovery,
+                manifest.android_version);
+            continue;
         }
-        return result;
+        auto localManifest = std::make_shared<ConfigParser::LocalManifest>();
+        localManifest->name = manifest.name;
+        localManifest->rom = romIt->second;
+        localManifest->devices.push_back(device.second);
+        manifests.push_back(localManifest);
     }
-};
-
-using DeviceMap = std::unordered_map<std::string, ConfigParser::Device::Ptr>;
-using ROMsMap = std::unordered_map<std::string, ConfigParser::ROMBranch::Ptr>;
-using Devices = std::vector<ConfigParser::Device::Ptr>;
-
-std::pair<Devices, ConfigParser::ROMBranch::Ptr> parseDeviceAndRom(
-    const NodeItemType<std::string>& device, const nlohmann::json& rootNode,
-    const DeviceMap& devicesPtr, const ROMsMap& romsPtr,
-    const std::string_view target_rom, const int android_version) {
-    ConfigParser::ROMBranch::Ptr romBranch;
-    std::vector<std::string> deviceCodenames;
-
-    // Parse codenames array
-    if (device.hasValue()) {
-        deviceCodenames.emplace_back(device);
-    } else {
-        for (const auto& deviceEntry : ProxyJsonBranch(rootNode, "devices")) {
-            deviceCodenames.emplace_back(deviceEntry.get<std::string>());
-        }
-    }
-    if (deviceCodenames.empty()) {
-        LOG(INFO) << "No device codenames found";
-        return {};
-    }
-
-    // Obtain pointers to device, else create dummy
-    std::vector<ConfigParser::Device::Ptr> devicePtrs;
-    std::ranges::transform(
-        deviceCodenames, std::back_inserter(devicePtrs),
-        [&devicesPtr](const auto& codename) {
-            if (!devicesPtr.contains(codename)) {
-                LOG(WARNING)
-                    << "No matching DeviceInfo for codename " << codename;
-                // Create dummy device if it doesn't exist, But this isn't gonna
-                // make it available.
-                return std::make_shared<ConfigParser::Device>(codename);
-            }
-            return devicesPtr.at(codename);
-        });
-
-    // Find the matching ROM
-    ConfigParser::ROMBranch::Ptr lookup = nullptr;
-    auto key = ConfigParser::ROMBranch::makeKey(
-        static_cast<std::string>(target_rom), android_version);
-
-    if (romsPtr.contains(key)) {
-        romBranch = romsPtr.at(key);
-    } else {
-        LOG(WARNING) << "No matching ROM for target_rom " << target_rom
-                     << " and android_version " << android_version;
-        return {};
-    }
-    return std::make_pair(std::move(devicePtrs), std::move(romBranch));
-}
-
-struct ROMLocalManifest {
-    using return_type = ConfigParser::LocalManifest::Ptr;
-    static constexpr auto _value = nlohmann::json::value_t::object;
-    static std::vector<return_type> parseOneLocalManifest(
-        const nlohmann::json& json, const DeviceMap& devices,
-        const ROMsMap& roms, std::string name, std::string manifest) {
-        ConfigParser::LocalManifest localManifest;
-        std::vector<return_type> result;
-        auto branchName = "name"_s;
-        auto target_rom = "target_rom"_s;
-        auto android_version = "android_version"_d;
-        auto device = "device"_s.setRequired(false);
-
-        if (!checkRequirements(json, target_rom, branchName, android_version,
-                               device)) {
-            LOG(INFO) << "Skipping invalid localmanifest-branches entry: "
-                      << json.dump();
-            return {};
-        }
-
-        auto [devicesVec, rom] = parseDeviceAndRom(
-            device, json, devices, roms, static_cast<std::string>(target_rom),
-            android_version);
-
-        if (devicesVec.empty() || !rom) {
-            LOG(INFO) << "No matching device or ROM for localmanifest-branches "
-                      << json.dump();
-            return {};
-        }
-        // Assign to the localmanifest
-        localManifest.devices = devicesVec;
-        localManifest.name = std::move(name);
-        localManifest.rom = rom;
-        result.emplace_back(std::make_shared<ConfigParser::LocalManifest>(
-            std::move(localManifest)));
-        return result;
-    }
-    static std::vector<return_type> parse(const nlohmann::json& root,
-                                          const DeviceMap& devices,
-                                          const ROMsMap& roms) {
-        auto name = "name"_s;
-        auto manifest = "url"_s;
-        if (!checkRequirements(root, name, manifest)) {
-            LOG(INFO) << "Skipping invalid localmanifest entry: "
-                      << root.dump();
-            return {};
-        }
-        std::vector<return_type> returnVec;
-        for (const auto& manifestEntry : ProxyJsonBranch(root, "branches")) {
-            auto localManifest = parseOneLocalManifest(manifestEntry, devices,
-                                                       roms, name, manifest);
-            if (!localManifest.empty()) {
-                returnVec.insert(returnVec.end(), localManifest.begin(),
-                                 localManifest.end());
-            }
-        }
-        return returnVec;
-    }
-};
-
-struct RecoveryManifest {
-    using return_type = ConfigParser::LocalManifest::Ptr;
-    static constexpr auto _value = nlohmann::json::value_t::object;
-    static std::vector<return_type> parse(const nlohmann::json& root,
-                                          const DeviceMap& devices,
-                                          const ROMsMap& roms) {
-        std::vector<return_type> manifests;
-        ConfigParser::LocalManifest localManifest;
-        auto name = "name"_s;
-        auto android_version = "android_version"_d;
-        auto device = "device"_s.setRequired(false);
-        auto recoveryName = "target_recovery"_s;
-
-        if (!checkRequirements(root, name, android_version, device,
-                               recoveryName)) {
-            LOG(INFO) << "Skipping invalid recovery_targets entry: "
-                      << root.dump();
-            return {};
-        }
-
-        auto [devicesVec, rom] = parseDeviceAndRom(
-            device, root, devices, roms, static_cast<std::string>(recoveryName),
-            android_version);
-        if (devicesVec.empty() || !rom) {
-            LOG(INFO) << "No matching device or ROM for localmanifest-branches "
-                      << root.dump();
-            return {};
-        }
-
-        localManifest.name = name;
-        localManifest.devices = std::move(devicesVec);
-        localManifest.rom = rom;
-        manifests.emplace_back(std::make_shared<ConfigParser::LocalManifest>(
-            std::move(localManifest)));
-
-        return manifests;
-    }
-};
-
-struct DeviceNames {
-    using return_type = ConfigParser::Device::Ptr;
-    static constexpr auto _value = nlohmann::json::value_t::array;
-    static std::vector<return_type> parse(const nlohmann::json& root) {
-        std::vector<return_type> devices;
-        for (const auto& entry : root) {
-            auto codename = "codename"_s;
-            auto name = "name"_s;
-
-            if (!checkRequirements(entry, codename, name)) {
-                LOG(INFO) << "Skipping invalid target entry: " << entry.dump();
-                return {};
-            }
-            auto device = std::make_shared<ConfigParser::Device>();
-            device->codename = codename;
-            device->marketName = name;
-            DLOG(INFO) << "Parsed device: " << device->codename;
-            devices.emplace_back(std::move(device));
-        }
-        return devices;
-    }
-};
-
-template <typename T, typename... Args>
-std::vector<typename T::return_type> parse(
-    const std::filesystem::path& jsonFile, Args&&... args) {
-    nlohmann::json value;
-
-    std::ifstream file(jsonFile);
-    if (!file.is_open()) {
-        LOG(ERROR) << fmt::format("Failed to open {}",
-                                  jsonFile.filename().string());
-        return {};
-    }
-
-    try {
-        file >> value;
-    } catch (const nlohmann::json::parse_error& e) {
-        LOG(ERROR) << fmt::format("Failed to parse {}: {}",
-                                  jsonFile.filename().string(), e.what());
-        return {};
-    }
-    if (value.type() != T::_value) {
-        LOG(ERROR) << fmt::format("Expected {} for {} (actual {})",
-                                  nlohmann::json(T::_value).type_name(),
-                                  jsonFile.filename().string(),
-                                  value.type_name());
-        return {};
-    }
-    return T::parse(value, std::forward<Args&&>(args)...);
+    return manifests;
 }
 
 bool is_json_file(const std::filesystem::path& path) {
@@ -486,37 +195,92 @@ bool is_json_file(const std::filesystem::path& path) {
 }  // namespace ParseFiles
 
 bool ConfigParser::merge() {
-    auto devices = ParseFiles::parse<ParseFiles::DeviceNames>(_jsonFileDir /
-                                                              "targets.json");
-
-    // Parse all the components
-    auto roms = ParseFiles::parse<ParseFiles::ROM>(_jsonFileDir / "roms.json",
-                                                   &storage);
-    auto recoveries = ParseFiles::parse<ParseFiles::Recovery>(
-        _jsonFileDir / "recoveries.json", &storage);
+    DLOG(INFO) << "Merging configuration files from " << _jsonFileDir.string();
+    DLOG(INFO) << "Loading targets.json";
+    std::ifstream targets_jsonFile(_jsonFileDir / "targets.json");
+    ParseFiles::Targets devices = nlohmann::json::parse(targets_jsonFile);
+    DLOG(INFO) << "Loading versions.json";
+    std::ifstream versions_jsonFile(_jsonFileDir / "versions.json");
+    ParseFiles::Versions versions = nlohmann::json::parse(versions_jsonFile);
+    DLOG(INFO) << "Loading roms.json";
+    std::ifstream roms_jsonFile(_jsonFileDir / "roms.json");
+    ParseFiles::ROMs roms = nlohmann::json::parse(roms_jsonFile);
+    DLOG(INFO) << "Loading recoveries.json";
+    std::ifstream recoveries_jsonFile(_jsonFileDir / "recoveries.json");
+    ParseFiles::ROMs recoveries = nlohmann::json::parse(recoveries_jsonFile);
+    DLOG(INFO) << "Building device and ROM maps";
 
     for (const auto& device : devices) {
-        deviceMap[device->codename] = device;
+        deviceMap[device.codename] =
+            std::make_shared<Device>(device.codename, device.name);
     }
+    for (const auto& version : versions) {
+        auto androidVersion = std::make_shared<AndroidVersion>();
+        androidVersion->version = version.version;
+        androidVersion->name =
+            fmt::format("{} ({},{})", version.codename, version.codename_short,
+                        version.version);
+        androidVersionMap[androidVersion->version] = androidVersion;
+    }
+
     for (const auto& rom : roms) {
-        romBranchMap[rom->makeKey()] = rom;
+        auto romInfo = std::make_shared<ROMInfo>();
+        romInfo->name = rom.name;
+        romInfo->url = rom.link;
+        romInfo->target = rom.target;
+        romInfo->artifact.data = rom.artifact.data;
+        romInfo->artifact.matcher = rom.artifact.matcher;
+
+        for (const auto& branch : rom.branches) {
+            auto romBranch = std::make_shared<ROMBranch>();
+            romBranch->branch = branch.branch;
+            romBranch->androidVersion =
+                androidVersionMap[branch.android_version];
+            romBranch->romInfo = romInfo;
+            romBranchMap[romBranch->makeKey()] = romBranch;
+        }
     }
     for (const auto& recovery : recoveries) {
-        romBranchMap[recovery->makeKey()] = recovery;
+        auto romInfo = std::make_shared<ROMInfo>();
+        romInfo->name = recovery.name;
+        romInfo->url = recovery.name;
+        romInfo->target = recovery.target;
+        romInfo->artifact.data = recovery.artifact.data;
+        romInfo->artifact.matcher = recovery.artifact.matcher;
+
+        for (const auto& branch : recovery.branches) {
+            auto romBranch = std::make_shared<ROMBranch>();
+            romBranch->branch = branch.branch;
+            romBranch->androidVersion =
+                androidVersionMap[branch.android_version];
+            romBranch->romInfo = romInfo;
+            romBranchMap[romBranch->makeKey()] = romBranch;
+        }
     }
 
+    DLOG(INFO) << "Scanning manifest files";
     std::error_code ec;
-
     // Scan through manifest/
     for (const auto& dirit :
          std::filesystem::directory_iterator(_jsonFileDir / "manifest", ec)) {
         if (ParseFiles::is_json_file(dirit.path())) {
-            auto manifests = ParseFiles::parse<ParseFiles::ROMLocalManifest>(
-                dirit.path(), deviceMap, romBranchMap);
-            parsedManifests.insert(parsedManifests.end(), manifests.begin(),
-                                   manifests.end());
-            DLOG(INFO) << "Add file: " << dirit.path().filename() << ": "
-                       << manifests.size();
+            try {
+                DLOG(INFO) << "Parsing manifest file: "
+                           << dirit.path().filename();
+                ParseFiles::Manifest manifest =
+                    nlohmann::json::parse(std::ifstream(dirit.path()));
+                DLOG(INFO) << "Manifest found: " << manifest.name;
+                auto manifests = ParseFiles::parse_manifest(manifest, deviceMap,
+                                                            romBranchMap);
+
+                parsedManifests.insert(parsedManifests.end(), manifests.begin(),
+                                       manifests.end());
+                DLOG(INFO) << "Add file: " << dirit.path().filename() << ": "
+                           << manifests.size();
+            } catch (const nlohmann::json::parse_error& e) {
+                LOG(ERROR) << "Failed to parse manifest file "
+                           << dirit.path().filename() << ": " << e.what();
+            }
         }
     }
     if (ec) {
@@ -525,26 +289,32 @@ bool ConfigParser::merge() {
     }
 
     // Scan through manifest/recovery
+    DLOG(INFO) << "Scanning recovery manifest files";
     for (const auto& dirit : std::filesystem::directory_iterator(
              _jsonFileDir / "manifest" / "recovery", ec)) {
         if (ParseFiles::is_json_file(dirit.path())) {
-            auto manifests = ParseFiles::parse<ParseFiles::RecoveryManifest>(
-                dirit.path(), deviceMap, romBranchMap);
-            parsedManifests.insert(parsedManifests.end(), manifests.begin(),
-                                   manifests.end());
-            DLOG(INFO) << "Recovery Add file: " << dirit.path().filename()
-                       << ": " << manifests.size();
+            try {
+                DLOG(INFO) << "Parsing recovery manifest file: "
+                           << dirit.path().filename();
+                ParseFiles::RecoveryManifest manifest =
+                    nlohmann::json::parse(std::ifstream(dirit.path()));
+                auto manifests = ParseFiles::parse_recoverymanifest(
+                    manifest, deviceMap, romBranchMap);
+                parsedManifests.insert(parsedManifests.end(), manifests.begin(),
+                                       manifests.end());
+                DLOG(INFO) << "Recovery Add file: " << dirit.path().filename()
+                           << ": " << manifests.size();
+            } catch (const nlohmann::json::parse_error& e) {
+                LOG(ERROR) << "Failed to parse recovery manifest file "
+                           << dirit.path().filename() << ": " << e.what();
+            }
         }
     }
     if (ec) {
         LOG(ERROR) << "Error scanning recovery directory: " << ec.message();
         return false;
     }
-
-    // Clear the old data (refcounts of shared objects)
-    devices.clear();
-    roms.clear();
-    recoveries.clear();
+    DLOG(INFO) << "Finished merging configuration files";
 
     // Now, clean the unreferenced device/roms
     std::erase_if(deviceMap, [](const auto& pair) {
@@ -558,47 +328,8 @@ bool ConfigParser::merge() {
     return !parsedManifests.empty();
 }
 
-namespace {
-bool zipFilePrefixer(std::string_view filename, std::string_view prefix,
-                     const bool debug) {
-    bool startsWith = filename.starts_with(prefix);
-    bool endsWith = filename.ends_with(".zip");
-    if (debug) {
-        LOG(INFO) << fmt::format(
-            "ZipFilePrefixer: StartsWith '{}': {}, "
-            "endsWithZip: {}, entry: {}",
-            prefix, startsWith, endsWith, filename);
-    }
-    return startsWith && endsWith;
-}
-
-bool exactMatcher(std::string_view filename, std::string_view prefix,
-                  const bool debug) {
-    if (debug) {
-        LOG(INFO) << fmt::format("ExactMatcher: Comparing {} with {}", filename,
-                                 prefix);
-    }
-    return filename == prefix;
-}
-
-bool containsMatcher(std::string_view filename, std::string_view prefix,
-                     const bool debug) {
-    if (debug) {
-        LOG(INFO) << fmt::format(
-            "ContainsMatcher: Checking if '{}' contains '{}'", filename,
-            prefix);
-    }
-    return filename.find(prefix) != std::string::npos;
-}
-}  // namespace
-
 ConfigParser::ConfigParser(std::filesystem::path jsonFileDir)
     : _jsonFileDir(std::move(jsonFileDir)) {
-    // Add default matchers
-    storage.add("ZipFilePrefixer", zipFilePrefixer);
-    storage.add("ExactMatcher", exactMatcher);
-    storage.add("ContainsMatcher", containsMatcher);
-
     // Load files
     LOG(INFO) << "Loading JSON files from directory: " << _jsonFileDir;
     merge();

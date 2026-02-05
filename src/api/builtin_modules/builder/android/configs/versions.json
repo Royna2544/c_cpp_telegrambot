@@ -1,0 +1,37 @@
+[
+    {
+        "version": 11,
+        "codename_short": "R",
+        "codename": "Red Velvet Cake"
+    },
+    {
+        "version": 12,
+        "codename_short": "S",
+        "codename": "SnowCone"
+    },
+    {
+        "version": 12.1,
+        "codename_short": "Sv2",
+        "codename": "SnowCone v2"
+    },
+    {
+        "version": 13,
+        "codename_short": "T",
+        "codename": "Tiramisu"
+    },
+    {
+        "version": 14,
+        "codename_short": "U",
+        "codename": "UpsideDownCake"
+    },
+    {
+        "version": 15,
+        "codename_short": "V",
+        "codename": "VanillaIceCream"
+    },
+    {
+        "version": 16,
+        "codename_short": "B",
+        "codename": "Baklava"
+    }
+]

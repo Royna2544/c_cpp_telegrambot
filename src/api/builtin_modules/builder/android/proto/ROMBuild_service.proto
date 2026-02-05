@@ -37,20 +37,28 @@ enum BuildVariant {
     Eng = 2;
 }
 
+message LocalManifestEntry {
+    string url = 1;
+    string branch = 2;
+    string path = 3;
+}
+
 // Request to start a new ROM build
 // config_name: Name of the build configuration to use
 // target_device: Device codename (e.g., "sailfish")
 // rom_name: Name of the ROM (e.g., "LineageOS")
-// rom_android_version: Android version (e.g., "11", "12")
+// rom_android_version: Android version (e.g., 11, 12, 12.1)
 // build_variant: Build variant (User, UserDebug, Eng)
 // parallel_jobs: Number of parallel jobs for the build (optional), defaults to system CPU cores if not set.
+// github_token: GitHub token for accessing private repositories (optional)
 message BuildRequest {
     string config_name = 1;
     string target_device = 2;
     string rom_name = 3;
-    string rom_android_version = 4;
+    float rom_android_version = 4;
     BuildVariant build_variant = 5;
     optional int32 parallel_jobs = 6;
+    optional string github_token = 8; // For private repo access
 }
 
 // Result of a build operation
@@ -61,14 +69,23 @@ message BuildResult {
     string artifact_path = 2;
 }
 
+enum LogLevel {
+    Debug = 0;
+    Info = 1;
+    Warning = 2;
+    Error = 3;
+    Fatal = 4;
+}
+
 // Log entry for build process
 // message: Log message
 // timestamp: Unix timestamp of the log entry
 // is_finished: Whether this log entry indicates the build has finished
 message BuildLogEntry {
-    string message = 1;
-    int64 timestamp = 2;
-    bool is_finished = 3;
+    int64 timestamp = 1;
+    LogLevel level = 2;
+    string message = 3;
+    bool is_finished = 4;
 }
 
 // Action referencing a specific build by ID
@@ -86,6 +103,10 @@ message BuildSubmission {
     string status_message = 3;
 }
 
+message DirectoryExistsResponse {
+    bool exists = 1;
+}
+
 // Service for building Android ROMs
 service ROMBuildService {
     // Get or set build settings
@@ -94,6 +115,7 @@ service ROMBuildService {
 
     // Clean a specified directory
     rpc CleanDirectory(CleanDirectoryRequest) returns (google.protobuf.Empty);
+    rpc DirectoryExists(CleanDirectoryRequest) returns (DirectoryExistsResponse);
     
     // Start a new ROM build.
     rpc StartBuild(BuildRequest) returns (BuildSubmission);
@@ -103,5 +125,7 @@ service ROMBuildService {
 
     // Cancel a build in progress
     rpc CancelBuild(BuildAction) returns (google.protobuf.Empty);
+
+    // Get the status of a build by ID
     rpc GetStatus(BuildAction) returns (BuildSubmission);
 }

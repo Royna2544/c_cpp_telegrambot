@@ -1,212 +1,139 @@
 {
-    "name": "Royna's Playground",
-    "url": "https://github.com/Roynas-Android-Playground/local_manifests/",
+  "name": "Royna's Playground",
+  "url": "https://github.com/Roynas-Android-Playground/local_manifests/",
   "branches": [
     {
       "name": "Exynos7885-new-sixteen",
       "target_rom": "LineageOS",
       "android_version": 16,
-      "devices": [
-        "a10",
-        "a20",
-        "a20e",
-        "a30",
-        "a30s",
-        "a40"
-      ]
+      "device": "a[1-4]0(e|s)?",
+      "use_regex": true
     },
     {
       "name": "Exynos7885-new-fifteen",
       "target_rom": "LineageOS",
       "android_version": 15,
-      "devices": [
-        "a10",
-        "a20",
-        "a20e",
-        "a30",
-        "a30s",
-        "a40"
-      ]
+      "device": "a[1-4]0(e|s)?",
+      "use_regex": true
     },
     {
       "name": "Exynos7885-new-fourteen",
       "target_rom": "LineageOS",
       "android_version": 14,
-      "devices": [
-        "a10",
-        "a20",
-        "a20e",
-        "a30",
-        "a30s",
-        "a40"
-      ]
+      "device": "a[1-4]0(e|s)?",
+      "use_regex": true
     },
     {
       "name": "Exynos7885-new-thirteen",
       "target_rom": "LineageOS",
       "android_version": 13,
-      "devices": [
-        "a10",
-        "a20",
-        "a20e",
-        "a30",
-        "a30s",
-        "a40"
-      ]
+      "device": "a[1-4]0(e|s)?",
+      "use_regex": true
     },
     {
       "name": "Exynos7885-new-twelve",
       "target_rom": "LineageOS",
       "android_version": 12,
-      "devices": [
-        "a10",
-        "a20",
-        "a20e",
-        "a30",
-        "a30s",
-        "a40"
-      ]
+      "device": "a[1-4]0(e|s)?",
+      "use_regex": true
     },
     {
       "name": "Exynos7885-new-eleven",
       "target_rom": "LineageOS",
       "android_version": 11,
-      "devices": [
-        "a10",
-        "a20",
-        "a20e",
-        "a30",
-        "a30s",
-        "a40"
-      ]
+      "device": "a[1-4]0(e|s)?",
+      "use_regex": true
+    },
+    {
+      "name": "Exynos7885-new-eleven",
+      "target_rom": "LineageOS",
+      "android_version": 11,
+      "device": "a[1-4]0(e|s)?",
+      "use_regex": true
     },
     {
       "name": "Exynos7885-new-fifteen",
       "target_rom": "crDroid",
       "android_version": 15,
-      "devices": [
-        "a10",
-        "a20",
-        "a20e",
-        "a30",
-        "a30s",
-        "a40"
-      ]
+      "device": "a[1-4]0(e|s)?",
+      "use_regex": true
     },
     {
       "name": "Exynos7885-new-fourteen",
       "target_rom": "crDroid",
       "android_version": 14,
-      "devices": [
-        "a10",
-        "a20",
-        "a20e",
-        "a30",
-        "a30s",
-        "a40"
-      ]
+      "device": "a[1-4]0(e|s)?",
+      "use_regex": true
     },
     {
       "name": "Exynos7885-new-thirteen",
       "target_rom": "crDroid",
       "android_version": 13,
-      "devices": [
-        "a10",
-        "a20",
-        "a20e",
-        "a30",
-        "a30s",
-        "a40"
-      ]
+      "device": "a[1-4]0(e|s)?",
+      "use_regex": true
     },
     {
       "name": "Exynos7885-new-twelve",
       "target_rom": "crDroid",
       "android_version": 12,
-      "devices": [
-        "a10",
-        "a20",
-        "a20e",
-        "a30",
-        "a30s",
-        "a40"
-      ]
+      "device": "a[1-4]0(e|s)?",
+      "use_regex": true
     },
     {
       "name": "Exynos7885-new-eleven",
       "target_rom": "crDroid",
       "android_version": 11,
-      "devices": [
-        "a10",
-        "a20",
-        "a20e",
-        "a30",
-        "a30s",
-        "a40"
-      ]
+      "device": "a[1-4]0(e|s)?",
+      "use_regex": true
     },
     {
       "name": "Exynos7885-new-sixteen",
       "target_rom": "Evolution-X",
       "android_version": 16,
-      "devices": [
-        "a10",
-        "a20",
-        "a20e",
-        "a30",
-        "a30s",
-        "a40"
-      ]
+      "device": "a[1-4]0(e|s)?",
+      "use_regex": true
     },
     {
       "name": "Exynos7885-new-fifteen",
       "target_rom": "Evolution-X",
       "android_version": 15,
-      "devices": [
-        "a10",
-        "a20",
-        "a20e",
-        "a30",
-        "a30s",
-        "a40"
-      ]
+      "device": "a[1-4]0(e|s)?",
+      "use_regex": true
     },
     {
       "name": "Exynos7885-new-fourteen",
       "target_rom": "Evolution-X",
       "android_version": 14,
-      "devices": [
-        "a10",
-        "a20",
-        "a20e",
-        "a30",
-        "a30s",
-        "a40"
-      ]
+      "device": "a[1-4]0(e|s)?",
+      "use_regex": true
     },
     {
       "name": "tb128fu-Evolution-X-udc",
       "target_rom": "Evolution-X",
       "android_version": 14,
-      "device": "tb128fu"
+      "device": "tb128fu",
+      "use_regex": false
     },
     {
       "name": "tb128fu-Evolution-X-vic",
       "target_rom": "Evolution-X",
       "android_version": 15,
-      "device": "tb128fu"
+      "device": "tb128fu",
+      "use_regex": false
     },
     {
       "name": "tb128fu-Evolution-X-bka",
       "target_rom": "Evolution-X",
       "android_version": 16,
-      "device": "tb128fu"
+      "device": "tb128fu",
+      "use_regex": false
     },
     {
       "name": "tb128fu-DerpFest-15",
       "target_rom": "DerpFest",
       "android_version": 15,
-      "device": "tb128fu"
+      "device": "tb128fu",
+      "use_regex": false
     }
   ]
 }

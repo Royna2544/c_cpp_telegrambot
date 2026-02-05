@@ -5,6 +5,7 @@
 #include <fmt/chrono.h>
 #include <fmt/format.h>
 #include <fmt/ranges.h>
+#include <google/protobuf/wrappers.pb.h>
 #include <grpcpp/client_context.h>
 #include <grpcpp/create_channel.h>
 #include <tgbot/TgException.h>
@@ -28,7 +29,10 @@
 #include "ConfigParsers.hpp"
 #include "HealthCheck_service.grpc.pb.h"
 #include "ROMBuild_service.grpc.pb.h"
+#include "ROMBuild_service.pb.h"
 #include "SystemMonitor_service.grpc.pb.h"
+#include "SystemMonitor_service.pb.h"
+#include "api/RateLimit.hpp"
 #include "command_modules/support/CwdRestorar.hpp"
 #include "command_modules/support/KeyBoardBuilder.hpp"
 
@@ -147,6 +151,8 @@ class ROMBuildQueryHandler {
     void handle_device(const Query& query);
     // Handle ROM selection button
     void handle_rom(const Query& query);
+    // Handle Android version selection button
+    void handle_android_version(const Query& query);
     // Handle type selection button
     void handle_type(const Query& query);
     // Handle cleaning directories
@@ -189,6 +195,8 @@ class ROMBuildQueryHandler {
                                           local_manifest, "local_manifest_"),
         DECLARE_BUTTON_HANDLER_WITHPREFIX("Select device", device, "device_"),
         DECLARE_BUTTON_HANDLER_WITHPREFIX("Select ROM", rom, "rom_"),
+        DECLARE_BUTTON_HANDLER_WITHPREFIX("Select Android version",
+                                          android_version, "android_version_"),
         DECLARE_BUTTON_HANDLER_WITHPREFIX("Select build variant", type,
                                           "type_")};
 
@@ -266,10 +274,12 @@ std::string showPerBuild(const PerBuildData& data,
 [Build Target Info]
 Device: {}
 ROM: {}
+Android Version: {}
 Manifest: {}
 )";
     return fmt::format(literal, banner, data.device->toString(),
-                       data.localManifest->rom->toString(),
+                       data.localManifest->rom->romInfo->name,
+                       data.localManifest->rom->androidVersion->name,
                        data.localManifest->name);
 }
 }  // namespace
@@ -471,7 +481,41 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     // Start build
     grpc::ClientContext context;
     tgbot::builder::android::BuildRequest request;
-    buildStub_->StartBuild(&context, request, nullptr);
+    android::BuildSubmission buildSubmission;
+    request.set_config_name(per_build.localManifest->name);
+    request.set_target_device(per_build.device->codename);
+    request.set_rom_name(per_build.localManifest->rom->romInfo->name);
+    request.set_rom_android_version(
+        per_build.localManifest->rom->androidVersion->version);
+    request.set_build_variant(static_cast<android::BuildVariant>(
+        static_cast<int>(per_build.variant)));
+
+    auto ret = buildStub_->StartBuild(&context, request, &buildSubmission);
+    if (!ret.ok()) {
+        LOG(ERROR) << "Failed to start build: " << ret.error_message();
+        _api->editMessage(sentMessage, "Failed to start build", backKeyboard);
+        return;
+    }
+    LOG(INFO) << "Started build with ID: " << buildSubmission.build_id();
+
+    grpc::ClientContext logContext;
+    android::BuildAction logRequest;
+    logRequest.set_build_id(buildSubmission.build_id());
+    auto read = buildStub_->StreamLogs(&logContext, logRequest);
+    if (!read) {
+        LOG(ERROR) << "Failed to stream logs";
+        _api->editMessage(sentMessage, "Failed to stream logs", backKeyboard);
+        return;
+    }
+    constexpr auto interval = std::chrono::seconds(5);
+    IntervalRateLimiter rateLimiter(1, interval);
+    android::BuildLogEntry logEntry;
+    while (read->Read(&logEntry)) {
+        if (!rateLimiter.check()) {
+            continue;  // Skip update if within rate limit
+        }
+        _api->editMessage(sentMessage, fmt::format("{}", logEntry.message()));
+    }
 
     // Success
     _api->editMessageMarkup(sentMessage, nullptr);
@@ -562,13 +606,23 @@ void ROMBuildQueryHandler::handle_device(const Query& query) {
                            [](const auto& manifest) { return manifest->rom; });
 
     // Very unlikely that there will be duplicates
-    // So, skip this
+    // So, skip that step
+
+    // Find unique ROMs (ignore android version)
+    std::vector<ConfigParser::ROMBranch::Ptr> uniqueRoms;
+    for (const auto& rom : roms) {
+        auto it = std::ranges::find_if(uniqueRoms, [&rom](const auto& urom) {
+            return urom->romInfo->name == rom->romInfo->name;
+        });
+        if (it == uniqueRoms.end()) {
+            uniqueRoms.emplace_back(rom);
+        }
+    }
 
     KeyboardBuilder builder;
-    for (const auto& roms : roms) {
+    for (const auto& roms : uniqueRoms) {
         builder.addKeyboard(
-            {roms->toString(), fmt::format("rom_{}_{}", roms->romInfo->name,
-                                           roms->androidVersion)});
+            {roms->romInfo->name, fmt::format("rom_{}", roms->romInfo->name)});
     }
     builder.addKeyboard(getButtonOf<Buttons::back>());
     _api->editMessage(sentMessage, "Select ROM...", builder.get());
@@ -576,16 +630,40 @@ void ROMBuildQueryHandler::handle_device(const Query& query) {
 
 void ROMBuildQueryHandler::handle_rom(const Query& query) {
     std::string_view rom = query->data;
-    std::vector<std::string> c = absl::StrSplit(rom, '_');
-    CHECK_EQ(c.size(), 2);
-    const auto& romName = c[0];
-    // Basically an assert
-    const int androidVersion = std::stoi(c[1]);
 
     auto [be, en] = std::ranges::remove_if(
-        lookup._localManifest, [romName, androidVersion](const auto& manifest) {
-            return manifest->rom->romInfo->name != romName ||
-                   manifest->rom->androidVersion != androidVersion;
+        lookup._localManifest, [rom](const auto& manifest) {
+            return manifest->rom->romInfo->name != rom;
+        });
+    lookup._localManifest.erase(be, en);
+
+    // Collect android versions
+    std::vector<ConfigParser::AndroidVersion::Ptr> androidVersions;
+    androidVersions.reserve(lookup._localManifest.size());
+    for (const auto& manifest : lookup._localManifest) {
+        androidVersions.emplace_back(manifest->rom->androidVersion);
+    }
+
+    // Find unique android versions
+    std::ranges::sort(androidVersions);
+    auto [b, e] = std::ranges::unique(androidVersions);
+    androidVersions.erase(b, e);
+
+    KeyboardBuilder builder;
+    for (const auto& version : androidVersions) {
+        builder.addKeyboard({version->name, fmt::format("android_version_{}",
+                                                        version->version)});
+    }
+    builder.addKeyboard(getButtonOf<Buttons::back>());
+    _api->editMessage(sentMessage, "Select Android version...", builder.get());
+}
+
+void ROMBuildQueryHandler::handle_android_version(const Query& query) {
+    int androidVersion = stoi(query->data);
+
+    auto [be, en] = std::ranges::remove_if(
+        lookup._localManifest, [androidVersion](const auto& manifest) {
+            return manifest->rom->androidVersion->version != androidVersion;
         });
     lookup._localManifest.erase(be, en);
 
@@ -594,9 +672,8 @@ void ROMBuildQueryHandler::handle_rom(const Query& query) {
                    << lookup._localManifest.size();
         _api->editMessage(
             sentMessage,
-            fmt::format(
-                "Failed to assemble local manifest. ROM name: {}, Android {}",
-                romName, androidVersion));
+            fmt::format("Failed to assemble local manifest. Found {} manifests",
+                        lookup._localManifest.size()));
         return;
     }
     per_build.localManifest = lookup._localManifest.front();
@@ -634,7 +711,8 @@ void ROMBuildQueryHandler::handle_type(const Query& query) {
 
     const auto confirm = fmt::format(
         "Build variant: {}\nDevice: {}\nRom: {}\nAndroid version: {}", type,
-        per_build.device->codename, rom->romInfo->name, rom->androidVersion);
+        per_build.device->codename, rom->romInfo->name,
+        rom->androidVersion->version);
 
     _api->editMessage(sentMessage, confirm,
                       createKeyboardWith<Buttons::confirm, Buttons::back>());
@@ -643,35 +721,98 @@ void ROMBuildQueryHandler::handle_type(const Query& query) {
 void ROMBuildQueryHandler::handle_clean_directories(const Query& query) {
     KeyboardBuilder builder;
 
+    tgbot::builder::android::CleanDirectoryRequest cleanDirectoryRequest;
+    cleanDirectoryRequest.set_directory_type(
+        android::CleanDirectoryType::ROMDirectory);
+
     std::string_view type = query->data;
+    grpc::ClientContext contextClean;
     absl::ConsumePrefix(&type, "clean_");
     if (type == "rom") {
-        LOG(INFO) << "Cleaning directory ";
+        LOG(INFO) << "Cleaning directory ROM";
+        auto r = buildStub_->CleanDirectory(&contextClean,
+                                            cleanDirectoryRequest, nullptr);
+        if (!r.ok()) {
+            LOG(ERROR) << "Failed to clean ROM directory: "
+                       << r.error_message();
+            _api->editMessage(query->message, "Failed to clean ROM directory",
+                              backKeyboard);
+            return;
+        }
         _api->answerCallbackQuery(query->id,
                                   "Wait... cleaning may take some time...");
+
     } else if (type == "build") {
         LOG(INFO) << "Cleaning directory ";
         _api->answerCallbackQuery(query->id,
                                   "Wait... cleaning may take some time...");
+        cleanDirectoryRequest.set_directory_type(
+            android::CleanDirectoryType::BuildDirectory);
+        auto r = buildStub_->CleanDirectory(&contextClean,
+                                            cleanDirectoryRequest, nullptr);
+        if (!r.ok()) {
+            LOG(ERROR) << "Failed to clean build directory: "
+                       << r.error_message();
+            _api->editMessage(query->message, "Failed to clean build directory",
+                              backKeyboard);
+            return;
+        }
+        cleanDirectoryRequest.set_directory_type(
+            android::CleanDirectoryType::ROMDirectory);
     }
-
-    /*
     std::string entry;
-    auto romRootSpace = DiskInfo(romRootDir);
+    grpc::ClientContext contextDirectoryExists1;
+    tgbot::builder::android::DirectoryExistsResponse boolValue;
+    auto rpcRes = buildStub_->DirectoryExists(
+        &contextDirectoryExists1, cleanDirectoryRequest, &boolValue);
+    if (!rpcRes.ok()) {
+        LOG(ERROR) << "Failed to check directory existence: "
+                   << rpcRes.error_message();
+        _api->editMessage(query->message, "Failed to check directory existence",
+                          backKeyboard);
+        return;
+    }
 
     std::error_code ec;
     entry = "Nothing to clean!";
-    if (std::filesystem::exists(romRootDir, ec)) {
-        entry = fmt::format("Current disk space free: {:.2f}GB",
-                            romRootSpace.availableSpace.value());
+    if (boolValue.exists()) {
+        constexpr double one_upgrader = 1024.0;
+        constexpr double gb_upgrader =
+            one_upgrader * one_upgrader * one_upgrader;
+        grpc::ClientContext contextGetSystemInfo;
+        system_monitor::GetSystemInfoRequest getSystemInfoRequest;
+        system_monitor::SystemInfo romRootSpace;
+        getSystemInfoRequest.set_disk_path("/");
+        if (auto res = monitorStub_->GetSystemInfo(
+                &contextGetSystemInfo, getSystemInfoRequest, &romRootSpace);
+            !res.ok()) {
+            LOG(ERROR) << "Failed to get directory size: "
+                       << res.error_message();
+            _api->editMessage(query->message, "Failed to get directory size",
+                              backKeyboard);
+            return;
+        }
+        entry = fmt::format("Current disk space free: {}GB",
+                            romRootSpace.disk_used_gb());
+
+        grpc::ClientContext contextDirectoryExists;
+        if (auto res = buildStub_->DirectoryExists(
+                &contextDirectoryExists, cleanDirectoryRequest, &boolValue);
+            !res.ok()) {
+            LOG(ERROR) << "Failed to check build directory existence: "
+                       << rpcRes.error_message();
+            _api->editMessage(query->message,
+                              "Failed to check build directory existence",
+                              backKeyboard);
+            return;
+        }
         builder.addKeyboard({"Clean ROM directory", "clean_rom"});
-        if (std::filesystem::exists(romRootDir / kOutDirectory, ec)) {
+        if (boolValue.exists()) {
             builder.addKeyboard({"Clean ROM build directory", "clean_build"});
         }
     }
     builder.addKeyboard(getButtonOf<Buttons::back>());
     _api->editMessage(query->message, entry, builder.get());
-    */
 }
 
 void ROMBuildQueryHandler::onCallbackQuery(

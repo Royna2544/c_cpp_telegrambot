@@ -26,9 +26,13 @@ ctrlc = "3.5"
 chrono = "0.4"
 walkdir = "2"
 sysinfo = "0.30"
+uuid = { version = "1.20.0", features = [ "v4" ] }
+which = "8.0.0"
+num_cpus = "1.0"
+xml = "1.2.1"
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.27", features = ["signal"] }
+nix = { version = "0.27", features = ["signal", "resource"] }
 
 [build-dependencies]
 tonic-build = "0.14"

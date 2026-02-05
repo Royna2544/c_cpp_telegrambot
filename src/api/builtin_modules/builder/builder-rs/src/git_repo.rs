@@ -128,10 +128,20 @@ impl GitRepo {
         let fetch_commit = self.repo.reference_to_annotated_commit(&fetch_head)?;
         let analysis = self.repo.merge_analysis(&[&fetch_commit])?;
         if analysis.0.is_fast_forward() {
+            let target_commit = self.repo.find_commit(fetch_commit.id())?;
+
+            // 1. Checkout the tree of the new commit FIRST
+            // This updates Index and Workdir to match the new commit
+            self.repo.checkout_tree(
+                target_commit.as_object(),
+                Some(git2::build::CheckoutBuilder::new().safe()),
+            )?;
+
+            // 2. Update the reference
             let refname = format!("refs/heads/{}", config_branch);
             let mut rhead = self.repo.find_reference(&refname)?;
             rhead.set_target(fetch_commit.id(), "Fast-Forward")?;
-            self.repo.checkout_head(None)?;
+
             info!("Fast-forwarded branch: {}", config_branch);
         }
 

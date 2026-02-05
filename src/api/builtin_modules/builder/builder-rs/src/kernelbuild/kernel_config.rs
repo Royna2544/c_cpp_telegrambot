@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
-use crate::kernelbuild::builder_config::Architecture;
+use crate::{kernelbuild::builder_config::Architecture, util::new_impl};
 use serde::{Deserialize, Serialize};
-use tracing::error;
+use tracing::{error, info};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Repo {
@@ -150,5 +150,9 @@ impl KernelConfig {
             .chain(std::iter::once((build_user.name, build_user.value)))
             .chain(std::iter::once((build_host.name, build_host.value)))
             .collect()
+    }
+
+    pub fn new(file_path: &PathBuf) -> Result<KernelConfig, ()> {
+        new_impl(&file_path)
     }
 }

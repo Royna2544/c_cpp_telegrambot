@@ -1,34 +1,42 @@
 [
     {
         "codename": "a10",
-        "name": "Galaxy A10"
+        "name": "Galaxy A10",
+        "manufacturer": "Samsung"
     },
     {
         "codename": "a20",
-        "name": "Galaxy A20"
+        "name": "Galaxy A20",
+        "manufacturer": "Samsung"
     },
     {
         "codename": "a20e",
-        "name": "Galaxy A20e"
+        "name": "Galaxy A20e",
+        "manufacturer": "Samsung"
     },
     {
         "codename": "a30",
-        "name": "Galaxy A30"
+        "name": "Galaxy A30",
+        "manufacturer": "Samsung"
     },
     {
         "codename": "a40",
-        "name": "Galaxy A40"
+        "name": "Galaxy A40",
+        "manufacturer": "Samsung"
     },
     {
         "codename": "tb128fu",
-        "name": "XiaoXin Pad 2022"
+        "name": "XiaoXin Pad 2022",
+        "manufacturer": "Lenovo"
     },
     {
         "codename": "TB128FU",
-        "name": "XiaoXin Pad 2022"
+        "name": "XiaoXin Pad 2022",
+        "manufacturer": "Lenovo"
     },
     {
         "codename": "a30s",
-        "name": "Galaxy A30s"
+        "name": "Galaxy A30s",
+        "manufacturer": "Samsung"
     }
 ]
