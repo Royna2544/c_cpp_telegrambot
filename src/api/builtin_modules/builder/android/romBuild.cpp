@@ -501,6 +501,8 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     }
     LOG(INFO) << "Started build with ID: " << buildSubmission.build_id();
 
+    build.start(buildSubmission.build_id());
+
     std::string_view variant;
     switch (per_build.variant) {
         case PerBuildData::Variant::kUser:
@@ -517,6 +519,9 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
             break;
     };
 
+    KeyboardBuilder kb;
+    kb.addKeyboard({{"Cancel build", "cancel"}});
+
     grpc::ClientContext logContext;
     android::BuildAction logRequest;
     logRequest.set_build_id(buildSubmission.build_id());
@@ -524,12 +529,13 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     if (!read) {
         LOG(ERROR) << "Failed to stream logs";
         _api->editMessage(sentMessage, "Failed to stream logs", backKeyboard);
+        build.finish();
         return;
     }
     constexpr auto interval = std::chrono::seconds(5);
     IntervalRateLimiter rateLimiter(1, interval);
     android::BuildLogEntry logEntry;
-    while (read->Read(&logEntry)) {
+    while (read->Read(&logEntry) && build.running()) {
         if (!rateLimiter.check()) {
             continue;  // Skip update if within rate limit
         }
@@ -578,8 +584,15 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
             statsResponse.memory_used_mb(), statsResponse.memory_total_mb(),
             infoResponse.disk_used_gb(), infoResponse.disk_total_gb(),
             std::thread::hardware_concurrency(), logEntry.message());
+
         _api->editMessage<TgBotApi::ParseMode::HTML>(sentMessage,
-                                                     buildInfoBuffer);
+                                                     buildInfoBuffer, kb.get());
+    }
+
+    if (!build.running()) {
+        // Build was cancelled
+        _api->editMessage(sentMessage, "Build cancelled", backKeyboard);
+        return;
     }
 
     // Success
@@ -595,6 +608,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
             LOG(ERROR) << "Failed to unpin message: " << e.what();
         }
     }
+    build.finish();
     sentMessage = nullptr;  // Clear the message out.
 }
 
