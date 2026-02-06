@@ -1,3 +1,30 @@
+//! Linux Kernel and Android ROM Builder Service
+//!
+//! A gRPC-based service for building Linux kernels and Android ROMs remotely.
+//! This service provides:
+//!
+//! - Linux kernel building with support for multiple configurations and toolchains
+//! - Android ROM building with various build variants (user, userdebug, eng)
+//! - System monitoring and health checking
+//! - Progress tracking and log streaming for builds
+//!
+//! # Configuration
+//!
+//! The service is configured through command-line arguments specifying:
+//! - Bind address for the gRPC server
+//! - Directories for configurations, outputs, and temporary files
+//!
+//! # Modules
+//!
+//! - `git_repo`: Git repository management and operations
+//! - `gofile_api`: Integration with GoFile API for artifact uploads
+//! - `health`: Health check service implementation
+//! - `kernelbuild`: Linux kernel build service and configuration
+//! - `ratelimit`: Rate limiting utilities
+//! - `rombuild`: Android ROM build service and configuration
+//! - `system_monitor`: System resource monitoring
+//! - `util`: Common utility functions
+
 use crate::kernelbuild::build_service::linux_kernel_build_service_server::LinuxKernelBuildServiceServer;
 use crate::kernelbuild::builder_config::BuilderConfig;
 use crate::kernelbuild::kernel_config::KernelConfig;

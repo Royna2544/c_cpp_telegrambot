@@ -41,8 +41,8 @@ use tokio::{
 };
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status, async_trait};
-use tracing::{info, warn};
 use tracing::{Instrument, error};
+use tracing::{info, warn};
 use xml::writer::XmlEvent;
 
 struct ActiveBuild {
@@ -279,7 +279,7 @@ impl BuildService {
                     info!("Waiting for process to exit after cancellation.");
                     let _ = child.wait().await;
                     info!("Process has exited after cancellation.");
-                
+
                     // Abort log tasks
                     out_handle.abort();
                     err_handle.abort();
@@ -515,8 +515,8 @@ impl rom_build_service_server::RomBuildService for BuildService {
                     .iter()
                     .filter(|entry| {
                         entry.target_rom == req.rom_name
-                            && entry.android_version == req.rom_android_version &&
-                            (entry.device == req.target_device
+                            && entry.android_version == req.rom_android_version
+                            && (entry.device == req.target_device
                                 || (entry.use_regex
                                     && regex::Regex::new(&entry.device)
                                         .map(|re| re.is_match(&req.target_device))
@@ -525,10 +525,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                     .collect::<Vec<_>>();
                 if branches.len() != 1 {
                     for b in &branches {
-                        info!(
-                            "Matching branch found: {} for device: {}",
-                            b.name, b.device
-                        );
+                        info!("Matching branch found: {} for device: {}", b.name, b.device);
                     }
                     return Err(tonic::Status::invalid_argument(format!(
                         "No unique branch found for target device: {} (Got {} entries)",
@@ -695,7 +692,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
 
         let span = tracing::info_span!("build_task", build_id = build_id);
         let task_handle: tokio::task::JoinHandle<Result<(), Status>> = tokio::spawn(async move {
-            macro_rules! send_log  {
+            macro_rules! send_log {
                 ($level:expr, $msg:expr) => {
                     match $level {
                         LogLevel::Debug => info!("{}", $msg),
@@ -704,14 +701,16 @@ impl rom_build_service_server::RomBuildService for BuildService {
                         LogLevel::Error => error!("{}", $msg),
                         LogLevel::Fatal => error!("{}", $msg),
                     }
-                    let _ = log_tx_clone.send(BuildLogEntry {
-                        level: $level.into(),
-                        message: $msg,
-                        timestamp: chrono::Utc::now().timestamp(),
-                        is_finished: false,
-                    }).inspect_err(|e| {
-                        error!("Failed to send log entry: {}", e);
-                    });
+                    let _ = log_tx_clone
+                        .send(BuildLogEntry {
+                            level: $level.into(),
+                            message: $msg,
+                            timestamp: chrono::Utc::now().timestamp(),
+                            is_finished: false,
+                        })
+                        .inspect_err(|e| {
+                            error!("Failed to send log entry: {}", e);
+                        });
                 };
             }
             macro_rules! send_log_final {
@@ -723,14 +722,16 @@ impl rom_build_service_server::RomBuildService for BuildService {
                         LogLevel::Error => error!("{}", $msg),
                         LogLevel::Fatal => error!("{}", $msg),
                     }
-                    let _ = log_tx_clone.send(BuildLogEntry {
-                        level: $level.into(),
-                        message: $msg,
-                        timestamp: chrono::Utc::now().timestamp(),
-                        is_finished: true,
-                    }).inspect_err(|e| {
-                        error!("Failed to send final log entry: {}", e);
-                    });
+                    let _ = log_tx_clone
+                        .send(BuildLogEntry {
+                            level: $level.into(),
+                            message: $msg,
+                            timestamp: chrono::Utc::now().timestamp(),
+                            is_finished: true,
+                        })
+                        .inspect_err(|e| {
+                            error!("Failed to send final log entry: {}", e);
+                        });
                 };
             }
 
@@ -808,7 +809,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
 
                         let error_file = (&tempdir_clone).join(format!("{}-{}", "repo-init", &build_log_filename_suffix));
                         info!("Repo init output log path: {:?}", &error_file);
-                        
+
                         let res = Self::run_command_with_logs(
                             repo_init_cmd,
                             &log_tx_clone,
@@ -1356,12 +1357,18 @@ impl rom_build_service_server::RomBuildService for BuildService {
 
             match res.await {
                 Ok(_) => {
-                    send_log_final!(LogLevel::Info, String::from("Build completed successfully."));
+                    send_log_final!(
+                        LogLevel::Info,
+                        String::from("Build completed successfully.")
+                    );
                 }
                 Err(e) => {
                     // Update known builds entry to contain failure
                     let known_builds_self = &mut known_builds_clone.lock().await;
-                    if let Some(build_entry) = known_builds_self.iter_mut().find(|b| b.id == build_id_clone) {
+                    if let Some(build_entry) = known_builds_self
+                        .iter_mut()
+                        .find(|b| b.id == build_id_clone)
+                    {
                         build_entry.error_message = Some(format!("{}", e));
                     }
                     send_log_final!(LogLevel::Error, format!("Build failed: {}", e));
@@ -1500,7 +1507,10 @@ impl rom_build_service_server::RomBuildService for BuildService {
 
         if !build_entry.success {
             warn!("Entering failure branch for build ID: {}", req.build_id);
-            let error_message = build_entry.error_message.clone().unwrap_or_else(|| "Build failed for unknown reasons.".into());
+            let error_message = build_entry
+                .error_message
+                .clone()
+                .unwrap_or_else(|| "Build failed for unknown reasons.".into());
             tx.send(Ok(BuildResult {
                 success: false,
                 upload_method: UploadMethod::None as i32,
@@ -1510,10 +1520,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
             }))
             .await
             .map_err(|e| {
-                tonic::Status::internal(format!(
-                    "Failed to send failure build result: {}",
-                    e
-                ))
+                tonic::Status::internal(format!("Failed to send failure build result: {}", e))
             })?;
             return Ok(tonic::Response::new(
                 Box::pin(ReceiverStream::new(rx)) as Self::GetBuildResultStream
@@ -1533,7 +1540,12 @@ impl rom_build_service_server::RomBuildService for BuildService {
         drop(upload_tasks);
         info!("Found upload task for build ID: {}", req.build_id);
 
-        let file_name = upload_task.artifact_path.file_name().unwrap().to_string_lossy().to_string();
+        let file_name = upload_task
+            .artifact_path
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
         info!("Artifact file name: {}", &file_name);
 
         tokio::spawn(async move {
@@ -1582,7 +1594,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                                 upload_method: UploadMethod::Stream as i32,
                                 result_details: None,
                                 error_message: None,
-                                file_name: None
+                                file_name: None,
                             }))
                             .await
                             .map_err(|e| {

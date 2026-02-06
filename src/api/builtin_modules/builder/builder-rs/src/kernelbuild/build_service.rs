@@ -67,7 +67,7 @@ pub struct BuildContext {
 struct PerBuildIdStatus {
     build_id: i32,
     finished: bool,
-    suceeded: bool,
+    succeeded: bool,
 }
 
 pub struct BuildService {
@@ -128,7 +128,7 @@ impl BuildService {
         let mut statuses = peridstat.lock().await;
         if let Some(entry) = statuses.iter_mut().find(|s| s.build_id == build_id) {
             entry.finished = true;
-            entry.suceeded = success;
+            entry.succeeded = success;
         }
     }
 
@@ -977,7 +977,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             per_build_statuses_lock.push(PerBuildIdStatus {
                 build_id: current_id,
                 finished: false,
-                suceeded: success,
+                succeeded: success,
             });
             drop(per_build_statuses_lock);
 

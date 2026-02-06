@@ -1,8 +1,23 @@
+//! Utility functions for file handling and path manipulation.
+//!
+//! This module provides common utility functions used throughout the builder-rs service,
+//! including JSON file processing, path canonicalization, and generic deserialization helpers.
+
 use std::path::PathBuf;
 
 use serde::Deserialize;
 use tracing::{debug, error, warn};
 
+/// Processes all JSON files in a directory with a provided function.
+///
+/// # Arguments
+///
+/// * `json_dir` - The directory containing JSON files
+/// * `func` - A function that processes each JSON file path and returns a result
+///
+/// # Returns
+///
+/// A vector of successfully processed results
 pub fn for_each_json_file<T>(
     json_dir: &PathBuf,
     func: impl Fn(&PathBuf) -> Result<T, ()>,
@@ -43,6 +58,15 @@ pub fn for_each_json_file<T>(
     results
 }
 
+/// Canonicalizes a path, returning None if the path doesn't exist or can't be resolved.
+///
+/// # Arguments
+///
+/// * `path` - The path to canonicalize
+///
+/// # Returns
+///
+/// The canonical path or None if canonicalization fails
 pub fn make_canonical_path(path: &PathBuf) -> Option<PathBuf> {
     match std::fs::canonicalize(path) {
         Ok(canonical) => Some(canonical),
@@ -53,6 +77,15 @@ pub fn make_canonical_path(path: &PathBuf) -> Option<PathBuf> {
     }
 }
 
+/// Canonicalizes a path, creating parent directories if they don't exist.
+///
+/// # Arguments
+///
+/// * `path` - The path to canonicalize and potentially create
+///
+/// # Returns
+///
+/// The canonical path or None if creation or canonicalization fails
 pub fn make_canonical_path_mkdirs(path: &PathBuf) -> Option<PathBuf> {
     match std::fs::canonicalize(path) {
         Ok(canonical) => Some(canonical),
@@ -82,6 +115,19 @@ pub fn make_canonical_path_mkdirs(path: &PathBuf) -> Option<PathBuf> {
     }
 }
 
+/// Generic helper to deserialize a JSON file into a type T.
+///
+/// # Type Parameters
+///
+/// * `T` - The type to deserialize into, must implement Deserialize
+///
+/// # Arguments
+///
+/// * `file_path` - Path to the JSON file
+///
+/// # Returns
+///
+/// The deserialized object or an error
 pub fn new_impl<T>(file_path: &PathBuf) -> Result<T, ()>
 where
     T: for<'de> Deserialize<'de>,
