@@ -153,12 +153,16 @@ mod tests {
 
     #[test]
     fn test_make_canonical_path_existing() {
-        let temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
         let path = temp_dir.path().to_path_buf();
 
         let canonical = make_canonical_path(&path);
-        assert!(canonical.is_some());
-        assert!(canonical.unwrap().exists());
+        assert!(canonical.is_some(), "Expected canonical path to be Some");
+        let canonical_path = canonical.expect("Canonical path should exist");
+        assert!(
+            canonical_path.exists(),
+            "Canonical path should exist on filesystem"
+        );
     }
 
     #[test]
@@ -170,27 +174,29 @@ mod tests {
 
     #[test]
     fn test_make_canonical_path_mkdirs_creates_directory() {
-        let temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
         let new_dir = temp_dir.path().join("new").join("nested").join("dir");
 
         let canonical = make_canonical_path_mkdirs(&new_dir);
-        assert!(canonical.is_some());
-        assert!(canonical.unwrap().exists());
+        assert!(canonical.is_some(), "Expected canonical path to be Some");
+        let canonical_path = canonical.expect("Canonical path should be created");
+        assert!(canonical_path.exists(), "Created path should exist");
     }
 
     #[test]
     fn test_make_canonical_path_mkdirs_existing() {
-        let temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
         let path = temp_dir.path().to_path_buf();
 
         let canonical = make_canonical_path_mkdirs(&path);
-        assert!(canonical.is_some());
-        assert!(canonical.unwrap().exists());
+        assert!(canonical.is_some(), "Expected canonical path to be Some");
+        let canonical_path = canonical.expect("Canonical path should exist");
+        assert!(canonical_path.exists(), "Path should exist on filesystem");
     }
 
     #[test]
     fn test_for_each_json_file_empty_dir() {
-        let temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
 
         let results: Vec<String> = for_each_json_file(&temp_dir.path().to_path_buf(), |_path| {
             Ok("test".to_string())
@@ -201,19 +207,24 @@ mod tests {
 
     #[test]
     fn test_for_each_json_file_with_json_files() {
-        let temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
 
         // Create test JSON files
         let json1 = temp_dir.path().join("test1.json");
         let json2 = temp_dir.path().join("test2.json");
         let non_json = temp_dir.path().join("test.txt");
 
-        fs::write(&json1, r#"{"key": "value1"}"#).unwrap();
-        fs::write(&json2, r#"{"key": "value2"}"#).unwrap();
-        fs::write(&non_json, "not json").unwrap();
+        fs::write(&json1, r#"{"key": "value1"}"#).expect("Failed to write test file");
+        fs::write(&json2, r#"{"key": "value2"}"#).expect("Failed to write test file");
+        fs::write(&non_json, "not json").expect("Failed to write test file");
 
         let results: Vec<String> = for_each_json_file(&temp_dir.path().to_path_buf(), |path| {
-            Ok(path.file_name().unwrap().to_string_lossy().to_string())
+            // Safe to unwrap here: we control the paths and they all have valid file names
+            Ok(path
+                .file_name()
+                .expect("Test path should have a file name")
+                .to_string_lossy()
+                .to_string())
         });
 
         assert_eq!(results.len(), 2);
@@ -229,15 +240,17 @@ mod tests {
             key: String,
         }
 
-        let temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
         let json_path = temp_dir.path().join("config.json");
 
-        let mut file = fs::File::create(&json_path).unwrap();
-        file.write_all(br#"{"key": "value"}"#).unwrap();
+        let mut file = fs::File::create(&json_path).expect("Failed to create test file");
+        file.write_all(br#"{"key": "value"}"#)
+            .expect("Failed to write test data");
 
         let config: Result<TestConfig, ()> = new_impl(&json_path);
-        assert!(config.is_ok());
-        assert_eq!(config.unwrap().key, "value");
+        assert!(config.is_ok(), "Expected valid JSON to parse successfully");
+        let config_data = config.expect("Config should be valid");
+        assert_eq!(config_data.key, "value");
     }
 
     #[test]
@@ -247,14 +260,15 @@ mod tests {
             key: String,
         }
 
-        let temp_dir = TempDir::new().unwrap();
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
         let json_path = temp_dir.path().join("bad.json");
 
-        let mut file = fs::File::create(&json_path).unwrap();
-        file.write_all(b"not valid json").unwrap();
+        let mut file = fs::File::create(&json_path).expect("Failed to create test file");
+        file.write_all(b"not valid json")
+            .expect("Failed to write test data");
 
         let config: Result<TestConfig, ()> = new_impl(&json_path);
-        assert!(config.is_err());
+        assert!(config.is_err(), "Expected invalid JSON to fail parsing");
     }
 
     #[test]

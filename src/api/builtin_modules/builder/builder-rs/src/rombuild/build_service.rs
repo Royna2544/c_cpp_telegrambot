@@ -1551,7 +1551,12 @@ impl rom_build_service_server::RomBuildService for BuildService {
         let file_name = upload_task
             .artifact_path
             .file_name()
-            .unwrap()
+            .ok_or_else(|| {
+                tonic::Status::internal(format!(
+                    "Invalid artifact path: {}",
+                    upload_task.artifact_path.display()
+                ))
+            })?
             .to_string_lossy()
             .to_string();
         info!("Artifact file name: {}", &file_name);
