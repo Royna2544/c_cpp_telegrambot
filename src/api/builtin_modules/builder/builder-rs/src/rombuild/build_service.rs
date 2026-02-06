@@ -504,7 +504,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
         let device_entry = device_entry[0].clone();
         info!("Found device entry: {}", device_entry.codename);
 
-        let (_branch_entry, rom_entry, rom_branch_entry): (
+        let (branch_entry, rom_entry, rom_branch_entry): (
             ManifestBranchesEntry,
             ROMEntry,
             ROMBranchEntry,
@@ -880,18 +880,18 @@ impl rom_build_service_server::RomBuildService for BuildService {
                                         })?;
                                     } else {
                                         send_log!(LogLevel::Info, "Local manifest repository URL matches expected URL.".to_string());
-                                        if repo.get_branch_name().map_err(|e| {
+                                        if &repo.get_branch_name().map_err(|e| {
                                         tonic::Status::internal(format!(
                                             "Failed to get branch name of local manifest repository: {}",
                                             e
                                         ))
-                                    })? != rom.name
+                                    })? != &branch_entry.name
                                     {
                                         send_log!(LogLevel::Warning, "Local manifest repository branch mismatch, checking out correct branch...".to_string());
-                                        repo.checkout_branch(&rom.name).map_err(|e| {
+                                        repo.checkout_branch(&branch_entry.name).map_err(|e| {
                                             tonic::Status::internal(format!(
                                                 "Failed to checkout branch {} of local manifest repository: {}",
-                                                &rom.name, e
+                                                &branch_entry.name, e
                                             ))
                                         })?;
                                     } else {
