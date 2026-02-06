@@ -7,7 +7,7 @@
             "path": "device/samsung"
         }
     ],
-    "android_version": 11,
+    "android_version": 12.1,
     "target_recovery": "TWRP",
     "device": "a[1-4]0(e|s)?",
     "use_regex": true

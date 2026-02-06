@@ -149,6 +149,14 @@ impl GitRepo {
         Ok(())
     }
 
+    pub fn cmp_head_with_branch(&self, branch: &str) -> Result<bool, git2::Error> {
+        let head = self.repo.head()?.peel_to_commit()?;
+        let branch_ref = self.repo.find_branch(branch, git2::BranchType::Local)?;
+        let branch_commit = branch_ref.get().peel_to_commit()?;
+
+        Ok(head.id() == branch_commit.id())
+    }
+
     pub fn clone(
         url: &str,
         branch: &str,

@@ -16,7 +16,7 @@ tokio-stream = "0.1"
 clap = { version = "4", features = ["derive"] }
 tracing = "0.1" 
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-reqwest = { version = "0.12", features = ["stream", "rustls-tls"] }
+reqwest = { version = "0.12", features = ["stream", "rustls-tls", "multipart"] }
 futures-util = "0.3" # Helper to stream data to file
 git2 = "0.20"
 tar = "0.4"

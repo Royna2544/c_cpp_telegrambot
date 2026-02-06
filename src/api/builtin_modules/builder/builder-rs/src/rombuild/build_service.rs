@@ -5,18 +5,22 @@ mod grpc_pb {
 pub use crate::rombuild::build_service::grpc_pb::rom_build_service_server::RomBuildServiceServer;
 use crate::{
     git_repo,
+    gofile_api::upload_file_to_gofile,
     rombuild::{
         build_service::grpc_pb::{
-            BuildAction, BuildLogEntry, BuildRequest, BuildSubmission, BuildVariant, CleanDirectoryRequest, CleanDirectoryType, DirectoryExistsResponse, LogLevel, Settings, rom_build_service_server
+            BuildAction, BuildLogEntry, BuildRequest, BuildResult, BuildSubmission, BuildVariant,
+            CleanDirectoryRequest, CleanDirectoryType, DirectoryExistsResponse, LogLevel, Settings,
+            UploadMethod, build_result::ResultDetails, rom_build_service_server,
         },
         types::{
-            ManifestBranchesEntry, ManifestEntry, ROMBranchEntry, ROMBuildConfig, ROMEntry,
-            RecoveryManifestEntry, TargetsEntry,
+            ManifestBranchesEntry, ManifestEntry, ROMArtifactMatcher, ROMBranchEntry,
+            ROMBuildConfig, ROMEntry, RecoveryManifestEntry, TargetsEntry,
         },
     },
 };
 
 use futures_util::Stream;
+use git2::build;
 #[cfg(unix)]
 use nix::libc::{rlimit, setrlimit};
 #[cfg(unix)]
@@ -24,17 +28,19 @@ use nix::sys::signal::{self, Signal};
 #[cfg(unix)]
 use nix::unistd::Pid;
 use std::{
+    fmt::Display,
     path::{Path, PathBuf},
     pin::Pin,
     process::Stdio,
     sync::Arc,
 };
 use tokio::{
-    io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
+    io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
     process::Command,
     sync::{Mutex, broadcast, mpsc},
     task::JoinHandle,
 };
+use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status, async_trait};
 use tracing::{Instrument, error};
 use tracing::{debug, info, warn};
@@ -49,11 +55,39 @@ struct ActiveBuild {
     // Used to wait for the task to finish (optional, for cleanup)
     _task: JoinHandle<Result<(), Status>>,
 }
+
+#[derive(Clone)]
+struct UploadTask {
+    method: UploadMethod,
+    build_id: String,
+    artifact_path: PathBuf,
+}
+
+struct BuildEntry {
+    id: String,
+    variant: BuildVariant,
+    target_device: TargetsEntry,
+    config_name: String,
+}
+
+impl Display for BuildVariant {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            BuildVariant::User => "user",
+            BuildVariant::UserDebug => "userdebug",
+            BuildVariant::Eng => "eng",
+        };
+        write!(f, "{}", s)
+    }
+}
+
 pub struct BuildService {
     settings: Arc<Mutex<Settings>>,
     build_dir: PathBuf,
     configs: ROMBuildConfig,
     active_job: Arc<Mutex<Option<ActiveBuild>>>,
+    active_uploads: Arc<Mutex<Vec<UploadTask>>>,
+    known_builds: Arc<Mutex<Vec<BuildEntry>>>,
 }
 
 impl BuildService {
@@ -71,6 +105,8 @@ impl BuildService {
             build_dir,
             configs,
             active_job: Arc::new(Mutex::new(None)),
+            active_uploads: Arc::new(Mutex::new(Vec::new())),
+            known_builds: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -117,15 +153,21 @@ impl BuildService {
                 tokio::spawn(async move {
                     while let Some(msg) = rx.recv().await {
                         // Write the message to the process
-                        if child_in.write_all(msg.as_bytes()).await.is_err() { break; }
-                        
+                        if child_in.write_all(msg.as_bytes()).await.is_err() {
+                            break;
+                        }
+
                         // Auto-append newline if missing (Shells usually need Enter)
                         if !msg.ends_with('\n') {
-                            if child_in.write_all(b"\n").await.is_err() { break; }
+                            if child_in.write_all(b"\n").await.is_err() {
+                                break;
+                            }
                         }
-                        
+
                         // Flush to ensure the process sees it immediately
-                        if child_in.flush().await.is_err() { break; }
+                        if child_in.flush().await.is_err() {
+                            break;
+                        }
                     }
                 });
             }
@@ -139,10 +181,7 @@ impl BuildService {
         let argv0 = command.as_std().get_program().to_string_lossy().to_string();
         let mut argv = Vec::new();
         argv.push(argv0.clone());
-        args = argv
-            .into_iter()
-            .chain(args.into_iter())
-            .collect::<Vec<_>>();
+        args = argv.into_iter().chain(args.into_iter()).collect::<Vec<_>>();
         let wd = command
             .as_std()
             .get_current_dir()
@@ -180,7 +219,6 @@ impl BuildService {
                     timestamp: chrono::Utc::now().timestamp(),
                     is_finished: false,
                 });
-
             }
         });
 
@@ -289,6 +327,8 @@ fn log_who_asked_me(method: &str, request: &Request<impl std::fmt::Debug>) {
 impl rom_build_service_server::RomBuildService for BuildService {
     type StreamLogsStream =
         Pin<Box<dyn Stream<Item = Result<BuildLogEntry, tonic::Status>> + Send + 'static>>;
+    type GetBuildResultStream =
+        Pin<Box<dyn Stream<Item = Result<BuildResult, tonic::Status>> + Send + 'static>>;
 
     async fn get_settings(
         &self,
@@ -371,10 +411,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
             CleanDirectoryType::RomDirectory => self.build_dir.clone(),
             CleanDirectoryType::BuildDirectory => self.build_dir.join("out"),
         };
-        info!(
-            "Checking existence of directory: {:?}",
-            check_dir
-        );
+        info!("Checking existence of directory: {:?}", check_dir);
         let exists = check_dir.exists();
         Ok(tonic::Response::new(DirectoryExistsResponse { exists }))
     }
@@ -572,6 +609,18 @@ impl rom_build_service_server::RomBuildService for BuildService {
             None => num_cpus::get() as i32,
         };
 
+        let build_variant_enum = req.build_variant.try_into().map_err(|_| {
+            tonic::Status::invalid_argument("Invalid build variant specified in request")
+        })?;
+
+        let known_builds_entry = BuildEntry {
+            id: build_id.clone(),
+            variant: build_variant_enum,
+            target_device: device_entry.clone(),
+            config_name: req.config_name.clone(),
+        };
+        self.known_builds.lock().await.push(known_builds_entry);
+
         // Write git-askpass file if github token is provided
         if let Some(token) = &req.github_token {
             let askpass_path = self.build_dir.join("git-askpass.sh");
@@ -609,6 +658,8 @@ impl rom_build_service_server::RomBuildService for BuildService {
         let settings_clone = self.settings.clone();
         let build_dir_clone = self.build_dir.clone();
         let log_tx_clone = log_tx.clone();
+        let uploads_clone = self.active_uploads.clone();
+        let build_id_clone = build_id.clone();
         let span = tracing::info_span!("build_task", build_id = build_id);
         let task_handle: tokio::task::JoinHandle<Result<(), Status>> = tokio::spawn(async move {
             let send_log = |level: LogLevel, msg: String| {
@@ -631,22 +682,19 @@ impl rom_build_service_server::RomBuildService for BuildService {
 
             // First, check if repo command is available
             if settings_clone.lock().await.do_repo_sync.unwrap() {
-                debug!("Checking for 'repo' command availability...");
+                send_log(LogLevel::Debug, "Checking for 'repo' command availability...".to_string());
                 if which::which("repo").is_err() {
                     return Err(tonic::Status::failed_precondition(
                         "The 'repo' command is not available in the system PATH.",
                     ));
                 }
-                debug!("'repo' command is available.");
+                send_log(LogLevel::Debug, "'repo' command is available.".to_string());
 
                 // Open .repo/manifest git repository and check URL and branch
                 let mut need_reinit = false;
                 let manifest_repo_path = &build_dir_clone.join(".repo").join("manifests.git");
                 if manifest_repo_path.exists() {
-                    debug!(
-                        "Opening manifest git repository at {:?}",
-                        manifest_repo_path
-                    );
+                    send_log(LogLevel::Debug, format!("Opening manifest git repository at {:?}", manifest_repo_path));
                     let repo = git_repo::GitRepo::new(&manifest_repo_path, "origin", None, None)
                         .map_err(|e| {
                             tonic::Status::internal(format!(
@@ -662,27 +710,27 @@ impl rom_build_service_server::RomBuildService for BuildService {
                         Status::internal(format!("Cannot retrieve branch name: {}", x))
                     })?;
 
-                    debug!("manifest repo url:{} branch:{}", repo_url, branch_name);
+                    send_log(LogLevel::Debug, format!("manifest repo url:{} branch:{}", repo_url, branch_name));
 
-                    if repo_url != rom_entry.link || branch_name != rom_branch_entry.branch {
-                        info!(
+                    if repo_url != rom_entry.link || !repo.cmp_head_with_branch(&rom_branch_entry.branch).unwrap_or(false) {
+                        send_log(LogLevel::Info, format!(
                             "Manifest repo URL or branch mismatch. Expected URL: {}, branch: {}. Found URL: {}, branch: {}. Will re-initialize repo.",
                             rom_entry.link, rom_branch_entry.branch, repo_url, branch_name
-                        );
+                        ));
                         // Set flag to re-init repo
                         need_reinit = true;
                     }
                 } else {
-                    info!(
+                    send_log(LogLevel::Info, format!(
                         "No manifest git repository found at {:?}. Will initialize repo.",
                         manifest_repo_path
-                    );
+                    ));
                     // Set flag to re-init repo
                     need_reinit = true;
                 }
 
                 if need_reinit {
-                    info!("Initializing repo...");
+                    send_log(LogLevel::Info, "Initializing repo...".to_string());
 
                     let mut repo_init_cmd = Command::new("repo");
                     repo_init_cmd.arg("init");
@@ -693,9 +741,9 @@ impl rom_build_service_server::RomBuildService for BuildService {
                     repo_init_cmd.arg("--git-lfs");
                     repo_init_cmd.arg("--depth=1");
                     repo_init_cmd.current_dir(&build_dir_clone);
-                    
+
                     let (stdin_tx, stdin_rx) = mpsc::channel(10);
-                    
+
                     // Sometimes, repo init may ask to "enable colored output" --- we auto-confirm it.
                     stdin_tx
                         .send("y".into())
@@ -715,7 +763,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                 }
 
                 // Prepare local manifest
-                info!("Preparing local manifest...");
+                send_log(LogLevel::Info, "Preparing local manifest...".to_string());
                 // Switches to two cases: One with full prebuilt manifest url, one that we have to write it ourselves.
                 let local_manifest_dir = &build_dir_clone.join(".repo").join("local_manifests");
                 if !local_manifest_dir.exists() {
@@ -742,7 +790,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                                     ))
                                 })? != rom.url
                                 {
-                                    warn!("Local manifest repository URL mismatch, re-cloning...");
+                                    send_log(LogLevel::Warning, "Local manifest repository URL mismatch, re-cloning...".to_string());
                                     std::fs::remove_dir_all(&local_manifest_dir).map_err(|e| {
                                     tonic::Status::internal(format!(
                                         "Failed to remove existing local manifest directory: {}",
@@ -764,7 +812,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                                         ))
                                     })?;
                                 } else {
-                                    info!("Local manifest repository URL matches expected URL.",);
+                                    send_log(LogLevel::Info, "Local manifest repository URL matches expected URL.".to_string());
                                     if repo.get_branch_name().map_err(|e| {
                                     tonic::Status::internal(format!(
                                         "Failed to get branch name of local manifest repository: {}",
@@ -772,7 +820,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                                     ))
                                 })? != rom.name
                                 {
-                                    warn!("Local manifest repository branch mismatch, checking out correct branch...");
+                                    send_log(LogLevel::Warning, "Local manifest repository branch mismatch, checking out correct branch...".to_string());
                                     repo.checkout_branch(&rom.name).map_err(|e| {
                                         tonic::Status::internal(format!(
                                             "Failed to checkout branch {} of local manifest repository: {}",
@@ -780,18 +828,16 @@ impl rom_build_service_server::RomBuildService for BuildService {
                                         ))
                                     })?;
                                 } else {
-                                    info!(
-                                        "Local manifest repository branch matches expected branch.",
-                                    );
+                                    send_log(LogLevel::Info, "Local manifest repository branch matches expected branch.".to_string());
                                 }
-                                    info!("Fast-forwarding local manifest repository...");
+                                    send_log(LogLevel::Info, "Fast-forwarding local manifest repository...".to_string());
                                     let _ = repo
                                         .fast_forward()
-                                        .inspect_err(|e| error!("Failed to fast-forward: {}", e));
+                                        .inspect_err(|e| send_log(LogLevel::Error, format!("Failed to fast-forward: {}", e)));
                                 }
                             }
                             Err(_) => {
-                                info!("Cloning local manifest repository from {}...", &rom.url);
+                                send_log(LogLevel::Info, format!("Cloning local manifest repository from {}...", &rom.url));
                                 git_repo::GitRepo::clone(
                                     &rom.url,
                                     &rom.name,
@@ -900,12 +946,12 @@ impl rom_build_service_server::RomBuildService for BuildService {
                                     e
                                 ))
                             })?;
-                        info!("Written local manifest to {:?}", local_manifest_path);
+                        send_log(LogLevel::Info, format!("Written local manifest to {:?}", local_manifest_path));
                     }
                 }
 
                 // Perform repo sync
-                info!("Performing 'repo sync'...");
+                send_log(LogLevel::Info, "Performing 'repo sync'...".to_string());
                 let mut repo_sync_command = Command::new("repo");
                 repo_sync_command.args([
                         "sync",
@@ -925,7 +971,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                     None,
                 ).await?;
                 if !repo_sync_status {
-                    info!("'repo sync' command failed or was cancelled.");
+                    send_log(LogLevel::Info, "'repo sync' command failed or was cancelled.".to_string());
                     return Err(tonic::Status::internal("'repo sync' command failed."));
                 }
             };
@@ -934,7 +980,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
             {
                 // Get current nofile limits
                 use nix::libc;
-                let  (mut soft_limit, mut hard_limit) : (libc::rlim_t, libc::rlim_t);
+                let  (soft_limit, hard_limit) : (libc::rlim_t, libc::rlim_t);
                 unsafe {
                     use nix::sys::resource::{getrlimit, Resource};
                     (soft_limit, hard_limit) = getrlimit(
@@ -943,16 +989,16 @@ impl rom_build_service_server::RomBuildService for BuildService {
                         tonic::Status::internal(format!("Failed to get nofile limit: {}", e))
                     })?;
                 };
-                info!("Current nofile limits - soft: {}, hard: {}", soft_limit, hard_limit);
+                send_log(LogLevel::Info, format!("Current nofile limits - soft: {}, hard: {}", soft_limit, hard_limit));
 
                 // AOSP requires us to have at least 16000, but why not 65536?
                 let new_soft_limit = 65536;
                 let new_hard_limit = if hard_limit > new_soft_limit {
                     hard_limit
-                } else { 
+                } else {
                     new_soft_limit
                 };
-                info!("Setting nofile limits - soft: {}, hard: {}", new_soft_limit, new_hard_limit);
+                send_log(LogLevel::Info, format!("Setting nofile limits - soft: {}, hard: {}", new_soft_limit, new_hard_limit));
                 let rlim = rlimit {
                     rlim_cur: new_soft_limit,
                     rlim_max: new_hard_limit,
@@ -964,11 +1010,11 @@ impl rom_build_service_server::RomBuildService for BuildService {
                         return Err(tonic::Status::internal("Failed to set nofile limit."));
                     }
                 }
-                info!("Successfully set nofile limits.");
+                send_log(LogLevel::Info, "Successfully set nofile limits.".to_string());
             }
 
             // Now, start the build process
-            info!("Starting build process...");
+            send_log(LogLevel::Info, "Starting build process...".to_string());
             let no_ccache = if !settings_clone.lock().await.use_ccache.unwrap() {
                 "unset USE_CCACHE=1"
             } else {
@@ -988,16 +1034,16 @@ impl rom_build_service_server::RomBuildService for BuildService {
                 let config_path = dir.path().join("config").join("BoardConfigSoong.mk");
                 if config_path.exists() {
                     vendor_name = dir.file_name().to_string_lossy().to_string();
-                    info!("Detected vendor: {}", vendor_name);
+                    send_log(LogLevel::Info, format!("Detected vendor: {}", vendor_name));
                     break;
                 }
             }
             if vendor_name == "unknown" {
-                warn!("Could not detect vendor from vendor directory.");
+                send_log(LogLevel::Warning, "Could not detect vendor from vendor directory.".to_string());
                 vendor_name = "lineage".to_string(); // Default to lineage
-                info!("Defaulting to vendor: {} for build.", vendor_name);
+                send_log(LogLevel::Info, format!("Defaulting to vendor: {} for build.", vendor_name));
             } else {
-                info!("Using vendor: {} for build.", vendor_name);
+                send_log(LogLevel::Info, format!("Using vendor: {} for build.", vendor_name));
             }
             let build_variant  = match req.build_variant {
                 val if val == BuildVariant::User as i32 => "user",
@@ -1012,15 +1058,15 @@ impl rom_build_service_server::RomBuildService for BuildService {
 
             let mut cmd = Command::new("bash");
             cmd.current_dir(&build_dir_clone);
-            
+
             let (stdin_tx, stdin_rx) = mpsc::channel(100);
 
             let command = format!("source build/envsetup.sh\n{}\nlunch {}_{}-{}\nm {} -j{}\nexit 0\n", no_ccache, vendor_name, device_entry.codename, build_variant, rom_entry.target, parallel_jobs);
-            info!("Running build command: {}", command);
+            send_log(LogLevel::Info, format!("Running build command: {}", command));
 
             for line in command.lines() {
                 stdin_tx.send(line.into()).await.map_err(|e| tonic::Status::internal(format!("Failed to send to stdin: {}", e)))?;
-                info!("Sent to stdin: {}", line);
+                send_log(LogLevel::Info, format!("Sent to stdin: {}", line));
             }
 
             if !Self::run_command_with_logs(cmd,
@@ -1031,11 +1077,104 @@ impl rom_build_service_server::RomBuildService for BuildService {
             ).await? {
                 return Err(tonic::Status::internal("Build command failed or was cancelled."));
             }
-            info!("Build process completed successfully.");
+            send_log(LogLevel::Info, "Build process completed successfully.".to_string());
+
+            if settings_clone.lock().await.do_upload() {
+                // Finally, check for output file
+                let output_dir = build_dir_clone.join("out").join("target").join("product").join(&device_entry.codename);
+                let artifact = match rom_entry.artifact.matcher {
+                    ROMArtifactMatcher::ZipFilePrefixer => {
+                        let prefix = rom_entry.artifact.data;
+                        let mut artifact_path: Option<PathBuf> = None;
+                        let mut found = false;
+                        for entry in std::fs::read_dir(&output_dir).map_err(|e| {
+                            tonic::Status::internal(format!("Failed to read output directory: {}", e))
+                        })? {
+                            let entry = entry.map_err(|e| {
+                                tonic::Status::internal(format!("Failed to read output entry: {}", e))
+                            })?;
+                            let file_name = entry.file_name().to_string_lossy().to_string();
+                            if file_name.starts_with(&prefix) && file_name.ends_with(".zip") {
+                                send_log(LogLevel::Info, format!("Found output artifact: {}", file_name));
+                                artifact_path = Some(output_dir.join(&file_name));
+                                found = true;
+                                break;
+                            }
+                        }
+                        if !found {
+                            send_log(LogLevel::Error, format!("No output artifact found with prefix: {}", prefix));
+                            None
+                        } else {
+
+                    artifact_path
+                        }
+                    }
+                    ROMArtifactMatcher::ExactMatcher => {
+                        let exact_name = rom_entry.artifact.data;
+                        let artifact_path = output_dir.join(&exact_name);
+                        if !artifact_path.exists() {
+                            send_log(LogLevel::Error, format!("No output artifact found with exact name: {}", exact_name));
+                            None
+                        } else {
+                        send_log(LogLevel::Info, format!("Found output artifact: {:?}", artifact_path));
+                        Some(artifact_path)
+
+                        }
+                    }
+            };
+            if let Some(artifact_path) = artifact {
+                send_log(LogLevel::Info, format!("Build artifact located at: {:?}", artifact_path));
+                let mut uploads = uploads_clone.lock().await;
+                match req.upload_method {
+                    val if val == UploadMethod::None as i32 => {
+                        send_log(LogLevel::Info, "Upload method set to None, skipping upload.".to_string());
+                    }
+                   val if val == UploadMethod::LocalFile as i32 => {
+                        send_log(LogLevel::Info, format!("File ready at local path: {:?}", artifact_path));
+                        uploads.push(
+                            UploadTask {
+                                build_id: build_id_clone,
+                                method: UploadMethod::LocalFile,
+                                artifact_path: artifact_path.clone(),
+                            }
+                        );
+                    }
+                    val if val == UploadMethod::GoFile as i32 => {
+                        send_log(LogLevel::Info, "Scheduling upload to GoFile...".to_string());
+                        uploads.push(
+                            UploadTask {
+                                build_id: build_id_clone,
+                                method: UploadMethod::GoFile,
+                                artifact_path: artifact_path.clone(),
+                            }
+                        );
+                    }
+                    val if val == UploadMethod::Stream as i32 => {
+                        send_log(LogLevel::Info, "Scheduling upload to Stream...".to_string());
+                        uploads.push(
+                            UploadTask {
+                                build_id: build_id_clone,
+                                method: UploadMethod::Stream,
+                                artifact_path: artifact_path.clone(),
+                            }
+                        );
+                    }
+                    _ => {
+                        send_log(LogLevel::Warning, "Unknown upload method specified, skipping upload.".to_string());   
+                    }
+                }
+            } else {
+                send_log(LogLevel::Error, "Build artifact not found.".to_string());
+            }
+
+        } else {
+                send_log(LogLevel::Info, "Upload disabled in settings, skipping artifact search.".to_string());
+
+            };
 
             Ok(())
             }.instrument(span);
-        
+
             match res.await {
                 Ok(_) => send_log_final("Build completed successfully.".into()),
                 Err(e) => send_log_final(format!("Build failed: {}", e)),
@@ -1093,7 +1232,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
         };
 
         Ok(tonic::Response::new(
-            Box::pin(output) as Self::StreamLogsStream,
+            Box::pin(output) as Self::StreamLogsStream
         ))
     }
 
@@ -1146,5 +1285,161 @@ impl rom_build_service_server::RomBuildService for BuildService {
             accepted: true,
             status_message: "Build is in progress.".into(),
         }))
+    }
+
+    async fn get_build_result(
+        &self,
+        request: tonic::Request<BuildAction>,
+    ) -> std::result::Result<tonic::Response<Self::GetBuildResultStream>, tonic::Status> {
+        log_who_asked_me("get_build_result", &request);
+        let req = request.into_inner();
+        let known_builds = self.known_builds.lock().await;
+        let build_entry = known_builds.iter().find(|entry| entry.id == req.build_id);
+        if build_entry.is_none() {
+            return Err(tonic::Status::invalid_argument(
+                "No known build with the specified ID.",
+            ));
+        }
+        info!("Fetching build result for ID: {}", req.build_id);
+        let build_entry = build_entry.unwrap();
+        info!(
+            "Found build entry: configname: {}, device: {}, variant: {}",
+            build_entry.config_name, build_entry.target_device.name, build_entry.variant
+        );
+
+        let upload_tasks = self.active_uploads.lock().await;
+        let upload_task = upload_tasks
+            .iter()
+            .find(|task| task.build_id == req.build_id);
+        if upload_task.is_none() {
+            return Err(tonic::Status::failed_precondition(
+                "No upload task found for the specified build ID. Build may still be in progress or upload not scheduled.",
+            ));
+        }
+        let upload_task = upload_task.unwrap().clone();
+        drop(upload_tasks);
+        info!("Found upload task for build ID: {}", req.build_id);
+
+        let (tx, rx) = mpsc::channel(10);
+
+        tokio::spawn(async move {
+            match upload_task.method {
+                UploadMethod::LocalFile => {
+                    info!(
+                        "Returning LocalFile build result for build ID: {}",
+                        req.build_id
+                    );
+                    tx.send(Ok(BuildResult {
+                        success: true,
+                        upload_method: UploadMethod::LocalFile as i32,
+                        result_details: Some(ResultDetails::LocalFilePath(
+                            upload_task.artifact_path.to_string_lossy().to_string(),
+                        )),
+                    }))
+                    .await
+                    .map_err(|e| {
+                        tonic::Status::internal(format!(
+                            "Failed to send LocalFile build result: {}",
+                            e
+                        ))
+                    })?;
+                }
+                UploadMethod::Stream => {
+                    info!(
+                        "Returning Stream build result for build ID: {}",
+                        req.build_id
+                    );
+                    let mut file = tokio::fs::File::open(&upload_task.artifact_path)
+                        .await
+                        .map_err(|e| {
+                            tonic::Status::internal(format!(
+                                "Failed to open artifact file for streaming: {}",
+                                e
+                            ))
+                        })?;
+                    let mut buffer = vec![0u8; 1024 * 64]; // 64KB buffer
+                    loop {
+                        let n = file.read(&mut buffer).await;
+                        if let Err(e) = n {
+                            tx.send(Ok(BuildResult {
+                                success: false,
+                                upload_method: UploadMethod::Stream as i32,
+                                result_details: None,
+                            }))
+                            .await
+                            .map_err(|e| {
+                                tonic::Status::internal(format!(
+                                    "Failed to send Stream build result: {}",
+                                    e
+                                ))
+                            })?;
+                            break;
+                        }
+                        let n = n.unwrap();
+                        if n == 0 {
+                            break;
+                        }
+                        tx.send(Ok(BuildResult {
+                            success: true,
+                            upload_method: UploadMethod::Stream as i32,
+                            result_details: Some(ResultDetails::StreamData(buffer[..n].to_vec())),
+                        }))
+                        .await
+                        .map_err(|e| {
+                            tonic::Status::internal(format!(
+                                "Failed to send Stream build result: {}",
+                                e
+                            ))
+                        })?;
+                    }
+                }
+                UploadMethod::GoFile => {
+                    info!(
+                        "Returning GoFile build result for build ID: {}",
+                        req.build_id
+                    );
+                    let upload_response =
+                        upload_file_to_gofile(&upload_task.artifact_path.to_string_lossy())
+                            .await
+                            .map_err(|e| {
+                                tonic::Status::internal(format!(
+                                    "Failed to upload file to GoFile: {}",
+                                    e
+                                ))
+                            })?;
+                    // Here we would normally have the link from the upload process
+                    let gofile_link = upload_response.data.downloadPage;
+                    info!("File uploaded to GoFile successfully: {}", gofile_link);
+                    tx.send(Ok(BuildResult {
+                        success: true,
+                        upload_method: UploadMethod::GoFile as i32,
+                        result_details: Some(ResultDetails::GofileLink(gofile_link)),
+                    }))
+                    .await
+                    .map_err(|e| {
+                        tonic::Status::internal(format!(
+                            "Failed to send GoFile build result: {}",
+                            e
+                        ))
+                    })?;
+                }
+                _ => {
+                    tx.send(Ok(BuildResult {
+                        success: false,
+                        upload_method: UploadMethod::None as i32,
+                        result_details: None,
+                    }))
+                    .await
+                    .map_err(|e| {
+                        tonic::Status::internal(format!("Failed to send None build result: {}", e))
+                    })?;
+                }
+            }
+            Ok::<(), tonic::Status>(())
+        });
+
+        Ok(tonic::Response::new(
+            Box::pin(ReceiverStream::new(rx)) as Self::GetBuildResultStream
+        ))
     }
 }

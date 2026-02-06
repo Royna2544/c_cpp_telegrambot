@@ -6,13 +6,13 @@ use tracing::{error, info};
 use crate::util::{self, new_impl};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-enum ROMArtifactMatcher {
+pub enum ROMArtifactMatcher {
     ZipFilePrefixer,
     ExactMatcher,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
-struct ROMArtifactEntry {
+pub struct ROMArtifactEntry {
     pub matcher: ROMArtifactMatcher,
     pub data: String,
 }

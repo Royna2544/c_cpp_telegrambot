@@ -411,7 +411,6 @@ fn log_who_asked_me(method: &str, request: &Request<impl std::fmt::Debug>) {
 macro_rules! report {
     ($tx:expr, $status:ident, $msg:expr) => {
         info!("Build Status - {:?}: {}", ProgressStatus::$status, $msg);
-        // We capture 'tx' from the surrounding scope automatically
         $tx.send(Ok(BuildStatus {
             status: ProgressStatus::$status.into(),
             output: $msg.into(),
@@ -425,7 +424,6 @@ macro_rules! report {
 macro_rules! report_blk {
     ($tx:expr, $status:ident, $msg:expr) => {
         info!("Build Status - {:?}: {}", ProgressStatus::$status, $msg);
-        // We capture 'tx' from the surrounding scope automatically
         $tx.blocking_send(Ok(BuildStatus {
             status: ProgressStatus::$status.into(),
             output: $msg.into(),
@@ -437,7 +435,7 @@ macro_rules! report_blk {
 
 macro_rules! report_build_id {
     ($tx:expr, $build_id:expr, $status:ident, $msg:expr) => {
-        // We capture 'tx' from the surrounding scope automatically
+        info!("Build Status - {:?}: {}", ProgressStatus::$status, $msg);
         $tx.send(Ok(BuildStatus {
             status: ProgressStatus::$status.into(),
             output: $msg.into(),
@@ -445,7 +443,6 @@ macro_rules! report_build_id {
         }))
         .await
         .unwrap();
-        info!("Build Status - {:?}: {}", ProgressStatus::$status, $msg);
     };
 }
 

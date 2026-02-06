@@ -36,6 +36,7 @@
 #include "api/RateLimit.hpp"
 #include "command_modules/support/CwdRestorar.hpp"
 #include "command_modules/support/KeyBoardBuilder.hpp"
+#include "tgbot/types/InputFile.h"
 
 using std::string_literals::operator""s;
 using namespace tgbot::builder;
@@ -490,6 +491,16 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
         per_build.localManifest->rom->androidVersion->version);
     request.set_build_variant(static_cast<android::BuildVariant>(
         static_cast<int>(per_build.variant)));
+    if (auto var = _config->get(ConfigManager::Configs::GITHUB_TOKEN); var) {
+        request.set_github_token(*var);
+    }
+    if (auto var = _config->get(ConfigManager::Configs::TELEGRAM_API_SERVER)) {
+        // If using custom API server (assuming self-hosted), use telegram
+        // upload method. (So download the file here.)
+        request.set_upload_method(android::UploadMethod::LocalFile);
+    } else {
+        request.set_upload_method(android::UploadMethod::GoFile);
+    }
 
     std::chrono::system_clock::time_point start =
         std::chrono::system_clock::now();
@@ -593,6 +604,137 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
         // Build was cancelled
         _api->editMessage(sentMessage, "Build cancelled", backKeyboard);
         return;
+    }
+
+    if (do_upload) {
+        android::BuildResult buildResult;
+        auto reader = buildStub_->GetBuildResult(&context, logRequest);
+        if (!reader) {
+            LOG(ERROR) << "Failed to get build result";
+            _api->editMessage(sentMessage, "Failed to get build result",
+                              backKeyboard);
+            build.finish();
+            return;
+        }
+        bool isStream = false;
+        std::ofstream streamFile;
+        std::filesystem::path streamFilePath =
+            "built_artifact_" + build.getId() + ".zip";
+        if (reader->Read(&buildResult)) {
+            switch (buildResult.upload_method()) {
+                case android::UploadMethod::LocalFile: {
+                    if (buildResult.success()) {
+                        _api->editMessage<TgBotApi::ParseMode::HTML>(
+                            sentMessage,
+                            showPerBuild(per_build,
+                                         fmt::format(
+                                             R"(Build complete! 
+Download the built artifact here: <code>{}</code>)",
+                                             buildResult.local_file_path())),
+                            backKeyboard);
+                    } else {
+                        _api->editMessage(
+                            sentMessage,
+                            showPerBuild(per_build, R"(Build failed!)"),
+                            backKeyboard);
+                    }
+                    break;
+                }
+                case android::UploadMethod::GoFile: {
+                    if (buildResult.success()) {
+                        _api->editMessage<TgBotApi::ParseMode::HTML>(
+                            sentMessage,
+                            showPerBuild(per_build,
+                                         fmt::format(
+                                             R"(Build complete!
+Download the built artifact here: <a href="{}">{}</a>)",
+                                             buildResult.gofile_link(),
+                                             buildResult.gofile_link())),
+                            backKeyboard);
+                    } else {
+                        _api->editMessage(
+                            sentMessage,
+                            showPerBuild(per_build, R"(Build failed!)"),
+                            backKeyboard);
+                    }
+                    break;
+                }
+                case android::UploadMethod::Stream: {
+                    LOG(INFO) << "Received Stream upload method in result";
+                    if (buildResult.success()) {
+                        isStream = true;
+                        streamFile.open(streamFilePath, std::ios::binary);
+                        if (!streamFile.is_open()) {
+                            LOG(ERROR)
+                                << "Failed to open stream file for writing";
+                            _api->editMessage(
+                                sentMessage,
+                                showPerBuild(
+                                    per_build,
+                                    R"(Build failed due to file error!)"),
+                                backKeyboard);
+                            break;
+                        }
+                        streamFile.write(buildResult.stream_data().data(),
+                                         buildResult.stream_data().size());
+                    } else {
+                        _api->editMessage(
+                            sentMessage,
+                            showPerBuild(per_build, R"(Build failed!)"),
+                            backKeyboard);
+                        streamFile.close();
+                        break;
+                    }
+                    break;
+                }
+                default: {
+                    LOG(ERROR) << "Unknown upload method in build result";
+                    _api->editMessage(
+                        sentMessage,
+                        showPerBuild(
+                            per_build,
+                            R"(Build failed due to unknown upload method!)"),
+                        backKeyboard);
+                    break;
+                }
+            }
+
+            if (isStream) {
+                // Continue reading stream data
+                android::BuildResult streamResult;
+                while (reader->Read(&streamResult)) {
+                    streamFile.write(streamResult.stream_data().data(),
+                                     streamResult.stream_data().size());
+                }
+                streamFile.close();
+                _api->sendDocument(
+                    sentMessage->chat,
+                    InputFile::fromFile(streamFilePath, "application/zip"),
+                    "Here is your built artifact!");
+                _api->editMessage<TgBotApi::ParseMode::HTML>(
+                    sentMessage,
+                    showPerBuild(per_build, fmt::format(
+                                                R"(Build complete!
+Download the built artifact above!)
+Build ID: <code>{}</code>)",
+                                                build.getId())),
+                    backKeyboard);
+            }
+        } else {
+            LOG(ERROR) << "Failed to read build result";
+            _api->editMessage(sentMessage, "Failed to read build result",
+                              backKeyboard);
+        }
+        auto status = reader->Finish();
+        if (!status.ok()) {
+            LOG(ERROR) << "GetBuildResult rpc failed: "
+                       << status.error_message();
+        }
+    } else {
+        _api->editMessage(
+            sentMessage,
+            showPerBuild(per_build, R"(Build complete! Upload skipped.)"),
+            backKeyboard);
     }
 
     // Success
