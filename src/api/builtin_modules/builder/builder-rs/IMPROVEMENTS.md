@@ -21,8 +21,8 @@ The `builder-rs` service is a gRPC-based system for building Linux kernels and A
 ### 2. Error Handling
 
 #### Reduced Unsafe `unwrap()` Usage
-- Replaced `git2::Config::open_default().unwrap()` with safe fallback
-- Used `NonZero::new_unchecked` with SAFETY comment for compile-time constant
+- Replaced `git2::Config::open_default().unwrap()` with safe fallback using `or_else()`
+- Used compile-time const evaluation for `NonZero` values (e.g., `const RATE_LIMIT_SECS: NonZero<u64> = NonZero::new(5).unwrap()`)
 - Replaced unsafe unwrap chains with safe pattern matching using `ok_or_else()`
 
 #### Improved Conditional Logic

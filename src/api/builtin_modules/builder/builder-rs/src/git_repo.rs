@@ -74,11 +74,9 @@ impl GitRepo {
         // F is any closure user passes in
         F: FnMut(&git2::Progress<'_>),
     {
-        // Use const evaluation to ensure compile-time non-zero check
-        const RATE_LIMIT_SECS: NonZero<u64> = match NonZero::new(5) {
-            Some(n) => n,
-            None => unreachable!(),
-        };
+        // Create non-zero constant at compile time. Since 5 is non-zero,
+        // the unwrap() will be evaluated at compile time and never panic.
+        const RATE_LIMIT_SECS: NonZero<u64> = NonZero::new(5).unwrap();
         let mut ratelimit = RateLimit::new(RATE_LIMIT_SECS);
 
         // logic: accepts value 'p', passes ref '&p' to inner callback
