@@ -1406,12 +1406,16 @@ impl rom_build_service_server::RomBuildService for BuildService {
         log_who_asked_me("stream_logs", &request);
         let req = request.into_inner();
         let lock = self.active_job.lock().await;
-        if lock.is_none() || lock.as_ref().unwrap().id != req.build_id {
-            return Err(tonic::Status::invalid_argument(
-                "No active build with the specified ID.",
-            ));
-        }
-        let active_build = lock.as_ref().unwrap();
+
+        let active_build = match lock.as_ref() {
+            Some(build) if build.id == req.build_id => build,
+            _ => {
+                return Err(tonic::Status::invalid_argument(
+                    "No active build with the specified ID.",
+                ));
+            }
+        };
+
         let mut log_rx = active_build.log_tx.subscribe();
 
         let output = async_stream::try_stream! {
@@ -1439,12 +1443,16 @@ impl rom_build_service_server::RomBuildService for BuildService {
         log_who_asked_me("cancel_build", &request);
         let req = request.into_inner();
         let lock = self.active_job.lock().await;
-        if lock.is_none() || lock.as_ref().unwrap().id != req.build_id {
-            return Err(tonic::Status::invalid_argument(
-                "No active build with the specified ID.",
-            ));
-        }
-        let active_build = lock.as_ref().unwrap();
+
+        let active_build = match lock.as_ref() {
+            Some(build) if build.id == req.build_id => build,
+            _ => {
+                return Err(tonic::Status::invalid_argument(
+                    "No active build with the specified ID.",
+                ));
+            }
+        };
+
         info!("Cancelling build with ID: {}", req.build_id);
         // Send cancellation signal
         match active_build.kill_tx.send(()).await {
@@ -1468,17 +1476,16 @@ impl rom_build_service_server::RomBuildService for BuildService {
         log_who_asked_me("get_status", &request);
         let req = request.into_inner();
         let lock = self.active_job.lock().await;
-        if lock.is_none() || lock.as_ref().unwrap().id != req.build_id {
-            return Ok(tonic::Response::new(BuildSubmission {
-                build_id: req.build_id,
-                accepted: false,
-                status_message: "No active build with the specified ID.".into(),
-            }));
-        }
+
+        let (accepted, status_message) = match lock.as_ref() {
+            Some(build) if build.id == req.build_id => (true, "Build is in progress.".into()),
+            _ => (false, "No active build with the specified ID.".into()),
+        };
+
         Ok(tonic::Response::new(BuildSubmission {
             build_id: req.build_id,
-            accepted: true,
-            status_message: "Build is in progress.".into(),
+            accepted,
+            status_message,
         }))
     }
 
@@ -1489,14 +1496,15 @@ impl rom_build_service_server::RomBuildService for BuildService {
         log_who_asked_me("get_build_result", &request);
         let req = request.into_inner();
         let known_builds = self.known_builds.lock().await;
-        let build_entry = known_builds.iter().find(|entry| entry.id == req.build_id);
-        if build_entry.is_none() {
-            return Err(tonic::Status::invalid_argument(
-                "No known build with the specified ID.",
-            ));
-        }
+
+        let build_entry = known_builds
+            .iter()
+            .find(|entry| entry.id == req.build_id)
+            .ok_or_else(|| {
+                tonic::Status::invalid_argument("No known build with the specified ID.")
+            })?;
+
         info!("Fetching build result for ID: {}", req.build_id);
-        let build_entry = build_entry.unwrap();
         info!(
             "Found build entry: configname: {}, device: {}, variant: {}",
             build_entry.config_name, build_entry.target_device.name, build_entry.variant
@@ -1530,13 +1538,13 @@ impl rom_build_service_server::RomBuildService for BuildService {
         let upload_tasks = self.active_uploads.lock().await;
         let upload_task = upload_tasks
             .iter()
-            .find(|task| task.build_id == req.build_id);
-        if upload_task.is_none() {
-            return Err(tonic::Status::failed_precondition(
-                "No upload task found for the specified build ID. Build may still be in progress or upload not scheduled.",
-            ));
-        }
-        let upload_task = upload_task.unwrap().clone();
+            .find(|task| task.build_id == req.build_id)
+            .ok_or_else(|| {
+                tonic::Status::failed_precondition(
+                    "No upload task found for the specified build ID. Build may still be in progress or upload not scheduled.",
+                )
+            })?
+            .clone();
         drop(upload_tasks);
         info!("Found upload task for build ID: {}", req.build_id);
 

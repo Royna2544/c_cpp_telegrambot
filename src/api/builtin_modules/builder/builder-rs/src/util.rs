@@ -143,3 +143,129 @@ where
     })?;
     Ok(config)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::io::Write;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_make_canonical_path_existing() {
+        let temp_dir = TempDir::new().unwrap();
+        let path = temp_dir.path().to_path_buf();
+
+        let canonical = make_canonical_path(&path);
+        assert!(canonical.is_some());
+        assert!(canonical.unwrap().exists());
+    }
+
+    #[test]
+    fn test_make_canonical_path_nonexistent() {
+        let path = PathBuf::from("/nonexistent/path/that/does/not/exist");
+        let canonical = make_canonical_path(&path);
+        assert!(canonical.is_none());
+    }
+
+    #[test]
+    fn test_make_canonical_path_mkdirs_creates_directory() {
+        let temp_dir = TempDir::new().unwrap();
+        let new_dir = temp_dir.path().join("new").join("nested").join("dir");
+
+        let canonical = make_canonical_path_mkdirs(&new_dir);
+        assert!(canonical.is_some());
+        assert!(canonical.unwrap().exists());
+    }
+
+    #[test]
+    fn test_make_canonical_path_mkdirs_existing() {
+        let temp_dir = TempDir::new().unwrap();
+        let path = temp_dir.path().to_path_buf();
+
+        let canonical = make_canonical_path_mkdirs(&path);
+        assert!(canonical.is_some());
+        assert!(canonical.unwrap().exists());
+    }
+
+    #[test]
+    fn test_for_each_json_file_empty_dir() {
+        let temp_dir = TempDir::new().unwrap();
+
+        let results: Vec<String> = for_each_json_file(&temp_dir.path().to_path_buf(), |_path| {
+            Ok("test".to_string())
+        });
+
+        assert_eq!(results.len(), 0);
+    }
+
+    #[test]
+    fn test_for_each_json_file_with_json_files() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // Create test JSON files
+        let json1 = temp_dir.path().join("test1.json");
+        let json2 = temp_dir.path().join("test2.json");
+        let non_json = temp_dir.path().join("test.txt");
+
+        fs::write(&json1, r#"{"key": "value1"}"#).unwrap();
+        fs::write(&json2, r#"{"key": "value2"}"#).unwrap();
+        fs::write(&non_json, "not json").unwrap();
+
+        let results: Vec<String> = for_each_json_file(&temp_dir.path().to_path_buf(), |path| {
+            Ok(path.file_name().unwrap().to_string_lossy().to_string())
+        });
+
+        assert_eq!(results.len(), 2);
+        assert!(results.contains(&"test1.json".to_string()));
+        assert!(results.contains(&"test2.json".to_string()));
+        assert!(!results.contains(&"test.txt".to_string()));
+    }
+
+    #[test]
+    fn test_new_impl_valid_json() {
+        #[derive(Deserialize)]
+        struct TestConfig {
+            key: String,
+        }
+
+        let temp_dir = TempDir::new().unwrap();
+        let json_path = temp_dir.path().join("config.json");
+
+        let mut file = fs::File::create(&json_path).unwrap();
+        file.write_all(br#"{"key": "value"}"#).unwrap();
+
+        let config: Result<TestConfig, ()> = new_impl(&json_path);
+        assert!(config.is_ok());
+        assert_eq!(config.unwrap().key, "value");
+    }
+
+    #[test]
+    fn test_new_impl_invalid_json() {
+        #[derive(Deserialize)]
+        struct TestConfig {
+            key: String,
+        }
+
+        let temp_dir = TempDir::new().unwrap();
+        let json_path = temp_dir.path().join("bad.json");
+
+        let mut file = fs::File::create(&json_path).unwrap();
+        file.write_all(b"not valid json").unwrap();
+
+        let config: Result<TestConfig, ()> = new_impl(&json_path);
+        assert!(config.is_err());
+    }
+
+    #[test]
+    fn test_new_impl_nonexistent_file() {
+        #[derive(Deserialize)]
+        struct TestConfig {
+            key: String,
+        }
+
+        let path = PathBuf::from("/nonexistent/config.json");
+        let config: Result<TestConfig, ()> = new_impl(&path);
+        assert!(config.is_err());
+    }
+}

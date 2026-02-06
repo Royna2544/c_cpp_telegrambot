@@ -35,6 +35,7 @@ impl RateLimit {
     ///
     /// Returns `true` if the action is allowed (enough time has elapsed),
     /// `false` otherwise. When returning `true`, the internal timer is updated.
+    #[must_use]
     pub fn check(&mut self) -> bool {
         let now = std::time::Instant::now();
         let elapsed = now.duration_since(self.last_time);
@@ -43,5 +44,51 @@ impl RateLimit {
         }
         self.last_time = std::time::Instant::now();
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::thread::sleep;
+    use std::time::Duration;
+
+    #[test]
+    fn test_ratelimit_initial_check_passes() {
+        // The first check should always pass because we initialize
+        // last_time to (now - interval)
+        let mut rl = RateLimit::new(NonZero::new(1).unwrap());
+        assert!(rl.check());
+    }
+
+    #[test]
+    fn test_ratelimit_blocks_immediate_second_call() {
+        let mut rl = RateLimit::new(NonZero::new(1).unwrap());
+        assert!(rl.check()); // First call passes
+        assert!(!rl.check()); // Second immediate call should be blocked
+    }
+
+    #[test]
+    fn test_ratelimit_allows_after_interval() {
+        // Use a very short interval for testing
+        let mut rl = RateLimit::new(NonZero::new(1).unwrap());
+        assert!(rl.check()); // First call passes
+
+        // Wait for the interval to pass
+        sleep(Duration::from_secs(1));
+
+        // Now the check should pass again
+        assert!(rl.check());
+    }
+
+    #[test]
+    fn test_ratelimit_multiple_blocked_attempts() {
+        let mut rl = RateLimit::new(NonZero::new(2).unwrap());
+        assert!(rl.check()); // First call passes
+
+        // Multiple immediate attempts should all be blocked
+        assert!(!rl.check());
+        assert!(!rl.check());
+        assert!(!rl.check());
     }
 }
