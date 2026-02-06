@@ -71,6 +71,8 @@ message BuildRequest {
 //   - local_file_path: Path to the local file if upload_method is LocalFile
 //   - stream_data: Byte stream of the file if upload_method is Stream (Sent multiple times for large files)
 //   - gofile_link: Link to the GoFile upload if upload_method is GoFile
+// error_message: Error message if the build failed
+// file_name: Name of the built file
 message BuildResult {
     bool success = 1;
     UploadMethod upload_method = 2;
@@ -79,6 +81,8 @@ message BuildResult {
         bytes stream_data = 4;      // If upload_method is Stream (Sent multiple times for large files)
         string gofile_link = 5;     // If upload_method is GoFile
     }
+    optional string error_message = 6;
+    optional string file_name = 7;
 }
 
 enum LogLevel {

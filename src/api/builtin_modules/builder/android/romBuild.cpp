@@ -5,6 +5,7 @@
 #include <fmt/chrono.h>
 #include <fmt/format.h>
 #include <fmt/ranges.h>
+#include <google/protobuf/empty.pb.h>
 #include <google/protobuf/wrappers.pb.h>
 #include <grpcpp/client_context.h>
 #include <grpcpp/create_channel.h>
@@ -259,7 +260,8 @@ class ROMBuildQueryHandler {
             tgbot::builder::android::BuildAction action;
             grpc::ClientContext context;
             action.set_build_id(build.getId());
-            auto rc = buildStub_->CancelBuild(&context, action, nullptr);
+            ::google::protobuf::Empty response;
+            auto rc = buildStub_->CancelBuild(&context, action, &response);
             if (!rc.ok()) {
                 LOG(ERROR) << "Failed to send cancel build request: "
                            << rc.error_message();
@@ -279,6 +281,11 @@ ROM: {}
 Android Version: {}
 Manifest: {}
 )";
+    if (!data.device || !data.localManifest || !data.localManifest->rom ||
+        !data.localManifest->rom->romInfo) {
+        return "(no data)";
+    }
+
     return fmt::format(literal, banner, data.device->toString(),
                        data.localManifest->rom->romInfo->name,
                        data.localManifest->rom->androidVersion->name,
@@ -448,21 +455,6 @@ Disk Usage (Of /): {} GB / {} GB total)",
 }
 
 void ROMBuildQueryHandler::handle_settings(const Query& /*query*/) {
-    grpc::ClientContext context;
-    tgbot::builder::android::Settings request;
-    request.set_use_rbe_service(do_use_rbe);
-    request.set_do_repo_sync(do_repo_sync);
-    request.set_do_upload(do_upload);
-    request.set_use_ccache(false);
-    request.set_do_clean_build(false);
-    ::google::protobuf::Empty response;
-    auto rc = buildStub_->SetSettings(&context, request, &response);
-    if (!rc.ok()) {
-        LOG(ERROR) << "Failed to set settings: " << rc.error_message();
-        _api->editMessage(sentMessage, "Failed to set settings", backKeyboard);
-        return;
-    }
-
     _api->editMessage(sentMessage,
                       fmt::format(R"(Settings
 
@@ -481,6 +473,23 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     }
 
     // Start build
+    grpc::ClientContext context1;
+    tgbot::builder::android::Settings request1;
+    request1.set_use_rbe_service(do_use_rbe);
+    request1.set_do_repo_sync(do_repo_sync);
+    request1.set_do_upload(do_upload);
+    request1.set_use_ccache(false);
+    request1.set_do_clean_build(false);
+    request1.set_rbe_api_token(
+        *_config->get(ConfigManager::Configs::BUILDBUDDY_API_KEY));
+    ::google::protobuf::Empty response;
+    auto rc = buildStub_->SetSettings(&context1, request1, &response);
+    if (!rc.ok()) {
+        LOG(ERROR) << "Failed to set settings: " << rc.error_message();
+        _api->editMessage(sentMessage, "Failed to set settings", backKeyboard);
+        return;
+    }
+
     grpc::ClientContext context;
     tgbot::builder::android::BuildRequest request;
     android::BuildSubmission buildSubmission;
@@ -494,10 +503,11 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     if (auto var = _config->get(ConfigManager::Configs::GITHUB_TOKEN); var) {
         request.set_github_token(*var);
     }
-    if (auto var = _config->get(ConfigManager::Configs::TELEGRAM_API_SERVER)) {
+    if (auto var = _config->get(ConfigManager::Configs::TELEGRAM_API_SERVER);
+        var) {
         // If using custom API server (assuming self-hosted), use telegram
         // upload method. (So download the file here.)
-        request.set_upload_method(android::UploadMethod::LocalFile);
+        request.set_upload_method(android::UploadMethod::Stream);
     } else {
         request.set_upload_method(android::UploadMethod::GoFile);
     }
@@ -596,8 +606,12 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
             infoResponse.disk_used_gb(), infoResponse.disk_total_gb(),
             std::thread::hardware_concurrency(), logEntry.message());
 
-        _api->editMessage<TgBotApi::ParseMode::HTML>(sentMessage,
-                                                     buildInfoBuffer, kb.get());
+        try {
+            _api->editMessage<TgBotApi::ParseMode::HTML>(
+                sentMessage, buildInfoBuffer, kb.get());
+        } catch (const TgBot::TgException& e) {
+            LOG(ERROR) << "Failed to edit message: " << e.what();
+        }
     }
 
     if (!build.running()) {
@@ -606,21 +620,48 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
         return;
     }
 
-    if (do_upload) {
-        android::BuildResult buildResult;
-        auto reader = buildStub_->GetBuildResult(&context, logRequest);
-        if (!reader) {
-            LOG(ERROR) << "Failed to get build result";
-            _api->editMessage(sentMessage, "Failed to get build result",
-                              backKeyboard);
+    android::BuildResult buildResult;
+    grpc::ClientContext newContext;
+    auto reader = buildStub_->GetBuildResult(&newContext, logRequest);
+    if (!reader) {
+        LOG(ERROR) << "Failed to get build result";
+        _api->editMessage(sentMessage, "Failed to get build result",
+                          backKeyboard);
+        build.finish();
+        return;
+    }
+    bool isStream = false;
+    std::ofstream streamFile;
+    std::filesystem::path streamFilePath =
+        "built_artifact_" + build.getId() + ".zip";
+    if (reader->Read(&buildResult)) {
+        if (!buildResult.success()) {
+            LOG(ERROR) << "Build failed.";
+            if (buildResult.error_message().empty()) {
+                _api->editMessage(
+                    sentMessage,
+                    showPerBuild(per_build,
+                                 R"(Build failed with unknown error!)"),
+                    backKeyboard);
+                build.finish();
+                return;
+            }
+            std::ofstream errorFile("build_error_" + build.getId() + ".txt");
+            errorFile << buildResult.error_message();
+            errorFile.close();
+            auto file = InputFile::fromFile(
+                "build_error_" + build.getId() + ".txt", "text/plain");
+            file->fileName = "error.log";
+            _api->sendDocument(sentMessage->chat, std::move(file),
+                               "The build has failed. Here is the error log.");
+            _api->editMessage(
+                sentMessage,
+                showPerBuild(per_build, R"(Build failed! Error log sent.)"),
+                backKeyboard);
             build.finish();
             return;
         }
-        bool isStream = false;
-        std::ofstream streamFile;
-        std::filesystem::path streamFilePath =
-            "built_artifact_" + build.getId() + ".zip";
-        if (reader->Read(&buildResult)) {
+        if (do_upload) {
             switch (buildResult.upload_method()) {
                 case android::UploadMethod::LocalFile: {
                     if (buildResult.success()) {
@@ -629,7 +670,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
                             showPerBuild(per_build,
                                          fmt::format(
                                              R"(Build complete! 
-Download the built artifact here: <code>{}</code>)",
+Get the built artifact here: <code>{}</code>)",
                                              buildResult.local_file_path())),
                             backKeyboard);
                     } else {
@@ -698,50 +739,44 @@ Download the built artifact here: <a href="{}">{}</a>)",
                     break;
                 }
             }
-
-            if (isStream) {
-                // Continue reading stream data
-                android::BuildResult streamResult;
-                while (reader->Read(&streamResult)) {
-                    streamFile.write(streamResult.stream_data().data(),
-                                     streamResult.stream_data().size());
-                }
-                streamFile.close();
-                _api->sendDocument(
-                    sentMessage->chat,
-                    InputFile::fromFile(streamFilePath, "application/zip"),
-                    "Here is your built artifact!");
-                _api->editMessage<TgBotApi::ParseMode::HTML>(
-                    sentMessage,
-                    showPerBuild(per_build, fmt::format(
-                                                R"(Build complete!
-Download the built artifact above!)
-Build ID: <code>{}</code>)",
-                                                build.getId())),
-                    backKeyboard);
-            }
-        } else {
-            LOG(ERROR) << "Failed to read build result";
-            _api->editMessage(sentMessage, "Failed to read build result",
-                              backKeyboard);
         }
-        auto status = reader->Finish();
-        if (!status.ok()) {
-            LOG(ERROR) << "GetBuildResult rpc failed: "
-                       << status.error_message();
+
+        if (isStream) {
+            // Continue reading stream data
+            android::BuildResult streamResult;
+            while (reader->Read(&streamResult)) {
+                streamFile.write(streamResult.stream_data().data(),
+                                 streamResult.stream_data().size());
+            }
+            streamFile.close();
+            LOG(INFO) << "Finished writing stream file";
+
+            auto outfile =
+                InputFile::fromFile(streamFilePath, "application/zip");
+            outfile->fileName = streamResult.file_name();
+            _api->sendDocument(sentMessage->chat, std::move(outfile),
+                               "Here is your built artifact!");
+            _api->editMessage<TgBotApi::ParseMode::HTML>(
+                sentMessage,
+                showPerBuild(per_build, fmt::format(
+                                            R"(Build complete!
+Download the built artifact below
+Build ID: <code>{}</code>)",
+                                            build.getId())),
+                backKeyboard);
         }
     } else {
-        _api->editMessage(
-            sentMessage,
-            showPerBuild(per_build, R"(Build complete! Upload skipped.)"),
-            backKeyboard);
+        LOG(ERROR) << "Failed to read build result";
+        _api->editMessage(sentMessage, "Failed to read build result",
+                          backKeyboard);
+    }
+    auto status = reader->Finish();
+    if (!status.ok()) {
+        LOG(ERROR) << "GetBuildResult rpc failed: " << status.error_message();
     }
 
     // Success
     _api->editMessageMarkup(sentMessage, nullptr);
-    _api->sendMessage(
-        sentMessage->chat,
-        showPerBuild(per_build, fmt::format(R"(Build complete!)")));
 
     if (didpin) {
         try {
@@ -880,7 +915,7 @@ void ROMBuildQueryHandler::handle_rom(const Query& query) {
 }
 
 void ROMBuildQueryHandler::handle_android_version(const Query& query) {
-    int androidVersion = stoi(query->data);
+    float androidVersion = stof(query->data);
 
     auto [be, en] = std::ranges::remove_if(
         lookup._localManifest, [androidVersion](const auto& manifest) {

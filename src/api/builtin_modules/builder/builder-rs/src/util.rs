@@ -56,7 +56,7 @@ pub fn make_canonical_path(path: &PathBuf) -> Option<PathBuf> {
 pub fn make_canonical_path_mkdirs(path: &PathBuf) -> Option<PathBuf> {
     match std::fs::canonicalize(path) {
         Ok(canonical) => Some(canonical),
-        Err(e) => {
+        Err(_e) => {
             warn!(
                 "Path {} does not exist. Attempting to create it.",
                 path.display()

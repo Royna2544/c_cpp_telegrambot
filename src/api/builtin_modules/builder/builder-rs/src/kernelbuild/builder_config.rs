@@ -1,13 +1,10 @@
-use std::fmt::format;
 use std::path::Path;
 use std::path::PathBuf;
 use std::time::Duration;
-use tokio::io::AsyncReadExt;
 
 use serde::Deserialize;
 use serde::Serialize;
 use tar::Archive;
-use tokio::fs::File;
 use tokio::io::AsyncWriteExt;
 use tokio::time::Instant;
 use tokio_stream::StreamExt;
@@ -234,7 +231,7 @@ impl Toolchain {
             Source::Tarball => {
                 info!("Downloading toolchain {} from {}", self.name, self.url);
                 let dest_file = dest_path.join(format!("{}.tar.gz", &self.name));
-                Self::download_file(&self.url, &dest_file, async |current, total| {
+                Self::download_file(&self.url, &dest_file, async |_current, total| {
                     info!(
                         "Downloading toolchain... Total downloaded {} KB",
                         total / 1024

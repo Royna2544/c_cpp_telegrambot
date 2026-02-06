@@ -99,6 +99,7 @@ fn make_kernel_builder_service(
 fn make_rom_build_service(
     rombuild_json_dir: &PathBuf,
     rombuild_output_dir: PathBuf,
+    temp_dir: PathBuf,
 ) -> Option<ROMBuildService> {
     let rombuild_config: Option<ROMBuildConfig> =
         match ROMBuildConfig::new(&PathBuf::from(&rombuild_json_dir)) {
@@ -110,7 +111,11 @@ fn make_rom_build_service(
             }
         };
 
-    Some(ROMBuildService::new(rombuild_output_dir, rombuild_config?))
+    Some(ROMBuildService::new(
+        rombuild_output_dir,
+        temp_dir,
+        rombuild_config?,
+    ))
 }
 
 #[tokio::main]
@@ -188,6 +193,7 @@ async fn main() {
     let android_build_service = make_rom_build_service(
         &PathBuf::from(&args.rombuild_json_dir),
         canonical_rombuild_output,
+        canonical_temp.clone(),
     )
     .expect("Failed to initialize ROM Build Service");
 

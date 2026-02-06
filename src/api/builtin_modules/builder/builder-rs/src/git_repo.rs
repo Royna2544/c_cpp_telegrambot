@@ -211,4 +211,8 @@ impl GitRepo {
         }
         Ok(())
     }
+
+    pub fn update_modules(&self) -> Result<(), git2::Error> {
+        Self::update_submodules(&self.repo)
+    }
 }

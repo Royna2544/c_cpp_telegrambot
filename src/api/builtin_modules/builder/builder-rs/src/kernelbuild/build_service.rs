@@ -5,9 +5,7 @@ use super::builder_config::Toolchain;
 use super::builder_config::{BuilderConfig, CompilerType};
 use super::kernel_config::KernelConfig;
 use crate::git_repo::GitRepo;
-use crate::kernelbuild::builder_config;
 use chrono::Local;
-use git2::FetchOptions;
 use grpc_pb::ArtifactChunk;
 use grpc_pb::ArtifactMetadata;
 use grpc_pb::BuildPrepareRequest;
@@ -39,7 +37,7 @@ use tokio_stream::Stream;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use tracing::Instrument;
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{debug, error, info, warn};
 use zip::CompressionMethod;
 use zip::ZipWriter;
 use zip::write::FileOptions; // for .process_group()
@@ -815,7 +813,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                                     }
                                 }
                             }
-                            Err(e) => {
+                            Err(_e) => {
                                 report_blk!(
                                     tx_for_inner,
                                     Failed,
