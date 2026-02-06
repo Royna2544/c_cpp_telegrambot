@@ -1,4 +1,32 @@
+//! GoFile API integration for file uploads.
+//!
+//! This module provides integration with the GoFile.io API for uploading
+//! build artifacts. It handles:
+//!
+//! - Server selection from available GoFile servers
+//! - Multipart file uploads
+//! - Response parsing and error handling
+//!
+//! # Examples
+//!
+//! ```no_run
+//! use gofile_api::upload_file_to_gofile;
+//!
+//! # async {
+//! let response = upload_file_to_gofile("/path/to/artifact.zip")
+//!     .await
+//!     .expect("Upload failed");
+//! println!("Download page: {}", response.data.downloadPage);
+//! # };
+//! ```
+
 use tracing::{error, info};
+
+/// Base URL for the GoFile API
+const GOFILE_API_BASE: &str = "https://api.gofile.io";
+
+/// Expected status value for successful API responses
+const API_STATUS_OK: &str = "ok";
 
 #[derive(serde::Deserialize, Debug)]
 pub struct ServerEntry {
@@ -46,17 +74,16 @@ pub struct UploadFileResponse {
 
 impl ServersJson {
     pub async fn get() -> Result<ServersJson, Box<dyn std::error::Error>> {
-        let resp = reqwest::get("https://api.gofile.io/servers")
-            .await
-            .inspect_err(|x| {
-                error!("Cannot GET /servers: {}", x);
-            })?;
+        let url = format!("{}/servers", GOFILE_API_BASE);
+        let resp = reqwest::get(&url).await.inspect_err(|x| {
+            error!("Cannot GET /servers: {}", x);
+        })?;
         let resp: ServersJson = serde_json::from_str(&resp.text().await.inspect_err(|x| {
             error!("Cannot obtain servers list in str: {}", x);
         })?)
         .inspect_err(|x| error!("Cannot parse JSON from response: {}", x))?;
 
-        if resp.status != "ok" {
+        if resp.status != API_STATUS_OK {
             Err(format!(
                 "Gofile API returned non-ok status: {}",
                 resp.status
@@ -123,7 +150,7 @@ pub async fn upload_file_to_gofile(
             error!("Failed to parse upload response JSON: {}", x);
         })?;
 
-    if upload_response.status != "ok" {
+    if upload_response.status != API_STATUS_OK {
         Err(format!(
             "Gofile upload returned non-ok status: {}",
             upload_response.status

@@ -1,3 +1,15 @@
+//! System resource monitoring and reporting.
+//!
+//! This module provides gRPC services for monitoring system resources including:
+//! - CPU usage
+//! - Memory usage (used and total)
+//! - System uptime
+//! - Disk usage (optional)
+//! - System information (OS, kernel version, CPU info, etc.)
+//!
+//! The monitoring service supports both one-time stats queries and streaming
+//! stats updates at configurable intervals.
+
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;

@@ -1,3 +1,31 @@
+//! Git repository management and operations.
+//!
+//! This module provides a wrapper around libgit2 for common Git operations
+//! used in the builder service, including:
+//!
+//! - Repository cloning with authentication
+//! - Branch checkout and fast-forward merging
+//! - Submodule updates
+//! - Progress tracking with rate limiting
+//!
+//! # Examples
+//!
+//! ```no_run
+//! use std::path::PathBuf;
+//! use git_repo::GitRepo;
+//!
+//! # async {
+//! let repo = GitRepo::new(
+//!     &PathBuf::from("/path/to/repo"),
+//!     "origin",
+//!     None, // No GitHub token
+//!     None, // No progress callback
+//! ).expect("Failed to open repository");
+//!
+//! repo.fast_forward().await.expect("Failed to fast-forward");
+//! # };
+//! ```
+
 use std::{num::NonZero, path::PathBuf};
 
 use super::ratelimit::RateLimit;
@@ -19,7 +47,8 @@ type ProgressCallbackForGit = dyn FnMut(git2::Progress) -> bool + Send + Sync;
 impl GitRepo {
     fn get_cred_callback(github_token: Option<String>) -> Box<CredCallback> {
         Box::new(move |url, username_from_url, _allowed_types| {
-            let config = git2::Config::open_default().unwrap();
+            let config = git2::Config::open_default()
+                .unwrap_or_else(|_| git2::Config::new().unwrap_or_default());
             let username = username_from_url.unwrap_or("git");
             if url.starts_with("ssh://") {
                 debug!("SSH URL detected for authentication.");
@@ -43,7 +72,8 @@ impl GitRepo {
         // F is any closure user passes in
         F: FnMut(&git2::Progress<'_>),
     {
-        let mut ratelimit = RateLimit::new(NonZero::new(5).unwrap());
+        // SAFETY: 5 is a non-zero value, so this is always safe
+        let mut ratelimit = RateLimit::new(unsafe { NonZero::new_unchecked(5) });
 
         // logic: accepts value 'p', passes ref '&p' to inner callback
         move |p| {

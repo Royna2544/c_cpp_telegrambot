@@ -6,11 +6,12 @@ use grpc_pb::health_check_service_server::HealthCheckService;
 pub use grpc_pb::health_check_service_server::HealthCheckServiceServer;
 use tracing::info;
 
+#[derive(Default)]
 pub struct HealthServiceImpl {}
 
 impl HealthServiceImpl {
     pub fn new() -> Self {
-        HealthServiceImpl {}
+        Self::default()
     }
 }
 
