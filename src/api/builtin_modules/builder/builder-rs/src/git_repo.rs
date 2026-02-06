@@ -66,7 +66,9 @@ impl GitRepo {
         github_token: Option<String>,
         progress_callback: Option<Box<ProgressCallback>>,
     ) -> Result<Self, git2::Error> {
-        let repo = Repository::open(path)?;
+        let repo = Repository::open(path).inspect_err(|e| {
+            error!("Cannot open repo at {:?}, {}", &path, e);
+        })?;
 
         Ok(GitRepo {
             repo,

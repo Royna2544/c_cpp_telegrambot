@@ -475,13 +475,15 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     // Start build
     grpc::ClientContext context1;
     tgbot::builder::android::Settings request1;
-    request1.set_use_rbe_service(do_use_rbe);
     request1.set_do_repo_sync(do_repo_sync);
     request1.set_do_upload(do_upload);
     request1.set_use_ccache(false);
     request1.set_do_clean_build(false);
-    request1.set_rbe_api_token(
-        *_config->get(ConfigManager::Configs::BUILDBUDDY_API_KEY));
+    if (auto key = _config->get(ConfigManager::Configs::BUILDBUDDY_API_KEY);
+        key) {
+        request1.set_use_rbe_service(do_use_rbe);
+        request1.set_rbe_api_token(*key);
+    }
     ::google::protobuf::Empty response;
     auto rc = buildStub_->SetSettings(&context1, request1, &response);
     if (!rc.ok()) {
@@ -636,7 +638,13 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
         "built_artifact_" + build.getId() + ".zip";
     if (reader->Read(&buildResult)) {
         if (!buildResult.success()) {
-            LOG(ERROR) << "Build failed.";
+            auto str = buildResult.error_message();
+            std::vector<std::string_view> vec = absl::StrSplit(str, '\n');
+            if (vec.size() > 0) {
+                LOG(ERROR) << "Build failed: " << vec.front();
+            } else {
+                LOG(ERROR) << "Build failed, empty error message";
+            }
             if (buildResult.error_message().empty()) {
                 _api->editMessage(
                     sentMessage,
