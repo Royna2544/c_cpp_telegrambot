@@ -12,7 +12,7 @@
 //!
 //! ```no_run
 //! use std::path::PathBuf;
-//! use git_repo::GitRepo;
+//! # use crate::git_repo::GitRepo;
 //!
 //! # async {
 //! let repo = GitRepo::new(
