@@ -47,8 +47,10 @@ type ProgressCallbackForGit = dyn FnMut(git2::Progress) -> bool + Send + Sync;
 impl GitRepo {
     fn get_cred_callback(github_token: Option<String>) -> Box<CredCallback> {
         Box::new(move |url, username_from_url, _allowed_types| {
+            // Try to open default config, fall back to new empty config if that fails
             let config = git2::Config::open_default()
-                .unwrap_or_else(|_| git2::Config::new().unwrap_or_default());
+                .or_else(|_| git2::Config::new())
+                .expect("Failed to initialize git config");
             let username = username_from_url.unwrap_or("git");
             if url.starts_with("ssh://") {
                 debug!("SSH URL detected for authentication.");
@@ -72,8 +74,12 @@ impl GitRepo {
         // F is any closure user passes in
         F: FnMut(&git2::Progress<'_>),
     {
-        // SAFETY: 5 is a non-zero value, so this is always safe
-        let mut ratelimit = RateLimit::new(unsafe { NonZero::new_unchecked(5) });
+        // Use const evaluation to ensure compile-time non-zero check
+        const RATE_LIMIT_SECS: NonZero<u64> = match NonZero::new(5) {
+            Some(n) => n,
+            None => unreachable!(),
+        };
+        let mut ratelimit = RateLimit::new(RATE_LIMIT_SECS);
 
         // logic: accepts value 'p', passes ref '&p' to inner callback
         move |p| {
