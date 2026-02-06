@@ -11,8 +11,8 @@
 //! # Examples
 //!
 //! ```no_run
-//! use std::path::PathBuf;
-//! # use crate::git_repo::GitRepo;
+//! # use std::path::PathBuf;
+//! # use builder::git_repo::GitRepo;
 //!
 //! # async {
 //! let repo = GitRepo::new(
