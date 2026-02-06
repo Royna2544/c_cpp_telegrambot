@@ -10,7 +10,7 @@
 //! # Examples
 //!
 //! ```no_run
-//! use gofile_api::upload_file_to_gofile;
+//! # use crate::gofile_api::upload_file_to_gofile;
 //!
 //! # async {
 //! let response = upload_file_to_gofile("/path/to/artifact.zip")
