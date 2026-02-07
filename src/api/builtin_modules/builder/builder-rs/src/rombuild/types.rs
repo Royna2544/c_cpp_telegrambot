@@ -86,7 +86,6 @@ pub struct ROMBuildConfig {
     pub targets: Vec<TargetsEntry>,
     pub manifests: Vec<ManifestEntry>,
     pub recovery_manifests: Vec<RecoveryManifestEntry>,
-    pub android_versions: Vec<AndroidVersion>,
 }
 
 impl ROMEntry {
@@ -142,17 +141,6 @@ impl ROMBuildConfig {
             }
         };
 
-        let android_versions = match AndroidVersion::new(&versions_file) {
-            Ok(cfg) => cfg,
-            Err(_) => {
-                error!(
-                    "Failed to parse Android versions config from file {:?}",
-                    versions_file
-                );
-                Vec::new()
-            }
-        };
-
         let recoveries = match ROMEntry::new(&recovery_file) {
             Ok(cfg) => cfg,
             Err(_) => {
@@ -201,7 +189,6 @@ impl ROMBuildConfig {
             manifests,
             recoveries,
             recovery_manifests,
-            android_versions,
         })
     }
 }
