@@ -72,13 +72,6 @@ pub struct RecoveryManifestEntry {
     pub use_regex: bool,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct AndroidVersion {
-    pub version: f32,
-    pub codename: String,
-    pub codename_short: String,
-}
-
 #[derive(Debug, Clone)]
 pub struct ROMBuildConfig {
     pub roms: Vec<ROMEntry>,
@@ -112,17 +105,10 @@ impl RecoveryManifestEntry {
     }
 }
 
-impl AndroidVersion {
-    pub fn new(file_path: &PathBuf) -> Result<Vec<AndroidVersion>, ()> {
-        new_impl(file_path)
-    }
-}
-
 impl ROMBuildConfig {
     pub fn new(json_dir: &PathBuf) -> Option<ROMBuildConfig> {
         let target_file = json_dir.join("targets.json");
         let manifest_file = json_dir.join("roms.json");
-        let versions_file = json_dir.join("versions.json");
         let recovery_file = json_dir.join("recoveries.json");
 
         let targets = match TargetsEntry::new(&target_file) {

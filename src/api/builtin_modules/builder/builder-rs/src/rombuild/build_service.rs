@@ -20,7 +20,7 @@ use crate::{
     },
 };
 
-use futures_util::{Stream, TryFutureExt};
+use futures_util::Stream;
 #[cfg(unix)]
 use nix::libc::{rlimit, setrlimit};
 #[cfg(unix)]
@@ -1153,15 +1153,14 @@ impl rom_build_service_server::RomBuildService for BuildService {
                 {
                     // Get current nofile limits
                     use nix::libc;
-                    let  (soft_limit, hard_limit) : (libc::rlim_t, libc::rlim_t);
-                    unsafe {
-                        use nix::sys::resource::{getrlimit, Resource};
-                        (soft_limit, hard_limit) = getrlimit(
-                            Resource::RLIMIT_NOFILE,
-                        ).map_err(|e| {
-                            tonic::Status::internal(format!("Failed to get nofile limit: {}", e))
-                        })?;
-                    };
+                    use nix::sys::resource::{getrlimit, Resource};
+                    let (soft_limit, hard_limit) : (libc::rlim_t, libc::rlim_t);
+                    (soft_limit, hard_limit) = getrlimit(
+                        Resource::RLIMIT_NOFILE,
+                    ).map_err(|e| {
+                        tonic::Status::internal(format!("Failed to get nofile limit: {}", e))
+                    })?;
+                
                     send_log!(LogLevel::Info, format!("Current nofile limits - soft: {}, hard: {}", soft_limit, hard_limit));
 
                     // AOSP requires us to have at least 16000, but why not 65536?
@@ -1235,7 +1234,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                     }
 
                     // Check build/release/build_config, scl for Android 14
-                    let build_config_path = path.join("build_config");
+                    let _build_config_path = path.join("build_config");
                     for file in std::fs::read_dir(&path).map_err(|e| {
                         tonic::Status::internal(format!("Failed to read release directory: {}", e))
                     })? {
@@ -1253,7 +1252,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                     // Fallback to build/release/release_configs, textproto, another stuff added on android 15
                     let release_configs_path = path.join("release_configs");
                     if release_configs_path.exists() {
-                        let mut latest_release: Option<String> = None;
+                        let _latest_release: Option<String> = None;
                         for file in std::fs::read_dir(&release_configs_path).map_err(|e| {
                             tonic::Status::internal(format!("Failed to read release_configs directory: {}", e))
                         })? {

@@ -28,7 +28,6 @@
 
 use std::{num::NonZero, path::PathBuf};
 
-use crate::ratelimit;
 
 use super::ratelimit::RateLimit;
 use git2::Repository;
