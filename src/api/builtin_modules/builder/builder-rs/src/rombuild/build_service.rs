@@ -251,7 +251,10 @@ impl BuildService {
                 res = child.wait() => {
                     match res {
                         Ok(status) => {
-                            info!("Process exited with status: {:?}", status);
+                            info!(
+                                "Process exited with status: {}",
+                                status.code().unwrap_or(-1)
+                            );
                             status.success()
                         }
                         Err(e) => {
@@ -302,7 +305,10 @@ impl BuildService {
         } else {
             match child.wait().await {
                 Ok(status) => {
-                    info!("Process exited with status: {:?}", status);
+                    info!(
+                        "Process exited with status: {}",
+                        status.code().unwrap_or(-1)
+                    );
                     status.success()
                 }
                 Err(e) => {
@@ -867,7 +873,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
 
                                         git_repo::GitRepo::clone(
                                             &rom.url,
-                                            &rom.name,
+                                            &branch_entry.name,
                                             None,
                                             &PathBuf::from(local_manifest_dir),
                                             req.github_token.clone(),
@@ -882,28 +888,27 @@ impl rom_build_service_server::RomBuildService for BuildService {
                                     } else {
                                         send_log!(LogLevel::Info, "Local manifest repository URL matches expected URL.".to_string());
                                         if &repo.get_branch_name().map_err(|e| {
-                                        tonic::Status::internal(format!(
-                                            "Failed to get branch name of local manifest repository: {}",
-                                            e
-                                        ))
-                                    })? != &branch_entry.name
-                                    {
-                                        send_log!(LogLevel::Warning, "Local manifest repository branch mismatch, checking out correct branch...".to_string());
-                                        repo.checkout_branch(&branch_entry.name).map_err(|e| {
                                             tonic::Status::internal(format!(
-                                                "Failed to checkout branch {} of local manifest repository: {}",
-                                                &branch_entry.name, e
+                                                "Failed to get branch name of local manifest repository: {}",
+                                                e
                                             ))
-                                        })?;
-                                    } else {
-                                        send_log!(LogLevel::Info, String::from("Local manifest repository branch matches expected branch."));
-                                    }
-                                        send_log!(LogLevel::Info, String::from("Fast-forwarding local manifest repository..."));
-                                        let _ = repo
-                                            .fast_forward()
-                                            .inspect_err(|e| {
-                                                send_log!(LogLevel::Error, format!("Failed to fast-forward: {}", e)); 
-                                            });
+                                        })? != &branch_entry.name {
+                                            send_log!(LogLevel::Warning, "Local manifest repository branch mismatch, checking out correct branch...".to_string());
+                                            repo.checkout_branch(&branch_entry.name).map_err(|e| {
+                                                tonic::Status::internal(format!(
+                                                    "Failed to checkout branch {} of local manifest repository: {}",
+                                                    &branch_entry.name, e
+                                                ))
+                                            })?;
+                                        } else {
+                                            send_log!(LogLevel::Info, String::from("Local manifest repository branch matches expected branch."));
+                                        }
+                                    send_log!(LogLevel::Info, String::from("Fast-forwarding local manifest repository..."));
+                                    let _ = repo
+                                        .fast_forward()
+                                        .inspect_err(|e| {
+                                            send_log!(LogLevel::Error, format!("Failed to fast-forward: {}", e)); 
+                                    });
                                     }
                                 }
                                 Err(_) => {
@@ -1180,6 +1185,9 @@ impl rom_build_service_server::RomBuildService for BuildService {
                     let dir = dir.map_err(|e| {
                         tonic::Status::internal(format!("Failed to read vendor subdirectory: {}", e))
                     })?;
+                    // Check for config/BoardConfigSoong.mk. This requires Android 10+, but most ROMs now target that or higher.
+                    // Android 9 is released on August 2018, (that was 8 years ago) so it's reasonable to assume most builds are Android 10+ now.
+                    // One exception may be TWRP, but you cannot build old versions of TWRP with this system anyway. (Need docker images with old toolchains)
                     let config_path = dir.path().join("config").join("BoardConfigSoong.mk");
                     if config_path.exists() {
                         vendor_name = dir.file_name().to_string_lossy().to_string();
@@ -1194,6 +1202,63 @@ impl rom_build_service_server::RomBuildService for BuildService {
                 } else {
                     send_log!(LogLevel::Info, format!("Using vendor: {} for build.", vendor_name));
                 }
+
+                // Detect build release
+                let mut release: String = "".to_string();
+                // We have two places to look for build release: build/release and vendor/<vendor>/build/release.
+                for path in [&build_dir_clone.join("build").join("release"), &build_dir_clone.join("vendor").join(&vendor_name).join("build").join("release")] {
+                    // First, check release_config_map.textproto. Refer: https://android.googlesource.com/platform/build/release/+/925b392ae2a5d212904adec6cfebf4d1b8f574d9.
+                    let release_config_map_path = path.join("release_config_map.textproto");
+                    if release_config_map_path.exists() {
+                        // In this case, aosp_current is automatically mapped to the latest release.
+                        send_log!(LogLevel::Info, format!("Detected release from release_config_map.textproto: {}", release));
+                        release = "aosp_current".to_string()
+                    }
+
+                    // Check build/release/build_config, scl for Android 14
+                    let build_config_path = path.join("build_config");
+                    for file in std::fs::read_dir(&path).map_err(|e| {
+                        tonic::Status::internal(format!("Failed to read release directory: {}", e))
+                    })? {
+                        let file = file.map_err(|e| {
+                            tonic::Status::internal(format!("Failed to read release file entry: {}", e))
+                        })?;
+                        if file.path().extension().and_then(|s| s.to_str()) == Some("scl") {
+                            let file_name = file.file_name().to_string_lossy().to_string();
+                            let release_name = file_name.trim_end_matches(".scl");
+                            send_log!(LogLevel::Info, format!("Detected release from build_config scl file: {}", release_name));
+                            release =  release_name.to_string();
+                        }
+                    }
+
+                    // Fallback to build/release/release_configs, textproto, another stuff added on android 15
+                    let release_configs_path = path.join("release_configs");
+                    if release_configs_path.exists() {
+                        let mut latest_release: Option<String> = None;
+                        for file in std::fs::read_dir(&release_configs_path).map_err(|e| {
+                            tonic::Status::internal(format!("Failed to read release_configs directory: {}", e))
+                        })? {
+                            let file = file.map_err(|e| {
+                                tonic::Status::internal(format!("Failed to read release_configs file entry: {}", e))
+                            })?;
+                            if file.path().extension().and_then(|s| s.to_str()) == Some("textproto") {
+                                let file_name = file.file_name().to_string_lossy().to_string();
+                                let release_name = file_name.trim_end_matches(".textproto");
+                                if vec!["root", "trunk"].contains(&release_name) {
+                                    continue;
+                                }
+                                send_log!(LogLevel::Info, format!("Detected release from release_configs textproto file: {}", release_name));
+                                release = release_name.to_string();
+                            }
+                        }
+                    }
+                };
+                if release.is_empty() {
+                    send_log!(LogLevel::Warning, "Could not detect release from build/release directory.".to_string());
+                } else {
+                    send_log!(LogLevel::Info, format!("Using release: {} for build.", release));
+                }
+
                 let build_variant  = match req.build_variant {
                     val if val == BuildVariant::User as i32 => "user",
                     val if val == BuildVariant::UserDebug as i32 => "userdebug",
@@ -1207,7 +1272,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
 
                 if settings_clone.lock().await.do_clean_build() {
                     send_log!(LogLevel::Info, "Performing clean build...".to_string());
-                    let out_dir = build_dir_clone.join("out");;
+                    let out_dir = build_dir_clone.join("out");
                     if out_dir.exists() {
                         send_log!(LogLevel::Info, format!("Removing output directory at {:?}", out_dir));
                         std::fs::remove_dir_all(&out_dir).map_err(|e| {
@@ -1224,8 +1289,8 @@ impl rom_build_service_server::RomBuildService for BuildService {
 
                 let (stdin_tx, stdin_rx) = mpsc::channel(100);
 
-                let command = format!("set -e\nsource build/envsetup.sh\n{}\nlunch {}_{}-{}\nm {} -j{}\nexit 0\n", no_ccache, vendor_name, device_entry.codename, build_variant, rom_entry.target, parallel_jobs);
-                send_log!(LogLevel::Info, format!("Running build command: {}", command));
+                let command = format!("set -e\nsource build/envsetup.sh\n{}\nlunch {}_{}-{}-{} || lunch {}_{}-{}\nm {} -j{}\nexit 0\n", 
+                    no_ccache, vendor_name, device_entry.codename, release, build_variant, vendor_name, device_entry.codename, build_variant, rom_entry.target, parallel_jobs);
 
                 for line in command.lines() {
                     stdin_tx.send(line.into()).await.map_err(|e| tonic::Status::internal(format!("Failed to send to stdin: {}", e)))?;
@@ -1239,15 +1304,22 @@ impl rom_build_service_server::RomBuildService for BuildService {
                     Some(error_file_path.clone()),
                     stdin_rx.into(),
                 ).await? {
-                    send_log!(LogLevel::Error, "Build command failed or was cancelled.".to_string());
+                    send_log!(LogLevel::Error, "Build command failed".to_string());
                     // Update known builds entry to contain failure
                     let known_builds_self = &mut known_builds_clone.lock().await;
                     if let Some(build_entry) = known_builds_self.iter_mut().find(|b| b.id == build_id_clone) {
                         let error_file = (&build_dir_clone).join("out").join("error.log");
+                        send_log!(LogLevel::Info, format!("Reading error log from {:?}", error_file));
                         let content = std::fs::read_to_string(&error_file).unwrap_or_else(|_| "Failed to read error log.".to_string());
                         if content.is_empty() {
+                            send_log!(LogLevel::Info, format!("Error log is empty, reading from build output log at {:?}", error_file_path));
                             let content = std::fs::read_to_string(&error_file_path).unwrap_or_else(|_| "Failed to read error log.".to_string());
-                            build_entry.error_message = Some(content);
+                            if content.is_empty() {
+                                send_log!(LogLevel::Warning, "Build output log is also empty, setting generic error message.".to_string());
+                                build_entry.error_message = Some("Build failed, but no error log available.".to_string());
+                            } else {
+                                build_entry.error_message = Some(content);
+                            }
                         } else {
                             build_entry.error_message = Some(content);
                         }

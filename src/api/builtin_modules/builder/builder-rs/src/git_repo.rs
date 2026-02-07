@@ -45,7 +45,6 @@ pub struct GitRepo {
 type CredCallback =
     dyn Fn(&str, Option<&str>, git2::CredentialType) -> Result<git2::Cred, git2::Error>;
 pub type ProgressCallback = dyn Fn(&git2::Progress) + Send + Sync;
-type ProgressCallbackForGit = dyn FnMut(git2::Progress) -> bool + Send + Sync;
 
 impl GitRepo {
     fn get_cred_callback(github_token: Option<String>) -> Box<CredCallback> {
@@ -136,18 +135,7 @@ impl GitRepo {
         }
     }
 
-    pub fn checkout_branch(&self, branch: &str) -> Result<(), git2::Error> {
-        let (object, reference) = self.repo.revparse_ext(branch)?;
-        self.repo.checkout_tree(&object, None)?;
-        match reference {
-            Some(gref) => self.repo.set_head(gref.name().unwrap()),
-            None => self.repo.set_head_detached(object.id()),
-        }?;
-        info!("Checked out branch: {}", branch);
-        Ok(())
-    }
-
-    pub fn fast_forward(&self) -> Result<(), git2::Error> {
+    fn fetch_branch(&self, branch: &str) -> Result<(), git2::Error> {
         let mut fo = git2::FetchOptions::new();
         let mut ro = git2::RemoteCallbacks::new();
         ro.credentials(self.cred_callback.as_ref());
@@ -155,10 +143,51 @@ impl GitRepo {
             ro.transfer_progress(self.with_rate_limit(progress_cb));
         }
         fo.remote_callbacks(ro);
-
-        let config_branch = self.get_branch_name()?;
         let mut remote = self.repo.find_remote(&self.remote_name)?;
-        remote.fetch(&[&config_branch], Some(&mut fo), None)?;
+        remote.fetch(&[branch], Some(&mut fo), None)?;
+        Ok(())
+    }
+
+    pub fn checkout_branch(&self, branch: &str) -> Result<(), git2::Error> {
+        // 1. Try to find local branch first
+        let local_refname = format!("refs/heads/{}", branch);
+        let target_obj = match self.repo.revparse_single(&local_refname) {
+            Ok(obj) => obj,
+            Err(_) => {
+                // 2. Not found locally, let's fetch
+                info!(
+                    "Branch {} not found locally, fetching from remote...",
+                    branch
+                );
+                self.fetch_branch(branch)?;
+
+                // 3. Look for the remote tracking branch (e.g., refs/remotes/origin/main)
+                let remote_refname = format!("refs/remotes/{}/{}", self.remote_name, branch);
+                let remote_obj = self.repo.revparse_single(&remote_refname).map_err(|e| {
+                    error!("Branch {} not found on remote after fetch", branch);
+                    e
+                })?;
+
+                // 4. Create the local branch pointing to the remote commit
+                let commit = remote_obj.peel_to_commit()?;
+                self.repo.branch(branch, &commit, false)?;
+                remote_obj
+            }
+        };
+
+        // 5. Perform the actual checkout (updates files in workdir)
+        self.repo.checkout_tree(&target_obj, None)?;
+
+        // 6. Point HEAD to the local branch (so it's not detached)
+        self.repo.set_head(&local_refname)?;
+
+        info!("Successfully checked out branch: {}", branch);
+        Ok(())
+    }
+
+    pub fn fast_forward(&self) -> Result<(), git2::Error> {
+        let config_branch = self.get_branch_name()?;
+        self.fetch_branch(&config_branch)?;
         let fetch_head = self.repo.find_reference("FETCH_HEAD")?;
         let fetch_commit = self.repo.reference_to_annotated_commit(&fetch_head)?;
         let analysis = self.repo.merge_analysis(&[&fetch_commit])?;
