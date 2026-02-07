@@ -692,7 +692,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
         let log_tx_clone = log_tx.clone();
         let uploads_clone = self.active_uploads.clone();
         let build_id_clone = build_id.clone();
-        let tempdir_clone = self.build_dir.clone();
+        let tempdir_clone = self.tempdir.clone();
         let known_builds_clone = self.known_builds.clone();
         let force_checkout = req.force_checkout.unwrap_or(false);
 
