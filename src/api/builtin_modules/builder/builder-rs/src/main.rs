@@ -168,8 +168,20 @@ async fn main() {
     info!("Temp Directory: {}", args.temp_dir);
 
     // 1. Define the address to listen on
-    let addr = args.bind_addr.parse().expect("Invalid bind address");
-    info!("Linux Kernel+Android ROM Builder listening on {}", addr);
+    let addr = match args.bind_addr.parse().inspect_err(|err| {
+        error!("Failed to parse bind address '{}': {}", args.bind_addr, err);
+    }) {
+        Ok(addr) => addr,
+        Err(_) => {
+            error!("Exiting due to invalid bind address.");
+            return;
+        }
+    };
+
+    info!(
+        "Linux  Kernel+Android ROM Builder+System Monitor+Health Checker service listening on {}",
+        addr
+    );
 
     let temp_dir = PathBuf::from(&args.temp_dir);
     let output_dir = PathBuf::from(&args.kernelbuild_output_dir);
@@ -231,7 +243,7 @@ async fn main() {
     let health_service = health::HealthServiceImpl::new();
 
     // 3. Build and Run the Server
-    Server::builder()
+    let x = Server::builder()
         .add_service(
             tonic_reflection::server::Builder::configure()
                 .register_encoded_file_descriptor_set(FILE_DESCRIPTOR_SET)
@@ -244,5 +256,7 @@ async fn main() {
         .add_service(SystemMonitorServiceServer::new(system_monitor))
         .serve(addr)
         .await
-        .unwrap();
+        .inspect_err(|err| error!("Cannot bind and serve service: {}", err));
+
+    info!("Server exited: {:?}", x);
 }
