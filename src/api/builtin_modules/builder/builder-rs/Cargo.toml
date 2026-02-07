@@ -43,6 +43,14 @@ tonic-build = "0.14"
 prost-build = "0.14.3"
 tonic-prost-build = "0.14"
 
+[lib]
+name = "builder"
+path = "src/lib.rs"
+
 [[bin]]
 name = "builder"
 path = "src/main.rs"
+
+[[bin]]
+name = "gofile-upload"
+path = "src/bin/gofile_upload.rs"
