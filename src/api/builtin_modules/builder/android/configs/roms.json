@@ -125,5 +125,20 @@
                 "branch": "11.0"
             }
         ]
+    },
+    {
+        "name": "Yaap",
+        "link": "https://github.com/yaap/manifest",
+        "target": "yaap",
+        "artifact": {
+            "matcher": "ZipFilePrefixer",
+            "data": "YAAP"
+        },
+        "branches": [
+            {
+                "android_version": 16,
+                "branch": "sixteen"
+            }
+        ]
     }
 ]
