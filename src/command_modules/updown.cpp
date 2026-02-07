@@ -8,14 +8,20 @@ DECLARE_COMMAND_HANDLER(up) {
     auto localFile = message->get<MessageAttrs::ExtraText>();
     std::error_code ec;
 
+    LOG(INFO) << "Uploading file: " << localFile;
     if (std::filesystem::exists(localFile, ec)) {
+        // File exists, proceed to send
+        LOG(INFO) << "File exists, sending...";
         api->sendReplyDocument(
             message->message(),
             TgBot::InputFile::fromFile(localFile, "application/octet-stream"),
             fmt::format("File: {}\nFile Size: {}B", localFile,
                         std::filesystem::file_size(localFile, ec)));
     } else {
-        api->sendReplyMessage(message->message(), res->get(Strings::FAILED_TO_READ_FILE));
+        LOG(ERROR) << "File does not exist: " << localFile
+                   << ", error: " << ec.message();
+        api->sendReplyMessage(message->message(),
+                              res->get(Strings::FAILED_TO_READ_FILE));
     }
 }
 
@@ -25,12 +31,18 @@ DECLARE_COMMAND_HANDLER(down) {
         return;
     }
 
+    LOG(INFO) << "Downloading file to: "
+              << message->get<MessageAttrs::ExtraText>();
     auto fileId = message->reply()->get<MessageAttrs::Document>()->fileId;
     if (!api->downloadFile(message->get<MessageAttrs::ExtraText>(), fileId)) {
-        api->sendReplyMessage(message->message(), res->get(Strings::FAILED_TO_DOWNLOAD_FILE));
+        LOG(ERROR) << "Failed to download file with id: " << fileId;
+        api->sendReplyMessage(message->message(),
+                              res->get(Strings::FAILED_TO_DOWNLOAD_FILE));
         return;
     }
-    api->sendReplyMessage(message->message(), res->get(Strings::OPERATION_SUCCESSFUL));
+    LOG(INFO) << "File downloaded successfully";
+    api->sendReplyMessage(message->message(),
+                          res->get(Strings::OPERATION_SUCCESSFUL));
 }
 
 extern "C" DYN_COMMAND_EXPORT const struct DynModule DYN_COMMAND_SYM = {
