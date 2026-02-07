@@ -159,3 +159,139 @@ pub async fn upload_file_to_gofile(
 
     Ok(upload_response)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_servers_response() {
+        let json = r#"{
+            "status": "ok",
+            "data": {
+                "servers": [
+                    {"name": "store1", "zone": "eu"},
+                    {"name": "store2", "zone": "na"}
+                ],
+                "serversAllZone": []
+            }
+        }"#;
+
+        let result: Result<ServersJson, _> = serde_json::from_str(json);
+        assert!(result.is_ok());
+
+        let servers = result.unwrap();
+        assert_eq!(servers.status, "ok");
+        assert_eq!(servers.data.servers.len(), 2);
+        assert_eq!(servers.data.servers[0].name, "store1");
+        assert_eq!(servers.data.servers[0].zone, "eu");
+        assert_eq!(servers.data.servers[1].name, "store2");
+        assert_eq!(servers.data.servers[1].zone, "na");
+    }
+
+    #[test]
+    fn test_parse_upload_response() {
+        let json = r#"{
+            "status": "ok",
+            "data": {
+                "createTime": 1640995200,
+                "downloadPage": "https://gofile.io/d/abc123",
+                "guestToken": "guest_token_123",
+                "id": "file_id_123",
+                "md5": "098f6bcd4621d373cade4e832627b4f6",
+                "mimeType": "application/zip",
+                "modTime": 1640995200,
+                "name": "test.zip",
+                "parentFolder": "folder_id",
+                "parentFolderCode": "folder_code",
+                "servers": ["store1"],
+                "size": 1024,
+                "type": "file"
+            }
+        }"#;
+
+        let result: Result<UploadFileResponse, _> = serde_json::from_str(json);
+        assert!(result.is_ok());
+
+        let response = result.unwrap();
+        assert_eq!(response.status, "ok");
+        assert_eq!(response.data.downloadPage, "https://gofile.io/d/abc123");
+        assert_eq!(response.data.name, "test.zip");
+        assert_eq!(response.data.size, 1024);
+        assert_eq!(response.data.md5, "098f6bcd4621d373cade4e832627b4f6");
+    }
+
+    #[test]
+    fn test_parse_servers_response_with_missing_fields() {
+        let json = r#"{
+            "status": "error",
+            "data": {
+                "servers": [],
+                "serversAllZone": []
+            }
+        }"#;
+
+        let result: Result<ServersJson, _> = serde_json::from_str(json);
+        assert!(result.is_ok());
+
+        let servers = result.unwrap();
+        assert_eq!(servers.status, "error");
+        assert_eq!(servers.data.servers.len(), 0);
+    }
+
+    #[test]
+    fn test_server_url_format() {
+        let server = ServerEntry {
+            name: "store5".to_string(),
+            zone: "eu".to_string(),
+        };
+        let url = format!("https://{}.gofile.io", server.name);
+        assert_eq!(url, "https://store5.gofile.io");
+    }
+
+    #[test]
+    fn test_upload_url_format() {
+        let server_url = "https://store1.gofile.io";
+        let upload_url = format!("{}/contents/uploadFile", server_url);
+        assert_eq!(upload_url, "https://store1.gofile.io/contents/uploadFile");
+    }
+
+    #[tokio::test]
+    async fn test_upload_file_with_nonexistent_file() {
+        // This test verifies that uploading a non-existent file returns an error
+        let result = upload_file_to_gofile("/nonexistent/path/to/file.txt").await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_file_name_extraction() {
+        use tempfile::NamedTempFile;
+        use tokio::io::AsyncWriteExt;
+
+        // Create a temporary file
+        let temp_file = NamedTempFile::new().expect("Failed to create temp file");
+        let temp_path = temp_file.path().to_str().unwrap();
+
+        // Write some content to it
+        let mut file = tokio::fs::File::create(temp_path)
+            .await
+            .expect("Failed to create file");
+        file.write_all(b"test content")
+            .await
+            .expect("Failed to write to file");
+        file.flush().await.expect("Failed to flush file");
+        drop(file);
+
+        // Extract file name
+        let file_name = std::path::Path::new(temp_path)
+            .file_name()
+            .expect("Failed to get file name")
+            .to_string_lossy()
+            .to_string();
+
+        assert!(!file_name.is_empty());
+        // The file name should not contain directory separators
+        assert!(!file_name.contains('/'));
+        assert!(!file_name.contains('\\'));
+    }
+}

@@ -44,7 +44,7 @@ use tracing_subscriber::EnvFilter;
 const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("descriptor");
 
 mod git_repo;
-mod gofile_api;
+pub mod gofile_api;
 mod health;
 mod kernelbuild;
 mod ratelimit;
