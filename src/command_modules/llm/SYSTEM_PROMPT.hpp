@@ -47,7 +47,6 @@ pre-formatted fixed-width code block written in the Python programming language
 >Hidden by default part of the expandable block quotation started
 >Expandable block quotation continued
 >The last line of the expandable block quotation with the expandability mark||
-4. Character '!' is reserved, DO NOT USE IT.
 
 ### Persona
 - Be helpful, polite, and efficient.)";

@@ -1,4 +1,5 @@
 #include <absl/log/log.h>
+#include <absl/strings/str_replace.h>
 #include <absl/strings/str_split.h>
 #include <fmt/chrono.h>
 #include <fmt/format.h>
@@ -85,13 +86,21 @@ File Size: {} bytes)",
         return;
     }
     const auto& response = *response_opt;
-    std::string reply = fmt::format(R"(
-Thought: {}
-)",
-                                    response.thought);
+    std::initializer_list<std::pair<absl::string_view, absl::string_view>>
+        replacements = {{"`", "\\`"}, {"_", "\\_"}, {"*", "\\*"}, {"[", "\\["},
+                        {"]", "\\]"}, {"(", "\\("}, {")", "\\)"}, {"~", "\\~"},
+                        {"`", "\\`"}, {">", "\\>"}, {"#", "\\#"}, {"+", "\\+"},
+                        {"-", "\\-"}, {"=", "\\="}, {"|", "\\|"}, {"{", "\\{"},
+                        {"}", "\\}"}, {".", "\\."}, {"!", "\\!"}};
+    std::string response_thought =
+        absl::StrReplaceAll(response.thought, replacements);
+    std::string response_answer =
+        absl::StrReplaceAll(response.answer, replacements);
+
+    std::string reply = fmt::format("Thought: {}", std::move(response_thought));
     api->editMessage(sent, reply);
     api->sendMessage(message->get<MessageAttrs::Chat>(),
-                     fmt::format("Answer: {}", response.answer));
+                     fmt::format("Answer: {}", std::move(response_answer)));
     api->sendMessage(
         message->get<MessageAttrs::Chat>(),
         fmt::format("Query processed in {:%S} seconds.", response.duration));
