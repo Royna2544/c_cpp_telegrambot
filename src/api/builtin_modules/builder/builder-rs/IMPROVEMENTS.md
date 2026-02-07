@@ -6,7 +6,48 @@ This document summarizes the improvements made to the `builder-rs` Rust service.
 
 The `builder-rs` service is a gRPC-based system for building Linux kernels and Android ROMs remotely. This improvement effort focused on enhancing code quality, documentation, testing, and safety.
 
-## Improvements Made
+## Latest Improvements (2026-02-07)
+
+### GoFile API Testing and Standalone Tool
+
+#### Added Comprehensive Unit Tests for `gofile_api.rs`
+- **Test Coverage**: Added 7 comprehensive tests covering all major functionality:
+  - `test_parse_servers_response`: Validates server list JSON parsing
+  - `test_parse_upload_response`: Verifies upload response deserialization
+  - `test_parse_servers_response_with_missing_fields`: Tests error handling for incomplete responses
+  - `test_server_url_format`: Validates URL construction logic
+  - `test_upload_url_format`: Tests upload endpoint URL generation
+  - `test_upload_file_with_nonexistent_file`: Verifies error handling for invalid files
+  - `test_file_name_extraction`: Tests file name extraction from paths
+
+#### Created Standalone GoFile Upload Executable
+- **New Binary**: `gofile-upload` - A command-line tool for uploading files to GoFile.io
+- **Features**:
+  - Simple CLI interface with `clap` argument parsing
+  - File validation (existence, type, size)
+  - Progress indication with file size display
+  - Detailed upload results with metadata
+  - Error handling with helpful troubleshooting messages
+  - Verbose logging mode for debugging
+- **Output Format**: Clean, user-friendly output with:
+  - File metadata (name, size, ID, MD5, MIME type)
+  - Download page URL for sharing
+  - Emoji indicators for better UX
+
+#### Library Structure Enhancement
+- **Created `lib.rs`**: Exposed `gofile_api` module as a reusable library
+- **Updated `Cargo.toml`**: Added library target configuration
+- **Module Visibility**: Made `gofile_api` public in both lib and main
+
+#### Documentation
+- **Created `README.gofile-upload.md`**: Comprehensive documentation for the upload tool including:
+  - Installation instructions
+  - Usage examples
+  - Output format description
+  - Error handling guide
+  - API integration details
+
+## Previous Improvements
 
 ### 1. Code Quality & Style
 
@@ -87,6 +128,15 @@ Added comprehensive module documentation for:
 - JSON file discovery and processing tests
 - Configuration deserialization tests (valid, invalid, missing files)
 
+#### Unit Tests for `gofile_api.rs` (Latest)
+- `test_parse_servers_response` - Server list JSON parsing
+- `test_parse_upload_response` - Upload response deserialization
+- `test_parse_servers_response_with_missing_fields` - Error handling
+- `test_server_url_format` - URL construction validation
+- `test_upload_url_format` - Upload endpoint URL generation
+- `test_upload_file_with_nonexistent_file` - File validation errors
+- `test_file_name_extraction` - File name path extraction
+
 All tests use `tempfile` for safe temporary file/directory handling.
 
 ### 6. Dependencies
@@ -95,7 +145,16 @@ Added `tempfile = "3.24"` to `[dev-dependencies]` for robust testing.
 
 ## Code Metrics
 
-### Files Modified
+### Files Modified (Latest)
+- `src/gofile_api.rs` - Added comprehensive unit tests
+- `src/main.rs` - Made gofile_api module public
+- `src/lib.rs` - Created library for reusable modules
+- `src/bin/gofile_upload.rs` - New standalone upload tool
+- `Cargo.toml` - Added library and binary configurations
+- `README.gofile-upload.md` - Documentation for upload tool
+- `IMPROVEMENTS.md` - Updated with latest changes
+
+### Files Modified (Previous)
 - `src/git_repo.rs` - Error handling improvements
 - `src/gofile_api.rs` - Constants and documentation
 - `src/health/service.rs` - Default implementation
@@ -108,9 +167,21 @@ Added `tempfile = "3.24"` to `[dev-dependencies]` for robust testing.
 - `Cargo.toml` - Added dev dependencies
 
 ### Lines of Code
-- **Documentation**: ~200 lines added
-- **Tests**: ~130 lines added
-- **Code improvements**: ~50 lines modified
+- **Latest Changes**:
+  - **Tests**: ~140 lines added (gofile_api tests)
+  - **New Binary**: ~120 lines (gofile-upload tool)
+  - **Documentation**: ~150 lines (README and IMPROVEMENTS updates)
+  - **Configuration**: ~15 lines (Cargo.toml and lib.rs)
+- **Previous Changes**:
+  - **Documentation**: ~200 lines added
+  - **Tests**: ~130 lines added
+  - **Code improvements**: ~50 lines modified
+
+### Test Count
+- **Total Tests**: 20 unit tests (up from 13)
+  - gofile_api: 7 tests
+  - ratelimit: 4 tests
+  - util: 9 tests
 
 ## Benefits
 
@@ -119,6 +190,8 @@ Added `tempfile = "3.24"` to `[dev-dependencies]` for robust testing.
 3. **Reliability**: Unit tests catch regressions and verify behavior
 4. **Readability**: Idiomatic Rust patterns improve code clarity
 5. **Standards**: Consistent formatting and conventions
+6. **Reusability**: Library structure enables code reuse
+7. **Tooling**: Standalone upload tool for easy file sharing
 
 ## Testing
 
@@ -129,6 +202,29 @@ cargo test
 
 All tests should pass successfully.
 
+## Usage
+
+### Building the GoFile Upload Tool
+
+```bash
+cargo build --release --bin gofile-upload
+```
+
+### Using the GoFile Upload Tool
+
+```bash
+# Upload a file
+./target/release/gofile-upload /path/to/file.zip
+
+# Upload with verbose logging
+./target/release/gofile-upload --verbose /path/to/file.zip
+
+# Show help
+./target/release/gofile-upload --help
+```
+
+For more details, see [README.gofile-upload.md](README.gofile-upload.md).
+
 ## Future Improvements
 
 Potential areas for further enhancement:
@@ -138,6 +234,9 @@ Potential areas for further enhancement:
 4. Add benchmarks for performance-critical paths
 5. Consider adding more `#[must_use]` attributes where appropriate
 6. Add CI/CD checks for formatting and linting
+7. Add integration tests for actual GoFile API uploads (with mocking)
+8. Add support for batch uploads in the gofile-upload tool
+9. Add progress bars for large file uploads
 
 ## Conclusion
 
