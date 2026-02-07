@@ -45,23 +45,6 @@ impl RateLimit {
         self.last_time.set(std::time::Instant::now());
         true
     }
-    /// Wraps a user-provided callback with rate limiting.
-    ///
-    /// The returned closure will only invoke the callback if the rate limit allows it.
-    /// # Arguments
-    /// * `callback` - The user-provided closure to be rate-limited
-    pub fn with<F>(&mut self, mut callback: F) -> impl FnMut()
-    where
-        // F is any closure user passes in
-        F: FnMut(),
-    {
-        // logic: accepts value 'p', passes ref '&p' to inner callback
-        move || {
-            if self.check() {
-                callback();
-            }
-        }
-    }
 }
 
 #[cfg(test)]

@@ -6,6 +6,7 @@ pub use crate::rombuild::build_service::grpc_pb::rom_build_service_server::RomBu
 use crate::{
     git_repo::{self, GitRepo},
     gofile_api::upload_file_to_gofile,
+    ratelimit::RateLimit,
     rombuild::{
         build_service::grpc_pb::{
             BuildAction, BuildLogEntry, BuildRequest, BuildResult, BuildSubmission, BuildVariant,
@@ -28,6 +29,7 @@ use nix::sys::signal::{self, Signal};
 use nix::unistd::Pid;
 use std::{
     fmt::Display,
+    num::NonZero,
     path::{Path, PathBuf},
     pin::Pin,
     process::Stdio,
@@ -203,6 +205,11 @@ impl BuildService {
         let file_out = file_handle.clone();
         let file_err = file_handle.clone();
 
+        // Have a ratelimit
+        let ratelimit = Arc::new(Mutex::new(RateLimit::new(NonZero::new(3).unwrap())));
+        let ratelimit_stdout = ratelimit.clone();
+        let ratelimit_stderr = ratelimit.clone();
+
         // --- Task A: Stdout ---
         let out_handle = tokio::spawn(async move {
             let mut reader = BufReader::new(stdout).lines();
@@ -213,6 +220,12 @@ impl BuildService {
                     let mut f = f_arc.lock().await;
                     let _ = f.write_all(&line.as_bytes()).await;
                     let _ = f.write_all(b"\n").await;
+                }
+
+                // Throttle log sending to avoid flooding
+                if !ratelimit_stdout.lock().await.check() {
+                    // If rate limit exceeded, skip sending this log line
+                    continue;
                 }
 
                 // B. Send to gRPC
@@ -233,6 +246,12 @@ impl BuildService {
                 if let Some(f_arc) = &file_err {
                     let mut f = f_arc.lock().await;
                     let _ = f.write_all(format!("ERR: {}\n", line).as_bytes()).await;
+                }
+
+                // Throttle log sending to avoid flooding
+                if !ratelimit_stderr.lock().await.check() {
+                    // If rate limit exceeded, skip sending this log line
+                    continue;
                 }
 
                 // B. Send to gRPC
