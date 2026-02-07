@@ -28,6 +28,8 @@
 
 use std::{num::NonZero, path::PathBuf};
 
+use crate::ratelimit;
+
 use super::ratelimit::RateLimit;
 use git2::Repository;
 use tracing::{debug, error, info};
@@ -37,6 +39,7 @@ pub struct GitRepo {
     remote_name: String,
     cred_callback: Box<CredCallback>,
     progress_callback: Option<Box<ProgressCallback>>,
+    ratelimit: RateLimit,
 }
 
 type CredCallback =
@@ -69,19 +72,14 @@ impl GitRepo {
         })
     }
 
-    fn with_rate_limit<F>(mut callback: F) -> impl FnMut(git2::Progress<'_>) -> bool
+    fn with_rate_limit<F>(&self, mut callback: F) -> impl FnMut(git2::Progress<'_>) -> bool
     where
         // F is any closure user passes in
         F: FnMut(&git2::Progress<'_>),
     {
-        // Create non-zero constant at compile time. Since 5 is non-zero,
-        // the unwrap() will be evaluated at compile time and never panic.
-        const RATE_LIMIT_SECS: NonZero<u64> = NonZero::new(5).unwrap();
-        let mut ratelimit = RateLimit::new(RATE_LIMIT_SECS);
-
         // logic: accepts value 'p', passes ref '&p' to inner callback
         move |p| {
-            if ratelimit.check() {
+            if self.ratelimit.check() {
                 callback(&p);
                 info!(
                     "[git stats] rx:{}/t:{} objects (idx:{})",
@@ -109,6 +107,7 @@ impl GitRepo {
             remote_name: remote_name.to_string(),
             progress_callback,
             cred_callback: Self::get_cred_callback(github_token),
+            ratelimit: RateLimit::new(NonZero::new(5).unwrap()),
         })
     }
 
@@ -153,7 +152,7 @@ impl GitRepo {
         let mut ro = git2::RemoteCallbacks::new();
         ro.credentials(self.cred_callback.as_ref());
         if let Some(progress_cb) = &self.progress_callback {
-            ro.transfer_progress(Self::with_rate_limit(progress_cb));
+            ro.transfer_progress(self.with_rate_limit(progress_cb));
         }
         fo.remote_callbacks(ro);
 

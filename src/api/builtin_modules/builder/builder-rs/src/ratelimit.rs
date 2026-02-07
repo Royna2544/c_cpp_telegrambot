@@ -1,4 +1,4 @@
-use std::num::NonZero;
+use std::{cell::Cell, num::NonZero};
 
 /// A simple rate limiter that ensures a minimum time interval between actions.
 ///
@@ -13,7 +13,7 @@ use std::num::NonZero;
 /// }
 /// ```
 pub struct RateLimit {
-    last_time: std::time::Instant,
+    last_time: Cell<std::time::Instant>,
     interval: std::time::Duration,
 }
 
@@ -26,7 +26,7 @@ impl RateLimit {
     pub fn new(min_sec_between: NonZero<u64>) -> Self {
         let interval = std::time::Duration::from_secs(min_sec_between.get());
         RateLimit {
-            last_time: std::time::Instant::now() - interval,
+            last_time: Cell::new(std::time::Instant::now() - interval),
             interval,
         }
     }
@@ -36,14 +36,31 @@ impl RateLimit {
     /// Returns `true` if the action is allowed (enough time has elapsed),
     /// `false` otherwise. When returning `true`, the internal timer is updated.
     #[must_use]
-    pub fn check(&mut self) -> bool {
+    pub fn check(&self) -> bool {
         let now = std::time::Instant::now();
-        let elapsed = now.duration_since(self.last_time);
+        let elapsed = now.duration_since(self.last_time.get());
         if elapsed < self.interval {
             return false;
         }
-        self.last_time = std::time::Instant::now();
+        self.last_time.set(std::time::Instant::now());
         true
+    }
+    /// Wraps a user-provided callback with rate limiting.
+    ///
+    /// The returned closure will only invoke the callback if the rate limit allows it.
+    /// # Arguments
+    /// * `callback` - The user-provided closure to be rate-limited
+    pub fn with<F>(&mut self, mut callback: F) -> impl FnMut()
+    where
+        // F is any closure user passes in
+        F: FnMut(),
+    {
+        // logic: accepts value 'p', passes ref '&p' to inner callback
+        move || {
+            if self.check() {
+                callback();
+            }
+        }
     }
 }
 
