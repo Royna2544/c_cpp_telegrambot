@@ -552,7 +552,7 @@ TgBotApiImpl::TgBotApiImpl(const std::string_view token, AuthContext* auth,
                            StringResLoader* loader, Providers* providers,
                            RefLock* refLock)
     : _bot(std::string(token),
-           std::make_unique<TgBot::CurlHttpClient>(std::chrono::seconds(30)),
+           std::make_unique<TgBot::CurlHttpClient>(std::chrono::hours(1)),
            providers->config->get(ConfigManager::Configs::TELEGRAM_API_SERVER)
                .value_or("https://api.telegram.org")),
       _auth(auth),
