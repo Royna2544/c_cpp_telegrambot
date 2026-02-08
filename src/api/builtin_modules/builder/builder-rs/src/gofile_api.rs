@@ -35,6 +35,7 @@ pub struct ServerEntry {
 }
 
 #[derive(serde::Deserialize, Debug)]
+#[allow(nonstandard_style, non_snake_case)] // Part of GoFile API response, not ours.
 pub struct ServerListEntry {
     pub servers: Vec<ServerEntry>,
     #[allow(nonstandard_style, non_snake_case)]
@@ -48,13 +49,14 @@ pub struct ServersJson {
 }
 
 #[derive(serde::Deserialize, Debug)]
+#[allow(nonstandard_style, non_snake_case)] // Part of GoFile API response, not ours.
 pub struct UploadFileResponseData {
     pub createTime: u32,          // Unix timestamp
     pub downloadPage: String,     // URL to download page
     pub guestToken: String,       // Guest token for file management
     pub id: String,               // File ID
     pub md5: String,              // MD5 checksum of the file
-    pub mimeType: String,         // MIME type of the file
+    pub mimetype: String,         // MIME type of the file
     pub modTime: u32,             // Unix timestamp of last modification
     pub name: String,             // Original file name
     pub parentFolder: String,     // ID of the parent folder
@@ -148,6 +150,7 @@ pub async fn upload_file_to_gofile(
     let upload_response: UploadFileResponse =
         serde_json::from_str(&resp_text).inspect_err(|x| {
             error!("Failed to parse upload response JSON: {}", x);
+            error!("Response text: {}", resp_text);
         })?;
 
     if upload_response.status != API_STATUS_OK {

@@ -23,7 +23,7 @@ use tracing::{error, info};
 use tracing_subscriber::EnvFilter;
 
 // Import the gofile_api module from the builder crate
-use builder::gofile_api::{upload_file_to_gofile, UploadFileResponse};
+use builder::gofile_api::{UploadFileResponse, upload_file_to_gofile};
 
 #[derive(Parser, Debug)]
 #[command(
@@ -50,7 +50,7 @@ fn print_upload_result(response: &UploadFileResponse) {
     println!("File Size:     {} bytes", response.data.size);
     println!("File ID:       {}", response.data.id);
     println!("MD5 Checksum:  {}", response.data.md5);
-    println!("MIME Type:     {}", response.data.mimeType);
+    println!("MIME Type:     {}", response.data.mimetype);
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     println!("📥 Download Page: {}", response.data.downloadPage);
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -70,6 +70,8 @@ async fn main() {
 
     tracing_subscriber::fmt()
         .with_env_filter(filter)
+        .with_file(true)
+        .with_line_number(true)
         .with_target(false)
         .init();
 
@@ -98,16 +100,27 @@ async fn main() {
     };
 
     info!("Uploading file: {}", args.file_path);
-    info!("File size: {} bytes ({:.2} MB)", file_size, file_size as f64 / 1_048_576.0);
+    info!(
+        "File size: {} bytes ({:.2} MB)",
+        file_size,
+        file_size as f64 / 1_048_576.0
+    );
 
     println!("📤 Uploading file: {}", args.file_path);
-    println!("📊 File size: {:.2} MB ({} bytes)", file_size as f64 / 1_048_576.0, file_size);
+    println!(
+        "📊 File size: {:.2} MB ({} bytes)",
+        file_size as f64 / 1_048_576.0,
+        file_size
+    );
     println!("⏳ Please wait...\n");
 
     // Upload the file
     match upload_file_to_gofile(&args.file_path).await {
         Ok(response) => {
-            info!("Upload successful! Download page: {}", response.data.downloadPage);
+            info!(
+                "Upload successful! Download page: {}",
+                response.data.downloadPage
+            );
             print_upload_result(&response);
             std::process::exit(0);
         }

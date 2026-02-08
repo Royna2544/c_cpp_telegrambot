@@ -43,14 +43,14 @@ use tracing_subscriber::EnvFilter;
 
 const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("descriptor");
 
-mod git_repo;
+pub mod git_repo;
 pub mod gofile_api;
 mod health;
 mod kernelbuild;
-mod ratelimit;
+pub mod ratelimit;
 mod rombuild;
 mod system_monitor;
-mod util;
+pub mod util;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]

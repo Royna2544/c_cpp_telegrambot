@@ -51,6 +51,9 @@ impl GitRepo {
         Box::new(move |url, username_from_url, _allowed_types| {
             // Try to open default config, fall back to new empty config if that fails
             let config = git2::Config::open_default()
+                .inspect_err(|x| {
+                    warn!("Opening new, empty gitconfig due to: {}", x);
+                })
                 .or_else(|_| git2::Config::new())
                 .expect("Failed to initialize git config");
             let username = username_from_url.unwrap_or("git");
@@ -67,7 +70,13 @@ impl GitRepo {
                 }
             }
             debug!("Using credential helper for authentication.");
-            return git2::Cred::credential_helper(&config, url, Some(username));
+            match git2::Cred::credential_helper(&config, url, Some(username)) {
+                Ok(cred) => return Ok(cred),
+                Err(e) => {
+                    error!("Credential helper failed: {}", e);
+                }
+            }
+            git2::Cred::default()
         })
     }
 
@@ -136,7 +145,7 @@ impl GitRepo {
         }
     }
 
-    fn fetch_branch(&self, branch: &str) -> Result<(), git2::Error> {
+    pub fn fetch_branch(&self, branch: &str) -> Result<(), git2::Error> {
         let mut fo = git2::FetchOptions::new();
         let mut ro = git2::RemoteCallbacks::new();
         ro.credentials(self.cred_callback.as_ref());
@@ -148,7 +157,15 @@ impl GitRepo {
             .repo
             .find_remote(&self.remote_name)
             .log_if_err("Cannot find remote")?;
-        remote.fetch(&[branch], Some(&mut fo), None)?;
+        let refspec = format!(
+            "refs/heads/{}:refs/remotes/{}/{}",
+            branch, self.remote_name, branch
+        );
+        remote
+            .fetch(&[&refspec], Some(&mut fo), None)
+            .log_if_err("Cannot fetch remote")?;
+        // Create FETCH_HEAD reference
+        info!("Fetched branch {} into FETCH_HEAD", branch);
         Ok(())
     }
 
@@ -198,17 +215,28 @@ impl GitRepo {
         if analysis.0.is_fast_forward() {
             let target_commit = self.repo.find_commit(fetch_commit.id())?;
 
+            // Mimic 'git pull --ff-only' behavior
+            let mut checkout_opts = git2::build::CheckoutBuilder::new();
+            checkout_opts.force(); // Overwrite local modifications
+            checkout_opts.remove_untracked(true); // Delete conflicting folders/submodules
+            checkout_opts.recreate_missing(true); // Restore deleted files
+
             // 1. Checkout the tree of the new commit FIRST
             // This updates Index and Workdir to match the new commit
-            self.repo.checkout_tree(
-                target_commit.as_object(),
-                Some(git2::build::CheckoutBuilder::new().safe()),
-            )?;
+            self.repo
+                .checkout_tree(target_commit.as_object(), Some(&mut checkout_opts))?;
 
             // 2. Update the reference
             let refname = format!("refs/heads/{}", config_branch);
             let mut rhead = self.repo.find_reference(&refname)?;
             rhead.set_target(fetch_commit.id(), "Fast-Forward")?;
+
+            let local_ref = self.repo.find_reference(&refname)?;
+            // 5. Update HEAD to point to the new commit (if we are currently ON this branch)
+            if self.repo.head()?.name() == local_ref.name() {
+                self.repo.set_head(local_ref.name().unwrap())?;
+                self.repo.checkout_head(Some(&mut checkout_opts))?;
+            }
 
             info!("Fast-forwarded branch: {}", config_branch);
         }
@@ -224,9 +252,10 @@ impl GitRepo {
             .warn_err("Cannot resolve HEAD")?
             .peel_to_commit()
             .warn_err("Cannot resolve HEAD to a commit")?;
+        let branch = format!("{}/{}", self.remote_name, branch);
         let branch_ref = self
             .repo
-            .find_branch(branch, git2::BranchType::Remote)
+            .find_branch(&branch, git2::BranchType::Remote)
             .warn_err_string(format!("Cannot find remote branch {} by name", &branch))?;
         let branch_commit = branch_ref.get().peel_to_commit()?;
 
@@ -287,10 +316,11 @@ impl GitRepo {
         for mut submodule in repo.submodules()? {
             info!(
                 "Updating submodule: {}",
-                submodule.name().unwrap_or("Unnamed")
+                submodule.name().unwrap_or("unnamed")
             );
             submodule.update(true, None)?;
         }
+        info!("Successfully updated submodules.");
         Ok(())
     }
 

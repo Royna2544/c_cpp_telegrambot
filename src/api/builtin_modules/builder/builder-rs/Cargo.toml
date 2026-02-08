@@ -31,6 +31,7 @@ which = "8.0.0"
 num_cpus = "1.0"
 xml = "1.2.1"
 regex = "1.10.4"
+anyhow = "1.0.101"
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.27", features = ["signal", "resource"] }
@@ -54,3 +55,7 @@ path = "src/main.rs"
 [[bin]]
 name = "gofile-upload"
 path = "src/bin/gofile_upload.rs"
+
+[[bin]]
+name = "git_cli"
+path = "src/bin/git_cli.rs"

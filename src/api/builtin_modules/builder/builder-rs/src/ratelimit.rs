@@ -57,13 +57,13 @@ mod tests {
     fn test_ratelimit_initial_check_passes() {
         // The first check should always pass because we initialize
         // last_time to (now - interval)
-        let mut rl = RateLimit::new(NonZero::new(1).unwrap());
+        let rl = RateLimit::new(NonZero::new(1).unwrap());
         assert!(rl.check());
     }
 
     #[test]
     fn test_ratelimit_blocks_immediate_second_call() {
-        let mut rl = RateLimit::new(NonZero::new(1).unwrap());
+        let rl = RateLimit::new(NonZero::new(1).unwrap());
         assert!(rl.check()); // First call passes
         assert!(!rl.check()); // Second immediate call should be blocked
     }
@@ -71,7 +71,7 @@ mod tests {
     #[test]
     fn test_ratelimit_allows_after_interval() {
         // Use a very short interval for testing
-        let mut rl = RateLimit::new(NonZero::new(1).unwrap());
+        let rl = RateLimit::new(NonZero::new(1).unwrap());
         assert!(rl.check()); // First call passes
 
         // Wait for the interval to pass
@@ -83,7 +83,7 @@ mod tests {
 
     #[test]
     fn test_ratelimit_multiple_blocked_attempts() {
-        let mut rl = RateLimit::new(NonZero::new(2).unwrap());
+        let rl = RateLimit::new(NonZero::new(2).unwrap());
         assert!(rl.check()); // First call passes
 
         // Multiple immediate attempts should all be blocked
