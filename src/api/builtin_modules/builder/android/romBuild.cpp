@@ -357,6 +357,20 @@ namespace {
 std::string keyToString(const std::string& key, const bool enabled) {
     return fmt::format("{} is now {}", key, enabled ? "enabled" : "disabled");
 }
+
+void notify_remote(
+    tgbot::builder::android::ROMBuildService::Stub* stub,
+    std::function<void(tgbot::builder::android::Settings*)> func) {
+    grpc::ClientContext context;
+    tgbot::builder::android::Settings request;
+    func(&request);
+    ::google::protobuf::Empty response;
+    auto rc = stub->SetSettings(&context, request, &response);
+    if (!rc.ok()) {
+        LOG(ERROR) << "Failed to notify remote of settings change: "
+                   << rc.error_message();
+    }
+}
 }  // namespace
 
 void ROMBuildQueryHandler::handle_repo_sync(const Query& query) {
@@ -370,13 +384,23 @@ void ROMBuildQueryHandler::handle_repo_sync_only(const Query& query) {
 void ROMBuildQueryHandler::handle_repo_sync_INTERNAL(const Query& query,
                                                      bool updatesettings) {
     do_repo_sync = !do_repo_sync;
+    notify_remote(buildStub_.get(),
+                  [&](tgbot::builder::android::Settings* settings) {
+                      settings->set_do_repo_sync(do_repo_sync);
+                  });
     (void)_api->answerCallbackQuery(query->id,
                                     keyToString("Repo sync", do_repo_sync));
-    if (updatesettings) handle_settings(query);
+    if (updatesettings) {
+        handle_settings(query);
+    }
 }
 
 void ROMBuildQueryHandler::handle_upload(const Query& query) {
     do_upload = !do_upload;
+    notify_remote(buildStub_.get(),
+                  [&](tgbot::builder::android::Settings* settings) {
+                      settings->set_do_upload(do_upload);
+                  });
     (void)_api->answerCallbackQuery(query->id,
                                     keyToString("Uploading", do_upload));
     handle_settings(query);
@@ -389,6 +413,12 @@ void ROMBuildQueryHandler::handle_use_rbe(const Query& query) {
         return;
     }
     do_use_rbe = !do_use_rbe;
+    notify_remote(
+        buildStub_.get(), [&](tgbot::builder::android::Settings* settings) {
+            settings->set_use_rbe_service(do_use_rbe);
+            settings->set_rbe_api_token(
+                *_config->get(ConfigManager::Configs::BUILDBUDDY_API_KEY));
+        });
     (void)_api->answerCallbackQuery(query->id,
                                     keyToString("Use RBE", do_use_rbe));
     handle_settings(query);
@@ -467,29 +497,16 @@ RBE enabled: {})",
 }
 
 void ROMBuildQueryHandler::handle_confirm(const Query& query) {
-    _api->editMessage(sentMessage, "Building...");
+    auto backKeyboard2 = KeyboardBuilder()
+                             .addKeyboard({{"Back", "back"},
+                                           {"Retry", "confirm"},
+                                           {"Tick RepoSync", "repo_sync_only"}})
+                             .get();
+    _api->answerCallbackQuery(query->id, "Starting build...");
+
+    _api->editMessage(sentMessage, "Starting build...");
     if (didpin) {
         _api->unpinMessage(sentMessage);
-    }
-
-    // Start build
-    grpc::ClientContext context1;
-    tgbot::builder::android::Settings request1;
-    request1.set_do_repo_sync(do_repo_sync);
-    request1.set_do_upload(do_upload);
-    request1.set_use_ccache(false);
-    request1.set_do_clean_build(false);
-    if (auto key = _config->get(ConfigManager::Configs::BUILDBUDDY_API_KEY);
-        key) {
-        request1.set_use_rbe_service(do_use_rbe);
-        request1.set_rbe_api_token(*key);
-    }
-    ::google::protobuf::Empty response;
-    auto rc = buildStub_->SetSettings(&context1, request1, &response);
-    if (!rc.ok()) {
-        LOG(ERROR) << "Failed to set settings: " << rc.error_message();
-        _api->editMessage(sentMessage, "Failed to set settings", backKeyboard);
-        return;
     }
 
     grpc::ClientContext context;
@@ -519,7 +536,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     auto ret = buildStub_->StartBuild(&context, request, &buildSubmission);
     if (!ret.ok()) {
         LOG(ERROR) << "Failed to start build: " << ret.error_message();
-        _api->editMessage(sentMessage, "Failed to start build", backKeyboard);
+        _api->editMessage(sentMessage, "Failed to start build", backKeyboard2);
         return;
     }
     LOG(INFO) << "Started build with ID: " << buildSubmission.build_id();
@@ -551,7 +568,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     auto read = buildStub_->StreamLogs(&logContext, logRequest);
     if (!read) {
         LOG(ERROR) << "Failed to stream logs";
-        _api->editMessage(sentMessage, "Failed to stream logs", backKeyboard);
+        _api->editMessage(sentMessage, "Failed to stream logs", backKeyboard2);
         build.finish();
         return;
     }
@@ -618,7 +635,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
 
     if (!build.running()) {
         // Build was cancelled
-        _api->editMessage(sentMessage, "Build cancelled", backKeyboard);
+        _api->editMessage(sentMessage, "Build cancelled", backKeyboard2);
         return;
     }
 
@@ -628,7 +645,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     if (!reader) {
         LOG(ERROR) << "Failed to get build result";
         _api->editMessage(sentMessage, "Failed to get build result",
-                          backKeyboard);
+                          backKeyboard2);
         build.finish();
         return;
     }
@@ -650,7 +667,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
                     sentMessage,
                     showPerBuild(per_build,
                                  R"(Build failed with unknown error!)"),
-                    backKeyboard);
+                    backKeyboard2);
                 build.finish();
                 return;
             }
@@ -665,7 +682,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
             _api->editMessage(
                 sentMessage,
                 showPerBuild(per_build, R"(Build failed! Error log sent.)"),
-                backKeyboard);
+                backKeyboard2);
             build.finish();
             return;
         }
@@ -685,7 +702,7 @@ Get the built artifact here: <code>{}</code>)",
                         _api->editMessage(
                             sentMessage,
                             showPerBuild(per_build, R"(Build failed!)"),
-                            backKeyboard);
+                            backKeyboard2);
                     }
                     break;
                 }
@@ -704,7 +721,7 @@ Download the built artifact here: <a href="{}">{}</a>)",
                         _api->editMessage(
                             sentMessage,
                             showPerBuild(per_build, R"(Build failed!)"),
-                            backKeyboard);
+                            backKeyboard2);
                     }
                     break;
                 }
@@ -730,7 +747,7 @@ Download the built artifact here: <a href="{}">{}</a>)",
                         _api->editMessage(
                             sentMessage,
                             showPerBuild(per_build, R"(Build failed!)"),
-                            backKeyboard);
+                            backKeyboard2);
                         streamFile.close();
                         break;
                     }
@@ -743,7 +760,7 @@ Download the built artifact here: <a href="{}">{}</a>)",
                         showPerBuild(
                             per_build,
                             R"(Build failed due to unknown upload method!)"),
-                        backKeyboard);
+                        backKeyboard2);
                     break;
                 }
             }
@@ -776,7 +793,7 @@ Build ID: <code>{}</code>)",
     } else {
         LOG(ERROR) << "Failed to read build result";
         _api->editMessage(sentMessage, "Failed to read build result",
-                          backKeyboard);
+                          backKeyboard2);
     }
     auto status = reader->Finish();
     if (!status.ok()) {
