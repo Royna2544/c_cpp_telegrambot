@@ -87,7 +87,7 @@ File Size: {} bytes)",
     }
     const auto& response = *response_opt;
     std::initializer_list<std::pair<absl::string_view, absl::string_view>>
-        replacements = {{"`", "\\`"}, {"_", "\\_"}, {"*", "\\*"}, {"[", "\\["},
+        replacements = {{"`", ""},    {"_", "\\_"}, {"*", "\\*"}, {"[", "\\["},
                         {"]", "\\]"}, {"(", "\\("}, {")", "\\)"}, {"~", "\\~"},
                         {"`", "\\`"}, {">", "\\>"}, {"#", "\\#"}, {"+", "\\+"},
                         {"-", "\\-"}, {"=", "\\="}, {"|", "\\|"}, {"{", "\\{"},
@@ -221,8 +221,13 @@ static void localnetmodelhandler(TgBotApi::Ptr api, MessageExt* message,
                 return;
             }
             response_key = chatResponse.response_id.value_or("");
-            api->editMessage<TgBotApi::ParseMode::MarkdownV2>(sent,
-                                                              it->content);
+
+            std::initializer_list<
+                std::pair<absl::string_view, absl::string_view>>
+                replacements = {{"!", "\\!"}};
+            auto replaced = absl::StrReplaceAll(it->content, replacements);
+            api->editMessage<TgBotApi::ParseMode::MarkdownV2>(
+                sent, std::move(replaced));
         } catch (const std::exception& e) {
             LOG(ERROR) << "Failed to parse LLM server response: " << e.what();
             api->editMessage(sent,
