@@ -1,0 +1,1 @@
+DELETE FROM mediaids WHERE mediaid = ?;

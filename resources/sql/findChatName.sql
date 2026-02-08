@@ -1,0 +1,1 @@
+SELECT chatid FROM chatmap WHERE chatid = ?

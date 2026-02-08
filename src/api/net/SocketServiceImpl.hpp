@@ -2,6 +2,7 @@
 
 #include "ManagedThreads.hpp"
 #include "api/TgBotApi.hpp"
+#include "database/DatabaseBase.hpp"
 #include "global_handlers/SpamBlock.hpp"
 #include "trivial_helpers/fruit_inject.hpp"
 
@@ -16,6 +17,7 @@ class SocketServiceImpl final : public ThreadRunner {
    private:
     TgBotApi* api_;
     SpamBlockBase* spamBlock_;
+    DatabaseBase* database_;
     Url* url_;
     std::unique_ptr<Service> service_;
     std::unique_ptr<Impl> impl_;
@@ -26,7 +28,7 @@ class SocketServiceImpl final : public ThreadRunner {
 
    public:
     APPLE_EXPLICIT_INJECT(SocketServiceImpl(TgBotApi* api,
-                                            SpamBlockBase* spamBlock,
-                                            Url* url));
+                                            SpamBlockBase* spamBlock, Url* url,
+                                            DatabaseBase* database));
     ~SocketServiceImpl() override;
 };

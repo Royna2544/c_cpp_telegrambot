@@ -385,6 +385,48 @@ SQLiteDatabase::ListResult SQLiteDatabase::removeUserFromList(
     return result;
 }
 
+std::optional<std::string> SQLiteDatabase::getChatName(
+    const ChatId chatId) const {
+    std::optional<Helper::Row> row;
+    auto helper =
+        Helper::create(db, _sqlScriptsPath, Helper::kFindChatNameFile);
+    if (!helper->prepare()) {
+        return std::nullopt;
+    }
+    helper->addArgument(chatId).bindArguments();
+    row = helper->execAndGetRow();
+    if (row) {
+        return row->get<std::string>(0);
+    }
+    return std::nullopt;
+}
+
+bool SQLiteDatabase::deleteChatInfo(const ChatId chatId) const {
+    auto helper = Helper::create(db, _sqlScriptsPath, Helper::kDeleteChatFile);
+    if (!helper->prepare()) {
+        return false;
+    }
+    helper->addArgument(chatId).bindArguments();
+    return helper->execute();
+}
+
+std::vector<SQLiteDatabase::ChatInfo> SQLiteDatabase::getAllChatInfos() const {
+    std::vector<ChatInfo> result;
+    std::optional<Helper::Row> row;
+    auto helper =
+        Helper::create(db, _sqlScriptsPath, Helper::kFindAllChatMapFile);
+    if (!helper->prepare()) {
+        return result;
+    }
+    while ((row = helper->execAndGetRow())) {
+        ChatInfo info;
+        info.chatId = row->get<ChatId>(0);
+        info.name = row->get<std::string>(1);
+        result.push_back(info);
+    }
+    return result;
+}
+
 bool SQLiteDatabase::load(std::filesystem::path filepath) {
     int ret = 0;
     std::error_code ec;
@@ -419,6 +461,11 @@ bool SQLiteDatabase::load(std::filesystem::path filepath) {
             throw std::runtime_error("Error initializing database");
         }
     }
+    // Enable foreign key support
+    sqlite3_exec(db, "PRAGMA foreign_keys = ON;", nullptr, nullptr, nullptr);
+    // Enable user version 1
+    sqlite3_exec(db, "PRAGMA user_version = 1;", nullptr, nullptr, nullptr);
+
     if (filepath != kInMemoryDatabase) {
         LOG(INFO) << "Loaded SQLite database: " << filepath;
     } else {
@@ -646,6 +693,16 @@ std::vector<SQLiteDatabase::MediaInfo> SQLiteDatabase::getAllMediaInfos()
         result.emplace_back(std::move(info));
     }
     return result;
+}
+
+bool SQLiteDatabase::deleteMediaInfo(
+    const decltype(MediaInfo::mediaId) mediaId) const {
+    auto helper = Helper::create(db, _sqlScriptsPath, Helper::kDeleteMediaFile);
+    if (!helper->prepare()) {
+        return false;
+    }
+    helper->addArgument(mediaId).bindArguments();
+    return helper->execute();
 }
 
 std::optional<UserId> SQLiteDatabase::getOwnerUserId() const {

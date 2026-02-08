@@ -35,6 +35,7 @@
 #include <trivial_helpers/fruit_inject.hpp>
 #include <utility>
 
+#include "DatabaseBase.hpp"
 #include "src/api/net/SocketServiceImpl.hpp"
 #include "tgbot/TgException.h"
 #include "utils/Env.hpp"
@@ -194,20 +195,28 @@ getTgBotApiImplComponent() {
 }
 
 #ifdef TGBOTCPP_ENABLE_WEBSERVER
-fruit::Component<fruit::Required<ThreadManager, CommandLine>,
+fruit::Component<fruit::Required<ThreadManager, CommandLine, ConfigManager>,
                  Unused<TgBotWebServer>> getWebServerComponent() {
     return fruit::createComponent()
         .bind<TgBotWebServerBase, TgBotWebServer>()
-        .registerProvider([](ThreadManager* threadManager,
-                             CommandLine* cmdline) -> Unused<TgBotWebServer> {
-            constexpr int kTgBotWebServerPort = 8080;
-            const auto server = threadManager->create<TgBotWebServer>(
-                ThreadManager::Usage::WEBSERVER_THREAD,
-                cmdline->getPath(FS::PathType::RESOURCES_WEBPAGE),
-                kTgBotWebServerPort);
-            server->run();
-            return {};
-        });
+        .registerProvider(
+            [](ThreadManager* threadManager, CommandLine* cmdline,
+               ConfigManager* config) -> Unused<TgBotWebServer> {
+                constexpr int kTgBotWebServerPort = 8080;
+                auto primary =
+                    config->get(ConfigManager::Configs::SOCKET_URL_PRIMARY);
+                if (!primary) {
+                    LOG(ERROR)
+                        << "Cannot start webserver: Primary socket URL not set";
+                    return {};
+                }
+                auto* const server = threadManager->create<TgBotWebServer>(
+                    ThreadManager::Usage::WEBSERVER_THREAD,
+                    cmdline->getPath(FS::PathType::RESOURCES_WEBPAGE),
+                    kTgBotWebServerPort, primary.value());
+                server->run();
+                return {};
+            });
 }
 #endif
 
@@ -238,21 +247,23 @@ getNetworkLogSinkComponent() {
 
 using SocketComponentFactory_t = std::function<Unused<SocketServiceImpl>(
     ThreadManager::Usage usage, SocketServiceImpl::Url* path)>;
-fruit::Component<
-    fruit::Required<TgBotApi, WrapPtr<SpamBlockBase>, ThreadManager>,
-    SocketComponentFactory_t>
+fruit::Component<fruit::Required<TgBotApi, WrapPtr<SpamBlockBase>,
+                                 ThreadManager, DatabaseBase>,
+                 SocketComponentFactory_t>
 getSocketInterfaceComponent() {
     return fruit::createComponent()
         .registerFactory<Unused<SocketServiceImpl>(
             fruit::Assisted<ThreadManager::Usage> usage,
             fruit::Assisted<SocketServiceImpl::Url*> path, TgBotApi::Ptr api,
-            WrapPtr<SpamBlockBase> spamblock, ThreadManager * manager)>(
+            WrapPtr<SpamBlockBase> spamblock, ThreadManager * manager,
+            DatabaseBase * database)>(
             [](ThreadManager::Usage usage, SocketServiceImpl::Url* path,
                TgBotApi::Ptr api, WrapPtr<SpamBlockBase> spamblock,
-               ThreadManager* manager) -> Unused<SocketServiceImpl> {
+               ThreadManager* manager,
+               DatabaseBase* database) -> Unused<SocketServiceImpl> {
                 manager
                     ->create<SocketServiceImpl>(usage, api, spamblock.pointer(),
-                                                path)
+                                                path, database)
                     ->run();
                 return {};
             });

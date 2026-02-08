@@ -65,12 +65,18 @@ struct DBIMPL_EXPORT SQLiteDatabase : DatabaseBase {
         std::string str) const override;
     [[nodiscard]] AddResult addMediaInfo(const MediaInfo& info) const override;
     [[nodiscard]] std::vector<MediaInfo> getAllMediaInfos() const override;
+    [[nodiscard]] bool deleteMediaInfo(
+        const decltype(MediaInfo::mediaId) mediaId) const override;
     void setOwnerUserId(UserId userId) const override;
     std::ostream& dump(std::ostream& ofs) const override;
     [[nodiscard]] AddResult addChatInfo(
         const ChatId chatid, const std::string_view name) const override;
     [[nodiscard]] std::optional<ChatId> getChatId(
         const std::string_view name) const override;
+    [[nodiscard]] std::optional<std::string> getChatName(
+        const ChatId chatId) const override;
+    [[nodiscard]] bool deleteChatInfo(const ChatId chatId) const override;
+    [[nodiscard]] std::vector<ChatInfo> getAllChatInfos() const override;
 
     /**
      * SQLiteDatabase::Helper is a helper class for executing SQL statements
@@ -103,11 +109,17 @@ struct DBIMPL_EXPORT SQLiteDatabase : DatabaseBase {
         static constexpr std::string_view kDumpDatabaseFile =
             "dumpDatabase.sql";
         static constexpr std::string_view kInsertChatFile = "insertChat.sql";
+        static constexpr std::string_view kFindChatNameFile =
+            "findChatName.sql";
         static constexpr std::string_view kFindChatIdFile = "findChatId.sql";
         static constexpr std::string_view kFindAllMediaMapFile =
             "findAllMediaMap.sql";
+        static constexpr std::string_view kFindAllChatMapFile =
+            "findAllChatMap.sql";
         static constexpr std::string_view kDeleteMediaNameFile =
             "deleteMediaName.sql";
+        static constexpr std::string_view kDeleteChatFile = "deleteChat.sql";
+        static constexpr std::string_view kDeleteMediaFile = "deleteMedia.sql";
 
         struct Row {
             template <typename T>

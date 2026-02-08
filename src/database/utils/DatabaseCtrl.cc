@@ -11,15 +11,15 @@
 #include "ConfigManager.hpp"
 #include "DatabaseBase.hpp"
 
-enum class Commands {
+enum class Commands : uint8_t {
     Noop,
     Help,
     Dump,
     AddChat,
     SetOwnerId,
     WhiteBlackList,
-    DeleteMedia = Noop,
-    DeleteChat = Noop,
+    DeleteMedia,
+    DeleteChat,
 };
 
 // Structure to hold command data for easier manipulation and handling
@@ -38,27 +38,56 @@ void executeCommand(const CommandData& data) {
 }
 
 template <>
+void executeCommand<Commands::DeleteMedia>(const CommandData& data) {
+    if (data.args.size() != 1) {
+        LOG(ERROR) << "Need <media_id> as argument";
+        return;
+    }
+    const std::string mediaId = std::string(data.args[0]);
+    if (data.impl->deleteMediaInfo(mediaId)) {
+        LOG(INFO) << "Deleted media with ID: " << mediaId;
+    } else {
+        LOG(ERROR) << "Failed to delete media with ID: " << mediaId;
+    }
+}
+
+template <>
+void executeCommand<Commands::DeleteChat>(const CommandData& data) {
+    if (data.args.size() != 1) {
+        LOG(ERROR) << "Need <chatid> as argument";
+        return;
+    }
+    ChatId chatid{};
+    if (!try_parse(data.args[0], &chatid)) {
+        LOG(ERROR) << "Invalid chatid specified";
+        return;
+    }
+    if (data.impl->deleteChatInfo(chatid)) {
+        LOG(INFO) << "Deleted chat info for chatid=" << chatid;
+    } else {
+        LOG(ERROR) << "Failed to delete chat info for chatid=" << chatid;
+    }
+}
+
+template <>
 void executeCommand<Commands::Noop>(const CommandData& /*data*/) {
     // No-op command for testing
-    std::cout << "No-op command executed" << std::endl;
+    std::cout << "No-op command executed" << '\n';
 }
 
 template <>
 void executeCommand<Commands::Help>(const CommandData& data) {
-    std::cout << std::endl << "Telegram Bot Database CLI" << std::endl;
-    std::cout << "Usage: " << data.args[0] << " [command] [args...]"
-              << std::endl;
-    std::cout << "Available commands:" << std::endl;
-    std::cout << "- dump: Dump the database contents to stdout" << std::endl;
-    std::cout << "- delete_media: Delete media from the database" << std::endl;
-    std::cout << "- add_chat: Add a chat info to the database" << std::endl;
-    std::cout << "- delete_chat: Delete a chat info from the database"
-              << std::endl;
-    std::cout << "- set_owner_id: Set the owner ID for the database"
-              << std::endl;
+    std::cout << '\n' << "Telegram Bot Database CLI" << '\n';
+    std::cout << "Usage: " << data.args[0] << " [command] [args...]" << '\n';
+    std::cout << "Available commands:" << '\n';
+    std::cout << "- dump: Dump the database contents to stdout" << '\n';
+    std::cout << "- delete_media: Delete media from the database" << '\n';
+    std::cout << "- add_chat: Add a chat info to the database" << '\n';
+    std::cout << "- delete_chat: Delete a chat info from the database" << '\n';
+    std::cout << "- set_owner_id: Set the owner ID for the database" << '\n';
     std::cout << "- set_white_black_list: Add/remove the white/black list user "
                  "for the database"
-              << std::endl;
+              << '\n';
 }
 
 template <>
@@ -164,7 +193,7 @@ int app_main(int argc, char** argv) {
     for (int i = 0; i < argc; ++i) {
         args.emplace_back(argv[i]);
     }
-    CommandData data = {args, nullptr};
+    CommandData data = {.args = args, .impl = nullptr};
 
     if (args.size() < 2) {
         executeCommand<Commands::Help>(data);
@@ -180,7 +209,7 @@ int app_main(int argc, char** argv) {
     const std::string_view command = args[1];
     // Erase exe, command name
     args.erase(args.begin(), args.begin() + 2);
-    data = {args, std::move(dbImpl)};
+    data = {.args = args, .impl = std::move(dbImpl)};
 
     DLOG(INFO) << "Executing command: " << command;
     if (command == "dump") {

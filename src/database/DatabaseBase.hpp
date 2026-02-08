@@ -12,7 +12,7 @@
 
 struct DBIMPL_EXPORT DatabaseBase {
     virtual ~DatabaseBase() = default;
-    
+
     struct DBIMPL_EXPORT exception : public std::runtime_error {
         using std::runtime_error::runtime_error;
     };
@@ -126,7 +126,7 @@ struct DBIMPL_EXPORT DatabaseBase {
         std::string str) const = 0;
 
     // Return value for addXXX methods.
-    enum class AddResult { OK, ALREADY_EXISTS, BACKEND_ERROR };
+    enum class AddResult : uint8_t { OK, ALREADY_EXISTS, BACKEND_ERROR };
 
     /**
      * @brief Add a media info to the database
@@ -147,6 +147,19 @@ struct DBIMPL_EXPORT DatabaseBase {
      * database.
      */
     [[nodiscard]] virtual std::vector<MediaInfo> getAllMediaInfos() const = 0;
+
+    /**
+     * @brief Delete a media info from the database
+     *
+     * This function deletes a media info from the database based on the given
+     * media id. If the media id does not exist in the database, the function
+     * should return false.
+     *
+     * @param mediaId The unique identifier of the media to be deleted.
+     * @return true if the media info was successfully deleted, false otherwise.
+     */
+    [[nodiscard]] virtual bool deleteMediaInfo(
+        const decltype(MediaInfo::mediaId) mediaId) const = 0;
 
     /**
      * @brief Add a chat info to the database
@@ -180,6 +193,41 @@ struct DBIMPL_EXPORT DatabaseBase {
      */
     [[nodiscard]] virtual std::optional<ChatId> getChatId(
         const std::string_view name) const = 0;
+
+    /**
+     * @brief Get the chat name associated with a given chat id
+     * This function retrieves the chat name associated with a given chat id
+     * from the database. If the chat id does not exist in the database, the
+     * function should return std::nullopt.
+     * @param chatId The unique identifier of the chat.
+     * @return The chat name associated with the given chat id. If the chat id
+     * does not exist, the function should return std::nullopt.
+     */
+    [[nodiscard]] virtual std::optional<std::string> getChatName(
+        const ChatId chatId) const = 0;
+
+    /**
+     * @brief Delete a chat info from the database
+     * This function deletes a chat info from the database based on the given
+     * chat id. If the chat id does not exist in the database, the function
+     * should return false.
+     * @param chatId The unique identifier of the chat to be deleted.
+     * @return true if the chat info was successfully deleted, false otherwise.
+     */
+    [[nodiscard]] virtual bool deleteChatInfo(const ChatId chatId) const = 0;
+
+    struct ChatInfo {
+        ChatId chatId;
+        std::string name;
+    };
+
+    /**
+     * @brief Get all chat infos inside the database
+     *
+     * @return std::vector<ChatInfo> containing all the chat infos in the
+     * database.
+     */
+    [[nodiscard]] virtual std::vector<ChatInfo> getAllChatInfos() const = 0;
 
     /**
      * @brief Dump the database to the specified output stream.

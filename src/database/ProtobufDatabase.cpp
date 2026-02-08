@@ -104,6 +104,48 @@ ProtoDatabase::ListResult ProtoDatabase::removeUserFromList(ListType type,
     return ListResult::NOT_IN_LIST;
 }
 
+std::optional<std::string> ProtoDatabase::getChatName(
+    const ChatId chatId) const {
+    if (!dbinfo.has_value()) {
+        LOG_ONCE(WARNING) << "Database not loaded! Cannot determine chat name!";
+        return std::nullopt;
+    }
+    for (const auto& chatInfo : dbinfo->object.chattonames()) {
+        if (chatInfo.telegramchatid() == chatId) return chatInfo.name();
+    }
+    return std::nullopt;
+}
+
+bool ProtoDatabase::deleteChatInfo(const ChatId chatId) const {
+    if (!dbinfo.has_value()) {
+        LOG_ONCE(WARNING) << "Database not loaded! Cannot delete chat info!";
+        return false;
+    }
+    auto* chatToNames = dbinfo->object.mutable_chattonames();
+    for (int i = 0; i < chatToNames->size(); ++i) {
+        if (chatToNames->Get(i).telegramchatid() == chatId) {
+            chatToNames->DeleteSubrange(i, 1);
+            return true;
+        }
+    }
+    return false;
+}
+
+std::vector<ProtoDatabase::ChatInfo> ProtoDatabase::getAllChatInfos() const {
+    if (!dbinfo.has_value()) {
+        LOG_ONCE(WARNING) << "Database not loaded! Cannot get chat infos!";
+        return {};
+    }
+    std::vector<ChatInfo> result;
+    for (const auto& chatInfo : dbinfo->object.chattonames()) {
+        ChatInfo info;
+        info.chatId = chatInfo.telegramchatid();
+        info.name = chatInfo.name();
+        result.emplace_back(std::move(info));
+    }
+    return result;
+}
+
 bool ProtoDatabase::load(std::filesystem::path filepath) {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
@@ -268,6 +310,18 @@ std::vector<ProtoDatabase::MediaInfo> ProtoDatabase::getAllMediaInfos() const {
         result.emplace_back(info);
     }
     return result;
+}
+
+bool ProtoDatabase::deleteMediaInfo(
+    const decltype(MediaInfo::mediaId) mediaId) const {
+    auto* mediaToNames = dbinfo->object.mutable_mediatonames();
+    for (int i = 0; i < mediaToNames->size(); ++i) {
+        if (mediaToNames->Get(i).telegrammediaid() == mediaId) {
+            mediaToNames->DeleteSubrange(i, 1);
+            return true;
+        }
+    }
+    return false;
 }
 
 std::ostream& ProtoDatabase::dump(std::ostream& os) const {

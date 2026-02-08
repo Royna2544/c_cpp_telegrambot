@@ -81,6 +81,7 @@
     "luamodules",
     "testing",
     "builder",
-    "backtrace"
+    "backtrace",
+    "web"
   ]
 }

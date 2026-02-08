@@ -13,3 +13,6 @@
 [submodule "src/third-party/stduuid"]
 	path = src/third-party/stduuid
 	url = https://github.com/mariusbancila/stduuid/
+[submodule "src/third-party/cryptopp-cmake"]
+	path = src/third-party/cryptopp-cmake
+	url = https://github.com/abdes/cryptopp-cmake

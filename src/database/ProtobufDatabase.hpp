@@ -28,6 +28,8 @@ struct DBIMPL_EXPORT ProtoDatabase : DatabaseBase {
         std::string str) const override;
     [[nodiscard]] AddResult addMediaInfo(const MediaInfo& info) const override;
     [[nodiscard]] std::vector<MediaInfo> getAllMediaInfos() const override;
+    [[nodiscard]] bool deleteMediaInfo(
+        const decltype(MediaInfo::mediaId) mediaId) const override;
     void setOwnerUserId(UserId userId) const override;
     std::ostream& dump(std::ostream& ofs) const override;
 
@@ -35,6 +37,10 @@ struct DBIMPL_EXPORT ProtoDatabase : DatabaseBase {
         const ChatId chatid, const std::string_view name) const override;
     [[nodiscard]] std::optional<ChatId> getChatId(
         const std::string_view name) const override;
+    [[nodiscard]] std::optional<std::string> getChatName(
+        const ChatId chatId) const override;
+    bool deleteChatInfo(const ChatId chatId) const override;
+    [[nodiscard]] std::vector<ChatInfo> getAllChatInfos() const override;
 
    private:
     struct Info {

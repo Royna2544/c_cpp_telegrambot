@@ -67,11 +67,22 @@ enum GenericResponseCode {
     ErrorClientError = 5;
 }
 
+/*
+ * Generic response message structure
+ */
+message GenericResponse {
+    optional GenericResponseCode code = 2;
+    optional string message = 3;
+}
+
 enum ChecksumAlgorithm {
     None = 0;
     MD5 = 1;
     SHA1 = 2;
     SHA256 = 3;
+    SHA512 = 4;
+    Blake2b = 5;
+    Blake2s = 6;
 }
 
 /*
@@ -107,13 +118,6 @@ message FileChunkRequest {
     optional int32 chunk_idx = 2;
 }
 
-/*
- * Generic response message structure
- */
-message GenericResponse {
-    optional GenericResponseCode code = 2;
-    optional string message = 3;
-}
 
 /**
  * Response message for file transfer requests
@@ -175,9 +179,59 @@ message BotInfo {
     string operating_system = 4;
 }
 
+message ChatAlias {
+    int64 chat_id = 1;
+    string alias = 2;
+}
+
+message ChatAliasRequest {
+    oneof identifier {
+        int64 chat_id = 1;
+        string alias = 2;
+    }
+}
+
+message ChatAliasResponse {
+    bool exists = 1;
+    int64 chat_id = 2;
+}
+
+message MediaAlias {
+    string media_id = 1;
+    repeated string alias = 2;
+}
+
+message MediaAliasResponse {
+    bool exists = 1;
+    repeated string media_id = 2;
+}
+
+message MediaAliasRequest {
+    oneof identifier {
+        string media_id = 1;
+        string alias = 2;
+    }
+}
+
 service SocketService {
     // Sends a message to a specified chat
     rpc sendMessage (SendMessageRequest) returns (GenericResponse);
+    
+    // Set/Get chatid/name aliases.
+    rpc setChatAlias (ChatAlias) returns (GenericResponse);
+    // ChatAliasRequest requires #alias to be set. only.
+    rpc getChatAlias (ChatAliasRequest) returns (ChatAliasResponse);
+    // ChatAliasRequest requires #chat_id to be set. only.
+    rpc deleteChatAlias (ChatAliasRequest) returns (GenericResponse);
+    rpc listChatAliases (google.protobuf.Empty) returns (stream ChatAlias);
+
+    // Set/Get MediaId/name aliases.
+    rpc setMediaAlias (MediaAlias) returns (GenericResponse);
+    // MediaAliasRequest requires #alias to be set. only.
+    rpc getMediaAlias (MediaAliasRequest) returns (MediaAliasResponse);
+    // MediaAliasRequest requires #media_id to be set. only.
+    rpc deleteMediaAlias (MediaAliasRequest) returns (GenericResponse);
+    rpc listMediaAliases (google.protobuf.Empty) returns (stream MediaAlias);
 
     // Sets the spam blocking configuration
     rpc setSpamBlockingConfig (SpamBlockingConfig) returns (GenericResponse);

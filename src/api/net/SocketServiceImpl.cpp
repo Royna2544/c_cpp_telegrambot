@@ -1,9 +1,11 @@
 #include "SocketServiceImpl.hpp"
 
+#include <absl/hash/hash.h>
 #include <absl/log/log.h>
 #include <fmt/format.h>
 #include <grpcpp/grpcpp.h>
 #include <grpcpp/server_builder.h>
+#include <grpcpp/support/status.h>
 #include <uuid.h>
 
 #include <GitBuildInfo.hpp>
@@ -21,7 +23,16 @@
 #include "api/TgBotApi.hpp"
 #include "api/Utils.hpp"
 #include "global_handlers/SpamBlock.hpp"
+#include "hex.h"
+#include "sha.h"
 #include "tgbot/TgException.h"
+
+#define CRYPTOPP_ENABLE_NAMESPACE_WEAK 1
+#include <cryptopp/blake2.h>
+#include <cryptopp/cryptlib.h>
+#include <cryptopp/hex.h>
+#include <cryptopp/md5.h>
+#include <cryptopp/sha.h>
 
 using grpc::ServerContext;
 using grpc::Status;
@@ -29,8 +40,9 @@ using namespace tgbot::proto::socket;
 
 class SocketServiceImpl::Service : public SocketService::Service {
    public:
-    explicit Service(TgBotApi* api, SpamBlockBase* spamBlock)
-        : api_(api), spamBlock_(spamBlock) {}
+    explicit Service(TgBotApi* api, SpamBlockBase* spamBlock,
+                     DatabaseBase* database)
+        : api_(api), spamBlock_(spamBlock), database_(database) {}
 
     std::chrono::system_clock::time_point startTime_ =
         std::chrono::system_clock::now();
@@ -65,15 +77,35 @@ class SocketServiceImpl::Service : public SocketService::Service {
                 const ::google::protobuf::Empty* request,
                 BotInfo* response) override;
 
+    Status setChatAlias(ServerContext* context, const ChatAlias* request,
+                        GenericResponse* response) override;
+    Status getChatAlias(ServerContext* context, const ChatAliasRequest* request,
+                        ChatAliasResponse* response) override;
+    Status deleteChatAlias(ServerContext* context,
+                           const ChatAliasRequest* request,
+                           GenericResponse* response) override;
+    Status listChatAliases(ServerContext* context,
+                           const ::google::protobuf::Empty* request,
+                           ::grpc::ServerWriter<ChatAlias>* writer) override;
+    Status setMediaAlias(ServerContext* context, const MediaAlias* request,
+                         GenericResponse* response) override;
+    Status deleteMediaAlias(ServerContext* context,
+                            const MediaAliasRequest* request,
+                            GenericResponse* response) override;
+    Status listMediaAliases(ServerContext* context,
+                            const ::google::protobuf::Empty* request,
+                            ::grpc::ServerWriter<MediaAlias>* writer) override;
+
    private:
     TgBotApi* api_;
     SpamBlockBase* spamBlock_;
+    DatabaseBase* database_;
 
     struct TranferEntry {
         std::fstream fileStream;
         std::filesystem::path filePath;
         std::uintmax_t totalSize = 0;
-        int chunk_count;
+        int chunk_count{};
     };
 
     std::map<std::string, TranferEntry> activeTransfers_;
@@ -246,6 +278,26 @@ Status SocketServiceImpl::Service::getSpamBlockingConfig(
     return Status::OK;
 }
 
+namespace {
+template <typename T>
+std::string calc_hash(const FileTransferRequest* request) {
+    T hash_obj;
+    CryptoPP::HexEncoder encoder;
+    hash_obj.Update(reinterpret_cast<const CryptoPP::byte*>(
+                        request->file_checksum().data()),
+                    request->file_checksum().size());
+    std::string digest;
+    digest.resize(hash_obj.DigestSize());
+    hash_obj.Final(reinterpret_cast<CryptoPP::byte*>(digest.data()));
+    std::string encoded;
+    encoder.Attach(new CryptoPP::StringSink(encoded));
+    encoder.Put(reinterpret_cast<const CryptoPP::byte*>(digest.data()),
+                digest.size());
+    encoder.MessageEnd();
+    return encoded;
+}
+
+}  // namespace
 Status SocketServiceImpl::Service::requestFileTransfer(
     ServerContext* context, const FileTransferRequest* request,
     FileTransferResponse* response) {
@@ -279,6 +331,45 @@ Status SocketServiceImpl::Service::requestFileTransfer(
             LOG(ERROR) << "File already exists for upload: "
                        << request->file_path();
             return Status::OK;
+        }
+
+        // Compute checksums if set
+        std::optional<std::string> result;
+        switch (request->file_checksum_algorithm()) {
+            case ChecksumAlgorithm::MD5: {
+                result = calc_hash<CryptoPP::Weak::MD5>(request);
+            } break;
+            case ChecksumAlgorithm::SHA1: {
+                result = calc_hash<CryptoPP::SHA1>(request);
+            } break;
+            case ChecksumAlgorithm::SHA256: {
+                result = calc_hash<CryptoPP::SHA256>(request);
+            } break;
+            case ChecksumAlgorithm::SHA512: {
+                result = calc_hash<CryptoPP::SHA512>(request);
+            } break;
+            case ChecksumAlgorithm::Blake2b: {
+                result = calc_hash<CryptoPP::BLAKE2b>(request);
+            } break;
+            case ChecksumAlgorithm::Blake2s: {
+                result = calc_hash<CryptoPP::BLAKE2s>(request);
+            } break;
+            case ChecksumAlgorithm::None:
+                break;
+        }
+        if (result.has_value()) {
+            std::string providedChecksum = request->file_checksum();
+            if (absl::Hash<std::string_view>{}(*result) !=
+                absl::Hash<std::string_view>{}(providedChecksum)) {
+                response->set_accepted(false);
+                response->set_reject_message("Checksum mismatch");
+                LOG(ERROR) << "Checksum mismatch for upload. Provided: "
+                           << std::quoted(providedChecksum)
+                           << ", Computed: " << std::quoted(*result);
+                return Status::OK;
+            }
+            LOG(INFO) << "Checksum verified for upload: "
+                      << std::quoted(providedChecksum);
         }
 
         // For upload, we create a temporary file to store incoming data
@@ -511,6 +602,135 @@ Status SocketServiceImpl::Service::info(
     return Status::OK;
 }
 
+Status SocketServiceImpl::Service::setChatAlias(ServerContext* context,
+                                                const ChatAlias* request,
+                                                GenericResponse* response) {
+    LogWhoCalledMe(context, "setChatAlias");
+
+    switch (database_->addChatInfo(request->chat_id(), request->alias())) {
+        case DatabaseBase::AddResult::OK:
+            break;
+        case DatabaseBase::AddResult::ALREADY_EXISTS:
+            response->set_code(GenericResponseCode::ErrorCommandIgnored);
+            response->set_message("Failed to set chat alias: already exists");
+            return Status::OK;
+        case DatabaseBase::AddResult::BACKEND_ERROR:
+            response->set_code(GenericResponseCode::ErrorRuntimeError);
+            response->set_message("Failed to set chat alias: backend error");
+            break;
+    }
+    response->set_code(GenericResponseCode::Success);
+    response->set_message("Chat alias set successfully");
+    return Status::OK;
+}
+
+Status SocketServiceImpl::Service::getChatAlias(ServerContext* context,
+                                                const ChatAliasRequest* request,
+                                                ChatAliasResponse* response) {
+    LogWhoCalledMe(context, "getChatAlias");
+
+    auto chatInfoOpt = database_->getChatId(request->alias());
+    if (!chatInfoOpt.has_value()) {
+        response->set_exists(false);
+        response->set_chat_id(-1);
+        return Status::OK;
+    }
+    response->set_exists(true);
+    response->set_chat_id(*chatInfoOpt);
+    LOG(INFO) << "Retrieved chat alias for chat_id_alias " << request->alias()
+              << ": " << *chatInfoOpt;
+    return Status::OK;
+}
+
+Status SocketServiceImpl::Service::deleteChatAlias(
+    ServerContext* context, const ChatAliasRequest* request,
+    GenericResponse* response) {
+    LogWhoCalledMe(context, "deleteChatAlias");
+
+    if (!database_->deleteChatInfo(request->chat_id())) {
+        response->set_code(GenericResponseCode::ErrorCommandIgnored);
+        response->set_message("Failed to delete chat alias: not found");
+        return Status::OK;
+    }
+    response->set_code(GenericResponseCode::Success);
+    response->set_message("Chat alias deleted successfully");
+    return Status::OK;
+}
+
+Status SocketServiceImpl::Service::listChatAliases(
+    ServerContext* context, const ::google::protobuf::Empty* /*request*/,
+    ::grpc::ServerWriter<ChatAlias>* writer) {
+    LogWhoCalledMe(context, "listChatAliases");
+
+    auto chatInfos = database_->getAllChatInfos();
+    for (const auto& chatInfo : chatInfos) {
+        ChatAlias alias;
+        alias.set_chat_id(chatInfo.chatId);
+        alias.set_alias(chatInfo.name);
+        writer->Write(alias);
+    }
+    return Status::OK;
+}
+
+Status SocketServiceImpl::Service::setMediaAlias(ServerContext* context,
+                                                 const MediaAlias* request,
+                                                 GenericResponse* response) {
+    LogWhoCalledMe(context, "setMediaAlias");
+
+    DatabaseBase::MediaInfo mediaInfo;
+    mediaInfo.mediaId = request->media_id();
+    std::ranges::transform(request->alias(),
+                           std::back_inserter(mediaInfo.names),
+                           [](const std::string& alias) { return alias; });
+
+    switch (database_->addMediaInfo(mediaInfo)) {
+        case DatabaseBase::AddResult::OK:
+            break;
+        case DatabaseBase::AddResult::ALREADY_EXISTS:
+            response->set_code(GenericResponseCode::ErrorCommandIgnored);
+            response->set_message("Failed to set media alias: already exists");
+            return Status::OK;
+        case DatabaseBase::AddResult::BACKEND_ERROR:
+            response->set_code(GenericResponseCode::ErrorRuntimeError);
+            response->set_message("Failed to set media alias: backend error");
+            break;
+    }
+    response->set_code(GenericResponseCode::Success);
+    response->set_message("Media alias set successfully");
+    return Status::OK;
+}
+
+Status SocketServiceImpl::Service::listMediaAliases(
+    ServerContext* context, const ::google::protobuf::Empty* /*request*/,
+    ::grpc::ServerWriter<MediaAlias>* writer) {
+    LogWhoCalledMe(context, "listMediaAliases");
+    auto mediaInfos = database_->getAllMediaInfos();
+    for (const auto& mediaInfo : mediaInfos) {
+        MediaAlias alias;
+        alias.set_media_id(mediaInfo.mediaId);
+        for (const auto& name : mediaInfo.names) {
+            alias.add_alias(name);
+        }
+        writer->Write(alias);
+    }
+    return Status::OK;
+}
+
+Status SocketServiceImpl::Service::deleteMediaAlias(
+    ServerContext* context, const MediaAliasRequest* request,
+    GenericResponse* response) {
+    LogWhoCalledMe(context, "deleteMediaAlias");
+
+    if (!database_->deleteMediaInfo(request->media_id())) {
+        response->set_code(GenericResponseCode::ErrorCommandIgnored);
+        response->set_message("Failed to delete media alias: not found");
+        return Status::OK;
+    }
+    response->set_code(GenericResponseCode::Success);
+    response->set_message("Media alias deleted successfully");
+    return Status::OK;
+}
+
 struct SocketServiceImpl::Impl {
     std::unique_ptr<grpc::Server> server;
 };
@@ -531,9 +751,9 @@ void SocketServiceImpl::runFunction(const std::stop_token& token) {
 void SocketServiceImpl::onPreStop() { impl_->server->Shutdown(); }
 
 SocketServiceImpl::SocketServiceImpl(TgBotApi* api, SpamBlockBase* spamBlock,
-                                     Url* url)
-    : api_(api), spamBlock_(spamBlock), url_(url) {
-    service_ = std::make_unique<Service>(api, spamBlock);
+                                     Url* url, DatabaseBase* database)
+    : api_(api), spamBlock_(spamBlock), url_(url), database_(database) {
+    service_ = std::make_unique<Service>(api, spamBlock, database);
     impl_ = std::make_unique<Impl>();
 }
 

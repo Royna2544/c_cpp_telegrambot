@@ -1,3 +1,5 @@
+#include <absl/log/log.h>
+
 #include <TgBotWebpage.hpp>
 #include <stop_token>
 #include <utility>
@@ -11,5 +13,6 @@ void TgBotWebServer::onPreStop() {
     stopServer();
 }
 TgBotWebServer::TgBotWebServer(std::filesystem::path wwwResource,
-                               int serverPort)
-    : TgBotWebServerBase(serverPort, std::move(wwwResource)) {}
+                               int serverPort, std::string grpcServerAddr)
+    : TgBotWebServerBase(serverPort, std::move(wwwResource),
+                         std::move(grpcServerAddr)) {}

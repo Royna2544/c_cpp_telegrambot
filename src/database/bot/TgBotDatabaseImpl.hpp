@@ -25,7 +25,7 @@ struct DBIMPL_EXPORT TgBotDatabaseImpl : DatabaseBase {
      * providers.
      */
     struct DBIMPL_EXPORT Providers {
-        explicit Providers(CommandLine *cmdline);
+        explicit Providers(CommandLine* cmdline);
 
         /**
          * @brief Registers a new database provider with the given name.
@@ -77,14 +77,21 @@ struct DBIMPL_EXPORT TgBotDatabaseImpl : DatabaseBase {
     [[nodiscard]] std::optional<DatabaseBase::MediaInfo> queryMediaInfo(
         std::string str) const override;
     [[nodiscard]] AddResult addMediaInfo(
-        const DatabaseBase::MediaInfo &info) const override;
+        const DatabaseBase::MediaInfo& info) const override;
     [[nodiscard]] std::vector<MediaInfo> getAllMediaInfos() const override;
-    std::ostream &dump(std::ostream &ofs) const override;
+    [[nodiscard]] bool deleteMediaInfo(
+        const decltype(MediaInfo::mediaId) mediaId) const override;
+    [[nodiscard]] std::vector<DatabaseBase::ChatInfo> getAllChatInfos()
+        const override;
+    std::ostream& dump(std::ostream& ofs) const override;
     void setOwnerUserId(UserId userid) const override;
     [[nodiscard]] AddResult addChatInfo(
         const ChatId chatid, const std::string_view name) const override;
     [[nodiscard]] std::optional<ChatId> getChatId(
         const std::string_view name) const override;
+    [[nodiscard]] bool deleteChatInfo(const ChatId chatid) const override;
+    [[nodiscard]] std::optional<std::string> getChatName(
+        const ChatId chatId) const override;
 
     // Load database from file
     bool load(std::filesystem::path filepath) override;
@@ -99,6 +106,6 @@ struct DBIMPL_EXPORT TgBotDatabaseImpl : DatabaseBase {
     bool loaded = false;
 };
 
-extern bool TgBotDatabaseImpl_load(ConfigManager *configmgr,
-                                   TgBotDatabaseImpl *dbimpl,
-                                   CommandLine *cmdline);
+extern bool TgBotDatabaseImpl_load(ConfigManager* configmgr,
+                                   TgBotDatabaseImpl* dbimpl,
+                                   CommandLine* cmdline);

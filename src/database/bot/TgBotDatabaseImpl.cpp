@@ -1,7 +1,7 @@
 #include "TgBotDatabaseImpl.hpp"
 
-#include <api/typedefs.h>
 #include <absl/log/log.h>
+#include <api/typedefs.h>
 #include <fmt/format.h>
 
 #include <database/DatabaseBase.hpp>
@@ -164,7 +164,7 @@ std::vector<TgBotDatabaseImpl::MediaInfo> TgBotDatabaseImpl::getAllMediaInfos()
     }
     try {
         return _databaseImpl->getAllMediaInfos();
-    } catch (const exception &ex) {
+    } catch (const exception& ex) {
         LOG(ERROR) << "Failed to get all media infos: " << ex.what();
         return {};
     }
@@ -190,7 +190,7 @@ void TgBotDatabaseImpl::setOwnerUserId(const UserId user) const {
     }
     try {
         _databaseImpl->setOwnerUserId(user);
-    } catch (const exception &e) {
+    } catch (const exception& e) {
         LOG(ERROR) << "Failed to set owner user ID: " << e.what();
     }
 }
@@ -223,11 +223,66 @@ std::optional<ChatId> TgBotDatabaseImpl::getChatId(
     }
 }
 
+bool TgBotDatabaseImpl::deleteChatInfo(const ChatId chatid) const {
+    if (!isLoaded()) {
+        LOG(ERROR) << __func__ << ": No-op due to missing database";
+        return false;
+    }
+    try {
+        return _databaseImpl->deleteChatInfo(chatid);
+    } catch (const exception& ex) {
+        LOG(ERROR) << "Failed to delete chat info: " << ex.what();
+        return false;
+    }
+}
+
+bool TgBotDatabaseImpl::deleteMediaInfo(
+    const decltype(DatabaseBase::MediaInfo::mediaId) mediaId) const {
+    if (!isLoaded()) {
+        LOG(ERROR) << __func__ << ": No-op due to missing database";
+        return false;
+    }
+    try {
+        return _databaseImpl->deleteMediaInfo(mediaId);
+    } catch (const exception& ex) {
+        LOG(ERROR) << "Failed to delete media info: " << ex.what();
+        return false;
+    }
+}
+
+std::optional<std::string> TgBotDatabaseImpl::getChatName(
+    const ChatId chatId) const {
+    if (!isLoaded()) {
+        LOG(ERROR) << __func__ << ": No-op due to missing database";
+        return std::nullopt;
+    }
+    try {
+        return _databaseImpl->getChatName(chatId);
+    } catch (const exception& ex) {
+        LOG(ERROR) << "Failed to get chat name: " << ex.what();
+        return std::nullopt;
+    }
+}
+
+std::vector<TgBotDatabaseImpl::ChatInfo> TgBotDatabaseImpl::getAllChatInfos()
+    const {
+    if (!isLoaded()) {
+        LOG(ERROR) << __func__ << ": No-op due to missing database";
+        return {};
+    }
+    try {
+        return _databaseImpl->getAllChatInfos();
+    } catch (const exception& ex) {
+        LOG(ERROR) << "Failed to get all chat infos: " << ex.what();
+        return {};
+    }
+}
+
 TgBotDatabaseImpl::Providers::Providers(CommandLine* cmdline) {
 #ifdef DATABASE_HAVE_SQLITE
-    registerProvider("sqlite", std::make_unique<SQLiteDatabase>(
-        cmdline->getPath(FS::PathType::RESOURCES_SQL)
-    ));
+    registerProvider("sqlite",
+                     std::make_unique<SQLiteDatabase>(
+                         cmdline->getPath(FS::PathType::RESOURCES_SQL)));
 #else
     (void)cmdline;
 #endif

@@ -1,7 +1,8 @@
 #pragma once
 
-#include <database/DatabaseBase.hpp>
 #include <gmock/gmock.h>
+
+#include <database/DatabaseBase.hpp>
 #include <trivial_helpers/fruit_inject.hpp>
 
 class MockDatabase : public DatabaseBase {
@@ -38,6 +39,14 @@ class MockDatabase : public DatabaseBase {
     MOCK_METHOD(std::optional<ChatId>, getChatId, (const std::string_view name),
                 (const, override));
 
+    MOCK_METHOD(std::vector<ChatInfo>, getAllChatInfos, (), (const override));
+
+    MOCK_METHOD(bool, deleteMediaInfo,
+                (const decltype(MediaInfo::mediaId) mediaId),
+                (const, override));
+    MOCK_METHOD(std::optional<std::string>, getChatName, (const ChatId chatId),
+                (const, override));
+    MOCK_METHOD(bool, deleteChatInfo, (const ChatId chatId), (const, override));
     MOCK_METHOD(bool, load, (std::filesystem::path filepath), (override));
     MOCK_METHOD(bool, unload, (), (override));
 };

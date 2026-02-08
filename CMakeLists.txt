@@ -406,6 +406,8 @@ add_subdirectory(src/utils)
 add_subdirectory(src/libos)
 add_subdirectory(src/third-party/stduuid)
 add_subdirectory(src/third-party/tgbot-cpp)
+set(CRYPTOPP_BUILD_TESTING OFF CACHE BOOL "Disable cryptopp tests" FORCE)
+add_subdirectory(src/third-party/cryptopp-cmake)
 
 # Tests
 if (TGBOTCPP_BUILD_TESTS)
