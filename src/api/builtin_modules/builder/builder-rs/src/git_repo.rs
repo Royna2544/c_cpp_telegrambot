@@ -28,10 +28,11 @@
 
 use std::{num::NonZero, path::PathBuf};
 
+use crate::util::LogErr;
 
 use super::ratelimit::RateLimit;
 use git2::Repository;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 pub struct GitRepo {
     repo: Repository,
@@ -96,9 +97,7 @@ impl GitRepo {
         github_token: Option<String>,
         progress_callback: Option<Box<ProgressCallback>>,
     ) -> Result<Self, git2::Error> {
-        let repo = Repository::open(path).inspect_err(|e| {
-            error!("Cannot open repo at {:?}, {}", &path, e);
-        })?;
+        let repo = Repository::open(path).log_if_err("Cannot open repository")?;
 
         Ok(GitRepo {
             repo,
@@ -110,7 +109,10 @@ impl GitRepo {
     }
 
     pub fn get_remote_url(&self) -> Result<String, git2::Error> {
-        let remote = self.repo.find_remote(&self.remote_name)?;
+        let remote = self
+            .repo
+            .find_remote(&self.remote_name)
+            .log_if_err("Cannot find remote")?;
         match remote.url() {
             None => {
                 return Err(git2::Error::from_str(&format!(
@@ -124,7 +126,7 @@ impl GitRepo {
     }
 
     pub fn get_branch_name(&self) -> Result<String, git2::Error> {
-        let head = self.repo.head()?;
+        let head = self.repo.head().log_if_err("Cannot get HEAD")?;
         match head.shorthand() {
             Some(name) => {
                 debug!("Current branch name: {}", name);
@@ -142,7 +144,10 @@ impl GitRepo {
             ro.transfer_progress(self.with_rate_limit(progress_cb));
         }
         fo.remote_callbacks(ro);
-        let mut remote = self.repo.find_remote(&self.remote_name)?;
+        let mut remote = self
+            .repo
+            .find_remote(&self.remote_name)
+            .log_if_err("Cannot find remote")?;
         remote.fetch(&[branch], Some(&mut fo), None)?;
         Ok(())
     }
@@ -162,10 +167,10 @@ impl GitRepo {
 
                 // 3. Look for the remote tracking branch (e.g., refs/remotes/origin/main)
                 let remote_refname = format!("refs/remotes/{}/{}", self.remote_name, branch);
-                let remote_obj = self.repo.revparse_single(&remote_refname).map_err(|e| {
-                    error!("Branch {} not found on remote after fetch", branch);
-                    e
-                })?;
+                let remote_obj = self
+                    .repo
+                    .revparse_single(&remote_refname)
+                    .log_if_err("Branch not found on remote after fetch")?;
 
                 // 4. Create the local branch pointing to the remote commit
                 let commit = remote_obj.peel_to_commit()?;
@@ -212,11 +217,25 @@ impl GitRepo {
         Ok(())
     }
 
-    pub fn cmp_head_with_branch(&self, branch: &str) -> Result<bool, git2::Error> {
-        let head = self.repo.head()?.peel_to_commit()?;
-        let branch_ref = self.repo.find_branch(branch, git2::BranchType::Local)?;
+    pub fn cmp_head_with_remote_branch(&self, branch: &str) -> Result<bool, git2::Error> {
+        let head = self
+            .repo
+            .head()
+            .warn_err("Cannot resolve HEAD")?
+            .peel_to_commit()
+            .warn_err("Cannot resolve HEAD to a commit")?;
+        let branch_ref = self
+            .repo
+            .find_branch(branch, git2::BranchType::Remote)
+            .warn_err_string(format!("Cannot find remote branch {} by name", &branch))?;
         let branch_commit = branch_ref.get().peel_to_commit()?;
 
+        info!(
+            "Comparing HEAD (id: {}) with remote branch {} (id: {})",
+            head.id(),
+            branch,
+            branch_commit.id()
+        );
         Ok(head.id() == branch_commit.id())
     }
 

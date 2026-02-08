@@ -794,7 +794,9 @@ impl rom_build_service_server::RomBuildService for BuildService {
 
                         send_log!(LogLevel::Debug, format!("manifest repo url:{} branch:{}", repo_url, branch_name));
 
-                        if repo_url.trim_end_matches('/') != rom_entry.link.trim_end_matches('/') || !repo.cmp_head_with_branch(&rom_branch_entry.branch).unwrap_or(false) {
+                        // On a valid repo init result, the .repo/manifests.git should match the expected URL *BUT* branch name is always 'default'
+                        // So we have to check the HEAD and remote's branch named "<rom_branch_entry.branch>"
+                        if repo_url.trim_end_matches('/') != rom_entry.link.trim_end_matches('/') || !repo.cmp_head_with_remote_branch(&rom_branch_entry.branch).unwrap_or(false) {
                             send_log!(LogLevel::Info, format!(
                                 "Manifest repo URL or branch mismatch. Expected URL: {}, branch: {}. Found URL: {}, branch: {}. Will re-initialize repo.",
                                 rom_entry.link, rom_branch_entry.branch, repo_url, branch_name
@@ -847,6 +849,10 @@ impl rom_build_service_server::RomBuildService for BuildService {
                             let known_builds_self = &mut known_builds_clone.lock().await;
                             if let Some(build_entry) = known_builds_self.iter_mut().find(|b| b.id == build_id_clone) {
                                 let content = std::fs::read_to_string(&error_file).unwrap_or_else(|_| "Failed to read error log.".to_string());
+                                // Remove error log file after reading
+                                std::fs::remove_file(&error_file).unwrap_or_else(|e| {
+                                    error!("Failed to remove error log file {:?}: {}", &error_file, e);
+                                });
                                 build_entry.error_message = Some(content);
                             }
                             return Err(tonic::Status::internal("'repo init' command failed or was cancelled."));
@@ -1142,6 +1148,10 @@ impl rom_build_service_server::RomBuildService for BuildService {
                         let known_builds_self = &mut known_builds_clone.lock().await;
                         if let Some(build_entry) = known_builds_self.iter_mut().find(|b| b.id == build_id_clone) {
                             let content = std::fs::read_to_string(&error_file).unwrap_or_else(|_| "Failed to read error log.".to_string());
+                            // Remove error log file after reading
+                            std::fs::remove_file(&error_file).unwrap_or_else(|e| {
+                                error!("Failed to remove error log file {:?}: {}", &error_file, e);
+                            });
                             build_entry.error_message = Some(content);
                         }
                         return Err(tonic::Status::internal("'repo sync' command failed."));
@@ -1222,36 +1232,40 @@ impl rom_build_service_server::RomBuildService for BuildService {
                 }
 
                 // Detect build release
-                let mut release: String = "".to_string();
+                let mut release: Option<String> = None;
                 // We have two places to look for build release: build/release and vendor/<vendor>/build/release.
                 for path in [&build_dir_clone.join("build").join("release"), &build_dir_clone.join("vendor").join(&vendor_name).join("build").join("release")] {
                     // First, check release_config_map.textproto. Refer: https://android.googlesource.com/platform/build/release/+/925b392ae2a5d212904adec6cfebf4d1b8f574d9.
                     let release_config_map_path = path.join("release_config_map.textproto");
                     if release_config_map_path.exists() {
                         // In this case, aosp_current is automatically mapped to the latest release.
-                        send_log!(LogLevel::Info, format!("Detected release from release_config_map.textproto: {}", release));
-                        release = "aosp_current".to_string()
+                        send_log!(LogLevel::Info, format!("Detected release from release_config_map.textproto"));
+                        release = Some("aosp_current".to_string());
+                        break;
                     }
 
                     // Check build/release/build_config, scl for Android 14
                     let _build_config_path = path.join("build_config");
-                    for file in std::fs::read_dir(&path).map_err(|e| {
-                        tonic::Status::internal(format!("Failed to read release directory: {}", e))
-                    })? {
-                        let file = file.map_err(|e| {
-                            tonic::Status::internal(format!("Failed to read release file entry: {}", e))
-                        })?;
-                        if file.path().extension().and_then(|s| s.to_str()) == Some("scl") {
-                            let file_name = file.file_name().to_string_lossy().to_string();
-                            let release_name = file_name.trim_end_matches(".scl");
-                            send_log!(LogLevel::Info, format!("Detected release from build_config scl file: {}", release_name));
-                            release =  release_name.to_string();
+                    if _build_config_path.is_dir() {
+                        for file in std::fs::read_dir(&path).map_err(|e| {
+                            tonic::Status::internal(format!("Failed to read release directory: {}", e))
+                        })? {
+                            let file = file.map_err(|e| {
+                                tonic::Status::internal(format!("Failed to read release file entry: {}", e))
+                            })?;
+                            if file.path().extension().and_then(|s| s.to_str()) == Some("scl") {
+                                let file_name = file.file_name().to_string_lossy().to_string();
+                                let release_name = file_name.trim_end_matches(".scl");
+                                send_log!(LogLevel::Info, format!("Detected release from build_config scl file: {}", release_name));
+                                release = Some(release_name.to_string());
+                                break; // Use the first valid one
+                            }
                         }
                     }
 
                     // Fallback to build/release/release_configs, textproto, another stuff added on android 15
                     let release_configs_path = path.join("release_configs");
-                    if release_configs_path.exists() {
+                    if release_configs_path.is_dir() {
                         let _latest_release: Option<String> = None;
                         for file in std::fs::read_dir(&release_configs_path).map_err(|e| {
                             tonic::Status::internal(format!("Failed to read release_configs directory: {}", e))
@@ -1266,15 +1280,16 @@ impl rom_build_service_server::RomBuildService for BuildService {
                                     continue;
                                 }
                                 send_log!(LogLevel::Info, format!("Detected release from release_configs textproto file: {}", release_name));
-                                release = release_name.to_string();
+                                release = Some(release_name.to_string());
+                                break; // Use the first valid one
                             }
                         }
                     }
                 };
-                if release.is_empty() {
+                if release.is_none() {
                     send_log!(LogLevel::Warning, "Could not detect release from build/release directory.".to_string());
                 } else {
-                    send_log!(LogLevel::Info, format!("Using release: {} for build.", release));
+                    send_log!(LogLevel::Info, format!("Using release: {} for build.", release.as_ref().unwrap()));
                 }
 
                 let build_variant  = match req.build_variant {
@@ -1307,8 +1322,16 @@ impl rom_build_service_server::RomBuildService for BuildService {
 
                 let (stdin_tx, stdin_rx) = mpsc::channel(100);
 
-                let command = format!("set -e\nsource build/envsetup.sh\n{}\nlunch {}_{}-{}-{} || lunch {}_{}-{}\nm {} -j{}\nexit 0\n", 
-                    no_ccache, vendor_name, device_entry.codename, release, build_variant, vendor_name, device_entry.codename, build_variant, rom_entry.target, parallel_jobs);
+                let command = match release {
+                    Some(ref rel) => {
+                        format!("set -e\nsource build/envsetup.sh\n{}\nlunch {}_{}-{}-{}\nm {} -j{}\nexit 0\n", 
+                            no_ccache, vendor_name, device_entry.codename, rel, build_variant, rom_entry.target, parallel_jobs)
+                    }
+                    None => {
+                        format!("set -e\nsource build/envsetup.sh\n{}\nllunch {}_{}-{}\nm {} -j{}\nexit 0\n", 
+                            no_ccache, vendor_name, device_entry.codename, build_variant, rom_entry.target, parallel_jobs)
+                    }
+                };
 
                 for line in command.lines() {
                     stdin_tx.send(line.into()).await.map_err(|e| tonic::Status::internal(format!("Failed to send to stdin: {}", e)))?;
@@ -1372,8 +1395,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                                 send_log!(LogLevel::Error, format!("No output artifact found with prefix: {}", prefix));
                                 None
                             } else {
-
-                        artifact_path
+                                artifact_path
                             }
                         }
                         ROMArtifactMatcher::ExactMatcher => {
@@ -1459,7 +1481,12 @@ impl rom_build_service_server::RomBuildService for BuildService {
                         .iter_mut()
                         .find(|b| b.id == build_id_clone)
                     {
-                        build_entry.error_message = Some(format!("{}", e));
+                        if let Some(msg) = &build_entry.error_message {
+                            // Already have an error message, do not overwrite. Just append.
+                            build_entry.error_message = Some(format!("{}\nWhich caused builder error: {}", msg, e));
+                        } else {
+                            build_entry.error_message = Some(format!("{}", e));
+                        }
                     }
                     send_log_final!(LogLevel::Error, format!("Build failed: {}", e));
                 }
