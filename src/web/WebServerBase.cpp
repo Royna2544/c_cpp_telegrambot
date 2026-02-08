@@ -85,8 +85,12 @@ void TgBotWebServerBase::startServer() {
             });
     svr.Post(Constants::kAPIV1MediaNode,
              [this](const httplib::Request& req, httplib::Response& res) {
-                 callback.handleMediaGet(req, res);
+                 callback.handleMedia(req, res);
              });
+    svr.Get(Constants::kAPIV1MediaNode,
+            [this](const httplib::Request& req, httplib::Response& res) {
+                callback.handleMediaGet(req, res);
+            });
     svr.set_logger(TgBotWebServerBase::loggerFn);
     svr.listen(Constants::kBindToIp, port);
 }
