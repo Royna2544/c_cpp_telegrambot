@@ -324,6 +324,24 @@ bool ProtoDatabase::deleteMediaInfo(
     return false;
 }
 
+std::optional<std::vector<decltype(ProtoDatabase::MediaInfo::mediaId)>>
+ProtoDatabase::getMediaIds(const std::string_view alias) const {
+    std::vector<decltype(MediaInfo::mediaId)> result;
+    const auto& obj = dbinfo->object;
+    for (const auto& mediaEntriesIt : obj.mediatonames()) {
+        for (const auto& name : mediaEntriesIt.names()) {
+            if (absl::EqualsIgnoreCase(name, alias)) {
+                result.emplace_back(mediaEntriesIt.telegrammediaid());
+            }
+        }
+    }
+    if (result.empty()) {
+        return std::nullopt;
+    }
+    return result;
+    ;
+}
+
 std::ostream& ProtoDatabase::dump(std::ostream& os) const {
     if (!dbinfo.has_value()) {
         os << "Database not loaded!";

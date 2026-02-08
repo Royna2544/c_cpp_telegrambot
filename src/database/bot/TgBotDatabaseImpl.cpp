@@ -250,6 +250,20 @@ bool TgBotDatabaseImpl::deleteMediaInfo(
     }
 }
 
+std::optional<std::vector<decltype(DatabaseBase::MediaInfo::mediaId)>>
+TgBotDatabaseImpl::getMediaIds(const std::string_view alias) const {
+    if (!isLoaded()) {
+        LOG(ERROR) << __func__ << ": No-op due to missing database";
+        return std::nullopt;
+    }
+    try {
+        return _databaseImpl->getMediaIds(alias);
+    } catch (const exception& ex) {
+        LOG(ERROR) << "Failed to get media IDs: " << ex.what();
+        return std::nullopt;
+    }
+}
+
 std::optional<std::string> TgBotDatabaseImpl::getChatName(
     const ChatId chatId) const {
     if (!isLoaded()) {

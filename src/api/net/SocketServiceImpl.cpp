@@ -89,6 +89,9 @@ class SocketServiceImpl::Service : public SocketService::Service {
                            ::grpc::ServerWriter<ChatAlias>* writer) override;
     Status setMediaAlias(ServerContext* context, const MediaAlias* request,
                          GenericResponse* response) override;
+    Status getMediaAlias(ServerContext* context,
+                         const MediaAliasRequest* request,
+                         MediaAliasResponse* response) override;
     Status deleteMediaAlias(ServerContext* context,
                             const MediaAliasRequest* request,
                             GenericResponse* response) override;
@@ -728,6 +731,25 @@ Status SocketServiceImpl::Service::deleteMediaAlias(
     }
     response->set_code(GenericResponseCode::Success);
     response->set_message("Media alias deleted successfully");
+    return Status::OK;
+}
+
+Status SocketServiceImpl::Service::getMediaAlias(
+    ServerContext* context, const MediaAliasRequest* request,
+    MediaAliasResponse* response) {
+    LogWhoCalledMe(context, "getMediaAlias");
+
+    auto mediaInfoOpt = database_->getMediaIds(request->alias());
+    if (!mediaInfoOpt.has_value()) {
+        response->set_exists(false);
+        return Status::OK;
+    }
+    response->set_exists(true);
+    for (const auto& mediaId : *mediaInfoOpt) {
+        response->add_media_id(mediaId);
+    }
+    LOG(INFO) << "Retrieved media alias for media_id_alias " << request->alias()
+              << ": " << mediaInfoOpt->size() << " media IDs";
     return Status::OK;
 }
 

@@ -46,6 +46,8 @@ class MockDatabase : public DatabaseBase {
                 (const, override));
     MOCK_METHOD(std::optional<std::string>, getChatName, (const ChatId chatId),
                 (const, override));
+    MOCK_METHOD(std::optional<std::vector<decltype(MediaInfo::mediaId)>>,
+                getMediaIds, (const std::string_view alias), (const, override));
     MOCK_METHOD(bool, deleteChatInfo, (const ChatId chatId), (const, override));
     MOCK_METHOD(bool, load, (std::filesystem::path filepath), (override));
     MOCK_METHOD(bool, unload, (), (override));

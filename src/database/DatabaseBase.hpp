@@ -162,6 +162,21 @@ struct DBIMPL_EXPORT DatabaseBase {
         const decltype(MediaInfo::mediaId) mediaId) const = 0;
 
     /**
+     * @brief Get the media ids associated with a given media alias
+     *
+     * This function retrieves the media ids associated with a given media alias
+     * from the database. If the media alias does not exist in the database, the
+     * function should return std::nullopt.
+     *
+     * @param alias The media alias.
+     * @return The media ids associated with the given media alias. If the media
+     * alias does not exist, the function should return std::nullopt.
+     */
+    [[nodiscard]] virtual std::optional<
+        std::vector<decltype(MediaInfo::mediaId)>>
+    getMediaIds(const std::string_view alias) const = 0;
+
+    /**
      * @brief Add a chat info to the database
      *
      * This function adds a new chat info to the database. The chat info

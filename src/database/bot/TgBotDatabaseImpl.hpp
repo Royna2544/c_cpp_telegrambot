@@ -92,6 +92,8 @@ struct DBIMPL_EXPORT TgBotDatabaseImpl : DatabaseBase {
     [[nodiscard]] bool deleteChatInfo(const ChatId chatid) const override;
     [[nodiscard]] std::optional<std::string> getChatName(
         const ChatId chatId) const override;
+    std::optional<std::vector<decltype(MediaInfo::mediaId)>> getMediaIds(
+        const std::string_view alias) const override;
 
     // Load database from file
     bool load(std::filesystem::path filepath) override;

@@ -67,6 +67,8 @@ struct DBIMPL_EXPORT SQLiteDatabase : DatabaseBase {
     [[nodiscard]] std::vector<MediaInfo> getAllMediaInfos() const override;
     [[nodiscard]] bool deleteMediaInfo(
         const decltype(MediaInfo::mediaId) mediaId) const override;
+    [[nodiscard]] std::optional<std::vector<decltype(MediaInfo::mediaId)>>
+    getMediaIds(const std::string_view alias) const override;
     void setOwnerUserId(UserId userId) const override;
     std::ostream& dump(std::ostream& ofs) const override;
     [[nodiscard]] AddResult addChatInfo(
@@ -120,6 +122,8 @@ struct DBIMPL_EXPORT SQLiteDatabase : DatabaseBase {
             "deleteMediaName.sql";
         static constexpr std::string_view kDeleteChatFile = "deleteChat.sql";
         static constexpr std::string_view kDeleteMediaFile = "deleteMedia.sql";
+        static constexpr std::string_view kFindMediaIdsByAliasFile =
+            "findMediaIdsByName.sql";
 
         struct Row {
             template <typename T>

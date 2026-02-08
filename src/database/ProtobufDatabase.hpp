@@ -30,6 +30,8 @@ struct DBIMPL_EXPORT ProtoDatabase : DatabaseBase {
     [[nodiscard]] std::vector<MediaInfo> getAllMediaInfos() const override;
     [[nodiscard]] bool deleteMediaInfo(
         const decltype(MediaInfo::mediaId) mediaId) const override;
+    [[nodiscard]] std::optional<std::vector<decltype(MediaInfo::mediaId)>>
+    getMediaIds(const std::string_view alias) const override;
     void setOwnerUserId(UserId userId) const override;
     std::ostream& dump(std::ostream& ofs) const override;
 

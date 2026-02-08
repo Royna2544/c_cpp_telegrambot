@@ -705,6 +705,25 @@ bool SQLiteDatabase::deleteMediaInfo(
     return helper->execute();
 }
 
+std::optional<std::vector<decltype(SQLiteDatabase::MediaInfo::mediaId)>>
+SQLiteDatabase::getMediaIds(const std::string_view alias) const {
+    std::vector<decltype(MediaInfo::mediaId)> result;
+    std::optional<Helper::Row> row;
+    auto helper =
+        Helper::create(db, _sqlScriptsPath, Helper::kFindMediaIdsByAliasFile);
+    if (!helper->prepare()) {
+        return std::nullopt;
+    }
+    helper->addArgument(std::string(alias)).bindArguments();
+    while ((row = helper->execAndGetRow())) {
+        result.push_back(row->get<std::string>(0));
+    }
+    if (result.empty()) {
+        return std::nullopt;
+    }
+    return result;
+}
+
 std::optional<UserId> SQLiteDatabase::getOwnerUserId() const {
     auto helper = Helper::create(db, _sqlScriptsPath, Helper::kFindOwnerFile);
     if (!helper->prepare()) {
