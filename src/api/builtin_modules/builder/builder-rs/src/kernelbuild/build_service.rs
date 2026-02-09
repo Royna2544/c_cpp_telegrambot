@@ -5,6 +5,7 @@ use super::builder_config::Toolchain;
 use super::builder_config::{BuilderConfig, CompilerType};
 use super::kernel_config::KernelConfig;
 use crate::git_repo::GitRepo;
+use builder::ratelimit::RateLimit;
 use chrono::Local;
 use grpc_pb::ArtifactChunk;
 use grpc_pb::ArtifactMetadata;
@@ -21,6 +22,7 @@ use nix::sys::signal::{self, Signal};
 use nix::unistd::Pid;
 use std::fs::File;
 use std::io::Read;
+use std::num::NonZero;
 use std::path::Path;
 use std::path::PathBuf;
 use std::pin::Pin;
@@ -282,6 +284,11 @@ impl BuildService {
         let file_out = file_handle.clone();
         let file_err = file_handle.clone();
 
+        // Have a ratelimit
+        let ratelimit = Arc::new(Mutex::new(RateLimit::new(NonZero::new(3).unwrap())));
+        let ratelimit_stdout = ratelimit.clone();
+        let ratelimit_stderr = ratelimit.clone();
+
         // --- Task A: Stdout ---
         let out_handle = tokio::spawn(async move {
             let mut reader = BufReader::new(stdout).lines();
@@ -292,6 +299,12 @@ impl BuildService {
                     let mut f = f_arc.lock().await;
                     let _ = f.write_all(line.as_bytes()).await;
                     let _ = f.write_all(b"\n").await;
+                }
+
+                // Throttle log sending to avoid flooding
+                if !ratelimit_stdout.lock().await.check() {
+                    // If rate limit exceeded, skip sending this log line
+                    continue;
                 }
 
                 // B. Send to gRPC
@@ -313,6 +326,12 @@ impl BuildService {
                 if let Some(f_arc) = &file_err {
                     let mut f = f_arc.lock().await;
                     let _ = f.write_all(format!("ERR: {}\n", line).as_bytes()).await;
+                }
+
+                // Throttle log sending to avoid flooding
+                if !ratelimit_stderr.lock().await.check() {
+                    // If rate limit exceeded, skip sending this log line
+                    continue;
                 }
 
                 // B. Send to gRPC
