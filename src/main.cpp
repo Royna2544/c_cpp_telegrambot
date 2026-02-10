@@ -14,6 +14,7 @@
 #include <LogSinks.hpp>
 #include <ManagedThreads.hpp>
 #include <ResourceManager.hpp>
+#include <TgBotWebpage.hpp>
 #include <algorithm>
 #include <api/StringResLoader.hpp>
 #include <api/TgBotApiImpl.hpp>
@@ -39,10 +40,6 @@
 #include "src/api/net/SocketServiceImpl.hpp"
 #include "tgbot/TgException.h"
 #include "utils/Env.hpp"
-
-#ifdef TGBOTCPP_ENABLE_WEBSERVER
-#include <TgBotWebpage.hpp>
-#endif
 
 class RegexHandlerInterface : public RegexHandler::Interface {
    public:
@@ -195,28 +192,20 @@ getTgBotApiImplComponent() {
 }
 
 #ifdef TGBOTCPP_ENABLE_WEBSERVER
-fruit::Component<fruit::Required<ThreadManager, CommandLine, ConfigManager>,
+fruit::Component<fruit::Required<ThreadManager, CommandLine>,
                  Unused<TgBotWebServer>> getWebServerComponent() {
     return fruit::createComponent()
         .bind<TgBotWebServerBase, TgBotWebServer>()
-        .registerProvider(
-            [](ThreadManager* threadManager, CommandLine* cmdline,
-               ConfigManager* config) -> Unused<TgBotWebServer> {
-                constexpr int kTgBotWebServerPort = 8080;
-                auto primary =
-                    config->get(ConfigManager::Configs::SOCKET_URL_PRIMARY);
-                if (!primary) {
-                    LOG(ERROR)
-                        << "Cannot start webserver: Primary socket URL not set";
-                    return {};
-                }
-                auto* const server = threadManager->create<TgBotWebServer>(
-                    ThreadManager::Usage::WEBSERVER_THREAD,
-                    cmdline->getPath(FS::PathType::RESOURCES_WEBPAGE),
-                    kTgBotWebServerPort, primary.value());
-                server->run();
-                return {};
-            });
+        .registerProvider([](ThreadManager* threadManager,
+                             CommandLine* cmdline) -> Unused<TgBotWebServer> {
+            constexpr int kTgBotWebServerPort = 8080;
+            auto* const server = threadManager->create<TgBotWebServer>(
+                ThreadManager::Usage::WEBSERVER_THREAD,
+                cmdline->getPath(FS::PathType::RESOURCES_WEBPAGE),
+                kTgBotWebServerPort);
+            server->run();
+            return {};
+        });
 }
 #endif
 

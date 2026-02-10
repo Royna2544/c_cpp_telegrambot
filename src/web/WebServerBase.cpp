@@ -56,49 +56,84 @@ void TgBotWebServerBase::startServer() {
         LOG(ERROR) << "Failed to switch mount point to " << webServerRootPath;
         return;
     } else {
-        LOG(INFO) << "Web page mount point: " << webServerRootPath.string()
-                  << " as root directory";
+        LOG(INFO) << "Web page mount point: " << webServerRootPath.string();
     }
+
+    // Static pages
     svr.Get(Constants::kWebRootNode,
-            [](const httplib::Request& req, httplib::Response& res) {
+            [](const httplib::Request&, httplib::Response& res) {
                 res.set_redirect(Constants::kAboutPage);
             });
     svr.Get(Constants::kAboutPage,
             [this](const httplib::Request& req, httplib::Response& res) {
                 callback.showIndex(req, res);
             });
-    svr.Post(Constants::kAPIVotesNode,
+
+    // --- REST API V1 ---
+
+    // 1. Messages (Noun)
+    // POST /api/v1/messages
+    svr.Post(Constants::kAPIV1Messages,
              [this](const httplib::Request& req, httplib::Response& res) {
-                 callback.handleAPIVotes(req, res);
+                 callback.handleMessageCreate(req, res);
              });
-    svr.Post(Constants::kAPIV1SendMessage,
-             [this](const httplib::Request& req, httplib::Response& res) {
-                 callback.handleSendMessage(req, res);
-             });
+
+    // 2. Stats
+    // GET /api/v1/stats
     svr.Get(Constants::kAPIV1Stats,
             [this](const httplib::Request& req, httplib::Response& res) {
                 callback.handleStats(req, res);
             });
-    svr.Post(Constants::kAPIV1ChatsNode,
+
+    // 3. Votes
+    // POST /api/v1/votes
+    svr.Post(Constants::kAPIVotesNode,
              [this](const httplib::Request& req, httplib::Response& res) {
-                 callback.handleChats(req, res);
+                 callback.handleAPIVotes(req, res);
              });
+
+    // 4. Chats
+    // PUT /api/v1/chats/:chat_id (Updates/Sets alias)
+    std::string chatPath = Constants::kAPIV1ChatsNode;
+    svr.Put(chatPath + "/:chat_id",
+            [this](const httplib::Request& req, httplib::Response& res) {
+                callback.handleChatPut(req, res);
+            });
+    // DELETE /api/v1/chats/:chat_id (Removes alias)
+    svr.Delete(chatPath + "/:chat_id",
+               [this](const httplib::Request& req, httplib::Response& res) {
+                   callback.handleChatDelete(req, res);
+               });
+    // GET /api/v1/chats?chat_name=... (Search)
     svr.Get(Constants::kAPIV1ChatsNode,
             [this](const httplib::Request& req, httplib::Response& res) {
                 callback.handleChatsGet(req, res);
             });
-    svr.Post(Constants::kAPIV1MediaNode,
-             [this](const httplib::Request& req, httplib::Response& res) {
-                 callback.handleMedia(req, res);
-             });
+
+    // 5. Media
+    // PUT /api/v1/media/:media_id (Updates/Sets alias)
+    std::string mediaPath = Constants::kAPIV1MediaNode;
+    svr.Put(mediaPath + "/:media_id",
+            [this](const httplib::Request& req, httplib::Response& res) {
+                callback.handleMediaPut(req, res);
+            });
+    // DELETE /api/v1/media/:media_id (Removes alias)
+    svr.Delete(mediaPath + "/:media_id",
+               [this](const httplib::Request& req, httplib::Response& res) {
+                   callback.handleMediaDelete(req, res);
+               });
+    // GET /api/v1/media?alias=... (Search)
     svr.Get(Constants::kAPIV1MediaNode,
             [this](const httplib::Request& req, httplib::Response& res) {
                 callback.handleMediaGet(req, res);
             });
+
+    // 6. Hardware
     svr.Get(Constants::kAPIV1Hardware,
             [this](const httplib::Request& req, httplib::Response& res) {
                 callback.handleHardware(req, res);
             });
+
     svr.set_logger(TgBotWebServerBase::loggerFn);
     svr.listen(Constants::kBindToIp, port);
 }
@@ -106,15 +141,10 @@ void TgBotWebServerBase::startServer() {
 void TgBotWebServerBase::stopServer() { svr.stop(); }
 
 TgBotWebServerBase::TgBotWebServerBase(int serverPort,
-                                       std::filesystem::path serverPath,
-                                       std::string grpcServerAddr)
-    : _grpcServerAddr(std::move(grpcServerAddr)),
-      port(serverPort),
+                                       std::filesystem::path serverPath)
+    : port(serverPort),
       callback(this),
-      webServerRootPath(std::move(serverPath)) {
-    LOG(INFO) << "TgBotWebServerBase initialized with gRPC server at "
-              << _grpcServerAddr;
-}
+      webServerRootPath(std::move(serverPath)) {}
 
 void TgBotWebServerBase::Callbacks::showIndex(const httplib::Request& req,
                                               httplib::Response& res) {
@@ -134,11 +164,15 @@ void TgBotWebServerBase::Callbacks::showIndex(const httplib::Request& req,
 
 #include "Socket_service.grpc.pb.h"
 
+using tgbot::builder::system_monitor::SystemMonitorService;
+using tgbot::proto::socket::SocketService;
+
 struct TgBotWebServerBase::Callbacks::Connection {
-    std::unique_ptr<tgbot::proto::socket::SocketService::Stub> stub;
-    std::unique_ptr<tgbot::builder::system_monitor::SystemMonitorService::Stub>
-        sysStub;
-    std::shared_ptr<grpc::Channel> channel;
+    struct Stubs {
+        std::unique_ptr<SocketService::Stub> sock;
+        std::unique_ptr<SystemMonitorService::Stub> mon;
+    } http, https;
+
     std::string successFalse;
 };
 
@@ -178,6 +212,7 @@ compat::expected<nlohmann::json, int> acceptAPIRequest(
 
     return document;
 }
+
 using tgbot::proto::socket::FileType;
 
 std::optional<FileType> fileTypeFromString(const std::string& type) {
@@ -207,27 +242,30 @@ using tgbot::proto::socket::GenericResponse;
 using tgbot::proto::socket::SendMessageRequest;
 using tgbot::proto::socket::SocketService;
 
-constexpr int kLocalBuilderConnection = 50051;
+// Local gRPC connection ports (behind Nginx or other reverse proxy)
+constexpr int kLocalHttpsConnection = 443;
+constexpr int kLocalHttpConnection = 80;
 
 TgBotWebServerBase::Callbacks::Callbacks(TgBotWebServerBase* server)
     : server(server), _conn(std::make_unique<Connection>()) {
-    _conn->channel = grpc::CreateChannel(server->_grpcServerAddr,
-                                         grpc::InsecureChannelCredentials());
-    _conn->stub = SocketService::NewStub(_conn->channel);
+    // Initialize gRPC connection
+    // We can lookup two addresses: one for HTTP, one for HTTPS
 
-    auto socketPath = fmt::format("localhost:{}", kLocalBuilderConnection);
-    auto localChannel =
-        grpc::CreateChannel(socketPath, grpc::InsecureChannelCredentials());
-    _conn->sysStub =
-        tgbot::builder::system_monitor::SystemMonitorService::NewStub(
-            localChannel);
+    auto httpChannel =
+        grpc::CreateChannel("127.0.0.1:80", grpc::InsecureChannelCredentials());
+    auto httpsChannel = grpc::CreateChannel("127.0.0.1:443",
+                                            grpc::InsecureChannelCredentials());
 
+    _conn->http.sock = SocketService::NewStub(httpChannel);
+    _conn->https.sock = SocketService::NewStub(httpsChannel);
+    _conn->http.mon = SystemMonitorService::NewStub(httpChannel);
+    _conn->https.mon = SystemMonitorService::NewStub(httpsChannel);
     _conn->successFalse = R"({"success": false})";
 }
 
 TgBotWebServerBase::Callbacks::~Callbacks() = default;
 
-void TgBotWebServerBase::Callbacks::handleSendMessage(
+void TgBotWebServerBase::Callbacks::handleMessageCreate(
     const httplib::Request& req, httplib::Response& res) {
     auto maybeDocument = acceptAPIRequest(req);
     if (!maybeDocument.has_value()) {
@@ -305,7 +343,7 @@ void TgBotWebServerBase::Callbacks::handleSendMessage(
               << " with text: " << grpcRequest.text();
 
     grpc::Status status =
-        _conn->stub->sendMessage(&context, grpcRequest, &grpcResponse);
+        _conn->https.sock->sendMessage(&context, grpcRequest, &grpcResponse);
     if (status.ok()) {
         res.status = httplib::StatusCode::OK_200;
     } else {
@@ -324,8 +362,8 @@ void TgBotWebServerBase::Callbacks::handleStats(const httplib::Request& req,
                                                 httplib::Response& res) {
     BotInfo grpcResponse;
     grpc::ClientContext context;
-    grpc::Status status =
-        _conn->stub->info(&context, google::protobuf::Empty{}, &grpcResponse);
+    grpc::Status status = _conn->https.sock->info(
+        &context, google::protobuf::Empty{}, &grpcResponse);
     if (status.ok()) {
         res.status = httplib::StatusCode::OK_200;
     } else {
@@ -362,7 +400,7 @@ void TgBotWebServerBase::Callbacks::handleChatsGet(const httplib::Request& req,
     tgbot::proto::socket::ChatAliasResponse grpcResponse;
     grpcRequest.set_alias(chatName);
     grpc::Status status =
-        _conn->stub->getChatAlias(&context, grpcRequest, &grpcResponse);
+        _conn->https.sock->getChatAlias(&context, grpcRequest, &grpcResponse);
     if (!status.ok()) {
         LOG(ERROR) << "gRPC getChatAlias failed: " << status.error_message();
         res.status = httplib::StatusCode::InternalServerError_500;
@@ -374,6 +412,97 @@ void TgBotWebServerBase::Callbacks::handleChatsGet(const httplib::Request& req,
     responseJson["success"] = status.ok() && grpcResponse.exists();
     responseJson["chat_id"] = grpcResponse.chat_id();
     res.status = httplib::StatusCode::OK_200;
+    res.set_content(responseJson.dump(), "application/json");
+}
+
+void TgBotWebServerBase::Callbacks::handleChatPut(const httplib::Request& req,
+                                                  httplib::Response& res) {
+    // 1. Get ID from URL Path
+    if (!req.has_param("chat_id")) {
+        // Should be impossible if routed correctly
+        res.status = httplib::StatusCode::BadRequest_400;
+        return;
+    }
+
+    int64_t chatId = 0;
+    try {
+        chatId = std::stoll(req.path_params.at("chat_id"));
+    } catch (...) {
+        res.status = httplib::StatusCode::BadRequest_400;
+        return;
+    }
+
+    // 2. Parse Body for Name
+    auto maybeDocument = acceptAPIRequest(req);
+    if (!maybeDocument.has_value()) {
+        res.status = maybeDocument.error();
+        return;
+    }
+    const auto& document = maybeDocument.value();
+
+    if (!document.contains(Constants::kAPIKeyChatName) ||
+        !document[Constants::kAPIKeyChatName].is_string()) {
+        LOG(ERROR) << "Invalid API request: Missing chat_name in body";
+        res.status = httplib::StatusCode::BadRequest_400;
+        return;
+    }
+    std::string chatName =
+        document[Constants::kAPIKeyChatName].get<std::string>();
+
+    // 3. Execute gRPC Update
+    grpc::ClientContext context;
+    GenericResponse grpcResponse;
+    tgbot::proto::socket::ChatAlias grpcRequest;
+    grpcRequest.set_chat_id(chatId);
+    grpcRequest.set_alias(chatName);
+
+    grpc::Status status =
+        _conn->https.sock->setChatAlias(&context, grpcRequest, &grpcResponse);
+
+    if (!status.ok()) {
+        LOG(ERROR) << "gRPC setChatAlias failed: " << status.error_message();
+        res.status = httplib::StatusCode::InternalServerError_500;
+        res.set_content(_conn->successFalse, "application/json");
+        return;
+    }
+
+    res.status = httplib::StatusCode::OK_200;
+    nlohmann::json responseJson;
+    responseJson["success"] = true;
+    res.set_content(responseJson.dump(), "application/json");
+}
+
+void TgBotWebServerBase::Callbacks::handleChatDelete(
+    const httplib::Request& req, httplib::Response& res) {
+    // 1. Get ID from URL Path
+    int64_t chatId = 0;
+    try {
+        chatId = std::stoll(req.path_params.at("chat_id"));
+    } catch (...) {
+        res.status = httplib::StatusCode::BadRequest_400;
+        return;
+    }
+
+    // 2. Execute gRPC Delete
+    grpc::ClientContext context;
+    GenericResponse grpcResponse;
+    tgbot::proto::socket::ChatAliasRequest grpcRequest;
+    grpcRequest.set_chat_id(chatId);
+
+    grpc::Status status = _conn->https.sock->deleteChatAlias(
+        &context, grpcRequest, &grpcResponse);
+
+    if (!status.ok()) {
+        LOG(ERROR) << "gRPC deleteChatAlias failed: " << status.error_message();
+        res.status = httplib::StatusCode::InternalServerError_500;
+        res.set_content(_conn->successFalse, "application/json");
+        return;
+    }
+
+    // 204 No Content is standard for DELETE, but 200 with JSON is also fine.
+    res.status = httplib::StatusCode::OK_200;
+    nlohmann::json responseJson;
+    responseJson["success"] = true;
     res.set_content(responseJson.dump(), "application/json");
 }
 
@@ -393,7 +522,7 @@ void TgBotWebServerBase::Callbacks::handleMediaGet(const httplib::Request& req,
     tgbot::proto::socket::MediaAliasResponse grpcResponse;
     grpcRequest.set_alias(alias);
     grpc::Status status =
-        _conn->stub->getMediaAlias(&context, grpcRequest, &grpcResponse);
+        _conn->https.sock->getMediaAlias(&context, grpcRequest, &grpcResponse);
     if (!status.ok()) {
         LOG(ERROR) << "gRPC getMediaAlias failed: " << status.error_message();
         res.status = httplib::StatusCode::InternalServerError_500;
@@ -410,61 +539,58 @@ void TgBotWebServerBase::Callbacks::handleMediaGet(const httplib::Request& req,
     res.set_content(responseJson.dump(), "application/json");
 }
 
-void TgBotWebServerBase::Callbacks::handleChats(const httplib::Request& req,
-                                                httplib::Response& res) {
-    std::optional<int64_t> chatId = std::nullopt;
-    std::optional<std::string> chatName;
+void TgBotWebServerBase::Callbacks::handleMediaPut(const httplib::Request& req,
+                                                   httplib::Response& res) {
+    // 1. Get ID from URL
+    std::string mediaId = req.path_params.at("media_id");
+
+    // 2. Parse Body for Alias List and Type
     auto maybeDocument = acceptAPIRequest(req);
     if (!maybeDocument.has_value()) {
         res.status = maybeDocument.error();
         return;
     }
-
     const auto& document = maybeDocument.value();
-    if (document.contains(Constants::kAPIKeyChatId) &&
-        document[Constants::kAPIKeyChatId].is_number_integer()) {
-        chatId = document[Constants::kAPIKeyChatId].get<int64_t>();
-    }
-    if (!chatId.has_value()) {
-        LOG(ERROR) << "Invalid API request: Missing chat_id value";
+
+    // Check Alias Array
+    if (!document.contains(Constants::kAPIKeyAlias) ||
+        !document[Constants::kAPIKeyAlias].is_array()) {
         res.status = httplib::StatusCode::BadRequest_400;
         return;
     }
-    if (document.contains(Constants::kAPIKeyChatName) &&
-        document[Constants::kAPIKeyChatName].is_string()) {
-        chatName = document[Constants::kAPIKeyChatName].get<std::string>();
-    }
-    LOG(INFO) << "API Req chat_id: " << chatId.value();
-    LOG(INFO) << "API Req chat_name: "
-              << (chatName.has_value() ? chatName.value() : "null");
+    auto aliases =
+        document[Constants::kAPIKeyAlias].get<std::vector<std::string>>();
 
+    // Check Media Type
+    std::optional<FileType> mediaType;
+    if (document.contains(Constants::kAPIKeyMediaType) &&
+        document[Constants::kAPIKeyMediaType].is_string()) {
+        auto typeStr = document[Constants::kAPIKeyMediaType].get<std::string>();
+        mediaType = fileTypeFromString(typeStr);
+    }
+
+    if (!mediaType.has_value()) {
+        res.status = httplib::StatusCode::BadRequest_400;
+        return;
+    }
+
+    // 3. Execute gRPC
     grpc::ClientContext context;
     GenericResponse grpcResponse;
-    if (chatName.has_value()) {
-        tgbot::proto::socket::ChatAlias grpcRequest;
-        grpcRequest.set_chat_id(chatId.value());
-        grpcRequest.set_alias(chatName.value());
-        grpc::Status status =
-            _conn->stub->setChatAlias(&context, grpcRequest, &grpcResponse);
-        if (!status.ok()) {
-            LOG(ERROR) << "gRPC setChatAlias failed: "
-                       << status.error_message();
-            res.status = httplib::StatusCode::InternalServerError_500;
-            res.set_content(_conn->successFalse, "application/json");
-            return;
-        }
-    } else {
-        tgbot::proto::socket::ChatAliasRequest grpcRequest;
-        grpcRequest.set_chat_id(chatId.value());
-        grpc::Status status =
-            _conn->stub->deleteChatAlias(&context, grpcRequest, &grpcResponse);
-        if (!status.ok()) {
-            LOG(ERROR) << "gRPC deleteChatAlias failed: "
-                       << status.error_message();
-            res.status = httplib::StatusCode::InternalServerError_500;
-            res.set_content(_conn->successFalse, "application/json");
-            return;
-        }
+    tgbot::proto::socket::MediaAlias grpcRequest;
+    grpcRequest.set_media_id(mediaId);
+    grpcRequest.set_media_type(*mediaType);
+    for (const auto& a : aliases) {
+        grpcRequest.add_alias(a);
+    }
+
+    grpc::Status status =
+        _conn->https.sock->setMediaAlias(&context, grpcRequest, &grpcResponse);
+
+    if (!status.ok()) {
+        res.status = httplib::StatusCode::InternalServerError_500;
+        res.set_content(_conn->successFalse, "application/json");
+        return;
     }
 
     res.status = httplib::StatusCode::OK_200;
@@ -473,89 +599,26 @@ void TgBotWebServerBase::Callbacks::handleChats(const httplib::Request& req,
     res.set_content(responseJson.dump(), "application/json");
 }
 
-void TgBotWebServerBase::Callbacks::handleMedia(const httplib::Request& req,
-                                                httplib::Response& res) {
-    std::optional<std::string> mediaId;
-    std::optional<std::vector<std::string>> alias;
-    std::optional<FileType> mediaType;
-    auto maybeDocument = acceptAPIRequest(req);
-    if (!maybeDocument.has_value()) {
-        res.status = maybeDocument.error();
-        return;
-    }
+void TgBotWebServerBase::Callbacks::handleMediaDelete(
+    const httplib::Request& req, httplib::Response& res) {
+    // 1. Get ID from URL
+    std::string mediaId = req.path_params.at("media_id");
 
-    const auto& document = maybeDocument.value();
-    if (document.contains(Constants::kAPIKeyMediaId) &&
-        document[Constants::kAPIKeyMediaId].is_string()) {
-        mediaId = document[Constants::kAPIKeyMediaId].get<std::string>();
-    }
-    if (!mediaId.has_value()) {
-        LOG(ERROR) << "Invalid API request: Missing media_id value";
-        res.status = httplib::StatusCode::BadRequest_400;
-        return;
-    }
-    if (document.contains(Constants::kAPIKeyAlias) &&
-        document[Constants::kAPIKeyAlias].is_array()) {
-        alias =
-            document[Constants::kAPIKeyAlias].get<std::vector<std::string>>();
-        if (document.contains(Constants::kAPIKeyMediaType) &&
-            document[Constants::kAPIKeyMediaType].is_string()) {
-            auto type =
-                document[Constants::kAPIKeyMediaType].get<std::string>();
-            auto fileTypeOpt = fileTypeFromString(type);
-            if (fileTypeOpt.has_value()) {
-                mediaType = fileTypeOpt;
-            } else {
-                LOG(ERROR) << "Invalid API request: Unknown media_type value";
-                res.status = httplib::StatusCode::BadRequest_400;
-                return;
-            }
-        } else {
-            LOG(ERROR)
-                << "Invalid API request: Missing media_type value for alias";
-            res.status = httplib::StatusCode::BadRequest_400;
-            return;
-        }
-    }
-    LOG(INFO) << "API Req media_id: " << mediaId.value();
-    if (alias.has_value()) {
-        LOG(INFO) << "API Req alias count: " << alias->size();
-    } else {
-        LOG(INFO) << "API Req alias: null";
-    }
-
+    // 2. Execute gRPC
     grpc::ClientContext context;
     GenericResponse grpcResponse;
-    if (alias.has_value()) {
-        tgbot::proto::socket::MediaAlias grpcRequest;
-        grpcRequest.set_media_id(mediaId.value());
-        for (const auto& a : alias.value()) {
-            grpcRequest.add_alias(a);
-        }
-        // Below is asserted by API request validation
-        grpcRequest.set_media_type(*mediaType);
-        grpc::Status status =
-            _conn->stub->setMediaAlias(&context, grpcRequest, &grpcResponse);
-        if (!status.ok()) {
-            LOG(ERROR) << "gRPC setMediaAlias failed: "
-                       << status.error_message();
-            res.status = httplib::StatusCode::InternalServerError_500;
-            res.set_content(_conn->successFalse, "application/json");
-            return;
-        }
-    } else {
-        tgbot::proto::socket::MediaAliasRequest grpcRequest;
-        grpcRequest.set_media_id(mediaId.value());
-        grpc::Status status =
-            _conn->stub->deleteMediaAlias(&context, grpcRequest, &grpcResponse);
-        if (!status.ok()) {
-            LOG(ERROR) << "gRPC deleteMediaAlias failed: "
-                       << status.error_message();
-            res.status = httplib::StatusCode::InternalServerError_500;
-            res.set_content(_conn->successFalse, "application/json");
-            return;
-        }
+    tgbot::proto::socket::MediaAliasRequest grpcRequest;
+    grpcRequest.set_media_id(mediaId);
+
+    grpc::Status status = _conn->https.sock->deleteMediaAlias(
+        &context, grpcRequest, &grpcResponse);
+
+    if (!status.ok()) {
+        res.status = httplib::StatusCode::InternalServerError_500;
+        res.set_content(_conn->successFalse, "application/json");
+        return;
     }
+
     res.status = httplib::StatusCode::OK_200;
     nlohmann::json responseJson;
     responseJson["success"] = true;
@@ -574,7 +637,7 @@ void TgBotWebServerBase::Callbacks::handleHardware(const httplib::Request& req,
 #endif
     grpc::ClientContext context;
     grpc::Status status =
-        _conn->sysStub->GetSystemInfo(&context, grpcRequest, &grpcResponse);
+        _conn->https.mon->GetSystemInfo(&context, grpcRequest, &grpcResponse);
     if (!status.ok()) {
         LOG(ERROR) << "gRPC GetSystemInfo failed: " << status.error_message();
         res.status = httplib::StatusCode::InternalServerError_500;
@@ -584,8 +647,8 @@ void TgBotWebServerBase::Callbacks::handleHardware(const httplib::Request& req,
 
     grpc::ClientContext context2;
     tgbot::builder::system_monitor::SystemStats stats;
-    status =
-        _conn->sysStub->GetStats(&context2, google::protobuf::Empty{}, &stats);
+    status = _conn->https.mon->GetStats(&context2, google::protobuf::Empty{},
+                                        &stats);
     if (!status.ok()) {
         LOG(ERROR) << "gRPC GetStats failed: " << status.error_message();
         res.status = httplib::StatusCode::InternalServerError_500;

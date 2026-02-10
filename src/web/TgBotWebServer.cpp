@@ -13,6 +13,5 @@ void TgBotWebServer::onPreStop() {
     stopServer();
 }
 TgBotWebServer::TgBotWebServer(std::filesystem::path wwwResource,
-                               int serverPort, std::string grpcServerAddr)
-    : TgBotWebServerBase(serverPort, std::move(wwwResource),
-                         std::move(grpcServerAddr)) {}
+                               int serverPort)
+    : TgBotWebServerBase(serverPort, std::move(wwwResource)) {}

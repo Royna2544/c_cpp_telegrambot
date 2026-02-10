@@ -10,15 +10,13 @@
 #include <string_view>
 
 #include "ManagedThreads.hpp"
-
 class TgBotWebServerBase {
    public:
     void startServer();
     void stopServer();
 
     explicit TgBotWebServerBase(int serverPort,
-                                std::filesystem::path serverPath,
-                                std::string grpcServerAddr);
+                                std::filesystem::path serverPath);
 
     static void loggerFn(const httplib::Request& req,
                          const httplib::Response& res);
@@ -27,7 +25,6 @@ class TgBotWebServerBase {
         static constexpr const char* kAboutPage = "/about.html";
         static constexpr const char* kAPIVotesKey = "votes";
         static constexpr const char* kBindToIp = "0.0.0.0";
-        static constexpr const char* kLocalHostname = "localhost";
 
         // Special X-headers
         static constexpr const char* kHeaderRealIp = "X-Real-IP";
@@ -39,38 +36,13 @@ class TgBotWebServerBase {
 
         // Start: API v1 endpoints
         static constexpr const char* kAPIV1Base = "/api/v1";
+
         /*
-         * Request: POST /api/v1/sendMessage
-         * int64 chat_id
-         * string text = 2;
-         * FileType file_type = 3;
-         * oneof {
-         *   string file_data   // Small files (<4MB) sent directly
-         *   string file_path   // Path on the server
-         *   string file_id     // File ID of an existing file on Telegram
-         * servers
-         * }
-         *
-         * Where FileType is: One of photo, video, audio, document, sticker,
-         * gif, dice (as string)
-         *
-         * Response: 200 OK
-         * Response body:
-         * Success = 0
-         * TelegramApiException = 1
-         * ErrorInvalidArgument = 2
-         * ErrorCommandIgnored = 3
-         * ErrorRuntimeError = 4
-         * ErrorClientError = 5
-         *
-         * {
-         *   bool success
-         *   int code
-         *   string message
-         * }
-         * Others: Appropriate HTTP error code
+         * REST: POST /api/v1/messages
+         * Creates (Sends) a message.
          */
-        static constexpr const char* kAPIV1SendMessage = "/api/v1/sendMessage";
+        static constexpr const char* kAPIV1Messages =
+            "/api/v1/messages";  // Was sendMessage
         static constexpr const char* kAPIKeyChatId = "chat_id";
         static constexpr const char* kAPIKeyText = "text";
         static constexpr const char* kAPIKeyFileType = "file_type";
@@ -79,74 +51,29 @@ class TgBotWebServerBase {
         static constexpr const char* kAPIKeyFileId = "file_id";
 
         /*
-         * Request: GET /api/v1/stats
-         * {
-         *  status: bool
-         *  uptime: {
-         *      int days,
-         *      int hours,
-         *      int minutes,
-         *      int seconds
-         *   }
-         *   string username,
-         *   int64 user_id,
-         *   string operating_system,
-         * }
-         * Response: 200 OK
-         * Others: Appropriate HTTP error code
+         * REST: GET /api/v1/stats
          */
         static constexpr const char* kAPIV1Stats = "/api/v1/stats";
 
         /*
-         * Request: POST /api/v1/votes
-         * {
-         *   string votes {"up" or "down"}
-         * }
-         * Response: 200 OK
-         * Others: Appropriate HTTP error code
+         * REST: POST /api/v1/votes
          */
         static constexpr const char* kAPIVotesNode = "/api/v1/votes";
 
         /*
-         * Request: POST /api/v1/chats
-         * {
-         *   int64 chat_id
-         *   string chat_name
-         * }
-         * Will add a chat to the database if it does not already exist.
-         * Will update the chat_name if it already exists.
-         * If chat_name is omitted, it will be deleted from the database.
-         * Response: 200 OK
-         * Others: Appropriate HTTP error code
-         *
-         * Request: GET /api/v1/chats?chat_name={chat_name}
-         * Response: 200 OK
-         * Response body: { "success": bool, "chat_id": int64 }
-         * Others: Appropriate HTTP error code with success=false
+         * REST:
+         * PUT    /api/v1/chats/:chat_id  -> Set Alias (Body: {chat_name})
+         * DELETE /api/v1/chats/:chat_id  -> Remove Alias
+         * GET    /api/v1/chats?chat_name=X -> Search ID by Name
          */
         static constexpr const char* kAPIV1ChatsNode = "/api/v1/chats";
         static constexpr const char* kAPIKeyChatName = "chat_name";
 
         /*
-         * Request: POST /api/v1/media
-         * {
-         *   string media_id
-         *   listof string alias
-         *   FileType media_type
-         * }
-         * Where FileType is: One of photo, video, audio, document, sticker,
-         * gif, dice (as string)
-         *
-         * Will add a media file to the database if it does not already exist.
-         * Will update the alias if it already exists.
-         * If alias is omitted, it will be deleted from the database.
-         * Response: 200 OK
-         * Others: Appropriate HTTP error code
-         *
-         * Request: GET /api/v1/media?alias={alias}
-         * Response: 200 OK
-         * Response body: { "success": bool, "media_id": listof string }
-         * Others: Appropriate HTTP error code with success=false
+         * REST:
+         * PUT    /api/v1/media/:media_id -> Set Alias (Body: {alias, type})
+         * DELETE /api/v1/media/:media_id -> Remove Alias
+         * GET    /api/v1/media?alias=X   -> Search ID by Alias
          */
         static constexpr const char* kAPIV1MediaNode = "/api/v1/media";
         static constexpr const char* kAPIKeyAlias = "alias";
@@ -154,32 +81,7 @@ class TgBotWebServerBase {
         static constexpr const char* kAPIKeyMediaType = "media_type";
 
         /*
-         * Request: GET /api/v1/hardware
-         * {
-         *    "success": bool,
-         *    "cpu" : {
-         *       "usage_percent": float,
-         *       "core_count": int,
-         *       "name": string
-         *    },
-         *    "memory" : {
-         *       "total_mbytes": int64,
-         *       "used_mbytes": int64,
-         *    },
-         *    "disk" : {
-         *       "total_gbytes": int32,
-         *       "used_gbytes": int32,
-         *    },
-         *    "os": {
-         *       "name": string,
-         *       "version": string,
-         *       "kernel_version": string,
-         *       "hostname": string,
-         *       "uptime_seconds": int64
-         *    }
-         * }
-         * Response: 200 OK
-         * Others: Appropriate HTTP error code
+         * REST: GET /api/v1/hardware
          */
         static constexpr const char* kAPIV1Hardware = "/api/v1/hardware";
         static constexpr const char* kAPIKeyCPU = "cpu";
@@ -190,31 +92,47 @@ class TgBotWebServerBase {
         // End: API v1 endpoints
     };
 
-   private:
-    std::string _grpcServerAddr;
-
-   public:
     struct Callbacks {
         using type = std::function<void(const httplib::Request& req,
                                         const httplib::Response& res)>;
         void showIndex(const httplib::Request& req, httplib::Response& res);
-        void handleSendMessage(const httplib::Request& req,
-                               httplib::Response& res);
+
+        // POST /messages
+        void handleMessageCreate(const httplib::Request& req,
+                                 httplib::Response& res);
+
+        // GET /stats
         void handleStats(const httplib::Request& req, httplib::Response& res);
-        void handleChats(const httplib::Request& req, httplib::Response& res);
-        void handleMedia(const httplib::Request& req, httplib::Response& res);
+
+        // Chats
+        void handleChatPut(const httplib::Request& req,
+                           httplib::Response& res);  // Update/Create
+        void handleChatDelete(const httplib::Request& req,
+                              httplib::Response& res);  // Delete
         void handleChatsGet(const httplib::Request& req,
-                            httplib::Response& res);
+                            httplib::Response& res);  // Search
+
+        // Media
+        void handleMediaPut(const httplib::Request& req,
+                            httplib::Response& res);  // Update/Create
+        void handleMediaDelete(const httplib::Request& req,
+                               httplib::Response& res);  // Delete
         void handleMediaGet(const httplib::Request& req,
-                            httplib::Response& res);
+                            httplib::Response& res);  // Search
+
+        // Hardware
         void handleHardware(const httplib::Request& req,
                             httplib::Response& res);
+
+        // Votes
         static void handleAPIVotes(const httplib::Request& req,
                                    httplib::Response& res);
+
         explicit Callbacks(TgBotWebServerBase* server);
         ~Callbacks();
 
-        struct Connection;  // gRPC Connection struct
+        struct Connection;
+
        private:
         TgBotWebServerBase* server;
         std::unique_ptr<Connection> _conn;
@@ -230,8 +148,7 @@ class TgBotWebServerBase {
 
 class TgBotWebServer : public ThreadRunner, public TgBotWebServerBase {
    public:
-    explicit TgBotWebServer(std::filesystem::path wwwResource, int serverPort,
-                            std::string grpcServerAddr);
+    explicit TgBotWebServer(std::filesystem::path wwwResource, int serverPort);
 
     void runFunction(const std::stop_token& token) override;
     void onPreStop() override;
