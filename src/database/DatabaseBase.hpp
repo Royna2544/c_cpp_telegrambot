@@ -19,8 +19,8 @@ struct DBIMPL_EXPORT DatabaseBase {
 
     static constexpr std::string_view kInMemoryDatabase = ":memory:";
 
-    enum class ListType { WHITELIST, BLACKLIST };
-    enum class ListResult {
+    enum class ListType : uint8_t { WHITELIST, BLACKLIST };
+    enum class ListResult : uint8_t {
         OK,
         NOT_IN_LIST,
         ALREADY_IN_LIST,
@@ -28,13 +28,13 @@ struct DBIMPL_EXPORT DatabaseBase {
         BACKEND_ERROR
     };
 
-    enum class MediaType {
+    enum class MediaType : uint8_t {
         UNKNOWN,
         PHOTO,
         VIDEO,
         AUDIO,
-        // DOCUMENT,
-        STICKER = 5,
+        DOCUMENT,
+        STICKER,
         GIF
     };
 
