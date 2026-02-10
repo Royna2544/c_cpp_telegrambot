@@ -180,7 +180,7 @@ std::optional<TgBotApi::FileOrMedia> makeFileOrMedia(
 
 void LogWhoCalledMe(ServerContext* context, const std::string& methodName) {
     auto peer = context->peer();
-    std::string_view unused;
+    std::string_view unused = peer;
     if (absl::ConsumePrefix(&unused, "ipv4:127.0.0.1")) {
         // Localhost call, ignore logging
         DLOG(INFO) << "Localhost call to " << methodName;
@@ -689,6 +689,7 @@ Status SocketServiceImpl::Service::setMediaAlias(ServerContext* context,
 
     DatabaseBase::MediaInfo mediaInfo;
     mediaInfo.mediaId = request->media_id();
+    mediaInfo.mediaUniqueId = request->media_unique_id();
     mediaInfo.mediaType =
         static_cast<DatabaseBase::MediaType>(request->media_type());
     std::ranges::transform(request->alias(),
@@ -720,6 +721,7 @@ Status SocketServiceImpl::Service::listMediaAliases(
     for (const auto& mediaInfo : mediaInfos) {
         MediaAlias alias;
         alias.set_media_id(mediaInfo.mediaId);
+        alias.set_media_unique_id(mediaInfo.mediaUniqueId);
         for (const auto& name : mediaInfo.names) {
             alias.add_alias(name);
         }

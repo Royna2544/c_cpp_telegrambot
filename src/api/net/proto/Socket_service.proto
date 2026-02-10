@@ -198,6 +198,7 @@ message ChatAliasResponse {
 
 message MediaAlias {
     string media_id = 1;
+    string media_unique_id = 4;
     repeated string alias = 2;
     FileType media_type = 3;
 }
