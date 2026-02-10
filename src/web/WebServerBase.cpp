@@ -214,7 +214,6 @@ TgBotWebServerBase::Callbacks::Callbacks(TgBotWebServerBase* server)
     _conn->channel = grpc::CreateChannel(server->_grpcServerAddr,
                                          grpc::InsecureChannelCredentials());
     _conn->stub = SocketService::NewStub(_conn->channel);
-    LOG(INFO) << "gRPC client created for " << server->_grpcServerAddr;
 
     auto socketPath = fmt::format("localhost:{}", kLocalBuilderConnection);
     auto localChannel =
@@ -222,10 +221,8 @@ TgBotWebServerBase::Callbacks::Callbacks(TgBotWebServerBase* server)
     _conn->sysStub =
         tgbot::builder::system_monitor::SystemMonitorService::NewStub(
             localChannel);
-    LOG(INFO) << "gRPC SystemMonitor client connected to " << socketPath;
 
     _conn->successFalse = R"({"success": false})";
-    LOG(INFO) << "gRPC client connected to " << server->_grpcServerAddr;
 }
 
 TgBotWebServerBase::Callbacks::~Callbacks() = default;
@@ -478,9 +475,9 @@ void TgBotWebServerBase::Callbacks::handleChats(const httplib::Request& req,
 
 void TgBotWebServerBase::Callbacks::handleMedia(const httplib::Request& req,
                                                 httplib::Response& res) {
-    std::optional<std::string> mediaId = std::nullopt;
+    std::optional<std::string> mediaId;
     std::optional<std::vector<std::string>> alias;
-    std::optional<FileType> mediaType = std::nullopt;
+    std::optional<FileType> mediaType;
     auto maybeDocument = acceptAPIRequest(req);
     if (!maybeDocument.has_value()) {
         res.status = maybeDocument.error();
@@ -501,17 +498,23 @@ void TgBotWebServerBase::Callbacks::handleMedia(const httplib::Request& req,
         document[Constants::kAPIKeyAlias].is_array()) {
         alias =
             document[Constants::kAPIKeyAlias].get<std::vector<std::string>>();
-        if (document.contains(Constants::kAPIKeyFileType) &&
-            document[Constants::kAPIKeyFileType].is_string()) {
-            auto type = document[Constants::kAPIKeyFileType].get<std::string>();
+        if (document.contains(Constants::kAPIKeyMediaType) &&
+            document[Constants::kAPIKeyMediaType].is_string()) {
+            auto type =
+                document[Constants::kAPIKeyMediaType].get<std::string>();
             auto fileTypeOpt = fileTypeFromString(type);
             if (fileTypeOpt.has_value()) {
                 mediaType = fileTypeOpt;
             } else {
-                LOG(ERROR) << "Invalid API request: Unknown file_type value";
+                LOG(ERROR) << "Invalid API request: Unknown media_type value";
                 res.status = httplib::StatusCode::BadRequest_400;
                 return;
             }
+        } else {
+            LOG(ERROR)
+                << "Invalid API request: Missing media_type value for alias";
+            res.status = httplib::StatusCode::BadRequest_400;
+            return;
         }
     }
     LOG(INFO) << "API Req media_id: " << mediaId.value();

@@ -2,6 +2,7 @@
 
 #include <absl/hash/hash.h>
 #include <absl/log/log.h>
+#include <absl/strings/strip.h>
 #include <fmt/format.h>
 #include <grpcpp/grpcpp.h>
 #include <grpcpp/server_builder.h>
@@ -179,6 +180,12 @@ std::optional<TgBotApi::FileOrMedia> makeFileOrMedia(
 
 void LogWhoCalledMe(ServerContext* context, const std::string& methodName) {
     auto peer = context->peer();
+    std::string_view unused;
+    if (absl::ConsumePrefix(&unused, "ipv4:127.0.0.1")) {
+        // Localhost call, ignore logging
+        DLOG(INFO) << "Localhost call to " << methodName;
+        return;
+    }
     LOG(INFO) << "Method " << methodName << " called by " << peer;
 }
 

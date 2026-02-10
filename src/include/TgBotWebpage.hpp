@@ -151,6 +151,7 @@ class TgBotWebServerBase {
         static constexpr const char* kAPIV1MediaNode = "/api/v1/media";
         static constexpr const char* kAPIKeyAlias = "alias";
         static constexpr const char* kAPIKeyMediaId = "media_id";
+        static constexpr const char* kAPIKeyMediaType = "media_type";
 
         /*
          * Request: GET /api/v1/hardware
