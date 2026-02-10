@@ -133,6 +133,13 @@ struct TgBotWebServerBase::Callbacks::Connection {
 };
 
 namespace {
+
+void logIfHasHeader(const httplib::Request& req, const char* headerName) {
+    if (req.has_header(headerName)) {
+        LOG(INFO) << headerName << ": " << req.get_header_value(headerName);
+    }
+}
+
 compat::expected<nlohmann::json, int> acceptAPIRequest(
     const httplib::Request& req) {
     constexpr const char* kContentType = "Content-Type";
@@ -143,6 +150,13 @@ compat::expected<nlohmann::json, int> acceptAPIRequest(
         LOG(ERROR) << "Invalid API request: Missing or invalid Content-Type";
         return compat::unexpected(httplib::StatusCode::BadRequest_400);
     }
+
+    logIfHasHeader(req, TgBotWebServerBase::Constants::kHeaderRealIp);
+    logIfHasHeader(req, TgBotWebServerBase::Constants::kHeaderForwardedFor);
+    logIfHasHeader(req, TgBotWebServerBase::Constants::kHeaderClientVerify);
+    logIfHasHeader(req, TgBotWebServerBase::Constants::kHeaderClientDn);
+    logIfHasHeader(req,
+                   TgBotWebServerBase::Constants::kHeaderClientFingerprint);
 
     nlohmann::json document{};
     try {

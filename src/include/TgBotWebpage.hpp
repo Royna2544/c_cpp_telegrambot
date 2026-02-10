@@ -29,6 +29,14 @@ class TgBotWebServerBase {
         static constexpr const char* kBindToIp = "0.0.0.0";
         static constexpr const char* kLocalHostname = "localhost";
 
+        // Special X-headers
+        static constexpr const char* kHeaderRealIp = "X-Real-IP";
+        static constexpr const char* kHeaderForwardedFor = "X-Forwarded-For";
+        static constexpr const char* kHeaderClientVerify = "X-Client-Verify";
+        static constexpr const char* kHeaderClientDn = "X-Client-DN";
+        static constexpr const char* kHeaderClientFingerprint =
+            "X-Client-Fingerprint";
+
         // Start: API v1 endpoints
         static constexpr const char* kAPIV1Base = "/api/v1";
         /*
