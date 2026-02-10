@@ -682,6 +682,8 @@ Status SocketServiceImpl::Service::setMediaAlias(ServerContext* context,
 
     DatabaseBase::MediaInfo mediaInfo;
     mediaInfo.mediaId = request->media_id();
+    mediaInfo.mediaType =
+        static_cast<DatabaseBase::MediaType>(request->media_type());
     std::ranges::transform(request->alias(),
                            std::back_inserter(mediaInfo.names),
                            [](const std::string& alias) { return alias; });
