@@ -9,6 +9,7 @@
 #include <TgBotWebpage.hpp>
 #include <cstdint>
 #include <expected_cpp20>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <memory>
@@ -16,6 +17,8 @@
 #include <utility>
 
 #include "Socket_service.pb.h"
+#include "SystemMonitor_service.grpc.pb.h"
+#include "SystemMonitor_service.pb.h"
 
 constexpr bool WEBSERVER_INBOUND_VERBOSE = false;
 
@@ -91,6 +94,10 @@ void TgBotWebServerBase::startServer() {
             [this](const httplib::Request& req, httplib::Response& res) {
                 callback.handleMediaGet(req, res);
             });
+    svr.Get(Constants::kAPIV1Hardware,
+            [this](const httplib::Request& req, httplib::Response& res) {
+                callback.handleHardware(req, res);
+            });
     svr.set_logger(TgBotWebServerBase::loggerFn);
     svr.listen(Constants::kBindToIp, port);
 }
@@ -128,6 +135,8 @@ void TgBotWebServerBase::Callbacks::showIndex(const httplib::Request& req,
 
 struct TgBotWebServerBase::Callbacks::Connection {
     std::unique_ptr<tgbot::proto::socket::SocketService::Stub> stub;
+    std::unique_ptr<tgbot::builder::system_monitor::SystemMonitorService::Stub>
+        sysStub;
     std::shared_ptr<grpc::Channel> channel;
     std::string successFalse;
 };
@@ -168,19 +177,51 @@ compat::expected<nlohmann::json, int> acceptAPIRequest(
 
     return document;
 }
+using tgbot::proto::socket::FileType;
+
+std::optional<FileType> fileTypeFromString(const std::string& type) {
+    if (type == "photo") {
+        return FileType::PHOTO;
+    } else if (type == "video") {
+        return FileType::VIDEO;
+    } else if (type == "audio") {
+        return FileType::AUDIO;
+    } else if (type == "document") {
+        return FileType::DOCUMENT;
+    } else if (type == "sticker") {
+        return FileType::STICKER;
+    } else if (type == "gif") {
+        return FileType::GIF;
+    } else if (type == "dice") {
+        return FileType::DICE;
+    } else {
+        return std::nullopt;
+    }
+}
 }  // namespace
 
 using tgbot::proto::socket::BotInfo;
-using tgbot::proto::socket::FileType;
 using tgbot::proto::socket::GenericResponse;
 using tgbot::proto::socket::SendMessageRequest;
 using tgbot::proto::socket::SocketService;
+
+constexpr int kLocalBuilderConnection = 50051;
 
 TgBotWebServerBase::Callbacks::Callbacks(TgBotWebServerBase* server)
     : server(server), _conn(std::make_unique<Connection>()) {
     _conn->channel = grpc::CreateChannel(server->_grpcServerAddr,
                                          grpc::InsecureChannelCredentials());
     _conn->stub = SocketService::NewStub(_conn->channel);
+    LOG(INFO) << "gRPC client created for " << server->_grpcServerAddr;
+
+    auto socketPath = fmt::format("localhost:{}", kLocalBuilderConnection);
+    auto localChannel =
+        grpc::CreateChannel(socketPath, grpc::InsecureChannelCredentials());
+    _conn->sysStub =
+        tgbot::builder::system_monitor::SystemMonitorService::NewStub(
+            localChannel);
+    LOG(INFO) << "gRPC SystemMonitor client connected to " << socketPath;
+
     _conn->successFalse = R"({"success": false})";
     LOG(INFO) << "gRPC client connected to " << server->_grpcServerAddr;
 }
@@ -227,20 +268,9 @@ void TgBotWebServerBase::Callbacks::handleSendMessage(
     if (document.contains(Constants::kAPIKeyFileType) &&
         document[Constants::kAPIKeyFileType].is_string()) {
         auto type = document[Constants::kAPIKeyFileType].get<std::string>();
-        if (type == "photo") {
-            grpcRequest.set_file_type(FileType::PHOTO);
-        } else if (type == "video") {
-            grpcRequest.set_file_type(FileType::VIDEO);
-        } else if (type == "audio") {
-            grpcRequest.set_file_type(FileType::AUDIO);
-        } else if (type == "document") {
-            grpcRequest.set_file_type(FileType::DOCUMENT);
-        } else if (type == "sticker") {
-            grpcRequest.set_file_type(FileType::STICKER);
-        } else if (type == "gif") {
-            grpcRequest.set_file_type(FileType::GIF);
-        } else if (type == "dice") {
-            grpcRequest.set_file_type(FileType::DICE);
+        auto fileTypeOpt = fileTypeFromString(type);
+        if (fileTypeOpt.has_value()) {
+            grpcRequest.set_file_type(fileTypeOpt.value());
         } else {
             LOG(ERROR) << "Invalid API request: Unknown file_type value";
             res.status = httplib::StatusCode::BadRequest_400;
@@ -448,6 +478,7 @@ void TgBotWebServerBase::Callbacks::handleMedia(const httplib::Request& req,
                                                 httplib::Response& res) {
     std::optional<std::string> mediaId = std::nullopt;
     std::optional<std::vector<std::string>> alias;
+    std::optional<FileType> mediaType = std::nullopt;
     auto maybeDocument = acceptAPIRequest(req);
     if (!maybeDocument.has_value()) {
         res.status = maybeDocument.error();
@@ -468,6 +499,18 @@ void TgBotWebServerBase::Callbacks::handleMedia(const httplib::Request& req,
         document[Constants::kAPIKeyAlias].is_array()) {
         alias =
             document[Constants::kAPIKeyAlias].get<std::vector<std::string>>();
+        if (document.contains(Constants::kAPIKeyFileType) &&
+            document[Constants::kAPIKeyFileType].is_string()) {
+            auto type = document[Constants::kAPIKeyFileType].get<std::string>();
+            auto fileTypeOpt = fileTypeFromString(type);
+            if (fileTypeOpt.has_value()) {
+                mediaType = fileTypeOpt;
+            } else {
+                LOG(ERROR) << "Invalid API request: Unknown file_type value";
+                res.status = httplib::StatusCode::BadRequest_400;
+                return;
+            }
+        }
     }
     LOG(INFO) << "API Req media_id: " << mediaId.value();
     if (alias.has_value()) {
@@ -484,6 +527,8 @@ void TgBotWebServerBase::Callbacks::handleMedia(const httplib::Request& req,
         for (const auto& a : alias.value()) {
             grpcRequest.add_alias(a);
         }
+        // Below is asserted by API request validation
+        grpcRequest.set_media_type(*mediaType);
         grpc::Status status =
             _conn->stub->setMediaAlias(&context, grpcRequest, &grpcResponse);
         if (!status.ok()) {
@@ -509,6 +554,70 @@ void TgBotWebServerBase::Callbacks::handleMedia(const httplib::Request& req,
     res.status = httplib::StatusCode::OK_200;
     nlohmann::json responseJson;
     responseJson["success"] = true;
+    res.set_content(responseJson.dump(), "application/json");
+}
+
+void TgBotWebServerBase::Callbacks::handleHardware(const httplib::Request& req,
+                                                   httplib::Response& res) {
+    // Try to connect to gRPC server
+    tgbot::builder::system_monitor::SystemInfo grpcResponse;
+    tgbot::builder::system_monitor::GetSystemInfoRequest grpcRequest;
+#ifdef _WIN32
+    grpcRequest.set_disk_path("C:\\");
+#else
+    grpcRequest.set_disk_path("/");
+#endif
+    grpc::ClientContext context;
+    grpc::Status status =
+        _conn->sysStub->GetSystemInfo(&context, grpcRequest, &grpcResponse);
+    if (!status.ok()) {
+        LOG(ERROR) << "gRPC GetSystemInfo failed: " << status.error_message();
+        res.status = httplib::StatusCode::InternalServerError_500;
+        res.set_content(_conn->successFalse, "application/json");
+        return;
+    }
+
+    grpc::ClientContext context2;
+    tgbot::builder::system_monitor::SystemStats stats;
+    status =
+        _conn->sysStub->GetStats(&context2, google::protobuf::Empty{}, &stats);
+    if (!status.ok()) {
+        LOG(ERROR) << "gRPC GetStats failed: " << status.error_message();
+        res.status = httplib::StatusCode::InternalServerError_500;
+        res.set_content(_conn->successFalse, "application/json");
+        return;
+    }
+    nlohmann::json responseJson;
+    responseJson["success"] = true;
+
+    // CPU
+    responseJson[Constants::kAPIKeyCPU]["usage_percent"] =
+        stats.cpu_usage_percent();
+    responseJson[Constants::kAPIKeyCPU]["core_count"] =
+        grpcResponse.cpu_cores();
+    responseJson[Constants::kAPIKeyCPU]["name"] = grpcResponse.cpu_name();
+
+    // Memory
+    responseJson[Constants::kAPIKeyMemory]["total_mbytes"] =
+        grpcResponse.memory_total_mb();
+    responseJson[Constants::kAPIKeyMemory]["used_mbytes"] =
+        stats.memory_used_mb();
+
+    // Disk
+    responseJson[Constants::kAPIKeyDisk]["total_gbytes"] =
+        grpcResponse.disk_total_gb();
+    responseJson[Constants::kAPIKeyDisk]["used_gbytes"] =
+        grpcResponse.disk_used_gb();
+
+    // OS
+    responseJson[Constants::kAPIKeyOS]["name"] = grpcResponse.os_name();
+    responseJson[Constants::kAPIKeyOS]["version"] = grpcResponse.os_version();
+    responseJson[Constants::kAPIKeyOS]["kernel_version"] =
+        grpcResponse.kernel_version();
+    responseJson[Constants::kAPIKeyOS]["hostname"] = grpcResponse.hostname();
+    responseJson[Constants::kAPIKeyOS]["uptime_seconds"] =
+        stats.uptime_seconds();
+    res.status = httplib::StatusCode::OK_200;
     res.set_content(responseJson.dump(), "application/json");
 }
 

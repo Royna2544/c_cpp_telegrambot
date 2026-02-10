@@ -132,7 +132,11 @@ class TgBotWebServerBase {
          * {
          *   string media_id
          *   listof string alias
+         *   FileType media_type
          * }
+         * Where FileType is: One of photo, video, audio, document, sticker,
+         * gif, dice (as string)
+         *
          * Will add a media file to the database if it does not already exist.
          * Will update the alias if it already exists.
          * If alias is omitted, it will be deleted from the database.
@@ -147,6 +151,41 @@ class TgBotWebServerBase {
         static constexpr const char* kAPIV1MediaNode = "/api/v1/media";
         static constexpr const char* kAPIKeyAlias = "alias";
         static constexpr const char* kAPIKeyMediaId = "media_id";
+
+        /*
+         * Request: GET /api/v1/hardware
+         * {
+         *    "success": bool,
+         *    "cpu" : {
+         *       "usage_percent": float,
+         *       "core_count": int,
+         *       "name": string
+         *    },
+         *    "memory" : {
+         *       "total_mbytes": int64,
+         *       "used_mbytes": int64,
+         *    },
+         *    "disk" : {
+         *       "total_gbytes": int32,
+         *       "used_gbytes": int32,
+         *    },
+         *    "os": {
+         *       "name": string,
+         *       "version": string,
+         *       "kernel_version": string,
+         *       "hostname": string,
+         *       "uptime_seconds": int64
+         *    }
+         * }
+         * Response: 200 OK
+         * Others: Appropriate HTTP error code
+         */
+        static constexpr const char* kAPIV1Hardware = "/api/v1/hardware";
+        static constexpr const char* kAPIKeyCPU = "cpu";
+        static constexpr const char* kAPIKeyMemory = "memory";
+        static constexpr const char* kAPIKeyDisk = "disk";
+        static constexpr const char* kAPIKeyOS = "os";
+
         // End: API v1 endpoints
     };
 
@@ -166,6 +205,8 @@ class TgBotWebServerBase {
         void handleChatsGet(const httplib::Request& req,
                             httplib::Response& res);
         void handleMediaGet(const httplib::Request& req,
+                            httplib::Response& res);
+        void handleHardware(const httplib::Request& req,
                             httplib::Response& res);
         static void handleAPIVotes(const httplib::Request& req,
                                    httplib::Response& res);
