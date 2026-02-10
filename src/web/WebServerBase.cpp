@@ -3,6 +3,7 @@
 // #undef CPPHTTPLIB_BROTLI_SUPPORT
 
 #include <absl/log/log.h>
+#include <absl/strings/ascii.h>
 #include <grpcpp/client_context.h>
 #include <grpcpp/create_channel.h>
 
@@ -180,19 +181,20 @@ compat::expected<nlohmann::json, int> acceptAPIRequest(
 using tgbot::proto::socket::FileType;
 
 std::optional<FileType> fileTypeFromString(const std::string& type) {
-    if (type == "photo") {
+    auto new_type = absl::AsciiStrToLower(type);
+    if (new_type == "photo") {
         return FileType::PHOTO;
-    } else if (type == "video") {
+    } else if (new_type == "video") {
         return FileType::VIDEO;
-    } else if (type == "audio") {
+    } else if (new_type == "audio") {
         return FileType::AUDIO;
-    } else if (type == "document") {
+    } else if (new_type == "document") {
         return FileType::DOCUMENT;
-    } else if (type == "sticker") {
+    } else if (new_type == "sticker") {
         return FileType::STICKER;
-    } else if (type == "gif") {
+    } else if (new_type == "gif") {
         return FileType::GIF;
-    } else if (type == "dice") {
+    } else if (new_type == "dice") {
         return FileType::DICE;
     } else {
         return std::nullopt;
