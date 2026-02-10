@@ -201,8 +201,8 @@ class UTILS_EXPORT ConfigManager {
         },
         {
             .config = Configs::KERNELBUILD_SERVER,
-            .name = "KernelBuildServer",
-            .description = "Kernel Build gRPC server address",
+            .name = "BuilderRSServer",
+            .description = "Builder-RS gRPC server address",
             .alias = Entry::ALIAS_NONE,
             .type = Entry::ArgType::STRING,
             .belongsTo = &sectionNetwork,
