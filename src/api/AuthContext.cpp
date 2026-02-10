@@ -35,6 +35,12 @@ AuthContext::Result AuthContext::isAuthorized(const User::Ptr& user,
     if (user && !user->isBot) {
         // Obtain id
         id = user->id;
+
+        constexpr UserId telegramOfficialAccountId = 777000;
+        if (id == telegramOfficialAccountId) {
+            // Telegram official account, treat as bot
+            return {false, Result::Reason::UserIsBot};
+        }
     }
     // If user is bot, quickly send off
     // if acl
