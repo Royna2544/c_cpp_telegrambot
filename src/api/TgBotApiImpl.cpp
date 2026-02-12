@@ -31,6 +31,7 @@
 #include <iterator>
 #include <libos/libsighandler.hpp>
 #include <memory>
+#include <nlohmann/detail/macro_scope.hpp>
 #include <set>
 #include <string>
 #include <string_view>
@@ -466,6 +467,14 @@ File::Ptr TgBotApiImpl::uploadStickerFile_impl(
     return getApi().uploadStickerFile(userId, sticker, stickerFormat);
 }
 
+struct ErrorOutput {
+    bool ok;
+    int error_code;
+    std::string description;
+};
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ErrorOutput, ok, error_code, description);
+
 bool TgBotApiImpl::downloadFile_impl(const std::filesystem::path& destfilename,
                                      const std::string_view fileid) const {
     const auto file = getApi().getFile(fileid);
@@ -478,7 +487,28 @@ bool TgBotApiImpl::downloadFile_impl(const std::filesystem::path& destfilename,
         return false;
     }
     // Download the file
+    DLOG(INFO) << "Downloading file " << fileid
+               << " from path: " << *file->filePath;
     std::string buffer = getApi().downloadFile(*file->filePath);
+    if (buffer.empty()) {
+        LOG(INFO) << "Failed to download file " << fileid;
+        return false;
+    }
+
+    if (absl::StartsWith(buffer, "{\"ok\":false")) {
+        // Telegram API error
+        try {
+            auto errorOutput = nlohmann::json::parse(buffer).get<ErrorOutput>();
+            LOG(ERROR) << "Telegram API error while downloading file: "
+                       << errorOutput.description
+                       << " (code: " << errorOutput.error_code << ")";
+        } catch (const std::exception& e) {
+            LOG(ERROR) << "Failed to parse Telegram API error response: "
+                       << e.what();
+        }
+        return false;
+    }
+
     // Save the file to a file on disk
     std::fstream ofs(destfilename, std::ios::binary | std::ios::out);
     if (!ofs.is_open()) {

@@ -1,6 +1,7 @@
 #include <absl/log/log.h>
 #include <api/typedefs.h>
 
+#include <algorithm>
 #include <api/AuthContext.hpp>
 
 bool AuthContext::isInList(DatabaseBase::ListType type,
@@ -29,18 +30,34 @@ AuthContext::Result AuthContext::isAuthorized(const Message::Ptr& message,
     }
 }
 
+// The group user id is a special case, as it is not a bot but should be treated
+// as one for ACL purposes Telegram-static-defined user id for "Group", or admin
+// annoymous user.
+constexpr UserId kGroupUserId = 1087968824;
+// The Telegram official account is also a special case, as it is not a bot but
+// should be treated as one for ACL purposes.
+constexpr UserId kTelegramOfficialAccountId = 777000;
+
+constexpr std::array<UserId, 2> kSpecialBotUserIds = {
+    kGroupUserId, kTelegramOfficialAccountId};
+
 AuthContext::Result AuthContext::isAuthorized(const User::Ptr& user,
                                               const AccessLevel flags) const {
     std::optional<UserId> id;
+
+    // Negative user id always means channel or group, which should be treated
+    // as bot for ACL purposes
+    if (user && (std::ranges::find(kSpecialBotUserIds, user->id) !=
+                     kSpecialBotUserIds.end() ||
+                 user->id < 0)) {
+        // Special case for group user and Telegram official account, treat as
+        // bot
+        return {false, Result::Reason::UserIsBot};
+    }
+
     if (user && !user->isBot) {
         // Obtain id
         id = user->id;
-
-        constexpr UserId telegramOfficialAccountId = 777000;
-        if (id == telegramOfficialAccountId) {
-            // Telegram official account, treat as bot
-            return {false, Result::Reason::UserIsBot};
-        }
     }
     // If user is bot, quickly send off
     // if acl
