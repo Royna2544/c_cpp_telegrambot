@@ -60,3 +60,15 @@ tgbot_exe(
     Api
   TEST
 )
+
+tgbot_exe(
+  NAME kernelbuildservice
+  SRCS
+    TestMain.cpp
+    LinuxKernelBuildServiceTest.cpp
+  LIBS
+    GTest::gtest
+    GTest::gmock
+    LinuxKernelBuild_proto
+  TEST
+)
