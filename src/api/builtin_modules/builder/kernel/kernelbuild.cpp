@@ -25,7 +25,9 @@
 
 #include "ConfigManager.hpp"
 #include "ConfigParsers2.hpp"
+#include "GrpcLinuxKernelBuildService.hpp"
 #include "HealthCheck_service.grpc.pb.h"
+#include "ILinuxKernelBuildService.hpp"
 #include "LinuxKernelBuild_service.grpc.pb.h"
 #include "LinuxKernelBuild_service.pb.h"
 #include "SystemMonitor_service.grpc.pb.h"
@@ -74,8 +76,9 @@ class KernelBuildHandler {
     Intermidates intermidiates;
     std::optional<std::string> gitToken;
 
-    // gRPC channel
-    std::unique_ptr<LinuxKernelBuildService::Stub> stub;
+    // Build service interface (allows dependency injection for testing)
+    std::shared_ptr<tgbot::builder::linuxkernel::ILinuxKernelBuildService>
+        buildService;
     std::unique_ptr<SystemMonitorService::Stub> systemMonitorStub;
     std::unique_ptr<tgbot::builder::healthcheck::HealthCheckService::Stub>
         healthStub;
@@ -93,11 +96,57 @@ class KernelBuildHandler {
     constexpr static std::string_view kOutDirectory = "out";
     constexpr static std::string_view kToolchainDirectory = "toolchain";
     constexpr static std::string_view kCallbackQueryPrefix = "kernel_build_";
+
+    // Constructor with dependency injection for testing
+    KernelBuildHandler(
+        TgBotApi::Ptr api, const CommandLine* line, const AuthContext* auth,
+        const ConfigManager* cfgmgr,
+        std::shared_ptr<tgbot::builder::linuxkernel::ILinuxKernelBuildService>
+            buildServiceImpl,
+        std::unique_ptr<SystemMonitorService::Stub> systemMonitorStubImpl,
+        std::unique_ptr<tgbot::builder::healthcheck::HealthCheckService::Stub>
+            healthStubImpl)
+        : _api(api),
+          _auth(auth),
+          gitToken(cfgmgr->get(ConfigManager::Configs::GITHUB_TOKEN)),
+          buildService(std::move(buildServiceImpl)),
+          systemMonitorStub(std::move(systemMonitorStubImpl)),
+          healthStub(std::move(healthStubImpl)) {
+        loadConfigs(line);
+    }
+
+    // Original constructor for production use
     KernelBuildHandler(TgBotApi::Ptr api, const CommandLine* line,
                        const AuthContext* auth, const ConfigManager* cfgmgr)
         : _api(api),
           _auth(auth),
           gitToken(cfgmgr->get(ConfigManager::Configs::GITHUB_TOKEN)) {
+        loadConfigs(line);
+
+        auto channel = grpc::CreateChannel(
+            *cfgmgr->get(ConfigManager::Configs::KERNELBUILD_SERVER),
+            grpc::InsecureChannelCredentials());
+        buildService = std::make_shared<
+            tgbot::builder::linuxkernel::GrpcLinuxKernelBuildService>(channel);
+        systemMonitorStub = SystemMonitorService::NewStub(channel);
+        healthStub =
+            tgbot::builder::healthcheck::HealthCheckService::NewStub(channel);
+
+        LOG(INFO) << "Connecting to HealthCheckService...";
+        grpc::ClientContext context;
+        google::protobuf::Empty request;
+        google::protobuf::Empty response;
+        auto rc = healthStub->ping(&context, request, &response);
+        if (!rc.ok()) {
+            throw std::runtime_error(
+                "Failed to connect to HealthCheckService: " +
+                rc.error_message());
+        }
+        LOG(INFO) << "Connected to remote successfully";
+    }
+
+   private:
+    void loadConfigs(const CommandLine* line) {
         auto jsonDir =
             line->getPath(FS::PathType::RESOURCES) / "builder" / "kernel";
 
@@ -116,27 +165,9 @@ class KernelBuildHandler {
             LOG(ERROR) << "Failed to opendir for kernel configurations: "
                        << ec.message();
         }
-
-        auto channel = grpc::CreateChannel(
-            *cfgmgr->get(ConfigManager::Configs::KERNELBUILD_SERVER),
-            grpc::InsecureChannelCredentials());
-        stub = LinuxKernelBuildService::NewStub(channel);
-        systemMonitorStub = SystemMonitorService::NewStub(channel);
-        healthStub =
-            tgbot::builder::healthcheck::HealthCheckService::NewStub(channel);
-
-        LOG(INFO) << "Connecting to HealthCheckService...";
-        grpc::ClientContext context;
-        google::protobuf::Empty request;
-        google::protobuf::Empty response;
-        auto rc = healthStub->ping(&context, request, &response);
-        if (!rc.ok()) {
-            throw std::runtime_error(
-                "Failed to connect to HealthCheckService: " +
-                rc.error_message());
-        }
-        LOG(INFO) << "Connected to remote successfully";
     }
+
+   public:
 
     constexpr static std::string_view kBuildPrefix = "build_";
     constexpr static std::string_view kSelectPrefix = "select_";
@@ -150,16 +181,16 @@ class KernelBuildHandler {
             // Reload config if needed.
             try {
                 bool updated = config.reParse();
-                grpc::ClientContext grpcContext;
                 if (updated) {
-                    // Notify gRPC server about config update
+                    // Notify build service about config update
                     ::tgbot::builder::linuxkernel::ConfigResponse response;
                     auto request = ::tgbot::builder::linuxkernel::Config();
                     request.set_name(config.name);
                     request.set_json_content(config.toJsonString());
-                    stub->updateConfig(&grpcContext, request, &response);
-                    if (!response.success()) {
-                        LOG(ERROR) << "Failed to notify gRPC server about "
+                    bool success =
+                        buildService->updateConfig(request, &response);
+                    if (!success || !response.success()) {
+                        LOG(ERROR) << "Failed to notify build service about "
                                       "config update: "
                                    << response.message();
                     } else {
@@ -287,17 +318,14 @@ class KernelBuildHandler {
                               int build_id);
 
     void handle_cancel(const TgBot::CallbackQuery::Ptr& query) {
-        grpc::ClientContext context;
         tgbot::builder::linuxkernel::BuildRequest req;
         tgbot::builder::linuxkernel::BuildStatus resp;
         req.set_build_id(intermidiates.build_id.load());
-        auto status = stub->cancelBuild(&context, req, &resp);
-        if (!status.ok()) {
-            LOG(ERROR) << "gRPC error when cancelling build: "
-                       << status.error_message();
-            _api->answerCallbackQuery(
-                query->id,
-                "gRPC error when cancelling build: " + status.error_message());
+        bool success = buildService->cancelBuild(req, &resp);
+        if (!success) {
+            LOG(ERROR) << "Error when cancelling build";
+            _api->answerCallbackQuery(query->id,
+                                      "Error when cancelling build");
             return;
         }
         _api->editMessage(query->message, "Build cancelled.");
@@ -362,23 +390,22 @@ bool KernelBuildHandler::handle_prepare(const TgBot::CallbackQuery::Ptr& query,
     // Make defconfig
     LOG(INFO) << "Preparing build for kernel: " << intermidiates.current->name;
 
-    BuildStatus response;
-    grpc::ClientContext grpcContext;
-
+    BuildStatus last_response;
     intermidiates.start_time = std::chrono::system_clock::now();
 
-    auto status = stub->prepareBuild(&grpcContext, request);
-    while (status->Read(&response)) {
-        *build_id = response.build_id();
-        if (!rateLimiter.check()) {
-            continue;  // Skip update if within rate limit
-        }
-        grpc::ClientContext monitorContext;
-        tgbot::builder::system_monitor::SystemStats info;
-        auto info_status =
-            systemMonitorStub->GetStats(&monitorContext, {}, &info);
-        auto fmted_msg = fmt::format(
-            R"(
+    bool success = buildService->prepareBuild(
+        request, [&](const BuildStatus& response) {
+            last_response = response;
+            *build_id = response.build_id();
+            if (!rateLimiter.check()) {
+                return;  // Skip update if within rate limit
+            }
+            grpc::ClientContext monitorContext;
+            tgbot::builder::system_monitor::SystemStats info;
+            auto info_status =
+                systemMonitorStub->GetStats(&monitorContext, {}, &info);
+            auto fmted_msg = fmt::format(
+                R"(
 <blockquote>Start Time: {} (GMT)
 Time Spent: {:%M minutes %S seconds}
 Kernel Name: {}</blockquote>
@@ -386,28 +413,27 @@ Kernel Name: {}</blockquote>
 💻 <b>CPU</b>: {:.2f}%
 💾 <b>Memory</b>: {}MB / {}MB</blockquote>
 <blockquote>{}</blockquote>)",
-            intermidiates.start_time,
-            std::chrono::system_clock::now() - intermidiates.start_time,
-            intermidiates.current->name, intermidiates.device,
-            info.cpu_usage_percent(), info.memory_used_mb(),
-            info.memory_total_mb(), response.output());
-        _api->editMessage<TgBotApi::ParseMode::HTML>(query->message, fmted_msg);
-    }
-    auto status_finish = status->Finish();
-    if (!status_finish.ok()) {
-        _api->editMessage(query->message, "Prepare failed due to gRPC error.");
-        LOG(ERROR) << "Prepare failed due to gRPC error. Error message: "
-                   << status_finish.error_message();
+                intermidiates.start_time,
+                std::chrono::system_clock::now() - intermidiates.start_time,
+                intermidiates.current->name, intermidiates.device,
+                info.cpu_usage_percent(), info.memory_used_mb(),
+                info.memory_total_mb(), response.output());
+            _api->editMessage<TgBotApi::ParseMode::HTML>(query->message,
+                                                         fmted_msg);
+        });
+    if (!success) {
+        _api->editMessage(query->message, "Prepare failed.");
+        LOG(ERROR) << "Prepare failed.";
         return false;
     } else {
         _api->editMessage(query->message, "Build process prepared.");
     }
-    if (response.status() != ProgressStatus::SUCCESS) {
+    if (last_response.status() != ProgressStatus::SUCCESS) {
         _api->editMessage(
             query->message,
-            "Prepare incomplete!!, last message: " + response.output());
+            "Prepare incomplete!!, last message: " + last_response.output());
         LOG(ERROR) << "Prepare incomplete!!, last message: "
-                   << response.output();
+                   << last_response.output();
         return false;
     }
     return true;
@@ -422,21 +448,20 @@ bool KernelBuildHandler::handle_build_process(
     BuildRequest buildRequest;
     buildRequest.set_build_id(build_id);
 
-    grpc::ClientContext grpcContext_v2;
-    auto finalResponse = stub->doBuild(&grpcContext_v2, buildRequest);
+    BuildStatus last_response;
+    bool success = buildService->doBuild(
+        buildRequest, [&](const BuildStatus& response) {
+            last_response = response;
+            if (!rateLimiter.check()) {
+                return;  // Skip update if within rate limit
+            }
 
-    BuildStatus response;
-    while (finalResponse->Read(&response)) {
-        if (!rateLimiter.check()) {
-            continue;  // Skip update if within rate limit
-        }
-
-        grpc::ClientContext monitorContext;
-        tgbot::builder::system_monitor::SystemStats info;
-        auto info_status = systemMonitorStub->GetStats(
-            &monitorContext, ::google::protobuf::Empty{}, &info);
-        auto fmted_msg = fmt::format(
-            R"(
+            grpc::ClientContext monitorContext;
+            tgbot::builder::system_monitor::SystemStats info;
+            auto info_status = systemMonitorStub->GetStats(
+                &monitorContext, ::google::protobuf::Empty{}, &info);
+            auto fmted_msg = fmt::format(
+                R"(
 <blockquote>Start Time: {} (GMT)
 Time Spent: {:%M minutes %S seconds}
 Kernel Name: {}</blockquote>
@@ -444,26 +469,25 @@ Kernel Name: {}</blockquote>
 💻 <b>CPU</b>: {:.2f}%
 💾 <b>Memory</b>: {}MB / {}MB</blockquote>
 <blockquote>{}</blockquote>)",
-            intermidiates.start_time,
-            std::chrono::system_clock::now() - intermidiates.start_time,
-            intermidiates.current->name, intermidiates.device,
-            info.cpu_usage_percent(), info.memory_used_mb(),
-            info.memory_total_mb(), response.output());
-        _api->editMessage<TgBotApi::ParseMode::HTML>(query->message, fmted_msg,
-                                                     makeCancelKeyboard());
-    }
-    auto finish_v2 = finalResponse->Finish();
-    if (!finish_v2.ok()) {
-        _api->editMessage(query->message, "Build failed due to gRPC error.");
-        LOG(ERROR) << "Build failed due to gRPC error. Error message: "
-                   << finish_v2.error_message();
+                intermidiates.start_time,
+                std::chrono::system_clock::now() - intermidiates.start_time,
+                intermidiates.current->name, intermidiates.device,
+                info.cpu_usage_percent(), info.memory_used_mb(),
+                info.memory_total_mb(), response.output());
+            _api->editMessage<TgBotApi::ParseMode::HTML>(
+                query->message, fmted_msg, makeCancelKeyboard());
+        });
+    if (!success) {
+        _api->editMessage(query->message, "Build failed.");
+        LOG(ERROR) << "Build failed.";
     } else {
         _api->editMessage(query->message, "Build process completed.");
     }
-    if (response.status() != ProgressStatus::SUCCESS) {
+    if (last_response.status() != ProgressStatus::SUCCESS) {
         _api->editMessage(query->message, "Build incomplete!!, last message: " +
-                                              response.output());
-        LOG(ERROR) << "Build incomplete!!, last message: " << response.output();
+                                              last_response.output());
+        LOG(ERROR) << "Build incomplete!!, last message: "
+                   << last_response.output();
         return false;
     }
     return true;
@@ -476,34 +500,30 @@ bool KernelBuildHandler::handle_artifact_download(
 
     BuildRequest artifactRequest;
     artifactRequest.set_build_id(build_id);
-    ArtifactChunk response_v2;
     ArtifactMetadata artifactMetadata;
-    grpc::ClientContext artifactContext;
-    auto artifactResponse =
-        stub->getArtifact(&artifactContext, artifactRequest);
     std::ofstream outputFile;
-    while (artifactResponse->Read(&response_v2)) {
-        if (!outputFile.is_open()) {
-            artifactMetadata = response_v2.metadata();
-            LOG(INFO) << "Receiving artifact: " << artifactMetadata.filename()
-                      << ", size: " << artifactMetadata.total_size();
-            outputFile.open(artifactMetadata.filename(), std::ios::binary);
+
+    bool success = buildService->getArtifact(
+        artifactRequest, [&](const ArtifactChunk& chunk) {
             if (!outputFile.is_open()) {
-                LOG(ERROR) << "Failed to open output file: "
-                           << artifactMetadata.filename();
-                _api->editMessage(query->message,
-                                  "Failed to open output file for writing.");
-                return false;
+                artifactMetadata = chunk.metadata();
+                LOG(INFO) << "Receiving artifact: "
+                          << artifactMetadata.filename()
+                          << ", size: " << artifactMetadata.total_size();
+                outputFile.open(artifactMetadata.filename(), std::ios::binary);
+                if (!outputFile.is_open()) {
+                    LOG(ERROR) << "Failed to open output file: "
+                               << artifactMetadata.filename();
+                    return;
+                }
             }
-        }
-        outputFile.write(response_v2.data().data(), response_v2.data().size());
-    }
+            outputFile.write(chunk.data().data(), chunk.data().size());
+        });
     outputFile.close();
-    auto finish_v3 = artifactResponse->Finish();
-    if (!finish_v3.ok()) {
+
+    if (!success) {
         _api->editMessage(query->message, "Failed to retrieve artifact.");
-        LOG(ERROR) << "Failed to retrieve artifact. Error message: "
-                   << finish_v3.error_message();
+        LOG(ERROR) << "Failed to retrieve artifact.";
         return false;
     } else {
         _api->editMessage(query->message, "Artifact retrieved successfully.");
