@@ -7,3 +7,4 @@ pub mod git_repo;
 pub mod gofile_api;
 pub mod ratelimit;
 pub mod util;
+pub mod command_executor;
