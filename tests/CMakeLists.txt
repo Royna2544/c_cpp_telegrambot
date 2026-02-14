@@ -69,6 +69,18 @@ tgbot_exe(
   LIBS
     GTest::gtest
     GTest::gmock
-    LinuxKernelBuild_proto
+    LinuxKernelBuildServiceProto
+  TEST
+)
+
+tgbot_exe(
+  NAME rombuildservice
+  SRCS
+    TestMain.cpp
+    ROMBuildServiceTest.cpp
+  LIBS
+    GTest::gtest
+    GTest::gmock
+    ROMBuildServiceProto
   TEST
 )
