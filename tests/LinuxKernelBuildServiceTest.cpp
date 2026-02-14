@@ -1,7 +1,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "../mocks/LinuxKernelBuildService.hpp"
+#include "mocks/LinuxKernelBuildService.hpp"
 
 using namespace tgbot::builder::linuxkernel;
 using testing::_;
