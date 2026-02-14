@@ -6,6 +6,7 @@ use std::{cell::Cell, num::NonZero};
 ///
 /// ```
 /// use std::num::NonZero;
+/// use builder::ratelimit::RateLimit;
 ///
 /// let mut rate_limit = RateLimit::new(NonZero::new(5).unwrap());
 /// if rate_limit.check() {
