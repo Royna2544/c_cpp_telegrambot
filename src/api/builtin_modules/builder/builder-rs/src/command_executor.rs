@@ -2,15 +2,14 @@
 ///
 /// This module provides a trait-based abstraction for executing commands,
 /// allowing the build services to be tested without actually spawning processes.
-
 use async_trait::async_trait;
 use std::path::PathBuf;
 use std::process::{ExitStatus, Stdio};
+use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
-use tokio::sync::mpsc;
-use std::sync::Arc;
 use tokio::sync::Mutex;
+use tokio::sync::mpsc;
 use tracing::{debug, error, info};
 
 /// Result of executing a command
@@ -73,32 +72,32 @@ impl CommandExecutor for RealCommandExecutor {
     ) -> Result<CommandResult, String> {
         let mut command = Command::new(program);
         command.args(args);
-        
+
         if let Some(dir) = cwd {
             command.current_dir(dir);
         }
-        
+
         for (key, value) in env {
             command.env(key, value);
         }
-        
+
         #[cfg(unix)]
         command.process_group(0);
-        
+
         command.stdout(Stdio::piped());
         command.stderr(Stdio::piped());
-        
+
         let mut child = command.spawn().map_err(|e| e.to_string())?;
-        
+
         let stdout = child.stdout.take().expect("stdout missing");
         let stderr = child.stderr.take().expect("stderr missing");
-        
+
         let pid = child.id();
         info!("Spawned process with PID: {:?}", pid);
-        
+
         let stdout_lines = Arc::new(Mutex::new(Vec::new()));
         let stderr_lines = Arc::new(Mutex::new(Vec::new()));
-        
+
         // Stream stdout
         let stdout_lines_clone = stdout_lines.clone();
         let tx_out = output_tx.clone();
@@ -111,7 +110,7 @@ impl CommandExecutor for RealCommandExecutor {
                 stdout_lines_clone.lock().await.push(line);
             }
         });
-        
+
         // Stream stderr
         let stderr_lines_clone = stderr_lines.clone();
         let tx_err = output_tx.clone();
@@ -124,7 +123,7 @@ impl CommandExecutor for RealCommandExecutor {
                 stderr_lines_clone.lock().await.push(line);
             }
         });
-        
+
         // Wait for process or kill signal
         let wait_result = if let Some(ref mut rx) = kill_rx {
             tokio::select! {
@@ -142,9 +141,9 @@ impl CommandExecutor for RealCommandExecutor {
                     #[cfg(unix)]
                     {
                         if let Some(pid) = pid {
-                            use nix::sys::signal::{self, Signal};
+                            use nix::sys::signal::{killpg, Signal};
                             use nix::unistd::Pid;
-                            let _ = signal::killpg(Pid::from_raw(pid as i32), Signal::SIGINT);
+                            let _ = killpg(Pid::from_raw(pid as i32), Signal::SIGINT);
                         }
                     }
                     let _ = child.kill().await;
@@ -154,13 +153,13 @@ impl CommandExecutor for RealCommandExecutor {
         } else {
             child.wait().await.ok()
         };
-        
+
         // Wait for streaming tasks
         let _ = tokio::join!(stdout_task, stderr_task);
-        
+
         let success = wait_result.as_ref().map(|s| s.success()).unwrap_or(false);
         let exit_code = wait_result.and_then(|s| s.code());
-        
+
         Ok(CommandResult {
             success,
             exit_code,
@@ -196,15 +195,15 @@ impl MockCommandExecutor {
             call_index: Arc::new(Mutex::new(0)),
         }
     }
-    
+
     /// Add a mock response for a command
-    pub fn add_response(&self, response: MockResponse) {
-        let mut responses = self.responses.blocking_lock();
+    pub async fn add_response(&self, response: MockResponse) {
+        let mut responses = self.responses.lock().await;
         responses.push(response);
     }
-    
+
     /// Add a simple success response
-    pub fn add_success(&self, program_pattern: &str, stdout: Vec<String>) {
+    pub async fn add_success(&self, program_pattern: &str, stdout: Vec<String>) {
         self.add_response(MockResponse {
             program_pattern: program_pattern.to_string(),
             success: true,
@@ -212,11 +211,12 @@ impl MockCommandExecutor {
             stdout_lines: stdout,
             stderr_lines: Vec::new(),
             delay_ms: None,
-        });
+        })
+        .await;
     }
-    
+
     /// Add a simple failure response
-    pub fn add_failure(&self, program_pattern: &str, stderr: Vec<String>) {
+    pub async fn add_failure(&self, program_pattern: &str, stderr: Vec<String>) {
         self.add_response(MockResponse {
             program_pattern: program_pattern.to_string(),
             success: false,
@@ -224,7 +224,8 @@ impl MockCommandExecutor {
             stdout_lines: Vec::new(),
             stderr_lines: stderr,
             delay_ms: None,
-        });
+        })
+        .await;
     }
 }
 
@@ -241,9 +242,9 @@ impl CommandExecutor for MockCommandExecutor {
     ) -> Result<CommandResult, String> {
         let mut index = self.call_index.lock().await;
         let responses = self.responses.lock().await;
-        
+
         debug!("Mock executing: {} {:?}", program, args);
-        
+
         // Find matching response
         let response = if *index < responses.len() {
             responses[*index].clone()
@@ -251,28 +252,28 @@ impl CommandExecutor for MockCommandExecutor {
             // No more responses configured, return default failure
             return Err(format!("No mock response configured for call #{}", *index));
         };
-        
+
         *index += 1;
         drop(index);
         drop(responses);
-        
+
         // Simulate delay if configured
         if let Some(delay) = response.delay_ms {
             tokio::time::sleep(tokio::time::Duration::from_millis(delay)).await;
         }
-        
+
         // Send stdout lines
         for line in &response.stdout_lines {
             let msg = format!("stdout: {}", line);
             let _ = output_tx.send(msg).await;
         }
-        
+
         // Send stderr lines
         for line in &response.stderr_lines {
             let msg = format!("stderr: {}", line);
             let _ = output_tx.send(msg).await;
         }
-        
+
         Ok(CommandResult {
             success: response.success,
             exit_code: Some(response.exit_code),
@@ -285,49 +286,50 @@ impl CommandExecutor for MockCommandExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[tokio::test]
     async fn test_mock_executor_success() {
         let executor = MockCommandExecutor::new();
-        executor.add_success("git", vec!["Cloning into 'repo'...".to_string()]);
-        
+        executor
+            .add_success("git", vec!["Cloning into 'repo'...".to_string()])
+            .await;
+
         let (tx, mut rx) = mpsc::channel(100);
-        let result = executor.execute(
-            "git",
-            &["clone", "https://example.com/repo.git"],
-            None,
-            &[],
-            tx,
-            None,
-        ).await;
-        
+        let result = executor
+            .execute(
+                "git",
+                &["clone", "https://example.com/repo.git"],
+                None,
+                &[],
+                tx,
+                None,
+            )
+            .await;
+
         assert!(result.is_ok());
         let cmd_result = result.unwrap();
         assert!(cmd_result.success);
         assert_eq!(cmd_result.exit_code, Some(0));
         assert_eq!(cmd_result.stdout_lines.len(), 1);
-        
+
         // Check that output was sent
         let msg = rx.recv().await;
         assert!(msg.is_some());
         assert!(msg.unwrap().contains("Cloning into 'repo'"));
     }
-    
+
     #[tokio::test]
     async fn test_mock_executor_failure() {
         let executor = MockCommandExecutor::new();
-        executor.add_failure("make", vec!["error: missing target".to_string()]);
-        
+        executor
+            .add_failure("make", vec!["error: missing target".to_string()])
+            .await;
+
         let (tx, _rx) = mpsc::channel(100);
-        let result = executor.execute(
-            "make",
-            &["defconfig"],
-            None,
-            &[],
-            tx,
-            None,
-        ).await;
-        
+        let result = executor
+            .execute("make", &["defconfig"], None, &[], tx, None)
+            .await;
+
         assert!(result.is_ok());
         let cmd_result = result.unwrap();
         assert!(!cmd_result.success);

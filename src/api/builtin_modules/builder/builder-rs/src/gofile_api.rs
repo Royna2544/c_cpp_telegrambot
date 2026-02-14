@@ -202,7 +202,7 @@ mod tests {
                 "guestToken": "guest_token_123",
                 "id": "file_id_123",
                 "md5": "098f6bcd4621d373cade4e832627b4f6",
-                "mimeType": "application/zip",
+                "mimetype": "application/zip",
                 "modTime": 1640995200,
                 "name": "test.zip",
                 "parentFolder": "folder_id",

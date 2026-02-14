@@ -22,7 +22,7 @@
 //!     None, // No progress callback
 //! ).expect("Failed to open repository");
 //!
-//! repo.fast_forward().await.expect("Failed to fast-forward");
+//! repo.fast_forward().expect("Failed to fast-forward");
 //! # };
 //! ```
 
