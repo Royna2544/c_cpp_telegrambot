@@ -502,9 +502,13 @@ bool KernelBuildHandler::handle_artifact_download(
     artifactRequest.set_build_id(build_id);
     ArtifactMetadata artifactMetadata;
     std::ofstream outputFile;
+    bool fileOpenError = false;
 
     bool success = buildService->getArtifact(
         artifactRequest, [&](const ArtifactChunk& chunk) {
+            if (fileOpenError) {
+                return;  // Skip processing if file open failed
+            }
             if (!outputFile.is_open()) {
                 artifactMetadata = chunk.metadata();
                 LOG(INFO) << "Receiving artifact: "
@@ -514,12 +518,19 @@ bool KernelBuildHandler::handle_artifact_download(
                 if (!outputFile.is_open()) {
                     LOG(ERROR) << "Failed to open output file: "
                                << artifactMetadata.filename();
+                    fileOpenError = true;
                     return;
                 }
             }
             outputFile.write(chunk.data().data(), chunk.data().size());
         });
     outputFile.close();
+
+    if (fileOpenError) {
+        _api->editMessage(query->message,
+                          "Failed to open output file for writing.");
+        return false;
+    }
 
     if (!success) {
         _api->editMessage(query->message, "Failed to retrieve artifact.");

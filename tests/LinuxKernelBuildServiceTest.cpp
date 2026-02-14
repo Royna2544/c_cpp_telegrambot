@@ -153,11 +153,10 @@ TEST_F(LinuxKernelBuildServiceTest, GetArtifactSuccess) {
     BuildRequest request;
     request.set_build_id(42);
 
+    // Create chunks with proper ownership
     ArtifactChunk metadataChunk;
-    auto* metadata = new ArtifactMetadata();
-    metadata->set_filename("kernel.zip");
-    metadata->set_total_size(1024);
-    metadataChunk.set_allocated_metadata(metadata);
+    metadataChunk.mutable_metadata()->set_filename("kernel.zip");
+    metadataChunk.mutable_metadata()->set_total_size(1024);
 
     ArtifactChunk dataChunk;
     dataChunk.set_data("test data content");
