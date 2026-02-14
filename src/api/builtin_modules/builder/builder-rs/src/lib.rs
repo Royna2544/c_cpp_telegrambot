@@ -8,3 +8,6 @@ pub mod gofile_api;
 pub mod ratelimit;
 pub mod util;
 pub mod command_executor;
+
+#[cfg(test)]
+mod command_executor_examples;
