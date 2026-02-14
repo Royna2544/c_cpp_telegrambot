@@ -1,7 +1,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "../mocks/ROMBuildService.hpp"
+#include "mocks/ROMBuildService.hpp"
 
 using namespace tgbot::builder::android;
 using testing::_;
