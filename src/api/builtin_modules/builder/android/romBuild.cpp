@@ -650,13 +650,13 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
         "built_artifact_" + build.getId() + ".zip";
 
     bool resultSuccess = buildService_->getBuildResult(
-        logRequest, [&](const android::BuildResult& lastBuildResult) {
-            lastBuildResult = lastBuildResult;
-            if (!lastBuildResult.success()) {
+        logRequest, [&](const android::BuildResult& result) {
+            lastBuildResult = result;
+            if (!result.success()) {
                 return;
             }
             // Handle streaming data
-            if (lastBuildResult.has_stream_data()) {
+            if (result.has_stream_data()) {
                 if (!isStream) {
                     isStream = true;
                     streamFile.open(streamFilePath, std::ios::binary);
@@ -666,8 +666,8 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
                         return;
                     }
                 }
-                streamFile.write(lastBuildResult.stream_data().data(),
-                                 lastBuildResult.stream_data().size());
+                streamFile.write(result.stream_data().data(),
+                                 result.stream_data().size());
             }
         });
 
@@ -793,17 +793,13 @@ Download the built artifact here: <a href="{}">{}</a>)",
     }
 
     if (isStream) {
-        // Continue reading stream data
-        android::BuildResult streamResult;
-        while (reader->Read(&streamResult)) {
-            streamFile.write(streamResult.stream_data().data(),
-                             streamResult.stream_data().size());
-        }
-        streamFile.close();
+        // Stream data was written during callback
         LOG(INFO) << "Finished writing stream file";
 
         auto outfile = InputFile::fromFile(streamFilePath, "application/zip");
-        outfile->fileName = streamResult.file_name();
+        if (lastBuildResult.has_file_name()) {
+            outfile->fileName = lastBuildResult.file_name();
+        }
         _api->sendDocument(sentMessage->chat, std::move(outfile),
                            "Here is your built artifact!");
         _api->editMessage<TgBotApi::ParseMode::HTML>(
@@ -815,29 +811,19 @@ Build ID: <code>{}</code>)",
                                         build.getId())),
             backKeyboard);
     }
-}
-else {
-    LOG(ERROR) << "Failed to read build result";
-    _api->editMessage(sentMessage, "Failed to read build result",
-                      backKeyboard2);
-}
-auto status = reader->Finish();
-if (!status.ok()) {
-    LOG(ERROR) << "GetBuildResult rpc failed: " << status.error_message();
-}
 
-// Success
-_api->editMessageMarkup(sentMessage, nullptr);
+    // Success
+    _api->editMessageMarkup(sentMessage, nullptr);
 
-if (didpin) {
-    try {
-        _api->unpinMessage(sentMessage);
-    } catch (const TgBot::TgException& e) {
-        LOG(ERROR) << "Failed to unpin message: " << e.what();
+    if (didpin) {
+        try {
+            _api->unpinMessage(sentMessage);
+        } catch (const TgBot::TgException& e) {
+            LOG(ERROR) << "Failed to unpin message: " << e.what();
+        }
     }
-}
-build.finish();
-sentMessage = nullptr;  // Clear the message out.
+    build.finish();
+    sentMessage = nullptr;  // Clear the message out.
 }
 
 void ROMBuildQueryHandler::handle_build(const Query& query) {
