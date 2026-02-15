@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-openssl = { version = "0.10.1", features = ["vendored"] }
 tonic = "0.14"
 tonic-prost = "0.14"
 prost = "0.14" 
@@ -37,6 +36,9 @@ anyhow = "1.0.101"
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.27", features = ["signal", "resource"] }
+
+[target.armv7-unknown-linux-gnueabihf.dependencies]
+openssl = { version = "0.10.1", features = ["vendored"] }
 
 [dev-dependencies]
 tempfile = "3.24"
