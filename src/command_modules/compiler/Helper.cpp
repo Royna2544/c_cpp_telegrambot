@@ -55,6 +55,6 @@ void CompilerInTgBotInterface::onResultReady(const std::string& text) {
 }
 
 void CompilerInTgBotInterface::onWdtTimeout() {
-    output << "\nWDT TIMEOUT" << std::endl;
+    output << "\nWDT TIMEOUT" << '\n';
     botApi->editMessage(sentMessage, output.str());
 }

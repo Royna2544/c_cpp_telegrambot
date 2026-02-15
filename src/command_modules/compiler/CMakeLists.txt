@@ -16,5 +16,10 @@ tgbot_library(
   STATIC)
 
 find_package(Python3 COMPONENTS Interpreter)
+
+if (TGBOTCPP_CROSS_COMPILING)
+  target_compile_definitions(Compiler INTERFACE TGBOTCPP_CROSS_COMPILING=1)
+endif()
+
 configure_file(CompilerPaths.hpp.inc
                ${CMAKE_CURRENT_BINARY_DIR}/CompilerPaths.hpp)

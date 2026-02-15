@@ -9,9 +9,9 @@
 bool CompilerInTgForGeneric::verifyParseWrite(const MessageExt::Ptr& message,
                                               std::string& extraargs) {
     if (!message->reply()->has<MessageAttrs::ExtraText>()) {
-        _callback->onErrorStatus(tinystatus::TinyStatus(
-            tinystatus::Status::kInvalidArgument,
-            _locale->get(Strings::REPLY_TO_A_CODE).data()));
+        _callback->onErrorStatus(
+            tinystatus::TinyStatus(tinystatus::Status::kInvalidArgument,
+                                   _locale->get(Strings::REPLY_TO_A_CODE)));
         return false;
     }
     if (message->has<MessageAttrs::ExtraText>()) {
@@ -21,7 +21,7 @@ bool CompilerInTgForGeneric::verifyParseWrite(const MessageExt::Ptr& message,
     if (file.fail()) {
         _callback->onErrorStatus(tinystatus::TinyStatus(
             tinystatus::Status::kWriteError,
-            _locale->get(Strings::FAILED_TO_WRITE_FILE).data()));
+            _locale->get(Strings::FAILED_TO_WRITE_FILE)));
         return false;
     }
     file << message->reply()->get<MessageAttrs::ExtraText>();

@@ -21,7 +21,18 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake")
 # ############################# OPTIONS ##############################
 option(TGBOTCPP_RUST_MODULES "TgBot-Cpp: Enable rust support" OFF)
 option(TGBOTCPP_BUILD_TESTS "TgBot-Cpp: Build the test suite" OFF)
+option(TGBOTCPP_CROSS_COMPILING "TgBot-Cpp: Cross compiling" OFF)
 option(BUILD_SHARED_LIBS "Build some dependent libraries as shared" OFF)
+
+include(CMakeDependentOption)
+cmake_dependent_option(TGBOTCPP_AUTODETECT_CROSS_COMPILING "TgBot-Cpp: Auto-detect cross compiling" ON "NOT TGBOTCPP_CROSS_COMPILING" OFF)
+
+if (TGBOTCPP_CROSS_COMPILING)
+  option(TGBOTCPP_CROSS_COMPILE_INSTALL_PATH "TgBot-Cpp: Install prefix for cross-compiling" "/usr/")
+  option(TGBOTCPP_CROSS_COMPILE_CC "TgBot-Cpp: C compiler available on remote host" "/usr/bin/cc")
+  option(TGBOTCPP_CROSS_COMPILE_CXX "TgBot-Cpp: C++ compiler available on remote host" "/usr/bin/c++")
+  option(TGBOTCPP_CROSS_COMPILE_PYTHON "TgBot-Cpp: Python executable available on remote host" "/usr/bin/python3")
+endif()
 # ##############################################################################
 
 # ##############################################################################
@@ -41,6 +52,31 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # ##############################################################################
+
+# Check if we're cross-compiling
+if(TGBOTCPP_AUTODETECT_CROSS_COMPILING)
+  if(CMAKE_SYSTEM_PROCESSOR AND NOT CMAKE_SYSTEM_PROCESSOR STREQUAL CMAKE_HOST_SYSTEM_PROCESSOR)
+    set(TGBOTCPP_CROSS_COMPILING TRUE)
+    message(STATUS "Auto-detected cross-compiling environment (Host: ${CMAKE_HOST_SYSTEM_PROCESSOR}, Target: ${CMAKE_SYSTEM_PROCESSOR})")
+  else()
+    set(TGBOTCPP_CROSS_COMPILING FALSE)
+    message(STATUS "Auto-detected native compiling environment (Arch: ${CMAKE_SYSTEM_PROCESSOR})")
+  endif()
+else()
+  if(TGBOTCPP_CROSS_COMPILING)
+    message(STATUS "Cross-compiling environment (manually set)")
+  else()
+    message(STATUS "Native compiling environment (manually set)")
+  endif()
+endif()
+
+if (TGBOTCPP_CROSS_COMPILING)
+  message(STATUS "Cross-compiling: Showing config")
+  message(STATUS "  Install path for cross-compiling tools: ${TGBOTCPP_CROSS_COMPILE_INSTALL_PATH}")
+  message(STATUS "  C compiler on remote host: ${TGBOTCPP_CROSS_COMPILE_CC}")
+  message(STATUS "  C++ compiler on remote host: ${TGBOTCPP_CROSS_COMPILE_CXX}")
+  message(STATUS "  Python executable on remote host: ${TGBOTCPP_CROSS_COMPILE_PYTHON}")
+endif()
 
 # Check PIE support
 include(CheckPIESupported)
@@ -527,6 +563,10 @@ if (LINUX)
   set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6, libstdc++6")
   set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
 endif()
+
+set(CPACK_PACKAGE_FILE_NAME 
+    "${PROJECT_NAME}-${PROJECT_VERSION}-${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}"
+)
 
 # Include CPack
 include(CPack)

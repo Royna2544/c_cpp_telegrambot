@@ -39,6 +39,12 @@
 - TGBOTCPP_RUST_MODULES: Enable and build command modules written with Rust language (default: OFF)
 - TGBOTCPP_LUA_MODULES: Enable support for command module written with Lua language (default: ON)
 - TGBOTCPP_ENABLE_LOCAL_LLM: Enable support for local LLM framework (Requires compatible hardware, e.g. NVIDIA GPU) (default: OFF)
+- TGBOTCPP_CROSS_COMPILING: Whether we are cross-compiling, can be auto detected or be manually set
+- TGBOTCPP_AUTODETECT_CROSS_COMPILING: Auto detect TGBOTCPP_CROSS_COMPILING via CMAKE_HOST_CMAKE_SYSTEM_PROCESSOR and CMAKE_SYSTEM_PROCESSOR
+- TGBOTCPP_CROSS_COMPILE_INSTALL_PATH: Path that the package is installed to (i.e. CMAKE_INSTALL_PREFIX). Default: /usr/bin (assuming debian systems)
+- TGBOTCPP_CROSS_COMPILE_CC: C Compiler that is present on remote system, can be omitted - then the following backend is disabled.
+- TGBOTCPP_CROSS_COMPILE_CXX: C++ Compiler that is present on remote system, can be omitted - then the following backend is disabled.
+- TGBOTCPP_CROSS_COMPILE_PYTHON: Python interpreter that is present on remote system, can be omitted - then the following backend is disabled.
 
 ## Config file options
 ### Section Main

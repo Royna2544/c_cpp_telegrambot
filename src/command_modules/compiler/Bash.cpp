@@ -8,8 +8,8 @@ void CompilerInTgForBash::run(MessageExt::Ptr message) {
         runCommand(message->get<MessageAttrs::ExtraText>(), res, !allowhang);
         _callback->onResultReady(res.str());
     } else {
-        _callback->onErrorStatus(tinystatus::TinyStatus(
-            tinystatus::Status::kInvalidArgument,
-            _locale->get(Strings::SEND_BASH_COMMAND).data()));
+        _callback->onErrorStatus(
+            tinystatus::TinyStatus(tinystatus::Status::kInvalidArgument,
+                                   _locale->get(Strings::SEND_BASH_COMMAND)));
     }
 }

@@ -25,6 +25,8 @@ class TinyStatus {
     TinyStatus() = default;
     explicit TinyStatus(Status s) : error(s) {}
     TinyStatus(Status s, std::string msg) : error(s), message(std::move(msg)) {}
+    TinyStatus(Status s, std::string_view msg) : error(s), message(msg) {}
+    TinyStatus(Status s, const char* msg) : error(s), message(msg) {}
     explicit operator Status() const { return error; }
 
     // Accessor methods
