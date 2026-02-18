@@ -59,7 +59,7 @@ class SameMessageMatcher : public Matcher {
         }
         return std::ranges::max_element(kSameMessageMap,
                                         [](const auto& smsg, const auto& rmsg) {
-                                            return smsg.second > rmsg.second;
+                                            return smsg.second < rmsg.second;
                                         })
             ->second;
     }

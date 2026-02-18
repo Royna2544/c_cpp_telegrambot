@@ -554,10 +554,10 @@ if(WIN32)
   set(CPACK_NSIS_MANIFEST_DPI_AWARE TRUE)
 
   # Install Visual C++ Redistributable if needed
-  include(InstallRequiredSystemLibraries)
   set(CMAKE_INSTALL_UCRT_LIBRARIES TRUE)
   set(CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION bin)
   set(CMAKE_INSTALL_SYSTEM_RUNTIME_COMPONENT AppMain)
+  include(InstallRequiredSystemLibraries)
 
   # Find the VC redistributable installer to bundle
   set(_vcredist_candidates

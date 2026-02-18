@@ -290,16 +290,15 @@ Status SocketServiceImpl::Service::getSpamBlockingConfig(
 
 namespace {
 template <typename T>
-std::string calc_hash(const FileTransferRequest* request) {
+std::string calc_hash(const std::string& data) {
     T hash_obj;
-    CryptoPP::HexEncoder encoder;
-    hash_obj.Update(reinterpret_cast<const CryptoPP::byte*>(
-                        request->file_checksum().data()),
-                    request->file_checksum().size());
+    hash_obj.Update(reinterpret_cast<const CryptoPP::byte*>(data.data()),
+                    data.size());
     std::string digest;
     digest.resize(hash_obj.DigestSize());
     hash_obj.Final(reinterpret_cast<CryptoPP::byte*>(digest.data()));
     std::string encoded;
+    CryptoPP::HexEncoder encoder;
     encoder.Attach(new CryptoPP::StringSink(encoded));
     encoder.Put(reinterpret_cast<const CryptoPP::byte*>(digest.data()),
                 digest.size());
@@ -324,11 +323,14 @@ Status SocketServiceImpl::Service::requestFileTransfer(
     // 2. Create file stream and store in activeTransfers_
     TranferEntry entry;
 
-    if (activeTransfers_.contains(uuids::to_string(uuid))) {
-        response->set_accepted(false);
-        LOG(ERROR) << "File transfer with UUID already exists: "
-                   << uuids::to_string(uuid);
-        return Status::OK;
+    {
+        std::lock_guard<std::mutex> lock(activeTransfersMutex_);
+        if (activeTransfers_.contains(uuids::to_string(uuid))) {
+            response->set_accepted(false);
+            LOG(ERROR) << "File transfer with UUID already exists: "
+                       << uuids::to_string(uuid);
+            return Status::OK;
+        }
     }
 
     std::error_code ec;
@@ -347,22 +349,22 @@ Status SocketServiceImpl::Service::requestFileTransfer(
         std::optional<std::string> result;
         switch (request->file_checksum_algorithm()) {
             case ChecksumAlgorithm::MD5: {
-                result = calc_hash<CryptoPP::Weak::MD5>(request);
+                result = calc_hash<CryptoPP::Weak::MD5>(request->file_checksum());
             } break;
             case ChecksumAlgorithm::SHA1: {
-                result = calc_hash<CryptoPP::SHA1>(request);
+                result = calc_hash<CryptoPP::SHA1>(request->file_checksum());
             } break;
             case ChecksumAlgorithm::SHA256: {
-                result = calc_hash<CryptoPP::SHA256>(request);
+                result = calc_hash<CryptoPP::SHA256>(request->file_checksum());
             } break;
             case ChecksumAlgorithm::SHA512: {
-                result = calc_hash<CryptoPP::SHA512>(request);
+                result = calc_hash<CryptoPP::SHA512>(request->file_checksum());
             } break;
             case ChecksumAlgorithm::Blake2b: {
-                result = calc_hash<CryptoPP::BLAKE2b>(request);
+                result = calc_hash<CryptoPP::BLAKE2b>(request->file_checksum());
             } break;
             case ChecksumAlgorithm::Blake2s: {
-                result = calc_hash<CryptoPP::BLAKE2s>(request);
+                result = calc_hash<CryptoPP::BLAKE2s>(request->file_checksum());
             } break;
             case ChecksumAlgorithm::None:
                 break;
@@ -387,6 +389,9 @@ Status SocketServiceImpl::Service::requestFileTransfer(
                          fmt::format("upload_{}.tmp", uuids::to_string(uuid));
 
         entry.totalSize = request->file_size();
+        // Create the file first, then resize
+        entry.fileStream.open(entry.filePath, std::ios::binary | std::ios::out);
+        entry.fileStream.close();
         std::filesystem::resize_file(entry.filePath, entry.totalSize, ec);
 
         LOG(INFO) << "Resized file: " << entry.filePath.string() << " to size "
@@ -417,7 +422,10 @@ Status SocketServiceImpl::Service::requestFileTransfer(
         response->set_file_size(entry.totalSize);
         response->set_chunk_count(entry.chunk_count);
     }
-    activeTransfers_.emplace(uuids::to_string(uuid), std::move(entry));
+    {
+        std::lock_guard<std::mutex> lock(activeTransfersMutex_);
+        activeTransfers_.emplace(uuids::to_string(uuid), std::move(entry));
+    }
     response->set_accepted(true);
     return Status::OK;
 }
@@ -431,6 +439,7 @@ Status SocketServiceImpl::Service::downloadFileLoop(
     LogWhoCalledMe(context, "downloadFileLoop");
 
     while (stream->Read(&msg)) {
+        std::lock_guard<std::mutex> lock(activeTransfersMutex_);
         if (!activeTransfers_.contains(msg.uuid())) {
             // Invalid UUID
             FileChunkResponse response;
@@ -492,6 +501,7 @@ Status SocketServiceImpl::Service::uploadFileLoop(
 
     LogWhoCalledMe(context, "uploadFileLoop");
     while (stream->Read(&msg)) {
+        std::lock_guard<std::mutex> lock(activeTransfersMutex_);
         if (!activeTransfers_.contains(msg.uuid())) {
             // Invalid UUID
             FileChunkResponse response;
@@ -505,7 +515,7 @@ Status SocketServiceImpl::Service::uploadFileLoop(
 
         std::fstream& fileStream = activeTransfers_[msg.uuid()].fileStream;
 
-        fileStream.seekg(msg.chunk_offset(), std::ios::beg);
+        fileStream.seekp(msg.chunk_offset(), std::ios::beg);
         if (!fileStream.good()) {
             // Seek failed
             FileChunkResponse response;
@@ -541,6 +551,7 @@ Status SocketServiceImpl::Service::endFileTransfer(
     ServerContext* context, const FileTransferRequest* request,
     GenericResponse* response) {
     LogWhoCalledMe(context, "endFileTransfer");
+    std::lock_guard<std::mutex> lock(activeTransfersMutex_);
     auto it = activeTransfers_.find(request->uuid());
     if (it == activeTransfers_.end()) {
         response->set_code(GenericResponseCode::ErrorCommandIgnored);
@@ -627,7 +638,7 @@ Status SocketServiceImpl::Service::setChatAlias(ServerContext* context,
         case DatabaseBase::AddResult::BACKEND_ERROR:
             response->set_code(GenericResponseCode::ErrorRuntimeError);
             response->set_message("Failed to set chat alias: backend error");
-            break;
+            return Status::OK;
     }
     response->set_code(GenericResponseCode::Success);
     response->set_message("Chat alias set successfully");
@@ -706,7 +717,7 @@ Status SocketServiceImpl::Service::setMediaAlias(ServerContext* context,
         case DatabaseBase::AddResult::BACKEND_ERROR:
             response->set_code(GenericResponseCode::ErrorRuntimeError);
             response->set_message("Failed to set media alias: backend error");
-            break;
+            return Status::OK;
     }
     response->set_code(GenericResponseCode::Success);
     response->set_message("Media alias set successfully");
