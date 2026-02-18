@@ -550,9 +550,54 @@ if(WIN32)
   set(CPACK_NSIS_WELCOME_TITLE "Welcome to The Glider Project Installer")
   set(CPACK_NSIS_BRANDING_TEXT "Created with CMake ${CMAKE_VERSION}")
   set(CPACK_NSIS_IGNORE_LICENSE_PAGE ON)
-  set(CPACK_NSIS_INSTALLED_ICON_NAME
-      "${CMAKE_BINARY_DIR}/bin/${PROJECT_NAME}_main.exe")
+  set(CPACK_NSIS_INSTALLED_ICON_NAME "bin\\\\${PROJECT_NAME}_main.exe")
   set(CPACK_NSIS_MANIFEST_DPI_AWARE TRUE)
+
+  # Install Visual C++ Redistributable if needed
+  include(InstallRequiredSystemLibraries)
+  set(CMAKE_INSTALL_UCRT_LIBRARIES TRUE)
+  set(CMAKE_INSTALL_SYSTEM_RUNTIME_DESTINATION bin)
+  set(CMAKE_INSTALL_SYSTEM_RUNTIME_COMPONENT AppMain)
+
+  # Find the VC redistributable installer to bundle
+  set(_vcredist_candidates
+    "$ENV{VCToolsRedistDir}/vc_redist.x64.exe"
+    "$ENV{VCINSTALLDIR}/Redist/MSVC/v143/vc_redist.x64.exe"
+  )
+  set(_vcredist_path "")
+  foreach(_candidate IN LISTS _vcredist_candidates)
+    if(EXISTS "${_candidate}")
+      set(_vcredist_path "${_candidate}")
+      break()
+    endif()
+  endforeach()
+
+  if(NOT _vcredist_path)
+    # Search common Visual Studio paths
+    file(GLOB _vcredist_glob
+      "C:/Program Files/Microsoft Visual Studio/*/*/VC/Redist/MSVC/*/vc_redist.x64.exe"
+    )
+    list(GET _vcredist_glob 0 _vcredist_path)
+  endif()
+
+  if(_vcredist_path)
+    message(STATUS "Found VC redistributable: ${_vcredist_path}")
+    install(PROGRAMS "${_vcredist_path}" DESTINATION bin COMPONENT AppMain)
+    set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "
+      ExecWait '\\\"$INSTDIR\\\\bin\\\\vc_redist.x64.exe\\\" /install /quiet /norestart'
+      Delete '\\\"$INSTDIR\\\\bin\\\\vc_redist.x64.exe\\\"'
+    ")
+  else()
+    message(WARNING "VC redistributable not found; installer will not include vcredist")
+  endif()
+
+  # Start Menu shortcut for the main application
+  set(CPACK_NSIS_CREATE_ICONS_EXTRA
+    "CreateShortCut '$SMPROGRAMS\\\\$STARTMENU_FOLDER\\\\Glider.lnk' '$INSTDIR\\\\bin\\\\${PROJECT_NAME}_main.exe'"
+  )
+  set(CPACK_NSIS_DELETE_ICONS_EXTRA
+    "Delete '$SMPROGRAMS\\\\$START_MENU\\\\Glider.lnk'"
+  )
 endif()
 
 if (LINUX)
