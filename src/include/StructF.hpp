@@ -10,7 +10,7 @@
 #include <string_view>
 
 struct F {
-    using size_type = long;
+    using size_type = size_t;
 
     // Constructor for FILE* managed by *this
     F() : handle(nullptr, &fclose), external_managed(false) {}
@@ -73,7 +73,7 @@ struct F {
      * }
      * @endcode
      */
-    enum class Mode : std::int32_t {
+    enum class Mode : std::int8_t {
         Read = 1,
         Write = 1 << 1,
         Append = 1 << 2,
@@ -86,7 +86,7 @@ struct F {
 
     struct Result {
         bool success;
-        enum class Reason {
+        enum class Reason : std::int8_t {
             kNone,
             kHandleNull,
             kIOFailure,
