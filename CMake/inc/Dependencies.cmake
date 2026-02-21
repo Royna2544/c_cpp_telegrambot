@@ -1,27 +1,14 @@
 
 # Fmt and spdlog are required, but we try to find them first before fetching to avoid unnecessary fetches during development.
 find_package(fmt)
-find_package(spdlog)
 
-if (NOT fmt_FOUND OR NOT spdlog_FOUND)
+if (NOT fmt_FOUND)
 # -----------------------------
 # Dependencies (FetchContent)
 # -----------------------------
 include(FetchContent)
 
 set(FMT_TEST OFF CACHE BOOL "disabling fmt tests" FORCE)
-
-FetchContent_Declare(
-   spdlog
-   GIT_REPOSITORY https://github.com/gabime/spdlog.git
-   GIT_TAG        v1.17.0
-   GIT_PROGRESS    TRUE
-   USES_TERMINAL_DOWNLOAD TRUE
-)
-FetchContent_GetProperties(spdlog)
-if (NOT spdlog_POPULATED)
-    FetchContent_MakeAvailable(spdlog)
-endif()
 
 # Important: Match the fmt version with spdlog's bundled version to avoid ODR issues.
 FetchContent_Declare(
@@ -36,7 +23,7 @@ if (NOT fmt_POPULATED)
     FetchContent_MakeAvailable(fmt)
 endif()
 else()
-  message(STATUS "Found fmt ${fmt_VERSION} and spdlog ${spdlog_VERSION}")
+  message(STATUS "Found fmt ${fmt_VERSION}")
   if (fmt_VERSION VERSION_LESS 10.0.0)
     message(FATAL_ERROR "fmt version >= 10.0.0 is required"
                         " (found ${fmt_VERSION})")
