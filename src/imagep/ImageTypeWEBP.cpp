@@ -30,6 +30,11 @@ PhotoBase::TinyStatus WebPImage::read(const std::filesystem::path& filename,
 
     const auto file_size = file.size();
 
+    constexpr size_t kMaxFileSize = 100 * 1024 * 1024;  // 100 MB
+    if (file_size > kMaxFileSize) {
+        return {PhotoBase::Status::kInvalidArgument, "Image too large"};
+    }
+
     auto data = std::make_unique_for_overwrite<uint8_t[]>(file_size);
     if (!file.read(data.get(), 1, file_size)) {
         return {PhotoBase::Status::kReadError, "Failed to read from file"};
