@@ -13,12 +13,9 @@ if(NOT CURL_FOUND)
 endif()
 
 tgbot_library(
-  NAME
-  CurlDownload
-  SRCS
-  CurlUtils.cpp
-  LIBS
-  CURL::libcurl
-  sighandler
-  STATIC)
+  NAME CurlDownload
+  SRCS CurlUtils.cpp
+  ALWAYS_STATIC
+)
+target_link_libraries(CurlDownload PRIVATE CURL::libcurl sighandler)
 

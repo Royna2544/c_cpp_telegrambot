@@ -20,6 +20,6 @@ tgbot_library(
     CommandLine.cpp
     ResourceManager.cpp
     libfs_${TARGET_VARIANT}.cpp
-    LIBS Boost::program_options $<$<BOOL:${WIN32}>:shlwapi>
-    DEFS ${UTILS_CMAKE_DEFINITIONS}
 )
+target_link_libraries(Utils PRIVATE Boost::program_options $<$<BOOL:${WIN32}>:shlwapi>)
+target_compile_definitions(Utils PRIVATE ${UTILS_CMAKE_DEFINITIONS})

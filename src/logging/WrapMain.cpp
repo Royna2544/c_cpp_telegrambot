@@ -1,15 +1,20 @@
-#include "AbslLogInit.hpp"
+#include <absl/log/initialize.h>
 #include <absl/log/log.h>
+#include <absl/log/log_sink_registry.h>
+
+#include "LogSinks.hpp"
 
 extern int app_main(int argc, char** argv);
 int main(int argc, char** argv) {
-   TgBot_AbslLogInit();
-   LOG(INFO) << "Launching " << argv[0] << " with " << argc << " args";
-   return app_main(argc, argv);
+    absl::InitializeLog();
+    StdFileSink stdFileSink;
+    absl::AddLogSink(&stdFileSink);
+    LOG(INFO) << "Launching " << argv[0] << " with " << argc << " args";
+    return app_main(argc, argv);
 }
 
-#include <absl/log/internal/log_message.h>
 #include <absl/base/config.h>
+#include <absl/log/internal/log_message.h>
 
 namespace absl {
 

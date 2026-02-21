@@ -26,13 +26,14 @@ jobs:
             cc: GCC
             real_cc: gcc
             real_cxx: g++
-            flags: ''
+            flags: '-DBUILD_SHARED_LIBS=ON'
+            str: (Shared)
           - os: ubuntu-latest
             cc: Clang
             real_cc: clang
             real_cxx: clang++
-            flags: -DTGBOTCPP_RUST_MODULES=ON
-            str: (Rust)
+            flags: -DTGBOTCPP_RUST_MODULES=ON -DBUILD_SHARED_LIBS=ON
+            str: (Rust, Shared)
           - os: ubuntu-latest
             cc: Clang
             real_cc: clang
@@ -43,11 +44,19 @@ jobs:
           - os: macos-latest
             cc: AppleClang
             flags: ''
+          - os: macos-latest
+            cc: AppleClang
+            flags: -DBUILD_SHARED_LIBS=ON
+            str: (Shared)
 
           # --- Windows Build ---
           - os: windows-latest
             cc: MSVC
             flags: ''
+          - os: windows-latest
+            cc: MSVC
+            flags: -DBUILD_SHARED_LIBS=ON
+            str: (Shared)
 
     env:
       VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"

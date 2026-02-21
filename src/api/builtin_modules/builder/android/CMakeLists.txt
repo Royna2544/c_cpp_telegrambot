@@ -1,25 +1,20 @@
 # ################ Android ROM builder with C++ #################
 tgbot_library(
-  NAME
-  AndroidBuilder-configparse
-  SRCS
-  ConfigParsers.cpp
-  LIBS
-  nlohmann_json::nlohmann_json
-  NO_LIBPREFIX
-  STATIC)
+  NAME AndroidBuilder-configparse
+  SRCS ConfigParsers.cpp
+  ALWAYS_STATIC
+)
 
+target_link_libraries(AndroidBuilder-configparse PRIVATE nlohmann_json::nlohmann_json)
 include(gRPCGenerate)
 grpc_generate(ROMBuild)
 
 tgbot_exe(
-  NAME
-  ConfigParserTest
-  SRCS
-  ConfigParserTest.cpp
-  LIBS
-  AndroidBuilder-configparse
+  NAME ConfigParserTest
+  SRCS ConfigParserTest.cpp
   OPTIONAL)
+
+target_link_libraries(ConfigParserTest PRIVATE AndroidBuilder-configparse)
 
 install(DIRECTORY configs/ DESTINATION share/${PROJECT_NAME}/builder/android)
 file(COPY configs/

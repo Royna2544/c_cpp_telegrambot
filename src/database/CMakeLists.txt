@@ -45,57 +45,42 @@ if(SQLite3_FOUND)
 endif()
 
 tgbot_library(
-  NAME
-  DBImpl
+  NAME DBImpl
   SRCS
-  ${SQLITE_SRCS}
-  ${PROTO_SRCS}
-  bot/TgBotDatabaseImpl.cpp
-  PUBLIC_INC
-  ${PROTO_HDRS_DIR}
-  PRIVATE_INC
-  ${Protobuf_INCLUDE_DIRS}
-  LIBS
-  Utils
-  ${DATABASE_LIBS}
-  DEFS
-  ${DATABASE_DEFS})
+    ${SQLITE_SRCS}
+    ${PROTO_SRCS}
+    bot/TgBotDatabaseImpl.cpp
+)
+target_include_directories(DBImpl PUBLIC ${PROTO_HDRS_DIR})
+target_include_directories(DBImpl PRIVATE ${Protobuf_INCLUDE_DIRS})
+target_link_libraries(DBImpl PRIVATE ${DATABASE_LIBS})
+target_link_libraries(DBImpl PUBLIC Utils)
+target_compile_definitions(DBImpl PUBLIC ${DATABASE_DEFS})
 
 tgbot_library(
-  NAME
-  DBLoading
+  NAME DBLoading
   SRCS
-  bot/LoadingDatabase.cpp
-  LIBS
-  Utils
-  DBImpl
-  STATIC)
+    bot/LoadingDatabase.cpp
+  ALWAYS_STATIC
+)
+target_link_libraries(DBLoading PRIVATE Utils DBImpl)
 
 # ################ Utility Programs (Database Ctl) ##################
 tgbot_exe(
-  NAME
-  DatabaseCtl
+  NAME DatabaseCtl
   SRCS
-  utils/DatabaseCtrl.cc
-  LIBS
-  DBImpl
-  DBLoading
-  Utils
-  RELATION
-  Database)
+    utils/DatabaseCtrl.cc
+  RELATION Database
+)
+target_link_libraries(DatabaseCtl PRIVATE DBImpl DBLoading Utils)
 # ##############################################################################
 
 # ############## Utility Programs (Send Media to chat) ################
 tgbot_exe(
-  NAME
-  MediaCli
+  NAME MediaCli
   SRCS
-  utils/SendMediaToChat.cc
-  LIBS
-  DBImpl
-  SocketServiceProto
-  DBLoading
-  nlohmann_json::nlohmann_json
-  RELATION
-  Socket)
+     utils/SendMediaToChat.cc
+  RELATION Socket
+)
+target_link_libraries(MediaCli PRIVATE DBImpl SocketServiceProto DBLoading nlohmann_json::nlohmann_json)
 # ##############################################################################

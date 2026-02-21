@@ -1,37 +1,12 @@
-if(WIN32)
-  tgbot_library(
-    NAME
-    LogInit
-    SRCS
-    AbslLogInit.cpp
-    LIBS
-    absl::log_initialize
-    absl::log_sink_registry
-    NO_HIDE
-    STATIC)
-else()
-  tgbot_library(
-    NAME
-    LogInit
-    SRCS
-    AbslLogInit.cpp
-    LIBS
-    absl::log_initialize
-    absl::log_sink_registry
-    NO_HIDE)
-endif()
-
 include(gRPCGenerate)
 grpc_generate(Log)
 
 tgbot_exe(
-  NAME
-  logcat
+  NAME logcat
   SRCS
-  LoggingClient.cpp
-  LIBS
-  LogServiceProto
-  Utils
-  sighandler
+    LoggingClient.cpp
   RELATION
-  Socket)
+  Socket
+)
+
+target_link_libraries(logcat PRIVATE LogServiceProto Utils sighandler)

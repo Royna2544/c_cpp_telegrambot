@@ -33,21 +33,18 @@ if(OpenCV_FOUND)
 endif()
 
 tgbot_library(
-  NAME
-  ImgProc
+  NAME ImgProc
   SRCS
-  ${IMGPROC_SOURCES}
-  ImageDebug.cpp
-  ImageProcAll.cpp
-  PRIVATE_INC
-  ${OpenCV_INCLUDE_DIRS}
-  LIBS
-  ${IMGPROC_LIBS}
-  DEFS
-  ${IMGPROC_FLAGS}
+    ${IMGPROC_SOURCES}
+    ImageDebug.cpp
+    ImageProcAll.cpp
 )
+
+target_include_directories(ImgProc PRIVATE ${OpenCV_INCLUDE_DIRS})
+target_link_libraries(ImgProc PRIVATE ${IMGPROC_LIBS})
+target_compile_definitions(ImgProc PRIVATE ${IMGPROC_FLAGS})
 
 # https://stackoverflow.com/a/46515541
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-  target_link_options(ImgProc PRIVATE -Wl,-Bsymbolic)
+  target_link_options(ImgProc PUBLIC -Wl,-Bsymbolic)
 endif()

@@ -53,16 +53,13 @@ function(command_module)
 
   add_library(${libname} SHARED ${CMD_SRCS})
 
-  tgbot_common_target(
-    ${libname}
-    PUBLIC_LIBS
-    absl::log
-    ${CMD_LIBS}
-    PRIVATE_INC
+  tgbot_common_target(${libname})
+
+  target_link_libraries(${libname} PRIVATE ${CMD_LIBS} fmt::fmt-header-only absl::log)
+  target_include_directories(${libname} PRIVATE 
     $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>
-    $<TARGET_PROPERTY:Random,INTERFACE_INCLUDE_DIRECTORIES>
-    DEFS
-    ${CMD_DEFS})
+    $<TARGET_PROPERTY:Random,INTERFACE_INCLUDE_DIRECTORIES>)
+  target_compile_definitions(${libname} PRIVATE ${CMD_DEFS})
 
   # force the Unix-style “lib” prefix even on Windows
   set_target_properties(${libname} PROPERTIES PREFIX "lib")
@@ -125,7 +122,6 @@ multi_command_module(
   SRCS
   alive.cpp
   LIBS
-  absl::strings
   DBImpl
   Utils)
 
@@ -136,7 +132,7 @@ multi_command_module(
   SRCS
   bash_impl.cpp
   LIBS
-  Compiler)
+  Compiler CompilerPaths)
 
 multi_command_module(
   PROVIDES
@@ -145,7 +141,7 @@ multi_command_module(
   SRCS
   compilers_impl.cpp
   LIBS
-  Compiler)
+  Compiler CompilerPaths)
 
 command_module(
   NAME
@@ -153,7 +149,7 @@ command_module(
   SRCS
   compilers_impl.cpp
   LIBS
-  Compiler
+  Compiler CompilerPaths
   PACKAGE
   Python3)
 

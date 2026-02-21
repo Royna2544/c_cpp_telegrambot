@@ -36,16 +36,17 @@ tgbot_library(
     MessageExt.cpp
     RateLimit.cpp
     StringResLoader.cpp
-  LIBS
+  ALWAYS_STATIC
+)
+target_link_libraries(Api PRIVATE 
     TgBot # TODO: This will be removed after refactoring
     DBImpl # Authorization
     ${CMAKE_DL_LIBS} # CommandModule
     restartfmt_parser # RestartCommand
     LibXml2::LibXml2 # StringResLoader
     ${lua_libs}
-  DEFS ${lua_def}
-  STATIC
 )
+target_compile_definitions(Api PRIVATE ${lua_def})
 
 # Builtin modules
 add_subdirectory(builtin_modules/builder)
@@ -53,32 +54,27 @@ tgbot_library(
   NAME builtin_module_RomBuild
   SRCS
     builtin_modules/builder/android/romBuild.cpp
-  LIBS  
-    AndroidBuilder-configparse
-    Utils
-    TgBot
-    AuthApi
-    ROMBuildServiceProto
-    SystemMonitorServiceProto
-    HealthCheckServiceProto
-  STATIC
+  ALWAYS_STATIC
 )
+target_link_libraries(builtin_module_RomBuild PRIVATE AndroidBuilder-configparse Utils TgBot AuthApi ROMBuildServiceProto SystemMonitorServiceProto HealthCheckServiceProto)
+
 
 tgbot_library(
   NAME builtin_module_KernelBuild
   SRCS
     builtin_modules/builder/kernel/kernelbuild.cpp
     builtin_modules/builder/kernel/ConfigParsers2.cpp
-  LIBS  
-    AuthApi
-    nlohmann_json::nlohmann_json
-    Utils
-    progress
-    LinuxKernelBuildServiceProto
-    SystemMonitorServiceProto
-    HealthCheckServiceProto
-    RateLimitApi
-  STATIC
+  ALWAYS_STATIC
+)
+target_link_libraries(builtin_module_KernelBuild PRIVATE
+  AuthApi
+  nlohmann_json::nlohmann_json
+  Utils
+  progress
+  LinuxKernelBuildServiceProto
+  SystemMonitorServiceProto
+  HealthCheckServiceProto
+  RateLimitApi
 )
 
 tgbot_library(
@@ -95,23 +91,23 @@ tgbot_library(
     components/Restart.cpp
     components/UnknownCommand.cpp
     components/ReactionsProvider.cpp
-  LIBS TgBot DBImpl ${cpptrace_libs} Api builtin_module_KernelBuild builtin_module_RomBuild
-  DEFS ${cpptrace_def}
-  STATIC
+  ALWAYS_STATIC
 )
+target_link_libraries(ApiImpl PRIVATE TgBot DBImpl ${cpptrace_libs} Api builtin_module_KernelBuild builtin_module_RomBuild restartfmt_parser)
+target_compile_definitions(ApiImpl PRIVATE ${cpptrace_def})
 
 tgbot_library(
   NAME AuthApi
   SRCS AuthContext.cpp
-  LIBS DBImpl
-  PUBLIC_INC $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>
-  STATIC
+  ALWAYS_STATIC
 )
+target_link_libraries(AuthApi PRIVATE DBImpl)
+target_include_directories(AuthApi PUBLIC $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>)
 
 tgbot_library(
   NAME RateLimitApi
   SRCS RateLimit.cpp
-  STATIC
+  ALWAYS_STATIC
 )
 
 add_subdirectory(components/restartfmt_parser)

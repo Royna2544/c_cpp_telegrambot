@@ -1,6 +1,7 @@
 tgbot_library(
   NAME Web 
   SRCS WebServerBase.cpp
-  LIBS httplib::httplib nlohmann_json::nlohmann_json SocketServiceProto SystemMonitorServiceProto
-  STATIC
+  ALWAYS_STATIC
 )
+
+target_link_libraries(Web PRIVATE httplib::httplib nlohmann_json::nlohmann_json SocketServiceProto SystemMonitorServiceProto)

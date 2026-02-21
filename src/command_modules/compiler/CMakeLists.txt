@@ -7,14 +7,11 @@ tgbot_library(
   CCpp.cpp
   Generic.cpp
   Helper.cpp
-  LIBS
-  popen_wdt
-  Utils
-  PUBLIC_INC
-  ${CMAKE_CURRENT_BINARY_DIR}
-  $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>
-  STATIC)
+  ALWAYS_STATIC)
 
+target_link_libraries(Compiler PRIVATE popen_wdt Utils)
+target_include_directories(Compiler PUBLIC $<TARGET_PROPERTY:popen_wdt,INTERFACE_INCLUDE_DIRECTORIES>)
+target_include_directories(Compiler PRIVATE $<TARGET_PROPERTY:TgBot,INTERFACE_INCLUDE_DIRECTORIES>)
 find_package(Python3 COMPONENTS Interpreter)
 
 if (TGBOTCPP_CROSS_COMPILING)
@@ -23,3 +20,5 @@ endif()
 
 configure_file(CompilerPaths.hpp.inc
                ${CMAKE_CURRENT_BINARY_DIR}/CompilerPaths.hpp)
+add_library(CompilerPaths INTERFACE)
+target_include_directories(CompilerPaths INTERFACE ${CMAKE_CURRENT_BINARY_DIR})
