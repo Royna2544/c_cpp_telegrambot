@@ -3,6 +3,7 @@
 #include <UtilsExports.h>
 
 #include <filesystem>
+#include <vector>
 
 namespace FS {
 

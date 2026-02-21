@@ -8,6 +8,46 @@
 
 #include "Env.hpp"
 
+#ifdef __linux__
+#include <unistd.h>
+
+#include <climits>
+
+namespace {
+std::filesystem::path getExecutablePath() {
+    char result[PATH_MAX];
+    ssize_t count = readlink("/proc/self/exe", result, PATH_MAX);
+    return std::string(result, (count > 0) ? count : 0);
+}
+}  // namespace
+#elif defined(_WIN32)
+#include <windows.h>
+
+namespace {
+std::filesystem::path getExecutablePath() {
+    wchar_t path[MAX_PATH];
+    GetModuleFileNameW(NULL, path, MAX_PATH);
+    return std::filesystem::path(path);
+}
+}  // namespace
+#elif defined(__APPLE__)
+#include <limits.h>
+#include <mach-o/dyld.h>
+
+namespace {
+std::filesystem::path getExecutablePath() {
+    char path[PATH_MAX];
+    uint32_t size = sizeof(path);
+    if (_NSGetExecutablePath(path, &size) == 0) {
+        return std::filesystem::path(path);
+    }
+    return {};
+}
+}  // namespace
+#else
+#error "Unsupported platform"
+#endif
+
 CommandLine::CommandLine(CommandLine::argc_type argc,
                          CommandLine::argv_type argv)
     : _argc(argc), _argv(argv) {
@@ -17,32 +57,12 @@ CommandLine::CommandLine(CommandLine::argc_type argc,
         throw std::invalid_argument("Invalid argv passed");
     }
 
-    LOG_ONCE(INFO) << "Try autodetect exePath";
-    const auto p1 = std::filesystem::current_path() / argv[0];
-    exePath = std::filesystem::canonical(p1, ec);
+    exePath = std::filesystem::canonical(getExecutablePath(), ec);
     if (ec) {
-        LOG_ONCE(WARNING) << "Try 1: " << p1 << ": " << ec.message();
-        const auto p2 = std::filesystem::path(INSTALL_PREFIX) / argv[0];
-        exePath = std::filesystem::canonical(p2, ec);
-        if (ec) {
-            LOG_ONCE(WARNING) << "Try 2: " << p2 << ": " << ec.message();
-            if (Env()["GLIDER_ROOT"].has()) {
-                const auto p3 =
-                    std::filesystem::path(Env()["GLIDER_ROOT"].get()) / argv[0];
-                exePath = std::filesystem::canonical(p3, ec);
-                if (ec) {
-                    LOG_ONCE(ERROR) << "Try 3: " << p3 << ": " << ec.message();
-                    LOG_ONCE(ERROR) << "Failed...";
-                } else {
-                    LOG_ONCE(INFO) << exePath << ": OK";
-                }
-            }
-        } else {
-            LOG_ONCE(INFO) << exePath << ": OK";
-        }
-    } else {
-        LOG_ONCE(INFO) << exePath << ": OK";
+        LOG(ERROR) << "Failed to get executable path: " << ec.message();
+        throw std::runtime_error("Failed to get executable path");
     }
+    DLOG(INFO) << "Executable path: " << exePath;
 }
 
 CommandLine::argv_type CommandLine::argv() const { return _argv; }

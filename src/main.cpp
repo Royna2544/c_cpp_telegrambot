@@ -446,6 +446,7 @@ int app_main(int argc, char** argv) {
     // Install signal handlers
     SignalHandler::install();
 
+    CommandLine cmdline{argc, argv};
     // Initialize dependencies
     fruit::Injector<TgBotApi, AuthContext, DatabaseBase, ThreadManager,
                     ConfigManager, Unused<RegexHandler>, Unused<NetworkLogSink>,
@@ -454,7 +455,7 @@ int app_main(int argc, char** argv) {
                     Unused<TgBotWebServer>,
 #endif
                     SocketComponentFactory_t, SocketChooser, ChatDataCollector>
-        injector(getAllComponent, CommandLine{argc, argv});
+        injector(getAllComponent, cmdline);
 
     auto configMgr = injector.get<ConfigManager*>();
 
@@ -559,10 +560,7 @@ int app_main(int argc, char** argv) {
     LOG(INFO) << fmt::format("Starting took {}", startupDp.get());
 
     // Export environment variable for install root
-    CommandLine cmdline{argc, argv};
     int exitCode = TGBOT_EXITCODE_OK;
-    Env()["TGBOT_INSTALL_ROOT"] =
-        CommandLine{argc, argv}.getPath(FS::PathType::INSTALL_ROOT).string();
 
     auto refLock = injector.get<RefLock*>();
 

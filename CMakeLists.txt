@@ -126,6 +126,7 @@ target_link_libraries(main PRIVATE
   sighandler
   ApiImpl
   LogServiceProto
+  Utils-Resource
 )
 target_compile_definitions(main PRIVATE ${httplib_def})
 # Add an icon
