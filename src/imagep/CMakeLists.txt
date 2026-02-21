@@ -42,7 +42,7 @@ tgbot_library(
 
 target_include_directories(ImgProc PRIVATE ${OpenCV_INCLUDE_DIRS})
 target_link_libraries(ImgProc PRIVATE ${IMGPROC_LIBS})
-target_compile_definitions(ImgProc PRIVATE ${IMGPROC_FLAGS})
+target_compile_definitions(ImgProc PUBLIC ${IMGPROC_FLAGS})
 
 # https://stackoverflow.com/a/46515541
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
