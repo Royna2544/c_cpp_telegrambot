@@ -45,10 +45,10 @@ bool ImageProcessingAll::read(PhotoBase::Target target) {
             _impl = std::move(impl);
             impls.clear();
 
-            LOG(INFO) << "Successfully read";
+            LOG(INFO) << "Successfully read with backend: " << _impl->version();
             return true;
         }
-        DLOG(INFO) << "Failed to read: " << ret;
+        LOG(INFO) << "Failed to read: " << ret;
     }
     LOG(INFO) << "No backend was suitable to read";
     return false;
