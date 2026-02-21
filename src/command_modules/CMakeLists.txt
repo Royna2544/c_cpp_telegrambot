@@ -194,15 +194,6 @@ command_module(
   stringcalc
   RUST)
 
-command_module(
-  NAME
-  copystickers
-  SRCS
-  copystickers.cpp
-  LIBS
-  ImgProc
-  Utils)
-
 multi_command_module(PROVIDES up down SRCS updown.cpp)
 
 command_module(NAME log SRCS log.cpp)
