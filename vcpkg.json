@@ -29,9 +29,29 @@
         {
           "name": "opencv4",
           "features": [
-            "ffmpeg"
+            "ffmpeg",
+            "jpeg",
+            "png",
+            "webp",
+            "tiff",
+            "thread"
           ],
-          "platform": "!(arm64 | arm)"
+          "platform": "!windows",
+          "default-features": false
+        },
+        {
+          "name": "opencv4",
+          "features": [
+            "ffmpeg",
+            "jpeg",
+            "png",
+            "webp",
+            "tiff",
+            "msmf",
+            "thread"
+          ],
+          "platform": "windows",
+          "default-features": false
         }
       ]
     },
@@ -54,14 +74,6 @@
         "gtest"
       ]
     },
-    "builder": {
-      "description": "Builder Module",
-      "dependencies": [
-        "boost-units",
-        "libgit2",
-        "libarchive"
-      ]
-    },
     "web": {
       "description": "Web Server Support",
       "dependencies": [
@@ -80,7 +92,6 @@
     "database",
     "luamodules",
     "testing",
-    "builder",
     "backtrace",
     "web"
   ]

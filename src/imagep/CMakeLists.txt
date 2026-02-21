@@ -1,6 +1,6 @@
 find_package(PNG)
 find_package(JPEG)
-find_package(OpenCV COMPONENTS core imgproc highgui)
+find_package(OpenCV COMPONENTS core imgproc imgcodecs videoio)
 find_package(WebP)
 
 set(IMGPROC_SOURCES)
