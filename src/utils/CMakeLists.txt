@@ -15,11 +15,17 @@ endif()
 tgbot_library(
   NAME Utils
   SRCS
-    ConfigManager.cpp
-    Env_${TARGET_VARIANT}.cpp
-    CommandLine.cpp
     ResourceManager.cpp
     libfs_${TARGET_VARIANT}.cpp
 )
-target_link_libraries(Utils PRIVATE Boost::program_options $<$<BOOL:${WIN32}>:shlwapi>)
-target_compile_definitions(Utils PRIVATE ${UTILS_CMAKE_DEFINITIONS})
+target_link_libraries(Utils PRIVATE $<$<BOOL:${WIN32}>:shlwapi> Utils-mini)
+
+tgbot_library(
+  NAME Utils-mini
+  SRCS 
+    CommandLine.cpp
+    ConfigManager.cpp
+    Env_${TARGET_VARIANT}.cpp
+)
+target_link_libraries(Utils-mini PRIVATE Boost::program_options)
+target_compile_definitions(Utils-mini PRIVATE ${UTILS_CMAKE_DEFINITIONS})
