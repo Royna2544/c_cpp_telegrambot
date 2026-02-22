@@ -1,7 +1,5 @@
 #include <cstdlib>
 #include <filesystem>
-#include <logging/AbslLogInit.hpp>
-
 #include "ConfigParsers.hpp"
 
 int app_main(int argc, char** argv) {
