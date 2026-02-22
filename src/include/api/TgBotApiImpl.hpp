@@ -494,4 +494,5 @@ class TgBotApiImpl : public TgBotApi {
     IntervalRateLimiter _rateLimiter;
     RefLock* _refLock;
     TgLongPoll* _longPoll;
+    Api::LocalFileMapper _apiServerLocalMapper;
 };

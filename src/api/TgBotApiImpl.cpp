@@ -1,5 +1,6 @@
 #include <absl/log/log.h>
 #include <absl/strings/match.h>
+#include <absl/strings/strip.h>
 #include <dlfcn.h>
 #include <fmt/chrono.h>
 #include <fmt/format.h>
@@ -489,7 +490,9 @@ bool TgBotApiImpl::downloadFile_impl(const std::filesystem::path& destfilename,
     // Download the file
     DLOG(INFO) << "Downloading file " << fileid
                << " from path: " << *file->filePath;
-    std::string buffer = getApi().downloadFile(*file->filePath);
+
+    std::string buffer =
+        getApi().downloadFile(*file->filePath, {}, _apiServerLocalMapper);
     if (buffer.empty()) {
         LOG(INFO) << "Failed to download file " << fileid;
         return false;
@@ -646,6 +649,31 @@ TgBotApiImpl::TgBotApiImpl(const std::string_view token, AuthContext* auth,
             TgBot::Update::Types::chat_member |
             TgBot::Update::Types::chat_join_request |
             TgBot::Update::Types::edited_message);
+
+    std::string removePrefix =
+        _provider->config
+            ->get(ConfigManager::Configs::
+                      TELEGRAM_API_SERVER_FILEPATH_REMOVE_PREFIX)
+            .value_or("");
+    std::string appendPrefix =
+        _provider->config
+            ->get(ConfigManager::Configs::
+                      TELEGRAM_API_SERVER_FILEPATH_APPEND_PREFIX)
+            .value_or("");
+
+    _apiServerLocalMapper = [removePrefix = std::move(removePrefix),
+                             appendPrefix = std::move(appendPrefix)](
+                                const std::string_view filePath) {
+        std::string path(filePath);
+        DLOG(INFO) << "Original file path: " << path;
+        if (!removePrefix.empty() && absl::StartsWith(path, removePrefix)) {
+            path = absl::StripPrefix(path, removePrefix);
+        }
+        DLOG(INFO) << "Mapped file path (Before prefixing): " << path;
+        auto it = appendPrefix + path;
+        DLOG(INFO) << "Mapped file path (After prefixing): " << it;
+        return std::move(it);
+    };
 }
 
 TgBotApiImpl::~TgBotApiImpl() = default;

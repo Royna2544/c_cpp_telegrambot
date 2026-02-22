@@ -39,6 +39,8 @@ class UTILS_EXPORT ConfigManager {
         LLM_LOCATION,
         LLM_AUTHKEY,
         TELEGRAM_API_SERVER,
+        TELEGRAM_API_SERVER_FILEPATH_REMOVE_PREFIX,
+        TELEGRAM_API_SERVER_FILEPATH_APPEND_PREFIX,
         KERNELBUILD_SERVER,
         MAX
     };
@@ -203,6 +205,26 @@ class UTILS_EXPORT ConfigManager {
             .config = Configs::KERNELBUILD_SERVER,
             .name = "BuilderRSServer",
             .description = "Builder-RS gRPC server address",
+            .alias = Entry::ALIAS_NONE,
+            .type = Entry::ArgType::STRING,
+            .belongsTo = &sectionNetwork,
+        },
+        {
+            .config = Configs::TELEGRAM_API_SERVER_FILEPATH_REMOVE_PREFIX,
+            .name = "ApiServerFilePathRemovePrefix",
+            .description =
+                "Prefix to remove from Telegram #getFile file paths when "
+                "using a custom API server",
+            .alias = Entry::ALIAS_NONE,
+            .type = Entry::ArgType::STRING,
+            .belongsTo = &sectionNetwork,
+        },
+        {
+            .config = Configs::TELEGRAM_API_SERVER_FILEPATH_APPEND_PREFIX,
+            .name = "ApiServerFilePathAppendPrefix",
+            .description =
+                "Prefix to append to Telegram #getFile file paths when using "
+                "a custom API server",
             .alias = Entry::ALIAS_NONE,
             .type = Entry::ArgType::STRING,
             .belongsTo = &sectionNetwork,
