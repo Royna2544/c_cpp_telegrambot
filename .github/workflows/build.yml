@@ -59,7 +59,7 @@ jobs:
             str: (Shared)
 
     env:
-      VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+      VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}/vcpkg_cache,readwrite"
 
     steps:
       - name: Checkout
@@ -67,12 +67,14 @@ jobs:
         with:
           submodules: true
 
-      - name: Export GitHub Actions Cache Env
-        uses: actions/github-script@v7
+      - name: Cache vcpkg binaries
+        uses: actions/cache@v4
         with:
-          script: |
-            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+          path: ${{ github.workspace }}/vcpkg_cache
+          # Cache key depends on OS, compiler, and the vcpkg.json file
+          key: vcpkg-${{ matrix.os }}-${{ matrix.cc }}-${{ hashFiles('vcpkg.json') }}
+          restore-keys: |
+            vcpkg-${{ matrix.os }}-${{ matrix.cc }}-
 
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
