@@ -53,7 +53,6 @@
       "cacheVariables": {
         "CMAKE_C_COMPILER": "cl.exe",
         "CMAKE_CXX_COMPILER": "cl.exe",
-        "CMAKE_TOOLCHAIN_FILE": "F:\\vcpkg\\scripts\\buildsystems\\vcpkg.cmake",
         "TGBOTCPP_BUILD_TESTS": true,
         "BUILD_SHARED_LIBS": false,
         "TGBOTCPP_ENABLE_LOCAL_LLM": false
@@ -114,11 +113,9 @@
       "description": "Target the Windows Subsystem for Linux (WSL) using GCC.",
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "installDir": "${sourceDir}/out/install/${presetName}",
-      "toolchainFile": "/home/royna/vcpkg/scripts/buildsystems/vcpkg.cmake",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "TGBOTCPP_LUA_MODULES": true,
-        "TGBOTCPP_ENABLE_LOCAL_LLM": true,
         "TGBOTCPP_BUILD_TESTS": true
       },
       "condition": {
@@ -133,11 +130,9 @@
       "description": "Target the Windows Subsystem for Linux (WSL) using GCC. (Release)",
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "installDir": "${sourceDir}/out/install/${presetName}",
-      "toolchainFile": "/home/royna/vcpkg/scripts/buildsystems/vcpkg.cmake",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "TGBOTCPP_LUA_MODULES": true,
-        "TGBOTCPP_ENABLE_LOCAL_LLM": true,
         "TGBOTCPP_BUILD_TESTS": true
       },
       "condition": {
@@ -152,13 +147,11 @@
       "description": "Target the Windows Subsystem for Linux (WSL) using Clang.",
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "installDir": "${sourceDir}/out/install/${presetName}",
-      "toolchainFile": "/home/royna/vcpkg/scripts/buildsystems/vcpkg.cmake",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_C_COMPILER": "clang",
         "CMAKE_CXX_COMPILER": "clang++",
         "TGBOTCPP_LUA_MODULES": true,
-        "TGBOTCPP_ENABLE_LOCAL_LLM": true,
         "TGBOTCPP_BUILD_TESTS": true
       },
       "condition": {
@@ -173,14 +166,54 @@
       "description": "Target the Windows Subsystem for Linux (WSL) using Clang. (Release)",
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "installDir": "${sourceDir}/out/install/${presetName}",
-      "toolchainFile": "/home/royna/vcpkg/scripts/buildsystems/vcpkg.cmake",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_C_COMPILER": "clang",
         "CMAKE_CXX_COMPILER": "clang++",
         "TGBOTCPP_LUA_MODULES": true,
-        "TGBOTCPP_ENABLE_LOCAL_LLM": true,
         "TGBOTCPP_BUILD_TESTS": true
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "linux-armhf-release",
+      "displayName": "Linux ARMHF Release",
+      "description": "Target Linux on ARMHF (32-bit) with GCC. (Release)",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "installDir": "${sourceDir}/out/install/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "TGBOTCPP_LUA_MODULES": true,
+        "TGBOTCPP_BUILD_TESTS": true,
+        "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/CMake/vcpkg",
+        "VCPKG_TARGET_TRIPLET": "armhf-linux",
+        "VCPKG_INSTALL_OPTIONS": "--allow-unsupported"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "linux-armhf-release-clang",
+      "displayName": "Linux ARMHF Release (Clang)",
+      "description": "Target Linux on ARMHF (32-bit) with Clang. (Release)",
+      "binaryDir": "${sourceDir}/out/build/${presetName}",
+      "installDir": "${sourceDir}/out/install/${presetName}",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "TGBOTCPP_LUA_MODULES": true,
+        "TGBOTCPP_BUILD_TESTS": true,
+        "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/CMake/vcpkg",
+        "VCPKG_TARGET_TRIPLET": "armhf-linux-clang",
+        "VCPKG_INSTALL_OPTIONS": "--allow-unsupported"
       },
       "condition": {
         "type": "equals",
