@@ -43,18 +43,28 @@ jobs:
           # --- macOS Build ---
           - os: macos-latest
             cc: AppleClang
+            real_cc: clang
+            real_cxx: clang++
             flags: ''
+
           - os: macos-latest
             cc: AppleClang
+            real_cc: clang
+            real_cxx: clang++
             flags: -DBUILD_SHARED_LIBS=ON
             str: (Shared)
 
           # --- Windows Build ---
           - os: windows-latest
             cc: MSVC
+            real_cc: cl.exe
+            real_cxx: cl.exe
             flags: ''
+
           - os: windows-latest
             cc: MSVC
+            real_cc: cl.exe
+            real_cxx: cl.exe
             flags: -DBUILD_SHARED_LIBS=ON
             str: (Shared)
 
