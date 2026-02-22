@@ -186,34 +186,12 @@
       "binaryDir": "${sourceDir}/out/build/${presetName}",
       "installDir": "${sourceDir}/out/install/${presetName}",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
         "TGBOTCPP_LUA_MODULES": true,
         "TGBOTCPP_BUILD_TESTS": true,
-        "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/CMake/vcpkg",
-        "VCPKG_TARGET_TRIPLET": "armhf-linux",
-        "VCPKG_INSTALL_OPTIONS": "--allow-unsupported"
-      },
-      "condition": {
-        "type": "equals",
-        "lhs": "${hostSystemName}",
-        "rhs": "Linux"
-      }
-    },
-    {
-      "name": "linux-armhf-release-clang",
-      "displayName": "Linux ARMHF Release (Clang)",
-      "description": "Target Linux on ARMHF (32-bit) with Clang. (Release)",
-      "binaryDir": "${sourceDir}/out/build/${presetName}",
-      "installDir": "${sourceDir}/out/install/${presetName}",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_C_COMPILER": "clang",
-        "CMAKE_CXX_COMPILER": "clang++",
-        "TGBOTCPP_LUA_MODULES": true,
-        "TGBOTCPP_BUILD_TESTS": true,
-        "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/CMake/vcpkg",
-        "VCPKG_TARGET_TRIPLET": "armhf-linux-clang",
-        "VCPKG_INSTALL_OPTIONS": "--allow-unsupported"
+        "VCPKG_TARGET_TRIPLET": "arm-linux-release",
+        "VCPKG_TARGET_ARCHITECTURE": "arm",
+        "VCPKG_INSTALL_OPTIONS": "--allow-unsupported",
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/CMake/toolchains/toolchain-armhf.cmake"
       },
       "condition": {
         "type": "equals",

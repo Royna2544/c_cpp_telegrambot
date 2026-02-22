@@ -4,8 +4,4 @@ set(VCPKG_LIBRARY_LINKAGE dynamic)
 set(VCPKG_CMAKE_SYSTEM_NAME Linux)
 set(VCPKG_CMAKE_SYSTEM_PROCESSOR arm)
 
-# Tell vcpkg to use clang
-set(VCPKG_C_COMPILER arm-linux-gnueabihf-gcc)
-set(VCPKG_CXX_COMPILER arm-linux-gnueabihf-g++)
-
 set(VCPKG_CHAINLOAD_TOOLCHAIN_FILE "${CMAKE_CURRENT_LIST_DIR}/../toolchains/toolchain-armhf.cmake")

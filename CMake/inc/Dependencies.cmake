@@ -33,6 +33,8 @@ endif()
 # Try to find nlohmann_json first to avoid unnecessary fetches during development.
 find_package(nlohmann_json)
 if (NOT nlohmann_json_FOUND)
+  include(FetchContent)
+
   FetchContent_Declare(
     nlohmann_json
     GIT_REPOSITORY https://github.com/nlohmann/json.git
