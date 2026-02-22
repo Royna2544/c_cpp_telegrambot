@@ -8,6 +8,7 @@ tgbot_exe(
     commands/CmdCmdTest.cpp
     commands/DatabaseCmdTest.cpp
     commands/DeleteEchoCmdTest.cpp
+    commands/FileIdCmdTest.cpp
   TEST
 )
 target_link_libraries(test_main PRIVATE Api fruit GTest::gtest GTest::gmock Utils)
