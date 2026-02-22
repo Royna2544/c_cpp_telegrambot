@@ -316,6 +316,8 @@ inline std::ostream& operator<<(std::ostream& os,
             return os << "STICKER";
         case DatabaseBase::MediaType::GIF:
             return os << "GIF";
+        case DatabaseBase::MediaType::DOCUMENT:
+            return os << "DOCUMENT";
     }
     return os;
 }
