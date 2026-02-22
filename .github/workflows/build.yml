@@ -45,13 +45,12 @@ jobs:
             cc: AppleClang
             real_cc: clang
             real_cxx: clang++
-            flags: ''
-
+            flags: -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0
           - os: macos-latest
             cc: AppleClang
             real_cc: clang
             real_cxx: clang++
-            flags: -DBUILD_SHARED_LIBS=ON
+            flags: -DBUILD_SHARED_LIBS=ON -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0
             str: (Shared)
 
           # --- Windows Build ---
