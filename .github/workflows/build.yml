@@ -85,6 +85,11 @@ jobs:
           restore-keys: |
             vcpkg-${{ matrix.os }}-${{ matrix.cc }}-
 
+      - uses: maxim-lobanov/setup-xcode@v1
+        if: matrix.os == 'macos-latest'
+        with:
+          xcode-version: latest-stable
+
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
         with:
