@@ -42,11 +42,9 @@ DECLARE_COMMAND_HANDLER(decho) {
         // Why would this really happen?
         LOG(ERROR) << "Failed to delete message";
         return;
-#ifdef __ANDROID__
-    } catch (...) {  // Only Termux acts like this
+    } catch (...) {
         LOG(ERROR) << "Failed to delete message";
         return;
-#endif
     }
 }
 
