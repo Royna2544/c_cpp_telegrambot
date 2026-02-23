@@ -18,6 +18,10 @@
 #include <string_view>
 #include <thread>
 
+#ifdef __APPLE__
+extern char** environ;
+#endif
+
 // Wrapper launcher to create a daemon process from the bot
 int app_main(int argc, char** argv) {
     const static std::filesystem::path kLogFile =
