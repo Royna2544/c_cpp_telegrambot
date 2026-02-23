@@ -49,7 +49,7 @@ static void* watchdog(void* arg) {
     struct popen_wdt_posix_priv* pdata = data->privdata;
 
     struct timespec ts = {};
-    clock_gettime(CLOCK_MONOTONIC, &ts);
+    clock_gettime(CLOCK_REALTIME, &ts);
     timespec_add_sec(&ts, data->sleep_secs);
 
     POPEN_WDT_DBGLOG("Posting semaphore");
@@ -213,16 +213,12 @@ bool popen_watchdog_start(popen_watchdog_data_t** data_in) {
             pdata->startup_sem = &sem;
 
             // Initialize condition variable
-            pthread_condattr_t cond_attr;
-            pthread_condattr_init(&cond_attr);
-            pthread_condattr_setclock(&cond_attr, CLOCK_MONOTONIC);
-            if (pthread_cond_init(&pdata->condition, &cond_attr)) {
+            if (pthread_cond_init(&pdata->condition, NULL)) {
                 POPEN_WDT_DBGLOG("Failed to initialize condition variable");
                 cleanup_resources(pdata, data, pipefd, writefd);
                 *data_in = NULL;
                 return false;
             }
-            pthread_condattr_destroy(&cond_attr);
 
             // Create the watchdog thread
             if (pthread_create(&pdata->wdt_thread, NULL, &watchdog, data)) {

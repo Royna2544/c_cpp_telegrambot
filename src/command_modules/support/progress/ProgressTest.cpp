@@ -5,7 +5,7 @@
 
 #include "Progress.hpp"
 
-int app_main(int argc, char* argv[]) {
+int app_main(int argc, char** argv) {
     // Check if the user provided a percentage argument
     if (argc != 2) {
         fmt::print(stderr, "Usage: {} <percentage>\n", argv[0]);
