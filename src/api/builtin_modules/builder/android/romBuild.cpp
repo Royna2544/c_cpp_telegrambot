@@ -444,6 +444,7 @@ void ROMBuildQueryHandler::handle_back(const Query& /*query*/) {
 
 void ROMBuildQueryHandler::handle_cancel(const Query& query) {
     if (build.running()) {
+        build.finish();
         shutdown();
         LOG(INFO) << "User cancelled build";
         handle_back(query);
@@ -565,6 +566,11 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     constexpr auto interval = std::chrono::seconds(5);
     IntervalRateLimiter rateLimiter(1, interval);
 
+    // Capture necessary data for the log callback
+    std::string targetRom = per_build.localManifest->rom->romInfo->name;
+    std::string targetBranch = per_build.localManifest->rom->branch;
+    std::string deviceCodename = per_build.device->codename;
+
     bool streamSuccess = buildService_->streamLogs(
         logRequest, [&](const android::BuildLogEntry& logEntry) {
             if (!build.running()) {
@@ -614,10 +620,8 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
                 fmt::format("{:%Y-%m-%d %H:%M:%S}",
                             std::chrono::system_clock::from_time_t(
                                 logEntry.timestamp())),
-                per_build.localManifest->rom->romInfo->name,
-                per_build.localManifest->rom->branch,
-                per_build.device->codename, variant, infoResponse.cpu_name(),
-                statsResponse.cpu_usage_percent(),
+                targetRom, targetBranch, deviceCodename, variant,
+                infoResponse.cpu_name(), statsResponse.cpu_usage_percent(),
                 statsResponse.memory_used_mb(), statsResponse.memory_total_mb(),
                 infoResponse.disk_used_gb(), infoResponse.disk_total_gb(),
                 std::thread::hardware_concurrency(), logEntry.message());
