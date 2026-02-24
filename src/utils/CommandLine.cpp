@@ -85,6 +85,10 @@ bool CommandLine::operator==(const CommandLine& other) const {
 
 std::filesystem::path CommandLine::getPath(FS::PathType type) const {
     std::filesystem::path buf = exePath.parent_path();
+    if (auto v = Env()["GLIDER_ROOT"]; v.has()) {
+        LOG_ONCE(INFO) << "Override GILDER_ROOT: " << v.get();
+        buf = v.get();
+    }
     switch (type) {
         case FS::PathType::INSTALL_ROOT:
             return buf.parent_path();

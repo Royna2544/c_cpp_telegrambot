@@ -106,6 +106,9 @@ function(tgbot_exe)
   if (EXE_TEST)
     # ---------- extra test registration ----------
     add_test(NAME TestSuite_${TARGET_NAME} COMMAND ${TARGET_NAME})
+    set_tests_properties(TestSuite_${TARGET_NAME} PROPERTIES
+	ENVIRONMENT "GLIDER_ROOT=${CMAKE_BINARY_DIR}"
+    )
   elseif(NOT EXE_OPTIONAL)
     if(NOT EXE_RELATION)
       message(
