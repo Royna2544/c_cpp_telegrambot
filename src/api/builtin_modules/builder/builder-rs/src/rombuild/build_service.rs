@@ -940,7 +940,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                                     send_log!(LogLevel::Info, format!("Cloning local manifest repository from {}...", &rom.url));
                                     git_repo::GitRepo::clone(
                                         &rom.url,
-                                        &rom.name,
+                                        &branch_entry.name,
                                         None,
                                         &PathBuf::from(local_manifest_dir),
                                         req.github_token.clone(),
