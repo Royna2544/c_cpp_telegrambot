@@ -997,9 +997,9 @@ impl rom_build_service_server::RomBuildService for BuildService {
                                                         send_log!(LogLevel::Info, format!("Found recurse_submodules=true in manifest file {:?}, updating submodules...", path));
 
                                                         let sub_repo_path = attributes.iter()
-                                                                .find(|attr| attr.name.local_name == "name").map(|attr| attr.value.clone());
+                                                                .find(|attr| attr.name.local_name == "path").map(|attr| attr.value.clone());
                                                         if sub_repo_path.is_none() {
-                                                            send_log!(LogLevel::Warning, format!("recurse_submodules=true is set but no project name found in manifest file {:?}, skipping submodule update.", path));
+                                                            send_log!(LogLevel::Warning, format!("recurse_submodules=true is set but no project path found in manifest file {:?}, skipping submodule update.", path));
                                                             continue;
                                                         }
 
