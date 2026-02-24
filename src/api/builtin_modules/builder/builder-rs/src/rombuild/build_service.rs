@@ -27,6 +27,7 @@ use nix::libc::{rlimit, setrlimit};
 use nix::sys::signal::{self, Signal};
 #[cfg(unix)]
 use nix::unistd::Pid;
+use tracing_subscriber::field::debug;
 use std::{
     fmt::Display,
     num::NonZero,
@@ -44,7 +45,7 @@ use tokio::{
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status, async_trait};
 use tracing::{Instrument, error};
-use tracing::{info, warn};
+use tracing::{info, warn, debug};
 use xml::writer::XmlEvent;
 
 struct ActiveBuild {
@@ -225,6 +226,7 @@ impl BuildService {
                 // Throttle log sending to avoid flooding
                 if !ratelimit_stdout.lock().await.check() {
                     // If rate limit exceeded, skip sending this log line
+                    debug!("Stdout log line skipped due to rate limiting: {}", line);
                     continue;
                 }
 
@@ -251,6 +253,7 @@ impl BuildService {
                 // Throttle log sending to avoid flooding
                 if !ratelimit_stderr.lock().await.check() {
                     // If rate limit exceeded, skip sending this log line
+                    debug!("Rate limit exceeded, skipping stderr log line: {}", line);
                     continue;
                 }
 
