@@ -717,6 +717,11 @@ impl rom_build_service_server::RomBuildService for BuildService {
             }
         }
 
+        unsafe {
+            // Set REPO_CONFIG_DIR to the build directory so that 'repo' command uses it for its internal git operations, avoiding conflicts with any existing .repo in the user's home or elsewhere.
+            std::env::set_var("REPO_CONFIG_DIR", self.build_dir.to_str().unwrap());
+        }
+
         let settings_clone = self.settings.clone();
         let build_dir_clone = self.build_dir.clone();
         let log_tx_clone = log_tx.clone();
