@@ -459,14 +459,35 @@ impl rom_build_service_server::RomBuildService for BuildService {
         // Channel for Cancellation (Capacity 1 is enough)
         let (kill_tx, mut kill_rx) = mpsc::channel::<()>(1);
 
-        let kill_tx_clone_for_ctrlc = kill_tx.clone();
-        ctrlc::set_handler(move || {
-            let _ = kill_tx_clone_for_ctrlc.try_send(());
-        });
 
         // Channel for Logs (Broadcast so multiple clients can watch)
         // Capacity 1000 lines buffer
         let (log_tx, _) = broadcast::channel::<BuildLogEntry>(1000);
+
+        let log_tx_clone_for_ctrlc = log_tx.clone();
+        let kill_tx_clone_for_ctrlc = kill_tx.clone();
+                
+        // Spawn an async task to listen for Ctrl-C just for the duration of this build
+        tokio::spawn(async move {
+            tokio::select! {
+                // Option 1: The user presses Ctrl-C
+                _ = tokio::signal::ctrl_c() => {
+                    let _ = kill_tx_clone_for_ctrlc.try_send(());
+                    let _ = log_tx_clone_for_ctrlc.send(BuildLogEntry {
+                        level: LogLevel::Warning as i32,
+                        message: "Cancellation requested via Ctrl-C.".into(),
+                        timestamp: chrono::Utc::now().timestamp(),
+                        is_finished: false,
+                    });
+                    tracing::info!("Build cancelled via Ctrl-C signal.");
+                }
+                // Option 2: The build finishes and kill_rx is dropped
+                _ = kill_tx_clone_for_ctrlc.closed() => {
+                    // The receiver no longer exists, meaning the build task is done.
+                    // This task exits cleanly without leaking memory.
+                }
+            }
+        });
 
         let active_job_cleanup = self.active_job.clone();
 
@@ -1482,7 +1503,6 @@ impl rom_build_service_server::RomBuildService for BuildService {
             }
 
             // Cleanup when done
-            ctrlc::set_handler(|| {}).expect("Failed to reset Ctrl-C handler");
             let mut lock = active_job_cleanup.lock().await;
             *lock = None;
 
