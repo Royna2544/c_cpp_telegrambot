@@ -27,7 +27,6 @@ use nix::libc::{rlimit, setrlimit};
 use nix::sys::signal::{self, Signal};
 #[cfg(unix)]
 use nix::unistd::Pid;
-use tracing_subscriber::field::debug;
 use std::{
     fmt::Display,
     num::NonZero,
@@ -45,7 +44,8 @@ use tokio::{
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status, async_trait};
 use tracing::{Instrument, error};
-use tracing::{info, warn, debug};
+use tracing::{debug, info, warn};
+use tracing_subscriber::field::debug;
 use xml::writer::XmlEvent;
 
 struct ActiveBuild {
@@ -459,14 +459,13 @@ impl rom_build_service_server::RomBuildService for BuildService {
         // Channel for Cancellation (Capacity 1 is enough)
         let (kill_tx, mut kill_rx) = mpsc::channel::<()>(1);
 
-
         // Channel for Logs (Broadcast so multiple clients can watch)
         // Capacity 1000 lines buffer
         let (log_tx, _) = broadcast::channel::<BuildLogEntry>(1000);
 
         let log_tx_clone_for_ctrlc = log_tx.clone();
         let kill_tx_clone_for_ctrlc = kill_tx.clone();
-                
+
         // Spawn an async task to listen for Ctrl-C just for the duration of this build
         tokio::spawn(async move {
             tokio::select! {
@@ -991,11 +990,47 @@ impl rom_build_service_server::RomBuildService for BuildService {
                                     for e in parser {
                                         match e {
                                             Ok(xml::reader::XmlEvent::StartElement { name, attributes, .. }) if name.local_name == "project" => {
-                                                for attr in attributes {
+                                                for attr in &attributes {
                                                     if attr.name.local_name == "recurse_submodules" && attr.value == "true" {
                                                         send_log!(LogLevel::Info, format!("Found recurse_submodules=true in manifest file {:?}, updating submodules...", path));
+
+                                                        let sub_repo_path = attributes.iter()
+                                                                .find(|attr| attr.name.local_name == "name").map(|attr| attr.value.clone());
+                                                        if sub_repo_path.is_none() {
+                                                            send_log!(LogLevel::Warning, format!("recurse_submodules=true is set but no project name found in manifest file {:?}, skipping submodule update.", path));
+                                                            continue;
+                                                        }
+
+                                                        let sub_repo_path = sub_repo_path.unwrap();
+
+                                                        // Perform a partial repo sync for the submodule to initialize the .git directory, then we can use git commands to update submodules.
+                                                        let mut repo_sync_command = Command::new("repo");
+                                                        repo_sync_command.args([
+                                                                "sync",
+                                                                "-c",
+                                                                "--force-sync",
+                                                                "--no-clone-bundle",
+                                                                "--no-tags",
+                                                                format!("-j{}", parallel_jobs.to_string()).as_str(),
+                                                                &(&sub_repo_path.clone()),
+                                                            ])
+                                                            .current_dir(&build_dir_clone);
+                                                        let error_file = (&tempdir_clone).join(format!("{}-{}-submodule-sync.log", "repo-sync", &build_id_clone));
+                                                        info!("Repo sync for submodule output log path: {:?}", &error_file);
+                                                        let repo_sync_status = Self::run_command_with_logs(
+                                                            repo_sync_command,
+                                                            &log_tx_clone,
+                                                            Some(&mut kill_rx),
+                                                            Some(error_file.clone()),
+                                                            None,
+                                                        ).await?;
+                                                        if !repo_sync_status {
+                                                            send_log!(LogLevel::Warning, format!("'repo sync' for submodule {} failed or was cancelled.", &sub_repo_path));
+                                                            continue;
+                                                        }
+
                                                         let sub_repo = GitRepo::new(
-                                                            &local_manifest_dir,
+                                                            &PathBuf::from(build_dir_clone.join(&sub_repo_path)),
                                                             "origin",
                                                             req.github_token.clone(),
                                                             None,
@@ -1180,7 +1215,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                     ).map_err(|e| {
                         tonic::Status::internal(format!("Failed to get nofile limit: {}", e))
                     })?;
-                
+
                     send_log!(LogLevel::Info, format!("Current nofile limits - soft: {}, hard: {}", soft_limit, hard_limit));
 
                     // AOSP requires us to have at least 16000, but why not 65536?
@@ -1493,7 +1528,8 @@ impl rom_build_service_server::RomBuildService for BuildService {
                     {
                         if let Some(msg) = &build_entry.error_message {
                             // Already have an error message, do not overwrite. Just append.
-                            build_entry.error_message = Some(format!("{}\nWhich caused builder error: {}", msg, e));
+                            build_entry.error_message =
+                                Some(format!("{}\nWhich caused builder error: {}", msg, e));
                         } else {
                             build_entry.error_message = Some(format!("{}", e));
                         }
