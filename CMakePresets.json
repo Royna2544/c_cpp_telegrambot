@@ -191,7 +191,8 @@
         "VCPKG_TARGET_TRIPLET": "arm-linux-release",
         "VCPKG_TARGET_ARCHITECTURE": "arm",
         "VCPKG_INSTALL_OPTIONS": "--allow-unsupported",
-        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/CMake/toolchains/toolchain-armhf.cmake"
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/CMake/toolchains/toolchain-armhf.cmake",
+        "CRYPTOPP_DISABLE_ARM_NEON": true
       },
       "condition": {
         "type": "equals",
