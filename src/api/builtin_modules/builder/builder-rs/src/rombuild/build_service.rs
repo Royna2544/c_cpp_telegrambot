@@ -1187,7 +1187,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                 // Now, start the build process
                 send_log!(LogLevel::Info, "Starting build process...".to_string());
                 let no_ccache = if !settings_clone.lock().await.use_ccache.unwrap() {
-                    "unset USE_CCACHE=1"
+                    "unset USE_CCACHE; unset CCACHE_EXEC;"
                 } else {
                     "true"
                 };
