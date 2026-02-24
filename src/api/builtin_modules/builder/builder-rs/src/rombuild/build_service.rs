@@ -471,15 +471,25 @@ impl rom_build_service_server::RomBuildService for BuildService {
             tokio::select! {
                 // Option 1: The user presses Ctrl-C
                 _ = tokio::signal::ctrl_c() => {
-                    let _ = kill_tx_clone_for_ctrlc.try_send(());
-                    let _ = log_tx_clone_for_ctrlc.send(BuildLogEntry {
-                        level: LogLevel::Warning as i32,
-                        message: "Cancellation requested via Ctrl-C.".into(),
-                        timestamp: chrono::Utc::now().timestamp(),
-                        is_finished: false,
-                    });
-                    tracing::info!("Build cancelled via Ctrl-C signal.");
-                    kill_tx_clone_for_ctrlc.closed().await; // Wait for the build task to acknowledge cancellation
+                    info!("Ctrl-C signal received.");
+                    if !kill_tx_clone_for_ctrlc.is_closed() {
+                        info!("Sending cancellation signal to build task.");
+                        let send1 = kill_tx_clone_for_ctrlc.try_send(());
+                        let send2 = log_tx_clone_for_ctrlc.send(BuildLogEntry {
+                            level: LogLevel::Warning as i32,
+                            message: "Cancellation requested via Ctrl-C.".into(),
+                            timestamp: chrono::Utc::now().timestamp(),
+                            is_finished: false,
+                        });
+                        if send1.is_err() {
+                            error!("Failed to send cancellation signal: {}", send1.err().unwrap());
+                        }
+                        if send2.is_err() {
+                            error!("Failed to send cancellation log: {}", send2.err().unwrap());
+                        }
+                        tracing::info!("Build cancelled via Ctrl-C signal.");
+                        kill_tx_clone_for_ctrlc.closed().await; // Wait for the build task to acknowledge cancellation
+                    }
                     signal::kill(Pid::this(), Signal::SIGINT).expect("Failed to send SIGINT to self");
                 }
                 // Option 2: The build finishes and kill_rx is dropped
@@ -718,7 +728,9 @@ impl rom_build_service_server::RomBuildService for BuildService {
         }
 
         unsafe {
-            // Set REPO_CONFIG_DIR to the build directory so that 'repo' command uses it for its internal git operations, avoiding conflicts with any existing .repo in the user's home or elsewhere.
+            // Set REPO_CONFIG_DIR to the build directory so that 'repo' command uses it for its internal git operations,
+            // avoiding conflicts with any existing .repo in the user's home or elsewhere.
+            // SAFETY: This is safe because we are only using single thread.
             std::env::set_var("REPO_CONFIG_DIR", self.build_dir.to_str().unwrap());
         }
 
