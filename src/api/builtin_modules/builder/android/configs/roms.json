@@ -33,7 +33,7 @@
         "branches": [
             {
                 "android_version": 16,
-                "branch": "16-priv"
+                "branch": "16.2"
             }
         ]
     },

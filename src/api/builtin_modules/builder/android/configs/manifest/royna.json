@@ -136,6 +136,13 @@
       "use_regex": false
     },
     {
+      "name": "tb128fu-DerpFest-16",
+      "target_rom": "DerpFestNew",
+      "android_version": 16,
+      "device": "tb128fu",
+      "use_regex": false
+    },
+    {
       "name": "tb128fu-YAAP-sixteen",
       "target_rom": "Yaap",
       "android_version": 16,
