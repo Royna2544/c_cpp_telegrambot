@@ -233,10 +233,13 @@ impl BuildService {
                 // B. Send to gRPC
                 let _ = tx_out.send(BuildLogEntry {
                     level: LogLevel::Info as i32,
-                    message: line,
+                    message: (&line).clone(),
                     timestamp: chrono::Utc::now().timestamp(),
                     is_finished: false,
                 });
+
+                // C. Send to stdout of this service for visibility
+                println!("{}", line);
             }
         });
 
@@ -260,10 +263,13 @@ impl BuildService {
                 // B. Send to gRPC
                 let _ = tx_err.send(BuildLogEntry {
                     level: LogLevel::Error as i32,
-                    message: line,
+                    message: (&line).clone(),
                     timestamp: chrono::Utc::now().timestamp(),
                     is_finished: false,
                 });
+
+                // C. Send to stderr of this service for visibility
+                eprintln!("{}", line);
             }
         });
 
