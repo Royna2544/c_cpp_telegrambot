@@ -84,16 +84,24 @@ bool CommandLine::operator==(const CommandLine& other) const {
 }
 
 std::filesystem::path CommandLine::getPath(FS::PathType type) const {
-    std::filesystem::path buf = exePath.parent_path();
+    // Example: if the executable is at /usr/local/bin/glider, then the install
+    // root is /usr/local, we call parent_path() twice to get it. Similarly, if
+    // the executable is at C:\Program Files\Glider\bin\glider.exe, the install
+    // root is C:\Program Files\Glider.
+    std::filesystem::path buf = exePath.parent_path().parent_path();
+
+    // Allow overriding the install root with an environment variable for
+    // testing
     if (auto v = Env()["GLIDER_ROOT"]; v.has()) {
         LOG_ONCE(INFO) << "Override GILDER_ROOT: " << v.get();
         buf = v.get();
     }
+
     switch (type) {
         case FS::PathType::INSTALL_ROOT:
-            return buf.parent_path();
+            return buf;
         case FS::PathType::RESOURCES:
-            return buf.parent_path() / "share" / "Glider";
+            return buf / "share" / "Glider";
         case FS::PathType::RESOURCES_SQL:
             return getPath(FS::PathType::RESOURCES) / "sql";
         case FS::PathType::RESOURCES_WEBPAGE:
@@ -101,7 +109,7 @@ std::filesystem::path CommandLine::getPath(FS::PathType type) const {
         case FS::PathType::RESOURCES_SCRIPTS:
             return getPath(FS::PathType::RESOURCES) / "scripts";
         case FS::PathType::CMD_MODULES:
-            return buf.parent_path() / "lib" / "modules";
+            return buf / "lib" / "modules";
         default:
             break;
     }
