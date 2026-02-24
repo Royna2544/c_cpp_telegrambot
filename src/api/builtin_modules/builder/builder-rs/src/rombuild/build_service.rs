@@ -479,6 +479,8 @@ impl rom_build_service_server::RomBuildService for BuildService {
                         is_finished: false,
                     });
                     tracing::info!("Build cancelled via Ctrl-C signal.");
+                    kill_tx_clone_for_ctrlc.closed().await; // Wait for the build task to acknowledge cancellation
+                    signal::kill(Pid::this(), Signal::SIGINT).expect("Failed to send SIGINT to self");
                 }
                 // Option 2: The build finishes and kill_rx is dropped
                 _ = kill_tx_clone_for_ctrlc.closed() => {
