@@ -1221,12 +1221,9 @@ impl rom_build_service_server::RomBuildService for BuildService {
                     send_log!(LogLevel::Info, format!("Current nofile limits - soft: {}, hard: {}", soft_limit, hard_limit));
 
                     // AOSP requires us to have at least 16000, but why not 65536?
-                    let new_soft_limit = 65536;
-                    let new_hard_limit = if hard_limit > new_soft_limit {
-                        hard_limit
-                    } else {
-                        new_soft_limit
-                    };
+                    let aosp_soft_limit = 65536;
+                    let new_hard_limit = std::cmp::max(hard_limit, aosp_soft_limit);
+                    let new_soft_limit = std::cmp::max(aosp_soft_limit, soft_limit);
                     send_log!(LogLevel::Info, format!("Setting nofile limits - soft: {}, hard: {}", new_soft_limit, new_hard_limit));
                     let rlim = rlimit {
                         rlim_cur: new_soft_limit,
