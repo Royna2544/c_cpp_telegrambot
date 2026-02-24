@@ -571,6 +571,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     std::string targetBranch = per_build.localManifest->rom->branch;
     std::string deviceCodename = per_build.device->codename;
 
+retry:
     bool streamSuccess = buildService_->streamLogs(
         logRequest, [&](const android::BuildLogEntry& logEntry) {
             if (!build.running()) {
@@ -636,9 +637,19 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
 
     if (!streamSuccess) {
         LOG(ERROR) << "Failed to stream logs";
-        _api->editMessage(sentMessage, "Failed to stream logs", backKeyboard2);
-        build.finish();
-        return;
+
+        android::BuildSubmission submission;
+        if (!buildService_->getStatus(logRequest, &submission)) {
+            LOG(ERROR)
+                << "Failed to get build status after log streaming failure";
+        } else {
+            if (submission.accepted()) {
+                LOG(INFO) << "Build is still running, retrying log stream...";
+                goto retry;
+            } else {
+                LOG(INFO) << "Build is no longer running";
+            }
+        }
     }
 
     if (!build.running()) {
