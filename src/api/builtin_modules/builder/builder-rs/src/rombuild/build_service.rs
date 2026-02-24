@@ -459,6 +459,11 @@ impl rom_build_service_server::RomBuildService for BuildService {
         // Channel for Cancellation (Capacity 1 is enough)
         let (kill_tx, mut kill_rx) = mpsc::channel::<()>(1);
 
+        let kill_tx_clone_for_ctrlc = kill_tx.clone();
+        ctrlc::set_handler(move || {
+            let _ = kill_tx_clone_for_ctrlc.try_send(());
+        });
+
         // Channel for Logs (Broadcast so multiple clients can watch)
         // Capacity 1000 lines buffer
         let (log_tx, _) = broadcast::channel::<BuildLogEntry>(1000);
@@ -1477,6 +1482,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
             }
 
             // Cleanup when done
+            ctrlc::set_handler(|| {}).expect("Failed to reset Ctrl-C handler");
             let mut lock = active_job_cleanup.lock().await;
             *lock = None;
 
