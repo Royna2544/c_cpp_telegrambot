@@ -522,6 +522,20 @@ impl rom_build_service_server::RomBuildService for BuildService {
         let log_tx_clone_for_ctrlc = log_tx.clone();
         let kill_tx_clone_for_ctrlc = kill_tx.clone();
 
+        // Ensure directory exists before we start the build, so that Ctrl-C handler can safely write logs even if the build fails early.
+        if !self.build_dir.exists() {
+            warn!(
+                "Build directory {:?} does not exist, creating it...",
+                self.build_dir
+            );
+            if let Err(e) = tokio::fs::create_dir_all(&self.build_dir).await {
+                return Err(Status::internal(format!(
+                    "Failed to create build directory: {}",
+                    e
+                )));
+            }
+        }
+
         // Spawn an async task to listen for Ctrl-C just for the duration of this build
         tokio::spawn(async move {
             tokio::select! {
@@ -1296,19 +1310,23 @@ impl rom_build_service_server::RomBuildService for BuildService {
                     let aosp_soft_limit = 65536;
                     let new_hard_limit = std::cmp::max(hard_limit, aosp_soft_limit);
                     let new_soft_limit = std::cmp::max(aosp_soft_limit, soft_limit);
-                    send_log!(LogLevel::Info, format!("Setting nofile limits - soft: {}, hard: {}", new_soft_limit, new_hard_limit));
-                    let rlim = rlimit {
-                        rlim_cur: new_soft_limit,
-                        rlim_max: new_hard_limit,
-                    };
-                    unsafe {
-                        use nix::sys::resource::Resource;
+                    if new_soft_limit == soft_limit && new_hard_limit == hard_limit {
+                        send_log!(LogLevel::Info, "Current nofile limits meet AOSP requirements, no need to change.".to_string());
+                    } else {
+                        send_log!(LogLevel::Info, format!("Setting nofile limits - soft: {}, hard: {}", new_soft_limit, new_hard_limit));
+                        let rlim = rlimit {
+                            rlim_cur: new_soft_limit,
+                            rlim_max: new_hard_limit,
+                        };
+                        unsafe {
+                            use nix::sys::resource::Resource;
 
-                        if setrlimit(Resource::RLIMIT_NOFILE as u32, &rlim) != 0 {
-                            return Err(tonic::Status::internal("Failed to set nofile limit."));
+                            if setrlimit(Resource::RLIMIT_NOFILE as u32, &rlim) != 0 {
+                                return Err(tonic::Status::internal("Failed to set nofile limit."));
+                            }
                         }
+                        send_log!(LogLevel::Info, "Successfully set nofile limits.".to_string());
                     }
-                    send_log!(LogLevel::Info, "Successfully set nofile limits.".to_string());
                 }
 
                 // Now, start the build process
