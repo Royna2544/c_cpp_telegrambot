@@ -27,8 +27,10 @@ class GrpcROMBuildService : public IROMBuildService {
     template <typename T>
     struct GrpcRepeatableSource : public RepeatableSource<T> {
         explicit GrpcRepeatableSource(
-            std::unique_ptr<grpc::ClientReader<T>> stream)
-            : stream_(std::move(stream)) {}
+            std::unique_ptr<grpc::ClientReader<T>> stream,
+            std::unique_ptr<grpc::ClientContext> context)
+            : stream_(std::move(stream)), context_(std::move(context)) {}
+        ~GrpcRepeatableSource() override = default;
 
         bool readOnce(T* output) override { return stream_->Read(output); }
 
@@ -46,6 +48,7 @@ class GrpcROMBuildService : public IROMBuildService {
 
        private:
         std::unique_ptr<grpc::ClientReader<T>> stream_;
+        std::unique_ptr<grpc::ClientContext> context_;
     };
 
     /**
@@ -114,14 +117,15 @@ class GrpcROMBuildService : public IROMBuildService {
 
     std::unique_ptr<RepeatableSource<BuildLogEntry>> streamLogs(
         const BuildAction& request) override {
-        grpc::ClientContext context;
-        auto stream = stub_->StreamLogs(&context, request);
+        std::unique_ptr<grpc::ClientContext> context =
+            std::make_unique<grpc::ClientContext>();
+        auto stream = stub_->StreamLogs(context.get(), request);
         if (!stream) {
             LOG(ERROR) << "StreamLogs RPC failed to start.";
             return nullptr;
         }
         return std::make_unique<GrpcRepeatableSource<BuildLogEntry>>(
-            std::move(stream));
+            std::move(stream), std::move(context));
     }
 
     bool cancelBuild(const BuildAction& request) override {
@@ -144,14 +148,15 @@ class GrpcROMBuildService : public IROMBuildService {
 
     std::unique_ptr<RepeatableSource<BuildResult>> getBuildResult(
         const BuildAction& request) override {
-        grpc::ClientContext context;
-        auto stream = stub_->GetBuildResult(&context, request);
+        std::unique_ptr<grpc::ClientContext> context =
+            std::make_unique<grpc::ClientContext>();
+        auto stream = stub_->GetBuildResult(context.get(), request);
         if (!stream) {
             LOG(ERROR) << "GetBuildResult RPC failed to start.";
             return nullptr;
         }
         return std::make_unique<GrpcRepeatableSource<BuildResult>>(
-            std::move(stream));
+            std::move(stream), std::move(context));
     }
 
    private:
