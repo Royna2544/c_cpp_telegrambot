@@ -35,7 +35,7 @@ regex = "1.10.4"
 anyhow = "1.0.101"
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.27", features = ["signal", "resource"] }
+nix = { version = "0.27", features = ["signal", "resource", "mount"] }
 
 [target.armv7-unknown-linux-gnueabihf.dependencies]
 openssl = { version = "0.10.1", features = ["vendored"] }

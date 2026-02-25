@@ -342,6 +342,52 @@ fn log_who_asked_me(method: &str, request: &Request<impl std::fmt::Debug>) {
     }
 }
 
+#[cfg(unix)]
+use nix::mount::umount;
+#[cfg(unix)]
+use std::fs;
+#[cfg(unix)]
+use std::os::unix::fs::MetadataExt;
+
+#[cfg(unix)]
+fn is_mountpoint<P: AsRef<Path>>(path: P) -> std::io::Result<bool> {
+    let path = path.as_ref();
+
+    // Get metadata without following symlinks
+    let meta = fs::symlink_metadata(path)?;
+
+    // If there is no parent, it's the root directory ("/"),
+    // which is always a mountpoint.
+    let parent = match path.parent() {
+        Some(p) => p,
+        None => return Ok(true),
+    };
+
+    let parent_meta = fs::symlink_metadata(parent)?;
+
+    // Compare the device IDs
+    Ok(meta.dev() != parent_meta.dev())
+}
+
+#[cfg(unix)]
+fn if_mounted_try_umount<P: AsRef<Path>>(path: P) {
+    if is_mountpoint(&path).unwrap_or(false) {
+        info!(
+            "Path {:?} is a mountpoint, attempting to unmount...",
+            path.as_ref()
+        );
+        match umount(path.as_ref()) {
+            Ok(_) => info!("Successfully unmounted {:?}", path.as_ref()),
+            Err(e) => error!("Failed to unmount {:?}: {}", path.as_ref(), e),
+        }
+    } else {
+        debug!(
+            "Path {:?} is not a mountpoint, no need to unmount.",
+            path.as_ref()
+        );
+    }
+}
+
 #[async_trait]
 impl rom_build_service_server::RomBuildService for BuildService {
     type StreamLogsStream =
@@ -443,6 +489,11 @@ impl rom_build_service_server::RomBuildService for BuildService {
         log_who_asked_me("start_build", &request);
         let req = request.into_inner();
         let mut lock = self.active_job.lock().await;
+
+        // Umount /sys/kernel/debug as it causes problem when zipping /d directory later,
+        // and it should be safe to umount it since it's only used for debugging and not
+        // critical for the build process.
+        if_mounted_try_umount("/sys/kernel/debug");
 
         // 1. Check concurrency (Android builds use 100% CPU, usually 1 at a time is best)
         if lock.is_some() {
