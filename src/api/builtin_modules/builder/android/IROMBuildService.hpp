@@ -1,5 +1,7 @@
 #pragma once
 
+#include <grpcpp/support/status.h>
+
 #include <functional>
 #include <memory>
 #include <string>
@@ -18,6 +20,20 @@ namespace tgbot::builder::android {
 class IROMBuildService {
    public:
     virtual ~IROMBuildService() = default;
+
+    template <typename T>
+    struct RepeatableSource {
+        RepeatableSource() = default;
+        virtual ~RepeatableSource() = default;
+        virtual bool readOnce(T* output) = 0;
+        virtual bool readAll(std::function<void(const T&)> callback) = 0;
+
+        // Disable copy and move semantics
+        RepeatableSource(const RepeatableSource&) = delete;
+        RepeatableSource& operator=(const RepeatableSource&) = delete;
+        RepeatableSource(RepeatableSource&&) = delete;
+        RepeatableSource& operator=(RepeatableSource&&) = delete;
+    };
 
     /**
      * @brief Get current build settings.
@@ -68,11 +84,10 @@ class IROMBuildService {
      *
      * @param request The build action (build ID).
      * @param callback Callback function invoked for each log entry.
-     * @return true if the operation succeeded, false otherwise.
+     * @return RepeatableSource for reading log entries.
      */
-    virtual bool streamLogs(
-        const BuildAction& request,
-        std::function<void(const BuildLogEntry&)> callback) = 0;
+    virtual std::unique_ptr<RepeatableSource<BuildLogEntry>> streamLogs(
+        const BuildAction& request) = 0;
 
     /**
      * @brief Cancel a build in progress.
@@ -97,11 +112,10 @@ class IROMBuildService {
      *
      * @param request The build action (build ID).
      * @param callback Callback function invoked for each result chunk.
-     * @return true if the operation succeeded, false otherwise.
+     * @return RepeatableSource for reading build results.
      */
-    virtual bool getBuildResult(
-        const BuildAction& request,
-        std::function<void(const BuildResult&)> callback) = 0;
+    virtual std::unique_ptr<RepeatableSource<BuildResult>> getBuildResult(
+        const BuildAction& request) = 0;
 };
 
 }  // namespace tgbot::builder::android

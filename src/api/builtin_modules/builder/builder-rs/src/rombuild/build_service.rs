@@ -65,13 +65,18 @@ struct UploadTask {
     artifact_path: PathBuf,
 }
 
+enum BuildStatus {
+    InProgress,
+    Success,
+    Failed(String), // Include error message if failed
+}
+
 struct BuildEntry {
     id: String,
     variant: BuildVariant,
     target_device: TargetsEntry,
     config_name: String,
-    success: bool,
-    error_message: Option<String>, // Optional error message if the build failed
+    success: BuildStatus,
 }
 
 impl Display for BuildVariant {
@@ -739,8 +744,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
             variant: build_variant_enum,
             target_device: device_entry.clone(),
             config_name: req.config_name.clone(),
-            success: false,
-            error_message: None,
+            success: BuildStatus::InProgress,
         };
         self.known_builds.lock().await.push(known_builds_entry);
 
@@ -932,7 +936,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                                 std::fs::remove_file(&error_file).unwrap_or_else(|e| {
                                     error!("Failed to remove error log file {:?}: {}", &error_file, e);
                                 });
-                                build_entry.error_message = Some(content);
+                                build_entry.success = BuildStatus::Failed(content);
                             }
                             return Err(tonic::Status::internal("'repo init' command failed or was cancelled."));
                         }
@@ -1267,7 +1271,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                             std::fs::remove_file(&error_file).unwrap_or_else(|e| {
                                 error!("Failed to remove error log file {:?}: {}", &error_file, e);
                             });
-                            build_entry.error_message = Some(content);
+                            build_entry.success = BuildStatus::Failed(content);
                         }
                         return Err(tonic::Status::internal("'repo sync' command failed."));
                     }
@@ -1469,12 +1473,12 @@ impl rom_build_service_server::RomBuildService for BuildService {
                             let content = std::fs::read_to_string(&error_file_path).unwrap_or_else(|_| "Failed to read error log.".to_string());
                             if content.is_empty() {
                                 send_log!(LogLevel::Warning, "Build output log is also empty, setting generic error message.".to_string());
-                                build_entry.error_message = Some("Build failed, but no error log available.".to_string());
+                                build_entry.success = BuildStatus::Failed("Build failed, but no error log available.".to_string());
                             } else {
-                                build_entry.error_message = Some(content);
+                                build_entry.success = BuildStatus::Failed(content);
                             }
                         } else {
-                            build_entry.error_message = Some(content);
+                            build_entry.success = BuildStatus::Failed(content);
                         }
                     }
                     return Err(tonic::Status::internal("Build command failed or was cancelled."));
@@ -1574,7 +1578,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                 // Mark build as successful in known builds
                 let known_builds_self = &mut known_builds_clone.lock().await;
                 if let Some(build_entry) = known_builds_self.iter_mut().find(|b| b.id == build_id_clone) {
-                    build_entry.success = true;
+                    build_entry.success = BuildStatus::Success;
                 }
                 Ok(())
             }.instrument(span);
@@ -1593,12 +1597,14 @@ impl rom_build_service_server::RomBuildService for BuildService {
                         .iter_mut()
                         .find(|b| b.id == build_id_clone)
                     {
-                        if let Some(msg) = &build_entry.error_message {
+                        if let BuildStatus::Failed(msg) = &build_entry.success {
                             // Already have an error message, do not overwrite. Just append.
-                            build_entry.error_message =
-                                Some(format!("{}\nWhich caused builder error: {}", msg, e));
+                            build_entry.success = BuildStatus::Failed(format!(
+                                "{}\nWhich caused builder error: {}",
+                                msg, e
+                            ));
                         } else {
-                            build_entry.error_message = Some(format!("{}", e));
+                            build_entry.success = BuildStatus::Failed(format!("{}", e));
                         }
                     }
                     send_log_final!(LogLevel::Error, format!("Build failed: {}", e));
@@ -1743,39 +1749,62 @@ impl rom_build_service_server::RomBuildService for BuildService {
         // Create a channel to stream results
         let (tx, rx) = mpsc::channel(10);
 
-        if !build_entry.success {
-            warn!("Entering failure branch for build ID: {}", req.build_id);
-            let error_message = build_entry
-                .error_message
-                .clone()
-                .unwrap_or_else(|| "Build failed for unknown reasons.".into());
-            tx.send(Ok(BuildResult {
-                success: false,
-                upload_method: UploadMethod::None as i32,
-                result_details: None,
-                error_message: Some(error_message),
-                file_name: None,
-            }))
-            .await
-            .map_err(|e| {
-                tonic::Status::internal(format!("Failed to send failure build result: {}", e))
-            })?;
-            return Ok(tonic::Response::new(
-                Box::pin(ReceiverStream::new(rx)) as Self::GetBuildResultStream
-            ));
+        match &build_entry.success {
+            BuildStatus::Failed(error_message) => {
+                warn!("Entering failure branch for build ID: {}", req.build_id);
+                tx.send(Ok(BuildResult {
+                    success: false,
+                    upload_method: UploadMethod::None as i32,
+                    result_details: None,
+                    error_message: Some(error_message.clone()),
+                    file_name: None,
+                }))
+                .await
+                .map_err(|e| {
+                    tonic::Status::internal(format!("Failed to send failure build result: {}", e))
+                })?;
+                return Ok(tonic::Response::new(
+                    Box::pin(ReceiverStream::new(rx)) as Self::GetBuildResultStream
+                ));
+            }
+            BuildStatus::Success => {
+                info!("Build marked as successful for ID: {}", req.build_id);
+            }
+            BuildStatus::InProgress => {
+                info!("Build is still in progress for ID: {}", req.build_id);
+                return Err(tonic::Status::failed_precondition(
+                    "Build is still in progress. Please check back later for results.",
+                ));
+            }
         }
 
         let upload_tasks = self.active_uploads.lock().await;
-        let upload_task = upload_tasks
-            .iter()
-            .find(|task| task.build_id == req.build_id)
-            .ok_or_else(|| {
-                tonic::Status::failed_precondition(
-                    "No upload task found for the specified build ID. Build may still be in progress or upload not scheduled.",
-                )
-            })?
-            .clone();
-        drop(upload_tasks);
+        let upload_task = {
+            let upload_task_ = upload_tasks
+                .iter()
+                .find(|task| task.build_id == req.build_id);
+            if !upload_task_.is_some() {
+                tx.send(Ok(BuildResult {
+                    success: false,
+                    upload_method: UploadMethod::None as i32,
+                    result_details: None,
+                    error_message: Some("No upload task found for this build.".into()),
+                    file_name: None,
+                }))
+                .await
+                .map_err(|e| {
+                    tonic::Status::internal(format!("Failed to send build result: {}", e))
+                })?;
+                // No upload task found, but build is marked as successful. This can happen if upload is disabled in settings,
+                // or if the artifact was not found. Just return success without upload details.
+                return Ok(tonic::Response::new(
+                    Box::pin(ReceiverStream::new(rx)) as Self::GetBuildResultStream
+                ));
+            }
+            let upload_task = upload_task_.unwrap().clone();
+            drop(upload_tasks);
+            upload_task
+        };
         info!("Found upload task for build ID: {}", req.build_id);
 
         let file_name = upload_task

@@ -1,14 +1,17 @@
 #pragma once
 
+#include <absl/log/log.h>
 #include <google/protobuf/empty.pb.h>
 #include <grpcpp/client_context.h>
 #include <grpcpp/create_channel.h>
+#include <grpcpp/support/status.h>
 
 #include <memory>
 #include <string>
 
 #include "IROMBuildService.hpp"
 #include "ROMBuild_service.grpc.pb.h"
+#include "ROMBuild_service.pb.h"
 
 namespace tgbot::builder::android {
 
@@ -21,12 +24,36 @@ namespace tgbot::builder::android {
  */
 class GrpcROMBuildService : public IROMBuildService {
    public:
+    template <typename T>
+    struct GrpcRepeatableSource : public RepeatableSource<T> {
+        explicit GrpcRepeatableSource(
+            std::unique_ptr<grpc::ClientReader<T>> stream)
+            : stream_(std::move(stream)) {}
+
+        bool readOnce(T* output) override { return stream_->Read(output); }
+
+        bool readAll(std::function<void(const T&)> callback) override {
+            T entry;
+            bool anyRead = false;
+            while (stream_->Read(&entry)) {
+                callback(entry);
+                anyRead = true;
+            }
+            return anyRead;
+        }
+
+        [[nodiscard]] grpc::Status finish() { return stream_->Finish(); }
+
+       private:
+        std::unique_ptr<grpc::ClientReader<T>> stream_;
+    };
+
     /**
      * @brief Construct a new gRPC ROM Build Service.
      *
      * @param channel The gRPC channel to use for communication.
      */
-    explicit GrpcROMBuildService(std::shared_ptr<grpc::Channel> channel)
+    explicit GrpcROMBuildService(const std::shared_ptr<grpc::Channel>& channel)
         : stub_(ROMBuildService::NewStub(channel)) {}
 
     /**
@@ -44,6 +71,8 @@ class GrpcROMBuildService : public IROMBuildService {
         grpc::ClientContext context;
         google::protobuf::Empty request;
         auto status = stub_->GetSettings(&context, request, response);
+        LOG_IF(ERROR, !status.ok())
+            << "GetSettings RPC failed: " << status.error_message();
         return status.ok();
     }
 
@@ -51,6 +80,8 @@ class GrpcROMBuildService : public IROMBuildService {
         grpc::ClientContext context;
         google::protobuf::Empty response;
         auto status = stub_->SetSettings(&context, settings, &response);
+        LOG_IF(ERROR, !status.ok())
+            << "SetSettings RPC failed: " << status.error_message();
         return status.ok();
     }
 
@@ -58,6 +89,8 @@ class GrpcROMBuildService : public IROMBuildService {
         grpc::ClientContext context;
         google::protobuf::Empty response;
         auto status = stub_->CleanDirectory(&context, request, &response);
+        LOG_IF(ERROR, !status.ok())
+            << "CleanDirectory RPC failed: " << status.error_message();
         return status.ok();
     }
 
@@ -65,6 +98,8 @@ class GrpcROMBuildService : public IROMBuildService {
                          DirectoryExistsResponse* response) override {
         grpc::ClientContext context;
         auto status = stub_->DirectoryExists(&context, request, response);
+        LOG_IF(ERROR, !status.ok())
+            << "DirectoryExists RPC failed: " << status.error_message();
         return status.ok();
     }
 
@@ -72,25 +107,29 @@ class GrpcROMBuildService : public IROMBuildService {
                     BuildSubmission* response) override {
         grpc::ClientContext context;
         auto status = stub_->StartBuild(&context, request, response);
+        LOG_IF(ERROR, !status.ok())
+            << "StartBuild RPC failed: " << status.error_message();
         return status.ok();
     }
 
-    bool streamLogs(
-        const BuildAction& request,
-        std::function<void(const BuildLogEntry&)> callback) override {
+    std::unique_ptr<RepeatableSource<BuildLogEntry>> streamLogs(
+        const BuildAction& request) override {
         grpc::ClientContext context;
         auto stream = stub_->StreamLogs(&context, request);
-        BuildLogEntry entry;
-        while (stream->Read(&entry)) {
-            callback(entry);
+        if (!stream) {
+            LOG(ERROR) << "StreamLogs RPC failed to start.";
+            return nullptr;
         }
-        return stream->Finish().ok();
+        return std::make_unique<GrpcRepeatableSource<BuildLogEntry>>(
+            std::move(stream));
     }
 
     bool cancelBuild(const BuildAction& request) override {
         grpc::ClientContext context;
         google::protobuf::Empty response;
         auto status = stub_->CancelBuild(&context, request, &response);
+        LOG_IF(ERROR, !status.ok())
+            << "CancelBuild RPC failed: " << status.error_message();
         return status.ok();
     }
 
@@ -98,19 +137,21 @@ class GrpcROMBuildService : public IROMBuildService {
                    BuildSubmission* response) override {
         grpc::ClientContext context;
         auto status = stub_->GetStatus(&context, request, response);
+        LOG_IF(ERROR, !status.ok())
+            << "GetStatus RPC failed: " << status.error_message();
         return status.ok();
     }
 
-    bool getBuildResult(
-        const BuildAction& request,
-        std::function<void(const BuildResult&)> callback) override {
+    std::unique_ptr<RepeatableSource<BuildResult>> getBuildResult(
+        const BuildAction& request) override {
         grpc::ClientContext context;
         auto stream = stub_->GetBuildResult(&context, request);
-        BuildResult result;
-        while (stream->Read(&result)) {
-            callback(result);
+        if (!stream) {
+            LOG(ERROR) << "GetBuildResult RPC failed to start.";
+            return nullptr;
         }
-        return stream->Finish().ok();
+        return std::make_unique<GrpcRepeatableSource<BuildResult>>(
+            std::move(stream));
     }
 
    private:

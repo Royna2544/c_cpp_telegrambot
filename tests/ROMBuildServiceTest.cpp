@@ -92,6 +92,31 @@ TEST_F(ROMBuildServiceTest, StartBuildSuccess) {
     EXPECT_EQ(actualResponse.status_message(), "Build started");
 }
 
+template <typename T>
+struct TestRepeatableSource : public IROMBuildService::RepeatableSource<T> {
+    std::vector<T> entries;
+    size_t currentIndex = 0;
+
+    explicit TestRepeatableSource(const std::vector<T>& entries)
+        : entries(entries) {}
+
+    bool readOnce(T* output) override {
+        if (currentIndex < entries.size()) {
+            *output = entries[currentIndex++];
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    bool readAll(std::function<void(const T&)> callback) override {
+        for (const auto& entry : entries) {
+            callback(entry);
+        }
+        return true;
+    }
+};
+
 /**
  * @brief Test that streamLogs method streams log entries.
  */
@@ -114,22 +139,17 @@ TEST_F(ROMBuildServiceTest, StreamLogsSuccess) {
     entry2.set_is_finished(true);
     logEntries.push_back(entry2);
 
-    EXPECT_CALL(*mockService, streamLogs(_, _))
-        .WillOnce(
-            Invoke([&](const BuildAction& req,
-                       std::function<void(const BuildLogEntry&)> callback) {
-                for (const auto& entry : logEntries) {
-                    callback(entry);
-                }
-                return true;
-            }));
-
+    EXPECT_CALL(*mockService, streamLogs(_))
+        .WillOnce(Invoke([&](const BuildAction& request) {
+            return std::make_unique<TestRepeatableSource<BuildLogEntry>>(
+                logEntries);
+        }));
     std::vector<BuildLogEntry> receivedEntries;
-    bool result = mockService->streamLogs(
-        request,
+    auto logStream = mockService->streamLogs(request);
+    ASSERT_NE(logStream, nullptr);
+    bool status = logStream->readAll(
         [&](const BuildLogEntry& entry) { receivedEntries.push_back(entry); });
-
-    EXPECT_TRUE(result);
+    EXPECT_TRUE(status);
     ASSERT_EQ(receivedEntries.size(), 2);
     EXPECT_EQ(receivedEntries[0].message(), "Build started");
     EXPECT_FALSE(receivedEntries[0].is_finished());
@@ -188,28 +208,24 @@ TEST_F(ROMBuildServiceTest, GetBuildResultSuccess) {
     result1.set_gofile_link("https://gofile.io/d/abc123");
     result1.set_file_name("lineage-19.1-sailfish.zip");
 
-    EXPECT_CALL(*mockService, getBuildResult(_, _))
-        .WillOnce(Invoke([&](const BuildAction& req,
-                             std::function<void(const BuildResult&)> callback) {
-            callback(result1);
-            return true;
+    EXPECT_CALL(*mockService, getBuildResult(_))
+        .WillOnce(Invoke([&](const BuildAction& req) {
+            return std::make_unique<TestRepeatableSource<BuildResult>>(
+                std::vector<BuildResult>{result1});
         }));
 
     std::string receivedLink;
     std::string receivedFileName;
     bool receivedSuccess = false;
-    bool result =
-        mockService->getBuildResult(request, [&](const BuildResult& result) {
-            receivedSuccess = result.success();
-            if (result.has_gofile_link()) {
-                receivedLink = result.gofile_link();
-            }
-            if (result.has_file_name()) {
-                receivedFileName = result.file_name();
-            }
-        });
+    auto resultStream = mockService->getBuildResult(request);
+    ASSERT_NE(resultStream, nullptr);
+    bool status = resultStream->readAll([&](const BuildResult& result) {
+        receivedSuccess = result.success();
+        receivedLink = result.gofile_link();
+        receivedFileName = result.file_name();
+    });
 
-    EXPECT_TRUE(result);
+    EXPECT_TRUE(status);
     EXPECT_TRUE(receivedSuccess);
     EXPECT_EQ(receivedLink, "https://gofile.io/d/abc123");
     EXPECT_EQ(receivedFileName, "lineage-19.1-sailfish.zip");

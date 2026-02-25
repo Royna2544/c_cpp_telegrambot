@@ -571,37 +571,64 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     std::string targetBranch = per_build.localManifest->rom->branch;
     std::string deviceCodename = per_build.device->codename;
 
-retry:
-    bool streamSuccess = buildService_->streamLogs(
-        logRequest, [&](const android::BuildLogEntry& logEntry) {
-            if (!build.running()) {
-                return;
-            }
-            lastLogEntry = logEntry;
-            if (!rateLimiter.check()) {
-                return;  // Skip update if within rate limit
-            }
+    std::unique_ptr<tgbot::builder::android::GrpcROMBuildService::
+                        RepeatableSource<android::BuildLogEntry>>
+        streamSource;
+    while (build.running()) {
+        streamSource = buildService_->streamLogs(logRequest);
+        if (!streamSource) {
+            LOG(ERROR) << "Failed to stream logs";
 
-            grpc::ClientContext statsContext;
-            tgbot::builder::system_monitor::SystemStats statsResponse;
-            if (!monitorStub_->GetStats(&statsContext, {}, &statsResponse)
-                     .ok()) {
-                LOG(ERROR) << "Failed to get system stats";
-                return;
+            android::BuildSubmission submission;
+            if (!buildService_->getStatus(logRequest, &submission)) {
+                LOG(ERROR) << "Failed to get build status after log streaming "
+                              "failure";
+                break;
+            } else {
+                if (submission.accepted()) {
+                    LOG(INFO) << "Build is still running, retrying...";
+                } else {
+                    LOG(INFO) << "Build is no longer running";
+                    break;
+                }
             }
-            system_monitor::GetSystemInfoRequest infoRequest;
-            infoRequest.set_disk_path("/");
-            grpc::ClientContext infoContext;
-            tgbot::builder::system_monitor::SystemInfo infoResponse;
-            if (!monitorStub_
-                     ->GetSystemInfo(&infoContext, infoRequest, &infoResponse)
-                     .ok()) {
-                LOG(ERROR) << "Failed to get system info";
-                return;
-            }
+        }
 
-            auto buildInfoBuffer = fmt::format(
-                R"(
+        auto status =
+            streamSource->readAll([&](const android::BuildLogEntry& entry) {
+                // Check cancelation and update message with log info every
+                // interval
+                if (!build.running()) {
+                    return;
+                }
+
+                lastLogEntry = entry;
+
+                if (!rateLimiter.check()) {
+                    return;  // Skip update if within rate limit
+                }
+
+                grpc::ClientContext statsContext;
+                tgbot::builder::system_monitor::SystemStats statsResponse;
+                if (!monitorStub_->GetStats(&statsContext, {}, &statsResponse)
+                         .ok()) {
+                    LOG(ERROR) << "Failed to get system stats";
+                    return;
+                }
+                system_monitor::GetSystemInfoRequest infoRequest;
+                infoRequest.set_disk_path("/");
+                grpc::ClientContext infoContext;
+                tgbot::builder::system_monitor::SystemInfo infoResponse;
+                if (!monitorStub_
+                         ->GetSystemInfo(&infoContext, infoRequest,
+                                         &infoResponse)
+                         .ok()) {
+                    LOG(ERROR) << "Failed to get system info";
+                    return;
+                }
+
+                auto buildInfoBuffer = fmt::format(
+                    R"(
 <blockquote>▶️ <b>Start time</b>: {} [GMT]
 🕐 <b>Time spent</b>: {:%H hours %M minutes %S seconds}
 🔄 <b>Last updated on</b>: {} [GMT]</blockquote>
@@ -616,39 +643,30 @@ retry:
 ❗️ <b>Job count</b>: {}</blockquote>
 <blockquote>💬 <b>Log message</b>:
 {}</blockquote>)",
-                fmt::format("{:%Y-%m-%d %H:%M:%S}", start),
-                std::chrono::system_clock::now() - start,
-                fmt::format("{:%Y-%m-%d %H:%M:%S}",
-                            std::chrono::system_clock::from_time_t(
-                                logEntry.timestamp())),
-                targetRom, targetBranch, deviceCodename, variant,
-                infoResponse.cpu_name(), statsResponse.cpu_usage_percent(),
-                statsResponse.memory_used_mb(), statsResponse.memory_total_mb(),
-                infoResponse.disk_used_gb(), infoResponse.disk_total_gb(),
-                std::thread::hardware_concurrency(), logEntry.message());
+                    fmt::format("{:%Y-%m-%d %H:%M:%S}", start),
+                    std::chrono::system_clock::now() - start,
+                    fmt::format("{:%Y-%m-%d %H:%M:%S}",
+                                std::chrono::system_clock::from_time_t(
+                                    entry.timestamp())),
+                    targetRom, targetBranch, deviceCodename, variant,
+                    infoResponse.cpu_name(), statsResponse.cpu_usage_percent(),
+                    statsResponse.memory_used_mb(),
+                    statsResponse.memory_total_mb(),
+                    infoResponse.disk_used_gb(), infoResponse.disk_total_gb(),
+                    std::thread::hardware_concurrency(), entry.message());
 
-            try {
-                _api->editMessage<TgBotApi::ParseMode::HTML>(
-                    sentMessage, buildInfoBuffer, kb.get());
-            } catch (const TgBot::TgException& e) {
-                LOG(ERROR) << "Failed to edit message: " << e.what();
-            }
-        });
+                try {
+                    _api->editMessage<TgBotApi::ParseMode::HTML>(
+                        sentMessage, buildInfoBuffer, kb.get());
+                } catch (const TgBot::TgException& e) {
+                    LOG(ERROR) << "Failed to edit message: " << e.what();
+                }
+            });
 
-    if (!streamSuccess) {
-        LOG(ERROR) << "Failed to stream logs";
-
-        android::BuildSubmission submission;
-        if (!buildService_->getStatus(logRequest, &submission)) {
-            LOG(ERROR)
-                << "Failed to get build status after log streaming failure";
-        } else {
-            if (submission.accepted()) {
-                LOG(INFO) << "Build is still running, retrying log stream...";
-                goto retry;
-            } else {
-                LOG(INFO) << "Build is no longer running";
-            }
+        if (!status) {
+            LOG(ERROR) << "Failed to read from log stream";
+            _api->editMessage(sentMessage, "Failed to read from log stream",
+                              backKeyboard2);
         }
     }
 
@@ -664,42 +682,20 @@ retry:
     std::filesystem::path streamFilePath =
         "built_artifact_" + build.getId() + ".zip";
 
-    bool resultSuccess = buildService_->getBuildResult(
-        logRequest, [&](const android::BuildResult& result) {
-            lastBuildResult = result;
-            if (!result.success()) {
-                return;
-            }
-            // Handle streaming data
-            if (result.has_stream_data()) {
-                if (!isStream) {
-                    isStream = true;
-                    streamFile.open(streamFilePath, std::ios::binary);
-                    if (!streamFile.is_open()) {
-                        LOG(ERROR)
-                            << "Failed to open stream file: " << streamFilePath;
-                        return;
-                    }
-                }
-                streamFile.write(result.stream_data().data(),
-                                 result.stream_data().size());
-            }
-        });
-
-    if (streamFile.is_open()) {
-        streamFile.close();
-    }
-
-    if (!resultSuccess) {
-        LOG(ERROR) << "Failed to get build result";
-        _api->editMessage(sentMessage, "Failed to get build result",
+    auto buildResultStream = buildService_->getBuildResult(logRequest);
+    if (!buildResultStream || !buildResultStream->readOnce(&lastBuildResult)) {
+        LOG(ERROR) << "Failed to get build result stream or read from it";
+        _api->editMessage(sentMessage,
+                          "Failed to get build result stream or read from it",
                           backKeyboard2);
         build.finish();
         return;
     }
 
+    // Failure case: if build failed, show error message and send error log if
+    // available
     if (!lastBuildResult.success()) {
-        auto str = lastBuildResult.error_message();
+        const auto& str = lastBuildResult.error_message();
         std::vector<std::string_view> vec = absl::StrSplit(str, '\n');
         if (vec.size() > 0) {
             LOG(ERROR) << "Build failed: " << vec.front();
@@ -729,6 +725,10 @@ retry:
         build.finish();
         return;
     }
+
+    // Success case: if build succeeded, show success message and send file if
+    // available
+
     if (do_upload) {
         switch (lastBuildResult.upload_method()) {
             case android::UploadMethod::LocalFile: {
@@ -805,6 +805,11 @@ Download the built artifact here: <a href="{}">{}</a>)",
                 break;
             }
         }
+    } else {
+        _api->editMessage(
+            sentMessage,
+            showPerBuild(per_build, R"(Build complete! Download is disabled.)"),
+            backKeyboard);
     }
 
     if (isStream) {

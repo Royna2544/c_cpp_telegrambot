@@ -2,7 +2,10 @@
 
 #include <gmock/gmock.h>
 
+#include <memory>
+
 #include "../../src/api/builtin_modules/builder/android/IROMBuildService.hpp"
+#include "ROMBuild_service.pb.h"
 
 namespace tgbot::builder::android {
 
@@ -30,10 +33,8 @@ class MockROMBuildService : public IROMBuildService {
                 (const BuildRequest& request, BuildSubmission* response),
                 (override));
 
-    MOCK_METHOD(bool, streamLogs,
-                (const BuildAction& request,
-                 std::function<void(const BuildLogEntry&)> callback),
-                (override));
+    MOCK_METHOD(std::unique_ptr<RepeatableSource<BuildLogEntry>>, streamLogs,
+                (const BuildAction& request), (override));
 
     MOCK_METHOD(bool, cancelBuild, (const BuildAction& request), (override));
 
@@ -41,10 +42,8 @@ class MockROMBuildService : public IROMBuildService {
                 (const BuildAction& request, BuildSubmission* response),
                 (override));
 
-    MOCK_METHOD(bool, getBuildResult,
-                (const BuildAction& request,
-                 std::function<void(const BuildResult&)> callback),
-                (override));
+    MOCK_METHOD(std::unique_ptr<RepeatableSource<BuildResult>>, getBuildResult,
+                (const BuildAction& request), (override));
 };
 
 }  // namespace tgbot::builder::android
