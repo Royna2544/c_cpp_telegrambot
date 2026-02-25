@@ -1462,7 +1462,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                             no_ccache, vendor_name, device_entry.codename, rel, build_variant, rom_entry.target, parallel_jobs)
                     }
                     None => {
-                        format!("set -e\nsource build/envsetup.sh\n{}\nllunch {}_{}-{}\nm {} -j{}\nexit 0\n", 
+                        format!("set -e\nsource build/envsetup.sh\n{}\nlunch {}_{}-{}\nm {} -j{}\nexit 0\n", 
                             no_ccache, vendor_name, device_entry.codename, build_variant, rom_entry.target, parallel_jobs)
                     }
                 };
