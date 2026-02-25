@@ -1,4 +1,5 @@
 #include <absl/log/check.h>
+#include <absl/log/log.h>
 #include <absl/strings/match.h>
 #include <absl/strings/str_split.h>
 #include <absl/strings/strip.h>
@@ -793,8 +794,21 @@ Download the built artifact here: <a href="{}">{}</a>)",
                             backKeyboard);
                         break;
                     }
+                    // Write the first chunk of stream data that came with the
+                    // build result
                     streamFile.write(lastBuildResult.stream_data().data(),
                                      lastBuildResult.stream_data().size());
+                    buildResultStream->readAll(
+                        [&streamFile](const android::BuildResult& result) {
+                            streamFile.write(result.stream_data().data(),
+                                             result.stream_data().size());
+                            LOG_EVERY_N(INFO, 100)
+                                << "Written another 100 chunks of stream data, "
+                                   "total size: "
+                                << streamFile.tellp() << " bytes";
+                        });
+
+                    streamFile.close();
                 } else {
                     _api->editMessage(
                         sentMessage,
