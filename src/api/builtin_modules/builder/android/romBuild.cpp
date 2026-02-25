@@ -665,8 +665,19 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
 
         if (!status) {
             LOG(ERROR) << "Failed to read from log stream";
-            _api->editMessage(sentMessage, "Failed to read from log stream",
-                              backKeyboard2);
+            android::BuildSubmission submission;
+            if (!buildService_->getStatus(logRequest, &submission)) {
+                LOG(ERROR) << "Failed to get build status after log streaming "
+                              "failure";
+                break;
+            } else {
+                if (submission.accepted()) {
+                    LOG(INFO) << "Build is still running, retrying...";
+                } else {
+                    LOG(INFO) << "Build is no longer running";
+                    break;
+                }
+            }
         }
     }
 
