@@ -9,7 +9,7 @@ DECLARE_COMMAND_HANDLER(setowner) {
         api->sendReplyMessage(message->message(),
                               res->get(Strings::BOT_OWNER_SET));
     } else {
-        LOG(WARNING) << "Your word rejected";
+        LOG(WARNING) << "#setowner rejected";
     }
 }
 
