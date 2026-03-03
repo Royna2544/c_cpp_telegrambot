@@ -38,5 +38,10 @@
         "codename": "a30s",
         "name": "Galaxy A30s",
         "manufacturer": "Samsung"
+    },
+    {
+        "codename": "d1x",
+        "name": "Galaxy Note 10 5G",
+        "manufacturer": "Samsung"
     }
 ]
