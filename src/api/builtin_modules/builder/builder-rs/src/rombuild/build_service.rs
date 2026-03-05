@@ -442,6 +442,55 @@ export RBE_LINT_POOL=default"##,
 
         Ok(success)
     }
+
+    async fn find_artifact(
+        build_dir: &PathBuf,
+        codename: &String,
+        rom_entry: &ROMEntry,
+    ) -> Result<Vec<PathBuf>, Status> {
+        let output_dir = build_dir
+            .join("out")
+            .join("target")
+            .join("product")
+            .join(&codename);
+        match rom_entry.artifact.matcher {
+            ROMArtifactMatcher::ZipFilePrefixer => {
+                let prefix = &rom_entry.artifact.data;
+                let mut artifact_paths: Vec<PathBuf> = Vec::new();
+                let mut found = false;
+                for entry in std::fs::read_dir(&output_dir).map_err(|e| {
+                    tonic::Status::internal(format!("Failed to read output directory: {}", e))
+                })? {
+                    let entry = entry.map_err(|e| {
+                        tonic::Status::internal(format!("Failed to read output entry: {}", e))
+                    })?;
+                    let file_name = entry.file_name().to_string_lossy().to_string();
+                    if file_name.starts_with(prefix) && file_name.ends_with(".zip") {
+                        artifact_paths.push(output_dir.join(&file_name));
+                        found = true;
+                    }
+                }
+                if !found {
+                    Err(tonic::Status::not_found(
+                        "Artifact not found with specified prefix",
+                    ))
+                } else {
+                    Ok(artifact_paths)
+                }
+            }
+            ROMArtifactMatcher::ExactMatcher => {
+                let exact_name = &rom_entry.artifact.data;
+                let artifact_path = output_dir.join(&exact_name);
+                if !artifact_path.exists() {
+                    Err(tonic::Status::not_found(
+                        "Artifact not found with exact name",
+                    ))
+                } else {
+                    Ok(vec![artifact_path])
+                }
+            }
+        }
+    }
 }
 
 fn log_who_asked_me(method: &str, request: &Request<impl std::fmt::Debug>) {
@@ -665,8 +714,12 @@ impl rom_build_service_server::RomBuildService for BuildService {
                         if send2.is_err() {
                             error!("Failed to send cancellation log: {}", send2.err().unwrap());
                         }
-                        tracing::info!("Build cancelled via Ctrl-C signal.");
-                        kill_tx_clone_for_ctrlc.closed().await; // Wait for the build task to acknowledge cancellation
+                        info!("Build cancelled via Ctrl-C signal.");
+                        let _ = tokio::time::timeout(
+                            std::time::Duration::from_secs(5),
+                            kill_tx_clone_for_ctrlc.closed()
+                        ).await;
+                        info!("Exiting Ctrl-C handler task.");
                     }
                     signal::kill(Pid::this(), Signal::SIGINT).expect("Failed to send SIGINT to self");
                 }
@@ -1568,6 +1621,25 @@ impl rom_build_service_server::RomBuildService for BuildService {
                     }
                 }
 
+                // Delete matching artifact from previous builds to prevent confusion. We will check for the artifact after the build completes, 
+                // if it's not there, we know the build failed. If it's there, we know the build succeeded and we can proceed to upload.
+                match Self::find_artifact(&build_dir_clone, &device_entry.codename, &rom_entry).await {
+                    Ok(artifacts) => {
+                        send_log!(LogLevel::Info, format!("Removing existing artifact from previous builds to prevent confusion. (count: {})", artifacts.len()));
+                        for artifact in artifacts {
+                            std::fs::remove_file(&artifact).map_err(|e| {
+                                tonic::Status::internal(format!(
+                                    "Failed to remove existing artifact for clean build: {}",
+                                    e
+                                ))
+                            })?;
+                        }
+                    }
+                    Err(e) => {
+                        send_log!(LogLevel::Warning, format!("Failed to check for existing artifacts before build: {}", e));
+                    }
+                }
+
                 let mut cmd = Command::new("bash");
                 cmd.current_dir(&build_dir_clone);
 
@@ -1632,61 +1704,32 @@ impl rom_build_service_server::RomBuildService for BuildService {
                 send_log!(LogLevel::Info, "Build process completed successfully.".to_string());
 
                 if settings_clone.lock().await.do_upload() {
-                    // Finally, check for output file
-                    let output_dir = build_dir_clone.join("out").join("target").join("product").join(&device_entry.codename);
-                    let artifact = match rom_entry.artifact.matcher {
-                        ROMArtifactMatcher::ZipFilePrefixer => {
-                            let prefix = rom_entry.artifact.data;
-                            let mut artifact_path: Option<PathBuf> = None;
-                            let mut found = false;
-                            for entry in std::fs::read_dir(&output_dir).map_err(|e| {
-                                tonic::Status::internal(format!("Failed to read output directory: {}", e))
-                            })? {
-                                let entry = entry.map_err(|e| {
-                                    tonic::Status::internal(format!("Failed to read output entry: {}", e))
-                                })?;
-                                let file_name = entry.file_name().to_string_lossy().to_string();
-                                if file_name.starts_with(&prefix) && file_name.ends_with(".zip") {
-                                    send_log!(LogLevel::Info, format!("Found output artifact: {}", file_name));
-                                    artifact_path = Some(output_dir.join(&file_name));
-                                    found = true;
-                                    break;
-                                }
-                            }
-                            if !found {
-                                send_log!(LogLevel::Error, format!("No output artifact found with prefix: {}", prefix));
-                                None
-                            } else {
-                                artifact_path
-                            }
+                    match Self::find_artifact(&build_dir_clone, &device_entry.codename, &rom_entry).await {
+                        Ok(artifact) => {
+                        send_log!(LogLevel::Info, format!("Found {} artifact(s) for upload.", artifact.len()));
+                        for (i, path) in artifact.iter().enumerate() {
+                            send_log!(LogLevel::Info, format!("Artifact {}: {:?}", i + 1, path));
                         }
-                        ROMArtifactMatcher::ExactMatcher => {
-                            let exact_name = rom_entry.artifact.data;
-                            let artifact_path = output_dir.join(&exact_name);
-                            if !artifact_path.exists() {
-                                send_log!(LogLevel::Error, format!("No output artifact found with exact name: {}", exact_name));
-                                None
-                            } else {
-                            send_log!(LogLevel::Info, format!("Found output artifact: {:?}", artifact_path));
-                            Some(artifact_path)
-
-                            }
+                        if artifact.len() != 1 {
+                            send_log!(LogLevel::Warning, format!("Expected to find exactly one artifact, but found {}.", artifact.len()));
                         }
-                    };
-                    if let Some(artifact_path) = artifact {
-                        send_log!(LogLevel::Info, format!("Build artifact located at: {:?}", artifact_path));
+                        let artifact_it = artifact.into_iter().next().unwrap_or_else(|| {
+                            send_log!(LogLevel::Error, "Failed to select an artifact for upload.".to_string());
+                            std::path::PathBuf::new()
+                        });
+                        send_log!(LogLevel::Info, format!("Build artifact located at: {:?}", artifact_it));
                         let mut uploads = uploads_clone.lock().await;
                         match req.upload_method {
                             val if val == UploadMethod::None as i32 => {
                                 send_log!(LogLevel::Info, "Upload method set to None, skipping upload.".to_string());
                             }
                             val if val == UploadMethod::LocalFile as i32 => {
-                                send_log!(LogLevel::Info, format!("File ready at local path: {:?}", artifact_path));
+                                send_log!(LogLevel::Info, format!("File ready at local path: {:?}", artifact_it));
                                 uploads.push(
                                     UploadTask {
                                         build_id: build_id_clone.clone(),
                                         method: UploadMethod::LocalFile,
-                                        artifact_path: artifact_path.clone(),
+                                        artifact_path: artifact_it.clone(),
                                     }
                                 );
                             }
@@ -1696,7 +1739,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                                     UploadTask {
                                         build_id: build_id_clone.clone(),
                                         method: UploadMethod::GoFile,
-                                        artifact_path: artifact_path.clone(),
+                                        artifact_path: artifact_it.clone(),
                                     }
                                 );
                             }
@@ -1706,7 +1749,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                                     UploadTask {
                                         build_id: build_id_clone.clone(),
                                         method: UploadMethod::Stream,
-                                        artifact_path: artifact_path.clone(),
+                                        artifact_path: artifact_it.clone(),
                                     }
                                 );
                             }
@@ -1714,8 +1757,11 @@ impl rom_build_service_server::RomBuildService for BuildService {
                                 send_log!(LogLevel::Warning, "Unknown upload method specified, skipping upload.".to_string());   
                             }
                         }
-                    } else {
-                        send_log!(LogLevel::Error, "Build artifact not found.".to_string());
+
+                        }
+                        Err(e) => {
+                            send_log!(LogLevel::Error, format!("Failed to find build artifact: {}", e));
+                        }
                     }
                 } else {
                     send_log!(LogLevel::Info, "Upload disabled in settings, skipping artifact search.".to_string());
