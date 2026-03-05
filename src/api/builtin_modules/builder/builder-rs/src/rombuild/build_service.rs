@@ -101,6 +101,77 @@ pub struct BuildService {
 }
 
 impl BuildService {
+    fn write_rbe_env_sh(build_dir: PathBuf, rbe_api_token: &str) -> Result<(), Status> {
+        let rbe_env_path = build_dir.join("rbe_env.sh");
+        let content = format!(
+r##"# Remote Build Execution (RBE) configurations
+# See https://nopenopeguy.github.io/rbe for more information
+
+# --- Enable RBE and General Settings ---
+export USE_RBE=1
+export RBE_DIR="{}"
+export NINJA_REMOTE_NUM_JOBS=128
+
+# --- BuildBuddy Connection Settings ---
+export RBE_service="aosp.buildbuddy.io:443"
+export RBE_remote_headers="x-buildbuddy-api-key={}"
+export RBE_use_rpc_credentials=false
+export RBE_service_no_auth=true
+
+# --- Unified Downloads/Uploads (Recommended) ---
+export RBE_use_unified_downloads=true
+export RBE_use_unified_uploads=true
+
+# --- Execution Strategies (remote_local_fallback is generally best) ---
+export RBE_R8_EXEC_STRATEGY=remote_local_fallback
+export RBE_D8_EXEC_STRATEGY=remote_local_fallback
+export RBE_JAVAC_EXEC_STRATEGY=remote_local_fallback
+export RBE_JAR_EXEC_STRATEGY=remote_local_fallback
+export RBE_ZIP_EXEC_STRATEGY=remote_local_fallback
+export RBE_TURBINE_EXEC_STRATEGY=remote_local_fallback
+export RBE_SIGNAPK_EXEC_STRATEGY=remote_local_fallback
+export RBE_CXX_EXEC_STRATEGY=remote_local_fallback
+export RBE_CXX_LINKS_EXEC_STRATEGY=remote_local_fallback
+export RBE_ABI_LINKER_EXEC_STRATEGY=remote_local_fallback
+export RBE_CLANG_TIDY_EXEC_STRATEGY=remote_local_fallback
+export RBE_METALAVA_EXEC_STRATEGY=remote_local_fallback
+export RBE_LINT_EXEC_STRATEGY=remote_local_fallback
+
+# --- Enable RBE for Specific Tools ---
+export RBE_R8=1
+export RBE_D8=1
+export RBE_JAVAC=1
+export RBE_JAR=1
+export RBE_ZIP=1
+export RBE_TURBINE=1
+export RBE_SIGNAPK=1
+export RBE_CXX_LINKS=1
+export RBE_CXX=1
+export RBE_ABI_LINKER=1
+export RBE_CLANG_TIDY=1
+export RBE_METALAVA=1
+export RBE_LINT=1
+
+# --- Resource Pools ---
+export RBE_JAVA_POOL=default
+export RBE_METALAVA_POOL=default
+export RBE_LINT_POOL=default"##, build_dir.to_string_lossy().to_string(), rbe_api_token
+        );
+        std::fs::write(&rbe_env_path, content)
+            .map_err(|e| Status::internal(format!("Failed to write RBE env file: {}", e)))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = std::fs::metadata(&rbe_env_path)
+                .map_err(|e| Status::internal(format!("Failed to get metadata for RBE env file: {}", e)))?
+                .permissions();
+            perms.set_mode(0o600);
+            std::fs::set_permissions(&rbe_env_path, perms)
+                .map_err(|e| Status::internal(format!("Failed to set permissions for RBE env file: {}", e)))?;
+        }
+        Ok(())
+    }
+
     pub fn new(build_dir: PathBuf, temp_dir: PathBuf, configs: ROMBuildConfig) -> Self {
         let settings = Settings {
             do_repo_sync: Some(true),
@@ -1331,11 +1402,20 @@ impl rom_build_service_server::RomBuildService for BuildService {
 
                 // Now, start the build process
                 send_log!(LogLevel::Info, "Starting build process...".to_string());
-                let no_ccache = if !settings_clone.lock().await.use_ccache.unwrap() {
-                    "unset USE_CCACHE; unset CCACHE_EXEC;"
-                } else {
-                    "true"
-                };
+
+                let use_ccache = settings_clone.lock().await.use_ccache.unwrap_or(false);
+                let use_rbe = settings_clone.lock().await.use_rbe_service.unwrap_or(false);
+
+                if use_rbe {
+                    send_log!(LogLevel::Info, "Writing RBE environment configuration...".to_string());
+                    Self::write_rbe_env_sh(
+                        build_dir_clone.clone(),
+                        settings_clone.lock().await.rbe_api_token.as_ref().map(|s| s.as_str()).unwrap_or(""),
+                    ).map_err(|e| {
+                        tonic::Status::internal(format!("Failed to write RBE environment configuration: {}", e))
+                    })?;
+                    send_log!(LogLevel::Info, "RBE environment configuration written successfully.".to_string());
+                }
 
                 // Detect vendor type.
                 let vendor_dir = build_dir_clone.join("vendor");
@@ -1456,19 +1536,30 @@ impl rom_build_service_server::RomBuildService for BuildService {
 
                 let (stdin_tx, stdin_rx) = mpsc::channel(100);
 
+                let mut command_list = Vec::new();
+                command_list.push("set -e".to_string());
+                if use_rbe {
+                    command_list.push(format!("source {}", build_dir_clone.join("rbe_env.sh").to_string_lossy()));
+                }
+                if !use_ccache {
+                    command_list.push("unset USE_CCACHE; unset CCACHE_EXEC;".to_string());
+                }
+                command_list.push("source build/envsetup.sh".to_string());
+
                 let command = match release {
                     Some(ref rel) => {
-                        format!("set -e\nsource build/envsetup.sh\n{}\nlunch {}_{}-{}-{}\nm {} -j{}\nexit 0\n", 
-                            no_ccache, vendor_name, device_entry.codename, rel, build_variant, rom_entry.target, parallel_jobs)
+                        format!("lunch {}_{}-{}-{}", vendor_name, device_entry.codename, rel, build_variant)
                     }
                     None => {
-                        format!("set -e\nsource build/envsetup.sh\n{}\nlunch {}_{}-{}\nm {} -j{}\nexit 0\n", 
-                            no_ccache, vendor_name, device_entry.codename, build_variant, rom_entry.target, parallel_jobs)
+                        format!("lunch {}_{}-{}", vendor_name, device_entry.codename, build_variant)
                     }
                 };
+                command_list.push(command);
+                command_list.push(format!("m {} -j{}", rom_entry.target, parallel_jobs));
+                command_list.push("exit 0".to_string());
 
-                for line in command.lines() {
-                    stdin_tx.send(line.into()).await.map_err(|e| tonic::Status::internal(format!("Failed to send to stdin: {}", e)))?;
+                for line in command_list {
+                    stdin_tx.send((&line).clone().into()).await.map_err(|e| tonic::Status::internal(format!("Failed to send to stdin: {}", e)))?;
                     send_log!(LogLevel::Info, format!("Sent to stdin: {}", line));
                 }
 
