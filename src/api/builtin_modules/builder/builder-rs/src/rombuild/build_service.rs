@@ -101,10 +101,42 @@ pub struct BuildService {
 }
 
 impl BuildService {
-    fn write_rbe_env_sh(build_dir: PathBuf, rbe_api_token: &str) -> Result<(), Status> {
+    async fn setup_rbe_env(build_dir: PathBuf, rbe_api_token: &str) -> Result<(), Status> {
         let rbe_env_path = build_dir.join("rbe_env.sh");
+        let rbe_cli_path = build_dir.join("rbe_cli");
+
+        const RBE_CLI_URL: &str =
+            "https://chrome-infra-packages.appspot.com/dl/infra/rbe/client/linux-amd64/+/stable";
+        if !rbe_cli_path.exists() {
+            // Download rbe_cli binary
+            info!("Downloading RBE CLI from {}", RBE_CLI_URL);
+            let client = reqwest::Client::new();
+            let response = client
+                .get(RBE_CLI_URL)
+                .send()
+                .await
+                .map_err(|e| Status::internal(format!("Failed to download RBE CLI: {}", e)))?;
+
+            if !response.status().is_success() {
+                return Err(Status::internal(format!(
+                    "Failed to download RBE CLI: HTTP {}",
+                    response.status()
+                )));
+            }
+            let bytes = response
+                .bytes()
+                .await
+                .map_err(|e| Status::internal(format!("Failed to read RBE CLI response: {}", e)))?;
+            // Unzip the downloaded file.
+            let mut archive = zip::ZipArchive::new(std::io::Cursor::new(bytes))
+                .map_err(|e| Status::internal(format!("Failed to read RBE CLI zip: {}", e)))?;
+            // Unzip the files to rbe_cli/
+            archive
+                .extract(&rbe_cli_path)
+                .map_err(|e| Status::internal(format!("Failed to extract RBE CLI: {}", e)))?;
+        }
         let content = format!(
-r##"# Remote Build Execution (RBE) configurations
+            r##"# Remote Build Execution (RBE) configurations
 # See https://nopenopeguy.github.io/rbe for more information
 
 # --- Enable RBE and General Settings ---
@@ -155,7 +187,9 @@ export RBE_LINT=1
 # --- Resource Pools ---
 export RBE_JAVA_POOL=default
 export RBE_METALAVA_POOL=default
-export RBE_LINT_POOL=default"##, build_dir.to_string_lossy().to_string(), rbe_api_token
+export RBE_LINT_POOL=default"##,
+            rbe_cli_path.to_string_lossy().to_string(),
+            rbe_api_token
         );
         std::fs::write(&rbe_env_path, content)
             .map_err(|e| Status::internal(format!("Failed to write RBE env file: {}", e)))?;
@@ -163,11 +197,14 @@ export RBE_LINT_POOL=default"##, build_dir.to_string_lossy().to_string(), rbe_ap
         {
             use std::os::unix::fs::PermissionsExt;
             let mut perms = std::fs::metadata(&rbe_env_path)
-                .map_err(|e| Status::internal(format!("Failed to get metadata for RBE env file: {}", e)))?
+                .map_err(|e| {
+                    Status::internal(format!("Failed to get metadata for RBE env file: {}", e))
+                })?
                 .permissions();
             perms.set_mode(0o600);
-            std::fs::set_permissions(&rbe_env_path, perms)
-                .map_err(|e| Status::internal(format!("Failed to set permissions for RBE env file: {}", e)))?;
+            std::fs::set_permissions(&rbe_env_path, perms).map_err(|e| {
+                Status::internal(format!("Failed to set permissions for RBE env file: {}", e))
+            })?;
         }
         Ok(())
     }
@@ -1408,10 +1445,10 @@ impl rom_build_service_server::RomBuildService for BuildService {
 
                 if use_rbe {
                     send_log!(LogLevel::Info, "Writing RBE environment configuration...".to_string());
-                    Self::write_rbe_env_sh(
+                    Self::setup_rbe_env(
                         build_dir_clone.clone(),
                         settings_clone.lock().await.rbe_api_token.as_ref().map(|s| s.as_str()).unwrap_or(""),
-                    ).map_err(|e| {
+                    ).await.map_err(|e| {
                         tonic::Status::internal(format!("Failed to write RBE environment configuration: {}", e))
                     })?;
                     send_log!(LogLevel::Info, "RBE environment configuration written successfully.".to_string());
