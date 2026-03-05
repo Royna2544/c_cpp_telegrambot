@@ -489,7 +489,13 @@ int app_main(int argc, char** argv) {
         return TGBOT_EXITCODE_CONFIG;
     }
 
-    auto api = injector.get<TgBotApi*>();
+    TgBotApi* api = nullptr;
+    try {
+        api = injector.get<TgBotApi*>();
+    } catch (const std::exception& ex) {
+        LOG(ERROR) << "Failed to initialize TgBotApi: " << ex.what();
+        return TGBOT_EXITCODE_TELEGRAM_API;
+    }
 
     try {
         (void)api->getBotUser();
