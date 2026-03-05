@@ -27,6 +27,7 @@ class IROMBuildService {
         virtual ~RepeatableSource() = default;
         virtual bool readOnce(T* output) = 0;
         virtual bool readAll(std::function<void(const T&)> callback) = 0;
+        virtual grpc::Status finish() = 0;
 
         // Disable copy and move semantics
         RepeatableSource(const RepeatableSource&) = delete;

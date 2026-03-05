@@ -44,7 +44,9 @@ class GrpcROMBuildService : public IROMBuildService {
             return anyRead;
         }
 
-        [[nodiscard]] grpc::Status finish() { return stream_->Finish(); }
+        [[nodiscard]] grpc::Status finish() override {
+            return stream_->Finish();
+        }
 
        private:
         std::unique_ptr<grpc::ClientReader<T>> stream_;

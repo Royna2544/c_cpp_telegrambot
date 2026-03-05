@@ -11,7 +11,6 @@
 #include <string_view>
 #include <unordered_map>
 #include <utility>
-#include <variant>
 
 struct RepoInfo {
     std::string url;
@@ -29,6 +28,8 @@ class ConfigParser {
         struct Artifact {
             std::string matcher;
             std::string data;
+
+            bool operator==(const Artifact& other) const = default;
         } artifact;
 
         bool operator==(const ROMInfo& other) const = default;
@@ -38,6 +39,10 @@ class ConfigParser {
         using Ptr = std::shared_ptr<AndroidVersion>;
         float version;
         std::string name;
+
+        bool operator==(const AndroidVersion& other) const {
+            return version == other.version;
+        }
     };
 
     struct ROMBranch {
@@ -58,6 +63,12 @@ class ConfigParser {
                 throw std::logic_error("No rom info available");
             }
             return makeKey(romInfo->name, androidVersion->version);
+        }
+
+        bool operator==(const ROMBranch& other) const {
+            return branch == other.branch &&
+                   androidVersion->version == other.androidVersion->version &&
+                   romInfo->name == other.romInfo->name;
         }
     };
 
@@ -118,35 +129,19 @@ struct PerBuildData {
     ConfigParser::Device::Ptr device;
     // associated local manifest
     ConfigParser::LocalManifest::Ptr localManifest;
-    enum class Variant {
+    enum class Variant : uint8_t {
         kUser,
         kUserDebug,
         kEng
     } variant;  // Target build variant
 
-    enum class Result { NONE, SUCCESS, ERROR_NONFATAL, ERROR_FATAL };
+    enum class Result : uint8_t { NONE, SUCCESS, ERROR_NONFATAL, ERROR_FATAL };
 
     void reset() {
         device.reset();
         localManifest.reset();
         variant = Variant::kUser;
-        result = nullptr;
     }
-
-    struct ResultData {
-        static constexpr int MSG_SIZE = 512;
-        Result value = Result::NONE;
-        std::array<char, MSG_SIZE> msg{};
-        void setMessage(const std::string& message) {
-            LOG_IF(WARNING, message.size() > msg.size())
-                << "Message size is " << message.size()
-                << " bytes, which exceeds limit";
-            std::strncpy(msg.data(), message.c_str(), msg.size() - 1);
-        }
-        [[nodiscard]] std::string getMessage() const noexcept {
-            return msg.data();
-        }
-    }* result;
 };
 
 inline std::ostream& operator<<(std::ostream& os,

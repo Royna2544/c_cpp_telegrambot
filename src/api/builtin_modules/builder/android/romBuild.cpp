@@ -19,6 +19,7 @@
 #include <api/CommandModule.hpp>
 #include <api/TgBotApi.hpp>
 #include <chrono>
+#include <cstdint>
 #include <cstdlib>
 #include <filesystem>
 #include <initializer_list>
@@ -72,7 +73,7 @@ class ROMBuildQueryHandler {
     KeyboardType mainKeyboard;
     KeyboardType backKeyboard;
 
-    enum class Buttons;
+    enum class Buttons : uint8_t;
     ConfigParser parser;
 
     // Create keyboard given buttons enum and x length
@@ -206,7 +207,7 @@ class ROMBuildQueryHandler {
         DECLARE_BUTTON_HANDLER_WITHPREFIX("Select build variant", type,
                                           "type_")};
 
-    enum class Buttons {
+    enum class Buttons : uint8_t {
         repo_sync,
         back,
         cancel,
@@ -361,7 +362,7 @@ std::string keyToString(const std::string& key, const bool enabled) {
 
 void notify_remote(
     tgbot::builder::android::IROMBuildService* service,
-    std::function<void(tgbot::builder::android::Settings*)> func) {
+    const std::function<void(tgbot::builder::android::Settings*)>& func) {
     tgbot::builder::android::Settings request;
     func(&request);
     bool success = service->setSettings(request);
@@ -448,7 +449,6 @@ void ROMBuildQueryHandler::handle_cancel(const Query& query) {
         build.finish();
         shutdown();
         LOG(INFO) << "User cancelled build";
-        handle_back(query);
         _api->answerCallbackQuery(query->id, "Task successfully cancelled!");
     } else {
         _api->deleteMessage(sentMessage);
@@ -507,6 +507,17 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     if (didpin) {
         _api->unpinMessage(sentMessage);
     }
+
+    notify_remote(
+        buildService_.get(), [&](tgbot::builder::android::Settings* settings) {
+            settings->set_do_repo_sync(do_repo_sync);
+            settings->set_do_upload(do_upload);
+            settings->set_use_rbe_service(do_use_rbe);
+            if (do_use_rbe) {
+                settings->set_rbe_api_token(
+                    *_config->get(ConfigManager::Configs::BUILDBUDDY_API_KEY));
+            }
+        });
 
     grpc::ClientContext context;
     tgbot::builder::android::BuildRequest request;
@@ -707,10 +718,22 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     // Failure case: if build failed, show error message and send error log if
     // available
     if (!lastBuildResult.success()) {
+        auto status = buildResultStream->finish();
+        if (!status.ok()) {
+            LOG(ERROR) << "Build failed and buildResultStream stream finished "
+                          "with error: "
+                       << status.error_message();
+            _api->editMessage(
+                sentMessage,
+                "Build failed and buildResultStream stream finished with error",
+                backKeyboard2);
+            build.finish();
+            return;
+        }
         const auto& str = lastBuildResult.error_message();
         std::vector<std::string_view> vec = absl::StrSplit(str, '\n');
         if (vec.size() > 0) {
-            LOG(ERROR) << "Build failed: " << vec.front();
+            LOG(ERROR) << "Build failed: first line: " << vec.front();
         } else {
             LOG(ERROR) << "Build failed, empty error message";
         }
@@ -858,6 +881,21 @@ Build ID: <code>{}</code>)",
     }
 
     // Success
+    auto status = buildResultStream->finish();  // Finish the stream
+    if (!status.ok()) {
+        LOG(ERROR)
+            << "Build succeeded but buildResultStream finished with error: "
+            << status.error_message();
+        _api->editMessage(
+            sentMessage,
+            showPerBuild(
+                per_build,
+                R"(Build succeeded but failed to get complete result!)"),
+            backKeyboard2);
+        build.finish();
+        return;
+    }
+
     _api->editMessageMarkup(sentMessage, nullptr);
 
     if (didpin) {
@@ -986,6 +1024,11 @@ void ROMBuildQueryHandler::handle_rom(const Query& query) {
     std::ranges::sort(androidVersions);
     auto [b, e] = std::ranges::unique(androidVersions);
     androidVersions.erase(b, e);
+
+    // Sort android versions by version number
+    std::ranges::sort(androidVersions, [](const auto& a, const auto& b) {
+        return a->version < b->version;
+    });
 
     KeyboardBuilder builder;
     for (const auto& version : androidVersions) {

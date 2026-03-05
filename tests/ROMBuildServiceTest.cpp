@@ -115,6 +115,8 @@ struct TestRepeatableSource : public IROMBuildService::RepeatableSource<T> {
         }
         return true;
     }
+
+    grpc::Status finish() override { return grpc::Status::OK; }
 };
 
 /**
