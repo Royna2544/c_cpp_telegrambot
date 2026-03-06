@@ -650,30 +650,34 @@ TgBotApiImpl::TgBotApiImpl(const std::string_view token, AuthContext* auth,
             TgBot::Update::Types::chat_join_request |
             TgBot::Update::Types::edited_message);
 
-    std::string removePrefix =
-        _provider->config
-            ->get(ConfigManager::Configs::
-                      TELEGRAM_API_SERVER_FILEPATH_REMOVE_PREFIX)
-            .value_or("");
-    std::string appendPrefix =
-        _provider->config
-            ->get(ConfigManager::Configs::
-                      TELEGRAM_API_SERVER_FILEPATH_APPEND_PREFIX)
-            .value_or("");
+    const auto* config = _provider->config.get();
 
-    _apiServerLocalMapper = [removePrefix = std::move(removePrefix),
-                             appendPrefix = std::move(appendPrefix)](
-                                const std::string_view filePath) {
-        std::string path(filePath);
-        DLOG(INFO) << "Original file path: " << path;
-        if (!removePrefix.empty() && absl::StartsWith(path, removePrefix)) {
-            path = absl::StripPrefix(path, removePrefix);
+    // Assumption: If the API server is customized, this means custom api server
+    // is used.
+    if (config->get(ConfigManager::Configs::TELEGRAM_API_SERVER)) {
+        auto removePrefix = _provider->config->get(
+            ConfigManager::Configs::TELEGRAM_API_SERVER_FILEPATH_REMOVE_PREFIX);
+        auto appendPrefix = _provider->config->get(
+            ConfigManager::Configs::TELEGRAM_API_SERVER_FILEPATH_APPEND_PREFIX);
+
+        if (removePrefix && appendPrefix) {
+            LOG(INFO) << "Setting up API server local file path mapper";
+            _apiServerLocalMapper = [removePrefix = std::move(*removePrefix),
+                                     appendPrefix = std::move(*appendPrefix)](
+                                        const std::string_view filePath) {
+                std::string path(filePath);
+                DLOG(INFO) << "Original file path: " << path;
+                if (!removePrefix.empty() &&
+                    absl::StartsWith(path, removePrefix)) {
+                    path = absl::StripPrefix(path, removePrefix);
+                }
+                DLOG(INFO) << "Mapped file path (Before prefixing): " << path;
+                auto it = appendPrefix + path;
+                DLOG(INFO) << "Mapped file path (After prefixing): " << it;
+                return std::move(it);
+            };
         }
-        DLOG(INFO) << "Mapped file path (Before prefixing): " << path;
-        auto it = appendPrefix + path;
-        DLOG(INFO) << "Mapped file path (After prefixing): " << it;
-        return std::move(it);
-    };
+    }
 }
 
 TgBotApiImpl::~TgBotApiImpl() = default;
