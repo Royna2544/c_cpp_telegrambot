@@ -1961,7 +1961,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                 .find(|task| task.build_id == req.build_id);
             if !upload_task_.is_some() {
                 tx.send(Ok(BuildResult {
-                    success: false,
+                    success: true,
                     upload_method: UploadMethod::None as i32,
                     result_details: None,
                     error_message: Some("No upload task found for this build.".into()),
