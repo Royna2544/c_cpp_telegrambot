@@ -817,6 +817,12 @@ Download the built artifact here: <a href="{}">{}</a>)",
                             backKeyboard);
                         break;
                     }
+
+                    _api->editMessage(sentMessage,
+                                      showPerBuild(per_build,
+                                                   R"(Build complete! Downloading the built artifact...)"),
+                                      backKeyboard);
+                                      
                     // Write the first chunk of stream data that came with the
                     // build result
                     streamFile.write(lastBuildResult.stream_data().data(),
