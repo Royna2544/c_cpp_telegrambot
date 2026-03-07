@@ -20,6 +20,7 @@ pub use grpc_pb::linux_kernel_build_service_server;
 use nix::sys::signal::{self, Signal};
 #[cfg(unix)]
 use nix::unistd::Pid;
+use uuid::timestamp::context;
 use std::fs::File;
 use std::io::Read;
 use std::num::NonZero;
@@ -33,7 +34,7 @@ use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, broadcast};
 use tokio::sync::mpsc;
 use tokio_stream::Stream;
 use tokio_stream::wrappers::ReceiverStream;
@@ -80,6 +81,7 @@ pub struct BuildService {
     builder_config: BuilderConfig,
     temp_directory: PathBuf,
     output_directory: PathBuf,
+    pub shutdown_tx: broadcast::Sender<()>, // Channel to signal shutdown
 }
 type WrappedBuildStatus = Arc<Mutex<Vec<PerBuildIdStatus>>>;
 type WrappedContexts = Arc<Mutex<Vec<BuildContext>>>;
@@ -91,6 +93,8 @@ impl BuildService {
         temp_directory: PathBuf,
         output_directory: PathBuf,
     ) -> Self {
+        let (shutdown_tx, _) = broadcast::channel(1);
+
         info!(
             "BuildService initialized with {} kernel configs.",
             &kernel_configs.len()
@@ -102,17 +106,41 @@ impl BuildService {
                 .map(|c| &c.name)
                 .collect::<Vec<&String>>()
         );
+        let contexts: Arc<Mutex<Vec<BuildContext>>> = Arc::new(Mutex::new(Vec::new()));
+        let contexts_clone = contexts.clone();
 
-        let v = BuildService {
+        tokio::spawn(async move {
+            tokio::signal::ctrl_c().await.expect("Failed to listen for Ctrl-C");
+            info!("Global Ctrl-C received");
+            
+            // Check if build is active
+            let job = contexts_clone.lock().await;
+            if let Some(active) = job.iter().find(|c| c.kill_signal.is_some()) {
+                info!("Active build found (ID: {}), sending kill signal...", active.id);
+                if let Some(kill_tx) = &active.kill_signal {
+                    let _ = kill_tx.send(()).await;
+                    info!("Kill signal sent to active build (ID: {})", active.id);
+                } else {
+                    warn!("No kill signal channel found for active build (ID: {})", active.id);
+                }
+            } else {
+                info!("No active build found, proceeding with shutdown.");
+            }
+            
+            info!("Exiting server");
+            std::process::exit(0);
+        });
+
+        BuildService {
             kernel_configs: Arc::new(Mutex::new(kernel_configs)),
-            contexts: Arc::new(Mutex::new(Vec::new())),
+            contexts: contexts,
             id: Arc::new(Mutex::new(0)),
             build_statuses: Arc::new(Mutex::new(Vec::new())),
             builder_config,
             temp_directory,
             output_directory,
-        };
-        v
+            shutdown_tx,
+        }
     }
 
     async fn add_artifact_path_to_context(

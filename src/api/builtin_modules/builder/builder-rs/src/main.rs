@@ -242,8 +242,14 @@ async fn main() {
     // 4. Initialize Health Check Service
     let health_service = health::HealthServiceImpl::new();
 
-    // 3. Build and Run the Server
-    let x = Server::builder()
+    // Subscribe to shutdown signal from ROM Build Service
+    let mut android_shutdown_rx = android_build_service.shutdown_tx.subscribe();
+
+    // Subscribe to shutdown signal from Kernel Build Service
+    let mut kernel_shutdown_rx = build_service.shutdown_tx.subscribe();
+
+    // Build and Run the Server
+    let server = Server::builder()
         .add_service(
             tonic_reflection::server::Builder::configure()
                 .register_encoded_file_descriptor_set(FILE_DESCRIPTOR_SET)
@@ -253,10 +259,21 @@ async fn main() {
         .add_service(LinuxKernelBuildServiceServer::new(build_service))
         .add_service(RomBuildServiceServer::new(android_build_service))
         .add_service(HealthCheckServiceServer::new(health_service))
-        .add_service(SystemMonitorServiceServer::new(system_monitor))
-        .serve(addr)
-        .await
-        .inspect_err(|err| error!("Cannot bind and serve service: {}", err));
+        .add_service(SystemMonitorServiceServer::new(system_monitor));
 
-    info!("Server exited: {:?}", x);
+        tokio::select! {
+            ret = server.serve(addr) => {
+                if let Err(e) = ret {
+                    error!("Android Server error: {}", e);
+                } else {
+                    info!("Android Server has shut down gracefully.");
+                }
+            },
+            _ = android_shutdown_rx.recv() => {
+                info!("AND: Shutdown signal received, stopping server");
+            }
+            _ = kernel_shutdown_rx.recv() => {
+                info!("KRN: Shutdown signal received, stopping server");
+            }
+        }
 }

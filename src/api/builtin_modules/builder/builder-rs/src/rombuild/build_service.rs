@@ -98,6 +98,7 @@ pub struct BuildService {
     active_job: Arc<Mutex<Option<ActiveBuild>>>,
     active_uploads: Arc<Mutex<Vec<UploadTask>>>,
     known_builds: Arc<Mutex<Vec<BuildEntry>>>,
+    pub shutdown_tx: broadcast::Sender<()>, // Channel to signal shutdown
 }
 
 impl BuildService {
@@ -210,22 +211,46 @@ export RBE_LINT_POOL=default"##,
     }
 
     pub fn new(build_dir: PathBuf, temp_dir: PathBuf, configs: ROMBuildConfig) -> Self {
-        let settings = Settings {
-            do_repo_sync: Some(true),
-            do_clean_build: Some(false),
-            use_ccache: Some(false),
-            use_rbe_service: Some(false),
-            rbe_api_token: None,
-            do_upload: Some(false),
-        };
+        let (shutdown_tx, _) = broadcast::channel(1);
+        
+        let active_job_for_handler = Arc::new(Mutex::new(None::<ActiveBuild>));
+        let active_job_clone = active_job_for_handler.clone();
+        
+        tokio::spawn(async move {
+            tokio::signal::ctrl_c().await.expect("Failed to listen for Ctrl-C");
+            info!("Global Ctrl-C received");
+            
+            // Check if build is active
+            let job = active_job_clone.lock().await;
+            if let Some(build) = job.as_ref() {
+                info!("Cancelling active build: {}", build.id);
+                let _ = build.kill_tx.send(()).await;
+                drop(job); // Release lock
+                
+                // Wait a bit for cleanup
+                tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+            }
+            
+            info!("Exiting server");
+            std::process::exit(0);
+        });
+        
         BuildService {
-            settings: Arc::new(Mutex::new(settings)),
+            settings: Arc::new(Mutex::new(Settings {
+                do_repo_sync: Some(true),
+                do_clean_build: Some(false),
+                use_ccache: Some(false),
+                use_rbe_service: Some(false),
+                rbe_api_token: None,
+                do_upload: Some(false),
+            })),
             build_dir,
             tempdir: temp_dir,
             configs,
-            active_job: Arc::new(Mutex::new(None)),
+            active_job: active_job_for_handler,
             active_uploads: Arc::new(Mutex::new(Vec::new())),
             known_builds: Arc::new(Mutex::new(Vec::new())),
+            shutdown_tx,
         }
     }
 
@@ -674,10 +699,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
 
         // Channel for Logs (Broadcast so multiple clients can watch)
         // Capacity 1000 lines buffer
-        let (log_tx, _) = broadcast::channel::<BuildLogEntry>(1000);
-
-        let log_tx_clone_for_ctrlc = log_tx.clone();
-        let kill_tx_clone_for_ctrlc = kill_tx.clone();
+        let (log_tx, _logz_rx) = broadcast::channel::<BuildLogEntry>(100);
 
         // Ensure directory exists before we start the build, so that Ctrl-C handler can safely write logs even if the build fails early.
         if !self.build_dir.exists() {
@@ -692,44 +714,6 @@ impl rom_build_service_server::RomBuildService for BuildService {
                 )));
             }
         }
-
-        // Spawn an async task to listen for Ctrl-C just for the duration of this build
-        tokio::spawn(async move {
-            tokio::select! {
-                // Option 1: The user presses Ctrl-C
-                _ = tokio::signal::ctrl_c() => {
-                    info!("Ctrl-C signal received.");
-                    if !kill_tx_clone_for_ctrlc.is_closed() {
-                        info!("Sending cancellation signal to build task.");
-                        let send1 = kill_tx_clone_for_ctrlc.try_send(());
-                        let send2 = log_tx_clone_for_ctrlc.send(BuildLogEntry {
-                            level: LogLevel::Warning as i32,
-                            message: "Cancellation requested via Ctrl-C.".into(),
-                            timestamp: chrono::Utc::now().timestamp(),
-                            is_finished: false,
-                        });
-                        if send1.is_err() {
-                            error!("Failed to send cancellation signal: {}", send1.err().unwrap());
-                        }
-                        if send2.is_err() {
-                            error!("Failed to send cancellation log: {}", send2.err().unwrap());
-                        }
-                        info!("Build cancelled via Ctrl-C signal.");
-                        let _ = tokio::time::timeout(
-                            std::time::Duration::from_secs(5),
-                            kill_tx_clone_for_ctrlc.closed()
-                        ).await;
-                        info!("Exiting Ctrl-C handler task.");
-                    }
-                    signal::kill(Pid::this(), Signal::SIGINT).expect("Failed to send SIGINT to self");
-                }
-                // Option 2: The build finishes and kill_rx is dropped
-                _ = kill_tx_clone_for_ctrlc.closed() => {
-                    // The receiver no longer exists, meaning the build task is done.
-                    // This task exits cleanly without leaking memory.
-                }
-            }
-        });
 
         let active_job_cleanup = self.active_job.clone();
 
