@@ -2049,7 +2049,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                                 e
                             ))
                         })?;
-                    let mut buffer = vec![0u8; 1024 * 64]; // 64KB buffer
+                    let mut buffer = vec![0u8; 1024 * 1024]; // 1MB buffer
                     loop {
                         let n = file.read(&mut buffer).await;
                         if let Err(_e) = n {
