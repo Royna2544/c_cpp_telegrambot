@@ -323,16 +323,6 @@ Status SocketServiceImpl::Service::requestFileTransfer(
     // 2. Create file stream and store in activeTransfers_
     TranferEntry entry;
 
-    {
-        std::lock_guard<std::mutex> lock(activeTransfersMutex_);
-        if (activeTransfers_.contains(uuids::to_string(uuid))) {
-            response->set_accepted(false);
-            LOG(ERROR) << "File transfer with UUID already exists: "
-                       << uuids::to_string(uuid);
-            return Status::OK;
-        }
-    }
-
     std::error_code ec;
     if (request->is_upload()) {
         // Check: is file already there?
@@ -424,7 +414,15 @@ Status SocketServiceImpl::Service::requestFileTransfer(
     }
     {
         std::lock_guard<std::mutex> lock(activeTransfersMutex_);
-        activeTransfers_.emplace(uuids::to_string(uuid), std::move(entry));
+        auto [it, inserted] = activeTransfers_.try_emplace(
+            uuids::to_string(uuid), std::move(entry));
+        if (!inserted) {
+            response->set_accepted(false);
+            response->set_reject_message("UUID collision detected");
+            LOG(ERROR) << "File transfer with UUID already exists: "
+                       << uuids::to_string(uuid);
+            return Status::OK;
+        }
     }
     response->set_accepted(true);
     return Status::OK;
@@ -439,22 +437,26 @@ Status SocketServiceImpl::Service::downloadFileLoop(
     LogWhoCalledMe(context, "downloadFileLoop");
 
     while (stream->Read(&msg)) {
-        std::lock_guard<std::mutex> lock(activeTransfersMutex_);
-        if (!activeTransfers_.contains(msg.uuid())) {
-            // Invalid UUID
-            FileChunkResponse response;
-            response.set_success(false);
-            response.set_retry(false);
-            LOG(ERROR) << "Invalid UUID for file download: "
-                       << std::quoted(msg.uuid());
-            stream->Write(response);
-            return Status::OK;
+        std::fstream* fileStream = nullptr;
+        {
+            std::lock_guard<std::mutex> lock(activeTransfersMutex_);
+            auto it = activeTransfers_.find(msg.uuid());
+            if (it == activeTransfers_.end()) {
+                // Invalid UUID
+                FileChunkResponse response;
+                response.set_success(false);
+                response.set_retry(false);
+                LOG(ERROR) << "Invalid UUID for file download: "
+                           << std::quoted(msg.uuid());
+                stream->Write(response);
+                return Status::OK;
+            }
+            fileStream = &it->second.fileStream;
         }
 
-        std::fstream& fileStream = activeTransfers_[msg.uuid()].fileStream;
-
-        fileStream.seekg(msg.chunk_idx() * CHUNK_SIZE, std::ios::beg);
-        if (!fileStream.good()) {
+        // Perform I/O without holding the lock
+        fileStream->seekg(msg.chunk_idx() * CHUNK_SIZE, std::ios::beg);
+        if (!fileStream->good()) {
             // Seek failed
             FileChunkResponse response;
             response.set_success(false);
@@ -465,8 +467,8 @@ Status SocketServiceImpl::Service::downloadFileLoop(
         }
 
         std::vector<char> buffer(CHUNK_SIZE);
-        fileStream.read(buffer.data(), buffer.size());
-        std::streamsize bytesRead = fileStream.gcount();
+        fileStream->read(buffer.data(), buffer.size());
+        std::streamsize bytesRead = fileStream->gcount();
 
         if (bytesRead <= 0) {
             // Read failed
@@ -501,22 +503,26 @@ Status SocketServiceImpl::Service::uploadFileLoop(
 
     LogWhoCalledMe(context, "uploadFileLoop");
     while (stream->Read(&msg)) {
-        std::lock_guard<std::mutex> lock(activeTransfersMutex_);
-        if (!activeTransfers_.contains(msg.uuid())) {
-            // Invalid UUID
-            FileChunkResponse response;
-            response.set_success(false);
-            response.set_retry(false);
-            LOG(ERROR) << "Invalid UUID for file upload: "
-                       << std::quoted(msg.uuid());
-            stream->Write(response);
-            return Status::OK;
+        std::fstream* fileStream = nullptr;
+        {
+            std::lock_guard<std::mutex> lock(activeTransfersMutex_);
+            auto it = activeTransfers_.find(msg.uuid());
+            if (it == activeTransfers_.end()) {
+                // Invalid UUID
+                FileChunkResponse response;
+                response.set_success(false);
+                response.set_retry(false);
+                LOG(ERROR) << "Invalid UUID for file upload: "
+                           << std::quoted(msg.uuid());
+                stream->Write(response);
+                return Status::OK;
+            }
+            fileStream = &it->second.fileStream;
         }
 
-        std::fstream& fileStream = activeTransfers_[msg.uuid()].fileStream;
-
-        fileStream.seekp(msg.chunk_offset(), std::ios::beg);
-        if (!fileStream.good()) {
+        // Perform I/O without holding the lock
+        fileStream->seekp(msg.chunk_offset(), std::ios::beg);
+        if (!fileStream->good()) {
             // Seek failed
             FileChunkResponse response;
             response.set_success(false);
@@ -525,8 +531,8 @@ Status SocketServiceImpl::Service::uploadFileLoop(
             stream->Write(response);
             return Status::OK;
         }
-        fileStream.write(msg.chunk_data().data(), msg.chunk_data().size());
-        if (!fileStream.good()) {
+        fileStream->write(msg.chunk_data().data(), msg.chunk_data().size());
+        if (!fileStream->good()) {
             // Write failed
             FileChunkResponse response;
             response.set_success(false);
