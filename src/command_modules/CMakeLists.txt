@@ -134,6 +134,14 @@ multi_command_module(
   LIBS
   Compiler CompilerPaths)
 
+command_module(
+  NAME
+  ibash
+  SRCS
+  ibash.cpp
+  PLATFORM
+  Unix)
+
 multi_command_module(
   PROVIDES
   c
