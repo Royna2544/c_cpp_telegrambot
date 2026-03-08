@@ -48,12 +48,12 @@ using std::string_literals::operator""s;
 using namespace tgbot::builder;
 
 class ROMBuildQueryHandler {
-    struct {
-        bool do_repo_sync = true;
-        std::optional<android::UploadMethod> upload_method;
-        bool didpin = false;
-        bool do_use_rbe = false;
-    };
+    // Settings
+    bool do_repo_sync = true;
+    std::optional<android::UploadMethod> upload_method;
+    bool didpin = false;
+    bool do_use_rbe = false;
+
     constexpr static std::string_view kBuildDirectory = "rom_build/";
     constexpr static std::string_view kOutDirectory = "out/";
     PerBuildData per_build;
