@@ -26,6 +26,7 @@
 #include <iterator>
 #include <libos/libsighandler.hpp>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <system_error>
 #include <utility>
@@ -1227,30 +1228,42 @@ void ROMBuildQueryHandler::onCallbackQuery(
 
 DECLARE_COMMAND_HANDLER(rombuild) {
     static std::shared_ptr<ROMBuildQueryHandler> handler;
+    static std::once_flag init_flag;
+    static std::mutex handler_mutex;
+    static bool init_failed = false;
 
-    if (handler) {
-        handler->start(message->message());
-        return;
-    }
+    std::call_once(init_flag, [&]() {
+        try {
+            handler = std::make_shared<ROMBuildQueryHandler>(
+                api, message->message(), provider->cmdline.get(),
+                provider->auth.get(), provider->config.get());
 
-    try {
-        handler = std::make_shared<ROMBuildQueryHandler>(
-            api, message->message(), provider->cmdline.get(),
-            provider->auth.get(), provider->config.get());
-    } catch (const std::exception& e) {
-        LOG(ERROR) << "Failed to create ROMBuildQueryHandler: " << e.what();
-        api->sendMessage(message->get<MessageAttrs::Chat>(),
-                         "Failed to initialize ROM build: "s + e.what());
-        return;
-    }
-
-    api->onCallbackQuery("rombuild", [](TgBot::CallbackQuery::Ptr query) {
-        if (handler) {
-            handler->onCallbackQuery(std::move(query));
-        } else {
-            LOG(WARNING) << "No ROMBuildQueryHandler to handle callback query";
+            api->onCallbackQuery("rombuild", [](TgBot::CallbackQuery::Ptr query) {
+                std::lock_guard<std::mutex> lock(handler_mutex);
+                if (handler) {
+                    handler->onCallbackQuery(std::move(query));
+                } else {
+                    LOG(WARNING) << "No ROMBuildQueryHandler to handle callback query";
+                }
+            });
+        } catch (const std::exception& e) {
+            LOG(ERROR) << "Failed to create ROMBuildQueryHandler: " << e.what();
+            init_failed = true;
+            api->sendMessage(message->get<MessageAttrs::Chat>(),
+                             "Failed to initialize ROM build: "s + e.what());
         }
     });
+
+    if (init_failed) {
+        api->sendMessage(message->get<MessageAttrs::Chat>(),
+                         "ROM build handler initialization failed");
+        return;
+    }
+
+    std::lock_guard<std::mutex> lock(handler_mutex);
+    if (handler) {
+        handler->start(message->message());
+    }
 }
 
 extern const struct DynModule cmd_rombuild = {

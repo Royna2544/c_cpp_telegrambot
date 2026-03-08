@@ -74,6 +74,7 @@ class KernelBuildHandler {
     std::vector<KernelConfig> configs;
 
     Intermidates intermidiates;
+    mutable std::mutex intermidiates_mutex_;
     std::optional<std::string> gitToken;
 
     // Build service interface (allows dependency injection for testing)
@@ -172,6 +173,7 @@ class KernelBuildHandler {
     constexpr static std::string_view kBuildPrefix = "build_";
     constexpr static std::string_view kSelectPrefix = "select_";
     void start(const Message::Ptr& message) {
+        std::lock_guard<std::mutex> lock(intermidiates_mutex_);
         intermidiates = {};
         if (configs.empty()) {
             _api->sendMessage(message->chat, "No kernel configurations found.");
@@ -212,6 +214,7 @@ class KernelBuildHandler {
     }
 
     void handle_build(const TgBot::CallbackQuery::Ptr& query) {
+        std::lock_guard<std::mutex> lock(intermidiates_mutex_);
         std::string_view data = query->data;
         if (!absl::ConsumePrefix(&data, kBuildPrefix)) {
             return;
@@ -248,6 +251,7 @@ class KernelBuildHandler {
 
     constexpr static std::string_view kEnablePrefix = "enable_";
     void handle_select(const TgBot::CallbackQuery::Ptr& query) {
+        std::lock_guard<std::mutex> lock(intermidiates_mutex_);
         std::string_view data = query->data;
         if (!absl::ConsumePrefix(&data, kSelectPrefix)) {
             return;
@@ -274,6 +278,7 @@ class KernelBuildHandler {
     constexpr static std::string_view kContinuePrefix = "continue";
 
     void handle_select_INTERNAL(const TgBot::CallbackQuery::Ptr& query) {
+        std::lock_guard<std::mutex> lock(intermidiates_mutex_);
         KeyboardBuilder builder;
         for (const auto& fragment : intermidiates.current->fragments) {
             bool enabled =
@@ -298,6 +303,7 @@ class KernelBuildHandler {
     }
 
     void handle_enable(const TgBot::CallbackQuery::Ptr& query) {
+        std::lock_guard<std::mutex> lock(intermidiates_mutex_);
         std::string_view data = query->data;
         if (!absl::ConsumePrefix(&data, kEnablePrefix)) {
             return;
@@ -577,40 +583,64 @@ void KernelBuildHandler::handle_continue(
 // Define the command handler function
 DECLARE_COMMAND_HANDLER(kernelbuild) {
     static std::shared_ptr<KernelBuildHandler> handler;
+    static std::once_flag init_flag;
+    static std::mutex handler_mutex;
+    static bool init_failed = false;
+
     if (!provider->config->get(ConfigManager::Configs::KERNELBUILD_SERVER)) {
         api->sendMessage(
             message->get<MessageAttrs::Chat>(),
             "Kernel build server is not configured. Please contact the admin.");
         return;
     }
-    if (!handler) {
-        handler = std::make_shared<KernelBuildHandler>(
-            api, provider->cmdline.get(), provider->auth.get(),
-            provider->config.get());
-        api->onCallbackQuery("kernelbuild", [api, provider](
-                                                const TgBot::CallbackQuery::Ptr&
-                                                    ptr) {
-            std::string_view data = ptr->data;
 
-            if (!provider->auth->isAuthorized(ptr->from)) {
-                api->answerCallbackQuery(
-                    ptr->id,
-                    "Sorry son, you are not allowed to touch this keyboard.");
-                return;
-            }
-            if (!absl::ConsumePrefix(
-                    &data, KernelBuildHandler::kCallbackQueryPrefix)) {
-                return;
-            }
-            ptr->data = data;
-            try {
-                handler->handleCallbackQuery(ptr);
-            } catch (const std::exception& ex) {
-                LOG(ERROR) << "Error handling callback query: " << ex.what();
-            }
-        });
+    std::call_once(init_flag, [&]() {
+        try {
+            handler = std::make_shared<KernelBuildHandler>(
+                api, provider->cmdline.get(), provider->auth.get(),
+                provider->config.get());
+
+            api->onCallbackQuery("kernelbuild", [api, provider](
+                                                    const TgBot::CallbackQuery::Ptr&
+                                                        ptr) {
+                std::string_view data = ptr->data;
+
+                if (!provider->auth->isAuthorized(ptr->from)) {
+                    api->answerCallbackQuery(
+                        ptr->id,
+                        "Sorry son, you are not allowed to touch this keyboard.");
+                    return;
+                }
+                if (!absl::ConsumePrefix(
+                        &data, KernelBuildHandler::kCallbackQueryPrefix)) {
+                    return;
+                }
+                ptr->data = data;
+                try {
+                    std::lock_guard<std::mutex> lock(handler_mutex);
+                    if (handler) {
+                        handler->handleCallbackQuery(ptr);
+                    }
+                } catch (const std::exception& ex) {
+                    LOG(ERROR) << "Error handling callback query: " << ex.what();
+                }
+            });
+        } catch (const std::exception& e) {
+            LOG(ERROR) << "Failed to create KernelBuildHandler: " << e.what();
+            init_failed = true;
+        }
+    });
+
+    if (init_failed) {
+        api->sendMessage(message->get<MessageAttrs::Chat>(),
+                         "Failed to initialize kernel build handler");
+        return;
     }
-    handler->start(message->message());
+
+    std::lock_guard<std::mutex> lock(handler_mutex);
+    if (handler) {
+        handler->start(message->message());
+    }
 }
 
 extern const struct DynModule cmd_kernelbuild = {
