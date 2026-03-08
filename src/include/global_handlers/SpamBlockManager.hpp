@@ -25,7 +25,7 @@ struct SpamBlockManager : SpamBlockBase, ThreadRunner {
     TgBotApi::Ptr _api;
     AuthContext *_auth;
     std::condition_variable condvar;
-    std::mutex mutex;
+    std::mutex cv_mutex;
 
     // Start next iteration when the message in buffer is bigger than sImmediateStartThreshold
     constexpr static int sImmediateStartThreshold = 10;

@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <api/AuthContext.hpp>
 #include <api/TgBotApi.hpp>
+#include <atomic>
 #include <chrono>
 #include <concepts>
 #include <cstddef>
@@ -68,11 +69,13 @@ struct SpamBlockBase {
     // Run the SpamBlock framework.
     void consumeAndDetect();
 
+   protected:
+    std::atomic<size_t> chat_messages_count{0};
+
    private:
     Config _config = Config::PURGE;
 
     std::unordered_map<ChatId, UserMessagesMap> chat_messages_data;
-    size_t chat_messages_count;
 
     // Cache these for easy lookup
     std::unordered_map<ChatId, Chat::Ptr> chat_map;

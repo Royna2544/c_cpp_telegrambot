@@ -11,16 +11,22 @@
 
 void SpamBlockManager::runFunction(const std::stop_token &token) {
     while (!token.stop_requested()) {
-        consumeAndDetect();
-        std::unique_lock<std::mutex> lock(mutex);
-        condvar.wait_for(lock, sSpamDetectDelay,
-                         [token] { return token.stop_requested(); });
+        {
+            std::unique_lock<std::mutex> lock(cv_mutex);
+            condvar.wait_for(
+                lock, sSpamDetectDelay, [this, token] {
+                    return token.stop_requested() ||
+                           chat_messages_count.load(std::memory_order_relaxed) >=
+                               sImmediateStartThreshold;
+                });
+        }
+        if (!token.stop_requested()) {
+            consumeAndDetect();
+        }
     }
 }
 
 void SpamBlockManager::onPreStop() {
-    { std::lock_guard<std::mutex> lock(mutex); }
-    // Cancel the timer
     condvar.notify_all();
 }
 
@@ -28,9 +34,8 @@ void SpamBlockManager::onMessageAdded(const size_t count) {
     if (count < sImmediateStartThreshold) {
         return;
     }
-    { std::lock_guard<std::mutex> lock(mutex); }
-    LOG_EVERY_N_SEC(INFO, sSpamDetectDelay.count()) << "Messages queued: " << count << ". Starting thread now";
-    // Wake up the timer
+    LOG_EVERY_N_SEC(INFO, sSpamDetectDelay.count())
+        << "Messages queued: " << count << ". Starting thread now";
     condvar.notify_all();
 }
 
