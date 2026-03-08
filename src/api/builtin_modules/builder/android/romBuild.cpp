@@ -50,7 +50,7 @@ using namespace tgbot::builder;
 class ROMBuildQueryHandler {
     struct {
         bool do_repo_sync = true;
-        bool do_upload = true;
+        std::optional<android::UploadMethod> upload_method;
         bool didpin = false;
         bool do_use_rbe = false;
     };
@@ -273,6 +273,26 @@ class ROMBuildQueryHandler {
 };
 
 namespace {
+std::string describe(const std::optional<android::UploadMethod>& method) {
+    if (!method.has_value()) {
+        return "Disabled";
+    }
+    switch (*method) {
+        case android::UploadMethod::GoFile:
+            return "GoFile";
+        case android::UploadMethod::Stream:
+            return "Stream to Telegram";
+        case android::UploadMethod::LocalFile:
+            return "Save to local file";
+        default:
+            return "Unknown";
+    }
+}
+
+std::string describe(bool value) {
+    return value ? "Enabled" : "Disabled";
+}
+
 std::string showPerBuild(const PerBuildData& data,
                          const std::string_view banner) {
     constexpr static std::string_view literal = R"({}
@@ -348,7 +368,8 @@ void ROMBuildQueryHandler::start(Message::Ptr userMessage) {
     }
     sentMessage = _api->sendMessage(_userMessage->chat, "Will build ROM...",
                                     mainKeyboard);
-    if (didpin) _api->pinMessage(sentMessage);
+    if (didpin)
+        _api->pinMessage(sentMessage);
     per_build.reset();
 }
 
@@ -357,8 +378,9 @@ void ROMBuildQueryHandler::updateSentMessage(Message::Ptr message) {
 }
 
 namespace {
-std::string keyToString(const std::string& key, const bool enabled) {
-    return fmt::format("{} is now {}", key, enabled ? "enabled" : "disabled");
+template <typename T>
+std::string describe(const std::string& key, const T value) {
+    return fmt::format("{} is now {}", key, describe(value));
 }
 
 void notify_remote(
@@ -389,20 +411,41 @@ void ROMBuildQueryHandler::handle_repo_sync_INTERNAL(const Query& query,
                       settings->set_do_repo_sync(do_repo_sync);
                   });
     (void)_api->answerCallbackQuery(query->id,
-                                    keyToString("Repo sync", do_repo_sync));
+                                    describe("Repo sync", do_repo_sync));
     if (updatesettings) {
         handle_settings(query);
     }
 }
 
 void ROMBuildQueryHandler::handle_upload(const Query& query) {
-    do_upload = !do_upload;
+    if (!upload_method.has_value()) {
+        // Next: GoFile
+        upload_method = android::UploadMethod::GoFile;
+    } else {
+        switch (*upload_method) {
+            case android::UploadMethod::GoFile:
+                // Next: Stream
+                upload_method = android::UploadMethod::Stream;
+                break;
+            case android::UploadMethod::Stream:
+                // Next: LocalFile
+                upload_method = android::UploadMethod::LocalFile;
+                break;
+            case android::UploadMethod::LocalFile:
+                // Next: Disabled
+                upload_method.reset();
+                break;
+            default:
+                upload_method.reset();
+                break;
+        }
+    }
     notify_remote(buildService_.get(),
                   [&](tgbot::builder::android::Settings* settings) {
-                      settings->set_do_upload(do_upload);
+                      settings->set_do_upload(upload_method.has_value());
                   });
     (void)_api->answerCallbackQuery(query->id,
-                                    keyToString("Uploading", do_upload));
+                                    describe("Uploading", upload_method));
     handle_settings(query);
 }
 
@@ -419,8 +462,7 @@ void ROMBuildQueryHandler::handle_use_rbe(const Query& query) {
             settings->set_rbe_api_token(
                 *_config->get(ConfigManager::Configs::BUILDBUDDY_API_KEY));
         });
-    (void)_api->answerCallbackQuery(query->id,
-                                    keyToString("Use RBE", do_use_rbe));
+    (void)_api->answerCallbackQuery(query->id, describe("Use RBE", do_use_rbe));
     handle_settings(query);
 }
 
@@ -485,15 +527,16 @@ Disk Usage (Of /): {} GB / {} GB total)",
 }
 
 void ROMBuildQueryHandler::handle_settings(const Query& /*query*/) {
-    _api->editMessage(sentMessage,
-                      fmt::format(R"(Settings
+    _api->editMessage(
+        sentMessage,
+        fmt::format(R"(Settings
 
 Pinned: {}
 RepoSync Enabled: {}
 Uploading Enabled: {}
 RBE enabled: {})",
-                                  didpin, do_repo_sync, do_upload, do_use_rbe),
-                      settingsKeyboard);
+                    didpin, do_repo_sync, describe(upload_method), do_use_rbe),
+        settingsKeyboard);
 }
 
 void ROMBuildQueryHandler::handle_confirm(const Query& query) {
@@ -512,7 +555,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     notify_remote(
         buildService_.get(), [&](tgbot::builder::android::Settings* settings) {
             settings->set_do_repo_sync(do_repo_sync);
-            settings->set_do_upload(do_upload);
+            settings->set_do_upload(upload_method.has_value());
             settings->set_use_rbe_service(do_use_rbe);
             if (do_use_rbe) {
                 settings->set_rbe_api_token(
@@ -533,13 +576,8 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     if (auto var = _config->get(ConfigManager::Configs::GITHUB_TOKEN); var) {
         request.set_github_token(*var);
     }
-    if (auto var = _config->get(ConfigManager::Configs::TELEGRAM_API_SERVER);
-        var) {
-        // If using custom API server (assuming self-hosted), use telegram
-        // upload method. (So download the file here.)
-        request.set_upload_method(android::UploadMethod::Stream);
-    } else {
-        request.set_upload_method(android::UploadMethod::GoFile);
+    if (upload_method.has_value()) {
+        request.set_upload_method(*upload_method);
     }
 
     std::chrono::system_clock::time_point start =
@@ -765,7 +803,7 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     // Success case: if build succeeded, show success message and send file if
     // available
 
-    if (do_upload) {
+    if (upload_method) {
         switch (lastBuildResult.upload_method()) {
             case android::UploadMethod::LocalFile: {
                 if (lastBuildResult.success()) {
@@ -819,11 +857,13 @@ Download the built artifact here: <a href="{}">{}</a>)",
                         break;
                     }
 
-                    _api->editMessage(sentMessage,
-                                      showPerBuild(per_build,
-                                                   R"(Build complete! Downloading the built artifact...)"),
-                                      backKeyboard);
-                                      
+                    _api->editMessage(
+                        sentMessage,
+                        showPerBuild(
+                            per_build,
+                            R"(Build complete! Downloading the built artifact...)"),
+                        backKeyboard);
+
                     // Write the first chunk of stream data that came with the
                     // build result
                     streamFile.write(lastBuildResult.stream_data().data(),
@@ -1238,12 +1278,14 @@ DECLARE_COMMAND_HANDLER(rombuild) {
                 api, message->message(), provider->cmdline.get(),
                 provider->auth.get(), provider->config.get());
 
-            api->onCallbackQuery("rombuild", [](TgBot::CallbackQuery::Ptr query) {
+            api->onCallbackQuery("rombuild", [](TgBot::CallbackQuery::Ptr
+                                                    query) {
                 std::lock_guard<std::mutex> lock(handler_mutex);
                 if (handler) {
                     handler->onCallbackQuery(std::move(query));
                 } else {
-                    LOG(WARNING) << "No ROMBuildQueryHandler to handle callback query";
+                    LOG(WARNING)
+                        << "No ROMBuildQueryHandler to handle callback query";
                 }
             });
         } catch (const std::exception& e) {
