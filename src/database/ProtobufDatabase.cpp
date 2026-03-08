@@ -65,6 +65,7 @@ std::optional<int> ProtoDatabase::findByUid(const RepeatedField<UserId> list,
 
 ProtoDatabase::ListResult ProtoDatabase::addUserToList(ListType type,
                                                        UserId user) const {
+    std::lock_guard<std::mutex> lock(dbinfo_mutex_);
     auto const otherList = getOtherPersonList(type);
     if (findByUid(otherList.id(), user)) {
         return ListResult::ALREADY_IN_OTHER_LIST;
@@ -79,6 +80,7 @@ ProtoDatabase::ListResult ProtoDatabase::addUserToList(ListType type,
 
 ProtoDatabase::ListResult ProtoDatabase::removeUserFromList(ListType type,
                                                             UserId user) const {
+    std::lock_guard<std::mutex> lock(dbinfo_mutex_);
     auto* const myList = getMutablePersonList(type);
     auto loc = findByUid(myList->id(), user);
     if (loc.has_value()) {
@@ -91,6 +93,7 @@ ProtoDatabase::ListResult ProtoDatabase::removeUserFromList(ListType type,
 
 [[nodiscard]] DatabaseBase::ListResult ProtoDatabase::checkUserInList(
     ListType type, UserId user) const {
+    std::lock_guard<std::mutex> lock(dbinfo_mutex_);
     auto const myList = getPersonList(type);
     auto loc = findByUid(myList.id(), user);
     if (loc.has_value()) {
@@ -106,6 +109,7 @@ ProtoDatabase::ListResult ProtoDatabase::removeUserFromList(ListType type,
 
 std::optional<std::string> ProtoDatabase::getChatName(
     const ChatId chatId) const {
+    std::lock_guard<std::mutex> lock(dbinfo_mutex_);
     if (!dbinfo.has_value()) {
         LOG_ONCE(WARNING) << "Database not loaded! Cannot determine chat name!";
         return std::nullopt;
@@ -117,6 +121,7 @@ std::optional<std::string> ProtoDatabase::getChatName(
 }
 
 bool ProtoDatabase::deleteChatInfo(const ChatId chatId) const {
+    std::lock_guard<std::mutex> lock(dbinfo_mutex_);
     if (!dbinfo.has_value()) {
         LOG_ONCE(WARNING) << "Database not loaded! Cannot delete chat info!";
         return false;
@@ -132,6 +137,7 @@ bool ProtoDatabase::deleteChatInfo(const ChatId chatId) const {
 }
 
 std::vector<ProtoDatabase::ChatInfo> ProtoDatabase::getAllChatInfos() const {
+    std::lock_guard<std::mutex> lock(dbinfo_mutex_);
     if (!dbinfo.has_value()) {
         LOG_ONCE(WARNING) << "Database not loaded! Cannot get chat infos!";
         return {};
@@ -147,6 +153,7 @@ std::vector<ProtoDatabase::ChatInfo> ProtoDatabase::getAllChatInfos() const {
 }
 
 bool ProtoDatabase::load(std::filesystem::path filepath) {
+    std::lock_guard<std::mutex> lock(dbinfo_mutex_);
     GOOGLE_PROTOBUF_VERIFY_VERSION;
 
     if (dbinfo.has_value()) {
@@ -177,6 +184,7 @@ bool ProtoDatabase::load(std::filesystem::path filepath) {
 }
 
 bool ProtoDatabase::unload() {
+    std::lock_guard<std::mutex> lock(dbinfo_mutex_);
     if (!dbinfo.has_value()) {
         LOG(WARNING) << "Database not loaded! Cannot unload!";
         return false;
@@ -205,6 +213,7 @@ bool ProtoDatabase::unload() {
 }
 
 std::optional<UserId> ProtoDatabase::getOwnerUserId() const {
+    std::lock_guard<std::mutex> lock(dbinfo_mutex_);
     if (!dbinfo.has_value()) {
         LOG_ONCE(WARNING)
             << "Database not loaded! Cannot determine owner user id!";
@@ -257,6 +266,7 @@ const PersonList& ProtoDatabase::getOtherPersonList(
 
 std::optional<ProtoDatabase::MediaInfo> ProtoDatabase::queryMediaInfo(
     std::string str) const {
+    std::lock_guard<std::mutex> lock(dbinfo_mutex_);
     std::optional<glider::proto::database::MediaToName> it;
     const auto& obj = dbinfo->object;
     for (const auto& mediaEntriesIt : obj.mediatonames()) {
@@ -279,6 +289,7 @@ std::optional<ProtoDatabase::MediaInfo> ProtoDatabase::queryMediaInfo(
 
 ProtoDatabase::AddResult ProtoDatabase::addMediaInfo(
     const MediaInfo& info) const {
+    std::lock_guard<std::mutex> lock(dbinfo_mutex_);
     auto* const mediaEntries = dbinfo->object.mutable_mediatonames();
     for (const auto& elem : *mediaEntries) {
         if (elem.telegrammediauniqueid() == info.mediaUniqueId) {
@@ -298,6 +309,7 @@ ProtoDatabase::AddResult ProtoDatabase::addMediaInfo(
 }
 
 std::vector<ProtoDatabase::MediaInfo> ProtoDatabase::getAllMediaInfos() const {
+    std::lock_guard<std::mutex> lock(dbinfo_mutex_);
     std::vector<MediaInfo> result;
     for (const auto& mediaEntriesIt : dbinfo->object.mediatonames()) {
         MediaInfo info;
@@ -314,6 +326,7 @@ std::vector<ProtoDatabase::MediaInfo> ProtoDatabase::getAllMediaInfos() const {
 
 bool ProtoDatabase::deleteMediaInfo(
     const decltype(MediaInfo::mediaId) mediaId) const {
+    std::lock_guard<std::mutex> lock(dbinfo_mutex_);
     auto* mediaToNames = dbinfo->object.mutable_mediatonames();
     for (int i = 0; i < mediaToNames->size(); ++i) {
         if (mediaToNames->Get(i).telegrammediaid() == mediaId) {
@@ -326,6 +339,7 @@ bool ProtoDatabase::deleteMediaInfo(
 
 std::optional<std::vector<decltype(ProtoDatabase::MediaInfo::mediaId)>>
 ProtoDatabase::getMediaIds(const std::string_view alias) const {
+    std::lock_guard<std::mutex> lock(dbinfo_mutex_);
     std::vector<decltype(MediaInfo::mediaId)> result;
     const auto& obj = dbinfo->object;
     for (const auto& mediaEntriesIt : obj.mediatonames()) {
@@ -343,6 +357,7 @@ ProtoDatabase::getMediaIds(const std::string_view alias) const {
 }
 
 std::ostream& ProtoDatabase::dump(std::ostream& os) const {
+    std::lock_guard<std::mutex> lock(dbinfo_mutex_);
     if (!dbinfo.has_value()) {
         os << "Database not loaded!";
         return os;
@@ -393,6 +408,7 @@ std::ostream& ProtoDatabase::dump(std::ostream& os) const {
 }
 
 void ProtoDatabase::setOwnerUserId(UserId userId) const {
+    std::lock_guard<std::mutex> lock(dbinfo_mutex_);
     if (!dbinfo.has_value()) {
         LOG(WARNING) << "Database not loaded! Cannot set owner user id!";
         return;
@@ -406,6 +422,7 @@ void ProtoDatabase::setOwnerUserId(UserId userId) const {
 
 [[nodiscard]] ProtoDatabase::AddResult ProtoDatabase::addChatInfo(
     const ChatId chatid, const std::string_view name) const {
+    std::lock_guard<std::mutex> lock(dbinfo_mutex_);
     auto* const chats = dbinfo->object.mutable_chattonames();
     for (const auto& chat : *chats) {
         if (chat.telegramchatid() == chatid) {
@@ -420,6 +437,7 @@ void ProtoDatabase::setOwnerUserId(UserId userId) const {
 
 [[nodiscard]] std::optional<ChatId> ProtoDatabase::getChatId(
     const std::string_view name) const {
+    std::lock_guard<std::mutex> lock(dbinfo_mutex_);
     const auto& obj = dbinfo->object;
     for (const auto& chat : obj.chattonames()) {
         if (absl::EqualsIgnoreCase(chat.name(), name)) {

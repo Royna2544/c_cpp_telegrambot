@@ -3,6 +3,7 @@
 #include <DBImplExports.h>
 #include <TgBotDB.pb.h>
 
+#include <mutex>
 #include <optional>
 #include <ostream>
 
@@ -50,6 +51,7 @@ struct DBIMPL_EXPORT ProtoDatabase : DatabaseBase {
         std::filesystem::path path;
     };
     std::optional<Info> dbinfo;
+    mutable std::mutex dbinfo_mutex_;
 
     static void dumpList(std::ostream& os, const PersonList& list,
                          const char* name);
