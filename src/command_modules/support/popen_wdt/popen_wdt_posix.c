@@ -68,6 +68,8 @@ static void* watchdog(void* arg) {
             data->watchdog_activated = true;
             if (killpg(pdata->childprocess_pid, POPEN_WDT_SIGTERM) == -1) {
                 POPEN_WDT_DBGLOG("Failed to send SIGINT to process group");
+                pthread_mutex_unlock(&pdata->wdt_mutex);
+                break;
             } else {
                 POPEN_WDT_DBGLOG("SIGINT signal sent");
                 pthread_mutex_unlock(&pdata->wdt_mutex);
@@ -305,7 +307,6 @@ popen_watchdog_exit_t popen_watchdog_destroy(popen_watchdog_data_t** data_in) {
         ret.exitcode = WEXITSTATUS(status);
     }
     close(pdata->pipefd_r);
-    pthread_mutex_unlock(&pdata->wdt_mutex);
     pthread_cond_destroy(&pdata->condition);
     pthread_mutex_destroy(&pdata->wdt_mutex);
     free(pdata);
