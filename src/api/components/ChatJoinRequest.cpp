@@ -22,10 +22,11 @@ void TgBotApiImpl::ChatJoinRequestImpl::onChatJoinRequestFunction(
     templateMarkup->inlineKeyboard.at(1).at(0)->callbackData =
         fmt::format("chatjoin_{}_ban", ptr->date);
 
-    auto msg = _api->sendMessage<TgBotApi::ParseMode::MarkdownV2>(
+    auto msg = _api->sendMessage<TgBotApi::ParseMode::HTML>(
         ptr->chat,
-        fmt::format("A new chat join request by [{}](tg://user?id={})",
-                    ptr->from, ptr->from->id),
+        fmt::format(
+            "A new chat join request by <a href=\"tg://user?id={}\">{}</a>",
+            ptr->from->id, ptr->from->firstName),
         templateMarkup);
     const std::lock_guard<std::mutex> _(mutex);
     joinReqs.emplace_back(std::move(msg), std::move(ptr));
