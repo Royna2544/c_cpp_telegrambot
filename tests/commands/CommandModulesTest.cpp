@@ -55,6 +55,21 @@ CommandModule::Ptr CommandModulesTest::loadModule(
     auto module = std::make_unique<DynCommandModule>(moduleFilePath);
 
     auto ret = module->load();
+    if (!ret) {
+        LOG(WARNING) << "Failed to load module " << name
+                     << " from path: " << moduleFilePath;
+        // Try to make ModulePath under Release
+        // TODO: This is a temporary workaround, we should find a better
+        // solution for this
+        auto releaseModuleFilePath = modulePath / "Release" /
+                                     moduleFileName / FS::SharedLib;
+        module = std::make_unique<DynCommandModule>(releaseModuleFilePath);
+        ret = module->load();
+        if (!ret) {
+           LOG(WARNING) << "Failed to load module " << name
+                        << " from path: " << releaseModuleFilePath;
+        }
+    }
     EXPECT_TRUE(ret);
 
     if (ret) {
