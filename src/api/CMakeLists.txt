@@ -32,6 +32,7 @@ tgbot_library(
   SRCS
     AuthContext.cpp
     DynCommandModule.cpp
+    BuiltInCommandModule.cpp
     ${lua_src}
     MessageExt.cpp
     RateLimit.cpp
@@ -94,7 +95,7 @@ tgbot_library(
   ALWAYS_STATIC
 )
 target_link_libraries(ApiImpl PRIVATE TgBot DBImpl ${cpptrace_libs} Api builtin_module_KernelBuild builtin_module_RomBuild restartfmt_parser)
-target_compile_definitions(ApiImpl PRIVATE ${cpptrace_def})
+target_compile_definitions(ApiImpl PRIVATE ${cpptrace_def} ${lua_def})
 
 tgbot_library(
   NAME AuthApi

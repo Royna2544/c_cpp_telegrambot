@@ -73,7 +73,7 @@ bool TgBotApiImpl::validateValidArgs(const CommandModule::Info* module,
         return true;  // No validation needed.
     }
     bool check_argc = module->valid_args.counts != 0;
-
+    
     // Try to split them.
     const std::vector<std::string>& args =
         message->get<MessageAttrs::ParsedArgumentsList>();

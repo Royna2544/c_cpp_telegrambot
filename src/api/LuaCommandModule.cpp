@@ -8,6 +8,8 @@
 #include <sol/sol.hpp>
 #include <string_view>
 
+#include "tgbot/TgException.h"
+
 struct LuaCommandModule::Context {
     sol::state lua;
     std::filesystem::path filePath;
@@ -31,6 +33,8 @@ void binds(TgBotApi::Ptr api, MessageExt* message,
     msg["chat_id"] = message->get<MessageAttrs::Chat>()->id;
     msg["message_id"] = message->get<MessageAttrs::MessageId>();
     msg["date"] = message->message()->date;  // seconds since epoch
+    msg["user_id"] = message->get<MessageAttrs::User>()->id;
+    msg["text"] = message->get<MessageAttrs::ExtraText>();
     lua["message"] = msg;
 
     /*───────────────────  time helpers  ────────────────────*/
@@ -61,7 +65,47 @@ void binds(TgBotApi::Ptr api, MessageExt* message,
         ph->chat = std::make_shared<TgBot::Chat>();
         ph->chat->id = m["chat_id"];
         ph->messageId = m["message_id"];
-        api->editMessage(ph, txt);
+        try {
+            api->editMessage(ph, txt);
+        } catch (const TgBot::TgException& ex) {
+            LOG(ERROR) << "Failed to edit message: " << ex.what();
+        }
+    };
+
+    lua["delete"] = [api](sol::table m) {
+        TgBot::Message::Ptr ph = std::make_shared<TgBot::Message>();
+        ph->chat = std::make_shared<TgBot::Chat>();
+        ph->chat->id = m["chat_id"];
+        ph->messageId = m["message_id"];
+        try {
+            api->deleteMessage(ph);
+        } catch (const TgBot::TgException& ex) {
+            LOG(ERROR) << "Failed to delete message: " << ex.what();
+        }
+    };
+
+    lua["ban"] = [api](int64_t chat_id, int64_t user_id) {
+        auto chat = std::make_shared<TgBot::Chat>();
+        chat->id = chat_id;
+        auto user = std::make_shared<TgBot::User>();
+        user->id = user_id;
+        try {
+            api->banChatMember(chat, user);
+        } catch (const TgBot::TgException& ex) {
+            LOG(ERROR) << "Failed to ban user: " << ex.what();
+        }
+    };
+
+    lua["unban"] = [api](int64_t chat_id, int64_t user_id) {
+        auto chat = std::make_shared<TgBot::Chat>();
+        chat->id = chat_id;
+        auto user = std::make_shared<TgBot::User>();
+        user->id = user_id;
+        try {
+            api->unbanChatMember(chat, user);
+        } catch (const TgBot::TgException& ex) {
+            LOG(ERROR) << "Failed to unban user: " << ex.what();
+        }
     };
 
     // bind db helper
@@ -131,7 +175,13 @@ bool LuaCommandModule::load() {
                         const Providers* provider) {
         sol::state_view lua = c->lua;
 
-        if (!c->isLoaded) return;
+        if (!c->isLoaded) {
+            DLOG(WARNING)
+                << "LuaCommandModule: Command invoked but module not loaded";
+            api->sendReplyMessage(message->message(),
+                                  res->get(Strings::BACKEND_ERROR));
+            return;
+        }
 
         binds(api, message, res, provider, lua);
 
@@ -144,7 +194,8 @@ bool LuaCommandModule::load() {
         }
     };
 
-    DLOG(INFO) << "Loaded Lua script: " << _context->filePath;
+    LOG(INFO) << "Loaded Lua script: " << _context->filePath.filename()
+              << " as command: " << info.name;
 
     _context->isLoaded = true;
     return true;
@@ -156,4 +207,6 @@ bool LuaCommandModule::unload() {
     return true;
 }
 
-bool LuaCommandModule::isLoaded() const { return _context->isLoaded; }
+bool LuaCommandModule::isLoaded() const {
+    return _context->isLoaded;
+}

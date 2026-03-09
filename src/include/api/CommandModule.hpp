@@ -17,7 +17,7 @@ class CommandModule;
 
 // Loading commandmodule definitions
 #define DYN_COMMAND_SYM_STR "cmd"
-#define DYN_COMMAND_SYM cmd
+#define DYN_COMMAND_SYM     cmd
 
 #ifdef _WIN32
 #define DYN_COMMAND_EXPORT __declspec(dllexport)
@@ -145,7 +145,8 @@ class CommandModule {
 
             valid_args.counts = dyn->valid_args.counts;
             valid_args.split_type = dyn->valid_args.split_type;
-            if (dyn->valid_args.usage) valid_args.usage = dyn->valid_args.usage;
+            if (dyn->valid_args.usage)
+                valid_args.usage = dyn->valid_args.usage;
         }
         Info() = default;
 
@@ -296,18 +297,10 @@ class BuiltinCommandModule : public CommandModule {
     bool loaded{};
 
    public:
-    explicit BuiltinCommandModule(const DynModule* dyn) { info = Info(dyn); }
-
-    bool load() override {
-        loaded = true;
-        return true;
-    }
-
-    bool unload() override {
-        loaded = false;
-        return true;
-    }
+    explicit BuiltinCommandModule(const DynModule* dyn);
+    bool load() override;
+    bool unload() override;
 
     // Trival accessors.
-    [[nodiscard]] bool isLoaded() const override { return loaded; }
+    [[nodiscard]] bool isLoaded() const override;
 };
