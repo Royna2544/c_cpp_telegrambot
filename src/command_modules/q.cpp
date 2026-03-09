@@ -119,7 +119,7 @@ DECLARE_COMMAND_HANDLER(q) {
     std::string media;
     if (message->reply()->has<MessageAttrs::Sticker>()) {
         auto _sticker = message->reply()->get<MessageAttrs::Sticker>();
-        if (!_sticker->isAnimated && !_sticker->isVideo) {
+        if (!_sticker->thumbnail) {
             media = _sticker->fileId;
         } else {
             // Grab thumbnail if the sticker is animated, since we don't support
@@ -137,6 +137,12 @@ DECLARE_COMMAND_HANDLER(q) {
         type = MessageType::Video;
     } else if (message->reply()->has<MessageAttrs::Animation>()) {
         auto animation = message->reply()->get<MessageAttrs::Animation>();
+        if (!animation->thumbnail) {
+            api->sendMessage(
+                message->get<MessageAttrs::Chat>(),
+                "Unsupported media type: animation without thumbnail");
+            return;
+        }
         media = animation->thumbnail->fileId;
         type = MessageType::Animation;
     }
@@ -174,17 +180,12 @@ DECLARE_COMMAND_HANDLER(q) {
     });
     if (user->id > 0) {
         auto photos = api->getUserProfilePhotos(user->id);
-        LOG_IF(WARNING, photos->totalCount != 1)
-            << "Expected exactly 1 profile photo, got " << photos->totalCount;
-        if (photos->totalCount == 0) {
-            api->sendMessage(message->get<MessageAttrs::Chat>(),
-                             "You don't have a profile photo!");
-            return;
-        }
-        const auto& photoSizes = photos->photos.front();
-        const auto& largestPhoto = photoSizes.back();
+        if (photos->totalCount != 0) {
+            const auto& photoSizes = photos->photos.front();
+            const auto& largestPhoto = photoSizes.back();
 
-        req.messages[0].from.photo.big_file_id = largestPhoto->fileId;
+            req.messages[0].from.photo.big_file_id = largestPhoto->fileId;
+        }
     } else if (user->id < 0) {
         auto chat = api->getChat(user->id);
         if (chat->photo) {
