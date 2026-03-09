@@ -74,12 +74,12 @@ TgBotApiImpl::ReactionsProvider::onAnyMessageFunction(Message::Ptr message) {
                           FilterFilename{.emoji = "😱", .match = "last_kmsg"});
     apply<FilterText>(
         reactions, message,
-        FilterText{.emoji = "🥰", .match = std::regex("[a-z]lex")});
+        FilterText{.emoji = "🥰", .match = std::regex("^[a-z]lex$")});
     apply<FilterUser>(reactions, message,
                       FilterUser{.emoji = "👑", .userId = 5037893234});
     apply<FilterText>(
         reactions, message,
-        FilterText{.emoji = "🍌", .match = std::regex("[a-z]ey")});
+        FilterText{.emoji = "🍌", .match = std::regex("^[a-z]ey$")});
     if (!reactions.empty()) {
         _apiImpl->setMessageReaction(message, reactions, false);
     }
