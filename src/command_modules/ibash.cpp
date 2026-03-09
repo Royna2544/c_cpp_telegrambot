@@ -1,8 +1,8 @@
 #include <absl/log/log.h>
 #include <fmt/format.h>
+#include <signal.h>
 #include <sys/wait.h>
 #include <unistd.h>
-#include <signal.h>
 
 #include <api/CommandModule.hpp>
 #include <api/MessageExt.hpp>
@@ -61,8 +61,7 @@ struct BashSession {
         }
 
         if (pipe(stdout_pipe) == -1) {
-            LOG(ERROR) << "Failed to create stdout pipe: "
-                       << strerror(errno);
+            LOG(ERROR) << "Failed to create stdout pipe: " << strerror(errno);
             close(stdin_pipe[0]);
             close(stdin_pipe[1]);
             return false;
@@ -116,8 +115,7 @@ struct BashSession {
         std::string cmd = command + "\n";
         ssize_t written = write(stdin_fd, cmd.c_str(), cmd.size());
         if (written == -1) {
-            LOG(ERROR) << "Failed to write to bash stdin: "
-                       << strerror(errno);
+            LOG(ERROR) << "Failed to write to bash stdin: " << strerror(errno);
             return false;
         }
 
@@ -135,7 +133,7 @@ struct BashSession {
         FD_ZERO(&read_fds);
         FD_SET(stdout_fd, &read_fds);
 
-        struct timeval timeout {};
+        struct timeval timeout{};
         timeout.tv_sec = 1;
         timeout.tv_usec = 0;
 
@@ -340,12 +338,4 @@ extern "C" DYN_COMMAND_EXPORT const struct DynModule DYN_COMMAND_SYM = {
     .name = "ibash",
     .description = "Interactive bash shell",
     .function = COMMAND_HANDLER_NAME(ibash),
-    .valid_args =
-        {
-            .enabled = true,
-            .counts = DynModule::craftArgCountMask<0, 1>(),
-            .split_type = DynModule::ValidArgs::Split::ByWhitespace,
-            .usage = "/ibash - Start session\n/ibash <command> - Execute "
-                     "command\n/ibash exit - End session",
-        },
 };
