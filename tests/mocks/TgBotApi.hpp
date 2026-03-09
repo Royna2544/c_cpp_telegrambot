@@ -126,6 +126,10 @@ class MockTgBotApi : public TgBotApi {
                 (const ChatId chatid, const MessageId message,
                  const std::vector<ReactionType::Ptr>& reaction, bool isBig),
                 (const override));
+    MOCK_METHOD(TgBot::UserProfilePhotos::Ptr, getUserProfilePhotos_impl,
+                (const UserId userId), (const override));
+    MOCK_METHOD(TgBot::Chat::Ptr, getChat_impl, (ChatId chatId),
+                (const override));
 
     // Non-TgBotApi methods
     MOCK_METHOD(bool, reloadCommand, (const std::string& cmd), (override));

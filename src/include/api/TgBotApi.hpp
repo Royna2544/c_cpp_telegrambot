@@ -22,6 +22,7 @@
 #include "ReplyParametersExt.hpp"
 #include "Utils.hpp"
 #include "api/typedefs.h"
+#include "tgbot/types/Chat.h"
 #include "tgbot/types/ChatMember.h"
 
 using TgBot::Chat;
@@ -471,6 +472,11 @@ class TgBotApi {
         ChatId chatId, MessageId messageId,
         const std::vector<ReactionType::Ptr>& reaction, bool isBig) const = 0;
 
+    virtual TgBot::UserProfilePhotos::Ptr getUserProfilePhotos_impl(
+        std::int64_t userId) const = 0;
+
+    virtual Chat::Ptr getChat_impl(ChatId chatId) const = 0;
+
     static FileOrString ToFileOrString(FileOrMedia media) {
         return std::visit(
             [](auto& x) -> FileOrString {
@@ -777,6 +783,13 @@ class TgBotApi {
         return setMessageReaction_impl(message->chat->id, message->messageId,
                                        reaction, isBig);
     }
+
+    inline TgBot::UserProfilePhotos::Ptr getUserProfilePhotos(
+        std::int64_t userId) {
+        return getUserProfilePhotos_impl(userId);
+    }
+
+    inline Chat::Ptr getChat(ChatId chatId) { return getChat_impl(chatId); }
 
     // TODO: Any better way than this?
 

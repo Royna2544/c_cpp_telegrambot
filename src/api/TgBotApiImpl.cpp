@@ -73,7 +73,7 @@ bool TgBotApiImpl::validateValidArgs(const CommandModule::Info* module,
         return true;  // No validation needed.
     }
     bool check_argc = module->valid_args.counts != 0;
-    
+
     // Try to split them.
     const std::vector<std::string>& args =
         message->get<MessageAttrs::ParsedArgumentsList>();
@@ -260,7 +260,9 @@ void TgBotApiImpl::removeInlineQueryKeyboard(const std::string_view key) {
     onInlineQueryImpl->remove(key);
 }
 
-void TgBotApiImpl::startPoll() { _longPoll->start(); }
+void TgBotApiImpl::startPoll() {
+    _longPoll->start();
+}
 
 namespace {
 void handleTgBotApiEx(const TgBot::TgException& ex) {
@@ -579,6 +581,15 @@ bool TgBotApiImpl::answerCallbackQuery_impl(
     const std::string_view callbackQueryId, const std::string_view text,
     bool showAlert) const {
     return getApi().answerCallbackQuery(callbackQueryId, text, showAlert);
+}
+
+TgBot::UserProfilePhotos::Ptr TgBotApiImpl::getUserProfilePhotos_impl(
+    const UserId userId) const {
+    return getApi().getUserProfilePhotos(userId, 0, 1);
+}
+
+TgBot::Chat::Ptr TgBotApiImpl::getChat_impl(ChatId chatId) const {
+    return getApi().getChat(chatId);
 }
 
 TgBotApiImpl::TgBotApiImpl(const std::string_view token, AuthContext* auth,

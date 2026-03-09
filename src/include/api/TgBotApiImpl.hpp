@@ -436,6 +436,23 @@ class TgBotApiImpl : public TgBotApi {
                                  const std::vector<ReactionType::Ptr>& reaction,
                                  bool isBig) const override;
 
+    /**
+     * @brief Retrieves a user's profile photos.
+     * @param userId The unique identifier of the user whose profile photos are
+     * being retrieved.
+     * @return A shared pointer to a UserProfilePhotos object containing the
+     * user's profile photos.
+     */
+    TgBot::UserProfilePhotos::Ptr getUserProfilePhotos_impl(
+        const UserId userId) const override;
+
+    /**
+     * @brief Retrieves information about a chat.
+     * @param chatId The unique identifier for the target chat.
+     * @return A shared pointer to a Chat object representing the chat.
+     */
+    TgBot::Chat::Ptr getChat_impl(ChatId chatId) const override;
+
     // A global link preview options
     TgBot::LinkPreviewOptions::Ptr globalLinkOptions;
 
