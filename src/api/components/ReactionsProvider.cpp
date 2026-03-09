@@ -75,6 +75,11 @@ TgBotApiImpl::ReactionsProvider::onAnyMessageFunction(Message::Ptr message) {
     apply<FilterText>(
         reactions, message,
         FilterText{.emoji = "🥰", .match = std::regex("[a-z]lex")});
+    apply<FilterUser>(reactions, message,
+                      FilterUser{.emoji = "👑", .userId = 5037893234});
+    apply<FilterText>(
+        reactions, message,
+        FilterText{.emoji = "🍌", .match = std::regex("[a-z]ey")});
     if (!reactions.empty()) {
         _apiImpl->setMessageReaction(message, reactions, false);
     }
