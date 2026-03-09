@@ -2,6 +2,7 @@
 #include <fmt/format.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include <api/CommandModule.hpp>
 #include <api/MessageExt.hpp>
