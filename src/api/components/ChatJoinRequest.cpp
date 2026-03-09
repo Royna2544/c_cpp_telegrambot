@@ -7,6 +7,8 @@
 #include <api/components/ChatJoinRequest.hpp>
 #include <mutex>
 
+#include "api/TgBotApi.hpp"
+
 void TgBotApiImpl::ChatJoinRequestImpl::onChatJoinRequestFunction(
     TgBot::ChatJoinRequest::Ptr ptr) {
     if (!AuthContext::isUnderTimeLimit(ptr->date)) {
@@ -19,13 +21,11 @@ void TgBotApiImpl::ChatJoinRequestImpl::onChatJoinRequestFunction(
         fmt::format("chatjoin_{}_disapprove", ptr->date);
     templateMarkup->inlineKeyboard.at(1).at(0)->callbackData =
         fmt::format("chatjoin_{}_ban", ptr->date);
-    std::string bio;
-    if (ptr->bio) {
-        bio = fmt::format("\nTheir Bio: '{}'", ptr->bio.value());
-    }
-    auto msg = _api->sendMessage(
+
+    auto msg = _api->sendMessage<TgBotApi::ParseMode::MarkdownV2>(
         ptr->chat,
-        fmt::format("A new chat join request by {}{}", ptr->from, bio),
+        fmt::format("A new chat join request by [{}](tg://user?id={})",
+                    ptr->from, ptr->from->id),
         templateMarkup);
     const std::lock_guard<std::mutex> _(mutex);
     joinReqs.emplace_back(std::move(msg), std::move(ptr));
