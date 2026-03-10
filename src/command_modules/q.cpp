@@ -157,6 +157,11 @@ DECLARE_COMMAND_HANDLER(q) {
             text = args.substr(5);
             media.clear();
         }
+        // Support media=<arg> to override the media.
+        else if (args.starts_with("media=")) {
+            media = args.substr(6);
+            text.clear();
+        }
     }
 
     std::string username;
