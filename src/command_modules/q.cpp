@@ -152,7 +152,11 @@ DECLARE_COMMAND_HANDLER(q) {
     // replied-to-message
     std::string args = message->get<MessageAttrs::ExtraText>();
     if (!args.empty()) {
-        // TODO: We parse options here
+        // Support text=<arg> to override the text.
+        if (args.starts_with("text=")) {
+            text = args.substr(5);
+            media.clear();
+        }
     }
 
     std::string username;
