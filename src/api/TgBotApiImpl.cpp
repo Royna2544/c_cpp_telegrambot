@@ -331,7 +331,7 @@ Message::Ptr TgBotApiImpl::sendSticker_impl(
     try {
         return getApi().sendSticker(chatId, sticker, replyParameters, nullptr,
                                     kDisableNotifications,
-                                    ReplyParamsToMsgTid{replyParameters});
+                                    ReplyParamsToMsgTid{replyParameters}, {}, "👍");
     } catch (const TgBot::TgException& ex) {
         handleTgBotApiEx(ex);
         return nullptr;
