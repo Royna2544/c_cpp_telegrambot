@@ -629,13 +629,18 @@ int app_main(int argc, char** argv) {
                                         kMaxRetries);
 
             // Sleep with periodic shutdown signal checks for responsive exit
+            bool shutdownSignaled = false;
             for (int i = 0; i < backoffSeconds; ++i) {
                 if (SignalHandler::isSignaled()) {
                     LOG(INFO)
                         << "Shutdown signal received during retry backoff";
-                    goto exit_retry_loop;
+                    shutdownSignaled = true;
+                    break;
                 }
                 std::this_thread::sleep_for(std::chrono::seconds(1));
+            }
+            if (shutdownSignaled) {
+                break;
             }
         } catch (const std::exception& e) {
             LOG(ERROR) << "Uncaught Exception: " << e.what();
@@ -643,7 +648,6 @@ int app_main(int argc, char** argv) {
             break;
         }
     }
-exit_retry_loop:
     threadManager->destroy();
 
     {
