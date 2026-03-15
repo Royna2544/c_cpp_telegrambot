@@ -386,7 +386,11 @@ using std::string_view_literals::operator""sv;
 
 void init_work(TgBotApi* api, DatabaseBase* database) {
     TgBotApi::InlineQuery mediaQuery{
-        "media", "Get media with the name from database", {}, true, false};
+        .name = "media",
+        .description = "Get media with the name from database",
+        .command = {},
+        .hasMoreArguments = true,
+        .enforced = false};
 
     // Add InlineQuery called 'media'
     api->addInlineQueryKeyboard(
@@ -394,6 +398,31 @@ void init_work(TgBotApi* api, DatabaseBase* database) {
         [database](
             std::string_view x) -> std::vector<TgBot::InlineQueryResult::Ptr> {
             return mediaQueryKeyboardFunction(database, x);
+        });
+
+    TgBotApi::InlineQuery bluetextQuery{.name = "bluetext",
+                                        .description = "Get bluetext",
+                                        .command = {},
+                                        .hasMoreArguments = false,
+                                        .enforced = false};
+
+    // Add InlineQuery called 'bluetext'
+    api->addInlineQueryKeyboard(
+        std::move(bluetextQuery),
+        [database](
+            std::string_view x) -> std::vector<TgBot::InlineQueryResult::Ptr> {
+            auto article = std::make_shared<TgBot::InlineQueryResultArticle>();
+            article->id = "bluetext_result";
+            article->title = "Bluetext";
+            article->description = "Get bluetext with the content you input";
+            auto text = std::make_shared<TgBot::InputTextMessageContent>();
+            text->messageText = fmt::format(
+                R"(/BLUE /TEXT
+/MUST /CLICK
+/I /AM /A /STUPID /ANIMAL /THAT /IS /ATTRACTED /TO /COLORS)",
+                x);
+            article->inputMessageContent = text;
+            return {article};
         });
 
     // Send a launch message to the owner.
