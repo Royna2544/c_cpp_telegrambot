@@ -24,7 +24,11 @@ bool AuthContext::isInList(DatabaseBase::ListType type,
 AuthContext::Result AuthContext::isAuthorized(const Message::Ptr& message,
                                               const AccessLevel flags) const {
     if (isUnderTimeLimit(message)) {
-        return isAuthorized(message->from, flags);
+        if (!message->from) {
+            // If the message has no sender, we can't authorize it.
+            return {false, Result::Reason::Unknown};
+        }
+        return isAuthorized(*message->from, flags);
     } else {
         return {false, Result::Reason::MessageTooOld};
     }

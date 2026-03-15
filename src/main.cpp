@@ -49,7 +49,10 @@ class RegexHandlerInterface : public RegexHandler::Interface {
             "RegexHandler has encountered an error: " + status.getMessage());
     }
     void onSuccess(const std::string& result) override {
-        _api->sendReplyMessage(_message->replyToMessage, result);
+        if (result.empty() || !_message->replyToMessage) {
+            return;
+        }
+        _api->sendReplyMessage(*_message->replyToMessage, result);
     }
 
     explicit RegexHandlerInterface(TgBotApi::CPtr api, Message::Ptr message)

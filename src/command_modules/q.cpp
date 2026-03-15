@@ -76,31 +76,31 @@ DECLARE_COMMAND_HANDLER(q) {
     auto user = message->reply()->get<MessageAttrs::User>();
     if (!origin) {
         // Empty body...
-    } else if (origin->type == TgBot::MessageOriginUser::TYPE) {
-        auto ptr = std::static_pointer_cast<TgBot::MessageOriginUser>(origin);
+    } else if ((*origin)->type == TgBot::MessageOriginUser::TYPE) {
+        auto ptr = std::static_pointer_cast<TgBot::MessageOriginUser>(*origin);
         user = ptr->senderUser;
-    } else if (origin->type == TgBot::MessageOriginHiddenUser::TYPE) {
+    } else if ((*origin)->type == TgBot::MessageOriginHiddenUser::TYPE) {
         auto ptr =
-            std::static_pointer_cast<TgBot::MessageOriginHiddenUser>(origin);
+            std::static_pointer_cast<TgBot::MessageOriginHiddenUser>(*origin);
         // We can't obtain the user, but we can at least get the name.
         user = std::make_shared<TgBot::User>();
         user->id = 0;
         user->firstName = ptr->senderUserName;
-    } else if (origin->type == TgBot::MessageOriginChat::TYPE) {
-        auto ptr = std::static_pointer_cast<TgBot::MessageOriginChat>(origin);
+    } else if ((*origin)->type == TgBot::MessageOriginChat::TYPE) {
+        auto ptr = std::static_pointer_cast<TgBot::MessageOriginChat>(*origin);
         user = std::make_shared<TgBot::User>();
         user->id = ptr->senderChat->id;
         user->firstName = ptr->senderChat->title.value_or("");
-    } else if (origin->type == TgBot::MessageOriginChannel::TYPE) {
+    } else if ((*origin)->type == TgBot::MessageOriginChannel::TYPE) {
         auto ptr =
-            std::static_pointer_cast<TgBot::MessageOriginChannel>(origin);
+            std::static_pointer_cast<TgBot::MessageOriginChannel>(*origin);
         user = std::make_shared<TgBot::User>();
         user->id = ptr->chat->id;
         user->firstName = ptr->chat->title.value_or("");
     } else {
         // Give up.
         api->sendMessage(message->get<MessageAttrs::Chat>(),
-                         "Unsupported message origin type: " + origin->type);
+                         "Unsupported message origin type: " + (*origin)->type);
         return;
     }
 
@@ -114,7 +114,7 @@ DECLARE_COMMAND_HANDLER(q) {
 
     auto text = message->reply()->message()->text.value_or("");
     if (message->message()->quote) {
-        text = message->message()->quote->text;
+        text = (*message->message()->quote)->text;
     }
     std::string media;
     if (message->reply()->has<MessageAttrs::Sticker>()) {
@@ -124,7 +124,7 @@ DECLARE_COMMAND_HANDLER(q) {
         } else {
             // Grab thumbnail if the sticker is animated, since we don't support
             // animated stickers for now.
-            media = _sticker->thumbnail->fileId;
+            media = (*_sticker->thumbnail)->fileId;
         }
         type = MessageType::Sticker;
     } else if (message->reply()->has<MessageAttrs::Photo>()) {
@@ -133,7 +133,7 @@ DECLARE_COMMAND_HANDLER(q) {
         type = MessageType::Photo;
     } else if (message->reply()->has<MessageAttrs::Video>()) {
         auto video = message->reply()->get<MessageAttrs::Video>();
-        media = video->thumbnail->fileId;
+        media = (*video->thumbnail)->fileId;
         type = MessageType::Video;
     } else if (message->reply()->has<MessageAttrs::Animation>()) {
         auto animation = message->reply()->get<MessageAttrs::Animation>();
@@ -143,7 +143,7 @@ DECLARE_COMMAND_HANDLER(q) {
                 "Unsupported media type: animation without thumbnail");
             return;
         }
-        media = animation->thumbnail->fileId;
+        media = (*animation->thumbnail)->fileId;
         type = MessageType::Animation;
     }
 
@@ -200,7 +200,7 @@ DECLARE_COMMAND_HANDLER(q) {
     } else if (user->id < 0) {
         auto chat = api->getChat(user->id);
         if (chat->photo) {
-            req.messages[0].from.photo.big_file_id = chat->photo->bigFileId;
+            req.messages[0].from.photo.big_file_id = (*chat->photo)->bigFileId;
         }
     }
     if (type == MessageType::Sticker) {

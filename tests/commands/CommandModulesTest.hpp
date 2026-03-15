@@ -170,7 +170,8 @@ class CommandTestBase : public CommandModulesTest {
     }
     void setCommandExtArgs() {
         defaultProvidedMessage->text = "/" + name;
-        defaultProvidedMessage->entities[0]->length =
+        defaultProvidedMessage->entities.emplace();
+        (*defaultProvidedMessage->entities)[0]->length =
             defaultProvidedMessage->text->size();
     }
     void execute() {

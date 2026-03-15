@@ -5,17 +5,16 @@
 #include <libfs.hpp>
 #include <memory>
 
+#include "../GetCommandLine.hpp"
 #include "CommandLine.hpp"
 #include "api/CommandModule.hpp"
 #include "api/Providers.hpp"
 #include "api/TgBotApi.hpp"
 #include "fruit/fruit_forward_decls.h"
-#include "../GetCommandLine.hpp"
 
 fruit::Component<CommandLine> getCommandLine() {
-    return fruit::createComponent().registerProvider([] () -> CommandLine {
-        return getCmdLine();
-    });
+    return fruit::createComponent().registerProvider(
+        []() -> CommandLine { return getCmdLine(); });
 }
 
 fruit::Component<MockTgBotApi, Providers, MockDatabase, MockResource,
@@ -61,13 +60,13 @@ CommandModule::Ptr CommandModulesTest::loadModule(
         // Try to make ModulePath under Release
         // TODO: This is a temporary workaround, we should find a better
         // solution for this
-        auto releaseModuleFilePath = modulePath / "Release" /
-                                     moduleFileName / FS::SharedLib;
+        auto releaseModuleFilePath =
+            modulePath / "Release" / moduleFileName / FS::SharedLib;
         module = std::make_unique<DynCommandModule>(releaseModuleFilePath);
         ret = module->load();
         if (!ret) {
-           LOG(WARNING) << "Failed to load module " << name
-                        << " from path: " << releaseModuleFilePath;
+            LOG(WARNING) << "Failed to load module " << name
+                         << " from path: " << releaseModuleFilePath;
         }
     }
     EXPECT_TRUE(ret);
@@ -92,9 +91,10 @@ Message::Ptr CommandModulesTest::createDefaultMessage() {
     message->chat->id = TEST_CHAT_ID;
     message->from = createDefaultUser();
     message->messageId = messageId++;
-    message->entities.emplace_back(std::make_shared<TgBot::MessageEntity>());
-    message->entities[0]->type = TgBot::MessageEntity::Type::BotCommand;
-    message->entities[0]->offset = 0;
+    message->entities.emplace();
+    message->entities->emplace_back(std::make_shared<TgBot::MessageEntity>());
+    message->entities->at(0)->type = TgBot::MessageEntity::Type::BotCommand;
+    message->entities->at(0)->offset = 0;
     return message;
 }
 

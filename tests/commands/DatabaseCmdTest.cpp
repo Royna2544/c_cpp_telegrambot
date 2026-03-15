@@ -27,16 +27,17 @@ struct DatabaseCommandTest : public CommandTestBase {
     void test_adduser() {
         defaultProvidedMessage->replyToMessage = createDefaultMessage();
 
-        defaultProvidedMessage->replyToMessage->from =
+        (*defaultProvidedMessage->replyToMessage)->from =
             createDefaultUser(14);  // NOLINT
 
         constexpr std::string_view something = "sdf";
         EXPECT_CALL(strings, get(Strings::USER_ADDED))
             .WillOnce(Return(something));
 
-        EXPECT_CALL(*database,
-                    addUserToList(
-                        type, defaultProvidedMessage->replyToMessage->from->id))
+        EXPECT_CALL(
+            *database,
+            addUserToList(
+                type, (*(*defaultProvidedMessage->replyToMessage)->from)->id))
             .WillOnce(Return(result));
         test_impl<X, Y>(something);
     }
@@ -45,16 +46,17 @@ struct DatabaseCommandTest : public CommandTestBase {
               int X, int Y>
     void test_removeuser() {
         defaultProvidedMessage->replyToMessage = createDefaultMessage();
-        defaultProvidedMessage->replyToMessage->from =
+        (*defaultProvidedMessage->replyToMessage)->from =
             createDefaultUser(324);  // NOLINT
 
         constexpr std::string_view something = "NOSUERE";
         EXPECT_CALL(strings, get(Strings::USER_REMOVED))
             .WillOnce(Return(something));
 
-        EXPECT_CALL(*database,
-                    removeUserFromList(
-                        type, defaultProvidedMessage->replyToMessage->from->id))
+        EXPECT_CALL(
+            *database,
+            removeUserFromList(
+                type, (*(*defaultProvidedMessage->replyToMessage)->from)->id))
             .WillOnce(Return(result));
         test_impl<X, Y>(something);
     }

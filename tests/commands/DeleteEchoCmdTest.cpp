@@ -29,7 +29,7 @@ struct DeleteEchoCommandTest : public CommandTestBase {
 
 TEST_F(DeleteEchoCommandTest, WithRepliedMessageNoArgs) {
     defaultProvidedMessage->replyToMessage = createDefaultMessage();
-    defaultProvidedMessage->replyToMessage->text = "This is alex";
+    (*defaultProvidedMessage->replyToMessage)->text = "This is alex";
 
     admin();
     Message::Ptr deletedMessage;
@@ -37,9 +37,10 @@ TEST_F(DeleteEchoCommandTest, WithRepliedMessageNoArgs) {
         .WillOnce(testing::SaveArg<0>(&deletedMessage));
     EXPECT_CALL(
         *botApi,
-        copyMessage_impl(
-            TEST_CHAT_ID, defaultProvidedMessage->replyToMessage->messageId,
-            createMessageReplyMatcher(defaultProvidedMessage->replyToMessage)));
+        copyMessage_impl(TEST_CHAT_ID,
+                         (*defaultProvidedMessage->replyToMessage)->messageId,
+                         createMessageReplyMatcher(
+                             *defaultProvidedMessage->replyToMessage)));
     execute();
     EXPECT_EQ(deletedMessage, defaultProvidedMessage);
 }
@@ -60,16 +61,17 @@ TEST_F(DeleteEchoCommandTest, WithRepliedMessageWithArgs) {
 
 TEST_F(DeleteEchoCommandTest, WithRepliedMessageNoArgsCannotDel) {
     defaultProvidedMessage->replyToMessage = createDefaultMessage();
-    defaultProvidedMessage->replyToMessage->text = "This is alex";
+    (*defaultProvidedMessage->replyToMessage)->text = "This is alex";
 
     admin();
     Message::Ptr deletedMessage;
     // If exception is thrown, the command should catch it and not crash
     EXPECT_CALL(
         *botApi,
-        copyMessage_impl(
-            TEST_CHAT_ID, defaultProvidedMessage->replyToMessage->messageId,
-            createMessageReplyMatcher(defaultProvidedMessage->replyToMessage)));
+        copyMessage_impl(TEST_CHAT_ID,
+                         (*defaultProvidedMessage->replyToMessage)->messageId,
+                         createMessageReplyMatcher(
+                             *defaultProvidedMessage->replyToMessage)));
     // But it should still attempt to delete the message
     EXPECT_CALL(*botApi, deleteMessage_impl(_))
         .WillOnce(
@@ -96,7 +98,7 @@ TEST_F(DeleteEchoCommandTest, WithArgsNoRepliedMessage) {
 
 TEST_F(DeleteEchoCommandTest, WithJustAMember) {
     defaultProvidedMessage->replyToMessage = createDefaultMessage();
-    defaultProvidedMessage->replyToMessage->text = "This is alex";
+    (*defaultProvidedMessage->replyToMessage)->text = "This is alex";
 
     member();
     Message::Ptr deletedMessage;

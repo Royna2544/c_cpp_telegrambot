@@ -34,7 +34,7 @@ template <>
 void apply<FilterFilename>(std::vector<TgBot::ReactionType::Ptr>& reactions,
                            const Message::Ptr& message,
                            const FilterFilename& filter) {
-    if (message->document && message->document->fileName == filter.match) {
+    if (message->document && (*message->document)->fileName == filter.match) {
         addReaction(reactions, filter.emoji);
     }
 }
@@ -48,7 +48,7 @@ struct FilterUser {
 template <>
 void apply<FilterUser>(std::vector<TgBot::ReactionType::Ptr>& reactions,
                        const Message::Ptr& message, const FilterUser& filter) {
-    if (message->from && message->from->id == filter.userId) {
+    if (message->from && (*message->from)->id == filter.userId) {
         addReaction(reactions, filter.emoji);
     }
 }

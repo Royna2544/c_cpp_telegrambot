@@ -1160,8 +1160,14 @@ void ROMBuildQueryHandler::handle_clean_directories(const Query& query) {
         bool success = buildService_->cleanDirectory(cleanDirectoryRequest);
         if (!success) {
             LOG(ERROR) << "Failed to clean ROM directory";
-            _api->editMessage(query->message, "Failed to clean ROM directory",
-                              backKeyboard);
+            if (query->message) {
+                _api->editMessage((*query->message),
+                                  "Failed to clean ROM directory",
+                                  backKeyboard);
+            } else {
+                LOG(ERROR) << "Query message is null, cannot edit message to "
+                              "show error";
+            }
             return;
         }
         _api->answerCallbackQuery(query->id,
@@ -1176,8 +1182,14 @@ void ROMBuildQueryHandler::handle_clean_directories(const Query& query) {
         bool success = buildService_->cleanDirectory(cleanDirectoryRequest);
         if (!success) {
             LOG(ERROR) << "Failed to clean build directory";
-            _api->editMessage(query->message, "Failed to clean build directory",
-                              backKeyboard);
+            if (query->message) {
+                _api->editMessage((*query->message),
+                                  "Failed to clean build directory",
+                                  backKeyboard);
+            } else {
+                LOG(ERROR) << "Query message is null, cannot edit message to "
+                              "show error";
+            }
             return;
         }
         cleanDirectoryRequest.set_directory_type(
@@ -1189,8 +1201,14 @@ void ROMBuildQueryHandler::handle_clean_directories(const Query& query) {
         buildService_->directoryExists(cleanDirectoryRequest, &boolValue);
     if (!checkSuccess) {
         LOG(ERROR) << "Failed to check directory existence";
-        _api->editMessage(query->message, "Failed to check directory existence",
-                          backKeyboard);
+        if (query->message) {
+            _api->editMessage((*query->message),
+                              "Failed to check directory existence",
+                              backKeyboard);
+        } else {
+            LOG(ERROR)
+                << "Query message is null, cannot edit message to show error";
+        }
         return;
     }
 
@@ -1209,8 +1227,13 @@ void ROMBuildQueryHandler::handle_clean_directories(const Query& query) {
             !res.ok()) {
             LOG(ERROR) << "Failed to get directory size: "
                        << res.error_message();
-            _api->editMessage(query->message, "Failed to get directory size",
-                              backKeyboard);
+            if (query->message) {
+                _api->editMessage((*query->message),
+                                  "Failed to get directory size", backKeyboard);
+            } else {
+                LOG(ERROR) << "Query message is null, cannot edit message to "
+                              "show error";
+            }
             return;
         }
         entry = fmt::format("Current disk space used: {}GB, total: {}GB",
@@ -1221,9 +1244,14 @@ void ROMBuildQueryHandler::handle_clean_directories(const Query& query) {
             buildService_->directoryExists(cleanDirectoryRequest, &boolValue);
         if (!checkSuccess2) {
             LOG(ERROR) << "Failed to check build directory existence";
-            _api->editMessage(query->message,
-                              "Failed to check build directory existence",
-                              backKeyboard);
+            if (query->message) {
+                _api->editMessage((*query->message),
+                                  "Failed to check build directory existence",
+                                  backKeyboard);
+            } else {
+                LOG(ERROR) << "Query message is null, cannot edit message to "
+                              "show error";
+            }
             return;
         }
         builder.addKeyboard({"Clean ROM directory", "clean_rom"});
@@ -1232,7 +1260,13 @@ void ROMBuildQueryHandler::handle_clean_directories(const Query& query) {
         }
     }
     builder.addKeyboard(getButtonOf<Buttons::back>());
-    _api->editMessage(query->message, entry, builder.get());
+    if (query->message) {
+        _api->editMessage((*query->message), entry, builder.get());
+    } else {
+        LOG(ERROR)
+            << "Query message is null, cannot edit message to show clean "
+               "options";
+    }
 }
 
 void ROMBuildQueryHandler::onCallbackQuery(
@@ -1241,8 +1275,13 @@ void ROMBuildQueryHandler::onCallbackQuery(
         DLOG(INFO) << "No message to handle callback query";
         return;
     }
-    if (query->message->chat->id != sentMessage->chat->id ||
-        query->message->messageId != sentMessage->messageId) {
+    if (!query->message) {
+        DLOG(INFO) << "No message in callback query";
+        return;
+    }
+    auto& msg = *query->message;
+    if (msg->chat->id != sentMessage->chat->id ||
+        msg->messageId != sentMessage->messageId) {
         DLOG(INFO) << "Mismatch on message id";
         return;
     }

@@ -10,7 +10,7 @@
 ChatDataCollector::Data::Data(const Message::Ptr& message) {
     if (message->text) {
         msgType = Data::MsgType::TEXT;
-    } else if (!message->photo.empty()) {
+    } else if (!message->photo) {
         msgType = Data::MsgType::PHOTO;
     } else if (message->video) {
         msgType = Data::MsgType::VIDEO;
@@ -24,21 +24,22 @@ ChatDataCollector::Data::Data(const Message::Ptr& message) {
         msgType = Data::MsgType::ETC;
     }
     chatId = message->chat->id;
-    userId = message->from->id;
+    userId = (*message->from)->id;
     timestamp = message->date;
     isEdited = message->editDate.has_value();
     isForwarded = message->forwardOrigin != nullptr;
     replyToUserId =
-        message->replyToMessage ? message->replyToMessage->from->id : 0;
+        message->replyToMessage ? (*(*message->replyToMessage)->from)->id : 0;
     messageid = message->messageId;
     replyToMessageId =
-        message->replyToMessage ? message->replyToMessage->messageId : 0;
+        message->replyToMessage ? (*message->replyToMessage)->messageId : 0;
     replyToChatId =
-        message->replyToMessage ? message->replyToMessage->chat->id : 0;
+        message->replyToMessage ? (*message->replyToMessage)->chat->id : 0;
     threadId = message->messageThreadId.has_value()
                    ? message->messageThreadId.value()
                    : 0;
-    is_premium = message->from->isPremium && message->from->isPremium.value();
+    is_premium =
+        (*message->from)->isPremium && (*message->from)->isPremium.value();
     std::string text;
     if (message->text) {
         text = *message->text;
@@ -58,19 +59,19 @@ void ChatDataCollector::onMessage(const Message::Ptr& message) {
     if (message->isAutomaticForward) {
         return;  // Skip automatic forwards from channel
     }
-    if (message->from->isBot) {
+    if ((*message->from)->isBot) {
         return;  // Skip messages from bots
     }
-    if (!message->newChatMembers.empty() || message->leftChatMember ||
+    if (!message->newChatMembers || message->leftChatMember ||
         message->groupChatCreated || message->pinnedMessage) {
         return;  // Skip join/leave messages
     }
     if (message->senderChat &&
-        message->senderChat->type == Chat::Type::Channel) {
+        (*message->senderChat)->type == Chat::Type::Channel) {
         return;  // Skip messages sent on behalf of a channel
     }
     constexpr UserId kExcludedUserId = 777000;  // Telegram official account
-    if (message->from->id == kExcludedUserId) {
+    if ((*message->from)->id == kExcludedUserId) {
         return;  // Skip messages from Telegram official account
     }
     if (message->chat->type != Chat::Type::Supergroup) {
@@ -79,7 +80,7 @@ void ChatDataCollector::onMessage(const Message::Ptr& message) {
     chatDataFile << Data(message);
 
     // Update user dict
-    userDict_[message->from->id] = message->from;
+    userDict_[(*message->from)->id] = *message->from;
     // Update chat dict
     chatDict_[message->chat->id] = message->chat;
 }

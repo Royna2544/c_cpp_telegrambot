@@ -118,7 +118,7 @@ DECLARE_COMMAND_HANDLER(database) {
     api->onAnyMessage([msg, userId, res, provider](TgBotApi::CPtr api,
                                                    const Message::Ptr& m) {
         if (m->replyToMessage &&
-            m->replyToMessage->messageId == msg->messageId) {
+            (*m->replyToMessage)->messageId == msg->messageId) {
             Strings text{};
             if (m->text == addtowhitelist) {
                 text = handleAddUser<DatabaseBase::ListType::WHITELIST>(

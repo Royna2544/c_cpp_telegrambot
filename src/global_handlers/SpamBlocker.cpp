@@ -163,19 +163,19 @@ void SpamBlockBase::addMessage(const Message::Ptr& message) {
     if (message->text) {
         messageData = *message->text;
     } else if (message->animation) {
-        messageData = message->animation->fileUniqueId;
+        messageData = (*message->animation)->fileUniqueId;
     } else if (message->sticker) {
-        messageData = message->sticker->fileUniqueId;
+        messageData = (*message->sticker)->fileUniqueId;
     }
 
     ChatId chatId = message->chat->id;
-    UserId userId = message->from->id;
+    UserId userId = (*message->from)->id;
     MessageId messageId = message->messageId;
     {
         const std::lock_guard<std::mutex> _(mutex);
         chat_messages_data[chatId][userId].emplace_back(messageId, messageData);
         chat_map[chatId] = message->chat;
-        user_map[userId] = message->from;
+        user_map[userId] = *message->from;
         chat_messages_count++;
         onMessageAdded(chat_messages_count);
     }

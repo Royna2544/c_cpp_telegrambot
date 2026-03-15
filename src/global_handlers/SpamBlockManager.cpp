@@ -7,18 +7,18 @@
 #include <condition_variable>
 #include <global_handlers/SpamBlockManager.hpp>
 #include <mutex>
+
 #include "global_handlers/SpamBlock.hpp"
 
-void SpamBlockManager::runFunction(const std::stop_token &token) {
+void SpamBlockManager::runFunction(const std::stop_token& token) {
     while (!token.stop_requested()) {
         {
             std::unique_lock<std::mutex> lock(cv_mutex);
-            condvar.wait_for(
-                lock, sSpamDetectDelay, [this, token] {
-                    return token.stop_requested() ||
-                           chat_messages_count.load(std::memory_order_relaxed) >=
-                               sImmediateStartThreshold;
-                });
+            condvar.wait_for(lock, sSpamDetectDelay, [this, token] {
+                return token.stop_requested() ||
+                       chat_messages_count.load(std::memory_order_relaxed) >=
+                           sImmediateStartThreshold;
+            });
         }
         if (!token.stop_requested()) {
             consumeAndDetect();
@@ -50,14 +50,14 @@ void SpamBlockManager::onDetected(ChatId chat, UserId user,
                 _api->muteChatMember(
                     chat, user, perms,
                     std::chrono::system_clock::now() + kMuteDuration);
-            } catch (const TgBot::TgException &e) {
+            } catch (const TgBot::TgException& e) {
                 LOG(WARNING) << fmt::format("Cannot mute: {}", e.what());
             }
             [[fallthrough]];
         case Config::PURGE: {
             try {
                 _api->deleteMessages(chat, messageIds);
-            } catch (const TgBot::TgException &e) {
+            } catch (const TgBot::TgException& e) {
                 DLOG(INFO) << "Error deleting messages: " << e.what();
             }
             [[fallthrough]];
@@ -70,7 +70,7 @@ void SpamBlockManager::onDetected(ChatId chat, UserId user,
     };
 }
 
-bool SpamBlockManager::shouldBeSkipped(const Message::Ptr &message) const {
+bool SpamBlockManager::shouldBeSkipped(const Message::Ptr& message) const {
     if (_auth->isAuthorized(message, AuthContext::AccessLevel::AdminUser)) {
         return true;
     }
@@ -86,16 +86,16 @@ bool SpamBlockManager::shouldBeSkipped(const Message::Ptr &message) const {
     }
 
     // Allow photos to be sent
-    if (!message->photo.empty()) {
+    if (message->photo) {
         return true;
     }
 
     return false;
 }
 
-SpamBlockManager::SpamBlockManager(TgBotApi::Ptr api, AuthContext *auth)
+SpamBlockManager::SpamBlockManager(TgBotApi::Ptr api, AuthContext* auth)
     : _api(api), _auth(auth) {
-    api->onAnyMessage([this](TgBotApi::CPtr, const Message::Ptr &message) {
+    api->onAnyMessage([this](TgBotApi::CPtr, const Message::Ptr& message) {
         addMessage(message);
         return TgBotApi::AnyMessageResult::Handled;
     });

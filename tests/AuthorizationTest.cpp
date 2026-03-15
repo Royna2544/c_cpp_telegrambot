@@ -84,7 +84,7 @@ TEST_P(AuthContextTest, expectedForMessagesInTime) {
     const auto& Authparam = GetParam();
     auto message = std::make_shared<Message>();
     message->from = std::make_shared<TgBot::User>();
-    message->from->id = Authparam.userId;
+    (*message->from)->id = Authparam.userId;
 
     // Set up some expectations
 

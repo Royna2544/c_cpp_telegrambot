@@ -146,6 +146,17 @@ class KernelBuildHandler {
         LOG(INFO) << "Connected to remote successfully";
     }
 
+    template <TgBotApi::ParseMode mode = TgBotApi::ParseMode::None>
+    void editQueryMessage(
+        const TgBot::CallbackQuery::Ptr& query, const std::string& text,
+        const TgBot::InlineKeyboardMarkup::Ptr& replyMarkup = nullptr) {
+        if (query->message) {
+            _api->editMessage<mode>(*query->message, text, replyMarkup);
+        } else {
+            LOG(ERROR) << "Query message is null, cannot edit message";
+        }
+    }
+
    private:
     void loadConfigs(const CommandLine* line) {
         auto jsonDir =
@@ -169,7 +180,6 @@ class KernelBuildHandler {
     }
 
    public:
-
     constexpr static std::string_view kBuildPrefix = "build_";
     constexpr static std::string_view kSelectPrefix = "select_";
     void start(const Message::Ptr& message) {
@@ -243,8 +253,8 @@ class KernelBuildHandler {
                                        absl::StrCat(kCallbackQueryPrefix,
                                                     kSelectPrefix, device)));
                 }
-                _api->editMessage(query->message, "Select device to build",
-                                  builder.get());
+                editQueryMessage(query, "Select device to build",
+                                 builder.get());
             }
         }
     }
@@ -296,10 +306,10 @@ class KernelBuildHandler {
         builder.addKeyboard(std::pair{
             "Done", absl::StrCat(kCallbackQueryPrefix, kContinuePrefix)});
 
-        _api->editMessage(query->message,
-                          fmt::format("Device: {}\n\nFragments selection",
-                                      intermidiates.device),
-                          builder.get());
+        editQueryMessage(query,
+                         fmt::format("Device: {}\n\nFragments selection",
+                                     intermidiates.device),
+                         builder.get());
     }
 
     void handle_enable(const TgBot::CallbackQuery::Ptr& query) {
@@ -330,11 +340,10 @@ class KernelBuildHandler {
         bool success = buildService->cancelBuild(req, &resp);
         if (!success) {
             LOG(ERROR) << "Error when cancelling build";
-            _api->answerCallbackQuery(query->id,
-                                      "Error when cancelling build");
+            _api->answerCallbackQuery(query->id, "Error when cancelling build");
             return;
         }
-        _api->editMessage(query->message, "Build cancelled.");
+        editQueryMessage(query, "Build cancelled!");
         _api->answerCallbackQuery(query->id, "Build cancelled!");
     }
 
@@ -399,8 +408,8 @@ bool KernelBuildHandler::handle_prepare(const TgBot::CallbackQuery::Ptr& query,
     BuildStatus last_response;
     intermidiates.start_time = std::chrono::system_clock::now();
 
-    bool success = buildService->prepareBuild(
-        request, [&](const BuildStatus& response) {
+    bool success =
+        buildService->prepareBuild(request, [&](const BuildStatus& response) {
             last_response = response;
             *build_id = response.build_id();
             if (!rateLimiter.check()) {
@@ -424,20 +433,24 @@ Kernel Name: {}</blockquote>
                 intermidiates.current->name, intermidiates.device,
                 info.cpu_usage_percent(), info.memory_used_mb(),
                 info.memory_total_mb(), response.output());
-            _api->editMessage<TgBotApi::ParseMode::HTML>(query->message,
-                                                         fmted_msg);
+            if (query->message) {
+                _api->editMessage<TgBotApi::ParseMode::HTML>(*query->message,
+                                                             fmted_msg);
+            } else {
+                LOG(ERROR) << "Query message is null, cannot edit message to "
+                              "show prepare status";
+            }
         });
     if (!success) {
-        _api->editMessage(query->message, "Prepare failed.");
+        editQueryMessage(query, "Prepare failed.");
         LOG(ERROR) << "Prepare failed.";
         return false;
     } else {
-        _api->editMessage(query->message, "Build process prepared.");
+        editQueryMessage(query, "Prepare process completed.");
     }
     if (last_response.status() != ProgressStatus::SUCCESS) {
-        _api->editMessage(
-            query->message,
-            "Prepare incomplete!!, last message: " + last_response.output());
+        editQueryMessage(query, "Prepare incomplete!!, last message: " +
+                                    last_response.output());
         LOG(ERROR) << "Prepare incomplete!!, last message: "
                    << last_response.output();
         return false;
@@ -455,8 +468,8 @@ bool KernelBuildHandler::handle_build_process(
     buildRequest.set_build_id(build_id);
 
     BuildStatus last_response;
-    bool success = buildService->doBuild(
-        buildRequest, [&](const BuildStatus& response) {
+    bool success =
+        buildService->doBuild(buildRequest, [&](const BuildStatus& response) {
             last_response = response;
             if (!rateLimiter.check()) {
                 return;  // Skip update if within rate limit
@@ -480,18 +493,18 @@ Kernel Name: {}</blockquote>
                 intermidiates.current->name, intermidiates.device,
                 info.cpu_usage_percent(), info.memory_used_mb(),
                 info.memory_total_mb(), response.output());
-            _api->editMessage<TgBotApi::ParseMode::HTML>(
-                query->message, fmted_msg, makeCancelKeyboard());
+            editQueryMessage<TgBotApi::ParseMode::HTML>(query, fmted_msg,
+                                                        makeCancelKeyboard());
         });
     if (!success) {
-        _api->editMessage(query->message, "Build failed.");
+        editQueryMessage(query, "Build failed.");
         LOG(ERROR) << "Build failed.";
     } else {
-        _api->editMessage(query->message, "Build process completed.");
+        editQueryMessage(query, "Build process completed.");
     }
     if (last_response.status() != ProgressStatus::SUCCESS) {
-        _api->editMessage(query->message, "Build incomplete!!, last message: " +
-                                              last_response.output());
+        editQueryMessage(query, "Build incomplete!!, last message: " +
+                                    last_response.output());
         LOG(ERROR) << "Build incomplete!!, last message: "
                    << last_response.output();
         return false;
@@ -533,17 +546,16 @@ bool KernelBuildHandler::handle_artifact_download(
     outputFile.close();
 
     if (fileOpenError) {
-        _api->editMessage(query->message,
-                          "Failed to open output file for writing.");
+        editQueryMessage(query, "Failed to open output file for writing.");
         return false;
     }
 
     if (!success) {
-        _api->editMessage(query->message, "Failed to retrieve artifact.");
+        editQueryMessage(query, "Failed to retrieve artifact.");
         LOG(ERROR) << "Failed to retrieve artifact.";
         return false;
     } else {
-        _api->editMessage(query->message, "Artifact retrieved successfully.");
+        editQueryMessage(query, "Artifact retrieved successfully.");
     }
 
     LOG(INFO) << "Artifact " << artifactMetadata.filename()
@@ -555,7 +567,7 @@ bool KernelBuildHandler::handle_artifact_download(
 void KernelBuildHandler::handle_continue(
     const TgBot::CallbackQuery::Ptr& query) {
     // Start the build process
-    _api->editMessage(query->message, "Starting build...");
+    editQueryMessage(query, "Starting build...");
     int build_id = 0;
     if (!handle_prepare(query, &build_id)) {
         return;
@@ -571,8 +583,12 @@ void KernelBuildHandler::handle_continue(
     if (!handle_artifact_download(query, build_id, &artifactPath)) {
         return;
     }
+    if (!query->message || !(*query->message)->chat) {
+        LOG(ERROR) << "Query message is null, cannot send artifact";
+        return;
+    }
     auto success = _api->sendDocument(
-        query->message->chat,
+        (*query->message)->chat,
         InputFile::fromFile(artifactPath, "application/octet-stream"));
     if (success) {
         std::error_code ec;
@@ -600,31 +616,33 @@ DECLARE_COMMAND_HANDLER(kernelbuild) {
                 api, provider->cmdline.get(), provider->auth.get(),
                 provider->config.get());
 
-            api->onCallbackQuery("kernelbuild", [api, provider](
-                                                    const TgBot::CallbackQuery::Ptr&
-                                                        ptr) {
-                std::string_view data = ptr->data;
+            api->onCallbackQuery(
+                "kernelbuild",
+                [api, provider](const TgBot::CallbackQuery::Ptr& ptr) {
+                    std::string_view data = ptr->data;
 
-                if (!provider->auth->isAuthorized(ptr->from)) {
-                    api->answerCallbackQuery(
-                        ptr->id,
-                        "Sorry son, you are not allowed to touch this keyboard.");
-                    return;
-                }
-                if (!absl::ConsumePrefix(
-                        &data, KernelBuildHandler::kCallbackQueryPrefix)) {
-                    return;
-                }
-                ptr->data = data;
-                try {
-                    std::lock_guard<std::mutex> lock(handler_mutex);
-                    if (handler) {
-                        handler->handleCallbackQuery(ptr);
+                    if (!provider->auth->isAuthorized(ptr->from)) {
+                        api->answerCallbackQuery(
+                            ptr->id,
+                            "Sorry son, you are not allowed to touch this "
+                            "keyboard.");
+                        return;
                     }
-                } catch (const std::exception& ex) {
-                    LOG(ERROR) << "Error handling callback query: " << ex.what();
-                }
-            });
+                    if (!absl::ConsumePrefix(
+                            &data, KernelBuildHandler::kCallbackQueryPrefix)) {
+                        return;
+                    }
+                    ptr->data = data;
+                    try {
+                        std::lock_guard<std::mutex> lock(handler_mutex);
+                        if (handler) {
+                            handler->handleCallbackQuery(ptr);
+                        }
+                    } catch (const std::exception& ex) {
+                        LOG(ERROR)
+                            << "Error handling callback query: " << ex.what();
+                    }
+                });
         } catch (const std::exception& e) {
             LOG(ERROR) << "Failed to create KernelBuildHandler: " << e.what();
             init_failed = true;

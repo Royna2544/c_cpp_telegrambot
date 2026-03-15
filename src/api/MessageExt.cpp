@@ -11,7 +11,8 @@ MessageExt::MessageExt(Message::Ptr message, SplitMessageText how)
     if (!_message) {
         return;
     }
-    _replyMessage = std::make_shared<MessageExt>(_message->replyToMessage);
+    _replyMessage = std::make_shared<MessageExt>(
+        _message->replyToMessage ? *_message->replyToMessage : nullptr);
 
     // Empty message won't need parsing
     if (!_message->text) {
@@ -21,26 +22,28 @@ MessageExt::MessageExt(Message::Ptr message, SplitMessageText how)
     // Initially, _extra_args is full text
     _extra_args = _message->text.value();
 
-    // Try to find botcommand entity
-    const auto botCommandEnt =
-        std::ranges::find_if(_message->entities, [](const auto& entity) {
-            return entity->type == TgBot::MessageEntity::Type::BotCommand &&
-                   entity->offset == 0;
-        });
+    if (_message->entities) {
+        // Try to find botcommand entity
+        const auto botCommandEnt =
+            std::ranges::find_if(*_message->entities, [](const auto& entity) {
+                return entity->type == TgBot::MessageEntity::Type::BotCommand &&
+                       entity->offset == 0;
+            });
 
-    // I believe entity must be sent here.
-    if (botCommandEnt != _message->entities.end() &&
-        _message->text->front() == '/') {
-        const auto entry = *botCommandEnt;
-        // Grab /start@username
-        _extra_args = _message->text->substr(entry->length);
-        absl::StripLeadingAsciiWhitespace(&_extra_args);
-        command.emplace();
-        std::pair<std::string, std::string> kCommandSplit =
-            absl::StrSplit(_message->text->substr(1, entry->length), "@");
-        command->name = kCommandSplit.first;
-        command->target = kCommandSplit.second;
-        absl::StripTrailingAsciiWhitespace(&command->target);
+        // I believe entity must be sent here.
+        if (botCommandEnt != (*_message->entities).end() &&
+            _message->text->front() == '/') {
+            const auto entry = *botCommandEnt;
+            // Grab /start@username
+            _extra_args = _message->text->substr(entry->length);
+            absl::StripLeadingAsciiWhitespace(&_extra_args);
+            command.emplace();
+            std::pair<std::string, std::string> kCommandSplit =
+                absl::StrSplit(_message->text->substr(1, entry->length), "@");
+            command->name = kCommandSplit.first;
+            command->target = kCommandSplit.second;
+            absl::StripTrailingAsciiWhitespace(&command->target);
+        }
     }
 
     if (_extra_args.size() != 0) {

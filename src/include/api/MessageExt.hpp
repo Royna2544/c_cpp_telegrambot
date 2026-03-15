@@ -164,13 +164,13 @@ class MessageExt {
         if constexpr (attr == MessageAttrs::ExtraText) {
             return _extra_args;
         } else if constexpr (attr == MessageAttrs::Photo) {
-            return _message->photo.back();
+            return _message->photo->back();
         } else if constexpr (attr == MessageAttrs::Sticker) {
-            return _message->sticker;
+            return *_message->sticker;
         } else if constexpr (attr == MessageAttrs::Animation) {
-            return _message->animation;
+            return *_message->animation;
         } else if constexpr (attr == MessageAttrs::User) {
-            return _message->from;
+            return _message->from.value();
         } else if constexpr (attr == MessageAttrs::Chat) {
             return _message->chat;
         } else if constexpr (attr == MessageAttrs::BotCommand) {
@@ -182,7 +182,7 @@ class MessageExt {
         } else if constexpr (attr == MessageAttrs::MessageId) {
             return _message->messageId;
         } else if constexpr (attr == MessageAttrs::Video) {
-            return _message->video;
+            return _message->video.value();
         } else if constexpr (attr == MessageAttrs::Locale) {
             std::string loc{};
             if (has<MessageAttrs::User>()) {
@@ -190,7 +190,7 @@ class MessageExt {
             }
             return loc;
         } else if constexpr (attr == MessageAttrs::Document) {
-            return _message->document;
+            return _message->document.value();
         }
         return {};
     }
@@ -260,27 +260,27 @@ class MessageExt {
             case MessageAttrs::ExtraText:
                 return !_extra_args.empty();
             case MessageAttrs::Photo:
-                return !_message->photo.empty();
+                return _message->photo.has_value();
             case MessageAttrs::Sticker:
-                return _message->sticker != nullptr;
+                return _message->sticker.has_value();
             case MessageAttrs::Animation:
-                return _message->animation != nullptr;
+                return _message->animation.has_value();
             case MessageAttrs::User:
             case MessageAttrs::Locale:
-                return _message->from != nullptr;
+                return _message->from.has_value();
             case MessageAttrs::Chat:
-                return _message->chat != nullptr;
+                return true;
             case MessageAttrs::BotCommand:
                 return command.has_value();
             case MessageAttrs::ParsedArgumentsList:
                 return !_arguments.empty();
             case MessageAttrs::Video:
-                return _message->video != nullptr;
+                return _message->video.has_value();
             case MessageAttrs::Date:
             case MessageAttrs::MessageId:
                 return true;
             case MessageAttrs::Document:
-                return _message->document != nullptr;
+                return _message->document.has_value();
         }
         return false;
     }
