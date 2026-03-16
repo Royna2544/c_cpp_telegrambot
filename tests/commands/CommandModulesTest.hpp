@@ -171,6 +171,10 @@ class CommandTestBase : public CommandModulesTest {
     void setCommandExtArgs() {
         defaultProvidedMessage->text = "/" + name;
         defaultProvidedMessage->entities.emplace();
+        defaultProvidedMessage->entities->emplace_back(std::make_shared<TgBot::MessageEntity>());
+        (*defaultProvidedMessage->entities)[0]->type =
+            TgBot::MessageEntity::Type::BotCommand;
+        (*defaultProvidedMessage->entities)[0]->offset = 0;
         (*defaultProvidedMessage->entities)[0]->length =
             defaultProvidedMessage->text->size();
     }

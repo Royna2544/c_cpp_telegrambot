@@ -12,10 +12,12 @@ void verifyKeyboard(const TgBot::GenericReply::Ptr& reply) {
         std::static_pointer_cast<TgBot::ReplyKeyboardMarkup>(reply);
     ASSERT_TRUE(keyboardReply);
 
-    EXPECT_TRUE(keyboardReply->resizeKeyboard.value());
-    EXPECT_TRUE(keyboardReply->oneTimeKeyboard.value());
-    EXPECT_TRUE(keyboardReply->selective.value());
-    EXPECT_FALSE(keyboardReply->isPersistent.value());
+#define EXPECT_OPT_TRUE(opt) EXPECT_TRUE(opt&& opt.value())
+#define EXPECT_OPT_FALSE(opt) EXPECT_TRUE(!opt || (opt && !opt.value()))
+    EXPECT_OPT_TRUE(keyboardReply->resizeKeyboard);
+    EXPECT_OPT_TRUE(keyboardReply->oneTimeKeyboard);
+    EXPECT_OPT_TRUE(keyboardReply->selective);
+    EXPECT_OPT_FALSE(keyboardReply->isPersistent);
 }
 }  // namespace
 

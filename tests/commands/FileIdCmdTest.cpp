@@ -11,6 +11,7 @@ struct FileIdCommandTest : public CommandTestBase {
 
 TEST_F(FileIdCommandTest, WithRepliedMedia) {
     defaultProvidedMessage->replyToMessage = createDefaultMessage();
+    (*defaultProvidedMessage->replyToMessage)->photo.emplace();
     (*defaultProvidedMessage->replyToMessage)
         ->photo->push_back(std::make_shared<TgBot::PhotoSize>());
     (*(*defaultProvidedMessage->replyToMessage)->photo)[0]->fileId =
