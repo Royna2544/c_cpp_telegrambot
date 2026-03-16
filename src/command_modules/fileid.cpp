@@ -17,7 +17,7 @@ DECLARE_COMMAND_HANDLER(fileid) {
             file = reply->get<MessageAttrs::Sticker>()->fileId;
             unifile = reply->get<MessageAttrs::Sticker>()->fileUniqueId;
             thumbnail = reply->get<MessageAttrs::Sticker>()->thumbnail ? std::make_optional(
-                            reply->get<MessageAttrs::Sticker>()->thumbnail->fileId)
+                            reply->get<MessageAttrs::Sticker>()->thumbnail.value()->fileId)
                     : std::nullopt;
         } else if (reply->has<MessageAttrs::Animation>()) {
             file = reply->get<MessageAttrs::Animation>()->fileId;
@@ -25,7 +25,7 @@ DECLARE_COMMAND_HANDLER(fileid) {
             thumbnail = reply->get<MessageAttrs::Animation>()->thumbnail
                             ? std::make_optional(
                                   reply->get<MessageAttrs::Animation>()
-                                      ->thumbnail->fileId)
+                                      ->thumbnail.value()->fileId)
                     : std::nullopt;
         } else if (reply->has<MessageAttrs::Photo>()) {
             file = reply->get<MessageAttrs::Photo>()->fileId;
@@ -36,7 +36,7 @@ DECLARE_COMMAND_HANDLER(fileid) {
             thumbnail =
                 reply->get<MessageAttrs::Video>()->thumbnail
                     ? std::make_optional(
-                          reply->get<MessageAttrs::Video>()->thumbnail->fileId)
+                          reply->get<MessageAttrs::Video>()->thumbnail.value()->fileId)
                     : std::nullopt;
         } else if (reply->has<MessageAttrs::Document>()) {
             file = reply->get<MessageAttrs::Document>()->fileId;

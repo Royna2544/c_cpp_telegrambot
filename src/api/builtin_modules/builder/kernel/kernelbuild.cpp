@@ -151,7 +151,11 @@ class KernelBuildHandler {
         const TgBot::CallbackQuery::Ptr& query, const std::string& text,
         const TgBot::InlineKeyboardMarkup::Ptr& replyMarkup = nullptr) {
         if (query->message) {
-            _api->editMessage<mode>(*query->message, text, replyMarkup);
+            if (auto msg = std::get_if<TgBot::Message::Ptr>(&(*query->message))) {
+                _api->editMessage<mode>(*msg, text, replyMarkup);
+            } else {
+                LOG(ERROR) << "Query message is inaccessible, cannot edit message";
+            }
         } else {
             LOG(ERROR) << "Query message is null, cannot edit message";
         }
@@ -434,8 +438,9 @@ Kernel Name: {}</blockquote>
                 info.cpu_usage_percent(), info.memory_used_mb(),
                 info.memory_total_mb(), response.output());
             if (query->message) {
-                _api->editMessage<TgBotApi::ParseMode::HTML>(*query->message,
-                                                             fmted_msg);
+                if (auto msg = std::get_if<TgBot::Message::Ptr>(&(*query->message))) {
+                    _api->editMessage<TgBotApi::ParseMode::HTML>(*msg, fmted_msg);
+                }
             } else {
                 LOG(ERROR) << "Query message is null, cannot edit message to "
                               "show prepare status";
@@ -583,12 +588,18 @@ void KernelBuildHandler::handle_continue(
     if (!handle_artifact_download(query, build_id, &artifactPath)) {
         return;
     }
-    if (!query->message || !(*query->message)->chat) {
+    TgBot::Message::Ptr msg = nullptr;
+    if (query->message) {
+        if (auto p = std::get_if<TgBot::Message::Ptr>(&(*query->message))) {
+            msg = *p;
+        }
+    }
+    if (!msg || !msg->chat) {
         LOG(ERROR) << "Query message is null, cannot send artifact";
         return;
     }
     auto success = _api->sendDocument(
-        (*query->message)->chat,
+        msg->chat->id,
         InputFile::fromFile(artifactPath, "application/octet-stream"));
     if (success) {
         std::error_code ec;

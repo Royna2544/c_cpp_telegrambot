@@ -1161,7 +1161,7 @@ void ROMBuildQueryHandler::handle_clean_directories(const Query& query) {
         if (!success) {
             LOG(ERROR) << "Failed to clean ROM directory";
             if (query->message) {
-                _api->editMessage((*query->message),
+                if (auto msg = std::get_if<TgBot::Message::Ptr>(&(*query->message))) _api->editMessage(*msg,
                                   "Failed to clean ROM directory",
                                   backKeyboard);
             } else {
@@ -1183,7 +1183,7 @@ void ROMBuildQueryHandler::handle_clean_directories(const Query& query) {
         if (!success) {
             LOG(ERROR) << "Failed to clean build directory";
             if (query->message) {
-                _api->editMessage((*query->message),
+                if (auto msg = std::get_if<TgBot::Message::Ptr>(&(*query->message))) _api->editMessage(*msg,
                                   "Failed to clean build directory",
                                   backKeyboard);
             } else {
@@ -1202,7 +1202,7 @@ void ROMBuildQueryHandler::handle_clean_directories(const Query& query) {
     if (!checkSuccess) {
         LOG(ERROR) << "Failed to check directory existence";
         if (query->message) {
-            _api->editMessage((*query->message),
+            if (auto msg = std::get_if<TgBot::Message::Ptr>(&(*query->message))) _api->editMessage(*msg,
                               "Failed to check directory existence",
                               backKeyboard);
         } else {
@@ -1228,7 +1228,7 @@ void ROMBuildQueryHandler::handle_clean_directories(const Query& query) {
             LOG(ERROR) << "Failed to get directory size: "
                        << res.error_message();
             if (query->message) {
-                _api->editMessage((*query->message),
+                if (auto msg = std::get_if<TgBot::Message::Ptr>(&(*query->message))) _api->editMessage(*msg,
                                   "Failed to get directory size", backKeyboard);
             } else {
                 LOG(ERROR) << "Query message is null, cannot edit message to "
@@ -1245,7 +1245,7 @@ void ROMBuildQueryHandler::handle_clean_directories(const Query& query) {
         if (!checkSuccess2) {
             LOG(ERROR) << "Failed to check build directory existence";
             if (query->message) {
-                _api->editMessage((*query->message),
+                if (auto msg = std::get_if<TgBot::Message::Ptr>(&(*query->message))) _api->editMessage(*msg,
                                   "Failed to check build directory existence",
                                   backKeyboard);
             } else {
@@ -1261,7 +1261,7 @@ void ROMBuildQueryHandler::handle_clean_directories(const Query& query) {
     }
     builder.addKeyboard(getButtonOf<Buttons::back>());
     if (query->message) {
-        _api->editMessage((*query->message), entry, builder.get());
+        if (auto msg = std::get_if<TgBot::Message::Ptr>(&(*query->message))) _api->editMessage(*msg, entry, builder.get());
     } else {
         LOG(ERROR)
             << "Query message is null, cannot edit message to show clean "
@@ -1279,7 +1279,12 @@ void ROMBuildQueryHandler::onCallbackQuery(
         DLOG(INFO) << "No message in callback query";
         return;
     }
-    auto& msg = *query->message;
+    auto* ptr = std::get_if<TgBot::Message::Ptr>(&(*query->message));
+    if (!ptr || !*ptr) {
+        DLOG(INFO) << "Message in callback query is inaccessible";
+        return;
+    }
+    auto& msg = *ptr;
     if (msg->chat->id != sentMessage->chat->id ||
         msg->messageId != sentMessage->messageId) {
         DLOG(INFO) << "Mismatch on message id";
@@ -1353,3 +1358,4 @@ extern const struct DynModule cmd_rombuild = {
     .description = "Build a ROM, I'm lazy",
     .function = COMMAND_HANDLER_NAME(rombuild),
 };
+
