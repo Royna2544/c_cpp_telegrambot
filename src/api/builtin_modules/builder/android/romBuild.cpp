@@ -349,7 +349,6 @@ ROMBuildQueryHandler::ROMBuildQueryHandler(TgBotApi::Ptr api,
         LOG(INFO) << "Health check failed: " << rc.error_message();
         throw std::runtime_error("Failed to connect to builder server");
     }
-    start(std::move(userMessage));
 }
 
 void ROMBuildQueryHandler::start(Message::Ptr userMessage) {
