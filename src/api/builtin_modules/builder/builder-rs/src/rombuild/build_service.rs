@@ -212,29 +212,31 @@ export RBE_LINT_POOL=default"##,
 
     pub fn new(build_dir: PathBuf, temp_dir: PathBuf, configs: ROMBuildConfig) -> Self {
         let (shutdown_tx, _) = broadcast::channel(1);
-        
+
         let active_job_for_handler = Arc::new(Mutex::new(None::<ActiveBuild>));
         let active_job_clone = active_job_for_handler.clone();
-        
+
         tokio::spawn(async move {
-            tokio::signal::ctrl_c().await.expect("Failed to listen for Ctrl-C");
+            tokio::signal::ctrl_c()
+                .await
+                .expect("Failed to listen for Ctrl-C");
             info!("Global Ctrl-C received");
-            
+
             // Check if build is active
             let job = active_job_clone.lock().await;
             if let Some(build) = job.as_ref() {
                 info!("Cancelling active build: {}", build.id);
                 let _ = build.kill_tx.send(()).await;
                 drop(job); // Release lock
-                
+
                 // Wait a bit for cleanup
                 tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
             }
-            
+
             info!("Exiting server");
             std::process::exit(0);
         });
-        
+
         BuildService {
             settings: Arc::new(Mutex::new(Settings {
                 do_repo_sync: Some(true),
@@ -1227,6 +1229,12 @@ impl rom_build_service_server::RomBuildService for BuildService {
                                                     if attr.name.local_name == "recurse_submodules" && attr.value == "true" {
                                                         send_log!(LogLevel::Info, format!("Found recurse_submodules=true in manifest file {:?}, updating submodules...", path));
 
+                                                        let sub_repo_name = attributes.iter()
+                                                                .find(|attr| attr.name.local_name == "name").map(|attr| attr.value.clone());
+                                                        if sub_repo_name.is_none() {
+                                                            send_log!(LogLevel::Warning, format!("recurse_submodules=true is set but no project path found in manifest file {:?}, skipping submodule update.", path));
+                                                            continue;
+                                                        }
                                                         let sub_repo_path = attributes.iter()
                                                                 .find(|attr| attr.name.local_name == "path").map(|attr| attr.value.clone());
                                                         if sub_repo_path.is_none() {
@@ -1234,6 +1242,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                                                             continue;
                                                         }
 
+                                                        let sub_repo_name = sub_repo_name.unwrap();
                                                         let sub_repo_path = sub_repo_path.unwrap();
 
                                                         // Perform a partial repo sync for the submodule to initialize the .git directory, then we can use git commands to update submodules.
@@ -1245,7 +1254,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                                                                 "--no-clone-bundle",
                                                                 "--no-tags",
                                                                 format!("-j{}", parallel_jobs.to_string()).as_str(),
-                                                                &(&sub_repo_path.clone()),
+                                                                &(&sub_repo_name.clone()),
                                                             ])
                                                             .current_dir(&build_dir_clone);
                                                         let error_file = (&tempdir_clone).join(format!("{}-{}-submodule-sync.log", "repo-sync", &build_id_clone));
@@ -1258,7 +1267,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                                                             None,
                                                         ).await?;
                                                         if !repo_sync_status {
-                                                            send_log!(LogLevel::Warning, format!("'repo sync' for submodule {} failed or was cancelled.", &sub_repo_path));
+                                                            send_log!(LogLevel::Warning, format!("'repo sync' for submodule {} failed or was cancelled.", &sub_repo_name));
                                                             continue;
                                                         }
 
@@ -1440,10 +1449,8 @@ impl rom_build_service_server::RomBuildService for BuildService {
                 #[cfg(unix)]
                 {
                     // Get current nofile limits
-                    use nix::libc;
                     use nix::sys::resource::{getrlimit, Resource};
-                    let (soft_limit, hard_limit) : (libc::rlim_t, libc::rlim_t);
-                    (soft_limit, hard_limit) = getrlimit(
+                    let (soft_limit, hard_limit) = getrlimit(
                         Resource::RLIMIT_NOFILE,
                     ).map_err(|e| {
                         tonic::Status::internal(format!("Failed to get nofile limit: {}", e))
