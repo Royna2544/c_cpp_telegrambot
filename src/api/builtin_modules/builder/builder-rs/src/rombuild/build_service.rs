@@ -6,7 +6,6 @@ pub use crate::rombuild::build_service::grpc_pb::rom_build_service_server::RomBu
 use crate::{
     git_repo::{self, GitRepo},
     gofile_api::upload_file_to_gofile,
-    ratelimit::RateLimit,
     rombuild::{
         build_service::grpc_pb::{
             BuildAction, BuildLogEntry, BuildRequest, BuildResult, BuildSubmission, BuildVariant,
@@ -29,7 +28,6 @@ use nix::sys::signal::{self, Signal};
 use nix::unistd::Pid;
 use std::{
     fmt::Display,
-    num::NonZero,
     path::{Path, PathBuf},
     pin::Pin,
     process::Stdio,
@@ -45,7 +43,6 @@ use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status, async_trait};
 use tracing::{Instrument, error};
 use tracing::{debug, info, warn};
-use tracing_subscriber::field::debug;
 use xml::writer::XmlEvent;
 
 struct ActiveBuild {

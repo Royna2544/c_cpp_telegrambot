@@ -4,7 +4,7 @@
 /// allowing the build services to be tested without actually spawning processes.
 use async_trait::async_trait;
 use std::path::PathBuf;
-use std::process::{ExitStatus, Stdio};
+use std::process::Stdio;
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;

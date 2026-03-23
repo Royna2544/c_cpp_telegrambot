@@ -20,7 +20,6 @@ pub use grpc_pb::linux_kernel_build_service_server;
 use nix::sys::signal::{self, Signal};
 #[cfg(unix)]
 use nix::unistd::Pid;
-use uuid::timestamp::context;
 use std::fs::File;
 use std::io::Read;
 use std::num::NonZero;
