@@ -119,8 +119,8 @@ class MockTgBotApi : public TgBotApi {
     MOCK_METHOD(TgBot::ChatMember::Ptr, getChatMember_impl,
                 (const ChatId, const UserId), (const override));
     MOCK_METHOD(void, setDescriptions_impl,
-                (const std::string_view description,
-                 const std::string_view shortDescription),
+                (const std::optional<std::string_view> description,
+                 const std::optional<std::string_view> shortDescription),
                 (const override));
     MOCK_METHOD(bool, setMessageReaction_impl,
                 (const ChatId chatid, const MessageId message,

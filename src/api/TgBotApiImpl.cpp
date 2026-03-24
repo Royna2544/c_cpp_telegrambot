@@ -565,10 +565,12 @@ TgBot::ChatMember::Ptr TgBotApiImpl::getChatMember_impl(ChatId chat,
 }
 
 void TgBotApiImpl::setDescriptions_impl(
-    const std::string_view description,
-    const std::string_view shortDescription) const {
-    getApi().setMyDescription(description);
-    getApi().setMyShortDescription(shortDescription);
+    const std::optional<std::string_view> description,
+    const std::optional<std::string_view> shortDescription) const {
+    if (description)
+        getApi().setMyDescription(description);
+    if (shortDescription)
+        getApi().setMyShortDescription(shortDescription);
 }
 
 bool TgBotApiImpl::setMessageReaction_impl(

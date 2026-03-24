@@ -418,8 +418,8 @@ class TgBotApiImpl : public TgBotApi {
      * @param shortDescription The short description of the chat.
      */
     void setDescriptions_impl(
-        const std::string_view description,
-        const std::string_view shortDescription) const override;
+        const std::optional<std::string_view> description,
+        const std::optional<std::string_view> shortDescription) const override;
 
     /**
      * @brief Sets a reaction to a message.

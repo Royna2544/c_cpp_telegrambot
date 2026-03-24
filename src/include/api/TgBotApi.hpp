@@ -448,8 +448,8 @@ class TgBotApi {
      * the chat.
      */
     virtual void setDescriptions_impl(
-        const std::string_view description,
-        const std::string_view shortDescription) const = 0;
+        const std::optional<std::string_view> description,
+        const std::optional<std::string_view> shortDescription) const = 0;
 
     /**
      * @brief Sets a reaction to a message in a chat.
@@ -772,8 +772,8 @@ class TgBotApi {
         return getChatMember_impl(chat, user);
     }
 
-    inline void setDescriptions(const std::string_view description,
-                                const std::string_view shortDescription) {
+    inline void setDescriptions(const std::optional<std::string_view> description,
+        const std::optional<std::string_view> shortDescription) {
         setDescriptions_impl(description, shortDescription);
     }
 
