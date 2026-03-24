@@ -472,9 +472,27 @@ class TgBotApi {
         ChatId chatId, MessageId messageId,
         const std::vector<ReactionType::Ptr>& reaction, bool isBig) const = 0;
 
+    /**
+     * @brief Retrieves a user's profile photos.
+     * 
+     * @param userId The unique identifier of the user whose profile photos are
+     * retrieved.
+     * 
+     * @return A shared pointer to a UserProfilePhotos object containing the
+     * profile photos of the specified user.
+    */
     virtual TgBot::UserProfilePhotos::Ptr getUserProfilePhotos_impl(
         std::int64_t userId) const = 0;
 
+    /**
+     * @brief Retrieves information about a chat.
+     *
+     * @param chatId The unique identifier of the chat to retrieve information
+     * about.
+     *
+     * @return A shared pointer to a Chat object containing the information about
+     * the specified chat.
+     */
     virtual Chat::Ptr getChat_impl(ChatId chatId) const = 0;
 
     static FileOrString ToFileOrString(FileOrMedia media) {
