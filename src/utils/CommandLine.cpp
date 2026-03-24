@@ -109,7 +109,7 @@ std::filesystem::path CommandLine::getPath(FS::PathType type) const {
         case FS::PathType::RESOURCES_SCRIPTS:
             return getPath(FS::PathType::RESOURCES) / "scripts";
         case FS::PathType::CMD_MODULES:
-            return buf / "lib" / "modules";
+            return buf / "lib" / "glider-modules";
         default:
             break;
     }

@@ -623,7 +623,7 @@ TgBotApiImpl::TgBotApiImpl(const std::string_view token, AuthContext* auth,
     // Register -> OnMyChatMember
     onMyChatMemberImpl =
         std::make_unique<TgBotApiImpl::OnMyChatMemberImpl>(this);
-    // Load modules (../lib/modules)
+    // Load modules (../lib/glider-modules)
     kModuleLoader = std::make_unique<ModulesManagement>(
         this, providers->cmdline->getPath(FS::PathType::CMD_MODULES));
     // Restart command

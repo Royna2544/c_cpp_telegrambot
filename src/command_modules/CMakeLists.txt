@@ -72,8 +72,8 @@ function(command_module)
   # override the default output directory just for this kind of module
   set_target_properties(
     ${libname}
-    PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib/modules
-               RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib/modules)
+    PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib/glider-modules
+               RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib/glider-modules)
 
   # ---------- CPack component ----------
   cpack_add_component(
@@ -84,7 +84,7 @@ function(command_module)
 
   install(
     TARGETS ${libname}
-    DESTINATION lib/modules
+    DESTINATION lib/glider-modules
     COMPONENT Command_${CMD_NAME})
 endfunction()
 
@@ -228,7 +228,7 @@ if (TGBOTCPP_LUA_MODULES)
     message(STATUS "Found Lua scripts: ${LUA_SCRIPTS}")
     install(
       FILES ${LUA_SCRIPTS}
-      DESTINATION lib/modules
+      DESTINATION glider-modules
       COMPONENT CommandModules
     )
   else()

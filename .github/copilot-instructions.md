@@ -5,14 +5,14 @@ Glider is a Telegram bot implementation written in C++ and C, primarily used for
 
 ## Repository Structure
 - **src/**: Main source code directory
-  - **command_modules/**: Bot command implementations (compiler, builder, support)
+  - **api/**: API interfaces
+    - **builtin_modules/**: Built-in bot command implementations (compiler, builder)
+      - **builder/**: Build system components including Android and kernel builders
+    - **net/**: gRPC-based network subsystem
+  - **command_modules/**: Dynamically loadable bot command modules
     - **compiler/**: Compiler command modules
-    - **builder/**: Build system components including kernel builder
+    - **llm/**: Local language model integration
     - **support/**: Support libraries (popen_wdt, progress)
-  - **socket/**: Socket-based API for external communication
-    - **server/**: Server-side implementation (SocketInterface, PacketDispatcher, CommandHandlers)
-    - **client/**: Client-side implementation
-    - **shared/**: Shared utilities (FileHelperNew)
   - **database/**: Database backend implementations (SQLite, Protobuf)
   - **web/**: Web server components
   - **api/**: API interfaces
@@ -33,7 +33,6 @@ Glider is a Telegram bot implementation written in C++ and C, primarily used for
 
 ## Build System
 - **Build Tool**: CMake (minimum version 3.14)
-- **Current Version**: CMake 4.1.1 (MSVC variant)
 - **Package Manager**: vcpkg
 - **Build Generator**: Ninja
 - **Build Configuration**: Use CMakePresets.json for standard configurations
@@ -52,8 +51,7 @@ The project uses several CMake options to control features:
 
 **Module-Specific Options** (defined in subdirectories):
 - TGBOTCPP_LUA_MODULES: Enable Lua language command modules (default: ON, defined in src/api/CMakeLists.txt)
-- TGBOTCPP_SOCKET_PACKET_VERBOSE: Enable verbose hex-view logging for socket packets (default: OFF, defined in src/socket/CMakeLists.txt)
-- ENABLE_LLM: Enable LLM command module (requires CUDA toolkit and NVIDIA GPU) (default: OFF, defined in src/command_modules/CMakeLists.txt)
+- TGBOTCPP_ENABLE_LOCAL_LLM: Enable LLM local module, requires CUDA toolkit and NVIDIA GPU (default: OFF, defined in src/command_modules/CMakeLists.txt)
 
 ## Language Standards
 - **C++**: C++20 standard (set in CMakeLists.txt), with C++23 features used where available
@@ -88,7 +86,7 @@ The project defines helper functions for consistent target configuration:
    - Package dependency gating
    - Rust module support
    - Forces lib prefix on all platforms
-   - Output to lib/modules/ directory
+   - Output to glider-modules directory
 
 5. **multi_command_module**: Creates multiple command modules from single source
 
@@ -111,10 +109,12 @@ The project uses vcpkg for dependency management. Major dependencies include:
 - **cpp-httplib**: HTTP server support
 - **sqlite3**: Database backend
 - **protobuf**: Alternative database backend
+- **gRPC**: Network API protocol and build interfaces
 - **libgit2**: Git operations (used in build info generation)
 - **GTest**: Testing framework
 - **Sol2**: Lua integration
 - **CppTrace**: Backtrace support
+- **llama.cpp**: LLM inferencing support
 - **OpenCV4**: Image processing
 - **Boost**: Various components (asio, system, program-options, units)
 - **fmt**: Format library (header-only mode)
@@ -146,11 +146,18 @@ The project uses vcpkg for dependency management. Major dependencies include:
 The bot uses a configuration file with the following options:
 - TOKEN: Telegram bot token (required)
 - LOG_FILE: Log file path
-- DATABASE_CFG: Database configuration format: "type:filename" (type: sqlite or protobuf)
-- SOCKET_CFG: Socket API configuration (ipv4 or ipv6, omit to disable)
+- DATABASE_FILEPATH: Path to the database file
+- DATABASE_TYPE: Database implementation type (sqlite or protobuf)
+- SOCKET_URL_PRIMARY: Primary socket RPC URL
+- SOCKET_URL_SECONDARY: Secondary socket RPC URL
+- SOCKET_URL_LOGGING: URL for logging sockets
 - GITHUB_TOKEN: GitHub token for private repository access
 - OPTIONAL_COMPONENTS: Comma-separated list (e.g., "webserver,datacollector")
 - BUILDBUDDY_API_KEY: BuildBuddy API key for Android RBE
+- LLM_TYPE / LLM_LOCATION / LLM_AUTHKEY: LLM connection details
+- TELEGRAM_API_SERVER: Custom Telegram API server URL
+- TELEGRAM_API_SERVER_FILEPATH_REMOVE_PREFIX / APPEND_PREFIX: File mapper parameters
+- KERNELBUILD_SERVER: Server for remote kernel building
 
 ## Multi-Language Support
 The project includes components in multiple languages:
@@ -162,45 +169,27 @@ The project includes components in multiple languages:
 - **Lua**: Optional command modules (dynamically loaded)
 - **Rust**: Optional command modules (via Corrosion)
 
-## Socket Interface Architecture
-The socket API provides external communication capabilities:
+## gRPC Network Interface Architecture
+The network API provides external communication capabilities using gRPC:
 
 **Core Components**:
-- **SocketInterfaceTgBot**: Main socket interface implementing ThreadRunner
-- **Session Management**: Token-based authentication with replay attack prevention
-  - Session struct: Contains session_key, last_nonce, and expiry
-  - Prevents replay attacks using nonce tracking
-- **Chunked File Transfer**: Supports large file transfers with SHA256 verification
-  - ChunkedTransferSession: Tracks transfer state including buffer, chunk_size, expected_chunk_index
-  - Mutex-protected transfer_sessions map
+- **SocketServiceImpl**: Server-side gRPC implementation providing bot control
+- **SocketServiceClient**: Client-side gRPC wrappers
+- **Protobuf Specifications**: Uses `Socket_service.proto` for RPC definitions
 
-**Command Handlers**:
-- handle_WriteMsgToChatId: Send messages to chats
-- handle_SendFileToChatId: Send files to chats
-- handle_CtrlSpamBlock: Control spam blocking
-- handle_ObserveChatId: Observe specific chats
-- handle_ObserveAllChats: Observe all chats
-- handle_TransferFile: Single-shot file transfer
-- handle_TransferFileBegin: Initialize chunked transfer
-- handle_TransferFileChunk: Process file chunk
-- handle_TransferFileEnd: Finalize chunked transfer
-- handle_TransferFileRequest: Request file from server
-- handle_GetUptime: Query server uptime
-- handle_OpenSession: Create new session
-- handle_CloseSession: Terminate session
-
-**Dependencies**:
-- TgBotApi: Telegram bot API interface
-- ChatObserver: Chat observation functionality
-- SpamBlockBase: Spam blocking control
-- SocketFile2DataHelper: File data conversion
-- ResourceProvider: Resource management
+**Supported Operations (via Proto)**:
+- WriteMsgToChatId: Send messages to chats
+- SendFileToChatId: Send files to chats
+- CtrlSpamBlock: Control spam blocking
+- ObserveChatId / ObserveAllChats: Observe chat events
+- File transfers (Download/Upload chunks)
+- System management/control interfaces
 
 **Features**:
-- Documentation: src/socket/README.api.md
-- Supports IPv4 and IPv6
-- Used by the Android client application
-- Verbose logging available via TGBOTCPP_SOCKET_PACKET_VERBOSE option
+- Uses structured Protobuf payloads with generated stubs
+- Replaced the legacy raw socket based code
+- More secure and scalable architecture
+- Supports both local and remote RPC communication based on configs
 
 ## Random Number Generation
 The project uses a tiered random number generation system:
@@ -215,7 +204,7 @@ Command modules are dynamically loadable plugins:
 
 **Configuration**:
 - **Prefix**: cmd_ for internal naming, lib for output files
-- **Output Directory**: lib/modules/
+- **Output Directory**: glider-modules
 - **Platform Gating**: Supports Unix, Linux platform restrictions
 - **Package Dependencies**: Optional external package requirements
 
