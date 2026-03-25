@@ -120,21 +120,30 @@ bool TgBotApiImpl::ModulesManagement::loadAll(
     load(std::make_unique<BuiltinCommandModule>(&cmd_rombuild));
 
     // Update BotCommandList
-    std::vector<TgBot::BotCommand::Ptr> buffer;
-    buffer.reserve(_handles.size());
+    std::vector<TgBot::BotCommand::Ptr> user_commands;
+    std::vector<TgBot::BotCommand::Ptr> privileged_commands;
+    user_commands.reserve(_handles.size());
     for (const auto& [name, mod] : _handles) {
         if (!mod->info.isHideDescription()) {
             auto onecommand = std::make_shared<TgBot::BotCommand>();
             onecommand->command = mod->info.name;
             onecommand->description = mod->info.description;
             if (mod->info.isPrivileged()) {
-                onecommand->description += " (Owner)";
+                privileged_commands.emplace_back(onecommand);
+            } else {
+                user_commands.emplace_back(onecommand);
             }
-            buffer.emplace_back(onecommand);
         }
     }
     try {
-        _api->getApi().setMyCommands(buffer);
+        if (!user_commands.empty())
+            _api->getApi().setMyCommands(user_commands);
+        if (auto id = _api->_provider->database->getOwnerUserId(); id && !privileged_commands.empty()) {
+            auto owner_scope = std::make_shared<TgBot::BotCommandScopeChat>();
+            owner_scope->chatId = id.value();
+            _api->getApi().setMyCommands(
+                privileged_commands, owner_scope);
+        }
     } catch (const TgBot::TgException& e) {
         LOG(ERROR) << fmt::format("Error updating bot commands list: {}",
                                   e.what());
