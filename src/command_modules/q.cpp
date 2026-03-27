@@ -18,6 +18,7 @@
 #include "api/MessageExt.hpp"
 #include "api/builtin_modules/builder/CurlUtils.hpp"
 #include "tgbot/types/MessageOrigin.h"
+#include <absl/strings/str_split.h>
 
 constexpr std::string_view kRemoteApi =
     "https://bot.lyo.su/quote/generate.webp";
@@ -152,17 +153,39 @@ DECLARE_COMMAND_HANDLER(q) {
     // replied-to-message
     std::string args = message->get<MessageAttrs::ExtraText>();
     if (!args.empty()) {
-        // Support text=<arg> to override the text.
-        if (args.starts_with("text=")) {
-            text = args.substr(5);
-            media.clear();
-            type = MessageType::Text;
-        }
-        // Support media=<arg> to override the media.
-        else if (args.starts_with("media=")) {
-            media = args.substr(6);
-            text.clear();
-            type = MessageType::Photo;
+        std::vector<std::string_view> parts = absl::StrSplit(args, ',');
+        for (const auto& part : parts) {
+            // Support text=<arg> to override the text.
+            if (part.starts_with("text=")) {
+                text = part.substr(5);
+                media.clear();
+                type = MessageType::Text;
+            }
+            // Support media=<arg> to override the media.
+            else if (part.starts_with("media=")) {
+                media = part.substr(6);
+                text.clear();
+                type = MessageType::Photo;
+            }
+            // Support id=<arg> to override the user ID and name.
+            else if (part.starts_with("id=")) {
+                std::string_view id_str = part.substr(3);
+                try {
+                    user->id = std::stoll(std::string(id_str));
+                    auto chat = api->getChat(user->id);
+                    if (chat->type == TgBot::Chat::Type::Private) {
+                        if (chat->firstName) {
+                            user->firstName = *chat->firstName;
+                        }
+                        user->lastName = chat->lastName;
+                        user->username = chat->username;
+                    }
+                } catch (const std::exception& e) {
+                    api->sendMessage(message->get<MessageAttrs::Chat>(),
+                                     "Invalid id: " + std::string(e.what()));
+                    return;
+                }
+            }
         }
     }
 
