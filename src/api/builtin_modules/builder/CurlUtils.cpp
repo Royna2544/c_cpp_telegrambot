@@ -111,7 +111,7 @@ bool download_file(const std::string_view url,
     }
     // Write callback
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, fwrite);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, static_cast<FILE*>(file));
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, file.native_handle());
 
     // Execute it
     bool result = CURL_perform_common(curl);

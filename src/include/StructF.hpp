@@ -18,10 +18,6 @@ struct F {
     explicit F(FILE* handle)
         : handle(handle, [](FILE*) { return 0; }), external_managed(true) {}
 
-    operator FILE*() const { return handle.get(); }
-    // Do not allow implicit cast to bool. Which is implied by operator FILE*
-    operator bool() const = delete;
-
     // No copy constructor
     F(const F&) = delete;
     F& operator=(const F&) = delete;
@@ -224,10 +220,20 @@ struct F {
      *
      * Calculates and returns the size of the file in bytes.
      */
-    [[nodiscard]] size_type size() const;
+    [[nodiscard]] std::optional<size_type> size() const;
 
-    // Represents the invalid file size returned by size().
-    constexpr static size_type INVALID_SIZE = -1;
+    /**
+     * @brief Return native FILE* handle for advanced use cases.
+     * 
+     * Returns the native `FILE*` handle managed by this class. This allows
+     * users to perform advanced file operations that are not directly supported
+     * by the F class. Note that if the file is externally managed (e.g.,
+     * `stdout` or `stderr`), the caller should not attempt to close the
+     * returned `FILE*`
+     */
+    [[nodiscard]] FILE* native_handle() const {
+        return handle.get();
+    }
 
    private:
     using HANDLE = std::unique_ptr<FILE, int (*)(FILE*)>;
@@ -236,6 +242,16 @@ struct F {
 
     static std::string_view constructFileMode(const Mode mode);
 };
+
+constexpr F::Mode operator|(F::Mode lhs, F::Mode rhs) {
+    return static_cast<F::Mode>(static_cast<std::int8_t>(lhs) |
+                                static_cast<std::int8_t>(rhs));
+}
+
+constexpr F::Mode operator&(F::Mode lhs, F::Mode rhs) {
+    return static_cast<F::Mode>(static_cast<std::int8_t>(lhs) &
+                                static_cast<std::int8_t>(rhs));
+}
 
 inline std::ostream& operator<<(std::ostream& self,
                                 const F::Result::Reason& reason) {
@@ -312,46 +328,65 @@ inline F::Result F::close() {
     return Result::ok();
 }
 
-inline F::size_type F::size() const {
+inline std::optional<F::size_type> F::size() const {
     if (handle == nullptr) {
         ABSL_LOG(ERROR) << "File handle is null";
-        return INVALID_SIZE;
+        return std::nullopt;
     }
     long current = ftell(handle.get());
     if (current == -1) {
         ABSL_LOG(ERROR) << "Failed to get current position in file";
-        return INVALID_SIZE;
+        return std::nullopt;
     }
-    F::size_type size = fseek(handle.get(), 0, SEEK_END);
-    if (size == -1) {
+    if (fseek(handle.get(), 0, SEEK_END) != 0) {
         ABSL_LOG(ERROR) << "Failed to seek to end of file";
-        return INVALID_SIZE;
+        return std::nullopt;
     }
-    if (fseek(handle.get(), current, SEEK_SET) == -1) {
+    F::size_type size = ftell(handle.get());
+    if (size == -1) {
+        ABSL_LOG(ERROR) << "Failed to get file size";
+        return std::nullopt;
+    }
+    if (fseek(handle.get(), current, SEEK_SET) != 0) {
         ABSL_LOG(ERROR) << "Failed to seek back to current position in file";
-        return INVALID_SIZE;
+        return std::nullopt;
     }
     return size;
 }
 
 inline std::string_view F::constructFileMode(const Mode mode) {
-    switch (mode) {
-        case Mode::Read:
-            return "r";
-        case Mode::Write:
-            return "w";
-        case Mode::Append:
-            return "a";
-        case Mode::ReadBinary:
-            return "rb";
-        case Mode::WriteBinary:
-            return "wb";
-        case Mode::AppendBinary:
-            return "ab";
-        default:
-            ABSL_LOG(ERROR) << "Invalid file mode: " << static_cast<int>(mode);
-            return "";
-    }
+    // Helper lambda to check if a specific flag is set
+    auto has_flag = [mode](Mode flag) {
+        return (mode & flag) != static_cast<Mode>(0);
+    };
+
+    const bool read = has_flag(Mode::Read);
+    const bool write = has_flag(Mode::Write);
+    const bool append = has_flag(Mode::Append);
+    const bool binary = has_flag(Mode::BinaryMask);
+
+    // Single modes
+    if (read && !write && !append)
+        return binary ? "rb" : "r";
+    if (!read && write && !append)
+        return binary ? "wb" : "w";
+    if (!read && !write && append)
+        return binary ? "ab" : "a";
+
+    // Combined modes (+)
+    if (read && write && !append)
+        return binary ? "rb+" : "r+";
+    if (read && append)
+        return binary ? "ab+" : "a+";
+
+    // Redundant case
+    if (write && append)
+        return binary ? "ab" : "a";
+
+    // Unhandled or contradictory combinations
+    ABSL_LOG(ERROR) << "Invalid or unsupported file mode combination: "
+                    << static_cast<int>(mode);
+    return "";
 }
 
 struct StdoutF : public F {

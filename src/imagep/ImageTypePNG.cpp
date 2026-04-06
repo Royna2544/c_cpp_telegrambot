@@ -68,7 +68,7 @@ PhotoBase::TinyStatus PngImage::read(const std::filesystem::path& filename,
                 "Error during reading image header"};
     }
 
-    png_init_io(png, fp);
+    png_init_io(png, fp.native_handle());
     png_read_info(png, info);
 
     width = png_get_image_width(png, info);
@@ -260,7 +260,7 @@ PhotoBase::TinyStatus PngImage::processAndWrite(
         return {PhotoBase::Status::kInternalError, "Error during init_io"};
     }
 
-    png_init_io(png, fp);
+    png_init_io(png, fp.native_handle());
 
     if (setjmp(png_jmpbuf(png))) {
         png_destroy_write_struct(&png, &info);

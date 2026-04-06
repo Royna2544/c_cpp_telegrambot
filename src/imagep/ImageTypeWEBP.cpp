@@ -30,18 +30,24 @@ PhotoBase::TinyStatus WebPImage::read(const std::filesystem::path& filename,
 
     const auto file_size = file.size();
 
+    // Check if file size could be determined
+    if (!file_size.has_value()) {
+        return {PhotoBase::Status::kReadError, "Failed to determine file size"};
+    }
+
+    // Check if file size is reasonable (e.g., not larger than 100 MB)
     constexpr size_t kMaxFileSize = 100 * 1024 * 1024;  // 100 MB
-    if (file_size > kMaxFileSize) {
+    if (*file_size > kMaxFileSize) {
         return {PhotoBase::Status::kInvalidArgument, "Image too large"};
     }
 
-    auto data = std::make_unique_for_overwrite<uint8_t[]>(file_size);
-    if (!file.read(data.get(), 1, file_size)) {
+    auto data = std::make_unique_for_overwrite<uint8_t[]>(*file_size);
+    if (!file.read(data.get(), 1, *file_size)) {
         return {PhotoBase::Status::kReadError, "Failed to read from file"};
     }
     file.close();
 
-    decoded_data = WebPDecodeRGBA(data.get(), file_size, &width, &height);
+    decoded_data = WebPDecodeRGBA(data.get(), *file_size, &width, &height);
 
     if (decoded_data == nullptr) {
         return {PhotoBase::Status::kInternalError,

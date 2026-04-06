@@ -73,7 +73,7 @@ JPEGImage::TinyStatus JPEGImage::read(const std::filesystem::path& filename,
                 "Error decompressing JPEG file"};
     }
 
-    jpeg_stdio_src(&cinfo, infile);
+    jpeg_stdio_src(&cinfo, infile.native_handle());
     jpeg_read_header(&cinfo, TRUE);
     jpeg_start_decompress(&cinfo);
 
@@ -205,7 +205,7 @@ JPEGImage::TinyStatus JPEGImage::processAndWrite(
 
     cinfo.err = jpeg_std_error(&jerr);
     jpeg_create_compress(&cinfo);
-    jpeg_stdio_dest(&cinfo, outfile);
+    jpeg_stdio_dest(&cinfo, outfile.native_handle());
 
     cinfo.image_width = width;
     cinfo.image_height = height;
