@@ -43,17 +43,7 @@ void AddOption(po::options_description& desc) {
     } else {
         static_assert(index->belongsTo != nullptr,
                       "Config entries with arguments must belong to a section");
-        const char* sectionName = nullptr;
-        if (index->belongsTo == &sectionMain) {
-            sectionName = sectionMain;
-        } else if (index->belongsTo == &sectionNetwork) {
-            sectionName = sectionNetwork;
-        } else if (index->belongsTo == &sectionDatabase) {
-            sectionName = sectionDatabase;
-        } else if (index->belongsTo == &sectionLLM) {
-            sectionName = sectionLLM;
-        }
-        std::string name = fmt::format("{}.{}", sectionName, index->name);
+        std::string name = fmt::format("{}.{}", *index->belongsTo, index->name);
         if (index->alias != ConfigManager::Entry::ALIAS_NONE) {
             desc.add_options()(fmt::format("{},{}", name, index->alias).c_str(),
                                po::value<T>(), index->description.data());
@@ -93,7 +83,7 @@ struct ArgTypeDeducer<ConfigManager::Entry::ArgType::NONE> {
 };
 
 template <ConfigManager::Configs config>
-void verifyUniqueConfig() {
+constexpr void verifyUniqueConfig() {
     constexpr auto count = std::ranges::count_if(
         ConfigManager::kConfigMap,
         [](const auto& entry) { return entry.config == config; });
