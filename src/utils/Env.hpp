@@ -22,19 +22,19 @@ class UTILS_EXPORT Env {
        public:
         explicit ValueEntry(const std::string_view key) : _key(key) {}
         // Aka, setenv
-        const Env::ValueEntry& operator=(const std::string_view value) const;
+        const Env::ValueEntry& operator=(
+            const std::string_view value) const noexcept;
         // Aka, unsetenv
-        void clear() const;
+        void clear() const noexcept;
         // Aka, getenv
-        [[nodiscard]] std::string get() const;
-
-        [[nodiscard]] bool has() const;
+        [[nodiscard]] std::optional<std::string> get() const noexcept;
 
         template <typename T>
             requires std::is_assignable_v<std::string, T>
         bool assign(T& ref) const {
-            if (has()) {
-                ref = get();
+            auto value = get();
+            if (value) {
+                ref = *value;
                 return true;
             }
             DLOG(WARNING) << "env name=" << _key << " is not set";
@@ -46,13 +46,20 @@ class UTILS_EXPORT Env {
             if (this == &other) {
                 return *this;
             }
-            *this = other.get();
+            // Get the value from the other entry and set it to this entry.
+            auto value = other.get();
+            if (value.has_value()) {
+                *this = value.value();
+            } else {
+                // If the other entry doesn't have a value, clear this entry.
+                clear();
+            }
             return *this;
         }
 
         // This is a ValueEntry, we are only playing with values...
-        ValueEntry& operator=(ValueEntry&& other) {
-            *this = std::move(other.get());
+        ValueEntry& operator=(ValueEntry&& other) noexcept {
+            operator=(other);
             other.clear();
             return *this;
         }
@@ -67,7 +74,27 @@ class UTILS_EXPORT Env {
         // When get() throws, this won't catch it.
         const Env::ValueEntry& operator+=(
             const absl::string_view addition) const {
-            *this = absl::StrCat(get(), addition);
+            auto current = get();
+            if (!current.has_value()) {
+                *this = addition;
+                return *this;
+            }
+            *this = absl::StrCat(current.value(), addition);
+            return *this;
+        }
+
+        // Remove the suffix if the current value ends with it.
+        const Env::ValueEntry& operator-=(
+            const absl::string_view suffix) const {
+            auto current = get();
+            if (!current.has_value()) {
+                return *this;
+            }
+            if (current->size() >= suffix.size() &&
+                current->compare(current->size() - suffix.size(), suffix.size(),
+                                suffix) == 0) {
+                *this = current->substr(0, current->size() - suffix.size());
+            }
             return *this;
         }
 
@@ -81,8 +108,9 @@ class UTILS_EXPORT Env {
 };
 
 inline std::ostream& operator<<(std::ostream& o, const Env::ValueEntry& entry) {
-    if (entry.has()) {
-        o << entry.get();
+    auto value = entry.get();
+    if (value) {
+        o << *value;
     } else {
         o << "(not set)";
     }

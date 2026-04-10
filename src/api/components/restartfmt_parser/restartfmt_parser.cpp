@@ -15,15 +15,19 @@
 RestartFmt::Type::Type(const absl::string_view string) {
     std::vector<std::string> parts =
         absl::StrSplit(string, ":", absl::SkipEmpty());
+    bool parseFail = false;
     if (parts.size() != 3) {
-        LOG(ERROR) << "Invalid format for RESTART=" << string
-                   << " (Expected three parts)";
-        throw std::invalid_argument("Invalid format for RESTART");
+        LOG(ERROR) << "env has " << parts.size()
+                   << " parts, expected 3 parts for RESTART=" << string;
+        parseFail = true;
     }
     if (!(try_parse(parts[0], &chat_id) && try_parse(parts[1], &message_id) &&
           try_parse(parts[2], &message_thread_id))) {
-        LOG(ERROR) << "Invalid format for RESTART=" << string
-                   << " (Failed to parse chat_id and message_id)";
+        LOG(ERROR) << "Failed to parse chat_id, message_id or message_thread_id "
+                   << "from env value: " << string;
+        parseFail = true;
+    }
+    if (parseFail) {
         throw std::invalid_argument("Invalid format for RESTART");
     }
 }
@@ -45,12 +49,12 @@ std::string RestartFmt::Type::to_string() const {
 bool RestartFmt::checkEnvAndVerifyRestart(TgBotApi::CPtr api) {
     // Check if the environment variable is set and valid
     DLOG(INFO) << "RestartFmt::checkEnvAndVerifyRestart";
-    auto env = Env()[ENV_VAR_NAME];
-    if (!env.has()) {
+    auto env = Env()[ENV_VAR_NAME].get();
+    if (!env.has_value()) {
         DLOG(INFO) << fmt::format("ENV_VAR {} is not set", ENV_VAR_NAME);
         return false;
     }
-    std::string value = env.get();
+    std::string value = *env;
     DLOG(INFO) << fmt::format("GETENV {}: is set to {}", ENV_VAR_NAME, value);
     LOG(INFO) << "Restart successful";
     try {
@@ -58,8 +62,7 @@ bool RestartFmt::checkEnvAndVerifyRestart(TgBotApi::CPtr api) {
         api->sendReplyMessage(t.chat_id, t.message_id, t.message_thread_id,
                               "Restart success!");
     } catch (const std::invalid_argument& ex) {
-        LOG(ERROR) << "Invalid format for RESTART=" << value << ": "
-                   << ex.what();
+        // Error already logged in Type constructor, just return false here.
         return false;
     } catch (const TgBot::TgException& ex) {
         LOG(ERROR) << "Failed to send message: " << ex.what();
@@ -69,12 +72,12 @@ bool RestartFmt::checkEnvAndVerifyRestart(TgBotApi::CPtr api) {
 }
 
 bool RestartFmt::isRestartedByThisMessage(const MessageExt::Ptr& message) {
-    auto env = Env()[ENV_VAR_NAME];
-    if (!env.has()) {
+    auto env = Env()[ENV_VAR_NAME].get();
+    if (!env.has_value()) {
         DLOG(INFO) << fmt::format("ENV_VAR {} is not set", ENV_VAR_NAME);
         return false;
     }
-    std::string value = env.get();
+    std::string value = *env;
     DLOG(INFO) << fmt::format("GETENV {}: is set to {}", ENV_VAR_NAME, value);
     if (Type{message->message()} == Type{value}) {
         DLOG(INFO) << "bot is restarted by this message";

@@ -6,28 +6,20 @@
 
 #include "Env.hpp"
 
-const Env::ValueEntry& Env::ValueEntry::operator=(const std::string_view value) const {
+const Env::ValueEntry& Env::ValueEntry::operator=(
+    const std::string_view value) const noexcept {
     SetEnvironmentVariableA(_key.data(), value.data());
     return *this;
 }
 
-void Env::ValueEntry::clear() const {
+void Env::ValueEntry::clear() const noexcept {
     SetEnvironmentVariableA(_key.data(), nullptr);
 }
 
-std::string Env::ValueEntry::get() const {
+std::optional<std::string> Env::ValueEntry::get() const noexcept {
     std::array<char, 1024> buf = {};
-    if (GetEnvironmentVariableA(_key.data(), buf.data(), buf.size()) != 0) {
+    if (GetEnvironmentVariableA(_key.data(), buf.data(), buf.size() - 1) != 0) {
         return buf.data();
     }
-    throw std::invalid_argument("env variable not set: " + _key);
-}
-
-bool Env::ValueEntry::has() const {
-    try {
-        (void)get();
-        return true;
-    } catch (const std::invalid_argument& ex) {
-        return false;
-    }
+    return std::nullopt;
 }
