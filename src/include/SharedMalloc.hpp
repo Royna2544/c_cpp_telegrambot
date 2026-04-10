@@ -10,8 +10,8 @@
 #include <type_traits>
 
 struct SharedMalloc {
-    using offset_type = std::ptrdiff_t;  // Changed from int for large file offsets
-    using size_type = std::size_t;       // Changed from long to support files > 2GB
+    using offset_type = std::ptrdiff_t;
+    using size_type = std::size_t;
     using data_type = std::uint8_t;
 
     struct Parent {
@@ -28,8 +28,8 @@ struct SharedMalloc {
             if (newSize == _size) {
                 return;  // No-op
             }
-            if (newSize == 0) {  // Changed from <= 0 since size_type is unsigned
-                _data.reset();  // Free memory and set pointer to nullptr
+            if (newSize == 0) {
+                _data.reset();
                 _size = 0;
                 return;
             }
@@ -47,10 +47,6 @@ struct SharedMalloc {
                     _data.reset(curmem);
                     throw std::bad_alloc();
                 }
-            }
-            if (newSize > _size) {
-                // Zero-fill the new block
-                memset(newMem + _size, 0, newSize - _size);
             }
             _data.reset(newMem);
             _size = newSize;
@@ -71,7 +67,7 @@ struct SharedMalloc {
         }
     }
     explicit SharedMalloc(std::nullptr_t) : SharedMalloc() {}
-    SharedMalloc() { parent = std::make_shared<Parent>(); }
+    SharedMalloc() : SharedMalloc(std::size_t{0}) {}
 
     template <typename T, std::enable_if_t<std::is_class_v<T>, bool> = true>
     explicit SharedMalloc(T value) {
@@ -107,7 +103,7 @@ struct SharedMalloc {
     }
 
     inline void offsetCheck(const offset_type offset) const {
-        if (offset > static_cast<offset_type>(size())) {  // Added cast for comparison
+        if (offset > static_cast<offset_type>(size())) {
             throw std::out_of_range("Offset exceeds allocated memory bounds");
         }
     }
@@ -249,26 +245,26 @@ struct SharedMalloc {
         if (this == &other) {
             return true;
         }
-        // Check if both shared memory blocks have same size
-        if (size() != other.size()) {
-            return false;
-        }
         // Check if either shared memory blocks are nullptr.
         // If so, then we don't need to pass it to memcmp
         if (get() == nullptr || other.get() == nullptr) {
             return get() == other.get();
         }
+        // Check if both shared memory blocks have same size
+        if (size() != other.size()) {
+            return false;
+        }
         return memcmp(get(), other.get(), size()) == 0;
+    }
+
+    template <typename T, typename... Args>
+      requires std::is_class_v<T>
+    static SharedMalloc fromType(Args&&... args) {
+        auto sm = SharedMalloc(sizeof(T));
+        new (sm.get()) T(std::forward<Args>(args)...);
+        return sm;
     }
 
    private:
     std::shared_ptr<Parent> parent;
 };
-
-template <typename T, typename... Args>
-  requires std::is_class_v<T>
-SharedMalloc MakeSharedMallocFrom(Args&&... args) {
-    auto sm = SharedMalloc(sizeof(T));
-    new (sm.get()) T(std::forward<Args>(args)...);
-    return sm;
-}

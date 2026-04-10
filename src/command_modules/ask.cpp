@@ -58,7 +58,7 @@ File Size: {} bytes)",
         }
     } else {
         provider->globalStorage->getStorage(kLLMStorageKey) =
-            MakeSharedMallocFrom<LLMCoreInstance>();
+            SharedMalloc::fromType<LLMCoreInstance>();
 
         instance = provider->globalStorage->getStorage(kLLMStorageKey)
                        .getAs<LLMCoreInstance>();
