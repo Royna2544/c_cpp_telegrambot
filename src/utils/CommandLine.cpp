@@ -92,9 +92,9 @@ std::filesystem::path CommandLine::getPath(FS::PathType type) const {
 
     // Allow overriding the install root with an environment variable for
     // testing
-    if (auto v = Env()["GLIDER_ROOT"]; v.has()) {
-        LOG_ONCE(INFO) << "Override GILDER_ROOT: " << v.get();
-        buf = v.get();
+    if (auto v = Env()["GLIDER_ROOT"].get(); v) {
+        LOG_ONCE(INFO) << "Override GILDER_ROOT: " << *v;
+        buf = *v;
     }
 
     switch (type) {

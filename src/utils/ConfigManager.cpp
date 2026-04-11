@@ -60,8 +60,8 @@ struct ConfigBackendEnv : public ConfigManager::Backend {
 
     std::optional<std::string> get(const std::string_view name) override {
         Env env;
-        if (env[name].has()) {
-            return env[name].get();
+        if (auto v = env[name].get(); v) {
+            return *v;
         }
         return std::nullopt;
     }
