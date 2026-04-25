@@ -38,7 +38,7 @@ anyhow = "1.0.101"
 nix = { version = "0.27", features = ["signal", "resource", "mount"] }
 
 [target.armv7-unknown-linux-gnueabihf.dependencies]
-openssl = { version = "0.10.1", features = ["vendored"] }
+openssl = { version = "0.10.78", features = ["vendored"] }
 
 [dev-dependencies]
 tempfile = "3.24"
