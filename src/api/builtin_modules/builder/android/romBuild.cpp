@@ -260,15 +260,18 @@ class ROMBuildQueryHandler {
     void onCallbackQuery(TgBot::CallbackQuery::Ptr query) const;
 
     // Shutdown method to cancel any running tasks
-    void shutdown() {
-        if (buildService_) {
-            tgbot::builder::android::BuildAction action;
-            action.set_build_id(build.getId());
-            bool success = buildService_->cancelBuild(action);
-            if (!success) {
-                LOG(ERROR) << "Failed to send cancel build request";
-            }
+    bool shutdown() {
+        if (!buildService_) {
+            LOG(ERROR) << "Build service is not initialized";
+            return false;
         }
+        tgbot::builder::android::BuildAction action;
+        action.set_build_id(build.getId());
+        bool success = buildService_->cancelBuild(action);
+        if (!success) {
+            LOG(ERROR) << "Failed to send cancel build request";
+        }
+        return success;
     }
 };
 
@@ -488,8 +491,12 @@ void ROMBuildQueryHandler::handle_back(const Query& /*query*/) {
 
 void ROMBuildQueryHandler::handle_cancel(const Query& query) {
     if (build.running()) {
+        if (!shutdown()) {
+            _api->answerCallbackQuery(query->id,
+                                      "Failed to cancel build on server", true);
+            return;
+        }
         build.finish();
-        shutdown();
         LOG(INFO) << "User cancelled build";
         _api->answerCallbackQuery(query->id, "Task successfully cancelled!");
     } else {
@@ -585,6 +592,12 @@ void ROMBuildQueryHandler::handle_confirm(const Query& query) {
     if (!success) {
         LOG(ERROR) << "Failed to start build";
         _api->editMessage(sentMessage, "Failed to start build", backKeyboard2);
+        return;
+    }
+    if (!buildSubmission.accepted()) {
+        LOG(ERROR) << "Build was rejected: " << buildSubmission.status_message();
+        _api->editMessage(sentMessage, buildSubmission.status_message(),
+                          backKeyboard2);
         return;
     }
     LOG(INFO) << "Started build with ID: " << buildSubmission.build_id();
@@ -1357,4 +1370,3 @@ extern const struct DynModule cmd_rombuild = {
     .description = "Build a ROM, I'm lazy",
     .function = COMMAND_HANDLER_NAME(rombuild),
 };
-

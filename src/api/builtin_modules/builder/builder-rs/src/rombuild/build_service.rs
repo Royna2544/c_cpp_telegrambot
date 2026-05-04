@@ -968,7 +968,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
             None
         };
 
-        let settings_clone = self.settings.clone();
+        let build_settings = self.settings.lock().await.clone();
         let build_dir_clone = self.build_dir.clone();
         let log_tx_clone = log_tx.clone();
         let uploads_clone = self.active_uploads.clone();
@@ -1026,7 +1026,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
             let res = async {
                 let build_log_filename_suffix = format!("build-{}.log", &build_id_clone);
                 // First, check if repo command is available
-                if settings_clone.lock().await.do_repo_sync.unwrap() {
+                if build_settings.do_repo_sync.unwrap_or(false) {
                     send_log!(LogLevel::Debug, "Checking for 'repo' command availability...".to_string());
                     if which::which("repo").is_err() {
                         return Err(tonic::Status::failed_precondition(
@@ -1509,14 +1509,14 @@ impl rom_build_service_server::RomBuildService for BuildService {
                 // Now, start the build process
                 send_log!(LogLevel::Info, "Starting build process...".to_string());
 
-                let use_ccache = settings_clone.lock().await.use_ccache.unwrap_or(false);
-                let use_rbe = settings_clone.lock().await.use_rbe_service.unwrap_or(false);
+                let use_ccache = build_settings.use_ccache.unwrap_or(false);
+                let use_rbe = build_settings.use_rbe_service.unwrap_or(false);
 
                 if use_rbe {
                     send_log!(LogLevel::Info, "Writing RBE environment configuration...".to_string());
                     Self::setup_rbe_env(
                         build_dir_clone.clone(),
-                        settings_clone.lock().await.rbe_api_token.as_ref().map(|s| s.as_str()).unwrap_or(""),
+                        build_settings.rbe_api_token.as_deref().unwrap_or(""),
                     ).await.map_err(|e| {
                         tonic::Status::internal(format!("Failed to write RBE environment configuration: {}", e))
                     })?;
@@ -1623,7 +1623,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                     }
                 };
 
-                if settings_clone.lock().await.do_clean_build() {
+                if build_settings.do_clean_build() {
                     send_log!(LogLevel::Info, "Performing clean build...".to_string());
                     let out_dir = build_dir_clone.join("out");
                     if out_dir.exists() {
@@ -1724,7 +1724,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
                 }
                 send_log!(LogLevel::Info, "Build process completed successfully.".to_string());
 
-                if settings_clone.lock().await.do_upload() {
+                if build_settings.do_upload() {
                     match Self::find_artifact(&build_dir_clone, &device_entry.codename, &rom_entry).await {
                         Ok(artifact) => {
                         send_log!(LogLevel::Info, format!("Found {} artifact(s) for upload.", artifact.len()));
