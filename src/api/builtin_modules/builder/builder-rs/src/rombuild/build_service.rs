@@ -99,6 +99,26 @@ pub struct BuildService {
 }
 
 impl BuildService {
+    fn shell_single_quote(value: &str) -> String {
+        format!("'{}'", value.replace('\'', "'\\''"))
+    }
+
+    fn configure_repo_command_env(
+        command: &mut Command,
+        build_dir: &Path,
+        askpass_path: Option<&Path>,
+    ) {
+        command.env("REPO_CONFIG_DIR", build_dir);
+        if let Some(path) = askpass_path {
+            command.env("GIT_ASKPASS", path);
+        }
+    }
+
+    fn is_safe_relative_path(path: &Path) -> bool {
+        path.components()
+            .all(|component| matches!(component, std::path::Component::Normal(_)))
+    }
+
     async fn setup_rbe_env(build_dir: PathBuf, rbe_api_token: &str) -> Result<(), Status> {
         let rbe_env_path = build_dir.join("rbe_env.sh");
         let rbe_cli_path = build_dir.join("rbe_cli");
@@ -504,8 +524,15 @@ export RBE_LINT_POOL=default"##,
             }
             ROMArtifactMatcher::ExactMatcher => {
                 let exact_name = &rom_entry.artifact.data;
-                let artifact_path = output_dir.join(&exact_name);
-                if !artifact_path.exists() {
+                let exact_path = Path::new(exact_name);
+                if !Self::is_safe_relative_path(exact_path) {
+                    return Err(tonic::Status::invalid_argument(format!(
+                        "Artifact path must be relative and stay under the product output directory: {}",
+                        exact_name
+                    )));
+                }
+                let artifact_path = output_dir.join(exact_path);
+                if !artifact_path.is_file() {
                     Err(tonic::Status::not_found(
                         "Artifact not found with exact name",
                     ))
@@ -907,11 +934,14 @@ impl rom_build_service_server::RomBuildService for BuildService {
         self.known_builds.lock().await.push(known_builds_entry);
 
         // Write git-askpass file if github token is provided
-        if let Some(token) = &req.github_token {
+        let askpass_path = if let Some(token) = &req.github_token {
             let askpass_path = self.build_dir.join("git-askpass.sh");
             info!("Writing git-askpass file to {:?}", askpass_path);
-            let res =
-                tokio::fs::write(&askpass_path, format!("#!/bin/sh\necho \"{}\"\n", token)).await;
+            let script = format!(
+                "#!/bin/sh\nprintf '%s\\n' {}\n",
+                Self::shell_single_quote(token)
+            );
+            let res = tokio::fs::write(&askpass_path, script).await;
             if let Err(e) = res {
                 return Err(Status::internal(format!(
                     "Failed to write git-askpass file: {}",
@@ -933,19 +963,10 @@ impl rom_build_service_server::RomBuildService for BuildService {
                     ))
                 })?;
             }
-            // Set GIT_ASKPASS environment
-            // SAFETY: This is safe because we are only using single thread, let me fix it when I change.
-            unsafe {
-                std::env::set_var("GIT_ASKPASS", askpass_path.to_str().unwrap());
-            }
-        }
-
-        unsafe {
-            // Set REPO_CONFIG_DIR to the build directory so that 'repo' command uses it for its internal git operations,
-            // avoiding conflicts with any existing .repo in the user's home or elsewhere.
-            // SAFETY: This is safe because we are only using single thread.
-            std::env::set_var("REPO_CONFIG_DIR", self.build_dir.to_str().unwrap());
-        }
+            Some(askpass_path)
+        } else {
+            None
+        };
 
         let settings_clone = self.settings.clone();
         let build_dir_clone = self.build_dir.clone();
@@ -954,6 +975,7 @@ impl rom_build_service_server::RomBuildService for BuildService {
         let build_id_clone = build_id.clone();
         let tempdir_clone = self.tempdir.clone();
         let known_builds_clone = self.known_builds.clone();
+        let askpass_path_clone = askpass_path.clone();
         let force_checkout = req.force_checkout.unwrap_or(false);
 
         let span = tracing::info_span!("build_task", build_id = build_id);
@@ -1066,6 +1088,11 @@ impl rom_build_service_server::RomBuildService for BuildService {
                         repo_init_cmd.arg("--git-lfs");
                         repo_init_cmd.arg("--depth=1");
                         repo_init_cmd.current_dir(&build_dir_clone);
+                        Self::configure_repo_command_env(
+                            &mut repo_init_cmd,
+                            &build_dir_clone,
+                            askpass_path_clone.as_deref(),
+                        );
 
                         let (stdin_tx, stdin_rx) = mpsc::channel(10);
 
@@ -1122,20 +1149,11 @@ impl rom_build_service_server::RomBuildService for BuildService {
                                     {
                                         send_log!(LogLevel::Warning, "Local manifest repository URL mismatch, re-cloning...".to_string());
                                         std::fs::remove_dir_all(&local_manifest_dir).map_err(|e| {
-                                        tonic::Status::internal(format!(
-                                            "Failed to remove existing local manifest directory: {}",
-                                            e
-                                        ))
-                                    })?;
-                                        if force_checkout {
-                                            send_log!(LogLevel::Info, "Force checkout enabled, removing local manifest directory before cloning.".to_string());
-                                            std::fs::remove_dir_all(&local_manifest_dir).map_err(|e| {
-                                                tonic::Status::internal(format!(
-                                                    "Failed to remove local manifest directory: {}",
-                                                    e
-                                                ))
-                                            })?;
-                                        }
+                                            tonic::Status::internal(format!(
+                                                "Failed to remove existing local manifest directory: {}",
+                                                e
+                                            ))
+                                        })?;
 
                                         git_repo::GitRepo::clone(
                                             &rom.url,
@@ -1254,6 +1272,11 @@ impl rom_build_service_server::RomBuildService for BuildService {
                                                                 &(&sub_repo_name.clone()),
                                                             ])
                                                             .current_dir(&build_dir_clone);
+                                                        Self::configure_repo_command_env(
+                                                            &mut repo_sync_command,
+                                                            &build_dir_clone,
+                                                            askpass_path_clone.as_deref(),
+                                                        );
                                                         let error_file = (&tempdir_clone).join(format!("{}-{}-submodule-sync.log", "repo-sync", &build_id_clone));
                                                         info!("Repo sync for submodule output log path: {:?}", &error_file);
                                                         let repo_sync_status = Self::run_command_with_logs(
@@ -1416,6 +1439,11 @@ impl rom_build_service_server::RomBuildService for BuildService {
                     if force_checkout {
                         repo_sync_command.arg("--force-remove-dirty");
                     }
+                    Self::configure_repo_command_env(
+                        &mut repo_sync_command,
+                        &build_dir_clone,
+                        askpass_path_clone.as_deref(),
+                    );
                     let error_file = (&tempdir_clone).join(format!("{}-{}", "repo-sync", &build_log_filename_suffix));
                     info!("Repo sync output log path: {:?}", &error_file);
 
@@ -1630,6 +1658,11 @@ impl rom_build_service_server::RomBuildService for BuildService {
 
                 let mut cmd = Command::new("bash");
                 cmd.current_dir(&build_dir_clone);
+                Self::configure_repo_command_env(
+                    &mut cmd,
+                    &build_dir_clone,
+                    askpass_path_clone.as_deref(),
+                );
 
                 let (stdin_tx, stdin_rx) = mpsc::channel(100);
 

@@ -33,8 +33,8 @@ use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
-use tokio::sync::{Mutex, broadcast};
 use tokio::sync::mpsc;
+use tokio::sync::{Mutex, broadcast};
 use tokio_stream::Stream;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
@@ -109,23 +109,31 @@ impl BuildService {
         let contexts_clone = contexts.clone();
 
         tokio::spawn(async move {
-            tokio::signal::ctrl_c().await.expect("Failed to listen for Ctrl-C");
+            tokio::signal::ctrl_c()
+                .await
+                .expect("Failed to listen for Ctrl-C");
             info!("Global Ctrl-C received");
-            
+
             // Check if build is active
             let job = contexts_clone.lock().await;
             if let Some(active) = job.iter().find(|c| c.kill_signal.is_some()) {
-                info!("Active build found (ID: {}), sending kill signal...", active.id);
+                info!(
+                    "Active build found (ID: {}), sending kill signal...",
+                    active.id
+                );
                 if let Some(kill_tx) = &active.kill_signal {
                     let _ = kill_tx.send(()).await;
                     info!("Kill signal sent to active build (ID: {})", active.id);
                 } else {
-                    warn!("No kill signal channel found for active build (ID: {})", active.id);
+                    warn!(
+                        "No kill signal channel found for active build (ID: {})",
+                        active.id
+                    );
                 }
             } else {
                 info!("No active build found, proceeding with shutdown.");
             }
-            
+
             info!("Exiting server");
             std::process::exit(0);
         });
@@ -400,9 +408,23 @@ impl BuildService {
                             let _ = child.kill().await;
                     }
 
-                    // Abort log tasks
-                    out_handle.abort();
-                    err_handle.abort();
+                    let exited = tokio::time::timeout(
+                        std::time::Duration::from_secs(10),
+                        child.wait(),
+                    )
+                    .await
+                    .map(|res| res.is_ok())
+                    .unwrap_or(false);
+                    if !exited {
+                        #[cfg(unix)]
+                        {
+                            if let Some(pid) = child.id() {
+                                let _ = signal::kill(Pid::from_raw(-(pid as i32)), Signal::SIGKILL);
+                            }
+                        }
+                        let _ = child.kill().await;
+                        let _ = child.wait().await;
+                    }
 
                     // Notify cancellation
                     let _ = tx.send(Ok(BuildStatus {
@@ -415,6 +437,9 @@ impl BuildService {
                         let mut f = f_arc.lock().await;
                         let _ = f.write_all(b"\n--- BUILD CANCELLED ---\n").await;
                     }
+                    // Abort log tasks after the process exits so readers can drain graceful shutdown output.
+                    out_handle.abort();
+                    err_handle.abort();
                     false
                 }
             }
@@ -829,33 +854,98 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                     if let Ok(existing_repo) = repo {
                         match existing_repo.get_remote_url() {
                             Ok(url) => {
-                                if url == config_url {
+                                if url.trim_end_matches('/') == config_url.trim_end_matches('/') {
                                     report_blk!(
                                         tx_for_inner,
                                         InProgressDownload,
-                                        "Existing repository URL matches config, skipping checkout."
+                                        "Existing repository URL matches config, checking out requested branch."
                                     );
-                                } else {
-                                    // Try to checkout the correct branch
                                     if let Err(e) = existing_repo.checkout_branch(&config_branch) {
                                         report_blk!(
                                             tx_for_inner,
-                                            InProgressDownload,
+                                            Failed,
                                             format!(
                                                 "Failed to checkout branch {}. Error: {}",
                                                 config_branch, e
                                             )
                                         );
-                                        return Ok(());
-                                    } else {
+                                        return Err(Status::internal(format!(
+                                            "Failed to checkout branch {}: {}",
+                                            config_branch, e
+                                        )));
+                                    }
+                                    match existing_repo.fast_forward() {
+                                        Ok(_) => {
+                                            report_blk!(
+                                                tx_for_inner,
+                                                InProgressDownload,
+                                                "Repository fast-forwarded successfully."
+                                            );
+                                        }
+                                        Err(e) => {
+                                            report_blk!(
+                                                tx_for_inner,
+                                                Failed,
+                                                format!(
+                                                    "Failed to fast-forward repository. Error: {}",
+                                                    e
+                                                )
+                                            );
+                                            return Err(Status::internal(format!(
+                                                "Failed to fast-forward repository: {}",
+                                                e
+                                            )));
+                                        }
+                                    }
+                                } else {
+                                    report_blk!(
+                                        tx_for_inner,
+                                        InProgressDownload,
+                                        format!(
+                                            "Existing repository URL {} does not match config URL {}, recloning.",
+                                            url, config_url
+                                        )
+                                    );
+                                    if let Err(e) = std::fs::remove_dir_all(&source_dir_clone2) {
                                         report_blk!(
                                             tx_for_inner,
-                                            InProgressDownload,
+                                            Failed,
                                             format!(
-                                                "Checked out branch {} successfully.",
-                                                config_branch
+                                                "Failed to remove mismatched repository {:?}. Error: {}",
+                                                source_dir_clone2, e
                                             )
                                         );
+                                        return Err(Status::internal(format!(
+                                            "Failed to remove mismatched repository: {}",
+                                            e
+                                        )));
+                                    }
+                                    match GitRepo::clone(
+                                        &config_url,
+                                        &config_branch,
+                                        None,
+                                        &source_dir_clone2,
+                                        req.github_token.clone(),
+                                        &None,
+                                    ) {
+                                        Ok(_) => {
+                                            report_blk!(
+                                                tx_for_inner,
+                                                InProgressDownload,
+                                                "Repository recloned successfully."
+                                            );
+                                        }
+                                        Err(e) => {
+                                            report_blk!(
+                                                tx_for_inner,
+                                                Failed,
+                                                format!("Failed to reclone repository. Error: {}", e)
+                                            );
+                                            return Err(Status::internal(format!(
+                                                "Failed to reclone repository: {}",
+                                                e
+                                            )));
+                                        }
                                     }
                                 }
                             }
@@ -865,25 +955,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                                     Failed,
                                     "Failed to get existing repository URL, aborting."
                                 );
-                                return Ok(());
-                            }
-                        }
-
-                        // Try to fast-forward
-                        match existing_repo.fast_forward() {
-                            Ok(_) => {
-                                report_blk!(
-                                    tx_for_inner,
-                                    InProgressDownload,
-                                    "Repository fast-forwarded successfully."
-                                );
-                            }
-                            Err(e) => {
-                                report_blk!(
-                                    tx_for_inner,
-                                    Failed,
-                                    format!("Failed to fast-forward repository. Error: {}", e)
-                                );
+                                return Err(Status::internal("Failed to get existing repository URL"));
                             }
                         }
                         Ok(())
@@ -909,7 +981,10 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                                     Failed,
                                     format!("Failed to clone repository. Error: {}", e)
                                 );
-                                return Ok(());
+                                return Err(Status::internal(format!(
+                                    "Failed to clone repository: {}",
+                                    e
+                                )));
                             }
                         }
 
@@ -1438,10 +1513,12 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
         }
         let context = {
             let contexts = self.contexts.lock().await;
-            let ctx = contexts
-                .iter()
-                .find(|c| c.id == request.get_ref().build_id)
-                .unwrap();
+            let Some(ctx) = contexts.iter().find(|c| c.id == request.get_ref().build_id) else {
+                return Err(Status::not_found(format!(
+                    "No build context found for ID: {}",
+                    request.get_ref().build_id
+                )));
+            };
             ctx.clone()
         };
 
@@ -1467,18 +1544,25 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
                 req.build_id, artifact_path
             );
             // First send metadata chunk
+            let metadata = match std::fs::metadata(&artifact_path) {
+                Ok(metadata) => metadata,
+                Err(e) => {
+                    let _ = tx
+                        .send(Err(Status::internal(format!(
+                            "Failed to get metadata for artifact file: {}",
+                            e
+                        ))))
+                        .await;
+                    return;
+                }
+            };
             let artifact_meta = ArtifactMetadata {
                 filename: artifact_path
                     .file_name()
                     .and_then(|s| s.to_str())
                     .unwrap_or("artifact.bin")
                     .to_string(),
-                total_size: std::fs::metadata(&artifact_path)
-                    .map_err(|e| {
-                        Status::internal(format!("Failed to get metadata for artifact file: {}", e))
-                    })
-                    .unwrap()
-                    .len(),
+                total_size: metadata.len(),
             };
             let meta_chunk = grpc_pb::ArtifactChunk {
                 content: Some(grpc_pb::artifact_chunk::Content::Metadata(artifact_meta)),

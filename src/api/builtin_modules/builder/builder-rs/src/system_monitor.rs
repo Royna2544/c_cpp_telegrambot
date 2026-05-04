@@ -10,6 +10,7 @@
 //! The monitoring service supports both one-time stats queries and streaming
 //! stats updates at configurable intervals.
 
+use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
@@ -75,9 +76,11 @@ impl MonitorService {
         let total_mem = sys.total_memory() / 1024 / 1024;
         let hostname = System::host_name().unwrap_or_default();
         let (disk_total, disk_used) = if let Some(path) = disk_path {
+            let requested_path = Path::new(path);
             if let Some(disk) = Disks::new_with_refreshed_list()
                 .iter()
-                .find(|d| path.starts_with(d.mount_point().to_str().unwrap_or("")))
+                .filter(|d| requested_path.starts_with(d.mount_point()))
+                .max_by_key(|d| d.mount_point().components().count())
             {
                 let total_gb = (disk.total_space() / 1024 / 1024 / 1024) as i32;
                 let used_gb =
