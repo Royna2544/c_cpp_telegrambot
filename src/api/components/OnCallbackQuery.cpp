@@ -22,10 +22,12 @@ void TgBotApiImpl::OnCallbackQueryImpl::onCallbackQuery(
 void TgBotApiImpl::OnCallbackQueryImpl::onUnload(
     const std::string_view command) {
     const std::lock_guard<std::mutex> lock(mutex);
-    for (auto it = listeners.begin(); it != listeners.end(); ++it) {
+    for (auto it = listeners.begin(); it != listeners.end();) {
         if (it->first == command) {
             DLOG(INFO) << "Removing callback query handler for " << command;
             it = listeners.erase(it);
+        } else {
+            ++it;
         }
     }
 }

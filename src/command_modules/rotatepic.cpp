@@ -45,8 +45,11 @@ DECLARE_COMMAND_HANDLER(rotatepic) {
                               res->get(Strings::FAILED_TO_DOWNLOAD_FILE));
         return;
     }
-    params.srcPath = tmpPath / kDownloadFile.data();
-    params.destPath = tmpPath / kOutputFile.data();
+    const auto uniqueSuffix =
+        std::to_string(message->get<MessageAttrs::Chat>()->id) + "_" +
+        std::to_string(message->get<MessageAttrs::MessageId>());
+    params.srcPath = tmpPath / (std::string(kDownloadFile) + "_" + uniqueSuffix);
+    params.destPath = tmpPath / (std::string(kOutputFile) + "_" + uniqueSuffix);
     std::string fileid;
     enum class MediaType { INVALID, MPEG4, WEBM, PNG } mediaType{};
     MessageAttrs attr{};

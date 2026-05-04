@@ -1,7 +1,7 @@
 #include "SocketServiceImpl.hpp"
 
-#include <absl/hash/hash.h>
 #include <absl/log/log.h>
+#include <absl/strings/ascii.h>
 #include <absl/strings/strip.h>
 #include <fmt/format.h>
 #include <grpcpp/grpcpp.h>
@@ -10,14 +10,17 @@
 #include <uuid.h>
 
 #include <GitBuildInfo.hpp>
+#include <array>
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <mutex>
+#include <optional>
 #include <random>
 #include <string_view>
 #include <system_error>
+#include <vector>
 
 #include "Socket_service.grpc.pb.h"
 #include "Socket_service.pb.h"
@@ -110,6 +113,9 @@ class SocketServiceImpl::Service : public SocketService::Service {
         std::filesystem::path filePath;
         std::uintmax_t totalSize = 0;
         int chunk_count{};
+        ChecksumAlgorithm checksumAlgorithm = ChecksumAlgorithm::None;
+        std::string checksum;
+        bool overwriteExisting = false;
     };
 
     std::map<std::string, TranferEntry> activeTransfers_;
@@ -289,21 +295,78 @@ Status SocketServiceImpl::Service::getSpamBlockingConfig(
 }
 
 namespace {
-template <typename T>
-std::string calc_hash(const std::string& data) {
-    T hash_obj;
-    hash_obj.Update(reinterpret_cast<const CryptoPP::byte*>(data.data()),
-                    data.size());
-    std::string digest;
-    digest.resize(hash_obj.DigestSize());
-    hash_obj.Final(reinterpret_cast<CryptoPP::byte*>(digest.data()));
+std::string hex_encode(std::string_view data) {
     std::string encoded;
     CryptoPP::HexEncoder encoder;
     encoder.Attach(new CryptoPP::StringSink(encoded));
-    encoder.Put(reinterpret_cast<const CryptoPP::byte*>(digest.data()),
-                digest.size());
+    encoder.Put(reinterpret_cast<const CryptoPP::byte*>(data.data()),
+                data.size());
     encoder.MessageEnd();
     return encoded;
+}
+
+template <typename T>
+std::optional<std::string> calc_file_hash(const std::filesystem::path& path) {
+    std::ifstream input(path, std::ios::binary);
+    if (!input.is_open()) {
+        return std::nullopt;
+    }
+
+    T hash_obj;
+    std::array<char, 64 * 1024> buffer{};
+    while (input.read(buffer.data(), buffer.size()) || input.gcount() > 0) {
+        hash_obj.Update(reinterpret_cast<const CryptoPP::byte*>(buffer.data()),
+                        static_cast<size_t>(input.gcount()));
+    }
+
+    std::string digest(hash_obj.DigestSize(), '\0');
+    hash_obj.Final(reinterpret_cast<CryptoPP::byte*>(digest.data()));
+    return hex_encode(digest);
+}
+
+template <typename T>
+bool file_checksum_matches(const std::filesystem::path& path,
+                           std::string providedChecksum) {
+    auto calculatedChecksum = calc_file_hash<T>(path);
+    if (!calculatedChecksum.has_value()) {
+        return false;
+    }
+
+    T hash_obj;
+    if (providedChecksum.size() == hash_obj.DigestSize()) {
+        providedChecksum = hex_encode(providedChecksum);
+    } else {
+        providedChecksum = absl::AsciiStrToUpper(providedChecksum);
+    }
+    return providedChecksum == *calculatedChecksum;
+}
+
+bool verify_file_checksum(const std::filesystem::path& path,
+                          ChecksumAlgorithm algorithm,
+                          const std::string& providedChecksum) {
+    switch (algorithm) {
+        case ChecksumAlgorithm::MD5:
+            return file_checksum_matches<CryptoPP::Weak::MD5>(
+                path, providedChecksum);
+        case ChecksumAlgorithm::SHA1:
+            return file_checksum_matches<CryptoPP::SHA1>(path,
+                                                         providedChecksum);
+        case ChecksumAlgorithm::SHA256:
+            return file_checksum_matches<CryptoPP::SHA256>(path,
+                                                           providedChecksum);
+        case ChecksumAlgorithm::SHA512:
+            return file_checksum_matches<CryptoPP::SHA512>(path,
+                                                           providedChecksum);
+        case ChecksumAlgorithm::Blake2b:
+            return file_checksum_matches<CryptoPP::BLAKE2b>(path,
+                                                            providedChecksum);
+        case ChecksumAlgorithm::Blake2s:
+            return file_checksum_matches<CryptoPP::BLAKE2s>(path,
+                                                            providedChecksum);
+        case ChecksumAlgorithm::None:
+            return true;
+    }
+    return false;
 }
 
 }  // namespace
@@ -335,44 +398,18 @@ Status SocketServiceImpl::Service::requestFileTransfer(
             return Status::OK;
         }
 
-        // Compute checksums if set
-        std::optional<std::string> result;
-        switch (request->file_checksum_algorithm()) {
-            case ChecksumAlgorithm::MD5: {
-                result = calc_hash<CryptoPP::Weak::MD5>(request->file_checksum());
-            } break;
-            case ChecksumAlgorithm::SHA1: {
-                result = calc_hash<CryptoPP::SHA1>(request->file_checksum());
-            } break;
-            case ChecksumAlgorithm::SHA256: {
-                result = calc_hash<CryptoPP::SHA256>(request->file_checksum());
-            } break;
-            case ChecksumAlgorithm::SHA512: {
-                result = calc_hash<CryptoPP::SHA512>(request->file_checksum());
-            } break;
-            case ChecksumAlgorithm::Blake2b: {
-                result = calc_hash<CryptoPP::BLAKE2b>(request->file_checksum());
-            } break;
-            case ChecksumAlgorithm::Blake2s: {
-                result = calc_hash<CryptoPP::BLAKE2s>(request->file_checksum());
-            } break;
-            case ChecksumAlgorithm::None:
-                break;
-        }
-        if (result.has_value()) {
-            std::string providedChecksum = request->file_checksum();
-            if (absl::Hash<std::string_view>{}(*result) !=
-                absl::Hash<std::string_view>{}(providedChecksum)) {
+        if (request->file_checksum_algorithm() != ChecksumAlgorithm::None) {
+            if (!request->has_file_checksum() ||
+                request->file_checksum().empty()) {
                 response->set_accepted(false);
-                response->set_reject_message("Checksum mismatch");
-                LOG(ERROR) << "Checksum mismatch for upload. Provided: "
-                           << std::quoted(providedChecksum)
-                           << ", Computed: " << std::quoted(*result);
+                response->set_reject_message(
+                    "Checksum algorithm set without checksum data");
                 return Status::OK;
             }
-            LOG(INFO) << "Checksum verified for upload: "
-                      << std::quoted(providedChecksum);
+            entry.checksumAlgorithm = request->file_checksum_algorithm();
+            entry.checksum = request->file_checksum();
         }
+        entry.overwriteExisting = request->overwrite_existing();
 
         // For upload, we create a temporary file to store incoming data
         entry.filePath = std::filesystem::temp_directory_path() /
@@ -518,6 +555,18 @@ Status SocketServiceImpl::Service::uploadFileLoop(
                 return Status::OK;
             }
             fileStream = &it->second.fileStream;
+            if (msg.chunk_offset() < 0 ||
+                static_cast<std::uintmax_t>(msg.chunk_offset()) +
+                        msg.chunk_data().size() >
+                    it->second.totalSize) {
+                FileChunkResponse response;
+                response.set_success(false);
+                response.set_retry(false);
+                LOG(ERROR) << "Invalid chunk range for upload UUID "
+                           << std::quoted(msg.uuid());
+                stream->Write(response);
+                return Status::OK;
+            }
         }
 
         // Perform I/O without holding the lock
@@ -569,9 +618,24 @@ Status SocketServiceImpl::Service::endFileTransfer(
     TranferEntry& entry = it->second;
     entry.fileStream.close();
     if (request->is_upload()) {
+        if (entry.checksumAlgorithm != ChecksumAlgorithm::None &&
+            !verify_file_checksum(entry.filePath, entry.checksumAlgorithm,
+                                  entry.checksum)) {
+            response->set_code(GenericResponseCode::ErrorInvalidArgument);
+            response->set_message("Checksum mismatch");
+            LOG(ERROR) << "Checksum mismatch for upload: " << request->uuid();
+            std::filesystem::remove(entry.filePath);
+            activeTransfers_.erase(it);
+            return Status::OK;
+        }
         // Move temporary file to final destination
         try {
-            std::filesystem::copy_file(entry.filePath, request->file_path());
+            const auto options =
+                entry.overwriteExisting
+                    ? std::filesystem::copy_options::overwrite_existing
+                    : std::filesystem::copy_options::none;
+            std::filesystem::copy_file(entry.filePath, request->file_path(),
+                                       options);
             std::filesystem::remove(entry.filePath);
             LOG(INFO) << "File uploaded successfully to: "
                       << request->file_path();

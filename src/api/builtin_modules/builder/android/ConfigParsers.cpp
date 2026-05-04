@@ -243,7 +243,7 @@ bool ConfigParser::merge() {
     for (const auto& recovery : recoveries) {
         auto romInfo = std::make_shared<ROMInfo>();
         romInfo->name = recovery.name;
-        romInfo->url = recovery.name;
+        romInfo->url = recovery.link;
         romInfo->target = recovery.target;
         romInfo->artifact.data = recovery.artifact.data;
         romInfo->artifact.matcher = recovery.artifact.matcher;

@@ -134,6 +134,11 @@ DECLARE_COMMAND_HANDLER(q) {
         type = MessageType::Photo;
     } else if (message->reply()->has<MessageAttrs::Video>()) {
         auto video = message->reply()->get<MessageAttrs::Video>();
+        if (!video->thumbnail) {
+            api->sendMessage(message->get<MessageAttrs::Chat>(),
+                             "Unsupported media type: video without thumbnail");
+            return;
+        }
         media = (*video->thumbnail)->fileId;
         type = MessageType::Video;
     } else if (message->reply()->has<MessageAttrs::Animation>()) {

@@ -115,11 +115,11 @@ void SpamBlockBase::setConfig(Config config) {
 void SpamBlockBase::consumeAndDetect() {
     const std::lock_guard<std::mutex> _(mutex);
     for (const auto& [chat, per_chat_map] : chat_messages_data) {
-        int count =
-            std::accumulate(per_chat_map.begin(), per_chat_map.end(), 0,
-                            [](const int /*index*/, const auto& messages) {
-                                return messages.second.size();
-                            });
+        int count = std::accumulate(
+            per_chat_map.begin(), per_chat_map.end(), 0,
+            [](const int index, const auto& messages) {
+                return index + static_cast<int>(messages.second.size());
+            });
         if (count >= sSpamDetectThreshold) {
             const auto& chatPtr = chat_map.at(chat);
             LOG(INFO) << fmt::format(
@@ -149,6 +149,10 @@ void SpamBlockBase::addMessage(const Message::Ptr& message) {
 
     // Run possible additional checks
     if (shouldBeSkipped(message)) {
+        return;
+    }
+
+    if (!message->chat || !message->from) {
         return;
     }
 

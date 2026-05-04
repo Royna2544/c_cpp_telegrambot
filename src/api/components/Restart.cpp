@@ -53,6 +53,7 @@ void TgBotApiImpl::RestartCommand::commandFunction(MessageExt::Ptr message) {
     if (std::distance(be, en) != 0) {
         DLOG(INFO) << "Removing existing RESTART=";
         myEnviron.erase(be, en);
+        count = static_cast<int>(myEnviron.size()) - 2;
     }
 
     std::array<char, RestartFmt::MAX_KNOWN_LENGTH> restartBuf = {0};

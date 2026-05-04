@@ -54,10 +54,13 @@ void TgBotApiImpl::OnInlineQueryImpl::onInlineQueryFunction(
 }
 
 void TgBotApiImpl::OnInlineQueryImpl::onUnload(const std::string_view command) {
-    for (auto it = queryResults.begin(); it != queryResults.end(); ++it) {
+    const std::lock_guard lock(mutex);
+    for (auto it = queryResults.begin(); it != queryResults.end();) {
         if (it->first.name == command) {
             DLOG(INFO) << "Removing inline query handler for " << command;
-            queryResults.erase(it);
+            it = queryResults.erase(it);
+        } else {
+            ++it;
         }
     }
 }

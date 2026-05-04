@@ -133,7 +133,10 @@ bool KernelConfig::parseRepoInfo(const nlohmann::json& node) {
     errors = get(node, "repo", "url", &url);
     errors = get(node, "repo", "branch", &branch);
     // Optional value
-    get(node, "repo", "shallow", &shallow_clone);
+    if (node.contains("repo")) {
+        get<bool, Optionality::OPTIONAL>(node["repo"], "shallow",
+                                         &shallow_clone);
+    }
     repo_info = RepoInfo{std::move(url), std::move(branch)};
     return static_cast<bool>(errors);
 }

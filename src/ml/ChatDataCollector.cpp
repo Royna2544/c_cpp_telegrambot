@@ -10,7 +10,7 @@
 ChatDataCollector::Data::Data(const Message::Ptr& message) {
     if (message->text) {
         msgType = Data::MsgType::TEXT;
-    } else if (!message->photo) {
+    } else if (message->photo) {
         msgType = Data::MsgType::PHOTO;
     } else if (message->video) {
         msgType = Data::MsgType::VIDEO;
@@ -28,8 +28,10 @@ ChatDataCollector::Data::Data(const Message::Ptr& message) {
     timestamp = message->date;
     isEdited = message->editDate.has_value();
     isForwarded = message->forwardOrigin != nullptr;
-    replyToUserId =
-        message->replyToMessage ? (*(*message->replyToMessage)->from)->id : 0;
+    replyToUserId = message->replyToMessage &&
+                            (*message->replyToMessage)->from
+                        ? (*(*message->replyToMessage)->from)->id
+                        : 0;
     messageid = message->messageId;
     replyToMessageId =
         message->replyToMessage ? (*message->replyToMessage)->messageId : 0;
@@ -62,7 +64,7 @@ void ChatDataCollector::onMessage(const Message::Ptr& message) {
     if ((*message->from)->isBot) {
         return;  // Skip messages from bots
     }
-    if (!message->newChatMembers || message->leftChatMember ||
+    if (message->newChatMembers || message->leftChatMember ||
         message->groupChatCreated || message->pinnedMessage) {
         return;  // Skip join/leave messages
     }

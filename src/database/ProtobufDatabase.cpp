@@ -100,7 +100,7 @@ ProtoDatabase::ListResult ProtoDatabase::removeUserFromList(ListType type,
         return ListResult::OK;
     }
     auto const otherList = getOtherPersonList(type);
-    auto otherLoc = findByUid(myList.id(), user);
+    auto otherLoc = findByUid(otherList.id(), user);
     if (otherLoc.has_value()) {
         return ListResult::ALREADY_IN_OTHER_LIST;
     }

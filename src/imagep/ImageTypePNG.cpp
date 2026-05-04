@@ -133,6 +133,7 @@ void PngImage::greyscale() {
 void PngImage::rotate_image_impl(png_uint_32 new_width, png_uint_32 new_height,
                                  const transform_fn_t& transform) {
     PngImage src = *this;
+    PngRefMem rotated_refmem;
 
     width = new_width;
     height = new_height;
@@ -140,7 +141,7 @@ void PngImage::rotate_image_impl(png_uint_32 new_width, png_uint_32 new_height,
     bit_depth = src.bit_depth;
 
     for (int y = 0; y < height; y++) {
-        refmem.add(static_cast<size_t>(width) * 4);
+        rotated_refmem.add(static_cast<size_t>(width) * 4);
     }
 
     for (ptrdiff_t y = 0; y < src.height; y++) {
@@ -149,10 +150,11 @@ void PngImage::rotate_image_impl(png_uint_32 new_width, png_uint_32 new_height,
             ptrdiff_t dst_y = 0;
             transform(src.width, src.height, dst_x, dst_y, x, y);
             png_bytep src_pixel = &src.refmem[y][x * 4];
-            png_bytep dst_pixel = &refmem[dst_y][dst_x * 4];
+            png_bytep dst_pixel = &rotated_refmem[dst_y][dst_x * 4];
             memcpy(dst_pixel, src_pixel, 4);
         }
     }
+    refmem = std::move(rotated_refmem);
 }
 
 PhotoBase::TinyStatus PngImage::rotate(int angle) {

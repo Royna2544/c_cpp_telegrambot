@@ -15,7 +15,7 @@ int app_main(int argc, char** argv) {
     // Convert the input argument to a double
     double percent = 0;
 
-    if (!try_parse(argv[1], &percent) || (percent < 0.0 && percent > 100.0)) {
+    if (!try_parse(argv[1], &percent) || percent < 0.0 || percent > 100.0) {
         (void)fputs("Error: Invalid percentage format.", stderr);
         return EXIT_FAILURE;
     }
