@@ -6,12 +6,16 @@
 #include <tgbot/TgException.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <api/CommandModule.hpp>
 #include <api/MessageExt.hpp>
 #include <api/TgBotApi.hpp>
 #include <filesystem>
+#include <memory>
+#include <mutex>
 #include <nlohmann/json.hpp>
 #include <string_view>
+#include <unordered_map>
 
 #include "CurlUtils.hpp"
 #include "llm/LMStudioApi.hpp"
@@ -21,27 +25,30 @@
 #ifdef ASK_ENABLE_LOCAL_LLM
 #include "llm/LLMCore.hpp"
 
-constexpr const char* kLLMStorageKey = "LLMCoreInstance";
-
 struct LLMCoreInstance {
     LLMCore llm;
     LLMCore::Model model;
+    std::filesystem::path modelPath;
 };
 
 // Handler for local model LLM <i.e. With supported GPU>
 static void localmodelhandler(TgBotApi::Ptr api, MessageExt* message,
-                              const StringResLoader::PerLocaleMap* res,
-                              const Providers* provider,
                               const std::filesystem::path& modelPath) {
-    LLMCoreInstance* instance = nullptr;
+    static std::mutex llm_mutex;
+    static std::unique_ptr<LLMCoreInstance> instance;
 
     auto sent = api->sendReplyMessage(message->message(),
                                       "Processing your query, please wait...");
 
-    if (provider->globalStorage->hasStorage(kLLMStorageKey)) {
-        instance = provider->globalStorage->getStorage(kLLMStorageKey)
-                       .getAs<LLMCoreInstance>();
+    std::unique_lock<std::mutex> lock(llm_mutex, std::defer_lock);
+    if (!lock.try_lock()) {
+        api->editMessage(sent,
+                         "Another LLM request is running. Waiting for it to "
+                         "finish...");
+        lock.lock();
+    }
 
+    if (instance != nullptr && instance->modelPath == modelPath) {
         if (!message->has<MessageAttrs::ExtraText>()) {
             auto info = instance->model.info();
             api->editMessage(
@@ -57,19 +64,23 @@ File Size: {} bytes)",
             return;
         }
     } else {
-        provider->globalStorage->getStorage(kLLMStorageKey) =
-            SharedMalloc::fromType<LLMCoreInstance>();
-
-        instance = provider->globalStorage->getStorage(kLLMStorageKey)
-                       .getAs<LLMCoreInstance>();
-
-        api->editMessage(sent, "Initializing LLM core, please wait...");
-        if (!instance->model.load(modelPath)) {
-            LOG(ERROR) << "Failed to initialize LLM core.";
-            api->editMessage(sent, "Error: Unable to initialize LLM core.");
-            provider->globalStorage->removeStorage(kLLMStorageKey);
+        if (!message->has<MessageAttrs::ExtraText>()) {
+            api->editMessage(
+                sent,
+                "Please provide a query after the command to ask the LLM.");
             return;
         }
+
+        api->editMessage(sent, "Initializing LLM core, please wait...");
+        instance.reset();
+        auto new_instance = std::make_unique<LLMCoreInstance>();
+        if (!new_instance->model.load(modelPath)) {
+            LOG(ERROR) << "Failed to initialize LLM core.";
+            api->editMessage(sent, "Error: Unable to initialize LLM core.");
+            return;
+        }
+        new_instance->modelPath = modelPath;
+        instance = std::move(new_instance);
     }
 
     if (!message->has<MessageAttrs::ExtraText>()) {
@@ -79,9 +90,17 @@ File Size: {} bytes)",
     }
 
     std::string query = message->get<MessageAttrs::ExtraText>();
-    auto response_opt = instance->llm.query(&instance->model, query, 512);
+    LLMCore::QueryError query_error = LLMCore::QueryError::None;
+    auto response_opt =
+        instance->llm.query(&instance->model, query, 512, &query_error);
     if (!response_opt) {
         LOG(ERROR) << "LLM query failed.";
+        if (query_error == LLMCore::QueryError::PromptTooLong) {
+            api->editMessage(sent,
+                             "Error: Prompt is too long for the local LLM "
+                             "context. Please shorten it and try again.");
+            return;
+        }
         api->editMessage(sent, "Error: LLM query failed.");
         return;
     }
@@ -106,8 +125,6 @@ File Size: {} bytes)",
         fmt::format("Query processed in {:%S} seconds.", response.duration));
 }
 #endif  // ASK_ENABLE_LOCAL_LLM
-
-constexpr float kTemperature = 0.7F;
 
 static void localnetmodelhandler(TgBotApi::Ptr api, MessageExt* message,
                                  const StringResLoader::PerLocaleMap* res,
@@ -165,7 +182,6 @@ static void localnetmodelhandler(TgBotApi::Ptr api, MessageExt* message,
             return m.type == LMStudioApi::LLMType::llm;
         });
 
-    static std::string response_key;
     if (that == modelResponse.models.end()) {
         LOG(ERROR) << "No LLM type models available from LLM server.";
         api->editMessage(
@@ -174,19 +190,18 @@ static void localnetmodelhandler(TgBotApi::Ptr api, MessageExt* message,
     }
     chatRequest.model = that->key;
     LOG(INFO) << "Using model " << chatRequest.model << " for query.";
-    chatRequest.temperature = 0.2f;
     chatRequest.system_prompt = SYSTEM_PROMPT;
     chatRequest.input = query;
-    std::vector<LMStudioApi::ChatRequest::Plugin> plugins{};
-    plugins.emplace_back(LMStudioApi::ChatRequest::Plugin{
-        .type = "plugin",
-        .id = "mcp/playwright",
-    });
-    chatRequest.integrations = plugins;
-    chatRequest.context_length = 64000;
-    chatRequest.reasoning = LMStudioApi::Reasoning::medium;
-    if (!response_key.empty()) {
-        chatRequest.previous_response_id = response_key;
+
+    const std::int64_t chat_id = message->get<MessageAttrs::Chat>()->id;
+    static std::mutex response_keys_mutex;
+    static std::unordered_map<std::int64_t, std::string> response_keys;
+    {
+        std::lock_guard<std::mutex> lock(response_keys_mutex);
+        if (auto it = response_keys.find(chat_id);
+            it != response_keys.end() && !it->second.empty()) {
+            chatRequest.previous_response_id = it->second;
+        }
     }
 
     nlohmann::json payload = chatRequest;
@@ -220,7 +235,14 @@ static void localnetmodelhandler(TgBotApi::Ptr api, MessageExt* message,
                     "Error: LLM server response has no 'message' type output.");
                 return;
             }
-            response_key = chatResponse.response_id.value_or("");
+            {
+                std::lock_guard<std::mutex> lock(response_keys_mutex);
+                if (chatResponse.response_id) {
+                    response_keys[chat_id] = *chatResponse.response_id;
+                } else {
+                    response_keys.erase(chat_id);
+                }
+            }
             std::initializer_list<
                 std::pair<absl::string_view, absl::string_view>>
                 replacements = {
@@ -266,9 +288,12 @@ DECLARE_COMMAND_HANDLER(ask) {
 
     if (type == "local") {
 #ifdef ASK_ENABLE_LOCAL_LLM
-        localmodelhandler(api, message, res, provider, location);
+        localmodelhandler(api, message, location);
 #else
         LOG(ERROR) << "Local LLM support is not enabled in this build.";
+        api->sendMessage(
+            message->get<MessageAttrs::Chat>(),
+            "Error: Local LLM support is not enabled in this build.");
 #endif
     } else if (type == "localnet") {
         if (authkey) {
@@ -280,6 +305,8 @@ DECLARE_COMMAND_HANDLER(ask) {
         }
     } else {
         LOG(ERROR) << "Unsupported LLM configuration type: " << type;
+        api->sendMessage(message->get<MessageAttrs::Chat>(),
+                         "Error: Unsupported LLM configuration type.");
     }
 }
 

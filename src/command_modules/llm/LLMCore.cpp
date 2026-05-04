@@ -1,8 +1,11 @@
- #include "LLMCore.hpp"
+#include "LLMCore.hpp"
 
 #include <absl/log/log.h>
 
 #include <algorithm>
+#include <array>
+#include <iomanip>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -15,6 +18,7 @@ struct LLMCore::Model::Impl {
     llama_context* ctx = nullptr;
     llama_sampler* sampler = nullptr;
     llama_batch batch{};
+    int n_batch = 0;
     int n_past = 0;
     int seq_id = 0;
 };
@@ -24,6 +28,8 @@ LLMCore::Model::~Model() { cleanup(); }
 
 bool LLMCore::Model::load(const std::filesystem::path& modelPath,
                           int n_gpu_layers, int n_ctx, int n_batch) {
+    cleanup();
+
     llama_model_params model_params = llama_model_default_params();
     llama_context_params ctx_params = llama_context_default_params();
 
@@ -72,6 +78,7 @@ bool LLMCore::Model::load(const std::filesystem::path& modelPath,
     llama_sampler_chain_add(impl_->sampler, llama_sampler_init_dist(1234));
     // Prepare Batch
     impl_->batch = llama_batch_init(n_batch, 0, 1);
+    impl_->n_batch = n_batch;
 
     info();
 
@@ -104,9 +111,12 @@ LLMCore::Model::Info LLMCore::Model::info() const {
 }
 
 void LLMCore::Model::cleanup() {
+    if (impl_->sampler != nullptr) {
+        llama_sampler_free(impl_->sampler);
+        impl_->sampler = nullptr;
+    }
     if (impl_->ctx != nullptr) {
         llama_batch_free(impl_->batch);
-        llama_sampler_free(impl_->sampler);
         llama_free(impl_->ctx);
         impl_->ctx = nullptr;
     }
@@ -114,6 +124,8 @@ void LLMCore::Model::cleanup() {
         llama_model_free(impl_->model);
         impl_->model = nullptr;
     }
+    impl_->n_batch = 0;
+    impl_->n_past = 0;
 }
 
 namespace {
@@ -153,6 +165,12 @@ std::vector<llama_token> tokenize(const llama_model* model,
     return tokens;
 }
 
+void set_error(LLMCore::QueryError* error, LLMCore::QueryError value) {
+    if (error != nullptr) {
+        *error = value;
+    }
+}
+
 }  // namespace
 
 LLMCore::LLMCore() {
@@ -166,21 +184,21 @@ LLMCore::~LLMCore() {
 }
 
 std::optional<LLMCore::Model::Response> LLMCore::query(
-    const Model* model, const std::string_view prompt, int max_tokens) {
+    const Model* model, const std::string_view prompt, int max_tokens,
+    QueryError* error) {
+    set_error(error, QueryError::None);
     auto start_time = std::chrono::steady_clock::now();
     LOG(INFO) << "LLMCore::query called with prompt: " << prompt;
 
-    // -----------------------
-    // 1. Context length check
-    // -----------------------
-    const auto n_ctx = llama_n_ctx(model->impl_->ctx);
-    if (model->impl_->n_past + max_tokens > n_ctx) {
-        LOG(WARNING) << "Context overflow likely. Resetting KV cache.";
-        model->impl_->n_past = 0;
+    if (model == nullptr || model->impl_->model == nullptr ||
+        model->impl_->ctx == nullptr || model->impl_->sampler == nullptr) {
+        LOG(ERROR) << "LLM query requested before the model was loaded.";
+        set_error(error, QueryError::ModelNotLoaded);
+        return std::nullopt;
     }
 
     // -----------------------
-    // 2. Construct Chat Prompt (Mistral format)
+    // 1. Construct Chat Prompt
     // -----------------------
     std::string system = SYSTEM_PROMPT;
 
@@ -196,17 +214,38 @@ std::optional<LLMCore::Model::Response> LLMCore::query(
     LOG(INFO) << "Formatted prompt: " << std::quoted(formatted_prompt);
 
     // -----------------------
-    // 3. Tokenize (do NOT add BOS manually)
+    // 2. Tokenize (do NOT add BOS manually)
     // -----------------------
     std::vector<llama_token> tokens =
         tokenize(model->impl_->model, formatted_prompt);
 
     if (tokens.empty()) {
         LOG(ERROR) << "Tokenization failed for prompt: " << prompt;
+        set_error(error, QueryError::TokenizationFailed);
         return std::nullopt;
     }
 
     LOG(INFO) << "Tokenized prompt into " << tokens.size() << " tokens.";
+
+    // -----------------------
+    // 3. Prompt size checks
+    // -----------------------
+    const auto n_ctx = llama_n_ctx(model->impl_->ctx);
+    if (tokens.size() > static_cast<size_t>(model->impl_->n_batch) ||
+        tokens.size() + static_cast<size_t>(max_tokens) >
+            static_cast<size_t>(n_ctx)) {
+        LOG(WARNING) << "Prompt is too long for the local LLM context. tokens="
+                     << tokens.size() << ", max_tokens=" << max_tokens
+                     << ", n_batch=" << model->impl_->n_batch
+                     << ", n_ctx=" << n_ctx;
+        set_error(error, QueryError::PromptTooLong);
+        return std::nullopt;
+    }
+
+    // Stateless per request: clear KV memory and sampler history.
+    llama_memory_clear(llama_get_memory(model->impl_->ctx), true);
+    llama_sampler_reset(model->impl_->sampler);
+    model->impl_->n_past = 0;
 
     // -----------------------
     // 4. Load prompt tokens
@@ -221,6 +260,7 @@ std::optional<LLMCore::Model::Response> LLMCore::query(
     // Decode
     if (llama_decode(model->impl_->ctx, model->impl_->batch) != 0) {
         LOG(ERROR) << "Decode failed for prompt";
+        set_error(error, QueryError::DecodeFailed);
         return std::nullopt;
     }
 

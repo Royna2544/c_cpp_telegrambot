@@ -14,6 +14,14 @@ class LLMCore {
     LLMCore();
     ~LLMCore();
 
+    enum class QueryError {
+        None,
+        ModelNotLoaded,
+        TokenizationFailed,
+        PromptTooLong,
+        DecodeFailed,
+    };
+
     class Model {
        public:
         friend class LLMCore;
@@ -82,5 +90,8 @@ class LLMCore {
      * 
      * Returns an optional Response struct containing the model's response
      */
-    std::optional<Model::Response> query(const Model* model, const std::string_view prompt, int max_tokens = 4096);
+    std::optional<Model::Response> query(const Model* model,
+                                         std::string_view prompt,
+                                         int max_tokens = 4096,
+                                         QueryError* error = nullptr);
 };
