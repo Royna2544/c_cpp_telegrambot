@@ -12,8 +12,8 @@ This guide explains how to set up Glider as a systemd service on Linux systems.
 
 Before setting up the systemd service, ensure you have a configuration file in your home directory. The bot searches for configuration files in the following order:
 
-1. `~/tgbotserver.debug.ini` (for debug builds)
-2. `~/tgbotserver.release.ini` (for release builds)
+1. `~/tgbotserver.Debug.ini` (for debug builds)
+2. `~/tgbotserver.Release.ini` (for release builds)
 3. `~/tgbotserver.ini` (fallback)
 
 The configuration file should contain at minimum:
@@ -53,10 +53,6 @@ Replace the following placeholders in `/etc/systemd/system/tgbot.service`:
   ```ini
   ExecStart=/usr/local/bin/Glider_main
   ```
-  or if using the daemon version:
-  ```ini
-  ExecStart=/usr/local/bin/Glider_maind
-  ```
 
 **Example of a complete service file:**
 
@@ -77,7 +73,7 @@ StandardOutput=journal
 StandardError=journal
 
 # Security settings
-NoNewPrivileges=true
+NoNewPrivileges=true            # Note, this may disable certain ability such as network ping under shell.
 PrivateTmp=true
 
 [Install]
