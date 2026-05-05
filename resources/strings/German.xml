@@ -90,4 +90,68 @@
     <string name="unknown_error">Unbekannter Fehler</string>
     <string name="invalid_args_passed">Ungültige Argumente übergeben</string>
     <string name="sticker_set_not_found">Sticker-Set nicht gefunden</string>
+
+    <!-- calc cmd -->
+    <string name="calc_usage">Verwendung: /calc &lt;Ausdruck&gt;</string>
+
+    <!-- ask cmd -->
+    <string name="llm_processing_query">Deine Anfrage wird verarbeitet, bitte warten...</string>
+    <string name="llm_busy_wait">Eine andere LLM-Anfrage läuft bereits. Warte, bis sie abgeschlossen ist...</string>
+    <string name="llm_model_information">Modellinformationen:&#10;Name: {}&#10;Architektur: {}&#10;Beschreibung: {}&#10;Parameteranzahl: {}&#10;Dateigröße: {} Bytes</string>
+    <string name="llm_provide_query">Bitte gib nach dem Befehl eine Anfrage für das LLM an.</string>
+    <string name="llm_initializing_core">LLM-Kern wird initialisiert, bitte warten...</string>
+    <string name="llm_init_failed">Fehler: LLM-Kern konnte nicht initialisiert werden.</string>
+    <string name="llm_prompt_too_long">Fehler: Der Prompt ist zu lang für den lokalen LLM-Kontext. Bitte kürze ihn und versuche es erneut.</string>
+    <string name="llm_query_failed">Fehler: LLM-Anfrage fehlgeschlagen.</string>
+    <string name="llm_thought_prefix">Gedanke: {}</string>
+    <string name="llm_answer_prefix">Antwort: {}</string>
+    <string name="llm_query_processed">Anfrage in {:%S} Sekunden verarbeitet.</string>
+    <string name="llm_connect_failed">Fehler: Verbindung zum LLM-Server unter der konfigurierten URL fehlgeschlagen.</string>
+    <string name="llm_parse_models_failed">Fehler: Modellantwort vom LLM-Server konnte nicht geparst werden.</string>
+    <string name="llm_no_models">Fehler: Keine Modelle vom LLM-Server verfügbar.</string>
+    <string name="llm_no_llm_models">Fehler: Keine Modelle vom Typ LLM auf dem LLM-Server verfügbar.</string>
+    <string name="llm_empty_output">Fehler: Der LLM-Server hat leere Ausgaben zurückgegeben.</string>
+    <string name="llm_no_message_output">Fehler: Die Antwort des LLM-Servers enthält keine Ausgabe vom Typ 'message'.</string>
+    <string name="llm_parse_response_failed">Fehler: Antwort des LLM-Servers konnte nicht geparst werden.</string>
+    <string name="llm_response_failed">Fehler: Antwort vom LLM-Server konnte nicht abgerufen werden.</string>
+    <string name="llm_not_configured">LLM-Funktionalität ist nicht konfiguriert. Bitte richte zuerst die LLM-Konfiguration ein.</string>
+    <string name="llm_local_not_enabled">Fehler: Lokale LLM-Unterstützung ist in diesem Build nicht aktiviert.</string>
+    <string name="llm_unsupported_type">Fehler: Nicht unterstützter LLM-Konfigurationstyp.</string>
+
+    <!-- command module strings -->
+    <string name="db_add_to_whitelist">Zur Whitelist hinzufügen</string>
+    <string name="db_remove_from_whitelist">Aus der Whitelist entfernen</string>
+    <string name="db_add_to_blacklist">Zur Blacklist hinzufügen</string>
+    <string name="db_remove_from_blacklist">Aus der Blacklist entfernen</string>
+    <string name="db_choose_user_action">Wähle aus, was du mit {} tun möchtest</string>
+    <string name="db_media_added">Medien mit Namen:&#10;{}&#10;hinzugefügt</string>
+    <string name="decide_deciding_object">Entscheide über '{}'...</string>
+    <string name="decide_try_prefix">Versuch {}: </string>
+    <string name="fileid_with_thumbnail">FileId: `{}`&#10;FileUniqueId: `{}`&#10;Thumbnail-FileId: `{}`</string>
+    <string name="fileid_basic">FileId: `{}`&#10;FileUniqueId: `{}`</string>
+    <string name="randsticker_info">Sticker-Index: {} Emoji: {}&#10;Aus Pack: &quot;{}&quot;</string>
+    <string name="spam_reply_supports">Unterstützt Sticker/GIF/Text als Antwort auf Nachrichten, gib eine Anzahl an</string>
+    <string name="spam_invalid_config_size">Ungültige Argumentanzahl für Spam-Konfiguration</string>
+    <string name="spam_send_config">Sende ein Paar aus Spam-Anzahl und Nachricht</string>
+    <string name="quote_reply_required">Bitte antworte auf eine Nachricht, um sie zu zitieren!</string>
+    <string name="quote_unsupported_origin_type">Nicht unterstützter Nachrichtenursprungstyp: {}</string>
+    <string name="quote_unsupported_video_no_thumbnail">Nicht unterstützter Medientyp: Video ohne Thumbnail</string>
+    <string name="quote_unsupported_animation_no_thumbnail">Nicht unterstützter Medientyp: Animation ohne Thumbnail</string>
+    <string name="quote_invalid_id">Ungültige ID: {}</string>
+    <string name="quote_generate_failed">Zitat konnte nicht erstellt werden!</string>
+    <string name="ibash_session_started">Interaktive Bash-Sitzung gestartet. Verwende /ibash &lt;Befehl&gt;, um Befehle auszuführen.&#10;Verwende /ibash exit, um die Sitzung zu schließen.</string>
+    <string name="ibash_session_start_failed">Sitzung konnte nicht gestartet werden oder existiert bereits.</string>
+    <string name="ibash_session_ended">Interaktive Bash-Sitzung beendet.</string>
+    <string name="ibash_no_active_session">Keine aktive Sitzung.</string>
+    <string name="ibash_start_first">Keine aktive Sitzung. Starte zuerst eine mit /ibash.</string>
+    <string name="ibash_no_output">(keine Ausgabe)</string>
+    <string name="ibash_output_truncated">[Ausgabe gekürzt]</string>
+    <string name="ibash_exec_failed">Befehl konnte nicht ausgeführt werden oder Sitzung wurde beendet.</string>
+    <string name="delay_message_timing">Anfragenachricht gesendet um: {}&#10;Empfangen um: {}&#10;Differenz: {}&#10;</string>
+    <string name="delay_reply_timing">Senden der Antwortnachricht dauerte: {}</string>
+    <string name="updown_file_info">Datei: {}&#10;Dateigröße: {}B</string>
+    <string name="reply_to_a_document">Auf ein Dokument antworten</string>
+    <string name="process_exit_type_signal">Signal</string>
+    <string name="process_exit_type_exit">Exit</string>
+    <string name="compiler_wdt_timeout">WDT-ZEITÜBERSCHREITUNG</string>
 </resources>

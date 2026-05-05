@@ -16,7 +16,7 @@ DECLARE_COMMAND_HANDLER(calc) {
         api->sendReplyMessage(message->message(), result);
         calculate_string_free(result.data());
     } else {
-        api->sendReplyMessage(message->message(), "Usage: /calc <expression>");
+        api->sendReplyMessage(message->message(), res->get(Strings::CALC_USAGE));
     }
 }
 

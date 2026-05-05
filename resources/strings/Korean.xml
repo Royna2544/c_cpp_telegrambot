@@ -90,4 +90,68 @@
     <string name="unknown_error">알 수 없는 오류</string>
     <string name="invalid_args_passed">잘못된 인수 전달됨</string>
     <string name="sticker_set_not_found">스티커 세트를 찾을 수 없습니다</string>
+
+    <!-- calc cmd -->
+    <string name="calc_usage">사용법: /calc &lt;표현식&gt;</string>
+
+    <!-- ask cmd -->
+    <string name="llm_processing_query">질문을 처리 중입니다. 잠시만 기다려 주세요...</string>
+    <string name="llm_busy_wait">다른 LLM 요청이 실행 중입니다. 완료될 때까지 기다립니다...</string>
+    <string name="llm_model_information">모델 정보:&#10;이름: {}&#10;아키텍처: {}&#10;설명: {}&#10;파라미터 수: {}&#10;파일 크기: {} 바이트</string>
+    <string name="llm_provide_query">LLM에 질문하려면 명령 뒤에 질문을 입력해 주세요.</string>
+    <string name="llm_initializing_core">LLM 코어를 초기화하는 중입니다. 잠시만 기다려 주세요...</string>
+    <string name="llm_init_failed">오류: LLM 코어를 초기화할 수 없습니다.</string>
+    <string name="llm_prompt_too_long">오류: 프롬프트가 로컬 LLM 컨텍스트에 비해 너무 깁니다. 줄인 뒤 다시 시도해 주세요.</string>
+    <string name="llm_query_failed">오류: LLM 질문에 실패했습니다.</string>
+    <string name="llm_thought_prefix">생각: {}</string>
+    <string name="llm_answer_prefix">답변: {}</string>
+    <string name="llm_query_processed">질문이 {:%S}초 만에 처리되었습니다.</string>
+    <string name="llm_connect_failed">오류: 설정된 URL의 LLM 서버에 연결하지 못했습니다.</string>
+    <string name="llm_parse_models_failed">오류: LLM 서버의 모델 응답을 구문 분석하지 못했습니다.</string>
+    <string name="llm_no_models">오류: LLM 서버에서 사용 가능한 모델이 없습니다.</string>
+    <string name="llm_no_llm_models">오류: LLM 서버에서 사용 가능한 LLM 유형 모델이 없습니다.</string>
+    <string name="llm_empty_output">오류: LLM 서버가 빈 출력을 반환했습니다.</string>
+    <string name="llm_no_message_output">오류: LLM 서버 응답에 'message' 유형 출력이 없습니다.</string>
+    <string name="llm_parse_response_failed">오류: LLM 서버 응답을 구문 분석하지 못했습니다.</string>
+    <string name="llm_response_failed">오류: LLM 서버에서 응답을 가져오지 못했습니다.</string>
+    <string name="llm_not_configured">LLM 기능이 설정되어 있지 않습니다. 먼저 LLM 설정을 완료해 주세요.</string>
+    <string name="llm_local_not_enabled">오류: 이 빌드에서는 로컬 LLM 지원이 활성화되어 있지 않습니다.</string>
+    <string name="llm_unsupported_type">오류: 지원되지 않는 LLM 설정 유형입니다.</string>
+
+    <!-- command module strings -->
+    <string name="db_add_to_whitelist">화이트리스트에 추가</string>
+    <string name="db_remove_from_whitelist">화이트리스트에서 제거</string>
+    <string name="db_add_to_blacklist">블랙리스트에 추가</string>
+    <string name="db_remove_from_blacklist">블랙리스트에서 제거</string>
+    <string name="db_choose_user_action">{}에 대해 수행할 작업을 선택하세요</string>
+    <string name="db_media_added">다음 이름으로 미디어가 추가되었습니다:&#10;{}</string>
+    <string name="decide_deciding_object">'{}' 결정 중...</string>
+    <string name="decide_try_prefix">시도 {}: </string>
+    <string name="fileid_with_thumbnail">FileId: `{}`&#10;FileUniqueId: `{}`&#10;썸네일 FileId: `{}`</string>
+    <string name="fileid_basic">FileId: `{}`&#10;FileUniqueId: `{}`</string>
+    <string name="randsticker_info">스티커 번호: {} 이모지: {}&#10;팩: &quot;{}&quot;</string>
+    <string name="spam_reply_supports">답장 메시지는 스티커/GIF/텍스트를 지원합니다. 횟수를 입력하세요</string>
+    <string name="spam_invalid_config_size">spam 설정의 인수 개수가 올바르지 않습니다</string>
+    <string name="spam_send_config">spam 횟수와 메시지 쌍을 보내세요</string>
+    <string name="quote_reply_required">인용하려면 메시지에 답장해 주세요!</string>
+    <string name="quote_unsupported_origin_type">지원되지 않는 메시지 원본 유형: {}</string>
+    <string name="quote_unsupported_video_no_thumbnail">지원되지 않는 미디어 유형: 썸네일 없는 동영상</string>
+    <string name="quote_unsupported_animation_no_thumbnail">지원되지 않는 미디어 유형: 썸네일 없는 애니메이션</string>
+    <string name="quote_invalid_id">잘못된 ID: {}</string>
+    <string name="quote_generate_failed">인용 생성에 실패했습니다!</string>
+    <string name="ibash_session_started">대화형 bash 세션이 시작되었습니다. 명령을 실행하려면 /ibash &lt;command&gt;를 사용하세요.&#10;세션을 닫으려면 /ibash exit를 사용하세요.</string>
+    <string name="ibash_session_start_failed">세션을 시작하지 못했거나 세션이 이미 존재합니다.</string>
+    <string name="ibash_session_ended">대화형 bash 세션이 종료되었습니다.</string>
+    <string name="ibash_no_active_session">활성 세션이 없습니다.</string>
+    <string name="ibash_start_first">활성 세션이 없습니다. 먼저 /ibash로 시작하세요.</string>
+    <string name="ibash_no_output">(출력 없음)</string>
+    <string name="ibash_output_truncated">[출력 잘림]</string>
+    <string name="ibash_exec_failed">명령 실행에 실패했거나 세션이 종료되었습니다.</string>
+    <string name="delay_message_timing">요청 메시지 전송 시각: {}&#10;수신 시각: {}&#10;차이: {}&#10;</string>
+    <string name="delay_reply_timing">답장 메시지 전송 소요 시간: {}</string>
+    <string name="updown_file_info">파일: {}&#10;파일 크기: {}B</string>
+    <string name="reply_to_a_document">문서에 답장하세요</string>
+    <string name="process_exit_type_signal">시그널</string>
+    <string name="process_exit_type_exit">종료</string>
+    <string name="compiler_wdt_timeout">WDT 시간 초과</string>
 </resources>

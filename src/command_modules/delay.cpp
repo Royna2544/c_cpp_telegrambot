@@ -6,6 +6,7 @@
 #include <DurationPoint.hpp>
 #include <api/CommandModule.hpp>
 #include <api/MessageExt.hpp>
+#include <api/StringResLoader.hpp>
 #include <api/TgBotApi.hpp>
 #include <chrono>
 #include <ctime>
@@ -20,14 +21,12 @@ DECLARE_COMMAND_HANDLER(delay) {
     auto msgTP = message->get<MessageAttrs::Date>();
     auto nowTP = system_clock::now();
 
-    ss << fmt::format(
-        "Request message sent at: {}\n"
-        "Received at: {}\n"
-        "Difference: {}\n",
-        msgTP, nowTP, to_secs(nowTP - msgTP));
+    ss << fmt::format(fmt::runtime(res->get(Strings::DELAY_MESSAGE_TIMING)),
+                      msgTP, nowTP, to_secs(nowTP - msgTP));
     MilliSecondDP dp;
     auto sentMsg = api->sendReplyMessage(message->message(), ss.str());
-    ss << fmt::format("Sending reply message took: {}", dp.get());
+    ss << fmt::format(fmt::runtime(res->get(Strings::DELAY_REPLY_TIMING)),
+                      dp.get());
     // Update the sent message with the delay information
     api->editMessage(sentMsg, ss.str());
 }

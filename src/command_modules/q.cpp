@@ -1,4 +1,5 @@
 #include <absl/log/log.h>
+#include <fmt/format.h>
 #include <tgbot/types/MessageOriginChannel.h>
 #include <tgbot/types/MessageOriginChat.h>
 #include <tgbot/types/MessageOriginHiddenUser.h>
@@ -6,6 +7,7 @@
 
 #include <LogSinks.hpp>
 #include <api/CommandModule.hpp>
+#include <api/StringResLoader.hpp>
 #include <api/TgBotApi.hpp>
 #include <cmath>
 #include <cstdint>
@@ -70,7 +72,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GenerateRequest::Message::Media, file_id,
 DECLARE_COMMAND_HANDLER(q) {
     if (!message->reply()->exists()) {
         api->sendReplyMessage(message->message(),
-                              "Please reply to a message to quote it!");
+                              res->get(Strings::QUOTE_REPLY_REQUIRED));
         return;
     }
     auto origin = message->reply()->message()->forwardOrigin;
@@ -100,8 +102,10 @@ DECLARE_COMMAND_HANDLER(q) {
         user->firstName = ptr->chat->title.value_or("");
     } else {
         // Give up.
-        api->sendMessage(message->get<MessageAttrs::Chat>(),
-                         "Unsupported message origin type: " + (*origin)->type);
+        api->sendMessage(
+            message->get<MessageAttrs::Chat>(),
+            fmt::format(fmt::runtime(res->get(Strings::QUOTE_UNSUPPORTED_ORIGIN_TYPE)),
+                        (*origin)->type));
         return;
     }
 
@@ -136,7 +140,7 @@ DECLARE_COMMAND_HANDLER(q) {
         auto video = message->reply()->get<MessageAttrs::Video>();
         if (!video->thumbnail) {
             api->sendMessage(message->get<MessageAttrs::Chat>(),
-                             "Unsupported media type: video without thumbnail");
+                             res->get(Strings::QUOTE_UNSUPPORTED_VIDEO_NO_THUMBNAIL));
             return;
         }
         media = (*video->thumbnail)->fileId;
@@ -146,7 +150,7 @@ DECLARE_COMMAND_HANDLER(q) {
         if (!animation->thumbnail) {
             api->sendMessage(
                 message->get<MessageAttrs::Chat>(),
-                "Unsupported media type: animation without thumbnail");
+                res->get(Strings::QUOTE_UNSUPPORTED_ANIMATION_NO_THUMBNAIL));
             return;
         }
         media = (*animation->thumbnail)->fileId;
@@ -186,8 +190,10 @@ DECLARE_COMMAND_HANDLER(q) {
                         user->username = chat->username;
                     }
                 } catch (const std::exception& e) {
-                    api->sendMessage(message->get<MessageAttrs::Chat>(),
-                                     "Invalid id: " + std::string(e.what()));
+                    api->sendMessage(
+                        message->get<MessageAttrs::Chat>(),
+                        fmt::format(fmt::runtime(res->get(Strings::QUOTE_INVALID_ID)),
+                                    e.what()));
                     return;
                 }
             }
@@ -240,7 +246,7 @@ DECLARE_COMMAND_HANDLER(q) {
     auto ret = CurlUtils::send_json_get_reply(kRemoteApi, j.dump());
     if (!ret) {
         api->sendMessage(message->get<MessageAttrs::Chat>(),
-                         "Failed to generate quote!");
+                         res->get(Strings::QUOTE_GENERATE_FAILED));
         return;
     }
     auto file = std::make_shared<InputFile>();

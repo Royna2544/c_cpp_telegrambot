@@ -90,4 +90,68 @@
     <string name="unknown_error">未知错误</string>
     <string name="invalid_args_passed">传递了无效参数</string>
     <string name="sticker_set_not_found">未找到贴纸集</string>
+
+    <!-- calc cmd -->
+    <string name="calc_usage">用法：/calc &lt;表达式&gt;</string>
+
+    <!-- ask cmd -->
+    <string name="llm_processing_query">正在处理你的请求，请稍候...</string>
+    <string name="llm_busy_wait">另一个LLM请求正在运行。正在等待其完成...</string>
+    <string name="llm_model_information">模型信息：&#10;名称：{}&#10;架构：{}&#10;描述：{}&#10;参数数量：{}&#10;文件大小：{} 字节</string>
+    <string name="llm_provide_query">请在命令后提供要询问LLM的查询。</string>
+    <string name="llm_initializing_core">正在初始化LLM核心，请稍候...</string>
+    <string name="llm_init_failed">错误：无法初始化LLM核心。</string>
+    <string name="llm_prompt_too_long">错误：提示词对于本地LLM上下文来说太长。请缩短后重试。</string>
+    <string name="llm_query_failed">错误：LLM查询失败。</string>
+    <string name="llm_thought_prefix">思考：{}</string>
+    <string name="llm_answer_prefix">回答：{}</string>
+    <string name="llm_query_processed">查询已在 {:%S} 秒内处理完成。</string>
+    <string name="llm_connect_failed">错误：无法连接到配置URL上的LLM服务器。</string>
+    <string name="llm_parse_models_failed">错误：无法解析LLM服务器的模型响应。</string>
+    <string name="llm_no_models">错误：LLM服务器没有可用模型。</string>
+    <string name="llm_no_llm_models">错误：LLM服务器没有LLM类型的可用模型。</string>
+    <string name="llm_empty_output">错误：LLM服务器返回了空输出。</string>
+    <string name="llm_no_message_output">错误：LLM服务器响应中没有'message'类型输出。</string>
+    <string name="llm_parse_response_failed">错误：无法解析LLM服务器响应。</string>
+    <string name="llm_response_failed">错误：无法从LLM服务器获取响应。</string>
+    <string name="llm_not_configured">LLM功能未配置。请先设置LLM配置。</string>
+    <string name="llm_local_not_enabled">错误：此构建未启用本地LLM支持。</string>
+    <string name="llm_unsupported_type">错误：不支持的LLM配置类型。</string>
+
+    <!-- command module strings -->
+    <string name="db_add_to_whitelist">添加到白名单</string>
+    <string name="db_remove_from_whitelist">从白名单移除</string>
+    <string name="db_add_to_blacklist">添加到黑名单</string>
+    <string name="db_remove_from_blacklist">从黑名单移除</string>
+    <string name="db_choose_user_action">选择你想对 {} 执行的操作</string>
+    <string name="db_media_added">已添加名称为：&#10;{}&#10;的媒体</string>
+    <string name="decide_deciding_object">正在决定 '{}'...</string>
+    <string name="decide_try_prefix">第 {} 次尝试： </string>
+    <string name="fileid_with_thumbnail">FileId：`{}`&#10;FileUniqueId：`{}`&#10;缩略图FileId：`{}`</string>
+    <string name="fileid_basic">FileId：`{}`&#10;FileUniqueId：`{}`</string>
+    <string name="randsticker_info">贴纸索引：{} 表情：{}&#10;来自贴纸包：&quot;{}&quot;</string>
+    <string name="spam_reply_supports">回复消息支持贴纸/GIF/文本，请提供次数</string>
+    <string name="spam_invalid_config_size">spam配置的参数数量无效</string>
+    <string name="spam_send_config">发送spam次数和消息这一对参数</string>
+    <string name="quote_reply_required">请回复一条消息以引用它！</string>
+    <string name="quote_unsupported_origin_type">不支持的消息来源类型：{}</string>
+    <string name="quote_unsupported_video_no_thumbnail">不支持的媒体类型：没有缩略图的视频</string>
+    <string name="quote_unsupported_animation_no_thumbnail">不支持的媒体类型：没有缩略图的动画</string>
+    <string name="quote_invalid_id">无效ID：{}</string>
+    <string name="quote_generate_failed">生成引用失败！</string>
+    <string name="ibash_session_started">交互式bash会话已启动。使用 /ibash &lt;command&gt; 执行命令。&#10;使用 /ibash exit 关闭会话。</string>
+    <string name="ibash_session_start_failed">无法启动会话，或会话已存在。</string>
+    <string name="ibash_session_ended">交互式bash会话已结束。</string>
+    <string name="ibash_no_active_session">没有活动会话。</string>
+    <string name="ibash_start_first">没有活动会话。请先使用 /ibash 启动一个。</string>
+    <string name="ibash_no_output">（无输出）</string>
+    <string name="ibash_output_truncated">[输出已截断]</string>
+    <string name="ibash_exec_failed">命令执行失败或会话已结束。</string>
+    <string name="delay_message_timing">请求消息发送时间：{}&#10;接收时间：{}&#10;差值：{}&#10;</string>
+    <string name="delay_reply_timing">发送回复消息耗时：{}</string>
+    <string name="updown_file_info">文件：{}&#10;文件大小：{}B</string>
+    <string name="reply_to_a_document">回复一个文档</string>
+    <string name="process_exit_type_signal">信号</string>
+    <string name="process_exit_type_exit">退出</string>
+    <string name="compiler_wdt_timeout">WDT超时</string>
 </resources>

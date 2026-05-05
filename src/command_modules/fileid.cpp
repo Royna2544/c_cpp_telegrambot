@@ -47,13 +47,13 @@ DECLARE_COMMAND_HANDLER(fileid) {
         if (thumbnail) {
             api->sendReplyMessage<TgBotApi::ParseMode::Markdown>(
                 message->message(),
-                fmt::format(
-                    "FileId: `{}`\nFileUniqueId: `{}`\nThumbnail FileId: `{}`",
-                    file, unifile, *thumbnail));
+                fmt::format(fmt::runtime(res->get(Strings::FILEID_WITH_THUMBNAIL)),
+                            file, unifile, *thumbnail));
         } else {
             api->sendReplyMessage<TgBotApi::ParseMode::Markdown>(
                 message->message(),
-                fmt::format("FileId: `{}`\nFileUniqueId: `{}`", file, unifile));
+                fmt::format(fmt::runtime(res->get(Strings::FILEID_BASIC)), file,
+                            unifile));
         }
     } else {
         api->sendReplyMessage(message->message(),

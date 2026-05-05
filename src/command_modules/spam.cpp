@@ -5,6 +5,7 @@
 #include <TryParseStr.hpp>
 #include <algorithm>
 #include <api/CommandModule.hpp>
+#include <api/StringResLoader.hpp>
 #include <api/TgBotApi.hpp>
 #include <functional>
 #include <thread>
@@ -64,8 +65,7 @@ DECLARE_COMMAND_HANDLER(spam) {
             };
         } else {
             api->sendReplyMessage(message->message(),
-                                  "Supports sticker/GIF/text for reply to "
-                                  "messages, give count");
+                                  res->get(Strings::SPAM_REPLY_SUPPORTS));
             spamable = false;
         }
 
@@ -85,11 +85,11 @@ DECLARE_COMMAND_HANDLER(spam) {
             spamable = true;
         } else {
             api->sendReplyMessage(message->message(),
-                                  "Invalid argument size for spam config");
+                                  res->get(Strings::SPAM_INVALID_CONFIG_SIZE));
         }
     } else {
         api->sendReplyMessage(message->message(),
-                              "Send a pair of spam count and message to spam");
+                              res->get(Strings::SPAM_SEND_CONFIG));
     }
     if (spamable) {
         for_count(count, fp);

@@ -1,3 +1,5 @@
+#include <fmt/format.h>
+
 #include <api/CommandModule.hpp>
 #include <api/Providers.hpp>
 #include <api/StringResLoader.hpp>
@@ -15,7 +17,7 @@ DECLARE_COMMAND_HANDLER(up) {
         api->sendReplyDocument(
             message->message(),
             TgBot::InputFile::fromFile(localFile, "application/octet-stream"),
-            fmt::format("File: {}\nFile Size: {}B", localFile,
+            fmt::format(fmt::runtime(res->get(Strings::UPDOWN_FILE_INFO)), localFile,
                         std::filesystem::file_size(localFile, ec)));
     } else {
         LOG(ERROR) << "File does not exist: " << localFile
@@ -27,7 +29,8 @@ DECLARE_COMMAND_HANDLER(up) {
 
 DECLARE_COMMAND_HANDLER(down) {
     if (!message->reply()->has<MessageAttrs::Document>()) {
-        api->sendReplyMessage(message->message(), "Reply to a document");
+        api->sendReplyMessage(message->message(),
+                              res->get(Strings::REPLY_TO_A_DOCUMENT));
         return;
     }
 

@@ -6,6 +6,7 @@
 
 #include <api/CommandModule.hpp>
 #include <api/MessageExt.hpp>
+#include <api/StringResLoader.hpp>
 #include <api/TgBotApi.hpp>
 #include <cerrno>
 #include <cstring>
@@ -122,7 +123,8 @@ struct BashSession {
         return true;
     }
 
-    std::optional<std::string> readOutput() {
+    std::optional<std::string> readOutput(const std::string& noOutput,
+                                          const std::string& outputTruncated) {
         if (!running || stdout_fd == -1) {
             return std::nullopt;
         }
@@ -144,7 +146,7 @@ struct BashSession {
         }
 
         if (ret == 0) {
-            return std::string("(no output)");
+            return noOutput;
         }
 
         std::string output;
@@ -170,13 +172,14 @@ struct BashSession {
             output.append(buffer, n);
 
             if (output.size() >= kMaxOutputSize) {
-                output += "\n[Output truncated]";
+                output += "\n";
+                output += outputTruncated;
                 break;
             }
         }
 
         if (output.empty()) {
-            return std::string("(no output)");
+            return noOutput;
         }
 
         return output;
@@ -241,7 +244,9 @@ class InteractiveBashManager {
     }
 
     std::optional<std::string> executeCommand(ChatId chatId,
-                                              const std::string& command) {
+                                              const std::string& command,
+                                              const std::string& noOutput,
+                                              const std::string& outputTruncated) {
         std::lock_guard<std::mutex> lock(mutex_);
 
         auto it = sessions_.find(chatId);
@@ -253,7 +258,7 @@ class InteractiveBashManager {
             return std::nullopt;
         }
 
-        return it->second->readOutput();
+        return it->second->readOutput(noOutput, outputTruncated);
     }
 
     bool endSession(ChatId chatId) {
@@ -288,12 +293,11 @@ DECLARE_COMMAND_HANDLER(ibash) {
         if (manager.startSession(chatId)) {
             api->sendReplyMessage(
                 message->message(),
-                "Interactive bash session started. Use /ibash <command> to "
-                "execute commands.\nUse /ibash exit to close the session.");
+                res->get(Strings::IBASH_SESSION_STARTED));
         } else {
             api->sendReplyMessage(
                 message->message(),
-                "Failed to start session or session already exists.");
+                res->get(Strings::IBASH_SESSION_START_FAILED));
         }
         return;
     }
@@ -303,9 +307,10 @@ DECLARE_COMMAND_HANDLER(ibash) {
     if (command.starts_with("exit")) {
         if (manager.endSession(chatId)) {
             api->sendReplyMessage(message->message(),
-                                  "Interactive bash session ended.");
+                                  res->get(Strings::IBASH_SESSION_ENDED));
         } else {
-            api->sendReplyMessage(message->message(), "No active session.");
+            api->sendReplyMessage(message->message(),
+                                  res->get(Strings::IBASH_NO_ACTIVE_SESSION));
         }
         return;
     }
@@ -313,20 +318,23 @@ DECLARE_COMMAND_HANDLER(ibash) {
     if (!manager.hasSession(chatId)) {
         api->sendReplyMessage(
             message->message(),
-            "No active session. Start one with /ibash first.");
+            res->get(Strings::IBASH_START_FIRST));
         return;
     }
 
-    auto output = manager.executeCommand(chatId, command);
+    auto output = manager.executeCommand(
+        chatId, command, std::string(res->get(Strings::IBASH_NO_OUTPUT)),
+        std::string(res->get(Strings::IBASH_OUTPUT_TRUNCATED)));
     if (output.has_value()) {
         if (output->empty()) {
-            api->sendReplyMessage(message->message(), "(no output)");
+            api->sendReplyMessage(message->message(),
+                                  res->get(Strings::IBASH_NO_OUTPUT));
         } else {
             api->sendReplyMessage(message->message(), *output);
         }
     } else {
         api->sendReplyMessage(message->message(),
-                              "Failed to execute command or session ended.");
+                              res->get(Strings::IBASH_EXEC_FAILED));
         manager.endSession(chatId);
     }
 }

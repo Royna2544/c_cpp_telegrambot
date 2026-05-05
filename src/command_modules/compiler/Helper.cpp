@@ -27,7 +27,9 @@ void CompilerInTgBotInterface::onExecutionStarted(
 
 void CompilerInTgBotInterface::onExecutionFinished(
     const std::string_view& /*command*/, const popen_watchdog_exit_t& exit) {
-    const std::string_view type = exit.signal ? "signal" : "exit";
+    const std::string_view type =
+        exit.signal ? _locale->get(Strings::PROCESS_EXIT_TYPE_SIGNAL)
+                    : _locale->get(Strings::PROCESS_EXIT_TYPE_EXIT);
     output << fmt::format("\n{} {}\n{} {} {}\n",
                           _locale->get(Strings::DONE_TOOK), timePoint.get(),
                           _locale->get(Strings::PROCESS_EXITED), type,
@@ -55,6 +57,6 @@ void CompilerInTgBotInterface::onResultReady(const std::string& text) {
 }
 
 void CompilerInTgBotInterface::onWdtTimeout() {
-    output << "\nWDT TIMEOUT" << '\n';
+    output << '\n' << _locale->get(Strings::COMPILER_WDT_TIMEOUT) << '\n';
     botApi->editMessage(sentMessage, output.str());
 }

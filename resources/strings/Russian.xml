@@ -90,4 +90,68 @@
     <string name="unknown_error">Неизвестная ошибка</string>
     <string name="invalid_args_passed">Переданы недопустимые аргументы</string>
     <string name="sticker_set_not_found">Набор стикеров не найден</string>
+
+    <!-- calc cmd -->
+    <string name="calc_usage">Использование: /calc &lt;выражение&gt;</string>
+
+    <!-- ask cmd -->
+    <string name="llm_processing_query">Обрабатываю ваш запрос, пожалуйста, подождите...</string>
+    <string name="llm_busy_wait">Другой LLM-запрос уже выполняется. Ожидаю его завершения...</string>
+    <string name="llm_model_information">Информация о модели:&#10;Имя: {}&#10;Архитектура: {}&#10;Описание: {}&#10;Количество параметров: {}&#10;Размер файла: {} байт</string>
+    <string name="llm_provide_query">Укажите запрос после команды, чтобы спросить LLM.</string>
+    <string name="llm_initializing_core">Инициализирую ядро LLM, пожалуйста, подождите...</string>
+    <string name="llm_init_failed">Ошибка: не удалось инициализировать ядро LLM.</string>
+    <string name="llm_prompt_too_long">Ошибка: промпт слишком длинный для контекста локальной LLM. Сократите его и попробуйте снова.</string>
+    <string name="llm_query_failed">Ошибка: LLM-запрос завершился неудачно.</string>
+    <string name="llm_thought_prefix">Мысль: {}</string>
+    <string name="llm_answer_prefix">Ответ: {}</string>
+    <string name="llm_query_processed">Запрос обработан за {:%S} секунд.</string>
+    <string name="llm_connect_failed">Ошибка: не удалось подключиться к LLM-серверу по настроенному URL.</string>
+    <string name="llm_parse_models_failed">Ошибка: не удалось разобрать ответ со списком моделей от LLM-сервера.</string>
+    <string name="llm_no_models">Ошибка: на LLM-сервере нет доступных моделей.</string>
+    <string name="llm_no_llm_models">Ошибка: на LLM-сервере нет доступных моделей типа LLM.</string>
+    <string name="llm_empty_output">Ошибка: LLM-сервер вернул пустые выходные данные.</string>
+    <string name="llm_no_message_output">Ошибка: в ответе LLM-сервера нет вывода типа 'message'.</string>
+    <string name="llm_parse_response_failed">Ошибка: не удалось разобрать ответ LLM-сервера.</string>
+    <string name="llm_response_failed">Ошибка: не удалось получить ответ от LLM-сервера.</string>
+    <string name="llm_not_configured">Функция LLM не настроена. Сначала настройте конфигурацию LLM.</string>
+    <string name="llm_local_not_enabled">Ошибка: поддержка локальной LLM не включена в этой сборке.</string>
+    <string name="llm_unsupported_type">Ошибка: неподдерживаемый тип конфигурации LLM.</string>
+
+    <!-- command module strings -->
+    <string name="db_add_to_whitelist">Добавить в белый список</string>
+    <string name="db_remove_from_whitelist">Удалить из белого списка</string>
+    <string name="db_add_to_blacklist">Добавить в черный список</string>
+    <string name="db_remove_from_blacklist">Удалить из черного списка</string>
+    <string name="db_choose_user_action">Выберите, что сделать с {}</string>
+    <string name="db_media_added">Медиа с именами:&#10;{}&#10;добавлено</string>
+    <string name="decide_deciding_object">Решаю насчет '{}'...</string>
+    <string name="decide_try_prefix">Попытка {}: </string>
+    <string name="fileid_with_thumbnail">FileId: `{}`&#10;FileUniqueId: `{}`&#10;FileId миниатюры: `{}`</string>
+    <string name="fileid_basic">FileId: `{}`&#10;FileUniqueId: `{}`</string>
+    <string name="randsticker_info">Индекс стикера: {} emoji: {}&#10;Из набора: &quot;{}&quot;</string>
+    <string name="spam_reply_supports">Поддерживаются стикер/GIF/текст в ответе на сообщение, укажите количество</string>
+    <string name="spam_invalid_config_size">Недопустимое количество аргументов для настройки spam</string>
+    <string name="spam_send_config">Отправьте пару из количества spam и сообщения</string>
+    <string name="quote_reply_required">Ответьте на сообщение, чтобы процитировать его!</string>
+    <string name="quote_unsupported_origin_type">Неподдерживаемый тип источника сообщения: {}</string>
+    <string name="quote_unsupported_video_no_thumbnail">Неподдерживаемый тип медиа: видео без миниатюры</string>
+    <string name="quote_unsupported_animation_no_thumbnail">Неподдерживаемый тип медиа: анимация без миниатюры</string>
+    <string name="quote_invalid_id">Недопустимый ID: {}</string>
+    <string name="quote_generate_failed">Не удалось создать цитату!</string>
+    <string name="ibash_session_started">Интерактивная bash-сессия запущена. Используйте /ibash &lt;command&gt; для выполнения команд.&#10;Используйте /ibash exit, чтобы закрыть сессию.</string>
+    <string name="ibash_session_start_failed">Не удалось запустить сессию или она уже существует.</string>
+    <string name="ibash_session_ended">Интерактивная bash-сессия завершена.</string>
+    <string name="ibash_no_active_session">Нет активной сессии.</string>
+    <string name="ibash_start_first">Нет активной сессии. Сначала запустите ее с помощью /ibash.</string>
+    <string name="ibash_no_output">(нет вывода)</string>
+    <string name="ibash_output_truncated">[Вывод обрезан]</string>
+    <string name="ibash_exec_failed">Не удалось выполнить команду или сессия завершилась.</string>
+    <string name="delay_message_timing">Сообщение запроса отправлено: {}&#10;Получено: {}&#10;Разница: {}&#10;</string>
+    <string name="delay_reply_timing">Отправка ответного сообщения заняла: {}</string>
+    <string name="updown_file_info">Файл: {}&#10;Размер файла: {}B</string>
+    <string name="reply_to_a_document">Ответьте на документ</string>
+    <string name="process_exit_type_signal">сигнал</string>
+    <string name="process_exit_type_exit">выход</string>
+    <string name="compiler_wdt_timeout">ТАЙМ-АУТ WDT</string>
 </resources>

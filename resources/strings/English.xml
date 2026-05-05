@@ -90,4 +90,68 @@
     <string name="unknown_error">Unknown error</string>
     <string name="invalid_args_passed">Invalid arguments passed</string>
     <string name="sticker_set_not_found">Sticker set not found</string>
+
+    <!-- calc cmd -->
+    <string name="calc_usage">Usage: /calc &lt;expression&gt;</string>
+
+    <!-- ask cmd -->
+    <string name="llm_processing_query">Processing your query, please wait...</string>
+    <string name="llm_busy_wait">Another LLM request is running. Waiting for it to finish...</string>
+    <string name="llm_model_information">Model Information:&#10;Name: {}&#10;Architecture: {}&#10;Description: {}&#10;Parameter Count: {}&#10;File Size: {} bytes</string>
+    <string name="llm_provide_query">Please provide a query after the command to ask the LLM.</string>
+    <string name="llm_initializing_core">Initializing LLM core, please wait...</string>
+    <string name="llm_init_failed">Error: Unable to initialize LLM core.</string>
+    <string name="llm_prompt_too_long">Error: Prompt is too long for the local LLM context. Please shorten it and try again.</string>
+    <string name="llm_query_failed">Error: LLM query failed.</string>
+    <string name="llm_thought_prefix">Thought: {}</string>
+    <string name="llm_answer_prefix">Answer: {}</string>
+    <string name="llm_query_processed">Query processed in {:%S} seconds.</string>
+    <string name="llm_connect_failed">Error: Failed to connect to LLM server at the configured URL.</string>
+    <string name="llm_parse_models_failed">Error: Failed to parse models response from LLM server.</string>
+    <string name="llm_no_models">Error: No models available from LLM server.</string>
+    <string name="llm_no_llm_models">Error: No LLM type models available from LLM server.</string>
+    <string name="llm_empty_output">Error: LLM server returned empty outputs in response.</string>
+    <string name="llm_no_message_output">Error: LLM server response has no 'message' type output.</string>
+    <string name="llm_parse_response_failed">Error: Failed to parse LLM server response.</string>
+    <string name="llm_response_failed">Error: Failed to get response from LLM server.</string>
+    <string name="llm_not_configured">LLM functionality is not configured. Please set up the LLM configuration first.</string>
+    <string name="llm_local_not_enabled">Error: Local LLM support is not enabled in this build.</string>
+    <string name="llm_unsupported_type">Error: Unsupported LLM configuration type.</string>
+
+    <!-- command module strings -->
+    <string name="db_add_to_whitelist">Add to whitelist</string>
+    <string name="db_remove_from_whitelist">Remove from whitelist</string>
+    <string name="db_add_to_blacklist">Add to blacklist</string>
+    <string name="db_remove_from_blacklist">Remove from blacklist</string>
+    <string name="db_choose_user_action">Choose what you want to do with {}</string>
+    <string name="db_media_added">Media with names:&#10;{}&#10;added</string>
+    <string name="decide_deciding_object">Deciding '{}'...</string>
+    <string name="decide_try_prefix">Try {}: </string>
+    <string name="fileid_with_thumbnail">FileId: `{}`&#10;FileUniqueId: `{}`&#10;Thumbnail FileId: `{}`</string>
+    <string name="fileid_basic">FileId: `{}`&#10;FileUniqueId: `{}`</string>
+    <string name="randsticker_info">Sticker idx: {} emoji: {}&#10;From pack: &quot;{}&quot;</string>
+    <string name="spam_reply_supports">Supports sticker/GIF/text for reply to messages, give count</string>
+    <string name="spam_invalid_config_size">Invalid argument size for spam config</string>
+    <string name="spam_send_config">Send a pair of spam count and message to spam</string>
+    <string name="quote_reply_required">Please reply to a message to quote it!</string>
+    <string name="quote_unsupported_origin_type">Unsupported message origin type: {}</string>
+    <string name="quote_unsupported_video_no_thumbnail">Unsupported media type: video without thumbnail</string>
+    <string name="quote_unsupported_animation_no_thumbnail">Unsupported media type: animation without thumbnail</string>
+    <string name="quote_invalid_id">Invalid id: {}</string>
+    <string name="quote_generate_failed">Failed to generate quote!</string>
+    <string name="ibash_session_started">Interactive bash session started. Use /ibash &lt;command&gt; to execute commands.&#10;Use /ibash exit to close the session.</string>
+    <string name="ibash_session_start_failed">Failed to start session or session already exists.</string>
+    <string name="ibash_session_ended">Interactive bash session ended.</string>
+    <string name="ibash_no_active_session">No active session.</string>
+    <string name="ibash_start_first">No active session. Start one with /ibash first.</string>
+    <string name="ibash_no_output">(no output)</string>
+    <string name="ibash_output_truncated">[Output truncated]</string>
+    <string name="ibash_exec_failed">Failed to execute command or session ended.</string>
+    <string name="delay_message_timing">Request message sent at: {}&#10;Received at: {}&#10;Difference: {}&#10;</string>
+    <string name="delay_reply_timing">Sending reply message took: {}</string>
+    <string name="updown_file_info">File: {}&#10;File Size: {}B</string>
+    <string name="reply_to_a_document">Reply to a document</string>
+    <string name="process_exit_type_signal">signal</string>
+    <string name="process_exit_type_exit">exit</string>
+    <string name="compiler_wdt_timeout">WDT TIMEOUT</string>
 </resources>

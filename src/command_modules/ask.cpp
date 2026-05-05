@@ -33,18 +33,17 @@ struct LLMCoreInstance {
 
 // Handler for local model LLM <i.e. With supported GPU>
 static void localmodelhandler(TgBotApi::Ptr api, MessageExt* message,
+                              const StringResLoader::PerLocaleMap* res,
                               const std::filesystem::path& modelPath) {
     static std::mutex llm_mutex;
     static std::unique_ptr<LLMCoreInstance> instance;
 
     auto sent = api->sendReplyMessage(message->message(),
-                                      "Processing your query, please wait...");
+                                      res->get(Strings::LLM_PROCESSING_QUERY));
 
     std::unique_lock<std::mutex> lock(llm_mutex, std::defer_lock);
     if (!lock.try_lock()) {
-        api->editMessage(sent,
-                         "Another LLM request is running. Waiting for it to "
-                         "finish...");
+        api->editMessage(sent, res->get(Strings::LLM_BUSY_WAIT));
         lock.lock();
     }
 
@@ -53,30 +52,23 @@ static void localmodelhandler(TgBotApi::Ptr api, MessageExt* message,
             auto info = instance->model.info();
             api->editMessage(
                 sent,
-                fmt::format(R"(Model Information:
-Name: {}
-Architecture: {}
-Description: {}
-Parameter Count: {}
-File Size: {} bytes)",
+                fmt::format(fmt::runtime(res->get(Strings::LLM_MODEL_INFORMATION)),
                             info.name, info.architecture, info.description,
                             info.parameterCount, info.fileSizeBytes));
             return;
         }
     } else {
         if (!message->has<MessageAttrs::ExtraText>()) {
-            api->editMessage(
-                sent,
-                "Please provide a query after the command to ask the LLM.");
+            api->editMessage(sent, res->get(Strings::LLM_PROVIDE_QUERY));
             return;
         }
 
-        api->editMessage(sent, "Initializing LLM core, please wait...");
+        api->editMessage(sent, res->get(Strings::LLM_INITIALIZING_CORE));
         instance.reset();
         auto new_instance = std::make_unique<LLMCoreInstance>();
         if (!new_instance->model.load(modelPath)) {
             LOG(ERROR) << "Failed to initialize LLM core.";
-            api->editMessage(sent, "Error: Unable to initialize LLM core.");
+            api->editMessage(sent, res->get(Strings::LLM_INIT_FAILED));
             return;
         }
         new_instance->modelPath = modelPath;
@@ -84,8 +76,7 @@ File Size: {} bytes)",
     }
 
     if (!message->has<MessageAttrs::ExtraText>()) {
-        api->editMessage(
-            sent, "Please provide a query after the command to ask the LLM.");
+        api->editMessage(sent, res->get(Strings::LLM_PROVIDE_QUERY));
         return;
     }
 
@@ -96,12 +87,10 @@ File Size: {} bytes)",
     if (!response_opt) {
         LOG(ERROR) << "LLM query failed.";
         if (query_error == LLMCore::QueryError::PromptTooLong) {
-            api->editMessage(sent,
-                             "Error: Prompt is too long for the local LLM "
-                             "context. Please shorten it and try again.");
+            api->editMessage(sent, res->get(Strings::LLM_PROMPT_TOO_LONG));
             return;
         }
-        api->editMessage(sent, "Error: LLM query failed.");
+        api->editMessage(sent, res->get(Strings::LLM_QUERY_FAILED));
         return;
     }
     const auto& response = *response_opt;
@@ -116,13 +105,17 @@ File Size: {} bytes)",
     std::string response_answer =
         absl::StrReplaceAll(response.answer, replacements);
 
-    std::string reply = fmt::format("Thought: {}", std::move(response_thought));
+    std::string reply =
+        fmt::format(fmt::runtime(res->get(Strings::LLM_THOUGHT_PREFIX)),
+                    std::move(response_thought));
     api->editMessage(sent, reply);
     api->sendMessage(message->get<MessageAttrs::Chat>(),
-                     fmt::format("Answer: {}", std::move(response_answer)));
+                     fmt::format(fmt::runtime(res->get(Strings::LLM_ANSWER_PREFIX)),
+                                 std::move(response_answer)));
     api->sendMessage(
         message->get<MessageAttrs::Chat>(),
-        fmt::format("Query processed in {:%S} seconds.", response.duration));
+        fmt::format(fmt::runtime(res->get(Strings::LLM_QUERY_PROCESSED)),
+                    response.duration));
 }
 #endif  // ASK_ENABLE_LOCAL_LLM
 
@@ -132,10 +125,9 @@ static void localnetmodelhandler(TgBotApi::Ptr api, MessageExt* message,
                                  const std::string_view url,
                                  const std::string_view authkey = "") {
     auto sent = api->sendReplyMessage(message->message(),
-                                      "Processing your query, please wait...");
+                                      res->get(Strings::LLM_PROCESSING_QUERY));
     if (!message->has<MessageAttrs::ExtraText>()) {
-        api->editMessage(
-            sent, "Please provide a query after the command to ask the LLM.");
+        api->editMessage(sent, res->get(Strings::LLM_PROVIDE_QUERY));
         return;
     }
 
@@ -147,9 +139,7 @@ static void localnetmodelhandler(TgBotApi::Ptr api, MessageExt* message,
             std::string(url) + LMStudioApi::kModelsEndpoint, nullptr, authkey);
         !modelsResponse) {
         LOG(ERROR) << "Failed to connect to LLM server at " << url;
-        api->editMessage(sent,
-                         "Error: Failed to connect to LLM server at the "
-                         "configured URL.");
+        api->editMessage(sent, res->get(Strings::LLM_CONNECT_FAILED));
         return;
     }
     LMStudioApi::ModelResponse modelResponse;
@@ -160,8 +150,7 @@ static void localnetmodelhandler(TgBotApi::Ptr api, MessageExt* message,
         LOG(ERROR) << "Failed to parse models response from LLM server: "
                    << e.what();
         LOG(ERROR) << "Response content: " << *modelsResponse;
-        api->editMessage(
-            sent, "Error: Failed to parse models response from LLM server.");
+        api->editMessage(sent, res->get(Strings::LLM_PARSE_MODELS_FAILED));
         return;
     }
     LOG(INFO) << "LLM Server Models Available:";
@@ -171,7 +160,7 @@ static void localnetmodelhandler(TgBotApi::Ptr api, MessageExt* message,
     }
     if (modelResponse.models.empty()) {
         LOG(ERROR) << "No models available from LLM server.";
-        api->editMessage(sent, "Error: No models available from LLM server.");
+        api->editMessage(sent, res->get(Strings::LLM_NO_MODELS));
         return;
     }
 
@@ -184,8 +173,7 @@ static void localnetmodelhandler(TgBotApi::Ptr api, MessageExt* message,
 
     if (that == modelResponse.models.end()) {
         LOG(ERROR) << "No LLM type models available from LLM server.";
-        api->editMessage(
-            sent, "Error: No LLM type models available from LLM server.");
+        api->editMessage(sent, res->get(Strings::LLM_NO_LLM_MODELS));
         return;
     }
     chatRequest.model = that->key;
@@ -216,9 +204,7 @@ static void localnetmodelhandler(TgBotApi::Ptr api, MessageExt* message,
             if (chatResponse.output.empty()) {
                 LOG(ERROR) << "LLM server returned empty outputs.";
                 LOG(ERROR) << "Response content: " << *rc;
-                api->editMessage(
-                    sent,
-                    "Error: LLM server returned empty outputs in response.");
+                api->editMessage(sent, res->get(Strings::LLM_EMPTY_OUTPUT));
                 return;
             }
             auto it = std::ranges::find_if(
@@ -230,9 +216,7 @@ static void localnetmodelhandler(TgBotApi::Ptr api, MessageExt* message,
                 LOG(ERROR)
                     << "LLM server response has no 'message' type output.";
                 LOG(ERROR) << "Response content: " << *rc;
-                api->editMessage(
-                    sent,
-                    "Error: LLM server response has no 'message' type output.");
+                api->editMessage(sent, res->get(Strings::LLM_NO_MESSAGE_OUTPUT));
                 return;
             }
             {
@@ -258,12 +242,11 @@ static void localnetmodelhandler(TgBotApi::Ptr api, MessageExt* message,
         } catch (const std::exception& e) {
             LOG(ERROR) << "Failed to parse LLM server response: " << e.what();
             api->editMessage(sent,
-                             "Error: Failed to parse LLM server response.");
+                             res->get(Strings::LLM_PARSE_RESPONSE_FAILED));
         }
     } else {
         LOG(ERROR) << "Failed to get response from LLM server.";
-        api->editMessage(sent,
-                         "Error: Failed to get response from LLM server.");
+        api->editMessage(sent, res->get(Strings::LLM_RESPONSE_FAILED));
     }
 }
 
@@ -274,8 +257,7 @@ DECLARE_COMMAND_HANDLER(ask) {
         !mgr->get(ConfigManager::Configs::LLM_LOCATION)) {
         api->sendMessage(
             message->get<MessageAttrs::Chat>(),
-            "LLM functionality is not configured. Please set up the LLM "
-            "configuration first.");
+            res->get(Strings::LLM_NOT_CONFIGURED));
         return;
     }
 
@@ -288,12 +270,12 @@ DECLARE_COMMAND_HANDLER(ask) {
 
     if (type == "local") {
 #ifdef ASK_ENABLE_LOCAL_LLM
-        localmodelhandler(api, message, location);
+        localmodelhandler(api, message, res, location);
 #else
         LOG(ERROR) << "Local LLM support is not enabled in this build.";
         api->sendMessage(
             message->get<MessageAttrs::Chat>(),
-            "Error: Local LLM support is not enabled in this build.");
+            res->get(Strings::LLM_LOCAL_NOT_ENABLED));
 #endif
     } else if (type == "localnet") {
         if (authkey) {
@@ -306,7 +288,7 @@ DECLARE_COMMAND_HANDLER(ask) {
     } else {
         LOG(ERROR) << "Unsupported LLM configuration type: " << type;
         api->sendMessage(message->get<MessageAttrs::Chat>(),
-                         "Error: Unsupported LLM configuration type.");
+                         res->get(Strings::LLM_UNSUPPORTED_TYPE));
     }
 }
 

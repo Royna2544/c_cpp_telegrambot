@@ -23,11 +23,13 @@ DECLARE_COMMAND_HANDLER(decide) {
     int count = COUNT_MAX;
     int yesno = 0;
 
-    msgtxt << fmt::format("{} '{}'...", res->get(Strings::DECIDING), obj);
+    msgtxt << fmt::format(fmt::runtime(res->get(Strings::DECIDE_DECIDING_OBJECT)),
+                          obj);
     msg = api->sendReplyMessage(message->message(), msgtxt.str());
     msgtxt << std::endl << std::endl;
     do {
-        msgtxt << fmt::format("Try {}: ", COUNT_MAX - count + 1);
+        msgtxt << fmt::format(fmt::runtime(res->get(Strings::DECIDE_TRY_PREFIX)),
+                              COUNT_MAX - count + 1);
         if (provider->random->generate(RANDOM_RANGE_NUM) % 2 == 1) {
             msgtxt << res->get(Strings::YES);
             ++yesno;

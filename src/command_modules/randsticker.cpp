@@ -3,7 +3,9 @@
 
 #include <api/CommandModule.hpp>
 #include <api/Providers.hpp>
+#include <api/StringResLoader.hpp>
 #include <api/TgBotApi.hpp>
+#include <string>
 
 using TgBot::StickerSet;
 
@@ -31,8 +33,9 @@ DECLARE_COMMAND_HANDLER(randsticker) {
                      MediaIds(stickset->stickers[pos]));
 
     const auto arg = fmt::format(
-        "Sticker idx: {} emoji: {}\nFrom pack: \"{}\"", pos + 1,
-        stickset->stickers[pos]->emoji.value_or("none"), stickset->title);
+        fmt::runtime(res->get(Strings::RANDSTICKER_INFO)), pos + 1,
+        stickset->stickers[pos]->emoji.value_or(std::string(res->get(Strings::UNKNOWN))),
+        stickset->title);
     api->sendMessage(message->get<MessageAttrs::Chat>(), arg);
 }
 

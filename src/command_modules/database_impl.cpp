@@ -85,11 +85,6 @@ std::vector<std::vector<KeyboardButton::Ptr>> genKeyboard() {
     return keyboard;
 }
 
-constexpr std::string_view addtowhitelist = "Add to whitelist";
-constexpr std::string_view removefromwhitelist = "Remove from whitelist";
-constexpr std::string_view addtoblacklist = "Add to blacklist";
-constexpr std::string_view removefromblacklist = "Remove from blacklist";
-
 DECLARE_COMMAND_HANDLER(database) {
     if (!message->reply()->exists()) {
         api->sendReplyMessage(message->message(),
@@ -99,10 +94,16 @@ DECLARE_COMMAND_HANDLER(database) {
 
     auto reply = std::make_shared<TgBot::ReplyKeyboardMarkup>();
     reply->keyboard = genKeyboard<2, 2>();
-    reply->keyboard.at(0).at(0)->text = addtowhitelist;
-    reply->keyboard.at(0).at(1)->text = removefromwhitelist;
-    reply->keyboard.at(1).at(0)->text = addtoblacklist;
-    reply->keyboard.at(1).at(1)->text = removefromblacklist;
+    const std::string addToWhitelist = std::string(res->get(Strings::DB_ADD_TO_WHITELIST));
+    const std::string removeFromWhitelist =
+        std::string(res->get(Strings::DB_REMOVE_FROM_WHITELIST));
+    const std::string addToBlacklist = std::string(res->get(Strings::DB_ADD_TO_BLACKLIST));
+    const std::string removeFromBlacklist =
+        std::string(res->get(Strings::DB_REMOVE_FROM_BLACKLIST));
+    reply->keyboard.at(0).at(0)->text = addToWhitelist;
+    reply->keyboard.at(0).at(1)->text = removeFromWhitelist;
+    reply->keyboard.at(1).at(0)->text = addToBlacklist;
+    reply->keyboard.at(1).at(1)->text = removeFromBlacklist;
     reply->oneTimeKeyboard = true;
     reply->resizeKeyboard = true;
     reply->selective = true;
@@ -111,25 +112,27 @@ DECLARE_COMMAND_HANDLER(database) {
 
     auto msg = api->sendReplyMessage(
         message->message(),
-        fmt::format("Choose what u want to do with {}",
+        fmt::format(fmt::runtime(res->get(Strings::DB_CHOOSE_USER_ACTION)),
                     message->reply()->get<MessageAttrs::User>()),
         reply);
 
-    api->onAnyMessage([msg, userId, res, provider](TgBotApi::CPtr api,
-                                                   const Message::Ptr& m) {
+    api->onAnyMessage([msg, userId, res, provider, addToWhitelist,
+                       removeFromWhitelist, addToBlacklist,
+                       removeFromBlacklist](TgBotApi::CPtr api,
+                                            const Message::Ptr& m) {
         if (m->replyToMessage &&
             (*m->replyToMessage)->messageId == msg->messageId) {
             Strings text{};
-            if (m->text == addtowhitelist) {
+            if (m->text == addToWhitelist) {
                 text = handleAddUser<DatabaseBase::ListType::WHITELIST>(
                     provider, userId);
-            } else if (m->text == removefromwhitelist) {
+            } else if (m->text == removeFromWhitelist) {
                 text = handleRemoveUser<DatabaseBase::ListType::WHITELIST>(
                     provider, userId);
-            } else if (m->text == addtoblacklist) {
+            } else if (m->text == addToBlacklist) {
                 text = handleAddUser<DatabaseBase::ListType::BLACKLIST>(
                     provider, userId);
-            } else if (m->text == removefromblacklist) {
+            } else if (m->text == removeFromBlacklist) {
                 text = handleRemoveUser<DatabaseBase::ListType::BLACKLIST>(
                     provider, userId);
             }
@@ -176,7 +179,7 @@ DECLARE_COMMAND_HANDLER(saveid) {
 
     switch (provider->database->addMediaInfo(info)) {
         case DatabaseBase::AddResult::OK: {
-            const auto content = fmt::format("Media with names:\n{}\nadded",
+            const auto content = fmt::format(fmt::runtime(res->get(Strings::DB_MEDIA_ADDED)),
                                              fmt::join(info.names, "\n"));
             api->sendReplyMessage(message->message(), content);
             break;

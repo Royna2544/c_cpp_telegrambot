@@ -80,6 +80,64 @@
     x(STICKER_PACK_CREATED)                                                    \
     x(FLASHING_ZIP)                                                            \
     x(PROCESS_EXITED)                                                          \
+    x(CALC_USAGE)                                                              \
+    x(LLM_PROCESSING_QUERY)                                                     \
+    x(LLM_BUSY_WAIT)                                                           \
+    x(LLM_MODEL_INFORMATION)                                                   \
+    x(LLM_PROVIDE_QUERY)                                                       \
+    x(LLM_INITIALIZING_CORE)                                                   \
+    x(LLM_INIT_FAILED)                                                         \
+    x(LLM_PROMPT_TOO_LONG)                                                     \
+    x(LLM_QUERY_FAILED)                                                        \
+    x(LLM_THOUGHT_PREFIX)                                                      \
+    x(LLM_ANSWER_PREFIX)                                                       \
+    x(LLM_QUERY_PROCESSED)                                                     \
+    x(LLM_CONNECT_FAILED)                                                      \
+    x(LLM_PARSE_MODELS_FAILED)                                                 \
+    x(LLM_NO_MODELS)                                                           \
+    x(LLM_NO_LLM_MODELS)                                                       \
+    x(LLM_EMPTY_OUTPUT)                                                        \
+    x(LLM_NO_MESSAGE_OUTPUT)                                                   \
+    x(LLM_PARSE_RESPONSE_FAILED)                                               \
+    x(LLM_RESPONSE_FAILED)                                                     \
+    x(LLM_NOT_CONFIGURED)                                                      \
+    x(LLM_LOCAL_NOT_ENABLED)                                                   \
+    x(LLM_UNSUPPORTED_TYPE)                                                    \
+    x(DB_ADD_TO_WHITELIST)                                                     \
+    x(DB_REMOVE_FROM_WHITELIST)                                                \
+    x(DB_ADD_TO_BLACKLIST)                                                     \
+    x(DB_REMOVE_FROM_BLACKLIST)                                                \
+    x(DB_CHOOSE_USER_ACTION)                                                   \
+    x(DB_MEDIA_ADDED)                                                          \
+    x(DECIDE_DECIDING_OBJECT)                                                  \
+    x(DECIDE_TRY_PREFIX)                                                       \
+    x(FILEID_WITH_THUMBNAIL)                                                   \
+    x(FILEID_BASIC)                                                            \
+    x(RANDSTICKER_INFO)                                                        \
+    x(SPAM_REPLY_SUPPORTS)                                                     \
+    x(SPAM_INVALID_CONFIG_SIZE)                                                \
+    x(SPAM_SEND_CONFIG)                                                        \
+    x(QUOTE_REPLY_REQUIRED)                                                    \
+    x(QUOTE_UNSUPPORTED_ORIGIN_TYPE)                                           \
+    x(QUOTE_UNSUPPORTED_VIDEO_NO_THUMBNAIL)                                    \
+    x(QUOTE_UNSUPPORTED_ANIMATION_NO_THUMBNAIL)                                \
+    x(QUOTE_INVALID_ID)                                                        \
+    x(QUOTE_GENERATE_FAILED)                                                   \
+    x(IBASH_SESSION_STARTED)                                                   \
+    x(IBASH_SESSION_START_FAILED)                                              \
+    x(IBASH_SESSION_ENDED)                                                     \
+    x(IBASH_NO_ACTIVE_SESSION)                                                 \
+    x(IBASH_START_FIRST)                                                       \
+    x(IBASH_NO_OUTPUT)                                                         \
+    x(IBASH_OUTPUT_TRUNCATED)                                                  \
+    x(IBASH_EXEC_FAILED)                                                       \
+    x(DELAY_MESSAGE_TIMING)                                                    \
+    x(DELAY_REPLY_TIMING)                                                      \
+    x(UPDOWN_FILE_INFO)                                                        \
+    x(REPLY_TO_A_DOCUMENT)                                                     \
+    x(PROCESS_EXIT_TYPE_SIGNAL)                                                \
+    x(PROCESS_EXIT_TYPE_EXIT)                                                  \
+    x(COMPILER_WDT_TIMEOUT)                                                    \
     x(__MAX__)
 // clang-format on
 

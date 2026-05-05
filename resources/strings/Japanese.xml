@@ -90,4 +90,68 @@
     <string name="unknown_error">不明なエラー</string>
     <string name="invalid_args_passed">無効な引数が渡されました</string>
     <string name="sticker_set_not_found">ステッカーセットが見つかりません</string>
+
+    <!-- calc cmd -->
+    <string name="calc_usage">使い方: /calc &lt;式&gt;</string>
+
+    <!-- ask cmd -->
+    <string name="llm_processing_query">クエリを処理しています。しばらくお待ちください...</string>
+    <string name="llm_busy_wait">別のLLMリクエストが実行中です。完了を待っています...</string>
+    <string name="llm_model_information">モデル情報:&#10;名前: {}&#10;アーキテクチャ: {}&#10;説明: {}&#10;パラメータ数: {}&#10;ファイルサイズ: {} バイト</string>
+    <string name="llm_provide_query">LLMに質問するには、コマンドの後にクエリを入力してください。</string>
+    <string name="llm_initializing_core">LLMコアを初期化しています。しばらくお待ちください...</string>
+    <string name="llm_init_failed">エラー: LLMコアを初期化できません。</string>
+    <string name="llm_prompt_too_long">エラー: プロンプトがローカルLLMのコンテキストに対して長すぎます。短くしてもう一度試してください。</string>
+    <string name="llm_query_failed">エラー: LLMクエリに失敗しました。</string>
+    <string name="llm_thought_prefix">思考: {}</string>
+    <string name="llm_answer_prefix">回答: {}</string>
+    <string name="llm_query_processed">クエリは{:%S}秒で処理されました。</string>
+    <string name="llm_connect_failed">エラー: 設定されたURLのLLMサーバーに接続できませんでした。</string>
+    <string name="llm_parse_models_failed">エラー: LLMサーバーからのモデル応答を解析できませんでした。</string>
+    <string name="llm_no_models">エラー: LLMサーバーから利用可能なモデルがありません。</string>
+    <string name="llm_no_llm_models">エラー: LLMサーバーにLLMタイプのモデルがありません。</string>
+    <string name="llm_empty_output">エラー: LLMサーバーが空の出力を返しました。</string>
+    <string name="llm_no_message_output">エラー: LLMサーバーの応答に'message'タイプの出力がありません。</string>
+    <string name="llm_parse_response_failed">エラー: LLMサーバーの応答を解析できませんでした。</string>
+    <string name="llm_response_failed">エラー: LLMサーバーから応答を取得できませんでした。</string>
+    <string name="llm_not_configured">LLM機能が設定されていません。先にLLM設定を行ってください。</string>
+    <string name="llm_local_not_enabled">エラー: このビルドではローカルLLMサポートが有効ではありません。</string>
+    <string name="llm_unsupported_type">エラー: サポートされていないLLM設定タイプです。</string>
+
+    <!-- command module strings -->
+    <string name="db_add_to_whitelist">ホワイトリストに追加</string>
+    <string name="db_remove_from_whitelist">ホワイトリストから削除</string>
+    <string name="db_add_to_blacklist">ブラックリストに追加</string>
+    <string name="db_remove_from_blacklist">ブラックリストから削除</string>
+    <string name="db_choose_user_action">{} に対して行う操作を選択してください</string>
+    <string name="db_media_added">次の名前でメディアを追加しました:&#10;{}</string>
+    <string name="decide_deciding_object">'{}' を判断中...</string>
+    <string name="decide_try_prefix">試行 {}: </string>
+    <string name="fileid_with_thumbnail">FileId: `{}`&#10;FileUniqueId: `{}`&#10;サムネイルFileId: `{}`</string>
+    <string name="fileid_basic">FileId: `{}`&#10;FileUniqueId: `{}`</string>
+    <string name="randsticker_info">ステッカー番号: {} 絵文字: {}&#10;パック: &quot;{}&quot;</string>
+    <string name="spam_reply_supports">返信メッセージではステッカー/GIF/テキストに対応しています。回数を指定してください</string>
+    <string name="spam_invalid_config_size">spam設定の引数数が無効です</string>
+    <string name="spam_send_config">spamする回数とメッセージのペアを送信してください</string>
+    <string name="quote_reply_required">引用するにはメッセージに返信してください!</string>
+    <string name="quote_unsupported_origin_type">サポートされていないメッセージ元タイプ: {}</string>
+    <string name="quote_unsupported_video_no_thumbnail">サポートされていないメディアタイプ: サムネイルなしの動画</string>
+    <string name="quote_unsupported_animation_no_thumbnail">サポートされていないメディアタイプ: サムネイルなしのアニメーション</string>
+    <string name="quote_invalid_id">無効なID: {}</string>
+    <string name="quote_generate_failed">引用の生成に失敗しました!</string>
+    <string name="ibash_session_started">対話型bashセッションを開始しました。コマンドを実行するには /ibash &lt;command&gt; を使用してください。&#10;セッションを閉じるには /ibash exit を使用してください。</string>
+    <string name="ibash_session_start_failed">セッションを開始できないか、既にセッションが存在します。</string>
+    <string name="ibash_session_ended">対話型bashセッションを終了しました。</string>
+    <string name="ibash_no_active_session">アクティブなセッションがありません。</string>
+    <string name="ibash_start_first">アクティブなセッションがありません。まず /ibash で開始してください。</string>
+    <string name="ibash_no_output">(出力なし)</string>
+    <string name="ibash_output_truncated">[出力は切り詰められました]</string>
+    <string name="ibash_exec_failed">コマンドの実行に失敗したか、セッションが終了しました。</string>
+    <string name="delay_message_timing">リクエストメッセージ送信時刻: {}&#10;受信時刻: {}&#10;差分: {}&#10;</string>
+    <string name="delay_reply_timing">返信メッセージの送信にかかった時間: {}</string>
+    <string name="updown_file_info">ファイル: {}&#10;ファイルサイズ: {}B</string>
+    <string name="reply_to_a_document">ドキュメントに返信してください</string>
+    <string name="process_exit_type_signal">シグナル</string>
+    <string name="process_exit_type_exit">終了</string>
+    <string name="compiler_wdt_timeout">WDTタイムアウト</string>
 </resources>
