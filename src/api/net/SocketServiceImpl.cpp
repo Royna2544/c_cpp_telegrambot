@@ -628,15 +628,14 @@ Status SocketServiceImpl::Service::endFileTransfer(
             activeTransfers_.erase(it);
             return Status::OK;
         }
-        // Move temporary file to final destination
+        // Move temporary file to final destination using rename to avoid
+        // materializing sparse holes during a copy.
         try {
-            const auto options =
-                entry.overwriteExisting
-                    ? std::filesystem::copy_options::overwrite_existing
-                    : std::filesystem::copy_options::none;
-            std::filesystem::copy_file(entry.filePath, request->file_path(),
-                                       options);
-            std::filesystem::remove(entry.filePath);
+            std::error_code moveEc;
+            if (entry.overwriteExisting) {
+                std::filesystem::remove(request->file_path(), moveEc);
+            }
+            std::filesystem::rename(entry.filePath, request->file_path());
             LOG(INFO) << "File uploaded successfully to: "
                       << request->file_path();
         } catch (const std::filesystem::filesystem_error& e) {
