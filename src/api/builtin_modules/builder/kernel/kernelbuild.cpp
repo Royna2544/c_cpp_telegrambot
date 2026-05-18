@@ -526,7 +526,9 @@ bool KernelBuildHandler::handle_artifact_download(
     artifactRequest.set_build_id(build_id);
     ArtifactMetadata artifactMetadata;
     std::ofstream outputFile;
+    std::filesystem::path localArtifactPath;
     bool fileOpenError = false;
+    bool invalidFilename = false;
 
     bool success = buildService->getArtifact(
         artifactRequest, [&](const ArtifactChunk& chunk) {
@@ -538,10 +540,24 @@ bool KernelBuildHandler::handle_artifact_download(
                 LOG(INFO) << "Receiving artifact: "
                           << artifactMetadata.filename()
                           << ", size: " << artifactMetadata.total_size();
-                outputFile.open(artifactMetadata.filename(), std::ios::binary);
+                const auto safeFilename =
+                    std::filesystem::path(artifactMetadata.filename())
+                        .filename();
+                if (safeFilename.empty() || safeFilename == "." ||
+                    safeFilename == "..") {
+                    LOG(ERROR) << "Invalid artifact filename from build "
+                                  "service: "
+                               << artifactMetadata.filename();
+                    invalidFilename = true;
+                    return;
+                }
+                localArtifactPath = std::filesystem::temp_directory_path() /
+                                    fmt::format("kernelbuild_{}_{}", build_id,
+                                                safeFilename.string());
+                outputFile.open(localArtifactPath, std::ios::binary);
                 if (!outputFile.is_open()) {
                     LOG(ERROR) << "Failed to open output file: "
-                               << artifactMetadata.filename();
+                               << localArtifactPath.string();
                     fileOpenError = true;
                     return;
                 }
@@ -549,6 +565,11 @@ bool KernelBuildHandler::handle_artifact_download(
             outputFile.write(chunk.data().data(), chunk.data().size());
         });
     outputFile.close();
+
+    if (invalidFilename) {
+        editQueryMessage(query, "Build service returned an invalid artifact name.");
+        return false;
+    }
 
     if (fileOpenError) {
         editQueryMessage(query, "Failed to open output file for writing.");
@@ -565,7 +586,7 @@ bool KernelBuildHandler::handle_artifact_download(
 
     LOG(INFO) << "Artifact " << artifactMetadata.filename()
               << " received successfully.";
-    *outPath = artifactMetadata.filename();
+    *outPath = localArtifactPath;
     return true;
 }
 
