@@ -1302,7 +1302,7 @@ void ROMBuildQueryHandler::onCallbackQuery(
         DLOG(INFO) << "Mismatch on message id";
         return;
     }
-    if (!_auth->isAuthorized(query->from)) {
+    if (!_auth->isAuthorized(query->from, AuthContext::AccessLevel::AdminUser)) {
         _api->answerCallbackQuery(
             query->id,
             "Sorry son, you are not allowed to touch this keyboard.");
