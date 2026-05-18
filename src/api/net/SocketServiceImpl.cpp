@@ -474,7 +474,8 @@ Status SocketServiceImpl::Service::downloadFileLoop(
     LogWhoCalledMe(context, "downloadFileLoop");
 
     while (stream->Read(&msg)) {
-        std::fstream* fileStream = nullptr;
+        std::vector<char> buffer(CHUNK_SIZE);
+        std::streamsize bytesRead = 0;
         {
             std::lock_guard<std::mutex> lock(activeTransfersMutex_);
             auto it = activeTransfers_.find(msg.uuid());
@@ -488,24 +489,23 @@ Status SocketServiceImpl::Service::downloadFileLoop(
                 stream->Write(response);
                 return Status::OK;
             }
-            fileStream = &it->second.fileStream;
-        }
 
-        // Perform I/O without holding the lock
-        fileStream->seekg(msg.chunk_idx() * CHUNK_SIZE, std::ios::beg);
-        if (!fileStream->good()) {
-            // Seek failed
-            FileChunkResponse response;
-            response.set_success(false);
-            response.set_retry(true);
-            LOG(ERROR) << "Seek failed during file download: " << msg.uuid();
-            stream->Write(response);
-            return Status::OK;
-        }
+            it->second.fileStream.seekg(msg.chunk_idx() * CHUNK_SIZE,
+                                        std::ios::beg);
+            if (!it->second.fileStream.good()) {
+                // Seek failed
+                FileChunkResponse response;
+                response.set_success(false);
+                response.set_retry(true);
+                LOG(ERROR) << "Seek failed during file download: "
+                           << msg.uuid();
+                stream->Write(response);
+                return Status::OK;
+            }
 
-        std::vector<char> buffer(CHUNK_SIZE);
-        fileStream->read(buffer.data(), buffer.size());
-        std::streamsize bytesRead = fileStream->gcount();
+            it->second.fileStream.read(buffer.data(), buffer.size());
+            bytesRead = it->second.fileStream.gcount();
+        }
 
         if (bytesRead <= 0) {
             // Read failed
@@ -540,7 +540,6 @@ Status SocketServiceImpl::Service::uploadFileLoop(
 
     LogWhoCalledMe(context, "uploadFileLoop");
     while (stream->Read(&msg)) {
-        std::fstream* fileStream = nullptr;
         {
             std::lock_guard<std::mutex> lock(activeTransfersMutex_);
             auto it = activeTransfers_.find(msg.uuid());
@@ -554,7 +553,6 @@ Status SocketServiceImpl::Service::uploadFileLoop(
                 stream->Write(response);
                 return Status::OK;
             }
-            fileStream = &it->second.fileStream;
             if (msg.chunk_offset() < 0 ||
                 static_cast<std::uintmax_t>(msg.chunk_offset()) +
                         msg.chunk_data().size() >
@@ -567,28 +565,30 @@ Status SocketServiceImpl::Service::uploadFileLoop(
                 stream->Write(response);
                 return Status::OK;
             }
-        }
 
-        // Perform I/O without holding the lock
-        fileStream->seekp(msg.chunk_offset(), std::ios::beg);
-        if (!fileStream->good()) {
-            // Seek failed
-            FileChunkResponse response;
-            response.set_success(false);
-            response.set_retry(true);
-            LOG(ERROR) << "Seek failed during file upload: " << msg.uuid();
-            stream->Write(response);
-            return Status::OK;
-        }
-        fileStream->write(msg.chunk_data().data(), msg.chunk_data().size());
-        if (!fileStream->good()) {
-            // Write failed
-            FileChunkResponse response;
-            response.set_success(false);
-            response.set_retry(true);
-            LOG(ERROR) << "Write failed during file upload: " << msg.uuid();
-            stream->Write(response);
-            return Status::OK;
+            it->second.fileStream.seekp(msg.chunk_offset(), std::ios::beg);
+            if (!it->second.fileStream.good()) {
+                // Seek failed
+                FileChunkResponse response;
+                response.set_success(false);
+                response.set_retry(true);
+                LOG(ERROR) << "Seek failed during file upload: "
+                           << msg.uuid();
+                stream->Write(response);
+                return Status::OK;
+            }
+            it->second.fileStream.write(msg.chunk_data().data(),
+                                        msg.chunk_data().size());
+            if (!it->second.fileStream.good()) {
+                // Write failed
+                FileChunkResponse response;
+                response.set_success(false);
+                response.set_retry(true);
+                LOG(ERROR) << "Write failed during file upload: "
+                           << msg.uuid();
+                stream->Write(response);
+                return Status::OK;
+            }
         }
         // Send success response
         FileChunkResponse response;
