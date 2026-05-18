@@ -86,6 +86,31 @@ type WrappedBuildStatus = Arc<Mutex<Vec<PerBuildIdStatus>>>;
 type WrappedContexts = Arc<Mutex<Vec<BuildContext>>>;
 
 impl BuildService {
+    fn validate_config_name(name: &str) -> Result<(), Status> {
+        if name.is_empty() {
+            return Err(Status::invalid_argument("Config name cannot be empty"));
+        }
+
+        let path = Path::new(name);
+        if path.is_absolute() {
+            return Err(Status::invalid_argument(
+                "Config name must be a relative path component",
+            ));
+        }
+
+        if path.components().count() != 1 || path.parent().is_some() {
+            return Err(Status::invalid_argument(
+                "Config name must be a single path component",
+            ));
+        }
+
+        if name == "." || name == ".." {
+            return Err(Status::invalid_argument("Config name is not allowed"));
+        }
+
+        Ok(())
+    }
+
     pub fn new(
         kernel_configs: Vec<KernelConfig>,
         builder_config: BuilderConfig,
@@ -539,6 +564,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             Ok(v) => v,
             Err(e) => return Err(Status::invalid_argument(format!("Bad JSON: {}", e))),
         };
+        Self::validate_config_name(&json_val.name)?;
 
         // 2. Store the valid config in memory
         let mut configs = self.kernel_configs.lock().await;
@@ -562,6 +588,7 @@ impl linux_kernel_build_service_server::LinuxKernelBuildService for BuildService
             Ok(v) => v,
             Err(e) => return Err(Status::invalid_argument(format!("Bad JSON: {}", e))),
         };
+        Self::validate_config_name(&json_val.name)?;
 
         // 2. Update existing config in memory
         let mut configs = self.kernel_configs.lock().await;
