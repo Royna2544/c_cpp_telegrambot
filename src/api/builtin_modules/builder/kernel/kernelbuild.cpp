@@ -357,7 +357,7 @@ class KernelBuildHandler {
     void handleCallbackQuery(const TgBot::CallbackQuery::Ptr& query) {
         std::string_view data = query->data;
 
-        if (!_auth->isAuthorized(query->from)) {
+        if (!_auth->isAuthorized(query->from, AuthContext::AccessLevel::AdminUser)) {
             _api->answerCallbackQuery(
                 query->id,
                 "Sorry son, you are not allowed to touch this keyboard.");
@@ -632,7 +632,8 @@ DECLARE_COMMAND_HANDLER(kernelbuild) {
                 [api, provider](const TgBot::CallbackQuery::Ptr& ptr) {
                     std::string_view data = ptr->data;
 
-                    if (!provider->auth->isAuthorized(ptr->from)) {
+                    if (!provider->auth->isAuthorized(ptr->from,
+                                                AuthContext::AccessLevel::AdminUser)) {
                         api->answerCallbackQuery(
                             ptr->id,
                             "Sorry son, you are not allowed to touch this "
