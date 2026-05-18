@@ -164,7 +164,7 @@ export NINJA_REMOTE_NUM_JOBS=128
 
 # --- BuildBuddy Connection Settings ---
 export RBE_service="aosp.buildbuddy.io:443"
-export RBE_remote_headers="x-buildbuddy-api-key={}"
+export RBE_remote_headers={}
 export RBE_use_rpc_credentials=false
 export RBE_service_no_auth=true
 
@@ -206,8 +206,8 @@ export RBE_LINT=1
 export RBE_JAVA_POOL=default
 export RBE_METALAVA_POOL=default
 export RBE_LINT_POOL=default"##,
-            rbe_cli_path.to_string_lossy().to_string(),
-            rbe_api_token
+            Self::shell_single_quote(&rbe_cli_path.to_string_lossy()),
+            Self::shell_single_quote(&format!("x-buildbuddy-api-key={}", rbe_api_token))
         );
         std::fs::write(&rbe_env_path, content)
             .map_err(|e| Status::internal(format!("Failed to write RBE env file: {}", e)))?;
