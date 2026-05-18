@@ -342,7 +342,7 @@ DECLARE_COMMAND_HANDLER(ibash) {
 }  // namespace
 
 extern "C" DYN_COMMAND_EXPORT const struct DynModule DYN_COMMAND_SYM = {
-    .flags = DynModule::Flags::None,
+    .flags = DynModule::Flags::Enforced,
     .name = "ibash",
     .description = "Interactive bash shell",
     .function = COMMAND_HANDLER_NAME(ibash),
