@@ -111,6 +111,7 @@ class SocketServiceImpl::Service : public SocketService::Service {
     struct TranferEntry {
         std::fstream fileStream;
         std::filesystem::path filePath;
+        std::filesystem::path destinationPath;
         std::uintmax_t totalSize = 0;
         int chunk_count{};
         ChecksumAlgorithm checksumAlgorithm = ChecksumAlgorithm::None;
@@ -410,6 +411,7 @@ Status SocketServiceImpl::Service::requestFileTransfer(
             entry.checksum = request->file_checksum();
         }
         entry.overwriteExisting = request->overwrite_existing();
+        entry.destinationPath = request->file_path();
 
         // For upload, we create a temporary file to store incoming data
         entry.filePath = std::filesystem::temp_directory_path() /
@@ -618,6 +620,18 @@ Status SocketServiceImpl::Service::endFileTransfer(
     TranferEntry& entry = it->second;
     entry.fileStream.close();
     if (request->is_upload()) {
+        if (request->file_path() != entry.destinationPath) {
+            response->set_code(GenericResponseCode::ErrorInvalidArgument);
+            response->set_message(
+                "Upload destination path mismatch for this transfer");
+            LOG(ERROR) << "Upload destination path mismatch for UUID "
+                       << request->uuid() << ": expected "
+                       << entry.destinationPath.string() << ", got "
+                       << request->file_path();
+            std::filesystem::remove(entry.filePath);
+            activeTransfers_.erase(it);
+            return Status::OK;
+        }
         if (entry.checksumAlgorithm != ChecksumAlgorithm::None &&
             !verify_file_checksum(entry.filePath, entry.checksumAlgorithm,
                                   entry.checksum)) {
@@ -633,11 +647,11 @@ Status SocketServiceImpl::Service::endFileTransfer(
         try {
             std::error_code moveEc;
             if (entry.overwriteExisting) {
-                std::filesystem::remove(request->file_path(), moveEc);
+                std::filesystem::remove(entry.destinationPath, moveEc);
             }
-            std::filesystem::rename(entry.filePath, request->file_path());
+            std::filesystem::rename(entry.filePath, entry.destinationPath);
             LOG(INFO) << "File uploaded successfully to: "
-                      << request->file_path();
+                      << entry.destinationPath.string();
         } catch (const std::filesystem::filesystem_error& e) {
             response->set_code(GenericResponseCode::ErrorCommandIgnored);
             response->set_message(
