@@ -30,7 +30,7 @@ void CompilerInTgForCCpp::run(MessageExt::Ptr message) {
         std::error_code ec;
         if (std::filesystem::exists(aoutname, ec)) {
             resultbuf << _locale->get(Strings::RUN_TIME) << ":\n";
-            runCommand(aoutname, resultbuf);
+            runCommand(aoutname.string(), resultbuf);
             std::filesystem::remove(aoutname);
         }
         std::filesystem::remove(params.outfile);

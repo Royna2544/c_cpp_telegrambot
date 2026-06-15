@@ -115,7 +115,7 @@ DECLARE_COMMAND_HANDLER(database) {
     // black/whitelist (the command is Enforced, but onAnyMessage fires for
     // everyone).
     const auto invoker = message->message()->from;
-    const UserId invokerId = invoker ? invoker->id : 0;
+    const UserId invokerId = invoker ? (*invoker)->id : 0;
 
     auto msg = api->sendReplyMessage(
         message->message(),
@@ -127,7 +127,7 @@ DECLARE_COMMAND_HANDLER(database) {
                        removeFromWhitelist, addToBlacklist,
                        removeFromBlacklist](TgBotApi::CPtr api,
                                             const Message::Ptr& m) {
-        if (invokerId != 0 && m->from && m->from->id == invokerId &&
+        if (invokerId != 0 && m->from && (*m->from)->id == invokerId &&
             m->replyToMessage &&
             (*m->replyToMessage)->messageId == msg->messageId) {
             Strings text{};
