@@ -1,1 +1,1 @@
-SELECT chatid FROM chatmap WHERE chatid = ?
+SELECT chatname FROM chatmap WHERE chatid = ?
