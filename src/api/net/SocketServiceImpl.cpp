@@ -662,14 +662,43 @@ Status SocketServiceImpl::Service::endFileTransfer(
             activeTransfers_.erase(it);
             return Status::OK;
         }
-        // Move temporary file to final destination using rename to avoid
-        // materializing sparse holes during a copy.
+        // Enforce no-overwrite at finalize time as well: the existence check in
+        // requestFileTransfer is a TOCTOU window, and std::filesystem::rename
+        // silently replaces an existing destination on POSIX, so a plain rename
+        // would clobber even when overwrite was not requested.
+        {
+            std::error_code existsEc;
+            if (!entry.overwriteExisting &&
+                std::filesystem::exists(entry.destinationPath, existsEc)) {
+                response->set_code(GenericResponseCode::ErrorInvalidArgument);
+                response->set_message("Destination already exists");
+                LOG(ERROR) << "Destination already exists for upload: "
+                           << entry.destinationPath.string();
+                std::filesystem::remove(entry.filePath, existsEc);
+                activeTransfers_.erase(it);
+                return Status::OK;
+            }
+        }
+        // Move temporary file to final destination. Prefer rename (atomic, no
+        // sparse-hole materialization) but fall back to copy when the temp dir
+        // and destination live on different filesystems (rename -> EXDEV).
         try {
             std::error_code moveEc;
             if (entry.overwriteExisting) {
                 std::filesystem::remove(entry.destinationPath, moveEc);
             }
-            std::filesystem::rename(entry.filePath, entry.destinationPath);
+            std::filesystem::rename(entry.filePath, entry.destinationPath,
+                                    moveEc);
+            if (moveEc == std::errc::cross_device_link) {
+                std::filesystem::copy_file(
+                    entry.filePath, entry.destinationPath,
+                    std::filesystem::copy_options::overwrite_existing);
+                std::filesystem::remove(entry.filePath);
+            } else if (moveEc) {
+                throw std::filesystem::filesystem_error(
+                    "Failed to move uploaded file", entry.filePath,
+                    entry.destinationPath, moveEc);
+            }
             LOG(INFO) << "File uploaded successfully to: "
                       << entry.destinationPath.string();
         } catch (const std::filesystem::filesystem_error& e) {
