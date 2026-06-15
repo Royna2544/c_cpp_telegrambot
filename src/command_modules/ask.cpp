@@ -95,7 +95,7 @@ static void localmodelhandler(TgBotApi::Ptr api, MessageExt* message,
     }
     const auto& response = *response_opt;
     std::initializer_list<std::pair<absl::string_view, absl::string_view>>
-        replacements = {{"`", ""},    {"_", "\\_"}, {"*", "\\*"}, {"[", "\\["},
+        replacements = {{"\\", "\\\\"}, {"_", "\\_"}, {"*", "\\*"}, {"[", "\\["},
                         {"]", "\\]"}, {"(", "\\("}, {")", "\\)"}, {"~", "\\~"},
                         {"`", "\\`"}, {">", "\\>"}, {"#", "\\#"}, {"+", "\\+"},
                         {"-", "\\-"}, {"=", "\\="}, {"|", "\\|"}, {"{", "\\{"},
@@ -230,7 +230,7 @@ static void localnetmodelhandler(TgBotApi::Ptr api, MessageExt* message,
             std::initializer_list<
                 std::pair<absl::string_view, absl::string_view>>
                 replacements = {
-                    {"`", ""},    {"_", "\\_"}, {"*", "\\*"}, {"[", "\\["},
+                    {"\\", "\\\\"}, {"_", "\\_"}, {"*", "\\*"}, {"[", "\\["},
                     {"]", "\\]"}, {"(", "\\("}, {")", "\\)"}, {"~", "\\~"},
                     {"`", "\\`"}, {">", "\\>"}, {"#", "\\#"}, {"+", "\\+"},
                     {"-", "\\-"}, {"=", "\\="}, {"|", "\\|"}, {"{", "\\{"},
