@@ -417,11 +417,31 @@ Status SocketServiceImpl::Service::requestFileTransfer(
         entry.filePath = std::filesystem::temp_directory_path() /
                          fmt::format("upload_{}.tmp", uuids::to_string(uuid));
 
+        // Reject absurd sizes before pre-allocating: file_size is
+        // client-supplied and resize_file would otherwise let a single request
+        // exhaust the disk.
+        constexpr std::uintmax_t kMaxTransferSize = 2ULL << 30;  // 2 GiB
+        if (request->file_size() > kMaxTransferSize) {
+            response->set_accepted(false);
+            response->set_reject_message(
+                "Requested file size exceeds maximum allowed");
+            LOG(ERROR) << "Rejecting upload exceeding size limit: "
+                       << request->file_size() << " > " << kMaxTransferSize;
+            return Status::OK;
+        }
         entry.totalSize = request->file_size();
         // Create the file first, then resize
         entry.fileStream.open(entry.filePath, std::ios::binary | std::ios::out);
         entry.fileStream.close();
         std::filesystem::resize_file(entry.filePath, entry.totalSize, ec);
+        if (ec) {
+            response->set_accepted(false);
+            response->set_reject_message("Failed to allocate file for upload");
+            LOG(ERROR) << "Failed to resize upload file " << entry.filePath
+                       << ": " << ec.message();
+            std::filesystem::remove(entry.filePath, ec);
+            return Status::OK;
+        }
 
         LOG(INFO) << "Resized file: " << entry.filePath.string() << " to size "
                   << entry.totalSize << " bytes";
