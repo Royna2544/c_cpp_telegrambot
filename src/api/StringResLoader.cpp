@@ -59,9 +59,12 @@ std::pair<LocaleResData, StringResLoader::PerLocaleMapImpl> parseLocaleResource(
     // Set up error handling
     xmlSetGenericErrorFunc(&ctx, libxml2_error_handler);
 
-    // Parse the XML file
+    // Parse the XML file. XML_PARSE_NONET forbids any network access for
+    // external references; entity expansion and DTD loading remain off (no
+    // NOENT/DTDLOAD/HUGE), keeping XXE and billion-laughs off the table.
     auto doc = RAII<xmlDocPtr>::template create<void>(
-        xmlReadFile(filename.string().c_str(), nullptr, 0), xmlFreeDoc);
+        xmlReadFile(filename.string().c_str(), nullptr, XML_PARSE_NONET),
+        xmlFreeDoc);
     if (doc == nullptr) {
         LOG(ERROR) << fmt::format("Could not parse file {} (code: {})",
                                   filename.string(), ctx.code);
