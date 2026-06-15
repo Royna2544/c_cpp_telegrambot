@@ -11,7 +11,11 @@ bool AuthContext::isInList(DatabaseBase::ListType type,
             return true;
         case DatabaseBase::ListResult::BACKEND_ERROR:
             LOG(ERROR) << "Backend error in checkUserInList()";
-            [[fallthrough]];
+            // Fail closed: on a backend error treat the user as being in the
+            // blacklist (deny) and not in the whitelist (deny). Both access
+            // levels then deny rather than silently granting access when the
+            // database is unavailable.
+            return type == DatabaseBase::ListType::BLACKLIST;
         case DatabaseBase::ListResult::ALREADY_IN_OTHER_LIST:
         case DatabaseBase::ListResult::NOT_IN_LIST:
             return false;
