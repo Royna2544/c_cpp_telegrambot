@@ -76,6 +76,20 @@ PhotoBase::TinyStatus PngImage::read(const std::filesystem::path& filename,
     color_type = png_get_color_type(png, info);
     bit_depth = png_get_bit_depth(png, info);
 
+    // Bound dimensions before allocating per-row buffers: libpng allows huge
+    // declared dimensions, which would drive unbounded allocation
+    // (decompression-bomb DoS) and overflow the int loop counters used below.
+    constexpr png_uint_32 kMaxDimension = 16384;
+    constexpr png_uint_32 kMaxPixels = 64U * 1024 * 1024;  // 64 MP
+    if (width == 0 || height == 0 || width > kMaxDimension ||
+        height > kMaxDimension || width > kMaxPixels / height) {
+        LOG(ERROR) << "PNG dimensions out of allowed range: " << width << "x"
+                   << height;
+        png_destroy_read_struct(&png, &info, nullptr);
+        return {PhotoBase::Status::kInternalError,
+                "Image dimensions out of allowed range"};
+    }
+
     if (setjmp(png_jmpbuf(png))) {
         png_destroy_read_struct(&png, &info, nullptr);
         return {PhotoBase::Status::kInternalError,

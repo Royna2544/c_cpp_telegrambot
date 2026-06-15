@@ -81,6 +81,22 @@ JPEGImage::TinyStatus JPEGImage::read(const std::filesystem::path& filename,
     height = cinfo.output_height;
     num_channels = cinfo.output_components;
 
+    // Bound dimensions before allocating: a tiny JPEG can declare huge output
+    // dimensions, which would overflow the size computation on 32-bit size_t
+    // (heap overflow) or request an enormous allocation (decompression-bomb
+    // DoS). Checks are written division-first to avoid overflowing themselves.
+    constexpr size_t kMaxDimension = 16384;
+    constexpr size_t kMaxPixels = 64ULL * 1024 * 1024;  // 64 MP
+    if (width == 0 || height == 0 || num_channels <= 0 || num_channels > 4 ||
+        width > kMaxDimension || height > kMaxDimension ||
+        width > kMaxPixels / height) {
+        LOG(ERROR) << "JPEG dimensions out of allowed range: " << width << "x"
+                   << height << "x" << num_channels;
+        jpeg_destroy_decompress(&cinfo);
+        return {PhotoBase::Status::kInternalError,
+                "Image dimensions out of allowed range"};
+    }
+
     size_t row_stride = width * num_channels;
     image_data =
         std::make_unique<unsigned char[]>(width * height * num_channels);
