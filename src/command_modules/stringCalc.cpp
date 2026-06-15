@@ -12,9 +12,17 @@ void calculate_string_free(const char *expr);
 DECLARE_COMMAND_HANDLER(calc) {
     if (message->has<MessageAttrs::ExtraText>()) {
         auto expr = message->get<MessageAttrs::ExtraText>();
-        const std::string_view result = calculate_string(expr.c_str());
-        api->sendReplyMessage(message->message(), result);
-        calculate_string_free(result.data());
+        const char *result = calculate_string(expr.c_str());
+        if (result == nullptr) {
+            // The Rust side returns null when the result cannot be turned into
+            // a C string (e.g. it contains an interior NUL byte). Constructing
+            // a string_view from null is UB, so bail out gracefully.
+            api->sendReplyMessage(message->message(),
+                                  res->get(Strings::CALC_USAGE));
+            return;
+        }
+        api->sendReplyMessage(message->message(), std::string_view(result));
+        calculate_string_free(result);
     } else {
         api->sendReplyMessage(message->message(), res->get(Strings::CALC_USAGE));
     }
