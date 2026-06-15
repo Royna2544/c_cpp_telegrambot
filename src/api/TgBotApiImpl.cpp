@@ -32,7 +32,7 @@
 #include <iterator>
 #include <libos/libsighandler.hpp>
 #include <memory>
-#include <nlohmann/detail/macro_scope.hpp>
+#include <nlohmann/json.hpp>
 #include <set>
 #include <string>
 #include <string_view>
@@ -40,7 +40,7 @@
 #include <utility>
 
 #include "RefLock.hpp"
-#include "tgbot/net/CurlHttpClient.h"
+#include "tgbot/Logger.h"
 #include "tgbot/types/ChatMember.h"
 
 #ifdef TGBOTCPP_ENABLE_CPPTRACE
@@ -329,9 +329,9 @@ Message::Ptr TgBotApiImpl::sendSticker_impl(
     getApi().sendChatAction(chatId, TgBot::Api::ChatAction::choose_sticker,
                             ReplyParamsToMsgTid{replyParameters});
     try {
-        return getApi().sendSticker(chatId, sticker, replyParameters, nullptr,
-                                    kDisableNotifications,
-                                    ReplyParamsToMsgTid{replyParameters}, {}, "👍");
+        return getApi().sendSticker(
+            chatId, sticker, replyParameters, nullptr, kDisableNotifications,
+            ReplyParamsToMsgTid{replyParameters}, {}, "👍");
     } catch (const TgBot::TgException& ex) {
         handleTgBotApiEx(ex);
         return nullptr;
@@ -594,11 +594,34 @@ TgBot::Chat::Ptr TgBotApiImpl::getChat_impl(ChatId chatId) const {
     return getApi().getChat(chatId);
 }
 
+class ABsllogSink : public TgBot::Logger {
+   public:
+    void log(TgBot::LogLevel level, const std::string& message) override {
+        switch (level) {
+            case TgBot::LogLevel::Trace:
+            case TgBot::LogLevel::Debug:
+                DLOG(INFO) << message;
+                break;
+            case TgBot::LogLevel::Info:
+                LOG(INFO) << message;
+                break;
+            case TgBot::LogLevel::Warning:
+                LOG(WARNING) << message;
+                break;
+            case TgBot::LogLevel::Error:
+                LOG(ERROR) << message;
+                break;
+            case TgBot::LogLevel::Off:
+                break;
+        }
+    }
+};
+
 TgBotApiImpl::TgBotApiImpl(const std::string_view token, AuthContext* auth,
                            StringResLoader* loader, Providers* providers,
                            RefLock* refLock)
     : _bot(std::string(token),
-           std::make_unique<TgBot::CurlHttpClient>(std::chrono::hours(1)),
+           std::make_unique<TgBot::HttplibClient>(std::chrono::minutes(1)),
            providers->config->get(ConfigManager::Configs::TELEGRAM_API_SERVER)
                .value_or("https://api.telegram.org")),
       _auth(auth),
@@ -606,6 +629,12 @@ TgBotApiImpl::TgBotApiImpl(const std::string_view token, AuthContext* auth,
       _provider(providers),
       _rateLimiter(2, std::chrono::seconds(3)),
       _refLock(refLock) {
+    // Set custom logger to route tgbot-cpp logs.
+    TgBot::setLogger(std::make_shared<ABsllogSink>());
+
+    // Disable link preview by default, as it's rarely used and can cause issues
+    // with some messages. It can be enabled in specific messages by passing
+    // LinkPreviewOptions with isDisabled=false.
     globalLinkOptions = std::make_shared<TgBot::LinkPreviewOptions>();
     globalLinkOptions->isDisabled = true;
     // Register -> onUnknownCommand
