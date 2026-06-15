@@ -27,3 +27,6 @@ CMakeSettings.json
 # Visual studio
 out/
 /vcpkg_installed
+
+# Leftover llama.cpp clone (local LLM path was dropped)
+src/command_modules/llm/llama.cpp/

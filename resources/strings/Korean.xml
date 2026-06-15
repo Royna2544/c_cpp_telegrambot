@@ -117,6 +117,9 @@
     <string name="llm_not_configured">LLM 기능이 설정되어 있지 않습니다. 먼저 LLM 설정을 완료해 주세요.</string>
     <string name="llm_local_not_enabled">오류: 이 빌드에서는 로컬 LLM 지원이 활성화되어 있지 않습니다.</string>
     <string name="llm_unsupported_type">오류: 지원되지 않는 LLM 설정 유형입니다.</string>
+    <string name="llm_models_available">Available models:&#10;{}</string>
+    <string name="llm_model_set">Model set to: {}</string>
+    <string name="llm_model_not_found">Model not found: {}</string>
 
     <!-- command module strings -->
     <string name="db_add_to_whitelist">화이트리스트에 추가</string>

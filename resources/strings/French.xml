@@ -117,6 +117,9 @@
     <string name="llm_not_configured">La fonctionnalité LLM n'est pas configurée. Veuillez d'abord configurer le LLM.</string>
     <string name="llm_local_not_enabled">Erreur : la prise en charge du LLM local n'est pas activée dans cette compilation.</string>
     <string name="llm_unsupported_type">Erreur : type de configuration LLM non pris en charge.</string>
+    <string name="llm_models_available">Available models:&#10;{}</string>
+    <string name="llm_model_set">Model set to: {}</string>
+    <string name="llm_model_not_found">Model not found: {}</string>
 
     <!-- command module strings -->
     <string name="db_add_to_whitelist">Ajouter à la liste blanche</string>

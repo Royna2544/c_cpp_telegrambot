@@ -103,6 +103,9 @@
     x(LLM_NOT_CONFIGURED)                                                      \
     x(LLM_LOCAL_NOT_ENABLED)                                                   \
     x(LLM_UNSUPPORTED_TYPE)                                                    \
+    x(LLM_MODELS_AVAILABLE)                                                    \
+    x(LLM_MODEL_SET)                                                           \
+    x(LLM_MODEL_NOT_FOUND)                                                     \
     x(DB_ADD_TO_WHITELIST)                                                     \
     x(DB_REMOVE_FROM_WHITELIST)                                                \
     x(DB_ADD_TO_BLACKLIST)                                                     \

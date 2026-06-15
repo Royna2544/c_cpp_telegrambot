@@ -117,6 +117,9 @@
     <string name="llm_not_configured">Функция LLM не настроена. Сначала настройте конфигурацию LLM.</string>
     <string name="llm_local_not_enabled">Ошибка: поддержка локальной LLM не включена в этой сборке.</string>
     <string name="llm_unsupported_type">Ошибка: неподдерживаемый тип конфигурации LLM.</string>
+    <string name="llm_models_available">Available models:&#10;{}</string>
+    <string name="llm_model_set">Model set to: {}</string>
+    <string name="llm_model_not_found">Model not found: {}</string>
 
     <!-- command module strings -->
     <string name="db_add_to_whitelist">Добавить в белый список</string>
