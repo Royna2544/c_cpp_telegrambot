@@ -130,7 +130,20 @@ void binds(TgBotApi::Ptr api, MessageExt* message,
 bool LuaCommandModule::load() {
     _context->lua.open_libraries(sol::lib::base, sol::lib::string,
                                  sol::lib::os);
-    sol::state lua;
+
+    // Harden the sandbox before any (untrusted) module script runs. The os and
+    // base libraries otherwise expose process/filesystem control that lets a
+    // script escape into the host (os.execute, file removal, dynamic code
+    // loading). Keep the benign time helpers (os.time/os.date) used by modules.
+    if (sol::table os_tbl = _context->lua["os"]; os_tbl.valid()) {
+        for (const auto* fn : {"execute", "remove", "rename", "exit",
+                               "tmpname", "getenv", "setlocale"}) {
+            os_tbl[fn] = sol::lua_nil;
+        }
+    }
+    for (const auto* fn : {"dofile", "loadfile", "load", "loadstring"}) {
+        _context->lua[fn] = sol::lua_nil;
+    }
 
     DLOG(INFO) << "Load file: " << _context->filePath.filename();
     // Load script file
